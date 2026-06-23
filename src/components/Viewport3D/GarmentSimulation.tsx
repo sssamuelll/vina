@@ -340,6 +340,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const foldInternals = piece?.internals?.filter(l => l.type === 'fold' && l.foldOptions);
       return { ...pm, vertices: transformed, stiffnessMultiplier, pressurePa, internals: foldInternals };
     });
+    // armAxis dep is load-bearing: when AvatarModel publishes posed arm dirs (async), this rebuilds → the solver re-seeds in A-pose. Removing it strands sleeves in T-pose (#924 A-pose).
   }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis]);
 
   // ─── Simulation lifecycle (solver cascade + collision) ──────────────────────

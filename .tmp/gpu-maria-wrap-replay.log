@@ -1,0 +1,30 @@
+
+> openclo@0.11.0 test:e2e:gpu
+> playwright test --config playwright.webgpu.config.ts webgpu-maria-replay -g drape M4 --repeat-each=3
+
+
+Running 3 tests using 1 worker
+
+[drape-m4] simSeconds=2.5 belowHipPct=0.00 minY=0.815 maxY=1.575 nan=0
+[creep-watch] simSeconds=10 belowHipPct=1.03 minY=0.000 maxY=1.575 nan=0 (issue #902 — non-deterministic, log-only)
+[wrap-spec-§8] t=0 penetrationCount=not-published (target=0)
+[wrap-spec-§8] t=0.5s belowHipPct=1.03 minY=0.000 (target: belowHip≤0.5%)
+[wrap-spec-§8] t=1s belowHipPct=1.03 minY=0.000 (target: minY≥0.5m)
+[wrap-spec-§8] collarHeight=not-published sleeveOnArm=not-published
+  ok 1 [chromium] › tests\e2e\webgpu-maria-replay.spec.ts:157:3 › WebGPU María replay @gpu-local — DoD #897 (F4) › drape M4 en tier webgpu (31.2s)
+[drape-m4] simSeconds=2.5 belowHipPct=0.00 minY=0.815 maxY=1.575 nan=0
+[creep-watch] simSeconds=10 belowHipPct=0.85 minY=0.000 maxY=1.575 nan=0 (issue #902 — non-deterministic, log-only)
+[wrap-spec-§8] t=0 penetrationCount=not-published (target=0)
+[wrap-spec-§8] t=0.5s belowHipPct=0.85 minY=0.000 (target: belowHip≤0.5%)
+[wrap-spec-§8] t=1s belowHipPct=0.85 minY=0.000 (target: minY≥0.5m)
+[wrap-spec-§8] collarHeight=not-published sleeveOnArm=not-published
+  ok 2 [chromium] › tests\e2e\webgpu-maria-replay.spec.ts:157:3 › WebGPU María replay @gpu-local — DoD #897 (F4) › drape M4 en tier webgpu (26.0s)
+[drape-m4] simSeconds=2.5 belowHipPct=0.00 minY=0.815 maxY=1.575 nan=0
+[creep-watch] simSeconds=10 belowHipPct=1.35 minY=0.000 maxY=1.575 nan=0 (issue #902 — non-deterministic, log-only)
+[wrap-spec-§8] t=0 penetrationCount=not-published (target=0)
+[wrap-spec-§8] t=0.5s belowHipPct=1.35 minY=0.000 (target: belowHip≤0.5%)
+[wrap-spec-§8] t=1s belowHipPct=1.35 minY=0.000 (target: minY≥0.5m)
+[wrap-spec-§8] collarHeight=not-published sleeveOnArm=not-published
+  ok 3 [chromium] › tests\e2e\webgpu-maria-replay.spec.ts:157:3 › WebGPU María replay @gpu-local — DoD #897 (F4) › drape M4 en tier webgpu (30.6s)
+
+  3 passed (1.6m)

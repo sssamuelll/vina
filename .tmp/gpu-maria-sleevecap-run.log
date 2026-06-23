@@ -1,0 +1,13 @@
+
+> openclo@0.11.0 test:e2e:gpu
+> playwright test --config playwright.webgpu.config.ts webgpu-maria-replay -g drape M4
+
+
+Running 1 test using 1 worker
+
+BROWSER [anchor-validate] pieces=4 totalVerts=332 edgeNames=sideSeam,sideSeam-2,shoulder,shoulder-2,neckline,collarNeckEdge,armhole,sleeveCap,collarNeckEdge-2,armhole-2
+[drape-m4] simSeconds=2.5 belowHipPct=0.00 minY=0.816 maxY=1.617 nan=0
+[creep-watch] simSeconds=10 belowHipPct=0.01 minY=0.000 maxY=1.617 nan=0 (issue #902 — non-deterministic, log-only)
+  ok 1 [chromium] › tests\e2e\webgpu-maria-replay.spec.ts:157:3 › WebGPU María replay @gpu-local — DoD #897 (F4) › drape M4 en tier webgpu (33.3s)
+
+  1 passed (36.6s)

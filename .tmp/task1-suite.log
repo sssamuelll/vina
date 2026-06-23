@@ -1,0 +1,1663 @@
+
+> openclo@0.11.0 test
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mD:/Desktop/projects/openclo[39m
+
+ [32m✓[39m src/copilot/action/skills/__tests__/skillRegistry.unified.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 396[2mms[22m[39m
+       [33m[2m✓[22m[39m returns singleton instance [33m 341[2mms[22m[39m
+ [32m✓[39m src/copilot/action/tools/definitions/__tests__/fabricTools.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 521[2mms[22m[39m
+     [33m[2m✓[22m[39m assigns fabric to piece and provides rollback [33m 517[2mms[22m[39m
+ [32m✓[39m src/copilot/action/tools/definitions/__tests__/cornerTypeTools.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 592[2mms[22m[39m
+     [33m[2m✓[22m[39m valid vertex → success, cornerTypes updated [33m 587[2mms[22m[39m
+ [32m✓[39m src/copilot/action/tools/definitions/__tests__/referenceImageTools.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 566[2mms[22m[39m
+     [33m[2m✓[22m[39m setReferenceImageOpacity with valid id → success [33m 515[2mms[22m[39m
+ [32m✓[39m src/copilot/action/tools/definitions/__tests__/createPieceBornNet.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 717[2mms[22m[39m
+     [33m[2m✓[22m[39m createPiece without seamAllowance param → piece lands with SA 0 [33m 645[2mms[22m[39m
+ [32m✓[39m src/copilot/actions/__tests__/importDxfExecutor.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1024[2mms[22m[39m
+     [33m[2m✓[22m[39m parses DXF content and produces pattern pieces [33m 303[2mms[22m[39m
+     [33m[2m✓[22m[39m does not generate seams or load diagnostics when opening a multi-piece DXF [33m 719[2mms[22m[39m
+ [32m✓[39m src/utils/mesh/__tests__/cdtMesher.test.ts [2m([22m[2m32 tests[22m[2m)[22m[33m 338[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/xpbdSolver.test.ts [2m([22m[2m39 tests[22m[2m)[22m[33m 1019[2mms[22m[39m
+     [33m[2m✓[22m[39m pushes particle inside body outward when collisionMesh is set [33m 858[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/mariaShirt.m0.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 424[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/projectSchema.test.ts [2m([22m[2m65 tests[22m[2m)[22m[32m 216[2mms[22m[39m
+ [32m✓[39m src/copilot/action/tools/definitions/__tests__/edgeTools.classify.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 164[2mms[22m[39m
+[90mstdout[2m | src/copilot/__tests__/errorRecovery.test.ts[2m > [22m[2mFallback Provider[2m > [22m[2mshould strip legacy API keys from localStorage on migration
+[22m[39m[Security] Migrated legacy API key from localStorage to SecureStorage
+
+[90mstdout[2m | src/copilot/__tests__/errorRecovery.test.ts[2m > [22m[2mFallback Provider[2m > [22m[2mshould migrate legacy API key to SecureStorage for current session
+[22m[39m[Security] Migrated legacy API key from localStorage to SecureStorage
+
+[90mstderr[2m | src/copilot/__tests__/errorRecovery.test.ts[2m > [22m[2mFallback Provider[2m > [22m[2mshould not crash on corrupted JSON during migration
+[22m[39m[Security] Failed to parse legacy fallback config, removing entire key: SyntaxError: Unexpected token 'o', "not-json{" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at clearLegacyFallbackKeys (D:/Desktop/projects/openclo/src/copilot/errorRecovery.ts:326:19)
+    at D:/Desktop/projects/openclo/src/copilot/__tests__/errorRecovery.test.ts:704:18
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+
+[90mstderr[2m | src/copilot/__tests__/errorRecovery.test.ts[2m > [22m[2mRecoveryStrategy[2m > [22m[2mshould wrap operations with withRecovery
+[22m[39m[RecoveryStrategy] Operation failed: Error: Network timeout
+    at D:/Desktop/projects/openclo/src/copilot/__tests__/errorRecovery.test.ts:869:30
+    at RecoveryStrategy.withRecovery (D:/Desktop/projects/openclo/src/copilot/errorRecovery.ts:587:20)
+    at D:/Desktop/projects/openclo/src/copilot/__tests__/errorRecovery.test.ts:867:35
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+
+[90mstderr[2m | src/copilot/__tests__/errorRecovery.test.ts[2m > [22m[2mRecoveryStrategy[2m > [22m[2mshould throw after failed recovery in withRecovery
+[22m[39m[RecoveryStrategy] Operation failed: Error: 401 Unauthorized
+    at D:/Desktop/projects/openclo/src/copilot/__tests__/errorRecovery.test.ts:882:15
+    at RecoveryStrategy.withRecovery (D:/Desktop/projects/openclo/src/copilot/errorRecovery.ts:587:20)
+    at D:/Desktop/projects/openclo/src/copilot/__tests__/errorRecovery.test.ts:881:16
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+
+ [32m✓[39m src/copilot/__tests__/errorRecovery.test.ts [2m([22m[2m105 tests[22m[2m)[22m[32m 211[2mms[22m[39m
+ [32m✓[39m src/components/ImportDXFDialog/__tests__/DetectedFormatBanner.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 350[2mms[22m[39m
+ [32m✓[39m src/copilot/action/tools/definitions/__tests__/renderTools.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 162[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/NotchPrecisionModal.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 675[2mms[22m[39m
+ [32m✓[39m src/components/shell/__tests__/DockAutoZone.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 650[2mms[22m[39m
+ [32m✓[39m eslint-rules/tests/require-use-disposable.test.js [2m([22m[2m1 test[22m[2m)[22m[32m 149[2mms[22m[39m
+ [32m✓[39m src/components/Viewport3D/__tests__/SurfaceModePill.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 892[2mms[22m[39m
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 1 (BP-1): el init del tier WASM recibe seamInitData
+[22m[39m[SimLifecycle] 🟠 Using Wasm XPBD solver
+
+ [32m✓[39m src/workers/__tests__/workerPool.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 203[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/gpuBuffers.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 121[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/EmptyState2D.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 745[2mms[22m[39m
+     [33m[2m✓[22m[39m renders the heading and all four affordances [33m 345[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/marketplace.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 129[2mms[22m[39m
+ [32m✓[39m src/components/PropertiesPanel/__tests__/NotchPropertiesSection.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 689[2mms[22m[39m
+     [33m[2m✓[22m[39m shows the mirror control with the two-position sense toggle [33m 319[2mms[22m[39m
+[90mstderr[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4: seam que resuelve a 0 constraints → toast de error + inspector + summary del overlay
+[22m[39m[SimLifecycle] Seams resolved to 0 constraints (will not sew): [ { seamId: [32m'seam-1'[39m, constraintCount: [33m0[39m, failure: [32m'unknown-edge'[39m } ]
+
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4: seam que resuelve a 0 constraints → toast de error + inspector + summary del overlay
+[22m[39m[SimLifecycle] 🟠 Using Wasm XPBD solver
+
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mF4 (#897): opt-in + seams → GPU tier intentado con seamPairs (capability flip)
+[22m[39m[SimLifecycle] 🟢 Using WebGPU TSL solver (zero-copy)
+
+ [32m✓[39m src/copilot/perception/__tests__/recentActionsTracker.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 119[2mms[22m[39m
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mF-default-on (#897): key SIN setear + seams → GPU tier por defecto (opt-out)
+[22m[39m[SimLifecycle] 🟢 Using WebGPU TSL solver (zero-copy)
+
+ [32m✓[39m src/components/shell/__tests__/DockToolPicker.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1428[2mms[22m[39m
+     [33m[2m✓[22m[39m an unselected tool is labeled Add and calls onAdd [33m 503[2mms[22m[39m
+     [33m[2m✓[22m[39m a selected tool is labeled Remove and calls onRemove [33m 306[2mms[22m[39m
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mF-default-on (#897): escape hatch — key en 'false' → GPU NO se intenta (cae a WASM)
+[22m[39m[SimLifecycle] 🟠 Using Wasm XPBD solver
+
+[90mstderr[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4 (control): WebGPU opt-in SIN seams → el gate no dispara toast
+[22m[39m[SimLifecycle] TSL solver failed, falling through to WASM: TypeError: Cannot read properties of undefined (reading 'requestAdapter')
+    at startSim (D:/Desktop/projects/openclo/src/components/Viewport3D/useSimulationLifecycle.ts:475:51)
+    at D:/Desktop/projects/openclo/src/components/Viewport3D/useSimulationLifecycle.ts:645:7
+    at commitHookEffectListMount [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:23189:26[90m)[39m
+    at commitPassiveMountOnFiber [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:24970:11[90m)[39m
+    at commitPassiveMountEffects_complete [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:24930:9[90m)[39m
+    at commitPassiveMountEffects_begin [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:24917:7[90m)[39m
+    at commitPassiveMountEffects [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:24905:3[90m)[39m
+    at flushPassiveEffectsImpl [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:27078:3[90m)[39m
+    at flushPassiveEffects [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:27023:14[90m)[39m
+    at [90mD:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:26808:9
+
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4 (control): WebGPU opt-in SIN seams → el gate no dispara toast
+[22m[39m[SimLifecycle] 🟠 Using Wasm XPBD solver
+
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.deviceLoss.test.tsx[2m > [22m[2museSimulationLifecycle — auto-cascada en pérdida de device GPU (#901)[2m > [22m[2mpérdida de device del renderer → auto-cascada GPU→WASM sin restart manual
+[22m[39m[SimLifecycle] 🟢 Using WebGPU TSL solver (zero-copy)
+
+[90mstderr[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4: seams solo inactivos (active:false) no activan el gate
+[22m[39m[SimLifecycle] TSL solver failed, falling through to WASM: TypeError: Cannot read properties of undefined (reading 'requestAdapter')
+    at startSim (D:/Desktop/projects/openclo/src/components/Viewport3D/useSimulationLifecycle.ts:475:51)
+    at D:/Desktop/projects/openclo/src/components/Viewport3D/useSimulationLifecycle.ts:645:7
+    at commitHookEffectListMount [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:23189:26[90m)[39m
+    at commitPassiveMountOnFiber [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:24970:11[90m)[39m
+    at commitPassiveMountEffects_complete [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:24930:9[90m)[39m
+    at commitPassiveMountEffects_begin [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:24917:7[90m)[39m
+    at commitPassiveMountEffects [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:24905:3[90m)[39m
+    at flushPassiveEffectsImpl [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:27078:3[90m)[39m
+    at flushPassiveEffects [90m(D:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:27023:14[90m)[39m
+    at [90mD:\Desktop\projects\openclo\[39mnode_modules\[4mreact-dom[24m\cjs\react-dom.development.js:26808:9
+
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4: seams solo inactivos (active:false) no activan el gate
+[22m[39m[SimLifecycle] 🟠 Using Wasm XPBD solver
+
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.deviceLoss.test.tsx[2m > [22m[2museSimulationLifecycle — auto-cascada en pérdida de device GPU (#901)[2m > [22m[2mpérdida de device del renderer → auto-cascada GPU→WASM sin restart manual
+[22m[39m[SimLifecycle] 🟠 Using Wasm XPBD solver
+
+ [32m✓[39m src/components/Viewport3D/__tests__/FitMapToggle.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 383[2mms[22m[39m
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4: todos los tiers con seams fallan → Neural NO arranca, toast de error, tier none
+[22m[39m[SimLifecycle] 🟡 Using CPU solver (Web Worker fallback)
+
+[90mstderr[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4: todos los tiers con seams fallan → Neural NO arranca, toast de error, tier none
+[22m[39m[SimLifecycle] Wasm solver not available
+
+[90mstderr[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4: todos los tiers con seams fallan → Neural NO arranca, toast de error, tier none
+[22m[39m[SimLifecycle] CPU worker failed, falling back to Neural Drape: Error: no workers in test
+    at D:/Desktop/projects/openclo/src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx:409:47
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mvitest[24m/dist/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+    at runTest [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1653:12[90m)[39m
+[SimLifecycle] All seam-capable tiers failed and Neural Drape cannot sew — simulation not started
+
+ [32m✓[39m src/components/PropertiesPanel/__tests__/EdgeVertexProperties.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 730[2mms[22m[39m
+ [32m✓[39m src/components/shell/__tests__/ContextPanel.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 314[2mms[22m[39m
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.deviceLoss.test.tsx[2m > [22m[2museSimulationLifecycle — auto-cascada en pérdida de device GPU (#901)[2m > [22m[2mhandleGpuDeviceLost es idempotente — avisos repetidos del device muerto no re-cascadean
+[22m[39m[SimLifecycle] 🟢 Using WebGPU TSL solver (zero-copy)
+
+ [32m✓[39m src/copilot/action/tools/definitions/__tests__/sewingEnhancementTools.direction.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 232[2mms[22m[39m
+ [32m✓[39m src/utils/export/__tests__/exportUtils.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 165[2mms[22m[39m
+[90mstdout[2m | src/utils/cloth/neural/__tests__/neuralDrape.test.ts[2m > [22m[2mNeuralDrapeClient[2m > [22m[2minitializes with merged piece data
+[22m[39m[NeuralDrape] Initialized: { particles: [33m6[39m, mode: [32m'analytical'[39m, model: [32m'none'[39m }
+
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4 (control): todos los tiers fallan SIN seams → Neural sí arranca como último recurso
+[22m[39m[SimLifecycle] 🟡 Using CPU solver (Web Worker fallback)
+
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.deviceLoss.test.tsx[2m > [22m[2museSimulationLifecycle — auto-cascada en pérdida de device GPU (#901)[2m > [22m[2mhandleGpuDeviceLost es idempotente — avisos repetidos del device muerto no re-cascadean
+[22m[39m[SimLifecycle] 🟠 Using Wasm XPBD solver
+
+[90mstdout[2m | src/utils/cloth/neural/__tests__/neuralDrape.test.ts[2m > [22m[2mNeuralDrapeClient[2m > [22m[2manalytical drape produces positions that move downward over time
+[22m[39m[NeuralDrape] Initialized: { particles: [33m3[39m, mode: [32m'analytical'[39m, model: [32m'none'[39m }
+
+[90mstderr[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4 (control): todos los tiers fallan SIN seams → Neural sí arranca como último recurso
+[22m[39m[SimLifecycle] Wasm solver not available
+
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4 (control): todos los tiers fallan SIN seams → Neural sí arranca como último recurso
+[22m[39m[SimLifecycle] 🔵 Using Neural Drape (analytical preview)
+
+[90mstderr[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx[2m > [22m[2museSimulationLifecycle — tier WASM (cascade por defecto)[2m > [22m[2mFASE 4 (control): todos los tiers fallan SIN seams → Neural sí arranca como último recurso
+[22m[39m[SimLifecycle] CPU worker failed, falling back to Neural Drape: Error: no workers in test
+    at D:/Desktop/projects/openclo/src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx:426:47
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mvitest[24m/dist/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+    at runTest [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1653:12[90m)[39m
+
+ [32m✓[39m src/copilot/action/tools/definitions/__tests__/slashAndSpreadTool.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 137[2mms[22m[39m
+ [32m✓[39m src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 590[2mms[22m[39m
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.deviceLoss.test.tsx[2m > [22m[2museSimulationLifecycle — auto-cascada en pérdida de device GPU (#901)[2m > [22m[2mgpuInitiallyDowngraded=true → salta GPU directo a WASM (supervivencia al remount tras device loss)
+[22m[39m[SimLifecycle] 🟠 Using Wasm XPBD solver
+
+[90mstdout[2m | src/utils/cloth/neural/__tests__/neuralDrape.test.ts[2m > [22m[2mNeuralDrapeClient[2m > [22m[2mstart/stop lifecycle works
+[22m[39m[NeuralDrape] Initialized: { particles: [33m1[39m, mode: [32m'analytical'[39m, model: [32m'none'[39m }
+
+[90mstdout[2m | src/utils/cloth/neural/__tests__/neuralDrape.test.ts[2m > [22m[2mNeuralDrapeClient[2m > [22m[2mdispose cleans up
+[22m[39m[NeuralDrape] Initialized: { particles: [33m1[39m, mode: [32m'analytical'[39m, model: [32m'none'[39m }
+
+ [32m✓[39m src/utils/cloth/neural/__tests__/neuralDrape.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 108[2mms[22m[39m
+ [32m✓[39m src/components/Viewport3D/__tests__/useSimulationLifecycle.deviceLoss.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 311[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/seamIntegration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 93[2mms[22m[39m
+ [32m✓[39m src/copilot/connections/__tests__/storage.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 85[2mms[22m[39m
+ [32m✓[39m src/components/shell/__tests__/RightDock.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 1158[2mms[22m[39m
+     [33m[2m✓[22m[39m Sew activates the 3D sewing tool and toggles back (reachability guard) [33m 477[2mms[22m[39m
+[90mstderr[2m | src/components/shell/__tests__/LogoMenu.test.tsx[2m > [22m[2mLogoMenu ▸ View — 2D display toggles[2m > [22m[2mtoggles Reference Images and reflects checked state
+[22m[39mSelector unknown returned the root state when called. This can lead to unnecessary rerenders.
+Selectors that return the entire state are almost certainly a mistake, as they will cause a rerender whenever *anything* in state changes. {
+  stack: [32m'Error: \n'[39m +
+    [32m'    at file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:1019:25\n'[39m +
+    [32m'    at memoizedSelector (D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:46:30)\n'[39m +
+    [32m'    at D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:70:22\n'[39m +
+    [32m'    at mountSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:15980:20)\n'[39m +
+    [32m'    at Object.useSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:16908:14)\n'[39m +
+    [32m'    at useSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react\\cjs\\react.development.js:1676:21)\n'[39m +
+    [32m'    at process.env.NODE_ENV.exports.useSyncExternalStoreWithSelector (D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:81:19)\n'[39m +
+    [32m'    at useSelector2 (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:1037:27)\n'[39m +
+    [32m'    at LogoMenu (D:/Desktop/projects/openclo/src/components/shell/LogoMenu.tsx:166:17)\n'[39m +
+    [32m'    at renderWithHooks (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:15486:18)'[39m
+}
+
+ [32m✓[39m src/copilot/preferences/__tests__/userPreferences.test.ts [2m([22m[2m64 tests[22m[2m)[22m[32m 86[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/cpuWasmParity.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 115[2mms[22m[39m
+ [32m✓[39m src/utils/import/__tests__/meshImporter.test.ts [2m([22m[2m34 tests[22m[2m)[22m[32m 87[2mms[22m[39m
+ [32m✓[39m src/copilot/action/skills/__tests__/integration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 129[2mms[22m[39m
+ [32m✓[39m src/components/Viewport3D/__tests__/SimulationStatusOverlay.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 156[2mms[22m[39m
+[90mstderr[2m | src/components/shell/__tests__/LogoMenu.test.tsx[2m > [22m[2mLogoMenu ▸ View — 2D display toggles[2m > [22m[2mtoggles Line Lengths
+[22m[39mSelector unknown returned the root state when called. This can lead to unnecessary rerenders.
+Selectors that return the entire state are almost certainly a mistake, as they will cause a rerender whenever *anything* in state changes. {
+  stack: [32m'Error: \n'[39m +
+    [32m'    at file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:1019:25\n'[39m +
+    [32m'    at memoizedSelector (D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:46:30)\n'[39m +
+    [32m'    at D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:70:22\n'[39m +
+    [32m'    at mountSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:15980:20)\n'[39m +
+    [32m'    at Object.useSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:16908:14)\n'[39m +
+    [32m'    at useSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react\\cjs\\react.development.js:1676:21)\n'[39m +
+    [32m'    at process.env.NODE_ENV.exports.useSyncExternalStoreWithSelector (D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:81:19)\n'[39m +
+    [32m'    at useSelector2 (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:1037:27)\n'[39m +
+    [32m'    at LogoMenu (D:/Desktop/projects/openclo/src/components/shell/LogoMenu.tsx:166:17)\n'[39m +
+    [32m'    at renderWithHooks (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:15486:18)'[39m
+}
+
+ [32m✓[39m src/utils/__tests__/patternOps.test.ts [2m([22m[2m64 tests[22m[2m)[22m[32m 68[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/bvh.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+[90mstderr[2m | src/components/shell/__tests__/LogoMenu.test.tsx[2m > [22m[2mLogoMenu ▸ View — 2D display toggles[2m > [22m[2mRender trio is a radio group: selecting Wireframe unchecks Textured
+[22m[39mSelector unknown returned the root state when called. This can lead to unnecessary rerenders.
+Selectors that return the entire state are almost certainly a mistake, as they will cause a rerender whenever *anything* in state changes. {
+  stack: [32m'Error: \n'[39m +
+    [32m'    at file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:1019:25\n'[39m +
+    [32m'    at memoizedSelector (D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:46:30)\n'[39m +
+    [32m'    at D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:70:22\n'[39m +
+    [32m'    at mountSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:15980:20)\n'[39m +
+    [32m'    at Object.useSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:16908:14)\n'[39m +
+    [32m'    at useSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react\\cjs\\react.development.js:1676:21)\n'[39m +
+    [32m'    at process.env.NODE_ENV.exports.useSyncExternalStoreWithSelector (D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:81:19)\n'[39m +
+    [32m'    at useSelector2 (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:1037:27)\n'[39m +
+    [32m'    at LogoMenu (D:/Desktop/projects/openclo/src/components/shell/LogoMenu.tsx:166:17)\n'[39m +
+    [32m'    at renderWithHooks (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:15486:18)'[39m
+}
+
+ [32m✓[39m src/utils/cloth/gpu/__tests__/tslSolver.test.ts [2m([22m[2m55 tests[22m[2m)[22m[32m 92[2mms[22m[39m
+[90mstderr[2m | src/components/shell/__tests__/LogoMenu.test.tsx[2m > [22m[2mLogoMenu ▸ View — 3D display toggles[2m > [22m[2m3D: Garment toggles simulation.showGarment and reflects checked state
+[22m[39mSelector unknown returned the root state when called. This can lead to unnecessary rerenders.
+Selectors that return the entire state are almost certainly a mistake, as they will cause a rerender whenever *anything* in state changes. {
+  stack: [32m'Error: \n'[39m +
+    [32m'    at file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:1019:25\n'[39m +
+    [32m'    at memoizedSelector (D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:46:30)\n'[39m +
+    [32m'    at D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:70:22\n'[39m +
+    [32m'    at mountSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:15980:20)\n'[39m +
+    [32m'    at Object.useSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:16908:14)\n'[39m +
+    [32m'    at useSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react\\cjs\\react.development.js:1676:21)\n'[39m +
+    [32m'    at process.env.NODE_ENV.exports.useSyncExternalStoreWithSelector (D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:81:19)\n'[39m +
+    [32m'    at useSelector2 (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:1037:27)\n'[39m +
+    [32m'    at LogoMenu (D:/Desktop/projects/openclo/src/components/shell/LogoMenu.tsx:166:17)\n'[39m +
+    [32m'    at renderWithHooks (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:15486:18)'[39m
+}
+
+ [32m✓[39m src/__tests__/store.test.ts [2m([22m[2m44 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/reactiveSolverMiddleware.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 82[2mms[22m[39m
+[90mstderr[2m | src/components/shell/__tests__/LogoMenu.test.tsx[2m > [22m[2mLogoMenu ▸ View — 3D display toggles[2m > [22m[2m3D: Seamlines toggles simulation.showSeamlines3D and reflects checked state
+[22m[39mSelector unknown returned the root state when called. This can lead to unnecessary rerenders.
+Selectors that return the entire state are almost certainly a mistake, as they will cause a rerender whenever *anything* in state changes. {
+  stack: [32m'Error: \n'[39m +
+    [32m'    at file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:1019:25\n'[39m +
+    [32m'    at memoizedSelector (D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:46:30)\n'[39m +
+    [32m'    at D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:70:22\n'[39m +
+    [32m'    at mountSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:15980:20)\n'[39m +
+    [32m'    at Object.useSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:16908:14)\n'[39m +
+    [32m'    at useSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react\\cjs\\react.development.js:1676:21)\n'[39m +
+    [32m'    at process.env.NODE_ENV.exports.useSyncExternalStoreWithSelector (D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:81:19)\n'[39m +
+    [32m'    at useSelector2 (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:1037:27)\n'[39m +
+    [32m'    at LogoMenu (D:/Desktop/projects/openclo/src/components/shell/LogoMenu.tsx:166:17)\n'[39m +
+    [32m'    at renderWithHooks (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:15486:18)'[39m
+}
+
+[90mstderr[2m | src/components/shell/__tests__/LogoMenu.test.tsx[2m > [22m[2mLogoMenu ▸ View — 3D display toggles[2m > [22m[2m3D: Internal Lines toggles simulation.showInternalLines3D and reflects checked state
+[22m[39mSelector unknown returned the root state when called. This can lead to unnecessary rerenders.
+Selectors that return the entire state are almost certainly a mistake, as they will cause a rerender whenever *anything* in state changes. {
+  stack: [32m'Error: \n'[39m +
+    [32m'    at file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:1019:25\n'[39m +
+    [32m'    at memoizedSelector (D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:46:30)\n'[39m +
+    [32m'    at D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:70:22\n'[39m +
+    [32m'    at mountSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:15980:20)\n'[39m +
+    [32m'    at Object.useSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:16908:14)\n'[39m +
+    [32m'    at useSyncExternalStore (D:\\Desktop\\projects\\openclo\\node_modules\\react\\cjs\\react.development.js:1676:21)\n'[39m +
+    [32m'    at process.env.NODE_ENV.exports.useSyncExternalStoreWithSelector (D:\\Desktop\\projects\\openclo\\node_modules\\use-sync-external-store\\cjs\\use-sync-external-store-with-selector.development.js:81:19)\n'[39m +
+    [32m'    at useSelector2 (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:1037:27)\n'[39m +
+    [32m'    at LogoMenu (D:/Desktop/projects/openclo/src/components/shell/LogoMenu.tsx:166:17)\n'[39m +
+    [32m'    at renderWithHooks (D:\\Desktop\\projects\\openclo\\node_modules\\react-dom\\cjs\\react-dom.development.js:15486:18)'[39m
+}
+
+ [32m✓[39m src/components/shell/__tests__/LogoMenu.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 859[2mms[22m[39m
+     [33m[2m✓[22m[39m toggles Reference Images and reflects checked state [33m 320[2mms[22m[39m
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl[2m > [22m[2mpopulates tslBuffers and computes numParticles correctly (behavior #1)
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl[2m > [22m[2maggregates particle counts across multiple pieces
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m8[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m2[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl re-init disposal (behavior #4 — #771 regression)[2m > [22m[2mreleases the prior TslBufferSet via renderer._attributes.delete on re-init
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl re-init disposal (behavior #4 — #771 regression)[2m > [22m[2mreleases the prior TslBufferSet via renderer._attributes.delete on re-init
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m8[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m2[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mfreezePieces (behavior #5)[2m > [22m[2mzeros invMass entries for frozen pieces and bumps SBA version
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m8[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m2[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mfreezePieces (behavior #5)[2m > [22m[2mrestores frozen pieces when unfrozen (re-bumps version)
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m8[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m2[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2msetBrushParams (behavior #6)[2m > [22m[2mwrites center/radius/strength into brushNodes uniforms
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mgrab uniforms (behavior #7)[2m > [22m[2mgrabStart sets center/radius/strength + activates + flags init pending
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mgrab uniforms (behavior #7)[2m > [22m[2mgrabMove updates only the center, leaves activation untouched
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mgrab uniforms (behavior #7)[2m > [22m[2mgrabRelease clears grabActive only
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2msetTslCollisionBody dispose chain (behavior #8 — #772 regression)[2m > [22m[2mroutes the previous body scratch SBAs (bestDist + bestTriIdx) through renderer._attributes.delete on replace
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2msetTslCollisionBody dispose chain (behavior #8 — #772 regression)[2m > [22m[2mroutes the previous body scratch SBAs (bestDist + bestTriIdx) through renderer._attributes.delete on replace
+[22m[39m[GpuSolverClient] TSL collision body 'avatar': { bvhNodes: [33m1[39m, triangles: [33m1[39m, margin: [33m0.005[39m, friction: [33m0.3[39m }
+[GpuSolverClient] TSL collision body 'avatar': { bvhNodes: [33m1[39m, triangles: [33m1[39m, margin: [33m0.005[39m, friction: [33m0.3[39m }
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2msetTslCollisionBody dispose chain (behavior #8 — #772 regression)[2m > [22m[2mremoveTslCollisionBody also disposes scratch SBAs
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2msetTslCollisionBody dispose chain (behavior #8 — #772 regression)[2m > [22m[2mremoveTslCollisionBody also disposes scratch SBAs
+[22m[39m[GpuSolverClient] TSL collision body 'prop': { bvhNodes: [33m1[39m, triangles: [33m1[39m, margin: [33m0.005[39m, friction: [33m0.3[39m }
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2msetTslCollisionBody dispose chain (behavior #8 — #772 regression)[2m > [22m[2mtracks the skip SBA (escape pointers, #897 F4.3b) and disposes it on replace
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2msetTslCollisionBody dispose chain (behavior #8 — #772 regression)[2m > [22m[2mtracks the skip SBA (escape pointers, #897 F4.3b) and disposes it on replace
+[22m[39m[GpuSolverClient] TSL collision body 'avatar': { bvhNodes: [33m1[39m, triangles: [33m1[39m, margin: [33m0.005[39m, friction: [33m0.3[39m }
+[GpuSolverClient] TSL collision body 'avatar': { bvhNodes: [33m1[39m, triangles: [33m1[39m, margin: [33m0.005[39m, friction: [33m0.3[39m }
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2msetTslCollisionBody dispose chain (behavior #8 — #772 regression)[2m > [22m[2mremoveTslCollisionBody also disposes the skip SBA (#897 F4.3b)
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2msetTslCollisionBody dispose chain (behavior #8 — #772 regression)[2m > [22m[2mremoveTslCollisionBody also disposes the skip SBA (#897 F4.3b)
+[22m[39m[GpuSolverClient] TSL collision body 'prop': { bvhNodes: [33m1[39m, triangles: [33m1[39m, margin: [33m0.005[39m, friction: [33m0.3[39m }
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mreadPositionsToCPU TSL readback (behavior #9 — #759)[2m > [22m[2mreturns a fresh Float32Array sourced from renderer.getArrayBufferAsync (explicit renderer)
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mreadPositionsToCPU TSL readback (behavior #9 — #759)[2m > [22m[2mfalls back to the cached rendererRef when no renderer is passed
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mreadPositionsToCPU TSL readback (behavior #9 — #759)[2m > [22m[2mstrips W when the GPU buffer is padded to vec4
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mreadPositionsToCPU TSL readback (behavior #9 — #759)[2m > [22m[2mthrows when TSL is active and no renderer is available
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mreadPositionsToCPU TSL readback (behavior #9 — #759)[2m > [22m[2mdoes not emit console.warn on the happy path (stub regression)
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl with seamPairs (behavior #10 — Fase 4)[2m > [22m[2mpacks seam pairs into per-color seam SBAs applying per-piece GLOBAL vertex offsets
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m8[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m2[39m,
+  seamConstraints: [33m2[39m,
+  seamColors: [33m1[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl with seamPairs (behavior #10 — Fase 4)[2m > [22m[2mskips pairs referencing unknown pieces with a loud warn; no seam SBA when none survive
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m8[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m2[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl with seamPairs (behavior #10 — Fase 4)[2m > [22m[2myields empty seamColors when seamPairs is omitted or empty
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m8[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m2[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl seam closure packing (behavior #11 — #897 F1)[2m > [22m[2mseeds targetDist = world distance × tensionFactor and per-constraint compliance, colored
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m8[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m2[39m,
+  seamConstraints: [33m1[39m,
+  seamColors: [33m1[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl seam closure packing (behavior #11 — #897 F1)[2m > [22m[2msplits shared-vertex pairs into separate color groups
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m8[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m2[39m,
+  seamConstraints: [33m2[39m,
+  seamColors: [33m2[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl default seam decay config (behavior #12 — #897 F1.4)[2m > [22m[2mseeds seamShrinkFactor and seamSewedThreshold from DEFAULT_SEAM_CONFIG
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mavatar collision calibration M4-D (behavior #13 — #897 F2)[2m > [22m[2msetCollisionMesh routes __avatar__ with friction 0.4 and margin 0.008
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mavatar collision calibration M4-D (behavior #13 — #897 F2)[2m > [22m[2msetCollisionMesh routes __avatar__ with friction 0.4 and margin 0.008
+[22m[39m[GpuSolverClient] TSL collision body '__avatar__': { bvhNodes: [33m1[39m, triangles: [33m1[39m, margin: [33m0.008[39m, friction: [33m0.4[39m }
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mavatar collision calibration M4-D (behavior #13 — #897 F2)[2m > [22m[2mupdateCollisionMesh routes __avatar__ with friction 0.4 and margin 0.008
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2mavatar collision calibration M4-D (behavior #13 — #897 F2)[2m > [22m[2mupdateCollisionMesh routes __avatar__ with friction 0.4 and margin 0.008
+[22m[39m[GpuSolverClient] TSL collision body '__avatar__': { bvhNodes: [33m1[39m, triangles: [33m1[39m, margin: [33m0.008[39m, friction: [33m0.4[39m }
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl default damping (behavior #14 — #897 F2)[2m > [22m[2mseeds the damping uniform with 0.99 (raw), not 0.9603 (pre-multiplied)
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m4[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m1[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl self-collision allocation (behavior #15 — #897 F3.3)[2m > [22m[2mallocates scBuffers with real CSR adjacency and a nextPrime(2N) bucket table
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m8[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m2[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstdout[2m | src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts[2m > [22m[2minitMultiPieceTsl self-collision allocation (behavior #15 — #897 F3.3)[2m > [22m[2mpasses selfCollision: true + thickness to createTslSolver — selfCollisionNodes wired
+[22m[39m[GpuSolverClient] TSL solver initialized: {
+  particles: [33m8[39m,
+  stretchColors: [33m3[39m,
+  bendConstraints: [33m2[39m,
+  seamConstraints: [33m0[39m,
+  seamColors: [33m0[39m,
+  hasUvs: [33mtrue[39m,
+  fabric: [32m'defaults'[39m
+}
+
+[90mstderr[2m | src/copilot/reasoning/bridge/__tests__/AgenticLoop.test.ts[2m > [22m[2mAgenticLoop[2m > [22m[2mreturns text response when LLM responds without tool calls
+[22m[39m[KnowledgeStore] Failed to load index: [TypeError: Failed to parse URL from /knowledge/knowledge-index.json] {
+  [cause]: TypeError: Invalid URL
+  [90m    at new URL (node:internal/url:819:25)[39m
+  [90m    at new Request (node:internal/deps/undici/undici:11063:25)[39m
+  [90m    at fetch (node:internal/deps/undici/undici:11988:25)[39m
+  [90m    at fetch (node:internal/deps/undici/undici:16555:10)[39m
+  [90m    at fetch (node:internal/bootstrap/web/exposed-window-or-worker:83:12)[39m
+      at D:/Desktop/projects/openclo/src/copilot/knowledge/KnowledgeStore.ts:22:28
+      at KnowledgeStore.load (D:/Desktop/projects/openclo/src/copilot/knowledge/KnowledgeStore.ts:29:5)
+      at KnowledgeStore.searchByKeyword (D:/Desktop/projects/openclo/src/copilot/knowledge/KnowledgeStore.ts:63:16)
+      at KnowledgeStore.search (D:/Desktop/projects/openclo/src/copilot/knowledge/KnowledgeStore.ts:102:17)
+      at AgenticLoop.retrieveKnowledge (D:/Desktop/projects/openclo/src/copilot/reasoning/bridge/AgenticLoop.ts:496:26) {
+    code: [32m'ERR_INVALID_URL'[39m,
+    input: [32m'/knowledge/knowledge-index.json'[39m
+  }
+}
+
+ [32m✓[39m src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts [2m([22m[2m43 tests[22m[2m)[22m[32m 68[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/bridge/__tests__/AgenticLoop.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/wasm/__tests__/wasmSolverClient.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32m✓[39m src/components/ImportDXFDialog/__tests__/ImportDXFDialog.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 105[2mms[22m[39m
+ [32m✓[39m src/components/shell/__tests__/ToastContainer.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 118[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/usageRecordSchema.test.ts [2m([22m[2m46 tests[22m[2m)[22m[32m 58[2mms[22m[39m
+ [32m✓[39m src/copilot/plugins/sandbox/__tests__/PluginBridge.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 4091[2mms[22m[39m
+       [33m[2m✓[22m[39m denies fetch when rate limit is exceeded [33m 3131[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/seamAssembly.test.ts [2m([22m[2m37 tests[22m[2m)[22m[32m 55[2mms[22m[39m
+ [32m✓[39m src/utils/formats/__tests__/zprj.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m src/utils/import/__tests__/imageImporter.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32m✓[39m tests/unit/seamAssembly.test.ts [2m([22m[2m37 tests[22m[2m)[22m[32m 66[2mms[22m[39m
+[90mstderr[2m | src/copilot/reasoning/bridge/__tests__/AgenticLoop.e2e.test.ts[2m > [22m[2mAgenticLoop E2E[2m > [22m[2mfull flow: inspect → modify → verify → respond
+[22m[39m[KnowledgeStore] Failed to load index: [TypeError: Failed to parse URL from /knowledge/knowledge-index.json] {
+  [cause]: TypeError: Invalid URL
+  [90m    at new URL (node:internal/url:819:25)[39m
+  [90m    at new Request (node:internal/deps/undici/undici:11063:25)[39m
+  [90m    at fetch (node:internal/deps/undici/undici:11988:25)[39m
+  [90m    at fetch (node:internal/deps/undici/undici:16555:10)[39m
+  [90m    at fetch (node:internal/bootstrap/web/exposed-window-or-worker:83:12)[39m
+      at D:/Desktop/projects/openclo/src/copilot/knowledge/KnowledgeStore.ts:22:28
+      at KnowledgeStore.load (D:/Desktop/projects/openclo/src/copilot/knowledge/KnowledgeStore.ts:29:5)
+      at KnowledgeStore.searchByKeyword (D:/Desktop/projects/openclo/src/copilot/knowledge/KnowledgeStore.ts:63:16)
+      at KnowledgeStore.search (D:/Desktop/projects/openclo/src/copilot/knowledge/KnowledgeStore.ts:102:17)
+      at AgenticLoop.retrieveKnowledge (D:/Desktop/projects/openclo/src/copilot/reasoning/bridge/AgenticLoop.ts:496:26) {
+    code: [32m'ERR_INVALID_URL'[39m,
+    input: [32m'/knowledge/knowledge-index.json'[39m
+  }
+}
+
+ [32m✓[39m src/copilot/reasoning/bridge/__tests__/AgenticLoop.e2e.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32m✓[39m src/utils/formats/__tests__/gerber.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 58[2mms[22m[39m
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mpersistWorkflow[2m > [22m[2mdoes not throw when localStorage is unavailable
+[22m[39m[safeStorage] setItem failed for "openclo-workflow": Error: storage unavailable
+    at Object.<anonymous> (D:/Desktop/projects/openclo/src/store/__tests__/workflowSlice.test.ts:276:17)
+    at Object.Mock [as setItem] [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/spy[24m/dist/index.js:285:34[90m)[39m
+    at safeSetItem (D:/Desktop/projects/openclo/src/utils/safeStorage.ts:84:18)
+    at persistWorkflow (D:/Desktop/projects/openclo/src/store/workflowSlice.ts:99:3)
+    at D:/Desktop/projects/openclo/src/store/__tests__/workflowSlice.test.ts:280:20
+    at Proxy.assertThrows [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mchai[24m/index.js:2798:5[90m)[39m
+    at Proxy.methodWrapper [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mchai[24m/index.js:1700:25[90m)[39m
+    at Proxy.<anonymous> [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/expect[24m/dist/index.js:1149:12[90m)[39m
+    at Proxy.overwritingMethodWrapper [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mchai[24m/index.js:1750:33[90m)[39m
+    at Proxy.<anonymous> [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/expect[24m/dist/index.js:1485:16[90m)[39m
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow[2m > [22m[2mreturns null when version does not match
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'version'[39m,
+      code: [32m'invalid_value'[39m,
+      message: [32m'Invalid input: expected 1'[39m
+    },
+    {
+      path: [32m'data.dxfPreferredFormat'[39m,
+      code: [32m'invalid_value'[39m,
+      message: [32m'Invalid option: expected one of "aama"|"astm"|"gerber"|"lectra"|"standard"'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow[2m > [22m[2mreturns null when data field is missing
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data'[39m,
+      code: [32m'invalid_type'[39m,
+      message: [32m'Invalid input: expected object, received undefined'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects envelope when expertMode is missing
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.expertMode'[39m,
+      code: [32m'invalid_type'[39m,
+      message: [32m'Invalid input: expected boolean, received undefined'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects envelope when confirmOverrides is missing
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.confirmOverrides'[39m,
+      code: [32m'invalid_type'[39m,
+      message: [32m'Invalid input: expected record, received undefined'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects expertMode as string "true" (truthy hijack)
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.expertMode'[39m,
+      code: [32m'invalid_type'[39m,
+      message: [32m'Invalid input: expected boolean, received string'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects expertMode as number 1
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.expertMode'[39m,
+      code: [32m'invalid_type'[39m,
+      message: [32m'Invalid input: expected boolean, received number'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects confirmOverrides as array
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.confirmOverrides'[39m,
+      code: [32m'invalid_type'[39m,
+      message: [32m'Invalid input: expected record, received array'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects toolMemory as string
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.toolMemory'[39m,
+      code: [32m'invalid_type'[39m,
+      message: [32m'Invalid input: expected record, received string'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects Infinity in toolMemory leaf (via 1e500 JSON literal)
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.toolMemory.hem.depth'[39m,
+      code: [32m'invalid_union'[39m,
+      message: [32m'Invalid input'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects -Infinity in toolMemory leaf
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.toolMemory.hem.depth'[39m,
+      code: [32m'invalid_union'[39m,
+      message: [32m'Invalid input'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects empty string as toolMemory tool key
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.toolMemory.'[39m,
+      code: [32m'invalid_key'[39m,
+      message: [32m'Invalid key in record'[39m
+    }
+  ]
+}
+
+ [32m✓[39m src/utils/cloth/__tests__/stability.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects null byte in confirmOverrides operation key
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.confirmOverrides.remove\x00Piece'[39m,
+      code: [32m'invalid_key'[39m,
+      message: [32m'Invalid key in record'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects oversized toolMemory option key (> 80 chars)
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.toolMemory.hem.kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk'[39m,
+      code: [32m'invalid_key'[39m,
+      message: [32m'Invalid key in record'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects oversized string value in toolMemory leaf (> 1024 chars)
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.toolMemory.hem.fabric'[39m,
+      code: [32m'too_big'[39m,
+      message: [32m'must be <= 1024 chars'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects extra field at envelope level (strict)
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m''[39m,
+      code: [32m'unrecognized_keys'[39m,
+      message: [32m'Unrecognized key: "extraneous"'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects extra field at data level (strict)
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data'[39m,
+      code: [32m'unrecognized_keys'[39m,
+      message: [32m'Unrecognized key: "futureField"'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects raw null as envelope
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m''[39m,
+      code: [32m'invalid_type'[39m,
+      message: [32m'Invalid input: expected object, received null'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects array as envelope
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m''[39m,
+      code: [32m'invalid_type'[39m,
+      message: [32m'Invalid input: expected object, received array'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects empty object as envelope
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'version'[39m,
+      code: [32m'invalid_value'[39m,
+      message: [32m'Invalid input: expected 1'[39m
+    },
+    {
+      path: [32m'data'[39m,
+      code: [32m'invalid_type'[39m,
+      message: [32m'Invalid input: expected object, received undefined'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects envelope with null data field
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data'[39m,
+      code: [32m'invalid_type'[39m,
+      message: [32m'Invalid input: expected object, received null'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects confirmOverrides value "yes" (not in enum)
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.confirmOverrides.removePiece'[39m,
+      code: [32m'invalid_value'[39m,
+      message: [32m'Invalid option: expected one of "default"|"always"|"never"'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects dxfPreferredFormat = "DROP-TABLE" (not in FormatId enum)
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.dxfPreferredFormat'[39m,
+      code: [32m'invalid_value'[39m,
+      message: [32m'Invalid option: expected one of "aama"|"astm"|"gerber"|"lectra"|"standard"'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects nested object in toolMemory leaf
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.toolMemory.hem.complex'[39m,
+      code: [32m'invalid_union'[39m,
+      message: [32m'Invalid input'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects array in toolMemory leaf
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.toolMemory.hem.list'[39m,
+      code: [32m'invalid_union'[39m,
+      message: [32m'Invalid input'[39m
+    }
+  ]
+}
+
+[90mstderr[2m | src/store/__tests__/workflowSlice.test.ts[2m > [22m[2mworkflowSlice[2m > [22m[2mloadWorkflow schema hardening[2m > [22m[2mrejects toolMemory with too many tools (> 200)
+[22m[39m[workflowSlice] discarding corrupt envelope {
+  issues: [
+    {
+      path: [32m'data.toolMemory'[39m,
+      code: [32m'custom'[39m,
+      message: [32m'too many tools (> 200)'[39m
+    }
+  ]
+}
+
+ [32m✓[39m src/store/__tests__/workflowSlice.test.ts [2m([22m[2m56 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/linkedEditingMiddleware.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m src/components/shell/__tests__/ToolTooltip.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 107[2mms[22m[39m
+ [32m✓[39m src/components/PropertiesPanel/__tests__/PropertiesPanel.rehome.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 1368[2mms[22m[39m
+     [33m[2m✓[22m[39m SA preset buttons write piece.seamAllowance (French → 15mm) [33m 969[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/webgpuDebug.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 77[2mms[22m[39m
+ [32m✓[39m src/utils/autoSew/__tests__/orphanBridging.regression.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m src/utils/export/__tests__/cuttingLayout.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m src/utils/export/__tests__/exportContent.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/renderers/__tests__/LineLengthLabels.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 69[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/toolsE2E.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 90[2mms[22m[39m
+ [32m✓[39m src/copilot/action/tools/definitions/__tests__/internalTools.mirrorNotch.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mdrops profile with missing required field (no chest)
+[22m[39m[avatarLibrary] dropped profile at index 0: measurements.chest — Invalid input: expected number, received undefined
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mdrops profile with required field of wrong type (height as string)
+[22m[39m[avatarLibrary] dropped profile at index 0: measurements.height — Invalid input: expected number, received string
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mdrops profile with NaN measurement
+[22m[39m[avatarLibrary] dropped profile at index 0: measurements.height — Invalid input: expected number, received null
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mdrops profile with Infinity measurement (parsed via custom JSON)
+[22m[39m[avatarLibrary] dropped profile at index 0: measurements.height — must be within [5, 500] cm
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mrejects -0 leak: zero is below MIN_MEASUREMENT_CM and dropped
+[22m[39m[avatarLibrary] dropped profile at index 0: measurements.height — must be within [5, 500] cm
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mdrops profile with empty string id
+[22m[39m[avatarLibrary] dropped profile at index 0: id — Too small: expected string to have >=1 characters
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mdrops profile with name containing null byte over max length
+[22m[39m[avatarLibrary] dropped profile at index 0: name — Too big: expected string to have <=256 characters
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mforward-compat: unknown extra field with non-number is dropped (whole profile invalidated by catchall)
+[22m[39m[avatarLibrary] dropped profile at index 0: measurements.bicepsCirc — Invalid input: expected number, received string
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mrejects null, undefined, empty array, empty object as profiles
+[22m[39m[avatarLibrary] dropped profile at index 0: <root> — Invalid input: expected object, received null
+[avatarLibrary] dropped profile at index 0: id — Invalid input: expected string, received undefined
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mrejects semantically impossible: updatedAt before createdAt
+[22m[39m[avatarLibrary] dropped profile at index 0: <root> — updatedAt < createdAt
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mrejects semantically impossible: timestamp far in the future
+[22m[39m[avatarLibrary] dropped profile at index 0: createdAt — too far in the future
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mrejects timestamp predating year 2000
+[22m[39m[avatarLibrary] dropped profile at index 0: createdAt — too far in the past
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mrejects non-integer timestamp
+[22m[39m[avatarLibrary] dropped profile at index 0: createdAt — Invalid input: expected int, received number
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mparseProfilesJson[2m > [22m[2mkeeps valid profiles when one in the array is corrupt
+[22m[39m[avatarLibrary] dropped profile at index 1: measurements.height — Invalid input: expected number, received string
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mloadProfiles with corrupt storage[2m > [22m[2mfalls back to defaults when storage holds non-array
+[22m[39m[avatarLibrary] resetting profiles: root: expected array, got object
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mloadProfiles with corrupt storage[2m > [22m[2mfalls back to defaults when storage holds invalid JSON
+[22m[39m[avatarLibrary] resetting profiles: invalid JSON: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mloadProfiles with corrupt storage[2m > [22m[2mreturns only valid profiles when array is partially corrupt
+[22m[39m[avatarLibrary] dropped profile at index 1: measurements.height — Invalid input: expected number, received string
+[avatarLibrary] dropped 1 corrupt profile(s) from storage
+
+ [32m✓[39m src/copilot/__tests__/ollama.test.ts [2m([22m[2m47 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mloadProfiles with corrupt storage[2m > [22m[2mfalls back to defaults when every profile is corrupt
+[22m[39m[avatarLibrary] dropped profile at index 0: name — Invalid input: expected string, received undefined
+[avatarLibrary] dropped profile at index 1: <root> — Invalid input: expected object, received null
+[avatarLibrary] dropped 2 corrupt profile(s) from storage
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mloadProfiles telemetry[2m > [22m[2memits json_parse failure when storage holds malformed JSON
+[22m[39m[avatarLibrary] resetting profiles: invalid JSON: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mloadProfiles telemetry[2m > [22m[2memits schema_root failure when root is not an array
+[22m[39m[avatarLibrary] resetting profiles: root: expected array, got object
+
+[90mstderr[2m | src/utils/avatar/__tests__/avatarLibrary.test.ts[2m > [22m[2mloadProfiles telemetry[2m > [22m[2memits schema_record failure with kept/dropped counts when one profile is corrupt
+[22m[39m[avatarLibrary] dropped profile at index 1: measurements.height — Invalid input: expected number, received string
+[avatarLibrary] dropped 1 corrupt profile(s) from storage
+
+ [32m✓[39m src/utils/avatar/__tests__/avatarLibrary.test.ts [2m([22m[2m37 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/projectSlice.sewing.test.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m src/utils/export/__tests__/objSequenceExporter.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/groupTools.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+[90mstderr[2m | src/store/__tests__/projectSlice.layer.test.ts[2m > [22m[2mloadProject backfills layer metadata[2m > [22m[2mbackfills layerNames and layerLocked from older projects
+[22m[39m[projectValidator] OUTLINE_NO_M: Piece "p1" has an outline that is empty or does not start with M and was removed.
+
+[90mstderr[2m | src/store/__tests__/projectSlice.layer.test.ts[2m > [22m[2mloadProject backfills layer metadata[2m > [22m[2mpreserves layerNames and layerLocked when present
+[22m[39m[projectValidator] OUTLINE_NO_M: Piece "p1" has an outline that is empty or does not start with M and was removed.
+
+ [32m✓[39m src/store/__tests__/projectSlice.layer.test.ts [2m([22m[2m39 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/pluginLoader.edge.test.ts [2m([22m[2m49 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32m✓[39m src/__tests__/exportPDF.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m src/__tests__/dxfParser.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/prefixSum.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m src/components/shell/__tests__/DockShell.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m src/components/Viewport3D/__tests__/PanCrosshair.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+ [32m✓[39m src/utils/dxf/__tests__/exportAAMA.multisize.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/slashAndSpread.test.ts [2m([22m[2m55 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/seamAssemblyCurvedEdges.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/useNotchTool.toolOptions.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 64[2mms[22m[39m
+[90mstderr[2m | src/components/Viewport3D/__tests__/Mannequin.test.tsx[2m > [22m[2mMannequin (BUG-9 / #612 inline dispose pattern)[2m > [22m[2mdisposes a LatheGeometry when measurements change (deps mirror useMemo)
+[22m[39mWarning: <meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+    at meshStandardMaterial
+    at mesh
+    at group
+    at Mannequin (D:/Desktop/projects/openclo/src/components/Viewport3D/Mannequin.tsx:66:61)
+    at Provider (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:875:11)
+Warning: The tag <meshStandardMaterial> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+    at meshStandardMaterial
+    at mesh
+    at group
+    at Mannequin (D:/Desktop/projects/openclo/src/components/Viewport3D/Mannequin.tsx:66:61)
+    at Provider (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:875:11)
+Warning: The tag <mesh> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+    at mesh
+    at group
+    at Mannequin (D:/Desktop/projects/openclo/src/components/Viewport3D/Mannequin.tsx:66:61)
+    at Provider (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:875:11)
+Warning: <meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+    at meshStandardMaterial
+    at mesh
+    at group
+    at Mannequin (D:/Desktop/projects/openclo/src/components/Viewport3D/Mannequin.tsx:66:61)
+    at Provider (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:875:11)
+Warning: <sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+    at sphereGeometry
+    at mesh
+    at group
+    at Mannequin (D:/Desktop/projects/openclo/src/components/Viewport3D/Mannequin.tsx:66:61)
+    at Provider (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:875:11)
+Warning: The tag <sphereGeometry> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+    at sphereGeometry
+    at mesh
+    at group
+    at Mannequin (D:/Desktop/projects/openclo/src/components/Viewport3D/Mannequin.tsx:66:61)
+    at Provider (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:875:11)
+Warning: <meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+    at meshStandardMaterial
+    at mesh
+    at group
+    at Mannequin (D:/Desktop/projects/openclo/src/components/Viewport3D/Mannequin.tsx:66:61)
+    at Provider (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:875:11)
+Warning: The tag <group> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+    at group
+    at Mannequin (D:/Desktop/projects/openclo/src/components/Viewport3D/Mannequin.tsx:66:61)
+    at Provider (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:875:11)
+Warning: React does not recognize the `userData` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `userdata` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+    at group
+    at Mannequin (D:/Desktop/projects/openclo/src/components/Viewport3D/Mannequin.tsx:66:61)
+    at Provider (file:///D:/Desktop/projects/openclo/node_modules/react-redux/dist/react-redux.mjs:875:11)
+
+ [32m✓[39m src/components/Viewport3D/__tests__/Mannequin.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 64[2mms[22m[39m
+ [32m✓[39m src/utils/autoSew/__tests__/autoSew.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/projectValidator.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m src/components/shell/__tests__/Dock.test.tsx [2m([22m[2m19 tests[22m[2m)[22m[33m 3024[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps a grade suggestion (✦→📌) and records it in the dock slice [33m 320[2mms[22m[39m
+ [32m✓[39m src/__tests__/exportDXF.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m src/copilot/perception/__tests__/copilotContext.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m src/copilot/plugins/sandbox/__tests__/PluginContext.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/copilotUISlice.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/physicalFabricEdgeCases.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+[90mstderr[2m | src/copilot/__tests__/costManager.test.ts[2m > [22m[2mCostManager[2m > [22m[2mdrops corrupt records on load and keeps valid ones, without producing NaN totals
+[22m[39m[CostManager] Dropped corrupt usage records on load { projectId: [32m'mixed'[39m, dropped: [33m3[39m, kept: [33m2[39m }
+
+[90mstderr[2m | src/copilot/__tests__/costManager.test.ts[2m > [22m[2mCostManager telemetry[2m > [22m[2memits schema_record failure with kept/dropped counts when records are partially corrupt
+[22m[39m[CostManager] Dropped corrupt usage records on load { projectId: [32m'telemetry-mixed'[39m, dropped: [33m2[39m, kept: [33m1[39m }
+
+ [32m✓[39m src/copilot/__tests__/costManager.test.ts [2m([22m[2m85 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m src/utils/formula/__tests__/safeEval.test.ts [2m([22m[2m76 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/garmentPlacement.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/tslCollision.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/confirmationMiddleware.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/skillLoader.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m tests/integration/dxf-import-no-synthetic-sa.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/integration/copilotIntegration.test.ts [2m([22m[2m52 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+[90mstderr[2m | src/utils/__tests__/storage.test.ts[2m > [22m[2mstorage abstraction (localStorage fallback)[2m > [22m[2mtelemetry hook (B6-state § 3.8)[2m > [22m[2mfires ls-quota-exhausted when localStorage.setItem throws QuotaExceededError
+[22m[39m[safeStorage] setItem failed for "openclo:settings:big-blob": Error [QuotaExceededError]: quota
+    at D:/Desktop/projects/openclo/src/utils/__tests__/storage.test.ts:170:38
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mvitest[24m/dist/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+    at runTest [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1653:12[90m)[39m {
+  code: [33m22[39m
+}
+
+[90mstderr[2m | src/utils/__tests__/storage.test.ts[2m > [22m[2mstorage abstraction (localStorage fallback)[2m > [22m[2mtelemetry hook (B6-state § 3.8)[2m > [22m[2malso fires ls-quota-exhausted for the legacy Firefox NS_ERROR_DOM_QUOTA_REACHED
+[22m[39m[safeStorage] setItem failed for "openclo:settings:legacy-quota": NS_ERROR_DOM_QUOTA_REACHED: quota
+    at D:/Desktop/projects/openclo/src/utils/__tests__/storage.test.ts:192:44
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1209:10[90m)[39m
+    at [90mfile:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27[90m)[39m
+    at trace [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4mvitest[24m/dist/chunks/test.B8ej_ZHS.js:239:21[90m)[39m
+    at runTest [90m(file:///D:/Desktop/projects/openclo/[39mnode_modules/[4m@vitest/runner[24m/dist/index.js:1653:12[90m)[39m {
+  code: [33m1014[39m
+}
+
+ [32m✓[39m src/utils/__tests__/storage.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/shortcuts/__tests__/seamAllowanceReachability.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/linkedEditing.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/diagnostics/__tests__/dataCollector.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/tslBuffers.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/utils/seamly2d/__tests__/templateEngine.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/useSeamAllowanceTool.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m src/utils/autoSew/__tests__/edgeCases.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m src/utils/grading/__tests__/batchGrader.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/input/__tests__/useSchemeHeuristic.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32m✓[39m src/utils/seam/__tests__/cornerTypes.test.ts [2m([22m[2m64 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/seamPairs.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m src/__tests__/seamAllowance.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/utils/export/__tests__/bomExport.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+[90mstdout[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.frameTime.test.tsx[2m > [22m[2museSimulationLifecycle — contabilidad de frame-time (F0 #897)[2m > [22m[2mrunning→paused resets the window: the first resumed window is NOT polluted by the pause gap
+[22m[39m[SimLifecycle] 🟡 Using CPU solver (Web Worker fallback)
+
+[90mstderr[2m | src/components/Viewport3D/__tests__/useSimulationLifecycle.frameTime.test.tsx[2m > [22m[2museSimulationLifecycle — contabilidad de frame-time (F0 #897)[2m > [22m[2mrunning→paused resets the window: the first resumed window is NOT polluted by the pause gap
+[22m[39m[SimLifecycle] Wasm solver not available
+
+ [32m✓[39m src/components/Viewport3D/__tests__/useSimulationLifecycle.frameTime.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 58[2mms[22m[39m
+ [32m✓[39m src/utils/dxf/__tests__/exportAAMA.metadata.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m src/copilot/actions/__tests__/actionExecutor.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/physicalFabric.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/renderSettingsSlice.test.ts [2m([22m[2m41 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m src/utils/dxf/__tests__/internalLineFidelity.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/components/Viewport3D/hooks/__tests__/useDisposable.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/nodeEditorUtils.test.ts [2m([22m[2m34 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/utils/export/__tests__/sceneCollector.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/clothWorkerClient.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/useFreeSewingTool.seamType.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/projectSlice.restore.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/copilot/action/skills/__tests__/skillValidator.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/pluginSlice.edge.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/projectSlice.pom.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/copilot/action/skills/__tests__/skillPersistence.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/copilot/providers/__tests__/secureStorage.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/seamAllowanceRenderer.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/projectSlice.groups.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+[90mstderr[2m | src/utils/cloth/__tests__/toolDispatch.test.ts[2m > [22m[2mdispatchBrushStroke[2m > [22m[2mreturns false on WASM variant (CPU/WASM/Neural-only configs)
+[22m[39m[toolDispatch] dispatchBrushStroke: WASM tier active; steam brush is GPU-only (point=[0,0,0], radius=0.05). Silent no-op.
+
+[90mstderr[2m | src/utils/cloth/__tests__/toolDispatch.test.ts[2m > [22m[2mdispatchBrushStroke[2m > [22m[2mreturns false on `none` variant
+[22m[39m[toolDispatch] dispatchBrushStroke: no tier present (kind='none'); tool is silent no-op (point=[0,0,0], radius=0.05).
+
+[90mstderr[2m | src/utils/cloth/__tests__/toolDispatch.test.ts[2m > [22m[2mdispatchGrabInit — WASM path[2m > [22m[2mreturns null when no particles fall within radius
+[22m[39m[toolDispatch] dispatchGrabInit: WASM tier present but 0 particles in radius (radius=0.5, point=[0,0,0], totalParticles=1).
+
+[90mstderr[2m | src/utils/cloth/__tests__/toolDispatch.test.ts[2m > [22m[2mdispatchGrabInit — WASM path[2m > [22m[2muses STRICT inequality (particle exactly on radius boundary is excluded)
+[22m[39m[toolDispatch] dispatchGrabInit: WASM tier present but 0 particles in radius (radius=0.5, point=[0,0,0], totalParticles=1).
+
+[90mstderr[2m | src/utils/cloth/__tests__/toolDispatch.test.ts[2m > [22m[2mdispatchGrabInit — none variant[2m > [22m[2mreturns null without invoking any client method
+[22m[39m[toolDispatch] dispatchGrabInit: no tier present (kind='none'); grab is silent no-op (point=[1,2,3], radius=0.5).
+
+[90mstderr[2m | src/utils/cloth/__tests__/toolDispatch.test.ts[2m > [22m[2mGrabHandle.move — GPU path[2m > [22m[2mreturns false if called after release()
+[22m[39m[toolDispatch] GrabHandle.move (GPU): called after release — caller bug?
+
+[90mstderr[2m | src/utils/cloth/__tests__/toolDispatch.test.ts[2m > [22m[2mGrabHandle.move — WASM path[2m > [22m[2mreturns false after release()
+[22m[39m[toolDispatch] GrabHandle.move (WASM): called after release — caller bug?
+
+ [32m✓[39m src/utils/cloth/__tests__/toolDispatch.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/pluginRegistry.edge.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/selectEdgeVertex.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/pleatGeometry.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2mloadPlugin()[2m > [22m[2mcreates a Worker and sends a load message
+[22m[39m[PluginHost] Plugin "com.test.plugin" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2mloadPlugin()[2m > [22m[2mresolves when the Worker sends loaded
+[22m[39m[PluginHost] Plugin "com.test.plugin" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2mloadPlugin()[2m > [22m[2mrejects when the Worker sends loadError
+[22m[39m[PluginHost] Plugin "com.test.plugin" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2mloadPlugin()[2m > [22m[2mrejects when the Worker emits an error event
+[22m[39m[PluginHost] Plugin "com.test.plugin" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2mloadPlugin()[2m > [22m[2mregisters tools in the registry with namespaced names
+[22m[39m[PluginHost] Plugin "com.acme.grader" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2mloadPlugin()[2m > [22m[2mthrows if the same plugin is loaded twice
+[22m[39m[PluginHost] Plugin "com.test.plugin" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2munloadPlugin()[2m > [22m[2mcalls bridge.destroy()
+[22m[39m[PluginHost] Plugin "com.test.plugin" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2munloadPlugin()[2m > [22m[2mremoves the plugin from the internal map
+[22m[39m[PluginHost] Plugin "com.test.plugin" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2munloadPlugin()[2m > [22m[2mde-registers tools from the registry
+[22m[39m[PluginHost] Plugin "com.acme.cleanup" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2misLoaded()[2m > [22m[2mreturns true after the plugin is loaded
+[22m[39m[PluginHost] Plugin "com.test.plugin" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2misLoaded()[2m > [22m[2mreturns false after the plugin is unloaded
+[22m[39m[PluginHost] Plugin "com.test.plugin" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2mgetLoadedPluginIds()[2m > [22m[2mreturns ids of all loaded plugins
+[22m[39m[PluginHost] Plugin "plugin.one" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2mgetLoadedPluginIds()[2m > [22m[2mreturns ids of all loaded plugins
+[22m[39m[PluginHost] Plugin "plugin.two" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+[90mstderr[2m | src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts[2m > [22m[2mPluginHost[2m > [22m[2mtool execution via registered tool[2m > [22m[2mroutes registry.execute() to bridge.executeTool()
+[22m[39m[PluginHost] Plugin "com.acme.exec" has no apiVersion in manifest; defaulting to 1. Consider adding apiVersion to the manifest.
+
+ [32m✓[39m src/store/__tests__/collisionBodySlice.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/copilot/plugins/sandbox/__tests__/PluginHost.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/semanticEdges.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/constructionSlice.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/copilot/perception/__tests__/designLog.test.ts [2m([22m[2m36 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/formulaPlugin.edge.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/copilot/llm/__tests__/errorRecovery.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/pluginLoader.test.ts [2m([22m[2m34 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/simulationSlice.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/triangleCollision.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/utils/dxf/__tests__/converterOptions.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/bomSlice.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/longRangeAttachments.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/utils/dxf/__tests__/importPipeline.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/utils/trace/__tests__/edgeDetection.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/copilot/action/skills/__tests__/seamlyToSkill.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/utils/import/__tests__/referenceImageStore.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/utils/formats/__tests__/svgImport.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/useWalkSeamTool.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/copilot/actions/__tests__/pieceQueryResolver.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/diagnostics/__tests__/ruleEngine.test.ts [2m([22m[2m43 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/trimActions.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/inspectorSlice.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/artworkActions.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/utils/trim/__tests__/trimExtractor.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/utils/export/__tests__/bomExtractor.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/copilot/llm/__tests__/actionSchemas.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/copilot/suggestions/__tests__/suggestionEngine.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/marketplace.edge.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/copilot/plugins/sandbox/__tests__/networkValidator.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+[90mstderr[2m | src/utils/__tests__/safeStorage.test.ts[2m > [22m[2msafeStorage[2m > [22m[2msafeGetItem / safeSetItem[2m > [22m[2mfalls back to memory when localStorage.getItem throws
+[22m[39m[safeStorage] getItem failed for "fallback-key": DOMException {}
+
+ [32m✓[39m src/utils/__tests__/safeStorage.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/setEdgeSeamAllowance.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+[90mstderr[2m | src/store/__tests__/dockSlice.test.ts[2m > [22m[2mdockSlice persistence[2m > [22m[2mloadDocks returns null for a corrupt envelope
+[22m[39m[dockSlice] discarding corrupt envelope { issues: [ { path: [32m'version'[39m, code: [32m'invalid_value'[39m } ] }
+
+ [32m✓[39m src/copilot/perception/__tests__/contextBuilder.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+[90mstderr[2m | src/store/__tests__/dockSlice.test.ts[2m > [22m[2mdockSlice persistence[2m > [22m[2mloadDocks returns null for wrong-typed data
+[22m[39m[dockSlice] discarding corrupt envelope { issues: [ { path: [32m'data.pinnedExtra.left'[39m, code: [32m'invalid_type'[39m } ] }
+
+[90mstderr[2m | src/store/__tests__/dockSlice.test.ts[2m > [22m[2mdockSlice signaling[2m > [22m[2mloadDocks discards an envelope with an invalid signaling value
+[22m[39m[dockSlice] discarding corrupt envelope { issues: [ { path: [32m'data.signaling'[39m, code: [32m'invalid_value'[39m } ] }
+
+[90mstderr[2m | src/store/__tests__/dockSlice.test.ts[2m > [22m[2mdockSlice tools2d[2m > [22m[2mloadDocks discards an envelope with a non-array tools2d
+[22m[39m[dockSlice] discarding corrupt envelope { issues: [ { path: [32m'data.tools2d'[39m, code: [32m'invalid_type'[39m } ] }
+
+ [32m✓[39m src/copilot/action/skills/__tests__/seamlyParser.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/dockSlice.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/pluginManager.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/pluginManager.edge.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/utils/semanticEdit/__tests__/semanticEdit.test.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/__tests__/nesting.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/gradingSkill.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/simulationSlice.freeze.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/utils/3d/__tests__/edgePicker.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/formulaPlugin.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/gradingSlice.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/pluginSlice.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/useSlashAndSpreadTool.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/projectSlice.referenceImage.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/projectSlice.batch.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/inputSchemeSlice.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/utils/seamly2d/__tests__/constructionResolver.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/arcLength.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/dartEntity.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/editorSlice.referenceImage.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/utils/seam/__tests__/commandRangeToFlattened.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/layerVisibility.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/copilot/knowledge/__tests__/patternKnowledge.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/copilot/llm/__tests__/responseParser.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/patternRules.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/communityFormat.edge.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/utils/animation/__tests__/animationSlice.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/copilot/perception/__tests__/geometryClassifier.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/components/MarkerEditor/__tests__/markerSlice.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/newProjectReset.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/fitMaps.test.ts [2m([22m[2m43 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/tslSelfCollision.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/simulationSlice.meshGrab.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/pluginRegistry.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/uiBridgeTools.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/proactiveAnalysis.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/simulationSlice.steam.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/utils/seamly2d/__tests__/formulaEvaluator.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/bridge/meta-tools/__tests__/metaTools.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/utils/dxf/__tests__/dxfImport.test.ts [2m([22m[2m16 tests[22m[2m | [22m[33m8 skipped[39m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/utils/grading/__tests__/gradeAllSizes.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/components/shell/__tests__/unifiedBarPosition.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/copilot/perception/__tests__/preferenceLearner.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/copilot/perception/__tests__/spatialDescriber.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/draftedPiecesBornNet.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/copilot/planner/__tests__/planGenerator.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/intelligence/__tests__/IntelligentContext.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/projectAutosave.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/notchAnchor.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/memory.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/parametricSlice.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/fabricLibrary.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/splitOutline.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+[90mstderr[2m | src/utils/seamly2d/__tests__/measurementNameTranslation.test.ts[2m > [22m[2mformulaEvaluator + measurement-name translation integration[2m > [22m[2mfalls back to 0 with a warning when neither the literal nor the translation resolves
+[22m[39m[formulaEvaluator] Unresolved measurement: @Aisancebassin, defaulting to 0
+
+ [32m✓[39m src/utils/telemetry/__tests__/storageTelemetry.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/utils/seamly2d/__tests__/measurementNameTranslation.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/utils/construction/__tests__/resolver.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/tslWind.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+[90mstderr[2m | src/components/Viewport3D/__tests__/simSeamLineData.test.ts[2m > [22m[2mbuildSimSeamLineData[2m > [22m[2mskips inactive and unresolvable seams; returns null when nothing resolves
+[22m[39m[seamPairs] seam seam-1: unknown edge (A=noSuchEdge, B=left)
+[seamPairs] seam s-bad: unknown edge (A=noSuchEdge, B=left)
+
+ [32m✓[39m src/components/Viewport3D/__tests__/simSeamLineData.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/copilot/perception/__tests__/intentPredictor.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/grainLine.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/copilot/planner/__tests__/planTypes.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/useMeasureTool.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/languagePacks.edge.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/nestingSlice.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/rateLimit.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/languagePacks.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/input/__tests__/orbitMath.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/copilot/action/skills/__tests__/skillEvents.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/__tests__/notches.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/registry.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/hooks/__tests__/useGuardedAction.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/utils/pom/__tests__/pomCompute.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/projectSlice.placementRules.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/copilot/action/tools/definitions/__tests__/internalTools.addNotch.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/copilot/action/skills/__tests__/SkillBuilder.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/utils/grading/__tests__/gradePieceByRules.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/editorSlice.fitView.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/copilot/action/skills/__tests__/nsid.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/arrangement/__tests__/arrangementBinding.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/simulationSlice.mode.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/avatarSlice.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/workers/__tests__/arrayBufferCodec.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/projectStateSerialization.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/utils/seam/__tests__/cornerTypes.asymmetric.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/utils/construction/__tests__/pieceBuilder.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/copilot/debug/__tests__/AgenticRecorder.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/utils/export/__tests__/fbxExporter.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/copilot/perception/__tests__/types.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/bridge/meta-tools/__tests__/types.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/communityFormat.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/avatarMeshExtractor.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/copilot/plugins/sandbox/__tests__/protocol.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/layerOffsets.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/qualityPresets.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/transformUtils.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/workers/__tests__/workerProtocol.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/skirtSkill.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/copilot/action/tools/__tests__/validation.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/utils/dxf/__tests__/notchGeometry.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/projectSlice.cornerTypes.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/pieceClassifier.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/__tests__/formula.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/components/shell/__tests__/dockSuggestions.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/intelligence/__tests__/SemanticResolver.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/path.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/layoutSlice.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/copilot/hooks/__tests__/useAgenticLoop.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/hooks/__tests__/useParametricEngine.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/solverCapabilities.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/bezier.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/__tests__/protocol.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/copilot/debug/__tests__/DebugStore.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/intelligence/__tests__/GarmentKnowledge.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/utils/dxf/__tests__/formatDetector.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/utils/seam/__tests__/perEdgeWidth.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/copilot/action/skills/__tests__/instructionGenerator.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/bridge/meta-tools/__tests__/getFitMapByPiece.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+[90mstderr[2m | src/utils/cloth/__tests__/configBridge.test.ts[2m > [22m[2mmapClothSimConfigToWasmSolverConfig[2m > [22m[2mhandles invalid gravity shape defensively
+[22m[39m[configBridge] gravity must be [number, number, number]; got []
+[configBridge] gravity must be [number, number, number]; got [ [33m0[39m ]
+
+ [32m✓[39m src/utils/cloth/__tests__/configBridge.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/bodiceSkill.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/windForce.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/linkedEditing.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/useNotchTool.anchor.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/cameraSlice.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/intelligence/__tests__/ContextEnricher.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/sanitizeName.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/modifyDimension.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+[90mstdout[2m | src/utils/cloth/__tests__/collisionMesh.test.ts[2m > [22m[2mextractCollisionMesh[2m > [22m[2mextracts vertices from a single triangle
+[22m[39m[CollisionMesh] extractCollisionMesh: 1 tris, vtxNormals=NO
+
+[90mstdout[2m | src/utils/cloth/__tests__/collisionMesh.test.ts[2m > [22m[2mextractCollisionMesh[2m > [22m[2mcomputes face normals correctly for XY-plane triangle
+[22m[39m[CollisionMesh] extractCollisionMesh: 1 tris, vtxNormals=NO
+
+[90mstdout[2m | src/utils/cloth/__tests__/collisionMesh.test.ts[2m > [22m[2mextractCollisionMesh[2m > [22m[2mextracts correct triangle count for quad
+[22m[39m[CollisionMesh] extractCollisionMesh: 2 tris, vtxNormals=NO
+
+[90mstdout[2m | src/utils/cloth/__tests__/collisionMesh.test.ts[2m > [22m[2mextractCollisionMesh[2m > [22m[2mreturns zero triCount for empty geometry
+[22m[39m[CollisionMesh] extractCollisionMesh: 0 tris, vtxNormals=NO
+
+[90mstdout[2m | src/utils/cloth/__tests__/collisionMesh.test.ts[2m > [22m[2mextractCollisionMesh[2m > [22m[2mhandles non-indexed geometry (no index)
+[22m[39m[CollisionMesh] extractCollisionMesh: 1 tris, vtxNormals=NO
+
+[90mstdout[2m | src/utils/cloth/__tests__/collisionMesh.test.ts[2m > [22m[2mcollisionMeshFromBuffers[2m > [22m[2mconverts indexed vertex/index buffers to CollisionMeshData
+[22m[39m[CollisionMesh] extractCollisionMesh: 1 tris, vtxNormals=NO
+
+ [32m✓[39m src/utils/cloth/__tests__/collisionMesh.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/simulationSlice.wind.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/defaults.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/morphTargets.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/sleeveSkill.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/utils/export/__tests__/objExporter.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/utils/seam/__tests__/notchMirror.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/selfCollision.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/edgeInterpolation.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/lineIntersect.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/utils/dxf/__tests__/formatProfiles.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/utils/seam/__tests__/edgeHitTest.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/colorwayResolver.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/tslBrush.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/mergeOutline.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/copilot/knowledge/__tests__/KnowledgeStore.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/copilot/action/tools/__tests__/setCameraView.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/coords.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/pieceLabel.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/ikSolver.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/autoSew/__tests__/namingHeuristics.regression.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/utils/animation/__tests__/interpolation.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/units.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/selfCollisionShader.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/renderers/__tests__/seamVisuals.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/easeTracking.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/compoundTools.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/toolExecutor.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/interfacing.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/components/Viewport3D/__tests__/inputBindings.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/teachingContext.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/arrangement/__tests__/placement.collision.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/elasticAssembly.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/copilot/perception/__tests__/languageDetection.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/utils/export/__tests__/markerCollision.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/renderers/__tests__/gridTiers.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/xpbdSolver.updateRestLengths.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/tslGrab.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/input/__tests__/wheelIntents.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/intelligence/__tests__/types.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/textures/__tests__/TextureManager.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/trace/__tests__/contourToPath.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/toolActivation.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/distance.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/grainAlignment.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/renderers/__tests__/rulerTicks.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/__tests__/grading.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/__tests__/exportOBJ.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/components/shell/__tests__/dock2dTools.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/bridge/meta-tools/__tests__/verifyGarment.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/editorSlice.selectAll.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/intelligence/__tests__/MeasurementCalculator.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/renderers/__tests__/internalLineStyle.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/useTopstitchTool.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/bridge/meta-tools/__tests__/getFitMapStats.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/wasm/__tests__/adjacencyCSR.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/components/PatternEditor/__tests__/useSegmentSewingTool.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/copilot/reasoning/bridge/__tests__/domainBootstrap.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/copilot/action/tools/__tests__/suggestTacks.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/calibration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/components/Viewport3D/__tests__/cameraPresets.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/agentSettings.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/boundaries.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/arrangement/__tests__/surfaceFrame.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/autoSew/__tests__/scorer.semantic.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/diagnostics/__tests__/agentAnalyzer.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/utils/avatar/__tests__/morphTargets.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/utils/artwork/__tests__/artworkCompositor.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/store/__tests__/workflowStage.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/input/__tests__/zoom2d.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/utils/geometry/__tests__/hitTest.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/copilot/actions/__tests__/linkPiecesAction.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/editClassifier.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/utils/autoSew/__tests__/lengthTolerance.regression.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/wasm/__tests__/bendRestDistances.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/components/shell/__tests__/panelSide.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/copilot/knowledge/__tests__/cosineSimilarity.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/__tests__/restLengthComputer.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/copilot/knowledge/__tests__/knowledgeIndexContent.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/components/Viewport3D/__tests__/rendererDeviceLost.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/copilot/actions/__tests__/importDxfAction.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/copilot/__tests__/uiStateTools.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/__tests__/utils.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/gpuStorageAttributes.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/components/Viewport3D/__tests__/seamColor.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/arrangement/__tests__/deriveDimensions.wrap.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/utils/export/__tests__/uiExport.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/utils/cloth/gpu/__tests__/webgpuDetect.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [2m[90m↓[39m[22m tests/integration/external-dxf-parse.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/integration/m3-dxf-import.test.ts [2m([22m[2m1 test[22m[2m | [22m[33m1 skipped[39m[2m)[22m
+[90mstdout[2m | src/utils/__tests__/mariaShirt.m4.test.ts[2m > [22m[2mM4 — sonda de dirección: las costuras propuestas cosen derechas en mundo[2m > [22m[2mninguna de las costuras del autoSew cose en X tras el placement anatómico
+[22m[39m[M4 probe] partículas totales: 29338
+[M4 probe] bodice:sideSeam ↔ bodice:sideSeam-2: 70 pares, derecho=25.593m, espejo=28.968m, media=36.6cm → derecha ✓
+           primero A(-0.26,0.94,0.18)↔B(-0.26,0.94,-0.18) | último A(-0.26,1.28,0.18)↔B(-0.26,1.27,-0.18)
+[M4 probe] bodice:sideSeam-2 ↔ bodice:sideSeam: 70 pares, derecho=25.593m, espejo=28.974m, media=36.6cm → derecha ✓
+           primero A(0.26,1.27,0.18)↔B(0.26,1.28,-0.18) | último A(0.26,0.94,0.18)↔B(0.26,0.94,-0.18)
+[M4 probe] bodice:shoulder ↔ bodice:shoulder-2: 29 pares, derecho=10.603m, espejo=10.862m, media=36.6cm → derecha ✓
+           primero A(-0.23,1.48,0.18)↔B(-0.23,1.48,-0.18) | último A(-0.10,1.53,0.18)↔B(-0.11,1.53,-0.18)
+[M4 probe] bodice:shoulder-2 ↔ bodice:shoulder: 29 pares, derecho=10.603m, espejo=10.862m, media=36.6cm → derecha ✓
+           primero A(0.11,1.53,0.18)↔B(0.10,1.53,-0.18) | último A(0.23,1.48,0.18)↔B(0.23,1.48,-0.18)
+[M4 probe] bodice:neckline ↔ collar:collarNeckEdge: 47 pares, derecho=14.068m, espejo=15.142m, media=29.9cm → derecha ✓
+           primero A(0.10,1.53,-0.18)↔B(0.23,1.54,0.09) | último A(-0.10,1.53,-0.18)↔B(0.00,1.54,0.09)
+[M4 probe] bodice:armhole ↔ sleeve:sleeveCap: 55 pares, derecho=22.489m, espejo=22.712m, media=40.9cm → derecha ✓
+           primero A(-0.26,1.28,0.18)↔B(-0.54,1.51,-0.11) | último A(-0.23,1.48,0.18)↔B(-0.54,1.51,0.27)
+[M4 probe] bodice:neckline ↔ collar:collarNeckEdge-2: 47 pares, derecho=7.611m, espejo=9.413m, media=16.2cm → derecha ✓
+           primero A(-0.10,1.53,0.18)↔B(-0.22,1.54,0.09) | último A(0.10,1.53,0.18)↔B(0.00,1.54,0.09)
+[M4 probe] bodice:armhole-2 ↔ sleeve:sleeveCap: 55 pares, derecho=22.568m, espejo=22.774m, media=41.0cm → derecha ✓
+           primero A(0.23,1.47,0.18)↔B(0.54,1.51,0.27) | último A(0.26,1.28,0.18)↔B(0.54,1.51,-0.11)
+
+ [32m✓[39m src/utils/__tests__/mariaShirt.m4.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 15138[2mms[22m[39m
+     [33m[2m✓[22m[39m ninguna de las costuras del autoSew cose en X tras el placement anatómico [33m 15136[2mms[22m[39m
+ [32m✓[39m src/utils/mesh/__tests__/cdtMesher.maria.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 15574[2mms[22m[39m
+     [33m[2m✓[22m[39m cada pieza produce malla no vacía y el delantero supera los 15k triángulos [33m 15572[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m392 passed[39m[22m[2m | [22m[33m2 skipped[39m[90m (394)[39m
+[2m      Tests [22m [1m[32m5668 passed[39m[22m[2m | [22m[33m12 skipped[39m[90m (5680)[39m
+[2m   Start at [22m 21:25:21
+[2m   Duration [22m 16.70s[2m (transform 39.01s, setup 0ms, import 85.10s, tests 63.88s, environment 64.71s)[22m
+

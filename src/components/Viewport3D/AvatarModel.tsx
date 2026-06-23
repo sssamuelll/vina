@@ -617,6 +617,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       };
       const left = armDir('LeftArm', 'LeftForeArm');
       const right = armDir('RightArm', 'RightForeArm');
+      // ready = "pose applied", not "both arm dirs resolved": armDir may return null on a non-standard rig; buildAxisHints then yields {} → T-pose default (graceful).
       dispatch(setArmAxis({ left, right, ready: true }));
     }
   }, [joints, measurements, morphTargets, dispatch]);

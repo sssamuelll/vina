@@ -702,6 +702,7 @@ export function useSimulationLifecycle({
     return undefined;
     // deviceLostGeneration: bumped by handleGpuDeviceLost so a renderer device
     // loss re-enters startSim (and, with gpuDowngradedRef set, falls to WASM).
+    // placedMeshes dep is load-bearing: an armAxis-driven placedMeshes rebuild intentionally re-seeds the solver in A-pose (transient T-pose→A-pose reinit). Do not drop it.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- collisionBodies/avatarModelUrl/avatarHeight read from refs to prevent reinit cascades (#315); live updates handled by separate effects. windEnabled/windForce/dragCoefficient also handled separately.
   }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, stretchingIdsRef, dispatch, deviceLostGeneration]);
 
