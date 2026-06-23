@@ -29,6 +29,7 @@ import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { resolveArrangementWithFrames } from '../../utils/cloth/arrangement/arrangementBinding';
 import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
 import { DEFAULT_WRAP } from '../../utils/cloth/arrangement/wrapParams';
+import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { addPin, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
@@ -203,6 +204,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
   const xrayMode = useSelector((s: RootState) => s.simulation.xrayMode);
   const xrayActiveLayer = useSelector((s: RootState) => s.simulation.xrayActiveLayer);
+  const armAxis = useSelector((s: RootState) => s.simulation.armAxis);
 
   // Filter inactive pieces — only active pieces participate in simulation
   // Also filter out hidden pieces (3D arrangement visibility) and hidden layers
@@ -236,7 +238,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const { staticGeometry } = useMemo(() => {
     if (pieceMeshes.length === 0) return { staticGeometry: null };
 
-    const arrangement = resolveArrangementWithFrames(activePieces, avatarMeasurements, arrangementOverrides);
+    const axisHints = buildAxisHints(activePieces, armAxis);
+    const arrangement = resolveArrangementWithFrames(activePieces, avatarMeasurements, arrangementOverrides, { axisHints, skeletonReady: armAxis.ready });
     // Index the arrangement by pieceId: useMeshing may drop pieces that fail to
     // mesh, so pieceMeshes is not guaranteed index-aligned with activePieces.
     const arrangeById = new Map(activePieces.map((p, i) => [p.id, arrangement[i]]));
@@ -303,7 +306,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     geo.computeVertexNormals();
 
     return { staticGeometry: geo };
-  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides]);
+  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis]);
   useDisposable(staticGeometry);
 
   const seamInitData = useMemo(() => seamsToInitData(seams, seamGroups), [seams, seamGroups]);
@@ -315,7 +318,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
     // M2: arrange-mode drags apply here too — what the user sees in the
     // arrange view is EXACTLY where the solver starts.
-    const arrangement = resolveArrangementWithFrames(activePieces, avatarMeasurements, arrangementOverrides);
+    const axisHints = buildAxisHints(activePieces, armAxis);
+    const arrangement = resolveArrangementWithFrames(activePieces, avatarMeasurements, arrangementOverrides, { axisHints, skeletonReady: armAxis.ready });
     // Index by pieceId — pieceMeshes may have dropped failed-to-mesh pieces, so
     // it is not guaranteed index-aligned with activePieces (matches render loop).
     const arrangeById = new Map(activePieces.map((p, i) => [p.id, arrangement[i]]));
@@ -336,7 +340,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const foldInternals = piece?.internals?.filter(l => l.type === 'fold' && l.foldOptions);
       return { ...pm, vertices: transformed, stiffnessMultiplier, pressurePa, internals: foldInternals };
     });
-  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides]);
+  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis]);
 
   // ─── Simulation lifecycle (solver cascade + collision) ──────────────────────
 

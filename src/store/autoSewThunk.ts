@@ -17,6 +17,7 @@ import { showSuccessToast, showInfoToast } from './copilotUISlice';
 import { autoSew } from '../utils/autoSew';
 import { refineSeamsInWorld } from '../utils/autoSew/worldRefine';
 import { resolveArrangementWithFrames } from '../utils/cloth/arrangement/arrangementBinding';
+import { buildAxisHints } from '../utils/cloth/arrangement/buildAxisHints';
 import type { PatternPiece, Seam } from '../types/types';
 
 /**
@@ -36,10 +37,15 @@ export function refineProposalsAgainstState(
   pieces: PatternPiece[],
   state: RootState,
 ): Seam[] {
+  // state.simulation may be absent in lightweight test stores that omit the
+  // simulation reducer — fall back to the no-hints default (ready=false).
+  const armAxis = state.simulation?.armAxis ?? { left: null, right: null, ready: false };
+  const axisHints = buildAxisHints(pieces, armAxis);
   const placements = resolveArrangementWithFrames(
     pieces,
     state.project.avatar.measurements,
     state.project.arrangementOverrides,
+    { axisHints, skeletonReady: armAxis.ready },
   );
   return refineSeamsInWorld(seams, pieces, placements);
 }
