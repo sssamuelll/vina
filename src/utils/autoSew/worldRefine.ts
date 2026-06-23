@@ -136,6 +136,13 @@ export function refineSeamsInWorld(
   }
 
   const resolved: Array<ResolvedSeam | null> = seams.map(seam => {
+    // Same-piece (self) seam — e.g. a sleeve's underarm tube closure. It must
+    // NOT enter the cross-piece partner-reassignment grouping (both sleeves'
+    // underarm self-seams share one role key and would be cross-paired).
+    // Returning null routes it through the existing "pass through untouched"
+    // branch in step 2, preserving the reversed the self-close pass set.
+    // See docs/superpowers/specs/2026-06-23-sleeve-tube-closure-design.md.
+    if (seam.pieceA.pieceId === seam.pieceB.pieceId) return null;
     const pa = byId.get(seam.pieceA.pieceId);
     const pb = byId.get(seam.pieceB.pieceId);
     if (!pa || !pb) return null;
