@@ -194,6 +194,46 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
       `[drape-m4] simSeconds=2.5 belowHipPct=${drape!.belowHipPct.toFixed(2)} minY=${drape!.minY.toFixed(3)} maxY=${drape!.maxY.toFixed(3)} nan=${drape!.nan}`,
     );
 
+    // A-pose sleeve-on-arm checkpoint at t=2.5s (maintainer-run)
+    // Segments cloth verts by |x|>0.25 (sleeve region) and asserts their
+    // mean Y is BELOW shoulder height (≈1.476m) — i.e. the sleeve drapes
+    // along the lowered A-pose arm, not floating at T-pose horizontal height.
+    // maintainer-run
+    const sleeveMeanY = await page.evaluate(() => {
+      const mesh = (window as unknown as { __OPENCLO_CLOTH_MESH__?: {
+        geometry: { attributes: { position: { count: number; getX: (i: number) => number; getY: (i: number) => number } } };
+      } }).__OPENCLO_CLOTH_MESH__;
+      if (!mesh) return null;
+      const pos = mesh.geometry.attributes.position;
+      const n = pos.count;
+      let sumY = 0;
+      let count = 0;
+      for (let i = 0; i < n; i++) {
+        const x = pos.getX(i);
+        if (Math.abs(x) > 0.25) {
+          const y = pos.getY(i);
+          if (!Number.isNaN(y)) { sumY += y; count++; }
+        }
+      }
+      if (count === 0) return { meanY: null, count: 0 };
+      return { meanY: sumY / count, count };
+    });
+    console.log(
+      `[apose-sleeve] simSeconds=2.5 sleeveMeanY=${sleeveMeanY?.meanY?.toFixed(3) ?? 'n/a'} sleeveVertCount=${sleeveMeanY?.count ?? 0} (target: meanY<1.476)`,
+    );
+    // Guard against empty sleeve segment — fails loudly with a clear message.
+    expect(
+      sleeveMeanY?.count ?? 0,
+      'No sleeve verts found (|x|>0.25) — mesh may not be loaded or A-pose arm geometry changed',
+    ).toBeGreaterThan(0);
+    // Assert sleeve mean Y is below shoulder height: the sleeve hangs along
+    // the lowered A-pose arm (≈60° below horizontal), not floating at T-pose
+    // shoulder height (≈1.476m). // maintainer-run
+    expect(
+      sleeveMeanY!.meanY!,
+      `Sleeve mean Y (${sleeveMeanY!.meanY!.toFixed(3)}m) is at or above shoulder height 1.476m — sleeves appear to be floating at T-pose height rather than draping on the A-pose arm`,
+    ).toBeLessThan(1.476);
+
     // Largo horizonte (600 frames = 10s de sim): SOLO REGISTRO, sin assert de
     // forma. El fix de stiction (#902) detuvo el slide-off durante el
     // asentamiento (checkpoint de 2.5s arriba), pero a 10s el drape es
