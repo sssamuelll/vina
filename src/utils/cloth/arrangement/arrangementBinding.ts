@@ -14,7 +14,8 @@ import type { BodyMeasurements, PatternPiece } from '../../../types/types';
 import { ANATOMY_BOTTOM_ROOTS, ANATOMY_TOP_ROOTS, anatomyLocalEndpoints, computeAutoFrame, computeEffectiveRegions, deriveDimensions, detectBodyRegion, outlineBBox, placeGarmentPieces, type BodyRegion, type PlacementResult } from '../garmentPlacement';
 import { surfaceFrame, type SurfaceFrame, type V3 } from './surfaceFrame';
 import { wrapPanel } from './wrapPanel';
-import { DEFAULT_WRAP } from './wrapParams';
+import { DEFAULT_WRAP, wrapParamsForRegion } from './wrapParams';
+import type { WrapParams } from './wrapPanel';
 
 export interface ArrangementBinding {
   space: 'frame';
@@ -109,6 +110,9 @@ export interface PlacementWithFrame {
    * the safety net that caught the rigid-flag-into-wrap mismatch.)
    */
   flip: boolean;
+  /** Per-region wrap coverage (sleeves wrap fuller; others = DEFAULT_WRAP).
+   *  Render and solver MUST both use this — see the design doc. */
+  wrapParams: WrapParams;
 }
 
 /** Mean of `axis·(wrappedPoint − frame.point)` over a region's anatomy edges =
@@ -189,5 +193,13 @@ export function resolveArrangementWithFrames(
   // so the flip must be decided against the actual frame+wrapPanel mapping.
   const flips = computeWrapFlipFlags(pieces, frames, regions);
 
-  return pieces.map((_p, i) => ({ placement: placements[i], frame: frames[i], flip: flips[i] }));
+  // Per-region wrap coverage: sleeves wrap near-closed (panel width = outline
+  // width in metres); the underarm self-seam closes the small remaining gap.
+  const wrapParamsList = pieces.map((p, i) =>
+    wrapParamsForRegion(regions[i], frames[i], pieceGeometryOf(p).widthMm * 0.001),
+  );
+
+  return pieces.map((_p, i) => ({
+    placement: placements[i], frame: frames[i], flip: flips[i], wrapParams: wrapParamsList[i],
+  }));
 }

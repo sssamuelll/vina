@@ -28,7 +28,6 @@ import { PatternPiece, Seam, SeamGroup } from '../../types/types';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { resolveArrangementWithFrames } from '../../utils/cloth/arrangement/arrangementBinding';
 import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
-import { DEFAULT_WRAP } from '../../utils/cloth/arrangement/wrapParams';
 import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
@@ -267,13 +266,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const p = validMeshes[pi];
       const numVerts = p.vertices.length / 3;
       const color = new THREE.Color(PIECE_COLORS[pi % PIECE_COLORS.length]);
-      const { frame, flip } = arrangeById.get(p.pieceId)!;
+      const { frame, flip, wrapParams } = arrangeById.get(p.pieceId)!;
 
       // Envelope wrap (Task 5): curve each piece's flat mesher vertices over the
       // region cylinder (frame.point already carries the gross landmark, so the
       // wrap fully replaces the old rigid Euler rotate+translate). `flip` is the
       // M4-C anatomy-up correction. MUST stay identical to the solver loop.
-      const curved = wrapPlacedMesh(p.vertices, frame, DEFAULT_WRAP, flip);
+      const curved = wrapPlacedMesh(p.vertices, frame, wrapParams, flip);
       positions.set(curved, vOffset * 3);
 
       for (let i = 0; i < numVerts; i++) {
@@ -329,11 +328,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     return pieceMeshes
       .filter(pm => arrangeById.has(pm.pieceId))
       .map((pm) => {
-      const { frame, flip } = arrangeById.get(pm.pieceId)!;
+      const { frame, flip, wrapParams } = arrangeById.get(pm.pieceId)!;
       // Envelope wrap (Task 5): IDENTICAL call to the render loop above — render
       // and solver must not diverge. `frame.point` carries the landmark; `flip`
       // is the M4-C anatomy-up correction.
-      const transformed = wrapPlacedMesh(pm.vertices, frame, DEFAULT_WRAP, flip);
+      const transformed = wrapPlacedMesh(pm.vertices, frame, wrapParams, flip);
       const piece = activePieces.find(p => p.id === pm.pieceId);
       const stiffnessMultiplier = computeStiffnessMultiplier(piece?.interfacingType, piece?.solidifyFactor);
       const pressurePa = piece?.pressurePa ?? 0;

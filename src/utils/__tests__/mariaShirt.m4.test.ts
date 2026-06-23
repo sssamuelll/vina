@@ -35,7 +35,6 @@ import { autoSew } from '../autoSew';
 import { meshPiece } from '../mesh';
 import { resolveArrangementWithFrames } from '../cloth/arrangement/arrangementBinding';
 import { wrapPlacedMesh } from '../cloth/arrangement/wrapPlacedMesh';
-import { DEFAULT_WRAP } from '../cloth/arrangement/wrapParams';
 import { refineSeamsInWorld } from '../autoSew/worldRefine';
 import { mergeMeshes, buildSeamConstraints } from '../cloth/seamAssembly';
 import type { PatternPiece, Seam } from '../../types/types';
@@ -90,10 +89,10 @@ function probeSeams(pieces: PatternPiece[], seams: Seam[]): { worldSeams: WorldS
   const arrangement = resolveArrangementWithFrames(pieces, MEASUREMENTS, undefined);
   const meshed = pieces.map((p, i) => {
     const mesh = meshPiece(p, MESH_OPTIONS);
-    const { frame, flip } = arrangement[i];
+    const { frame, flip, wrapParams } = arrangement[i];
     return {
       pieceId: p.id,
-      vertices: wrapPlacedMesh(mesh.vertices, frame, DEFAULT_WRAP, flip),
+      vertices: wrapPlacedMesh(mesh.vertices, frame, wrapParams, flip),
       triIds: mesh.triIds,
       boundaryOrig: mesh.boundaryOrig,
     };

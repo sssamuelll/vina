@@ -30,7 +30,6 @@ import type { PatternPiece, Seam } from '../../types/types';
 import { outlineBBoxCenter } from '../cloth/garmentPlacement';
 import type { PlacementWithFrame } from '../cloth/arrangement/arrangementBinding';
 import { wrapPlacedMesh } from '../cloth/arrangement/wrapPlacedMesh';
-import { DEFAULT_WRAP } from '../cloth/arrangement/wrapParams';
 import { flattenPath, commandRangeToFlattened } from '../seam/index';
 
 type V3 = [number, number, number];
@@ -78,7 +77,7 @@ function edgeWorld(
     (pFirst.x - center.cx) * 0.001, 0, (pFirst.y - center.cy) * 0.001,
     (pLast.x - center.cx) * 0.001, 0, (pLast.y - center.cy) * 0.001,
   ]);
-  const wrapped = wrapPlacedMesh(local, pwf.frame, DEFAULT_WRAP, pwf.flip);
+  const wrapped = wrapPlacedMesh(local, pwf.frame, pwf.wrapParams, pwf.flip);
   const first: V3 = [wrapped[0], wrapped[1], wrapped[2]];
   const last: V3 = [wrapped[3], wrapped[4], wrapped[5]];
   const mid: V3 = [
