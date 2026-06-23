@@ -16,8 +16,9 @@ import { metresToImporter, importerToMetres } from '../geometry';
 export async function extractAvatarCollisionMesh(
   avatarUrl: string,
   avatarHeight: number,
+  joints?: Record<string, { x: number; y: number; z: number }>,
 ): Promise<CollisionMeshData | null> {
-  const { extractMeshData } = await import('./avatarMeshExtractor');
+  const { extractMeshData, applyPose } = await import('./avatarMeshExtractor');
   const { importMesh } = await import('../import/meshImporter');
 
   const filename = avatarUrl.split('/').pop() || avatarUrl;
@@ -26,15 +27,16 @@ export async function extractAvatarCollisionMesh(
   });
 
   importerToMetres(result.scene);
-  // NOTE (M4-D): do NOT applyAPose() here. The visual avatar starts in
-  // A-pose while this collision mesh bakes the GLB's T-pose bind — a real
-  // mismatch — but applying the pose at this point CORRUPTS the skinned
-  // bake (measured: the whole garment fell through to the ground,
-  // minY≈0, vs a correct drape without it; rotating bones after the
-  // import's scale pass desyncs the bind matrices `extractMeshData`
-  // bakes with). Pose-matched collision needs the bake to happen in the
-  // same skeleton state the renderer uses — tracked as a follow-up issue.
   result.scene.updateMatrixWorld(true);
+
+  // Pose-matched bake: rotate bones to the rendered pose, then REFRESH the
+  // world-matrix tree before extractMeshData's skeleton.update() reads
+  // bone.matrixWorld. Without this second update the bake mixes posed
+  // quaternions with stale (import-scaled) world matrices → minY≈0 collapse.
+  if (joints && Object.keys(joints).length > 0) {
+    applyPose(result.scene, joints);
+    result.scene.updateMatrixWorld(true);
+  }
 
   const { vertices, indices, normals } = extractMeshData(result.scene);
   console.log(`[AvatarCollision] extractMeshData: ${vertices.length / 3} verts, ${indices.length / 3} tris, normals=${normals ? normals.length / 3 : 'NONE'}`);
