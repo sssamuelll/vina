@@ -205,12 +205,13 @@ async function loadCollision(
   dispatch: ReturnType<typeof useDispatch>,
   cancelled: { value: boolean },
   isWasm: boolean,
+  joints: Record<string, { x: number; y: number; z: number }>,
 ): Promise<void> {
   // Avatar collision mesh
   if (avatarModelUrl && !cancelled.value) {
     try {
       const collisionMesh = await withTimeout(
-        extractAvatarCollisionMesh(avatarModelUrl, avatarHeight),
+        extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, joints),
         5000,
         'Collision mesh extraction',
       );
@@ -295,6 +296,10 @@ export function useSimulationLifecycle({
   // cleanup → reinit loops, leaving tslSolverRef.current permanently null.
   // Live updates for these values are handled by separate effects (collision rebuild,
   // useCollisionBodies hook).
+  const avatarJoints = useSelector((s: RootState) => s.avatar.pose.joints);
+  const avatarJointsRef = useRef(avatarJoints);
+  useEffect(() => { avatarJointsRef.current = avatarJoints; });
+
   const collisionBodiesRef = useRef(collisionBodies);
   collisionBodiesRef.current = collisionBodies;
   const avatarModelUrlRef = useRef(avatarModelUrl);
@@ -516,7 +521,7 @@ export function useSimulationLifecycle({
 
                 // Load collision meshes — setCollisionMesh routes through BVH builder in TSL mode
                 // Read from refs (not closure) to avoid stale values and reinit cascades (#315)
-                await loadCollision(gpuClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false);
+                await loadCollision(gpuClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false, avatarJointsRef.current);
 
                 // Push pre-existing freeze state — the separate freeze useEffect
                 // fires on mount before gpuClientRef is set, so it's a no-op.
@@ -562,7 +567,7 @@ export function useSimulationLifecycle({
               wasmClient.requestEdgeData();
 
               // Load collision BEFORE starting (prevents explosion)
-              await loadCollision(wasmClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, true);
+              await loadCollision(wasmClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, true, avatarJointsRef.current);
 
               if (!cancelled) {
                 wasmClient.start();
@@ -609,7 +614,7 @@ export function useSimulationLifecycle({
             client.requestEdgeData();
 
             // Load collision BEFORE starting (prevents explosion)
-            await loadCollision(client, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false);
+            await loadCollision(client, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false, avatarJointsRef.current);
 
             if (!cancelled) {
               client.start();
@@ -715,7 +720,7 @@ export function useSimulationLifecycle({
 
     collisionRebuildTimer.current = setTimeout(async () => {
       try {
-        const collisionMesh = await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight);
+        const collisionMesh = await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, avatarJointsRef.current);
         if (!collisionMesh) return;
 
         // Check client is still alive (user may have stopped sim); skip a
