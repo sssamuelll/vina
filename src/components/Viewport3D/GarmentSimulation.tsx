@@ -26,7 +26,9 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece, Seam, SeamGroup } from '../../types/types';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
-import { resolveArrangement } from '../../utils/cloth/arrangement/arrangementBinding';
+import { resolveArrangementWithFrames } from '../../utils/cloth/arrangement/arrangementBinding';
+import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
+import { DEFAULT_WRAP } from '../../utils/cloth/arrangement/wrapParams';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { addPin, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
@@ -234,7 +236,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const { staticGeometry } = useMemo(() => {
     if (pieceMeshes.length === 0) return { staticGeometry: null };
 
-    const placements = resolveArrangement(activePieces, avatarMeasurements, arrangementOverrides);
+    const arrangement = resolveArrangementWithFrames(activePieces, avatarMeasurements, arrangementOverrides);
+    // Index the arrangement by pieceId: useMeshing may drop pieces that fail to
+    // mesh, so pieceMeshes is not guaranteed index-aligned with activePieces.
+    const arrangeById = new Map(activePieces.map((p, i) => [p.id, arrangement[i]]));
 
     let totalVerts = 0;
     for (const p of pieceMeshes) {
@@ -252,23 +257,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const p = pieceMeshes[pi];
       const numVerts = p.vertices.length / 3;
       const color = new THREE.Color(PIECE_COLORS[pi % PIECE_COLORS.length]);
-      const placement = placements[pi];
+      const { frame, flip } = arrangeById.get(p.pieceId) ?? arrangement[pi];
 
-      const [rx, ry, rz] = placement.rotation;
-      const [px, py, pz] = placement.position;
-      const cx = Math.cos(rx), sx = Math.sin(rx);
-      const cy = Math.cos(ry), sy = Math.sin(ry);
-      const cz = Math.cos(rz), sz = Math.sin(rz);
-
-      for (let vi = 0; vi < numVerts; vi++) {
-        const vx = p.vertices[vi * 3], vy = p.vertices[vi * 3 + 1], vz = p.vertices[vi * 3 + 2];
-        const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
-        const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
-        const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
-        positions[(vOffset + vi) * 3] = x3 + px;
-        positions[(vOffset + vi) * 3 + 1] = y3 + py;
-        positions[(vOffset + vi) * 3 + 2] = z2 + pz;
-      }
+      // Envelope wrap (Task 5): curve each piece's flat mesher vertices over the
+      // region cylinder (frame.point already carries the gross landmark, so the
+      // wrap fully replaces the old rigid Euler rotate+translate). `flip` is the
+      // M4-C anatomy-up correction. MUST stay identical to the solver loop.
+      const curved = wrapPlacedMesh(p.vertices, frame, DEFAULT_WRAP, flip);
+      positions.set(curved, vOffset * 3);
 
       for (let i = 0; i < numVerts; i++) {
         colors[(vOffset + i) * 3] = color.r;
@@ -312,27 +308,17 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
     // M2: arrange-mode drags apply here too — what the user sees in the
     // arrange view is EXACTLY where the solver starts.
-    const placements = resolveArrangement(activePieces, avatarMeasurements, arrangementOverrides);
+    const arrangement = resolveArrangementWithFrames(activePieces, avatarMeasurements, arrangementOverrides);
+    // Index by pieceId — pieceMeshes may have dropped failed-to-mesh pieces, so
+    // it is not guaranteed index-aligned with activePieces (matches render loop).
+    const arrangeById = new Map(activePieces.map((p, i) => [p.id, arrangement[i]]));
 
     return pieceMeshes.map((pm, i) => {
-      const placement = placements[i] || { position: [0, 1.0, -0.2], rotation: [0, 0, 0] };
-      const [rx, ry, rz] = placement.rotation;
-      const [px, py, pz] = placement.position;
-      const cx = Math.cos(rx), sx = Math.sin(rx);
-      const cy = Math.cos(ry), sy = Math.sin(ry);
-      const cz = Math.cos(rz), sz = Math.sin(rz);
-
-      const numVerts = pm.vertices.length / 3;
-      const transformed = new Float32Array(pm.vertices.length);
-      for (let vi = 0; vi < numVerts; vi++) {
-        const vx = pm.vertices[vi * 3], vy = pm.vertices[vi * 3 + 1], vz = pm.vertices[vi * 3 + 2];
-        const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
-        const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
-        const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
-        transformed[vi * 3] = x3 + px;
-        transformed[vi * 3 + 1] = y3 + py;
-        transformed[vi * 3 + 2] = z2 + pz;
-      }
+      const { frame, flip } = arrangeById.get(pm.pieceId) ?? arrangement[i];
+      // Envelope wrap (Task 5): IDENTICAL call to the render loop above — render
+      // and solver must not diverge. `frame.point` carries the landmark; `flip`
+      // is the M4-C anatomy-up correction.
+      const transformed = wrapPlacedMesh(pm.vertices, frame, DEFAULT_WRAP, flip);
       const piece = activePieces[i];
       const stiffnessMultiplier = computeStiffnessMultiplier(piece?.interfacingType, piece?.solidifyFactor);
       const pressurePa = piece?.pressurePa ?? 0;

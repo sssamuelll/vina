@@ -359,11 +359,40 @@ export function outlineBBoxCenter(outline: PathCommand[]): { cx: number; cy: num
 // pieces is NOT resolved here — left/right pairing is the autoSew world
 // refinement's job; this pass only guarantees anatomy-up.
 
-const ANATOMY_TOP_ROOTS = new Set(['neckline', 'shoulder', 'sleevecap', 'collarneckedge']);
-const ANATOMY_BOTTOM_ROOTS = new Set(['hemline', 'cuffedge', 'collarouteredge']);
+export const ANATOMY_TOP_ROOTS = new Set(['neckline', 'shoulder', 'sleevecap', 'collarneckedge']);
+export const ANATOMY_BOTTOM_ROOTS = new Set(['hemline', 'cuffedge', 'collarouteredge']);
 
-function edgeRoot(name: string): string {
+export function edgeRoot(name: string): string {
   return name.toLowerCase().replace(/-\d+$/, '');
+}
+
+/**
+ * Mesher-local endpoints (((x−cx)·0.001, 0, (y−cy)·0.001) — the
+ * cdtMesher.convertToClothMeshData convention) of the piece's edges whose root
+ * is in `roots`. The wrap consumes these to decide its own (wrap-space) flip,
+ * which is NOT the rigid-Euler flip `computeFlipFlags` produces — the rigid
+ * placement and the wrap map local→world differently (front/back normal and
+ * the binormal basis), so they disagree on front-torso/collar. Returns [] when
+ * the piece carries no matching anatomical edge.
+ */
+export function anatomyLocalEndpoints(
+  piece: PatternPiece,
+  roots: Set<string>,
+): Array<[number, number, number]> {
+  if (!piece.edges || piece.edges.length === 0) return [];
+  const center = outlineBBoxCenter(piece.outline);
+  const flat = flattenPath(piece.outline, 12);
+  const out: Array<[number, number, number]> = [];
+  for (const e of piece.edges) {
+    if (!roots.has(edgeRoot(e.name))) continue;
+    const [fs, fe] = commandRangeToFlattened(piece.outline, e.segmentRange, 12);
+    for (const idx of [fs, fe % flat.length]) {
+      const p = flat[idx];
+      if (!p) continue;
+      out.push([(p.x - center.cx) * 0.001, 0, (p.y - center.cy) * 0.001]);
+    }
+  }
+  return out;
 }
 
 /** Mean world-Y of the endpoints of the piece's edges whose root is in `roots`. */
@@ -391,21 +420,48 @@ function meanEdgeWorldY(
 }
 
 /**
+ * Per-piece in-plane flip flags: `true` where the piece's anatomy lands
+ * upside-down under its placement (anatomical TOP edges below BOTTOM in world).
+ * Pieces without anatomical evidence (no semantic edges, no top/bottom roles —
+ * synthetic rectangles, unclassified pieces) report `false`.
+ *
+ * THE single anatomy-up oracle: `normalizeInPlaneOrientation` applies it as an
+ * Euler flip (rigid path) and the wrap (Task 5) consumes it via
+ * `resolveArrangementWithFrames` → `wrapPlacedMesh(..., flip)`. Both must read
+ * the SAME decision, so this is the one place the `meanEdgeWorldY(top) <
+ * meanEdgeWorldY(bottom)` test lives (the mariaShirt.m4 sonda pins that the
+ * rigid path stays byte-identical).
+ */
+export function computeFlipFlags(
+  pieces: PatternPiece[],
+  placements: PlacementResult[],
+): boolean[] {
+  return placements.map((placement, i) => {
+    const piece = pieces[i];
+    if (!piece) return false;
+    const topY = meanEdgeWorldY(piece, placement, ANATOMY_TOP_ROOTS);
+    const bottomY = meanEdgeWorldY(piece, placement, ANATOMY_BOTTOM_ROOTS);
+    if (topY == null || bottomY == null) return false;
+    return topY < bottomY; // anatomy inverted → flip
+  });
+}
+
+/**
  * Flip pieces whose anatomy lands upside-down in world. Returns a new array;
  * placements without anatomical evidence (no semantic edges, no top/bottom
  * roles — synthetic rectangles, unclassified pieces) pass through untouched.
+ *
+ * Delegates the decision to `computeFlipFlags` (single oracle) and applies it
+ * as the closed-form in-plane 180° Euler flip — byte-identical to the previous
+ * inline test (mariaShirt.m4 sonda pins this).
  */
 export function normalizeInPlaneOrientation(
   pieces: PatternPiece[],
   placements: PlacementResult[],
 ): PlacementResult[] {
+  const flips = computeFlipFlags(pieces, placements);
   return placements.map((placement, i) => {
-    const piece = pieces[i];
-    if (!piece) return placement;
-    const topY = meanEdgeWorldY(piece, placement, ANATOMY_TOP_ROOTS);
-    const bottomY = meanEdgeWorldY(piece, placement, ANATOMY_BOTTOM_ROOTS);
-    if (topY == null || bottomY == null) return placement;
-    if (topY >= bottomY) return placement; // anatomy already up
+    if (!flips[i]) return placement; // anatomy already up (or no evidence)
     const [rx, ry, rz] = placement.rotation;
     return { ...placement, rotation: [rx, -ry, rz + Math.PI] as [number, number, number] };
   });

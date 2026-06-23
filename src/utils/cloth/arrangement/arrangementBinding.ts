@@ -11,8 +11,10 @@
  */
 import * as THREE from 'three';
 import type { BodyMeasurements, PatternPiece } from '../../../types/types';
-import { computeAutoFrame, computeEffectiveRegions, deriveDimensions, detectBodyRegion, outlineBBox, placeGarmentPieces, type PlacementResult } from '../garmentPlacement';
+import { ANATOMY_BOTTOM_ROOTS, ANATOMY_TOP_ROOTS, anatomyLocalEndpoints, computeAutoFrame, computeEffectiveRegions, deriveDimensions, detectBodyRegion, outlineBBox, placeGarmentPieces, type BodyRegion, type PlacementResult } from '../garmentPlacement';
 import { surfaceFrame, type SurfaceFrame, type V3 } from './surfaceFrame';
+import { wrapPanel } from './wrapPanel';
+import { DEFAULT_WRAP } from './wrapParams';
 
 export interface ArrangementBinding {
   space: 'frame';
@@ -92,6 +94,65 @@ export function resolveArrangement(
 export interface PlacementWithFrame {
   placement: PlacementResult;
   frame: SurfaceFrame;
+  /**
+   * M4-C in-plane 180° flag for the WRAP: the piece's 2D anatomy is drawn
+   * upside-down, so the wrap must pre-flip its local vertices
+   * (`wrapPlacedMesh(..., flip)`).
+   *
+   * IMPORTANT — this is NOT `garmentPlacement.computeFlipFlags` (the rigid-Euler
+   * oracle that `normalizeInPlaneOrientation` uses). The rigid placement and the
+   * wrap map local→world differently (the rigid path's per-region base Euler vs
+   * the wrap's `axis`/`binormal` basis), so the two flips DISAGREE on
+   * front-torso and collar for María's real pieces. The flip must be measured in
+   * the space it is applied — here, wrap space — or anatomy lands upside-down.
+   * `false` for pieces with no anatomical evidence. (wrapOrientation.test.ts is
+   * the safety net that caught the rigid-flag-into-wrap mismatch.)
+   */
+  flip: boolean;
+}
+
+/** Mean of `axis·(wrappedPoint − frame.point)` over a region's anatomy edges =
+ * mean local-z along the wrap axis (proximal/distal for sleeves, low/high for
+ * upright regions). null when the piece carries no matching edge. */
+function meanAxisProjection(
+  pieceOutlineEndpoints: Array<[number, number, number]>,
+  frame: SurfaceFrame,
+): number | null {
+  if (pieceOutlineEndpoints.length === 0) return null;
+  const [ax, ay, az] = frame.axis;
+  const al = Math.hypot(ax, ay, az) || 1;
+  const [px, py, pz] = frame.point;
+  let sum = 0;
+  for (const lv of pieceOutlineEndpoints) {
+    const w = wrapPanel(lv, frame, DEFAULT_WRAP);
+    sum += ((w[0] - px) * ax + (w[1] - py) * ay + (w[2] - pz) * az) / al;
+  }
+  return sum / pieceOutlineEndpoints.length;
+}
+
+/**
+ * Per-piece flip flags for the WRAP, measured in wrap space (see PlacementWithFrame.flip).
+ * Flip when the anatomical TOP would land on the wrong side of the wrap axis vs
+ * the BOTTOM: for sleeves TOP (sleeveCap) must be PROXIMAL (smaller axis
+ * projection = closer to the shoulder); for upright regions TOP must be HIGHER
+ * along the axis. Pieces without top+bottom anatomical evidence flag `false`.
+ */
+export function computeWrapFlipFlags(
+  pieces: PatternPiece[],
+  frames: SurfaceFrame[],
+  regions: BodyRegion[],
+): boolean[] {
+  return pieces.map((p, i) => {
+    const frame = frames[i];
+    const topProj = meanAxisProjection(anatomyLocalEndpoints(p, ANATOMY_TOP_ROOTS), frame);
+    const botProj = meanAxisProjection(anatomyLocalEndpoints(p, ANATOMY_BOTTOM_ROOTS), frame);
+    if (topProj == null || botProj == null) return false;
+    const isSleeve = regions[i] === 'left-sleeve' || regions[i] === 'right-sleeve'
+      || regions[i] === 'cuff-left' || regions[i] === 'cuff-right';
+    // Upright when: sleeves → TOP proximal (topProj < botProj);
+    //               others → TOP high (topProj > botProj). Flip otherwise.
+    return isSleeve ? topProj > botProj : topProj < botProj;
+  });
 }
 
 /**
@@ -118,8 +179,15 @@ export function resolveArrangementWithFrames(
   const placements = resolveArrangement(pieces, measurements, overrides, opts);
   const dims = deriveDimensions(measurements);
 
-  return pieces.map((p, i) => {
+  const frames = pieces.map((p, i) => {
     const axisHint = opts?.skeletonReady === false ? undefined : opts?.axisHints?.[p.id];
-    return { placement: placements[i], frame: surfaceFrame(regions[i], dims, axisHint) };
+    return surfaceFrame(regions[i], dims, axisHint);
   });
+
+  // M4-C flip flags measured in WRAP space (NOT the rigid computeFlipFlags —
+  // see PlacementWithFrame.flip). The wrap basis differs from the rigid Euler,
+  // so the flip must be decided against the actual frame+wrapPanel mapping.
+  const flips = computeWrapFlipFlags(pieces, frames, regions);
+
+  return pieces.map((_p, i) => ({ placement: placements[i], frame: frames[i], flip: flips[i] }));
 }
