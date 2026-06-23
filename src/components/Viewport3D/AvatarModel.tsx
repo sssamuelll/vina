@@ -6,6 +6,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../../utils/avatar/morphTargets';
 import { IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS, setAvailableMorphTargets, clearMorphTargets } from '../../store/avatarSlice';
+import { setArmAxis } from '../../store/simulationSlice';
 import { clampSwingTwist, ANATOMICAL_CONSTRAINTS } from '../../utils/avatar/swingTwistConstraint';
 import { isVRMFile, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
 import { detectFormat, importMesh, type MeshFormat } from '../../utils/import/meshImporter';
@@ -600,7 +601,24 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
     if (boneMap.current.size > 0) {
       applyPose.current();
     }
-  }, [joints, measurements, morphTargets]);
+    const armDir = (boneName: string, childName: string): [number, number, number] | null => {
+      const bone = boneMap.current.get(boneName);
+      const child = boneMap.current.get(childName);
+      if (!bone) return null;
+      const a = new THREE.Vector3(); bone.getWorldPosition(a);
+      if (child) {
+        const b = new THREE.Vector3(); child.getWorldPosition(b);
+        const d = b.sub(a).normalize();
+        if (d.lengthSq() > 1e-8) return [d.x, d.y, d.z];
+      }
+      const q = new THREE.Quaternion(); bone.getWorldQuaternion(q);
+      const d = new THREE.Vector3(1, 0, 0).applyQuaternion(q).normalize();
+      return [d.x, d.y, d.z];
+    };
+    const left = armDir('LeftArm', 'LeftForeArm');
+    const right = armDir('RightArm', 'RightForeArm');
+    dispatch(setArmAxis({ left, right, ready: boneMap.current.size > 0 }));
+  }, [joints, measurements, morphTargets, dispatch]);
 
   // Also apply every frame for smooth animation + VRM spring bones
   useFrame((_, delta) => {
