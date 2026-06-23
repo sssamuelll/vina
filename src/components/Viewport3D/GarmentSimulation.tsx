@@ -241,8 +241,15 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // mesh, so pieceMeshes is not guaranteed index-aligned with activePieces.
     const arrangeById = new Map(activePieces.map((p, i) => [p.id, arrangement[i]]));
 
+    // Skip stale meshes whose piece was deleted: pieceMeshes is async React
+    // state, activePieces shrinks synchronously, so a just-deleted piece has a
+    // mesh but no frame. The old `?? arrangement[pi]` fallback destructured
+    // `undefined` here and crashed the memo (#924).
+    const validMeshes = pieceMeshes.filter(p => arrangeById.has(p.pieceId));
+    if (validMeshes.length === 0) return { staticGeometry: null };
+
     let totalVerts = 0;
-    for (const p of pieceMeshes) {
+    for (const p of validMeshes) {
       totalVerts += p.vertices.length / 3;
     }
 
@@ -253,11 +260,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     let vOffset = 0;
     let hasUVs = false;
 
-    for (let pi = 0; pi < pieceMeshes.length; pi++) {
-      const p = pieceMeshes[pi];
+    for (let pi = 0; pi < validMeshes.length; pi++) {
+      const p = validMeshes[pi];
       const numVerts = p.vertices.length / 3;
       const color = new THREE.Color(PIECE_COLORS[pi % PIECE_COLORS.length]);
-      const { frame, flip } = arrangeById.get(p.pieceId) ?? arrangement[pi];
+      const { frame, flip } = arrangeById.get(p.pieceId)!;
 
       // Envelope wrap (Task 5): curve each piece's flat mesher vertices over the
       // region cylinder (frame.point already carries the gross landmark, so the
@@ -313,8 +320,12 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // it is not guaranteed index-aligned with activePieces (matches render loop).
     const arrangeById = new Map(activePieces.map((p, i) => [p.id, arrangement[i]]));
 
-    return pieceMeshes.map((pm, i) => {
-      const { frame, flip } = arrangeById.get(pm.pieceId) ?? arrangement[i];
+    // Skip stale meshes (deleted piece, no frame) — same guard as the render
+    // loop; the old `?? arrangement[i]` fallback destructured undefined (#924).
+    return pieceMeshes
+      .filter(pm => arrangeById.has(pm.pieceId))
+      .map((pm) => {
+      const { frame, flip } = arrangeById.get(pm.pieceId)!;
       // Envelope wrap (Task 5): IDENTICAL call to the render loop above — render
       // and solver must not diverge. `frame.point` carries the landmark; `flip`
       // is the M4-C anatomy-up correction.
