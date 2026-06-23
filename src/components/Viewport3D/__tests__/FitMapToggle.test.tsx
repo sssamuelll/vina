@@ -72,6 +72,7 @@ function createTestStore() {
         xrayActiveLayer: null,
         xrayOpacitySnapshot: null,
         piecePressures: {},
+        armAxis: { left: null, right: null, ready: false },
       },
     },
   });
