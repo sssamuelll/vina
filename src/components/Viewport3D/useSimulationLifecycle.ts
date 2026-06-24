@@ -192,7 +192,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 /** Load avatar collision mesh and custom bodies into a solver client (shared between WASM and CPU paths) */
 async function loadCollision(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  client: { setCollisionMesh: (mesh: any) => void; updateCollisionBody: (data: any) => void },
+  client: { setCollisionMesh: (mesh: any, friction?: number) => void; updateCollisionBody: (data: any) => void },
   avatarModelUrl: string | null,
   avatarHeight: number,
   collisionBodies: Array<{
@@ -206,6 +206,7 @@ async function loadCollision(
   cancelled: { value: boolean },
   isWasm: boolean,
   joints: Record<string, { x: number; y: number; z: number }>,
+  bodyFriction?: number,
 ): Promise<void> {
   // Avatar collision mesh
   if (avatarModelUrl && !cancelled.value) {
@@ -217,7 +218,9 @@ async function loadCollision(
       );
       if (collisionMesh && !cancelled.value) {
         console.log('[SimLifecycle] ✅ Collision mesh extracted:', collisionMesh.triCount, 'triangles');
-        client.setCollisionMesh(collisionMesh);
+        // F0: pass the active fabric's body-friction (was dead data). undefined →
+        // setCollisionMesh falls back to its AVATAR_FRICTION (0.4 cotton) default.
+        client.setCollisionMesh(collisionMesh, bodyFriction);
         if (isWasm && 'applyInitialTriangleCollision' in client) {
           (client as WasmSolverClient).applyInitialTriangleCollision();
         }
@@ -521,7 +524,7 @@ export function useSimulationLifecycle({
 
                 // Load collision meshes — setCollisionMesh routes through BVH builder in TSL mode
                 // Read from refs (not closure) to avoid stale values and reinit cascades (#315)
-                await loadCollision(gpuClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false, avatarJointsRef.current);
+                await loadCollision(gpuClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
 
                 // Push pre-existing freeze state — the separate freeze useEffect
                 // fires on mount before gpuClientRef is set, so it's a no-op.
@@ -567,7 +570,7 @@ export function useSimulationLifecycle({
               wasmClient.requestEdgeData();
 
               // Load collision BEFORE starting (prevents explosion)
-              await loadCollision(wasmClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, true, avatarJointsRef.current);
+              await loadCollision(wasmClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, true, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
 
               if (!cancelled) {
                 wasmClient.start();
@@ -614,7 +617,7 @@ export function useSimulationLifecycle({
             client.requestEdgeData();
 
             // Load collision BEFORE starting (prevents explosion)
-            await loadCollision(client, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false, avatarJointsRef.current);
+            await loadCollision(client, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
 
             if (!cancelled) {
               client.start();
@@ -729,7 +732,8 @@ export function useSimulationLifecycle({
         const client = (gpuDowngradedRef.current ? null : gpuClientRef.current) || wasmClientRef.current || clientRef.current;
         if (client) {
           console.log('[SimLifecycle] ♻️ Collision mesh rebuilt for measurement change:', collisionMesh.triCount, 'tris');
-          client.setCollisionMesh(collisionMesh);
+          // F0: keep the fabric's body-friction on pose/measurement rebuilds too.
+          client.setCollisionMesh(collisionMesh, getPhysicalFabric(fabricId)?.frictionBody);
         }
       } catch (e) {
         console.warn('[SimLifecycle] Collision mesh rebuild failed:', e);
@@ -742,7 +746,9 @@ export function useSimulationLifecycle({
         collisionRebuildTimer.current = null;
       }
     };
-  }, [measurements, morphTargets, avatarModelUrl, avatarHeight, simulationState]);
+    // fabricId is a dep so a fabric swap rebuilds the avatar collider with the
+    // new frictionBody (F0); the rebuild is debounced + gated on running sim.
+  }, [measurements, morphTargets, avatarModelUrl, avatarHeight, simulationState, fabricId]);
 
   // ─── Push wind config to GPU solver when it changes ───────────────────────
   useEffect(() => {

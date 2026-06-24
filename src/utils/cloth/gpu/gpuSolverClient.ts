@@ -798,10 +798,15 @@ export class GpuSolverClient implements ClothSolverClient {
    * Vertices should be expanded: 9 floats per triangle (3 verts × 3 components).
    * Normals: 3 floats per triangle.
    */
-  setCollisionMesh(mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }): void {
+  setCollisionMesh(
+    mesh: { vertices: Float32Array; normals: Float32Array; triCount: number },
+    friction: number = AVATAR_FRICTION,
+  ): void {
     if (this.tslSolver) {
-      // TSL mode: build BVH and create TSL collision body
-      this.setTslCollisionBody('__avatar__', mesh, AVATAR_FRICTION, AVATAR_MARGIN);
+      // TSL mode: build BVH and create TSL collision body. `friction` carries the
+      // active fabric's frictionBody (F0 — was dead data); AVATAR_FRICTION (0.4
+      // cotton-on-skin) stays the fallback when no fabric friction is provided.
+      this.setTslCollisionBody('__avatar__', mesh, friction, AVATAR_MARGIN);
       return;
     }
     this.solver.setCollisionMesh(mesh);
@@ -810,11 +815,16 @@ export class GpuSolverClient implements ClothSolverClient {
   /**
    * Update collision mesh vertices/normals (same triangle count, reuses buffers).
    */
-  updateCollisionMesh(vertices: Float32Array, normals: Float32Array): void {
+  updateCollisionMesh(
+    vertices: Float32Array,
+    normals: Float32Array,
+    friction: number = AVATAR_FRICTION,
+  ): void {
     if (this.tslSolver) {
-      // TSL mode: rebuild BVH (topology may differ, so full rebuild)
+      // TSL mode: rebuild BVH (topology may differ, so full rebuild). `friction`
+      // carries the active fabric's frictionBody (F0); AVATAR_FRICTION fallback.
       const triCount = vertices.length / 9;
-      this.setTslCollisionBody('__avatar__', { vertices, normals, triCount }, AVATAR_FRICTION, AVATAR_MARGIN);
+      this.setTslCollisionBody('__avatar__', { vertices, normals, triCount }, friction, AVATAR_MARGIN);
       return;
     }
     this.solver.updateCollisionMesh(vertices, normals);

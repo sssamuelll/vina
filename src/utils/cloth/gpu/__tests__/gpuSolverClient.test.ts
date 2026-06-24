@@ -1022,6 +1022,23 @@ describe('avatar collision calibration M4-D (behavior #13 — #897 F2)', () => {
       0.008,
     );
   });
+
+  // F0 (cloth-realism north star): fabric.frictionBody was dead data — the GPU
+  // avatar body always used the hardcoded AVATAR_FRICTION (0.4 cotton-on-skin).
+  // Now the caller passes the active fabric's frictionBody; 0.4 stays the
+  // fallback when no friction is provided (the two tests above still hold).
+  it('setCollisionMesh forwards a provided fabric body-friction to __avatar__ (F0)', async () => {
+    const spy = vi.spyOn(GpuSolverClient.prototype, 'setTslCollisionBody');
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    const mesh = makeTriCollisionMesh();
+    client.setCollisionMesh(mesh, 0.6); // e.g. denim frictionBody (was ignored → 0.4)
+
+    expect(spy).toHaveBeenCalledWith('__avatar__', mesh, 0.6, 0.008);
+  });
 });
 
 // ─── Behavior #14 — default damping 0.99, not 0.9603 (#897 F2) ───────────────
