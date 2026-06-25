@@ -128,8 +128,8 @@ const SHARED_DEFAULTS = {
   stretchComplianceWarp: 0.0,
   stretchComplianceWeft: 0.0,
   stretchComplianceShear: 0.001,
-  bendComplianceWarp: 1.0,
-  bendComplianceWeft: 1.0,
+  bendComplianceWarp: 2.5e-5, // #gummy STEP 1: was 1.0 (dead bend), lockstep CPU↔WASM
+  bendComplianceWeft: 2.5e-5,
   internalDamping: 0.3,
 };
 

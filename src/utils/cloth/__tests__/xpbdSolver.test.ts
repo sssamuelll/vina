@@ -411,8 +411,8 @@ describe('XPBDClothSolver - Anisotropic Bending', () => {
   it('should use default anisotropic bending values', () => {
     const mesh = makeSquareMesh();
     const solver = new XPBDClothSolver(mesh);
-    expect(solver.config.bendComplianceWarp).toBe(1.0);
-    expect(solver.config.bendComplianceWeft).toBe(1.0);
+    expect(solver.config.bendComplianceWarp).toBe(2.5e-5); // #gummy STEP 1: was 1.0 (dead bend)
+    expect(solver.config.bendComplianceWeft).toBe(2.5e-5);
   });
 });
 

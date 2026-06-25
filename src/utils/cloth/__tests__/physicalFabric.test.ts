@@ -175,6 +175,20 @@ describe('toXPBDParams', () => {
     }
   });
 
+  it('bend compliance lands in the solver live alpha band (dead-bend fix)', () => {
+    // The GPU/WASM/CPU solvers compute alpha = compliance/sdt² with sdt=1/900
+    // (sdt²≈1.23e-6). A bend compliance on the old 0.05-20 scale gives
+    // alpha=40k-16M → correction ≈0 → the bend constraint is DEAD (floppy cloth).
+    // Every fabric must land in ~[1.2e-6, 2e-4] so the bend actually resists folding.
+    for (const f of PHYSICAL_FABRIC_LIBRARY) {
+      const p = toXPBDParams(f);
+      for (const c of [p.bendComplianceWarp, p.bendComplianceWeft]) {
+        expect(c).toBeGreaterThanOrEqual(1.2e-6);
+        expect(c).toBeLessThanOrEqual(2e-4);
+      }
+    }
+  });
+
   it('preserves diagnostic thresholds', () => {
     const poplin = getPhysicalFabric('cotton-poplin')!;
     const params = toXPBDParams(poplin);

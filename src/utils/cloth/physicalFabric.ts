@@ -664,10 +664,16 @@ export function toXPBDParams(pf: PhysicalFabric): PhysicalXPBDParams {
   const stretchComplianceWarp = pf.stretchWarp / 10;
   const stretchComplianceWeft = pf.stretchWeft / 10;
 
-  // Bending: mN·cm → compliance (inverse: higher rigidity = lower compliance)
-  // Scale: 0.04 mN·cm → 20.0 compliance (chiffon), 8.0 mN·cm → 0.1 compliance (neoprene)
-  const bendComplianceWarp = Math.max(0.05, 1 / (pf.bendingWarp + 0.05));
-  const bendComplianceWeft = Math.max(0.05, 1 / (pf.bendingWeft + 0.05));
+  // Bending: mN·cm → XPBD compliance (inverse: higher rigidity = lower compliance).
+  // RESCALED to the solver's live alpha band (#gummy STEP 1): the solver computes
+  // alpha = compliance/sdt² with sdt=1/900 (sdt²≈1.23e-6), so compliance must be
+  // ~[1.2e-6, 2e-4] to produce a real bend correction. The OLD scale (0.05-20) gave
+  // alpha=40k-16M → s≈0 → DEAD bend constraint → floppy/gummy cloth with no body.
+  // BEND_K=2e-5: cotton (0.8 mN·cm) → ~2.2e-5; chiffon (~0.04) → ~1.4e-4 (soft);
+  // neoprene (~8) → ~2.5e-6 (stiff). Same inverse law, corrected magnitude.
+  const BEND_K = 2.0e-5;
+  const bendComplianceWarp = Math.min(2e-4, Math.max(1.2e-6, BEND_K / (pf.bendingWarp + 0.1)));
+  const bendComplianceWeft = Math.min(2e-4, Math.max(1.2e-6, BEND_K / (pf.bendingWeft + 0.1)));
 
   // Shear: N/m → compliance (inverse)
   const shearCompliance = Math.max(0.01, 10 / (pf.shearStiffness + 1));

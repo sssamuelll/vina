@@ -362,8 +362,12 @@ export class GpuSolverClient implements ClothSolverClient {
       stretchComplianceWarp: 0.0,
       stretchComplianceWeft: 0.0,
       shearCompliance: 0.001,
-      bendComplianceWarp: 1.0,
-      bendComplianceWeft: 1.0,
+      // #gummy STEP 1: 1.0 → 2.5e-5. alpha=compliance/sdt² (sdt=1/900) gave
+      // alpha=810000 at 1.0 → s≈0 → DEAD bend → cloth had no body (floppy/gummy).
+      // 2.5e-5 → alpha≈20 → real bending stiffness. ≈ cotton's toXPBDParams value.
+      // PARITY: WASM (lib.rs) + CPU (xpbdSolver) carry the SAME default in lockstep.
+      bendComplianceWarp: 2.5e-5,
+      bendComplianceWeft: 2.5e-5,
     };
 
     const numStretch = stretch.ids.length / 2;

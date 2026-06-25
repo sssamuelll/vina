@@ -395,4 +395,55 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     // el rojo es la evidencia, y se pone verde cuando la épica cierra.
     expect(1000 / medianMs).toBeGreaterThanOrEqual(30);
   });
+
+  // ── DIAG (maintainer-run, log-only): long-horizon descent trajectory ─────────
+  // Samuel observes the garment "melting" into the torso over time + avatar skin
+  // showing through. The drape-M4 test only samples 2.5s/10s and is blind to the
+  // >10s horizon and to interpenetration. This probe samples readDrape every 1s
+  // out to 30s SIM so the maintainer can SEE whether descent is arrested (A1
+  // cured it) or creeps past 10s (structural residue): maxY falling = melting
+  // from the top; belowHip rising = falling below the hip. Log-only — asserts
+  // ONLY nan===0 so --repeat-each=N runs every repeat to completion without abort.
+  test('DIAG @gpu-local long-horizon descent 0-30s (log-only)', async ({ page }) => {
+    test.setTimeout(420_000);
+    await importSewAndSimulate(page);
+    await expect
+      .poll(async () => getState<boolean>(page, 'simulation.bodyCollision'), { timeout: 30_000 })
+      .toBe(true);
+    // areaStretchPct = mesh triangle area vs the t=1s reference. A rigid (real)
+    // fabric is near-inextensible → area stays ~flat. A "gummy" cloth keeps
+    // inflating under gravity → area climbs. This is the objective stretch metric.
+    let area0 = 0;
+    for (let w = 2; w <= 16; w += 2) {
+      // every 2 windows = 1.0s SIM, out to 8s (gummy shows early)
+      await waitForSimWindows(page, w, 90_000);
+      const d = await readDrape(page);
+      const m = await page.evaluate(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mesh = (window as any).__OPENCLO_CLOTH_MESH__;
+        if (!mesh) return { sleeve: 0, area: 0 };
+        const pos = mesh.geometry.attributes.position;
+        const idx = mesh.geometry.index;
+        let sleeve = 0;
+        for (let i = 0; i < pos.count; i++) if (Math.abs(pos.getX(i)) > 0.25) sleeve++;
+        let area = 0;
+        if (idx) {
+          for (let t = 0; t < idx.count; t += 3) {
+            const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+            const ux = pos.getX(b) - pos.getX(a), uy = pos.getY(b) - pos.getY(a), uz = pos.getZ(b) - pos.getZ(a);
+            const vx = pos.getX(c) - pos.getX(a), vy = pos.getY(c) - pos.getY(a), vz = pos.getZ(c) - pos.getZ(a);
+            const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+            area += 0.5 * Math.sqrt(cx * cx + cy * cy + cz * cz);
+          }
+        }
+        return { sleeve, area };
+      });
+      if (area0 === 0) area0 = m.area;
+      const stretchPct = area0 > 0 ? (m.area / area0 - 1) * 100 : 0;
+      console.log(
+        `[diag-gummy] simSeconds=${(w * 0.5).toFixed(1)} belowHip=${d!.belowHipPct.toFixed(2)} minY=${d!.minY.toFixed(3)} maxY=${d!.maxY.toFixed(3)} sleeve=${m.sleeve} areaStretchPct=${stretchPct.toFixed(2)} nan=${d!.nan}`,
+      );
+      expect(d!.nan).toBe(0);
+    }
+  });
 });

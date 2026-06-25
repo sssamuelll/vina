@@ -148,7 +148,7 @@ impl XpbdSolver {
             damping: 0.99,
             substeps: 15,
             stretch_compliance: 0.0,
-            bend_compliance: 1.0,
+            bend_compliance: 2.5e-5, // #gummy STEP 1: was 1.0 (alpha 810k → dead bend); lockstep w/ GPU+CPU
             ground_y: 0.0,
             collision_margin: 0.005,
             drag_coefficient: 1.0,
@@ -158,8 +158,8 @@ impl XpbdSolver {
             stretch_compliance_shear: 0.001,
             stretch_compliances: Vec::new(),
             stretch_edge_types: Vec::new(),
-            bend_compliance_warp: 1.0,
-            bend_compliance_weft: 1.0,
+            bend_compliance_warp: 2.5e-5, // #gummy STEP 1: was 1.0 (dead bend)
+            bend_compliance_weft: 2.5e-5,
             bend_compliances: Vec::new(),
             bend_edge_types: Vec::new(),
             internal_damping: 0.3,
@@ -1773,15 +1773,15 @@ mod tests {
         let inv_mass = vec![1.0; 4];
         let mut s = XpbdSolver::new(&positions, &inv_mass);
 
-        // Two warp-edge bend constraints, default warp = 1.0.
+        // Two warp-edge bend constraints, default warp = 2.5e-5 (#gummy STEP 1).
         s.set_bend_with_types(
             &[0u32, 1, 2, 3, 0, 1, 2, 3],
             &[1.0, 1.0],
             &[0u8, 0],
         );
         assert!(
-            s.bend_compliances.iter().all(|&c| (c - 1.0).abs() < 1e-9),
-            "init: bend cache should reflect default warp=1.0"
+            s.bend_compliances.iter().all(|&c| (c - 2.5e-5).abs() < 1e-9),
+            "init: bend cache should reflect default warp=2.5e-5"
         );
 
         // Mutate warp via configure — cache MUST regenerate.
