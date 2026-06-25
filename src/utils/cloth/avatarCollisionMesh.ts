@@ -17,8 +17,10 @@ export async function extractAvatarCollisionMesh(
   avatarUrl: string,
   avatarHeight: number,
   joints?: Record<string, { x: number; y: number; z: number }>,
+  measurements?: import('../avatar/morphTargets').MorphConfig,
+  morphTargets?: Record<string, number>,
 ): Promise<CollisionMeshData | null> {
-  const { extractMeshData, applyPose } = await import('./avatarMeshExtractor');
+  const { extractMeshData, applyPose, applyMorph } = await import('./avatarMeshExtractor');
   const { importMesh } = await import('../import/meshImporter');
 
   const filename = avatarUrl.split('/').pop() || avatarUrl;
@@ -33,10 +35,13 @@ export async function extractAvatarCollisionMesh(
   // world-matrix tree before extractMeshData's skeleton.update() reads
   // bone.matrixWorld. Without this second update the bake mixes posed
   // quaternions with stale (import-scaled) world matrices → minY≈0 collapse.
-  if (joints && Object.keys(joints).length > 0) {
-    applyPose(result.scene, joints);
-    result.scene.updateMatrixWorld(true);
-  }
+  // Also apply the same measurement MORPH (bone scaling + blendshapes) the render
+  // does (#frente2 collision fix): without it the collider is the BASE avatar while
+  // the render is morphed, so cloth collides with a differently-shaped invisible body.
+  const posed = !!(joints && Object.keys(joints).length > 0);
+  if (posed) applyPose(result.scene, joints!);
+  if (measurements) applyMorph(result.scene, measurements, morphTargets ?? {});
+  if (posed || measurements) result.scene.updateMatrixWorld(true);
 
   const { vertices, indices, normals } = extractMeshData(result.scene);
   console.log(`[AvatarCollision] extractMeshData: ${vertices.length / 3} verts, ${indices.length / 3} tris, normals=${normals ? normals.length / 3 : 'NONE'}`);

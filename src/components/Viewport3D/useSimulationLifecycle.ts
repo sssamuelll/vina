@@ -738,7 +738,15 @@ export function useSimulationLifecycle({
 
     collisionRebuildTimer.current = setTimeout(async () => {
       try {
-        const collisionMesh = await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, avatarJointsRef.current);
+        // #frente2 collision fix: pass measurements (mapped to MorphConfig — same
+        // rename as AvatarModel.tsx:497-505: hip←hips, shoulderWidth←shoulder) +
+        // native morphTargets so the collider matches the MORPHED render body.
+        const morphCfg = {
+          chest: measurements.chest, waist: measurements.waist, hip: measurements.hips,
+          shoulderWidth: measurements.shoulder, height: measurements.height,
+          armLength: measurements.armLength, inseam: measurements.inseam,
+        };
+        const collisionMesh = await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, avatarJointsRef.current, morphCfg, morphTargets);
         if (!collisionMesh) return;
 
         // Check client is still alive (user may have stopped sim); skip a
