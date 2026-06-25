@@ -492,9 +492,15 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // the pre-collision snapshot — so the cap is energy-consistent (folds into
       // vNat) instead of reading as a velocity-excluded collision push.
       substepNodes.push(...solver.strainLimitColors);
-      // Body-tether (frente#2): max-distance cling, after strain-limit, before
-      // groundClamp/snapshot — same energy-consistent slot as strain-limiting.
-      if (solver.tether) substepNodes.push(solver.tether);
+      // Body-tether (frente#2): DISABLED pending a debug pass. @gpu-local shows
+      // it freezes + collapses the drape (belowHip 72%, minY at floor, area
+      // frozen 0.00). Suspected root cause: the init target is captured against
+      // pre-placement (local/origin) cloth positions in captureTetherTargets, so
+      // closest-point lands on the avatar's LOWER body and the kernel clamps the
+      // cloth down there. Kernel/buffers/wiring (Tasks 1-5) are sound + unit-green;
+      // re-enable after fixing the target-capture coordinate frame.
+      const TETHER_ENABLED = false;
+      if (TETHER_ENABLED && solver.tether) substepNodes.push(solver.tether);
       // Ground ANTES de la colisión de cuerpo (#897 F2.3) — espejo WASM:
       // en esa tier el ground corre DENTRO del step de Rust y la colisión
       // de triángulos JS corre después (wasmSolverWorker.ts:336,359). Así
