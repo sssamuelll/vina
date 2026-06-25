@@ -296,6 +296,18 @@ describe('createTslSolver', () => {
     }
   });
 
+  it('returns per-color strain-limit nodes mirroring the stretch colors (#gummy STEP 4)', () => {
+    const buffers = makeMockBufferSet({ numStretchColors: 3 });
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+
+    // Strain-limiting reuses the stretch graph coloring 1:1 (same ids+restLengths,
+    // race-free) → one strain-limit node per stretch color.
+    expect(solver.strainLimitColors).toHaveLength(3);
+    for (const node of solver.strainLimitColors) {
+      expect(node).toHaveProperty('__tslCompute', true);
+    }
+  });
+
   it('returns bend compute node when constraints exist', () => {
     const buffers = makeMockBufferSet({ numBend: 2 });
     const solver = createTslSolver(buffers, { ...defaultConfig });

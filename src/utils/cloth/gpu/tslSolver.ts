@@ -75,6 +75,13 @@ export interface TslSolverConfig {
   thickness?: number;
   windForce?: [number, number, number];
   dragCoefficient?: number;
+  /**
+   * Hard strain limit (#gummy STEP 4): max fractional edge elongation past rest
+   * before a rigid one-sided clamp pulls it back. εmax=0.02 (2%, woven default).
+   * Kills the residual rubberiness the compliant stretch solve can't (Jacobi
+   * under-convergence). 0 disables. GPU-ahead vs WASM/CPU (A7 divergence).
+   */
+  maxStrain?: number;
 }
 
 // ─── Solver interface ────────────────────────────────────────────────────────
@@ -84,6 +91,13 @@ export interface TslSolver {
   preSolve: ComputeNode;
   /** Per-color stretch constraint compute nodes */
   stretchColors: ComputeNode[];
+  /**
+   * Per-color strain-limit compute nodes (#gummy STEP 4). Hard one-sided edge
+   * clamp to restLen*(1+maxStrain); reuses the stretch graph coloring 1:1
+   * (race-free). Dispatch AFTER stretch/bend/seam/self-collision, BEFORE
+   * groundClamp/snapshot. Empty if no stretch constraints.
+   */
+  strainLimitColors: ComputeNode[];
   /** Bend constraint compute node (null if no bend constraints) */
   bend: ComputeNode | null;
   /**
@@ -215,6 +229,7 @@ interface SolverUniforms {
   seamShrinkFactor: FloatUniform;
   seamSewedThreshold: FloatUniform;
   groundY: FloatUniform;
+  maxStrain: FloatUniform;
 }
 
 function createUniforms(config: TslSolverConfig): SolverUniforms {
@@ -229,6 +244,7 @@ function createUniforms(config: TslSolverConfig): SolverUniforms {
     seamShrinkFactor: uniform(config.seamShrinkFactor),
     seamSewedThreshold: uniform(config.seamSewedThreshold),
     groundY: uniform(config.groundY),
+    maxStrain: uniform(config.maxStrain ?? 0.02),
   };
 }
 
@@ -367,6 +383,49 @@ function makeDistanceConstraintFn(
 
         // Push particle 1 in opposite direction
         posBuf.element(id1).addAssign(n.mul(s).mul(w1));
+      });
+    });
+  })();
+}
+
+/**
+ * Strain-limiting kernel (#gummy STEP 4). A rigid, ONE-SIDED distance clamp:
+ * when an edge is stretched past restLen*(1+maxStrain), project both particles
+ * back to that cap (mass-weighted, alpha=0 — no compliance). Never compresses.
+ * Reuses the stretch ids+restLengths + graph coloring (race-free), so it kills
+ * the residual stretch the compliant Jacobi solve under-converges on.
+ */
+function makeStrainLimitFn(
+  posBuf: TslNode,
+  invMassBuf: TslNode,
+  idsBuf: TslNode,
+  restLenBuf: TslNode,
+  maxStrain: FloatUniform,
+  idStride: number,
+  idOffset0: number,
+  idOffset1: number,
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
+    const ci = instanceIndex;
+    const baseIdx = uint(ci).mul(uint(idStride));
+    const id0 = idsBuf.element(baseIdx.add(uint(idOffset0)));
+    const id1 = idsBuf.element(baseIdx.add(uint(idOffset1)));
+    const w0 = invMassBuf.element(id0);
+    const w1 = invMassBuf.element(id1);
+    const delta = posBuf.element(id1).sub(posBuf.element(id0));
+    const len = delta.dot(delta).sqrt();
+    If(len.greaterThan(float(1e-7)), () => {
+      const maxLen = restLenBuf.element(ci).mul(maxStrain.add(float(1.0)));
+      // One-sided: only clamp when over-stretched (never compress the cloth).
+      If(len.greaterThan(maxLen), () => {
+        const denom = w0.add(w1);
+        If(denom.greaterThan(float(0.0)), () => {
+          const s = len.sub(maxLen).negate().div(denom); // rigid (alpha=0)
+          const n = delta.div(len);
+          posBuf.element(id0).addAssign(n.mul(s).mul(w0).negate());
+          posBuf.element(id1).addAssign(n.mul(s).mul(w1));
+        });
       });
     });
   })();
@@ -743,6 +802,19 @@ export function createTslSolver(
     return compute(fn, color.count, [64]);
   });
 
+  // ─── Strain limiting (#gummy STEP 4) — rigid one-sided cap. Reuses the ─
+  // stretch ids+restLengths + graph coloring (race-free); no compliance buffer.
+  const strainLimitColors = buffers.stretchColors.map((color) => {
+    const idsBuf = storage(color.idsSBA, 'uint', color.count * 2);
+    const restBuf = storage(color.restLengthsSBA, 'float', color.count);
+    const fn = makeStrainLimitFn(
+      posBuf, invMassBuf, idsBuf, restBuf,
+      uniforms.maxStrain,
+      2, 0, 1,
+    );
+    return compute(fn, color.count, [64]);
+  });
+
   // ─── Bend constraints (per-constraint compliance) ──────────────────
   let bend: ComputeNode | null = null;
   if (buffers.bendIdsSBA && buffers.bendRestSBA && buffers.bendComplianceSBA && buffers.numBendConstraints > 0) {
@@ -930,6 +1002,10 @@ export function createTslSolver(
       config.dragCoefficient = partial.dragCoefficient;
       windNodes.dragCoeff.value = partial.dragCoefficient;
     }
+    if (partial.maxStrain !== undefined) {
+      config.maxStrain = partial.maxStrain;
+      uniforms.maxStrain.value = partial.maxStrain;
+    }
   }
 
   function dispose(renderer?: unknown): void {
@@ -947,6 +1023,7 @@ export function createTslSolver(
   return {
     preSolve,
     stretchColors,
+    strainLimitColors,
     bend,
     seamColors,
     groundClamp,

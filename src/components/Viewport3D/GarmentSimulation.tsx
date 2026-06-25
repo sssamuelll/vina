@@ -481,6 +481,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         const sc = solver.selfCollisionNodes;
         substepNodes.push(sc.cellClearNode, sc.scatterNode, sc.resolveNode, sc.applyNode);
       }
+      // Strain limiting (#gummy STEP 4): hard one-sided cap on edge over-stretch,
+      // after all position constraints + self-collision, BEFORE groundClamp and
+      // the pre-collision snapshot — so the cap is energy-consistent (folds into
+      // vNat) instead of reading as a velocity-excluded collision push.
+      substepNodes.push(...solver.strainLimitColors);
       // Ground ANTES de la colisión de cuerpo (#897 F2.3) — espejo WASM:
       // en esa tier el ground corre DENTRO del step de Rust y la colisión
       // de triángulos JS corre después (wasmSolverWorker.ts:336,359). Así
