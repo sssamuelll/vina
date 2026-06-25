@@ -61,6 +61,12 @@ import {
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
+// Body-tether (frente#2): frame at which the drape is settled enough to capture
+// tether targets from the cloth's wrapped-on-body positions. 150 frames ≈ 2.5 s
+// — the M4 checkpoint the e2e validates as settled (seams closed, garment on
+// body). Capturing here (vs init) is the root-cause fix for the tether collapse.
+const TETHER_SETTLE_FRAMES = 150;
+
 /**
  * Convert Seam[] to SeamInitData[] for the worker.
  * Filters out inactive seams and passes extended fields (tension, strength, etc.).
@@ -163,6 +169,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const tslFrameCounter = useRef(0);
   const tslReadbackPending = useRef(false);
+  // Body-tether (frente#2) settle-capture state. Targets MUST be captured from
+  // the SETTLED drape (cloth wrapped on the body), NOT at init where positions
+  // are the pre-wrap spread-out layout (~0.6 m mean from the body → garbage
+  // targets → clamp drags cloth down, belowHip 72% collapse). `requested` fires
+  // the async GPU readback recapture once; `ready` gates the kernel until good
+  // targets exist.
+  const tetherCaptureRequested = useRef(false);
+  const tetherReady = useRef(false);
   // Renderer WebGPU device-loss latch (#901). Set the instant the renderer's
   // device.lost resolves so useFrame stops dispatching renderer.compute() on a
   // dead device — without waiting for the lifecycle effect to tear down the TSL
@@ -492,15 +506,16 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // the pre-collision snapshot — so the cap is energy-consistent (folds into
       // vNat) instead of reading as a velocity-excluded collision push.
       substepNodes.push(...solver.strainLimitColors);
-      // Body-tether (frente#2): DISABLED pending a debug pass. @gpu-local shows
-      // it freezes + collapses the drape (belowHip 72%, minY at floor, area
-      // frozen 0.00). Suspected root cause: the init target is captured against
-      // pre-placement (local/origin) cloth positions in captureTetherTargets, so
-      // closest-point lands on the avatar's LOWER body and the kernel clamps the
-      // cloth down there. Kernel/buffers/wiring (Tasks 1-5) are sound + unit-green;
-      // re-enable after fixing the target-capture coordinate frame.
-      const TETHER_ENABLED = false;
-      if (TETHER_ENABLED && solver.tether) substepNodes.push(solver.tether);
+      // Body-tether (frente#2): max-distance cling that holds each vertex within
+      // its per-region radius of a target. Targets = each vertex's own SETTLED
+      // position, captured from the wrapped-on-body drape (see settle-trigger
+      // after the substep dispatch), NOT at init — init positions are the pre-wrap
+      // spread-out layout (~0.6 m mean from the body), which collapsed the garment
+      // (belowHip 72%, root-caused 2026-06-25). Gated on tetherReady so the kernel
+      // runs only once good settled targets exist; with those, the cloth starts at
+      // dist≈0 < radius so the clamp is a gentle anti-drift/anti-slide that also
+      // arrests the #902 long-horizon slide-off, not an over-constraint.
+      if (tetherReady.current && solver.tether) substepNodes.push(solver.tether);
       // Ground ANTES de la colisión de cuerpo (#897 F2.3) — espejo WASM:
       // en esa tier el ground corre DENTRO del step de Rust y la colisión
       // de triángulos JS corre después (wasmSolverWorker.ts:336,359). Así
@@ -550,6 +565,28 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // Always runs periodically; more frequent when an interaction tool is active.
       tslFrameCounter.current++;
       const gpuClient = clientsRef.current.gpu;
+
+      // Body-tether settle-capture (frente#2): once the drape has settled (the
+      // M4 checkpoint, ~150 frames / 2.5 s — cloth is now wrapped on the body),
+      // recapture tether targets from the CURRENT GPU positions, then enable the
+      // kernel. Fires exactly once. Shares tslReadbackPending so this readback
+      // and the per-frame geometry readback never map the position buffer
+      // concurrently. Degrades safely: if the readback fails, tetherReady stays
+      // false and the tether simply never turns on.
+      if (
+        gpuClient &&
+        !tetherCaptureRequested.current &&
+        !tslReadbackPending.current &&
+        tslFrameCounter.current >= TETHER_SETTLE_FRAMES
+      ) {
+        tetherCaptureRequested.current = true;
+        tslReadbackPending.current = true;
+        gpuClient.recaptureTetherTargetsFromGpu().then((ok) => {
+          tetherReady.current = ok;
+          tslReadbackPending.current = false;
+        });
+      }
+
       if (gpuClient && !tslReadbackPending.current && staticGeometry) {
         const isToolActive = activeTool3D === 'meshGrab' || activeTool3D === 'steamBrush';
         const interval = isToolActive ? 3 : 15;

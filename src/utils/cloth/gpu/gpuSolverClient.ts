@@ -1034,12 +1034,14 @@ export class GpuSolverClient implements ClothSolverClient {
 
     this.tslSolver.setCollisionBody(body, this.rendererRef);
 
-    // Capture tether targets from the avatar body surface (#tether Task 4).
-    // When the avatar body changes (re-pose) we refresh the targets so the
-    // tether kernel always pulls toward the current body shape.
+    // Retain the avatar body tris for captureTetherTargets (body-surface query).
+    // NOTE: the body-surface capture is NOT auto-run here — it is an O(N×tris)
+    // brute force (~26 s for an 18 k-tri avatar) that froze Start, and the tether
+    // now targets each vertex's SETTLED position instead (recaptureTetherTargetsFromGpu,
+    // O(N), fired once the drape settles). tetherBodyTris is kept so
+    // captureTetherTargets remains callable (e.g. a future active body-pull mode).
     if (id === '__avatar__') {
       this.tetherBodyTris = mesh;
-      this.captureTetherTargets();
     }
 
     console.log(`[GpuSolverClient] TSL collision body '${id}':`, {
@@ -1103,6 +1105,42 @@ export class GpuSolverClient implements ClothSolverClient {
     }
 
     this.tslBuffers.tetherTargetSBA.needsUpdate = true;
+  }
+
+  /**
+   * Recapture tether targets from the CURRENT (settled) drape, then return true
+   * so the caller can enable the tether kernel.
+   *
+   * Why this exists: the init `captureTetherTargets` runs at body-set time, when
+   * the cloth is still in its pre-wrap spread-out layout (~0.6 m mean from the
+   * body) — those targets are meaningless once the cloth actually drapes, and a
+   * tether toward them collapses the garment (belowHip 72%, root-caused
+   * 2026-06-25). This reads back the live GPU positions (the cloth as settled on
+   * the body) and uses EACH vertex's own settled position as its tether target.
+   * That makes the max-distance clamp a gentle "stay within `radius` of where you
+   * draped" anti-slide (not an over-constraint), preserves the natural drape
+   * folds, and is O(N) — deliberately NOT the per-vertex body-surface search,
+   * which is ~26 s for an 18 k-tri avatar and would freeze the frame loop mid-sim.
+   *
+   * Returns false (caller keeps the tether disabled) if buffers are absent, no
+   * renderer is cached yet, or the readback fails / short-reads.
+   */
+  async recaptureTetherTargetsFromGpu(): Promise<boolean> {
+    if (!this.tslBuffers || !this.tslSolver) return false;
+    const N = this.tslBuffers.numParticles;
+    let settled: Float32Array | null = null;
+    try {
+      settled = await this.readPositionsToCPU();
+    } catch (e) {
+      console.warn('[GpuSolverClient] tether settle-recapture readback failed:', e);
+      return false;
+    }
+    if (!settled || settled.length < N * 3) return false;
+
+    const tArr = this.tslBuffers.tetherTargetSBA.array as Float32Array;
+    tArr.set(settled.subarray(0, N * 3));
+    this.tslBuffers.tetherTargetSBA.needsUpdate = true;
+    return true;
   }
 
   /**

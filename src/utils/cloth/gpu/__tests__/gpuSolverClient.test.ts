@@ -1199,9 +1199,12 @@ describe('captureTetherTargets (behavior #16 — tether body target)', () => {
     // Init with a quad whose verts are at y=2.
     await client.initMultiPieceTsl([makeQuadPieceAtY2()]);
 
-    // Set body — a flat xz plane at y=0.  captureTetherTargets is called
-    // at the end of setTslCollisionBody for '__avatar__'.
+    // Set body — a flat xz plane at y=0.  setTslCollisionBody retains the body
+    // tris; captureTetherTargets (the body-surface query) is now invoked
+    // explicitly (the 26 s auto-call was removed — production uses the O(N)
+    // settle-copy in recaptureTetherTargetsFromGpu instead).
     client.setTslCollisionBody('__avatar__', makeFlatBodyMesh(), 0.4, 0.008);
+    client.captureTetherTargets();
 
     // getTetherTargets() is a thin test accessor returning tetherTargetSBA.array.
     const t = client.getTetherTargets();
