@@ -224,6 +224,8 @@ function makeMockBufferSet(options?: {
     triangleIdsSBA: new StorageBufferAttribute(new Uint32Array(triangles), 1),
     grabMaskSBA: new StorageBufferAttribute(new Float32Array(numParticles), 1),
     grabOffsetSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
+    tetherTargetSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
+    tetherMaxDistSBA: new StorageBufferAttribute(new Float32Array(numParticles).fill(0.06), 1),
     numParticles,
     numTriangles: 2,
     scBuffers: null,

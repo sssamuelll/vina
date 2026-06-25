@@ -244,6 +244,44 @@ describe('disposeStorageBufferAttribute', () => {
   });
 });
 
+describe('tether buffers', () => {
+  it('allocates tether target (vec3, seeded to positions) and maxDist (float) buffers', () => {
+    const mesh = makeTestMesh();
+    const { colored } = makeTestStretch();
+    const bend = makeTestBend();
+    const radii = new Float32Array([0.02, 0.02, 0.12, 0.12]);
+    const set = createTslBuffers(mesh, colored, bend, null, undefined, radii);
+    expect(set.tetherTargetSBA.itemSize).toBe(3);
+    expect(set.tetherTargetSBA.array).toHaveLength(4 * 3);
+    expect(set.tetherMaxDistSBA.itemSize).toBe(1);
+    const maxDist = Array.from(set.tetherMaxDistSBA.array);
+    expect(maxDist[0]).toBeCloseTo(0.02, 5);
+    expect(maxDist[2]).toBeCloseTo(0.12, 5);
+  });
+
+  it('fills maxDist with default 0.06 when no radii supplied', () => {
+    const mesh = makeTestMesh();
+    const { colored } = makeTestStretch();
+    const bend = makeTestBend();
+    const set = createTslBuffers(mesh, colored, bend, null);
+    expect(set.tetherMaxDistSBA.itemSize).toBe(1);
+    expect(set.tetherMaxDistSBA.array).toHaveLength(4);
+    for (const v of set.tetherMaxDistSBA.array) {
+      expect(v).toBeCloseTo(0.06, 5);
+    }
+  });
+
+  it('accepts Float64Array radii (buildTetherRadii output) and converts to Float32', () => {
+    const mesh = makeTestMesh();
+    const { colored } = makeTestStretch();
+    const bend = makeTestBend();
+    const radii64 = new Float64Array([0.03, 0.03, 0.15, 0.15]);
+    const set = createTslBuffers(mesh, colored, bend, null, undefined, radii64);
+    expect(set.tetherMaxDistSBA.array).toBeInstanceOf(Float32Array);
+    expect(set.tetherMaxDistSBA.array[2]).toBeCloseTo(0.15);
+  });
+});
+
 describe('destroyTslBufferSet', () => {
   it('routes every SBA in the set through renderer._attributes.delete', () => {
     const deleteSpy = vi.fn();
@@ -262,11 +300,11 @@ describe('destroyTslBufferSet', () => {
 
     destroyTslBufferSet(buffers, renderer);
 
-    // 13 fixed SBAs (position, prevPos, preCollisionPos, velocity, invMass,
-    // normal, normalAccum, triangleIds, grabMask, grabOffset, bendIds,
-    // bendRest, bendCompliance)
+    // 15 fixed SBAs (position, prevPos, preCollisionPos, velocity, invMass,
+    // normal, normalAccum, triangleIds, grabMask, grabOffset,
+    // tetherTarget, tetherMaxDist, bendIds, bendRest, bendCompliance)
     // + 3 SBAs per stretch color group + 3 SBAs per seam color group.
-    const expected = 13 + buffers.stretchColors.length * 3 + buffers.seamColors.length * 3;
+    const expected = 15 + buffers.stretchColors.length * 3 + buffers.seamColors.length * 3;
     expect(deleteSpy).toHaveBeenCalledTimes(expected);
 
     // Spot-check that core SBAs were each passed.
@@ -310,9 +348,9 @@ describe('destroyTslBufferSet', () => {
 
     destroyTslBufferSet(buffers, renderer);
 
-    // 10 fixed non-null SBAs (3 bend are null) + stretch colors * 3;
+    // 12 fixed non-null SBAs (3 bend are null, +2 tether) + stretch colors * 3;
     // empty seamColors contributes nothing.
-    const expected = 10 + buffers.stretchColors.length * 3;
+    const expected = 12 + buffers.stretchColors.length * 3;
     expect(deleteSpy).toHaveBeenCalledTimes(expected);
   });
 

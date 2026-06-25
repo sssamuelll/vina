@@ -100,6 +100,10 @@ export interface TslBufferSet {
   // Wind accumulation buffers (null if no wind)
   windBuffers: WindBufferSet | null;
 
+  // Body-tether buffers (frente#2: cloth clings to body, UE max-distance)
+  tetherTargetSBA: StorageBufferAttribute;  // vec3 — anchor point on body (seeded to positions)
+  tetherMaxDistSBA: StorageBufferAttribute; // float — per-vertex cling radius
+
   // Counts
   numParticles: number;
   numTriangles: number;
@@ -134,6 +138,7 @@ export function createTslBuffers(
   bend: BendConstraints,
   seam: TslSeamConstraintData | null,
   fabricCompliance?: FabricComplianceConfig,
+  tetherRadii?: Float32Array | Float64Array,
 ): TslBufferSet {
   const N = mesh.positions.length / 3;
   const numTri = mesh.triangles.length / 3;
@@ -155,6 +160,16 @@ export function createTslBuffers(
   const preCollisionPosSBA = new StorageBufferAttribute(new Float32Array(mesh.positions), 3);
   const velocitySBA = new StorageBufferAttribute(new Float32Array(N * 3), 3);
   const invMassSBA = new StorageBufferAttribute(new Float32Array(mesh.invMass), 1);
+
+  // ─── Body-tether (frente#2): target seeded to positions (filled in init via
+  // captureTetherTargets); maxDist per-vertex from region radii. ─────────────
+  const tetherTargetSBA = new StorageBufferAttribute(new Float32Array(mesh.positions), 3);
+  const tetherMaxDistSBA = new StorageBufferAttribute(
+    tetherRadii && tetherRadii.length === N
+      ? new Float32Array(tetherRadii)            // copy/convert Float64→Float32 for GPU
+      : new Float32Array(N).fill(0.06),
+    1,
+  );
 
   // ─── Per-color stretch constraints with per-constraint compliance ───
   const stretchColors: StretchColorGroup[] = [];
@@ -256,6 +271,8 @@ export function createTslBuffers(
     normalSBA,
     normalAccumSBA,
     triangleIdsSBA,
+    tetherTargetSBA,
+    tetherMaxDistSBA,
     scBuffers: null,
     windBuffers: null,
     numParticles: N,
@@ -314,7 +331,7 @@ export function disposeStorageBufferAttribute(
 /**
  * Release every GPU buffer owned by a TslBufferSet.
  *
- * Iterates the 13 fixed SBA fields plus per-color stretch and seam SBAs, then
+ * Iterates the 15 fixed SBA fields plus per-color stretch and seam SBAs, then
  * delegates self-collision and wind buffer disposal to their owning modules.
  * See `disposeStorageBufferAttribute` for the renderer-routing rationale.
  */
@@ -333,6 +350,8 @@ export function destroyTslBufferSet(
     set.triangleIdsSBA,
     set.grabMaskSBA,
     set.grabOffsetSBA,
+    set.tetherTargetSBA,
+    set.tetherMaxDistSBA,
     set.bendIdsSBA,
     set.bendRestSBA,
     set.bendComplianceSBA,
