@@ -27,6 +27,7 @@ import { RootState } from '../../store';
 import { PatternPiece, Seam, SeamGroup } from '../../types/types';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { resolveArrangementWithFrames } from '../../utils/cloth/arrangement/arrangementBinding';
+import { computeEffectiveRegions } from '../../utils/cloth/garmentPlacement';
 import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
 import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
@@ -323,6 +324,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // it is not guaranteed index-aligned with activePieces (matches render loop).
     const arrangeById = new Map(activePieces.map((p, i) => [p.id, arrangement[i]]));
 
+    // Per-region tether radii (frente#2): one deterministic pass via
+    // computeEffectiveRegions (same toggle-reset semantics as the arrangement path).
+    const regions = computeEffectiveRegions(activePieces);
+    const regionById = new Map(activePieces.map((p, i) => [p.id, regions[i] as string]));
+
     // Skip stale meshes (deleted piece, no frame) — same guard as the render
     // loop; the old `?? arrangement[i]` fallback destructured undefined (#924).
     return pieceMeshes
@@ -337,7 +343,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const stiffnessMultiplier = computeStiffnessMultiplier(piece?.interfacingType, piece?.solidifyFactor);
       const pressurePa = piece?.pressurePa ?? 0;
       const foldInternals = piece?.internals?.filter(l => l.type === 'fold' && l.foldOptions);
-      return { ...pm, vertices: transformed, stiffnessMultiplier, pressurePa, internals: foldInternals };
+      return { ...pm, vertices: transformed, stiffnessMultiplier, pressurePa, internals: foldInternals, region: regionById.get(pm.pieceId) };
     });
     // armAxis dep is load-bearing: when AvatarModel publishes posed arm dirs (async), this rebuilds → the solver re-seeds in A-pose. Removing it strands sleeves in T-pose (#924 A-pose).
   }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis]);
@@ -486,6 +492,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // the pre-collision snapshot — so the cap is energy-consistent (folds into
       // vNat) instead of reading as a velocity-excluded collision push.
       substepNodes.push(...solver.strainLimitColors);
+      // Body-tether (frente#2): max-distance cling, after strain-limit, before
+      // groundClamp/snapshot — same energy-consistent slot as strain-limiting.
+      if (solver.tether) substepNodes.push(solver.tether);
       // Ground ANTES de la colisión de cuerpo (#897 F2.3) — espejo WASM:
       // en esa tier el ground corre DENTRO del step de Rust y la colisión
       // de triángulos JS corre después (wasmSolverWorker.ts:336,359). Así

@@ -35,6 +35,7 @@ import type { StorageBufferAttribute } from 'three/webgpu';
 import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
 import { withErrorScope, attachUncapturedErrorListener, instrumentShaderCapture } from './webgpuDebug';
+import { buildTetherRadii } from './tetherRadii';
 
 // ─── CPU helpers ─────────────────────────────────────────────────────────────
 
@@ -141,6 +142,10 @@ export interface PieceMeshData {
   vertices: Float32Array;
   triIds: Int32Array;
   uvs?: Float32Array;
+  /** BodyRegion string (e.g. 'front-torso', 'left-sleeve'). Used to seed
+   *  per-region tether radii (frente#2). Optional — falls back to default
+   *  0.06 m when absent. */
+  region?: string;
 }
 
 export interface GpuSolverClientCallbacks {
@@ -538,13 +543,19 @@ export class GpuSolverClient implements ClothSolverClient {
       // degrades to a ref-drop — see `disposeStorageBufferAttribute`.
       this.disposeTslResources();
 
-      // Create TSL buffers with per-constraint compliance
+      // Create TSL buffers with per-constraint compliance and per-region
+      // tether radii (frente#2). Each piece contributes its region string
+      // (threaded via PieceMeshData.region); missing region → default 0.06 m.
+      const tetherRadii = buildTetherRadii(
+        pieces.map((p) => ({ region: p.region ?? 'unknown', vertexCount: p.vertices.length / 3 })),
+      );
       this.tslBuffers = createTslBuffers(
         { positions, triangles, invMass },
         colored,
         bend,
         seam,
         fabric,
+        tetherRadii,
       );
 
       // Self-collision (#897 F3): SIEMPRE activo en el tier GPU. RATIFICADO:
