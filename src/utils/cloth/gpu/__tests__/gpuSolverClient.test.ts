@@ -1143,3 +1143,88 @@ describe('initMultiPieceTsl self-collision allocation (behavior #15 — #897 F3.
     expect(uniformCalls).toContain(0.002);
   });
 });
+
+// ─── Behavior #16 — captureTetherTargets writes closest body point (#tether) ──
+//
+// tetherTargetSBA is seeded in createTslBuffers to each cloth vertex's own
+// initial position (a valid "no-op" default that keeps the tether kernel from
+// producing NaN). captureTetherTargets() replaces those seeds with the closest
+// point on the collision body — so the tether actually pulls cloth toward the
+// body rather than toward an arbitrary cloth position.
+//
+// Fixture: a quad piece whose four verts all sit at y=2.  Body: two triangles
+// forming a 2×2 quad on the xz plane at y=0 (normal [0,1,0]).  After capture
+// each vertex's target y should be ~0 (pulled to the body plane).
+
+describe('captureTetherTargets (behavior #16 — tether body target)', () => {
+  /** Quad piece with all verts lifted to y=2. */
+  function makeQuadPieceAtY2(id: string = 'piece-0'): PieceMeshData {
+    return {
+      pieceId: id,
+      vertices: new Float32Array([
+        -0.5, 2.0, -0.5,
+         0.5, 2.0, -0.5,
+         0.5, 2.0,  0.5,
+        -0.5, 2.0,  0.5,
+      ]),
+      triIds: new Int32Array([0, 1, 2, 0, 2, 3]),
+      uvs: new Float32Array([0, 1,  1, 1,  1, 0,  0, 0]),
+    };
+  }
+
+  /** 2×2 flat body on the xz plane at y=0 (two triangles, normal [0,1,0]). */
+  function makeFlatBodyMesh() {
+    // Expanded format: 9 floats per tri (3 verts × xyz), normals 3 floats per tri.
+    return {
+      vertices: new Float32Array([
+        // tri 0
+        -1.0, 0.0, -1.0,
+         1.0, 0.0, -1.0,
+         1.0, 0.0,  1.0,
+        // tri 1
+        -1.0, 0.0, -1.0,
+         1.0, 0.0,  1.0,
+        -1.0, 0.0,  1.0,
+      ]),
+      normals: new Float32Array([0, 1, 0,  0, 1, 0]),
+      triCount: 2,
+    };
+  }
+
+  it('captureTetherTargets writes the closest body point per cloth vertex', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+
+    // Init with a quad whose verts are at y=2.
+    await client.initMultiPieceTsl([makeQuadPieceAtY2()]);
+
+    // Set body — a flat xz plane at y=0.  captureTetherTargets is called
+    // at the end of setTslCollisionBody for '__avatar__'.
+    client.setTslCollisionBody('__avatar__', makeFlatBodyMesh(), 0.4, 0.008);
+
+    // getTetherTargets() is a thin test accessor returning tetherTargetSBA.array.
+    const t = client.getTetherTargets();
+    expect(t).not.toBeNull();
+    // First vertex (index 0): target y should have been pulled to ~0 (body plane).
+    expect(t![1]).toBeCloseTo(0, 1);
+    // All four vertices: y component (indices 1, 4, 7, 10) should be ~0.
+    expect(t![4]).toBeCloseTo(0, 1);
+    expect(t![7]).toBeCloseTo(0, 1);
+    expect(t![10]).toBeCloseTo(0, 1);
+  });
+
+  it('captureTetherTargets is a no-op before init (no throw)', () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    expect(() => client.captureTetherTargets()).not.toThrow();
+  });
+
+  it('getTetherTargets returns null before init', () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    expect(client.getTetherTargets()).toBeNull();
+  });
+});

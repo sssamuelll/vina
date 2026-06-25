@@ -36,6 +36,97 @@ import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
 import { withErrorScope, attachUncapturedErrorListener, instrumentShaderCapture } from './webgpuDebug';
 
+// ─── CPU helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns the closest point on a triangle to point (px,py,pz).
+ * The triangle is given as 9 consecutive floats in `triVerts` starting at
+ * `vOff` (A=vOff..+2, B=vOff+3..+5, C=vOff+6..+8).
+ * The triangle normal (unit) is in `triNormals` at `nOff` (3 floats).
+ *
+ * Algorithm: project onto the triangle's plane, test if inside via barycentric
+ * coordinates, otherwise clamp to the nearest edge. Mirrors the math in
+ * triangleCollision.ts `pointToTriangleDist` but returns XYZ rather than dist.
+ */
+function closestPointOnTriangle(
+  px: number, py: number, pz: number,
+  triVerts: Float32Array, vOff: number,
+  triNormals: Float32Array, nOff: number,
+): [number, number, number] {
+  const ax = triVerts[vOff],     ay = triVerts[vOff + 1], az = triVerts[vOff + 2];
+  const bx = triVerts[vOff + 3], by = triVerts[vOff + 4], bz = triVerts[vOff + 5];
+  const cx = triVerts[vOff + 6], cy = triVerts[vOff + 7], cz = triVerts[vOff + 8];
+
+  const nnx = triNormals[nOff], nny = triNormals[nOff + 1], nnz = triNormals[nOff + 2];
+
+  const abx = bx - ax, aby = by - ay, abz = bz - az;
+  const acx = cx - ax, acy = cy - ay, acz = cz - az;
+  const apx = px - ax, apy = py - ay, apz = pz - az;
+
+  // Signed distance to the plane
+  const dot = apx * nnx + apy * nny + apz * nnz;
+
+  // Projection onto the plane
+  const projx = px - dot * nnx;
+  const projy = py - dot * nny;
+  const projz = pz - dot * nnz;
+
+  // Barycentric coords of the projection
+  const v0x = projx - ax, v0y = projy - ay, v0z = projz - az;
+  const d00 = abx * abx + aby * aby + abz * abz;
+  const d01 = abx * acx + aby * acy + abz * acz;
+  const d02 = abx * v0x + aby * v0y + abz * v0z;
+  const d11 = acx * acx + acy * acy + acz * acz;
+  const d12 = acx * v0x + acy * v0y + acz * v0z;
+  const denom = d00 * d11 - d01 * d01;
+
+  if (Math.abs(denom) > 1e-12) {
+    const invD = 1.0 / denom;
+    const u = (d11 * d02 - d01 * d12) * invD;
+    const v = (d00 * d12 - d01 * d02) * invD;
+
+    if (u >= 0 && v >= 0 && u + v <= 1) {
+      // Projection is inside the triangle — closest point is the projection.
+      return [projx, projy, projz];
+    }
+  }
+
+  // Outside: find nearest edge point (3-edge clamp, same as triangleCollision.ts lines 58–92).
+  let minDsq = Infinity;
+  let cpx = ax, cpy = ay, cpz = az;
+
+  const abLenSq = abx * abx + aby * aby + abz * abz;
+  if (abLenSq > 1e-12) {
+    const t = Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / abLenSq));
+    const ex = ax + t * abx, ey = ay + t * aby, ez = az + t * abz;
+    const dx = px - ex, dy = py - ey, dz = pz - ez;
+    const dsq = dx * dx + dy * dy + dz * dz;
+    if (dsq < minDsq) { minDsq = dsq; cpx = ex; cpy = ey; cpz = ez; }
+  }
+
+  const acLenSq = acx * acx + acy * acy + acz * acz;
+  if (acLenSq > 1e-12) {
+    const t = Math.max(0, Math.min(1, (apx * acx + apy * acy + apz * acz) / acLenSq));
+    const ex = ax + t * acx, ey = ay + t * acy, ez = az + t * acz;
+    const dx = px - ex, dy = py - ey, dz = pz - ez;
+    const dsq = dx * dx + dy * dy + dz * dz;
+    if (dsq < minDsq) { minDsq = dsq; cpx = ex; cpy = ey; cpz = ez; }
+  }
+
+  const bcx = cx - bx, bcy = cy - by, bcz = cz - bz;
+  const bpx = px - bx, bpy = py - by, bpz = pz - bz;
+  const bcLenSq = bcx * bcx + bcy * bcy + bcz * bcz;
+  if (bcLenSq > 1e-12) {
+    const t = Math.max(0, Math.min(1, (bpx * bcx + bpy * bcy + bpz * bcz) / bcLenSq));
+    const ex = bx + t * bcx, ey = by + t * bcy, ez = bz + t * bcz;
+    const dx = px - ex, dy = py - ey, dz = pz - ez;
+    const dsq = dx * dx + dy * dy + dz * dz;
+    if (dsq < minDsq) { minDsq = dsq; cpx = ex; cpy = ey; cpz = ez; }
+  }
+
+  return [cpx, cpy, cpz];
+}
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 /** Calibración M4-D del avatar (espejo wasmSolverWorker.ts setCollisionMesh):
@@ -105,6 +196,17 @@ export class GpuSolverClient implements ClothSolverClient {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private rendererRef: any = null;
+
+  /**
+   * Body triangle data retained from the last `setTslCollisionBody('__avatar__', …)` call.
+   * Stored so `captureTetherTargets()` can re-query the body after init and on
+   * every pose-update rebuild.  Null until the avatar body is first set.
+   */
+  private tetherBodyTris: {
+    vertices: Float32Array;
+    normals: Float32Array;
+    triCount: number;
+  } | null = null;
 
   /**
    * Tracks BVH SBAs per collision body id so `setTslCollisionBody` can free
@@ -921,12 +1023,85 @@ export class GpuSolverClient implements ClothSolverClient {
 
     this.tslSolver.setCollisionBody(body, this.rendererRef);
 
+    // Capture tether targets from the avatar body surface (#tether Task 4).
+    // When the avatar body changes (re-pose) we refresh the targets so the
+    // tether kernel always pulls toward the current body shape.
+    if (id === '__avatar__') {
+      this.tetherBodyTris = mesh;
+      this.captureTetherTargets();
+    }
+
     console.log(`[GpuSolverClient] TSL collision body '${id}':`, {
       bvhNodes: bvh.nodeCount,
       triangles: bvh.triCount,
       margin,
       friction,
     });
+  }
+
+  /**
+   * Capture per-vertex body-surface targets for the tether kernel.
+   *
+   * For each cloth particle i, queries the retained body triangles
+   * (`this.tetherBodyTris`) for the closest surface point and writes it into
+   * `tetherTargetSBA.array[i*3 .. i*3+2]`.  Brute-force over all triangles is
+   * acceptable here: this runs ONCE per init/rebuild (not per frame), and the
+   * avatar mesh is O(few thousand) tris.
+   *
+   * Called automatically at the end of `setTslCollisionBody` for id
+   * `'__avatar__'` and is a public no-op so callers can trigger it manually.
+   *
+   * Guard: no-op if no TSL solver, no buffers, or no body captured yet.
+   */
+  captureTetherTargets(): void {
+    if (!this.tslBuffers || !this.tslSolver) return;
+    if (!this.tetherBodyTris) return;
+
+    const { vertices: bv, normals: bn, triCount } = this.tetherBodyTris;
+    // Read particle positions from positionSBA (the canonical cloth positions,
+    // stable across repeated captureTetherTargets calls).  tetherTargetSBA
+    // holds the RESULTS of this function — using it as the query source would
+    // corrupt the targets on the second call (body-surface point ≠ cloth pos).
+    const pArr = this.tslBuffers.positionSBA.array as Float32Array;
+    const tArr = this.tslBuffers.tetherTargetSBA.array as Float32Array;
+    const N = this.tslBuffers.numParticles;
+
+    for (let i = 0; i < N; i++) {
+      const px = pArr[i * 3];
+      const py = pArr[i * 3 + 1];
+      const pz = pArr[i * 3 + 2];
+
+      let bestDist = Infinity;
+      let bestX = px, bestY = py, bestZ = pz;
+
+      for (let t = 0; t < triCount; t++) {
+        const vOff = t * 9;
+        const nOff = t * 3;
+        const [cx, cy, cz] = closestPointOnTriangle(px, py, pz, bv, vOff, bn, nOff);
+        const dx = px - cx, dy = py - cy, dz = pz - cz;
+        const dsq = dx * dx + dy * dy + dz * dz;
+        if (dsq < bestDist) {
+          bestDist = dsq;
+          bestX = cx; bestY = cy; bestZ = cz;
+        }
+      }
+
+      tArr[i * 3]     = bestX;
+      tArr[i * 3 + 1] = bestY;
+      tArr[i * 3 + 2] = bestZ;
+    }
+
+    this.tslBuffers.tetherTargetSBA.needsUpdate = true;
+  }
+
+  /**
+   * Thin test accessor — returns `tetherTargetSBA.array` (Float32Array of N×3
+   * target positions, after captureTetherTargets has run).
+   * Returns null when the TSL buffers are not initialized.
+   */
+  getTetherTargets(): Float32Array | null {
+    if (!this.tslBuffers) return null;
+    return this.tslBuffers.tetherTargetSBA.array as Float32Array;
   }
 
   /**
