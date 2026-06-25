@@ -495,6 +495,13 @@ describe('createTslSolver', () => {
     expect(solver.windNodes).toBeDefined();
     expect(solver.windNodes).not.toBeNull();
   });
+
+  it('returns a body-tether compute node (#frente2)', () => {
+    const buffers = makeMockBufferSet({ numStretchColors: 3 });
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    expect(solver.tether).not.toBeNull();
+    expect(solver.tether).toHaveProperty('__tslCompute', true);
+  });
 });
 
 describe('updateConfig', () => {

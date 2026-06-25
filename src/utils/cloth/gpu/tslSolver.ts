@@ -98,6 +98,13 @@ export interface TslSolver {
    * groundClamp/snapshot. Empty if no stretch constraints.
    */
   strainLimitColors: ComputeNode[];
+  /**
+   * Body-tether compute node (frente#2). Max-distance cling kernel: projects
+   * cloth vertices back onto their per-vertex radius sphere around the static
+   * body target when the vertex drifts too far. Race-free (per-particle).
+   * Dispatch AFTER strain-limit, BEFORE groundClamp.
+   */
+  tether: ComputeNode | null;
   /** Bend constraint compute node (null if no bend constraints) */
   bend: ComputeNode | null;
   /**
@@ -426,6 +433,36 @@ function makeStrainLimitFn(
           posBuf.element(id0).addAssign(n.mul(s).mul(w0).negate());
           posBuf.element(id1).addAssign(n.mul(s).mul(w1));
         });
+      });
+    });
+  })();
+}
+
+// ─── Body-tether kernel ───────────────────────────────────────────────────────
+
+/**
+ * Body-tether kernel (frente#2). Max-distance cling: if a cloth vertex is farther
+ * than its per-vertex radius from its static body target, project it back onto the
+ * radius sphere. One-sided (target is fixed; only the vertex moves), respects invMass.
+ * Race-free: each particle is independent (no shared particles).
+ */
+function makeTetherFn(
+  posBuf: TslNode,
+  invMassBuf: TslNode,
+  targetBuf: TslNode,
+  maxDistBuf: TslNode,
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
+    const i = instanceIndex;
+    const w = invMassBuf.element(i);
+    If(w.greaterThan(float(0.0)), () => {
+      const d = posBuf.element(i).sub(targetBuf.element(i));
+      const dist = d.length();
+      const maxD = maxDistBuf.element(i);
+      If(dist.greaterThan(maxD), () => {
+        // project onto the radius sphere around the target
+        posBuf.element(i).assign(targetBuf.element(i).add(d.mul(maxD.div(dist.max(float(1e-7))))));
       });
     });
   })();
@@ -815,6 +852,15 @@ export function createTslSolver(
     return compute(fn, color.count, [64]);
   });
 
+  // ─── Body-tether (frente#2) — max-distance cling, per-particle ───────
+  const tetherTargetBuf = storage(buffers.tetherTargetSBA, 'vec3', N);
+  const tetherMaxDistBuf = storage(buffers.tetherMaxDistSBA, 'float', N);
+  const tether = compute(
+    makeTetherFn(posBuf, invMassBuf, tetherTargetBuf, tetherMaxDistBuf),
+    N,
+    [64],
+  );
+
   // ─── Bend constraints (per-constraint compliance) ──────────────────
   let bend: ComputeNode | null = null;
   if (buffers.bendIdsSBA && buffers.bendRestSBA && buffers.bendComplianceSBA && buffers.numBendConstraints > 0) {
@@ -1024,6 +1070,7 @@ export function createTslSolver(
     preSolve,
     stretchColors,
     strainLimitColors,
+    tether,
     bend,
     seamColors,
     groundClamp,
