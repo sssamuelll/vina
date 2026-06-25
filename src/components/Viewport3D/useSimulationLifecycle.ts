@@ -108,7 +108,7 @@ import { setSeamResolutionErrors } from '../../store/inspectorSlice';
 import { showWarningToast, showErrorToast } from '../../store/copilotUISlice';
 import { GPU_CAPABILITIES, NEURAL_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { safeGetItem } from '../../utils/safeStorage';
-import { getPhysicalFabric } from '../../utils/cloth/physicalFabric';
+import { getPhysicalFabric, toXPBDParams } from '../../utils/cloth/physicalFabric';
 import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
 import { extractMeshData } from '../../utils/cloth/avatarMeshExtractor';
 import { collisionMeshFromBuffers } from '../../utils/cloth/collisionMesh';
@@ -498,23 +498,37 @@ export function useSimulationLifecycle({
                 gpuClientRef.current = gpuClient;
                 gpuClient.onFrame = onFrame;
 
-                // Use default compliance values that match the CPU solver:
-                // stretchWarp: 0.0, stretchWeft: 0.0, shear: 0.001,
-                // bendWarp: 1.0, bendWeft: 1.0
-                // The CPU solver builds per-edge compliance at init from these
-                // defaults and never rebuilds them when fabric changes.
-                // Passing fabricCompliance here is intentionally omitted to
-                // match the CPU solver's actual behavior.
+                // #gummy STEP 3: wire the active fabric's BEND compliance to the GPU
+                // (was dead data, omitted — like frictionBody pre-F0). Bend is the
+                // material's drape/flexibility differentiator (silk soft, denim stiff),
+                // rescaled to the live alpha band in STEP 1. GPU-ahead vs WASM/CPU
+                // (still on defaults) — A7 divergence.
                 const pf = getPhysicalFabric(fabricId);
+                const xpbd = pf ? toXPBDParams(pf) : undefined;
                 const tslSolverConfig: Partial<import('../../utils/cloth/gpu/tslSolver').TslSolverConfig> = {
                   ...(pf ? { internalDamping: pf.internalDamping } : {}),
                   windForce: windEnabled ? windForce : [0, 0, 0],
                   dragCoefficient,
                 };
+                const fabricCompliance = xpbd
+                  ? {
+                      // Stretch stays RIGID (0.0): wiring the compliant fabric stretch
+                      // let edges compact and the sleeve recoil (verified @gpu-local —
+                      // sleeve ~6460 stable at 0.0 vs ~3590 at the fabric's 1e-6).
+                      // Stretch/shear differentiation (lycra) is a follow-up needing
+                      // two-sided strain handling; toXPBDParams already has them
+                      // rescaled+ready. Bend alone gives the drape differentiation.
+                      stretchComplianceWarp: 0.0,
+                      stretchComplianceWeft: 0.0,
+                      shearCompliance: 0.001,
+                      bendComplianceWarp: xpbd.bendComplianceWarp,
+                      bendComplianceWeft: xpbd.bendComplianceWeft,
+                    }
+                  : undefined;
 
                 const seamPairs = seamInitDataToPairs(seamInitData, placedMeshes);
                 await withTimeout(
-                  gpuClient.initMultiPieceTsl(placedMeshes, seamPairs, tslSolverConfig),
+                  gpuClient.initMultiPieceTsl(placedMeshes, seamPairs, tslSolverConfig, fabricCompliance),
                   12000,
                   'TSL solver init',
                 );

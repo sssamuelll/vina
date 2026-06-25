@@ -659,10 +659,13 @@ export interface PhysicalXPBDParams extends XPBDCompliance {
  * We simplify to a normalized mapping suitable for the solver.
  */
 export function toXPBDParams(pf: PhysicalFabric): PhysicalXPBDParams {
-  // Stretch: % elongation → compliance (higher % = higher compliance = easier to stretch)
-  // Scale: 1% → 0.1 compliance, 80% → 8.0 compliance
-  const stretchComplianceWarp = pf.stretchWarp / 10;
-  const stretchComplianceWeft = pf.stretchWeft / 10;
+  // Stretch: % elongation → XPBD compliance, RESCALED to the solver live band
+  // (#gummy STEP 3): the old `stretchWarp/10` gave 0.2-8 → alpha 160k-6M → null
+  // constraint → free stretch. Now stretchPct*5e-7 clamped to [5e-7, 1e-5]:
+  // cotton (2%) → 1e-6 (near-rigid), lycra (~50%) → 1e-5 (stretchy). The GPU
+  // strain-limiting (STEP 4) caps the extreme; here the material differentiates.
+  const stretchComplianceWarp = Math.min(1e-5, Math.max(5e-7, pf.stretchWarp * 5e-7));
+  const stretchComplianceWeft = Math.min(1e-5, Math.max(5e-7, pf.stretchWeft * 5e-7));
 
   // Bending: mN·cm → XPBD compliance (inverse: higher rigidity = lower compliance).
   // RESCALED to the solver's live alpha band (#gummy STEP 1): the solver computes
@@ -675,8 +678,8 @@ export function toXPBDParams(pf: PhysicalFabric): PhysicalXPBDParams {
   const bendComplianceWarp = Math.min(2e-4, Math.max(1.2e-6, BEND_K / (pf.bendingWarp + 0.1)));
   const bendComplianceWeft = Math.min(2e-4, Math.max(1.2e-6, BEND_K / (pf.bendingWeft + 0.1)));
 
-  // Shear: N/m → compliance (inverse)
-  const shearCompliance = Math.max(0.01, 10 / (pf.shearStiffness + 1));
+  // Shear: N/m → compliance (inverse), RESCALED to the live band (#gummy STEP 3).
+  const shearCompliance = Math.min(1e-4, Math.max(1e-5, 1e-3 / (pf.shearStiffness + 1)));
 
   // Damping from weight
   const weightFactor = Math.min(pf.weight / 500, 1.0);

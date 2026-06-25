@@ -175,6 +175,21 @@ describe('toXPBDParams', () => {
     }
   });
 
+  it('stretch + shear compliance land in the solver live alpha band (#gummy STEP 3)', () => {
+    // Same alpha=compliance/sdt² band as bend. The old scale (stretchWarp/10 →
+    // 0.2-8, shear 0.01-10) gave null constraints. Rescaled so the fabric's
+    // real stretch/shear stiffness differentiates materials when wired to the GPU.
+    for (const f of PHYSICAL_FABRIC_LIBRARY) {
+      const p = toXPBDParams(f);
+      for (const c of [p.stretchComplianceWarp, p.stretchComplianceWeft]) {
+        expect(c).toBeGreaterThanOrEqual(5e-7);
+        expect(c).toBeLessThanOrEqual(1e-5);
+      }
+      expect(p.shearCompliance).toBeGreaterThanOrEqual(1e-5);
+      expect(p.shearCompliance).toBeLessThanOrEqual(1e-4);
+    }
+  });
+
   it('bend compliance lands in the solver live alpha band (dead-bend fix)', () => {
     // The GPU/WASM/CPU solvers compute alpha = compliance/sdt² with sdt=1/900
     // (sdt²≈1.23e-6). A bend compliance on the old 0.05-20 scale gives
