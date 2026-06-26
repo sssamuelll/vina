@@ -178,6 +178,8 @@ if (((DIST_QUANT_MAX << TRI_BITS) | TRI_MASK) >= INT32_MAX) {
  * @param bvhSkipSBA - Escape pointers (1 uint per node) for threaded traversal (#897 F4.3b)
  * @param triVertsSBA - Expanded triangle vertices (9 floats per tri)
  * @param triNormalsSBA - Face normals (3 floats per tri)
+ * @param edgePseudoSBA - Edge pseudonormals (9 floats per tri: AB,BC,CA × xyz, BVH-leaf order)
+ * @param vertexPseudoSBA - Vertex pseudonormals (9 floats per tri: A,B,C × xyz, BVH-leaf order)
  * @param numParticles - Number of cloth particles (dispatch count)
  * @param numNodes - Number of BVH nodes
  * @param numTris - Number of collision triangles
@@ -193,6 +195,8 @@ export function createTslCollisionBody(
   bvhSkipSBA: StorageBufferAttribute,
   triVertsSBA: StorageBufferAttribute,
   triNormalsSBA: StorageBufferAttribute,
+  edgePseudoSBA: StorageBufferAttribute,
+  vertexPseudoSBA: StorageBufferAttribute,
   numParticles: number,
   numNodes: number,
   numTris: number,
@@ -221,6 +225,11 @@ export function createTslCollisionBody(
   const skipBuf = storage(bvhSkipSBA, 'uint', numNodes);
   const triVertBuf = storage(triVertsSBA, 'float', numTris * 9);
   const triNormBuf = storage(triNormalsSBA, 'float', numTris * 3);
+  // Pseudonormal buffers for closest-feature inside/outside sign (Task 3).
+  // Layout: triIdx*9 + featureIdx*3 = {AB=0,BC=1,CA=2}×xyz for edges;
+  //         triIdx*9 + vertexIdx*3 = {A=0,B=1,C=2}×xyz for vertices.
+  const edgePseudoBuf = storage(edgePseudoSBA, 'float', numTris * 9);
+  const vertexPseudoBuf = storage(vertexPseudoSBA, 'float', numTris * 9);
 
   // Atomic scratch — array<atomic<i32>> binding with read_write access is what
   // makes the atomic-emulation pattern work (sidesteps the outer-toVar /
@@ -536,6 +545,9 @@ export function createTslCollisionBody(
       const nnx = triNormBuf.element(tnBase);
       const nny = triNormBuf.element(tnBase.add(uint(1)));
       const nnz = triNormBuf.element(tnBase.add(uint(2)));
+      // Base offset into the pseudonormal buffers for this triangle.
+      // Both edge and vertex buffers are laid out as triIdx*9 + featureIdx*3.
+      const tpBase = triIdxU.mul(uint(9));
 
       // Recompute SIDE + DIST for the winning triangle. Mirrors CPU
       // pointToTriangleDist (triangleCollision.ts:16–93). Uses two function-
@@ -616,6 +628,13 @@ export function createTslCollisionBody(
           const dsqBC = dBCx.mul(dBCx).add(dBCy.mul(dBCy)).add(dBCz.mul(dBCz));
 
           // Pick the closest edge via cascaded If/ElseIf/Else.
+          // For each branch, derive bestSide from the closest-feature pseudonormal
+          // instead of the face normal — mirrors CPU triangleCollision.ts (55d882b3):
+          //   t ≤ EPS_VERT → start-vertex pseudonormal
+          //   t ≥ 1-EPS_VERT → end-vertex pseudonormal
+          //   otherwise → edge-interior pseudonormal
+          // Edge→builder-index: AB=0 (offsets 0-2), BC=1 (3-5), CA=2 (6-8).
+          // Vertex order: A=0 (offsets 0-2), B=1 (3-5), C=2 (6-8).
           // greaterThanEqual/lessThanEqual missing from @types/three at runtime.
           If(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -623,16 +642,82 @@ export function createTslCollisionBody(
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .and((dsqAB as any).lessThanEqual(dsqBC)),
             () => {
+              // Edge AB (builder index 0): t≈0 → A(0), t≈1 → B(1), else edge 0.
               bestDist.assign(dsqAB.sqrt());
-              bestSide.assign(dABx.mul(nnx).add(dABy.mul(nny)).add(dABz.mul(nnz)));
+              const snABx = float(0).toVar('snABx');
+              const snABy = float(0).toVar('snABy');
+              const snABz = float(0).toVar('snABz');
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              If((tAB as any).lessThanEqual(float(1e-6)), () => {
+                // t ≈ 0 → vertex A (offset 0)
+                snABx.assign(vertexPseudoBuf.element(tpBase));
+                snABy.assign(vertexPseudoBuf.element(tpBase.add(uint(1))));
+                snABz.assign(vertexPseudoBuf.element(tpBase.add(uint(2))));
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              }).ElseIf((tAB as any).greaterThanEqual(float(1 - 1e-6)), () => {
+                // t ≈ 1 → vertex B (offset 3)
+                snABx.assign(vertexPseudoBuf.element(tpBase.add(uint(3))));
+                snABy.assign(vertexPseudoBuf.element(tpBase.add(uint(4))));
+                snABz.assign(vertexPseudoBuf.element(tpBase.add(uint(5))));
+              }).Else(() => {
+                // edge interior → edge AB (offset 0)
+                snABx.assign(edgePseudoBuf.element(tpBase));
+                snABy.assign(edgePseudoBuf.element(tpBase.add(uint(1))));
+                snABz.assign(edgePseudoBuf.element(tpBase.add(uint(2))));
+              });
+              bestSide.assign(dABx.mul(snABx).add(dABy.mul(snABy)).add(dABz.mul(snABz)));
             },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ).ElseIf((dsqAC as any).lessThanEqual(dsqBC), () => {
+            // Edge AC/CA (builder index 2): t≈0 → A(0), t≈1 → C(2), else edge 2.
             bestDist.assign(dsqAC.sqrt());
-            bestSide.assign(dACx.mul(nnx).add(dACy.mul(nny)).add(dACz.mul(nnz)));
+            const snACx = float(0).toVar('snACx');
+            const snACy = float(0).toVar('snACy');
+            const snACz = float(0).toVar('snACz');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            If((tAC as any).lessThanEqual(float(1e-6)), () => {
+              // t ≈ 0 → vertex A (offset 0)
+              snACx.assign(vertexPseudoBuf.element(tpBase));
+              snACy.assign(vertexPseudoBuf.element(tpBase.add(uint(1))));
+              snACz.assign(vertexPseudoBuf.element(tpBase.add(uint(2))));
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            }).ElseIf((tAC as any).greaterThanEqual(float(1 - 1e-6)), () => {
+              // t ≈ 1 → vertex C (offset 6)
+              snACx.assign(vertexPseudoBuf.element(tpBase.add(uint(6))));
+              snACy.assign(vertexPseudoBuf.element(tpBase.add(uint(7))));
+              snACz.assign(vertexPseudoBuf.element(tpBase.add(uint(8))));
+            }).Else(() => {
+              // edge interior → edge CA (offset 6)
+              snACx.assign(edgePseudoBuf.element(tpBase.add(uint(6))));
+              snACy.assign(edgePseudoBuf.element(tpBase.add(uint(7))));
+              snACz.assign(edgePseudoBuf.element(tpBase.add(uint(8))));
+            });
+            bestSide.assign(dACx.mul(snACx).add(dACy.mul(snACy)).add(dACz.mul(snACz)));
           }).Else(() => {
+            // Edge BC (builder index 1): t≈0 → B(1), t≈1 → C(2), else edge 1.
             bestDist.assign(dsqBC.sqrt());
-            bestSide.assign(dBCx.mul(nnx).add(dBCy.mul(nny)).add(dBCz.mul(nnz)));
+            const snBCx = float(0).toVar('snBCx');
+            const snBCy = float(0).toVar('snBCy');
+            const snBCz = float(0).toVar('snBCz');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            If((tBC as any).lessThanEqual(float(1e-6)), () => {
+              // t ≈ 0 → vertex B (offset 3)
+              snBCx.assign(vertexPseudoBuf.element(tpBase.add(uint(3))));
+              snBCy.assign(vertexPseudoBuf.element(tpBase.add(uint(4))));
+              snBCz.assign(vertexPseudoBuf.element(tpBase.add(uint(5))));
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            }).ElseIf((tBC as any).greaterThanEqual(float(1 - 1e-6)), () => {
+              // t ≈ 1 → vertex C (offset 6)
+              snBCx.assign(vertexPseudoBuf.element(tpBase.add(uint(6))));
+              snBCy.assign(vertexPseudoBuf.element(tpBase.add(uint(7))));
+              snBCz.assign(vertexPseudoBuf.element(tpBase.add(uint(8))));
+            }).Else(() => {
+              // edge interior → edge BC (offset 3)
+              snBCx.assign(edgePseudoBuf.element(tpBase.add(uint(3))));
+              snBCy.assign(edgePseudoBuf.element(tpBase.add(uint(4))));
+              snBCz.assign(edgePseudoBuf.element(tpBase.add(uint(5))));
+            });
+            bestSide.assign(dBCx.mul(snBCx).add(dBCy.mul(snBCy)).add(dBCz.mul(snBCz)));
           });
         });
 

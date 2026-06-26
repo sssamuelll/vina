@@ -144,6 +144,9 @@ function buildKernel(opts?: {
   const bvhSkipSBA = new StorageBufferAttribute(new Uint32Array(numNodes), 1);
   const triVertsSBA = new StorageBufferAttribute(new Float32Array(numTris * 9), 1);
   const triNormalsSBA = new StorageBufferAttribute(new Float32Array(numTris * 3), 1);
+  // Pseudonormal SBAs for closest-feature inside/outside sign (Task 2-3).
+  const edgePseudoSBA = new StorageBufferAttribute(new Float32Array(numTris * 9), 1);
+  const vertexPseudoSBA = new StorageBufferAttribute(new Float32Array(numTris * 9), 1);
 
   // Full chain-proxy mock TSL node — same pattern as the three/tsl mock. The
   // kernel body calls `.toVar()`, `.equal()`, etc. on posBuf elements; a plain
@@ -163,6 +166,8 @@ function buildKernel(opts?: {
     bvhSkipSBA,
     triVertsSBA,
     triNormalsSBA,
+    edgePseudoSBA,
+    vertexPseudoSBA,
     numParticles,
     numNodes,
     numTris,

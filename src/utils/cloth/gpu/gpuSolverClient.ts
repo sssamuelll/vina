@@ -226,6 +226,8 @@ export class GpuSolverClient implements ClothSolverClient {
       bvhSkipSBA: StorageBufferAttribute;
       triVertsSBA: StorageBufferAttribute;
       triNormalsSBA: StorageBufferAttribute;
+      edgePseudoSBA: StorageBufferAttribute;
+      vertexPseudoSBA: StorageBufferAttribute;
     }
   > = new Map();
 
@@ -1001,6 +1003,8 @@ export class GpuSolverClient implements ClothSolverClient {
       disposeStorageBufferAttribute(previous.bvhSkipSBA, this.rendererRef);
       disposeStorageBufferAttribute(previous.triVertsSBA, this.rendererRef);
       disposeStorageBufferAttribute(previous.triNormalsSBA, this.rendererRef);
+      disposeStorageBufferAttribute(previous.edgePseudoSBA, this.rendererRef);
+      disposeStorageBufferAttribute(previous.vertexPseudoSBA, this.rendererRef);
     }
 
     // Create StorageBufferAttributes for GPU upload
@@ -1008,7 +1012,9 @@ export class GpuSolverClient implements ClothSolverClient {
     const bvhSkipSBA = createSBA(bvh.skip, 1);
     const triVertsSBA = createSBA(bvh.triVerts, 1);
     const triNormalsSBA = createSBA(bvh.triNormals, 1);
-    this.collisionBodySBAs.set(id, { bvhNodesSBA, bvhSkipSBA, triVertsSBA, triNormalsSBA });
+    const edgePseudoSBA = createSBA(bvh.edgePseudonormals, 1);
+    const vertexPseudoSBA = createSBA(bvh.vertexPseudonormals, 1);
+    this.collisionBodySBAs.set(id, { bvhNodesSBA, bvhSkipSBA, triVertsSBA, triNormalsSBA, edgePseudoSBA, vertexPseudoSBA });
 
     // Use shared buffer nodes from the solver
     const N = this.tslSolver.numParticles;
@@ -1024,6 +1030,8 @@ export class GpuSolverClient implements ClothSolverClient {
       bvhSkipSBA,
       triVertsSBA,
       triNormalsSBA,
+      edgePseudoSBA,
+      vertexPseudoSBA,
       N,
       bvh.nodeCount,
       bvh.triCount,
@@ -1164,6 +1172,8 @@ export class GpuSolverClient implements ClothSolverClient {
       disposeStorageBufferAttribute(tracked.bvhSkipSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triVertsSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triNormalsSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.edgePseudoSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.vertexPseudoSBA, this.rendererRef);
       this.collisionBodySBAs.delete(id);
     }
   }
@@ -1179,6 +1189,8 @@ export class GpuSolverClient implements ClothSolverClient {
       disposeStorageBufferAttribute(tracked.bvhSkipSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triVertsSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triNormalsSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.edgePseudoSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.vertexPseudoSBA, this.rendererRef);
     }
     this.collisionBodySBAs.clear();
     if (this.tslBuffers) {
