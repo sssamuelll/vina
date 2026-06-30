@@ -178,8 +178,7 @@ normal** by the penetration depth — measuring and pushing along the **same axi
 avoids the depth-vs-direction mismatch and the "different body points" issue of the
 first draft (which pushed along the body pseudonormal):
 
-- **Penetration depth** `d = margin − (bodyFeaturePoint − faceCorner)·n_face`, where
-  `n_face` is the cloth face's **outward** normal.
+- **Signed position + penetration depth (corrected sign):** `signed = (bodyFeaturePoint − faceCorner)·n_outward`, where `n_outward` is the cloth face normal oriented **away from the body**. A safely-covered body vertex sits on the inner side (`signed ≤ −margin`). **Violation** when `signed > −margin` (the body vertex is within `margin` of, or past, the face on the outward side); then **penetration depth** `d = signed + margin` (> 0). Push the face out along `n_outward` by `d` so the body vertex ends up `margin` behind it. (An earlier draft `d = margin − signed` was sign-inverted — it would push harder the deeper the body sat.)
 - **Outward orientation of `n_face` (the M11 fix):** cloth face normals are
   recomputed each frame and not globally sign-consistent. Disambiguate using the body
   pseudonormal (we build/upload angle-weighted Baerentzen–Aanaes edge+vertex

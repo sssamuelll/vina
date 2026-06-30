@@ -187,6 +187,18 @@ it('cube-poke: all 3 corners of a pierced cloth face lift +n; control face untou
   );
   expect(r2.dA[0]).toBe(0); expect(r2.dA[1]).toBe(0); expect(r2.dA[2]).toBe(0);
 });
+
+it('a body vertex safely behind the face yields ZERO correction (sign discriminator)', () => {
+  const body = bodyVertexBump();
+  const pn = buildBodyPseudonormals(body, 1e-6);
+  // Face well OUTWARD of the apex: face at y=0.5, apex at y=0.2 → apex sits 0.3
+  // behind the outward (+y) face, > margin → must NOT be pushed. A wrong
+  // `depth = margin - signed` would push it (harder the deeper it sits) and fail here.
+  const A = [-1, 0.5, -1], B = [1, 0.5, -1], C = [0, 0.5, 1];
+  const margin = 0.15;
+  const r = facePokeCorrection(A[0],A[1],A[2], B[0],B[1],B[2], C[0],C[1],C[2], body.vertices, pn.vertex, margin);
+  expect(r.dA[1]).toBe(0); expect(r.dB[1]).toBe(0); expect(r.dC[1]).toBe(0);
+});
 ```
 
 - [ ] **Step 2: Run — verify it fails** (`facePokeCorrection is not a function`).
@@ -248,7 +260,7 @@ export function facePokeCorrection(
     if (ox * pnx + oy * pny + oz * pnz < 0) { ox = -ox; oy = -oy; oz = -oz; }
     // Signed distance of P from the face plane, along outward normal.
     const signed = (px - ax) * ox + (py - ay) * oy + (pz - az) * oz;
-    if (signed >= margin) continue; // not penetrating the band on the outward side
+    if (signed <= -margin) continue; // body vertex safely >= margin behind the face → no violation
     // Barycentric of P projected onto the triangle.
     const wx = px - ax, wy = py - ay, wz = pz - az;
     const d20 = wx * e1x + wy * e1y + wz * e1z;
@@ -257,7 +269,7 @@ export function facePokeCorrection(
     const gamma = (d00 * d21 - d01 * d20) / denom;
     const alpha = 1 - beta - gamma;
     if (alpha < 0 || beta < 0 || gamma < 0) continue; // projects outside the triangle
-    const depth = margin - signed; // > 0
+    const depth = signed + margin; // > 0 — push the face out until the body vert sits margin behind it
     const s = alpha * alpha + beta * beta + gamma * gamma;
     if (s === 0) continue;
     const ka = (alpha / s) * depth, kb = (beta / s) * depth, kg = (gamma / s) * depth;
