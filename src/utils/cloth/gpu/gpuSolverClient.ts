@@ -22,6 +22,7 @@ import {
   type FabricComplianceConfig,
 } from './tslBuffers';
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
+import { makeFacePokeSnapshotNode, makeFacePokeCorrectNode } from './tslFacePoke';
 import { createSelfCollisionBuffers } from './tslSelfCollision';
 import { buildAdjacency, nextPrime } from '../selfCollision';
 import { buildAdjacencyCSR } from '../wasm/adjacencyCSR';
@@ -1042,6 +1043,42 @@ export class GpuSolverClient implements ClothSolverClient {
 
     this.tslSolver.setCollisionBody(body, this.rendererRef);
 
+    // ─── Face-poke pass (face-poke v1, GPU-only) ──────────────────────────────
+    // The correction kernel queries THIS body's BVH for body vertices poking
+    // through cloth faces, so it is built here (where the BVH SBAs exist) and
+    // exposed on the solver. v1 = avatar only (the motivating case — María's
+    // body showing through the front drape); other collision bodies don't get a
+    // face-poke pass. Re-built on every avatar pose update (fresh BVH); the old
+    // compute nodes become GC-eligible (they own no GPU buffers — the SBAs are
+    // owned by tslBuffers + collisionBodySBAs and disposed there).
+    if (id === '__avatar__') {
+      this.tslSolver.facePokeNodes = {
+        snapshot: makeFacePokeSnapshotNode(
+          this.tslSolver.positionBufNode,
+          this.tslBuffers.facePokeSnapshotSBA,
+          N,
+        ),
+        correct: makeFacePokeCorrectNode({
+          posBuf: this.tslSolver.positionBufNode,
+          prevPosBuf: this.tslSolver.prevPosBufNode,
+          invMassBuf: this.tslSolver.invMassBufNode,
+          snapshotSBA: this.tslBuffers.facePokeSnapshotSBA,
+          incidentOffsetsSBA: this.tslBuffers.incidentFaceOffsetsSBA,
+          incidentListSBA: this.tslBuffers.incidentFaceListSBA,
+          triIdsSBA: this.tslBuffers.triangleIdsSBA,
+          bvhNodesSBA,
+          bvhSkipSBA,
+          triVertsSBA,
+          vertexPseudoSBA,
+          numParticles: N,
+          numClothTriangles: this.tslBuffers.numTriangles,
+          numBvhNodes: bvh.nodeCount,
+          numBodyTris: bvh.triCount,
+          margin,
+        }),
+      };
+    }
+
     // Retain the avatar body tris for captureTetherTargets (body-surface query).
     // NOTE: the body-surface capture is NOT auto-run here — it is an O(N×tris)
     // brute force (~26 s for an 18 k-tri avatar) that froze Start, and the tether
@@ -1166,6 +1203,10 @@ export class GpuSolverClient implements ClothSolverClient {
    */
   removeTslCollisionBody(id: string): void {
     this.tslSolver?.removeCollisionBody(id, this.rendererRef);
+    // Drop the face-poke nodes when the avatar goes away — the correction
+    // kernel references this body's BVH SBAs (freed below), so a later dispatch
+    // would read freed buffers.
+    if (id === '__avatar__' && this.tslSolver) this.tslSolver.facePokeNodes = null;
     const tracked = this.collisionBodySBAs.get(id);
     if (tracked) {
       disposeStorageBufferAttribute(tracked.bvhNodesSBA, this.rendererRef);

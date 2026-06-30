@@ -42,6 +42,7 @@ import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
+import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { isRendererDeviceLost, markRendererDeviceLost } from './rendererDeviceLost';
 import { useCollisionBodies } from './useCollisionBodies';
 import { useMeshing } from './useMeshing';
@@ -551,6 +552,17 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // Steam brush (once per frame, after substeps settle; skip when inactive)
       if (solver.brushNodes.strength.value > 0) {
         renderer.compute(solver.brushNodes.brushNode);
+      }
+
+      // Face-poke (face-poke v1, GPU-only): once per frame, AFTER the substep
+      // loop, BEFORE the normal recompute so the smooth normals reflect the
+      // tented geometry. snapshot freezes the post-settle corner positions (B1
+      // determinism fix), then correct tents poked cloth faces over convex body
+      // bumps. Gated by the GPU tier's facePoke capability (the kill-switch) +
+      // the nodes existing (set once the avatar body is loaded).
+      if (GPU_CAPABILITIES.facePoke && solver.facePokeNodes) {
+        renderer.compute(solver.facePokeNodes.snapshot);
+        renderer.compute(solver.facePokeNodes.correct);
       }
 
       renderer.compute(solver.normalZero);
