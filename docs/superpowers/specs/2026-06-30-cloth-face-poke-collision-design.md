@@ -1,270 +1,337 @@
 # Cloth–Body Face-Poke: Face-Aware Collision Pass (Phase B) — Design
 
 **Date:** 2026-06-30
-**Status:** Approved (brainstorming) — ready for implementation plan
+**Status:** Approved (brainstorming) — **revised after roster review (2026-06-30)** — ready for implementation plan
 **North star:** purest possible cloth realism — the garment must sit on the avatar
 like real clothing (Unreal/CLO3D feel); the body must not show through the cloth.
 **Branch:** `feat/envelope-wrap`
-**Author:** Samuel + Claude (Opus 4.8), informed by a 22-repo market benchmark + roster review (Halberg/Voronov/Cassian)
+**Author:** Samuel + Claude (Opus 4.8), informed by a 22-repo market benchmark + two roster passes (benchmark synthesis; spec critique Serrano/Voronov/Halberg/Richter/Cassian + arbiter ruling)
 
 > **Framing — this REFORMULATES the Phase B promised by the pseudonormal spec.**
 > `docs/superpowers/specs/2026-06-26-cloth-body-collision-pseudonormal-design.md`
 > committed to "Phase B = a unified, narrow-band, face-sampled signed-distance
-> **field** read by both collision and the tether." A 22-repo market benchmark
-> (2026-06-30) **refutes the field as the face-poke fix**: (1) no repo demonstrates
-> a real-time face-sampled narrow-band body SDF; (2) we already built and **deleted**
-> a uniform-grid SDF (`docs/plans/2026-03-05-sdf-removal-design.md`) because at
-> feasible resolution it blurs sub-cm detail; (3) an SDF sampled at 3 face verts is
-> blind to the face interior — the exact poke location — so it needs face-interior
-> sampling, reintroducing the same between-samples blindness; (4) the SDF cannot
-> subsume the tether (Eulerian distance-to-*nearest-surface* ≠ the tether's
-> Lagrangian distance-to-*my-anchor*). **Phase B is hereby redefined as a face-aware
-> DUAL collision pass** (body features vs cloth faces), the only direction with both
-> market proof of the algorithm and a real-time-feasible shape on our stack. The
-> unified field, if ever built, is a separate *tether-unification* program, not the
-> face-poke fix.
+> **field**." A 22-repo benchmark (2026-06-30) refuted the field as the face-poke
+> fix: (1) no repo demonstrates a real-time face-sampled narrow-band body SDF; (2)
+> we already built and **deleted** a uniform-grid SDF
+> (`docs/plans/2026-03-05-sdf-removal-design.md`) — at feasible resolution it blurs
+> sub-cm detail; (3) an SDF sampled at 3 face verts is blind to the face interior;
+> (4) it cannot subsume the tether (Eulerian distance-to-*nearest-surface* ≠ the
+> tether's Lagrangian distance-to-*my-anchor*). **Phase B is a face-aware collision
+> pass** (body features vs cloth faces), the only direction with both market proof
+> of the algorithm and a real-time-feasible shape on our stack.
 
-## 1. Problem / root cause (confirmed)
+> **Revision note (roster review, 2026-06-30).** Five lenses endorsed the
+> architecture and found two BLOCKERs + three verified factual errors in the first
+> draft, now fixed here: **(B1)** "determinism for free" was false — the gather
+> reads *neighbor* face corners that peer threads mutate; fix = read from the
+> `preCollisionPos` snapshot (immutable), §A2. **(B2)** the ~2 ms budget was
+> underived and likely fails the ≥30 fps gate; the fix scope is now decided by a
+> measurement gate, §7. **(Ruling c)** v1 ships a **body-vertex-only** detector as a
+> ship-quality probe; the body-edge Möller-Trumbore test is a *measured* escalation,
+> not a v1 default, §A3/§7 — because the poke geometry (§1) shows the edge regime is
+> real, so vertex-only coverage of the motivating bump is *unknown until measured*.
+> Also fixed: the insertion slot (§A5), the tether premise (§A6), the response math
+> (§A4), and the fps-table misread (§4).
+
+## 1. Problem / root cause (confirmed) — and the poke geometry
 
 Phase A (pseudonormal sign fix, `55d882b3`..`918123c5`) stopped genuine **vertex**
-penetration at concave junctions; the shirt now covers the body. The residual is
-**face-poke**: a cloth triangle whose **3 vertices are all outside the body** is
-still pierced by a convex body bump (nipple, ab) that pokes up **between** the verts,
-through the flat cloth **face**. The opaque body then overdraws the cloth → anatomy-
-shaped "skin patches" on the front.
+penetration; the shirt now covers the body. The residual is **face-poke**: a cloth
+triangle whose **3 vertices are all outside the body** is pierced by a convex body
+feature poking up **between** the verts, through the flat cloth **face**. The opaque
+body overdraws it → anatomy-shaped "skin patches" on the front. Vertex-vs-triangle
+collision is **structurally blind** to this — the contact's owner is a *face*, not a
+*point*; more substeps / wider margin cannot touch it.
 
-This is **structurally unsolvable by vertex-vs-triangle collision**: that test
-dispatches over cloth *points* and asks "is this point inside the body?". A
-face-poke has no cloth point in contact — the body feature pierces the **interior
-of a cloth 2-cell**. More substeps / a wider margin cannot touch it; the contact's
-natural owner is a *face*, not a *point*. This is the first contact event in the
-engine whose natural owner is not a single particle (see §4 A1).
+**Poke geometry (the load-bearing fact, from the arbiter ruling).** A cloth face
+with all 3 verts outside, yet poked, requires curvature on the scale of the cloth
+triangle. A piecewise-flat triangle-soup body has curvature **only at its edges and
+vertices**. So the piercing feature is a **body vertex** OR a **body edge** (a convex
+ridge) crossing the face. Critically, because the cloth (~58k tris) is **denser**
+than the avatar (~18k tris), a long body **edge** can cross a small cloth triangle
+with *both* its endpoints projecting outside that triangle — a case **only the
+edge (segment-triangle) test catches**, invisible to vertex-only detection. This is
+why v1's vertex-only coverage of the motivating bump must be **measured, not
+assumed** (§7).
 
 ## 2. Market evidence (22-repo benchmark, 2026-06-30)
 
-Provenance: workflow `face-poke-benchmark` (28 agents). Full records archived with
-the session. Decision-grade summary:
+Provenance: workflow `face-poke-benchmark` (28 agents). Decision-grade summary:
 
-- **Only 2 of 22 repos solve face-poke. Every other cloth-on-body solver shares our
-  exact blind spot** — including the closest peers: `NvidiaWarp-GarmentCode` (XPBD)
-  "identical structural gap as ours", `GarmentLab` (PhysX5) "structurally identical
-  blindness to OpenClo", `Electric-Bluefish/garment-sim` (XPBD) same. The gap is
-  **structural to vertex-only collision, not a tuning miss.** We are in genuinely
-  under-served territory.
-- **`st-tech/ppf-contact-solver`** (Apache-2.0) — IPC cubic-barrier + ACCD, with
-  **point-triangle contact in BOTH directions** (body-vertex vs cloth-face AND
-  cloth-vertex vs body-face). Structurally *is* the fix. But **offline** (2–437
-  s/frame). → **Borrow the barrier RESPONSE math (code-reusable); reject the global
-  Newton/Hessian/PCG solver (the offline trap).**
-- **`nakjun/Cloth-Simulation-WebGPU`** (no license) — Möller-Trumbore segment/tri-tri
-  detection **in WGSL on our exact stack**, proving face-aware detection runs in a
-  browser. But crude response (velocity reversal, jitter, ships with collision
-  commented out) and all-pairs O(N·M). → **Reimplement the M-T kernel (LEARN-ONLY,
-  M-T is prior art); drive it from OUR BVH, never their all-pairs dispatch.**
+- **Only 2 of 22 repos solve face-poke; every other cloth-on-body solver shares our
+  exact blind spot** — incl. peers `NvidiaWarp-GarmentCode` (XPBD) "identical gap as
+  ours", `GarmentLab` (PhysX5) "structurally identical blindness to OpenClo",
+  `garment-sim` (XPBD). The gap is **structural to vertex-only collision**, not a
+  tuning miss. Under-served territory.
+- **`st-tech/ppf-contact-solver`** (Apache-2.0) — IPC cubic-barrier + ACCD,
+  point-triangle in BOTH directions. *Is* the fix, but **offline** (2–437 s/frame).
+  → borrow the barrier RESPONSE math (code-reusable); reject the global solver.
+- **`nakjun/Cloth-Simulation-WebGPU`** (no license) — Möller-Trumbore detection
+  **in WGSL on our stack**, proving face-aware detection runs in a browser. Crude
+  response (velocity reversal, jitter, ships with collision commented out), all-pairs
+  O(N·M). → reimplement the M-T kernel (LEARN-ONLY); drive from OUR BVH.
 
-**Borrow table:**
+**What the benchmark proves and does NOT prove (honest scope):** it proves the
+blind spot is industry-wide and that face-aware *detection* is browser-portable. It
+does **not** prove a real-time face-poke *response* is feasible at our scale — 0/22
+demonstrate that. Do not borrow that confidence; §7 measures it.
 
-| Technique | Source | License → use | Notes |
-|---|---|---|---|
-| Cubic-barrier contact response → position correction | ppf `energy/model/push.hpp` | Apache-2.0 → **code-reusable** (keep notice) | ~30 lines; optional, only if pure XPBD push over/undershoots |
-| Möller-Trumbore segment-vs-triangle detection | nakjun `IntersectionShader.ts` | none → **learn-only, reimplement** | drive from our BVH, not all-pairs |
-| Closest-point-on-triangle (vertex direction) | — | **already ours** (`triangleCollision.ts`) | do not rewrite |
-
-**Do NOT touch (license):** GPL (`ccincotti3/webgpu_cloth_simulator`,
-`liren2515/DrapeNet`), NVSCL non-commercial (`NvidiaWarp-GarmentCode`) — study only.
+**Borrow table:** cubic-barrier response → ppf `energy/model/push.hpp` (Apache, code-
+reusable, ~30 lines, **optional** per §A4); Möller-Trumbore segment-triangle → nakjun
+`IntersectionShader.ts` (no license, **learn-only, reimplement**, **v2 only** per
+ruling c). **Avoid (license):** GPL (`ccincotti3`, `DrapeNet`), NVSCL non-commercial
+(`NvidiaWarp-GarmentCode`).
 
 ## 3. Goals / Non-goals
 
 **Goals**
-- A **physical** fix: cloth tents realistically over convex body bumps; the body no
-  longer shows through cloth faces on the front of María's drape.
-- Real-time on the **default GPU tier** (≥30 fps held on the María fixture).
-- Determinism preserved — **no new non-determinism axis** beyond what ships today.
+- A **physical** fix: cloth tents over convex body bumps; the body stops showing
+  through cloth faces on María's front drape.
+- Real-time on the **default GPU tier** — ≥30 fps held on María (hard gate, §7).
+- **No new non-determinism axis** — honestly achievable via the snapshot read (§A2).
 
 **Non-goals (this design)**
-- A render-only mitigation (visible-avatar inset) — explicitly rejected by the user
-  in favor of the physical fix ("sin compromiso").
-- The unified body field / SDF — refuted as the face-poke fix (see Framing).
+- Render-only mitigation (visible-avatar inset) — rejected by the user ("físico").
+- The unified body field / SDF — refuted (see Framing).
+- **Body-edge Möller-Trumbore in v1** — it is a *measured escalation* (§7), not a v1
+  default. v1 is the body-vertex probe.
 - WASM/CPU parity in v1 — deferred follow-up (tracked A7 GPU-ahead divergence, like
-  strain-limiting and the tether). GPU is what the user sees.
-- CCD — the avatar is static; per-frame cadence + the `MAX_PUSH_DIST` clamp cover it.
-- Self-collision face-poke (cloth-cloth) — body-vs-cloth only here.
+  strain-limit + tether). A CPU-mirror correctness oracle MAY land in v1 CI (§A7).
+- CCD as a structural feature — but the CCD-skip is justified on *cloth-velocity*
+  grounds, not "avatar static" (§A5).
+- Cloth-cloth face-poke (self-collision).
 
 ## 4. Global constraints (the substrate)
 
-- GPU/TSL/WebGPU is the DEFAULT tier. Collision lives in
-  `src/utils/cloth/gpu/tslCollision.ts` (BVH traversal on a GPU StorageBuffer).
-- **The frame budget is already saturated.** The F4.3c sweep baked into
-  `tslCollision.ts:254-274`: María, 29,338 particles, **margin 0.03 → 30.7 ms →
-  32 fps**; margin 0.02 → 24 fps ("the cliff edge"). Collision IS the budget; there
-  is ~0.7–3 ms of headroom above 30 fps. **Cost the pass you will actually dispatch.**
-- The avatar is **STATIC** during a drape (joints/morph constant). The body
-  collision BVH (`gpu/bvh.ts`, three-mesh-bvh, leaf-ordered, build-once) and any new
-  per-particle precompute amortize at body-rebuild (debounced ~200 ms), never per-frame.
-- Cloth topology is **static** for a given drape → the per-particle incident-face
-  list builds once (like the tether captures targets once).
-- The body collision mesh is **triangle soup** (`CollisionMeshData`, 9 floats/tri);
-  the BVH bounds its triangles (hence its vertices and edges) — no new structure
-  needed to find body features near a cloth face.
+- GPU/TSL/WebGPU is the DEFAULT tier; collision is `gpu/tslCollision.ts` (BVH on a
+  GPU StorageBuffer).
+- **The frame budget is saturated.** Sweep in `tslCollision.ts:254-274`: María,
+  29,338 particles, 15 substeps, **margin 0.03 → 30.7 ms → ~32 fps**; ~**2.6 ms**
+  headroom to the 33.33 ms / 30 fps hard floor. *(Correction: margin 0.02 = 24.6 ms
+  = 40.7 fps; that "cliff" is a **drape** cliff — creep/shoulder-slip — NOT an fps
+  cliff. So lowering margin is not a free fps lever; it was rejected for drape.)*
+- The avatar is **STATIC** during a drape → the body BVH (`gpu/bvh.ts`, build-once,
+  leaf-ordered, already carries edge+vertex pseudonormals) and any per-particle
+  precompute amortize at body-rebuild, never per-frame.
+- Cloth topology is **static** for a drape → the per-particle incident-face list
+  builds once.
+- The body BVH bounds body **triangles** (hence their vertices and edges) — querying
+  it with a cloth-face AABB finds the body features near that face; **no second
+  acceleration structure** is needed on GPU.
+- A `preCollisionPos` snapshot already exists in the pipeline (`snapshotPreCollision`,
+  the `snapshot→postSolve` window) — the immutable read source for §A2.
 
 ## 5. Design
 
-### A1 — The governing invariant (why the obvious shape is wrong)
+### A1 — The governing invariant (stated correctly this time)
 
-The engine has **one law, repeated in every subsystem**: *the only actuator writes a
-particle position from data that particle gathered itself.* `findBestNode` /
-`applyPushNode` dispatch over **particles**; `bestDistBuf` is sized `numParticles`;
-the pseudonormal sign is the *sign of a point*; the tether kernel is
-`compute(fn, N)` over **particles**, each writing only itself ("race-free by
-construction, no atomics"). The #921 composite-key `atomicMin` determinism win and
-the tether's atomic-freedom are dividends of this law.
+The engine's law: *the actuator writes a particle position, and a particle gathers
+only **immutable** data.* The existing vertex collision reads only the particle's own
+(immutable-within-pass) position. The first draft mis-stated this as "writes from
+self-gathered data" and claimed determinism "for free"; the face pass gathers a
+face's **other two corners**, which are **mutable co-owned** state — so the invariant
+that actually keeps it deterministic is **"gather only immutable data."**
 
-The naive face-poke shape — *dispatch over cloth faces, push the face out* — is
-**scatter**: a face writes its 3 shared particles; adjacent faces contend → float
-`atomicAdd` → non-associative → **re-opens the #921 determinism axis we just
-closed**. **Rejected.**
+(Note: scatter is **not** forbidden by the engine — `normalAccum`,
+`tslSolver.ts:919-920`, already scatters over faces into per-particle accumulators
+deterministically via int-quantized atomics, the #921 trick. We choose **gather**
+here for simplicity and atomic-freedom *given the snapshot*, not because scatter is
+impossible. The scatter-to-scratch shape remains a valid fallback if the gather cost
+(§7) disappoints.)
 
-### A2 — Mechanism (gather, not scatter)
-
-Keep the particle as the sole write-owner. Move only **detection** to be face-aware:
+### A2 — Mechanism: per-particle gather from the SNAPSHOT (the B1 fix)
 
 ```
 dispatch OVER PARTICLES (as today):
   i = particle index
-  for each cloth face f incident to i:          // clothVertexFaces[i], static, built once
-    aabb = AABB(f) expanded by band             // f's 3 current positions
+  for each cloth face f incident to i:            // clothVertexFaces[i], static, built once
+    read f's 3 corners from preCollisionPos (IMMUTABLE snapshot, NOT live posBuf)
+    aabb = AABB(f) + band
     query the EXISTING body-triangle BVH with aabb
     for each returned body triangle t:
-      // does a body FEATURE of t pierce face f?
-      if  body-vertex(t) inside f's prism  OR  body-edge(t) crosses f  (§A3):
-        d = penetration depth of that feature through f
-        push particle i OUTWARD by its barycentric share of d  (§A4)   // writes ONLY i
+      if a body FEATURE of t pierces f (§A3):
+        accumulate the penetration into particle i's own correction   // writes ONLY i
+  apply particle i's correction to its position (+ velocity damp, §A5)
 ```
 
-Each of a poked face's 3 corners independently runs this, detects the same body
-feature, and lifts itself → the face tents. **No new BVH, no scatter, no new
-atomics, determinism preserved for free.** The synthesis's "double-response" open
-question dissolves — it was an artifact of the rejected face-dispatch.
+Reading the face corners from `preCollisionPos` makes the detection input
+**immutable during the dispatch** → no read-after-write race → determinism holds.
+Each corner of a poked face independently detects the same feature and lifts itself →
+the face tents. No new BVH, no scatter, no new atomics.
 
-### A3 — Detection: two body features (both mandatory)
+### A3 — Detection (v1 = vertex only; edge = measured v2, per ruling c)
 
-- **Body-vertex vs cloth-face:** is a body vertex inside the thin prism over face
-  `f` (within the band, projecting inside the triangle)? Reuse the closest-point /
-  barycentric machinery already in `triangleCollision.ts` / `tslCollision.ts`.
-- **Body-edge vs cloth-face (mandatory, not optional):** Möller-Trumbore
-  segment-vs-triangle — does a body edge cross `f`? Vertex-only **misses sparse,
-  low-poly bumps** whose tip sits between body verts (Halberg). Reimplemented from
-  nakjun (learn-only).
+- **v1 — body-vertex vs cloth-face:** is a body vertex inside the band-thick prism
+  over face `f` (projects inside the triangle, on the inside of the face plane)?
+  Built **ship-quality**, not scaffolding — it promotes to the v1 default in place if
+  §7 passes.
+- **v2 (measured escalation) — body-edge vs cloth-face:** Möller-Trumbore segment-
+  vs-triangle. Built **only if** §7 shows the motivating poke survives vertex-only —
+  the edge regime (§1) makes this genuinely possible. Reimplemented from nakjun
+  (learn-only), driven by our BVH (never all-pairs), and gated behind an optimization
+  pass (it is the single heaviest leaf, §7).
 
-### A4 — Response
+### A4 — Response (axis-consistent; the M7 fix)
 
-Positional XPBD correction: particle `i` moves outward along the **body
-pseudonormal** of the piercing feature (we already build + upload angle-weighted
-Baerentzen–Aanaes pseudonormals, `bodyPseudonormals.ts` / `bvh.ts`), by its
-barycentric share of the measured penetration, invMass-weighted, clamped to
-`MAX_PUSH_DIST = 0.05`. Pushing along the pseudonormal composes with the Phase A
-Pass-2 sign fix (same body normal field) rather than fighting it.
+The cloth **face** is the surface being pierced, so push the face out along **its own
+normal** by the penetration depth — measuring and pushing along the **same axis**
+avoids the depth-vs-direction mismatch and the "different body points" issue of the
+first draft (which pushed along the body pseudonormal):
 
-Start with the **pure XPBD push** (compliance carries stiffness). Add the **ppf
-cubic-barrier inertia term** (`mass/gap²`, Apache, ~30 lines) **only if** the pure
-push over/undershoots in @gpu-local tuning. The full elasticity-inclusive barrier
-(needs a Hessian we don't assemble) is out.
+- **Penetration depth** `d = margin − (bodyFeaturePoint − faceCorner)·n_face`, where
+  `n_face` is the cloth face's **outward** normal.
+- **Outward orientation of `n_face` (the M11 fix):** cloth face normals are
+  recomputed each frame and not globally sign-consistent. Disambiguate using the body
+  pseudonormal (we build/upload angle-weighted Baerentzen–Aanaes edge+vertex
+  pseudonormals): flip `n_face` if `n_face · n_pseudo(feature) < 0` so it points away
+  from the body. (Pseudonormal used for *sign*, not as the push axis.)
+- **Distribute to the 3 corners by the constraint gradient, not raw barycentrics
+  (the M7(a) fix):** moving corner `i` by `α_i·d` lifts the contact point by only
+  `(Σα_j²)·d < d` → under-clears. Use `Δx_i = (α_i / Σα_j²) · d · n_face`
+  (mass-weighted), so one pass clears the contact by `d`. Clamp total Δx per particle
+  to `MAX_PUSH_DIST = 0.05`.
+- **Stiffness:** start with the pure positional push (XPBD compliance carries
+  elasticity). Add the ppf cubic-barrier inertia term (`mass/gap²`, Apache, ~30
+  lines) **only if** the pure push over/undershoots in @gpu-local tuning. Full
+  elasticity-inclusive barrier (needs a Hessian) is out.
 
-### A5 — Cadence: once per FRAME, not per substep
+### A5 — Cadence + insertion (the H3 fix)
 
-Collision is already the whole budget; a second pass **per substep** (×15) →
-~17–20 fps (Halberg, from the sweep). Face-poke is **quasi-static** against a static
-avatar — it does not need per-substep CCD. Dispatch the face pass **once per frame**,
-after the substep loop, before postSolve/normals (in `GarmentSimulation.tsx`'s frame
-step). Budget ≈ ~2 ms → fits the headroom.
+**Once per FRAME**, not per substep (a per-substep second pass ×15 → ~17–20 fps).
+The real once-per-frame slot is the **brush/normals block** (`GarmentSimulation.tsx`
+~`:551-558`), which runs **after** the final `postSolve` — the first-draft's "after
+substeps, before postSolve" slot does not exist (those are inside `substepNodes`,
+×15).
 
-*Watch-item (honest):* the per-frame tent may "breathe" sub-cm (substeps flatten,
-the frame re-tents). At 30 fps likely imperceptible; if it flutters, escalate to
-every-N-substeps. Measure.
+**Velocity handling (newly specified):** because the pass runs *after* `postSolve`
+(which already derived velocity from the substep position delta), a position-only push
+would leave velocity pointing back into the bump → re-penetration next frame. So the
+face pass also **damps the inward-normal component** of the corrected vertex's
+velocity (a mini velocity-exclusion mirroring the per-substep collision's
+snapshot→postSolve behavior, #897 F2.3). Without this, the tent re-collapses each
+frame.
 
-### A6 — Tether coupling (the de-risk-FIRST item)
+*Watch-item:* per-frame correction may "breathe" sub-cm (15 substeps re-flatten, the
+frame re-tents). With the velocity damp it should hold; if it shimmers, escalate to
+every-N-substeps. Measured in §7.
 
-The body-tether (`feat/envelope-wrap`,
-`docs/superpowers/specs/2026-06-25-cloth-body-tether-max-distance-design.md`) pulls a
-vertex toward its **init-captured anchor** (its closest body point — which is **not**
-the bump). The face pass pushes the vertex **off the bump**. For the same vertex the
-two authorities reference **different body locations** and will fight: the face pass
-lifts to clear the bump, the tether yanks it back → oscillation.
+**CCD-skip rationale (the L15 fix):** justified on **cloth-velocity** grounds — the
+poke is quasi-static (the cloth creeps slowly at the bump), and `MAX_PUSH_DIST`
+bounds per-frame travel — NOT on "avatar is static." Bound the transient-poke miss
+during the high-motion settle phase in §7.
 
-**Structural rule (Voronov):** the corrected vertex's **effective tether radius must
-be ≥ the bump clearance**, i.e. the tether *yields* to the face pass — either by
-flooring the radius at corrected verts, or recapturing the tether target to the
-corrected position after the face pass. This coupling is **branch-specific and the
-highest integration risk; de-risk it FIRST in the plan** (measure whether, at
-default region radii, any proud bump under a tight-radius region forces the
-oscillation; pick yield-vs-recapture from the measurement).
+### A6 — Tether coupling (rewritten against the REAL tether; the H4 fix)
+
+The first draft built its "de-risk FIRST" argument on `captureTetherTargets`
+("closest body point"), which is **explicitly not auto-run** (`gpuSolverClient.ts`
+~`:1045-1050`). The **shipped** tether targets each vertex's **settled
+self-position** via `recaptureTetherTargetsFromGpu`, fired once at ~frame 150
+(`GarmentSimulation.tsx` ~`:569-588`). So:
+
+- If the face pass runs continuously, the ~frame-150 settle-capture snapshots the
+  **already-corrected** (tented) pose → tether target and face pass **agree**. The
+  feared oscillation is largely an artifact of the wrong model.
+- The only real coupling: the tether is a **max-distance clamp**; a face lift that
+  exceeds the vertex's region radius fights it. But the push is clamped to
+  `MAX_PUSH_DIST = 0.05`, and where the region radius ≥ 0.05 the clamp never trips →
+  no fight. Front-torso radius is ~0.025 m, so a tight-radius bump *could* fight.
+
+**Demoted from "#1 risk / de-risk FIRST" to a MEASUREMENT GATE:** measure the region
+radii at the nipple/ab and whether a lift there exceeds the local radius **before**
+building any remedy. If a fight exists, prefer re-using the existing
+`recaptureTetherTargetsFromGpu` *after* the first face correction over a new
+radius-floor SBA (which carries 1-frame cross-kernel latency). Do **not** add
+GPU target recapture that re-introduces the slide-off the settle-tether arrested
+(project memory `613fd730`).
 
 ### A7 — Scope, tiers, parity
 
-- **GPU-only in v1**, behind `SolverCapabilities.collision.facePoke` +
-  `SimulationStatusOverlay` silent-absence (A7 / Epic-746 convention).
-- **WASM/CPU port + parity oracle = deferred follow-up** (tracked A7 GPU-ahead
-  divergence). On CPU/WASM there is no BVH (it uses `TriangleSpatialHash` over body
-  *triangles*) — the dual query needs its own acceleration there; scoped with the
-  port, not now.
-- **Boundary-contract oracle (ships with the WASM port):** a cube vertex/edge poking
-  a flat 2-triangle quad whose 3 verts are all outside → assert all 3 face verts move
-  +pseudonormal, none cross the body, a non-poking control vertex yields zero
-  correction.
+- **GPU-only v1**, behind a `SolverCapabilities` flag. Note (L14): this is a **schema
+  change** — there is no `collision` category today (flat flags + one `tools`
+  sub-object), and per C4 #701 every field is required → all 4 tier constants must
+  declare it.
+- **Device-loss quality signal (the H6 fix):** `device.lost → handleGpuDeviceLost →`
+  WASM, which has **no** face-poke → the body silently pokes through again. The
+  silent-absence overlay today is for *tool* absence; add a **quality-downgrade
+  signal** so a GPU-less fallback is not silently wrong.
+- **WASM/CPU port = deferred follow-up** (tracked A7 GPU-ahead divergence). On
+  CPU/WASM there is no BVH (`TriangleSpatialHash` over body *triangles*) — the dual
+  query needs its own structure there; scoped with the port.
+- **Correctness oracle, decoupled from the port (the F4 fix):** a CPU-mirror of the
+  detection+response math runs the cube-poke-quad boundary test **in v1 CI** — a cube
+  vertex/edge poking a flat 2-tri quad whose 3 verts are all outside → assert all 3
+  face verts move +n_face, none cross the body, a non-poking control vertex yields
+  zero correction. This guards the most novel collision code without waiting for the
+  full WASM port.
 
 ## 6. Components
 
 | Unit | Responsibility | Status |
 |---|---|---|
-| `clothVertexFaces` incident-face list | per-particle → incident cloth faces; built once at init (static topology) | **new**, cheap |
-| body-vertex-vs-face test | closest-point + in-prism + depth | **reuse** `triangleCollision.ts` math |
-| body-edge-vs-face test | Möller-Trumbore segment-triangle | **new**, reimplemented from nakjun (learn-only) |
-| face-pass kernel | per-particle gather + push-self along pseudonormal, clamp `MAX_PUSH_DIST` | **new** (`tslCollision.ts` / `tslSolver.ts`) |
-| frame-step insertion | dispatch once/frame after substeps | **modify** `GarmentSimulation.tsx` |
-| tether yield/recapture | radius floor or target recapture at corrected verts | **modify** tether path (`gpuSolverClient.ts`) |
-| `SolverCapabilities.collision.facePoke` + overlay | GPU-only gating + silent absence | **new** flag |
+| `clothVertexFaces` incident-face list | per-particle → incident cloth faces | **new, cheap** — invert the existing `triangleIdsSBA` (already on GPU for `normalAccum`); do not re-upload topology (L13) |
+| snapshot read | face corners from `preCollisionPos` (immutable) | **reuse** existing snapshot |
+| body-vertex-vs-face test (v1) | in-prism + signed depth | **new TSL** (distance math mirrors `triangleCollision.ts`, but the GPU kernel is a re-author, not an import; the cloth-side sign is `(V−corner)·n_face`, no body pseudonormal for the cloth face) (M10) |
+| body-edge-vs-face test (v2) | Möller-Trumbore segment-triangle | **deferred** (measured escalation) |
+| face-pass kernel | per-particle gather + self-push along outward `n_face`, `α_i/Σα_j²` weighting, `MAX_PUSH` clamp, inward-velocity damp | **new** (`tslCollision.ts`/`tslSolver.ts`) |
+| frame-step insertion | once/frame in the brush/normals slot (~`:551-558`) | **modify** `GarmentSimulation.tsx` |
+| multi-feature reduction | a body vertex is shared by ~6 tris, an edge by 2 → same feature returned up to 6× → over-push at convex tips (M8); reduce by single-winner `atomicMin` on depth (like the existing pass) or divide by incidence | **new** discipline |
+| `SolverCapabilities.collision.facePoke` + quality-downgrade signal | GPU-only gating; non-silent fallback | **new** (schema change, 4 tiers) |
+| CPU-mirror cube-poke oracle | v1 CI correctness guard | **new test** |
 
-## 7. Validation / success criteria
+## 7. Validation / success criteria — the measurement gate (ruling c)
 
-- **@gpu-local María (maintainer-run):**
-  1. **fps GATE (hard, before default-on):** ≥30 fps held with the pass on. If it
-     misses, narrow the band / drop the edge test before shipping default-on.
-     (Halberg + synthesis OQ8 — the "fits" budget is an estimate until measured.)
-  2. **face-poke residual:** the front inside-body / overdraw fraction drops sharply
-     vs the Phase-A baseline at the nipple/ab regions; visible skin patches gone.
-  3. **tether harmony:** the cloth tents over bumps without oscillating against the
-     tether (A6).
-- **Unit (CI, no GPU):** the incident-face list builder; the Möller-Trumbore
-  segment-triangle test on a known crossing/non-crossing fixture; (with the WASM
-  port) the cube-poke-quad boundary oracle.
+The build is a **ship-quality body-vertex probe**; one @gpu-local María run
+(29,338 particles, 15 substeps, maintainer-run) measures two numbers and forces the
+scope decision:
+
+1. **fps with the vertex face-pass on** (hard gate = ≥30 fps with device margin).
+2. **face-poke residual** — does the motivating nipple/ab poke visibly survive?
+
+**Decision table:**
+
+| fps | nipple | Outcome |
+|---|---|---|
+| ≥30 (margin) | closed | **Promote the probe to v1 default-on in place**; spec scope = vertex-only, now backed by the number; edge test never built. |
+| ≥30 | **survives** | The bug is in the **edge regime** (§1). Vertex-only does NOT go default-on as "the fix." **v2 = add body-edge Möller-Trumbore**, budgeted against the measured residual headroom → **optimization pass first** (BVH refit / valence cap / two-phase broad-cull) before default-on. |
+| **<30** | — | The pass is too heavy at this fidelity → escalate to **architecture** (quality-tier gating / optimization), not scope, before any default-on. |
+
+- **Also measured:** the "breathing" watch-item (A5); the settle-phase transient-poke
+  miss (A5 CCD-skip); whether a tether fight exists at nipple/ab radii (A6).
+- **Unit (CI, no GPU):** the `clothVertexFaces` builder; the CPU-mirror cube-poke
+  oracle (§A7); (with the edge escalation) the M-T segment-triangle test.
 - **Visual (Samuel):** the front face-poke gone on María.
 
 ## 8. Risk & de-risk order
 
-1. **Tether coupling (A6)** — de-risk FIRST; it can reshape the response/cadence.
-2. **Frame budget (A5/§7.1)** — measure on María before default-on; the gate.
-3. **Sparse-bump miss** — body-edge test mandatory; if still missed, the calibration
-   knob is avatar bump-region tessellation vs band width.
-4. **Breathing flutter (A5)** — escalate to every-N-substeps only if visible.
+1. **Budget / fps gate (B2)** — the existential risk; the §7 measurement is the first
+   thing the plan runs after the probe builds. Everything default-on hinges on it.
+2. **Multi-feature over-count (M8)** — over-push at convex tips (the loudest pokes);
+   the reduction discipline must land in the kernel, not be an afterthought.
+3. **Velocity handling / breathing (A5)** — verify the inward-velocity damp holds the
+   tent without shimmer.
+4. **Tether fight (A6)** — measurement gate, not a pre-emptive build.
 
 ## 9. Out of scope
 
-Render-only inset; the unified SDF/body field; WASM/CPU parity (v1); CCD;
-cloth-cloth face-poke; the full elasticity-inclusive barrier; ppf's global solver;
-any GPL/NVSCL code reuse.
+Render-only inset; the unified SDF/body field; body-edge M-T in v1 (measured v2);
+WASM/CPU parity (v1); the full elasticity-inclusive barrier; ppf's global solver; any
+GPL/NVSCL code reuse.
 
 ## 10. Open questions
 
-**Resolved during design:** queried primitive = vertex **and** edge (A3); response =
-pure XPBD push first, ppf barrier term only if needed (A4); push direction =
-pseudonormal (A4); cadence = per-frame (A5); CCD = skip (avatar static); scatter
-double-count = dissolved by gather formulation (A1/A2); SDF = rejected (Framing).
+**Resolved during design + roster review:** detector scope v1 = vertex-only probe,
+edge = measured escalation (ruling c); read source = `preCollisionPos` snapshot (B1);
+response axis = outward cloth face normal, distribute by `α_i/Σα_j²` (M7);
+orientation sign via body pseudonormal (M11); cadence = per-frame at the brush/normals
+slot + inward-velocity damp (H3); tether = measurement gate against the real
+settled-self target (H4/A6); scatter not forbidden, gather chosen for simplicity
+(M9); CCD-skip on cloth-velocity grounds (L15); SDF rejected (Framing).
 
 **Remaining (for the plan):**
-- A6: yield-vs-recapture for the tether — decide from the measurement.
-- Exact insertion point + uniform/SBA plumbing in `GarmentSimulation.tsx` /
-  `tslSolver.ts` for a per-frame (not per-substep) pass.
-- Band width vs avatar tessellation calibration.
+- The exact dispatched cost derivation feeding the §7 gate (union-AABB vs per-face
+  traversal; expected candidate-triangle count per particle).
+- The multi-feature reduction choice (atomicMin single-winner vs divide-by-incidence).
+- Band width vs avatar tessellation calibration (if the edge escalation triggers).
 
 ## Appendix — benchmark cluster map (provenance)
 
