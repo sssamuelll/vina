@@ -300,11 +300,12 @@ describe('destroyTslBufferSet', () => {
 
     destroyTslBufferSet(buffers, renderer);
 
-    // 15 fixed SBAs (position, prevPos, preCollisionPos, velocity, invMass,
+    // 18 fixed SBAs (position, prevPos, preCollisionPos, velocity, invMass,
     // normal, normalAccum, triangleIds, grabMask, grabOffset,
-    // tetherTarget, tetherMaxDist, bendIds, bendRest, bendCompliance)
+    // tetherTarget, tetherMaxDist, incidentFaceOffsets, incidentFaceList,
+    // facePokeSnapshot, bendIds, bendRest, bendCompliance)
     // + 3 SBAs per stretch color group + 3 SBAs per seam color group.
-    const expected = 15 + buffers.stretchColors.length * 3 + buffers.seamColors.length * 3;
+    const expected = 18 + buffers.stretchColors.length * 3 + buffers.seamColors.length * 3;
     expect(deleteSpy).toHaveBeenCalledTimes(expected);
 
     // Spot-check that core SBAs were each passed.
@@ -348,9 +349,9 @@ describe('destroyTslBufferSet', () => {
 
     destroyTslBufferSet(buffers, renderer);
 
-    // 12 fixed non-null SBAs (3 bend are null, +2 tether) + stretch colors * 3;
+    // 15 fixed non-null SBAs (3 bend are null, +2 tether, +3 face-poke) + stretch colors * 3;
     // empty seamColors contributes nothing.
-    const expected = 12 + buffers.stretchColors.length * 3;
+    const expected = 15 + buffers.stretchColors.length * 3;
     expect(deleteSpy).toHaveBeenCalledTimes(expected);
   });
 

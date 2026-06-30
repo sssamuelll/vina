@@ -13,6 +13,7 @@ import type { SelfCollisionBufferSet } from './tslSelfCollision';
 import { destroySelfCollisionBuffers } from './tslSelfCollision';
 import type { WindBufferSet } from './tslWind';
 import { destroyWindBuffers } from './tslWind';
+import { buildClothVertexFaces } from '../clothVertexFaces';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,11 @@ export interface TslBufferSet {
   // Body-tether buffers (frente#2: cloth clings to body, UE max-distance)
   tetherTargetSBA: StorageBufferAttribute;  // vec3 — anchor point on body (seeded to positions)
   tetherMaxDistSBA: StorageBufferAttribute; // float — per-vertex cling radius
+
+  // Incident-face CSR + face-poke snapshot (face-poke v1)
+  incidentFaceOffsetsSBA: StorageBufferAttribute; // uint, numParticles+1 — CSR row pointers
+  incidentFaceListSBA: StorageBufferAttribute;    // uint, numTriangles*3  — CSR column data
+  facePokeSnapshotSBA: StorageBufferAttribute;    // vec3, numParticles    — per-frame read source scratch
 
   // Counts
   numParticles: number;
@@ -252,6 +258,14 @@ export function createTslBuffers(
   const normalAccumSBA = new StorageBufferAttribute(new Int32Array(N * 3), 1);
   const triangleIdsSBA = new StorageBufferAttribute(new Uint32Array(mesh.triangles), 1);
 
+  // ─── Incident-face CSR + face-poke snapshot (face-poke v1) ────────────────
+  // Build CSR from the same cloth triangle indices already uploaded as
+  // triangleIdsSBA; no extra data source needed.
+  const { offsets: ifOffsets, faces: ifFaces } = buildClothVertexFaces(mesh.triangles, N);
+  const incidentFaceOffsetsSBA = createSBA(ifOffsets, 1);
+  const incidentFaceListSBA = createSBA(ifFaces, 1);
+  const facePokeSnapshotSBA = createSBA(new Float32Array(N * 3), 3);
+
   return {
     positionSBA,
     prevPosSBA,
@@ -273,6 +287,9 @@ export function createTslBuffers(
     triangleIdsSBA,
     tetherTargetSBA,
     tetherMaxDistSBA,
+    incidentFaceOffsetsSBA,
+    incidentFaceListSBA,
+    facePokeSnapshotSBA,
     scBuffers: null,
     windBuffers: null,
     numParticles: N,
@@ -352,6 +369,9 @@ export function destroyTslBufferSet(
     set.grabOffsetSBA,
     set.tetherTargetSBA,
     set.tetherMaxDistSBA,
+    set.incidentFaceOffsetsSBA,
+    set.incidentFaceListSBA,
+    set.facePokeSnapshotSBA,
     set.bendIdsSBA,
     set.bendRestSBA,
     set.bendComplianceSBA,
