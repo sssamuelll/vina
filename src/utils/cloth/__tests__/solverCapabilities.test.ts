@@ -93,6 +93,7 @@ describe('SolverCapabilities frozen shape', () => {
     expect(CPU_CAPABILITIES).toEqual({
       selfCollision: true,
       bodyCollision: true,
+      facePoke: false,
       lra: true,
       pressure: true,
       fold: true,
@@ -106,6 +107,7 @@ describe('SolverCapabilities frozen shape', () => {
     expect(WASM_CAPABILITIES).toEqual({
       selfCollision: true,
       bodyCollision: true,
+      facePoke: false,
       lra: false,
       pressure: false,
       fold: false,
@@ -131,6 +133,7 @@ describe('SolverCapabilities frozen shape', () => {
       // GPU↔WASM divergences behind the historical 30cm gap were closed
       // in F2.1-F2.5. See the JSDoc on `GPU_CAPABILITIES.bodyCollision`.
       bodyCollision: true,
+      facePoke: true,
       lra: false,
       pressure: false,
       fold: false,
@@ -152,6 +155,7 @@ describe('SolverCapabilities frozen shape', () => {
     expect(NEURAL_CAPABILITIES).toEqual({
       selfCollision: false,
       bodyCollision: false,
+      facePoke: false,
       lra: false,
       pressure: false,
       fold: false,

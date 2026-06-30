@@ -8,6 +8,21 @@
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { SolverTier } from '../../store/simulationSlice';
+import {
+  CPU_CAPABILITIES,
+  WASM_CAPABILITIES,
+  GPU_CAPABILITIES,
+  NEURAL_CAPABILITIES,
+} from '../../utils/cloth/solverCapabilities';
+
+// ponytail: static map — tier strings are a closed enum (SolverTier), no dynamic lookup needed.
+const TIER_CAPS = {
+  'webgpu':       GPU_CAPABILITIES,
+  'wasm':         WASM_CAPABILITIES,
+  'cpu-worker':   CPU_CAPABILITIES,
+  'neural-drape': NEURAL_CAPABILITIES,
+  'none':         CPU_CAPABILITIES,
+} as const satisfies Record<SolverTier, typeof CPU_CAPABILITIES>;
 
 const TIER_INFO: Record<SolverTier, { label: string; color: string; icon: string }> = {
   'none':          { label: 'Idle',         color: '#666',    icon: '⏸' },
@@ -87,6 +102,11 @@ export function SimulationStatusOverlay() {
       {solverTier !== 'none' && !bodyCollision && (
         <div style={{ color: '#fb923c', fontSize: 10 }}>
           ⚠️ No body collision
+        </div>
+      )}
+      {solverTier !== 'none' && bodyCollision && !TIER_CAPS[solverTier].facePoke && (
+        <div style={{ color: '#fb923c', fontSize: 10 }}>
+          ⚠️ Body detail may show through cloth — face-poke unavailable on this tier
         </div>
       )}
       {solverTier === 'wasm' && (

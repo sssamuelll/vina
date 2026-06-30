@@ -31,6 +31,9 @@ export interface SolverCapabilities {
    * inference contract.
    */
   bodyCollision: boolean;
+  /** Body-vertex-vs-cloth-face correction (face-poke). GPU-only in v1; see
+   *  docs/superpowers/specs/2026-06-30-cloth-face-poke-collision-design.md. */
+  facePoke: boolean;
   /** Long Range Attachments (Dijkstra geodesic + soft constraint). */
   lra: boolean;
   /** Per-piece pressure (inflation forces per triangle). */
@@ -117,6 +120,7 @@ export interface SolverCapabilities {
 export const CPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: true,
   bodyCollision: true,
+  facePoke: false,
   lra: true,
   pressure: true,
   fold: true,
@@ -141,6 +145,7 @@ export const CPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
 export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: true,
   bodyCollision: true,
+  facePoke: false,
   lra: false,
   pressure: false,
   fold: false,
@@ -231,6 +236,7 @@ export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
    * @see docs/reports/2026-05-04-733-gpu-body-collision-design.md § 9
    */
   bodyCollision: true,
+  facePoke: true,
   lra: false,
   pressure: false,
   fold: false,
@@ -287,6 +293,7 @@ export const NEURAL_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
    * exclusion per C4 RFC § 2.3.
    */
   bodyCollision: false,
+  facePoke: false,
   lra: false,
   pressure: false,
   fold: false,
