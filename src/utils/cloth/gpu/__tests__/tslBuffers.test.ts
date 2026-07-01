@@ -131,14 +131,50 @@ describe('createTslBuffers', () => {
     expect(totalConstraints).toBe(5);
   });
 
-  it('creates bend constraint SBAs', () => {
+  it('creates per-color bend constraint SBAs (stride-2 (c,d) pairs)', () => {
     const mesh = makeTestMesh();
     const { colored } = makeTestStretch();
     const bend = makeTestBend();
     const buffers = createTslBuffers(mesh, colored, bend, null);
 
-    expect(buffers.bendIdsSBA).not.toBeNull();
+    // 1 bend constraint → 1 color group of count 1; ids are stride-2 (c,d).
+    expect(buffers.bendColors).toHaveLength(1);
+    expect(buffers.bendColors[0].count).toBe(1);
+    expect(buffers.bendColors[0].idsSBA.itemSize).toBe(2);
     expect(buffers.numBendConstraints).toBe(1);
+  });
+
+  it('graph-colors bend so no color group has two constraints sharing a vertex (P4-1)', () => {
+    // 6 verts on a line; two bend constraints whose opposite-vertex (c,d) pairs
+    // share vertex 3 — (1,3) and (3,5) — must land in DIFFERENT color groups,
+    // else their non-atomic addAssign to vertex 3 races.
+    const mesh: ClothMeshData = {
+      positions: new Float32Array([0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 0, 5, 0, 0]),
+      triangles: new Uint32Array([0, 1, 2]),
+      invMass: new Float32Array(6).fill(1),
+    };
+    const { colored } = makeTestStretch();
+    const bend: BendConstraints = {
+      // stride-4, offsets 2,3 are (c,d): [_, _, 1, 3] and [_, _, 3, 5]
+      ids: new Uint32Array([0, 2, 1, 3, 2, 4, 3, 5]),
+      restAngles: new Float32Array([Math.PI, Math.PI]),
+      edgeTypes: new Uint8Array([1, 1]),
+    };
+    const buffers = createTslBuffers(mesh, colored, bend, null);
+
+    // Proper coloring: within each group no vertex index repeats.
+    for (const color of buffers.bendColors) {
+      const seen = new Set<number>();
+      const ids = color.idsSBA.array as unknown as Uint32Array;
+      for (let i = 0; i < color.count * 2; i++) {
+        expect(seen.has(ids[i])).toBe(false);
+        seen.add(ids[i]);
+      }
+    }
+    // Shared vertex 3 forces ≥2 groups; all constraints preserved.
+    expect(buffers.bendColors.length).toBeGreaterThanOrEqual(2);
+    expect(buffers.bendColors.reduce((s, c) => s + c.count, 0)).toBe(2);
+    expect(buffers.numBendConstraints).toBe(2);
   });
 
   it('creates seam color groups when seam data provided', () => {
@@ -300,12 +336,13 @@ describe('destroyTslBufferSet', () => {
 
     destroyTslBufferSet(buffers, renderer);
 
-    // 17 fixed SBAs (position, prevPos, preCollisionPos, velocity, invMass,
+    // 14 fixed SBAs (position, prevPos, preCollisionPos, velocity, invMass,
     // normal, normalAccum, triangleIds, grabMask, grabOffset,
     // tetherTarget, tetherMaxDist, facePokeCsr (packed offsets+list+triIds),
-    // facePokeSnapshot, bendIds, bendRest, bendCompliance)
-    // + 3 SBAs per stretch color group + 3 SBAs per seam color group.
-    const expected = 17 + buffers.stretchColors.length * 3 + buffers.seamColors.length * 3;
+    // facePokeSnapshot) + 3 SBAs per bend/stretch/seam color group.
+    const expected =
+      14 +
+      (buffers.bendColors.length + buffers.stretchColors.length + buffers.seamColors.length) * 3;
     expect(deleteSpy).toHaveBeenCalledTimes(expected);
 
     // Spot-check that core SBAs were each passed.
@@ -316,7 +353,11 @@ describe('destroyTslBufferSet', () => {
     expect(deleteSpy).toHaveBeenCalledWith(buffers.invMassSBA);
     expect(deleteSpy).toHaveBeenCalledWith(buffers.normalSBA);
     expect(deleteSpy).toHaveBeenCalledWith(buffers.triangleIdsSBA);
-    expect(deleteSpy).toHaveBeenCalledWith(buffers.bendIdsSBA);
+    for (const color of buffers.bendColors) {
+      expect(deleteSpy).toHaveBeenCalledWith(color.idsSBA);
+      expect(deleteSpy).toHaveBeenCalledWith(color.restLengthsSBA);
+      expect(deleteSpy).toHaveBeenCalledWith(color.complianceSBA);
+    }
     for (const color of buffers.stretchColors) {
       expect(deleteSpy).toHaveBeenCalledWith(color.idsSBA);
       expect(deleteSpy).toHaveBeenCalledWith(color.restLengthsSBA);
@@ -349,9 +390,11 @@ describe('destroyTslBufferSet', () => {
 
     destroyTslBufferSet(buffers, renderer);
 
-    // 14 fixed non-null SBAs (3 bend are null, +2 tether, +2 face-poke: csr+snapshot) + stretch colors * 3;
-    // empty seamColors contributes nothing.
-    const expected = 14 + buffers.stretchColors.length * 3;
+    // 14 fixed non-null SBAs (+2 tether, +2 face-poke: csr+snapshot) + 3 per
+    // color group; empty bend and seam color arrays contribute nothing.
+    const expected =
+      14 +
+      (buffers.bendColors.length + buffers.stretchColors.length + buffers.seamColors.length) * 3;
     expect(deleteSpy).toHaveBeenCalledTimes(expected);
   });
 

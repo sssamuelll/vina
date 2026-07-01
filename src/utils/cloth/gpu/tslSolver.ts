@@ -13,7 +13,7 @@
  * Solver steps:
  *   1. preSolve     — save prevPos, integrate gravity + damping (per-particle)
  *   2. stretch      — graph-colored distance constraints (per-color dispatch)
- *   3. bend         — single Jacobi distance constraint on opposite verts
+ *   3. bend         — graph-colored distance constraint on opposite verts (per-color dispatch)
  *   4. seam         — graph-colored decaying-target constraints closing seam pairs
  *   5. groundClamp  — clamp positions to ground plane (AFTER constraints)
  *   6. snapshotPreCollision — pos → preCollisionPos (tras grab, ANTES de
@@ -105,8 +105,8 @@ export interface TslSolver {
    * Dispatch AFTER strain-limit, BEFORE groundClamp.
    */
   tether: ComputeNode | null;
-  /** Bend constraint compute node (null if no bend constraints) */
-  bend: ComputeNode | null;
+  /** Bend constraint compute nodes, one per color group (P4-1: race-free) */
+  bendColors: ComputeNode[];
   /**
    * Per-color seam constraint compute nodes (empty if no seam constraints).
    * F1.4 (#897): dedicated kernel (`makeSeamConstraintFn`) with in-kernel
@@ -808,7 +808,7 @@ function makeNormalNormalizeFn(
  * enabling zero-copy rendering.
  *
  * Execution order per substep (espejo WASM — ver GarmentSimulation.tsx):
- *   preSolve → stretch(per-color) → bend → seam(per-color) → groundClamp →
+ *   preSolve → stretch(per-color) → bend(per-color) → seam(per-color) → groundClamp →
  *   [grab] → snapshotPreCollision → collision bodies → postSolve
  */
 export function createTslSolver(
@@ -871,21 +871,23 @@ export function createTslSolver(
     [64],
   );
 
-  // ─── Bend constraints (per-constraint compliance) ──────────────────
-  let bend: ComputeNode | null = null;
-  if (buffers.bendIdsSBA && buffers.bendRestSBA && buffers.bendComplianceSBA && buffers.numBendConstraints > 0) {
-    const bendIdsBuf = storage(buffers.bendIdsSBA, 'uint', buffers.numBendConstraints * 4);
-    const bendRestBuf = storage(buffers.bendRestSBA, 'float', buffers.numBendConstraints);
-    const bendCompBuf = storage(buffers.bendComplianceSBA, 'float', buffers.numBendConstraints);
+  // ─── Bend constraints (per-color, race-free — P4-1 determinism) ────
+  // Colored (c,d) distance constraints, one dispatch per color exactly like
+  // stretch. Replaces the old single non-colored Jacobi pass whose non-atomic
+  // addAssign to shared hinge verts was a data race (non-deterministic drape).
+  const bendColors = buffers.bendColors.map((color) => {
+    const idsBuf = storage(color.idsSBA, 'uint', color.count * 2);
+    const restBuf = storage(color.restLengthsSBA, 'float', color.count);
+    const compBuf = storage(color.complianceSBA, 'float', color.count);
 
     const fn = makeDistanceConstraintFn(
-      posBuf, invMassBuf, bendIdsBuf, bendRestBuf,
+      posBuf, invMassBuf, idsBuf, restBuf,
       uniforms.sdt,
-      4, 2, 3, // quad stride, opposite vertex indices
-      bendCompBuf,
+      2, 0, 1,
+      compBuf,
     );
-    bend = compute(fn, buffers.numBendConstraints, [64]);
-  }
+    return compute(fn, color.count, [64]);
+  });
 
   // ─── Seam constraints (per-color, decaying target + compliance) ────
   // F1.4 (#897): dedicated kernel — per-substep target decay in-kernel
@@ -1080,8 +1082,8 @@ export function createTslSolver(
     preSolve,
     stretchColors,
     strainLimitColors,
+    bendColors,
     tether,
-    bend,
     seamColors,
     groundClamp,
     snapshotPreCollision,

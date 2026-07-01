@@ -486,7 +486,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // the sequential dispatches inside the pass (same guarantee as the
       // seam batch below).
       substepNodes.push(...solver.stretchColors);
-      if (solver.bend) substepNodes.push(solver.bend);
+      // Bend colored like stretch (P4-1 determinism): one dispatch per color,
+      // no two constraints in a color share a vertex → race-free.
+      substepNodes.push(...solver.bendColors);
       // Seam colors batched like stretch (#897 F1.3): sequential dispatches
       // inside one compute pass — WebGPU guarantees storage writes from one
       // dispatch are visible to the next, so cross-color shared vertices
