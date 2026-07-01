@@ -12,29 +12,30 @@
  * Two kernels, dispatched in order each frame (BOTH over numParticles):
  *   1. snapshot — copy posBuf → facePokeSnapshotBuf. Runs FIRST so the
  *      correction reads frozen (immutable) corner positions, never the live
- *      posBuf it is writing. THIS IS THE B1 DETERMINISM FIX (a gather over
- *      mutable co-owned face corners would re-open the #921 non-determinism
- *      axis). Mirrors `makeSnapshotPreCollisionFn` (tslSolver.ts).
+ *      posBuf it is writing. THIS IS THE B1 DETERMINISM FIX.
  *   2. correct — per particle i: accumulate i's barycentric share of the
  *      penetration depth over every poking body vertex into a local `corr`,
  *      clamp |corr| to MAX_PUSH_DIST, add corr to BOTH posBuf and prevPosBuf
- *      (velocity-neutral: pos−prevPos unchanged, so the tent holds without
- *      injecting speed).
+ *      (velocity-neutral).
+ *
+ * **WebGPU storage-buffer budget (root cause of the T5 no-op, fixed here).**
+ * The correct kernel must bind ≤ 8 storage buffers per compute stage (WebGPU
+ * `maxStorageBuffersPerShaderStage` = 8). The first-cut kernel bound 11
+ * (pos/prevPos/invMass + snapshot + incidentOffsets/incidentList/triIds +
+ * bvhNodes/bvhSkip + triVerts/vertexPseudo) → invalid pipeline → the kernel
+ * silently never ran. This version PACKS to 8: the cloth CSR (offsets + list +
+ * triIds) rides ONE `csrSBA`, and the body geometry (triVerts + vertexPseudo)
+ * rides ONE interleaved `bodyGeomSBA` (18 floats/tri). Final bind set:
+ * pos, prevPos, invMass, snapshot, csr, bvhNodes, bvhSkip, bodyGeom = 8.
  *
  * **CPU↔GPU parity contract.** The per-body-vertex math (sign convention,
  * barycentric projection, `(α/Σα²)·depth·n_outward` distribution, soup
- * multiplicity) MIRRORS `src/utils/cloth/facePokeCorrection.ts` EXACTLY — that
- * committed CPU function is the reference + CI oracle. A body vertex shared by
- * k returned BVH triangles is accumulated k times (soup multiplicity), exactly
- * as the CPU reference loops `bodyVerts.length/3` candidate points. v1 adds NO
- * single-winner reduction / de-dup (the M8 reduction is a deferred refinement
- * applied to BOTH tiers later) — that would diverge from the oracle.
+ * multiplicity) MIRRORS `src/utils/cloth/facePokeCorrection.ts` EXACTLY.
  *
  * The BVH traversal (stackless escape-pointer walk, AABB-overlap descent)
  * mirrors `findBestNode` in tslCollision.ts, but queries with the cloth FACE's
  * AABB (union of its 3 snapshot corners ± band) and runs the port-math for
- * EVERY body triangle whose AABB overlaps (enumerate leaves) instead of
- * tracking a single closest contact.
+ * EVERY body triangle whose AABB overlaps (enumerate leaves).
  *
  * Spec: docs/superpowers/specs/2026-06-30-cloth-face-poke-collision-design.md.
  * GPU-only in v1 (A7 GPU-ahead divergence, like strain-limit / tether).
@@ -52,7 +53,6 @@ import {
   uniform,
   float,
   uint,
-  int,
   vec3,
   select,
   instanceIndex,
@@ -66,20 +66,58 @@ type TslNode = any;
 
 /**
  * Maximum total face-poke push per particle per frame (meters). Mirrors
- * `MAX_PUSH_DIST` in tslCollision.ts — prevents a degenerate accumulation from
- * launching a particle (NaN cascade guard). CPU `facePokeCorrection` does not
- * clamp; this is a GPU-tier safety bound applied to the accumulated total.
+ * `MAX_PUSH_DIST` in tslCollision.ts — a NaN-cascade / launch guard on the
+ * accumulated total (CPU `facePokeCorrection` does not clamp).
  */
 const MAX_PUSH_DIST = 0.05;
 
 /**
+ * Build the packed cloth-CSR Uint32Array consumed by `csrSBA`:
+ *   [ offsets (numParticles+1) | list (numClothTriangles*3) | triIds (numClothTriangles*3) ]
+ * Packing the three cloth-topology arrays into ONE storage buffer is what keeps
+ * the correct kernel at ≤ 8 storage buffers (see the module header).
+ */
+export function packFacePokeCsr(
+  offsets: Uint32Array,
+  faces: Uint32Array,
+  triangleIds: Uint32Array | number[],
+  numParticles: number,
+): Uint32Array {
+  const listBase = numParticles + 1;
+  const triIdsBase = listBase + faces.length;
+  const out = new Uint32Array(triIdsBase + triangleIds.length);
+  out.set(offsets, 0);
+  out.set(faces, listBase);
+  out.set(triangleIds instanceof Uint32Array ? triangleIds : Uint32Array.from(triangleIds), triIdsBase);
+  return out;
+}
+
+/**
+ * Build the interleaved body-geometry Float32Array consumed by `bodyGeomSBA`:
+ * per BVH-leaf-ordered body triangle, 18 floats = [vert0..2 xyz (9)][pseudo0..2 xyz (9)].
+ * Interleaving triVerts + vertexPseudonormals into ONE storage buffer saves a
+ * bind slot. Both inputs are already BVH-leaf-ordered (from buildLinearBVH).
+ */
+export function packFacePokeBodyGeom(
+  triVerts: Float32Array,
+  vertexPseudonormals: Float32Array,
+  numBodyTris: number,
+): Float32Array {
+  const out = new Float32Array(numBodyTris * 18);
+  for (let t = 0; t < numBodyTris; t++) {
+    const src = t * 9;
+    const dst = t * 18;
+    for (let k = 0; k < 9; k++) {
+      out[dst + k] = triVerts[src + k];
+      out[dst + 9 + k] = vertexPseudonormals[src + k];
+    }
+  }
+  return out;
+}
+
+/**
  * Build the snapshot kernel: copy posBuf → facePokeSnapshotBuf over
- * numParticles. Dispatch this BEFORE the correction kernel each frame so the
- * correction reads frozen corner positions (the B1 determinism fix).
- *
- * @param posBuf - shared vec3 position storage node (from the solver)
- * @param snapshotSBA - facePokeSnapshotSBA (vec3, numParticles)
- * @param numParticles - dispatch count
+ * numParticles. Dispatch BEFORE the correction kernel each frame (B1 fix).
  */
 export function makeFacePokeSnapshotNode(
   posBuf: TslNode,
@@ -101,40 +139,34 @@ export interface FacePokeCorrectParams {
   prevPosBuf: TslNode;
   /** Shared float inverse-mass node (0 = pinned → skipped). */
   invMassBuf: TslNode;
-  /** facePokeSnapshotSBA (vec3, numParticles) — the immutable read source for face corners. */
+  /** facePokeSnapshotSBA (vec3, numParticles) — immutable read source for face corners. */
   snapshotSBA: StorageBufferAttribute;
-  /** incidentFaceOffsetsSBA (uint, numParticles+1) — CSR row pointers. */
-  incidentOffsetsSBA: StorageBufferAttribute;
-  /** incidentFaceListSBA (uint, numClothTriangles*3) — CSR column data (triangle indices). */
-  incidentListSBA: StorageBufferAttribute;
-  /** triangleIdsSBA (uint, numClothTriangles*3) — cloth topology (vertex ids per triangle). */
-  triIdsSBA: StorageBufferAttribute;
+  /** Packed cloth CSR (uint): [offsets(N+1), list(numTri*3), triIds(numTri*3)]. See packFacePokeCsr. */
+  csrSBA: StorageBufferAttribute;
   /** BVH nodes (float, numBvhNodes*8). */
   bvhNodesSBA: StorageBufferAttribute;
   /** BVH escape pointers (uint, numBvhNodes). */
   bvhSkipSBA: StorageBufferAttribute;
-  /** Body triangle verts (float, numBodyTris*9), BVH-leaf order. */
-  triVertsSBA: StorageBufferAttribute;
-  /** Body vertex pseudonormals (float, numBodyTris*9 — A,B,C × xyz), BVH-leaf order. */
-  vertexPseudoSBA: StorageBufferAttribute;
+  /** Interleaved body geometry (float, numBodyTris*18): [verts 9][pseudo 9]. See packFacePokeBodyGeom. */
+  bodyGeomSBA: StorageBufferAttribute;
   numParticles: number;
-  /** Number of CLOTH triangles (sizes triIds + incident-face CSR). */
+  /** Number of CLOTH triangles (sizes the CSR list/triIds regions). */
   numClothTriangles: number;
   /** Number of BVH nodes. */
   numBvhNodes: number;
   /** Number of BODY triangles. */
   numBodyTris: number;
-  /** Body collision margin (meters) — same value as the body's collision margin. */
+  /** Body collision margin (meters). */
   margin: number;
 }
 
 /**
- * Build the correction kernel. Per particle i: gather incident cloth faces,
- * traverse the body BVH per face, accumulate i's own barycentric share of every
- * poking body vertex into `corr`, clamp, and apply to pos + prevPos.
+ * Build the correction kernel (single pass, ≤ 8 storage buffers via packed CSR
+ * + interleaved body geometry). Per particle i: gather incident cloth faces,
+ * traverse the body BVH per face, accumulate i's barycentric share of every
+ * poking body vertex into `corr`, clamp, apply to pos + prevPos.
  *
- * The math mirrors `facePokeCorrection.ts` line-by-line (see the parity
- * contract in the module header).
+ * The math mirrors `facePokeCorrection.ts` line-by-line.
  */
 export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
   const {
@@ -148,23 +180,19 @@ export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
     margin,
   } = p;
 
-  // ─── Wrap SBAs as TSL storage nodes ──────────────────────────────────────
-  // facePokeSnapshotSBA is also wrapped (write side) inside the snapshot
-  // kernel; both wraps reference the same GPU buffer (snapshot writes → correct
-  // reads), exactly like triangleIdsSBA is wrapped by both normals + wind.
+  // ─── Wrap SBAs as TSL storage nodes (8 total incl. shared pos/prevPos/invMass) ──
   const snapBuf = storage(p.snapshotSBA, 'vec3', numParticles);
-  const incidentOffsetsBuf = storage(p.incidentOffsetsSBA, 'uint', numParticles + 1);
-  const incidentListBuf = storage(p.incidentListSBA, 'uint', numClothTriangles * 3);
-  const triIdsBuf = storage(p.triIdsSBA, 'uint', numClothTriangles * 3);
+  const csrLen = numParticles + 1 + numClothTriangles * 3 * 2;
+  const csrBuf = storage(p.csrSBA, 'uint', csrLen);
   const bvhBuf = storage(p.bvhNodesSBA, 'float', numBvhNodes * 8);
   const skipBuf = storage(p.bvhSkipSBA, 'uint', numBvhNodes);
-  const triVertBuf = storage(p.triVertsSBA, 'float', numBodyTris * 9);
-  const vertexPseudoBuf = storage(p.vertexPseudoSBA, 'float', numBodyTris * 9);
+  const bodyGeomBuf = storage(p.bodyGeomSBA, 'float', numBodyTris * 18);
+
+  // Packed-CSR region bases (compile-time constants → u32 literals in-kernel).
+  const listBase = numParticles + 1;
+  const triIdsBase = listBase + numClothTriangles * 3;
 
   const uMargin = uniform(margin);
-  // BVH AABB query band — same calibration as tslCollision.ts findBest
-  // (max(margin, 0.03)). band ≥ margin guarantees every body vertex within
-  // `margin` of the face plane lands inside a leaf AABB the query reaches.
   const uBand = uniform(Math.max(margin, 0.03));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -173,24 +201,22 @@ export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
     const w = invMassBuf.element(i);
 
     If(w.greaterThan(float(0.0)), () => {
-      // i's accumulated correction (i's own barycentric share, summed over every
-      // poking body vertex of every incident face). Atomic-free: per-particle
-      // self-write + immutable snapshot read (design §A1).
       const corr = vec3(0, 0, 0).toVar('fpCorr');
 
-      // ── Incident-face loop (CSR; mirrors the self-collision adjacency loop:
-      //    start = offsets[i], count = offsets[i+1] − start, index start+k) ──
-      const fStart = incidentOffsetsBuf.element(uint(i));
-      const fEnd = incidentOffsetsBuf.element(uint(i).add(uint(1)));
+      // ── Incident-face loop (packed CSR: offsets region at [0..N]) ──
+      const fStart = csrBuf.element(uint(i));
+      const fEnd = csrBuf.element(uint(i).add(uint(1)));
       const fCount = fEnd.sub(fStart);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       Loop({ start: uint(0), end: fCount, type: 'uint', condition: '<' }, ({ i: fk }: { i: any }) => {
-        const t = incidentListBuf.element(fStart.add(fk)); // cloth triangle index
-        const triBase = t.mul(uint(3));
-        const id0 = triIdsBuf.element(triBase).toVar('fpId0');
-        const id1 = triIdsBuf.element(triBase.add(uint(1))).toVar('fpId1');
-        const id2 = triIdsBuf.element(triBase.add(uint(2))).toVar('fpId2');
+        // list region at [listBase ..]; each entry is a cloth triangle index.
+        const t = csrBuf.element(uint(listBase).add(fStart).add(fk));
+        // triIds region at [triIdsBase ..]; 3 vertex ids per cloth triangle.
+        const triBase = uint(triIdsBase).add(t.mul(uint(3)));
+        const id0 = csrBuf.element(triBase).toVar('fpId0');
+        const id1 = csrBuf.element(triBase.add(uint(1))).toVar('fpId1');
+        const id2 = csrBuf.element(triBase.add(uint(2))).toVar('fpId2');
 
         // Face corners A,B,C from the SNAPSHOT (NOT live posBuf) — B1 fix.
         const A = snapBuf.element(id0);
@@ -200,22 +226,15 @@ export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
         const bx = B.x.toVar('fpBx'); const by = B.y.toVar('fpBy'); const bz = B.z.toVar('fpBz');
         const cx = C.x.toVar('fpCx'); const cy = C.y.toVar('fpCy'); const cz = C.z.toVar('fpCz');
 
-        // e1 = B−A, e2 = C−A (mirror facePokeCorrection.ts).
         const e1x = bx.sub(ax).toVar('fpE1x'); const e1y = by.sub(ay).toVar('fpE1y'); const e1z = bz.sub(az).toVar('fpE1z');
         const e2x = cx.sub(ax).toVar('fpE2x'); const e2y = cy.sub(ay).toVar('fpE2y'); const e2z = cz.sub(az).toVar('fpE2z');
 
-        // Barycentric precompute (cached edge dot products).
         const d00 = e1x.mul(e1x).add(e1y.mul(e1y)).add(e1z.mul(e1z)).toVar('fpD00');
         const d01 = e1x.mul(e2x).add(e1y.mul(e2y)).add(e1z.mul(e2z)).toVar('fpD01');
         const d11 = e2x.mul(e2x).add(e2y.mul(e2y)).add(e2z.mul(e2z)).toVar('fpD11');
         const denom = d00.mul(d11).sub(d01.mul(d01)).toVar('fpDenom');
 
-        // CPU: `if (denom === 0) return`. Guard with the house degeneracy
-        // epsilon (1e-12, same as findBest); a degenerate cloth triangle is
-        // skipped on both tiers. Face normal + AABB + traversal live inside so
-        // the normalize divide never sees a zero length.
         If(denom.abs().greaterThan(float(1e-12)), () => {
-          // Face plane normal n = normalize((B−A) × (C−A)).
           const rnx = e1y.mul(e2z).sub(e1z.mul(e2y));
           const rny = e1z.mul(e2x).sub(e1x.mul(e2z));
           const rnz = e1x.mul(e2y).sub(e1y.mul(e2x));
@@ -224,8 +243,6 @@ export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
           const ny = rny.mul(invNl).toVar('fpNy');
           const nz = rnz.mul(invNl).toVar('fpNz');
 
-          // Face AABB (union of the 3 corners), expanded by uBand in the
-          // overlap test against each node AABB.
           const fminx = ax.min(bx).min(cx).toVar('fpMinX');
           const fmaxx = ax.max(bx).max(cx).toVar('fpMaxX');
           const fminy = ay.min(by).min(cy).toVar('fpMinY');
@@ -233,10 +250,7 @@ export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
           const fminz = az.min(bz).min(cz).toVar('fpMinZ');
           const fmaxz = az.max(bz).max(cz).toVar('fpMaxZ');
 
-          // ── Stackless BVH traversal (escape pointers), mirror of findBestNode.
-          //    AABB hit on internal → descend left (slot 6); miss or processed
-          //    leaf → jump to skip[node]. Loop(numNodes) is the hard bound; the
-          //    cursor strictly increases so each node is visited at most once. ──
+          // ── Stackless BVH traversal (mirror of findBestNode) ──
           const nodeIdx = uint(0).toVar('fpNode');
           Loop(numBvhNodes, () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -251,7 +265,6 @@ export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
             const nMaxZ = bvhBuf.element(nodeBase.add(uint(5)));
             const triCnt = bvhBuf.element(nodeBase.add(uint(7)));
 
-            // AABB overlap: face box (± uBand) vs node box.
             If(
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (fminx.sub(uBand) as any).lessThanEqual(nMaxX)
@@ -267,42 +280,37 @@ export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
                 .and((fmaxz.add(uBand) as any).greaterThanEqual(nMinZ)),
               () => {
                 If(triCnt.greaterThan(float(0)), () => {
-                  // Leaf — enumerate its triangles, run the port-math for each
-                  // (no single-winner reduction; soup multiplicity preserved).
-                  const triStart = bvhBuf.element(nodeBase.add(uint(6)));
-                  const cnt = int(triCnt);
+                  // All-uint leaf loop (no i32) — WGSL rejects `i32 + u32`, and a
+                  // 'int'-typed loop counter mixing with an i32 cast triggered exactly
+                  // that. triStart/cnt cast to uint; the counter and index math stay u32.
+                  const triStart = uint(bvhBuf.element(nodeBase.add(uint(6))));
+                  const cnt = uint(triCnt);
 
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  Loop({ start: int(0), end: cnt, type: 'int', condition: '<' }, ({ i: ti }: { i: any }) => {
-                    const bt = uint(int(triStart).add(ti)); // body triangle index
+                  Loop({ start: uint(0), end: cnt, type: 'uint', condition: '<' }, ({ i: ti }: { i: any }) => {
+                    const bt = triStart.add(ti); // body triangle index (uint)
 
-                    // Each of the body triangle's 3 verts is a candidate body
-                    // point (mirror: CPU loops bodyVerts.length/3 = triCount*3).
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     Loop({ start: uint(0), end: uint(3), type: 'uint', condition: '<' }, ({ i: lv }: { i: any }) => {
-                      const vBase = bt.mul(uint(9)).add(lv.mul(uint(3)));
-                      const px = triVertBuf.element(vBase);
-                      const py = triVertBuf.element(vBase.add(uint(1)));
-                      const pz = triVertBuf.element(vBase.add(uint(2)));
-                      const pnx = vertexPseudoBuf.element(vBase);
-                      const pny = vertexPseudoBuf.element(vBase.add(uint(1)));
-                      const pnz = vertexPseudoBuf.element(vBase.add(uint(2)));
+                      // Interleaved body geom: verts at [bt*18 + lv*3], pseudo at [bt*18 + 9 + lv*3].
+                      const geomBase = bt.mul(uint(18)).add(lv.mul(uint(3)));
+                      const px = bodyGeomBuf.element(geomBase);
+                      const py = bodyGeomBuf.element(geomBase.add(uint(1)));
+                      const pz = bodyGeomBuf.element(geomBase.add(uint(2)));
+                      const pnBase = geomBase.add(uint(9));
+                      const pnx = bodyGeomBuf.element(pnBase);
+                      const pny = bodyGeomBuf.element(pnBase.add(uint(1)));
+                      const pnz = bodyGeomBuf.element(pnBase.add(uint(2)));
 
-                      // Outward orientation: flip n if n·pseudonormal < 0 so it
-                      // points away from the body (M11 sign fix).
                       const dotPn = nx.mul(pnx).add(ny.mul(pny)).add(nz.mul(pnz));
                       const flip = dotPn.lessThan(float(0.0));
                       const ox = select(flip, nx.negate(), nx);
                       const oy = select(flip, ny.negate(), ny);
                       const oz = select(flip, nz.negate(), nz);
 
-                      // signed = (P−A)·n_outward; w = P−A reused for barycentric.
                       const wpx = px.sub(ax); const wpy = py.sub(ay); const wpz = pz.sub(az);
                       const signed = wpx.mul(ox).add(wpy.mul(oy)).add(wpz.mul(oz));
 
-                      // CPU: `if (signed <= -margin) continue` → process when
-                      // signed > -margin (body vert within margin of, or past,
-                      // the face on the outward side).
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       If(signed.greaterThan((uMargin as any).negate()), () => {
                         const d20 = wpx.mul(e1x).add(wpy.mul(e1y)).add(wpz.mul(e1z));
@@ -311,7 +319,6 @@ export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
                         const gamma = d00.mul(d21).sub(d01.mul(d20)).div(denom);
                         const alpha = float(1.0).sub(beta).sub(gamma);
 
-                        // Projects inside the triangle (all barycentrics ≥ 0).
                         If(
                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           (alpha as any).greaterThanEqual(float(0.0))
@@ -323,7 +330,6 @@ export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
                             const depth = signed.add(uMargin); // > 0
                             const s = alpha.mul(alpha).add(beta.mul(beta)).add(gamma.mul(gamma));
                             If(s.greaterThan(float(0.0)), () => {
-                              // i's own barycentric weight: whichever corner is i.
                               const alphaSelf = select(
                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 (uint(i) as any).equal(id0),
@@ -332,7 +338,6 @@ export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
                                 select((uint(i) as any).equal(id1), beta, gamma),
                               );
                               const k = alphaSelf.div(s).mul(depth);
-                              // corr += (α_self / Σα²)·depth·n_outward.
                               corr.addAssign(vec3(ox, oy, oz).mul(k));
                             });
                           },
@@ -341,25 +346,18 @@ export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
                     });
                   });
 
-                  // Leaf processed → escape past this subtree.
                   nodeIdx.assign(skipBuf.element(nodeIdx));
                 }).Else(() => {
-                  // Internal hit → descend into the left child (slot 6 == nodeIdx+1).
                   nodeIdx.assign(uint(bvhBuf.element(nodeBase.add(uint(6)))));
                 });
               },
             ).Else(() => {
-              // Miss → skip the whole subtree.
               nodeIdx.assign(skipBuf.element(nodeIdx));
             });
           });
         });
       });
 
-      // Clamp |corr| to MAX_PUSH_DIST, then apply velocity-neutral (pos AND
-      // prevPos move by the same corr → pos−prevPos unchanged). The `> 0` gate
-      // skips the no-op common case AND NaN (NaN > 0 is false), so a degenerate
-      // accumulation never corrupts pos/prevPos.
       const corrLen = corr.length().toVar('fpLen');
       If(corrLen.greaterThan(float(0.0)), () => {
         If(corrLen.greaterThan(float(MAX_PUSH_DIST)), () => {

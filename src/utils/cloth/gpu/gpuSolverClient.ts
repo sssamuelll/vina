@@ -22,7 +22,7 @@ import {
   type FabricComplianceConfig,
 } from './tslBuffers';
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
-import { makeFacePokeSnapshotNode, makeFacePokeCorrectNode } from './tslFacePoke';
+import { makeFacePokeSnapshotNode, makeFacePokeCorrectNode, packFacePokeBodyGeom } from './tslFacePoke';
 import { createSelfCollisionBuffers } from './tslSelfCollision';
 import { buildAdjacency, nextPrime } from '../selfCollision';
 import { buildAdjacencyCSR } from '../wasm/adjacencyCSR';
@@ -175,6 +175,10 @@ export class GpuSolverClient implements ClothSolverClient {
 
   /** Guard against concurrent readback requests (mapAsync throws if pending). */
   private readbackPending: boolean = false;
+
+  /** Face-poke: interleaved body geom (triVerts+vertexPseudo, 18 floats/tri) — a packed
+   *  duplicate of the body geometry so the correct kernel binds ≤8 storage buffers. */
+  private facePokeBodyGeomSBA: StorageBufferAttribute | null = null;
 
   /** Prevents operations after dispose (readback promises may still resolve). */
   private disposed: boolean = false;
@@ -1052,6 +1056,18 @@ export class GpuSolverClient implements ClothSolverClient {
     // compute nodes become GC-eligible (they own no GPU buffers — the SBAs are
     // owned by tslBuffers + collisionBodySBAs and disposed there).
     if (id === '__avatar__') {
+      // Pack triVerts + vertexPseudonormals into ONE interleaved buffer (18
+      // floats/tri) so the correct kernel binds ≤8 storage buffers (WebGPU
+      // maxStorageBuffersPerShaderStage=8; the un-packed kernel bound 11 →
+      // invalid pipeline → silent no-op). Dispose the previous avatar's packed
+      // geom on rebuild — it owns a GPU buffer.
+      if (this.facePokeBodyGeomSBA) {
+        disposeStorageBufferAttribute(this.facePokeBodyGeomSBA, this.rendererRef);
+      }
+      this.facePokeBodyGeomSBA = createSBA(
+        packFacePokeBodyGeom(bvh.triVerts, bvh.vertexPseudonormals, bvh.triCount),
+        1,
+      );
       this.tslSolver.facePokeNodes = {
         snapshot: makeFacePokeSnapshotNode(
           this.tslSolver.positionBufNode,
@@ -1063,13 +1079,10 @@ export class GpuSolverClient implements ClothSolverClient {
           prevPosBuf: this.tslSolver.prevPosBufNode,
           invMassBuf: this.tslSolver.invMassBufNode,
           snapshotSBA: this.tslBuffers.facePokeSnapshotSBA,
-          incidentOffsetsSBA: this.tslBuffers.incidentFaceOffsetsSBA,
-          incidentListSBA: this.tslBuffers.incidentFaceListSBA,
-          triIdsSBA: this.tslBuffers.triangleIdsSBA,
+          csrSBA: this.tslBuffers.facePokeCsrSBA,
           bvhNodesSBA,
           bvhSkipSBA,
-          triVertsSBA,
-          vertexPseudoSBA,
+          bodyGeomSBA: this.facePokeBodyGeomSBA,
           numParticles: N,
           numClothTriangles: this.tslBuffers.numTriangles,
           numBvhNodes: bvh.nodeCount,
@@ -1206,7 +1219,13 @@ export class GpuSolverClient implements ClothSolverClient {
     // Drop the face-poke nodes when the avatar goes away — the correction
     // kernel references this body's BVH SBAs (freed below), so a later dispatch
     // would read freed buffers.
-    if (id === '__avatar__' && this.tslSolver) this.tslSolver.facePokeNodes = null;
+    if (id === '__avatar__' && this.tslSolver) {
+      this.tslSolver.facePokeNodes = null;
+      if (this.facePokeBodyGeomSBA) {
+        disposeStorageBufferAttribute(this.facePokeBodyGeomSBA, this.rendererRef);
+        this.facePokeBodyGeomSBA = null;
+      }
+    }
     const tracked = this.collisionBodySBAs.get(id);
     if (tracked) {
       disposeStorageBufferAttribute(tracked.bvhNodesSBA, this.rendererRef);

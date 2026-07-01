@@ -133,7 +133,7 @@ describe('SolverCapabilities frozen shape', () => {
       // GPU↔WASM divergences behind the historical 30cm gap were closed
       // in F2.1-F2.5. See the JSDoc on `GPU_CAPABILITIES.bodyCollision`.
       bodyCollision: true,
-      facePoke: true,
+      facePoke: false, // WIP (T5b): reworked kernel runs but not yet effective/in-budget → gated off
       lra: false,
       pressure: false,
       fold: false,

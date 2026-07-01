@@ -236,7 +236,12 @@ export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
    * @see docs/reports/2026-05-04-733-gpu-body-collision-design.md § 9
    */
   bodyCollision: true,
-  facePoke: true,
+  // WIP (T5b): the reworked kernel now compiles + runs (root cause was >8 storage
+  // buffers + an i32/u32 WGSL error, both fixed), but it does not yet tent the
+  // cloth effectively and costs ~5ms (drops María to ~29fps, below the 30 gate).
+  // Gated OFF until it delivers working face-poke within budget. See
+  // docs/superpowers/specs/2026-06-30-cloth-face-poke-collision-design.md.
+  facePoke: false,
   lra: false,
   pressure: false,
   fold: false,
