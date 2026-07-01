@@ -27,6 +27,8 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:gpu": "playwright test --config playwright.webgpu.config.ts",
+    "test:e2e:gpu:determinism": "playwright test --config playwright.webgpu.config.ts -g determinism --repeat-each=5",
+    "determinism:diff": "tsx scripts/gpu-determinism-diff.ts",
     "bench": "tsx bench/run.ts",
     "bench:matchvertices": "tsx bench/matchVertices.bench.ts",
     "bench:lra": "tsx bench/buildLRAConstraints.bench.ts"

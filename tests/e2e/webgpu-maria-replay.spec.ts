@@ -32,11 +32,18 @@
 import { test, expect, Page } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { switchView, startSimulation } from './helpers/sim';
 
 const FIXTURE = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../fixtures/garments/maria_patrones_samuel_2M.dxf',
+);
+
+/** P4-0 determinism gate: stable cross-repeat dump dir (repo-root/.tmp/determinism). */
+const DETERMINISM_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../.tmp/determinism',
 );
 
 async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
@@ -445,5 +452,44 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
       );
       expect(d!.nan).toBe(0);
     }
+  });
+
+  // ── P4-0 determinism gate (@gpu-local, maintainer-run) ───────────────────────
+  // Dumps the settled drape position buffer at the 2.5s checkpoint — which is
+  // ALSO the tether capture window (TETHER_SETTLE_FRAMES=150) — to a stable
+  // per-run artifact, then the offline diff asserts bit-exactness across runs:
+  //   npm run test:e2e:gpu:determinism   # capture N runs → .tmp/determinism/
+  //   npm run determinism:diff           # bit-exact compare (pass/fail)
+  // Repeat 0 clears the dir so a fresh N-run has no stale bins; workers=1 in
+  // playwright.webgpu.config makes repeats sequential, so the clean is race-free.
+  // Expected to DIVERGE today (bend Jacobi race, tslSolver.ts:887); must be
+  // bit-exact after P4-1 graph-coloring. See docs/plans/2026-07-01-drape-determinism-p4-design.md.
+  test('determinism @gpu-local — dump drape positions at 2.5s', async ({ page }, testInfo) => {
+    test.setTimeout(240_000);
+    await importSewAndSimulate(page);
+    await expect
+      .poll(async () => getState<boolean>(page, 'simulation.bodyCollision'), { timeout: 30_000 })
+      .toBe(true);
+
+    // 2.5s SIM = M4 settle checkpoint = tether capture frame (same window).
+    await waitForSimWindows(page, 5, 120_000);
+    const positions = await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mesh = (window as any).__OPENCLO_CLOTH_MESH__;
+      if (!mesh) return null;
+      return Array.from(mesh.geometry.attributes.position.array as Float32Array);
+    });
+    expect(
+      positions,
+      'Cloth mesh not found — __OPENCLO_CLOTH_MESH__ not published',
+    ).not.toBeNull();
+
+    if (testInfo.repeatEachIndex === 0) rmSync(DETERMINISM_DIR, { recursive: true, force: true });
+    mkdirSync(DETERMINISM_DIR, { recursive: true });
+    const bin = path.join(DETERMINISM_DIR, `pos-${testInfo.repeatEachIndex}.bin`);
+    writeFileSync(bin, Buffer.from(Float32Array.from(positions!).buffer));
+    console.log(
+      `[determinism] run ${testInfo.repeatEachIndex}: wrote ${positions!.length / 3} particles → ${bin}`,
+    );
   });
 });
