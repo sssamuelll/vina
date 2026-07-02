@@ -386,10 +386,15 @@ describe('autoSew', () => {
       onlyPairs: [['f', 'b']],
     });
 
-    // Only front↔back seams, no sleeve involved
+    // onlyPairs restricts CROSS-PIECE seams only — 's' must not appear in any
+    // cross-piece seam. Same-piece self-seams (pieceA.pieceId === pieceB.pieceId)
+    // are exempt: the sleeve's tube closure is a same-piece operation that
+    // cannot be expressed as a pair, so onlyPairs was never meant to gate it.
     for (const s of result.seams) {
-      const ids = [s.seam.pieceA.pieceId, s.seam.pieceB.pieceId];
-      expect(ids).not.toContain('s');
+      const { pieceA, pieceB } = s.seam;
+      if (pieceA.pieceId !== pieceB.pieceId) {
+        expect([pieceA.pieceId, pieceB.pieceId]).not.toContain('s');
+      }
     }
   });
 

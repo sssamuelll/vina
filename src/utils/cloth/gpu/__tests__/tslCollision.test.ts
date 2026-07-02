@@ -144,6 +144,9 @@ function buildKernel(opts?: {
   const bvhSkipSBA = new StorageBufferAttribute(new Uint32Array(numNodes), 1);
   const triVertsSBA = new StorageBufferAttribute(new Float32Array(numTris * 9), 1);
   const triNormalsSBA = new StorageBufferAttribute(new Float32Array(numTris * 3), 1);
+  // Pseudonormal SBAs for closest-feature inside/outside sign (Task 2-3).
+  const edgePseudoSBA = new StorageBufferAttribute(new Float32Array(numTris * 9), 1);
+  const vertexPseudoSBA = new StorageBufferAttribute(new Float32Array(numTris * 9), 1);
 
   // Full chain-proxy mock TSL node — same pattern as the three/tsl mock. The
   // kernel body calls `.toVar()`, `.equal()`, etc. on posBuf elements; a plain
@@ -163,6 +166,8 @@ function buildKernel(opts?: {
     bvhSkipSBA,
     triVertsSBA,
     triNormalsSBA,
+    edgePseudoSBA,
+    vertexPseudoSBA,
     numParticles,
     numNodes,
     numTris,
@@ -211,33 +216,31 @@ describe('createTslCollisionBody', () => {
 });
 
 // ─── #771 follow-up: per-body atomic scratch SBA disposal ──────────────────
-// `createTslCollisionBody` allocates `bestDistSBA` and `bestTriIdxSBA` internal
-// to the closure. PR #771 left their lifecycle out-of-scope; this guard ensures
-// the new `dispose(renderer?)` routes both SBAs through `renderer._attributes.delete`.
+// `createTslCollisionBody` allocates the composite-key scratch `bestDistSBA`
+// (#921 Eje A folded the former `bestTriIdxSBA` into its low bits) internal to the
+// closure. PR #771 left its lifecycle out-of-scope; this guard ensures
+// `dispose(renderer?)` routes the SBA through `renderer._attributes.delete`.
 
 describe('TslCollisionBody.dispose', () => {
-  it('routes bestDistSBA and bestTriIdxSBA through renderer._attributes.delete', () => {
+  it('routes the composite-key scratch SBA through renderer._attributes.delete', () => {
     const numParticles = 8;
     setAtomicCalls.length = 0;
     const body = buildKernel({ numParticles });
 
-    // The two atomic SBAs registered during construction are the per-body
-    // scratch buffers (bestDist filled with INT32_MAX, bestTriIdx with -1).
+    // The single atomic SBA registered during construction is the per-body
+    // composite-key scratch buffer (init filled with the INT32_MAX sentinel).
     const atomicSBAs = setAtomicCalls
       .map((c) => c.sba as { array: Int32Array })
       .filter((sba) => sba.array instanceof Int32Array);
-    const bestDistSBA = atomicSBAs.find((s) => s.array[0] === 0x7FFFFFFF);
-    const bestTriIdxSBA = atomicSBAs.find((s) => s.array[0] === -1);
+    const bestDistSBA = atomicSBAs.find((s) => s.array[0] === 0x7fffffff);
     expect(bestDistSBA).toBeDefined();
-    expect(bestTriIdxSBA).toBeDefined();
 
     const deleteSpy = vi.fn();
     const renderer = { _attributes: { delete: deleteSpy } };
     body.dispose(renderer);
 
     expect(deleteSpy).toHaveBeenCalledWith(bestDistSBA);
-    expect(deleteSpy).toHaveBeenCalledWith(bestTriIdxSBA);
-    expect(deleteSpy).toHaveBeenCalledTimes(2);
+    expect(deleteSpy).toHaveBeenCalledTimes(1);
   });
 
   it('is a no-op when renderer is omitted (best-effort, references dropped)', () => {
@@ -260,20 +263,20 @@ describe('TslCollisionBody.dispose', () => {
 });
 
 // ─── Atomic-buffer regression guards ────────────────────────────────────────
-// Per-body scratch (`bestDistBuf`, `bestTriIdxBuf`) MUST be declared atomic so
+// The per-body composite-key scratch (`bestDistBuf`) MUST be declared atomic so
 // WGSL emits `array<atomic<i32>>` with read_write access. Without this, the
 // kernel falls back to the broken toVar/storage-read codegen and produces
 // ~200 validation warnings (per the design doc on the prior attempt).
 
 describe('atomic-buffer regression guards', () => {
-  it('per-body bestDist scratch is declared atomic', () => {
+  it('per-body composite-key scratch is declared atomic', () => {
     buildKernel();
-    // bestDist is the first atomic SBA created in the factory (Int32Array).
+    // The composite-key buffer is the only atomic SBA created in the factory.
     const atomicI32Calls = setAtomicCalls.filter(
       (c) => (c.sba as { array: ArrayLike<number> }).array instanceof Int32Array,
     );
-    expect(atomicI32Calls.length).toBeGreaterThanOrEqual(2);
-    // Both scratch buffers should have setAtomic(true) — see design doc rationale.
+    expect(atomicI32Calls.length).toBe(1);
+    // The scratch buffer should have setAtomic(true) — see design doc rationale.
     expect(atomicI32Calls.every((c) => c.value === true)).toBe(true);
   });
 
@@ -292,36 +295,22 @@ describe('atomic-buffer regression guards', () => {
     expect(arr[numParticles - 1]).toBe(0x7FFFFFFF);
   });
 
-  it('initializes bestTriIdx scratch to -1 so "no collision found" is the natural sentinel', () => {
-    const numParticles = 8;
-    setAtomicCalls.length = 0;
-    buildKernel({ numParticles });
-    // The two atomic SBAs are bestDist (filled with INT32_MAX) and
-    // bestTriIdx (filled with -1) — distinguish by checking the fill value.
-    const allAtomicSBAs = setAtomicCalls
-      .map((c) => (c.sba as { array: Int32Array }).array)
-      .filter((a) => a instanceof Int32Array);
-    const bestTriIdx = allAtomicSBAs.find((a) => a[0] === -1);
-    expect(bestTriIdx).toBeDefined();
-    expect(bestTriIdx!.length).toBe(numParticles);
-  });
-
   it('uses atomicLoad on read passes (#554 WGSL spec compliance)', () => {
-    // Symmetric to the setAtomic guards above. The applyPushNode pass reads
-    // bestTriIdxBuf via atomicLoad at function-top — required because the
-    // buffer is array<atomic<i32>>. Plain `.element(i)` is a WGSL validation
+    // Symmetric to the setAtomic guards above. The applyPushNode pass reads the
+    // composite-key bestDistBuf via atomicLoad at function-top — required because
+    // the buffer is array<atomic<i32>>. Plain `.element(i)` is a WGSL validation
     // error.
     atomicLoadCalls.length = 0;
     buildKernel();
     expect(atomicLoadCalls.length).toBeGreaterThan(0);
   });
 
-  it('per-body scratch SBAs are distinct across bodies (no aliasing)', () => {
+  it('per-body scratch SBA is distinct across bodies (no aliasing)', () => {
     // Multi-body composition: each call to createTslCollisionBody must allocate
-    // its own bestDistBuf + bestTriIdxBuf. If a future refactor hoists the
-    // scratch SBAs to module scope as a perf "optimization", two bodies
-    // dispatched in sequence would race on shared atomic state and silently
-    // corrupt each other's collision results. This test is the tripwire.
+    // its own composite-key bestDistBuf. If a future refactor hoists the scratch
+    // SBA to module scope as a perf "optimization", two bodies dispatched in
+    // sequence would race on shared atomic state and silently corrupt each
+    // other's collision results. This test is the tripwire.
     setAtomicCalls.length = 0;
     buildKernel({ id: 'avatar-1', numParticles: 8 });
     const a1Scratch = setAtomicCalls
@@ -334,11 +323,10 @@ describe('atomic-buffer regression guards', () => {
       .map((c) => c.sba)
       .filter((sba) => (sba as { array: ArrayLike<number> }).array instanceof Int32Array);
 
-    expect(a1Scratch.length).toBeGreaterThanOrEqual(2);
-    expect(a2Scratch.length).toBeGreaterThanOrEqual(2);
-    // Both bestDist (idx 0) and bestTriIdx (idx 1) must be distinct allocations.
+    expect(a1Scratch.length).toBe(1);
+    expect(a2Scratch.length).toBe(1);
+    // The composite-key scratch must be a distinct allocation per body.
     expect(a1Scratch[0]).not.toBe(a2Scratch[0]);
-    expect(a1Scratch[1]).not.toBe(a2Scratch[1]);
   });
 });
 
@@ -364,10 +352,12 @@ describe('findBest NaN guard + i32 clamp (#897 F2, §9 cand. 5-6)', () => {
     }
   });
 
-  it('uses int(INT32_MAX) as the NaN fallback at both sites (sentinel = no distance)', () => {
+  it('uses int(INT32_MAX) as the NaN/sentinel at every site', () => {
     buildKernel();
-    // 2 guard fallbacks (pass 1) + 1 scratch reset (applyPush tail).
-    expect(intCalls.filter((v) => v === 0x7FFFFFFF).length).toBe(3);
+    // 2 NaN-guard fallbacks (pass 1) + 1 "contact found" threshold (pass 2) +
+    // 1 scratch reset (applyPush tail) = 4 (#921 Eje A: bestDistBuf is the key
+    // buffer; its sentinel doubles as the no-contact fallback).
+    expect(intCalls.filter((v) => v === 0x7fffffff).length).toBe(4);
   });
 
   it('clamps distance to 2.0 m before the ×1e6 scale at both sites (i32 overflow)', () => {
@@ -404,5 +394,72 @@ describe('findBest threaded BVH traversal (#897 F4.3b)', () => {
     // sentinel (numNodes).
     buildKernel();
     expect(breakCalls.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ─── #921 Eje A: composite-key contact selection (order-independence) ────────
+// The winner is packed as key = (distQ << TRI_BITS) | triIdx and selected via a
+// single atomicMin. These pins prove the ENCODING invariant in pure JS (GPU
+// execution itself is @gpu-local): atomicMin over the packed keys is
+// order-independent and yields (min distance, then LOWEST triIdx on a tie) — the
+// property the old split atomicMin+atomicStore design violated both on exact ties
+// AND across distinct distances (the store-vs-min window). The end-to-end drape
+// stabilization is the GPU-local isolation measurement tracked in #921.
+
+describe('composite-key contact selection (#921 Eje A)', () => {
+  // Mirror of the source constants (module-internal to tslCollision.ts).
+  const TRI_BITS = 18;
+  const TRI_MASK = 0x3ffff;
+  const DIST_QUANT_MAX = 8190;
+  const SENTINEL = 0x7fffffff;
+  const pack = (distQ: number, tri: number) => (distQ << TRI_BITS) | tri;
+  const decodeTri = (key: number) => key & TRI_MASK;
+  // atomicMin over a candidate set, visited in a given order.
+  const selectWinner = (cands: Array<{ distQ: number; tri: number }>, order: number[]) => {
+    let best = SENTINEL;
+    for (const idx of order) best = Math.min(best, pack(cands[idx].distQ, cands[idx].tri));
+    return best;
+  };
+  const permutations = (arr: number[]): number[][] =>
+    arr.length <= 1
+      ? [arr]
+      : arr.flatMap((x, i) =>
+          permutations([...arr.slice(0, i), ...arr.slice(i + 1)]).map((p) => [x, ...p]));
+
+  it('roundtrips triIdx through pack/decode', () => {
+    for (const [distQ, tri] of [[0, 0], [1, 5], [8190, 262143], [4096, 100000]] as const) {
+      expect(decodeTri(pack(distQ, tri))).toBe(tri);
+    }
+  });
+
+  it('orders by distance first, then lowest triIdx on ties', () => {
+    expect(pack(400, 8)).toBeLessThan(pack(500, 3)); // closer wins regardless of tri
+    expect(pack(500, 3)).toBeLessThan(pack(500, 5)); // equal dist → lower tri wins
+  });
+
+  it('is order-independent across distinct distances (the old store-vs-min bug)', () => {
+    // Two ties at dist=500 plus a closer triangle at dist=400. The old design
+    // could leave tri 3 or 5 recorded (a worse distance); the key picks tri 8.
+    const cands = [{ distQ: 500, tri: 5 }, { distQ: 500, tri: 3 }, { distQ: 400, tri: 8 }];
+    const idxs = cands.map((_, i) => i);
+    const winners = new Set(permutations(idxs).map((o) => decodeTri(selectWinner(cands, o))));
+    expect(winners.size).toBe(1);
+    expect([...winners][0]).toBe(8);
+  });
+
+  it('breaks exact-distance ties to the lowest triIdx, order-independent', () => {
+    const cands = [{ distQ: 700, tri: 42 }, { distQ: 700, tri: 7 }, { distQ: 700, tri: 19 }];
+    const idxs = cands.map((_, i) => i);
+    const winners = new Set(permutations(idxs).map((o) => decodeTri(selectWinner(cands, o))));
+    expect(winners.size).toBe(1);
+    expect([...winners][0]).toBe(7);
+  });
+
+  it('keeps the max packable key below the no-contact sentinel', () => {
+    expect(pack(DIST_QUANT_MAX, TRI_MASK)).toBeLessThan(SENTINEL);
+  });
+
+  it('throws when the collision mesh exceeds the composite-key triangle cap', () => {
+    expect(() => buildKernel({ numTris: (1 << TRI_BITS) + 1 })).toThrow(/composite-key cap/);
   });
 });

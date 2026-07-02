@@ -27,11 +27,9 @@
  */
 
 import type { PatternPiece, Seam } from '../../types/types';
-import {
-  patternPointToWorld,
-  outlineBBoxCenter,
-  type PlacementResult,
-} from '../cloth/garmentPlacement';
+import { outlineBBoxCenter } from '../cloth/garmentPlacement';
+import type { PlacementWithFrame } from '../cloth/arrangement/arrangementBinding';
+import { wrapPlacedMesh } from '../cloth/arrangement/wrapPlacedMesh';
 import { flattenPath, commandRangeToFlattened } from '../seam/index';
 
 type V3 = [number, number, number];
@@ -57,7 +55,7 @@ function edgeRoot(name: string): string {
 
 function edgeWorld(
   piece: PatternPiece,
-  placement: PlacementResult,
+  pwf: PlacementWithFrame,
   edgeName: string,
 ): EdgeWorld | null {
   const edge = piece.edges?.find(e => e.name === edgeName);
@@ -69,8 +67,19 @@ function edgeWorld(
   const pFirst = flat[fs];
   const pLast = flat[fe % flat.length];
   if (!pFirst || !pLast) return null;
-  const first = patternPointToWorld(pFirst.x, pFirst.y, center, placement);
-  const last = patternPointToWorld(pLast.x, pLast.y, center, placement);
+  // Position the endpoints with the EXACT mapping the solver uses (envelope
+  // wrap, not the old rigid Euler): build the two local mesher verts in the
+  // mesher's local convention ([(x−cx)·0.001, 0, (y−cy)·0.001], same as
+  // patternPointToWorld), then run them through wrapPlacedMesh — byte-identical
+  // geometry to GarmentSimulation's placed-mesh wrap. Do NOT re-implement the
+  // wrap math here.
+  const local = new Float32Array([
+    (pFirst.x - center.cx) * 0.001, 0, (pFirst.y - center.cy) * 0.001,
+    (pLast.x - center.cx) * 0.001, 0, (pLast.y - center.cy) * 0.001,
+  ]);
+  const wrapped = wrapPlacedMesh(local, pwf.frame, pwf.wrapParams, pwf.flip);
+  const first: V3 = [wrapped[0], wrapped[1], wrapped[2]];
+  const last: V3 = [wrapped[3], wrapped[4], wrapped[5]];
   const mid: V3 = [
     (first[0] + last[0]) / 2,
     (first[1] + last[1]) / 2,
@@ -107,18 +116,32 @@ interface ResolvedSeam {
  * symmetric partners by world proximity and seed `pieceB.reversed` from
  * endpoint geometry. Returns refined copies in the same order; unresolvable
  * seams pass through untouched.
+ *
+ * Endpoints are positioned with the WRAP (envelope-wrap PR), via the same
+ * `wrapPlacedMesh(frame, flip)` the solver starts pieces with — NOT the old
+ * rigid Euler placement. Scoring against the rigid pose while the solver
+ * starts pieces wrapped diverged 4-8cm on wrapped edges and could decide
+ * partner/`reversed` against the wrong geometry (PR #924 finding #5). Takes a
+ * `PlacementWithFrame` per piece (`resolveArrangementWithFrames`).
  */
 export function refineSeamsInWorld(
   seams: Seam[],
   pieces: PatternPiece[],
-  placements: PlacementResult[],
+  placements: PlacementWithFrame[],
 ): Seam[] {
-  const byId = new Map<string, { piece: PatternPiece; placement: PlacementResult }>();
+  const byId = new Map<string, { piece: PatternPiece; placement: PlacementWithFrame }>();
   for (let i = 0; i < pieces.length; i++) {
     if (placements[i]) byId.set(pieces[i].id, { piece: pieces[i], placement: placements[i] });
   }
 
   const resolved: Array<ResolvedSeam | null> = seams.map(seam => {
+    // Same-piece (self) seam — e.g. a sleeve's underarm tube closure. It must
+    // NOT enter the cross-piece partner-reassignment grouping (both sleeves'
+    // underarm self-seams share one role key and would be cross-paired).
+    // Returning null routes it through the existing "pass through untouched"
+    // branch in step 2, preserving the reversed the self-close pass set.
+    // See docs/superpowers/specs/2026-06-23-sleeve-tube-closure-design.md.
+    if (seam.pieceA.pieceId === seam.pieceB.pieceId) return null;
     const pa = byId.get(seam.pieceA.pieceId);
     const pb = byId.get(seam.pieceB.pieceId);
     if (!pa || !pb) return null;

@@ -16,7 +16,8 @@ import { addSeam } from './projectSlice';
 import { showSuccessToast, showInfoToast } from './copilotUISlice';
 import { autoSew } from '../utils/autoSew';
 import { refineSeamsInWorld } from '../utils/autoSew/worldRefine';
-import { placeGarmentPieces, applyArrangementOverrides } from '../utils/cloth/garmentPlacement';
+import { resolveArrangementWithFrames } from '../utils/cloth/arrangement/arrangementBinding';
+import { buildAxisHints } from '../utils/cloth/arrangement/buildAxisHints';
 import type { PatternPiece, Seam } from '../types/types';
 
 /**
@@ -25,16 +26,26 @@ import type { PatternPiece, Seam } from '../types/types';
  * edges are ADJACENT (and in which traversal direction) is a placement
  * fact. Shared by the ⌘K thunk and the copilot tools so every dispatch
  * path proposes the same seams the simulation will actually converge on.
+ *
+ * Scores against the WRAP pose (`resolveArrangementWithFrames` → per-piece
+ * `{frame, flip}`), the same geometry GarmentSimulation starts the solver
+ * with — NOT the rigid Euler placement, which diverged on wrapped edges and
+ * could pick the wrong partner/direction (PR #924 finding #5).
  */
 export function refineProposalsAgainstState(
   seams: Seam[],
   pieces: PatternPiece[],
   state: RootState,
 ): Seam[] {
-  const placements = applyArrangementOverrides(
-    placeGarmentPieces(pieces, state.project.avatar.measurements),
+  // state.simulation may be absent in lightweight test stores that omit the
+  // simulation reducer — fall back to the no-hints default (ready=false).
+  const armAxis = state.simulation?.armAxis ?? { left: null, right: null, ready: false };
+  const axisHints = buildAxisHints(pieces, armAxis);
+  const placements = resolveArrangementWithFrames(
     pieces,
+    state.project.avatar.measurements,
     state.project.arrangementOverrides,
+    { axisHints, skeletonReady: armAxis.ready },
   );
   return refineSeamsInWorld(seams, pieces, placements);
 }

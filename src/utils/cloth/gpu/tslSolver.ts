@@ -13,7 +13,7 @@
  * Solver steps:
  *   1. preSolve     — save prevPos, integrate gravity + damping (per-particle)
  *   2. stretch      — graph-colored distance constraints (per-color dispatch)
- *   3. bend         — single Jacobi distance constraint on opposite verts
+ *   3. bend         — graph-colored distance constraint on opposite verts (per-color dispatch)
  *   4. seam         — graph-colored decaying-target constraints closing seam pairs
  *   5. groundClamp  — clamp positions to ground plane (AFTER constraints)
  *   6. snapshotPreCollision — pos → preCollisionPos (tras grab, ANTES de
@@ -75,6 +75,13 @@ export interface TslSolverConfig {
   thickness?: number;
   windForce?: [number, number, number];
   dragCoefficient?: number;
+  /**
+   * Hard strain limit (#gummy STEP 4): max fractional edge elongation past rest
+   * before a rigid one-sided clamp pulls it back. εmax=0.02 (2%, woven default).
+   * Kills the residual rubberiness the compliant stretch solve can't (Jacobi
+   * under-convergence). 0 disables. GPU-ahead vs WASM/CPU (A7 divergence).
+   */
+  maxStrain?: number;
 }
 
 // ─── Solver interface ────────────────────────────────────────────────────────
@@ -84,8 +91,22 @@ export interface TslSolver {
   preSolve: ComputeNode;
   /** Per-color stretch constraint compute nodes */
   stretchColors: ComputeNode[];
-  /** Bend constraint compute node (null if no bend constraints) */
-  bend: ComputeNode | null;
+  /**
+   * Per-color strain-limit compute nodes (#gummy STEP 4). Hard one-sided edge
+   * clamp to restLen*(1+maxStrain); reuses the stretch graph coloring 1:1
+   * (race-free). Dispatch AFTER stretch/bend/seam/self-collision, BEFORE
+   * groundClamp/snapshot. Empty if no stretch constraints.
+   */
+  strainLimitColors: ComputeNode[];
+  /**
+   * Body-tether compute node (frente#2). Max-distance cling kernel: projects
+   * cloth vertices back onto their per-vertex radius sphere around the static
+   * body target when the vertex drifts too far. Race-free (per-particle).
+   * Dispatch AFTER strain-limit, BEFORE groundClamp.
+   */
+  tether: ComputeNode | null;
+  /** Bend constraint compute nodes, one per color group (P4-1: race-free) */
+  bendColors: ComputeNode[];
   /**
    * Per-color seam constraint compute nodes (empty if no seam constraints).
    * F1.4 (#897): dedicated kernel (`makeSeamConstraintFn`) with in-kernel
@@ -126,6 +147,16 @@ export interface TslSolver {
   normalAccum: ComputeNode;
   /** Normalize accumulated normals and write to normalSBA (dispatch: numParticles) */
   normalNormalize: ComputeNode;
+  /**
+   * Face-poke correction nodes (face-poke v1, GPU-only). Built + assigned by
+   * `GpuSolverClient.setTslCollisionBody` when the avatar body is set (the
+   * correction kernel needs that body's BVH). `null` until then. Dispatched
+   * once per frame in the brush/normals block (`GarmentSimulation.tsx`):
+   * `snapshot` first (freezes corner positions — the B1 determinism fix), then
+   * `correct` (tents poked cloth faces over convex body bumps). See
+   * `tslFacePoke.ts`.
+   */
+  facePokeNodes: { snapshot: ComputeNode; correct: ComputeNode } | null;
   /** Number of particles */
   numParticles: number;
   /** Number of triangles */
@@ -215,6 +246,7 @@ interface SolverUniforms {
   seamShrinkFactor: FloatUniform;
   seamSewedThreshold: FloatUniform;
   groundY: FloatUniform;
+  maxStrain: FloatUniform;
 }
 
 function createUniforms(config: TslSolverConfig): SolverUniforms {
@@ -229,6 +261,7 @@ function createUniforms(config: TslSolverConfig): SolverUniforms {
     seamShrinkFactor: uniform(config.seamShrinkFactor),
     seamSewedThreshold: uniform(config.seamSewedThreshold),
     groundY: uniform(config.groundY),
+    maxStrain: uniform(config.maxStrain ?? 0.02),
   };
 }
 
@@ -367,6 +400,79 @@ function makeDistanceConstraintFn(
 
         // Push particle 1 in opposite direction
         posBuf.element(id1).addAssign(n.mul(s).mul(w1));
+      });
+    });
+  })();
+}
+
+/**
+ * Strain-limiting kernel (#gummy STEP 4). A rigid, ONE-SIDED distance clamp:
+ * when an edge is stretched past restLen*(1+maxStrain), project both particles
+ * back to that cap (mass-weighted, alpha=0 — no compliance). Never compresses.
+ * Reuses the stretch ids+restLengths + graph coloring (race-free), so it kills
+ * the residual stretch the compliant Jacobi solve under-converges on.
+ */
+function makeStrainLimitFn(
+  posBuf: TslNode,
+  invMassBuf: TslNode,
+  idsBuf: TslNode,
+  restLenBuf: TslNode,
+  maxStrain: FloatUniform,
+  idStride: number,
+  idOffset0: number,
+  idOffset1: number,
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
+    const ci = instanceIndex;
+    const baseIdx = uint(ci).mul(uint(idStride));
+    const id0 = idsBuf.element(baseIdx.add(uint(idOffset0)));
+    const id1 = idsBuf.element(baseIdx.add(uint(idOffset1)));
+    const w0 = invMassBuf.element(id0);
+    const w1 = invMassBuf.element(id1);
+    const delta = posBuf.element(id1).sub(posBuf.element(id0));
+    const len = delta.dot(delta).sqrt();
+    If(len.greaterThan(float(1e-7)), () => {
+      const maxLen = restLenBuf.element(ci).mul(maxStrain.add(float(1.0)));
+      // One-sided: only clamp when over-stretched (never compress the cloth).
+      If(len.greaterThan(maxLen), () => {
+        const denom = w0.add(w1);
+        If(denom.greaterThan(float(0.0)), () => {
+          const s = len.sub(maxLen).negate().div(denom); // rigid (alpha=0)
+          const n = delta.div(len);
+          posBuf.element(id0).addAssign(n.mul(s).mul(w0).negate());
+          posBuf.element(id1).addAssign(n.mul(s).mul(w1));
+        });
+      });
+    });
+  })();
+}
+
+// ─── Body-tether kernel ───────────────────────────────────────────────────────
+
+/**
+ * Body-tether kernel (frente#2). Max-distance cling: if a cloth vertex is farther
+ * than its per-vertex radius from its static body target, project it back onto the
+ * radius sphere. One-sided (target is fixed; only the vertex moves), respects invMass.
+ * Race-free: each particle is independent (no shared particles).
+ */
+function makeTetherFn(
+  posBuf: TslNode,
+  invMassBuf: TslNode,
+  targetBuf: TslNode,
+  maxDistBuf: TslNode,
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
+    const i = instanceIndex;
+    const w = invMassBuf.element(i);
+    If(w.greaterThan(float(0.0)), () => {
+      const d = posBuf.element(i).sub(targetBuf.element(i));
+      const dist = d.length();
+      const maxD = maxDistBuf.element(i);
+      If(dist.greaterThan(maxD), () => {
+        // project onto the radius sphere around the target
+        posBuf.element(i).assign(targetBuf.element(i).add(d.mul(maxD.div(dist.max(float(1e-7))))));
       });
     });
   })();
@@ -702,7 +808,7 @@ function makeNormalNormalizeFn(
  * enabling zero-copy rendering.
  *
  * Execution order per substep (espejo WASM — ver GarmentSimulation.tsx):
- *   preSolve → stretch(per-color) → bend → seam(per-color) → groundClamp →
+ *   preSolve → stretch(per-color) → bend(per-color) → seam(per-color) → groundClamp →
  *   [grab] → snapshotPreCollision → collision bodies → postSolve
  */
 export function createTslSolver(
@@ -743,21 +849,45 @@ export function createTslSolver(
     return compute(fn, color.count, [64]);
   });
 
-  // ─── Bend constraints (per-constraint compliance) ──────────────────
-  let bend: ComputeNode | null = null;
-  if (buffers.bendIdsSBA && buffers.bendRestSBA && buffers.bendComplianceSBA && buffers.numBendConstraints > 0) {
-    const bendIdsBuf = storage(buffers.bendIdsSBA, 'uint', buffers.numBendConstraints * 4);
-    const bendRestBuf = storage(buffers.bendRestSBA, 'float', buffers.numBendConstraints);
-    const bendCompBuf = storage(buffers.bendComplianceSBA, 'float', buffers.numBendConstraints);
+  // ─── Strain limiting (#gummy STEP 4) — rigid one-sided cap. Reuses the ─
+  // stretch ids+restLengths + graph coloring (race-free); no compliance buffer.
+  const strainLimitColors = buffers.stretchColors.map((color) => {
+    const idsBuf = storage(color.idsSBA, 'uint', color.count * 2);
+    const restBuf = storage(color.restLengthsSBA, 'float', color.count);
+    const fn = makeStrainLimitFn(
+      posBuf, invMassBuf, idsBuf, restBuf,
+      uniforms.maxStrain,
+      2, 0, 1,
+    );
+    return compute(fn, color.count, [64]);
+  });
+
+  // ─── Body-tether (frente#2) — max-distance cling, per-particle ───────
+  const tetherTargetBuf = storage(buffers.tetherTargetSBA, 'vec3', N);
+  const tetherMaxDistBuf = storage(buffers.tetherMaxDistSBA, 'float', N);
+  const tether = compute(
+    makeTetherFn(posBuf, invMassBuf, tetherTargetBuf, tetherMaxDistBuf),
+    N,
+    [64],
+  );
+
+  // ─── Bend constraints (per-color, race-free — P4-1 determinism) ────
+  // Colored (c,d) distance constraints, one dispatch per color exactly like
+  // stretch. Replaces the old single non-colored Jacobi pass whose non-atomic
+  // addAssign to shared hinge verts was a data race (non-deterministic drape).
+  const bendColors = buffers.bendColors.map((color) => {
+    const idsBuf = storage(color.idsSBA, 'uint', color.count * 2);
+    const restBuf = storage(color.restLengthsSBA, 'float', color.count);
+    const compBuf = storage(color.complianceSBA, 'float', color.count);
 
     const fn = makeDistanceConstraintFn(
-      posBuf, invMassBuf, bendIdsBuf, bendRestBuf,
+      posBuf, invMassBuf, idsBuf, restBuf,
       uniforms.sdt,
-      4, 2, 3, // quad stride, opposite vertex indices
-      bendCompBuf,
+      2, 0, 1,
+      compBuf,
     );
-    bend = compute(fn, buffers.numBendConstraints, [64]);
-  }
+    return compute(fn, color.count, [64]);
+  });
 
   // ─── Seam constraints (per-color, decaying target + compliance) ────
   // F1.4 (#897): dedicated kernel — per-substep target decay in-kernel
@@ -930,6 +1060,10 @@ export function createTslSolver(
       config.dragCoefficient = partial.dragCoefficient;
       windNodes.dragCoeff.value = partial.dragCoefficient;
     }
+    if (partial.maxStrain !== undefined) {
+      config.maxStrain = partial.maxStrain;
+      uniforms.maxStrain.value = partial.maxStrain;
+    }
   }
 
   function dispose(renderer?: unknown): void {
@@ -947,7 +1081,9 @@ export function createTslSolver(
   return {
     preSolve,
     stretchColors,
-    bend,
+    strainLimitColors,
+    bendColors,
+    tether,
     seamColors,
     groundClamp,
     snapshotPreCollision,
@@ -961,6 +1097,9 @@ export function createTslSolver(
     normalZero,
     normalAccum,
     normalNormalize,
+    // Assigned by GpuSolverClient.setTslCollisionBody once the avatar body
+    // (with its BVH) exists — the correction kernel needs it. Null until then.
+    facePokeNodes: null,
     numParticles: N,
     numTriangles: buffers.numTriangles,
     triangles: buffers.triangles,

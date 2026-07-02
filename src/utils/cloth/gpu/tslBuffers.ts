@@ -8,11 +8,14 @@
  */
 
 import { StorageBufferAttribute } from 'three/webgpu';
+import { colorConstraints } from './gpuBuffers';
 import type { ClothMeshData, BendConstraints, ColoredConstraints } from './gpuBuffers';
 import type { SelfCollisionBufferSet } from './tslSelfCollision';
 import { destroySelfCollisionBuffers } from './tslSelfCollision';
 import type { WindBufferSet } from './tslWind';
 import { destroyWindBuffers } from './tslWind';
+import { buildClothVertexFaces } from '../clothVertexFaces';
+import { packFacePokeCsr } from './tslFacePoke';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -72,10 +75,8 @@ export interface TslBufferSet {
   // Stretch constraints (per-color for race-free dispatch)
   stretchColors: StretchColorGroup[];
 
-  // Bend constraints
-  bendIdsSBA: StorageBufferAttribute | null;
-  bendRestSBA: StorageBufferAttribute | null;
-  bendComplianceSBA: StorageBufferAttribute | null;
+  // Bend constraints (per-color for race-free dispatch — P4-1 determinism)
+  bendColors: StretchColorGroup[];
   numBendConstraints: number;
 
   // Seam constraints (per-color for race-free dispatch — #897 F1.3)
@@ -99,6 +100,14 @@ export interface TslBufferSet {
 
   // Wind accumulation buffers (null if no wind)
   windBuffers: WindBufferSet | null;
+
+  // Body-tether buffers (frente#2: cloth clings to body, UE max-distance)
+  tetherTargetSBA: StorageBufferAttribute;  // vec3 — anchor point on body (seeded to positions)
+  tetherMaxDistSBA: StorageBufferAttribute; // float — per-vertex cling radius
+
+  // Face-poke (v1): packed cloth CSR + snapshot (packing keeps the correct kernel ≤8 storage buffers)
+  facePokeCsrSBA: StorageBufferAttribute;         // uint — [offsets(N+1), list(numTri*3), triIds(numTri*3)] (packFacePokeCsr)
+  facePokeSnapshotSBA: StorageBufferAttribute;    // vec3, numParticles — per-frame read source scratch
 
   // Counts
   numParticles: number;
@@ -134,6 +143,7 @@ export function createTslBuffers(
   bend: BendConstraints,
   seam: TslSeamConstraintData | null,
   fabricCompliance?: FabricComplianceConfig,
+  tetherRadii?: Float32Array | Float64Array,
 ): TslBufferSet {
   const N = mesh.positions.length / 3;
   const numTri = mesh.triangles.length / 3;
@@ -155,6 +165,16 @@ export function createTslBuffers(
   const preCollisionPosSBA = new StorageBufferAttribute(new Float32Array(mesh.positions), 3);
   const velocitySBA = new StorageBufferAttribute(new Float32Array(N * 3), 3);
   const invMassSBA = new StorageBufferAttribute(new Float32Array(mesh.invMass), 1);
+
+  // ─── Body-tether (frente#2): target seeded to positions (filled in init via
+  // captureTetherTargets); maxDist per-vertex from region radii. ─────────────
+  const tetherTargetSBA = new StorageBufferAttribute(new Float32Array(mesh.positions), 3);
+  const tetherMaxDistSBA = new StorageBufferAttribute(
+    tetherRadii && tetherRadii.length === N
+      ? new Float32Array(tetherRadii)            // copy/convert Float64→Float32 for GPU
+      : new Float32Array(N).fill(0.06),
+    1,
+  );
 
   // ─── Per-color stretch constraints with per-constraint compliance ───
   const stretchColors: StretchColorGroup[] = [];
@@ -181,17 +201,24 @@ export function createTslBuffers(
     });
   }
 
-  // ─── Bend constraints ───────────────────────────────────────────────
+  // ─── Bend constraints (per-color, race-free — P4-1 determinism) ──────
+  // Distance-based bending = a distance constraint between the two opposite
+  // hinge verts (c,d). Extract those as stride-2 (c,d) pairs and graph-color
+  // them exactly like stretch, so within a color no two constraints share a
+  // vertex → the non-atomic addAssign is race-free. Replaces the old single
+  // non-colored Jacobi pass whose shared-vertex writes were a data race
+  // (non-deterministic drape). See docs/plans/2026-07-01-drape-determinism-p4-design.md.
   const numBend = bend.ids.length / 4;
-  let bendIdsSBA: StorageBufferAttribute | null = null;
-  let bendRestSBA: StorageBufferAttribute | null = null;
-  let bendComplianceSBA: StorageBufferAttribute | null = null;
+  const bendColors: StretchColorGroup[] = [];
   if (numBend > 0) {
+    const bendPairIds = new Uint32Array(numBend * 2);
     const bendRestDist = new Float32Array(numBend);
     const bendCompliance = new Float32Array(numBend);
     for (let i = 0; i < numBend; i++) {
       const c = bend.ids[i * 4 + 2];
       const d = bend.ids[i * 4 + 3];
+      bendPairIds[i * 2] = c;
+      bendPairIds[i * 2 + 1] = d;
       const dx = mesh.positions[d * 3] - mesh.positions[c * 3];
       const dy = mesh.positions[d * 3 + 1] - mesh.positions[c * 3 + 1];
       const dz = mesh.positions[d * 3 + 2] - mesh.positions[c * 3 + 2];
@@ -201,9 +228,22 @@ export function createTslBuffers(
       const edgeType = bend.edgeTypes ? bend.edgeTypes[i] : 1; // default WEFT
       bendCompliance[i] = bendEdgeTypeToCompliance(edgeType, fabric);
     }
-    bendIdsSBA = new StorageBufferAttribute(new Uint32Array(bend.ids), 4);
-    bendRestSBA = new StorageBufferAttribute(bendRestDist, 1);
-    bendComplianceSBA = new StorageBufferAttribute(bendCompliance, 1);
+
+    // Color the (c,d) distance constraints. colorConstraints reorders ids,
+    // restLengths and compliance together, so each colorRange is a contiguous
+    // slice — identical shape to the stretch path above.
+    const coloredBend = colorConstraints(bendPairIds, bendRestDist, numBend, bendCompliance);
+    for (const range of coloredBend.colorRanges) {
+      const colorIds = coloredBend.ids.slice(range.offset * 2, (range.offset + range.count) * 2);
+      const colorRest = coloredBend.restLengths.slice(range.offset, range.offset + range.count);
+      const colorCompliance = coloredBend.compliance!.slice(range.offset, range.offset + range.count);
+      bendColors.push({
+        idsSBA: new StorageBufferAttribute(new Uint32Array(colorIds), 2),
+        restLengthsSBA: new StorageBufferAttribute(new Float32Array(colorRest), 1),
+        complianceSBA: new StorageBufferAttribute(new Float32Array(colorCompliance), 1),
+        count: range.count,
+      });
+    }
   }
 
   // ─── Per-color seam constraints with per-constraint compliance ─────
@@ -237,6 +277,13 @@ export function createTslBuffers(
   const normalAccumSBA = new StorageBufferAttribute(new Int32Array(N * 3), 1);
   const triangleIdsSBA = new StorageBufferAttribute(new Uint32Array(mesh.triangles), 1);
 
+  // ─── Incident-face CSR + face-poke snapshot (face-poke v1) ────────────────
+  // Build CSR from the same cloth triangle indices already uploaded as
+  // triangleIdsSBA; no extra data source needed.
+  const { offsets: ifOffsets, faces: ifFaces } = buildClothVertexFaces(mesh.triangles, N);
+  const facePokeCsrSBA = createSBA(packFacePokeCsr(ifOffsets, ifFaces, mesh.triangles, N), 1);
+  const facePokeSnapshotSBA = createSBA(new Float32Array(N * 3), 3);
+
   return {
     positionSBA,
     prevPosSBA,
@@ -244,9 +291,7 @@ export function createTslBuffers(
     velocitySBA,
     invMassSBA,
     stretchColors,
-    bendIdsSBA,
-    bendRestSBA,
-    bendComplianceSBA,
+    bendColors,
     numBendConstraints: numBend,
     seamColors,
     numSeamConstraints: numSeam,
@@ -256,6 +301,10 @@ export function createTslBuffers(
     normalSBA,
     normalAccumSBA,
     triangleIdsSBA,
+    tetherTargetSBA,
+    tetherMaxDistSBA,
+    facePokeCsrSBA,
+    facePokeSnapshotSBA,
     scBuffers: null,
     windBuffers: null,
     numParticles: N,
@@ -314,8 +363,8 @@ export function disposeStorageBufferAttribute(
 /**
  * Release every GPU buffer owned by a TslBufferSet.
  *
- * Iterates the 13 fixed SBA fields plus per-color stretch and seam SBAs, then
- * delegates self-collision and wind buffer disposal to their owning modules.
+ * Iterates the 14 fixed SBA fields plus per-color bend, stretch and seam SBAs,
+ * then delegates self-collision and wind buffer disposal to their owning modules.
  * See `disposeStorageBufferAttribute` for the renderer-routing rationale.
  */
 export function destroyTslBufferSet(
@@ -333,10 +382,14 @@ export function destroyTslBufferSet(
     set.triangleIdsSBA,
     set.grabMaskSBA,
     set.grabOffsetSBA,
-    set.bendIdsSBA,
-    set.bendRestSBA,
-    set.bendComplianceSBA,
+    set.tetherTargetSBA,
+    set.tetherMaxDistSBA,
+    set.facePokeCsrSBA,
+    set.facePokeSnapshotSBA,
   ];
+  for (const color of set.bendColors) {
+    sbas.push(color.idsSBA, color.restLengthsSBA, color.complianceSBA);
+  }
   for (const color of set.stretchColors) {
     sbas.push(color.idsSBA, color.restLengthsSBA, color.complianceSBA);
   }

@@ -1,5 +1,7 @@
 # Epic-746 RFC — Boundary contract tests for cloth solver clients
 
+> **Amendment 2026-06-23 (feat/envelope-wrap — sleeve tube closure):** same-piece (self) seams are now SUPPORTED on the GPU tier. The explicit self-seam skip in `src/utils/cloth/seamPairs.ts` `resolveSeamVertexPairs` (which returned `failure:'self-seam'` and zero constraints whenever `pieceAId === pieceBId`) was removed so that the GPU path handles same-piece seams identically to `buildSeamConstraints` (CPU/WASM). This enables the sleeve underarm tube closure (underarmSeam↔underarmSeam-2 on the same pieceId), which had been silently producing zero constraints on the default GPU tier. `'self-seam'` was removed from the `SeamResolutionFailure` union as it can no longer be produced. The GPU consumer (`gpuSolverClient.ts`) was confirmed correct without modification — both halves are offset by the same per-piece vertex offset, yielding distinct global indices. Tests in `seamPairs.test.ts` updated accordingly.
+
 **Fecha:** 2026-05-10
 **Epic:** [#746](https://github.com/sssamuelll/openclo/issues/746) — "Cloth subsystem quality audit (Fase 2 closure) — 18 findings tracked".
 **Status:** CLOSED. Test-coverage phase of the audit complete; 5 PRs mergeados a `main`.

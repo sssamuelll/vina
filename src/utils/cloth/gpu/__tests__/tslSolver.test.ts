@@ -184,15 +184,16 @@ function makeMockBufferSet(options?: {
     });
   }
 
-  // Bend
-  let bendIdsSBA: StorageBufferAttribute | null = null;
-  let bendRestSBA: StorageBufferAttribute | null = null;
-  let bendComplianceSBA: StorageBufferAttribute | null = null;
-  if (numBend > 0) {
-    bendIdsSBA = new StorageBufferAttribute(new Uint32Array(numBend * 4), 4);
-    bendRestSBA = new StorageBufferAttribute(new Float32Array(numBend), 1);
-    bendComplianceSBA = new StorageBufferAttribute(new Float32Array(numBend), 1);
-  }
+  // Bend (per-color — P4-1). Model the whole bend set as a single color group
+  // of `numBend` stride-2 (c,d) constraints for dispatch-count assertions.
+  const bendColors = numBend > 0
+    ? [{
+        idsSBA: new StorageBufferAttribute(new Uint32Array(numBend * 2), 2),
+        restLengthsSBA: new StorageBufferAttribute(new Float32Array(numBend), 1),
+        complianceSBA: new StorageBufferAttribute(new Float32Array(numBend), 1),
+        count: numBend,
+      }]
+    : [];
 
   // Seam (per-color groups — #897 F1.3)
   const seamColorCounts = options?.seamColorCounts ?? (numSeam > 0 ? [numSeam] : []);
@@ -212,9 +213,7 @@ function makeMockBufferSet(options?: {
     velocitySBA,
     invMassSBA,
     stretchColors,
-    bendIdsSBA,
-    bendRestSBA,
-    bendComplianceSBA,
+    bendColors,
     numBendConstraints: numBend,
     seamColors,
     numSeamConstraints: seamColorCounts.reduce((a, b) => a + b, 0),
@@ -224,6 +223,10 @@ function makeMockBufferSet(options?: {
     triangleIdsSBA: new StorageBufferAttribute(new Uint32Array(triangles), 1),
     grabMaskSBA: new StorageBufferAttribute(new Float32Array(numParticles), 1),
     grabOffsetSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
+    tetherTargetSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
+    tetherMaxDistSBA: new StorageBufferAttribute(new Float32Array(numParticles).fill(0.06), 1),
+    facePokeCsrSBA: new StorageBufferAttribute(new Uint32Array(numParticles + 1 + 6 + 6), 1),
+    facePokeSnapshotSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
     numParticles,
     numTriangles: 2,
     scBuffers: null,
@@ -296,19 +299,31 @@ describe('createTslSolver', () => {
     }
   });
 
-  it('returns bend compute node when constraints exist', () => {
+  it('returns per-color strain-limit nodes mirroring the stretch colors (#gummy STEP 4)', () => {
+    const buffers = makeMockBufferSet({ numStretchColors: 3 });
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+
+    // Strain-limiting reuses the stretch graph coloring 1:1 (same ids+restLengths,
+    // race-free) → one strain-limit node per stretch color.
+    expect(solver.strainLimitColors).toHaveLength(3);
+    for (const node of solver.strainLimitColors) {
+      expect(node).toHaveProperty('__tslCompute', true);
+    }
+  });
+
+  it('returns per-color bend compute nodes when constraints exist', () => {
     const buffers = makeMockBufferSet({ numBend: 2 });
     const solver = createTslSolver(buffers, { ...defaultConfig });
 
-    expect(solver.bend).not.toBeNull();
-    expect(solver.bend).toHaveProperty('__tslCompute', true);
+    expect(solver.bendColors).toHaveLength(1);
+    expect(solver.bendColors[0]).toHaveProperty('__tslCompute', true);
   });
 
-  it('returns null bend when no constraints', () => {
+  it('returns empty bendColors when no constraints', () => {
     const buffers = makeMockBufferSet({ numBend: 0 });
     const solver = createTslSolver(buffers, { ...defaultConfig });
 
-    expect(solver.bend).toBeNull();
+    expect(solver.bendColors).toEqual([]);
   });
 
   it('returns per-color seam compute nodes when constraints exist', () => {
@@ -402,7 +417,7 @@ describe('createTslSolver', () => {
     const buffers = makeMockBufferSet({ numBend: 5 });
     const solver = createTslSolver(buffers, { ...defaultConfig });
 
-    expect(solver.bend).toHaveProperty('dispatchCount', 5);
+    expect(solver.bendColors[0]).toHaveProperty('dispatchCount', 5);
   });
 
   it('seam dispatch count matches seam constraint count (single group)', () => {
@@ -480,6 +495,13 @@ describe('createTslSolver', () => {
     });
     expect(solver.windNodes).toBeDefined();
     expect(solver.windNodes).not.toBeNull();
+  });
+
+  it('returns a body-tether compute node (#frente2)', () => {
+    const buffers = makeMockBufferSet({ numStretchColors: 3 });
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    expect(solver.tether).not.toBeNull();
+    expect(solver.tether).toHaveProperty('__tslCompute', true);
   });
 });
 

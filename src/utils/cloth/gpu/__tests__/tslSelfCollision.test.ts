@@ -110,6 +110,7 @@ vi.mock('three/tsl', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Loop: (_count: unknown, cb?: (...args: any[]) => any) => { tryInvoke(cb, { i: proxy }); return proxy; },
     atomicAdd: () => proxy,
+    atomicMin: () => proxy,
     atomicStore: () => proxy,
     atomicLoad: (dest: unknown) => {
       atomicLoadCalls.push(dest);
@@ -155,7 +156,6 @@ describe('tslSelfCollision buffers (bucket layout, #897 F3)', () => {
     expect(buffers).toBeDefined();
     expect(buffers.deltaSBA).toBeDefined();
     expect(buffers.corrCountSBA).toBeDefined();
-    expect(buffers.cellCountSBA).toBeDefined();
     expect(buffers.cellEntriesSBA).toBeDefined();
     expect(buffers.adjOffsetsSBA).toBeDefined();
     expect(buffers.adjNeighborsSBA).toBeDefined();
@@ -175,10 +175,9 @@ describe('tslSelfCollision buffers (bucket layout, #897 F3)', () => {
     expect('cellStartSBA' in buffers).toBe(false);
   });
 
-  it('cellCount buffer is Uint32Array with tableSize elements', () => {
+  it('does NOT allocate a cellCount buffer — P4-2 keep-smallest admission needs no counter', () => {
     const buffers = createSelfCollisionBuffers(50, 101, new Uint32Array(51), new Uint32Array(100));
-    expect(buffers.cellCountSBA.array).toBeInstanceOf(Uint32Array);
-    expect(buffers.cellCountSBA.array.length).toBe(101);
+    expect('cellCountSBA' in buffers).toBe(false);
   });
 
   it('delta buffer is Int32Array with N*3 elements', () => {
@@ -247,9 +246,10 @@ describe('makeSelfCollisionComputeNodes (4-pass bucket pipeline, #897 F3)', () =
     }
   });
 
-  it('dispatch counts are [tableSize, N, N, N] for cellClear/scatter/resolve/apply', () => {
+  it('dispatch counts are [tableSize*K, N, N, N] for cellClear/scatter/resolve/apply', () => {
     const nodes = buildNodes();
-    expect(asMockCompute(nodes.cellClearNode).count).toBe(TABLE_SIZE);
+    // cellClear sentinel-fills every entries slot (P4-2) → tableSize*CELL_CAPACITY.
+    expect(asMockCompute(nodes.cellClearNode).count).toBe(TABLE_SIZE * CELL_CAPACITY);
     expect(asMockCompute(nodes.scatterNode).count).toBe(NUM_PARTICLES);
     expect(asMockCompute(nodes.resolveNode).count).toBe(NUM_PARTICLES);
     expect(asMockCompute(nodes.applyNode).count).toBe(NUM_PARTICLES);
@@ -260,8 +260,8 @@ describe('makeSelfCollisionComputeNodes (4-pass bucket pipeline, #897 F3)', () =
 // Future refactors / Three.js upgrades could silently drop `.setAtomic(true)`,
 // regressing to WGSL `array<i32>` + Dawn warnings + silent CPU fallback. These
 // tests guard against that for each of the three atomic buffers in the
-// self-collision kernel pipeline (cellCount: cellClear store + scatter add +
-// resolve load; delta/corrCount: resolve add + apply load/store).
+// self-collision kernel pipeline (cellEntries: cellClear store + scatter
+// atomicMin + resolve load; delta/corrCount: resolve add + apply load/store).
 
 describe('#554 atomic buffer regression guards', () => {
   function buildNodes() {
@@ -281,9 +281,9 @@ describe('#554 atomic buffer regression guards', () => {
     return buffers;
   }
 
-  it('declares array<atomic<i32>> on cellCountBuf via setAtomic(true)', () => {
+  it('declares array<atomic<u32>> on cellEntriesBuf via setAtomic(true) (P4-2)', () => {
     const buffers = buildNodes();
-    const call = setAtomicCalls.find((c) => c.sba === buffers.cellCountSBA);
+    const call = setAtomicCalls.find((c) => c.sba === buffers.cellEntriesSBA);
     expect(call).toBeDefined();
     expect(call?.value).toBe(true);
   });
@@ -304,8 +304,8 @@ describe('#554 atomic buffer regression guards', () => {
 
   it('uses atomicLoad on read passes (#554 WGSL spec compliance)', () => {
     // Symmetric to the setAtomic guards above. The resolve / apply passes read
-    // cellCountBuf, corrCountBuf, and deltaBuf via atomicLoad — required
-    // because all three are array<atomic<i32>> (post-setAtomic). Plain
+    // cellEntriesBuf, corrCountBuf, and deltaBuf via atomicLoad — required
+    // because they are array<atomic<*>> (post-setAtomic). Plain
     // `.element(i)` is a WGSL validation error.
     atomicLoadCalls.length = 0;
     buildNodes();

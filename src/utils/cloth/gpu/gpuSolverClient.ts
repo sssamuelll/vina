@@ -22,6 +22,7 @@ import {
   type FabricComplianceConfig,
 } from './tslBuffers';
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
+import { makeFacePokeSnapshotNode, makeFacePokeCorrectNode, packFacePokeBodyGeom } from './tslFacePoke';
 import { createSelfCollisionBuffers } from './tslSelfCollision';
 import { buildAdjacency, nextPrime } from '../selfCollision';
 import { buildAdjacencyCSR } from '../wasm/adjacencyCSR';
@@ -35,6 +36,98 @@ import type { StorageBufferAttribute } from 'three/webgpu';
 import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
 import { withErrorScope, attachUncapturedErrorListener, instrumentShaderCapture } from './webgpuDebug';
+import { buildTetherRadii } from './tetherRadii';
+
+// ─── CPU helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns the closest point on a triangle to point (px,py,pz).
+ * The triangle is given as 9 consecutive floats in `triVerts` starting at
+ * `vOff` (A=vOff..+2, B=vOff+3..+5, C=vOff+6..+8).
+ * The triangle normal (unit) is in `triNormals` at `nOff` (3 floats).
+ *
+ * Algorithm: project onto the triangle's plane, test if inside via barycentric
+ * coordinates, otherwise clamp to the nearest edge. Mirrors the math in
+ * triangleCollision.ts `pointToTriangleDist` but returns XYZ rather than dist.
+ */
+function closestPointOnTriangle(
+  px: number, py: number, pz: number,
+  triVerts: Float32Array, vOff: number,
+  triNormals: Float32Array, nOff: number,
+): [number, number, number] {
+  const ax = triVerts[vOff],     ay = triVerts[vOff + 1], az = triVerts[vOff + 2];
+  const bx = triVerts[vOff + 3], by = triVerts[vOff + 4], bz = triVerts[vOff + 5];
+  const cx = triVerts[vOff + 6], cy = triVerts[vOff + 7], cz = triVerts[vOff + 8];
+
+  const nnx = triNormals[nOff], nny = triNormals[nOff + 1], nnz = triNormals[nOff + 2];
+
+  const abx = bx - ax, aby = by - ay, abz = bz - az;
+  const acx = cx - ax, acy = cy - ay, acz = cz - az;
+  const apx = px - ax, apy = py - ay, apz = pz - az;
+
+  // Signed distance to the plane
+  const dot = apx * nnx + apy * nny + apz * nnz;
+
+  // Projection onto the plane
+  const projx = px - dot * nnx;
+  const projy = py - dot * nny;
+  const projz = pz - dot * nnz;
+
+  // Barycentric coords of the projection
+  const v0x = projx - ax, v0y = projy - ay, v0z = projz - az;
+  const d00 = abx * abx + aby * aby + abz * abz;
+  const d01 = abx * acx + aby * acy + abz * acz;
+  const d02 = abx * v0x + aby * v0y + abz * v0z;
+  const d11 = acx * acx + acy * acy + acz * acz;
+  const d12 = acx * v0x + acy * v0y + acz * v0z;
+  const denom = d00 * d11 - d01 * d01;
+
+  if (Math.abs(denom) > 1e-12) {
+    const invD = 1.0 / denom;
+    const u = (d11 * d02 - d01 * d12) * invD;
+    const v = (d00 * d12 - d01 * d02) * invD;
+
+    if (u >= 0 && v >= 0 && u + v <= 1) {
+      // Projection is inside the triangle — closest point is the projection.
+      return [projx, projy, projz];
+    }
+  }
+
+  // Outside: find nearest edge point (3-edge clamp, same as triangleCollision.ts lines 58–92).
+  let minDsq = Infinity;
+  let cpx = ax, cpy = ay, cpz = az;
+
+  const abLenSq = abx * abx + aby * aby + abz * abz;
+  if (abLenSq > 1e-12) {
+    const t = Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / abLenSq));
+    const ex = ax + t * abx, ey = ay + t * aby, ez = az + t * abz;
+    const dx = px - ex, dy = py - ey, dz = pz - ez;
+    const dsq = dx * dx + dy * dy + dz * dz;
+    if (dsq < minDsq) { minDsq = dsq; cpx = ex; cpy = ey; cpz = ez; }
+  }
+
+  const acLenSq = acx * acx + acy * acy + acz * acz;
+  if (acLenSq > 1e-12) {
+    const t = Math.max(0, Math.min(1, (apx * acx + apy * acy + apz * acz) / acLenSq));
+    const ex = ax + t * acx, ey = ay + t * acy, ez = az + t * acz;
+    const dx = px - ex, dy = py - ey, dz = pz - ez;
+    const dsq = dx * dx + dy * dy + dz * dz;
+    if (dsq < minDsq) { minDsq = dsq; cpx = ex; cpy = ey; cpz = ez; }
+  }
+
+  const bcx = cx - bx, bcy = cy - by, bcz = cz - bz;
+  const bpx = px - bx, bpy = py - by, bpz = pz - bz;
+  const bcLenSq = bcx * bcx + bcy * bcy + bcz * bcz;
+  if (bcLenSq > 1e-12) {
+    const t = Math.max(0, Math.min(1, (bpx * bcx + bpy * bcy + bpz * bcz) / bcLenSq));
+    const ex = bx + t * bcx, ey = by + t * bcy, ez = bz + t * bcz;
+    const dx = px - ex, dy = py - ey, dz = pz - ez;
+    const dsq = dx * dx + dy * dy + dz * dz;
+    if (dsq < minDsq) { minDsq = dsq; cpx = ex; cpy = ey; cpz = ez; }
+  }
+
+  return [cpx, cpy, cpz];
+}
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -50,6 +143,10 @@ export interface PieceMeshData {
   vertices: Float32Array;
   triIds: Int32Array;
   uvs?: Float32Array;
+  /** BodyRegion string (e.g. 'front-torso', 'left-sleeve'). Used to seed
+   *  per-region tether radii (frente#2). Optional — falls back to default
+   *  0.06 m when absent. */
+  region?: string;
 }
 
 export interface GpuSolverClientCallbacks {
@@ -79,6 +176,10 @@ export class GpuSolverClient implements ClothSolverClient {
   /** Guard against concurrent readback requests (mapAsync throws if pending). */
   private readbackPending: boolean = false;
 
+  /** Face-poke: interleaved body geom (triVerts+vertexPseudo, 18 floats/tri) — a packed
+   *  duplicate of the body geometry so the correct kernel binds ≤8 storage buffers. */
+  private facePokeBodyGeomSBA: StorageBufferAttribute | null = null;
+
   /** Prevents operations after dispose (readback promises may still resolve). */
   private disposed: boolean = false;
 
@@ -107,6 +208,17 @@ export class GpuSolverClient implements ClothSolverClient {
   private rendererRef: any = null;
 
   /**
+   * Body triangle data retained from the last `setTslCollisionBody('__avatar__', …)` call.
+   * Stored so `captureTetherTargets()` can re-query the body after init and on
+   * every pose-update rebuild.  Null until the avatar body is first set.
+   */
+  private tetherBodyTris: {
+    vertices: Float32Array;
+    normals: Float32Array;
+    triCount: number;
+  } | null = null;
+
+  /**
    * Tracks BVH SBAs per collision body id so `setTslCollisionBody` can free
    * the previous allocation when called again for the same id (avatar pose
    * updates re-allocate 4 SBAs each call, see #753; the 4th — escape
@@ -119,6 +231,8 @@ export class GpuSolverClient implements ClothSolverClient {
       bvhSkipSBA: StorageBufferAttribute;
       triVertsSBA: StorageBufferAttribute;
       triNormalsSBA: StorageBufferAttribute;
+      edgePseudoSBA: StorageBufferAttribute;
+      vertexPseudoSBA: StorageBufferAttribute;
     }
   > = new Map();
 
@@ -362,8 +476,12 @@ export class GpuSolverClient implements ClothSolverClient {
       stretchComplianceWarp: 0.0,
       stretchComplianceWeft: 0.0,
       shearCompliance: 0.001,
-      bendComplianceWarp: 1.0,
-      bendComplianceWeft: 1.0,
+      // #gummy STEP 1: 1.0 → 2.5e-5. alpha=compliance/sdt² (sdt=1/900) gave
+      // alpha=810000 at 1.0 → s≈0 → DEAD bend → cloth had no body (floppy/gummy).
+      // 2.5e-5 → alpha≈20 → real bending stiffness. ≈ cotton's toXPBDParams value.
+      // PARITY: WASM (lib.rs) + CPU (xpbdSolver) carry the SAME default in lockstep.
+      bendComplianceWarp: 2.5e-5,
+      bendComplianceWeft: 2.5e-5,
     };
 
     const numStretch = stretch.ids.length / 2;
@@ -432,13 +550,19 @@ export class GpuSolverClient implements ClothSolverClient {
       // degrades to a ref-drop — see `disposeStorageBufferAttribute`.
       this.disposeTslResources();
 
-      // Create TSL buffers with per-constraint compliance
+      // Create TSL buffers with per-constraint compliance and per-region
+      // tether radii (frente#2). Each piece contributes its region string
+      // (threaded via PieceMeshData.region); missing region → default 0.06 m.
+      const tetherRadii = buildTetherRadii(
+        pieces.map((p) => ({ region: p.region ?? 'unknown', vertexCount: p.vertices.length / 3 })),
+      );
       this.tslBuffers = createTslBuffers(
         { positions, triangles, invMass },
         colored,
         bend,
         seam,
         fabric,
+        tetherRadii,
       );
 
       // Self-collision (#897 F3): SIEMPRE activo en el tier GPU. RATIFICADO:
@@ -798,10 +922,15 @@ export class GpuSolverClient implements ClothSolverClient {
    * Vertices should be expanded: 9 floats per triangle (3 verts × 3 components).
    * Normals: 3 floats per triangle.
    */
-  setCollisionMesh(mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }): void {
+  setCollisionMesh(
+    mesh: { vertices: Float32Array; normals: Float32Array; triCount: number },
+    friction: number = AVATAR_FRICTION,
+  ): void {
     if (this.tslSolver) {
-      // TSL mode: build BVH and create TSL collision body
-      this.setTslCollisionBody('__avatar__', mesh, AVATAR_FRICTION, AVATAR_MARGIN);
+      // TSL mode: build BVH and create TSL collision body. `friction` carries the
+      // active fabric's frictionBody (F0 — was dead data); AVATAR_FRICTION (0.4
+      // cotton-on-skin) stays the fallback when no fabric friction is provided.
+      this.setTslCollisionBody('__avatar__', mesh, friction, AVATAR_MARGIN);
       return;
     }
     this.solver.setCollisionMesh(mesh);
@@ -810,11 +939,16 @@ export class GpuSolverClient implements ClothSolverClient {
   /**
    * Update collision mesh vertices/normals (same triangle count, reuses buffers).
    */
-  updateCollisionMesh(vertices: Float32Array, normals: Float32Array): void {
+  updateCollisionMesh(
+    vertices: Float32Array,
+    normals: Float32Array,
+    friction: number = AVATAR_FRICTION,
+  ): void {
     if (this.tslSolver) {
-      // TSL mode: rebuild BVH (topology may differ, so full rebuild)
+      // TSL mode: rebuild BVH (topology may differ, so full rebuild). `friction`
+      // carries the active fabric's frictionBody (F0); AVATAR_FRICTION fallback.
       const triCount = vertices.length / 9;
-      this.setTslCollisionBody('__avatar__', { vertices, normals, triCount }, AVATAR_FRICTION, AVATAR_MARGIN);
+      this.setTslCollisionBody('__avatar__', { vertices, normals, triCount }, friction, AVATAR_MARGIN);
       return;
     }
     this.solver.updateCollisionMesh(vertices, normals);
@@ -874,6 +1008,8 @@ export class GpuSolverClient implements ClothSolverClient {
       disposeStorageBufferAttribute(previous.bvhSkipSBA, this.rendererRef);
       disposeStorageBufferAttribute(previous.triVertsSBA, this.rendererRef);
       disposeStorageBufferAttribute(previous.triNormalsSBA, this.rendererRef);
+      disposeStorageBufferAttribute(previous.edgePseudoSBA, this.rendererRef);
+      disposeStorageBufferAttribute(previous.vertexPseudoSBA, this.rendererRef);
     }
 
     // Create StorageBufferAttributes for GPU upload
@@ -881,7 +1017,9 @@ export class GpuSolverClient implements ClothSolverClient {
     const bvhSkipSBA = createSBA(bvh.skip, 1);
     const triVertsSBA = createSBA(bvh.triVerts, 1);
     const triNormalsSBA = createSBA(bvh.triNormals, 1);
-    this.collisionBodySBAs.set(id, { bvhNodesSBA, bvhSkipSBA, triVertsSBA, triNormalsSBA });
+    const edgePseudoSBA = createSBA(bvh.edgePseudonormals, 1);
+    const vertexPseudoSBA = createSBA(bvh.vertexPseudonormals, 1);
+    this.collisionBodySBAs.set(id, { bvhNodesSBA, bvhSkipSBA, triVertsSBA, triNormalsSBA, edgePseudoSBA, vertexPseudoSBA });
 
     // Use shared buffer nodes from the solver
     const N = this.tslSolver.numParticles;
@@ -897,6 +1035,8 @@ export class GpuSolverClient implements ClothSolverClient {
       bvhSkipSBA,
       triVertsSBA,
       triNormalsSBA,
+      edgePseudoSBA,
+      vertexPseudoSBA,
       N,
       bvh.nodeCount,
       bvh.triCount,
@@ -907,6 +1047,61 @@ export class GpuSolverClient implements ClothSolverClient {
 
     this.tslSolver.setCollisionBody(body, this.rendererRef);
 
+    // ─── Face-poke pass (face-poke v1, GPU-only) ──────────────────────────────
+    // The correction kernel queries THIS body's BVH for body vertices poking
+    // through cloth faces, so it is built here (where the BVH SBAs exist) and
+    // exposed on the solver. v1 = avatar only (the motivating case — María's
+    // body showing through the front drape); other collision bodies don't get a
+    // face-poke pass. Re-built on every avatar pose update (fresh BVH); the old
+    // compute nodes become GC-eligible (they own no GPU buffers — the SBAs are
+    // owned by tslBuffers + collisionBodySBAs and disposed there).
+    if (id === '__avatar__') {
+      // Pack triVerts + vertexPseudonormals into ONE interleaved buffer (18
+      // floats/tri) so the correct kernel binds ≤8 storage buffers (WebGPU
+      // maxStorageBuffersPerShaderStage=8; the un-packed kernel bound 11 →
+      // invalid pipeline → silent no-op). Dispose the previous avatar's packed
+      // geom on rebuild — it owns a GPU buffer.
+      if (this.facePokeBodyGeomSBA) {
+        disposeStorageBufferAttribute(this.facePokeBodyGeomSBA, this.rendererRef);
+      }
+      this.facePokeBodyGeomSBA = createSBA(
+        packFacePokeBodyGeom(bvh.triVerts, bvh.vertexPseudonormals, bvh.triCount),
+        1,
+      );
+      this.tslSolver.facePokeNodes = {
+        snapshot: makeFacePokeSnapshotNode(
+          this.tslSolver.positionBufNode,
+          this.tslBuffers.facePokeSnapshotSBA,
+          N,
+        ),
+        correct: makeFacePokeCorrectNode({
+          posBuf: this.tslSolver.positionBufNode,
+          prevPosBuf: this.tslSolver.prevPosBufNode,
+          invMassBuf: this.tslSolver.invMassBufNode,
+          snapshotSBA: this.tslBuffers.facePokeSnapshotSBA,
+          csrSBA: this.tslBuffers.facePokeCsrSBA,
+          bvhNodesSBA,
+          bvhSkipSBA,
+          bodyGeomSBA: this.facePokeBodyGeomSBA,
+          numParticles: N,
+          numClothTriangles: this.tslBuffers.numTriangles,
+          numBvhNodes: bvh.nodeCount,
+          numBodyTris: bvh.triCount,
+          margin,
+        }),
+      };
+    }
+
+    // Retain the avatar body tris for captureTetherTargets (body-surface query).
+    // NOTE: the body-surface capture is NOT auto-run here — it is an O(N×tris)
+    // brute force (~26 s for an 18 k-tri avatar) that froze Start, and the tether
+    // now targets each vertex's SETTLED position instead (recaptureTetherTargetsFromGpu,
+    // O(N), fired once the drape settles). tetherBodyTris is kept so
+    // captureTetherTargets remains callable (e.g. a future active body-pull mode).
+    if (id === '__avatar__') {
+      this.tetherBodyTris = mesh;
+    }
+
     console.log(`[GpuSolverClient] TSL collision body '${id}':`, {
       bvhNodes: bvh.nodeCount,
       triangles: bvh.triCount,
@@ -916,16 +1111,129 @@ export class GpuSolverClient implements ClothSolverClient {
   }
 
   /**
+   * Capture per-vertex body-surface targets for the tether kernel.
+   *
+   * For each cloth particle i, queries the retained body triangles
+   * (`this.tetherBodyTris`) for the closest surface point and writes it into
+   * `tetherTargetSBA.array[i*3 .. i*3+2]`.  Brute-force over all triangles is
+   * acceptable here: this runs ONCE per init/rebuild (not per frame), and the
+   * avatar mesh is O(few thousand) tris.
+   *
+   * Called automatically at the end of `setTslCollisionBody` for id
+   * `'__avatar__'` and is a public no-op so callers can trigger it manually.
+   *
+   * Guard: no-op if no TSL solver, no buffers, or no body captured yet.
+   */
+  captureTetherTargets(): void {
+    if (!this.tslBuffers || !this.tslSolver) return;
+    if (!this.tetherBodyTris) return;
+
+    const { vertices: bv, normals: bn, triCount } = this.tetherBodyTris;
+    // Read particle positions from positionSBA (the canonical cloth positions,
+    // stable across repeated captureTetherTargets calls).  tetherTargetSBA
+    // holds the RESULTS of this function — using it as the query source would
+    // corrupt the targets on the second call (body-surface point ≠ cloth pos).
+    const pArr = this.tslBuffers.positionSBA.array as Float32Array;
+    const tArr = this.tslBuffers.tetherTargetSBA.array as Float32Array;
+    const N = this.tslBuffers.numParticles;
+
+    for (let i = 0; i < N; i++) {
+      const px = pArr[i * 3];
+      const py = pArr[i * 3 + 1];
+      const pz = pArr[i * 3 + 2];
+
+      let bestDist = Infinity;
+      let bestX = px, bestY = py, bestZ = pz;
+
+      for (let t = 0; t < triCount; t++) {
+        const vOff = t * 9;
+        const nOff = t * 3;
+        const [cx, cy, cz] = closestPointOnTriangle(px, py, pz, bv, vOff, bn, nOff);
+        const dx = px - cx, dy = py - cy, dz = pz - cz;
+        const dsq = dx * dx + dy * dy + dz * dz;
+        if (dsq < bestDist) {
+          bestDist = dsq;
+          bestX = cx; bestY = cy; bestZ = cz;
+        }
+      }
+
+      tArr[i * 3]     = bestX;
+      tArr[i * 3 + 1] = bestY;
+      tArr[i * 3 + 2] = bestZ;
+    }
+
+    this.tslBuffers.tetherTargetSBA.needsUpdate = true;
+  }
+
+  /**
+   * Recapture tether targets from the CURRENT (settled) drape, then return true
+   * so the caller can enable the tether kernel.
+   *
+   * Why this exists: the init `captureTetherTargets` runs at body-set time, when
+   * the cloth is still in its pre-wrap spread-out layout (~0.6 m mean from the
+   * body) — those targets are meaningless once the cloth actually drapes, and a
+   * tether toward them collapses the garment (belowHip 72%, root-caused
+   * 2026-06-25). This reads back the live GPU positions (the cloth as settled on
+   * the body) and uses EACH vertex's own settled position as its tether target.
+   * That makes the max-distance clamp a gentle "stay within `radius` of where you
+   * draped" anti-slide (not an over-constraint), preserves the natural drape
+   * folds, and is O(N) — deliberately NOT the per-vertex body-surface search,
+   * which is ~26 s for an 18 k-tri avatar and would freeze the frame loop mid-sim.
+   *
+   * Returns false (caller keeps the tether disabled) if buffers are absent, no
+   * renderer is cached yet, or the readback fails / short-reads.
+   */
+  async recaptureTetherTargetsFromGpu(): Promise<boolean> {
+    if (!this.tslBuffers || !this.tslSolver) return false;
+    const N = this.tslBuffers.numParticles;
+    let settled: Float32Array | null = null;
+    try {
+      settled = await this.readPositionsToCPU();
+    } catch (e) {
+      console.warn('[GpuSolverClient] tether settle-recapture readback failed:', e);
+      return false;
+    }
+    if (!settled || settled.length < N * 3) return false;
+
+    const tArr = this.tslBuffers.tetherTargetSBA.array as Float32Array;
+    tArr.set(settled.subarray(0, N * 3));
+    this.tslBuffers.tetherTargetSBA.needsUpdate = true;
+    return true;
+  }
+
+  /**
+   * Thin test accessor — returns `tetherTargetSBA.array` (Float32Array of N×3
+   * target positions, after captureTetherTargets has run).
+   * Returns null when the TSL buffers are not initialized.
+   */
+  getTetherTargets(): Float32Array | null {
+    if (!this.tslBuffers) return null;
+    return this.tslBuffers.tetherTargetSBA.array as Float32Array;
+  }
+
+  /**
    * Remove a TSL collision body by ID.
    */
   removeTslCollisionBody(id: string): void {
     this.tslSolver?.removeCollisionBody(id, this.rendererRef);
+    // Drop the face-poke nodes when the avatar goes away — the correction
+    // kernel references this body's BVH SBAs (freed below), so a later dispatch
+    // would read freed buffers.
+    if (id === '__avatar__' && this.tslSolver) {
+      this.tslSolver.facePokeNodes = null;
+      if (this.facePokeBodyGeomSBA) {
+        disposeStorageBufferAttribute(this.facePokeBodyGeomSBA, this.rendererRef);
+        this.facePokeBodyGeomSBA = null;
+      }
+    }
     const tracked = this.collisionBodySBAs.get(id);
     if (tracked) {
       disposeStorageBufferAttribute(tracked.bvhNodesSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.bvhSkipSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triVertsSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triNormalsSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.edgePseudoSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.vertexPseudoSBA, this.rendererRef);
       this.collisionBodySBAs.delete(id);
     }
   }
@@ -941,6 +1249,8 @@ export class GpuSolverClient implements ClothSolverClient {
       disposeStorageBufferAttribute(tracked.bvhSkipSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triVertsSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triNormalsSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.edgePseudoSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.vertexPseudoSBA, this.rendererRef);
     }
     this.collisionBodySBAs.clear();
     if (this.tslBuffers) {

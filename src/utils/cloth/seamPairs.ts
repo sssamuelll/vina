@@ -200,7 +200,6 @@ export function seamInitDataToPairs(
 
 /** Why an active seam resolved to zero constraints. */
 export type SeamResolutionFailure =
-  | 'self-seam'
   | 'missing-piece'
   | 'non-finite-outline'
   | 'unknown-edge'
@@ -249,9 +248,10 @@ function resolveSeamVertexPairs(
     return { vertexPairs: [], failure };
   };
 
-  if (seam.pieceAId === seam.pieceBId) {
-    return fail('self-seam', 'self-seam (pieceAId === pieceBId), skipping');
-  }
+  // Same-piece (self) seams are valid — e.g. a sleeve's underarm tube closure
+  // (underarmSeam↔underarmSeam-2 on the same pieceId). The GPU consumer
+  // (gpuSolverClient.ts) offsets both halves by the same per-piece vertex
+  // offset, which yields distinct correct global indices. Resolves like any seam.
 
   const pieceA = pieceById.get(seam.pieceAId);
   const pieceB = pieceById.get(seam.pieceBId);

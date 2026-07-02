@@ -32,11 +32,18 @@
 import { test, expect, Page } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { switchView, startSimulation } from './helpers/sim';
 
 const FIXTURE = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../fixtures/garments/maria_patrones_samuel_2M.dxf',
+);
+
+/** P4-0 determinism gate: stable cross-repeat dump dir (repo-root/.tmp/determinism). */
+const DETERMINISM_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../.tmp/determinism',
 );
 
 async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
@@ -194,6 +201,48 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
       `[drape-m4] simSeconds=2.5 belowHipPct=${drape!.belowHipPct.toFixed(2)} minY=${drape!.minY.toFixed(3)} maxY=${drape!.maxY.toFixed(3)} nan=${drape!.nan}`,
     );
 
+    // A-pose sleeve-on-arm checkpoint at t=2.5s (maintainer-run)
+    // Segments cloth verts by |x|>0.25 (sleeve region) and asserts their
+    // mean Y is BELOW shoulder height (≈1.476m) — i.e. the sleeve drapes
+    // along the lowered A-pose arm, not floating at T-pose horizontal height.
+    // maintainer-run
+    const sleeveMeanY = await page.evaluate(() => {
+      const mesh = (window as unknown as { __OPENCLO_CLOTH_MESH__?: {
+        geometry: { attributes: { position: { count: number; getX: (i: number) => number; getY: (i: number) => number } } };
+      } }).__OPENCLO_CLOTH_MESH__;
+      if (!mesh) return null;
+      const pos = mesh.geometry.attributes.position;
+      const n = pos.count;
+      let sumY = 0;
+      let count = 0;
+      for (let i = 0; i < n; i++) {
+        const x = pos.getX(i);
+        if (Math.abs(x) > 0.25) {
+          const y = pos.getY(i);
+          if (!Number.isNaN(y)) { sumY += y; count++; }
+        }
+      }
+      if (count === 0) return { meanY: null, count: 0 };
+      return { meanY: sumY / count, count };
+    });
+    console.log(
+      `[apose-sleeve] simSeconds=2.5 sleeveMeanY=${sleeveMeanY?.meanY?.toFixed(3) ?? 'n/a'} sleeveVertCount=${sleeveMeanY?.count ?? 0} (target: meanY<1.476)`,
+    );
+    // Detect global publish failure separately from empty sleeve segment.
+    expect(sleeveMeanY, 'Cloth mesh not found — __OPENCLO_CLOTH_MESH__ global not published').not.toBeNull();
+    // Guard against empty sleeve segment — fails loudly with a clear message.
+    expect(
+      sleeveMeanY?.count ?? 0,
+      'No sleeve verts found (|x|>0.25) — mesh may not be loaded or A-pose arm geometry changed',
+    ).toBeGreaterThan(0);
+    // Assert sleeve mean Y is below shoulder height: the sleeve hangs along
+    // the lowered A-pose arm (≈60° below horizontal), not floating at T-pose
+    // shoulder height (≈1.476m). // maintainer-run
+    expect(
+      sleeveMeanY!.meanY!,
+      `Sleeve mean Y (${sleeveMeanY!.meanY!.toFixed(3)}m) is at or above shoulder height 1.476m — sleeves appear to be floating at T-pose height rather than draping on the A-pose arm`,
+    ).toBeLessThan(1.476);
+
     // Largo horizonte (600 frames = 10s de sim): SOLO REGISTRO, sin assert de
     // forma. El fix de stiction (#902) detuvo el slide-off durante el
     // asentamiento (checkpoint de 2.5s arriba), pero a 10s el drape es
@@ -213,6 +262,100 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
       `[creep-watch] simSeconds=10 belowHipPct=${creep!.belowHipPct.toFixed(2)} minY=${creep!.minY.toFixed(3)} maxY=${creep!.maxY.toFixed(3)} nan=${creep!.nan} (issue #902 — non-deterministic, log-only)`,
     );
     expect(creep!.nan).toBe(0);
+
+    // Tube-closure check (maintainer-run): the sleeve must STAY on the arm.
+    // Before tube closure, sleeve verts (|x|>0.25) collapsed 993→~2 over 10s
+    // as the open sleeve slid off. With the underarm seam closing the tube the
+    // on-arm population persists. The 10s drape is non-deterministic (#902), so
+    // this is a loose ANTI-COLLAPSE floor, not a tight bound — the maintainer
+    // runs --repeat-each=3 and reads the logged counts. // maintainer-run
+    const sleeveAt10 = await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mesh = (window as any).__OPENCLO_CLOTH_MESH__;
+      if (!mesh) return null;
+      const pos = mesh.geometry.attributes.position;
+      let count = 0, maxAbsX = 0;
+      for (let i = 0; i < pos.count; i++) {
+        const ax = Math.abs(pos.getX(i));
+        if (ax > maxAbsX) maxAbsX = ax;
+        if (ax > 0.25) count++;
+      }
+      return { count, maxAbsX };
+    });
+    console.log(
+      `[sleeve-persist] simSeconds=10 sleeveVertCount=${sleeveAt10?.count ?? 'n/a'} maxAbsX=${sleeveAt10?.maxAbsX?.toFixed(3) ?? 'n/a'} (anti-collapse floor: count≥50)`,
+    );
+    expect(sleeveAt10, 'Cloth mesh not found — __OPENCLO_CLOTH_MESH__ not published').not.toBeNull();
+    // Anti-collapse floor: well above the pre-fix collapse (~2), loose enough
+    // for the non-deterministic 10s drape. // maintainer-run
+    expect(sleeveAt10!.count).toBeGreaterThanOrEqual(50);
+
+    // ── §8 envelope-wrap checkpoints (maintainer-run) ────────────────────────
+    // These checkpoints measure the auto-support bet from the envelope-wrap
+    // spec §8: wrapping panels over body cylinders holds the garment without
+    // structural pins. Targets: minY ≥ 0.5m primary, belowHip ≤ 0.5%,
+    // interpenetration count = 0. The 10s self-support bet is MEASURED BY THE
+    // MAINTAINER (npm run test:e2e:gpu -- webgpu-maria-replay -g "drape M4"
+    // --repeat-each=3). CI does not execute @gpu-local; only deterministic
+    // invariants are asserted here (nan=0, structural presence).
+
+    // §8 pin-disabled assert: computeShoulderAnchors is NOT wired on this
+    // branch (it lives on exp/anchor-on-arrangement). The solver must be
+    // running in un-pinned envelope-wrap mode. // maintainer-run
+    const pinCount = await getState<number>(page, 'simulation.pinnedVertexCount');
+    // The wrap mechanism holds geometry — no structural shoulder pins expected.
+    // If pinCount > 0 something wired computeShoulderAnchors unexpectedly.
+    expect(pinCount ?? 0).toBe(0);
+
+    // §8 t=0 penetration count: cloth verts inside the baked body mesh at
+    // sim start. With envelope-wrap placement the panels are tangent-to and
+    // outside the body cylinders, so interpenetration at t=0 should be zero.
+    // Log-only: deterministic only if the baked mesh is loaded by t=0. // maintainer-run
+    const penetrationCount = await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      // __OPENCLO_PENETRATION_COUNT__ is published by the collision subsystem
+      // after the first solver step; undefined = not yet available.
+      return (w.__OPENCLO_PENETRATION_COUNT__ as number | undefined) ?? null;
+    });
+    console.log(
+      `[wrap-spec-§8] t=0 penetrationCount=${penetrationCount ?? 'not-published'} (target=0)`,
+    );
+    if (penetrationCount !== null) {
+      // Only assert when the subsystem published the value. // maintainer-run
+      expect(penetrationCount).toBe(0);
+    }
+
+    // §8 early-collapse sampling at t=0.5s and t=1s — log belowHip/minY.
+    // The wrap bet says the ring catches on the shoulders and the garment
+    // holds; early collapse (belowHip > 0.5% at t=0.5s) would mean the
+    // ring slipped through. Logged for the maintainer; not CI-asserted. // maintainer-run
+    await waitForSimWindows(page, 1, 30_000); // t≈0.5s
+    const earlyA = await readDrape(page);
+    console.log(
+      `[wrap-spec-§8] t=0.5s belowHipPct=${earlyA?.belowHipPct.toFixed(2) ?? 'n/a'} minY=${earlyA?.minY.toFixed(3) ?? 'n/a'} (target: belowHip≤0.5%)`,
+    );
+
+    await waitForSimWindows(page, 2, 30_000); // t≈1s
+    const earlyB = await readDrape(page);
+    console.log(
+      `[wrap-spec-§8] t=1s belowHipPct=${earlyB?.belowHipPct.toFixed(2) ?? 'n/a'} minY=${earlyB?.minY.toFixed(3) ?? 'n/a'} (target: minY≥0.5m)`,
+    );
+
+    // §8 collar-height + sleeve-on-arm logs (structural presence). // maintainer-run
+    const collarHeight = await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      return (w.__OPENCLO_COLLAR_HEIGHT__ as number | undefined) ?? null;
+    });
+    const sleeveOnArm = await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      return (w.__OPENCLO_SLEEVE_ON_ARM__ as boolean | undefined) ?? null;
+    });
+    console.log(
+      `[wrap-spec-§8] collarHeight=${collarHeight ?? 'not-published'} sleeveOnArm=${sleeveOnArm ?? 'not-published'}`,
+    );
+    // Structural NaN guard on early samples is deterministic. // maintainer-run
+    expect(earlyA?.nan ?? 0).toBe(0);
+    expect(earlyB?.nan ?? 0).toBe(0);
   });
 
   test('DoD #897: ≥30fps sostenidos', async ({ page }) => {
@@ -258,5 +401,95 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     // El DoD de la épica. Hoy (F4.3a) se espera que falle — sin test.fail():
     // el rojo es la evidencia, y se pone verde cuando la épica cierra.
     expect(1000 / medianMs).toBeGreaterThanOrEqual(30);
+  });
+
+  // ── DIAG (maintainer-run, log-only): long-horizon descent trajectory ─────────
+  // Samuel observes the garment "melting" into the torso over time + avatar skin
+  // showing through. The drape-M4 test only samples 2.5s/10s and is blind to the
+  // >10s horizon and to interpenetration. This probe samples readDrape every 1s
+  // out to 30s SIM so the maintainer can SEE whether descent is arrested (A1
+  // cured it) or creeps past 10s (structural residue): maxY falling = melting
+  // from the top; belowHip rising = falling below the hip. Log-only — asserts
+  // ONLY nan===0 so --repeat-each=N runs every repeat to completion without abort.
+  test('DIAG @gpu-local long-horizon descent 0-30s (log-only)', async ({ page }) => {
+    test.setTimeout(420_000);
+    await importSewAndSimulate(page);
+    await expect
+      .poll(async () => getState<boolean>(page, 'simulation.bodyCollision'), { timeout: 30_000 })
+      .toBe(true);
+    // areaStretchPct = mesh triangle area vs the t=1s reference. A rigid (real)
+    // fabric is near-inextensible → area stays ~flat. A "gummy" cloth keeps
+    // inflating under gravity → area climbs. This is the objective stretch metric.
+    let area0 = 0;
+    for (let w = 2; w <= 16; w += 2) {
+      // every 2 windows = 1.0s SIM, out to 8s (gummy shows early)
+      await waitForSimWindows(page, w, 90_000);
+      const d = await readDrape(page);
+      const m = await page.evaluate(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mesh = (window as any).__OPENCLO_CLOTH_MESH__;
+        if (!mesh) return { sleeve: 0, area: 0 };
+        const pos = mesh.geometry.attributes.position;
+        const idx = mesh.geometry.index;
+        let sleeve = 0;
+        for (let i = 0; i < pos.count; i++) if (Math.abs(pos.getX(i)) > 0.25) sleeve++;
+        let area = 0;
+        if (idx) {
+          for (let t = 0; t < idx.count; t += 3) {
+            const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+            const ux = pos.getX(b) - pos.getX(a), uy = pos.getY(b) - pos.getY(a), uz = pos.getZ(b) - pos.getZ(a);
+            const vx = pos.getX(c) - pos.getX(a), vy = pos.getY(c) - pos.getY(a), vz = pos.getZ(c) - pos.getZ(a);
+            const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+            area += 0.5 * Math.sqrt(cx * cx + cy * cy + cz * cz);
+          }
+        }
+        return { sleeve, area };
+      });
+      if (area0 === 0) area0 = m.area;
+      const stretchPct = area0 > 0 ? (m.area / area0 - 1) * 100 : 0;
+      console.log(
+        `[diag-gummy] simSeconds=${(w * 0.5).toFixed(1)} belowHip=${d!.belowHipPct.toFixed(2)} minY=${d!.minY.toFixed(3)} maxY=${d!.maxY.toFixed(3)} sleeve=${m.sleeve} areaStretchPct=${stretchPct.toFixed(2)} nan=${d!.nan}`,
+      );
+      expect(d!.nan).toBe(0);
+    }
+  });
+
+  // ── P4-0 determinism gate (@gpu-local, maintainer-run) ───────────────────────
+  // Dumps the settled drape position buffer at the 2.5s checkpoint — which is
+  // ALSO the tether capture window (TETHER_SETTLE_FRAMES=150) — to a stable
+  // per-run artifact, then the offline diff asserts bit-exactness across runs:
+  //   npm run test:e2e:gpu:determinism   # capture N runs → .tmp/determinism/
+  //   npm run determinism:diff           # bit-exact compare (pass/fail)
+  // Repeat 0 clears the dir so a fresh N-run has no stale bins; workers=1 in
+  // playwright.webgpu.config makes repeats sequential, so the clean is race-free.
+  // Expected to DIVERGE today (bend Jacobi race, tslSolver.ts:887); must be
+  // bit-exact after P4-1 graph-coloring. See docs/plans/2026-07-01-drape-determinism-p4-design.md.
+  test('determinism @gpu-local — dump drape positions at 2.5s', async ({ page }, testInfo) => {
+    test.setTimeout(240_000);
+    await importSewAndSimulate(page);
+    await expect
+      .poll(async () => getState<boolean>(page, 'simulation.bodyCollision'), { timeout: 30_000 })
+      .toBe(true);
+
+    // 2.5s SIM = M4 settle checkpoint = tether capture frame (same window).
+    await waitForSimWindows(page, 5, 120_000);
+    const positions = await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mesh = (window as any).__OPENCLO_CLOTH_MESH__;
+      if (!mesh) return null;
+      return Array.from(mesh.geometry.attributes.position.array as Float32Array);
+    });
+    expect(
+      positions,
+      'Cloth mesh not found — __OPENCLO_CLOTH_MESH__ not published',
+    ).not.toBeNull();
+
+    if (testInfo.repeatEachIndex === 0) rmSync(DETERMINISM_DIR, { recursive: true, force: true });
+    mkdirSync(DETERMINISM_DIR, { recursive: true });
+    const bin = path.join(DETERMINISM_DIR, `pos-${testInfo.repeatEachIndex}.bin`);
+    writeFileSync(bin, Buffer.from(Float32Array.from(positions!).buffer));
+    console.log(
+      `[determinism] run ${testInfo.repeatEachIndex}: wrote ${positions!.length / 3} particles → ${bin}`,
+    );
   });
 });

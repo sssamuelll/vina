@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildLinearBVH } from '../bvh';
 import type { LinearBVH } from '../bvh';
 import type { CollisionMeshData } from '../../collisionMesh';
+import { buildBodyPseudonormals } from '../../bodyPseudonormals';
 
 /** Two triangles forming a 1×1 floor plane at y=0 */
 function makeFloorPlane(): CollisionMeshData {
@@ -358,4 +359,33 @@ describe('buildLinearBVH skip pointers (#897 F4.3b)', () => {
     const { tris } = traverseTriangles(bvh, [0.5, 0.5, 0.5], 0.1);
     expect(tris.size).toBeGreaterThan(0);
   });
+});
+
+// ─── Pseudonormal leaf-reorder ───────────────────────────────────────────────
+
+it('emits edge/vertex pseudonormals reordered to match triVerts leaf order', () => {
+  const mesh = { // two tris sharing edge B-C (a valley)
+    vertices: new Float32Array([1,0,0, 0,0,0, 0,1,0,  0,0,1, 0,0,0, 0,1,0]),
+    normals: new Float32Array([0,0,-1,  -1,0,0]),
+    triCount: 2,
+  };
+  const lb = buildLinearBVH(mesh);
+  const soup = buildBodyPseudonormals(mesh, 1e-6);
+  expect(lb.edgePseudonormals.length).toBe(2 * 9);
+  expect(lb.vertexPseudonormals.length).toBe(2 * 9);
+  // For each leaf slot, find which original tri its triVerts came from, then the
+  // pseudonormals at that slot must equal the soup builder's output for that tri.
+  for (let i = 0; i < mesh.triCount; i++) {
+    const v0 = lb.triVerts.slice(i * 9, i * 9 + 9);
+    let orig = -1;
+    for (let t = 0; t < mesh.triCount; t++) {
+      const s = mesh.vertices.slice(t * 9, t * 9 + 9);
+      if (s.every((x, k) => x === v0[k])) { orig = t; break; }
+    }
+    expect(orig).toBeGreaterThanOrEqual(0);
+    for (let k = 0; k < 9; k++) {
+      expect(lb.edgePseudonormals[i * 9 + k]).toBeCloseTo(soup.edge[orig * 9 + k], 6);
+      expect(lb.vertexPseudonormals[i * 9 + k]).toBeCloseTo(soup.vertex[orig * 9 + k], 6);
+    }
+  }
 });

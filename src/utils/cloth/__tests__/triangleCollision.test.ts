@@ -4,6 +4,7 @@ import {
   solveTriangleCollision,
   pointToTriangleDist,
 } from '../triangleCollision';
+import { buildBodyPseudonormals } from '../bodyPseudonormals';
 import type { CollisionMeshData } from '../collisionMesh';
 
 function makeFloorTriangle(): CollisionMeshData {
@@ -302,6 +303,60 @@ describe('solveTriangleCollision — friction kernel (regression for BUG-2 #605)
     // Hybrid (#902): each pass's 0.2 slide is kinetic (≫ pushDist) → scale =
     // friction = 0.5 → removes 0.1 per pass. 1.0 − 5*0.1 = 0.5.
     expect(withFriction[0]).toBeCloseTo(0.5, 3);
+  });
+});
+
+// ─── Pseudonormal sign fix ───────────────────────────────────────────────────
+// At a concave body crease, the face normal of one triangle can lie on the
+// WRONG side of the crease direction, causing a cloth particle that is
+// genuinely OUTSIDE the body to be misclassified as inside (side<0) and
+// incorrectly pushed.  The fix: when per-triangle pseudonormals (Task 2) are
+// threaded in, `pointToTriangleDist` uses the angle-weighted pseudonormal of
+// the closest feature (edge interior or vertex endpoint) rather than the flat
+// face normal for the side test.  The push axis (nx,ny,nz = face normal) is
+// unchanged — only the sign decision changes.
+//
+// Fixture: two triangles sharing edge B–C (bodyPseudonormals fixture).
+//   tri0: A=(1,0,0), B=(0,0,0), C=(0,1,0), normal=(0,0,-1).
+//   tri1: A1=(0,0,1), B=(0,0,0), C=(0,1,0), normal=(-1,0,0).
+// Pseudonormal of BC = normalize((0,0,-1)+(-1,0,0)) = (-1,0,-1)/√2.
+//
+// Test point p=(-0.5, 0.5, 0.1) against tri0 alone:
+//   • Projects outside tri0 (u+v=1.5>1) → edge-case branch executes.
+//   • Closest edge is BC (dsq≈0.26 < AB,AC dsq≈0.51), clamped t=0.5 (interior).
+//   • cp = (0, 0.5, 0).  (p-cp) = (-0.5, 0, 0.1).
+//   • Face-normal test: (-0.5,0,0.1)·(0,0,-1) = -0.1 < 0  → "inside" (WRONG).
+//   • Pseudonormal test: (-0.5,0,0.1)·(-1/√2,0,-1/√2) = (0.5-0.1)/√2 ≈ +0.28
+//     → side > 0  → correctly "outside" (CORRECT).
+describe('pointToTriangleDist — concave-wedge pseudonormal sign fix', () => {
+  function makeConcaveValley(): CollisionMeshData {
+    // Identical to the bodyPseudonormals test fixture.
+    const vertices = new Float32Array([
+      1, 0, 0,  0, 0, 0,  0, 1, 0, // tri0 A,B,C
+      0, 0, 1,  0, 0, 0,  0, 1, 0, // tri1 A1,B,C
+    ]);
+    const normals = new Float32Array([0, 0, -1,  -1, 0, 0]);
+    return { vertices, normals, triCount: 2 };
+  }
+
+  it('legacy (no pseudonormals): edge BC misclassifies an outside point as inside', () => {
+    const mesh = makeConcaveValley();
+    const r = pointToTriangleDist(-0.5, 0.5, 0.1, mesh.vertices, 0, mesh.normals, 0);
+    // Without pseudonormals the face normal (0,0,-1) is used for the edge side
+    // test → side = -0.1 < 0 → "inside".  This is the misclassification we fix.
+    expect(r.side).toBeLessThan(0);
+  });
+
+  it('concave wedge: pseudonormal gives the correct outside sign where the face normal fails', () => {
+    const mesh = makeConcaveValley();
+    const pn = buildBodyPseudonormals(mesh, 1e-6);
+    // BC pseudonormal = (-1/√2, 0, -1/√2).  (p-cp)·pn = (0.5-0.1)/√2 ≈ +0.28.
+    const r = pointToTriangleDist(-0.5, 0.5, 0.1, mesh.vertices, 0, mesh.normals, 0, pn, 0);
+    expect(r.side).toBeGreaterThan(0); // correctly OUTSIDE
+    // Push axis unchanged — still the face normal.
+    expect(r.nx).toBeCloseTo(0, 5);
+    expect(r.ny).toBeCloseTo(0, 5);
+    expect(r.nz).toBeCloseTo(-1, 5);
   });
 });
 

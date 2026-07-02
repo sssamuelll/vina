@@ -9,6 +9,7 @@
 
 import * as THREE from 'three';
 import { POSE_PRESETS } from '../../store/avatarSlice';
+import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../avatar/morphTargets';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -233,34 +234,75 @@ export function validateMeshData(meshData: ExtractedMeshData): {
 // ─── A-Pose helpers ──────────────────────────────────────────────────────────
 
 /**
- * Apply the same A-pose bone rotations that AvatarModel.tsx applies.
- * Uses the same Euler rotation approach for consistency.
+ * Apply per-bone rotations (degrees, Euler ZYX, post-multiplied onto the bind quaternion).
+ *
+ * @param scene - Three.js scene containing bones
+ * @param joints - Record mapping bone names to rotation in degrees { x, y, z }
  */
-export function applyAPose(scene: THREE.Object3D): void {
+export function applyPose(
+  scene: THREE.Object3D,
+  joints: Record<string, { x: number; y: number; z: number }>,
+): void {
   const boneMap = new Map<string, THREE.Bone>();
   const bindPoses = new Map<string, THREE.Quaternion>();
-
-  // Collect bones
   scene.traverse((obj) => {
     if (!(obj as THREE.Bone).isBone) return;
     const bone = obj as THREE.Bone;
     boneMap.set(bone.name, bone);
     bindPoses.set(bone.name, bone.quaternion.clone());
   });
-
-  // Apply A-pose rotations using the same logic as AvatarModel.tsx
-  const aPoseJoints = POSE_PRESETS['A-pose'];
   boneMap.forEach((bone, name) => {
     const bindPose = bindPoses.get(name);
     if (!bindPose) return;
-
-    const jointRot = aPoseJoints[name];
+    const jointRot = joints[name];
     if (jointRot) {
       const euler = new THREE.Euler(jointRot.x * DEG2RAD, jointRot.y * DEG2RAD, jointRot.z * DEG2RAD, 'ZYX');
       const rotQ = new THREE.Quaternion().setFromEuler(euler);
       bone.quaternion.copy(bindPose).multiply(rotQ);
     } else {
       bone.quaternion.copy(bindPose);
+    }
+  });
+}
+
+/** Back-compat: A-pose from the static preset. */
+export function applyAPose(scene: THREE.Object3D): void {
+  applyPose(scene, POSE_PRESETS['A-pose']);
+}
+
+/**
+ * Apply the SAME measurement morph the render does (AvatarModel.tsx:523-550) to a
+ * freshly-loaded avatar scene, so the EXTRACTED collision mesh matches the RENDERED
+ * (morphed) body instead of the base GLB. Without this the collider is the base avatar
+ * (default measurements) while the render is morphed → cloth collides with a
+ * differently-shaped invisible body (passes through / floats). Mirrors the render's
+ * bone-scaling table (girth=X+Z, shoulder=X, limb=Y) + native morph-target influences
+ * EXACTLY. Call AFTER applyPose, BEFORE updateMatrixWorld so scaled bones bake in.
+ */
+export function applyMorph(
+  scene: THREE.Object3D,
+  measurements: MorphConfig,
+  morphTargets: Record<string, number>,
+): void {
+  const w = computeMorphWeights(measurements);
+  scene.traverse((obj) => {
+    if ((obj as THREE.Bone).isBone) {
+      const bone = obj as THREE.Bone;
+      const n = bone.name;
+      if ((MORPH_BONE_MAP.chest as readonly string[]).includes(n)) bone.scale.set(w.chestScale, 1, w.chestScale);
+      else if ((MORPH_BONE_MAP.waist as readonly string[]).includes(n)) bone.scale.set(w.waistScale, 1, w.waistScale);
+      else if ((MORPH_BONE_MAP.hip as readonly string[]).includes(n)) bone.scale.set(w.hipScale, 1, w.hipScale);
+      else if (n === MORPH_BONE_MAP.shoulderLeft || n === MORPH_BONE_MAP.shoulderRight) bone.scale.set(w.shoulderScale, 1, 1);
+      else if (n === MORPH_BONE_MAP.armLeft || n === MORPH_BONE_MAP.armRight) bone.scale.set(1, w.armLength, 1);
+      else if (n === MORPH_BONE_MAP.legLeft || n === MORPH_BONE_MAP.legRight) bone.scale.set(1, w.legLength, 1);
+      else bone.scale.set(1, 1, 1); // mirror render's reset of non-morph bones
+    }
+    const mesh = obj as THREE.SkinnedMesh;
+    if (mesh.isSkinnedMesh && mesh.morphTargetDictionary && mesh.morphTargetInfluences) {
+      for (const [name, index] of Object.entries(mesh.morphTargetDictionary)) {
+        const value = morphTargets[name];
+        if (value !== undefined) mesh.morphTargetInfluences[index] = value;
+      }
     }
   });
 }

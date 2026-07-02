@@ -554,13 +554,13 @@ describe('dispose mid-readback (behavior #3)', () => {
 //
 // `setTslCollisionBody(id, mesh)` allocates 3 BVH SBAs (covered by #771) plus
 // 2 per-body atomic scratch SBAs inside `createTslCollisionBody`
-// (`bestDistSBA` filled with INT32_MAX, `bestTriIdxSBA` filled with -1).
+// (`bestDistSBA` filled with INT32_MAX — #921 Eje A folded bestTriIdx into it).
 // PR #772 extended the dispose chain so a second `setTslCollisionBody` call
 // for the same id releases BOTH sets. This guard verifies the scratch SBAs
 // specifically — the BVH disposal is already covered by #771 elsewhere.
 
 describe('setTslCollisionBody dispose chain (behavior #8 — #772 regression)', () => {
-  it('routes the previous body scratch SBAs (bestDist + bestTriIdx) through renderer._attributes.delete on replace', async () => {
+  it('routes the previous body composite-key scratch SBA through renderer._attributes.delete on replace', async () => {
     const device = new FakeGPUDevice();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client = new GpuSolverClient(device as any);
@@ -581,16 +581,14 @@ describe('setTslCollisionBody dispose chain (behavior #8 — #772 regression)', 
       .map((c) => c.sba as TestSBA)
       .filter((sba) => sba.array instanceof Int32Array);
     const firstBestDist = firstBodyAtomicSBAs.find((s) => (s.array as Int32Array)[0] === 0x7fffffff);
-    const firstBestTriIdx = firstBodyAtomicSBAs.find((s) => (s.array as Int32Array)[0] === -1);
     expect(firstBestDist).toBeDefined();
-    expect(firstBestTriIdx).toBeDefined();
 
     // Replace the body with the same id — the previous body's dispose must
-    // route the two scratch SBAs through renderer._attributes.delete.
+    // route the composite-key scratch SBA through renderer._attributes.delete
+    // (#921 Eje A folded bestTriIdx into the key buffer, so there is one now).
     client.setTslCollisionBody('avatar', makeTriCollisionMesh());
 
     expect(renderer._attributes.delete).toHaveBeenCalledWith(firstBestDist);
-    expect(renderer._attributes.delete).toHaveBeenCalledWith(firstBestTriIdx);
   });
 
   it('removeTslCollisionBody also disposes scratch SBAs', async () => {
@@ -611,12 +609,10 @@ describe('setTslCollisionBody dispose chain (behavior #8 — #772 regression)', 
       .map((c) => c.sba as TestSBA)
       .filter((sba) => sba.array instanceof Int32Array);
     const bestDist = atomicSBAs.find((s) => (s.array as Int32Array)[0] === 0x7fffffff);
-    const bestTriIdx = atomicSBAs.find((s) => (s.array as Int32Array)[0] === -1);
 
     client.removeTslCollisionBody('prop');
 
     expect(renderer._attributes.delete).toHaveBeenCalledWith(bestDist);
-    expect(renderer._attributes.delete).toHaveBeenCalledWith(bestTriIdx);
   });
 
   // #897 F4.3b: setTslCollisionBody now allocates a 4th BVH SBA — the
@@ -1026,6 +1022,23 @@ describe('avatar collision calibration M4-D (behavior #13 — #897 F2)', () => {
       0.008,
     );
   });
+
+  // F0 (cloth-realism north star): fabric.frictionBody was dead data — the GPU
+  // avatar body always used the hardcoded AVATAR_FRICTION (0.4 cotton-on-skin).
+  // Now the caller passes the active fabric's frictionBody; 0.4 stays the
+  // fallback when no friction is provided (the two tests above still hold).
+  it('setCollisionMesh forwards a provided fabric body-friction to __avatar__ (F0)', async () => {
+    const spy = vi.spyOn(GpuSolverClient.prototype, 'setTslCollisionBody');
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    const mesh = makeTriCollisionMesh();
+    client.setCollisionMesh(mesh, 0.6); // e.g. denim frictionBody (was ignored → 0.4)
+
+    expect(spy).toHaveBeenCalledWith('__avatar__', mesh, 0.6, 0.008);
+  });
 });
 
 // ─── Behavior #14 — default damping 0.99, not 0.9603 (#897 F2) ───────────────
@@ -1119,8 +1132,9 @@ describe('initMultiPieceTsl self-collision allocation (behavior #15 — #897 F3.
     expect(solver.selfCollisionNodes).not.toBeNull();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const nodes = solver.selfCollisionNodes as any;
-    // Dispatch counts baked into the compute() wraps: [tableSize, N, N, N].
-    expect(nodes.cellClearNode.dispatchCount).toBe(17);
+    // Dispatch counts baked into the compute() wraps: [tableSize*K, N, N, N].
+    // cellClear sentinel-fills every entries slot (P4-2) → tableSize*CELL_CAPACITY.
+    expect(nodes.cellClearNode.dispatchCount).toBe(17 * 8);
     expect(nodes.scatterNode.dispatchCount).toBe(8);
     expect(nodes.resolveNode.dispatchCount).toBe(8);
     expect(nodes.applyNode.dispatchCount).toBe(8);
@@ -1128,5 +1142,93 @@ describe('initMultiPieceTsl self-collision allocation (behavior #15 — #897 F3.
     // the kernel as a uniform; 0.002 appears nowhere else in the TSL init
     // path (audit in the behavior #12 comment).
     expect(uniformCalls).toContain(0.002);
+  });
+});
+
+// ─── Behavior #16 — captureTetherTargets writes closest body point (#tether) ──
+//
+// tetherTargetSBA is seeded in createTslBuffers to each cloth vertex's own
+// initial position (a valid "no-op" default that keeps the tether kernel from
+// producing NaN). captureTetherTargets() replaces those seeds with the closest
+// point on the collision body — so the tether actually pulls cloth toward the
+// body rather than toward an arbitrary cloth position.
+//
+// Fixture: a quad piece whose four verts all sit at y=2.  Body: two triangles
+// forming a 2×2 quad on the xz plane at y=0 (normal [0,1,0]).  After capture
+// each vertex's target y should be ~0 (pulled to the body plane).
+
+describe('captureTetherTargets (behavior #16 — tether body target)', () => {
+  /** Quad piece with all verts lifted to y=2. */
+  function makeQuadPieceAtY2(id: string = 'piece-0'): PieceMeshData {
+    return {
+      pieceId: id,
+      vertices: new Float32Array([
+        -0.5, 2.0, -0.5,
+         0.5, 2.0, -0.5,
+         0.5, 2.0,  0.5,
+        -0.5, 2.0,  0.5,
+      ]),
+      triIds: new Int32Array([0, 1, 2, 0, 2, 3]),
+      uvs: new Float32Array([0, 1,  1, 1,  1, 0,  0, 0]),
+    };
+  }
+
+  /** 2×2 flat body on the xz plane at y=0 (two triangles, normal [0,1,0]). */
+  function makeFlatBodyMesh() {
+    // Expanded format: 9 floats per tri (3 verts × xyz), normals 3 floats per tri.
+    return {
+      vertices: new Float32Array([
+        // tri 0
+        -1.0, 0.0, -1.0,
+         1.0, 0.0, -1.0,
+         1.0, 0.0,  1.0,
+        // tri 1
+        -1.0, 0.0, -1.0,
+         1.0, 0.0,  1.0,
+        -1.0, 0.0,  1.0,
+      ]),
+      normals: new Float32Array([0, 1, 0,  0, 1, 0]),
+      triCount: 2,
+    };
+  }
+
+  it('captureTetherTargets writes the closest body point per cloth vertex', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+
+    // Init with a quad whose verts are at y=2.
+    await client.initMultiPieceTsl([makeQuadPieceAtY2()]);
+
+    // Set body — a flat xz plane at y=0.  setTslCollisionBody retains the body
+    // tris; captureTetherTargets (the body-surface query) is now invoked
+    // explicitly (the 26 s auto-call was removed — production uses the O(N)
+    // settle-copy in recaptureTetherTargetsFromGpu instead).
+    client.setTslCollisionBody('__avatar__', makeFlatBodyMesh(), 0.4, 0.008);
+    client.captureTetherTargets();
+
+    // getTetherTargets() is a thin test accessor returning tetherTargetSBA.array.
+    const t = client.getTetherTargets();
+    expect(t).not.toBeNull();
+    // First vertex (index 0): target y should have been pulled to ~0 (body plane).
+    expect(t![1]).toBeCloseTo(0, 1);
+    // All four vertices: y component (indices 1, 4, 7, 10) should be ~0.
+    expect(t![4]).toBeCloseTo(0, 1);
+    expect(t![7]).toBeCloseTo(0, 1);
+    expect(t![10]).toBeCloseTo(0, 1);
+  });
+
+  it('captureTetherTargets is a no-op before init (no throw)', () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    expect(() => client.captureTetherTargets()).not.toThrow();
+  });
+
+  it('getTetherTargets returns null before init', () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    expect(client.getTetherTargets()).toBeNull();
   });
 });

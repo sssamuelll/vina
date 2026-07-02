@@ -4,6 +4,7 @@
  */
 
 import type { CollisionMeshData } from './collisionMesh';
+import type { BodyPseudonormals } from './bodyPseudonormals';
 
 export interface PtTriResult {
   dist: number;
@@ -17,6 +18,8 @@ export function pointToTriangleDist(
   px: number, py: number, pz: number,
   vertices: Float32Array, vOff: number,
   normals: Float32Array, nOff: number,
+  pn?: BodyPseudonormals,
+  triIdx?: number,
 ): PtTriResult {
   const ax = vertices[vOff],     ay = vertices[vOff + 1], az = vertices[vOff + 2];
   const bx = vertices[vOff + 3], by = vertices[vOff + 4], bz = vertices[vOff + 5];
@@ -51,44 +54,96 @@ export function pointToTriangleDist(
   const u = (d11 * d02 - d01 * d12) * invD;
   const v = (d00 * d12 - d01 * d02) * invD;
 
+  // Inside-projection case: face normal IS the pseudonormal — keep side = dot.
   if (u >= 0 && v >= 0 && u + v <= 1) {
     return { dist: Math.abs(dot), side: dot, nx: nnx, ny: nny, nz: nnz };
   }
 
+  // Edge / vertex case — find the closest point on each of the three edges.
+  // Also track which edge won (builder order: AB=0, BC=1, CA=2) and its
+  // clamped parameter so we can choose the right pseudonormal when `pn` is
+  // provided.  When pseudonormals are absent the fallback is the face normal
+  // (byte-identical to the previous behaviour).
   let minDsq = Infinity;
   let cpx = ax, cpy = ay, cpz = az;
+  // Builder edge index of the current winner and the clamped edge-parameter.
+  let closestEdge = 0;  // 0 = AB, 1 = BC, 2 = CA (= AC traversed in reverse)
+  let closestEdgeT = 0; // clamped [0,1]; t≈0/1 means the closest point is a vertex
 
   const abLenSq = abx * abx + aby * aby + abz * abz;
   if (abLenSq > 1e-12) {
-    const t = Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / abLenSq));
-    const ex = ax + t * abx, ey = ay + t * aby, ez = az + t * abz;
+    const et = Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / abLenSq));
+    const ex = ax + et * abx, ey = ay + et * aby, ez = az + et * abz;
     const dx = px - ex, dy = py - ey, dz = pz - ez;
     const dsq = dx * dx + dy * dy + dz * dz;
-    if (dsq < minDsq) { minDsq = dsq; cpx = ex; cpy = ey; cpz = ez; }
+    if (dsq < minDsq) {
+      minDsq = dsq; cpx = ex; cpy = ey; cpz = ez;
+      closestEdge = 0; closestEdgeT = et; // AB → builder index 0
+    }
   }
 
   const acLenSq = acx * acx + acy * acy + acz * acz;
   if (acLenSq > 1e-12) {
-    const t = Math.max(0, Math.min(1, (apx * acx + apy * acy + apz * acz) / acLenSq));
-    const ex = ax + t * acx, ey = ay + t * acy, ez = az + t * acz;
+    const et = Math.max(0, Math.min(1, (apx * acx + apy * acy + apz * acz) / acLenSq));
+    const ex = ax + et * acx, ey = ay + et * acy, ez = az + et * acz;
     const dx = px - ex, dy = py - ey, dz = pz - ez;
     const dsq = dx * dx + dy * dy + dz * dz;
-    if (dsq < minDsq) { minDsq = dsq; cpx = ex; cpy = ey; cpz = ez; }
+    if (dsq < minDsq) {
+      minDsq = dsq; cpx = ex; cpy = ey; cpz = ez;
+      closestEdge = 2; closestEdgeT = et; // AC = CA (builder index 2); t=0→A(0), t=1→C(2)
+    }
   }
 
   const bcx = cx - bx, bcy = cy - by, bcz = cz - bz;
   const bpx = px - bx, bpy = py - by, bpz = pz - bz;
   const bcLenSq = bcx * bcx + bcy * bcy + bcz * bcz;
   if (bcLenSq > 1e-12) {
-    const t = Math.max(0, Math.min(1, (bpx * bcx + bpy * bcy + bpz * bcz) / bcLenSq));
-    const ex = bx + t * bcx, ey = by + t * bcy, ez = bz + t * bcz;
+    const et = Math.max(0, Math.min(1, (bpx * bcx + bpy * bcy + bpz * bcz) / bcLenSq));
+    const ex = bx + et * bcx, ey = by + et * bcy, ez = bz + et * bcz;
     const dx = px - ex, dy = py - ey, dz = pz - ez;
     const dsq = dx * dx + dy * dy + dz * dz;
-    if (dsq < minDsq) { minDsq = dsq; cpx = ex; cpy = ey; cpz = ez; }
+    if (dsq < minDsq) {
+      minDsq = dsq; cpx = ex; cpy = ey; cpz = ez;
+      closestEdge = 1; closestEdgeT = et; // BC → builder index 1; t=0→B(1), t=1→C(2)
+    }
   }
 
   const dist = Math.sqrt(minDsq);
-  const edgeSide = (px - cpx) * nnx + (py - cpy) * nny + (pz - cpz) * nnz;
+
+  // Derive inside/outside sign from the closest-feature pseudonormal when
+  // available, otherwise fall back to the face normal (legacy behaviour).
+  let edgeSide: number;
+  if (pn !== undefined && triIdx !== undefined) {
+    // Threshold for detecting that the closest point is at a vertex endpoint.
+    const EPS_VERT = 1e-6;
+    const base = triIdx * 9;
+    let snx: number, sny: number, snz: number;
+
+    if (closestEdgeT <= EPS_VERT) {
+      // t ≈ 0 → start-vertex pseudonormal.
+      // AB: t=0 → A(0);  AC(CA): t=0 → A(0);  BC: t=0 → B(1).
+      const vIdx = (closestEdge === 1) ? 1 : 0;
+      snx = pn.vertex[base + vIdx * 3];
+      sny = pn.vertex[base + vIdx * 3 + 1];
+      snz = pn.vertex[base + vIdx * 3 + 2];
+    } else if (closestEdgeT >= 1 - EPS_VERT) {
+      // t ≈ 1 → end-vertex pseudonormal.
+      // AB: t=1 → B(1);  AC(CA): t=1 → C(2);  BC: t=1 → C(2).
+      const vIdx = (closestEdge === 0) ? 1 : 2;
+      snx = pn.vertex[base + vIdx * 3];
+      sny = pn.vertex[base + vIdx * 3 + 1];
+      snz = pn.vertex[base + vIdx * 3 + 2];
+    } else {
+      // Edge-interior pseudonormal (angle-weighted average of the two sharing faces).
+      snx = pn.edge[base + closestEdge * 3];
+      sny = pn.edge[base + closestEdge * 3 + 1];
+      snz = pn.edge[base + closestEdge * 3 + 2];
+    }
+    edgeSide = (px - cpx) * snx + (py - cpy) * sny + (pz - cpz) * snz;
+  } else {
+    // Legacy: face normal as the side-test axis (unchanged behaviour).
+    edgeSide = (px - cpx) * nnx + (py - cpy) * nny + (pz - cpz) * nnz;
+  }
   return { dist, side: edgeSide, nx: nnx, ny: nny, nz: nnz };
 }
 

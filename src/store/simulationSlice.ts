@@ -188,6 +188,8 @@ interface SimulationSliceState {
   xrayActiveLayer: number | null;
   /** Snapshot of pieceOpacity before X-ray mode was enabled (for restore) */
   xrayOpacitySnapshot: Record<string, number> | null;
+  /** Left and right arm axis directions (unit vectors), null until avatar model poses them */
+  armAxis: { left: [number, number, number] | null; right: [number, number, number] | null; ready: boolean };
 }
 
 const initialState: SimulationSliceState = {
@@ -252,6 +254,7 @@ const initialState: SimulationSliceState = {
   xrayMode: false,
   xrayActiveLayer: null,
   xrayOpacitySnapshot: null,
+  armAxis: { left: null, right: null, ready: false },
 };
 
 const simulationSlice = createSlice({
@@ -705,6 +708,13 @@ const simulationSlice = createSlice({
         state.xrayActiveLayer = null;
       }
     },
+
+    // ─── A-Pose: Arm Axis Directions ───────────────────────────────────────
+
+    /** Store left and right arm axis directions from avatar model. */
+    setArmAxis(state, action: PayloadAction<{ left: [number, number, number] | null; right: [number, number, number] | null; ready: boolean }>) {
+      state.armAxis = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -807,6 +817,8 @@ export const {
   setXrayMode,
   setXrayActiveLayer,
   cleanupRemovedLayer,
+  // A-Pose: arm axis
+  setArmAxis,
 } = simulationSlice.actions;
 
 /** @deprecated Use setSimulationMode */

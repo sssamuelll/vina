@@ -21,45 +21,47 @@ describe('toXPBDParams — edge cases', () => {
   it('handles very stretchy fabric (lycra 80% weft)', () => {
     const lycra = getPhysicalFabric('lycra-spandex')!;
     const params = toXPBDParams(lycra);
-    // 80% → compliance = 8.0
-    expect(params.stretchComplianceWeft).toBeCloseTo(8.0, 1);
-    expect(params.stretchComplianceWarp).toBeCloseTo(6.0, 1);
+    // #gummy STEP 3 rescale: stretchPct*5e-7 clamped to 1e-5 max (very stretchy)
+    expect(params.stretchComplianceWeft).toBe(1e-5);
+    expect(params.stretchComplianceWarp).toBe(1e-5);
   });
 
   it('handles very stiff fabric (canvas 1% stretch)', () => {
     const canvas = getPhysicalFabric('canvas-12oz')!;
     const params = toXPBDParams(canvas);
-    expect(params.stretchComplianceWarp).toBeCloseTo(0.1, 1);
-    expect(params.stretchComplianceWeft).toBeCloseTo(0.1, 1);
+    // #gummy STEP 3 rescale: 1% stretch → 5e-7 (clamped to band min, near-inextensible)
+    expect(params.stretchComplianceWarp).toBe(5e-7);
+    expect(params.stretchComplianceWeft).toBe(5e-7);
   });
 
   it('handles extreme bending stiffness (neoprene 8.0 mN·cm)', () => {
     const neo = getPhysicalFabric('neoprene-3mm')!;
     const params = toXPBDParams(neo);
-    // 1 / (8.0 + 0.05) ≈ 0.124
-    expect(params.bendComplianceWarp).toBeLessThan(0.15);
-    expect(params.bendComplianceWarp).toBeGreaterThan(0.05);
+    // #gummy STEP 1 rescale: 2e-5 / (8.0 + 0.1) ≈ 2.5e-6 (stiff → low compliance)
+    expect(params.bendComplianceWarp).toBeLessThan(1e-5);
+    expect(params.bendComplianceWarp).toBeGreaterThan(1.2e-6);
   });
 
   it('handles very flexible bending (chiffon 0.05 mN·cm)', () => {
     const chiffon = getPhysicalFabric('chiffon')!;
     const params = toXPBDParams(chiffon);
-    // 1 / (0.05 + 0.05) = 10.0
-    expect(params.bendComplianceWarp).toBeGreaterThan(5);
+    // #gummy STEP 1 rescale: 2e-5 / (0.05 + 0.1) ≈ 1.3e-4 (flexible → high compliance, near 2e-4 cap)
+    expect(params.bendComplianceWarp).toBeGreaterThan(1e-4);
+    expect(params.bendComplianceWarp).toBeLessThan(2e-4);
   });
 
   it('handles high shear stiffness (neoprene 200 N/m)', () => {
     const neo = getPhysicalFabric('neoprene-3mm')!;
     const params = toXPBDParams(neo);
-    // 10 / (200 + 1) ≈ 0.05
-    expect(params.shearCompliance).toBeLessThan(0.1);
+    // #gummy STEP 3 rescale: 1e-3/(200+1) → clamped to 1e-5 min (high shear stiffness → stiff)
+    expect(params.shearCompliance).toBe(1e-5);
   });
 
   it('handles low shear stiffness (tulle 3 N/m)', () => {
     const tulle = getPhysicalFabric('tulle')!;
     const params = toXPBDParams(tulle);
-    // 10 / (3 + 1) = 2.5
-    expect(params.shearCompliance).toBeGreaterThan(2);
+    // #gummy STEP 3 rescale: 1e-3/(3+1) → clamped to 1e-4 max (low shear stiffness → soft)
+    expect(params.shearCompliance).toBe(1e-4);
   });
 
   it('all fabrics produce finite XPBD values (no NaN/Infinity)', () => {
@@ -75,11 +77,13 @@ describe('toXPBDParams — edge cases', () => {
     }
   });
 
-  it('compliance ordering: stretch > bend > shear for rigid wovens', () => {
-    // For stiff wovens, shear compliance should be lowest (hardest to shear)
+  it('compliance ordering: rigid wovens are stiffest in stretch (#gummy STEP 3)', () => {
+    // After the rescale, a rigid woven is most inextensible in STRETCH (lowest
+    // compliance); it folds (bend) and shears more easily than it stretches.
     const canvas = getPhysicalFabric('canvas-12oz')!;
     const p = toXPBDParams(canvas);
-    expect(p.shearCompliance).toBeLessThan(p.stretchComplianceWarp);
+    expect(p.stretchComplianceWarp).toBeLessThanOrEqual(p.bendComplianceWarp);
+    expect(p.stretchComplianceWarp).toBeLessThanOrEqual(p.shearCompliance);
   });
 });
 

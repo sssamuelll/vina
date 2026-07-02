@@ -13,6 +13,7 @@ import type { PatternPiece, PathCommand } from '../../types/types';
 import type { BodyMeasurements } from '../../types/types';
 import { mmToM, cmToM } from '../geometry';
 import { flattenPath, commandRangeToFlattened } from '../seam/index';
+import { surfaceFrame, frameToEulerXYZ, type SurfaceFrame, type V3 } from './arrangement/surfaceFrame';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ export interface PlacementResult {
 // ── Piece geometry helpers ───────────────────────────────────────────────────
 
 /** Compute bounding box of outline in mm */
-function outlineBBox(outline: PathCommand[]): { width: number; height: number } {
+export function outlineBBox(outline: PathCommand[]): { width: number; height: number } {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const cmd of outline) {
     for (let i = 0; i < cmd.values.length - 1; i += 2) {
@@ -197,7 +198,7 @@ export function detectBodyRegion(piece: PatternPiece): BodyRegion {
 
 // ── Derived body dimensions (cm → meters) ────────────────────────────────────
 
-interface BodyDimensions {
+export interface BodyDimensions {
   heightM: number;
   waistHeight: number;
   shoulderHeight: number;
@@ -206,21 +207,26 @@ interface BodyDimensions {
   hipRadius: number;
   shoulderWidth: number;
   armLength: number;
+  neckR: number;
+  armR: number;
 }
 
 export function deriveDimensions(m: BodyMeasurements): BodyDimensions {
   const h = cmToM(m.height);
   const chestCirc = cmToM(m.chest);
   const hipCirc = cmToM(m.hips);
+  const chestRadius = chestCirc / (2 * Math.PI);
   return {
     heightM: h,
     waistHeight: m.waistHeight ? cmToM(m.waistHeight) : h * 0.55,
     shoulderHeight: h * 0.82,
     neckHeight: h * 0.87,
-    chestRadius: chestCirc / (2 * Math.PI),
+    chestRadius,
     hipRadius: hipCirc / (2 * Math.PI),
     shoulderWidth: m.shoulderWidth ? cmToM(m.shoulderWidth) : cmToM(m.shoulder),
     armLength: m.armLength ? cmToM(m.armLength) : h * 0.33,
+    neckR: m.neckCirc ? cmToM(m.neckCirc) / (2 * Math.PI) : chestRadius * 0.4,
+    armR: m.upperArmCirc ? cmToM(m.upperArmCirc) / (2 * Math.PI) : 0.05,
   };
 }
 
@@ -235,107 +241,45 @@ export function deriveDimensions(m: BodyMeasurements): BodyDimensions {
 
 const GAP = 0.03; // 3cm from body surface
 
+// Re-export V3 and SurfaceFrame so callers don't need to reach into surfaceFrame.ts.
+export type { V3, SurfaceFrame };
+
+/**
+ * Collision-aware auto pose for a region (#887 Phase 1): position = surface
+ * landmark + outward normal · (radius + GAP) — tangent to and OUTSIDE the body
+ * cylinder — and orientation from the surface frame (replaces the old hard-coded
+ * per-region rotation that placed sleeves as a flat z=0 plane through the arm).
+ */
+export function computeAutoFrame(
+  region: BodyRegion,
+  measurements: BodyMeasurements,
+  pieceGeometry: { widthMm: number; heightMm: number },
+  axisHint?: V3,
+): { placement: PlacementResult; frame: SurfaceFrame } {
+  const d = deriveDimensions(measurements);
+  const frame = surfaceFrame(region, d, axisHint);
+  const pH = mmToM(pieceGeometry.heightMm);
+
+  // Hang skirts only from their landmark by half the piece height along
+  // the tangent, matching the old vertical-centering behaviour.
+  const hang = (region === 'front-skirt' || region === 'back-skirt') ? pH / 2 : 0;
+
+  const offset = frame.radius + GAP;
+  const position: [number, number, number] = [
+    frame.point[0] + frame.normal[0] * offset - frame.tangent[0] * hang,
+    frame.point[1] + frame.normal[1] * offset - frame.tangent[1] * hang,
+    frame.point[2] + frame.normal[2] * offset - frame.tangent[2] * hang,
+  ];
+  const rotation = frameToEulerXYZ(frame.normal, frame.tangent);
+  return { placement: { position, rotation }, frame };
+}
+
 export function computePlacement(
   region: BodyRegion,
   measurements: BodyMeasurements,
   pieceGeometry: { widthMm: number; heightMm: number },
 ): PlacementResult {
-  const d = deriveDimensions(measurements);
-  const midTorso = (d.shoulderHeight + d.waistHeight) / 2;
-
-  // Piece height in meters (for vertical centering)
-  const pH = mmToM(pieceGeometry.heightMm);
-
-  // Both PieceMesh and CDT mesher now output pieces in XZ plane (Y=0).
-  // Pattern X → 3D X (width), Pattern Y → 3D Z (height/length).
-  // Pieces are flat/horizontal. Need rotation to stand them up.
-  //
-  // To stand up a piece: rotate -π/2 around X (Z becomes Y, -Y becomes Z)
-
-  // FORWARD CONVENTION: the avatar's front faces +Z (AvatarModel declares
-  // "Z=forward") and the default camera sits at +Z looking toward it. So a
-  // FRONT piece lands on the +Z side (toward camera) and a BACK piece on -Z.
-  //
-  // UP is NOT guaranteed by these rotations. Whether "pattern-up" lands
-  // world-up depends on the 2D drawing's y direction, which real CAD does
-  // not promise (María's DXF draws anatomy toward negative y — SVG y-down —
-  // so [-π/2, 0, 0] landed the front upside-down while the back's in-plane π
-  // happened to un-invert it). The anatomical orientation pass
-  // (normalizeInPlaneOrientation, M4-C) measures where the classified
-  // anatomy actually lands and flips in-plane when inverted — these base
-  // rotations only fix FACING (+Z / −Z / ±X).
-  switch (region) {
-    case 'front-torso':
-      return {
-        position: [0, midTorso, d.chestRadius + GAP],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (+Z)
-      };
-    case 'back-torso':
-      return {
-        position: [0, midTorso, -(d.chestRadius + GAP)],
-        rotation: [-Math.PI / 2, 0, Math.PI], // stand up, face backward (-Z)
-      };
-    case 'left-sleeve':
-      return {
-        // Offset from shoulder, stand up, rotate to point left
-        position: [-(d.shoulderWidth / 2 + 0.12), d.shoulderHeight - 0.03, 0],
-        rotation: [-Math.PI / 2, Math.PI / 2, 0], // stand up, face left (-X)
-      };
-    case 'right-sleeve':
-      return {
-        position: [d.shoulderWidth / 2 + 0.12, d.shoulderHeight - 0.03, 0],
-        rotation: [-Math.PI / 2, -Math.PI / 2, 0], // stand up, face right (+X)
-      };
-    case 'front-skirt':
-      return {
-        position: [0, d.waistHeight - pH / 2, d.hipRadius + GAP],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face front (+Z)
-      };
-    case 'back-skirt':
-      return {
-        position: [0, d.waistHeight - pH / 2, -(d.hipRadius + GAP)],
-        rotation: [-Math.PI / 2, 0, Math.PI], // stand up, face back (-Z)
-      };
-    case 'collar':
-      return {
-        // Collar in front of neck, standing vertical like front-torso
-        position: [0, d.neckHeight, d.chestRadius * 0.5 + GAP],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (+Z)
-      };
-    case 'waistband':
-      return {
-        // Waistband in front of waist, standing vertical
-        position: [0, d.waistHeight, d.hipRadius * 0.5 + GAP],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (+Z)
-      };
-    case 'hood':
-      return {
-        // Behind head, standing vertical facing backward (-Z)
-        position: [0, d.neckHeight + 0.05, -(d.chestRadius + GAP)],
-        rotation: [-Math.PI / 2, 0, Math.PI], // stand up, face backward (-Z)
-      };
-    case 'cuff-left':
-      return {
-        // At wrist, standing vertical facing outward
-        position: [-(d.shoulderWidth / 2 + d.armLength * 0.9), d.shoulderHeight - d.armLength * 0.85, 0],
-        rotation: [-Math.PI / 2, Math.PI / 2, 0], // stand up, face left
-      };
-    case 'cuff-right':
-      return {
-        position: [d.shoulderWidth / 2 + d.armLength * 0.9, d.shoulderHeight - d.armLength * 0.85, 0],
-        rotation: [-Math.PI / 2, -Math.PI / 2, 0], // stand up, face right
-      };
-    case 'unknown':
-    default: {
-      // Fallback: arrange in a circle around the torso, standing up.
-      // Place toward camera (+Z) so a lone unclassified piece is visible.
-      const radius = Math.max(d.chestRadius, d.hipRadius) + 0.12;
-      return {
-        position: [0, midTorso, radius],
-        rotation: [-Math.PI / 2, 0, 0], // stand up
-      };
-    }
-  }
+  return computeAutoFrame(region, measurements, pieceGeometry).placement;
 }
 
 // ── Placement transform (shared) ─────────────────────────────────────────────
@@ -415,11 +359,40 @@ export function outlineBBoxCenter(outline: PathCommand[]): { cx: number; cy: num
 // pieces is NOT resolved here — left/right pairing is the autoSew world
 // refinement's job; this pass only guarantees anatomy-up.
 
-const ANATOMY_TOP_ROOTS = new Set(['neckline', 'shoulder', 'sleevecap', 'collarneckedge']);
-const ANATOMY_BOTTOM_ROOTS = new Set(['hemline', 'cuffedge', 'collarouteredge']);
+export const ANATOMY_TOP_ROOTS = new Set(['neckline', 'shoulder', 'sleevecap', 'collarneckedge']);
+export const ANATOMY_BOTTOM_ROOTS = new Set(['hemline', 'cuffedge', 'collarouteredge']);
 
-function edgeRoot(name: string): string {
+export function edgeRoot(name: string): string {
   return name.toLowerCase().replace(/-\d+$/, '');
+}
+
+/**
+ * Mesher-local endpoints (((x−cx)·0.001, 0, (y−cy)·0.001) — the
+ * cdtMesher.convertToClothMeshData convention) of the piece's edges whose root
+ * is in `roots`. The wrap consumes these to decide its own (wrap-space) flip,
+ * which is NOT the rigid-Euler flip `computeFlipFlags` produces — the rigid
+ * placement and the wrap map local→world differently (front/back normal and
+ * the binormal basis), so they disagree on front-torso/collar. Returns [] when
+ * the piece carries no matching anatomical edge.
+ */
+export function anatomyLocalEndpoints(
+  piece: PatternPiece,
+  roots: Set<string>,
+): Array<[number, number, number]> {
+  if (!piece.edges || piece.edges.length === 0) return [];
+  const center = outlineBBoxCenter(piece.outline);
+  const flat = flattenPath(piece.outline, 12);
+  const out: Array<[number, number, number]> = [];
+  for (const e of piece.edges) {
+    if (!roots.has(edgeRoot(e.name))) continue;
+    const [fs, fe] = commandRangeToFlattened(piece.outline, e.segmentRange, 12);
+    for (const idx of [fs, fe % flat.length]) {
+      const p = flat[idx];
+      if (!p) continue;
+      out.push([(p.x - center.cx) * 0.001, 0, (p.y - center.cy) * 0.001]);
+    }
+  }
+  return out;
 }
 
 /** Mean world-Y of the endpoints of the piece's edges whose root is in `roots`. */
@@ -447,21 +420,48 @@ function meanEdgeWorldY(
 }
 
 /**
+ * Per-piece in-plane flip flags: `true` where the piece's anatomy lands
+ * upside-down under its placement (anatomical TOP edges below BOTTOM in world).
+ * Pieces without anatomical evidence (no semantic edges, no top/bottom roles —
+ * synthetic rectangles, unclassified pieces) report `false`.
+ *
+ * THE single anatomy-up oracle: `normalizeInPlaneOrientation` applies it as an
+ * Euler flip (rigid path) and the wrap (Task 5) consumes it via
+ * `resolveArrangementWithFrames` → `wrapPlacedMesh(..., flip)`. Both must read
+ * the SAME decision, so this is the one place the `meanEdgeWorldY(top) <
+ * meanEdgeWorldY(bottom)` test lives (the mariaShirt.m4 sonda pins that the
+ * rigid path stays byte-identical).
+ */
+export function computeFlipFlags(
+  pieces: PatternPiece[],
+  placements: PlacementResult[],
+): boolean[] {
+  return placements.map((placement, i) => {
+    const piece = pieces[i];
+    if (!piece) return false;
+    const topY = meanEdgeWorldY(piece, placement, ANATOMY_TOP_ROOTS);
+    const bottomY = meanEdgeWorldY(piece, placement, ANATOMY_BOTTOM_ROOTS);
+    if (topY == null || bottomY == null) return false;
+    return topY < bottomY; // anatomy inverted → flip
+  });
+}
+
+/**
  * Flip pieces whose anatomy lands upside-down in world. Returns a new array;
  * placements without anatomical evidence (no semantic edges, no top/bottom
  * roles — synthetic rectangles, unclassified pieces) pass through untouched.
+ *
+ * Delegates the decision to `computeFlipFlags` (single oracle) and applies it
+ * as the closed-form in-plane 180° Euler flip — byte-identical to the previous
+ * inline test (mariaShirt.m4 sonda pins this).
  */
 export function normalizeInPlaneOrientation(
   pieces: PatternPiece[],
   placements: PlacementResult[],
 ): PlacementResult[] {
+  const flips = computeFlipFlags(pieces, placements);
   return placements.map((placement, i) => {
-    const piece = pieces[i];
-    if (!piece) return placement;
-    const topY = meanEdgeWorldY(piece, placement, ANATOMY_TOP_ROOTS);
-    const bottomY = meanEdgeWorldY(piece, placement, ANATOMY_BOTTOM_ROOTS);
-    if (topY == null || bottomY == null) return placement;
-    if (topY >= bottomY) return placement; // anatomy already up
+    if (!flips[i]) return placement; // anatomy already up (or no evidence)
     const [rx, ry, rz] = placement.rotation;
     return { ...placement, rotation: [rx, -ry, rz + Math.PI] as [number, number, number] };
   });
@@ -487,16 +487,54 @@ export function normalizeInPlaneOrientation(
 // `flippedPieceIds` (DraggablePiece scale-z) remains the human override for
 // true reflections.
 
+/**
+ * Toggle-reset + single deterministic `detectBodyRegion` pass — the ONE place
+ * the side-effecting L/R toggles are exercised for a batch. Returns the RAW
+ * regions (with `'unknown'` preserved); callers layer the `allUnknown`
+ * alternation on top. Private so the toggle reset is never duplicated.
+ */
+function rawRegions(pieces: PatternPiece[]): BodyRegion[] {
+  _sleeveToggle = false;
+  _cuffToggle = false;
+  // Compute regions ONCE to avoid double-calling detectBodyRegion
+  // (it has toggle side effects for sleeve/cuff L/R assignment).
+  return pieces.map(p => detectBodyRegion(p));
+}
+
+/**
+ * The EFFECTIVE per-piece regions a batch placement uses — the deterministic
+ * region assignment, NOT a fresh per-piece `detectBodyRegion`.
+ *
+ * `detectBodyRegion` has toggle side-effects (`_sleeveToggle`/`_cuffToggle`)
+ * for L/R assignment of side-less sleeve/cuff pairs, so calling it per piece
+ * out of band can flip L↔R relative to what the batch assigned. This helper is
+ * the single deterministic source: toggle reset + one mapping pass (via
+ * `rawRegions`, shared with `placeGarmentPieces`), then the same `allUnknown`
+ * front/back alternation `placeGarmentPieces` uses (so a fully-unclassified
+ * pattern reports the same regions it's placed with, not a row of `'unknown'`).
+ * The placement path stays byte-identical (pinned by the mariaShirt.m4 sonda).
+ */
+export function computeEffectiveRegions(pieces: PatternPiece[]): BodyRegion[] {
+  const regions = rawRegions(pieces);
+  const unknownCount = regions.filter(r => r === 'unknown').length;
+  const allUnknown = unknownCount === pieces.length && pieces.length > 0;
+  if (!allUnknown) return regions;
+
+  // Fully-unclassified pattern: the placement alternates front/back torso by
+  // index (see placeGarmentPieces). Reflect that here so the effective region
+  // matches the pose actually used, instead of leaving them all 'unknown'.
+  return regions.map((_, i) => (i % 2 === 0 ? 'front-torso' : 'back-torso'));
+}
+
 export function placeGarmentPieces(
   pieces: PatternPiece[],
   measurements: BodyMeasurements,
 ): PlacementResult[] {
-  _sleeveToggle = false;
-  _cuffToggle = false;
-
-  // Compute regions ONCE to avoid double-calling detectBodyRegion
-  // (it has toggle side effects for sleeve/cuff L/R assignment)
-  const regions = pieces.map(p => detectBodyRegion(p));
+  // Raw regions (toggle reset + single detectBodyRegion pass) — same source as
+  // computeEffectiveRegions. The loop below still needs the raw 'unknown'
+  // marker to stagger X / pick the circle fallback, so it works off the raw
+  // regions and applies the allUnknown alternation itself.
+  const regions = rawRegions(pieces);
   const unknownCount = regions.filter(r => r === 'unknown').length;
   // When EVERY piece is unknown, the pattern came from a source that doesn't
   // expose category metadata (notably the Seamly2D converter, which produces

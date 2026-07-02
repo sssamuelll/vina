@@ -28,6 +28,7 @@
 import { MeshBVH } from 'three-mesh-bvh';
 import * as THREE from 'three';
 import type { CollisionMeshData } from '../collisionMesh';
+import { buildBodyPseudonormals } from '../bodyPseudonormals';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,16 @@ export interface LinearBVH {
   skip: Uint32Array;
   nodeCount: number;
   triCount: number;
+  /**
+   * 9 floats per triangle: angle-weighted edge pseudonormals [AB,BC,CA]×xyz —
+   * reordered to BVH leaf order (same triOrder index as triVerts/triNormals).
+   */
+  edgePseudonormals: Float32Array;
+  /**
+   * 9 floats per triangle: angle-weighted vertex pseudonormals [A,B,C]×xyz —
+   * reordered to BVH leaf order (same triOrder index as triVerts/triNormals).
+   */
+  vertexPseudonormals: Float32Array;
 }
 
 // ─── three-mesh-bvh constants ───────────────────────────────────────────────
@@ -78,6 +89,8 @@ export function buildLinearBVH(mesh: CollisionMeshData): LinearBVH {
       skip: new Uint32Array(0),
       nodeCount: 0,
       triCount: 0,
+      edgePseudonormals: new Float32Array(0),
+      vertexPseudonormals: new Float32Array(0),
     };
   }
 
@@ -211,6 +224,12 @@ export function buildLinearBVH(mesh: CollisionMeshData): LinearBVH {
   const outTriVerts = new Float32Array(mesh.triCount * 9);
   const outTriNormals = new Float32Array(mesh.triCount * 3);
 
+  // Compute angle-weighted edge + vertex pseudonormals in soup order, then
+  // reorder them to match the BVH leaf ordering alongside triVerts/triNormals.
+  const soupPN = buildBodyPseudonormals(mesh, 1e-4);
+  const outEdgePN = new Float32Array(mesh.triCount * 9);
+  const outVertexPN = new Float32Array(mesh.triCount * 9);
+
   for (let i = 0; i < triOrder.length; i++) {
     const origTri = triOrder[i];
     for (let j = 0; j < 9; j++) {
@@ -218,6 +237,10 @@ export function buildLinearBVH(mesh: CollisionMeshData): LinearBVH {
     }
     for (let j = 0; j < 3; j++) {
       outTriNormals[i * 3 + j] = mesh.normals[origTri * 3 + j];
+    }
+    for (let j = 0; j < 9; j++) {
+      outEdgePN[i * 9 + j] = soupPN.edge[origTri * 9 + j];
+      outVertexPN[i * 9 + j] = soupPN.vertex[origTri * 9 + j];
     }
   }
 
@@ -230,5 +253,7 @@ export function buildLinearBVH(mesh: CollisionMeshData): LinearBVH {
     skip: outSkip,
     nodeCount,
     triCount: mesh.triCount,
+    edgePseudonormals: outEdgePN,
+    vertexPseudonormals: outVertexPN,
   };
 }

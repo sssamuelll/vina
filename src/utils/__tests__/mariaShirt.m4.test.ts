@@ -3,9 +3,12 @@
  * (docs/plans/2026-06-12-maria-shirt-plan.md, fase M4).
  *
  * Reproduce el camino de producción ENTERO en node — mesher puro (mismas
- * opciones que SimulationInitClient), placement anatómico, transformación
- * Euler de GarmentSimulation, mergeMeshes y buildSeamConstraints — y mide
- * cada costura propuesta en espacio MUNDO.
+ * opciones que SimulationInitClient), placement anatómico, ENVELOPE WRAP de
+ * GarmentSimulation (wrapPlacedMesh sobre el cilindro de cada región, NO la
+ * vieja transformación Euler rígida), mergeMeshes y buildSeamConstraints — y
+ * mide cada costura propuesta en espacio MUNDO. El solver arranca las piezas
+ * envueltas, así que la sonda debe medir la pose envuelta o deja de ser una
+ * red de seguridad real (PR #924 finding #5).
  *
  * Lo que esta sonda desenterró (paciente cero del drape, M4-A):
  * `parameterizeEdge` reconstruye la numeración de vértices de frontera del
@@ -30,7 +33,8 @@ import { detectSemanticEdges } from '../semanticEdges';
 import { classifyPiecesGeometric } from '../geometricClassifier';
 import { autoSew } from '../autoSew';
 import { meshPiece } from '../mesh';
-import { placeGarmentPieces } from '../cloth/garmentPlacement';
+import { resolveArrangementWithFrames } from '../cloth/arrangement/arrangementBinding';
+import { wrapPlacedMesh } from '../cloth/arrangement/wrapPlacedMesh';
 import { refineSeamsInWorld } from '../autoSew/worldRefine';
 import { mergeMeshes, buildSeamConstraints } from '../cloth/seamAssembly';
 import type { PatternPiece, Seam } from '../../types/types';
@@ -63,30 +67,6 @@ function importClassified(): PatternPiece[] {
   return pieces;
 }
 
-/** Transformación rígida EXACTA de GarmentSimulation.placedMeshes (Euler XYZ + traslación). */
-function transformVertices(
-  vertices: Float32Array,
-  rotation: [number, number, number],
-  position: [number, number, number],
-): Float32Array {
-  const [rx, ry, rz] = rotation;
-  const [px, py, pz] = position;
-  const cx = Math.cos(rx), sx = Math.sin(rx);
-  const cy = Math.cos(ry), sy = Math.sin(ry);
-  const cz = Math.cos(rz), sz = Math.sin(rz);
-  const out = new Float32Array(vertices.length);
-  for (let vi = 0; vi < vertices.length / 3; vi++) {
-    const vx = vertices[vi * 3], vy = vertices[vi * 3 + 1], vz = vertices[vi * 3 + 2];
-    const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
-    const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
-    const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
-    out[vi * 3] = x3 + px;
-    out[vi * 3 + 1] = y3 + py;
-    out[vi * 3 + 2] = z2 + pz;
-  }
-  return out;
-}
-
 interface WorldSeam {
   label: string;
   pairCount: number;
@@ -103,12 +83,16 @@ interface WorldSeam {
 
 /** Construye el estado mundo de producción y mide cada costura propuesta. */
 function probeSeams(pieces: PatternPiece[], seams: Seam[]): { worldSeams: WorldSeam[]; particleCount: number } {
-  const placements = placeGarmentPieces(pieces, MEASUREMENTS);
+  // Envelope wrap: la MISMA llamada que GarmentSimulation.placedMeshes
+  // (wrapPlacedMesh sobre el frame de cada región + flip M4-C). El solver
+  // arranca aquí; la sonda mide esta pose envuelta, no la Euler rígida.
+  const arrangement = resolveArrangementWithFrames(pieces, MEASUREMENTS, undefined);
   const meshed = pieces.map((p, i) => {
     const mesh = meshPiece(p, MESH_OPTIONS);
+    const { frame, flip, wrapParams } = arrangement[i];
     return {
       pieceId: p.id,
-      vertices: transformVertices(mesh.vertices, placements[i].rotation, placements[i].position),
+      vertices: wrapPlacedMesh(mesh.vertices, frame, wrapParams, flip),
       triIds: mesh.triIds,
       boundaryOrig: mesh.boundaryOrig,
     };
@@ -181,11 +165,14 @@ function getProbe() {
     const pieces = importClassified();
     const result = autoSew(pieces, { minConfidence: 0.3 });
     // Mismo camino que el thunk runAutoSew (M4-C): refinado en mundo de
-    // partners + reversed contra los placements normalizados.
+    // partners + reversed contra la pose ENVUELTA (resolveArrangementWithFrames,
+    // sin overrides) — el mismo {frame, flip} con que el solver arranca cada
+    // pieza. Antes refinaba contra la Euler rígida que el solver ya no corre
+    // (PR #924 finding #5).
     const refined = refineSeamsInWorld(
       result.seams.map(s => s.seam),
       pieces,
-      placeGarmentPieces(pieces, MEASUREMENTS),
+      resolveArrangementWithFrames(pieces, MEASUREMENTS, undefined),
     );
     const { worldSeams, particleCount } = probeSeams(pieces, refined);
     probeCache = { seamCount: refined.length, worldSeams, particleCount };
@@ -239,6 +226,16 @@ describe('M4 — sonda de dirección: las costuras propuestas cosen derechas en 
     // CONTRATO M4 (dirección): cero costuras cruzadas dentro de sí mismas.
     const crossed = worldSeams.filter(ws => ws.crossed);
     expect(crossed.map(ws => ws.label)).toEqual([]);
+
+    // Tube closure: each sleeve's underarm self-seam is proposed, resolves to
+    // real constraints, and sews straight (not crossed). With the fuller sleeve
+    // wrap (Task 2) the two underarm edges start close, so meanPairDist is small.
+    const underarmSeams = worldSeams.filter(ws => /underarmSeam/.test(ws.label));
+    expect(underarmSeams.length).toBeGreaterThanOrEqual(2); // one per sleeve
+    for (const ws of underarmSeams) {
+      expect(ws.pairCount).toBeGreaterThan(0);
+      expect(ws.crossed, ws.label).toBe(false);
+    }
   });
 
   // ── CONTRATO M4-C: emparejamiento en espacio mundo ───────────────────────

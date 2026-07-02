@@ -108,7 +108,7 @@ import { setSeamResolutionErrors } from '../../store/inspectorSlice';
 import { showWarningToast, showErrorToast } from '../../store/copilotUISlice';
 import { GPU_CAPABILITIES, NEURAL_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { safeGetItem } from '../../utils/safeStorage';
-import { getPhysicalFabric } from '../../utils/cloth/physicalFabric';
+import { getPhysicalFabric, toXPBDParams } from '../../utils/cloth/physicalFabric';
 import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
 import { extractMeshData } from '../../utils/cloth/avatarMeshExtractor';
 import { collisionMeshFromBuffers } from '../../utils/cloth/collisionMesh';
@@ -192,7 +192,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 /** Load avatar collision mesh and custom bodies into a solver client (shared between WASM and CPU paths) */
 async function loadCollision(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  client: { setCollisionMesh: (mesh: any) => void; updateCollisionBody: (data: any) => void },
+  client: { setCollisionMesh: (mesh: any, friction?: number) => void; updateCollisionBody: (data: any) => void },
   avatarModelUrl: string | null,
   avatarHeight: number,
   collisionBodies: Array<{
@@ -205,18 +205,22 @@ async function loadCollision(
   dispatch: ReturnType<typeof useDispatch>,
   cancelled: { value: boolean },
   isWasm: boolean,
+  joints: Record<string, { x: number; y: number; z: number }>,
+  bodyFriction?: number,
 ): Promise<void> {
   // Avatar collision mesh
   if (avatarModelUrl && !cancelled.value) {
     try {
       const collisionMesh = await withTimeout(
-        extractAvatarCollisionMesh(avatarModelUrl, avatarHeight),
+        extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, joints),
         5000,
         'Collision mesh extraction',
       );
       if (collisionMesh && !cancelled.value) {
         console.log('[SimLifecycle] ✅ Collision mesh extracted:', collisionMesh.triCount, 'triangles');
-        client.setCollisionMesh(collisionMesh);
+        // F0: pass the active fabric's body-friction (was dead data). undefined →
+        // setCollisionMesh falls back to its AVATAR_FRICTION (0.4 cotton) default.
+        client.setCollisionMesh(collisionMesh, bodyFriction);
         if (isWasm && 'applyInitialTriangleCollision' in client) {
           (client as WasmSolverClient).applyInitialTriangleCollision();
         }
@@ -295,6 +299,10 @@ export function useSimulationLifecycle({
   // cleanup → reinit loops, leaving tslSolverRef.current permanently null.
   // Live updates for these values are handled by separate effects (collision rebuild,
   // useCollisionBodies hook).
+  const avatarJoints = useSelector((s: RootState) => s.avatar.pose.joints);
+  const avatarJointsRef = useRef(avatarJoints);
+  useEffect(() => { avatarJointsRef.current = avatarJoints; });
+
   const collisionBodiesRef = useRef(collisionBodies);
   collisionBodiesRef.current = collisionBodies;
   const avatarModelUrlRef = useRef(avatarModelUrl);
@@ -490,23 +498,37 @@ export function useSimulationLifecycle({
                 gpuClientRef.current = gpuClient;
                 gpuClient.onFrame = onFrame;
 
-                // Use default compliance values that match the CPU solver:
-                // stretchWarp: 0.0, stretchWeft: 0.0, shear: 0.001,
-                // bendWarp: 1.0, bendWeft: 1.0
-                // The CPU solver builds per-edge compliance at init from these
-                // defaults and never rebuilds them when fabric changes.
-                // Passing fabricCompliance here is intentionally omitted to
-                // match the CPU solver's actual behavior.
+                // #gummy STEP 3: wire the active fabric's BEND compliance to the GPU
+                // (was dead data, omitted — like frictionBody pre-F0). Bend is the
+                // material's drape/flexibility differentiator (silk soft, denim stiff),
+                // rescaled to the live alpha band in STEP 1. GPU-ahead vs WASM/CPU
+                // (still on defaults) — A7 divergence.
                 const pf = getPhysicalFabric(fabricId);
+                const xpbd = pf ? toXPBDParams(pf) : undefined;
                 const tslSolverConfig: Partial<import('../../utils/cloth/gpu/tslSolver').TslSolverConfig> = {
                   ...(pf ? { internalDamping: pf.internalDamping } : {}),
                   windForce: windEnabled ? windForce : [0, 0, 0],
                   dragCoefficient,
                 };
+                const fabricCompliance = xpbd
+                  ? {
+                      // Stretch stays RIGID (0.0): wiring the compliant fabric stretch
+                      // let edges compact and the sleeve recoil (verified @gpu-local —
+                      // sleeve ~6460 stable at 0.0 vs ~3590 at the fabric's 1e-6).
+                      // Stretch/shear differentiation (lycra) is a follow-up needing
+                      // two-sided strain handling; toXPBDParams already has them
+                      // rescaled+ready. Bend alone gives the drape differentiation.
+                      stretchComplianceWarp: 0.0,
+                      stretchComplianceWeft: 0.0,
+                      shearCompliance: 0.001,
+                      bendComplianceWarp: xpbd.bendComplianceWarp,
+                      bendComplianceWeft: xpbd.bendComplianceWeft,
+                    }
+                  : undefined;
 
                 const seamPairs = seamInitDataToPairs(seamInitData, placedMeshes);
                 await withTimeout(
-                  gpuClient.initMultiPieceTsl(placedMeshes, seamPairs, tslSolverConfig),
+                  gpuClient.initMultiPieceTsl(placedMeshes, seamPairs, tslSolverConfig, fabricCompliance),
                   12000,
                   'TSL solver init',
                 );
@@ -516,7 +538,7 @@ export function useSimulationLifecycle({
 
                 // Load collision meshes — setCollisionMesh routes through BVH builder in TSL mode
                 // Read from refs (not closure) to avoid stale values and reinit cascades (#315)
-                await loadCollision(gpuClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false);
+                await loadCollision(gpuClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
 
                 // Push pre-existing freeze state — the separate freeze useEffect
                 // fires on mount before gpuClientRef is set, so it's a no-op.
@@ -562,7 +584,7 @@ export function useSimulationLifecycle({
               wasmClient.requestEdgeData();
 
               // Load collision BEFORE starting (prevents explosion)
-              await loadCollision(wasmClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, true);
+              await loadCollision(wasmClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, true, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
 
               if (!cancelled) {
                 wasmClient.start();
@@ -609,7 +631,7 @@ export function useSimulationLifecycle({
             client.requestEdgeData();
 
             // Load collision BEFORE starting (prevents explosion)
-            await loadCollision(client, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false);
+            await loadCollision(client, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
 
             if (!cancelled) {
               client.start();
@@ -697,6 +719,7 @@ export function useSimulationLifecycle({
     return undefined;
     // deviceLostGeneration: bumped by handleGpuDeviceLost so a renderer device
     // loss re-enters startSim (and, with gpuDowngradedRef set, falls to WASM).
+    // placedMeshes dep is load-bearing: an armAxis-driven placedMeshes rebuild intentionally re-seeds the solver in A-pose (transient T-pose→A-pose reinit). Do not drop it.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- collisionBodies/avatarModelUrl/avatarHeight read from refs to prevent reinit cascades (#315); live updates handled by separate effects. windEnabled/windForce/dragCoefficient also handled separately.
   }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, stretchingIdsRef, dispatch, deviceLostGeneration]);
 
@@ -715,7 +738,15 @@ export function useSimulationLifecycle({
 
     collisionRebuildTimer.current = setTimeout(async () => {
       try {
-        const collisionMesh = await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight);
+        // #frente2 collision fix: pass measurements (mapped to MorphConfig — same
+        // rename as AvatarModel.tsx:497-505: hip←hips, shoulderWidth←shoulder) +
+        // native morphTargets so the collider matches the MORPHED render body.
+        const morphCfg = {
+          chest: measurements.chest, waist: measurements.waist, hip: measurements.hips,
+          shoulderWidth: measurements.shoulder, height: measurements.height,
+          armLength: measurements.armLength, inseam: measurements.inseam,
+        };
+        const collisionMesh = await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, avatarJointsRef.current, morphCfg, morphTargets);
         if (!collisionMesh) return;
 
         // Check client is still alive (user may have stopped sim); skip a
@@ -723,7 +754,8 @@ export function useSimulationLifecycle({
         const client = (gpuDowngradedRef.current ? null : gpuClientRef.current) || wasmClientRef.current || clientRef.current;
         if (client) {
           console.log('[SimLifecycle] ♻️ Collision mesh rebuilt for measurement change:', collisionMesh.triCount, 'tris');
-          client.setCollisionMesh(collisionMesh);
+          // F0: keep the fabric's body-friction on pose/measurement rebuilds too.
+          client.setCollisionMesh(collisionMesh, getPhysicalFabric(fabricId)?.frictionBody);
         }
       } catch (e) {
         console.warn('[SimLifecycle] Collision mesh rebuild failed:', e);
@@ -736,7 +768,9 @@ export function useSimulationLifecycle({
         collisionRebuildTimer.current = null;
       }
     };
-  }, [measurements, morphTargets, avatarModelUrl, avatarHeight, simulationState]);
+    // fabricId is a dep so a fabric swap rebuilds the avatar collider with the
+    // new frictionBody (F0); the rebuild is debounced + gated on running sim.
+  }, [measurements, morphTargets, avatarModelUrl, avatarHeight, simulationState, fabricId]);
 
   // ─── Push wind config to GPU solver when it changes ───────────────────────
   useEffect(() => {

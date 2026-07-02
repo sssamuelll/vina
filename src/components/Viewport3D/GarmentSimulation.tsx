@@ -26,7 +26,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece, Seam, SeamGroup } from '../../types/types';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
-import { placeGarmentPieces, applyArrangementOverrides } from '../../utils/cloth/garmentPlacement';
+import { resolveArrangementWithFrames } from '../../utils/cloth/arrangement/arrangementBinding';
+import { computeEffectiveRegions } from '../../utils/cloth/garmentPlacement';
+import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
+import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { addPin, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
@@ -39,6 +42,7 @@ import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
+import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { isRendererDeviceLost, markRendererDeviceLost } from './rendererDeviceLost';
 import { useCollisionBodies } from './useCollisionBodies';
 import { useMeshing } from './useMeshing';
@@ -57,6 +61,12 @@ import {
 } from '../../utils/cloth/toolDispatch';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
+
+// Body-tether (frente#2): frame at which the drape is settled enough to capture
+// tether targets from the cloth's wrapped-on-body positions. 150 frames ≈ 2.5 s
+// — the M4 checkpoint the e2e validates as settled (seams closed, garment on
+// body). Capturing here (vs init) is the root-cause fix for the tether collapse.
+const TETHER_SETTLE_FRAMES = 150;
 
 /**
  * Convert Seam[] to SeamInitData[] for the worker.
@@ -160,6 +170,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const tslFrameCounter = useRef(0);
   const tslReadbackPending = useRef(false);
+  // Body-tether (frente#2) settle-capture state. Targets MUST be captured from
+  // the SETTLED drape (cloth wrapped on the body), NOT at init where positions
+  // are the pre-wrap spread-out layout (~0.6 m mean from the body → garbage
+  // targets → clamp drags cloth down, belowHip 72% collapse). `requested` fires
+  // the async GPU readback recapture once; `ready` gates the kernel until good
+  // targets exist.
+  const tetherCaptureRequested = useRef(false);
+  const tetherReady = useRef(false);
   // Renderer WebGPU device-loss latch (#901). Set the instant the renderer's
   // device.lost resolves so useFrame stops dispatching renderer.compute() on a
   // dead device — without waiting for the lifecycle effect to tear down the TSL
@@ -201,6 +219,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
   const xrayMode = useSelector((s: RootState) => s.simulation.xrayMode);
   const xrayActiveLayer = useSelector((s: RootState) => s.simulation.xrayActiveLayer);
+  const armAxis = useSelector((s: RootState) => s.simulation.armAxis);
 
   // Filter inactive pieces — only active pieces participate in simulation
   // Also filter out hidden pieces (3D arrangement visibility) and hidden layers
@@ -234,12 +253,21 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const { staticGeometry } = useMemo(() => {
     if (pieceMeshes.length === 0) return { staticGeometry: null };
 
-    const placements = applyArrangementOverrides(
-      placeGarmentPieces(activePieces, avatarMeasurements), activePieces, arrangementOverrides,
-    );
+    const axisHints = buildAxisHints(activePieces, armAxis);
+    const arrangement = resolveArrangementWithFrames(activePieces, avatarMeasurements, arrangementOverrides, { axisHints, skeletonReady: armAxis.ready });
+    // Index the arrangement by pieceId: useMeshing may drop pieces that fail to
+    // mesh, so pieceMeshes is not guaranteed index-aligned with activePieces.
+    const arrangeById = new Map(activePieces.map((p, i) => [p.id, arrangement[i]]));
+
+    // Skip stale meshes whose piece was deleted: pieceMeshes is async React
+    // state, activePieces shrinks synchronously, so a just-deleted piece has a
+    // mesh but no frame. The old `?? arrangement[pi]` fallback destructured
+    // `undefined` here and crashed the memo (#924).
+    const validMeshes = pieceMeshes.filter(p => arrangeById.has(p.pieceId));
+    if (validMeshes.length === 0) return { staticGeometry: null };
 
     let totalVerts = 0;
-    for (const p of pieceMeshes) {
+    for (const p of validMeshes) {
       totalVerts += p.vertices.length / 3;
     }
 
@@ -250,27 +278,18 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     let vOffset = 0;
     let hasUVs = false;
 
-    for (let pi = 0; pi < pieceMeshes.length; pi++) {
-      const p = pieceMeshes[pi];
+    for (let pi = 0; pi < validMeshes.length; pi++) {
+      const p = validMeshes[pi];
       const numVerts = p.vertices.length / 3;
       const color = new THREE.Color(PIECE_COLORS[pi % PIECE_COLORS.length]);
-      const placement = placements[pi];
+      const { frame, flip, wrapParams } = arrangeById.get(p.pieceId)!;
 
-      const [rx, ry, rz] = placement.rotation;
-      const [px, py, pz] = placement.position;
-      const cx = Math.cos(rx), sx = Math.sin(rx);
-      const cy = Math.cos(ry), sy = Math.sin(ry);
-      const cz = Math.cos(rz), sz = Math.sin(rz);
-
-      for (let vi = 0; vi < numVerts; vi++) {
-        const vx = p.vertices[vi * 3], vy = p.vertices[vi * 3 + 1], vz = p.vertices[vi * 3 + 2];
-        const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
-        const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
-        const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
-        positions[(vOffset + vi) * 3] = x3 + px;
-        positions[(vOffset + vi) * 3 + 1] = y3 + py;
-        positions[(vOffset + vi) * 3 + 2] = z2 + pz;
-      }
+      // Envelope wrap (Task 5): curve each piece's flat mesher vertices over the
+      // region cylinder (frame.point already carries the gross landmark, so the
+      // wrap fully replaces the old rigid Euler rotate+translate). `flip` is the
+      // M4-C anatomy-up correction. MUST stay identical to the solver loop.
+      const curved = wrapPlacedMesh(p.vertices, frame, wrapParams, flip);
+      positions.set(curved, vOffset * 3);
 
       for (let i = 0; i < numVerts; i++) {
         colors[(vOffset + i) * 3] = color.r;
@@ -302,7 +321,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     geo.computeVertexNormals();
 
     return { staticGeometry: geo };
-  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides]);
+  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis]);
   useDisposable(staticGeometry);
 
   const seamInitData = useMemo(() => seamsToInitData(seams, seamGroups), [seams, seamGroups]);
@@ -314,36 +333,35 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
     // M2: arrange-mode drags apply here too — what the user sees in the
     // arrange view is EXACTLY where the solver starts.
-    const placements = applyArrangementOverrides(
-      placeGarmentPieces(activePieces, avatarMeasurements), activePieces, arrangementOverrides,
-    );
+    const axisHints = buildAxisHints(activePieces, armAxis);
+    const arrangement = resolveArrangementWithFrames(activePieces, avatarMeasurements, arrangementOverrides, { axisHints, skeletonReady: armAxis.ready });
+    // Index by pieceId — pieceMeshes may have dropped failed-to-mesh pieces, so
+    // it is not guaranteed index-aligned with activePieces (matches render loop).
+    const arrangeById = new Map(activePieces.map((p, i) => [p.id, arrangement[i]]));
 
-    return pieceMeshes.map((pm, i) => {
-      const placement = placements[i] || { position: [0, 1.0, -0.2], rotation: [0, 0, 0] };
-      const [rx, ry, rz] = placement.rotation;
-      const [px, py, pz] = placement.position;
-      const cx = Math.cos(rx), sx = Math.sin(rx);
-      const cy = Math.cos(ry), sy = Math.sin(ry);
-      const cz = Math.cos(rz), sz = Math.sin(rz);
+    // Per-region tether radii (frente#2): one deterministic pass via
+    // computeEffectiveRegions (same toggle-reset semantics as the arrangement path).
+    const regions = computeEffectiveRegions(activePieces);
+    const regionById = new Map(activePieces.map((p, i) => [p.id, regions[i] as string]));
 
-      const numVerts = pm.vertices.length / 3;
-      const transformed = new Float32Array(pm.vertices.length);
-      for (let vi = 0; vi < numVerts; vi++) {
-        const vx = pm.vertices[vi * 3], vy = pm.vertices[vi * 3 + 1], vz = pm.vertices[vi * 3 + 2];
-        const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
-        const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
-        const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
-        transformed[vi * 3] = x3 + px;
-        transformed[vi * 3 + 1] = y3 + py;
-        transformed[vi * 3 + 2] = z2 + pz;
-      }
-      const piece = activePieces[i];
+    // Skip stale meshes (deleted piece, no frame) — same guard as the render
+    // loop; the old `?? arrangement[i]` fallback destructured undefined (#924).
+    return pieceMeshes
+      .filter(pm => arrangeById.has(pm.pieceId))
+      .map((pm) => {
+      const { frame, flip, wrapParams } = arrangeById.get(pm.pieceId)!;
+      // Envelope wrap (Task 5): IDENTICAL call to the render loop above — render
+      // and solver must not diverge. `frame.point` carries the landmark; `flip`
+      // is the M4-C anatomy-up correction.
+      const transformed = wrapPlacedMesh(pm.vertices, frame, wrapParams, flip);
+      const piece = activePieces.find(p => p.id === pm.pieceId);
       const stiffnessMultiplier = computeStiffnessMultiplier(piece?.interfacingType, piece?.solidifyFactor);
       const pressurePa = piece?.pressurePa ?? 0;
       const foldInternals = piece?.internals?.filter(l => l.type === 'fold' && l.foldOptions);
-      return { ...pm, vertices: transformed, stiffnessMultiplier, pressurePa, internals: foldInternals };
+      return { ...pm, vertices: transformed, stiffnessMultiplier, pressurePa, internals: foldInternals, region: regionById.get(pm.pieceId) };
     });
-  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides]);
+    // armAxis dep is load-bearing: when AvatarModel publishes posed arm dirs (async), this rebuilds → the solver re-seeds in A-pose. Removing it strands sleeves in T-pose (#924 A-pose).
+  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis]);
 
   // ─── Simulation lifecycle (solver cascade + collision) ──────────────────────
 
@@ -468,7 +486,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // the sequential dispatches inside the pass (same guarantee as the
       // seam batch below).
       substepNodes.push(...solver.stretchColors);
-      if (solver.bend) substepNodes.push(solver.bend);
+      // Bend colored like stretch (P4-1 determinism): one dispatch per color,
+      // no two constraints in a color share a vertex → race-free.
+      substepNodes.push(...solver.bendColors);
       // Seam colors batched like stretch (#897 F1.3): sequential dispatches
       // inside one compute pass — WebGPU guarantees storage writes from one
       // dispatch are visible to the next, so cross-color shared vertices
@@ -484,6 +504,21 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         const sc = solver.selfCollisionNodes;
         substepNodes.push(sc.cellClearNode, sc.scatterNode, sc.resolveNode, sc.applyNode);
       }
+      // Strain limiting (#gummy STEP 4): hard one-sided cap on edge over-stretch,
+      // after all position constraints + self-collision, BEFORE groundClamp and
+      // the pre-collision snapshot — so the cap is energy-consistent (folds into
+      // vNat) instead of reading as a velocity-excluded collision push.
+      substepNodes.push(...solver.strainLimitColors);
+      // Body-tether (frente#2): max-distance cling that holds each vertex within
+      // its per-region radius of a target. Targets = each vertex's own SETTLED
+      // position, captured from the wrapped-on-body drape (see settle-trigger
+      // after the substep dispatch), NOT at init — init positions are the pre-wrap
+      // spread-out layout (~0.6 m mean from the body), which collapsed the garment
+      // (belowHip 72%, root-caused 2026-06-25). Gated on tetherReady so the kernel
+      // runs only once good settled targets exist; with those, the cloth starts at
+      // dist≈0 < radius so the clamp is a gentle anti-drift/anti-slide that also
+      // arrests the #902 long-horizon slide-off, not an over-constraint.
+      if (tetherReady.current && solver.tether) substepNodes.push(solver.tether);
       // Ground ANTES de la colisión de cuerpo (#897 F2.3) — espejo WASM:
       // en esa tier el ground corre DENTRO del step de Rust y la colisión
       // de triángulos JS corre después (wasmSolverWorker.ts:336,359). Así
@@ -521,6 +556,17 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         renderer.compute(solver.brushNodes.brushNode);
       }
 
+      // Face-poke (face-poke v1, GPU-only): once per frame, AFTER the substep
+      // loop, BEFORE the normal recompute so the smooth normals reflect the
+      // tented geometry. snapshot freezes the post-settle corner positions (B1
+      // determinism fix), then correct tents poked cloth faces over convex body
+      // bumps. Gated by the GPU tier's facePoke capability (the kill-switch) +
+      // the nodes existing (set once the avatar body is loaded).
+      if (GPU_CAPABILITIES.facePoke && solver.facePokeNodes) {
+        renderer.compute(solver.facePokeNodes.snapshot);
+        renderer.compute(solver.facePokeNodes.correct);
+      }
+
       renderer.compute(solver.normalZero);
       renderer.compute(solver.normalAccum);
       renderer.compute(solver.normalNormalize);
@@ -533,6 +579,28 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // Always runs periodically; more frequent when an interaction tool is active.
       tslFrameCounter.current++;
       const gpuClient = clientsRef.current.gpu;
+
+      // Body-tether settle-capture (frente#2): once the drape has settled (the
+      // M4 checkpoint, ~150 frames / 2.5 s — cloth is now wrapped on the body),
+      // recapture tether targets from the CURRENT GPU positions, then enable the
+      // kernel. Fires exactly once. Shares tslReadbackPending so this readback
+      // and the per-frame geometry readback never map the position buffer
+      // concurrently. Degrades safely: if the readback fails, tetherReady stays
+      // false and the tether simply never turns on.
+      if (
+        gpuClient &&
+        !tetherCaptureRequested.current &&
+        !tslReadbackPending.current &&
+        tslFrameCounter.current >= TETHER_SETTLE_FRAMES
+      ) {
+        tetherCaptureRequested.current = true;
+        tslReadbackPending.current = true;
+        gpuClient.recaptureTetherTargetsFromGpu().then((ok) => {
+          tetherReady.current = ok;
+          tslReadbackPending.current = false;
+        });
+      }
+
       if (gpuClient && !tslReadbackPending.current && staticGeometry) {
         const isToolActive = activeTool3D === 'meshGrab' || activeTool3D === 'steamBrush';
         const interval = isToolActive ? 3 : 15;
