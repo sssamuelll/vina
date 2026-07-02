@@ -1,6 +1,6 @@
 import { Component, Suspense, type ReactNode, useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, ContactShadows } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import FloorGrid from './FloorGrid';
 import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
@@ -103,12 +103,6 @@ const _homeTarget = new THREE.Vector3();
  */
 /** Whether to use the native WebGPU backend (vs WebGL2 fallback). */
 const isWebGPUBackend = isWebGPURendererActive;
-/**
- * WebGPURenderer is always used (with forceWebGL when WebGPU is off).
- * Its NodeMaterial system rejects legacy materials (MeshDepthMaterial,
- * ShaderMaterial, ShadowMaterial), so shadow features must stay disabled.
- */
-const nodeMaterialActive = true;
 
 function createWebGPURenderer(canvas: HTMLCanvasElement): WebGPURenderer {
   const renderer = new WebGPURenderer({
@@ -118,6 +112,17 @@ function createWebGPURenderer(canvas: HTMLCanvasElement): WebGPURenderer {
     // Falls back to WebGL2 when WebGPU is unavailable or feature-flagged off
     forceWebGL: !isWebGPUBackend,
   });
+
+  // Shadow maps under WebGPURenderer: supported since the NodeMaterial
+  // ShadowNode landed (r184 ships Basic/PCF/PCFSoft/VSM filters — see
+  // three/src/nodes/lighting/ShadowNode.js). The old "NodeMaterial rejects
+  // MeshDepthMaterial" guard (9af1b3f8, r183-era) no longer applies to shadow
+  // maps — only to drei's raw-ShaderMaterial helpers (ContactShadows/Grid),
+  // which stay out. Set here (not only via the Canvas `shadows` prop) so the
+  // renderer is correctly configured regardless of R3F prop handling for
+  // custom gl factories.
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   // Suppress "render called before init" errors by gating early render calls.
   // R3F calls .render() on the first frame before async init() completes.
@@ -179,7 +184,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
   const colorways = useSelector((s: RootState) => s.project.colorways);
   const activeColorwayId = useSelector((s: RootState) => s.project.activeColorwayId);
-  const { groundVisible, shadowOpacity, shadowBlur } = useSelector((s: RootState) => s.renderSettings);
+  const { groundVisible } = useSelector((s: RootState) => s.renderSettings);
   const playbackState = useSelector((s: RootState) => s.animation.playbackState);
   const useClothSim = simulationState !== 'idle';
   const isArrangeMode = viewMode3D === 'arrange';
@@ -749,7 +754,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       <PanCrosshair ref={crosshairRef} />
       <Canvas
         camera={{ position: [0, 0.85, 3.0], fov: 50 }}
-        shadows={!nodeMaterialActive}
+        shadows
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -852,13 +857,11 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
           />
         )}
 
-        {/* ContactShadows uses a custom ShaderMaterial incompatible with NodeMaterial */}
-        {!nodeMaterialActive && (
-          <ContactShadows position={[0, 0, 0]} opacity={shadowOpacity} scale={3} blur={shadowBlur} far={2} />
-        )}
+        {/* drei ContactShadows (raw ShaderMaterial) stays incompatible with the
+            WebGPURenderer — real shadow maps on the key light replace it. */}
 
         {groundVisible && (
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow={!nodeMaterialActive}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow>
             <planeGeometry args={[100, 100]} />
             <meshStandardMaterial color="#ffffff" />
           </mesh>

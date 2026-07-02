@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { CustomLight } from '../../store/renderSettingsSlice';
+import { DIR_SHADOW_PROPS } from './shadowConfig';
 
 // Module-level promise so the LTC lookup textures are initialized exactly once
 // and every RectLight instance can await the same resolution. Resolves once
@@ -48,18 +49,31 @@ function RectLight({ light }: { light: CustomLight }) {
 
 function PointLightComponent({ light }: { light: CustomLight }) {
   return <pointLight color={light.color} intensity={light.intensity}
-    position={light.position} distance={light.distance} decay={light.decay} />;
+    position={light.position} distance={light.distance} decay={light.decay}
+    castShadow={light.castShadow} shadow-bias={-0.0001} shadow-normalBias={0.02} />;
 }
 
 function DirectionalLightComponent({ light }: { light: CustomLight }) {
+  // The default 'sun' (intensity 2.0) is the scene's dominant light — its
+  // shadow provides most of the visible contrast (the EnvironmentSetup key at
+  // 0.5 alone washes out against HDRI + ambient + fills). The castShadow flag
+  // was already in Redux + the LightingSection checkbox; it was silently
+  // ignored here during the stale pre-r184 shadow lockout.
+  // near/far bracket the light→origin distance so the frustum stays tight to
+  // the avatar even when the user drags the light position.
+  const d = Math.hypot(...light.position);
   return <directionalLight color={light.color} intensity={light.intensity}
-    position={light.position} />;
+    position={light.position} castShadow={light.castShadow}
+    {...DIR_SHADOW_PROPS}
+    shadow-camera-near={Math.max(0.1, d - 2)} shadow-camera-far={d + 4} />;
 }
 
 function SpotLightComponent({ light }: { light: CustomLight }) {
   return <spotLight color={light.color} intensity={light.intensity}
     position={light.position} angle={THREE.MathUtils.degToRad(light.spotAngle)}
-    penumbra={light.spotPenumbra} distance={light.distance} decay={light.decay} />;
+    penumbra={light.spotPenumbra} distance={light.distance} decay={light.decay}
+    castShadow={light.castShadow} shadow-mapSize={[2048, 2048]}
+    shadow-bias={-0.0001} shadow-normalBias={0.02} />;
 }
 
 function LightRenderer({ light }: { light: CustomLight }) {

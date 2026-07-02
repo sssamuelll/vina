@@ -11,8 +11,6 @@ import { clampSwingTwist, ANATOMICAL_CONSTRAINTS } from '../../utils/avatar/swin
 import { isVRMFile, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
 import { detectFormat, importMesh, type MeshFormat } from '../../utils/import/meshImporter';
 import { metresToImporter, importerToMetres } from '../../utils/geometry';
-// WebGPURenderer always uses NodeMaterial — legacy MeshDepthMaterial (shadows) unsupported
-const nodeMaterialActive = true;
 import type { VRM } from '@pixiv/three-vrm';
 
 interface AvatarModelProps {
@@ -319,8 +317,10 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
             mat.envMapIntensity = 0.5;
           }
         }
-        mesh.castShadow = !nodeMaterialActive;
-        mesh.receiveShadow = !nodeMaterialActive;
+        // WebGPURenderer shadow maps work with NodeMaterial since r184 —
+        // stale r183 guard removed (see EnvironmentSetup key light).
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
       }
     });
 
