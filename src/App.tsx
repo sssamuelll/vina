@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { store } from './store';
 import AppShell from './components/shell/AppShell';
@@ -7,6 +7,9 @@ import { SkillRegistry } from './copilot/action/skills/skillRegistry';
 import { isStorageAvailable } from './utils/safeStorage';
 import { showToast } from './store/copilotUISlice';
 import './App.css';
+
+// DEV-only Cusick gate harness (plan drape-profesional §B2) — lazy: chunk aparte, jamás cargado en prod.
+const CusickHarness = lazy(() => import('./components/testScenes/CusickHarness'));
 
 function App() {
   const [ready, setReady] = useState(false);
@@ -27,6 +30,16 @@ function App() {
     }
     init();
   }, []);
+
+  // DEV-only: ?testScene=cusick reemplaza la app entera por el harness del
+  // gate Cusick @gpu-local (tests/e2e/cusick-gate.spec.ts, corre Samuel).
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('testScene') === 'cusick') {
+    return (
+      <Suspense fallback={null}>
+        <CusickHarness fabricId={new URLSearchParams(window.location.search).get('fabric') ?? 'chiffon'} />
+      </Suspense>
+    );
+  }
 
   if (!ready) {
     return (
