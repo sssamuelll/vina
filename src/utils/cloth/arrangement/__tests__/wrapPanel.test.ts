@@ -31,8 +31,13 @@ describe('wrapPanel', () => {
     expect(along).toBeCloseTo(0.123, 4);
   });
   it('clamps the wrap angle to thetaMax/2', () => {
-    const big = wrapPanel([10, 1.2, 0], frame, params); // w/R huge → clamp
-    const small = wrapPanel([frame.radius * params.thetaMaxRad / 2, 1.2, 0], frame, params); // exactly at cap
+    const big = wrapPanel([10, 1.2, 0], frame, params); // w huge → clamp
+    // Isometric parameterization (plan §6bis): φ = w / (R + gap) — the arc is
+    // measured at the radius the cloth lives at, so the cap sits at
+    // w = (R + gap)·thetaMax/2 (the old pin used R·thetaMax/2, which
+    // over-curved the panel ×(R+gap)/R and piled vertices on the clamp lines).
+    const wAtCap = (frame.radius + params.gap) * params.thetaMaxRad / 2;
+    const small = wrapPanel([wAtCap, 1.2, 0], frame, params); // exactly at cap
     expect(distToAxis(big)).toBeCloseTo(frame.radius + params.gap, 4);
     // both clamped to the same angular position
     expect(big[0]).toBeCloseTo(small[0], 3);

@@ -35,10 +35,27 @@ function radialNormal(axis: THREE.Vector3, prefer = v(0, 0, 1)): THREE.Vector3 {
   return n.normalize();
 }
 
-export function surfaceFrame(region: BodyRegion, d: BodyDimensions, axisHint?: V3): SurfaceFrame {
+/** Axial standoff between the shoulder joint and the sleeve-cap edge ≈ armhole
+ *  depth. NOT smaller: the cylinder model breaks at the joint — a cap ring at
+ *  ~2cm sits inside the deltoid/armpit volume and collision ejects the tube
+ *  against the ribcage (measured 2026-07-03: sleeve verts 6640 → 16 @10s). At
+ *  armhole depth the ring clears the deltoid and the short seam pulls the tube
+ *  UP the arm — the seam holds the sleeve the way a real armhole does. */
+export const SLEEVE_CAP_MARGIN = 0.10; // 10cm
+
+export function surfaceFrame(region: BodyRegion, d: BodyDimensions, axisHint?: V3, pieceLengthM?: number): SurfaceFrame {
   const midTorso = (d.shoulderHeight + d.waistHeight) / 2;
   const armR = d.armR;
   const neckR = d.neckR;
+
+  // Sleeves anchor the CAP edge adjacent to the armhole (plan §6bis item 5):
+  // the mesher-local length axis is bbox-centered (±L/2, flip-invariant), so
+  // point = shoulder + axis·(margin + L/2) puts the proximal edge at
+  // shoulder + margin. The old armLength/2 centered the tube at mid-arm,
+  // leaving the sleeveCap↔armhole seam a ~30cm gap whose closure dragged the
+  // tube off the arm. Cuffs and callers without geometry keep mid-arm.
+  const sleeveAlong = (isSleeve: boolean) =>
+    isSleeve && pieceLengthM != null ? SLEEVE_CAP_MARGIN + pieceLengthM / 2 : d.armLength / 2;
 
   switch (region) {
     case 'front-torso':
@@ -57,7 +74,7 @@ export function surfaceFrame(region: BodyRegion, d: BodyDimensions, axisHint?: V
     case 'left-sleeve':
     case 'cuff-left': {
       const axis = (axisHint ? v(...axisHint) : v(-1, 0, 0)).normalize();
-      const point = v(-(d.shoulderWidth / 2), d.shoulderHeight, 0).add(axis.clone().multiplyScalar(d.armLength / 2));
+      const point = v(-(d.shoulderWidth / 2), d.shoulderHeight, 0).add(axis.clone().multiplyScalar(sleeveAlong(region === 'left-sleeve')));
       const normal = radialNormal(axis);
       const tangent = axis.clone(); // sleeve length runs along the arm
       return { point: toV3(point), normal: toV3(normal), tangent: toV3(tangent), axis: toV3(axis), radius: armR };
@@ -65,7 +82,7 @@ export function surfaceFrame(region: BodyRegion, d: BodyDimensions, axisHint?: V
     case 'right-sleeve':
     case 'cuff-right': {
       const axis = (axisHint ? v(...axisHint) : v(1, 0, 0)).normalize();
-      const point = v(d.shoulderWidth / 2, d.shoulderHeight, 0).add(axis.clone().multiplyScalar(d.armLength / 2));
+      const point = v(d.shoulderWidth / 2, d.shoulderHeight, 0).add(axis.clone().multiplyScalar(sleeveAlong(region === 'right-sleeve')));
       const normal = radialNormal(axis);
       const tangent = axis.clone();
       return { point: toV3(point), normal: toV3(normal), tangent: toV3(tangent), axis: toV3(axis), radius: armR };

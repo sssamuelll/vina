@@ -257,8 +257,8 @@ export function computeAutoFrame(
   axisHint?: V3,
 ): { placement: PlacementResult; frame: SurfaceFrame } {
   const d = deriveDimensions(measurements);
-  const frame = surfaceFrame(region, d, axisHint);
   const pH = mmToM(pieceGeometry.heightMm);
+  const frame = surfaceFrame(region, d, axisHint, pH);
 
   // Hang skirts only from their landmark by half the piece height along
   // the tangent, matching the old vertical-centering behaviour.
