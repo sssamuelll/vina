@@ -44,6 +44,7 @@ import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
 import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { isRendererDeviceLost, markRendererDeviceLost } from './rendererDeviceLost';
+import { isTetherDisabled } from './tetherFlag';
 import { useCollisionBodies } from './useCollisionBodies';
 import { useMeshing } from './useMeshing';
 import { useSimulationRecorder } from '../../hooks/useSimulationRecorder';
@@ -178,6 +179,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // targets exist.
   const tetherCaptureRequested = useRef(false);
   const tetherReady = useRef(false);
+  // B1 off-switch: read once per mount (mirror of the e2e addInitScript
+  // pattern); suppresses the capture below so `tetherReady` never arms.
+  const tetherDisabled = useRef(isTetherDisabled());
   // Renderer WebGPU device-loss latch (#901). Set the instant the renderer's
   // device.lost resolves so useFrame stops dispatching renderer.compute() on a
   // dead device — without waiting for the lifecycle effect to tear down the TSL
@@ -589,6 +593,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // false and the tether simply never turns on.
       if (
         gpuClient &&
+        !tetherDisabled.current &&
         !tetherCaptureRequested.current &&
         !tslReadbackPending.current &&
         tslFrameCounter.current >= TETHER_SETTLE_FRAMES
