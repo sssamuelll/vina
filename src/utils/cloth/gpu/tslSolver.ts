@@ -103,14 +103,7 @@ export interface TslSolver {
   preSolve: ComputeNode;
   /** Per-color stretch constraint compute nodes */
   stretchColors: ComputeNode[];
-  /**
-   * Per-color strain-limit compute nodes (#gummy STEP 4). Hard one-sided edge
-   * clamp to restLen*(1+maxStrain); reuses the stretch graph coloring 1:1
-   * (race-free). Dispatch AFTER stretch/bend/seam/self-collision, BEFORE
-   * groundClamp/snapshot. Empty if no stretch constraints.
-   */
-  strainLimitColors: ComputeNode[];
-  /**
+    /**
    * Body-tether compute node (frente#2). Max-distance cling kernel: projects
    * cloth vertices back onto their per-vertex radius sphere around the static
    * body target when the vertex drifts too far. Race-free (per-particle).
@@ -370,6 +363,16 @@ function makeDistanceConstraintFn(
   idOffset0: number,
   idOffset1: number,
   complianceBuf: TslNode,
+  // FUSION strainLimit->stretch (consejo 2026-07-02, Richter §7b / Halberg
+  // precondición A4): con el uniform presente, el cap rígido one-sided
+  // (#gummy STEP 4) corre DENTRO del mismo kernel tras el solve compliant —
+  // mismos ids, mismo color group => misma race-safety; releer posBuf tras
+  // el addAssign es coherente dentro de la invocación (orden de programa
+  // WGSL). Elimina ~150 dispatches/frame (~1ms medido). Semántica que
+  // CAMBIA: el cap ya no corre al FINAL del substep — el estiramiento que
+  // bend/seams/self-collision introduzcan después se capea con 1 substep de
+  // lag (~µm/substep; gates: drape sleeve count + Cusick).
+  maxStrainUniform?: FloatUniform,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (Fn as any)(() => {
@@ -423,6 +426,23 @@ function makeDistanceConstraintFn(
         // Push particle 1 in opposite direction
         posBuf.element(id1).addAssign(n.mul(s).mul(w1));
       });
+
+      if (maxStrainUniform) {
+        // Cap rígido one-sided fusionado (era makeStrainLimitFn): relee las
+        // posiciones ya corregidas por ESTE hilo y clampea a rest*(1+max).
+        const delta2 = posBuf.element(id1).sub(posBuf.element(id0));
+        const len2 = delta2.dot(delta2).sqrt();
+        const maxLen = restLenBuf.element(ci).mul(maxStrainUniform.add(float(1.0)));
+        If(len2.greaterThan(maxLen).and(len2.greaterThan(float(1e-7))), () => {
+          const wSum = w0.add(w1);
+          If(wSum.greaterThan(float(0.0)), () => {
+            const sCap = len2.sub(maxLen).negate().div(wSum); // rígido (alpha=0)
+            const n2 = delta2.div(len2);
+            posBuf.element(id0).addAssign(n2.mul(sCap).mul(w0).negate());
+            posBuf.element(id1).addAssign(n2.mul(sCap).mul(w1));
+          });
+        });
+      }
     });
   })();
 }
@@ -527,48 +547,6 @@ function makeDihedralConstraintFn(
   })();
 }
 
-/**
- * Strain-limiting kernel (#gummy STEP 4). A rigid, ONE-SIDED distance clamp:
- * when an edge is stretched past restLen*(1+maxStrain), project both particles
- * back to that cap (mass-weighted, alpha=0 — no compliance). Never compresses.
- * Reuses the stretch ids+restLengths + graph coloring (race-free), so it kills
- * the residual stretch the compliant Jacobi solve under-converges on.
- */
-function makeStrainLimitFn(
-  posBuf: TslNode,
-  invMassBuf: TslNode,
-  idsBuf: TslNode,
-  restLenBuf: TslNode,
-  maxStrain: FloatUniform,
-  idStride: number,
-  idOffset0: number,
-  idOffset1: number,
-) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (Fn as any)(() => {
-    const ci = instanceIndex;
-    const baseIdx = uint(ci).mul(uint(idStride));
-    const id0 = idsBuf.element(baseIdx.add(uint(idOffset0)));
-    const id1 = idsBuf.element(baseIdx.add(uint(idOffset1)));
-    const w0 = invMassBuf.element(id0);
-    const w1 = invMassBuf.element(id1);
-    const delta = posBuf.element(id1).sub(posBuf.element(id0));
-    const len = delta.dot(delta).sqrt();
-    If(len.greaterThan(float(1e-7)), () => {
-      const maxLen = restLenBuf.element(ci).mul(maxStrain.add(float(1.0)));
-      // One-sided: only clamp when over-stretched (never compress the cloth).
-      If(len.greaterThan(maxLen), () => {
-        const denom = w0.add(w1);
-        If(denom.greaterThan(float(0.0)), () => {
-          const s = len.sub(maxLen).negate().div(denom); // rigid (alpha=0)
-          const n = delta.div(len);
-          posBuf.element(id0).addAssign(n.mul(s).mul(w0).negate());
-          posBuf.element(id1).addAssign(n.mul(s).mul(w1));
-        });
-      });
-    });
-  })();
-}
 
 // ─── Body-tether kernel ───────────────────────────────────────────────────────
 
@@ -969,19 +947,7 @@ export function createTslSolver(
       uniforms.sdt,
       2, 0, 1,
       compBuf,
-    );
-    return compute(fn, color.count, [64]);
-  });
-
-  // ─── Strain limiting (#gummy STEP 4) — rigid one-sided cap. Reuses the ─
-  // stretch ids+restLengths + graph coloring (race-free); no compliance buffer.
-  const strainLimitColors = buffers.stretchColors.map((color) => {
-    const idsBuf = storage(color.idsSBA, 'uint', color.count * 2);
-    const restBuf = storage(color.restLengthsSBA, 'float', color.count);
-    const fn = makeStrainLimitFn(
-      posBuf, invMassBuf, idsBuf, restBuf,
-      uniforms.maxStrain,
-      2, 0, 1,
+      uniforms.maxStrain, // cap fusionado (ver factory) — era un pase aparte
     );
     return compute(fn, color.count, [64]);
   });
@@ -1205,7 +1171,6 @@ export function createTslSolver(
   return {
     preSolve,
     stretchColors,
-    strainLimitColors,
     bendColors,
     tether,
     seamColors,

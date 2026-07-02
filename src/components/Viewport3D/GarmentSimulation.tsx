@@ -528,11 +528,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         const sc = solver.selfCollisionNodes;
         substepNodes.push(sc.cellClearNode, sc.scatterNode, sc.resolveNode, sc.applyNode);
       }
-      // Strain limiting (#gummy STEP 4): hard one-sided cap on edge over-stretch,
-      // after all position constraints + self-collision, BEFORE groundClamp and
-      // the pre-collision snapshot — so the cap is energy-consistent (folds into
-      // vNat) instead of reading as a velocity-excluded collision push.
-      substepNodes.push(...solver.strainLimitColors);
+      // Strain limiting (#gummy STEP 4): FUSIONADO dentro del kernel de
+      // stretch (consejo 2026-07-02 — mismos ids/colores, ~150 dispatches
+      // menos/frame). El cap corre en el slot del stretch; ver
+      // makeDistanceConstraintFn (tslSolver.ts) para la semántica de lag.
       // Body-tether (frente#2): max-distance cling that holds each vertex within
       // its per-region radius of a target. Targets = each vertex's own SETTLED
       // position, captured from the wrapped-on-body drape (see settle-trigger
@@ -1234,6 +1233,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
         material={tslMaterial || undefined}
+        // Render pass 2026-07-02: la tela castea y recibe sombra (ShadowNode
+        // r184 soporta NodeMaterial; guard stale removido en EnvironmentSetup).
+        castShadow
+        receiveShadow
       >
         {!tslMaterial && (
           <meshPhysicalMaterial

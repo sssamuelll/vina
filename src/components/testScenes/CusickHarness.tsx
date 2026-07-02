@@ -227,7 +227,7 @@ function CusickScene({ fabricId }: { fabricId: string }) {
       const sc = solver.selfCollisionNodes;
       substepNodes.push(sc.cellClearNode, sc.scatterNode, sc.resolveNode, sc.applyNode);
     }
-    substepNodes.push(...solver.strainLimitColors);
+      // strainLimit: fusionado dentro del stretch (2026-07-02) — implícito.
     substepNodes.push(solver.groundClamp);
     substepNodes.push(solver.snapshotPreCollision);
     for (const body of solver.collisionBodies) {

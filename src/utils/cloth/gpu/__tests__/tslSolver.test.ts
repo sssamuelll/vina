@@ -299,16 +299,16 @@ describe('createTslSolver', () => {
     }
   });
 
-  it('returns per-color strain-limit nodes mirroring the stretch colors (#gummy STEP 4)', () => {
+  it('strain-limit is FUSED into the stretch kernel — no separate pass (consejo 2026-07-02)', () => {
     const buffers = makeMockBufferSet({ numStretchColors: 3 });
     const solver = createTslSolver(buffers, { ...defaultConfig });
 
-    // Strain-limiting reuses the stretch graph coloring 1:1 (same ids+restLengths,
-    // race-free) → one strain-limit node per stretch color.
-    expect(solver.strainLimitColors).toHaveLength(3);
-    for (const node of solver.strainLimitColors) {
-      expect(node).toHaveProperty('__tslCompute', true);
-    }
+    // El cap one-sided (#gummy STEP 4) vive DENTRO de makeDistanceConstraintFn
+    // (mismos ids/colores → misma race-safety, ~150 dispatches menos/frame).
+    // El contrato: stretch sigue 1 nodo por color, y la interface ya no expone
+    // un pase de strain-limit aparte.
+    expect(solver.stretchColors).toHaveLength(3);
+    expect('strainLimitColors' in solver).toBe(false);
   });
 
   it('returns per-color bend compute nodes when constraints exist', () => {
