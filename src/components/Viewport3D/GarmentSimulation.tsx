@@ -193,6 +193,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // B1 off-switch: read once per mount (mirror of the e2e addInitScript
   // pattern); suppresses the capture below so `tetherReady` never arms.
   const tetherDisabled = useRef(isTetherDisabled());
+  // Dev A/B del face-poke (track piel): forzar el pase sin recompilar.
+  const facePokeForced = useRef(
+    typeof window !== 'undefined' &&
+      (window as unknown as { localStorage?: Storage }).localStorage?.getItem('openclo-facepoke-on') === 'true',
+  );
   // Renderer WebGPU device-loss latch (#901). Set the instant the renderer's
   // device.lost resolves so useFrame stops dispatching renderer.compute() on a
   // dead device — without waiting for the lifecycle effect to tear down the TSL
@@ -462,6 +467,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   useFrame(({ gl }) => {
     if (!meshRef.current || !staticGeometry) return;
     if (isPlayingBack) return;
+    // Dev-only freeze: congela el loop de sim SIN desmontar (pausar por store
+    // desmonta via useClothSim). Lo usa el probe del face-poke @gpu-local para
+    // leer posiciones quietas; setear window.__OPENCLO_FREEZE_FRAME__=true.
+    if (import.meta.env.DEV && (window as unknown as Record<string, unknown>).__OPENCLO_FREEZE_FRAME__) return;
 
     const solver = tslSolverRef.current;
 
@@ -577,7 +586,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // determinism fix), then correct tents poked cloth faces over convex body
       // bumps. Gated by the GPU tier's facePoke capability (the kill-switch) +
       // the nodes existing (set once the avatar body is loaded).
-      if (GPU_CAPABILITIES.facePoke && solver.facePokeNodes) {
+      // Override dev: localStorage('openclo-facepoke-on')='true' activa el
+      // pase aunque la capability siga OFF — para A/B del efecto sostenido
+      // (penetrationCount on vs off) sin recompilar. Medición del track piel.
+      if ((GPU_CAPABILITIES.facePoke || facePokeForced.current) && solver.facePokeNodes) {
         renderer.compute(solver.facePokeNodes.snapshot);
         renderer.compute(solver.facePokeNodes.correct);
       }

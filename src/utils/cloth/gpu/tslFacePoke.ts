@@ -193,7 +193,13 @@ export function makeFacePokeCorrectNode(p: FacePokeCorrectParams): ComputeNode {
   const triIdsBase = listBase + numClothTriangles * 3;
 
   const uMargin = uniform(margin);
-  const uBand = uniform(Math.max(margin, 0.03));
+  // uBand: expande el AABB de la cara para el BVH query del cuerpo. 30mm
+  // dejaba fuera los body-verts que asoman PROFUNDO (>30mm): el probe
+  // @gpu-local 2026-07-02 midio 73/4254 deep-pokes agarrados a 30mm vs
+  // 687/4582 a 120mm (9x). 60mm = compromiso cobertura/costo del walk; el
+  // pase sigue gated OFF (GPU_CAPABILITIES.facePoke=false) hasta el rework A4
+  // (respuesta dentro del substep loop, que arregla la reversion).
+  const uBand = uniform(Math.max(margin, 0.06));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fn = (Fn as any)(() => {

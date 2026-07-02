@@ -618,6 +618,12 @@ export class GpuSolverClient implements ClothSolverClient {
       this.tslSolver = createTslSolver(this.tslBuffers, defaultConfig);
       this.zeroCopy = true; // TSL mode = zero-copy
 
+      // Dev-only: el handle del probe apunta SIEMPRE al ultimo cliente vivo
+      // que inicializo (el avatar-set tambien lo re-escribe; dispose lo limpia
+      // solo si le pertenece — StrictMode double-mount).
+      if (import.meta.env.DEV && typeof window !== 'undefined') {
+        (window as unknown as Record<string, unknown>).__OPENCLO_GPU_CLIENT__ = this;
+      }
       console.log('[GpuSolverClient] TSL solver initialized:', {
         particles: totalVerts,
         stretchColors: colored.colorRanges.length,
@@ -932,6 +938,15 @@ export class GpuSolverClient implements ClothSolverClient {
    */
   dispose(): void {
     this.disposed = true;
+    // Dev-only: no dejar el handle del probe apuntando a un cliente muerto —
+    // el double-mount de StrictMode dispone el cliente del primer mount
+    // DESPUES de que el segundo ya corrio (async), y el probe del face-poke
+    // agarraba la instancia disposed (getTslSolver()=null). Solo se limpia
+    // si el handle es NUESTRO; el cliente vivo lo re-puebla en su avatar-set.
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+      const w = window as unknown as Record<string, unknown>;
+      if (w.__OPENCLO_GPU_CLIENT__ === this) delete w.__OPENCLO_GPU_CLIENT__;
+    }
     this.stop();
     this.positionAttr = null;
     this.normalAttr = null;
