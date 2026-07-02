@@ -193,6 +193,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // B1 off-switch: read once per mount (mirror of the e2e addInitScript
   // pattern); suppresses the capture below so `tetherReady` never arms.
   const tetherDisabled = useRef(isTetherDisabled());
+  // 2a/2b-lite: identidad del solver del frame anterior — un re-init (T-pose
+  // →A-pose por armAxis, cambio de fabric/medidas) crea un TslSolver NUEVO;
+  // los contadores de settle (tether, readbacks) deben contar desde el
+  // ÚLTIMO seed, no desde el mount, o el tether captura la pose transitoria.
+  const lastSolverRef = useRef<import('../../utils/cloth/gpu/tslSolver').TslSolver | null>(null);
   // Dev A/B del face-poke (track piel): forzar el pase sin recompilar.
   const facePokeForced = useRef(
     typeof window !== 'undefined' &&
@@ -387,7 +392,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   const activeElastics = useMemo(() => elastics.filter(e => e.active !== false), [elastics]);
 
-  const { clients, positionsRef, edgeDataRef, onFrame, recordFrameTick, tslSolverRef, handleGpuDeviceLost } = useSimulationLifecycle({
+  const { clients, positionsRef, edgeDataRef, onFrame, recordFrameTick, tslSolverRef, simReadyRef, handleGpuDeviceLost } = useSimulationLifecycle({
     placedMeshes,
     seamInitData,
     elastics: activeElastics,
@@ -473,6 +478,18 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     if (import.meta.env.DEV && (window as unknown as Record<string, unknown>).__OPENCLO_FREEZE_FRAME__) return;
 
     const solver = tslSolverRef.current;
+    // 2a (init-race, plan §6bis): sin colisión cargada NO se stepea — los
+    // frames sin cuerpo son basura física (la tela cae, la manga desliza) y
+    // el settle-tether los congelaba. También raíz de la "bistabilidad" #902.
+    if (solver && !simReadyRef.current) return;
+    // 2b-lite: solver nuevo (re-seed) → los relojes de settle arrancan de 0.
+    if (solver && solver !== lastSolverRef.current) {
+      lastSolverRef.current = solver;
+      tslFrameCounter.current = 0;
+      tslReadbackCount.current = 0;
+      tetherCaptureRequested.current = false;
+      tetherReady.current = false;
+    }
 
     // ─── TSL zero-copy path ──────────────────────────────────────────
     // rendererDeviceLostRef gate (#901): once the renderer device is lost,

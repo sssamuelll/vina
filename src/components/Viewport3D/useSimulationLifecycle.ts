@@ -163,6 +163,9 @@ interface UseSimulationLifecycleResult {
   recordFrameTick: () => void;
   /** TSL solver ref for renderer.compute() dispatch */
   tslSolverRef: React.MutableRefObject<import('../../utils/cloth/gpu/tslSolver').TslSolver | null>;
+  /** 2a (init-race): true cuando la colisión del init ACTUAL está cargada —
+   *  el frame loop TSL no stepea hasta entonces (WASM/CPU ya gated por start()). */
+  simReadyRef: React.MutableRefObject<boolean>;
   /** Notify the lifecycle that the RENDERER's WebGPU device was lost so it can
    *  drop the GPU tier and re-run the cascade to a CPU-side fallback (#901). */
   handleGpuDeviceLost: () => void;
@@ -300,6 +303,14 @@ export function useSimulationLifecycle({
   const positionsRef = useRef<Float32Array | null>(null);
   const edgeDataRef = useRef<SolverEdgeData | null>(null);
   const tslSolverRef = useRef<import('../../utils/cloth/gpu/tslSolver').TslSolver | null>(null);
+  // 2a (init-race, plan §6bis): la sim NO corre frames hasta que la colisión
+  // del avatar esté cargada en el solver activo. El tier TSL stepea vía
+  // useFrame apenas existe el solver — sin este gate corre frames SIN cuerpo
+  // durante todo el fetch/extract/BVH del avatar (segundos): la tela cae, la
+  // manga desliza, y el settle-tether congela la pose mala. WASM/CPU ya
+  // estaban gated (start() post-loadCollision); esto empareja el TSL. También
+  // es el fix de raíz de la "bistabilidad" #902 (carrera de init, no floats).
+  const simReadyRef = useRef(false);
 
   // ─── Refs for values used during init but NOT as effect deps ────────────────
   // These prevent reinit cascades (#315): if collisionBodies/avatarModelUrl/avatarHeight
@@ -429,6 +440,9 @@ export function useSimulationLifecycle({
     if (simulationState === 'running' && placedMeshes.length > 0) {
       let cancelled = false;
       const cancelFlag = { get value() { return cancelled; } };
+      // 2a: cada (re)init re-arma el gate — el solver nuevo no stepea hasta
+      // que SU colisión cargue.
+      simReadyRef.current = false;
 
       const startSim = async () => {
         // Seam capability gate (CLO3D parity plan Fase 4): tiers declaring
@@ -550,6 +564,10 @@ export function useSimulationLifecycle({
                 // Load collision meshes — setCollisionMesh routes through BVH builder in TSL mode
                 // Read from refs (not closure) to avoid stale values and reinit cascades (#315)
                 await loadCollision(gpuClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
+                // 2a: colisión lista → el frame loop puede stepear. Si
+                // loadCollision throwea caemos al tier WASM (catch de arriba);
+                // si resuelve degradado (warning), corre bodiless como antes.
+                simReadyRef.current = true;
 
                 // Push pre-existing freeze state — the separate freeze useEffect
                 // fires on mount before gpuClientRef is set, so it's a no-op.
@@ -599,6 +617,7 @@ export function useSimulationLifecycle({
 
               // Load collision BEFORE starting (prevents explosion)
               await loadCollision(wasmClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, true, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
+              simReadyRef.current = true; // 2a (consistencia — WASM ya gated por start())
 
               if (!cancelled) {
                 wasmClient.start();
@@ -649,6 +668,7 @@ export function useSimulationLifecycle({
 
             // Load collision BEFORE starting (prevents explosion)
             await loadCollision(client, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
+            simReadyRef.current = true; // 2a (consistencia — CPU ya gated por start())
 
             if (!cancelled) {
               client.start();
@@ -846,6 +866,7 @@ export function useSimulationLifecycle({
     onFrame,
     recordFrameTick,
     tslSolverRef,
+    simReadyRef,
     handleGpuDeviceLost,
   };
 }
