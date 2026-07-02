@@ -161,13 +161,15 @@ export class XpbdSolver {
     }
     /**
      * Set bend constraints.
+     * P1 dihedral: `rest` son ÁNGULOS dihedral (radianes, signed, flat=0)
+     * del extractor compartido — ya NO distancias c-d.
      * @param {Uint32Array} ids
-     * @param {Float32Array} rest_distances
+     * @param {Float32Array} rest_angles
      */
-    set_bend(ids, rest_distances) {
+    set_bend(ids, rest_angles) {
         const ptr0 = passArray32ToWasm0(ids, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF32ToWasm0(rest_distances, wasm.__wbindgen_malloc);
+        const ptr1 = passArrayF32ToWasm0(rest_angles, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         wasm.xpbdsolver_set_bend(this.__wbg_ptr, ptr0, len0, ptr1, len1);
     }
@@ -180,13 +182,13 @@ export class XpbdSolver {
      * (#747). Routes through `recompute_bend_compliances` — single
      * source of truth for the cache derivation.
      * @param {Uint32Array} ids
-     * @param {Float32Array} rest_distances
+     * @param {Float32Array} rest_angles
      * @param {Uint8Array} edge_types
      */
-    set_bend_with_types(ids, rest_distances, edge_types) {
+    set_bend_with_types(ids, rest_angles, edge_types) {
         const ptr0 = passArray32ToWasm0(ids, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF32ToWasm0(rest_distances, wasm.__wbindgen_malloc);
+        const ptr1 = passArrayF32ToWasm0(rest_angles, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         const ptr2 = passArray8ToWasm0(edge_types, wasm.__wbindgen_malloc);
         const len2 = WASM_VECTOR_LEN;
@@ -205,6 +207,16 @@ export class XpbdSolver {
         const ptr1 = passArrayF32ToWasm0(positions, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         wasm.xpbdsolver_set_pins(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+    }
+    /**
+     * A3: set the terminal seam rest-length floor (m). Defensive per
+     * set_seam_shrink_params: non-finite ignored, negative clamps to 0 (the
+     * sewed threshold then lower-bounds the effective floor in solve_seams,
+     * preserving the legacy near-zero terminal gap).
+     * @param {number} floor
+     */
+    set_seam_rest_length_floor(floor) {
+        wasm.xpbdsolver_set_seam_rest_length_floor(this.__wbg_ptr, floor);
     }
     /**
      * Configure the seam target decay schedule (Fase 2 / BP-2).

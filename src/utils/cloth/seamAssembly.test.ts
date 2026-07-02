@@ -8,6 +8,8 @@ import {
   solveSeamConstraints,
   isFullySewn,
   DEFAULT_SEAM_CONFIG,
+  SEAM_REST_LENGTH_FLOOR_MIN_M,
+  computeSeamRestLengthFloor,
   seamInitDataToSeams,
   type ParameterizedVertex,
   type SeamConstraintSet,
@@ -510,6 +512,109 @@ describe('isFullySewn', () => {
       config: DEFAULT_SEAM_CONFIG,
     };
     expect(isFullySewn(seamSet)).toBe(false);
+  });
+});
+
+// ─── Rest-length floor (borrow-plan A3) ─────────────────────────────────────
+//
+// Seams used to shrink restLength to LITERAL 0 — at the armscye over the
+// convex shoulder that drags the seam midpoint THROUGH the body (mechanism 2
+// of the skin-poke diagnosis, 2026-06-26). The terminal target is now a
+// scalar floor (fabric-thickness spacing, min 2mm), NOT a claim that this
+// alone fixes the poke — the measurement gate is penetrationCount (A1).
+
+describe('seam rest-length floor (A3)', () => {
+  it('DEFAULT_SEAM_CONFIG pins restLengthFloor at the 2mm minimum', () => {
+    expect(SEAM_REST_LENGTH_FLOOR_MIN_M).toBe(0.002);
+    expect(DEFAULT_SEAM_CONFIG.restLengthFloor).toBe(0.002);
+  });
+
+  it('decay clamps at the floor instead of snapping to 0', () => {
+    const positions = new Float32Array([0, 0, 0, 1, 0, 0]);
+    const invMass = new Float32Array([1, 1]);
+    const seamSet: SeamConstraintSet = {
+      ids: new Int32Array([0, 1]),
+      restLengths: new Float32Array([1.0]),
+      compliances: new Float32Array([0]),
+      count: 1,
+      config: { ...DEFAULT_SEAM_CONFIG, shrinkFactor: 0.5 },
+    };
+    const sdt = 1 / 60 / 15;
+    for (let i = 0; i < 50; i++) {
+      solveSeamConstraints(positions, invMass, seamSet, sdt);
+    }
+    // 1.0 × 0.5^n crosses 0.002 at n=9; the multiply must clamp AT the
+    // floor exactly (snap-to-floor, f32-quantized by the Float32Array),
+    // never below and never to 0.
+    expect(seamSet.restLengths[0]).toBe(Math.fround(DEFAULT_SEAM_CONFIG.restLengthFloor));
+  });
+
+  it('honors a custom (thick-fabric) floor', () => {
+    const positions = new Float32Array([0, 0, 0, 1, 0, 0]);
+    const invMass = new Float32Array([1, 1]);
+    const seamSet: SeamConstraintSet = {
+      ids: new Int32Array([0, 1]),
+      restLengths: new Float32Array([1.0]),
+      compliances: new Float32Array([0]),
+      count: 1,
+      config: { ...DEFAULT_SEAM_CONFIG, shrinkFactor: 0.5, restLengthFloor: 0.1 },
+    };
+    const sdt = 1 / 60 / 15;
+    for (let i = 0; i < 50; i++) {
+      solveSeamConstraints(positions, invMass, seamSet, sdt);
+    }
+    expect(seamSet.restLengths[0]).toBe(Math.fround(0.1));
+    // The rigid solve tracks the floored target: pair distance ≈ 0.1, not 0.
+    const dist = Math.abs(positions[3] - positions[0]);
+    expect(dist).toBeCloseTo(0.1, 3);
+  });
+
+  it('isFullySewn treats restLength at (or below) the floor as sewn', () => {
+    const atFloor: SeamConstraintSet = {
+      ids: new Int32Array([0, 1]),
+      restLengths: new Float32Array([DEFAULT_SEAM_CONFIG.restLengthFloor]),
+      compliances: new Float32Array([0]),
+      count: 1,
+      config: DEFAULT_SEAM_CONFIG,
+    };
+    expect(isFullySewn(atFloor)).toBe(true);
+
+    const aboveFloor: SeamConstraintSet = {
+      ...atFloor,
+      restLengths: new Float32Array([DEFAULT_SEAM_CONFIG.restLengthFloor + 0.001]),
+    };
+    expect(isFullySewn(aboveFloor)).toBe(false);
+  });
+});
+
+describe('computeSeamRestLengthFloor (A3)', () => {
+  const seam = (a: string, b: string, active = true) =>
+    ({ pieceAId: a, pieceBId: b, active }) as Pick<SeamInitData, 'pieceAId' | 'pieceBId' | 'active'>;
+
+  it('returns the 2mm minimum when fabrics are thin (today: 0.1-1.2mm)', () => {
+    const thickness = new Map([['a', 0.3], ['b', 0.9]]);
+    // (0.3 + 0.9) / 2 = 0.6mm → 0.0006m < 0.002m minimum
+    expect(computeSeamRestLengthFloor([seam('a', 'b')], thickness)).toBe(0.002);
+  });
+
+  it('scales with fabric thickness above the minimum (the thick-fabric knob)', () => {
+    const thickness = new Map([['a', 5], ['b', 3]]);
+    // (5 + 3) / 2 = 4mm → 0.004m > 0.002m
+    expect(computeSeamRestLengthFloor([seam('a', 'b')], thickness)).toBeCloseTo(0.004, 9);
+  });
+
+  it('is scalar v1: the MAX over all active seams wins', () => {
+    const thickness = new Map([['a', 5], ['b', 3], ['c', 0.2]]);
+    expect(
+      computeSeamRestLengthFloor([seam('a', 'c'), seam('a', 'b')], thickness),
+    ).toBeCloseTo(0.004, 9);
+  });
+
+  it('ignores inactive seams and unknown pieces (falls back to the minimum)', () => {
+    const thickness = new Map([['a', 50], ['b', 50]]);
+    expect(computeSeamRestLengthFloor([seam('a', 'b', false)], thickness)).toBe(0.002);
+    expect(computeSeamRestLengthFloor([seam('x', 'y')], thickness)).toBe(0.002);
+    expect(computeSeamRestLengthFloor([], thickness)).toBe(0.002);
   });
 });
 

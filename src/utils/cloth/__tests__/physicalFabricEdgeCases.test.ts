@@ -37,17 +37,17 @@ describe('toXPBDParams — edge cases', () => {
   it('handles extreme bending stiffness (neoprene 8.0 mN·cm)', () => {
     const neo = getPhysicalFabric('neoprene-3mm')!;
     const params = toXPBDParams(neo);
-    // #gummy STEP 1 rescale: 2e-5 / (8.0 + 0.1) ≈ 2.5e-6 (stiff → low compliance)
-    expect(params.bendComplianceWarp).toBeLessThan(1e-5);
-    expect(params.bendComplianceWarp).toBeGreaterThan(1.2e-6);
+    // P1 angular: 1.08 / (8.0 + 0.1) ≈ 0.133 (rígido → compliance baja, banda [6e-2,10])
+    expect(params.bendComplianceWarp).toBeLessThan(0.5);
+    expect(params.bendComplianceWarp).toBeGreaterThanOrEqual(6e-2);
   });
 
   it('handles very flexible bending (chiffon 0.05 mN·cm)', () => {
     const chiffon = getPhysicalFabric('chiffon')!;
     const params = toXPBDParams(chiffon);
-    // #gummy STEP 1 rescale: 2e-5 / (0.05 + 0.1) ≈ 1.3e-4 (flexible → high compliance, near 2e-4 cap)
-    expect(params.bendComplianceWarp).toBeGreaterThan(1e-4);
-    expect(params.bendComplianceWarp).toBeLessThan(2e-4);
+    // P1 angular: 1.08 / (0.05 + 0.1) ≈ 7.2 (fluido → compliance alta, cerca del cap 10)
+    expect(params.bendComplianceWarp).toBeGreaterThan(5);
+    expect(params.bendComplianceWarp).toBeLessThanOrEqual(10);
   });
 
   it('handles high shear stiffness (neoprene 200 N/m)', () => {

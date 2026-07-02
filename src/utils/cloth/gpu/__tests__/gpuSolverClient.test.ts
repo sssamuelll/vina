@@ -953,11 +953,12 @@ describe('initMultiPieceTsl seam closure packing (behavior #11 — #897 F1)', ()
 // groundY 0).
 
 describe('initMultiPieceTsl default seam decay config (behavior #12 — #897 F1.4)', () => {
-  it('seeds seamShrinkFactor and seamSewedThreshold from DEFAULT_SEAM_CONFIG', async () => {
+  it('seeds seamShrinkFactor and the EFFECTIVE seam floor from DEFAULT_SEAM_CONFIG (A3)', async () => {
     // Anchor the literals first so the wiring assertion below can't go
     // tautological if DEFAULT_SEAM_CONFIG drifts.
     expect(DEFAULT_SEAM_CONFIG.shrinkFactor).toBe(0.97);
     expect(DEFAULT_SEAM_CONFIG.sewedThreshold).toBe(1e-6);
+    expect(DEFAULT_SEAM_CONFIG.restLengthFloor).toBe(0.002);
 
     uniformCalls.length = 0;
     const device = new FakeGPUDevice();
@@ -966,7 +967,9 @@ describe('initMultiPieceTsl default seam decay config (behavior #12 — #897 F1.
     await client.initMultiPieceTsl([makeQuadPiece()]);
 
     expect(uniformCalls).toContain(DEFAULT_SEAM_CONFIG.shrinkFactor);
-    expect(uniformCalls).toContain(DEFAULT_SEAM_CONFIG.sewedThreshold);
+    // A3: al kernel llega el piso EFECTIVO max(restLengthFloor, sewedThreshold)
+    // = 0.002 — el threshold crudo ya no se emite como uniform.
+    expect(uniformCalls).toContain(DEFAULT_SEAM_CONFIG.restLengthFloor);
   });
 });
 

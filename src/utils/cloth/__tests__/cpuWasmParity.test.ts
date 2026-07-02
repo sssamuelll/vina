@@ -38,7 +38,6 @@ import {
   extractStretchConstraints,
   extractBendConstraints,
 } from '../gpu/gpuBuffers';
-import { computeBendRestDistances } from '../wasm/bendRestDistances';
 
 // ─── WASM loader (mirrors scripts/verify-wasm-smoke.mjs / #748) ──────────
 
@@ -269,8 +268,8 @@ function buildWasmFromMesh(fixture: MeshFixture, useUVs: boolean): WasmXpbdSolve
   solver.set_stretch_with_types(stretch.ids, stretch.restLengths, stretch.edgeTypes);
 
   const bend = extractBendConstraints(fixture.positions, fixture.triangles, uvs);
-  const bendDistances = computeBendRestDistances(fixture.positions, bend.ids);
-  solver.set_bend_with_types(bend.ids, bendDistances, bend.edgeTypes);
+  // P1 dihedral: angulos rest directo (espejo del worker; BUG-1 invertido).
+  solver.set_bend_with_types(bend.ids, bend.restAngles, bend.edgeTypes);
 
   solver.set_triangles(fixture.triangles);
 

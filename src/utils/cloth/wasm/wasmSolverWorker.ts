@@ -34,7 +34,6 @@ import { buildElasticConstraints, type ElasticConstraintSet } from '../elasticAs
 import type { PathCommand, Elastic } from '../../../types/types';
 import type { CollisionMeshData } from '../collisionMesh';
 import { TriangleSpatialHash, solveTriangleCollision } from '../triangleCollision';
-import { computeBendRestDistances } from './bendRestDistances';
 import { buildAdjacency } from '../selfCollision';
 import { buildAdjacencyCSR } from './adjacencyCSR';
 import { createCountSamplingLimiter } from '../../rateLimit';
@@ -536,12 +535,11 @@ self.onmessage = async (event: MessageEvent) => {
         solver.set_stretch_with_types(stretch.ids, stretch.restLengths, stretch.edgeTypes);
 
         const bend = extractBendConstraints(merged.vertices, triangles, merged.uvs);
-        // BUG-1 (#604): Rust solve_bend expects rest *distances* between the
-        // opposite vertices c, d (indices 2 and 3 of each 4-tuple), not the
-        // dihedral angles that the shared TSL extractor returns. Compute the
-        // distances locally so the WASM tier matches CPU semantics.
-        const bendRestDistances = computeBendRestDistances(merged.vertices, bend.ids);
-        solver.set_bend_with_types(bend.ids, bendRestDistances, bend.edgeTypes);
+        // P1 dihedral: Rust solve_bend ahora consume los ÁNGULOS rest del
+        // extractor compartido directo (radianes, signed, flat=0) — BUG-1
+        // quedó invertido y computeBendRestDistances borrado. Una sola
+        // verdad del ángulo: dihedral.ts, que el extractor reusa.
+        solver.set_bend_with_types(bend.ids, bend.restAngles, bend.edgeTypes);
 
         // Pass triangle indices for air drag calculation
         solver.set_triangles(triangles);

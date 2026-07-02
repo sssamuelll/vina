@@ -480,12 +480,13 @@ export class GpuSolverClient implements ClothSolverClient {
       stretchComplianceWarp: 0.0,
       stretchComplianceWeft: 0.0,
       shearCompliance: 0.001,
-      // #gummy STEP 1: 1.0 → 2.5e-5. alpha=compliance/sdt² (sdt=1/900) gave
-      // alpha=810000 at 1.0 → s≈0 → DEAD bend → cloth had no body (floppy/gummy).
-      // 2.5e-5 → alpha≈20 → real bending stiffness. ≈ cotton's toXPBDParams value.
-      // PARITY: WASM (lib.rs) + CPU (xpbdSolver) carry the SAME default in lockstep.
-      bendComplianceWarp: 2.5e-5,
-      bendComplianceWeft: 2.5e-5,
+      // P1 dihedral: default ANGULAR 1.0 ∈ banda [6e-2,10] (spec 2026-07-02
+      // §8). En la era distance-bend 1.0 era bend MUERTO (alpha 810k) y el
+      // fix #gummy lo bajó a 2.5e-5; con el constraint angular la banda viva
+      // es ~×5.4e4 y 1.0 vuelve a ser un default vivo. PARITY: WASM (lib.rs)
+      // + CPU (xpbdSolver) llevan el MISMO default en lockstep.
+      bendComplianceWarp: 1.0,
+      bendComplianceWeft: 1.0,
     };
 
     const numStretch = stretch.ids.length / 2;
@@ -599,6 +600,9 @@ export class GpuSolverClient implements ClothSolverClient {
         internalDamping: 0.3,
         seamShrinkFactor: DEFAULT_SEAM_CONFIG.shrinkFactor,
         seamSewedThreshold: DEFAULT_SEAM_CONFIG.sewedThreshold,
+        // A3: piso terminal del decay (2mm) — canónico cross-tier con CPU
+        // DEFAULT_SEAM_CONFIG.restLengthFloor y Rust seam_rest_length_floor.
+        seamRestLengthFloor: DEFAULT_SEAM_CONFIG.restLengthFloor,
         groundY: 0.0,
         dt: 1 / 60,
         // Always-on en GPU (#897 F3, ver bloque scBuffers arriba); thickness

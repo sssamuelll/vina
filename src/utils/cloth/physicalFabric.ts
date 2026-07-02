@@ -658,6 +658,18 @@ export interface PhysicalXPBDParams extends XPBDCompliance {
  *   compliance = 1 / (stiffness * dt²)
  * We simplify to a normalized mapping suitable for the solver.
  */
+/**
+ * Banda viva ANGULAR del bend dihedral (P1) — compartida cross-tier: los 3
+ * tiers consumen estos números vía el flujo fabricCompliance/configBridge.
+ * Derivación en el spec 2026-07-02-dihedral-bend-design.md §8. OJO: la banda
+ * asume sdt=1/900 (15 substeps) y malla ~7mm — si cualquiera cambia, la banda
+ * escala (alpha=compliance/sdt², denom ~1/e²); el gate Cusick es el oráculo
+ * que caza la deriva.
+ */
+export const BEND_K_ANGULAR = 1.08;
+export const BEND_ANGULAR_MIN = 6e-2;
+export const BEND_ANGULAR_MAX = 10;
+
 export function toXPBDParams(pf: PhysicalFabric): PhysicalXPBDParams {
   // Stretch: % elongation → XPBD compliance, RESCALED to the solver live band
   // (#gummy STEP 3): the old `stretchWarp/10` gave 0.2-8 → alpha 160k-6M → null
@@ -667,16 +679,20 @@ export function toXPBDParams(pf: PhysicalFabric): PhysicalXPBDParams {
   const stretchComplianceWarp = Math.min(1e-5, Math.max(5e-7, pf.stretchWarp * 5e-7));
   const stretchComplianceWeft = Math.min(1e-5, Math.max(5e-7, pf.stretchWeft * 5e-7));
 
-  // Bending: mN·cm → XPBD compliance (inverse: higher rigidity = lower compliance).
-  // RESCALED to the solver's live alpha band (#gummy STEP 1): the solver computes
-  // alpha = compliance/sdt² with sdt=1/900 (sdt²≈1.23e-6), so compliance must be
-  // ~[1.2e-6, 2e-4] to produce a real bend correction. The OLD scale (0.05-20) gave
-  // alpha=40k-16M → s≈0 → DEAD bend constraint → floppy/gummy cloth with no body.
-  // BEND_K=2e-5: cotton (0.8 mN·cm) → ~2.2e-5; chiffon (~0.04) → ~1.4e-4 (soft);
-  // neoprene (~8) → ~2.5e-6 (stiff). Same inverse law, corrected magnitude.
-  const BEND_K = 2.0e-5;
-  const bendComplianceWarp = Math.min(2e-4, Math.max(1.2e-6, BEND_K / (pf.bendingWarp + 0.1)));
-  const bendComplianceWeft = Math.min(2e-4, Math.max(1.2e-6, BEND_K / (pf.bendingWeft + 0.1)));
+  // Bending ANGULAR (P1 dihedral, spec 2026-07-02 §8): mN·cm → compliance del
+  // constraint DIHEDRAL (C en radianes, ∇C ~ 1/m). La banda viva angular es
+  // ~×5.4e4 la de distancia (aritmética verificada: ratio de denoms
+  // 2·(1.155/e)² con e≈7mm) → [6e-2, 10] en vez de [1.2e-6, 2e-4], y es
+  // mesh-dependent (~1/e²). BARRERA ANTI-BEND-MUERTO: el clamp inferior
+  // BEND_ANGULAR_MIN está DENTRO de la banda viva — un valor legacy de la
+  // banda de distancia (p.ej. 2.5e-5) queda clampeado a 6e-2 y el bend jamás
+  // vuelve a morir en silencio (#gummy). El test de physicalFabric pinnea
+  // este piso. BEND_K_ANGULAR = 2e-5 × 5.4e4 ≈ 1.08: cotton (0.8 mN·cm) →
+  // ~1.2; chiffon (~0.04) → ~7.7 (fluido); neoprene (~8) → ~0.13 (rígido).
+  // La ley inversa se conserva; la magnitud es la angular. Re-sweep contra el
+  // gate Cusick (B2) = la otra barrera.
+  const bendComplianceWarp = Math.min(BEND_ANGULAR_MAX, Math.max(BEND_ANGULAR_MIN, BEND_K_ANGULAR / (pf.bendingWarp + 0.1)));
+  const bendComplianceWeft = Math.min(BEND_ANGULAR_MAX, Math.max(BEND_ANGULAR_MIN, BEND_K_ANGULAR / (pf.bendingWeft + 0.1)));
 
   // Shear: N/m → compliance (inverse), RESCALED to the live band (#gummy STEP 3).
   const shearCompliance = Math.min(1e-4, Math.max(1e-5, 1e-3 / (pf.shearStiffness + 1)));
