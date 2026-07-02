@@ -169,7 +169,8 @@ export default function InspectorTab() {
                   <div>particles: {data.simulation.particleCount}</div>
                 )}
                 {data.simulation.collisionDistance !== undefined && (
-                  <div>collision distance: {data.simulation.collisionDistance.toFixed(4)}m</div>
+                  // §A1: the penetration metric publishes this in mm (rule-engine units).
+                  <div>collision distance: {data.simulation.collisionDistance.toFixed(1)}mm</div>
                 )}
               </div>
             )}

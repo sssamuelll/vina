@@ -110,6 +110,7 @@ import { GPU_CAPABILITIES, NEURAL_CAPABILITIES } from '../../utils/cloth/solverC
 import { safeGetItem } from '../../utils/safeStorage';
 import { getPhysicalFabric, toXPBDParams } from '../../utils/cloth/physicalFabric';
 import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
+import { registerPenetrationBody } from '../../utils/cloth/penetrationMetric';
 import { extractMeshData } from '../../utils/cloth/avatarMeshExtractor';
 import { collisionMeshFromBuffers } from '../../utils/cloth/collisionMesh';
 import { importMesh } from '../../utils/import/meshImporter';
@@ -225,12 +226,19 @@ async function loadCollision(
           (client as WasmSolverClient).applyInitialTriangleCollision();
         }
         dispatch(setBodyCollision(true));
+        // §A1: expose the body to the penetration metric (GarmentSimulation
+        // readback cadence). Derived data builds lazily on the first tick.
+        registerPenetrationBody(collisionMesh);
       } else if (!cancelled.value) {
         dispatch(setBodyCollision(false));
+        registerPenetrationBody(null);
       }
     } catch (e) {
       console.warn('[SimLifecycle] Collision mesh extraction failed:', e);
-      if (!cancelled.value) dispatch(setBodyCollision(false));
+      if (!cancelled.value) {
+        dispatch(setBodyCollision(false));
+        registerPenetrationBody(null);
+      }
     }
   }
 
@@ -702,6 +710,9 @@ export function useSimulationLifecycle({
       neuralClientRef.current?.dispose();
       neuralClientRef.current = null;
       positionsRef.current = null;
+      // §A1: drop the metric's body (releases pseudonormals + hash; re-registered
+      // by loadCollision on the next init).
+      registerPenetrationBody(null);
       dispatch(setSolverTier('none'));
       dispatch(setFrameTime(0));
       resetFrameWindow();
@@ -756,6 +767,8 @@ export function useSimulationLifecycle({
           console.log('[SimLifecycle] ♻️ Collision mesh rebuilt for measurement change:', collisionMesh.triCount, 'tris');
           // F0: keep the fabric's body-friction on pose/measurement rebuilds too.
           client.setCollisionMesh(collisionMesh, getPhysicalFabric(fabricId)?.frictionBody);
+          // §A1: keep the penetration metric's body in sync with the morphed collider.
+          registerPenetrationBody(collisionMesh);
         }
       } catch (e) {
         console.warn('[SimLifecycle] Collision mesh rebuild failed:', e);

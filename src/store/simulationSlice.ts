@@ -105,6 +105,13 @@ interface SimulationSliceState {
   seamResolution: SeamResolutionSummary | null;
   /** Whether body collision is active */
   bodyCollision: boolean;
+  /**
+   * Min cloth↔body signed distance in mm from the penetration metric (plan
+   * drape-profesional §A1). Negative = penetration. null = never computed.
+   * Kept after stop for post-stop inspection (same convention as
+   * `lastSolverError`).
+   */
+  collisionDistance: number | null;
   /** 3D viewport mode */
   viewMode3D: ViewMode3D;
   /** Pre-simulation arrangement snapshot for reset */
@@ -211,6 +218,7 @@ const initialState: SimulationSliceState = {
   particleCount: 0,
   seamResolution: null,
   bodyCollision: false,
+  collisionDistance: null,
   viewMode3D: 'arrange' as ViewMode3D,
   arrangementSnapshot: null,
   pinnedVertices: {},
@@ -338,6 +346,14 @@ const simulationSlice = createSlice({
     /** Set body collision status. */
     setBodyCollision(state, action: PayloadAction<boolean>) {
       state.bodyCollision = action.payload;
+    },
+    /**
+     * Record the min cloth↔body signed distance (mm) from the penetration
+     * metric (§A1). Feeds the inspector rules `fit:body-penetration` /
+     * `fit:pressure-point` via dataCollector.
+     */
+    setCollisionDistance(state, action: PayloadAction<number | null>) {
+      state.collisionDistance = action.payload;
     },
     /** Set 3D viewport mode (arrange/simulate). */
     setViewMode3D(state, action: PayloadAction<ViewMode3D>) {
@@ -751,6 +767,7 @@ export const {
   setFrameTime,
   setParticleCount,
   setBodyCollision,
+  setCollisionDistance,
   setViewMode3D,
   saveArrangementSnapshot,
   clearArrangementSnapshot,

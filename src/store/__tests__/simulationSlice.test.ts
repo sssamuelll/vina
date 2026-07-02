@@ -14,6 +14,7 @@ import reducer, {
   removeSnapshot,
   setActiveSnapshot,
   clearSnapshots,
+  setCollisionDistance,
 } from '../simulationSlice';
 
 const initial = () => reducer(undefined, { type: '@@INIT' });
@@ -39,6 +40,22 @@ describe('simulationSlice', () => {
       const running = reducer(initial(), startSimulation());
       const s = reducer(running, resetSimulation());
       expect(s.simulationState).toBe('idle');
+    });
+  });
+
+  describe('collision distance (penetration metric, plan drape-profesional §A1)', () => {
+    it('defaults to null (never computed)', () => {
+      expect(initial().collisionDistance).toBeNull();
+    });
+
+    it('setCollisionDistance records the min signed distance in mm', () => {
+      const s = reducer(initial(), setCollisionDistance(-3.2));
+      expect(s.collisionDistance).toBe(-3.2);
+    });
+
+    it('setCollisionDistance(null) clears it', () => {
+      const s = reducer(reducer(initial(), setCollisionDistance(1.5)), setCollisionDistance(null));
+      expect(s.collisionDistance).toBeNull();
     });
   });
 

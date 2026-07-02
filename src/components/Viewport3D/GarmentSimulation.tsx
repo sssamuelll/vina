@@ -32,7 +32,7 @@ import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
 import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
-import { addPin, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
+import { addPin, setCollisionDistance, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
 import { showErrorToast } from '../../store/copilotUISlice';
 import { textureManager } from '../../utils/textures/TextureManager';
 import type { Texture } from 'three';
@@ -51,6 +51,7 @@ import { useSimulationRecorder } from '../../hooks/useSimulationRecorder';
 import { useSimulationPlayback } from '../../hooks/useSimulationPlayback';
 import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
+import { computePenetrationMetric, getPenetrationBody, penetrationStrideFor } from '../../utils/cloth/penetrationMetric';
 import { mapClothSimConfigToWasmSolverConfig, type SharedClothSimConfigKeys } from '../../utils/cloth/configBridge';
 import type { ClothSimConfig } from '../../utils/cloth/xpbdSolver';
 import {
@@ -68,6 +69,13 @@ const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 // — the M4 checkpoint the e2e validates as settled (seams closed, garment on
 // body). Capturing here (vs init) is the root-cause fix for the tether collapse.
 const TETHER_SETTLE_FRAMES = 150;
+
+// Penetration metric cadence (plan drape-profesional §A1): every 4th position
+// readback (readbacks run every 15 frames → metric ≈ every 60 frames ≈ 2 s).
+// Cheap and honest — it's an oracle, not a gate. Cost per tick: ≤~7ms
+// (sample-budgeted stride, see penetrationStrideFor) + one-time ~60ms lazy
+// body build (pseudonormals + hash) on the first tick after a body registers.
+const PENETRATION_READBACK_CADENCE = 4;
 
 /**
  * Convert Seam[] to SeamInitData[] for the worker.
@@ -171,6 +179,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const tslFrameCounter = useRef(0);
   const tslReadbackPending = useRef(false);
+  // §A1: completed-readback counter — the penetration metric runs on every
+  // PENETRATION_READBACK_CADENCE-th resolved readback.
+  const tslReadbackCount = useRef(0);
   // Body-tether (frente#2) settle-capture state. Targets MUST be captured from
   // the SETTLED drape (cloth wrapped on the body), NOT at init where positions
   // are the pre-wrap spread-out layout (~0.6 m mean from the body → garbage
@@ -613,6 +624,24 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           tslReadbackPending.current = true;
           gpuClient.readbackPositionsToGeometry(renderer, staticGeometry).then(() => {
             tslReadbackPending.current = false;
+            // §A1 penetration metric — slow cadence over the freshly-read
+            // positions. No-op while no avatar body is registered.
+            tslReadbackCount.current++;
+            if (tslReadbackCount.current % PENETRATION_READBACK_CADENCE !== 0) return;
+            const body = getPenetrationBody();
+            const posAttr = staticGeometry.getAttribute('position');
+            if (!body || !posAttr) return;
+            const positions = posAttr.array as Float32Array;
+            const { count, minSignedDist } = computePenetrationMetric(positions, body, {
+              stride: penetrationStrideFor(posAttr.count),
+            });
+            // e2e §8 debug global — same window-cast pattern as __OPENCLO_CLOTH_MESH__.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window as any).__OPENCLO_PENETRATION_COUNT__ = count;
+            if (Number.isFinite(minSignedDist)) {
+              // Inspector rules (fit:body-penetration / fit:pressure-point) compare in mm.
+              dispatch(setCollisionDistance(minSignedDist * 1000));
+            }
           });
         }
       }
