@@ -8,19 +8,20 @@
  * per substep: 180-900ms/frame at María scale, dead-on-arrival for ≥30fps).
  *
  * Pipeline passes (the FULL sequence must run EVERY substep — cellClear
- * resets the counters scatter accumulates into):
- *   1. cellClear — atomicStore 0 into every cellCount      (dispatch: tableSize)
- *   2. scatter   — hash particle pos → cell h; claim slot via
- *                  atomicAdd(cellCount[h], 1); write particle index into
- *                  cellEntries[h*K + slot] if slot < K     (dispatch: N)
- *   3. resolve   — detect pairs in the 27-cell neighborhood, atomicAdd
- *                  i32 fixed-point corrections             (dispatch: N)
+ * sentinel-fills the entries scatter deposits into):
+ *   1. cellClear — atomicStore SENTINEL into every cellEntries slot (dispatch: tableSize*K)
+ *   2. scatter   — hash particle pos → cell h; keep the K SMALLEST indices via
+ *                  an atomicMin cascade over cellEntries[h*K .. h*K+K-1] (P4-2:
+ *                  deterministic, order-independent)       (dispatch: N)
+ *   3. resolve   — detect pairs in the 27-cell neighborhood (skip SENTINEL
+ *                  slots), atomicAdd i32 fixed-point corrections (dispatch: N)
  *   4. apply     — drain deltas, average, apply to positions, reset
  *                  delta/corrCount                         (dispatch: N)
  *
- * cellEntries is tableSize × CELL_CAPACITY: no prefix sum, no cellStart, no
- * separate count pass. Cells with more than CELL_CAPACITY particles truncate
- * candidates (ratified divergence vs unbounded CPU/WASM — see CELL_CAPACITY).
+ * cellEntries is tableSize × CELL_CAPACITY atomic<u32>: no prefix sum, no
+ * cellStart, no cellCount. Cells with >CELL_CAPACITY particles keep the K
+ * smallest indices — a DETERMINISTIC bounded subset (ratified divergence vs
+ * unbounded CPU/WASM; see CELL_CAPACITY + the P4-2 spec).
  *
  * Adjacency is pre-uploaded (CSR flat list + offsets) to skip connected neighbors.
  *
@@ -43,6 +44,7 @@ import {
   If,
   Loop,
   atomicAdd,
+  atomicMin,
   atomicLoad,
   atomicStore,
 } from 'three/tsl';
@@ -55,8 +57,9 @@ type TslNode = any;
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface SelfCollisionBufferSet {
-  // Spatial hash (fixed-capacity buckets)
-  cellCountSBA: StorageBufferAttribute;   // Uint32Array, tableSize (atomic)
+  // Spatial hash (fixed-capacity buckets). cellEntries is atomic<u32>; empty
+  // slots hold SENTINEL (0xFFFFFFFF). No cellCount buffer (P4-2): the
+  // keep-smallest atomicMin cascade needs no per-cell counter.
   cellEntriesSBA: StorageBufferAttribute; // Uint32Array, tableSize * CELL_CAPACITY
 
   // Adjacency (CSR)
@@ -92,11 +95,13 @@ export interface SelfCollisionComputeNodes {
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 /** Capacidad por celda. 27 celdas × 8 = 216 candidatos/partícula máximo.
- *  A 5mm de spacing con celda = thickness (2mm), >8 partículas/celda solo
- *  ocurre en interpenetración masiva — truncar ahí es aceptable (divergencia
- *  ratificada vs CPU/WASM unbounded; plan B: port Blelloch del WGSL legacy).
- *  Sustituye al prefix-sum serial: 1 hilo × ~59k iter × 15 substeps era
- *  180-900ms/frame — inviable para el DoD ≥30fps (#897 H-BP1). */
+ *  Cuando >K partículas caen en una celda (frecuente en el ruedo: ~200 celdas
+ *  a K=21-31 medido), la admisión conserva las K de MENOR índice de forma
+ *  DETERMINISTA (cascade atomicMin, P4-2) — divergencia ratificada vs CPU/WASM
+ *  unbounded, pero reproducible corrida-a-corrida (antes era el set que llegara
+ *  primero = no-determinista). Sustituye al prefix-sum serial (180-900ms/frame,
+ *  inviable para el DoD ≥30fps #897 H-BP1).
+ *  Spec: docs/plans/2026-07-01-drape-determinism-p4-2-selfcollision-admission.md */
 export const CELL_CAPACITY = 8;
 
 /**
@@ -132,8 +137,14 @@ export function createSelfCollisionBuffers(
   adjacencyOffsets: Uint32Array,
   adjacencyNeighbors: Uint32Array,
 ): SelfCollisionBufferSet {
+  // SENTINEL (0xFFFFFFFF) marks an empty entries slot, so a real particle index
+  // must never equal it (mirror of the INT32_MAX guard in tslCollision.ts).
+  if (numParticles >= 0xffffffff) {
+    throw new Error(
+      `self-collision: numParticles ${numParticles} collides with the empty-slot SENTINEL (0xFFFFFFFF)`,
+    );
+  }
   return {
-    cellCountSBA: new StorageBufferAttribute(new Uint32Array(tableSize), 1),
     cellEntriesSBA: new StorageBufferAttribute(
       new Uint32Array(tableSize * CELL_CAPACITY),
       1,
@@ -174,7 +185,6 @@ export function destroySelfCollisionBuffers(
   const attrs = (renderer as any)?._attributes;
   if (!attrs || typeof attrs.delete !== 'function') return;
   const sbas: StorageBufferAttribute[] = [
-    buffers.cellCountSBA,
     buffers.cellEntriesSBA,
     buffers.adjOffsetsSBA,
     buffers.adjNeighborsSBA,
@@ -214,8 +224,10 @@ export function makeSelfCollisionComputeNodes(
 
   // ─── Wrap SBAs as TSL storage nodes ──────────────────────────────
   // cellCount/delta/corrCount need atomic access for atomicAdd/atomicStore.
-  const cellCountBuf = makeAtomicStorage(buffers.cellCountSBA, 'int', T);
-  const cellEntriesBuf = storage(buffers.cellEntriesSBA, 'uint', T * CELL_CAPACITY);
+  // cellEntries is now atomic<u32> (P4-2): scatter does atomicMin into it,
+  // resolve atomicLoads it. SENTINEL (0xFFFFFFFF) = empty slot.
+  const cellEntriesBuf = makeAtomicStorage(buffers.cellEntriesSBA, 'uint', T * CELL_CAPACITY);
+  const SENTINEL = uint(0xffffffff);
   const adjOffsetsBuf = storage(buffers.adjOffsetsSBA, 'uint', N + 1);
   const adjNeighborsBuf = storage(buffers.adjNeighborsSBA, 'uint', adjNeighborCount);
   const deltaBuf = makeAtomicStorage(buffers.deltaSBA, 'int', N * 3);
@@ -235,14 +247,15 @@ export function makeSelfCollisionComputeNodes(
   const cellClearFn = (Fn as any)(() => {
     const i = instanceIndex;
 
-    If(uint(i).lessThan(uint(uTableSize)), () => {
-      // toVar() forces explicit i32 in WGSL — bare int(0) emits AbstractInt
-      // which some WebGPU implementations reject for atomicStore (same
-      // idiom as makeNormalZeroFn in tslSolver.ts).
-      atomicStore(cellCountBuf.element(i), int(0).toVar());
+    // Sentinel-fill EVERY entries slot each substep — with cellCount gone,
+    // SENTINEL is the only "empty" signal the scatter cascade and resolve read.
+    // Dispatch T*K (was T). toVar() forces a concrete u32 (AbstractInt caveat,
+    // same idiom as makeNormalZeroFn in tslSolver.ts).
+    If(uint(i).lessThan(uint(T * CELL_CAPACITY)), () => {
+      atomicStore(cellEntriesBuf.element(i), SENTINEL.toVar());
     });
   })();
-  const cellClearNode = compute(cellClearFn, T, [64]);
+  const cellClearNode = compute(cellClearFn, T * CELL_CAPACITY, [64]);
 
   // ─── Pass 2: scatter ─────────────────────────────────────────────
   // Hash each particle position to a cell, claim a slot via atomicAdd, and
@@ -280,17 +293,22 @@ export function makeSelfCollisionComputeNodes(
         hVar.assign(uint(modded));
       });
 
-      // atomicAdd returns the OLD value (= the claimed slot) as i32 — same
-      // old-value contract tslCollision.ts relies on for atomicMin. toVar()
-      // materializes it so the two uses below don't re-emit the atomic op.
+      // Keep the K SMALLEST particle indices in this cell via an atomicMin
+      // cascade (P4-2 determinism): carry our index down the K slots; each
+      // atomicMin deposits min(slot,val) and hands the displaced (larger) value
+      // onward. Once we deposit (val→SENTINEL) the guard skips the rest — the
+      // ONLY legal early-out. A `val>=old`/`old<=val` early-out would stop while
+      // still carrying a real value and DROP it (see spec §2.3 +
+      // kSmallestAdmission.test.ts, which fails on exactly that mistake).
+      const base = hVar.mul(uint(CELL_CAPACITY));
+      const val = uint(i).toVar('val');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const slot = (atomicAdd(cellCountBuf.element(hVar), int(1)) as any).toVar('slot');
-      If(slot.lessThan(int(CELL_CAPACITY)), () => {
-        // Inside this branch slot ∈ [0, CELL_CAPACITY) → i32→u32 cast is
-        // safe; index math stays in uint like every entries access.
-        cellEntriesBuf
-          .element(hVar.mul(uint(CELL_CAPACITY)).add(uint(slot)))
-          .assign(uint(i));
+      Loop({ start: uint(0), end: uint(CELL_CAPACITY), type: 'uint', condition: '<' }, ({ i: s }: { i: any }) => {
+        If(val.notEqual(SENTINEL), () => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const old = (atomicMin(cellEntriesBuf.element(base.add(s)), val) as any).toVar('old');
+          val.assign(old.max(val));
+        });
       });
     });
   })();
@@ -350,22 +368,18 @@ export function makeSelfCollisionComputeNodes(
                 hVar.assign(uint(modded));
               });
 
-              // Bucket iteration: clamp to CELL_CAPACITY — the counter keeps
-              // counting past the bucket (scatter truncates writes, not the
-              // count), so entries beyond K-1 don't exist.
-              // atomicLoad required because cellCountBuf is array<atomic<i32>> (#554).
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const cellCount = (uint(atomicLoad(cellCountBuf.element(hVar))) as any)
-                .min(uint(CELL_CAPACITY));
+              // Iterate the K fixed slots. cellCount is gone (P4-2) — empty
+              // slots hold SENTINEL, filled slots hold the K smallest indices.
+              // atomicLoad required because cellEntries is now array<atomic<u32>>.
               const entriesBase = hVar.mul(uint(CELL_CAPACITY));
 
-              // Iterate entries in this cell's bucket
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              Loop({ start: uint(0), end: cellCount, type: 'uint', condition: '<' }, ({ i: ki }: { i: any }) => {
-                const j = cellEntriesBuf.element(entriesBase.add(ki));
+              Loop({ start: uint(0), end: uint(CELL_CAPACITY), type: 'uint', condition: '<' }, ({ i: ki }: { i: any }) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const j = (atomicLoad(cellEntriesBuf.element(entriesBase.add(ki))) as any).toVar('jEntry');
 
-                // Only process pairs where j > i to avoid duplicates
-                If(j.greaterThan(uint(i)), () => {
+                // Skip empty slots (SENTINEL); dedupe pairs with j>i.
+                If(j.notEqual(SENTINEL).and(j.greaterThan(uint(i))), () => {
                   const wj = invMassBufNode.element(j);
 
                   If(wj.greaterThan(float(0.0)), () => {

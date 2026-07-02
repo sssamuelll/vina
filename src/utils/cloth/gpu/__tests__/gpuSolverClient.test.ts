@@ -1132,8 +1132,9 @@ describe('initMultiPieceTsl self-collision allocation (behavior #15 — #897 F3.
     expect(solver.selfCollisionNodes).not.toBeNull();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const nodes = solver.selfCollisionNodes as any;
-    // Dispatch counts baked into the compute() wraps: [tableSize, N, N, N].
-    expect(nodes.cellClearNode.dispatchCount).toBe(17);
+    // Dispatch counts baked into the compute() wraps: [tableSize*K, N, N, N].
+    // cellClear sentinel-fills every entries slot (P4-2) → tableSize*CELL_CAPACITY.
+    expect(nodes.cellClearNode.dispatchCount).toBe(17 * 8);
     expect(nodes.scatterNode.dispatchCount).toBe(8);
     expect(nodes.resolveNode.dispatchCount).toBe(8);
     expect(nodes.applyNode.dispatchCount).toBe(8);
