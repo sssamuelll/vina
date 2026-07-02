@@ -136,8 +136,8 @@ interface MockComputeNode {
 const asMockCompute = (node: unknown): MockComputeNode => node as MockComputeNode;
 
 describe('tslSelfCollision buffers (bucket layout, #897 F3)', () => {
-  it('exports CELL_CAPACITY = 8', () => {
-    expect(CELL_CAPACITY).toBe(8);
+  it('exports CELL_CAPACITY = 4 (P4-2 perf: keep-4-smallest, fps 27.9->31.3 con drape verde)', () => {
+    expect(CELL_CAPACITY).toBe(4);
   });
 
   it('creates buffer set with correct sizes', () => {
@@ -167,7 +167,7 @@ describe('tslSelfCollision buffers (bucket layout, #897 F3)', () => {
     const tableSize = 211;
     const buffers = createSelfCollisionBuffers(100, tableSize, new Uint32Array(101), new Uint32Array(200));
     expect(buffers.cellEntriesSBA.array).toBeInstanceOf(Uint32Array);
-    expect(buffers.cellEntriesSBA.array.length).toBe(tableSize * 8);
+    expect(buffers.cellEntriesSBA.array.length).toBe(tableSize * CELL_CAPACITY);
   });
 
   it('does NOT allocate a cellStart buffer — the bucket design has no prefix-sum pass', () => {

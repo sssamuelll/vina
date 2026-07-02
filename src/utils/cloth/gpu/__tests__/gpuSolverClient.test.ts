@@ -134,6 +134,7 @@ vi.mock('three/tsl', () => sharedMock());
 
 import { GpuSolverClient, type PieceMeshData } from '../gpuSolverClient';
 import { DEFAULT_SEAM_CONFIG } from '../../seamAssembly';
+import { CELL_CAPACITY } from '../tslSelfCollision';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -1116,9 +1117,9 @@ describe('initMultiPieceTsl self-collision allocation (behavior #15 — #897 F3.
     expect(p4).toEqual([5, 6, 7]);
 
     // tableSize = nextPrime(2N) = nextPrime(16) = 17 (SpatialHashGrid.build
-    // mirror); bucket entries are tableSize × CELL_CAPACITY (8).
+    // mirror); bucket entries are tableSize × CELL_CAPACITY (4, P4-2 perf).
     expect(sc.tableSize).toBe(17);
-    expect(sc.cellEntriesSBA.array.length).toBe(17 * 8);
+    expect(sc.cellEntriesSBA.array.length).toBe(17 * CELL_CAPACITY);
   });
 
   it('passes selfCollision: true + thickness to createTslSolver — selfCollisionNodes wired', async () => {
@@ -1137,7 +1138,7 @@ describe('initMultiPieceTsl self-collision allocation (behavior #15 — #897 F3.
     const nodes = solver.selfCollisionNodes as any;
     // Dispatch counts baked into the compute() wraps: [tableSize*K, N, N, N].
     // cellClear sentinel-fills every entries slot (P4-2) → tableSize*CELL_CAPACITY.
-    expect(nodes.cellClearNode.dispatchCount).toBe(17 * 8);
+    expect(nodes.cellClearNode.dispatchCount).toBe(17 * CELL_CAPACITY);
     expect(nodes.scatterNode.dispatchCount).toBe(8);
     expect(nodes.resolveNode.dispatchCount).toBe(8);
     expect(nodes.applyNode.dispatchCount).toBe(8);
