@@ -256,6 +256,18 @@ Uses the P4-0 harness verbatim (`docs/plans/2026-07-01-drape-determinism-p4-desi
 
 ---
 
+## 11. Verification outcome (@gpu-local, 2026-07-02) — SHIPPED, race-determinism closed
+
+P4-2 landed (commit `6ceae493` on feat/envelope-wrap), after P4-1 (`b4b82572`) and P4-0 (`7ad5e198`). @gpu-local, María shirt, webgpu tier, María default measurements:
+
+- **R1 clear.** The u32 `atomicMin` cascade compiled and ran on GPU — the tier stayed `webgpu` across every run (a codegen failure would have fallen to WASM and failed the tier assertion). The residue-slot fallback (§ 4) was NOT needed.
+- **P4-2 hit its target.** The self-collision admission race is gone: before P4-2 the drape split into 2 basins ~17mm apart with no bit-exact majority; after, runs form bit-exact clusters — the per-frame solver is deterministic.
+- **Bit-exact NOT achieved — a metastable residual remains.** A 10-run gate (`--repeat-each=10`) clustered into 5 bit-exact groups forming **two macro-basins ~320-345mm apart (7/3 split)** plus fine 15-42mm sub-structure. Both macro-basins are valid drapes (belowHip 0%, same envelope) — a different whole-garment WRINKLE configuration, not a collapse.
+
+**Root cause (not a race).** With bend (P4-1), self-collision (P4-2) and contact (A1) races all eliminated — the only data races the audit found — the residual is the caveat in § "What deterministic means": WGSL does not spec-guarantee run-to-run float determinism even absent races (FMA contraction / op reordering across runs). On a metastable drape that sub-ULP noise tips the basin. **More race-elimination cannot close this — no races remain.** Aggravating: the settle-tether captures at the SAME 2.5s frame, freezing whichever basin the transient landed in.
+
+**Conclusion — P4 race-determinism CLOSED.** Bit-exact is not reachable by the determinism axis on this architecture. The remaining ~320mm macro-bifurcation is a **drape-stability / quality** problem (the drape has multiple valid settled states), addressed by the bend-model fix (P1 dihedral → real flexural rigidity → fewer basins) and/or tether-capture timing — NOT by more determinism work. Recorded as a known limitation; keep-smallest's index bias (§ 9 Finding A) did not visibly regress the drape (belowHip 0%, envelope unchanged).
+
 **Files this spec anchors on (all absolute):**
 - `D:\Desktop\projects\openclo\src\utils\cloth\gpu\tslSelfCollision.ts` (interface `:57-73`, factory `:129-155`, destroy `:168-191`, cellClear `:235-245`, scatter `:253-297` incl. slot-claim `:287-294`, resolve `:304-438` incl. count-load `:358-359`/entries-read `:365`/`j>i` guard `:368`, `CELL_CAPACITY` `:100`, prefix-sum-rejected note `:98`)
 - `D:\Desktop\projects\openclo\src\utils\cloth\gpu\atomicStorage.ts` (`makeAtomicStorage` `'uint'`+atomicMin `:65`/`:77-83`, atomicLoad-required note `:69`)
