@@ -37,6 +37,7 @@ import { TriangleSpatialHash, solveTriangleCollision } from '../triangleCollisio
 import { buildAdjacency } from '../selfCollision';
 import { buildAdjacencyCSR } from './adjacencyCSR';
 import { createCountSamplingLimiter } from '../../rateLimit';
+import { fabricInvMassScale } from '../physicalFabric';
 import type { PieceMeshData, WasmSolverConfig } from './wasmSolverClient';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -163,7 +164,7 @@ const DEFAULT_SOLVER_CONFIG: AppliedSolverConfig = {
   damping: 0.99,
   gravityY: -9.81,
   stretchCompliance: 0.0,
-  bendCompliance: 1.0,
+  bendCompliance: 1e4,
   selfCollision: true,
   thickness: 0.002,
   collisionMargin: 0.005,
@@ -172,9 +173,11 @@ const DEFAULT_SOLVER_CONFIG: AppliedSolverConfig = {
   stretchComplianceWarp: 0.0,
   stretchComplianceWeft: 0.0,
   stretchComplianceShear: 0.001,
-  bendComplianceWarp: 1.0,
-  bendComplianceWeft: 1.0,
+  bendComplianceWarp: 1e4,
+  bendComplianceWeft: 1e4,
   internalDamping: 0.3,
+  // P7-density: referencia 150 GSM → escala 1 (comportamiento pre-P7).
+  fabricDensity: 0.15,
 };
 let currentConfig: AppliedSolverConfig = { ...DEFAULT_SOLVER_CONFIG };
 
@@ -524,7 +527,13 @@ self.onmessage = async (event: MessageEvent) => {
         const totalVerts = merged.vertices.length / 3;
         
         const invMass = new Float32Array(totalVerts);
-        for (let i = 0; i < totalVerts; i++) invMass[i] = 1.0;
+        // P7-density: masa relativa a la referencia (150 GSM). A la densidad
+        // de referencia el fill es 1.0 exacto (pre-P7). Espejo del fill GPU
+        // (gpuSolverClient) y del scale CPU (initPhysics).
+        const invMassFill = fabricInvMassScale(
+          (msg.config as Partial<WasmSolverConfig> | undefined)?.fabricDensity,
+        );
+        for (let i = 0; i < totalVerts; i++) invMass[i] = invMassFill;
 
         numParticles = totalVerts;
         solver = new wasmModule.XpbdSolver(merged.vertices, invMass);

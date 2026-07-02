@@ -200,8 +200,8 @@ describe('toXPBDParams', () => {
     for (const f of PHYSICAL_FABRIC_LIBRARY) {
       const p = toXPBDParams(f);
       for (const c of [p.bendComplianceWarp, p.bendComplianceWeft]) {
-        expect(c).toBeGreaterThanOrEqual(6e-2);
-        expect(c).toBeLessThanOrEqual(10);
+        expect(c).toBeGreaterThanOrEqual(6e2);
+        expect(c).toBeLessThanOrEqual(1e5);
         // Rechazo explícito de la banda vieja: nada puede emitir un valor
         // que el kernel angular vería como rígido-absoluto/muerto.
         expect(c).toBeGreaterThan(2e-4);
@@ -215,8 +215,8 @@ describe('toXPBDParams', () => {
     // banda muerta.
     const stiffest = { ...PHYSICAL_FABRIC_LIBRARY[0], bendingWarp: 1e9, bendingWeft: 1e9 };
     const p = toXPBDParams(stiffest);
-    expect(p.bendComplianceWarp).toBe(6e-2);
-    expect(p.bendComplianceWeft).toBe(6e-2);
+    expect(p.bendComplianceWarp).toBe(6e2);
+    expect(p.bendComplianceWeft).toBe(6e2);
   });
 
   it('preserves diagnostic thresholds', () => {

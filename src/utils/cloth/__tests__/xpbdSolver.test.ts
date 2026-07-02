@@ -411,8 +411,9 @@ describe('XPBDClothSolver - Anisotropic Bending', () => {
   it('should use default anisotropic bending values', () => {
     const mesh = makeSquareMesh();
     const solver = new XPBDClothSolver(mesh);
-    expect(solver.config.bendComplianceWarp).toBe(1.0); // P1 angular (banda [6e-2,10]) — #gummy STEP 1: was 1.0 (dead bend)
-    expect(solver.config.bendComplianceWeft).toBe(1.0);
+    // P1 angular: default 1e4, calibrado contra el gate Cusick (banda [6e2,1e5])
+    expect(solver.config.bendComplianceWarp).toBe(1e4);
+    expect(solver.config.bendComplianceWeft).toBe(1e4);
   });
 });
 

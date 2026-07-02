@@ -26,6 +26,8 @@ export interface FabricComplianceConfig {
   shearCompliance: number;
   bendComplianceWarp: number;
   bendComplianceWeft: number;
+  /** P7-density: kg/m² (GSM/1000). undefined → escala de masa 1 (150 GSM). */
+  density?: number;
 }
 
 /** Seam constraints del path TSL (#897 F1) — coloreadas, con compliance.

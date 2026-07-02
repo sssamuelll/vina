@@ -89,6 +89,8 @@ function runCusick(fabricId: string): CusickResult {
     bendComplianceWarp: xpbd.bendComplianceWarp,
     bendComplianceWeft: xpbd.bendComplianceWeft,
     internalDamping: pf.internalDamping,
+    // P7-density: el ratio B/ρ del drape real existe desde 2026-07-02.
+    fabricDensity: xpbd.density,
   });
 
   // Camino de producción CPU (clothWorker 'setCollisionMesh'): friction 0.4 +

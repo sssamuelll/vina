@@ -666,9 +666,29 @@ export interface PhysicalXPBDParams extends XPBDCompliance {
  * escala (alpha=compliance/sdt², denom ~1/e²); el gate Cusick es el oráculo
  * que caza la deriva.
  */
-export const BEND_K_ANGULAR = 1.08;
-export const BEND_ANGULAR_MIN = 6e-2;
-export const BEND_ANGULAR_MAX = 10;
+/**
+ * Densidad de referencia (kg/m² = GSM/1000) de la escala de masa relativa —
+ * algodón medio ~150 GSM. A esta densidad `fabricInvMassScale` = 1 y el
+ * comportamiento del solver es EXACTAMENTE el de la era densidad-1 (no se
+ * re-rompe la calibración #gummy/P1). P7-density: sin esto, chiffon (30 GSM)
+ * y canvas (407 GSM) caían con la misma masa y el ratio B/ρ del drape real
+ * no existía (gap Cusick 2.0 vs anclas 30/85).
+ */
+export const REFERENCE_FABRIC_DENSITY = 0.15;
+
+/**
+ * Escala de invMass por densidad de tela: invMass_i *= REFERENCE/ρ.
+ * Defensivo (A3): densidad ausente/degenerada → 1 (comportamiento actual);
+ * clamp [0.1, 10] — el solver no sobrevive extremos de ×100.
+ */
+export function fabricInvMassScale(density?: number): number {
+  if (density === undefined || !Number.isFinite(density) || density <= 0) return 1;
+  return Math.min(10, Math.max(0.1, REFERENCE_FABRIC_DENSITY / density));
+}
+
+export const BEND_K_ANGULAR = 1.08e4;
+export const BEND_ANGULAR_MIN = 6e2;
+export const BEND_ANGULAR_MAX = 1e5;
 
 export function toXPBDParams(pf: PhysicalFabric): PhysicalXPBDParams {
   // Stretch: % elongation → XPBD compliance, RESCALED to the solver live band
@@ -679,18 +699,19 @@ export function toXPBDParams(pf: PhysicalFabric): PhysicalXPBDParams {
   const stretchComplianceWarp = Math.min(1e-5, Math.max(5e-7, pf.stretchWarp * 5e-7));
   const stretchComplianceWeft = Math.min(1e-5, Math.max(5e-7, pf.stretchWeft * 5e-7));
 
-  // Bending ANGULAR (P1 dihedral, spec 2026-07-02 §8): mN·cm → compliance del
-  // constraint DIHEDRAL (C en radianes, ∇C ~ 1/m). La banda viva angular es
-  // ~×5.4e4 la de distancia (aritmética verificada: ratio de denoms
-  // 2·(1.155/e)² con e≈7mm) → [6e-2, 10] en vez de [1.2e-6, 2e-4], y es
-  // mesh-dependent (~1/e²). BARRERA ANTI-BEND-MUERTO: el clamp inferior
-  // BEND_ANGULAR_MIN está DENTRO de la banda viva — un valor legacy de la
-  // banda de distancia (p.ej. 2.5e-5) queda clampeado a 6e-2 y el bend jamás
-  // vuelve a morir en silencio (#gummy). El test de physicalFabric pinnea
-  // este piso. BEND_K_ANGULAR = 2e-5 × 5.4e4 ≈ 1.08: cotton (0.8 mN·cm) →
-  // ~1.2; chiffon (~0.04) → ~7.7 (fluido); neoprene (~8) → ~0.13 (rígido).
-  // La ley inversa se conserva; la magnitud es la angular. Re-sweep contra el
-  // gate Cusick (B2) = la otra barrera.
+  // Bending ANGULAR (P1 dihedral): mN·cm → compliance del constraint
+  // DIHEDRAL (C en radianes). Banda CALIBRADA CONTRA EL GATE CUSICK
+  // (2026-07-02): el ratio teórico ×5.4e4 sobre la banda de distancia daba
+  // [6e-2,10], pero el sweep empírico mostró bend efectivamente RÍGIDO ahí
+  // (chiffon y canvas drapeaban igual, DC~46 ambos); a ×1e4 el gap abre a
+  // 11 DC (chiffon 23 / canvas 34, hacia las anclas 30/85) → banda viva
+  // real [6e2, 1e5]. Lección: las anclas absolutas son del gate, no de la
+  // aritmética. BARRERA ANTI-BEND-MUERTO: el clamp inferior está DENTRO de
+  // la banda viva — cualquier valor legacy queda clampeado a 6e2 y el bend
+  // jamás muere en silencio (#gummy); el test lo pinnea. Ley inversa:
+  // cotton (0.8) → ~1.2e4; chiffon (0.04) → ~7.2e4 (fluido); neoprene (8)
+  // → ~1.3e3 (rígido). Refinamiento per-fabric (canvas necesita más rigidez
+  // relativa para su ancla 85) = sweep Fase 4.
   const bendComplianceWarp = Math.min(BEND_ANGULAR_MAX, Math.max(BEND_ANGULAR_MIN, BEND_K_ANGULAR / (pf.bendingWarp + 0.1)));
   const bendComplianceWeft = Math.min(BEND_ANGULAR_MAX, Math.max(BEND_ANGULAR_MIN, BEND_K_ANGULAR / (pf.bendingWeft + 0.1)));
 

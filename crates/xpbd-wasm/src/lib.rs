@@ -156,7 +156,7 @@ impl XpbdSolver {
             damping: 0.99,
             substeps: 15,
             stretch_compliance: 0.0,
-            bend_compliance: 1.0, // P1 dihedral: default ANGULAR (banda [6e-2,10], spec 2026-07-02 §8); lockstep GPU+CPU
+            bend_compliance: 1e4, // P1 dihedral: default ANGULAR calibrado contra el gate Cusick (banda [6e2,1e5]); lockstep GPU+CPU
             ground_y: 0.0,
             collision_margin: 0.005,
             drag_coefficient: 1.0,
@@ -166,8 +166,8 @@ impl XpbdSolver {
             stretch_compliance_shear: 0.001,
             stretch_compliances: Vec::new(),
             stretch_edge_types: Vec::new(),
-            bend_compliance_warp: 1.0, // P1 angular (ver bend_compliance)
-            bend_compliance_weft: 1.0,
+            bend_compliance_warp: 1e4, // P1 angular (ver bend_compliance)
+            bend_compliance_weft: 1e4,
             bend_compliances: Vec::new(),
             bend_edge_types: Vec::new(),
             internal_damping: 0.3,
@@ -1936,15 +1936,15 @@ mod tests {
         let inv_mass = vec![1.0; 4];
         let mut s = XpbdSolver::new(&positions, &inv_mass);
 
-        // Two warp-edge bend constraints, default warp = 1.0 (P1 angular).
+        // Two warp-edge bend constraints, default warp = 1e4 (P1 angular).
         s.set_bend_with_types(
             &[0u32, 1, 2, 3, 0, 1, 2, 3],
             &[1.0, 1.0],
             &[0u8, 0],
         );
         assert!(
-            s.bend_compliances.iter().all(|&c| (c - 1.0).abs() < 1e-6),
-            "init: bend cache should reflect default warp=1.0 (P1 angular)"
+            s.bend_compliances.iter().all(|&c| (c - 1e4).abs() < 1e-2),
+            "init: bend cache should reflect default warp=1e4 (P1 angular)"
         );
 
         // Mutate warp via configure — cache MUST regenerate.

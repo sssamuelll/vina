@@ -531,6 +531,9 @@ export function useSimulationLifecycle({
                       shearCompliance: 0.001,
                       bendComplianceWarp: xpbd.bendComplianceWarp,
                       bendComplianceWeft: xpbd.bendComplianceWeft,
+                      // P7-density: el peso GSM entra a la masa (invMass ∝ 1/ρ)
+                      // — antes solo tocaba damping y chiffon caía como lona.
+                      density: xpbd.density,
                     }
                   : undefined;
 
@@ -578,6 +581,8 @@ export function useSimulationLifecycle({
               };
               // Preset config at init (M4-D — see simulationModeRef note).
               const wasmMode = SIMULATION_MODES[simulationModeRef.current];
+              // P7-density: el peso GSM de la tela activa entra al invMass.
+              const pfWasm = getPhysicalFabric(fabricId);
               await withTimeout(
                 wasmClient.initMultiPiece(
                   placedMeshes,
@@ -585,6 +590,7 @@ export function useSimulationLifecycle({
                   mapClothSimConfigToWasmSolverConfig({
                     numSubsteps: wasmMode.substeps,
                     selfCollision: wasmMode.selfCollision,
+                    fabricDensity: pfWasm ? toXPBDParams(pfWasm).density : undefined,
                   }),
                 ),
                 12000, 'Wasm solver init',
@@ -628,9 +634,12 @@ export function useSimulationLifecycle({
             };
             // Preset config at init (M4-D — see simulationModeRef note).
             const cpuMode = SIMULATION_MODES[simulationModeRef.current];
+            const pfCpu = getPhysicalFabric(fabricId);
             await withTimeout(
               client.initMultiPiece(placedMeshes, seamInitData, {
                 numSubsteps: cpuMode.substeps,
+                // P7-density (espejo del branch WASM/GPU)
+                fabricDensity: pfCpu ? toXPBDParams(pfCpu).density : undefined,
                 selfCollision: cpuMode.selfCollision,
               }),
               15000, 'CPU worker init',

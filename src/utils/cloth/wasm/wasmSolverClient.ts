@@ -95,6 +95,8 @@ export interface WasmSolverConfig {
   bendComplianceWeft?: number;
   /** Internal damping (0.0 = fluid, 1.0 = heavy/settles quickly) */
   internalDamping?: number;
+  /** P7-density: kg/m² (GSM/1000) — escala el invMass en init (REF/ρ). */
+  fabricDensity?: number;
 }
 
 export class WasmSolverClient implements ClothSolverClient {

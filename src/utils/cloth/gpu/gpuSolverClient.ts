@@ -31,6 +31,7 @@ import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities';
 import { DEFAULT_SEAM_CONFIG } from '../seamAssembly';
+import { fabricInvMassScale } from '../physicalFabric';
 import type { ClothSolverClient } from '../solverProtocol';
 import type { LocalVertexIndex, SeamPair } from '../seamPairs';
 import type { StorageBufferAttribute } from 'three/webgpu';
@@ -439,6 +440,10 @@ export class GpuSolverClient implements ClothSolverClient {
     const positions = new Float32Array(totalVerts * 3);
     const invMass = new Float32Array(totalVerts);
     const triangles = new Uint32Array(totalTris);
+    // P7-density: masa relativa a la referencia (150 GSM) — a la densidad de
+    // referencia esto es 1.0 exacto (comportamiento pre-P7). Espejo del
+    // worker WASM y del scale del CPU initPhysics.
+    const invMassFill = fabricInvMassScale(fabricCompliance?.density);
     // Merge UVs for anisotropic edge classification
     let mergedUvs: Float32Array | undefined;
     let hasUvs = false;
@@ -449,7 +454,7 @@ export class GpuSolverClient implements ClothSolverClient {
     for (const p of pieces) {
       const numV = p.vertices.length / 3;
       positions.set(p.vertices, vOff * 3);
-      for (let i = 0; i < numV; i++) invMass[vOff + i] = 1.0;
+      for (let i = 0; i < numV; i++) invMass[vOff + i] = invMassFill;
       for (let i = 0; i < p.triIds.length; i++) triangles[tOff + i] = p.triIds[i] + vOff;
 
       // Merge UVs
@@ -480,13 +485,11 @@ export class GpuSolverClient implements ClothSolverClient {
       stretchComplianceWarp: 0.0,
       stretchComplianceWeft: 0.0,
       shearCompliance: 0.001,
-      // P1 dihedral: default ANGULAR 1.0 ∈ banda [6e-2,10] (spec 2026-07-02
-      // §8). En la era distance-bend 1.0 era bend MUERTO (alpha 810k) y el
-      // fix #gummy lo bajó a 2.5e-5; con el constraint angular la banda viva
-      // es ~×5.4e4 y 1.0 vuelve a ser un default vivo. PARITY: WASM (lib.rs)
-      // + CPU (xpbdSolver) llevan el MISMO default en lockstep.
-      bendComplianceWarp: 1.0,
-      bendComplianceWeft: 1.0,
+      // P1 dihedral: default ANGULAR 1e4 — banda [6e2,1e5] calibrada contra
+      // el gate Cusick 2026-07-02 (la teórica [6e-2,10] era bend rígido).
+      // PARITY: WASM (lib.rs) + CPU (xpbdSolver) llevan el MISMO default.
+      bendComplianceWarp: 1e4,
+      bendComplianceWeft: 1e4,
     };
 
     const numStretch = stretch.ids.length / 2;

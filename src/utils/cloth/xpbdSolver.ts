@@ -15,6 +15,7 @@ import { SpatialHashGrid, buildAdjacency, solveSelfCollision } from './selfColli
 import { type LRAConstraint, buildLRAConstraints, solveLRA } from './longRangeAttachments';
 import { EdgeType, classifyEdgeType } from './gpu/gpuBuffers';
 import { dihedralAngle, solveDihedralQuad } from './dihedral';
+import { fabricInvMassScale } from './physicalFabric';
 import type { CollisionMeshData } from './collisionMesh';
 import { TriangleSpatialHash, solveTriangleCollision } from './triangleCollision';
 
@@ -189,6 +190,12 @@ export interface ClothSimConfig {
   bendComplianceWarp: number;
   /** Bending compliance in weft direction (horizontal in UV) */
   bendComplianceWeft: number;
+  /**
+   * P7-density: densidad de la tela en kg/m² (GSM/1000). Escala el invMass
+   * relativo a la referencia (150 GSM): invMass *= REF/ρ. undefined = escala
+   * 1 (comportamiento pre-P7 exacto). Ver fabricInvMassScale.
+   */
+  fabricDensity?: number;
   /** Internal damping (0.0 = fluid/oscillates, 1.0 = heavy/settles quickly). Default: 0.3 */
   internalDamping: number;
   /** Directional wind force [x, y, z] in N/m² (default [0,0,0] = no wind) */
@@ -419,7 +426,7 @@ export class XPBDClothSolver {
       dt: 1.0 / 60.0,
       damping: 0.99,
       stretchingCompliance: 0.0,
-      bendingCompliance: 1.0, // P1 dihedral: default ANGULAR (radianes; banda [6e-2,10] — spec 2026-07-02 §8). El 2.5e-5 era de la era distance-bend (#gummy) y hoy = bend muerto. Lockstep GPU+WASM.
+      bendingCompliance: 1e4, // P1 dihedral: default ANGULAR calibrado contra el gate Cusick (banda [6e2,1e5]). Lockstep GPU+WASM.
       groundY: 0.0,
       groundFriction: 0.5,
       selfCollision: true,
@@ -433,8 +440,11 @@ export class XPBDClothSolver {
       stretchComplianceWarp: 0.0,
       stretchComplianceWeft: 0.0,
       stretchComplianceShear: 0.001,
-      bendComplianceWarp: 1.0, // P1 angular (ver bendingCompliance)
-      bendComplianceWeft: 1.0,
+      bendComplianceWarp: 1e4, // P1 angular (ver bendingCompliance)
+      bendComplianceWeft: 1e4,
+      // P7-density: kg/m² (GSM/1000). undefined → escala 1 (densidad de
+      // referencia 150 GSM = comportamiento pre-P7 exacto).
+      fabricDensity: undefined,
       internalDamping: 0.3,
       windForce: [0, 0, 0],
       ...config,
@@ -559,6 +569,13 @@ export class XPBDClothSolver {
       this.invMass[id0] += pInvMass;
       this.invMass[id1] += pInvMass;
       this.invMass[id2] += pInvMass;
+    }
+
+    // P7-density: escala de masa relativa a la referencia (150 GSM).
+    // invMass *= REF/ρ — a ρ=REF es exactamente el comportamiento previo.
+    const densityScale = fabricInvMassScale(this.config.fabricDensity);
+    if (densityScale !== 1) {
+      for (let i = 0; i < this.numParticles; i++) this.invMass[i] *= densityScale;
     }
 
     // Compute rest lengths for stretching
