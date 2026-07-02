@@ -111,6 +111,14 @@ Parámetro `oneSided` SOLO en el call-site de stretch (bend intacto — así no 
 | P6: schema GarmentCode + normalización edge-loops + warning delta-longitud de seams + seams inspeccionables (clo3d-mcp como referencia de tool-surface) | Track producto M2, no bloquea drape | El warning de delta-longitud es el borrow #1 de UX de costuras (frente #4). |
 | Experimento icontour (ContourCraft MIT) como untangle CPU post-settle | Post-P1 | Recovery ocasional, jamás per-frame. |
 
+## 6bis. Enmienda 2026-07-02 (post-consejo, decisión de Samuel)
+
+**Hito redefinido en PÍXELES (consejo, Cassian): screenshot de María el V 24-jul** — cero piel a través de la tela, tela apoyada a ~grosor (2-3mm), pliegues con chiffon≠canvas distinguibles, sombras de contacto. Slip máximo declarado: 31-jul.
+
+**MANGAS DENTRO DEL SCOPE (decisión Samuel 2026-07-02):** los screenshots (docs/reports/assets/2026-07-02-render-*.png) muestran que los 3 asesinos visuales son parches (A4) + **mangas-caja** (paneles sin envolver el brazo — arrangement #887 Fase 4, los pares underarm arrancan a 8.1cm) + nudo del cuello. Con solo A4 el hito no lee profesional → el wrap circunferencial de manga entra al camino del 24-jul (scoping en curso; secuencia vs A4 según sizing).
+
+**Ejecutado del consejo (commits 3164e432/a8eb2b39/22379f07):** fusión strainLimit→stretch (precondición A4 ✓, 31.5ms), ease-vector v0 (María: chest +8.0 measured / waist +22.0 / hips +8.0), sombras WebGPU (guard stale r183; IBL 0.3; fps 31.6). Asignación ratificada: 60% motor acotado / 25% fit / 15% grading, kill-switch 2 semanas. Podas del consejo: fold-count fuera del pass/fail Cusick (telemetría + probe de convergencia), tether re-pose refresh → condición de retiro (A4 ON + margen partido + fricción sostiene ⇒ borrar tether), icontour post-settle borrado, malla fina UNIFORME prohibida (zonal per-pieza + wrinkles de render = el camino), margen 8mm → partir en grosor-físico per-fabric + offset de render (Richter: error de categoría, no un número que se baja). A4 se construye como CONTACTO UNIFICADO (una superficie, un grosor, una respuesta — no el quinto miembro del "comité de superficies"). Acta: docs/reports/2026-07-02-consejo-drape-profesional.md.
+
 ## 7. Techo estructural (Richter — se nombra, no se retrofitea hoy)
 
 El solver acumula pases por feature y ya golpeó DOS veces la pared de 8 buffers con 0 slack. Tres consolidaciones nombradas como follow-ups estructurales, y una regla vigente desde ya: **(a)** empaquetar pos+invMass en vec4 intercalado libera un slot en CADA pase (disuelve la pared una vez, no se negocia feature a feature); **(b)** fusionar strainLimit→stretch (mismos ids, mismos colores, mitad de dispatches); **(c)** el Generate/Solve de A4 es la **semilla del subsistema de contacto unificado** — REGLA: no se escribe un quinto pipeline de contacto; la próxima feature de contacto extiende Gen/Solve o justifica por qué no.
