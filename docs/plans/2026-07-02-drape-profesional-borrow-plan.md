@@ -102,7 +102,7 @@ Parámetro `oneSided` SOLO en el call-site de stretch (bend intacto — así no 
 | Qué | Cuándo | Nota |
 |---|---|---|
 | Backport strain-limit WASM/CPU (deuda A7 STEP-4) | Semana del 13, PR aparte | Fuera del PR más riesgoso (Richter); obligatorio ANTES de tocar main con física nueva — hace honesto el oráculo de paridad. |
-| Variante WASM del gate Cusick en CI | Con el merge | Dos baselines declaradas hasta el backport. |
+| Variante WASM del gate Cusick en CI | POST-merge (diferida 2026-07-03 con nombre) | El backport strain-limit aterrizó pre-merge y `cpuWasmParity` ejercita la física capeada bit-a-bit en CI — la función (paridad honesta) está cubierta; la variante Cusick-WASM es red de regresión adicional del tier (media jornada honesta: orquestación per-substep del worker + masas uniformes vs área + extracción de bend fieles). |
 | Merge PR #924 → main | Semana del 13, tras veredicto face-poke | Luego: PRs por fase tras flags. |
 | Schema P7 (tensileModulus, `cusick.dc` — NO voltear `drapeCoefficient` in-place, semántica invertida vs ISO alimenta el sheen —, provenance 'estimated') | Fase 4 | Los targets DC del hito viven en el fixture del test. |
 | Sweep 3 parámetros × 5 anclas (con harness batch previo — un solo runner humano) | Fase 4, post-merge | Valores medidos de vendors caen sin cambio de código. |
