@@ -114,7 +114,7 @@ export default function Mannequin() {
   return (
     <group userData={{ opencloRole: 'avatar' }}>
       {/* Body */}
-      <mesh geometry={bodyGeometry}>
+      <mesh geometry={bodyGeometry} castShadow receiveShadow>
         <meshStandardMaterial
           color="#c8b8a8"
           roughness={0.75}
@@ -124,7 +124,7 @@ export default function Mannequin() {
       </mesh>
 
       {/* Stand */}
-      <mesh geometry={standGeometry}>
+      <mesh geometry={standGeometry} castShadow receiveShadow>
         <meshStandardMaterial
           color="#2a2a2a"
           roughness={0.3}

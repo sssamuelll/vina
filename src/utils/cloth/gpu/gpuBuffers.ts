@@ -7,6 +7,8 @@
  * @module gpuBuffers
  */
 
+import { dihedralAngle } from '../dihedral';
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export enum EdgeType {
@@ -203,12 +205,11 @@ export function extractStretchConstraints(
  * For each internal edge (shared by 2 triangles), create a bend constraint
  * between the 4 vertices of the two triangles.
  *
- * Returns rest **dihedral angles** (radians). The TSL/WebGPU bend solver
- * consumes angles directly; the WASM and CPU solvers consume **distances**
- * instead — WASM converts via `bendRestDistances.ts:computeBendRestDistances`
- * at the worker boundary (BUG-1 fix, PR #604), CPU computes distances inline
- * (xpbdSolver.ts:564-568). The angle/distance seam is ratified in A4 Fase 2
- * § 2.5; the dual-extractor cleavage in § 3.2.
+ * Returns rest **dihedral angles** (radians, SIGNED, flat=0 — dihedral.ts
+ * convention). P1 (spec 2026-07-02): los 3 tiers consumen los ángulos
+ * DIRECTO — el seam ángulo/distancia de A4 § 2.5 quedó eliminado junto con
+ * `bendRestDistances.ts` (BUG-1 invertido); el CPU computa sus propios rest
+ * angles inline con la misma función compartida (xpbdSolver.initPhysics).
  */
 export function extractBendConstraints(
   positions: Float32Array,
@@ -249,8 +250,11 @@ export function extractBendConstraints(
     const c = tri0Verts.find(v => v !== a && v !== b)!;
     const d = tri1Verts.find(v => v !== a && v !== b)!;
 
-    // Compute rest dihedral angle
-    const angle = computeDihedralAngle(positions, a, b, c, d);
+    // Rest dihedral angle — MISMA función que los kernels runtime
+    // (dihedral.ts, P1): flat=0, signed, degenerado→0. La versión local
+    // vieja (flat=π, degenerado→π) se borró: mezclar convenciones arruga
+    // la prenda al primer substep (spec 2026-07-02 §5).
+    const angle = dihedralAngle(positions, a, b, c, d) ?? 0;
     ids.push(a, b, c, d);
     restAngles.push(angle);
 
@@ -275,41 +279,6 @@ export function extractBendConstraints(
   };
 }
 
-function computeDihedralAngle(
-  pos: Float32Array,
-  a: number, b: number, c: number, d: number,
-): number {
-  // Edge vector
-  const ex = pos[b * 3] - pos[a * 3];
-  const ey = pos[b * 3 + 1] - pos[a * 3 + 1];
-  const ez = pos[b * 3 + 2] - pos[a * 3 + 2];
-
-  // Vectors to opposite vertices
-  const acx = pos[c * 3] - pos[a * 3];
-  const acy = pos[c * 3 + 1] - pos[a * 3 + 1];
-  const acz = pos[c * 3 + 2] - pos[a * 3 + 2];
-
-  const adx = pos[d * 3] - pos[a * 3];
-  const ady = pos[d * 3 + 1] - pos[a * 3 + 1];
-  const adz = pos[d * 3 + 2] - pos[a * 3 + 2];
-
-  // Face normals
-  const n0x = ey * acz - ez * acy;
-  const n0y = ez * acx - ex * acz;
-  const n0z = ex * acy - ey * acx;
-
-  const n1x = ey * adz - ez * ady;
-  const n1y = ez * adx - ex * adz;
-  const n1z = ex * ady - ey * adx;
-
-  const len0 = Math.sqrt(n0x * n0x + n0y * n0y + n0z * n0z);
-  const len1 = Math.sqrt(n1x * n1x + n1y * n1y + n1z * n1z);
-
-  if (len0 < 1e-10 || len1 < 1e-10) return Math.PI;
-
-  const dot = (n0x * n1x + n0y * n1y + n0z * n1z) / (len0 * len1);
-  return Math.acos(Math.max(-1, Math.min(1, dot)));
-}
 
 // ─── Buffer Creation ────────────────────────────────────────────────────────
 
@@ -469,32 +438,45 @@ export function colorConstraints(
   restLengths: Float32Array,
   numConstraints: number,
   compliance?: Float32Array,
+  stride: number = 2,
 ): ColoredConstraints {
   if (numConstraints === 0) {
     return { ids: new Uint32Array(0), restLengths: new Float32Array(0), colorRanges: [] };
   }
 
+  // Vértices ÚNICOS del constraint i (stride-N — P1 dihedral: el quad
+  // [a,b,c,d] escribe los 4 vértices; colorear solo por (c,d) reabriría la
+  // race P4-1. Dedupe por si un quad degenerado repite ids).
+  const vertsOf = (i: number): number[] => {
+    const out: number[] = [];
+    for (let k = 0; k < stride; k++) {
+      const v = ids[i * stride + k];
+      if (!out.includes(v)) out.push(v);
+    }
+    return out;
+  };
+
   // Build vertex → constraint adjacency
   const vertexConstraints = new Map<number, number[]>();
   for (let i = 0; i < numConstraints; i++) {
-    const v0 = ids[i * 2];
-    const v1 = ids[i * 2 + 1];
-    if (!vertexConstraints.has(v0)) vertexConstraints.set(v0, []);
-    if (!vertexConstraints.has(v1)) vertexConstraints.set(v1, []);
-    vertexConstraints.get(v0)!.push(i);
-    vertexConstraints.get(v1)!.push(i);
+    for (const v of vertsOf(i)) {
+      if (!vertexConstraints.has(v)) vertexConstraints.set(v, []);
+      vertexConstraints.get(v)!.push(i);
+    }
   }
 
   // ── Smallest-degree-last (degeneracy) ordering ──────────────────────────
   // Approximate conflict degree per constraint: occurrences of OTHER
-  // constraints in its two endpoint lists. Self appears once in each list
-  // (hence -2); a neighbor sharing both endpoints counts twice — consistent
-  // with the per-occurrence decrement below, so degrees never go negative.
+  // constraints in its endpoint lists. Self appears once per UNIQUE vertex
+  // (hence -verts.length); a neighbor sharing m vertices counts m times —
+  // consistent with the per-occurrence decrement below, so degrees never go
+  // negative.
   const degrees = new Int32Array(numConstraints);
   for (let i = 0; i < numConstraints; i++) {
-    degrees[i] =
-      vertexConstraints.get(ids[i * 2])!.length +
-      vertexConstraints.get(ids[i * 2 + 1])!.length - 2;
+    const vs = vertsOf(i);
+    let d = 0;
+    for (const v of vs) d += vertexConstraints.get(v)!.length;
+    degrees[i] = d - vs.length;
   }
 
   // Bucket queue with lazy deletion: repeatedly remove the min-degree
@@ -516,7 +498,7 @@ export function colorConstraints(
     if (removed[i] === 1 || degrees[i] !== cursor) continue; // stale lazy entry
     removed[i] = 1;
     removalOrder[nRemoved++] = i;
-    for (const endpoint of [ids[i * 2], ids[i * 2 + 1]]) {
+    for (const endpoint of vertsOf(i)) {
       for (const j of vertexConstraints.get(endpoint)!) {
         if (j === i || removed[j] === 1) continue;
         degrees[j]--;
@@ -533,13 +515,10 @@ export function colorConstraints(
   for (let k = numConstraints - 1; k >= 0; k--) {
     const i = removalOrder[k];
     const usedColors = new Set<number>();
-    const v0 = ids[i * 2];
-    const v1 = ids[i * 2 + 1];
-    for (const neighbor of vertexConstraints.get(v0)!) {
-      if (constraintColors[neighbor] >= 0) usedColors.add(constraintColors[neighbor]);
-    }
-    for (const neighbor of vertexConstraints.get(v1)!) {
-      if (constraintColors[neighbor] >= 0) usedColors.add(constraintColors[neighbor]);
+    for (const v of vertsOf(i)) {
+      for (const neighbor of vertexConstraints.get(v)!) {
+        if (constraintColors[neighbor] >= 0) usedColors.add(constraintColors[neighbor]);
+      }
     }
 
     let color = 0;
@@ -554,7 +533,7 @@ export function colorConstraints(
     colorGroups[constraintColors[i]].push(i);
   }
 
-  const reorderedIds = new Uint32Array(numConstraints * 2);
+  const reorderedIds = new Uint32Array(numConstraints * stride);
   const reorderedRest = new Float32Array(numConstraints);
   const reorderedCompliance = compliance ? new Float32Array(numConstraints) : undefined;
   const colorRanges: Array<{ offset: number; count: number }> = [];
@@ -564,8 +543,9 @@ export function colorConstraints(
     colorRanges.push({ offset, count: group.length });
     for (let j = 0; j < group.length; j++) {
       const srcIdx = group[j];
-      reorderedIds[(offset + j) * 2] = ids[srcIdx * 2];
-      reorderedIds[(offset + j) * 2 + 1] = ids[srcIdx * 2 + 1];
+      for (let s = 0; s < stride; s++) {
+        reorderedIds[(offset + j) * stride + s] = ids[srcIdx * stride + s];
+      }
       reorderedRest[offset + j] = restLengths[srcIdx];
       if (compliance && reorderedCompliance) {
         reorderedCompliance[offset + j] = compliance[srcIdx];

@@ -184,8 +184,14 @@ export function collectInspectionData(
   }
 
   // ─── Simulation metadata ──────────────────────────────────────────────────
+  // collisionDistance (mm): min signed cloth↔body distance from the
+  // penetration metric (§A1) — feeds `fit:body-penetration` / `fit:pressure-point`.
+  // null = never computed → left undefined so the fit rules stay silent.
   const simulation: InspectionSimulationData = {
     particleCount: state.simulation.particleCount,
+    ...(state.simulation.collisionDistance !== null
+      ? { collisionDistance: state.simulation.collisionDistance }
+      : {}),
   };
 
   const pieces = state.project.pieces;

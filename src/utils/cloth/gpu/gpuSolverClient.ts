@@ -22,7 +22,7 @@ import {
   type FabricComplianceConfig,
 } from './tslBuffers';
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
-import { makeFacePokeSnapshotNode, makeFacePokeCorrectNode, packFacePokeBodyGeom } from './tslFacePoke';
+import { makeFacePokeGenerateNode, makeFacePokeSolveNode, packFacePokeBodyGeom } from './tslFacePoke';
 import { createSelfCollisionBuffers } from './tslSelfCollision';
 import { buildAdjacency, nextPrime } from '../selfCollision';
 import { buildAdjacencyCSR } from '../wasm/adjacencyCSR';
@@ -30,6 +30,7 @@ import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities';
 import { DEFAULT_SEAM_CONFIG } from '../seamAssembly';
+import { fabricInvMassScale } from '../physicalFabric';
 import type { ClothSolverClient } from '../solverProtocol';
 import type { LocalVertexIndex, SeamPair } from '../seamPairs';
 import type { StorageBufferAttribute } from 'three/webgpu';
@@ -179,6 +180,8 @@ export class GpuSolverClient implements ClothSolverClient {
   /** Face-poke: interleaved body geom (triVerts+vertexPseudo, 18 floats/tri) — a packed
    *  duplicate of the body geometry so the correct kernel binds ≤8 storage buffers. */
   private facePokeBodyGeomSBA: StorageBufferAttribute | null = null;
+
+  /** Margin the face-poke correct kernel was built with (retained for the debug probe). */
 
   /** Prevents operations after dispose (readback promises may still resolve). */
   private disposed: boolean = false;
@@ -435,6 +438,10 @@ export class GpuSolverClient implements ClothSolverClient {
     const positions = new Float32Array(totalVerts * 3);
     const invMass = new Float32Array(totalVerts);
     const triangles = new Uint32Array(totalTris);
+    // P7-density: masa relativa a la referencia (150 GSM) — a la densidad de
+    // referencia esto es 1.0 exacto (comportamiento pre-P7). Espejo del
+    // worker WASM y del scale del CPU initPhysics.
+    const invMassFill = fabricInvMassScale(fabricCompliance?.density);
     // Merge UVs for anisotropic edge classification
     let mergedUvs: Float32Array | undefined;
     let hasUvs = false;
@@ -445,7 +452,7 @@ export class GpuSolverClient implements ClothSolverClient {
     for (const p of pieces) {
       const numV = p.vertices.length / 3;
       positions.set(p.vertices, vOff * 3);
-      for (let i = 0; i < numV; i++) invMass[vOff + i] = 1.0;
+      for (let i = 0; i < numV; i++) invMass[vOff + i] = invMassFill;
       for (let i = 0; i < p.triIds.length; i++) triangles[tOff + i] = p.triIds[i] + vOff;
 
       // Merge UVs
@@ -476,12 +483,11 @@ export class GpuSolverClient implements ClothSolverClient {
       stretchComplianceWarp: 0.0,
       stretchComplianceWeft: 0.0,
       shearCompliance: 0.001,
-      // #gummy STEP 1: 1.0 → 2.5e-5. alpha=compliance/sdt² (sdt=1/900) gave
-      // alpha=810000 at 1.0 → s≈0 → DEAD bend → cloth had no body (floppy/gummy).
-      // 2.5e-5 → alpha≈20 → real bending stiffness. ≈ cotton's toXPBDParams value.
-      // PARITY: WASM (lib.rs) + CPU (xpbdSolver) carry the SAME default in lockstep.
-      bendComplianceWarp: 2.5e-5,
-      bendComplianceWeft: 2.5e-5,
+      // P1 dihedral: default ANGULAR 1e4 — banda [6e2,1e5] calibrada contra
+      // el gate Cusick 2026-07-02 (la teórica [6e-2,10] era bend rígido).
+      // PARITY: WASM (lib.rs) + CPU (xpbdSolver) llevan el MISMO default.
+      bendComplianceWarp: 1e4,
+      bendComplianceWeft: 1e4,
     };
 
     const numStretch = stretch.ids.length / 2;
@@ -595,6 +601,9 @@ export class GpuSolverClient implements ClothSolverClient {
         internalDamping: 0.3,
         seamShrinkFactor: DEFAULT_SEAM_CONFIG.shrinkFactor,
         seamSewedThreshold: DEFAULT_SEAM_CONFIG.sewedThreshold,
+        // A3: piso terminal del decay (2mm) — canónico cross-tier con CPU
+        // DEFAULT_SEAM_CONFIG.restLengthFloor y Rust seam_rest_length_floor.
+        seamRestLengthFloor: DEFAULT_SEAM_CONFIG.restLengthFloor,
         groundY: 0.0,
         dt: 1 / 60,
         // Always-on en GPU (#897 F3, ver bloque scBuffers arriba); thickness
@@ -607,6 +616,12 @@ export class GpuSolverClient implements ClothSolverClient {
       this.tslSolver = createTslSolver(this.tslBuffers, defaultConfig);
       this.zeroCopy = true; // TSL mode = zero-copy
 
+      // Dev-only: el handle del probe apunta SIEMPRE al ultimo cliente vivo
+      // que inicializo (el avatar-set tambien lo re-escribe; dispose lo limpia
+      // solo si le pertenece — StrictMode double-mount).
+      if (import.meta.env.DEV && typeof window !== 'undefined') {
+        (window as unknown as Record<string, unknown>).__OPENCLO_GPU_CLIENT__ = this;
+      }
       console.log('[GpuSolverClient] TSL solver initialized:', {
         particles: totalVerts,
         stretchColors: colored.colorRanges.length,
@@ -893,6 +908,15 @@ export class GpuSolverClient implements ClothSolverClient {
    */
   dispose(): void {
     this.disposed = true;
+    // Dev-only: no dejar el handle del probe apuntando a un cliente muerto —
+    // el double-mount de StrictMode dispone el cliente del primer mount
+    // DESPUES de que el segundo ya corrio (async), y el probe del face-poke
+    // agarraba la instancia disposed (getTslSolver()=null). Solo se limpia
+    // si el handle es NUESTRO; el cliente vivo lo re-puebla en su avatar-set.
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+      const w = window as unknown as Record<string, unknown>;
+      if (w.__OPENCLO_GPU_CLIENT__ === this) delete w.__OPENCLO_GPU_CLIENT__;
+    }
     this.stop();
     this.positionAttr = null;
     this.normalAttr = null;
@@ -1069,27 +1093,39 @@ export class GpuSolverClient implements ClothSolverClient {
         1,
       );
       this.tslSolver.facePokeNodes = {
-        snapshot: makeFacePokeSnapshotNode(
-          this.tslSolver.positionBufNode,
-          this.tslBuffers.facePokeSnapshotSBA,
-          N,
-        ),
-        correct: makeFacePokeCorrectNode({
+        generate: makeFacePokeGenerateNode({
           posBuf: this.tslSolver.positionBufNode,
-          prevPosBuf: this.tslSolver.prevPosBufNode,
-          invMassBuf: this.tslSolver.invMassBufNode,
-          snapshotSBA: this.tslBuffers.facePokeSnapshotSBA,
           csrSBA: this.tslBuffers.facePokeCsrSBA,
           bvhNodesSBA,
           bvhSkipSBA,
           bodyGeomSBA: this.facePokeBodyGeomSBA,
+          contactSBA: this.tslBuffers.facePokeContactSBA,
           numParticles: N,
           numClothTriangles: this.tslBuffers.numTriangles,
           numBvhNodes: bvh.nodeCount,
           numBodyTris: bvh.triCount,
           margin,
         }),
+        solve: makeFacePokeSolveNode({
+          posBuf: this.tslSolver.positionBufNode,
+          prevPosBuf: this.tslSolver.prevPosBufNode,
+          invMassBuf: this.tslSolver.invMassBufNode,
+          preCollisionSBA: this.tslBuffers.preCollisionPosSBA,
+          csrSBA: this.tslBuffers.facePokeCsrSBA,
+          bodyGeomSBA: this.facePokeBodyGeomSBA,
+          contactSBA: this.tslBuffers.facePokeContactSBA,
+          numParticles: N,
+          numClothTriangles: this.tslBuffers.numTriangles,
+          numBodyTris: bvh.triCount,
+          margin,
+          friction,
+        }),
       };
+      // Dev-only console handle (freeze-frame flag, ad-hoc @gpu-local probes):
+      // the client instance is otherwise unreachable from the browser console.
+      if (import.meta.env.DEV && typeof window !== 'undefined') {
+        (window as unknown as Record<string, unknown>).__OPENCLO_GPU_CLIENT__ = this;
+      }
     }
 
     // Retain the avatar body tris for captureTetherTargets (body-surface query).

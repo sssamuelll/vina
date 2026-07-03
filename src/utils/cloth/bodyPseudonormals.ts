@@ -14,8 +14,9 @@ function vkey(x: number, y: number, z: number, eps: number): string {
   return `${Math.round(x * q)},${Math.round(y * q)},${Math.round(z * q)}`;
 }
 
-/** Weld soup verts; return per-soup-vert the welded index + the welded positions. */
-function weld(mesh: CollisionMeshData, eps: number) {
+/** Weld soup verts; return per-soup-vert the welded index + the welded positions.
+ *  Exported for facePokeMetric (welded body verts = soup sin multiplicidad). */
+export function weld(mesh: CollisionMeshData, eps: number) {
   const v = mesh.vertices;
   const map = new Map<string, number>();
   const weldedOf = new Int32Array(mesh.triCount * 3); // soup vert i -> welded id

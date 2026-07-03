@@ -184,12 +184,12 @@ function makeMockBufferSet(options?: {
     });
   }
 
-  // Bend (per-color — P4-1). Model the whole bend set as a single color group
-  // of `numBend` stride-2 (c,d) constraints for dispatch-count assertions.
+  // Bend (per-color — P4-1 + P1 dihedral). Model the whole bend set as a
+  // single color group of `numBend` stride-4 quads for dispatch-count asserts.
   const bendColors = numBend > 0
     ? [{
-        idsSBA: new StorageBufferAttribute(new Uint32Array(numBend * 2), 2),
-        restLengthsSBA: new StorageBufferAttribute(new Float32Array(numBend), 1),
+        idsSBA: new StorageBufferAttribute(new Uint32Array(numBend * 4), 4),
+        restAnglesSBA: new StorageBufferAttribute(new Float32Array(numBend), 1),
         complianceSBA: new StorageBufferAttribute(new Float32Array(numBend), 1),
         count: numBend,
       }]
@@ -226,7 +226,7 @@ function makeMockBufferSet(options?: {
     tetherTargetSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
     tetherMaxDistSBA: new StorageBufferAttribute(new Float32Array(numParticles).fill(0.06), 1),
     facePokeCsrSBA: new StorageBufferAttribute(new Uint32Array(numParticles + 1 + 6 + 6), 1),
-    facePokeSnapshotSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
+    facePokeContactSBA: new StorageBufferAttribute(new Uint32Array(2), 1),
     numParticles,
     numTriangles: 2,
     scBuffers: null,
@@ -299,16 +299,16 @@ describe('createTslSolver', () => {
     }
   });
 
-  it('returns per-color strain-limit nodes mirroring the stretch colors (#gummy STEP 4)', () => {
+  it('strain-limit is FUSED into the stretch kernel — no separate pass (consejo 2026-07-02)', () => {
     const buffers = makeMockBufferSet({ numStretchColors: 3 });
     const solver = createTslSolver(buffers, { ...defaultConfig });
 
-    // Strain-limiting reuses the stretch graph coloring 1:1 (same ids+restLengths,
-    // race-free) → one strain-limit node per stretch color.
-    expect(solver.strainLimitColors).toHaveLength(3);
-    for (const node of solver.strainLimitColors) {
-      expect(node).toHaveProperty('__tslCompute', true);
-    }
+    // El cap one-sided (#gummy STEP 4) vive DENTRO de makeDistanceConstraintFn
+    // (mismos ids/colores → misma race-safety, ~150 dispatches menos/frame).
+    // El contrato: stretch sigue 1 nodo por color, y la interface ya no expone
+    // un pase de strain-limit aparte.
+    expect(solver.stretchColors).toHaveLength(3);
+    expect('strainLimitColors' in solver).toBe(false);
   });
 
   it('returns per-color bend compute nodes when constraints exist', () => {
@@ -751,28 +751,36 @@ describe('#897 F1.4 seam target decay uniforms', () => {
     expect(uniformNodes.some((u) => u.value === 0.97)).toBe(true);
   });
 
-  it('creates a seamSewedThreshold uniform with the config value (1e-6)', () => {
+  it('creates the EFFECTIVE seam floor uniform: max(restLengthFloor, sewedThreshold) — A3', () => {
     uniformNodes.length = 0;
     const buffers = makeMockBufferSet({ numSeam: 2 });
-    createTslSolver(buffers, { ...defaultConfig });
+    // 0.0037 es distintivo (0.002 colisionaría con el thickness del
+    // self-collision) — pinnea que el floor de config llega como uniform.
+    createTslSolver(buffers, { ...defaultConfig, seamRestLengthFloor: 0.0037 });
+    expect(uniformNodes.some((u) => u.value === 0.0037)).toBe(true);
+  });
 
+  it('a floor of 0 degrades to the legacy near-zero snap (threshold lower-bounds it)', () => {
+    uniformNodes.length = 0;
+    const buffers = makeMockBufferSet({ numSeam: 2 });
+    createTslSolver(buffers, { ...defaultConfig, seamRestLengthFloor: 0 });
     expect(uniformNodes.some((u) => u.value === 1e-6)).toBe(true);
   });
 
   it('seam decay params are init-only — updateConfig does not write them (mirrors WASM init-wired set_seam_shrink_params)', () => {
     uniformNodes.length = 0;
     const buffers = makeMockBufferSet({ numSeam: 2 });
-    const solver = createTslSolver(buffers, { ...defaultConfig });
+    const solver = createTslSolver(buffers, { ...defaultConfig, seamRestLengthFloor: 0.0037 });
 
     const shrinkNode = uniformNodes.find((u) => u.value === 0.97);
-    const thresholdNode = uniformNodes.find((u) => u.value === 1e-6);
+    const floorNode = uniformNodes.find((u) => u.value === 0.0037);
     expect(shrinkNode).toBeDefined();
-    expect(thresholdNode).toBeDefined();
+    expect(floorNode).toBeDefined();
 
     solver.updateConfig({ seamShrinkFactor: 0.5, seamSewedThreshold: 0.1 });
 
     expect(shrinkNode!.value).toBe(0.97);
-    expect(thresholdNode!.value).toBe(1e-6);
+    expect(floorNode!.value).toBe(0.0037);
   });
 
   it('TslSolverConfig no longer accepts seamStiffness (compile-level pin)', () => {

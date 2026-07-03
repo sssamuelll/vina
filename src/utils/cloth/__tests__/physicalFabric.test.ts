@@ -190,18 +190,33 @@ describe('toXPBDParams', () => {
     }
   });
 
-  it('bend compliance lands in the solver live alpha band (dead-bend fix)', () => {
-    // The GPU/WASM/CPU solvers compute alpha = compliance/sdt² with sdt=1/900
-    // (sdt²≈1.23e-6). A bend compliance on the old 0.05-20 scale gives
-    // alpha=40k-16M → correction ≈0 → the bend constraint is DEAD (floppy cloth).
-    // Every fabric must land in ~[1.2e-6, 2e-4] so the bend actually resists folding.
+  it('bend compliance lands in the ANGULAR live band (P1 dihedral — anti-dead-bend barrier)', () => {
+    // P1 (spec 2026-07-02 §8): el bend es ANGULAR (C en radianes) y su banda
+    // viva es ~×5.4e4 la de distancia → [6e-2, 10]. Un valor de la banda de
+    // distancia vieja (1.2e-6..2e-4, era #gummy) sería BEND MUERTO con el
+    // constraint dihedral — este test es la BARRERA AUTOMÁTICA (Serrano F3):
+    // el clamp inferior de toXPBDParams está DENTRO de la banda viva, así que
+    // el bend muerto es unshippeable por construcción, no por memoria.
     for (const f of PHYSICAL_FABRIC_LIBRARY) {
       const p = toXPBDParams(f);
       for (const c of [p.bendComplianceWarp, p.bendComplianceWeft]) {
-        expect(c).toBeGreaterThanOrEqual(1.2e-6);
-        expect(c).toBeLessThanOrEqual(2e-4);
+        expect(c).toBeGreaterThanOrEqual(6e2);
+        expect(c).toBeLessThanOrEqual(1e5);
+        // Rechazo explícito de la banda vieja: nada puede emitir un valor
+        // que el kernel angular vería como rígido-absoluto/muerto.
+        expect(c).toBeGreaterThan(2e-4);
       }
     }
+  });
+
+  it('a legacy distance-band bending input clamps INTO the angular band (dead-bend impossible)', () => {
+    // Tela sintética con bendingWarp altísimo (equivalente a pedir la
+    // compliance mínima): el clamp la deja en el piso VIVO 6e-2, jamás en la
+    // banda muerta.
+    const stiffest = { ...PHYSICAL_FABRIC_LIBRARY[0], bendingWarp: 1e9, bendingWeft: 1e9 };
+    const p = toXPBDParams(stiffest);
+    expect(p.bendComplianceWarp).toBe(6e2);
+    expect(p.bendComplianceWeft).toBe(6e2);
   });
 
   it('preserves diagnostic thresholds', () => {

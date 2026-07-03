@@ -5,14 +5,13 @@ import * as THREE from 'three';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../../utils/avatar/morphTargets';
+import { registerAvatarRenderRoot } from '../../utils/cloth/renderCollisionBake';
 import { IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS, setAvailableMorphTargets, clearMorphTargets } from '../../store/avatarSlice';
 import { setArmAxis } from '../../store/simulationSlice';
 import { clampSwingTwist, ANATOMICAL_CONSTRAINTS } from '../../utils/avatar/swingTwistConstraint';
 import { isVRMFile, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
 import { detectFormat, importMesh, type MeshFormat } from '../../utils/import/meshImporter';
 import { metresToImporter, importerToMetres } from '../../utils/geometry';
-// WebGPURenderer always uses NodeMaterial — legacy MeshDepthMaterial (shadows) unsupported
-const nodeMaterialActive = true;
 import type { VRM } from '@pixiv/three-vrm';
 
 interface AvatarModelProps {
@@ -319,8 +318,10 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
             mat.envMapIntensity = 0.5;
           }
         }
-        mesh.castShadow = !nodeMaterialActive;
-        mesh.receiveShadow = !nodeMaterialActive;
+        // WebGPURenderer shadow maps work with NodeMaterial since r184 —
+        // stale r183 guard removed (see EnvironmentSetup key light).
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
       }
     });
 
@@ -595,6 +596,14 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       ikSolvedRotations.current.clear();
     }
   };
+
+  // Register the live avatar for the render-mesh collision bake
+  // (renderCollisionBake): the collider is baked from THESE meshes, so
+  // collision and render can never diverge (the ~10-15mm mismatch class).
+  useEffect(() => {
+    registerAvatarRenderRoot(groupRef.current);
+    return () => registerAvatarRenderRoot(null);
+  }, [importedScene]);
 
   // Apply pose reactively when joints or measurements change
   useEffect(() => {

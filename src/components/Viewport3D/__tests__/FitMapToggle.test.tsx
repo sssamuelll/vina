@@ -37,6 +37,7 @@ function createTestStore() {
         particleCount: 0,
         seamResolution: null,
         bodyCollision: false,
+        collisionDistance: null,
         viewMode3D: 'arrange' as ViewMode3D,
         arrangementSnapshot: null,
         pinnedVertices: {},

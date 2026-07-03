@@ -26,6 +26,8 @@ export interface FabricComplianceConfig {
   shearCompliance: number;
   bendComplianceWarp: number;
   bendComplianceWeft: number;
+  /** P7-density: kg/m² (GSM/1000). undefined → escala de masa 1 (150 GSM). */
+  density?: number;
 }
 
 /** Seam constraints del path TSL (#897 F1) — coloreadas, con compliance.
@@ -58,6 +60,18 @@ export interface SeamColorGroup {
   count: number;
 }
 
+export interface BendColorGroup {
+  /** Quads [a,b,c,d, ...] de este color — arista a-b, alas c,d (itemSize 4).
+   *  P1 dihedral: el kernel escribe los 4 vértices; el coloring es sobre los
+   *  4 ids (stride-4), NO sobre pares (c,d) — eso reabriría la race P4-1. */
+  idsSBA: StorageBufferAttribute;
+  /** Ángulos dihedral rest (radianes, signed, flat=0 — dihedral.ts) */
+  restAnglesSBA: StorageBufferAttribute;
+  /** Compliance ANGULAR per-constraint (banda ~[6e-2,10], no la de distancia) */
+  complianceSBA: StorageBufferAttribute;
+  count: number;
+}
+
 export interface TslBufferSet {
   // Core particle buffers
   positionSBA: StorageBufferAttribute;
@@ -75,8 +89,9 @@ export interface TslBufferSet {
   // Stretch constraints (per-color for race-free dispatch)
   stretchColors: StretchColorGroup[];
 
-  // Bend constraints (per-color for race-free dispatch — P4-1 determinism)
-  bendColors: StretchColorGroup[];
+  // Bend constraints (per-color for race-free dispatch — P4-1 determinism;
+  // P1: quads dihedral stride-4, coloreados sobre los 4 ids)
+  bendColors: BendColorGroup[];
   numBendConstraints: number;
 
   // Seam constraints (per-color for race-free dispatch — #897 F1.3)
@@ -107,7 +122,7 @@ export interface TslBufferSet {
 
   // Face-poke (v1): packed cloth CSR + snapshot (packing keeps the correct kernel ≤8 storage buffers)
   facePokeCsrSBA: StorageBufferAttribute;         // uint — [offsets(N+1), list(numTri*3), triIds(numTri*3)] (packFacePokeCsr)
-  facePokeSnapshotSBA: StorageBufferAttribute;    // vec3, numParticles — per-frame read source scratch
+  facePokeContactSBA: StorageBufferAttribute;     // uint, numTriangles — per-face contact slot (soupIdx+1, 0=none; A4 Pass A writes, Pass B reads)
 
   // Counts
   numParticles: number;
@@ -201,45 +216,31 @@ export function createTslBuffers(
     });
   }
 
-  // ─── Bend constraints (per-color, race-free — P4-1 determinism) ──────
-  // Distance-based bending = a distance constraint between the two opposite
-  // hinge verts (c,d). Extract those as stride-2 (c,d) pairs and graph-color
-  // them exactly like stretch, so within a color no two constraints share a
-  // vertex → the non-atomic addAssign is race-free. Replaces the old single
-  // non-colored Jacobi pass whose shared-vertex writes were a data race
-  // (non-deterministic drape). See docs/plans/2026-07-01-drape-determinism-p4-design.md.
+  // ─── Bend constraints (per-color, race-free — P4-1 + P1 dihedral) ────
+  // P1 (spec 2026-07-02): el bend es un constraint DIHEDRAL sobre el quad
+  // completo [a,b,c,d] — los rest angles del extractor (que este path antes
+  // DESCARTABA para reconstruir distancias c-d) ahora son la data del kernel.
+  // Coloring sobre los 4 ids (stride-4): el kernel escribe los 4 vértices;
+  // colorear solo (c,d) dejaría dos hinges del mismo color compartiendo la
+  // arista a,b = la race P4-1 reabierta.
   const numBend = bend.ids.length / 4;
-  const bendColors: StretchColorGroup[] = [];
+  const bendColors: BendColorGroup[] = [];
   if (numBend > 0) {
-    const bendPairIds = new Uint32Array(numBend * 2);
-    const bendRestDist = new Float32Array(numBend);
     const bendCompliance = new Float32Array(numBend);
     for (let i = 0; i < numBend; i++) {
-      const c = bend.ids[i * 4 + 2];
-      const d = bend.ids[i * 4 + 3];
-      bendPairIds[i * 2] = c;
-      bendPairIds[i * 2 + 1] = d;
-      const dx = mesh.positions[d * 3] - mesh.positions[c * 3];
-      const dy = mesh.positions[d * 3 + 1] - mesh.positions[c * 3 + 1];
-      const dz = mesh.positions[d * 3 + 2] - mesh.positions[c * 3 + 2];
-      bendRestDist[i] = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
       // Per-constraint bend compliance from edge type
       const edgeType = bend.edgeTypes ? bend.edgeTypes[i] : 1; // default WEFT
       bendCompliance[i] = bendEdgeTypeToCompliance(edgeType, fabric);
     }
 
-    // Color the (c,d) distance constraints. colorConstraints reorders ids,
-    // restLengths and compliance together, so each colorRange is a contiguous
-    // slice — identical shape to the stretch path above.
-    const coloredBend = colorConstraints(bendPairIds, bendRestDist, numBend, bendCompliance);
+    const coloredBend = colorConstraints(bend.ids, bend.restAngles, numBend, bendCompliance, 4);
     for (const range of coloredBend.colorRanges) {
-      const colorIds = coloredBend.ids.slice(range.offset * 2, (range.offset + range.count) * 2);
+      const colorIds = coloredBend.ids.slice(range.offset * 4, (range.offset + range.count) * 4);
       const colorRest = coloredBend.restLengths.slice(range.offset, range.offset + range.count);
       const colorCompliance = coloredBend.compliance!.slice(range.offset, range.offset + range.count);
       bendColors.push({
-        idsSBA: new StorageBufferAttribute(new Uint32Array(colorIds), 2),
-        restLengthsSBA: new StorageBufferAttribute(new Float32Array(colorRest), 1),
+        idsSBA: new StorageBufferAttribute(new Uint32Array(colorIds), 4),
+        restAnglesSBA: new StorageBufferAttribute(new Float32Array(colorRest), 1),
         complianceSBA: new StorageBufferAttribute(new Float32Array(colorCompliance), 1),
         count: range.count,
       });
@@ -282,7 +283,7 @@ export function createTslBuffers(
   // triangleIdsSBA; no extra data source needed.
   const { offsets: ifOffsets, faces: ifFaces } = buildClothVertexFaces(mesh.triangles, N);
   const facePokeCsrSBA = createSBA(packFacePokeCsr(ifOffsets, ifFaces, mesh.triangles, N), 1);
-  const facePokeSnapshotSBA = createSBA(new Float32Array(N * 3), 3);
+  const facePokeContactSBA = createSBA(new Uint32Array(numTri), 1);
 
   return {
     positionSBA,
@@ -304,7 +305,7 @@ export function createTslBuffers(
     tetherTargetSBA,
     tetherMaxDistSBA,
     facePokeCsrSBA,
-    facePokeSnapshotSBA,
+    facePokeContactSBA,
     scBuffers: null,
     windBuffers: null,
     numParticles: N,
@@ -385,10 +386,10 @@ export function destroyTslBufferSet(
     set.tetherTargetSBA,
     set.tetherMaxDistSBA,
     set.facePokeCsrSBA,
-    set.facePokeSnapshotSBA,
+    set.facePokeContactSBA,
   ];
   for (const color of set.bendColors) {
-    sbas.push(color.idsSBA, color.restLengthsSBA, color.complianceSBA);
+    sbas.push(color.idsSBA, color.restAnglesSBA, color.complianceSBA);
   }
   for (const color of set.stretchColors) {
     sbas.push(color.idsSBA, color.restLengthsSBA, color.complianceSBA);

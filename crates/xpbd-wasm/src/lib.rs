@@ -40,9 +40,16 @@ pub struct XpbdSolver {
     // Seam target decay schedule (Fase 2 / BP-2). Mirrors CPU
     // `DEFAULT_SEAM_CONFIG` in `src/utils/cloth/seamAssembly.ts`:
     // each substep multiplies every target by `seam_shrink_factor`;
-    // once below `seam_sewed_threshold` it snaps to 0 ("fully sewn").
+    // it clamps at max(seam_rest_length_floor, seam_sewed_threshold) —
+    // the terminal seam gap ("fully sewn" = at the floor, A3).
     seam_shrink_factor: f32,
     seam_sewed_threshold: f32,
+    // A3 (borrow-plan 2026-07-02): terminal seam rest length (m). Decay
+    // clamps HERE instead of snapping to 0 — snap-to-0 dragged armscye seam
+    // midpoints through the convex shoulder (skin-poke mechanism 2). 0.002
+    // is the cross-tier canonical default (CPU DEFAULT_SEAM_CONFIG
+    // .restLengthFloor, GPU seamRestLengthFloor uniform).
+    seam_rest_length_floor: f32,
 
     // Self-collision
     self_collision: bool,
@@ -64,6 +71,9 @@ pub struct XpbdSolver {
     damping: f32,
     substeps: u32,
     stretch_compliance: f32,
+    /// Backport A7 STEP-4: cap rígido one-sided de elongación (espejo del
+    /// default GPU 0.02 = 2% woven). 0 deshabilita.
+    max_strain: f32,
     bend_compliance: f32,
     ground_y: f32,
     collision_margin: f32,
@@ -138,6 +148,7 @@ impl XpbdSolver {
             seam_compliance: Vec::new(),
             seam_shrink_factor: 0.97,
             seam_sewed_threshold: 1e-6,
+            seam_rest_length_floor: 0.002,
             self_collision: false,
             thickness: 0.002,
             adjacency: None,
@@ -148,7 +159,8 @@ impl XpbdSolver {
             damping: 0.99,
             substeps: 15,
             stretch_compliance: 0.0,
-            bend_compliance: 2.5e-5, // #gummy STEP 1: was 1.0 (alpha 810k → dead bend); lockstep w/ GPU+CPU
+            max_strain: 0.02,
+            bend_compliance: 1e4, // P1 dihedral: default ANGULAR calibrado contra el gate Cusick (banda [6e2,1e5]); lockstep GPU+CPU
             ground_y: 0.0,
             collision_margin: 0.005,
             drag_coefficient: 1.0,
@@ -158,8 +170,8 @@ impl XpbdSolver {
             stretch_compliance_shear: 0.001,
             stretch_compliances: Vec::new(),
             stretch_edge_types: Vec::new(),
-            bend_compliance_warp: 2.5e-5, // #gummy STEP 1: was 1.0 (dead bend)
-            bend_compliance_weft: 2.5e-5,
+            bend_compliance_warp: 1e4, // P1 angular (ver bend_compliance)
+            bend_compliance_weft: 1e4,
             bend_compliances: Vec::new(),
             bend_edge_types: Vec::new(),
             internal_damping: 0.3,
@@ -194,9 +206,11 @@ impl XpbdSolver {
     }
 
     /// Set bend constraints.
-    pub fn set_bend(&mut self, ids: &[u32], rest_distances: &[f32]) {
+    /// P1 dihedral: `rest` son ÁNGULOS dihedral (radianes, signed, flat=0)
+    /// del extractor compartido — ya NO distancias c-d.
+    pub fn set_bend(&mut self, ids: &[u32], rest_angles: &[f32]) {
         self.bend_ids = ids.to_vec();
-        self.bend_rest = rest_distances.to_vec();
+        self.bend_rest = rest_angles.to_vec();
     }
 
     /// Set bend constraints with edge type classification.
@@ -206,9 +220,9 @@ impl XpbdSolver {
     /// per-constraint compliance cache after global-field mutation
     /// (#747). Routes through `recompute_bend_compliances` — single
     /// source of truth for the cache derivation.
-    pub fn set_bend_with_types(&mut self, ids: &[u32], rest_distances: &[f32], edge_types: &[u8]) {
+    pub fn set_bend_with_types(&mut self, ids: &[u32], rest_angles: &[f32], edge_types: &[u8]) {
         self.bend_ids = ids.to_vec();
-        self.bend_rest = rest_distances.to_vec();
+        self.bend_rest = rest_angles.to_vec();
         self.bend_edge_types = edge_types.to_vec();
         self.recompute_bend_compliances();
     }
@@ -255,6 +269,16 @@ impl XpbdSolver {
         }
         if sewed_threshold.is_finite() {
             self.seam_sewed_threshold = sewed_threshold.max(0.0);
+        }
+    }
+
+    /// A3: set the terminal seam rest-length floor (m). Defensive per
+    /// set_seam_shrink_params: non-finite ignored, negative clamps to 0 (the
+    /// sewed threshold then lower-bounds the effective floor in solve_seams,
+    /// preserving the legacy near-zero terminal gap).
+    pub fn set_seam_rest_length_floor(&mut self, floor: f32) {
+        if floor.is_finite() {
+            self.seam_rest_length_floor = floor.max(0.0);
         }
     }
 
@@ -575,74 +599,162 @@ impl XpbdSolver {
 
             let rest = self.stretch_rest[c];
             let c_val = dist - rest;
-            let s = -c_val / (w_sum + alpha);
+            // P1-A (B5): ONE-SIDED — solo tensión; compresión libre (el
+            // pandeo lo gobierna el dihedral). Espejo CPU solveStretching.
+            if c_val > 0.0 {
+                let s = -c_val / (w_sum + alpha);
 
-            let nx = dx / dist;
-            let ny = dy / dist;
-            let nz = dz / dist;
+                let nx = dx / dist;
+                let ny = dy / dist;
+                let nz = dz / dist;
 
-            self.positions[ai] -= nx * s * wa;
-            self.positions[ai + 1] -= ny * s * wa;
-            self.positions[ai + 2] -= nz * s * wa;
-            self.positions[bi] += nx * s * wb;
-            self.positions[bi + 1] += ny * s * wb;
-            self.positions[bi + 2] += nz * s * wb;
+                self.positions[ai] -= nx * s * wa;
+                self.positions[ai + 1] -= ny * s * wa;
+                self.positions[ai + 2] -= nz * s * wa;
+                self.positions[bi] += nx * s * wb;
+                self.positions[bi + 1] += ny * s * wb;
+                self.positions[bi + 2] += nz * s * wb;
+            }
+
+            // Cap rígido one-sided fusionado (backport A7 STEP-4, espejo CPU
+            // solveStretching / TSL makeDistanceConstraintFn): si tras el
+            // solve compliant el edge sigue sobre rest·(1+max_strain),
+            // proyección RÍGIDA (alpha=0) de vuelta al cap.
+            if self.max_strain > 0.0 {
+                let dx2 = self.positions[bi] - self.positions[ai];
+                let dy2 = self.positions[bi + 1] - self.positions[ai + 1];
+                let dz2 = self.positions[bi + 2] - self.positions[ai + 2];
+                let dist2 = (dx2 * dx2 + dy2 * dy2 + dz2 * dz2).sqrt();
+                let max_len = rest * (1.0 + self.max_strain);
+                if dist2 > max_len && dist2 > 1e-7 {
+                    let s_cap = -(dist2 - max_len) / w_sum;
+                    let nx2 = dx2 / dist2;
+                    let ny2 = dy2 / dist2;
+                    let nz2 = dz2 / dist2;
+                    self.positions[ai] -= nx2 * s_cap * wa;
+                    self.positions[ai + 1] -= ny2 * s_cap * wa;
+                    self.positions[ai + 2] -= nz2 * s_cap * wa;
+                    self.positions[bi] += nx2 * s_cap * wb;
+                    self.positions[bi + 1] += ny2 * s_cap * wb;
+                    self.positions[bi + 2] += nz2 * s_cap * wb;
+                }
+            }
         }
     }
 
     fn solve_bend(&mut self, sdt: f32) {
-        // Bend constraints use 4 particles [a, b, c, d] where a-b is the shared edge
-        // and c, d are the opposite vertices. We use distance-based bending (rest distance between c and d).
+        // P1 dihedral (spec 2026-07-02-dihedral-bend-design.md §4): proyección
+        // XPBD angular C = φ − φ* sobre el quad completo [a,b,c,d] (arista
+        // a-b, alas c,d). Transcripción línea-a-línea de dihedral.ts
+        // `solveDihedralQuad` — ESA es la verdad compartida; si esto diverge,
+        // la paridad CPU↔WASM se rompe. bend_rest ahora guarda ÁNGULOS
+        // (radianes, signed, flat=0), no distancias c-d (BUG-1 invertido:
+        // computeBendRestDistances borrado). Gradientes PBD (n/|n|² baka
+        // 1/(2·área)); ángulo por atan2 (Tissu) — estable cerca de plano.
+        // Guards load-bearing (A3 + one-sided stretch hace slivers más
+        // probables): |e|², |n|², denom. Corrección = +w·λ·d (el flip de
+        // signo del acos de PBD queda absorbido por el φ signed).
+        const EPS_EDGE_SQ: f32 = 1e-12;
+        const EPS_NORMAL_SQ: f32 = 1e-12;
         let num_constraints = self.bend_ids.len() / 4;
 
         for c in 0..num_constraints {
-            // Use per-constraint compliance if available, else global
             let compliance = if c < self.bend_compliances.len() {
                 self.bend_compliances[c]
             } else {
                 self.bend_compliance
             };
-            let alpha = compliance / (sdt * sdt);
+            let alpha_tilde = compliance / (sdt * sdt);
 
-            // Get the opposite vertices (indices 2 and 3) for distance-based bending
-            // Layout: [a, b, c, d] where a-b is shared edge, c and d are opposite vertices
-            let p0 = self.bend_ids[c * 4 + 2] as usize;  // opposite vertex c
-            let p1 = self.bend_ids[c * 4 + 3] as usize;  // opposite vertex d
+            let a = self.bend_ids[c * 4] as usize;
+            let b = self.bend_ids[c * 4 + 1] as usize;
+            let cc = self.bend_ids[c * 4 + 2] as usize;
+            let d = self.bend_ids[c * 4 + 3] as usize;
 
-            // Inverse masses
-            let w0 = self.inv_mass[p0];
-            let w1 = self.inv_mass[p1];
-            let w_sum = w0 + w1;
-            if w_sum == 0.0 { continue; }
+            let wa = self.inv_mass[a];
+            let wb = self.inv_mass[b];
+            let wc = self.inv_mass[cc];
+            let wd = self.inv_mass[d];
+            if wa + wb + wc + wd == 0.0 { continue; }
 
-            // Position indices
-            let i0 = p0 * 3;
-            let i1 = p1 * 3;
+            let (ax, ay, az) = (self.positions[a * 3], self.positions[a * 3 + 1], self.positions[a * 3 + 2]);
+            let (bx, by, bz) = (self.positions[b * 3], self.positions[b * 3 + 1], self.positions[b * 3 + 2]);
+            let (cx, cy, cz) = (self.positions[cc * 3], self.positions[cc * 3 + 1], self.positions[cc * 3 + 2]);
+            let (px, py, pz) = (self.positions[d * 3], self.positions[d * 3 + 1], self.positions[d * 3 + 2]);
 
-            // Vector from p0 to p1
-            let dx = self.positions[i1] - self.positions[i0];
-            let dy = self.positions[i1 + 1] - self.positions[i0 + 1];
-            let dz = self.positions[i1 + 2] - self.positions[i0 + 2];
-            let dist = (dx * dx + dy * dy + dz * dz).sqrt();
-            if dist < 1e-12 { continue; }
+            let (ex, ey, ez) = (bx - ax, by - ay, bz - az);
+            let elen_sq = ex * ex + ey * ey + ez * ez;
+            if elen_sq < EPS_EDGE_SQ { continue; }
+            let elen = elen_sq.sqrt();
+            let inv_elen = 1.0 / elen;
 
-            // Rest distance stored in bend_rest
+            // n1 = (a−c)×(b−c), n2 = (b−d)×(a−d)
+            let (acx, acy, acz) = (ax - cx, ay - cy, az - cz);
+            let (bcx, bcy, bcz) = (bx - cx, by - cy, bz - cz);
+            let mut n1x = acy * bcz - acz * bcy;
+            let mut n1y = acz * bcx - acx * bcz;
+            let mut n1z = acx * bcy - acy * bcx;
+
+            let (bdx, bdy, bdz) = (bx - px, by - py, bz - pz);
+            let (adx, ady, adz) = (ax - px, ay - py, az - pz);
+            let mut n2x = bdy * adz - bdz * ady;
+            let mut n2y = bdz * adx - bdx * adz;
+            let mut n2z = bdx * ady - bdy * adx;
+
+            let n1sq = n1x * n1x + n1y * n1y + n1z * n1z;
+            let n2sq = n2x * n2x + n2y * n2y + n2z * n2z;
+            if n1sq < EPS_NORMAL_SQ || n2sq < EPS_NORMAL_SQ { continue; }
+
+            let inv1 = 1.0 / n1sq.sqrt();
+            let inv2 = 1.0 / n2sq.sqrt();
+            let (u1x, u1y, u1z) = (n1x * inv1, n1y * inv1, n1z * inv1);
+            let (u2x, u2y, u2z) = (n2x * inv2, n2y * inv2, n2z * inv2);
+            let cos_t = (u1x * u2x + u1y * u2y + u1z * u2z).clamp(-1.0, 1.0);
+            let crx = u1y * u2z - u1z * u2y;
+            let cry = u1z * u2x - u1x * u2z;
+            let crz = u1x * u2y - u1y * u2x;
+            let sin_t = (crx * ex + cry * ey + crz * ez) * inv_elen;
+            let phi = sin_t.atan2(cos_t);
+
+            // Gradientes con n/|n|².
+            n1x /= n1sq; n1y /= n1sq; n1z /= n1sq;
+            n2x /= n2sq; n2y /= n2sq; n2z /= n2sq;
+
+            let (dcx, dcy, dcz) = (elen * n1x, elen * n1y, elen * n1z);
+            let (ddx, ddy, ddz) = (elen * n2x, elen * n2y, elen * n2z);
+            let cb_dot_e = ((cx - bx) * ex + (cy - by) * ey + (cz - bz) * ez) * inv_elen;
+            let db_dot_e = ((px - bx) * ex + (py - by) * ey + (pz - bz) * ez) * inv_elen;
+            let dax = cb_dot_e * n1x + db_dot_e * n2x;
+            let day = cb_dot_e * n1y + db_dot_e * n2y;
+            let daz = cb_dot_e * n1z + db_dot_e * n2z;
+            let ac_dot_e = ((ax - cx) * ex + (ay - cy) * ey + (az - cz) * ez) * inv_elen;
+            let ad_dot_e = ((ax - px) * ex + (ay - py) * ey + (az - pz) * ez) * inv_elen;
+            let dbx = ac_dot_e * n1x + ad_dot_e * n2x;
+            let dby = ac_dot_e * n1y + ad_dot_e * n2y;
+            let dbz = ac_dot_e * n1z + ad_dot_e * n2z;
+
+            let denom = wa * (dax * dax + day * day + daz * daz)
+                + wb * (dbx * dbx + dby * dby + dbz * dbz)
+                + wc * (dcx * dcx + dcy * dcy + dcz * dcz)
+                + wd * (ddx * ddx + ddy * ddy + ddz * ddz)
+                + alpha_tilde;
+            if denom <= EPS_NORMAL_SQ { continue; }
+
             let rest = self.bend_rest[c];
-            let c_val = dist - rest;
-            let s = -c_val / (w_sum + alpha);
+            let lambda = (phi - rest) / denom;
 
-            // Normalized direction
-            let nx = dx / dist;
-            let ny = dy / dist;
-            let nz = dz / dist;
-
-            // Apply position corrections
-            self.positions[i0] -= nx * s * w0;
-            self.positions[i0 + 1] -= ny * s * w0;
-            self.positions[i0 + 2] -= nz * s * w0;
-            self.positions[i1] += nx * s * w1;
-            self.positions[i1 + 1] += ny * s * w1;
-            self.positions[i1 + 2] += nz * s * w1;
+            self.positions[a * 3] += wa * lambda * dax;
+            self.positions[a * 3 + 1] += wa * lambda * day;
+            self.positions[a * 3 + 2] += wa * lambda * daz;
+            self.positions[b * 3] += wb * lambda * dbx;
+            self.positions[b * 3 + 1] += wb * lambda * dby;
+            self.positions[b * 3 + 2] += wb * lambda * dbz;
+            self.positions[cc * 3] += wc * lambda * dcx;
+            self.positions[cc * 3 + 1] += wc * lambda * dcy;
+            self.positions[cc * 3 + 2] += wc * lambda * dcz;
+            self.positions[d * 3] += wd * lambda * ddx;
+            self.positions[d * 3 + 1] += wd * lambda * ddy;
+            self.positions[d * 3 + 2] += wd * lambda * ddz;
         }
     }
 
@@ -654,13 +766,13 @@ impl XpbdSolver {
         // restLength = current distance) and seams never closed on the
         // WASM tier: pieces hovered at exactly the gap they were placed.
         let shrink = self.seam_shrink_factor;
-        let floor = self.seam_sewed_threshold;
+        // A3: clamp at the rest-length floor (fabric-thickness spacing), NOT
+        // snap to 0. The sewed threshold lower-bounds the effective floor so
+        // a floor of 0 degrades to the legacy near-zero terminal gap.
+        let floor = self.seam_rest_length_floor.max(self.seam_sewed_threshold);
         for t in self.seam_target.iter_mut() {
             if *t > floor {
-                *t *= shrink;
-                if *t < floor {
-                    *t = 0.0;
-                }
+                *t = (*t * shrink).max(floor);
             }
         }
 
@@ -1465,15 +1577,127 @@ mod tests {
             "rigid seam should track the decayed target; got dist={dist}"
         );
 
-        // 2.0 × 0.97^n < 1e-6 at n ≈ 477 → after 600 more substeps the
-        // target must have hit the floor and snapped to exactly 0.
+        // 2.0 × 0.97^n < 0.002 at n ≈ 227 → after 600 more substeps the
+        // target must have clamped at the rest-length floor (A3: fabric
+        // thickness spacing, default 2mm), NOT snapped to literal 0 —
+        // snap-to-0 dragged armscye seam midpoints through the body.
         for _ in 0..600 {
             s.solve_seams(sdt);
         }
         assert_eq!(
-            s.seam_target[0], 0.0,
-            "target below sewed_threshold must snap to exactly 0"
+            s.seam_target[0], 0.002,
+            "target must clamp at the default rest-length floor (2mm), not 0"
         );
+    }
+
+    /// P1-A (B5): stretch ONE-SIDED — la compresión es libre (el pandeo lo
+    /// gobierna el dihedral); la tensión sigue resistiendo. Espejo del test
+    /// CPU oneSidedStretch.test.ts.
+    #[test]
+    fn stretch_is_one_sided_compression_free() {
+        // Par a 0.5 con rest 1.0 (COMPRIMIDO): no debe expandirse.
+        let positions = vec![0.0, 0.0, 0.0, 0.5, 0.0, 0.0];
+        let inv_mass = vec![1.0, 1.0];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+        s.set_stretch(&[0u32, 1u32], &[1.0f32]);
+        let sdt = 1.0 / 60.0 / 15.0;
+        for _ in 0..50 {
+            s.solve_stretch(sdt);
+        }
+        let dist = s.positions[3] - s.positions[0];
+        assert!(
+            (dist - 0.5).abs() < 1e-6,
+            "compressed edge must stay compressed (one-sided); got {dist}"
+        );
+
+        // Par a 1.5 con rest 1.0 (ESTIRADO): la tensión sí corrige.
+        let positions = vec![0.0, 0.0, 0.0, 1.5, 0.0, 0.0];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+        s.set_stretch(&[0u32, 1u32], &[1.0f32]);
+        for _ in 0..50 {
+            s.solve_stretch(sdt);
+        }
+        let dist = s.positions[3] - s.positions[0];
+        assert!(
+            (dist - 1.0).abs() < 1e-3,
+            "stretched edge must pull back to rest; got {dist}"
+        );
+    }
+
+    /// Backport A7 STEP-4: cap rígido one-sided de elongación (espejo del
+    /// GPU makeDistanceConstraintFn fusionado y del CPU solveStretching).
+    /// Con compliance ALTA el solve compliant apenas corrige — el cap rígido
+    /// debe clavar el edge en rest·(1+max_strain) en un solo pase. A
+    /// max_strain=0 el cap queda deshabilitado.
+    #[test]
+    fn stretch_hard_cap_at_max_strain() {
+        // Par a 1.5 con rest 1.0, compliance enorme (solve compliant ~no-op).
+        let positions = vec![0.0, 0.0, 0.0, 1.5, 0.0, 0.0];
+        let inv_mass = vec![1.0, 1.0];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+        s.set_stretch(&[0u32, 1u32], &[1.0f32]);
+        s.stretch_compliances = vec![1e6];
+        let sdt = 1.0 / 60.0 / 15.0;
+        s.solve_stretch(sdt);
+        let dist = s.positions[3] - s.positions[0];
+        assert!(
+            (dist - 1.02).abs() < 1e-4,
+            "edge must be rigidly capped at rest*(1+0.02); got {dist}"
+        );
+
+        // max_strain = 0 → cap deshabilitado: el edge queda casi sin corregir.
+        let positions = vec![0.0, 0.0, 0.0, 1.5, 0.0, 0.0];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+        s.set_stretch(&[0u32, 1u32], &[1.0f32]);
+        s.stretch_compliances = vec![1e6];
+        s.max_strain = 0.0;
+        s.solve_stretch(sdt);
+        let dist = s.positions[3] - s.positions[0];
+        assert!(
+            dist > 1.4,
+            "with max_strain=0 the cap is off and huge compliance leaves the edge stretched; got {dist}"
+        );
+    }
+
+    /// Borrow-plan A3: the seam target decay clamps at `seam_rest_length_floor`
+    /// (terminal seam gap = fabric-thickness spacing) instead of snapping to 0.
+    /// The setter is backward-compatible: default 0.002 when never called,
+    /// non-finite input ignored, negative clamps to 0 (and the sewed
+    /// threshold lower-bounds the effective floor, preserving the legacy
+    /// near-zero snap for floor=0).
+    #[test]
+    fn seam_target_decay_clamps_at_rest_length_floor() {
+        let positions = vec![0.0, 0.0, 0.0, 2.0, 0.0, 0.0];
+        let inv_mass = vec![1.0, 1.0];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+        assert_eq!(
+            s.seam_rest_length_floor, 0.002,
+            "constructor default must be 0.002 (backward-compatible when the setter is never called)"
+        );
+
+        // Custom (thick-fabric) floor: decay must clamp exactly there.
+        s.set_seams_with_compliance(&[0u32, 1u32], &[2.0f32], &[0.0f32]);
+        s.set_seam_rest_length_floor(0.1);
+        let sdt = 1.0 / 60.0 / 15.0;
+        for _ in 0..600 {
+            s.solve_seams(sdt);
+        }
+        assert_eq!(
+            s.seam_target[0], 0.1,
+            "decay must clamp at the configured floor"
+        );
+        let dist = s.positions[3] - s.positions[0];
+        assert!(
+            (dist - 0.1).abs() < 1e-4,
+            "rigid seam must hold the floored target as its gap; got {dist}"
+        );
+
+        // Defensive: NaN ignored, negative clamps to 0 (effective floor then
+        // falls back to the sewed threshold — legacy near-zero behavior).
+        s.set_seam_rest_length_floor(f32::NAN);
+        assert_eq!(s.seam_rest_length_floor, 0.1, "NaN floor must keep the current value");
+        s.set_seam_rest_length_floor(-1.0);
+        assert_eq!(s.seam_rest_length_floor, 0.0, "negative floor must clamp to 0");
     }
 
     /// Fase 2 done-criterion: with the standard-seam compliance from
@@ -1507,13 +1731,16 @@ mod tests {
         let dy = s.positions[4] - s.positions[1];
         let dz = s.positions[5] - s.positions[2];
         let dist = (dx * dx + dy * dy + dz * dz).sqrt();
+        // A3: "closed" now means AT the rest-length floor (2mm fabric
+        // spacing), not below 1mm — the pre-A3 done-criterion of <1mm only
+        // held because the target snapped to literal 0.
         assert!(
-            dist < 0.001,
-            "seam should close below 1 mm within 2 s of sim-time; got {dist}"
+            dist < 0.003,
+            "seam should close to the 2mm floor (+compliance slack) within 2 s of sim-time; got {dist}"
         );
         assert_eq!(
-            s.seam_target[0], 0.0,
-            "target should have decayed to the floor and snapped to 0"
+            s.seam_target[0], 0.002,
+            "target should have decayed to the rest-length floor (2mm)"
         );
     }
 
@@ -1773,15 +2000,15 @@ mod tests {
         let inv_mass = vec![1.0; 4];
         let mut s = XpbdSolver::new(&positions, &inv_mass);
 
-        // Two warp-edge bend constraints, default warp = 2.5e-5 (#gummy STEP 1).
+        // Two warp-edge bend constraints, default warp = 1e4 (P1 angular).
         s.set_bend_with_types(
             &[0u32, 1, 2, 3, 0, 1, 2, 3],
             &[1.0, 1.0],
             &[0u8, 0],
         );
         assert!(
-            s.bend_compliances.iter().all(|&c| (c - 2.5e-5).abs() < 1e-9),
-            "init: bend cache should reflect default warp=2.5e-5"
+            s.bend_compliances.iter().all(|&c| (c - 1e4).abs() < 1e-2),
+            "init: bend cache should reflect default warp=1e4 (P1 angular)"
         );
 
         // Mutate warp via configure — cache MUST regenerate.

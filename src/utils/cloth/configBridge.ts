@@ -104,5 +104,6 @@ export function mapClothSimConfigToWasmSolverConfig(
   if (cpu.bendComplianceWarp !== undefined) out.bendComplianceWarp = cpu.bendComplianceWarp;
   if (cpu.bendComplianceWeft !== undefined) out.bendComplianceWeft = cpu.bendComplianceWeft;
   if (cpu.internalDamping !== undefined) out.internalDamping = cpu.internalDamping;
+  if (cpu.fabricDensity !== undefined) out.fabricDensity = cpu.fabricDensity;
   return out;
 }

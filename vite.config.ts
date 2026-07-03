@@ -34,6 +34,19 @@ function serveWasmRaw(): import('vite').Plugin {
 
 export default defineConfig({
   base: '/',
+  resolve: {
+    // El Desktop del usuario es una Junction (C:\Users\...\Desktop →
+    // D:\Desktop). Sin esto, vite lanzado desde la ruta C: resuelve los
+    // módulos al realpath D: (fuera de su root) → "Pre-transform error:
+    // Failed to load url /src/main.tsx (resolved id: D:/...)" y la app
+    // nunca monta (cazado 2026-07-02 con el gate María @gpu-local).
+    // Canonicalizar el root al realpath tampoco sirve: root D: + cwd C:
+    // cruza drives y revienta el dep-optimizer (TypeError output.imports,
+    // reproducido 2×). preserveSymlinks mantiene TODO en el spelling de
+    // lanzamiento — consistente desde ambas rutas; desde D: es identidad
+    // (node_modules es layout npm plano, sin symlinks que preservar).
+    preserveSymlinks: true,
+  },
   build: {
     outDir: './dist',
     rollupOptions: {

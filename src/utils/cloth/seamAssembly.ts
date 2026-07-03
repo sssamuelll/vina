@@ -35,8 +35,23 @@ export interface SeamConstraintPair {
 export interface SeamConstraintConfig {
   /** Shrink factor per substep (e.g. 0.995 = slow sewing). Default 0.995 */
   shrinkFactor: number;
-  /** Minimum rest length below which the seam is considered "sewn". Default 1e-6 */
+  /**
+   * Sewn-detection epsilon (m): a seam counts as sewn once
+   * `restLength <= restLengthFloor + sewedThreshold`. Also lower-bounds the
+   * effective floor, so a (test-only) floor of 0 degrades to the legacy
+   * near-zero snap instead of decaying forever. Default 1e-6.
+   */
   sewedThreshold: number;
+  /**
+   * Terminal seam rest length (m) — borrow-plan A3. Decay clamps HERE, not
+   * at 0: snap-to-0 dragged the armscye seam midpoint through the convex
+   * shoulder (mechanism 2 of the skin-poke diagnosis, 2026-06-26). Semantics:
+   * `max(0.002, avg fabric thickness of the joined pieces)` via
+   * `computeSeamRestLengthFloor`. Default 0.002 (2mm) — cross-tier canonical
+   * with Rust `XpbdSolver::new` (`seam_rest_length_floor`) and the GPU
+   * `seamRestLengthFloor` uniform.
+   */
+  restLengthFloor: number;
   /** XPBD compliance per seam type. Lower = stiffer. */
   compliance: Record<Seam['type'], number>;
 }
@@ -148,10 +163,19 @@ export interface PieceSeamData {
 
 // ─── Default Config ─────────────────────────────────────────────────────────
 
+/**
+ * Minimum seam rest-length floor (m) — borrow-plan A3. With today's fabric
+ * library (0.1-1.2mm thickness) this 2mm minimum always dominates; the
+ * fabric-thickness term in `computeSeamRestLengthFloor` is the knob for
+ * thick fabrics (>4mm avg).
+ */
+export const SEAM_REST_LENGTH_FLOOR_MIN_M = 0.002;
+
 /** Default seam constraint configuration. */
 export const DEFAULT_SEAM_CONFIG: SeamConstraintConfig = {
   shrinkFactor: 0.97,
   sewedThreshold: 1e-6,
+  restLengthFloor: SEAM_REST_LENGTH_FLOOR_MIN_M,
   compliance: {
     standard: 0.0001,
     french: 0.00001,
@@ -159,6 +183,38 @@ export const DEFAULT_SEAM_CONFIG: SeamConstraintConfig = {
     overlock: 0.0002,
   },
 };
+
+/**
+ * Compute the scalar seam rest-length floor (m) for a seam set — A3 v1.
+ *
+ * Per-seam semantics: `max(2mm, (thicknessA + thicknessB) / 2)` where the
+ * thicknesses (mm) come from each joined piece's `PhysicalFabric.thickness`
+ * (B10-state: `project.pieces[].fabricId`, fallback default fabric — the
+ * caller resolves that mapping into `thicknessMmByPieceId`). v1 is SCALAR:
+ * the max over all active seams wins for the whole set; per-seam floors are
+ * the named escalation, not built here.
+ *
+ * HONESTY (Serrano F6): the floor is the HYPOTHESIS fix for the seam
+ * pull-through — the gate is Samuel's penetrationCount run (A1), and the
+ * named escalation if it fails is body-aware midpoint projection (own spec).
+ *
+ * @param seams - worker-protocol seam entries (only pieceAId/pieceBId/active read)
+ * @param thicknessMmByPieceId - pieceId → fabric thickness in MM (missing → 0)
+ * @returns floor in METERS, never below SEAM_REST_LENGTH_FLOOR_MIN_M
+ */
+export function computeSeamRestLengthFloor(
+  seams: ReadonlyArray<Pick<SeamInitData, 'pieceAId' | 'pieceBId' | 'active'>>,
+  thicknessMmByPieceId: ReadonlyMap<string, number>,
+): number {
+  let floor = SEAM_REST_LENGTH_FLOOR_MIN_M;
+  for (const s of seams) {
+    if (s.active === false) continue;
+    const tA = thicknessMmByPieceId.get(s.pieceAId) ?? 0;
+    const tB = thicknessMmByPieceId.get(s.pieceBId) ?? 0;
+    floor = Math.max(floor, (tA + tB) / 2 / 1000);
+  }
+  return floor;
+}
 
 // ─── Edge Parameterization ──────────────────────────────────────────────────
 
@@ -743,13 +799,15 @@ export function solveSeamConstraints(
   seamSet: SeamConstraintSet,
   sdt: number,
 ): void {
-  // Shrink rest lengths
+  // Shrink rest lengths — clamped at the rest-length floor (A3): the
+  // terminal target is fabric-thickness spacing, NOT literal 0 (snap-to-0
+  // dragged armscye seam midpoints through the body). sewedThreshold
+  // lower-bounds the floor so a floor of 0 degrades to the legacy near-zero
+  // snap. Mirrors Rust `solve_seams` and the GPU seam kernel.
+  const floor = Math.max(seamSet.config.restLengthFloor, seamSet.config.sewedThreshold);
   for (let i = 0; i < seamSet.count; i++) {
-    if (seamSet.restLengths[i] > seamSet.config.sewedThreshold) {
-      seamSet.restLengths[i] *= seamSet.config.shrinkFactor;
-      if (seamSet.restLengths[i] < seamSet.config.sewedThreshold) {
-        seamSet.restLengths[i] = 0;
-      }
+    if (seamSet.restLengths[i] > floor) {
+      seamSet.restLengths[i] = Math.max(seamSet.restLengths[i] * seamSet.config.shrinkFactor, floor);
     }
   }
 
@@ -790,14 +848,18 @@ export function solveSeamConstraints(
 }
 
 /**
- * Check if all seam constraints are fully sewn (rest length ≈ 0).
+ * Check if all seam constraints are fully sewn (rest length at the floor).
+ *
+ * A3: sewn means `restLength <= restLengthFloor + sewedThreshold` (the
+ * threshold is the epsilon) — the terminal target is the floor, not 0.
  *
  * @param seamSet - The seam constraint set
- * @returns true if all constraints have rest length below threshold
+ * @returns true if all constraints are within epsilon of the floor
  */
 export function isFullySewn(seamSet: SeamConstraintSet): boolean {
+  const floor = Math.max(seamSet.config.restLengthFloor, seamSet.config.sewedThreshold);
   for (let i = 0; i < seamSet.count; i++) {
-    if (seamSet.restLengths[i] > seamSet.config.sewedThreshold) {
+    if (seamSet.restLengths[i] > floor + seamSet.config.sewedThreshold) {
       return false;
     }
   }

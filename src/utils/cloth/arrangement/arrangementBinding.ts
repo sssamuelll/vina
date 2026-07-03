@@ -185,7 +185,9 @@ export function resolveArrangementWithFrames(
 
   const frames = pieces.map((p, i) => {
     const axisHint = opts?.skeletonReady === false ? undefined : opts?.axisHints?.[p.id];
-    return surfaceFrame(regions[i], dims, axisHint);
+    // pieceLength keeps this frame in lockstep with computeAutoFrame's (both
+    // anchor the sleeve-cap edge at the shoulder — see surfaceFrame).
+    return surfaceFrame(regions[i], dims, axisHint, pieceGeometryOf(p).heightMm * 0.001);
   });
 
   // M4-C flip flags measured in WRAP space (NOT the rigid computeFlipFlags —

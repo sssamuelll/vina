@@ -32,7 +32,7 @@ import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
 import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
-import { addPin, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
+import { addPin, setCollisionDistance, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
 import { showErrorToast } from '../../store/copilotUISlice';
 import { textureManager } from '../../utils/textures/TextureManager';
 import type { Texture } from 'three';
@@ -43,13 +43,17 @@ import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
 import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
+import { FACE_POKE_GENERATE_CADENCE } from '../../utils/cloth/gpu/tslFacePoke';
 import { isRendererDeviceLost, markRendererDeviceLost } from './rendererDeviceLost';
+import { isTetherDisabled } from './tetherFlag';
 import { useCollisionBodies } from './useCollisionBodies';
 import { useMeshing } from './useMeshing';
 import { useSimulationRecorder } from '../../hooks/useSimulationRecorder';
 import { useSimulationPlayback } from '../../hooks/useSimulationPlayback';
 import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
+import { computePenetrationMetric, getPenetrationBody, penetrationStrideFor } from '../../utils/cloth/penetrationMetric';
+import { computeFacePokeMetric, getFacePokeMetricBody, facePokeStrideFor } from '../../utils/cloth/facePokeMetric';
 import { mapClothSimConfigToWasmSolverConfig, type SharedClothSimConfigKeys } from '../../utils/cloth/configBridge';
 import type { ClothSimConfig } from '../../utils/cloth/xpbdSolver';
 import {
@@ -67,6 +71,13 @@ const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 // — the M4 checkpoint the e2e validates as settled (seams closed, garment on
 // body). Capturing here (vs init) is the root-cause fix for the tether collapse.
 const TETHER_SETTLE_FRAMES = 150;
+
+// Penetration metric cadence (plan drape-profesional §A1): every 4th position
+// readback (readbacks run every 15 frames → metric ≈ every 60 frames ≈ 2 s).
+// Cheap and honest — it's an oracle, not a gate. Cost per tick: ≤~7ms
+// (sample-budgeted stride, see penetrationStrideFor) + one-time ~60ms lazy
+// body build (pseudonormals + hash) on the first tick after a body registers.
+const PENETRATION_READBACK_CADENCE = 4;
 
 /**
  * Convert Seam[] to SeamInitData[] for the worker.
@@ -170,6 +181,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const tslFrameCounter = useRef(0);
   const tslReadbackPending = useRef(false);
+  // §A1: completed-readback counter — the penetration metric runs on every
+  // PENETRATION_READBACK_CADENCE-th resolved readback.
+  const tslReadbackCount = useRef(0);
   // Body-tether (frente#2) settle-capture state. Targets MUST be captured from
   // the SETTLED drape (cloth wrapped on the body), NOT at init where positions
   // are the pre-wrap spread-out layout (~0.6 m mean from the body → garbage
@@ -178,6 +192,19 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // targets exist.
   const tetherCaptureRequested = useRef(false);
   const tetherReady = useRef(false);
+  // B1 off-switch: read once per mount (mirror of the e2e addInitScript
+  // pattern); suppresses the capture below so `tetherReady` never arms.
+  const tetherDisabled = useRef(isTetherDisabled());
+  // 2a/2b-lite: identidad del solver del frame anterior — un re-init (T-pose
+  // →A-pose por armAxis, cambio de fabric/medidas) crea un TslSolver NUEVO;
+  // los contadores de settle (tether, readbacks) deben contar desde el
+  // ÚLTIMO seed, no desde el mount, o el tether captura la pose transitoria.
+  const lastSolverRef = useRef<import('../../utils/cloth/gpu/tslSolver').TslSolver | null>(null);
+  // Dev A/B del face-poke (track piel): forzar el pase sin recompilar.
+  const facePokeForced = useRef(
+    typeof window !== 'undefined' &&
+      (window as unknown as { localStorage?: Storage }).localStorage?.getItem('openclo-facepoke-on') === 'true',
+  );
   // Renderer WebGPU device-loss latch (#901). Set the instant the renderer's
   // device.lost resolves so useFrame stops dispatching renderer.compute() on a
   // dead device — without waiting for the lifecycle effect to tear down the TSL
@@ -220,6 +247,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const xrayMode = useSelector((s: RootState) => s.simulation.xrayMode);
   const xrayActiveLayer = useSelector((s: RootState) => s.simulation.xrayActiveLayer);
   const armAxis = useSelector((s: RootState) => s.simulation.armAxis);
+  const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
 
   // Filter inactive pieces — only active pieces participate in simulation
   // Also filter out hidden pieces (3D arrangement visibility) and hidden layers
@@ -367,7 +395,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   const activeElastics = useMemo(() => elastics.filter(e => e.active !== false), [elastics]);
 
-  const { clients, positionsRef, edgeDataRef, onFrame, recordFrameTick, tslSolverRef, handleGpuDeviceLost } = useSimulationLifecycle({
+  const { clients, positionsRef, edgeDataRef, onFrame, recordFrameTick, tslSolverRef, simReadyRef, handleGpuDeviceLost } = useSimulationLifecycle({
     placedMeshes,
     seamInitData,
     elastics: activeElastics,
@@ -447,8 +475,32 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   useFrame(({ gl }) => {
     if (!meshRef.current || !staticGeometry) return;
     if (isPlayingBack) return;
+    // Dev-only freeze: congela el loop de sim SIN desmontar (pausar por store
+    // desmonta via useClothSim). Lo usa el probe del face-poke @gpu-local para
+    // leer posiciones quietas; setear window.__OPENCLO_FREEZE_FRAME__=true.
+    if (import.meta.env.DEV && (window as unknown as Record<string, unknown>).__OPENCLO_FREEZE_FRAME__) return;
 
     const solver = tslSolverRef.current;
+    // 2a (init-race, plan §6bis): sin colisión cargada NO se stepea — los
+    // frames sin cuerpo son basura física (la tela cae, la manga desliza) y
+    // el settle-tether los congelaba. También raíz de la "bistabilidad" #902.
+    if (solver && !simReadyRef.current) return;
+    // 2a-ext: con avatar presente, no stepear hasta que el esqueleto publique
+    // armAxis — el seed T-pose transitorio (pre-A-pose) nunca corre frames.
+    // Antes esto lo "resolvía" un accidente: la extracción de colisión por
+    // URL tardaba ~1.5s y serializaba el init; el bake vivo (15ms) destapó
+    // la tormenta de doble-init dentro de las ventanas del DoD (medido:
+    // ventanas 92/53/48/42/40 → 30 estable). Sin avatar, armAxis.ready
+    // nunca llega: no se gatea (mannequin/proyectos sin cuerpo).
+    if (solver && avatarModelUrl && !armAxis.ready) return;
+    // 2b-lite: solver nuevo (re-seed) → los relojes de settle arrancan de 0.
+    if (solver && solver !== lastSolverRef.current) {
+      lastSolverRef.current = solver;
+      tslFrameCounter.current = 0;
+      tslReadbackCount.current = 0;
+      tetherCaptureRequested.current = false;
+      tetherReady.current = false;
+    }
 
     // ─── TSL zero-copy path ──────────────────────────────────────────
     // rendererDeviceLostRef gate (#901): once the renderer device is lost,
@@ -504,11 +556,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         const sc = solver.selfCollisionNodes;
         substepNodes.push(sc.cellClearNode, sc.scatterNode, sc.resolveNode, sc.applyNode);
       }
-      // Strain limiting (#gummy STEP 4): hard one-sided cap on edge over-stretch,
-      // after all position constraints + self-collision, BEFORE groundClamp and
-      // the pre-collision snapshot — so the cap is energy-consistent (folds into
-      // vNat) instead of reading as a velocity-excluded collision push.
-      substepNodes.push(...solver.strainLimitColors);
+      // Strain limiting (#gummy STEP 4): FUSIONADO dentro del kernel de
+      // stretch (consejo 2026-07-02 — mismos ids/colores, ~150 dispatches
+      // menos/frame). El cap corre en el slot del stretch; ver
+      // makeDistanceConstraintFn (tslSolver.ts) para la semántica de lag.
       // Body-tether (frente#2): max-distance cling that holds each vertex within
       // its per-region radius of a target. Targets = each vertex's own SETTLED
       // position, captured from the wrapped-on-body drape (see settle-trigger
@@ -542,10 +593,35 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       for (const body of solver.collisionBodies) {
         substepNodes.push(body.findBestNode, body.applyPushNode);
       }
+      // A4 face-poke Pass B (solve) — DENTRO del substep loop, tras el par de
+      // colisión de cuerpo y antes de postSolve: la corrección queda excluida
+      // de la velocidad vía preCollisionPos, igual que el push del cuerpo (el
+      // monolito v1 corría 1×/frame post-substeps y los 15 substeps lo
+      // deshacían). Gate = capability + dev flag 'openclo-facepoke-on'.
+      // A4 face-poke Pass B (solve) — DENTRO del substep loop, tras el par de
+      // colisión de cuerpo y antes de postSolve: corrección excluida de la
+      // velocidad vía preCollisionPos + fricción Coulomb propia. CADA substep:
+      // a substeps alternos la retención de manga cae (medido 6151 → 3945 —
+      // el par push+grip por substep es protector). Gate = capability + dev
+      // flag 'openclo-facepoke-on'.
+      const facePokeOn = (GPU_CAPABILITIES.facePoke || facePokeForced.current) && solver.facePokeNodes;
+      if (facePokeOn && solver.facePokeNodes) {
+        substepNodes.push(solver.facePokeNodes.solve);
+      }
       // postSolve deriva la velocidad de preCollisionPos (no de pos): el
       // push de colisión corrige posición sin crear velocidad, + respuesta
       // inelástica (#897 F2.3, espejo wasmSolverWorker.ts:367-399).
       substepNodes.push(solver.postSolve);
+
+      // A4 face-poke Pass A (generate) — por CARA, cadencia 2 frames, ANTES
+      // de los substeps: llena faceContactBuf (identidad del contacto más
+      // profundo por cara); Pass B recomputa la profundidad fresca en cada
+      // substep, así que los slots con 1 frame de edad siguen siendo válidos
+      // (cuerpo estático, tela se mueve ~µm/substep).
+      const fpCadence = tslFrameCounter.current < 300 ? FACE_POKE_GENERATE_CADENCE : FACE_POKE_GENERATE_CADENCE * 3;
+      if (facePokeOn && solver.facePokeNodes && tslFrameCounter.current % fpCadence === 0) {
+        renderer.compute(solver.facePokeNodes.generate);
+      }
 
       for (let s = 0; s < substeps; s++) {
         renderer.compute(substepNodes);
@@ -554,17 +630,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // Steam brush (once per frame, after substeps settle; skip when inactive)
       if (solver.brushNodes.strength.value > 0) {
         renderer.compute(solver.brushNodes.brushNode);
-      }
-
-      // Face-poke (face-poke v1, GPU-only): once per frame, AFTER the substep
-      // loop, BEFORE the normal recompute so the smooth normals reflect the
-      // tented geometry. snapshot freezes the post-settle corner positions (B1
-      // determinism fix), then correct tents poked cloth faces over convex body
-      // bumps. Gated by the GPU tier's facePoke capability (the kill-switch) +
-      // the nodes existing (set once the avatar body is loaded).
-      if (GPU_CAPABILITIES.facePoke && solver.facePokeNodes) {
-        renderer.compute(solver.facePokeNodes.snapshot);
-        renderer.compute(solver.facePokeNodes.correct);
       }
 
       renderer.compute(solver.normalZero);
@@ -589,6 +654,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // false and the tether simply never turns on.
       if (
         gpuClient &&
+        !tetherDisabled.current &&
         !tetherCaptureRequested.current &&
         !tslReadbackPending.current &&
         tslFrameCounter.current >= TETHER_SETTLE_FRAMES
@@ -608,6 +674,40 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           tslReadbackPending.current = true;
           gpuClient.readbackPositionsToGeometry(renderer, staticGeometry).then(() => {
             tslReadbackPending.current = false;
+            // §A1 penetration metric — slow cadence over the freshly-read
+            // positions. No-op while no avatar body is registered.
+            tslReadbackCount.current++;
+            if (tslReadbackCount.current % PENETRATION_READBACK_CADENCE !== 0) return;
+            const body = getPenetrationBody();
+            const posAttr = staticGeometry.getAttribute('position');
+            if (!body || !posAttr) return;
+            const positions = posAttr.array as Float32Array;
+            const { count, minSignedDist } = computePenetrationMetric(positions, body, {
+              stride: penetrationStrideFor(posAttr.count),
+            });
+            // e2e §8 debug global — same window-cast pattern as __OPENCLO_CLOTH_MESH__.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window as any).__OPENCLO_PENETRATION_COUNT__ = count;
+            if (Number.isFinite(minSignedDist)) {
+              // Inspector rules (fit:body-penetration / fit:pressure-point) compare in mm.
+              dispatch(setCollisionDistance(minSignedDist * 1000));
+            }
+            // A4 face-aware oracle — counts body verts through cloth FACES (the
+            // visible symptom A1 is blind to). HALF the A1 cadence (~2s): the
+            // 120mm-band grid scan costs ~10-30ms per tick on the main thread.
+            if (tslReadbackCount.current % (PENETRATION_READBACK_CADENCE * 2) !== 0) return;
+            const fpBody = getFacePokeMetricBody();
+            const idxAttr = staticGeometry.getIndex();
+            if (fpBody && idxAttr) {
+              const fp = computeFacePokeMetric(
+                positions,
+                idxAttr.array as Uint32Array | Uint16Array,
+                fpBody,
+                { stride: facePokeStrideFor(idxAttr.count / 3), debugPairs: 24 },
+              );
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (window as any).__OPENCLO_FACE_POKE__ = fp;
+            }
           });
         }
       }
@@ -668,6 +768,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     if (typeof window !== 'undefined' && meshRef.current) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__OPENCLO_CLOTH_MESH__ = meshRef.current;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__OPENCLO_THREE__ = THREE;
     }
     return () => {
       if (typeof window !== 'undefined') {
@@ -1188,6 +1290,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
         material={tslMaterial || undefined}
+        // Render pass 2026-07-02: la tela castea y recibe sombra (ShadowNode
+        // r184 soporta NodeMaterial; guard stale removido en EnvironmentSetup).
+        castShadow
+        receiveShadow
       >
         {!tslMaterial && (
           <meshPhysicalMaterial

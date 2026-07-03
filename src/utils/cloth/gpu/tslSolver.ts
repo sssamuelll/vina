@@ -38,6 +38,9 @@ import {
   atomicStore,
   atomicAdd,
   atomicLoad,
+  cross,
+  clamp,
+  atan,
 } from 'three/tsl';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
@@ -65,10 +68,19 @@ export interface TslSolverConfig {
    */
   seamShrinkFactor: number;
   /**
-   * Seam target floor: below it the target snaps to 0 ("sewed"). Init-only,
+   * Sewn-detection epsilon (m). Lower-bounds the effective rest-length floor
+   * (a floor of 0 degrades to the legacy near-zero snap). Init-only,
    * same rationale as seamShrinkFactor.
    */
   seamSewedThreshold: number;
+  /**
+   * Terminal seam rest length (m) — borrow-plan A3. El decay clampa AQUÍ, no
+   * en 0: snap-a-0 arrastraba el punto medio del seam de la sisa a través del
+   * hombro convexo (mecanismo 2 del diagnóstico de parches de piel). Default
+   * 0.002 (2mm) — canónico cross-tier con `DEFAULT_SEAM_CONFIG.restLengthFloor`
+   * (CPU) y `XpbdSolver::seam_rest_length_floor` (Rust). Init-only.
+   */
+  seamRestLengthFloor?: number;
   groundY: number;
   dt: number;
   selfCollision?: boolean;
@@ -91,14 +103,7 @@ export interface TslSolver {
   preSolve: ComputeNode;
   /** Per-color stretch constraint compute nodes */
   stretchColors: ComputeNode[];
-  /**
-   * Per-color strain-limit compute nodes (#gummy STEP 4). Hard one-sided edge
-   * clamp to restLen*(1+maxStrain); reuses the stretch graph coloring 1:1
-   * (race-free). Dispatch AFTER stretch/bend/seam/self-collision, BEFORE
-   * groundClamp/snapshot. Empty if no stretch constraints.
-   */
-  strainLimitColors: ComputeNode[];
-  /**
+    /**
    * Body-tether compute node (frente#2). Max-distance cling kernel: projects
    * cloth vertices back onto their per-vertex radius sphere around the static
    * body target when the vertex drifts too far. Race-free (per-particle).
@@ -148,15 +153,15 @@ export interface TslSolver {
   /** Normalize accumulated normals and write to normalSBA (dispatch: numParticles) */
   normalNormalize: ComputeNode;
   /**
-   * Face-poke correction nodes (face-poke v1, GPU-only). Built + assigned by
+   * Face-poke Generate/Solve nodes (A4, GPU-only). Built + assigned by
    * `GpuSolverClient.setTslCollisionBody` when the avatar body is set (the
-   * correction kernel needs that body's BVH). `null` until then. Dispatched
-   * once per frame in the brush/normals block (`GarmentSimulation.tsx`):
-   * `snapshot` first (freezes corner positions — the B1 determinism fix), then
-   * `correct` (tents poked cloth faces over convex body bumps). See
-   * `tslFacePoke.ts`.
+   * generate kernel needs that body's BVH). `null` until then. Dispatch
+   * (`GarmentSimulation.tsx`): `generate` BEFORE the substep loop at
+   * FACE_POKE_GENERATE_CADENCE; `solve` INSIDE the substep loop after the
+   * body-collision pair (velocity-excluded via preCollisionPos, like the
+   * body push). See `tslFacePoke.ts`.
    */
-  facePokeNodes: { snapshot: ComputeNode; correct: ComputeNode } | null;
+  facePokeNodes: { generate: ComputeNode; solve: ComputeNode } | null;
   /** Number of particles */
   numParticles: number;
   /** Number of triangles */
@@ -244,7 +249,8 @@ interface SolverUniforms {
   damping: FloatUniform;
   internalDamping: FloatUniform;
   seamShrinkFactor: FloatUniform;
-  seamSewedThreshold: FloatUniform;
+  /** Piso EFECTIVO del decay: max(seamRestLengthFloor, seamSewedThreshold). */
+  seamRestLengthFloor: FloatUniform;
   groundY: FloatUniform;
   maxStrain: FloatUniform;
 }
@@ -259,7 +265,12 @@ function createUniforms(config: TslSolverConfig): SolverUniforms {
     damping: uniform(config.damping),
     internalDamping: uniform(config.internalDamping),
     seamShrinkFactor: uniform(config.seamShrinkFactor),
-    seamSewedThreshold: uniform(config.seamSewedThreshold),
+    // max host-side (A3): el threshold acota el piso por abajo para que un
+    // floor test-only de 0 degrade al snap near-zero legacy, nunca a decay
+    // infinito. Espejo de solveSeamConstraints (CPU) y solve_seams (Rust).
+    seamRestLengthFloor: uniform(
+      Math.max(config.seamRestLengthFloor ?? 0.002, config.seamSewedThreshold),
+    ),
     groundY: uniform(config.groundY),
     maxStrain: uniform(config.maxStrain ?? 0.02),
   };
@@ -352,6 +363,16 @@ function makeDistanceConstraintFn(
   idOffset0: number,
   idOffset1: number,
   complianceBuf: TslNode,
+  // FUSION strainLimit->stretch (consejo 2026-07-02, Richter §7b / Halberg
+  // precondición A4): con el uniform presente, el cap rígido one-sided
+  // (#gummy STEP 4) corre DENTRO del mismo kernel tras el solve compliant —
+  // mismos ids, mismo color group => misma race-safety; releer posBuf tras
+  // el addAssign es coherente dentro de la invocación (orden de programa
+  // WGSL). Elimina ~150 dispatches/frame (~1ms medido). Semántica que
+  // CAMBIA: el cap ya no corre al FINAL del substep — el estiramiento que
+  // bend/seams/self-collision introduzcan después se capea con 1 substep de
+  // lag (~µm/substep; gates: drape sleeve count + Cusick).
+  maxStrainUniform?: FloatUniform,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (Fn as any)(() => {
@@ -385,10 +406,14 @@ function makeDistanceConstraintFn(
       const alpha = complianceBuf.element(ci).div(sdt.mul(sdt));
 
       const denom = w0.add(w1).add(alpha);
+      // P1-A (B5): ONE-SIDED — corrige solo en tensión (C>0); compresión
+      // libre = la membrana puede juntarse y el dihedral gobierna el pandeo.
+      // Esta factory es stretch-only (el bend usa makeDihedralConstraintFn);
+      // seams (makeSeamConstraintFn) y strain-limit intactos.
       // Guard 0/0 (espejo de Rust `if w_sum == 0 { continue }` y del solver CPU):
       // pieza congelada (invMass=0 en ambos extremos) + compliance 0 (default
       // warp/weft) producía NaN permanente — postSolve no restaura pinned.
-      If(denom.greaterThan(float(0.0)), () => {
+      If(C.greaterThan(float(0.0)).and(denom.greaterThan(float(0.0))), () => {
         // Correction scalar
         const s = C.negate().div(denom);
 
@@ -401,52 +426,127 @@ function makeDistanceConstraintFn(
         // Push particle 1 in opposite direction
         posBuf.element(id1).addAssign(n.mul(s).mul(w1));
       });
+
+      if (maxStrainUniform) {
+        // Cap rígido one-sided fusionado (era makeStrainLimitFn): relee las
+        // posiciones ya corregidas por ESTE hilo y clampea a rest*(1+max).
+        const delta2 = posBuf.element(id1).sub(posBuf.element(id0));
+        const len2 = delta2.dot(delta2).sqrt();
+        const maxLen = restLenBuf.element(ci).mul(maxStrainUniform.add(float(1.0)));
+        If(len2.greaterThan(maxLen).and(len2.greaterThan(float(1e-7))), () => {
+          const wSum = w0.add(w1);
+          If(wSum.greaterThan(float(0.0)), () => {
+            const sCap = len2.sub(maxLen).negate().div(wSum); // rígido (alpha=0)
+            const n2 = delta2.div(len2);
+            posBuf.element(id0).addAssign(n2.mul(sCap).mul(w0).negate());
+            posBuf.element(id1).addAssign(n2.mul(sCap).mul(w1));
+          });
+        });
+      }
     });
   })();
 }
 
 /**
- * Strain-limiting kernel (#gummy STEP 4). A rigid, ONE-SIDED distance clamp:
- * when an edge is stretched past restLen*(1+maxStrain), project both particles
- * back to that cap (mass-weighted, alpha=0 — no compliance). Never compresses.
- * Reuses the stretch ids+restLengths + graph coloring (race-free), so it kills
- * the residual stretch the compliant Jacobi solve under-converges on.
+ * Kernel dihedral (P1, spec 2026-07-02-dihedral-bend-design.md §4).
+ *
+ * Transcripción línea-a-línea de `dihedral.ts:solveDihedralQuad` — ESA es la
+ * verdad compartida (el CPU la llama directo, Rust la transcribe igual); si
+ * esto diverge, la paridad cross-tier se rompe. Proyección XPBD angular
+ * C = φ − φ* sobre el quad [a,b,c,d] (arista a-b, alas c,d): gradientes PBD
+ * (n/|n|² baka 1/(2·área)), ángulo por atan(sin, cos) = atan2 (Tissu, estable
+ * cerca de plano donde vive el drape). Corrección = +w·λ·d (el flip de signo
+ * del acos de PBD queda absorbido por el φ SIGNED — verificado a mano +
+ * pinneado por dihedral.test.ts en ambas direcciones de pliegue).
+ *
+ * Race-safety: dentro de un color ningún constraint comparte NINGUNO de sus
+ * 4 vértices (coloring stride-4 en tslBuffers) → el addAssign no-atómico a
+ * los 4 es race-free. Guards load-bearing (one-sided stretch hace slivers más
+ * probables): |e|², |n|², denom.
  */
-function makeStrainLimitFn(
+function makeDihedralConstraintFn(
   posBuf: TslNode,
   invMassBuf: TslNode,
   idsBuf: TslNode,
-  restLenBuf: TslNode,
-  maxStrain: FloatUniform,
-  idStride: number,
-  idOffset0: number,
-  idOffset1: number,
+  restAngleBuf: TslNode,
+  complianceBuf: TslNode,
+  sdt: FloatUniform,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (Fn as any)(() => {
-    const ci = instanceIndex;
-    const baseIdx = uint(ci).mul(uint(idStride));
-    const id0 = idsBuf.element(baseIdx.add(uint(idOffset0)));
-    const id1 = idsBuf.element(baseIdx.add(uint(idOffset1)));
-    const w0 = invMassBuf.element(id0);
-    const w1 = invMassBuf.element(id1);
-    const delta = posBuf.element(id1).sub(posBuf.element(id0));
-    const len = delta.dot(delta).sqrt();
-    If(len.greaterThan(float(1e-7)), () => {
-      const maxLen = restLenBuf.element(ci).mul(maxStrain.add(float(1.0)));
-      // One-sided: only clamp when over-stretched (never compress the cloth).
-      If(len.greaterThan(maxLen), () => {
-        const denom = w0.add(w1);
-        If(denom.greaterThan(float(0.0)), () => {
-          const s = len.sub(maxLen).negate().div(denom); // rigid (alpha=0)
-          const n = delta.div(len);
-          posBuf.element(id0).addAssign(n.mul(s).mul(w0).negate());
-          posBuf.element(id1).addAssign(n.mul(s).mul(w1));
+    const ci = instanceIndex; // constraint index
+
+    const baseIdx = uint(ci).mul(uint(4));
+    const ia = idsBuf.element(baseIdx);
+    const ib = idsBuf.element(baseIdx.add(uint(1)));
+    const ic = idsBuf.element(baseIdx.add(uint(2)));
+    const id = idsBuf.element(baseIdx.add(uint(3)));
+
+    const wa = invMassBuf.element(ia);
+    const wb = invMassBuf.element(ib);
+    const wc = invMassBuf.element(ic);
+    const wd = invMassBuf.element(id);
+
+    const pa = posBuf.element(ia).toVar();
+    const pb = posBuf.element(ib).toVar();
+    const pc = posBuf.element(ic).toVar();
+    const pd = posBuf.element(id).toVar();
+
+    const e = pb.sub(pa).toVar();
+    const elenSq = e.dot(e);
+
+    If(elenSq.greaterThan(float(1e-12)), () => {
+      const elen = elenSq.sqrt().toVar();
+      const invElen = float(1.0).div(elen).toVar();
+
+      // n1 = (a−c)×(b−c), n2 = (b−d)×(a−d)
+      const n1raw = cross(pa.sub(pc), pb.sub(pc)).toVar();
+      const n2raw = cross(pb.sub(pd), pa.sub(pd)).toVar();
+      const n1sq = n1raw.dot(n1raw).toVar();
+      const n2sq = n2raw.dot(n2raw).toVar();
+
+      If(n1sq.greaterThan(float(1e-12)).and(n2sq.greaterThan(float(1e-12))), () => {
+        // Ángulo con normales unitarias
+        const u1 = n1raw.div(n1sq.sqrt()).toVar();
+        const u2 = n2raw.div(n2sq.sqrt()).toVar();
+        const cosT = clamp(u1.dot(u2), float(-1.0), float(1.0));
+        const sinT = cross(u1, u2).dot(e).mul(invElen);
+        const phi = atan(sinT, cosT); // atan(y, x) = atan2 en TSL
+
+        // Gradientes con n/|n|²
+        const g1 = n1raw.div(n1sq).toVar();
+        const g2 = n2raw.div(n2sq).toVar();
+
+        const dC = g1.mul(elen).toVar();
+        const dD = g2.mul(elen).toVar();
+        const cbDotE = pc.sub(pb).dot(e).mul(invElen);
+        const dbDotE = pd.sub(pb).dot(e).mul(invElen);
+        const dA = g1.mul(cbDotE).add(g2.mul(dbDotE)).toVar();
+        const acDotE = pa.sub(pc).dot(e).mul(invElen);
+        const adDotE = pa.sub(pd).dot(e).mul(invElen);
+        const dB = g1.mul(acDotE).add(g2.mul(adDotE)).toVar();
+
+        const alpha = complianceBuf.element(ci).div(sdt.mul(sdt));
+        const denom = wa.mul(dA.dot(dA))
+          .add(wb.mul(dB.dot(dB)))
+          .add(wc.mul(dC.dot(dC)))
+          .add(wd.mul(dD.dot(dD)))
+          .add(alpha);
+
+        If(denom.greaterThan(float(1e-12)), () => {
+          const lambda = phi.sub(restAngleBuf.element(ci)).div(denom);
+
+          // Δpᵢ = +wᵢ·λ·dᵢ (convención signed — ver header)
+          posBuf.element(ia).addAssign(dA.mul(lambda.mul(wa)));
+          posBuf.element(ib).addAssign(dB.mul(lambda.mul(wb)));
+          posBuf.element(ic).addAssign(dC.mul(lambda.mul(wc)));
+          posBuf.element(id).addAssign(dD.mul(lambda.mul(wd)));
         });
       });
     });
   })();
 }
+
 
 // ─── Body-tether kernel ───────────────────────────────────────────────────────
 
@@ -501,18 +601,20 @@ function makeSeamConstraintFn(
   complianceBuf: TslNode,
   sdt: FloatUniform,
   shrink: FloatUniform,
-  threshold: FloatUniform,
+  floor: FloatUniform,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (Fn as any)(() => {
     const ci = instanceIndex; // constraint index
 
-    // ── Decay (shrink-before-solve, espejo lib.rs:656-664) ──
+    // ── Decay (shrink-before-solve, espejo lib.rs solve_seams) ──
+    // A3: clamp al rest-length floor (spacing de grosor de tela), NO snap a 0
+    // — el snap-a-0 arrastraba el punto medio del seam a través del cuerpo.
     const tgt = targetBuf.element(ci);
-    If(tgt.greaterThan(threshold), () => {
+    If(tgt.greaterThan(floor), () => {
       const shrunk = tgt.mul(shrink);
-      If(shrunk.lessThan(threshold), () => {
-        targetBuf.element(ci).assign(float(0.0));
+      If(shrunk.lessThan(floor), () => {
+        targetBuf.element(ci).assign(floor);
       }).Else(() => {
         targetBuf.element(ci).assign(shrunk);
       });
@@ -845,19 +947,7 @@ export function createTslSolver(
       uniforms.sdt,
       2, 0, 1,
       compBuf,
-    );
-    return compute(fn, color.count, [64]);
-  });
-
-  // ─── Strain limiting (#gummy STEP 4) — rigid one-sided cap. Reuses the ─
-  // stretch ids+restLengths + graph coloring (race-free); no compliance buffer.
-  const strainLimitColors = buffers.stretchColors.map((color) => {
-    const idsBuf = storage(color.idsSBA, 'uint', color.count * 2);
-    const restBuf = storage(color.restLengthsSBA, 'float', color.count);
-    const fn = makeStrainLimitFn(
-      posBuf, invMassBuf, idsBuf, restBuf,
-      uniforms.maxStrain,
-      2, 0, 1,
+      uniforms.maxStrain, // cap fusionado (ver factory) — era un pase aparte
     );
     return compute(fn, color.count, [64]);
   });
@@ -871,20 +961,20 @@ export function createTslSolver(
     [64],
   );
 
-  // ─── Bend constraints (per-color, race-free — P4-1 determinism) ────
-  // Colored (c,d) distance constraints, one dispatch per color exactly like
-  // stretch. Replaces the old single non-colored Jacobi pass whose non-atomic
-  // addAssign to shared hinge verts was a data race (non-deterministic drape).
+  // ─── Bend constraints (per-color, race-free — P4-1 + P1 dihedral) ──
+  // Kernel DIHEDRAL sobre el quad [a,b,c,d] completo (P1, spec 2026-07-02):
+  // reemplaza el surrogate de distancia (c,d) que confundía bend con stretch
+  // y des-plegaba cada substep. Un dispatch por color; el coloring stride-4
+  // (tslBuffers) garantiza que ningún constraint del color comparte vértices
+  // → addAssign a los 4 race-free. 5 storage buffers ≤ 8 ✓.
   const bendColors = buffers.bendColors.map((color) => {
-    const idsBuf = storage(color.idsSBA, 'uint', color.count * 2);
-    const restBuf = storage(color.restLengthsSBA, 'float', color.count);
+    const idsBuf = storage(color.idsSBA, 'uint', color.count * 4);
+    const restBuf = storage(color.restAnglesSBA, 'float', color.count);
     const compBuf = storage(color.complianceSBA, 'float', color.count);
 
-    const fn = makeDistanceConstraintFn(
-      posBuf, invMassBuf, idsBuf, restBuf,
+    const fn = makeDihedralConstraintFn(
+      posBuf, invMassBuf, idsBuf, restBuf, compBuf,
       uniforms.sdt,
-      2, 0, 1,
-      compBuf,
     );
     return compute(fn, color.count, [64]);
   });
@@ -903,7 +993,7 @@ export function createTslSolver(
       posBuf, invMassBuf, idsBuf, targetBuf, compBuf,
       uniforms.sdt,
       uniforms.seamShrinkFactor,
-      uniforms.seamSewedThreshold,
+      uniforms.seamRestLengthFloor,
     );
     return compute(fn, color.count, [64]);
   });
@@ -1081,7 +1171,6 @@ export function createTslSolver(
   return {
     preSolve,
     stretchColors,
-    strainLimitColors,
     bendColors,
     tether,
     seamColors,

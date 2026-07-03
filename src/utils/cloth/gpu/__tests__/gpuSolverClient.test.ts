@@ -134,6 +134,7 @@ vi.mock('three/tsl', () => sharedMock());
 
 import { GpuSolverClient, type PieceMeshData } from '../gpuSolverClient';
 import { DEFAULT_SEAM_CONFIG } from '../../seamAssembly';
+import { CELL_CAPACITY } from '../tslSelfCollision';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -953,11 +954,12 @@ describe('initMultiPieceTsl seam closure packing (behavior #11 — #897 F1)', ()
 // groundY 0).
 
 describe('initMultiPieceTsl default seam decay config (behavior #12 — #897 F1.4)', () => {
-  it('seeds seamShrinkFactor and seamSewedThreshold from DEFAULT_SEAM_CONFIG', async () => {
+  it('seeds seamShrinkFactor and the EFFECTIVE seam floor from DEFAULT_SEAM_CONFIG (A3)', async () => {
     // Anchor the literals first so the wiring assertion below can't go
     // tautological if DEFAULT_SEAM_CONFIG drifts.
     expect(DEFAULT_SEAM_CONFIG.shrinkFactor).toBe(0.97);
     expect(DEFAULT_SEAM_CONFIG.sewedThreshold).toBe(1e-6);
+    expect(DEFAULT_SEAM_CONFIG.restLengthFloor).toBe(0.002);
 
     uniformCalls.length = 0;
     const device = new FakeGPUDevice();
@@ -966,7 +968,9 @@ describe('initMultiPieceTsl default seam decay config (behavior #12 — #897 F1.
     await client.initMultiPieceTsl([makeQuadPiece()]);
 
     expect(uniformCalls).toContain(DEFAULT_SEAM_CONFIG.shrinkFactor);
-    expect(uniformCalls).toContain(DEFAULT_SEAM_CONFIG.sewedThreshold);
+    // A3: al kernel llega el piso EFECTIVO max(restLengthFloor, sewedThreshold)
+    // = 0.002 — el threshold crudo ya no se emite como uniform.
+    expect(uniformCalls).toContain(DEFAULT_SEAM_CONFIG.restLengthFloor);
   });
 });
 
@@ -1113,9 +1117,9 @@ describe('initMultiPieceTsl self-collision allocation (behavior #15 — #897 F3.
     expect(p4).toEqual([5, 6, 7]);
 
     // tableSize = nextPrime(2N) = nextPrime(16) = 17 (SpatialHashGrid.build
-    // mirror); bucket entries are tableSize × CELL_CAPACITY (8).
+    // mirror); bucket entries are tableSize × CELL_CAPACITY (4, P4-2 perf).
     expect(sc.tableSize).toBe(17);
-    expect(sc.cellEntriesSBA.array.length).toBe(17 * 8);
+    expect(sc.cellEntriesSBA.array.length).toBe(17 * CELL_CAPACITY);
   });
 
   it('passes selfCollision: true + thickness to createTslSolver — selfCollisionNodes wired', async () => {
@@ -1134,7 +1138,7 @@ describe('initMultiPieceTsl self-collision allocation (behavior #15 — #897 F3.
     const nodes = solver.selfCollisionNodes as any;
     // Dispatch counts baked into the compute() wraps: [tableSize*K, N, N, N].
     // cellClear sentinel-fills every entries slot (P4-2) → tableSize*CELL_CAPACITY.
-    expect(nodes.cellClearNode.dispatchCount).toBe(17 * 8);
+    expect(nodes.cellClearNode.dispatchCount).toBe(17 * CELL_CAPACITY);
     expect(nodes.scatterNode.dispatchCount).toBe(8);
     expect(nodes.resolveNode.dispatchCount).toBe(8);
     expect(nodes.applyNode.dispatchCount).toBe(8);

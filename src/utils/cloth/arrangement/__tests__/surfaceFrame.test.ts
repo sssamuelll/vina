@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { surfaceFrame, frameToEulerXYZ } from '../surfaceFrame';
+import { surfaceFrame, frameToEulerXYZ, SLEEVE_CAP_MARGIN } from '../surfaceFrame';
 import type { BodyDimensions } from '../../garmentPlacement';
 import { deriveDimensions } from '../../garmentPlacement';
 
@@ -82,6 +82,26 @@ describe('surfaceFrame', () => {
     const cLen = Math.hypot(c[0], c[1], c[2]);
     expect(cLen).toBeGreaterThan(0.99); // axis × normal is a valid horizontal binormal
     expect(f.radius).toBeCloseTo(D2.neckR, 4);
+  });
+
+  // Plan §6bis item 5: the sleeve tube anchors its CAP edge adjacent to the
+  // armhole. Mesher-local length is bbox-centered (±L/2), so the proximal edge
+  // of the wrapped tube is point − axis·L/2 = shoulder + axis·SLEEVE_CAP_MARGIN.
+  it('anchors the sleeve cap edge at the shoulder when pieceLengthM is given', () => {
+    const L = 0.3;
+    const f = surfaceFrame('left-sleeve', D, undefined, L);
+    const shoulder = [-(D.shoulderWidth / 2), D.shoulderHeight, 0];
+    const capEdge = f.point.map((p, i) => p - f.axis[i] * (L / 2));
+    for (let i = 0; i < 3; i++) {
+      expect(capEdge[i]).toBeCloseTo(shoulder[i] + f.axis[i] * SLEEVE_CAP_MARGIN, 6);
+    }
+  });
+
+  it('keeps mid-arm placement without pieceLengthM (back-compat) and for cuffs', () => {
+    const f = surfaceFrame('right-sleeve', D);
+    expect(f.point[0]).toBeCloseTo(D.shoulderWidth / 2 + D.armLength / 2, 6);
+    const cuff = surfaceFrame('cuff-right', D, undefined, 0.08);
+    expect(cuff.point[0]).toBeCloseTo(D.shoulderWidth / 2 + D.armLength / 2, 6);
   });
 
   it('sleeve frame uses armR, axis runs along the arm, and axis × normal is non-degenerate', () => {

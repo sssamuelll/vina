@@ -131,16 +131,19 @@ describe('createTslBuffers', () => {
     expect(totalConstraints).toBe(5);
   });
 
-  it('creates per-color bend constraint SBAs (stride-2 (c,d) pairs)', () => {
+  it('creates per-color bend constraint SBAs (stride-4 dihedral quads — P1)', () => {
     const mesh = makeTestMesh();
     const { colored } = makeTestStretch();
     const bend = makeTestBend();
     const buffers = createTslBuffers(mesh, colored, bend, null);
 
-    // 1 bend constraint → 1 color group of count 1; ids are stride-2 (c,d).
+    // 1 bend constraint → 1 color group of count 1; ids son el quad completo
+    // [a,b,c,d] (P1 dihedral) y el rest es el ÁNGULO del extractor, ya no la
+    // distancia c-d reconstruida.
     expect(buffers.bendColors).toHaveLength(1);
     expect(buffers.bendColors[0].count).toBe(1);
-    expect(buffers.bendColors[0].idsSBA.itemSize).toBe(2);
+    expect(buffers.bendColors[0].idsSBA.itemSize).toBe(4);
+    expect(buffers.bendColors[0].restAnglesSBA.array[0]).toBe(bend.restAngles[0]);
     expect(buffers.numBendConstraints).toBe(1);
   });
 
@@ -162,11 +165,12 @@ describe('createTslBuffers', () => {
     };
     const buffers = createTslBuffers(mesh, colored, bend, null);
 
-    // Proper coloring: within each group no vertex index repeats.
+    // Proper coloring sobre los 4 ids del quad (P1): dentro de un grupo
+    // ningún vértice se repite — el kernel dihedral escribe los 4.
     for (const color of buffers.bendColors) {
       const seen = new Set<number>();
       const ids = color.idsSBA.array as unknown as Uint32Array;
-      for (let i = 0; i < color.count * 2; i++) {
+      for (let i = 0; i < color.count * 4; i++) {
         expect(seen.has(ids[i])).toBe(false);
         seen.add(ids[i]);
       }
@@ -355,7 +359,7 @@ describe('destroyTslBufferSet', () => {
     expect(deleteSpy).toHaveBeenCalledWith(buffers.triangleIdsSBA);
     for (const color of buffers.bendColors) {
       expect(deleteSpy).toHaveBeenCalledWith(color.idsSBA);
-      expect(deleteSpy).toHaveBeenCalledWith(color.restLengthsSBA);
+      expect(deleteSpy).toHaveBeenCalledWith(color.restAnglesSBA);
       expect(deleteSpy).toHaveBeenCalledWith(color.complianceSBA);
     }
     for (const color of buffers.stretchColors) {

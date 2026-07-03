@@ -658,6 +658,38 @@ export interface PhysicalXPBDParams extends XPBDCompliance {
  *   compliance = 1 / (stiffness * dt²)
  * We simplify to a normalized mapping suitable for the solver.
  */
+/**
+ * Banda viva ANGULAR del bend dihedral (P1) — compartida cross-tier: los 3
+ * tiers consumen estos números vía el flujo fabricCompliance/configBridge.
+ * Derivación en el spec 2026-07-02-dihedral-bend-design.md §8. OJO: la banda
+ * asume sdt=1/900 (15 substeps) y malla ~7mm — si cualquiera cambia, la banda
+ * escala (alpha=compliance/sdt², denom ~1/e²); el gate Cusick es el oráculo
+ * que caza la deriva.
+ */
+/**
+ * Densidad de referencia (kg/m² = GSM/1000) de la escala de masa relativa —
+ * algodón medio ~150 GSM. A esta densidad `fabricInvMassScale` = 1 y el
+ * comportamiento del solver es EXACTAMENTE el de la era densidad-1 (no se
+ * re-rompe la calibración #gummy/P1). P7-density: sin esto, chiffon (30 GSM)
+ * y canvas (407 GSM) caían con la misma masa y el ratio B/ρ del drape real
+ * no existía (gap Cusick 2.0 vs anclas 30/85).
+ */
+export const REFERENCE_FABRIC_DENSITY = 0.15;
+
+/**
+ * Escala de invMass por densidad de tela: invMass_i *= REFERENCE/ρ.
+ * Defensivo (A3): densidad ausente/degenerada → 1 (comportamiento actual);
+ * clamp [0.1, 10] — el solver no sobrevive extremos de ×100.
+ */
+export function fabricInvMassScale(density?: number): number {
+  if (density === undefined || !Number.isFinite(density) || density <= 0) return 1;
+  return Math.min(10, Math.max(0.1, REFERENCE_FABRIC_DENSITY / density));
+}
+
+export const BEND_K_ANGULAR = 1.08e4;
+export const BEND_ANGULAR_MIN = 6e2;
+export const BEND_ANGULAR_MAX = 1e5;
+
 export function toXPBDParams(pf: PhysicalFabric): PhysicalXPBDParams {
   // Stretch: % elongation → XPBD compliance, RESCALED to the solver live band
   // (#gummy STEP 3): the old `stretchWarp/10` gave 0.2-8 → alpha 160k-6M → null
@@ -667,16 +699,21 @@ export function toXPBDParams(pf: PhysicalFabric): PhysicalXPBDParams {
   const stretchComplianceWarp = Math.min(1e-5, Math.max(5e-7, pf.stretchWarp * 5e-7));
   const stretchComplianceWeft = Math.min(1e-5, Math.max(5e-7, pf.stretchWeft * 5e-7));
 
-  // Bending: mN·cm → XPBD compliance (inverse: higher rigidity = lower compliance).
-  // RESCALED to the solver's live alpha band (#gummy STEP 1): the solver computes
-  // alpha = compliance/sdt² with sdt=1/900 (sdt²≈1.23e-6), so compliance must be
-  // ~[1.2e-6, 2e-4] to produce a real bend correction. The OLD scale (0.05-20) gave
-  // alpha=40k-16M → s≈0 → DEAD bend constraint → floppy/gummy cloth with no body.
-  // BEND_K=2e-5: cotton (0.8 mN·cm) → ~2.2e-5; chiffon (~0.04) → ~1.4e-4 (soft);
-  // neoprene (~8) → ~2.5e-6 (stiff). Same inverse law, corrected magnitude.
-  const BEND_K = 2.0e-5;
-  const bendComplianceWarp = Math.min(2e-4, Math.max(1.2e-6, BEND_K / (pf.bendingWarp + 0.1)));
-  const bendComplianceWeft = Math.min(2e-4, Math.max(1.2e-6, BEND_K / (pf.bendingWeft + 0.1)));
+  // Bending ANGULAR (P1 dihedral): mN·cm → compliance del constraint
+  // DIHEDRAL (C en radianes). Banda CALIBRADA CONTRA EL GATE CUSICK
+  // (2026-07-02): el ratio teórico ×5.4e4 sobre la banda de distancia daba
+  // [6e-2,10], pero el sweep empírico mostró bend efectivamente RÍGIDO ahí
+  // (chiffon y canvas drapeaban igual, DC~46 ambos); a ×1e4 el gap abre a
+  // 11 DC (chiffon 23 / canvas 34, hacia las anclas 30/85) → banda viva
+  // real [6e2, 1e5]. Lección: las anclas absolutas son del gate, no de la
+  // aritmética. BARRERA ANTI-BEND-MUERTO: el clamp inferior está DENTRO de
+  // la banda viva — cualquier valor legacy queda clampeado a 6e2 y el bend
+  // jamás muere en silencio (#gummy); el test lo pinnea. Ley inversa:
+  // cotton (0.8) → ~1.2e4; chiffon (0.04) → ~7.2e4 (fluido); neoprene (8)
+  // → ~1.3e3 (rígido). Refinamiento per-fabric (canvas necesita más rigidez
+  // relativa para su ancla 85) = sweep Fase 4.
+  const bendComplianceWarp = Math.min(BEND_ANGULAR_MAX, Math.max(BEND_ANGULAR_MIN, BEND_K_ANGULAR / (pf.bendingWarp + 0.1)));
+  const bendComplianceWeft = Math.min(BEND_ANGULAR_MAX, Math.max(BEND_ANGULAR_MIN, BEND_K_ANGULAR / (pf.bendingWeft + 0.1)));
 
   // Shear: N/m → compliance (inverse), RESCALED to the live band (#gummy STEP 3).
   const shearCompliance = Math.min(1e-4, Math.max(1e-5, 1e-3 / (pf.shearStiffness + 1)));

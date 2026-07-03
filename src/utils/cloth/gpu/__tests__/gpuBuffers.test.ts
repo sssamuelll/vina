@@ -68,6 +68,19 @@ describe('EdgeType classification', () => {
   });
 
   describe('extractBendConstraints', () => {
+    it('emits rest angles with the SOLVER convention: flat = 0, degenerate = 0 (P1 flip)', () => {
+      // Quad plano — la convención vieja daba π (normales construidas
+      // antiparalelas); la del solver (dihedral.ts) da 0. Mezclarlas arruga
+      // la prenda al primer substep (spec §5).
+      const positions = new Float32Array([
+        0, 0, 0, 1, 0, 0, 0.5, 1, 0, 0.5, -1, 0,
+      ]);
+      const triangles = new Uint32Array([0, 1, 2, 0, 3, 1]);
+      const result = extractBendConstraints(positions, triangles);
+      expect(result.restAngles.length).toBe(1);
+      expect(Math.abs(result.restAngles[0])).toBeLessThan(1e-6);
+    });
+
     it('should return edgeTypes array', () => {
       // Two triangles sharing an edge
       const positions = new Float32Array([
@@ -279,5 +292,81 @@ describe('colorConstraints', () => {
 
     const result = colorConstraints(ids, restLengths, n, compliance);
     expect(result.colorRanges.length).toBeLessThanOrEqual(maxPerVertex + 1);
+  });
+});
+
+// ─── colorConstraints stride-4 (P1 dihedral, spec 2026-07-02) ────────────────
+//
+// El kernel dihedral escribe los 4 vértices del quad [a,b,c,d]. Colorear solo
+// por (c,d) — el shape del bend de distancia — deja dos hinges del mismo color
+// compartiendo los vértices de arista a,b = la race P4-1 reabierta. El
+// coloring debe ser propio sobre los 4 ids.
+describe('colorConstraints stride-4 (dihedral quads)', () => {
+  /**
+   * Abanico de k hinges que comparten la arista (0,1) con alas disjuntas:
+   * (c,d) por pares NO colisiona, (a,b) sí — el caso exacto de la race.
+   */
+  function makeSharedEdgeFan(k: number) {
+    const ids = new Uint32Array(k * 4);
+    const rest = new Float32Array(k);
+    const compliance = new Float32Array(k);
+    for (let i = 0; i < k; i++) {
+      ids[i * 4] = 0; // a
+      ids[i * 4 + 1] = 1; // b
+      ids[i * 4 + 2] = 2 + i * 2; // c — disjuntas entre hinges
+      ids[i * 4 + 3] = 3 + i * 2; // d
+      rest[i] = 0.01 * (i + 1);
+      compliance[i] = 1e-9 * (i + 1);
+    }
+    return { ids, rest, compliance, k };
+  }
+
+  it('hinges sharing the (a,b) edge never share a color (P4-1 race case)', () => {
+    const { ids, rest, compliance, k } = makeSharedEdgeFan(5);
+    const result = colorConstraints(ids, rest, k, compliance, 4);
+    // Todas comparten la arista → coloring propio = k colores de 1.
+    expect(result.colorRanges).toHaveLength(k);
+    for (const { count } of result.colorRanges) expect(count).toBe(1);
+  });
+
+  it('proper coloring over ALL 4 ids on a hinge strip', () => {
+    // Tira de quads: hinge i = [i, i+1, i+2, i+3] — vecinos solapan en 3 verts.
+    const k = 30;
+    const ids = new Uint32Array(k * 4);
+    const rest = new Float32Array(k);
+    for (let i = 0; i < k; i++) {
+      ids[i * 4] = i;
+      ids[i * 4 + 1] = i + 1;
+      ids[i * 4 + 2] = i + 2;
+      ids[i * 4 + 3] = i + 3;
+      rest[i] = 0.01 + i * 1e-6;
+    }
+    const result = colorConstraints(ids, rest, k, undefined, 4);
+
+    let covered = 0;
+    for (const { offset, count } of result.colorRanges) {
+      const seen = new Set<number>();
+      for (let j = offset; j < offset + count; j++) {
+        for (let s = 0; s < 4; s++) {
+          const v = result.ids[j * 4 + s];
+          expect(seen.has(v), `color group repeats vertex ${v}`).toBe(false);
+          seen.add(v);
+        }
+      }
+      covered += count;
+    }
+    expect(covered).toBe(k);
+  });
+
+  it('reorders stride-4 tuples with rest+compliance pairing intact', () => {
+    const { ids, rest, compliance, k } = makeSharedEdgeFan(7);
+    const result = colorConstraints(ids, rest, k, compliance, 4);
+    const tuple = (idArr: Uint32Array, r: Float32Array, c: Float32Array, i: number) =>
+      `${idArr[i * 4]},${idArr[i * 4 + 1]},${idArr[i * 4 + 2]},${idArr[i * 4 + 3]},${r[i]},${c[i]}`;
+    const input = new Set<string>();
+    for (let i = 0; i < k; i++) input.add(tuple(ids, rest, compliance, i));
+    for (let i = 0; i < k; i++) {
+      expect(input.has(tuple(result.ids, result.restLengths, result.compliance!, i))).toBe(true);
+    }
   });
 });

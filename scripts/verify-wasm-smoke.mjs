@@ -75,12 +75,17 @@ for (let i = 0; i < 120; i++) seamSolver.step(1 / 60);
 const ptr = seamSolver.positions_ptr();
 const pos = new Float32Array(wasm.memory.buffer, ptr, 6);
 const dist = Math.hypot(pos[3] - pos[0], pos[4] - pos[1], pos[5] - pos[2]);
-if (!(dist < 0.001)) {
+// A3 (borrow-plan, 2026-07-02): the seam target decay clamps at the
+// rest-length FLOOR (default 0.002 m = fabric-thickness spacing) instead of
+// snapping to 0 — snap-to-0 dragged armscye seam midpoints through the body.
+// The seam therefore closes TO THE FLOOR, not below it: assert a band around
+// 2 mm (regression on either side = decay broken OR floor lost).
+if (!(dist < 0.003 && dist > 0.0005)) {
   console.error(
-    `[verify-wasm-smoke] ✗ seam did not close: distance after 2 s of sim-time is ${dist} m (expected < 0.001). ` +
-    'The committed binary is missing or regressing the seam target decay (Fase 2 / BP-2).',
+    `[verify-wasm-smoke] ✗ seam did not close to the rest-length floor: distance after 2 s of sim-time is ${dist} m (expected ≈0.002, band (0.0005, 0.003)). ` +
+    'The committed binary is missing or regressing the seam target decay (Fase 2 / BP-2) or the A3 floor clamp.',
   );
   process.exit(1);
 }
-console.log(`[verify-wasm-smoke] ✓ seam closed to ${dist.toExponential(2)} m within 2 s of sim-time`);
+console.log(`[verify-wasm-smoke] ✓ seam closed to the rest-length floor: ${dist.toExponential(2)} m within 2 s of sim-time`);
 seamSolver.free();

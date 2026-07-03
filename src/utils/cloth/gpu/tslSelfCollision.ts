@@ -43,6 +43,7 @@ import {
   float,
   If,
   Loop,
+  Break,
   atomicAdd,
   atomicMin,
   atomicLoad,
@@ -102,7 +103,14 @@ export interface SelfCollisionComputeNodes {
  *  primero = no-determinista). Sustituye al prefix-sum serial (180-900ms/frame,
  *  inviable para el DoD ≥30fps #897 H-BP1).
  *  Spec: docs/plans/2026-07-01-drape-determinism-p4-2-selfcollision-admission.md */
-export const CELL_CAPACITY = 8;
+// P4-2 perf (2026-07-02): 8 -> 4. Con particulas a 5mm y celda = thickness
+// (2mm), >4 particulas/celda solo ocurre en apilamiento masivo; keep-4-
+// smallest sigue siendo DETERMINISTA (mismo argumento del spec P4-2, K menor)
+// y corta clear/cascade/scan a la mitad: fps 27.9 -> 31.3 en Maria @gpu-local
+// con drape VERDE (belowHip 0.00, sleeve 6561->6571 @10s — mas estable que
+// K=8). ponytail: si la calidad de self-collision en pliegues densos sufre,
+// K es el knob (cada +2 cuesta ~2ms/frame en Maria).
+export const CELL_CAPACITY = 4;
 
 /**
  * Fixed-point scale for atomic<i32> accumulation (WGSL has no atomic<f32>).
@@ -227,6 +235,12 @@ export function makeSelfCollisionComputeNodes(
   // cellEntries is now atomic<u32> (P4-2): scatter does atomicMin into it,
   // resolve atomicLoads it. SENTINEL (0xFFFFFFFF) = empty slot.
   const cellEntriesBuf = makeAtomicStorage(buffers.cellEntriesSBA, 'uint', T * CELL_CAPACITY);
+  // P4-2 perf: wrapper NO-atomico del MISMO SBA para el pase resolve (solo
+  // lectura). WGSL tipa los bindings POR PIPELINE: scatter/clear lo ven como
+  // array<atomic<u32>> (cascade/store), resolve como array<u32> plano — los
+  // reads coalescen/cachean en vez de 94M atomicLoads/frame. La visibilidad
+  // cross-pass la da la barrera implicita entre dispatches.
+  const cellEntriesReadBuf = storage(buffers.cellEntriesSBA, 'uint', T * CELL_CAPACITY);
   const SENTINEL = uint(0xffffffff);
   const adjOffsetsBuf = storage(buffers.adjOffsetsSBA, 'uint', N + 1);
   const adjNeighborsBuf = storage(buffers.adjNeighborsSBA, 'uint', adjNeighborCount);
@@ -252,7 +266,10 @@ export function makeSelfCollisionComputeNodes(
     // Dispatch T*K (was T). toVar() forces a concrete u32 (AbstractInt caveat,
     // same idiom as makeNormalZeroFn in tslSolver.ts).
     If(uint(i).lessThan(uint(T * CELL_CAPACITY)), () => {
-      atomicStore(cellEntriesBuf.element(i), SENTINEL.toVar());
+      // P4-2 perf: store PLANO via el wrapper no-atomico (pipeline propio =
+      // binding array<u32>): mismos bytes, stores coalesced sin semantica
+      // atomica. La barrera entre dispatches ordena clear -> scatter.
+      cellEntriesReadBuf.element(i).assign(SENTINEL.toVar());
     });
   })();
   const cellClearNode = compute(cellClearFn, T * CELL_CAPACITY, [64]);
@@ -304,11 +321,14 @@ export function makeSelfCollisionComputeNodes(
       const val = uint(i).toVar('val');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       Loop({ start: uint(0), end: uint(CELL_CAPACITY), type: 'uint', condition: '<' }, ({ i: s }: { i: any }) => {
-        If(val.notEqual(SENTINEL), () => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const old = (atomicMin(cellEntriesBuf.element(base.add(s)), val) as any).toVar('old');
-          val.assign(old.max(val));
+        // P4-2 perf: Break al depositar (val==SENTINEL) — el UNICO early-out
+        // legal (spec §2.3); antes el loop iteraba los 8 slots con branch.
+        If(val.equal(SENTINEL), () => {
+          Break();
         });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const old = (atomicMin(cellEntriesBuf.element(base.add(s)), val) as any).toVar('old');
+        val.assign(old.max(val));
       });
     });
   })();
@@ -375,11 +395,22 @@ export function makeSelfCollisionComputeNodes(
 
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               Loop({ start: uint(0), end: uint(CELL_CAPACITY), type: 'uint', condition: '<' }, ({ i: ki }: { i: any }) => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const j = (atomicLoad(cellEntriesBuf.element(entriesBase.add(ki))) as any).toVar('jEntry');
+                 
+                const j = cellEntriesReadBuf.element(entriesBase.add(ki)).toVar('jEntry');
 
-                // Skip empty slots (SENTINEL); dedupe pairs with j>i.
-                If(j.notEqual(SENTINEL).and(j.greaterThan(uint(i))), () => {
+                // P4-2 perf (cazado 2026-07-02, +23ms/frame): la cascada
+                // keep-smallest NUNCA deja huecos — un thread no puede saltar
+                // un slot SENTINEL (depositaria ahi y terminaria), asi que
+                // SENTINEL implica que TODOS los slots siguientes son
+                // SENTINEL. Break legal y determinista: corta el scan de 8
+                // slots x 27 celdas (216 atomicLoads/particula/substep) a
+                // ~ocupacion real (~1-2 por celda).
+                If(j.equal(SENTINEL), () => {
+                  Break();
+                });
+
+                // Dedupe pairs with j>i.
+                If(j.greaterThan(uint(i)), () => {
                   const wj = invMassBufNode.element(j);
 
                   If(wj.greaterThan(float(0.0)), () => {

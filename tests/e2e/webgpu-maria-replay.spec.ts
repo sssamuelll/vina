@@ -263,6 +263,20 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     );
     expect(creep!.nan).toBe(0);
 
+    // A4 face-aware oracle @10s (log-only): body verts through cloth FACES —
+    // the visible "skin patches" symptom the vertex metric is blind to.
+    // Baseline OFF vs A4 ON compared by the maintainer (gate: visible ≥80% ↓,
+    // same stride). // maintainer-run
+    const facePoke = await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      return (w.__OPENCLO_FACE_POKE__ as {
+        visible: number; visibleTrue: number; near: number; maxDepth: number; sampledFaces: number; stride: number;
+      } | undefined) ?? null;
+    });
+    console.log(
+      `[face-poke] simSeconds=10 visible=${facePoke?.visible ?? 'not-published'} visibleTrue=${facePoke?.visibleTrue ?? 'n/a'} near=${facePoke?.near ?? 'n/a'} maxDepthMm=${facePoke ? (facePoke.maxDepth * 1000).toFixed(1) : 'n/a'} sampledFaces=${facePoke?.sampledFaces ?? 'n/a'} stride=${facePoke?.stride ?? 'n/a'} (gate A4: visibleTrue ≥80% ↓ vs baseline OFF)`,
+    );
+
     // Tube-closure check (maintainer-run): the sleeve must STAY on the arm.
     // Before tube closure, sleeve verts (|x|>0.25) collapsed 993→~2 over 10s
     // as the open sleeve slid off. With the underarm seam closing the tube the
@@ -385,13 +399,21 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     await page.waitForFunction(
       () =>
         ((window as unknown as { __PERF_FRAMETIMES__?: number[] }).__PERF_FRAMETIMES__?.length ??
-          0) >= 4,
+          0) >= 8,
       undefined,
       { timeout: 120_000 },
     );
-    const [, ...samples] = await page.evaluate(
+    const all = await page.evaluate(
       () => (window as unknown as { __PERF_FRAMETIMES__: number[] }).__PERF_FRAMETIMES__,
-    ); // descarta ventana 1 = arranque frío
+    );
+    // Descarta las primeras 5 ventanas (~2.5s) = warmup de COMPILACIÓN de
+    // pipelines WGSL, no física: WebGPU compila cada kernel en su primer
+    // dispatch (medido 2026-07-03: 93/52/47/42/39 → 29.7 estable). Antes el
+    // warmup quedaba OCULTO fuera de las ventanas porque la extracción de
+    // colisión por URL tardaba ~1.5s y Chrome compilaba en background; el
+    // bake vivo (15ms) lo destapó. El DoD es "sostenidos": se mide el estado
+    // estable. Precompile async del arranque = follow-up nombrado.
+    const samples = all.slice(5);
 
     const med = (a: number[]) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
     const medianMs = med(samples);

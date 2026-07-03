@@ -14,6 +14,8 @@ import { type SeamConstraintSet, solveSeamConstraints } from './seamAssembly';
 import { SpatialHashGrid, buildAdjacency, solveSelfCollision } from './selfCollision';
 import { type LRAConstraint, buildLRAConstraints, solveLRA } from './longRangeAttachments';
 import { EdgeType, classifyEdgeType } from './gpu/gpuBuffers';
+import { dihedralAngle, solveDihedralQuad } from './dihedral';
+import { fabricInvMassScale } from './physicalFabric';
 import type { CollisionMeshData } from './collisionMesh';
 import { TriangleSpatialHash, solveTriangleCollision } from './triangleCollision';
 
@@ -188,6 +190,20 @@ export interface ClothSimConfig {
   bendComplianceWarp: number;
   /** Bending compliance in weft direction (horizontal in UV) */
   bendComplianceWeft: number;
+  /**
+   * P7-density: densidad de la tela en kg/m² (GSM/1000). Escala el invMass
+   * relativo a la referencia (150 GSM): invMass *= REF/ρ. undefined = escala
+   * 1 (comportamiento pre-P7 exacto). Ver fabricInvMassScale.
+   */
+  fabricDensity?: number;
+  /**
+   * Hard strain limit (backport A7 STEP-4, espejo TSL makeDistanceConstraintFn):
+   * elongación fraccional máxima de un edge sobre su rest antes de que un
+   * clamp rígido one-sided (alpha=0) lo devuelva. 0.02 (2%, woven default).
+   * 0 = deshabilitado. Mata la gomosidad residual que el solve compliant no
+   * converge (Jacobi/GS under-convergence).
+   */
+  maxStrain: number;
   /** Internal damping (0.0 = fluid/oscillates, 1.0 = heavy/settles quickly). Default: 0.3 */
   internalDamping: number;
   /** Directional wind force [x, y, z] in N/m² (default [0,0,0] = no wind) */
@@ -348,8 +364,10 @@ export class XPBDClothSolver {
 
   /** Bending constraint quad [edgeId0, edgeId1, oppId0, oppId1, ...] */
   private bendingIds: Int32Array;
-  /** Rest lengths for bending constraints */
-  private bendingLengths: Float32Array;
+  /** Rest DIHEDRAL ANGLES (radians, signed, flat=0) per bend quad — P1
+   *  dihedral (spec 2026-07-02). Antes: rest DISTANCES c-d (el surrogate que
+   *  hacía los pliegues imposibles). */
+  private bendingRestAngles: Float32Array;
 
   /** Per-constraint compliance for anisotropic stretch */
   private stretchCompliances!: Float32Array;
@@ -358,7 +376,7 @@ export class XPBDClothSolver {
   private bendCompliances!: Float32Array;
 
   /** Original bending rest lengths (before fold overrides) for reset */
-  private originalBendingLengths: Float32Array | null = null;
+  private originalBendingRestAngles: Float32Array | null = null;
   /** Original bending compliances (before fold overrides) for reset */
   private originalBendCompliances: Float32Array | null = null;
 
@@ -416,7 +434,7 @@ export class XPBDClothSolver {
       dt: 1.0 / 60.0,
       damping: 0.99,
       stretchingCompliance: 0.0,
-      bendingCompliance: 2.5e-5, // #gummy STEP 1: was 1.0 (alpha 810k → dead bend); lockstep w/ GPU+WASM
+      bendingCompliance: 1e4, // P1 dihedral: default ANGULAR calibrado contra el gate Cusick (banda [6e2,1e5]). Lockstep GPU+WASM.
       groundY: 0.0,
       groundFriction: 0.5,
       selfCollision: true,
@@ -430,8 +448,12 @@ export class XPBDClothSolver {
       stretchComplianceWarp: 0.0,
       stretchComplianceWeft: 0.0,
       stretchComplianceShear: 0.001,
-      bendComplianceWarp: 2.5e-5, // #gummy STEP 1: was 1.0 (dead bend)
-      bendComplianceWeft: 2.5e-5,
+      bendComplianceWarp: 1e4, // P1 angular (ver bendingCompliance)
+      bendComplianceWeft: 1e4,
+      // P7-density: kg/m² (GSM/1000). undefined → escala 1 (densidad de
+      // referencia 150 GSM = comportamiento pre-P7 exacto).
+      fabricDensity: undefined,
+      maxStrain: 0.02, // espejo del default GPU (tslSolver config.maxStrain ?? 0.02)
       internalDamping: 0.3,
       windForce: [0, 0, 0],
       ...config,
@@ -489,7 +511,7 @@ export class XPBDClothSolver {
     this.stretchingIds = new Int32Array(edgeIdsList);
     this.bendingIds = new Int32Array(triPairIdsList);
     this.stretchingLengths = new Float32Array(this.stretchingIds.length / 2);
-    this.bendingLengths = new Float32Array(this.bendingIds.length / 4);
+    this.bendingRestAngles = new Float32Array(this.bendingIds.length / 4);
 
     // Validate constraint IDs are within particle bounds
     this.validateConstraintIds();
@@ -558,6 +580,13 @@ export class XPBDClothSolver {
       this.invMass[id2] += pInvMass;
     }
 
+    // P7-density: escala de masa relativa a la referencia (150 GSM).
+    // invMass *= REF/ρ — a ρ=REF es exactamente el comportamiento previo.
+    const densityScale = fabricInvMassScale(this.config.fabricDensity);
+    if (densityScale !== 1) {
+      for (let i = 0; i < this.numParticles; i++) this.invMass[i] *= densityScale;
+    }
+
     // Compute rest lengths for stretching
     for (let i = 0; i < this.stretchingLengths.length; i++) {
       const id0 = this.stretchingIds[2 * i];
@@ -596,17 +625,22 @@ export class XPBDClothSolver {
       }
     }
 
-    // Compute rest lengths for bending
-    for (let i = 0; i < this.bendingLengths.length; i++) {
-      const id0 = this.bendingIds[4 * i + 2];
-      const id1 = this.bendingIds[4 * i + 3];
-      this.bendingLengths[i] = Math.sqrt(vecDistSquared(this.pos, id0, this.pos, id1));
+    // Rest dihedral angles for bending (P1): misma función que el runtime —
+    // una sola verdad del ángulo (dihedral.ts). Degenerados → 0 (flat), NO π:
+    // la convención vieja (flat=π) era del extractor pre-P1 y mezclarlas
+    // arruga la prenda al primer substep.
+    for (let i = 0; i < this.bendingRestAngles.length; i++) {
+      const a = this.bendingIds[4 * i];
+      const b = this.bendingIds[4 * i + 1];
+      const c = this.bendingIds[4 * i + 2];
+      const d = this.bendingIds[4 * i + 3];
+      this.bendingRestAngles[i] = dihedralAngle(this.pos, a, b, c, d) ?? 0;
     }
 
     // Classify bend edges and assign per-constraint compliance for anisotropic bending
-    this.bendCompliances = new Float32Array(this.bendingLengths.length);
+    this.bendCompliances = new Float32Array(this.bendingRestAngles.length);
 
-    for (let i = 0; i < this.bendingLengths.length; i++) {
+    for (let i = 0; i < this.bendingRestAngles.length; i++) {
       // Get the shared edge vertices (a, b are first two indices of quad)
       const a = this.bendingIds[i * 4];
       const b = this.bendingIds[i * 4 + 1];
@@ -670,7 +704,7 @@ export class XPBDClothSolver {
     }
 
     // Modify bend constraints
-    for (let i = 0; i < this.bendingLengths.length; i++) {
+    for (let i = 0; i < this.bendingRestAngles.length; i++) {
       const idA = this.bendingIds[4 * i + 2];
       const idB = this.bendingIds[4 * i + 3];
       const pieceA = vertexToPiece[idA];
@@ -1242,10 +1276,32 @@ export class XPBDClothSolver {
       vecScale(this.grads, 0, 1.0 / len);
       const restLen = this.stretchingLengths[i];
       const C = len - restLen;
-      const s = -C / (w + alpha);
+      // P1-A (B5): ONE-SIDED — solo tensión. La compresión es libre: la
+      // membrana puede juntarse y el pandeo fuera de plano lo gobierna el
+      // dihedral (P1-B) = nucleación de pliegues. Espejo Rust solve_stretch
+      // y TSL makeDistanceConstraintFn.
+      if (C > 0) {
+        const s = -C / (w + alpha);
 
-      vecAdd(this.pos, id0, this.grads, 0, s * w0);
-      vecAdd(this.pos, id1, this.grads, 0, -s * w1);
+        vecAdd(this.pos, id0, this.grads, 0, s * w0);
+        vecAdd(this.pos, id1, this.grads, 0, -s * w1);
+      }
+
+      // Cap rígido one-sided fusionado (backport A7 STEP-4, espejo TSL
+      // makeDistanceConstraintFn): tras el solve compliant, si el edge sigue
+      // sobre rest·(1+maxStrain), proyección RÍGIDA (alpha=0) de vuelta al cap.
+      const maxStrain = this.config.maxStrain;
+      if (maxStrain > 0) {
+        vecSetDiff(this.grads, 0, this.pos, id0, this.pos, id1);
+        const len2 = Math.sqrt(vecLengthSquared(this.grads, 0));
+        const maxLen = restLen * (1 + maxStrain);
+        if (len2 > maxLen && len2 > 1e-7) {
+          vecScale(this.grads, 0, 1.0 / len2);
+          const sCap = -(len2 - maxLen) / w;
+          vecAdd(this.pos, id0, this.grads, 0, sCap * w0);
+          vecAdd(this.pos, id1, this.grads, 0, -sCap * w1);
+        }
+      }
     }
   }
 
@@ -1270,8 +1326,8 @@ export class XPBDClothSolver {
     folds: Array<{ edgeA: number; edgeB: number; creaseAngleDeg: number; stiffness: number }>,
   ): void {
     // Save originals for reset (only on first call)
-    if (!this.originalBendingLengths) {
-      this.originalBendingLengths = new Float32Array(this.bendingLengths);
+    if (!this.originalBendingRestAngles) {
+      this.originalBendingRestAngles = new Float32Array(this.bendingRestAngles);
       this.originalBendCompliances = new Float32Array(this.bendCompliances);
     }
 
@@ -1291,9 +1347,12 @@ export class XPBDClothSolver {
       const bendIdx = edgeToBendIdx.get(key);
       if (bendIdx === undefined) continue;
 
-      const angleFactor = Math.max(0, Math.min(1, fold.creaseAngleDeg / 180));
-      const originalRestLen = this.originalBendingLengths[bendIdx];
-      this.bendingLengths[bendIdx] = originalRestLen * angleFactor;
+      // P1 dihedral: el crease pasa de hack de distancia (rest·factor,
+      // direction-blind) a ángulo objetivo EXACTO: φ* = π·(1 − deg/180)
+      // (180=plano → 0; 0=doblado → π). Rama positiva v1 — mountain/valley
+      // llegará por FoldOptions.direction cuando el dominio lo exponga.
+      const clampedDeg = Math.max(0, Math.min(180, fold.creaseAngleDeg));
+      this.bendingRestAngles[bendIdx] = Math.PI * (1 - clampedDeg / 180);
 
       const stiffness = Math.max(0, Math.min(1, fold.stiffness));
       this.bendCompliances[bendIdx] = 0.1 * Math.pow(0.0001, stiffness);
@@ -1302,36 +1361,29 @@ export class XPBDClothSolver {
 
   /** Reset all fold constraint overrides, restoring original bending behavior. */
   clearFoldConstraints(): void {
-    if (this.originalBendingLengths && this.originalBendCompliances) {
-      this.bendingLengths.set(this.originalBendingLengths);
+    if (this.originalBendingRestAngles && this.originalBendCompliances) {
+      this.bendingRestAngles.set(this.originalBendingRestAngles);
       this.bendCompliances.set(this.originalBendCompliances);
     }
   }
 
   private solveBending(sdt: number): void {
-    for (let i = 0; i < this.bendingLengths.length; i++) {
-      const compliance = this.bendCompliances[i];
-      const alpha = compliance / (sdt * sdt);
-
-      const id0 = this.bendingIds[4 * i + 2]; // opposite vertex 0
-      const id1 = this.bendingIds[4 * i + 3]; // opposite vertex 1
-
-      const w0 = this.invMass[id0];
-      const w1 = this.invMass[id1];
-      const w = w0 + w1;
-      if (w === 0.0) continue;
-
-      vecSetDiff(this.grads, 0, this.pos, id0, this.pos, id1);
-      const len = Math.sqrt(vecLengthSquared(this.grads, 0));
-      if (len === 0.0) continue;
-
-      vecScale(this.grads, 0, 1.0 / len);
-      const restLen = this.bendingLengths[i];
-      const C = len - restLen;
-      const s = -C / (w + alpha);
-
-      vecAdd(this.pos, id0, this.grads, 0, s * w0);
-      vecAdd(this.pos, id1, this.grads, 0, -s * w1);
+    // P1 dihedral: proyección XPBD angular C = φ − φ* sobre el quad completo
+    // [a,b,c,d] (dihedral.ts — Rust y TSL transcriben de ahí). Reemplaza el
+    // surrogate de distancia c-d que confundía bend con stretch y DES-plegaba
+    // la tela cada substep (la causa del "domo 80s", diagnóstico 2026-06-26).
+    for (let i = 0; i < this.bendingRestAngles.length; i++) {
+      const alphaTilde = this.bendCompliances[i] / (sdt * sdt);
+      solveDihedralQuad(
+        this.pos,
+        this.invMass,
+        this.bendingIds[4 * i],
+        this.bendingIds[4 * i + 1],
+        this.bendingIds[4 * i + 2],
+        this.bendingIds[4 * i + 3],
+        this.bendingRestAngles[i],
+        alphaTilde,
+      );
     }
   }
 
@@ -1583,7 +1635,7 @@ export class XPBDClothSolver {
    * Get the number of bending constraints.
    */
   get numBendingConstraints(): number {
-    return this.bendingLengths.length;
+    return this.bendingRestAngles.length;
   }
 
   /**
