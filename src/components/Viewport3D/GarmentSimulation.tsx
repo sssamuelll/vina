@@ -52,6 +52,7 @@ import { useSimulationPlayback } from '../../hooks/useSimulationPlayback';
 import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
 import { computePenetrationMetric, getPenetrationBody, penetrationStrideFor } from '../../utils/cloth/penetrationMetric';
+import { computeFacePokeMetric, getFacePokeMetricBody, facePokeStrideFor } from '../../utils/cloth/facePokeMetric';
 import { mapClothSimConfigToWasmSolverConfig, type SharedClothSimConfigKeys } from '../../utils/cloth/configBridge';
 import type { ClothSimConfig } from '../../utils/cloth/xpbdSolver';
 import {
@@ -669,6 +670,20 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
             if (Number.isFinite(minSignedDist)) {
               // Inspector rules (fit:body-penetration / fit:pressure-point) compare in mm.
               dispatch(setCollisionDistance(minSignedDist * 1000));
+            }
+            // A4 face-aware oracle — counts body verts through cloth FACES (the
+            // visible symptom A1 is blind to). Same cadence, sampled faces.
+            const fpBody = getFacePokeMetricBody();
+            const idxAttr = staticGeometry.getIndex();
+            if (fpBody && idxAttr) {
+              const fp = computeFacePokeMetric(
+                positions,
+                idxAttr.array as Uint32Array | Uint16Array,
+                fpBody,
+                { stride: facePokeStrideFor(idxAttr.count / 3) },
+              );
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (window as any).__OPENCLO_FACE_POKE__ = fp;
             }
           });
         }

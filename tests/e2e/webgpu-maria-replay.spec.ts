@@ -263,6 +263,20 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     );
     expect(creep!.nan).toBe(0);
 
+    // A4 face-aware oracle @10s (log-only): body verts through cloth FACES —
+    // the visible "skin patches" symptom the vertex metric is blind to.
+    // Baseline OFF vs A4 ON compared by the maintainer (gate: visible ≥80% ↓,
+    // same stride). // maintainer-run
+    const facePoke = await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      return (w.__OPENCLO_FACE_POKE__ as {
+        visible: number; near: number; maxDepth: number; sampledFaces: number; stride: number;
+      } | undefined) ?? null;
+    });
+    console.log(
+      `[face-poke] simSeconds=10 visible=${facePoke?.visible ?? 'not-published'} near=${facePoke?.near ?? 'n/a'} maxDepthMm=${facePoke ? (facePoke.maxDepth * 1000).toFixed(1) : 'n/a'} sampledFaces=${facePoke?.sampledFaces ?? 'n/a'} stride=${facePoke?.stride ?? 'n/a'} (gate A4: visible ≥80% ↓ vs baseline OFF)`,
+    );
+
     // Tube-closure check (maintainer-run): the sleeve must STAY on the arm.
     // Before tube closure, sleeve verts (|x|>0.25) collapsed 993→~2 over 10s
     // as the open sleeve slid off. With the underarm seam closing the tube the

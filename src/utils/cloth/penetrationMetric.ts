@@ -195,6 +195,12 @@ export function registerPenetrationBody(mesh: CollisionMeshData | null): void {
   builtBody = null; // derived data (pseudonormals + hash) rebuilds lazily
 }
 
+/** The registered mesh, for sibling oracles (facePokeMetric) to key their own
+ *  lazy builds on — one registry, N derived caches. */
+export function getRegisteredCollisionMesh(): CollisionMeshData | null {
+  return registeredMesh;
+}
+
 /**
  * Body prepared for the metric, or null when no body is loaded. Lazily builds
  * pseudonormals + spatial hash once per registered mesh (one-time cost, paid
