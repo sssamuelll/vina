@@ -43,6 +43,7 @@ import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
 import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
+import { FACE_POKE_GENERATE_CADENCE } from '../../utils/cloth/gpu/tslFacePoke';
 import { isRendererDeviceLost, markRendererDeviceLost } from './rendererDeviceLost';
 import { isTetherDisabled } from './tetherFlag';
 import { useCollisionBodies } from './useCollisionBodies';
@@ -583,10 +584,35 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       for (const body of solver.collisionBodies) {
         substepNodes.push(body.findBestNode, body.applyPushNode);
       }
+      // A4 face-poke Pass B (solve) — DENTRO del substep loop, tras el par de
+      // colisión de cuerpo y antes de postSolve: la corrección queda excluida
+      // de la velocidad vía preCollisionPos, igual que el push del cuerpo (el
+      // monolito v1 corría 1×/frame post-substeps y los 15 substeps lo
+      // deshacían). Gate = capability + dev flag 'openclo-facepoke-on'.
+      // A4 face-poke Pass B (solve) — DENTRO del substep loop, tras el par de
+      // colisión de cuerpo y antes de postSolve: corrección excluida de la
+      // velocidad vía preCollisionPos + fricción Coulomb propia. CADA substep:
+      // a substeps alternos la retención de manga cae (medido 6151 → 3945 —
+      // el par push+grip por substep es protector). Gate = capability + dev
+      // flag 'openclo-facepoke-on'.
+      const facePokeOn = (GPU_CAPABILITIES.facePoke || facePokeForced.current) && solver.facePokeNodes;
+      if (facePokeOn && solver.facePokeNodes) {
+        substepNodes.push(solver.facePokeNodes.solve);
+      }
       // postSolve deriva la velocidad de preCollisionPos (no de pos): el
       // push de colisión corrige posición sin crear velocidad, + respuesta
       // inelástica (#897 F2.3, espejo wasmSolverWorker.ts:367-399).
       substepNodes.push(solver.postSolve);
+
+      // A4 face-poke Pass A (generate) — por CARA, cadencia 2 frames, ANTES
+      // de los substeps: llena faceContactBuf (identidad del contacto más
+      // profundo por cara); Pass B recomputa la profundidad fresca en cada
+      // substep, así que los slots con 1 frame de edad siguen siendo válidos
+      // (cuerpo estático, tela se mueve ~µm/substep).
+      const fpCadence = tslFrameCounter.current < 300 ? FACE_POKE_GENERATE_CADENCE : FACE_POKE_GENERATE_CADENCE * 3;
+      if (facePokeOn && solver.facePokeNodes && tslFrameCounter.current % fpCadence === 0) {
+        renderer.compute(solver.facePokeNodes.generate);
+      }
 
       for (let s = 0; s < substeps; s++) {
         renderer.compute(substepNodes);
@@ -595,20 +621,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // Steam brush (once per frame, after substeps settle; skip when inactive)
       if (solver.brushNodes.strength.value > 0) {
         renderer.compute(solver.brushNodes.brushNode);
-      }
-
-      // Face-poke (face-poke v1, GPU-only): once per frame, AFTER the substep
-      // loop, BEFORE the normal recompute so the smooth normals reflect the
-      // tented geometry. snapshot freezes the post-settle corner positions (B1
-      // determinism fix), then correct tents poked cloth faces over convex body
-      // bumps. Gated by the GPU tier's facePoke capability (the kill-switch) +
-      // the nodes existing (set once the avatar body is loaded).
-      // Override dev: localStorage('openclo-facepoke-on')='true' activa el
-      // pase aunque la capability siga OFF — para A/B del efecto sostenido
-      // (penetrationCount on vs off) sin recompilar. Medición del track piel.
-      if ((GPU_CAPABILITIES.facePoke || facePokeForced.current) && solver.facePokeNodes) {
-        renderer.compute(solver.facePokeNodes.snapshot);
-        renderer.compute(solver.facePokeNodes.correct);
       }
 
       renderer.compute(solver.normalZero);
@@ -672,7 +684,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
               dispatch(setCollisionDistance(minSignedDist * 1000));
             }
             // A4 face-aware oracle — counts body verts through cloth FACES (the
-            // visible symptom A1 is blind to). Same cadence, sampled faces.
+            // visible symptom A1 is blind to). HALF the A1 cadence (~2s): the
+            // 120mm-band grid scan costs ~10-30ms per tick on the main thread.
+            if (tslReadbackCount.current % (PENETRATION_READBACK_CADENCE * 2) !== 0) return;
             const fpBody = getFacePokeMetricBody();
             const idxAttr = staticGeometry.getIndex();
             if (fpBody && idxAttr) {
@@ -680,7 +694,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
                 positions,
                 idxAttr.array as Uint32Array | Uint16Array,
                 fpBody,
-                { stride: facePokeStrideFor(idxAttr.count / 3) },
+                { stride: facePokeStrideFor(idxAttr.count / 3), debugPairs: 24 },
               );
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (window as any).__OPENCLO_FACE_POKE__ = fp;
@@ -745,6 +759,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     if (typeof window !== 'undefined' && meshRef.current) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__OPENCLO_CLOTH_MESH__ = meshRef.current;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__OPENCLO_THREE__ = THREE;
     }
     return () => {
       if (typeof window !== 'undefined') {

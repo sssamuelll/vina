@@ -153,15 +153,15 @@ export interface TslSolver {
   /** Normalize accumulated normals and write to normalSBA (dispatch: numParticles) */
   normalNormalize: ComputeNode;
   /**
-   * Face-poke correction nodes (face-poke v1, GPU-only). Built + assigned by
+   * Face-poke Generate/Solve nodes (A4, GPU-only). Built + assigned by
    * `GpuSolverClient.setTslCollisionBody` when the avatar body is set (the
-   * correction kernel needs that body's BVH). `null` until then. Dispatched
-   * once per frame in the brush/normals block (`GarmentSimulation.tsx`):
-   * `snapshot` first (freezes corner positions — the B1 determinism fix), then
-   * `correct` (tents poked cloth faces over convex body bumps). See
-   * `tslFacePoke.ts`.
+   * generate kernel needs that body's BVH). `null` until then. Dispatch
+   * (`GarmentSimulation.tsx`): `generate` BEFORE the substep loop at
+   * FACE_POKE_GENERATE_CADENCE; `solve` INSIDE the substep loop after the
+   * body-collision pair (velocity-excluded via preCollisionPos, like the
+   * body push). See `tslFacePoke.ts`.
    */
-  facePokeNodes: { snapshot: ComputeNode; correct: ComputeNode } | null;
+  facePokeNodes: { generate: ComputeNode; solve: ComputeNode } | null;
   /** Number of particles */
   numParticles: number;
   /** Number of triangles */

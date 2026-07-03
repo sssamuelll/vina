@@ -50,6 +50,14 @@ export interface FacePokeMetricBody {
 export interface FacePokeMetric {
   /** Sampled (face, body-vert) pairs with the body vert OUTSIDE the cloth (signed > 0). */
   visible: number;
+  /** Subset of `visible` with signed ≤ 30mm — inside the Pass A generate band
+   *  (what the A4 response can see). Deep pokes = visible − visibleShallow. */
+  visibleShallow: number;
+  /** Subset of `visible` passing the A4 alignment gate (|dot(faceNormal,
+   *  vertPseudonormal)| > 0.5 — face lies ON the skin): true patches. The
+   *  complement is open-geometry (armhole/collar bridging), which the A4
+   *  response deliberately does not chase. GATE metric = visibleAligned. */
+  visibleAligned: number;
   /** Sampled pairs inside the collision band (−margin < signed ≤ 0). */
   near: number;
   /** Deepest visible poke seen (m above the cloth surface); 0 when none. */
@@ -58,6 +66,9 @@ export interface FacePokeMetric {
   sampledFaces: number;
   /** Stride used (publish so gate runs compare same-stride counts). */
   stride: number;
+  /** Dev probe: positions of the first `debugPairs` visible pairs —
+   *  [bodyVertX, bodyVertY, bodyVertZ, depthM, alignedFlag] each. */
+  pairs?: number[][];
 }
 
 const cellKey = (x: number, y: number, z: number) =>
@@ -121,7 +132,7 @@ export function computeFacePokeMetric(
   clothPositions: Float32Array,
   clothTriIndices: Uint32Array | Uint16Array,
   body: FacePokeMetricBody,
-  opts?: { margin?: number; stride?: number; bandAbove?: number },
+  opts?: { margin?: number; stride?: number; bandAbove?: number; debugPairs?: number },
 ): FacePokeMetric {
   const margin = opts?.margin ?? 0.008;
   const stride = Math.max(1, opts?.stride ?? 1);
@@ -130,7 +141,10 @@ export function computeFacePokeMetric(
   const { verts, pseudo, grid } = body;
 
   let visible = 0;
+  let visibleShallow = 0;
+  let visibleAligned = 0;
   let near = 0;
+  const pairs: number[][] | undefined = opts?.debugPairs ? [] : undefined;
   let maxDepth = 0;
   let sampledFaces = 0;
 
@@ -190,7 +204,12 @@ export function computeFacePokeMetric(
 
             if (signed > 0) {
               visible++;
+              if (signed <= 0.03) visibleShallow++;
+              if (Math.abs(dotPn) > 0.5) visibleAligned++;
               if (signed > maxDepth) maxDepth = signed;
+              if (pairs && pairs.length < (opts?.debugPairs ?? 0)) {
+                pairs.push([px, py, pz, signed, Math.abs(dotPn) > 0.5 ? 1 : 0]);
+              }
             } else {
               near++;
             }
@@ -200,7 +219,7 @@ export function computeFacePokeMetric(
     }
   }
 
-  return { visible, near, maxDepth, sampledFaces, stride };
+  return { visible, visibleShallow, visibleAligned, near, maxDepth, sampledFaces, stride, ...(pairs ? { pairs } : {}) };
 }
 
 /** Deterministic face-sampling stride for the main-thread wiring (~7k faces

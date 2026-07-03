@@ -192,8 +192,9 @@ describe('production wiring: createTslBuffers builds facePokeCsrSBA with this ex
     expect(Array.from(buffers.facePokeCsrSBA.array)).toEqual(Array.from(reference));
     expect(checkPackedCsrInvariants(buffers.facePokeCsrSBA.array as Uint32Array, N, NUM_TRIS)).toEqual([]);
 
-    // Snapshot scratch: vec3 per particle, zero-seeded (written per-frame on GPU).
-    expect(buffers.facePokeSnapshotSBA.itemSize).toBe(3);
-    expect(buffers.facePokeSnapshotSBA.array.length).toBe(N * 3);
+    // A4 contact slots: one uint per cloth face, zero-seeded (0 = no contact;
+    // Pass A writes soupIdx+1, Pass B reads).
+    expect(buffers.facePokeContactSBA.itemSize).toBe(1);
+    expect(buffers.facePokeContactSBA.array.length).toBe(NUM_TRIS);
   });
 });

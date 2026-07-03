@@ -122,7 +122,7 @@ export interface TslBufferSet {
 
   // Face-poke (v1): packed cloth CSR + snapshot (packing keeps the correct kernel ≤8 storage buffers)
   facePokeCsrSBA: StorageBufferAttribute;         // uint — [offsets(N+1), list(numTri*3), triIds(numTri*3)] (packFacePokeCsr)
-  facePokeSnapshotSBA: StorageBufferAttribute;    // vec3, numParticles — per-frame read source scratch
+  facePokeContactSBA: StorageBufferAttribute;     // uint, numTriangles — per-face contact slot (soupIdx+1, 0=none; A4 Pass A writes, Pass B reads)
 
   // Counts
   numParticles: number;
@@ -283,7 +283,7 @@ export function createTslBuffers(
   // triangleIdsSBA; no extra data source needed.
   const { offsets: ifOffsets, faces: ifFaces } = buildClothVertexFaces(mesh.triangles, N);
   const facePokeCsrSBA = createSBA(packFacePokeCsr(ifOffsets, ifFaces, mesh.triangles, N), 1);
-  const facePokeSnapshotSBA = createSBA(new Float32Array(N * 3), 3);
+  const facePokeContactSBA = createSBA(new Uint32Array(numTri), 1);
 
   return {
     positionSBA,
@@ -305,7 +305,7 @@ export function createTslBuffers(
     tetherTargetSBA,
     tetherMaxDistSBA,
     facePokeCsrSBA,
-    facePokeSnapshotSBA,
+    facePokeContactSBA,
     scBuffers: null,
     windBuffers: null,
     numParticles: N,
@@ -386,7 +386,7 @@ export function destroyTslBufferSet(
     set.tetherTargetSBA,
     set.tetherMaxDistSBA,
     set.facePokeCsrSBA,
-    set.facePokeSnapshotSBA,
+    set.facePokeContactSBA,
   ];
   for (const color of set.bendColors) {
     sbas.push(color.idsSBA, color.restAnglesSBA, color.complianceSBA);

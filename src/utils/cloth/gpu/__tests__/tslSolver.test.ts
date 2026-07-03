@@ -226,7 +226,7 @@ function makeMockBufferSet(options?: {
     tetherTargetSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
     tetherMaxDistSBA: new StorageBufferAttribute(new Float32Array(numParticles).fill(0.06), 1),
     facePokeCsrSBA: new StorageBufferAttribute(new Uint32Array(numParticles + 1 + 6 + 6), 1),
-    facePokeSnapshotSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
+    facePokeContactSBA: new StorageBufferAttribute(new Uint32Array(2), 1),
     numParticles,
     numTriangles: 2,
     scBuffers: null,

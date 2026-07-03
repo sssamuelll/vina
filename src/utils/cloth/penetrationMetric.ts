@@ -193,6 +193,11 @@ let builtBody: PenetrationBody | null = null;
 export function registerPenetrationBody(mesh: CollisionMeshData | null): void {
   registeredMesh = mesh !== null && mesh.triCount > 0 ? mesh : null;
   builtBody = null; // derived data (pseudonormals + hash) rebuilds lazily
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    // Dev probe (render-vs-collision surface comparisons @gpu-local).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__OPENCLO_COLLISION_MESH__ = registeredMesh;
+  }
 }
 
 /** The registered mesh, for sibling oracles (facePokeMetric) to key their own

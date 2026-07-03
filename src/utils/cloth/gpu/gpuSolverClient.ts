@@ -22,8 +22,7 @@ import {
   type FabricComplianceConfig,
 } from './tslBuffers';
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
-import { makeFacePokeSnapshotNode, makeFacePokeCorrectNode, packFacePokeBodyGeom } from './tslFacePoke';
-import type { FacePokeDebugState, FacePokeProbeRenderer } from './facePokeDebug';
+import { makeFacePokeGenerateNode, makeFacePokeSolveNode, packFacePokeBodyGeom } from './tslFacePoke';
 import { createSelfCollisionBuffers } from './tslSelfCollision';
 import { buildAdjacency, nextPrime } from '../selfCollision';
 import { buildAdjacencyCSR } from '../wasm/adjacencyCSR';
@@ -183,7 +182,6 @@ export class GpuSolverClient implements ClothSolverClient {
   private facePokeBodyGeomSBA: StorageBufferAttribute | null = null;
 
   /** Margin the face-poke correct kernel was built with (retained for the debug probe). */
-  private facePokeMargin: number = AVATAR_MARGIN;
 
   /** Prevents operations after dispose (readback promises may still resolve). */
   private disposed: boolean = false;
@@ -901,34 +899,6 @@ export class GpuSolverClient implements ClothSolverClient {
   }
 
   /**
-   * Dev-only accessor for the face-poke debug probe (`facePokeDebug.ts`).
-   * Exposes the CPU-side copies of the packed kernel inputs (the same arrays
-   * uploaded to the GPU), the compute nodes, and the cached renderer so the
-   * probe can dispatch the pass directly and diff positions against the CPU
-   * oracle. Returns null until the avatar body exists (facePokeNodes are
-   * built in `setTslCollisionBody('__avatar__', …)`). No production callsite
-   * — the probe is invoked manually @gpu-local (see the facePokeDebug header).
-   */
-  getFacePokeDebugState(): FacePokeDebugState | null {
-    const nodes = this.tslSolver?.facePokeNodes;
-    const buffers = this.tslBuffers;
-    const bodyGeomSBA = this.facePokeBodyGeomSBA;
-    if (!nodes || !buffers || !bodyGeomSBA) return null;
-    return {
-      nodes,
-      csr: buffers.facePokeCsrSBA.array as Uint32Array,
-      bodyGeom: bodyGeomSBA.array as Float32Array,
-      invMass: buffers.invMassSBA.array as Float32Array,
-      snapshotSBA: buffers.facePokeSnapshotSBA,
-      numParticles: buffers.numParticles,
-      numClothTriangles: buffers.numTriangles,
-      numBodyTris: bodyGeomSBA.array.length / 18,
-      margin: this.facePokeMargin,
-      renderer: this.rendererRef as FacePokeProbeRenderer | null,
-    };
-  }
-
-  /**
    * Clean up all resources.
    *
    * Order matters: TSL GPU buffers must be released BEFORE `solver.destroy()`
@@ -1123,29 +1093,35 @@ export class GpuSolverClient implements ClothSolverClient {
         1,
       );
       this.tslSolver.facePokeNodes = {
-        snapshot: makeFacePokeSnapshotNode(
-          this.tslSolver.positionBufNode,
-          this.tslBuffers.facePokeSnapshotSBA,
-          N,
-        ),
-        correct: makeFacePokeCorrectNode({
+        generate: makeFacePokeGenerateNode({
           posBuf: this.tslSolver.positionBufNode,
-          prevPosBuf: this.tslSolver.prevPosBufNode,
-          invMassBuf: this.tslSolver.invMassBufNode,
-          snapshotSBA: this.tslBuffers.facePokeSnapshotSBA,
           csrSBA: this.tslBuffers.facePokeCsrSBA,
           bvhNodesSBA,
           bvhSkipSBA,
           bodyGeomSBA: this.facePokeBodyGeomSBA,
+          contactSBA: this.tslBuffers.facePokeContactSBA,
           numParticles: N,
           numClothTriangles: this.tslBuffers.numTriangles,
           numBvhNodes: bvh.nodeCount,
           numBodyTris: bvh.triCount,
           margin,
         }),
+        solve: makeFacePokeSolveNode({
+          posBuf: this.tslSolver.positionBufNode,
+          prevPosBuf: this.tslSolver.prevPosBufNode,
+          invMassBuf: this.tslSolver.invMassBufNode,
+          preCollisionSBA: this.tslBuffers.preCollisionPosSBA,
+          csrSBA: this.tslBuffers.facePokeCsrSBA,
+          bodyGeomSBA: this.facePokeBodyGeomSBA,
+          contactSBA: this.tslBuffers.facePokeContactSBA,
+          numParticles: N,
+          numClothTriangles: this.tslBuffers.numTriangles,
+          numBodyTris: bvh.triCount,
+          margin,
+          friction,
+        }),
       };
-      this.facePokeMargin = margin;
-      // Dev-only console handle for the face-poke corr≈0 probe (facePokeDebug.ts):
+      // Dev-only console handle (freeze-frame flag, ad-hoc @gpu-local probes):
       // the client instance is otherwise unreachable from the browser console.
       if (import.meta.env.DEV && typeof window !== 'undefined') {
         (window as unknown as Record<string, unknown>).__OPENCLO_GPU_CLIENT__ = this;
