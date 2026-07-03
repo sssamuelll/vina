@@ -71,6 +71,9 @@ pub struct XpbdSolver {
     damping: f32,
     substeps: u32,
     stretch_compliance: f32,
+    /// Backport A7 STEP-4: cap rígido one-sided de elongación (espejo del
+    /// default GPU 0.02 = 2% woven). 0 deshabilita.
+    max_strain: f32,
     bend_compliance: f32,
     ground_y: f32,
     collision_margin: f32,
@@ -156,6 +159,7 @@ impl XpbdSolver {
             damping: 0.99,
             substeps: 15,
             stretch_compliance: 0.0,
+            max_strain: 0.02,
             bend_compliance: 1e4, // P1 dihedral: default ANGULAR calibrado contra el gate Cusick (banda [6e2,1e5]); lockstep GPU+CPU
             ground_y: 0.0,
             collision_margin: 0.005,
@@ -597,19 +601,44 @@ impl XpbdSolver {
             let c_val = dist - rest;
             // P1-A (B5): ONE-SIDED — solo tensión; compresión libre (el
             // pandeo lo gobierna el dihedral). Espejo CPU solveStretching.
-            if c_val <= 0.0 { continue; }
-            let s = -c_val / (w_sum + alpha);
+            if c_val > 0.0 {
+                let s = -c_val / (w_sum + alpha);
 
-            let nx = dx / dist;
-            let ny = dy / dist;
-            let nz = dz / dist;
+                let nx = dx / dist;
+                let ny = dy / dist;
+                let nz = dz / dist;
 
-            self.positions[ai] -= nx * s * wa;
-            self.positions[ai + 1] -= ny * s * wa;
-            self.positions[ai + 2] -= nz * s * wa;
-            self.positions[bi] += nx * s * wb;
-            self.positions[bi + 1] += ny * s * wb;
-            self.positions[bi + 2] += nz * s * wb;
+                self.positions[ai] -= nx * s * wa;
+                self.positions[ai + 1] -= ny * s * wa;
+                self.positions[ai + 2] -= nz * s * wa;
+                self.positions[bi] += nx * s * wb;
+                self.positions[bi + 1] += ny * s * wb;
+                self.positions[bi + 2] += nz * s * wb;
+            }
+
+            // Cap rígido one-sided fusionado (backport A7 STEP-4, espejo CPU
+            // solveStretching / TSL makeDistanceConstraintFn): si tras el
+            // solve compliant el edge sigue sobre rest·(1+max_strain),
+            // proyección RÍGIDA (alpha=0) de vuelta al cap.
+            if self.max_strain > 0.0 {
+                let dx2 = self.positions[bi] - self.positions[ai];
+                let dy2 = self.positions[bi + 1] - self.positions[ai + 1];
+                let dz2 = self.positions[bi + 2] - self.positions[ai + 2];
+                let dist2 = (dx2 * dx2 + dy2 * dy2 + dz2 * dz2).sqrt();
+                let max_len = rest * (1.0 + self.max_strain);
+                if dist2 > max_len && dist2 > 1e-7 {
+                    let s_cap = -(dist2 - max_len) / w_sum;
+                    let nx2 = dx2 / dist2;
+                    let ny2 = dy2 / dist2;
+                    let nz2 = dz2 / dist2;
+                    self.positions[ai] -= nx2 * s_cap * wa;
+                    self.positions[ai + 1] -= ny2 * s_cap * wa;
+                    self.positions[ai + 2] -= nz2 * s_cap * wa;
+                    self.positions[bi] += nx2 * s_cap * wb;
+                    self.positions[bi + 1] += ny2 * s_cap * wb;
+                    self.positions[bi + 2] += nz2 * s_cap * wb;
+                }
+            }
         }
     }
 
@@ -1592,6 +1621,41 @@ mod tests {
         assert!(
             (dist - 1.0).abs() < 1e-3,
             "stretched edge must pull back to rest; got {dist}"
+        );
+    }
+
+    /// Backport A7 STEP-4: cap rígido one-sided de elongación (espejo del
+    /// GPU makeDistanceConstraintFn fusionado y del CPU solveStretching).
+    /// Con compliance ALTA el solve compliant apenas corrige — el cap rígido
+    /// debe clavar el edge en rest·(1+max_strain) en un solo pase. A
+    /// max_strain=0 el cap queda deshabilitado.
+    #[test]
+    fn stretch_hard_cap_at_max_strain() {
+        // Par a 1.5 con rest 1.0, compliance enorme (solve compliant ~no-op).
+        let positions = vec![0.0, 0.0, 0.0, 1.5, 0.0, 0.0];
+        let inv_mass = vec![1.0, 1.0];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+        s.set_stretch(&[0u32, 1u32], &[1.0f32]);
+        s.stretch_compliances = vec![1e6];
+        let sdt = 1.0 / 60.0 / 15.0;
+        s.solve_stretch(sdt);
+        let dist = s.positions[3] - s.positions[0];
+        assert!(
+            (dist - 1.02).abs() < 1e-4,
+            "edge must be rigidly capped at rest*(1+0.02); got {dist}"
+        );
+
+        // max_strain = 0 → cap deshabilitado: el edge queda casi sin corregir.
+        let positions = vec![0.0, 0.0, 0.0, 1.5, 0.0, 0.0];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+        s.set_stretch(&[0u32, 1u32], &[1.0f32]);
+        s.stretch_compliances = vec![1e6];
+        s.max_strain = 0.0;
+        s.solve_stretch(sdt);
+        let dist = s.positions[3] - s.positions[0];
+        assert!(
+            dist > 1.4,
+            "with max_strain=0 the cap is off and huge compliance leaves the edge stretched; got {dist}"
         );
     }
 

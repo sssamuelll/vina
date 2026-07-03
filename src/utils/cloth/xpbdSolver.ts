@@ -196,6 +196,14 @@ export interface ClothSimConfig {
    * 1 (comportamiento pre-P7 exacto). Ver fabricInvMassScale.
    */
   fabricDensity?: number;
+  /**
+   * Hard strain limit (backport A7 STEP-4, espejo TSL makeDistanceConstraintFn):
+   * elongación fraccional máxima de un edge sobre su rest antes de que un
+   * clamp rígido one-sided (alpha=0) lo devuelva. 0.02 (2%, woven default).
+   * 0 = deshabilitado. Mata la gomosidad residual que el solve compliant no
+   * converge (Jacobi/GS under-convergence).
+   */
+  maxStrain: number;
   /** Internal damping (0.0 = fluid/oscillates, 1.0 = heavy/settles quickly). Default: 0.3 */
   internalDamping: number;
   /** Directional wind force [x, y, z] in N/m² (default [0,0,0] = no wind) */
@@ -445,6 +453,7 @@ export class XPBDClothSolver {
       // P7-density: kg/m² (GSM/1000). undefined → escala 1 (densidad de
       // referencia 150 GSM = comportamiento pre-P7 exacto).
       fabricDensity: undefined,
+      maxStrain: 0.02, // espejo del default GPU (tslSolver config.maxStrain ?? 0.02)
       internalDamping: 0.3,
       windForce: [0, 0, 0],
       ...config,
@@ -1271,11 +1280,28 @@ export class XPBDClothSolver {
       // membrana puede juntarse y el pandeo fuera de plano lo gobierna el
       // dihedral (P1-B) = nucleación de pliegues. Espejo Rust solve_stretch
       // y TSL makeDistanceConstraintFn.
-      if (C <= 0) continue;
-      const s = -C / (w + alpha);
+      if (C > 0) {
+        const s = -C / (w + alpha);
 
-      vecAdd(this.pos, id0, this.grads, 0, s * w0);
-      vecAdd(this.pos, id1, this.grads, 0, -s * w1);
+        vecAdd(this.pos, id0, this.grads, 0, s * w0);
+        vecAdd(this.pos, id1, this.grads, 0, -s * w1);
+      }
+
+      // Cap rígido one-sided fusionado (backport A7 STEP-4, espejo TSL
+      // makeDistanceConstraintFn): tras el solve compliant, si el edge sigue
+      // sobre rest·(1+maxStrain), proyección RÍGIDA (alpha=0) de vuelta al cap.
+      const maxStrain = this.config.maxStrain;
+      if (maxStrain > 0) {
+        vecSetDiff(this.grads, 0, this.pos, id0, this.pos, id1);
+        const len2 = Math.sqrt(vecLengthSquared(this.grads, 0));
+        const maxLen = restLen * (1 + maxStrain);
+        if (len2 > maxLen && len2 > 1e-7) {
+          vecScale(this.grads, 0, 1.0 / len2);
+          const sCap = -(len2 - maxLen) / w;
+          vecAdd(this.pos, id0, this.grads, 0, sCap * w0);
+          vecAdd(this.pos, id1, this.grads, 0, -sCap * w1);
+        }
+      }
     }
   }
 

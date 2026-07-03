@@ -527,6 +527,7 @@ describe('XPBDClothSolver - Air Drag', () => {
       groundY: -100,    // Move ground far away
       selfCollision: false,
       maxVelocity: 100,
+      maxStrain: 0,     // aísla el drag del hard strain cap (backport A7)
     });
     solverLow.pinParticle(0);
     solverLow.pinParticle(4);
@@ -539,6 +540,7 @@ describe('XPBDClothSolver - Air Drag', () => {
       groundY: -100,
       selfCollision: false,
       maxVelocity: 100,
+      maxStrain: 0,     // aísla el drag del hard strain cap (backport A7)
     });
     solverHigh.pinParticle(0);
     solverHigh.pinParticle(4);
