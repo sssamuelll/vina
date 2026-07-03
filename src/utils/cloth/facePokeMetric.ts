@@ -56,8 +56,14 @@ export interface FacePokeMetric {
   /** Subset of `visible` passing the A4 alignment gate (|dot(faceNormal,
    *  vertPseudonormal)| > 0.5 — face lies ON the skin): true patches. The
    *  complement is open-geometry (armhole/collar bridging), which the A4
-   *  response deliberately does not chase. GATE metric = visibleAligned. */
+   *  response deliberately does not chase. */
   visibleAligned: number;
+  /** Subset of `visibleAligned` that also survives the BACK-CONTACT veto
+   *  (mirror of Pass A): deep pairs (>30mm) on faces with body skin just
+   *  BEHIND them (−60mm..−margin, inside the face) are cross-geometry — a
+   *  sleeve tube's outer face seeing the far side of the arm — not trapped
+   *  cloth. THE GATE METRIC: what the A4 response actually chases. */
+  visibleTrue: number;
   /** Sampled pairs inside the collision band (−margin < signed ≤ 0). */
   near: number;
   /** Deepest visible poke seen (m above the cloth surface); 0 when none. */
@@ -143,6 +149,7 @@ export function computeFacePokeMetric(
   let visible = 0;
   let visibleShallow = 0;
   let visibleAligned = 0;
+  let visibleTrue = 0;
   let near = 0;
   const pairs: number[][] | undefined = opts?.debugPairs ? [] : undefined;
   let maxDepth = 0;
@@ -177,6 +184,11 @@ export function computeFacePokeMetric(
     const minY = Math.min(ay, by, cy) - band, maxY = Math.max(ay, by, cy) + band;
     const minZ = Math.min(az, bz, cz) - band, maxZ = Math.max(az, bz, cz) + band;
 
+    // Face-local candidate sweep, two facts per pair: classification counts
+    // and (for the veto mirror) whether ANY body skin sits just behind the
+    // face. Collected in one pass; veto applied after.
+    let hasBack = false;
+    const front: Array<[number, number, number]> = []; // [signed, alignedFlag, vi]
     for (let gx = Math.floor(minX / CELL); gx <= Math.floor(maxX / CELL); gx++) {
       for (let gy = Math.floor(minY / CELL); gy <= Math.floor(maxY / CELL); gy++) {
         for (let gz = Math.floor(minZ / CELL); gz <= Math.floor(maxZ / CELL); gz++) {
@@ -193,7 +205,7 @@ export function computeFacePokeMetric(
 
             const wpx = px - ax, wpy = py - ay, wpz = pz - az;
             const signed = wpx * ox + wpy * oy + wpz * oz;
-            if (signed <= -margin || signed > bandAbove) continue;
+            if (signed <= -0.06 || signed > bandAbove) continue;
 
             const d20 = wpx * e1x + wpy * e1y + wpz * e1z;
             const d21 = wpx * e2x + wpy * e2y + wpz * e2z;
@@ -202,13 +214,17 @@ export function computeFacePokeMetric(
             const alpha = 1 - beta - gamma;
             if (alpha < 0 || beta < 0 || gamma < 0) continue;
 
-            if (signed > 0) {
+            if (signed <= -margin) {
+              hasBack = true; // skin just behind the face (veto band)
+            } else if (signed > 0) {
               visible++;
+              const aligned = Math.abs(dotPn) > 0.5;
               if (signed <= 0.03) visibleShallow++;
-              if (Math.abs(dotPn) > 0.5) visibleAligned++;
+              if (aligned) visibleAligned++;
+              front.push([signed, aligned ? 1 : 0, vi]);
               if (signed > maxDepth) maxDepth = signed;
               if (pairs && pairs.length < (opts?.debugPairs ?? 0)) {
-                pairs.push([px, py, pz, signed, Math.abs(dotPn) > 0.5 ? 1 : 0]);
+                pairs.push([px, py, pz, signed, aligned ? 1 : 0]);
               }
             } else {
               near++;
@@ -217,9 +233,16 @@ export function computeFacePokeMetric(
         }
       }
     }
+
+    // Veto mirror (Pass A): deep front pairs on a face with skin right behind
+    // it are cross-geometry; shallow pairs always count.
+    for (const [signed, aligned] of front) {
+      if (!aligned) continue;
+      if (signed <= 0.03 || !hasBack) visibleTrue++;
+    }
   }
 
-  return { visible, visibleShallow, visibleAligned, near, maxDepth, sampledFaces, stride, ...(pairs ? { pairs } : {}) };
+  return { visible, visibleShallow, visibleAligned, visibleTrue, near, maxDepth, sampledFaces, stride, ...(pairs ? { pairs } : {}) };
 }
 
 /** Deterministic face-sampling stride for the main-thread wiring (~7k faces

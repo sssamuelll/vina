@@ -247,6 +247,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const xrayMode = useSelector((s: RootState) => s.simulation.xrayMode);
   const xrayActiveLayer = useSelector((s: RootState) => s.simulation.xrayActiveLayer);
   const armAxis = useSelector((s: RootState) => s.simulation.armAxis);
+  const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
 
   // Filter inactive pieces — only active pieces participate in simulation
   // Also filter out hidden pieces (3D arrangement visibility) and hidden layers
@@ -484,6 +485,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // frames sin cuerpo son basura física (la tela cae, la manga desliza) y
     // el settle-tether los congelaba. También raíz de la "bistabilidad" #902.
     if (solver && !simReadyRef.current) return;
+    // 2a-ext: con avatar presente, no stepear hasta que el esqueleto publique
+    // armAxis — el seed T-pose transitorio (pre-A-pose) nunca corre frames.
+    // Antes esto lo "resolvía" un accidente: la extracción de colisión por
+    // URL tardaba ~1.5s y serializaba el init; el bake vivo (15ms) destapó
+    // la tormenta de doble-init dentro de las ventanas del DoD (medido:
+    // ventanas 92/53/48/42/40 → 30 estable). Sin avatar, armAxis.ready
+    // nunca llega: no se gatea (mannequin/proyectos sin cuerpo).
+    if (solver && avatarModelUrl && !armAxis.ready) return;
     // 2b-lite: solver nuevo (re-seed) → los relojes de settle arrancan de 0.
     if (solver && solver !== lastSolverRef.current) {
       lastSolverRef.current = solver;

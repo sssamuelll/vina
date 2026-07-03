@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../../utils/avatar/morphTargets';
+import { registerAvatarRenderRoot } from '../../utils/cloth/renderCollisionBake';
 import { IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS, setAvailableMorphTargets, clearMorphTargets } from '../../store/avatarSlice';
 import { setArmAxis } from '../../store/simulationSlice';
 import { clampSwingTwist, ANATOMICAL_CONSTRAINTS } from '../../utils/avatar/swingTwistConstraint';
@@ -595,6 +596,14 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       ikSolvedRotations.current.clear();
     }
   };
+
+  // Register the live avatar for the render-mesh collision bake
+  // (renderCollisionBake): the collider is baked from THESE meshes, so
+  // collision and render can never diverge (the ~10-15mm mismatch class).
+  useEffect(() => {
+    registerAvatarRenderRoot(groupRef.current);
+    return () => registerAvatarRenderRoot(null);
+  }, [importedScene]);
 
   // Apply pose reactively when joints or measurements change
   useEffect(() => {

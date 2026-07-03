@@ -111,6 +111,7 @@ import { safeGetItem } from '../../utils/safeStorage';
 import { getPhysicalFabric, toXPBDParams } from '../../utils/cloth/physicalFabric';
 import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
 import { registerPenetrationBody } from '../../utils/cloth/penetrationMetric';
+import { bakeCollisionFromRender } from '../../utils/cloth/renderCollisionBake';
 import { extractMeshData } from '../../utils/cloth/avatarMeshExtractor';
 import { collisionMeshFromBuffers } from '../../utils/cloth/collisionMesh';
 import { importMesh } from '../../utils/import/meshImporter';
@@ -215,7 +216,11 @@ async function loadCollision(
   // Avatar collision mesh
   if (avatarModelUrl && !cancelled.value) {
     try {
-      const collisionMesh = await withTimeout(
+      // Render-mesh bake FIRST (collider == what the user sees; kills the
+      // ~10-15mm centering/pose/morph divergence of the re-import pipeline —
+      // which also never received morphs on THIS initial path, only on the
+      // measurement-rebuild). URL pipeline stays as the headless fallback.
+      const collisionMesh = (await bakeCollisionFromRender()) ?? await withTimeout(
         extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, joints),
         5000,
         'Collision mesh extraction',
@@ -786,7 +791,10 @@ export function useSimulationLifecycle({
           shoulderWidth: measurements.shoulder, height: measurements.height,
           armLength: measurements.armLength, inseam: measurements.inseam,
         };
-        const collisionMesh = await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, avatarJointsRef.current, morphCfg, morphTargets);
+        // Live bake first (reads the CURRENT morphed render — no arg plumbing);
+        // URL pipeline with explicit morphs as fallback.
+        const collisionMesh = (await bakeCollisionFromRender())
+          ?? await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, avatarJointsRef.current, morphCfg, morphTargets);
         if (!collisionMesh) return;
 
         // Check client is still alive (user may have stopped sim); skip a
