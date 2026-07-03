@@ -37,14 +37,16 @@ describe('buildCusickDiscMesh', () => {
     }
   });
 
-  it('is deterministic: same seed → bit-identical mesh', () => {
+  // Timeout: el runner de CI mallea el disco en ~4s (dev ~0.5s); este test
+  // construye DOS mallas. Presupuesto holgado, no es un perf gate.
+  it('is deterministic: same seed → bit-identical mesh', { timeout: 30_000 }, () => {
     const a = buildCusickDiscMesh({ y: 0.9, seed: 42 });
     const b = buildCusickDiscMesh({ y: 0.9, seed: 42 });
     expect(Array.from(a.mesh.vertices)).toEqual(Array.from(b.mesh.vertices));
     expect(Array.from(a.mesh.triIds)).toEqual(Array.from(b.mesh.triIds));
   });
 
-  it('symmetry-breaking: different seeds → different outlines', () => {
+  it('symmetry-breaking: different seeds → different outlines', { timeout: 30_000 }, () => {
     const a = buildCusickDiscMesh({ y: 0.9, seed: 42 });
     const b = buildCusickDiscMesh({ y: 0.9, seed: 43 });
     expect(Array.from(a.mesh.vertices)).not.toEqual(Array.from(b.mesh.vertices));
