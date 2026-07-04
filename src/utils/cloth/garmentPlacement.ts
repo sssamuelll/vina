@@ -325,6 +325,75 @@ export function patternPointToWorld(
   );
 }
 
+/**
+ * The VIEW realization of a placement — what PieceMesh/DraggablePiece actually
+ * render: geometry local = (x·s, 0, −y·s) (commandsToShape emits −y, then
+ * rotateX(π/2) → pattern Y lands NEGATED on local Z) and the Euler applied via
+ * THREE `<group rotation>` ('XYZ': Rz acts on the vector FIRST, M = Rx·Ry·Rz).
+ *
+ * This is NOT `placementLocalToWorld` (Rz·Ry·Rx on positive-Z local): the two
+ * realizations coincide on the upright family [−π/2, ry, rz] (torso/collar —
+ * the path the mariaShirt.m4 sonda pinned) but DIVERGE on the sleeve triples
+ * [π/2, ±π/2, 0]: the helper models a vertical card (cap up in Y) while the
+ * view renders a horizontal card whose cap pointed DISTAL — the "curvas del
+ * cap hacia afuera" Samuel saw (bloque cosido María-style, plan §6bis). Any
+ * orientation decision about the CARD must measure here, in the space where
+ * it is applied — the same lesson `computeWrapFlipFlags` already encodes for
+ * the wrap (arrangementBinding).
+ *
+ * Takes the MESHER-local convention ((x−cx)·0.001, 0, (y−cy)·0.001) so callers
+ * share `anatomyLocalEndpoints`; the view's Z-negation happens inside.
+ */
+export function cardLocalToWorld(
+  local: [number, number, number],
+  placement: PlacementResult,
+): [number, number, number] {
+  const [lx, ly, lz] = local;
+  const x = lx, y = ly, z = -lz; // view geometry: pattern Y negated on local Z
+  const [rx, ry, rz] = placement.rotation;
+  const [px, py, pz] = placement.position;
+  const cx = Math.cos(rx), sx = Math.sin(rx);
+  const cy = Math.cos(ry), sy = Math.sin(ry);
+  const cz = Math.cos(rz), sz = Math.sin(rz);
+  const x1 = x * cz - y * sz, y1 = x * sz + y * cz;   // Rz (first, THREE 'XYZ')
+  const x2 = x1 * cy + z * sy, z2 = -x1 * sy + z * cy; // Ry
+  const y3 = y1 * cx - z2 * sx, z3 = y1 * sx + z2 * cx; // Rx (last)
+  return [x2 + px, y3 + py, z3 + pz];
+}
+
+/**
+ * TRUE in-plane 180° of the CARD (rotation about its normal), as an Euler
+ * triple in the view's composition: M' = M·Ry_local(π) with M = Rx·Ry·Rz
+ * (THREE 'XYZ'), re-extracted. Unlike the closed-form [rx, −ry, rz+π] (proven
+ * for the upright family under the OTHER composition), this keeps the card's
+ * face toward the camera and preserves chirality — for María's sleeve pair it
+ * exactly swaps the L/R base triples ([π/2,∓π/2,0] ↔ [π/2,±π/2,0]), which is
+ * how the crossed caps read: the pair was flipped.
+ */
+export function flipCardInPlane(
+  rotation: [number, number, number],
+): [number, number, number] {
+  const [rx, ry, rz] = rotation;
+  const cx = Math.cos(rx), sx = Math.sin(rx);
+  const cy = Math.cos(ry), sy = Math.sin(ry);
+  const cz = Math.cos(rz), sz = Math.sin(rz);
+  // M = Rx·Ry·Rz (three.js Matrix4.makeRotationFromEuler, 'XYZ' branch) —
+  // only the entries the 'XYZ' extraction reads.
+  let m11 = cy * cz, m13 = sy;
+  const m12 = -cy * sz;
+  let m23 = -sx * cy, m33 = cx * cy;
+  const m22 = cx * cz - sx * sz * sy;
+  const m32 = sx * cz + cx * sz * sy;
+  // … · Ry(π) = diag(−1,1,−1): negate columns 1 and 3 (the in-plane axes).
+  m11 = -m11; m13 = -m13; m23 = -m23; m33 = -m33;
+  // Euler 'XYZ' extraction (three.js Euler.setFromRotationMatrix).
+  const ry2 = Math.asin(Math.max(-1, Math.min(1, m13)));
+  if (Math.abs(m13) < 0.9999999) {
+    return [Math.atan2(-m23, m33), ry2, Math.atan2(-m12, m11)];
+  }
+  return [Math.atan2(m32, m22), ry2, 0];
+}
+
 /** Bbox center (mm) of the flattened outline — the mesher's centering. */
 export function outlineBBoxCenter(outline: PathCommand[]): { cx: number; cy: number } {
   const pts = flattenPath(outline, 12);
@@ -358,6 +427,13 @@ export function outlineBBoxCenter(outline: PathCommand[]): { cx: number; cy: num
 // algebraically + pinned by the mariaShirt.m4 sonda). X-mirroring across
 // pieces is NOT resolved here — left/right pairing is the autoSew world
 // refinement's job; this pass only guarantees anatomy-up.
+//
+// SLEEVE CARDS (bloque cosido María-style, 2026-07-05) are the exception on
+// both counts: the closed form above is only an in-plane 180 under the
+// composition the VIEW does NOT use, and world-Y never constrained a card
+// whose length runs along ±X. They get their own measurement + application in
+// view space (`cardLocalToWorld` + `flipCardInPlane`, below) with the wrap's
+// criterion: sleeveCap PROXIMAL, facing the armhole it sews to.
 
 export const ANATOMY_TOP_ROOTS = new Set(['neckline', 'shoulder', 'sleevecap', 'collarneckedge']);
 export const ANATOMY_BOTTOM_ROOTS = new Set(['hemline', 'cuffedge', 'collarouteredge']);
@@ -395,11 +471,14 @@ export function anatomyLocalEndpoints(
   return out;
 }
 
-/** Mean world-Y of the endpoints of the piece's edges whose root is in `roots`. */
-function meanEdgeWorldY(
+/** Mean projection onto `dir` (world) of the endpoints of the piece's edges
+ * whose root is in `roots`. With dir=(0,1,0) this is FP-identical to the old
+ * mean world-Y (the mariaShirt.m4 sonda pins that path byte-identical). */
+function meanEdgeWorldProj(
   piece: PatternPiece,
   placement: PlacementResult,
   roots: Set<string>,
+  dir: [number, number, number],
 ): number | null {
   if (!piece.edges || piece.edges.length === 0) return null;
   const center = outlineBBoxCenter(piece.outline);
@@ -412,7 +491,8 @@ function meanEdgeWorldY(
     for (const idx of [fs, fe % flat.length]) {
       const p = flat[idx];
       if (!p) continue;
-      sum += patternPointToWorld(p.x, p.y, center, placement)[1];
+      const w = patternPointToWorld(p.x, p.y, center, placement);
+      sum += w[0] * dir[0] + w[1] * dir[1] + w[2] * dir[2];
       n++;
     }
   }
@@ -425,24 +505,55 @@ function meanEdgeWorldY(
  * Pieces without anatomical evidence (no semantic edges, no top/bottom roles —
  * synthetic rectangles, unclassified pieces) report `false`.
  *
- * THE single anatomy-up oracle: `normalizeInPlaneOrientation` applies it as an
- * Euler flip (rigid path) and the wrap (Task 5) consumes it via
- * `resolveArrangementWithFrames` → `wrapPlacedMesh(..., flip)`. Both must read
- * the SAME decision, so this is the one place the `meanEdgeWorldY(top) <
- * meanEdgeWorldY(bottom)` test lives (the mariaShirt.m4 sonda pins that the
- * rigid path stays byte-identical).
+ * THE anatomy-up oracle of the RIGID path: `normalizeInPlaneOrientation`
+ * applies it as an Euler flip. (The wrap has its own wrap-space oracle,
+ * `computeWrapFlipFlags` — the two bases differ; see arrangementBinding.)
+ *
+ * `regions` (bloque cosido María-style, plan §6bis 2026-07-05): upright
+ * regions measure along world up (legacy world-Y, byte-identical without
+ * regions — mariaShirt.m4 sonda). SLEEVE/CUFF cards are different twice over:
+ * (a) their length runs along ±X in the view, so world-Y never constrained
+ * them, and (b) the view realization DIVERGES from `placementLocalToWorld` on
+ * their triples (see `cardLocalToWorld`) — the old oracle modeled a vertical
+ * card (cap up ⇒ "fine") while the rendered card lay horizontal with the cap
+ * DISTAL: las curvas del cap hacia afuera, lejos de la sisa. Sleeves therefore
+ * measure IN CARD SPACE along the region's distal axis and require the
+ * sleeveCap PROXIMAL (toward the armhole it sews to) — the same criterion
+ * `computeWrapFlipFlags` applies in wrap space.
  */
 export function computeFlipFlags(
   pieces: PatternPiece[],
   placements: PlacementResult[],
+  regions?: BodyRegion[],
 ): boolean[] {
   return placements.map((placement, i) => {
     const piece = pieces[i];
     if (!piece) return false;
-    const topY = meanEdgeWorldY(piece, placement, ANATOMY_TOP_ROOTS);
-    const bottomY = meanEdgeWorldY(piece, placement, ANATOMY_BOTTOM_ROOTS);
-    if (topY == null || bottomY == null) return false;
-    return topY < bottomY; // anatomy inverted → flip
+    const region = regions?.[i];
+    const isSleeve = region === 'left-sleeve' || region === 'right-sleeve'
+      || region === 'cuff-left' || region === 'cuff-right';
+    if (!isSleeve) {
+      const topY = meanEdgeWorldProj(piece, placement, ANATOMY_TOP_ROOTS, [0, 1, 0]);
+      const bottomY = meanEdgeWorldProj(piece, placement, ANATOMY_BOTTOM_ROOTS, [0, 1, 0]);
+      if (topY == null || bottomY == null) return false;
+      return topY < bottomY; // anatomy inverted → flip
+    }
+    // Distal axis in lockstep with surfaceFrame's no-hint defaults (left −X,
+    // right +X) — the batch path never passes axisHints, so this IS the axis
+    // the card was placed with. Measured via cardLocalToWorld: the space the
+    // flip is applied in.
+    const dx = region === 'right-sleeve' || region === 'cuff-right' ? 1 : -1;
+    const proj = (roots: Set<string>): number | null => {
+      const locals = anatomyLocalEndpoints(piece, roots);
+      if (locals.length === 0) return null;
+      let sum = 0;
+      for (const lv of locals) sum += cardLocalToWorld(lv, placement)[0] * dx;
+      return sum / locals.length;
+    };
+    const capP = proj(ANATOMY_TOP_ROOTS);
+    const cuffP = proj(ANATOMY_BOTTOM_ROOTS);
+    if (capP == null || cuffP == null) return false;
+    return capP > cuffP; // cap distal → flip (cap must face the armhole)
   });
 }
 
@@ -458,10 +569,20 @@ export function computeFlipFlags(
 export function normalizeInPlaneOrientation(
   pieces: PatternPiece[],
   placements: PlacementResult[],
+  regions?: BodyRegion[],
 ): PlacementResult[] {
-  const flips = computeFlipFlags(pieces, placements);
+  const flips = computeFlipFlags(pieces, placements, regions);
   return placements.map((placement, i) => {
     if (!flips[i]) return placement; // anatomy already up (or no evidence)
+    const region = regions?.[i];
+    if (region === 'left-sleeve' || region === 'right-sleeve'
+      || region === 'cuff-left' || region === 'cuff-right') {
+      // Sleeve cards flip in VIEW space (true in-plane 180 about the card
+      // normal) — the closed form below is an in-plane 180 only under the
+      // OTHER composition; on sleeve triples it flips the card about its
+      // width axis instead (back face out, silhouette mirrored).
+      return { ...placement, rotation: flipCardInPlane(placement.rotation) };
+    }
     const [rx, ry, rz] = placement.rotation;
     return { ...placement, rotation: [rx, -ry, rz + Math.PI] as [number, number, number] };
   });
@@ -620,8 +741,9 @@ export function placeGarmentPieces(
 
   // Anatomical orientation pass (M4-C): single exit point so EVERY consumer
   // (solver init, arrange view, sew tools, thunks) sees the same upright
-  // placements.
-  return normalizeInPlaneOrientation(pieces, raw);
+  // placements. Regions feed the sleeve-card axial criterion (cap proximal —
+  // cosido María-style); allUnknown batches carry 'unknown' → world-Y as ever.
+  return normalizeInPlaneOrientation(pieces, raw, regions);
 }
 
 // ─── Arrangement overrides (camisa de María plan, M2) ────────────────────────

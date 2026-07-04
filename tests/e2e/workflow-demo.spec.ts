@@ -3,6 +3,9 @@
  * del flujo CLO3D-style y captura una imagen por etapa en .tmp/flow-demo/:
  *
  *   01 hilos de costura (abanicos range-aware, pre-sim)
+ *   01b hilos a 3/4 — el cosido del TORSO (hombros/costados front↔back) es
+ *       invisible de frente; esta vista lo hace legible (bloque cosido
+ *       María-style, plan §6bis)
  *   02 modo arrange: anchor points horneados sobre María
  *   03 pieza seleccionada: gizmo anclado + anchors del namespace destacados
  *   04 pieza re-colocada vía binding (el gesto click-pieza→click-punto)
@@ -71,6 +74,24 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
 
   // 01 — hilos de costura (showSeamlines3D es default ON)
   await shot(page, '01-hilos-costura.png');
+
+  // 01b — 3/4: orbitar ~45° para que los hilos de hombro/costado (front↔back)
+  // se lean — de frente quedan ocultos tras las cartas. RIGHT-drag = orbit
+  // (Viewport3D deshabilita LEFT/MIDDLE y mapea RIGHT→ROTATE, estilo CLO3D).
+  // Se orbita de vuelta al final para que el resto del demo siga frontal.
+  const canvas = page.locator('canvas').first();
+  const box = (await canvas.boundingBox())!;
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  const orbit = async (dx: number) => {
+    await page.mouse.move(cx, cy);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(cx + dx, cy, { steps: 12 });
+    await page.mouse.up({ button: 'right' });
+    await page.waitForTimeout(600); // damping settle
+  };
+  await orbit(-90); // ~45°: se leen los abanicos Y la escalera de costado front↔back
+  await shot(page, '01b-hilos-3cuartos.png');
+  await orbit(90);
 
   // 02 — modo arrange: anchor points horneados (bake async → espera)
   await page.evaluate(() => {
