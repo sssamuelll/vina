@@ -177,11 +177,19 @@ export const DEFAULT_SEAM_CONFIG: SeamConstraintConfig = {
   shrinkFactor: 0.97,
   sewedThreshold: 1e-6,
   restLengthFloor: SEAM_REST_LENGTH_FLOOR_MIN_M,
+  // Una costura cosida es casi RÍGIDA (el hilo no estira): con 1e-4 el α
+  // XPBD daba 81 (cada endpoint avanzaba ~1.2% de la violación por substep)
+  // y la sisa se estancaba a 8-10cm contra la fricción del tubo sobre el
+  // brazo — medido en vivo por la sonda seam-gap (2026-07-04; plateau desde
+  // 0.5s, tether exonerado por A/B ON/OFF bit-idéntico). El ramp de decay
+  // (el target arranca en la distancia actual y baja ×shrinkFactor) ya
+  // protege del snap explosivo, así que la constraint final puede ser dura.
+  // Jerarquía relativa entre tipos preservada (÷100 uniforme).
   compliance: {
-    standard: 0.0001,
-    french: 0.00001,
-    'flat-felled': 0.00005,
-    overlock: 0.0002,
+    standard: 0.000001,
+    french: 0.0000001,
+    'flat-felled': 0.0000005,
+    overlock: 0.000002,
   },
 };
 

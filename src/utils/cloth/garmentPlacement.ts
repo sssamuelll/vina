@@ -525,6 +525,7 @@ export function computeFlipFlags(
   pieces: PatternPiece[],
   placements: PlacementResult[],
   regions?: BodyRegion[],
+  axes?: Array<V3 | undefined>,
 ): boolean[] {
   return placements.map((placement, i) => {
     const piece = pieces[i];
@@ -538,16 +539,20 @@ export function computeFlipFlags(
       if (topY == null || bottomY == null) return false;
       return topY < bottomY; // anatomy inverted → flip
     }
-    // Distal axis in lockstep with surfaceFrame's no-hint defaults (left −X,
-    // right +X) — the batch path never passes axisHints, so this IS the axis
-    // the card was placed with. Measured via cardLocalToWorld: the space the
-    // flip is applied in.
-    const dx = region === 'right-sleeve' || region === 'cuff-right' ? 1 : -1;
+    // Distal axis = the frame axis the card was placed with (`axes`, from
+    // placeGarmentPieces — bone-hinted when the skeleton is ready). Fallback
+    // in lockstep with surfaceFrame's no-hint defaults (left −X, right +X).
+    // Measured via cardLocalToWorld: the space the flip is applied in.
+    const dir: V3 = axes?.[i]
+      ?? [region === 'right-sleeve' || region === 'cuff-right' ? 1 : -1, 0, 0];
     const proj = (roots: Set<string>): number | null => {
       const locals = anatomyLocalEndpoints(piece, roots);
       if (locals.length === 0) return null;
       let sum = 0;
-      for (const lv of locals) sum += cardLocalToWorld(lv, placement)[0] * dx;
+      for (const lv of locals) {
+        const w = cardLocalToWorld(lv, placement);
+        sum += w[0] * dir[0] + w[1] * dir[1] + w[2] * dir[2];
+      }
       return sum / locals.length;
     };
     const capP = proj(ANATOMY_TOP_ROOTS);
@@ -570,8 +575,9 @@ export function normalizeInPlaneOrientation(
   pieces: PatternPiece[],
   placements: PlacementResult[],
   regions?: BodyRegion[],
+  axes?: Array<V3 | undefined>,
 ): PlacementResult[] {
-  const flips = computeFlipFlags(pieces, placements, regions);
+  const flips = computeFlipFlags(pieces, placements, regions, axes);
   return placements.map((placement, i) => {
     if (!flips[i]) return placement; // anatomy already up (or no evidence)
     const region = regions?.[i];
@@ -650,6 +656,12 @@ export function computeEffectiveRegions(pieces: PatternPiece[]): BodyRegion[] {
 export function placeGarmentPieces(
   pieces: PatternPiece[],
   measurements: BodyMeasurements,
+  /** Per-piece bone axis hints (tilt A-pose, bloque cosido María-style parte
+   *  2): the CARDS finally use the same hinted frames the wrap/override paths
+   *  already used — sleeve cards lean along the real arm instead of the
+   *  horizontal T-pose default. Omitted (all other callers) = defaults,
+   *  byte-identical to before. */
+  opts?: { axisHints?: Record<string, V3> },
 ): PlacementResult[] {
   // Raw regions (toggle reset + single detectBodyRegion pass) — same source as
   // computeEffectiveRegions. The loop below still needs the raw 'unknown'
@@ -680,6 +692,10 @@ export function placeGarmentPieces(
   // arrive here as unknown. Filed as follow-up; see docs/plans for status.
   const allUnknown = unknownCount === pieces.length && pieces.length > 0;
   let unknownIndex = 0;
+
+  // Frame axis per piece — the flip oracle measures the sleeve criterion
+  // along the axis the card was actually placed with (hinted or default).
+  const axes: Array<V3 | undefined> = new Array(pieces.length);
 
   const raw = pieces.map((piece, i) => {
     const region = regions[i];
@@ -733,17 +749,21 @@ export function placeGarmentPieces(
       };
     }
 
-    return computePlacement(region, measurements, {
-      widthMm: geo.width,
-      heightMm: geo.height,
-    });
+    const { placement, frame } = computeAutoFrame(
+      region,
+      measurements,
+      { widthMm: geo.width, heightMm: geo.height },
+      opts?.axisHints?.[piece.id],
+    );
+    axes[i] = frame.axis;
+    return placement;
   });
 
   // Anatomical orientation pass (M4-C): single exit point so EVERY consumer
   // (solver init, arrange view, sew tools, thunks) sees the same upright
   // placements. Regions feed the sleeve-card axial criterion (cap proximal —
   // cosido María-style); allUnknown batches carry 'unknown' → world-Y as ever.
-  return normalizeInPlaneOrientation(pieces, raw, regions);
+  return normalizeInPlaneOrientation(pieces, raw, regions, axes);
 }
 
 // ─── Arrangement overrides (camisa de María plan, M2) ────────────────────────

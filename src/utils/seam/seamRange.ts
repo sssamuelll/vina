@@ -22,6 +22,24 @@ export interface SeamHalfRange {
 }
 
 /**
+ * Espejo de un rango t al invertir la dirección de recorrido del edge:
+ * [s, e] → [1−e, 1−s].
+ *
+ * LA convención (header de este archivo): el rango almacenado del half B se
+ * interpreta en dirección de COSIDO — el filtro corre DESPUÉS de que
+ * `parameterizeEdge` invierte t con `reversed`. Quien ESCRIBA `reversed`
+ * sobre un half con rango parcial debe espejar el rango almacenado con este
+ * helper, o el solver cose la mitad física EQUIVOCADA (bug 2026-07-04: las
+ * dos medias costuras de la sisa reclamaban la misma mitad del cap y la
+ * otra quedaba desnuda — esquinas de 9-13cm). Único definidor del espejo:
+ * worldRefine (siembra IA) y cualquier toggle humano (Ctrl+B, v2 nombrado)
+ * deben pasar por aquí.
+ */
+export function mirrorPctRange(r: [number, number]): [number, number] {
+  return [1 - r[1], 1 - r[0]];
+}
+
+/**
  * Clamp a percent pair to integers in [0, 100] with start < end.
  * When the edit makes the pair invalid, the OTHER bound is pushed
  * (never returns an invalid or empty range).

@@ -312,8 +312,9 @@ describe('seamInitDataToPairs', () => {
 
     const pairs = seamInitDataToPairs(seams, pieces);
 
-    // french base 0.00001 / strength 0.5 × taped 0.1 = 0.000002
-    expect(pairs[0].compliance).toBeCloseTo(0.000002, 9);
+    // french base 1e-7 / strength 0.5 × taped 0.1 = 2e-8 (costura rígida
+    // 2026-07-04 — el hilo no estira; ver DEFAULT_SEAM_CONFIG en seamAssembly)
+    expect(pairs[0].compliance).toBeCloseTo(0.00000002, 11);
     // tension 80 / 100 = 0.8
     expect(pairs[0].tensionFactor).toBeCloseTo(0.8, 6);
   });
@@ -325,7 +326,7 @@ describe('seamInitDataToPairs', () => {
       [makeSquarePiece('A'), makeSquarePiece('B')],
     );
 
-    expect(pairs[0].compliance).toBeCloseTo(0.0001, 9); // standard base, unmodified
+    expect(pairs[0].compliance).toBeCloseTo(0.000001, 11); // standard base (rígida 2026-07-04), unmodified
     expect(pairs[0].tensionFactor).toBe(1);
   });
 

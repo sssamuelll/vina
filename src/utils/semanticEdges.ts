@@ -161,7 +161,12 @@ export function detectSemanticEdges(piece: PatternPiece): SemanticEdge[] {
       } else if (zone === 'top' && isNearlyHorizontal(avgAngle)) {
         name = 'collarOuterEdge'; edgeType = 'hem';
       } else {
-        name = 'collarEnd'; edgeType = 'seam';
+        // self-close: los dos extremos cortos de la banda se cosen ENTRE SÍ
+        // para cerrar el aro del cuello (el residual nombrado "collar
+        // short-end closure") — sin esto nada ancla la banda y rota libre.
+        // El pass genérico de autoSew (mismo mecanismo que underarmSeam)
+        // emite el cierre cuando la pieza tiene exactamente 2 de estos.
+        name = 'collarEnd'; edgeType = 'seam'; matchHint = 'self-close';
       }
     } else if (category === 'skirt') {
       if (zone === 'top' && isNearlyHorizontal(avgAngle)) {
