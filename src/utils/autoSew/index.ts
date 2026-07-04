@@ -217,8 +217,75 @@ export function autoSew(
   );
   const finalRanked = [...ranked, ...bridgeCandidates];
 
+  // ── Sisa split pass (proceso de cosido María-style, 2026-07-04) ──────────
+  //
+  // Una camisa real cose el CAP de la manga a AMBOS armholes (delantero Y
+  // espalda) — la sisa es una curva continua una vez cerrados hombros y
+  // costados. El dedup greedy de arriba es 1:1 (cada edge una costura), así
+  // que cada cap reclamaba UN armhole y los de la otra pieza del torso
+  // quedaban huérfanos. Medido en vivo (sonda seam-gap): el centro del cap
+  // cerraba a 1.3cm y los extremos quedaban a 12-16cm — media manga sin
+  // partner ("chaleco + brazaletes").
+  //
+  // Split: cada costura cap↔armhole se parte en DOS medias costuras con
+  // rango parcial en el lado del cap (t 0-0.5 / 0.5-1 — la maquinaria de
+  // rangos + renormalizeFilteredT es de Fase 5), la segunda apuntando al
+  // mejor armhole NO consumido de OTRA pieza (ya scoreado por el pipeline —
+  // armhole↔sleeveCap son declared partners, siempre llegan al scorer).
+  // Qué mitad va a cuál armhole y la dirección los decide worldRefine en
+  // pose MUNDO (permutación del grupo bodice:armhole↔sleeve:sleevecap,
+  // ahora de 4 miembros — cabe en MAX_GROUP_PERMUTE).
+  const edgeRootOf = (n: string) => n.toLowerCase().replace(/-\d+$/, '');
+  interface SeamSpec {
+    cand: ScoredSeamCandidate;
+    /** Rango t del lado CAP ('A'|'B' de cand) — solo en medias costuras de sisa. */
+    capSide?: 'A' | 'B';
+    capRange?: [number, number];
+  }
+  const usedEdgeKeys = new Set(finalRanked.flatMap(s => [
+    `${s.edgeA.pieceId}:${s.edgeA.edgeIndex}`,
+    `${s.edgeB.pieceId}:${s.edgeB.edgeIndex}`,
+  ]));
+  const splitExtras: ScoredSeamCandidate[] = [];
+  const seamSpecs: SeamSpec[] = [];
+  for (const cand of finalRanked) {
+    const rootA = edgeRootOf(cand.edgeA.name);
+    const rootB = edgeRootOf(cand.edgeB.name);
+    const capSide: 'A' | 'B' | null =
+      rootA === 'sleevecap' && rootB === 'armhole' ? 'A'
+      : rootB === 'sleevecap' && rootA === 'armhole' ? 'B'
+      : null;
+    if (!capSide) { seamSpecs.push({ cand }); continue; }
+    const cap = capSide === 'A' ? cand.edgeA : cand.edgeB;
+    const arm = capSide === 'A' ? cand.edgeB : cand.edgeA;
+
+    // Mejor segundo armhole para ESTE cap, en otra pieza, con edge libre.
+    let second: ScoredSeamCandidate | null = null;
+    let secondCapSide: 'A' | 'B' = 'A';
+    for (const c of safeCandidates) {
+      const capIsA = c.edgeA.pieceId === cap.pieceId && c.edgeA.edgeIndex === cap.edgeIndex;
+      const capIsB = c.edgeB.pieceId === cap.pieceId && c.edgeB.edgeIndex === cap.edgeIndex;
+      if (!capIsA && !capIsB) continue;
+      const other = capIsA ? c.edgeB : c.edgeA;
+      if (edgeRootOf(other.name) !== 'armhole') continue;
+      if (other.pieceId === arm.pieceId) continue;
+      if (usedEdgeKeys.has(`${other.pieceId}:${other.edgeIndex}`)) continue;
+      if (!second || c.confidence > second.confidence) {
+        second = c;
+        secondCapSide = capIsA ? 'A' : 'B';
+      }
+    }
+    if (!second) { seamSpecs.push({ cand }); continue; }
+
+    const secondArm = secondCapSide === 'A' ? second.edgeB : second.edgeA;
+    usedEdgeKeys.add(`${secondArm.pieceId}:${secondArm.edgeIndex}`);
+    splitExtras.push(second);
+    seamSpecs.push({ cand, capSide, capRange: [0, 0.5] });
+    seamSpecs.push({ cand: second, capSide: secondCapSide, capRange: [0.5, 1] });
+  }
+
   // Convert to ProposedSeam objects
-  const seams: ProposedSeam[] = finalRanked.map((candidate, idx) => ({
+  const seams: ProposedSeam[] = seamSpecs.map(({ cand: candidate, capSide, capRange }, idx) => ({
     seam: {
       // state-encoded ID — see B10-state. The rank index is intentionally
       // baked into the auto-seam ID; do NOT migrate to newId().
@@ -226,14 +293,14 @@ export function autoSew(
       pieceA: {
         pieceId: candidate.edgeA.pieceId,
         edgeName: candidate.edgeA.name,
-        tStart: 0,
-        tEnd: 1,
+        tStart: capSide === 'A' && capRange ? capRange[0] : 0,
+        tEnd: capSide === 'A' && capRange ? capRange[1] : 1,
       },
       pieceB: {
         pieceId: candidate.edgeB.pieceId,
         edgeName: candidate.edgeB.name,
-        tStart: 0,
-        tEnd: 1,
+        tStart: capSide === 'B' && capRange ? capRange[0] : 0,
+        tEnd: capSide === 'B' && capRange ? capRange[1] : 1,
       },
       type: 'standard' as const,
       tension: 100,
@@ -307,7 +374,7 @@ export function autoSew(
 
   // Find unmatched edges (exclude self-close edges already claimed above)
   const matchedEdgeKeys = new Set<string>();
-  for (const s of finalRanked) {
+  for (const s of [...finalRanked, ...splitExtras]) {
     matchedEdgeKeys.add(`${s.edgeA.pieceId}:${s.edgeA.edgeIndex}`);
     matchedEdgeKeys.add(`${s.edgeB.pieceId}:${s.edgeB.edgeIndex}`);
   }

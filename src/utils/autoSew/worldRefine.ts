@@ -57,13 +57,25 @@ function edgeWorld(
   piece: PatternPiece,
   pwf: PlacementWithFrame,
   edgeName: string,
+  tRange?: [number, number],
 ): EdgeWorld | null {
   const edge = piece.edges?.find(e => e.name === edgeName);
   if (!edge) return null;
   const flat = flattenPath(piece.outline, 12);
   if (flat.length === 0) return null;
   const center = outlineBBoxCenter(piece.outline);
-  const [fs, fe] = commandRangeToFlattened(piece.outline, edge.segmentRange, 12);
+  const [fs0, fe0] = commandRangeToFlattened(piece.outline, edge.segmentRange, 12);
+  // Sub-rango t (medias costuras de sisa): recorta el tramo de índices
+  // linealmente en t — la misma aproximación index-lineal de
+  // parameterizeEdge. Sin esto, las dos mitades del cap medirían el MISMO
+  // midpoint y la permutación de grupo no podría discriminarlas.
+  let fs = fs0, fe = fe0;
+  if (tRange && (tRange[0] > 0 || tRange[1] < 1)) {
+    const span = fe0 - fs0;
+    fs = fs0 + Math.round(Math.max(0, Math.min(1, tRange[0])) * span);
+    fe = fs0 + Math.round(Math.max(0, Math.min(1, tRange[1])) * span);
+    if (fe <= fs) fe = Math.min(fs + 1, fe0);
+  }
   const pFirst = flat[fs];
   const pLast = flat[fe % flat.length];
   if (!pFirst || !pLast) return null;
@@ -145,8 +157,10 @@ export function refineSeamsInWorld(
     const pa = byId.get(seam.pieceA.pieceId);
     const pb = byId.get(seam.pieceB.pieceId);
     if (!pa || !pb) return null;
-    const aWorld = edgeWorld(pa.piece, pa.placement, seam.pieceA.edgeName);
-    const bWorld = edgeWorld(pb.piece, pb.placement, seam.pieceB.edgeName);
+    const tOf = (h: { tStart?: number; tEnd?: number }): [number, number] | undefined =>
+      h.tStart != null || h.tEnd != null ? [h.tStart ?? 0, h.tEnd ?? 1] : undefined;
+    const aWorld = edgeWorld(pa.piece, pa.placement, seam.pieceA.edgeName, tOf(seam.pieceA));
+    const bWorld = edgeWorld(pb.piece, pb.placement, seam.pieceB.edgeName, tOf(seam.pieceB));
     if (!aWorld || !bWorld) return null;
 
     const keyA = `${pa.piece.category ?? '?'}:${edgeRoot(seam.pieceA.edgeName)}`;
