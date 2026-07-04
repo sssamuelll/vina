@@ -85,6 +85,27 @@ describe('projectSlice — updateSeam', () => {
     expect(next.seams).toHaveLength(1);
     expect(next.isDirty).toBe(false);
   });
+
+  it('roundtrips sewn-range fields (tStart/tEnd) on both halves', () => {
+    const state = baseState({ seams: [makeSeam('s1')] });
+    const ranged = makeSeam('s1', {
+      pieceA: { pieceId: 'p1', edgeName: 'sideSeam', tStart: 0.3, tEnd: 0.7 },
+      pieceB: { pieceId: 'p2', edgeName: 'sideSeam', tStart: 0, tEnd: 0.5, reversed: true },
+    });
+    const next = reducer(state, updateSeam(ranged));
+    expect(next.seams[0].pieceA).toEqual({ pieceId: 'p1', edgeName: 'sideSeam', tStart: 0.3, tEnd: 0.7 });
+    expect(next.seams[0].pieceB).toEqual({ pieceId: 'p2', edgeName: 'sideSeam', tStart: 0, tEnd: 0.5, reversed: true });
+    expect(next.isDirty).toBe(true);
+  });
+
+  it('clearing ranges back to full-edge leaves NO tStart/tEnd fields', () => {
+    const state = baseState({
+      seams: [makeSeam('s1', { pieceA: { pieceId: 'p1', edgeName: 'sideSeam', tStart: 0.3, tEnd: 0.7 } })],
+    });
+    const next = reducer(state, updateSeam(makeSeam('s1')));
+    expect('tStart' in next.seams[0].pieceA).toBe(false);
+    expect('tEnd' in next.seams[0].pieceA).toBe(false);
+  });
 });
 
 describe('projectSlice — setSeamTension', () => {

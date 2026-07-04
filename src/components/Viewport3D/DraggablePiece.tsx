@@ -1,21 +1,24 @@
 /**
  * DraggablePiece — Wrapper around PieceMesh that enables 3D drag in Arrange mode.
  *
- * Uses @react-three/drei TransformControls for gizmo:
- * - Translate along XYZ axes
- * - Only active when piece is selected and in arrange mode
+ * Gizmo: ArrangeGizmo propio (estilo CLO3D, mesh-based/WebGPU-safe), ANCLADO
+ * a la pieza. Reemplaza drei TransformControls, que aquí tenía dos bugs
+ * (2026-07-04): el gizmo se renderizaba en el ORIGEN del mundo (envolvía un
+ * grupo con position propio) y el drag por gizmo escribía la posición VIEJA
+ * (movía su wrapper interno, pero onMouseUp leía el grupo hijo intacto).
  *
- * TransformControls uses MeshBasicMaterial + LineBasicMaterial internally,
- * which are compatible with WebGPURenderer's NodeMaterial system.
- * (PivotControls was replaced because it uses LineMaterial extending
- * ShaderMaterial, which WebGPURenderer rejects.)
+ * Flujo de drag: el gizmo reporta un delta WORLD live → se aplica al grupo
+ * (visual inmediato) → onDragEnd despacha position = base + delta al store
+ * (setArrangement3D V3 legacy) → resolveArrangement lo compone (única
+ * autoridad) → la prop `position` vuelve resuelta y el delta local se
+ * resetea. El drag directo de la pieza (sin gizmo) se conserva.
  */
 
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
-import { TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
 import PieceMesh from './PieceMesh';
+import ArrangeGizmo from './ArrangeGizmo';
 import type { PatternPiece } from '../../types/types';
 
 interface DraggablePieceProps {
@@ -24,7 +27,6 @@ interface DraggablePieceProps {
   color: string;
   position: [number, number, number];
   rotation?: [number, number, number];
-  arrangementOverride?: [number, number, number];
   flippedPieceIds?: string[];
   canDrag: boolean;
   onSelect: (pieceId: string, shiftKey: boolean) => void;
@@ -40,7 +42,6 @@ export default function DraggablePiece({
   color,
   position,
   rotation,
-  arrangementOverride,
   flippedPieceIds,
   canDrag,
   onSelect,
@@ -50,7 +51,7 @@ export default function DraggablePiece({
   fabricRoughness,
 }: DraggablePieceProps) {
   const groupRef = useRef<THREE.Group>(null);
-  const actualPos = arrangementOverride || position;
+  const actualPos = position; // colocación YA resuelta (única autoridad: resolveArrangement)
   const isFlipped = flippedPieceIds?.includes(piece.id) ?? false;
 
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
@@ -58,63 +59,58 @@ export default function DraggablePiece({
     onSelect(piece.id, e.nativeEvent.shiftKey);
   }, [piece.id, onSelect]);
 
-  const handleMouseDown = useCallback(() => {
-    setOrbitEnabled(false);
-  }, [setOrbitEnabled]);
-
-  const handleMouseUp = useCallback(() => {
-    setOrbitEnabled(true);
+  // Delta live del gizmo: visual inmediato sin pasar por el store.
+  const handleGizmoDrag = useCallback((delta: [number, number, number]) => {
     if (!groupRef.current) return;
-    const pos = groupRef.current.position;
-    onDragEnd(piece.id, [pos.x, pos.y, pos.z]);
-  }, [piece.id, onDragEnd, setOrbitEnabled]);
+    groupRef.current.position.set(
+      actualPos[0] + delta[0],
+      actualPos[1] + delta[1],
+      actualPos[2] + delta[2],
+    );
+  }, [actualPos]);
 
-  // Set initial position when actualPos changes
+  const handleGizmoDragEnd = useCallback((delta: [number, number, number]) => {
+    onDragEnd(piece.id, [
+      actualPos[0] + delta[0],
+      actualPos[1] + delta[1],
+      actualPos[2] + delta[2],
+    ]);
+  }, [piece.id, actualPos, onDragEnd]);
+
+  // Re-sync cuando el store devuelve la posición resuelta (post-dragEnd o
+  // cambio de binding/medidas): el delta local queda absorbido por la base.
   useEffect(() => {
-    if (groupRef.current) {
-      groupRef.current.position.set(...actualPos);
-    }
+    groupRef.current?.position.set(...actualPos);
   }, [actualPos]);
 
   const showGizmo = canDrag && isSelected;
 
-  if (showGizmo) {
-    return (
-      <TransformControls
-        mode="translate"
-        size={0.6}
-        showX
-        showY
-        showZ
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-      >
-        <group ref={groupRef} onClick={handleClick} position={actualPos} scale={[1, 1, isFlipped ? -1 : 1]}>
-          <PieceMesh
-            piece={piece}
-            isSelected={isSelected}
-            color={color}
-            position={[0, 0, 0]}
-            placementRotation={rotation}
-            fabricColor={fabricColor}
-            fabricRoughness={fabricRoughness}
-          />
-        </group>
-      </TransformControls>
-    );
-  }
-
   return (
-    <group onClick={handleClick} scale={[1, 1, isFlipped ? -1 : 1]}>
-      <PieceMesh
-        piece={piece}
-        isSelected={isSelected}
-        color={color}
+    <>
+      <group
+        ref={groupRef}
+        onClick={handleClick}
         position={actualPos}
-        placementRotation={rotation}
-        fabricColor={fabricColor}
-        fabricRoughness={fabricRoughness}
-      />
-    </group>
+        scale={[1, 1, isFlipped ? -1 : 1]}
+      >
+        <PieceMesh
+          piece={piece}
+          isSelected={isSelected}
+          color={color}
+          position={[0, 0, 0]}
+          placementRotation={rotation}
+          fabricColor={fabricColor}
+          fabricRoughness={fabricRoughness}
+        />
+      </group>
+      {showGizmo && (
+        <ArrangeGizmo
+          position={actualPos}
+          onDrag={handleGizmoDrag}
+          onDragEnd={handleGizmoDragEnd}
+          setOrbitEnabled={setOrbitEnabled}
+        />
+      )}
+    </>
   );
 }

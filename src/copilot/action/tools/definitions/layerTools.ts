@@ -10,7 +10,7 @@
 import type { ToolDefinition, ToolResult } from '../registry';
 import type { AppDispatch, RootState } from '../../../../store';
 import {
-  setLayer, setSublayer, cloneToLayer, superimposePiece, setArrangement3D,
+  setLayer, setSublayer, cloneToLayer, superimposePiece, setArrangement3D, setArrangementBinding,
   renameLayer as renameLayerAction, deleteLayerName, setLayerLocked as setLayerLockedAction,
   removePiece,
 } from '../../../../store/projectSlice';
@@ -174,7 +174,12 @@ const superimposeTool: ToolDefinition = {
           dispatch(setLayer({ pieceId: params.pieceId as string, layer: previousLayer }));
         }
         if (previousPos) {
-          dispatch(setArrangement3D({ pieceId: params.pieceId as string, position: [...previousPos] as [number, number, number] }));
+          // Contrato: el override previo puede ser V3 legacy o binding frame-delta.
+          if (Array.isArray(previousPos)) {
+            dispatch(setArrangement3D({ pieceId: params.pieceId as string, position: [...previousPos] as [number, number, number] }));
+          } else {
+            dispatch(setArrangementBinding({ pieceId: params.pieceId as string, binding: previousPos }));
+          }
         }
       },
     };

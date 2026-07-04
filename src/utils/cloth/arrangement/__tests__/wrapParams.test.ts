@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { wrapParamsForRegion, MAX_SLEEVE_WRAP, SLEEVE_CLEARANCE, DEFAULT_WRAP } from '../wrapParams';
+import { wrapParamsForRegion, MAX_SLEEVE_WRAP, SLEEVE_CLEARANCE, MAX_COLLAR_WRAP, COLLAR_CLEARANCE, DEFAULT_WRAP } from '../wrapParams';
 import type { SurfaceFrame } from '../surfaceFrame';
 
 const frame = (radius: number): SurfaceFrame => ({
@@ -44,9 +44,30 @@ describe('wrapParamsForRegion', () => {
     expect((2 * Math.PI * R) / (R + wp.gap)).toBeLessThan(MAX_SLEEVE_WRAP);
   });
 
-  it('returns the 150° default for non-sleeve regions', () => {
+  // Collar coverage (D9-11): collar was DEFAULT_WRAP (150° cap) → 44.2% of
+  // María's band vertices piled on the ±75° clamp lines (the neckline "knot").
+  // Now it gets the same panel-derived tube treatment as sleeves.
+  it('derives the collar band radius from the panel (María: 456mm, neckR 61.1mm)', () => {
+    const R = 0.0611;
+    const wp = wrapParamsForRegion('collar', frame(R), 0.456);
+    expect(wp.thetaMaxRad).toBeCloseTo(MAX_COLLAR_WRAP, 5);
+    expect(R + wp.gap).toBeCloseTo(0.456 / MAX_COLLAR_WRAP, 5); // ≈ 0.0792m
+    // Coverage measured where the cloth lives = exactly the cap → zero piling.
+    expect(0.456 / (R + wp.gap)).toBeCloseTo(MAX_COLLAR_WRAP, 5);
+  });
+
+  it('floors the collar radius at neckR + COLLAR_CLEARANCE for narrow bands', () => {
+    const R = 0.0611;
+    const narrow = 0.2; // 0.2/MAX_COLLAR_WRAP ≈ 0.0347 < R + clearance → floor wins
+    const wp = wrapParamsForRegion('collar', frame(R), narrow);
+    expect(wp.gap).toBeCloseTo(COLLAR_CLEARANCE, 5);
+    expect(narrow / (R + wp.gap)).toBeLessThan(wp.thetaMaxRad);
+  });
+
+  it('returns the 150° default for non-tube regions (hood stays a draping panel)', () => {
     expect(wrapParamsForRegion('front-torso', frame(0.14), 0.4)).toEqual(DEFAULT_WRAP);
-    expect(wrapParamsForRegion('collar', frame(0.056), 0.3)).toEqual(DEFAULT_WRAP);
+    // hood deliberately NOT collar-wrapped — see wrapParams.ts.
+    expect(wrapParamsForRegion('hood', frame(0.056), 0.3)).toEqual(DEFAULT_WRAP);
   });
 
   it('applies to cuff regions too', () => {

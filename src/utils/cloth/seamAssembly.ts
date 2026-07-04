@@ -10,6 +10,7 @@
 
 import type { PathCommand, Point2D, Seam, SemanticEdge } from '../../types/types';
 import { flattenPath, commandRangeToFlattened } from '../seam/index';
+import { renormalizeFilteredT } from '../seam/seamRange';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -727,12 +728,20 @@ export function buildSeamConstraints(
           SEAM_CURVE_RESOLUTION, pieceBData?.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH, reversedB,
         );
 
-    // Apply t-range filtering: restrict parameterized vertices to the sub-range
+    // Apply t-range filtering: restrict parameterized vertices to the sub-range,
+    // then RENORMALIZE t to the sub-range (renormalizeFilteredT — sin esto los
+    // rangos asimétricos no stretch-mapean; espejo GPU en seamPairs.ts).
     if (seam.pieceA.tStart != null && seam.pieceA.tEnd != null) {
-      edgeA = edgeA.filter(v => v.t >= seam.pieceA.tStart! && v.t <= seam.pieceA.tEnd!);
+      edgeA = renormalizeFilteredT(
+        edgeA.filter(v => v.t >= seam.pieceA.tStart! && v.t <= seam.pieceA.tEnd!),
+        seam.pieceA.tStart, seam.pieceA.tEnd,
+      );
     }
     if (seam.pieceB.tStart != null && seam.pieceB.tEnd != null) {
-      edgeB = edgeB.filter(v => v.t >= seam.pieceB.tStart! && v.t <= seam.pieceB.tEnd!);
+      edgeB = renormalizeFilteredT(
+        edgeB.filter(v => v.t >= seam.pieceB.tStart! && v.t <= seam.pieceB.tEnd!),
+        seam.pieceB.tStart, seam.pieceB.tEnd,
+      );
     }
 
     const pairs = matchVertices(edgeA, edgeB);

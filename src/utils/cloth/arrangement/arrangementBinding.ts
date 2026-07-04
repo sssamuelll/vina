@@ -11,7 +11,7 @@
  */
 import * as THREE from 'three';
 import type { BodyMeasurements, PatternPiece } from '../../../types/types';
-import { ANATOMY_BOTTOM_ROOTS, ANATOMY_TOP_ROOTS, anatomyLocalEndpoints, computeAutoFrame, computeEffectiveRegions, deriveDimensions, detectBodyRegion, outlineBBox, placeGarmentPieces, type BodyRegion, type PlacementResult } from '../garmentPlacement';
+import { ANATOMY_BOTTOM_ROOTS, ANATOMY_TOP_ROOTS, anatomyLocalEndpoints, computeAutoFrame, computeEffectiveRegions, deriveDimensions, outlineBBox, placeGarmentPieces, type BodyRegion, type PlacementResult } from '../garmentPlacement';
 import { surfaceFrame, type SurfaceFrame, type V3 } from './surfaceFrame';
 import { wrapPanel } from './wrapPanel';
 import { DEFAULT_WRAP, wrapParamsForRegion } from './wrapParams';
@@ -21,11 +21,17 @@ export interface ArrangementBinding {
   space: 'frame';
   posDelta: V3;                                  // in the auto frame's local basis
   rotDelta: [number, number, number, number];    // quaternion relative to the auto frame
+  /** Proveniencia del contrato de colocación (consejo 2026-07-03): el anchor
+   *  point elegido (`region.ringN.bearing`), escrito por el click del humano
+   *  o el tool del agente. Hoy informativo; la re-resolución contra el mapa
+   *  vivo (anchor-tracking) es follow-up con nombre. */
+  anchorId?: string;
 }
 
 export type ArrangementOverride = ArrangementBinding | V3;
 
-function isBinding(o: ArrangementOverride): o is ArrangementBinding {
+/** Guard del contrato: V3 legacy (array) vs binding frame-delta (objeto). */
+export function isBinding(o: ArrangementOverride): o is ArrangementBinding {
   return !Array.isArray(o) && (o as ArrangementBinding).space === 'frame';
 }
 
@@ -40,6 +46,23 @@ export function resolveArrangement(
   overrides: Record<string, ArrangementOverride> | undefined,
   opts?: { skeletonReady?: boolean; axisHints?: Record<string, V3> },
 ): PlacementResult[] {
+  return resolveArrangementCore(pieces, measurements, overrides, opts).placements;
+}
+
+/**
+ * Core compartido: además de los placements resueltos expone los AUTO
+ * placements, para que `resolveArrangementWithFrames` pueda componer el DELTA
+ * del override dentro del frame del wrap (fix del drag no-op, consejo
+ * 2026-07-03 / hallazgo Halberg §4: post-envelope-wrap el solver siembra vía
+ * `wrapPlacedMesh(frame, …)` y `placement.position` no se componía nunca —
+ * el drag del usuario era un no-op silencioso con costo de recompute).
+ */
+function resolveArrangementCore(
+  pieces: PatternPiece[],
+  measurements: BodyMeasurements,
+  overrides: Record<string, ArrangementOverride> | undefined,
+  opts?: { skeletonReady?: boolean; axisHints?: Record<string, V3> },
+): { placements: PlacementResult[]; autoPlacements: PlacementResult[] } {
   // Build the normalized, deterministic batch placement in ONE pass.
   // This is the single source of truth for both the arrange view (Viewport3D)
   // and the solver/autoSew path (GarmentSimulation / autoSewThunk), fixing:
@@ -49,8 +72,13 @@ export function resolveArrangement(
   //     not reset before per-piece calls, producing non-deterministic L/R
   //     assignment for side-less sleeve/cuff pairs across the two paths.
   const autoPlacements = placeGarmentPieces(pieces, measurements);
+  // Region lock (consejo 2026-07-03, cierre del bug latente que este archivo
+  // documentaba): el branch de binding usa las MISMAS regiones deterministas
+  // que placeGarmentPieces asignó — nunca un detectBodyRegion fresco cuyo
+  // toggle L/R puede divergir.
+  const effRegions = computeEffectiveRegions(pieces);
 
-  return pieces.map((p, i) => {
+  const placements = pieces.map((p, i) => {
     const autoPlacement = autoPlacements[i];
 
     const ov = overrides?.[p.id];
@@ -62,13 +90,8 @@ export function resolveArrangement(
     }
 
     // Frame-delta compose: posDelta in the frame basis, rotDelta relative to the frame.
-    // NOTE: this branch is Phase-2 territory — no ArrangementBinding deltas are written
-    // in Phase 1; only the unit test exercises it. Phase 2 must lock the region used
-    // here to the same one placeGarmentPieces assigned (to keep the delta semantically
-    // anchored to the normalized auto frame, not a fresh detectBodyRegion call that
-    // could diverge due to toggle state or skeleton-hint differences).
     // Skeleton not ready → ignore bone axis hints, use the parametric default.
-    const region = detectBodyRegion(p);
+    const region = effRegions[i];
     const axisHint = opts?.skeletonReady === false ? undefined : opts?.axisHints?.[p.id];
     const { frame } = computeAutoFrame(region, measurements, pieceGeometryOf(p), axisHint);
 
@@ -88,8 +111,10 @@ export function resolveArrangement(
     );
     const deltaQ = new THREE.Quaternion(ov.rotDelta[0], ov.rotDelta[1], ov.rotDelta[2], ov.rotDelta[3]);
     const e = new THREE.Euler().setFromQuaternion(autoQ.multiply(deltaQ), 'XYZ');
-    return { position, rotation: [e.x, e.y, e.z] };
+    return { position, rotation: [e.x, e.y, e.z] as [number, number, number] };
   });
+
+  return { placements, autoPlacements };
 }
 
 export interface PlacementWithFrame {
@@ -180,14 +205,28 @@ export function resolveArrangementWithFrames(
   opts?: { skeletonReady?: boolean; axisHints?: Record<string, V3> },
 ): PlacementWithFrame[] {
   const regions = computeEffectiveRegions(pieces);
-  const placements = resolveArrangement(pieces, measurements, overrides, opts);
+  const { placements, autoPlacements } = resolveArrangementCore(pieces, measurements, overrides, opts);
   const dims = deriveDimensions(measurements);
 
   const frames = pieces.map((p, i) => {
     const axisHint = opts?.skeletonReady === false ? undefined : opts?.axisHints?.[p.id];
     // pieceLength keeps this frame in lockstep with computeAutoFrame's (both
     // anchor the sleeve-cap edge at the shoulder — see surfaceFrame).
-    return surfaceFrame(regions[i], dims, axisHint, pieceGeometryOf(p).heightMm * 0.001);
+    const f = surfaceFrame(regions[i], dims, axisHint, pieceGeometryOf(p).heightMm * 0.001);
+    // Fix del drag no-op (consejo 2026-07-03, Halberg §4): el delta del
+    // override (drag legacy [x,y,z] O binding frame-delta) se compone como
+    // traslación rígida del FRAME del wrap — el mismo delta que la vista
+    // rígida aplica a placement.position. Sin override, delta = 0 y el frame
+    // queda bit-idéntico (los flips M4-C son invariantes a la traslación:
+    // comparan proyecciones RELATIVAS al point). Rotación fina del override:
+    // POST (triage del consejo).
+    const dx = placements[i].position[0] - autoPlacements[i].position[0];
+    const dy = placements[i].position[1] - autoPlacements[i].position[1];
+    const dz = placements[i].position[2] - autoPlacements[i].position[2];
+    if (dx !== 0 || dy !== 0 || dz !== 0) {
+      return { ...f, point: [f.point[0] + dx, f.point[1] + dy, f.point[2] + dz] as V3 };
+    }
+    return f;
   });
 
   // M4-C flip flags measured in WRAP space (NOT the rigid computeFlipFlags —
