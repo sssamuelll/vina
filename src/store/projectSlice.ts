@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, NotchAnchor, NotchOptions, NotchPair, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage } from '../types/types';
+import type { ArrangementBinding, ArrangementOverride } from '../utils/cloth/arrangement/arrangementBinding';
 import type { Trim } from '../types/trim';
 import type { PieceArtwork } from '../types/artwork';
 import { NEW_PROJECT } from './actions';
@@ -192,7 +193,10 @@ interface ProjectState {
   /** M:N seam groups connecting multiple edges */
   seamGroups: SeamGroup[];
   /** Per-piece 3D arrangement position overrides (piece ID → [x,y,z]) */
-  arrangementOverrides: Record<string, [number, number, number]>;
+  /** Contrato de colocación (consejo 2026-07-03): V3 world legacy (drag) o
+   *  ArrangementBinding frame-delta grading-safe (anchors / tool del agente).
+   *  resolveArrangement es el ÚNICO resolutor — nadie re-aplica esto a mano. */
+  arrangementOverrides: Record<string, ArrangementOverride>;
   /** Points of measure */
   poms: PointOfMeasure[];
   /** Declared notch-mirror pairs (Alcance B1) — identity only, re-derived.
@@ -456,6 +460,12 @@ const projectSlice = createSlice({
     /** Set a 3D arrangement position override for a piece. */
     setArrangement3D(state, action: PayloadAction<{ pieceId: string; position: [number, number, number] }>) {
       state.arrangementOverrides[action.payload.pieceId] = action.payload.position;
+      state.isDirty = true;
+    },
+    /** Escribe un binding de colocación grading-safe (contrato: click de
+     *  anchor del humano o tool del agente — placementContract.ts). */
+    setArrangementBinding(state, action: PayloadAction<{ pieceId: string; binding: ArrangementBinding }>) {
+      state.arrangementOverrides[action.payload.pieceId] = action.payload.binding;
       state.isDirty = true;
     },
     /** Clear all 3D arrangement overrides. */
@@ -1136,7 +1146,10 @@ const projectSlice = createSlice({
       state.pieces.push(clone);
       const arrangement = state.arrangementOverrides[piece.id];
       if (arrangement) {
-        state.arrangementOverrides[clone.id] = [...arrangement] as [number, number, number];
+        // Contrato: V3 legacy se clona como array; binding frame-delta como objeto.
+        state.arrangementOverrides[clone.id] = Array.isArray(arrangement)
+          ? ([...arrangement] as [number, number, number])
+          : { ...arrangement, posDelta: [...arrangement.posDelta] as [number, number, number], rotDelta: [...arrangement.rotDelta] as [number, number, number, number] };
       }
       state.isDirty = true;
     },
@@ -1151,7 +1164,10 @@ const projectSlice = createSlice({
       const target = state.pieces.find(p => p.id === targetPieceId);
       if (!piece || !target) return;
       const targetPos = state.arrangementOverrides[targetPieceId];
-      if (targetPos) {
+      // Solo overrides V3 legacy: un binding frame-delta no lleva posición
+      // world en el store (la resuelve resolveArrangement) — superimpose
+      // sobre pieza bindeada queda como no-op documentado (contrato v1).
+      if (targetPos && Array.isArray(targetPos)) {
         if (mode === 'side') {
           state.arrangementOverrides[pieceId] = [targetPos[0] + SUPERIMPOSE_SIDE_OFFSET_M, targetPos[1], targetPos[2]];
         } else {
@@ -1515,7 +1531,7 @@ const projectSlice = createSlice({
 
 export const {
   restoreState, loadProject, restoreProject, clearLoadDiagnostics, setProjectName, setGarmentInfo, setGarmentInfoBulk,
-  addPiece, updatePiece, removePiece, removePieces, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, clearArrangementOverrides,
+  addPiece, updatePiece, removePiece, removePieces, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, setArrangementBinding, clearArrangementOverrides,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
   addAnnotation, removeAnnotation, updateAnnotation,
   // Reactive solver (parametric updates)

@@ -28,7 +28,6 @@ interface SeamRenderer3DProps {
   seams: Seam[];
   pieces: PatternPiece[];
   placements: PlacementResult[];
-  arrangementOverrides: Record<string, [number, number, number]>;
   flippedPieceIds: string[];
 }
 
@@ -39,6 +38,7 @@ interface SeamRenderer3DProps {
 const SEAM_COLOR_AI = '#f59e0b';    // amber
 const SEAM_COLOR_HUMAN = '#3fb950'; // green
 
+// eslint-disable-next-line react-refresh/only-export-components -- helper puro pre-existente (pineado por seamColor.test.ts); moverlo es churn de imports sin ganancia de fast-refresh real
 export function seamColor(createdBy: Seam['createdBy']): string {
   return createdBy === 'ai' ? SEAM_COLOR_AI : SEAM_COLOR_HUMAN;
 }
@@ -65,16 +65,14 @@ export default function SeamRenderer3D({
   seams,
   pieces,
   placements,
-  arrangementOverrides,
   flippedPieceIds,
 }: SeamRenderer3DProps) {
   const seamLines = useMemo(() => {
     const placementOf = (pieceId: string) => {
       const idx = pieces.findIndex((p) => p.id === pieceId);
       if (idx === -1) return null;
-      const pos = arrangementOverrides[pieceId]
-        || placements[idx]?.position
-        || ([0, 0, 0] as [number, number, number]);
+      const pos = placements[idx]?.position
+        || ([0, 0, 0] as [number, number, number]); // placements ya resueltos (única autoridad)
       return {
         piece: pieces[idx],
         pos,
@@ -118,7 +116,7 @@ export default function SeamRenderer3D({
         }
       },
     };
-  }, [seams, pieces, placements, arrangementOverrides, flippedPieceIds]);
+  }, [seams, pieces, placements, flippedPieceIds]);
 
   useDisposable(seamLines);
 

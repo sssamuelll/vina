@@ -24,7 +24,6 @@ interface DraggablePieceProps {
   color: string;
   position: [number, number, number];
   rotation?: [number, number, number];
-  arrangementOverride?: [number, number, number];
   flippedPieceIds?: string[];
   canDrag: boolean;
   onSelect: (pieceId: string, shiftKey: boolean) => void;
@@ -40,7 +39,6 @@ export default function DraggablePiece({
   color,
   position,
   rotation,
-  arrangementOverride,
   flippedPieceIds,
   canDrag,
   onSelect,
@@ -50,7 +48,7 @@ export default function DraggablePiece({
   fabricRoughness,
 }: DraggablePieceProps) {
   const groupRef = useRef<THREE.Group>(null);
-  const actualPos = arrangementOverride || position;
+  const actualPos = position; // colocación YA resuelta (única autoridad: resolveArrangement)
   const isFlipped = flippedPieceIds?.includes(piece.id) ?? false;
 
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {

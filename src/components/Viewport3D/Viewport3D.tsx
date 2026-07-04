@@ -25,7 +25,7 @@ import { usePoseDrag } from './usePoseDrag';
 import { isPanGesture, isPanRelease, cameraViewFromKeyEvent, isDoublePanClick, type PanClick } from './inputBindings';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
 import { orbitAroundTarget, dollyTowardTarget, panViewpoint, recenterTarget } from '../../input/orbitMath';
-import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
+import { resolveArrangement } from '../../utils/cloth/arrangement/arrangementBinding';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
 import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
 import { collectExportScene } from '../../utils/export/sceneCollector';
@@ -191,10 +191,13 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   const { handleAvatarClick, isTapeTool } = useAvatarTape(activeTool3D);
   useColorwaySync();
 
-  // Compute placements once — shared by DraggablePiece and Sew3DTool
+  // Colocaciones RESUELTAS (auto + overrides/bindings) — la ÚNICA autoridad
+  // (consejo 2026-07-03 §1: cardinalidad uno). Antes: placeGarmentPieces sin
+  // overrides + cada consumidor re-aplicaba `overrides[id] || position` a
+  // mano (solo V3, sin bindings, sin rotación) = comité de colocaciones.
   const garmentPlacements = useMemo(
-    () => placeGarmentPieces(pieces, avatar.measurements),
-    [pieces, avatar.measurements],
+    () => resolveArrangement(pieces, avatar.measurements, arrangementOverrides),
+    [pieces, avatar.measurements, arrangementOverrides],
   );
 
   const simRef = useRef<GarmentSimulationHandle>(null);
@@ -822,7 +825,6 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
                 color={PIECE_COLORS[i % PIECE_COLORS.length]}
                 position={garmentPlacements[i].position}
                 rotation={garmentPlacements[i].rotation}
-                arrangementOverride={arrangementOverrides[piece.id]}
                 flippedPieceIds={flippedPieceIds}
                 canDrag={isArrangeMode}
                 onSelect={(id, shift) => dispatch(shift ? togglePieceSelection(id) : selectPiece(id))}
@@ -839,7 +841,6 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
           <Sew3DTool
             pieces={pieces}
             placements={garmentPlacements}
-            arrangementOverrides={arrangementOverrides}
             flippedPieceIds={flippedPieceIds}
           />
         )}
@@ -852,7 +853,6 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
             seams={seams}
             pieces={pieces}
             placements={garmentPlacements}
-            arrangementOverrides={arrangementOverrides}
             flippedPieceIds={flippedPieceIds}
           />
         )}

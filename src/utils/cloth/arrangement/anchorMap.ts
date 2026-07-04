@@ -279,3 +279,18 @@ export function buildAnchorMap(
   }
   return { rings, points: rings.flatMap((r) => r.points) };
 }
+
+// ─── Registry ────────────────────────────────────────────────────────────────
+// Mismo patrón module-singleton que penetrationMetric: AnchorPoints registra
+// el mapa que construyó (async, del bake); el tool del copilot lo lee — y si
+// no hay, construye el suyo on-demand. Un solo mapa vivo por sesión.
+
+let liveMap: AnchorMap | null = null;
+
+export function registerAnchorMap(map: AnchorMap | null): void {
+  liveMap = map;
+}
+
+export function getAnchorMap(): AnchorMap | null {
+  return liveMap;
+}

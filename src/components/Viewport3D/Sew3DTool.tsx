@@ -120,11 +120,10 @@ function PiecePickMesh({ piece, position, rotation, flipped, onPointerMove, onCl
 interface Sew3DToolProps {
   pieces: PatternPiece[];
   placements: { position: [number, number, number]; rotation: [number, number, number] }[];
-  arrangementOverrides: Record<string, [number, number, number]>;
   flippedPieceIds: string[];
 }
 
-export default function Sew3DTool({ pieces, placements, arrangementOverrides, flippedPieceIds }: Sew3DToolProps) {
+export default function Sew3DTool({ pieces, placements, flippedPieceIds }: Sew3DToolProps) {
   const dispatch = useDispatch<AppDispatch>();
   const seams = useSelector((s: RootState) => s.project.seams);
   // Seam construction type — shared option surface for the seam tool family
@@ -241,11 +240,11 @@ export default function Sew3DTool({ pieces, placements, arrangementOverrides, fl
     const idx = pieces.findIndex(p => p.id === pieceId);
     if (idx === -1) return null;
     const piece = pieces[idx];
-    const pos = arrangementOverrides[pieceId] || placements[idx]?.position || [0, 0, 0] as [number, number, number];
+    const pos = placements[idx]?.position || [0, 0, 0] as [number, number, number]; // placements ya resueltos
     const rot = placements[idx]?.rotation;
     const flipped = flippedPieceIds.includes(pieceId);
     return { piece, pos, rot, flipped };
-  }, [pieces, placements, arrangementOverrides, flippedPieceIds]);
+  }, [pieces, placements, flippedPieceIds]);
 
   // Build highlight rotation for a piece (shared with SeamRenderer3D via
   // edgePicker.pieceHighlightRotation so the transforms can't drift apart).
@@ -265,7 +264,7 @@ export default function Sew3DTool({ pieces, placements, arrangementOverrides, fl
       {/* Invisible pick meshes for each piece */}
       {activePiecesWithEdges.map((piece) => {
         const idx = pieces.indexOf(piece);
-        const pos = arrangementOverrides[piece.id] || placements[idx]?.position || [0, 0, 0] as [number, number, number];
+        const pos = placements[idx]?.position || [0, 0, 0] as [number, number, number]; // placements ya resueltos
         const rot = placements[idx]?.rotation;
         const flipped = flippedPieceIds.includes(piece.id);
         return (

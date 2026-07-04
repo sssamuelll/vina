@@ -26,7 +26,7 @@ import {
   hideAll3D,
   toggleFlipNormal,
 } from '../../../../store/simulationSlice';
-import { updatePiece, setArrangement3D, clearArrangementOverrides } from '../../../../store/projectSlice';
+import { updatePiece, setArrangement3D, setArrangementBinding, clearArrangementOverrides } from '../../../../store/projectSlice';
 import type { FitMapMode } from '../../../../utils/cloth/fitMaps';
 import type { InterfacingType } from '../../../../types/types';
 import { FABRIC_LIBRARY } from '../../../../utils/cloth/fabricLibrary';
@@ -548,7 +548,12 @@ const reset3DArrangementTool: ToolDefinition = {
       return {
         success: true,
         data: { pieceId, resetPosition: [0, 0, 0] },
-        rollback: () => { if (prevPos) dispatch(setArrangement3D({ pieceId, position: prevPos })); },
+        rollback: () => {
+          if (!prevPos) return;
+          // Contrato: el override previo puede ser V3 legacy o binding frame-delta.
+          if (Array.isArray(prevPos)) dispatch(setArrangement3D({ pieceId, position: prevPos }));
+          else dispatch(setArrangementBinding({ pieceId, binding: prevPos }));
+        },
       };
     }
     const prevOverrides = { ...getState().project.arrangementOverrides };

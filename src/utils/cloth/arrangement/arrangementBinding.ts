@@ -21,11 +21,17 @@ export interface ArrangementBinding {
   space: 'frame';
   posDelta: V3;                                  // in the auto frame's local basis
   rotDelta: [number, number, number, number];    // quaternion relative to the auto frame
+  /** Proveniencia del contrato de colocación (consejo 2026-07-03): el anchor
+   *  point elegido (`region.ringN.bearing`), escrito por el click del humano
+   *  o el tool del agente. Hoy informativo; la re-resolución contra el mapa
+   *  vivo (anchor-tracking) es follow-up con nombre. */
+  anchorId?: string;
 }
 
 export type ArrangementOverride = ArrangementBinding | V3;
 
-function isBinding(o: ArrangementOverride): o is ArrangementBinding {
+/** Guard del contrato: V3 legacy (array) vs binding frame-delta (objeto). */
+export function isBinding(o: ArrangementOverride): o is ArrangementBinding {
   return !Array.isArray(o) && (o as ArrangementBinding).space === 'frame';
 }
 
