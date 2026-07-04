@@ -11,19 +11,20 @@
  *      (no clamp) while w/r < thetaMax;
  *  (b) the wrap is an isometry: adjacent-vertex distances pre-wrap ≈ post-wrap;
  *  (c) the synthetic María sleeve (panel 381mm, armR 50mm) clamps ≤5% of verts;
- *  (d) the real María collar's clamped coverage drops vs the old φ = w/R.
+ *  (d) the real María collar clamps ~0% under the collar wrap (was 44.2% under
+ *      DEFAULT_WRAP's 150° cap — the "knot at the neckline", plan item 3).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import * as THREE from 'three';
 import { wrapPanel } from '../wrapPanel';
-import { wrapParamsForRegion, DEFAULT_WRAP, MAX_SLEEVE_WRAP } from '../wrapParams';
+import { wrapParamsForRegion, DEFAULT_WRAP, MAX_SLEEVE_WRAP, MAX_COLLAR_WRAP } from '../wrapParams';
 import { surfaceFrame, type SurfaceFrame } from '../surfaceFrame';
 import { importDXFContent } from '../../../dxf';
 import { classifyPiecesGeometric } from '../../../geometricClassifier';
 import { detectSemanticEdges } from '../../../semanticEdges';
-import { computeEffectiveRegions, deriveDimensions } from '../../garmentPlacement';
+import { computeEffectiveRegions, deriveDimensions, outlineBBox } from '../../garmentPlacement';
 import { meshPiece } from '../../../mesh';
 import type { BodyMeasurements, PatternPiece } from '../../../../types/types';
 
@@ -104,7 +105,7 @@ describe('wrap isometry (§6bis fix)', () => {
     expect(clampedOld / total).toBeGreaterThan(0.1);
   });
 
-  it("(d) María's real collar: clamped coverage drops under the isometric φ", () => {
+  it("(d) María's real collar: ~0% clamped under the collar wrap (was 44.2% with DEFAULT_WRAP)", () => {
     const pieces = importDXFContent(readFileSync(MARIA_FIXTURE, 'utf-8'), { unit: 'auto', autoDetect: true }).pieces;
     const map = classifyPiecesGeometric(pieces);
     for (const p of pieces as PatternPiece[]) {
@@ -118,26 +119,31 @@ describe('wrap isometry (§6bis fix)', () => {
 
     const d = deriveDimensions(MARIA_MEAS);
     const frame = surfaceFrame('collar', d);
+    // Production panel width: outline bbox width in metres (arrangementBinding).
+    // Verified circumferential for María's collar: bbox 456×40.9mm.
+    const panelWidth = outlineBBox(pieces[collarIdx].outline).width * 0.001;
+    const params = wrapParamsForRegion('collar', frame, panelWidth);
+    expect(params.thetaMaxRad).toBeCloseTo(MAX_COLLAR_WRAP, 10);
     // Coarse mesh (15mm) — enough vertices for a stable clamped fraction.
     const mesh = meshPiece(pieces[collarIdx], {
       yHeight: 0, scale: 0.001, maxEdgeLength: 15, minAngle: 25, maxRefinementPasses: 3, curveResolution: 12,
     });
-    const half = DEFAULT_WRAP.thetaMaxRad / 2;
     const n = mesh.vertices.length / 3;
-    let clampedOld = 0; // φ = w / R (the bug)
-    let clampedNew = 0; // φ = w / (R + gap) (isometric)
+    const halfDefault = DEFAULT_WRAP.thetaMaxRad / 2;
+    const halfNow = params.thetaMaxRad / 2;
+    let clampedDefault = 0; // isometric φ but DEFAULT_WRAP (150° cap) — pre-fix state
+    let clampedNow = 0;     // collar wrap: 330° cap + panel-derived radius
     for (let i = 0; i < mesh.vertices.length; i += 3) {
       const w = mesh.vertices[i]; // mesher-local +X = circumference width
-      if (Math.abs(w / frame.radius) > half) clampedOld++;
-      if (Math.abs(w / (frame.radius + DEFAULT_WRAP.gap)) > half) clampedNew++;
+      if (Math.abs(w / (frame.radius + DEFAULT_WRAP.gap)) > halfDefault) clampedDefault++;
+      if (Math.abs(w / (frame.radius + params.gap)) > halfNow + 1e-9) clampedNow++;
     }
-    const before = clampedOld / n;
-    const after = clampedNew / n;
-    console.log(`[collar coverage] clamped before (φ=w/R): ${(before * 100).toFixed(1)}% → after (φ=w/(R+gap)): ${(after * 100).toFixed(1)}% (n=${n})`);
-    // The diagnosis measured ~59% clamped under the old φ; the isometric φ
-    // must strictly reduce it (the collar keeps DEFAULT_WRAP's 150° cap —
-    // full de-clamping is the collar's own follow-up treatment).
+    const before = clampedDefault / n;
+    const after = clampedNow / n;
+    console.log(`[collar coverage] clamped DEFAULT_WRAP (150°): ${(before * 100).toFixed(1)}% → collar wrap (330°, panel-derived r): ${(after * 100).toFixed(1)}% (n=${n})`);
+    // Historical contrast: DEFAULT_WRAP clamped 44.2% of the band onto the ±75°
+    // lines (the neckline "knot"). The panel-derived collar wrap must uncap it.
     expect(before).toBeGreaterThan(0.4);
-    expect(after).toBeLessThan(before);
+    expect(after).toBeLessThanOrEqual(0.05); // in fact 0 — coverage = exactly 330°
   });
 });
