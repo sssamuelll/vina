@@ -31,6 +31,7 @@ import { outlineBBoxCenter } from '../cloth/garmentPlacement';
 import type { PlacementWithFrame } from '../cloth/arrangement/arrangementBinding';
 import { wrapPlacedMesh } from '../cloth/arrangement/wrapPlacedMesh';
 import { flattenPath, commandRangeToFlattened } from '../seam/index';
+import { mirrorPctRange } from '../seam/seamRange';
 
 type V3 = [number, number, number];
 
@@ -159,19 +160,30 @@ export function refineSeamsInWorld(
     if (!pa || !pb) return null;
     const tOf = (h: { tStart?: number; tEnd?: number }): [number, number] | undefined =>
       h.tStart != null || h.tEnd != null ? [h.tStart ?? 0, h.tEnd ?? 1] : undefined;
-    const aWorld = edgeWorld(pa.piece, pa.placement, seam.pieceA.edgeName, tOf(seam.pieceA));
-    const bWorld = edgeWorld(pb.piece, pb.placement, seam.pieceB.edgeName, tOf(seam.pieceB));
+    // FÍSICO, no almacenado (bug reversed×rango 2026-07-04): el rango del
+    // half B se almacena en dirección de COSIDO (seamRange header) — para
+    // MEDIR geometría hay que des-espejarlo cuando el input trae
+    // reversed=true. Las halves internas cargan el rango FÍSICO; la emisión
+    // (paso 2) re-espeja según el reversed FINAL. Sin esto, worldRefine
+    // seteaba reversed sin tocar el rango y el solver cosía la mitad física
+    // equivocada: las dos medias de la sisa reclamaban la MISMA mitad del
+    // cap y la otra quedaba desnuda (esquinas de 9-13cm medidas).
+    const rangeA = tOf(seam.pieceA); // A nunca lleva reversed: almacenado ≡ físico
+    const rangeB0 = tOf(seam.pieceB);
+    const rangeB = seam.pieceB.reversed === true && rangeB0 ? mirrorPctRange(rangeB0) : rangeB0;
+    const aWorld = edgeWorld(pa.piece, pa.placement, seam.pieceA.edgeName, rangeA);
+    const bWorld = edgeWorld(pb.piece, pb.placement, seam.pieceB.edgeName, rangeB);
     if (!aWorld || !bWorld) return null;
 
     const keyA = `${pa.piece.category ?? '?'}:${edgeRoot(seam.pieceA.edgeName)}`;
     const keyB = `${pb.piece.category ?? '?'}:${edgeRoot(seam.pieceB.edgeName)}`;
     const halfA: SeamHalf = {
       pieceId: seam.pieceA.pieceId, edgeName: seam.pieceA.edgeName,
-      tStart: seam.pieceA.tStart, tEnd: seam.pieceA.tEnd,
+      tStart: rangeA?.[0], tEnd: rangeA?.[1],
     };
     const halfB: SeamHalf = {
       pieceId: seam.pieceB.pieceId, edgeName: seam.pieceB.edgeName,
-      tStart: seam.pieceB.tStart, tEnd: seam.pieceB.tEnd,
+      tStart: rangeB?.[0], tEnd: rangeB?.[1],
     };
 
     const aIsX = keyA < keyB || (keyA === keyB && seam.pieceA.pieceId <= seam.pieceB.pieceId);
@@ -224,11 +236,23 @@ export function refineSeamsInWorld(
     const y = assignedY.get(i) ?? r.y;
     const straight = dist(r.x.world.first, y.world.first) + dist(r.x.world.last, y.world.last);
     const crossed = dist(r.x.world.first, y.world.last) + dist(r.x.world.last, y.world.first);
+    const reversed = crossed < straight;
+
+    // Las halves internas cargan rangos FÍSICOS (ver ingesta). El half B se
+    // almacena en dirección de COSIDO: si reversed queda true, se espeja al
+    // emitir (mirrorPctRange — el único definidor del espejo). Idempotente:
+    // re-refinar des-espeja en la ingesta y re-espeja aquí.
+    const yStored = reversed && y.half.tStart != null && y.half.tEnd != null
+      ? (() => {
+          const [s, e] = mirrorPctRange([y.half.tStart!, y.half.tEnd!]);
+          return { ...y.half, tStart: s, tEnd: e };
+        })()
+      : y.half;
 
     return {
       ...seam,
       pieceA: { ...r.x.half },
-      pieceB: { ...y.half, reversed: crossed < straight },
+      pieceB: { ...yStored, reversed },
     };
   });
 }

@@ -52,6 +52,20 @@ function armholeHalf(s: Seam): Seam['pieceA'] {
   return /^armhole/i.test(s.pieceA.edgeName.replace(/-\d+$/, '')) ? s.pieceA : s.pieceB;
 }
 
+/**
+ * Rango FÍSICO (dirección del outline) del lado cap: el almacenado del half B
+ * va en dirección de COSIDO (seamRange header) — si el cap quedó como pieceB
+ * con reversed=true, hay que des-espejarlo. La versión anterior de este test
+ * asertaba lo ALMACENADO y era ciega al bug reversed×rango (las dos medias
+ * cosían la misma mitad física del cap).
+ */
+function capPhysicalRange(s: Seam): [number, number] {
+  const cap = capHalf(s);
+  const stored: [number, number] = [cap.tStart ?? 0, cap.tEnd ?? 1];
+  const rev = cap === s.pieceB && s.pieceB.reversed === true;
+  return rev ? [1 - stored[1], 1 - stored[0]] : stored;
+}
+
 describe('sisaSplit — el cap de cada manga se cose a los DOS armholes (delantero + espalda)', () => {
   it('María: 4 medias costuras de sisa (2 por manga), con rangos complementarios y armholes en piezas distintas', () => {
     const pieces = importMariaClassified();
@@ -78,9 +92,11 @@ describe('sisaSplit — el cap de cada manga se cose a los DOS armholes (delante
     for (const [sleeveId, seams] of bySleeve) {
       expect(seams.length, `manga ${sleeveId}: dos medias costuras`).toBe(2);
 
-      // Rangos complementarios en el lado del cap: [0,0.5] + [0.5,1]
+      // Rangos FÍSICOS complementarios en el lado del cap: [0,0.5] + [0.5,1]
+      // (la unión debe ser el anillo COMPLETO — con el bug reversed×rango
+      // ambas medias daban la misma mitad física y esto fallaba).
       const ranges = seams
-        .map(s => [capHalf(s).tStart ?? 0, capHalf(s).tEnd ?? 1] as [number, number])
+        .map(capPhysicalRange)
         .sort((a, b) => a[0] - b[0]);
       expect(ranges[0][0]).toBeCloseTo(0, 5);
       expect(ranges[0][1]).toBeCloseTo(0.5, 5);
