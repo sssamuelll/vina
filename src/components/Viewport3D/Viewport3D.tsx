@@ -90,7 +90,7 @@ class Viewport3DErrorBoundary extends Component<{ children: ReactNode }, { hasEr
   }
 }
 
-const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
+const PIECE_COLORS = ['#e6e0f8', '#dcece2', '#f4e4d9', '#dfe9f6', '#f2e0e8']; // pasteles con hue (lavanda/salvia/durazno/cielo/rosa) — refresh 2026-07-04
 
 // Scratch vectors for custom pan — avoids allocations in pointermove hot path
 const _panRight = new THREE.Vector3();

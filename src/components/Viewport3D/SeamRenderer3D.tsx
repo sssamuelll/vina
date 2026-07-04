@@ -27,6 +27,7 @@
 
 import { useMemo } from 'react';
 import * as THREE from 'three';
+import { seamThreadColor } from '../../utils/colors/seamPalette';
 import type { PatternPiece, Seam } from '../../types/types';
 import type { PlacementResult } from '../../utils/cloth/garmentPlacement';
 import { pieceHighlightRotation } from '../../utils/3d/edgePicker';
@@ -130,7 +131,10 @@ export default function SeamRenderer3D({
       );
       if (!ptsA || !ptsB) continue;
 
-      color.set(seamColor(seam.createdBy));
+      // Identidad por-seam (paleta hash-estable) + proveniencia como
+      // saturación (IA = hue pálido "revísame", humano = pleno). El viejo
+      // ámbar/verde global (seamColor) queda para superficies no-hilo.
+      color.set(seamThreadColor(seam.id, seam.createdBy));
       for (let i = 0; i < ptsA.length; i++) {
         positions.push(ptsA[i].x, ptsA[i].y, ptsA[i].z, ptsB[i].x, ptsB[i].y, ptsB[i].z);
         colors.push(color.r, color.g, color.b, color.r, color.g, color.b);

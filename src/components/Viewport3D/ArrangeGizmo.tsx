@@ -48,7 +48,7 @@ const AXIS_COLOR: Record<'x' | 'y' | 'z', string> = {
   z: '#5fb0ff',
 };
 const HOVER_COLOR = '#ffffff';
-const CENTER_COLOR = '#f5d90a';
+const CENTER_COLOR = '#e2e8f0'; // blanco pizarra (el amarillo murió con el resto, 2026-07-04)
 
 /** Punto de la línea (p, dir a) más cercano al rayo (o, d). */
 function closestPointOnAxis(
@@ -223,7 +223,7 @@ export default function ArrangeGizmo({
       >
         <sphereGeometry args={[size * 0.11, 20, 14]} />
         <meshBasicMaterial
-          color={hover === 'center' ? HOVER_COLOR : CENTER_COLOR}
+          color={hover === 'center' ? '#8b7cf8' : CENTER_COLOR}
           depthTest={false}
           depthWrite={false}
           transparent

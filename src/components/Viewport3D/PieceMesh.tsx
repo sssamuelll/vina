@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
+import { SELECTION_ACCENT, mixHex } from '../../utils/colors/seamPalette';
 import { Html } from '@react-three/drei';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
@@ -139,15 +140,21 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
     return [0, -(piece.rotation ?? 0) * Math.PI / 180, 0];
   }, [placementRotation, piece.rotation]);
 
-  // Color priority: selected=gold > fabric > category
-  const meshColor = isSelected ? '#ffd700' : (fabricColor || getCategoryColor(piece.category));
+  // La pieza conserva SU color siempre (fabric > categoría); la selección es
+  // un GLOW de acento (emissive), no un reemplazo plano — el oro #ffd700
+  // mataba la identidad de la pieza (pedido Samuel 2026-07-04).
+  const baseColor = fabricColor || getCategoryColor(piece.category);
+  // Selección legible sobre pasteles: tinte hacia el acento + glow + borde.
+  const meshColor = isSelected ? mixHex(baseColor, SELECTION_ACCENT, 0.38) : baseColor;
   const roughness = fabricRoughness ?? 0.7;
   if (!geometry) return null;
 
   const isWireMode = surfaceMode === 'mesh' || surfaceMode === 'xray'
     || surfaceMode === 'shaded-wire' || surfaceMode === 'textured-wire';
   const showSolid = surfaceMode !== 'mesh';
-  const showWireframe = isWireMode;
+  // Borde de acento SIEMPRE que hay selección (el glow solo no se lee sobre
+  // los tintes pastel — visto en las capturas del workflow-demo).
+  const showWireframe = isWireMode || isSelected;
 
   let solidOpacity = 1.0;
   let useEmissiveOnly = false;
@@ -176,8 +183,12 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
             opacity={solidOpacity}
             roughness={useEmissiveOnly ? 1 : roughness}
             metalness={0}
-            emissive={useEmissiveOnly ? meshColor : undefined}
-            emissiveIntensity={useEmissiveOnly ? 1 : 0}
+            emissive={
+              isSelected
+                ? (useEmissiveOnly ? mixHex(meshColor, SELECTION_ACCENT, 0.5) : SELECTION_ACCENT)
+                : (useEmissiveOnly ? meshColor : undefined)
+            }
+            emissiveIntensity={useEmissiveOnly ? 1 : isSelected ? 0.3 : 0}
             map={stripTextures ? null : undefined}
             normalMap={stripTextures ? null : undefined}
             roughnessMap={stripTextures ? null : undefined}
@@ -188,10 +199,10 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
       {showWireframe && (
         <mesh geometry={geometry}>
           <meshBasicMaterial
-            color={surfaceMode === 'mesh' ? meshColor : '#888888'}
+            color={isSelected ? SELECTION_ACCENT : surfaceMode === 'mesh' ? meshColor : '#888888'}
             wireframe
             transparent
-            opacity={surfaceMode === 'mesh' ? 0.8 : 0.3}
+            opacity={isSelected ? 0.55 : surfaceMode === 'mesh' ? 0.8 : 0.3}
           />
         </mesh>
       )}
