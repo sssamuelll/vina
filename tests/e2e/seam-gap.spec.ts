@@ -39,6 +39,8 @@ interface SeamGapRow {
   maxM: number;
   /** 5 muestras de distancia a lo largo de la costura (t=0,.25,.5,.75,1). */
   profile: number[];
+  /** Pares con distancia >3cm: índice + posiciones mundo (diagnóstico de huecos). */
+  openPairs: Array<{ k: number; d: number; a: number[]; b: number[] }>;
 }
 
 async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
@@ -81,7 +83,20 @@ async function measureSeams(page: Page): Promise<SeamGapRow[]> {
       const profile = n
         ? [0, 0.25, 0.5, 0.75, 1].map(t => dists[Math.min(n - 1, Math.round(t * (n - 1)))])
         : [];
-      return { id: s.id, label: `${s.edgeA} ↔ ${s.edgeB}`, pairs: n, meanM: n ? sum / n : 0, maxM: max, profile };
+      // Pares ABIERTOS (>3cm): índice + posiciones mundo de ambos extremos —
+      // localiza el hueco visible (hombro vs axila) sin adivinar.
+      const openPairs: Array<{ k: number; d: number; a: number[]; b: number[] }> = [];
+      for (let k = 0; k < n; k++) {
+        if (dists[k] <= 0.03) continue;
+        const a = s.globalPairs[2 * k] * 3, b = s.globalPairs[2 * k + 1] * 3;
+        openPairs.push({
+          k,
+          d: dists[k],
+          a: [pos[a], pos[a + 1], pos[a + 2]],
+          b: [pos[b], pos[b + 1], pos[b + 2]],
+        });
+      }
+      return { id: s.id, label: `${s.edgeA} ↔ ${s.edgeB}`, pairs: n, meanM: n ? sum / n : 0, maxM: max, profile, openPairs };
     });
   });
 }
@@ -163,7 +178,15 @@ test(`seam-gap: residual de cierre por costura (tether ${TETHER_OFF ? 'OFF' : 'O
     expect(rows.length, 'seam debug publicado').toBeGreaterThanOrEqual(6);
 
     console.log(`\n[seam-gap ${TETHER_OFF ? 'tether-OFF' : 'tether-ON'}] ${name}:`);
-    for (const r of rows) console.log(`  ${fmt(r)}${isSisa(r) ? '   ← SISA' : ''}`);
+    for (const r of rows) {
+      console.log(`  ${fmt(r)}${isSisa(r) ? '   ← SISA' : ''}`);
+      if (name === 't≈10s') {
+        for (const p of r.openPairs) {
+          const f = (v: number[]) => `(${v.map(x => x.toFixed(3)).join(',')})`;
+          console.log(`    OPEN k=${p.k}/${r.pairs} d=${(p.d * 100).toFixed(1)}cm A=${f(p.a)} B=${f(p.b)}`);
+        }
+      }
+    }
 
     for (const r of rows.filter(isSisa)) {
       expect(r.pairs, `${r.label} tiene pares`).toBeGreaterThan(0);
