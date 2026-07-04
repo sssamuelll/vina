@@ -71,7 +71,11 @@ function resolveArrangementCore(
   //   Important-2: detectBodyRegion toggle state (_sleeveToggle/_cuffToggle) was
   //     not reset before per-piece calls, producing non-deterministic L/R
   //     assignment for side-less sleeve/cuff pairs across the two paths.
-  const autoPlacements = placeGarmentPieces(pieces, measurements);
+  // axisHints (tilt A-pose): the batch uses the SAME hinted frames the
+  // override branch and the wrap already used — sleeve cards lean along the
+  // real arm. Same skeleton gating as everywhere else in this file.
+  const hints = opts?.skeletonReady === false ? undefined : opts?.axisHints;
+  const autoPlacements = placeGarmentPieces(pieces, measurements, { axisHints: hints });
   // Region lock (consejo 2026-07-03, cierre del bug latente que este archivo
   // documentaba): el branch de binding usa las MISMAS regiones deterministas
   // que placeGarmentPieces asignó — nunca un detectBodyRegion fresco cuyo
@@ -92,8 +96,7 @@ function resolveArrangementCore(
     // Frame-delta compose: posDelta in the frame basis, rotDelta relative to the frame.
     // Skeleton not ready → ignore bone axis hints, use the parametric default.
     const region = effRegions[i];
-    const axisHint = opts?.skeletonReady === false ? undefined : opts?.axisHints?.[p.id];
-    const { frame } = computeAutoFrame(region, measurements, pieceGeometryOf(p), axisHint);
+    const { frame } = computeAutoFrame(region, measurements, pieceGeometryOf(p), hints?.[p.id]);
 
     const n = new THREE.Vector3(...frame.normal).normalize();
     const t = new THREE.Vector3(...frame.tangent).normalize();
