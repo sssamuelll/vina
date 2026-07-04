@@ -10,6 +10,8 @@ import { updatePiece, addSeam, removeSeam } from '../../../../store/projectSlice
 import type { Seam, CornerType } from '../../../../types/types';
 import { DEFAULT_SEAM_TENSION, DEFAULT_SEAM_STRENGTH } from '../../../../utils/defaults';
 import { newId } from '../../../../utils/ids';
+import { applyPctRange } from '../../../../utils/seam/seamRange';
+import { CreateSeamSchema } from '../validation';
 
 // ─── setSeamAllowance ───────────────────────────────────────────────────────
 
@@ -101,7 +103,11 @@ const createSeamTool: ToolDefinition = {
   description:
     'Connect two named edges from different pieces with a seam (costura). ' +
     'Use edge names like "armhole", "sideSeam", "hemline", "shoulder". ' +
-    '/ Conectar dos bordes nombrados de diferentes piezas con una costura.',
+    'Optional rangeA/rangeB = [startPercent, endPercent] (0–100) sew only that span of the edge ' +
+    '(CLO3D-style seam extents); omit them to sew the full edges. Percent positions are matched ' +
+    'across halves, so use the same or nested spans for partial sewing. ' +
+    '/ Conectar dos bordes nombrados de diferentes piezas con una costura. rangeA/rangeB opcionales ' +
+    '= [inicio%, fin%] (0–100) cosen solo esa porción del borde; omítelos para coser el borde completo.',
   parameters: {
     type: 'object',
     properties: {
@@ -114,9 +120,20 @@ const createSeamTool: ToolDefinition = {
         enum: ['standard', 'french', 'flat-felled', 'overlock'],
         description: 'Seam type / Tipo de costura',
       },
+      rangeA: {
+        type: 'array',
+        items: { type: 'number' },
+        description: 'Optional [startPercent, endPercent] (0–100) sewn span of edge A / porción cosida del borde A en %',
+      },
+      rangeB: {
+        type: 'array',
+        items: { type: 'number' },
+        description: 'Optional [startPercent, endPercent] (0–100) sewn span of edge B / porción cosida del borde B en %',
+      },
     },
     required: ['pieceAId', 'edgeAName', 'pieceBId', 'edgeBName'],
   },
+  schema: CreateSeamSchema,
   execute: async (params, dispatch, getState): Promise<ToolResult> => {
     const state = getState();
     const pieceA = state.project.pieces.find(p => p.id === params.pieceAId);
@@ -134,11 +151,22 @@ const createSeamTool: ToolDefinition = {
     if (!edgeA) return { success: false, error: `Edge "${edgeAName}" not found on piece "${pieceA.name}". Available: ${pieceA.edges?.map(e => e.name).join(', ') || 'none (run detectEdges first)'}` };
     if (!edgeB) return { success: false, error: `Edge "${edgeBName}" not found on piece "${pieceB.name}". Available: ${pieceB.edges?.map(e => e.name).join(', ') || 'none (run detectEdges first)'}` };
 
+    const rangeA = params.rangeA as [number, number] | undefined;
+    const rangeB = params.rangeB as [number, number] | undefined;
+
     const seamId = newId();
+    // Full range → NO tStart/tEnd fields (applyPctRange normalizes) — the
+    // Seam convention: sub-range fields only when a real sub-range exists.
     const seam: Seam = {
       id: seamId,
-      pieceA: { pieceId: params.pieceAId as string, edgeName: edgeAName, tStart: 0, tEnd: 1 },
-      pieceB: { pieceId: params.pieceBId as string, edgeName: edgeBName, tStart: 0, tEnd: 1 },
+      pieceA: applyPctRange(
+        { pieceId: params.pieceAId as string, edgeName: edgeAName },
+        rangeA?.[0] ?? 0, rangeA?.[1] ?? 100,
+      ),
+      pieceB: applyPctRange(
+        { pieceId: params.pieceBId as string, edgeName: edgeBName },
+        rangeB?.[0] ?? 0, rangeB?.[1] ?? 100,
+      ),
       type: (params.seamType as Seam['type']) || 'standard',
       tension: DEFAULT_SEAM_TENSION,
       strength: DEFAULT_SEAM_STRENGTH,

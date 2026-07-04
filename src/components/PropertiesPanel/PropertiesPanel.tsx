@@ -120,6 +120,8 @@ export default function PropertiesPanel() {
               seam={selectedSeam}
               pieceAName={pieces.find(p => p.id === selectedSeam.pieceA.pieceId)?.name || '?'}
               pieceBName={pieces.find(p => p.id === selectedSeam.pieceB.pieceId)?.name || '?'}
+              edgeALengthMm={pieces.find(p => p.id === selectedSeam.pieceA.pieceId)?.edges?.find(e => e.name === selectedSeam.pieceA.edgeName)?.length}
+              edgeBLengthMm={pieces.find(p => p.id === selectedSeam.pieceB.pieceId)?.edges?.find(e => e.name === selectedSeam.pieceB.edgeName)?.length}
               collapsed={!!collapsedSections['seam-props']}
               onToggle={toggleSection}
             />

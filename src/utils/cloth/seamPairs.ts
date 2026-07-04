@@ -36,6 +36,7 @@
  */
 
 import type { PathCommand } from '../../types/types';
+import { renormalizeFilteredT } from '../seam/seamRange';
 import type { SeamInitData } from './clothWorker';
 import {
   parameterizeEdge,
@@ -302,13 +303,15 @@ function resolveSeamVertexPairs(
         reversedB,
       );
 
+  // Filtro + RENORMALIZACIÓN de t al sub-rango (espejo exacto de
+  // seamAssembly.ts — renormalizeFilteredT; los tiers no pueden divergir).
   if (seam.pieceARange) {
     const [t0, t1] = seam.pieceARange;
-    edgeA = edgeA.filter(v => v.t >= t0 && v.t <= t1);
+    edgeA = renormalizeFilteredT(edgeA.filter(v => v.t >= t0 && v.t <= t1), t0, t1);
   }
   if (seam.pieceBRange) {
     const [t0, t1] = seam.pieceBRange;
-    edgeB = edgeB.filter(v => v.t >= t0 && v.t <= t1);
+    edgeB = renormalizeFilteredT(edgeB.filter(v => v.t >= t0 && v.t <= t1), t0, t1);
   }
 
   const vertexPairs = matchVertices(edgeA, edgeB) as Array<[LocalVertexIndex, LocalVertexIndex]>;

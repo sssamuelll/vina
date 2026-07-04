@@ -20,7 +20,9 @@ import {
 } from '../../../../store/projectSlice';
 import type { SeamGroup } from '../../../../types/types';
 import { DEFAULT_SEAM_TENSION, DEFAULT_SEAM_STRENGTH } from '../../../../utils/defaults';
+import { applyPctRange } from '../../../../utils/seam/seamRange';
 import { uid } from '../../../../utils/pathHelpers';
+import { SetSeamRangeSchema } from '../validation';
 
 // ─── setSeamTension ──────────────────────────────────────────────────────────
 
@@ -76,78 +78,63 @@ const setSeamTensionTool: ToolDefinition = {
 const setSeamRangeTool: ToolDefinition = {
   name: 'setSeamRange',
   description:
-    'Set the parametric range [tStart, tEnd] on one side (A or B) of a seam. ' +
-    'CURRENTLY only the full range [0, 1] is accepted: partial-edge sewing is deferred ' +
-    'until the solver renormalizes filtered t-values (un-renormalized sub-ranges pair the ' +
-    'wrong vertices and twist the garment). Use full-edge seams instead. ' +
-    '/ Establecer el rango paramétrico [tStart, tEnd] en un lado (A o B) de una costura. ' +
-    'ACTUALMENTE solo se acepta el rango completo [0, 1]: el cosido parcial está diferido ' +
-    'hasta que el solver renormalice los t filtrados. Usa costuras de borde completo.',
+    'Set how much of each edge a seam sews, as [startPercent, endPercent] of the edge (0–100) — ' +
+    'CLO3D-style seam extents. Example: rangeA [0, 40] sews only the first 40% of edge A. ' +
+    'Percents are measured along the SEWING direction (a reversed B half counts from its sewing start). ' +
+    'Vertices are paired at equal percent positions across the two halves (A\'s 30% sews to B\'s 30%), ' +
+    'so give both halves the same or nested spans for partial sewing. [0, 100] = full edge. ' +
+    'Omit a range to leave that half unchanged. ' +
+    '/ Establecer qué porcentaje de cada borde cose la costura, como [inicio%, fin%] (0–100) — ' +
+    'los extents de costura de CLO3D. Los vértices se emparejan en posiciones porcentuales iguales ' +
+    'entre las dos mitades; usa rangos iguales o anidados para cosido parcial. [0, 100] = borde completo. ' +
+    'Omite un rango para no tocar esa mitad.',
   parameters: {
     type: 'object',
     properties: {
       seamId: { type: 'string', description: 'Seam ID / ID de la costura' },
-      side: {
-        type: 'string',
-        enum: ['A', 'B'],
-        description: 'Which side of the seam to modify / Qué lado de la costura modificar',
+      rangeA: {
+        type: 'array',
+        items: { type: 'number' },
+        description: '[startPercent, endPercent] (0–100) sewn span of edge A / porción cosida del borde A en %',
       },
-      tStart: {
-        type: 'number',
-        description: 'Start of the range (0–1) / Inicio del rango (0–1)',
-      },
-      tEnd: {
-        type: 'number',
-        description: 'End of the range (0–1) / Fin del rango (0–1)',
+      rangeB: {
+        type: 'array',
+        items: { type: 'number' },
+        description: '[startPercent, endPercent] (0–100) sewn span of edge B, along the sewing direction / porción cosida del borde B en %',
       },
     },
-    required: ['seamId', 'side', 'tStart', 'tEnd'],
+    required: ['seamId'],
   },
+  schema: SetSeamRangeSchema,
   execute: async (
     params: Record<string, unknown>,
     dispatch: AppDispatch,
     getState: () => RootState,
   ): Promise<ToolResult> => {
-    const state = getState();
-    const seam = state.project.seams.find(s => s.id === params.seamId);
-    if (!seam) return { success: false, error: `Seam "${params.seamId}" not found` };
+    const seamId = params.seamId as string;
+    const seam = getState().project.seams.find(s => s.id === seamId);
+    if (!seam) return { success: false, error: `Seam "${seamId}" not found` };
 
-    const side = params.side as 'A' | 'B';
-    const tStart = params.tStart as number;
-    const tEnd = params.tEnd as number;
-
-    if (tStart < 0 || tStart > 1 || tEnd < 0 || tEnd > 1) {
-      return { success: false, error: 'tStart and tEnd must be between 0 and 1' };
-    }
-    if (tStart >= tEnd) {
-      return { success: false, error: 'tStart must be less than tEnd' };
-    }
-    // Parity plan Fase 5 mitigation (§ 5 DEFER "partial-edge sewing"):
-    // dispatching a sub-range arms the solver bug — buildSeamConstraints
-    // filters vertices by t WITHOUT renormalizing, so a [0.3, 0.7] side
-    // matched against a full [0, 1] side pairs geometrically wrong
-    // vertices and twists the piece. Refuse honestly until the
-    // dispatch+renormalization pair lands together.
-    if (tStart !== 0 || tEnd !== 1) {
-      return {
-        success: false,
-        error:
-          'Partial-edge ranges are not supported yet: the solver does not renormalize ' +
-          'filtered t-values, so a sub-range seam would sew the wrong vertices and twist ' +
-          'the garment. Use the full range [0, 1] (full-edge seam) — partial-edge sewing ' +
-          'ships together with solver renormalization.',
-      };
+    const rangeA = params.rangeA as [number, number] | undefined;
+    const rangeB = params.rangeB as [number, number] | undefined;
+    if (!rangeA && !rangeB) {
+      // Also enforced by SetSeamRangeSchema; kept for direct callers.
+      return { success: false, error: 'Provide rangeA and/or rangeB' };
     }
 
-    const updatedSeam = side === 'A'
-      ? { ...seam, pieceA: { ...seam.pieceA, tStart, tEnd } }
-      : { ...seam, pieceB: { ...seam.pieceB, tStart, tEnd } };
-
+    const updatedSeam = {
+      ...seam,
+      pieceA: rangeA ? applyPctRange(seam.pieceA, rangeA[0], rangeA[1]) : seam.pieceA,
+      pieceB: rangeB ? applyPctRange(seam.pieceB, rangeB[0], rangeB[1]) : seam.pieceB,
+    };
     dispatch(updateSeam(updatedSeam));
 
     return {
       success: true,
-      data: { seamId: params.seamId, side, tStart, tEnd },
+      data: { seamId, rangeA: rangeA ?? null, rangeB: rangeB ?? null },
+      // Rollback: restore the pre-dispatch seam snapshot (Redux state is
+      // immutable — `seam` is the frozen previous object).
+      rollback: () => dispatch(updateSeam(seam)),
     };
   },
 };
