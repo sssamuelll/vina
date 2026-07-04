@@ -238,9 +238,11 @@ export function autoSew(
   const edgeRootOf = (n: string) => n.toLowerCase().replace(/-\d+$/, '');
   interface SeamSpec {
     cand: ScoredSeamCandidate;
-    /** Rango t del lado CAP ('A'|'B' de cand) — solo en medias costuras de sisa. */
-    capSide?: 'A' | 'B';
-    capRange?: [number, number];
+    /** Rangos t por lado (splits M:N de sisa/collar). Autorados en dirección
+     *  ORIGINAL del outline; worldRefine espeja el lado B si siembra
+     *  reversed (convención seamRange). */
+    rangeA?: [number, number];
+    rangeB?: [number, number];
   }
   const usedEdgeKeys = new Set(finalRanked.flatMap(s => [
     `${s.edgeA.pieceId}:${s.edgeA.edgeIndex}`,
@@ -280,12 +282,101 @@ export function autoSew(
     const secondArm = secondCapSide === 'A' ? second.edgeB : second.edgeA;
     usedEdgeKeys.add(`${secondArm.pieceId}:${secondArm.edgeIndex}`);
     splitExtras.push(second);
-    seamSpecs.push({ cand, capSide, capRange: [0, 0.5] });
-    seamSpecs.push({ cand: second, capSide: secondCapSide, capRange: [0.5, 1] });
+    seamSpecs.push({ cand, [capSide === 'A' ? 'rangeA' : 'rangeB']: [0, 0.5] as [number, number] });
+    seamSpecs.push({ cand: second, [secondCapSide === 'A' ? 'rangeA' : 'rangeB']: [0.5, 1] as [number, number] });
+  }
+
+  // ── Collar split pass (cosido de mundo real, 2026-07-04) ─────────────────
+  //
+  // El DXF real trae el neck edge del collar partido en DOS mitades cuyo
+  // junction cae en centro-FRONT del tubo envuelto y cuyos extremos libres
+  // caen en centro-back; el pipeline cosía cada mitad ENTERA a un neckline
+  // entero — pero cada mitad envuelve un COSTADO del cuello, y el neckline
+  // delantero (299.7mm en María) NO cabe en una mitad de collar (228mm):
+  // déficit del 24% físicamente imposible de cerrar (medido: el escote
+  // delantero quedaba medio abierto, max 13.3cm de piel). La construcción
+  // real corta en los HOMBROS: cada mitad de collar reparte su arco entre
+  // el neckline delantero y el trasero con f = FN/(FN+BN) (María: 0.578).
+  // Espejo del split de sisa — misma maquinaria de rangos; worldRefine
+  // reasigna mitades por geometría y siembra reversed (fix reversed×rango).
+  {
+    const collarIdx = seamSpecs
+      .map((sp, i) => ({ sp, i }))
+      .filter(({ sp }) => {
+        const rA = edgeRootOf(sp.cand.edgeA.name), rB = edgeRootOf(sp.cand.edgeB.name);
+        return (rA === 'collarneckedge' && rB === 'neckline') || (rB === 'collarneckedge' && rA === 'neckline');
+      });
+    if (collarIdx.length === 2) {
+      const info = collarIdx.map(({ sp, i }) => {
+        const collarIsA = edgeRootOf(sp.cand.edgeA.name) === 'collarneckedge';
+        return {
+          i,
+          base: sp.cand,
+          collar: collarIsA ? sp.cand.edgeA : sp.cand.edgeB,
+          neck: collarIsA ? sp.cand.edgeB : sp.cand.edgeA,
+        };
+      });
+      const [c1, c2] = info;
+      const sameCollarPiece = c1.collar.pieceId === c2.collar.pieceId
+        && c1.collar.edgeIndex !== c2.collar.edgeIndex;
+      const distinctNecks = c1.neck.pieceId !== c2.neck.pieceId;
+      if (sameCollarPiece && distinctNecks) {
+        // front/back por side de la pieza; fallback: el neckline MÁS LARGO
+        // es el delantero (los escotes delanteros bajan más).
+        const sideOf = (pid: string) => activePieces.find(p => p.id === pid)?.side;
+        const c1Front = sideOf(c1.neck.pieceId) === 'front'
+          || (sideOf(c1.neck.pieceId) == null && c1.neck.arcLength >= c2.neck.arcLength);
+        const front = c1Front ? c1 : c2;
+        const back = c1Front ? c2 : c1;
+        const f = front.neck.arcLength / (front.neck.arcLength + back.neck.arcLength);
+
+        // El extremo JUNCTION de cada mitad = el par de endpoints más
+        // cercano entre las dos mitades en 2D (comparten esquina del
+        // outline). La porción delantera de cada mitad arranca ahí.
+        const dj = (p: { x: number; y: number }, q: { x: number; y: number }) =>
+          Math.hypot(p.x - q.x, p.y - q.y);
+        const e1 = [c1.collar.start, c1.collar.end];
+        const e2 = [c2.collar.start, c2.collar.end];
+        let bi = 0, bj = 0, bd = Infinity;
+        for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+          const d = dj(e1[i], e2[j]);
+          if (d < bd) { bd = d; bi = i; bj = j; }
+        }
+        const portions = (junctionAtStart: boolean): { front: [number, number]; back: [number, number] } =>
+          junctionAtStart
+            ? { front: [0, f], back: [f, 1] }
+            : { front: [1 - f, 1], back: [0, 1 - f] };
+        const p1 = portions(bi === 0);
+        const p2 = portions(bj === 0);
+
+        // 4 medias costuras (neckline half ↔ porción de collar); la
+        // asignación exacta la refina worldRefine por midpoints mundiales.
+        const mkSpec = (
+          neck: typeof c1.neck, neckRange: [number, number],
+          collar: typeof c1.collar, collarRange: [number, number],
+          base: ScoredSeamCandidate,
+        ): SeamSpec => ({
+          cand: { ...base, edgeA: neck, edgeB: collar },
+          rangeA: neckRange,
+          rangeB: collarRange,
+        });
+        const replacement: SeamSpec[] = [
+          mkSpec(front.neck, [0, 0.5], c1.collar, p1.front, front.base),
+          mkSpec(front.neck, [0.5, 1], c2.collar, p2.front, front.base),
+          mkSpec(back.neck, [0, 0.5], c1.collar, p1.back, back.base),
+          mkSpec(back.neck, [0.5, 1], c2.collar, p2.back, back.base),
+        ];
+        // Reemplazar las 2 costuras enteras por las 4 medias (in-place,
+        // conservando el orden aproximado del ranking).
+        const [i1, i2] = [c1.i, c2.i].sort((a, b) => b - a);
+        seamSpecs.splice(i1, 1);
+        seamSpecs.splice(i2, 1, ...replacement);
+      }
+    }
   }
 
   // Convert to ProposedSeam objects
-  const seams: ProposedSeam[] = seamSpecs.map(({ cand: candidate, capSide, capRange }, idx) => ({
+  const seams: ProposedSeam[] = seamSpecs.map(({ cand: candidate, rangeA, rangeB }, idx) => ({
     seam: {
       // state-encoded ID — see B10-state. The rank index is intentionally
       // baked into the auto-seam ID; do NOT migrate to newId().
@@ -293,14 +384,14 @@ export function autoSew(
       pieceA: {
         pieceId: candidate.edgeA.pieceId,
         edgeName: candidate.edgeA.name,
-        tStart: capSide === 'A' && capRange ? capRange[0] : 0,
-        tEnd: capSide === 'A' && capRange ? capRange[1] : 1,
+        tStart: rangeA ? rangeA[0] : 0,
+        tEnd: rangeA ? rangeA[1] : 1,
       },
       pieceB: {
         pieceId: candidate.edgeB.pieceId,
         edgeName: candidate.edgeB.name,
-        tStart: capSide === 'B' && capRange ? capRange[0] : 0,
-        tEnd: capSide === 'B' && capRange ? capRange[1] : 1,
+        tStart: rangeB ? rangeB[0] : 0,
+        tEnd: rangeB ? rangeB[1] : 1,
       },
       type: 'standard' as const,
       tension: 100,
