@@ -557,6 +557,31 @@ export function useSimulationLifecycle({
                   : undefined;
 
                 const seamPairs = seamInitDataToPairs(seamInitData, placedMeshes);
+                // Sonda seam-gap (diagnóstico sisa↔cap): publica los pares
+                // GLOBALES por costura para que el e2e mida el residual de
+                // cierre EN VIVO sobre __OPENCLO_CLOTH_MESH__ — el overlay
+                // solo CUENTA constraints (474), nunca medía si cierran.
+                // Offsets idénticos al packing de initMultiPieceTsl (orden
+                // acumulativo de placedMeshes). Mismo patrón de global e2e
+                // que __OPENCLO_CLOTH_MESH__ / __OPENCLO_FACE_POKE__.
+                {
+                  const offsets = new Map<string, number>();
+                  let acc = 0;
+                  for (const p of placedMeshes) { offsets.set(p.pieceId, acc); acc += p.vertices.length / 3; }
+                  (window as unknown as Record<string, unknown>).__OPENCLO_SEAM_DEBUG__ = seamInitData.map(s => {
+                    const [pair] = seamInitDataToPairs([s], placedMeshes);
+                    const offA = offsets.get(s.pieceAId) ?? 0;
+                    const offB = offsets.get(s.pieceBId) ?? 0;
+                    return {
+                      id: s.id,
+                      edgeA: s.pieceAEdgeName,
+                      edgeB: s.pieceBEdgeName,
+                      pieceAId: s.pieceAId,
+                      pieceBId: s.pieceBId,
+                      globalPairs: pair ? pair.vertexPairs.flatMap(([a, b]) => [offA + a, offB + b]) : [],
+                    };
+                  });
+                }
                 await withTimeout(
                   gpuClient.initMultiPieceTsl(placedMeshes, seamPairs, tslSolverConfig, fabricCompliance),
                   12000,
