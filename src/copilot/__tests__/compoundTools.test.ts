@@ -49,7 +49,8 @@ describe('Compound Tools', () => {
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
       // + 1 mirrorNotch (2026-06-09) + 1 reverseSeam (Fase 5, 2026-06-11) − 2 blueprint tools un-registered (#847, 2026-06-17)
-      expect(registry.size).toBe(230);
+      // + 2 contrato de colocación: place_piece + list_anchor_points (consejo 2026-07-03)
+      expect(registry.size).toBe(232);
     });
   });
 });

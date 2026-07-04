@@ -26,12 +26,20 @@ import {
   hideAll3D,
   toggleFlipNormal,
 } from '../../../../store/simulationSlice';
-import { updatePiece, setArrangement3D, setArrangementBinding, clearArrangementOverrides } from '../../../../store/projectSlice';
+import { updatePiece, setArrangement3D, setArrangementBinding, clearArrangementOverride, clearArrangementOverrides } from '../../../../store/projectSlice';
 import type { FitMapMode } from '../../../../utils/cloth/fitMaps';
-import type { InterfacingType } from '../../../../types/types';
+import type { InterfacingType, PatternPiece } from '../../../../types/types';
+import type { AppDispatch, RootState } from '../../../../store';
 import { FABRIC_LIBRARY } from '../../../../utils/cloth/fabricLibrary';
 import { computeStiffnessMultiplier } from '../../../../utils/cloth/interfacing';
 import { newId } from '../../../../utils/ids';
+import { buildAnchorMap, getAnchorMap, registerAnchorMap, type AnchorMap } from '../../../../utils/cloth/arrangement/anchorMap';
+import { anchorNamespaceFor, bindingForAnchor, type ContractOpts } from '../../../../utils/cloth/arrangement/placementContract';
+import type { ArrangementOverride } from '../../../../utils/cloth/arrangement/arrangementBinding';
+import { buildAxisHints } from '../../../../utils/cloth/arrangement/buildAxisHints';
+import { computeEffectiveRegions } from '../../../../utils/cloth/garmentPlacement';
+import { bakeCollisionFromRender } from '../../../../utils/cloth/renderCollisionBake';
+import { getRegisteredCollisionMesh } from '../../../../utils/cloth/penetrationMetric';
 
 // ─── listFabrics ────────────────────────────────────────────────────────────
 
@@ -525,13 +533,190 @@ const flipNormal3DTool: ToolDefinition = {
   },
 };
 
+// ─── Placement contract (consejo 2026-07-03 §1/§6) ──────────────────────────
+// El agente es escritor de PRIMERA CLASE del contrato de colocación: escribe
+// el mismo `ArrangementBinding` grading-safe que el click del humano, vía el
+// traductor único (placementContract.bindingForAnchor). Nada de este bloque
+// escribe world-space legacy.
+
+const AVATAR_NOT_READY_ERROR =
+  'Avatar not ready: no baked body surface to build anchor points from. Load/show the avatar in the 3D view first. ' +
+  '/ El avatar aún no está listo: no hay superficie horneada para construir los anchor points. Carga/muestra el avatar en la vista 3D primero.';
+
+/** Mapa vivo: el registrado, o construido on-demand desde el bake del render
+ *  (mismo camino que AnchorPoints: bake ?? colisión registrada). */
+async function resolveLiveAnchorMap(getState: () => RootState): Promise<AnchorMap | null> {
+  const existing = getAnchorMap();
+  if (existing && existing.rings.length > 0) return existing;
+  const mesh = (await bakeCollisionFromRender()) ?? getRegisteredCollisionMesh();
+  if (!mesh) return null;
+  const state = getState();
+  const armAxis = state.simulation.armAxis;
+  const map = buildAnchorMap(mesh, state.project.avatar.measurements, { left: armAxis.left, right: armAxis.right });
+  registerAnchorMap(map);
+  return map.rings.length > 0 ? map : null;
+}
+
+/** ESPEJO EXACTO del piece-set del solver (GarmentSimulation.activePieces):
+ *  divergir aquí re-abre el split-brain de regiones que arrangementBinding
+ *  advierte (los toggles L/R de computeEffectiveRegions dependen del SET). */
+function contractPieces(state: RootState): PatternPiece[] {
+  return state.project.pieces.filter(p =>
+    p.active !== false
+    && !state.simulation.hiddenPieceIds.includes(p.id)
+    && !state.simulation.hiddenLayerIds.includes(p.layer ?? 1),
+  );
+}
+
+/** ESPEJO EXACTO de GarmentSimulation.tsx (~283-285) — el comentario de
+ *  arrangementBinding advierte que divergir aquí re-abre un split-brain. */
+function contractOpts(state: RootState, pieces: PatternPiece[]): ContractOpts {
+  const armAxis = state.simulation.armAxis;
+  return { skeletonReady: armAxis.ready, axisHints: buildAxisHints(pieces, armAxis) };
+}
+
+/** Guard del contrato para rollbacks: V3 legacy / binding / undefined. */
+function restoreOverride(dispatch: AppDispatch, pieceId: string, prev: ArrangementOverride | undefined): void {
+  if (prev === undefined) dispatch(clearArrangementOverride(pieceId));
+  else if (Array.isArray(prev)) dispatch(setArrangement3D({ pieceId, position: prev }));
+  else dispatch(setArrangementBinding({ pieceId, binding: prev }));
+}
+
+/** Resuelve pieceId/pieceName (case-insensitive) contra el set del contrato. */
+function resolveContractPiece(
+  state: RootState,
+  pieces: PatternPiece[],
+  params: Record<string, unknown>,
+): { piece?: PatternPiece; index?: number; error?: string } {
+  const pieceId = params.pieceId as string | undefined;
+  const pieceName = params.pieceName as string | undefined;
+  if (!pieceId && !pieceName) return { error: 'Provide pieceId or pieceName' };
+
+  let index = -1;
+  if (pieceId) {
+    index = pieces.findIndex(p => p.id === pieceId);
+    if (index < 0) {
+      const exists = state.project.pieces.some(p => p.id === pieceId);
+      return { error: exists ? `Piece "${pieceId}" is inactive or hidden — cannot be placed` : `Piece "${pieceId}" not found` };
+    }
+  } else {
+    const needle = (pieceName as string).toLowerCase();
+    const matches = pieces.filter(p => p.name.toLowerCase() === needle);
+    if (matches.length === 0) return { error: `No active piece named "${pieceName}". Active pieces: ${pieces.map(p => p.name).join(', ') || '(none)'}` };
+    if (matches.length > 1) return { error: `Piece name "${pieceName}" is ambiguous (${matches.length} matches). Use pieceId: ${matches.map(p => p.id).join(', ')}` };
+    index = pieces.indexOf(matches[0]);
+  }
+  return { piece: pieces[index], index };
+}
+
+// ─── place_piece ────────────────────────────────────────────────────────────
+
+const placePieceTool: ToolDefinition = {
+  name: 'place_piece',
+  description:
+    'Place a pattern piece at a named anchor point on the avatar body (e.g. "front-torso.ring1.front"). ' +
+    'Writes a grading-safe ArrangementBinding — the placement survives graded sizes. ' +
+    'Use list_anchor_points to discover valid anchor IDs and each piece\'s compatible namespace. ' +
+    '/ Colocar una pieza de patrón en un anchor point con nombre del cuerpo del avatar. ' +
+    'Escribe un ArrangementBinding grading-safe — la colocación sobrevive al escalado de tallas. ' +
+    'Usa list_anchor_points para descubrir los anchor IDs válidos.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'ID of the piece to place (this or pieceName) / ID de la pieza a colocar' },
+      pieceName: { type: 'string', description: 'Name of the piece, case-insensitive (this or pieceId) / Nombre de la pieza, sin distinguir mayúsculas' },
+      anchorId: { type: 'string', description: 'Anchor point ID, format "region.ringN.bearing" (e.g. "front-torso.ring1.front") / ID del anchor point' },
+    },
+    required: ['anchorId'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const state = getState();
+    const anchorId = params.anchorId as string;
+    const pieces = contractPieces(state);
+
+    const resolved = resolveContractPiece(state, pieces, params);
+    if (!resolved.piece) return { success: false, error: resolved.error };
+    const { piece, index } = resolved as { piece: PatternPiece; index: number };
+
+    const map = await resolveLiveAnchorMap(getState);
+    if (!map) return { success: false, error: AVATAR_NOT_READY_ERROR };
+
+    const measurements = state.project.avatar.measurements;
+    const opts = contractOpts(state, pieces);
+    const binding = bindingForAnchor(pieces, index, measurements, map, anchorId, opts);
+    const namespace = anchorNamespaceFor(computeEffectiveRegions(pieces)[index]);
+
+    if (!binding) {
+      // Error DISCOVERABLE (consejo §6): el agente debe poder autocorregirse
+      // en el siguiente call — namespace de la pieza + anchors válidos.
+      const valid = map.points.filter(pt => pt.region === namespace).map(pt => pt.id);
+      return {
+        success: false,
+        error: valid.length > 0
+          ? `Anchor "${anchorId}" is not valid for piece "${piece.name}" (its namespace is "${namespace}"). Valid anchors: ${valid.join(', ')}`
+          : `The anchor map has no anchors for namespace "${namespace}" (piece "${piece.name}") — that body ring was omitted from the bake.`,
+      };
+    }
+
+    const prev = state.project.arrangementOverrides[piece.id];
+    dispatch(setArrangementBinding({ pieceId: piece.id, binding }));
+    return {
+      success: true,
+      data: { pieceId: piece.id, pieceName: piece.name, anchorId, namespace },
+      rollback: () => restoreOverride(dispatch, piece.id, prev),
+    };
+  },
+};
+
+// ─── list_anchor_points ─────────────────────────────────────────────────────
+
+const listAnchorPointsTool: ToolDefinition = {
+  name: 'list_anchor_points',
+  description:
+    'List the anchor points measured on the avatar body: per namespace, each ring with its anchor IDs and position summary, ' +
+    'plus each active piece\'s compatible namespace. Use before place_piece to discover where a piece can go. ' +
+    '/ Listar los anchor points medidos sobre el cuerpo del avatar: por namespace, cada anillo con sus anchor IDs y resumen de posición, ' +
+    'más el namespace compatible de cada pieza activa. Úsalo antes de place_piece.',
+  parameters: {
+    type: 'object',
+    properties: {},
+  },
+  execute: async (_params, _dispatch, getState): Promise<ToolResult> => {
+    const map = await resolveLiveAnchorMap(getState);
+    if (!map) return { success: false, error: AVATAR_NOT_READY_ERROR };
+
+    const r3 = (n: number) => Math.round(n * 1000) / 1000;
+    const namespaces: Record<string, Array<Record<string, unknown>>> = {};
+    for (const ring of map.rings) {
+      (namespaces[ring.region] ??= []).push({
+        ring: ring.ring,
+        heightM: r3(ring.axisPoint[1]),
+        axisPoint: ring.axisPoint.map(r3),
+        radiusM: r3(ring.radius),
+        anchorIds: ring.points.map(pt => pt.id),
+      });
+    }
+
+    const state = getState();
+    const pieces = contractPieces(state);
+    const regions = computeEffectiveRegions(pieces);
+    const pieceNamespaces = pieces.map((p, i) => ({
+      pieceId: p.id,
+      name: p.name,
+      namespace: anchorNamespaceFor(regions[i]),
+    }));
+
+    return { success: true, data: { namespaces, pieces: pieceNamespaces } };
+  },
+};
+
 // ─── reset3DArrangement ─────────────────────────────────────────────────────
 
 const reset3DArrangementTool: ToolDefinition = {
   name: 'reset3DArrangement',
   description:
-    'Reset the 3D position of a specific piece, or reset all piece positions. ' +
-    '/ Restablecer la posición 3D de una pieza específica, o restablecer todas las posiciones.',
+    'Reset the 3D arrangement of a piece (or all pieces) back to its automatic placement, by clearing the override. ' +
+    '/ Restablecer la colocación 3D de una pieza (o todas) a su colocación automática, limpiando el override.',
   parameters: {
     type: 'object',
     properties: {
@@ -544,16 +729,13 @@ const reset3DArrangementTool: ToolDefinition = {
       const piece = getState().project.pieces.find((p: { id: string }) => p.id === pieceId);
       if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
       const prevPos = getState().project.arrangementOverrides[pieceId];
-      dispatch(setArrangement3D({ pieceId, position: [0, 0, 0] }));
+      // Reset = QUITAR el override (vuelve al auto-frame). Escribir [0,0,0]
+      // world era "muévete al origen del mundo", no reset (consejo §6).
+      dispatch(clearArrangementOverride(pieceId));
       return {
         success: true,
-        data: { pieceId, resetPosition: [0, 0, 0] },
-        rollback: () => {
-          if (!prevPos) return;
-          // Contrato: el override previo puede ser V3 legacy o binding frame-delta.
-          if (Array.isArray(prevPos)) dispatch(setArrangement3D({ pieceId, position: prevPos }));
-          else dispatch(setArrangementBinding({ pieceId, binding: prevPos }));
-        },
+        data: { pieceId, cleared: true },
+        rollback: () => restoreOverride(dispatch, pieceId, prevPos),
       };
     }
     const prevOverrides = { ...getState().project.arrangementOverrides };
@@ -562,8 +744,8 @@ const reset3DArrangementTool: ToolDefinition = {
       success: true,
       data: { resetAll: true },
       rollback: () => {
-        for (const [id, pos] of Object.entries(prevOverrides)) {
-          dispatch(setArrangement3D({ pieceId: id, position: pos as [number, number, number] }));
+        for (const [id, ov] of Object.entries(prevOverrides)) {
+          restoreOverride(dispatch, id, ov);
         }
       },
     };
@@ -588,4 +770,6 @@ export const tools: ToolDefinition[] = [
   showAll3DPiecesTool,
   flipNormal3DTool,
   reset3DArrangementTool,
+  placePieceTool,
+  listAnchorPointsTool,
 ];

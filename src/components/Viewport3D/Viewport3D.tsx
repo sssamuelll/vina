@@ -26,6 +26,7 @@ import { isPanGesture, isPanRelease, cameraViewFromKeyEvent, isDoublePanClick, t
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
 import { orbitAroundTarget, dollyTowardTarget, panViewpoint, recenterTarget } from '../../input/orbitMath';
 import { resolveArrangement } from '../../utils/cloth/arrangement/arrangementBinding';
+import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
 import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
 import { collectExportScene } from '../../utils/export/sceneCollector';
@@ -58,7 +59,10 @@ import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins,
 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { resolveColorway } from '../../utils/colorwayResolver';
-import { setArrangement3D, clearArrangementOverrides, setLayer, setSublayer, cloneToLayer } from '../../store/projectSlice';
+import { setArrangement3D, setArrangementBinding, clearArrangementOverride, clearArrangementOverrides, setLayer, setSublayer, cloneToLayer } from '../../store/projectSlice';
+import { showErrorToast, showInfoToast } from '../../store/copilotUISlice';
+import { getAnchorMap } from '../../utils/cloth/arrangement/anchorMap';
+import { resolveAnchorClick, selectionNamespace } from './anchorClick';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
 import { useDispatch } from 'react-redux';
 import { toolRegistry } from '../../tools';
@@ -191,14 +195,65 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   const { handleAvatarClick, isTapeTool } = useAvatarTape(activeTool3D);
   useColorwaySync();
 
+  // ─── Placement contract: el humano escribe el binding (click pieza → click
+  // anchor). anchorNamespace destaca los puntos válidos para la pieza
+  // seleccionada; el click resuelve vía anchorClick.ts, cuyo binding usa los
+  // MISMOS opts que GarmentSimulation (espejo — ver anchorClick.ts).
+  const armAxis = useSelector((s: RootState) => s.simulation.armAxis);
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
+  // ESPEJO de GarmentSimulation.activePieces (axisHints source).
+  const activePieces = useMemo(
+    () => pieces.filter(p =>
+      p.active !== false
+      && !hiddenPieceIds.includes(p.id)
+      && !hiddenLayerIds.includes(p.layer ?? 1)
+    ),
+    [pieces, hiddenPieceIds, hiddenLayerIds],
+  );
+
   // Colocaciones RESUELTAS (auto + overrides/bindings) — la ÚNICA autoridad
   // (consejo 2026-07-03 §1: cardinalidad uno). Antes: placeGarmentPieces sin
   // overrides + cada consumidor re-aplicaba `overrides[id] || position` a
   // mano (solo V3, sin bindings, sin rotación) = comité de colocaciones.
+  // Con los MISMOS opts que la sim (axisHints/skeletonReady): el preview del
+  // arrange ES donde la sim siembra — sin esto, el binding de un anchor de
+  // manga se computaba contra el frame A-pose pero se previsualizaba contra
+  // T-pose (split-brain que el acta prohíbe; hallazgo del agente de UI).
   const garmentPlacements = useMemo(
-    () => resolveArrangement(pieces, avatar.measurements, arrangementOverrides),
-    [pieces, avatar.measurements, arrangementOverrides],
+    () => resolveArrangement(pieces, avatar.measurements, arrangementOverrides, {
+      skeletonReady: armAxis.ready,
+      axisHints: buildAxisHints(activePieces, armAxis),
+    }),
+    [pieces, activePieces, avatar.measurements, arrangementOverrides, armAxis],
   );
+  const anchorNamespace = useMemo(
+    () => (activeTool3D === 'arrangement' ? selectionNamespace(pieces, selectedPieceIds) : null),
+    [activeTool3D, pieces, selectedPieceIds],
+  );
+  const handleAnchorClick = useCallback((anchorId: string) => {
+    const result = resolveAnchorClick({
+      pieces,
+      activePieces,
+      selectedPieceIds,
+      measurements: avatar.measurements,
+      map: getAnchorMap(),
+      anchorId,
+      armAxis,
+    });
+    switch (result.kind) {
+      case 'no-selection':
+        dispatch(showInfoToast('Selecciona una pieza primero — luego el punto donde va'));
+        break;
+      case 'cross-namespace':
+        dispatch(showErrorToast(`Ese punto es de otra zona del cuerpo (la pieza va en ${result.namespace})`));
+        break;
+      case 'bound':
+        dispatch(setArrangementBinding({ pieceId: result.pieceId, binding: result.binding }));
+        break;
+      case 'no-map': // unreachable from a rendered point — nothing sane to do
+        break;
+    }
+  }, [pieces, activePieces, selectedPieceIds, avatar.measurements, armAxis, dispatch]);
 
   const simRef = useRef<GarmentSimulationHandle>(null);
   const cameraMode = activeTool3D === 'camera';
@@ -790,7 +845,12 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         <IKEndEffectorGizmos setOrbitEnabled={setOrbitEnabled} />
         <AvatarTapes />
         {/* AnchorPoints: only when 'arrangement' tool is active — mutually exclusive with pose */}
-        <AnchorPoints measurements={avatar.measurements} visible={activeTool3D === 'arrangement' && !poseEditorOpen} />
+        <AnchorPoints
+          measurements={avatar.measurements}
+          visible={activeTool3D === 'arrangement' && !poseEditorOpen}
+          onAnchorClick={handleAnchorClick}
+          activeNamespace={anchorNamespace}
+        />
 
         {/* Collision Bodies */}
         {collisionBodies.map(body => (
@@ -976,7 +1036,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       )}
       {!cameraMode && (
         <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9, pointerEvents: 'none' }}>
-          {poseEditorOpen ? '● POSE MODE' : activeTool3D === 'arrangement' ? '⊕ ARRANGE MODE' : '✏️ EDIT MODE'} — {inputScheme === 'trackpad' ? 'two-finger orbit · pinch zoom · ⌥-drag pan' : 'right-drag orbit · middle/⌥-drag pan'}
+          {poseEditorOpen ? '● POSE MODE' : activeTool3D === 'arrangement' ? '⊕ ARRANGE — click pieza, luego click punto de arrangement' : '✏️ EDIT MODE'} — {inputScheme === 'trackpad' ? 'two-finger orbit · pinch zoom · ⌥-drag pan' : 'right-drag orbit · middle/⌥-drag pan'}
         </div>
       )}
 
@@ -987,7 +1047,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         onToggleAvatar={() => setAvatarHidden(h => !h)}
         onSnapshot={snapshot3D}
         onSelectPiece={(id) => dispatch(selectPiece(id))}
-        onResetPieceArrangement={(id) => dispatch(setArrangement3D({ pieceId: id, position: [0, 0, 0] }))}
+        onResetPieceArrangement={(id) => dispatch(clearArrangementOverride(id))} // reset = LIMPIAR el override (antes: [0,0,0] world = "muévete al origen", el mismo bug que el tool del agente tenía)
         onResetPose={() => dispatch(resetPose())}
         onShowProperties={(id) => {
           dispatch(selectPiece(id));

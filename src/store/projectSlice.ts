@@ -468,6 +468,13 @@ const projectSlice = createSlice({
       state.arrangementOverrides[action.payload.pieceId] = action.payload.binding;
       state.isDirty = true;
     },
+    /** Contrato de colocación: "reset" de una pieza = QUITAR su override
+     *  (vuelve al auto-frame), NO escribir [0,0,0] world ("muévete al origen
+     *  del mundo" — el bug que el consejo 2026-07-03 §6 manda a matar). */
+    clearArrangementOverride(state, action: PayloadAction<string>) {
+      delete state.arrangementOverrides[action.payload];
+      state.isDirty = true;
+    },
     /** Clear all 3D arrangement overrides. */
     clearArrangementOverrides(state) {
       state.arrangementOverrides = {};
@@ -1531,7 +1538,7 @@ const projectSlice = createSlice({
 
 export const {
   restoreState, loadProject, restoreProject, clearLoadDiagnostics, setProjectName, setGarmentInfo, setGarmentInfoBulk,
-  addPiece, updatePiece, removePiece, removePieces, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, setArrangementBinding, clearArrangementOverrides,
+  addPiece, updatePiece, removePiece, removePieces, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, setArrangementBinding, clearArrangementOverride, clearArrangementOverrides,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
   addAnnotation, removeAnnotation, updateAnnotation,
   // Reactive solver (parametric updates)

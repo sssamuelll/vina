@@ -74,8 +74,8 @@ describe('Tools E2E', () => {
   // ─── Registry health ───────────────────────────────────────────────
 
   describe('Registry', () => {
-    it('has 230 tools registered', () => {
-      expect(registry.size).toBe(230); // 229 + 1 reverseSeam; −2 blueprint tools un-registered (#847)
+    it('has 232 tools registered', () => {
+      expect(registry.size).toBe(232); // 230 + 2 contrato de colocación: place_piece + list_anchor_points (consejo 2026-07-03)
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(230); // 229 + 1 reverseSeam; −2 blueprint tools un-registered (#847)
+      expect(names.length).toBe(232); // 230 + 2 contrato de colocación: place_piece + list_anchor_points (consejo 2026-07-03)
 
       // Key tools from every category
       const expected = [
