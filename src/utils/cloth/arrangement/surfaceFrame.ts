@@ -41,7 +41,7 @@ function radialNormal(axis: THREE.Vector3, prefer = v(0, 0, 1)): THREE.Vector3 {
  *  against the ribcage (measured 2026-07-03: sleeve verts 6640 → 16 @10s). At
  *  armhole depth the ring clears the deltoid and the short seam pulls the tube
  *  UP the arm — the seam holds the sleeve the way a real armhole does. */
-export const SLEEVE_CAP_MARGIN = 0.10; // 10cm
+export const SLEEVE_CAP_MARGIN = 0.03; // barrido 2026-07-04: {0.10 base, 0.05, 0.03}
 
 export function surfaceFrame(region: BodyRegion, d: BodyDimensions, axisHint?: V3, pieceLengthM?: number): SurfaceFrame {
   const midTorso = (d.shoulderHeight + d.waistHeight) / 2;
