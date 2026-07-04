@@ -1,15 +1,23 @@
 /**
- * SeamRenderer3D — draws each project seam as a 3D connection line between the
- * midpoints of its two sewn edges, in ARRANGE mode (before simulation). This
- * is the CLO3D-style "see the sewing before you drape" — the perception layer
- * that lets a user verify what is connected (and what is missing) before
- * hitting Simulate.
+ * SeamRenderer3D — draws each project seam as a CLO3D-style FAN OF THREADS
+ * connecting corresponding points of its two sewn edges, in ARRANGE mode
+ * (before simulation). This is the "see the sewing before you drape"
+ * perception layer: the fan shows WHICH sub-range is sewn (tStart/tEnd) and
+ * in WHICH direction (pieceB.reversed — crossed fan when the pairing flips),
+ * so a user can verify what is connected before hitting Simulate.
  *
- * Coordinate space: each edge midpoint is computed in piece-local space
- * (edgeMidpointLocal3D) and transformed to world space using the SAME
- * position + rotation (pieceHighlightRotation) + flip(scale z) chain that
- * Sew3DTool / DraggablePiece apply — both pull from edgePicker so the line
- * endpoints land exactly on the edges they represent.
+ * Coordinate space: edge points are sampled in piece-local space at the
+ * seam's arc-length parameters (seamThreads helpers) and transformed to
+ * world space using the SAME position + rotation (pieceHighlightRotation) +
+ * flip(scale z) chain that Sew3DTool / DraggablePiece apply — both pull from
+ * edgePicker so the thread endpoints land exactly on the edges they
+ * represent.
+ *
+ * Rendering: ALL threads of ALL seams are merged into ONE LineSegments with
+ * a vertex-colored LineBasicMaterial (one draw call — dictamen Halberg).
+ * WebGPURenderer rejects drei's LineMaterial/fat-lines (see DraggablePiece
+ * header), so v1 is hairlines; ribbons of instanced quads are the plan B if
+ * legibility demands it.
  *
  * Lifecycle: geometry + material are built in a memo keyed on the seams and
  * every piece placement, and disposed on change/unmount (RFC C1).
@@ -21,7 +29,14 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { PatternPiece, Seam } from '../../types/types';
 import type { PlacementResult } from '../../utils/cloth/garmentPlacement';
-import { edgeMidpointLocal3D, pieceHighlightRotation } from '../../utils/3d/edgePicker';
+import { pieceHighlightRotation } from '../../utils/3d/edgePicker';
+import {
+  edgeLocalPolyline,
+  pairSeamRanges,
+  polylineArcLength,
+  sampleAtParams,
+  threadCount,
+} from './seamThreads';
 import { useDisposable } from './hooks/useDisposable';
 
 interface SeamRenderer3DProps {
@@ -43,22 +58,30 @@ export function seamColor(createdBy: Seam['createdBy']): string {
   return createdBy === 'ai' ? SEAM_COLOR_AI : SEAM_COLOR_HUMAN;
 }
 
-function edgeWorldMidpoint(
+/**
+ * World-space points of an edge sampled at arc-length parameters `ts`.
+ * Generalization of the old `edgeWorldMidpoint` — SAME T * R * S chain
+ * applied per sample, matching the piece's group transform.
+ */
+function edgeWorldPoints(
   piece: PatternPiece,
   edgeName: string,
   pos: [number, number, number],
   rot: [number, number, number] | undefined,
   flipped: boolean,
-): THREE.Vector3 | null {
+  ts: number[],
+): THREE.Vector3[] | null {
   const edge = piece.edges?.find((e) => e.name === edgeName);
   if (!edge) return null;
-  const local = edgeMidpointLocal3D(piece.outline, edge);
-  if (!local) return null;
-  // T * R * S applied to the local midpoint, matching the piece's group transform.
-  const v = new THREE.Vector3(local.x, 0.003, local.z * (flipped ? -1 : 1));
-  v.applyEuler(new THREE.Euler(...pieceHighlightRotation(piece.rotation, rot)));
-  v.add(new THREE.Vector3(pos[0], pos[1], pos[2]));
-  return v;
+  const poly = edgeLocalPolyline(piece.outline, edge);
+  if (!poly) return null;
+  const euler = new THREE.Euler(...pieceHighlightRotation(piece.rotation, rot));
+  const offset = new THREE.Vector3(pos[0], pos[1], pos[2]);
+  return sampleAtParams(poly, ts).map((local) =>
+    new THREE.Vector3(local.x, 0.003, local.z * (flipped ? -1 : 1))
+      .applyEuler(euler)
+      .add(offset),
+  );
 }
 
 export default function SeamRenderer3D({
@@ -67,7 +90,7 @@ export default function SeamRenderer3D({
   placements,
   flippedPieceIds,
 }: SeamRenderer3DProps) {
-  const seamLines = useMemo(() => {
+  const seamThreads = useMemo(() => {
     const placementOf = (pieceId: string) => {
       const idx = pieces.findIndex((p) => p.id === pieceId);
       if (idx === -1) return null;
@@ -81,50 +104,60 @@ export default function SeamRenderer3D({
       };
     };
 
-    const objs: THREE.Line[] = [];
+    const positions: number[] = [];
+    const colors: number[] = [];
+    const color = new THREE.Color();
     for (const seam of seams) {
       if (seam.active === false) continue;
       const a = placementOf(seam.pieceA.pieceId);
       const b = placementOf(seam.pieceB.pieceId);
       if (!a || !b) continue;
-      const ma = edgeWorldMidpoint(a.piece, seam.pieceA.edgeName, a.pos, a.rot, a.flipped);
-      const mb = edgeWorldMidpoint(b.piece, seam.pieceB.edgeName, b.pos, b.rot, b.flipped);
-      if (!ma || !mb) continue;
 
-      const geo = new THREE.BufferGeometry().setFromPoints([ma, mb]);
-      const mat = new THREE.LineDashedMaterial({
-        color: seamColor(seam.createdBy),
-        dashSize: 0.018,
-        gapSize: 0.012,
-        linewidth: 1,
-        transparent: true,
-        opacity: 0.9,
-      });
-      const line = new THREE.Line(geo, mat);
-      line.computeLineDistances(); // required for dashes
-      line.renderOrder = 999; // draw over the pieces
-      objs.push(line);
+      // K adaptivo: one thread per ~2cm of A's SEWN arc (A is the direction
+      // reference), clamped [4, 40].
+      const edgeA = a.piece.edges?.find((e) => e.name === seam.pieceA.edgeName);
+      const polyA = edgeA ? edgeLocalPolyline(a.piece.outline, edgeA) : null;
+      if (!polyA) continue;
+      const sewnArc = polylineArcLength(polyA)
+        * Math.abs((seam.pieceA.tEnd ?? 1) - (seam.pieceA.tStart ?? 0));
+      const pairs = pairSeamRanges(seam.pieceA, seam.pieceB, threadCount(sewnArc));
+
+      const ptsA = edgeWorldPoints(
+        a.piece, seam.pieceA.edgeName, a.pos, a.rot, a.flipped, pairs.map((p) => p.tA),
+      );
+      const ptsB = edgeWorldPoints(
+        b.piece, seam.pieceB.edgeName, b.pos, b.rot, b.flipped, pairs.map((p) => p.tB),
+      );
+      if (!ptsA || !ptsB) continue;
+
+      color.set(seamColor(seam.createdBy));
+      for (let i = 0; i < ptsA.length; i++) {
+        positions.push(ptsA[i].x, ptsA[i].y, ptsA[i].z, ptsB[i].x, ptsB[i].y, ptsB[i].z);
+        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+      }
     }
-    // Wrap as a single disposable so useDisposable (RFC C1) can clean up all
-    // line geometries + materials on change/unmount.
+
+    // ONE merged LineSegments = one draw call for all K×N threads.
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    const material = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const segments = new THREE.LineSegments(geometry, material);
+    segments.renderOrder = 999; // draw over the pieces
     return {
-      lines: objs,
+      segments,
       dispose() {
-        for (const line of objs) {
-          line.geometry.dispose();
-          (line.material as THREE.Material).dispose();
-        }
+        geometry.dispose();
+        material.dispose();
       },
     };
   }, [seams, pieces, placements, flippedPieceIds]);
 
-  useDisposable(seamLines);
+  useDisposable(seamThreads);
 
-  return (
-    <group>
-      {seamLines.lines.map((line, i) => (
-        <primitive key={i} object={line} />
-      ))}
-    </group>
-  );
+  return <primitive object={seamThreads.segments} />;
 }
