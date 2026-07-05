@@ -26,6 +26,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece, Seam, SeamGroup } from '../../types/types';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
+import { seamInitDataToPairs } from '../../utils/cloth/seamPairs';
+import { buildSeamFillIndices } from './seamFill';
 import { resolveArrangementWithFrames } from '../../utils/cloth/arrangement/arrangementBinding';
 import { computeEffectiveRegions } from '../../utils/cloth/garmentPlacement';
 import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
@@ -280,6 +282,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   // ─── Geometry building ──────────────────────────────────────────────────────
 
+  // Hoisted sobre el memo de geometría: el seam fill strip (abajo) necesita
+  // los pares de costura para puentear la ranura del piso físico en el render.
+  const seamInitData = useMemo(() => seamsToInitData(seams, seamGroups), [seams, seamGroups]);
+
   const { staticGeometry } = useMemo(() => {
     if (pieceMeshes.length === 0) return { staticGeometry: null };
 
@@ -308,6 +314,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     let vOffset = 0;
     let hasUVs = false;
 
+    // Piezas con vértices ENVUELTOS — el seam fill resuelve pares sobre la
+    // misma pose que el solver (placedMeshes) para paridad exacta de conteo.
+    const wrappedMeshes: Array<(typeof validMeshes)[number]> = [];
+
     for (let pi = 0; pi < validMeshes.length; pi++) {
       const p = validMeshes[pi];
       const numVerts = p.vertices.length / 3;
@@ -320,6 +330,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // M4-C anatomy-up correction. MUST stay identical to the solver loop.
       const curved = wrapPlacedMesh(p.vertices, frame, wrapParams, flip);
       positions.set(curved, vOffset * 3);
+      wrappedMeshes.push({ ...p, vertices: curved });
 
       for (let i = 0; i < numVerts; i++) {
         colors[(vOffset + i) * 3] = color.r;
@@ -348,13 +359,29 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     }
     geo.setIndex(indices);
+    // Normales ANTES del fill: con las piezas aún separadas los puentes son
+    // grandes y sesgarían las normales init (el GPU las recalcula por frame
+    // sobre los triángulos de SIM — el strip nunca entra a esa suma).
     geo.computeVertexNormals();
 
-    return { staticGeometry: geo };
-  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis]);
-  useDisposable(staticGeometry);
+    // Seam fill strip (costura-real): puentea la ranura del piso físico
+    // (2mm shell, A3) SOLO en el index de render — sin él, la piel asoma
+    // como línea a lo largo de toda costura cosida ("línea marrón",
+    // hallazgo 2026-07-06). Cero vértices nuevos, cero física, cero costo
+    // por frame. Kill-switch dev: localStorage 'openclo-seamfill' = 'off'.
+    const seamFillEnabled = typeof window === 'undefined'
+      || window.localStorage?.getItem('openclo-seamfill') !== 'off';
+    if (seamFillEnabled && seamInitData.length > 0) {
+      const offsets = new Map<string, number>();
+      let acc = 0;
+      for (const p of validMeshes) { offsets.set(p.pieceId, acc); acc += p.vertices.length / 3; }
+      const fill = buildSeamFillIndices(seamInitDataToPairs(seamInitData, wrappedMeshes), offsets);
+      if (fill.length > 0) geo.setIndex([...indices, ...fill]);
+    }
 
-  const seamInitData = useMemo(() => seamsToInitData(seams, seamGroups), [seams, seamGroups]);
+    return { staticGeometry: geo };
+  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis, seamInitData]);
+  useDisposable(staticGeometry);
 
   // ─── Placed meshes for solver init ──────────────────────────────────────────
 
