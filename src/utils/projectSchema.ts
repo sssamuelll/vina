@@ -201,6 +201,9 @@ const seamSchema = z
     active: z.boolean(),
     taped: z.boolean(),
     tapeWidth: finiteNumber,
+    // Versión del motor de auto-cosido (staleness de seams IA) — .loose()
+    // ya lo round-tripea; se declara por higiene de tipos/validación.
+    sewEngine: finiteNumber.optional(),
   })
   .loose();
 

@@ -413,6 +413,15 @@ export interface Seam {
    * Drives provenance coloring in SeamRenderer3D (amber AI / green human).
    */
   createdBy?: 'ai' | 'human';
+  /**
+   * Versión del motor de auto-cosido que generó esta costura (solo seams IA;
+   * `SEAM_ENGINE_VERSION` en autoSew). Ausente = pre-versionado (motor 0).
+   * Al restaurar un proyecto cuyo motor quedó atrás, el toast "Re-coser"
+   * ofrece regenerarlas — sin esto un proyecto viejo arrastra costuras malas
+   * para siempre (el autoSew generativo solo corre con seams vacías, y el
+   * dedupe de runAutoSew bloquea las nuevas contra las viejas).
+   */
+  sewEngine?: number;
 }
 
 // ─── Elastics (edge-based elastic/gathering) ───

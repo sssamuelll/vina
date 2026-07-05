@@ -27,7 +27,9 @@ import { loadFromStorage, saveToStorage } from '../utils/projectIO';
 import { restoreProject } from './projectSlice';
 import { requestFitView } from './editorSlice';
 import { showToast, showErrorToast } from './copilotUISlice';
-import { NEW_PROJECT } from './actions';
+import { NEW_PROJECT, RESEW_AI_SEAMS } from './actions';
+import { isStaleAiSeam } from '../utils/autoSew';
+import type { Seam } from '../types/types';
 
 export const AUTOSAVE_DEBOUNCE_MS = 1500;
 
@@ -59,6 +61,21 @@ export async function initProjectPersistence(store: PersistenceStore): Promise<v
           actionPayload: NEW_PROJECT(),
           duration: 8000,
         }));
+        // Costuras IA de un motor anterior (SEAM_ENGINE_VERSION): sin esto,
+        // un proyecto viejo arrastra costuras malas para siempre — el
+        // autoSew generativo solo corre con seams vacías y el dedupe de
+        // runAutoSew bloquea las nuevas contra las viejas. El botón puentea
+        // al thunk resewAiSeams vía resewBridgeMiddleware.
+        const seams = (project.seams ?? []) as Seam[];
+        if (seams.some(isStaleAiSeam)) {
+          store.dispatch(showToast({
+            type: 'warning',
+            message: 'Este proyecto tiene costuras generadas con un motor de cosido anterior — pueden drapear mal',
+            actionLabel: 'Re-coser',
+            actionPayload: RESEW_AI_SEAMS(),
+            duration: 12000,
+          }));
+        }
       }
     } else if (result && !result.ok) {
       // projectIO already quarantined the corrupt blob; tell the user honestly.

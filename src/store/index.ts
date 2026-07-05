@@ -29,6 +29,7 @@ import { undoMiddleware } from './undoMiddleware';
 import { linkedEditingMiddleware } from './linkedEditingMiddleware';
 import { reactiveSolverMiddleware } from './reactiveSolverMiddleware';
 import { gradingStalenessMiddleware } from './gradingStalenessMiddleware';
+import { resewBridgeMiddleware } from './resewBridgeMiddleware';
 
 export const store = configureStore({
   reducer: {
@@ -76,7 +77,7 @@ export const store = configureStore({
         ignoredPaths: ['project.pieces', 'project.avatar', 'collisionBody.bodies', 'copilotUI.pendingConfirmation'],
         ignoredActions: ['project/loadProject', 'project/restoreState', 'copilotUI/showConfirmation'],
       },
-    }).concat(confirmationMiddleware, linkedEditingMiddleware, undoMiddleware, reactiveSolverMiddleware, gradingStalenessMiddleware),
+    }).concat(confirmationMiddleware, linkedEditingMiddleware, undoMiddleware, reactiveSolverMiddleware, gradingStalenessMiddleware, resewBridgeMiddleware),
 });
 
 const savedWorkflow = loadWorkflow();
