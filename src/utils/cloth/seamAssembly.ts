@@ -446,19 +446,30 @@ export function parameterizeEdgeFromBoundary(
 // ─── Vertex Pairing ─────────────────────────────────────────────────────────
 
 /**
- * Match vertices from two parameterized edges by closest arc-length parameter.
+ * Match vertices from two parameterized edges by closest arc-length parameter,
+ * BIDIRECTIONALLY — every vertex on BOTH edges gets at least one pair.
  *
- * For each vertex on the shorter edge, finds the closest match on the longer
- * edge. Handles unequal vertex counts gracefully.
+ * F2 (costura de proceso real): a single driver-side walk (shorter edge
+ * drives) leaves the longer edge's surplus vertices with zero constraints —
+ * physically, skipped stitches: those spans float held only by their own
+ * piece (the shoulder "almendra" slit was exactly this). A real lockstitch
+ * anchors every 2-3mm with no gaps, so we walk in both directions and union.
+ * Where M≠N several vertices fan onto a shared partner — that is CLO-style
+ * gathering, and the one-sided stretch limit absorbs the compression.
  *
  * Assumes both inputs are sorted by ascending `t` — an invariant produced by
- * `parameterizeEdge`, which builds `t` from cumulative arc length. Uses a
- * two-pointer walk: O(|edgeA| + |edgeB|). On exact ties in |dv.t − target.t|,
- * the lower target index wins (matches the previous strict-less-than impl).
+ * `parameterizeEdge` (cumulative arc length). Each pass is a two-pointer
+ * monotone walk: O(|edgeA| + |edgeB|) total. On exact ties in |t−t'| the
+ * lower target index wins (strict-less-than, matches the legacy impl).
+ *
+ * Output is deduped by (indexA, indexB) and sorted by (tA, tB) —
+ * `buildCrossSeamBendQuads` consumes consecutive-in-t pairs, so the union
+ * of the two passes MUST be re-sorted before emission (two monotone walks
+ * interleave when concatenated raw).
  *
  * @param edgeA - Parameterized vertices of edge A (ascending t)
  * @param edgeB - Parameterized vertices of edge B (ascending t)
- * @returns Array of [indexA, indexB] pairs
+ * @returns Array of [indexA, indexB] pairs, sorted by (tA, tB)
  */
 export function matchVertices(
   edgeA: ParameterizedVertex[],
@@ -466,25 +477,31 @@ export function matchVertices(
 ): Array<[number, number]> {
   if (edgeA.length === 0 || edgeB.length === 0) return [];
 
-  const driverIsA = edgeA.length <= edgeB.length;
-  const driver = driverIsA ? edgeA : edgeB;
-  const target = driverIsA ? edgeB : edgeA;
+  const union = new Map<string, { a: number; b: number; tA: number; tB: number }>();
 
-  const pairs = new Array<[number, number]>(driver.length);
-  const lastTargetIdx = target.length - 1;
-  let j = 0;
-
-  for (let i = 0; i < driver.length; i++) {
-    const dv = driver[i];
-    const dt = dv.t;
-    while (j < lastTargetIdx && Math.abs(dt - target[j + 1].t) < Math.abs(dt - target[j].t)) {
-      j++;
+  const walk = (driver: ParameterizedVertex[], target: ParameterizedVertex[], driverIsA: boolean) => {
+    const lastTargetIdx = target.length - 1;
+    let j = 0;
+    for (let i = 0; i < driver.length; i++) {
+      const dv = driver[i];
+      const dt = dv.t;
+      while (j < lastTargetIdx && Math.abs(dt - target[j + 1].t) < Math.abs(dt - target[j].t)) {
+        j++;
+      }
+      const tv = target[j];
+      const av = driverIsA ? dv : tv;
+      const bv = driverIsA ? tv : dv;
+      const key = `${av.index},${bv.index}`;
+      if (!union.has(key)) union.set(key, { a: av.index, b: bv.index, tA: av.t, tB: bv.t });
     }
-    const tgtIndex = target[j].index;
-    pairs[i] = driverIsA ? [dv.index, tgtIndex] : [tgtIndex, dv.index];
-  }
+  };
 
-  return pairs;
+  walk(edgeA, edgeB, true);
+  walk(edgeB, edgeA, false);
+
+  return [...union.values()]
+    .sort((p, q) => p.tA - q.tA || p.tB - q.tB)
+    .map(p => [p.a, p.b] as [number, number]);
 }
 
 // ─── Multi-piece Mesh Merging ───────────────────────────────────────────────

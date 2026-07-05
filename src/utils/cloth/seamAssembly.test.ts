@@ -114,7 +114,7 @@ describe('matchVertices', () => {
     expect(pairs).toEqual([[0, 10], [1, 11], [2, 12]]);
   });
 
-  it('handles unequal vertex counts (fewer on A)', () => {
+  it('handles unequal vertex counts (fewer on A) — every B vertex gets a stitch', () => {
     const a: ParameterizedVertex[] = [
       { index: 0, t: 0 }, { index: 1, t: 1 },
     ];
@@ -122,11 +122,13 @@ describe('matchVertices', () => {
       { index: 10, t: 0 }, { index: 11, t: 0.5 }, { index: 12, t: 1 },
     ];
     const pairs = matchVertices(a, b);
-    // A is shorter → drives. vertex 0 (t=0) → 10 (t=0), vertex 1 (t=1) → 12 (t=1)
-    expect(pairs).toEqual([[0, 10], [1, 12]]);
+    // Bidirectional (F2 costura real): A-driven gives (0,10),(1,12); B-driven
+    // adds (0,11) — b11 (t=0.5) ties to a0/a1, lower index wins. No skipped
+    // stitches: b11 no longer floats unconstrained. Sorted by (tA, tB).
+    expect(pairs).toEqual([[0, 10], [0, 11], [1, 12]]);
   });
 
-  it('handles unequal vertex counts (fewer on B)', () => {
+  it('handles unequal vertex counts (fewer on B) — every A vertex gets a stitch', () => {
     const a: ParameterizedVertex[] = [
       { index: 0, t: 0 }, { index: 1, t: 0.5 }, { index: 2, t: 1 },
     ];
@@ -134,33 +136,34 @@ describe('matchVertices', () => {
       { index: 10, t: 0 }, { index: 11, t: 1 },
     ];
     const pairs = matchVertices(a, b);
-    // B is shorter → drives. 10(t=0)→0(t=0), 11(t=1)→2(t=1)
-    expect(pairs).toEqual([[0, 10], [2, 11]]);
+    // B-driven: (0,10),(2,11); A-driven adds (1,10) — a1 (t=0.5) ties, lower wins.
+    expect(pairs).toEqual([[0, 10], [1, 10], [2, 11]]);
   });
 
-  it('handles single-vertex target (every driver maps to the only target)', () => {
+  it('handles single-vertex target (fan: every driver maps to the only target)', () => {
     const a: ParameterizedVertex[] = [
       { index: 0, t: 0 }, { index: 1, t: 0.3 }, { index: 2, t: 1 },
     ];
     const b: ParameterizedVertex[] = [{ index: 99, t: 0.5 }];
-    // B is shorter (length 1) → drives. Only one b vertex to emit.
     const pairs = matchVertices(a, b);
-    // Closest to 0.5 is a[1] (t=0.3, dist=0.2) — tied? 0.3 vs 1 → |0.5-0.3|=0.2, |0.5-1|=0.5, |0.5-0|=0.5.
-    expect(pairs).toEqual([[1, 99]]);
+    // B-driven: 99→a1 (t=0.3 closest to 0.5). A-driven: all three fan onto 99 —
+    // like a real gathered seam, no A vertex is left unstitched.
+    expect(pairs).toEqual([[0, 99], [1, 99], [2, 99]]);
   });
 
   it('picks the lower target index on exact distance ties', () => {
-    // dv.t = 0.5 is equidistant to t=0 and t=1. Legacy uses strict `<`, so j=0 wins.
+    // dv.t = 0.5 is equidistant to t=0 and t=1. Strict `<` in the walk, so j=0 wins
+    // for the A-driven pass; the B-driven pass then pairs both b's back to a0.
     const driver: ParameterizedVertex[] = [{ index: 0, t: 0.5 }];
     const target: ParameterizedVertex[] = [
       { index: 10, t: 0 },
       { index: 11, t: 1 },
     ];
     const pairs = matchVertices(driver, target);
-    expect(pairs).toEqual([[0, 10]]);
+    expect(pairs).toEqual([[0, 10], [0, 11]]);
   });
 
-  it('handles duplicate t values on target (picks lowest index on tie)', () => {
+  it('handles duplicate t values on target (lowest index on tie, full coverage)', () => {
     const driver: ParameterizedVertex[] = [{ index: 0, t: 0.5 }];
     const target: ParameterizedVertex[] = [
       { index: 10, t: 0.5 },
@@ -168,7 +171,31 @@ describe('matchVertices', () => {
       { index: 12, t: 0.5 },
     ];
     const pairs = matchVertices(driver, target);
-    expect(pairs).toEqual([[0, 10]]);
+    expect(pairs).toEqual([[0, 10], [0, 11], [0, 12]]);
+  });
+
+  it('covers every vertex on BOTH edges (no skipped stitches) and stays t-sorted', () => {
+    // The almendra-slit class of bug: one-directional matching leaves the long
+    // side's surplus vertices with zero constraints. Property: after F2, every
+    // index of edgeA and edgeB appears in ≥1 pair, and pairs are non-decreasing
+    // in tA (buildCrossSeamBendQuads consumes consecutive-in-t pairs).
+    const a: ParameterizedVertex[] = Array.from({ length: 7 }, (_, i) => ({
+      index: i, t: i / 6,
+    }));
+    const b: ParameterizedVertex[] = Array.from({ length: 19 }, (_, i) => ({
+      index: 100 + i, t: i / 18,
+    }));
+    const pairs = matchVertices(a, b);
+    const seenA = new Set(pairs.map(p => p[0]));
+    const seenB = new Set(pairs.map(p => p[1]));
+    for (const v of a) expect(seenA.has(v.index)).toBe(true);
+    for (const v of b) expect(seenB.has(v.index)).toBe(true);
+    // No duplicate (a,b) pairs.
+    expect(new Set(pairs.map(p => `${p[0]},${p[1]}`)).size).toBe(pairs.length);
+    // Sorted by tA (index maps monotonically to t here).
+    for (let i = 1; i < pairs.length; i++) {
+      expect(pairs[i][0]).toBeGreaterThanOrEqual(pairs[i - 1][0]);
+    }
   });
 
   it('does not mutate the input arrays', () => {
@@ -242,7 +269,18 @@ describe('matchVertices', () => {
       const nB = 2 + Math.floor(rng() * 120);
       const a = makeSortedEdge(rng, nA, 0);
       const b = makeSortedEdge(rng, nB, 1000);
-      expect(matchVertices(a, b)).toEqual(legacyMatchVertices(a, b));
+      // Bidirectional output is a SUPERSET of the legacy one-directional
+      // matching (same walk, same tie-breaks — plus the reverse pass).
+      const pairs = matchVertices(a, b);
+      const got = new Set(pairs.map(p => `${p[0]},${p[1]}`));
+      for (const [pa, pb] of legacyMatchVertices(a, b)) {
+        expect(got.has(`${pa},${pb}`)).toBe(true);
+      }
+      // And it covers every vertex on both edges (the legacy one does not).
+      const seenA = new Set(pairs.map(p => p[0]));
+      const seenB = new Set(pairs.map(p => p[1]));
+      expect(seenA.size).toBe(nA);
+      expect(seenB.size).toBe(nB);
     }
   });
 
