@@ -62,3 +62,7 @@ El modelo de constraints NO es la categoría equivocada (es la ontología de CLO
 - CONFIRMADA — líneas rayos-X: `SimSeamLines.tsx:96` (`depthTest:false`) + `:100` (`renderOrder=999`).
 - CONFIRMADA — pair map + anclaje CPU para normal-weld: `seamPairs.ts` (con test) + `GarmentSimulation.tsx:351` (`computeVertexNormals`).
 - CONFIRMADA — veto substeps: `physicalFabric.ts:665-666` (banda angular asume sdt=1/900; Cusick como oráculo).
+
+## Firma del founder (2026-07-05)
+
+**"Vamos con todo"** — tríada v1 completa aprobada. Respuesta a Lyra: **el criterio se fija contra la foto CLO3D (A/B con criterios nombrados) Y con el ojo del founder en el e2e** — ancla híbrida: el A/B filtra, el ojo veta.
