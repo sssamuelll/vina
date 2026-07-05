@@ -582,6 +582,10 @@ export interface SeamInitData {
   tension: number;
   /** Strength of the seam bond (0-1, default 1.0) */
   strength: number;
+  /** Proveniencia (Seam.createdBy) — solo para el COLOR de las seam lines
+   *  sobre el drape (seamThreadColor: IA pálida / humano pleno). Los solvers
+   *  la ignoran. */
+  createdBy?: 'ai' | 'human';
   /** Whether this seam participates in simulation */
   active: boolean;
   /** Whether seam tape is applied */

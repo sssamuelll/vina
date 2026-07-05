@@ -106,6 +106,8 @@ function seamsToInitData(seams: Seam[], seamGroups?: SeamGroup[]): SeamInitData[
       strength: s.strength ?? 1.0,
       active: true,
       taped: s.taped ?? false,
+      // Proveniencia — solo para el color de las seam lines (seamThreadColor).
+      createdBy: s.createdBy,
     }));
 
   // Flatten SeamGroups into additional SeamInitData entries
@@ -1329,11 +1331,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         </mesh>
       )}
       <PinRenderer livePositions={positionsRef.current || undefined} />
-      {/* Seam connection lines over the live garment (R2 #880): the pairs
-          the solver is sewing, fed from positionsRef each frame. Gated on
-          showSeamlines3D inside the component. */}
+      {/* Seam lines over the live garment (R2 #880 + polylines de borde
+          2026-07-05): conexiones + línea de costura CLO3D-style, leídas de
+          staticGeometry — la fuente que TODOS los tiers sincronizan
+          (positionsRef solo lo alimentaban CPU/WASM: en el tier GPU default
+          el componente estaba muerto). Gated showSeamlines3D adentro. */}
       <SimSeamLines
-        positionsRef={positionsRef}
+        geometry={staticGeometry}
         placedMeshes={placedMeshes}
         seamInitData={seamInitData}
       />

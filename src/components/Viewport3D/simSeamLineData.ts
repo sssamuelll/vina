@@ -17,7 +17,7 @@
 
 import type { SeamInitData } from '../../utils/cloth/seamAssembly';
 import { seamInitDataToPairs, type PieceWithOutline } from '../../utils/cloth/seamPairs';
-import { seamPairColor } from '../PatternEditor/renderers/seamVisuals';
+import { seamThreadColor } from '../../utils/colors/seamPalette';
 
 export interface SimSeamPieceMesh extends PieceWithOutline {
   vertices: Float32Array;
@@ -93,7 +93,11 @@ export function buildSimSeamLineData(
     const lastSampled = sampled[sampled.length - 1];
     if (lastSampled[0] !== last[0] || lastSampled[1] !== last[1]) sampled.push(last);
 
-    const [r, g, b] = hexToRgb(seamPairColor(seam.id));
+    // Unificado 2026-07-05: seamThreadColor (identidad hash-estable +
+    // proveniencia como saturación) — el mismo hue que los hilos de arrange
+    // y las polylines de borde, para que TODO lo de una costura se lea junto.
+    // (Antes seamPairColor, el lenguaje del canvas 2D — divergencia retirada.)
+    const [r, g, b] = hexToRgb(seamThreadColor(seam.id, seam.createdBy));
     for (const [la, lb] of sampled) {
       const ga = offA + la;
       const gb = offB + lb;
@@ -112,4 +116,94 @@ export function buildSimSeamLineData(
     colors: new Float32Array(rgb),
     lineCount: idx.length / 2,
   };
+}
+
+/**
+ * Polyline del BORDE de cada costura sobre el garment simulado (paridad
+ * CLO3D, 2026-07-05): la línea continua que recorre el lado A de los pares
+ * cosidos — con la costura cerrada (piso 2mm) esto ES la línea de costura
+ * sobre la prenda, como CLO3D la dibuja.
+ *
+ * Orden garantizado: `matchVertices` emite los pares en t ascendente en
+ * AMBOS lados (invariante documentada en seamAssembly; `reversed` restaura
+ * el orden con reverse+1−t), así que encadenar índices consecutivos del
+ * lado A produce la polyline del borde sin reordenar. Cuando B es el driver
+ * el índice A puede repetirse en pares consecutivos — se deduplica (si no,
+ * segmentos de longitud cero).
+ *
+ * SIN subsample: ~600 puntos en toda la prenda — trivial (<0.05ms/frame).
+ */
+export function buildSeamEdgePolylineData(
+  seamInitData: SeamInitData[],
+  pieces: SimSeamPieceMesh[],
+): SimSeamLineData | null {
+  if (seamInitData.length === 0 || pieces.length === 0) return null;
+
+  const offsets = new Map<string, number>();
+  let acc = 0;
+  for (const p of pieces) {
+    offsets.set(p.pieceId, acc);
+    acc += p.vertices.length / 3;
+  }
+  const totalVerts = acc;
+
+  const idx: number[] = [];
+  const rgb: number[] = [];
+
+  for (const seam of seamInitData) {
+    if (seam.active === false) continue;
+
+    const resolved = seamInitDataToPairs([seam], pieces);
+    if (resolved.length === 0) continue;
+    const { pieceAId, vertexPairs } = resolved[0];
+
+    const offA = offsets.get(pieceAId);
+    if (offA === undefined) continue;
+
+    // Cadena de índices globales del lado A, dedup de consecutivos.
+    const chain: number[] = [];
+    for (const [la] of vertexPairs) {
+      const ga = offA + la;
+      if (ga >= totalVerts) continue; // guard defensivo (mismo criterio de arriba)
+      if (chain.length === 0 || chain[chain.length - 1] !== ga) chain.push(ga);
+    }
+    if (chain.length < 2) continue;
+
+    const [r, g, b] = hexToRgb(seamThreadColor(seam.id, seam.createdBy));
+    for (let k = 0; k + 1 < chain.length; k++) {
+      idx.push(chain[k], chain[k + 1]);
+      rgb.push(r, g, b, r, g, b);
+    }
+  }
+
+  if (idx.length === 0) return null;
+
+  return {
+    vertexIndices: new Uint32Array(idx),
+    colors: new Float32Array(rgb),
+    lineCount: idx.length / 2,
+  };
+}
+
+/**
+ * Copia por-frame: llena `out` (posiciones de línea, 3 floats por vértice)
+ * leyendo `positions` por índice global. Devuelve si algo entró (visible).
+ * Extraída pura para testear sin R3F (antes vivía inline en SimSeamLines).
+ */
+export function fillSeamLinePositions(
+  out: Float32Array,
+  vertexIndices: Uint32Array,
+  positions: ArrayLike<number>,
+): boolean {
+  let visible = false;
+  for (let i = 0; i < vertexIndices.length; i++) {
+    const v = vertexIndices[i] * 3;
+    if (v + 2 < positions.length) {
+      out[i * 3] = positions[v];
+      out[i * 3 + 1] = positions[v + 1];
+      out[i * 3 + 2] = positions[v + 2];
+      visible = true;
+    }
+  }
+  return visible;
 }
