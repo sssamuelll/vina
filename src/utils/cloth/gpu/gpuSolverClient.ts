@@ -30,6 +30,7 @@ import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities';
 import { DEFAULT_SEAM_CONFIG } from '../seamAssembly';
+import { dihedralAngle } from '../dihedral';
 import { fabricInvMassScale } from '../physicalFabric';
 import type { ClothSolverClient } from '../solverProtocol';
 import type { LocalVertexIndex, SeamPair } from '../seamPairs';
@@ -198,6 +199,21 @@ export class GpuSolverClient implements ClothSolverClient {
   private tslBuffers: TslBufferSet | null = null;
   private pieceVertexRanges: Map<string, { start: number; count: number }> | null = null;
   private originalInvMass: Float32Array | null = null;
+
+  /**
+   * F1 planchado (acta costura-proceso-real 2026-07-05): metadata de los
+   * quads cross-seam que SOBREVIVIERON la barrera Halberg, stasheada en
+   * init para el press en settle. Llave = `${a},${b},${c},${d}` de los ids
+   * del quad (el layout GPU se recolorea y parte en SBAs por-color — no hay
+   * región contigua cross que escribir por offset; el press escanea los
+   * grupos y matchea por llave). Valor = partners de costura [b0,b1] del
+   * hinge, para el gate sewn. Null = sin quads cross (barrera / kill-switch
+   * / sin costuras).
+   */
+  private crossQuadPartners: Map<string, [number, number]> | null = null;
+  /** Compliance angular objetivo del press (la del fabric — el planchado
+   *  fija el ángulo CON rigidez real; 1e5 era la bisagra floja pre-F1). */
+  private pressedBendCompliance = 1e4;
 
   /**
    * Cached WebGPURenderer reference, captured the first time a render-coupled
@@ -575,6 +591,9 @@ export class GpuSolverClient implements ClothSolverClient {
     let bendAll = bend;
     let crossQuadCount = 0;
     let bendColorDelta = 0;
+    // Re-init: el stash del press pertenece a los buffers viejos — un
+    // proyecto nuevo con otro layout de quads lo envenenaría.
+    this.crossQuadPartners = null;
     const crossBendEnabled = typeof window === 'undefined'
       || window.localStorage?.getItem('openclo-crossbend') !== 'off';
     if (crossBendEnabled && seamGlobalPairs.length > 0) {
@@ -600,12 +619,14 @@ export class GpuSolverClient implements ClothSolverClient {
         if (bendColorDelta <= 4) {
           // Compliance per-quad: intra = NaN (createTslBuffers mapea
           // edgeType→fabric como siempre); cross = TOPE BLANDO de la banda
-          // angular calibrada [6e2, 1e5]. MEDIDO 2026-07-05 (A/B con el
-          // kill-switch): a rigidez del fabric + rest 0, los quads
-          // planchaban costuras con ángulo real (la sisa envuelve por
-          // diseño) → grieta con piel + tela explotada. A 1e5 el
-          // acoplamiento es sugerencia de continuidad, no plancha; la
-          // escalera de rigidez (3e4, ...) queda para el A/B visual.
+          // angular calibrada [6e2, 1e5] MIENTRAS la costura se cierra.
+          // MEDIDO 2026-07-05 (A/B con el kill-switch): a rigidez del
+          // fabric + rest 0, los quads planchaban costuras con ángulo real
+          // (la sisa envuelve por diseño) → grieta con piel + tela
+          // explotada. El bug era el REST (0 = "prefiere plano"), no la
+          // rigidez: en settle el press F1 captura el ángulo ensamblado
+          // real y ENTONCES endurece a fabric (pressCrossSeamAngles) — el
+          // planchado del proceso real, por fases como en fábrica.
           const CROSS_SEAM_BEND_COMPLIANCE = 1e5;
           const numCross = cross.ids.length / 4;
           const jointCompliance = new Float32Array(jointIds.length / 4).fill(Number.NaN);
@@ -617,6 +638,18 @@ export class GpuSolverClient implements ClothSolverClient {
             compliance: jointCompliance,
           };
           crossQuadCount = numCross;
+          // F1: stash para el press en settle (llave del quad → partners B
+          // del hinge). El fabric weft es la rigidez destino del planchado.
+          this.crossQuadPartners = new Map();
+          for (let q = 0; q < numCross; q++) {
+            const o = q * 4;
+            const key = `${cross.ids[o]},${cross.ids[o + 1]},${cross.ids[o + 2]},${cross.ids[o + 3]}`;
+            this.crossQuadPartners.set(key, [
+              cross.seamPartners![q * 2],
+              cross.seamPartners![q * 2 + 1],
+            ]);
+          }
+          this.pressedBendCompliance = fabric.bendComplianceWeft;
         } else {
           console.warn(
             `[GpuSolverClient] cross-seam bend EXCLUIDO: coloring conjunto ` +
@@ -1350,7 +1383,82 @@ export class GpuSolverClient implements ClothSolverClient {
     const tArr = this.tslBuffers.tetherTargetSBA.array as Float32Array;
     tArr.set(settled.subarray(0, N * 3));
     this.tslBuffers.tetherTargetSBA.needsUpdate = true;
+
+    // F1 planchado: el MISMO readback del settle alimenta el press de los
+    // quads cross-seam — cero readbacks extra (corrección mnCheck).
+    this.pressCrossSeamAngles(settled);
     return true;
+  }
+
+  /**
+   * F1 — PLANCHADO (acta consejo costura-proceso-real 2026-07-05).
+   *
+   * El proceso real: la costura se cierra PRIMERO (arrastre + decay al piso)
+   * y luego la plancha fija el ángulo que la geometría ensamblada tiene, con
+   * rigidez alta. Rest 0 decía "prefiere plano" — por eso endurecer los
+   * quads cross-seam planchaba la sisa que envuelve por diseño (bug de REST,
+   * no de rigidez, medido 2026-07-05).
+   *
+   * Sobre las posiciones asentadas del readback del tether (frame 150):
+   * por cada quad cross-seam superviviente (stash `crossQuadPartners`),
+   * si sus dos pares de costura están COSIDOS (|pa−pb| ≤ floor+ε en el mismo
+   * readback — no el targetDist GPU, que vive decaído), captura el ángulo
+   * dihedral real con `dihedralAngle` (misma convención signed/atan2 del
+   * kernel TSL) y lo escribe como rest angle + endurece a compliance del
+   * fabric. Los no cosidos conservan rest 0 / 1e5 (sugerencia blanda).
+   *
+   * Escritura: escanea `bendColors[]` (el layout GPU está recoloreado y
+   * partido en SBAs por color — no hay región cross contigua), matchea por
+   * llave de quad, muta `SBA.array` + `needsUpdate` (patrón tether).
+   * Limitación heredada del tether: no refresca en re-pose.
+   */
+  private pressCrossSeamAngles(settled: Float32Array): void {
+    if (!this.tslBuffers || !this.crossQuadPartners || this.crossQuadPartners.size === 0) return;
+
+    // Gate sewn: piso terminal del decay (2mm) + ε de asentamiento. A 5mm el
+    // par está cosido de verdad; una almendra abierta (3-10cm) NO se hornea.
+    const SEWN_EPS = 0.003;
+    const sewnThreshold = DEFAULT_SEAM_CONFIG.restLengthFloor + SEWN_EPS;
+    const gap = (u: number, v: number) => Math.hypot(
+      settled[u * 3] - settled[v * 3],
+      settled[u * 3 + 1] - settled[v * 3 + 1],
+      settled[u * 3 + 2] - settled[v * 3 + 2],
+    );
+
+    let pressed = 0;
+    let openSkipped = 0;
+    for (const group of this.tslBuffers.bendColors) {
+      const ids = group.idsSBA.array as Uint32Array;
+      const rest = group.restAnglesSBA.array as Float32Array;
+      const compliance = group.complianceSBA.array as Float32Array;
+      let dirty = false;
+      for (let slot = 0; slot < group.count; slot++) {
+        const o = slot * 4;
+        const a0 = ids[o], a1 = ids[o + 1], c = ids[o + 2], d = ids[o + 3];
+        const partners = this.crossQuadPartners.get(`${a0},${a1},${c},${d}`);
+        if (!partners) continue; // quad intra-pieza
+        if (gap(a0, partners[0]) > sewnThreshold || gap(a1, partners[1]) > sewnThreshold) {
+          openSkipped++;
+          continue; // costura abierta aquí — no hornear el ángulo del hueco
+        }
+        const phi = dihedralAngle(settled, a0, a1, c, d);
+        if (phi === null) continue; // degenerado — dihedral.ts guards
+        rest[slot] = phi;
+        compliance[slot] = this.pressedBendCompliance;
+        dirty = true;
+        pressed++;
+      }
+      if (dirty) {
+        // version++ directo (convención freezePieces / Epic-746) — equivale
+        // al setter needsUpdate de three y es lo que el contrato #17 pinnea.
+        group.restAnglesSBA.version++;
+        group.complianceSBA.version++;
+      }
+    }
+    console.log(
+      `[GpuSolverClient] planchado F1: ${pressed}/${this.crossQuadPartners.size} quads ` +
+      `cross-seam presseados (${openSkipped} abiertos conservan sugerencia blanda)`,
+    );
   }
 
   /**

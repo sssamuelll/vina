@@ -52,6 +52,13 @@ export interface BendConstraints {
    * calibrada como acoplamiento de sugerencia, no plancha.
    */
   compliance?: Float32Array;
+  /**
+   * Solo quads cross-seam (F1 planchado): los partners de costura del lado B
+   * [b0,b1] por quad — el hinge (a0,a1) vive del lado A y sus pares cosidos
+   * son (a0,b0)/(a1,b1). El cliente GPU los stashea para el gate sewn del
+   * press en settle (|pa−pb| ≤ floor+ε del MISMO readback del tether).
+   */
+  seamPartners?: Uint32Array;
 }
 
 export interface SeamConstraintData {
@@ -343,6 +350,7 @@ export function buildCrossSeamBendQuads(
   const ids: number[] = [];
   const restAngles: number[] = [];
   const edgeTypes: number[] = [];
+  const seamPartners: number[] = [];
 
   for (const pairs of seamGlobalPairs) {
     const n = pairs.length / 2;
@@ -358,6 +366,9 @@ export function buildCrossSeamBendQuads(
       ids.push(a0, a1, wingA, wingB);
       restAngles.push(0);
       edgeTypes.push(EdgeType.WEFT);
+      // F1 planchado: partners B del hinge — el gate sewn del press en settle
+      // verifica que (a0,b0) y (a1,b1) estén cerrados antes de hornear el ángulo.
+      seamPartners.push(b0, b1);
     }
   }
 
@@ -365,6 +376,7 @@ export function buildCrossSeamBendQuads(
     ids: new Uint32Array(ids),
     restAngles: new Float32Array(restAngles),
     edgeTypes: new Uint8Array(edgeTypes),
+    seamPartners: new Uint32Array(seamPartners),
   };
 }
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { FakeGPUDevice, FakeRenderer } from './fakeDevice';
+import { dihedralAngle } from '../../dihedral';
 
 // vi.hoisted runs before vi.mock hoisting, so the shared MockSBA + setAtomicCalls
 // are visible to both `three/webgpu` and `three/tsl` mock factories. Pattern
@@ -1234,5 +1235,112 @@ describe('captureTetherTargets (behavior #16 — tether body target)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client = new GpuSolverClient(device as any);
     expect(client.getTetherTargets()).toBeNull();
+  });
+});
+
+// ─── Behavior #17 — F1 planchado: press de rest-angle cross-seam en settle ───
+//
+// Acta consejo costura-proceso-real 2026-07-05: el mismo readback del tether
+// (recaptureTetherTargetsFromGpu) alimenta pressCrossSeamAngles — por cada
+// quad cross-seam cuyos pares de costura están COSIDOS (gap ≤ floor+ε en las
+// posiciones asentadas), el ángulo dihedral real se hornea como rest angle y
+// la compliance sube de sugerencia blanda (1e5) a rigidez del fabric. Los no
+// cosidos conservan rest 0 / 1e5 (no se hornea el ángulo de un hueco).
+
+describe('pressCrossSeamAngles via settle recapture (behavior #17 — F1 planchado)', () => {
+  const seamPairs = () => [{
+    pieceAId: 'a',
+    pieceBId: 'b',
+    // Borde superior de ambos quads: A(0,1) ↔ B(0,1) → hinge global (0,1),
+    // wing A = 2, wing B = 6, partners [4,5].
+    vertexPairs: [[0, 0], [1, 1]] as Array<[never, never]>,
+    compliance: 0.0001,
+    tensionFactor: 1.0,
+  }];
+
+  /** Localiza el slot del quad cross [0,1,2,6] en los grupos bend por-color. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function findCrossSlot(buffers: any): { group: any; slot: number } {
+    for (const group of buffers.bendColors) {
+      const ids = group.idsSBA.array as Uint32Array;
+      for (let slot = 0; slot < group.count; slot++) {
+        const o = slot * 4;
+        if (ids[o] === 0 && ids[o + 1] === 1 && ids[o + 2] === 2 && ids[o + 3] === 6) {
+          return { group, slot };
+        }
+      }
+    }
+    throw new Error('cross quad [0,1,2,6] not found in bendColors');
+  }
+
+  /** Posiciones asentadas: costura del borde superior cerrada (gap dado en m),
+   *  ala B doblada fuera del plano → ángulo dihedral real no-cero. */
+  function makeSettled(seamGap: number): Float32Array {
+    return new Float32Array([
+      -0.5, 1.0, 0.0, //  0 — hinge
+       0.5, 1.0, 0.0, //  1 — hinge
+       0.5, 0.0, 0.0, //  2 — wing A (plano)
+      -0.5, 0.0, 0.0, //  3
+      -0.5, 1.0, seamGap, // 4 — partner de 0
+       0.5, 1.0, seamGap, // 5 — partner de 1
+       0.5, 1.6, 0.8,     // 6 — wing B (doblada: pliegue real)
+      -0.5, 1.6, 0.8,     // 7
+    ]);
+  }
+
+  it('hornea el ángulo asentado + rigidez fabric en quads con costura cosida', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')], seamPairs());
+
+    const settled = makeSettled(0.0); // costura cerrada (gap 0 ≤ floor+ε)
+    vi.spyOn(client, 'readPositionsToCPU').mockResolvedValue(settled);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buffers = (client as any).tslBuffers;
+    const { group, slot } = findCrossSlot(buffers);
+    // Estado pre-press: sugerencia blanda (rest 0, tope de banda 1e5).
+    expect(group.restAnglesSBA.array[slot]).toBe(0);
+    expect(group.complianceSBA.array[slot]).toBe(1e5);
+
+    await expect(client.recaptureTetherTargetsFromGpu()).resolves.toBe(true);
+
+    const expectedPhi = dihedralAngle(settled, 0, 1, 2, 6)!;
+    expect(expectedPhi).not.toBe(0); // el fold del fixture es real
+    expect(group.restAnglesSBA.array[slot]).toBeCloseTo(expectedPhi, 6);
+    // Rigidez destino = bendComplianceWeft del fabric default (1e4).
+    expect(group.complianceSBA.array[slot]).toBeCloseTo(1e4, 6);
+    // El re-upload GPU quedó marcado (patrón tether: needsUpdate → version++).
+    expect(group.restAnglesSBA.version).toBeGreaterThanOrEqual(1);
+    expect(group.complianceSBA.version).toBeGreaterThanOrEqual(1);
+  });
+
+  it('NO hornea quads cuya costura sigue abierta (conserva rest 0 / 1e5)', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')], seamPairs());
+
+    // Gap 5 cm — una almendra abierta; hornear su ángulo congelaría el hueco.
+    vi.spyOn(client, 'readPositionsToCPU').mockResolvedValue(makeSettled(0.05));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buffers = (client as any).tslBuffers;
+    const { group, slot } = findCrossSlot(buffers);
+
+    await expect(client.recaptureTetherTargetsFromGpu()).resolves.toBe(true);
+
+    expect(group.restAnglesSBA.array[slot]).toBe(0);
+    expect(group.complianceSBA.array[slot]).toBe(1e5);
+  });
+
+  it('press es no-op sin quads cross (sin costuras) — el recapture del tether no se rompe', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece('a')]);
+    vi.spyOn(client, 'readPositionsToCPU').mockResolvedValue(new Float32Array(12));
+    await expect(client.recaptureTetherTargetsFromGpu()).resolves.toBe(true);
   });
 });
