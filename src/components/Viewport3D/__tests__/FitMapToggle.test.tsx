@@ -47,6 +47,7 @@ function createTestStore() {
         selectLasso3D: null,
         showGarment: true,
         showSeamlines3D: true,
+        showSimSeamLines: false,
         showInternalLines3D: true,
         surfaceMode3D: 'textured' as SurfaceMode3D,
         snapshots: [],

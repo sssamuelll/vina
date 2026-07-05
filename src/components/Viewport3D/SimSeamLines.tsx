@@ -70,7 +70,10 @@ function mergeLineData(
 }
 
 export default function SimSeamLines({ geometry, placedMeshes, seamInitData }: SimSeamLinesProps) {
-  const showSeamlines3D = useSelector((s: RootState) => s.simulation.showSeamlines3D);
+  // Modo INSPECCIÓN, default OFF (acta consejo costura-real 2026-07-05): la
+  // anotación dibujada contradiciendo al shading era el "más anormal" del
+  // founder — la costura debe VERSE por física+normales, no por overlay.
+  const showSimSeamLines = useSelector((s: RootState) => s.simulation.showSimSeamLines);
   const lineDataRef = useRef<SimSeamLineData | null>(null);
 
   const lineObj = useMemo(() => {
@@ -122,7 +125,7 @@ export default function SimSeamLines({ geometry, placedMeshes, seamInitData }: S
     posAttr.needsUpdate = true;
   });
 
-  if (!showSeamlines3D || !lineObj) return null;
+  if (!showSimSeamLines || !lineObj) return null;
 
   return <primitive object={lineObj.lines} />;
 }

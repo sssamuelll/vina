@@ -48,7 +48,11 @@ const shot = (page: Page, name: string) =>
 test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }) => {
   test.setTimeout(300_000);
   mkdirSync(OUT_DIR, { recursive: true });
-  await page.addInitScript(() => localStorage.setItem('openclo-use-webgpu', 'true'));
+  // CROSSBEND=off — A/B del kill-switch del bend cross-seam (acta costura-real).
+  await page.addInitScript((crossbendOff) => {
+    localStorage.setItem('openclo-use-webgpu', 'true');
+    if (crossbendOff) localStorage.setItem('openclo-crossbend', 'off');
+  }, process.env.CROSSBEND === 'off');
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
   await page.waitForFunction(
@@ -75,10 +79,12 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
   // 01 — hilos de costura (showSeamlines3D es default ON)
   await shot(page, '01-hilos-costura.png');
 
-  // 01b — 3/4: orbitar ~45° para que los hilos de hombro/costado (front↔back)
-  // se lean — de frente quedan ocultos tras las cartas. RIGHT-drag = orbit
-  // (Viewport3D deshabilita LEFT/MIDDLE y mapea RIGHT→ROTATE, estilo CLO3D).
-  // Se orbita de vuelta al final para que el resto del demo siga frontal.
+  // Helper de orbit (RIGHT-drag = ROTATE; LEFT/MIDDLE deshabilitados,
+  // estilo CLO3D). OJO: el damping de OrbitControls hace que orbitar "de
+  // vuelta" con el mouse NUNCA regrese exacto — el ángulo derivaba capturas
+  // enteras (cenitales/traseras). El regreso a frontal es DETERMINISTA:
+  // dispatch camera/setCameraPreset('front') (useCameraPresets anima al
+  // preset y termina exacto).
   const canvas = page.locator('canvas').first();
   const box = (await canvas.boundingBox())!;
   const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
@@ -89,9 +95,18 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
     await page.mouse.up({ button: 'right' });
     await page.waitForTimeout(600); // damping settle
   };
-  await orbit(-90); // ~45°: se leen los abanicos Y la escalera de costado front↔back
+  const resetToFront = async () => {
+    await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__OPENCLO_STORE__.dispatch({ type: 'camera/setCameraPreset', payload: 'front' });
+    });
+    await page.waitForTimeout(1200); // animación del preset
+  };
+
+  // 01b — hilos a 3/4 (los del torso: hombros/costados) y regreso exacto.
+  await orbit(-90);
   await shot(page, '01b-hilos-3cuartos.png');
-  await orbit(90);
+  await resetToFront();
 
   // 02 — modo arrange: anchor points horneados (bake async → espera)
   await page.evaluate(() => {
@@ -201,4 +216,10 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
   await shot(page, '06-drape-2.5s.png');
   await waitWindows(20, 120_000); // ≈10s sim
   await shot(page, '07-drape-10s.png');
+
+  // 07b — drape a 3/4 (la vista del A/B contra la referencia CLO3D: se lee
+  // la unión hombro→manga). Va AL FINAL: después de esto ya no hay capturas
+  // frontales que el orbit pueda contaminar.
+  await orbit(-90);
+  await shot(page, '07b-drape-3cuartos.png');
 });

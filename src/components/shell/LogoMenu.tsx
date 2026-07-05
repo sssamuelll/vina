@@ -9,7 +9,7 @@ import {
 } from '../../store/editorSlice';
 import {
   startSimulation, pauseSimulation, resetSimulation, setViewMode3D,
-  toggleGarment, toggleSeamlines3D, toggleInternalLines3D,
+  toggleGarment, toggleSeamlines3D, toggleSimSeamLines, toggleInternalLines3D,
 } from '../../store/simulationSlice';
 import { toggleDockSignaling } from '../../store/dockSlice';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
@@ -91,6 +91,7 @@ const VIEW_MENU: MenuItem[] = [
   { separator: true, label: '' },
   { label: '3D: Garment', action: (d) => d(toggleGarment()), checked: (s) => s.simulation.showGarment },
   { label: '3D: Seamlines', action: (d) => d(toggleSeamlines3D()), checked: (s) => s.simulation.showSeamlines3D },
+  { label: '3D: Seamlines en sim', action: (d) => d(toggleSimSeamLines()), checked: (s) => s.simulation.showSimSeamLines },
   { label: '3D: Internal Lines', action: (d) => d(toggleInternalLines3D()), checked: (s) => s.simulation.showInternalLines3D },
   { separator: true, label: '' },
   { label: 'Dock Suggestions', action: (d) => d(toggleDockSignaling()), checked: (s) => s.dock.signaling === 'subtle' },
