@@ -484,10 +484,15 @@ export class GpuSolverClient implements ClothSolverClient {
       tOff += p.triIds.length;
     }
 
-    // Snapshot invMass for freeze/unfreeze restore. Currently all particles
-    // init at 1.0. If a GPU pin system is added that also mutates invMass,
-    // this snapshot must be taken AFTER pins are applied.
-    this.originalInvMass = new Float32Array(invMass);
+    // NOTA: el snapshot originalInvMass se toma DESPUÉS de aplicar la masa
+    // de banda F3 (más abajo) — freeze/unfreeze debe restaurar la nervadura,
+    // no la masa uniforme (corrección mnCheck; el comentario viejo de "after
+    // pins" pedía exactamente esto).
+
+    // F3 nervadura: adyacencia de malla hoisted — la consumen la banda de
+    // margen (BFS) y el CSR de self-collision (antes se construía allá abajo;
+    // una sola construcción, corrección mnCheck).
+    const adjSets = buildAdjacency(new Int32Array(triangles), totalVerts); // firma pide Int32Array (S8)
 
     // Extract constraints with UV-based edge classification
     const uvArg = hasUvs ? mergedUvs : undefined;
@@ -571,6 +576,65 @@ export class GpuSolverClient implements ClothSolverClient {
       }
     }
 
+    // ── F3 NERVADURA (acta consejo costura-proceso-real 2026-07-05) ─────────
+    //
+    // La banda de margen real tiene 2-4 capas de tela: flexión ~8-27× (cúbica
+    // con el grosor) y 2-3× la masa — es la nervadura que desvía los pliegues
+    // del drapeado y hace que la costura cuelgue estable en vez de flotar.
+    // Banda = BFS 2 anillos (~1cm a malla de 5mm) desde los vértices de
+    // costura, sobre la adyacencia de malla PURA (sin partners cross-seam —
+    // la banda ya cubre ambos lados porque los pares aportan a y b).
+    // Masa ×2 (invMass ×0.5) + flexión ×3 (÷3 compliance) — empezamos ×3 y
+    // no el 8-27× idealizado porque la escala cúbica sobre malla gruesa
+    // sobre-rigidiza (calibrar en A/B visual).
+    const bandVerts = new Set<number>();
+    if (seamGlobalPairs.length > 0) {
+      const SEAM_BAND_RINGS = 2;
+      for (const pairs of seamGlobalPairs) for (const v of pairs) bandVerts.add(v);
+      let frontier = [...bandVerts];
+      for (let ring = 0; ring < SEAM_BAND_RINGS; ring++) {
+        const next: number[] = [];
+        for (const v of frontier) {
+          for (const nb of adjSets[v]) {
+            if (!bandVerts.has(nb)) {
+              bandVerts.add(nb);
+              next.push(nb);
+            }
+          }
+        }
+        frontier = next;
+      }
+      for (const v of bandVerts) invMass[v] *= 0.5;
+
+      // Flexión de banda: quads intra-pieza con los 4 vértices en banda →
+      // fabric/3 vía el override per-quad (NaN = mapping normal). El branch
+      // cross-seam de abajo PRESERVA este array al construir el conjunto.
+      const numBendQuads = bend.ids.length / 4;
+      if (numBendQuads > 0) {
+        const bandCompliance = new Float32Array(numBendQuads).fill(Number.NaN);
+        let bandQuads = 0;
+        for (let i = 0; i < numBendQuads; i++) {
+          const o = i * 4;
+          if (
+            bandVerts.has(bend.ids[o]) && bandVerts.has(bend.ids[o + 1]) &&
+            bandVerts.has(bend.ids[o + 2]) && bandVerts.has(bend.ids[o + 3])
+          ) {
+            const et = bend.edgeTypes[i];
+            const base = et === EdgeType.WARP
+              ? fabric.bendComplianceWarp
+              : fabric.bendComplianceWeft;
+            bandCompliance[i] = base / 3;
+            bandQuads++;
+          }
+        }
+        if (bandQuads > 0) bend.compliance = bandCompliance;
+      }
+    }
+
+    // Snapshot invMass para freeze/unfreeze — DESPUÉS de la masa de banda F3
+    // (restore preserva la nervadura) y antes de que createTslBuffers copie.
+    this.originalInvMass = new Float32Array(invMass);
+
     // ── Bend cross-seam (acta consejo costura-real 2026-07-05) ──────────────
     //
     // El término que convierte la unión de BISAGRA en costura de fábrica: la
@@ -630,6 +694,8 @@ export class GpuSolverClient implements ClothSolverClient {
           const CROSS_SEAM_BEND_COMPLIANCE = 1e5;
           const numCross = cross.ids.length / 4;
           const jointCompliance = new Float32Array(jointIds.length / 4).fill(Number.NaN);
+          // Preserva los overrides de banda F3 en la región intra.
+          if (bend.compliance) jointCompliance.set(bend.compliance, 0);
           jointCompliance.fill(CROSS_SEAM_BEND_COMPLIANCE, numBase, numBase + numCross);
           bendAll = {
             ids: jointIds,
@@ -690,7 +756,25 @@ export class GpuSolverClient implements ClothSolverClient {
       // tamaño de tabla espeja SpatialHashGrid.build: nextPrime(2N).
       // scBuffers DEBE asignarse antes de createTslSolver — su gate
       // (`config.selfCollision && buffers.scBuffers`) lee el campo en init.
-      const adjSets = buildAdjacency(new Int32Array(triangles), totalVerts); // firma pide Int32Array (S8)
+      //
+      // F4a (acta costura-proceso-real): las parejas COSIDAS entran a la
+      // adyacencia (hoisted arriba) antes del CSR — dos plies cosidos están
+      // en contacto POR DISEÑO, no en colisión. floor==thickness==2mm es
+      // equilibrio exacto y F2 densifica pares justo en ese umbral (el
+      // escéptico runtime lo subió de condicional a listo-en-el-PR).
+      // Kill-switch dev: localStorage 'openclo-seamscx' = 'off'.
+      const seamScExclEnabled = typeof window === 'undefined'
+        || window.localStorage?.getItem('openclo-seamscx') !== 'off';
+      if (seamScExclEnabled) {
+        for (const pairs of seamGlobalPairs) {
+          for (let k = 0; k + 1 < pairs.length; k += 2) {
+            const a = pairs[k], b = pairs[k + 1];
+            if (a === b) continue;
+            adjSets[a].add(b);
+            adjSets[b].add(a);
+          }
+        }
+      }
       const csr = buildAdjacencyCSR(adjSets, totalVerts);
       this.tslBuffers.scBuffers = createSelfCollisionBuffers(
         totalVerts,

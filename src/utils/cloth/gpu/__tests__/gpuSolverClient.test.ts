@@ -1344,3 +1344,101 @@ describe('pressCrossSeamAngles via settle recapture (behavior #17 — F1 plancha
     await expect(client.recaptureTetherTargetsFromGpu()).resolves.toBe(true);
   });
 });
+
+// ─── Behavior #18 — F3 nervadura + F4a exclusión seam↔self-collision ─────────
+//
+// Acta costura-proceso-real 2026-07-05: la banda de margen real tiene 2-4
+// plies → masa ×2 (invMass ×0.5, BFS 2 anillos desde vértices de costura,
+// snapshoteada DESPUÉS para que freeze/unfreeze la preserve) + flexión ×3
+// (compliance ÷3 en quads intra con los 4 vértices en banda). F4a: las
+// parejas cosidas entran a la adyacencia del CSR de self-collision (dos
+// plies cosidos están en contacto por diseño, no en colisión).
+
+describe('banda de margen F3 + exclusión seam↔SC F4a (behavior #18)', () => {
+  const seamPairs = () => [{
+    pieceAId: 'a',
+    pieceBId: 'b',
+    vertexPairs: [[0, 0], [1, 1]] as Array<[never, never]>,
+    compliance: 0.0001,
+    tensionFactor: 1.0,
+  }];
+
+  it('aplica masa ×2 a la banda (invMass ×0.5) y el snapshot la preserva en freeze/unfreeze', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')], seamPairs());
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const invMass = (client as any).tslBuffers.invMassSBA.array as Float32Array;
+    // Quads de 4 vértices: TODO vértice queda a ≤2 anillos de la costura.
+    for (let i = 0; i < 8; i++) expect(invMass[i]).toBeCloseTo(0.5, 6);
+
+    // freeze → 0; unfreeze (lista vacía, contrato single-arg A6 #684) →
+    // restaura la masa de BANDA (0.5), no 1.0 — el snapshot se toma después
+    // de aplicar la nervadura (corrección mnCheck).
+    client.freezePieces(['a']);
+    expect(invMass[0]).toBe(0);
+    client.freezePieces([]);
+    expect(invMass[0]).toBeCloseTo(0.5, 6);
+  });
+
+  it('sin costuras no hay banda: invMass uniforme 1.0', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const invMass = (client as any).tslBuffers.invMassSBA.array as Float32Array;
+    for (let i = 0; i < 8; i++) expect(invMass[i]).toBe(1);
+  });
+
+  it('endurece flexión ×3 en quads intra de banda (fabric/3) y el cross conserva su tope', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')], seamPairs());
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buffers = (client as any).tslBuffers;
+    let intraChecked = 0;
+    let crossChecked = 0;
+    for (const group of buffers.bendColors) {
+      const ids = group.idsSBA.array as Uint32Array;
+      const compliance = group.complianceSBA.array as Float32Array;
+      for (let slot = 0; slot < group.count; slot++) {
+        const o = slot * 4;
+        if (ids[o] === 0 && ids[o + 1] === 1 && ids[o + 2] === 2 && ids[o + 3] === 6) {
+          // Quad cross-seam: tope blando hasta el press F1 (no ÷3).
+          expect(compliance[slot]).toBe(1e5);
+          crossChecked++;
+        } else {
+          // Quads intra (interior de cada quad piece): 4 vértices en banda
+          // → bendComplianceWeft default (1e4) ÷ 3.
+          expect(compliance[slot]).toBeCloseTo(1e4 / 3, 3);
+          intraChecked++;
+        }
+      }
+    }
+    expect(intraChecked).toBeGreaterThan(0);
+    expect(crossChecked).toBe(1);
+  });
+
+  it('F4a: las parejas cosidas entran a la adyacencia del CSR de self-collision', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')], seamPairs());
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sc = (client as any).tslBuffers.scBuffers;
+    const offsets = sc.adjOffsetsSBA.array as Uint32Array;
+    const neighbors = sc.adjNeighborsSBA.array as Uint32Array;
+    // Vértice 0 (pieza a): vecinos de malla {1,2,3} + pareja cosida 4.
+    const p0 = Array.from(neighbors.slice(offsets[0], offsets[1])).sort((a, b) => a - b);
+    expect(p0).toEqual([1, 2, 3, 4]);
+    // Simetría: vértice 4 (pieza b, local 0) incluye a 0.
+    const p4 = Array.from(neighbors.slice(offsets[4], offsets[5])).sort((a, b) => a - b);
+    expect(p4).toContain(0);
+  });
+});
