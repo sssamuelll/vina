@@ -72,6 +72,19 @@ export interface BendColorGroup {
   count: number;
 }
 
+/** CSR de soldadura de normales: vértices de costura + sus parejas
+ *  (acta consejo costura-real 2026-07-05). */
+export interface NormalWeldBufferSet {
+  /** uint — vértices únicos de costura (ordenados, determinista). */
+  vertsSBA: StorageBufferAttribute;
+  /** uint, count+1 — offsets CSR sobre partnersSBA. */
+  offsetsSBA: StorageBufferAttribute;
+  /** uint — parejas aplanadas (ordenadas por vértice, determinista). */
+  partnersSBA: StorageBufferAttribute;
+  /** Número de vértices soldados (dispatch del kernel normalWeld). */
+  count: number;
+}
+
 export interface TslBufferSet {
   // Core particle buffers
   positionSBA: StorageBufferAttribute;
@@ -112,6 +125,11 @@ export interface TslBufferSet {
 
   // Self-collision buffers (null if disabled)
   scBuffers: SelfCollisionBufferSet | null;
+
+  // Normal-weld cross-seam (acta costura-real): la superficie se lee
+  // continua a través de la unión. Asignado por GpuSolverClient antes de
+  // createTslSolver (patrón scBuffers); null sin costuras.
+  weldBuffers: NormalWeldBufferSet | null;
 
   // Wind accumulation buffers (null if no wind)
   windBuffers: WindBufferSet | null;
@@ -228,9 +246,15 @@ export function createTslBuffers(
   if (numBend > 0) {
     const bendCompliance = new Float32Array(numBend);
     for (let i = 0; i < numBend; i++) {
-      // Per-constraint bend compliance from edge type
-      const edgeType = bend.edgeTypes ? bend.edgeTypes[i] : 1; // default WEFT
-      bendCompliance[i] = bendEdgeTypeToCompliance(edgeType, fabric);
+      // Per-constraint bend compliance: override per-quad (cross-seam,
+      // acta costura-real; NaN = sin override) o mapping edge type→fabric.
+      const override = bend.compliance?.[i];
+      if (override !== undefined && Number.isFinite(override)) {
+        bendCompliance[i] = override;
+      } else {
+        const edgeType = bend.edgeTypes ? bend.edgeTypes[i] : 1; // default WEFT
+        bendCompliance[i] = bendEdgeTypeToCompliance(edgeType, fabric);
+      }
     }
 
     const coloredBend = colorConstraints(bend.ids, bend.restAngles, numBend, bendCompliance, 4);
@@ -307,6 +331,7 @@ export function createTslBuffers(
     facePokeCsrSBA,
     facePokeContactSBA,
     scBuffers: null,
+    weldBuffers: null,
     windBuffers: null,
     numParticles: N,
     numTriangles: numTri,
@@ -396,6 +421,9 @@ export function destroyTslBufferSet(
   }
   for (const color of set.seamColors) {
     sbas.push(color.idsSBA, color.targetDistSBA, color.complianceSBA);
+  }
+  if (set.weldBuffers) {
+    sbas.push(set.weldBuffers.vertsSBA, set.weldBuffers.offsetsSBA, set.weldBuffers.partnersSBA);
   }
   for (const sba of sbas) {
     disposeStorageBufferAttribute(sba, renderer);

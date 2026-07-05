@@ -637,6 +637,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       renderer.compute(solver.normalZero);
       renderer.compute(solver.normalAccum);
       renderer.compute(solver.normalNormalize);
+      // Normal-weld cross-seam (acta costura-real): tras normalize, los
+      // vértices de costura promedian su normal con la de sus parejas → la
+      // superficie se lee CONTINUA a través de la unión (el slit de 2mm pasa
+      // de grieta de luz a surco de costura). Determinista, race-free.
+      if (solver.normalWeld) {
+        renderer.compute(solver.normalWeld);
+      }
 
       // F0 (#897): en TSL la cadencia de render == cadencia de sim.
       recordFrameTick();

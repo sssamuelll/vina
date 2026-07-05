@@ -28,6 +28,7 @@ import {
   storage,
   Fn,
   If,
+  Loop,
   compute,
   uniform,
   float,
@@ -152,6 +153,17 @@ export interface TslSolver {
   normalAccum: ComputeNode;
   /** Normalize accumulated normals and write to normalSBA (dispatch: numParticles) */
   normalNormalize: ComputeNode;
+  /**
+   * Normal-weld cross-seam (acta consejo costura-real 2026-07-05): re-escribe
+   * la normal de cada vértice de costura como la normalización de la SUMA de
+   * acumuladores (el suyo + sus parejas del otro lado) — la superficie se lee
+   * CONTINUA a través de la unión y el slit de 2mm pasa de grieta de luz a
+   * surco de costura natural. Dispatch: count de vértices soldados, DESPUÉS
+   * de normalNormalize. Determinista y race-free: cada vértice escribe SOLO
+   * su slot y lee el buffer de ACUMULACIÓN (estable en ese punto). `null`
+   * sin costuras.
+   */
+  normalWeld: ComputeNode | null;
   /**
    * Face-poke Generate/Solve nodes (A4, GPU-only). Built + assigned by
    * `GpuSolverClient.setTslCollisionBody` when the avatar body is set (the
@@ -900,6 +912,53 @@ function makeNormalNormalizeFn(
   })();
 }
 
+/**
+ * Normal-weld cross-seam: normal[self] = normalize(accum[self] + Σ accum[partner]).
+ *
+ * Lee el buffer de ACUMULACIÓN (estable tras normalAccum — nadie lo escribe
+ * durante este pase) y escribe SOLO el slot propio del normalBuf → cero
+ * razas, determinista (P4). El invScale del fixed-point se cancela en la
+ * normalización, así que se suma en crudo. Degenerado (suma ~0, normales
+ * opuestas): conserva lo que normalNormalize dejó — no escribe.
+ */
+function makeNormalWeldFn(
+  normalBuf: TslNode,
+  normalAccumBuf: TslNode,
+  vertsBuf: TslNode,
+  offsetsBuf: TslNode,
+  partnersBuf: TslNode,
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
+    const w = instanceIndex;
+    const self = uint(vertsBuf.element(w)).toVar('selfV');
+    const base = self.mul(uint(3));
+    const sum = vec3(
+      float(atomicLoad(normalAccumBuf.element(base))),
+      float(atomicLoad(normalAccumBuf.element(base.add(uint(1))))),
+      float(atomicLoad(normalAccumBuf.element(base.add(uint(2))))),
+    ).toVar('sum');
+
+    const pStart = int(offsetsBuf.element(w)).toVar('pStart');
+    const pEnd = int(offsetsBuf.element(uint(w).add(uint(1)))).toVar('pEnd');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Loop({ start: pStart, end: pEnd, type: 'int', condition: '<' }, ({ i }: { i: any }) => {
+      const p = uint(partnersBuf.element(uint(i)));
+      const pb = p.mul(uint(3));
+      sum.addAssign(vec3(
+        float(atomicLoad(normalAccumBuf.element(pb))),
+        float(atomicLoad(normalAccumBuf.element(pb.add(uint(1))))),
+        float(atomicLoad(normalAccumBuf.element(pb.add(uint(2))))),
+      ));
+    });
+
+    const len = sum.dot(sum).sqrt();
+    If(len.greaterThan(float(1e-3)), () => {
+      normalBuf.element(self).assign(sum.div(len));
+    });
+  })();
+}
+
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 /**
@@ -1023,6 +1082,20 @@ export function createTslSolver(
 
   const normalNormalizeFn = makeNormalNormalizeFn(normalBuf, normalAccumBuf);
   const normalNormalize = compute(normalNormalizeFn, N, [64]);
+
+  // ─── Normal-weld cross-seam (acta costura-real 2026-07-05) ────────
+  let normalWeld: ComputeNode | null = null;
+  if (buffers.weldBuffers && buffers.weldBuffers.count > 0) {
+    const wb = buffers.weldBuffers;
+    const weldVertsBuf = storage(wb.vertsSBA, 'uint', wb.count);
+    const weldOffsetsBuf = storage(wb.offsetsSBA, 'uint', wb.count + 1);
+    const weldPartnersBuf = storage(wb.partnersSBA, 'uint', wb.partnersSBA.count);
+    normalWeld = compute(
+      makeNormalWeldFn(normalBuf, normalAccumBuf, weldVertsBuf, weldOffsetsBuf, weldPartnersBuf),
+      wb.count,
+      [64],
+    );
+  }
 
   // ─── Collision body management ──────────────────────────────────────
   const collisionBodies: TslCollisionBody[] = [];
@@ -1186,6 +1259,7 @@ export function createTslSolver(
     normalZero,
     normalAccum,
     normalNormalize,
+    normalWeld,
     // Assigned by GpuSolverClient.setTslCollisionBody once the avatar body
     // (with its BVH) exists — the correction kernel needs it. Null until then.
     facePokeNodes: null,

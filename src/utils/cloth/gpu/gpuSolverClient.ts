@@ -10,7 +10,7 @@
  */
 
 import { GpuClothSolver, type GpuSolverConfig } from './gpuSolver';
-import { extractStretchConstraints, extractBendConstraints, colorConstraints, type SeamConstraintData } from './gpuBuffers';
+import { extractStretchConstraints, extractBendConstraints, buildCrossSeamBendQuads, colorConstraints, type SeamConstraintData } from './gpuBuffers';
 import { createPositionStorageAttribute, createNormalStorageAttribute } from './gpuStorageAttributes';
 import {
   createTslBuffers,
@@ -505,6 +505,9 @@ export class GpuSolverClient implements ClothSolverClient {
     // distancia mundial actual × tension/100 (decae en GPU), compliance
     // per-constraint, coloreado para dispatch paralelo race-free.
     let seam: TslSeamConstraintData | null = null;
+    // Pares globales POR COSTURA en orden t — alimentan los quads dihedral
+    // cross-seam (acta consejo costura-real 2026-07-05).
+    const seamGlobalPairs: number[][] = [];
     if (seamPairs && seamPairs.length > 0) {
       const seamIds: number[] = [];
       const seamDist: number[] = [];
@@ -520,6 +523,7 @@ export class GpuSolverClient implements ClothSolverClient {
           );
           continue;
         }
+        const globals: number[] = [];
         for (const [a, b] of sp.vertexPairs) {
           const ga = a + offA;
           const gb = b + offB;
@@ -529,7 +533,9 @@ export class GpuSolverClient implements ClothSolverClient {
           seamIds.push(ga, gb);
           seamDist.push(Math.sqrt(dx * dx + dy * dy + dz * dz) * sp.tensionFactor);
           seamCompliance.push(sp.compliance);
+          globals.push(ga, gb);
         }
+        if (globals.length > 0) seamGlobalPairs.push(globals);
       }
       if (seamIds.length > 0) {
         const seamColored = colorConstraints(
@@ -549,6 +555,77 @@ export class GpuSolverClient implements ClothSolverClient {
       }
     }
 
+    // ── Bend cross-seam (acta consejo costura-real 2026-07-05) ──────────────
+    //
+    // El término que convierte la unión de BISAGRA en costura de fábrica: la
+    // curvatura fluye a través de la costura. Quads dihedral cross-pieza
+    // concatenados al set de bend ANTES del coloring (mismo kernel P1, cero
+    // dispatch nuevo — viajan dentro de bendColors). Rest 0, compliance =
+    // bendComplianceWeft del fabric (EdgeType.WEFT en el builder). GPU-only:
+    // divergencia A7 deliberada (precedente self-seams, Epic-746) — el
+    // fallback WASM/CPU drapea con bisagras, documentado.
+    //
+    // BARRERA HALBERG (automática, ratificada): los quads cross-seam tocan
+    // vértices de alta valencia; si el coloring conjunto infla los grupos de
+    // bend en más de 4 colores vs el baseline intra-pieza, el costo son
+    // cientos de encodes extra por frame → los quads se EXCLUYEN con warn
+    // (la feature no se shipea rota, degrada a bisagra).
+    //
+    // Kill-switch dev: localStorage 'openclo-crossbend' = 'off'.
+    let bendAll = bend;
+    let crossQuadCount = 0;
+    let bendColorDelta = 0;
+    const crossBendEnabled = typeof window === 'undefined'
+      || window.localStorage?.getItem('openclo-crossbend') !== 'off';
+    if (crossBendEnabled && seamGlobalPairs.length > 0) {
+      const cross = buildCrossSeamBendQuads(triangles, seamGlobalPairs);
+      if (cross.ids.length > 0) {
+        const numBase = bend.ids.length / 4;
+        const baseColors = numBase > 0
+          ? colorConstraints(bend.ids, bend.restAngles, numBase, undefined, 4).colorRanges.length
+          : 0;
+        const jointIds = new Uint32Array(bend.ids.length + cross.ids.length);
+        jointIds.set(bend.ids, 0);
+        jointIds.set(cross.ids, bend.ids.length);
+        const jointAngles = new Float32Array(bend.restAngles.length + cross.restAngles.length);
+        jointAngles.set(bend.restAngles, 0);
+        jointAngles.set(cross.restAngles, bend.restAngles.length);
+        const jointTypes = new Uint8Array(bend.edgeTypes.length + cross.edgeTypes.length);
+        jointTypes.set(bend.edgeTypes, 0);
+        jointTypes.set(cross.edgeTypes, bend.edgeTypes.length);
+        const jointColors = colorConstraints(
+          jointIds, jointAngles, jointIds.length / 4, undefined, 4,
+        ).colorRanges.length;
+        bendColorDelta = jointColors - baseColors;
+        if (bendColorDelta <= 4) {
+          // Compliance per-quad: intra = NaN (createTslBuffers mapea
+          // edgeType→fabric como siempre); cross = TOPE BLANDO de la banda
+          // angular calibrada [6e2, 1e5]. MEDIDO 2026-07-05 (A/B con el
+          // kill-switch): a rigidez del fabric + rest 0, los quads
+          // planchaban costuras con ángulo real (la sisa envuelve por
+          // diseño) → grieta con piel + tela explotada. A 1e5 el
+          // acoplamiento es sugerencia de continuidad, no plancha; la
+          // escalera de rigidez (3e4, ...) queda para el A/B visual.
+          const CROSS_SEAM_BEND_COMPLIANCE = 1e5;
+          const numCross = cross.ids.length / 4;
+          const jointCompliance = new Float32Array(jointIds.length / 4).fill(Number.NaN);
+          jointCompliance.fill(CROSS_SEAM_BEND_COMPLIANCE, numBase, numBase + numCross);
+          bendAll = {
+            ids: jointIds,
+            restAngles: jointAngles,
+            edgeTypes: jointTypes,
+            compliance: jointCompliance,
+          };
+          crossQuadCount = numCross;
+        } else {
+          console.warn(
+            `[GpuSolverClient] cross-seam bend EXCLUIDO: coloring conjunto ` +
+            `infla bendColors en ${bendColorDelta} (>4) — barrera Halberg`,
+          );
+        }
+      }
+    }
+
     await withErrorScope(this.device, 'GpuSolverClient.initMultiPieceTsl', () => {
       // Re-init: free any previously-allocated TSL resources so re-init cycles
       // (load project → simulate → load different project) don't leak GPUBuffers
@@ -565,7 +642,7 @@ export class GpuSolverClient implements ClothSolverClient {
       this.tslBuffers = createTslBuffers(
         { positions, triangles, invMass },
         colored,
-        bend,
+        bendAll, // bend intra-pieza + quads cross-seam (acta costura-real)
         seam,
         fabric,
         tetherRadii,
@@ -588,6 +665,43 @@ export class GpuSolverClient implements ClothSolverClient {
         csr.offsets,
         csr.neighbors,
       );
+
+      // Normal-weld cross-seam (acta consejo costura-real 2026-07-05): CSR
+      // vértice→parejas construido de los MISMOS pares globales del seam
+      // packing — las normales se sueldan a través de la unión en el kernel
+      // normalWeld (post-normalNormalize) y la superficie se lee continua.
+      // Orden determinista (verts y parejas sorted) — P4.
+      if (seamGlobalPairs.length > 0) {
+        const partnersByVert = new Map<number, Set<number>>();
+        for (const pairs of seamGlobalPairs) {
+          for (let k = 0; k + 1 < pairs.length; k += 2) {
+            const a = pairs[k], b = pairs[k + 1];
+            if (a === b) continue;
+            let sa = partnersByVert.get(a);
+            if (!sa) { sa = new Set(); partnersByVert.set(a, sa); }
+            sa.add(b);
+            let sb = partnersByVert.get(b);
+            if (!sb) { sb = new Set(); partnersByVert.set(b, sb); }
+            sb.add(a);
+          }
+        }
+        const weldVerts = [...partnersByVert.keys()].sort((x, y) => x - y);
+        if (weldVerts.length > 0) {
+          const weldOffsets = new Uint32Array(weldVerts.length + 1);
+          const weldPartners: number[] = [];
+          weldVerts.forEach((v, i) => {
+            const ps = [...partnersByVert.get(v)!].sort((x, y) => x - y);
+            weldPartners.push(...ps);
+            weldOffsets[i + 1] = weldPartners.length;
+          });
+          this.tslBuffers.weldBuffers = {
+            vertsSBA: createSBA(new Uint32Array(weldVerts), 1),
+            offsetsSBA: createSBA(weldOffsets, 1),
+            partnersSBA: createSBA(new Uint32Array(weldPartners), 1),
+            count: weldVerts.length,
+          };
+        }
+      }
 
       const defaultConfig: TslSolverConfig = {
         substeps: 15,
@@ -625,7 +739,9 @@ export class GpuSolverClient implements ClothSolverClient {
       console.log('[GpuSolverClient] TSL solver initialized:', {
         particles: totalVerts,
         stretchColors: colored.colorRanges.length,
-        bendConstraints: bend.ids.length / 4,
+        bendConstraints: bendAll.ids.length / 4,
+        crossSeamBendQuads: crossQuadCount,
+        bendColorDelta,
         seamConstraints: seam ? seam.ids.length / 2 : 0,
         seamColors: seam ? seam.colorRanges.length : 0,
         hasUvs,
