@@ -27,7 +27,7 @@ import { RootState } from '../../store';
 import { PatternPiece, Seam, SeamGroup } from '../../types/types';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { seamInitDataToPairs } from '../../utils/cloth/seamPairs';
-import { buildSeamFillIndices } from './seamFill';
+import { buildSeamFillBridges, filterSewnBridges } from './seamFill';
 import { resolveArrangementWithFrames } from '../../utils/cloth/arrangement/arrangementBinding';
 import { computeEffectiveRegions } from '../../utils/cloth/garmentPlacement';
 import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
@@ -367,16 +367,26 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // Seam fill strip (costura-real): puentea la ranura del piso físico
     // (2mm shell, A3) SOLO en el index de render — sin él, la piel asoma
     // como línea a lo largo de toda costura cosida ("línea marrón",
-    // hallazgo 2026-07-06). Cero vértices nuevos, cero física, cero costo
-    // por frame. Kill-switch dev: localStorage 'openclo-seamfill' = 'off'.
+    // hallazgo 2026-07-06). Cero vértices nuevos, cero física.
+    //
+    // Los puentes NO se añaden aquí: en init TODO par está abierto y los
+    // abiertos cordean por DENTRO del cuerpo (las fotos de Samuel desde
+    // dentro del avatar: "la tela como un hacha desmembrando el brazo" —
+    // la almendra une bordes a lados opuestos del brazo). Se stashean con
+    // sus compuertas y el settle (frame 150, mismo readback del tether)
+    // aplica solo los COSIDOS vía filterSewnBridges.
+    // Kill-switch dev: localStorage 'openclo-seamfill' = 'off'.
     const seamFillEnabled = typeof window === 'undefined'
       || window.localStorage?.getItem('openclo-seamfill') !== 'off';
     if (seamFillEnabled && seamInitData.length > 0) {
       const offsets = new Map<string, number>();
       let acc = 0;
       for (const p of validMeshes) { offsets.set(p.pieceId, acc); acc += p.vertices.length / 3; }
-      const fill = buildSeamFillIndices(seamInitDataToPairs(seamInitData, wrappedMeshes), offsets);
-      if (fill.length > 0) geo.setIndex([...indices, ...fill]);
+      geo.userData.seamFillBridges = buildSeamFillBridges(
+        seamInitDataToPairs(seamInitData, wrappedMeshes),
+        offsets,
+      );
+      geo.userData.seamFillBaseIndices = indices;
     }
 
     return { staticGeometry: geo };
@@ -700,6 +710,27 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         gpuClient.recaptureTetherTargetsFromGpu().then((ok) => {
           tetherReady.current = ok;
           tslReadbackPending.current = false;
+          // Seam fill en settle (costura-real): con la pose asentada ya se
+          // sabe QUÉ pares cosieron — tetherTargetSBA ES la copia de las
+          // posiciones asentadas tras un recapture exitoso. Solo los
+          // puentes 100% cosidos entran al index; los abiertos (almendra)
+          // se quedan fuera — un puente abierto cordea por DENTRO del
+          // brazo (fotos 2026-07-06).
+          if (ok && staticGeometry) {
+            const bridges = staticGeometry.userData.seamFillBridges as
+              | import('./seamFill').SeamFillBridge[]
+              | undefined;
+            const base = staticGeometry.userData.seamFillBaseIndices as number[] | undefined;
+            const settled = gpuClient.getTetherTargets();
+            if (bridges?.length && base && settled) {
+              const fill = filterSewnBridges(bridges, settled);
+              if (fill.length > 0) staticGeometry.setIndex([...base, ...fill]);
+              console.log(
+                `[GarmentSimulation] seam fill: ${fill.length / 3} tris puente ` +
+                `(${bridges.length} candidatos) — abiertos excluidos`,
+              );
+            }
+          }
         });
       }
 

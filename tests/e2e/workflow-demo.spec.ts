@@ -46,7 +46,9 @@ const shot = (page: Page, name: string) =>
   page.screenshot({ path: path.join(OUT_DIR, name) });
 
 test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }) => {
-  test.setTimeout(300_000);
+  // HOLD_OPEN alarga el límite del test para que el waitForTimeout de 10 min
+  // (inspección manual, ver el final) no lo mate antes.
+  test.setTimeout(process.env.HOLD_OPEN ? 900_000 : 300_000);
   mkdirSync(OUT_DIR, { recursive: true });
   // CROSSBEND=off — A/B del kill-switch del bend cross-seam (acta costura-real).
   await page.addInitScript((crossbendOff) => {
@@ -222,4 +224,14 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
   // frontales que el orbit pueda contaminar.
   await orbit(-90);
   await shot(page, '07b-drape-3cuartos.png');
+
+  // HOLD_OPEN=1: deja la ventana headed abierta al final para inspección
+  // manual (Samuel orbita con right-drag y juzga con su ojo — ancla híbrida
+  // del 17-jul). Sin el flag el test cierra normal. Regreso a frontal para
+  // que arranque en la vista de referencia.
+  if (process.env.HOLD_OPEN) {
+    await resetToFront();
+    console.log('\n[workflow-demo] HOLD_OPEN — ventana abierta 10 min. Right-drag orbita. Ctrl+C para cerrar.\n');
+    await page.waitForTimeout(600_000);
+  }
 });
