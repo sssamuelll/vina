@@ -1471,7 +1471,71 @@ export class GpuSolverClient implements ClothSolverClient {
     // F1 planchado: el MISMO readback del settle alimenta el press de los
     // quads cross-seam — cero readbacks extra (corrección mnCheck).
     this.pressCrossSeamAngles(settled);
+    // Puntadas bloqueadas: mismo readback — el hilo no atraviesa el brazo.
+    this.releaseBlockedSeamPairs(settled);
     return true;
+  }
+
+  /**
+   * PUNTADAS BLOQUEADAS (fotos de Samuel desde dentro del avatar,
+   * 2026-07-06): en la almendra dorso-hombro los pares de costura unen un
+   * punto DETRÁS del brazo con uno DELANTE — no pueden cerrar porque el
+   * brazo está en el medio. La constraint rígida (compliance 1e-6) se queda
+   * halando eternamente y la tela tensada CORTA el brazo como cuerda ("la
+   * tela como un hacha desmembrando al avatar"): la colisión del tier GPU
+   * es por vértices (face-poke no disponible), así que las CARAS tensas
+   * cortan el interior aunque los vértices queden fuera.
+   *
+   * En el mundo real esto es imposible: el hilo no atraviesa el cuerpo —
+   * una puntada que no puede cerrar NO SE COSE (queda saltada). Simular el
+   * proceso real = soltarla: en el settle (frame 150, mismo readback del
+   * tether/planchado), todo par con gap > BLOCKED_SEAM_GAP_M se libera
+   * (compliance → 1.0, α ≈ 8e5 con sdt 1/900 → corrección ~0). La colisión
+   * empuja la tela fuera del brazo y la almendra queda como hueco honesto
+   * hasta el fix de la junction (colocación/alcance del cap).
+   *
+   * Umbral 2cm: bien por encima del típico cosido en settle (0.2-0.4cm,
+   * perfil de la sonda seam-gap) y por debajo del run de la almendra
+   * (3-13cm). Los pares que iban a cerrar YA cerraron (curvas planas desde
+   * 0.5s). Coherente con el gate del press (≤5mm) y el filtro del seam
+   * fill: bloqueado → ni planchado ni puente.
+   *
+   * GPU-only (divergencia A7, precedente press/normal-weld). Limitación
+   * heredada del tether: no refresca en re-pose.
+   */
+  private releaseBlockedSeamPairs(settled: Float32Array): void {
+    if (!this.tslBuffers) return;
+    const BLOCKED_SEAM_GAP_M = 0.02;
+    const RELEASED_SEAM_COMPLIANCE = 1.0;
+
+    let released = 0;
+    let total = 0;
+    for (const group of this.tslBuffers.seamColors) {
+      const ids = group.idsSBA.array as Uint32Array;
+      const compliance = group.complianceSBA.array as Float32Array;
+      let dirty = false;
+      for (let slot = 0; slot < group.count; slot++) {
+        total++;
+        const a = ids[slot * 2], b = ids[slot * 2 + 1];
+        const gap = Math.hypot(
+          settled[a * 3] - settled[b * 3],
+          settled[a * 3 + 1] - settled[b * 3 + 1],
+          settled[a * 3 + 2] - settled[b * 3 + 2],
+        );
+        if (gap > BLOCKED_SEAM_GAP_M) {
+          compliance[slot] = RELEASED_SEAM_COMPLIANCE;
+          dirty = true;
+          released++;
+        }
+      }
+      if (dirty) group.complianceSBA.version++;
+    }
+    if (released > 0) {
+      console.log(
+        `[GpuSolverClient] puntadas bloqueadas: ${released}/${total} pares ` +
+        `liberados (gap > ${BLOCKED_SEAM_GAP_M * 100}cm — el hilo no atraviesa el brazo)`,
+      );
+    }
   }
 
   /**

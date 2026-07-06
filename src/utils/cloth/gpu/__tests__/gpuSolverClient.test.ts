@@ -1345,6 +1345,84 @@ describe('pressCrossSeamAngles via settle recapture (behavior #17 — F1 plancha
   });
 });
 
+// ─── Behavior #19 — puntadas bloqueadas: release en settle ───────────────────
+//
+// Fotos desde dentro del avatar (2026-07-06): pares de la almendra unen
+// puntos a lados opuestos del brazo; la constraint rígida hala eternamente
+// y la tela tensa corta el brazo (colisión vértice-only). El hilo real no
+// atraviesa el cuerpo: en el settle, gap > 2cm → compliance 1.0 (muerta).
+
+describe('releaseBlockedSeamPairs via settle recapture (behavior #19)', () => {
+  const seamPairs = () => [{
+    pieceAId: 'a',
+    pieceBId: 'b',
+    vertexPairs: [[0, 0], [1, 1]] as Array<[never, never]>,
+    compliance: 0.0001,
+    tensionFactor: 1.0,
+  }];
+
+  /** Posiciones asentadas con el par (0,4) a `gap0` y el par (1,5) a `gap1`. */
+  function makeSettledGaps(gap0: number, gap1: number): Float32Array {
+    return new Float32Array([
+      -0.5, 1.0, 0.0, //  0
+       0.5, 1.0, 0.0, //  1
+       0.5, 0.0, 0.0, //  2
+      -0.5, 0.0, 0.0, //  3
+      -0.5, 1.0, gap0, // 4 — partner de 0
+       0.5, 1.0, gap1, // 5 — partner de 1
+       0.5, 0.0, 0.0,  // 6
+      -0.5, 0.0, 0.0,  // 7
+    ]);
+  }
+
+  async function initWithSeams() {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')], seamPairs());
+    return client;
+  }
+
+  /** Compliance por par (a,b) escaneando los grupos seam por-color. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function seamCompliance(buffers: any, a: number, b: number): number {
+    for (const group of buffers.seamColors) {
+      const ids = group.idsSBA.array as Uint32Array;
+      for (let slot = 0; slot < group.count; slot++) {
+        if (ids[slot * 2] === a && ids[slot * 2 + 1] === b) {
+          return (group.complianceSBA.array as Float32Array)[slot];
+        }
+      }
+    }
+    throw new Error(`seam pair (${a},${b}) not found`);
+  }
+
+  it('libera el par bloqueado (>2cm) y conserva el cosido', async () => {
+    const client = await initWithSeams();
+    // Par (0,4) bloqueado a 8cm (almendra); par (1,5) cosido a 1mm.
+    vi.spyOn(client, 'readPositionsToCPU').mockResolvedValue(makeSettledGaps(0.08, 0.001));
+
+    await expect(client.recaptureTetherTargetsFromGpu()).resolves.toBe(true);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buffers = (client as any).tslBuffers;
+    expect(seamCompliance(buffers, 0, 4)).toBe(1.0);      // liberada (α≈8e5 → muerta)
+    expect(seamCompliance(buffers, 1, 5)).toBeCloseTo(0.0001, 8); // sigue cosiendo
+  });
+
+  it('no toca nada cuando todos los pares están cosidos', async () => {
+    const client = await initWithSeams();
+    vi.spyOn(client, 'readPositionsToCPU').mockResolvedValue(makeSettledGaps(0.001, 0.001));
+
+    await expect(client.recaptureTetherTargetsFromGpu()).resolves.toBe(true);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buffers = (client as any).tslBuffers;
+    expect(seamCompliance(buffers, 0, 4)).toBeCloseTo(0.0001, 8);
+    expect(seamCompliance(buffers, 1, 5)).toBeCloseTo(0.0001, 8);
+  });
+});
+
 // ─── Behavior #18 — F3 nervadura + F4a exclusión seam↔self-collision ─────────
 //
 // Acta costura-proceso-real 2026-07-05: la banda de margen real tiene 2-4
