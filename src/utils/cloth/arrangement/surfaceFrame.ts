@@ -75,7 +75,15 @@ export function surfaceFrame(region: BodyRegion, d: BodyDimensions, axisHint?: V
     case 'cuff-left': {
       const axis = (axisHint ? v(...axisHint) : v(-1, 0, 0)).normalize();
       const point = v(-(d.shoulderWidth / 2), d.shoulderHeight, 0).add(axis.clone().multiplyScalar(sleeveAlong(region === 'left-sleeve')));
-      const normal = radialNormal(axis);
+      // prefer=+Y (ARRIBA, no el default +Z frente): φ=0 del wrap = cresta del
+      // hombro. Con el default, el ápice del cap nacía en el FRENTE del brazo
+      // (anilla rotada ~130° de construcción) y la mitad trasera del cap
+      // quedaba a 12cm de su armhole con el deltoide en el camino — la
+      // almendra dorso-hombro (diagnóstico 3-frentes 2026-07-06: patrón 2D y
+      // mapeo de rangos exonerados con arcos/pares medidos; el seed ES el
+      // destino, el cap @10s está a 3.6cm de donde nace). Con +Y la abertura
+      // del tubo cae en la AXILA, donde vive el underarmSeam real.
+      const normal = radialNormal(axis, v(0, 1, 0));
       const tangent = axis.clone(); // sleeve length runs along the arm
       return { point: toV3(point), normal: toV3(normal), tangent: toV3(tangent), axis: toV3(axis), radius: armR };
     }
@@ -83,7 +91,8 @@ export function surfaceFrame(region: BodyRegion, d: BodyDimensions, axisHint?: V
     case 'cuff-right': {
       const axis = (axisHint ? v(...axisHint) : v(1, 0, 0)).normalize();
       const point = v(d.shoulderWidth / 2, d.shoulderHeight, 0).add(axis.clone().multiplyScalar(sleeveAlong(region === 'right-sleeve')));
-      const normal = radialNormal(axis);
+      // prefer=+Y — ver left-sleeve.
+      const normal = radialNormal(axis, v(0, 1, 0));
       const tangent = axis.clone();
       return { point: toV3(point), normal: toV3(normal), tangent: toV3(tangent), axis: toV3(axis), radius: armR };
     }
