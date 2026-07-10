@@ -13,6 +13,7 @@
 
 import type { AppDispatch, RootState } from './index';
 import { addSeam, removeSeam } from './projectSlice';
+import { batchUndo } from './undoMiddleware';
 import { showSuccessToast, showInfoToast } from './copilotUISlice';
 import { autoSew, isStaleAiSeam } from '../utils/autoSew';
 import { refineSeamsInWorld } from '../utils/autoSew/worldRefine';
@@ -129,19 +130,24 @@ export function resewAiSeams(minConfidence: number = DEFAULT_MIN_CONFIDENCE) {
       return { removed: 0, added: 0 };
     }
 
-    // 2. Borrar las stale (meta.skipConfirmation: el gate de confirmación es
-    // para borrados del usuario, no para este reemplazo atómico ofrecido).
-    for (const s of stale) {
-      dispatch({ type: removeSeam.type, payload: s.id, meta: { skipConfirmation: true } });
-    }
-
-    // 3. Añadir dedupando SOLO contra las supervivientes humanas.
+    // 2+3 dentro de UN batch de undo (review #934): sin él, undoMiddleware
+    // snapshotea los removes y los adds por separado y un solo Ctrl+Z
+    // aterrizaba en el intermedio "todo borrado, nada re-añadido".
     let added = 0;
-    for (const seam of refined) {
-      if (survivors.some(e => samePair(e, seam))) continue;
-      dispatch(addSeam({ ...seam, createdBy: 'ai' }));
-      added++;
-    }
+    batchUndo(dispatch, 'Re-coser', () => {
+      // 2. Borrar las stale (meta.skipConfirmation: el gate de confirmación es
+      // para borrados del usuario, no para este reemplazo atómico ofrecido).
+      for (const s of stale) {
+        dispatch({ type: removeSeam.type, payload: s.id, meta: { skipConfirmation: true } });
+      }
+
+      // 3. Añadir dedupando SOLO contra las supervivientes humanas.
+      for (const seam of refined) {
+        if (survivors.some(e => samePair(e, seam))) continue;
+        dispatch(addSeam({ ...seam, createdBy: 'ai' }));
+        added++;
+      }
+    });
 
     dispatch(showSuccessToast(
       `Re-cosido: ${stale.length} costura${stale.length === 1 ? '' : 's'} vieja${stale.length === 1 ? '' : 's'} → ${added} nueva${added === 1 ? '' : 's'} con el motor actual`,

@@ -16,6 +16,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, { addSeam, restoreProject } from '../projectSlice';
+import { undoMiddleware } from '../undoMiddleware';
 import { resewAiSeams } from '../autoSewThunk';
 import { SEAM_ENGINE_VERSION, isStaleAiSeam } from '../../utils/autoSew';
 import { importDXFContent } from '../../utils/dxf';
@@ -108,6 +109,34 @@ describe('resewAiSeams', () => {
       [s.pieceA.edgeName, s.pieceB.edgeName].some(n => /^sleeveCap/i.test(n))
       && [s.pieceA, s.pieceB].some(h => (h.tStart ?? 0) !== 0 || (h.tEnd ?? 1) !== 1));
     expect(sisaHalves.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("'Re-coser' es UN solo paso de undo — un Ctrl+Z devuelve el estado original completo", () => {
+    // Bug #934 review: sin batchUndo, undoMiddleware snapshotea removeSeam×N y
+    // addSeam×M por separado → un solo Ctrl+Z aterrizaba en el intermedio
+    // "todas las IA borradas, ninguna re-añadida" (la prenda se desarma).
+    const pieces = importMariaClassified();
+    const stale = staleSeam(pieces);
+    const human = humanSeam(pieces);
+    const store = configureStore({
+      reducer: { project: projectReducer },
+      middleware: (gdm) => gdm({ serializableCheck: false }).concat(undoMiddleware),
+    });
+    store.dispatch(restoreProject({
+      ...store.getState().project,
+      pieces,
+      seams: [],
+      createdAt: 0,
+      updatedAt: 0,
+    }));
+    for (const s of [stale, human]) store.dispatch(addSeam(s));
+    const before = store.getState().project.seams;
+
+    resewAiSeams()(store.dispatch as never, store.getState as never);
+    expect(store.getState().project.seams.some(isStaleAiSeam)).toBe(false); // sanity: re-cosió
+
+    store.dispatch({ type: 'editor/undo' });
+    expect(store.getState().project.seams).toEqual(before);
   });
 
   it('si el motor no propone nada, NO borra las stale (orden crítico: proponer primero)', () => {
