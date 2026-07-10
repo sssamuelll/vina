@@ -3,11 +3,15 @@
  * (arrangement mode: click pieza → click anchor → binding). Extracted from
  * Viewport3D so the branching is unit-testable without an R3F harness.
  *
- * The binding opts here MIRROR GarmentSimulation's staticGeometry/placedMeshes
- * construction (`{ axisHints: buildAxisHints(activePieces, armAxis),
- * skeletonReady: armAxis.ready }`) — diverging would re-open the split-brain
- * that arrangementBinding documents: the delta must be expressed against the
- * SAME auto-frame the solver seeds from.
+ * The whole contract here MIRRORS the solver: the piece-set is activePieces
+ * (GarmentSimulation's filter, same as the agent's contractPieces) and the
+ * binding opts are `{ axisHints: buildAxisHints(activePieces, armAxis),
+ * skeletonReady: armAxis.ready }`. Diverging on EITHER re-opens the
+ * split-brain that arrangementBinding documents: computeEffectiveRegions
+ * assigns L/R to side-less sleeves per-SET (toggle), so a binding baked over
+ * the FULL array could compose against the mirrored arm's frame at simulate
+ * (review #934). The delta must be expressed against the SAME auto-frame the
+ * solver seeds from.
  */
 import type { BodyMeasurements, PatternPiece } from '../../types/types';
 import { computeEffectiveRegions, type BodyRegion } from '../../utils/cloth/garmentPlacement';
@@ -30,9 +34,9 @@ function selectedIndex(pieces: PatternPiece[], selectedPieceIds: string[]): numb
 
 /**
  * Anchor namespace of the single selected piece — drives the accent/dim
- * highlight on AnchorPoints. Null unless exactly one selected piece exists in
- * `pieces` (the FULL array — same one garmentPlacements resolves over, so the
- * effective-region classification matches what the view shows).
+ * highlight on AnchorPoints. Callers pass activePieces (the solver's set) so
+ * the highlighted anchors are exactly the ones resolveAnchorClick will
+ * accept. Null unless exactly one selected piece exists in the set.
  */
 export function selectionNamespace(
   pieces: PatternPiece[],
@@ -44,9 +48,11 @@ export function selectionNamespace(
 }
 
 export interface AnchorClickArgs {
-  /** FULL pieces array — consistent with Viewport3D's garmentPlacements memo. */
-  pieces: PatternPiece[];
-  /** Active pieces (GarmentSimulation's filter) — axisHints source, mirror exacto. */
+  /**
+   * Contract piece-set: activePieces (GarmentSimulation's filter — same set
+   * as the agent's contractPieces). NOT the full array: effective-region L/R
+   * assignment is per-set, and the solver composes the binding over this set.
+   */
   activePieces: PatternPiece[];
   selectedPieceIds: string[];
   measurements: BodyMeasurements;
@@ -57,20 +63,20 @@ export interface AnchorClickArgs {
 
 /** Click on an anchor point → what should happen (toast vs binding dispatch). */
 export function resolveAnchorClick(args: AnchorClickArgs): AnchorClickResult {
-  const { pieces, activePieces, selectedPieceIds, measurements, map, anchorId, armAxis } = args;
-  const index = selectedIndex(pieces, selectedPieceIds);
+  const { activePieces, selectedPieceIds, measurements, map, anchorId, armAxis } = args;
+  const index = selectedIndex(activePieces, selectedPieceIds);
   if (index < 0) return { kind: 'no-selection' };
   if (!map) return { kind: 'no-map' };
 
-  const binding = bindingForAnchor(pieces, index, measurements, map, anchorId, {
+  const binding = bindingForAnchor(activePieces, index, measurements, map, anchorId, {
     skeletonReady: armAxis.ready,
     axisHints: buildAxisHints(activePieces, armAxis),
   });
   if (!binding) {
     return {
       kind: 'cross-namespace',
-      namespace: anchorNamespaceFor(computeEffectiveRegions(pieces)[index]),
+      namespace: anchorNamespaceFor(computeEffectiveRegions(activePieces)[index]),
     };
   }
-  return { kind: 'bound', pieceId: pieces[index].id, binding };
+  return { kind: 'bound', pieceId: activePieces[index].id, binding };
 }

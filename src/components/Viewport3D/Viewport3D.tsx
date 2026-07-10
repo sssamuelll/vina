@@ -226,13 +226,14 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     }),
     [pieces, activePieces, avatar.measurements, arrangementOverrides, armAxis],
   );
+  // activePieces (no el array FULL): el set del contrato es el del solver —
+  // ver anchorClick.ts (review #934, split-brain L/R por-set).
   const anchorNamespace = useMemo(
-    () => (activeTool3D === 'arrangement' ? selectionNamespace(pieces, selectedPieceIds) : null),
-    [activeTool3D, pieces, selectedPieceIds],
+    () => (activeTool3D === 'arrangement' ? selectionNamespace(activePieces, selectedPieceIds) : null),
+    [activeTool3D, activePieces, selectedPieceIds],
   );
   const handleAnchorClick = useCallback((anchorId: string) => {
     const result = resolveAnchorClick({
-      pieces,
       activePieces,
       selectedPieceIds,
       measurements: avatar.measurements,
@@ -253,7 +254,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       case 'no-map': // unreachable from a rendered point — nothing sane to do
         break;
     }
-  }, [pieces, activePieces, selectedPieceIds, avatar.measurements, armAxis, dispatch]);
+  }, [activePieces, selectedPieceIds, avatar.measurements, armAxis, dispatch]);
 
   const simRef = useRef<GarmentSimulationHandle>(null);
   const cameraMode = activeTool3D === 'camera';
