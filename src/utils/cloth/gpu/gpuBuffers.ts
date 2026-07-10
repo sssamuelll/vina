@@ -42,6 +42,23 @@ export interface BendConstraints {
   restAngles: Float32Array;
   /** EdgeType per constraint (WARP or WEFT) */
   edgeTypes: Uint8Array;
+  /**
+   * Compliance ANGULAR per-quad opcional — cuando está presente y la
+   * entrada es finita, OVERRIDEA el mapping edgeType→fabric de
+   * createTslBuffers (NaN = "usa el mapping"). Introducida para los quads
+   * cross-seam (acta costura-real): a rigidez del fabric con rest 0
+   * planchaban costuras con ángulo real y EXPLOTABAN la sisa (medido
+   * 2026-07-05, A/B con kill-switch) — entran al tope blando de la banda
+   * calibrada como acoplamiento de sugerencia, no plancha.
+   */
+  compliance?: Float32Array;
+  /**
+   * Solo quads cross-seam (F1 planchado): los partners de costura del lado B
+   * [b0,b1] por quad — el hinge (a0,a1) vive del lado A y sus pares cosidos
+   * son (a0,b0)/(a1,b1). El cliente GPU los stashea para el gate sewn del
+   * press en settle (|pa−pb| ≤ floor+ε del MISMO readback del tether).
+   */
+  seamPartners?: Uint32Array;
 }
 
 export interface SeamConstraintData {
@@ -279,6 +296,89 @@ export function extractBendConstraints(
   };
 }
 
+
+/**
+ * Quads dihedral CROSS-SEAM (acta consejo costura-real 2026-07-05): la
+ * flexión a través de la costura — el término que hace que la unión deje de
+ * ser una BISAGRA y la curvatura fluya de pieza a pieza como en una prenda
+ * cosida de fábrica. `extractBendConstraints` (arriba) solo emite quads en
+ * aristas compartidas por 2 triángulos: las fronteras de pieza nunca
+ * califican, así que la bisagra era estructural.
+ *
+ * Por cada par CONSECUTIVO (k, k+1) de una costura (pares globales en orden
+ * t — invariante matchVertices): hinge = el borde del lado A (gaₖ, gaₖ₊₁);
+ * alas = el vértice interior del triángulo flanqueante de A + el del
+ * triángulo flanqueante de B sobre SU borde (gbₖ, gbₖ₊₁). El triángulo
+ * virtual (hinge + ala B) cruza la costura; con la costura cerrada (piso
+ * 2mm) coincide con el flanqueante real de B — la aproximación ratificada
+ * por el consejo. Rest angle 0 (continuación plana; el ángulo real del
+ * patrón cosido es v2 con nota de Halberg). EdgeType WEFT → los quads
+ * heredan bendComplianceWeft del fabric como baseline (la salvedad de
+ * Richter — una unión real es MÁS rígida — queda nombrada, no implícita).
+ *
+ * Solo hinges que son FRONTERA de pieza (1 triángulo flanqueante): pares no
+ * adyacentes en la malla (saltos del stretch-map) o degenerados se saltan —
+ * cobertura dispersa aceptada, cada quad que entra es válido.
+ *
+ * GPU-only (divergencia A7 deliberada, precedente self-seams Epic-746):
+ * el fallback WASM/CPU drapea con bisagras — documentado, no escondido.
+ */
+export function buildCrossSeamBendQuads(
+  triangles: Uint32Array,
+  /** Pares globales POR COSTURA, aplanados [a0,b0,a1,b1,...] en orden t. */
+  seamGlobalPairs: Array<ArrayLike<number>>,
+): BendConstraints {
+  // Frontera: edge → tercer vértice de su ÚNICO triángulo flanqueante.
+  // (2 triángulos = interior → se marca y descarta.)
+  const boundaryThird = new Map<string, number>();
+  const interior = new Set<string>();
+  for (let t = 0; t < triangles.length; t += 3) {
+    const v0 = triangles[t], v1 = triangles[t + 1], v2 = triangles[t + 2];
+    const edges: Array<[number, number, number]> = [[v0, v1, v2], [v1, v2, v0], [v2, v0, v1]];
+    for (const [a, b, third] of edges) {
+      const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+      if (interior.has(key)) continue;
+      if (boundaryThird.has(key)) {
+        boundaryThird.delete(key);
+        interior.add(key);
+      } else {
+        boundaryThird.set(key, third);
+      }
+    }
+  }
+
+  const ids: number[] = [];
+  const restAngles: number[] = [];
+  const edgeTypes: number[] = [];
+  const seamPartners: number[] = [];
+
+  for (const pairs of seamGlobalPairs) {
+    const n = pairs.length / 2;
+    for (let k = 0; k + 1 < n; k++) {
+      const a0 = pairs[2 * k], b0 = pairs[2 * k + 1];
+      const a1 = pairs[2 * (k + 1)], b1 = pairs[2 * (k + 1) + 1];
+      if (a0 === a1 || b0 === b1) continue; // degenerado (B/A driver repite índice)
+      const keyA = a0 < a1 ? `${a0}-${a1}` : `${a1}-${a0}`;
+      const keyB = b0 < b1 ? `${b0}-${b1}` : `${b1}-${b0}`;
+      const wingA = boundaryThird.get(keyA);
+      const wingB = boundaryThird.get(keyB);
+      if (wingA === undefined || wingB === undefined) continue; // no-edge o interior
+      ids.push(a0, a1, wingA, wingB);
+      restAngles.push(0);
+      edgeTypes.push(EdgeType.WEFT);
+      // F1 planchado: partners B del hinge — el gate sewn del press en settle
+      // verifica que (a0,b0) y (a1,b1) estén cerrados antes de hornear el ángulo.
+      seamPartners.push(b0, b1);
+    }
+  }
+
+  return {
+    ids: new Uint32Array(ids),
+    restAngles: new Float32Array(restAngles),
+    edgeTypes: new Uint8Array(edgeTypes),
+    seamPartners: new Uint32Array(seamPartners),
+  };
+}
 
 // ─── Buffer Creation ────────────────────────────────────────────────────────
 

@@ -130,6 +130,11 @@ interface SimulationSliceState {
   showGarment: boolean;
   /** 3D visibility: show seam connection lines */
   showSeamlines3D: boolean;
+  /** Seam lines DURANTE la sim (SimSeamLines) — default OFF por acta del
+   *  consejo costura-real 2026-07-05: la anotación contradiciendo al shading
+   *  era el "más anormal" del founder; queda como modo inspección. El toggle
+   *  de arrange (showSeamlines3D) no cambia. */
+  showSimSeamLines: boolean;
   /** 3D visibility: show internal lines (darts, notches, etc.) */
   showInternalLines3D: boolean;
   /** 3D surface rendering mode */
@@ -228,6 +233,7 @@ const initialState: SimulationSliceState = {
   selectLasso3D: null,
   showGarment: true,
   showSeamlines3D: true,
+  showSimSeamLines: false,
   showInternalLines3D: true,
   surfaceMode3D: 'textured' as SurfaceMode3D,
   snapshots: [],
@@ -459,6 +465,9 @@ const simulationSlice = createSlice({
     },
     toggleSeamlines3D(state) {
       state.showSeamlines3D = !state.showSeamlines3D;
+    },
+    toggleSimSeamLines(state) {
+      state.showSimSeamLines = !state.showSimSeamLines;
     },
     toggleInternalLines3D(state) {
       state.showInternalLines3D = !state.showInternalLines3D;
@@ -787,6 +796,7 @@ export const {
   // 3D display
   toggleGarment,
   toggleSeamlines3D,
+  toggleSimSeamLines,
   toggleInternalLines3D,
   setSurfaceMode3D,
   // Snapshots

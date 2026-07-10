@@ -20,6 +20,29 @@ import { scorePieceNames } from './namingHeuristics';
 import { matchEdgesByLength, lengthSimilarity } from './arcLengthMatcher';
 import { scoreEdgePair, rankAndDeduplicate, areDeclaredPartners, type ScoredSeamCandidate, type ScorerWeights } from './scorer';
 
+// ─── Seam engine versioning ──────────────────────────────────────────────────
+
+/**
+ * Versión del MOTOR de auto-cosido — súbela cuando la lógica de propuesta
+ * cambie de forma (splits, rangos, partners): las seams IA persistidas en
+ * proyectos viejos quedan marcadas stale y el toast "Re-coser" ofrece
+ * regenerarlas. Historia: 1 = splits M:N de sisa+collar + cierre de
+ * collarEnds + fix reversed×rango (2026-07-04). Ausente en la seam = 0
+ * (pre-versionado). Disciplina manual — si cambias la propuesta, súbela.
+ */
+export const SEAM_ENGINE_VERSION = 1;
+
+/**
+ * ¿Es una seam IA generada por un motor anterior? El predicado de
+ * provenance cubre las dos marcas que autoSew estampa (createdBy 'ai' +
+ * prefijo state-encoded 'auto-seam-'); las seams humanas (newId, sin
+ * createdBy) NUNCA son stale.
+ */
+export function isStaleAiSeam(s: Seam): boolean {
+  const isAi = s.createdBy === 'ai' || s.id.startsWith('auto-seam-');
+  return isAi && (s.sewEngine ?? 0) < SEAM_ENGINE_VERSION;
+}
+
 // ─── Public types ───────────────────────────────────────────────────────────
 
 export interface AutoSewOptions {
@@ -400,6 +423,7 @@ export function autoSew(
       taped: false,
       tapeWidth: 10,
       createdBy: 'ai' as const, // auto-sew proposal — review me
+      sewEngine: SEAM_ENGINE_VERSION,
     },
     confidence: candidate.confidence,
     reason: candidate.breakdown.reason,
@@ -453,6 +477,7 @@ export function autoSew(
         taped: false,
         tapeWidth: 10,
         createdBy: 'ai' as const,
+        sewEngine: SEAM_ENGINE_VERSION,
       },
       confidence: 1.0,
       reason: 'sleeve underarm tube closure (self-seam)',

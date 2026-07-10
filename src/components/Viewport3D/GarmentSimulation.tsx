@@ -26,6 +26,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece, Seam, SeamGroup } from '../../types/types';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
+import { seamInitDataToPairs } from '../../utils/cloth/seamPairs';
+import { buildSeamFillBridges, filterSewnBridges } from './seamFill';
 import { resolveArrangementWithFrames } from '../../utils/cloth/arrangement/arrangementBinding';
 import { computeEffectiveRegions } from '../../utils/cloth/garmentPlacement';
 import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
@@ -106,6 +108,8 @@ function seamsToInitData(seams: Seam[], seamGroups?: SeamGroup[]): SeamInitData[
       strength: s.strength ?? 1.0,
       active: true,
       taped: s.taped ?? false,
+      // Proveniencia — solo para el color de las seam lines (seamThreadColor).
+      createdBy: s.createdBy,
     }));
 
   // Flatten SeamGroups into additional SeamInitData entries
@@ -278,6 +282,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   // ─── Geometry building ──────────────────────────────────────────────────────
 
+  // Hoisted sobre el memo de geometría: el seam fill strip (abajo) necesita
+  // los pares de costura para puentear la ranura del piso físico en el render.
+  const seamInitData = useMemo(() => seamsToInitData(seams, seamGroups), [seams, seamGroups]);
+
   const { staticGeometry } = useMemo(() => {
     if (pieceMeshes.length === 0) return { staticGeometry: null };
 
@@ -306,6 +314,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     let vOffset = 0;
     let hasUVs = false;
 
+    // Piezas con vértices ENVUELTOS — el seam fill resuelve pares sobre la
+    // misma pose que el solver (placedMeshes) para paridad exacta de conteo.
+    const wrappedMeshes: Array<(typeof validMeshes)[number]> = [];
+
     for (let pi = 0; pi < validMeshes.length; pi++) {
       const p = validMeshes[pi];
       const numVerts = p.vertices.length / 3;
@@ -318,6 +330,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // M4-C anatomy-up correction. MUST stay identical to the solver loop.
       const curved = wrapPlacedMesh(p.vertices, frame, wrapParams, flip);
       positions.set(curved, vOffset * 3);
+      wrappedMeshes.push({ ...p, vertices: curved });
 
       for (let i = 0; i < numVerts; i++) {
         colors[(vOffset + i) * 3] = color.r;
@@ -346,13 +359,39 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     }
     geo.setIndex(indices);
+    // Normales ANTES del fill: con las piezas aún separadas los puentes son
+    // grandes y sesgarían las normales init (el GPU las recalcula por frame
+    // sobre los triángulos de SIM — el strip nunca entra a esa suma).
     geo.computeVertexNormals();
 
-    return { staticGeometry: geo };
-  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis]);
-  useDisposable(staticGeometry);
+    // Seam fill strip (costura-real): puentea la ranura del piso físico
+    // (2mm shell, A3) SOLO en el index de render — sin él, la piel asoma
+    // como línea a lo largo de toda costura cosida ("línea marrón",
+    // hallazgo 2026-07-06). Cero vértices nuevos, cero física.
+    //
+    // Los puentes NO se añaden aquí: en init TODO par está abierto y los
+    // abiertos cordean por DENTRO del cuerpo (las fotos de Samuel desde
+    // dentro del avatar: "la tela como un hacha desmembrando el brazo" —
+    // la almendra une bordes a lados opuestos del brazo). Se stashean con
+    // sus compuertas y el settle (frame 150, mismo readback del tether)
+    // aplica solo los COSIDOS vía filterSewnBridges.
+    // Kill-switch dev: localStorage 'openclo-seamfill' = 'off'.
+    const seamFillEnabled = typeof window === 'undefined'
+      || window.localStorage?.getItem('openclo-seamfill') !== 'off';
+    if (seamFillEnabled && seamInitData.length > 0) {
+      const offsets = new Map<string, number>();
+      let acc = 0;
+      for (const p of validMeshes) { offsets.set(p.pieceId, acc); acc += p.vertices.length / 3; }
+      geo.userData.seamFillBridges = buildSeamFillBridges(
+        seamInitDataToPairs(seamInitData, wrappedMeshes),
+        offsets,
+      );
+      geo.userData.seamFillBaseIndices = indices;
+    }
 
-  const seamInitData = useMemo(() => seamsToInitData(seams, seamGroups), [seams, seamGroups]);
+    return { staticGeometry: geo };
+  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis, seamInitData]);
+  useDisposable(staticGeometry);
 
   // ─── Placed meshes for solver init ──────────────────────────────────────────
 
@@ -635,6 +674,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       renderer.compute(solver.normalZero);
       renderer.compute(solver.normalAccum);
       renderer.compute(solver.normalNormalize);
+      // Normal-weld cross-seam (acta costura-real): tras normalize, los
+      // vértices de costura promedian su normal con la de sus parejas → la
+      // superficie se lee CONTINUA a través de la unión (el slit de 2mm pasa
+      // de grieta de luz a surco de costura). Determinista, race-free.
+      if (solver.normalWeld) {
+        renderer.compute(solver.normalWeld);
+      }
 
       // F0 (#897): en TSL la cadencia de render == cadencia de sim.
       recordFrameTick();
@@ -664,6 +710,27 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         gpuClient.recaptureTetherTargetsFromGpu().then((ok) => {
           tetherReady.current = ok;
           tslReadbackPending.current = false;
+          // Seam fill en settle (costura-real): con la pose asentada ya se
+          // sabe QUÉ pares cosieron — tetherTargetSBA ES la copia de las
+          // posiciones asentadas tras un recapture exitoso. Solo los
+          // puentes 100% cosidos entran al index; los abiertos (almendra)
+          // se quedan fuera — un puente abierto cordea por DENTRO del
+          // brazo (fotos 2026-07-06).
+          if (ok && staticGeometry) {
+            const bridges = staticGeometry.userData.seamFillBridges as
+              | import('./seamFill').SeamFillBridge[]
+              | undefined;
+            const base = staticGeometry.userData.seamFillBaseIndices as number[] | undefined;
+            const settled = gpuClient.getTetherTargets();
+            if (bridges?.length && base && settled) {
+              const fill = filterSewnBridges(bridges, settled);
+              if (fill.length > 0) staticGeometry.setIndex([...base, ...fill]);
+              console.log(
+                `[GarmentSimulation] seam fill: ${fill.length / 3} tris puente ` +
+                `(${bridges.length} candidatos) — abiertos excluidos`,
+              );
+            }
+          }
         });
       }
 
@@ -1329,11 +1396,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         </mesh>
       )}
       <PinRenderer livePositions={positionsRef.current || undefined} />
-      {/* Seam connection lines over the live garment (R2 #880): the pairs
-          the solver is sewing, fed from positionsRef each frame. Gated on
-          showSeamlines3D inside the component. */}
+      {/* Seam lines over the live garment (R2 #880 + polylines de borde
+          2026-07-05): conexiones + línea de costura CLO3D-style, leídas de
+          staticGeometry — la fuente que TODOS los tiers sincronizan
+          (positionsRef solo lo alimentaban CPU/WASM: en el tier GPU default
+          el componente estaba muerto). Gated showSeamlines3D adentro. */}
       <SimSeamLines
-        positionsRef={positionsRef}
+        geometry={staticGeometry}
         placedMeshes={placedMeshes}
         seamInitData={seamInitData}
       />

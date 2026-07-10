@@ -20,7 +20,7 @@ vi.mock('../../utils/projectIO', () => ({
 
 import { loadFromStorage, saveToStorage } from '../../utils/projectIO';
 import { initProjectPersistence, AUTOSAVE_DEBOUNCE_MS } from '../projectAutosave';
-import { NEW_PROJECT } from '../actions';
+import { NEW_PROJECT, RESEW_AI_SEAMS } from '../actions';
 
 const mockedLoad = vi.mocked(loadFromStorage);
 const mockedSave = vi.mocked(saveToStorage);
@@ -117,6 +117,38 @@ describe('initProjectPersistence — boot hydration', () => {
     await initProjectPersistence(store);
 
     expect(dispatchedTypes(store)).toEqual([]);
+  });
+
+  it('costuras IA de motor anterior → toast warning con acción "Re-coser" (RESEW_AI_SEAMS)', async () => {
+    const staleSeam = { id: 'auto-seam-123-0', createdBy: 'ai', pieceA: {}, pieceB: {} }; // sin sewEngine = motor 0
+    const saved = { id: 'saved', pieces: [{}], seams: [staleSeam] };
+    mockedLoad.mockResolvedValue({ ok: true, project: saved, warnings: [] } as never);
+    const store = makeFakeStore(emptyProject());
+
+    await initProjectPersistence(store);
+
+    const toasts = store.dispatch.mock.calls
+      .filter(c => (c[0] as UnknownAction).type === 'copilotUI/showToast')
+      .map(c => (c[0] as unknown as { payload: { type: string; actionLabel?: string; actionPayload?: UnknownAction } }).payload);
+    const resew = toasts.find(t => t.actionLabel === 'Re-coser');
+    expect(resew).toBeDefined();
+    expect(resew!.type).toBe('warning');
+    expect(resew!.actionPayload?.type).toBe(RESEW_AI_SEAMS.type);
+  });
+
+  it('costuras IA FRESCAS (sewEngine actual) o solo humanas → sin toast de Re-coser', async () => {
+    const { SEAM_ENGINE_VERSION } = await import('../../utils/autoSew');
+    const freshAi = { id: 'auto-seam-123-0', createdBy: 'ai', sewEngine: SEAM_ENGINE_VERSION, pieceA: {}, pieceB: {} };
+    const human = { id: 'uuid-normal', pieceA: {}, pieceB: {} };
+    for (const seams of [[freshAi], [human]]) {
+      mockedLoad.mockResolvedValue({ ok: true, project: { id: 's', pieces: [{}], seams }, warnings: [] } as never);
+      const store = makeFakeStore(emptyProject());
+      await initProjectPersistence(store);
+      const labels = store.dispatch.mock.calls
+        .filter(c => (c[0] as UnknownAction).type === 'copilotUI/showToast')
+        .map(c => (c[0] as unknown as { payload: { actionLabel?: string } }).payload.actionLabel);
+      expect(labels).not.toContain('Re-coser');
+    }
   });
 
   it('save subscriber attaches only AFTER hydration resolves (anti-clobber order)', async () => {

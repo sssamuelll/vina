@@ -1,5 +1,48 @@
 import { describe, it, expect } from 'vitest';
-import { EdgeType, classifyEdgeType, extractStretchConstraints, extractBendConstraints, colorConstraints } from '../gpuBuffers';
+import { EdgeType, classifyEdgeType, extractStretchConstraints, extractBendConstraints, buildCrossSeamBendQuads, colorConstraints } from '../gpuBuffers';
+
+describe('buildCrossSeamBendQuads — flexión a través de la costura (acta consejo costura-real 2026-07-05)', () => {
+  // Dos tiras de 2 triángulos cada una (piezas A y B), islas separadas en el
+  // buffer merged. Pieza A: verts 0-3 (quad 0,1,2,3 → tris [0,1,2],[1,3,2]);
+  // borde de costura de A = (1,3) — boundary edge, tri flanqueante [1,3,2],
+  // ala interior = 2. Pieza B: verts 4-7 (tris [4,5,6],[5,7,6]); borde de
+  // costura de B = (4,6)? — usar (4,6): tri [4,5,6], ala = 5.
+  const triangles = new Uint32Array([
+    0, 1, 2, 1, 3, 2, // pieza A
+    4, 5, 6, 5, 7, 6, // pieza B
+  ]);
+
+  it('emite un quad [hingeA0, hingeA1, alaA, alaB] con rest 0 por cada par consecutivo de costura', () => {
+    // Costura: pares (a,b) = (1,4), (3,6) — el hinge de A es (1,3), el edge
+    // de B es (4,6); alas interiores: 2 (de A) y 5 (de B).
+    const cross = buildCrossSeamBendQuads(triangles, [[1, 4, 3, 6]]);
+
+    expect(cross.ids.length).toBe(4); // 1 quad
+    const [a, b, c, d] = [cross.ids[0], cross.ids[1], cross.ids[2], cross.ids[3]];
+    expect([a, b].sort()).toEqual([1, 3]);   // hinge = borde de costura de A
+    expect(c).toBe(2);                        // ala interior de A
+    expect(d).toBe(5);                        // ala interior de B (cruza la costura)
+    expect(cross.restAngles[0]).toBe(0);      // continuación plana (consejo)
+    expect(cross.edgeTypes[0]).toBe(EdgeType.WEFT); // baseline del fabric
+  });
+
+  it('salta pares degenerados (índice repetido) y edges que no existen en la malla', () => {
+    // (1,4),(1,6): hinge A degenerado (1,1) → skip.
+    expect(buildCrossSeamBendQuads(triangles, [[1, 4, 1, 6]]).ids.length).toBe(0);
+    // (0,4),(3,6): hinge A = (0,3) no es edge de la malla → skip.
+    expect(buildCrossSeamBendQuads(triangles, [[0, 4, 3, 6]]).ids.length).toBe(0);
+  });
+
+  it('no emite quads sobre edges INTERIORES (el hinge debe ser frontera de pieza)', () => {
+    // (1,4),(2,6): hinge A = (1,2) es interior (compartido por 2 tris) → skip.
+    expect(buildCrossSeamBendQuads(triangles, [[1, 4, 2, 6]]).ids.length).toBe(0);
+  });
+
+  it('varios seams: los pares consecutivos no cruzan la frontera entre seams', () => {
+    // Dos seams de 1 par cada uno — cero quads (un par solo no forma hinge).
+    expect(buildCrossSeamBendQuads(triangles, [[1, 4], [3, 6]]).ids.length).toBe(0);
+  });
+});
 
 describe('EdgeType classification', () => {
   describe('classifyEdgeType', () => {

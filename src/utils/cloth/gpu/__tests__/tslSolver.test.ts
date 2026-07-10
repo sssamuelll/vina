@@ -230,6 +230,7 @@ function makeMockBufferSet(options?: {
     numParticles,
     numTriangles: 2,
     scBuffers: null,
+    weldBuffers: null,
     windBuffers: null,
   };
 }

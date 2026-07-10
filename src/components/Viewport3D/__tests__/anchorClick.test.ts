@@ -39,10 +39,8 @@ const armRing = ring('left-sleeve', 0, [-0.3, 1.3, 0]);
 const MAP: AnchorMap = { rings: [waistRing, armRing], points: [...waistRing.points, ...armRing.points] };
 
 const args = (over: Partial<Parameters<typeof resolveAnchorClick>[0]> = {}) => {
-  const pieces = [piece('p1', 'Front')];
   return {
-    pieces,
-    activePieces: pieces,
+    activePieces: [piece('p1', 'Front')],
     selectedPieceIds: ['p1'],
     measurements: MEAS,
     map: MAP,
@@ -59,7 +57,12 @@ describe('resolveAnchorClick', () => {
 
   it('multi-selection is not a contract writer → no-selection', () => {
     const pieces = [piece('p1', 'Front'), piece('p2', 'Back')];
-    expect(resolveAnchorClick(args({ pieces, activePieces: pieces, selectedPieceIds: ['p1', 'p2'] })))
+    expect(resolveAnchorClick(args({ activePieces: pieces, selectedPieceIds: ['p1', 'p2'] })))
+      .toEqual({ kind: 'no-selection' });
+  });
+
+  it('selected piece hidden (not in activePieces) → no-selection (el solver no la siembra)', () => {
+    expect(resolveAnchorClick(args({ selectedPieceIds: ['hidden-piece'] })))
       .toEqual({ kind: 'no-selection' });
   });
 
@@ -84,18 +87,47 @@ describe('resolveAnchorClick', () => {
     expect(result.pieceId).toBe('p1');
     expect(result.binding.anchorId).toBe('front-torso.ring1.front');
     // Espejo exacto: mismos opts que GarmentSimulation (skeletonReady + axisHints).
-    const direct = bindingForAnchor(a.pieces, 0, MEAS, MAP, a.anchorId, {
+    const direct = bindingForAnchor(a.activePieces, 0, MEAS, MAP, a.anchorId, {
       skeletonReady: ARM_AXIS.ready,
       axisHints: {},
     });
     expect(result.binding).toEqual(direct);
   });
 
-  it('indexes over the FULL pieces array (selected piece not at index 0)', () => {
+  it('indexes over activePieces (selected piece not at index 0)', () => {
     const pieces = [piece('p0', 'Back'), piece('p1', 'Front')];
-    const result = resolveAnchorClick(args({ pieces, activePieces: pieces, selectedPieceIds: ['p1'] }));
+    const result = resolveAnchorClick(args({ activePieces: pieces, selectedPieceIds: ['p1'] }));
     expect(result.kind).toBe('bound');
     if (result.kind === 'bound') expect(result.pieceId).toBe('p1');
+  });
+
+  it('resuelve el contrato sobre activePieces — espejo del solver, no del array FULL (split-brain #934)', () => {
+    // Dos mangas SIN side: computeEffectiveRegions asigna L/R por orden DEL SET
+    // (toggle). Con la primera manga oculta:
+    //   FULL   = [torso, slvA, slvB] → slvB = right-sleeve
+    //   ACTIVE = [torso, slvB]       → slvB = left-sleeve  ← lo que el solver siembra
+    // El binding debe hornearse contra el frame del set ACTIVO (contractPieces
+    // del agente / GarmentSimulation.activePieces), no contra el FULL.
+    const torso = piece('t1', 'Front');
+    const slvB = { ...piece('s2', 'Sleeve'), category: 'sleeve' } as PatternPiece;
+    // El array FULL sería [torso, slvA(oculta), slvB] → slvB = right-sleeve.
+    const activePieces = [torso, slvB]; // slvA oculta (filtro de GarmentSimulation)
+
+    const result = resolveAnchorClick(args({
+      activePieces,
+      selectedPieceIds: ['s2'],
+      anchorId: 'left-sleeve.ring0.front',
+    }));
+
+    expect(result.kind).toBe('bound');
+    if (result.kind !== 'bound') return;
+    expect(result.pieceId).toBe('s2');
+    // Espejo exacto del bake que el solver compone: set ACTIVO, mismos opts.
+    const direct = bindingForAnchor(activePieces, 1, MEAS, MAP, 'left-sleeve.ring0.front', {
+      skeletonReady: ARM_AXIS.ready,
+      axisHints: {},
+    });
+    expect(result.binding).toEqual(direct);
   });
 });
 

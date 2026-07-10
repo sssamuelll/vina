@@ -41,6 +41,13 @@ interface SeamGapRow {
   profile: number[];
   /** Pares con distancia >3cm: índice + posiciones mundo (diagnóstico de huecos). */
   openPairs: Array<{ k: number; d: number; a: number[]; b: number[] }>;
+  /**
+   * EXTREMOS de la costura (primera/última puntada) por separado — la
+   * corrección del consejo costura-proceso-real: la almendra vive en los
+   * extremos/junctions; sin este split un residual de extremo se confunde
+   * con cobertura (F2) o fold-angle (F1) y el diagnóstico adivina.
+   */
+  endsM: [number, number];
 }
 
 async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
@@ -96,14 +103,15 @@ async function measureSeams(page: Page): Promise<SeamGapRow[]> {
           b: [pos[b], pos[b + 1], pos[b + 2]],
         });
       }
-      return { id: s.id, label: `${s.edgeA} ↔ ${s.edgeB}`, pairs: n, meanM: n ? sum / n : 0, maxM: max, profile, openPairs };
+      const endsM: [number, number] = n ? [dists[0], dists[n - 1]] : [0, 0];
+      return { id: s.id, label: `${s.edgeA} ↔ ${s.edgeB}`, pairs: n, meanM: n ? sum / n : 0, maxM: max, profile, openPairs, endsM };
     });
   });
 }
 
 const isSisa = (r: SeamGapRow) => /armhole/i.test(r.label) && /sleevecap/i.test(r.label);
 const fmt = (r: SeamGapRow) =>
-  `${r.label}: ${r.pairs} pares, media=${(r.meanM * 100).toFixed(1)}cm, max=${(r.maxM * 100).toFixed(1)}cm, perfil=[${r.profile.map(d => (d * 100).toFixed(1)).join(', ')}]cm`;
+  `${r.label}: ${r.pairs} pares, media=${(r.meanM * 100).toFixed(1)}cm, max=${(r.maxM * 100).toFixed(1)}cm, extremos=[${r.endsM.map(d => (d * 100).toFixed(1)).join(', ')}]cm, perfil=[${r.profile.map(d => (d * 100).toFixed(1)).join(', ')}]cm`;
 
 test(`seam-gap: residual de cierre por costura (tether ${TETHER_OFF ? 'OFF' : 'ON'}) @gpu-local`, async ({ page }) => {
   test.setTimeout(300_000);

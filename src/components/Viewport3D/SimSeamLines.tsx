@@ -1,19 +1,31 @@
 /**
- * SimSeamLines — seam connection lines over the SIMULATED garment
- * (post-ship plan R2, #880; plan de paridad § 5:87 fast-follow).
+ * SimSeamLines — seam lines over the SIMULATED garment
+ * (post-ship plan R2, #880; fuente staticGeometry + polylines de borde
+ * 2026-07-05 — paridad CLO3D).
  *
- * CLO3D draws sewing lines "como líneas que conectan las piezas en la
- * ventana 3D" durante la simulación; hasta R2, OpenClo solo las dibujaba en
- * arrange (`SeamRenderer3D`, gated `!useClothSim`) y "el seam cerrado ERA
- * la visualización". This component draws the matched vertex pairs the
- * solver is actually pulling together, read from the live positions buffer
- * each frame — the lines converge as the seam closes, and a reversed seam
- * shows the crossed-X in 3D for free (same error language as 2D).
+ * CLO3D draws sewing lines on the draped garment. This component draws TWO
+ * layers in ONE merged LineSegments (un draw call — dictamen Halberg; el
+ * WebGPURenderer rechaza fat lines):
+ *   1. Connection pairs (R2): the matched vertex pairs the solver pulls
+ *      together — converge as the seam closes; a reversed seam shows the
+ *      crossed-X for free.
+ *   2. Edge polylines (2026-07-05): the continuous seam line along side A —
+ *      with the seam closed (2mm floor) this IS the CLO3D seam line on the
+ *      garment.
  *
- * Color = pair identity (`seamPairColor`, Fase 6 — same language as the 2D
- * canvas). Deliberate divergence from arrange-mode `SeamRenderer3D`, which
- * keeps provenance coloring (amber AI / green human): arrange answers
- * "who proposed this seam?", sim answers "which pair is closing where?".
+ * FUENTE DE POSICIONES (fix 2026-07-05): `staticGeometry.position` — la
+ * geometry que TODOS los tiers sincronizan (CPU/WASM cada frame; GPU cada
+ * 15 frames vía readbackPositionsToGeometry). Antes leía `positionsRef`,
+ * que solo alimenta el onFrame de los workers CPU/WASM → en el tier GPU
+ * DEFAULT el componente estaba silenciosamente MUERTO (buffer todo-ceros,
+ * invisible): la sim por defecto no dibujaba NINGUNA costura. Caveat
+ * conocido: en GPU las líneas trailean ≤15 frames respecto a la tela
+ * visible (node material a full rate); exactas al asentarse, que es cuando
+ * se inspeccionan costuras.
+ *
+ * Color = `seamThreadColor` (identidad hash-estable por seam.id +
+ * proveniencia como saturación) — unificado con los hilos de arrange
+ * (SeamRenderer3D) para que todo lo de una costura comparta hue.
  *
  * Lifecycle per RFC C1: geometry + material wrapped in a disposable.
  */
@@ -24,27 +36,56 @@ import { useSelector } from 'react-redux';
 import * as THREE from 'three';
 import type { RootState } from '../../store';
 import type { SeamInitData } from '../../utils/cloth/seamAssembly';
-import { buildSimSeamLineData, type SimSeamPieceMesh } from './simSeamLineData';
+import {
+  buildSimSeamLineData,
+  buildSeamEdgePolylineData,
+  fillSeamLinePositions,
+  type SimSeamPieceMesh,
+  type SimSeamLineData,
+} from './simSeamLineData';
 import { useDisposable } from './hooks/useDisposable';
 
 interface SimSeamLinesProps {
-  /** Live solver positions (merged-mesh order) — read fresh every frame. */
-  positionsRef: React.MutableRefObject<Float32Array | null>;
+  /** La geometry sincronizada por el solver en TODOS los tiers (merged-mesh
+   *  order; índice de vértice == índice global de partícula). */
+  geometry: THREE.BufferGeometry | null;
   placedMeshes: SimSeamPieceMesh[];
   seamInitData: SeamInitData[];
 }
 
-export default function SimSeamLines({ positionsRef, placedMeshes, seamInitData }: SimSeamLinesProps) {
-  const showSeamlines3D = useSelector((s: RootState) => s.simulation.showSeamlines3D);
-  const lineDataRef = useRef<ReturnType<typeof buildSimSeamLineData>>(null);
+/** Concatena los dos datasets (conexiones + polylines) en uno. */
+function mergeLineData(
+  a: SimSeamLineData | null,
+  b: SimSeamLineData | null,
+): SimSeamLineData | null {
+  if (!a) return b;
+  if (!b) return a;
+  const vertexIndices = new Uint32Array(a.vertexIndices.length + b.vertexIndices.length);
+  vertexIndices.set(a.vertexIndices, 0);
+  vertexIndices.set(b.vertexIndices, a.vertexIndices.length);
+  const colors = new Float32Array(a.colors.length + b.colors.length);
+  colors.set(a.colors, 0);
+  colors.set(b.colors, a.colors.length);
+  return { vertexIndices, colors, lineCount: a.lineCount + b.lineCount };
+}
+
+export default function SimSeamLines({ geometry, placedMeshes, seamInitData }: SimSeamLinesProps) {
+  // Modo INSPECCIÓN, default OFF (acta consejo costura-real 2026-07-05): la
+  // anotación dibujada contradiciendo al shading era el "más anormal" del
+  // founder — la costura debe VERSE por física+normales, no por overlay.
+  const showSimSeamLines = useSelector((s: RootState) => s.simulation.showSimSeamLines);
+  const lineDataRef = useRef<SimSeamLineData | null>(null);
 
   const lineObj = useMemo(() => {
-    const data = buildSimSeamLineData(seamInitData, placedMeshes);
+    const data = mergeLineData(
+      buildSimSeamLineData(seamInitData, placedMeshes),
+      buildSeamEdgePolylineData(seamInitData, placedMeshes),
+    );
     lineDataRef.current = data;
     if (!data) return null;
 
     const geo = new THREE.BufferGeometry();
-    // Positions start at 0 and are overwritten from the live buffer each
+    // Positions start at 0 and are overwritten from the synced geometry each
     // frame; frustumCulled=false below avoids per-frame bounding updates.
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(data.lineCount * 2 * 3), 3));
     geo.setAttribute('color', new THREE.BufferAttribute(data.colors, 3));
@@ -75,27 +116,16 @@ export default function SimSeamLines({ positionsRef, placedMeshes, seamInitData 
 
   useFrame(() => {
     const data = lineDataRef.current;
-    const positions = positionsRef.current;
+    const positions = geometry?.getAttribute('position')?.array;
     if (!lineObj || !data || !positions) return;
 
     const posAttr = lineObj.lines.geometry.getAttribute('position') as THREE.BufferAttribute;
-    const out = posAttr.array as Float32Array;
-    const idx = data.vertexIndices;
-    let visible = false;
-    for (let i = 0; i < idx.length; i++) {
-      const v = idx[i] * 3;
-      if (v + 2 < positions.length) {
-        out[i * 3] = positions[v];
-        out[i * 3 + 1] = positions[v + 1];
-        out[i * 3 + 2] = positions[v + 2];
-        visible = true;
-      }
-    }
+    const visible = fillSeamLinePositions(posAttr.array as Float32Array, data.vertexIndices, positions);
     lineObj.lines.visible = visible;
     posAttr.needsUpdate = true;
   });
 
-  if (!showSeamlines3D || !lineObj) return null;
+  if (!showSimSeamLines || !lineObj) return null;
 
   return <primitive object={lineObj.lines} />;
 }
