@@ -24,6 +24,8 @@ snapshot-*.md
 # design-handoff/ui-screenshots/ (committed); never mix test evidence there.
 screenshots/
 .claude/
+# Ad-hoc scratch: probe screenshots, measurement scripts, demo captures from manual runs.
+.tmp/
 
 # Local review artifacts
 OpenClo_Review_*.docx
