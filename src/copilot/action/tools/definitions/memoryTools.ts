@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * #81 — Copilot Memory tools: rememberThis, recallContext, setPreference, addNote
  * #143/#146 — Design Log tools: writeDesignNote, recallDesignLog
@@ -24,6 +24,19 @@ import type { DesignLogEntryType, SkillOverride } from '../../../perception/type
 
 function getProjectId(getState: () => any): string {
   return getState().project?.id || 'default';
+}
+
+/**
+ * Gate an irreversible clear behind a blocking native confirm. Unlike the
+ * piece/seam deletes (Ctrl+Z-undoable, so they don't confirm by default), these
+ * two tools have NO undo, yet the agent can invoke them — a crafted or misread
+ * instruction must not silently wipe memory. The Redux confirmation dialog is a
+ * dark surface (nothing renders `pendingConfirmation`), so we use the native
+ * confirm; a non-browser context (no window) proceeds. (Security study #4.)
+ */
+function confirmIrreversible(message: string): boolean {
+  if (typeof window === 'undefined' || typeof window.confirm !== 'function') return true;
+  return window.confirm(message);
 }
 
 export const tools: ToolDefinition[] = [
@@ -101,6 +114,9 @@ export const tools: ToolDefinition[] = [
     description: 'Clear all copilot memory for the current project. Use with caution.',
     parameters: { type: 'object', properties: {} },
     execute: async (_params, _dispatch, getState) => {
+      if (!confirmIrreversible('Clear ALL copilot memory for this project? This cannot be undone.')) {
+        return { success: false, message: 'Cancelled — memory was not cleared.' };
+      }
       const projectId = getProjectId(getState);
       await clearLongTermMemory(projectId);
       return { success: true, message: `Memory cleared for project ${projectId}` };
@@ -195,6 +211,9 @@ export const tools: ToolDefinition[] = [
     description: 'Clear the design log for the current project. Use with caution — this removes all persisted design decisions.',
     parameters: { type: 'object', properties: {} },
     execute: async (_params, _dispatch, getState) => {
+      if (!confirmIrreversible('Clear the design log for this project? This cannot be undone.')) {
+        return { success: false, message: 'Cancelled — design log was not cleared.' };
+      }
       const projectId = getProjectId(getState);
       DesignLogManager.clear(projectId);
       return { success: true, message: `Design log cleared for project ${projectId}` };
