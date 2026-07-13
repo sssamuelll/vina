@@ -6,6 +6,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: 16.192.98.132 # Elastic IP (antes 13.48.46.19, efímera — se liberó al asociar la Elastic)
     steps:
       - uses: actions/checkout@v4
 
@@ -21,7 +23,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/key
           chmod 600 ~/.ssh/key
-          ssh -i ~/.ssh/key -o StrictHostKeyChecking=no ubuntu@13.48.46.19 "mkdir -p /tmp/openclo-deploy/assets /tmp/openclo-deploy/wasm"
-          rsync -az --delete --no-inc-recursive -e "ssh -i ~/.ssh/key -o StrictHostKeyChecking=no" dist/ ubuntu@13.48.46.19:/tmp/openclo-deploy/
-          ssh -i ~/.ssh/key -o StrictHostKeyChecking=no ubuntu@13.48.46.19 "sudo rsync -a --delete /tmp/openclo-deploy/ /var/www/openclo/ && sudo chown -R www-data:www-data /var/www/openclo/"
+          ssh -i ~/.ssh/key -o StrictHostKeyChecking=no ubuntu@$DEPLOY_HOST "mkdir -p /tmp/openclo-deploy/assets /tmp/openclo-deploy/wasm"
+          rsync -az --delete --no-inc-recursive -e "ssh -i ~/.ssh/key -o StrictHostKeyChecking=no" dist/ ubuntu@$DEPLOY_HOST:/tmp/openclo-deploy/
+          ssh -i ~/.ssh/key -o StrictHostKeyChecking=no ubuntu@$DEPLOY_HOST "sudo rsync -a --delete /tmp/openclo-deploy/ /var/www/openclo/ && sudo chown -R www-data:www-data /var/www/openclo/"
           rm -f ~/.ssh/key
