@@ -23,7 +23,9 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/key
           chmod 600 ~/.ssh/key
-          ssh -i ~/.ssh/key -o StrictHostKeyChecking=no ubuntu@$DEPLOY_HOST "mkdir -p /tmp/openclo-deploy/assets /tmp/openclo-deploy/wasm"
-          rsync -az --delete --no-inc-recursive -e "ssh -i ~/.ssh/key -o StrictHostKeyChecking=no" dist/ ubuntu@$DEPLOY_HOST:/tmp/openclo-deploy/
-          ssh -i ~/.ssh/key -o StrictHostKeyChecking=no ubuntu@$DEPLOY_HOST "sudo rsync -a --delete /tmp/openclo-deploy/ /var/www/openclo/ && sudo chown -R www-data:www-data /var/www/openclo/"
+          cp "$GITHUB_WORKSPACE/deploy/known_hosts" ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          ssh -i ~/.ssh/key -o StrictHostKeyChecking=yes ubuntu@$DEPLOY_HOST "mkdir -p /tmp/openclo-deploy/assets /tmp/openclo-deploy/wasm"
+          rsync -az --delete --no-inc-recursive -e "ssh -i ~/.ssh/key -o StrictHostKeyChecking=yes" dist/ ubuntu@$DEPLOY_HOST:/tmp/openclo-deploy/
+          ssh -i ~/.ssh/key -o StrictHostKeyChecking=yes ubuntu@$DEPLOY_HOST "sudo rsync -a --delete /tmp/openclo-deploy/ /var/www/openclo/ && sudo chown -R www-data:www-data /var/www/openclo/"
           rm -f ~/.ssh/key
