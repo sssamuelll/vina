@@ -305,19 +305,26 @@ function parseBlocks(pairs: GroupPair[]): Map<string, DXFBlock> {
 
 // ─── Helpers ───
 
+// A DXF is untrusted input: `1e400` → Infinity, `abc` → NaN. Guard non-finite
+// values at the boundary so poisoned geometry never reaches the solver — the
+// `.openclo` path already enforces this via zod's `finiteNumber`.
 function num(pairs: GroupPair[], code: number): number {
   const p = pairs.find(p => p.code === code);
-  return p ? parseFloat(p.value) : 0;
+  const v = p ? parseFloat(p.value) : 0;
+  return Number.isFinite(v) ? v : 0;
 }
 
 function numOr(pairs: GroupPair[], code: number, def: number): number {
   const p = pairs.find(p => p.code === code);
-  return p ? parseFloat(p.value) : def;
+  if (!p) return def;
+  const v = parseFloat(p.value);
+  return Number.isFinite(v) ? v : def;
 }
 
 function int(pairs: GroupPair[], code: number): number {
   const p = pairs.find(p => p.code === code);
-  return p ? parseInt(p.value, 10) : 0;
+  const v = p ? parseInt(p.value, 10) : 0;
+  return Number.isFinite(v) ? v : 0;
 }
 
 // ─── Main Parser ───

@@ -13,6 +13,18 @@ import { flattenPath } from '../seam';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../notches';
 import { computeNotchAnchor } from '../notchAnchor';
 
+/**
+ * Sanitize a piece name lifted from an untrusted DXF TEXT entity. Names flow
+ * into the copilot's LLM system prompt, so strip control chars / newlines (which
+ * a crafted file uses to fake role labels — indirect prompt injection) and cap
+ * length, mirroring the null-byte + MAX_NAME_LEN guards the zod `.openclo` path
+ * already enforces.
+ */
+function cleanImportedName(s: string): string {
+  // eslint-disable-next-line no-control-regex
+  return s.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+}
+
 // ─── Entity → PathCommand[] conversion ───
 
 /**
@@ -400,7 +412,7 @@ function entitiesToPiece(
     if (e.type === 'TEXT' || e.type === 'MTEXT') {
       const text = (e.data as DXFTextData).text.trim();
       const match = text.match(/^Piece\s*Name:\s*(.+)/i);
-      if (match) { name = match[1].trim(); break; }
+      if (match) { name = cleanImportedName(match[1]); break; }
     }
   }
   // Fallback: first non-label, non-notch text
@@ -409,7 +421,7 @@ function entitiesToPiece(
       if (e.type === 'TEXT' || e.type === 'MTEXT') {
         const text = (e.data as DXFTextData).text.trim();
         if (text && !text.match(/^#\s*\d+$/) && !text.match(/^Piece\s*Name:/i) && !text.match(/^Size\s/i)) {
-          name = text; break;
+          name = cleanImportedName(text); break;
         }
       }
     }
