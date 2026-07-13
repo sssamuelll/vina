@@ -5,3 +5,7 @@
 # Frozen DXF garment fixtures: keep bytes identical across platforms (the
 # parser tolerates CRLF, but byte-stable fixtures keep hashes/diffs honest).
 tests/fixtures/garments/*.dxf text eol=lf
+
+# SSH known_hosts consumed by the deploy runner: a trailing CR on a key line
+# breaks host-key verification. Force LF everywhere.
+deploy/known_hosts text eol=lf
