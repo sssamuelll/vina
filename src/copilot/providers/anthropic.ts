@@ -183,7 +183,6 @@ export const anthropicProvider: LLMProvider = {
 
     console.log('[Anthropic] config check:', {
       apiKeyLength: apiKey.length,
-      apiKeyPrefix: apiKey.slice(0, 8) + '...',
       provider: config.provider,
       model: config.model,
       baseUrl,

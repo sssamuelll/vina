@@ -53,6 +53,10 @@ function deserializeDates(obj: unknown): unknown {
     if (rec.__date__) return new Date(rec.__date__ as string).getTime();
     const result: Record<string, unknown> = {};
     for (const key of Object.keys(rec)) {
+      // A crafted .openclo can carry an own "__proto__" key (JSON.parse keeps it);
+      // bracket-assigning it invokes the prototype setter. Skip it — legit project
+      // data never uses these keys. (Security study #12, hygiene.)
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
       result[key] = deserializeDates(rec[key]);
     }
     return result;
