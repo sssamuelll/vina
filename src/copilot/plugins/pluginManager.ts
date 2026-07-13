@@ -9,7 +9,6 @@
 
 import type { InstalledPlugin, PluginManifest, OpenCloPlugin } from './types';
 import {
-  loadPlugin,
   loadPluginDirect,
   unloadPlugin,
   isPluginLoaded,
@@ -393,18 +392,16 @@ export async function loadEnabledPlugins(): Promise<{
         failed.push({ id: manifest.id, error: msg });
       }
     } else {
-      // ── Legacy path (no sandbox) ─────────────────────────────────────────
-      // Kept for backward compatibility when PluginHost is not initialized.
-      // Deprecated: callers should call initPluginHost() at startup.
-      const registry = getDefaultPluginRegistry();
-      try {
-        const plugin = await loadPlugin(manifest);
-        registry.registerPlugin(plugin, manifest.permissions);
-        loaded.push(manifest.id);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        failed.push({ id: manifest.id, error: msg });
-      }
+      // Fail closed. Without an initialized PluginHost the only remaining route
+      // is loadPlugin()'s unsandboxed main-thread `import()` of the manifest's
+      // entryPoint URL — origin-level code execution with the API key in reach,
+      // and it was the DEFAULT because initPluginHost() is never called at
+      // startup. Refuse rather than silently run third-party code unsandboxed;
+      // callers must initPluginHost() before enabling plugins. (Security study L1.)
+      failed.push({
+        id: manifest.id,
+        error: 'PluginHost not initialized — refusing to load plugin unsandboxed',
+      });
     }
   }
 
