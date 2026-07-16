@@ -3,8 +3,14 @@
  *
  * Positioned in the 3D viewport corner. Only visible during simulation.
  * Color-coded by solver tier for instant visual feedback.
+ *
+ * Collapsed by default to a single line (dot + tier + warning badge); the
+ * telemetry detail expands on click (Fase1-H2: debug chrome fuera de la
+ * posición primaria de lectura — plan 2026-07-16). The silent-absence
+ * surface (C4 § 3.1.A) survives the collapse via the warning badge.
  */
 
+import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { SolverTier } from '../../store/simulationSlice';
@@ -24,15 +30,16 @@ const TIER_CAPS = {
   'none':         CPU_CAPABILITIES,
 } as const satisfies Record<SolverTier, typeof CPU_CAPABILITIES>;
 
-const TIER_INFO: Record<SolverTier, { label: string; color: string; icon: string }> = {
-  'none':          { label: 'Idle',         color: '#666',    icon: '⏸' },
-  'webgpu':        { label: 'WebGPU',       color: '#4ade80', icon: '🟢' },
-  'wasm':          { label: 'Wasm XPBD',    color: '#fb923c', icon: '🟠' },
-  'cpu-worker':    { label: 'CPU Worker',   color: '#facc15', icon: '🟡' },
-  'neural-drape':  { label: 'Neural Drape', color: '#60a5fa', icon: '🔵' },
+const TIER_INFO: Record<SolverTier, { label: string; color: string }> = {
+  'none':          { label: 'Idle',         color: '#666'    },
+  'webgpu':        { label: 'WebGPU',       color: '#4ade80' },
+  'wasm':          { label: 'Wasm XPBD',    color: '#fb923c' },
+  'cpu-worker':    { label: 'CPU Worker',   color: '#facc15' },
+  'neural-drape':  { label: 'Neural Drape', color: '#60a5fa' },
 };
 
 export function SimulationStatusOverlay() {
+  const [expanded, setExpanded] = useState(false);
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const solverTier = useSelector((s: RootState) => s.simulation.solverTier);
   const frameTimeMs = useSelector((s: RootState) => s.simulation.frameTimeMs);
@@ -59,19 +66,51 @@ export function SimulationStatusOverlay() {
   const fps = frameTimeMs > 0 ? Math.round(1000 / frameTimeMs) : 0;
   const isMobile = typeof navigator !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent);
 
+  // Diagnósticos reales que el colapso no puede silenciar (C4 § 3.1.A):
+  // el badge ⚠ del header delata que hay detalle que leer.
+  const warningCount =
+    (seamResolution && seamResolution.zeroConstraintSeams.length > 0 ? 1 : 0) +
+    (solverTier !== 'none' && !bodyCollision ? 1 : 0) +
+    (solverTier !== 'none' && bodyCollision && !TIER_CAPS[solverTier].facePoke ? 1 : 0) +
+    (solverTier === 'wasm' ? 1 : 0) +
+    (toolUnsupported ? 1 : 0);
+
   return (
     <div style={{
       position: 'absolute', top: 8, left: 8, zIndex: 100,
       background: 'rgba(0,0,0,0.75)', borderRadius: 6,
-      padding: '6px 10px', fontFamily: 'monospace', fontSize: 11,
-      color: '#e0e0e0', pointerEvents: 'none',
+      padding: '4px 8px', fontFamily: 'monospace', fontSize: 11,
+      color: '#e0e0e0',
       backdropFilter: 'blur(4px)', lineHeight: 1.6,
       border: `1px solid ${tier.color}33`,
     }}>
-      <div style={{ color: tier.color, fontWeight: 600 }}>
-        {tier.icon} {tier.label}
+      <button
+        type="button"
+        aria-label="Simulation status"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: 'none', border: 'none', padding: 0, margin: 0,
+          font: 'inherit', color: tier.color, fontWeight: 600, cursor: 'pointer',
+        }}
+      >
+        <span aria-hidden style={{
+          width: 7, height: 7, borderRadius: '50%', background: tier.color, flexShrink: 0,
+        }} />
+        {tier.label}
         {simulationState === 'paused' && ' (paused)'}
-      </div>
+        {warningCount > 0 && (
+          <span
+            aria-label={warningCount === 1 ? '1 warning' : `${warningCount} warnings`}
+            style={{ color: '#fb923c', fontWeight: 600 }}
+          >
+            ⚠ {warningCount}
+          </span>
+        )}
+        <span aria-hidden style={{ opacity: 0.5, fontSize: 9 }}>{expanded ? '▾' : '▸'}</span>
+      </button>
+      {expanded && <>
       {fps > 0 && (
         <div style={{ color: fps >= 50 ? '#4ade80' : fps >= 30 ? '#facc15' : '#ef4444' }}>
           {fps} FPS ({frameTimeMs.toFixed(1)}ms)
@@ -133,6 +172,7 @@ export function SimulationStatusOverlay() {
           ⚠️ Active tool ({activeTool3D === 'steamBrush' ? 'steam brush' : 'mesh grab'}) not supported on this tier
         </div>
       )}
+      </>}
     </div>
   );
 }
