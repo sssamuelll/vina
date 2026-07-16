@@ -95,7 +95,9 @@ const S = {
   toggleBar: {
     position: 'absolute' as const,
     top: 8,
-    right: 48,
+    // Deja el carril right:8..130 al SurfaceModePill (Fase1-S3): esta barra
+    // crece hacia la izquierda y a right:48 se montaba sobre el pill.
+    right: 130,
     display: 'flex',
     gap: 1,
     zIndex: 10,

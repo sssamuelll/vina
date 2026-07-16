@@ -4,7 +4,10 @@
   z-index: 15;
 }
 .floating-3d--bottom-left {
-  bottom: var(--sp-3);
+  /* Por encima del UnifiedBar en su posición default (58px alto + 24px de
+     offset, barPosition.ts) — a bottom:12 quedaba recortado DETRÁS del bar
+     (Fase1-S3). Si el usuario arrastra el bar, ese es su layout. */
+  bottom: 94px;
   left: var(--sp-3);
   display: flex;
   align-items: center;
