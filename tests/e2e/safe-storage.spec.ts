@@ -74,7 +74,7 @@ test('shows warning toast and app works when localStorage is blocked', async ({ 
   // Verify the toast warning appeared. App dispatches showToast({type:'error'})
   // for the storage-blocked path → renders as `.toast.toast--error` via the now-
   // mounted ToastContainer.
-  const toast = page.locator('.toast--error', { hasText: 'Local storage is unavailable' });
+  const toast = page.locator('.toast--error', { hasText: 'El navegador bloqueó el almacenamiento local' });
   await expect(toast.first()).toBeVisible({ timeout: 10000 });
 
   // Verify the app is still functional — pattern editor loaded
