@@ -13,9 +13,9 @@ import type { SectionProps } from './types';
 const PRESETS: { value: ResolutionPreset; label: string }[] = [
   { value: '1080p',           label: '1080p' },
   { value: '4k',              label: '4K' },
-  { value: 'instagram',       label: 'IG Square' },
-  { value: 'instagram-story', label: 'IG Story' },
-  { value: 'custom',          label: 'Custom' },
+  { value: 'instagram',       label: 'Cuadrado IG' },
+  { value: 'instagram-story', label: 'Historia IG' },
+  { value: 'custom',          label: 'Personalizada' },
 ];
 
 export default function ResolutionSection({ open, onToggle }: SectionProps) {
@@ -28,7 +28,7 @@ export default function ResolutionSection({ open, onToggle }: SectionProps) {
     <div className="ap-section">
       <button className="ap-section-header" onClick={onToggle}>
         <span className={`ap-chevron ${open ? 'open' : ''}`}>&#9656;</span>
-        Resolution
+        Resolución
       </button>
       {open && (
         <div className="ap-section-body">
@@ -45,7 +45,7 @@ export default function ResolutionSection({ open, onToggle }: SectionProps) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <label style={{ fontSize: 10, color: '#888' }}>W</label>
+            <label style={{ fontSize: 10, color: '#888' }}>An</label>
             <input
               type="number"
               min={256}
@@ -67,7 +67,7 @@ export default function ResolutionSection({ open, onToggle }: SectionProps) {
 
             <button
               onClick={() => dispatch(setAspectRatioLocked(!aspectRatioLocked))}
-              title={aspectRatioLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+              title={aspectRatioLocked ? 'Desbloquear proporción' : 'Bloquear proporción'}
               style={{
                 background: 'none',
                 border: 'none',
@@ -81,7 +81,7 @@ export default function ResolutionSection({ open, onToggle }: SectionProps) {
               {aspectRatioLocked ? <Lock size={12} /> : <Unlock size={12} />}
             </button>
 
-            <label style={{ fontSize: 10, color: '#888' }}>H</label>
+            <label style={{ fontSize: 10, color: '#888' }}>Al</label>
             <input
               type="number"
               min={256}

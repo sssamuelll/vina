@@ -22,7 +22,7 @@ import { test, expect, Page } from '@playwright/test';
 async function waitForApp(page: Page) {
   await page.goto('/');
   await page.waitForFunction(() => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__), { timeout: 15000 });
-  await expect(page.locator('[aria-label="Simulate"]').first()).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('[aria-label="Simular"]').first()).toBeVisible({ timeout: 15000 });
 }
 
 async function open3DView(page: Page) {
@@ -43,7 +43,7 @@ test.describe('Bundle Split — Dynamic Imports', () => {
     // Open the Avatar panel via the RightDock affordance.
     await page.locator('button[aria-label="Avatar"]').click({ force: true });
     await page.waitForTimeout(500);
-    await expect(page.locator('h3:has-text("Avatar & Pose")')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.context-panel__header >> text=Avatar')).toBeVisible({ timeout: 5000 });
 
     // Expand Pose section if collapsed.
     const poseHeader = page.locator('.avatar-panel button:has-text("Pose")');

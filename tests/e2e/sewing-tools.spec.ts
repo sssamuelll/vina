@@ -393,7 +393,7 @@ test.describe('Seam Context Menu', () => {
 
     await expect(page.locator('text=Reverse Sewing Direction')).toBeVisible({ timeout: 2000 });
     // The seam menu offers Select "<pieceName>" for each connected piece.
-    const selectItems = page.locator('button:has-text("Select")');
+    const selectItems = page.locator('button:has-text("Seleccionar")');
     expect(await selectItems.count()).toBeGreaterThanOrEqual(2);
   });
 

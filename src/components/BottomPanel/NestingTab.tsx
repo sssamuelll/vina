@@ -288,19 +288,19 @@ export default function NestingTab() {
       {/* Toolbar */}
       <div className="nesting-toolbar">
         <button onClick={handleNest} disabled={activePieces.length === 0}>
-          Nest
+          Crear marcada
         </button>
         {result && (
-          <button onClick={handleClear}>Clear</button>
+          <button onClick={handleClear}>Limpiar marcada</button>
         )}
 
         <label>
-          Roll:
+          Rollo:
           <select value={rollWidthSelectValue} onChange={handleRollWidthChange}>
             {ROLL_WIDTHS.map(rw => (
               <option key={rw.value} value={String(rw.value)}>{rw.label}</option>
             ))}
-            <option value="custom">Custom</option>
+            <option value="custom">Personalizado</option>
           </select>
         </label>
 
@@ -312,21 +312,21 @@ export default function NestingTab() {
               min={100}
               step={10}
               onChange={handleCustomRollWidth}
-              aria-label="Custom roll width in millimeters"
+              aria-label="Ancho de rollo personalizado en milímetros"
             />
             <span className="nesting-unit-suffix">mm</span>
           </label>
         )}
 
         <label className="nesting-unit-input">
-          Gap:
+          Separación:
           <input
             type="number"
             value={config.gap}
             min={0}
             step={1}
             onChange={handleGapChange}
-            aria-label="Gap between pieces in millimeters"
+            aria-label="Separación entre piezas en milímetros"
           />
           <span className="nesting-unit-suffix">mm</span>
         </label>
@@ -335,13 +335,13 @@ export default function NestingTab() {
         {result && usedLength != null && wastePercent != null && (
           <div className="nesting-stats">
             <span className="nesting-stat">
-              Length: <strong>{(usedLength / 10).toFixed(1)} cm</strong>
+              Largo: <strong>{(usedLength / 10).toFixed(1)} cm</strong>
             </span>
             <span className="nesting-stat">
-              Utilization: <strong>{(100 - wastePercent).toFixed(1)}%</strong>
+              Aprovechamiento: <strong>{(100 - wastePercent).toFixed(1)}%</strong>
             </span>
             <span className="nesting-stat">
-              Waste: <strong>{wastePercent.toFixed(1)}%</strong>
+              Desperdicio: <strong>{wastePercent.toFixed(1)}%</strong>
             </span>
           </div>
         )}
@@ -355,8 +355,8 @@ export default function NestingTab() {
       ) : (
         <div className="nesting-empty">
           {activePieces.length === 0
-            ? 'No active pieces to nest.'
-            : 'Click Nest to arrange pieces on fabric roll.'}
+            ? 'No hay piezas activas para la marcada.'
+            : "Haz clic en 'Crear marcada' para colocar las piezas en el rollo de tela."}
         </div>
       )}
     </div>

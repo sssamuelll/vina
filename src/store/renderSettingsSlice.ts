@@ -73,12 +73,12 @@ export interface RenderSettingsState {
 // ---------------------------------------------------------------------------
 
 export const HDRI_PRESETS: HdriPreset[] = [
-  { id: 'studio-soft',       name: 'Studio Soft', file: '/hdri/studio-soft.hdr',       thumbnail: '/hdri/thumb-studio-soft.jpg' },
-  { id: 'studio-hard',       name: 'Studio Hard', file: '/hdri/studio-hard.hdr',       thumbnail: '/hdri/thumb-studio-hard.jpg' },
-  { id: 'showroom',          name: 'Showroom',    file: '/hdri/showroom.hdr',          thumbnail: '/hdri/thumb-showroom.jpg' },
-  { id: 'outdoor-daylight',  name: 'Outdoor',     file: '/hdri/outdoor-daylight.hdr',  thumbnail: '/hdri/thumb-outdoor-daylight.jpg' },
-  { id: 'sunset',            name: 'Sunset',      file: '/hdri/sunset.hdr',            thumbnail: '/hdri/thumb-sunset.jpg' },
-  { id: 'neutral-grey',      name: 'Neutral',     file: '/hdri/neutral-grey.hdr',      thumbnail: '/hdri/thumb-neutral-grey.jpg' },
+  { id: 'studio-soft',       name: 'Estudio suave', file: '/hdri/studio-soft.hdr',       thumbnail: '/hdri/thumb-studio-soft.jpg' },
+  { id: 'studio-hard',       name: 'Estudio duro',  file: '/hdri/studio-hard.hdr',       thumbnail: '/hdri/thumb-studio-hard.jpg' },
+  { id: 'showroom',          name: 'Showroom',      file: '/hdri/showroom.hdr',          thumbnail: '/hdri/thumb-showroom.jpg' },
+  { id: 'outdoor-daylight',  name: 'Exterior',      file: '/hdri/outdoor-daylight.hdr',  thumbnail: '/hdri/thumb-outdoor-daylight.jpg' },
+  { id: 'sunset',            name: 'Atardecer',     file: '/hdri/sunset.hdr',            thumbnail: '/hdri/thumb-sunset.jpg' },
+  { id: 'neutral-grey',      name: 'Neutro',        file: '/hdri/neutral-grey.hdr',      thumbnail: '/hdri/thumb-neutral-grey.jpg' },
 ];
 
 const LIGHT_NEW_DEFAULTS: Omit<CustomLight, 'id' | 'color' | 'intensity' | 'width' | 'height' | 'position' | 'rotation'> = {

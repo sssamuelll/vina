@@ -35,18 +35,18 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, edge
   ];
 
   return (
-    <PropertySection id="seam-props" title={`SEAM: ${pieceAName} ↔ ${pieceBName}`} collapsed={collapsed} onToggle={onToggle}>
+    <PropertySection id="seam-props" title={`COSTURA: ${pieceAName} ↔ ${pieceBName}`} collapsed={collapsed} onToggle={onToggle}>
       {/* Type dropdown */}
       <div className="panel-field">
-        <label>Type</label>
+        <label>Tipo</label>
         <select
           className="panel-input"
           value={seam.type}
           onChange={e => dispatch(updateSeam({ ...seam, type: e.target.value as Seam['type'] }))}
         >
-          <option value="standard">Standard</option>
-          <option value="french">French</option>
-          <option value="flat-felled">Flat-felled</option>
+          <option value="standard">Estándar</option>
+          <option value="french">Francesa</option>
+          <option value="flat-felled">Sobrecargada</option>
           <option value="overlock">Overlock</option>
         </select>
       </div>
@@ -56,30 +56,30 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, edge
           stored as undefined tStart/tEnd — applyPctRange normalizes. */}
       {halves.map(({ key, name, pct: [startPct, endPct], sewn }) => (
         <div className="panel-field" key={key}>
-          <label>Sewn range — {name}</label>
+          <label>Rango cosido — {name}</label>
           <div className="panel-action-row">
             <input
               type="number" className="panel-input narrow"
               min={0} max={99} step={1} value={startPct}
-              aria-label={`Sewn range start % (${name})`}
+              aria-label={`Inicio de rango cosido % (${name})`}
               onChange={e => setHalfRange(key, Number(e.target.value), endPct, 'start')}
             />
             <span className="panel-value">–</span>
             <input
               type="number" className="panel-input narrow"
               min={1} max={100} step={1} value={endPct}
-              aria-label={`Sewn range end % (${name})`}
+              aria-label={`Fin de rango cosido % (${name})`}
               onChange={e => setHalfRange(key, startPct, Number(e.target.value), 'end')}
             />
             <span className="panel-value">%</span>
-            {sewn != null && <span className="panel-value">{(sewn / 10).toFixed(1)} cm sewn</span>}
+            {sewn != null && <span className="panel-value">{(sewn / 10).toFixed(1)} cm cosidos</span>}
           </div>
         </div>
       ))}
       {mismatch !== undefined && mismatch > 0.1 && (
         <div className="panel-field">
           <span className="panel-tension-tag panel-tension-tag--gather">
-            Sewn lengths differ by {Math.round(mismatch * 100)}% — intentional gathering/ease, or adjust the ranges.
+            Los largos cosidos difieren un {Math.round(mismatch * 100)}% — fruncido/embebido intencional, o ajusta los rangos.
           </span>
         </div>
       )}
@@ -87,11 +87,11 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, edge
       {/* Tension slider */}
       <div className="panel-field">
         <label>
-          Tension{' '}
+          Tensión{' '}
           {seam.tension < 100
-            ? <span className="panel-tension-tag panel-tension-tag--gather">(Gathering)</span>
+            ? <span className="panel-tension-tag panel-tension-tag--gather">(Fruncido)</span>
             : seam.tension > 100
-            ? <span className="panel-tension-tag panel-tension-tag--ease">(Easing)</span>
+            ? <span className="panel-tension-tag panel-tension-tag--ease">(Embebido)</span>
             : null}
         </label>
         <input
@@ -110,7 +110,7 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, edge
 
       {/* Strength slider */}
       <div className="panel-field">
-        <label>Strength</label>
+        <label>Fuerza</label>
         <input
           type="range" className="panel-slider"
           min={1} max={100} value={Math.round(seam.strength * 100)}
@@ -126,7 +126,7 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, edge
             type="checkbox" checked={seam.taped}
             onChange={e => dispatch(updateSeam({ ...seam, taped: e.target.checked }))}
           />{' '}
-          Taped
+          Encintada
         </label>
         {seam.taped && (
           <input
@@ -143,19 +143,19 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, edge
           className={`panel-chip-btn ${seam.active ? 'panel-chip-btn--destructive' : 'panel-chip-btn--success'}`}
           onClick={() => dispatch(deactivateSeam({ seamId: seam.id, active: !seam.active }))}
         >
-          {seam.active ? 'Deactivate' : 'Activate'}
+          {seam.active ? 'Desactivar' : 'Activar'}
         </button>
         <button
           className="panel-chip-btn"
           onClick={() => dispatch(reverseSeam(seam.id))}
         >
-          Reverse
+          Invertir
         </button>
         <button
           className="panel-chip-btn panel-chip-btn--destructive"
           onClick={() => dispatch(removeSeam(seam.id))}
         >
-          Delete
+          Eliminar costura
         </button>
       </div>
     </PropertySection>

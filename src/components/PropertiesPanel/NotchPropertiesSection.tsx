@@ -34,11 +34,11 @@ export default function NotchPropertiesSection() {
     const partnerPiece = pieces.find(p => p.id === partner.pieceId);
     return (
       <section className="panel-section">
-        <div className="panel-subtitle panel-subtitle--spaced">Notch · mirrored pair</div>
-        <div className="panel-hint">Linked to a notch on {partnerPiece?.name ?? 'another piece'}.</div>
+        <div className="panel-subtitle panel-subtitle--spaced">Piquete · par espejado</div>
+        <div className="panel-hint">Vinculado a un piquete en {partnerPiece?.name ?? 'otra pieza'}.</div>
         <div className="panel-field panel-field--row">
           <button className="panel-chip-btn panel-chip-btn--destructive" onClick={() => dispatch(removeNotchPair(pair.id))}>
-            Break link
+            Romper vínculo
           </button>
         </div>
       </section>
@@ -62,28 +62,28 @@ export default function NotchPropertiesSection() {
 
   return (
     <section className="panel-section">
-      <div className="panel-subtitle panel-subtitle--spaced">Notch · mirror to paired edge</div>
+      <div className="panel-subtitle panel-subtitle--spaced">Piquete · espejar al borde emparejado</div>
       <div className="panel-field panel-field--row">
-        <label>Sense</label>
+        <label>Sentido</label>
         <div className="panel-preset-row">
           <button
             className={`panel-chip-btn ${invert ? 'panel-chip-btn--active' : ''}`}
             aria-pressed={invert}
             onClick={() => dispatch(setNotchMirrorInvert(true))}
           >
-            Opposite side
+            Lado opuesto
           </button>
           <button
             className={`panel-chip-btn ${!invert ? 'panel-chip-btn--active' : ''}`}
             aria-pressed={!invert}
             onClick={() => dispatch(setNotchMirrorInvert(false))}
           >
-            Same side
+            Mismo lado
           </button>
         </div>
       </div>
       {mapped.ok ? (
-        <button className="panel-btn-primary" onClick={create}>Create mirror notch</button>
+        <button className="panel-btn-primary" onClick={create}>Crear piquete espejado</button>
       ) : (
         <div className="panel-hint panel-hint--warn">{mapped.message}</div>
       )}

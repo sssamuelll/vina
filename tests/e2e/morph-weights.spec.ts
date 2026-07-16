@@ -18,7 +18,7 @@ async function openAvatarPanel(page: Page) {
   await avatarBtn.click({ force: true });
   await page.waitForTimeout(500);
 
-  await expect(page.locator('h3:has-text("Avatar & Pose")')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.context-panel__header >> text=Avatar')).toBeVisible({ timeout: 5000 });
 }
 
 test.describe('Morph Weights (#271)', () => {

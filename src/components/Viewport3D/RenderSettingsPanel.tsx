@@ -34,8 +34,8 @@ export default function RenderSettingsPanel({
     <div className="render-panel-wrapper">
       <div className="render-panel">
         <div className="render-panel-header">
-          <h3>Render Settings</h3>
-          <button className="render-panel-close" onClick={onClose} title="Close">&times;</button>
+          <h3>Render y export 3D</h3>
+          <button className="render-panel-close" onClick={onClose} title="Cerrar">&times;</button>
         </div>
 
         <div className="render-panel-scroll">

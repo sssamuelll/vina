@@ -235,22 +235,22 @@ export default function LayerPanel() {
     <div className="layer-panel">
       {/* Toolbar */}
       <div className="layer-panel-toolbar">
-        <button onClick={handleAddLayer} title="Add layer">+ Layer</button>
+        <button onClick={handleAddLayer} title="Agregar capa">+ Capa</button>
         <button
           className={xrayMode ? 'active' : ''}
           onClick={handleToggleXray}
-          title="X-ray mode"
+          title="Modo rayos X"
         >
-          X-ray
+          Rayos X
         </button>
-        <button onClick={handleCollapseAll} title="Collapse/expand all">
+        <button onClick={handleCollapseAll} title="Contraer/expandir todo">
           {allLayers.every(l => collapsed[l]) ? '\u25B6' : '\u25BC'}
         </button>
       </div>
 
       {/* Layer groups */}
       {allLayers.length === 0 && (
-        <div className="layer-empty">No pieces in project</div>
+        <div className="layer-empty">Sin piezas en el proyecto</div>
       )}
 
       {allLayers.map(layerNum => {
@@ -310,7 +310,7 @@ export default function LayerPanel() {
               <button
                 className={`layer-icon-btn${isHidden ? '' : ' active'}`}
                 onClick={e => { e.stopPropagation(); dispatch(toggleLayerVisibility(layerNum)); }}
-                title={isHidden ? 'Show layer' : 'Hide layer'}
+                title={isHidden ? 'Mostrar capa' : 'Ocultar capa'}
               >
                 {isHidden ? '\uD83D\uDE48' : '\uD83D\uDC41'}
               </button>
@@ -321,7 +321,7 @@ export default function LayerPanel() {
                   e.stopPropagation();
                   dispatch(setLayerLocked({ layer: layerNum, locked: !isLocked }));
                 }}
-                title={isLocked ? 'Unlock layer' : 'Lock layer'}
+                title={isLocked ? 'Desbloquear capa' : 'Bloquear capa'}
               >
                 {isLocked ? '\uD83D\uDD12' : '\uD83D\uDD13'}
               </button>
@@ -336,7 +336,7 @@ export default function LayerPanel() {
               <div className="layer-group-pieces">
                 {layerPieces.length === 0 && (
                   <div className="layer-empty" style={{ padding: '4px 8px', fontSize: '10px' }}>
-                    Empty layer
+                    Capa vacía
                   </div>
                 )}
                 {layerPieces.map(piece => {
@@ -359,7 +359,7 @@ export default function LayerPanel() {
                       onDrop={e => handleDropOnPiece(e, piece.id, layerNum)}
                       onClick={() => dispatch(selectPiece(piece.id))}
                     >
-                      <span className="layer-piece-drag-handle" title="Drag to reorder">
+                      <span className="layer-piece-drag-handle" title="Arrastra para reordenar">
                         &#x2630;
                       </span>
                       <span className="layer-piece-name">{piece.name}</span>
@@ -369,7 +369,7 @@ export default function LayerPanel() {
                       <button
                         className={`layer-icon-btn${!isPieceHidden ? ' active' : ''}`}
                         onClick={e => { e.stopPropagation(); dispatch(toggleHide3D(piece.id)); }}
-                        title={isPieceHidden ? 'Show piece' : 'Hide piece'}
+                        title={isPieceHidden ? 'Mostrar pieza' : 'Ocultar pieza'}
                       >
                         {isPieceHidden ? '\uD83D\uDE48' : '\uD83D\uDC41'}
                       </button>
@@ -389,19 +389,19 @@ export default function LayerPanel() {
           className="layer-context-menu"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
-          <button onClick={handleContextRename}>Rename Layer</button>
+          <button onClick={handleContextRename}>Renombrar capa</button>
           <button
             onClick={handleContextDelete}
             disabled={contextMenu.layer === 1}
-            title={contextMenu.layer === 1 ? 'Cannot delete layer 1' : undefined}
+            title={contextMenu.layer === 1 ? 'La capa 1 no se puede eliminar' : undefined}
           >
-            Delete Layer
+            Eliminar capa
           </button>
           <button onClick={handleContextHide}>
-            {hiddenLayerIds.includes(contextMenu.layer) ? 'Show Layer' : 'Hide Layer'}
+            {hiddenLayerIds.includes(contextMenu.layer) ? 'Mostrar capa' : 'Ocultar capa'}
           </button>
           <button onClick={handleContextLock}>
-            {layerLocked[contextMenu.layer] ? 'Unlock Layer' : 'Lock Layer'}
+            {layerLocked[contextMenu.layer] ? 'Desbloquear capa' : 'Bloquear capa'}
           </button>
         </div>
       )}

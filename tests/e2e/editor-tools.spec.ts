@@ -196,8 +196,8 @@ test.describe('Undo / Redo', () => {
   test('undo button in toolbar works', async ({ page }) => {
     await drawRect(page);
     await expect.poll(() => getPieceCount(page), { timeout: 3000 }).toBe(1);
-    // TopBar (`src/components/shell/TopBar.tsx`) exposes `aria-label="Undo"`.
-    await page.click('button[aria-label="Undo"]');
+    // TopBar (`src/components/shell/TopBar.tsx`) exposes `aria-label="Deshacer"`.
+    await page.click('button[aria-label="Deshacer"]');
     await expect.poll(() => getPieceCount(page), { timeout: 3000 }).toBe(0);
   });
 });

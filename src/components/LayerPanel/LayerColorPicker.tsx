@@ -31,7 +31,7 @@ export default function LayerColorPicker({ color, onChange }: LayerColorPickerPr
         className="layer-color-dot"
         style={{ backgroundColor: color }}
         onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
-        title="Change layer color"
+        title="Cambiar color de capa"
       />
       {open && (
         <div className="layer-color-popover">

@@ -17,7 +17,7 @@ export default function GroundSection({ open, onToggle }: SectionProps) {
     <div className="ap-section">
       <button className="ap-section-header" onClick={onToggle}>
         <span className={`ap-chevron ${open ? 'open' : ''}`}>&#9656;</span>
-        Ground
+        Suelo
       </button>
       {open && (
         <div className="ap-section-body">
@@ -34,7 +34,7 @@ export default function GroundSection({ open, onToggle }: SectionProps) {
 
           <div>
             <div className="ap-slider-label">
-              <span>Shadow Opacity</span>
+              <span>Opacidad de sombra</span>
               <span>{shadowOpacity.toFixed(2)}</span>
             </div>
             <div className="ap-slider-control">
@@ -59,7 +59,7 @@ export default function GroundSection({ open, onToggle }: SectionProps) {
 
           <div>
             <div className="ap-slider-label">
-              <span>Shadow Blur</span>
+              <span>Difuminado de sombra</span>
               <span>{shadowBlur.toFixed(1)}</span>
             </div>
             <div className="ap-slider-control">

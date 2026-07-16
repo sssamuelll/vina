@@ -65,16 +65,16 @@ export default function ExportSection({
     <div className="ap-section">
       <button className="ap-section-header" onClick={onToggle}>
         <span className={`ap-chevron ${open ? 'open' : ''}`}>&#9656;</span>
-        Export
+        Exportar
       </button>
       {open && (
         <div className="ap-section-body">
 
           {/* ── Still ── */}
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#999', marginBottom: 4 }}>Still</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#999', marginBottom: 4 }}>Imagen</div>
 
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <label style={{ fontSize: 10, color: '#888' }}>Format</label>
+            <label style={{ fontSize: 10, color: '#888' }}>Formato</label>
             <select
               className="ap-select"
               style={{ width: 'auto' }}
@@ -90,7 +90,7 @@ export default function ExportSection({
           {imageFormat === 'jpeg' && (
             <div>
               <div className="ap-slider-label">
-                <span>JPEG Quality</span>
+                <span>Calidad JPEG</span>
                 <span>{Math.round(jpegQuality * 100)}%</span>
               </div>
               <div className="ap-slider-control">
@@ -114,7 +114,7 @@ export default function ExportSection({
               checked={exportTransparent}
               onChange={e => dispatch(setExportTransparent(e.target.checked))}
             />
-            Transparent background
+            Fondo transparente
           </label>
 
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -123,24 +123,24 @@ export default function ExportSection({
               disabled={!onExportStill}
               onClick={() => onExportStill?.(exportWidth, exportHeight, exportTransparent)}
             >
-              Export Still
+              Exportar imagen
             </button>
             <button
               className="ap-btn"
               onClick={handleCopy}
-              title="Copy to clipboard"
+              title="Copiar al portapapeles"
             >
-              {copied ? 'Copied!' : 'Copy'}
+              {copied ? 'Copiado' : 'Copiar'}
             </button>
           </div>
 
           {/* ── Turntable ── */}
           <div style={{ fontSize: 11, fontWeight: 600, color: '#999', marginTop: 10, marginBottom: 4 }}>
-            Turntable
+            Vuelta 360&deg;
           </div>
 
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <label style={{ fontSize: 10, color: '#888' }}>Frames</label>
+            <label style={{ fontSize: 10, color: '#888' }}>Fotogramas</label>
             <select
               className="ap-select"
               style={{ width: 'auto' }}
@@ -172,13 +172,13 @@ export default function ExportSection({
                 className={turntableDirection === 'cw' ? 'active' : ''}
                 onClick={() => dispatch(setTurntableDirection('cw'))}
               >
-                CW
+                Horario
               </button>
               <button
                 className={turntableDirection === 'ccw' ? 'active' : ''}
                 onClick={() => dispatch(setTurntableDirection('ccw'))}
               >
-                CCW
+                Antihorario
               </button>
             </div>
 
@@ -190,7 +190,7 @@ export default function ExportSection({
             >
               <option value="webm">WebM</option>
               <option value="mp4" disabled={!mp4Supported}>
-                MP4{!mp4Supported ? ' (unsupported)' : ''}
+                MP4{!mp4Supported ? ' (no compatible)' : ''}
               </option>
             </select>
           </div>
@@ -200,28 +200,28 @@ export default function ExportSection({
             disabled={!onExportTurntable}
             onClick={() => onExportTurntable?.()}
           >
-            Render Turntable
+            Generar vuelta 360&deg;
           </button>
 
           {/* ── Batch ── */}
           <div style={{ fontSize: 11, fontWeight: 600, color: '#999', marginTop: 10, marginBottom: 4 }}>
-            Batch
+            Lote
           </div>
           <button
             className="ap-btn accent"
             disabled={!onExportAllViews}
             onClick={() => onExportAllViews?.(exportWidth, exportHeight, exportTransparent)}
           >
-            Export All Views
+            Exportar todas las vistas
           </button>
 
           {/* ── 3D Model ── */}
           <div style={{ fontSize: 11, fontWeight: 600, color: '#999', marginTop: 10, marginBottom: 4 }}>
-            3D Model
+            Modelo 3D
           </div>
 
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <label style={{ fontSize: 10, color: '#888' }}>Format</label>
+            <label style={{ fontSize: 10, color: '#888' }}>Formato</label>
             <select
               className="ap-select"
               style={{ width: 'auto' }}
@@ -233,7 +233,7 @@ export default function ExportSection({
               <option value="3d-usdz">USDZ</option>
             </select>
 
-            <label style={{ fontSize: 10, color: '#888' }}>Scale</label>
+            <label style={{ fontSize: 10, color: '#888' }}>Escala</label>
             <select
               className="ap-select"
               style={{ width: 'auto' }}
@@ -243,7 +243,7 @@ export default function ExportSection({
               <option value={1.0}>mm</option>
               <option value={0.1}>cm</option>
               <option value={0.001}>m</option>
-              <option value={0.03937}>inches</option>
+              <option value={0.03937}>pulgadas</option>
             </select>
           </div>
 
@@ -255,7 +255,7 @@ export default function ExportSection({
               checked={export3DIncludeAvatar}
               onChange={e => setExport3DIncludeAvatar(e.target.checked)}
             />
-            Include avatar
+            Incluir avatar
           </label>
 
           <button
@@ -263,7 +263,7 @@ export default function ExportSection({
             disabled={!onExport3D}
             onClick={() => onExport3D?.(export3DFormat, export3DIncludeAvatar, export3DScale)}
           >
-            Export 3D
+            Exportar modelo 3D
           </button>
         </div>
       )}

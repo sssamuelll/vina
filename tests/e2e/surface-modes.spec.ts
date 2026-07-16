@@ -170,13 +170,13 @@ test.describe('Surface Modes — WebGPU/TSL path', () => {
 
     // Flat
     await page.locator('.surface-pill__trigger').click();
-    await page.locator('.surface-pill__option', { hasText: 'Flat' }).first().click();
+    await page.locator('.surface-pill__option', { hasText: 'Plano' }).first().click();
     await page.waitForTimeout(300);
     expect(await getMode()).toBe('flat');
 
     // X-Ray (the flyout closes after each pick — reopen)
     await page.locator('.surface-pill__trigger').click();
-    await page.locator('.surface-pill__option', { hasText: 'X-Ray' }).first().click();
+    await page.locator('.surface-pill__option', { hasText: 'Rayos X' }).first().click();
     await page.waitForTimeout(300);
     expect(await getMode()).toBe('xray');
   });

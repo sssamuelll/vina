@@ -57,37 +57,37 @@ function setup(withSeam = true) {
 describe('NotchPropertiesSection (F3)', () => {
   it('shows the mirror control with the two-position sense toggle', () => {
     setup();
-    expect(screen.getByText(/mirror to paired edge/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /opposite side/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /same side/i })).toBeTruthy();
+    expect(screen.getByText(/espejar al borde emparejado/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /lado opuesto/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /mismo lado/i })).toBeTruthy();
   });
 
   it('defaults to Opposite side; toggling dispatches the sense', () => {
     const store = setup();
     expect(store.getState().editor.notchMirrorInvert).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: /same side/i }));
+    fireEvent.click(screen.getByRole('button', { name: /mismo lado/i }));
     expect(store.getState().editor.notchMirrorInvert).toBe(false);
   });
 
   it('Create adds a notch to the paired piece, records a pair, and switches to linked', () => {
     const store = setup();
-    fireEvent.click(screen.getByRole('button', { name: /create mirror notch/i }));
+    fireEvent.click(screen.getByRole('button', { name: /crear piquete espejado/i }));
     const back = store.getState().project.pieces.find(p => p.id === 'B')!;
     expect(back.internals.filter(i => i.type === 'notch')).toHaveLength(1);
     expect(store.getState().project.notchPairs).toHaveLength(1);   // B1: declared identity
-    expect(screen.getByText(/break link/i)).toBeTruthy();          // section now linked
+    expect(screen.getByText(/romper vínculo/i)).toBeTruthy();      // section now linked
   });
 
   it('Break link drops the declared pair', () => {
     const store = setup();
-    fireEvent.click(screen.getByRole('button', { name: /create mirror notch/i }));
-    fireEvent.click(screen.getByRole('button', { name: /break link/i }));
+    fireEvent.click(screen.getByRole('button', { name: /crear piquete espejado/i }));
+    fireEvent.click(screen.getByRole('button', { name: /romper vínculo/i }));
     expect(store.getState().project.notchPairs).toHaveLength(0);
   });
 
   it('without a seam, shows the feedback message and no create button', () => {
     setup(false);
-    expect(screen.queryByRole('button', { name: /create mirror notch/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /crear piquete espejado/i })).toBeNull();
     expect(screen.getByText(/seam/i)).toBeTruthy();
   });
 });

@@ -41,6 +41,13 @@ const GRADING_LAYER = 10;
 /** Measurement keys we display as columns (in mm internally, shown as cm). */
 const DISPLAY_MEASUREMENTS = ['chest', 'waist', 'hips'] as const;
 
+/** UI labels for measurement columns (keys stay English — they index measurement data). */
+const MEASUREMENT_LABELS: Record<(typeof DISPLAY_MEASUREMENTS)[number], string> = {
+  chest: 'Pecho',
+  waist: 'Cintura',
+  hips: 'Cadera',
+};
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function mmToCm(mm: number): string {
@@ -171,7 +178,7 @@ export default function GradingTab() {
     const baseMeas = sizeMeasurements[baseSize];
     if (!baseMeas) return;
 
-    batchUndo(dispatch, 'Grade pattern', () => {
+    batchUndo(dispatch, 'Escalar patrón', () => {
       // Remove any prior generated pieces
       removeGenerated();
 
@@ -217,7 +224,7 @@ export default function GradingTab() {
       }
 
       // Ensure layer name is set
-      dispatch(renameLayer({ layer: GRADING_LAYER, name: 'Grading' }));
+      dispatch(renameLayer({ layer: GRADING_LAYER, name: 'Escalado' }));
       dispatch(setGradingResult({ generatedPieces: generated }));
       dispatch(setEnabled(true));
     });
@@ -240,7 +247,7 @@ export default function GradingTab() {
   }, [runGrading]);
 
   const handleClear = useCallback(() => {
-    batchUndo(dispatch, 'Clear grading', () => {
+    batchUndo(dispatch, 'Limpiar escalado', () => {
       removeGenerated();
       dispatch(clearGrading());
     });
@@ -253,7 +260,7 @@ export default function GradingTab() {
       <div className="grading-tab">
         <div className="grading-toolbar">
           <label>
-            System:
+            Sistema:
             <select value={sizeSystem} onChange={handleSystemChange} style={{ marginLeft: 4 }}>
               {sizeSystems.map((s) => (
                 <option key={s.system} value={s.system}>
@@ -264,7 +271,7 @@ export default function GradingTab() {
           </label>
         </div>
         <div className="grading-empty">
-          <span>Select a size system and click Grade to generate size variants.</span>
+          <span>Selecciona un sistema de tallas y pulsa Escalar para generar las variantes de talla.</span>
         </div>
       </div>
     );
@@ -275,19 +282,19 @@ export default function GradingTab() {
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
       <div className="grading-toolbar">
         <button onClick={handleGrade} disabled={activeSizes.length === 0 || basePieces.length === 0}>
-          Grade
+          Escalar
         </button>
         {hasGenerated && (
           <button onClick={handleRegrade}>
-            Re-grade
-            {stale && <span className="grading-stale-badge"> (stale)</span>}
+            Reescalar
+            {stale && <span className="grading-stale-badge"> (desactualizado)</span>}
           </button>
         )}
         {hasGenerated && (
-          <button onClick={handleClear}>Clear</button>
+          <button onClick={handleClear}>Limpiar escalado</button>
         )}
         <label>
-          System:
+          Sistema:
           <select value={sizeSystem} onChange={handleSystemChange} style={{ marginLeft: 4 }}>
             {sizeSystems.map((s) => (
               <option key={s.system} value={s.system}>
@@ -313,12 +320,12 @@ export default function GradingTab() {
         <table className="grading-table">
           <thead>
             <tr>
-              <th>Active</th>
-              <th>Size</th>
+              <th>Activa</th>
+              <th>Talla</th>
               {DISPLAY_MEASUREMENTS.map((m) => (
-                <th key={m}>{m} (cm)</th>
+                <th key={m}>{MEASUREMENT_LABELS[m]} (cm)</th>
               ))}
-              <th>Qty</th>
+              <th>Cant</th>
             </tr>
           </thead>
           <tbody>
@@ -364,10 +371,10 @@ export default function GradingTab() {
 
       {/* ── Stats Footer ────────────────────────────────────────────────── */}
       <div className="grading-stats">
-        <span>Active sizes: {activeSizes.length}</span>
-        <span>Total units: {totalUnits}</span>
+        <span>Tallas activas: {activeSizes.length}</span>
+        <span>Unidades: {totalUnits}</span>
         {lastGradedAt && (
-          <span>Last graded: {new Date(lastGradedAt).toLocaleTimeString()}</span>
+          <span>Último escalado: {new Date(lastGradedAt).toLocaleTimeString()}</span>
         )}
       </div>
     </div>
