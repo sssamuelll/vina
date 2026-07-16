@@ -53,7 +53,7 @@ export default function AvatarTapes() {
                   padding: '2px 6px',
                   borderRadius: 4,
                   fontSize: 11,
-                  fontFamily: "'Inter', sans-serif",
+                  fontFamily: 'var(--font-sans)',
                   fontWeight: 600,
                   whiteSpace: 'nowrap',
                 }}
@@ -90,7 +90,7 @@ export default function AvatarTapes() {
                   padding: '2px 6px',
                   borderRadius: 4,
                   fontSize: 11,
-                  fontFamily: "'Inter', sans-serif",
+                  fontFamily: 'var(--font-sans)',
                   fontWeight: 600,
                   whiteSpace: 'nowrap',
                 }}

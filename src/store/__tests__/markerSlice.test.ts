@@ -9,8 +9,8 @@ import markerReducer, {
   toggleGrid,
   setGridSpacing,
   type MarkerState,
-} from '../../../store/markerSlice';
-import type { LayoutResult } from '../../../utils/export/cuttingLayout';
+} from '../markerSlice';
+import type { LayoutResult } from '../../utils/export/cuttingLayout';
 
 function makeLayout(): LayoutResult {
   return {

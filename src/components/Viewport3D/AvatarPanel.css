@@ -2,7 +2,6 @@
 .avatar-panel-wrapper {
   flex-shrink: 0;
   overflow: hidden;
-  transition: width 0.2s ease;
 }
 
 .avatar-panel-wrapper.open {
@@ -353,7 +352,7 @@
   color: #ccc;
   cursor: pointer;
   font-size: 11px;
-  font-family: Inter, sans-serif;
+  font-family: var(--font-sans);
 }
 .ik-toggle-btn:hover {
   background: var(--bg-hover, #333);

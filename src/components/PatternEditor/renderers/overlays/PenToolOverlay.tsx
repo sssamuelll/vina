@@ -106,8 +106,7 @@ export default function PenToolOverlay({ zoom2D, units, penNodes, previewPath, g
           />
           <text
             textAnchor="middle" dominantBaseline="central"
-            fill="#fff" fontSize={10 / zoom2D}
-            fontFamily="Inter, sans-serif" pointerEvents="none"
+            fill="#fff" fontSize={10 / zoom2D} pointerEvents="none"
           >
             {formatDimension(penDistance.distance, units as UnitSystem)}
           </text>

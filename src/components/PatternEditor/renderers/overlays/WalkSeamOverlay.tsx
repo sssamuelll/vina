@@ -83,8 +83,7 @@ function MetricsPanel({
           x={0}
           y={-totalH + lineH * (i + 0.75)}
           textAnchor="middle" dominantBaseline="central"
-          fill="#fff" fontSize={fontSize}
-          fontFamily="Inter, sans-serif" pointerEvents="none"
+          fill="#fff" fontSize={fontSize} pointerEvents="none"
         >
           {line}
         </text>

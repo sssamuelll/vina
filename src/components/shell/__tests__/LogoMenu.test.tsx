@@ -33,7 +33,7 @@ function renderMenu() {
       construction: constructionReducer,
     },
   });
-  render(<Provider store={store}><LogoMenu /></Provider>);
+  render(<Provider store={store}><LogoMenu onOpenPanel={() => {}} onImportDXF={() => {}} /></Provider>);
   return store;
 }
 

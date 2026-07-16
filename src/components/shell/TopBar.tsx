@@ -9,8 +9,8 @@ import LogoMenu from './LogoMenu';
 type ViewMode = '2d' | 'split' | '3d';
 
 interface TopBarProps {
-  onOpenPanel?: (name: string) => void;
-  onImportDXF?: () => void;
+  onOpenPanel: (name: string) => void;
+  onImportDXF: () => void;
 }
 
 export default function TopBar({ onOpenPanel, onImportDXF }: TopBarProps) {

@@ -124,10 +124,6 @@
 
 /* ─── Model badge (hidden by default, shown in settings) ─── */
 
-.unified-bar__model {
-  display: none;
-}
-
 /* ─── Shortcut hint ─── */
 
 .unified-bar__shortcut {
@@ -140,10 +136,6 @@
 }
 
 /* ─── Metadata (moved out of bar) ─── */
-
-.unified-bar__meta {
-  display: none;
-}
 
 /* ─── Expanding Panel ─── */
 

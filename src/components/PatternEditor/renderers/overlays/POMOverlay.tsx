@@ -76,7 +76,6 @@ function DimensionLabel({
         dominantBaseline="central"
         fill="#fff"
         fontSize={fontSize}
-        fontFamily="Inter, sans-serif"
         fontWeight={500}
       >
         {label}

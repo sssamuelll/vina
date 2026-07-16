@@ -170,7 +170,8 @@ export default function BOMTab() {
       <div className="bom-toolbar">
         <button onClick={handleRefresh}>
           Refresh BOM
-          {isStale && <span className="bom-stale-badge"> (stale)</span>}
+          {/* Punto, no jerga: "(stale)" era vocabulario de cache (Fase 2). */}
+          {isStale && <span className="bom-stale-badge" title="The pattern changed since the last refresh"> •</span>}
         </button>
         <button onClick={handleAddItem}>+ Add Item</button>
         <select value={currency} onChange={handleCurrencyChange}>
@@ -178,9 +179,12 @@ export default function BOMTab() {
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
-        <span className="bom-total">
-          Total: {currencySymbol}{grandTotal.toFixed(2)}
-        </span>
+        {/* Sin entradas no hay total que mostrar — "$0.00" leia como bug (Fase 2). */}
+        {displayEntries.length > 0 && (
+          <span className="bom-total">
+            Total: {currencySymbol}{grandTotal.toFixed(2)}
+          </span>
+        )}
       </div>
 
       {/* Colorway tabs */}

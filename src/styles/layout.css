@@ -17,12 +17,6 @@
   flex-shrink: 0;
   z-index: 10;
 }
-.top-bar__logo {
-  font-size: var(--text-heading);
-  font-weight: var(--weight-semibold);
-  color: var(--text-primary);
-  letter-spacing: -0.3px;
-}
 .top-bar__spacer { flex: 1; }
 .top-bar__status {
   display: flex;

@@ -19,6 +19,7 @@ import { store } from '../../store';
 import { runUiExport } from '../../utils/export/uiExport';
 import { clearStorageProject } from '../../utils/projectIO';
 import { ChevronRight, ChevronDown } from 'lucide-react';
+import { displayShortcut } from './shortcutDisplay';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -150,8 +151,8 @@ const TOP_LEVEL: TopLevelItem[] = [
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface LogoMenuProps {
-  onOpenPanel?: (name: string) => void;
-  onImportDXF?: () => void;
+  onOpenPanel: (name: string) => void;
+  onImportDXF: () => void;
 }
 
 export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
@@ -160,7 +161,10 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
   const [hoveredSub, setHoveredSub] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch<AppDispatch>();
-  const state = useSelector((s: RootState) => s);
+  // Suscripción solo con el menú abierto: cerrado devuelve null estable
+  // (sin re-render por cada cambio del store). checked/disabled solo se
+  // evalúan con el menú visible (Fase 2 — warning de selector root-state).
+  const state = useSelector((s: RootState) => (open ? s : null));
 
   useEffect(() => {
     if (!open) return;
@@ -184,27 +188,27 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
 
   const handleItemClick = useCallback((item: MenuItem) => {
     if (item.separator || item.submenu) return;
-    if (item.disabled?.(state)) return;
+    if (item.disabled?.(store.getState())) return;
 
     if (item.label === 'Import DXF...') {
-      onImportDXF?.();
+      onImportDXF();
     } else if (item.label === 'Avatar & Measurements...') {
-      onOpenPanel?.('Avatar');
+      onOpenPanel('Avatar');
     } else if (item.action) {
       item.action(dispatch);
     }
 
     setOpen(false);
     setHoveredTop(null);
-  }, [dispatch, state, onOpenPanel, onImportDXF]);
+  }, [dispatch, onOpenPanel, onImportDXF]);
 
   const renderMenuItem = (item: MenuItem, index: number) => {
     if (item.separator) {
       return <div key={`sep-${index}`} className="logo-menu__separator" />;
     }
 
-    const isDisabled = item.disabled?.(state);
-    const isChecked = item.checked?.(state);
+    const isDisabled = state ? item.disabled?.(state) : false;
+    const isChecked = state ? item.checked?.(state) : false;
     const hasSubmenu = item.submenu && item.submenu.length > 0;
 
     return (
@@ -217,7 +221,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
       >
         <span className="logo-menu__check">{isChecked ? '✓' : ''}</span>
         <span className="logo-menu__label">{item.label}</span>
-        {item.shortcut && <span className="logo-menu__shortcut">{item.shortcut}</span>}
+        {item.shortcut && <span className="logo-menu__shortcut">{displayShortcut(item.shortcut)}</span>}
         {hasSubmenu && <ChevronRight size={14} className="logo-menu__chevron" />}
         {hasSubmenu && hoveredSub === item.label && (
           <div className="logo-menu__submenu">

@@ -36,8 +36,7 @@ function MeasurementLabel({ x, y, label, zoom2D, bold }: { x: number; y: number;
       />
       <text
         textAnchor="middle" dominantBaseline="central"
-        fill="#fff" fontSize={fontSize}
-        fontFamily="Inter, sans-serif" pointerEvents="none"
+        fill="#fff" fontSize={fontSize} pointerEvents="none"
         fontWeight={bold ? 700 : 400}
       >
         {label}
@@ -80,8 +79,7 @@ function AngleArc({ start, end, zoom2D }: { start: Point2D; end: Point2D; zoom2D
       <text
         x={labelPos.x} y={labelPos.y}
         textAnchor="middle" dominantBaseline="central"
-        fill="#9c27b0" fontSize={8 / zoom2D}
-        fontFamily="Inter, sans-serif" pointerEvents="none"
+        fill="#9c27b0" fontSize={8 / zoom2D} pointerEvents="none"
       >
         {label}
       </text>
@@ -220,8 +218,7 @@ function HintLabel({ text, cursorPos, zoom2D }: { text: string; cursorPos: Point
       />
       <text
         textAnchor="middle" dominantBaseline="central"
-        fill="#fff" fontSize={9 / zoom2D}
-        fontFamily="Inter, sans-serif" pointerEvents="none"
+        fill="#fff" fontSize={9 / zoom2D} pointerEvents="none"
         fontStyle="italic"
       >
         {text}

@@ -81,8 +81,7 @@ export default function NodeEditorOverlay({ zoom2D, units, pieces, nodeEditorEdi
           />
           <text
             textAnchor="middle" dominantBaseline="central"
-            fill="#fff" fontSize={9 / zoom2D}
-            fontFamily="Inter, sans-serif" pointerEvents="none"
+            fill="#fff" fontSize={9 / zoom2D} pointerEvents="none"
           >
             x: {formatDimension(selectedNodeData.position.x, units as UnitSystem)}, y: {formatDimension(selectedNodeData.position.y, units as UnitSystem)}
           </text>

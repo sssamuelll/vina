@@ -37,8 +37,7 @@ export default function RectangleToolOverlay({ zoom2D, units, rectPreview, rectD
             />
             <text
               textAnchor="middle" dominantBaseline="central"
-              fill="#fff" fontSize={10 / zoom2D}
-              fontFamily="Inter, sans-serif" pointerEvents="none"
+              fill="#fff" fontSize={10 / zoom2D} pointerEvents="none"
             >
               {dimText}
             </text>

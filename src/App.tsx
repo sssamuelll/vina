@@ -45,7 +45,7 @@ function App() {
     return (
       <div style={{
         height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#0c0c14', color: '#4a4a6a', fontFamily: "'Inter', system-ui, sans-serif",
+        background: '#0c0c14', color: '#4a4a6a', fontFamily: 'var(--font-sans)',
       }}>
         Loading...
       </div>
