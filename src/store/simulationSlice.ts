@@ -91,6 +91,8 @@ interface SimulationSliceState {
   pieceParticleDistance: Record<string, number>;
   /** Active fit map visualization mode */
   fitMapMode: FitMapMode;
+  /** Render/Export 3D panel visible (puerta: File menu + palette, Fase 2) */
+  renderSettingsOpen: boolean;
   /** Fit map visualization configuration */
   fitMapConfig: FitMapConfig;
   /** Simulation mode: normal (fast) or complete (full quality) */
@@ -211,6 +213,7 @@ const initialState: SimulationSliceState = {
   particleDistance: 5,
   pieceParticleDistance: {},
   fitMapMode: 'none' as FitMapMode,
+  renderSettingsOpen: false,
   fitMapConfig: {
     stressRange: [0, 100],
     strainRange: [1.0, 1.2],
@@ -319,6 +322,10 @@ const simulationSlice = createSlice({
     /** Set the active fit map visualization mode. */
     setFitMapMode(state, action: PayloadAction<FitMapMode>) {
       state.fitMapMode = action.payload;
+    },
+    /** Show/hide the Render & Export 3D panel. */
+    setRenderSettingsOpen(state, action: PayloadAction<boolean>) {
+      state.renderSettingsOpen = action.payload;
     },
     /** Update fit map configuration (partial merge). */
     updateFitMapConfig(state, action: PayloadAction<Partial<FitMapConfig>>) {
@@ -770,6 +777,7 @@ export const {
   setParticleDistance,
   setPieceParticleDistance,
   setFitMapMode,
+  setRenderSettingsOpen,
   updateFitMapConfig,
   setSimulationMode,
   setSolverTier,

@@ -9,13 +9,14 @@ import { runUiExport } from '../../utils/export/uiExport';
 import { setViewMode, toggleSnapToGrid, toggleSeamAllowance, toggleGrainlines, togglePieceNames, undo, redo } from '../../store/editorSlice';
 import { startSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
 import {
-  FileText, Scissors, Ruler, Shirt, Grid3x3, Eye,
+  FileText, Scissors, Ruler, Shirt, Download, Grid3x3, Eye,
   Layers, ScanLine, Undo2, Redo2, User, Package,
   Search, PenLine, Tag, Hand, MousePointer2,
   SlidersHorizontal, type LucideIcon,
 } from 'lucide-react';
 import { setUserScheme } from '../../store/inputSchemeSlice';
 import { runAutoSew } from '../../store/autoSewThunk';
+import { openRenderSettings } from '../../store/renderSettingsThunk';
 
 export interface CommandDef {
   id: string;
@@ -53,6 +54,7 @@ export const COMMANDS: CommandDef[] = [
   { id: 'show-properties', name: 'Properties', description: 'Piece, seam and material properties', icon: SlidersHorizontal, action: (_d, cb) => cb.onOpenPanel('Properties') },
 
   // ─── Export ───
+  { id: 'export-3d', name: 'Export 3D / Turntable', description: 'High-res stills, 360° turntable, glTF/USDZ', icon: Download, action: (d) => d(openRenderSettings()) },
   { id: 'export-dxf', name: 'Export DXF', description: 'Export patterns as DXF files', icon: FileText, action: (d) => runUiExport('dxf', store.getState().project, d) },
 
   // ─── View ───

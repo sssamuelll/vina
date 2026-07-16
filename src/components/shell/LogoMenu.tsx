@@ -14,6 +14,7 @@ import {
 import { toggleDockSignaling } from '../../store/dockSlice';
 import { duplicatePiece, removePieces, removeSeam } from '../../store/projectSlice';
 import { runAutoSew } from '../../store/autoSewThunk';
+import { openRenderSettings } from '../../store/renderSettingsThunk';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { store } from '../../store';
 import { runUiExport } from '../../utils/export/uiExport';
@@ -52,6 +53,7 @@ const FILE_MENU: MenuItem[] = [
   { label: 'Export DXF', action: (d) => runUiExport('dxf', store.getState().project, d) },
   { label: 'Export PDF (1:1)', action: (d) => runUiExport('pdf', store.getState().project, d) },
   { label: 'Export BOM (CSV)', action: (d) => runUiExport('bom', store.getState().project, d) },
+  { label: 'Export 3D / Turntable...', action: (d) => d(openRenderSettings()) },
 ];
 
 const EDIT_MENU: MenuItem[] = [
