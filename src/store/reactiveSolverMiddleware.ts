@@ -500,7 +500,7 @@ async function initializePool(): Promise<void> {
     if (storeDispatch) {
       storeDispatch(setLastSolverError({ error, jobId, timestamp: Date.now() }) as AnyAction);
       if (solverToastLimiter.tryEmit()) {
-        storeDispatch(showErrorToast(`Construction error: ${error}`) as AnyAction);
+        storeDispatch(showErrorToast(`Error de construcción: ${error}`) as AnyAction);
       }
     }
   });

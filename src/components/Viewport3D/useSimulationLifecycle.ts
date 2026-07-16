@@ -718,7 +718,7 @@ export function useSimulationLifecycle({
           // takes no seam parameter) — starting it would silently drop
           // every seam. Honest failure instead: no tier, visible error.
           console.error('[SimLifecycle] All seam-capable tiers failed and Neural Drape cannot sew — simulation not started');
-          dispatch(showErrorToast('Simulation could not start: no available solver supports sewing on this device'));
+          dispatch(showErrorToast('La simulación no pudo arrancar: ningún solver disponible en este equipo soporta costura. Prueba en un navegador con WebGPU (Chrome o Edge actuales).'));
           dispatch(setSolverTier('none'));
           return;
         }

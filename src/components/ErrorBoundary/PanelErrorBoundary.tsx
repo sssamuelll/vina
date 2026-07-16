@@ -33,12 +33,12 @@ export class PanelErrorBoundary extends Component<Props, State> {
       return (
         <div className="panel-error-boundary">
           <div className="panel-error-icon">⚠️</div>
-          <div className="panel-error-title">{this.props.panelName} Error</div>
+          <div className="panel-error-title">Error en {this.props.panelName}</div>
           <div className="panel-error-message">
-            {this.state.errorMessage || 'An unexpected error occurred in this panel.'}
+            {this.state.errorMessage || 'Un error inesperado ocurrió en este panel.'}
           </div>
           <button className="panel-error-reset" onClick={this.handleReset}>
-            Reset Panel
+            Reiniciar el panel
           </button>
         </div>
       );

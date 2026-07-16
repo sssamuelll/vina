@@ -1335,7 +1335,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       console.error('[GarmentSimulation] WebGPU device lost:', info?.message);
       rendererDeviceLostRef.current = true;
       handleGpuDeviceLost();
-      dispatch(showErrorToast('WebGPU device lost — simulating on the fallback solver; reload to restore the 3D view'));
+      dispatch(showErrorToast('Se perdió el dispositivo WebGPU — la simulación sigue en el solver de respaldo. Recarga la página para restaurar la vista 3D.'));
     });
     const onUncaptured = (e: Event) => {
       console.error('[GarmentSimulation] uncaptured GPU error:', (e as { error?: { message?: string } }).error?.message);
