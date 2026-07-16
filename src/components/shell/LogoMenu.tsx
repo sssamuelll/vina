@@ -150,8 +150,8 @@ const TOP_LEVEL: TopLevelItem[] = [
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface LogoMenuProps {
-  onOpenPanel?: (name: string) => void;
-  onImportDXF?: () => void;
+  onOpenPanel: (name: string) => void;
+  onImportDXF: () => void;
 }
 
 export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
@@ -187,9 +187,9 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
     if (item.disabled?.(state)) return;
 
     if (item.label === 'Import DXF...') {
-      onImportDXF?.();
+      onImportDXF();
     } else if (item.label === 'Avatar & Measurements...') {
-      onOpenPanel?.('Avatar');
+      onOpenPanel('Avatar');
     } else if (item.action) {
       item.action(dispatch);
     }

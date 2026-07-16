@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, MessageSquare, Settings, ArrowUp } from 'lucide-react';
-import { useSelector, useDispatch } from 'react-redux';
-import type { RootState } from '../../store';
+import { useDispatch } from 'react-redux';
 import { showErrorToast } from '../../store/copilotUISlice';
 import { readAndParseDXFFile } from '../../utils/dxf';
 import { dxfErrorMessage, type PendingDXFAttachment } from './dxfImport';
@@ -14,7 +13,7 @@ import { loadPosition, clampPosition, savePosition } from './barPosition';
 export type BarMode = 'chat' | 'commands' | 'settings';
 
 interface UnifiedBarProps {
-  onOpenPanel?: (name: string) => void;
+  onOpenPanel: (name: string) => void;
 }
 
 const MODE_ICONS: Record<BarMode, typeof MessageSquare> = {
@@ -29,7 +28,7 @@ const MODE_PLACEHOLDERS: Record<BarMode, string> = {
   settings: 'Search settings...',
 };
 
-export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps = {}) {
+export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
   const [mode, setMode] = useState<BarMode>('chat');
   const [input, setInput] = useState('');
   const [panelOpen, setPanelOpen] = useState(false);
@@ -46,8 +45,6 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps = {}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
-  const pieces = useSelector((s: RootState) => s.project.pieces);
-  const seams = useSelector((s: RootState) => s.project.seams);
   const dispatch = useDispatch();
 
   // ─── DXF chat attachment (Claude-style: drop → attach → send with text) ──
@@ -193,9 +190,6 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps = {}) {
     }
   }, [input, mode, pendingDXF]);
 
-  // Suppress unused vars — pieces/seams kept for future metadata display
-  void pieces; void seams;
-
   const barClasses = [
     'unified-bar',
     panelOpen ? 'unified-bar--panel-open' : '',
@@ -289,7 +283,7 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps = {}) {
             <UnifiedBarCommands
               query={input}
               onExecute={() => { setPanelOpen(false); setInput(''); }}
-              onOpenPanel={onOpenPanel ?? (() => {})}
+              onOpenPanel={onOpenPanel}
             />
           )}
           {mode === 'settings' && (
