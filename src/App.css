@@ -4,8 +4,6 @@
 @import './styles/floating.css';
 @import './styles/unified-bar.css';
 
-/* Legacy shared utilities (used by unmigrated components) */
-@import './styles/shared.css';
 
 /* ──────────────────────────────────────────────
    Legacy CSS variables — backward compatibility.
