@@ -14,40 +14,43 @@
 }
 
 .render-panel {
-  background: rgba(30, 30, 30, 0.95);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  /* Superficie del design system (misma voz que ContextPanel) — el drawer
+     traía el gris VS-Code de la era vieja (Fase 3, skin puerta-export). */
+  background: rgba(8, 8, 15, 0.95);
+  backdrop-filter: var(--blur);
+  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   height: 100%;
-  color: #ccc;
+  color: var(--text-secondary);
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .render-panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
 }
 
 .render-panel-header h3 {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
+  font-size: var(--text-heading);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
 }
 
 .render-panel-close {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   font-size: 16px;
   cursor: pointer;
   padding: 2px 6px;
 }
-.render-panel-close:hover { color: #fff; }
+.render-panel-close:hover { color: var(--text-primary); }
 
 .render-panel-scroll {
   flex: 1;
@@ -65,24 +68,24 @@
 
 .render-hdri-item {
   padding: 6px 4px;
-  border: 1px solid var(--border-color, #444);
-  border-radius: 4px;
-  background: var(--bg-secondary, #2a2a2a);
-  color: var(--text-primary, #ccc);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
   cursor: pointer;
-  font-size: 10px;
+  font-size: var(--text-xs);
   text-align: center;
-  transition: border-color 0.15s;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
 .render-hdri-item:hover {
-  background: var(--bg-hover, #333);
+  background: var(--bg-elevated);
 }
 
 .render-hdri-item.active {
-  border-color: var(--accent, #007acc);
-  background: rgba(0, 122, 204, 0.15);
-  color: var(--accent, #007acc);
+  border-color: var(--accent-border);
+  background: var(--accent-subtle);
+  color: var(--accent-hover);
 }
 
 /* Color picker row */
@@ -95,7 +98,7 @@
 .render-color-row input[type="color"] {
   width: 28px;
   height: 22px;
-  border: 1px solid var(--border-color, #444);
+  border: 1px solid var(--border);
   border-radius: 3px;
   background: none;
   cursor: pointer;
@@ -108,8 +111,8 @@
   flex-direction: column;
   gap: 4px;
   padding: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   margin-bottom: 4px;
 }
 
