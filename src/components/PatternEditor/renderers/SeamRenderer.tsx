@@ -12,7 +12,7 @@ import { PatternPiece, Point2D, Seam } from '../../../types/types';
 import { getEdgeEndpoints, getEdgeArcLength, getEdgePathD } from '../../../utils/geometry/path';
 import { resolveEdgePolyline } from '../../../utils/seam/index';
 import { samplePolyline, perpendicular } from '../../../utils/pleatGeometry';
-import { seamPairColor, seamMismatchMm, SEAM_MISMATCH_THRESHOLD_MM } from './seamVisuals';
+import { seamPairColor, seamMismatchMm, layoutMismatchLabels, SEAM_MISMATCH_THRESHOLD_MM } from './seamVisuals';
 
 interface SeamRendererProps {
   seams: Seam[];
@@ -36,12 +36,13 @@ function directionTick(pts: Point2D[], zoom: number): string | null {
 }
 
 export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: SeamRendererProps) {
-  return (
-    <>
-      {seams.map((seam) => {
+  // Pre-pass (Fase1-H1): resolver la geometría de todos los seams ANTES de
+  // renderizar, para que los labels de mismatch puedan hacer layout
+  // anticolisión entre seams (anclados al mismo punto se apilaban ilegibles).
+  const entries = seams.flatMap((seam) => {
         const pieceA = pieces.find(p => p.id === seam.pieceA.pieceId);
         const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
-        if (!pieceA || !pieceB) return null;
+        if (!pieceA || !pieceB) return [];
 
         // Resolve semantic edge name to segment index (with edge-N fallback)
         const semEdgeA = pieceA.edges?.find(e => e.name === seam.pieceA.edgeName);
@@ -60,7 +61,7 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
 
         const epA = getEdgeEndpoints(pieceA.outline, segIdxA);
         const epB = getEdgeEndpoints(pieceB.outline, segIdxB);
-        if (!epA || !epB) return null;
+        if (!epA || !epB) return [];
 
         const offA = pieceA.position;
         const offB = pieceB.position;
@@ -134,6 +135,34 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         const tickA = hasDirection ? directionTick(polyA, zoom2D) : null;
         const tickB = hasDirection ? directionTick(polyB, zoom2D) : null;
 
+        return [{
+          seam, epA, epB, offA, offB, pathDA, pathDB, midA, midB, lenA, lenB,
+          mismatchMm, hasMismatch, isSelected, isInactive, baseColor, edgeDash,
+          edgeWidth, polyA, polyB, hasDirection, tickA, tickB,
+        }];
+  });
+
+  // Layout global de labels de mismatch: mismos anclajes → apilado vertical.
+  const labelFont = 9 / zoom2D;
+  const labelPos = layoutMismatchLabels(
+    entries
+      .filter(e => e.hasMismatch)
+      .map(e => ({
+        id: e.seam.id,
+        x: (e.midA.x + e.midB.x) / 2,
+        y: (e.midA.y + e.midB.y) / 2 - 8 / zoom2D,
+        text: `⚠ ${e.mismatchMm.toFixed(1)}mm mismatch`,
+      })),
+    labelFont,
+  );
+
+  return (
+    <>
+      {entries.map(({
+        seam, epA, epB, offA, offB, pathDA, pathDB, midA, midB, lenA, lenB,
+        mismatchMm, hasMismatch, isSelected, isInactive, baseColor, edgeDash,
+        edgeWidth, polyA, polyB, hasDirection, tickA, tickB,
+      }) => {
         return (
           <g
             key={seam.id}
@@ -238,12 +267,12 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
               )}
             </g>
 
-            {/* Length mismatch warning */}
+            {/* Length mismatch warning — posición del layout anticolisión */}
             {hasMismatch && (
               <text
-                x={(midA.x + midB.x) / 2}
-                y={(midA.y + midB.y) / 2 - 8 / zoom2D}
-                fontSize={9 / zoom2D}
+                x={labelPos.get(seam.id)?.x ?? (midA.x + midB.x) / 2}
+                y={labelPos.get(seam.id)?.y ?? (midA.y + midB.y) / 2 - 8 / zoom2D}
+                fontSize={labelFont}
                 textAnchor="middle"
                 fontWeight={600}
                 style={{ fill: 'var(--piece-error-2d)', fontFamily: 'var(--font-mono-2d)' }}

@@ -119,7 +119,8 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
       {simActive && (
         <div className="floating-3d floating-3d--bottom-left">
           <span className="dot dot--success" />
-          <span>SIMULATING · {fps}fps</span>
+          {/* Sin cifra hasta el primer frame real: "0fps" lee como crash (Fase1-S4). */}
+          <span>{fps > 0 ? `SIMULATING · ${fps}fps` : 'SIMULATING'}</span>
         </div>
       )}
     </>

@@ -12,6 +12,8 @@ import {
   toggleGarment, toggleSeamlines3D, toggleSimSeamLines, toggleInternalLines3D,
 } from '../../store/simulationSlice';
 import { toggleDockSignaling } from '../../store/dockSlice';
+import { duplicatePiece, removePieces, removeSeam } from '../../store/projectSlice';
+import { runAutoSew } from '../../store/autoSewThunk';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { store } from '../../store';
 import { runUiExport } from '../../utils/export/uiExport';
@@ -42,28 +44,29 @@ const FILE_MENU: MenuItem[] = [
   } },
   { separator: true, label: '' },
   { label: 'Import DXF...', action: () => {} }, // wired via callback (opens file picker)
-  { label: 'Import Reference Image...', action: () => {} },
   { separator: true, label: '' },
+  // Fase1-S2: solo exports que EXISTEN. Tech Pack / 3D / Reference Image /
+  // Project Settings eran noops o abrían el placeholder circular — un item
+  // de menú que miente quema más confianza que uno ausente.
   { label: 'Export DXF', action: (d) => runUiExport('dxf', store.getState().project, d) },
   { label: 'Export PDF (1:1)', action: (d) => runUiExport('pdf', store.getState().project, d) },
-  { label: 'Export Tech Pack', action: () => {} },
-  { label: 'Export 3D Model', submenu: [
-    { label: 'OBJ', action: () => {} },
-    { label: 'glTF / GLB', action: () => {} },
-    { label: 'FBX', action: () => {} },
-    { label: 'USDZ', action: () => {} },
-  ]},
   { label: 'Export BOM (CSV)', action: (d) => runUiExport('bom', store.getState().project, d) },
-  { separator: true, label: '' },
-  { label: 'Project Settings...', action: () => {} },
 ];
 
 const EDIT_MENU: MenuItem[] = [
   { label: 'Undo', shortcut: '⌘Z', action: (d) => d(undo()), disabled: () => !canUndo() },
   { label: 'Redo', shortcut: '⌘⇧Z', action: (d) => d(redo()), disabled: () => !canRedo() },
   { separator: true, label: '' },
-  { label: 'Duplicate', shortcut: '⌘D', action: () => {} },
-  { label: 'Delete', shortcut: '⌫', action: () => {} },
+  // Mismos dispatches que edit.duplicate / edit.delete (useKeyboardShortcuts):
+  // el menú pintaba el shortcut pero el item era un noop (Fase1-S2).
+  { label: 'Duplicate', shortcut: '⌘D', action: (d) => {
+    for (const id of store.getState().editor.selectedPieceIds) d(duplicatePiece(id));
+  } },
+  { label: 'Delete', shortcut: '⌫', action: (d) => {
+    const { selectedPieceIds, selectedSeamId } = store.getState().editor;
+    if (selectedPieceIds.length > 0) d(removePieces(selectedPieceIds));
+    else if (selectedSeamId) d(removeSeam(selectedSeamId));
+  } },
   { separator: true, label: '' },
   { label: 'Select All', shortcut: '⌘A', action: (d) => { const ids = store.getState().project.pieces.map(p => p.id); d({ type: 'editor/selectAllPieces', payload: ids }); } },
   { label: 'Select None', shortcut: '⌘⇧A', action: (d) => d(clearSelection()) },
@@ -101,13 +104,10 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Ruler: mm', action: (d) => d(setUnits('mm')), checked: (s) => s.editor.units === 'mm' },
 ];
 
+// Fase1-S2: Detect All Edges / Validate Pattern / Grade All Sizes / Nesting
+// Layout eran noops; Auto-Sew es el único con implementación real.
 const PATTERN_MENU: MenuItem[] = [
-  { label: 'Auto-Sew All Pieces', action: () => {} },
-  { label: 'Detect All Edges', action: () => {} },
-  { label: 'Validate Pattern', action: () => {} },
-  { separator: true, label: '' },
-  { label: 'Grade All Sizes', action: () => {} },
-  { label: 'Nesting Layout', action: () => {} },
+  { label: 'Auto-Sew All Pieces', action: (d) => d(runAutoSew()) },
 ];
 
 const SIMULATION_MENU: MenuItem[] = [
@@ -115,16 +115,12 @@ const SIMULATION_MENU: MenuItem[] = [
   { label: 'Start Simulation', shortcut: 'Space', action: (d) => d(startSimulation()) },
   { label: 'Pause', action: (d) => d(pauseSimulation()) },
   { label: 'Reset', action: (d) => d(resetSimulation()) },
-  { separator: true, label: '' },
-  { label: 'Simulation Settings...', action: () => {} },
-  { label: 'Fabric Library...', action: () => {} },
 ];
 
+// Fase1-S2: AI Provider abría el placeholder circular (la superficie real es
+// el modo settings del UnifiedBar); Keyboard Shortcuts era un noop.
 const PREFERENCES_MENU: MenuItem[] = [
-  { label: 'AI Provider...', action: () => {} },
-  { label: 'Avatar & Measurements...', action: () => {} },
-  { separator: true, label: '' },
-  { label: 'Keyboard Shortcuts', shortcut: '⌘/', action: () => {} },
+  { label: 'Avatar & Measurements...', action: () => {} }, // wired via onOpenPanel('Avatar')
 ];
 
 const HELP_MENU: MenuItem[] = [
@@ -192,10 +188,6 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
 
     if (item.label === 'Import DXF...') {
       onImportDXF?.();
-    } else if (item.label.includes('Settings...') || item.label === 'Fabric Library...') {
-      onOpenPanel?.(item.label.replace('...', '').trim());
-    } else if (item.label === 'AI Provider...') {
-      onOpenPanel?.('Settings');
     } else if (item.label === 'Avatar & Measurements...') {
       onOpenPanel?.('Avatar');
     } else if (item.action) {

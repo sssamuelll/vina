@@ -1,6 +1,8 @@
 .snapshot-bar {
   position: absolute;
-  bottom: 12px;
+  /* Por encima del UnifiedBar default (58+24, barPosition.ts) — a bottom:12
+     el capsule quedaba medio recortado detrás del bar (Fase1-S3). */
+  bottom: 94px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;

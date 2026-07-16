@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
   seamPairColor,
   seamMismatchMm,
+  layoutMismatchLabels,
   SEAM_MISMATCH_THRESHOLD_MM,
   SEAM_PALETTE,
   SEWING_PICK_FIRST,
@@ -58,5 +59,46 @@ describe('shared sewing pick colors', () => {
     expect(SEWING_PICK_FIRST).toBe('#2ecc71');
     expect(SEWING_PICK_SECOND).toBe('#3498db');
     expect(SEWING_PICK_FIRST).not.toBe(SEWING_PICK_SECOND);
+  });
+});
+
+describe('layoutMismatchLabels (Fase1-H1 — anticolisión)', () => {
+  const FONT = 9;
+  const label = (id: string, x: number, y: number, text = '⚠ 220.7mm mismatch') => ({ id, x, y, text });
+
+  it('leaves far-apart labels at their anchors', () => {
+    const out = layoutMismatchLabels([label('a', 0, 0), label('b', 500, 500)], FONT);
+    expect(out.get('a')).toEqual({ x: 0, y: 0 });
+    expect(out.get('b')).toEqual({ x: 500, y: 500 });
+  });
+
+  it('stacks labels that share the same anchor so they never overlap', () => {
+    // El caso del cuello post-auto-sew: tres seams anclados al mismo punto
+    // se imprimían uno sobre otro hasta ser texto basura (shots 04/08).
+    const out = layoutMismatchLabels(
+      [label('a', 100, 100), label('b', 100, 100), label('c', 100, 100)],
+      FONT,
+    );
+    const ys = ['a', 'b', 'c'].map(id => out.get(id)!.y).sort((p, q) => p - q);
+    expect(new Set(ys).size).toBe(3);
+    expect(ys[1] - ys[0]).toBeGreaterThanOrEqual(FONT * 1.2);
+    expect(ys[2] - ys[1]).toBeGreaterThanOrEqual(FONT * 1.2);
+  });
+
+  it('separates labels that overlap only partially (near anchors)', () => {
+    const out = layoutMismatchLabels([label('a', 100, 100), label('b', 130, 103)], FONT);
+    const a = out.get('a')!;
+    const b = out.get('b')!;
+    // O quedaron lejos en x (no se tocan) o el layout los separó en y.
+    const width = FONT * 0.62 * '⚠ 220.7mm mismatch'.length;
+    const apart = Math.abs(a.x - b.x) >= width || Math.abs(a.y - b.y) >= FONT * 1.2;
+    expect(apart).toBe(true);
+  });
+
+  it('is deterministic regardless of input order', () => {
+    const set1 = layoutMismatchLabels([label('a', 100, 100), label('b', 100, 100)], FONT);
+    const set2 = layoutMismatchLabels([label('b', 100, 100), label('a', 100, 100)], FONT);
+    expect(set1.get('a')).toEqual(set2.get('a'));
+    expect(set1.get('b')).toEqual(set2.get('b'));
   });
 });

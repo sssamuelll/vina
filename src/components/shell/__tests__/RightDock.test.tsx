@@ -10,7 +10,7 @@ import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import editorReducer, { setViewMode } from '../../../store/editorSlice';
-import simulationReducer, { startSimulation, pauseSimulation } from '../../../store/simulationSlice';
+import simulationReducer, { startSimulation, pauseSimulation, setFrameTime } from '../../../store/simulationSlice';
 import toolsReducer from '../../../store/toolSlice';
 import projectReducer, { addPiece } from '../../../store/projectSlice';
 import dockReducer, { toggleDockSignaling } from '../../../store/dockSlice';
@@ -102,5 +102,18 @@ describe('RightDock (3D dock)', () => {
     });
     expect(screen.queryByText('auto')).toBeNull();
     expect(screen.queryByRole('button', { name: 'BOM' })).toBeNull();
+  });
+});
+
+describe('SIMULATING badge (Fase1-S4)', () => {
+  it('omits the fps figure until the first real frame arrives', () => {
+    // "SIMULATING · 0fps" en los primeros segundos del drape lee como crash
+    // (Jordan cierra la pestaña ahí — assessment Nielsen P0).
+    const { store } = renderRightDock();
+    act(() => { store.dispatch(startSimulation()); });
+    const badge = screen.getByText(/SIMULATING/);
+    expect(badge.textContent).not.toMatch(/0fps/);
+    act(() => { store.dispatch(setFrameTime(33.3)); });
+    expect(screen.getByText(/SIMULATING · 30fps/)).toBeTruthy();
   });
 });

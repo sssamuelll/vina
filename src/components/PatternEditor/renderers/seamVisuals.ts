@@ -53,3 +53,55 @@ export function seamMismatchMm(lenA: number, lenB: number): number {
  */
 export const SEWING_PICK_FIRST = '#2ecc71';
 export const SEWING_PICK_SECOND = '#3498db';
+
+export interface MismatchLabelAnchor {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+}
+
+/**
+ * Anticolisión de labels de mismatch (Fase1-H1): los seams del cuello
+ * post-auto-sew anclaban su label al mismo punto medio y se imprimían uno
+ * sobre otro hasta ser ilegibles. Pase global: los labels cuyo box estimado
+ * colisiona se apilan hacia abajo en pasos de una línea. Coordenadas y
+ * fontSize en unidades del canvas (el caller ya dividió por zoom).
+ */
+export function layoutMismatchLabels(
+  anchors: MismatchLabelAnchor[],
+  fontSize: number,
+): Map<string, { x: number; y: number }> {
+  const lineH = fontSize * 1.4;
+  // Box estimado: ancho ≈ chars × fontSize × 0.62 (mono), centrado (textAnchor=middle).
+  const halfW = (text: string) => (text.length * fontSize * 0.62) / 2;
+  // Orden estable (y, x, id) → mismo resultado sea cual sea el orden de entrada.
+  const sorted = [...anchors].sort(
+    (a, b) => a.y - b.y || a.x - b.x || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
+  const placed: { x: number; y: number; hw: number }[] = [];
+  const out = new Map<string, { x: number; y: number }>();
+  for (const a of sorted) {
+    const hw = halfW(a.text);
+    let y = a.y;
+    // ponytail: greedy O(n²) — n = labels con mismatch visibles (decenas máximo).
+    // `next > y` obliga progreso estricto: sin él, el error de redondeo de
+    // (p.y + lineH) − p.y < lineH re-dispara la colisión con el mismo y → loop.
+    let moved = true;
+    while (moved) {
+      moved = false;
+      for (const p of placed) {
+        if (Math.abs(a.x - p.x) < hw + p.hw && Math.abs(y - p.y) < lineH) {
+          const next = p.y + lineH;
+          if (next > y) {
+            y = next;
+            moved = true;
+          }
+        }
+      }
+    }
+    placed.push({ x: a.x, y, hw });
+    out.set(a.id, { x: a.x, y });
+  }
+  return out;
+}

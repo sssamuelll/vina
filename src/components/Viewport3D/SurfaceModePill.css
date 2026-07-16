@@ -1,7 +1,10 @@
 .surface-pill {
   position: absolute;
   top: 8px;
-  right: 116px;
+  /* Carril propio en el borde: el toolbar de FitMapToggle crece hacia la
+     izquierda desde right:130 (Fase1-S3) — a right:116 el pill quedaba
+     DEBAJO de los iconos cuando la simulación corría. */
+  right: 8px;
   z-index: 25;
 }
 
