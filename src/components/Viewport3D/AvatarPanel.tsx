@@ -39,10 +39,9 @@ const AXIS_KEYS = ['x', 'y', 'z'] as const;
 
 interface AvatarPanelProps {
   open: boolean;
-  onClose: () => void;
 }
 
-export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
+export default function AvatarPanel({ open }: AvatarPanelProps) {
   const dispatch = useDispatch<AppDispatch>();
 
   // Avatar state
@@ -174,11 +173,8 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
   return (
     <div className={`avatar-panel-wrapper ${open ? 'open' : 'closed'}`}>
       <div className="avatar-panel">
-        <div className="avatar-panel-header">
-          <h3>Avatar & Pose</h3>
-          <button className="avatar-panel-close" onClick={onClose} title="Close">×</button>
-        </div>
-
+        {/* Fase1-S6: sin header propio — el host (ContextPanel "Avatar") ya
+            pone título y botón de cerrar; aquí había un segundo par. */}
         <div className="avatar-panel-scroll">
           {/* ── Avatar Section ── */}
           <div className="ap-section">

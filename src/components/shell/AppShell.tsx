@@ -4,7 +4,7 @@ import type { RootState } from '../../store';
 import { setSplitRatio } from '../../store/layoutSlice';
 import { addPiece } from '../../store/projectSlice';
 import { classifyImportedPieces } from '../../utils/geometricClassifier';
-import { selectPiece, requestFitView } from '../../store/editorSlice';
+import { requestFitView } from '../../store/editorSlice';
 import { showSuccessToast, showErrorToast, showInfoToast } from '../../store/copilotUISlice';
 import { readAndParseDXFFile } from '../../utils/dxf';
 import { dxfErrorMessage, piecesLabel } from './dxfImport';
@@ -38,11 +38,11 @@ const PanelLoading = () => (
   </div>
 );
 
-function renderPanelContent(name: string, onClose: () => void) {
+function renderPanelContent(name: string) {
   const fallback = <PanelLoading />;
   switch (name) {
     case 'Avatar':
-      return <Suspense fallback={fallback}><AvatarPanel open onClose={onClose} /></Suspense>;
+      return <Suspense fallback={fallback}><AvatarPanel open /></Suspense>;
     case 'BOM':
       return <Suspense fallback={fallback}><BOMTab /></Suspense>;
     case 'Grading':
@@ -99,7 +99,8 @@ export default function AppShell() {
       // missing link zero behind the alien-blob drape.
       const classification = classifyImportedPieces(result.pieces);
       for (const piece of result.pieces) dispatch(addPiece(piece));
-      dispatch(selectPiece(result.pieces[0].id));
+      // Fase1-S5: sin auto-selección post-import — dejaba el gizmo de
+      // transformación plantado sobre el avatar sin gesto del usuario.
       dispatch(requestFitView()); // frame the freshly imported pattern (no more blank/tiny canvas)
       dispatch(showSuccessToast(
         `Cargué tu patrón: ${piecesLabel(result.pieces.length)}` +
@@ -273,7 +274,7 @@ export default function AppShell() {
         </div>
         {contextPanel && (
           <ContextPanel title={contextPanel} side={getPanelSide(contextPanel)} onClose={() => setContextPanel(null)}>
-            {renderPanelContent(contextPanel, () => setContextPanel(null))}
+            {renderPanelContent(contextPanel)}
           </ContextPanel>
         )}
       </div>
