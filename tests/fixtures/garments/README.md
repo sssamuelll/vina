@@ -26,10 +26,11 @@ reducer (for the app's duplicate-name enrichment) → `generateDXFAAMA` →
 these bytes. Each file was round-trip-verified: `importDXFContent` re-imports
 the exact piece count.
 
-*\*Jacket pieces are prefixed `1..5` because `sanitizeBlockName` strips
-non-ASCII to `_`, making Cyrillic block names collide (latent exporter bug,
-filed separately). Digits survive sanitization, so the prefix keeps DXF
-blocks unique while preserving the original names.*
+*\*Jacket pieces are prefixed `1..5` for readability. `sanitizeBlockName`
+strips non-ASCII to `_`, so names like Cyrillic ones would sanitize to the
+same string; the exporter now disambiguates such collisions with a numeric
+suffix (`assignUniqueBlockNames`, #848), so the prefix is no longer a
+correctness workaround — just keeps the fixture block names legible.*
 
 **Consumers**: none yet — these exist for the DoD-over-DXF retarget
 (post-nuke backlog). Load with `importDXFContent(readFileSync(path, 'utf-8'))`.
