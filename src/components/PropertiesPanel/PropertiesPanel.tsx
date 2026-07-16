@@ -13,8 +13,8 @@ import { X } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { removeSeam } from '../../store/projectSlice';
-import { selectSeam } from '../../store/editorSlice';
+import { removeSeam, removePiece } from '../../store/projectSlice';
+import { selectSeam, clearSelection } from '../../store/editorSlice';
 import PropertySection from './PropertySection';
 import PieceProperties from './PieceProperties';
 import SeamPropertiesPanel from './SeamPropertiesPanel';
@@ -60,6 +60,8 @@ export default function PropertiesPanel() {
     piece: false,
     material: false,
     seams: false,
+    // Progressive disclosure (Fase 3): los parámetros del solver arrancan plegados.
+    sim: true,
   });
 
   const toggleSection = useCallback((sectionId: string) => {
@@ -120,7 +122,7 @@ export default function PropertiesPanel() {
           )}
           {selectedNotch && <NotchPropertiesSection />}
           {selectedPiece && (
-            <PieceProperties piece={selectedPiece} collapsed={!!collapsedSections.piece} onToggle={toggleSection} />
+            <PieceProperties piece={selectedPiece} collapsed={!!collapsedSections.piece} simCollapsed={!!collapsedSections.sim} onToggle={toggleSection} />
           )}
 
           {selectedSeam && (
@@ -142,6 +144,17 @@ export default function PropertiesPanel() {
           )}
 
           {seamsList}
+
+          {/* Acción destructiva al FINAL del panel, nunca en mitad del
+              formulario (Fase 3 — hallazgo de prevención de errores). */}
+          {selectedPiece && (
+            <button
+              className="panel-delete"
+              onClick={() => { dispatch(removePiece(selectedPiece.id)); dispatch(clearSelection()); }}
+            >
+              Eliminar pieza
+            </button>
+          )}
         </>
       )}
     </div>
