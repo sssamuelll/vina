@@ -54,7 +54,7 @@ ENDSEC
 
 // ─── Tables ───
 
-function dxfTables(pieces: PatternPiece[], opts: DXFExportOptions): string {
+function dxfTables(pieces: PatternPiece[], opts: DXFExportOptions, blockNames: string[]): string {
   let s = `0
 SECTION
 2
@@ -117,13 +117,13 @@ ${brName}
 `;
     }
     // One block record per piece
-    for (const piece of pieces) {
+    for (let i = 0; i < pieces.length; i++) {
       s += `0
 BLOCK_RECORD
 5
 ${nextHandle()}
 2
-${sanitizeBlockName(piece.name)}
+${blockNames[i]}
 `;
     }
     s += `0
@@ -139,8 +139,9 @@ ENDSEC
 
 // ─── Blocks ───
 
-function dxfBlocks(pieces: PatternPiece[], opts: DXFExportOptions): string {
-  // Pre-compute SA outlines via pipeline (for block content)
+function dxfBlocks(pieces: PatternPiece[], opts: DXFExportOptions, blockNames: string[]): string {
+  // Pre-compute SA outlines via pipeline (for block content).
+  // preparePieces preserves input order 1:1, so blockNames[i] ↔ prepared[i].
   const prepared = preparePieces(pieces, { spacing: 30 });
 
   let s = `0
@@ -196,9 +197,9 @@ ${nextHandle()}
 `;
 
   // One block per piece — use prepared SA outlines
-  for (const pp of prepared) {
-    const { piece, seamOutline } = pp;
-    const blockName = sanitizeBlockName(piece.name);
+  for (let i = 0; i < prepared.length; i++) {
+    const { piece, seamOutline } = prepared[i];
+    const blockName = blockNames[i];
     s += `0
 BLOCK
 5
@@ -232,8 +233,8 @@ ENDSEC
 
 // ─── Entities Section (INSERTs) ───
 
-function dxfEntities(pieces: PatternPiece[]): string {
-  // Use pipeline for consistent layout
+function dxfEntities(pieces: PatternPiece[], blockNames: string[]): string {
+  // Use pipeline for consistent layout (same 1:1 order as dxfBlocks).
   const prepared = preparePieces(pieces, { spacing: 30 });
 
   let s = `0
@@ -242,7 +243,8 @@ SECTION
 ENTITIES
 `;
 
-  for (const pp of prepared) {
+  for (let i = 0; i < prepared.length; i++) {
+    const pp = prepared[i];
     s += `0
 INSERT
 5
@@ -250,7 +252,7 @@ ${nextHandle()}
 8
 ${AAMA_LAYERS.CUT}
 2
-${sanitizeBlockName(pp.piece.name)}
+${blockNames[i]}
 10
 ${pp.offsetX.toFixed(4)}
 20
@@ -517,8 +519,40 @@ ${escapeDxfString(text)}
 
 // ─── Helpers ───
 
+/** DXF symbol-table name limit (R12/AAMA). Block names are capped here. */
+const MAX_BLOCK_NAME = 31;
+
 function sanitizeBlockName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 31);
+  return name.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, MAX_BLOCK_NAME);
+}
+
+/**
+ * Assign a unique, DXF-safe block name to each piece name, in order.
+ *
+ * Sanitization collapses non-`[A-Za-z0-9_-]` chars to `_` and caps length,
+ * so distinct piece names can land on the same block name — "Piña"/"Piñá" both
+ * become "Pi_a", and two long names truncate to the same 31 chars. A duplicated
+ * block name silently drops a piece on import (the second BLOCK overwrites the
+ * first). This appends `_2`, `_3`, … to collisions, kept within the char cap,
+ * so every piece exports to its own block (#848).
+ */
+export function assignUniqueBlockNames(rawNames: string[]): string[] {
+  const used = new Set<string>();
+  return rawNames.map((raw) => {
+    const base = sanitizeBlockName(raw);
+    if (!used.has(base)) {
+      used.add(base);
+      return base;
+    }
+    for (let n = 2; ; n++) {
+      const suffix = `_${n}`;
+      const candidate = base.substring(0, MAX_BLOCK_NAME - suffix.length) + suffix;
+      if (!used.has(candidate)) {
+        used.add(candidate);
+        return candidate;
+      }
+    }
+  });
 }
 
 /** Gap between size groups on Y axis (mm) */
@@ -533,27 +567,6 @@ export interface GradedSizeSet {
 }
 
 // ─── Multi-Size Helpers ───
-
-/**
- * Build a size-qualified block name: `<PIECE_NAME>_<SIZE>`.
- * Sanitized and truncated to 31 chars per DXF spec.
- */
-function sizeBlockName(pieceName: string, size: string): string {
-  return sanitizeBlockName(`${pieceName}_${size}`);
-}
-
-/**
- * Collect all size-qualified block names across every graded set.
- */
-function collectMultiSizeBlockNames(gradedSets: GradedSizeSet[]): string[] {
-  const names: string[] = [];
-  for (const gs of gradedSets) {
-    for (const piece of gs.pieces) {
-      names.push(sizeBlockName(piece.name, gs.size));
-    }
-  }
-  return names;
-}
 
 /**
  * TABLES section for multi-size DXF.
@@ -644,7 +657,7 @@ ENDSEC
  * BLOCKS section for multi-size DXF.
  * Creates one block per piece per size, reusing `pieceEntities()`.
  */
-function dxfBlocksMultiSize(gradedSets: GradedSizeSet[], opts: DXFExportOptions): string {
+function dxfBlocksMultiSize(gradedSets: GradedSizeSet[], opts: DXFExportOptions, blockNames: string[]): string {
   let s = `0
 SECTION
 2
@@ -697,11 +710,13 @@ ${nextHandle()}
 0
 `;
 
-  // One block per piece per size
+  // One block per piece per size. blockNames is the deduped flat list in the
+  // same gs→pieces order preparePieces preserves, so a running index aligns.
+  let bi = 0;
   for (const gs of gradedSets) {
     const prepared = preparePieces(gs.pieces, { spacing: 30 });
     for (const pp of prepared) {
-      const blockName = sizeBlockName(pp.piece.name, gs.size);
+      const blockName = blockNames[bi++];
       s += `0
 BLOCK
 5
@@ -739,7 +754,7 @@ ENDSEC
  * Each size group is offset on the Y axis by SIZE_GAP plus the max height
  * of the previous group, so sizes don't overlap.
  */
-function dxfEntitiesMultiSize(gradedSets: GradedSizeSet[]): string {
+function dxfEntitiesMultiSize(gradedSets: GradedSizeSet[], blockNames: string[]): string {
   let s = `0
 SECTION
 2
@@ -747,6 +762,7 @@ ENTITIES
 `;
 
   let currentY = 0;
+  let bi = 0; // running index into the deduped flat blockNames (gs→pieces order)
 
   for (const gs of gradedSets) {
     const prepared = preparePieces(gs.pieces, { spacing: 30 });
@@ -765,7 +781,7 @@ ${nextHandle()}
 8
 ${AAMA_LAYERS.CUT}
 2
-${sizeBlockName(pp.piece.name, gs.size)}
+${blockNames[bi++]}
 10
 ${pp.offsetX.toFixed(4)}
 20
@@ -809,11 +825,13 @@ export function generateDXFAAMA(pieces: PatternPiece[], options?: Partial<DXFExp
   const opts = { ...DEFAULT_OPTIONS, ...options };
   resetHandles();
 
+  const blockNames = assignUniqueBlockNames(pieces.map((p) => p.name));
+
   let dxf = '';
   dxf += dxfHeader();
-  dxf += dxfTables(pieces, opts);
-  dxf += dxfBlocks(pieces, opts);
-  dxf += dxfEntities(pieces);
+  dxf += dxfTables(pieces, opts, blockNames);
+  dxf += dxfBlocks(pieces, opts, blockNames);
+  dxf += dxfEntities(pieces, blockNames);
   dxf += `0
 EOF
 `;
@@ -856,13 +874,15 @@ export function generateMultiSizeDXF(gradedSets: GradedSizeSet[], options?: Part
   const opts = { ...DEFAULT_OPTIONS, ...options };
   resetHandles();
 
-  const blockNames = collectMultiSizeBlockNames(gradedSets);
+  const blockNames = assignUniqueBlockNames(
+    gradedSets.flatMap((gs) => gs.pieces.map((p) => `${p.name}_${gs.size}`)),
+  );
 
   let dxf = '';
   dxf += dxfHeader();
   dxf += dxfTablesMultiSize(blockNames, opts);
-  dxf += dxfBlocksMultiSize(gradedSets, opts);
-  dxf += dxfEntitiesMultiSize(gradedSets);
+  dxf += dxfBlocksMultiSize(gradedSets, opts, blockNames);
+  dxf += dxfEntitiesMultiSize(gradedSets, blockNames);
   dxf += `0
 EOF
 `;
