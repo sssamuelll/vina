@@ -56,6 +56,23 @@
   margin-left: 4px;
 }
 
+/* ─── Honest provenance note ─────────────────────────────────────────────── */
+
+.grading-provenance {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted, #999);
+  border-bottom: 1px solid var(--border-subtle, #2a2a2a);
+}
+
+.grading-provenance-warn {
+  color: #f59e0b;
+}
+
 /* ─── Table Container ────────────────────────────────────────────────────── */
 
 .grading-table-container {

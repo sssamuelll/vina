@@ -24,6 +24,7 @@ import {
 import type { GradingState } from '../../store/gradingSlice';
 import { addPiece, removePieces, renameLayer } from '../../store/projectSlice';
 import { gradePieceToSize } from '../../utils/grading/gradingEngine';
+import { summarizeGradingProvenance } from '../../utils/grading/provenance';
 import { batchUndo } from '../../store/undoMiddleware';
 import {
   getSizeSystems,
@@ -105,6 +106,16 @@ export default function GradingTab() {
   const basePieces = useMemo(
     () => pieces.filter((p) => !p.gradedSize),
     [pieces],
+  );
+
+  /**
+   * How these pieces actually grade — per-point (real) vs uniform (proportional).
+   * Drives the honest label so a proportional scale is never passed off as a
+   * true size run (Step 4, Level-1 imported-grading scope).
+   */
+  const provenance = useMemo(
+    () => summarizeGradingProvenance(basePieces),
+    [basePieces],
   );
 
   /** All generated piece IDs across all sizes, flattened. */
@@ -314,6 +325,31 @@ export default function GradingTab() {
           </select>
         </label>
       </div>
+
+      {/* ── Honest provenance ───────────────────────────────────────────── */}
+      {basePieces.length > 0 && (
+        <div className="grading-provenance">
+          {provenance.method === 'uniform' ? (
+            <span>
+              Escalado proporcional: todas las medidas crecen a la par. Este
+              patrón no trae reglas de escalado por punto.
+            </span>
+          ) : (
+            <span>
+              Escalado por punto
+              {provenance.method === 'mixed' ? ' (mixto con proporcional)' : ''}.
+            </span>
+          )}
+          {provenance.frozenInternalsPieces > 0 && (
+            <span className="grading-provenance-warn">
+              {provenance.frozenInternalsPieces}{' '}
+              {provenance.frozenInternalsPieces === 1 ? 'pieza' : 'piezas'} con
+              pinzas o piquetes: en escalado por punto los internos se mantienen
+              sin escalar todavía.
+            </span>
+          )}
+        </div>
+      )}
 
       {/* ── Size Table ──────────────────────────────────────────────────── */}
       <div className="grading-table-container">
