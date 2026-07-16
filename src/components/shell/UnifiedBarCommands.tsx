@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '../../store';
-import { COMMANDS } from './unifiedBarCommandDefs';
+import { COMMANDS, COMMAND_CATEGORIES } from './unifiedBarCommandDefs';
 import { displayShortcut } from './shortcutDisplay';
 
 function fuzzyMatch(query: string, text: string): boolean {
@@ -28,9 +28,26 @@ export default function UnifiedBarCommands({ query, onExecute, onOpenPanel }: Pr
     return COMMANDS.filter(c => fuzzyMatch(query, c.name) || fuzzyMatch(query, c.description));
   }, [query]);
 
+  // Grupos por categoría, en el orden del set cerrado (Fase 3): 20 comandos
+  // en lista plana eran el flag #1 de carga cognitiva del assessment.
+  const groups = useMemo(
+    () => COMMAND_CATEGORIES
+      .map(cat => ({ cat, cmds: filtered.filter(c => c.category === cat) }))
+      .filter(g => g.cmds.length > 0),
+    [filtered],
+  );
+
   return (
     <div style={{ padding: 'var(--sp-2)', maxHeight: '50vh', overflowY: 'auto' }}>
-      {filtered.map(cmd => {
+      {groups.map(({ cat, cmds }) => (
+        <div key={cat}>
+          <div style={{
+            padding: '6px 12px 2px', fontSize: '10px', letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: 'var(--text-ghost)', fontWeight: 600,
+          }}>
+            {cat}
+          </div>
+          {cmds.map(cmd => {
         const Icon = cmd.icon;
         return (
           <button
@@ -55,10 +72,12 @@ export default function UnifiedBarCommands({ query, onExecute, onOpenPanel }: Pr
             )}
           </button>
         );
-      })}
+          })}
+        </div>
+      ))}
       {filtered.length === 0 && (
         <div style={{ padding: 'var(--sp-4)', textAlign: 'center', color: 'var(--text-ghost)', fontSize: '14px' }}>
-          No commands match "{query}"
+          Ningún comando coincide con «{query}»
         </div>
       )}
     </div>
