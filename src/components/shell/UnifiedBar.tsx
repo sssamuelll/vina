@@ -5,6 +5,7 @@ import { showErrorToast } from '../../store/copilotUISlice';
 import { readAndParseDXFFile } from '../../utils/dxf';
 import { dxfErrorMessage, type PendingDXFAttachment } from './dxfImport';
 import UnifiedBarChat from './UnifiedBarChat';
+import { displayShortcut } from './shortcutDisplay';
 import UnifiedBarCommands from './UnifiedBarCommands';
 import AgentSettings from '../../copilot/AgentSettings';
 import InputSchemeSection from './InputSchemeSection';
@@ -257,12 +258,12 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
           onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
           placeholder={MODE_PLACEHOLDERS[mode]}
         />
-        {mode === 'commands' && <span className="unified-bar__shortcut">⌘K</span>}
+        {mode === 'commands' && <span className="unified-bar__shortcut">{displayShortcut('⌘K')}</span>}
       </div>
 
       {/* Send button (chat mode) */}
       {mode === 'chat' && (
-        <button className="unified-bar__send" onClick={handleSubmit} disabled={!input.trim() && !pendingDXF}>
+        <button className="unified-bar__send" aria-label="Send" onClick={handleSubmit} disabled={!input.trim() && !pendingDXF}>
           <ArrowUp size={18} />
         </button>
       )}

@@ -61,6 +61,7 @@
 .grading-table-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: auto; /* headers enteros con scroll, no "WAIST (C" (Fase 2) */
 }
 
 /* ─── Table ──────────────────────────────────────────────────────────────── */
@@ -71,6 +72,7 @@
 }
 
 .grading-table th {
+  white-space: nowrap;
   position: sticky;
   top: 0;
   background: var(--panel-bg, #1e1e1e);

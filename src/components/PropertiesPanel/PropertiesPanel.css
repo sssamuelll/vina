@@ -153,6 +153,12 @@
   width: 120px;
 }
 
+.panel-input--grow {
+  flex: 1;
+  width: auto;
+  min-width: 120px;
+}
+
 .panel-input:focus {
   outline: none;
   border-color: var(--accent);

@@ -65,7 +65,8 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         <input
           id="prop-piece-name"
           type="text"
-          className="panel-input"
+          className="panel-input panel-input--grow"
+          title={piece.name}
           value={piece.name}
           onChange={e => dispatch(updatePiece({ ...piece, name: e.target.value, updatedAt: Date.now() }))}
         />
