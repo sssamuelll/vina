@@ -26,15 +26,15 @@ interface ModeDef {
 
 // Same inventory + icons the legacy DisplayBar3D exposed (deleted 2026-06-04).
 const MODES: ModeDef[] = [
-  { mode: 'textured', label: 'Textured', icon: Image },
-  { mode: 'translucent', label: 'Translucent', icon: Droplets },
-  { mode: 'mesh', label: 'Mesh', icon: Box },
-  { mode: 'thick', label: 'Thick Surface', icon: Layers },
-  { mode: 'flat', label: 'Flat', icon: Square },
-  { mode: 'xray', label: 'X-Ray', icon: Scan },
-  { mode: 'shaded', label: 'Shaded', icon: Circle },
-  { mode: 'shaded-wire', label: 'Shaded + Wire', icon: CircleDot },
-  { mode: 'textured-wire', label: 'Textured + Wire', icon: ImagePlus },
+  { mode: 'textured', label: 'Texturizado', icon: Image },
+  { mode: 'translucent', label: 'Translúcido', icon: Droplets },
+  { mode: 'mesh', label: 'Malla', icon: Box },
+  { mode: 'thick', label: 'Con grosor', icon: Layers },
+  { mode: 'flat', label: 'Plano', icon: Square },
+  { mode: 'xray', label: 'Rayos X', icon: Scan },
+  { mode: 'shaded', label: 'Sombreado', icon: Circle },
+  { mode: 'shaded-wire', label: 'Sombreado + alambre', icon: CircleDot },
+  { mode: 'textured-wire', label: 'Texturizado + alambre', icon: ImagePlus },
 ];
 
 export default function SurfaceModePill() {
@@ -68,14 +68,14 @@ export default function SurfaceModePill() {
     <div ref={wrapperRef} className="surface-pill">
       <button
         className={`surface-pill__trigger ${open ? 'surface-pill__trigger--open' : ''}`}
-        aria-label={`Surface mode: ${current.label}`}
+        aria-label={`Modo de superficie: ${current.label}`}
         onClick={() => setOpen(o => !o)}
       >
         <CurrentIcon size={14} />
         <span>{current.label}</span>
       </button>
       {open && (
-        <div className="surface-pill__flyout" role="group" aria-label="Surface mode">
+        <div className="surface-pill__flyout" role="group" aria-label="Modo de superficie">
           {MODES.map(({ mode, label, icon: Icon }) => (
             <button
               key={mode}

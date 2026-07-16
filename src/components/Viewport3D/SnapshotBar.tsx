@@ -78,7 +78,7 @@ export default function SnapshotBar({ onSaveSnapshot, onRestoreSnapshot, onDelet
         className="snap-save-btn"
         onClick={handleSave}
         disabled={!canSave}
-        title="Save current state"
+        title="Guardar el estado actual"
       >
         +
       </button>

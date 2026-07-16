@@ -60,28 +60,28 @@ interface ModeInfo {
 const MODES: ModeInfo[] = [
   {
     mode: 'stress',
-    label: 'Stress Map',
+    label: 'Mapa de tensión',
     shortcut: 'Alt+6',
     // Thermometer-style icon
     icon: 'M12 2a3 3 0 0 0-3 3v8.17a5 5 0 1 0 6 0V5a3 3 0 0 0-3-3Z',
   },
   {
     mode: 'strain',
-    label: 'Strain Map',
+    label: 'Mapa de estiramiento',
     shortcut: 'Alt+7',
     // Stretch/expand arrows icon
     icon: 'M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4',
   },
   {
     mode: 'fit',
-    label: 'Fit Map',
+    label: 'Mapa de ajuste',
     shortcut: 'Alt+8',
     // Person/fit icon
     icon: 'M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2',
   },
   {
     mode: 'pressure',
-    label: 'Pressure Points',
+    label: 'Puntos de presión',
     shortcut: 'Alt+9',
     // Contact/dot grid icon
     icon: 'M12 12m-2 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0M5 5m-1.5 0a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0M19 5m-1.5 0a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0M5 19m-1.5 0a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0M19 19m-1.5 0a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0',
@@ -280,7 +280,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
         <div style={{ width: 1, background: '#555', margin: '4px 2px' }} />
         <button
           onClick={onToggleAvatar}
-          title={`${avatarHidden ? 'Show' : 'Hide'} Avatar (Shift+A)`}
+          title={`${avatarHidden ? 'Mostrar' : 'Ocultar'} avatar (Shift+A)`}
           style={S.toggleBtn(!avatarHidden)}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={S.toggleIcon(!avatarHidden)}>
@@ -291,7 +291,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
 
         <button
           onClick={onSnapshot}
-          title="Snapshot 3D Window (F10)"
+          title="Captura del visor 3D (F10)"
           style={S.toggleBtn(false)}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={S.toggleIcon(false)}>
@@ -303,7 +303,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
         {/* Config gear button */}
         <button
           onClick={() => setShowConfig(!showConfig)}
-          title="Fit Map Config"
+          title="Ajustes del mapa de ajuste"
           style={S.toggleBtn(showConfig)}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={S.toggleIcon(showConfig)}>
@@ -315,16 +315,16 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
         {/* Config popover */}
         {showConfig && (
           <div style={S.configPanel}>
-            <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>Fit Map Config</div>
+            <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>Ajustes del mapa de ajuste</div>
 
             {/* Stress Range */}
-            <div style={{ ...S.configLabel, marginBottom: 2 }}>Stress Range (kPa)</div>
+            <div style={{ ...S.configLabel, marginBottom: 2 }}>Rango de tensión (kPa)</div>
             <div style={S.configRow}>
               <label style={S.configLabel}>
-                Min
+                Mín
                 <input
                   type="number"
-                  aria-label="Stress Min"
+                  aria-label="Tensión mín"
                   style={{ ...S.configInput, marginLeft: 4 }}
                   value={fitMapConfig.stressRange[0]}
                   onChange={(e) => {
@@ -334,10 +334,10 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
                 />
               </label>
               <label style={S.configLabel}>
-                Max
+                Máx
                 <input
                   type="number"
-                  aria-label="Stress Max"
+                  aria-label="Tensión máx"
                   style={{ ...S.configInput, marginLeft: 4 }}
                   value={fitMapConfig.stressRange[1]}
                   onChange={(e) => {
@@ -349,13 +349,13 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
             </div>
 
             {/* Strain Range */}
-            <div style={{ ...S.configLabel, marginBottom: 2 }}>Strain Range (%)</div>
+            <div style={{ ...S.configLabel, marginBottom: 2 }}>Rango de estiramiento (%)</div>
             <div style={S.configRow}>
               <label style={S.configLabel}>
-                Min
+                Mín
                 <input
                   type="number"
-                  aria-label="Strain Min"
+                  aria-label="Estiramiento mín"
                   style={{ ...S.configInput, marginLeft: 4 }}
                   value={+(fitMapConfig.strainRange[0] * 100).toFixed(1)}
                   step={1}
@@ -366,10 +366,10 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
                 />
               </label>
               <label style={S.configLabel}>
-                Max
+                Máx
                 <input
                   type="number"
-                  aria-label="Strain Max"
+                  aria-label="Estiramiento máx"
                   style={{ ...S.configInput, marginLeft: 4 }}
                   value={+(fitMapConfig.strainRange[1] * 100).toFixed(1)}
                   step={1}
@@ -382,13 +382,13 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
             </div>
 
             {/* Fit Thresholds */}
-            <div style={{ ...S.configLabel, marginBottom: 2 }}>Fit Thresholds (%)</div>
+            <div style={{ ...S.configLabel, marginBottom: 2 }}>Umbrales de ajuste (%)</div>
             <div style={S.configRow}>
               <label style={S.configLabel}>
-                Tight
+                Apretado
                 <input
                   type="number"
-                  aria-label="Fit Tight"
+                  aria-label="Umbral apretado"
                   style={{ ...S.configInput, marginLeft: 4 }}
                   value={+(fitMapConfig.fitThresholds[0] * 100).toFixed(1)}
                   step={1}
@@ -399,10 +399,10 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
                 />
               </label>
               <label style={S.configLabel}>
-                Can't Wear
+                No entra
                 <input
                   type="number"
-                  aria-label="Fit Can't Wear"
+                  aria-label="Umbral no entra"
                   style={{ ...S.configInput, marginLeft: 4 }}
                   value={+(fitMapConfig.fitThresholds[1] * 100).toFixed(1)}
                   step={1}
@@ -438,7 +438,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
               style={S.configResetBtn}
               onClick={() => dispatch(updateFitMapConfig(DEFAULT_FIT_MAP_CONFIG))}
             >
-              Reset to Defaults
+              Restablecer valores
             </button>
           </div>
         )}
@@ -495,7 +495,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
       {/* ── Fit Map Summary Table (CLO3D top-right panel) ── */}
       {showFitTable && stats && (
         <div style={S.fitTable}>
-          <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 12 }}>Fit Map</div>
+          <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 12 }}>Mapa de ajuste</div>
           <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
             <tbody>
               <tr>
@@ -509,7 +509,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
                     marginRight: 6,
                     verticalAlign: 'middle',
                   }} />
-                  Can't Wear
+                  No entra
                 </td>
                 <td style={{ textAlign: 'right' as const, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                   {stats.cantWearPct.toFixed(1)}%
@@ -526,7 +526,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
                     marginRight: 6,
                     verticalAlign: 'middle',
                   }} />
-                  Tight
+                  Apretado
                 </td>
                 <td style={{ textAlign: 'right' as const, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                   {stats.tightPct.toFixed(1)}%
@@ -544,7 +544,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
                     marginRight: 6,
                     verticalAlign: 'middle',
                   }} />
-                  Fit
+                  Bien
                 </td>
                 <td style={{ textAlign: 'right' as const, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                   {(100 - stats.cantWearPct - stats.tightPct).toFixed(1)}%
@@ -558,7 +558,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
       {/* ── Pressure Points Legend ── */}
       {fitMapMode === 'pressure' && stats && (
         <div style={S.fitTable}>
-          <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 12 }}>Pressure Points</div>
+          <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 12 }}>Puntos de presión</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
             <span style={{
               width: 8,
@@ -567,7 +567,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
               background: '#ff00cc',
               display: 'inline-block',
             }} />
-            <span>Contact: <b>{stats.pressurePointCount}</b></span>
+            <span>Contacto: <b>{stats.pressurePointCount}</b></span>
           </div>
         </div>
       )}
