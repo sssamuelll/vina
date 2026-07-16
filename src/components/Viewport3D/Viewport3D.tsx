@@ -975,7 +975,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
             padding: '6px 10px',
             cursor: 'pointer',
             fontSize: 12,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
           }}
           title="Render Settings"
           onClick={() => setRenderPanelOpen(!renderPanelOpen)}
@@ -1008,7 +1008,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
             padding: '6px 10px',
             cursor: 'pointer',
             fontSize: 12,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-sans)',
           }}
           title="Collision Bodies"
           onClick={() => setCollisionPanelOpen(!collisionPanelOpen)}

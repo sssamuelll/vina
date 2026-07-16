@@ -41,3 +41,10 @@
 .seam-connection--selected .seam-detail {
   opacity: 1;
 }
+
+/* Texto SVG del canvas papel sin font propia hereda el token de superficie
+   (Fase 2: antes cada overlay hardcodeaba 'Inter'). Los renderers con
+   intencion propia (labels mono) la declaran inline y ganan. */
+.pattern-svg text {
+  font-family: var(--font-ui-2d);
+}

@@ -34,8 +34,7 @@ export default function LineToolOverlay({ zoom2D, units, lineStart, lineCursor, 
           />
           <text
             textAnchor="middle" dominantBaseline="central"
-            fill="#fff" fontSize={10 / zoom2D}
-            fontFamily="Inter, sans-serif" pointerEvents="none"
+            fill="#fff" fontSize={10 / zoom2D} pointerEvents="none"
           >
             {formatDimension(lineLength.length, units as UnitSystem)}
           </text>

@@ -216,7 +216,7 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
             pointerEvents: 'none',
             userSelect: 'none',
             fontSize: '10px',
-            fontFamily: "'Inter', sans-serif",
+            fontFamily: 'var(--font-sans)',
             color: isSelected ? '#ffd700' : '#555',
             textShadow: '0 1px 3px rgba(0,0,0,0.8)',
             whiteSpace: 'nowrap',

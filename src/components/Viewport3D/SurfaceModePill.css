@@ -19,7 +19,7 @@
   padding: 6px 10px;
   cursor: pointer;
   font-size: 12px;
-  font-family: Inter, sans-serif;
+  font-family: var(--font-sans);
 }
 
 .surface-pill__trigger--open {
@@ -54,7 +54,7 @@
   padding: 8px 4px;
   cursor: pointer;
   font-size: 10px;
-  font-family: Inter, sans-serif;
+  font-family: var(--font-sans);
   text-align: center;
 }
 

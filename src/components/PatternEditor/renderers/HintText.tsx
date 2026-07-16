@@ -29,7 +29,7 @@ export default function HintText({
           x="50%" y="98%"
           textAnchor="middle" dominantBaseline="auto"
           fill="rgba(255, 215, 0, 0.5)"
-          fontSize="11" fontFamily="Inter, sans-serif"
+          fontSize="11"
         >
           Editing nodes — Drag to move · Esc to exit
         </text>
@@ -37,14 +37,14 @@ export default function HintText({
 
       {!hasPieces && activeTool === 'pen' && penNodesLength === 0 && (
         <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
-          fill="rgba(0,0,0,0.2)" fontSize="13" fontFamily="Inter, sans-serif">
+          fill="rgba(0,0,0,0.2)" fontSize="13">
           Click to add points · Drag to curve · Click first point to close · Enter to finish open · Esc to cancel
         </text>
       )}
 
       {(activeTool === 'seam' || activeTool === 'freesewing') && (
         <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
-          fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
+          fill="rgba(255, 215, 0, 0.5)" fontSize="11">
           {seamHasFirstEdge
             ? 'Click an edge on a different piece to sew · Esc to cancel'
             : 'Click an edge on the first piece to start a seam'}
@@ -61,7 +61,7 @@ export default function HintText({
         };
         return (
           <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
-            fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
+            fill="rgba(255, 215, 0, 0.5)" fontSize="11">
             {msgs[segmentSewingPhase ?? 'idle'] ?? msgs.idle}
           </text>
         );
@@ -76,7 +76,7 @@ export default function HintText({
         };
         return (
           <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
-            fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
+            fill="rgba(255, 215, 0, 0.5)" fontSize="11">
             {msgs[topstitchMode ?? 'seamline'] ?? msgs.seamline}
           </text>
         );
@@ -84,7 +84,7 @@ export default function HintText({
 
       {activeTool === 'seamAllowance' && (
         <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
-          fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
+          fill="rgba(255, 215, 0, 0.5)" fontSize="11">
           {`Click a piece to apply ${saDefaultWidthMm ?? DEFAULT_SEAM_ALLOWANCE}mm · drag across pieces to apply to all · click an edge for its width · a corner for corner type`}
         </text>
       )}
@@ -97,7 +97,7 @@ export default function HintText({
         };
         return (
           <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
-            fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
+            fill="rgba(255, 215, 0, 0.5)" fontSize="11">
             {msgs[walkSeamPhase ?? 'idle'] ?? msgs.idle}
           </text>
         );
