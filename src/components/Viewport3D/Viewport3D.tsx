@@ -35,7 +35,6 @@ import { downloadUSDZ } from '../../utils/export/usdzExporter';
 import type { Tool3D } from '../../types/types';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import PanCrosshair from './PanCrosshair';
-import SimModeToggle from './SimModeToggle';
 import SnapshotBar from './SnapshotBar';
 import AnchorPoints from './AnchorPoints';
 import AvatarTapes from './AvatarTapes';
@@ -797,7 +796,6 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       }}
       onContextMenu={handleContextMenu}
     >
-      {!hideChrome && <SimModeToggle />}
       {/* NOT gated on hideChrome (same rationale as SurfaceModePill below):
           AppShell — the only production shell — mounts Viewport3D with
           hideChrome, which left this overlay permanently dark. It is the
@@ -1029,12 +1027,6 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
           redesign-era UI — gating it would make it a dark surface. */}
       <SurfaceModePill />
 
-      {/* Status indicators */}
-      {!hideChrome && (
-        <div className={`sim-status ${simulationState === 'running' ? 'running' : ''}`}>
-          {simulationState === 'running' ? '● SIMULATING' : simulationState === 'paused' ? '⏸ PAUSED' : `○ ${pieces.length} piece${pieces.length !== 1 ? 's' : ''}`}
-        </div>
-      )}
       {!cameraMode && (
         <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9, pointerEvents: 'none' }}>
           {poseEditorOpen ? '● POSE MODE' : activeTool3D === 'arrangement' ? '⊕ ARRANGE — click pieza, luego click punto de arrangement' : '✏️ EDIT MODE'} — {inputScheme === 'trackpad' ? 'two-finger orbit · pinch zoom · ⌥-drag pan' : 'right-drag orbit · middle/⌥-drag pan'}
