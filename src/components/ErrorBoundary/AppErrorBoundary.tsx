@@ -43,22 +43,22 @@ export class AppErrorBoundary extends Component<Props, State> {
       return (
         <div className="app-error-boundary">
           <div className="app-error-icon">⚠️</div>
-          <div className="app-error-title">Something went wrong</div>
+          <div className="app-error-title">Algo salió mal</div>
           <div className="app-error-message">
-            {this.state.errorMessage || 'An unexpected error crashed the application.'}
+            {this.state.errorMessage || 'Un error inesperado tumbó la aplicación.'}
           </div>
           {this.state.didAutoSave === true && (
             <div className="app-error-save-status app-error-save-ok">
-              Your project was auto-saved.
+              Tu proyecto quedó auto-guardado.
             </div>
           )}
           {this.state.didAutoSave === false && (
             <div className="app-error-save-status app-error-save-fail">
-              Auto-save failed. Your recent changes may be lost.
+              El auto-guardado falló: los últimos cambios pueden perderse.
             </div>
           )}
           <button className="app-error-reload" onClick={this.handleReload}>
-            Reload Application
+            Recargar la aplicación
           </button>
         </div>
       );

@@ -205,7 +205,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     dispatch(updatePiece({ ...piece, seamAllowance: widthMm, updatedAt: Date.now() }));
     if (prevWidthMm > 0 && prevWidthMm !== widthMm) {
       dispatch(showUndoToast(
-        `Seam allowance ${prevWidthMm}mm → ${widthMm}mm`,
+        `Margen de costura ${prevWidthMm}mm → ${widthMm}mm`,
         updatePiece({ ...piece, seamAllowance: prevWidthMm, updatedAt: Date.now() }),
       ));
     }

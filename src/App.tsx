@@ -23,7 +23,7 @@ function App() {
       if (!isStorageAvailable()) {
         store.dispatch(showToast({
           type: 'error',
-          message: 'Local storage is unavailable. Settings will not persist.',
+          message: 'El navegador bloqueó el almacenamiento local: los ajustes no van a persistir. Revisa los permisos de almacenamiento para este sitio.',
           duration: 8000,
         }));
       }
