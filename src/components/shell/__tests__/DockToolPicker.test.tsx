@@ -24,19 +24,19 @@ describe('DockToolPicker', () => {
 
   it('an unselected tool is labeled Add and calls onAdd', () => {
     const { onAdd } = setup(['select']);
-    fireEvent.click(screen.getByRole('button', { name: 'Add Notch to dock' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Añadir Piquete al dock' }));
     expect(onAdd).toHaveBeenCalledWith('notch');
   });
 
   it('a selected tool is labeled Remove and calls onRemove', () => {
     const { onRemove } = setup(['select', 'pen']);
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Pen from dock' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar Pluma del dock' }));
     expect(onRemove).toHaveBeenCalledWith('pen');
   });
 
   it('the only selected tool cannot be removed (disabled, no onRemove)', () => {
     const { onRemove } = setup(['select']);
-    const btn = screen.getByRole('button', { name: 'Remove Select from dock' }) as HTMLButtonElement;
+    const btn = screen.getByRole('button', { name: 'Quitar Seleccionar del dock' }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
     fireEvent.click(btn);
     expect(onRemove).not.toHaveBeenCalled();

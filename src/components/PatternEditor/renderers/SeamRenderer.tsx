@@ -151,7 +151,7 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         id: e.seam.id,
         x: (e.midA.x + e.midB.x) / 2,
         y: (e.midA.y + e.midB.y) / 2 - 8 / zoom2D,
-        text: `⚠ ${e.mismatchMm.toFixed(1)}mm mismatch`,
+        text: `⚠ ${e.mismatchMm.toFixed(1)}mm de diferencia`,
       })),
     labelFont,
   );
@@ -277,7 +277,7 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
                 fontWeight={600}
                 style={{ fill: 'var(--piece-error-2d)', fontFamily: 'var(--font-mono-2d)' }}
               >
-                ⚠ {mismatchMm.toFixed(1)}mm mismatch
+                ⚠ {mismatchMm.toFixed(1)}mm de diferencia
               </text>
             )}
 
@@ -291,7 +291,7 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
                 fontWeight={600}
                 style={{ fill: seam.tension < 100 ? 'var(--seam-tension-gather-2d)' : 'var(--seam-tension-ease-2d)', fontFamily: 'var(--font-mono-2d)' }}
               >
-                {seam.tension}%{seam.tension < 100 ? ' gather' : ' ease'}
+                {seam.tension}%{seam.tension < 100 ? ' fruncido' : ' embebido'}
               </text>
             )}
 

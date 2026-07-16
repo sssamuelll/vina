@@ -27,9 +27,9 @@ export default function SeamAllowanceDefaultSection() {
 
   return (
     <section className="panel-section">
-      <div className="panel-subtitle panel-subtitle--spaced">Seam Allowance Default</div>
+      <div className="panel-subtitle panel-subtitle--spaced">Margen de costura por defecto</div>
       <div className="panel-field">
-        <label htmlFor="sa-default-width">Width (mm)</label>
+        <label htmlFor="sa-default-width">Ancho (mm)</label>
         <input
           id="sa-default-width"
           type="number"
@@ -43,7 +43,7 @@ export default function SeamAllowanceDefaultSection() {
           onBlur={commit}
         />
       </div>
-      <div className="panel-hint">Click a piece body to apply · drag across pieces to apply to all.</div>
+      <div className="panel-hint">Haz clic en el cuerpo de una pieza para aplicar · arrastra sobre varias piezas para aplicar a todas.</div>
     </section>
   );
 }

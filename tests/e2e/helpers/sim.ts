@@ -28,7 +28,7 @@ export async function waitForApp(page: Page) {
     });
   // RightDock Simulate button is part of the shell in split/3D view; its
   // presence implies the shell mounted (UnifiedBar + 3D viewport present).
-  await expect(page.locator('[aria-label="Simulate"]').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[aria-label="Simular"]').first()).toBeVisible({ timeout: 15_000 });
 }
 
 /**

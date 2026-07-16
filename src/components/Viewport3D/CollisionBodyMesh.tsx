@@ -51,8 +51,8 @@ export default function CollisionBodyMesh({ body, orbitRef }: CollisionBodyMeshP
       console.warn('[CollisionBodyMesh] Failed to load:', body.name, err);
       if (cancelled) return;
       const msg = err instanceof MeshImportLimitError
-        ? `Collision body "${body.name}" exceeds size limit: ${err.message}`
-        : `Failed to load collision body "${body.name}": ${err instanceof Error ? err.message : 'unknown error'}`;
+        ? `El cuerpo de colisión "${body.name}" supera el límite de tamaño: ${err.message}`
+        : `No se pudo cargar el cuerpo de colisión "${body.name}": ${err instanceof Error ? err.message : 'error desconocido'}`;
       dispatch(showErrorToast(msg));
     });
     return () => { cancelled = true; };

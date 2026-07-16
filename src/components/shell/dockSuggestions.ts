@@ -8,9 +8,9 @@ export interface DockSuggestion {
   label: string;
 }
 
-const GRADE: DockSuggestion = { id: 'grade', icon: Scaling, label: 'Grade' };
-const EXPORT: DockSuggestion = { id: 'export', icon: Download, label: 'Export DXF' };
-const FITMAP: DockSuggestion = { id: 'fitmap', icon: Activity, label: 'Fit map' };
+const GRADE: DockSuggestion = { id: 'grade', icon: Scaling, label: 'Escalar' };
+const EXPORT: DockSuggestion = { id: 'export', icon: Download, label: 'Exportar DXF' };
+const FITMAP: DockSuggestion = { id: 'fitmap', icon: Activity, label: 'Mapa de ajuste' };
 const BOM: DockSuggestion = { id: 'bom', icon: Package, label: 'BOM' };
 
 // Wired-only suggestions per stage (painted-door/undefined tools dropped).

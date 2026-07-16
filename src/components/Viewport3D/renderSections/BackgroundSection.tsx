@@ -17,18 +17,22 @@ export default function BackgroundSection({ open, onToggle }: SectionProps) {
     <div className="ap-section">
       <button className="ap-section-header" onClick={onToggle}>
         <span className={`ap-chevron ${open ? 'open' : ''}`}>&#9656;</span>
-        Background
+        Fondo
       </button>
       {open && (
         <div className="ap-section-body">
           <div className="ap-mode-toggle">
-            {(['hdri', 'solid', 'transparent'] as BackgroundMode[]).map(mode => (
+            {([
+              ['hdri', 'HDRI'],
+              ['solid', 'Sólido'],
+              ['transparent', 'Transparente'],
+            ] as [BackgroundMode, string][]).map(([mode, label]) => (
               <button
                 key={mode}
                 className={backgroundMode === mode ? 'active' : ''}
                 onClick={() => dispatch(setBackgroundMode(mode))}
               >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                {label}
               </button>
             ))}
           </div>

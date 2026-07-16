@@ -9,13 +9,13 @@ interface Props {
 }
 
 const CORNER_TYPES: { type: CornerType; label: string; disabled?: boolean }[] = [
-  { type: 'mitered', label: 'Mitered' },
-  { type: 'doubleMitered', label: 'Double Mitered' },
-  { type: 'envelope', label: 'Envelope' },
-  { type: 'squared', label: 'Squared' },
-  { type: 'slant', label: 'Slant' },
-  { type: 'match', label: 'Match (coming soon)', disabled: true },
-  { type: 'trimMirrored', label: 'Trim Mirrored' },
+  { type: 'mitered', label: 'Inglete' },
+  { type: 'doubleMitered', label: 'Inglete doble' },
+  { type: 'envelope', label: 'Envolvente' },
+  { type: 'squared', label: 'Cuadrada' },
+  { type: 'slant', label: 'Sesgada' },
+  { type: 'match', label: 'Empatada (próximamente)', disabled: true },
+  { type: 'trimMirrored', label: 'Recorte espejado' },
 ];
 
 /**
@@ -43,7 +43,7 @@ export default function VertexPropertiesSection({ pieceId, vertexIndex }: Props)
 
   return (
     <section className="panel-section">
-      <div className="panel-subtitle panel-subtitle--spaced">Corner</div>
+      <div className="panel-subtitle panel-subtitle--spaced">Esquina</div>
       <div className="panel-preset-row">
         {CORNER_TYPES.map(({ type, label, disabled }) => (
           <button
@@ -58,7 +58,7 @@ export default function VertexPropertiesSection({ pieceId, vertexIndex }: Props)
       </div>
       <div className="panel-field panel-field--row">
         <button className="panel-chip-btn" onClick={() => setForAll(current)}>
-          Apply to all corners
+          Aplicar a todas las esquinas
         </button>
       </div>
     </section>

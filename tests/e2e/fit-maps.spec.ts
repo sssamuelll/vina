@@ -93,7 +93,7 @@ async function startSimulation(page: Page) {
   ).toBe('running');
 
   // The toggle bar should now be visible in the 3D viewport.
-  await expect(page.locator('button[title="Stress Map (Alt+6)"]')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('button[title="Mapa de tensión (Alt+6)"]')).toBeVisible({ timeout: 5000 });
   // Let physics settle a bit so stats can be computed.
   await page.waitForTimeout(2000);
 }
@@ -121,7 +121,7 @@ test.describe('Fit Map UI', () => {
 
   test('toolbar flyout renders and toggles stress map', async ({ page }) => {
     // The toggle bar should be visible once simulation is running
-    const stressBtn = page.locator('button[title="Stress Map (Alt+6)"]');
+    const stressBtn = page.locator('button[title="Mapa de tensión (Alt+6)"]');
     await expect(stressBtn).toBeVisible({ timeout: 5000 });
 
     // Click to activate stress map (force: surface-mode pill overlaps the bar)
@@ -152,10 +152,10 @@ test.describe('Fit Map UI', () => {
 
   test('all 4 map modes activate without crash', async ({ page }) => {
     const modes: { title: string; mode: string }[] = [
-      { title: 'Stress Map (Alt+6)', mode: 'stress' },
-      { title: 'Strain Map (Alt+7)', mode: 'strain' },
-      { title: 'Fit Map (Alt+8)', mode: 'fit' },
-      { title: 'Pressure Points (Alt+9)', mode: 'pressure' },
+      { title: 'Mapa de tensión (Alt+6)', mode: 'stress' },
+      { title: 'Mapa de estiramiento (Alt+7)', mode: 'strain' },
+      { title: 'Mapa de ajuste (Alt+8)', mode: 'fit' },
+      { title: 'Puntos de presión (Alt+9)', mode: 'pressure' },
     ];
 
     for (const { title } of modes) {
@@ -170,7 +170,7 @@ test.describe('Fit Map UI', () => {
     }
 
     // Deactivate by clicking the last mode again (pressure)
-    const pressureBtn = page.locator('button[title="Pressure Points (Alt+9)"]');
+    const pressureBtn = page.locator('button[title="Puntos de presión (Alt+9)"]');
     await pressureBtn.click({ force: true });
     await page.waitForTimeout(300);
 
@@ -180,14 +180,14 @@ test.describe('Fit Map UI', () => {
     await expect(page.locator('canvas')).toBeVisible();
     expect(await getState<string>(page, 'simulation.simulationState')).toBe('running');
     // Toggle bar still mounted (FitMapToggle renders while non-idle).
-    await expect(page.locator('button[title="Stress Map (Alt+6)"]')).toBeVisible();
+    await expect(page.locator('button[title="Mapa de tensión (Alt+6)"]')).toBeVisible();
   });
 
   // ── Test 3: Legend shows live stats (not NaN) ──────────────────────────
 
   test('legend shows live stats via window global', async ({ page }) => {
     // Activate strain map so stats are generated
-    const strainBtn = page.locator('button[title="Strain Map (Alt+7)"]');
+    const strainBtn = page.locator('button[title="Mapa de estiramiento (Alt+7)"]');
     await strainBtn.click({ force: true });
 
     // Give the simulation a moment to compute fit map stats
@@ -233,33 +233,33 @@ test.describe('Fit Map UI', () => {
 
   test('config popover opens and has inputs', async ({ page }) => {
     // First activate stress map so there is context for the config
-    const stressBtn = page.locator('button[title="Stress Map (Alt+6)"]');
+    const stressBtn = page.locator('button[title="Mapa de tensión (Alt+6)"]');
     await stressBtn.click({ force: true });
     await page.waitForTimeout(300);
 
     // Click the config/gear button
-    const configBtn = page.locator('button[title="Fit Map Config"]');
+    const configBtn = page.locator('button[title="Ajustes del mapa de ajuste"]');
     await expect(configBtn).toBeVisible({ timeout: 3000 });
     await configBtn.click({ force: true });
     await page.waitForTimeout(300);
 
     // The config popover should appear with the heading
-    await expect(page.locator('text=Fit Map Config')).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('text=Ajustes del mapa de ajuste')).toBeVisible({ timeout: 3000 });
 
     // Should show "Stress Range" label
-    await expect(page.locator('text=/Stress Range/')).toBeVisible();
+    await expect(page.locator('text=/Rango de tensión/')).toBeVisible();
 
     // Should show "Strain Range" label
-    await expect(page.locator('text=/Strain Range/')).toBeVisible();
+    await expect(page.locator('text=/Rango de estiramiento/')).toBeVisible();
 
     // Should have numeric inputs — check by aria-label
-    await expect(page.locator('input[aria-label="Stress Min"]')).toBeVisible();
-    await expect(page.locator('input[aria-label="Stress Max"]')).toBeVisible();
-    await expect(page.locator('input[aria-label="Strain Min"]')).toBeVisible();
-    await expect(page.locator('input[aria-label="Strain Max"]')).toBeVisible();
+    await expect(page.locator('input[aria-label="Tensión mín"]')).toBeVisible();
+    await expect(page.locator('input[aria-label="Tensión máx"]')).toBeVisible();
+    await expect(page.locator('input[aria-label="Estiramiento mín"]')).toBeVisible();
+    await expect(page.locator('input[aria-label="Estiramiento máx"]')).toBeVisible();
 
     // Should have "Reset to Defaults" button
-    await expect(page.locator('button:has-text("Reset to Defaults")')).toBeVisible();
+    await expect(page.locator('button:has-text("Restablecer valores")')).toBeVisible();
 
     // Close the popover by clicking the config button again
     await configBtn.click({ force: true });
@@ -270,13 +270,13 @@ test.describe('Fit Map UI', () => {
     // The config panel heading "Fit Map Config" should no longer be visible in the popover
     // Note: We need to be careful because the config button itself has title="Fit Map Config"
     // so we check for the inner div heading text which appears only when the popover is open
-    const configHeading = page.locator('div >> text="Fit Map Config"');
+    const configHeading = page.locator('div >> text="Ajustes del mapa de ajuste"');
     const headingCount = await configHeading.count();
     // When popover is closed, the heading text inside the panel div should not be visible
     if (headingCount > 0) {
       // At least one element with the text might be the button title attribute
       // Check the actual div-based heading is gone
-      const popoverPanel = page.locator('input[aria-label="Stress Min"]');
+      const popoverPanel = page.locator('input[aria-label="Tensión mín"]');
       await expect(popoverPanel).not.toBeVisible({ timeout: 2000 });
     }
   });
@@ -286,7 +286,8 @@ test.describe('Fit Map UI', () => {
   test('keyboard shortcut Alt+6 toggles stress map', async ({ page }) => {
     // Make sure canvas / 3D view is focused for shortcuts to work
     const canvas = page.locator('canvas');
-    await canvas.click({ position: { x: 10, y: 10 } });
+    // Centro del canvas: la esquina (10,10) la intercepta el HUD colapsado (Fase1-H2).
+    await canvas.click({ position: { x: 300, y: 300 } });
     await page.waitForTimeout(300);
 
     // Press Alt+6 to activate stress map
@@ -318,7 +319,7 @@ test.describe('Fit Map UI', () => {
       );
 
       // Verify the button-based approach works as a fallback
-      const stressBtn = page.locator('button[title="Stress Map (Alt+6)"]');
+      const stressBtn = page.locator('button[title="Mapa de tensión (Alt+6)"]');
       await stressBtn.click({ force: true });
       await page.waitForTimeout(500);
       await expect(page.locator('text=/kPa/').first()).toBeVisible({ timeout: 3000 });
@@ -329,7 +330,7 @@ test.describe('Fit Map UI', () => {
 
   test('fit map survives simulation reset and restart', async ({ page }) => {
     // Activate fit map mode
-    const fitBtn = page.locator('button[title="Fit Map (Alt+8)"]');
+    const fitBtn = page.locator('button[title="Mapa de ajuste (Alt+8)"]');
     await fitBtn.click({ force: true });
     await page.waitForTimeout(500);
 
@@ -358,7 +359,7 @@ test.describe('Fit Map UI', () => {
     await page.waitForTimeout(1000);
 
     // The toggle bar should reappear and the canvas should still render.
-    await expect(page.locator('button[title="Fit Map (Alt+8)"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('button[title="Mapa de ajuste (Alt+8)"]')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('canvas')).toBeVisible();
   });
 });

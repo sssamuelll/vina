@@ -59,9 +59,9 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
 
   return (
     <>
-    <PropertySection id="piece" title="PIECE" collapsed={collapsed} onToggle={onToggle}>
+    <PropertySection id="piece" title="PIEZA" collapsed={collapsed} onToggle={onToggle}>
       <div className="panel-field">
-        <label htmlFor="prop-piece-name">Name</label>
+        <label htmlFor="prop-piece-name">Nombre</label>
         <input
           id="prop-piece-name"
           type="text"
@@ -72,7 +72,7 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         />
       </div>
       <div className="panel-field">
-        <label htmlFor="prop-piece-sa">Seam (mm)</label>
+        <label htmlFor="prop-piece-sa">Margen (mm)</label>
         <input
           id="prop-piece-sa"
           type="number"
@@ -84,9 +84,9 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         />
       </div>
       <div className="panel-field panel-field--wrap">
-        <label>SA Presets</label>
+        <label>Presets de margen</label>
         <div className="panel-preset-row">
-          {([['Overlock', 8], ['Standard', 10], ['Flat-felled', 12], ['French', 15]] as const).map(([label, width]) => (
+          {([['Overlock', 8], ['Estándar', 10], ['Sobrecargada', 12], ['Francesa', 15]] as const).map(([label, width]) => (
             <button
               key={label}
               className="panel-chip-btn"
@@ -99,21 +99,21 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         </div>
       </div>
       <div className="panel-field">
-        <label htmlFor="prop-piece-fabric">Fabric</label>
+        <label htmlFor="prop-piece-fabric">Tela</label>
         <select
           id="prop-piece-fabric"
           className="panel-input"
           value={piece.fabricId || ''}
           onChange={e => dispatch(updatePiece({ ...piece, fabricId: e.target.value || undefined, updatedAt: Date.now() }))}
         >
-          <option value="">None</option>
+          <option value="">Ninguna</option>
           {fabrics.map(f => (
             <option key={f.id} value={f.id}>{f.name}</option>
           ))}
         </select>
       </div>
       <div className="panel-field">
-        <label htmlFor="prop-piece-fabric-code">Fabric Code</label>
+        <label htmlFor="prop-piece-fabric-code">Código de tela</label>
         {(() => {
           const current = piece.fabricCode || 'SELF';
           const isCustom = !STANDARD_FABRIC_CODES.includes(current as typeof STANDARD_FABRIC_CODES[number]);
@@ -141,30 +141,30 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
               {STANDARD_FABRIC_CODES.map(code => (
                 <option key={code} value={code}>{code}</option>
               ))}
-              <option value="__custom__">Custom...</option>
+              <option value="__custom__">Personalizado...</option>
             </select>
           );
         })()}
       </div>
       <div className="panel-field">
-        <label htmlFor="prop-piece-interfacing">Interfacing</label>
+        <label htmlFor="prop-piece-interfacing">Entretela</label>
         <select
           id="prop-piece-interfacing"
           className="panel-input"
           value={piece.interfacingType || 'none'}
           onChange={e => dispatch(updatePiece({ ...piece, interfacingType: e.target.value as InterfacingType, updatedAt: Date.now() }))}
         >
-          <option value="none">None</option>
-          <option value="fusible-light">Fusible Light (2x)</option>
-          <option value="fusible-medium">Fusible Medium (4x)</option>
-          <option value="fusible-heavy">Fusible Heavy (8x)</option>
-          <option value="sew-in-light">Sew-in Light (1.5x)</option>
-          <option value="sew-in-heavy">Sew-in Heavy (3x)</option>
-          <option value="canvas">Canvas (10x)</option>
+          <option value="none">Ninguna</option>
+          <option value="fusible-light">Termoadhesiva ligera (2x)</option>
+          <option value="fusible-medium">Termoadhesiva media (4x)</option>
+          <option value="fusible-heavy">Termoadhesiva pesada (8x)</option>
+          <option value="sew-in-light">De coser ligera (1.5x)</option>
+          <option value="sew-in-heavy">De coser pesada (3x)</option>
+          <option value="canvas">Crin (10x)</option>
         </select>
       </div>
       <div className="panel-field">
-        <label>Solidify</label>
+        <label>Solidificar</label>
         <input
           type="range" className="panel-slider"
           min={0} max={100} value={Math.round((piece.solidifyFactor ?? 0) * 100)}
@@ -173,7 +173,7 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         <span className="panel-value">{((piece.solidifyFactor ?? 0) * 100).toFixed(0)}%</span>
       </div>
       <div className="panel-field">
-        <label>Pressure (Pa)</label>
+        <label>Presión (Pa)</label>
         <input
           type="range" className="panel-slider"
           min={0} max={500} step={10}
@@ -184,11 +184,11 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
       </div>
       {(piece.interfacingType && piece.interfacingType !== 'none' || (piece.solidifyFactor ?? 0) > 0) && (
         <div className="panel-hint">
-          Effective stiffness: {computeStiffnessMultiplier(piece.interfacingType, piece.solidifyFactor).toFixed(1)}x
+          Rigidez efectiva: {computeStiffnessMultiplier(piece.interfacingType, piece.solidifyFactor).toFixed(1)}x
         </div>
       )}
       <div className="panel-field">
-        <label htmlFor="prop-piece-mirror">Mirror</label>
+        <label htmlFor="prop-piece-mirror">Espejada</label>
         <input
           id="prop-piece-mirror"
           type="checkbox"
@@ -199,12 +199,12 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
       {/* Linked Editing */}
       {piece.linkedPieceId && (
         <div className="panel-subblock">
-          <div className="panel-subtitle">Linked Editing</div>
+          <div className="panel-subtitle">Edición vinculada</div>
           <div className="panel-link-row">
             <span className={piece.linkMode === 'symmetry' ? 'panel-link-mode--symmetry' : 'panel-link-mode--instance'}>
-              {piece.linkMode === 'symmetry' ? 'Symmetry' : 'Instance'}
+              {piece.linkMode === 'symmetry' ? 'Simetría' : 'Instancia'}
             </span>
-            {' linked to '}
+            {' vinculada a '}
             <button
               className="panel-link"
               onClick={() => dispatch(selectPiece(piece.linkedPieceId!))}
@@ -216,44 +216,44 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
             className="panel-delete"
             onClick={() => dispatch(unlinkPieces({ pieceId: piece.id }))}
           >
-            Remove Linked Editing
+            Quitar edición vinculada
           </button>
         </div>
       )}
       {/* Annotations */}
-      <div className="panel-subtitle panel-subtitle--spaced">Annotations</div>
+      <div className="panel-subtitle panel-subtitle--spaced">Anotaciones</div>
       {(piece.annotations || []).map(ann => (
         <div key={ann.id} className="panel-field panel-field--between">
           <span className="panel-item-text">{ann.text}</span>
-          <button className="panel-btn-sm" aria-label={`Remove annotation ${ann.text}`}
+          <button className="panel-btn-sm" aria-label={`Eliminar anotación ${ann.text}`}
             onClick={() => dispatch(removeAnnotation({ pieceId: piece.id, annotationId: ann.id }))}>✕</button>
         </div>
       ))}
       <div className="panel-field panel-field--row">
         <select className="panel-input panel-input--grow" value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)}>
-          <option value="">Template...</option>
+          <option value="">Plantilla...</option>
           {ANNOTATION_TEMPLATES.map((t, i) => <option key={i} value={t.text}>{t.text}</option>)}
         </select>
         <button className="panel-btn-sm" onClick={handleAddTemplate} disabled={!selectedTemplate}>+</button>
       </div>
       <div className="panel-field panel-field--row">
-        <input className="panel-input panel-input--grow" placeholder="Custom..." value={customText} onChange={e => setCustomText(e.target.value)} />
+        <input className="panel-input panel-input--grow" placeholder="Texto personalizado..." value={customText} onChange={e => setCustomText(e.target.value)} />
         <button className="panel-btn-sm" onClick={handleAddCustom} disabled={!customText.trim()}>+</button>
       </div>
 
       {/* Placement Rules */}
-      <div className="panel-subtitle panel-subtitle--spaced">Placement Rules</div>
+      <div className="panel-subtitle panel-subtitle--spaced">Reglas de colocación</div>
       {(piece.placementRules || []).map((rule, idx) => (
         <div key={idx} className="panel-field panel-field--between">
           <span className="panel-item-text">
-            {rule.type === 'atFold' ? 'At Fold' :
-             rule.type === 'atEdge' ? `At ${rule.edge || 'left'} edge` :
-             rule.type === 'priority' ? `Priority ${rule.value || 1}` :
-             rule.type === 'grainTilt' ? `Tilt ≤${rule.value || 5}°` :
-             rule.type === 'pairWith' ? 'Pair' :
-             rule.type === 'minDistance' ? `Min ${rule.value || 10}mm` : rule.type}
+            {rule.type === 'atFold' ? 'Al doblez' :
+             rule.type === 'atEdge' ? `Al borde ${rule.edge === 'right' ? 'derecho' : 'izquierdo'}` :
+             rule.type === 'priority' ? `Prioridad ${rule.value || 1}` :
+             rule.type === 'grainTilt' ? `Inclinación ≤${rule.value || 5}°` :
+             rule.type === 'pairWith' ? 'Emparejar' :
+             rule.type === 'minDistance' ? `Mín ${rule.value || 10}mm` : rule.type}
           </span>
-          <button className="panel-btn-sm" aria-label="Remove placement rule"
+          <button className="panel-btn-sm" aria-label="Eliminar regla de colocación"
             onClick={() => dispatch(removePlacementRule({ pieceId: piece.id, ruleIndex: idx }))}>✕</button>
         </div>
       ))}
@@ -269,53 +269,53 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
           dispatch(addPlacementRule({ pieceId: piece.id, rule }));
           e.target.value = '';
         }}>
-          <option value="">Add rule...</option>
-          <option value="atFold">At Fold</option>
-          <option value="atEdge">At Edge</option>
-          <option value="priority">Priority</option>
-          <option value="grainTilt">Grain Tilt</option>
-          <option value="pairWith">Pair With</option>
-          <option value="minDistance">Min Distance</option>
+          <option value="">Agregar regla...</option>
+          <option value="atFold">Al doblez</option>
+          <option value="atEdge">Al borde</option>
+          <option value="priority">Prioridad</option>
+          <option value="grainTilt">Inclinación de hilo</option>
+          <option value="pairWith">Emparejar con</option>
+          <option value="minDistance">Distancia mínima</option>
         </select>
       </div>
 
       <button className="panel-delete" onClick={handleDeletePiece}>
-        Delete Piece
+        Eliminar pieza
       </button>
 
       {/* Notch defaults — written to tools.toolOptions.notch; the notch tool
           merges them over DEFAULT_NOTCH_OPTIONS on every placement. */}
       <div className="panel-subblock">
-        <div className="panel-subtitle">Notch Settings</div>
+        <div className="panel-subtitle">Ajustes de piquete</div>
         <div className="panel-field">
-          <label htmlFor="prop-notch-shape">Shape</label>
+          <label htmlFor="prop-notch-shape">Forma</label>
           <select
             id="prop-notch-shape"
             className="panel-input"
             value={notchSettings.shape}
             onChange={e => setNotchOption('shape', e.target.value as NotchShape)}
           >
-            <option value="slit">Slit</option>
-            <option value="t-notch">T-Notch</option>
-            <option value="v-internal">V-Internal</option>
-            <option value="v-external">V-External</option>
-            <option value="u-notch">U-Notch</option>
-            <option value="castle">Castle</option>
-            <option value="diamond">Diamond</option>
+            <option value="slit">Recto</option>
+            <option value="t-notch">En T</option>
+            <option value="v-internal">V interna</option>
+            <option value="v-external">V externa</option>
+            <option value="u-notch">En U</option>
+            <option value="castle">Castillo</option>
+            <option value="diamond">Rombo</option>
           </select>
         </div>
         <div className="panel-field">
-          <label htmlFor="prop-notch-length">Depth (mm)</label>
+          <label htmlFor="prop-notch-length">Profundidad (mm)</label>
           <input id="prop-notch-length" type="number" className="panel-input narrow" value={notchSettings.length} min={1} max={30}
             onChange={e => setNotchOption('length', Number(e.target.value))} />
         </div>
         <div className="panel-field">
-          <label htmlFor="prop-notch-width">Width (mm)</label>
+          <label htmlFor="prop-notch-width">Ancho (mm)</label>
           <input id="prop-notch-width" type="number" className="panel-input narrow" value={notchSettings.width} min={1} max={20}
             onChange={e => setNotchOption('width', Number(e.target.value))} />
         </div>
         <div className="panel-field">
-          <label htmlFor="prop-notch-count">Count</label>
+          <label htmlFor="prop-notch-count">Cantidad</label>
           <select id="prop-notch-count" className="panel-input" value={notchSettings.count}
             onChange={e => setNotchOption('count', Number(e.target.value))}>
             <option value={1}>1</option>
@@ -326,9 +326,9 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
       </div>
     </PropertySection>
 
-    <PropertySection id="layer" title="LAYER" collapsed={collapsed} onToggle={onToggle}>
+    <PropertySection id="layer" title="CAPA" collapsed={collapsed} onToggle={onToggle}>
       <div className="panel-field">
-        <label htmlFor="prop-piece-layer">Layer</label>
+        <label htmlFor="prop-piece-layer">Capa</label>
         <input
           id="prop-piece-layer"
           type="number"
@@ -340,7 +340,7 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         />
       </div>
       <div className="panel-field">
-        <label htmlFor="prop-piece-sublayer">Sublayer</label>
+        <label htmlFor="prop-piece-sublayer">Subcapa</label>
         <input
           id="prop-piece-sublayer"
           type="number"

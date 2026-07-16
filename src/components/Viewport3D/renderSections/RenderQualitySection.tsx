@@ -19,7 +19,7 @@ export default function RenderQualitySection({ open, onToggle }: SectionProps) {
     <div className="ap-section">
       <button className="ap-section-header" onClick={onToggle}>
         <span className={`ap-chevron ${open ? 'open' : ''}`}>&#9656;</span>
-        Rendering
+        Render
       </button>
       {open && (
         <div className="ap-section-body">
@@ -34,13 +34,13 @@ export default function RenderQualitySection({ open, onToggle }: SectionProps) {
             >
               <option value="aces">ACES Filmic</option>
               <option value="reinhard">Reinhard</option>
-              <option value="linear">Linear</option>
+              <option value="linear">Lineal</option>
             </select>
           </div>
 
           <div>
             <div className="ap-slider-label">
-              <span>Exposure</span>
+              <span>Exposición</span>
               <span>{exposure.toFixed(1)}</span>
             </div>
             <div className="ap-slider-control">
@@ -65,7 +65,7 @@ export default function RenderQualitySection({ open, onToggle }: SectionProps) {
 
           <div>
             <div className="ap-slider-label">
-              <span>Export Samples</span>
+              <span>Muestras de export</span>
               <span>{samplesPerPixel}</span>
             </div>
             <div className="ap-slider-control">
@@ -86,7 +86,7 @@ export default function RenderQualitySection({ open, onToggle }: SectionProps) {
                 onChange={e => dispatch(setSamplesPerPixel(Number(e.target.value)))}
               />
             </div>
-            <div className="ap-hint">Higher = smoother exports, slower render</div>
+            <div className="ap-hint">Más = export más suave, render más lento</div>
           </div>
 
           <label
@@ -97,7 +97,7 @@ export default function RenderQualitySection({ open, onToggle }: SectionProps) {
               checked={denoiserEnabled}
               onChange={e => dispatch(setDenoiserEnabled(e.target.checked))}
             />
-            Export Denoiser
+            Denoiser al exportar
           </label>
         </div>
       )}

@@ -17,19 +17,19 @@ export default function LightingSection({ open, onToggle }: SectionProps) {
     <div className="ap-section">
       <button className="ap-section-header" onClick={onToggle}>
         <span className={`ap-chevron ${open ? 'open' : ''}`}>&#9656;</span>
-        Lighting
+        Iluminación
       </button>
       {open && (
         <div className="ap-section-body">
           <div className="ap-btn-row">
             <button className="ap-btn" onClick={() => dispatch(applyLightPreset('studio3Point'))}>
-              Studio 3-Point
+              Estudio 3 puntos
             </button>
             <button className="ap-btn" onClick={() => dispatch(applyLightPreset('softBox'))}>
-              Soft Box
+              Softbox
             </button>
             <button className="ap-btn" onClick={() => dispatch(applyLightPreset('dramatic'))}>
-              Dramatic
+              Dramática
             </button>
             <button className="ap-btn" onClick={() => dispatch(applyLightPreset('natural'))}>
               Natural
@@ -41,7 +41,7 @@ export default function LightingSection({ open, onToggle }: SectionProps) {
             onClick={() => dispatch(addLight())}
             disabled={lights.length >= 4}
           >
-            Add Light
+            Agregar luz
           </button>
 
           {lights.map(light => (
@@ -61,7 +61,7 @@ export default function LightingSection({ open, onToggle }: SectionProps) {
                   className="ap-btn"
                   style={{ flex: 'none', padding: '1px 6px', fontSize: 10 }}
                   onClick={() => dispatch(removeLight(light.id))}
-                  title="Remove light"
+                  title="Eliminar luz"
                 >
                   &times;
                 </button>
@@ -70,7 +70,7 @@ export default function LightingSection({ open, onToggle }: SectionProps) {
               {/* Type selector */}
               <div>
                 <div className="ap-slider-label">
-                  <span>Type</span>
+                  <span>Tipo</span>
                 </div>
                 <select
                   className="ap-select"
@@ -79,17 +79,17 @@ export default function LightingSection({ open, onToggle }: SectionProps) {
                     dispatch(updateLight({ id: light.id, changes: { type: e.target.value as LightType } }))
                   }
                 >
-                  <option value="rect">Area (Rect)</option>
-                  <option value="point">Point</option>
-                  <option value="directional">Directional</option>
-                  <option value="spot">Spot</option>
+                  <option value="rect">Área (rectangular)</option>
+                  <option value="point">Puntual</option>
+                  <option value="directional">Direccional</option>
+                  <option value="spot">Foco</option>
                 </select>
               </div>
 
               {/* Intensity */}
               <div>
                 <div className="ap-slider-label">
-                  <span>Intensity</span>
+                  <span>Intensidad</span>
                   <span>{light.intensity.toFixed(1)}</span>
                 </div>
                 <div className="ap-slider-control">
@@ -111,7 +111,7 @@ export default function LightingSection({ open, onToggle }: SectionProps) {
                 <>
                   <div>
                     <div className="ap-slider-label">
-                      <span>Width</span>
+                      <span>Ancho</span>
                       <span>{(light.width ?? 1).toFixed(1)}</span>
                     </div>
                     <div className="ap-slider-control">
@@ -129,7 +129,7 @@ export default function LightingSection({ open, onToggle }: SectionProps) {
                   </div>
                   <div>
                     <div className="ap-slider-label">
-                      <span>Height</span>
+                      <span>Alto</span>
                       <span>{(light.height ?? 1).toFixed(1)}</span>
                     </div>
                     <div className="ap-slider-control">
@@ -153,7 +153,7 @@ export default function LightingSection({ open, onToggle }: SectionProps) {
                 <>
                   <div>
                     <div className="ap-slider-label">
-                      <span>Spot Angle</span>
+                      <span>Ángulo del foco</span>
                       <span>{light.spotAngle.toFixed(0)}&deg;</span>
                     </div>
                     <div className="ap-slider-control">
@@ -201,7 +201,7 @@ export default function LightingSection({ open, onToggle }: SectionProps) {
                     cursor: 'pointer',
                     opacity: 0.5,
                   }}
-                  title="Shadow maps require WebGL fallback mode"
+                  title="Las sombras proyectadas requieren el modo de respaldo WebGL"
                 >
                   <input
                     type="checkbox"
@@ -210,7 +210,7 @@ export default function LightingSection({ open, onToggle }: SectionProps) {
                       dispatch(updateLight({ id: light.id, changes: { castShadow: e.target.checked } }))
                     }
                   />
-                  Cast Shadow
+                  Proyectar sombra
                 </label>
               )}
             </div>

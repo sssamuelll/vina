@@ -18,7 +18,7 @@ async function openAvatarPanel(page: Page) {
   await avatarBtn.click({ force: true });
   await page.waitForTimeout(500);
 
-  await expect(page.locator('h3:has-text("Avatar & Pose")')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.context-panel__header >> text=Avatar')).toBeVisible({ timeout: 5000 });
 }
 
 test.describe('Morph Weights (#271)', () => {
@@ -30,9 +30,9 @@ test.describe('Morph Weights (#271)', () => {
 
     // Verify measurement sliders exist (scoped to avatar panel to avoid template library matches)
     const panel = page.locator('.avatar-panel');
-    await expect(panel.locator('text=Height')).toBeVisible({ timeout: 3000 });
-    await expect(panel.locator('text=Chest')).toBeVisible({ timeout: 3000 });
-    await expect(panel.locator('text=Waist')).toBeVisible({ timeout: 3000 });
+    await expect(panel.locator('text=Estatura')).toBeVisible({ timeout: 3000 });
+    await expect(panel.locator('text=Pecho')).toBeVisible({ timeout: 3000 });
+    await expect(panel.locator('text=Cintura')).toBeVisible({ timeout: 3000 });
   });
 
   test('changing measurements produces no console errors', async ({ page }) => {

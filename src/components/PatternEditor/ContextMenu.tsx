@@ -147,7 +147,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
 
   if (menu.segmentIndex !== undefined) {
     items.push({
-      label: menu.segmentIsCurve ? 'Convert to Line' : 'Convert to Curve',
+      label: menu.segmentIsCurve ? 'Convertir en línea' : 'Convertir en curva',
       icon: menu.segmentIsCurve ? '─' : '⌒',
       action: () => { onConvertSegment?.(menu.segmentIndex!, !menu.segmentIsCurve); onClose(); },
       separator: true,
@@ -161,12 +161,12 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
 
     if (line?.type === 'fold') {
       items.push({
-        label: 'Unfold',
+        label: 'Desplegar',
         icon: '⇔',
         action: () => act(() => onUnfold?.(menu.pieceId!, menu.internalLineId!)),
       });
       items.push({
-        label: 'Unfold Outline Only',
+        label: 'Desplegar solo el contorno',
         icon: '⇔',
         action: () => act(() => onUnfold?.(menu.pieceId!, menu.internalLineId!, true)),
         separator: true,
@@ -174,13 +174,13 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     }
 
     items.push({
-      label: 'Offset as Internal Line',
+      label: 'Offset como línea interna',
       icon: '⏛',
       action: () => act(() => onOffsetInternalLine?.(menu.pieceId!, menu.internalLineId!)),
     });
 
     items.push({
-      label: 'Optimize Curve Points',
+      label: 'Optimizar puntos de curva',
       icon: '◇',
       action: () => act(() => onOptimizeCurves?.(menu.pieceId!, menu.internalLineId!)),
       separator: true,
@@ -195,7 +195,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     const connectedB = seam?.pieceB.pieceId;
 
     items.push({
-      label: 'Reverse Sewing Direction',
+      label: 'Invertir dirección de costura',
       icon: '↔',
       shortcut: 'Ctrl+B',
       action: () => act(() => dispatch(reverseSeam(sid))),
@@ -203,15 +203,15 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
 
     // Select connected pieces
     if (connectedA && connectedB) {
-      const nameA = pieces.find(p => p.id === connectedA)?.name || 'Piece A';
-      const nameB = pieces.find(p => p.id === connectedB)?.name || 'Piece B';
+      const nameA = pieces.find(p => p.id === connectedA)?.name || 'Pieza A';
+      const nameB = pieces.find(p => p.id === connectedB)?.name || 'Pieza B';
       items.push({
-        label: `Select "${nameA}"`,
+        label: `Seleccionar "${nameA}"`,
         icon: '☐',
         action: () => act(() => dispatch(selectPiece(connectedA))),
       });
       items.push({
-        label: `Select "${nameB}"`,
+        label: `Seleccionar "${nameB}"`,
         icon: '☐',
         action: () => act(() => dispatch(selectPiece(connectedB))),
         separator: true,
@@ -219,7 +219,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     }
 
     items.push({
-      label: 'Delete Seam',
+      label: 'Eliminar costura',
       icon: '🗑',
       shortcut: 'Del',
       action: () => act(() => {
@@ -238,7 +238,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
 
     // Copy
     items.push({
-      label: 'Copy',
+      label: 'Copiar',
       icon: '📄',
       shortcut: 'Ctrl+C',
       action: () => act(() => {
@@ -248,7 +248,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     // Paste
     if (clipboard) {
       items.push({
-        label: 'Paste',
+        label: 'Pegar',
         icon: '📋',
         shortcut: 'Ctrl+V',
         action: () => act(() => {
@@ -257,7 +257,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
         }),
       });
       items.push({
-        label: 'Mirror Paste',
+        label: 'Pegar en espejo',
         icon: '🪞',
         shortcut: 'Ctrl+R',
         action: () => act(() => {
@@ -268,7 +268,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       });
     } else {
       items.push({
-        label: 'Paste',
+        label: 'Pegar',
         icon: '📋',
         shortcut: 'Ctrl+V',
         action: () => {},
@@ -278,18 +278,18 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
 
     // Rotate
     items.push({
-      label: 'Rotate 90°',
+      label: 'Rotar 90°',
       icon: '↻',
       shortcut: 'R',
       action: () => act(() => dispatch(rotatePiece({ id: pid, rotation: currentRotation + 90 }))),
     });
     items.push({
-      label: 'Rotate 180°',
+      label: 'Rotar 180°',
       icon: '↻',
       action: () => act(() => dispatch(rotatePiece({ id: pid, rotation: currentRotation + 180 }))),
     });
     items.push({
-      label: 'Rotate -90°',
+      label: 'Rotar -90°',
       icon: '↺',
       action: () => act(() => dispatch(rotatePiece({ id: pid, rotation: currentRotation - 90 }))),
       separator: true,
@@ -297,13 +297,13 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
 
     // Flip
     items.push({
-      label: 'Flip Horizontal',
+      label: 'Voltear horizontal',
       icon: '↔',
       shortcut: 'H',
       action: () => act(() => dispatch(flipPieceH(pid))),
     });
     items.push({
-      label: 'Flip Vertical',
+      label: 'Voltear vertical',
       icon: '↕',
       shortcut: 'V',
       action: () => act(() => dispatch(flipPieceV(pid))),
@@ -312,22 +312,22 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
 
     // Z-order
     items.push({
-      label: 'Bring to Front',
+      label: 'Traer al frente',
       icon: '⬆',
       action: () => act(() => dispatch(bringToFront(pid))),
     });
     items.push({
-      label: 'Bring Forward',
+      label: 'Adelantar',
       icon: '↑',
       action: () => act(() => dispatch(bringForward(pid))),
     });
     items.push({
-      label: 'Send Backward',
+      label: 'Atrasar',
       icon: '↓',
       action: () => act(() => dispatch(sendBackward(pid))),
     });
     items.push({
-      label: 'Send to Back',
+      label: 'Enviar al fondo',
       icon: '⬇',
       action: () => act(() => dispatch(sendToBack(pid))),
       separator: true,
@@ -336,16 +336,16 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
 
     // Layer submenu
     const layerItems: SubMenuItem[] = [
-      { label: `Set Layer... (${piece?.layer ?? 1})`, action: () => { dispatch(setLayer({ pieceId: pid, layer: ((piece?.layer ?? 1) % 10) + 1 })); onClose(); } },
-      { label: `Set Sublayer... (${piece?.sublayer ?? 0})`, action: () => { dispatch(setSublayer({ pieceId: pid, sublayer: ((piece?.sublayer ?? 0) + 1) % 5 })); onClose(); } },
-      { separator: true, label: 'Clone Above', action: () => { dispatch(cloneToLayer({ pieceId: pid, direction: 'over' })); onClose(); } },
-      { label: 'Clone Below', action: () => { dispatch(cloneToLayer({ pieceId: pid, direction: 'under' })); onClose(); } },
-      { separator: true, label: 'Superimpose Over...', action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'over' })); onClose(); } },
-      { label: 'Superimpose Under...', action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'under' })); onClose(); } },
-      { label: 'Superimpose Side...', action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'side' })); onClose(); } },
+      { label: `Cambiar capa... (${piece?.layer ?? 1})`, action: () => { dispatch(setLayer({ pieceId: pid, layer: ((piece?.layer ?? 1) % 10) + 1 })); onClose(); } },
+      { label: `Cambiar subcapa... (${piece?.sublayer ?? 0})`, action: () => { dispatch(setSublayer({ pieceId: pid, sublayer: ((piece?.sublayer ?? 0) + 1) % 5 })); onClose(); } },
+      { separator: true, label: 'Clonar encima', action: () => { dispatch(cloneToLayer({ pieceId: pid, direction: 'over' })); onClose(); } },
+      { label: 'Clonar debajo', action: () => { dispatch(cloneToLayer({ pieceId: pid, direction: 'under' })); onClose(); } },
+      { separator: true, label: 'Superponer encima...', action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'over' })); onClose(); } },
+      { label: 'Superponer debajo...', action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'under' })); onClose(); } },
+      { label: 'Superponer al lado...', action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'side' })); onClose(); } },
     ];
     items.push({
-      label: 'Layer',
+      label: 'Capa',
       icon: '\u{1F4D1}',
       action: () => {},
       _layerSubmenu: layerItems,
@@ -354,7 +354,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
 
     // Duplicate
     items.push({
-      label: 'Duplicate',
+      label: 'Duplicar',
       icon: '⧉',
       shortcut: 'Ctrl+D',
       action: () => act(() => dispatch(duplicatePiece(pid))),
@@ -362,21 +362,21 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
 
     // Lock / Unlock
     items.push({
-      label: piece?.locked ? 'Unlock' : 'Lock',
+      label: piece?.locked ? 'Desbloquear' : 'Bloquear',
       icon: piece?.locked ? '🔓' : '🔒',
       action: () => act(() => dispatch(piece?.locked ? unlockPiece(pid) : lockPiece(pid))),
     });
 
     // Activate / Deactivate
     items.push({
-      label: piece?.active === false ? 'Activate Piece' : 'Deactivate Piece',
+      label: piece?.active === false ? 'Activar pieza' : 'Desactivar pieza',
       icon: piece?.active === false ? '▶' : '⏸',
       action: () => act(() => dispatch(deactivatePiece({ pieceId: pid, active: piece?.active === false }))),
     });
 
     // Rename
     items.push({
-      label: 'Rename…',
+      label: 'Renombrar…',
       icon: '✏️',
       shortcut: 'F2',
       action: () => act(() => onRename?.(pid)),
@@ -385,7 +385,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     // Properties — high in the menu: it's María's everyday entry point to
     // SA width / fabric / seam editing, and long menus can scroll.
     items.push({
-      label: 'Properties…',
+      label: 'Propiedades…',
       icon: '🎛',
       action: () => act(() => onOpenProperties?.(pid)),
       separator: true,
@@ -395,12 +395,12 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     if (piece?.linkedPieceId) {
       // Already linked — show unlink and select partner
       items.push({
-        label: 'Remove Linked Editing',
+        label: 'Quitar edición vinculada',
         icon: '🔗',
         action: () => act(() => dispatch(unlinkPieces({ pieceId: pid }))),
       });
       items.push({
-        label: 'Select Linked Pattern',
+        label: 'Seleccionar patrón vinculado',
         icon: '👆',
         action: () => act(() => dispatch(selectPiece(piece.linkedPieceId!))),
         separator: true,
@@ -408,12 +408,12 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     } else if (selectedPieceIds.length === 2) {
       // Two pieces selected — show link options
       items.push({
-        label: 'Apply Linked Editing – Symmetry Pattern',
+        label: 'Aplicar edición vinculada – simetría',
         icon: '🪞',
         action: () => act(() => dispatch(linkPieces({ pieceIdA: selectedPieceIds[0], pieceIdB: selectedPieceIds[1], mode: 'symmetry' }))),
       });
       items.push({
-        label: 'Apply Linked Editing – Instance Pattern',
+        label: 'Aplicar edición vinculada – instancia',
         icon: '📋',
         action: () => act(() => dispatch(linkPieces({ pieceIdA: selectedPieceIds[0], pieceIdB: selectedPieceIds[1], mode: 'instance' }))),
         separator: true,
@@ -421,12 +421,12 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     } else {
       // Single unlinked piece — show clone options
       items.push({
-        label: 'Clone with Linked Editing – Symmetry Pattern',
+        label: 'Clonar con edición vinculada – simetría',
         icon: '🪞',
         action: () => act(() => dispatch(cloneAsLinked({ pieceId: pid, mode: 'symmetry' }))),
       });
       items.push({
-        label: 'Clone with Linked Editing – Instance Pattern',
+        label: 'Clonar con edición vinculada – instancia',
         icon: '📋',
         action: () => act(() => dispatch(cloneAsLinked({ pieceId: pid, mode: 'instance' }))),
         separator: true,
@@ -435,18 +435,18 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
 
     // ─── Groups ───
     items.push({
-      label: 'Create Group from Selection',
+      label: 'Crear grupo con la selección',
       icon: '📁',
       action: () => act(() => {
         const ids = selectedPieceIds.length > 0 ? selectedPieceIds : [pid];
-        dispatch(createGroup({ name: `Group ${groups.length + 1}`, pieceIds: ids }));
+        dispatch(createGroup({ name: `Grupo ${groups.length + 1}`, pieceIds: ids }));
       }),
     });
     if (groups.length > 0) {
       for (const group of groups) {
         if (!group.pieceIds.includes(pid)) {
           items.push({
-            label: `Add to "${group.name}"`,
+            label: `Agregar a "${group.name}"`,
             icon: '+',
             action: () => act(() => dispatch(addPiecesToGroup({ groupId: group.id, pieceIds: [pid] }))),
           });
@@ -456,7 +456,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       for (const group of groups) {
         if (group.pieceIds.includes(pid)) {
           items.push({
-            label: `Remove from "${group.name}"`,
+            label: `Quitar de "${group.name}"`,
             icon: '−',
             action: () => act(() => dispatch(removePiecesFromGroup({ groupId: group.id, pieceIds: [pid] }))),
           });
@@ -472,7 +472,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
 
     if (!menu.internalLineId && !menu.seamId) {
       items.push({
-        label: 'Optimize All Curve Points',
+        label: 'Optimizar todos los puntos de curva',
         icon: '◇',
         action: () => act(() => onOptimizeCurves?.(pid)),
         separator: true,
@@ -480,12 +480,12 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     }
 
     items.push({
-      label: 'Select',
+      label: 'Seleccionar',
       icon: '☐',
       action: () => act(() => dispatch(selectPiece(pid))),
     });
     items.push({
-      label: 'Inspect',
+      label: 'Inspeccionar',
       icon: '🔍',
       action: () => act(() => {
         dispatchInspectPiece(dispatch, pid);
@@ -493,7 +493,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       separator: true,
     });
     items.push({
-      label: 'Delete',
+      label: 'Eliminar pieza',
       icon: '🗑',
       shortcut: 'Del',
       action: () => act(() => dispatch(removePiece(pid))),
@@ -503,7 +503,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     // ── Empty canvas context ──
     if (clipboard) {
       items.push({
-        label: 'Paste',
+        label: 'Pegar',
         icon: '📋',
         shortcut: 'Ctrl+V',
         action: () => act(() => {
@@ -512,7 +512,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
         }),
       });
       items.push({
-        label: 'Mirror Paste',
+        label: 'Pegar en espejo',
         icon: '🪞',
         shortcut: 'Ctrl+R',
         action: () => act(() => {
@@ -523,12 +523,12 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       });
     }
     items.push({
-      label: 'Zoom to Fit',
+      label: 'Ajustar zoom al patrón',
       icon: '⊞',
       action: () => act(() => onZoomToFit?.()),
     });
     items.push({
-      label: 'Deselect All',
+      label: 'Deseleccionar todo',
       icon: '☐',
       shortcut: 'Esc',
       action: () => act(() => dispatch(clearSelection())),
@@ -543,7 +543,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     >
       {menu.seamId && (
         <div className="context-menu__header context-menu__header--seam">
-          Seam
+          Costura
         </div>
       )}
       {menu.pieceId && !menu.seamId && (

@@ -31,7 +31,7 @@ export default function EnvironmentSection({ open, onToggle }: SectionProps) {
     <div className="ap-section">
       <button className="ap-section-header" onClick={onToggle}>
         <span className={`ap-chevron ${open ? 'open' : ''}`}>&#9656;</span>
-        Environment
+        Entorno
       </button>
       {open && (
         <div className="ap-section-body">
@@ -50,7 +50,7 @@ export default function EnvironmentSection({ open, onToggle }: SectionProps) {
 
           <div>
             <div className="ap-slider-label">
-              <span>Rotation</span>
+              <span>Rotación</span>
               <span>{hdriRotation}&deg;</span>
             </div>
             <div className="ap-slider-control">
@@ -85,9 +85,9 @@ export default function EnvironmentSection({ open, onToggle }: SectionProps) {
             }}
           />
           <button className="ap-btn" onClick={() => hdriInputRef.current?.click()}>
-            Upload HDRI
+            Subir HDRI
           </button>
-          {hdriCustomUrl && <div className="ap-hint">Custom HDRI loaded</div>}
+          {hdriCustomUrl && <div className="ap-hint">HDRI personalizado cargado</div>}
         </div>
       )}
     </div>

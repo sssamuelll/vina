@@ -23,10 +23,16 @@ const MODE_ICONS: Record<BarMode, typeof MessageSquare> = {
   settings: Settings,
 };
 
+const MODE_LABELS: Record<BarMode, string> = {
+  chat: 'Modo chat',
+  commands: 'Modo comandos',
+  settings: 'Modo ajustes',
+};
+
 const MODE_PLACEHOLDERS: Record<BarMode, string> = {
-  chat: 'Design with AI...',
-  commands: 'Type a command...',
-  settings: 'Search settings...',
+  chat: 'Diseña con la IA...',
+  commands: 'Escribe un comando...',
+  settings: 'Buscar en ajustes...',
 };
 
 export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
@@ -239,7 +245,7 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
               key={m}
               className={`unified-bar__mode-btn ${mode === m ? 'unified-bar__mode-btn--active' : ''}`}
               onClick={() => { setMode(m); setPanelOpen(m !== 'chat'); inputRef.current?.focus(); }}
-              aria-label={`${m} mode`}
+              aria-label={MODE_LABELS[m]}
             >
               <Icon size={16} />
             </button>
@@ -263,7 +269,7 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
 
       {/* Send button (chat mode) */}
       {mode === 'chat' && (
-        <button className="unified-bar__send" aria-label="Send" onClick={handleSubmit} disabled={!input.trim() && !pendingDXF}>
+        <button className="unified-bar__send" aria-label="Enviar" onClick={handleSubmit} disabled={!input.trim() && !pendingDXF}>
           <ArrowUp size={18} />
         </button>
       )}

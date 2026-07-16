@@ -6,9 +6,9 @@ import type { SectionProps } from './types';
 
 const AVATAR_STYLES: { value: AvatarRenderStyle; label: string }[] = [
   { value: 'visible',   label: 'Visible' },
-  { value: 'xray',      label: 'Transparent' },
-  { value: 'wireframe', label: 'Silhouette' },
-  { value: 'hidden',    label: 'Hidden' },
+  { value: 'xray',      label: 'Transparente' },
+  { value: 'wireframe', label: 'Silueta' },
+  { value: 'hidden',    label: 'Oculto' },
 ];
 
 export default function AvatarStyleSection({ open, onToggle }: SectionProps) {
@@ -19,7 +19,7 @@ export default function AvatarStyleSection({ open, onToggle }: SectionProps) {
     <div className="ap-section">
       <button className="ap-section-header" onClick={onToggle}>
         <span className={`ap-chevron ${open ? 'open' : ''}`}>&#9656;</span>
-        Avatar Style
+        Estilo del avatar
       </button>
       {open && (
         <div className="ap-section-body">

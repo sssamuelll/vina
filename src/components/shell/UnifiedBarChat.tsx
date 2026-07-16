@@ -184,7 +184,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
       setMessages(prev => [...prev, {
         id: newId(),
         role: 'assistant',
-        content: `Cargué tu patrón (${piecesLabel(attachment.pieces.length)}). Configura un proveedor de AI en ajustes para que pueda ayudarte con él.`,
+        content: `Cargué tu patrón (${piecesLabel(attachment.pieces.length)}). Configura un proveedor de IA en ajustes para que pueda ayudarte con él.`,
       }]);
       return;
     }
@@ -240,7 +240,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
           color: 'var(--text-ghost)',
           fontSize: 'var(--text-ui)',
         }}>
-          {hasProvider ? 'Ask the AI about your design...' : 'Add an AI provider in settings to start chatting.'}
+          {hasProvider ? 'Pregúntale a la IA sobre tu diseño...' : 'Agrega un proveedor de IA en ajustes para empezar a conversar.'}
         </div>
       )}
 
@@ -248,7 +248,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
       {messages.map(m => (
         <Fragment key={m.id}>
           <div className={`chat-message ${m.role === 'user' ? 'chat-message--user' : ''}`}>
-            {m.role === 'assistant' && <div className="chat-message__avatar">AI</div>}
+            {m.role === 'assistant' && <div className="chat-message__avatar">IA</div>}
             <div className="chat-message__text">
               {m.role === 'assistant' ? (
                 <div className="chat-markdown">
@@ -322,9 +322,9 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
           color: 'var(--text-muted)',
           fontSize: 'var(--text-sm)',
         }}>
-          <div className="chat-message__avatar">AI</div>
+          <div className="chat-message__avatar">IA</div>
           <span style={{ fontStyle: 'italic' }}>
-            {runningToolName ? `Running ${runningToolName}...` : 'Thinking...'}
+            {runningToolName ? `Ejecutando ${runningToolName}...` : 'Pensando...'}
           </span>
         </div>
       )}

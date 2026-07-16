@@ -175,13 +175,13 @@ export default function ConnectionModal(props: Props) {
       <div style={dialogStyle} onMouseDown={(e) => e.stopPropagation()}>
         <div style={headerStyle}>
           <h4 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>
-            {isEdit ? 'Edit connection' : 'Add connection'}
+            {isEdit ? 'Editar conexión' : 'Agregar conexión'}
           </h4>
           <button
             type="button"
             onClick={props.onClose}
             style={{ ...btnSecondaryStyle, padding: '4px 10px', fontSize: 13 }}
-            aria-label="Close"
+            aria-label="Cerrar"
           >
             ✕
           </button>
@@ -191,7 +191,7 @@ export default function ConnectionModal(props: Props) {
           {!isEdit && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
-                Provider
+                Proveedor
               </label>
               <select
                 style={{
@@ -223,7 +223,7 @@ export default function ConnectionModal(props: Props) {
         </div>
         <div style={footerStyle}>
           <button type="button" style={btnSecondaryStyle} onClick={props.onClose}>
-            Cancel
+            Cancelar
           </button>
           <button
             type="button"
@@ -231,7 +231,7 @@ export default function ConnectionModal(props: Props) {
             onClick={handleSave}
             disabled={!isValid}
           >
-            {isEdit ? 'Save changes' : 'Add connection'}
+            {isEdit ? 'Guardar cambios' : 'Agregar conexión'}
           </button>
         </div>
       </div>

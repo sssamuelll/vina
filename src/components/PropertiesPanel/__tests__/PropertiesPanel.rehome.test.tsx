@@ -79,15 +79,15 @@ describe('opener surfaces', () => {
 describe('PropertiesPanel content', () => {
   it('shows the empty state when nothing is selected', () => {
     renderPanel();
-    expect(screen.getByText(/select a piece/i)).toBeTruthy();
+    expect(screen.getByText(/selecciona una pieza/i)).toBeTruthy();
   });
 
   it('shows the editable SA default when the seamAllowance tool is active and nothing is selected', () => {
     const store = makeStore();
     store.dispatch(setActiveTool('seamAllowance'));
     renderPanel(store);
-    expect(screen.getByText('Seam Allowance Default')).toBeTruthy();
-    const input = screen.getByLabelText('Width (mm)') as HTMLInputElement;
+    expect(screen.getByText('Margen de costura por defecto')).toBeTruthy();
+    const input = screen.getByLabelText('Ancho (mm)') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '12' } });
     fireEvent.blur(input);
     expect(store.getState().editor.defaultSeamAllowanceWidth).toBe(12);
@@ -97,7 +97,7 @@ describe('PropertiesPanel content', () => {
     const store = makeStore();
     store.dispatch(setActiveTool('select'));
     renderPanel(store);
-    expect(screen.queryByText('Seam Allowance Default')).toBeNull();
+    expect(screen.queryByText('Margen de costura por defecto')).toBeNull();
   });
 
   it('shows the PIECE section for the selected piece', () => {
@@ -105,16 +105,16 @@ describe('PropertiesPanel content', () => {
     store.dispatch(addPiece(makePiece()));
     store.dispatch(selectPiece('p1'));
     renderPanel(store);
-    expect(screen.getByText('PIECE')).toBeTruthy();
+    expect(screen.getByText('PIEZA')).toBeTruthy();
     expect(screen.getByDisplayValue('Front')).toBeTruthy();
   });
 
-  it('SA preset buttons write piece.seamAllowance (French → 15mm)', () => {
+  it('SA preset buttons write piece.seamAllowance (Francesa → 15mm)', () => {
     const store = makeStore();
     store.dispatch(addPiece(makePiece()));
     store.dispatch(selectPiece('p1'));
     renderPanel(store);
-    fireEvent.click(screen.getByRole('button', { name: 'French' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Francesa' }));
     expect(store.getState().project.pieces[0].seamAllowance).toBe(15);
   });
 
@@ -135,7 +135,7 @@ describe('PropertiesPanel content', () => {
     store.dispatch(addSeam(seam));
     store.dispatch(selectSeam('s1'));
     renderPanel(store);
-    fireEvent.click(screen.getByRole('button', { name: 'Reverse' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Invertir' }));
     const after = store.getState().project.seams[0];
     // Fase 5: Reverse alterna pieceB.reversed (direccion real de cosido).
     // El swap A<->B anterior era un no-op fisico (matchVertices empareja
@@ -150,7 +150,7 @@ describe('PropertiesPanel content', () => {
     store.dispatch(addPiece(makePiece()));
     store.dispatch(selectPiece('p1'));
     renderPanel(store);
-    const shapeSelect = screen.getByLabelText('Shape');
+    const shapeSelect = screen.getByLabelText('Forma');
     fireEvent.change(shapeSelect, { target: { value: 't-notch' } });
     expect(store.getState().tools.toolOptions?.notch?.shape).toBe('t-notch');
   });

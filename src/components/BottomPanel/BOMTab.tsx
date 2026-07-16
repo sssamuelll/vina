@@ -55,14 +55,23 @@ const CATEGORY_ORDER: BOMCategory[] = [
 ];
 
 const CATEGORY_LABELS: Record<BOMCategory, string> = {
-  fabric: 'Fabrics',
-  interfacing: 'Interfacing',
-  thread: 'Thread',
-  'seam-tape': 'Seam Tape',
-  elastic: 'Elastics',
-  trim: 'Trims',
-  label: 'Labels',
-  other: 'Other',
+  fabric: 'Telas',
+  interfacing: 'Entretela',
+  thread: 'Hilo',
+  'seam-tape': 'Cinta de costura',
+  elastic: 'Elásticos',
+  trim: 'Avíos',
+  label: 'Etiquetas',
+  other: 'Otros',
+};
+
+// Display-only: los valores de BOMUnit son claves tipadas (extractores, tools, tests) — no se traducen.
+const UNIT_LABELS: Record<string, string> = {
+  meters: 'm',
+  yards: 'yd',
+  cm: 'cm',
+  pieces: 'uds',
+  rolls: 'rollos',
 };
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -130,7 +139,7 @@ export default function BOMTab() {
   const handleAddItem = useCallback(() => {
     dispatch(addManualEntry({
       category: 'other',
-      name: 'New Item',
+      name: 'Nuevo ítem',
       description: '',
       quantity: 1,
       unit: 'pieces',
@@ -169,11 +178,11 @@ export default function BOMTab() {
       {/* Toolbar */}
       <div className="bom-toolbar">
         <button onClick={handleRefresh}>
-          Refresh BOM
+          Actualizar BOM
           {/* Punto, no jerga: "(stale)" era vocabulario de cache (Fase 2). */}
-          {isStale && <span className="bom-stale-badge" title="The pattern changed since the last refresh"> •</span>}
+          {isStale && <span className="bom-stale-badge" title="El patrón cambió desde la última actualización"> •</span>}
         </button>
-        <button onClick={handleAddItem}>+ Add Item</button>
+        <button onClick={handleAddItem}>+ Añadir ítem</button>
         <select value={currency} onChange={handleCurrencyChange}>
           {CURRENCIES.map(c => (
             <option key={c} value={c}>{c}</option>
@@ -211,7 +220,8 @@ export default function BOMTab() {
       {/* Table or empty state */}
       {entries.length === 0 ? (
         <div className="bom-empty">
-          No BOM entries. Click &quot;Refresh BOM&quot; to extract from project or &quot;+ Add Item&quot; to add manually.
+          La lista de materiales (BOM) reúne los insumos del proyecto —telas, avíos, hilo— con cantidades y costos.
+          &quot;Actualizar BOM&quot; la extrae de las piezas del proyecto; &quot;+ Añadir ítem&quot; agrega una entrada manual.
         </div>
       ) : (
         <div className="bom-table-container">
@@ -219,11 +229,11 @@ export default function BOMTab() {
             <thead>
               <tr>
                 <th style={{ width: 24 }}></th>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Qty</th>
-                <th>Unit</th>
-                <th>Unit Cost</th>
+                <th>Nombre</th>
+                <th>Descripción</th>
+                <th>Cant.</th>
+                <th>Unidad</th>
+                <th>Costo unitario</th>
                 <th>Total</th>
                 <th style={{ width: 30 }}></th>
               </tr>
@@ -248,7 +258,7 @@ export default function BOMTab() {
               })}
               {/* Grand total row */}
               <tr>
-                <td colSpan={6} className="bom-grand-total">Grand Total</td>
+                <td colSpan={6} className="bom-grand-total">Total general</td>
                 <td className="bom-grand-total">{currencySymbol}{grandTotal.toFixed(2)}</td>
                 <td></td>
               </tr>
@@ -310,7 +320,7 @@ function CategoryGroup({
         <tr key={entry.id} className="bom-row">
           <td>
             {entry.autoPopulated && (
-              <span className="bom-lock-icon" title="Auto-populated from project">
+              <span className="bom-lock-icon" title="Extraído automáticamente del proyecto">
                 &#x1f512;
               </span>
             )}
@@ -340,7 +350,7 @@ function CategoryGroup({
               onChange={e => onUpdate(entry.id, 'quantity', parseFloat(e.target.value) || 0)}
             />
           </td>
-          <td>{entry.unit}</td>
+          <td>{UNIT_LABELS[entry.unit] ?? entry.unit}</td>
           <td>
             <input
               type="number"
@@ -358,7 +368,7 @@ function CategoryGroup({
               <button
                 className="bom-delete-btn"
                 onClick={() => onRemove(entry.id)}
-                title="Remove entry"
+                title="Eliminar entrada"
               >
                 &times;
               </button>

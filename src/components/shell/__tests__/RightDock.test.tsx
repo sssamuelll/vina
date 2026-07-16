@@ -30,24 +30,24 @@ describe('RightDock (3D dock)', () => {
   it('Sew activates the 3D sewing tool and toggles back (reachability guard)', () => {
     const { store } = renderRightDock();
     expect(store.getState().tools.activeTool3D).toBe('camera');
-    fireEvent.click(screen.getByRole('button', { name: /sew/i }));
+    fireEvent.click(screen.getByRole('button', { name: /coser/i }));
     expect(store.getState().tools.activeTool3D).toBe('sew3d');
     expect(store.getState().simulation.simulationState).toBe('idle');
     expect(store.getState().simulation.viewMode3D).toBe('arrange');
-    fireEvent.click(screen.getByRole('button', { name: /sew/i }));
+    fireEvent.click(screen.getByRole('button', { name: /coser/i }));
     expect(store.getState().tools.activeTool3D).toBe('camera');
   });
 
   it('Simulate starts the solver', () => {
     const { store } = renderRightDock();
     expect(store.getState().simulation.simulationState).toBe('idle');
-    fireEvent.click(screen.getByRole('button', { name: /simulate/i }));
+    fireEvent.click(screen.getByRole('button', { name: /simular/i }));
     expect(store.getState().simulation.simulationState).not.toBe('idle');
   });
 
   it('Arrange sets the 3D view mode to arrange', () => {
     const { store } = renderRightDock();
-    fireEvent.click(screen.getByRole('button', { name: /arrange/i }));
+    fireEvent.click(screen.getByRole('button', { name: /colocar/i }));
     expect(store.getState().simulation.viewMode3D).toBe('arrange');
   });
 
@@ -86,9 +86,9 @@ describe('RightDock (3D dock)', () => {
       store.dispatch(startSimulation());
       store.dispatch(pauseSimulation());
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Keep BOM' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Fijar BOM' }));
     expect(store.getState().dock.pinnedExtra.right).toEqual(['bom']);
-    expect(screen.getByRole('button', { name: 'Unpin BOM' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Soltar BOM' })).toBeTruthy();
   });
 
   it('signaling=off mutes the auto layer at the simulated stage', () => {
@@ -107,13 +107,13 @@ describe('RightDock (3D dock)', () => {
 
 describe('SIMULATING badge (Fase1-S4)', () => {
   it('omits the fps figure until the first real frame arrives', () => {
-    // "SIMULATING · 0fps" en los primeros segundos del drape lee como crash
+    // "SIMULANDO · 0fps" en los primeros segundos del drape lee como crash
     // (Jordan cierra la pestaña ahí — assessment Nielsen P0).
     const { store } = renderRightDock();
     act(() => { store.dispatch(startSimulation()); });
-    const badge = screen.getByText(/SIMULATING/);
+    const badge = screen.getByText(/SIMULANDO/);
     expect(badge.textContent).not.toMatch(/0fps/);
     act(() => { store.dispatch(setFrameTime(33.3)); });
-    expect(screen.getByText(/SIMULATING · 30fps/)).toBeTruthy();
+    expect(screen.getByText(/SIMULANDO · 30fps/)).toBeTruthy();
   });
 });

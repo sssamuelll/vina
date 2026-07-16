@@ -25,14 +25,21 @@ interface SliderDef {
 }
 
 const SLIDERS: SliderDef[] = [
-  { key: 'height', label: 'Height', min: 140, max: 210 },
-  { key: 'chest', label: 'Chest', min: 70, max: 130 },
-  { key: 'waist', label: 'Waist', min: 55, max: 120 },
-  { key: 'hips', label: 'Hip', min: 70, max: 130 },
-  { key: 'shoulder', label: 'Shoulder Width', min: 35, max: 55 },
-  { key: 'armLength', label: 'Arm Length', min: 50, max: 75 },
-  { key: 'inseam', label: 'Inseam', min: 65, max: 90 },
+  { key: 'height', label: 'Estatura', min: 140, max: 210 },
+  { key: 'chest', label: 'Pecho', min: 70, max: 130 },
+  { key: 'waist', label: 'Cintura', min: 55, max: 120 },
+  { key: 'hips', label: 'Cadera', min: 70, max: 130 },
+  { key: 'shoulder', label: 'Ancho de hombros', min: 35, max: 55 },
+  { key: 'armLength', label: 'Largo de brazo', min: 50, max: 75 },
+  { key: 'inseam', label: 'Entrepierna', min: 65, max: 90 },
 ];
+
+// Las keys de POSE_PRESETS son estado Redux (activePreset) — no se traducen; solo el label visible.
+const PRESET_LABELS: Record<string, string> = {
+  'Relaxed': 'Relajada',
+  'Arms Forward': 'Brazos al frente',
+  'Sitting': 'Sentado',
+};
 
 const AXIS_LABELS = ['X', 'Y', 'Z'] as const;
 const AXIS_KEYS = ['x', 'y', 'z'] as const;
@@ -129,7 +136,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
   }, [dispatch, profiles]);
 
   const handleSave = useCallback(() => {
-    const name = prompt('Profile name:');
+    const name = prompt('Nombre del perfil:');
     if (!name) return;
     const now = Date.now();
     const profile: AvatarProfile = {
@@ -149,7 +156,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
 
   const handleDelete = useCallback(() => {
     if (!activeProfileId) return;
-    if (!confirm('Delete this profile?')) return;
+    if (!confirm('¿Eliminar este perfil?')) return;
     dispatch(deleteProfile(activeProfileId));
   }, [dispatch, activeProfileId]);
 
@@ -202,10 +209,10 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                   onDragLeave={() => setDragover(false)}
                   onDrop={handleDrop}
                 >
-                  📁 Drop .obj, .fbx, .glb, .gltf, or .vrm file
+                  📁 Suelta un archivo .obj, .fbx, .glb, .gltf o .vrm
                 </div>
                 <div className="ap-model-info">
-                  <span>{modelName ?? 'Default Avatar'}</span>
+                  <span>{modelName ?? 'Avatar por defecto'}</span>
                   {modelName && (
                     <button
                       className="ap-btn"
@@ -215,7 +222,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                         setModelName(null);
                       }}
                     >
-                      Reset
+                      Restablecer
                     </button>
                   )}
                 </div>
@@ -226,26 +233,26 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                     className={avatarMode === 'model' ? 'active' : ''}
                     onClick={() => dispatch(setAvatarMode('model' as AvatarMode))}
                   >
-                    Model
+                    Modelo
                   </button>
                   <button
                     className={avatarMode === 'dressform' ? 'active' : ''}
                     onClick={() => dispatch(setAvatarMode('dressform' as AvatarMode))}
                   >
-                    Dress Form
+                    Maniquí
                   </button>
                 </div>
 
                 {/* Profiles */}
                 <select className="ap-select" value={activeProfileId ?? ''} onChange={handleProfileChange}>
-                  <option value="">— Select Profile —</option>
+                  <option value="">— Elegir perfil —</option>
                   {profiles.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
                 <div className="ap-btn-row">
-                  <button className="ap-btn" onClick={handleSave}>Save Profile</button>
-                  <button className="ap-btn" onClick={handleDelete} disabled={!activeProfileId}>Delete</button>
+                  <button className="ap-btn" onClick={handleSave}>Guardar perfil</button>
+                  <button className="ap-btn" onClick={handleDelete} disabled={!activeProfileId}>Eliminar</button>
                 </div>
 
                 {/* Measurements */}
@@ -281,7 +288,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
             <div className="ap-section">
               <button className="ap-section-header" onClick={() => setBodyShapeOpen(!bodyShapeOpen)}>
                 <span className={`ap-chevron ${bodyShapeOpen ? 'open' : ''}`}>▸</span>
-                Body Shape
+                Forma del cuerpo
               </button>
               {bodyShapeOpen && (
                 <div className="ap-section-body">
@@ -331,20 +338,20 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                       className={`ap-preset-btn ${activePreset === name ? 'active' : ''}`}
                       onClick={() => dispatch(setPreset(name))}
                     >
-                      {name}
+                      {PRESET_LABELS[name] ?? name}
                     </button>
                   ))}
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <button className="ap-btn" style={{ flex: 1 }} onClick={() => dispatch(resetPose())}>Reset All</button>
+                  <button className="ap-btn" style={{ flex: 1 }} onClick={() => dispatch(resetPose())}>Restablecer todo</button>
                   <button className="ap-btn" style={{ flex: 1 }} onClick={() => {
-                    const name = prompt('Pose name:');
+                    const name = prompt('Nombre de la pose:');
                     if (name) dispatch(savePose(name));
-                  }}>Save Pose</button>
+                  }}>Guardar pose</button>
                   <button
                     className={`ik-toggle-btn ${ikEnabled ? 'active' : ''}`}
                     onClick={() => dispatch(toggleIK())}
-                    title={ikEnabled ? 'Switch to FK (Direct Joint Rotation)' : 'Switch to IK (Drag End-Effectors)'}
+                    title={ikEnabled ? 'Cambiar a FK (rotación directa de articulaciones)' : 'Cambiar a IK (arrastrar efectores finales)'}
                   >
                     {ikEnabled ? 'IK Mode' : 'FK Mode'}
                   </button>
@@ -353,7 +360,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                 {/* Saved custom poses */}
                 {savedPoses.length > 0 && (
                   <div className="ap-saved-poses">
-                    <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>Saved Poses</div>
+                    <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>Poses guardadas</div>
                     {savedPoses.map(p => (
                       <div key={p.id} className="ap-saved-pose-row">
                         <button
@@ -367,26 +374,26 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                           className="ap-btn"
                           style={{ padding: '1px 5px', fontSize: 9, flexShrink: 0 }}
                           onClick={() => dispatch(overwriteSavedPose(p.id))}
-                          title="Overwrite with current pose"
+                          title="Sobrescribir con la pose actual"
                         >↻</button>
                         <button
                           className="ap-btn"
                           style={{ padding: '1px 5px', fontSize: 9, flexShrink: 0 }}
-                          onClick={() => { if (confirm(`Delete "${p.name}"?`)) dispatch(deleteSavedPose(p.id)); }}
-                          title="Delete"
+                          onClick={() => { if (confirm(`¿Eliminar "${p.name}"?`)) dispatch(deleteSavedPose(p.id)); }}
+                          title="Eliminar pose"
                         >×</button>
                       </div>
                     ))}
                   </div>
                 )}
 
-                <div className="ap-hint">Click joints in 3D to pose</div>
+                <div className="ap-hint">Clic en las articulaciones del 3D para posar</div>
 
                 {/* Selected joint */}
                 {selectedJoint ? (
                   <>
                     <div className="ap-joint-info">
-                      Selected: {selectedJoint}
+                      Seleccionada: {selectedJoint}
                       <button
                         className="ap-btn"
                         style={{ flex: 'none', marginLeft: 8, padding: '1px 6px', fontSize: 10 }}
@@ -399,7 +406,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                           className="ap-btn"
                           style={{ flex: 'none', marginLeft: 4, padding: '1px 6px', fontSize: 10 }}
                           onClick={() => dispatch(mirrorJoint(selectedJoint))}
-                          title="Mirror to opposite side"
+                          title="Reflejar al lado opuesto"
                         >
                           ↔
                         </button>
@@ -414,7 +421,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                         onClick={() => setJointDetailsOpen(!jointDetailsOpen)}
                       >
                         <span className={`ap-chevron ${jointDetailsOpen ? 'open' : ''}`}>▸</span>
-                        Joint Details
+                        Detalles de articulación
                       </button>
                       {jointDetailsOpen && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -440,14 +447,14 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                             style={{ alignSelf: 'flex-start', padding: '2px 8px', fontSize: 10 }}
                             onClick={() => dispatch(setJointRotation({ joint: selectedJoint, rotation: { x: 0, y: 0, z: 0 } }))}
                           >
-                            Reset Joint
+                            Restablecer articulación
                           </button>
                         </div>
                       )}
                     </div>
                   </>
                 ) : (
-                  <div className="ap-hint">No joint selected</div>
+                  <div className="ap-hint">Ninguna articulación seleccionada</div>
                 )}
               </div>
             )}

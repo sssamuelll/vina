@@ -29,9 +29,9 @@ function SuggestionCard({ suggestion }: { suggestion: AgentSuggestion }) {
         <button
           className="inspector-suggestion-apply"
           disabled
-          title="Coming soon — will auto-apply via copilot bridge"
+          title="Próximamente — se aplicará automáticamente vía el copiloto"
         >
-          Apply
+          Aplicar
         </button>
       )}
     </div>
@@ -48,7 +48,7 @@ export default function InspectorTab() {
   if (!target) {
     return (
       <div className="inspector-tab inspector-empty">
-        <span>Right-click a piece and select &apos;Inspect&apos; to begin</span>
+        <span>Clic derecho en una pieza y elige &apos;Inspeccionar&apos; para empezar</span>
       </div>
     );
   }
@@ -76,7 +76,7 @@ export default function InspectorTab() {
         </div>
         {issueCount > 0 && (
           <span className="inspector-issue-count">
-            {issueCount} issue{issueCount !== 1 ? 's' : ''}
+            {issueCount} problema{issueCount !== 1 ? 's' : ''}
           </span>
         )}
       </div>
@@ -109,7 +109,7 @@ export default function InspectorTab() {
       {/* Agent analysis */}
       <div className="inspector-agent">
         {agentStreaming && !agentAnalysis && (
-          <div className="inspector-agent-loading">Analyzing…</div>
+          <div className="inspector-agent-loading">Analizando…</div>
         )}
         {agentError && (
           <div className="inspector-agent-error">⚠ {agentError}</div>
@@ -129,26 +129,26 @@ export default function InspectorTab() {
       {/* Raw data (collapsible) */}
       {data && (
         <details className="inspector-raw-data">
-          <summary>Raw data</summary>
+          <summary>Datos crudos</summary>
           <div className="inspector-raw-content">
             <div className="inspector-raw-group">
-              <div className="inspector-raw-label">Piece</div>
+              <div className="inspector-raw-label">Pieza</div>
               <div>id: {data.piece.id}</div>
-              <div>position: ({data.piece.position.x.toFixed(2)}, {data.piece.position.y.toFixed(2)})</div>
-              <div>rotation: {data.piece.rotation.toFixed(2)}°</div>
-              <div>seam allowance: {data.piece.seamAllowance}mm</div>
+              <div>posición: ({data.piece.position.x.toFixed(2)}, {data.piece.position.y.toFixed(2)})</div>
+              <div>rotación: {data.piece.rotation.toFixed(2)}°</div>
+              <div>margen de costura: {data.piece.seamAllowance}mm</div>
             </div>
             {data.edge && (
               <div className="inspector-raw-group">
-                <div className="inspector-raw-label">Edge</div>
-                <div>name: {data.edge.name}</div>
-                <div>type: {data.edge.type}</div>
-                <div>length: {data.edge.length.toFixed(2)}mm</div>
+                <div className="inspector-raw-label">Borde</div>
+                <div>nombre: {data.edge.name}</div>
+                <div>tipo: {data.edge.type}</div>
+                <div>largo: {data.edge.length.toFixed(2)}mm</div>
               </div>
             )}
             {data.seams.length > 0 && (
               <div className="inspector-raw-group">
-                <div className="inspector-raw-label">Seams ({data.seams.length})</div>
+                <div className="inspector-raw-label">Costuras ({data.seams.length})</div>
                 {data.seams.map((seam, i) => (
                   <div key={i}>{seam.edgeName} → {seam.partnerPieceName}</div>
                 ))}
@@ -156,7 +156,7 @@ export default function InspectorTab() {
             )}
             {data.internals.length > 0 && (
               <div className="inspector-raw-group">
-                <div className="inspector-raw-label">Internals</div>
+                <div className="inspector-raw-label">Internos</div>
                 {data.internals.map((int, i) => (
                   <div key={i}>{int.type}: {int.count}</div>
                 ))}
@@ -164,13 +164,13 @@ export default function InspectorTab() {
             )}
             {data.simulation && (
               <div className="inspector-raw-group">
-                <div className="inspector-raw-label">Simulation</div>
+                <div className="inspector-raw-label">Simulación</div>
                 {data.simulation.particleCount !== undefined && (
-                  <div>particles: {data.simulation.particleCount}</div>
+                  <div>partículas: {data.simulation.particleCount}</div>
                 )}
                 {data.simulation.collisionDistance !== undefined && (
                   // §A1: the penetration metric publishes this in mm (rule-engine units).
-                  <div>collision distance: {data.simulation.collisionDistance.toFixed(1)}mm</div>
+                  <div>distancia de colisión: {data.simulation.collisionDistance.toFixed(1)}mm</div>
                 )}
               </div>
             )}

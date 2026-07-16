@@ -34,9 +34,21 @@ const PropertiesPanel = lazy(() => import('../PropertiesPanel/PropertiesPanel'))
 
 const PanelLoading = () => (
   <div style={{ padding: 'var(--sp-4)', color: 'var(--text-ghost)', fontSize: '13px', textAlign: 'center' }}>
-    Loading...
+    Cargando...
   </div>
 );
+
+/** Nombre visible del panel. Las CLAVES (Properties, BOM...) no se tocan:
+ * indexan renderPanelContent y getPanelSide; solo cambia el display. */
+const PANEL_LABELS: Record<string, string> = {
+  Avatar: 'Avatar',
+  BOM: 'Lista de materiales',
+  Grading: 'Escalado',
+  Inspector: 'Inspector',
+  Nesting: 'Marcada',
+  Layers: 'Capas',
+  Properties: 'Propiedades',
+};
 
 function renderPanelContent(name: string) {
   const fallback = <PanelLoading />;
@@ -273,7 +285,7 @@ export default function AppShell() {
           </Viewport3DErrorBoundary>
         </div>
         {contextPanel && (
-          <ContextPanel title={contextPanel} side={getPanelSide(contextPanel)} onClose={() => setContextPanel(null)}>
+          <ContextPanel title={PANEL_LABELS[contextPanel] ?? contextPanel} side={getPanelSide(contextPanel)} onClose={() => setContextPanel(null)}>
             {renderPanelContent(contextPanel)}
           </ContextPanel>
         )}

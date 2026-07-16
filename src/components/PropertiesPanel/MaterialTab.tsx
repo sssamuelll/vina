@@ -40,7 +40,7 @@ function TextureSlot({ slot, pieceId }: { slot: 'diffuse' | 'normal' | 'roughnes
       {url && (
         <button
           className="panel-btn-sm"
-          aria-label={`Clear ${slot} texture`}
+          aria-label={`Quitar textura ${slot}`}
           onClick={() => {
             if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
             dispatch(setPieceTextureOverride({ pieceId, slot, url: null }));
@@ -74,7 +74,7 @@ export default function MaterialTab() {
   }, [dispatch, selectedPieceId]);
 
   if (!selectedPieceId) {
-    return <div className="panel-empty">Select a piece to edit material</div>;
+    return <div className="panel-empty">Selecciona una pieza para editar el material</div>;
   }
 
   const fabricId = pieceFabrics[selectedPieceId] || defaultFabricId;
@@ -89,7 +89,7 @@ export default function MaterialTab() {
     <div className="material-tab">
       {/* Fabric Preset Grid */}
       <div className="material-block">
-        <div className="panel-subtitle">Fabric Preset</div>
+        <div className="panel-subtitle">Preset de tela</div>
         <div className="material-grid">
           {PHYSICAL_FABRIC_LIBRARY.map(f => (
             <button
@@ -111,7 +111,7 @@ export default function MaterialTab() {
 
       {/* Color Tint */}
       <div className="material-block">
-        <div className="panel-subtitle">Color Tint</div>
+        <div className="panel-subtitle">Tinte</div>
         <div className="material-row">
           <input
             type="color"
@@ -129,14 +129,14 @@ export default function MaterialTab() {
             className="panel-chip-btn"
             onClick={() => dispatch(setPieceTint({ pieceId: selectedPieceId, tint: '#ffffff' }))}
           >
-            Reset
+            Restablecer
           </button>
         </div>
       </div>
 
       {/* Opacity */}
       <div className="material-block">
-        <div className="panel-subtitle">Opacity</div>
+        <div className="panel-subtitle">Opacidad</div>
         <div className="material-row">
           <input
             type="range" className="panel-slider"
@@ -154,7 +154,7 @@ export default function MaterialTab() {
 
       {/* Emission */}
       <div className="material-block">
-        <div className="panel-subtitle">Emission</div>
+        <div className="panel-subtitle">Emisión</div>
         <div className="material-row">
           <input
             type="color"
@@ -180,7 +180,7 @@ export default function MaterialTab() {
                 className="panel-chip-btn"
                 onClick={() => dispatch(clearPieceEmission(selectedPieceId))}
               >
-                Clear
+                Quitar
               </button>
             </>
           )}
@@ -189,7 +189,7 @@ export default function MaterialTab() {
 
       {/* UV Transform */}
       <div className="material-block">
-        <div className="panel-subtitle">UV Transform</div>
+        <div className="panel-subtitle">Transformación UV</div>
 
         {/* Repeat Presets */}
         <div className="panel-field panel-field--row">
@@ -210,11 +210,11 @@ export default function MaterialTab() {
         {/* Repeat X */}
         <div className="panel-field">
           <label>
-            Repeat X
+            Repetición X
             <button
               className="material-lock-btn"
               onClick={() => setLockAspect(!lockAspect)}
-              title={lockAspect ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+              title={lockAspect ? 'Desbloquear proporción' : 'Bloquear proporción'}
             >
               {lockAspect ? '🔗' : '🔓'}
             </button>
@@ -239,7 +239,7 @@ export default function MaterialTab() {
 
         {/* Repeat Y */}
         <div className="panel-field">
-          <label>Repeat Y</label>
+          <label>Repetición Y</label>
           <input
             type="range" className="panel-slider"
             min={0.1}
@@ -260,7 +260,7 @@ export default function MaterialTab() {
 
         {/* Offset X */}
         <div className="panel-field">
-          <label>Offset X</label>
+          <label>Desplazamiento X</label>
           <input
             type="range" className="panel-slider"
             min={0}
@@ -274,7 +274,7 @@ export default function MaterialTab() {
 
         {/* Offset Y */}
         <div className="panel-field">
-          <label>Offset Y</label>
+          <label>Desplazamiento Y</label>
           <input
             type="range" className="panel-slider"
             min={0}
@@ -288,7 +288,7 @@ export default function MaterialTab() {
 
         {/* Rotation */}
         <div className="panel-field">
-          <label>Rotation</label>
+          <label>Rotación</label>
           <input
             type="range" className="panel-slider"
             min={0}
@@ -303,7 +303,7 @@ export default function MaterialTab() {
 
       {/* Texture Map Slots */}
       <div className="material-block">
-        <div className="panel-subtitle">Texture Overrides</div>
+        <div className="panel-subtitle">Texturas personalizadas</div>
         {(['diffuse', 'normal', 'roughness', 'ao'] as const).map(slot => (
           <TextureSlot
             key={slot}

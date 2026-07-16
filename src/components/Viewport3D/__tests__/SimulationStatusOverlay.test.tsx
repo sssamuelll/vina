@@ -41,7 +41,7 @@ function renderOverlay(seamResolution: SeamResolutionSummary | null) {
 
 /** El HUD arranca colapsado (Fase1-H2); el detalle vive detrás del toggle. */
 function expandOverlay() {
-  fireEvent.click(screen.getByRole('button', { name: /simulation status/i }));
+  fireEvent.click(screen.getByRole('button', { name: /estado de la simulación/i }));
 }
 
 describe('SimulationStatusOverlay — colapsado por defecto (Fase1-H2)', () => {
@@ -50,9 +50,9 @@ describe('SimulationStatusOverlay — colapsado por defecto (Fase1-H2)', () => {
   it('starts collapsed: tier label visible, telemetry detail hidden', () => {
     renderOverlay({ totalConstraints: 124, zeroConstraintSeams: [] });
     expect(screen.getByText(/Wasm XPBD/)).toBeTruthy();
-    expect(screen.queryByText(/particles/)).toBeNull();
-    expect(screen.queryByText(/seam constraints/)).toBeNull();
-    expect(screen.queryByText(/Mode:/)).toBeNull();
+    expect(screen.queryByText(/partículas/)).toBeNull();
+    expect(screen.queryByText(/constraints de costura/)).toBeNull();
+    expect(screen.queryByText(/Modo:/)).toBeNull();
   });
 
   it('shows a warning badge while collapsed when a seam resolved to 0 constraints', () => {
@@ -62,16 +62,16 @@ describe('SimulationStatusOverlay — colapsado por defecto (Fase1-H2)', () => {
     });
     // La superficie de silent-absence (C4 § 3.1.A) no puede quedar invisible
     // por el colapso: colapsado debe seguir delatando que hay diagnósticos.
-    expect(screen.getByLabelText(/warning/i)).toBeTruthy();
+    expect(screen.getByLabelText(/aviso/i)).toBeTruthy();
   });
 
   it('expands on click and collapses on second click', () => {
     renderOverlay({ totalConstraints: 124, zeroConstraintSeams: [] });
     expandOverlay();
     // Separador de miles según locale de la máquina (29,338 / 29.338)
-    expect(screen.getByText(/29[.,]338 particles/)).toBeTruthy();
+    expect(screen.getByText(/29[.,]338 partículas/)).toBeTruthy();
     expandOverlay();
-    expect(screen.queryByText(/29[.,]338 particles/)).toBeNull();
+    expect(screen.queryByText(/29[.,]338 partículas/)).toBeNull();
   });
 });
 
@@ -81,8 +81,8 @@ describe('SimulationStatusOverlay — seam observability (Fase 4, tras expandir)
   it('shows the total seam constraint count when a summary exists', () => {
     renderOverlay({ totalConstraints: 124, zeroConstraintSeams: [] });
     expandOverlay();
-    expect(screen.getByText(/124 seam constraints/)).toBeTruthy();
-    expect(screen.queryByText(/will not sew/)).toBeNull();
+    expect(screen.getByText(/124 constraints de costura/)).toBeTruthy();
+    expect(screen.queryByText(/no va a coser/)).toBeNull();
   });
 
   it('warns in red when seams resolved to 0 constraints, with per-seam cause in the tooltip', () => {
@@ -91,7 +91,7 @@ describe('SimulationStatusOverlay — seam observability (Fase 4, tras expandir)
       zeroConstraintSeams: [{ seamId: 'seam-7', reason: 'unknown-edge' }],
     });
     expandOverlay();
-    const warning = screen.getByText(/1 seam resolved to 0 constraints — will not sew/);
+    const warning = screen.getByText(/1 costura sin constraints — no va a coser/);
     expect(warning).toBeTruthy();
     expect(warning.style.color).toBe('rgb(239, 68, 68)');
     expect(warning.title).toContain('seam-7 (unknown-edge)');
@@ -106,13 +106,13 @@ describe('SimulationStatusOverlay — seam observability (Fase 4, tras expandir)
       ],
     });
     expandOverlay();
-    expect(screen.getByText(/2 seams resolved to 0 constraints/)).toBeTruthy();
+    expect(screen.getByText(/2 costuras sin constraints/)).toBeTruthy();
   });
 
   it('renders no seam line at all when the summary is null (project without seams)', () => {
     renderOverlay(null);
     expandOverlay();
-    expect(screen.queryByText(/seam constraints/)).toBeNull();
-    expect(screen.queryByText(/will not sew/)).toBeNull();
+    expect(screen.queryByText(/constraints de costura/)).toBeNull();
+    expect(screen.queryByText(/no va a coser/)).toBeNull();
   });
 });

@@ -641,7 +641,7 @@ test.describe('Seam parity replay — auto-sew end-to-end (M3)', () => {
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
     await page.keyboard.press('Control+k');
     await page.waitForTimeout(400);
-    await page.getByText('Auto-Sew Pieces', { exact: false }).first().click();
+    await page.getByText('Coser piezas automáticamente', { exact: false }).first().click();
 
     // La camisa completa: hombros×2 + costados×2 + sisas↔copas×2 + tira↔escotes.
     await expect
@@ -705,7 +705,7 @@ test.describe('Seam parity replay — drape sobre el avatar (M4)', () => {
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
     await page.keyboard.press('Control+k');
     await page.waitForTimeout(400);
-    await page.getByText('Auto-Sew Pieces', { exact: false }).first().click();
+    await page.getByText('Coser piezas automáticamente', { exact: false }).first().click();
     await expect
       .poll(async () => ((await getState<unknown[]>(page, 'project.seams')) ?? []).length, {
         timeout: 10_000,

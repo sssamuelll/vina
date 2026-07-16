@@ -71,7 +71,7 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
   await page.keyboard.press('Control+k');
   await page.waitForTimeout(400);
-  await page.getByText('Auto-Sew Pieces', { exact: false }).first().click();
+  await page.getByText('Coser piezas automáticamente', { exact: false }).first().click();
   await expect
     .poll(async () => ((await getState<unknown[]>(page, 'project.seams')) ?? []).length, { timeout: 15_000 })
     .toBeGreaterThanOrEqual(6);

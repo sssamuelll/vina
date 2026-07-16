@@ -32,7 +32,8 @@ const initialState: GradingState = {
   enabled: false,
   sizeSystem: 'eu-women',
   baseSize: 'M',
-  activeSizes: [],
+  // Base size starts active so the panel doesn't open dead (Fase 3).
+  activeSizes: ['M'],
   quantities: {},
   generatedPieces: {},
   stale: false,

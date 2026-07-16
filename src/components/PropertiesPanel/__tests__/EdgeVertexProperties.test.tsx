@@ -37,12 +37,12 @@ describe('EdgePropertiesSection', () => {
   it('shows the edge name and the effective width (inherited)', () => {
     mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
     expect(screen.getByText(/hem/i)).toBeTruthy();
-    expect((screen.getByLabelText(/width/i) as HTMLInputElement).value).toBe('10');
+    expect((screen.getByLabelText(/ancho/i) as HTMLInputElement).value).toBe('10');
   });
 
   it('commits a per-edge width on Enter', () => {
     const store = mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
-    const input = screen.getByLabelText(/width/i);
+    const input = screen.getByLabelText(/ancho/i);
     fireEvent.change(input, { target: { value: '40' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     const e = store.getState().project.pieces[0].edges!.find(x => x.id === 'p:hem')!;
@@ -51,7 +51,7 @@ describe('EdgePropertiesSection', () => {
 
   it('Inherit clears the per-edge override', () => {
     const store = mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece({ edges: [{ ...hem, seamAllowanceWidth: 40 }] }));
-    fireEvent.click(screen.getByRole('button', { name: /inherit/i }));
+    fireEvent.click(screen.getByRole('button', { name: /heredar/i }));
     const e = store.getState().project.pieces[0].edges!.find(x => x.id === 'p:hem')!;
     expect(e.seamAllowanceWidth).toBeUndefined();
   });
@@ -65,10 +65,10 @@ describe('EdgePropertiesSection', () => {
       <EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }, { pieceId: 'p', edgeId: 'p:side' }]} />,
       piece({ edges: twoEdges }),
     );
-    expect(screen.getByText('2 edges')).toBeTruthy();
-    const input = screen.getByLabelText(/width/i) as HTMLInputElement;
-    expect(input.value).toBe('');                       // divergent → Mixed (empty)
-    expect(input.placeholder).toBe('Mixed');
+    expect(screen.getByText('2 bordes')).toBeTruthy();
+    const input = screen.getByLabelText(/ancho/i) as HTMLInputElement;
+    expect(input.value).toBe('');                       // divergent → Varios (empty)
+    expect(input.placeholder).toBe('Varios');
     fireEvent.change(input, { target: { value: '12' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     const edges = store.getState().project.pieces[0].edges!;
@@ -88,24 +88,24 @@ describe('PropertiesPanel edge switching', () => {
     render(<Provider store={store}><PropertiesPanel /></Provider>);
 
     act(() => { store.dispatch(selectSaEdges({ items: [{ pieceId: 'p', edgeId: 'p:hem' }] })); });
-    expect((screen.getByLabelText(/width/i) as HTMLInputElement).value).toBe('40');
+    expect((screen.getByLabelText(/ancho/i) as HTMLInputElement).value).toBe('40');
 
     act(() => { store.dispatch(selectSaEdges({ items: [{ pieceId: 'p', edgeId: 'p:side' }] })); });
-    expect((screen.getByLabelText(/width/i) as HTMLInputElement).value).toBe('10');
+    expect((screen.getByLabelText(/ancho/i) as HTMLInputElement).value).toBe('10');
   });
 });
 
 describe('VertexPropertiesSection', () => {
   it('lists corner types and applies the chosen one to the vertex', () => {
     const store = mount(<VertexPropertiesSection pieceId="p" vertexIndex={2} />, piece());
-    fireEvent.click(screen.getByRole('button', { name: /^squared$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^cuadrada$/i }));
     expect(store.getState().project.pieces[0].cornerTypes?.[2]).toBe('squared');
   });
 
   it('can apply a corner type to all corners (default)', () => {
     const store = mount(<VertexPropertiesSection pieceId="p" vertexIndex={2} />, piece());
-    fireEvent.click(screen.getByRole('button', { name: /squared/i }));
-    fireEvent.click(screen.getByRole('button', { name: /all corners/i }));
+    fireEvent.click(screen.getByRole('button', { name: /cuadrada/i }));
+    fireEvent.click(screen.getByRole('button', { name: /todas las esquinas/i }));
     expect(store.getState().project.pieces[0].defaultCornerType).toBe('squared');
   });
 });

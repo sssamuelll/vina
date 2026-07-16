@@ -8,7 +8,7 @@ import { Scaling, Package } from 'lucide-react';
 
 afterEach(cleanup);
 
-const GRADE = { id: 'grade', icon: Scaling, label: 'Grade' };
+const GRADE = { id: 'grade', icon: Scaling, label: 'Escalar' };
 const BOM = { id: 'bom', icon: Package, label: 'BOM' };
 
 function setup(props: Partial<Parameters<typeof DockAutoZone>[0]> = {}) {
@@ -28,34 +28,34 @@ describe('DockAutoZone', () => {
   it('renders suggested items under the auto label with a Keep badge', () => {
     setup({ suggested: [GRADE] });
     expect(screen.getByText('auto')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Grade' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Keep Grade' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Escalar' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Fijar Escalar' })).toBeTruthy();
   });
 
   it('renders kept items with an Unpin badge and no auto label when no suggestions', () => {
     setup({ kept: [BOM] });
     expect(screen.queryByText('auto')).toBeNull();
     expect(screen.getByRole('button', { name: 'BOM' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Unpin BOM' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Soltar BOM' })).toBeTruthy();
   });
 
   it('the Keep badge calls onPin and NOT onRun', () => {
     const { onRun, onPin } = setup({ suggested: [GRADE] });
-    fireEvent.click(screen.getByRole('button', { name: 'Keep Grade' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Fijar Escalar' }));
     expect(onPin).toHaveBeenCalledWith('grade');
     expect(onRun).not.toHaveBeenCalled();
   });
 
   it('the Unpin badge calls onUnpin and NOT onRun', () => {
     const { onRun, onUnpin } = setup({ kept: [BOM] });
-    fireEvent.click(screen.getByRole('button', { name: 'Unpin BOM' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Soltar BOM' }));
     expect(onUnpin).toHaveBeenCalledWith('bom');
     expect(onRun).not.toHaveBeenCalled();
   });
 
   it('the icon button calls onRun', () => {
     const { onRun } = setup({ suggested: [GRADE] });
-    fireEvent.click(screen.getByRole('button', { name: 'Grade' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Escalar' }));
     expect(onRun).toHaveBeenCalledWith('grade');
   });
 
@@ -75,7 +75,7 @@ describe('DockAutoZone', () => {
   it('off: no suggestions rise even when suggested is non-empty', () => {
     const { container } = setup({ suggested: [GRADE], signaling: 'off' });
     expect(screen.queryByText('auto')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Grade' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Escalar' })).toBeNull();
     expect(container.querySelector('.dock__tool')).toBeNull();
   });
 

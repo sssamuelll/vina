@@ -23,9 +23,9 @@ function setup() {
       onCancel={onCancel}
     />,
   );
-  const distance = screen.getByLabelText(/Distance from corner/i) as HTMLInputElement;
-  const depth = screen.getByLabelText(/Depth/i) as HTMLInputElement;
-  const confirm = screen.getByRole('button', { name: /Place exactly/i }) as HTMLButtonElement;
+  const distance = screen.getByLabelText(/Distancia desde la esquina/i) as HTMLInputElement;
+  const depth = screen.getByLabelText(/Profundidad/i) as HTMLInputElement;
+  const confirm = screen.getByRole('button', { name: /Colocar exacto/i }) as HTMLButtonElement;
   return { onConfirm, onCancel, onPreview, distance, depth, confirm };
 }
 

@@ -53,13 +53,13 @@ function mount(seam: Seam, lengths: { a?: number; b?: number } = {}) {
 describe('SeamPropertiesPanel — sewn range', () => {
   it('shows 0–100 for a seam without stored ranges', () => {
     mount(makeSeam());
-    expect((screen.getByLabelText('Sewn range start % (Front)') as HTMLInputElement).value).toBe('0');
-    expect((screen.getByLabelText('Sewn range end % (Front)') as HTMLInputElement).value).toBe('100');
+    expect((screen.getByLabelText('Inicio de rango cosido % (Front)') as HTMLInputElement).value).toBe('0');
+    expect((screen.getByLabelText('Fin de rango cosido % (Front)') as HTMLInputElement).value).toBe('100');
   });
 
   it('writes a sub-range as fractions via updateSeam', () => {
     const store = mount(makeSeam());
-    fireEvent.change(screen.getByLabelText('Sewn range start % (Front)'), { target: { value: '30' } });
+    fireEvent.change(screen.getByLabelText('Inicio de rango cosido % (Front)'), { target: { value: '30' } });
     const seam = store.getState().project.seams[0];
     expect(seam.pieceA.tStart).toBe(0.3);
     expect(seam.pieceA.tEnd).toBe(1);
@@ -70,7 +70,7 @@ describe('SeamPropertiesPanel — sewn range', () => {
   it('restoring the full range removes the fields (no redundant 0/1)', () => {
     // [30, 100] displayed; one edit (start → 0) reaches the full range.
     const store = mount(makeSeam({ pieceA: { pieceId: 'p1', edgeName: 'sideSeam', tStart: 0.3, tEnd: 1 } }));
-    fireEvent.change(screen.getByLabelText('Sewn range start % (Front)'), { target: { value: '0' } });
+    fireEvent.change(screen.getByLabelText('Inicio de rango cosido % (Front)'), { target: { value: '0' } });
     const seam = store.getState().project.seams[0];
     expect('tStart' in seam.pieceA).toBe(false);
     expect('tEnd' in seam.pieceA).toBe(false);
@@ -78,7 +78,7 @@ describe('SeamPropertiesPanel — sewn range', () => {
 
   it('clamps start >= end instead of storing an invalid range', () => {
     const store = mount(makeSeam({ pieceA: { pieceId: 'p1', edgeName: 'sideSeam', tStart: 0.2, tEnd: 0.5 } }));
-    fireEvent.change(screen.getByLabelText('Sewn range start % (Front)'), { target: { value: '80' } });
+    fireEvent.change(screen.getByLabelText('Inicio de rango cosido % (Front)'), { target: { value: '80' } });
     const seam = store.getState().project.seams[0];
     expect(seam.pieceA.tStart).toBe(0.8);
     expect(seam.pieceA.tEnd).toBe(0.81); // end pushed forward, never invalid
@@ -90,14 +90,14 @@ describe('SeamPropertiesPanel — sewn range', () => {
       makeSeam({ pieceB: { pieceId: 'p2', edgeName: 'sideSeam', tStart: 0, tEnd: 0.5 } }),
       { a: 400, b: 300 },
     );
-    expect(screen.getByText('40.0 cm sewn')).toBeTruthy();
-    expect(screen.getByText('15.0 cm sewn')).toBeTruthy();
-    expect(screen.getByText(/Sewn lengths differ by 63%/)).toBeTruthy();
+    expect(screen.getByText('40.0 cm cosidos')).toBeTruthy();
+    expect(screen.getByText('15.0 cm cosidos')).toBeTruthy();
+    expect(screen.getByText(/Los largos cosidos difieren un 63%/)).toBeTruthy();
   });
 
   it('hides length and warning when edge lengths are unknown', () => {
     mount(makeSeam());
-    expect(screen.queryByText(/cm sewn/)).toBeNull();
-    expect(screen.queryByText(/Sewn lengths differ/)).toBeNull();
+    expect(screen.queryByText(/cm cosidos/)).toBeNull();
+    expect(screen.queryByText(/Los largos cosidos difieren/)).toBeNull();
   });
 });

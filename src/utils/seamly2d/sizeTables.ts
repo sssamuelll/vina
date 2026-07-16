@@ -22,7 +22,7 @@ interface SizeTable {
 
 const EU_WOMEN: SizeTable = {
   system: 'eu-women',
-  label: 'European Women',
+  label: 'Europeo mujer',
   sizes: {
     'XXS': {
       height: 1640, chest: 780, waist: 600, hips: 840,
@@ -71,7 +71,7 @@ const EU_WOMEN: SizeTable = {
 
 const EU_MEN: SizeTable = {
   system: 'eu-men',
-  label: 'European Men',
+  label: 'Europeo hombre',
   sizes: {
     'XXS': {
       height: 1720, chest: 860, waist: 720, hips: 880,
@@ -120,7 +120,7 @@ const EU_MEN: SizeTable = {
 
 const EU_CHILDREN: SizeTable = {
   system: 'eu-children',
-  label: 'European Children',
+  label: 'Europeo infantil',
   sizes: {
     'XXS': { // ~104cm / 4y
       height: 1040, chest: 560, waist: 520, hips: 580,

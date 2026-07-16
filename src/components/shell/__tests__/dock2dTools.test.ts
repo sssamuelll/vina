@@ -10,12 +10,12 @@ describe('dock2dTools catalog', () => {
   it('surfaces the seamAllowance tool (reachability — María, hallazgo #2)', () => {
     const sa = getDockToolById('seamAllowance');
     expect(sa).toBeTruthy();
-    expect(sa!.label).toBe('Seam Allowance');
+    expect(sa!.label).toBe('Margen de costura');
     expect(sa!.shortcut).toBe('O');
   });
 
   it('getDockToolById resolves a member and is undefined for an unknown id', () => {
-    expect(getDockToolById('select')?.label).toBe('Select');
+    expect(getDockToolById('select')?.label).toBe('Seleccionar');
     expect(getDockToolById('nope')).toBeUndefined();
   });
 

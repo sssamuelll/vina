@@ -34,13 +34,13 @@ test.describe('Cloth Simulation', () => {
     }
 
     // Start simulation by clicking the play button
-    const playButton = page.locator('button[title*="Start"], button[aria-label*="Start"], button[title*="Play"], button[aria-label*="Play"], button:has-text("▶"), button:has-text("Start")');
+    const playButton = page.locator('button[title*="Start"], button[aria-label*="Start"], button[title*="Play"], button[aria-label*="Play"], button:has-text("▶"), button:has-text("Iniciar"), button:has-text("Start")');
     const simButton = playButton.first();
     if (await simButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await simButton.click();
     } else {
       // Try finding the simulate button by other means
-      const altButton = page.locator('[data-testid="simulate-button"], button:has-text("Simulate")').first();
+      const altButton = page.locator('[data-testid="simulate-button"], button:has-text("Simular")').first();
       if (await altButton.isVisible({ timeout: 3000 }).catch(() => false)) {
         await altButton.click();
       } else {

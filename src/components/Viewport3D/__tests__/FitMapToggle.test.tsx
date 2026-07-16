@@ -98,9 +98,9 @@ describe('FitMapToggle config popover', () => {
         <FitMapToggle stats={testStats} />
       </Provider>,
     );
-    const gearBtn = screen.getByTitle('Fit Map Config');
+    const gearBtn = screen.getByTitle('Ajustes del mapa de ajuste');
     fireEvent.click(gearBtn);
-    expect(screen.getByText(/Stress Range/i)).toBeTruthy();
+    expect(screen.getByText(/Rango de tensión/i)).toBeTruthy();
   });
 
   it('updates stress max via input', () => {
@@ -110,9 +110,9 @@ describe('FitMapToggle config popover', () => {
         <FitMapToggle stats={testStats} />
       </Provider>,
     );
-    const gearBtn = screen.getByTitle('Fit Map Config');
+    const gearBtn = screen.getByTitle('Ajustes del mapa de ajuste');
     fireEvent.click(gearBtn);
-    const maxInput = screen.getByLabelText('Stress Max');
+    const maxInput = screen.getByLabelText('Tensión máx');
     fireEvent.change(maxInput, { target: { value: '200' } });
     const state = store.getState().simulation;
     expect(state.fitMapConfig.stressRange[1]).toBe(200);

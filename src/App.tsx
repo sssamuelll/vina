@@ -47,7 +47,7 @@ function App() {
         height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: '#0c0c14', color: '#4a4a6a', fontFamily: 'var(--font-sans)',
       }}>
-        Loading...
+        Cargando...
       </div>
     );
   }

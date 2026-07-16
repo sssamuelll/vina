@@ -31,7 +31,7 @@ const TIER_CAPS = {
 } as const satisfies Record<SolverTier, typeof CPU_CAPABILITIES>;
 
 const TIER_INFO: Record<SolverTier, { label: string; color: string }> = {
-  'none':          { label: 'Idle',         color: '#666'    },
+  'none':          { label: 'En reposo',    color: '#666'    },
   'webgpu':        { label: 'WebGPU',       color: '#4ade80' },
   'wasm':          { label: 'Wasm XPBD',    color: '#fb923c' },
   'cpu-worker':    { label: 'CPU Worker',   color: '#facc15' },
@@ -86,7 +86,7 @@ export function SimulationStatusOverlay() {
     }}>
       <button
         type="button"
-        aria-label="Simulation status"
+        aria-label="Estado de la simulación"
         aria-expanded={expanded}
         onClick={() => setExpanded(e => !e)}
         style={{
@@ -99,10 +99,10 @@ export function SimulationStatusOverlay() {
           width: 7, height: 7, borderRadius: '50%', background: tier.color, flexShrink: 0,
         }} />
         {tier.label}
-        {simulationState === 'paused' && ' (paused)'}
+        {simulationState === 'paused' && ' (en pausa)'}
         {warningCount > 0 && (
           <span
-            aria-label={warningCount === 1 ? '1 warning' : `${warningCount} warnings`}
+            aria-label={warningCount === 1 ? '1 aviso' : `${warningCount} avisos`}
             style={{ color: '#fb923c', fontWeight: 600 }}
           >
             ⚠ {warningCount}
@@ -117,35 +117,35 @@ export function SimulationStatusOverlay() {
         </div>
       )}
       {particleCount > 0 && (
-        <div>{particleCount.toLocaleString()} particles</div>
+        <div>{particleCount.toLocaleString()} partículas</div>
       )}
       {seamResolution && (
-        <div>🧵 {seamResolution.totalConstraints.toLocaleString()} seam constraints</div>
+        <div>🧵 {seamResolution.totalConstraints.toLocaleString()} constraints de costura</div>
       )}
       {seamResolution && seamResolution.zeroConstraintSeams.length > 0 && (
         <div
           style={{ color: '#ef4444', fontSize: 10, maxWidth: 200, marginTop: 2 }}
           title={
-            'These seams resolved to 0 XPBD constraints, so the solver cannot pull them together. ' +
-            'Per-seam cause: ' +
+            'Estas costuras resolvieron a 0 constraints XPBD: el solver no puede unirlas. ' +
+            'Causa por costura: ' +
             seamResolution.zeroConstraintSeams.map(z => `${z.seamId} (${z.reason})`).join(', ') +
-            '. Check the seam edge pairing in 2D. Parity plan Fase 4.'
+            '. Revisa el emparejado de bordes en 2D. Parity plan Fase 4.'
           }
         >
-          ⚠️ {seamResolution.zeroConstraintSeams.length} seam{seamResolution.zeroConstraintSeams.length === 1 ? '' : 's'} resolved to 0 constraints — will not sew
+          ⚠️ {seamResolution.zeroConstraintSeams.length} costura{seamResolution.zeroConstraintSeams.length === 1 ? '' : 's'} sin constraints — no va a coser
         </div>
       )}
       <div style={{ opacity: 0.6 }}>
-        Mode: {simulationMode}{isMobile ? ' · Mobile' : ''}
+        Modo: {simulationMode}{isMobile ? ' · móvil' : ''}
       </div>
       {solverTier !== 'none' && !bodyCollision && (
         <div style={{ color: '#fb923c', fontSize: 10 }}>
-          ⚠️ No body collision
+          ⚠️ Sin colisión con el cuerpo
         </div>
       )}
       {solverTier !== 'none' && bodyCollision && !TIER_CAPS[solverTier].facePoke && (
         <div style={{ color: '#fb923c', fontSize: 10 }}>
-          ⚠️ Body detail may show through cloth — face-poke unavailable on this tier
+          ⚠️ El cuerpo puede asomar a través de la tela — face-poke no disponible en este tier
         </div>
       )}
       {solverTier === 'wasm' && (
@@ -155,9 +155,9 @@ export function SimulationStatusOverlay() {
         // honestly CPU-only (WASM_CAPABILITIES, A7).
         <div
           style={{ color: '#fb923c', fontSize: 10, maxWidth: 200, marginTop: 2 }}
-          title="WASM tier does not support LRA (long range attachments), fold constraints, per-piece pressure, or per-piece stiffness. Switch to CPU tier for full feature parity. See A7 RFC."
+          title="El tier WASM no soporta LRA (long range attachments), constraints de pliegue, presión por pieza ni rigidez por pieza. Cambia al tier CPU para paridad completa. Ver RFC A7."
         >
-          ⚠️ Limited features (LRA, fold, pressure, piece stiffness disabled — use CPU tier)
+          ⚠️ Funciones limitadas (LRA, pliegues, presión y rigidez por pieza apagados — usa el tier CPU)
         </div>
       )}
       {toolUnsupported && (
@@ -165,11 +165,11 @@ export function SimulationStatusOverlay() {
           style={{ color: '#fb923c', fontSize: 10, maxWidth: 200, marginTop: 2 }}
           title={
             activeTool3D === 'steamBrush'
-              ? 'Steam brush requires the WebGPU tier (TSL kernels write per-particle velocity damping). The WebGPU tier is on by default; if you disabled it, clear localStorage(\'openclo-use-webgpu\'). See C4 RFC § 2.3.'
-              : 'Mesh grab requires the WebGPU or WASM tier (CPU has no positional pin; Neural has no per-particle interactivity). Switch to WASM or WebGPU tier. See C4 RFC § 2.3.'
+              ? 'La plancha a vapor requiere el tier WebGPU (los kernels TSL escriben el amortiguado de velocidad por partícula). El tier WebGPU viene activado por defecto; si lo desactivaste, limpia localStorage(\'openclo-use-webgpu\'). Ver RFC C4 § 2.3.'
+              : 'El agarre de malla requiere el tier WebGPU o WASM (CPU no tiene pin posicional; Neural no tiene interactividad por partícula). Cambia al tier WASM o WebGPU. Ver RFC C4 § 2.3.'
           }
         >
-          ⚠️ Active tool ({activeTool3D === 'steamBrush' ? 'steam brush' : 'mesh grab'}) not supported on this tier
+          ⚠️ La herramienta activa ({activeTool3D === 'steamBrush' ? 'plancha a vapor' : 'agarre de malla'}) no funciona en este tier
         </div>
       )}
       </>}

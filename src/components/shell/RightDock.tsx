@@ -56,33 +56,33 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
   return (
     <>
       <DockShell side="right" domainLabel="3D">
-        <ToolTooltip name="Arrange" position="left">
+        <ToolTooltip name="Colocar" position="left">
           <button
             type="button"
             className="dock__tool"
             onClick={() => dispatch(setViewMode3D('arrange'))}
-            aria-label="Arrange"
+            aria-label="Colocar"
           >
             <Shirt size={16} />
           </button>
         </ToolTooltip>
-        <ToolTooltip name="Sew" position="left">
+        <ToolTooltip name="Coser" position="left">
           <button
             type="button"
             className={`dock__tool ${sewActive ? 'dock__tool--active' : ''}`}
             onClick={toggleSew}
-            aria-label="Sew"
+            aria-label="Coser"
             aria-pressed={sewActive}
           >
             <Spline size={16} />
           </button>
         </ToolTooltip>
-        <ToolTooltip name="Simulate" shortcut="space" position="left">
+        <ToolTooltip name="Simular" shortcut="espacio" position="left">
           <button
             type="button"
             className={`dock__tool ${simActive ? 'dock__tool--active' : ''}`}
             onClick={() => { if (simActive) dispatch(pauseSimulation()); else dispatch(startSimulation()); }}
-            aria-label="Simulate"
+            aria-label="Simular"
             aria-pressed={simActive}
           >
             <SimIcon size={16} />
@@ -120,7 +120,7 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
         <div className="floating-3d floating-3d--bottom-left">
           <span className="dot dot--success" />
           {/* Sin cifra hasta el primer frame real: "0fps" lee como crash (Fase1-S4). */}
-          <span>{fps > 0 ? `SIMULATING · ${fps}fps` : 'SIMULATING'}</span>
+          <span>{fps > 0 ? `SIMULANDO · ${fps}fps` : 'SIMULANDO'}</span>
         </div>
       )}
     </>

@@ -18,7 +18,7 @@ async function openAvatarPanel(page: Page) {
   await page.waitForTimeout(500);
 
   // AvatarPanel should now show "Avatar & Pose" heading
-  await expect(page.locator('h3:has-text("Avatar & Pose")')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.context-panel__header >> text=Avatar')).toBeVisible({ timeout: 5000 });
 
   // Expand Pose section if collapsed
   const poseHeader = page.locator('.avatar-panel button:has-text("Pose")');

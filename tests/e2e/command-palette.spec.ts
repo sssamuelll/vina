@@ -73,26 +73,26 @@ test.describe('Command Palette (UnifiedBar commands mode)', () => {
     await expect(page.locator(PANEL)).toBeVisible();
     const total = await page.locator(COMMAND_BTN).count();
 
-    await page.locator(INPUT).fill('grading');
+    await page.locator(INPUT).fill('escalado');
     await page.waitForTimeout(200);
 
     const filtered = await page.locator(COMMAND_BTN).count();
     expect(filtered).toBeGreaterThan(0);
     expect(filtered).toBeLessThan(total);
-    await expect(page.locator(COMMAND_BTN).first()).toContainText(/Grading/i);
+    await expect(page.locator(COMMAND_BTN).first()).toContainText(/Escalado/i);
   });
 
   test('shows a no-match message for gibberish', async ({ page }) => {
     await page.keyboard.press('Control+k');
     await page.locator(INPUT).fill('zzzzzzzzz');
     await page.waitForTimeout(200);
-    await expect(page.locator(PANEL)).toContainText(/No commands match/i);
+    await expect(page.locator(PANEL)).toContainText(/Ningún comando coincide/i);
   });
 
   test('clicking a command executes it (view mode changes)', async ({ page }) => {
     await setViewMode(page, 'split');
     await page.keyboard.press('Control+k');
-    await page.locator(INPUT).fill('2D Only');
+    await page.locator(INPUT).fill('solo 2D');
     await page.waitForTimeout(200);
     await page.locator(COMMAND_BTN).first().click();
     await page.waitForTimeout(200);
@@ -105,10 +105,10 @@ test.describe('Command Palette (UnifiedBar commands mode)', () => {
   test('shortcuts are displayed next to commands that have one', async ({ page }) => {
     await page.keyboard.press('Control+k');
     // "Toggle Grid" defines shortcut 'G' in UnifiedBarCommands.
-    await page.locator(INPUT).fill('Toggle Grid');
+    await page.locator(INPUT).fill('cuadrícula');
     await page.waitForTimeout(200);
     const item = page.locator(COMMAND_BTN).first();
-    await expect(item).toContainText('Toggle Grid');
+    await expect(item).toContainText('cuadrícula');
     await expect(item).toContainText('G');
   });
 });

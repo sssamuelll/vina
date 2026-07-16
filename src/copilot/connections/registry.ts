@@ -37,7 +37,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderMetadata> = {
     helpUrl: 'https://vercel.com/account/ai/keys',
     apiKey: { placeholder: 'vck_...', required: true },
     baseUrl: null,
-    hint: 'One key, many providers (Anthropic, OpenAI, DeepSeek, Meta, ...).',
+    hint: 'Una clave, varios proveedores (Anthropic, OpenAI, DeepSeek, Meta, ...).',
   },
 
   anthropic: {
@@ -93,12 +93,12 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderMetadata> = {
     helpUrl: null,
     apiKey: null,
     baseUrl: {
-      label: 'Ollama URL',
+      label: 'URL de Ollama',
       placeholder: 'http://localhost:11434',
       defaultValue: 'http://localhost:11434',
       required: true,
     },
-    hint: 'Run a model locally with the Ollama CLI before connecting.',
+    hint: 'Ejecuta un modelo local con la CLI de Ollama antes de conectar.',
   },
 
   'claude-bridge': {
@@ -110,12 +110,12 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderMetadata> = {
     helpUrl: null,
     apiKey: null,
     baseUrl: {
-      label: 'Bridge URL',
+      label: 'URL del bridge',
       placeholder: 'http://localhost:3200',
       defaultValue: 'http://localhost:3200',
       required: false,
     },
-    hint: 'Uses your Claude Code OAuth session via the local bridge server. Run: node server/claude-bridge.mjs',
+    hint: 'Usa tu sesión OAuth de Claude Code mediante el servidor bridge local. Ejecuta: node server/claude-bridge.mjs',
   },
 };
 

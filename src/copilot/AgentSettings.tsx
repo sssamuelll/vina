@@ -211,11 +211,11 @@ export default function AgentSettings({
     <div style={panelStyle}>
       <div style={contentStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h4 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Agent Settings</h4>
+          <h4 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Ajustes del agente</h4>
           <button
             onClick={onClose}
             style={{ ...btnSecondaryStyle, padding: '4px 10px', fontSize: 13 }}
-            title="Close settings"
+            title="Cerrar ajustes"
           >
             ✕
           </button>
@@ -229,7 +229,7 @@ export default function AgentSettings({
         {/* Teaching Mode */}
         <div style={sectionStyle}>
           <div style={rowStyle}>
-            <label style={{ ...labelStyle, flex: 1, fontSize: 13 }}>Teaching Mode</label>
+            <label style={{ ...labelStyle, flex: 1, fontSize: 13 }}>Modo enseñanza</label>
             <input
               type="checkbox"
               checked={teachingMode}
@@ -237,23 +237,23 @@ export default function AgentSettings({
               style={{ width: 16, height: 16, cursor: 'pointer' }}
             />
             <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 40 }}>
-              {teachingMode ? 'ON' : 'OFF'}
+              {teachingMode ? 'Activado' : 'Desactivado'}
             </span>
           </div>
           <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            When on, the agent explains the WHY behind each action (patronaje education).
+            Al activarlo, el agente explica el porqué de cada acción (formación en patronaje).
           </span>
         </div>
 
         {/* Language Preference */}
         <div style={{ ...fieldStyle, marginTop: 18 }}>
-          <label style={{ ...labelStyle, fontSize: 13 }}>Language</label>
+          <label style={{ ...labelStyle, fontSize: 13 }}>Idioma</label>
           <select
             style={inputStyle}
             value={language}
             onChange={(e) => setLanguage(e.target.value as LanguagePreference)}
           >
-            <option value="auto">Auto-detect</option>
+            <option value="auto">Detección automática</option>
             <option value="es">Español</option>
             <option value="en">English</option>
           </select>
@@ -267,7 +267,7 @@ export default function AgentSettings({
           <>
             <div style={sectionStyle}>
               <div style={fieldStyle}>
-                <label style={labelStyle}>Monthly Budget (USD)</label>
+                <label style={labelStyle}>Presupuesto mensual (USD)</label>
                 <input
                   type="number"
                   style={inputStyle}
@@ -280,7 +280,7 @@ export default function AgentSettings({
             </div>
 
             <div style={sectionStyle}>
-              <label style={{ ...labelStyle, fontSize: 13, marginBottom: 10, display: 'block' }}>Token Usage</label>
+              <label style={{ ...labelStyle, fontSize: 13, marginBottom: 10, display: 'block' }}>Uso de tokens</label>
               <div
                 style={{
                   display: 'grid',
@@ -291,18 +291,18 @@ export default function AgentSettings({
               >
                 <div style={{ background: 'var(--bg-primary)', padding: 10, borderRadius: 5, textAlign: 'center' }}>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}>{formatCost(sessionCost)}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>This session</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>Esta sesión</div>
                   <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{formatTokens(sessionCost)} tokens</div>
                 </div>
                 <div style={{ background: 'var(--bg-primary)', padding: 10, borderRadius: 5, textAlign: 'center' }}>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}>{formatCost(projectCost)}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>This project</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>Este proyecto</div>
                   <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{formatTokens(projectCost)} tokens</div>
                 </div>
                 <div style={{ background: 'var(--bg-primary)', padding: 10, borderRadius: 5, textAlign: 'center' }}>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}>${budgetValue.toFixed(2)}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>Budget</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>per month</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>Presupuesto</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>al mes</div>
                 </div>
               </div>
             </div>
@@ -314,12 +314,12 @@ export default function AgentSettings({
           <div style={{ ...sectionStyle, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {onClearConversation && (
               <button style={btnSecondaryStyle} onClick={onClearConversation}>
-                🗑 Clear conversation
+                🗑 Borrar conversación
               </button>
             )}
             {onClearMemory && (
               <button style={btnSecondaryStyle} onClick={onClearMemory}>
-                🧹 Clear memory
+                🧹 Borrar memoria
               </button>
             )}
           </div>
@@ -328,8 +328,8 @@ export default function AgentSettings({
 
       {/* Footer — Save preferences. Connections persist immediately, not on Save. */}
       <div style={footerStyle}>
-        <button style={btnSecondaryStyle} onClick={onClose}>Close</button>
-        <button style={btnStyle} onClick={handleSavePrefs}>Save preferences</button>
+        <button style={btnSecondaryStyle} onClick={onClose}>Cerrar</button>
+        <button style={btnStyle} onClick={handleSavePrefs}>Guardar preferencias</button>
       </div>
     </div>
   );

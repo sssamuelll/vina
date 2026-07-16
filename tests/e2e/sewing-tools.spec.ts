@@ -351,15 +351,15 @@ test.describe('Seam Context Menu', () => {
     await seedPiecesAndSeam(page);
     await openSeamMenu(page);
 
-    await expect(page.locator('text=Reverse Sewing Direction')).toBeVisible({ timeout: 2000 });
-    await expect(page.locator('text=Delete Seam')).toBeVisible();
+    await expect(page.locator('text=Invertir dirección de costura')).toBeVisible({ timeout: 2000 });
+    await expect(page.locator('text=Eliminar costura')).toBeVisible();
   });
 
   test('Reverse Sewing Direction keeps the seam alive', async ({ page }) => {
     await seedPiecesAndSeam(page);
     await openSeamMenu(page);
 
-    const reverse = page.locator('text=Reverse Sewing Direction');
+    const reverse = page.locator('text=Invertir dirección de costura');
     await expect(reverse).toBeVisible({ timeout: 2000 });
     await reverse.click();
     await page.waitForTimeout(300);
@@ -378,7 +378,7 @@ test.describe('Seam Context Menu', () => {
     expect(before.length).toBe(1);
 
     await openSeamMenu(page);
-    const del = page.locator('text=Delete Seam');
+    const del = page.locator('text=Eliminar costura');
     await expect(del).toBeVisible({ timeout: 2000 });
     await del.click();
     await page.waitForTimeout(400);
@@ -391,9 +391,9 @@ test.describe('Seam Context Menu', () => {
     await seedPiecesAndSeam(page);
     await openSeamMenu(page);
 
-    await expect(page.locator('text=Reverse Sewing Direction')).toBeVisible({ timeout: 2000 });
-    // The seam menu offers Select "<pieceName>" for each connected piece.
-    const selectItems = page.locator('button:has-text("Select")');
+    await expect(page.locator('text=Invertir dirección de costura')).toBeVisible({ timeout: 2000 });
+    // The seam menu offers Seleccionar "<pieceName>" for each connected piece.
+    const selectItems = page.locator('button:has-text("Seleccionar")');
     expect(await selectItems.count()).toBeGreaterThanOrEqual(2);
   });
 
@@ -405,8 +405,8 @@ test.describe('Seam Context Menu', () => {
     await page.mouse.click(pt.x, pt.y, { button: 'right' });
     await page.waitForTimeout(300);
 
-    await expect(page.locator('text=Rotate 90°')).toBeVisible({ timeout: 2000 });
-    await expect(page.locator('text=Reverse Sewing Direction')).not.toBeVisible();
+    await expect(page.locator('text=Rotar 90°')).toBeVisible({ timeout: 2000 });
+    await expect(page.locator('text=Invertir dirección de costura')).not.toBeVisible();
   });
 });
 

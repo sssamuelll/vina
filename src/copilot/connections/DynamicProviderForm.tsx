@@ -71,7 +71,7 @@ export default function DynamicProviderForm({ provider, values, onChange, provid
     <div>
       {/* Custom label — always shown */}
       <div style={fieldStyle}>
-        <label style={labelStyle}>Label</label>
+        <label style={labelStyle}>Nombre</label>
         <input
           type="text"
           style={inputStyle}
@@ -79,7 +79,7 @@ export default function DynamicProviderForm({ provider, values, onChange, provid
           value={values.label}
           onChange={(e) => set('label', e.target.value)}
         />
-        <span style={hintStyle}>Optional display name. Helps when you have multiple connections.</span>
+        <span style={hintStyle}>Nombre opcional. Útil cuando tienes varias conexiones.</span>
       </div>
 
       {/* Provider info banner when locked (edit mode) */}
@@ -95,14 +95,14 @@ export default function DynamicProviderForm({ provider, values, onChange, provid
             lineHeight: 1.5,
           }}
         >
-          Provider: <strong style={{ color: 'var(--text-primary)' }}>{meta.label}</strong> (cannot be changed after creation — delete and re-add to switch provider)
+          Proveedor: <strong style={{ color: 'var(--text-primary)' }}>{meta.label}</strong> (no se puede cambiar después de crear la conexión — elimínala y agrégala de nuevo para cambiar de proveedor)
         </div>
       )}
 
       {/* API key (if applicable) */}
       {meta.apiKey && (
         <div style={fieldStyle}>
-          <label style={labelStyle}>API Key</label>
+          <label style={labelStyle}>Clave API</label>
           <div style={{ display: 'flex', gap: 6 }}>
             <input
               type={showKey ? 'text' : 'password'}
@@ -126,14 +126,14 @@ export default function DynamicProviderForm({ provider, values, onChange, provid
                 cursor: 'pointer',
                 fontWeight: 500,
               }}
-              aria-label={showKey ? 'Hide key' : 'Show key'}
+              aria-label={showKey ? 'Ocultar clave' : 'Mostrar clave'}
             >
-              {showKey ? 'Hide' : 'Show'}
+              {showKey ? 'Ocultar' : 'Mostrar'}
             </button>
           </div>
           {meta.helpUrl && (
             <span style={hintStyle}>
-              Get a key at{' '}
+              Obtén una clave en{' '}
               <a
                 href={meta.helpUrl}
                 target="_blank"
@@ -150,7 +150,7 @@ export default function DynamicProviderForm({ provider, values, onChange, provid
       {/* Base URL (if applicable) */}
       {meta.baseUrl && (
         <div style={fieldStyle}>
-          <label style={labelStyle}>{meta.baseUrl.label ?? 'Base URL'}</label>
+          <label style={labelStyle}>{meta.baseUrl.label ?? 'URL base'}</label>
           <input
             type="text"
             style={inputStyle}
@@ -162,7 +162,7 @@ export default function DynamicProviderForm({ provider, values, onChange, provid
           />
           {!meta.baseUrl.required && (
             <span style={hintStyle}>
-              Optional override. Leave empty to use the default ({meta.baseUrl.defaultValue ?? 'provider default'}).
+              Opcional. Si lo dejas vacío se usa el valor por defecto ({meta.baseUrl.defaultValue ?? 'el del proveedor'}).
             </span>
           )}
         </div>
@@ -170,7 +170,7 @@ export default function DynamicProviderForm({ provider, values, onChange, provid
 
       {/* Model */}
       <div style={fieldStyle}>
-        <label style={labelStyle}>Model</label>
+        <label style={labelStyle}>Modelo</label>
         <select
           style={inputStyle}
           value={values.model}

@@ -45,7 +45,8 @@ describe('gradingSlice — initial state', () => {
     expect(state.enabled).toBe(false);
     expect(state.sizeSystem).toBe('eu-women');
     expect(state.baseSize).toBe('M');
-    expect(state.activeSizes).toEqual([]);
+    // Base size starts active — the panel must not open dead (Fase 3).
+    expect(state.activeSizes).toEqual(['M']);
     expect(state.quantities).toEqual({});
     expect(state.generatedPieces).toEqual({});
     expect(state.stale).toBe(false);
@@ -208,7 +209,7 @@ describe('NEW_PROJECT', () => {
     expect(state.enabled).toBe(false);
     expect(state.sizeSystem).toBe('eu-women');
     expect(state.baseSize).toBe('M');
-    expect(state.activeSizes).toEqual([]);
+    expect(state.activeSizes).toEqual(['M']);
     expect(state.quantities).toEqual({});
     expect(state.generatedPieces).toEqual({});
     expect(state.stale).toBe(false);

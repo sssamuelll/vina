@@ -54,7 +54,7 @@ export default function DockAutoZone({ kept, suggested, signaling, side, onRun, 
               type="button"
               className={`dock__badge ${variant === 'kept' ? 'dock__badge--pin' : 'dock__badge--auto'}`}
               onClick={(e) => { e.stopPropagation(); (variant === 'kept' ? onUnpin : onPin)(s.id); }}
-              aria-label={`${variant === 'kept' ? 'Unpin' : 'Keep'} ${s.label}`}
+              aria-label={`${variant === 'kept' ? 'Soltar' : 'Fijar'} ${s.label}`}
             >
               <BadgeIcon size={9} />
             </button>

@@ -38,7 +38,7 @@ export default function HintText({
       {!hasPieces && activeTool === 'pen' && penNodesLength === 0 && (
         <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
           fill="rgba(0,0,0,0.2)" fontSize="13">
-          Click to add points · Drag to curve · Click first point to close · Enter to finish open · Esc to cancel
+          Clic para añadir puntos · arrastra para curvar · clic en el primer punto para cerrar · Enter termina abierto · Esc cancela
         </text>
       )}
 
@@ -46,18 +46,18 @@ export default function HintText({
         <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
           fill="rgba(255, 215, 0, 0.5)" fontSize="11">
           {seamHasFirstEdge
-            ? 'Click an edge on a different piece to sew · Esc to cancel'
-            : 'Click an edge on the first piece to start a seam'}
+            ? 'Clic en un borde de otra pieza para coser · Esc cancela'
+            : 'Clic en un borde de la primera pieza para empezar la costura'}
         </text>
       )}
 
       {activeTool === 'segmentSewing' && (() => {
         const msgs: Record<string, string> = {
-          idle: 'Click on an edge to start segment A',
-          a_start: 'Click further along the same edge to define segment A end',
-          a_end: 'Click on a different piece to start segment B',
-          b_start: 'Click further along the same edge to define segment B end',
-          b_end: 'Press Enter to sew · Backspace to undo · Esc to cancel',
+          idle: 'Clic en un borde para empezar el segmento A',
+          a_start: 'Clic más adelante en el mismo borde para cerrar el segmento A',
+          a_end: 'Clic en otra pieza para empezar el segmento B',
+          b_start: 'Clic más adelante en el mismo borde para cerrar el segmento B',
+          b_end: 'Enter cose · Retroceso deshace · Esc cancela',
         };
         return (
           <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
@@ -69,10 +69,10 @@ export default function HintText({
 
       {(activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree' || activeTool === 'topstitchEdit') && (() => {
         const msgs: Record<string, string> = {
-          seamline: 'Click an edge to add topstitch along its full length',
-          segment: 'Click two points on the same edge to define topstitch segment',
-          free: 'Click to add points · Enter to confirm · Backspace to undo · Esc to cancel',
-          edit: 'Click a topstitch line to select and edit it',
+          seamline: 'Clic en un borde para pespuntear todo su largo',
+          segment: 'Clic en dos puntos del mismo borde para el tramo de pespunte',
+          free: 'Clic añade puntos · Enter confirma · Retroceso deshace · Esc cancela',
+          edit: 'Clic en un pespunte para seleccionarlo y editarlo',
         };
         return (
           <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
@@ -91,9 +91,9 @@ export default function HintText({
 
       {activeTool === 'walkSeam' && (() => {
         const msgs: Record<string, string> = {
-          idle: 'Click an edge to start walk verification · Shift+click for manual pair',
-          stationary: 'Shift+click another edge for manual pair · or auto-paired via seam data',
-          walking: 'Hover along edge to walk · Click to reset · Esc to clear',
+          idle: 'Clic en un borde para recorrer la costura · Shift+clic para par manual',
+          stationary: 'Shift+clic en otro borde para par manual · o auto-emparejado por la costura',
+          walking: 'Recorre el borde con el cursor · clic reinicia · Esc limpia',
         };
         return (
           <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"

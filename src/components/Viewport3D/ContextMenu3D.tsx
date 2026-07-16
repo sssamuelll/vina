@@ -116,38 +116,38 @@ export default function ContextMenu3D({
   if (menu.target === 'piece' && menu.pieceId) {
     const pid = menu.pieceId;
     items.push({
-      label: 'Select',
+      label: 'Seleccionar',
       icon: '☐',
       action: () => act(() => onSelectPiece?.(pid)),
     });
     items.push({
-      label: 'Reset 3D Arrangement',
+      label: 'Restablecer colocación 3D',
       icon: '↩',
       action: () => act(() => onResetPieceArrangement?.(pid)),
     });
     items.push({
-      label: isPieceHidden ? 'Show Piece' : 'Hide Piece',
+      label: isPieceHidden ? 'Mostrar pieza' : 'Ocultar pieza',
       icon: isPieceHidden ? '👁' : '🙈',
       action: () => act(() => onToggleHide?.(pid)),
     });
     items.push({
-      label: isPieceFlipped ? 'Unflip Normal' : 'Flip Normal',
+      label: isPieceFlipped ? 'Restaurar normal' : 'Invertir normal',
       icon: '🔄',
       action: () => act(() => onToggleFlipNormal?.(pid)),
       separator: true,
     });
     items.push({
-      label: 'Inspect',
+      label: 'Inspeccionar',
       icon: '🔍',
       action: () => act(() => onInspect?.(pid)),
     });
     items.push({
-      label: isPieceActive === false ? 'Activate Piece' : 'Deactivate Piece',
+      label: isPieceActive === false ? 'Activar pieza' : 'Desactivar pieza',
       icon: isPieceActive === false ? '▶' : '⏸',
       action: () => act(() => onDeactivatePiece?.(pid, isPieceActive === false)),
     });
     items.push({
-      label: 'Properties\u2026',
+      label: 'Propiedades\u2026',
       icon: '\u2139',
       action: () => act(() => onShowProperties?.(pid)),
       separator: true,
@@ -156,98 +156,98 @@ export default function ContextMenu3D({
     // Layer submenu
     if (layerProps) {
       const layerItems: SubMenuItem[] = [
-        { label: `Set Layer... (${layerProps.currentLayer ?? 1})`, action: () => { layerProps.onSetLayer(pid, ((layerProps.currentLayer ?? 1) % 10) + 1); onClose(); } },
-        { label: `Set Sublayer... (${layerProps.currentSublayer ?? 0})`, action: () => { layerProps.onSetSublayer(pid, ((layerProps.currentSublayer ?? 0) + 1) % 5); onClose(); } },
-        { separator: true, label: 'Clone Above', action: () => { layerProps.onCloneToLayer(pid, 'over'); onClose(); } },
-        { label: 'Clone Below', action: () => { layerProps.onCloneToLayer(pid, 'under'); onClose(); } },
-        { separator: true, label: 'Superimpose Over...', action: () => { layerProps.onSuperimpose(pid, 'over'); onClose(); } },
-        { label: 'Superimpose Under...', action: () => { layerProps.onSuperimpose(pid, 'under'); onClose(); } },
-        { label: 'Superimpose Side...', action: () => { layerProps.onSuperimpose(pid, 'side'); onClose(); } },
+        { label: `Cambiar capa... (${layerProps.currentLayer ?? 1})`, action: () => { layerProps.onSetLayer(pid, ((layerProps.currentLayer ?? 1) % 10) + 1); onClose(); } },
+        { label: `Cambiar subcapa... (${layerProps.currentSublayer ?? 0})`, action: () => { layerProps.onSetSublayer(pid, ((layerProps.currentSublayer ?? 0) + 1) % 5); onClose(); } },
+        { separator: true, label: 'Clonar encima', action: () => { layerProps.onCloneToLayer(pid, 'over'); onClose(); } },
+        { label: 'Clonar debajo', action: () => { layerProps.onCloneToLayer(pid, 'under'); onClose(); } },
+        { separator: true, label: 'Superponer encima...', action: () => { layerProps.onSuperimpose(pid, 'over'); onClose(); } },
+        { label: 'Superponer debajo...', action: () => { layerProps.onSuperimpose(pid, 'under'); onClose(); } },
+        { label: 'Superponer al lado...', action: () => { layerProps.onSuperimpose(pid, 'side'); onClose(); } },
       ];
-      items.push({ label: 'Layer', icon: '\u{1F4D1}', action: () => {}, _layerSubmenu: layerItems });
+      items.push({ label: 'Capa', icon: '\u{1F4D1}', action: () => {}, _layerSubmenu: layerItems });
     }
   } else if (menu.target === 'avatar') {
     items.push({
-      label: 'Toggle Avatar',
+      label: 'Mostrar/ocultar avatar',
       icon: '👤',
       shortcut: 'Shift+A',
       action: () => act(() => onToggleAvatar?.()),
     });
     items.push({
-      label: 'Reset Pose',
+      label: 'Restablecer pose',
       icon: '↩',
       action: () => act(() => onResetPose?.()),
     });
   } else {
     // Background — camera presets section
     items.push({
-      label: 'Front',
+      label: 'Frontal',
       icon: '📷',
       shortcut: 'Num2',
       action: () => act(() => onCameraPreset?.('front')),
     });
     items.push({
-      label: 'Back',
+      label: 'Trasera',
       icon: '📷',
       shortcut: 'Num8',
       action: () => act(() => onCameraPreset?.('back')),
     });
     items.push({
-      label: 'Left',
+      label: 'Izquierda',
       icon: '📷',
       shortcut: 'Num6',
       action: () => act(() => onCameraPreset?.('left')),
     });
     items.push({
-      label: 'Right',
+      label: 'Derecha',
       icon: '📷',
       shortcut: 'Num4',
       action: () => act(() => onCameraPreset?.('right')),
     });
     items.push({
-      label: 'Top',
+      label: 'Superior',
       icon: '📷',
       shortcut: 'Num5',
       action: () => act(() => onCameraPreset?.('top')),
     });
     items.push({
-      label: 'Bottom',
+      label: 'Inferior',
       icon: '📷',
       shortcut: 'Num0',
       action: () => act(() => onCameraPreset?.('bottom')),
       separator: true,
     });
     items.push({
-      label: 'Reset Camera',
+      label: 'Restablecer cámara',
       icon: '🎥',
       action: () => act(() => onResetCamera?.()),
     });
     items.push({
-      label: 'Zoom to Fit',
+      label: 'Ajustar zoom',
       icon: '🔍',
       action: () => act(() => onZoomToFit?.()),
       separator: true,
     });
     items.push({
-      label: 'Toggle Avatar',
+      label: 'Mostrar/ocultar avatar',
       icon: '👤',
       shortcut: 'Shift+A',
       action: () => act(() => onToggleAvatar?.()),
     });
     items.push({
-      label: 'Show All Pieces',
+      label: 'Mostrar todas las piezas',
       icon: '👁',
       action: () => act(() => onShowAll?.()),
     });
     items.push({
-      label: 'Reset All 3D',
+      label: 'Restablecer todo en 3D',
       icon: '↩',
       shortcut: 'Ctrl+F',
       action: () => act(() => onResetAll3D?.()),
       separator: true,
     });
     items.push({
-      label: 'Snapshot',
+      label: 'Captura',
       icon: '📸',
       shortcut: 'F10',
       action: () => act(() => onSnapshot?.()),

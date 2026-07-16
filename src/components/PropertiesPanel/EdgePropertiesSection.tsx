@@ -53,13 +53,13 @@ export default function EdgePropertiesSection({ items }: Props) {
     dispatch(setEdgesSeamAllowance({ items: commitItems, width: w }));
   };
 
-  const subtitle = count === 1 ? `Edge · ${resolved[0].edgeName}` : `${count} edges`;
+  const subtitle = count === 1 ? `Borde · ${resolved[0].edgeName}` : `${count} bordes`;
 
   return (
     <section className="panel-section">
       <div className="panel-subtitle panel-subtitle--spaced">{subtitle}</div>
       <div className="panel-field">
-        <label htmlFor="edge-prop-width">Width (mm)</label>
+        <label htmlFor="edge-prop-width">Ancho (mm)</label>
         <input
           id="edge-prop-width"
           type="number"
@@ -67,7 +67,7 @@ export default function EdgePropertiesSection({ items }: Props) {
           min={0}
           max={100}
           value={value}
-          placeholder={allSame ? undefined : 'Mixed'}
+          placeholder={allSame ? undefined : 'Varios'}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
           onBlur={commit}
@@ -79,10 +79,10 @@ export default function EdgePropertiesSection({ items }: Props) {
           disabled={!anyOverridden}
           onClick={() => dispatch(setEdgesSeamAllowance({ items: commitItems, width: null }))}
           title={count === 1
-            ? `Inherit the piece allowance (${resolved[0].pieceDefault}mm)`
-            : 'Inherit the piece allowance on all selected edges'}
+            ? `Heredar el margen de la pieza (${resolved[0].pieceDefault}mm)`
+            : 'Heredar el margen de la pieza en todos los bordes seleccionados'}
         >
-          {count === 1 ? `Inherit (${resolved[0].pieceDefault})` : 'Inherit'}
+          {count === 1 ? `Heredar (${resolved[0].pieceDefault})` : 'Heredar'}
         </button>
       </div>
     </section>

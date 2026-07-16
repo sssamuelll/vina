@@ -27,28 +27,28 @@ function makeDataTransfer() {
 }
 
 const TOOLS = [
-  { id: 'select', icon: MousePointer2, label: 'Select', shortcut: 'Z' },
-  { id: 'pen', icon: Pen, label: 'Pen', shortcut: 'H' },
+  { id: 'select', icon: MousePointer2, label: 'Seleccionar', shortcut: 'Z' },
+  { id: 'pen', icon: Pen, label: 'Pluma', shortcut: 'H' },
 ];
 
 describe('Dock (presentational)', () => {
   it('renders the domain label and one button per tool', () => {
     render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={() => {}} />);
     expect(screen.getByText('2D')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /select · z/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /pen · h/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /seleccionar · z/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /pluma · h/i })).toBeTruthy();
   });
 
   it('calls onSelectTool with the tool id on click', () => {
     const onSelectTool = vi.fn();
     render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={onSelectTool} />);
-    fireEvent.click(screen.getByRole('button', { name: /pen · h/i }));
+    fireEvent.click(screen.getByRole('button', { name: /pluma · h/i }));
     expect(onSelectTool).toHaveBeenCalledWith('pen');
   });
 
   it('marks the active tool', () => {
     render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="pen" onSelectTool={() => {}} />);
-    const penBtn = screen.getByRole('button', { name: /pen · h/i });
+    const penBtn = screen.getByRole('button', { name: /pluma · h/i });
     expect(penBtn.className).toContain('dock__tool--active');
   });
 
@@ -56,9 +56,9 @@ describe('Dock (presentational)', () => {
     const onReorderTool = vi.fn();
     render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={() => {}} onReorderTool={onReorderTool} />);
     const dt = makeDataTransfer();
-    fireEvent.dragStart(screen.getByRole('button', { name: /select · z/i }), { dataTransfer: dt });
-    fireEvent.dragOver(screen.getByRole('button', { name: /pen · h/i }), { dataTransfer: dt });
-    fireEvent.drop(screen.getByRole('button', { name: /pen · h/i }), { dataTransfer: dt });
+    fireEvent.dragStart(screen.getByRole('button', { name: /seleccionar · z/i }), { dataTransfer: dt });
+    fireEvent.dragOver(screen.getByRole('button', { name: /pluma · h/i }), { dataTransfer: dt });
+    fireEvent.drop(screen.getByRole('button', { name: /pluma · h/i }), { dataTransfer: dt });
     expect(onReorderTool).toHaveBeenCalledWith('select', 'pen');
   });
 
@@ -66,7 +66,7 @@ describe('Dock (presentational)', () => {
     const onReorderTool = vi.fn();
     render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={() => {}} onReorderTool={onReorderTool} />);
     const dt = makeDataTransfer();
-    const sel = screen.getByRole('button', { name: /select · z/i });
+    const sel = screen.getByRole('button', { name: /seleccionar · z/i });
     fireEvent.dragStart(sel, { dataTransfer: dt });
     fireEvent.drop(sel, { dataTransfer: dt });
     expect(onReorderTool).not.toHaveBeenCalled();
@@ -74,26 +74,26 @@ describe('Dock (presentational)', () => {
 
   it('tool buttons are not draggable without onReorderTool', () => {
     render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={() => {}} />);
-    expect((screen.getByRole('button', { name: /select · z/i }) as HTMLButtonElement).draggable).toBe(false);
+    expect((screen.getByRole('button', { name: /seleccionar · z/i }) as HTMLButtonElement).draggable).toBe(false);
   });
 
   it('clicking a tool still activates it while reorder is enabled', () => {
     const onSelectTool = vi.fn();
     render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={onSelectTool} onReorderTool={() => {}} />);
-    fireEvent.click(screen.getByRole('button', { name: /pen · h/i }));
+    fireEvent.click(screen.getByRole('button', { name: /pluma · h/i }));
     expect(onSelectTool).toHaveBeenCalledWith('pen');
   });
 
   it('keeps the accessible name and shows a right-positioned tooltip on hover', () => {
     vi.useFakeTimers();
     const { container } = render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={() => {}} />);
-    expect(screen.getByRole('button', { name: /select · z/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /seleccionar · z/i })).toBeTruthy();
     fireEvent.mouseEnter(container.querySelectorAll('.tool-tooltip-wrapper')[0]);
     act(() => { vi.advanceTimersByTime(500); });
     const tip = document.querySelector('.tool-tooltip');
     expect(tip).toBeTruthy();
     expect(tip!.classList.contains('tooltip-right')).toBe(true);
-    expect(tip!.querySelector('.tool-tooltip-name')!.textContent).toBe('Select');
+    expect(tip!.querySelector('.tool-tooltip-name')!.textContent).toBe('Seleccionar');
     vi.useRealTimers();
   });
 });
@@ -109,7 +109,7 @@ function renderLeftDock(onOpenPanel = vi.fn()) {
 describe('LeftDock (container)', () => {
   it('activates a tool in BOTH slices on click (convergence guard)', () => {
     const { store } = renderLeftDock();
-    fireEvent.click(screen.getByRole('button', { name: /sew · b/i }));
+    fireEvent.click(screen.getByRole('button', { name: /coser · b/i }));
     expect(store.getState().editor.activeTool).toBe('seam');
     expect(store.getState().tools.activeTool2D).toBe('seam');
   });
@@ -127,7 +127,7 @@ describe('LeftDock (container)', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Grade' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Escalar' }));
     expect(onOpenPanel).toHaveBeenCalledWith('Grading');
   });
 
@@ -137,10 +137,10 @@ describe('LeftDock (container)', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Keep Grade' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Fijar Escalar' }));
     expect(store.getState().dock.pinnedExtra.left).toEqual(['grade']);
-    expect(screen.getByRole('button', { name: 'Unpin Grade' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Keep Grade' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Soltar Escalar' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Fijar Escalar' })).toBeNull();
   });
 
   it('signaling=off mutes the auto layer but shows no suggestion', () => {
@@ -151,8 +151,8 @@ describe('LeftDock (container)', () => {
       store.dispatch(toggleDockSignaling()); // → 'off'
     });
     expect(screen.queryByText('auto')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Keep Grade' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Grade' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Fijar Escalar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Escalar' })).toBeNull();
   });
 
   it('off: a kept tool still renders (plain, no Unpin badge)', () => {
@@ -163,52 +163,52 @@ describe('LeftDock (container)', () => {
       store.dispatch(pinAuto({ side: 'left', id: 'grade' }));
       store.dispatch(toggleDockSignaling()); // → 'off'
     });
-    expect(screen.getByRole('button', { name: 'Grade' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Unpin Grade' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Escalar' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Soltar Escalar' })).toBeNull();
   });
 
   it('adds a catalog tool to the dock when dispatched', () => {
     const { store } = renderLeftDock();
-    expect(screen.queryByRole('button', { name: /notch/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /piquete/i })).toBeNull();
     act(() => { store.dispatch(addDockTool('notch')); });
-    expect(screen.getByRole('button', { name: /notch/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /piquete/i })).toBeTruthy();
   });
 
   it('removes a default tool from the dock when dispatched', () => {
     const { store } = renderLeftDock();
-    expect(screen.getByRole('button', { name: /pen · h/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /pluma · h/i })).toBeTruthy();
     act(() => { store.dispatch(removeDockTool('pen')); });
-    expect(screen.queryByRole('button', { name: /pen · h/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /pluma · h/i })).toBeNull();
   });
 
   it('the ＋ button toggles the picker and Escape closes it', () => {
     renderLeftDock();
-    const add = screen.getByRole('button', { name: 'Customize dock tools' });
-    expect(screen.queryByRole('group', { name: 'Customize dock tools' })).toBeNull();
+    const add = screen.getByRole('button', { name: 'Personalizar herramientas del dock' });
+    expect(screen.queryByRole('group', { name: 'Personalizar herramientas del dock' })).toBeNull();
     fireEvent.click(add);
-    expect(screen.getByRole('group', { name: 'Customize dock tools' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Personalizar herramientas del dock' })).toBeTruthy();
     fireEvent.keyDown(window, { key: 'Escape' });
-    expect(screen.queryByRole('group', { name: 'Customize dock tools' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Personalizar herramientas del dock' })).toBeNull();
   });
 
   it('the ＋ picker closes on a click outside the dock editor', () => {
     renderLeftDock();
-    fireEvent.click(screen.getByRole('button', { name: 'Customize dock tools' }));
-    expect(screen.getByRole('group', { name: 'Customize dock tools' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Personalizar herramientas del dock' }));
+    expect(screen.getByRole('group', { name: 'Personalizar herramientas del dock' })).toBeTruthy();
     // mousedown outside the editorRef wrapper closes the picker (the trigger is
     // inside the ref, so opening it never self-closes — this guards that seam).
     fireEvent.mouseDown(document.body);
-    expect(screen.queryByRole('group', { name: 'Customize dock tools' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Personalizar herramientas del dock' })).toBeNull();
   });
 
   it('renders tools in tools2d order; reordering moves the tool in the DOM', () => {
     const { store } = renderLeftDock();
-    const select1 = screen.getByRole('button', { name: /select · z/i });
-    const sew1 = screen.getByRole('button', { name: /sew · b/i });
+    const select1 = screen.getByRole('button', { name: /seleccionar · z/i });
+    const sew1 = screen.getByRole('button', { name: /coser · b/i });
     expect(select1.compareDocumentPosition(sew1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     act(() => { store.dispatch(reorderDockTool({ fromId: 'seam', toId: 'select' })); });
-    const select2 = screen.getByRole('button', { name: /select · z/i });
-    const sew2 = screen.getByRole('button', { name: /sew · b/i });
+    const select2 = screen.getByRole('button', { name: /seleccionar · z/i });
+    const sew2 = screen.getByRole('button', { name: /coser · b/i });
     expect(sew2.compareDocumentPosition(select2) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

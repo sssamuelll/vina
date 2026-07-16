@@ -78,8 +78,8 @@ class Viewport3DErrorBoundary extends Component<{ children: ReactNode }, { hasEr
       return (
         <div className="viewport3d viewport3d-error">
           <div style={{ padding: '2rem', textAlign: 'center', color: '#888', fontSize: '0.85rem' }}>
-            <p style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>⚠️ 3D Preview Unavailable</p>
-            <p>WebGL could not initialize. The 2D editor still works normally.</p>
+            <p style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>⚠️ Vista 3D no disponible</p>
+            <p>WebGL no pudo inicializar. El editor 2D sigue funcionando normal.</p>
             <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', opacity: 0.6 }}>{this.state.error}</p>
           </div>
         </div>
@@ -1010,7 +1010,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
 
       {!cameraMode && (
         <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9, pointerEvents: 'none' }}>
-          {poseEditorOpen ? '● POSE MODE' : activeTool3D === 'arrangement' ? '⊕ ARRANGE — click pieza, luego click punto de arrangement' : '✏️ EDIT MODE'} — {inputScheme === 'trackpad' ? 'two-finger orbit · pinch zoom · ⌥-drag pan' : 'right-drag orbit · middle/⌥-drag pan'}
+          {poseEditorOpen ? '● MODO POSE' : activeTool3D === 'arrangement' ? '⊕ COLOCAR — clic en la pieza, luego clic en el punto de colocación' : '✏️ MODO EDICIÓN'} — {inputScheme === 'trackpad' ? 'orbitar con dos dedos · zoom con pellizco · ⌥+arrastrar panea' : 'clic derecho orbita · clic central/⌥+arrastrar panea'}
         </div>
       )}
 

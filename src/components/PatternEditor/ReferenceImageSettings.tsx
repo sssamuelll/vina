@@ -57,7 +57,7 @@ export default function ReferenceImageSettings({
         className="ref-img-import-btn"
         onClick={() => fileInputRef.current?.click()}
         disabled={atLimit}
-        title={atLimit ? 'Maximum 10 images reached' : 'Import reference image'}
+        title={atLimit ? 'Máximo 10 imágenes' : 'Importar imagen de referencia'}
       >
         <Upload size={12} />
         <span>Import Image</span>

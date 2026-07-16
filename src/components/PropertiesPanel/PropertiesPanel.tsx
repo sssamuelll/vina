@@ -25,6 +25,14 @@ import SeamAllowanceDefaultSection from './SeamAllowanceDefaultSection';
 import NotchPropertiesSection from './NotchPropertiesSection';
 import './PropertiesPanel.css';
 
+// Etiquetas ES para el badge de tipo de costura (los valores son keys de datos).
+const SEAM_TYPE_LABELS: Record<string, string> = {
+  standard: 'estándar',
+  french: 'francesa',
+  'flat-felled': 'sobrecargada',
+  overlock: 'overlock',
+};
+
 export default function PropertiesPanel() {
   const dispatch = useDispatch();
   const { pieces, seams } = useSelector((s: RootState) => s.project);
@@ -62,7 +70,7 @@ export default function PropertiesPanel() {
   }, []);
 
   const seamsList = seams.length > 0 && (
-    <PropertySection id="seams" title={`SEAMS (${seams.length})`} collapsed={!!collapsedSections.seams} onToggle={toggleSection}>
+    <PropertySection id="seams" title={`COSTURAS (${seams.length})`} collapsed={!!collapsedSections.seams} onToggle={toggleSection}>
       {seams.map(seam => {
         const pA = pieces.find(p => p.id === seam.pieceA.pieceId);
         const pB = pieces.find(p => p.id === seam.pieceB.pieceId);
@@ -76,10 +84,10 @@ export default function PropertiesPanel() {
             <span className="seam-label">
               {pA?.name || '?'} ↔ {pB?.name || '?'}
             </span>
-            <span className="seam-type">{seam.type}</span>
+            <span className="seam-type">{SEAM_TYPE_LABELS[seam.type] ?? seam.type}</span>
             <button
               className="seam-delete"
-              aria-label="Delete seam"
+              aria-label="Eliminar costura"
               onClick={(e) => { e.stopPropagation(); dispatch(removeSeam(seam.id)); }}
             >
               <X size={10} />
@@ -97,7 +105,7 @@ export default function PropertiesPanel() {
           {/* Tool-scoped: the SA default lives here so the body-click / drag-to-all
               applies an editable width (CLO3D parity), not a hardcoded constant. */}
           {editor.activeTool === 'seamAllowance' && <SeamAllowanceDefaultSection />}
-          <div className="panel-empty">Select a piece, seam or edge to edit</div>
+          <div className="panel-empty">Selecciona una pieza, costura o borde para editar</div>
           {seamsList}
         </>
       ) : (
