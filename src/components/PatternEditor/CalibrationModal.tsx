@@ -29,10 +29,10 @@ export default function CalibrationModal({
   return (
     <div className="calibration-overlay" onClick={onCancel}>
       <div className="calibration-modal" onClick={e => e.stopPropagation()}>
-        <h3>Scale Calibration</h3>
-        <p>Measured distance: {pixelDistance.toFixed(1)} pixels</p>
+        <h3>Calibración de escala</h3>
+        <p>Distancia medida: {pixelDistance.toFixed(1)} píxeles</p>
         <div className="calibration-input-row">
-          <label>Real-world distance (mm):</label>
+          <label>Distancia real (mm):</label>
           <input
             type="number"
             min={0.1}
@@ -43,13 +43,13 @@ export default function CalibrationModal({
           />
         </div>
         <div className="calibration-actions">
-          <button onClick={onCancel}>Cancel</button>
+          <button onClick={onCancel}>Cancelar</button>
           <button
             className="primary"
             onClick={() => onConfirm(value)}
             disabled={value <= 0}
           >
-            Apply
+            Aplicar
           </button>
         </div>
       </div>

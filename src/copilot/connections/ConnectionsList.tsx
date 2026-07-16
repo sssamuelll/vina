@@ -90,7 +90,7 @@ export default function ConnectionsList({ onStateChange }: Props) {
   );
 
   if (!state) {
-    return <div style={{ ...emptyStyle, padding: '20px' }}>Loading connections…</div>;
+    return <div style={{ ...emptyStyle, padding: '20px' }}>Cargando conexiones…</div>;
   }
 
   const handleAdd = () => setModal({ mode: 'add' });
@@ -124,7 +124,7 @@ export default function ConnectionsList({ onStateChange }: Props) {
   };
 
   const handleDelete = (c: AIConnection) => {
-    if (!confirm(`Delete connection "${c.label}"?`)) return;
+    if (!confirm(`¿Eliminar la conexión "${c.label}"?`)) return;
     persist(removeConnection(state, c.id));
   };
 
@@ -132,16 +132,16 @@ export default function ConnectionsList({ onStateChange }: Props) {
     <div style={containerStyle}>
       <div style={headerStyle}>
         <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>
-          Connections ({state.connections.length})
+          Conexiones ({state.connections.length})
         </span>
         <button type="button" style={addBtnStyle} onClick={handleAdd}>
-          + Add connection
+          + Agregar conexión
         </button>
       </div>
 
       {state.connections.length === 0 ? (
         <div style={emptyStyle}>
-          No AI connections yet.
+          Aún no hay conexiones de IA.
           <br />
           <button
             type="button"
@@ -153,7 +153,7 @@ export default function ConnectionsList({ onStateChange }: Props) {
             }}
             onClick={handleAdd}
           >
-            + Add your first connection
+            + Agregar tu primera conexión
           </button>
         </div>
       ) : (

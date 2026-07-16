@@ -415,13 +415,13 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
             </div>
 
             {/* Pressure Distance */}
-            <div style={{ ...S.configLabel, marginBottom: 2 }}>Pressure Distance (mm)</div>
+            <div style={{ ...S.configLabel, marginBottom: 2 }}>Distancia de presión (mm)</div>
             <div style={S.configRow}>
               <label style={S.configLabel}>
-                Distance
+                Distancia
                 <input
                   type="number"
-                  aria-label="Pressure Distance"
+                  aria-label="Distancia de presión"
                   style={{ ...S.configInput, marginLeft: 4 }}
                   value={+(fitMapConfig.pressureDistance * 1000).toFixed(1)}
                   step={0.1}
@@ -596,7 +596,7 @@ function formatInspectedValue(mode: FitMapMode, value: number): string {
     case 'stress': return `${value.toFixed(2)} kPa`;
     case 'strain': return `${value.toFixed(1)}%`;
     case 'fit': return `${(value * 100).toFixed(1)}%`;
-    case 'pressure': return value > 0.5 ? 'Contact' : 'No Contact';
+    case 'pressure': return value > 0.5 ? 'Contacto' : 'Sin contacto';
     default: return '';
   }
 }

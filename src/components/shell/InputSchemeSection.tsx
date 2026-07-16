@@ -2,10 +2,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import { setUserScheme } from '../../store/inputSchemeSlice';
 import type { InputSchemeId } from '../../input/wheelIntents';
+import { IS_MAC } from './shortcutDisplay';
 
 const OPTIONS: Array<{ id: InputSchemeId; label: string; hint: string }> = [
-  { id: 'mouse',    label: 'Mouse (CLO3D)', hint: 'right-drag orbit · middle-drag pan · wheel zoom' },
-  { id: 'trackpad', label: 'Trackpad',      hint: 'two-finger orbit (3D) / pan (2D) · pinch zoom · ⌥-drag pan' },
+  { id: 'mouse',    label: 'Mouse (CLO3D)', hint: 'botón derecho: orbitar · botón central: desplazar · rueda: zoom' },
+  { id: 'trackpad', label: 'Trackpad',      hint: `dos dedos: orbitar (3D) / desplazar (2D) · pellizco: zoom · ${IS_MAC ? '⌥' : 'Alt'}+arrastre: desplazar` },
 ];
 
 /** Input scheme picker — UnifiedBar settings mode (spec 2026-06-04 § UI). */
@@ -15,7 +16,7 @@ export default function InputSchemeSection() {
 
   return (
     <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>Input</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>Entrada</div>
       <div style={{ display: 'flex', gap: 8 }}>
         {OPTIONS.map((opt) => (
           <button

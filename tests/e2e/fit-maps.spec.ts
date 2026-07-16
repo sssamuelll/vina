@@ -247,10 +247,10 @@ test.describe('Fit Map UI', () => {
     await expect(page.locator('text=Ajustes del mapa de ajuste')).toBeVisible({ timeout: 3000 });
 
     // Should show "Stress Range" label
-    await expect(page.locator('text=/Stress Range/')).toBeVisible();
+    await expect(page.locator('text=/Rango de tensión/')).toBeVisible();
 
     // Should show "Strain Range" label
-    await expect(page.locator('text=/Strain Range/')).toBeVisible();
+    await expect(page.locator('text=/Rango de estiramiento/')).toBeVisible();
 
     // Should have numeric inputs — check by aria-label
     await expect(page.locator('input[aria-label="Tensión mín"]')).toBeVisible();
@@ -286,7 +286,8 @@ test.describe('Fit Map UI', () => {
   test('keyboard shortcut Alt+6 toggles stress map', async ({ page }) => {
     // Make sure canvas / 3D view is focused for shortcuts to work
     const canvas = page.locator('canvas');
-    await canvas.click({ position: { x: 10, y: 10 } });
+    // Centro del canvas: la esquina (10,10) la intercepta el HUD colapsado (Fase1-H2).
+    await canvas.click({ position: { x: 300, y: 300 } });
     await page.waitForTimeout(300);
 
     // Press Alt+6 to activate stress map

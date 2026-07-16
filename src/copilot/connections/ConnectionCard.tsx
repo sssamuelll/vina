@@ -135,14 +135,14 @@ export default function ConnectionCard({
       }}
       role="button"
       tabIndex={0}
-      aria-label={`Connection ${connection.label}`}
+      aria-label={`Conexión ${connection.label}`}
     >
       <button
         type="button"
         style={toggleStyle}
         onClick={onToggleEnabled}
-        aria-label={connection.enabled ? 'Disable connection' : 'Enable connection'}
-        title={connection.enabled ? 'Disable' : 'Enable'}
+        aria-label={connection.enabled ? 'Desactivar conexión' : 'Activar conexión'}
+        title={connection.enabled ? 'Desactivar' : 'Activar'}
       >
         <div style={toggleKnobStyle(connection.enabled)} />
       </button>
@@ -152,7 +152,7 @@ export default function ConnectionCard({
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {connection.label}
           </span>
-          {isActive && <span style={badgeStyle}>Active</span>}
+          {isActive && <span style={badgeStyle}>Activa</span>}
           {!hasKey && (
             <span
               style={{
@@ -160,7 +160,7 @@ export default function ConnectionCard({
                 background: 'var(--color-warning, #ca8a04)',
               }}
             >
-              No key
+              Sin clave
             </span>
           )}
         </div>
@@ -169,16 +169,16 @@ export default function ConnectionCard({
         </div>
       </div>
 
-      <button type="button" style={iconBtnStyle} onClick={onEdit} aria-label="Edit">
-        Edit
+      <button type="button" style={iconBtnStyle} onClick={onEdit} aria-label="Editar">
+        Editar
       </button>
       <button
         type="button"
         style={{ ...iconBtnStyle, color: 'var(--color-error, #f87171)' }}
         onClick={onDelete}
-        aria-label="Delete"
+        aria-label="Eliminar"
       >
-        Delete
+        Eliminar
       </button>
     </div>
   );

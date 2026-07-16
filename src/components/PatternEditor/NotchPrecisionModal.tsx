@@ -64,11 +64,11 @@ export default function NotchPrecisionModal({
   }, [distance, depth, valid, onConfirm, onCancel]);
 
   return (
-    <div className="notch-precision-modal" role="dialog" aria-label="Notch placement">
-      <h3>Notch placement</h3>
-      <p>Distance is measured along the outline from the marked corner.</p>
+    <div className="notch-precision-modal" role="dialog" aria-label="Colocación de piquete">
+      <h3>Colocación de piquete</h3>
+      <p>La distancia se mide sobre el contorno desde la esquina marcada.</p>
       <div className="notch-precision-input-row">
-        <label htmlFor="notch-distance">Distance from corner (mm):</label>
+        <label htmlFor="notch-distance">Distancia desde la esquina (mm):</label>
         <input
           id="notch-distance"
           type="number"
@@ -87,10 +87,10 @@ export default function NotchPrecisionModal({
         />
       </div>
       <div className="notch-precision-hint">
-        outline perimeter: {maxDistanceMm.toFixed(0)} mm
+        perímetro del contorno: {maxDistanceMm.toFixed(0)} mm
       </div>
       <div className="notch-precision-input-row">
-        <label htmlFor="notch-depth">Depth (mm):</label>
+        <label htmlFor="notch-depth">Profundidad (mm):</label>
         <input
           id="notch-depth"
           type="number"
@@ -104,13 +104,13 @@ export default function NotchPrecisionModal({
         />
       </div>
       <div className="notch-precision-actions">
-        <button onClick={onCancel}>Keep click</button>
+        <button onClick={onCancel}>Mantener el clic</button>
         <button
           className="primary"
           onClick={() => onConfirm(distance, depth)}
           disabled={!valid}
         >
-          Place exactly
+          Colocar exacto
         </button>
       </div>
     </div>
