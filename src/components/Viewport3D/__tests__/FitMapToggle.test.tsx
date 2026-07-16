@@ -20,6 +20,7 @@ function createTestStore() {
     preloadedState: {
       simulation: {
         simulationState: 'running' as SimulationState,
+        renderSettingsOpen: false,
         fitMapMode: 'stress' as FitMapMode,
         fitMapConfig: {
           stressRange: [0, 100] as [number, number],

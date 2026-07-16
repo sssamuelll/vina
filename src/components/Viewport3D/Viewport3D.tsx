@@ -54,7 +54,7 @@ import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection, togglePieceSelection, enterSuperimposePickMode } from '../../store/editorSlice';
 import { toggleIK, resetPose } from '../../store/avatarSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
-import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal, clearFlippedNormals, setSelectedVertices } from '../../store/simulationSlice';
+import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal, clearFlippedNormals, setSelectedVertices, setRenderSettingsOpen } from '../../store/simulationSlice';
 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { resolveColorway } from '../../utils/colorwayResolver';
@@ -432,7 +432,8 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   const [inspectedValue, setInspectedValue] = useState<number | null>(null);
   const [avatarHidden, setAvatarHidden] = useState(false);
   const [collisionPanelOpen, setCollisionPanelOpen] = useState(false);
-  const [renderPanelOpen, setRenderPanelOpen] = useState(false);
+  // Redux y no useState: las puertas (File menu, palette) viven fuera de este árbol.
+  const renderPanelOpen = useSelector((s: RootState) => s.simulation.renderSettingsOpen);
 
   // Expose fitMapStats to window for Playwright E2E testing
   useEffect(() => {
@@ -960,32 +961,12 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         onDeleteSnapshot={(id) => simRef.current?.deleteSnapshot(id)}
       />
 
-      {/* Render Settings toggle + panel */}
-      {!hideChrome && (
-        <button
-          style={{
-            position: 'absolute',
-            top: 8,
-            right: renderPanelOpen ? 290 : (collisionPanelOpen ? 334 : 52),
-            zIndex: 25,
-            background: renderPanelOpen ? 'rgba(74, 158, 255, 0.2)' : 'rgba(30, 30, 30, 0.8)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            borderRadius: 6,
-            color: renderPanelOpen ? '#4a9eff' : '#ccc',
-            padding: '6px 10px',
-            cursor: 'pointer',
-            fontSize: 12,
-            fontFamily: 'var(--font-sans)',
-          }}
-          title="Render Settings"
-          onClick={() => setRenderPanelOpen(!renderPanelOpen)}
-        >
-          Render
-        </button>
-      )}
+      {/* Render & Export 3D — se abre desde File ▸ Export 3D / Turntable...
+          o la palette (export-3d); el botón !hideChrome que era su única
+          puerta jamás renderizó en el shell actual (Fase 2, puerta-export). */}
       <RenderSettingsPanel
         open={renderPanelOpen}
-        onClose={() => setRenderPanelOpen(false)}
+        onClose={() => dispatch(setRenderSettingsOpen(false))}
         onExportStill={handleExportStill}
         onExportTurntable={handleExportTurntable}
         onExportAllViews={handleExportAllViews}
