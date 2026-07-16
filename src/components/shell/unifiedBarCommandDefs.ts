@@ -9,9 +9,9 @@ import { runUiExport } from '../../utils/export/uiExport';
 import { setViewMode, toggleSnapToGrid, toggleSeamAllowance, toggleGrainlines, togglePieceNames, undo, redo } from '../../store/editorSlice';
 import { startSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
 import {
-  FileText, Scissors, Ruler, Shirt, Download, Grid3x3, Eye,
+  FileText, Scissors, Ruler, Shirt, Grid3x3, Eye,
   Layers, ScanLine, Undo2, Redo2, User, Package,
-  Search, ClipboardList, Wind, Palette, PenLine, Tag, Hand, MousePointer2,
+  Search, PenLine, Tag, Hand, MousePointer2,
   SlidersHorizontal, type LucideIcon,
 } from 'lucide-react';
 import { setUserScheme } from '../../store/inputSchemeSlice';
@@ -45,15 +45,14 @@ export const COMMANDS: CommandDef[] = [
   { id: 'show-bom', name: 'Bill of Materials', description: 'Fabrics, trims, costs summary', icon: Package, action: (_d, cb) => cb.onOpenPanel('BOM') },
   { id: 'show-grading', name: 'Grading', description: 'Size grading table (XS–XXL)', icon: Ruler, action: (_d, cb) => cb.onOpenPanel('Grading') },
   { id: 'show-inspector', name: 'Inspector', description: 'Piece diagnostics and validation', icon: Search, action: (_d, cb) => cb.onOpenPanel('Inspector') },
-  { id: 'show-problems', name: 'Problems', description: 'Pattern warnings and errors', icon: ClipboardList, action: (_d, cb) => cb.onOpenPanel('Problems') },
+  // Fase1-S2: show-problems / show-simulation / show-colorways / export-techpack
+  // eliminados — abrían el placeholder circular "available via ⌘K" (el panel
+  // no existe en AppShell.renderPanelContent). Vuelven cuando exista el panel.
   { id: 'show-nesting', name: 'Nesting Preview', description: 'Fabric nesting layout', icon: Layers, action: (_d, cb) => cb.onOpenPanel('Nesting') },
   { id: 'show-layers', name: 'Layers', description: 'Piece layer management', icon: Layers, action: (_d, cb) => cb.onOpenPanel('Layers') },
   { id: 'show-properties', name: 'Properties', description: 'Piece, seam and material properties', icon: SlidersHorizontal, action: (_d, cb) => cb.onOpenPanel('Properties') },
-  { id: 'show-simulation', name: 'Simulation Settings', description: 'Fabric, gravity, wind, solver', icon: Wind, action: (_d, cb) => cb.onOpenPanel('Simulation') },
-  { id: 'show-colorways', name: 'Colorways', description: 'Color variant management', icon: Palette, action: (_d, cb) => cb.onOpenPanel('Colorways') },
 
   // ─── Export ───
-  { id: 'export-techpack', name: 'Export Tech Pack', description: 'Generate PDF tech pack with BOM', icon: Download, action: (_d, cb) => cb.onOpenPanel('Export') },
   { id: 'export-dxf', name: 'Export DXF', description: 'Export patterns as DXF files', icon: FileText, action: (d) => runUiExport('dxf', store.getState().project, d) },
 
   // ─── View ───

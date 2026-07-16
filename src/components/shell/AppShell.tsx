@@ -56,11 +56,10 @@ function renderPanelContent(name: string, onClose: () => void) {
     case 'Properties':
       return <Suspense fallback={fallback}><PropertiesPanel /></Suspense>;
     default:
-      return (
-        <div style={{ padding: 'var(--sp-4)', color: 'var(--text-muted)', fontSize: '13px' }}>
-          {name} — available via ⌘K
-        </div>
-      );
+      // Fase1-S2: murió el placeholder circular ("X — available via ⌘K").
+      // Ya ningún opener vivo pasa nombres fuera del switch; si uno llega,
+      // es un bug del opener, no una superficie que mostrar.
+      return null;
   }
 }
 
