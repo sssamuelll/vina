@@ -35,42 +35,42 @@ export const COMMANDS: CommandDef[] = [
   // ─── Patterns ───
   // M3 (camisa de María): execute for real — the old action opened the
   // 'Auto-Sew' panel name, which AppShell renders as a dead placeholder.
-  { id: 'auto-sew', name: 'Auto-Sew Pieces', description: 'Detect and create seams automatically', icon: Scissors, action: (d) => d(runAutoSew()) },
+  { id: 'auto-sew', name: 'Coser piezas automáticamente', description: 'Detecta y propone las costuras', icon: Scissors, action: (d) => d(runAutoSew()) },
 
   // ─── Simulation ───
-  { id: 'dress-avatar', name: 'Dress Avatar', description: 'Place pieces and start simulation', icon: Shirt, action: (d) => { d(setViewMode3D('simulate')); d(startSimulation()); } },
-  { id: 'reset-sim', name: 'Reset Simulation', description: 'Stop simulation and reset', icon: Shirt, action: (d) => d(resetSimulation()) },
+  { id: 'dress-avatar', name: 'Vestir avatar', description: 'Coloca las piezas y arranca la simulación', icon: Shirt, action: (d) => { d(setViewMode3D('simulate')); d(startSimulation()); } },
+  { id: 'reset-sim', name: 'Restablecer simulación', description: 'Detiene la simulación y vuelve al inicio', icon: Shirt, action: (d) => d(resetSimulation()) },
 
   // ─── Panels ───
-  { id: 'show-avatar', name: 'Avatar & Measurements', description: 'Body measurements, pose, avatar model', icon: User, action: (_d, cb) => cb.onOpenPanel('Avatar') },
-  { id: 'show-bom', name: 'Bill of Materials', description: 'Fabrics, trims, costs summary', icon: Package, action: (_d, cb) => cb.onOpenPanel('BOM') },
-  { id: 'show-grading', name: 'Grading', description: 'Size grading table (XS–XXL)', icon: Ruler, action: (_d, cb) => cb.onOpenPanel('Grading') },
-  { id: 'show-inspector', name: 'Inspector', description: 'Piece diagnostics and validation', icon: Search, action: (_d, cb) => cb.onOpenPanel('Inspector') },
+  { id: 'show-avatar', name: 'Avatar y medidas', description: 'Medidas corporales, pose y modelo del avatar', icon: User, action: (_d, cb) => cb.onOpenPanel('Avatar') },
+  { id: 'show-bom', name: 'Lista de materiales (BOM)', description: 'Telas, avíos y costos', icon: Package, action: (_d, cb) => cb.onOpenPanel('BOM') },
+  { id: 'show-grading', name: 'Escalado', description: 'Tabla de tallas (XS–XXL)', icon: Ruler, action: (_d, cb) => cb.onOpenPanel('Grading') },
+  { id: 'show-inspector', name: 'Inspector', description: 'Diagnóstico y validación de piezas', icon: Search, action: (_d, cb) => cb.onOpenPanel('Inspector') },
   // Fase1-S2: show-problems / show-simulation / show-colorways / export-techpack
   // eliminados — abrían el placeholder circular "available via ⌘K" (el panel
   // no existe en AppShell.renderPanelContent). Vuelven cuando exista el panel.
-  { id: 'show-nesting', name: 'Nesting Preview', description: 'Fabric nesting layout', icon: Layers, action: (_d, cb) => cb.onOpenPanel('Nesting') },
-  { id: 'show-layers', name: 'Layers', description: 'Piece layer management', icon: Layers, action: (_d, cb) => cb.onOpenPanel('Layers') },
-  { id: 'show-properties', name: 'Properties', description: 'Piece, seam and material properties', icon: SlidersHorizontal, action: (_d, cb) => cb.onOpenPanel('Properties') },
+  { id: 'show-nesting', name: 'Marcada', description: 'Distribución de piezas en la tela (nesting)', icon: Layers, action: (_d, cb) => cb.onOpenPanel('Nesting') },
+  { id: 'show-layers', name: 'Capas', description: 'Capas de piezas', icon: Layers, action: (_d, cb) => cb.onOpenPanel('Layers') },
+  { id: 'show-properties', name: 'Propiedades', description: 'Pieza, costura y materiales', icon: SlidersHorizontal, action: (_d, cb) => cb.onOpenPanel('Properties') },
 
   // ─── Export ───
-  { id: 'export-3d', name: 'Export 3D / Turntable', description: 'High-res stills, 360° turntable, glTF/USDZ', icon: Download, action: (d) => d(openRenderSettings()) },
-  { id: 'export-dxf', name: 'Export DXF', description: 'Export patterns as DXF files', icon: FileText, action: (d) => runUiExport('dxf', store.getState().project, d) },
+  { id: 'export-3d', name: 'Exportar 3D / Vuelta 360°', description: 'Capturas en alta, vuelta 360°, glTF/USDZ', icon: Download, action: (d) => d(openRenderSettings()) },
+  { id: 'export-dxf', name: 'Exportar DXF', description: 'Exporta el patrón como DXF', icon: FileText, action: (d) => runUiExport('dxf', store.getState().project, d) },
 
   // ─── View ───
-  { id: 'view-2d', name: 'View: 2D Only', description: 'Switch to 2D pattern view', icon: Eye, action: (d) => d(setViewMode('2d')) },
-  { id: 'view-3d', name: 'View: 3D Only', description: 'Switch to 3D simulation view', icon: Eye, action: (d) => d(setViewMode('3d')) },
-  { id: 'view-split', name: 'View: Split', description: 'Side-by-side 2D + 3D', icon: Layers, action: (d) => d(setViewMode('split')) },
-  { id: 'input-trackpad', name: 'Use Trackpad Controls', description: 'Two-finger orbit/pan, pinch zoom, ⌥-drag pan', icon: Hand, action: (d) => d(setUserScheme('trackpad')) },
-  { id: 'input-mouse', name: 'Use Mouse Controls', description: 'CLO3D-style: right-drag orbit, wheel zoom', icon: MousePointer2, action: (d) => d(setUserScheme('mouse')) },
+  { id: 'view-2d', name: 'Vista: solo 2D', description: 'Solo el patrón 2D', icon: Eye, action: (d) => d(setViewMode('2d')) },
+  { id: 'view-3d', name: 'Vista: solo 3D', description: 'Solo la simulación 3D', icon: Eye, action: (d) => d(setViewMode('3d')) },
+  { id: 'view-split', name: 'Vista: dividida', description: '2D y 3D lado a lado', icon: Layers, action: (d) => d(setViewMode('split')) },
+  { id: 'input-trackpad', name: 'Controles de trackpad', description: 'Orbitar con dos dedos, zoom con pellizco', icon: Hand, action: (d) => d(setUserScheme('trackpad')) },
+  { id: 'input-mouse', name: 'Controles de mouse', description: 'Estilo CLO3D: orbitar con clic derecho, zoom con rueda', icon: MousePointer2, action: (d) => d(setUserScheme('mouse')) },
 
   // ─── Toggles ───
-  { id: 'toggle-grid', name: 'Toggle Grid', description: 'Show/hide canvas grid', icon: Grid3x3, shortcut: 'G', action: (d) => d(toggleSnapToGrid()) },
-  { id: 'toggle-seam-allowance', name: 'Toggle Seam Allowance', description: 'Show/hide seam allowance', icon: ScanLine, shortcut: '⇧S', action: (d) => d(toggleSeamAllowance()) },
-  { id: 'toggle-grainlines', name: 'Toggle Grainlines', description: 'Show/hide grainline arrows', icon: PenLine, action: (d) => d(toggleGrainlines()) },
-  { id: 'toggle-piece-names', name: 'Toggle Piece Names', description: 'Show/hide piece labels', icon: Tag, action: (d) => d(togglePieceNames()) },
+  { id: 'toggle-grid', name: 'Mostrar u ocultar cuadrícula', description: 'La cuadrícula del canvas', icon: Grid3x3, shortcut: 'G', action: (d) => d(toggleSnapToGrid()) },
+  { id: 'toggle-seam-allowance', name: 'Mostrar u ocultar margen de costura', description: 'El margen alrededor de cada pieza', icon: ScanLine, shortcut: '⇧S', action: (d) => d(toggleSeamAllowance()) },
+  { id: 'toggle-grainlines', name: 'Mostrar u ocultar hilos', description: 'Las flechas de dirección de hilo', icon: PenLine, action: (d) => d(toggleGrainlines()) },
+  { id: 'toggle-piece-names', name: 'Mostrar u ocultar nombres de pieza', description: 'Las etiquetas de cada pieza', icon: Tag, action: (d) => d(togglePieceNames()) },
 
   // ─── Edit ───
-  { id: 'undo', name: 'Undo', description: 'Undo last action', icon: Undo2, shortcut: '⌘Z', action: (d) => d(undo()) },
-  { id: 'redo', name: 'Redo', description: 'Redo last undone action', icon: Redo2, shortcut: '⌘⇧Z', action: (d) => d(redo()) },
+  { id: 'undo', name: 'Deshacer', description: 'Deshace la última acción', icon: Undo2, shortcut: '⌘Z', action: (d) => d(undo()) },
+  { id: 'redo', name: 'Rehacer', description: 'Rehace lo último deshecho', icon: Redo2, shortcut: '⌘⇧Z', action: (d) => d(redo()) },
 ];

@@ -79,7 +79,7 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
             type="button"
             className="dock__add"
             onClick={() => setPickerOpen((o) => !o)}
-            aria-label="Customize dock tools"
+            aria-label="Personalizar herramientas del dock"
             aria-expanded={pickerOpen}
           >
             <Plus size={16} />

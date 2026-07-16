@@ -40,8 +40,8 @@ export default function TopBar({ onOpenPanel, onImportDXF }: TopBarProps) {
         className="icon-btn"
         onClick={handleUndo}
         disabled={!canUndo()}
-        title="Undo (⌘Z)"
-        aria-label="Undo"
+        title="Deshacer (⌘Z)"
+        aria-label="Deshacer"
         style={{ opacity: canUndo() ? 1 : 0.3 }}
       >
         <Undo2 size={14} />
@@ -50,8 +50,8 @@ export default function TopBar({ onOpenPanel, onImportDXF }: TopBarProps) {
         className="icon-btn"
         onClick={handleRedo}
         disabled={!canRedo()}
-        title="Redo (⌘⇧Z)"
-        aria-label="Redo"
+        title="Rehacer (⌘⇧Z)"
+        aria-label="Rehacer"
         style={{ opacity: canRedo() ? 1 : 0.3 }}
       >
         <Redo2 size={14} />

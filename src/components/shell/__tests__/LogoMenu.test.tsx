@@ -40,7 +40,7 @@ function renderMenu() {
 /** Open the dropdown and hover the View top-level entry so its submenu mounts. */
 function openViewMenu() {
   fireEvent.click(screen.getByRole('button', { name: /openclo/i }));
-  fireEvent.mouseEnter(screen.getByText('View'));
+  fireEvent.mouseEnter(screen.getByText('Vista'));
 }
 
 function isChecked(label: string): boolean {
@@ -53,8 +53,8 @@ describe('LogoMenu ▸ View — 2D display toggles', () => {
     const store = renderMenu();
     const before = store.getState().editor.showReferenceImages;
     openViewMenu();
-    expect(isChecked('Reference Images')).toBe(before);
-    fireEvent.click(screen.getByText('Reference Images'));
+    expect(isChecked('Imágenes de referencia')).toBe(before);
+    fireEvent.click(screen.getByText('Imágenes de referencia'));
     expect(store.getState().editor.showReferenceImages).toBe(!before);
   });
 
@@ -62,8 +62,8 @@ describe('LogoMenu ▸ View — 2D display toggles', () => {
     const store = renderMenu();
     const before = store.getState().editor.showLineLengths;
     openViewMenu();
-    expect(isChecked('Line Lengths')).toBe(before);
-    fireEvent.click(screen.getByText('Line Lengths'));
+    expect(isChecked('Largos de línea')).toBe(before);
+    fireEvent.click(screen.getByText('Largos de línea'));
     expect(store.getState().editor.showLineLengths).toBe(!before);
   });
 
@@ -71,22 +71,22 @@ describe('LogoMenu ▸ View — 2D display toggles', () => {
     const store = renderMenu();
     expect(store.getState().editor.renderMode2D).toBe('textured');
     openViewMenu();
-    expect(isChecked('Render: Textured')).toBe(true);
-    expect(isChecked('Render: Wireframe')).toBe(false);
-    fireEvent.click(screen.getByText('Render: Wireframe'));
+    expect(isChecked('Render: texturizado')).toBe(true);
+    expect(isChecked('Render: alambre')).toBe(false);
+    fireEvent.click(screen.getByText('Render: alambre'));
     expect(store.getState().editor.renderMode2D).toBe('wireframe');
     // menu closed on click — reopen and re-assert exclusivity
     openViewMenu();
-    expect(isChecked('Render: Wireframe')).toBe(true);
-    expect(isChecked('Render: Textured')).toBe(false);
+    expect(isChecked('Render: alambre')).toBe(true);
+    expect(isChecked('Render: texturizado')).toBe(false);
   });
 });
 
 describe('LogoMenu ▸ View — 3D display toggles', () => {
   it.each([
-    ['3D: Garment', 'showGarment'],
-    ['3D: Seamlines', 'showSeamlines3D'],
-    ['3D: Internal Lines', 'showInternalLines3D'],
+    ['3D: prenda', 'showGarment'],
+    ['3D: líneas de costura', 'showSeamlines3D'],
+    ['3D: líneas internas', 'showInternalLines3D'],
   ] as const)('%s toggles simulation.%s and reflects checked state', (label, field) => {
     const store = renderMenu();
     const before = store.getState().simulation[field];
