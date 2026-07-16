@@ -21,11 +21,11 @@
   --bg-canvas: #f5f3f0;
   --bg-grid: #e8e4df;
 
-  --text-secondary: #b0b0b0;
-
-  --accent: #4a9eff;
-  --accent-hover: #6bb3ff;
-  --accent-dim: rgba(74, 158, 255, 0.15);
+  /* --text-secondary / --accent / --accent-hover: NO redefinir aquí — este
+     bloque carga después de tokens.css y lo pisaba (la app entera renderizaba
+     el azul VS-Code legacy en vez del indigo del design system). Los valores
+     canónicos viven en styles/tokens.css. */
+  --accent-dim: rgba(99, 102, 241, 0.15); /* legacy alias de --accent-subtle; consumidor vivo: InputSchemeSection */
   --seam-color: #ff6b6b;
   --grainline-color: #6bff6b;
   --selected: #ffd700;
