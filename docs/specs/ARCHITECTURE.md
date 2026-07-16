@@ -1,4 +1,6 @@
-# OpenClo.ai — Architecture Overview (v0.7)
+# OpenClo — Architecture Overview
+
+> Current as of v0.11.0. Intentionally high-level; the code is the source of truth, and the ratified RFCs in [`docs/reports/`](../reports/) govern closed areas.
 
 ## What is OpenClo.ai?
 
@@ -11,11 +13,11 @@ OpenClo.ai is a **Cognitive Design Engine** for professional fashion engineering
 | Layer | Technology |
 |-------|------------|
 | **UI Framework** | React 18 + TypeScript (strict) + Vite 6 |
-| **State Management** | Redux Toolkit |
+| **State Management** | Redux Toolkit + Zustand |
 | **Semantic Engine** | Graph-based Node/Edge Model with deterministic edge IDs |
 | **2D Viewport** | SVG (Semantic Overlay + PathCommand System) |
-| **3D Viewport** | Three.js via React Three Fiber v8 |
-| **Physics Engine** | Extended Position Based Dynamics (XPBD) in **Rust (WASM)** |
+| **3D Viewport** | Three.js (WebGPU renderer, `^0.184`) via React Three Fiber |
+| **Physics Engine** | XPBD cloth, 4-tier cascade: **WebGPU/TSL (default)** → Rust/WASM (fallback + CI parity oracle) → CPU (reference) → Neural (experimental) |
 | **AI Copilot** | Unified Agentic Loop (Provider-Agnostic) with Persistent Memory |
 | **Server** | Node.js + Express (Project storage + Copilot Bridge) |
 | **Testing** | Vitest (unit) + Playwright (E2E) |
@@ -52,14 +54,12 @@ src/
 │   │   ├── AgenticLoop.ts     # Main LLM-driven iteration loop
 │   │   ├── meta-tools/        # Read-only introspection tools
 │   │   └── domainBootstrap.ts # Domain context initialization
-│   ├── action/skills/     # Skill system
-│   │   ├── SkillBuilder.ts    # Skill authoring API
-│   │   └── marketplace.ts     # Registry discovery + validation
+│   ├── action/tools/      # Copilot tool definitions (schema + execute handler)
+│   ├── action/skills/     # Skill system (SkillBuilder, registry)
+│   ├── knowledge/         # RAG knowledge base
 │   ├── memory/            # Durable design memory (cross-session)
 │   ├── providers/         # LLM providers (Anthropic, OpenAI, Ollama)
 │   └── hooks/             # React integration (useBridge)
-├── tools/                 # 45 professional tool definitions
-│   └── definitions/       # Individual tool schemas + handlers
 ├── components/            # UI Layers
 │   ├── PatternEditor/     # 2D SVG canvas with tool hooks
 │   │   └── renderers/     # Overlays (topstitch, etc.)
@@ -98,10 +98,10 @@ src/
 ## Key Architectural Decisions
 
 1. **Semantic-First Representation**: Geometry is a projection of the semantic graph. This allows the AI to "think" in terms of tailoring rules rather than coordinate manipulation.
-2. **Deterministic Physics (Rust/WASM)**: By moving the XPBD solver to Rust, we achieve sub-millisecond physics updates in the browser, enabling "Instant Drape" feedback during drafting.
+2. **Four-tier cloth solver with parity**: The XPBD simulation runs on a WebGPU/TSL tier by default and cascades to Rust/WASM (also the deterministic CI parity oracle), a CPU reference, and an experimental neural tier. Cross-tier equivalence is locked by a boundary-contract test suite (see `docs/reports/2026-05-10-rfc-746-cloth-solver-boundary-contracts.md`).
 3. **Stable Edge References**: All seam connections use `pieceId:edgeName` identifiers instead of fragile index-based references, ensuring stability across edits.
 4. **Unified Agentic Loop**: The copilot uses a single `AgenticLoop` that drives LLM tool-use iteration with meta-tools (read-only) and action tools (mutations), replacing the earlier Planner/Executor/Reasoner triad.
-5. **Silent Ingestion Layer**: Compatibility with formats like Seamly2D or DXF is handled as a background "Hydration Service." Legacy data is imported and automatically upgraded to our semantic model.
+5. **DXF-first import**: The primary import path is DXF/AAMA — the format professional CAD tools (CLO3D, Gerber, Optitex) export. Imported geometry is hydrated into the semantic model: pieces, edges, notches, and grainlines are detected from the flat file. Seamly2D import remains as a deprecated legacy path.
 6. **Durable Agent Memory**: The Copilot's memory is decoupled from the project. It persists across sessions, learning the user's aesthetic and technical standards.
 7. **Agent-Agnostic Protocol**: The communication between the UI and the AI uses a strict JSON-RPC protocol, allowing OpenClo.ai to work with any LLM (Claude, GPT-4, or local Llama3 via Ollama).
 8. **Linked Editing Middleware**: Redux middleware intercepts pattern mutations and propagates changes to linked partner pieces (instance cloning or symmetric mirroring).

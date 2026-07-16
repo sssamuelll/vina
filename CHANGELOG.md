@@ -5,7 +5,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **Real sewing on the avatar (#934, merged 2026-07-10)** — the sewing process (arrange → sew F1–F4a → seam fill → release) closes a garment on the avatar: sleeve tubes close and armholes seal to ~0.3cm at ~29fps on the reference shirt. This is the milestone that took "pieces fall as loose panels" (#531) to "a shirt forms and drapes."
+- **Collision-aware 3D piece placement (#923, arrangement points Phase 1, 2026-06-21)** — imported pieces are placed around the avatar without intersecting the body (sleeves stop passing through the arm), with grading-safe binding anchored by landmark + frame-delta.
+
 ### Changed
+- **The application UI is now Spanish (#942–#947, 2026-07-16)** — a frontend pass put the whole shell, panels, menus, command palette, and error messages into Spanish for the professional-patternmaker audience; grouped the Ctrl+K command palette by category; added a real door to 3D export / turntable from the File menu and palette; and removed ~5,900 lines of dead UI code. Error messages now say what happened, why, and what to do. Contributor docs remain in English.
 - **WebGPU promoted to the default solver tier (#897)** — the cascade runs GPU → WASM → CPU → Neural with WebGPU **on by default** (opt-out via `localStorage 'openclo-use-webgpu' = 'false'`), after the TSL tier reached ≥30fps prod-verified on the María fixture with seams, body and self collision all closing on GPU. Three.js bumped to `^0.184`; the upstream `atomicAdd` bug (#554) is worked around in `src/utils/cloth/gpu/atomicStorage.ts` (storage `setAtomic(true)` → `array<atomic<T>>`), so it no longer blocks the tier. **WASM is now the fallback, not the default** — kept as the CPU-side solver for browsers without WebGPU and as the deterministic CI parity oracle.
 
 ### Fixed

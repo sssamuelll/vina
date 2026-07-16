@@ -1,13 +1,13 @@
 # Contributing to OpenClo
 
-Thanks for your interest in OpenClo! This guide will get you up and running.
+Thanks for your interest in OpenClo. This guide gets you from clone to first PR.
 
 ## Prerequisites
 
 - **Node.js 18+**
-- **npm** or **pnpm**
+- **npm**
 - Git
-- **Rust + wasm-pack** (only if modifying the XPBD solver)
+- **Rust + wasm-pack** — only if you modify the XPBD solver in `crates/xpbd-wasm`
 
 ## Setup
 
@@ -18,123 +18,127 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5180`
+Open `http://localhost:5173`.
 
-## Project Structure
+## Project structure
 
 ```
 src/
-├── components/        # React UI components
-│   ├── shell/             # AppShell + UnifiedBar (chat/commands/settings) + TopBar + LeftDock/RightDock (DockShell — 2D & 3D side docks) + ContextPanel
-│   ├── DisplayBar2D/      # 2D context toolbar (toggles, render modes)
+├── components/        # React UI
+│   ├── shell/             # AppShell + UnifiedBar (chat / commands / settings) + docks + ContextPanel
 │   ├── PatternEditor/     # 2D SVG canvas + tool hooks
-│   ├── Viewport3D/        # R3F 3D viewport, collision bodies, snapshots
-│   ├── Toolbar2D/         # 2D tool buttons
-│   ├── Toolbar3D/         # 3D tool buttons
-│   └── BottomPanel/       # Lazy sub-tabs (BOMTab, GradingTab, InspectorTab, NestingTab) loaded into ContextPanel
-├── copilot/           # AI copilot system
+│   ├── Viewport3D/        # R3F 3D viewport, collision bodies, simulation
+│   ├── PropertiesPanel/   # Selected-entity inspector
+│   └── BottomPanel/       # Lazy sub-tabs: BOMTab, GradingTab, NestingTab, InspectorTab
+├── copilot/           # AI copilot
 │   ├── reasoning/bridge/  # AgenticLoop, meta-tools, domain bootstrap
-│   ├── action/skills/     # Skill system (SkillBuilder, marketplace, registry)
+│   ├── action/tools/      # Tool definitions the agent (and UI) call
+│   ├── action/skills/     # Skill system (SkillBuilder, registry)
+│   ├── knowledge/         # RAG knowledge base
 │   ├── memory/            # Durable design memory
 │   └── providers/         # LLM providers (Anthropic, OpenAI, Ollama)
-├── tools/             # Tool definitions (45 tools)
-│   └── definitions/       # Individual tool schemas + handlers
-├── store/             # Redux Toolkit slices
-│   ├── collisionBodySlice.ts  # Multi-body collision state
-│   ├── simulationSlice.ts     # Simulation + snapshots
-│   ├── cameraSlice.ts         # 3D camera presets
-│   └── linkedEditingMiddleware.ts  # Symmetric propagation
+├── store/             # Redux Toolkit slices + middleware
+├── stores/            # Zustand state
 ├── utils/             # Core engines
 │   ├── cloth/             # XPBD solver, triangle collision, fabric library
+│   ├── cloth/gpu/         # WebGPU (TSL) solver
 │   ├── dxf/               # DXF parser, converter, AAMA export
-│   ├── geometry/          # Geometry extraction + utilities
 │   ├── grading/           # Multi-size scaling
-│   ├── nesting/           # Bin packing layout
+│   ├── nesting/           # Bin-packing layout
 │   └── seam/              # Seam allowance engine
-├── types/             # TypeScript type definitions
+├── types/             # Shared TypeScript types
 └── workers/           # Web Workers (WASM + CPU solvers)
 
 crates/
 └── xpbd-wasm/         # Rust WASM cloth solver
 
 docs/
-├── specs/             # Architecture, roadmap, simulation, testing specs
-├── api/               # API documentation (DXF, grading, nesting, etc.)
-├── research/          # Cloth simulation research, fabric calibration
-└── business/          # Strategy and pitch documents
+├── specs/             # Architecture, simulation, testing specs
+├── api/               # Engine API docs (DXF, grading, nesting, ...)
+├── research/          # Cloth-simulation research, fabric calibration
+├── reports/           # Closed-audit RFCs (read before touching a ratified area)
+└── business/          # Strategy documents
 ```
 
-## Running Tests
+## The commit gate
+
+Run this before every commit. All three must pass:
 
 ```bash
-npx vitest run          # Unit tests (186 test files)
-npx vitest run --watch  # Watch mode
-npm run test:e2e        # E2E tests (Playwright)
-npx tsc --noEmit        # Type check
+npx tsc -b --noEmit && npm run test && npm run lint
 ```
 
-## Code Style
+Two things that trip people up:
 
-- **TypeScript strict** — no `any`, no unused variables
-- **JSDoc on all exports** — document public functions and types
-- **Domain terminology** — use correct garment/pattern terms (see below)
-- Functional components, hooks over classes
-- Keep files focused — one component or engine per file
+- **Typecheck must be build mode: `npx tsc -b --noEmit`, not bare `tsc --noEmit`.** The root `tsconfig` has `"files": []`, so bare `tsc --noEmit` reports clean *vacuously* — it checks nothing. The pre-commit hook uses `-b`; match it.
+- A **Husky pre-commit hook** runs the fast half automatically (`tsc -b` + ESLint on staged files, `--max-warnings=0`). It does **not** run the full test suite — that's on you before you push. Don't bypass the hook with `--no-verify`.
 
-## PR Process
+Other useful commands:
 
-1. **Fork** the repo
-2. **Branch** from `main` (`feat/your-feature` or `fix/your-fix`)
-3. **Write tests** for new functionality
-4. **Run** `npx vitest run` — all tests must pass
-5. **Open PR** with a clear description of what and why
+```bash
+npm run test:watch    # Vitest in watch mode
+npm run test:e2e      # Playwright end-to-end tests
+npm run lint          # ESLint
+```
 
-### Automated PR checks
+The suite is ~6,000 unit tests across ~440 files, plus Playwright E2E.
 
-- `.github/workflows/pr-checks.yml` runs on every PR open / synchronize / reopen and **fails** if the PR's head SHA matches a recently merged PR. This is the cheapest check that would have caught the #590 = #591 duplicate merge (same head ref + SHA, merged nine hours apart). If you intentionally re-apply a previously merged commit (e.g. after a revert), close the existing PR and open a new one with a fresh commit on top.
-- The same workflow emits a non-blocking warning if the head **branch name** matches a recently merged PR's branch but the SHA differs — verify it is a deliberate follow-up, not an accidental re-push of a stale branch.
+## Code style
 
-## Engine Development Guidelines
+- **TypeScript strict** — no `any`, no unused variables.
+- **JSDoc on exports** — document public functions and types.
+- **Domain terminology** — use correct garment terms (see the glossary below).
+- Functional components, hooks over classes.
+- Keep files focused: one component or one engine per file.
+- Use `newId()` from `src/utils/ids.ts` for entity IDs.
+
+## Engine guidelines
 
 Each engine in `src/utils/` is an independent module:
 
-- **No external dependencies** for algorithm code — pure TypeScript math
-- **Must have unit tests** — see existing `*.test.ts` files for patterns
-- **Single responsibility** — one engine, one concern (e.g., seam allowance, nesting, grading)
-- **Deterministic** — same input, same output, no side effects
-- Export pure functions, not classes (unless state is truly needed)
+- **Pure TypeScript math** — no external dependencies in algorithm code.
+- **Unit-tested** — see the neighboring `*.test.ts` for the pattern.
+- **Single responsibility** — one engine, one concern (seam allowance, nesting, grading, ...).
+- **Deterministic** — same input, same output, no side effects.
+- Export pure functions, not classes, unless state is genuinely required.
 
-Current engines: seam allowance, nesting (bin packing), grading, formula, DXF parser/converter/exporter, PDF exporter, OBJ exporter, cloth simulation (XPBD), triangle collision, edit classifier, geometry utilities.
+## Adding things
 
-## Adding a Tool
+- **A copilot tool** → add a definition under `src/copilot/action/tools/definitions/` (schema + execute handler returning a `ToolResult`) and register it; copy the shape of an existing tool.
+- **A fabric preset** → append to `PHYSICAL_FABRIC_LIBRARY` in `src/utils/cloth/physicalFabric.ts` with realistic textile properties.
+- **Cloth physics** → the Rust solver in `crates/xpbd-wasm/src/lib.rs` and the JS fallback in `src/utils/cloth/xpbdSolver.ts`. Rebuilding WASM copies **both** `xpbd_wasm.js` and `xpbd_wasm_bg.wasm` into `public/wasm/` — a JS-only copy silently falls back to CPU.
 
-1. Create a definition file in `src/tools/definitions/yourTool.tsx`
-2. Define the tool schema with name, shortcut, icon, and options
-3. Implement the execute handler
-4. Register in the tool registry
-5. Add tests
+Areas with a closed audit (`docs/reports/`) have ratified conventions — read the relevant RFC before adding code there.
 
-## Adding a Fabric Preset
+## PR process
 
-1. Edit `src/utils/cloth/physicalFabric.ts`
-2. Add to `PHYSICAL_FABRIC_LIBRARY` array with realistic textile properties
+1. **Fork** the repo.
+2. **Branch** from `main` (`feat/your-feature` or `fix/your-fix`).
+3. **Write tests** for new behavior — we practice test-first where we can.
+4. **Run the gate** (`npx tsc -b --noEmit && npm run test && npm run lint`).
+5. **Open a PR** with a clear description of what changed and why.
 
-## Terminology Guide
+### Automated PR checks
 
-Use consistent terminology across code, comments, and docs:
+`.github/workflows/pr-checks.yml` runs on every PR and **fails** if the PR's head SHA matches a recently merged PR — the cheapest guard against an accidental duplicate merge. If you intentionally re-apply a previously merged commit (e.g. after a revert), open a fresh PR with a new commit on top. The same workflow warns (non-blocking) when a branch name matches a recently merged PR but the SHA differs, so you can catch a stale re-push.
 
-| English | Espanol | Description |
-|---------|---------|-------------|
-| Pattern piece | Pieza | A single flat shape to be cut from fabric |
+## Terminology
+
+Use consistent garment terms across code, comments, and docs. The product UI is Spanish; these are the anchors:
+
+| English | Español | Meaning |
+|---------|---------|---------|
+| Pattern piece | Pieza | A single flat shape cut from fabric |
 | Seam | Costura | Where two pieces are sewn together |
-| Notch | Muesca | Alignment mark on a seam edge |
-| Grainline | Hilo | Arrow showing fabric grain direction |
 | Seam allowance | Margen de costura | Extra fabric around the sewing line |
-| Grading | Escalado | Scaling a pattern across sizes |
+| Notch | Piquete | Alignment mark on a seam edge |
+| Grainline | Hilo | Arrow showing fabric grain direction |
 | Dart | Pinza | V-shaped fold for shaping |
-| Bodice | Corpino | Upper body pattern block |
-| Topstitch | Pespunte | Decorative/structural visible stitch line |
+| Grading | Escalado | Scaling a pattern across sizes |
+| Nesting | Marcada | Arranging pieces to minimize fabric use |
+| Topstitch | Pespunte | Decorative or structural visible stitch |
+| Interfacing | Entretela | Stiffening layer fused to fabric |
 
-## Code of Conduct
+## Code of conduct
 
-Be respectful, constructive, and inclusive. We follow the [Contributor Covenant](https://www.contributor-covenant.org/version/2/1/code_of_conduct/).
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). Be respectful, constructive, and inclusive.
