@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { updatePiece, removePiece, unlinkPieces, setLayer, setSublayer, addAnnotation, removeAnnotation, setFabricCode, addPlacementRule, removePlacementRule } from '../../store/projectSlice';
+import { updatePiece, unlinkPieces, setLayer, setSublayer, addAnnotation, removeAnnotation, setFabricCode, addPlacementRule, removePlacementRule } from '../../store/projectSlice';
 import { setToolOption } from '../../store/toolSlice';
 import { STANDARD_FABRIC_CODES } from '../../utils/fabricCodes';
-import { clearSelection, selectPiece } from '../../store/editorSlice';
+import { selectPiece } from '../../store/editorSlice';
 import type { NotchShape, NotchOptions, InterfacingType, PatternPiece, PlacementRule, PlacementRuleType } from '../../types/types';
 import { DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
@@ -14,10 +14,12 @@ import PropertySection from './PropertySection';
 interface PiecePropertiesProps {
   piece: PatternPiece;
   collapsed: boolean;
+  /** SIMULACIÓN plegada por defecto — patronaje y solver no se mezclan (Fase 3). */
+  simCollapsed: boolean;
   onToggle: (id: string) => void;
 }
 
-export default function PieceProperties({ piece, collapsed, onToggle }: PiecePropertiesProps) {
+export default function PieceProperties({ piece, collapsed, simCollapsed, onToggle }: PiecePropertiesProps) {
   const dispatch = useDispatch();
   const fabrics = useSelector((s: RootState) => s.project.fabrics);
   const pieces = useSelector((s: RootState) => s.project.pieces);
@@ -50,11 +52,6 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
       annotation: { id: annotationId(), text: sanitizeAnnotationText(customText), position: 'center', category: 'general', fontSize: 8 },
     }));
     setCustomText('');
-  };
-
-  const handleDeletePiece = () => {
-    dispatch(removePiece(piece.id));
-    dispatch(clearSelection());
   };
 
   return (
@@ -164,30 +161,6 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         </select>
       </div>
       <div className="panel-field">
-        <label>Solidificar</label>
-        <input
-          type="range" className="panel-slider"
-          min={0} max={100} value={Math.round((piece.solidifyFactor ?? 0) * 100)}
-          onChange={e => dispatch(updatePiece({ ...piece, solidifyFactor: Number(e.target.value) / 100, updatedAt: Date.now() }))}
-        />
-        <span className="panel-value">{((piece.solidifyFactor ?? 0) * 100).toFixed(0)}%</span>
-      </div>
-      <div className="panel-field">
-        <label>Presión (Pa)</label>
-        <input
-          type="range" className="panel-slider"
-          min={0} max={500} step={10}
-          value={piece.pressurePa || 0}
-          onChange={e => dispatch(updatePiece({ ...piece, pressurePa: Number(e.target.value), updatedAt: Date.now() }))}
-        />
-        <span className="panel-value">{piece.pressurePa || 0}</span>
-      </div>
-      {(piece.interfacingType && piece.interfacingType !== 'none' || (piece.solidifyFactor ?? 0) > 0) && (
-        <div className="panel-hint">
-          Rigidez efectiva: {computeStiffnessMultiplier(piece.interfacingType, piece.solidifyFactor).toFixed(1)}x
-        </div>
-      )}
-      <div className="panel-field">
         <label htmlFor="prop-piece-mirror">Espejada</label>
         <input
           id="prop-piece-mirror"
@@ -279,10 +252,6 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         </select>
       </div>
 
-      <button className="panel-delete" onClick={handleDeletePiece}>
-        Eliminar pieza
-      </button>
-
       {/* Notch defaults — written to tools.toolOptions.notch; the notch tool
           merges them over DEFAULT_NOTCH_OPTIONS on every placement. */}
       <div className="panel-subblock">
@@ -352,6 +321,35 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         />
       </div>
     </PropertySection>
+
+    <PropertySection id="sim" title="SIMULACIÓN" collapsed={simCollapsed} onToggle={onToggle}>
+      <div className="panel-field">
+        <label>Solidificar</label>
+        <input
+          type="range" className="panel-slider"
+          min={0} max={100} value={Math.round((piece.solidifyFactor ?? 0) * 100)}
+          onChange={e => dispatch(updatePiece({ ...piece, solidifyFactor: Number(e.target.value) / 100, updatedAt: Date.now() }))}
+        />
+        <span className="panel-value">{((piece.solidifyFactor ?? 0) * 100).toFixed(0)}%</span>
+      </div>
+      <div className="panel-field">
+        <label>Presión (Pa)</label>
+        <input
+          type="range" className="panel-slider"
+          min={0} max={500} step={10}
+          value={piece.pressurePa || 0}
+          onChange={e => dispatch(updatePiece({ ...piece, pressurePa: Number(e.target.value), updatedAt: Date.now() }))}
+        />
+        <span className="panel-value">{piece.pressurePa || 0}</span>
+      </div>
+      {(piece.interfacingType && piece.interfacingType !== 'none' || (piece.solidifyFactor ?? 0) > 0) && (
+        <div className="panel-hint">
+          Rigidez efectiva: {computeStiffnessMultiplier(piece.interfacingType, piece.solidifyFactor).toFixed(1)}x
+        </div>
+      )}
+    </PropertySection>
+
+
     </>
   );
 }
