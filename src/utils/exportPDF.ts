@@ -1,4 +1,4 @@
-import { PatternPiece, PathCommand } from '../types/types';
+import { PatternPiece, PathCommand, Seam } from '../types/types';
 import { preparePieces } from './export/pipeline';
 import { escapePdfString } from './sanitizeName';
 
@@ -73,9 +73,9 @@ function commandsToPDFPath(
  * Uses shared pipeline for piece preparation (bbox, SA, layout).
  * Returns raw PDF bytes as a string (ASCII + binary-safe via Blob).
  */
-export function generatePDF(pieces: PatternPiece[]): string {
+export function generatePDF(pieces: PatternPiece[], seams?: Seam[]): string {
   const MARGIN = 20; // mm
-  const prepared = preparePieces(pieces, { spacing: 30 });
+  const prepared = preparePieces(pieces, { spacing: 30, seams });
 
   // Calculate total layout dimensions
   let totalW = MARGIN * 2;
@@ -198,8 +198,8 @@ export function generatePDF(pieces: PatternPiece[]): string {
 }
 
 /** Download PDF as file */
-export function downloadPDF(pieces: PatternPiece[], filename = 'pattern.pdf') {
-  const pdf = generatePDF(pieces);
+export function downloadPDF(pieces: PatternPiece[], filename = 'pattern.pdf', seams?: Seam[]) {
+  const pdf = generatePDF(pieces, seams);
   const blob = new Blob([pdf], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

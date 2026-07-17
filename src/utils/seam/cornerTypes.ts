@@ -2,6 +2,7 @@ import type { PathCommand, Point2D, SemanticEdge } from '../../types/types';
 import type { CornerType } from '../../types/types';
 import { Clipper, Paths64, Path64, Point64 } from 'clipper2-js';
 import { flattenPathWithSource } from './index';
+import type { SourcedPoint } from './index';
 
 // Clipper2 scale: integer coords at 100x for 0.01mm precision (same as index.ts)
 const CLIPPER_SCALE = 100;
@@ -553,6 +554,234 @@ export function perEdgeWidths(
   return widths;
 }
 
+// ─── Matched corner ("Empatada") support ─────────────────────────────────
+//
+// A `match` corner slides the sewn border's cut-line endpoint at the vertex so
+// the border's cut length equals `targetLen` (the partner border's cut length,
+// resolved in matchResolver.ts). Base length is the border's mitered cut length;
+// delta = targetLen − baseLen slides the endpoint (extend / retract) and the
+// corner closes straight to the adjacent border's offset — the "necessary angle".
+
+/** Which adjacent border of the match vertex is the sewn one, + its target cut length. */
+export interface MatchTarget {
+  /** 'prev' = incoming border (covers the vertex's command); 'next' = outgoing border. */
+  side: 'prev' | 'next';
+  /** Desired cut length (mm) of the sewn border. */
+  targetLen: number;
+}
+
+/** Match resolution keyed by outline COMMAND index (same key space as cornerTypes). */
+export type MatchLookup = Record<number, MatchTarget>;
+
+/** The flattened + offset scaffolding the edge-walk operates on (Steps 1-3). */
+export interface OffsetEdgeData {
+  /** Flattened outline points (closing duplicate removed), tagged by source command. */
+  sourced: SourcedPoint[];
+  vertices: Point2D[];
+  edges: Line2D[];
+  edgeWidths: number[];
+  offsetEdges: Line2D[];
+  n: number;
+}
+
+/**
+ * Flatten + build per-edge offsets for an outline (generator Steps 1-3),
+ * factored out so the resolver can measure a partner border's cut length with
+ * the exact same geometry the generator produces. Returns null for degenerate
+ * outlines (< 3 vertices).
+ */
+export function buildOffsetEdges(
+  outline: PathCommand[],
+  saWidth: number,
+  semanticEdges?: SemanticEdge[],
+): OffsetEdgeData | null {
+  const sourced = flattenPathWithSource(outline);
+  if (sourced.length >= 2) {
+    const first = sourced[0];
+    const last = sourced[sourced.length - 1];
+    if (Math.abs(first.x - last.x) < 1e-6 && Math.abs(first.y - last.y) < 1e-6) {
+      sourced.pop();
+    }
+  }
+  if (sourced.length < 3) return null;
+
+  const vertices: Point2D[] = sourced.map((p) => ({ x: p.x, y: p.y }));
+  const n = vertices.length;
+  const edges: Line2D[] = [];
+  for (let i = 0; i < n; i++) edges.push({ start: vertices[i], end: vertices[(i + 1) % n] });
+  const edgeWidths = perEdgeWidths(sourced.map((p) => p.cmd), semanticEdges, saWidth);
+  const offsetEdges = edges.map((e, i) => offsetEdge(e, edgeWidths[i]));
+  return { sourced, vertices, edges, edgeWidths, offsetEdges, n };
+}
+
+/** Mitered corner point at flattened vertex k (matches cornerMitered, incl. its parallel fallback). */
+function miterAt(offsetEdges: Line2D[], n: number, k: number): Point2D {
+  const prev = offsetEdges[(k - 1 + n) % n];
+  const next = offsetEdges[k % n];
+  const pt = lineIntersection(prev, next);
+  return pt ?? { ...prev.end };
+}
+
+function polylineLength(pts: Point2D[]): number {
+  let s = 0;
+  for (let i = 1; i < pts.length; i++) s += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  return s;
+}
+
+/**
+ * Flattened edge indices belonging to a SemanticEdge's command range, as a
+ * sorted ascending run. Returns null when the range emits no edges or the run
+ * is non-contiguous / wraps the polygon closure (caller falls back to mitered).
+ * ponytail: wrap-spanning borders (closing edge) are the rare case; falling back
+ * to mitered there is acceptable until a real garment needs it.
+ */
+function edgesInBorder(sourced: SourcedPoint[], n: number, range: [number, number]): number[] | null {
+  const [start, end] = range;
+  const run: number[] = [];
+  for (let j = 0; j < n; j++) {
+    const owningCmd = sourced[(j + 1) % n].cmd;
+    if (owningCmd >= start && owningCmd < end) run.push(j);
+  }
+  if (run.length === 0) return null;
+  run.sort((a, b) => a - b);
+  if (run[run.length - 1] - run[0] + 1 !== run.length) return null; // gap / wrap
+  return run;
+}
+
+/**
+ * Length of a SemanticEdge's mitered cut line (the outward SA offset polyline),
+ * built with the exact geometry `generateSeamAllowanceWithCorners` uses. Used by
+ * matchResolver to read a partner border's target length. Corners are ALWAYS
+ * mitered here — this is the one-level anti-recursion: measuring a partner never
+ * re-resolves the partner's own `match` corners. Returns null when unmeasurable.
+ */
+export function measureBorderCutLength(
+  outline: PathCommand[],
+  saWidth: number,
+  semanticEdges: SemanticEdge[] | undefined,
+  segmentRange: [number, number],
+): number | null {
+  const data = buildOffsetEdges(outline, saWidth, semanticEdges);
+  if (!data) return null;
+  const run = edgesInBorder(data.sourced, data.n, segmentRange);
+  if (!run) return null;
+  const miters: Point2D[] = [];
+  for (let k = run[0]; k <= run[run.length - 1] + 1; k++) miters.push(miterAt(data.offsetEdges, data.n, k % data.n));
+  return polylineLength(miters);
+}
+
+/**
+ * Slide the near endpoint of a mitered cut polyline (ordered far→near) to make
+ * the total length `targetLen`. Returns the slid endpoint E and `lastRetainedIdx`
+ * (the index of the last far-side miter kept before E). delta≥0 extends the last
+ * segment colinearly; delta<0 walks back from the far end accumulating length,
+ * clamped to keep ≥10% of the base. Returns null for a degenerate polyline.
+ */
+function slideMatchEndpoint(
+  mitersFarToNear: Point2D[],
+  targetLen: number,
+): { E: Point2D; lastRetainedIdx: number } | null {
+  const m = mitersFarToNear;
+  const last = m.length - 1;
+  if (last < 1) return null;
+
+  const seg: number[] = [];
+  let baseLen = 0;
+  for (let p = 0; p < last; p++) {
+    const l = Math.hypot(m[p + 1].x - m[p].x, m[p + 1].y - m[p].y);
+    seg.push(l);
+    baseLen += l;
+  }
+  if (baseLen < 1e-9) return null;
+
+  if (targetLen >= baseLen) {
+    // Extend beyond the near end along the last segment's direction.
+    const l = seg[last - 1] || 1e-9;
+    const ux = (m[last].x - m[last - 1].x) / l;
+    const uy = (m[last].y - m[last - 1].y) / l;
+    const extra = targetLen - baseLen;
+    return { E: { x: m[last].x + ux * extra, y: m[last].y + uy * extra }, lastRetainedIdx: last - 1 };
+  }
+
+  // Retract; clamp to keep at least 10% of the base length.
+  const target = Math.max(targetLen, 0.1 * baseLen);
+  let acc = 0;
+  for (let p = 0; p < last; p++) {
+    if (acc + seg[p] >= target) {
+      const t = (target - acc) / (seg[p] || 1e-9);
+      return {
+        E: { x: m[p].x + (m[p + 1].x - m[p].x) * t, y: m[p].y + (m[p + 1].y - m[p].y) * t },
+        lastRetainedIdx: p,
+      };
+    }
+    acc += seg[p];
+  }
+  return { E: { ...m[last - 1] }, lastRetainedIdx: last - 1 }; // numerical guard
+}
+
+/**
+ * Resolve a `match` vertex into a map of per-vertex output-slot replacements.
+ * Returns null → the vertex falls back to the mitered output already in `out[i]`
+ * (missing border, wrap, degenerate). Operates entirely on `data.offsetEdges` —
+ * independent of emit order, applied as a post-pass over the per-vertex arrays.
+ *
+ * The map rewrites three groups of slots:
+ *  - The sewn border's own slots keep only their miter (the true cut line),
+ *    dropping the redundant on-edge start point — those detour points are
+ *    harmless under a full miter but poke through the retraction notch and
+ *    make Clipper's largest-area pick drop the far corner.
+ *  - Near-side corner slots the retraction consumes are emptied.
+ *  - The match vertex slot carries the slid endpoint + the straight closure.
+ */
+function resolveMatchVertex(
+  data: OffsetEdgeData,
+  i: number,
+  entry: MatchTarget,
+  semanticEdges: SemanticEdge[],
+): Map<number, Point2D[]> | null {
+  const { sourced, offsetEdges, n } = data;
+  const coveringCmd = entry.side === 'prev' ? sourced[i].cmd : sourced[(i + 1) % n].cmd;
+  const border = semanticEdges.find(
+    (e) => e.segmentRange[0] <= coveringCmd && coveringCmd < e.segmentRange[1],
+  );
+  if (!border) return null;
+  const run = edgesInBorder(sourced, n, border.segmentRange);
+  if (!run) return null;
+
+  // Corner vertices spanning the border, oriented far → near (near = vertex i).
+  let cornersFarToNear: number[];
+  if (entry.side === 'prev') {
+    if ((run[run.length - 1] + 1) % n !== i) return null; // border must end at this vertex
+    cornersFarToNear = [];
+    for (let k = run[0]; k <= run[run.length - 1] + 1; k++) cornersFarToNear.push(k % n);
+  } else {
+    if (run[0] % n !== i) return null; // border must start at this vertex
+    const nearToFar: number[] = [];
+    for (let k = run[0]; k <= run[run.length - 1] + 1; k++) nearToFar.push(k % n);
+    cornersFarToNear = nearToFar.slice().reverse();
+  }
+
+  const miters = cornersFarToNear.map((k) => miterAt(offsetEdges, n, k));
+  const slid = slideMatchEndpoint(miters, entry.targetLen);
+  if (!slid) return null;
+
+  const updates = new Map<number, Point2D[]>();
+  // Sewn border slots → miter-only (strip the redundant on-edge detour point).
+  for (const k of run) updates.set(k, [miterAt(offsetEdges, n, k)]);
+  // Near-side corners past the retained endpoint are consumed.
+  for (const v of cornersFarToNear.slice(slid.lastRetainedIdx + 1)) {
+    if (v !== i) updates.set(v, []);
+  }
+  // The match vertex carries the slid endpoint and the straight closure.
+  updates.set(
+    i,
+    entry.side === 'prev'
+      ? [slid.E, { ...offsetEdges[i].start }] // cut endpoint, then close to the adjacent (next) offset
+      : [{ ...offsetEdges[(i - 1 + n) % n].end }, slid.E], // adjacent (prev) offset, then close to cut endpoint
+  );
+  return updates;
+}
+
 // ─── generateSeamAllowanceWithCorners ─────────────────────────────────────
 
 /**
@@ -576,8 +805,11 @@ export function perEdgeWidths(
  * @param defaultCornerType Corner type used when a vertex has no explicit override
  * @param cornerTypes       Per-vertex overrides (key = vertex index in outline)
  * @param semanticEdges     Optional piece.edges — supplies per-edge SA widths via
- *                          `seamAllowanceWidth`; absent → uniform `saWidth`
- * @param seamLookup        Optional seam lookup for 'match' corner resolution (unused at this level)
+ *                          `seamAllowanceWidth`; absent → uniform `saWidth`. Also
+ *                          identifies the sewn border for `match` corners.
+ * @param matchLookup       Optional `match`-corner resolution (command index →
+ *                          {side, targetLen}, from matchResolver.buildMatchLookup).
+ *                          Absent, or no entry for a vertex → mitered (byte-identical).
  */
 export function generateSeamAllowanceWithCorners(
   outline: PathCommand[],
@@ -585,87 +817,63 @@ export function generateSeamAllowanceWithCorners(
   defaultCornerType: CornerType,
   cornerTypes: Record<number, CornerType>,
   semanticEdges?: SemanticEdge[],
-  _seamLookup?: (vertexIndex: number) => { pieceId: string; vertexIndex: number } | null,
+  matchLookup?: MatchLookup,
 ): PathCommand[] {
   // ── Guard: degenerate inputs ──────────────────────────────────────────────
   if (saWidth <= 0) return [];
 
-  // ── Step 1: Flatten curves to line segments, then extract vertices ────────
-  // flattenPathWithSource linearizes C/Q/A commands into points so the edge-walk
-  // handles curved outlines (armholes, necklines, hems), and tags each point
-  // with its source command index. cornerTypes is keyed by COMMAND index
-  // (findNearestVertex walks the command array); without the source tag a curved
-  // piece would apply an override to the wrong flattened vertex (a mid-curve
-  // sample) instead of the real corner.
-  const sourced = flattenPathWithSource(outline);
+  // ── Steps 1-3: Flatten + build per-edge offsets ───────────────────────────
+  // flattenPathWithSource linearizes C/Q/A commands so the edge-walk handles
+  // curved outlines, tagging each point with its source command index (cornerTypes
+  // is keyed by COMMAND index). Per-edge offsets carry the per-edge SA widths.
+  const data = buildOffsetEdges(outline, saWidth, semanticEdges);
+  if (!data) return [];
+  const { sourced, vertices, edges, edgeWidths, offsetEdges, n } = data;
 
-  // Remove closing duplicate if present
-  if (sourced.length >= 2) {
-    const first = sourced[0];
-    const last = sourced[sourced.length - 1];
-    if (Math.abs(first.x - last.x) < 1e-6 && Math.abs(first.y - last.y) < 1e-6) {
-      sourced.pop();
-    }
-  }
-
-  if (sourced.length < 3) return [];
-
-  const vertices: Point2D[] = sourced.map((p) => ({ x: p.x, y: p.y }));
-  const n = vertices.length;
-
-  // ── Step 2: Build edges (each consecutive pair; polygon wraps) ────────────
-  const edges: Line2D[] = [];
-  for (let i = 0; i < n; i++) {
-    edges.push({
-      start: vertices[i],
-      end: vertices[(i + 1) % n],
-    });
-  }
-
-  // ── Step 3: Offset each edge outward by its per-edge width ─────────────────
-  // Each edge offsets by its own SA width (per-edge SA); absent → uniform saWidth.
-  const edgeWidths = perEdgeWidths(sourced.map((p) => p.cmd), semanticEdges, saWidth);
-  const offsetEdges: Line2D[] = edges.map((e, i) => offsetEdge(e, edgeWidths[i]));
-
-  // ── Step 4 + 5: Assemble the SA outline ──────────────────────────────────
-  // For each vertex i, the corner is between offsetEdges[i-1] (prev) and
-  // offsetEdges[i] (next). The corner function returns geometry points.
-  const resultPoints: Point2D[] = [];
+  // ── Step 4 + 5: Assemble the SA outline, one array of points per vertex ────
+  // out[i] = [nextOffsetEdge.start, ...cornerGeometry]. Flattened in order this
+  // is byte-identical to the legacy single-pass emit; the per-vertex structure
+  // lets the `match` post-pass rewrite a vertex and trim the slots its
+  // retraction consumes, without disturbing any other vertex.
+  const out: Point2D[][] = [];
 
   for (let i = 0; i < n; i++) {
     const prevOffsetEdge = offsetEdges[(i + n - 1) % n];
     const nextOffsetEdge = offsetEdges[i];
     const vertex = vertices[i];
 
-    // Resolve corner type: cornerTypes is keyed by source command index, so map
-    // this flattened vertex back to the command that produced it. Mid-curve
-    // samples carry the curve command's index (which carries no corner override),
-    // so they correctly fall through to defaultCornerType.
     const type: CornerType = cornerTypes[sourced[i].cmd] ?? defaultCornerType;
     const cornerFn = getCornerFunction(type);
 
-    // Compute interior angle for corner functions that need it
     const prevEdge = edges[(i + n - 1) % n];
     const nextEdge = edges[i];
     const angle = interiorAngle(prevEdge, nextEdge);
 
-    // Get corner geometry points. The two adjacent edges may carry different
-    // per-edge widths (e.g. a 40mm hem meeting a 10mm armhole); the corner
-    // function resolves the asymmetry. prevWidth = incoming edge (i-1),
-    // nextWidth = outgoing edge (i).
+    // prevWidth = incoming edge (i-1), nextWidth = outgoing edge (i).
     const prevWidth = edgeWidths[(i + n - 1) % n];
     const nextWidth = edgeWidths[i];
     const cornerPts = cornerFn(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, angle);
 
-    // Emit the start of the offset edge for the NEXT edge (i.e., nextOffsetEdge.start),
-    // then the corner geometry points.
-    // The start of nextOffsetEdge is the offset vertex on the incoming side.
-    resultPoints.push({ ...nextOffsetEdge.start });
-    for (const pt of cornerPts) {
-      resultPoints.push(pt);
+    out.push([{ ...nextOffsetEdge.start }, ...cornerPts]);
+  }
+
+  // ── Step 5b: Matched corners ──────────────────────────────────────────────
+  // For each `match` vertex with a resolved target, slide the sewn border's
+  // cut-line endpoint to the target length and close straight to the adjacent
+  // border. Anything unresolved (no lookup, no entry, missing border) leaves the
+  // mitered `out[i]` in place → byte-identical to today.
+  if (matchLookup && semanticEdges) {
+    for (let i = 0; i < n; i++) {
+      if ((cornerTypes[sourced[i].cmd] ?? defaultCornerType) !== 'match') continue;
+      const entry = matchLookup[sourced[i].cmd];
+      if (!entry) continue;
+      const resolved = resolveMatchVertex(data, i, entry, semanticEdges);
+      if (!resolved) continue;
+      for (const [slot, pts] of resolved) out[slot] = pts;
     }
   }
 
+  const resultPoints: Point2D[] = out.flat();
   if (resultPoints.length < 3) return [];
 
   // ── Step 6: Self-intersection cleanup via Clipper2 SimplifyPaths ──────────

@@ -15,9 +15,9 @@ import {
   shiftCornerTypes,
   generateSeamAllowanceWithCorners,
 } from '../cornerTypes';
-import type { Line2D } from '../cornerTypes';
+import type { Line2D, MatchLookup } from '../cornerTypes';
 import { flattenPathWithSource } from '../index';
-import type { CornerType, PathCommand } from '../../../types/types';
+import type { CornerType, PathCommand, SemanticEdge } from '../../../types/types';
 
 // ─── flattenPathWithSource (the corner-index fix's core) ─────────────────────
 
@@ -613,5 +613,142 @@ describe('getCornerFunction', () => {
 
   it('returns cornerTrimMirrored for "trimMirrored"', () => {
     expect(getCornerFunction('trimMirrored')).toBe(cornerTrimMirrored);
+  });
+});
+
+// ─── generateSeamAllowanceWithCorners — matched corner geometry ───────────────
+//
+// A `match` corner slides the sewn border's cut-line endpoint at the vertex so
+// the border's cut length equals a target (the partner's cut length, resolved
+// upstream). Base length is measured with the corner mitered; delta = target −
+// base. delta>0 extends the last segment colinearly; delta<0 walks the border
+// polyline back (supports curves); a defensive clamp keeps ≥10% of the base.
+// Without a lookup entry the corner is byte-identical to mitered.
+
+describe('generateSeamAllowanceWithCorners — match corner', () => {
+  const square: PathCommand[] = [
+    { type: 'M', values: [0, 0] },     // c0
+    { type: 'L', values: [100, 0] },   // c1  top-right corner (match vertex)
+    { type: 'L', values: [100, 100] }, // c2
+    { type: 'L', values: [0, 100] },   // c3
+    { type: 'Z', values: [] },
+  ];
+  const topEdge = (w?: number): SemanticEdge =>
+    ({ id: 'top', name: 'top', segmentRange: [1, 2], edgeType: 'seam', seamAllowanceWidth: w });
+  const rightEdge = (w?: number): SemanticEdge =>
+    ({ id: 'right', name: 'right', segmentRange: [2, 3], edgeType: 'seam', seamAllowanceWidth: w });
+
+  const ptsOf = (cmds: PathCommand[]) =>
+    cmds.filter((c) => c.type === 'M' || c.type === 'L').map((c) => ({ x: c.values[0], y: c.values[1] }));
+
+  // The sewn border for a match at cmd1/side 'prev' is the TOP edge (y≈-10);
+  // baseLen (mitered) = |(-10,-10)→(110,-10)| = 120.
+
+  it('falls back to mitered (byte-identical) with no lookup', () => {
+    const withMatchType = generateSeamAllowanceWithCorners(square, 10, 'mitered', { 1: 'match' }, [topEdge()]);
+    const plainMitered = generateSeamAllowanceWithCorners(square, 10, 'mitered', {}, [topEdge()]);
+    expect(withMatchType).toEqual(plainMitered);
+  });
+
+  it('falls back to mitered when the lookup has no entry for the vertex', () => {
+    const noEntry = generateSeamAllowanceWithCorners(
+      square, 10, 'mitered', { 1: 'match' }, [topEdge()], {} as MatchLookup,
+    );
+    const plainMitered = generateSeamAllowanceWithCorners(square, 10, 'mitered', {}, [topEdge()]);
+    expect(noEntry).toEqual(plainMitered);
+  });
+
+  it('extends the sewn border colinearly when target > base (delta>0)', () => {
+    const lookup: MatchLookup = { 1: { side: 'prev', targetLen: 140 } }; // +20
+    const sa = generateSeamAllowanceWithCorners(square, 10, 'mitered', { 1: 'match' }, [topEdge()], lookup);
+    const xs = ptsOf(sa).map((p) => p.x);
+    // Base miter reaches x=110; a +20 extension slides the endpoint to x≈130.
+    expect(Math.max(...xs)).toBeGreaterThan(125);
+    // Mitered baseline never exceeds 110.
+    const base = generateSeamAllowanceWithCorners(square, 10, 'mitered', {}, [topEdge()]);
+    expect(Math.max(...ptsOf(base).map((p) => p.x))).toBeCloseTo(110, 0);
+  });
+
+  it('retracts the sewn border endpoint when target < base (delta<0)', () => {
+    const lookup: MatchLookup = { 1: { side: 'prev', targetLen: 60 } }; // half
+    const sa = generateSeamAllowanceWithCorners(square, 10, 'mitered', { 1: 'match' }, [topEdge()], lookup);
+    const top = ptsOf(sa).filter((p) => p.y < -5); // points along the top cut line
+    // The far corner (-10,-10) survives; the endpoint retracts to x≈50, so no
+    // top point reaches the old corner near x=110.
+    expect(Math.max(...top.map((p) => p.x))).toBeLessThan(65);
+    expect(top.some((p) => Math.abs(p.x - 50) < 5)).toBe(true);
+    // The old mitered corner (110,-10) is gone.
+    expect(ptsOf(sa).some((p) => Math.hypot(p.x - 110, p.y + 10) < 3)).toBe(false);
+  });
+
+  it('clamps retraction to ≥10% of the base length', () => {
+    const lookup: MatchLookup = { 1: { side: 'prev', targetLen: 0 } }; // ask for nothing
+    const sa = generateSeamAllowanceWithCorners(square, 10, 'mitered', { 1: 'match' }, [topEdge()], lookup);
+    const top = ptsOf(sa).filter((p) => p.y < -5);
+    // Clamp keeps 10% of base (120) = 12 → endpoint at x≈2, not past the far
+    // corner. Far corner (-10,-10) retained; nothing over-retracts past it.
+    expect(Math.min(...top.map((p) => p.x))).toBeCloseTo(-10, 0);
+    expect(top.some((p) => Math.abs(p.x - 2) < 4)).toBe(true);
+  });
+
+  it('walks back across polyline joints on a multi-segment (bent) sewn border', () => {
+    // Top border = ONE SemanticEdge spanning TWO flattened segments [1,3):
+    //   (0,0)→(50,0)→(100,10).  Its mitered cut ≈ [(-10,-10),(51,-10),(110,1.8)].
+    // Match vertex = its near corner (100,10) at command 2.
+    const bent: PathCommand[] = [
+      { type: 'M', values: [0, 0] },     // c0
+      { type: 'L', values: [50, 0] },    // c1
+      { type: 'L', values: [100, 10] },  // c2  near corner (match vertex)
+      { type: 'L', values: [100, 100] }, // c3
+      { type: 'L', values: [0, 100] },   // c4
+      { type: 'Z', values: [] },
+    ];
+    const bentTop: SemanticEdge = { id: 'top', name: 'top', segmentRange: [1, 3], edgeType: 'seam' };
+    // baseLen ≈ 121. A deep retract to 30 lands the endpoint on the FAR
+    // segment (x≈20), crossing (removing) the middle joint miter (~51,-10).
+    const deep: MatchLookup = { 2: { side: 'prev', targetLen: 30 } };
+    const sa = generateSeamAllowanceWithCorners(bent, 10, 'mitered', { 2: 'match' }, [bentTop], deep);
+    const pts = ptsOf(sa);
+    // Endpoint landed on the far segment near (20,-10).
+    expect(pts.some((p) => Math.hypot(p.x - 20, p.y + 10) < 5)).toBe(true);
+    // The middle joint miter (~51,-10) was crossed → removed.
+    expect(pts.some((p) => Math.hypot(p.x - 51, p.y + 10) < 4)).toBe(false);
+
+    // A mild retract to 100 lands on the NEAR segment → the middle joint is kept.
+    const mild: MatchLookup = { 2: { side: 'prev', targetLen: 100 } };
+    const saMild = generateSeamAllowanceWithCorners(bent, 10, 'mitered', { 2: 'match' }, [bentTop], mild);
+    expect(ptsOf(saMild).some((p) => Math.hypot(p.x - 51, p.y + 10) < 5)).toBe(true);
+  });
+
+  it('handles a match on the NEXT border (side "next")', () => {
+    // Sewn border = RIGHT edge (side 'next' at cmd1). Extend it by 20 → the
+    // right cut endpoint at the corner slides upward (y from -10 to -30).
+    const lookup: MatchLookup = { 1: { side: 'next', targetLen: 140 } };
+    const sa = generateSeamAllowanceWithCorners(square, 10, 'mitered', { 1: 'match' }, [topEdge(), rightEdge()], lookup);
+    const ys = ptsOf(sa).map((p) => p.y);
+    // Right border base corner (110,-10); +20 extension slides to y≈-30.
+    expect(Math.min(...ys)).toBeLessThan(-25);
+  });
+
+  it('respects asymmetric per-edge widths (prevWidth ≠ nextWidth)', () => {
+    // Top (sewn) = 40mm, right (adjacent) = 10mm. The wide top offsets to y≈-40;
+    // extension slides its endpoint out along y≈-40, closing back to the 10mm
+    // right offset — an angled corner.
+    const lookup: MatchLookup = { 1: { side: 'prev', targetLen: 140 } };
+    const sa = generateSeamAllowanceWithCorners(
+      square, 10, 'mitered', { 1: 'match' }, [topEdge(40), rightEdge(10)], lookup,
+    );
+    const pts = ptsOf(sa);
+    // Wide sewn border sits at y≈-40 and extends past x=110.
+    expect(Math.max(...pts.map((p) => p.x))).toBeGreaterThan(125);
+    expect(pts.some((p) => p.y < -35 && p.x > 110)).toBe(true);
+  });
+
+  it('produces a valid closed SA outline for every match variant', () => {
+    const lookup: MatchLookup = { 1: { side: 'prev', targetLen: 140 } };
+    const sa = generateSeamAllowanceWithCorners(square, 10, 'mitered', { 1: 'match' }, [topEdge()], lookup);
+    expect(sa.length).toBeGreaterThan(3);
+    expect(sa[0].type).toBe('M');
+    expect(sa[sa.length - 1].type).toBe('Z');
   });
 });

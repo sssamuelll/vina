@@ -6,10 +6,11 @@
  * pre-processed data without duplicating preparation steps.
  */
 
-import type { PatternPiece, PathCommand, Point2D } from '../../types/types';
+import type { PatternPiece, PathCommand, Point2D, Seam } from '../../types/types';
 import { generateSeamAllowance, flattenPath } from '../seam/index';
 import type { SeamJoinType } from '../seam/index';
-import { generateSeamAllowanceWithCorners } from '../seam/cornerTypes';
+import { generateSeamAllowanceWithCorners, type MatchLookup } from '../seam/cornerTypes';
+import { buildMatchLookup } from '../seam/matchResolver';
 
 // ─── Types ───
 
@@ -46,6 +47,8 @@ export interface PipelineOptions {
   spacing?: number;
   /** Curve flattening resolution for flattenPath (default: 12) */
   curveResolution?: number;
+  /** Project seams — enable `match` ("Empatada") corners. Absent → mitered fallback. */
+  seams?: Seam[];
 }
 
 const DEFAULT_SPACING = 30; // mm
@@ -93,6 +96,7 @@ export function computeBBoxFromPoints(points: Point2D[]): BBox {
 export function preparePiece(
   piece: PatternPiece,
   opts: PipelineOptions = {},
+  matchLookup?: MatchLookup,
 ): Omit<PreparedPiece, 'offsetX' | 'offsetY'> {
   const resolution = opts.curveResolution ?? 12;
   const joinType = opts.seamJoinType ?? 'round';
@@ -110,7 +114,7 @@ export function preparePiece(
     // EXPORT path, so per-edge widths must reach the factory DXF/PDF.
     const hasPerEdgeWidths = piece.edges?.some((e) => e.seamAllowanceWidth != null) ?? false;
     seamOutline = hasCustomCorners || hasPerEdgeWidths
-      ? generateSeamAllowanceWithCorners(piece.outline, piece.seamAllowance, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {}, piece.edges)
+      ? generateSeamAllowanceWithCorners(piece.outline, piece.seamAllowance, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {}, piece.edges, matchLookup)
       : generateSeamAllowance(piece.outline, piece.seamAllowance, joinType);
     if (seamOutline.length > 0) {
       flatSeamOutline = flattenPath(seamOutline, resolution);
@@ -136,7 +140,10 @@ export function preparePieces(
   let currentX = 0;
 
   for (const piece of pieces) {
-    const base = preparePiece(piece, opts);
+    // `match` corners need the partner border's length — resolved against the
+    // full piece set + seams. Absent seams → undefined → mitered fallback.
+    const matchLookup = opts.seams ? buildMatchLookup(piece, pieces, opts.seams) : undefined;
+    const base = preparePiece(piece, opts, matchLookup);
     const bb = base.boundingBox;
 
     const offsetX = currentX - bb.minX;
