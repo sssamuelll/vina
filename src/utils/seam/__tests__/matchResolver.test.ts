@@ -69,6 +69,60 @@ describe('measureBorderCutLength', () => {
   it('returns null for a border whose command range emits no edges', () => {
     expect(measureBorderCutLength(square, 10, makePiece('p').edges, [9, 10])).toBeNull();
   });
+
+  // ── Real partner corners at the border extremes (the maria-164 fix) ──────────
+  // The old measurement forced EVERY corner to mitered, so a partner whose sewn
+  // border ends in a squared/envelope/… corner reported a length that was not
+  // the real cut line ("lo primero que dices no es real"). The measurement must
+  // use the partner's REAL corner geometry at the two border extremes, degrading
+  // only `match` → mitered (one-level anti-recursion).
+  //
+  // sideSeam [2,3) = right edge, vertices v1=(100,0)..v2=(100,100). Mitered cut =
+  // miter(110,-10)→miter(110,110) = 120. Squaring the TOP-RIGHT corner (command 1)
+  // attributes the 10mm mitered overhang to the CORNER, not the border: the
+  // sideSeam cut now starts at the on-edge point (110,0). Real length = 110.
+  // NOTE: on a convex corner the miter apex is the OUTERMOST point, so any real
+  // corner (squared/envelope/…) shortens the border cut vs the forced miter — the
+  // design prose's "más larga" holds only for reflex corners; here the invariant
+  // is that the length changes to the TRUE value, and mitered is the maximum.
+  const edges = makePiece('p').edges;
+
+  it('uses the partner REAL squared corner at the start extreme (110, not the forced-mitered 120)', () => {
+    const mitered = measureBorderCutLength(square, 10, edges, [2, 3]);
+    const squared = measureBorderCutLength(square, 10, edges, [2, 3], { 1: 'squared' });
+    expect(mitered!).toBeCloseTo(120, 3);
+    expect(squared!).toBeCloseTo(110, 3);
+    expect(squared!).toBeLessThan(mitered!);
+  });
+
+  it('respects a real squared corner at BOTH border extremes (command 1 and command 2)', () => {
+    // Squaring cmd2 (bottom-right, the END vertex) drops the other overhang too.
+    const endOnly = measureBorderCutLength(square, 10, edges, [2, 3], { 2: 'squared' });
+    const both = measureBorderCutLength(square, 10, edges, [2, 3], { 1: 'squared', 2: 'squared' });
+    expect(endOnly!).toBeCloseTo(110, 3);
+    expect(both!).toBeCloseTo(100, 3);
+  });
+
+  it('respects a real envelope corner at the start extreme (≠ mitered)', () => {
+    // envelope tab starts at miter + nextDir*ext, ext = 10*0.75 = 7.5 → (110,-2.5);
+    // cut = (110,-2.5)→(110,110) = 112.5.
+    const envelope = measureBorderCutLength(square, 10, edges, [2, 3], { 1: 'envelope' });
+    expect(envelope!).toBeCloseTo(112.5, 3);
+    expect(envelope!).not.toBeCloseTo(120, 1);
+  });
+
+  it('degrades a partner `match` corner at the extreme to mitered (one-level anti-recursion)', () => {
+    // A partner corner typed `match` must NOT re-resolve — measured as mitered.
+    const asMatch = measureBorderCutLength(square, 10, edges, [2, 3], { 1: 'match' });
+    expect(asMatch!).toBeCloseTo(120, 3);
+  });
+
+  it('is byte-identical to the forced-mitered length when the partner is all-mitered (regression pin)', () => {
+    const noTypes = measureBorderCutLength(square, 10, edges, [2, 3]);
+    const explicitDefault = measureBorderCutLength(square, 10, edges, [2, 3], {}, 'mitered');
+    expect(noTypes!).toBeCloseTo(120, 6);
+    expect(explicitDefault!).toBeCloseTo(noTypes!, 6);
+  });
 });
 
 // ─── buildMatchLookup ────────────────────────────────────────────────────────
@@ -86,6 +140,17 @@ describe('buildMatchLookup', () => {
     expect(lookup[1].side).toBe('next');
     // Partner B's sideSeam mitered cut length = 120.
     expect(lookup[1].targetLen).toBeCloseTo(120, 3);
+  });
+
+  it('reads targetLen from the partner REAL corner, not a forced miter', () => {
+    // A's sideSeam is sewn to B's sideSeam; B squares its top-right corner (cmd1),
+    // an extreme of that border. A's match target must be B's TRUE cut length (110),
+    // not the old forced-mitered 120.
+    const a = makePiece('A', { cornerTypes: { 1: 'match' } });
+    const b = makePiece('B', { cornerTypes: { 1: 'squared' } });
+    const seams = [seam('A', 'sideSeam', 'B', 'sideSeam')];
+    const lookup = buildMatchLookup(a, [a, b], seams);
+    expect(lookup[1].targetLen).toBeCloseTo(110, 3);
   });
 
   it('is deterministic and mutually stable for two pieces matched to each other', () => {

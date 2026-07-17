@@ -649,25 +649,72 @@ function edgesInBorder(sourced: SourcedPoint[], n: number, range: [number, numbe
 }
 
 /**
- * Length of a SemanticEdge's mitered cut line (the outward SA offset polyline),
- * built with the exact geometry `generateSeamAllowanceWithCorners` uses. Used by
- * matchResolver to read a partner border's target length. Corners are ALWAYS
- * mitered here — this is the one-level anti-recursion: measuring a partner never
- * re-resolves the partner's own `match` corners. Returns null when unmeasurable.
+ * Corner geometry bundle at flattened vertex `i`, computed from the exact
+ * per-vertex inputs `generateSeamAllowanceWithCorners` feeds its corner
+ * functions (the two offset edges, the interior angle, the per-edge widths).
+ * Shared by the generator and the partner-length measurement so both read
+ * identical geometry. Bundles are ordered prev-side → next-side (mitered = 1
+ * point); doubleMitered/trimMirrored emit their two blunt points and are the
+ * known exceptions to that ordering — irrelevant to the length measurement's
+ * required cases (mitered/squared/envelope/slant).
+ */
+function cornerBundleAt(data: OffsetEdgeData, i: number, type: CornerType): Point2D[] {
+  const { vertices, edges, edgeWidths, offsetEdges, n } = data;
+  const prevOffsetEdge = offsetEdges[(i + n - 1) % n];
+  const nextOffsetEdge = offsetEdges[i];
+  const angle = interiorAngle(edges[(i + n - 1) % n], edges[i]);
+  const prevWidth = edgeWidths[(i + n - 1) % n];
+  const nextWidth = edgeWidths[i];
+  return getCornerFunction(type)(prevOffsetEdge, nextOffsetEdge, vertices[i], prevWidth, nextWidth, angle);
+}
+
+/**
+ * Length of a SemanticEdge's cut line (the outward SA offset polyline), built
+ * with the exact geometry `generateSeamAllowanceWithCorners` uses. Used by
+ * matchResolver to read a partner border's target length.
+ *
+ * The two EXTREME vertices of the border use the partner's REAL corner geometry
+ * (`cornerTypes` / `defaultCornerType`), so a squared/envelope/… corner at a
+ * border end changes the measured length exactly as it changes the real cut
+ * line — the maria-164 fix ("lo primero que dices no es real"). The length runs
+ * from the LAST point of the start-vertex bundle (the point that touches this
+ * border) through the interior mitered joints to the FIRST point of the
+ * end-vertex bundle. A partner corner typed `match` is measured MITERED: the
+ * one-level anti-recursion, so measuring a partner never re-resolves its own
+ * `match` corners. With no cornerTypes every corner is mitered → miter-to-miter
+ * (byte-identical to the pre-fix behavior). Returns null when unmeasurable.
  */
 export function measureBorderCutLength(
   outline: PathCommand[],
   saWidth: number,
   semanticEdges: SemanticEdge[] | undefined,
   segmentRange: [number, number],
+  cornerTypes?: Record<number, CornerType>,
+  defaultCornerType?: CornerType,
 ): number | null {
   const data = buildOffsetEdges(outline, saWidth, semanticEdges);
   if (!data) return null;
-  const run = edgesInBorder(data.sourced, data.n, segmentRange);
+  const { sourced, offsetEdges, n } = data;
+  const run = edgesInBorder(sourced, n, segmentRange);
   if (!run) return null;
-  const miters: Point2D[] = [];
-  for (let k = run[0]; k <= run[run.length - 1] + 1; k++) miters.push(miterAt(data.offsetEdges, data.n, k % data.n));
-  return polylineLength(miters);
+
+  // One-level anti-recursion: a partner's own `match` corner is measured mitered.
+  const resolveType = (cmd: number): CornerType => {
+    const t = cornerTypes?.[cmd] ?? defaultCornerType ?? 'mitered';
+    return t === 'match' ? 'mitered' : t;
+  };
+
+  const startV = run[0];
+  const endV = (run[run.length - 1] + 1) % n;
+  const startBundle = cornerBundleAt(data, startV, resolveType(sourced[startV].cmd));
+  const endBundle = cornerBundleAt(data, endV, resolveType(sourced[endV].cmd));
+
+  // start-touching point (next-side) → interior mitered joints → end-touching
+  // point (prev-side). For all-mitered this is exactly miter-to-miter.
+  const poly: Point2D[] = [startBundle[startBundle.length - 1]];
+  for (let k = run[0] + 1; k <= run[run.length - 1]; k++) poly.push(miterAt(offsetEdges, n, k % n));
+  poly.push(endBundle[0]);
+  return polylineLength(poly);
 }
 
 /**
@@ -828,7 +875,7 @@ export function generateSeamAllowanceWithCorners(
   // is keyed by COMMAND index). Per-edge offsets carry the per-edge SA widths.
   const data = buildOffsetEdges(outline, saWidth, semanticEdges);
   if (!data) return [];
-  const { sourced, vertices, edges, edgeWidths, offsetEdges, n } = data;
+  const { sourced, offsetEdges, n } = data;
 
   // ── Step 4 + 5: Assemble the SA outline, one array of points per vertex ────
   // out[i] = [nextOffsetEdge.start, ...cornerGeometry]. Flattened in order this
@@ -838,23 +885,9 @@ export function generateSeamAllowanceWithCorners(
   const out: Point2D[][] = [];
 
   for (let i = 0; i < n; i++) {
-    const prevOffsetEdge = offsetEdges[(i + n - 1) % n];
-    const nextOffsetEdge = offsetEdges[i];
-    const vertex = vertices[i];
-
     const type: CornerType = cornerTypes[sourced[i].cmd] ?? defaultCornerType;
-    const cornerFn = getCornerFunction(type);
-
-    const prevEdge = edges[(i + n - 1) % n];
-    const nextEdge = edges[i];
-    const angle = interiorAngle(prevEdge, nextEdge);
-
-    // prevWidth = incoming edge (i-1), nextWidth = outgoing edge (i).
-    const prevWidth = edgeWidths[(i + n - 1) % n];
-    const nextWidth = edgeWidths[i];
-    const cornerPts = cornerFn(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, angle);
-
-    out.push([{ ...nextOffsetEdge.start }, ...cornerPts]);
+    const cornerPts = cornerBundleAt(data, i, type);
+    out.push([{ ...offsetEdges[i].start }, ...cornerPts]);
   }
 
   // ── Step 5b: Matched corners ──────────────────────────────────────────────

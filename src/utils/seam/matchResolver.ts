@@ -6,10 +6,12 @@ import { measureBorderCutLength, type MatchLookup, type MatchTarget } from './co
 // A `match` corner copies the LENGTH (not the angle) of the cut line of the
 // border it is sewn to. `buildMatchLookup` walks a piece's `match` vertices,
 // finds the sewn adjacent border via the `Seam` list, measures the partner
-// border's mitered cut length, and returns the per-vertex targets the generator
-// consumes. Resolution is one level deep: the partner is always measured MITERED
-// (`measureBorderCutLength` never re-resolves `match`), so two pieces matched to
-// each other are symmetric, order-independent and stable — no recursion.
+// border's REAL cut length (its actual corner types at the border extremes —
+// squared/envelope/… included), and returns the per-vertex targets the
+// generator consumes. Resolution is one level deep: only the partner's own
+// `match` corners are degraded to mitered by `measureBorderCutLength`, so two
+// pieces matched to each other are symmetric, order-independent and stable — no
+// recursion.
 
 /** SemanticEdge whose command range covers command `cmd`, if any. */
 function edgeCoveringCmd(edges: SemanticEdge[], cmd: number): SemanticEdge | undefined {
@@ -108,6 +110,8 @@ export function buildMatchLookup(
       partnerPiece.seamAllowance || 0,
       partnerPiece.edges,
       partnerEdge.segmentRange,
+      partnerPiece.cornerTypes,
+      partnerPiece.defaultCornerType,
     );
     if (targetLen == null || targetLen <= 0) continue;
 
