@@ -40,8 +40,8 @@ export function runUiExport(format: UiExportFormat, project: ExportProject, disp
   }
   const base = (name && name.trim()) || 'patron';
   try {
-    if (format === 'dxf') downloadDXFAAMA(pieces, `${base}.dxf`);
-    else if (format === 'pdf') downloadPDF(pieces, `${base}.pdf`);
+    if (format === 'dxf') downloadDXFAAMA(pieces, `${base}.dxf`, undefined, seams);
+    else if (format === 'pdf') downloadPDF(pieces, `${base}.pdf`, seams);
     else downloadBOM(pieces, seams, fabrics, `${base}-bom.csv`);
     dispatch(showSuccessToast(SUCCESS[format]));
   } catch (err) {

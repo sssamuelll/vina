@@ -27,14 +27,14 @@ describe('runUiExport', () => {
   it('exports DXF with a name-derived filename and toasts success', () => {
     const dispatch = vi.fn();
     runUiExport('dxf', project([piece]), dispatch);
-    expect(downloadDXFAAMA).toHaveBeenCalledWith([piece], 'Tee.dxf');
+    expect(downloadDXFAAMA).toHaveBeenCalledWith([piece], 'Tee.dxf', undefined, []);
     expect(dispatch).toHaveBeenCalledWith(showSuccessToast('Exporté tu patrón en DXF.'));
   });
 
   it('exports PDF', () => {
     const dispatch = vi.fn();
     runUiExport('pdf', project([piece]), dispatch);
-    expect(downloadPDF).toHaveBeenCalledWith([piece], 'Tee.pdf');
+    expect(downloadPDF).toHaveBeenCalledWith([piece], 'Tee.pdf', []);
     expect(dispatch).toHaveBeenCalledWith(showSuccessToast('Exporté tu patrón en PDF.'));
   });
 
@@ -48,7 +48,7 @@ describe('runUiExport', () => {
   it('falls back to "patron" when the project name is empty', () => {
     const dispatch = vi.fn();
     runUiExport('dxf', project([piece], ''), dispatch);
-    expect(downloadDXFAAMA).toHaveBeenCalledWith([piece], 'patron.dxf');
+    expect(downloadDXFAAMA).toHaveBeenCalledWith([piece], 'patron.dxf', undefined, []);
   });
 
   it('shows an error toast and downloads nothing with zero pieces', () => {

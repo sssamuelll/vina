@@ -6,7 +6,8 @@ import { PatternPiece, PathCommand, UnitSystem } from '../../../types/types';
 import LineLengthLabels from './LineLengthLabels';
 import { pathToSVG } from '../utils';
 import { generateSeamAllowance, effectiveSeamAllowanceWidth } from '../../../utils/seam';
-import { generateSeamAllowanceWithCorners } from '../../../utils/seam/cornerTypes';
+import { generateSeamAllowanceWithCorners, type MatchLookup } from '../../../utils/seam/cornerTypes';
+import { buildMatchLookup } from '../../../utils/seam/matchResolver';
 import { extractNodes } from '../nodeEditorUtils';
 import { ANNOTATION_CATEGORY_COLORS } from '../../../utils/annotationTemplates';
 import { resolveColorway } from '../../../utils/colorwayResolver';
@@ -45,6 +46,8 @@ interface SinglePieceProps {
   hasResolutionErrors?: boolean;
   /** Active colorway override color for this piece (from resolveColorway) */
   colorwayColor?: string;
+  /** `match` ("Empatada") corner resolution for this piece (parent-memoized). */
+  matchLookup?: MatchLookup;
   onPieceNameDoubleClick?: (pieceId: string) => void;
   onPieceNameSave?: (pieceId: string, newName: string) => void;
   onPieceNameCancel?: () => void;
@@ -68,6 +71,7 @@ const SinglePiece = memo(function SinglePiece({
   isLayerLocked,
   hasResolutionErrors,
   colorwayColor,
+  matchLookup,
   onPieceNameDoubleClick,
   onPieceNameSave,
   onPieceNameCancel,
@@ -82,17 +86,21 @@ const SinglePiece = memo(function SinglePiece({
   // between the two contours.
   // Hallazgo #2: pieces are NET — the margin renders ONLY when the piece's own
   // seamAllowance was explicitly set. No editor-wide default fallback.
-  const saWidth = effectiveSeamAllowanceWidth(piece);
-  const hasCustomCorners = (piece.cornerTypes && Object.keys(piece.cornerTypes).length > 0)
-    || (piece.defaultCornerType && piece.defaultCornerType !== 'mitered');
-  // Per-edge SA widths also require the edge-walk generator (the uniform Clipper
-  // offset can't vary width per edge).
-  const hasPerEdgeWidths = piece.edges?.some((e) => e.seamAllowanceWidth != null) ?? false;
-  const saPath = (showSeamAllowance && saWidth > 0 && (piece.outline?.length ?? 0) >= 2)
-    ? (hasCustomCorners || hasPerEdgeWidths
-        ? generateSeamAllowanceWithCorners(piece.outline, saWidth, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {}, piece.edges)
-        : generateSeamAllowance(piece.outline, saWidth))
-    : [];
+  // Memoized so the partner-SA regen a `match` corner triggers doesn't run every
+  // render frame — only when the piece geometry, widths, or its match lookup change.
+  const saPath = useMemo(() => {
+    const saWidth = effectiveSeamAllowanceWidth(piece);
+    if (!(showSeamAllowance && saWidth > 0 && (piece.outline?.length ?? 0) >= 2)) return [];
+    const hasCustomCorners = (piece.cornerTypes && Object.keys(piece.cornerTypes).length > 0)
+      || (piece.defaultCornerType && piece.defaultCornerType !== 'mitered');
+    // Per-edge SA widths also require the edge-walk generator (the uniform Clipper
+    // offset can't vary width per edge).
+    const hasPerEdgeWidths = piece.edges?.some((e) => e.seamAllowanceWidth != null) ?? false;
+    return hasCustomCorners || hasPerEdgeWidths
+      ? generateSeamAllowanceWithCorners(piece.outline, saWidth, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {}, piece.edges, matchLookup)
+      : generateSeamAllowance(piece.outline, saWidth);
+    // piece is an immutable Redux object — a stable ref until it actually changes.
+  }, [showSeamAllowance, piece, matchLookup]);
   const hasSA = saPath.length > 0;
   const outlineD = piece.outline?.length ? pathToSVG(piece.outline) : '';
   const saD = hasSA ? pathToSVG(saPath) : '';
@@ -531,6 +539,22 @@ export default function PieceRenderer({
   const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
   const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
 
+  // Matched corner ("Empatada") lookups. Built once per [pieces, seams] change —
+  // NOT per render frame — so the partner-SA measurement each `match` vertex
+  // needs isn't recomputed on unrelated re-renders. Only pieces that actually
+  // carry a `match` corner get an entry; the rest stay undefined (no work, and
+  // the SinglePiece memo is undisturbed).
+  const seams = useSelector((s: RootState) => s.project.seams);
+  const matchLookupByPiece = useMemo(() => {
+    const m: Record<string, MatchLookup> = {};
+    for (const p of pieces) {
+      const hasMatch = p.defaultCornerType === 'match'
+        || Object.values(p.cornerTypes ?? {}).some((t) => t === 'match');
+      if (hasMatch) m[p.id] = buildMatchLookup(p, pieces, seams);
+    }
+    return m;
+  }, [pieces, seams]);
+
   // Colorway selectors + resolver
   const colorways = useSelector((s: RootState) => s.project.colorways);
   const activeColorwayId = useSelector((s: RootState) => s.project.activeColorwayId);
@@ -602,6 +626,7 @@ export default function PieceRenderer({
           selectedLineId={selectedInternalLine?.lineId}
           isEditingName={editingPieceNameId === piece.id}
           pieceNumber={pieceNumberById[piece.id] ?? 0}
+          matchLookup={matchLookupByPiece[piece.id]}
           onPieceNameDoubleClick={onPieceNameDoubleClick}
           onPieceNameSave={onPieceNameSave}
           onPieceNameCancel={onPieceNameCancel}

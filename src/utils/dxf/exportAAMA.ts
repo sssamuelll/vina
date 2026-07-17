@@ -9,7 +9,7 @@
  * - Text height = 2.5 (AAMA standard)
  * - Supports R12 (POLYLINE) and R2000+ (LWPOLYLINE)
  */
-import { PatternPiece, PathCommand } from '../../types/types';
+import { PatternPiece, PathCommand, Seam } from '../../types/types';
 import { AAMA_LAYERS, DXFExportOptions } from './types';
 import { preparePieces, computeBBox } from '../export/pipeline';
 import { escapeDxfString } from '../sanitizeName';
@@ -143,10 +143,10 @@ ENDSEC
 
 // ─── Blocks ───
 
-function dxfBlocks(pieces: PatternPiece[], opts: DXFExportOptions, blockNames: string[]): string {
+function dxfBlocks(pieces: PatternPiece[], opts: DXFExportOptions, blockNames: string[], seams?: Seam[]): string {
   // Pre-compute SA outlines via pipeline (for block content).
   // preparePieces preserves input order 1:1, so blockNames[i] ↔ prepared[i].
-  const prepared = preparePieces(pieces, { spacing: 30 });
+  const prepared = preparePieces(pieces, { spacing: 30, seams });
 
   let s = `0
 SECTION
@@ -237,9 +237,9 @@ ENDSEC
 
 // ─── Entities Section (INSERTs) ───
 
-function dxfEntities(pieces: PatternPiece[], blockNames: string[]): string {
+function dxfEntities(pieces: PatternPiece[], blockNames: string[], seams?: Seam[]): string {
   // Use pipeline for consistent layout (same 1:1 order as dxfBlocks).
-  const prepared = preparePieces(pieces, { spacing: 30 });
+  const prepared = preparePieces(pieces, { spacing: 30, seams });
 
   let s = `0
 SECTION
@@ -838,9 +838,11 @@ ENDSEC
  *
  * @param pieces - Pattern pieces to export
  * @param options - Optional export settings (DXF version, AAMA layer toggle)
+ * @param seams - Optional project seams — enable `match` ("Empatada") corners.
+ *                Absent → mitered fallback (unchanged output).
  * @returns Complete DXF file content as a string
  */
-export function generateDXFAAMA(pieces: PatternPiece[], options?: Partial<DXFExportOptions>): string {
+export function generateDXFAAMA(pieces: PatternPiece[], options?: Partial<DXFExportOptions>, seams?: Seam[]): string {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   resetHandles();
 
@@ -849,8 +851,8 @@ export function generateDXFAAMA(pieces: PatternPiece[], options?: Partial<DXFExp
   let dxf = '';
   dxf += dxfHeader();
   dxf += dxfTables(pieces, opts, blockNames);
-  dxf += dxfBlocks(pieces, opts, blockNames);
-  dxf += dxfEntities(pieces, blockNames);
+  dxf += dxfBlocks(pieces, opts, blockNames, seams);
+  dxf += dxfEntities(pieces, blockNames, seams);
   dxf += `0
 EOF
 `;
@@ -863,9 +865,10 @@ EOF
  * @param pieces - Pattern pieces to export
  * @param filename - Download filename (default: `'pattern-aama.dxf'`)
  * @param options - Optional DXF export settings
+ * @param seams - Optional project seams — enable `match` ("Empatada") corners.
  */
-export function downloadDXFAAMA(pieces: PatternPiece[], filename = 'pattern-aama.dxf', options?: Partial<DXFExportOptions>) {
-  const dxf = generateDXFAAMA(pieces, options);
+export function downloadDXFAAMA(pieces: PatternPiece[], filename = 'pattern-aama.dxf', options?: Partial<DXFExportOptions>, seams?: Seam[]) {
+  const dxf = generateDXFAAMA(pieces, options, seams);
   const blob = new Blob([dxf], { type: 'application/dxf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

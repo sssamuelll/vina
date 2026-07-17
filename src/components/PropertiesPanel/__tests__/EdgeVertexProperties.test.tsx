@@ -108,4 +108,12 @@ describe('VertexPropertiesSection', () => {
     fireEvent.click(screen.getByRole('button', { name: /todas las esquinas/i }));
     expect(store.getState().project.pieces[0].defaultCornerType).toBe('squared');
   });
+
+  it('enables the Empatada chip and applies match to the vertex', () => {
+    const store = mount(<VertexPropertiesSection pieceId="p" vertexIndex={2} />, piece());
+    const chip = screen.getByRole('button', { name: /empatada/i }) as HTMLButtonElement;
+    expect(chip.disabled).toBe(false);
+    fireEvent.click(chip);
+    expect(store.getState().project.pieces[0].cornerTypes?.[2]).toBe('match');
+  });
 });

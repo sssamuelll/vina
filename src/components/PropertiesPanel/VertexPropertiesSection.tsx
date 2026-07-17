@@ -14,7 +14,7 @@ const CORNER_TYPES: { type: CornerType; label: string; disabled?: boolean }[] = 
   { type: 'envelope', label: 'Envolvente' },
   { type: 'squared', label: 'Cuadrada' },
   { type: 'slant', label: 'Sesgada' },
-  { type: 'match', label: 'Empatada (próximamente)', disabled: true },
+  { type: 'match', label: 'Empatada' },
   { type: 'trimMirrored', label: 'Recorte espejado' },
 ];
 
