@@ -417,6 +417,7 @@ export function useEditorInteractions(
     }
     if (activeTool === 'internalShape') {
       internalShapeTool.handleDoubleClick();
+      return;
     }
     if (activeTool === 'select') {
       const target = e.target as SVGElement;
