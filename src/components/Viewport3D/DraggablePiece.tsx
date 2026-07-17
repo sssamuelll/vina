@@ -85,6 +85,13 @@ export default function DraggablePiece({
 
   const showGizmo = canDrag && isSelected;
 
+  // Si el gizmo desaparece sin escritura al store (deselección/Escape a mitad de
+  // drag), `actualPos` no cambia y el efecto de arriba no corre — revierte el
+  // desplazamiento imperativo de handleGizmoDrag para que el store mande (#935).
+  useEffect(() => {
+    if (!showGizmo) groupRef.current?.position.set(...actualPos);
+  }, [showGizmo, actualPos]);
+
   return (
     <>
       <group
