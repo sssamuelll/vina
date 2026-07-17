@@ -3,8 +3,18 @@ import { DOCK_2D_CATALOG, getDockToolById } from '../dock2dTools';
 import { DEFAULT_DOCK_2D_IDS } from '../../../store/dockSlice';
 
 describe('dock2dTools catalog', () => {
-  it('has 15 entries', () => {
-    expect(DOCK_2D_CATALOG).toHaveLength(15);
+  it('has 12 entries (3 unwired phantom tools removed, #529)', () => {
+    expect(DOCK_2D_CATALOG).toHaveLength(12);
+  });
+
+  it('drops the unwired phantom tools but keeps internalShape (María needs Forma interna)', () => {
+    // grading / textAnnotation / addPiece had no canvas mousedown handler → silent
+    // no-op; their real behavior lives in the Grading panel, Properties panel, and
+    // pen/rectangle respectively. internalShape stays: María wants it (to be wired).
+    expect(getDockToolById('grading')).toBeUndefined();
+    expect(getDockToolById('textAnnotation')).toBeUndefined();
+    expect(getDockToolById('addPiece')).toBeUndefined();
+    expect(getDockToolById('internalShape')?.label).toBe('Forma interna');
   });
 
   it('surfaces the seamAllowance tool (reachability — María, hallazgo #2)', () => {
