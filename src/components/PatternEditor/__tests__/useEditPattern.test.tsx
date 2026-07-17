@@ -11,7 +11,7 @@ import { renderHook, cleanup, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, { restoreState } from '../../../store/projectSlice';
-import { useEditPattern, findInsertTarget, resyncStateToPiece } from '../useEditPattern';
+import { useEditPattern, findInsertTarget, resyncStateToPiece, patternToPieceLocal, pieceLocalToPattern } from '../useEditPattern';
 import { extractNodes, splitSegmentAt } from '../nodeEditorUtils';
 import type { PatternPiece } from '../../../types/types';
 import type { EditPatternState } from '../useEditPattern';
@@ -156,6 +156,85 @@ describe('resyncStateToPiece', () => {
     expect(next.selectedSegments.size).toBe(0);
     expect(next.hoveredNode).toBeNull();
     expect(next.addPointPreview).toBeNull();
+  });
+});
+
+// ─── Rotation-aware coordinate mapping (nota de María #170) ───
+
+describe('patternToPieceLocal / pieceLocalToPattern', () => {
+  // Square center is (100,100); rotate the piece 90° about it.
+  const rot90 = { ...piece(), rotation: 90 } as PatternPiece;
+
+  it('maps a pattern point back to un-rotated piece-local coords', () => {
+    // Node 1 (local 200,0) appears visually at (200,200) when rotated 90°.
+    const local = patternToPieceLocal({ x: 200, y: 200 }, rot90);
+    expect(local.x).toBeCloseTo(200);
+    expect(local.y).toBeCloseTo(0);
+  });
+
+  it('round-trips local → pattern → local under rotation + offset', () => {
+    const offset = { ...piece(), rotation: 37, position: { x: 40, y: -15 } } as PatternPiece;
+    const back = patternToPieceLocal(pieceLocalToPattern({ x: 170, y: 30 }, offset), offset);
+    expect(back.x).toBeCloseTo(170);
+    expect(back.y).toBeCloseTo(30);
+  });
+
+  it('is a pure position offset when rotation is 0', () => {
+    const p = { ...piece(), position: { x: 10, y: 20 } } as PatternPiece;
+    expect(patternToPieceLocal({ x: 60, y: 70 }, p)).toEqual({ x: 50, y: 50 });
+  });
+});
+
+describe('useEditPattern hit-testing on a rotated piece', () => {
+  function setup(p: PatternPiece) {
+    const store = configureStore({ reducer: { project: projectReducer } });
+    store.dispatch(restoreState({ ...store.getState().project, pieces: [p] }));
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <Provider store={store}>{children}</Provider>
+    );
+    const hook = renderHook(() => useEditPattern(1, { x: 0, y: 0 }), { wrapper });
+    return { store, hook };
+  }
+  function clickAt(x: number, y: number) {
+    return {
+      button: 0, shiftKey: false, clientX: x, clientY: y,
+      currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
+    } as unknown as React.MouseEvent<SVGSVGElement>;
+  }
+
+  const rot90 = { ...piece(), rotation: 90 } as PatternPiece;
+
+  it('selects the node under the cursor at its ROTATED screen position', () => {
+    // Node 1 (local 200,0) is visually at (200,200) after a 90° turn about the
+    // square center. A rotation-blind hit-test would grab node 2 (local 200,200).
+    const { hook } = setup(rot90);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(clickAt(200, 200)); });
+    act(() => hook.result.current.handleMouseUp());
+    expect([...hook.result.current.selectedNodes]).toEqual([1]);
+  });
+
+  it('marquee selects the node inside its ROTATED screen box', () => {
+    // A box around visual (200,200) must catch node 1, not node 2.
+    const { hook } = setup(rot90);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(clickAt(150, 150)); }); // empty interior → marquee
+    act(() => { hook.result.current.handleMouseMove(clickAt(250, 250)); });
+    act(() => hook.result.current.handleMouseUp());
+    expect([...hook.result.current.selectedNodes]).toEqual([1]);
+  });
+
+  it('drags a node in the pointer direction, not skewed by the rotation', () => {
+    // Grab node 1 (visual 200,200) and drag +10px in screen X. On a 90° piece,
+    // a rightward screen drag is a −Y move in un-rotated local space.
+    const { store, hook } = setup(rot90);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(clickAt(200, 200)); });
+    act(() => { hook.result.current.handleMouseMove(clickAt(210, 200)); });
+    act(() => hook.result.current.handleMouseUp());
+    const outline = (store.getState() as { project: { pieces: PatternPiece[] } }).project.pieces[0].outline;
+    expect(outline[1].values[0]).toBeCloseTo(200);
+    expect(outline[1].values[1]).toBeCloseTo(-10);
   });
 });
 

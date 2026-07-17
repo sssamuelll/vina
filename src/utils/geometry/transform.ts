@@ -130,6 +130,53 @@ export function rotateOutline(
 }
 
 /**
+ * Rotate a single point around a center. Angle in radians, same handedness as
+ * {@link rotateOutline} and SVG `rotate()` — so a piece rendered with
+ * `rotate(deg, cx, cy)` and a point rotated by `deg·π/180` about `(cx,cy)` land
+ * in the same place. Pass a negative angle to invert (screen → piece-local).
+ */
+export function rotatePoint(pt: Point2D, center: Point2D, angle: number): Point2D {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const dx = pt.x - center.x;
+  const dy = pt.y - center.y;
+  return {
+    x: center.x + dx * cos - dy * sin,
+    y: center.y + dx * sin + dy * cos,
+  };
+}
+
+/**
+ * Bounding-box center of a piece-local outline — the pivot the 2D renderer
+ * rotates each piece around (`rotate(piece.rotation, cx, cy)`). Includes bezier
+ * control points, so edit overlays and hit-tests share the renderer's exact
+ * pivot. Empty outline → origin.
+ */
+export function outlineBBoxCenter(outline: PathCommand[]): Point2D {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const seen = (x: number, y: number) => {
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  };
+  for (const cmd of outline) {
+    const v = cmd.values;
+    if (cmd.type === 'M' || cmd.type === 'L') {
+      seen(v[0], v[1]);
+    } else if (cmd.type === 'C') {
+      for (let i = 0; i < 6; i += 2) seen(v[i], v[i + 1]);
+    } else if (cmd.type === 'Q') {
+      for (let i = 0; i < 4; i += 2) seen(v[i], v[i + 1]);
+    } else if (cmd.type === 'H') {
+      if (v[0] < minX) minX = v[0]; if (v[0] > maxX) maxX = v[0];
+    } else if (cmd.type === 'V') {
+      if (v[0] < minY) minY = v[0]; if (v[0] > maxY) maxY = v[0];
+    }
+  }
+  if (!isFinite(minX)) return { x: 0, y: 0 };
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+}
+
+/**
  * Hit-test: find which handle (if any) is under the given pattern-space point.
  */
 export function hitTestHandle(
