@@ -1,4 +1,5 @@
 import type { PatternPiece, Point2D } from '../../../../types/types';
+import { outlineBBoxCenter } from '../../../../utils/geometry/transform';
 
 interface EditPatternOverlayProps {
   zoom2D: number;
@@ -100,9 +101,20 @@ export default function EditPatternOverlay({
     }
   }
 
+  // Match the renderer's per-piece transform so anchor dots track a rotated
+  // piece (nota de María #170): translate by position, then rotate about the
+  // outline bbox center. The marquee stays screen-aligned (outside this group).
+  const rot = piece.rotation ?? 0;
+  const anchorTransform = (() => {
+    const base = `translate(${piece.position.x}, ${piece.position.y})`;
+    if (!rot) return base;
+    const { x: cx, y: cy } = outlineBBoxCenter(piece.outline);
+    return `${base} rotate(${rot}, ${cx}, ${cy})`;
+  })();
+
   return (
     <>
-      <g transform={`translate(${piece.position.x}, ${piece.position.y})`}>
+      <g transform={anchorTransform}>
         {/* Segment highlights */}
         {segmentHighlights}
 

@@ -25,6 +25,8 @@ import {
   type EditableNode,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
+import { outlineBBoxCenter, rotatePoint } from '../../utils/geometry/transform';
+import { reanchorNotches } from '../../utils/notchReanchor';
 
 // ─── Constants ───
 
@@ -81,6 +83,35 @@ interface MarqueeDrag {
 type DragState = NodeDrag | SegmentDrag | MarqueeDrag;
 
 // ─── Pure helpers ───
+
+/**
+ * A pattern-space point expressed in the piece's un-rotated local frame: undo
+ * the piece offset, then the render rotation (`rotate(piece.rotation, cx, cy)`).
+ * Outline coords are stored un-rotated, so every hit-test compares against this.
+ * Without the inverse rotation, editing a rotated piece grabs the wrong node
+ * (nota de María #170).
+ */
+export function patternToPieceLocal(
+  patternPt: Point2D,
+  piece: Pick<PatternPiece, 'position' | 'outline' | 'rotation'>,
+): Point2D {
+  const local = { x: patternPt.x - piece.position.x, y: patternPt.y - piece.position.y };
+  const rot = piece.rotation ?? 0;
+  if (!rot) return local;
+  return rotatePoint(local, outlineBBoxCenter(piece.outline), -rot * Math.PI / 180);
+}
+
+/** Inverse of {@link patternToPieceLocal}: un-rotated local → pattern space. */
+export function pieceLocalToPattern(
+  localPt: Point2D,
+  piece: Pick<PatternPiece, 'position' | 'outline' | 'rotation'>,
+): Point2D {
+  const rot = piece.rotation ?? 0;
+  const rotated = rot
+    ? rotatePoint(localPt, outlineBBoxCenter(piece.outline), rot * Math.PI / 180)
+    : localPt;
+  return { x: rotated.x + piece.position.x, y: rotated.y + piece.position.y };
+}
 
 /**
  * Where a double-click should insert a new point, if anywhere. Guards against
@@ -159,15 +190,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     [zoom, pan],
   );
 
-  /** Convert screen coords to piece-local coords (subtract piece.position after pan/zoom) */
+  /** Convert screen coords to piece-local coords (undo position + render rotation) */
   const toLocal = useCallback(
-    (e: React.MouseEvent<SVGSVGElement>, piece: PatternPiece): Point2D => {
-      const pt = toPattern(e);
-      return {
-        x: pt.x - piece.position.x,
-        y: pt.y - piece.position.y,
-      };
-    },
+    (e: React.MouseEvent<SVGSVGElement>, piece: PatternPiece): Point2D =>
+      patternToPieceLocal(toPattern(e), piece),
     [toPattern],
   );
 
@@ -191,6 +217,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       const updated: PatternPiece = {
         ...piece,
         outline: newOutline,
+        // Notches with a parametric anchor follow the reshaped edge (#171).
+        internals: reanchorNotches(piece.internals, newOutline),
         updatedAt: Date.now(),
       };
       expectedOutlineRef.current = newOutline;
@@ -402,8 +430,15 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       // Active drag
       if (drag) {
         if (drag.type === 'node' || drag.type === 'segment') {
-          const dx = screenToPatternLength(e.clientX - drag.startMouse.x, zoom);
-          const dy = screenToPatternLength(e.clientY - drag.startMouse.y, zoom);
+          const dxS = screenToPatternLength(e.clientX - drag.startMouse.x, zoom);
+          const dyS = screenToPatternLength(e.clientY - drag.startMouse.y, zoom);
+          // Positions are stored un-rotated; rotate the screen delta into the
+          // piece's local frame so a rotated piece drags in the pointer's
+          // direction, not skewed (nota de María #170).
+          const rot = piece.rotation ?? 0;
+          const { x: dx, y: dy } = rot
+            ? rotatePoint({ x: dxS, y: dyS }, { x: 0, y: 0 }, -rot * Math.PI / 180)
+            : { x: dxS, y: dyS };
 
           let outline = piece.outline;
           for (const [cmdIdx, startPos] of drag.startPositions) {
@@ -488,15 +523,16 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         if (!piece) return { ...s, marquee: null };
 
         const { start, current } = s.marquee;
-        // Marquee is in pattern space; nodes are in piece-local space
-        const minX = Math.min(start.x, current.x) - piece.position.x;
-        const maxX = Math.max(start.x, current.x) - piece.position.x;
-        const minY = Math.min(start.y, current.y) - piece.position.y;
-        const maxY = Math.max(start.y, current.y) - piece.position.y;
+        // Marquee is a screen-aligned box in pattern space; project each
+        // (un-rotated) node to its rotated pattern position before the test.
+        const minX = Math.min(start.x, current.x);
+        const maxX = Math.max(start.x, current.x);
+        const minY = Math.min(start.y, current.y);
+        const maxY = Math.max(start.y, current.y);
 
         const insideNodes = new Set(s.selectedNodes); // keep existing if shift was held
         for (const node of s.nodes) {
-          const { x, y } = node.position;
+          const { x, y } = pieceLocalToPattern(node.position, piece);
           if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
             insideNodes.add(node.ref.commandIndex);
           }
@@ -546,6 +582,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           const updated: PatternPiece = {
             ...piece,
             outline,
+            internals: reanchorNotches(piece.internals, outline),
             updatedAt: Date.now(),
           };
           expectedOutlineRef.current = outline;

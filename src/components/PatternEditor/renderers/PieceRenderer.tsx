@@ -13,32 +13,13 @@ import { resolveColorway } from '../../../utils/colorwayResolver';
 import { formatPieceLabel } from '../../../utils/pieceLabel';
 import { dartApexPoint, internalLineColor } from './internalLineStyle';
 import { PHYSICAL_FABRIC_LIBRARY } from '../../../utils/cloth/physicalFabric';
+import { outlineBBoxCenter } from '../../../utils/geometry/transform';
+import { grainlineArrowheads } from '../../../utils/grainLine';
 
-/** Compute bounding box center of a path outline. */
+/** Rotation pivot: bbox center of an outline. Shared with edit overlays/hit-tests. */
 function getOutlineCenter(outline: PathCommand[]): { cx: number; cy: number } {
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const cmd of outline) {
-    const v = cmd.values;
-    if (cmd.type === 'M' || cmd.type === 'L') {
-      if (v[0] < minX) minX = v[0]; if (v[0] > maxX) maxX = v[0];
-      if (v[1] < minY) minY = v[1]; if (v[1] > maxY) maxY = v[1];
-    } else if (cmd.type === 'C') {
-      for (let i = 0; i < 6; i += 2) {
-        if (v[i] < minX) minX = v[i]; if (v[i] > maxX) maxX = v[i];
-        if (v[i + 1] < minY) minY = v[i + 1]; if (v[i + 1] > maxY) maxY = v[i + 1];
-      }
-    } else if (cmd.type === 'Q') {
-      for (let i = 0; i < 4; i += 2) {
-        if (v[i] < minX) minX = v[i]; if (v[i] > maxX) maxX = v[i];
-        if (v[i + 1] < minY) minY = v[i + 1]; if (v[i + 1] > maxY) maxY = v[i + 1];
-      }
-    } else if (cmd.type === 'H') {
-      if (v[0] < minX) minX = v[0]; if (v[0] > maxX) maxX = v[0];
-    } else if (cmd.type === 'V') {
-      if (v[0] < minY) minY = v[0]; if (v[0] > maxY) maxY = v[0];
-    }
-  }
-  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+  const { x, y } = outlineBBoxCenter(outline);
+  return { cx: x, cy: y };
 }
 
 interface SinglePieceProps {
@@ -224,6 +205,11 @@ const SinglePiece = memo(function SinglePiece({
         // Tokenized internal-line colors (design surface 5, P0.3) — see internalLineColor.
         const lineColor = internalLineColor(line, isLineSelected);
         const dartApex = line.type === 'dart' ? dartApexPoint(line.path) : null;
+        // Grainline arrowheads (nota de María #169): the persisted line carries
+        // the double-headed arrows the draw preview already shows.
+        const grainlineHeads = line.type === 'grainline' && showGrainlines
+          ? grainlineArrowheads(line.path, 6 / zoom2D)
+          : [];
 
         // Compute fold direction markers for fold lines with foldOptions
         const foldMarkers: React.ReactElement[] = [];
@@ -283,6 +269,16 @@ const SinglePiece = memo(function SinglePiece({
               }
               opacity={line.type === 'grainline' && !showGrainlines ? 0 : line.type === 'reference' ? 0.6 : isLineSelected ? 1 : 0.8}
             />
+            {/* Grainline arrowheads (both ends) */}
+            {grainlineHeads.map((tri, gi) => (
+              <polygon
+                key={`gl-arrow-${gi}`}
+                points={tri.map(p => `${p.x},${p.y}`).join(' ')}
+                style={{ fill: lineColor }}
+                opacity={isLineSelected ? 1 : 0.8}
+                pointerEvents="none"
+              />
+            ))}
             {/* Dart apex point marker (P0.3) */}
             {dartApex && (
               <circle
