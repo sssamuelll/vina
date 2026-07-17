@@ -527,12 +527,6 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       icon: '⊞',
       action: () => act(() => onZoomToFit?.()),
     });
-    items.push({
-      label: 'Deseleccionar todo',
-      icon: '☐',
-      shortcut: 'Esc',
-      action: () => act(() => dispatch(clearSelection())),
-    });
   }
 
   return (

@@ -92,7 +92,7 @@ function getInternalLineEndpoints(line: InternalLine): [Point2D, Point2D] | null
 }
 
 interface ToolHooks {
-  pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => void };
+  pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => void; reset: () => void };
   rectTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
   lineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
@@ -202,6 +202,7 @@ interface ToolHooks {
     handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleKeyDown: (e: KeyboardEvent) => void;
     handleDoubleClick: () => void;
+    reset: () => void;
   };
   internalShapeTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -292,6 +293,18 @@ export function useEditorInteractions(
     if (activeTool !== 'internalShape') internalShapeTool.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTool, internalShapeTool.reset]);
+
+  // Clear an abandoned pen/polyPen stroke when switching away — otherwise it
+  // reappears "already placed" on re-activation (nota de María)
+  useEffect(() => {
+    if (activeTool !== 'pen') pen.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool, pen.reset]);
+
+  useEffect(() => {
+    if (activeTool !== 'polyPen') polyPenTool.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool, polyPenTool.reset]);
 
   // Delete/Backspace handler for selected internal line
   const handleInternalLineKeyDown = useCallback((e: KeyboardEvent) => {
