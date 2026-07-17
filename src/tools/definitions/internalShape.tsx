@@ -28,16 +28,16 @@ export const internalShapeTool: ToolDefinition = {
   cursor: 'crosshair',
   group: 'draw',
   copilot: {
-    description: 'Creates internal cutouts or holes within a pattern piece. Used for adding buttonholes, pocket openings, decorative cutouts, or other internal shapes that need to be cut out of the fabric. The internal shape becomes a hole in the pattern piece.',
+    description: 'Add internal reference markings to pattern pieces. Internal shapes are guide lines or marks drawn on the piece that are printed and exported but not cut—the fabric stays whole. Used to mark pocket placement, internal references, placement guides, and other fabrication notes.',
     examples: [
-      'Add a buttonhole cutout',
-      'Create an internal pocket opening',
-      'Draw a cutout shape',
-      'Add a decorative hole',
+      'Mark the pocket placement on the bodice',
+      'Draw an internal reference line',
+      'Add a placement guide for construction',
+      'Mark internal fabrication details',
     ],
-    keywords: ['internal', 'cutout', 'hole', 'opening', 'buttonhole', 'pocket', 'shape', 'cut'],
+    keywords: ['internal', 'marking', 'reference', 'guide', 'placement', 'pocket', 'line', 'fabrication'],
     requiresSelection: 'piece',
-    produces: 'piece',
+    produces: 'none',
     undoable: true,
   },
 };

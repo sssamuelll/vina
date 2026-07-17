@@ -6,7 +6,7 @@ import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../util
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, Point2D } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, Point2D, PathCommand } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
 import { useLineTool } from './useLineTool';
@@ -35,6 +35,7 @@ import { useWalkSeamTool } from './useWalkSeamTool';
 import { useOffsetTool } from './useOffsetTool';
 import { useExtendTrimTool } from './useExtendTrimTool';
 import { usePolyPenTool } from './usePolyPenTool';
+import { toPieceLocalPath } from './internalShapePath';
 import { usePleatTool } from '../../hooks/usePleatTool';
 import { useEditorInteractions } from './useEditorInteractions';
 import { useElasticTool } from '../../hooks/useElasticTool';
@@ -266,6 +267,18 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   }, [selectedPieceIds, pieces, dispatch]);
 
   const polyPenTool = usePolyPenTool(zoom2D, pan2D, handlePieceComplete, handlePolyPenCompleteInternalLine, polyPenMode, polyPenLineType);
+
+  const handleInternalShapeComplete = useCallback((path: PathCommand[]) => {
+    // polyPen produces a pattern-space path; internals are stored piece-local.
+    const target = pieces.find((p) => p.id === selectedPieceIds[0]) ?? pieces[pieces.length - 1];
+    if (!target) return;
+    dispatch(addInternalLine({
+      pieceId: target.id,
+      line: { id: newId(), type: 'reference', path: toPieceLocalPath(path, target.position) },
+    }));
+  }, [pieces, selectedPieceIds, dispatch]);
+
+  const internalShapeTool = usePolyPenTool(zoom2D, pan2D, handlePieceComplete, handleInternalShapeComplete, 'internalLine', 'reference');
   const pleatTool = usePleatTool(zoom2D, pan2D);
   const elasticTool = useElasticTool(zoom2D, pan2D, pieces);
 
@@ -480,7 +493,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, pleatTool, elasticTool,
+      pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
     });
 
   // Track SVG viewport size for the ruler layer (screen-space ticks/labels).
@@ -794,6 +807,15 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
               previewPoint={polyPenTool.previewPoint}
               isDragging={polyPenTool.isDragging}
               dragHandle={polyPenTool.dragHandle}
+              zoom2D={zoom2D}
+            />
+          )}
+          {activeTool === 'internalShape' && (
+            <PolyPenToolOverlay
+              nodes={internalShapeTool.nodes}
+              previewPoint={internalShapeTool.previewPoint}
+              isDragging={internalShapeTool.isDragging}
+              dragHandle={internalShapeTool.dragHandle}
               zoom2D={zoom2D}
             />
           )}
