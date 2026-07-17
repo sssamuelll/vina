@@ -49,42 +49,78 @@ are already in place:
 
 Two changes.
 
-### 1. A polyline draw interaction — `internalShapeTool` hook
+### 1. Wire the `internalShape` (G) tool to a polyPen `reference` preset
 
-A new tool hook, mirroring the existing per-tool hooks (`grainlineTool`, `lineTool`,
-`notchTool`): it owns the in-progress polyline state and produces a `'reference'`
-internal line.
+The polyline-to-internal-line interaction already exists: `usePolyPenTool`
+(usePolyPenTool.ts) in `'internalLine'` mode accumulates nodes on click, closes by
+clicking near the first vertex (≥3 nodes → path ends with `Z`), finishes on
+double-click, cancels on Escape, supports click-drag curves, renders a live preview
+(`PolyPenToolOverlay`), and calls `onCompleteInternalLine(path, lineType)`. In
+PatternEditor that callback (`handlePolyPenCompleteInternalLine`, PatternEditor.tsx:256)
+dispatches `addInternalLine({ pieceId, line: { id: newId(), type: lineType, path } })`.
 
-Interaction (closable polyline, pen-style):
+So the Forma interna does **not** need a new hook. It needs a second `usePolyPenTool`
+instance preset to internal-line / `'reference'`, wired to the `internalShape` tool with
+its own completion handler:
 
-- **Click** places a vertex (canvas point → piece-local coords, as the grainline /
-  notch tools already convert).
-- **Double-click** or **Enter** finishes as an **open** polyline.
-- **Click near the first vertex** (within a small pixel threshold) finishes as a
-  **closed** polyline (path ends with `Z`) — the single close mechanism.
-- **Escape** cancels the in-progress polyline (no dispatch).
-- On finish, dispatch `addInternalLine({ pieceId: <selected>, line: { id: newId(),
-  type: 'reference', path } })`. `path` is `M` + `L…` (+ `Z` if closed).
-- Straight segments only (no curves) for this version.
+```ts
+// PatternEditor.tsx — next to the existing polyPenTool instantiation (:268)
+const internalShapeTool = usePolyPenTool(
+  zoom2D, pan2D,
+  handlePieceComplete,          // unused in internalLine mode
+  handleInternalShapeComplete,  // NEW: converts to piece-local, stores type:'reference'
+  'internalLine',
+  'reference',
+);
+```
 
-Wiring in `useEditorInteractions`:
+**Coordinate space — the one correctness subtlety.** polyPen produces its path in
+*pattern* space, but internal lines are stored *piece-local* (PieceRenderer wraps
+internals in `translate(piece.position…)`, PieceRenderer.tsx:136; grainline/notch
+subtract `piece.position` when storing). The existing
+`handlePolyPenCompleteInternalLine` stores the path as-is — a latent misplacement bug in
+polyPen's own internalLine mode for pieces not at the origin (out of scope to fix here).
+`internalShape` must therefore use a **new** completion handler that shifts the path into
+the target piece's local space before dispatch (subtract `position`, matching
+grainline; rotation is not handled, same limitation as the existing internal-draw
+tools):
 
-- `handleMouseDown` chain (~L436-478): add `if (activeTool === 'internalShape') {
-  internalShapeTool.handleMouseDown(e); return; }`.
-- `handleKeyDown` chain (~L297-313): add the tool's `handleKeyDown` (Enter/Escape/close).
-- A reset effect (mirroring the `walkSeam` / `measure` reset effects, ~L266-280) clears
-  the in-progress polyline when the active tool changes away from `internalShape`.
-- An in-progress **preview** overlay renders the polyline being drawn (reuse the
-  pen tool's preview approach).
+```ts
+const handleInternalShapeComplete = useCallback((path: PathCommand[]) => {
+  const target = pieces.find((p) => p.id === selectedPieceIds[0]) ?? pieces[pieces.length - 1];
+  if (!target) return;
+  const local = path.map((cmd) => ({
+    ...cmd,
+    values: cmd.values.map((v, i) => (i % 2 === 0 ? v - target.position.x : v - target.position.y)),
+  }));
+  dispatch(addInternalLine({ pieceId: target.id, line: { id: newId(), type: 'reference', path: local } }));
+}, [pieces, selectedPieceIds, dispatch]);
+```
 
-**Guard:** the tool requires a selected piece (`requiresSelection: 'piece'`). With no
-piece selected, clicking is a no-op that surfaces a hint (toast) rather than silently
-doing nothing — never reintroduce a phantom.
+Wiring:
 
-**Approach chosen:** a dedicated hook, not an extension of the pen tool. The pen
-produces a new *piece*; overloading it to emit an internal line on the *selected*
-piece would couple two unrelated outputs. A dedicated hook matches the codebase's
-one-hook-per-tool pattern and keeps pen uncoupled.
+- Add `internalShapeTool` to the `ToolHooks` interface and to the `tools` object passed
+  to `useEditorInteractions` (PatternEditor.tsx:482), and destructure it (:236).
+- `useEditorInteractions` — mirror the existing `polyPen` branches for `internalShape`:
+  `handleMouseDown` (~L454), `handleMouseMove`, `handleMouseUp`, `handleDoubleClick`, and
+  `handleKeyDown` (~L297-313, Escape). polyPen uses mouse down/move/up (curve drag) +
+  double-click, so all of those route through.
+- A reset effect (mirroring the `walkSeam` / `measure` reset effects, ~L266-280) calls
+  `internalShapeTool.reset()` when the active tool changes away from `internalShape`.
+- Render the preview overlay when `activeTool === 'internalShape'` (reuse
+  `PolyPenToolOverlay`, as the `polyPen` branch does at PatternEditor.tsx:791).
+
+**Curve support** comes for free from polyPen (click = straight vertex, click-drag =
+curve). This is a superset of the straight-only MVP and is kept.
+
+**No-piece behavior:** matches polyPen — the existing dispatcher falls back to the last
+piece when nothing is selected (`selectedPieceIds[0] ?? pieces[last]`). Consistent with
+the tool we reuse; not a strict "requires selection" guard.
+
+**Approach chosen:** reuse `usePolyPenTool`, not a new hook. The closable-polyline →
+internal-line machinery (state, close, curves, preview, `Z`, dispatch) already exists
+and is tested; a parallel hook would duplicate it. The `internalShape` tool becomes a
+thin preset (mode + type) over polyPen.
 
 ### 2. Full-polyline DXF export
 
@@ -106,27 +142,38 @@ a follow-up only if María asks for one.
   per-point grading, internals are frozen (outline-only grading), so the marking does
   not rescale. Acceptable for this version; rescaling markings under grading is out of
   scope.
-- **Curves:** none — straight segments only.
+- **Curves:** supported via polyPen (click-drag), for free. Straight vertices by
+  clicking.
+- **No-piece selected:** falls back to the last piece (polyPen's existing behavior),
+  not a strict guard.
 - **Selection / delete:** reuse the existing `selectedInternalLine` +
   `handleInternalLineKeyDown` path; no new code.
 
 ## Testing
 
-- **Draw hook (TDD):** the in-progress polyline accumulates vertices on click; finishes
-  open on Enter/double-click; finishes closed (`Z`) when the last click lands near the
-  first vertex; Escape cancels with no dispatch; finish dispatches `addInternalLine`
-  with `type: 'reference'` and the built path. Test the hook's pure state logic (the
-  repo's convention for interaction logic — extract and unit-test, as with
-  `pointerDragSession` / `anchorClick`).
-- **Export:** a `reference` polyline of N vertices exports as a full N-vertex polyline
-  on the DRAW layer, and a closed polyline exports closed. Extends the existing
-  `exportAAMA` tests.
+Two pieces of genuinely new logic, each TDD'd as a pure function:
+
+- **Piece-local conversion (TDD):** `toPieceLocalPath(path, position)` subtracts the
+  piece origin from every `(x, y)` pair across `M` / `L` / `C` / `Q` and leaves `Z`
+  untouched. Tests: a point at pattern (position + local) maps back to local; a closed
+  `M L L L Z` keeps its `Z`; a curve's six control values all shift.
+- **Export (TDD):** a `reference` polyline of N vertices exports as a full N-vertex
+  polyline on the DRAW layer; a closed polyline exports closed (`Z`). Before the fix the
+  emitter drops everything past the first segment. Extends the `exportAAMA` tests.
+- **Wiring:** reuses `usePolyPenTool` (existing, exercised interaction logic), so no new
+  hook to test. Verified by the gate (typecheck compiles the new branches) plus a manual
+  smoke: select `internalShape` (G), click vertices on a piece not at the origin, close by
+  clicking the first vertex, confirm the `reference` line renders at the click location
+  (not offset) and survives export.
 - Full gate green: `tsc -b` + `eslint --max-warnings=0` + full suite.
 
 ## Out of scope (follow-ups)
 
 - Cutout/hole geometry (the fabric-removal reading) — not what this is.
 - A dedicated internal-marking DXF layer distinct from DRAW.
-- Rescaling markings under per-point grading.
-- Curved marking segments.
+- Rescaling markings under per-point grading; rotation of the drawn path for a rotated
+  piece (same limitation as grainline/notch today).
+- A strict "requires selected piece" guard (polyPen's last-piece fallback is kept).
+- Fixing polyPen's own internalLine mode (stores pattern-space paths → misplaced off
+  origin); `internalShape` sidesteps it with its own converting handler.
 - `removeInternalLine` linked-mirror cascade (a pre-existing gap, #619-adjacent).
