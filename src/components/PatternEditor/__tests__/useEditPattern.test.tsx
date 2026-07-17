@@ -13,7 +13,9 @@ import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, { restoreState } from '../../../store/projectSlice';
 import { useEditPattern, findInsertTarget, resyncStateToPiece, patternToPieceLocal, pieceLocalToPattern } from '../useEditPattern';
 import { extractNodes, splitSegmentAt } from '../nodeEditorUtils';
-import type { PatternPiece } from '../../../types/types';
+import { computeNotchAnchor } from '../../../utils/notchAnchor';
+import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../../utils/notches';
+import type { PatternPiece, InternalLine } from '../../../types/types';
 import type { EditPatternState } from '../useEditPattern';
 
 afterEach(cleanup);
@@ -235,6 +237,48 @@ describe('useEditPattern hit-testing on a rotated piece', () => {
     const outline = (store.getState() as { project: { pieces: PatternPiece[] } }).project.pieces[0].outline;
     expect(outline[1].values[0]).toBeCloseTo(200);
     expect(outline[1].values[1]).toBeCloseTo(-10);
+  });
+});
+
+// ─── Notch re-anchoring on outline edit (nota de María #171) ───
+
+describe('useEditPattern re-anchors notches when the outline is edited', () => {
+  function notchedPiece(): PatternPiece {
+    const anchor = computeNotchAnchor(square as PatternPiece['outline'], { x: 100, y: 0 })!;
+    const notch: InternalLine = {
+      id: 'n1', type: 'notch',
+      path: generateNotchPath({ x: 100, y: 0 }, { x: 0, y: 1 }, DEFAULT_NOTCH_OPTIONS),
+      notchOptions: DEFAULT_NOTCH_OPTIONS,
+      notchAnchor: anchor,
+    };
+    return { ...piece(), internals: [notch] } as PatternPiece;
+  }
+  function setup(p: PatternPiece) {
+    const store = configureStore({ reducer: { project: projectReducer } });
+    store.dispatch(restoreState({ ...store.getState().project, pieces: [p] }));
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <Provider store={store}>{children}</Provider>
+    );
+    const hook = renderHook(() => useEditPattern(1, { x: 0, y: 0 }), { wrapper });
+    return { store, hook };
+  }
+  function clickAt(x: number, y: number) {
+    return {
+      button: 0, shiftKey: false, clientX: x, clientY: y,
+      currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
+    } as unknown as React.MouseEvent<SVGSVGElement>;
+  }
+
+  it('recomputes the notch path when a corner of its edge is dragged', () => {
+    const { store, hook } = setup(notchedPiece());
+    const before = (store.getState() as { project: { pieces: PatternPiece[] } }).project.pieces[0].internals[0].path;
+    act(() => hook.result.current.enterEdit('p'));
+    // Drag node 1 (200,0) up to (200,-50), reshaping the bottom edge.
+    act(() => { hook.result.current.handleMouseDown(clickAt(200, 0)); });
+    act(() => { hook.result.current.handleMouseMove(clickAt(200, -50)); });
+    act(() => hook.result.current.handleMouseUp());
+    const after = (store.getState() as { project: { pieces: PatternPiece[] } }).project.pieces[0].internals[0].path;
+    expect(JSON.stringify(after)).not.toEqual(JSON.stringify(before));
   });
 });
 

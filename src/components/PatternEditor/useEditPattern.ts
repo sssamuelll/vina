@@ -26,6 +26,7 @@ import {
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { outlineBBoxCenter, rotatePoint } from '../../utils/geometry/transform';
+import { reanchorNotches } from '../../utils/notchReanchor';
 
 // ─── Constants ───
 
@@ -216,6 +217,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       const updated: PatternPiece = {
         ...piece,
         outline: newOutline,
+        // Notches with a parametric anchor follow the reshaped edge (#171).
+        internals: reanchorNotches(piece.internals, newOutline),
         updatedAt: Date.now(),
       };
       expectedOutlineRef.current = newOutline;
@@ -579,6 +582,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           const updated: PatternPiece = {
             ...piece,
             outline,
+            internals: reanchorNotches(piece.internals, outline),
             updatedAt: Date.now(),
           };
           expectedOutlineRef.current = outline;
