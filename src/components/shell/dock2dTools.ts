@@ -1,6 +1,6 @@
 import {
   MousePointer2, PenTool, Minus, Square, Scissors, Ruler, Spline,
-  PenLine, Shapes, Triangle, MoveVertical, Scaling, Type, SquarePlus,
+  PenLine, Shapes, Triangle, MoveVertical,
   SquareDashed,
   type LucideIcon,
 } from 'lucide-react';
@@ -16,7 +16,9 @@ export interface DockToolDef {
 
 /** Curated catalog of dock-eligible 2D tools. Render order = this order; the
  *  first 7 are the default set (DEFAULT_DOCK_2D_IDS in dockSlice). Every id is a
- *  real Tool2D union member, activatable via activate2DTool. */
+ *  real Tool2D union member with a canvas handler in useEditorInteractions —
+ *  except internalShape, whose handler is not built yet (kept because María
+ *  wants "Forma interna"; the other unwired tools were removed per #529). */
 export const DOCK_2D_CATALOG: DockToolDef[] = [
   { id: 'select', icon: MousePointer2, label: 'Seleccionar', shortcut: 'Z' },
   { id: 'pen', icon: PenTool, label: 'Pluma', shortcut: 'H' },
@@ -30,9 +32,6 @@ export const DOCK_2D_CATALOG: DockToolDef[] = [
   { id: 'notch', icon: Triangle, label: 'Piquete' },
   { id: 'seamAllowance', icon: SquareDashed, label: 'Margen de costura', shortcut: 'O' },
   { id: 'grainline', icon: MoveVertical, label: 'Hilo' },
-  { id: 'grading', icon: Scaling, label: 'Escalado' },
-  { id: 'textAnnotation', icon: Type, label: 'Texto' },
-  { id: 'addPiece', icon: SquarePlus, label: 'Añadir pieza' },
 ];
 
 export function getDockToolById(id: string): DockToolDef | undefined {
