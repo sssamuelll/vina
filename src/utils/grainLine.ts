@@ -4,7 +4,7 @@
  * @module grainLine
  */
 
-import type { PatternPiece, GrainLine, GrainDirection, InternalLine, PathCommand } from '../types/types';
+import type { PatternPiece, GrainLine, GrainDirection, InternalLine, PathCommand, Point2D } from '../types/types';
 import { newId } from './ids';
 
 // B11-state: thin wrapper. Previous `let _glCounter = 0` removed.
@@ -83,6 +83,33 @@ export function grainAlignmentRotation(piece: Pick<PatternPiece, 'internals'>): 
   while (deg > 90) deg -= 180;
   while (deg <= -90) deg += 180;
   return Math.round(deg * 100) / 100;
+}
+
+/**
+ * Arrowhead wings for a grainline, as triangles `[tip, wingA, wingB]` in the
+ * same coord space as the path. One per end — a finished grainline is
+ * double-headed (nota de María #169: the persisted line and its DXF must carry
+ * the arrows the draw preview already shows). `size` is the wing length in that
+ * space (canvas passes px/zoom; DXF passes mm). Degenerate line → [].
+ */
+export function grainlineArrowheads(path: PathCommand[], size: number): Point2D[][] {
+  const pts = samplePath(path);
+  if (pts.length < 2) return [];
+  const a = pts[0];
+  const b = pts[pts.length - 1];
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-6) return [];
+  const ux = dx / len, uy = dy / len;
+  const wing = (tip: Point2D, wx: number, wy: number): Point2D[] => {
+    const bx = tip.x - wx * size, by = tip.y - wy * size;
+    return [
+      { x: tip.x, y: tip.y },
+      { x: bx + wy * size * 0.5, y: by - wx * size * 0.5 },
+      { x: bx - wy * size * 0.5, y: by + wx * size * 0.5 },
+    ];
+  };
+  return [wing(b, ux, uy), wing(a, -ux, -uy)];
 }
 
 function samplePath(path: PathCommand[]): { x: number; y: number }[] {

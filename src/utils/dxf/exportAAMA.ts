@@ -13,8 +13,12 @@ import { PatternPiece, PathCommand } from '../../types/types';
 import { AAMA_LAYERS, DXFExportOptions } from './types';
 import { preparePieces, computeBBox } from '../export/pipeline';
 import { escapeDxfString } from '../sanitizeName';
+import { grainlineArrowheads } from '../grainLine';
 
 const DEFAULT_OPTIONS: DXFExportOptions = { version: 'R2000', aamaLayers: true };
+
+/** Grainline arrowhead wing length in mm (physical output). */
+const GRAINLINE_ARROW_MM = 6;
 
 // ─── Handle counter for R2000+ ───
 
@@ -308,6 +312,15 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
         line.path[1].values[0], line.path[1].values[1],
         layer,
       );
+
+      // Grainline arrowheads (nota de María #169) — a finished grainline is
+      // double-headed. Each wing is a short LINE from the tip on layer 7.
+      if (line.type === 'grainline') {
+        for (const [tip, w1, w2] of grainlineArrowheads(line.path, GRAINLINE_ARROW_MM)) {
+          s += lineToDXF(tip.x, tip.y, w1.x, w1.y, layer);
+          s += lineToDXF(tip.x, tip.y, w2.x, w2.y, layer);
+        }
+      }
 
       // Fold direction annotation — placed at midpoint of fold line
       if (line.type === 'fold') {
