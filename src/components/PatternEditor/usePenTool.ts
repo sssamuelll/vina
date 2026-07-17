@@ -177,6 +177,11 @@ export function usePenTool(
     setState(prev => ({ ...prev, isDragging: false }));
   }, []);
 
+  /** Clear any in-progress stroke (used when switching away from the tool). */
+  const reset = useCallback(() => {
+    setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
+  }, []);
+
   /** Escape = cancel, Enter = finalize open path */
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -211,5 +216,6 @@ export function usePenTool(
     handleMouseMove,
     handleMouseUp,
     handleKeyDown,
+    reset,
   };
 }

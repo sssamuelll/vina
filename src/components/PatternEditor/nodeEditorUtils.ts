@@ -376,6 +376,18 @@ export function splitSegmentAt(
       return cmds;
     }
 
+    case 'Z': {
+      // Closing segment (last anchor → first anchor). Insert an L before the
+      // Z so the closing edge of a closed piece is splittable like any other
+      // — nearestSegment maps clicks on this edge to the Z command's index.
+      const firstAnchor = getAnchor(cmds[0]);
+      if (!firstAnchor) return cmds;
+      const midX = prevAnchor.x + t * (firstAnchor.x - prevAnchor.x);
+      const midY = prevAnchor.y + t * (firstAnchor.y - prevAnchor.y);
+      cmds.splice(commandIndex, 0, { type: 'L', values: [midX, midY] });
+      return cmds;
+    }
+
     default:
       return cmds;
   }

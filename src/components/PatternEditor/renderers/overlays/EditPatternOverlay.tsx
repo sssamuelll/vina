@@ -4,7 +4,7 @@ interface EditPatternOverlayProps {
   zoom2D: number;
   pieces: PatternPiece[];
   editingPieceId: string;
-  nodes: Array<{ position: Point2D; ref: { commandIndex: number } }>;
+  nodes: Array<{ position: Point2D; cp1?: Point2D; ref: { commandIndex: number } }>;
   selectedNodes: Set<number>;
   selectedSegments: Set<number>;
   hoveredNode: number | null;
@@ -117,17 +117,33 @@ export default function EditPatternOverlay({
           />
         )}
 
-        {/* Anchor points */}
+        {/* Anchor points — curve anchors (C/Q, have cp1) are squares, corners circles */}
         {nodes.map((node, i) => {
           const isSelected = selectedNodes.has(node.ref.commandIndex);
           const isHovered = hoveredNode === node.ref.commandIndex;
+          const fill = isSelected ? '#FFD700' : isHovered ? '#6BB3FF' : '#4A9EFF';
+          if (node.cp1) {
+            return (
+              <rect
+                key={i}
+                x={node.position.x - r}
+                y={node.position.y - r}
+                width={r * 2}
+                height={r * 2}
+                fill={fill}
+                stroke="#fff"
+                strokeWidth={sw}
+                style={{ cursor: 'move' }}
+              />
+            );
+          }
           return (
             <circle
               key={i}
               cx={node.position.x}
               cy={node.position.y}
               r={r}
-              fill={isSelected ? '#FFD700' : isHovered ? '#6BB3FF' : '#4A9EFF'}
+              fill={fill}
               stroke="#fff"
               strokeWidth={sw}
               style={{ cursor: 'move' }}

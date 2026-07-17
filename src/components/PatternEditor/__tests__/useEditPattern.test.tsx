@@ -1,0 +1,265 @@
+// @vitest-environment jsdom
+/**
+ * useEditPattern — phantom-point guard + node resync after external outline
+ * changes (undo/redo). Notas de María #167: double-clicking a corner vertex
+ * spawned a coincident extra point, and Ctrl+Z left the overlay nodes detached
+ * from the reverted outline.
+ */
+import { describe, it, expect, afterEach } from 'vitest';
+import React from 'react';
+import { renderHook, cleanup, act } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import projectReducer, { restoreState } from '../../../store/projectSlice';
+import { useEditPattern, findInsertTarget, resyncStateToPiece } from '../useEditPattern';
+import { extractNodes, splitSegmentAt } from '../nodeEditorUtils';
+import type { PatternPiece } from '../../../types/types';
+import type { EditPatternState } from '../useEditPattern';
+
+afterEach(cleanup);
+
+const square = [
+  { type: 'M', values: [0, 0] },
+  { type: 'L', values: [200, 0] },
+  { type: 'L', values: [200, 200] },
+  { type: 'L', values: [0, 200] },
+  { type: 'Z', values: [] },
+] as PatternPiece['outline'];
+
+// M/L/C mix — armhole-style curve ending at (100, 100).
+const curved = [
+  { type: 'M', values: [0, 0] },
+  { type: 'L', values: [100, 0] },
+  { type: 'C', values: [120, 20, 120, 80, 100, 100] },
+  { type: 'Z', values: [] },
+] as PatternPiece['outline'];
+
+function piece(outline = square): PatternPiece {
+  return {
+    id: 'p', name: 'Square', outline, position: { x: 0, y: 0 },
+    rotation: 0, mirrored: false, active: true, seamAllowance: 0, internals: [], edges: [],
+  } as unknown as PatternPiece;
+}
+
+const HR = 8;
+
+// ─── findInsertTarget (phantom-point guard) ───
+
+describe('findInsertTarget', () => {
+  const p = piece();
+  const nodes = extractNodes(p);
+
+  it('double-click exactly on a corner vertex does not insert', () => {
+    expect(findInsertTarget({ x: 0, y: 0 }, nodes, p.outline, HR)).toBeNull();
+  });
+
+  it('double-click within hit radius of a vertex does not insert', () => {
+    // (5,5) is ~7.07 from the corner (inside HR) and distance 5 from both
+    // adjacent segments — the exact case that spawned the phantom point.
+    expect(findInsertTarget({ x: 5, y: 5 }, nodes, p.outline, HR)).toBeNull();
+  });
+
+  it('double-click mid-segment returns an insert target on that segment', () => {
+    const target = findInsertTarget({ x: 100, y: 1 }, nodes, p.outline, HR);
+    expect(target).not.toBeNull();
+    expect(target!.commandIndex).toBe(1);
+    expect(target!.t).toBeCloseTo(0.5, 1);
+  });
+
+  it('double-click far from the outline does nothing', () => {
+    expect(findInsertTarget({ x: 500, y: 500 }, nodes, p.outline, HR)).toBeNull();
+  });
+
+  it('double-click on the closing (Z) edge targets that edge', () => {
+    // Closing edge of the square runs from (0,200) back to (0,0).
+    const target = findInsertTarget({ x: 1, y: 100 }, nodes, p.outline, HR);
+    expect(target).not.toBeNull();
+    expect(p.outline[target!.commandIndex].type).toBe('Z');
+  });
+
+  it('ignores the phantom closing edge of an open outline', () => {
+    const open = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [200, 0] },
+      { type: 'L', values: [200, 200] },
+    ] as PatternPiece['outline'];
+    const openNodes = extractNodes(piece(open));
+    // (100,100) sits on the imaginary last→first line; there is no real edge.
+    expect(findInsertTarget({ x: 100, y: 100 }, openNodes, open, HR)).toBeNull();
+  });
+
+  it('double-click on a CURVE anchor does not insert (guard covers C/Q anchors)', () => {
+    const cp = piece(curved);
+    const cNodes = extractNodes(cp);
+    // The C anchor sits at (100,100), on its own arc at distance ~0.
+    expect(findInsertTarget({ x: 100, y: 100 }, cNodes, cp.outline, HR)).toBeNull();
+    expect(findInsertTarget({ x: 102, y: 102 }, cNodes, cp.outline, HR)).toBeNull();
+  });
+
+  it('double-click mid-arc inserts on the curve segment', () => {
+    const cp = piece(curved);
+    const cNodes = extractNodes(cp);
+    // Cubic midpoint of the C segment is (115, 50) — far from every anchor.
+    const target = findInsertTarget({ x: 115, y: 50 }, cNodes, cp.outline, HR);
+    expect(target).not.toBeNull();
+    expect(target!.commandIndex).toBe(2);
+    expect(cp.outline[target!.commandIndex].type).toBe('C');
+  });
+});
+
+// ─── splitSegmentAt on the closing edge ───
+
+describe('splitSegmentAt on the closing (Z) edge', () => {
+  it('inserts an L before the Z at the interpolated point', () => {
+    const out = splitSegmentAt(square, 4, 0.5);
+    expect(out).toHaveLength(6);
+    expect(out[4]).toEqual({ type: 'L', values: [0, 100] });
+    expect(out[5].type).toBe('Z');
+  });
+});
+
+// ─── resyncStateToPiece ───
+
+describe('resyncStateToPiece', () => {
+  const triangle = [
+    { type: 'M', values: [0, 0] },
+    { type: 'L', values: [100, 0] },
+    { type: 'L', values: [50, 80] },
+    { type: 'Z', values: [] },
+  ] as PatternPiece['outline'];
+
+  function stateFor(p: PatternPiece): EditPatternState {
+    return {
+      isEditing: true,
+      editingPieceId: p.id,
+      nodes: extractNodes(piece()), // stale: extracted from the square
+      selectedNodes: new Set([1, 3]),
+      selectedSegments: new Set([2]),
+      hoveredNode: 1,
+      hoveredSegment: null,
+      addPointPreview: { x: 5, y: 5 },
+      marquee: null,
+    };
+  }
+
+  it('re-extracts nodes from the new outline', () => {
+    const p = piece(triangle);
+    const next = resyncStateToPiece(stateFor(p), p);
+    expect(next.nodes).toHaveLength(3);
+    expect(next.nodes[2].position).toEqual({ x: 50, y: 80 });
+  });
+
+  it('clears selections and transient hover state — indices from before an external change may denote different geometry', () => {
+    const p = piece(triangle);
+    const next = resyncStateToPiece(stateFor(p), p);
+    expect(next.selectedNodes.size).toBe(0);
+    expect(next.selectedSegments.size).toBe(0);
+    expect(next.hoveredNode).toBeNull();
+    expect(next.addPointPreview).toBeNull();
+  });
+});
+
+// ─── Hook: resync after undo (restoreState) ───
+
+describe('useEditPattern resync after restoreState', () => {
+  function setup(initialPieces: PatternPiece[]) {
+    const store = configureStore({ reducer: { project: projectReducer } });
+    store.dispatch(restoreState({ ...store.getState().project, pieces: initialPieces }));
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <Provider store={store}>{children}</Provider>
+    );
+    const hook = renderHook(() => useEditPattern(1, { x: 0, y: 0 }), { wrapper });
+    return { store, hook };
+  }
+
+  // zoom=1, pan=0, rect at origin → pattern point === client point.
+  function clickAt(x: number, y: number) {
+    return {
+      button: 0,
+      shiftKey: false,
+      clientX: x,
+      clientY: y,
+      currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
+    } as unknown as React.MouseEvent<SVGSVGElement>;
+  }
+
+  const reverted = [
+    { type: 'M', values: [0, 0] },
+    { type: 'L', values: [150, 0] },
+    { type: 'L', values: [200, 200] },
+    { type: 'L', values: [0, 200] },
+    { type: 'Z', values: [] },
+  ] as PatternPiece['outline'];
+
+  function undoTo(store: ReturnType<typeof configureStore>, pieces: PatternPiece[]) {
+    store.dispatch(restoreState({ ...(store.getState() as { project: object }).project, pieces }));
+  }
+
+  it('re-extracts overlay nodes when the edited outline is reverted externally (Ctrl+Z)', () => {
+    const { store, hook } = setup([piece()]);
+    act(() => hook.result.current.enterEdit('p'));
+    expect(hook.result.current.nodes[1].position).toEqual({ x: 200, y: 0 });
+
+    act(() => undoTo(store, [piece(reverted)]));
+
+    expect(hook.result.current.nodes[1].position).toEqual({ x: 150, y: 0 });
+  });
+
+  it('clears the selection when the outline changes externally', () => {
+    const { store, hook } = setup([piece()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(clickAt(200, 0)); });
+    act(() => hook.result.current.handleMouseUp());
+    expect([...hook.result.current.selectedNodes]).toEqual([1]);
+
+    act(() => undoTo(store, [piece(reverted)]));
+
+    expect(hook.result.current.selectedNodes.size).toBe(0);
+  });
+
+  it('keeps the selection across the hook’s own edits (dragging must not deselect)', () => {
+    const { hook } = setup([piece()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(clickAt(200, 0)); });
+    act(() => { hook.result.current.handleMouseMove(clickAt(210, 0)); });
+    act(() => hook.result.current.handleMouseUp());
+    expect([...hook.result.current.selectedNodes]).toEqual([1]);
+  });
+
+  it('resyncs when an internal edit and an external restore land in the same React batch', () => {
+    const { store, hook } = setup([piece()]);
+    act(() => hook.result.current.enterEdit('p'));
+
+    act(() => {
+      // Internal edit (double-click inserts a point at (100,0))…
+      hook.result.current.handleDoubleClick(clickAt(100, 0));
+      // …and an external restore, before the resync effect gets to run.
+      undoTo(store, [piece(reverted)]);
+    });
+
+    // The external outline must win: 4 anchors, node 1 at the reverted spot.
+    expect(hook.result.current.nodes).toHaveLength(4);
+    expect(hook.result.current.nodes[1].position).toEqual({ x: 150, y: 0 });
+  });
+
+  it('cancels an in-flight drag when the outline is reverted externally', () => {
+    const { store, hook } = setup([piece()]);
+    act(() => hook.result.current.enterEdit('p'));
+    // Grab node 1 at (200,0); mouse stays down.
+    act(() => { hook.result.current.handleMouseDown(clickAt(200, 0)); });
+
+    act(() => undoTo(store, [piece(reverted)]));
+
+    // The next mousemove must NOT re-impose pre-undo geometry.
+    act(() => { hook.result.current.handleMouseMove(clickAt(210, 0)); });
+    const outline = (store.getState() as { project: { pieces: PatternPiece[] } }).project.pieces[0].outline;
+    expect(outline[1].values).toEqual([150, 0]);
+  });
+
+  it('exits edit mode when the edited piece disappears (undo past creation)', () => {
+    const { store, hook } = setup([piece()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => undoTo(store, []));
+    expect(hook.result.current.isEditing).toBe(false);
+  });
+});

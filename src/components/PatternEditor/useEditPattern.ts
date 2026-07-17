@@ -8,11 +8,11 @@
  * Does NOT show bezier handles — that is for useEditCurve.
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
-import type { Point2D, PatternPiece } from '../../types/types';
+import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import {
   extractNodes,
   hitTestNode,
@@ -80,6 +80,56 @@ interface MarqueeDrag {
 
 type DragState = NodeDrag | SegmentDrag | MarqueeDrag;
 
+// ─── Pure helpers ───
+
+/**
+ * Where a double-click should insert a new point, if anywhere. Guards against
+ * the phantom-point bug: a click on (or near) an existing anchor must NOT
+ * split the adjacent segment — at a corner the vertex lies on both segments
+ * at distance ~0, so the segment test alone always passes there.
+ */
+export function findInsertTarget(
+  localPt: Point2D,
+  nodes: EditableNode[],
+  outline: PathCommand[],
+  hitRadius: number,
+): { commandIndex: number; t: number } | null {
+  if (hitTestNode(localPt, nodes, hitRadius)) return null;
+  const segHit = nearestSegment(localPt, outline);
+  if (segHit && segHit.distance < hitRadius) {
+    // An M target is nearestSegment's phantom closing edge of an OPEN
+    // outline — there is no real edge there, so inserting is meaningless
+    // (and would push a junk no-op entry onto the undo stack).
+    if (outline[segHit.commandIndex]?.type === 'M') return null;
+    return { commandIndex: segHit.commandIndex, t: segHit.t };
+  }
+  return null;
+}
+
+/**
+ * Rebuild overlay nodes from the piece's current outline after an EXTERNAL
+ * change (undo/redo restoring project state), so the anchor dots never detach
+ * from the path. Selections and transient hover state are cleared, not
+ * remapped: command indices shift when an insert is undone, so a surviving
+ * index would silently denote different geometry (and a Delete on it would
+ * destroy a legitimate corner).
+ */
+export function resyncStateToPiece(
+  state: EditPatternState,
+  piece: PatternPiece,
+): EditPatternState {
+  return {
+    ...state,
+    nodes: extractNodes(piece),
+    selectedNodes: new Set<number>(),
+    selectedSegments: new Set<number>(),
+    hoveredNode: null,
+    hoveredSegment: null,
+    addPointPreview: null,
+    marquee: null,
+  };
+}
+
 // ─── Hook ───
 
 export function useEditPattern(zoom: number, pan: Point2D) {
@@ -88,6 +138,15 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   const [state, setState] = useState<EditPatternState>({ ...INITIAL_STATE });
   const dragRef = useRef<DragState | null>(null);
+  /**
+   * Outline object (by identity) this hook itself dispatched. The resync
+   * effect treats a pieces change as internal only when the store's outline
+   * IS that object — a boolean flag would mis-consume an external restore
+   * that lands in the same React batch as an internal edit.
+   */
+  const expectedOutlineRef = useRef<PathCommand[] | null>(null);
+  /** Last outline (by identity) of the edited piece this hook has seen. */
+  const seenOutlineRef = useRef<PathCommand[] | null>(null);
 
   // ─── Coordinate helpers ───
 
@@ -134,6 +193,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         outline: newOutline,
         updatedAt: Date.now(),
       };
+      expectedOutlineRef.current = newOutline;
       dispatch(updatePiece(updated));
       const newNodes = extractNodes(updated);
       setState(s => ({ ...s, nodes: newNodes }));
@@ -148,6 +208,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (pieceId: string) => {
       const piece = pieces.find(p => p.id === pieceId);
       if (!piece) return;
+      seenOutlineRef.current = piece.outline;
+      expectedOutlineRef.current = null;
       setState({
         isEditing: true,
         editingPieceId: pieceId,
@@ -169,7 +231,33 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   const exitEdit = useCallback(() => {
     setState({ ...INITIAL_STATE });
     dragRef.current = null;
+    seenOutlineRef.current = null;
   }, []);
+
+  // Resync when the edited piece's outline changes OUTSIDE this hook
+  // (undo/redo via restoreState, copilot edits). Without this the dots detach
+  // from the reverted path and points appear to vanish. The hook's own
+  // dispatches are skipped by outline identity — they already refreshed
+  // nodes, and clearing selection/drag on them would kill an active drag.
+  useEffect(() => {
+    if (!state.isEditing || !state.editingPieceId) return;
+    const piece = pieces.find(p => p.id === state.editingPieceId);
+    if (!piece) {
+      exitEdit();
+      return;
+    }
+    if (seenOutlineRef.current === piece.outline) return;
+    seenOutlineRef.current = piece.outline;
+    if (expectedOutlineRef.current === piece.outline) {
+      expectedOutlineRef.current = null;
+      return;
+    }
+    // External change: refresh nodes, drop selections (indices may denote
+    // different geometry now), and cancel any in-flight drag so the next
+    // mousemove can't re-impose pre-undo positions.
+    dragRef.current = null;
+    setState(s => resyncStateToPiece(s, piece));
+  }, [pieces, state.isEditing, state.editingPieceId, exitEdit]);
 
   // ─── handleMouseDown ───
 
@@ -460,6 +548,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
             outline,
             updatedAt: Date.now(),
           };
+          expectedOutlineRef.current = outline;
           dispatch(updatePiece(updated));
           setState(s => ({
             ...s,
@@ -485,11 +574,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       if (!piece) return false;
 
       const localPt = toLocal(e, piece);
-      const hr = hitRadius;
 
-      const segHit = nearestSegment(localPt, piece.outline);
-      if (segHit && segHit.distance < hr) {
-        const newOutline = splitSegmentAt(piece.outline, segHit.commandIndex, segHit.t);
+      const target = findInsertTarget(localPt, state.nodes, piece.outline, hitRadius);
+      if (target) {
+        const newOutline = splitSegmentAt(piece.outline, target.commandIndex, target.t);
         dispatchAndRefresh(piece, newOutline);
         return true;
       }
