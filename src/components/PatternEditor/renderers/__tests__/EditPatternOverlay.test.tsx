@@ -43,6 +43,40 @@ function renderOverlay() {
   );
 }
 
+describe('EditPatternOverlay rotation (nota de María #170)', () => {
+  it('rotates the anchor group with the piece so dots track the rotated outline', () => {
+    const rotated = { ...piece, rotation: 90 } as unknown as PatternPiece;
+    const { container } = render(
+      <svg>
+        <EditPatternOverlay
+          zoom2D={1}
+          pieces={[rotated]}
+          editingPieceId="p"
+          nodes={extractNodes(rotated)}
+          selectedNodes={new Set()}
+          selectedSegments={new Set()}
+          hoveredNode={null}
+          hoveredSegment={null}
+          addPointPreview={null}
+          marquee={null}
+        />
+      </svg>,
+    );
+    const g = Array.from(container.querySelectorAll('g')).find(el =>
+      /rotate\(\s*90/.test(el.getAttribute('transform') ?? ''),
+    );
+    expect(g).toBeTruthy();
+  });
+
+  it('emits no rotate transform for an un-rotated piece', () => {
+    const { container } = renderOverlay();
+    const anyRotate = Array.from(container.querySelectorAll('g')).some(el =>
+      /rotate\(/.test(el.getAttribute('transform') ?? ''),
+    );
+    expect(anyRotate).toBe(false);
+  });
+});
+
 describe('EditPatternOverlay anchor marks', () => {
   it('renders corner anchors as circles and curve anchors as squares', () => {
     const { container } = renderOverlay();

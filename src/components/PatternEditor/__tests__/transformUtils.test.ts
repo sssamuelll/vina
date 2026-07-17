@@ -4,6 +4,8 @@ import {
   computeHandlePositions,
   scaleOutline,
   rotateOutline,
+  rotatePoint,
+  outlineBBoxCenter,
 } from '../../../utils/geometry/transform';
 import type { PathCommand, PatternPiece } from '../../../types/types';
 
@@ -151,5 +153,41 @@ describe('rotateOutline', () => {
     const center = { x: 60, y: 45 };
     const result = rotateOutline(outline, center, 0);
     expect(result[0].values).toEqual(outline[0].values);
+  });
+});
+
+describe('rotatePoint', () => {
+  it('rotates a point 90 degrees around a center (SVG rotate convention)', () => {
+    // (100,0) about origin by +90° → (0,100) with [cos -sin; sin cos].
+    const p = rotatePoint({ x: 100, y: 0 }, { x: 0, y: 0 }, Math.PI / 2);
+    expect(p.x).toBeCloseTo(0);
+    expect(p.y).toBeCloseTo(100);
+  });
+
+  it('inverse rotation round-trips back to the original point', () => {
+    const center = { x: 50, y: 50 };
+    const rad = (37 * Math.PI) / 180;
+    const orig = { x: 120, y: 10 };
+    const back = rotatePoint(rotatePoint(orig, center, rad), center, -rad);
+    expect(back.x).toBeCloseTo(120);
+    expect(back.y).toBeCloseTo(10);
+  });
+});
+
+describe('outlineBBoxCenter', () => {
+  it('returns the bbox center of a square', () => {
+    expect(outlineBBoxCenter(makeRect(0, 0, 200, 200))).toEqual({ x: 100, y: 100 });
+  });
+
+  it('includes bezier control points (matches the renderer rotation pivot)', () => {
+    const outline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [10, -20, 90, -20, 100, 0] },
+      { type: 'L', values: [100, 40] },
+      { type: 'L', values: [0, 40] },
+      { type: 'Z', values: [] },
+    ];
+    // Control points reach y=-20, so the vertical center is (−20+40)/2 = 10.
+    expect(outlineBBoxCenter(outline)).toEqual({ x: 50, y: 10 });
   });
 });
