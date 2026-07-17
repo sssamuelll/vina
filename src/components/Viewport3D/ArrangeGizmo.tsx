@@ -20,9 +20,10 @@
  * al rayo del puntero; centro → intersección con el plano ⊥ cámara por el
  * origen del gizmo. El delta se reporta en WORLD; el dueño lo aplica.
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
+import { bindPointerDrag } from './pointerDragSession';
 
 type Handle = 'x' | 'y' | 'z' | 'center';
 
@@ -84,6 +85,12 @@ export default function ArrangeGizmo({
 
   const origin = useMemo(() => new THREE.Vector3(...position), [position]);
 
+  // Cancel the active drag WITHOUT committing (set fresh per drag in handleDown).
+  // Called on unmount so an Escape-deselect mid-drag doesn't leave listeners that
+  // later fire a phantom onDragEnd (#935).
+  const cancelRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => { cancelRef.current?.(); }, []);
+
   const grabPoint = useCallback((handle: Handle, ray: THREE.Ray, at: THREE.Vector3): THREE.Vector3 | null => {
     if (handle === 'center') {
       const normal = new THREE.Vector3();
@@ -137,16 +144,20 @@ export default function ArrangeGizmo({
       drag.delta = d;
       onDrag(d);
     };
-    const onUp = () => {
+    const session = bindPointerDrag(el, window, onMove, () => {
       const drag = dragRef.current;
       dragRef.current = null;
-      el.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
+      cancelRef.current = null;
       setOrbitEnabled(true);
       if (drag) onDragEnd(drag.delta);
+    });
+    // Unmount-mid-drag path: drop the drag, restore orbit, do NOT commit.
+    cancelRef.current = () => {
+      session.cancel();
+      dragRef.current = null;
+      cancelRef.current = null;
+      setOrbitEnabled(true);
     };
-    el.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
   }, [grabPoint, origin, camera, gl, onDrag, onDragEnd, setOrbitEnabled]);
 
   const over = useCallback((h: Handle) => (e: ThreeEvent<PointerEvent>) => {
