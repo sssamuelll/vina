@@ -138,8 +138,13 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   const [state, setState] = useState<EditPatternState>({ ...INITIAL_STATE });
   const dragRef = useRef<DragState | null>(null);
-  /** True while a pieces change originated from this hook's own dispatch. */
-  const internalUpdateRef = useRef(false);
+  /**
+   * Outline object (by identity) this hook itself dispatched. The resync
+   * effect treats a pieces change as internal only when the store's outline
+   * IS that object — a boolean flag would mis-consume an external restore
+   * that lands in the same React batch as an internal edit.
+   */
+  const expectedOutlineRef = useRef<PathCommand[] | null>(null);
   /** Last outline (by identity) of the edited piece this hook has seen. */
   const seenOutlineRef = useRef<PathCommand[] | null>(null);
 
@@ -188,7 +193,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         outline: newOutline,
         updatedAt: Date.now(),
       };
-      internalUpdateRef.current = true;
+      expectedOutlineRef.current = newOutline;
       dispatch(updatePiece(updated));
       const newNodes = extractNodes(updated);
       setState(s => ({ ...s, nodes: newNodes }));
@@ -204,7 +209,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       const piece = pieces.find(p => p.id === pieceId);
       if (!piece) return;
       seenOutlineRef.current = piece.outline;
-      internalUpdateRef.current = false;
+      expectedOutlineRef.current = null;
       setState({
         isEditing: true,
         editingPieceId: pieceId,
@@ -232,7 +237,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   // Resync when the edited piece's outline changes OUTSIDE this hook
   // (undo/redo via restoreState, copilot edits). Without this the dots detach
   // from the reverted path and points appear to vanish. The hook's own
-  // dispatches are skipped via internalUpdateRef — they already refreshed
+  // dispatches are skipped by outline identity — they already refreshed
   // nodes, and clearing selection/drag on them would kill an active drag.
   useEffect(() => {
     if (!state.isEditing || !state.editingPieceId) return;
@@ -243,8 +248,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     }
     if (seenOutlineRef.current === piece.outline) return;
     seenOutlineRef.current = piece.outline;
-    if (internalUpdateRef.current) {
-      internalUpdateRef.current = false;
+    if (expectedOutlineRef.current === piece.outline) {
+      expectedOutlineRef.current = null;
       return;
     }
     // External change: refresh nodes, drop selections (indices may denote
@@ -543,7 +548,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
             outline,
             updatedAt: Date.now(),
           };
-          internalUpdateRef.current = true;
+          expectedOutlineRef.current = outline;
           dispatch(updatePiece(updated));
           setState(s => ({
             ...s,

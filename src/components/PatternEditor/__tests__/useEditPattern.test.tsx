@@ -226,6 +226,22 @@ describe('useEditPattern resync after restoreState', () => {
     expect([...hook.result.current.selectedNodes]).toEqual([1]);
   });
 
+  it('resyncs when an internal edit and an external restore land in the same React batch', () => {
+    const { store, hook } = setup([piece()]);
+    act(() => hook.result.current.enterEdit('p'));
+
+    act(() => {
+      // Internal edit (double-click inserts a point at (100,0))…
+      hook.result.current.handleDoubleClick(clickAt(100, 0));
+      // …and an external restore, before the resync effect gets to run.
+      undoTo(store, [piece(reverted)]);
+    });
+
+    // The external outline must win: 4 anchors, node 1 at the reverted spot.
+    expect(hook.result.current.nodes).toHaveLength(4);
+    expect(hook.result.current.nodes[1].position).toEqual({ x: 150, y: 0 });
+  });
+
   it('cancels an in-flight drag when the outline is reverted externally', () => {
     const { store, hook } = setup([piece()]);
     act(() => hook.result.current.enterEdit('p'));
