@@ -14,6 +14,7 @@ import { formatPieceLabel } from '../../../utils/pieceLabel';
 import { dartApexPoint, internalLineColor } from './internalLineStyle';
 import { PHYSICAL_FABRIC_LIBRARY } from '../../../utils/cloth/physicalFabric';
 import { outlineBBoxCenter } from '../../../utils/geometry/transform';
+import { grainlineArrowheads } from '../../../utils/grainLine';
 
 /** Rotation pivot: bbox center of an outline. Shared with edit overlays/hit-tests. */
 function getOutlineCenter(outline: PathCommand[]): { cx: number; cy: number } {
@@ -204,6 +205,11 @@ const SinglePiece = memo(function SinglePiece({
         // Tokenized internal-line colors (design surface 5, P0.3) — see internalLineColor.
         const lineColor = internalLineColor(line, isLineSelected);
         const dartApex = line.type === 'dart' ? dartApexPoint(line.path) : null;
+        // Grainline arrowheads (nota de María #169): the persisted line carries
+        // the double-headed arrows the draw preview already shows.
+        const grainlineHeads = line.type === 'grainline' && showGrainlines
+          ? grainlineArrowheads(line.path, 6 / zoom2D)
+          : [];
 
         // Compute fold direction markers for fold lines with foldOptions
         const foldMarkers: React.ReactElement[] = [];
@@ -263,6 +269,16 @@ const SinglePiece = memo(function SinglePiece({
               }
               opacity={line.type === 'grainline' && !showGrainlines ? 0 : line.type === 'reference' ? 0.6 : isLineSelected ? 1 : 0.8}
             />
+            {/* Grainline arrowheads (both ends) */}
+            {grainlineHeads.map((tri, gi) => (
+              <polygon
+                key={`gl-arrow-${gi}`}
+                points={tri.map(p => `${p.x},${p.y}`).join(' ')}
+                style={{ fill: lineColor }}
+                opacity={isLineSelected ? 1 : 0.8}
+                pointerEvents="none"
+              />
+            ))}
             {/* Dart apex point marker (P0.3) */}
             {dartApex && (
               <circle

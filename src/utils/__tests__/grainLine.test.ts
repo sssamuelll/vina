@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { extractGrainLine, classifyDirection, setGrainDirection } from '../grainLine';
-import type { PatternPiece } from '../../types/types';
+import { extractGrainLine, classifyDirection, setGrainDirection, grainlineArrowheads } from '../grainLine';
+import type { PatternPiece, PathCommand } from '../../types/types';
 
 function makePiece(grainlinePath?: { type: string; values: number[] }[]): PatternPiece {
   return {
@@ -20,6 +20,34 @@ function makePiece(grainlinePath?: { type: string; values: number[] }[]): Patter
     seamAllowance: 10, layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
+
+describe('grainlineArrowheads (nota de María #169)', () => {
+  const vertical: PathCommand[] = [
+    { type: 'M', values: [100, 50] },
+    { type: 'L', values: [100, 150] },
+  ];
+
+  it('returns one arrowhead per end (grainlines are double-headed)', () => {
+    const heads = grainlineArrowheads(vertical, 6);
+    expect(heads).toHaveLength(2);
+    expect(heads.every(tri => tri.length === 3)).toBe(true);
+  });
+
+  it('points each wing outward from its own tip', () => {
+    const heads = grainlineArrowheads(vertical, 6);
+    // Tip of head 0 = the end point (100,150); head 1 = the start (100,50).
+    expect(heads[0][0]).toEqual({ x: 100, y: 150 });
+    expect(heads[1][0]).toEqual({ x: 100, y: 50 });
+    // The end wing sits back toward the line (y < 150); the start wing y > 50.
+    expect(heads[0][1].y).toBeLessThan(150);
+    expect(heads[1][1].y).toBeGreaterThan(50);
+  });
+
+  it('returns nothing for a degenerate (zero-length) grainline', () => {
+    expect(grainlineArrowheads([{ type: 'M', values: [10, 10] }, { type: 'L', values: [10, 10] }], 6)).toEqual([]);
+    expect(grainlineArrowheads([{ type: 'M', values: [10, 10] }], 6)).toEqual([]);
+  });
+});
 
 describe('classifyDirection', () => {
   it.each([
