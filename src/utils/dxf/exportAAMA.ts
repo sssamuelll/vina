@@ -292,6 +292,12 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
 
   // Internal lines
   for (const line of piece.internals) {
+    // Reference markings (Forma interna) are multi-vertex, possibly closed/curved
+    // polylines — emit the whole path, not just the first M→L segment (#529).
+    if (line.type === 'reference') {
+      s += pathToEntities(line.path, AAMA_LAYERS.DRAW, opts);
+      continue;
+    }
     let layer: string = AAMA_LAYERS.DRAW;
     if (line.type === 'notch') layer = AAMA_LAYERS.NOTCH;
     else if (line.type === 'grainline') layer = AAMA_LAYERS.GRAINLINE;
