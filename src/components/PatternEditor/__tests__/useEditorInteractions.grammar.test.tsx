@@ -187,3 +187,37 @@ describe('cursor honesto sobre los handles (F15)', () => {
     expect(hook.result.current.getCursor()).toBe('default');
   });
 });
+
+describe('coordinación de Escape (CF-1)', () => {
+  it('Escape durante un transform drag lo cancela y consume el evento (un Esc = una acción)', () => {
+    const tj = { ...idleTransform(), isDragging: true, handleKeyDown: vi.fn() };
+    const tools = makeTools({ nodeEditor: idleNodeEditor(), transformTool: tj });
+    const { hook, store } = setup('select', [pieceP1()], tools);
+    void hook;
+    act(() => { store.dispatch(selectPiece('p1')); });
+    const docSpy = vi.fn();
+    document.addEventListener('keydown', docSpy);
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    document.removeEventListener('keydown', docSpy);
+    expect(tj.handleKeyDown).toHaveBeenCalled();
+    expect(docSpy).not.toHaveBeenCalled(); // clearSelection global bloqueado
+  });
+
+  it('Escape en idle no se consume: el deselect global sigue llegando', () => {
+    const tj = { ...idleTransform(), isDragging: false, handleKeyDown: vi.fn() };
+    const tools = makeTools({ nodeEditor: idleNodeEditor(), transformTool: tj });
+    const { hook, store } = setup('select', [pieceP1()], tools);
+    void hook;
+    act(() => { store.dispatch(selectPiece('p1')); });
+    const docSpy = vi.fn();
+    document.addEventListener('keydown', docSpy);
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    document.removeEventListener('keydown', docSpy);
+    expect(tj.handleKeyDown).not.toHaveBeenCalled();
+    expect(docSpy).toHaveBeenCalled();
+  });
+});

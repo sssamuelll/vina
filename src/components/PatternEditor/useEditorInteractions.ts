@@ -382,6 +382,24 @@ export function useEditorInteractions(
     return () => window.removeEventListener('keydown', handler);
   }, [activeTool, pen.handleKeyDown, lineTool.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, segmentSewingTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown, freeSewingTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown, polyPenTool.handleKeyDown, internalShapeTool.handleKeyDown]);
 
+  // Coordinación de Escape (CF-1): un solo Esc = una sola acción. Durante un
+  // transform drag en select, la fase de CAPTURA en window corre antes que el
+  // listener de document del ShortcutProvider; cancelamos el drag y detenemos la
+  // propagación para que clearSelection no dispare doble. Sin drag activo el
+  // Escape fluye normal → deseleccionar.
+  useEffect(() => {
+    const onEscapeCapture = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (activeTool !== 'select') return;
+      if (!transformTool.isDragging) return;
+      transformTool.handleKeyDown(e);
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener('keydown', onEscapeCapture, { capture: true });
+    return () => window.removeEventListener('keydown', onEscapeCapture, { capture: true });
+  }, [activeTool, transformTool]);
+
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);
   zoomRef.current = zoom2D;
