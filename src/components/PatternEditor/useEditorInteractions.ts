@@ -34,6 +34,10 @@ import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 
 const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
 
+/** Umbral de arrastre (px de pantalla). Debajo de esto, un mousedown+up es un
+ *  clic, no un movimiento — no ensucia el historial de undo (EB-1/EB-2). */
+const MIN_DRAG_PX = 3;
+
 /** Distance from point (px,py) to line segment (x1,y1)-(x2,y2) */
 function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
   const dx = x2 - x1;
@@ -111,6 +115,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
   };
   transformTool: {
+    isDragging: boolean;
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseUp: () => void;
@@ -222,6 +227,27 @@ interface ToolHooks {
   };
 }
 
+/**
+ * Decide si el transform box (mover/escalar/rotar) se muestra y se hit-testea.
+ * Única fuente de verdad para render (ToolOverlay), hit (handleMouseDown) y
+ * cursor (getCursor) — así los tres coinciden. Reglas:
+ *  - `transform` tool: siempre (comportamiento standalone intacto).
+ *  - `select`: solo con selección, desbloqueada y fuera de la altitud POINT
+ *    (G7: la altitud POINT nunca dibuja el box).
+ */
+export function shouldShowTransformBox(opts: {
+  activeTool: Tool2D;
+  isNodeEditing: boolean;
+  selectedCount: number;
+  selectionHasLocked: boolean;
+}): boolean {
+  if (opts.activeTool === 'transform') return true;
+  return opts.activeTool === 'select'
+    && !opts.isNodeEditing
+    && opts.selectedCount > 0
+    && !opts.selectionHasLocked;
+}
+
 export function useEditorInteractions(
   activeTool: Tool2D,
   zoom2D: number,
@@ -240,9 +266,20 @@ export function useEditorInteractions(
   } | null>(null);
   const marqueeRef = useRef<{ startPattern: Point2D; currentPattern: Point2D; shiftKey: boolean } | null>(null);
   const [selectMarquee, setSelectMarquee] = useState<{ start: Point2D; current: Point2D } | null>(null);
+  const [hoverCursor, setHoverCursor] = useState<string | null>(null);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
   const { pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool } = tools;
+
+  const selectionHasLocked = selectedPieceIds.some(
+    id => pieces.find(p => p.id === id)?.locked,
+  );
+  const showTransformBox = shouldShowTransformBox({
+    activeTool,
+    isNodeEditing: nodeEditor.isEditing,
+    selectedCount: selectedPieceIds.length,
+    selectionHasLocked,
+  });
 
   /** Check if a click is near an anchor point of a piece */
   const findClickedAnchorPoint = useCallback((
@@ -344,6 +381,24 @@ export function useEditorInteractions(
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [activeTool, pen.handleKeyDown, lineTool.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, segmentSewingTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown, freeSewingTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown, polyPenTool.handleKeyDown, internalShapeTool.handleKeyDown]);
+
+  // Coordinación de Escape (CF-1): un solo Esc = una sola acción. Durante un
+  // transform drag en select, la fase de CAPTURA en window corre antes que el
+  // listener de document del ShortcutProvider; cancelamos el drag y detenemos la
+  // propagación para que clearSelection no dispare doble. Sin drag activo el
+  // Escape fluye normal → deseleccionar.
+  useEffect(() => {
+    const onEscapeCapture = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (activeTool !== 'select') return;
+      if (!transformTool.isDragging) return;
+      transformTool.handleKeyDown(e);
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener('keydown', onEscapeCapture, { capture: true });
+    return () => window.removeEventListener('keydown', onEscapeCapture, { capture: true });
+  }, [activeTool, transformTool]);
 
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);
@@ -509,6 +564,13 @@ export function useEditorInteractions(
       return;
     }
     if (activeTool === 'select') {
+      // Transform box en el verbo por defecto (nota 170): sus handles se hit-testean
+      // primero. Gateado por showTransformBox → una pieza bloqueada (box oculto) y la
+      // altitud POINT (G7) nunca rutean acá.
+      if (showTransformBox) {
+        const handled = transformTool.handleMouseDown(e);
+        if (handled) return;
+      }
       const rect = e.currentTarget.getBoundingClientRect();
       const { x: clickX, y: clickY } = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
 
@@ -603,7 +665,7 @@ export function useEditorInteractions(
         };
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -617,6 +679,10 @@ export function useEditorInteractions(
         mainG.setAttribute('transform', `translate(${newX}, ${newY}) scale(${zoom2D})`);
       }
       panRef.current.lastPos = { x: newX, y: newY };
+      return;
+    }
+    if (transformTool.isDragging && activeTool === 'select') {
+      transformTool.handleMouseMove(e);
       return;
     }
     if (editPattern.isEditing && activeTool === 'editPattern') {
@@ -692,6 +758,19 @@ export function useEditorInteractions(
       const handled = nodeEditor.handleMouseMove(e);
       if (handled) return;
     }
+    // Hover idle en select: predice el clic para que el cursor diga la verdad
+    // sobre los handles (nota 170). Sin drag activo → barato, acotado a ≤9
+    // handles. El functional-update evita re-render salvo al cruzar un borde.
+    if (activeTool === 'select') {
+      let c: string | null = null;
+      if (showTransformBox) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const pt = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
+        c = transformTool.getCursor(pt);
+      }
+      setHoverCursor(prev => (prev === c ? prev : c));
+      return;
+    }
     if (activeTool === 'transform') {
       const handled = transformTool.handleMouseMove(e);
       if (handled) return;
@@ -718,7 +797,7 @@ export function useEditorInteractions(
     if (activeTool === 'internalShape') internalShapeTool.handleMouseMove(e);
     if (activeTool === 'pleat') pleatTool.handleMouseMove(e);
     if (activeTool === 'elastic') elasticTool.handleMouseMove(e);
-  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool]);
+  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseUp = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
     // Resolve marquee selection
@@ -728,7 +807,7 @@ export function useEditorInteractions(
       const my1 = Math.min(mq.startPattern.y, mq.currentPattern.y);
       const mx2 = Math.max(mq.startPattern.x, mq.currentPattern.x);
       const my2 = Math.max(mq.startPattern.y, mq.currentPattern.y);
-      const MIN_DRAG = screenToPatternLength(3, zoom2D);
+      const MIN_DRAG = screenToPatternLength(MIN_DRAG_PX, zoom2D);
       if (mx2 - mx1 > MIN_DRAG || my2 - my1 > MIN_DRAG) {
         const hitIds: string[] = [];
         for (const piece of pieces) {
@@ -774,9 +853,16 @@ export function useEditorInteractions(
     if (panRef.current?.lastPos) {
       dispatch(setPan2D(panRef.current.lastPos));
     }
-    // Commit piece position to Redux on mouseUp
-    if (dragRef.current?.lastPos) {
-      dispatch(movePiece({ id: dragRef.current.pieceId, x: dragRef.current.lastPos.x, y: dragRef.current.lastPos.y }));
+    // Commit piece position to Redux on mouseUp — solo pasado el umbral de
+    // arrastre. Un clic normal tiembla sub-pixel entre down y up; sin este
+    // gate cada clic despachaba un "Move Piece" de cero intención al undo
+    // (EB-1/EB-2). Espeja el gate del marquee (:731).
+    const d = dragRef.current;
+    if (d?.lastPos) {
+      const moved = Math.hypot(d.lastPos.x - d.startPos.x, d.lastPos.y - d.startPos.y);
+      if (moved >= screenToPatternLength(MIN_DRAG_PX, zoom2D)) {
+        dispatch(movePiece({ id: d.pieceId, x: d.lastPos.x, y: d.lastPos.y }));
+      }
     }
     panRef.current = null;
     dragRef.current = null;
@@ -785,7 +871,7 @@ export function useEditorInteractions(
     if (activeTool === 'rectangle') rectTool.handleMouseUp();
     if (activeTool === 'seamAllowance') seamAllowanceTool.handleMouseUp();
     if (activeTool === 'grainline') grainlineTool.handleMouseUp();
-    if (activeTool === 'transform') transformTool.handleMouseUp();
+    if (activeTool === 'transform' || (activeTool === 'select' && transformTool.isDragging)) transformTool.handleMouseUp();
     if (nodeEditor.isEditing) nodeEditor.handleMouseUp();
     if (activeTool === 'editPattern') editPattern.handleMouseUp();
     if (activeTool === 'scissors') scissorsTool.handleMouseUp();
@@ -802,7 +888,10 @@ export function useEditorInteractions(
     switch (activeTool) {
       case 'pen': return 'crosshair';
       case 'hand': return panRef.current ? 'grabbing' : 'grab';
-      case 'select': return marqueeRef.current ? 'crosshair' : dragRef.current ? 'grabbing' : 'default';
+      case 'select':
+        if (dragRef.current) return 'grabbing';
+        if (marqueeRef.current) return 'crosshair';
+        return hoverCursor ?? 'default';
       case 'transform': return 'default';
       case 'editPattern': return editPattern.isEditing ? editPattern.getCursor() : 'default';
       case 'seam': return 'crosshair';
@@ -827,5 +916,5 @@ export function useEditorInteractions(
     }
   };
 
-  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee };
+  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox };
 }

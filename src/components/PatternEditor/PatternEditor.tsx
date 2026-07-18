@@ -60,6 +60,9 @@ import { computePixelsPerMm } from '../../utils/geometry/calibration';
 import { importReferenceImage } from '../../utils/import/imageImporter';
 import { storeImageBlob, loadImageBlob } from '../../utils/import/referenceImageStore';
 import ContextMenu, { type ContextMenuState } from './ContextMenu';
+import FloatingActionBar from './FloatingActionBar';
+import { resolveTargetKind, type CurationCtx } from './actionCuration';
+import { selectWorkflowStage } from '../../store/selectors';
 import './PatternEditor.css';
 
 // Module-level map: imageId → blob URL (outside Redux for non-serializable data)
@@ -85,6 +88,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const showReferenceImages = useSelector((s: RootState) => s.editor.showReferenceImages);
   const selectedReferenceImageId = useSelector((s: RootState) => s.editor.selectedReferenceImageId);
   const calibrationMode = useSelector((s: RootState) => s.editor.calibrationMode);
+  const stage = useSelector(selectWorkflowStage);
+  const clipboard = useSelector((s: RootState) => s.editor.clipboard);
 
   // Hydrate objectUrlMap from IndexedDB for images loaded from autosave / project file
   useEffect(() => {
@@ -109,7 +114,33 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     }
     return map;
   }, [groups]);
-  
+
+  // Contexto de Surface A (barra flotante). Solo pieza/multiPieza (BAR_ENABLED_KINDS);
+  // la barra decide el montaje. `properties` de la barra necesita onOpenProperties;
+  // el resto son dispatches puros.
+  const barCtx: CurationCtx | null = useMemo(() => {
+    if (selectedPieceIds.length === 0) return null;
+    const firstId = selectedPieceIds[0];
+    const piece = pieces.find(p => p.id === firstId) ?? null;
+    const targetKind = resolveTargetKind({
+      seamId: null,
+      pieceId: firstId,
+      pieceCount: selectedPieceIds.length,
+      internalLineType: null,
+      altitude: 'body',
+    });
+    return {
+      dispatch, targetKind, stage, altitude: 'body',
+      pieceId: firstId, piece, selectedPieceIds,
+      seamId: null, seam: null,
+      internalLineId: null, internalLineType: null, internalLine: null,
+      segmentIndex: undefined, segmentIsCurve: undefined,
+      clipboard, groups, pieces,
+      cb: { onOpenProperties: (id: string) => { dispatch(selectPiece(id)); onOpenPanel?.('Properties'); } },
+      onClose: () => {},
+    };
+  }, [selectedPieceIds, pieces, dispatch, stage, clipboard, groups, onOpenPanel]);
+
   // Calibration modal local state
   const [showCalibrationModal, setShowCalibrationModal] = useState(false);
   const [calibrationPixelDist, setCalibrationPixelDist] = useState(0);
@@ -455,6 +486,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       activeTool,
       internalLineId: hitInternalLineId,
       internalLineType: hitInternalLineType,
+      isEditingNodes: editPatternTool.isEditing,
     });
   }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.editingPieceId]);
 
@@ -491,7 +523,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     setEditingPieceNameId(null);
   }, []);
 
-  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee } =
+  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
       pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
     });
@@ -735,6 +767,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             nodeEditorNodes={nodeEditor.nodes}
             selectedNode={nodeEditor.selectedNode}
             hoveredNode={nodeEditor.hoveredNode}
+            showTransformBox={showTransformBox}
             transformBbox={transformTool.bbox}
             transformHandles={transformTool.handles}
             transformPreview={transformTool.preview}
@@ -849,6 +882,16 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           height={svgSize.height}
         />
       </svg>
+      <FloatingActionBar
+        show={showTransformBox}
+        bbox={transformTool.bbox}
+        pan2D={pan2D}
+        zoom2D={zoom2D}
+        isDragging={transformTool.isDragging}
+        contextMenuOpen={ctxMenu.visible}
+        calibrationActive={calibrationMode !== null}
+        ctx={barCtx}
+      />
       {shouldShowEmptyState(pieces.length, activeTool) && (
         <EmptyState2D onImportDXF={onImportDXF} />
       )}
