@@ -34,6 +34,10 @@ import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 
 const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
 
+/** Umbral de arrastre (px de pantalla). Debajo de esto, un mousedown+up es un
+ *  clic, no un movimiento — no ensucia el historial de undo (EB-1/EB-2). */
+const MIN_DRAG_PX = 3;
+
 /** Distance from point (px,py) to line segment (x1,y1)-(x2,y2) */
 function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
   const dx = x2 - x1;
@@ -728,7 +732,7 @@ export function useEditorInteractions(
       const my1 = Math.min(mq.startPattern.y, mq.currentPattern.y);
       const mx2 = Math.max(mq.startPattern.x, mq.currentPattern.x);
       const my2 = Math.max(mq.startPattern.y, mq.currentPattern.y);
-      const MIN_DRAG = screenToPatternLength(3, zoom2D);
+      const MIN_DRAG = screenToPatternLength(MIN_DRAG_PX, zoom2D);
       if (mx2 - mx1 > MIN_DRAG || my2 - my1 > MIN_DRAG) {
         const hitIds: string[] = [];
         for (const piece of pieces) {
@@ -774,9 +778,16 @@ export function useEditorInteractions(
     if (panRef.current?.lastPos) {
       dispatch(setPan2D(panRef.current.lastPos));
     }
-    // Commit piece position to Redux on mouseUp
-    if (dragRef.current?.lastPos) {
-      dispatch(movePiece({ id: dragRef.current.pieceId, x: dragRef.current.lastPos.x, y: dragRef.current.lastPos.y }));
+    // Commit piece position to Redux on mouseUp — solo pasado el umbral de
+    // arrastre. Un clic normal tiembla sub-pixel entre down y up; sin este
+    // gate cada clic despachaba un "Move Piece" de cero intención al undo
+    // (EB-1/EB-2). Espeja el gate del marquee (:731).
+    const d = dragRef.current;
+    if (d?.lastPos) {
+      const moved = Math.hypot(d.lastPos.x - d.startPos.x, d.lastPos.y - d.startPos.y);
+      if (moved >= screenToPatternLength(MIN_DRAG_PX, zoom2D)) {
+        dispatch(movePiece({ id: d.pieceId, x: d.lastPos.x, y: d.lastPos.y }));
+      }
     }
     panRef.current = null;
     dragRef.current = null;
