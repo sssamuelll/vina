@@ -1639,3 +1639,564 @@ Todo esto queda **fuera del core del viernes** por decisión del scope cut. Cada
 - **Variación de la barra/menú por etapa (`stage`).** Mecanismo listo (columna `stage` en `CurationRow` + `matchRow` con especificidad). En v1 ninguna fila la usa (verbos de pieza invariantes al flujo; la sensibilidad de etapa vive en el dock). Disparador: aparece un verbo de pieza dependiente de etapa → María autora una fila `stage`-específica sin cirugía.
 
 - **Submenú/overflow en la barra.** Nunca. La barra es plana, cap 5; el desborde va al clic derecho.
+
+---
+
+# Surface A — barra flotante de acciones (Tareas 8–9)
+
+> **Continuación del addendum** de `docs/superpowers/plans/2026-07-18-boton-izquierdo-click-grammar.md`.
+> Aterriza la subsección **Diferido del addendum → Surface A**, ítems **A4** (íconos monocromo) y
+> **A5** (componente de barra), ahora que su precondición de revival se cumplió: **T1–T5 mergeadas**
+> en `feat/click-grammar-v1` (`847ccebd..731fa8f7`). Las interfaces que Surface A consume ya están
+> vivas en el código: `shouldShowTransformBox`/`showTransformBox` (retorno del hook y prop de
+> `ToolOverlay`), `ToolHooks.transformTool.isDragging`, y el listener de **fase de captura** de
+> Escape (T5) — por eso la barra **no lleva listener de teclado**: la seguridad de Escape es por
+> construcción. La tabla de curación (T6, `resolveBarActions`/`BAR_ENABLED_KINDS`) ya autora la
+> columna `bar` para pieza/multiPieza; Surface A la lee **sin cirugía**.
+>
+> Ciclo por checkbox (2–5 min): test que falla → correr y ver **FAIL** → implementación mínima →
+> correr y ver **PASS** → commit. No saltes el rojo/verde.
+
+---
+
+### Tarea 8 — Íconos monocromo de la barra (mapa propio)
+
+La barra es **icon-only** sobre superficie neutral-dark; los emoji del menú (`ACTIONS[id].icon`)
+renderizan en **color** en la mayoría de plataformas → romperían el look monocromo. A4 resuelve esto
+con un **mapa propio de la barra keyed por `ActionId`**, separado de `ACTIONS`: el menú conserva su
+emoji (status quo, cero regresión) y la barra usa glifos monocromo de **`lucide-react`** (dep ya
+instalada — la usan `unifiedBarCommandDefs.ts`, `TopBar.tsx`, `LogoMenu.tsx`; stroke `currentColor`,
+single-weight, garantizado monocromo cross-plataforma). **No se toca `ActionDef.icon`.**
+
+El mapa cubre **todo `ActionId` alcanzable por una fila `bar` de `BAR_ENABLED_KINDS`** (`piece` +
+`multiPiece`): los 8 glifos que fija A4 (`rotate90`, `duplicate`, `flipH`, `properties`,
+`lockToggle`, `groupCreate`, `linkSymmetry`, `linkInstance`) **más `duplicateAll`** — que la fila
+`multiPiece` de T6 (`CURATION`) autora en su `bar` y sin el cual la barra no podría renderizar
+icon-only en multi-selección. Un test de integridad ata el mapa a la tabla para que no se
+desincronicen.
+
+#### Files
+- **Create** `src/components/PatternEditor/barIcons.ts` (mapa `BAR_ICONS: Partial<Record<ActionId, LucideIcon>>`).
+- **Create** `src/components/PatternEditor/__tests__/barIcons.test.ts` (integridad del mapa + no-regresión de `ACTIONS.icon`).
+
+#### Interfaces
+- **Consume:** `ActionId` (T6, `actionCuration.ts`); `LucideIcon` + `RotateCw`/`Copy`/`FlipHorizontal2`/`SlidersHorizontal`/`Lock`/`Group`/`Link`/`Link2` (`lucide-react`, dep instalada); `ACTIONS`/`CURATION`/`BAR_ENABLED_KINDS` (T6 — solo en el test).
+- **Produce:**
+  ```ts
+  export const BAR_ICONS: Partial<Record<ActionId, LucideIcon>>; // 9 entradas (los 8 de A4 + duplicateAll)
+  ```
+
+#### Steps
+
+- [ ] Crear el test de integridad del mapa. Contenido completo:
+
+```ts
+import { describe, it, expect } from 'vitest';
+import { BAR_ICONS } from '../barIcons';
+import { ACTIONS, CURATION, BAR_ENABLED_KINDS } from '../actionCuration';
+
+describe('BAR_ICONS — mapa monocromo propio de la barra (A4)', () => {
+  it('cubre TODO ActionId alcanzable por una fila bar de BAR_ENABLED_KINDS', () => {
+    for (const row of CURATION) {
+      if (!BAR_ENABLED_KINDS.has(row.targetKind)) continue;
+      for (const id of row.bar) {
+        expect(BAR_ICONS[id], `sin ícono monocromo para el id de barra: ${id}`).toBeDefined();
+      }
+    }
+  });
+
+  it('cada valor es un componente de ícono renderizable (no un string)', () => {
+    for (const key of Object.keys(BAR_ICONS)) {
+      const Icon = BAR_ICONS[key as keyof typeof BAR_ICONS];
+      // lucide expone forwardRef → typeof 'object'; nunca un string (eso es el emoji del menú)
+      expect(typeof Icon === 'object' || typeof Icon === 'function').toBe(true);
+      expect(typeof Icon).not.toBe('string');
+    }
+  });
+
+  it('NO toca ActionDef.icon: el menú conserva su emoji (cero regresión)', () => {
+    expect(ACTIONS.rotate90.icon).toBe('↻');
+    expect(ACTIONS.lockToggle.icon).toBe('🔒');
+    expect(ACTIONS.groupCreate.icon).toBe('📁');
+    // el ícono de barra es un componente aparte, distinto del glifo emoji del menú
+    expect(BAR_ICONS.rotate90).toBeTruthy();
+    expect(BAR_ICONS.rotate90).not.toBe(ACTIONS.rotate90.icon);
+  });
+});
+```
+
+- [ ] Correr y esperar **FAIL** (el módulo `../barIcons` no existe aún → los imports fallan): `npm run test -- src/components/PatternEditor/__tests__/barIcons.test.ts`
+
+- [ ] Crear el módulo `src/components/PatternEditor/barIcons.ts` con el código completo:
+
+```ts
+/**
+ * barIcons — mapa de íconos MONOCROMO de la barra flotante (Surface A), keyed por
+ * `ActionId`. Propio de la barra: el menú de clic-derecho conserva `ACTIONS[id].icon`
+ * (emoji, status quo) — este mapa NO lo toca. Los emoji renderizan en color en la
+ * mayoría de plataformas; la barra necesita glifos single-weight monocromo, así que
+ * usa `lucide-react` (stroke `currentColor`).
+ *
+ * Cubre todo `ActionId` alcanzable por una fila `bar` de `BAR_ENABLED_KINDS`
+ * (piece + multiPiece). El test `barIcons.test.ts` ata este mapa a `CURATION` →
+ * agregar un id a una fila `bar` enabled sin ícono aquí rompe el gate.
+ */
+import {
+  RotateCw, Copy, FlipHorizontal2, SlidersHorizontal, Lock, Group, Link, Link2,
+  type LucideIcon,
+} from 'lucide-react';
+import type { ActionId } from './actionCuration';
+
+export const BAR_ICONS: Partial<Record<ActionId, LucideIcon>> = {
+  // fila `piece`
+  rotate90: RotateCw,
+  duplicate: Copy,
+  flipH: FlipHorizontal2,
+  properties: SlidersHorizontal,
+  lockToggle: Lock,                 // glifo único; el estado (bloq/desbloq) lo dice el tooltip
+  // fila `multiPiece`
+  duplicateAll: Copy,               // mismo verbo-familia que `duplicate`
+  groupCreate: Group,
+  linkSymmetry: Link2,
+  linkInstance: Link,
+};
+```
+
+- [ ] Correr y esperar **PASS**: `npm run test -- src/components/PatternEditor/__tests__/barIcons.test.ts`
+
+- [ ] `npx tsc -b --noEmit` limpio.
+
+- [ ] Commit: `git add -A && git commit -m "feat(pattern-edit): mapa de íconos monocromo de la barra flotante (keyed por ActionId, sin tocar ActionDef.icon)"`
+
+---
+
+### Tarea 9 — Componente FloatingActionBar (Surface A)
+
+Materializa la barra flotante que cabalga el transform box de T2–T5. Consume `resolveBarActions`
+(T6) para las acciones, `BAR_ICONS` (T8) para los glifos, y `ToolTooltip` (shell) para los labels
+(icon-only: el nombre vive en el tooltip). Se ancla al box vía `transformTool.bbox` (T2/F4)
+convertido a pantalla con `pan2D`/`zoom2D` — coords locales del contenedor `.pattern-editor`
+(`position: relative`, SVG a 0,0). Toda la disciplina de dismiss vive en **una sola compuerta**
+del componente.
+
+**Decisiones fijadas (A5), honradas 1:1:**
+- `BAR_ENABLED_KINDS = {piece, multiPiece}`, cap 5, sin `danger` → los tres los aplica
+  `resolveBarActions` (T6); la barra solo los lee.
+- **icon-only + `ToolTooltip`** (labels quedan en el menú).
+- Superficie **neutral-dark `#1a1a1a`** (NUNCA el azul de selección `#4A9EFF` — evita "el otro
+  handle" y la colisión de dos azules), **`z-index: 90`** (bajo `unified-bar` z=100, sobre el SVG).
+- **`ROTATE_HANDLE_GAP = 32px`**: la corona del handle de rotación vive en `bboxScreen.top − 29px`
+  (`ROTATION_ARM_LENGTH=25` en `useTransformTool`/`transform.ts` + `ROTATE_RADIUS=4` en
+  `TransformHandlesOverlay`), 32 = 29 + 3px de aire. **`BAR_GAP = 8px`** para el caso below-flip
+  (despeja los handles inferiores por ~5px).
+- **Sin listener de teclado** en la barra: la seguridad de Escape la da la captura de T5 → cero race
+  por construcción (test lo pinnea: la barra no registra `keydown` en `window`).
+- **Suprimida en altitud POINT por construcción**: solo monta si `showTransformBox` es `true`, y ese
+  helper (T2, invariante G7) ya es `false` en POINT.
+- **Dismiss** (una compuerta): deselección / cambio de tool / POINT → `show=false`; `isDragging` (T3);
+  `contextMenuOpen` (dos superficies no coexisten); `calibrationActive` (F9 — se **threadea**
+  `calibrationMode` como prop porque el hook nunca lo recibe).
+- **Boundary test** que fija el contrato de `transformTool.bbox` (F4): la barra lee `{x,y,width,height}`.
+
+#### Files
+- **Create** `src/components/PatternEditor/FloatingActionBar.tsx` (componente + `FloatingActionBarProps` + consts de anclaje).
+- **Create** `src/components/PatternEditor/__tests__/FloatingActionBar.test.tsx` (render RTL: anclaje/F4, superficie, icon-only, dismiss, Escape-por-construcción).
+- **Modify** `src/components/PatternEditor/PatternEditor.tsx`
+  - Imports: `FloatingActionBar`, `resolveTargetKind`/`CurationCtx` (`./actionCuration`), `selectWorkflowStage` (`../../store/selectors`).
+  - Selectores nuevos junto a `calibrationMode` (`:87`): `stage` + `clipboard`.
+  - `barCtx` (`useMemo`) desde la selección.
+  - Montar `<FloatingActionBar/>` como hermano del `<svg>` dentro de `.pattern-editor` (tras `</svg>`, `:852`).
+
+#### Interfaces
+- **Consume:**
+  - T2: `showTransformBox: boolean` (prop `show`) + `transformTool.bbox: BBox | null`.
+  - T3: `transformTool.isDragging: boolean`.
+  - T5: listener de captura de Escape (por construcción — la barra **no** agrega listener).
+  - T6: `resolveBarActions(ctx: CurationCtx): ActionDef[]`, `resolveTargetKind(t): TargetKind`, tipos `CurationCtx`/`ActionDef`/`ActionId`, `BAR_ENABLED_KINDS`.
+  - T8: `BAR_ICONS: Partial<Record<ActionId, LucideIcon>>`.
+  - Shell: `ToolTooltip` (`{ name, shortcut?, children }`). Store: `selectWorkflowStage`, `s.editor.clipboard`. Geometría: `BBox` (`utils/geometry/transform`).
+- **Produce:**
+  ```ts
+  export interface FloatingActionBarProps {
+    show: boolean;                 // showTransformBox (T2)
+    bbox: BBox | null;             // transformTool.bbox (T2/F4)
+    pan2D: Point2D;
+    zoom2D: number;
+    isDragging: boolean;           // transformTool.isDragging (T3)
+    contextMenuOpen: boolean;      // ctxMenu.visible
+    calibrationActive: boolean;    // calibrationMode !== null (F9)
+    ctx: CurationCtx | null;       // selección → piece/multiPiece
+  }
+  export default function FloatingActionBar(props: FloatingActionBarProps): JSX.Element | null;
+  ```
+  - En `PatternEditor`: `barCtx: CurationCtx | null` (memo desde la selección) + el montaje de la barra.
+
+#### Steps
+
+- [ ] Crear el test de la barra. Contenido completo:
+
+```tsx
+// @vitest-environment jsdom
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { type ComponentProps } from 'react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import FloatingActionBar from '../FloatingActionBar';
+import type { CurationCtx } from '../actionCuration';
+import type { AppDispatch } from '../../../store';
+import type { PatternPiece } from '../../../types/types';
+import type { BBox } from '../../../utils/geometry/transform';
+
+afterEach(cleanup);
+
+function pieceFix(locked = false): PatternPiece {
+  return {
+    id: 'p1', name: 'P1', position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+    active: true, locked, seamAllowance: 0, outline: [], internals: [], edges: [],
+  } as unknown as PatternPiece;
+}
+
+function makeCtx(over: Partial<CurationCtx> = {}): CurationCtx {
+  return {
+    dispatch: vi.fn() as unknown as AppDispatch,
+    targetKind: 'piece', stage: 'drafted', altitude: 'body',
+    pieceId: 'p1', piece: pieceFix(), selectedPieceIds: ['p1'],
+    seamId: null, seam: null,
+    internalLineId: null, internalLineType: null, internalLine: null,
+    segmentIndex: undefined, segmentIsCurve: undefined,
+    clipboard: null, groups: [], pieces: [pieceFix()],
+    cb: {}, onClose: vi.fn(),
+    ...over,
+  };
+}
+
+const BBOX: BBox = { x: 100, y: 100, width: 200, height: 100 };
+
+function renderBar(over: Partial<ComponentProps<typeof FloatingActionBar>> = {}) {
+  return render(
+    <FloatingActionBar
+      show
+      bbox={BBOX}
+      pan2D={{ x: 0, y: 0 }}
+      zoom2D={1}
+      isDragging={false}
+      contextMenuOpen={false}
+      calibrationActive={false}
+      ctx={makeCtx()}
+      {...over}
+    />,
+  );
+}
+
+describe('FloatingActionBar — anclaje (F4: contrato de transformTool.bbox)', () => {
+  it('ancla sobre el handle de rotación: centro-X del box, tope − 32px, translate(-50%,-100%)', () => {
+    const { container } = renderBar();
+    const bar = container.querySelector('.floating-action-bar') as HTMLElement;
+    expect(bar).toBeTruthy();
+    // left = pan.x + (bbox.x + bbox.width/2)*zoom = 0 + (100+100)*1
+    expect(bar.style.left).toBe('200px');
+    // top = boxTop(100) − ROTATE_HANDLE_GAP(32)
+    expect(bar.style.top).toBe('68px');
+    expect(bar.style.transform).toBe('translate(-50%, -100%)');
+  });
+
+  it('below-flip cuando no hay aire arriba: ancla bajo el box con BAR_GAP y translate(-50%,0)', () => {
+    const { container } = renderBar({ bbox: { x: 0, y: 10, width: 100, height: 40 } });
+    const bar = container.querySelector('.floating-action-bar') as HTMLElement;
+    // boxBottom = (10+40)*1 = 50; top = 50 + BAR_GAP(8)
+    expect(bar.style.top).toBe('58px');
+    expect(bar.style.transform).toBe('translate(-50%, 0)');
+    expect(bar.style.left).toBe('50px');
+  });
+
+  it('respeta pan y zoom al convertir patrón → pantalla', () => {
+    const { container } = renderBar({
+      pan2D: { x: 20, y: 40 }, zoom2D: 2, bbox: { x: 100, y: 100, width: 50, height: 50 },
+    });
+    const bar = container.querySelector('.floating-action-bar') as HTMLElement;
+    // left = 20 + (100+25)*2 = 270; boxTop = 40 + 100*2 = 240; top = 240 − 32 = 208
+    expect(bar.style.left).toBe('270px');
+    expect(bar.style.top).toBe('208px');
+  });
+});
+
+describe('FloatingActionBar — superficie neutral-dark (nunca azul de selección)', () => {
+  it('fondo #1a1a1a, z-index 90; NO el azul de selección #4A9EFF', () => {
+    const { container } = renderBar();
+    const bar = container.querySelector('.floating-action-bar') as HTMLElement;
+    expect(bar.style.backgroundColor).toBe('rgb(26, 26, 26)');       // #1a1a1a
+    expect(bar.style.backgroundColor).not.toBe('rgb(74, 158, 255)'); // #4A9EFF
+    expect(bar.style.zIndex).toBe('90');
+  });
+});
+
+describe('FloatingActionBar — icon-only + labels en tooltip', () => {
+  it('renderiza icon-only: un botón por acción, con SVG y sin texto visible', () => {
+    renderBar();
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(5); // rotate90, duplicate, flipH, properties, lockToggle
+    for (const b of buttons) {
+      expect(b.querySelector('svg')).toBeTruthy();
+      expect((b.textContent ?? '').trim()).toBe('');
+    }
+  });
+
+  it('la acción corre el verbo existente al hacer clic (rotate90 → dispatch)', () => {
+    const ctx = makeCtx();
+    render(
+      <FloatingActionBar
+        show bbox={BBOX} pan2D={{ x: 0, y: 0 }} zoom2D={1}
+        isDragging={false} contextMenuOpen={false} calibrationActive={false} ctx={ctx}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Rotar 90°' }));
+    expect(ctx.dispatch).toHaveBeenCalled();
+  });
+});
+
+describe('FloatingActionBar — dismiss (una sola compuerta)', () => {
+  const cases: Array<[string, Partial<ComponentProps<typeof FloatingActionBar>>]> = [
+    ['show=false (deselección / cambio de tool / altitud POINT)', { show: false }],
+    ['transform drag activo (T3)', { isDragging: true }],
+    ['menú contextual abierto (dos superficies no coexisten)', { contextMenuOpen: true }],
+    ['calibración activa (F9)', { calibrationActive: true }],
+    ['sin ctx', { ctx: null }],
+  ];
+  it.each(cases)('no monta con %s', (_label, over) => {
+    const { container } = renderBar(over);
+    expect(container.querySelector('.floating-action-bar')).toBeNull();
+  });
+});
+
+describe('FloatingActionBar — Escape seguro por construcción (T5)', () => {
+  it('no registra ningún listener de teclado en window (cero race con la captura de Escape)', () => {
+    const addSpy = vi.spyOn(window, 'addEventListener');
+    renderBar();
+    expect(addSpy.mock.calls.some(c => c[0] === 'keydown')).toBe(false);
+    addSpy.mockRestore();
+  });
+});
+```
+
+- [ ] Correr y esperar **FAIL** (el módulo `../FloatingActionBar` no existe aún): `npm run test -- src/components/PatternEditor/__tests__/FloatingActionBar.test.tsx`
+
+- [ ] Crear el componente `src/components/PatternEditor/FloatingActionBar.tsx` con el código completo:
+
+```tsx
+/**
+ * FloatingActionBar (Surface A) — barra flotante de acciones sobre el transform
+ * box en el verbo `select`. Cabalga T2–T5: monta cuando `showTransformBox` es
+ * true (⇒ suprimida en altitud POINT por construcción, invariante G7), se ancla
+ * a `transformTool.bbox`, y NO lleva listener de teclado — la seguridad de Escape
+ * la da la captura de T5. Lee `resolveBarActions` (T6, cap 5, sin danger,
+ * BAR_ENABLED_KINDS) y `BAR_ICONS` (T8, monocromo). icon-only + ToolTooltip:
+ * el label vive en el tooltip.
+ */
+import { useMemo } from 'react';
+import type { BBox } from '../../utils/geometry/transform';
+import type { Point2D } from '../../types/types';
+import type { CurationCtx } from './actionCuration';
+import { resolveBarActions } from './actionCuration';
+import { BAR_ICONS } from './barIcons';
+import ToolTooltip from '../shell/ToolTooltip';
+
+/** Gap (px de pantalla) del borde inferior de la barra al tope del box. La corona
+ *  del handle de rotación vive en `bboxScreen.top − 29px` (ROTATION_ARM_LENGTH=25
+ *  + ROTATE_RADIUS=4); 32 = 29 + 3px de aire → la barra nunca pisa el handle. */
+const ROTATE_HANDLE_GAP = 32;
+/** Gap del caso below-flip: despeja los handles inferiores (~5px). */
+const BAR_GAP = 8;
+// ponytail: altura estimada solo para ELEGIR arriba/abajo; el anclaje exacto no
+// depende de ella. Subir a medición con ref si el layout real difiere.
+const APPROX_BAR_HEIGHT = 40;
+
+export interface FloatingActionBarProps {
+  /** showTransformBox (T2): monta SOLO si es true → POINT suprimido por construcción. */
+  show: boolean;
+  /** transformTool.bbox (T2/F4): anclaje en coords de patrón. */
+  bbox: BBox | null;
+  pan2D: Point2D;
+  zoom2D: number;
+  /** transformTool.isDragging (T3): dismiss en cuanto arranca el transform drag. */
+  isDragging: boolean;
+  /** ctxMenu.visible: dos superficies nunca coexisten. */
+  contextMenuOpen: boolean;
+  /** calibrationMode !== null (F9): barra suprimida en calibración. */
+  calibrationActive: boolean;
+  /** Contexto resuelto (selección → piece/multiPiece). null si no hay selección. */
+  ctx: CurationCtx | null;
+}
+
+export default function FloatingActionBar({
+  show, bbox, pan2D, zoom2D, isDragging, contextMenuOpen, calibrationActive, ctx,
+}: FloatingActionBarProps) {
+  const actions = useMemo(() => (ctx ? resolveBarActions(ctx) : []), [ctx]);
+
+  // Compuerta de montaje: todos los dismiss en un solo lugar.
+  if (!show || !bbox || isDragging || contextMenuOpen || calibrationActive || !ctx) return null;
+  if (actions.length === 0) return null;
+
+  // Anclaje: box (patrón) → pantalla vía pan/zoom. Coords locales del contenedor
+  // .pattern-editor (position:relative; SVG a 0,0).
+  const left = pan2D.x + (bbox.x + bbox.width / 2) * zoom2D;
+  const boxTop = pan2D.y + bbox.y * zoom2D;
+  const boxBottom = pan2D.y + (bbox.y + bbox.height) * zoom2D;
+  const flipBelow = boxTop - ROTATE_HANDLE_GAP - APPROX_BAR_HEIGHT < 0;
+  const top = flipBelow ? boxBottom + BAR_GAP : boxTop - ROTATE_HANDLE_GAP;
+  const transform = flipBelow ? 'translate(-50%, 0)' : 'translate(-50%, -100%)';
+
+  return (
+    <div
+      className="floating-action-bar"
+      style={{
+        position: 'absolute',
+        left,
+        top,
+        transform,
+        zIndex: 90,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        padding: 4,
+        backgroundColor: '#1a1a1a',
+        border: '1px solid #333',
+        borderRadius: 6,
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+      }}
+    >
+      {actions.map((def) => {
+        const Icon = BAR_ICONS[def.id];
+        const label = typeof def.label === 'function' ? def.label(ctx) : def.label;
+        return (
+          <ToolTooltip key={def.id} name={label} shortcut={def.shortcut}>
+            <button
+              type="button"
+              className="floating-action-bar__btn"
+              aria-label={label}
+              onClick={() => def.run(ctx)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 28,
+                height: 28,
+                padding: 0,
+                background: 'transparent',
+                border: 'none',
+                borderRadius: 4,
+                color: '#e0e0e0',
+                cursor: 'pointer',
+              }}
+            >
+              {Icon && <Icon size={16} />}
+            </button>
+          </ToolTooltip>
+        );
+      })}
+    </div>
+  );
+}
+```
+
+- [ ] Correr y esperar **PASS**: `npm run test -- src/components/PatternEditor/__tests__/FloatingActionBar.test.tsx`
+
+- [ ] En `PatternEditor.tsx`, agregar los imports (junto a los imports de componentes/store existentes):
+
+```ts
+import FloatingActionBar from './FloatingActionBar';
+import { resolveTargetKind, type CurationCtx } from './actionCuration';
+import { selectWorkflowStage } from '../../store/selectors';
+```
+
+- [ ] En `PatternEditor.tsx`, agregar los selectores nuevos junto a `calibrationMode` (`:87`):
+
+```ts
+  const calibrationMode = useSelector((s: RootState) => s.editor.calibrationMode);
+  const stage = useSelector(selectWorkflowStage);
+  const clipboard = useSelector((s: RootState) => s.editor.clipboard);
+```
+
+- [ ] En `PatternEditor.tsx`, construir `barCtx` desde la selección (tras el `useMemo` de `groupColors`, `:111` — necesita `selectedPieceIds`, `pieces`, `dispatch`, `stage`, `clipboard`, `groups`, `onOpenPanel`, todos ya en scope):
+
+```ts
+  // Contexto de Surface A (barra flotante). Solo pieza/multiPieza (BAR_ENABLED_KINDS);
+  // la barra decide el montaje. `properties` de la barra necesita onOpenProperties;
+  // el resto son dispatches puros.
+  const barCtx: CurationCtx | null = useMemo(() => {
+    if (selectedPieceIds.length === 0) return null;
+    const firstId = selectedPieceIds[0];
+    const piece = pieces.find(p => p.id === firstId) ?? null;
+    const targetKind = resolveTargetKind({
+      seamId: null,
+      pieceId: firstId,
+      pieceCount: selectedPieceIds.length,
+      internalLineType: null,
+      altitude: 'body',
+    });
+    return {
+      dispatch, targetKind, stage, altitude: 'body',
+      pieceId: firstId, piece, selectedPieceIds,
+      seamId: null, seam: null,
+      internalLineId: null, internalLineType: null, internalLine: null,
+      segmentIndex: undefined, segmentIsCurve: undefined,
+      clipboard, groups, pieces,
+      cb: { onOpenProperties: (id: string) => { dispatch(selectPiece(id)); onOpenPanel?.('Properties'); } },
+      onClose: () => {},
+    };
+  }, [selectedPieceIds, pieces, dispatch, stage, clipboard, groups, onOpenPanel]);
+```
+
+- [ ] En `PatternEditor.tsx`, montar la barra como hermano del `<svg>`, tras `</svg>` (`:852`, antes del bloque `shouldShowEmptyState`):
+
+```tsx
+      </svg>
+      <FloatingActionBar
+        show={showTransformBox}
+        bbox={transformTool.bbox}
+        pan2D={pan2D}
+        zoom2D={zoom2D}
+        isDragging={transformTool.isDragging}
+        contextMenuOpen={ctxMenu.visible}
+        calibrationActive={calibrationMode !== null}
+        ctx={barCtx}
+      />
+```
+
+- [ ] `npx tsc -b --noEmit` limpio (el `CurationCtx` del `barCtx` debe cuadrar con lo que produce T6; `transformTool.bbox`/`.isDragging` con lo que produce `useTransformTool` tras T2/T3).
+
+- [ ] Gate completo: `npx tsc -b --noEmit && npm run test && npm run lint`
+
+- [ ] Commit: `git add -A && git commit -m "feat(pattern-edit): barra flotante de acciones en select (Surface A) anclada al transform box"`
+
+---
+
+## Auto-revisión antes de cerrar (Surface A)
+
+**Decisiones A5 vs implementación:**
+
+| Decisión fijada (A5/A4) | Dónde vive | Estado |
+|---|---|---|
+| Mapa monocromo propio keyed por `ActionId`, sin tocar `ActionDef.icon` | T8 `barIcons.ts` + test de no-regresión | ✅ |
+| `BAR_ENABLED_KINDS={piece,multiPiece}`, cap 5, sin danger | `resolveBarActions` (T6); la barra solo lee | ✅ |
+| icon-only + `ToolTooltip` | T9 componente + test icon-only | ✅ |
+| Superficie `#1a1a1a`, nunca `#4A9EFF`, `z=90` | inline styles + test de superficie | ✅ |
+| `ROTATE_HANDLE_GAP=32`, `BAR_GAP=8` + below-flip | consts de módulo + tests de anclaje (F4) | ✅ |
+| Sin listener de teclado (Escape por construcción, T5) | componente sin `useEffect` de keydown + test `window.addEventListener` | ✅ |
+| Suprimida en POINT por construcción | monta solo con `show`=`showTransformBox` (T2, G7) | ✅ |
+| Dismiss: deselect/tool-switch/POINT, drag (T3), contextmenu, `calibrationMode!==null` (F9) | una compuerta + threading de `calibrationMode` como prop | ✅ |
+| Boundary test del contrato `transformTool.bbox` (F4) | describe "anclaje (F4)" | ✅ |
+
+**Placeholder scan:** cero "TBD", cero "similar a la Tarea N". Cada test trae su cuerpo vitest real;
+cada implementación su código real.
+
+**Consistencia de tipos:** `BAR_ICONS` (T8) keyed por `ActionId` (T6); `FloatingActionBarProps.ctx:
+CurationCtx` (T6); `bbox: BBox` (geometry/transform, el mismo que produce `transformTool`); `show`
+alimentado por `showTransformBox` (T2), `isDragging` por `transformTool.isDragging` (T3). `barCtx`
+en `PatternEditor` produce un `CurationCtx` válido con `cb.onOpenProperties` para el verbo
+`properties` de la fila `piece`. Ningún tipo referenciado sin definir.
+
+**Nota de alcance honesta (desviación registrada):** A4 lista **8** glifos; el mapa autora **9**
+(agrega `duplicateAll`). Razón: la fila `multiPiece` de `CURATION` (T6) autora `duplicateAll` en su
+`bar`, y sin su ícono la barra no puede renderizar icon-only en multi-selección — el "~8" del pin es
+aproximado y no incluía este id. El test de integridad de T8 ata el mapa a la tabla, así que la
+cobertura es exacta, no un número mágico. No hay ninguna otra decisión fijada que no se haya podido
+honrar.
