@@ -115,6 +115,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
   };
   transformTool: {
+    isDragging: boolean;
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseUp: () => void;
@@ -544,6 +545,13 @@ export function useEditorInteractions(
       return;
     }
     if (activeTool === 'select') {
+      // Transform box en el verbo por defecto (nota 170): sus handles se hit-testean
+      // primero. Gateado por showTransformBox → una pieza bloqueada (box oculto) y la
+      // altitud POINT (G7) nunca rutean acá.
+      if (showTransformBox) {
+        const handled = transformTool.handleMouseDown(e);
+        if (handled) return;
+      }
       const rect = e.currentTarget.getBoundingClientRect();
       const { x: clickX, y: clickY } = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
 
@@ -638,7 +646,7 @@ export function useEditorInteractions(
         };
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -652,6 +660,10 @@ export function useEditorInteractions(
         mainG.setAttribute('transform', `translate(${newX}, ${newY}) scale(${zoom2D})`);
       }
       panRef.current.lastPos = { x: newX, y: newY };
+      return;
+    }
+    if (transformTool.isDragging && activeTool === 'select') {
+      transformTool.handleMouseMove(e);
       return;
     }
     if (editPattern.isEditing && activeTool === 'editPattern') {
@@ -827,7 +839,7 @@ export function useEditorInteractions(
     if (activeTool === 'rectangle') rectTool.handleMouseUp();
     if (activeTool === 'seamAllowance') seamAllowanceTool.handleMouseUp();
     if (activeTool === 'grainline') grainlineTool.handleMouseUp();
-    if (activeTool === 'transform') transformTool.handleMouseUp();
+    if (activeTool === 'transform' || (activeTool === 'select' && transformTool.isDragging)) transformTool.handleMouseUp();
     if (nodeEditor.isEditing) nodeEditor.handleMouseUp();
     if (activeTool === 'editPattern') editPattern.handleMouseUp();
     if (activeTool === 'scissors') scissorsTool.handleMouseUp();

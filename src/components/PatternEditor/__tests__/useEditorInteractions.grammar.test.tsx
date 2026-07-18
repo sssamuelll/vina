@@ -15,9 +15,6 @@ import inputSchemeReducer from '../../../store/inputSchemeSlice';
 import { useEditorInteractions } from '../useEditorInteractions';
 import type { PatternPiece, Tool2D } from '../../../types/types';
 
-// usado por los describes de las tareas 3-5; void mientras tanto (noUnusedLocals)
-void selectPiece;
-
 afterEach(cleanup);
 
 type Tools = Parameters<typeof useEditorInteractions>[4];
@@ -134,5 +131,39 @@ describe('gate de phantom-move (EB-1/EB-2)', () => {
     act(() => { hook.result.current.handleMouseMove(moveTo(100, 110)); }); // 10px
     act(() => { hook.result.current.handleMouseUp(); });
     expect(projPos(store)).toEqual({ x: 0, y: 10 });
+  });
+});
+
+describe('enrutado del transform box en select', () => {
+  it('rutea el handle-hit a transformTool y no despacha selectPiece/movePiece', () => {
+    const tj = { ...idleTransform(), handleMouseDown: vi.fn(() => true) };
+    const tools = makeTools({ nodeEditor: idleNodeEditor(), transformTool: tj });
+    const { hook, store } = setup('select', [pieceP1()], tools);
+    act(() => { store.dispatch(selectPiece('p1')); }); // showTransformBox → true
+    act(() => { hook.result.current.handleMouseDown(downOn('p1', 5, 5)); });
+    act(() => { hook.result.current.handleMouseMove(moveTo(15, 15)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(tj.handleMouseDown).toHaveBeenCalled();
+    expect(projPos(store)).toEqual({ x: 0, y: 0 }); // ningún movePiece se coló
+  });
+
+  it('rutea move y up cuando el transform drag está activo', () => {
+    const tj = { ...idleTransform(), isDragging: true, handleMouseMove: vi.fn(() => true), handleMouseUp: vi.fn() };
+    const tools = makeTools({ nodeEditor: idleNodeEditor(), transformTool: tj });
+    const { hook, store } = setup('select', [pieceP1()], tools);
+    act(() => { store.dispatch(selectPiece('p1')); });
+    act(() => { hook.result.current.handleMouseMove(moveTo(20, 20)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(tj.handleMouseMove).toHaveBeenCalled();
+    expect(tj.handleMouseUp).toHaveBeenCalled();
+  });
+
+  it('no rutea al transform box si la pieza está bloqueada (F8)', () => {
+    const tj = { ...idleTransform(), handleMouseDown: vi.fn(() => true) };
+    const tools = makeTools({ nodeEditor: idleNodeEditor(), transformTool: tj });
+    const { hook, store } = setup('select', [pieceP1(true)], tools); // locked
+    act(() => { store.dispatch(selectPiece('p1')); });
+    act(() => { hook.result.current.handleMouseDown(downOn('p1', 5, 5)); });
+    expect(tj.handleMouseDown).not.toHaveBeenCalled();
   });
 });
