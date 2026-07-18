@@ -41,7 +41,7 @@ export const GROUP_ORDER: GroupId[] = ['clipboard', 'transform', 'order', 'organ
 export type ActionId =
   | 'copy' | 'paste' | 'pasteMirror'
   | 'rotate90' | 'flipH' | 'flipV'
-  | 'reverseSeam' | 'unfold' | 'unfoldOutlineOnly' | 'offsetInternalLine' | 'optimizeCurves' | 'convertSegment'
+  | 'reverseSeam' | 'unfold' | 'unfoldOutlineOnly' | 'offsetInternalLine' | 'optimizeCurves' | 'optimizeAllCurves' | 'convertSegment'
   | 'order' | 'layer' | 'lockToggle' | 'activeToggle' | 'groupCreate' | 'addToGroup' | 'removeFromGroup'
   | 'unlinkPieces' | 'selectLinkedPartner' | 'linkSymmetry' | 'linkInstance' | 'cloneLinkedSymmetry' | 'cloneLinkedInstance'
   | 'duplicate' | 'duplicateAll' | 'rename' | 'properties' | 'select' | 'inspect' | 'selectPieceOfLine' | 'selectSeamA' | 'selectSeamB' | 'zoomToFit'
@@ -167,6 +167,8 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     run: (ctx) => ctx.cb.onOffsetInternalLine?.(ctx.pieceId!, ctx.internalLineId!) },
   optimizeCurves: { id: 'optimizeCurves', group: 'transform', icon: '◇', label: 'Optimizar puntos de curva',
     gate: hasCurveCmds, run: (ctx) => ctx.cb.onOptimizeCurves?.(ctx.pieceId!, ctx.internalLineId!) },
+  optimizeAllCurves: { id: 'optimizeAllCurves', group: 'transform', icon: '◇', label: 'Optimizar todos los puntos de curva',
+    gate: notLocked, run: (ctx) => ctx.cb.onOptimizeCurves?.(ctx.pieceId!) },                             // parity restore: old ContextMenu piece-level item (no lineId) — F2-hardened vs. old ungated item
   convertSegment: { id: 'convertSegment', group: 'transform', icon: '⌒',
     label: (ctx) => (ctx.segmentIsCurve ? 'Convertir en línea' : 'Convertir en curva'),
     run: (ctx) => ctx.cb.onConvertSegment?.(ctx.segmentIndex!, !ctx.segmentIsCurve) },
@@ -270,7 +272,7 @@ export const CURATION: CurationRow[] = [
     bar: ['rotate90', 'duplicate', 'flipH', 'properties', 'lockToggle'],
     menu: [
       'copy', 'paste', 'pasteMirror',
-      'rotate90', 'flipH', 'flipV',
+      'rotate90', 'flipH', 'flipV', 'optimizeAllCurves',
       'order',
       'layer', 'lockToggle', 'activeToggle', 'groupCreate', 'addToGroup', 'removeFromGroup',
       'unlinkPieces', 'selectLinkedPartner', 'linkSymmetry', 'linkInstance', 'cloneLinkedSymmetry', 'cloneLinkedInstance',

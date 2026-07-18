@@ -108,6 +108,7 @@ describe('gate !locked en el menú de pieza (F2)', () => {
     expect(ids).not.toContain('flipH');
     expect(ids).not.toContain('flipV');
     expect(ids).not.toContain('deletePiece');
+    expect(ids).not.toContain('optimizeAllCurves');
     expect(ids).toContain('lockToggle');
     expect(ids).toContain('copy');
     expect(ids).toContain('select');
@@ -117,6 +118,7 @@ describe('gate !locked en el menú de pieza (F2)', () => {
     expect(ids).toContain('rotate90');
     expect(ids).toContain('flipH');
     expect(ids).toContain('deletePiece');
+    expect(ids).toContain('optimizeAllCurves');
   });
 });
 
