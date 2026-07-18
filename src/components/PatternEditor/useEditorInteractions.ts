@@ -266,6 +266,7 @@ export function useEditorInteractions(
   } | null>(null);
   const marqueeRef = useRef<{ startPattern: Point2D; currentPattern: Point2D; shiftKey: boolean } | null>(null);
   const [selectMarquee, setSelectMarquee] = useState<{ start: Point2D; current: Point2D } | null>(null);
+  const [hoverCursor, setHoverCursor] = useState<string | null>(null);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
   const { pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool } = tools;
@@ -739,6 +740,19 @@ export function useEditorInteractions(
       const handled = nodeEditor.handleMouseMove(e);
       if (handled) return;
     }
+    // Hover idle en select: predice el clic para que el cursor diga la verdad
+    // sobre los handles (nota 170). Sin drag activo → barato, acotado a ≤9
+    // handles. El functional-update evita re-render salvo al cruzar un borde.
+    if (activeTool === 'select') {
+      let c: string | null = null;
+      if (showTransformBox) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const pt = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
+        c = transformTool.getCursor(pt);
+      }
+      setHoverCursor(prev => (prev === c ? prev : c));
+      return;
+    }
     if (activeTool === 'transform') {
       const handled = transformTool.handleMouseMove(e);
       if (handled) return;
@@ -765,7 +779,7 @@ export function useEditorInteractions(
     if (activeTool === 'internalShape') internalShapeTool.handleMouseMove(e);
     if (activeTool === 'pleat') pleatTool.handleMouseMove(e);
     if (activeTool === 'elastic') elasticTool.handleMouseMove(e);
-  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool]);
+  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseUp = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
     // Resolve marquee selection
@@ -856,7 +870,10 @@ export function useEditorInteractions(
     switch (activeTool) {
       case 'pen': return 'crosshair';
       case 'hand': return panRef.current ? 'grabbing' : 'grab';
-      case 'select': return marqueeRef.current ? 'crosshair' : dragRef.current ? 'grabbing' : 'default';
+      case 'select':
+        if (dragRef.current) return 'grabbing';
+        if (marqueeRef.current) return 'crosshair';
+        return hoverCursor ?? 'default';
       case 'transform': return 'default';
       case 'editPattern': return editPattern.isEditing ? editPattern.getCursor() : 'default';
       case 'seam': return 'crosshair';

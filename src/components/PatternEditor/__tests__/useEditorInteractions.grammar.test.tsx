@@ -167,3 +167,23 @@ describe('enrutado del transform box en select', () => {
     expect(tj.handleMouseDown).not.toHaveBeenCalled();
   });
 });
+
+describe('cursor honesto sobre los handles (F15)', () => {
+  it('muestra el cursor del handle al hacer hover en select con selección', () => {
+    const tj = { ...idleTransform(), getCursor: vi.fn(() => 'nwse-resize') };
+    const tools = makeTools({ nodeEditor: idleNodeEditor(), transformTool: tj });
+    const { hook, store } = setup('select', [pieceP1()], tools);
+    act(() => { store.dispatch(selectPiece('p1')); });
+    act(() => { hook.result.current.handleMouseMove(moveTo(10, 10)); });
+    expect(hook.result.current.getCursor()).toBe('nwse-resize');
+  });
+
+  it('devuelve default fuera de los handles', () => {
+    const tj = { ...idleTransform(), getCursor: vi.fn(() => null) };
+    const tools = makeTools({ nodeEditor: idleNodeEditor(), transformTool: tj });
+    const { hook, store } = setup('select', [pieceP1()], tools);
+    act(() => { store.dispatch(selectPiece('p1')); });
+    act(() => { hook.result.current.handleMouseMove(moveTo(10, 10)); });
+    expect(hook.result.current.getCursor()).toBe('default');
+  });
+});
