@@ -725,3 +725,917 @@ Todo esto queda **fuera de v1** por decisión del scope cut. Cada uno con su pre
 - **Cursor de calibración honesto (F15, resto).** El hook nunca recibe `calibrationMode` (es local de `PatternEditor`, `:602`); cerrarlo requiere threadear estado nuevo → fuera del diff `select`-only.
 - **Cortes visuales de Iris:** grey de piezas inertes, un box para multi-selección (9 handles, no 9×N), dim al 40% en altitud POINT, hover como stroke sin fill, mínimo de zoom para colapsar handles, SVG custom del cursor rotate. Superficie de Iris Tane; se revisan cuando shippen las features que dependen de ellas.
 - **Rechazados (quedan rechazados):** R1 (doble-clic body → zoom, destruye la única puerta a POINT), R2 (split tap-vs-hold de 200ms, modo temporal invisible), R3 (spring por hold de tool-key, re-importa el modo de timing).
+
+---
+
+## Addendum v1.1 — Curación de menús contextuales (2026-07-18)
+
+Este addendum continúa el plan de la gramática de clic-izquierdo (Tareas 1–5) y aterriza el **mandato del dueño**: la curación de las dos superficies de acción (barra flotante + menú de clic-derecho) vive en **un único módulo declarativo** — `src/components/PatternEditor/actionCuration.ts` — que exporta el registro de verbos (`ACTIONS`, propiedad de ingeniería) y la tabla de curación (`CURATION`, propiedad de María). Ambas superficies leen esa misma tabla; curar en el futuro = editar filas de `CURATION`, nunca tocar componentes. Por eso las tareas se ordenan así: **la tabla aterriza primero con sus propios tests (Tarea 6)**, y recién entonces cada superficie la consume. El core que shippea en esta ventana es el **menú de clic-derecho (Surface B, Tarea 7)** — un swap de builder sobre código existente, independiente de T1–T5, con hide-not-disable, gate `!locked` en todo verbo mutador/destructivo (arregla los dos BLOCKERS: `removePiece`/rotate/flip ungated sobre piezas bloqueadas), y separadores por-frontera-de-grupo (mata el bug del separador vacío). La **barra flotante (Surface A)** cabalga interfaces de T1–T5 sin mergear y carga toda la deuda visual (íconos, colisión de azul, threading de `calibrationMode`): se difiere en bloque a la subsección **Diferido del addendum**, con su disparador de revival (merge de T1–T5). La tabla ya autora las columnas `bar` (data lista, apagada por `BAR_ENABLED_KINDS`) para que Surface A la consuma sin cirugía cuando llegue.
+
+---
+
+## Tarea 6 — Módulo declarativo de curación (`actionCuration.ts`) + tests de la tabla
+
+Aterriza la única pieza nueva de lógica: el registro `ACTIONS` (id → verbo existente, con procedencia citada — cierra "solo verbos existentes"), la tabla `CURATION` (filas §2.3 que María edita), y los tres puros que ambas superficies comparten: `resolveTargetKind` (F11: firma normalizada, `point.*` solo con hit-test), `matchRow` (F6: fallback vacío, sin crash) y los lectores `resolveMenuActions`/`resolveBarActions`. El gate `!locked` (F2) se codifica en los `ActionDef` mutadores/destructivos; la fila `multiPiece` **no autora** el id de borrado (F3); ningún slot muerto `5.—` (se autora el conteo real). Cero dependencia de T1–T5.
+
+### Files
+- **Create** `src/components/PatternEditor/actionCuration.ts` (módulo declarativo: tipos + `ACTIONS` + `CURATION` + `resolveTargetKind` + `matchRow` + `resolveMenuActions` + `resolveBarActions`).
+- **Create** `src/components/PatternEditor/__tests__/actionCuration.test.ts` (tests puros de la tabla y los resolvers).
+
+### Interfaces
+- Consume (verbos existentes): `projectSlice` (`removePiece`, `removeSeam`, `reverseSeam`, `rotatePiece`, `duplicatePiece`, `flipPieceH`, `flipPieceV`, `linkPieces`, `unlinkPieces`, `cloneAsLinked`, `bringToFront`, `sendToBack`, `bringForward`, `sendBackward`, `lockPiece`, `unlockPiece`, `addPiece`, `createGroup`, `addPiecesToGroup`, `removePiecesFromGroup`, `deactivatePiece`, `setLayer`, `setSublayer`, `cloneToLayer`, `removeInternalLine` — `projectSlice.ts:518`), `editorSlice` (`selectPiece`, `clearSelection`, `copyPieces`, `createPastedPieces`, `enterSuperimposePickMode`), `inspectorSlice` (`dispatchInspectPiece` — `:221`); tipos `PatternPiece`/`InternalLine`/`InternalLineType`/`Seam`/`PieceGroup` (`types.ts`), `WorkflowStage` (`selectors.ts:28`), `AppDispatch` (`store/index.ts:128`), `SubMenuItem` (`shared/SubMenu`).
+- Produce:
+```ts
+export type TargetKind =
+  | 'piece' | 'multiPiece' | 'seam'
+  | 'il.notch' | 'il.grainline' | 'il.fold' | 'il.dart' | 'il.other'
+  | 'point.node' | 'point.segment' | 'emptyCanvas';
+export type GroupId = 'clipboard' | 'transform' | 'order' | 'organize' | 'linked' | 'identity' | 'danger';
+export type ActionId = /* unión enumerada — ver módulo */ string;
+export interface CurationCtx { /* datos resueltos + dispatch + callbacks + onClose */ }
+export interface ActionDef { id; label; icon; shortcut?; group; danger?; gate?; run; submenu?; }
+export interface CurationRow { targetKind; stage; altitude; bar: ActionId[]; menu: ActionId[]; }
+export const ACTIONS: Record<ActionId, ActionDef>;
+export const CURATION: CurationRow[];
+export const BAR_MAX_VISIBLE = 5;
+export const BAR_ENABLED_KINDS: Set<TargetKind>;
+export function resolveTargetKind(t: TargetInput): TargetKind;
+export function matchRow(key): CurationRow | null;
+export function resolveMenuActions(ctx: CurationCtx): ActionDef[];
+export function resolveBarActions(ctx: CurationCtx): ActionDef[];
+```
+
+### Steps
+
+- [ ] Crear el test puro del módulo con todos los invariantes. Contenido completo:
+
+```ts
+import { describe, it, expect, vi } from 'vitest';
+import {
+  ACTIONS, CURATION, BAR_MAX_VISIBLE, BAR_ENABLED_KINDS,
+  resolveTargetKind, matchRow, resolveMenuActions, resolveBarActions,
+  type CurationCtx, type ActionId, type TargetKind,
+} from '../actionCuration';
+import type { AppDispatch } from '../../../store';
+import type { PatternPiece } from '../../../types/types';
+
+function pieceFix(locked = false): PatternPiece {
+  return {
+    id: 'p1', name: 'P1', position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+    active: true, locked, seamAllowance: 0, outline: [], internals: [], edges: [],
+  } as unknown as PatternPiece;
+}
+
+function makeCtx(over: Partial<CurationCtx> = {}): CurationCtx {
+  return {
+    dispatch: vi.fn() as unknown as AppDispatch,
+    targetKind: 'piece', stage: 'drafted', altitude: 'body',
+    pieceId: 'p1', piece: pieceFix(), selectedPieceIds: ['p1'],
+    seamId: null, seam: null,
+    internalLineId: null, internalLineType: null, internalLine: null,
+    segmentIndex: undefined, segmentIsCurve: undefined,
+    clipboard: null, groups: [], pieces: [pieceFix()],
+    cb: {}, onClose: vi.fn(),
+    ...over,
+  };
+}
+
+describe('resolveTargetKind — precedencia y refinamiento de altitud', () => {
+  it('seam gana sobre línea interna y sobre pieza', () => {
+    expect(resolveTargetKind({
+      seamId: 's1', pieceId: 'p1', pieceCount: 1,
+      internalLineType: 'notch', altitude: 'body', segmentHit: false,
+    })).toBe('seam');
+  });
+  it('línea interna gana sobre pieza; el subtipo cae en su cubo', () => {
+    expect(resolveTargetKind({ seamId: null, pieceId: 'p1', pieceCount: 1, internalLineType: 'notch', altitude: 'body' })).toBe('il.notch');
+    expect(resolveTargetKind({ seamId: null, pieceId: 'p1', pieceCount: 1, internalLineType: 'grainline', altitude: 'body' })).toBe('il.grainline');
+    expect(resolveTargetKind({ seamId: null, pieceId: 'p1', pieceCount: 1, internalLineType: 'fold', altitude: 'body' })).toBe('il.fold');
+    expect(resolveTargetKind({ seamId: null, pieceId: 'p1', pieceCount: 1, internalLineType: 'dart', altitude: 'body' })).toBe('il.dart');
+    expect(resolveTargetKind({ seamId: null, pieceId: 'p1', pieceCount: 1, internalLineType: 'pleat', altitude: 'body' })).toBe('il.other');
+    expect(resolveTargetKind({ seamId: null, pieceId: 'p1', pieceCount: 1, internalLineType: 'seam', altitude: 'body' })).toBe('il.other');
+  });
+  it('pieza única, multi y vacío', () => {
+    expect(resolveTargetKind({ seamId: null, pieceId: 'p1', pieceCount: 1, internalLineType: null, altitude: 'body' })).toBe('piece');
+    expect(resolveTargetKind({ seamId: null, pieceId: 'p1', pieceCount: 3, internalLineType: null, altitude: 'body' })).toBe('multiPiece');
+    expect(resolveTargetKind({ seamId: null, pieceId: null, pieceCount: 0, internalLineType: null, altitude: 'body' })).toBe('emptyCanvas');
+  });
+  it('altitud POINT: segmentHit → point.segment, si no → point.node (F11)', () => {
+    expect(resolveTargetKind({ seamId: null, pieceId: 'p1', pieceCount: 1, internalLineType: null, altitude: 'point', segmentHit: true })).toBe('point.segment');
+    expect(resolveTargetKind({ seamId: null, pieceId: 'p1', pieceCount: 1, internalLineType: null, altitude: 'point', segmentHit: false })).toBe('point.node');
+  });
+});
+
+describe('matchRow — especificidad y fallback', () => {
+  it('empareja la fila del targetKind con stage/altitud comodín', () => {
+    const row = matchRow({ targetKind: 'piece', stage: 'sewn', altitude: 'body' });
+    expect(row?.targetKind).toBe('piece');
+  });
+  it('devuelve null si ningún targetKind matchea (F6: sin crash)', () => {
+    const row = matchRow({ targetKind: 'unknownKind' as TargetKind, stage: 'drafted', altitude: 'body' });
+    expect(row).toBeNull();
+  });
+});
+
+describe('integridad de CURATION', () => {
+  it('todo id de bar y menu existe en ACTIONS', () => {
+    for (const row of CURATION) {
+      for (const id of [...row.bar, ...row.menu]) {
+        expect(ACTIONS[id], `id sin ActionDef: ${id}`).toBeDefined();
+      }
+    }
+  });
+  it('paridad: bar ⊆ menu en cada fila', () => {
+    for (const row of CURATION) {
+      for (const id of row.bar) {
+        expect(row.menu, `${row.targetKind}: ${id} en bar pero no en menu`).toContain(id);
+      }
+    }
+  });
+  it('ningún verbo danger vive en bar', () => {
+    for (const row of CURATION) {
+      for (const id of row.bar) {
+        expect(ACTIONS[id].danger, `danger en bar: ${id}`).not.toBe(true);
+      }
+    }
+  });
+  it('bar autorada no excede el cap de 5', () => {
+    for (const row of CURATION) {
+      expect(row.bar.length).toBeLessThanOrEqual(BAR_MAX_VISIBLE);
+    }
+  });
+  it('la fila multiPiece NO autora el borrado (F3: verbo diferido = fuera de pantalla)', () => {
+    const multi = CURATION.find(r => r.targetKind === 'multiPiece');
+    expect(multi).toBeDefined();
+    expect(multi!.menu).not.toContain('deletePiece' as ActionId);
+    expect(multi!.bar).not.toContain('deletePiece' as ActionId);
+  });
+});
+
+describe('gate !locked en el menú de pieza (F2)', () => {
+  it('pieza bloqueada oculta rotate/flip/delete y conserva desbloquear/copiar/seleccionar', () => {
+    const ctx = makeCtx({ piece: pieceFix(true), pieces: [pieceFix(true)] });
+    const ids = resolveMenuActions(ctx).map(d => d.id);
+    expect(ids).not.toContain('rotate90');
+    expect(ids).not.toContain('flipH');
+    expect(ids).not.toContain('flipV');
+    expect(ids).not.toContain('deletePiece');
+    expect(ids).toContain('lockToggle');
+    expect(ids).toContain('copy');
+    expect(ids).toContain('select');
+  });
+  it('pieza desbloqueada sí muestra rotate/flip/delete', () => {
+    const ids = resolveMenuActions(makeCtx()).map(d => d.id);
+    expect(ids).toContain('rotate90');
+    expect(ids).toContain('flipH');
+    expect(ids).toContain('deletePiece');
+  });
+});
+
+describe('resolveBarActions — cap, no-danger y BAR_ENABLED_KINDS', () => {
+  it('pieza desbloqueada: barra rankeada, ≤5, sin danger', () => {
+    const bar = resolveBarActions(makeCtx()).map(d => d.id);
+    expect(bar).toEqual(['rotate90', 'duplicate', 'flipH', 'properties', 'lockToggle']);
+    expect(bar.length).toBeLessThanOrEqual(BAR_MAX_VISIBLE);
+    for (const id of bar) expect(ACTIONS[id].danger).not.toBe(true);
+  });
+  it('targetKind fuera de BAR_ENABLED_KINDS (seam) → barra vacía', () => {
+    expect(BAR_ENABLED_KINDS.has('seam')).toBe(false);
+    expect(resolveBarActions(makeCtx({ targetKind: 'seam' }))).toEqual([]);
+  });
+  it('paste se oculta sin clipboard y aparece con clipboard', () => {
+    const empty = makeCtx({ targetKind: 'emptyCanvas', pieceId: null, piece: null });
+    expect(resolveMenuActions(empty).map(d => d.id)).not.toContain('paste');
+    const withClip = makeCtx({ targetKind: 'emptyCanvas', pieceId: null, piece: null, clipboard: { pieces: [pieceFix()] } });
+    expect(resolveMenuActions(withClip).map(d => d.id)).toContain('paste');
+  });
+});
+```
+
+- [ ] Correr y esperar **FAIL** (el módulo `../actionCuration` no existe aún → todos los imports fallan): `npm run test -- src/components/PatternEditor/__tests__/actionCuration.test.ts`
+
+- [ ] Crear el módulo `src/components/PatternEditor/actionCuration.ts` con el código completo:
+
+```ts
+/**
+ * actionCuration — tabla declarativa de acciones contextuales del PatternEditor 2D.
+ *
+ * Módulo ÚNICO que ambas superficies consumen (mandato del dueño):
+ *  - ACTIONS  → registro de verbos EXISTENTES (propiedad de ingeniería).
+ *  - CURATION → tabla de ranking/selección por contexto (propiedad de María).
+ * Curar = editar filas de CURATION; nunca tocar componentes.
+ *
+ * Surface B (menú derecho) consume `resolveMenuActions`. Surface A (barra) —
+ * diferida hasta el merge de T1–T5 — consumirá `resolveBarActions`. La columna
+ * `bar` ya está autorada (data lista, apagada por BAR_ENABLED_KINDS) para que
+ * Surface A la lea sin cirugía.
+ */
+import type { AppDispatch } from '../../store';
+import type { PatternPiece, InternalLine, InternalLineType, Seam, PieceGroup } from '../../types/types';
+import type { WorkflowStage } from '../../store/selectors';
+import type { SubMenuItem } from '../shared/SubMenu';
+import {
+  removePiece, removeSeam, reverseSeam, rotatePiece, duplicatePiece,
+  flipPieceH, flipPieceV, linkPieces, unlinkPieces, cloneAsLinked,
+  bringToFront, sendToBack, bringForward, sendBackward, lockPiece, unlockPiece,
+  addPiece, createGroup, addPiecesToGroup, removePiecesFromGroup, deactivatePiece,
+  setLayer, setSublayer, cloneToLayer, removeInternalLine,
+} from '../../store/projectSlice';
+import { selectPiece, clearSelection, copyPieces, createPastedPieces, enterSuperimposePickMode } from '../../store/editorSlice';
+import { dispatchInspectPiece } from '../../store/inspectorSlice';
+
+// ── Vocabulario ──────────────────────────────────────────────────────────────
+
+export type TargetKind =
+  | 'piece' | 'multiPiece' | 'seam'
+  | 'il.notch' | 'il.grainline' | 'il.fold' | 'il.dart' | 'il.other'
+  | 'point.node' | 'point.segment' | 'emptyCanvas';
+
+export type GroupId = 'clipboard' | 'transform' | 'order' | 'organize' | 'linked' | 'identity' | 'danger';
+
+/** Orden fijo de grupos del menú (§2.2). El renderer emite un separador SOLO
+ *  entre grupos presentes → N grupos = N−1 separadores, ninguno vacío. */
+export const GROUP_ORDER: GroupId[] = ['clipboard', 'transform', 'order', 'organize', 'linked', 'identity', 'danger'];
+
+export type ActionId =
+  | 'copy' | 'paste' | 'pasteMirror'
+  | 'rotate90' | 'flipH' | 'flipV'
+  | 'reverseSeam' | 'unfold' | 'unfoldOutlineOnly' | 'offsetInternalLine' | 'optimizeCurves' | 'convertSegment'
+  | 'order' | 'layer' | 'lockToggle' | 'activeToggle' | 'groupCreate' | 'addToGroup' | 'removeFromGroup'
+  | 'unlinkPieces' | 'selectLinkedPartner' | 'linkSymmetry' | 'linkInstance' | 'cloneLinkedSymmetry' | 'cloneLinkedInstance'
+  | 'duplicate' | 'duplicateAll' | 'rename' | 'properties' | 'select' | 'inspect' | 'selectPieceOfLine' | 'selectSeamA' | 'selectSeamB' | 'zoomToFit'
+  | 'deletePiece' | 'deleteSeam' | 'deleteInternalLine';
+
+/** Callbacks que Surface B pasa como props (verbos que no son dispatches puros). */
+export interface CurationCallbacks {
+  onRename?: (pieceId: string) => void;
+  onConvertSegment?: (commandIndex: number, toCurve: boolean) => void;
+  onZoomToFit?: () => void;
+  onUnfold?: (pieceId: string, foldLineId: string, outlineOnly?: boolean) => void;
+  onOffsetInternalLine?: (pieceId: string, lineId: string) => void;
+  onOptimizeCurves?: (pieceId: string, lineId?: string) => void;
+  onOpenProperties?: (pieceId: string) => void;
+}
+
+/** Contexto resuelto que consumen gate/label/run/submenu. Lo arma cada superficie
+ *  a partir de su fuente (hit-test en B; selección en A). */
+export interface CurationCtx {
+  dispatch: AppDispatch;
+  targetKind: TargetKind;
+  stage: WorkflowStage;
+  altitude: 'body' | 'point';
+  pieceId: string | null;
+  piece: PatternPiece | null;
+  selectedPieceIds: string[];
+  seamId: string | null;
+  seam: Seam | null;
+  internalLineId: string | null;
+  internalLineType: InternalLineType | null;
+  internalLine: InternalLine | null;
+  segmentIndex?: number;
+  segmentIsCurve?: boolean;
+  clipboard: { pieces: PatternPiece[] } | null;
+  groups: PieceGroup[];
+  pieces: PatternPiece[];
+  cb: CurationCallbacks;
+  onClose: () => void;
+}
+
+export interface ActionDef {
+  id: ActionId;
+  label: string | ((ctx: CurationCtx) => string);
+  icon: string;
+  shortcut?: string;
+  group: GroupId;
+  danger?: boolean;
+  /** Precondición. Si devuelve false, el ítem se OCULTA (hide-not-disable, §4). */
+  gate?: (ctx: CurationCtx) => boolean;
+  /** Verbo (dispatch/callback existente). El renderer llama run(ctx) y luego onClose. */
+  run: (ctx: CurationCtx) => void;
+  /** Si está presente, el ítem se renderiza como SubMenu (Orden/Capa/Grupos). */
+  submenu?: (ctx: CurationCtx) => SubMenuItem[];
+}
+
+export interface CurationRow {
+  targetKind: TargetKind;
+  stage: WorkflowStage | '*';
+  altitude: 'body' | 'point' | '*';
+  bar: ActionId[];
+  menu: ActionId[];
+}
+
+export const BAR_MAX_VISIBLE = 5;
+/** En v1 la barra solo monta para pieza/multi (cabalga el transform box de T2).
+ *  Las demás filas traen su `bar` autorada pero apagada — flip para v2 sin cirugía. */
+export const BAR_ENABLED_KINDS = new Set<TargetKind>(['piece', 'multiPiece']);
+
+// ── Gates compartidos ──────────────────────────────────────────────────────
+
+const notLocked = (ctx: CurationCtx) => !ctx.piece?.locked;
+const hasClipboard = (ctx: CurationCtx) => !!ctx.clipboard;
+const isLinked = (ctx: CurationCtx) => !!ctx.piece?.linkedPieceId;
+const twoSelected = (ctx: CurationCtx) => !ctx.piece?.linkedPieceId && ctx.selectedPieceIds.length === 2;
+const cloneable = (ctx: CurationCtx) => !ctx.piece?.linkedPieceId && ctx.selectedPieceIds.length !== 2;
+const canAddToGroup = (ctx: CurationCtx) => !!ctx.pieceId && ctx.groups.some(g => !g.pieceIds.includes(ctx.pieceId!));
+const canRemoveFromGroup = (ctx: CurationCtx) => !!ctx.pieceId && ctx.groups.some(g => g.pieceIds.includes(ctx.pieceId!));
+const seamBothConnected = (ctx: CurationCtx) => !!(ctx.seam?.pieceA.pieceId && ctx.seam?.pieceB.pieceId);
+const hasCurveCmds = (ctx: CurationCtx) => !!ctx.internalLine?.path.some(c => c.type === 'C' || c.type === 'Q');
+
+const pasteRun = (mirror: boolean) => (ctx: CurationCtx) => {
+  if (!ctx.clipboard) return;
+  createPastedPieces(ctx.clipboard, mirror).forEach(p => ctx.dispatch(addPiece(p)));
+};
+const seamPartnerName = (ctx: CurationCtx, side: 'A' | 'B') => {
+  const id = side === 'A' ? ctx.seam?.pieceA.pieceId : ctx.seam?.pieceB.pieceId;
+  return ctx.pieces.find(p => p.id === id)?.name || (side === 'A' ? 'Pieza A' : 'Pieza B');
+};
+const ilDeleteLabel = (ctx: CurationCtx) => {
+  switch (ctx.internalLineType) {
+    case 'notch': return 'Eliminar piquete';
+    case 'grainline': return 'Eliminar hilo';
+    case 'dart': return 'Eliminar pinza';
+    default: return 'Eliminar';
+  }
+};
+
+// ── ACTIONS: id → verbo existente (procedencia entre paréntesis) ─────────────
+
+export const ACTIONS: Record<ActionId, ActionDef> = {
+  // clipboard
+  copy: { id: 'copy', group: 'clipboard', icon: '📄', label: 'Copiar', shortcut: 'Ctrl+C',
+    run: (ctx) => { if (ctx.piece) ctx.dispatch(copyPieces({ pieces: [ctx.piece] })); } },              // editorSlice.copyPieces
+  paste: { id: 'paste', group: 'clipboard', icon: '📋', label: 'Pegar', shortcut: 'Ctrl+V',
+    gate: hasClipboard, run: pasteRun(false) },                                                          // editorSlice.createPastedPieces + projectSlice.addPiece
+  pasteMirror: { id: 'pasteMirror', group: 'clipboard', icon: '🪞', label: 'Pegar en espejo', shortcut: 'Ctrl+R',
+    gate: hasClipboard, run: pasteRun(true) },
+
+  // transform (mutadores de geometría → gate !locked, F2)
+  rotate90: { id: 'rotate90', group: 'transform', icon: '↻', label: 'Rotar 90°', shortcut: 'R',
+    gate: notLocked, run: (ctx) => ctx.dispatch(rotatePiece({ id: ctx.pieceId!, rotation: (ctx.piece?.rotation ?? 0) + 90 })) }, // projectSlice.rotatePiece
+  flipH: { id: 'flipH', group: 'transform', icon: '↔', label: 'Voltear horizontal', shortcut: 'H',
+    gate: notLocked, run: (ctx) => ctx.dispatch(flipPieceH(ctx.pieceId!)) },                             // projectSlice.flipPieceH
+  flipV: { id: 'flipV', group: 'transform', icon: '↕', label: 'Voltear vertical', shortcut: 'V',
+    gate: notLocked, run: (ctx) => ctx.dispatch(flipPieceV(ctx.pieceId!)) },                             // projectSlice.flipPieceV
+  reverseSeam: { id: 'reverseSeam', group: 'transform', icon: '↔', label: 'Invertir dirección de costura', shortcut: 'Ctrl+B',
+    run: (ctx) => ctx.dispatch(reverseSeam(ctx.seamId!)) },                                              // projectSlice.reverseSeam
+  unfold: { id: 'unfold', group: 'transform', icon: '⇔', label: 'Desplegar',
+    run: (ctx) => ctx.cb.onUnfold?.(ctx.pieceId!, ctx.internalLineId!) },                                // Surface B prop
+  unfoldOutlineOnly: { id: 'unfoldOutlineOnly', group: 'transform', icon: '⇔', label: 'Desplegar solo el contorno',
+    run: (ctx) => ctx.cb.onUnfold?.(ctx.pieceId!, ctx.internalLineId!, true) },
+  offsetInternalLine: { id: 'offsetInternalLine', group: 'transform', icon: '⏛', label: 'Offset como línea interna',
+    run: (ctx) => ctx.cb.onOffsetInternalLine?.(ctx.pieceId!, ctx.internalLineId!) },
+  optimizeCurves: { id: 'optimizeCurves', group: 'transform', icon: '◇', label: 'Optimizar puntos de curva',
+    gate: hasCurveCmds, run: (ctx) => ctx.cb.onOptimizeCurves?.(ctx.pieceId!, ctx.internalLineId!) },
+  convertSegment: { id: 'convertSegment', group: 'transform', icon: '⌒',
+    label: (ctx) => (ctx.segmentIsCurve ? 'Convertir en línea' : 'Convertir en curva'),
+    run: (ctx) => ctx.cb.onConvertSegment?.(ctx.segmentIndex!, !ctx.segmentIsCurve) },
+
+  // order (submenú z-order — colapsa 4 ítems planos en uno)
+  order: { id: 'order', group: 'order', icon: '⇅', label: 'Orden', run: () => {},
+    submenu: (ctx) => [
+      { label: 'Traer al frente', action: () => { ctx.dispatch(bringToFront(ctx.pieceId!)); ctx.onClose(); } },     // projectSlice.bringToFront
+      { label: 'Adelantar', action: () => { ctx.dispatch(bringForward(ctx.pieceId!)); ctx.onClose(); } },           // bringForward
+      { label: 'Atrasar', action: () => { ctx.dispatch(sendBackward(ctx.pieceId!)); ctx.onClose(); } },             // sendBackward
+      { label: 'Enviar al fondo', action: () => { ctx.dispatch(sendToBack(ctx.pieceId!)); ctx.onClose(); } },       // sendToBack
+    ] },
+
+  // organize
+  layer: { id: 'layer', group: 'organize', icon: '\u{1F4D1}', label: 'Capa', run: () => {},
+    submenu: (ctx) => {
+      const pid = ctx.pieceId!;
+      return [
+        { label: `Cambiar capa... (${ctx.piece?.layer ?? 1})`, action: () => { ctx.dispatch(setLayer({ pieceId: pid, layer: ((ctx.piece?.layer ?? 1) % 10) + 1 })); ctx.onClose(); } },       // setLayer
+        { label: `Cambiar subcapa... (${ctx.piece?.sublayer ?? 0})`, action: () => { ctx.dispatch(setSublayer({ pieceId: pid, sublayer: ((ctx.piece?.sublayer ?? 0) + 1) % 5 })); ctx.onClose(); } }, // setSublayer
+        { separator: true, label: 'Clonar encima', action: () => { ctx.dispatch(cloneToLayer({ pieceId: pid, direction: 'over' })); ctx.onClose(); } },                                        // cloneToLayer
+        { label: 'Clonar debajo', action: () => { ctx.dispatch(cloneToLayer({ pieceId: pid, direction: 'under' })); ctx.onClose(); } },
+        { separator: true, label: 'Superponer encima...', action: () => { ctx.dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'over' })); ctx.onClose(); } },                     // enterSuperimposePickMode
+        { label: 'Superponer debajo...', action: () => { ctx.dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'under' })); ctx.onClose(); } },
+        { label: 'Superponer al lado...', action: () => { ctx.dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'side' })); ctx.onClose(); } },
+      ];
+    } },
+  lockToggle: { id: 'lockToggle', group: 'organize', icon: '🔒',
+    label: (ctx) => (ctx.piece?.locked ? 'Desbloquear' : 'Bloquear'),
+    run: (ctx) => ctx.dispatch(ctx.piece?.locked ? unlockPiece(ctx.pieceId!) : lockPiece(ctx.pieceId!)) },  // lock/unlockPiece — NUNCA gateado por locked (escape hatch)
+  activeToggle: { id: 'activeToggle', group: 'organize', icon: '⏸',
+    label: (ctx) => (ctx.piece?.active === false ? 'Activar pieza' : 'Desactivar pieza'),
+    run: (ctx) => ctx.dispatch(deactivatePiece({ pieceId: ctx.pieceId!, active: ctx.piece?.active === false })) }, // deactivatePiece
+  groupCreate: { id: 'groupCreate', group: 'organize', icon: '📁', label: 'Crear grupo con la selección',
+    run: (ctx) => {
+      const ids = ctx.selectedPieceIds.length > 0 ? ctx.selectedPieceIds : [ctx.pieceId!];
+      ctx.dispatch(createGroup({ name: `Grupo ${ctx.groups.length + 1}`, pieceIds: ids }));                  // createGroup
+    } },
+  addToGroup: { id: 'addToGroup', group: 'organize', icon: '+', label: 'Agregar a grupo', gate: canAddToGroup, run: () => {},
+    submenu: (ctx) => ctx.groups.filter(g => !g.pieceIds.includes(ctx.pieceId!)).map(g => ({
+      label: `Agregar a "${g.name}"`, action: () => { ctx.dispatch(addPiecesToGroup({ groupId: g.id, pieceIds: [ctx.pieceId!] })); ctx.onClose(); },  // addPiecesToGroup
+    })) },
+  removeFromGroup: { id: 'removeFromGroup', group: 'organize', icon: '−', label: 'Quitar de grupo', gate: canRemoveFromGroup, run: () => {},
+    submenu: (ctx) => ctx.groups.filter(g => g.pieceIds.includes(ctx.pieceId!)).map(g => ({
+      label: `Quitar de "${g.name}"`, action: () => { ctx.dispatch(removePiecesFromGroup({ groupId: g.id, pieceIds: [ctx.pieceId!] })); ctx.onClose(); }, // removePiecesFromGroup
+    })) },
+
+  // linked (3-vías, idéntico al if/else-if/else de hoy)
+  unlinkPieces: { id: 'unlinkPieces', group: 'linked', icon: '🔗', label: 'Quitar edición vinculada', gate: isLinked,
+    run: (ctx) => ctx.dispatch(unlinkPieces({ pieceId: ctx.pieceId! })) },                                   // unlinkPieces
+  selectLinkedPartner: { id: 'selectLinkedPartner', group: 'linked', icon: '👆', label: 'Seleccionar patrón vinculado', gate: isLinked,
+    run: (ctx) => ctx.dispatch(selectPiece(ctx.piece!.linkedPieceId!)) },
+  linkSymmetry: { id: 'linkSymmetry', group: 'linked', icon: '🪞', label: 'Aplicar edición vinculada – simetría', gate: twoSelected,
+    run: (ctx) => ctx.dispatch(linkPieces({ pieceIdA: ctx.selectedPieceIds[0], pieceIdB: ctx.selectedPieceIds[1], mode: 'symmetry' })) }, // linkPieces
+  linkInstance: { id: 'linkInstance', group: 'linked', icon: '📋', label: 'Aplicar edición vinculada – instancia', gate: twoSelected,
+    run: (ctx) => ctx.dispatch(linkPieces({ pieceIdA: ctx.selectedPieceIds[0], pieceIdB: ctx.selectedPieceIds[1], mode: 'instance' })) },
+  cloneLinkedSymmetry: { id: 'cloneLinkedSymmetry', group: 'linked', icon: '🪞', label: 'Clonar con edición vinculada – simetría', gate: cloneable,
+    run: (ctx) => ctx.dispatch(cloneAsLinked({ pieceId: ctx.pieceId!, mode: 'symmetry' })) },               // cloneAsLinked
+  cloneLinkedInstance: { id: 'cloneLinkedInstance', group: 'linked', icon: '📋', label: 'Clonar con edición vinculada – instancia', gate: cloneable,
+    run: (ctx) => ctx.dispatch(cloneAsLinked({ pieceId: ctx.pieceId!, mode: 'instance' })) },
+
+  // identity
+  duplicate: { id: 'duplicate', group: 'identity', icon: '⧉', label: 'Duplicar', shortcut: 'Ctrl+D',
+    run: (ctx) => ctx.dispatch(duplicatePiece(ctx.pieceId!)) },                                              // duplicatePiece
+  duplicateAll: { id: 'duplicateAll', group: 'identity', icon: '⧉', label: 'Duplicar',
+    run: (ctx) => ctx.selectedPieceIds.forEach(id => ctx.dispatch(duplicatePiece(id))) },                    // loop pieza-a-pieza (verbo existente)
+  rename: { id: 'rename', group: 'identity', icon: '✏️', label: 'Renombrar…', shortcut: 'F2',
+    run: (ctx) => ctx.cb.onRename?.(ctx.pieceId!) },                                                         // Surface B prop → inline rename
+  properties: { id: 'properties', group: 'identity', icon: '🎛', label: 'Propiedades…',
+    run: (ctx) => ctx.cb.onOpenProperties?.(ctx.pieceId!) },                                                 // Surface B prop → Properties panel
+  select: { id: 'select', group: 'identity', icon: '☐', label: 'Seleccionar',
+    run: (ctx) => ctx.dispatch(selectPiece(ctx.pieceId!)) },                                                 // selectPiece
+  inspect: { id: 'inspect', group: 'identity', icon: '🔍', label: 'Inspeccionar',
+    run: (ctx) => dispatchInspectPiece(ctx.dispatch, ctx.pieceId!) },                                        // inspectorSlice.dispatchInspectPiece
+  selectPieceOfLine: { id: 'selectPieceOfLine', group: 'identity', icon: '☐', label: 'Seleccionar pieza',
+    run: (ctx) => ctx.dispatch(selectPiece(ctx.pieceId!)) },
+  selectSeamA: { id: 'selectSeamA', group: 'identity', icon: '☐', gate: seamBothConnected,
+    label: (ctx) => `Seleccionar "${seamPartnerName(ctx, 'A')}"`,
+    run: (ctx) => ctx.dispatch(selectPiece(ctx.seam!.pieceA.pieceId)) },
+  selectSeamB: { id: 'selectSeamB', group: 'identity', icon: '☐', gate: seamBothConnected,
+    label: (ctx) => `Seleccionar "${seamPartnerName(ctx, 'B')}"`,
+    run: (ctx) => ctx.dispatch(selectPiece(ctx.seam!.pieceB.pieceId)) },
+  zoomToFit: { id: 'zoomToFit', group: 'identity', icon: '⊞', label: 'Ajustar zoom al patrón',
+    run: (ctx) => ctx.cb.onZoomToFit?.() },                                                                  // Surface B prop
+
+  // danger (destructivos → gate !locked donde aplica, F2)
+  deletePiece: { id: 'deletePiece', group: 'danger', icon: '🗑', label: 'Eliminar pieza', shortcut: 'Del', danger: true,
+    gate: notLocked, run: (ctx) => ctx.dispatch(removePiece(ctx.pieceId!)) },                                // projectSlice.removePiece (SIN cascade-clean — POST-SHIP)
+  deleteSeam: { id: 'deleteSeam', group: 'danger', icon: '🗑', label: 'Eliminar costura', shortcut: 'Del', danger: true,
+    run: (ctx) => { ctx.dispatch(removeSeam(ctx.seamId!)); ctx.dispatch(clearSelection()); } },              // removeSeam + clearSelection
+  deleteInternalLine: { id: 'deleteInternalLine', group: 'danger', icon: '🗑', label: ilDeleteLabel, danger: true,
+    run: (ctx) => ctx.dispatch(removeInternalLine({ pieceId: ctx.pieceId!, lineId: ctx.internalLineId! })) }, // projectSlice.removeInternalLine (:518)
+};
+
+// ── CURATION: la tabla que María edita ───────────────────────────────────────
+// Leyenda: `bar` rankeada (cap 5, apagada salvo BAR_ENABLED_KINDS); `menu` agrupada por ActionDef.group.
+
+export const CURATION: CurationRow[] = [
+  {
+    targetKind: 'piece', stage: '*', altitude: 'body',
+    bar: ['rotate90', 'duplicate', 'flipH', 'properties', 'lockToggle'],
+    menu: [
+      'copy', 'paste', 'pasteMirror',
+      'rotate90', 'flipH', 'flipV',
+      'order',
+      'layer', 'lockToggle', 'activeToggle', 'groupCreate', 'addToGroup', 'removeFromGroup',
+      'unlinkPieces', 'selectLinkedPartner', 'linkSymmetry', 'linkInstance', 'cloneLinkedSymmetry', 'cloneLinkedInstance',
+      'duplicate', 'rename', 'properties', 'select', 'inspect',
+      'deletePiece',
+    ],
+  },
+  {
+    // Consumida SOLO por Surface A (barra, selección>1). Surface B resuelve por
+    // hit-test → siempre pieza única; el caso "2 seleccionadas" lo cubren los
+    // gates del row `piece` (linkSymmetry/linkInstance). NO autora deletePiece (F3).
+    targetKind: 'multiPiece', stage: '*', altitude: 'body',
+    bar: ['duplicateAll', 'groupCreate', 'linkSymmetry', 'linkInstance'],
+    menu: ['duplicateAll', 'groupCreate', 'addToGroup', 'linkSymmetry', 'linkInstance'],
+  },
+  {
+    targetKind: 'seam', stage: '*', altitude: 'body',
+    bar: ['reverseSeam', 'selectSeamA', 'selectSeamB'], // data v2 (apagada por BAR_ENABLED_KINDS)
+    menu: ['reverseSeam', 'selectSeamA', 'selectSeamB', 'deleteSeam'],
+  },
+  { targetKind: 'il.notch', stage: '*', altitude: 'body', bar: [], menu: ['selectPieceOfLine', 'deleteInternalLine'] },
+  { targetKind: 'il.grainline', stage: '*', altitude: 'body', bar: [], menu: ['selectPieceOfLine', 'deleteInternalLine'] },
+  {
+    targetKind: 'il.fold', stage: '*', altitude: 'body',
+    bar: ['unfold', 'unfoldOutlineOnly'], // data v2
+    menu: ['unfold', 'unfoldOutlineOnly', 'selectPieceOfLine', 'deleteInternalLine'],
+  },
+  { targetKind: 'il.dart', stage: '*', altitude: 'body', bar: [], menu: ['optimizeCurves', 'selectPieceOfLine', 'deleteInternalLine'] },
+  { targetKind: 'il.other', stage: '*', altitude: 'body', bar: [], menu: ['offsetInternalLine', 'optimizeCurves', 'selectPieceOfLine', 'deleteInternalLine'] },
+  { targetKind: 'point.segment', stage: '*', altitude: 'point', bar: [], menu: ['convertSegment'] },
+  { targetKind: 'point.node', stage: '*', altitude: 'point', bar: [], menu: [] },
+  { targetKind: 'emptyCanvas', stage: '*', altitude: 'body', bar: [], menu: ['paste', 'pasteMirror', 'zoomToFit'] },
+];
+
+// ── Resolvers puros ──────────────────────────────────────────────────────────
+
+export interface TargetInput {
+  seamId: string | null;
+  pieceId: string | null;
+  /** Surface A: selectedPieceIds.length. Surface B (hit-test): 0 ó 1. */
+  pieceCount: number;
+  internalLineType: InternalLineType | null;
+  altitude: 'body' | 'point';
+  /** Solo Surface B en altitud POINT (hit-test bajo el cursor). */
+  segmentHit?: boolean;
+}
+
+function ilBucket(t: InternalLineType): 'notch' | 'grainline' | 'fold' | 'dart' | 'other' {
+  return (t === 'notch' || t === 'grainline' || t === 'fold' || t === 'dart') ? t : 'other';
+}
+
+/**
+ * Puro y compartido. Precedencia (la del hit-test existente): altitud POINT >
+ * seam > línea interna > pieza. `point.*` SOLO cuando `altitude==='point'`
+ * (F11): Surface A nunca pasa esa altitud — su box está suprimido en POINT (G7).
+ */
+export function resolveTargetKind(t: TargetInput): TargetKind {
+  if (t.altitude === 'point') return t.segmentHit ? 'point.segment' : 'point.node';
+  if (t.seamId) return 'seam';
+  if (t.internalLineType) return `il.${ilBucket(t.internalLineType)}` as TargetKind;
+  if (t.pieceCount > 1) return 'multiPiece';
+  if (t.pieceId) return 'piece';
+  return 'emptyCanvas';
+}
+
+/** Fila más específica: stage exacto sobre '*', altitud exacta sobre '*'.
+ *  Sin match → null (F6: el lector devuelve menú vacío, sin crash). */
+export function matchRow(key: { targetKind: TargetKind; stage: WorkflowStage; altitude: 'body' | 'point' }): CurationRow | null {
+  const viable = CURATION.filter(r =>
+    r.targetKind === key.targetKind &&
+    (r.stage === key.stage || r.stage === '*') &&
+    (r.altitude === key.altitude || r.altitude === '*'));
+  if (viable.length === 0) return null;
+  const score = (r: CurationRow) =>
+    (r.stage === key.stage ? 2 : 1) * 10 + (r.altitude === key.altitude ? 2 : 1);
+  return viable.reduce((best, r) => (score(r) > score(best) ? r : best));
+}
+
+/** Menú (Surface B): fila → ids → ActionDef → filtro por gate. Agrupación/orden
+ *  y separadores los aplica el renderer por GROUP_ORDER. */
+export function resolveMenuActions(ctx: CurationCtx): ActionDef[] {
+  const row = matchRow({ targetKind: ctx.targetKind, stage: ctx.stage, altitude: ctx.altitude });
+  if (!row) return [];
+  return row.menu.map(id => ACTIONS[id]).filter(Boolean).filter(def => !def.gate || def.gate(ctx));
+}
+
+/** Barra (Surface A): solo BAR_ENABLED_KINDS, sin danger, gate aplicado, cap 5. */
+export function resolveBarActions(ctx: CurationCtx): ActionDef[] {
+  if (!BAR_ENABLED_KINDS.has(ctx.targetKind)) return [];
+  const row = matchRow({ targetKind: ctx.targetKind, stage: ctx.stage, altitude: ctx.altitude });
+  if (!row) return [];
+  return row.bar
+    .map(id => ACTIONS[id]).filter(Boolean)
+    .filter(def => !def.danger && (!def.gate || def.gate(ctx)))
+    .slice(0, BAR_MAX_VISIBLE);
+}
+```
+
+- [ ] Correr y esperar **PASS**: `npm run test -- src/components/PatternEditor/__tests__/actionCuration.test.ts`
+
+- [ ] `npx tsc -b --noEmit` limpio.
+
+- [ ] Commit: `git add -A && git commit -m "feat(pattern-edit): módulo declarativo de curación de menús (tabla ACTIONS/CURATION + resolvers)"`
+
+---
+
+## Tarea 7 — Surface B (menú derecho) consume la tabla: reescribir el builder de `ContextMenu`
+
+Reemplaza el builder imperativo de `ContextMenu.tsx:146-530` (25+ `items.push`) por una lectura de tabla: arma el `CurationCtx` desde el hit-test (prop `menu`) + Redux, llama `resolveMenuActions`, y renderiza agrupando por `GROUP_ORDER` con separadores por-frontera-de-grupo. Codifica las tres disciplinas del spec §4: **hide-not-disable** (gate false → no se renderiza; muere el "Pegar" deshabilitado), **separador por-frontera** (N grupos = N−1 separadores; muere el separador vacío `:466-471`), y el gate **`!locked`** heredado de `ACTIONS` (F2: rotate/flip/delete ocultos en pieza bloqueada). El hit-test (`PatternEditor.tsx:319-459`), el clamp (`:110-120`), el dismiss (`:123-137`) y la cabecera del objeto (`:538-547`) quedan **intactos**. Cero dependencia de T1–T5.
+
+### Files
+- **Modify** `src/components/PatternEditor/ContextMenu.tsx`
+  - `ContextMenuState`: agregar `isEditingNodes?: boolean` (`:64-66`, junto a `internalLineType`).
+  - Reemplazar el bloque builder `items: MenuItem[]` + `items.push(...)` (`:146-530`) por la construcción del `CurationCtx` + `resolveMenuActions`.
+  - Reemplazar el `return`/render (`:532-570`) por el render agrupado por `GROUP_ORDER`.
+  - Eliminar la interfaz local `MenuItem` (`:84-93`) y el helper `act` (`:139-142`) — reemplazados por `ActionDef` y por `run(ctx)+onClose` inline.
+- **Modify** `src/components/PatternEditor/PatternEditor.tsx`
+  - En `handleContextMenu`, agregar `isEditingNodes: editPatternTool.isEditing` al `setCtxMenu` (`:446-458`).
+- **Create** `src/components/PatternEditor/__tests__/ContextMenu.curation.test.tsx` (render RTL de la superficie curada).
+
+### Interfaces
+- Consume: `resolveMenuActions(ctx)`, `resolveTargetKind`, `GROUP_ORDER`, `ActionDef`, `CurationCtx`, `CurationCallbacks` (Tarea 6); `selectWorkflowStage` (`selectors.ts:36`); `SubMenu`/`SubMenuItem` (intactos).
+- Produce: `ContextMenuState.isEditingNodes?: boolean`; `ContextMenu` render table-driven (misma prop-surface `onRename`/`onConvertSegment`/`onZoomToFit`/`onUnfold`/`onOffsetInternalLine`/`onOptimizeCurves`/`onOpenProperties`).
+
+### Steps
+
+- [ ] Crear el test de render de la superficie curada. Contenido completo:
+
+```tsx
+// @vitest-environment jsdom
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import editorReducer from '../../../store/editorSlice';
+import projectReducer, { restoreState } from '../../../store/projectSlice';
+import ContextMenu, { type ContextMenuState } from '../ContextMenu';
+import type { PatternPiece } from '../../../types/types';
+
+afterEach(cleanup);
+
+function piece(id: string, over: Partial<PatternPiece> = {}): PatternPiece {
+  return {
+    id, name: id.toUpperCase(), position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+    active: true, locked: false, seamAllowance: 0,
+    outline: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [10, 0] }, { type: 'Z', values: [] }],
+    internals: [], edges: [], createdAt: 0, updatedAt: 0, ...over,
+  } as unknown as PatternPiece;
+}
+
+function renderMenu(menu: ContextMenuState, pieces: PatternPiece[]) {
+  const store = configureStore({
+    reducer: {
+      project: projectReducer,
+      editor: editorReducer,
+      // stub: selectWorkflowStage solo lee simulationState
+      simulation: (s: { simulationState: string } = { simulationState: 'idle' }) => s,
+    },
+  });
+  store.dispatch(restoreState({ ...store.getState().project, pieces }));
+  return render(
+    <Provider store={store}>
+      <ContextMenu menu={menu} onClose={vi.fn()} />
+    </Provider>,
+  );
+}
+
+const base: ContextMenuState = { visible: true, x: 10, y: 10, pieceId: null };
+
+describe('ContextMenu curado (Surface B)', () => {
+  it('pieza bloqueada oculta Rotar/Voltear/Eliminar y muestra Desbloquear (F2)', () => {
+    renderMenu({ ...base, pieceId: 'p1', pieceName: 'P1' }, [piece('p1', { locked: true })]);
+    expect(screen.queryByText('Rotar 90°')).toBeNull();
+    expect(screen.queryByText('Voltear horizontal')).toBeNull();
+    expect(screen.queryByText('Eliminar pieza')).toBeNull();
+    expect(screen.getByText('Desbloquear')).toBeTruthy();
+    expect(screen.getByText('Copiar')).toBeTruthy();
+  });
+
+  it('pieza desbloqueada muestra Rotar/Voltear/Eliminar', () => {
+    renderMenu({ ...base, pieceId: 'p1', pieceName: 'P1' }, [piece('p1')]);
+    expect(screen.getByText('Rotar 90°')).toBeTruthy();
+    expect(screen.getByText('Eliminar pieza')).toBeTruthy();
+  });
+
+  it('piquete: sin Offset ni Optimizar; con Seleccionar pieza y Eliminar piquete (curación por subtipo)', () => {
+    renderMenu(
+      { ...base, pieceId: 'p1', internalLineId: 'l1', internalLineType: 'notch' },
+      [piece('p1', { internals: [{ id: 'l1', type: 'notch', path: [{ type: 'M', values: [0, 0] }] }] as unknown as PatternPiece['internals'] })],
+    );
+    expect(screen.queryByText('Offset como línea interna')).toBeNull();
+    expect(screen.queryByText('Optimizar puntos de curva')).toBeNull();
+    expect(screen.getByText('Seleccionar pieza')).toBeTruthy();
+    expect(screen.getByText('Eliminar piquete')).toBeTruthy();
+  });
+
+  it('Pegar se oculta sin clipboard en canvas vacío (hide-not-disable)', () => {
+    renderMenu({ ...base }, []);
+    expect(screen.queryByText('Pegar')).toBeNull();
+    expect(screen.getByText('Ajustar zoom al patrón')).toBeTruthy();
+  });
+
+  it('ningún botón del menú se renderiza en blanco (muere el separador vacío)', () => {
+    const { container } = renderMenu({ ...base, pieceId: 'p1', pieceName: 'P1' }, [piece('p1')]);
+    const buttons = [...container.querySelectorAll('.context-menu__item')];
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const b of buttons) expect((b.textContent ?? '').trim().length).toBeGreaterThan(0);
+  });
+
+  it('point.node (edición de nodos, sin segmento) no monta menú', () => {
+    const { container } = renderMenu(
+      { ...base, pieceId: 'p1', isEditingNodes: true },
+      [piece('p1')],
+    );
+    expect(container.querySelector('.context-menu')).toBeNull();
+  });
+});
+```
+
+- [ ] Correr y esperar **FAIL** (hoy la pieza bloqueada sí muestra "Rotar 90°"/"Eliminar pieza", el piquete sí muestra "Offset como línea interna", y `point.node` monta el menú de pieza completo): `npm run test -- src/components/PatternEditor/__tests__/ContextMenu.curation.test.tsx`
+
+- [ ] En `ContextMenu.tsx`, agregar `isEditingNodes` a `ContextMenuState` (`:64-66`, junto a `internalLineType`):
+
+```ts
+  /** Type of internal line under cursor */
+  internalLineType?: string | null;
+  /** True cuando el hit-test ocurrió en altitud POINT (edición de nodos). */
+  isEditingNodes?: boolean;
+```
+
+- [ ] En `ContextMenu.tsx`, reemplazar los imports de verbos + `MenuItem` + `act` + todo el builder `items.push(...)` (`:15-530`) por los imports del módulo y la construcción del ctx. Los imports de verbos de `projectSlice`/`editorSlice`/`inspectorSlice` que solo usaba el builder se ELIMINAN (ahora viven en `actionCuration.ts`); se conservan `RootState`, `SubMenu`/`SubMenuItem` y los hooks. Cabecera de imports:
+
+```ts
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, Fragment } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState, AppDispatch } from '../../store';
+import { selectWorkflowStage } from '../../store/selectors';
+import type { InternalLineType } from '../../types/types';
+import SubMenu from '../../components/shared/SubMenu';
+import {
+  ACTIONS, GROUP_ORDER, resolveMenuActions, resolveTargetKind,
+  type CurationCtx, type CurationCallbacks,
+} from './actionCuration';
+```
+
+- [ ] En `ContextMenu.tsx`, reemplazar la firma de props para componer `CurationCallbacks` (conserva los nombres actuales), y borrar la interfaz `MenuItem` (`:84-93`):
+
+```ts
+interface ContextMenuProps extends CurationCallbacks {
+  menu: ContextMenuState;
+  onClose: () => void;
+}
+```
+
+- [ ] En `ContextMenu.tsx`, reemplazar el cuerpo del componente desde `const dispatch = useDispatch();` hasta el `return (...)` final (`:98-570`) por la versión table-driven (clamp/dismiss intactos; builder → ctx + `resolveMenuActions`; render agrupado por `GROUP_ORDER`):
+
+```tsx
+export default function ContextMenu(props: ContextMenuProps) {
+  const { menu, onClose } = props;
+  const cb: CurationCallbacks = props; // onRename/onConvertSegment/onZoomToFit/onUnfold/onOffsetInternalLine/onOptimizeCurves/onOpenProperties
+  const dispatch = useDispatch<AppDispatch>();
+  const pieces = useSelector((s: RootState) => s.project.pieces);
+  const seams = useSelector((s: RootState) => s.project.seams);
+  const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
+  const clipboard = useSelector((s: RootState) => s.editor.clipboard);
+  const groups = useSelector((s: RootState) => s.project.groups);
+  const stage = useSelector(selectWorkflowStage);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Clamp into viewport (intacto).
+  const [pos, setPos] = useState({ x: menu.x, y: menu.y });
+  useLayoutEffect(() => {
+    if (!menu.visible) return;
+    const el = ref.current;
+    if (!el) { setPos({ x: menu.x, y: menu.y }); return; }
+    const pad = 8;
+    const r = el.getBoundingClientRect();
+    setPos({
+      x: Math.min(menu.x, Math.max(pad, window.innerWidth - r.width - pad)),
+      y: Math.min(menu.y, Math.max(pad, window.innerHeight - r.height - pad)),
+    });
+  }, [menu.visible, menu.x, menu.y]);
+
+  // Dismiss on click-outside / Escape (intacto).
+  useEffect(() => {
+    if (!menu.visible) return;
+    const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [menu.visible, onClose]);
+
+  if (!menu.visible) return null;
+
+  // Arma el CurationCtx desde el hit-test (prop menu) + Redux.
+  const piece = menu.pieceId ? pieces.find(p => p.id === menu.pieceId) ?? null : null;
+  const seam = menu.seamId ? seams.find(s => s.id === menu.seamId) ?? null : null;
+  const internalLine = (piece && menu.internalLineId) ? piece.internals.find(l => l.id === menu.internalLineId) ?? null : null;
+  const altitude: 'body' | 'point' = menu.isEditingNodes ? 'point' : 'body';
+  const targetKind = resolveTargetKind({
+    seamId: menu.seamId ?? null,
+    pieceId: menu.pieceId,
+    pieceCount: menu.pieceId ? 1 : 0, // Surface B: hit-test = objeto único
+    internalLineType: (menu.internalLineType as InternalLineType | null) ?? null,
+    altitude,
+    segmentHit: menu.segmentIndex !== undefined,
+  });
+
+  const ctx: CurationCtx = {
+    dispatch, targetKind, stage, altitude,
+    pieceId: menu.pieceId, piece, selectedPieceIds,
+    seamId: menu.seamId ?? null, seam,
+    internalLineId: menu.internalLineId ?? null,
+    internalLineType: (menu.internalLineType as InternalLineType | null) ?? null,
+    internalLine,
+    segmentIndex: menu.segmentIndex, segmentIsCurve: menu.segmentIsCurve,
+    clipboard, groups, pieces, cb, onClose,
+  };
+
+  const defs = resolveMenuActions(ctx);
+  if (defs.length === 0) return null; // p.ej. point.node en v1: sin verbo → sin caja fantasma
+
+  // Agrupa por GROUP_ORDER; separador SOLO entre grupos presentes (N−1, cero vacíos).
+  const present = GROUP_ORDER
+    .map(g => defs.filter(d => d.group === g))
+    .filter(g => g.length > 0);
+
+  return (
+    <div ref={ref} className="context-menu" style={{ left: pos.x, top: pos.y }}>
+      {menu.seamId && (
+        <div className="context-menu__header context-menu__header--seam">Costura</div>
+      )}
+      {menu.pieceId && !menu.seamId && (
+        <div className="context-menu__header">{menu.pieceName || menu.pieceId}</div>
+      )}
+      {present.map((group, gi) => (
+        <Fragment key={gi}>
+          {group.map((def) => {
+            const label = typeof def.label === 'function' ? def.label(ctx) : def.label;
+            if (def.submenu) {
+              return <SubMenu key={def.id} label={label} icon={def.icon} items={def.submenu(ctx)} />;
+            }
+            return (
+              <button
+                key={def.id}
+                onClick={() => { def.run(ctx); onClose(); }}
+                className={`context-menu__item${def.danger ? ' context-menu__item--danger' : ''}`}
+              >
+                <span className="context-menu__icon">{def.icon}</span>
+                <span className="context-menu__label">{label}</span>
+                {def.shortcut && <span className="context-menu__shortcut">{def.shortcut}</span>}
+              </button>
+            );
+          })}
+          {gi < present.length - 1 && <div className="context-menu__separator" />}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+```
+
+Nota: `ACTIONS` se importa para futuros consumidores/tests; si el linter marca no-uso, retíralo del import — el render solo necesita los `ActionDef` que ya trae `resolveMenuActions`. (El helper `useCallback` puede quedar sin uso tras borrar `act`; retíralo del import si eslint lo marca.)
+
+- [ ] En `PatternEditor.tsx`, agregar `isEditingNodes` al `setCtxMenu` de `handleContextMenu` (`:446`):
+
+```tsx
+    setCtxMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      pieceId: hitSeamId ? null : (hitPiece?.id ?? null),
+      pieceName: hitSeamId ? undefined : hitPiece?.name,
+      seamId: hitSeamId,
+      segmentIndex,
+      segmentIsCurve,
+      activeTool,
+      internalLineId: hitInternalLineId,
+      internalLineType: hitInternalLineType,
+      isEditingNodes: editPatternTool.isEditing,
+    });
+```
+
+- [ ] Correr y esperar **PASS**: `npm run test -- src/components/PatternEditor/__tests__/ContextMenu.curation.test.tsx`
+
+- [ ] Gate completo: `npx tsc -b --noEmit && npm run test && npm run lint`
+
+- [ ] Commit: `git add -A && git commit -m "feat(pattern-edit): menú derecho curado por tabla declarativa (hide-not-disable, !locked, separadores por grupo)"`
+
+---
+
+## Auto-revisión antes de cerrar (addendum)
+
+**Cobertura vs el core shippable (scope cut de Cassian + BLOCKERS de las críticas):**
+
+| Ítem (HARD) | Tarea | Estado |
+|---|---|---|
+| Tabla declarativa única consumida por ambas superficies (mandato del dueño) | 6 | ✅ |
+| F5 registro `ActionId` enumerado con procedencia (cierra "solo verbos existentes") | 6 | ✅ |
+| F6 `matchRow` con fallback vacío (sin crash) | 6 | ✅ |
+| F11 `resolveTargetKind` puro/compartido; `point.*` solo con hit-test | 6 | ✅ |
+| F2 gate `!locked` en rotate/flip/delete de pieza (menú) — BLOCKER | 6 (ActionDef) + 7 (render) | ✅ |
+| F1 `removePiece` permanece en `danger`, JAMÁS en barra (paridad); cascade = POST-SHIP — BLOCKER | 6 (danger + parity test) | ✅ |
+| F3 fila `multiPiece` NO autora el borrado (verbo diferido = fuera de pantalla) | 6 | ✅ |
+| Sin slot muerto `5.—` (conteo real) | 6 | ✅ |
+| Hide-not-disable (muere "Pegar" deshabilitado) | 7 | ✅ |
+| Separador por-frontera (muere el separador vacío `:466-471`) | 7 | ✅ |
+| Curación por subtipo de IL (piquete sin Offset/Optimizar) | 6 (tabla) + 7 (render) | ✅ |
+| Hit-test/clamp/dismiss/cabecera intactos | 7 | ✅ |
+
+**Placeholder scan:** cero "TBD", cero pasos de código sin código. Cada test trae su cuerpo vitest real; cada implementación su código real.
+
+**Consistencia de tipos entre tareas:** `CurationCtx`/`ActionDef`/`CurationRow`/`TargetKind`/`ActionId`/`GROUP_ORDER`/`BAR_ENABLED_KINDS` (T6) los consume T7 y (diferido) Surface A. `resolveMenuActions` (T7) y `resolveBarActions` (Surface A) leen la misma `CURATION`. `ContextMenuState.isEditingNodes` (T7) fluye `PatternEditor.handleContextMenu` → `ContextMenu` → `altitude`. Ningún tipo referenciado sin definir.
+
+**Regresiones cubiertas:** el gate completo corre la suite; el menú conserva su prop-surface (`onRename`/`onConvertSegment`/`onZoomToFit`/`onUnfold`/`onOffsetInternalLine`/`onOptimizeCurves`/`onOpenProperties`) → `PatternEditor.tsx:856-869` no cambia salvo el nuevo `isEditingNodes`.
+
+---
+
+## Diferido del addendum (POST-SHIP, con disparador)
+
+Todo esto queda **fuera del core del viernes** por decisión del scope cut. Cada uno con su precondición de revival:
+
+- **Surface A — la barra flotante completa.** **Disparador: merge de T1–T5** (target 2026-07-31). Es la mitad frágil: cabalga `showTransformBox` + `transformTool.bbox` (T2), `isDragging` (T3) y el listener de captura de Escape (T5), todo sin mergear. Consume `resolveBarActions` de la Tarea 6 (data `bar` ya autorada). Dos subtareas cuando T1–T5 esté en `main`:
+  - **A4 — Íconos monocromo de la barra.** Subset single-weight de ~8 glifos (`rotate90`, `duplicate`, `flipH`, `properties`, `lockToggle`, `groupCreate`, `linkSymmetry`, `linkInstance`) en un **mapa propio de la barra keyed por `ActionId`** — NO se toca `ActionDef.icon` (el menú conserva su emoji, status quo, cero regresión; ver "no acomodado" abajo). Bloquea A5.
+  - **A5 — Componente de barra flotante.** Consume T2 (`showTransformBox` + `transformTool.bbox`), T3 (`isDragging`), T5 (Escape de captura → la barra **sin listener de teclado**, cero race por construcción). Reglas fijadas: `BAR_ENABLED_KINDS = {piece, multiPiece}`, cap 5, icon-only + `ToolTooltip` (labels quedan en el menú), superficie **neutral-dark `#1a1a1a`** (NO azul de selección `#4A9EFF`, NO índigo del menú — evita el "otro handle" y la colisión de dos azules), `z=90` (bajo `unified-bar` z=100, sobre el SVG). **Gap de anclaje resuelto: `ROTATE_HANDLE_GAP = 32px`, no 24** — la corona del handle de rotación vive en `bboxScreen.top − 29px` (`ROTATION_ARM_LENGTH=25` + `ROTATE_RADIUS=4`), así que 32 = 29 + 3px de aire; el placeholder de 24 caía 5px DENTRO del handle. `BAR_GAP = 8px` firme (el caso below-flip despeja los handles inferiores por ~5px). Dismiss incluye **contextmenu abierto → desmonta la barra** (F8: dos superficies no coexisten sobre objetos distintos). Requiere **threadear `calibrationMode`** (hoy local de `PatternEditor.tsx:602`) como prop al gate de la barra (F9) — barra suprimida si `calibrationMode !== null`. Boundary test que fija el contrato de `transformTool.bbox` (F4). `BAR_SETTLE_MS` se tunea aquí (F7: la correctitud la da el unmount reactivo `altitude→point ⇒ box false`; el flicker es cosmético).
+
+- **Flip de `BAR_ENABLED_KINDS` para seam / línea interna / notch / point.** Disparador: María pide verbos rápidos sobre esos objetos. La data `bar` ya está autorada (seam, fold); revivir requiere anclaje propio de línea/costura (nuevo cálculo de bbox, no cabalga el transform box de pieza).
+
+- **Delete unificado multi selection-driven (G3).** Disparador: contrato completo — undoable, respeta `locked`, cascade-limpia costuras cross-pieza. En v1 el borrado multi queda por el handler pieza-a-pieza existente; el verbo unificado NO se promueve ni se autora en `multiPiece`.
+
+- **Cascade-clean de costuras al borrar pieza (`removePiece`).** Disparador: hardening del reducer preexistente. La curación NO introduce el gap — `removePiece` ya vive en `main` y ya deja costuras huérfanas; se conserva en `danger`, gateado `!locked`. Endurecer el cascade es POST-SHIP, independiente de esta curación.
+
+- **`classify` como verbo de menú (F12).** Fuera de estas dos superficies en v1: vive en el paso `classify` del workflow DXF (import → classify → editar). Disparador: si María pide "Reclasificar" desde el menú de pieza, se evalúa agregar el `ActionId` cuando exista el verbo con hogar.
+
+- **Rotar 180° / Rotar −90° en el menú de pieza.** Data-recuperable: María los agrega al array `menu` de la fila `piece` (los `ActionDef` `rotate180`/`rotateMinus90` NO se autoran en v1 por baja frecuencia; 180° = dos Rotar 90°). Disparador: pedido explícito.
+
+- **Rotar/voltear de multi-selección.** Disparador: exista un verbo batch (hoy `rotatePiece`/`flipPieceH` son por-id; ofrecerlo en multi = capacidad nueva). Simétrico con el delete multi excluido.
+
+- **Auditoría §7 (LogoMenu / Dock / menú 3D).** DOC-ONLY, cero build. Recomendaciones post-ship ya escritas en el spec: gatear los 4 toggles `3D:` de `LogoMenu` tras `viewMode !== '2d'` y reubicar unidades de regla a Ajustes; colapsar las 4 etapas no-vacías del dock a `pieces.length>0` (enlaza con el moat #915); mover los 6 presets de cámara del `ContextMenu3D` a un submenú `Cámara ▸`. Se abren como tareas propias cuando toque su superficie.
+
+- **Deshabilitar en vez de ocultar.** Nunca por defecto (regla ÚNICA del spec §4). Revive solo si pruebas con María muestran que oculta un verbo que ella busca (entonces se evalúa un "atenuado" puntual).
+
+- **Variación de la barra/menú por etapa (`stage`).** Mecanismo listo (columna `stage` en `CurationRow` + `matchRow` con especificidad). En v1 ninguna fila la usa (verbos de pieza invariantes al flujo; la sensibilidad de etapa vive en el dock). Disparador: aparece un verbo de pieza dependiente de etapa → María autora una fila `stage`-específica sin cirugía.
+
+- **Submenú/overflow en la barra.** Nunca. La barra es plana, cap 5; el desborde va al clic derecho.
