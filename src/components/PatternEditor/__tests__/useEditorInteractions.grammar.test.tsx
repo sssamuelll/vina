@@ -9,14 +9,14 @@ import React from 'react';
 import { renderHook, cleanup, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-// nota: las tareas 3-5 anexan describes a este archivo y pueden necesitar
-// importar `selectPiece` de editorSlice en ese momento (no se importa aquí
-// sin uso — noUnusedLocals de tsc lo rechaza).
-import editorReducer from '../../../store/editorSlice';
+import editorReducer, { selectPiece } from '../../../store/editorSlice';
 import projectReducer, { restoreState } from '../../../store/projectSlice';
 import inputSchemeReducer from '../../../store/inputSchemeSlice';
 import { useEditorInteractions } from '../useEditorInteractions';
 import type { PatternPiece, Tool2D } from '../../../types/types';
+
+// usado por los describes de las tareas 3-5; void mientras tanto (noUnusedLocals)
+void selectPiece;
 
 afterEach(cleanup);
 
