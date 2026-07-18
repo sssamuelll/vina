@@ -1,7 +1,7 @@
 # Cierre de confianza de «Editar patrón» — acceso, semántica de nodos y undo por gesto
 
 **Fecha:** 2026-07-18
-**Estado:** Consenso aprobado; spec escrita pendiente de revisión final del usuario
+**Estado:** Aprobada por Samuel para planificación e implementación
 **Fuente:** nota de María del 2026-06-07, auditada contra `main` en `42789bd6`
 **Alcance:** PatternEditor 2D, dock izquierdo, shortcuts, overlays de nodos y undo de arrastre
 **No modifica:** `PatternPiece.outline`, importación DXF, simplificación de polilíneas ni conversión a Bézier
