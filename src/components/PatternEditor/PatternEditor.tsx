@@ -491,7 +491,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     setEditingPieceNameId(null);
   }, []);
 
-  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee } =
+  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
       pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
     });
@@ -735,6 +735,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             nodeEditorNodes={nodeEditor.nodes}
             selectedNode={nodeEditor.selectedNode}
             hoveredNode={nodeEditor.hoveredNode}
+            showTransformBox={showTransformBox}
             transformBbox={transformTool.bbox}
             transformHandles={transformTool.handles}
             transformPreview={transformTool.preview}

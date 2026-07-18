@@ -226,6 +226,27 @@ interface ToolHooks {
   };
 }
 
+/**
+ * Decide si el transform box (mover/escalar/rotar) se muestra y se hit-testea.
+ * Única fuente de verdad para render (ToolOverlay), hit (handleMouseDown) y
+ * cursor (getCursor) — así los tres coinciden. Reglas:
+ *  - `transform` tool: siempre (comportamiento standalone intacto).
+ *  - `select`: solo con selección, desbloqueada y fuera de la altitud POINT
+ *    (G7: la altitud POINT nunca dibuja el box).
+ */
+export function shouldShowTransformBox(opts: {
+  activeTool: Tool2D;
+  isNodeEditing: boolean;
+  selectedCount: number;
+  selectionHasLocked: boolean;
+}): boolean {
+  if (opts.activeTool === 'transform') return true;
+  return opts.activeTool === 'select'
+    && !opts.isNodeEditing
+    && opts.selectedCount > 0
+    && !opts.selectionHasLocked;
+}
+
 export function useEditorInteractions(
   activeTool: Tool2D,
   zoom2D: number,
@@ -247,6 +268,16 @@ export function useEditorInteractions(
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
   const { pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool } = tools;
+
+  const selectionHasLocked = selectedPieceIds.some(
+    id => pieces.find(p => p.id === id)?.locked,
+  );
+  const showTransformBox = shouldShowTransformBox({
+    activeTool,
+    isNodeEditing: nodeEditor.isEditing,
+    selectedCount: selectedPieceIds.length,
+    selectionHasLocked,
+  });
 
   /** Check if a click is near an anchor point of a piece */
   const findClickedAnchorPoint = useCallback((
@@ -838,5 +869,5 @@ export function useEditorInteractions(
     }
   };
 
-  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee };
+  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox };
 }

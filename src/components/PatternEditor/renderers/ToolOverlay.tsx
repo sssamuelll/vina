@@ -94,6 +94,7 @@ interface ToolOverlayProps {
   nodeEditorNodes: EditorNode[];
   selectedNode: NodeRef | null;
   hoveredNode: NodeRef | null;
+  showTransformBox: boolean;
   transformBbox: BBox | null;
   transformHandles: HandlePosition[];
   transformPreview: TransformPreview | null;
@@ -229,7 +230,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         />
       )}
 
-      {activeTool === 'transform' && props.transformBbox && (
+      {props.showTransformBox && props.transformBbox && (
         <TransformHandlesOverlay
           zoom2D={zoom2D}
           bbox={props.transformBbox}
