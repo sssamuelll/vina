@@ -455,6 +455,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       activeTool,
       internalLineId: hitInternalLineId,
       internalLineType: hitInternalLineType,
+      isEditingNodes: editPatternTool.isEditing,
     });
   }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.editingPieceId]);
 
