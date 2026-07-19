@@ -29,7 +29,6 @@ async function commandValues(page: Page, pieceId: string, commandIndex: number):
 }
 
 test('María DXF: editPattern visible → slow drag → undo/redo keeps marker on geometry', async ({ page }) => {
-  test.setTimeout(60_000);
   await page.addInitScript(() => localStorage.removeItem('openclo-docks'));
   await page.goto('/');
   const svg = page.locator('svg.pattern-svg');
