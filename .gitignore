@@ -48,6 +48,7 @@ CLAUDE/
 # Local tooling state (per-developer, not project canonical)
 .cgcignore
 .superpowers/
+.worktrees/
 entities.json
 mempalace.yaml
 
