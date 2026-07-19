@@ -2,7 +2,12 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import dockReducer, { pinAuto, unpinAuto, persistDocks, loadDocks, toggleDockSignaling, rehydrateDocks, addDockTool, removeDockTool, resetDockTools, reorderDockTool, DEFAULT_DOCK_2D_IDS } from '../dockSlice';
+import dockReducer, {
+  pinAuto, unpinAuto, persistDocks, loadDocks, toggleDockSignaling,
+  rehydrateDocks, addDockTool, removeDockTool, resetDockTools,
+  reorderDockTool, LEGACY_DEFAULT_DOCK_2D_IDS, DEFAULT_DOCK_2D_IDS,
+  migrateDefaultDockTools,
+} from '../dockSlice';
 
 const initial = () => dockReducer(undefined, { type: '@@INIT' });
 
@@ -81,9 +86,42 @@ describe('dockSlice signaling', () => {
 describe('dockSlice tools2d', () => {
   beforeEach(() => localStorage.clear());
 
-  it('defaults tools2d to the 7 default ids', () => {
+  it('defaults tools2d to the 8 ids with editPattern immediately after select', () => {
     expect(initial().tools2d).toEqual(DEFAULT_DOCK_2D_IDS);
-    expect(DEFAULT_DOCK_2D_IDS).toEqual(['select', 'pen', 'line', 'rectangle', 'scissors', 'measure', 'seam']);
+    expect(DEFAULT_DOCK_2D_IDS).toEqual([
+      'select', 'editPattern', 'pen', 'line',
+      'rectangle', 'scissors', 'measure', 'seam',
+    ]);
+  });
+
+  it('migrates only the exact ordered historical default', () => {
+    expect(migrateDefaultDockTools(LEGACY_DEFAULT_DOCK_2D_IDS)).toEqual(DEFAULT_DOCK_2D_IDS);
+    expect(migrateDefaultDockTools([...LEGACY_DEFAULT_DOCK_2D_IDS].reverse()))
+      .toEqual([...LEGACY_DEFAULT_DOCK_2D_IDS].reverse());
+    expect(migrateDefaultDockTools(['select', 'pen', 'notch']))
+      .toEqual(['select', 'pen', 'notch']);
+  });
+
+  it('does not duplicate editPattern in an already-current or customized dock', () => {
+    expect(migrateDefaultDockTools(DEFAULT_DOCK_2D_IDS))
+      .toEqual(DEFAULT_DOCK_2D_IDS);
+    expect(migrateDefaultDockTools(DEFAULT_DOCK_2D_IDS)
+      .filter((id) => id === 'editPattern')).toHaveLength(1);
+  });
+
+  it('loadDocks migrates a persisted historical default and round-trips it as v1', () => {
+    localStorage.setItem('openclo-docks', JSON.stringify({
+      version: 1,
+      data: {
+        pinnedExtra: { left: [], right: [] },
+        signaling: 'subtle',
+        tools2d: [...LEGACY_DEFAULT_DOCK_2D_IDS],
+      },
+    }));
+    const loaded = loadDocks();
+    expect(loaded?.tools2d).toEqual(DEFAULT_DOCK_2D_IDS);
+    persistDocks(loaded!);
+    expect(loadDocks()?.tools2d).toEqual(DEFAULT_DOCK_2D_IDS);
   });
 
   it('addDockTool appends a new id once (idempotent)', () => {

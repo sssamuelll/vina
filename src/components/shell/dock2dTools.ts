@@ -15,19 +15,19 @@ export interface DockToolDef {
 }
 
 /** Curated catalog of dock-eligible 2D tools. Render order = this order; the
- *  first 7 are the default set (DEFAULT_DOCK_2D_IDS in dockSlice). Every id is a
+ *  first 8 are the default set (DEFAULT_DOCK_2D_IDS in dockSlice). Every id is a
  *  real Tool2D union member with a canvas handler in useEditorInteractions —
  *  except internalShape, whose handler is not built yet (kept because María
  *  wants "Forma interna"; the other unwired tools were removed per #529). */
 export const DOCK_2D_CATALOG: DockToolDef[] = [
   { id: 'select', icon: MousePointer2, label: 'Seleccionar', shortcut: 'Z' },
+  { id: 'editPattern', icon: PenLine, label: 'Editar patrón', shortcut: 'Q' },
   { id: 'pen', icon: PenTool, label: 'Pluma', shortcut: 'H' },
   { id: 'line', icon: Minus, label: 'Línea', shortcut: '⇧L' },
   { id: 'rectangle', icon: Square, label: 'Rectángulo', shortcut: 'S' },
   { id: 'scissors', icon: Scissors, label: 'Tijeras', shortcut: 'X' },
   { id: 'measure', icon: Ruler, label: 'Medir', shortcut: 'M' },
   { id: 'seam', icon: Spline, label: 'Coser', shortcut: 'B' },
-  { id: 'editPattern', icon: PenLine, label: 'Editar patrón', shortcut: 'Q' },
   { id: 'internalShape', icon: Shapes, label: 'Forma interna', shortcut: 'G' },
   { id: 'notch', icon: Triangle, label: 'Piquete' },
   { id: 'seamAllowance', icon: SquareDashed, label: 'Margen de costura', shortcut: 'O' },
