@@ -12,6 +12,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
+import { beginUndoBatch, endUndoBatch } from '../../store/undoMiddleware';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import {
   extractNodes,
@@ -169,6 +170,19 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   const [state, setState] = useState<EditPatternState>({ ...INITIAL_STATE });
   const dragRef = useRef<DragState | null>(null);
+  const dragBatchOpenRef = useRef(false);
+
+  const beginDragBatch = useCallback(() => {
+    if (dragBatchOpenRef.current) return;
+    beginUndoBatch(dispatch, 'Editar puntos del patrón');
+    dragBatchOpenRef.current = true;
+  }, [dispatch]);
+
+  const endDragBatch = useCallback(() => {
+    if (!dragBatchOpenRef.current) return;
+    dragBatchOpenRef.current = false;
+    endUndoBatch(dispatch);
+  }, [dispatch]);
   /**
    * Outline object (by identity) this hook itself dispatched. The resync
    * effect treats a pieces change as internal only when the store's outline
@@ -234,6 +248,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   const enterEdit = useCallback(
     (pieceId: string) => {
+      endDragBatch();
       const piece = pieces.find(p => p.id === pieceId);
       if (!piece) return;
       seenOutlineRef.current = piece.outline;
@@ -251,16 +266,17 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       });
       dragRef.current = null;
     },
-    [pieces],
+    [pieces, endDragBatch],
   );
 
   // ─── exitEdit ───
 
   const exitEdit = useCallback(() => {
+    endDragBatch();
     setState({ ...INITIAL_STATE });
     dragRef.current = null;
     seenOutlineRef.current = null;
-  }, []);
+  }, [endDragBatch]);
 
   // Resync when the edited piece's outline changes OUTSIDE this hook
   // (undo/redo via restoreState, copilot edits). Without this the dots detach
@@ -283,9 +299,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     // External change: refresh nodes, drop selections (indices may denote
     // different geometry now), and cancel any in-flight drag so the next
     // mousemove can't re-impose pre-undo positions.
+    endDragBatch();
     dragRef.current = null;
     setState(s => resyncStateToPiece(s, piece));
-  }, [pieces, state.isEditing, state.editingPieceId, exitEdit]);
+  }, [pieces, state.isEditing, state.editingPieceId, exitEdit, endDragBatch]);
+
+  useEffect(() => () => endDragBatch(), [endDragBatch]);
 
   // ─── handleMouseDown ───
 
@@ -440,6 +459,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
             ? rotatePoint({ x: dxS, y: dyS }, { x: 0, y: 0 }, -rot * Math.PI / 180)
             : { x: dxS, y: dyS };
 
+          if (drag.startPositions.size === 0 || (dx === 0 && dy === 0)) return true;
+          beginDragBatch();
+
           let outline = piece.outline;
           for (const [cmdIdx, startPos] of drag.startPositions) {
             const newPos: Point2D = {
@@ -501,7 +523,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       }));
       return false;
     },
-    [state, getPiece, toLocal, toPattern, zoom, hitRadius, dispatchAndRefresh],
+    [state, getPiece, toLocal, toPattern, zoom, hitRadius, dispatchAndRefresh, beginDragBatch],
   );
 
   // ─── handleMouseUp ───
@@ -509,6 +531,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   const handleMouseUp = useCallback(() => {
     const drag = dragRef.current;
     dragRef.current = null;
+    endDragBatch();
 
     if (!drag) return;
 
@@ -544,7 +567,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     }
 
     // For node/segment drags, just clear — the mutations already happened during mousemove
-  }, [pieces]);
+  }, [pieces, endDragBatch]);
 
   // ─── handleKeyDown ───
 
