@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import projectReducer, { loadProject, updatePiece } from '../../../store/projectSlice';
-import editorReducer, { setActiveTool } from '../../../store/editorSlice';
+import editorReducer from '../../../store/editorSlice';
 import toolReducer from '../../../store/toolSlice';
 import simulationReducer from '../../../store/simulationSlice';
 import constructionReducer from '../../../store/constructionSlice';
@@ -12,6 +12,8 @@ import inputSchemeReducer from '../../../store/inputSchemeSlice';
 import workflowReducer from '../../../store/workflowSlice';
 import { getUndoLength, undoMiddleware } from '../../../store/undoMiddleware';
 import type { PatternPiece } from '../../../types/types';
+import { ShortcutProvider } from '../../../shortcuts/ShortcutProvider';
+import { useKeyboardShortcuts } from '../../../hooks/useKeyboardShortcuts';
 import PatternEditor from '../PatternEditor';
 
 afterEach(() => {
@@ -35,6 +37,15 @@ function squarePiece(): PatternPiece {
   };
 }
 
+function ShortcutEnabledPatternEditor() {
+  useKeyboardShortcuts();
+  return (
+    <div data-shortcut-context="2d" data-testid="shortcut-host" tabIndex={0}>
+      <PatternEditor />
+    </div>
+  );
+}
+
 function setupHost() {
   const store = configureStore({
     reducer: {
@@ -54,8 +65,17 @@ function setupHost() {
     ...base, id: 'test', name: 'Test', pieces: [squarePiece()], seams: [], fabrics: [],
     createdAt: 0, updatedAt: 0,
   }));
-  store.dispatch(setActiveTool('editPattern'));
-  const view = render(<Provider store={store}><PatternEditor /></Provider>);
+  const view = render(
+    <Provider store={store}>
+      <ShortcutProvider><ShortcutEnabledPatternEditor /></ShortcutProvider>
+    </Provider>,
+  );
+  const shortcutHost = view.getByTestId('shortcut-host');
+  shortcutHost.focus();
+  fireEvent.keyDown(shortcutHost, { key: 'q' });
+  expect(store.getState().editor.activeTool).toBe('editPattern');
+  expect(store.getState().tools.activeTool2D).toBe('editPattern');
+
   const svg = view.container.querySelector<SVGSVGElement>('svg.pattern-svg')!;
   const pieceFill = view.container.querySelector<SVGPathElement>('[data-piece-id="p"] .piece-fill')!;
 
@@ -64,7 +84,7 @@ function setupHost() {
   fireEvent.mouseUp(window, { button: 0, buttons: 0, clientX: 50, clientY: 50 });
   expect(view.container.querySelector('[data-anchor-role]')).not.toBeNull();
 
-  return { store, svg, view };
+  return { store, svg, view, shortcutHost };
 }
 
 function beginNodeDrag(svg: SVGSVGElement) {
@@ -114,4 +134,40 @@ describe('PatternEditor external drag release', () => {
     expect(removeListener).toHaveBeenCalledWith('mouseup', expect.any(Function));
     expect(removeListener).toHaveBeenCalledWith('blur', expect.any(Function));
   });
+
+  it.each(['mouseup', 'blur'] as const)(
+    'closes the captured edit gesture on %s after the Select shortcut changes activeTool',
+    (releaseKind) => {
+      const { store, svg, shortcutHost } = setupHost();
+      const outline = () => store.getState().project.pieces[0].outline;
+      const historyBefore = getUndoLength();
+      beginNodeDrag(svg);
+      expect(outline()[1].values).toEqual([110, 0]);
+
+      // Z is the real 2D Select shortcut and updates both tool authorities.
+      fireEvent.keyDown(shortcutHost, { key: 'z' });
+      expect(store.getState().editor.activeTool).toBe('select');
+      expect(store.getState().tools.activeTool2D).toBe('select');
+
+      if (releaseKind === 'mouseup') {
+        fireEvent.mouseUp(window, { button: 0, buttons: 0, clientX: 500, clientY: 500 });
+      } else {
+        fireEvent(window, new Event('blur'));
+      }
+      const afterRelease = structuredClone(outline());
+      const historyAfterGesture = getUndoLength();
+
+      // Re-enable Edit Pattern: a stale drag would otherwise replay here.
+      fireEvent.keyDown(shortcutHost, { key: 'q' });
+      fireEvent.mouseMove(svg, { buttons: 1, clientX: 130, clientY: 0 });
+      store.dispatch(updatePiece({
+        ...store.getState().project.pieces[0],
+        name: 'Independent after tool switch',
+      }));
+
+      expect.soft(historyAfterGesture).toBe(historyBefore + 1);
+      expect.soft(outline()).toEqual(afterRelease);
+      expect.soft(getUndoLength()).toBe(historyAfterGesture + 1);
+    },
+  );
 });

@@ -529,28 +529,38 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     });
 
   // Mouse capture fallback for gestures that leave the SVG. Keep the latest
-  // release authority in a ref so the global listeners stay stable across
-  // drag-driven renders, while `mouseInteractionActiveRef` makes every close
-  // path idempotent (SVG mouseup, window mouseup, blur, re-entry, unmount).
+  // release authorities in refs so the global listeners stay stable across
+  // drag-driven renders. Edit Pattern owns its primary gesture from mousedown
+  // to release even if a shortcut changes activeTool in between.
   const mouseInteractionActiveRef = useRef(false);
   const handleMouseUpRef = useRef(handleMouseUp);
   handleMouseUpRef.current = handleMouseUp;
+  const editPatternMouseUpRef = useRef(editPatternTool.handleMouseUp);
+  editPatternMouseUpRef.current = editPatternTool.handleMouseUp;
+  const capturedMouseOwnerRef = useRef<'editPattern' | null>(null);
+
+  const finishMouseInteraction = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
+    if (!mouseInteractionActiveRef.current) return;
+    mouseInteractionActiveRef.current = false;
+    const owner = capturedMouseOwnerRef.current;
+    capturedMouseOwnerRef.current = null;
+    if (owner === 'editPattern') {
+      editPatternMouseUpRef.current();
+      return;
+    }
+    handleMouseUpRef.current(e);
+  }, []);
 
   useEffect(() => {
-    const finishMouseInteraction = () => {
-      if (!mouseInteractionActiveRef.current) return;
-      mouseInteractionActiveRef.current = false;
-      handleMouseUpRef.current();
-    };
-
-    window.addEventListener('mouseup', finishMouseInteraction);
-    window.addEventListener('blur', finishMouseInteraction);
+    const finishGlobalMouseInteraction = () => finishMouseInteraction();
+    window.addEventListener('mouseup', finishGlobalMouseInteraction);
+    window.addEventListener('blur', finishGlobalMouseInteraction);
     return () => {
-      window.removeEventListener('mouseup', finishMouseInteraction);
-      window.removeEventListener('blur', finishMouseInteraction);
+      window.removeEventListener('mouseup', finishGlobalMouseInteraction);
+      window.removeEventListener('blur', finishGlobalMouseInteraction);
       finishMouseInteraction();
     };
-  }, []);
+  }, [finishMouseInteraction]);
 
   // Track SVG viewport size for the ruler layer (screen-space ticks/labels).
   useEffect(() => {
@@ -658,6 +668,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     if (e.button === 0 || e.button === 1) {
       mouseInteractionActiveRef.current = true;
     }
+    capturedMouseOwnerRef.current =
+      !calibrationMode && e.button === 0 && activeTool === 'editPattern'
+        ? 'editPattern'
+        : null;
     if (calibrationMode) {
       const svgEl = svgRef.current;
       if (!svgEl) return;
@@ -679,14 +693,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       return; // don't pass to tool handlers
     }
     editorHandleMouseDown(e);
-  }, [calibrationMode, pan2D, zoom2D, dispatch, svgRef, editorHandleMouseDown]);
+  }, [activeTool, calibrationMode, pan2D, zoom2D, dispatch, svgRef, editorHandleMouseDown]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     // If release happened outside the browser window, mouseup may be absent;
     // the first buttonless re-entry must close instead of replaying the drag.
     if (mouseInteractionActiveRef.current && e.buttons === 0) {
-      mouseInteractionActiveRef.current = false;
-      handleMouseUpRef.current();
+      finishMouseInteraction();
       return;
     }
     // Track cursor position in pattern space for CalibrationOverlay
@@ -700,12 +713,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       }
     }
     editorHandleMouseMove(e);
-  }, [pan2D, zoom2D, svgRef, calibrationMode, editorHandleMouseMove]);
+  }, [pan2D, zoom2D, svgRef, calibrationMode, editorHandleMouseMove, finishMouseInteraction]);
 
   const handleHostMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    mouseInteractionActiveRef.current = false;
-    handleMouseUp(e);
-  }, [handleMouseUp]);
+    finishMouseInteraction(e);
+  }, [finishMouseInteraction]);
 
   return (
     <div className="pattern-editor">
