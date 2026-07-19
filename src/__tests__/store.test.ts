@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, {
   addPiece, updatePiece, removePiece, movePiece, rotatePiece,
@@ -14,8 +14,13 @@ import editorReducer, {
   toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid,
   copyPieces, clearClipboard, createPastedPieces,
 } from '../store/editorSlice';
-import { undoMiddleware, canUndo, canRedo, batchUndo, getUndoLength } from '../store/undoMiddleware';
+import {
+  undoMiddleware, canUndo, canRedo, batchUndo, beginUndoBatch,
+  endUndoBatch, getHistory, getUndoLength,
+} from '../store/undoMiddleware';
 import { PatternPiece } from '../types/types';
+
+afterEach(() => vi.useRealTimers());
 
 function makePiece(id: string): PatternPiece {
   return {
@@ -493,6 +498,104 @@ describe('clipboard (editorSlice)', () => {
 // ─── Undo Batching ─────────────────────────────────────────────────────────
 
 describe('Undo batch grouping', () => {
+  it('an empty explicit batch creates no history entry', () => {
+    const store = createStore();
+    store.dispatch(loadProject({
+      id: 'test', name: 'Test', pieces: [], seams: [], fabrics: [],
+      avatar: store.getState().project.avatar, createdAt: 0, updatedAt: 0,
+    }));
+    const before = getUndoLength();
+    beginUndoBatch(store.dispatch, 'Empty gesture');
+    endUndoBatch(store.dispatch);
+    expect(getUndoLength()).toBe(before);
+  });
+
+  it('groups one gesture even when identical updates are more than 500ms apart', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const store = createStore();
+    store.dispatch(loadProject({
+      id: 'test', name: 'Test', pieces: [makePiece('p')], seams: [], fabrics: [],
+      avatar: store.getState().project.avatar, createdAt: 0, updatedAt: 0,
+    }));
+    const before = getUndoLength();
+    beginUndoBatch(store.dispatch, 'Editar puntos del patrón');
+    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'A' }));
+    vi.advanceTimersByTime(750);
+    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'B' }));
+    endUndoBatch(store.dispatch);
+    expect(getUndoLength()).toBe(before + 1);
+    expect(getHistory().past.at(-1)?.label).toBe('Editar puntos del patrón');
+  });
+
+  it('finalizes an open dirty batch before the same editor/undo', () => {
+    const store = createStore();
+    store.dispatch(loadProject({
+      id: 'test', name: 'Test', pieces: [makePiece('p')], seams: [], fabrics: [],
+      avatar: store.getState().project.avatar, createdAt: 0, updatedAt: 0,
+    }));
+    beginUndoBatch(store.dispatch, 'Editar puntos del patrón');
+    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'Moved' }));
+    store.dispatch({ type: 'editor/undo' });
+    expect(store.getState().project.pieces[0].name).toBe('Test');
+    expect(canRedo()).toBe(true);
+    endUndoBatch(store.dispatch);
+  });
+
+  it('finalizes an open dirty batch before editor/redo without leaking a late endBatch', () => {
+    const store = createStore();
+    store.dispatch(loadProject({
+      id: 'test', name: 'Test', pieces: [makePiece('p')], seams: [], fabrics: [],
+      avatar: store.getState().project.avatar, createdAt: 0, updatedAt: 0,
+    }));
+    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'Existing' }));
+    store.dispatch({ type: 'editor/undo' });
+    beginUndoBatch(store.dispatch, 'New gesture');
+    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'Moved' }));
+
+    store.dispatch({ type: 'editor/redo' });
+    expect(store.getState().project.pieces[0].name).toBe('Moved');
+    expect(getUndoLength()).toBe(1);
+    endUndoBatch(store.dispatch);
+    expect(getUndoLength()).toBe(1);
+
+    store.dispatch({ type: 'editor/undo' });
+    expect(store.getState().project.pieces[0].name).toBe('Test');
+  });
+
+  it('resets temporal coalescing when an explicit batch closes', () => {
+    const store = createStore();
+    store.dispatch(loadProject({
+      id: 'test', name: 'Test', pieces: [makePiece('p')], seams: [], fabrics: [],
+      avatar: store.getState().project.avatar, createdAt: 0, updatedAt: 0,
+    }));
+    beginUndoBatch(store.dispatch, 'Gesture');
+    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'Inside' }));
+    endUndoBatch(store.dispatch);
+    const afterBatch = getUndoLength();
+    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'After' }));
+    expect(getUndoLength()).toBe(afterBatch + 1);
+  });
+
+  it('loadProject clears an in-flight explicit batch without leaking it', () => {
+    const store = createStore();
+    const project = {
+      id: 'test', name: 'Test', pieces: [makePiece('p')], seams: [], fabrics: [],
+      avatar: store.getState().project.avatar, createdAt: 0, updatedAt: 0,
+    };
+    store.dispatch(loadProject(project));
+    beginUndoBatch(store.dispatch, 'Abandoned gesture');
+    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'Inside' }));
+    store.dispatch(loadProject(project));
+    endUndoBatch(store.dispatch);
+    expect(canUndo()).toBe(false);
+
+    beginUndoBatch(store.dispatch, 'Fresh gesture');
+    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'Fresh' }));
+    endUndoBatch(store.dispatch);
+    expect(getUndoLength()).toBe(1);
+  });
+
   it('multiple dispatches inside batchUndo create a single undo entry', () => {
     const store = createStore();
     store.dispatch(loadProject({

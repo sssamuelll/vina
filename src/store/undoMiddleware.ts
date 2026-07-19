@@ -50,6 +50,8 @@ interface UndoState {
   batchSnapshot: unknown | null;
   /** Label for the batched undo entry */
   batchLabel: string | null;
+  /** Whether a project action occurred inside the outermost explicit batch. */
+  batchDirty: boolean;
 }
 
 const undoState: UndoState = {
@@ -62,6 +64,7 @@ const undoState: UndoState = {
   batchDepth: 0,
   batchSnapshot: null,
   batchLabel: null,
+  batchDirty: false,
 };
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -99,16 +102,26 @@ export function jumpToIndex(index: number, store: any): void {
  *     dispatch(addInternalLine(...));
  *   });
  */
+type UndoDispatch = (action: { type: string; payload?: unknown }) => unknown;
+
+export function beginUndoBatch(dispatch: UndoDispatch, label: string): void {
+  dispatch({ type: 'undo/startBatch', payload: label });
+}
+
+export function endUndoBatch(dispatch: UndoDispatch): void {
+  dispatch({ type: 'undo/endBatch' });
+}
+
 export function batchUndo(
-  dispatch: (action: { type: string; payload?: unknown }) => void,
+  dispatch: UndoDispatch,
   label: string,
   fn: () => void,
 ): void {
-  dispatch({ type: 'undo/startBatch', payload: label });
+  beginUndoBatch(dispatch, label);
   try {
     fn();
   } finally {
-    dispatch({ type: 'undo/endBatch' });
+    endUndoBatch(dispatch);
   }
 }
 
@@ -125,6 +138,37 @@ export function subscribeHistory(cb: () => void) {
 function bumpRevision() {
   _revision++;
   _listeners.forEach(cb => cb());
+}
+
+function resetExplicitBatchState(): void {
+  undoState.batchDepth = 0;
+  undoState.batchSnapshot = null;
+  undoState.batchLabel = null;
+  undoState.batchDirty = false;
+  undoState.batchingAction = null;
+  undoState.lastSnapshotTime = 0;
+}
+
+function finalizeExplicitBatch(): void {
+  const snapshot = undoState.batchSnapshot;
+  const label = undoState.batchLabel || 'Batch Operation';
+  const dirty = undoState.batchDirty;
+  resetExplicitBatchState();
+  if (!dirty || !snapshot) return;
+
+  undoState.past.push(snapshot);
+  undoState.pastEntries.push({
+    label,
+    actionType: 'batch',
+    timestamp: Date.now(),
+  });
+  if (undoState.past.length > MAX_HISTORY) {
+    undoState.past.shift();
+    undoState.pastEntries.shift();
+  }
+  undoState.future.length = 0;
+  undoState.futureEntries.length = 0;
+  bumpRevision();
 }
 
 // ─── Action label mapping ───────────────────────────────────────────────────
@@ -213,6 +257,9 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
   const actionType: string = action?.type ?? '';
 
   if (actionType === 'editor/undo') {
+    if (undoState.batchDepth > 0) {
+      finalizeExplicitBatch();
+    }
     if (undoState.past.length === 0) return;
     const currentProject = (store.getState() as RootState).project;
     const snapshot = safeClone(currentProject);
@@ -232,6 +279,9 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
   }
 
   if (actionType === 'editor/redo') {
+    if (undoState.batchDepth > 0) {
+      finalizeExplicitBatch();
+    }
     if (undoState.future.length === 0) return;
     const currentProject = (store.getState() as RootState).project;
     const snapshot = safeClone(currentProject);
@@ -247,36 +297,20 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
   // ─── Explicit batch grouping ──────────────────────────────────────────────
   if (actionType === 'undo/startBatch') {
     if (undoState.batchDepth === 0) {
-      // Take snapshot at the start of the outermost batch
       const currentProject = (store.getState() as RootState).project;
       undoState.batchSnapshot = safeClone(currentProject);
       undoState.batchLabel = (action.payload as string) || 'Batch Operation';
+      undoState.batchDirty = false;
     }
     undoState.batchDepth++;
-    return; // Don't pass through
+    return;
   }
 
   if (actionType === 'undo/endBatch') {
-    if (undoState.batchDepth > 0) undoState.batchDepth--;
-    if (undoState.batchDepth === 0 && undoState.batchSnapshot) {
-      // Push the pre-batch snapshot as a single undo entry
-      undoState.past.push(undoState.batchSnapshot);
-      undoState.pastEntries.push({
-        label: undoState.batchLabel || 'Batch Operation',
-        actionType: 'batch',
-        timestamp: Date.now(),
-      });
-      if (undoState.past.length > MAX_HISTORY) {
-        undoState.past.shift();
-        undoState.pastEntries.shift();
-      }
-      undoState.future.length = 0;
-      undoState.futureEntries.length = 0;
-      undoState.batchSnapshot = null;
-      undoState.batchLabel = null;
-      bumpRevision();
-    }
-    return; // Don't pass through
+    if (undoState.batchDepth === 0) return;
+    undoState.batchDepth--;
+    if (undoState.batchDepth === 0) finalizeExplicitBatch();
+    return;
   }
 
   // Track project actions (except restoreState and loadProject)
@@ -294,6 +328,7 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     // Batch rapid identical actions (e.g. slider-driven updatePiece) into one undo step
     // Skip snapshot if inside an explicit batch (handled by startBatch/endBatch)
     if (undoState.batchDepth > 0) {
+      undoState.batchDirty = true;
       // Inside batch — suppress snapshot, just clear redo and pass through
       undoState.future.length = 0;
       undoState.futureEntries.length = 0;
@@ -332,8 +367,7 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     undoState.future.length = 0;
     undoState.pastEntries.length = 0;
     undoState.futureEntries.length = 0;
-    undoState.lastSnapshotTime = 0;
-    undoState.batchingAction = null;
+    resetExplicitBatchState();
     bumpRevision();
   }
 
