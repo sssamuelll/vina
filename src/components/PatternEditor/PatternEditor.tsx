@@ -528,6 +528,30 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
     });
 
+  // Mouse capture fallback for gestures that leave the SVG. Keep the latest
+  // release authority in a ref so the global listeners stay stable across
+  // drag-driven renders, while `mouseInteractionActiveRef` makes every close
+  // path idempotent (SVG mouseup, window mouseup, blur, re-entry, unmount).
+  const mouseInteractionActiveRef = useRef(false);
+  const handleMouseUpRef = useRef(handleMouseUp);
+  handleMouseUpRef.current = handleMouseUp;
+
+  useEffect(() => {
+    const finishMouseInteraction = () => {
+      if (!mouseInteractionActiveRef.current) return;
+      mouseInteractionActiveRef.current = false;
+      handleMouseUpRef.current();
+    };
+
+    window.addEventListener('mouseup', finishMouseInteraction);
+    window.addEventListener('blur', finishMouseInteraction);
+    return () => {
+      window.removeEventListener('mouseup', finishMouseInteraction);
+      window.removeEventListener('blur', finishMouseInteraction);
+      finishMouseInteraction();
+    };
+  }, []);
+
   // Track SVG viewport size for the ruler layer (screen-space ticks/labels).
   useEffect(() => {
     const el = svgRef.current;
@@ -631,6 +655,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
 
   // ─── Wrapped mouse handlers with calibration intercept ───────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (e.button === 0 || e.button === 1) {
+      mouseInteractionActiveRef.current = true;
+    }
     if (calibrationMode) {
       const svgEl = svgRef.current;
       if (!svgEl) return;
@@ -655,6 +682,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   }, [calibrationMode, pan2D, zoom2D, dispatch, svgRef, editorHandleMouseDown]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    // If release happened outside the browser window, mouseup may be absent;
+    // the first buttonless re-entry must close instead of replaying the drag.
+    if (mouseInteractionActiveRef.current && e.buttons === 0) {
+      mouseInteractionActiveRef.current = false;
+      handleMouseUpRef.current();
+      return;
+    }
     // Track cursor position in pattern space for CalibrationOverlay
     const svgEl = svgRef.current;
     if (svgEl) {
@@ -668,6 +702,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     editorHandleMouseMove(e);
   }, [pan2D, zoom2D, svgRef, calibrationMode, editorHandleMouseMove]);
 
+  const handleHostMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    mouseInteractionActiveRef.current = false;
+    handleMouseUp(e);
+  }, [handleMouseUp]);
+
   return (
     <div className="pattern-editor">
       <svg
@@ -678,7 +717,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         style={{ cursor: getCursor() }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
+        onMouseUp={handleHostMouseUp}
         onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
