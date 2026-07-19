@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
-import type { Point2D } from '../../types/types';
+import type { PatternPiece, Point2D } from '../../types/types';
 import {
   extractNodes,
   applyNodeMove,
@@ -10,8 +10,33 @@ import {
   type NodeRef,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
-import { rotatePoint } from '../../utils/geometry/transform';
+import { outlineBBoxCenter, rotatePoint } from '../../utils/geometry/transform';
 import { patternToPieceLocal } from './useEditPattern';
+
+function compensatePositionForPivotChange(
+  piece: PatternPiece,
+  nextOutline: PatternPiece['outline'],
+): Point2D {
+  const rotation = piece.rotation ?? 0;
+  if (!rotation) return piece.position;
+
+  const previousCenter = outlineBBoxCenter(piece.outline);
+  const nextCenter = outlineBBoxCenter(nextOutline);
+  const pivotDelta = {
+    x: previousCenter.x - nextCenter.x,
+    y: previousCenter.y - nextCenter.y,
+  };
+  const rotatedDelta = rotatePoint(
+    pivotDelta,
+    { x: 0, y: 0 },
+    rotation * Math.PI / 180,
+  );
+
+  return {
+    x: piece.position.x + pivotDelta.x - rotatedDelta.x,
+    y: piece.position.y + pivotDelta.y - rotatedDelta.y,
+  };
+}
 
 export interface EditCurveState {
   isEditing: boolean;
@@ -137,8 +162,13 @@ export function useEditCurve(zoom: number, pan: Point2D) {
           dragRef.current.nodeRef.pointType,
           newPos,
         );
-        dispatch(updatePiece({ ...piece, outline: newOutline, updatedAt: Date.now() }));
-        const updatedPiece = { ...piece, outline: newOutline };
+        const updatedPiece = {
+          ...piece,
+          position: compensatePositionForPivotChange(piece, newOutline),
+          outline: newOutline,
+          updatedAt: Date.now(),
+        };
+        dispatch(updatePiece(updatedPiece));
         setState(s => ({ ...s, nodes: extractNodes(updatedPiece) }));
       }
       return true;

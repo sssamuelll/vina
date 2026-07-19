@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { act, cleanup, renderHook } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
-import { Provider } from 'react-redux';
+import { Provider, useSelector } from 'react-redux';
 import { afterEach, describe, expect, it } from 'vitest';
 import projectReducer, { restoreState } from '../../../store/projectSlice';
 import type { PatternPiece } from '../../../types/types';
+import { rotatePoint } from '../../../utils/geometry/transform';
+import NodeEditorOverlay from '../renderers/overlays/NodeEditorOverlay';
 import { useEditCurve } from '../useEditCurve';
 
 afterEach(cleanup);
@@ -66,6 +68,88 @@ function storedOutline(store: ReturnType<typeof setup>['store']) {
   return store.getState().project.pieces[0].outline;
 }
 
+function InteractiveEditor() {
+  const editor = useEditCurve(1, { x: 0, y: 0 });
+  const pieces = useSelector((state: { project: { pieces: PatternPiece[] } }) => state.project.pieces);
+
+  return (
+    <>
+      <button type="button" onClick={() => editor.enterEdit('p')}>Edit</button>
+      <svg
+        data-testid="editor"
+        onMouseDown={editor.handleMouseDown}
+        onMouseMove={editor.handleMouseMove}
+        onMouseUp={editor.handleMouseUp}
+      >
+        {editor.editingPieceId && (
+          <NodeEditorOverlay
+            zoom2D={1}
+            units="mm"
+            pieces={pieces}
+            nodeEditorEditingPieceId={editor.editingPieceId}
+            nodeEditorNodes={editor.nodes}
+            selectedNode={editor.selectedNode}
+            hoveredNode={editor.hoveredNode}
+          />
+        )}
+      </svg>
+    </>
+  );
+}
+
+function renderInteractive(piece: PatternPiece) {
+  const store = configureStore({ reducer: { project: projectReducer } });
+  store.dispatch(restoreState({ ...store.getState().project, pieces: [piece] }));
+  const view = render(
+    <Provider store={store}>
+      <InteractiveEditor />
+    </Provider>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  return { store, view, svg: screen.getByTestId('editor') };
+}
+
+function renderedPoint(local: { x: number; y: number }): { x: number; y: number } {
+  const group = document.querySelector<SVGGElement>('g.node-editor');
+  expect(group).not.toBeNull();
+  const transform = group!.getAttribute('transform') ?? '';
+  const match = transform.match(
+    /^translate\(([-\d.]+), ([-\d.]+)\)(?: rotate\(([-\d.]+), ([-\d.]+), ([-\d.]+)\))?$/,
+  );
+  expect(match).not.toBeNull();
+  const [, tx, ty, angle, cx, cy] = match!;
+  const rotated = angle
+    ? rotatePoint(
+        local,
+        { x: Number(cx), y: Number(cy) },
+        Number(angle) * Math.PI / 180,
+      )
+    : local;
+  return { x: rotated.x + Number(tx), y: rotated.y + Number(ty) };
+}
+
+function renderedAnchorPosition(commandIndex: number) {
+  const glyph = document.querySelector<SVGGElement>(
+    `[data-command-index="${commandIndex}"] [data-anchor-role]`,
+  );
+  expect(glyph).not.toBeNull();
+  const match = (glyph!.getAttribute('transform') ?? '').match(
+    /^translate\(([-\d.]+) ([-\d.]+)\)$/,
+  );
+  expect(match).not.toBeNull();
+  return renderedPoint({ x: Number(match![1]), y: Number(match![2]) });
+}
+
+function renderedHandlePosition(commandIndex: number) {
+  const handle = document.querySelector<SVGRectElement>(
+    `[data-command-index="${commandIndex}"] .node-editor__control-handle`,
+  );
+  expect(handle).not.toBeNull();
+  const x = Number(handle!.getAttribute('x')) + Number(handle!.getAttribute('width')) / 2;
+  const y = Number(handle!.getAttribute('y')) + Number(handle!.getAttribute('height')) / 2;
+  return renderedPoint({ x, y });
+}
+
 describe('useEditCurve rotation-aware interaction', () => {
   it('hovers the anchor at its rotated visible position', () => {
     const { hook } = setup(squarePiece());
@@ -100,6 +184,17 @@ describe('useEditCurve rotation-aware interaction', () => {
     expect(storedOutline(store)[1].values[1]).toBeCloseTo(-10);
   });
 
+  it('keeps a rotated anchor glyph under the cursor when its drag changes the outline bbox', () => {
+    const { svg } = renderInteractive(squarePiece());
+
+    fireEvent.mouseDown(svg, { button: 0, clientX: 210, clientY: 220 });
+    fireEvent.mouseMove(svg, { clientX: 220, clientY: 220 });
+
+    const rendered = renderedAnchorPosition(1);
+    expect(rendered.x).toBeCloseTo(220);
+    expect(rendered.y).toBeCloseTo(220);
+  });
+
   it('hit-tests and drags a rotated Bezier handle in piece-local space', () => {
     const { store, hook } = setup(curvedPiece());
     act(() => hook.result.current.enterEdit('p'));
@@ -112,6 +207,17 @@ describe('useEditCurve rotation-aware interaction', () => {
     act(() => hook.result.current.handleMouseUp());
     expect(storedOutline(store)[1].values[2]).toBeCloseTo(100);
     expect(storedOutline(store)[1].values[3]).toBeCloseTo(-10);
+  });
+
+  it('keeps a rotated Bezier handle under the cursor when its drag changes the outline bbox', () => {
+    const { svg } = renderInteractive(curvedPiece());
+
+    fireEvent.mouseDown(svg, { button: 0, clientX: 110, clientY: 120 });
+    fireEvent.mouseMove(svg, { clientX: 120, clientY: 120 });
+
+    const rendered = renderedHandlePosition(1);
+    expect(rendered.x).toBeCloseTo(120);
+    expect(rendered.y).toBeCloseTo(120);
   });
 
   it('preserves unrotated hit-testing and drag direction', () => {
