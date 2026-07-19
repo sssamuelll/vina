@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
-import type { PatternPiece, Point2D } from '../../types/types';
+import type { Point2D } from '../../types/types';
 import {
   extractNodes,
   applyNodeMove,
@@ -10,33 +10,11 @@ import {
   type NodeRef,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
-import { outlineBBoxCenter, rotatePoint } from '../../utils/geometry/transform';
-import { patternToPieceLocal } from './useEditPattern';
-
-function compensatePositionForPivotChange(
-  piece: PatternPiece,
-  nextOutline: PatternPiece['outline'],
-): Point2D {
-  const rotation = piece.rotation ?? 0;
-  if (!rotation) return piece.position;
-
-  const previousCenter = outlineBBoxCenter(piece.outline);
-  const nextCenter = outlineBBoxCenter(nextOutline);
-  const pivotDelta = {
-    x: previousCenter.x - nextCenter.x,
-    y: previousCenter.y - nextCenter.y,
-  };
-  const rotatedDelta = rotatePoint(
-    pivotDelta,
-    { x: 0, y: 0 },
-    rotation * Math.PI / 180,
-  );
-
-  return {
-    x: piece.position.x + pivotDelta.x - rotatedDelta.x,
-    y: piece.position.y + pivotDelta.y - rotatedDelta.y,
-  };
-}
+import { rotatePoint } from '../../utils/geometry/transform';
+import {
+  compensatePositionForPivotChange,
+  patternToPieceLocal,
+} from './pieceTransform';
 
 export interface EditCurveState {
   isEditing: boolean;

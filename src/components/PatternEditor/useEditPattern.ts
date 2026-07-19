@@ -1,5 +1,5 @@
 /**
- * useEditPattern.ts — Edit Pattern (Z) hook.
+ * useEditPattern.ts — Edit Pattern (Q) hook.
  *
  * Manages point/segment selection (including multi-select and marquee),
  * dragging points and segments, and delegates mutations (add, delete, convert)
@@ -26,8 +26,13 @@ import {
   type EditableNode,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
-import { outlineBBoxCenter, rotatePoint } from '../../utils/geometry/transform';
+import { rotatePoint } from '../../utils/geometry/transform';
 import { reanchorNotches } from '../../utils/notchReanchor';
+import {
+  compensatePositionForPivotChange,
+  patternToPieceLocal,
+  pieceLocalToPattern,
+} from './pieceTransform';
 
 // ─── Constants ───
 
@@ -84,35 +89,6 @@ interface MarqueeDrag {
 type DragState = NodeDrag | SegmentDrag | MarqueeDrag;
 
 // ─── Pure helpers ───
-
-/**
- * A pattern-space point expressed in the piece's un-rotated local frame: undo
- * the piece offset, then the render rotation (`rotate(piece.rotation, cx, cy)`).
- * Outline coords are stored un-rotated, so every hit-test compares against this.
- * Without the inverse rotation, editing a rotated piece grabs the wrong node
- * (nota de María #170).
- */
-export function patternToPieceLocal(
-  patternPt: Point2D,
-  piece: Pick<PatternPiece, 'position' | 'outline' | 'rotation'>,
-): Point2D {
-  const local = { x: patternPt.x - piece.position.x, y: patternPt.y - piece.position.y };
-  const rot = piece.rotation ?? 0;
-  if (!rot) return local;
-  return rotatePoint(local, outlineBBoxCenter(piece.outline), -rot * Math.PI / 180);
-}
-
-/** Inverse of {@link patternToPieceLocal}: un-rotated local → pattern space. */
-export function pieceLocalToPattern(
-  localPt: Point2D,
-  piece: Pick<PatternPiece, 'position' | 'outline' | 'rotation'>,
-): Point2D {
-  const rot = piece.rotation ?? 0;
-  const rotated = rot
-    ? rotatePoint(localPt, outlineBBoxCenter(piece.outline), rot * Math.PI / 180)
-    : localPt;
-  return { x: rotated.x + piece.position.x, y: rotated.y + piece.position.y };
-}
 
 /**
  * Where a double-click should insert a new point, if anywhere. Guards against
@@ -230,6 +206,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (piece: PatternPiece, newOutline: PatternPiece['outline']) => {
       const updated: PatternPiece = {
         ...piece,
+        position: compensatePositionForPivotChange(piece, newOutline),
         outline: newOutline,
         // Notches with a parametric anchor follow the reshaped edge (#171).
         internals: reanchorNotches(piece.internals, newOutline),
@@ -604,6 +581,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         if (deletedCount > 0) {
           const updated: PatternPiece = {
             ...piece,
+            position: compensatePositionForPivotChange(piece, outline),
             outline,
             internals: reanchorNotches(piece.internals, outline),
             updatedAt: Date.now(),

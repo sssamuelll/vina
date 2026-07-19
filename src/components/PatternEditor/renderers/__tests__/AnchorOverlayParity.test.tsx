@@ -2,6 +2,7 @@
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { PatternPiece } from '../../../../types/types';
+import { outlineBBoxCenter, rotatePoint } from '../../../../utils/geometry/transform';
 import { extractNodes } from '../../nodeEditorUtils';
 import EditPatternOverlay from '../overlays/EditPatternOverlay';
 import NodeEditorOverlay from '../overlays/NodeEditorOverlay';
@@ -25,6 +26,13 @@ const piece = {
 function roleList(root: Element): string[] {
   return Array.from(root.querySelectorAll('[data-anchor-role]'))
     .map((node) => node.getAttribute('data-anchor-role')!);
+}
+
+function selectedLabelPosition(container: HTMLElement): { x: number; y: number } {
+  const transform = container.querySelector('text')?.parentElement?.getAttribute('transform') ?? '';
+  const match = transform.match(/^translate\(([-\d.]+), ([-\d.]+)\)$/);
+  expect(match).not.toBeNull();
+  return { x: Number(match![1]), y: Number(match![2]) };
 }
 
 describe('anchor overlay parity', () => {
@@ -69,6 +77,33 @@ describe('anchor overlay parity', () => {
     expect(container.querySelector('.node-editor')?.getAttribute('transform'))
       .toContain('rotate(30');
   });
+
+  it.each([90, 0])(
+    'anchors a selected-node label at its visible position for rotation %i',
+    (rotation) => {
+      const selectedPiece = { ...piece, rotation } as PatternPiece;
+      const nodes = extractNodes(selectedPiece);
+      const selected = nodes[1];
+      const { container } = render(
+        <svg>
+          <NodeEditorOverlay
+            zoom2D={1} units="mm" pieces={[selectedPiece]}
+            nodeEditorEditingPieceId="p" nodeEditorNodes={nodes}
+            selectedNode={selected.ref} hoveredNode={null}
+          />
+        </svg>,
+      );
+      const center = outlineBBoxCenter(selectedPiece.outline);
+      const projected = rotation
+        ? rotatePoint(selected.position, center, rotation * Math.PI / 180)
+        : selected.position;
+
+      expect(selectedLabelPosition(container)).toEqual({
+        x: projected.x + selectedPiece.position.x,
+        y: projected.y + selectedPiece.position.y - 20,
+      });
+    },
+  );
 
   it('keeps a Bezier control handle red and outside the anchor-role grammar', () => {
     const curved = {

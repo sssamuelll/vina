@@ -3,6 +3,7 @@ import { outlineBBoxCenter } from '../../../../utils/geometry/transform';
 import { formatDimension } from '../../../../utils/units';
 import { classifyEditableAnchors } from '../../anchorRoles';
 import type { EditableNode, NodeRef } from '../../nodeEditorUtils';
+import { pieceLocalToPattern } from '../../pieceTransform';
 import AnchorGlyph, { type AnchorVisualState } from '../AnchorGlyph';
 
 interface NodeEditorOverlayProps {
@@ -36,6 +37,9 @@ export default function NodeEditorOverlay({ zoom2D, units, pieces, nodeEditorEdi
     hoveredNode.pointType === ref.pointType;
 
   const selectedNodeData = selectedNode ? nodeEditorNodes.find(n => isNodeSelected(n.ref)) : null;
+  const selectedNodePatternPosition = selectedNodeData
+    ? pieceLocalToPattern(selectedNodeData.position, piece)
+    : null;
 
   return (
     <>
@@ -81,8 +85,8 @@ export default function NodeEditorOverlay({ zoom2D, units, pieces, nodeEditorEdi
         })}
       </g>
 
-      {selectedNodeData && (
-        <g transform={`translate(${selectedNodeData.position.x + piece.position.x}, ${selectedNodeData.position.y + piece.position.y - 20 / zoom2D})`}>
+      {selectedNodeData && selectedNodePatternPosition && (
+        <g transform={`translate(${selectedNodePatternPosition.x}, ${selectedNodePatternPosition.y - 20 / zoom2D})`}>
           <rect
             x={-40 / zoom2D} y={-8 / zoom2D}
             width={80 / zoom2D} height={16 / zoom2D}

@@ -12,7 +12,8 @@ import type { PatternPiece, Point2D } from '../../../types/types';
 import { importDXFContent } from '../../../utils/dxf';
 import { classifyEditableAnchors } from '../anchorRoles';
 import { extractNodes, getAnchor } from '../nodeEditorUtils';
-import { pieceLocalToPattern, useEditPattern } from '../useEditPattern';
+import { pieceLocalToPattern } from '../pieceTransform';
+import { useEditPattern } from '../useEditPattern';
 import EditPatternOverlay from '../renderers/overlays/EditPatternOverlay';
 
 afterEach(() => {

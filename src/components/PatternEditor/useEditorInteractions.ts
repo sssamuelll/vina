@@ -31,7 +31,7 @@ function getOutlineCenterForDrag(outline: PathCommand[]): { cx: number; cy: numb
 }
 import { extractNodes, NodeRef } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
-import { patternToPieceLocal } from './useEditPattern';
+import { patternToPieceLocal } from './pieceTransform';
 
 const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
 
