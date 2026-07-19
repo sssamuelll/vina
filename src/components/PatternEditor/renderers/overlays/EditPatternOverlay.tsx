@@ -1,11 +1,14 @@
 import type { PatternPiece, Point2D } from '../../../../types/types';
 import { outlineBBoxCenter } from '../../../../utils/geometry/transform';
+import { classifyEditableAnchors } from '../../anchorRoles';
+import type { EditableNode } from '../../nodeEditorUtils';
+import AnchorGlyph, { type AnchorVisualState } from '../AnchorGlyph';
 
 interface EditPatternOverlayProps {
   zoom2D: number;
   pieces: PatternPiece[];
   editingPieceId: string;
-  nodes: Array<{ position: Point2D; cp1?: Point2D; ref: { commandIndex: number } }>;
+  nodes: EditableNode[];
   selectedNodes: Set<number>;
   selectedSegments: Set<number>;
   hoveredNode: number | null;
@@ -29,8 +32,7 @@ export default function EditPatternOverlay({
   const piece = pieces.find(p => p.id === editingPieceId);
   if (!piece) return null;
 
-  const r = 5 / zoom2D;
-  const sw = 1.2 / zoom2D;
+  const classifiedAnchors = classifyEditableAnchors(piece, nodes);
 
   // Build segment paths for highlight
   const segmentHighlights: JSX.Element[] = [];
@@ -129,37 +131,23 @@ export default function EditPatternOverlay({
           />
         )}
 
-        {/* Anchor points — curve anchors (C/Q, have cp1) are squares, corners circles */}
-        {nodes.map((node, i) => {
-          const isSelected = selectedNodes.has(node.ref.commandIndex);
-          const isHovered = hoveredNode === node.ref.commandIndex;
-          const fill = isSelected ? '#FFD700' : isHovered ? '#6BB3FF' : '#4A9EFF';
-          if (node.cp1) {
-            return (
-              <rect
-                key={i}
-                x={node.position.x - r}
-                y={node.position.y - r}
-                width={r * 2}
-                height={r * 2}
-                fill={fill}
-                stroke="#fff"
-                strokeWidth={sw}
-                style={{ cursor: 'move' }}
-              />
-            );
-          }
+        {/* Semantic anchor glyphs */}
+        {classifiedAnchors.map(({ node, role }) => {
+          const commandIndex = node.ref.commandIndex;
+          const state: AnchorVisualState = selectedNodes.has(commandIndex)
+            ? 'selected'
+            : hoveredNode === commandIndex
+              ? 'hovered'
+              : 'idle';
           return (
-            <circle
-              key={i}
-              cx={node.position.x}
-              cy={node.position.y}
-              r={r}
-              fill={fill}
-              stroke="#fff"
-              strokeWidth={sw}
-              style={{ cursor: 'move' }}
-            />
+            <g key={commandIndex} data-command-index={commandIndex}>
+              <AnchorGlyph
+                role={role}
+                position={node.position}
+                zoom2D={zoom2D}
+                state={state}
+              />
+            </g>
           );
         })}
       </g>
