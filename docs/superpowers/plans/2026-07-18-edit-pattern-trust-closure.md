@@ -77,7 +77,7 @@
 - Consumes: envelope persistido `DockState v1` con `tools2d: string[]`.
 - Produces: `LEGACY_DEFAULT_DOCK_2D_IDS`, `DEFAULT_DOCK_2D_IDS` y `migrateDefaultDockTools(ids: readonly string[]): string[]`.
 
-- [ ] **Step 1: Escribir las regresiones rojas de default y migración**
+- [x] **Step 1: Escribir las regresiones rojas de default y migración**
 
 En `dockSlice.test.ts`, amplía el import y reemplaza el test del default de siete ids; agrega estos casos dentro de `describe('dockSlice tools2d', ...)`:
 
@@ -137,7 +137,7 @@ it('the first 8 catalog ids are the defaults in order', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar las pruebas para confirmar el rojo**
+- [x] **Step 2: Ejecutar las pruebas para confirmar el rojo**
 
 Run:
 
@@ -147,7 +147,7 @@ npm run test -- src/store/__tests__/dockSlice.test.ts src/components/shell/__tes
 
 Expected: FAIL porque no existen `LEGACY_DEFAULT_DOCK_2D_IDS`/`migrateDefaultDockTools`, el default aún tiene siete ids y el catálogo coloca `editPattern` octavo.
 
-- [ ] **Step 3: Implementar las constantes y la migración pura**
+- [x] **Step 3: Implementar las constantes y la migración pura**
 
 En `dockSlice.ts`, reemplaza la constante actual y aplica la migración al resultado validado:
 
@@ -199,7 +199,7 @@ En `dock2dTools.ts`, actualiza el comentario a “first 8” y mueve esta entrad
 
 Elimina la antigua entrada `editPattern` situada después de `seam`.
 
-- [ ] **Step 4: Ejecutar las pruebas verdes del dock**
+- [x] **Step 4: Ejecutar las pruebas verdes del dock**
 
 Run:
 
@@ -209,7 +209,7 @@ npm run test -- src/store/__tests__/dockSlice.test.ts src/components/shell/__tes
 
 Expected: PASS en ambos archivos; `git diff --check` no reporta errores.
 
-- [ ] **Step 5: Commit del acceso visible**
+- [x] **Step 5: Commit del acceso visible**
 
 ```bash
 git add src/store/dockSlice.ts src/components/shell/dock2dTools.ts src/store/__tests__/dockSlice.test.ts src/components/shell/__tests__/dock2dTools.test.ts
@@ -230,7 +230,7 @@ git commit -m "feat(editor): surface edit pattern in default dock"
 - Consumes: `activate2DTool(dispatch, id)` y resolución ordenada de `ShortcutRegistry`.
 - Produces: action id `tool.editPattern` con `key: 'q'`, `context: '2d'` y handler único.
 
-- [ ] **Step 1: Crear la prueba roja de definición, precedencia y activación**
+- [x] **Step 1: Crear la prueba roja de definición, precedencia y activación**
 
 Crea `editPatternReachability.test.tsx`:
 
@@ -301,7 +301,7 @@ describe('tool.editPattern shortcut contract', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar la prueba para confirmar el rojo**
+- [x] **Step 2: Ejecutar la prueba para confirmar el rojo**
 
 Run:
 
@@ -311,7 +311,7 @@ npm run test -- src/shortcuts/__tests__/editPatternReachability.test.tsx
 
 Expected: FAIL porque `tool.editPattern` no está registrado y `Q` combinado resuelve actualmente a `tool3d.camera`.
 
-- [ ] **Step 3: Registrar definición y handler por la autoridad existente**
+- [x] **Step 3: Registrar definición y handler por la autoridad existente**
 
 En `src/shortcuts/defaults.ts`, inserta la definición inmediatamente después de `tool.select`:
 
@@ -335,7 +335,7 @@ En `src/types/types.ts`, corrige el comentario:
 | 'editPattern'  // edit points and segments (Q key)
 ```
 
-- [ ] **Step 4: Ejecutar la prueba verde y las regresiones de shortcuts**
+- [x] **Step 4: Ejecutar la prueba verde y las regresiones de shortcuts**
 
 Run:
 
@@ -345,7 +345,7 @@ npm run test -- src/shortcuts/__tests__/editPatternReachability.test.tsx src/sho
 
 Expected: PASS; `Q` 2D activa `editor.activeTool` y `tools.activeTool2D`, y los precedentes contextuales siguen verdes.
 
-- [ ] **Step 5: Commit del shortcut**
+- [x] **Step 5: Commit del shortcut**
 
 ```bash
 git add src/shortcuts/defaults.ts src/hooks/useKeyboardShortcuts.ts src/types/types.ts src/shortcuts/__tests__/editPatternReachability.test.tsx
@@ -365,7 +365,7 @@ git commit -m "feat(editor): wire edit pattern q shortcut"
 - Consumes: `PatternPiece`, `EditableNode[]`, `detectCorners(outline)`.
 - Produces: `AnchorRole`, `ClassifiedAnchor`, `ANCHOR_MATCH_EPS_MM` y `classifyEditableAnchors(piece, nodes)`.
 
-- [ ] **Step 1: Crear los tests rojos sintéticos**
+- [x] **Step 1: Crear los tests rojos sintéticos**
 
 Crea `anchorRoles.test.ts`:
 
@@ -473,7 +473,7 @@ describe('classifyEditableAnchors', () => {
 });
 ```
 
-- [ ] **Step 2: Crear el contrato rojo contra el DXF real**
+- [x] **Step 2: Crear el contrato rojo contra el DXF real**
 
 Crea `anchorRoles.maria.test.ts`:
 
@@ -508,7 +508,7 @@ describe('anchor roles — patrón real de María', () => {
 });
 ```
 
-- [ ] **Step 3: Ejecutar ambos archivos para confirmar el rojo**
+- [x] **Step 3: Ejecutar ambos archivos para confirmar el rojo**
 
 Run:
 
@@ -518,7 +518,7 @@ npm run test -- src/components/PatternEditor/__tests__/anchorRoles.test.ts src/c
 
 Expected: FAIL porque `anchorRoles.ts` todavía no existe.
 
-- [ ] **Step 4: Implementar el clasificador puro completo**
+- [x] **Step 4: Implementar el clasificador puro completo**
 
 Crea `anchorRoles.ts`:
 
@@ -610,7 +610,7 @@ export function classifyEditableAnchors(
 }
 ```
 
-- [ ] **Step 5: Ejecutar tests del clasificador y detectores base**
+- [x] **Step 5: Ejecutar tests del clasificador y detectores base**
 
 Run:
 
@@ -620,7 +620,7 @@ npm run test -- src/components/PatternEditor/__tests__/anchorRoles.test.ts src/c
 
 Expected: PASS; el fixture conserva cinco piezas y ninguna conversión a `C/Q`.
 
-- [ ] **Step 6: Commit del modelo visual derivado**
+- [x] **Step 6: Commit del modelo visual derivado**
 
 ```bash
 git add src/components/PatternEditor/anchorRoles.ts src/components/PatternEditor/__tests__/anchorRoles.test.ts src/components/PatternEditor/__tests__/anchorRoles.maria.test.ts
@@ -643,7 +643,7 @@ git commit -m "feat(editor): classify pattern anchors by geometry"
 - Consumes: `AnchorRole`, `classifyEditableAnchors`, `EditableNode`, `Point2D`.
 - Produces: `AnchorGlyphProps`, `AnchorVisualState` y `<AnchorGlyph>` con `data-anchor-role`.
 
-- [ ] **Step 1: Crear los tests rojos del glifo**
+- [x] **Step 1: Crear los tests rojos del glifo**
 
 Crea `AnchorGlyph.test.tsx`:
 
@@ -708,7 +708,7 @@ describe('AnchorGlyph', () => {
 });
 ```
 
-- [ ] **Step 2: Crear la regresión roja de paridad entre overlays**
+- [x] **Step 2: Crear la regresión roja de paridad entre overlays**
 
 Crea `AnchorOverlayParity.test.tsx`:
 
@@ -812,7 +812,7 @@ describe('anchor overlay parity', () => {
 });
 ```
 
-- [ ] **Step 3: Ejecutar las pruebas nuevas para confirmar el rojo**
+- [x] **Step 3: Ejecutar las pruebas nuevas para confirmar el rojo**
 
 Run:
 
@@ -822,7 +822,7 @@ npm run test -- src/components/PatternEditor/renderers/__tests__/AnchorGlyph.tes
 
 Expected: FAIL porque `AnchorGlyph.tsx` no existe y los overlays aún usan gramáticas distintas.
 
-- [ ] **Step 4: Implementar el renderer compartido**
+- [x] **Step 4: Implementar el renderer compartido**
 
 Crea `AnchorGlyph.tsx`:
 
@@ -896,7 +896,7 @@ export default function AnchorGlyph({
 }
 ```
 
-- [ ] **Step 5: Sustituir la gramática local de `EditPatternOverlay`**
+- [x] **Step 5: Sustituir la gramática local de `EditPatternOverlay`**
 
 Agrega imports:
 
@@ -935,7 +935,7 @@ Reemplaza por completo el bloque local de anchor points:
 })}
 ```
 
-- [ ] **Step 6: Sustituir las anclas de `NodeEditorOverlay` sin tocar handles**
+- [x] **Step 6: Sustituir las anclas de `NodeEditorOverlay` sin tocar handles**
 
 Importa `outlineBBoxCenter`, el clasificador y el glifo:
 
@@ -999,7 +999,7 @@ Cambia el transform del grupo principal a `anchorTransform`. Conserva el brazo y
 
 Elimina el `nodeEditorNodes.map` anterior para no renderizar anclas o handles duplicados. La etiqueta de coordenadas permanece fuera del grupo y sin cambios.
 
-- [ ] **Step 7: Actualizar la regresión antigua de círculos/cuadrados**
+- [x] **Step 7: Actualizar la regresión antigua de círculos/cuadrados**
 
 En `EditPatternOverlay.test.tsx`, cambia el comentario del contrato y reemplaza el test de marks por una pieza con una recta subdividida:
 
@@ -1033,7 +1033,7 @@ it('renders geometric corners differently from smooth polyline samples', () => {
 });
 ```
 
-- [ ] **Step 8: Ejecutar el paquete visual completo**
+- [x] **Step 8: Ejecutar el paquete visual completo**
 
 Run:
 
@@ -1043,7 +1043,7 @@ npm run test -- src/components/PatternEditor/renderers/__tests__/AnchorGlyph.tes
 
 Expected: PASS; ambos overlays emiten la misma secuencia de roles y el test de rotación previo sigue verde.
 
-- [ ] **Step 9: Commit de la gramática visual compartida**
+- [x] **Step 9: Commit de la gramática visual compartida**
 
 ```bash
 git add src/components/PatternEditor/renderers/AnchorGlyph.tsx src/components/PatternEditor/renderers/overlays/EditPatternOverlay.tsx src/components/PatternEditor/renderers/overlays/NodeEditorOverlay.tsx src/components/PatternEditor/renderers/__tests__/AnchorGlyph.test.tsx src/components/PatternEditor/renderers/__tests__/AnchorOverlayParity.test.tsx src/components/PatternEditor/renderers/__tests__/EditPatternOverlay.test.tsx
@@ -1062,7 +1062,7 @@ git commit -m "feat(editor): share semantic anchor glyphs"
 - Consumes: acciones de control `undo/startBatch`, `undo/endBatch` y acciones `project/*`.
 - Produces: `beginUndoBatch(dispatch, label): void`, `endUndoBatch(dispatch): void`; `batchUndo` conserva su firma.
 
-- [ ] **Step 1: Escribir regresiones rojas del contrato dirty**
+- [x] **Step 1: Escribir regresiones rojas del contrato dirty**
 
 En `store.test.ts`, amplía imports:
 
@@ -1157,7 +1157,7 @@ it('loadProject clears an in-flight explicit batch without leaking it', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar el archivo para confirmar el rojo**
+- [x] **Step 2: Ejecutar el archivo para confirmar el rojo**
 
 Run:
 
@@ -1167,7 +1167,7 @@ npm run test -- src/__tests__/store.test.ts
 
 Expected: FAIL porque los helpers no existen; el batch vacío actual crea una entrada y undo no finaliza un batch abierto.
 
-- [ ] **Step 3: Agregar estado dirty y helpers públicos**
+- [x] **Step 3: Agregar estado dirty y helpers públicos**
 
 En `UndoState` y `undoState` agrega:
 
@@ -1211,7 +1211,7 @@ export function batchUndo(
 }
 ```
 
-- [ ] **Step 4: Centralizar cierre y limpieza del batch exterior**
+- [x] **Step 4: Centralizar cierre y limpieza del batch exterior**
 
 Después de `bumpRevision`, agrega:
 
@@ -1248,7 +1248,7 @@ function finalizeExplicitBatch(): void {
 }
 ```
 
-- [ ] **Step 5: Aplicar el cierre a undo, endBatch, acciones y reset de proyecto**
+- [x] **Step 5: Aplicar el cierre a undo, endBatch, acciones y reset de proyecto**
 
 Al inicio de la rama `editor/undo`, antes de consultar `past.length`, agrega:
 
@@ -1300,7 +1300,7 @@ resetExplicitBatchState();
 
 Conserva el vaciado existente de `past`, `future`, `pastEntries` y `futureEntries` antes de llamar al helper.
 
-- [ ] **Step 6: Ejecutar las pruebas del middleware**
+- [x] **Step 6: Ejecutar las pruebas del middleware**
 
 Run:
 
@@ -1310,7 +1310,7 @@ npm run test -- src/__tests__/store.test.ts src/store/__tests__/linkedEditingMid
 
 Expected: PASS; nested batches conservan una entrada, batch vacío cero y undo abierto restaura el snapshot pregesto.
 
-- [ ] **Step 7: Commit del contrato transaccional**
+- [x] **Step 7: Commit del contrato transaccional**
 
 ```bash
 git add src/store/undoMiddleware.ts src/__tests__/store.test.ts
@@ -1329,7 +1329,7 @@ git commit -m "fix(undo): make explicit gesture batches atomic"
 - Consumes: `beginUndoBatch`, `endUndoBatch`, `classifyEditableAnchors`, `EditPatternOverlay`.
 - Produces: un batch idempotente por drag real de nodo o segmento; no cambia la API pública del hook.
 
-- [ ] **Step 1: Crear el harness de integración con middleware real**
+- [x] **Step 1: Crear el harness de integración con middleware real**
 
 Crea `useEditPattern.undo.test.tsx` con imports, fixture y helpers:
 
@@ -1433,7 +1433,7 @@ function maxCoincidentMultiplicity(outline: PatternPiece['outline']): number {
 }
 ```
 
-- [ ] **Step 2: Agregar las regresiones rojas de gesto largo, click y undo abierto**
+- [x] **Step 2: Agregar las regresiones rojas de gesto largo, click y undo abierto**
 
 Añade al mismo archivo:
 
@@ -1516,7 +1516,7 @@ describe('useEditPattern undo gesture integration', () => {
 });
 ```
 
-- [ ] **Step 3: Agregar la regresión roja con corner y smooth sample reales**
+- [x] **Step 3: Agregar la regresión roja con corner y smooth sample reales**
 
 Añade al mismo archivo:
 
@@ -1565,7 +1565,7 @@ describe('useEditPattern — DXF real de María', () => {
 });
 ```
 
-- [ ] **Step 4: Ejecutar el archivo para confirmar el rojo**
+- [x] **Step 4: Ejecutar el archivo para confirmar el rojo**
 
 Run:
 
@@ -1575,7 +1575,7 @@ npm run test -- src/components/PatternEditor/__tests__/useEditPattern.undo.test.
 
 Expected: FAIL: el hook no abre/cierra batches explícitos y un drag lento depende todavía de la ventana temporal.
 
-- [ ] **Step 5: Cablear el ciclo de vida idempotente del batch**
+- [x] **Step 5: Cablear el ciclo de vida idempotente del batch**
 
 En `useEditPattern.ts`, importa helpers:
 
@@ -1618,7 +1618,7 @@ En la rama de cambio externo del effect de resync, antes de limpiar `dragRef`, a
 useEffect(() => () => endDragBatch(), [endDragBatch]);
 ```
 
-- [ ] **Step 6: Abrir solo en movimiento efectivo y cerrar en mouseup**
+- [x] **Step 6: Abrir solo en movimiento efectivo y cerrar en mouseup**
 
 En `handleMouseMove`, después de calcular `dx`/`dy` y antes de construir `outline`, inserta:
 
@@ -1629,7 +1629,7 @@ beginDragBatch();
 
 Agrega `beginDragBatch` a dependencias. En `handleMouseUp`, inmediatamente después de `dragRef.current = null`, llama `endDragBatch()` y agrégalo a dependencias. Marquee no abre batch; el cierre idempotente no despacha nada.
 
-- [ ] **Step 7: Ejecutar integración sintética, María y middleware**
+- [x] **Step 7: Ejecutar integración sintética, María y middleware**
 
 Run:
 
@@ -1639,7 +1639,7 @@ npm run test -- src/components/PatternEditor/__tests__/useEditPattern.undo.test.
 
 Expected: PASS; una entrada para 750 ms, click sin entrada, Ctrl+Z durante drag restaura y ambos roles del fixture conservan longitud/multiplicidad.
 
-- [ ] **Step 8: Commit del gesto reversible**
+- [x] **Step 8: Commit del gesto reversible**
 
 ```bash
 git add src/components/PatternEditor/useEditPattern.ts src/components/PatternEditor/__tests__/useEditPattern.undo.test.tsx
@@ -1658,7 +1658,7 @@ git commit -m "fix(editor): group pattern drag into one undo step"
 - Consumes: default dock, shortcut `Q`, `data-anchor-role`, `data-command-index`, Redux undo/redo.
 - Produces: contrato browser import→edit→drag lento→undo→redo sobre el fixture real.
 
-- [ ] **Step 1: Crear el test Playwright end-to-end**
+- [x] **Step 1: Crear el test Playwright end-to-end**
 
 Crea `edit-pattern-trust.spec.ts`:
 
@@ -1758,7 +1758,7 @@ test('María DXF: editPattern visible → slow drag → undo/redo keeps marker o
 });
 ```
 
-- [ ] **Step 2: Ejecutar el replay focal**
+- [x] **Step 2: Ejecutar el replay focal**
 
 Run:
 
@@ -1768,7 +1768,7 @@ npm run test:e2e -- tests/e2e/edit-pattern-trust.spec.ts
 
 Expected: 1 passed en Chromium; la pausa de 650 ms sigue siendo un gesto y un Ctrl+Z devuelve valores y centro del glifo.
 
-- [ ] **Step 3: Ejecutar typecheck y suite completa**
+- [x] **Step 3: Ejecutar typecheck y suite completa**
 
 Run:
 
@@ -1779,7 +1779,7 @@ npm run test
 
 Expected: ambos comandos terminan con exit code 0.
 
-- [ ] **Step 4: Ejecutar lint y whitespace gate**
+- [x] **Step 4: Ejecutar lint y whitespace gate**
 
 Run:
 
@@ -1790,7 +1790,7 @@ git diff --check
 
 Expected: exit code 0 y ningún diagnóstico.
 
-- [ ] **Step 5: Auditar los no objetivos en el diff**
+- [x] **Step 5: Auditar los no objetivos en el diff**
 
 Run:
 
@@ -1800,7 +1800,7 @@ git diff -- src/types/types.ts src/store/dockSlice.ts src/components/PatternEdit
 
 Expected: `types.ts` solo corrige el comentario de `Q`; `dockSlice` conserva v1; el hook cambia la transacción, no el modelo geométrico ni `HIT_RADIUS_PX = 8`.
 
-- [ ] **Step 6: Commit del replay**
+- [x] **Step 6: Commit del replay**
 
 ```bash
 git add tests/e2e/edit-pattern-trust.spec.ts
