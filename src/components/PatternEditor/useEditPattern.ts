@@ -33,6 +33,7 @@ import {
   patternToPieceLocal,
   pieceLocalToPattern,
 } from './pieceTransform';
+export { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 
 // ─── Constants ───
 
