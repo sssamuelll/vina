@@ -35,6 +35,7 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   // ─── 2D Tools (CLO3D mapping, no modifiers) ────────────────────────────────
   { id: 'tool.transform', key: 'a', label: 'Transform Pattern', category: '2D Tools', context: '2d' },
   { id: 'tool.select', key: 'z', label: 'Edit Pattern (Select)', category: '2D Tools', context: '2d' },
+  { id: 'tool.editPattern', key: 'q', label: 'Editar patrón', category: '2D Tools', context: '2d' },
   { id: 'tool.editCurve', key: 'v', label: 'Edit Curve Point', category: '2D Tools', context: '2d' },
   { id: 'tool.editConstrain', key: 'c', label: 'Edit Curvature', category: '2D Tools', context: '2d' },
   { id: 'tool.pen', key: 'h', label: 'Polygon (Pen)', category: '2D Tools', context: '2d' },

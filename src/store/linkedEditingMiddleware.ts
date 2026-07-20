@@ -2,6 +2,7 @@ import type { Dispatch, Middleware } from '@reduxjs/toolkit';
 import { updatePiece, addInternalLine, updateInternalLine } from './projectSlice';
 import { mirrorOutlineX, mirrorInternalsX, outlineCenterX } from '../utils/linkedEditing';
 import type { PatternPiece, InternalLine, PathCommand } from '../types/types';
+import { batchUndo } from './undoMiddleware';
 
 let isSyncing = false;
 
@@ -79,7 +80,7 @@ function locatePieceForAction(action: ActionLike, state: ProjectStateShape): Pat
  * dispatches: project/updatePiece, project/addInternalLine,
  *             project/updateInternalLine on the partner piece
  * guard: module-level boolean isSyncing (prevents re-entrance)
- * undo: batch grouped via undo/startBatch/endBatch (BUG-7 #610 precedent)
+ * undo: grouped via batchUndo capture-all mode (BUG-7 #610 precedent)
  * cap-depth: 1 (isSyncing bypasses re-entry; partner dispatches no-op)
  * cross-ref: `docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md`
  */
@@ -94,10 +95,9 @@ export const linkedEditingMiddleware: Middleware = (store) => (next) => (action:
 
   const label = BATCH_LABELS[act.type] ?? 'Linked Edit';
 
-  // Open undo batch BEFORE the original action passes through undoMiddleware,
-  // so undoMid suppresses per-action snapshots and commits one entry on endBatch.
-  store.dispatch({ type: 'undo/startBatch', payload: label });
-  try {
+  // Open capture-all mode before the original action reaches undoMiddleware so
+  // both the source action and its synchronous partner cascade stay atomic.
+  return batchUndo(store.dispatch, label, () => {
     const result = next(action);
 
     isSyncing = true;
@@ -108,9 +108,7 @@ export const linkedEditingMiddleware: Middleware = (store) => (next) => (action:
     }
 
     return result;
-  } finally {
-    store.dispatch({ type: 'undo/endBatch' });
-  }
+  });
 };
 
 function runCascade(action: ActionLike, store: StoreLike) {

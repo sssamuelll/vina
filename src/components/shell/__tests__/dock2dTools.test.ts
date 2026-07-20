@@ -40,7 +40,8 @@ describe('dock2dTools catalog', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('the first 7 catalog ids are the defaults in order', () => {
-    expect(DOCK_2D_CATALOG.slice(0, 7).map((t) => t.id)).toEqual(DEFAULT_DOCK_2D_IDS);
+  it('the first 8 catalog ids are the defaults in order', () => {
+    expect(DOCK_2D_CATALOG.slice(0, 8).map((tool) => tool.id))
+      .toEqual(DEFAULT_DOCK_2D_IDS);
   });
 });

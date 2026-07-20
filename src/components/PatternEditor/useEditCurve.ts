@@ -10,6 +10,11 @@ import {
   type NodeRef,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
+import { rotatePoint } from '../../utils/geometry/transform';
+import {
+  compensatePositionForPivotChange,
+  patternToPieceLocal,
+} from './pieceTransform';
 
 export interface EditCurveState {
   isEditing: boolean;
@@ -72,9 +77,12 @@ export function useEditCurve(zoom: number, pan: Point2D) {
 
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
-    const pt = toPattern(e.clientX, e.clientY, rect);
     const piece = pieces.find(p => p.id === state.editingPieceId);
     if (!piece) return false;
+    const pt = patternToPieceLocal(
+      toPattern(e.clientX, e.clientY, rect),
+      piece,
+    );
 
     const HIT = screenToPatternLength(8, zoom);
 
@@ -110,23 +118,35 @@ export function useEditCurve(zoom: number, pan: Point2D) {
     if (!state.isEditing || !state.editingPieceId) return false;
 
     if (dragRef.current) {
-      const dx = screenToPatternLength(e.clientX - dragRef.current.startMouse.x, zoom);
-      const dy = screenToPatternLength(e.clientY - dragRef.current.startMouse.y, zoom);
-      const newPos: Point2D = {
-        x: dragRef.current.startPos.x + dx,
-        y: dragRef.current.startPos.y + dy,
-      };
-
       const piece = pieces.find(p => p.id === state.editingPieceId);
       if (piece) {
+        const dxPattern = screenToPatternLength(e.clientX - dragRef.current.startMouse.x, zoom);
+        const dyPattern = screenToPatternLength(e.clientY - dragRef.current.startMouse.y, zoom);
+        const rotation = piece.rotation ?? 0;
+        const { x: dx, y: dy } = rotation
+          ? rotatePoint(
+              { x: dxPattern, y: dyPattern },
+              { x: 0, y: 0 },
+              -rotation * Math.PI / 180,
+            )
+          : { x: dxPattern, y: dyPattern };
+        const newPos: Point2D = {
+          x: dragRef.current.startPos.x + dx,
+          y: dragRef.current.startPos.y + dy,
+        };
         const newOutline = applyNodeMove(
           piece.outline,
           dragRef.current.nodeRef.commandIndex,
           dragRef.current.nodeRef.pointType,
           newPos,
         );
-        dispatch(updatePiece({ ...piece, outline: newOutline, updatedAt: Date.now() }));
-        const updatedPiece = { ...piece, outline: newOutline };
+        const updatedPiece = {
+          ...piece,
+          position: compensatePositionForPivotChange(piece, newOutline),
+          outline: newOutline,
+          updatedAt: Date.now(),
+        };
+        dispatch(updatePiece(updatedPiece));
         setState(s => ({ ...s, nodes: extractNodes(updatedPiece) }));
       }
       return true;
@@ -135,7 +155,12 @@ export function useEditCurve(zoom: number, pan: Point2D) {
     // Hover detection
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
-    const pt = toPattern(e.clientX, e.clientY, rect);
+    const piece = pieces.find(p => p.id === state.editingPieceId);
+    if (!piece) return false;
+    const pt = patternToPieceLocal(
+      toPattern(e.clientX, e.clientY, rect),
+      piece,
+    );
     const HIT = screenToPatternLength(8, zoom);
 
     let hovered: NodeRef | null = null;

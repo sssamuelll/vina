@@ -31,6 +31,7 @@ function getOutlineCenterForDrag(outline: PathCommand[]): { cx: number; cy: numb
 }
 import { extractNodes, NodeRef } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
+import { patternToPieceLocal } from './pieceTransform';
 
 const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
 
@@ -289,16 +290,14 @@ export function useEditorInteractions(
     const rect = e.currentTarget.getBoundingClientRect();
     const { x: clickX, y: clickY } = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
 
-    // Convert to piece-local coordinates
-    const localX = clickX - piece.position.x;
-    const localY = clickY - piece.position.y;
+    const local = patternToPieceLocal({ x: clickX, y: clickY }, piece);
 
     const nodes = extractNodes(piece);
     const CLICK_THRESHOLD = screenToPatternLength(8, zoom2D); // 8 screen pixels
     
     for (const node of nodes) {
-      const dx = localX - node.position.x;
-      const dy = localY - node.position.y;
+      const dx = local.x - node.position.x;
+      const dy = local.y - node.position.y;
       const dist = Math.hypot(dx, dy);
       if (dist <= CLICK_THRESHOLD) {
         return node.ref;

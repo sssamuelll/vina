@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 /**
- * EditPatternOverlay — corner vs curve anchors must be visually distinct
- * (nota de María #167c: "parecen iguales, no se diferencian en nada").
- * Corner (M/L) anchors render as circles; curve (C/Q) anchors as squares.
+ * EditPatternOverlay — geometric corners and smooth samples use the shared
+ * semantic anchor grammar.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
@@ -78,22 +77,31 @@ describe('EditPatternOverlay rotation (nota de María #170)', () => {
 });
 
 describe('EditPatternOverlay anchor marks', () => {
-  it('renders corner anchors as circles and curve anchors as squares', () => {
-    const { container } = renderOverlay();
-    // M(0,0) and L(100,0) are corner anchors → circles.
-    expect(container.querySelectorAll('circle')).toHaveLength(2);
-    // C anchor (has cp1) → a square mark, not a circle.
-    const rects = container.querySelectorAll('rect');
-    expect(rects).toHaveLength(1);
-    // The square is centered on the curve anchor (100, 100). Both x AND y are
-    // asserted: the corner L also sits at x=100, so y is what discriminates a
-    // square drawn on the wrong node or at a broken coordinate.
-    const r = rects[0];
-    const x = parseFloat(r.getAttribute('x')!);
-    const w = parseFloat(r.getAttribute('width')!);
-    const y = parseFloat(r.getAttribute('y')!);
-    const h = parseFloat(r.getAttribute('height')!);
-    expect(x + w / 2).toBeCloseTo(100);
-    expect(y + h / 2).toBeCloseTo(100);
+  it('renders geometric corners differently from smooth polyline samples', () => {
+    const densePiece = {
+      ...piece,
+      outline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [50, 0] },
+        { type: 'L', values: [100, 0] },
+        { type: 'L', values: [100, 100] },
+        { type: 'L', values: [0, 100] },
+        { type: 'Z', values: [] },
+      ],
+    } as PatternPiece;
+    const { container } = render(
+      <svg>
+        <EditPatternOverlay
+          zoom2D={1} pieces={[densePiece]} editingPieceId="p"
+          nodes={extractNodes(densePiece)} selectedNodes={new Set()}
+          selectedSegments={new Set()} hoveredNode={null}
+          hoveredSegment={null} addPointPreview={null} marquee={null}
+        />
+      </svg>,
+    );
+    expect(container.querySelectorAll('[data-anchor-role="corner"]')).toHaveLength(4);
+    expect(container.querySelectorAll('[data-anchor-role="smoothSample"]')).toHaveLength(1);
+    expect(container.querySelector('[data-anchor-role="corner"] rect')).toBeTruthy();
+    expect(container.querySelector('[data-anchor-role="smoothSample"] circle')).toBeTruthy();
   });
 });

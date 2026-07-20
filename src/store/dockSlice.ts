@@ -22,9 +22,23 @@ const MAX_PINNED = 16;
 const MAX_ID_LEN = 80;
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
-/** The 7 default left-dock 2D tool ids, in render order. Lives here (store layer)
- *  so the slice owns its default without importing the component-layer catalog. */
-export const DEFAULT_DOCK_2D_IDS = ['select', 'pen', 'line', 'rectangle', 'scissors', 'measure', 'seam'];
+/** Historical seven-tool default. Kept only for exact migration matching. */
+export const LEGACY_DEFAULT_DOCK_2D_IDS = [
+  'select', 'pen', 'line', 'rectangle', 'scissors', 'measure', 'seam',
+] as const;
+
+/** Current default left-dock 2D tool ids, in render order. */
+export const DEFAULT_DOCK_2D_IDS = [
+  'select', 'editPattern', 'pen', 'line',
+  'rectangle', 'scissors', 'measure', 'seam',
+] as const;
+
+export function migrateDefaultDockTools(ids: readonly string[]): string[] {
+  const isHistoricalDefault =
+    ids.length === LEGACY_DEFAULT_DOCK_2D_IDS.length &&
+    ids.every((id, index) => id === LEGACY_DEFAULT_DOCK_2D_IDS[index]);
+  return isHistoricalDefault ? [...DEFAULT_DOCK_2D_IDS] : [...ids];
+}
 
 const idString = z
   .string()
@@ -76,7 +90,8 @@ export function loadDocks(): DockState | null {
     });
     return null;
   }
-  return result.data.data;
+  const data = result.data.data;
+  return { ...data, tools2d: migrateDefaultDockTools(data.tools2d) };
 }
 
 const dockSlice = createSlice({

@@ -186,6 +186,7 @@ export function useKeyboardShortcuts() {
       // 2D Tools (CLO3D mapping) — all route through the single writer
       ['tool.transform', () => activate2DTool(dispatch, 'transform')],
       ['tool.select', () => activate2DTool(dispatch, 'select')],
+      ['tool.editPattern', () => activate2DTool(dispatch, 'editPattern')],
       ['tool.editCurve', () => activate2DTool(dispatch, 'editCurve')],
       ['tool.editConstrain', () => activate2DTool(dispatch, 'editConstrain')],
       ['tool.pen', () => activate2DTool(dispatch, 'pen')],

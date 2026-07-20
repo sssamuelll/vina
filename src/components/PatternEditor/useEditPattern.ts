@@ -1,5 +1,5 @@
 /**
- * useEditPattern.ts — Edit Pattern (Z) hook.
+ * useEditPattern.ts — Edit Pattern (Q) hook.
  *
  * Manages point/segment selection (including multi-select and marquee),
  * dragging points and segments, and delegates mutations (add, delete, convert)
@@ -12,6 +12,13 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
+import {
+  beginUndoBatch,
+  endUndoBatch,
+  isUndoBatchTokenActive,
+  withUndoBatchToken,
+  type UndoBatchToken,
+} from '../../store/undoMiddleware';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import {
   extractNodes,
@@ -25,8 +32,14 @@ import {
   type EditableNode,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
-import { outlineBBoxCenter, rotatePoint } from '../../utils/geometry/transform';
+import { rotatePoint } from '../../utils/geometry/transform';
 import { reanchorNotches } from '../../utils/notchReanchor';
+import {
+  compensatePositionForPivotChange,
+  patternToPieceLocal,
+  pieceLocalToPattern,
+} from './pieceTransform';
+export { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 
 // ─── Constants ───
 
@@ -85,35 +98,6 @@ type DragState = NodeDrag | SegmentDrag | MarqueeDrag;
 // ─── Pure helpers ───
 
 /**
- * A pattern-space point expressed in the piece's un-rotated local frame: undo
- * the piece offset, then the render rotation (`rotate(piece.rotation, cx, cy)`).
- * Outline coords are stored un-rotated, so every hit-test compares against this.
- * Without the inverse rotation, editing a rotated piece grabs the wrong node
- * (nota de María #170).
- */
-export function patternToPieceLocal(
-  patternPt: Point2D,
-  piece: Pick<PatternPiece, 'position' | 'outline' | 'rotation'>,
-): Point2D {
-  const local = { x: patternPt.x - piece.position.x, y: patternPt.y - piece.position.y };
-  const rot = piece.rotation ?? 0;
-  if (!rot) return local;
-  return rotatePoint(local, outlineBBoxCenter(piece.outline), -rot * Math.PI / 180);
-}
-
-/** Inverse of {@link patternToPieceLocal}: un-rotated local → pattern space. */
-export function pieceLocalToPattern(
-  localPt: Point2D,
-  piece: Pick<PatternPiece, 'position' | 'outline' | 'rotation'>,
-): Point2D {
-  const rot = piece.rotation ?? 0;
-  const rotated = rot
-    ? rotatePoint(localPt, outlineBBoxCenter(piece.outline), rot * Math.PI / 180)
-    : localPt;
-  return { x: rotated.x + piece.position.x, y: rotated.y + piece.position.y };
-}
-
-/**
  * Where a double-click should insert a new point, if anywhere. Guards against
  * the phantom-point bug: a click on (or near) an existing anchor must NOT
  * split the adjacent segment — at a corner the vertex lies on both segments
@@ -169,6 +153,22 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   const [state, setState] = useState<EditPatternState>({ ...INITIAL_STATE });
   const dragRef = useRef<DragState | null>(null);
+  const dragBatchTokenRef = useRef<UndoBatchToken | null>(null);
+
+  const beginDragBatch = useCallback((): UndoBatchToken => {
+    const current = dragBatchTokenRef.current;
+    if (current && isUndoBatchTokenActive(current)) return current;
+    const token = beginUndoBatch(dispatch, 'Editar puntos del patrón');
+    dragBatchTokenRef.current = token;
+    return token;
+  }, [dispatch]);
+
+  const endDragBatch = useCallback(() => {
+    const token = dragBatchTokenRef.current;
+    if (!token) return;
+    dragBatchTokenRef.current = null;
+    endUndoBatch(dispatch, token);
+  }, [dispatch]);
   /**
    * Outline object (by identity) this hook itself dispatched. The resync
    * effect treats a pieces change as internal only when the store's outline
@@ -213,16 +213,22 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   // ─── Helper: dispatch piece update and refresh nodes ───
 
   const dispatchAndRefresh = useCallback(
-    (piece: PatternPiece, newOutline: PatternPiece['outline']) => {
+    (
+      piece: PatternPiece,
+      newOutline: PatternPiece['outline'],
+      undoBatchToken?: UndoBatchToken,
+    ) => {
       const updated: PatternPiece = {
         ...piece,
+        position: compensatePositionForPivotChange(piece, newOutline),
         outline: newOutline,
         // Notches with a parametric anchor follow the reshaped edge (#171).
         internals: reanchorNotches(piece.internals, newOutline),
         updatedAt: Date.now(),
       };
       expectedOutlineRef.current = newOutline;
-      dispatch(updatePiece(updated));
+      const action = updatePiece(updated);
+      dispatch(undoBatchToken ? withUndoBatchToken(action, undoBatchToken) : action);
       const newNodes = extractNodes(updated);
       setState(s => ({ ...s, nodes: newNodes }));
       return newNodes;
@@ -234,6 +240,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   const enterEdit = useCallback(
     (pieceId: string) => {
+      endDragBatch();
       const piece = pieces.find(p => p.id === pieceId);
       if (!piece) return;
       seenOutlineRef.current = piece.outline;
@@ -251,16 +258,17 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       });
       dragRef.current = null;
     },
-    [pieces],
+    [pieces, endDragBatch],
   );
 
   // ─── exitEdit ───
 
   const exitEdit = useCallback(() => {
+    endDragBatch();
     setState({ ...INITIAL_STATE });
     dragRef.current = null;
     seenOutlineRef.current = null;
-  }, []);
+  }, [endDragBatch]);
 
   // Resync when the edited piece's outline changes OUTSIDE this hook
   // (undo/redo via restoreState, copilot edits). Without this the dots detach
@@ -283,9 +291,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     // External change: refresh nodes, drop selections (indices may denote
     // different geometry now), and cancel any in-flight drag so the next
     // mousemove can't re-impose pre-undo positions.
+    endDragBatch();
     dragRef.current = null;
     setState(s => resyncStateToPiece(s, piece));
-  }, [pieces, state.isEditing, state.editingPieceId, exitEdit]);
+  }, [pieces, state.isEditing, state.editingPieceId, exitEdit, endDragBatch]);
+
+  useEffect(() => () => endDragBatch(), [endDragBatch]);
 
   // ─── handleMouseDown ───
 
@@ -440,6 +451,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
             ? rotatePoint({ x: dxS, y: dyS }, { x: 0, y: 0 }, -rot * Math.PI / 180)
             : { x: dxS, y: dyS };
 
+          if (drag.startPositions.size === 0 || (dx === 0 && dy === 0)) return true;
+          const undoBatchToken = beginDragBatch();
+
           let outline = piece.outline;
           for (const [cmdIdx, startPos] of drag.startPositions) {
             const newPos: Point2D = {
@@ -449,7 +463,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
             outline = applyNodeMove(outline, cmdIdx, 'anchor', newPos);
           }
 
-          dispatchAndRefresh(piece, outline);
+          dispatchAndRefresh(piece, outline, undoBatchToken);
           return true;
         }
 
@@ -501,7 +515,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       }));
       return false;
     },
-    [state, getPiece, toLocal, toPattern, zoom, hitRadius, dispatchAndRefresh],
+    [state, getPiece, toLocal, toPattern, zoom, hitRadius, dispatchAndRefresh, beginDragBatch],
   );
 
   // ─── handleMouseUp ───
@@ -509,6 +523,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   const handleMouseUp = useCallback(() => {
     const drag = dragRef.current;
     dragRef.current = null;
+    endDragBatch();
 
     if (!drag) return;
 
@@ -544,7 +559,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     }
 
     // For node/segment drags, just clear — the mutations already happened during mousemove
-  }, [pieces]);
+  }, [pieces, endDragBatch]);
 
   // ─── handleKeyDown ───
 
@@ -581,6 +596,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         if (deletedCount > 0) {
           const updated: PatternPiece = {
             ...piece,
+            position: compensatePositionForPivotChange(piece, outline),
             outline,
             internals: reanchorNotches(piece.internals, outline),
             updatedAt: Date.now(),

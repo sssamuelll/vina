@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Middleware } from '@reduxjs/toolkit';
 import { RootState } from './index';
+import { newId } from '../utils/ids';
 
 // ─── Simulation Snapshot Integration ────────────────────────────────────────
 
@@ -37,6 +38,20 @@ export interface HistoryEntry {
   timestamp: number;
 }
 
+declare const undoBatchTokenBrand: unique symbol;
+export type UndoBatchToken = string & { readonly [undoBatchTokenBrand]: true };
+
+export interface UndoBatchOwnershipMeta {
+  undoBatchToken: UndoBatchToken;
+}
+
+type UndoBatchMode = 'owned' | 'capture-all';
+
+interface ActiveUndoBatch {
+  token: UndoBatchToken;
+  mode: UndoBatchMode;
+}
+
 interface UndoState {
   past: unknown[];
   future: unknown[];
@@ -44,12 +59,16 @@ interface UndoState {
   futureEntries: HistoryEntry[];
   lastSnapshotTime: number;
   batchingAction: string | null;
-  /** When > 0, snapshot creation is suppressed (explicit batch grouping) */
-  batchDepth: number;
+  /** Nested explicit batches, identified so stale end actions cannot close a successor. */
+  batchStack: ActiveUndoBatch[];
   /** Snapshot taken at the start of the outermost batch */
   batchSnapshot: unknown | null;
   /** Label for the batched undo entry */
   batchLabel: string | null;
+  /** Whether a project action occurred inside the outermost explicit batch. */
+  batchDirty: boolean;
+  /** The first owned mutation already handled the simulation snapshot contract. */
+  batchSimulationSnapshotHandled: boolean;
 }
 
 const undoState: UndoState = {
@@ -59,9 +78,11 @@ const undoState: UndoState = {
   futureEntries: [],
   lastSnapshotTime: 0,
   batchingAction: null,
-  batchDepth: 0,
+  batchStack: [],
   batchSnapshot: null,
   batchLabel: null,
+  batchDirty: false,
+  batchSimulationSnapshotHandled: false,
 };
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -99,16 +120,61 @@ export function jumpToIndex(index: number, store: any): void {
  *     dispatch(addInternalLine(...));
  *   });
  */
-export function batchUndo(
-  dispatch: (action: { type: string; payload?: unknown }) => void,
+type UndoDispatch = (action: { type: string; payload?: unknown; meta?: unknown }) => unknown;
+
+interface UndoBatchStartPayload {
+  token: UndoBatchToken;
+  label: string;
+  mode: UndoBatchMode;
+}
+
+function startUndoBatch(
+  dispatch: UndoDispatch,
   label: string,
-  fn: () => void,
-): void {
-  dispatch({ type: 'undo/startBatch', payload: label });
+  mode: UndoBatchMode,
+): UndoBatchToken {
+  const token = newId() as UndoBatchToken;
+  dispatch({ type: 'undo/startBatch', payload: { token, label, mode } });
+  return token;
+}
+
+/** Start an ownership-scoped batch; tag its project actions with the returned token. */
+export function beginUndoBatch(dispatch: UndoDispatch, label: string): UndoBatchToken {
+  return startUndoBatch(dispatch, label, 'owned');
+}
+
+/** End only the matching innermost batch; stale or out-of-order tokens are no-ops. */
+export function endUndoBatch(dispatch: UndoDispatch, token: UndoBatchToken): void {
+  dispatch({ type: 'undo/endBatch', payload: token });
+}
+
+/** Lets long-lived gesture owners detect undo/load invalidation and reopen safely. */
+export function isUndoBatchTokenActive(token: UndoBatchToken): boolean {
+  return undoState.batchStack.some((batch) => batch.token === token);
+}
+
+/** Attach explicit ownership while preserving any action metadata already present. */
+export function withUndoBatchToken<A extends { type: string }>(
+  action: A,
+  token: UndoBatchToken,
+): A & { meta: UndoBatchOwnershipMeta } {
+  const existingMeta = (action as A & { meta?: Record<string, unknown> }).meta;
+  return {
+    ...action,
+    meta: { ...existingMeta, undoBatchToken: token },
+  };
+}
+
+export function batchUndo<T>(
+  dispatch: UndoDispatch,
+  label: string,
+  fn: () => T,
+): T {
+  const token = startUndoBatch(dispatch, label, 'capture-all');
   try {
-    fn();
+    return fn();
   } finally {
-    dispatch({ type: 'undo/endBatch' });
+    endUndoBatch(dispatch, token);
   }
 }
 
@@ -125,6 +191,38 @@ export function subscribeHistory(cb: () => void) {
 function bumpRevision() {
   _revision++;
   _listeners.forEach(cb => cb());
+}
+
+function resetExplicitBatchState(): void {
+  undoState.batchStack.length = 0;
+  undoState.batchSnapshot = null;
+  undoState.batchLabel = null;
+  undoState.batchDirty = false;
+  undoState.batchSimulationSnapshotHandled = false;
+  undoState.batchingAction = null;
+  undoState.lastSnapshotTime = 0;
+}
+
+function finalizeExplicitBatch(): void {
+  const snapshot = undoState.batchSnapshot;
+  const label = undoState.batchLabel || 'Batch Operation';
+  const dirty = undoState.batchDirty;
+  resetExplicitBatchState();
+  if (!dirty || !snapshot) return;
+
+  undoState.past.push(snapshot);
+  undoState.pastEntries.push({
+    label,
+    actionType: 'batch',
+    timestamp: Date.now(),
+  });
+  if (undoState.past.length > MAX_HISTORY) {
+    undoState.past.shift();
+    undoState.pastEntries.shift();
+  }
+  undoState.future.length = 0;
+  undoState.futureEntries.length = 0;
+  bumpRevision();
 }
 
 // ─── Action label mapping ───────────────────────────────────────────────────
@@ -197,13 +295,33 @@ function safeClone<T>(value: T): T | null {
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
 
+function actionUndoBatchToken(action: any): UndoBatchToken | null {
+  const token = action?.meta?.undoBatchToken;
+  return typeof token === 'string' ? token as UndoBatchToken : null;
+}
+
+function activeBatchCaptures(action: any): boolean {
+  if (undoState.batchStack.some((batch) => batch.mode === 'capture-all')) return true;
+  const token = actionUndoBatchToken(action);
+  return token !== null && undoState.batchStack.some((batch) => batch.token === token);
+}
+
+function snapshotSimulationForFirstBatchMutation(store: { getState: () => unknown }): void {
+  if (undoState.batchSimulationSnapshotHandled) return;
+  undoState.batchSimulationSnapshotHandled = true;
+  const simState = (store.getState() as RootState).simulation?.simulationState;
+  if (simState && simState !== 'idle' && _snapshotSave) {
+    _snapshotSave('auto-pre-edit');
+  }
+}
+
 /**
  * @cascade (mechanism, not user-facing cascade)
  * shape: self-dispatch + control-actions consumer
  * triggers (self): editor/undo, editor/redo (also dispatched by jumpToIndex)
  * triggers (control): undo/startBatch, undo/endBatch
  * dispatches: project/restoreState (on undo/redo)
- * guard: batchDepth counter suppresses snapshots inside explicit batches
+ * guard: identified batch stack suppresses snapshots only for owned actions
  * undo: this middleware IS the grouping mechanism for other cascades
  * cap-depth: n/a (self-dispatch is idempotent — each editor/undo consumes stack)
  * cross-ref: `docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md`,
@@ -213,6 +331,9 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
   const actionType: string = action?.type ?? '';
 
   if (actionType === 'editor/undo') {
+    if (undoState.batchStack.length > 0) {
+      finalizeExplicitBatch();
+    }
     if (undoState.past.length === 0) return;
     const currentProject = (store.getState() as RootState).project;
     const snapshot = safeClone(currentProject);
@@ -232,6 +353,9 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
   }
 
   if (actionType === 'editor/redo') {
+    if (undoState.batchStack.length > 0) {
+      finalizeExplicitBatch();
+    }
     if (undoState.future.length === 0) return;
     const currentProject = (store.getState() as RootState).project;
     const snapshot = safeClone(currentProject);
@@ -246,55 +370,51 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
 
   // ─── Explicit batch grouping ──────────────────────────────────────────────
   if (actionType === 'undo/startBatch') {
-    if (undoState.batchDepth === 0) {
-      // Take snapshot at the start of the outermost batch
+    const payload = action.payload as UndoBatchStartPayload | undefined;
+    if (!payload
+      || typeof payload.token !== 'string'
+      || typeof payload.label !== 'string'
+      || (payload.mode !== 'owned' && payload.mode !== 'capture-all')
+      || isUndoBatchTokenActive(payload.token)) {
+      return;
+    }
+    if (undoState.batchStack.length === 0) {
       const currentProject = (store.getState() as RootState).project;
       undoState.batchSnapshot = safeClone(currentProject);
-      undoState.batchLabel = (action.payload as string) || 'Batch Operation';
+      undoState.batchLabel = payload.label || 'Batch Operation';
+      undoState.batchDirty = false;
+      undoState.batchSimulationSnapshotHandled = false;
     }
-    undoState.batchDepth++;
-    return; // Don't pass through
+    undoState.batchStack.push({ token: payload.token, mode: payload.mode });
+    return;
   }
 
   if (actionType === 'undo/endBatch') {
-    if (undoState.batchDepth > 0) undoState.batchDepth--;
-    if (undoState.batchDepth === 0 && undoState.batchSnapshot) {
-      // Push the pre-batch snapshot as a single undo entry
-      undoState.past.push(undoState.batchSnapshot);
-      undoState.pastEntries.push({
-        label: undoState.batchLabel || 'Batch Operation',
-        actionType: 'batch',
-        timestamp: Date.now(),
-      });
-      if (undoState.past.length > MAX_HISTORY) {
-        undoState.past.shift();
-        undoState.pastEntries.shift();
-      }
-      undoState.future.length = 0;
-      undoState.futureEntries.length = 0;
-      undoState.batchSnapshot = null;
-      undoState.batchLabel = null;
-      bumpRevision();
-    }
-    return; // Don't pass through
+    const token = action.payload as UndoBatchToken | undefined;
+    const activeBatch = undoState.batchStack.at(-1);
+    if (!token || !activeBatch || activeBatch.token !== token) return;
+    undoState.batchStack.pop();
+    if (undoState.batchStack.length === 0) finalizeExplicitBatch();
+    return;
   }
 
   // Track project actions (except restoreState and loadProject)
   if (actionType.startsWith('project/') && actionType !== 'project/restoreState' && actionType !== 'project/loadProject') {
+    const hadActiveBatch = undoState.batchStack.length > 0;
+    const capturedByBatch = hadActiveBatch && activeBatchCaptures(action);
+    if (hadActiveBatch && !capturedByBatch) {
+      // Commit the owned gesture before recording an unrelated action so
+      // history order remains causal and every gesture token is invalidated.
+      finalizeExplicitBatch();
+    }
+
     const now = Date.now();
     const isSameAction = actionType === undoState.batchingAction;
     const isRecent = (now - undoState.lastSnapshotTime) < UNDO_BATCH_MS;
 
-    // Auto-save simulation state before pattern edit (for undo integration)
-    const simState = (store.getState() as RootState).simulation?.simulationState;
-    if (simState && simState !== 'idle' && _snapshotSave && !(isSameAction && isRecent)) {
-      _snapshotSave('auto-pre-edit');
-    }
-
-    // Batch rapid identical actions (e.g. slider-driven updatePiece) into one undo step
-    // Skip snapshot if inside an explicit batch (handled by startBatch/endBatch)
-    if (undoState.batchDepth > 0) {
-      // Inside batch — suppress snapshot, just clear redo and pass through
+    if (capturedByBatch) {
+      snapshotSimulationForFirstBatchMutation(store);
+      undoState.batchDirty = true;
       undoState.future.length = 0;
       undoState.futureEntries.length = 0;
       undoState.lastSnapshotTime = now;
@@ -302,6 +422,15 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
       bumpRevision();
       return next(action);
     }
+
+    // Auto-save simulation state before pattern edit (for undo integration)
+    const simState = (store.getState() as RootState).simulation?.simulationState;
+    if (simState && simState !== 'idle' && _snapshotSave && !(isSameAction && isRecent)) {
+      _snapshotSave('auto-pre-edit');
+    }
+
+    // Batch rapid identical actions (e.g. slider-driven updatePiece) into one undo step.
+    // Owned explicit-batch actions already returned through the branch above.
     if (!(isSameAction && isRecent)) {
       const currentProject = (store.getState() as RootState).project;
       const snapshot = safeClone(currentProject);
@@ -332,8 +461,7 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     undoState.future.length = 0;
     undoState.pastEntries.length = 0;
     undoState.futureEntries.length = 0;
-    undoState.lastSnapshotTime = 0;
-    undoState.batchingAction = null;
+    resetExplicitBatchState();
     bumpRevision();
   }
 

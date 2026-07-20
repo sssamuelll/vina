@@ -93,13 +93,19 @@ function setup(tool: Tool2D, pieces: PatternPiece[], tools: Tools) {
 }
 
 // zoom=1, pan=0, rect en origen → punto de pantalla === punto de patrón.
-function downOn(pieceId: string | null, x: number, y: number) {
+function downOn(pieceId: string | null, x: number, y: number, selected = false) {
   return {
     button: 0, shiftKey: false, altKey: false, ctrlKey: false, metaKey: false,
     clientX: x, clientY: y,
     target: {
       closest: (_s: string) => (pieceId ? { getAttribute: () => pieceId } : null),
-      ownerSVGElement: null,
+      ownerSVGElement: selected
+        ? {
+            querySelectorAll: () => [{
+              getAttribute: () => pieceId,
+            }],
+          }
+        : null,
     },
     currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
   } as unknown as React.MouseEvent<SVGSVGElement>;
@@ -165,6 +171,24 @@ describe('enrutado del transform box en select', () => {
     act(() => { store.dispatch(selectPiece('p1')); });
     act(() => { hook.result.current.handleMouseDown(downOn('p1', 5, 5)); });
     expect(tj.handleMouseDown).not.toHaveBeenCalled();
+  });
+});
+
+describe('entrada a edición de nodos en una pieza rotada', () => {
+  it('abre el nodo que está bajo su glifo rotado visible', () => {
+    const nodeEditor = idleNodeEditor();
+    const tools = makeTools({ nodeEditor, transformTool: idleTransform() });
+    const rotated = { ...pieceP1(), rotation: 90 } as PatternPiece;
+    const { hook, store } = setup('select', [rotated], tools);
+    act(() => { store.dispatch(selectPiece('p1')); });
+
+    // Local (100,0) se dibuja en (100,100) al rotar 90° sobre el centro.
+    act(() => { hook.result.current.handleMouseDown(downOn('p1', 100, 100, true)); });
+
+    expect(nodeEditor.enterEdit).toHaveBeenCalledWith(
+      'p1',
+      expect.objectContaining({ commandIndex: 1, pointType: 'anchor' }),
+    );
   });
 });
 
