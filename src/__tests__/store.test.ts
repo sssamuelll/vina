@@ -16,7 +16,7 @@ import editorReducer, {
 } from '../store/editorSlice';
 import {
   undoMiddleware, canUndo, canRedo, batchUndo, beginUndoBatch,
-  endUndoBatch, getHistory, getUndoLength,
+  endUndoBatch, getHistory, getUndoLength, withUndoBatchToken,
 } from '../store/undoMiddleware';
 import { PatternPiece } from '../types/types';
 
@@ -505,8 +505,8 @@ describe('Undo batch grouping', () => {
       avatar: store.getState().project.avatar, createdAt: 0, updatedAt: 0,
     }));
     const before = getUndoLength();
-    beginUndoBatch(store.dispatch, 'Empty gesture');
-    endUndoBatch(store.dispatch);
+    const token = beginUndoBatch(store.dispatch, 'Empty gesture');
+    endUndoBatch(store.dispatch, token);
     expect(getUndoLength()).toBe(before);
   });
 
@@ -519,11 +519,17 @@ describe('Undo batch grouping', () => {
       avatar: store.getState().project.avatar, createdAt: 0, updatedAt: 0,
     }));
     const before = getUndoLength();
-    beginUndoBatch(store.dispatch, 'Editar puntos del patrón');
-    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'A' }));
+    const token = beginUndoBatch(store.dispatch, 'Editar puntos del patrón');
+    store.dispatch(withUndoBatchToken(
+      updatePiece({ ...store.getState().project.pieces[0], name: 'A' }),
+      token,
+    ));
     vi.advanceTimersByTime(750);
-    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'B' }));
-    endUndoBatch(store.dispatch);
+    store.dispatch(withUndoBatchToken(
+      updatePiece({ ...store.getState().project.pieces[0], name: 'B' }),
+      token,
+    ));
+    endUndoBatch(store.dispatch, token);
     expect(getUndoLength()).toBe(before + 1);
     expect(getHistory().past.at(-1)?.label).toBe('Editar puntos del patrón');
   });
@@ -534,12 +540,15 @@ describe('Undo batch grouping', () => {
       id: 'test', name: 'Test', pieces: [makePiece('p')], seams: [], fabrics: [],
       avatar: store.getState().project.avatar, createdAt: 0, updatedAt: 0,
     }));
-    beginUndoBatch(store.dispatch, 'Editar puntos del patrón');
-    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'Moved' }));
+    const token = beginUndoBatch(store.dispatch, 'Editar puntos del patrón');
+    store.dispatch(withUndoBatchToken(
+      updatePiece({ ...store.getState().project.pieces[0], name: 'Moved' }),
+      token,
+    ));
     store.dispatch({ type: 'editor/undo' });
     expect(store.getState().project.pieces[0].name).toBe('Test');
     expect(canRedo()).toBe(true);
-    endUndoBatch(store.dispatch);
+    endUndoBatch(store.dispatch, token);
   });
 
   it('finalizes an open dirty batch before editor/redo without leaking a late endBatch', () => {
@@ -550,13 +559,16 @@ describe('Undo batch grouping', () => {
     }));
     store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'Existing' }));
     store.dispatch({ type: 'editor/undo' });
-    beginUndoBatch(store.dispatch, 'New gesture');
-    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'Moved' }));
+    const token = beginUndoBatch(store.dispatch, 'New gesture');
+    store.dispatch(withUndoBatchToken(
+      updatePiece({ ...store.getState().project.pieces[0], name: 'Moved' }),
+      token,
+    ));
 
     store.dispatch({ type: 'editor/redo' });
     expect(store.getState().project.pieces[0].name).toBe('Moved');
     expect(getUndoLength()).toBe(1);
-    endUndoBatch(store.dispatch);
+    endUndoBatch(store.dispatch, token);
     expect(getUndoLength()).toBe(1);
 
     store.dispatch({ type: 'editor/undo' });
@@ -569,9 +581,12 @@ describe('Undo batch grouping', () => {
       id: 'test', name: 'Test', pieces: [makePiece('p')], seams: [], fabrics: [],
       avatar: store.getState().project.avatar, createdAt: 0, updatedAt: 0,
     }));
-    beginUndoBatch(store.dispatch, 'Gesture');
-    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'Inside' }));
-    endUndoBatch(store.dispatch);
+    const token = beginUndoBatch(store.dispatch, 'Gesture');
+    store.dispatch(withUndoBatchToken(
+      updatePiece({ ...store.getState().project.pieces[0], name: 'Inside' }),
+      token,
+    ));
+    endUndoBatch(store.dispatch, token);
     const afterBatch = getUndoLength();
     store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'After' }));
     expect(getUndoLength()).toBe(afterBatch + 1);
@@ -584,15 +599,21 @@ describe('Undo batch grouping', () => {
       avatar: store.getState().project.avatar, createdAt: 0, updatedAt: 0,
     };
     store.dispatch(loadProject(project));
-    beginUndoBatch(store.dispatch, 'Abandoned gesture');
-    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'Inside' }));
+    const abandonedToken = beginUndoBatch(store.dispatch, 'Abandoned gesture');
+    store.dispatch(withUndoBatchToken(
+      updatePiece({ ...store.getState().project.pieces[0], name: 'Inside' }),
+      abandonedToken,
+    ));
     store.dispatch(loadProject(project));
-    endUndoBatch(store.dispatch);
+    endUndoBatch(store.dispatch, abandonedToken);
     expect(canUndo()).toBe(false);
 
-    beginUndoBatch(store.dispatch, 'Fresh gesture');
-    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'Fresh' }));
-    endUndoBatch(store.dispatch);
+    const freshToken = beginUndoBatch(store.dispatch, 'Fresh gesture');
+    store.dispatch(withUndoBatchToken(
+      updatePiece({ ...store.getState().project.pieces[0], name: 'Fresh' }),
+      freshToken,
+    ));
+    endUndoBatch(store.dispatch, freshToken);
     expect(getUndoLength()).toBe(1);
   });
 
@@ -682,5 +703,33 @@ describe('Undo batch grouping', () => {
 
     expect(store.getState().project.pieces).toHaveLength(3);
     expect(getUndoLength()).toBe(undoBefore + 1);
+  });
+
+  it('finalizes nested capture-all batches when the callback throws', () => {
+    const store = createStore();
+    store.dispatch(loadProject({
+      id: 'test', name: 'Test', pieces: [], seams: [], fabrics: [],
+      avatar: store.getState().project.avatar, createdAt: 0, updatedAt: 0,
+    }));
+    const undoBefore = getUndoLength();
+
+    expect(() => batchUndo(store.dispatch, 'Outer failure', () => {
+      store.dispatch(addPiece(makePiece('e1')));
+      batchUndo(store.dispatch, 'Inner failure', () => {
+        store.dispatch(addPiece(makePiece('e2')));
+        throw new Error('expected batch failure');
+      });
+    })).toThrow('expected batch failure');
+
+    expect(getUndoLength()).toBe(undoBefore + 1);
+    batchUndo(store.dispatch, 'Fresh after failure', () => {
+      store.dispatch(addPiece(makePiece('e3')));
+    });
+    expect(getUndoLength()).toBe(undoBefore + 2);
+
+    store.dispatch({ type: 'editor/undo' });
+    expect(store.getState().project.pieces.map((piece) => piece.id)).toEqual(['e1', 'e2']);
+    store.dispatch({ type: 'editor/undo' });
+    expect(store.getState().project.pieces).toHaveLength(0);
   });
 });

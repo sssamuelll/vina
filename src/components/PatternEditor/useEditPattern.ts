@@ -12,7 +12,13 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
-import { beginUndoBatch, endUndoBatch } from '../../store/undoMiddleware';
+import {
+  beginUndoBatch,
+  endUndoBatch,
+  isUndoBatchTokenActive,
+  withUndoBatchToken,
+  type UndoBatchToken,
+} from '../../store/undoMiddleware';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import {
   extractNodes,
@@ -147,18 +153,21 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   const [state, setState] = useState<EditPatternState>({ ...INITIAL_STATE });
   const dragRef = useRef<DragState | null>(null);
-  const dragBatchOpenRef = useRef(false);
+  const dragBatchTokenRef = useRef<UndoBatchToken | null>(null);
 
-  const beginDragBatch = useCallback(() => {
-    if (dragBatchOpenRef.current) return;
-    beginUndoBatch(dispatch, 'Editar puntos del patrón');
-    dragBatchOpenRef.current = true;
+  const beginDragBatch = useCallback((): UndoBatchToken => {
+    const current = dragBatchTokenRef.current;
+    if (current && isUndoBatchTokenActive(current)) return current;
+    const token = beginUndoBatch(dispatch, 'Editar puntos del patrón');
+    dragBatchTokenRef.current = token;
+    return token;
   }, [dispatch]);
 
   const endDragBatch = useCallback(() => {
-    if (!dragBatchOpenRef.current) return;
-    dragBatchOpenRef.current = false;
-    endUndoBatch(dispatch);
+    const token = dragBatchTokenRef.current;
+    if (!token) return;
+    dragBatchTokenRef.current = null;
+    endUndoBatch(dispatch, token);
   }, [dispatch]);
   /**
    * Outline object (by identity) this hook itself dispatched. The resync
@@ -204,7 +213,11 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   // ─── Helper: dispatch piece update and refresh nodes ───
 
   const dispatchAndRefresh = useCallback(
-    (piece: PatternPiece, newOutline: PatternPiece['outline']) => {
+    (
+      piece: PatternPiece,
+      newOutline: PatternPiece['outline'],
+      undoBatchToken?: UndoBatchToken,
+    ) => {
       const updated: PatternPiece = {
         ...piece,
         position: compensatePositionForPivotChange(piece, newOutline),
@@ -214,7 +227,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         updatedAt: Date.now(),
       };
       expectedOutlineRef.current = newOutline;
-      dispatch(updatePiece(updated));
+      const action = updatePiece(updated);
+      dispatch(undoBatchToken ? withUndoBatchToken(action, undoBatchToken) : action);
       const newNodes = extractNodes(updated);
       setState(s => ({ ...s, nodes: newNodes }));
       return newNodes;
@@ -438,7 +452,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
             : { x: dxS, y: dyS };
 
           if (drag.startPositions.size === 0 || (dx === 0 && dy === 0)) return true;
-          beginDragBatch();
+          const undoBatchToken = beginDragBatch();
 
           let outline = piece.outline;
           for (const [cmdIdx, startPos] of drag.startPositions) {
@@ -449,7 +463,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
             outline = applyNodeMove(outline, cmdIdx, 'anchor', newPos);
           }
 
-          dispatchAndRefresh(piece, outline);
+          dispatchAndRefresh(piece, outline, undoBatchToken);
           return true;
         }
 

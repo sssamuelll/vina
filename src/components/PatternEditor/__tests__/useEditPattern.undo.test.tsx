@@ -146,6 +146,37 @@ describe('useEditPattern undo gesture integration', () => {
     expect(outline()).toEqual(original);
   });
 
+  it('reopens an invalidated gesture batch after an unrelated project action', () => {
+    const { store, ref } = setup(squarePiece());
+    const outline = () => store.getState().project.pieces[0].outline;
+    const original = structuredClone(outline());
+    const historyBefore = getUndoLength();
+
+    act(() => { ref.current!.handleMouseDown(mouseAt({ x: 100, y: 0 })); });
+    act(() => { ref.current!.handleMouseMove(mouseAt({ x: 110, y: 0 })); });
+    act(() => {
+      store.dispatch(updatePiece({
+        ...store.getState().project.pieces[0],
+        name: 'Foreign action',
+      }));
+    });
+    act(() => { ref.current!.handleMouseMove(mouseAt({ x: 120, y: 0 })); });
+    act(() => { ref.current!.handleMouseUp(); });
+
+    expect(getUndoLength()).toBe(historyBefore + 3);
+    expect(outline()[1].values).toEqual([120, 0]);
+    expect(store.getState().project.pieces[0].name).toBe('Foreign action');
+
+    act(() => { store.dispatch({ type: 'editor/undo' }); });
+    expect(outline()[1].values).toEqual([110, 0]);
+    expect(store.getState().project.pieces[0].name).toBe('Foreign action');
+    act(() => { store.dispatch({ type: 'editor/undo' }); });
+    expect(outline()[1].values).toEqual([110, 0]);
+    expect(store.getState().project.pieces[0].name).toBe('Square');
+    act(() => { store.dispatch({ type: 'editor/undo' }); });
+    expect(outline()).toEqual(original);
+  });
+
   it('groups a segment drag under the same single-entry contract', () => {
     const { store, ref } = setup(squarePiece());
     const original = structuredClone(store.getState().project.pieces[0].outline);
