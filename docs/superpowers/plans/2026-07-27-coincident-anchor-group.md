@@ -1154,7 +1154,7 @@ Si los pasos anteriores no exigieron cambios, no hay commit. Si sí, commitear c
 Con `npm run dev`, importar `tests/fixtures/garments/maria_patrones_samuel_2M.dxf`, activar `Editar patrón` con `Q` y sobre una esquina:
 
 1. Arrastrarla: debe moverse entera al primer intento, sin dejar punto atrás ni abrir púa.
-2. Ctrl+Z: el contorno vuelve. (Si los glifos quedan flotando, eso es el bug de resync de `useEditCurve`, que es otro PR — solo ocurre entrando con doble clic desde `Seleccionar`.)
+2. Ctrl+Z: el contorno vuelve.
 3. Seleccionarla y pulsar `Delete`: la esquina desaparece de verdad.
 4. Mirar el escote: los cuadrados deben verse limpios, sin círculo estampado, y los puntos de curva más discretos.
 

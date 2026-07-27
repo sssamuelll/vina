@@ -6,6 +6,8 @@
 **Alcance:** clasificación de anclas y operaciones de edición de nodos del PatternEditor 2D
 **No modifica:** `PatternPiece`, `PathCommand`, el esquema zod, IndexedDB, el importador DXF, `detectCorners` ni el umbral angular
 
+> **Enmienda 2026-07-27:** el alcance se amplió por decisión explícita de Samuel («todos los pendientes en este mismo PR») para incluir también el resync de `useEditCurve` y el port del undo por gesto (Task 8 del plan). §3 y §12 abajo todavía describen ese resync como no-objetivo diferido a otro PR; quedó cerrado en esta misma rama, no en una posterior.
+
 ---
 
 ## 1. Resumen ejecutivo
@@ -91,7 +93,7 @@ Los tres se invierten a propósito y el commit lo dice.
 - No se unifican los dos detectores de esquina que conviven en el repo.
 - No se deduplican los vértices coincidentes en el importador. Esta spec depende de que existan.
 - No se fusionan `useEditPattern` y `useEditCurve`, ni se unifica su hit-testing.
-- No se corrige el resync de `useEditCurve` (el undo que deja puntos flotando). Es un bug de otra familia y va en su propio PR.
+- ~~No se corrige el resync de `useEditCurve` (el undo que deja puntos flotando). Es un bug de otra familia y va en su propio PR.~~ **Superado por la enmienda del 2026-07-27**: Samuel amplió el alcance para cerrar todos los pendientes en este mismo PR. El resync y el undo por gesto de `useEditCurve` se cerraron en la Task 8 del plan — sigue siendo conceptualmente un bug de otra familia, pero ya no está diferido.
 
 ## 4. Experiencia de usuario
 
@@ -279,7 +281,7 @@ Los pasos 1-3 arreglan daño real al patrón y podrían salir solos si hiciera f
 
 ## 12. Trabajo adyacente, fuera de esta spec
 
-- **Resync de `useEditCurve`.** Tras un Ctrl+Z el contorno vuelve pero los nodos del hook conservan posiciones e índices viejos, así que los glifos quedan flotando y el siguiente arrastre escribe en el comando equivocado. `useEditPattern` ya tiene la solución (`resyncStateToPiece` más el efecto de identidad de outline en `useEditPattern.ts:278-297`); `useEditCurve` no importa siquiera `useEffect`. Es la queja 3 de la nota #167 y sigue viva.
+- ~~**Resync de `useEditCurve`.**~~ **Cerrado en esta misma rama (Task 8 del plan, enmienda 2026-07-27).** Tras un Ctrl+Z el contorno volvía pero los nodos del hook conservaban posiciones e índices viejos, así que los glifos quedaban flotando y el siguiente arrastre escribía en el comando equivocado. `useEditPattern` ya tenía la solución (`resyncStateToPiece` más el efecto de identidad de outline en `useEditPattern.ts:278-297`); `useEditCurve` no importaba siquiera `useEffect`. Era la queja 3 de la nota #167. Samuel decidió cerrar todos los pendientes en el mismo PR en vez de diferirlo, así que ya no sigue viva.
 - **Clasificación de anclas `C/Q` por tangentes de puntos de control.** `CURVE_RESOLUTION = 12` es fijo por comando (`src/utils/seam/index.ts:4`), así que partir una curva con `splitSegmentAt` duplica las muestras y reclasifica puntos sin que nadie mueva nada. Es la única dependencia de resolución reproducible en la ruta viva del producto. Unas ocho líneas, cuando alguien lo reporte.
 - **Importar las capas 2/3 del DXF.** `converter.ts:441-452` descarta los puntos de trazado y de curva que CLO declara, con el comentario de que son ruido. Es el camino de subida el día que se necesite el tipo de punto en piezas sin gemelos, o que el grading necesite un productor de reglas.
 

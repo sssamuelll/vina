@@ -44,15 +44,22 @@ export function classifyEditableAnchors(
   nodes: EditableNode[],
 ): ClassifiedAnchor[] {
   const closed = piece.outline.some((command) => command.type === 'Z');
-  const endpoints = new Set<number>();
-  if (!closed && nodes.length > 0) {
-    endpoints.add(nodes[0].ref.commandIndex);
-    endpoints.add(nodes[nodes.length - 1].ref.commandIndex);
-  }
 
   const groupOf = new Map<number, number[]>();
   for (const members of coincidentAnchorGroups(piece.outline).values()) {
     for (const index of members) groupOf.set(index, members);
+  }
+
+  // An open endpoint's role wins for its whole coincident group (spec §7),
+  // not just the literal first/last command: CLO doubles the vertex at an
+  // open path's endpoint too, and the twin has no angular break of its own
+  // to fall back on (detectCorners reads the reversal as a break), so
+  // without this it stacked a corner glyph on the endpoint diamond.
+  const endpoints = new Set<number>();
+  if (!closed && nodes.length > 0) {
+    for (const index of [nodes[0].ref.commandIndex, nodes[nodes.length - 1].ref.commandIndex]) {
+      for (const member of groupOf.get(index) ?? [index]) endpoints.add(member);
+    }
   }
 
   // A detected corner colours every member of its group. Claiming one node per

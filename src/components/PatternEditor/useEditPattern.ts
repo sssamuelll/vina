@@ -269,6 +269,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     endDragBatch();
     setState({ ...INITIAL_STATE });
     dragRef.current = null;
+    expectedOutlineRef.current = null;
     seenOutlineRef.current = null;
   }, [endDragBatch]);
 

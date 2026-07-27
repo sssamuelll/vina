@@ -124,8 +124,13 @@ describe('classifyEditableAnchors', () => {
       { type: 'L', values: [100, 0] },
     ]);
     // El último nodo comparte coordenada con el anterior; el extremo abierto
-    // manda igual, que es la prioridad declarada en la spec §7.
+    // manda igual, que es la prioridad declarada en la spec §7. El extremo
+    // se propaga a TODO el grupo: el nodo 2 es el gemelo coincidente del
+    // nodo 3 y debe llevar el mismo rol, o el defecto que esta spec existe
+    // para eliminar (glifos distintos apilados en la misma coordenada)
+    // sobrevive en los contornos abiertos.
     expect(result[0].role).toBe('openEndpoint');
+    expect(result[2].role).toBe('openEndpoint');
     expect(result[3].role).toBe('openEndpoint');
   });
 
