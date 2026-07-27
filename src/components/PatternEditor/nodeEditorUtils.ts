@@ -58,6 +58,43 @@ export function getAnchor(cmd: PathCommand): Point2D | null {
   }
 }
 
+/** Grouping key for an anchor: exact coordinate quantised to the nanometre. */
+function anchorKey(point: Point2D): string {
+  return `${Math.round(point.x * 1e6)}|${Math.round(point.y * 1e6)}`;
+}
+
+/**
+ * Command indices grouped by exact anchor coordinate. Z contributes nothing.
+ *
+ * CLO doubles the vertex at every turn point, so a corner arrives as two (or
+ * three) commands at the identical coordinate. Treating that group as one
+ * point is what keeps a drag from tearing the outline into a spike.
+ *
+ * ponytail: exact equality, never epsilon — epsilon grouping is non-transitive
+ * (A~B, B~C, A!~C) and would make the result depend on iteration order, which
+ * is the opposite of a deterministic attribute. Two anchors 0.001mm apart do
+ * not group; moving one leaves the other 0.001mm away, geometrically inert.
+ */
+export function coincidentAnchorGroups(outline: PathCommand[]): Map<string, number[]> {
+  const groups = new Map<string, number[]>();
+  for (let i = 0; i < outline.length; i++) {
+    const anchor = getAnchor(outline[i]);
+    if (!anchor) continue;
+    const key = anchorKey(anchor);
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(i);
+    else groups.set(key, [i]);
+  }
+  return groups;
+}
+
+/** Command indices sharing an anchor with `commandIndex`, including itself. */
+export function anchorGroupOf(outline: PathCommand[], commandIndex: number): number[] {
+  const anchor = getAnchor(outline[commandIndex]);
+  if (!anchor) return [];
+  return coincidentAnchorGroups(outline).get(anchorKey(anchor)) ?? [];
+}
+
 // ─── Public Functions ───
 
 /** Extract editable nodes from a piece's outline */
