@@ -1139,7 +1139,9 @@ Expected: cero errores y cero warnings.
 
 Run: `git diff main...HEAD --stat`
 
-Comprobar que el diff **no** toca: `src/types/types.ts`, `src/store/projectSchema.ts`, `src/utils/dxf/`, `src/utils/notchAnchor.ts`, `src/utils/outlineAnalysis.ts`, `src/components/PatternEditor/useEditCurve.ts`. Si alguno aparece, se salió del alcance de la spec y hay que revertir esa parte.
+Comprobar que el diff **no** toca: `src/types/types.ts`, `src/store/projectSchema.ts`, `src/utils/dxf/`, `src/utils/notchAnchor.ts`, `src/utils/outlineAnalysis.ts`. Si alguno aparece, se salió del alcance de la spec y hay que revertir esa parte.
+
+> **Enmienda 2026-07-27:** `src/components/PatternEditor/useEditCurve.ts` salía de esta lista, porque el resync era no-objetivo. Samuel amplió el alcance para cerrar todos los pendientes en el mismo PR, así que ese archivo **sí** se toca, y solo en la Task 8. La auditoría de este paso se corre después de la Task 8, no antes.
 
 - [ ] **Step 5: Commit de cierre si quedó algo pendiente**
 
@@ -1155,3 +1157,277 @@ Con `npm run dev`, importar `tests/fixtures/garments/maria_patrones_samuel_2M.dx
 2. Ctrl+Z: el contorno vuelve. (Si los glifos quedan flotando, eso es el bug de resync de `useEditCurve`, que es otro PR — solo ocurre entrando con doble clic desde `Seleccionar`.)
 3. Seleccionarla y pulsar `Delete`: la esquina desaparece de verdad.
 4. Mirar el escote: los cuadrados deben verse limpios, sin círculo estampado, y los puntos de curva más discretos.
+
+---
+
+### Task 8: Resync y undo por gesto en `useEditCurve`
+
+> **Añadida 2026-07-27** por decisión de Samuel («todos los pendientes en este mismo PR»). El spec la había declarado no-objetivo por ser «un bug de otra familia»; sigue siéndolo conceptualmente, pero se cierra aquí. **Correr la Task 7 (gate) después de esta, no antes.**
+
+Es la queja 3 de la nota #167 de María: *«si mueves puntos y deshaces la acción (ctrl+Z), los puntos desaparecen de la línea»*. El PR #963 cerró eso en `useEditPattern` (la herramienta `Q`), pero `useEditCurve` —a la que se llega con el gesto por defecto, `Seleccionar` + doble clic sobre la pieza— nunca lo recibió. Ese hook ni siquiera importa `useEffect`, así que no puede tener resync: tras un Ctrl+Z el contorno del store vuelve, pero `state.nodes` conserva posiciones **e índices** viejos, así que los glifos quedan flotando fuera del trazo y el siguiente arrastre escribe en el comando equivocado. Además cada `mousemove` despacha `updatePiece` suelto, así que un arrastre con una pausa de más de 500 ms deja dos entradas de historial y el primer Ctrl+Z deshace a medias.
+
+Se porta el patrón ya probado de `useEditPattern`, sin inventar nada.
+
+**Files:**
+- Modify: `src/components/PatternEditor/useEditCurve.ts` (archivo completo, 201 líneas)
+- Create: `src/components/PatternEditor/__tests__/useEditCurve.undo.test.tsx`
+
+**Interfaces:**
+- Consumes: `beginUndoBatch(dispatch, label): UndoBatchToken`, `endUndoBatch(dispatch, token)`, `isUndoBatchTokenActive(token)`, `withUndoBatchToken(action, token)` de `src/store/undoMiddleware.ts`; `extractNodes` de `nodeEditorUtils`.
+- Produces: ningún símbolo exportado nuevo. `useEditCurve` conserva su firma y su objeto de retorno.
+
+**Por qué NO se reutiliza `resyncStateToPiece`:** está tipada contra `EditPatternState`, cuya selección es `selectedNodes: Set<number>` / `selectedSegments: Set<number>`. `EditCurveState` tiene `selectedNode: NodeRef | null`. Son formas distintas; generalizar la función para dos consumidores con estados diferentes cuesta más que las ocho líneas del equivalente local.
+
+- [ ] **Step 1: Escribir las regresiones rojas**
+
+Crear `src/components/PatternEditor/__tests__/useEditCurve.undo.test.tsx`. Montar `useEditCurve` con `renderHook` sobre un store REAL configurado igual que el de `__tests__/editPatternHarness.tsx` (reducers `project` + `copilotUI`, con `undoMiddleware`). Si el harness compartido se puede reusar tal cual, reusarlo; si está atado a `useEditPattern`, replicar solo la construcción del store, no duplicar el componente.
+
+Cuatro tests, con los cuerpos escritos completos (los comentarios de abajo son el contrato de cada uno, no marcadores de posición):
+
+1. **`reattaches the overlay nodes to the reverted outline`** — entrar a edición, arrastrar el nodo del índice 1 de (100,0) a (140,0), soltar, despachar `{ type: 'editor/undo' }` sobre el store real, y afirmar DOS cosas: que el outline volvió a `[100, 0]`, y que `hook.nodes[1].position` volvió a `{ x: 100, y: 0 }`. Antes del arreglo la segunda falla: el nodo se queda en 140. Este es el test que reproduce la captura de María.
+2. **`turns a drag longer than 500ms into a single undo entry`** — arrastrar en dos tramos con el reloj simulado avanzando más de 500 ms entre ellos, soltar, y afirmar que UN solo `editor/undo` devuelve el outline original. Antes del arreglo hacen falta dos.
+3. **`does not add history for a click without movement`** — `handleMouseDown` + `handleMouseUp` sin mover: la longitud del historial no cambia.
+4. **`keeps the node passed to enterEdit selected`** — llamar `enterEdit(pieceId, ref)` y afirmar que `hook.selectedNode` sigue siendo `ref` después de que corran los efectos. Protege el sembrado de `seenOutlineRef`: sin él, el efecto de resync se dispara en su primera pasada y borra la selección que `enterEdit` acaba de poner.
+
+Pieza de prueba (cuadrado simple, sin vértices duplicados, para que el test aísle el resync y no el agrupamiento):
+
+```tsx
+function squarePiece(): PatternPiece {
+  return {
+    id: 'p', name: 'P', position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+    seamAllowance: 0, active: true, createdAt: 0, updatedAt: 0, internals: [],
+    outline: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ],
+  } as PatternPiece;
+}
+```
+
+Para el reloj usar `vi.useFakeTimers()` con `vi.setSystemTime`, y restaurarlo en `afterEach` igual que hace `useEditPattern.undo.test.tsx`. Registrar `afterEach(cleanup)`.
+
+- [ ] **Step 2: Correr el archivo para confirmar el rojo**
+
+Run: `npx vitest run src/components/PatternEditor/__tests__/useEditCurve.undo.test.tsx`
+Expected: FAIL en «reattaches the overlay nodes» (el nodo se queda en 140) y en «single undo entry» (hacen falta dos undos).
+
+- [ ] **Step 3: Añadir imports, refs y transacción de gesto**
+
+En `src/components/PatternEditor/useEditCurve.ts`, cambiar la línea 1:
+
+```ts
+import { useState, useCallback, useEffect, useRef } from 'react';
+```
+
+Sustituir la línea 5 (que hoy importa solo `Point2D`) y añadir el import del middleware:
+
+```ts
+import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
+import {
+  beginUndoBatch,
+  endUndoBatch,
+  isUndoBatchTokenActive,
+  withUndoBatchToken,
+  type UndoBatchToken,
+} from '../../store/undoMiddleware';
+```
+
+Dentro del hook, justo después de `dragRef`:
+
+```ts
+  const dragBatchTokenRef = useRef<UndoBatchToken | null>(null);
+
+  const beginDragBatch = useCallback((): UndoBatchToken => {
+    const current = dragBatchTokenRef.current;
+    if (current && isUndoBatchTokenActive(current)) return current;
+    const token = beginUndoBatch(dispatch, 'Editar nodo');
+    dragBatchTokenRef.current = token;
+    return token;
+  }, [dispatch]);
+
+  const endDragBatch = useCallback(() => {
+    const token = dragBatchTokenRef.current;
+    if (!token) return;
+    dragBatchTokenRef.current = null;
+    endUndoBatch(dispatch, token);
+  }, [dispatch]);
+
+  /**
+   * Outline object (by identity) this hook itself dispatched. The resync
+   * effect treats a pieces change as internal only when the store outline
+   * IS that object — a boolean flag would mis-consume an external restore
+   * that lands in the same React batch as an internal edit.
+   */
+  const expectedOutlineRef = useRef<PathCommand[] | null>(null);
+  /** Last outline (by identity) of the edited piece this hook has seen. */
+  const seenOutlineRef = useRef<PathCommand[] | null>(null);
+```
+
+- [ ] **Step 4: Sembrar y limpiar las refs al entrar y salir**
+
+Sustituir `enterEdit` y `exitEdit` (líneas 51-72) por:
+
+```ts
+  const enterEdit = useCallback((pieceId: string, selectedNode?: NodeRef) => {
+    endDragBatch();
+    const piece = pieces.find(p => p.id === pieceId);
+    if (!piece) return;
+    // Seed the seen-outline identity so the resync effect first run is a
+    // no-op — otherwise it would immediately clear the node just selected.
+    seenOutlineRef.current = piece.outline;
+    expectedOutlineRef.current = null;
+    setState({
+      isEditing: true,
+      editingPieceId: pieceId,
+      selectedNode: selectedNode || null,
+      hoveredNode: null,
+      nodes: extractNodes(piece),
+    });
+    dragRef.current = null;
+  }, [pieces, endDragBatch]);
+
+  const exitEdit = useCallback(() => {
+    endDragBatch();
+    setState({
+      isEditing: false,
+      editingPieceId: null,
+      selectedNode: null,
+      hoveredNode: null,
+      nodes: [],
+    });
+    dragRef.current = null;
+    expectedOutlineRef.current = null;
+    seenOutlineRef.current = null;
+  }, [endDragBatch]);
+```
+
+- [ ] **Step 5: Abrir el batch solo en movimiento efectivo y marcar la identidad**
+
+En `handleMouseMove`, dentro de `if (dragRef.current)`, sustituir el bloque que va desde `const newPos` hasta `setState(s => ({ ...s, nodes: extractNodes(updatedPiece) }));` por:
+
+```ts
+        if (dx === 0 && dy === 0) return true;
+        const undoBatchToken = beginDragBatch();
+        const newPos: Point2D = {
+          x: dragRef.current.startPos.x + dx,
+          y: dragRef.current.startPos.y + dy,
+        };
+        const newOutline = applyNodeMove(
+          piece.outline,
+          dragRef.current.nodeRef.commandIndex,
+          dragRef.current.nodeRef.pointType,
+          newPos,
+        );
+        const updatedPiece = {
+          ...piece,
+          position: compensatePositionForPivotChange(piece, newOutline),
+          outline: newOutline,
+          updatedAt: Date.now(),
+        };
+        expectedOutlineRef.current = newOutline;
+        dispatch(withUndoBatchToken(updatePiece(updatedPiece), undoBatchToken));
+        setState(s => ({ ...s, nodes: extractNodes(updatedPiece) }));
+```
+
+Añadir `beginDragBatch` al array de dependencias de `handleMouseMove`.
+
+- [ ] **Step 6: Cerrar el batch al soltar y al desmontar**
+
+Sustituir `handleMouseUp` (líneas 182-184) por:
+
+```ts
+  const handleMouseUp = useCallback(() => {
+    dragRef.current = null;
+    endDragBatch();
+  }, [endDragBatch]);
+```
+
+Y añadir el cierre idempotente en el desmontaje, junto al efecto del paso siguiente:
+
+```ts
+  useEffect(() => () => endDragBatch(), [endDragBatch]);
+```
+
+- [ ] **Step 7: Añadir el resync por identidad de outline**
+
+A nivel de módulo, encima de `export function useEditCurve`:
+
+```ts
+/**
+ * Rebuild overlay nodes from the piece current outline after an EXTERNAL
+ * change (undo/redo restoring project state), so the anchor dots never detach
+ * from the path. Selection and hover are cleared, not remapped: command
+ * indices shift when an insert is undone, so a surviving ref would silently
+ * denote different geometry.
+ */
+function resyncCurveStateToPiece(
+  state: EditCurveState,
+  piece: PatternPiece,
+): EditCurveState {
+  return {
+    ...state,
+    nodes: extractNodes(piece),
+    selectedNode: null,
+    hoveredNode: null,
+  };
+}
+```
+
+Y dentro del hook, después de `exitEdit`:
+
+```ts
+  // Resync when the edited piece outline changes OUTSIDE this hook
+  // (undo/redo via restoreState, copilot edits). Without this the dots detach
+  // from the reverted path — nota de María #167, queja 3. The hook own
+  // dispatches are skipped by outline identity.
+  useEffect(() => {
+    if (!state.isEditing || !state.editingPieceId) return;
+    const piece = pieces.find(p => p.id === state.editingPieceId);
+    if (!piece) {
+      exitEdit();
+      return;
+    }
+    if (seenOutlineRef.current === piece.outline) return;
+    seenOutlineRef.current = piece.outline;
+    if (expectedOutlineRef.current === piece.outline) {
+      expectedOutlineRef.current = null;
+      return;
+    }
+    endDragBatch();
+    dragRef.current = null;
+    setState(s => resyncCurveStateToPiece(s, piece));
+  }, [pieces, state.isEditing, state.editingPieceId, exitEdit, endDragBatch]);
+```
+
+- [ ] **Step 8: Correr el archivo nuevo y la regresión del hook**
+
+Run:
+
+```bash
+npx vitest run src/components/PatternEditor/__tests__/useEditCurve.undo.test.tsx src/components/PatternEditor/__tests__/useEditCurve.rotation.test.tsx
+```
+
+Expected: PASS los dos. `useEditCurve.rotation.test.tsx` existe desde el PR #963 y no debe moverse.
+
+- [ ] **Step 9: Commit**
+
+Mensaje sugerido, con el trailer `Co-Authored-By` que usa el resto de la rama:
+
+```text
+fix(pattern-edit): resync y undo por gesto en useEditCurve (nota #167, queja 3)
+
+Tras un Ctrl+Z el contorno volvia pero los nodos del hook conservaban
+posiciones e indices viejos: los glifos quedaban flotando fuera del trazo y
+el siguiente arrastre escribia en el comando equivocado. Es exactamente la
+captura de Maria, y ocurria por el camino POR DEFECTO (Seleccionar + doble
+clic), no por la herramienta Q, que el PR #963 ya habia arreglado.
+
+Ademas cada mousemove despachaba updatePiece suelto, asi que un arrastre con
+una pausa de mas de 500ms dejaba dos entradas de historial.
+
+Se porta el patron ya probado de useEditPattern: identidad de outline para
+distinguir cambios propios de externos, y transaccion de gesto explicita.
+```
