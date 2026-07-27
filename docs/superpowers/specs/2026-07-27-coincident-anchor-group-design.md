@@ -27,7 +27,7 @@ Esta spec no agrega un modelo geométrico ni un campo persistido. Establece un i
 
 ## 2. Contexto medido
 
-Medición propia sobre `tests/fixtures/garments/maria_patrones_samuel_2M.dxf`, por la misma ruta de carga que usan los tests (`importDXFContent` con `{ unit: 'auto', autoDetect: true }`). Script de evidencia en `.tmp/groupStats.ts` (directorio ignorado por git).
+Medición propia sobre `tests/fixtures/garments/maria_patrones_samuel_2M.dxf`, por la misma ruta de carga que usan los tests (`importDXFContent` con `{ unit: 'auto', autoDetect: true }`). Para reproducirla: agrupar los nodos de `extractNodes` por coordenada de ancla exacta y cruzar cada grupo contra `detectCorners`. Los conteos quedan fijados como contrato ejecutable en la Task 6 del plan.
 
 | Pieza | Comandos | Nodos | Esquinas | Grupos ≥2 | Grupos con esquina | Grupos suaves |
 |---|---|---|---|---|---|---|
@@ -291,4 +291,4 @@ Los pasos 1-3 arreglan daño real al patrón y podrían salir solos si hiciera f
 - `src/components/PatternEditor/renderers/AnchorGlyph.tsx`
 - `src/utils/notchAnchor.ts`
 - Tarjeta Trello #167, `https://trello.com/c/ntvnk0pn`
-- Evidencia de medición: `.tmp/groupStats.ts`
+- Contrato ejecutable de los conteos medidos: Task 6 del plan (`src/components/PatternEditor/__tests__/anchorRoles.maria.test.ts`)
