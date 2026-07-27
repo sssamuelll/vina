@@ -29,6 +29,7 @@ import {
   deletePoint,
   convertToCurve,
   convertToLine,
+  anchorGroupOf,
   type EditableNode,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
@@ -316,13 +317,16 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       if (nodeHit) {
         const idx = nodeHit.commandIndex;
         const shift = e.shiftKey;
+        // A coincident group is one point: selecting a member selects them all,
+        // so Delete removes the corner instead of leaving its twin behind.
+        const group = anchorGroupOf(piece.outline, idx);
 
         setState(s => {
           const newSelected = new Set(shift ? s.selectedNodes : []);
           if (shift && s.selectedNodes.has(idx)) {
-            newSelected.delete(idx);
+            for (const ci of group) newSelected.delete(ci);
           } else {
-            newSelected.add(idx);
+            for (const ci of group) newSelected.add(ci);
           }
           return {
             ...s,
@@ -331,12 +335,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           };
         });
 
-        // Build startPositions for all selected nodes (including the new one)
+        // Build startPositions for all selected nodes (including the new group)
         const selectedAfterClick = new Set(e.shiftKey ? state.selectedNodes : []);
         if (e.shiftKey && state.selectedNodes.has(idx)) {
-          selectedAfterClick.delete(idx);
+          for (const ci of group) selectedAfterClick.delete(ci);
         } else {
-          selectedAfterClick.add(idx);
+          for (const ci of group) selectedAfterClick.add(ci);
         }
 
         const startPositions = new Map<number, Point2D>();
@@ -581,16 +585,16 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         // Sort indices descending to preserve earlier indices when deleting
         const indices = [...state.selectedNodes].sort((a, b) => b - a);
 
+        // All-or-nothing: deleting part of a coincident group would leave a
+        // stranded twin, and a partial multi-delete is worse than none.
+        const anchorCount = piece.outline.filter(c => c.type !== 'Z').length;
+        if (anchorCount - indices.length < 3) return;
+
         let outline = piece.outline;
         let deletedCount = 0;
         for (const idx of indices) {
-          try {
-            outline = deletePoint(outline, idx);
-            deletedCount++;
-          } catch {
-            // Cannot delete — minimum 3 points
-            break;
-          }
+          outline = deletePoint(outline, idx);
+          deletedCount++;
         }
 
         if (deletedCount > 0) {

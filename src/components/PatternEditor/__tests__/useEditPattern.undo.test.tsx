@@ -13,6 +13,7 @@ import { importDXFContent } from '../../../utils/dxf';
 import { classifyEditableAnchors } from '../anchorRoles';
 import { anchorGroupOf, extractNodes, getAnchor } from '../nodeEditorUtils';
 import { pieceLocalToPattern } from '../pieceTransform';
+export { pieceLocalToPattern };
 import { useEditPattern } from '../useEditPattern';
 import EditPatternOverlay from '../renderers/overlays/EditPatternOverlay';
 
@@ -57,7 +58,7 @@ function squarePiece(): PatternPiece {
   };
 }
 
-function setup(piece: PatternPiece) {
+export function setup(piece: PatternPiece) {
   const store = configureStore({
     reducer: { project: projectReducer },
     middleware: (getDefault) => getDefault({ serializableCheck: false })
@@ -74,7 +75,7 @@ function setup(piece: PatternPiece) {
   return { store, ref, view };
 }
 
-function mouseAt(point: Point2D): React.MouseEvent<SVGSVGElement> {
+export function mouseAt(point: Point2D): React.MouseEvent<SVGSVGElement> {
   return {
     button: 0, shiftKey: false, clientX: point.x, clientY: point.y,
     currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
