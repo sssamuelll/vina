@@ -40,14 +40,39 @@ describe('DXF real de María — contrato de grupos y roles', () => {
   it('carries 40 coincident groups, 28 of them on corners', () => {
     let groups = 0;
     let members = 0;
+    let cornerGroups = 0;
+    let cornerMembers = 0;
+    let smoothGroups = 0;
+    let smoothMembers = 0;
     for (const piece of mariaPieces()) {
+      const roleByIndex = new Map(
+        classifyEditableAnchors(piece, extractNodes(piece))
+          .map((item) => [item.node.ref.commandIndex, item.role]),
+      );
       const multi = [...coincidentAnchorGroups(piece.outline).values()]
         .filter((g) => g.length >= 2);
       groups += multi.length;
       members += multi.reduce((sum, g) => sum + g.length, 0);
+      for (const group of multi) {
+        // Uniform per group — proven by the "never stacks" test below — so
+        // the first member's role tells us which bucket the group is in.
+        if (roleByIndex.get(group[0]) === 'corner') {
+          cornerGroups += 1;
+          cornerMembers += group.length;
+        } else {
+          smoothGroups += 1;
+          smoothMembers += group.length;
+        }
+      }
     }
     expect(groups).toBe(40);
     expect(members).toBe(85);
+    expect(cornerGroups).toBe(28);
+    expect(cornerMembers).toBe(58);
+    expect(smoothGroups).toBe(12);
+    expect(smoothMembers).toBe(27);
+    expect(cornerGroups + smoothGroups).toBe(groups);
+    expect(cornerMembers + smoothMembers).toBe(members);
   });
 
   it('classifies 58 corners, 27 lineEnds and 802 curve samples', () => {
