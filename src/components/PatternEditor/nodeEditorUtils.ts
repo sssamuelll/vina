@@ -145,7 +145,18 @@ export function extractNodes(piece: PatternPiece): EditableNode[] {
   return nodes;
 }
 
-/** Apply a node position change back to the PathCommand array (immutable) */
+/**
+ * Apply a node position change back to the PathCommand array (immutable).
+ *
+ * An anchor move applies to the whole coincident group: CLO doubles the vertex
+ * at every turn point, and writing to only one member leaves the twin behind,
+ * which tears the outline into a spike and leaves a glyph stranded at the old
+ * coordinate. Control-point moves are never grouped — handles are not anchors.
+ *
+ * ponytail: for a group whose members are C/Q the per-command handle coupling
+ * runs once per member. No known file has coincident Bézier anchors; if one
+ * appears, that is the case to test.
+ */
 export function applyNodeMove(
   outline: PathCommand[],
   commandIndex: number,
@@ -153,9 +164,26 @@ export function applyNodeMove(
   newPos: Point2D,
 ): PathCommand[] {
   const cmds = outline.map(c => ({ ...c, values: [...c.values] }));
-  const cmd = cmds[commandIndex];
+  if (!cmds[commandIndex]) return cmds;
 
-  if (!cmd) return cmds;
+  const targets = pointType === 'anchor'
+    ? anchorGroupOf(outline, commandIndex)
+    : [commandIndex];
+
+  for (const index of targets) moveOneCommand(cmds, index, pointType, newPos);
+
+  return cmds;
+}
+
+/** Write a single command in place. Extracted so a group can reuse it. */
+function moveOneCommand(
+  cmds: PathCommand[],
+  commandIndex: number,
+  pointType: 'anchor' | 'cp1' | 'cp2',
+  newPos: Point2D,
+): void {
+  const cmd = cmds[commandIndex];
+  if (!cmd) return;
 
   switch (cmd.type) {
     case 'M':
@@ -205,8 +233,6 @@ export function applyNodeMove(
       }
       break;
   }
-
-  return cmds;
 }
 
 /** Check if a point is within threshold of any node's anchor position */

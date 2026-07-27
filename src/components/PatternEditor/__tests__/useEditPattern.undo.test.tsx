@@ -11,7 +11,7 @@ import { canRedo, getUndoLength, undoMiddleware } from '../../../store/undoMiddl
 import type { PatternPiece, Point2D } from '../../../types/types';
 import { importDXFContent } from '../../../utils/dxf';
 import { classifyEditableAnchors } from '../anchorRoles';
-import { extractNodes, getAnchor } from '../nodeEditorUtils';
+import { anchorGroupOf, extractNodes, getAnchor } from '../nodeEditorUtils';
 import { pieceLocalToPattern } from '../pieceTransform';
 import { useEditPattern } from '../useEditPattern';
 import EditPatternOverlay from '../renderers/overlays/EditPatternOverlay';
@@ -268,8 +268,13 @@ describe('useEditPattern — DXF real de María', () => {
           JSON.stringify(command) === JSON.stringify(moved[index]) ? null : index)
         .filter((index): index is number => index !== null);
       expect(moved).toHaveLength(original.length);
-      expect(changedIndices).toEqual([target!.node.ref.commandIndex]);
-      expect(maxCoincidentMultiplicity(moved)).toBeLessThanOrEqual(originalMultiplicity);
+      // A coincident group is one point: every member moves, or the outline
+      // tears. The old assertion demanded exactly one changed command, which
+      // is the bug María reported as "a phantom point appeared".
+      expect(changedIndices).toEqual(
+        anchorGroupOf(piece.outline, target!.node.ref.commandIndex),
+      );
+      expect(maxCoincidentMultiplicity(moved)).toBe(originalMultiplicity);
       act(() => { store.dispatch({ type: 'editor/undo' }); });
       expect(outline()).toEqual(original);
       expect(roleList(view.container)).toEqual(originalRoles);

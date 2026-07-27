@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PathCommand } from '../../../types/types';
-import { anchorGroupOf, coincidentAnchorGroups } from '../nodeEditorUtils';
+import { anchorGroupOf, applyNodeMove, coincidentAnchorGroups } from '../nodeEditorUtils';
 
 const square: PathCommand[] = [
   { type: 'M', values: [0, 0] },
@@ -68,5 +68,44 @@ describe('coincidentAnchorGroups', () => {
 
   it('returns an empty group for a Z command', () => {
     expect(anchorGroupOf(square, 4)).toEqual([]);
+  });
+});
+
+describe('applyNodeMove sobre un grupo coincidente', () => {
+  it('moves every member of the group to the same coordinate', () => {
+    const moved = applyNodeMove(doubledCorner, 1, 'anchor', { x: 140, y: 40 });
+    expect(moved[1].values).toEqual([140, 40]);
+    expect(moved[2].values).toEqual([140, 40]);
+    expect(moved).toHaveLength(doubledCorner.length);
+  });
+
+  it('keeps the group intact so a second drag still finds it', () => {
+    const moved = applyNodeMove(doubledCorner, 1, 'anchor', { x: 140, y: 40 });
+    expect(anchorGroupOf(moved, 2)).toEqual([1, 2]);
+  });
+
+  it('leaves untouched commands byte-identical', () => {
+    const moved = applyNodeMove(doubledCorner, 1, 'anchor', { x: 140, y: 40 });
+    expect(moved[0].values).toEqual([0, 0]);
+    expect(moved[3].values).toEqual([100, 100]);
+    expect(moved[4].values).toEqual([0, 100]);
+  });
+
+  it('moves a lone anchor exactly as before', () => {
+    const moved = applyNodeMove(square, 1, 'anchor', { x: 140, y: 40 });
+    expect(moved[1].values).toEqual([140, 40]);
+    expect(moved[2].values).toEqual([100, 100]);
+  });
+
+  it('does not group control-point moves', () => {
+    const curved: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [10, 10, 20, 20, 100, 0] },
+      { type: 'C', values: [30, 30, 40, 40, 100, 0] },
+      { type: 'Z', values: [] },
+    ];
+    const moved = applyNodeMove(curved, 1, 'cp1', { x: 55, y: 55 });
+    expect(moved[1].values.slice(0, 2)).toEqual([55, 55]);
+    expect(moved[2].values.slice(0, 2)).toEqual([30, 30]);
   });
 });
