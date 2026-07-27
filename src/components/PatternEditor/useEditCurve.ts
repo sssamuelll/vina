@@ -1,8 +1,15 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
-import type { Point2D } from '../../types/types';
+import {
+  beginUndoBatch,
+  endUndoBatch,
+  isUndoBatchTokenActive,
+  withUndoBatchToken,
+  type UndoBatchToken,
+} from '../../store/undoMiddleware';
+import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import {
   extractNodes,
   applyNodeMove,
@@ -24,6 +31,25 @@ export interface EditCurveState {
   nodes: EditableNode[];
 }
 
+/**
+ * Rebuild overlay nodes from the piece current outline after an EXTERNAL
+ * change (undo/redo restoring project state), so the anchor dots never detach
+ * from the path. Selection and hover are cleared, not remapped: command
+ * indices shift when an insert is undone, so a surviving ref would silently
+ * denote different geometry.
+ */
+function resyncCurveStateToPiece(
+  state: EditCurveState,
+  piece: PatternPiece,
+): EditCurveState {
+  return {
+    ...state,
+    nodes: extractNodes(piece),
+    selectedNode: null,
+    hoveredNode: null,
+  };
+}
+
 export function useEditCurve(zoom: number, pan: Point2D) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
@@ -42,6 +68,33 @@ export function useEditCurve(zoom: number, pan: Point2D) {
     startPos: Point2D;
   } | null>(null);
 
+  const dragBatchTokenRef = useRef<UndoBatchToken | null>(null);
+
+  const beginDragBatch = useCallback((): UndoBatchToken => {
+    const current = dragBatchTokenRef.current;
+    if (current && isUndoBatchTokenActive(current)) return current;
+    const token = beginUndoBatch(dispatch, 'Editar nodo');
+    dragBatchTokenRef.current = token;
+    return token;
+  }, [dispatch]);
+
+  const endDragBatch = useCallback(() => {
+    const token = dragBatchTokenRef.current;
+    if (!token) return;
+    dragBatchTokenRef.current = null;
+    endUndoBatch(dispatch, token);
+  }, [dispatch]);
+
+  /**
+   * Outline object (by identity) this hook itself dispatched. The resync
+   * effect treats a pieces change as internal only when the store outline
+   * IS that object — a boolean flag would mis-consume an external restore
+   * that lands in the same React batch as an internal edit.
+   */
+  const expectedOutlineRef = useRef<PathCommand[] | null>(null);
+  /** Last outline (by identity) of the edited piece this hook has seen. */
+  const seenOutlineRef = useRef<PathCommand[] | null>(null);
+
   const toPattern = useCallback(
     (screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
       screenToPattern(screenX, screenY, svgRect, zoom, pan),
@@ -49,8 +102,13 @@ export function useEditCurve(zoom: number, pan: Point2D) {
   );
 
   const enterEdit = useCallback((pieceId: string, selectedNode?: NodeRef) => {
+    endDragBatch();
     const piece = pieces.find(p => p.id === pieceId);
     if (!piece) return;
+    // Seed the seen-outline identity so the resync effect first run is a
+    // no-op — otherwise it would immediately clear the node just selected.
+    seenOutlineRef.current = piece.outline;
+    expectedOutlineRef.current = null;
     setState({
       isEditing: true,
       editingPieceId: pieceId,
@@ -58,9 +116,11 @@ export function useEditCurve(zoom: number, pan: Point2D) {
       hoveredNode: null,
       nodes: extractNodes(piece),
     });
-  }, [pieces]);
+    dragRef.current = null;
+  }, [pieces, endDragBatch]);
 
   const exitEdit = useCallback(() => {
+    endDragBatch();
     setState({
       isEditing: false,
       editingPieceId: null,
@@ -69,7 +129,33 @@ export function useEditCurve(zoom: number, pan: Point2D) {
       nodes: [],
     });
     dragRef.current = null;
-  }, []);
+    expectedOutlineRef.current = null;
+    seenOutlineRef.current = null;
+  }, [endDragBatch]);
+
+  // Resync when the edited piece outline changes OUTSIDE this hook
+  // (undo/redo via restoreState, copilot edits). Without this the dots detach
+  // from the reverted path — nota de María #167, queja 3. The hook own
+  // dispatches are skipped by outline identity.
+  useEffect(() => {
+    if (!state.isEditing || !state.editingPieceId) return;
+    const piece = pieces.find(p => p.id === state.editingPieceId);
+    if (!piece) {
+      exitEdit();
+      return;
+    }
+    if (seenOutlineRef.current === piece.outline) return;
+    seenOutlineRef.current = piece.outline;
+    if (expectedOutlineRef.current === piece.outline) {
+      expectedOutlineRef.current = null;
+      return;
+    }
+    endDragBatch();
+    dragRef.current = null;
+    setState(s => resyncCurveStateToPiece(s, piece));
+  }, [pieces, state.isEditing, state.editingPieceId, exitEdit, endDragBatch]);
+
+  useEffect(() => () => endDragBatch(), [endDragBatch]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (!state.isEditing || !state.editingPieceId) return false;
@@ -130,6 +216,8 @@ export function useEditCurve(zoom: number, pan: Point2D) {
               -rotation * Math.PI / 180,
             )
           : { x: dxPattern, y: dyPattern };
+        if (dx === 0 && dy === 0) return true;
+        const undoBatchToken = beginDragBatch();
         const newPos: Point2D = {
           x: dragRef.current.startPos.x + dx,
           y: dragRef.current.startPos.y + dy,
@@ -146,7 +234,8 @@ export function useEditCurve(zoom: number, pan: Point2D) {
           outline: newOutline,
           updatedAt: Date.now(),
         };
-        dispatch(updatePiece(updatedPiece));
+        expectedOutlineRef.current = newOutline;
+        dispatch(withUndoBatchToken(updatePiece(updatedPiece), undoBatchToken));
         setState(s => ({ ...s, nodes: extractNodes(updatedPiece) }));
       }
       return true;
@@ -177,11 +266,12 @@ export function useEditCurve(zoom: number, pan: Point2D) {
       setState(s => ({ ...s, hoveredNode: hovered }));
     }
     return false;
-  }, [state, pieces, zoom, toPattern, dispatch]);
+  }, [state, pieces, zoom, toPattern, dispatch, beginDragBatch]);
 
   const handleMouseUp = useCallback(() => {
     dragRef.current = null;
-  }, []);
+    endDragBatch();
+  }, [endDragBatch]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && state.isEditing) {
