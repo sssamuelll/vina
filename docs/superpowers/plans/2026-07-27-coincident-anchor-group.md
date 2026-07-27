@@ -579,6 +579,8 @@ it('deletes a real corner of María pattern, group and all', () => {
 
 `setup`, `mouseAt` y `pieceLocalToPattern` viven hoy en `useEditPattern.undo.test.tsx` sin exportar. Exportarlos ahí en este mismo paso (añadir `export` a las tres declaraciones) en vez de duplicarlos.
 
+> **Erratum (registrado durante la ejecución):** esta instrucción NO se siguió tal cual. Exportar desde `useEditPattern.undo.test.tsx` hace que vitest recolecte ese archivo como punto de entrada del import y reejecute sus `describe`/`it` de nivel superior una segunda vez, atribuidos al archivo importador (9 tests duplicados). Lo que se hizo en su lugar: extraer `setup`, `mouseAt` y `pieceLocalToPattern` a `__tests__/editPatternHarness.tsx` (no-componentes) y el árbol de render a `__tests__/EditPatternTestHarness.tsx` (el componente), ninguno de los cuales matchea el glob `src/**/*.test.ts(x)` que vitest recolecta. `useEditPattern.undo.test.tsx` y `useEditPattern.groupDelete.test.tsx` importan ambos desde `editPatternHarness.tsx`. Quien ejecute las Tareas 4-7 debe importar desde `./editPatternHarness` (y `./EditPatternTestHarness` si necesita el árbol de render), no desde `useEditPattern.undo.test.tsx`.
+
 - [ ] **Step 2: Correr el archivo para confirmar el rojo**
 
 Run: `npx vitest run src/components/PatternEditor/__tests__/useEditPattern.groupDelete.test.tsx`

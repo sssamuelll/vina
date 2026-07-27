@@ -35,6 +35,7 @@ import {
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { rotatePoint } from '../../utils/geometry/transform';
 import { reanchorNotches } from '../../utils/notchReanchor';
+import { showInfoToast } from '../../store/copilotUISlice';
 import {
   compensatePositionForPivotChange,
   patternToPieceLocal,
@@ -588,32 +589,35 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         // All-or-nothing: deleting part of a coincident group would leave a
         // stranded twin, and a partial multi-delete is worse than none.
         const anchorCount = piece.outline.filter(c => c.type !== 'Z').length;
-        if (anchorCount - indices.length < 3) return;
+        if (anchorCount - indices.length < 3) {
+          dispatch(showInfoToast('No se puede borrar: la pieza necesita al menos 3 puntos'));
+          // Early return skips preventDefault, which is safe: the global
+          // delete shortcut runs on a document listener (ShortcutProvider)
+          // that never checks defaultPrevented, and Delete/Backspace have
+          // no native browser default worth suppressing here.
+          return;
+        }
 
         let outline = piece.outline;
-        let deletedCount = 0;
         for (const idx of indices) {
           outline = deletePoint(outline, idx);
-          deletedCount++;
         }
 
-        if (deletedCount > 0) {
-          const updated: PatternPiece = {
-            ...piece,
-            position: compensatePositionForPivotChange(piece, outline),
-            outline,
-            internals: reanchorNotches(piece.internals, outline),
-            updatedAt: Date.now(),
-          };
-          expectedOutlineRef.current = outline;
-          dispatch(updatePiece(updated));
-          setState(s => ({
-            ...s,
-            nodes: extractNodes(updated),
-            selectedNodes: new Set<number>(),
-            selectedSegments: new Set<number>(),
-          }));
-        }
+        const updated: PatternPiece = {
+          ...piece,
+          position: compensatePositionForPivotChange(piece, outline),
+          outline,
+          internals: reanchorNotches(piece.internals, outline),
+          updatedAt: Date.now(),
+        };
+        expectedOutlineRef.current = outline;
+        dispatch(updatePiece(updated));
+        setState(s => ({
+          ...s,
+          nodes: extractNodes(updated),
+          selectedNodes: new Set<number>(),
+          selectedSegments: new Set<number>(),
+        }));
 
         e.preventDefault();
       }

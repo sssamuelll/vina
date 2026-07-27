@@ -17,6 +17,7 @@ import { act, render } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, { loadProject } from '../../../store/projectSlice';
+import copilotUIReducer from '../../../store/copilotUISlice';
 import { undoMiddleware } from '../../../store/undoMiddleware';
 import type { PatternPiece, Point2D } from '../../../types/types';
 import EditPatternTestHarness, { type EditorApi } from './EditPatternTestHarness';
@@ -25,7 +26,7 @@ export { pieceLocalToPattern } from '../pieceTransform';
 
 export function setup(piece: PatternPiece) {
   const store = configureStore({
-    reducer: { project: projectReducer },
+    reducer: { project: projectReducer, copilotUI: copilotUIReducer },
     middleware: (getDefault) => getDefault({ serializableCheck: false })
       .concat(undoMiddleware),
   });

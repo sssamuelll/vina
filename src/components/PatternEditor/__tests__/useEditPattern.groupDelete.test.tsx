@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { act } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, cleanup } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PatternPiece } from '../../../types/types';
@@ -8,6 +8,10 @@ import { setup, mouseAt, pieceLocalToPattern } from './editPatternHarness';
 import { importDXFContent } from '../../../utils/dxf';
 import { extractNodes, anchorGroupOf } from '../nodeEditorUtils';
 import { classifyEditableAnchors } from '../anchorRoles';
+
+afterEach(() => {
+  cleanup();
+});
 
 function pieceWithDoubledCorner(): PatternPiece {
   return {
@@ -79,6 +83,9 @@ describe('useEditPattern — borrado de un grupo coincidente', () => {
       );
     });
     expect(store.getState().project.pieces[0].outline).toEqual(before);
+    expect(store.getState().copilotUI.toasts.map((t) => t.message)).toContain(
+      'No se puede borrar: la pieza necesita al menos 3 puntos',
+    );
   });
 
   it('shift-clicking a member of an unselected group adds the whole group', () => {
@@ -124,27 +131,29 @@ const MARIA_FIXTURE = resolve(
   '../../../../tests/fixtures/garments/maria_patrones_samuel_2M.dxf',
 );
 
-it('deletes a real corner of María pattern, group and all', () => {
-  const pieces = importDXFContent(readFileSync(MARIA_FIXTURE, 'utf8'), {
-    unit: 'auto', autoDetect: true,
-  }).pieces;
-  const piece = pieces.find((item) => item.outline.length > 100)!;
-  const corner = classifyEditableAnchors(piece, extractNodes(piece))
-    .find((item) => item.role === 'corner')!;
-  const group = anchorGroupOf(piece.outline, corner.node.ref.commandIndex);
-  expect(group.length).toBeGreaterThanOrEqual(2);
+describe('useEditPattern — borrado de un grupo coincidente (DXF real)', () => {
+  it('deletes a real corner of María pattern, group and all', () => {
+    const pieces = importDXFContent(readFileSync(MARIA_FIXTURE, 'utf8'), {
+      unit: 'auto', autoDetect: true,
+    }).pieces;
+    const piece = pieces.find((item) => item.outline.length > 100)!;
+    const corner = classifyEditableAnchors(piece, extractNodes(piece))
+      .find((item) => item.role === 'corner')!;
+    const group = anchorGroupOf(piece.outline, corner.node.ref.commandIndex);
+    expect(group.length).toBeGreaterThanOrEqual(2);
 
-  const { store, ref } = setup(piece);
-  const before = store.getState().project.pieces[0].outline.length;
+    const { store, ref } = setup(piece);
+    const before = store.getState().project.pieces[0].outline.length;
 
-  act(() => {
-    ref.current!.handleMouseDown(
-      mouseAt(pieceLocalToPattern(corner.node.position, piece)),
-    );
+    act(() => {
+      ref.current!.handleMouseDown(
+        mouseAt(pieceLocalToPattern(corner.node.position, piece)),
+      );
+    });
+    act(() => {
+      ref.current!.handleKeyDown(new KeyboardEvent('keydown', { key: 'Delete' }));
+    });
+
+    expect(store.getState().project.pieces[0].outline).toHaveLength(before - group.length);
   });
-  act(() => {
-    ref.current!.handleKeyDown(new KeyboardEvent('keydown', { key: 'Delete' }));
-  });
-
-  expect(store.getState().project.pieces[0].outline).toHaveLength(before - group.length);
 });
