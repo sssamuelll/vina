@@ -19,7 +19,7 @@
 - Tamaños de pantalla exactos: endpoint diamante 10 px, corner cuadrado 10 px relleno, Bézier anillo 9 px, `lineEnd` cuadrado 8 px hueco, `smoothSample` círculo 4 px sin borde.
 - Los tests de `AnchorGlyph` renderizan con `zoom2D={2}`, así que las aserciones de tamaño valen la mitad del valor de pantalla.
 - No se deduplican vértices coincidentes en el importador. Este trabajo depende de que existan.
-- No se corrige el resync de `useEditCurve` ni se unifica el hit-testing de los dos hooks.
+- ~~No se corrige el resync de `useEditCurve`~~ **superado por la enmienda del 2026-07-27**: la Task 8 lo cierra en esta misma rama. Lo que sigue vigente de esta restricción es la segunda mitad: **no se unifica el hit-testing de los dos hooks**.
 - Verificación final obligatoria: `npx tsc -b --noEmit`, `npm run test` y `npm run lint`.
 
 ---
