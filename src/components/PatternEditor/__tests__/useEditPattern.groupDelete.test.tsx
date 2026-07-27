@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PatternPiece } from '../../../types/types';
-import { setup, mouseAt, pieceLocalToPattern } from './useEditPattern.undo.test';
+import { setup, mouseAt, pieceLocalToPattern } from './editPatternHarness';
 import { importDXFContent } from '../../../utils/dxf';
 import { extractNodes, anchorGroupOf } from '../nodeEditorUtils';
 import { classifyEditableAnchors } from '../anchorRoles';
@@ -79,6 +79,43 @@ describe('useEditPattern — borrado de un grupo coincidente', () => {
       );
     });
     expect(store.getState().project.pieces[0].outline).toEqual(before);
+  });
+
+  it('shift-clicking a member of an unselected group adds the whole group', () => {
+    const piece = pieceWithDoubledCorner();
+    const { ref } = setup(piece);
+    act(() => {
+      ref.current!.handleMouseDown(
+        mouseAt(pieceLocalToPattern({ x: 0, y: 100 }, piece)),
+      );
+    });
+    act(() => {
+      ref.current!.handleMouseDown(
+        mouseAt(pieceLocalToPattern({ x: 100, y: 0 }, piece), true),
+      );
+    });
+    expect([...ref.current!.selectedNodes].sort((a, b) => a - b)).toEqual([1, 2, 4]);
+  });
+
+  it('shift-clicking a member of an already-selected group removes the whole group', () => {
+    const piece = pieceWithDoubledCorner();
+    const { ref } = setup(piece);
+    act(() => {
+      ref.current!.handleMouseDown(
+        mouseAt(pieceLocalToPattern({ x: 0, y: 100 }, piece)),
+      );
+    });
+    act(() => {
+      ref.current!.handleMouseDown(
+        mouseAt(pieceLocalToPattern({ x: 100, y: 0 }, piece), true),
+      );
+    });
+    act(() => {
+      ref.current!.handleMouseDown(
+        mouseAt(pieceLocalToPattern({ x: 100, y: 0 }, piece), true),
+      );
+    });
+    expect([...ref.current!.selectedNodes].sort((a, b) => a - b)).toEqual([4]);
   });
 });
 
