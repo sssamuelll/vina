@@ -218,8 +218,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
         key={item.label}
         className={`logo-menu__item ${isDisabled ? 'logo-menu__item--disabled' : ''}`}
         onClick={() => !hasSubmenu && handleItemClick(item)}
-        onMouseEnter={() => hasSubmenu && setHoveredSub(item.label)}
-        onMouseLeave={() => hasSubmenu && setHoveredSub(null)}
+        onMouseEnter={() => setHoveredSub(hasSubmenu ? item.label : null)}
       >
         <span className="logo-menu__check">{isChecked ? '✓' : ''}</span>
         <span className="logo-menu__label">{item.label}</span>
@@ -246,7 +245,14 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
       </button>
 
       {open && (
-        <div className="logo-menu">
+        // El flyout vive en `left: calc(100% + 4px)`: ir del item al submenú
+        // cruza una banda de 4px que pertenece al panel, no al item. Cerrar en
+        // el mouseleave del *item* convertía esa banda en zona muerta y el
+        // submenú se esfumaba a medio camino. Solo salir del panel cierra.
+        <div
+          className="logo-menu"
+          onMouseLeave={() => { setHoveredTop(null); setHoveredSub(null); }}
+        >
           {/* Top-level menu items with submenus */}
           {TOP_LEVEL.map((item, i) => {
             if ((item as unknown as { separator?: boolean }).separator) {
@@ -256,8 +262,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
               <div
                 key={item.label}
                 className={`logo-menu__item ${hoveredTop === item.label ? 'logo-menu__item--hovered' : ''}`}
-                onMouseEnter={() => setHoveredTop(item.label)}
-                onMouseLeave={() => setHoveredTop(null)}
+                onMouseEnter={() => { setHoveredTop(item.label); setHoveredSub(null); }}
               >
                 <span className="logo-menu__check" />
                 <span className="logo-menu__label">{item.label}</span>
