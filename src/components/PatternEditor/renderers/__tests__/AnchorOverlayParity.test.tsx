@@ -16,6 +16,12 @@ const piece = {
     { type: 'L', values: [50, 0] },
     { type: 'L', values: [100, 0] },
     { type: 'L', values: [100, 100] },
+    // Doubled vertex on the top edge (colinear, no angular break) so a
+    // lineEnd role actually renders — spec §8.4 claims both overlays agree
+    // on role sequence "incluyendo lineEnd"; without this the fixture never
+    // produced one.
+    { type: 'L', values: [50, 100] },
+    { type: 'L', values: [50, 100] },
     { type: 'L', values: [0, 100] },
     { type: 'Z', values: [] },
   ],
@@ -61,6 +67,7 @@ describe('anchor overlay parity', () => {
       .toEqual(roleList(view.getByTestId('node-overlay')));
     expect(roleList(view.getByTestId('edit-overlay'))).toContain('corner');
     expect(roleList(view.getByTestId('edit-overlay'))).toContain('smoothSample');
+    expect(roleList(view.getByTestId('edit-overlay'))).toContain('lineEnd');
   });
 
   it('rotates the node editor anchor group with the piece', () => {

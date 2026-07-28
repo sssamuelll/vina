@@ -39,11 +39,15 @@ describe('AnchorGlyph', () => {
     expect(Number(corner.getAttribute('width'))).toBe(5);
     cleanup();
     const smooth = draw('smoothSample').container.querySelector('circle')!;
-    expect(Number(smooth.getAttribute('r'))).toBe(1.5);
+    expect(Number(smooth.getAttribute('r'))).toBe(1);
     cleanup();
     const bezier = draw('bezierAnchor').container.querySelectorAll('circle');
     expect(bezier).toHaveLength(2);
     expect(Number(bezier[0].getAttribute('r'))).toBe(2.25);
+    cleanup();
+    const lineEnd = draw('lineEnd').container.querySelectorAll('rect');
+    expect(lineEnd).toHaveLength(2);
+    expect(Number(lineEnd[0].getAttribute('width'))).toBe(4);
   });
 
   it('keeps role shape while selected and hovered state change color', () => {
@@ -55,13 +59,23 @@ describe('AnchorGlyph', () => {
     expect(hovered.container.querySelector('rect')?.getAttribute('fill')).toBe('#6BB3FF');
   });
 
-  it('uses diamond, square, ring and small circle as distinct glyphs', () => {
+  it('uses diamond, square, ring, hollow square and dot as distinct glyphs', () => {
     expect(draw('openEndpoint').container.querySelector('polygon')).toBeTruthy();
     cleanup();
-    expect(draw('corner').container.querySelector('rect')).toBeTruthy();
+    expect(draw('corner').container.querySelector('rect')?.getAttribute('fill'))
+      .toBe('#4A9EFF');
     cleanup();
     expect(draw('bezierAnchor').container.querySelectorAll('circle')).toHaveLength(2);
     cleanup();
+    const lineEnd = draw('lineEnd').container.querySelectorAll('rect');
+    expect(lineEnd).toHaveLength(2);
+    expect(lineEnd[1].getAttribute('fill')).toBe('none');
+    cleanup();
     expect(draw('smoothSample').container.querySelectorAll('circle')).toHaveLength(1);
+  });
+
+  it('draws the curve dot without a white halo so corners stay legible', () => {
+    const smooth = draw('smoothSample').container.querySelector('circle')!;
+    expect(smooth.getAttribute('stroke')).toBeNull();
   });
 });

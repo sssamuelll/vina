@@ -23,6 +23,7 @@ export default function AnchorGlyph({
   const color = STATE_COLOR[state];
   const strokeWidth = 1.2 / zoom2D;
   const halfLarge = 5 / zoom2D;
+  const halfSmall = 4 / zoom2D;
 
   return (
     <g
@@ -57,11 +58,22 @@ export default function AnchorGlyph({
           />
         </>
       )}
+      {role === 'lineEnd' && (
+        <>
+          <rect
+            x={-halfSmall} y={-halfSmall}
+            width={halfSmall * 2} height={halfSmall * 2}
+            fill="none" stroke="#fff" strokeWidth={3 / zoom2D}
+          />
+          <rect
+            x={-halfSmall} y={-halfSmall}
+            width={halfSmall * 2} height={halfSmall * 2}
+            fill="none" stroke={color} strokeWidth={1.5 / zoom2D}
+          />
+        </>
+      )}
       {role === 'smoothSample' && (
-        <circle
-          r={3 / zoom2D} fill={color} stroke="#fff"
-          strokeWidth={strokeWidth}
-        />
+        <circle r={2 / zoom2D} fill={color} />
       )}
     </g>
   );

@@ -58,6 +58,43 @@ export function getAnchor(cmd: PathCommand): Point2D | null {
   }
 }
 
+/** Grouping key for an anchor: exact coordinate quantised to the nanometre. */
+function anchorKey(point: Point2D): string {
+  return `${Math.round(point.x * 1e6)}|${Math.round(point.y * 1e6)}`;
+}
+
+/**
+ * Command indices grouped by exact anchor coordinate. Z contributes nothing.
+ *
+ * CLO doubles the vertex at every turn point, so a corner arrives as two (or
+ * three) commands at the identical coordinate. Treating that group as one
+ * point is what keeps a drag from tearing the outline into a spike.
+ *
+ * ponytail: exact equality, never epsilon — epsilon grouping is non-transitive
+ * (A~B, B~C, A!~C) and would make the result depend on iteration order, which
+ * is the opposite of a deterministic attribute. Two anchors 0.001mm apart do
+ * not group; moving one leaves the other 0.001mm away, geometrically inert.
+ */
+export function coincidentAnchorGroups(outline: PathCommand[]): Map<string, number[]> {
+  const groups = new Map<string, number[]>();
+  for (let i = 0; i < outline.length; i++) {
+    const anchor = getAnchor(outline[i]);
+    if (!anchor) continue;
+    const key = anchorKey(anchor);
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(i);
+    else groups.set(key, [i]);
+  }
+  return groups;
+}
+
+/** Command indices sharing an anchor with `commandIndex`, including itself. */
+export function anchorGroupOf(outline: PathCommand[], commandIndex: number): number[] {
+  const anchor = getAnchor(outline[commandIndex]);
+  if (!anchor) return [];
+  return coincidentAnchorGroups(outline).get(anchorKey(anchor)) ?? [];
+}
+
 // ─── Public Functions ───
 
 /** Extract editable nodes from a piece's outline */
@@ -108,7 +145,18 @@ export function extractNodes(piece: PatternPiece): EditableNode[] {
   return nodes;
 }
 
-/** Apply a node position change back to the PathCommand array (immutable) */
+/**
+ * Apply a node position change back to the PathCommand array (immutable).
+ *
+ * An anchor move applies to the whole coincident group: CLO doubles the vertex
+ * at every turn point, and writing to only one member leaves the twin behind,
+ * which tears the outline into a spike and leaves a glyph stranded at the old
+ * coordinate. Control-point moves are never grouped — handles are not anchors.
+ *
+ * ponytail: for a group whose members are C/Q the per-command handle coupling
+ * runs once per member. No known file has coincident Bézier anchors; if one
+ * appears, that is the case to test.
+ */
 export function applyNodeMove(
   outline: PathCommand[],
   commandIndex: number,
@@ -116,9 +164,26 @@ export function applyNodeMove(
   newPos: Point2D,
 ): PathCommand[] {
   const cmds = outline.map(c => ({ ...c, values: [...c.values] }));
-  const cmd = cmds[commandIndex];
+  if (!cmds[commandIndex]) return cmds;
 
-  if (!cmd) return cmds;
+  const targets = pointType === 'anchor'
+    ? anchorGroupOf(outline, commandIndex)
+    : [commandIndex];
+
+  for (const index of targets) moveOneCommand(cmds, index, pointType, newPos);
+
+  return cmds;
+}
+
+/** Write a single command in place. Extracted so a group can reuse it. */
+function moveOneCommand(
+  cmds: PathCommand[],
+  commandIndex: number,
+  pointType: 'anchor' | 'cp1' | 'cp2',
+  newPos: Point2D,
+): void {
+  const cmd = cmds[commandIndex];
+  if (!cmd) return;
 
   switch (cmd.type) {
     case 'M':
@@ -168,8 +233,6 @@ export function applyNodeMove(
       }
       break;
   }
-
-  return cmds;
 }
 
 /** Check if a point is within threshold of any node's anchor position */

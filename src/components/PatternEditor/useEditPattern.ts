@@ -29,11 +29,13 @@ import {
   deletePoint,
   convertToCurve,
   convertToLine,
+  anchorGroupOf,
   type EditableNode,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { rotatePoint } from '../../utils/geometry/transform';
 import { reanchorNotches } from '../../utils/notchReanchor';
+import { showInfoToast } from '../../store/copilotUISlice';
 import {
   compensatePositionForPivotChange,
   patternToPieceLocal,
@@ -267,6 +269,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     endDragBatch();
     setState({ ...INITIAL_STATE });
     dragRef.current = null;
+    expectedOutlineRef.current = null;
     seenOutlineRef.current = null;
   }, [endDragBatch]);
 
@@ -316,13 +319,16 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       if (nodeHit) {
         const idx = nodeHit.commandIndex;
         const shift = e.shiftKey;
+        // A coincident group is one point: selecting a member selects them all,
+        // so Delete removes the corner instead of leaving its twin behind.
+        const group = anchorGroupOf(piece.outline, idx);
 
         setState(s => {
           const newSelected = new Set(shift ? s.selectedNodes : []);
           if (shift && s.selectedNodes.has(idx)) {
-            newSelected.delete(idx);
+            for (const ci of group) newSelected.delete(ci);
           } else {
-            newSelected.add(idx);
+            for (const ci of group) newSelected.add(ci);
           }
           return {
             ...s,
@@ -331,12 +337,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           };
         });
 
-        // Build startPositions for all selected nodes (including the new one)
+        // Build startPositions for all selected nodes (including the new group)
         const selectedAfterClick = new Set(e.shiftKey ? state.selectedNodes : []);
         if (e.shiftKey && state.selectedNodes.has(idx)) {
-          selectedAfterClick.delete(idx);
+          for (const ci of group) selectedAfterClick.delete(ci);
         } else {
-          selectedAfterClick.add(idx);
+          for (const ci of group) selectedAfterClick.add(ci);
         }
 
         const startPositions = new Map<number, Point2D>();
@@ -581,35 +587,38 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         // Sort indices descending to preserve earlier indices when deleting
         const indices = [...state.selectedNodes].sort((a, b) => b - a);
 
-        let outline = piece.outline;
-        let deletedCount = 0;
-        for (const idx of indices) {
-          try {
-            outline = deletePoint(outline, idx);
-            deletedCount++;
-          } catch {
-            // Cannot delete — minimum 3 points
-            break;
-          }
+        // All-or-nothing: deleting part of a coincident group would leave a
+        // stranded twin, and a partial multi-delete is worse than none.
+        const anchorCount = piece.outline.filter(c => c.type !== 'Z').length;
+        if (anchorCount - indices.length < 3) {
+          dispatch(showInfoToast('No se puede borrar: la pieza necesita al menos 3 puntos'));
+          // Early return skips preventDefault, which is safe: the global
+          // delete shortcut runs on a document listener (ShortcutProvider)
+          // that never checks defaultPrevented, and Delete/Backspace have
+          // no native browser default worth suppressing here.
+          return;
         }
 
-        if (deletedCount > 0) {
-          const updated: PatternPiece = {
-            ...piece,
-            position: compensatePositionForPivotChange(piece, outline),
-            outline,
-            internals: reanchorNotches(piece.internals, outline),
-            updatedAt: Date.now(),
-          };
-          expectedOutlineRef.current = outline;
-          dispatch(updatePiece(updated));
-          setState(s => ({
-            ...s,
-            nodes: extractNodes(updated),
-            selectedNodes: new Set<number>(),
-            selectedSegments: new Set<number>(),
-          }));
+        let outline = piece.outline;
+        for (const idx of indices) {
+          outline = deletePoint(outline, idx);
         }
+
+        const updated: PatternPiece = {
+          ...piece,
+          position: compensatePositionForPivotChange(piece, outline),
+          outline,
+          internals: reanchorNotches(piece.internals, outline),
+          updatedAt: Date.now(),
+        };
+        expectedOutlineRef.current = outline;
+        dispatch(updatePiece(updated));
+        setState(s => ({
+          ...s,
+          nodes: extractNodes(updated),
+          selectedNodes: new Set<number>(),
+          selectedSegments: new Set<number>(),
+        }));
 
         e.preventDefault();
       }

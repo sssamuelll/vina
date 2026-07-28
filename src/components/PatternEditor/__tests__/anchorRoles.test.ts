@@ -74,7 +74,7 @@ describe('classifyEditableAnchors', () => {
     expect(result.find((item) => item.node.ref.commandIndex === 1)?.role).toBe('corner');
   });
 
-  it('assigns one corner role when consecutive commands share a coordinate', () => {
+  it('gives the corner role to every command sharing the coordinate', () => {
     const result = roles([
       { type: 'M', values: [0, 0] },
       { type: 'L', values: [100, 0] },
@@ -85,7 +85,53 @@ describe('classifyEditableAnchors', () => {
     ]);
     const coincident = result.filter((item) =>
       item.node.position.x === 100 && item.node.position.y === 0);
-    expect(coincident.filter((item) => item.role === 'corner')).toHaveLength(1);
+    expect(coincident).toHaveLength(2);
+    expect(coincident.map((item) => item.role)).toEqual(['corner', 'corner']);
+  });
+
+  it('marks a smooth doubled vertex as lineEnd', () => {
+    const result = roles([
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [50, 0] },
+      { type: 'L', values: [50, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ]);
+    const coincident = result.filter((item) =>
+      item.node.position.x === 50 && item.node.position.y === 0);
+    expect(coincident.map((item) => item.role)).toEqual(['lineEnd', 'lineEnd']);
+  });
+
+  it('does not invent lineEnd where no vertex is doubled', () => {
+    const result = roles([
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [50, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ]);
+    expect(result.some((item) => item.role === 'lineEnd')).toBe(false);
+  });
+
+  it('keeps openEndpoint above the group role on an open path', () => {
+    const result = roles([
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [50, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 0] },
+    ]);
+    // El último nodo comparte coordenada con el anterior; el extremo abierto
+    // manda igual, que es la prioridad declarada en la spec §7. El extremo
+    // se propaga a TODO el grupo: el nodo 2 es el gemelo coincidente del
+    // nodo 3 y debe llevar el mismo rol, o el defecto que esta spec existe
+    // para eliminar (glifos distintos apilados en la misma coordenada)
+    // sobrevive en los contornos abiertos.
+    expect(result[0].role).toBe('openEndpoint');
+    expect(result[2].role).toBe('openEndpoint');
+    expect(result[3].role).toBe('openEndpoint');
   });
 
   it('preserves node order and commandIndex', () => {

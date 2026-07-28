@@ -1,46 +1,19 @@
 // @vitest-environment jsdom
-import React, { forwardRef, useImperativeHandle } from 'react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render } from '@testing-library/react';
-import { Provider, useSelector } from 'react-redux';
-import { configureStore } from '@reduxjs/toolkit';
-import projectReducer, { loadProject, updatePiece } from '../../../store/projectSlice';
-import { canRedo, getUndoLength, undoMiddleware } from '../../../store/undoMiddleware';
-import type { PatternPiece, Point2D } from '../../../types/types';
+import { act, cleanup } from '@testing-library/react';
+import { updatePiece } from '../../../store/projectSlice';
+import { canRedo, getUndoLength } from '../../../store/undoMiddleware';
+import type { PatternPiece } from '../../../types/types';
 import { importDXFContent } from '../../../utils/dxf';
 import { classifyEditableAnchors } from '../anchorRoles';
-import { extractNodes, getAnchor } from '../nodeEditorUtils';
-import { pieceLocalToPattern } from '../pieceTransform';
-import { useEditPattern } from '../useEditPattern';
-import EditPatternOverlay from '../renderers/overlays/EditPatternOverlay';
+import { anchorGroupOf, extractNodes, getAnchor } from '../nodeEditorUtils';
+import { setup, mouseAt, pieceLocalToPattern } from './editPatternHarness';
 
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
-});
-
-type EditorApi = ReturnType<typeof useEditPattern>;
-type TestState = { project: ReturnType<typeof projectReducer> };
-
-const Harness = forwardRef<EditorApi>(function Harness(_, ref) {
-  const editor = useEditPattern(1, { x: 0, y: 0 });
-  const pieces = useSelector((state: TestState) => state.project.pieces);
-  useImperativeHandle(ref, () => editor, [editor]);
-  return (
-    <svg>
-      {editor.isEditing && editor.editingPieceId && (
-        <EditPatternOverlay
-          zoom2D={1} pieces={pieces} editingPieceId={editor.editingPieceId}
-          nodes={editor.nodes} selectedNodes={editor.selectedNodes}
-          selectedSegments={editor.selectedSegments} hoveredNode={editor.hoveredNode}
-          hoveredSegment={editor.hoveredSegment} addPointPreview={editor.addPointPreview}
-          marquee={editor.marquee}
-        />
-      )}
-    </svg>
-  );
 });
 
 function squarePiece(): PatternPiece {
@@ -55,30 +28,6 @@ function squarePiece(): PatternPiece {
     mirrored: false, seamAllowance: 0, active: true,
     createdAt: 0, updatedAt: 0,
   };
-}
-
-function setup(piece: PatternPiece) {
-  const store = configureStore({
-    reducer: { project: projectReducer },
-    middleware: (getDefault) => getDefault({ serializableCheck: false })
-      .concat(undoMiddleware),
-  });
-  const base = store.getState().project;
-  store.dispatch(loadProject({
-    ...base, id: 'test', name: 'Test', pieces: [piece], seams: [], fabrics: [],
-    createdAt: 0, updatedAt: 0,
-  }));
-  const ref = React.createRef<EditorApi>();
-  const view = render(<Provider store={store}><Harness ref={ref} /></Provider>);
-  act(() => ref.current!.enterEdit(piece.id));
-  return { store, ref, view };
-}
-
-function mouseAt(point: Point2D): React.MouseEvent<SVGSVGElement> {
-  return {
-    button: 0, shiftKey: false, clientX: point.x, clientY: point.y,
-    currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
-  } as unknown as React.MouseEvent<SVGSVGElement>;
 }
 
 function roleList(container: HTMLElement): string[] {
@@ -268,8 +217,13 @@ describe('useEditPattern — DXF real de María', () => {
           JSON.stringify(command) === JSON.stringify(moved[index]) ? null : index)
         .filter((index): index is number => index !== null);
       expect(moved).toHaveLength(original.length);
-      expect(changedIndices).toEqual([target!.node.ref.commandIndex]);
-      expect(maxCoincidentMultiplicity(moved)).toBeLessThanOrEqual(originalMultiplicity);
+      // A coincident group is one point: every member moves, or the outline
+      // tears. The old assertion demanded exactly one changed command, which
+      // is the bug María reported as "a phantom point appeared".
+      expect(changedIndices).toEqual(
+        anchorGroupOf(piece.outline, target!.node.ref.commandIndex),
+      );
+      expect(maxCoincidentMultiplicity(moved)).toBe(originalMultiplicity);
       act(() => { store.dispatch({ type: 'editor/undo' }); });
       expect(outline()).toEqual(original);
       expect(roleList(view.container)).toEqual(originalRoles);
