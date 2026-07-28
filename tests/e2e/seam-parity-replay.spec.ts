@@ -49,6 +49,18 @@ async function getState<T = unknown>(page: Page, path: string): Promise<T> {
   }, path) as Promise<T>;
 }
 
+/**
+ * El SimulationStatusOverlay arranca COLAPSADO (Fase1-H2, plan 2026-07-16):
+ * el header deja el tier y el badge ⚠, y el detalle de telemetría — entre él
+ * el recuento de constraints de costura — vive tras un click. Los asserts de
+ * observabilidad de seams miran ese detalle, así que hay que abrirlo.
+ */
+async function expandSimOverlay(page: Page) {
+  const toggle = page.getByRole('button', { name: 'Estado de la simulación' });
+  await expect(toggle).toBeVisible({ timeout: 15_000 });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+}
+
 /** Pattern-space (mm) → screen coords. Defaults: zoom=1, pan=(0,0). */
 async function patternToScreen(page: Page, px: number, py: number) {
   const box = await page.locator('svg.pattern-svg').boundingBox();
@@ -276,7 +288,9 @@ test.describe('Seam parity replay — lote 1', () => {
     expect(summary!.zeroConstraintSeams).toHaveLength(0);
 
     // Y el overlay lo enseña al usuario.
-    await expect(page.locator('text=/seam constraints/')).toBeVisible({ timeout: 10_000 });
+    await expandSimOverlay(page);
+    // Copia del overlay (SimulationStatusOverlay): "🧵 N constraints de costura".
+    await expect(page.locator('text=/constraints de costura/')).toBeVisible({ timeout: 10_000 });
   });
 
   // Fase 4: un seam irresoluble NO falla en silencio — toast de error +
@@ -303,7 +317,9 @@ test.describe('Seam parity replay — lote 1', () => {
       'simulation.seamResolution',
     );
     expect(summary!.zeroConstraintSeams.map((z) => z.seamId)).toEqual(['s-bad']);
-    await expect(page.locator('text=/resolved to 0 constraints/')).toBeVisible({
+    await expandSimOverlay(page);
+    // "⚠️ N costura(s) sin constraints — no va a coser".
+    await expect(page.locator('text=/sin constraints/')).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -424,7 +440,8 @@ test.describe('Seam parity replay — lote 1', () => {
     });
     await page.waitForTimeout(400);
 
-    await expect(page.locator('svg.pattern-svg text', { hasText: '19.0mm mismatch' })).toBeVisible();
+    // Label del SeamRenderer: "⚠ 19.0mm de diferencia".
+    await expect(page.locator('svg.pattern-svg text', { hasText: '19.0mm de diferencia' })).toBeVisible();
   });
 
   // Fase 6: los anchos per-edge del SA tool sobreviven el load generativo
@@ -551,7 +568,9 @@ test.describe('Seam parity replay — patrón real de María', () => {
     }>(page, 'simulation.seamResolution');
     expect(summary!.totalConstraints).toBeGreaterThan(40);
     expect(summary!.zeroConstraintSeams).toHaveLength(0);
-    await expect(page.locator('text=/seam constraints/')).toBeVisible({ timeout: 10_000 });
+    await expandSimOverlay(page);
+    // Copia del overlay (SimulationStatusOverlay): "🧵 N constraints de costura".
+    await expect(page.locator('text=/constraints de costura/')).toBeVisible({ timeout: 10_000 });
   });
 });
 

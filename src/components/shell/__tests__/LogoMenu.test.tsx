@@ -4,6 +4,12 @@
  * Guards the View menu display toggles (spec 2026-06-04 display-toggles-resurface):
  * 2D — Reference Images / Line Lengths checkboxes + Render mode radio trio.
  * 3D — Garment / Seamlines / Internal Lines checkboxes (Task 2).
+ *
+ * Also guards submenu hover persistence: the flyout sits at
+ * `left: calc(100% + 4px)`, so travelling from the parent item into it crosses
+ * a 4px band that belongs to the panel, not the item. Closing on the *item's*
+ * mouseleave made that band a dead zone — the submenu vanished mid-traverse.
+ * Only leaving the whole panel may close it.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
@@ -79,6 +85,45 @@ describe('LogoMenu ▸ View — 2D display toggles', () => {
     openViewMenu();
     expect(isChecked('Render: alambre')).toBe(true);
     expect(isChecked('Render: texturizado')).toBe(false);
+  });
+});
+
+describe('LogoMenu ▸ submenu hover persistence', () => {
+  /** Open the dropdown and hover a top-level entry; returns the panel element. */
+  function openTop(label: string): HTMLElement {
+    fireEvent.click(screen.getByRole('button', { name: /openclo/i }));
+    fireEvent.mouseEnter(screen.getByText(label));
+    return document.querySelector('.logo-menu') as HTMLElement;
+  }
+
+  it('stays open when the pointer leaves the parent item toward the flyout', () => {
+    renderMenu();
+    const panel = openTop('Archivo');
+    expect(screen.queryByText('Exportar DXF')).toBeTruthy();
+
+    // The 4px band between item and flyout is over the panel, not the item —
+    // hence relatedTarget: the pointer left the item but never left the menu.
+    const item = screen.getByText('Archivo').closest('.logo-menu__item')!;
+    fireEvent.mouseLeave(item, { relatedTarget: panel });
+    expect(screen.queryByText('Exportar DXF')).toBeTruthy();
+  });
+
+  it('closes once the pointer leaves the whole panel', () => {
+    renderMenu();
+    const panel = openTop('Archivo');
+    expect(screen.queryByText('Exportar DXF')).toBeTruthy();
+
+    fireEvent.mouseLeave(panel);
+    expect(screen.queryByText('Exportar DXF')).toBeNull();
+  });
+
+  it('swaps flyouts when another top-level entry is hovered', () => {
+    renderMenu();
+    openTop('Archivo');
+    fireEvent.mouseEnter(screen.getByText('Vista'));
+
+    expect(screen.queryByText('Exportar DXF')).toBeNull();
+    expect(screen.queryByText('Zoom 100%')).toBeTruthy();
   });
 });
 
