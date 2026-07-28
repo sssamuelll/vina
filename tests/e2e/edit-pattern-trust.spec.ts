@@ -82,10 +82,20 @@ test('María DXF: editPattern visible → slow drag → undo/redo keeps marker o
   await page.keyboard.press('Control+z');
   await expect.poll(() => commandValues(page, pieceId, commandIndex))
     .toEqual(originalValues);
-  const restoredGlyphBox = await glyph.boundingBox();
-  if (!restoredGlyphBox) throw new Error('Restored corner glyph has no bounding box');
-  expect(restoredGlyphBox.x + restoredGlyphBox.width / 2).toBeCloseTo(startX, 1);
-  expect(restoredGlyphBox.y + restoredGlyphBox.height / 2).toBeCloseTo(startY, 1);
+
+  // The store restores first; the anchor-role pass settles ~4 frames later, so
+  // the marker must be polled rather than sampled once. Address it by command
+  // index too: the corner set changes while the undo lands, so `.first()` can
+  // resolve to a different node and silently compare the wrong glyph.
+  const draggedGlyph = page.locator(`[data-command-index="${commandIndex}"] [data-anchor-role]`);
+  await expect.poll(async () => {
+    const box = await draggedGlyph.boundingBox();
+    if (!box) return null;
+    return Math.max(
+      Math.abs(box.x + box.width / 2 - startX),
+      Math.abs(box.y + box.height / 2 - startY),
+    );
+  }).toBeLessThan(0.05);
 
   await page.keyboard.press('Control+Shift+z');
   await expect.poll(() => commandValues(page, pieceId, commandIndex)).toEqual(movedValues);
