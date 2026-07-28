@@ -20,8 +20,9 @@ import {
   flipPieceH, flipPieceV, linkPieces, unlinkPieces, cloneAsLinked,
   bringToFront, sendToBack, bringForward, sendBackward, lockPiece, unlockPiece,
   addPiece, createGroup, addPiecesToGroup, removePiecesFromGroup, deactivatePiece,
-  setLayer, setSublayer, cloneToLayer, removeInternalLine,
+  setLayer, setSublayer, cloneToLayer, removeInternalLine, updateInternalLine,
 } from '../../store/projectSlice';
+import { reverseGrainline } from '../../utils/grainLine';
 import { selectPiece, clearSelection, copyPieces, createPastedPieces, enterSuperimposePickMode } from '../../store/editorSlice';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
 
@@ -41,7 +42,7 @@ export const GROUP_ORDER: GroupId[] = ['clipboard', 'transform', 'order', 'organ
 export type ActionId =
   | 'copy' | 'paste' | 'pasteMirror'
   | 'rotate90' | 'flipH' | 'flipV'
-  | 'reverseSeam' | 'unfold' | 'unfoldOutlineOnly' | 'offsetInternalLine' | 'optimizeCurves' | 'optimizeAllCurves' | 'convertSegment'
+  | 'reverseSeam' | 'reverseGrainline' | 'unfold' | 'unfoldOutlineOnly' | 'offsetInternalLine' | 'optimizeCurves' | 'optimizeAllCurves' | 'convertSegment'
   | 'order' | 'layer' | 'lockToggle' | 'activeToggle' | 'groupCreate' | 'addToGroup' | 'removeFromGroup'
   | 'unlinkPieces' | 'selectLinkedPartner' | 'linkSymmetry' | 'linkInstance' | 'cloneLinkedSymmetry' | 'cloneLinkedInstance'
   | 'duplicate' | 'duplicateAll' | 'rename' | 'properties' | 'select' | 'inspect' | 'selectPieceOfLine' | 'selectSeamA' | 'selectSeamB' | 'zoomToFit'
@@ -159,6 +160,11 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     gate: notLocked, run: (ctx) => ctx.dispatch(flipPieceV(ctx.pieceId!)) },                             // projectSlice.flipPieceV
   reverseSeam: { id: 'reverseSeam', group: 'transform', icon: '↔', label: 'Invertir dirección de costura', shortcut: 'Ctrl+B',
     run: (ctx) => ctx.dispatch(reverseSeam(ctx.seamId!)) },                                              // projectSlice.reverseSeam
+  reverseGrainline: { id: 'reverseGrainline', group: 'transform', icon: '⇅', label: 'Invertir sentido del hilo',
+    run: (ctx) => ctx.dispatch(updateInternalLine({                                                     // projectSlice.updateInternalLine (:497)
+      pieceId: ctx.pieceId!, lineId: ctx.internalLineId!,
+      path: reverseGrainline(ctx.internalLine!.path),
+    })) },
   unfold: { id: 'unfold', group: 'transform', icon: '⇔', label: 'Desplegar',
     run: (ctx) => ctx.cb.onUnfold?.(ctx.pieceId!, ctx.internalLineId!) },                                // Surface B prop
   unfoldOutlineOnly: { id: 'unfoldOutlineOnly', group: 'transform', icon: '⇔', label: 'Desplegar solo el contorno',
@@ -294,7 +300,7 @@ export const CURATION: CurationRow[] = [
     menu: ['reverseSeam', 'selectSeamA', 'selectSeamB', 'deleteSeam'],
   },
   { targetKind: 'il.notch', stage: '*', altitude: 'body', bar: [], menu: ['selectPieceOfLine', 'deleteInternalLine'] },
-  { targetKind: 'il.grainline', stage: '*', altitude: 'body', bar: [], menu: ['selectPieceOfLine', 'deleteInternalLine'] },
+  { targetKind: 'il.grainline', stage: '*', altitude: 'body', bar: ['reverseGrainline'], menu: ['reverseGrainline', 'selectPieceOfLine', 'deleteInternalLine'] },
   {
     targetKind: 'il.fold', stage: '*', altitude: 'body',
     bar: ['unfold', 'unfoldOutlineOnly'], // data v2

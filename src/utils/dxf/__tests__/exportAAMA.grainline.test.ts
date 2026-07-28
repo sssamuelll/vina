@@ -24,16 +24,25 @@ function pieceWithGrainline(path: PathCommand[]): PatternPiece {
   } as unknown as PatternPiece;
 }
 
-describe('generateDXFAAMA — grainline arrowheads (nota de María #169)', () => {
-  it('emits arrowhead segments at both ends of the grainline', () => {
+describe('generateDXFAAMA — grainline arrowhead (nota de María #169)', () => {
+  it('emits the arrowhead at the path end only, so the file carries the direction', () => {
     const dxf = generateDXFAAMA([pieceWithGrainline(GRAINLINE)]);
-    // Arrowhead wing bases (Y negated in DXF): end tip 200 → base 194,
-    // start tip 100 → base 106. Neither appears without the arrowheads.
+    // Wing base (Y negated in DXF): end tip 200 → base 194. The start tip would
+    // give 106 — its absence is what makes the arrow single-headed.
     expect(dxf).toContain('-194.0000');
-    expect(dxf).toContain('-106.0000');
+    expect(dxf).not.toContain('-106.0000');
   });
 
-  it('does not add arrowheads to a non-grainline internal line', () => {
+  it('moves the arrowhead when the grainline points the other way', () => {
+    const dxf = generateDXFAAMA([pieceWithGrainline([
+      { type: 'M', values: [50, 200] },
+      { type: 'L', values: [50, 100] },
+    ])]);
+    expect(dxf).toContain('-106.0000');
+    expect(dxf).not.toContain('-194.0000');
+  });
+
+  it('does not add an arrowhead to a non-grainline internal line', () => {
     const dxf = generateDXFAAMA([{
       ...pieceWithGrainline(GRAINLINE),
       internals: [{ id: 'f1', type: 'fold', path: GRAINLINE }],

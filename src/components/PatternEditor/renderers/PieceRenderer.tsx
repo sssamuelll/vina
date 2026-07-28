@@ -213,8 +213,9 @@ const SinglePiece = memo(function SinglePiece({
         // Tokenized internal-line colors (design surface 5, P0.3) — see internalLineColor.
         const lineColor = internalLineColor(line, isLineSelected);
         const dartApex = line.type === 'dart' ? dartApexPoint(line.path) : null;
-        // Grainline arrowheads (nota de María #169): the persisted line carries
-        // the double-headed arrows the draw preview already shows.
+        // Grainline arrowhead (nota de María #169): one head, at the path's end
+        // — same single arrow the draw preview shows, pointing the way the
+        // piece gets cut. See grainlineArrowheads.
         const grainlineHeads = line.type === 'grainline' && showGrainlines
           ? grainlineArrowheads(line.path, 6 / zoom2D)
           : [];
@@ -277,7 +278,7 @@ const SinglePiece = memo(function SinglePiece({
               }
               opacity={line.type === 'grainline' && !showGrainlines ? 0 : line.type === 'reference' ? 0.6 : isLineSelected ? 1 : 0.8}
             />
-            {/* Grainline arrowheads (both ends) */}
+            {/* Grainline arrowhead (direction of cut) */}
             {grainlineHeads.map((tri, gi) => (
               <polygon
                 key={`gl-arrow-${gi}`}

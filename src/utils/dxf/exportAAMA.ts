@@ -313,8 +313,9 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
         layer,
       );
 
-      // Grainline arrowheads (nota de María #169) — a finished grainline is
-      // double-headed. Each wing is a short LINE from the tip on layer 7.
+      // Grainline arrowhead (nota de María #169) — one head at the path's end,
+      // carrying the cut direction into the file. Each wing is a short LINE
+      // from the tip on layer 7.
       if (line.type === 'grainline') {
         for (const [tip, w1, w2] of grainlineArrowheads(line.path, GRAINLINE_ARROW_MM)) {
           s += lineToDXF(tip.x, tip.y, w1.x, w1.y, layer);
