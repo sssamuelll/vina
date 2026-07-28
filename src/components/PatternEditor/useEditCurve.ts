@@ -18,6 +18,7 @@ import {
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { rotatePoint } from '../../utils/geometry/transform';
+import { reanchorNotches } from '../../utils/notchReanchor';
 import {
   compensatePositionForPivotChange,
   patternToPieceLocal,
@@ -232,6 +233,11 @@ export function useEditCurve(zoom: number, pan: Point2D) {
           ...piece,
           position: compensatePositionForPivotChange(piece, newOutline),
           outline: newOutline,
+          // Same re-anchoring as the "Editar patrón" tool (nota de María
+          // #171): both editors reshape the outline, so both must let the
+          // notches follow it, or the surface you happen to use decides
+          // whether your piquetes stay on the edge.
+          internals: reanchorNotches(piece.internals, newOutline, piece.outline),
           updatedAt: Date.now(),
         };
         expectedOutlineRef.current = newOutline;

@@ -149,10 +149,56 @@ export function computeNotchAnchor(outline: PathCommand[], snapPoint: Point2D): 
   return best;
 }
 
+/** Index of the entry in `pts` closest to `pt`, or -1 for an empty list. */
+function nearestIndex(pts: Point2D[], pt: Point2D): number {
+  let best = -1;
+  let bestDist = Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    const d = Math.hypot(pts[i].x - pt.x, pts[i].y - pt.y);
+    if (d < bestDist) { bestDist = d; best = i; }
+  }
+  return best;
+}
+
+/**
+ * Follow a reference corner that was itself dragged, so an anchor keeps
+ * pointing at "the armhole corner" rather than at the coordinates the armhole
+ * corner used to have (nota de María #171).
+ *
+ * `detectCorners` returns corners in ring order, so a corner that merely moved
+ * keeps its ordinal — that ordinal survives the coordinate change which makes
+ * {@link resolveNotchAnchor} fail. The ordinal match must ALSO be the nearest
+ * corner to the old position: two independent signals, and disagreement means
+ * the shape changed in a way ordinals can't describe. Returns null then, and
+ * whenever the corner count changed (the corner was deleted, or an edit made a
+ * new vertex sharp enough to count), because relocating a notch to the wrong
+ * reference is worse than leaving it frozen (D-2: path manda).
+ */
+export function trackMovedCorner(
+  prevOutline: PathCommand[],
+  outline: PathCommand[],
+  refPoint: Point2D,
+): Point2D | null {
+  const prev = detectCorners(prevOutline);
+  const next = detectCorners(outline);
+  if (prev.length === 0 || prev.length !== next.length) return null;
+
+  const ordinal = nearestIndex(prev, refPoint);
+  // Guard against anchors that never pointed at a corner in the first place:
+  // refPoint is copied verbatim out of detectCorners, so an honest one matches
+  // exactly and this tolerance only absorbs float noise.
+  if (Math.hypot(prev[ordinal].x - refPoint.x, prev[ordinal].y - refPoint.y) > REF_POINT_SNAP_TOL) {
+    return null;
+  }
+  if (nearestIndex(next, refPoint) !== ordinal) return null;
+  return next[ordinal];
+}
+
 /**
  * Resolve an anchor back to a point on the outline + inward unit normal.
  * Returns null when the refPoint no longer lies on the outline (edited
- * geometry) — callers fall back to the frozen path (D-2: path manda).
+ * geometry) — callers re-identify the corner via {@link trackMovedCorner}, or
+ * fall back to the frozen path (D-2: path manda).
  */
 export function resolveNotchAnchor(
   outline: PathCommand[],

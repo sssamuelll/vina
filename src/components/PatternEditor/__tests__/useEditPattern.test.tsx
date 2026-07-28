@@ -281,6 +281,23 @@ describe('useEditPattern re-anchors notches when the outline is edited', () => {
     const after = (store.getState() as { project: { pieces: PatternPiece[] } }).project.pieces[0].internals[0].path;
     expect(JSON.stringify(after)).not.toEqual(JSON.stringify(before));
   });
+
+  it('follows the notch when the dragged node IS its reference corner', () => {
+    // The notch is anchored to (0,0). Dragging that very corner used to strand
+    // it — the anchor matched by coordinates and found nothing.
+    const { store, hook } = setup(notchedPiece());
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(clickAt(0, 0)); });
+    act(() => { hook.result.current.handleMouseMove(clickAt(-40, -40)); });
+    act(() => hook.result.current.handleMouseUp());
+
+    const notch = (store.getState() as { project: { pieces: PatternPiece[] } }).project.pieces[0].internals[0];
+    expect(notch.notchAnchor!.refPoint).toEqual({ x: -40, y: -40 });
+    // Still 100 along the reshaped bottom edge from the corner it names.
+    const edgeLen = Math.hypot(240, 40);
+    expect(notch.path[0].values[0]).toBeCloseTo(-40 + (100 / edgeLen) * 240);
+    expect(notch.path[0].values[1]).toBeCloseTo(-40 + (100 / edgeLen) * 40);
+  });
 });
 
 // ─── Hook: resync after undo (restoreState) ───
