@@ -225,7 +225,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         position: compensatePositionForPivotChange(piece, newOutline),
         outline: newOutline,
         // Notches with a parametric anchor follow the reshaped edge (#171).
-        internals: reanchorNotches(piece.internals, newOutline),
+        // piece.outline is the pre-edit shape, which lets a dragged reference
+        // corner be re-identified instead of stranding its notch.
+        internals: reanchorNotches(piece.internals, newOutline, piece.outline),
         updatedAt: Date.now(),
       };
       expectedOutlineRef.current = newOutline;
@@ -608,7 +610,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           ...piece,
           position: compensatePositionForPivotChange(piece, outline),
           outline,
-          internals: reanchorNotches(piece.internals, outline),
+          internals: reanchorNotches(piece.internals, outline, piece.outline),
           updatedAt: Date.now(),
         };
         expectedOutlineRef.current = outline;

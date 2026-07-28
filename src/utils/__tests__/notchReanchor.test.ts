@@ -41,19 +41,45 @@ describe('reanchorNotches (nota de María #171)', () => {
     expect(JSON.stringify(next[0].path)).not.toEqual(JSON.stringify(notch.path));
   });
 
-  it('freezes the path when the reference corner itself moves (D-2 path manda)', () => {
-    // Move the (0,0) corner away — the anchor refPoint no longer sits on the
-    // outline, so there is nothing to re-anchor to; the frozen path stays.
-    const refMoved: PathCommand[] = [
-      { type: 'M', values: [50, 50] },
-      { type: 'L', values: [200, 0] },
+  // The (0,0) reference corner itself is dragged to (-40,-40). Its coordinates
+  // no longer sit on the outline, so resolveNotchAnchor alone gives up.
+  const refCornerMoved: PathCommand[] = [
+    { type: 'M', values: [-40, -40] },
+    { type: 'L', values: [200, 0] },
+    { type: 'L', values: [200, 200] },
+    { type: 'L', values: [0, 200] },
+    { type: 'Z', values: [] },
+  ];
+
+  it('follows the reference corner when it is the point being dragged', () => {
+    const notch = bottomNotch();
+    const next = reanchorNotches([notch], refCornerMoved, square);
+
+    // The anchor now names the corner's new position, still 100 along the
+    // bottom edge from it — the notch rides the edge instead of stranding.
+    expect(next[0].notchAnchor!.refPoint).toEqual({ x: -40, y: -40 });
+    const edgeLen = Math.hypot(240, 40);
+    const [bx, by] = next[0].path[0].values;
+    expect(bx).toBeCloseTo(-40 + (100 / edgeLen) * 240);
+    expect(by).toBeCloseTo(-40 + (100 / edgeLen) * 40);
+  });
+
+  it('freezes when the previous outline is unavailable (D-2 path manda)', () => {
+    const notch = bottomNotch();
+    expect(reanchorNotches([notch], refCornerMoved)[0]).toBe(notch);
+  });
+
+  it('freezes when the reference corner was deleted, not moved', () => {
+    // Dropping (0,0) leaves a triangle: the corner count changed, so no
+    // ordinal mapping is trustworthy and relocating the notch would be a lie.
+    const cornerDeleted: PathCommand[] = [
+      { type: 'M', values: [200, 0] },
       { type: 'L', values: [200, 200] },
-      { type: 'L', values: [50, 200] },
+      { type: 'L', values: [0, 200] },
       { type: 'Z', values: [] },
     ];
     const notch = bottomNotch();
-    const next = reanchorNotches([notch], refMoved);
-    expect(next[0]).toBe(notch);
+    expect(reanchorNotches([notch], cornerDeleted, square)[0]).toBe(notch);
   });
 
   it('leaves an anchor-less notch untouched', () => {
