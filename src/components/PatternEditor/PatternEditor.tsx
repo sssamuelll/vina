@@ -6,7 +6,7 @@ import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../util
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, Point2D, PathCommand } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, PathCommand } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
 import { useLineTool } from './useLineTool';
@@ -25,7 +25,7 @@ import { useEditCurve } from './useEditCurve';
 import { useEditPattern } from './useEditPattern';
 import { nearestSegment } from './nodeEditorUtils';
 import { useMeasureTool } from './useMeasureTool';
-import { useTransformTool } from './useTransformTool';
+import { useTransformTool, type TransformUpdate } from './useTransformTool';
 import { useScissorsTool } from './useScissorsTool';
 import { useSlashAndSpreadTool } from './useSlashAndSpreadTool';
 import { useMergeTool } from './useMergeTool';
@@ -490,7 +490,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     });
   }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.editingPieceId]);
 
-  const handleTransform = useCallback((updates: Array<{ id: string; outline: PatternPiece['outline']; position: Point2D }>) => {
+  const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
       const piece = pieces.find(p => p.id === u.id);
       if (piece) {
@@ -498,6 +498,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           ...piece,
           outline: u.outline,
           position: u.position,
+          // The internals ride the same transform (nota de María #171): a
+          // scaled outline over un-scaled grainlines and piquetes is the
+          // stranding bug wearing a different handle.
+          internals: u.internals,
           updatedAt: Date.now(),
         }));
       }

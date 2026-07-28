@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
-import type { Point2D, PatternPiece } from '../../types/types';
+import type { Point2D, PathCommand, PatternPiece } from '../../types/types';
 import {
   computeBoundingBox,
   computeHandlePositions,
@@ -8,10 +8,12 @@ import {
   computeRotationFromDrag,
   scaleOutline,
   rotateOutline,
+  rotatePoint,
   type HandleId,
   type BBox,
 } from '../../utils/geometry/transform';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
+import { reanchorTransformedNotches } from '../../utils/notchReanchor';
 
 interface TransformDragState {
   handleId: HandleId;
@@ -31,12 +33,37 @@ export interface TransformPreview {
 
 const HANDLE_HIT_THRESHOLD = 8; // screen pixels
 
+export interface TransformUpdate {
+  id: string;
+  outline: PatternPiece['outline'];
+  position: Point2D;
+  internals: PatternPiece['internals'];
+}
+
+/**
+ * Carry a piece's internals through the same transform as its outline. The box
+ * moves the piece as a plane, so grainlines, darts and piquetes have to move
+ * with it — rewriting the outline alone strands every one of them at its old
+ * coordinates (nota de María #171, reached by a handle instead of a node).
+ * Notches then get their anchors re-derived, which also redraws the mark at
+ * its true size rather than stretching it with the piece.
+ */
+function transformInternals(
+  snap: PatternPiece,
+  newOutline: PatternPiece['outline'],
+  mapPath: (path: PathCommand[]) => PathCommand[],
+  mapPoint: (pt: Point2D) => Point2D,
+): PatternPiece['internals'] {
+  const mapped = snap.internals.map(line => ({ ...line, path: mapPath(line.path) }));
+  return reanchorTransformedNotches(mapped, snap.outline, newOutline, mapPoint);
+}
+
 export function useTransformTool(
   zoom2D: number,
   pan2D: Point2D,
   pieces: PatternPiece[],
   selectedPieceIds: string[],
-  onTransform: (updates: Array<{ id: string; outline: PatternPiece['outline']; position: Point2D }>) => void,
+  onTransform: (updates: TransformUpdate[]) => void,
 ) {
   const [drag, setDrag] = useState<TransformDragState | null>(null);
   const dragRef = useRef<TransformDragState | null>(null);
@@ -111,7 +138,7 @@ export function useTransformTool(
 
     const snappedBbox = d.bboxSnapshot;
     const center: Point2D = { x: snappedBbox.x + snappedBbox.width / 2, y: snappedBbox.y + snappedBbox.height / 2 };
-    const updates: Array<{ id: string; outline: PatternPiece['outline']; position: Point2D }> = [];
+    const updates: TransformUpdate[] = [];
 
     if (d.handleId === 'rotate') {
       const angle = computeRotationFromDrag(snappedBbox, d.origin, d.current, shiftRef.current);
@@ -130,7 +157,17 @@ export function useTransformTool(
           x: center.x + dx * cos - dy * sin,
           y: center.y + dx * sin + dy * cos,
         };
-        updates.push({ id: snap.id, outline: newOutline, position: newPos });
+        updates.push({
+          id: snap.id,
+          outline: newOutline,
+          position: newPos,
+          internals: transformInternals(
+            snap,
+            newOutline,
+            path => rotateOutline(path, localCenter, angle),
+            pt => rotatePoint(pt, localCenter, angle),
+          ),
+        });
       }
     } else {
       const uniform = ['nw', 'ne', 'sw', 'se'].includes(d.handleId) && !shiftRef.current;
@@ -145,7 +182,20 @@ export function useTransformTool(
           x: center.x + (ox - center.x) * scaleX,
           y: center.y + (oy - center.y) * scaleY,
         };
-        updates.push({ id: snap.id, outline: newOutline, position: newPos });
+        updates.push({
+          id: snap.id,
+          outline: newOutline,
+          position: newPos,
+          internals: transformInternals(
+            snap,
+            newOutline,
+            path => scaleOutline(path, localCenter, scaleX, scaleY),
+            pt => ({
+              x: localCenter.x + (pt.x - localCenter.x) * scaleX,
+              y: localCenter.y + (pt.y - localCenter.y) * scaleY,
+            }),
+          ),
+        });
       }
     }
 
