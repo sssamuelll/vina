@@ -42,6 +42,19 @@ describe('generateDXFAAMA — grainline arrowhead (nota de María #169)', () => 
     expect(dxf).not.toContain('-194.0000');
   });
 
+  it('runs the shaft end-to-end on a multi-vertex grainline, so the arrow is attached', () => {
+    // A POLYLINE on layer 7 imports with intermediate vertices. The first-
+    // segment rule would stop the shaft at -137 while the head tips at -200.
+    // (137 and not 150: the piece label sits at the bbox centre, y=150.)
+    const dxf = generateDXFAAMA([pieceWithGrainline([
+      { type: 'M', values: [50, 100] },
+      { type: 'L', values: [50, 137] },
+      { type: 'L', values: [50, 200] },
+    ])]);
+    expect(dxf).toContain('-200.0000');
+    expect(dxf).not.toContain('-137.0000');
+  });
+
   it('does not add an arrowhead to a non-grainline internal line', () => {
     const dxf = generateDXFAAMA([{
       ...pieceWithGrainline(GRAINLINE),

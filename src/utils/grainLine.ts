@@ -101,10 +101,9 @@ export function grainAlignmentRotation(piece: Pick<PatternPiece, 'internals'>): 
  * the shape predates the single-head decision.
  */
 export function grainlineArrowheads(path: PathCommand[], size: number): Point2D[][] {
-  const pts = samplePath(path);
-  if (pts.length < 2) return [];
-  const a = pts[0];
-  const b = pts[pts.length - 1];
+  const ends = grainlineEndpoints(path);
+  if (!ends) return [];
+  const [a, b] = ends;
   const dx = b.x - a.x, dy = b.y - a.y;
   const len = Math.hypot(dx, dy);
   if (len < 1e-6) return [];
@@ -118,23 +117,35 @@ export function grainlineArrowheads(path: PathCommand[], size: number): Point2D[
 }
 
 /**
+ * Start and end of a grainline — the only two points that carry meaning on a
+ * line that is straight by definition. Every consumer (arrowheads, angle,
+ * alignment, DXF shaft) reads exactly these. Degenerate path → null.
+ */
+export function grainlineEndpoints(path: PathCommand[]): [Point2D, Point2D] | null {
+  const pts = samplePath(path);
+  if (pts.length < 2) return null;
+  return [pts[0], pts[pts.length - 1]];
+}
+
+/**
  * The same grainline pointing the other way. An imported piece carries whatever
  * vertex order its source CAD wrote, and a drag can go the wrong way — without
  * this, a backwards arrow is unfixable from the UI, and a backwards grain arrow
  * is a piece cut backwards.
  *
- * Paths shorter than two points come back untouched.
+ * Always comes back as a single M→L segment: a straight line needs no
+ * intermediate vertices, and a multi-vertex grainline is what makes the DXF
+ * shaft and its arrowhead disagree. Paths shorter than two points are returned
+ * untouched.
  */
 export function reverseGrainline(path: PathCommand[]): PathCommand[] {
-  const pts = samplePath(path);
-  if (pts.length < 2) return path;
-  // ponytail: rebuilt as M→L…, so control points of a curved grainline would be
-  // dropped. A grainline is straight by definition and the rest of this module
-  // already reads 'C' as its endpoint alone (see samplePath).
-  return pts.reverse().map((p, i) => ({
-    type: i === 0 ? 'M' : 'L',
-    values: [p.x, p.y],
-  } as PathCommand));
+  const ends = grainlineEndpoints(path);
+  if (!ends) return path;
+  const [start, end] = ends;
+  return [
+    { type: 'M', values: [end.x, end.y] },
+    { type: 'L', values: [start.x, start.y] },
+  ];
 }
 
 function samplePath(path: PathCommand[]): { x: number; y: number }[] {

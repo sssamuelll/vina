@@ -70,6 +70,19 @@ describe('reverseGrainline (nota de María #169)', () => {
     expect(reverseGrainline(reverseGrainline(gl))).toEqual(gl);
   });
 
+  it('collapses a multi-vertex grainline to one segment', () => {
+    // A POLYLINE on layer 7 imports with intermediate vertices. Keeping them
+    // would leave the DXF shaft stopping short of its own arrowhead.
+    expect(reverseGrainline([
+      { type: 'M', values: [50, 100] },
+      { type: 'L', values: [50, 150] },
+      { type: 'L', values: [50, 200] },
+    ])).toEqual([
+      { type: 'M', values: [50, 200] },
+      { type: 'L', values: [50, 100] },
+    ]);
+  });
+
   it('leaves a path with fewer than two points alone', () => {
     const stub: PathCommand[] = [{ type: 'M', values: [10, 10] }];
     expect(reverseGrainline(stub)).toBe(stub);
