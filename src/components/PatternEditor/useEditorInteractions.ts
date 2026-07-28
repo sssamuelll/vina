@@ -125,6 +125,7 @@ interface ToolHooks {
   };
   editPattern: {
     isEditing: boolean;
+    editingPieceId: string | null;
     hoveredNode: number | null;
     hoveredSegment: number | null;
     enterEdit: (pieceId: string) => void;
@@ -505,6 +506,20 @@ export function useEditorInteractions(
       if (handled) return;
     }
     if (editPattern.isEditing && activeTool === 'editPattern') {
+      // Clicking a DIFFERENT piece switches the edit target (nota de María
+      // #170). The tool's handleMouseDown consumes every click — its last
+      // branch turns a miss into a marquee — so without this check the entry
+      // below is unreachable while editing and you stay locked on the first
+      // piece, with Escape as the only way out. Nothing under the cursor
+      // (empty canvas, or a node glyph, which lives in the overlay and hangs
+      // off no [data-piece-id]) still goes to the tool, so marquee and point
+      // dragging are untouched.
+      const clicked = (e.target as SVGElement)
+        .closest('[data-piece-id]')?.getAttribute('data-piece-id');
+      if (clicked && clicked !== editPattern.editingPieceId) {
+        editPattern.enterEdit(clicked);
+        return;
+      }
       const handled = editPattern.handleMouseDown(e);
       if (handled) return;
     }

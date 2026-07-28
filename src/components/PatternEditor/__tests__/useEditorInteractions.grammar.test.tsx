@@ -192,6 +192,59 @@ describe('entrada a edición de nodos en una pieza rotada', () => {
   });
 });
 
+/** "Editar patrón" en plena edición de p1. Su handleMouseDown consume TODO
+ *  clic — punto, segmento o marquee sobre vacío — y ese `true` es justo lo que
+ *  dejaba el modo trabado en una sola pieza. */
+function editingP1() {
+  return {
+    isEditing: true,
+    editingPieceId: 'p1',
+    hoveredNode: null,
+    hoveredSegment: null,
+    enterEdit: vi.fn(),
+    exitEdit: vi.fn(),
+    handleMouseDown: vi.fn(() => true),
+    handleMouseMove: vi.fn(() => false),
+    handleMouseUp: vi.fn(),
+    handleKeyDown: vi.fn(),
+    handleDoubleClick: vi.fn(() => false),
+    getCursor: vi.fn(() => 'default'),
+  };
+}
+
+function pieceP2(): PatternPiece {
+  return { ...pieceP1(), id: 'p2', name: 'P2', position: { x: 400, y: 0 } } as PatternPiece;
+}
+
+describe('cambiar de pieza sin salir de "Editar patrón" (nota de María #170)', () => {
+  it('el clic en otra pieza pasa a editarla en vez de morir en el marquee', () => {
+    const editPattern = editingP1();
+    const { hook } = setup('editPattern', [pieceP1(), pieceP2()], makeTools({ editPattern }));
+    act(() => { hook.result.current.handleMouseDown(downOn('p2', 450, 50)); });
+    expect(editPattern.enterEdit).toHaveBeenCalledWith('p2');
+    expect(editPattern.handleMouseDown).not.toHaveBeenCalled();
+  });
+
+  it('el clic sobre la pieza en edición sigue siendo de la herramienta', () => {
+    const editPattern = editingP1();
+    const { hook } = setup('editPattern', [pieceP1(), pieceP2()], makeTools({ editPattern }));
+    act(() => { hook.result.current.handleMouseDown(downOn('p1', 50, 50)); });
+    expect(editPattern.handleMouseDown).toHaveBeenCalled();
+    expect(editPattern.enterEdit).not.toHaveBeenCalled();
+  });
+
+  // Sin pieza bajo el cursor: lienzo vacío, y también los glifos de nodo, que
+  // se dibujan en el overlay y no cuelgan de ningún [data-piece-id]. El
+  // marquee y el arrastre de puntos quedan intactos.
+  it('el clic fuera de toda pieza sigue siendo de la herramienta (marquee)', () => {
+    const editPattern = editingP1();
+    const { hook } = setup('editPattern', [pieceP1(), pieceP2()], makeTools({ editPattern }));
+    act(() => { hook.result.current.handleMouseDown(downOn(null, 900, 900)); });
+    expect(editPattern.handleMouseDown).toHaveBeenCalled();
+    expect(editPattern.enterEdit).not.toHaveBeenCalled();
+  });
+});
+
 describe('cursor honesto sobre los handles (F15)', () => {
   it('muestra el cursor del handle al hacer hover en select con selección', () => {
     const tj = { ...idleTransform(), getCursor: vi.fn(() => 'nwse-resize') };
