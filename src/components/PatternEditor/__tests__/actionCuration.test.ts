@@ -100,6 +100,32 @@ describe('integridad de CURATION', () => {
   });
 });
 
+describe('invertir sentido del hilo (nota de María #169)', () => {
+  const grainlineCtx = (path: PatternPiece['internals'][0]['path']) => makeCtx({
+    targetKind: 'il.grainline', internalLineType: 'grainline',
+    internalLineId: 'gl1', internalLine: { id: 'gl1', type: 'grainline', path },
+  });
+
+  it('la fila del hilo ofrece invertir el sentido', () => {
+    const path = [{ type: 'M' as const, values: [50, 100] }, { type: 'L' as const, values: [50, 200] }];
+    expect(resolveMenuActions(grainlineCtx(path)).map(d => d.id)).toContain('reverseGrainline');
+  });
+
+  it('despacha el path invertido — sin esto una flecha al revés no tiene arreglo', () => {
+    const ctx = grainlineCtx([
+      { type: 'M', values: [50, 100] },
+      { type: 'L', values: [50, 200] },
+    ]);
+    ACTIONS.reverseGrainline.run(ctx);
+    expect(ctx.dispatch).toHaveBeenCalledWith(expect.objectContaining({
+      payload: {
+        pieceId: 'p1', lineId: 'gl1',
+        path: [{ type: 'M', values: [50, 200] }, { type: 'L', values: [50, 100] }],
+      },
+    }));
+  });
+});
+
 describe('gate !locked en el menú de pieza (F2)', () => {
   it('pieza bloqueada oculta rotate/flip/delete y conserva desbloquear/copiar/seleccionar', () => {
     const ctx = makeCtx({ piece: pieceFix(true), pieces: [pieceFix(true)] });

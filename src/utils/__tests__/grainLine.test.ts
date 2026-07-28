@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractGrainLine, classifyDirection, setGrainDirection, grainlineArrowheads } from '../grainLine';
+import { extractGrainLine, classifyDirection, setGrainDirection, grainlineArrowheads, reverseGrainline } from '../grainLine';
 import type { PatternPiece, PathCommand } from '../../types/types';
 
 function makePiece(grainlinePath?: { type: string; values: number[] }[]): PatternPiece {
@@ -27,25 +27,65 @@ describe('grainlineArrowheads (nota de María #169)', () => {
     { type: 'L', values: [100, 150] },
   ];
 
-  it('returns one arrowhead per end (grainlines are double-headed)', () => {
+  it('returns a single arrowhead — the grainline points one way', () => {
     const heads = grainlineArrowheads(vertical, 6);
-    expect(heads).toHaveLength(2);
-    expect(heads.every(tri => tri.length === 3)).toBe(true);
+    expect(heads).toHaveLength(1);
+    expect(heads[0]).toHaveLength(3);
   });
 
-  it('points each wing outward from its own tip', () => {
-    const heads = grainlineArrowheads(vertical, 6);
-    // Tip of head 0 = the end point (100,150); head 1 = the start (100,50).
-    expect(heads[0][0]).toEqual({ x: 100, y: 150 });
-    expect(heads[1][0]).toEqual({ x: 100, y: 50 });
-    // The end wing sits back toward the line (y < 150); the start wing y > 50.
-    expect(heads[0][1].y).toBeLessThan(150);
-    expect(heads[1][1].y).toBeGreaterThan(50);
+  it('puts the tip at the path end and the wings behind it', () => {
+    const [[tip, wingA, wingB]] = grainlineArrowheads(vertical, 6);
+    expect(tip).toEqual({ x: 100, y: 150 });
+    // Both wings sit back along the line (y < 150), straddling it in x.
+    expect(wingA.y).toBeLessThan(150);
+    expect(wingB.y).toBeLessThan(150);
+    expect(Math.sign(wingA.x - 100)).toBe(-Math.sign(wingB.x - 100));
+  });
+
+  it('follows the path order — the reversed line points the other way', () => {
+    const flipped = grainlineArrowheads(reverseGrainline(vertical), 6);
+    expect(flipped[0][0]).toEqual({ x: 100, y: 50 });
+    expect(flipped[0][1].y).toBeGreaterThan(50);
   });
 
   it('returns nothing for a degenerate (zero-length) grainline', () => {
     expect(grainlineArrowheads([{ type: 'M', values: [10, 10] }, { type: 'L', values: [10, 10] }], 6)).toEqual([]);
     expect(grainlineArrowheads([{ type: 'M', values: [10, 10] }], 6)).toEqual([]);
+  });
+});
+
+describe('reverseGrainline (nota de María #169)', () => {
+  it('swaps the endpoints and keeps the M→L shape', () => {
+    expect(reverseGrainline([
+      { type: 'M', values: [100, 50] },
+      { type: 'L', values: [100, 150] },
+    ])).toEqual([
+      { type: 'M', values: [100, 150] },
+      { type: 'L', values: [100, 50] },
+    ]);
+  });
+
+  it('round-trips back to the original', () => {
+    const gl: PathCommand[] = [{ type: 'M', values: [10, 20] }, { type: 'L', values: [30, 60] }];
+    expect(reverseGrainline(reverseGrainline(gl))).toEqual(gl);
+  });
+
+  it('collapses a multi-vertex grainline to one segment', () => {
+    // A POLYLINE on layer 7 imports with intermediate vertices. Keeping them
+    // would leave the DXF shaft stopping short of its own arrowhead.
+    expect(reverseGrainline([
+      { type: 'M', values: [50, 100] },
+      { type: 'L', values: [50, 150] },
+      { type: 'L', values: [50, 200] },
+    ])).toEqual([
+      { type: 'M', values: [50, 200] },
+      { type: 'L', values: [50, 100] },
+    ]);
+  });
+
+  it('leaves a path with fewer than two points alone', () => {
+    const stub: PathCommand[] = [{ type: 'M', values: [10, 10] }];
+    expect(reverseGrainline(stub)).toBe(stub);
   });
 });
 

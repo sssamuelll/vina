@@ -87,29 +87,65 @@ export function grainAlignmentRotation(piece: Pick<PatternPiece, 'internals'>): 
 
 /**
  * Arrowhead wings for a grainline, as triangles `[tip, wingA, wingB]` in the
- * same coord space as the path. One per end — a finished grainline is
- * double-headed (nota de María #169: the persisted line and its DXF must carry
- * the arrows the draw preview already shows). `size` is the wing length in that
- * space (canvas passes px/zoom; DXF passes mm). Degenerate line → [].
+ * same coord space as the path. `size` is the wing length in that space (canvas
+ * passes px/zoom; DXF passes mm). Degenerate line → [].
+ *
+ * SINGLE-headed, at the path's end (nota de María #169): the grainline says
+ * which way the piece gets cut, and a napped or directional fabric does not
+ * behave the same cut top-to-bottom as bottom-to-top. Two heads state the axis
+ * and hide the answer. The direction is the path's own order — the drag that
+ * drew it, or the vertex order the source DXF emitted — so it is already
+ * stored; use {@link reverseGrainline} to flip it.
+ *
+ * Returns an array (not one triangle) because both consumers map over it and
+ * the shape predates the single-head decision.
  */
 export function grainlineArrowheads(path: PathCommand[], size: number): Point2D[][] {
-  const pts = samplePath(path);
-  if (pts.length < 2) return [];
-  const a = pts[0];
-  const b = pts[pts.length - 1];
+  const ends = grainlineEndpoints(path);
+  if (!ends) return [];
+  const [a, b] = ends;
   const dx = b.x - a.x, dy = b.y - a.y;
   const len = Math.hypot(dx, dy);
   if (len < 1e-6) return [];
   const ux = dx / len, uy = dy / len;
-  const wing = (tip: Point2D, wx: number, wy: number): Point2D[] => {
-    const bx = tip.x - wx * size, by = tip.y - wy * size;
-    return [
-      { x: tip.x, y: tip.y },
-      { x: bx + wy * size * 0.5, y: by - wx * size * 0.5 },
-      { x: bx - wy * size * 0.5, y: by + wx * size * 0.5 },
-    ];
-  };
-  return [wing(b, ux, uy), wing(a, -ux, -uy)];
+  const base = { x: b.x - ux * size, y: b.y - uy * size };
+  return [[
+    { x: b.x, y: b.y },
+    { x: base.x + uy * size * 0.5, y: base.y - ux * size * 0.5 },
+    { x: base.x - uy * size * 0.5, y: base.y + ux * size * 0.5 },
+  ]];
+}
+
+/**
+ * Start and end of a grainline — the only two points that carry meaning on a
+ * line that is straight by definition. Every consumer (arrowheads, angle,
+ * alignment, DXF shaft) reads exactly these. Degenerate path → null.
+ */
+export function grainlineEndpoints(path: PathCommand[]): [Point2D, Point2D] | null {
+  const pts = samplePath(path);
+  if (pts.length < 2) return null;
+  return [pts[0], pts[pts.length - 1]];
+}
+
+/**
+ * The same grainline pointing the other way. An imported piece carries whatever
+ * vertex order its source CAD wrote, and a drag can go the wrong way — without
+ * this, a backwards arrow is unfixable from the UI, and a backwards grain arrow
+ * is a piece cut backwards.
+ *
+ * Always comes back as a single M→L segment: a straight line needs no
+ * intermediate vertices, and a multi-vertex grainline is what makes the DXF
+ * shaft and its arrowhead disagree. Paths shorter than two points are returned
+ * untouched.
+ */
+export function reverseGrainline(path: PathCommand[]): PathCommand[] {
+  const ends = grainlineEndpoints(path);
+  if (!ends) return path;
+  const [start, end] = ends;
+  return [
+    { type: 'M', values: [end.x, end.y] },
+    { type: 'L', values: [start.x, start.y] },
+  ];
 }
 
 function samplePath(path: PathCommand[]): { x: number; y: number }[] {

@@ -13,7 +13,7 @@ import { PatternPiece, PathCommand, Seam } from '../../types/types';
 import { AAMA_LAYERS, DXFExportOptions } from './types';
 import { preparePieces, computeBBox } from '../export/pipeline';
 import { escapeDxfString } from '../sanitizeName';
-import { grainlineArrowheads } from '../grainLine';
+import { grainlineArrowheads, grainlineEndpoints } from '../grainLine';
 
 const DEFAULT_OPTIONS: DXFExportOptions = { version: 'R2000', aamaLayers: true };
 
@@ -307,14 +307,17 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
     else if (line.type === 'grainline') layer = AAMA_LAYERS.GRAINLINE;
 
     if (line.path.length >= 2 && line.path[0].type === 'M' && line.path[1].type === 'L') {
-      s += lineToDXF(
-        line.path[0].values[0], line.path[0].values[1],
-        line.path[1].values[0], line.path[1].values[1],
-        layer,
-      );
+      // A grainline is straight by definition, so its shaft runs end-to-end —
+      // otherwise a multi-vertex one (a POLYLINE on layer 7) exports a shaft
+      // stopping at vertex 2 while the arrowhead tips at the last, and the
+      // arrow arrives detached. Every other type keeps the first-segment rule.
+      const end = (line.type === 'grainline' ? grainlineEndpoints(line.path)?.[1] : null)
+        ?? { x: line.path[1].values[0], y: line.path[1].values[1] };
+      s += lineToDXF(line.path[0].values[0], line.path[0].values[1], end.x, end.y, layer);
 
-      // Grainline arrowheads (nota de María #169) — a finished grainline is
-      // double-headed. Each wing is a short LINE from the tip on layer 7.
+      // Grainline arrowhead (nota de María #169) — one head at the path's end,
+      // carrying the cut direction into the file. Each wing is a short LINE
+      // from the tip on layer 7.
       if (line.type === 'grainline') {
         for (const [tip, w1, w2] of grainlineArrowheads(line.path, GRAINLINE_ARROW_MM)) {
           s += lineToDXF(tip.x, tip.y, w1.x, w1.y, layer);
