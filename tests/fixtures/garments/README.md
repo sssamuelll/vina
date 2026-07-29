@@ -1,11 +1,13 @@
-# Frozen garment fixtures (DXF AAMA)
+# Frozen garment fixtures (DXF import contracts)
 
-Real multi-piece garment patterns, frozen as DXF bytes on **2026-06-05** —
-PASO 0 of the Seamly2D removal (council plan, same date). These five pre-existing garments
-were the #506 dress-avatar DoD cases; their source geometry existed only as
-Seamly2D conversions (`tools/seamly2d-converter/output/*.json`, deleted with
-the nuke). Freezing them preserves the real-garment test substrate so the DoD
-connectivity suite can be retargeted onto the DXF import path (backlog issue).
+This directory had five fixtures before Vectorizer Phase 0: four
+Seamly2D-derived garments frozen as DXF bytes on **2026-06-05**, plus María's
+external CAD export added on **2026-06-11**. The first four were the #506
+dress-avatar DoD cases; their source geometry existed only as Seamly2D
+conversions (`tools/seamly2d-converter/output/*.json`, deleted with the nuke).
+Freezing them preserves the real-garment test substrate so the DoD connectivity
+suite can be retargeted onto the DXF import path (backlog issue). María and the
+new Vectorizer fixture retain their separate provenance below.
 
 | File | Pieces | Provenance |
 |---|---|---|
@@ -16,16 +18,17 @@ connectivity suite can be retargeted onto the DXF import path (backlog issue).
 | `maria_patrones_samuel_2M.dxf` | 5 | **María (patternmaker), 2026-06-11** — real external CAD export (AC1009, block `PATRONES PARA SAMUEL-2_M`): front/back bodices, 2 sleeves, strip. NOT Seamly2D-derived — this is the canonical real-pattern substrate; the user mandated all integration-level verification use it (`seam-parity-replay.spec.ts`). |
 | `vectorizer_jacket_M.dxf` | 7 | Regenerated Phase 0 Vectorizer output (`patent_pattern/jacket_sizes/jacket_M.dxf`), mechanically copied into this fixture set: front/back panels, sleeves L/R, collar, waistband. |
 
-**How they were produced** (one-shot script, deleted after running — it
-imported modules that died with the nuke): for each pattern JSON, replicate
-the `loadSeamlyPattern` pipeline — `applyMeasMapping` + `deriveMeasurements`
+**How the four Seamly2D-derived fixtures were produced** (one-shot script,
+deleted after running — it imported modules that died with the nuke): for each
+pattern JSON, replicate the `loadSeamlyPattern` pipeline —
+`applyMeasMapping` + `deriveMeasurements`
 over the default avatar measurements (height 180, chest 96, waist 82, hips 96,
 shoulder 44, armLength 64, inseam 82) → `adaptSeamlyPattern` →
 `buildPieceWithOffset` per construction piece → cm→mm scale → x-offset
 placement → `applyClassification` + `detectSemanticEdges` → the `loadProject`
 reducer (for the app's duplicate-name enrichment) → `generateDXFAAMA` →
-these bytes. Each file was round-trip-verified: `importDXFContent` re-imports
-the exact piece count.
+those four byte streams. Each was round-trip-verified:
+`importDXFContent` re-imports the exact piece count.
 
 *\*Jacket pieces are prefixed `1..5` for readability. `sanitizeBlockName`
 strips non-ASCII to `_`, so names like Cyrillic ones would sanitize to the
