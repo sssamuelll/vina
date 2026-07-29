@@ -153,6 +153,7 @@ function splineToPath(d: DXFSplineData): PathCommand[] {
       cmds.push({ type: 'L', values: [pts[i].x, pts[i].y] });
     }
   }
+  if (d.closed) cmds.push({ type: 'Z', values: [] });
   return cmds;
 }
 
