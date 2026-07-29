@@ -18,11 +18,41 @@ const closedSpline: DXFEntity = {
   },
 };
 
+const closedCubicSpline: DXFEntity = {
+  ...closedSpline,
+  data: {
+    degree: 3,
+    closed: true,
+    knots: [],
+    controlPoints: [
+      { x: 0, y: 0 },
+      { x: 5, y: 0 },
+      { x: 10, y: 5 },
+      { x: 10, y: 10 },
+    ],
+    fitPoints: [],
+  },
+};
+
+function expectExactlyOneTerminalClose(path: ReturnType<typeof entityToPath>) {
+  const closes = path.filter(command => command.type === 'Z');
+  expect(closes).toEqual([{ type: 'Z', values: [] }]);
+  expect(path[path.length - 1]).toEqual(closes[0]);
+}
+
 describe('entityToPath closed SPLINE conversion', () => {
-  it('ends a closed spline path with Z', () => {
+  it('closes a linear spline exactly once at the terminal command', () => {
     const path = entityToPath(closedSpline);
 
-    expect(path[path.length - 1]).toEqual({ type: 'Z', values: [] });
+    expect(path.map(command => command.type)).toEqual(['M', 'L', 'L', 'Z']);
+    expectExactlyOneTerminalClose(path);
+  });
+
+  it('closes a cubic spline exactly once at the terminal command', () => {
+    const path = entityToPath(closedCubicSpline);
+
+    expect(path.map(command => command.type)).toEqual(['M', 'C', 'Z']);
+    expectExactlyOneTerminalClose(path);
   });
 
   it('leaves an open spline path unclosed', () => {
@@ -31,6 +61,7 @@ describe('entityToPath closed SPLINE conversion', () => {
       data: { ...closedSpline.data, closed: false },
     });
 
-    expect(path[path.length - 1]).toEqual({ type: 'L', values: [10, 10] });
+    expect(path.map(command => command.type)).toEqual(['M', 'L', 'L']);
+    expect(path.filter(command => command.type === 'Z')).toHaveLength(0);
   });
 });
