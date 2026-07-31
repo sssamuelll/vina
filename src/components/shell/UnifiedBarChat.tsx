@@ -8,7 +8,7 @@ import type { AppDispatch } from '../../store';
 import { addPiece } from '../../store/projectSlice';
 import { selectPiece, requestFitView } from '../../store/editorSlice';
 import { showSuccessToast } from '../../store/copilotUISlice';
-import { piecesLabel, type PendingDXFAttachment } from './dxfImport';
+import { piecesLabel, promptSafeName, type PendingDXFAttachment } from './dxfImport';
 import { useAgenticLoop, type ToolCallProgress } from '../../copilot/hooks/useAgenticLoop';
 import { getDefaultRegistry } from '../../copilot/action/tools/registry';
 import { anthropicProvider } from '../../copilot/providers/anthropic';
@@ -160,9 +160,13 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
       dispatch(selectPiece(attachment.pieces[0].id));
       dispatch(requestFitView()); // frame the imported pattern in the 2D canvas
       clearAttachment();
-      const label = `${attachment.name} · ${piecesLabel(attachment.pieces.length)}`;
+      // The filename is attacker-controlled and never passes through the DXF
+      // parser, so it reaches the model unfiltered unless we neutralize the
+      // delimiters of the context note here. See `promptSafeName`.
+      const safeName = promptSafeName(attachment.name);
+      const label = `${safeName} · ${piecesLabel(attachment.pieces.length)}`;
       displayContent = text.trim() ? `📎 ${label}\n${text}` : `📎 ${label}`;
-      const note = `[Contexto: el usuario adjuntó y cargó un patrón DXF "${attachment.name}" con ${attachment.pieces.length} piezas, ya presentes en el proyecto.]`;
+      const note = `[Contexto: el usuario adjuntó y cargó un patrón DXF "${safeName}" con ${attachment.pieces.length} piezas, ya presentes en el proyecto.]`;
       agentText = text.trim()
         ? `${note}\n\n${text}`
         : `${note}\n\nAcabo de cargar este patrón. ¿Qué puedes hacer con él?`;
