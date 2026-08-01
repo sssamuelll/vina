@@ -1,5 +1,5 @@
 /**
- * Convert DXF entities to OpenClo PatternPiece objects.
+ * Convert DXF entities to Vina PatternPiece objects.
  */
 import { PatternPiece, PathCommand, InternalLine } from '../../types/types';
 import {
@@ -277,7 +277,7 @@ function resolveUnitFactor(unit: string | undefined, doc: DXFDocument): number {
 // ─── Main Converter ───
 
 /**
- * Convert a parsed DXF document into OpenClo pattern pieces.
+ * Convert a parsed DXF document into Vina pattern pieces.
  *
  * If the document contains blocks, each block becomes a piece (with INSERT
  * transforms applied). Otherwise, all entities are treated as a single piece.

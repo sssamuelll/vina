@@ -40,7 +40,7 @@ export interface AIConnection {
    * The API key as the user typed it. Stored directly in IDB.
    *
    * Security model (deliberate, documented in code):
-   *   API keys are persisted in IndexedDB under the openclo origin.
+   *   API keys are persisted in IndexedDB under the vina origin.
    *   Anyone with access to this browser profile can read them. This
    *   matches Cursor / Continue.dev / Open-WebUI / chatbot-ui defaults.
    *

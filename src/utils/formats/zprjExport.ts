@@ -1,5 +1,5 @@
 /**
- * Export OpenClo project as CLO3D .zprj file (ZIP archive).
+ * Export Vina project as CLO3D .zprj file (ZIP archive).
  */
 import { zipSync, strToU8 } from 'fflate';
 import { generateDXFAAMA } from '../dxf';
@@ -85,7 +85,7 @@ export async function exportZprj(
     name: config.projectName,
     version: '1.0',
     createdAt: new Date().toISOString(),
-    software: 'OpenClo',
+    software: 'Vina',
   };
   zipFiles['project_info.json'] = strToU8(JSON.stringify(projectInfo, null, 2));
 

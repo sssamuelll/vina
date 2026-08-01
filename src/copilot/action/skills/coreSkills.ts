@@ -1,7 +1,7 @@
 /**
  * Core Skills — bundled skills with NSID identifiers.
  *
- * All skills that ship with OpenClo are defined here with their
+ * All skills that ship with Vina are defined here with their
  * namespace identifiers for the unified registry.
  *
  * DORMANT (M2, #847): these skills encode real drafting formulas but are NOT

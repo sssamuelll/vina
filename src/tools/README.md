@@ -1,4 +1,4 @@
-# OpenClo Professional Tool System
+# Vina Professional Tool System
 
 This tool system is designed to match CLO3D's professional workflow, making it familiar to patronistas and fashion designers.
 
@@ -83,4 +83,4 @@ Tools are automatically registered on application startup. The registry system s
 - Professional grouping and separation
 - Tool lifecycle hooks (onActivate/onDeactivate)
 
-This creates a familiar environment for users transitioning from CLO3D to OpenClo.
+This creates a familiar environment for users transitioning from CLO3D to Vina.

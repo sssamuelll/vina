@@ -1,5 +1,5 @@
 /**
- * CDT (Constrained Delaunay Triangulation) Mesher for OpenClo
+ * CDT (Constrained Delaunay Triangulation) Mesher for Vina
  *
  * Replaces ear-clipping triangulation with proper CDT using cdt2d + clean-pslg
  * for simulation-quality meshes. This is the foundation for cloth simulation —

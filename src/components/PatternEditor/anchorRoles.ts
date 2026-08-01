@@ -34,7 +34,7 @@ function distance(a: Point2D, b: Point2D): number {
  * the difference María asked about in note #167.
  *
  * ponytail: lineEnd depends on CLO's doubled vertex. A piece drawn inside
- * OpenClo has no twins and gets no lineEnd — it still gets corners by angle.
+ * Vina has no twins and gets no lineEnd — it still gets corners by angle.
  * If the importer ever dedupes coincident anchors, lineEnd goes to zero; the
  * counts pinned in anchorRoles.maria.test.ts go red that day, which is the
  * moment to read DXF layers 2/3 instead.

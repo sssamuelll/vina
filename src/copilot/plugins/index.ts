@@ -1,5 +1,5 @@
 /**
- * Plugin System — public API for the OpenClo plugin architecture.
+ * Plugin System — public API for the Vina plugin architecture.
  *
  * Re-exports all plugin types, the loader, registry, manager, and formula integration.
  *

@@ -215,7 +215,7 @@ export async function storageClear(store: StoreNames): Promise<void> {
 }
 
 /**
- * Clear ALL OpenClo data (all stores). For full reset.
+ * Clear ALL Vina data (all stores). For full reset.
  */
 export async function storageClearAll(): Promise<void> {
   try {

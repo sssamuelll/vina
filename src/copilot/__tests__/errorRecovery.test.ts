@@ -618,7 +618,7 @@ describe('Fallback Provider', () => {
     });
     // Post-BUG-10: saveFallbackProvider routes through storageSet (IDB-only).
     // The legacy LS key is not written. In tests without IDB the LS fallback
-    // inside storageSet writes to a *different* key (`openclo:settings:...`).
+    // inside storageSet writes to a *different* key (`vina:settings:...`).
     // Either way the legacy key has no API key — verify the legacy key is
     // empty AND none of the LS values contains the secret string.
     expect(localStorageMock.getItem('vina-fallback-provider')).toBeNull();

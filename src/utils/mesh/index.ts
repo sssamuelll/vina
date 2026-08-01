@@ -1,5 +1,5 @@
 /**
- * CDT Meshing Module for OpenClo
+ * CDT Meshing Module for Vina
  *
  * Provides high-quality triangle mesh generation using Constrained Delaunay
  * Triangulation (CDT) for cloth simulation. Replaces ear-clipping with proper

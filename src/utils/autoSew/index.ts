@@ -1,7 +1,7 @@
 /**
  * Auto-Sew — automatic seam detection for pattern pieces.
  * 
- * This is OpenClo's competitive advantage: no other open-source (or commercial)
+ * This is Vina's competitive advantage: no other open-source (or commercial)
  * tool does automatic seam matching. It combines:
  * 
  * 1. **Naming heuristics** — patternmaking domain knowledge (front↔back, bodice↔sleeve)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# OpenClo.ai — Competitive Parity Roadmap Issue Creator
+# Vina.ai — Competitive Parity Roadmap Issue Creator
 # =====================================================
 # Creates GitHub issues for every feature gap identified in
 # docs/specs/COMPETITIVE-GAP-ANALYSIS.md

@@ -127,10 +127,10 @@ const PREFERENCES_MENU: MenuItem[] = [
 ];
 
 const HELP_MENU: MenuItem[] = [
-  { label: 'Documentación', action: () => window.open('https://github.com/sssamuelll/openclo', '_blank') },
-  { label: 'Reportar un bug', action: () => window.open('https://github.com/sssamuelll/openclo/issues', '_blank') },
+  { label: 'Documentación', action: () => window.open('https://github.com/sssamuelll/vina', '_blank') },
+  { label: 'Reportar un bug', action: () => window.open('https://github.com/sssamuelll/vina/issues', '_blank') },
   { separator: true, label: '' },
-  { label: 'Acerca de OpenClo', action: () => alert('OpenClo v0.7.0\nMotor de diseño cognitivo para ingeniería de moda') },
+  { label: 'Acerca de Vina', action: () => alert('Vina v0.11.0\nMotor de diseño cognitivo para ingeniería de moda') },
 ];
 
 interface TopLevelItem {
@@ -240,7 +240,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
         className={`logo-menu__trigger ${open ? 'logo-menu__trigger--active' : ''}`}
         onClick={() => { setOpen(!open); setHoveredTop(null); }}
       >
-        <span className="logo-menu__logo-text">OpenClo</span>
+        <span className="logo-menu__logo-text">Vina</span>
         <ChevronDown size={12} />
       </button>
 

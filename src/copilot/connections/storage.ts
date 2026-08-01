@@ -12,7 +12,7 @@
 // shape: ConnectionsState v1 — opt-in envelope: no
 //
 // LS-only justification (per CLAUDE.md B6-state): not LS, this writes to
-// IDB via storageSet — the canonical persistence layer for openclo. The
+// IDB via storageSet — the canonical persistence layer for vina. The
 // inline shape comment above documents the schema for future readers
 // (per the B6 inline-comment convention).
 

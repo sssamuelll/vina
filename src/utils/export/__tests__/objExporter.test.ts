@@ -24,7 +24,7 @@ describe('exportToOBJ', () => {
     const group = makeTestMesh();
     const obj = exportToOBJ(group);
 
-    expect(obj).toContain('# OpenClo OBJ Export');
+    expect(obj).toContain('# Vina OBJ Export');
     expect(obj).toContain('o test_piece');
     // 6 vertices
     const vLines = obj.split('\n').filter(l => l.startsWith('v '));
@@ -59,7 +59,7 @@ describe('exportToOBJ', () => {
   it('handles empty group', () => {
     const group = new THREE.Group();
     const obj = exportToOBJ(group);
-    expect(obj).toContain('# OpenClo OBJ Export');
+    expect(obj).toContain('# Vina OBJ Export');
     const fLines = obj.split('\n').filter(l => l.startsWith('f '));
     expect(fLines.length).toBe(0);
   });

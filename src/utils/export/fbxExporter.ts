@@ -315,7 +315,7 @@ function buildFBXBinary(
   writeNode(w, node('FBXHeaderExtension', [], [
     node('FBXHeaderVersion', [propI(1003)]),
     node('FBXVersion', [propI(7400)]),
-    node('Creator', [propS('OpenClo')]),
+    node('Creator', [propS('Vina')]),
   ]));
 
   // --- GlobalSettings ---

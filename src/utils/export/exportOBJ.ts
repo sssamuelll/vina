@@ -94,7 +94,7 @@ export function triangulate(points: Point2D[]): number[][] {
  * @returns OBJ file content as a string
  */
 export function generateOBJ(pieces: PatternPiece[]): string {
-  const lines: string[] = ['# OpenClo OBJ Export'];
+  const lines: string[] = ['# Vina OBJ Export'];
   let vertexOffset = 0;
 
   for (const piece of pieces) {

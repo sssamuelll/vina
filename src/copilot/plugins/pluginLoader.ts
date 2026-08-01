@@ -17,7 +17,7 @@ import type {
 import { ALL_PLUGIN_PERMISSIONS } from './types';
 import { safeGetItem, safeRemoveItem } from '../../utils/safeStorage';
 
-/** Current OpenClo version — used for plugin compatibility checks */
+/** Current Vina version — used for plugin compatibility checks */
 const VINA_VERSION = '0.4.0';
 
 /** Loaded plugin instances keyed by plugin id */
@@ -66,7 +66,7 @@ export function satisfiesSemver(current: string, range: string): boolean {
  * - All required fields are present and non-empty strings
  * - Version is valid semver
  * - All permissions are recognized
- * - Plugin is compatible with current OpenClo version
+ * - Plugin is compatible with current Vina version
  *
  * @param manifest - The manifest to validate
  * @returns ValidationResult with errors and warnings
@@ -111,7 +111,7 @@ export function validateManifest(manifest: PluginManifest): ValidationResult {
   // Compatibility check
   if (manifest.compatibleWith && !satisfiesSemver(VINA_VERSION, manifest.compatibleWith)) {
     warnings.push(
-      `Plugin requires OpenClo ${manifest.compatibleWith}, current version is ${VINA_VERSION}`,
+      `Plugin requires Vina ${manifest.compatibleWith}, current version is ${VINA_VERSION}`,
     );
   }
 

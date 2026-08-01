@@ -13,7 +13,7 @@ import type { CommunitySkillMetadata } from './communityFormat';
 
 /**
  * Where the skill originated.
- * - 'core': Bundled with OpenClo (immutable)
+ * - 'core': Bundled with Vina (immutable)
  * - 'community': Installed from marketplace
  * - 'local': Imported from local file
  */
