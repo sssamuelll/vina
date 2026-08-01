@@ -1,62 +1,17 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App';
-import { AppErrorBoundary } from './components/ErrorBoundary/AppErrorBoundary';
-import { ShortcutProvider } from './shortcuts';
-import './index.css';
-
-// WebGPU debug infrastructure — patches GPUAdapter.prototype.requestDevice so
-// every device (Three.js renderer's + GpuSolverClient's) gets shader capture
-// and uncapturederror listener installed automatically. Dev-only; production:
-// no-op. Hoisted to first body statement so any other top-level setup that
-// might call adapter.requestDevice() sees the hook in place.
-import { installEarlyDeviceHook } from './utils/cloth/gpu/webgpuDebug';
-installEarlyDeviceHook();
-
-// Initialize tool registry
-import './tools';
-
-// Global error tracking (captures unhandled errors + rejections)
-import { initErrorTracker, getTrackedErrors, getErrorCount } from './utils/errorTracker';
-initErrorTracker();
-// Expose for devtools: __VINA_ERRORS__() returns tracked errors
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(window as any).__VINA_ERRORS__ = getTrackedErrors;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(window as any).__VINA_ERROR_COUNT__ = getErrorCount;
-
-// Security: clear any API keys from legacy localStorage fallback storage
-import { clearLegacyFallbackKeys } from './copilot/errorRecovery';
-clearLegacyFallbackKeys();
-
-// ─── Block browser zoom (Cmd+/-, Cmd+0, Ctrl+wheel, pinch) ───
-// Zoom gestures are reserved for the 2D canvas and 3D viewport.
-document.addEventListener('keydown', (e) => {
-  if ((e.metaKey || e.ctrlKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) {
-    e.preventDefault();
-  }
-});
-document.addEventListener('wheel', (e) => {
-  if (e.ctrlKey || e.metaKey) e.preventDefault();
-}, { passive: false });
-document.addEventListener('gesturestart', (e) => e.preventDefault());
-document.addEventListener('gesturechange', (e) => e.preventDefault());
-document.addEventListener('gestureend', (e) => e.preventDefault());
-
-// One-shot client-data migration OpenClo → Vina. Runs before the app mounts
-// so storage.ts opens the renamed IDB database with data already in place.
-// No top-level await (would change the chunk graph) — render moves inside
-// .finally() instead.
+// One-shot client-data migration OpenClo → Vina must run BEFORE anything in
+// the app graph touches storage. ES imports are hoisted: a static `import App
+// from './App'` here would pull in `./store` (and other module bodies) that
+// read `vina-*` localStorage keys / open the `vina` IDB database at MODULE
+// EVAL TIME — i.e. before this file's own top-level statements run. That
+// would hydrate empty state from the not-yet-migrated renamed storage, then
+// autosave would debounce-overwrite the legacy data still sitting under
+// `openclo*` (silent data loss, CRITICAL #1 of the 2026-08-01 rename review).
+//
+// Fix: this file's ONLY static import is the migration module. Everything
+// else (App, store, styles, error tracking, the legacy-fallback-key security
+// scrubber, createRoot().render()) lives in ./bootstrap, loaded via a dynamic
+// import only after the migration settles — so the app graph never evaluates
+// until the renamed storage is actually in place.
 import { migrateFromOpenClo } from './utils/renameMigration';
 
-migrateFromOpenClo().finally(() => {
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <AppErrorBoundary>
-        <ShortcutProvider>
-          <App />
-        </ShortcutProvider>
-      </AppErrorBoundary>
-    </StrictMode>,
-  );
-});
+migrateFromOpenClo().finally(() => { void import('./bootstrap'); });

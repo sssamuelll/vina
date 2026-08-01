@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { openDB } from 'idb';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { migrateFromOpenClo } from '../renameMigration';
 
 describe('migrateFromOpenClo', () => {
@@ -48,7 +48,7 @@ describe('migrateFromOpenClo', () => {
     expect(localStorage.getItem('openclo-layout')).toBe('tarde');
   });
 
-  it('clona la base IDB openclo → vina (datos + claves con prefijo reescrito) y borra la vieja', async () => {
+  it('clona la base IDB openclo → vina (datos + claves con prefijo reescrito) y borra la vieja (best-effort)', async () => {
     const old = await openDB('openclo', 1, {
       upgrade(db) { db.createObjectStore('kv'); },
     });
@@ -63,11 +63,20 @@ describe('migrateFromOpenClo', () => {
     expect(await nueva.get('kv', 'proyecto-1')).toEqual({ v: 2 });
     nueva.close();
 
-    const dbs = await indexedDB.databases();
-    expect(dbs.map(d => d.name)).not.toContain('openclo');
+    // deleteDB() is fire-and-forget (IMPORTANT #2, 2026-08-01 review) — it
+    // must not gate rendering, so it isn't awaited by migrateFromOpenClo().
+    // The clone/data correctness above is the real contract; deletion is
+    // best-effort and only tolerantly (eventually) asserted here.
+    await vi.waitFor(async () => {
+      const dbs = await indexedDB.databases();
+      expect(dbs.map(d => d.name)).not.toContain('openclo');
+    });
   });
 
   it('si la base vieja no existía, no deja una base basura creada por el probe', async () => {
+    // With the indexedDB.databases() pre-check (MINOR #6), cloneDb() is never
+    // even called for a name that doesn't exist — deterministic, no probe DB
+    // is ever created, so this no longer depends on the fire-and-forget delete.
     await migrateFromOpenClo();
     const dbs = await indexedDB.databases();
     expect(dbs.map(d => d.name)).not.toContain('openclo');
@@ -85,6 +94,27 @@ describe('migrateFromOpenClo', () => {
 
     const nueva = await openDB('vina_skills_v1', 1);
     expect(await nueva.get('skills', 'openclo:bodice')).toEqual({ nsid: 'openclo:bodice', enabled: true });
+    nueva.close();
+  });
+
+  it('clona indexes de un store con keyPath (MINOR #5)', async () => {
+    const old = await openDB('openclo_skills_v1', 1, {
+      upgrade(db) {
+        const store = db.createObjectStore('skills', { keyPath: 'nsid' });
+        store.createIndex('source', 'source', { unique: false });
+      },
+    });
+    await old.put('skills', { nsid: 'openclo:bodice', source: 'community' });
+    old.close();
+
+    await migrateFromOpenClo();
+
+    const nueva = await openDB('vina_skills_v1', 1);
+    const tx = nueva.transaction('skills', 'readonly');
+    const index = tx.objectStore('skills').index('source');
+    expect(index.keyPath).toBe('source');
+    expect(index.unique).toBe(false);
+    expect(await index.get('community')).toEqual({ nsid: 'openclo:bodice', source: 'community' });
     nueva.close();
   });
 });

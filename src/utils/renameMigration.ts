@@ -58,21 +58,33 @@ async function cloneDb(oldName: string, newName: string): Promise<void> {
   const old = await openDB(oldName);
   if (old.objectStoreNames.length === 0) {
     old.close();
-    await deleteDB(oldName);
+    // Fire-and-forget: a lingering empty probe-created DB is harmless, and
+    // awaiting it can hang the whole migration (and thus app boot) if
+    // another tab holds it open (IMPORTANT #2, 2026-08-01 final review).
+    void deleteDB(oldName);
     return;
   }
   const meta = Array.from(old.objectStoreNames).map((name) => {
     const store = old.transaction(name).objectStore(name);
-    return { name, keyPath: store.keyPath, autoIncrement: store.autoIncrement };
+    // Preserve indexes too — a clone that drops them silently breaks any
+    // `.index()` lookup on the renamed DB (MINOR #5, 2026-08-01 review).
+    const indexes = Array.from(store.indexNames).map((indexName) => {
+      const index = store.index(indexName);
+      return { name: indexName, keyPath: index.keyPath, unique: index.unique, multiEntry: index.multiEntry };
+    });
+    return { name, keyPath: store.keyPath, autoIncrement: store.autoIncrement, indexes };
   });
   const next = await openDB(newName, old.version, {
     upgrade(db) {
       for (const m of meta) {
         if (!db.objectStoreNames.contains(m.name)) {
-          db.createObjectStore(m.name, {
+          const store = db.createObjectStore(m.name, {
             keyPath: m.keyPath ?? undefined,
             autoIncrement: m.autoIncrement,
           });
+          for (const idx of m.indexes) {
+            store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multiEntry });
+          }
         }
       }
     },
@@ -94,14 +106,31 @@ async function cloneDb(oldName: string, newName: string): Promise<void> {
   }
   old.close();
   next.close();
-  await deleteDB(oldName);
+  // Fire-and-forget (not awaited): if another tab still has the old DB open,
+  // deleteDB() hangs until that tab closes/navigates — the marker set right
+  // after cloneDb() prevents re-cloning regardless, so a lingering old DB is
+  // harmless and must not block rendering (IMPORTANT #2, 2026-08-01 review).
+  void deleteDB(oldName);
 }
 
 export async function migrateFromOpenClo(): Promise<void> {
   try {
     if (localStorage.getItem(MARKER) !== null) return;
     migrateLocalStorage();
-    for (const [o, n] of DB_PAIRS) await cloneDb(o, n);
+    // For fresh users (no legacy DBs at all), skip the cloneDb probe cost —
+    // each cloneDb() call opens (and, if empty, creates+deletes) a DB just to
+    // check. When indexedDB.databases() is available, list once and only
+    // probe names that actually exist (MINOR #6, 2026-08-01 review). Falls
+    // back to the current probe-every-name behavior when the API is missing.
+    let existing: Set<string> | null = null;
+    if (typeof indexedDB.databases === 'function') {
+      const dbs = await indexedDB.databases();
+      existing = new Set(dbs.map((d) => d.name).filter((n): n is string => Boolean(n)));
+    }
+    for (const [o, n] of DB_PAIRS) {
+      if (existing !== null && !existing.has(o)) continue;
+      await cloneDb(o, n);
+    }
     localStorage.setItem(MARKER, '1');
   } catch {
     // Storage no disponible o clon fallido: la app arranca igual (variante

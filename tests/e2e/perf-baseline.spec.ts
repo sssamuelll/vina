@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { switchView, startSimulation } from './helpers/sim';
 
-const RUN = process.env.VINA_PERF === '1';
+const RUN = (process.env.VINA_PERF || process.env.OPENCLO_PERF) === '1';
 const FIXTURE = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../fixtures/garments/maria_patrones_samuel_2M.dxf',

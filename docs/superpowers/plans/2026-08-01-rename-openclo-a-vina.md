@@ -297,6 +297,8 @@ migrateFromOpenClo().finally(() => {
 });
 ```
 
+> **Enmienda (final review 2026-08-01):** el `.finally()` de arriba resultó insuficiente — los imports ES se hoistean, así que un `import App from './App'` (u otro import estático del árbol) en `main.tsx` evalúa `./store` y compañía ANTES de que corran las sentencias de nivel superior de este archivo, sin importar dónde caiga el `.finally()` en el cuerpo. El fix que se shippeó es partir el archivo: `src/main.tsx` queda con un único import estático (`renameMigration`) y carga el resto de la app (`src/bootstrap.tsx`, con el `createRoot(...).render(...)` de siempre) vía `import('./bootstrap')` dinámico dentro del `.finally()` — así el grafo de la app nunca se evalúa hasta que la migración asienta.
+
 - [ ] **Step 3: Revisar el diff completo**
 
 `git diff` — buscar falsos positivos del sed (prosa en comentarios está bien renombrada; lo único prohibido es tocar los 4 literales legacy y `renameMigration.ts`).

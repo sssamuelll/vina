@@ -8,6 +8,7 @@ import {
   createNSID,
   validateNSID,
   normalizeLegacyNSID,
+  denormalizeToLegacyNSID,
 } from '../nsid';
 
 describe('nsid', () => {
@@ -121,6 +122,17 @@ describe('nsid', () => {
     it('deja intactos los demás autores', () => {
       expect(normalizeLegacyNSID('sdar:stretch_bodice')).toBe('sdar:stretch_bodice');
       expect(normalizeLegacyNSID('vina:bodice')).toBe('vina:bodice');
+    });
+  });
+
+  describe('denormalizeToLegacyNSID', () => {
+    it('mapea autores canónicos vina → openclo (inverso de normalizeLegacyNSID)', () => {
+      expect(denormalizeToLegacyNSID('vina:bodice')).toBe('openclo:bodice');
+      expect(denormalizeToLegacyNSID('vina-community:pleats')).toBe('openclo-community:pleats');
+    });
+    it('retorna null para autores que no tienen forma legacy', () => {
+      expect(denormalizeToLegacyNSID('sdar:stretch_bodice')).toBeNull();
+      expect(denormalizeToLegacyNSID('openclo:bodice')).toBeNull();
     });
   });
 });

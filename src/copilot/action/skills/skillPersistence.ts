@@ -8,7 +8,7 @@
  */
 
 import type { NSID } from './nsid';
-import { normalizeLegacyNSID } from './nsid';
+import { normalizeLegacyNSID, denormalizeToLegacyNSID } from './nsid';
 import type { RegisteredSkill, TriggerPreference } from './registryTypes';
 import { safeGetItem, safeRemoveItem } from '../../../utils/safeStorage';
 
@@ -112,16 +112,34 @@ export class SkillPersistence {
   }
 
   /**
-   * Get a skill by NSID.
+   * Look up a skill record by its exact stored key (no legacy fallback).
    */
-  async getSkill(nsid: NSID): Promise<RegisteredSkill | undefined> {
+  private async getSkillByExactKey(key: string): Promise<RegisteredSkill | undefined> {
     const db = this.ensureOpen();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(SKILLS_STORE, 'readonly');
-      const request = tx.objectStore(SKILLS_STORE).get(nsid);
+      const request = tx.objectStore(SKILLS_STORE).get(key);
       request.onsuccess = () => resolve(request.result ?? undefined);
       request.onerror = () => reject(request.error);
     });
+  }
+
+  /**
+   * Get a skill by NSID.
+   *
+   * Falls back to the legacy form of the NSID when the canonical key misses:
+   * `cloneDb` (renameMigration.ts) copies the `skills` store verbatim, so a
+   * skill cloned from the pre-rename DB may still be keyed under its
+   * `openclo:*` NSID even though `getAllSkills()` normalizes it to `vina:*`
+   * on read. Without this, a lookup/delete by the canonical NSID silently
+   * misses the legacy-keyed record (IMPORTANT #4, 2026-08-01 final review).
+   */
+  async getSkill(nsid: NSID): Promise<RegisteredSkill | undefined> {
+    const direct = await this.getSkillByExactKey(nsid);
+    if (direct) return direct;
+    const legacyKey = denormalizeToLegacyNSID(nsid);
+    if (legacyKey === null) return undefined;
+    return this.getSkillByExactKey(legacyKey);
   }
 
   /**
@@ -145,12 +163,16 @@ export class SkillPersistence {
    */
   async deleteSkill(nsid: NSID): Promise<boolean> {
     const db = this.ensureOpen();
-    const exists = await this.getSkill(nsid);
-    if (!exists) return false;
+    const existing = await this.getSkill(nsid);
+    if (!existing) return false;
+    // Delete whichever key the record actually lives under — for a
+    // legacy-keyed clone (see getSkill's fallback), that's `existing.nsid`
+    // (the raw, unnormalized stored key), not the canonical `nsid` param.
+    const actualKey = existing.nsid;
 
     return new Promise((resolve, reject) => {
       const tx = db.transaction(SKILLS_STORE, 'readwrite');
-      tx.objectStore(SKILLS_STORE).delete(nsid);
+      tx.objectStore(SKILLS_STORE).delete(actualKey);
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
     });

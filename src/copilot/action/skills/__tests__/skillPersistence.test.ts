@@ -89,6 +89,21 @@ describe('SkillPersistence', () => {
       const deleted = await persistence.deleteSkill('nonexistent:skill' as NSID);
       expect(deleted).toBe(false);
     });
+
+    it('falls back to the legacy NSID key for a record cloned verbatim (IMPORTANT #4), and a subsequent save does not duplicate', async () => {
+      // Simulate cloneDb's verbatim copy: the record is keyed under its
+      // legacy nsid because saveSkill() does not normalize on write.
+      await persistence.saveSkill({ ...mockSkill, nsid: 'openclo-community:pleats' as NSID });
+
+      const deleted = await persistence.deleteSkill('vina-community:pleats' as NSID);
+      expect(deleted).toBe(true);
+      expect(await persistence.getAllSkills()).toHaveLength(0);
+
+      // Re-saving under the canonical NSID must not leave a stray legacy
+      // record behind — deleteSkill above already removed the real key.
+      await persistence.saveSkill({ ...mockSkill, nsid: 'vina-community:pleats' as NSID });
+      expect(await persistence.getAllSkills()).toHaveLength(1);
+    });
   });
 
   describe('preferences', () => {

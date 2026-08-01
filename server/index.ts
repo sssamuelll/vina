@@ -108,7 +108,7 @@ wss.on('connection', (ws: WebSocket) => {
 server.listen(PORT, () => {
   console.log(`
   ╔═══════════════════════════════════════╗
-  ║          Vina v0.4.0                  ║
+  ║          Vina v0.11.0                 ║
   ║  http://localhost:${PORT}               ║
   ╚═══════════════════════════════════════╝
 

@@ -20,7 +20,7 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 
-const BASE = process.env.VINA_BASE ?? 'http://localhost:5173';
+const BASE = process.env.VINA_BASE || process.env.OPENCLO_BASE || 'http://localhost:5173';
 const DIR = 'screenshots/seam-allowance';
 mkdirSync(DIR, { recursive: true });
 const shot = (page, n) => page.screenshot({ path: `${DIR}/${n}.png` });

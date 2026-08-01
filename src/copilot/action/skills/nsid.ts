@@ -184,3 +184,19 @@ export function normalizeLegacyNSID(nsid: string): string {
   if (nsid.startsWith('openclo-community:')) return `vina-community:${nsid.slice('openclo-community:'.length)}`;
   return nsid;
 }
+
+/**
+ * Inverse of normalizeLegacyNSID — maps a canonical NSID back to the legacy
+ * form it may still be stored under. Needed because `cloneDb` (renameMigration.ts)
+ * copies the IDB `skills` store verbatim: its keyPath is `nsid`, so records
+ * cloned from the old `openclo_skills_v1` DB keep `openclo:*` record keys even
+ * though `getAllSkills()` normalizes them on read. A lookup by the canonical
+ * key (`getSkill('vina:x')`) then misses the legacy-keyed record — this is the
+ * fallback `skillPersistence.getSkill` tries when the canonical key isn't
+ * found (IMPORTANT #4, 2026-08-01 final review).
+ */
+export function denormalizeToLegacyNSID(nsid: string): string | null {
+  if (nsid.startsWith('vina-community:')) return `openclo-community:${nsid.slice('vina-community:'.length)}`;
+  if (nsid.startsWith('vina:')) return `openclo:${nsid.slice('vina:'.length)}`;
+  return null;
+}
