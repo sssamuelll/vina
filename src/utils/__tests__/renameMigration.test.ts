@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { openDB } from 'idb';
@@ -71,5 +72,19 @@ describe('migrateFromOpenClo', () => {
     const dbs = await indexedDB.databases();
     expect(dbs.map(d => d.name)).not.toContain('openclo');
     expect(dbs.map(d => d.name)).not.toContain('openclo-reference-images');
+  });
+
+  it('clona stores con keyPath (skills): la clave viaja dentro del value', async () => {
+    const old = await openDB('openclo_skills_v1', 1, {
+      upgrade(db) { db.createObjectStore('skills', { keyPath: 'nsid' }); },
+    });
+    await old.put('skills', { nsid: 'openclo:bodice', enabled: true });
+    old.close();
+
+    await migrateFromOpenClo();
+
+    const nueva = await openDB('vina_skills_v1', 1);
+    expect(await nueva.get('skills', 'openclo:bodice')).toEqual({ nsid: 'openclo:bodice', enabled: true });
+    nueva.close();
   });
 });
