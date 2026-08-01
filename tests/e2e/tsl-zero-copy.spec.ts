@@ -75,7 +75,7 @@ test.describe('TSL Zero-Copy Rendering', () => {
     // In headless Chromium (no WebGPU), the tier should be wasm or cpu-worker —
     // crucially NOT 'none'. Read it straight off the store.
     const tier = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: { getState: () => { simulation: { solverTier: string } } } }).__OPENCLO_STORE__;
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => { simulation: { solverTier: string } } } }).__VINA_STORE__;
       return s.getState().simulation.solverTier;
     });
     console.log(`Solver tier: ${tier}`);
@@ -95,14 +95,14 @@ test.describe('TSL Zero-Copy Rendering', () => {
     await page.waitForTimeout(1000);
 
     await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: { dispatch: (a: unknown) => void } }).__OPENCLO_STORE__;
+      const s = (window as unknown as { __VINA_STORE__: { dispatch: (a: unknown) => void } }).__VINA_STORE__;
       s.dispatch({ type: 'simulation/pauseSimulation' });
     });
     await page.waitForTimeout(300);
     expect(await getSimulationState(page)).toBe('paused');
 
     await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: { dispatch: (a: unknown) => void } }).__OPENCLO_STORE__;
+      const s = (window as unknown as { __VINA_STORE__: { dispatch: (a: unknown) => void } }).__VINA_STORE__;
       s.dispatch({ type: 'simulation/resetSimulation' });
     });
     await page.waitForTimeout(300);

@@ -349,14 +349,14 @@ describe('CostManager', () => {
   });
 
   it('should handle corrupted localStorage gracefully', () => {
-    localStorageMock.setItem('openclo_usage_corrupt-project', 'not-valid-json{{{');
+    localStorageMock.setItem('vina_usage_corrupt-project', 'not-valid-json{{{');
     const corruptManager = new CostManager('corrupt-project');
     // Should not throw, should start with empty records
     expect(corruptManager.getProjectCost().calls).toBe(0);
   });
 
   it('should handle non-array localStorage data gracefully', () => {
-    localStorageMock.setItem('openclo_usage_non-array', JSON.stringify({ not: 'an array' }));
+    localStorageMock.setItem('vina_usage_non-array', JSON.stringify({ not: 'an array' }));
     const badManager = new CostManager('non-array');
     expect(badManager.getProjectCost().calls).toBe(0);
   });
@@ -378,7 +378,7 @@ describe('CostManager', () => {
       { ...goodA, timestamp: '2026-01-15T00:00:00Z' }, // string timestamp
       goodB,
     ];
-    localStorageMock.setItem('openclo_usage_mixed', JSON.stringify(corrupt));
+    localStorageMock.setItem('vina_usage_mixed', JSON.stringify(corrupt));
 
     const m = new CostManager('mixed');
     const summary = m.getProjectCost();
@@ -388,7 +388,7 @@ describe('CostManager', () => {
     expect(summary.estimatedCost).toBeCloseTo(0.009, 6);
 
     // Sanitized list is re-persisted so corruption does not survive next load.
-    const persisted = JSON.parse(localStorageMock.getItem('openclo_usage_mixed')!);
+    const persisted = JSON.parse(localStorageMock.getItem('vina_usage_mixed')!);
     expect(persisted).toHaveLength(2);
   });
 
@@ -574,11 +574,11 @@ describe('CostManager telemetry', () => {
   });
 
   it('emits json_parse failure when project storage holds malformed JSON', () => {
-    localStorageMock.setItem('openclo_usage_telemetry-bad-json', 'not-json{{{');
+    localStorageMock.setItem('vina_usage_telemetry-bad-json', 'not-json{{{');
     new CostManager('telemetry-bad-json');
     const snap = getStorageParseFailureSnapshot();
     expect(snap.total).toBe(1);
-    expect(snap.byKey['openclo_usage_telemetry-bad-json']).toBe(1);
+    expect(snap.byKey['vina_usage_telemetry-bad-json']).toBe(1);
     expect(snap.byReason.json_parse).toBe(1);
   });
 
@@ -592,7 +592,7 @@ describe('CostManager telemetry', () => {
       timestamp: 1_700_000_000_000,
     };
     const corrupt = [good, { ...good, inputTokens: 'oops' }, { ...good, cost: NaN }];
-    localStorageMock.setItem('openclo_usage_telemetry-mixed', JSON.stringify(corrupt));
+    localStorageMock.setItem('vina_usage_telemetry-mixed', JSON.stringify(corrupt));
     new CostManager('telemetry-mixed');
     const snap = getStorageParseFailureSnapshot();
     expect(snap.total).toBe(1);
@@ -615,7 +615,7 @@ describe('CostManager telemetry', () => {
       cost: 0.006,
       timestamp: 1_700_000_000_000,
     };
-    localStorageMock.setItem('openclo_usage_telemetry-good', JSON.stringify([good, good]));
+    localStorageMock.setItem('vina_usage_telemetry-good', JSON.stringify([good, good]));
     new CostManager('telemetry-good');
     expect(getStorageParseFailureSnapshot().total).toBe(0);
   });

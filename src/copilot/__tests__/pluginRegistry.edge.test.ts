@@ -7,11 +7,11 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PluginRegistry, getDefaultPluginRegistry, resetDefaultPluginRegistry } from '../plugins/pluginRegistry';
-import type { OpenCloPlugin } from '../plugins/types';
+import type { VinaPlugin } from '../plugins/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function makePlugin(id: string, overrides?: Partial<OpenCloPlugin>): OpenCloPlugin {
+function makePlugin(id: string, overrides?: Partial<VinaPlugin>): VinaPlugin {
   return {
     id,
     name: `Plugin ${id}`,

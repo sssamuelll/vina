@@ -5,14 +5,14 @@ import { test, expect } from '@playwright/test';
  *
  * Setup retargeted (2026-06-04): the old `.status-bar` sentinel was deleted
  * with the legacy shell. App-alive is now asserted via the store handle
- * (`window.__OPENCLO_STORE__`) plus the canvas + TopBar view pills still being
+ * (`window.__VINA_STORE__`) plus the canvas + TopBar view pills still being
  * present. View switching uses the TopBar pills (2D / Split / 3D).
  */
 
 test.describe('3D Viewport', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.waitForFunction(() => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__), { timeout: 15000 });
+    await page.waitForFunction(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__), { timeout: 15000 });
   });
 
   test('canvas renders in split view', async ({ page }) => {
@@ -45,7 +45,7 @@ test.describe('3D Viewport', () => {
     // App still alive: canvas present + store intact + TopBar pills clickable.
     await expect(page.locator('canvas').first()).toBeVisible();
     await expect(page.locator('button:has-text("Split")')).toBeVisible();
-    const alive = await page.evaluate(() => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__));
+    const alive = await page.evaluate(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__));
     expect(alive).toBe(true);
   });
 
@@ -56,7 +56,7 @@ test.describe('3D Viewport', () => {
     // tripped, the canvas-area__3d pane would still be mounted and the store
     // would survive. Assert the app shell is intact.
     await expect(page.locator('.canvas-area__3d')).toBeVisible();
-    const alive = await page.evaluate(() => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__));
+    const alive = await page.evaluate(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__));
     expect(alive).toBe(true);
   });
 });
@@ -64,7 +64,7 @@ test.describe('3D Viewport', () => {
 test.describe('Avatar Rendering', () => {
   test('avatar loads in 3D view', async ({ page }) => {
     await page.goto('/');
-    await page.waitForFunction(() => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__), { timeout: 15000 });
+    await page.waitForFunction(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__), { timeout: 15000 });
     await page.click('button:has-text("3D")');
     await page.waitForTimeout(3000);
     await expect(page.locator('canvas').first()).toBeVisible();

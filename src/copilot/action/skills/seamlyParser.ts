@@ -3,7 +3,7 @@
  *
  * Parses Seamly2D pattern files (.sm2d, .val) and extracts construction
  * steps, pieces, variables, and measurements in a format ready for
- * conversion to OpenClo skills.
+ * conversion to Vina skills.
  *
  * @module skills/seamlyParser
  */

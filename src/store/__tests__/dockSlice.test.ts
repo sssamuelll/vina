@@ -36,11 +36,11 @@ describe('dockSlice persistence', () => {
     expect(loadDocks()).toBeNull();
   });
   it('loadDocks returns null for a corrupt envelope', () => {
-    localStorage.setItem('openclo-docks', JSON.stringify({ version: 99, data: { pinnedExtra: { left: [], right: [] } } }));
+    localStorage.setItem('vina-docks', JSON.stringify({ version: 99, data: { pinnedExtra: { left: [], right: [] } } }));
     expect(loadDocks()).toBeNull();
   });
   it('loadDocks returns null for wrong-typed data', () => {
-    localStorage.setItem('openclo-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: 'nope', right: [] } } }));
+    localStorage.setItem('vina-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: 'nope', right: [] } } }));
     expect(loadDocks()).toBeNull();
   });
 });
@@ -65,14 +65,14 @@ describe('dockSlice signaling', () => {
   });
 
   it('loadDocks defaults signaling to subtle for a pre-3c envelope (no signaling key)', () => {
-    localStorage.setItem('openclo-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: [], right: [] } } }));
+    localStorage.setItem('vina-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: [], right: [] } } }));
     const loaded = loadDocks();
     expect(loaded).not.toBeNull();
     expect(loaded!.signaling).toBe('subtle');
   });
 
   it('loadDocks discards an envelope with an invalid signaling value', () => {
-    localStorage.setItem('openclo-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: [], right: [] }, signaling: 'loud' } }));
+    localStorage.setItem('vina-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: [], right: [] }, signaling: 'loud' } }));
     expect(loadDocks()).toBeNull();
   });
 
@@ -110,7 +110,7 @@ describe('dockSlice tools2d', () => {
   });
 
   it('loadDocks migrates a persisted historical default and round-trips it as v1', () => {
-    localStorage.setItem('openclo-docks', JSON.stringify({
+    localStorage.setItem('vina-docks', JSON.stringify({
       version: 1,
       data: {
         pinnedExtra: { left: [], right: [] },
@@ -157,14 +157,14 @@ describe('dockSlice tools2d', () => {
   });
 
   it('loadDocks defaults tools2d for a pre-slice-4 envelope (no tools2d key)', () => {
-    localStorage.setItem('openclo-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: [], right: [] }, signaling: 'subtle' } }));
+    localStorage.setItem('vina-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: [], right: [] }, signaling: 'subtle' } }));
     const loaded = loadDocks();
     expect(loaded).not.toBeNull();
     expect(loaded!.tools2d).toEqual(DEFAULT_DOCK_2D_IDS);
   });
 
   it('loadDocks discards an envelope with a non-array tools2d', () => {
-    localStorage.setItem('openclo-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: [], right: [] }, signaling: 'subtle', tools2d: 'nope' } }));
+    localStorage.setItem('vina-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: [], right: [] }, signaling: 'subtle', tools2d: 'nope' } }));
     expect(loadDocks()).toBeNull();
   });
 

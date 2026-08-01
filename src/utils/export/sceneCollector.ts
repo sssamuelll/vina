@@ -22,7 +22,7 @@ export function collectExportScene(
     group.add(garmentMesh.clone(true));
   }
 
-  // 2. Add avatar — find groups containing SkinnedMesh or opencloRole marker
+  // 2. Add avatar — find groups containing SkinnedMesh or vinaRole marker
   if (includeAvatar) {
     for (const child of scene.children) {
       if (child === garmentMesh) continue;
@@ -31,8 +31,8 @@ export function collectExportScene(
       child.traverse(obj => {
         if ((obj as THREE.SkinnedMesh).isSkinnedMesh) isAvatar = true;
       });
-      // Check for opencloRole marker (mannequin / dress form)
-      if (!isAvatar && child.userData?.opencloRole === 'avatar') {
+      // Check for vinaRole marker (mannequin / dress form)
+      if (!isAvatar && child.userData?.vinaRole === 'avatar') {
         isAvatar = true;
       }
       if (isAvatar) {

@@ -29,6 +29,7 @@ screenshots/
 
 # Local review artifacts
 OpenClo_Review_*.docx
+Vina_Review_*.docx
 .github/*
 !.github/workflows/
 !.github/workflows/**

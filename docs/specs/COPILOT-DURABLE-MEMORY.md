@@ -4,7 +4,7 @@
 Inspired by the **OpenClaw** architecture, this system moves the Copilot from a transient message-based history to a persistent, human-readable **Markdown Design Log**. It prevents "AI amnesia" during long design sessions by flushing durable facts to permanent storage before compacting the context window.
 
 ## 2. Storage Architecture: The "Design Log"
-We will maintain a virtual file system inside IndexedDB that simulates a file at `.openclo/project-log.md`.
+We will maintain a virtual file system inside IndexedDB that simulates a file at `.vina/project-log.md`.
 
 ### Log Structure
 - **Durable Facts (`MEMORY.md` style)**: Long-term preferences (e.g., "User prefers 12mm seam allowance for denim").

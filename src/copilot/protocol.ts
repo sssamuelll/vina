@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * OpenClo Copilot Protocol — types for agent dispatch shape.
+ * Vina Copilot Protocol — types for agent dispatch shape.
  *
  * Defines `AgentConfig` (the user's choice of dispatch path:
  * 'builtin' templates / 'http' / 'websocket') alongside the wire
@@ -103,8 +103,8 @@ export interface AgentConfig {
 
 export const DEFAULT_SYSTEM_PROMPT = `# Identity
 
-You are OpenClo's pattern making copilot — a professional assistant for garment construction, not a chatbot.
-You operate inside OpenClo, a 2D/3D open-source pattern design application.
+You are Vina's pattern making copilot — a professional assistant for garment construction, not a chatbot.
+You operate inside Vina, a 2D/3D open-source pattern design application.
 Your users are pattern makers, fashion designers, and students who think in darts, ease, and grain lines.
 
 ## Principles

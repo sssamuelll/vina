@@ -1,7 +1,7 @@
-# OpenClo vs Gerber AccuMark — Direct Comparison
+# Vina vs Gerber AccuMark — Direct Comparison
 
 > Date: 2026-03-06
-> Gerber AccuMark V2025.1 (Lectra) vs OpenClo.ai current
+> Gerber AccuMark V2025.1 (Lectra) vs Vina.ai current
 
 Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike CLO3D/Browzwear (which are design-first 3D tools), Gerber's strength is in industrial pattern engineering, grading, marker making, and cutting integration. Its 3D capabilities are limited (powered by Browzwear VStitcher integration).
 
@@ -11,7 +11,7 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 ### 1. Pattern Design (2D)
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | Freeform point/line drawing | Yes | Yes | Both have full pen/polygon tools |
 | Rectangle/circle/conic primitives | Yes | Yes | Gerber: conics replace corners with arcs |
@@ -44,15 +44,15 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 | Group pieces (V2025.1) | Yes | No | **Gerber has** — batch PDS actions on grouped pieces |
 | Colorway support | Yes | No | **Gerber has** — multiple color combos without duplicating models |
 | Digital print file generation | Yes | No | **Gerber has** — automated with batch processing |
-| Linked editing (symmetry) | No | Yes | **OpenClo has** — automatic mirrored piece editing |
-| AI copilot for patternmaking | No | Yes | **OpenClo has** — natural language pattern commands |
-| Constraint-based geometry | No | Yes | **OpenClo has** — parametric relationships |
-| Real-time parametric sliders | No | Yes | **OpenClo has** — adjust dimensions via sliders |
-| Real-time 2D↔3D live link | No | Yes | **OpenClo has** — edit pattern, see 3D update instantly |
+| Linked editing (symmetry) | No | Yes | **Vina has** — automatic mirrored piece editing |
+| AI copilot for patternmaking | No | Yes | **Vina has** — natural language pattern commands |
+| Constraint-based geometry | No | Yes | **Vina has** — parametric relationships |
+| Real-time parametric sliders | No | Yes | **Vina has** — adjust dimensions via sliders |
+| Real-time 2D↔3D live link | No | Yes | **Vina has** — edit pattern, see 3D update instantly |
 
 ### 2. Grading & Sizing
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | Multi-size grading | Yes | Yes | |
 | Per-point grade rules | Yes | Partial | Gerber: full point-by-point rules |
@@ -67,7 +67,7 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 ### 3. Marker Making / Nesting
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | Easy Marking (interactive) | Yes | No | **Gerber has** — Marker Wizard + floating toolbox |
 | Step/tilt/flip/rotate tools | Yes | No | **Gerber has** — precise piece nudging (=, [, ], ' keys) |
@@ -94,14 +94,14 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 | Roll width/length config | Yes | No | **Gerber has** |
 | Costing vs production markers | Yes | No | **Gerber has** — fast costing vs optimized production |
 | Marker plotting | Yes | No | **Gerber has** — direct output to plotters |
-| Basic nesting | Partial (#195) | Partial | OpenClo: planned basic auto-nesting |
+| Basic nesting | Partial (#195) | Partial | Vina: planned basic auto-nesting |
 
 ### 4. 3D Simulation
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
-| Cloth physics simulation | Yes (Avametric engine) | Yes (XPBD) | Gerber: licensed engine; OpenClo: native WASM |
-| Real-time simulation | Yes | Yes | **OpenClo better** — native, no third-party license |
+| Cloth physics simulation | Yes (Avametric engine) | Yes (XPBD) | Gerber: licensed engine; Vina: native WASM |
+| Real-time simulation | Yes | Yes | **Vina better** — native, no third-party license |
 | Self-collision | Via VStitcher | Yes | |
 | Fabric presets library | 42 presets (Lectra Labs) | 32+ presets | Gerber: lab-tested mechanical properties |
 | KES-F fabric coefficients | Yes | No | **Gerber has** — precise textile test data input |
@@ -111,15 +111,15 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 | Mark-up/drawing on 3D | Yes | No | **Gerber has** — draw on 3D for pattern adjustments |
 | AR visualization (Avametric) | Yes | No | **Gerber has** — augmented reality garment try-on |
 | Image Edition in 3D | Yes | No | **Gerber has** — graphic design placement reflected 2D↔3D |
-| Collision bodies (multi-mesh) | No | Yes | **OpenClo has** — import any mesh as collision body |
-| Simulation snapshots (A/B/C) | No | Yes | **OpenClo has** — compare drape states |
-| Air drag / anisotropic damping | No | Yes | **OpenClo has** — per-direction air resistance |
-| WASM + JS fallback | No | Yes | **OpenClo has** — works on any browser, any OS |
-| BVH triangle collision | No | Yes | **OpenClo has** — spatial hash + BVH collision pipeline |
+| Collision bodies (multi-mesh) | No | Yes | **Vina has** — import any mesh as collision body |
+| Simulation snapshots (A/B/C) | No | Yes | **Vina has** — compare drape states |
+| Air drag / anisotropic damping | No | Yes | **Vina has** — per-direction air resistance |
+| WASM + JS fallback | No | Yes | **Vina has** — works on any browser, any OS |
+| BVH triangle collision | No | Yes | **Vina has** — spatial hash + BVH collision pipeline |
 
 ### 5. Avatar System
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | Parametric body editing | Yes | Yes | |
 | ASTM-based size avatars | Yes | Yes | |
@@ -135,7 +135,7 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 ### 6. Data Management (AccuMark Explorer)
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | Storage area management | Yes | No | **Gerber has** — SQL-backed storage areas |
 | Model/piece/marker database | Yes | No | **Gerber has** — relational data management |
@@ -147,12 +147,12 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 | Report generation | Yes | No | **Gerber has** — data reports from Explorer |
 | Annotation library | Yes | No | **Gerber has** — shared annotation templates |
 | SQL Server integration | Yes | No | **Gerber has** — enterprise database storage |
-| Browser-based access | No | Yes | **OpenClo has** — web app, no install needed |
-| IndexedDB local persistence | No | Yes | **OpenClo has** — client-side storage |
+| Browser-based access | No | Yes | **Vina has** — web app, no install needed |
+| IndexedDB local persistence | No | Yes | **Vina has** — client-side storage |
 
 ### 7. Digitizing (AccuScan)
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | Scan physical patterns | Yes | No | **Gerber has** — flatbed scanner integration |
 | Auto-trace scanned images | Yes | No | **Gerber has** — automatic edge detection |
@@ -164,7 +164,7 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 ### 8. Production Planning (AccuPlan)
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | Cut order planning | Yes | No | **Gerber has** — multi-order planning together |
 | Spread planning | Yes | No | **Gerber has** — plan fabric lay-up sequences |
@@ -183,7 +183,7 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 ### 9. Made-to-Measure (MTM)
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | Individual body measurement input | Yes | No | **Gerber has** — from tape/scanner/web |
 | Automatic pattern alteration | Yes | No | **Gerber has** — rule-based pattern modification |
@@ -195,19 +195,19 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 ### 10. Automation & Scripting
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | Pattern Wizard macros | Yes | No | **Gerber has** — recorded script sequences |
 | Script groups (up to 3 custom) | Yes | No | **Gerber has** — organize macros in groups |
 | Batch processing | Yes | No | **Gerber has** — bulk operations via scripts |
 | Queue submission | Yes | No | **Gerber has** — submit jobs to processing queue |
-| AI copilot tool execution | No | Yes | **OpenClo has** — LLM-driven tool execution |
-| Planner/Executor/Reasoner | No | Yes | **OpenClo has** — bridge architecture for AI operations |
-| Skill marketplace | No | Yes | **OpenClo has** — extensible skill plugins |
+| AI copilot tool execution | No | Yes | **Vina has** — LLM-driven tool execution |
+| Planner/Executor/Reasoner | No | Yes | **Vina has** — bridge architecture for AI operations |
+| Skill marketplace | No | Yes | **Vina has** — extensible skill plugins |
 
 ### 11. Cutting Integration
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | Direct cutter output | Yes | No | **Gerber has** — GERBERcutter Z1, Paragon, Atria |
 | Cut data generation | Yes | No | **Gerber has** — DXF/HPGL cut files |
@@ -218,7 +218,7 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 ### 12. File Formats & Interoperability
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | DXF (AAMA/ASTM) | Yes | Yes | Both: industry-standard pattern exchange |
 | Standard DXF (AutoCAD) | Yes | Yes | |
@@ -237,29 +237,29 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 ### 13. Collaboration & Cloud
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | Kubix Link PLM integration | Yes | No | **Gerber has** — Lectra PLM connection |
 | Cloud nesting (AccuNest Cloud) | Yes | No | **Gerber has** — offload nesting to cloud |
 | Subscription licensing | Yes | Yes (free) | |
 | Tech pack export to PLM | Yes | No | **Gerber has** — auto-generate for suppliers |
-| Browser-based access | No | Yes | **OpenClo has** — full app runs in browser |
-| Real-time collaboration | No | Planned | OpenClo: cloud review planned (#236) |
-| AI copilot chat | No | Yes | **OpenClo has** — conversational assistant |
+| Browser-based access | No | Yes | **Vina has** — full app runs in browser |
+| Real-time collaboration | No | Planned | Vina: cloud review planned (#236) |
+| AI copilot chat | No | Yes | **Vina has** — conversational assistant |
 
 ### 14. Rendering & Visualization
 
-| Feature | Gerber AccuMark | OpenClo | Notes |
+| Feature | Gerber AccuMark | Vina | Notes |
 |---------|:-:|:-:|-------|
 | 3D garment rendering | Via VStitcher | Yes (R3F) | |
 | Fabric texture preview | Via VStitcher | Planned (#220) | |
 | AR visualization | Yes (Avametric app) | No | **Gerber has** — augmented reality try-on |
-| Real-time 3D viewport | Via VStitcher | Yes | **OpenClo better** — native in-browser |
+| Real-time 3D viewport | Via VStitcher | Yes | **Vina better** — native in-browser |
 | Photorealistic rendering | No | Planned (#237) | Neither has production-ready render |
 
 ---
 
-## What Gerber Has That OpenClo Doesn't
+## What Gerber Has That Vina Doesn't
 
 ### Production & Manufacturing (Gerber's core strength)
 
@@ -296,7 +296,7 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 ---
 
-## What OpenClo Has That Gerber Doesn't
+## What Vina Has That Gerber Doesn't
 
 ### Technology Advantages
 
@@ -330,7 +330,7 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 ## Strategic Summary
 
-| Dimension | Gerber AccuMark | OpenClo |
+| Dimension | Gerber AccuMark | Vina |
 |-----------|:-:|:-:|
 | **Primary strength** | Production/manufacturing | Design/prototyping |
 | **Target user** | Factory/production team | Designer/pattern maker |
@@ -346,16 +346,16 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 ### Key Insight
 
-Gerber AccuMark and OpenClo serve **different segments of the value chain**:
+Gerber AccuMark and Vina serve **different segments of the value chain**:
 
 - **Gerber** = Production engine. Optimized for factories: pattern → grade → nest → cut → sew. Weak on 3D and design creativity.
-- **OpenClo** = Design engine. Optimized for designers: sketch → simulate → iterate → present. Weak on production workflow.
+- **Vina** = Design engine. Optimized for designers: sketch → simulate → iterate → present. Weak on production workflow.
 
 The overlap is in **2D pattern design and grading** — where both compete directly. The non-overlapping areas represent **partnership or integration opportunities** rather than direct competition.
 
 ### Gerber Feature Integration Plan
 
-We are implementing **16 Gerber-inspired features** (#252–#267) to make OpenClo patterns production-ready. See [GERBER-INTEGRATION-SPEC.md](./GERBER-INTEGRATION-SPEC.md) for full details.
+We are implementing **16 Gerber-inspired features** (#252–#267) to make Vina patterns production-ready. See [GERBER-INTEGRATION-SPEC.md](./GERBER-INTEGRATION-SPEC.md) for full details.
 
 | Sprint | Features | Goal |
 |--------|----------|------|
@@ -368,10 +368,10 @@ We are implementing **16 Gerber-inspired features** (#252–#267) to make OpenCl
 
 ### Interoperability Strategy
 
-In addition to the 16 integrated features, OpenClo maintains **interoperability** with Gerber's ecosystem:
+In addition to the 16 integrated features, Vina maintains **interoperability** with Gerber's ecosystem:
 
-1. **DXF/AAMA export** → Already done. Gerber can import OpenClo patterns.
-2. **RUL grade rule export** → Add to #227. Let Gerber users import OpenClo grading.
+1. **DXF/AAMA export** → Already done. Gerber can import Vina patterns.
+2. **RUL grade rule export** → Add to #227. Let Gerber users import Vina grading.
 3. **Marker-ready output** → Export patterns with fabric codes (#257) and grain direction that Gerber's AccuNest can consume.
-4. **MTM API integration** → OpenClo designs + Gerber MTM automation = end-to-end custom tailoring.
+4. **MTM API integration** → Vina designs + Gerber MTM automation = end-to-end custom tailoring.
 5. **DXF Wizard** (#262) → Auto-detect Gerber DXF format on import for seamless round-trip.

@@ -18,7 +18,7 @@ Pieces (piezas) are mapped through AAMA numbered layers where each layer has a s
 ## Quick Example
 
 ```ts
-import { parseDXF, dxfToPatternPieces, generateDXFAAMA } from '@openclo/utils/dxf';
+import { parseDXF, dxfToPatternPieces, generateDXFAAMA } from '@vina/utils/dxf';
 
 // Import
 const doc = parseDXF(dxfFileContent);
@@ -69,7 +69,7 @@ Parses a DXF ASCII string into a structured document.
 
 ### `dxfToPatternPieces(doc): PatternPiece[]`
 
-Converts a parsed DXF document to OpenClo pattern pieces.
+Converts a parsed DXF document to Vina pattern pieces.
 
 - Each **block** becomes a pattern piece (or all entities as one piece if no blocks)
 - Entities are grouped by layer role: cut→outline, notch/grainline/draw→internals

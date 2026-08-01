@@ -24,7 +24,7 @@ export type StorageParseFailureReason =
   | 'storage_read';   // safeGetItem threw / storage unavailable
 
 export interface StorageParseFailureEvent {
-  /** localStorage key, e.g. 'openclo-avatar-profiles'. */
+  /** localStorage key, e.g. 'vina-avatar-profiles'. */
   key: string;
   reason: StorageParseFailureReason;
   /** Number of records (or 1 for atomic payloads) discarded. */

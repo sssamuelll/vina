@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 
 export interface USDZExportOptions {
-  /** Filename without extension (default 'openclo-export') */
+  /** Filename without extension (default 'vina-export') */
   filename?: string;
 }
 
@@ -33,7 +33,7 @@ export async function downloadUSDZ(
   object: THREE.Object3D,
   options: USDZExportOptions = {},
 ): Promise<void> {
-  const { filename = 'openclo-export' } = options;
+  const { filename = 'vina-export' } = options;
   const data = await exportToUSDZ(object);
   const blob = new Blob([data], { type: 'model/vnd.usdz+zip' });
   const url = URL.createObjectURL(blob);

@@ -161,7 +161,7 @@ const export3DOBJTool: ToolDefinition = {
   execute: async (params): Promise<ToolResult> => {
     const filename = (params.filename as string) || 'garment-3d';
     const scale = (params.scale as number) || 0.1;
-    window.dispatchEvent(new CustomEvent('openclo:export3d', {
+    window.dispatchEvent(new CustomEvent('vina:export3d', {
       detail: { format: 'obj', filename, scale },
     }));
     return { success: true, data: { filename: `${filename}.obj`, format: 'OBJ', note: 'Export triggered via 3D viewport' } };
@@ -186,7 +186,7 @@ const export3DGLTFTool: ToolDefinition = {
   execute: async (params): Promise<ToolResult> => {
     const filename = (params.filename as string) || 'garment-3d';
     const binary = (params.binary as boolean) ?? true;
-    window.dispatchEvent(new CustomEvent('openclo:export3d', {
+    window.dispatchEvent(new CustomEvent('vina:export3d', {
       detail: { format: binary ? 'glb' : 'gltf', filename, binary },
     }));
     return { success: true, data: { filename: `${filename}.${binary ? 'glb' : 'gltf'}`, format: binary ? 'GLB' : 'glTF' } };
@@ -198,7 +198,7 @@ const export3DGLTFTool: ToolDefinition = {
 const saveProjectTool: ToolDefinition = {
   name: 'saveProject',
   description:
-    'Save the current project to an .openclo file. / Guardar el proyecto actual en un archivo .openclo.',
+    'Save the current project to a .vina file. / Guardar el proyecto actual en un archivo .vina.',
   parameters: {
     type: 'object',
     properties: {
@@ -213,7 +213,7 @@ const saveProjectTool: ToolDefinition = {
       const filename = (params.filename as string) || state.project.name || 'project';
       downloadProjectFile(state.project, filename);
 
-      return { success: true, data: { filename: filename + '.openclo' } };
+      return { success: true, data: { filename: filename + '.vina' } };
     } catch (e: unknown) {
       return { success: false, error: (e as Error).message };
     }
@@ -311,7 +311,7 @@ const export3DFBXTool: ToolDefinition = {
   execute: async (params): Promise<ToolResult> => {
     const filename = (params.filename as string) || 'garment-3d';
     const scale = (params.scale as number) || 0.1;
-    window.dispatchEvent(new CustomEvent('openclo:export3d', {
+    window.dispatchEvent(new CustomEvent('vina:export3d', {
       detail: { format: 'fbx', filename, scale },
     }));
     return { success: true, data: { filename: `${filename}.fbx`, format: 'FBX' } };
@@ -338,7 +338,7 @@ const exportOBJSequenceTool: ToolDefinition = {
     const fps = (params.fps as number) || 24;
     const filename = (params.filename as string) || 'simulation-sequence';
 
-    window.dispatchEvent(new CustomEvent('openclo:exportObjSequence', {
+    window.dispatchEvent(new CustomEvent('vina:exportObjSequence', {
       detail: { frameCount, fps, filename },
     }));
 

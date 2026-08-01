@@ -1,5 +1,5 @@
 /**
- * Claude Bridge — minimal HTTP server that wraps `claude` CLI for OpenClo's copilot.
+ * Claude Bridge — minimal HTTP server that wraps `claude` CLI for Vina's copilot.
  *
  * Uses Claude Max subscription via the CLI (no API credits needed).
  * Streams responses as SSE (Server-Sent Events).
@@ -39,7 +39,7 @@ function readBody(req) {
 
 // ─── System prompt ──────────────────────────────────────────────────────────
 
-const DEFAULT_SYSTEM = `You are an AI assistant inside OpenClo, an open-source CLO3D alternative. Be concise. Match user's language.`;
+const DEFAULT_SYSTEM = `You are an AI assistant inside Vina, an open-source CLO3D alternative. Be concise. Match user's language.`;
 
 // ─── Chat handler ───────────────────────────────────────────────────────────
 

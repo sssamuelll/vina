@@ -69,12 +69,12 @@ describe('EmptyState2D', () => {
     expect(btn.disabled).toBe(true);
   });
 
-  it('dispatches openclo:focusChat when the AI hint is clicked', () => {
+  it('dispatches vina:focusChat when the AI hint is clicked', () => {
     const spy = vi.fn();
-    window.addEventListener('openclo:focusChat', spy);
+    window.addEventListener('vina:focusChat', spy);
     renderWithStore({ onImportDXF: () => {} });
     fireEvent.click(screen.getByRole('button', { name: /describe tu patrón a la ia/i }));
     expect(spy).toHaveBeenCalledTimes(1);
-    window.removeEventListener('openclo:focusChat', spy);
+    window.removeEventListener('vina:focusChat', spy);
   });
 });

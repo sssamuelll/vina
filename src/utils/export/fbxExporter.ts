@@ -118,7 +118,7 @@ export function downloadFBX(
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${options.filename || 'openclo-export'}.fbx`;
+  a.download = `${options.filename || 'vina-export'}.fbx`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -315,7 +315,7 @@ function buildFBXBinary(
   writeNode(w, node('FBXHeaderExtension', [], [
     node('FBXHeaderVersion', [propI(1003)]),
     node('FBXVersion', [propI(7400)]),
-    node('Creator', [propS('OpenClo')]),
+    node('Creator', [propS('Vina')]),
   ]));
 
   // --- GlobalSettings ---

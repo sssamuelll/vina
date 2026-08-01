@@ -1,5 +1,5 @@
 /**
- * Project Validator — runtime validation and repair for OpenCloProject data.
+ * Project Validator — runtime validation and repair for VinaProject data.
  *
  * Validates structural invariants and cross-references within a project,
  * producing diagnostics and quarantining corrupt entities while preserving
@@ -11,7 +11,7 @@
  * @module projectValidator
  */
 
-import type { OpenCloProject, PatternPiece, Seam, SeamGroup, PointOfMeasure } from '../types/types';
+import type { VinaProject, PatternPiece, Seam, SeamGroup, PointOfMeasure } from '../types/types';
 import { PHYSICAL_FABRIC_LIBRARY } from './cloth/physicalFabric';
 import { getEdgeEndpoints } from './geometry/path';
 
@@ -58,7 +58,7 @@ export interface Quarantine {
 }
 
 export interface ValidationResult {
-  project: OpenCloProject;
+  project: VinaProject;
   diagnostics: ValidationDiagnostic[];
   quarantine: Quarantine;
 }
@@ -98,9 +98,9 @@ function isValidEdgeReference(piece: PatternPiece, edgeName: string): boolean {
  * Returns the cleaned project, a list of diagnostics, and a quarantine
  * containing all removed entities for inspection or recovery.
  */
-export function validateAndRepairProject(project: OpenCloProject): ValidationResult {
+export function validateAndRepairProject(project: VinaProject): ValidationResult {
   // Deep clone so we never mutate caller's state
-  const p: OpenCloProject = JSON.parse(JSON.stringify(project));
+  const p: VinaProject = JSON.parse(JSON.stringify(project));
 
   const diagnostics: ValidationDiagnostic[] = [];
   const quarantine: Quarantine = { pieces: [], seams: [], poms: [], seamGroups: [] };

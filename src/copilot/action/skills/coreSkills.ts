@@ -1,7 +1,7 @@
 /**
  * Core Skills — bundled skills with NSID identifiers.
  *
- * All skills that ship with OpenClo are defined here with their
+ * All skills that ship with Vina are defined here with their
  * namespace identifiers for the unified registry.
  *
  * DORMANT (M2, #847): these skills encode real drafting formulas but are NOT
@@ -23,11 +23,11 @@ import { gradingSkill } from './definitions/gradingSkill';
 
 /** Core skill NSIDs */
 export const CORE_NSIDS = {
-  BODICE: 'openclo:bodice' as NSID,
-  SLEEVE: 'openclo:sleeve' as NSID,
-  SKIRT: 'openclo:skirt' as NSID,
-  COLLAR: 'openclo:collar' as NSID,
-  GRADING: 'openclo:grading' as NSID,
+  BODICE: 'vina:bodice' as NSID,
+  SLEEVE: 'vina:sleeve' as NSID,
+  SKIRT: 'vina:skirt' as NSID,
+  COLLAR: 'vina:collar' as NSID,
+  GRADING: 'vina:grading' as NSID,
 } as const;
 
 /** All core NSIDs as a set for fast lookup */

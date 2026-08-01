@@ -512,7 +512,7 @@ describe('PreferenceManager corrupt-storage fallback', () => {
 
   it('falls back to defaults when localStorage holds wrong-shape JSON', () => {
     localStorageMock.setItem(
-      'openclo_copilot_preferences',
+      'vina_copilot_preferences',
       JSON.stringify({ stats: { totalActions: '5' }, units: 'cm' }),
     );
     const manager = new PreferenceManager();
@@ -523,7 +523,7 @@ describe('PreferenceManager corrupt-storage fallback', () => {
   });
 
   it('falls back to defaults when localStorage holds invalid JSON', () => {
-    localStorageMock.setItem('openclo_copilot_preferences', '{not json');
+    localStorageMock.setItem('vina_copilot_preferences', '{not json');
     const manager = new PreferenceManager();
     expect(manager.getPreferences().stats.totalActions).toBe(0);
   });
@@ -532,7 +532,7 @@ describe('PreferenceManager corrupt-storage fallback', () => {
     // The motivating bug: old code accepted stats.totalActions = "5" and the
     // next trackAction() produced "51" (string concat), persisted forever.
     localStorageMock.setItem(
-      'openclo_copilot_preferences',
+      'vina_copilot_preferences',
       JSON.stringify({
         ...createDefaultPreferences(),
         stats: { ...DEFAULT_USAGE_STATS, totalActions: '5' },
@@ -550,7 +550,7 @@ describe('PreferenceManager corrupt-storage fallback', () => {
     // by index, leaving `{ '0':'a', '1':'b', '2':'c', ... }`. trackAction
     // then ranked phantom keys "0"/"1"/"2" alongside the real one.
     localStorageMock.setItem(
-      'openclo_copilot_preferences',
+      'vina_copilot_preferences',
       JSON.stringify({
         ...createDefaultPreferences(),
         stats: { ...DEFAULT_USAGE_STATS, actionCounts: 'abc' },
@@ -577,17 +577,17 @@ describe('PreferenceManager telemetry', () => {
   });
 
   it('emits json_parse failure when storage holds malformed JSON', () => {
-    localStorageMock.setItem('openclo_copilot_preferences', '{not json');
+    localStorageMock.setItem('vina_copilot_preferences', '{not json');
     new PreferenceManager();
     const snap = getStorageParseFailureSnapshot();
     expect(snap.total).toBe(1);
-    expect(snap.byKey['openclo_copilot_preferences']).toBe(1);
+    expect(snap.byKey['vina_copilot_preferences']).toBe(1);
     expect(snap.byReason.json_parse).toBe(1);
   });
 
   it('emits schema_root failure when storage holds JSON with wrong shape', () => {
     localStorageMock.setItem(
-      'openclo_copilot_preferences',
+      'vina_copilot_preferences',
       JSON.stringify({ skillLevel: 'wrong-value' }),
     );
     new PreferenceManager();
@@ -604,7 +604,7 @@ describe('PreferenceManager telemetry', () => {
 
   it('does not emit when storage holds a valid payload', () => {
     localStorageMock.setItem(
-      'openclo_copilot_preferences',
+      'vina_copilot_preferences',
       JSON.stringify(createDefaultPreferences()),
     );
     new PreferenceManager();

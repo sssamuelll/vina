@@ -1,14 +1,14 @@
-# OpenClo.ai — Cloth Simulation Spec (v0.7)
+# Vina.ai — Cloth Simulation Spec (v0.7)
 
 ## Overview
 
-Real-time, physically accurate cloth simulation is the technical core of OpenClo.ai. By using **Deterministic XPBD Physics**, we bridge the gap between 2D pattern engineering and 3D virtual fitting.
+Real-time, physically accurate cloth simulation is the technical core of Vina.ai. By using **Deterministic XPBD Physics**, we bridge the gap between 2D pattern engineering and 3D virtual fitting.
 
 ## Physics Model
 
 ### Extended Position Based Dynamics (XPBD)
 
-OpenClo.ai implements an **XPBD solver** in **Rust (WASM)** for maximum performance. Unlike traditional mass-spring models, XPBD is unconditionally stable and handles constraints (seams, collisions) with industrial precision.
+Vina.ai implements an **XPBD solver** in **Rust (WASM)** for maximum performance. Unlike traditional mass-spring models, XPBD is unconditionally stable and handles constraints (seams, collisions) with industrial precision.
 
 **Implementation Details:**
 - **Wasm Acceleration**: 60fps draping on mobile and desktop.
@@ -56,7 +56,7 @@ OpenClo.ai implements an **XPBD solver** in **Rust (WASM)** for maximum performa
 
 ## Initial Garment Placement
 
-OpenClo.ai uses a **Semantic-Aware Placement** system to automatically position pieces around the avatar.
+Vina.ai uses a **Semantic-Aware Placement** system to automatically position pieces around the avatar.
 
 1. **Classification**: Pieces are identified by `category` and `side` (Bodice Front, Sleeve Left, etc.).
 2. **Tangent Plane Mapping**: Pieces are placed as flat planes tangent to the avatar surface at the correct body region.

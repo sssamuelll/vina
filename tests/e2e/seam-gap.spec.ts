@@ -7,8 +7,8 @@
  * abierta ~8-10cm a los 10s mientras todo lo demás reporta verde.
  *
  * Mide, por costura, mean/max de distancia de sus pares (globales, publicados
- * por useSimulationLifecycle en __OPENCLO_SEAM_DEBUG__) sobre las posiciones
- * REALES del solver (__OPENCLO_CLOTH_MESH__, readback cada 15 frames ⇒
+ * por useSimulationLifecycle en __VINA_SEAM_DEBUG__) sobre las posiciones
+ * REALES del solver (__VINA_CLOTH_MESH__, readback cada 15 frames ⇒
  * staleness ≤0.25s) en t≈0 / 1s / 2.5s / 10s de sim.
  *
  * Experimento discriminante (verdict del workflow 2026-07-04): correr DOS
@@ -52,7 +52,7 @@ interface SeamGapRow {
 
 async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
   return page.evaluate((p) => {
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as
       | { getState: () => unknown }
       | undefined;
     if (!store) return null;
@@ -66,13 +66,13 @@ async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
 async function measureSeams(page: Page): Promise<SeamGapRow[]> {
   return page.evaluate(() => {
     const w = window as unknown as {
-      __OPENCLO_SEAM_DEBUG__?: Array<{
+      __VINA_SEAM_DEBUG__?: Array<{
         id: string; edgeA: string; edgeB: string; globalPairs: number[];
       }>;
-      __OPENCLO_CLOTH_MESH__?: { geometry: { attributes: { position: { array: ArrayLike<number> } } } };
+      __VINA_CLOTH_MESH__?: { geometry: { attributes: { position: { array: ArrayLike<number> } } } };
     };
-    const seams = w.__OPENCLO_SEAM_DEBUG__ ?? [];
-    const pos = w.__OPENCLO_CLOTH_MESH__?.geometry.attributes.position.array;
+    const seams = w.__VINA_SEAM_DEBUG__ ?? [];
+    const pos = w.__VINA_CLOTH_MESH__?.geometry.attributes.position.array;
     if (!pos) return [];
     return seams.map(s => {
       let sum = 0, max = 0;
@@ -116,13 +116,13 @@ const fmt = (r: SeamGapRow) =>
 test(`seam-gap: residual de cierre por costura (tether ${TETHER_OFF ? 'OFF' : 'ON'}) @gpu-local`, async ({ page }) => {
   test.setTimeout(300_000);
   await page.addInitScript((tetherOff) => {
-    localStorage.setItem('openclo-use-webgpu', 'true');
-    if (tetherOff) localStorage.setItem('openclo-tether-disabled', 'true');
+    localStorage.setItem('vina-use-webgpu', 'true');
+    if (tetherOff) localStorage.setItem('vina-tether-disabled', 'true');
   }, TETHER_OFF);
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
   await page.waitForFunction(
-    () => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__),
+    () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),
     { timeout: 15_000 },
   );
   await page.waitForTimeout(500);
@@ -145,7 +145,7 @@ test(`seam-gap: residual de cierre por costura (tether ${TETHER_OFF ? 'OFF' : 'O
   // webgpu-maria-replay / workflow-demo.
   await page.evaluate(() => {
     const w = window as unknown as Record<string, unknown>;
-    const store = w.__OPENCLO_STORE__ as {
+    const store = w.__VINA_STORE__ as {
       getState: () => { simulation: { frameTimeMs: number } };
       subscribe: (f: () => void) => void;
     };

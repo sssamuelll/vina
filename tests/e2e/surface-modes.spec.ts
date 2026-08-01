@@ -166,7 +166,7 @@ test.describe('Surface Modes — WebGPU/TSL path', () => {
 
     const getMode = () => page.evaluate(() =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__OPENCLO_STORE__?.getState().simulation.surfaceMode3D ?? '');
+      (window as any).__VINA_STORE__?.getState().simulation.surfaceMode3D ?? '');
 
     // Flat
     await page.locator('.surface-pill__trigger').click();

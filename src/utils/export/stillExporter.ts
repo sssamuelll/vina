@@ -20,7 +20,7 @@ function timestampedFilename(ext: string): string {
   const HH = String(now.getHours()).padStart(2, '0');
   const min = String(now.getMinutes()).padStart(2, '0');
   const ss = String(now.getSeconds()).padStart(2, '0');
-  return `openclo-render-${yyyy}-${mm}-${dd}-${HH}${min}${ss}.${ext}`;
+  return `vina-render-${yyyy}-${mm}-${dd}-${HH}${min}${ss}.${ext}`;
 }
 
 export async function exportStill(
@@ -164,7 +164,7 @@ export async function exportAllViews(
     camera.lookAt(target);
     await exportStill(renderer, scene, camera, {
       ...config,
-      filename: `openclo-${view}-${config.width}x${config.height}.${ext}`,
+      filename: `vina-${view}-${config.width}x${config.height}.${ext}`,
     });
   }
 

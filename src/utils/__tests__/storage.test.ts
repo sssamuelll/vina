@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * Tests for IndexedDB storage abstraction.
  * Mocks the `idb` module so openDB always rejects, forcing localStorage fallback.
@@ -181,7 +180,7 @@ describe('storage abstraction (localStorage fallback)', () => {
       expect(quotaEvents).toHaveLength(1);
       expect(quotaEvents[0]).toEqual({
         type: 'ls-quota-exhausted',
-        key: 'openclo:settings:big-blob',
+        key: 'vina:settings:big-blob',
       });
     });
 

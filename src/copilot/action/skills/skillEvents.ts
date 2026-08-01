@@ -38,7 +38,7 @@ export type SkillEventHandler = (nsid: NSID, skill?: RegisteredSkill) => void;
  *   console.log(`Skill ${nsid} registered`);
  * });
  *
- * emitter.emit('skill:registered', 'openclo:bodice', skill);
+ * emitter.emit('skill:registered', 'vina:bodice', skill);
  *
  * // Later: unsubscribe()
  */

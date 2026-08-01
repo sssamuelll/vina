@@ -32,7 +32,7 @@ const OUT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.
 
 async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
   return page.evaluate((p) => {
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as
       | { getState: () => unknown }
       | undefined;
     if (!store) return null;
@@ -52,13 +52,13 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
   mkdirSync(OUT_DIR, { recursive: true });
   // CROSSBEND=off — A/B del kill-switch del bend cross-seam (acta costura-real).
   await page.addInitScript((crossbendOff) => {
-    localStorage.setItem('openclo-use-webgpu', 'true');
-    if (crossbendOff) localStorage.setItem('openclo-crossbend', 'off');
+    localStorage.setItem('vina-use-webgpu', 'true');
+    if (crossbendOff) localStorage.setItem('vina-crossbend', 'off');
   }, process.env.CROSSBEND === 'off');
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
   await page.waitForFunction(
-    () => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__),
+    () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),
     { timeout: 15_000 },
   );
   await page.waitForTimeout(500);
@@ -100,7 +100,7 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
   const resetToFront = async () => {
     await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__OPENCLO_STORE__.dispatch({ type: 'camera/setCameraPreset', payload: 'front' });
+      (window as any).__VINA_STORE__.dispatch({ type: 'camera/setCameraPreset', payload: 'front' });
     });
     await page.waitForTimeout(1200); // animación del preset
   };
@@ -113,7 +113,7 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
   // 02 — modo arrange: anchor points horneados (bake async → espera)
   await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).__OPENCLO_STORE__.dispatch({ type: 'tools/setActiveTool3D', payload: 'arrangement' });
+    (window as any).__VINA_STORE__.dispatch({ type: 'tools/setActiveTool3D', payload: 'arrangement' });
   });
   await page.waitForTimeout(3000);
   await shot(page, '02-arrange-anchors.png');
@@ -121,7 +121,7 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
   // 03 — pieza seleccionada: gizmo anclado a la pieza + namespace destacado
   const frontId = await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const store = (window as any).__OPENCLO_STORE__;
+    const store = (window as any).__VINA_STORE__;
     const pieces = store.getState().project.pieces as Array<{ id: string; category?: string; side?: string; name: string }>;
     const front = pieces.find((p) => p.category === 'bodice' && p.side === 'front')
       ?? pieces.find((p) => p.category === 'bodice');
@@ -136,7 +136,7 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
   // 04 — el gesto del flujo: binding (click-pieza→click-punto) → re-colocación
   await page.evaluate((id) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).__OPENCLO_STORE__.dispatch({
+    (window as any).__VINA_STORE__.dispatch({
       type: 'project/setArrangementBinding',
       payload: {
         pieceId: id,
@@ -154,13 +154,13 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
   // Volver al auto (el demo del drape usa la colocación limpia)
   await page.evaluate((id) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).__OPENCLO_STORE__.dispatch({ type: 'project/clearArrangementOverride', payload: id });
+    (window as any).__VINA_STORE__.dispatch({ type: 'project/clearArrangementOverride', payload: id });
   }, frontId!);
 
   // 05 — rango parcial de costura: los hilos muestran CUÁNTO se cose
   const seamSnapshot = await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const store = (window as any).__OPENCLO_STORE__;
+    const store = (window as any).__VINA_STORE__;
     const seams = store.getState().project.seams as Array<Record<string, unknown>>;
     if (!seams.length) return null;
     const s = JSON.parse(JSON.stringify(seams[0]));
@@ -175,19 +175,19 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
   await shot(page, '05-rango-parcial-hilos.png');
   await page.evaluate((original) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).__OPENCLO_STORE__.dispatch({ type: 'project/updateSeam', payload: original });
+    (window as any).__VINA_STORE__.dispatch({ type: 'project/updateSeam', payload: original });
   }, seamSnapshot!);
 
   // ── Simular (salir de arrange primero) y capturar el drape
   await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const store = (window as any).__OPENCLO_STORE__;
+    const store = (window as any).__VINA_STORE__;
     store.dispatch({ type: 'tools/setActiveTool3D', payload: 'camera' });
     store.dispatch({ type: 'editor/clearSelection' });
   });
   await page.evaluate(() => {
     const w = window as unknown as Record<string, unknown>;
-    const store = w.__OPENCLO_STORE__ as {
+    const store = w.__VINA_STORE__ as {
       getState: () => { simulation: { frameTimeMs: number } };
       subscribe: (f: () => void) => void;
     };

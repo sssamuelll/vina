@@ -1,7 +1,7 @@
-# OpenClo.ai — Product Security Architecture (v0.7)
+# Vina.ai — Product Security Architecture (v0.7)
 
 ## Overview
-As OpenClo.ai transitions into a production-ready **Cognitive Design Engine**, security must be a foundational pillar. This document outlines the defense mechanisms against modern AI-specific threats (Prompt Injection) and traditional software vulnerabilities (Path Traversal, Injection, Data Corruption).
+As Vina.ai transitions into a production-ready **Cognitive Design Engine**, security must be a foundational pillar. This document outlines the defense mechanisms against modern AI-specific threats (Prompt Injection) and traditional software vulnerabilities (Path Traversal, Injection, Data Corruption).
 
 ## 1. AI Safety & Prompt Injection Defense
 
@@ -40,19 +40,19 @@ With the migration to `pieceId:edgeName` references (v0.7), all seam and tool op
 External files are treated as untrusted inputs.
 
 ### 2.1 File Ingestion Schemas
-All imported files (`.openclo`, `.val`, `.dxf`) must pass strict schema validation before their data enters the Semantic Engine.
+All imported files (`.vina`, `.val`, `.dxf`) must pass strict schema validation before their data enters the Semantic Engine.
 - **No `eval()` or direct JSON mapping**: Data is mapped to typed interfaces via parsers.
 - **Geometry Sanitization**: Polygons must be checked for self-intersections and zero-area conditions before entering the meshing pipeline to prevent solver crashes.
 - **DXF Entity Validation**: The DXF parser validates entity types (LINE, LWPOLYLINE, POLYLINE, SPLINE, ARC, CIRCLE) and rejects malformed geometry.
 
 ### 2.2 Plugin Sandboxing
-Community-created plugins extend OpenClo functionality with custom tools, skills, fabrics, and templates.
+Community-created plugins extend Vina functionality with custom tools, skills, fabrics, and templates.
 - **Web Worker Isolation**: Implemented — each plugin runs in a dedicated Web Worker with **no DOM access**, **no direct network access**, and **no access to the main thread state**.
 - **Permission Manifests**: Implemented — plugins declare requested capabilities (`read-pieces`, `write-pieces`, `read-measurements`, `export`, `simulation`, `network`, `storage`) at install time. The capability-gated bridge enforces these at runtime — each API method is guarded by a permission check.
 - **Community Skill Validation**: Planned — the plugin validation pipeline will check plugin integrity, verify manifest structure, and validate semver compatibility before installation.
 
 ### 2.3 Plugin Bridge Protocol
-Plugins communicate with OpenClo's main thread via a dedicated postMessage bridge that enforces permissions, validates mutations, and handles errors.
+Plugins communicate with Vina's main thread via a dedicated postMessage bridge that enforces permissions, validates mutations, and handles errors.
 
 **Architecture:**
 - **One Worker per plugin**: Each installed plugin spawns a single Web Worker that lives for the duration of the session. The plugin's sandboxed code runs entirely inside the Worker with no access to the DOM or main thread state.

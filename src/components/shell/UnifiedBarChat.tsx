@@ -93,8 +93,8 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
   // subsequent calls see the refreshed value. Mid-conversation active
   // connection switching is out of scope for MVP v1.
   useEffect(() => {
-    window.addEventListener('openclo:provider-config-changed', loadFromActiveConnection);
-    return () => window.removeEventListener('openclo:provider-config-changed', loadFromActiveConnection);
+    window.addEventListener('vina:provider-config-changed', loadFromActiveConnection);
+    return () => window.removeEventListener('vina:provider-config-changed', loadFromActiveConnection);
   }, [loadFromActiveConnection]);
 
   // Chat messages state

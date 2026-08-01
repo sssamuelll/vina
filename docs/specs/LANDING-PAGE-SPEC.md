@@ -1,7 +1,7 @@
-# Design Spec: OpenClo Landing Page (Strategic Update)
+# Design Spec: Vina Landing Page (Strategic Update)
 
 ## 1. Core Narrative: "The Universal Fashion IDE"
-OpenClo is the professional bridge between traditional pattern making and the future of AI-driven simulation. Our primary hook is **Unrestricted Interoperability**: the ability to design, simulate, and export using the same industrial standards (DXF-AAMA) used by major global brands.
+Vina is the professional bridge between traditional pattern making and the future of AI-driven simulation. Our primary hook is **Unrestricted Interoperability**: the ability to design, simulate, and export using the same industrial standards (DXF-AAMA) used by major global brands.
 
 ## 2. Updated Page Structure
 

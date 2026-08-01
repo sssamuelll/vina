@@ -15,13 +15,13 @@ import { test, expect, Page } from '@playwright/test';
  *  - The IK-chunk test now opens the Avatar panel via the RightDock
  *    `[aria-label="Avatar"]` affordance (the old `[data-tool-id="avatar"]`
  *    Toolbar3D button was deleted) and toggles `.ik-toggle-btn`.
- *  - The store handle is `__OPENCLO_STORE__` (RectAreaLight test dispatches
+ *  - The store handle is `__VINA_STORE__` (RectAreaLight test dispatches
  *    `renderSettings/addLight`, which still exists).
  */
 
 async function waitForApp(page: Page) {
   await page.goto('/');
-  await page.waitForFunction(() => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__), { timeout: 15000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__), { timeout: 15000 });
   await expect(page.locator('[aria-label="Simular"]').first()).toBeVisible({ timeout: 15000 });
 }
 
@@ -77,7 +77,7 @@ test.describe('Bundle Split — Dynamic Imports', () => {
     // Add a light via the store — triggers RectLight which dynamically imports
     // RectAreaLightUniformsLib.
     await page.evaluate(() => {
-      const store = (window as unknown as { __OPENCLO_STORE__?: { dispatch: (a: unknown) => void } }).__OPENCLO_STORE__;
+      const store = (window as unknown as { __VINA_STORE__?: { dispatch: (a: unknown) => void } }).__VINA_STORE__;
       store?.dispatch({ type: 'renderSettings/addLight' });
     });
 

@@ -1,6 +1,6 @@
 # Roadmap
 
-OpenClo is at **v0.11.0**. The core loop — import a pattern, sew it in 3D, drape it on an avatar — works end to end. This roadmap describes direction, not dates: priorities shift, and the [issue tracker](https://github.com/sssamuelll/openclo/issues) is the source of truth. Larger efforts carry the `roadmap` label.
+Vina is at **v0.11.0**. The core loop — import a pattern, sew it in 3D, drape it on an avatar — works end to end. This roadmap describes direction, not dates: priorities shift, and the [issue tracker](https://github.com/sssamuelll/vina/issues) is the source of truth. Larger efforts carry the `roadmap` label.
 
 ## Where we are
 

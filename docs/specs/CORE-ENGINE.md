@@ -1,4 +1,4 @@
-# OpenClo.ai — Core Engine Spec (v0.7)
+# Vina.ai — Core Engine Spec (v0.7)
 
 ## Overview
 
@@ -54,7 +54,7 @@ To ensure simulation stability, we use a **Constrained Delaunay Triangulation (C
 
 ## 3. Virtual Assembly (Seams)
 
-OpenClo.ai uses an **Arc-Length Parameterization** model for sewing, allowing pieces with different vertex counts to be joined smoothly.
+Vina.ai uses an **Arc-Length Parameterization** model for sewing, allowing pieces with different vertex counts to be joined smoothly.
 
 ### Seam Model
 - **Edge-Name References**: Seams connect edges by stable `pieceId:edgeName` identifiers (migrated from index-based in v0.7).

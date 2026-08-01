@@ -1,7 +1,7 @@
 /**
- * Plugin System Types — interfaces for the OpenClo plugin architecture.
+ * Plugin System Types — interfaces for the Vina plugin architecture.
  *
- * Plugins extend OpenClo by providing custom tools, skills, fabrics,
+ * Plugins extend Vina by providing custom tools, skills, fabrics,
  * templates, and formulas. They follow a strict permission model and
  * sandboxed lifecycle.
  *
@@ -118,7 +118,7 @@ export interface PluginTemplate {
  * permission checking and compatibility validation upfront.
  */
 export interface PluginManifest {
-  /** Unique plugin identifier (reverse-domain, e.g. "com.openclo.dart-manipulator") */
+  /** Unique plugin identifier (reverse-domain, e.g. "com.vina.dart-manipulator") */
   id: string;
   /** Display name */
   name: string;
@@ -130,7 +130,7 @@ export interface PluginManifest {
   description: string;
   /** License identifier (e.g. "MIT", "Apache-2.0") */
   license: string;
-  /** Minimum OpenClo version this plugin supports (semver range) */
+  /** Minimum Vina version this plugin supports (semver range) */
   compatibleWith: string;
   /** Relative path to the main ES module entry point */
   entryPoint: string;
@@ -152,16 +152,16 @@ export interface PluginManifest {
   networkAllowlist?: string[];
 }
 
-// ─── OpenClo Plugin ─────────────────────────────────────────────────────────
+// ─── Vina Plugin ─────────────────────────────────────────────────────────
 
 /**
  * A fully loaded plugin instance.
  *
  * Plugins provide tools, skills, fabrics, and/or templates that extend
- * OpenClo's core functionality. They follow a lifecycle of load/unload
+ * Vina's core functionality. They follow a lifecycle of load/unload
  * and can only access subsystems granted by their permissions.
  */
-export interface OpenCloPlugin {
+export interface VinaPlugin {
   /** Unique plugin identifier (matches manifest id) */
   id: string;
   /** Display name */
@@ -174,7 +174,7 @@ export interface OpenCloPlugin {
   description: string;
   /** License identifier */
   license: string;
-  /** Minimum OpenClo version this plugin supports */
+  /** Minimum Vina version this plugin supports */
   compatibleWith: string;
 
   /** Custom agent tools provided by this plugin */

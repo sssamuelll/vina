@@ -56,7 +56,7 @@ describe('OBJ Export', () => {
 
   it('OBJ header present', () => {
     const obj = generateOBJ([]);
-    expect(obj).toContain('# OpenClo OBJ Export');
+    expect(obj).toContain('# Vina OBJ Export');
   });
 
   it('all faces are triangles (3 vertices each)', () => {

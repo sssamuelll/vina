@@ -1,5 +1,7 @@
 # OpenClo — capturas de UI/UX (handoff a diseño)
 
+> Capturas pre-rename (2026): la UI mostrada dice "OpenClo"; el producto se llama Vina desde 2026-08-01.
+
 Capturadas el **2026-05-31** contra la app en vivo (dev server local), viewport **1440×900**.
 Cargadas con el **patrón DXF real de María**. Reflejan la UX que ships hoy, **no un mockup**.
 

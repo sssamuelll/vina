@@ -177,8 +177,8 @@ describe('PluginCrashError', () => {
   });
 
   it('includes pluginId in the message', () => {
-    const err = new PluginCrashError('com.openclo.test', 'syntax error');
-    expect(err.message).toContain('com.openclo.test');
+    const err = new PluginCrashError('com.vina.test', 'syntax error');
+    expect(err.message).toContain('com.vina.test');
     expect(err.message).toContain('syntax error');
   });
 });

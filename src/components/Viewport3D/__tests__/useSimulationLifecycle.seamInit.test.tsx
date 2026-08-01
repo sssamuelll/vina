@@ -38,7 +38,7 @@ const neuralMocks = vi.hoisted(() => ({
 }));
 // isWebGPUAvailable es controlable por test; el flag del tier GPU (opt-out
 // desde #897: default ON, 'false' lo apaga) se controla vía localStorage
-// ('openclo-use-webgpu'), que es lo que lee el hook real.
+// ('vina-use-webgpu'), que es lo que lee el hook real.
 const webgpuMocks = vi.hoisted(() => ({
   isWebGPUAvailable: vi.fn(() => false),
 }));

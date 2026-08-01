@@ -14,18 +14,18 @@ import { safeGetItem, safeSetItem, safeRemoveItem } from '../../safeStorage';
 /**
  * localStorage key for the WebGPU feature flag.
  *
- * Project convention is to prefix all keys with `openclo-` (see
- * `openclo-workflow`, `openclo-layout`, `openclo-saved-poses`, etc.).
+ * Project convention is to prefix all keys with `vina-` (see
+ * `vina-workflow`, `vina-layout`, `vina-saved-poses`, etc.).
  * The legacy `webclo-use-webgpu` key was the lone outlier; BUG-11 (#614)
  * migrates it to this canonical prefix.
  */
-export const WEBGPU_FEATURE_FLAG_KEY = 'openclo-use-webgpu';
+export const WEBGPU_FEATURE_FLAG_KEY = 'vina-use-webgpu';
 
 const LEGACY_WEBGPU_FEATURE_FLAG_KEY = 'webclo-use-webgpu';
 
 /**
  * One-time migration of the WebGPU feature flag from the legacy
- * `webclo-use-webgpu` key to the canonical `openclo-use-webgpu`.
+ * `webclo-use-webgpu` key to the canonical `vina-use-webgpu`.
  *
  * Idempotent: safe to call any number of times. After the first call,
  * the legacy key is gone and subsequent calls are no-ops.
@@ -83,7 +83,7 @@ export function isWebGPUAvailable(): boolean {
  * Whether the WebGPU **rendering** backend is active.
  *
  * Returns `true` when the browser supports WebGPU AND the user has not
- * explicitly opted out via `localStorage.setItem('openclo-use-webgpu', 'false')`.
+ * explicitly opted out via `localStorage.setItem('vina-use-webgpu', 'false')`.
  * Used to disable features incompatible with WebGPU (e.g. shadow mapping with
  * legacy MeshDepthMaterial).
  */

@@ -20,7 +20,7 @@ export function createDebugAPI(store: DebugStore): DebugAPI {
     getRecent: (limit = 10) => store.getRecent(limit),
     exportJSON: () => store.exportAsJSON(),
     clear: () => store.clear(),
-    enable: () => safeSetItem('openclo-debug-bridge', 'true'),
-    disable: () => safeSetItem('openclo-debug-bridge', 'false'),
+    enable: () => safeSetItem('vina-debug-bridge', 'true'),
+    disable: () => safeSetItem('vina-debug-bridge', 'false'),
   };
 }

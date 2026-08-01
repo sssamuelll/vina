@@ -1,8 +1,8 @@
 /**
- * OpenCloProject — structural parser for untrusted project payloads.
+ * VinaProject — structural parser for untrusted project payloads.
  *
  * The boundary: every place where a JSON blob from disk or IndexedDB autosave
- * is cast `as OpenCloProject`. This module replaces those casts with a zod
+ * is cast `as VinaProject`. This module replaces those casts with a zod
  * parse that returns a Result. Semantic repair (cross-references, outline
  * closure) stays in `projectValidator.ts` and runs *after* this parser
  * accepts the payload.
@@ -15,7 +15,7 @@
  * @module projectSchema
  */
 import { z } from 'zod';
-import type { OpenCloProject, InternalLineType } from '../types/types';
+import type { VinaProject, InternalLineType } from '../types/types';
 
 // ─── DoS bounds ──────────────────────────────────────────────────────────────
 // Real patterns: <500 pieces, <1000 outline cmds. Margins are 10–20×.
@@ -381,8 +381,8 @@ const notchPairSchema = z
   })
   .loose();
 
-// ─── Top-level OpenCloProject ───────────────────────────────────────────────
-const openCloProjectSchema = z
+// ─── Top-level VinaProject ───────────────────────────────────────────────
+const vinaProjectSchema = z
   .object({
     id: idString,
     name: nameString,
@@ -421,7 +421,7 @@ export interface ParseWarning {
 }
 
 export type ProjectParseResult =
-  | { ok: true; project: OpenCloProject; warnings: ParseWarning[] }
+  | { ok: true; project: VinaProject; warnings: ParseWarning[] }
   | { ok: false; error: ParseError };
 
 const formatPath = (segments: ReadonlyArray<PropertyKey>): string => {
@@ -447,11 +447,11 @@ const truncate = (v: unknown): string => {
 const isDataImageUri = (s: string): boolean => /^data:image\//i.test(s);
 
 /**
- * Parse an arbitrary value into an OpenCloProject. Returns a Result; never
+ * Parse an arbitrary value into an VinaProject. Returns a Result; never
  * throws. Callers decide how to react to `ok: false` (toast, log, quarantine).
  */
-export function parseOpenCloProject(input: unknown): ProjectParseResult {
-  const result = openCloProjectSchema.safeParse(input);
+export function parseVinaProject(input: unknown): ProjectParseResult {
+  const result = vinaProjectSchema.safeParse(input);
   if (!result.success) {
     const issue = result.error.issues[0];
     const path = issue ? formatPath(issue.path) : undefined;
@@ -469,18 +469,18 @@ export function parseOpenCloProject(input: unknown): ProjectParseResult {
     };
   }
   // Boundary cast: `.loose()` widens the inferred type with an index signature
-  // for unknown keys; we narrow to OpenCloProject after zod has verified every
+  // for unknown keys; we narrow to VinaProject after zod has verified every
   // known field. Forward-compat extras survive at runtime.
-  const parsed = result.data as OpenCloProject;
+  const parsed = result.data as VinaProject;
   const warnings = filterReferenceImageData(parsed);
   return { ok: true, project: parsed, warnings };
 }
 
 /**
- * Convenience: parse a JSON string. Wraps `parseOpenCloProject` and reports
+ * Convenience: parse a JSON string. Wraps `parseVinaProject` and reports
  * JSON syntax errors with `code: 'invalid_json'`.
  */
-export function parseOpenCloProjectJson(json: string): ProjectParseResult {
+export function parseVinaProjectJson(json: string): ProjectParseResult {
   let raw: unknown;
   try {
     raw = JSON.parse(json);
@@ -493,7 +493,7 @@ export function parseOpenCloProjectJson(json: string): ProjectParseResult {
       },
     };
   }
-  return parseOpenCloProject(raw);
+  return parseVinaProject(raw);
 }
 
 /**
@@ -502,7 +502,7 @@ export function parseOpenCloProjectJson(json: string): ProjectParseResult {
  * This is a security filter: prevents `data:text/html` or `javascript:`
  * masquerading as image blobs from reaching `<img src>` later.
  */
-function filterReferenceImageData(project: OpenCloProject): ParseWarning[] {
+function filterReferenceImageData(project: VinaProject): ParseWarning[] {
   const data = project.referenceImageData;
   if (!data || typeof data !== 'object') return [];
 

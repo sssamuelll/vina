@@ -180,7 +180,7 @@ export function useKeyboardShortcuts() {
 
       // View
       ['view.toggleSeamAllowance', () => dispatch(toggleSeamAllowance())],
-      ['view.layersPanel', () => window.dispatchEvent(new CustomEvent('openclo:toggleLayersPanel'))],
+      ['view.layersPanel', () => window.dispatchEvent(new CustomEvent('vina:toggleLayersPanel'))],
       ['view.xrayMode', () => dispatch(setXrayMode({ enabled: !xrayMode }))],
 
       // 2D Tools (CLO3D mapping) — all route through the single writer

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * OpenClo CLI — headless garment processing.
+ * Vina CLI — headless garment processing.
  *
  * Usage:
- *   openclo info <project.json>
- *   openclo export <project.json> --format dxf|pdf|aama [--output <file>]
- *   openclo validate <project.json>
+ *   vina info <project.json>
+ *   vina export <project.json> --format dxf|pdf|aama [--output <file>]
+ *   vina validate <project.json>
  *
  * @module cli
  */
@@ -17,22 +17,22 @@ const VERSION = '0.9.0';
 
 function printUsage(): void {
   console.log(`
-OpenClo CLI v${VERSION} — Headless Garment Processing
+Vina CLI v${VERSION} — Headless Garment Processing
 
 Usage:
-  openclo info <project.json>                          Print project summary
-  openclo export <project.json> --format <fmt> [-o f]  Export to DXF/PDF/AAMA
-  openclo validate <project.json>                      Validate project data
-  openclo --version                                    Show version
-  openclo --help                                       Show this help
+  vina info <project.json>                          Print project summary
+  vina export <project.json> --format <fmt> [-o f]  Export to DXF/PDF/AAMA
+  vina validate <project.json>                      Validate project data
+  vina --version                                    Show version
+  vina --help                                       Show this help
 
 Export formats: dxf, pdf, aama
 
 Examples:
-  openclo info my-garment.json
-  openclo export my-garment.json --format dxf -o output.dxf
-  openclo export my-garment.json --format aama
-  openclo validate my-garment.json
+  vina info my-garment.json
+  vina export my-garment.json --format dxf -o output.dxf
+  vina export my-garment.json --format aama
+  vina validate my-garment.json
 `);
 }
 
@@ -46,7 +46,7 @@ if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
 }
 
 if (args.includes('--version') || args.includes('-v')) {
-  console.log(`openclo v${VERSION}`);
+  console.log(`vina v${VERSION}`);
   process.exit(0);
 }
 
@@ -161,9 +161,9 @@ async function cmdValidate(): Promise<void> {
   const project = loadProject(projectPath);
 
   // Use the shared projectValidator for full validation
-  type OpenCloProject = import('../src/types/types').OpenCloProject;
+  type VinaProject = import('../src/types/types').VinaProject;
   const { validateAndRepairProject } = await import('../src/utils/projectValidator.js');
-  const { diagnostics } = validateAndRepairProject(project as unknown as OpenCloProject);
+  const { diagnostics } = validateAndRepairProject(project as unknown as VinaProject);
 
   const pieces = (project.pieces || []) as unknown[];
   const seams = (project.seams || []) as unknown[];

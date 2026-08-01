@@ -45,7 +45,7 @@ function renderMenu() {
 
 /** Open the dropdown and hover the View top-level entry so its submenu mounts. */
 function openViewMenu() {
-  fireEvent.click(screen.getByRole('button', { name: /openclo/i }));
+  fireEvent.click(screen.getByRole('button', { name: /vina/i }));
   fireEvent.mouseEnter(screen.getByText('Vista'));
 }
 
@@ -91,7 +91,7 @@ describe('LogoMenu ▸ View — 2D display toggles', () => {
 describe('LogoMenu ▸ submenu hover persistence', () => {
   /** Open the dropdown and hover a top-level entry; returns the panel element. */
   function openTop(label: string): HTMLElement {
-    fireEvent.click(screen.getByRole('button', { name: /openclo/i }));
+    fireEvent.click(screen.getByRole('button', { name: /vina/i }));
     fireEvent.mouseEnter(screen.getByText(label));
     return document.querySelector('.logo-menu') as HTMLElement;
   }

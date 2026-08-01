@@ -9,16 +9,16 @@
 
 ---
 
-# OpenClo.ai — Professional UI Architecture (Fashion IDE) (v0.7)
+# Vina.ai — Professional UI Architecture (Fashion IDE) (v0.7)
 
 ## 1. Overview
-OpenClo.ai provides a high-performance, ergonomic design environment for professional fashion engineering. We have adopted the **"Integrated Development Environment" (IDE)** pattern, specifically inspired by the **Visual Studio Code (Monaco)** design language. This ensures high visual contrast, reduced eye strain, and a familiar technical aesthetic for modern designers.
+Vina.ai provides a high-performance, ergonomic design environment for professional fashion engineering. We have adopted the **"Integrated Development Environment" (IDE)** pattern, specifically inspired by the **Visual Studio Code (Monaco)** design language. This ensures high visual contrast, reduced eye strain, and a familiar technical aesthetic for modern designers.
 
 ## 2. CSS Tokenization (Theming System)
 The entire UI is built on a strict tokenization system using CSS variables. This enables native theme support and ensures consistency across all functional modules.
 
 ### Core Token Mappings
-| OpenClo UI Region | VS Code Token Equivalent | CSS Variable Name |
+| Vina UI Region | VS Code Token Equivalent | CSS Variable Name |
 | :--- | :--- | :--- |
 | **Main Background** | `editor.background` | `--vscode-editor-background` |
 | **Activity Bar** | `activityBar.background` | `--vscode-activityBar-background` |

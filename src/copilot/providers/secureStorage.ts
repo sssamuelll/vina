@@ -11,7 +11,7 @@
  * @module copilot/providers/secureStorage
  */
 
-const PREFIX = 'openclo-secure-';
+const PREFIX = 'vina-secure-';
 
 // ─── Per-session AES-GCM key (memory-only) ──────────────────────────────────
 

@@ -15,14 +15,14 @@ describe('storageTelemetry', () => {
   describe('recordStorageParseFailure', () => {
     it('increments total + byKey + byReason on a single event', () => {
       recordStorageParseFailure({
-        key: 'openclo-avatar-profiles',
+        key: 'vina-avatar-profiles',
         reason: 'json_parse',
         droppedCount: 1,
         keptCount: 0,
       });
       const snap = getStorageParseFailureSnapshot();
       expect(snap.total).toBe(1);
-      expect(snap.byKey['openclo-avatar-profiles']).toBe(1);
+      expect(snap.byKey['vina-avatar-profiles']).toBe(1);
       expect(snap.byReason.json_parse).toBe(1);
       expect(snap.byReason.schema_root).toBe(0);
       expect(snap.byReason.schema_record).toBe(0);

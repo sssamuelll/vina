@@ -61,7 +61,7 @@ export default function EmptyState2D({ onImportDXF }: EmptyState2DProps) {
         <button
           type="button"
           className="empty-state-2d__ai-hint"
-          onClick={() => window.dispatchEvent(new CustomEvent('openclo:focusChat'))}
+          onClick={() => window.dispatchEvent(new CustomEvent('vina:focusChat'))}
           aria-label="Describe tu patrón a la IA"
         >
           o descríbelo a la <span className="empty-state-2d__ai-word">IA</span>

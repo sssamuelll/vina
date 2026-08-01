@@ -1,7 +1,7 @@
 /**
  * F0 (#897): baseline de perf con el patrón real de María, GPU real (config
  * webgpu, sin SwiftShader). No asserta umbrales — imprime el baseline.
- * Correr: OPENCLO_PERF=1 npm run test:e2e:gpu -- perf-baseline
+ * Correr: VINA_PERF=1 npm run test:e2e:gpu -- perf-baseline
  *
  * Mecánica de import/cosido copiada del replay M4 (seam-parity-replay.spec.ts):
  * DXF por file input, Auto-Sew vía ⌘K, tier por defecto 'wasm'.
@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { switchView, startSimulation } from './helpers/sim';
 
-const RUN = process.env.OPENCLO_PERF === '1';
+const RUN = (process.env.VINA_PERF || process.env.OPENCLO_PERF) === '1';
 const FIXTURE = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../fixtures/garments/maria_patrones_samuel_2M.dxf',
@@ -19,7 +19,7 @@ const FIXTURE = path.resolve(
 
 async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
   return page.evaluate((p) => {
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as
       | { getState: () => unknown }
       | undefined;
     if (!store) return null;
@@ -30,7 +30,7 @@ async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
 }
 
 test.describe('perf baseline @gpu-local — camisa de María', () => {
-  test.skip(!RUN, 'OPENCLO_PERF=1 para correr el baseline');
+  test.skip(!RUN, 'VINA_PERF=1 para correr el baseline');
 
   test('mide FPS de solver y de render en el tier por defecto', async ({ page }) => {
     test.setTimeout(240_000);
@@ -38,7 +38,7 @@ test.describe('perf baseline @gpu-local — camisa de María', () => {
     await page.goto('/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
     await page.waitForFunction(
-      () => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__),
+      () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),
       { timeout: 15_000 },
     );
     await page.waitForTimeout(500);
@@ -73,7 +73,7 @@ test.describe('perf baseline @gpu-local — camisa de María', () => {
     // re-lee valores stale y la mediana colapsa a una sola ventana.
     await page.evaluate(() => {
       const w = window as unknown as Record<string, unknown>;
-      const store = w.__OPENCLO_STORE__ as {
+      const store = w.__VINA_STORE__ as {
         getState: () => { simulation: { frameTimeMs: number } };
         subscribe: (f: () => void) => void;
       };

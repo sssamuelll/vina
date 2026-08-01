@@ -1,10 +1,10 @@
-# OpenClo — Architecture Overview
+# Vina — Architecture Overview
 
 > Current as of v0.11.0. Intentionally high-level; the code is the source of truth, and the ratified RFCs in [`docs/reports/`](../reports/) govern closed areas.
 
-## What is OpenClo.ai?
+## What is Vina.ai?
 
-OpenClo.ai is a **Cognitive Design Engine** for professional fashion engineering. It transcends traditional CAD by combining a **Semantic Garment Engine**, a **Situated AI Copilot**, and **Deterministic XPBD Physics** into a unified browser-native ecosystem.
+Vina.ai is a **Cognitive Design Engine** for professional fashion engineering. It transcends traditional CAD by combining a **Semantic Garment Engine**, a **Situated AI Copilot**, and **Deterministic XPBD Physics** into a unified browser-native ecosystem.
 
 **Primary Goal:** To digitize fashion intelligence, moving beyond static 2D drawing into intent-based garment synthesis and 3D validation.
 
@@ -24,10 +24,10 @@ OpenClo.ai is a **Cognitive Design Engine** for professional fashion engineering
 
 ## Core Data Model: The Semantic Graph
 
-Unlike legacy systems that store patterns as isolated loops of coordinates, OpenClo.ai represents a garment as a **Semantic Directed Graph**.
+Unlike legacy systems that store patterns as isolated loops of coordinates, Vina.ai represents a garment as a **Semantic Directed Graph**.
 
 ```typescript
-OpenCloProject
+VinaProject
 ├── pieces: ProfessionalPatternPiece[]
 │   ├── nodes: SemanticNode[]         // Landmarks (e.g., NeckPoint, BustPoint)
 │   ├── edges: SemanticEdge[]         // Curves with meaning (e.g., Armhole, Hem)
@@ -103,5 +103,5 @@ src/
 4. **Unified Agentic Loop**: The copilot uses a single `AgenticLoop` that drives LLM tool-use iteration with meta-tools (read-only) and action tools (mutations), replacing the earlier Planner/Executor/Reasoner triad.
 5. **DXF-first import**: The primary import path is DXF/AAMA — the format professional CAD tools (CLO3D, Gerber, Optitex) export. Imported geometry is hydrated into the semantic model: pieces, edges, notches, and grainlines are detected from the flat file. Seamly2D import remains as a deprecated legacy path.
 6. **Durable Agent Memory**: The Copilot's memory is decoupled from the project. It persists across sessions, learning the user's aesthetic and technical standards.
-7. **Agent-Agnostic Protocol**: The communication between the UI and the AI uses a strict JSON-RPC protocol, allowing OpenClo.ai to work with any LLM (Claude, GPT-4, or local Llama3 via Ollama).
+7. **Agent-Agnostic Protocol**: The communication between the UI and the AI uses a strict JSON-RPC protocol, allowing Vina.ai to work with any LLM (Claude, GPT-4, or local Llama3 via Ollama).
 8. **Linked Editing Middleware**: Redux middleware intercepts pattern mutations and propagates changes to linked partner pieces (instance cloning or symmetric mirroring).

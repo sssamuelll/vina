@@ -235,9 +235,9 @@ export class SkillBuilder {
     };
 
     const method: DraftingMethod = {
-      name: 'OpenClo Export',
+      name: 'Vina Export',
       origin: 'exported',
-      description: `Exported from OpenClo project`,
+      description: `Exported from Vina project`,
       formulas: {},
     };
 

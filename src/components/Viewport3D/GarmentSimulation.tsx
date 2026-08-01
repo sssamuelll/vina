@@ -207,7 +207,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // Dev A/B del face-poke (track piel): forzar el pase sin recompilar.
   const facePokeForced = useRef(
     typeof window !== 'undefined' &&
-      (window as unknown as { localStorage?: Storage }).localStorage?.getItem('openclo-facepoke-on') === 'true',
+      (window as unknown as { localStorage?: Storage }).localStorage?.getItem('vina-facepoke-on') === 'true',
   );
   // Renderer WebGPU device-loss latch (#901). Set the instant the renderer's
   // device.lost resolves so useFrame stops dispatching renderer.compute() on a
@@ -375,9 +375,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // la almendra une bordes a lados opuestos del brazo). Se stashean con
     // sus compuertas y el settle (frame 150, mismo readback del tether)
     // aplica solo los COSIDOS vía filterSewnBridges.
-    // Kill-switch dev: localStorage 'openclo-seamfill' = 'off'.
+    // Kill-switch dev: localStorage 'vina-seamfill' = 'off'.
     const seamFillEnabled = typeof window === 'undefined'
-      || window.localStorage?.getItem('openclo-seamfill') !== 'off';
+      || window.localStorage?.getItem('vina-seamfill') !== 'off';
     if (seamFillEnabled && seamInitData.length > 0) {
       const offsets = new Map<string, number>();
       let acc = 0;
@@ -516,8 +516,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     if (isPlayingBack) return;
     // Dev-only freeze: congela el loop de sim SIN desmontar (pausar por store
     // desmonta via useClothSim). Lo usa el probe del face-poke @gpu-local para
-    // leer posiciones quietas; setear window.__OPENCLO_FREEZE_FRAME__=true.
-    if (import.meta.env.DEV && (window as unknown as Record<string, unknown>).__OPENCLO_FREEZE_FRAME__) return;
+    // leer posiciones quietas; setear window.__VINA_FREEZE_FRAME__=true.
+    if (import.meta.env.DEV && (window as unknown as Record<string, unknown>).__VINA_FREEZE_FRAME__) return;
 
     const solver = tslSolverRef.current;
     // 2a (init-race, plan §6bis): sin colisión cargada NO se stepea — los
@@ -636,13 +636,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // colisión de cuerpo y antes de postSolve: la corrección queda excluida
       // de la velocidad vía preCollisionPos, igual que el push del cuerpo (el
       // monolito v1 corría 1×/frame post-substeps y los 15 substeps lo
-      // deshacían). Gate = capability + dev flag 'openclo-facepoke-on'.
+      // deshacían). Gate = capability + dev flag 'vina-facepoke-on'.
       // A4 face-poke Pass B (solve) — DENTRO del substep loop, tras el par de
       // colisión de cuerpo y antes de postSolve: corrección excluida de la
       // velocidad vía preCollisionPos + fricción Coulomb propia. CADA substep:
       // a substeps alternos la retención de manga cae (medido 6151 → 3945 —
       // el par push+grip por substep es protector). Gate = capability + dev
-      // flag 'openclo-facepoke-on'.
+      // flag 'vina-facepoke-on'.
       const facePokeOn = (GPU_CAPABILITIES.facePoke || facePokeForced.current) && solver.facePokeNodes;
       if (facePokeOn && solver.facePokeNodes) {
         substepNodes.push(solver.facePokeNodes.solve);
@@ -752,9 +752,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
             const { count, minSignedDist } = computePenetrationMetric(positions, body, {
               stride: penetrationStrideFor(posAttr.count),
             });
-            // e2e §8 debug global — same window-cast pattern as __OPENCLO_CLOTH_MESH__.
+            // e2e §8 debug global — same window-cast pattern as __VINA_CLOTH_MESH__.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (window as any).__OPENCLO_PENETRATION_COUNT__ = count;
+            (window as any).__VINA_PENETRATION_COUNT__ = count;
             if (Number.isFinite(minSignedDist)) {
               // Inspector rules (fit:body-penetration / fit:pressure-point) compare in mm.
               dispatch(setCollisionDistance(minSignedDist * 1000));
@@ -773,7 +773,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
                 { stride: facePokeStrideFor(idxAttr.count / 3), debugPairs: 24 },
               );
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (window as any).__OPENCLO_FACE_POKE__ = fp;
+              (window as any).__VINA_FACE_POKE__ = fp;
             }
           });
         }
@@ -834,14 +834,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   useEffect(() => {
     if (typeof window !== 'undefined' && meshRef.current) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__OPENCLO_CLOTH_MESH__ = meshRef.current;
+      (window as any).__VINA_CLOTH_MESH__ = meshRef.current;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__OPENCLO_THREE__ = THREE;
+      (window as any).__VINA_THREE__ = THREE;
     }
     return () => {
       if (typeof window !== 'undefined') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (window as any).__OPENCLO_CLOTH_MESH__;
+        delete (window as any).__VINA_CLOTH_MESH__;
       }
     };
   }, [staticGeometry]);
@@ -887,8 +887,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         console.error('[GarmentSimulation] 3D export failed:', err);
       }
     };
-    window.addEventListener('openclo:export3d', handler);
-    return () => window.removeEventListener('openclo:export3d', handler);
+    window.addEventListener('vina:export3d', handler);
+    return () => window.removeEventListener('vina:export3d', handler);
   }, []);
 
   // Derive render params from selected fabric

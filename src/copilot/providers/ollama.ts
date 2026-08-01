@@ -29,7 +29,7 @@ export const OLLAMA_DEFAULT_URL = 'http://localhost:11434';
 export const OLLAMA_MODELS = ['llama3', 'codellama', 'mistral', 'mixtral'] as const;
 
 /** Ollama-specific configuration key */
-const OLLAMA_CONFIG_KEY = 'openclo-ollama-config';
+const OLLAMA_CONFIG_KEY = 'vina-ollama-config';
 
 /**
  * Ollama connection configuration.

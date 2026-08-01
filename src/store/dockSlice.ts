@@ -16,7 +16,7 @@ export interface DockState {
   tools2d: string[];
 }
 
-const STORAGE_KEY = 'openclo-docks';
+const STORAGE_KEY = 'vina-docks';
 const STORAGE_VERSION = 1;
 const MAX_PINNED = 16;
 const MAX_ID_LEN = 80;

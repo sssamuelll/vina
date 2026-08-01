@@ -24,7 +24,7 @@ const FIXTURE = path.resolve(
 
 async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
   return page.evaluate((p) => {
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as
       | { getState: () => unknown }
       | undefined;
     if (!store) return null;
@@ -36,11 +36,11 @@ async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
 
 test('arrangement flow: binding → preview → seed → drape @gpu-local', async ({ page }) => {
   test.setTimeout(240_000);
-  await page.addInitScript(() => localStorage.setItem('openclo-use-webgpu', 'true'));
+  await page.addInitScript(() => localStorage.setItem('vina-use-webgpu', 'true'));
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
   await page.waitForFunction(
-    () => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__),
+    () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),
     { timeout: 15_000 },
   );
   await page.waitForTimeout(500);
@@ -64,7 +64,7 @@ test('arrangement flow: binding → preview → seed → drape @gpu-local', asyn
   const bound = await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const w = window as any;
-    const store = w.__OPENCLO_STORE__;
+    const store = w.__VINA_STORE__;
     const pieces = store.getState().project.pieces as Array<{ id: string; name: string; category?: string; side?: string }>;
     // Clasificación real: category ('bodice'...) + side ('front'/'back'). Los
     // nombres del DXF son técnicos. Fallback: el bodice más ancho (el torso).
@@ -92,7 +92,7 @@ test('arrangement flow: binding → preview → seed → drape @gpu-local', asyn
   const stored = await page.evaluate((id) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const w = window as any;
-    return w.__OPENCLO_STORE__.getState().project.arrangementOverrides[id];
+    return w.__VINA_STORE__.getState().project.arrangementOverrides[id];
   }, bound!);
   expect(stored?.space).toBe('frame');
   expect(stored?.anchorId).toBe('front-torso.ring1.front');
@@ -100,7 +100,7 @@ test('arrangement flow: binding → preview → seed → drape @gpu-local', asyn
   // ── Simular desde el binding: mismo boot de ventanas que el gate M4.
   await page.evaluate(() => {
     const w = window as unknown as Record<string, unknown>;
-    const store = w.__OPENCLO_STORE__ as {
+    const store = w.__VINA_STORE__ as {
       getState: () => { simulation: { frameTimeMs: number } };
       subscribe: (f: () => void) => void;
     };
@@ -128,7 +128,7 @@ test('arrangement flow: binding → preview → seed → drape @gpu-local', asyn
 
   const drape = await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mesh = (window as any).__OPENCLO_CLOTH_MESH__;
+    const mesh = (window as any).__VINA_CLOTH_MESH__;
     if (!mesh) return null;
     const pos = mesh.geometry.attributes.position;
     let nan = 0, belowHip = 0, sleeve = 0;

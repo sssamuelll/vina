@@ -9,7 +9,7 @@
  */
 
 import type {
-  OpenCloPlugin,
+  VinaPlugin,
   PluginManifest,
   PluginPermission,
   ValidationResult,
@@ -17,11 +17,11 @@ import type {
 import { ALL_PLUGIN_PERMISSIONS } from './types';
 import { safeGetItem, safeRemoveItem } from '../../utils/safeStorage';
 
-/** Current OpenClo version — used for plugin compatibility checks */
-const OPENCLO_VERSION = '0.4.0';
+/** Current Vina version — used for plugin compatibility checks */
+const VINA_VERSION = '0.4.0';
 
 /** Loaded plugin instances keyed by plugin id */
-const loadedPlugins: Map<string, OpenCloPlugin> = new Map();
+const loadedPlugins: Map<string, VinaPlugin> = new Map();
 
 // ─── Semver Utilities ───────────────────────────────────────────────────────
 
@@ -66,7 +66,7 @@ export function satisfiesSemver(current: string, range: string): boolean {
  * - All required fields are present and non-empty strings
  * - Version is valid semver
  * - All permissions are recognized
- * - Plugin is compatible with current OpenClo version
+ * - Plugin is compatible with current Vina version
  *
  * @param manifest - The manifest to validate
  * @returns ValidationResult with errors and warnings
@@ -109,9 +109,9 @@ export function validateManifest(manifest: PluginManifest): ValidationResult {
   }
 
   // Compatibility check
-  if (manifest.compatibleWith && !satisfiesSemver(OPENCLO_VERSION, manifest.compatibleWith)) {
+  if (manifest.compatibleWith && !satisfiesSemver(VINA_VERSION, manifest.compatibleWith)) {
     warnings.push(
-      `Plugin requires OpenClo ${manifest.compatibleWith}, current version is ${OPENCLO_VERSION}`,
+      `Plugin requires Vina ${manifest.compatibleWith}, current version is ${VINA_VERSION}`,
     );
   }
 
@@ -134,7 +134,7 @@ export function validateManifest(manifest: PluginManifest): ValidationResult {
  * @param plugin - The plugin object to validate
  * @returns ValidationResult with errors and warnings
  */
-export function validatePlugin(plugin: OpenCloPlugin): ValidationResult {
+export function validatePlugin(plugin: VinaPlugin): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -292,10 +292,10 @@ export function getPermissionDescriptions(permissions: PluginPermission[]): stri
  * stores it in the loaded plugins map.
  *
  * @param manifest - The plugin manifest with entry point path
- * @returns The loaded and validated OpenCloPlugin
+ * @returns The loaded and validated VinaPlugin
  * @throws Error if manifest is invalid, import fails, or plugin is invalid
  */
-export async function loadPlugin(manifest: PluginManifest): Promise<OpenCloPlugin> {
+export async function loadPlugin(manifest: PluginManifest): Promise<VinaPlugin> {
   // Validate manifest first
   const manifestResult = validateManifest(manifest);
   if (!manifestResult.valid) {
@@ -317,7 +317,7 @@ export async function loadPlugin(manifest: PluginManifest): Promise<OpenCloPlugi
   }
 
   // Extract plugin object (default export or named 'plugin')
-  const plugin = (pluginModule.default ?? pluginModule.plugin) as OpenCloPlugin | undefined;
+  const plugin = (pluginModule.default ?? pluginModule.plugin) as VinaPlugin | undefined;
   if (!plugin) {
     throw new Error(`Plugin module "${manifest.id}" has no default or named "plugin" export`);
   }
@@ -338,15 +338,15 @@ export async function loadPlugin(manifest: PluginManifest): Promise<OpenCloPlugi
 }
 
 /**
- * Load a plugin directly from an already-constructed OpenCloPlugin object.
+ * Load a plugin directly from an already-constructed VinaPlugin object.
  *
  * Useful for built-in plugins or testing. Validates and stores the plugin.
  *
  * @param plugin - The pre-constructed plugin object
- * @returns The validated OpenCloPlugin
+ * @returns The validated VinaPlugin
  * @throws Error if plugin is invalid or already loaded
  */
-export function loadPluginDirect(plugin: OpenCloPlugin): OpenCloPlugin {
+export function loadPluginDirect(plugin: VinaPlugin): VinaPlugin {
   const result = validatePlugin(plugin);
   if (!result.valid) {
     throw new Error(`Invalid plugin "${plugin.id}": ${result.errors.join('; ')}`);
@@ -384,9 +384,9 @@ export function unloadPlugin(pluginId: string): void {
 /**
  * Get all currently loaded plugins.
  *
- * @returns Array of loaded OpenCloPlugin instances
+ * @returns Array of loaded VinaPlugin instances
  */
-export function getLoadedPlugins(): OpenCloPlugin[] {
+export function getLoadedPlugins(): VinaPlugin[] {
   return Array.from(loadedPlugins.values());
 }
 
@@ -396,7 +396,7 @@ export function getLoadedPlugins(): OpenCloPlugin[] {
  * @param pluginId - The plugin id
  * @returns The plugin, or undefined if not loaded
  */
-export function getLoadedPlugin(pluginId: string): OpenCloPlugin | undefined {
+export function getLoadedPlugin(pluginId: string): VinaPlugin | undefined {
   return loadedPlugins.get(pluginId);
 }
 
@@ -433,7 +433,7 @@ export function resetLoadedPlugins(): void {
  * @returns The localStorage key prefix for this plugin
  */
 export function getPluginStorageKey(pluginId: string): string {
-  return `openclo_plugins_${pluginId}`;
+  return `vina_plugins_${pluginId}`;
 }
 
 /**

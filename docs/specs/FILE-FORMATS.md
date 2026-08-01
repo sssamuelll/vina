@@ -1,18 +1,18 @@
-# OpenClo.ai — Interoperability & Ingestion Spec (v0.7)
+# Vina.ai — Interoperability & Ingestion Spec (v0.7)
 
 ## The "Silent Ingestion" Philosophy
 
-OpenClo.ai is designed to be a frictionless ecosystem for professional designers. Our strategy for interoperability is not based on "Bridges" or "Converters" in the UI, but on a **Silent Ingestion Layer**.
+Vina.ai is designed to be a frictionless ecosystem for professional designers. Our strategy for interoperability is not based on "Bridges" or "Converters" in the UI, but on a **Silent Ingestion Layer**.
 
 When a user drags a legacy file (DXF, Seamly2D) into the workspace, the engine performs **Semantic Hydration**:
 1. **Parsing**: Extracting geometric primitives (points, lines, curves).
 2. **Elevation**: Using AI-driven heuristics and tailoring logic to tag these primitives (e.g., identifying which curve is an `Armhole` vs. a `Hem`).
 3. **Constraint Synthesis**: Automatically generating geometric constraints to maintain technical integrity.
-4. **Semantic Graph Output**: The result is a native OpenClo.ai `ProfessionalPatternPiece` with stable `pieceId:edgeName` references.
+4. **Semantic Graph Output**: The result is a native Vina.ai `ProfessionalPatternPiece` with stable `pieceId:edgeName` references.
 
 ## Industry Interop Map
 
-| Standard | Ecosystem | Status | Role in OpenClo.ai |
+| Standard | Ecosystem | Status | Role in Vina.ai |
 |----------|-----------|--------|---------------------|
 | **DXF (ASTM D6673)** | Industry Universal | Full (Import + Export) | Standard Industrial Exchange |
 | **Seamly2D (.val/.vit)**| Open Source Legacy | Auto-Ingest | Library Absorption (Invisible) |
@@ -50,7 +50,7 @@ Features:
 
 ### Layer-to-Semantic Mapping
 
-| ASTM Layer | Semantic Label (OpenClo.ai) | Role |
+| ASTM Layer | Semantic Label (Vina.ai) | Role |
 |------------|-----------------------------|------|
 | 1 | `Outline / CutLine` | The primary boundary of the piece |
 | 2 | `SewLine` | Internal boundary for stitch placement |
@@ -61,7 +61,7 @@ Features:
 | 11 | `SemanticNode / Landmark` | Key anatomical anchor points |
 
 ### Export Strategy
-OpenClo.ai exports **ASTM-compliant DXF** with `SPLINE` entities for maximum fidelity in industrial cutting machines (`src/utils/dxf/exportAAMA.ts`). The Semantic Graph is flattened accurately back into the legacy layer structure.
+Vina.ai exports **ASTM-compliant DXF** with `SPLINE` entities for maximum fidelity in industrial cutting machines (`src/utils/dxf/exportAAMA.ts`). The Semantic Graph is flattened accurately back into the legacy layer structure.
 
 ---
 
@@ -104,7 +104,7 @@ Any 3D mesh can be imported as a collision body for cloth simulation.
 ### Hydration Strategy (Planned)
 1. **Unzip**: Extract the internal `pattern.dxf` and `pattern_info.json`.
 2. **Metadata Extraction**: Recover piece names, fabric properties, and seam connections.
-3. **Avatar Alignment**: Map measurements to the OpenClo.ai parametric avatar.
+3. **Avatar Alignment**: Map measurements to the Vina.ai parametric avatar.
 4. **Re-Simulation**: Discard proprietary simulation state, perform fresh XPBD drape.
 
 ---

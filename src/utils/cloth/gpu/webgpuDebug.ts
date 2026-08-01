@@ -13,7 +13,7 @@
  *
  *   3. {@link instrumentShaderCapture} — patches `device.createShaderModule`
  *      so every WGSL source the renderer compiles is captured into
- *      `window.__OPENCLO_SHADERS__` and `getCompilationInfo()` warnings/errors
+ *      `window.__VINA_SHADERS__` and `getCompilationInfo()` warnings/errors
  *      surface via `console.error`/`console.warn`.
  *
  * All three are gated on `import.meta.env.DEV`. In production builds:
@@ -42,13 +42,13 @@ export interface ShaderEntry {
 declare global {
   interface Window {
     /** Map of shader key → {@link ShaderEntry}. Populated by {@link instrumentShaderCapture} in dev mode. */
-    __OPENCLO_SHADERS__?: Map<string, ShaderEntry>;
+    __VINA_SHADERS__?: Map<string, ShaderEntry>;
   }
 }
 
-const SHADER_PATCH_MARKER = Symbol.for('openclo.webgpuDebug.shaderPatched');
-const LISTENER_MARKER = Symbol.for('openclo.webgpuDebug.listenerAttached');
-const ADAPTER_HOOK_INSTALLED = Symbol.for('openclo.webgpuDebug.adapterHookInstalled');
+const SHADER_PATCH_MARKER = Symbol.for('vina.webgpuDebug.shaderPatched');
+const LISTENER_MARKER = Symbol.for('vina.webgpuDebug.listenerAttached');
+const ADAPTER_HOOK_INSTALLED = Symbol.for('vina.webgpuDebug.adapterHookInstalled');
 
 type MarkedDevice = GPUDevice & {
   [SHADER_PATCH_MARKER]?: true;
@@ -145,7 +145,7 @@ export function attachUncapturedErrorListener(device: GPUDevice): void {
 
 /**
  * Patch `device.createShaderModule` to capture WGSL source into
- * `window.__OPENCLO_SHADERS__` and surface `getCompilationInfo()` diagnostics.
+ * `window.__VINA_SHADERS__` and surface `getCompilationInfo()` diagnostics.
  *
  * Idempotent: marks the device on first call; subsequent calls no-op.
  *
@@ -155,7 +155,7 @@ export function attachUncapturedErrorListener(device: GPUDevice): void {
  *
  * Browser DevTools usage:
  *   ```js
- *   for (const [key, entry] of window.__OPENCLO_SHADERS__) {
+ *   for (const [key, entry] of window.__VINA_SHADERS__) {
  *     console.log(key, entry.deviceId, entry.source.length);
  *   }
  *   ```
@@ -166,8 +166,8 @@ export function instrumentShaderCapture(device: GPUDevice): void {
   if (d[SHADER_PATCH_MARKER]) return;
   d[SHADER_PATCH_MARKER] = true;
 
-  window.__OPENCLO_SHADERS__ = window.__OPENCLO_SHADERS__ ?? new Map();
-  const shaders = window.__OPENCLO_SHADERS__;
+  window.__VINA_SHADERS__ = window.__VINA_SHADERS__ ?? new Map();
+  const shaders = window.__VINA_SHADERS__;
   const deviceId = getOrAssignDeviceId(device);
 
   const original = device.createShaderModule.bind(device);

@@ -1,7 +1,7 @@
 # Master Spec: Copilot Brain Architecture (v1.0)
 
 ## 1. Overview
-This specification defines the "Cerebral" layer of the OpenClo Copilot. Inspired by the **OpenClaw** hub-and-spoke model, it transitions the agent from a reactive command-executor to a situated design partner with visual awareness and historical memory.
+This specification defines the "Cerebral" layer of the Vina Copilot. Inspired by the **OpenClaw** hub-and-spoke model, it transitions the agent from a reactive command-executor to a situated design partner with visual awareness and historical memory.
 
 ## 2. Structural Hierarchy
 All logic for the Copilot's intelligence is centralized in `src/copilot/vision/`.
@@ -11,7 +11,7 @@ All logic for the Copilot's intelligence is centralized in `src/copilot/vision/`
 - **Spatial Describer**: Analyzes the 3D Scene Graph to describe adjacency and collisions between pieces.
 
 ### 🧠 Memory Layer
-- **Durable Design Log**: Manages the persistent Markdown journal (`.openclo/design-log.md`). Extracts technical decisions from chat history.
+- **Durable Design Log**: Manages the persistent Markdown journal (`.vina/design-log.md`). Extracts technical decisions from chat history.
 - **Preference Learner**: Observes manual user edits to override built-in skill formulas.
 
 ### ⚡ Action Layer

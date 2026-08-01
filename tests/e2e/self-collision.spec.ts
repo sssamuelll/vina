@@ -115,7 +115,7 @@ test.describe('Self-Collision (GPU pipeline, issue #293)', () => {
     await dispatch(page, { type: 'simulation/setSimulationMode', payload: 'normal' });
     await page.waitForTimeout(300);
     const mode1 = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: { getState: () => { simulation: { simulationMode: string } } } }).__OPENCLO_STORE__;
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => { simulation: { simulationMode: string } } } }).__VINA_STORE__;
       return s.getState().simulation.simulationMode;
     });
     expect(mode1).toBe('normal');

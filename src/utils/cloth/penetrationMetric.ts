@@ -4,7 +4,7 @@
  * Plan drape-profesional 2026-07-02 §A1 (Fase 0.1): computes how many cloth
  * verts sit ≥2mm INSIDE the avatar body, plus the most-negative signed
  * distance. Published from the GPU readback cadence (GarmentSimulation.tsx)
- * as `window.__OPENCLO_PENETRATION_COUNT__` (e2e §8) and
+ * as `window.__VINA_PENETRATION_COUNT__` (e2e §8) and
  * `simulation.collisionDistance` (inspector rule `fit:body-penetration`).
  *
  * Reuses the CPU collision tier's machinery wholesale: closest-feature +
@@ -196,7 +196,7 @@ export function registerPenetrationBody(mesh: CollisionMeshData | null): void {
   if (import.meta.env.DEV && typeof window !== 'undefined') {
     // Dev probe (render-vs-collision surface comparisons @gpu-local).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).__OPENCLO_COLLISION_MESH__ = registeredMesh;
+    (window as any).__VINA_COLLISION_MESH__ = registeredMesh;
   }
 }
 

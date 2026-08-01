@@ -1,5 +1,5 @@
 /**
- * Copilot Bridge — server-side proxy between OpenClo and the user's AI agent
+ * Copilot Bridge — server-side proxy between Vina and the user's AI agent
  * 
  * Supports connecting to:
  * - Claude Code (via stdio/subprocess)
@@ -33,9 +33,10 @@ interface CopilotResponse {
   commands: Array<{ type: string; [key: string]: unknown }>;
 }
 
+// El rename de dir en index.ts (~/.openclo → ~/.vina) ya migró este config.
 const CONFIG_PATH = path.join(
   process.env.HOME || process.env.USERPROFILE || '.',
-  '.openclo',
+  '.vina',
   'copilot-config.json',
 );
 
@@ -44,7 +45,7 @@ const DEFAULT_CONFIG: BridgeConfig = {
   name: 'No Agent Connected',
 };
 
-const SYSTEM_PROMPT = `You are an AI pattern making copilot inside OpenClo, an open-source 2D/3D garment design application.
+const SYSTEM_PROMPT = `You are an AI pattern making copilot inside Vina, an open-source 2D/3D garment design application.
 
 You receive a JSON context with the current project state (pieces, measurements, selection) and a user message.
 You respond with JSON containing "message" (string explanation) and "commands" (array of actions to execute).

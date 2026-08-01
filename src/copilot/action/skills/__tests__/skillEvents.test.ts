@@ -11,9 +11,9 @@ describe('SkillEventEmitter', () => {
     const handler = vi.fn();
 
     emitter.on('skill:registered', handler);
-    emitter.emit('skill:registered', 'openclo:bodice' as NSID);
+    emitter.emit('skill:registered', 'vina:bodice' as NSID);
 
-    expect(handler).toHaveBeenCalledWith('openclo:bodice', undefined);
+    expect(handler).toHaveBeenCalledWith('vina:bodice', undefined);
   });
 
   it('supports multiple handlers for same event', () => {
@@ -23,7 +23,7 @@ describe('SkillEventEmitter', () => {
 
     emitter.on('skill:registered', handler1);
     emitter.on('skill:registered', handler2);
-    emitter.emit('skill:registered', 'openclo:bodice' as NSID);
+    emitter.emit('skill:registered', 'vina:bodice' as NSID);
 
     expect(handler1).toHaveBeenCalled();
     expect(handler2).toHaveBeenCalled();
@@ -35,7 +35,7 @@ describe('SkillEventEmitter', () => {
 
     const unsubscribe = emitter.on('skill:registered', handler);
     unsubscribe();
-    emitter.emit('skill:registered', 'openclo:bodice' as NSID);
+    emitter.emit('skill:registered', 'vina:bodice' as NSID);
 
     expect(handler).not.toHaveBeenCalled();
   });
@@ -44,7 +44,7 @@ describe('SkillEventEmitter', () => {
     const emitter = new SkillEventEmitter();
     const handler = vi.fn();
     const skillData = {
-      nsid: 'openclo:bodice' as NSID,
+      nsid: 'vina:bodice' as NSID,
       source: 'core' as const,
       version: '1.0.0',
       checksum: 'abc123',
@@ -63,9 +63,9 @@ describe('SkillEventEmitter', () => {
     };
 
     emitter.on('skill:registered', handler);
-    emitter.emit('skill:registered', 'openclo:bodice' as NSID, skillData);
+    emitter.emit('skill:registered', 'vina:bodice' as NSID, skillData);
 
-    expect(handler).toHaveBeenCalledWith('openclo:bodice', skillData);
+    expect(handler).toHaveBeenCalledWith('vina:bodice', skillData);
   });
 
   it('handles all event types', () => {

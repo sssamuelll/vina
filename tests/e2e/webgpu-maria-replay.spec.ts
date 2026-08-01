@@ -48,7 +48,7 @@ const DETERMINISM_DIR = path.resolve(
 
 async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
   return page.evaluate((p) => {
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as
       | { getState: () => unknown }
       | undefined;
     if (!store) return null;
@@ -65,12 +65,12 @@ async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
 async function importSewAndSimulate(page: Page) {
   // F4.1: el bypass fue eliminado y la capability está flipped — el único
   // switch es el opt-in de usuario, y debe existir ANTES de cargar la app.
-  await page.addInitScript(() => localStorage.setItem('openclo-use-webgpu', 'true'));
+  await page.addInitScript(() => localStorage.setItem('vina-use-webgpu', 'true'));
 
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
   await page.waitForFunction(
-    () => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__),
+    () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),
     { timeout: 15_000 },
   );
   await page.waitForTimeout(500);
@@ -104,7 +104,7 @@ async function importSewAndSimulate(page: Page) {
   // TARDE (nunca antes) del tiempo de sim nominal.
   await page.evaluate(() => {
     const w = window as unknown as Record<string, unknown>;
-    const store = w.__OPENCLO_STORE__ as {
+    const store = w.__VINA_STORE__ as {
       getState: () => { simulation: { frameTimeMs: number } };
       subscribe: (f: () => void) => void;
     };
@@ -139,9 +139,9 @@ async function waitForSimWindows(page: Page, windows: number, timeout: number) {
 /** Métricas de drape M4 sobre el mesh de tela (mismas que el replay WASM). */
 async function readDrape(page: Page) {
   return page.evaluate(() => {
-    const mesh = (window as unknown as { __OPENCLO_CLOTH_MESH__?: {
+    const mesh = (window as unknown as { __VINA_CLOTH_MESH__?: {
       geometry: { attributes: { position: { count: number; getY: (i: number) => number } } };
-    } }).__OPENCLO_CLOTH_MESH__;
+    } }).__VINA_CLOTH_MESH__;
     if (!mesh) return null;
     const pos = mesh.geometry.attributes.position;
     const n = pos.count;
@@ -207,9 +207,9 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     // along the lowered A-pose arm, not floating at T-pose horizontal height.
     // maintainer-run
     const sleeveMeanY = await page.evaluate(() => {
-      const mesh = (window as unknown as { __OPENCLO_CLOTH_MESH__?: {
+      const mesh = (window as unknown as { __VINA_CLOTH_MESH__?: {
         geometry: { attributes: { position: { count: number; getX: (i: number) => number; getY: (i: number) => number } } };
-      } }).__OPENCLO_CLOTH_MESH__;
+      } }).__VINA_CLOTH_MESH__;
       if (!mesh) return null;
       const pos = mesh.geometry.attributes.position;
       const n = pos.count;
@@ -229,7 +229,7 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
       `[apose-sleeve] simSeconds=2.5 sleeveMeanY=${sleeveMeanY?.meanY?.toFixed(3) ?? 'n/a'} sleeveVertCount=${sleeveMeanY?.count ?? 0} (target: meanY<1.476)`,
     );
     // Detect global publish failure separately from empty sleeve segment.
-    expect(sleeveMeanY, 'Cloth mesh not found — __OPENCLO_CLOTH_MESH__ global not published').not.toBeNull();
+    expect(sleeveMeanY, 'Cloth mesh not found — __VINA_CLOTH_MESH__ global not published').not.toBeNull();
     // Guard against empty sleeve segment — fails loudly with a clear message.
     expect(
       sleeveMeanY?.count ?? 0,
@@ -269,7 +269,7 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     // same stride). // maintainer-run
     const facePoke = await page.evaluate(() => {
       const w = window as unknown as Record<string, unknown>;
-      return (w.__OPENCLO_FACE_POKE__ as {
+      return (w.__VINA_FACE_POKE__ as {
         visible: number; visibleTrue: number; near: number; maxDepth: number; sampledFaces: number; stride: number;
       } | undefined) ?? null;
     });
@@ -285,7 +285,7 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     // runs --repeat-each=3 and reads the logged counts. // maintainer-run
     const sleeveAt10 = await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mesh = (window as any).__OPENCLO_CLOTH_MESH__;
+      const mesh = (window as any).__VINA_CLOTH_MESH__;
       if (!mesh) return null;
       const pos = mesh.geometry.attributes.position;
       let count = 0, maxAbsX = 0;
@@ -299,7 +299,7 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     console.log(
       `[sleeve-persist] simSeconds=10 sleeveVertCount=${sleeveAt10?.count ?? 'n/a'} maxAbsX=${sleeveAt10?.maxAbsX?.toFixed(3) ?? 'n/a'} (anti-collapse floor: count≥50)`,
     );
-    expect(sleeveAt10, 'Cloth mesh not found — __OPENCLO_CLOTH_MESH__ not published').not.toBeNull();
+    expect(sleeveAt10, 'Cloth mesh not found — __VINA_CLOTH_MESH__ not published').not.toBeNull();
     // Anti-collapse floor: well above the pre-fix collapse (~2), loose enough
     // for the non-deterministic 10s drape. // maintainer-run
     expect(sleeveAt10!.count).toBeGreaterThanOrEqual(50);
@@ -327,9 +327,9 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     // Log-only: deterministic only if the baked mesh is loaded by t=0. // maintainer-run
     const penetrationCount = await page.evaluate(() => {
       const w = window as unknown as Record<string, unknown>;
-      // __OPENCLO_PENETRATION_COUNT__ is published by the collision subsystem
+      // __VINA_PENETRATION_COUNT__ is published by the collision subsystem
       // after the first solver step; undefined = not yet available.
-      return (w.__OPENCLO_PENETRATION_COUNT__ as number | undefined) ?? null;
+      return (w.__VINA_PENETRATION_COUNT__ as number | undefined) ?? null;
     });
     console.log(
       `[wrap-spec-§8] t=0 penetrationCount=${penetrationCount ?? 'not-published'} (target=0)`,
@@ -358,11 +358,11 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     // §8 collar-height + sleeve-on-arm logs (structural presence). // maintainer-run
     const collarHeight = await page.evaluate(() => {
       const w = window as unknown as Record<string, unknown>;
-      return (w.__OPENCLO_COLLAR_HEIGHT__ as number | undefined) ?? null;
+      return (w.__VINA_COLLAR_HEIGHT__ as number | undefined) ?? null;
     });
     const sleeveOnArm = await page.evaluate(() => {
       const w = window as unknown as Record<string, unknown>;
-      return (w.__OPENCLO_SLEEVE_ON_ARM__ as boolean | undefined) ?? null;
+      return (w.__VINA_SLEEVE_ON_ARM__ as boolean | undefined) ?? null;
     });
     console.log(
       `[wrap-spec-§8] collarHeight=${collarHeight ?? 'not-published'} sleeveOnArm=${sleeveOnArm ?? 'not-published'}`,
@@ -381,7 +381,7 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     // los números sean conmensurables con el baseline F0.
     await page.evaluate(() => {
       const w = window as unknown as Record<string, unknown>;
-      const store = w.__OPENCLO_STORE__ as {
+      const store = w.__VINA_STORE__ as {
         getState: () => { simulation: { frameTimeMs: number } };
         subscribe: (f: () => void) => void;
       };
@@ -449,7 +449,7 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
       const d = await readDrape(page);
       const m = await page.evaluate(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mesh = (window as any).__OPENCLO_CLOTH_MESH__;
+        const mesh = (window as any).__VINA_CLOTH_MESH__;
         if (!mesh) return { sleeve: 0, area: 0 };
         const pos = mesh.geometry.attributes.position;
         const idx = mesh.geometry.index;
@@ -497,13 +497,13 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     await waitForSimWindows(page, 5, 120_000);
     const positions = await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mesh = (window as any).__OPENCLO_CLOTH_MESH__;
+      const mesh = (window as any).__VINA_CLOTH_MESH__;
       if (!mesh) return null;
       return Array.from(mesh.geometry.attributes.position.array as Float32Array);
     });
     expect(
       positions,
-      'Cloth mesh not found — __OPENCLO_CLOTH_MESH__ not published',
+      'Cloth mesh not found — __VINA_CLOTH_MESH__ not published',
     ).not.toBeNull();
 
     if (testInfo.repeatEachIndex === 0) rmSync(DETERMINISM_DIR, { recursive: true, force: true });

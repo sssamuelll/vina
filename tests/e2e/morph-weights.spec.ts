@@ -46,7 +46,7 @@ test.describe('Morph Weights (#271)', () => {
 
     // Change chest measurement via Redux store dispatch
     await page.evaluate(() => {
-      const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as {
+      const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as {
         dispatch: (action: { type: string; payload: Record<string, number> }) => void;
       };
       if (store) {
@@ -72,7 +72,7 @@ test.describe('Morph Weights (#271)', () => {
 
     // Verify avatar slice has morph target fields
     const state = await page.evaluate(() => {
-      const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as {
+      const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as {
         getState: () => { avatar: { morphTargets: Record<string, number>; availableMorphTargets: string[] } };
       };
       if (!store) return null;

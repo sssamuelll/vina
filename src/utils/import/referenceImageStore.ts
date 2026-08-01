@@ -5,7 +5,7 @@
  * Cleanup is deferred to garbageCollect(), called on NEW_PROJECT / loadProject.
  */
 
-const DB_NAME = 'openclo-reference-images';
+const DB_NAME = 'vina-reference-images';
 const STORE_NAME = 'blobs';
 const DB_VERSION = 1;
 

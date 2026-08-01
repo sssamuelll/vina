@@ -32,7 +32,7 @@ export interface ShortcutDef {
   context: ShortcutContext;
 }
 
-const STORAGE_KEY = 'openclo-shortcut-overrides';
+const STORAGE_KEY = 'vina-shortcut-overrides';
 
 // ─── Registry ────────────────────────────────────────────────────────────────
 

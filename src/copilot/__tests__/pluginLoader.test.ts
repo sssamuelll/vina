@@ -13,7 +13,7 @@ import {
   resetLoadedPlugins,
   getPluginStorageKey,
 } from '../plugins/pluginLoader';
-import type { PluginManifest, OpenCloPlugin, PluginPermission } from '../plugins/types';
+import type { PluginManifest, VinaPlugin, PluginPermission } from '../plugins/types';
 
 // ─── Mock localStorage ──────────────────────────────────────────────────────
 const store: Record<string, string> = {};
@@ -44,7 +44,7 @@ function validManifest(overrides?: Partial<PluginManifest>): PluginManifest {
   };
 }
 
-function validPlugin(overrides?: Partial<OpenCloPlugin>): OpenCloPlugin {
+function validPlugin(overrides?: Partial<VinaPlugin>): VinaPlugin {
   return {
     id: 'com.test.plugin',
     name: 'Test Plugin',
@@ -318,6 +318,6 @@ describe('Plugin loading lifecycle', () => {
 
 describe('getPluginStorageKey', () => {
   it('should return namespaced key', () => {
-    expect(getPluginStorageKey('com.test.plugin')).toBe('openclo_plugins_com.test.plugin');
+    expect(getPluginStorageKey('com.test.plugin')).toBe('vina_plugins_com.test.plugin');
   });
 });

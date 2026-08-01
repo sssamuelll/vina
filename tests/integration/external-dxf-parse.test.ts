@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Probe — does openclo's existing DXF parser handle a real CLO/CAD export?
+ * Probe — does vina's existing DXF parser handle a real CLO/CAD export?
  * Read-only, no Redux, no agentic loop. Just `parseDXF` + `dxfToPatternPieces`
  * on the raw file. Tells us whether the M3 "agentic DXF import" slice needs
  * only a tool wire (parser already handles real files) or actually needs

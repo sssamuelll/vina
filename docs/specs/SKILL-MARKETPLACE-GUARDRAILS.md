@@ -13,17 +13,17 @@ When the user issues a command (e.g., "Draft a skirt") and multiple installed sk
 
 1. **User Preference**: The `skillRegistry` checks if a "Default Provider" is set for the "skirt" category.
 2. **Contextual Match**: If no default exists, the Copilot analyzes active piece metadata (e.g., if existing pieces are from `sdar`, prioritize `sdar:skirt`).
-3. **Clarification Turn**: If ambiguity persists, the agent MUST ask: *"I have two methods for skirts: 'Basic' by OpenClo and 'Tailored' by Sdar. Which should I use?"*
+3. **Clarification Turn**: If ambiguity persists, the agent MUST ask: *"I have two methods for skirts: 'Basic' by Vina and 'Tailored' by Sdar. Which should I use?"*
 
 ## 3. Project Pinning (Stability Guardrail)
-Every `.openclo` project file must include a `dependencyManifest` to prevent "geometry drift" when skills are updated.
+Every `.vina` project file must include a `dependencyManifest` to prevent "geometry drift" when skills are updated.
 
 ### Manifest Schema
 ```json
 {
   "dependencies": {
     "skills": [
-      { "id": "openclo:standard_shirt", "version": "1.2.0", "checksum": "a7b8..." }
+      { "id": "vina:standard_shirt", "version": "1.2.0", "checksum": "a7b8..." }
     ]
   }
 }
@@ -32,7 +32,7 @@ Every `.openclo` project file must include a `dependencyManifest` to prevent "ge
 ### Execution Rules:
 - **Locking**: When a piece is generated, its drafting logic is locked to the current skill version.
 - **Update Workflow**: If a newer version is available in the Marketplace, the UI shows a "Update Drafting Logic" badge. It is **never** automatic.
-- **Fallback**: If a project references a skill that the user has uninstalled, OpenClo will prompt to "Temporarily re-activate" or "Convert to static geometry."
+- **Fallback**: If a project references a skill that the user has uninstalled, Vina will prompt to "Temporarily re-activate" or "Convert to static geometry."
 
 ## 4. Security Sandbox (Logic Integrity)
 To prevent malicious code execution:

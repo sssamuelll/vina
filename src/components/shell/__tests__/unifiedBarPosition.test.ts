@@ -9,7 +9,7 @@ function setViewport(w: number, h: number) {
   Object.defineProperty(window, 'innerHeight', { value: h, writable: true, configurable: true });
 }
 
-const KEY = 'openclo-bar-position';
+const KEY = 'vina-bar-position';
 
 describe('loadPosition — restoring a persisted bar position', () => {
   beforeEach(() => localStorage.clear());

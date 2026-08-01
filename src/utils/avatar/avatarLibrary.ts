@@ -12,7 +12,7 @@ export interface AvatarProfile {
   updatedAt: number;
 }
 
-const STORAGE_KEY = 'openclo-avatar-profiles';
+const STORAGE_KEY = 'vina-avatar-profiles';
 
 // ─── Validation bounds ───────────────────────────────────────────────────────
 // String caps protect against quota exhaustion / DoS via crafted localStorage.

@@ -41,21 +41,21 @@ interface CusickGpuResult {
 async function runCusick(page: Page, fabricId: string): Promise<CusickGpuResult> {
   await page.addInitScript(() => {
     // Opt-in WebGPU ANTES de cargar la app (mismo patrón que webgpu-maria-replay).
-    localStorage.setItem('openclo-use-webgpu', 'true');
+    localStorage.setItem('vina-use-webgpu', 'true');
     // B1: suprime la captura del settle-tether — el harness no lo despacha,
     // pero el flag mantiene el contrato del gate explícito en el entorno.
-    localStorage.setItem('openclo-tether-disabled', 'true');
+    localStorage.setItem('vina-tether-disabled', 'true');
   });
   await page.goto(`/?testScene=cusick&fabric=${fabricId}`);
   await page.waitForFunction(
     () =>
-      (window as unknown as { __OPENCLO_CUSICK__?: { done?: boolean } }).__OPENCLO_CUSICK__
+      (window as unknown as { __VINA_CUSICK__?: { done?: boolean } }).__VINA_CUSICK__
         ?.done === true,
     undefined,
     { timeout: 120_000 },
   );
   const r = await page.evaluate(
-    () => (window as unknown as { __OPENCLO_CUSICK__: CusickGpuResult }).__OPENCLO_CUSICK__,
+    () => (window as unknown as { __VINA_CUSICK__: CusickGpuResult }).__VINA_CUSICK__,
   );
   // Línea estructurada en el reporte Playwright (el harness ya la logueó en consola del browser).
   console.log(

@@ -1,4 +1,4 @@
-# OpenClo AI Agent — User Guide
+# Vina AI Agent — User Guide
 
 > Your AI pattern-making copilot that speaks the language of patronaje.
 
@@ -101,7 +101,7 @@ You: Export DXF for the cutting machine
 Agent: 📄 Exporting AAMA/ASTM D6673 compliant DXF...
        
        ✅ 1 action applied:
-       🔧 exportDXF → openclo-project.dxf (12 layers, 6 pieces)
+       🔧 exportDXF → vina-project.dxf (12 layers, 6 pieces)
        
        Includes: piece boundaries, seam allowance, notches,
        grainlines, and dart lines. Compatible with Gerber, Lectra,
@@ -163,7 +163,7 @@ Agent: 📄 Exporting AAMA/ASTM D6673 compliant DXF...
 1. Install Ollama: [ollama.com](https://ollama.com)
 2. Pull a model: `ollama pull llama3`
 3. Start Ollama (it runs in background)
-4. In OpenClo Settings, select "Ollama (Local)" as provider
+4. In Vina Settings, select "Ollama (Local)" as provider
 5. The agent will auto-detect your Ollama instance
 
 ### Recommended Models

@@ -8,7 +8,7 @@ export interface LayoutState {
   splitRatio: number;
 }
 
-const STORAGE_KEY = 'openclo-layout';
+const STORAGE_KEY = 'vina-layout';
 
 const LAYOUT_DEFAULTS: LayoutState = {
   primaryView: '2d',

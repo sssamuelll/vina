@@ -1,6 +1,6 @@
-# Contributing to OpenClo
+# Contributing to Vina
 
-Thanks for your interest in OpenClo. This guide gets you from clone to first PR.
+Thanks for your interest in Vina. This guide gets you from clone to first PR.
 
 ## Prerequisites
 
@@ -12,8 +12,8 @@ Thanks for your interest in OpenClo. This guide gets you from clone to first PR.
 ## Setup
 
 ```bash
-git clone https://github.com/sssamuelll/openclo.git
-cd openclo
+git clone https://github.com/sssamuelll/vina.git
+cd vina
 npm install
 npm run dev
 ```

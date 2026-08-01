@@ -10,7 +10,7 @@
 import type { PieceGroup, ReferenceImage } from '../types/types';
 import type { Trim } from '../types/trim';
 import { saveProject, loadProject as loadProjectFromIDB, clearProject } from './storage';
-import { parseOpenCloProject } from './projectSchema';
+import { parseVinaProject } from './projectSchema';
 import type { ProjectParseResult, ParseError } from './projectSchema';
 
 export type { ProjectParseResult, ParseError } from './projectSchema';
@@ -104,7 +104,7 @@ export function loadProjectFromJSON(json: string): ProjectParseResult {
       error: { code: 'invalid_json', message: e instanceof Error ? e.message : 'invalid JSON' },
     };
   }
-  return parseOpenCloProject(deserializeDates(raw));
+  return parseVinaProject(deserializeDates(raw));
 }
 
 // ─── IndexedDB Autosave (async) ─────────────────────────────────────────────
@@ -128,12 +128,12 @@ export async function saveToStorage(state: ProjectState): Promise<void> {
 export async function loadFromStorage(): Promise<ProjectParseResult | null> {
   const raw = await loadProjectFromIDB();
   if (!raw) return null;
-  const result = parseOpenCloProject(deserializeDates(raw));
+  const result = parseVinaProject(deserializeDates(raw));
   if (!result.ok) quarantineCorruptAutosave(raw, result.error);
   return result;
 }
 
-const QUARANTINE_KEY_PREFIX = 'openclo-autosave-quarantine-';
+const QUARANTINE_KEY_PREFIX = 'vina-autosave-quarantine-';
 // Cap the per-quarantine entry to ~5MB so we never fill localStorage with one blob.
 const MAX_QUARANTINE_BYTES = 5_000_000;
 
@@ -202,7 +202,7 @@ export function downloadProjectFile(state: ProjectState, filename?: string): voi
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = (filename || state.name || 'project') + '.openclo';
+  a.download = (filename || state.name || 'project') + '.vina';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -213,7 +213,8 @@ export function uploadProjectFile(): Promise<ProjectParseResult> {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.openclo,.json';
+    // '.openclo' legacy: se abre para siempre, solo cambió lo que se escribe
+    input.accept = '.vina,.openclo,.json';
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) { reject(new Error('No file selected')); return; }

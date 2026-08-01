@@ -8,10 +8,11 @@
  */
 
 import type { NSID } from './nsid';
+import { normalizeLegacyNSID, denormalizeToLegacyNSID } from './nsid';
 import type { RegisteredSkill, TriggerPreference } from './registryTypes';
 import { safeGetItem, safeRemoveItem } from '../../../utils/safeStorage';
 
-const DB_NAME = 'openclo_skills_v1';
+const DB_NAME = 'vina_skills_v1';
 const DB_VERSION = 1;
 const SKILLS_STORE = 'skills';
 const PREFERENCES_STORE = 'preferences';
@@ -111,16 +112,34 @@ export class SkillPersistence {
   }
 
   /**
-   * Get a skill by NSID.
+   * Look up a skill record by its exact stored key (no legacy fallback).
    */
-  async getSkill(nsid: NSID): Promise<RegisteredSkill | undefined> {
+  private async getSkillByExactKey(key: string): Promise<RegisteredSkill | undefined> {
     const db = this.ensureOpen();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(SKILLS_STORE, 'readonly');
-      const request = tx.objectStore(SKILLS_STORE).get(nsid);
+      const request = tx.objectStore(SKILLS_STORE).get(key);
       request.onsuccess = () => resolve(request.result ?? undefined);
       request.onerror = () => reject(request.error);
     });
+  }
+
+  /**
+   * Get a skill by NSID.
+   *
+   * Falls back to the legacy form of the NSID when the canonical key misses:
+   * `cloneDb` (renameMigration.ts) copies the `skills` store verbatim, so a
+   * skill cloned from the pre-rename DB may still be keyed under its
+   * `openclo:*` NSID even though `getAllSkills()` normalizes it to `vina:*`
+   * on read. Without this, a lookup/delete by the canonical NSID silently
+   * misses the legacy-keyed record (IMPORTANT #4, 2026-08-01 final review).
+   */
+  async getSkill(nsid: NSID): Promise<RegisteredSkill | undefined> {
+    const direct = await this.getSkillByExactKey(nsid);
+    if (direct) return direct;
+    const legacyKey = denormalizeToLegacyNSID(nsid);
+    if (legacyKey === null) return undefined;
+    return this.getSkillByExactKey(legacyKey);
   }
 
   /**
@@ -128,12 +147,14 @@ export class SkillPersistence {
    */
   async getAllSkills(): Promise<RegisteredSkill[]> {
     const db = this.ensureOpen();
-    return new Promise((resolve, reject) => {
+    const skills = await new Promise<RegisteredSkill[]>((resolve, reject) => {
       const tx = db.transaction(SKILLS_STORE, 'readonly');
       const request = tx.objectStore(SKILLS_STORE).getAll();
       request.onsuccess = () => resolve(request.result ?? []);
       request.onerror = () => reject(request.error);
     });
+    // Alias legacy 'openclo:*' NSIDs read from disk to 'vina:*' — see normalizeLegacyNSID.
+    return skills.map(s => ({ ...s, nsid: normalizeLegacyNSID(s.nsid) as NSID }));
   }
 
   /**
@@ -142,12 +163,16 @@ export class SkillPersistence {
    */
   async deleteSkill(nsid: NSID): Promise<boolean> {
     const db = this.ensureOpen();
-    const exists = await this.getSkill(nsid);
-    if (!exists) return false;
+    const existing = await this.getSkill(nsid);
+    if (!existing) return false;
+    // Delete whichever key the record actually lives under — for a
+    // legacy-keyed clone (see getSkill's fallback), that's `existing.nsid`
+    // (the raw, unnormalized stored key), not the canonical `nsid` param.
+    const actualKey = existing.nsid;
 
     return new Promise((resolve, reject) => {
       const tx = db.transaction(SKILLS_STORE, 'readwrite');
-      tx.objectStore(SKILLS_STORE).delete(nsid);
+      tx.objectStore(SKILLS_STORE).delete(actualKey);
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
     });
@@ -173,12 +198,14 @@ export class SkillPersistence {
    */
   async getPreference(trigger: string): Promise<NSID | undefined> {
     const db = this.ensureOpen();
-    return new Promise((resolve, reject) => {
+    const preferredNsid = await new Promise<NSID | undefined>((resolve, reject) => {
       const tx = db.transaction(PREFERENCES_STORE, 'readonly');
       const request = tx.objectStore(PREFERENCES_STORE).get(trigger);
       request.onsuccess = () => resolve(request.result?.preferredNsid);
       request.onerror = () => reject(request.error);
     });
+    // Alias legacy 'openclo:*' NSIDs read from disk to 'vina:*' — see normalizeLegacyNSID.
+    return preferredNsid ? (normalizeLegacyNSID(preferredNsid) as NSID) : undefined;
   }
 
   /**
@@ -186,12 +213,14 @@ export class SkillPersistence {
    */
   async getAllPreferences(): Promise<TriggerPreference[]> {
     const db = this.ensureOpen();
-    return new Promise((resolve, reject) => {
+    const prefs = await new Promise<TriggerPreference[]>((resolve, reject) => {
       const tx = db.transaction(PREFERENCES_STORE, 'readonly');
       const request = tx.objectStore(PREFERENCES_STORE).getAll();
       request.onsuccess = () => resolve(request.result ?? []);
       request.onerror = () => reject(request.error);
     });
+    // Alias legacy 'openclo:*' NSIDs read from disk to 'vina:*' — see normalizeLegacyNSID.
+    return prefs.map(p => ({ ...p, preferredNsid: normalizeLegacyNSID(p.preferredNsid) as NSID }));
   }
 
   // ─── Migration ───────────────────────────────────────────────────────────
@@ -203,7 +232,7 @@ export class SkillPersistence {
    * @returns Number of skills migrated
    */
   async migrateLegacySkills(): Promise<number> {
-    const INSTALLED_SKILLS_KEY = 'openclo_installed_community_skills';
+    const INSTALLED_SKILLS_KEY = 'vina_installed_community_skills';
     let count = 0;
 
     try {
@@ -216,7 +245,10 @@ export class SkillPersistence {
       for (const cs of parsed) {
         if (cs.metadata?.id && cs.skill) {
           const registered: RegisteredSkill = {
-            nsid: cs.metadata.id as NSID,
+            // Normalize at write: the store's keyPath is 'nsid', so a raw legacy
+            // id here would persist under the old key forever (getAllSkills
+            // masks it on read, but deleteSkill('vina-...') would silently miss).
+            nsid: normalizeLegacyNSID(cs.metadata.id) as NSID,
             source: 'community',
             version: cs.metadata.version || '1.0.0',
             checksum: '',

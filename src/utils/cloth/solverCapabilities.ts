@@ -172,7 +172,7 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
  * after end-to-end verification on the real María pattern in a real
  * browser (2026-06-12). With this flip the tier cascade no longer skips
  * the GPU tier for seamed projects — combined with the default-on flip of
- * the solver flag (`openclo-use-webgpu` is opt-out: the tier runs unless
+ * the solver flag (`vina-use-webgpu` is opt-out: the tier runs unless
  * explicitly `'false'`), this is the user-facing activation of the epic.
  * Parity status + ratified divergences per flag below.
  *

@@ -1,4 +1,4 @@
-# OpenClo.ai — Product Roadmap (v0.7)
+# Vina.ai — Product Roadmap (v0.7)
 
 ## Vision
 
@@ -8,7 +8,7 @@ To build the world's first **Cognitive Design Engine** for fashion. We aim to de
 
 ## v0.1-v0.5: Foundations & Physics Engine (DONE)
 
-The "Core Simulation Pipeline Gap" has been closed. OpenClo.ai now features a professional, deterministic pipeline from pattern drafting to 3D drape.
+The "Core Simulation Pipeline Gap" has been closed. Vina.ai now features a professional, deterministic pipeline from pattern drafting to 3D drape.
 
 ### Core Simulation Pipeline
 - [x] **CDT Meshing** — `cdt2d` integration for simulation-ready triangle meshes.

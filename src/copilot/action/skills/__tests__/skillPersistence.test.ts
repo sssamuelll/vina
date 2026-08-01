@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SkillPersistence } from '../skillPersistence';
 import type { RegisteredSkill } from '../registryTypes';
 import type { NSID } from '../nsid';
+import { safeSetItem } from '../../../../utils/safeStorage';
 
 // Mock IndexedDB using fake-indexeddb
 import 'fake-indexeddb/auto';
@@ -67,6 +68,12 @@ describe('SkillPersistence', () => {
       const all = await persistence.getAllSkills();
       expect(all).toEqual([]);
     });
+
+    it('normalizes a legacy openclo NSID in the installed skills list', async () => {
+      await persistence.saveSkill({ ...mockSkill, nsid: 'openclo-community:pleats' as NSID });
+      const all = await persistence.getAllSkills();
+      expect(all.map(s => s.nsid)).toContain('vina-community:pleats');
+    });
   });
 
   describe('deleteSkill', () => {
@@ -82,6 +89,21 @@ describe('SkillPersistence', () => {
       const deleted = await persistence.deleteSkill('nonexistent:skill' as NSID);
       expect(deleted).toBe(false);
     });
+
+    it('falls back to the legacy NSID key for a record cloned verbatim (IMPORTANT #4), and a subsequent save does not duplicate', async () => {
+      // Simulate cloneDb's verbatim copy: the record is keyed under its
+      // legacy nsid because saveSkill() does not normalize on write.
+      await persistence.saveSkill({ ...mockSkill, nsid: 'openclo-community:pleats' as NSID });
+
+      const deleted = await persistence.deleteSkill('vina-community:pleats' as NSID);
+      expect(deleted).toBe(true);
+      expect(await persistence.getAllSkills()).toHaveLength(0);
+
+      // Re-saving under the canonical NSID must not leave a stray legacy
+      // record behind — deleteSkill above already removed the real key.
+      await persistence.saveSkill({ ...mockSkill, nsid: 'vina-community:pleats' as NSID });
+      expect(await persistence.getAllSkills()).toHaveLength(1);
+    });
   });
 
   describe('preferences', () => {
@@ -96,11 +118,43 @@ describe('SkillPersistence', () => {
       expect(pref).toBeUndefined();
     });
 
+    it('normalizes a legacy openclo NSID read from preferences', async () => {
+      await persistence.setPreference('bodice', 'openclo:bodice' as NSID);
+      const pref = await persistence.getPreference('bodice');
+      expect(pref).toBe('vina:bodice');
+    });
+
     it('getAllPreferences returns all preferences', async () => {
       await persistence.setPreference('bodice', 'sdar:bodice' as NSID);
-      await persistence.setPreference('skirt', 'openclo:skirt' as NSID);
+      await persistence.setPreference('skirt', 'vina:skirt' as NSID);
       const all = await persistence.getAllPreferences();
       expect(all).toHaveLength(2);
+    });
+
+    it('normalizes a legacy openclo NSID in getAllPreferences', async () => {
+      await persistence.setPreference('skirt', 'openclo:skirt' as NSID);
+      const all = await persistence.getAllPreferences();
+      expect(all.find(p => p.trigger === 'skirt')?.preferredNsid).toBe('vina:skirt');
+    });
+  });
+
+  describe('migrateLegacySkills', () => {
+    it('normalizes a legacy openclo-community NSID at write time so deleteSkill can find it', async () => {
+      safeSetItem('vina_installed_community_skills', JSON.stringify([
+        { metadata: { id: 'openclo-community:pleats', version: '1.0.0' }, skill: mockSkill.skill },
+      ]));
+
+      const count = await persistence.migrateLegacySkills();
+      expect(count).toBe(1);
+
+      const all = await persistence.getAllSkills();
+      expect(all.map(s => s.nsid)).toContain('vina-community:pleats');
+
+      // The real bug: if the legacy id was written raw, the IDB record's key
+      // (keyPath: 'nsid') stays 'openclo-community:pleats' and a delete by the
+      // normalized id silently finds nothing.
+      const deleted = await persistence.deleteSkill('vina-community:pleats' as NSID);
+      expect(deleted).toBe(true);
     });
   });
 });

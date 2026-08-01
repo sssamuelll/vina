@@ -14,7 +14,7 @@ import {
  * 4. Simulation runs with grab tool active — no errors.
  *
  * Setup retargeted (2026-06-04): store handle fixed from `__REDUX_STORE__`
- * (never exposed) to `__OPENCLO_STORE__`; defaults aligned to the live slice
+ * (never exposed) to `__VINA_STORE__`; defaults aligned to the live slice
  * (src/store/simulationSlice.ts: radius 0.08, strength 0.6 — the old spec's
  * 0.05/0.8 was stale); the 'o' shortcut maps to `tool3d.meshGrab` which only
  * resolves in the 3D shortcut context, so we focus an element inside
@@ -27,7 +27,7 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
   test('mesh grab Redux state has correct defaults', async ({ page }) => {
     await waitForApp(page);
     const state = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: { getState: () => { simulation: { meshGrab: unknown } } } }).__OPENCLO_STORE__;
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => { simulation: { meshGrab: unknown } } } }).__VINA_STORE__;
       return s.getState().simulation.meshGrab;
     });
     expect(state).toEqual({ active: false, radius: 0.08, strength: 0.6 });
@@ -43,7 +43,7 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
     await page.waitForTimeout(300);
 
     const activeTool = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: { getState: () => { tools: { activeTool3D: string } } } }).__OPENCLO_STORE__;
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => { tools: { activeTool3D: string } } } }).__VINA_STORE__;
       return s.getState().tools.activeTool3D;
     });
     expect(activeTool).toBe('meshGrab');
@@ -52,10 +52,10 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
   test('mesh grab state updates via Redux dispatch', async ({ page }) => {
     await waitForApp(page);
     const updated = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: {
+      const s = (window as unknown as { __VINA_STORE__: {
         dispatch: (a: unknown) => void;
         getState: () => { simulation: { meshGrab: { radius: number; strength: number; active: boolean } } };
-      } }).__OPENCLO_STORE__;
+      } }).__VINA_STORE__;
       s.dispatch({ type: 'simulation/setMeshGrabRadius', payload: 0.1 });
       s.dispatch({ type: 'simulation/setMeshGrabStrength', payload: 0.5 });
       s.dispatch({ type: 'simulation/setMeshGrabActive', payload: true });
@@ -69,10 +69,10 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
   test('mesh grab clamping works via Redux', async ({ page }) => {
     await waitForApp(page);
     const clamped = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: {
+      const s = (window as unknown as { __VINA_STORE__: {
         dispatch: (a: unknown) => void;
         getState: () => { simulation: { meshGrab: { radius: number; strength: number } } };
-      } }).__OPENCLO_STORE__;
+      } }).__VINA_STORE__;
       s.dispatch({ type: 'simulation/setMeshGrabRadius', payload: 0 });
       const r1 = s.getState().simulation.meshGrab.radius;
       s.dispatch({ type: 'simulation/setMeshGrabRadius', payload: 2 });

@@ -55,7 +55,7 @@ function createMockDevice(poppedResults: Array<GPUError | null> = []): {
 
 beforeEach(() => {
   if (typeof window !== 'undefined') {
-    delete window.__OPENCLO_SHADERS__;
+    delete window.__VINA_SHADERS__;
   }
 });
 
@@ -208,10 +208,10 @@ describe('attachUncapturedErrorListener', () => {
 // ─── instrumentShaderCapture ───────────────────────────────────────────────
 
 describe('instrumentShaderCapture', () => {
-  it('initializes window.__OPENCLO_SHADERS__ as a Map', () => {
+  it('initializes window.__VINA_SHADERS__ as a Map', () => {
     const { device } = createMockDevice();
     instrumentShaderCapture(device);
-    expect(window.__OPENCLO_SHADERS__).toBeInstanceOf(Map);
+    expect(window.__VINA_SHADERS__).toBeInstanceOf(Map);
   });
 
   it('captures shader source under its label', () => {
@@ -220,7 +220,7 @@ describe('instrumentShaderCapture', () => {
 
     device.createShaderModule({ label: 'cloth_module', code: '@compute fn main() {}' });
 
-    const entry = window.__OPENCLO_SHADERS__!.get('cloth_module');
+    const entry = window.__VINA_SHADERS__!.get('cloth_module');
     expect(entry?.source).toBe('@compute fn main() {}');
     expect(entry?.label).toBe('cloth_module');
     expect(entry?.deviceId).toMatch(/^device_\d+$/);
@@ -233,8 +233,8 @@ describe('instrumentShaderCapture', () => {
     device.createShaderModule({ code: 'wgsl1' });
     device.createShaderModule({ code: 'wgsl2' });
 
-    expect(window.__OPENCLO_SHADERS__!.get('unlabeled_0')?.source).toBe('wgsl1');
-    expect(window.__OPENCLO_SHADERS__!.get('unlabeled_1')?.source).toBe('wgsl2');
+    expect(window.__VINA_SHADERS__!.get('unlabeled_0')?.source).toBe('wgsl1');
+    expect(window.__VINA_SHADERS__!.get('unlabeled_1')?.source).toBe('wgsl2');
   });
 
   it('disambiguates duplicate labels with a #N suffix', () => {
@@ -244,11 +244,11 @@ describe('instrumentShaderCapture', () => {
     device.createShaderModule({ label: 'shared', code: 'a' });
     device.createShaderModule({ label: 'shared', code: 'b' });
 
-    expect(window.__OPENCLO_SHADERS__!.get('shared')?.source).toBe('a');
-    expect(window.__OPENCLO_SHADERS__!.get('shared#1')?.source).toBe('b');
+    expect(window.__VINA_SHADERS__!.get('shared')?.source).toBe('a');
+    expect(window.__VINA_SHADERS__!.get('shared#1')?.source).toBe('b');
     // Both entries report the original label without the #1 suffix.
-    expect(window.__OPENCLO_SHADERS__!.get('shared')?.label).toBe('shared');
-    expect(window.__OPENCLO_SHADERS__!.get('shared#1')?.label).toBe('shared');
+    expect(window.__VINA_SHADERS__!.get('shared')?.label).toBe('shared');
+    expect(window.__VINA_SHADERS__!.get('shared#1')?.label).toBe('shared');
   });
 
   it('still calls the original createShaderModule and returns its result', () => {
@@ -278,7 +278,7 @@ describe('instrumentShaderCapture', () => {
     instrumentShaderCapture(device);
 
     expect(device.createShaderModule).toBe(before);
-    expect(window.__OPENCLO_SHADERS__).toBeUndefined();
+    expect(window.__VINA_SHADERS__).toBeUndefined();
   });
 
   it('disambiguates same-label shaders from two devices via deviceId', () => {
@@ -290,8 +290,8 @@ describe('instrumentShaderCapture', () => {
     deviceA.createShaderModule({ label: 'shared_kernel', code: 'src_a' });
     deviceB.createShaderModule({ label: 'shared_kernel', code: 'src_b' });
 
-    const a = window.__OPENCLO_SHADERS__!.get('shared_kernel');
-    const b = window.__OPENCLO_SHADERS__!.get('shared_kernel#1');
+    const a = window.__VINA_SHADERS__!.get('shared_kernel');
+    const b = window.__VINA_SHADERS__!.get('shared_kernel#1');
 
     expect(a?.source).toBe('src_a');
     expect(b?.source).toBe('src_b');
@@ -327,7 +327,7 @@ describe('instrumentShaderCapture', () => {
     )).toBe(true);
 
     // Source still captured in the map (failure was non-fatal).
-    expect(window.__OPENCLO_SHADERS__!.get('broken_info')?.source).toBe('src');
+    expect(window.__VINA_SHADERS__!.get('broken_info')?.source).toBe('src');
   });
 
   it('does not leave a phantom entry when original createShaderModule throws', () => {
@@ -346,7 +346,7 @@ describe('instrumentShaderCapture', () => {
       device.createShaderModule({ label: 'broken', code: 'invalid wgsl' });
     }).toThrow('invalid descriptor');
 
-    expect(window.__OPENCLO_SHADERS__!.has('broken')).toBe(false);
+    expect(window.__VINA_SHADERS__!.has('broken')).toBe(false);
   });
 });
 
@@ -388,10 +388,10 @@ describe('installEarlyDeviceHook', () => {
     const device = await adapter.requestDevice();
 
     // Auto-instrumented: shader capture installed (Map exists, listener attached).
-    expect(window.__OPENCLO_SHADERS__).toBeInstanceOf(Map);
+    expect(window.__VINA_SHADERS__).toBeInstanceOf(Map);
     // The device's createShaderModule should be patched (different identity).
     device.createShaderModule({ label: 'auto', code: 'wgsl_auto' });
-    expect(window.__OPENCLO_SHADERS__!.get('auto')?.source).toBe('wgsl_auto');
+    expect(window.__VINA_SHADERS__!.get('auto')?.source).toBe('wgsl_auto');
   });
 
   it('is idempotent — second call leaves prototype intact', () => {

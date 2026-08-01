@@ -116,7 +116,7 @@ function buildSystemPrompt(
   const parts: string[] = [];
 
   // Core identity
-  parts.push(`You are a helpful pattern making assistant for OpenCLO, a garment CAD application.
+  parts.push(`You are a helpful pattern making assistant for Vina, a garment CAD application.
 Your role is to help users create and modify clothing patterns, run simulations, and understand garment construction.
 
 When the user requests actions, respond with JSON containing the actions to execute.

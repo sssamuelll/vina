@@ -1,5 +1,5 @@
 /**
- * Export OpenClo project as Gerber AccuMark ZIP package.
+ * Export Vina project as Gerber AccuMark ZIP package.
  *
  * Structure:
  *   pieces/PIECE_NAME.dxf   — individual AAMA DXF per piece

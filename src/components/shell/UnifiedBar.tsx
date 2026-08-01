@@ -175,8 +175,8 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
       setPanelOpen(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     };
-    window.addEventListener('openclo:focusChat', handler);
-    return () => window.removeEventListener('openclo:focusChat', handler);
+    window.addEventListener('vina:focusChat', handler);
+    return () => window.removeEventListener('vina:focusChat', handler);
   }, []);
 
   const handleInputFocus = useCallback(() => {
@@ -299,11 +299,11 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
               <AgentSettings
                 onClose={() => setPanelOpen(false)}
                 onSave={() => {
-                  // `openclo:provider-config-changed` is fired by `ConnectionsList`
+                  // `vina:provider-config-changed` is fired by `ConnectionsList`
                   // on every connection mutation directly — this onSave callback
                   // is here only for preference changes (teaching mode, language,
                   // budget) and panel close after Save preferences.
-                  window.dispatchEvent(new CustomEvent('openclo:provider-config-changed'));
+                  window.dispatchEvent(new CustomEvent('vina:provider-config-changed'));
                 }}
               />
             </>

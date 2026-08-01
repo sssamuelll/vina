@@ -5,7 +5,7 @@
  * (react-refresh) and so the restore→clamp contract is unit-testable.
  */
 
-const STORAGE_KEY = 'openclo-bar-position';
+const STORAGE_KEY = 'vina-bar-position';
 export const BAR_WIDTH = 560;
 export const BAR_HEIGHT = 58;
 

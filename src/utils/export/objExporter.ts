@@ -30,7 +30,7 @@ export function exportToOBJ(
   const { scale = 0.1, normals = true, uvs = true } = options;
 
   const lines: string[] = [];
-  lines.push('# OpenClo OBJ Export');
+  lines.push('# Vina OBJ Export');
   lines.push(`# Scale: ${scale} (1 unit = ${(1 / scale).toFixed(0)}mm)`);
   lines.push('');
 
@@ -139,7 +139,7 @@ export function downloadOBJ(
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${options.filename || 'openclo-export'}.obj`;
+  a.download = `${options.filename || 'vina-export'}.obj`;
   a.click();
   URL.revokeObjectURL(url);
 }

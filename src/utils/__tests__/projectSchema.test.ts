@@ -1,5 +1,5 @@
 /**
- * Tests for projectSchema — structural parser at the OpenCloProject boundary.
+ * Tests for projectSchema — structural parser at the VinaProject boundary.
  *
  * Each test pins behavior the parser MUST preserve: known-good payloads pass
  * through untouched, malformed payloads are rejected with a structured error,
@@ -11,11 +11,11 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  parseOpenCloProject,
-  parseOpenCloProjectJson,
+  parseVinaProject,
+  parseVinaProjectJson,
   __testing,
 } from '../projectSchema';
-import type { OpenCloProject, PatternPiece } from '../../types/types';
+import type { VinaProject, PatternPiece } from '../../types/types';
 
 const BASE_AVATAR = {
   id: 'avatar-1',
@@ -53,7 +53,7 @@ function makePiece(id = 'piece-1'): PatternPiece {
   };
 }
 
-function makeProject(overrides: Partial<OpenCloProject> = {}): OpenCloProject {
+function makeProject(overrides: Partial<VinaProject> = {}): VinaProject {
   return {
     id: 'proj-1',
     name: 'Untitled',
@@ -77,9 +77,9 @@ function makeProject(overrides: Partial<OpenCloProject> = {}): OpenCloProject {
   };
 }
 
-describe('parseOpenCloProject — happy path', () => {
+describe('parseVinaProject — happy path', () => {
   it('accepts a minimal valid project', () => {
-    const r = parseOpenCloProject(makeProject());
+    const r = parseVinaProject(makeProject());
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.project.id).toBe('proj-1');
@@ -89,7 +89,7 @@ describe('parseOpenCloProject — happy path', () => {
   });
 
   it('accepts optional groups, poms, seamGroups, garmentInfo', () => {
-    const r = parseOpenCloProject(
+    const r = parseVinaProject(
       makeProject({
         groups: [{ id: 'g1', name: 'Main', pieceIds: [], color: '#abc', createdAt: 1, updatedAt: 1 }],
         poms: [],
@@ -116,7 +116,7 @@ describe('parseOpenCloProject — happy path', () => {
         ],
       })),
     };
-    const r = parseOpenCloProject(makeProject({ pieces: [piece] }));
+    const r = parseVinaProject(makeProject({ pieces: [piece] }));
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.project.pieces[0].internals).toHaveLength(types.length);
   });
@@ -144,7 +144,7 @@ describe('parseOpenCloProject — happy path', () => {
         },
       ],
     };
-    const r = parseOpenCloProject(makeProject({ pieces: [piece] }));
+    const r = parseVinaProject(makeProject({ pieces: [piece] }));
     expect(r.ok).toBe(true);
     if (r.ok) {
       const notch = r.project.pieces[0].internals[0];
@@ -170,7 +170,7 @@ describe('parseOpenCloProject — happy path', () => {
         },
       ],
     };
-    const r = parseOpenCloProject(makeProject({ pieces: [piece] }));
+    const r = parseVinaProject(makeProject({ pieces: [piece] }));
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.project.pieces[0].internals[0].notchAnchor).toBeUndefined();
   });
@@ -195,13 +195,13 @@ describe('parseOpenCloProject — happy path', () => {
         },
       ],
     };
-    const r = parseOpenCloProject(makeProject({ pieces: [piece as unknown as PatternPiece] }));
+    const r = parseVinaProject(makeProject({ pieces: [piece as unknown as PatternPiece] }));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe('invalid_shape');
   });
 });
 
-describe('parseOpenCloProject — required field absent', () => {
+describe('parseVinaProject — required field absent', () => {
   it.each([
     ['id', { id: undefined }],
     ['name', { name: undefined }],
@@ -213,21 +213,21 @@ describe('parseOpenCloProject — required field absent', () => {
     ['updatedAt', { updatedAt: undefined }],
   ])('rejects when %s is missing', (_name, patch) => {
     const proj = { ...makeProject(), ...patch };
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe('invalid_shape');
   });
 });
 
-describe('parseOpenCloProject — wrong type for required field', () => {
+describe('parseVinaProject — wrong type for required field', () => {
   it('rejects id as number', () => {
-    const r = parseOpenCloProject({ ...makeProject(), id: 42 });
+    const r = parseVinaProject({ ...makeProject(), id: 42 });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.path).toBe('id');
   });
 
   it('rejects pieces as object instead of array', () => {
-    const r = parseOpenCloProject({ ...makeProject(), pieces: { '0': makePiece() } });
+    const r = parseVinaProject({ ...makeProject(), pieces: { '0': makePiece() } });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.path).toBe('pieces');
   });
@@ -235,17 +235,17 @@ describe('parseOpenCloProject — wrong type for required field', () => {
   it('rejects pieces[0].outline as string', () => {
     const bad = makeProject();
     (bad.pieces[0] as unknown as { outline: unknown }).outline = 'not-an-array';
-    const r = parseOpenCloProject(bad);
+    const r = parseVinaProject(bad);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.path).toBe('pieces[0].outline');
   });
 });
 
-describe('parseOpenCloProject — numeric edge cases', () => {
+describe('parseVinaProject — numeric edge cases', () => {
   it('rejects NaN in piece position', () => {
     const bad = makeProject();
     bad.pieces[0].position = { x: NaN, y: 0 };
-    const r = parseOpenCloProject(bad);
+    const r = parseVinaProject(bad);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.path).toBe('pieces[0].position.x');
   });
@@ -253,7 +253,7 @@ describe('parseOpenCloProject — numeric edge cases', () => {
   it('rejects Infinity in fabric weight', () => {
     const bad = makeProject();
     bad.fabrics[0].weight = Infinity;
-    const r = parseOpenCloProject(bad);
+    const r = parseVinaProject(bad);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.path).toBe('fabrics[0].weight');
   });
@@ -261,59 +261,59 @@ describe('parseOpenCloProject — numeric edge cases', () => {
   it('accepts -0 (treated as finite)', () => {
     const proj = makeProject();
     proj.pieces[0].position = { x: -0, y: 0 };
-    expect(parseOpenCloProject(proj).ok).toBe(true);
+    expect(parseVinaProject(proj).ok).toBe(true);
   });
 
   it('rejects NaN in createdAt', () => {
-    const r = parseOpenCloProject({ ...makeProject(), createdAt: NaN });
+    const r = parseVinaProject({ ...makeProject(), createdAt: NaN });
     expect(r.ok).toBe(false);
   });
 });
 
-describe('parseOpenCloProject — string hardening', () => {
+describe('parseVinaProject — string hardening', () => {
   it('rejects null byte in name', () => {
-    const r = parseOpenCloProject({ ...makeProject(), name: 'evil\0name' });
+    const r = parseVinaProject({ ...makeProject(), name: 'evil\0name' });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.message).toMatch(/null byte/);
   });
 
   it('rejects empty string for required id', () => {
-    const r = parseOpenCloProject({ ...makeProject(), id: '' });
+    const r = parseVinaProject({ ...makeProject(), id: '' });
     expect(r.ok).toBe(false);
   });
 
   it('rejects id over MAX_ID_LEN', () => {
-    const r = parseOpenCloProject({ ...makeProject(), id: 'x'.repeat(__testing.MAX_ID_LEN + 1) });
+    const r = parseVinaProject({ ...makeProject(), id: 'x'.repeat(__testing.MAX_ID_LEN + 1) });
     expect(r.ok).toBe(false);
   });
 
   it('rejects javascript: scheme in avatar.modelUrl', () => {
     const proj = makeProject();
     proj.avatar = { ...BASE_AVATAR, modelUrl: 'javascript:alert(1)' };
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.path).toBe('avatar.modelUrl');
   });
 });
 
-describe('parseOpenCloProject — primitive and degenerate inputs', () => {
+describe('parseVinaProject — primitive and degenerate inputs', () => {
   it.each([null, undefined, 0, '', false, [], 'string', 42])('rejects %p as input', (input) => {
-    const r = parseOpenCloProject(input);
+    const r = parseVinaProject(input);
     expect(r.ok).toBe(false);
   });
 
   it('rejects empty object', () => {
-    const r = parseOpenCloProject({});
+    const r = parseVinaProject({});
     expect(r.ok).toBe(false);
   });
 });
 
-describe('parseOpenCloProject — DoS guards', () => {
+describe('parseVinaProject — DoS guards', () => {
   it('rejects pieces array exceeding MAX_PIECES', () => {
     const proj = makeProject({
       pieces: Array.from({ length: __testing.MAX_PIECES + 1 }, (_, i) => makePiece(`p${i}`)),
     });
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe('too_large');
   });
@@ -324,7 +324,7 @@ describe('parseOpenCloProject — DoS guards', () => {
       type: 'L' as const,
       values: [0, 0],
     }));
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe('too_large');
   });
@@ -348,12 +348,12 @@ describe('parseOpenCloProject — DoS guards', () => {
       ],
       referenceImageData: { 'img-1': 'data:image/png;base64,' + 'a'.repeat(__testing.MAX_DATA_URI_LEN + 1) },
     });
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     expect(r.ok).toBe(false);
   });
 });
 
-describe('parseOpenCloProject — purity', () => {
+describe('parseVinaProject — purity', () => {
   it('does not mutate the input on success', () => {
     const proj = makeProject({
       referenceImages: [
@@ -375,22 +375,22 @@ describe('parseOpenCloProject — purity', () => {
       referenceImageData: { 'img-1': 'data:image/png;base64,x', 'orphan': 'data:image/png;base64,y' },
     });
     const snapshot = JSON.parse(JSON.stringify(proj));
-    parseOpenCloProject(proj);
+    parseVinaProject(proj);
     expect(proj).toEqual(snapshot);
   });
 
   it('does not mutate the input on failure', () => {
     const bad = { ...makeProject(), id: 42 };
     const snapshot = JSON.parse(JSON.stringify(bad));
-    parseOpenCloProject(bad);
+    parseVinaProject(bad);
     expect(bad).toEqual(snapshot);
   });
 });
 
-describe('parseOpenCloProject — forward compatibility', () => {
+describe('parseVinaProject — forward compatibility', () => {
   it('accepts and preserves unknown top-level fields', () => {
     const proj = { ...makeProject(), futureField: 'hello', anotherOne: 42 };
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect((r.project as unknown as { futureField: string }).futureField).toBe('hello');
@@ -401,7 +401,7 @@ describe('parseOpenCloProject — forward compatibility', () => {
   it('accepts and preserves unknown fields inside a piece', () => {
     const proj = makeProject();
     (proj.pieces[0] as unknown as { newProp: number }).newProp = 7;
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect((r.project.pieces[0] as unknown as { newProp: number }).newProp).toBe(7);
@@ -409,7 +409,7 @@ describe('parseOpenCloProject — forward compatibility', () => {
   });
 });
 
-describe('parseOpenCloProject — seam structural validity', () => {
+describe('parseVinaProject — seam structural validity', () => {
   // This was a real crash path: validateAndRepairProject reads
   // seam.pieceA.pieceId without checking that pieceA exists. The parser is
   // the gate.
@@ -426,10 +426,10 @@ describe('parseOpenCloProject — seam structural validity', () => {
           active: true,
           taped: false,
           tapeWidth: 10,
-        } as unknown as OpenCloProject['seams'][number],
+        } as unknown as VinaProject['seams'][number],
       ],
     });
-    const r = parseOpenCloProject(bad);
+    const r = parseVinaProject(bad);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.path).toMatch(/^seams\[0\]\.pieceA/);
   });
@@ -450,12 +450,12 @@ describe('parseOpenCloProject — seam structural validity', () => {
         },
       ],
     });
-    const r = parseOpenCloProject(bad);
+    const r = parseVinaProject(bad);
     expect(r.ok).toBe(false);
   });
 });
 
-describe('parseOpenCloProject — referenceImageData filtering', () => {
+describe('parseVinaProject — referenceImageData filtering', () => {
   const imageEntry = {
     id: 'img-1',
     filename: 'real.png',
@@ -475,7 +475,7 @@ describe('parseOpenCloProject — referenceImageData filtering', () => {
       referenceImages: [imageEntry],
       referenceImageData: { 'img-1': 'data:image/png;base64,iVBOR' },
     });
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.project.referenceImageData).toEqual({ 'img-1': 'data:image/png;base64,iVBOR' });
@@ -488,7 +488,7 @@ describe('parseOpenCloProject — referenceImageData filtering', () => {
       referenceImages: [imageEntry],
       referenceImageData: { 'img-1': 'data:image/png;base64,a', 'orphan': 'data:image/png;base64,b' },
     });
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.project.referenceImageData).toEqual({ 'img-1': 'data:image/png;base64,a' });
@@ -502,7 +502,7 @@ describe('parseOpenCloProject — referenceImageData filtering', () => {
       referenceImages: [imageEntry],
       referenceImageData: { 'img-1': 'data:text/html,<script>alert(1)</script>' },
     });
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.project.referenceImageData).toBeUndefined();
@@ -515,7 +515,7 @@ describe('parseOpenCloProject — referenceImageData filtering', () => {
       referenceImages: [imageEntry],
       referenceImageData: { 'img-1': 'javascript:alert(1)' },
     });
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.warnings[0].code).toBe('invalid_data_uri');
@@ -526,7 +526,7 @@ describe('parseOpenCloProject — referenceImageData filtering', () => {
     const proj = makeProject({
       referenceImageData: { __proto__: 'data:image/png;base64,a' },
     });
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     // Either the key validator rejects it, or the orphan filter drops it.
     // Both are acceptable; the prototype must not pollute either way.
     if (r.ok) {
@@ -538,9 +538,9 @@ describe('parseOpenCloProject — referenceImageData filtering', () => {
   });
 });
 
-describe('parseOpenCloProject — trim placement discriminated union', () => {
+describe('parseVinaProject — trim placement discriminated union', () => {
   it('accepts each valid placement mode', () => {
-    const placements: NonNullable<OpenCloProject['trims']>[number]['placement'][] = [
+    const placements: NonNullable<VinaProject['trims']>[number]['placement'][] = [
       { mode: 'edge', edgeName: 'hem', tStart: 0, tEnd: 1 },
       { mode: 'edge-points', edgeName: 'hem', positions: [0.25, 0.75] },
       { mode: 'count', quantity: 3 },
@@ -564,7 +564,7 @@ describe('parseOpenCloProject — trim placement discriminated union', () => {
           },
         ],
       });
-      const r = parseOpenCloProject(proj);
+      const r = parseVinaProject(proj);
       expect(r.ok).toBe(true);
     }
   });
@@ -578,7 +578,7 @@ describe('parseOpenCloProject — trim placement discriminated union', () => {
           type: 'button',
           name: 'B',
           description: '',
-          placement: { mode: 'unknown', edgeName: 'x' } as unknown as NonNullable<OpenCloProject['trims']>[number]['placement'],
+          placement: { mode: 'unknown', edgeName: 'x' } as unknown as NonNullable<VinaProject['trims']>[number]['placement'],
           material: 'plastic',
           color: '#000',
           size: 10,
@@ -587,26 +587,26 @@ describe('parseOpenCloProject — trim placement discriminated union', () => {
         },
       ],
     });
-    const r = parseOpenCloProject(proj);
+    const r = parseVinaProject(proj);
     expect(r.ok).toBe(false);
   });
 });
 
-describe('parseOpenCloProjectJson', () => {
+describe('parseVinaProjectJson', () => {
   it('parses a valid JSON string', () => {
     const json = JSON.stringify(makeProject());
-    const r = parseOpenCloProjectJson(json);
+    const r = parseVinaProjectJson(json);
     expect(r.ok).toBe(true);
   });
 
   it('returns invalid_json for syntax errors', () => {
-    const r = parseOpenCloProjectJson('{ not json');
+    const r = parseVinaProjectJson('{ not json');
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe('invalid_json');
   });
 
   it('returns invalid_shape when JSON is well-formed but wrong shape', () => {
-    const r = parseOpenCloProjectJson('{"id":"p","name":"n"}');
+    const r = parseVinaProjectJson('{"id":"p","name":"n"}');
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe('invalid_shape');
   });
@@ -629,8 +629,8 @@ describe('isDataImageUri helper', () => {
 // ─── Seam direction round-trip (parity plan Fase 5) ──────────────────────────
 
 describe('seam pieceB.reversed survives parse (Fase 5)', () => {
-  it('preserves reversed:true through parseOpenCloProject', () => {
-    const r = parseOpenCloProject(makeProject({
+  it('preserves reversed:true through parseVinaProject', () => {
+    const r = parseVinaProject(makeProject({
       seams: [{
         id: 's1',
         pieceA: { pieceId: 'p1', edgeName: 'sideSeam' },
@@ -646,7 +646,7 @@ describe('seam pieceB.reversed survives parse (Fase 5)', () => {
   });
 
   it('legacy seams without the field parse clean (reversed undefined)', () => {
-    const r = parseOpenCloProject(makeProject({
+    const r = parseVinaProject(makeProject({
       seams: [{
         id: 's1',
         pieceA: { pieceId: 'p1', edgeName: 'a' },

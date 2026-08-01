@@ -1,4 +1,4 @@
-# Glosario de copy UI en español — OpenClo
+# Glosario de copy UI en español — Vina
 
 **Decisión (Fase 3, 2026-07-16):** el idioma del producto es **español**. Sin framework
 de i18n: strings directos (YAGNI hasta que exista una segunda lengua; cuando llegue,

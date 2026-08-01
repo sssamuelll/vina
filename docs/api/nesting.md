@@ -19,8 +19,8 @@ The nesting engine places pattern pieces (piezas) onto rectangular fabric sheets
 ## Quick Example
 
 ```ts
-import { nestPieces } from '@openclo/utils/nesting';
-import type { NestingOptions } from '@openclo/utils/nesting';
+import { nestPieces } from '@vina/utils/nesting';
+import type { NestingOptions } from '@vina/utils/nesting';
 
 const options: NestingOptions = {
   sheet: { width: 1500, height: 3000, margin: 10 },

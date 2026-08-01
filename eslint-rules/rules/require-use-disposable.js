@@ -159,7 +159,7 @@ export default {
     docs: {
       description:
         'Enforce useDisposable() registration for Three.js disposable resources created in useMemo (C1 RFC ratified pattern).',
-      url: 'https://github.com/sssamuelll/openclo/issues/674',
+      url: 'https://github.com/sssamuelll/vina/issues/674',
     },
     schema: [],
     messages: {

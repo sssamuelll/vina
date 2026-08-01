@@ -1,4 +1,4 @@
-# OpenClo — UX/UI Design Spec (v0.7)
+# Vina — UX/UI Design Spec (v0.7)
 
 ## Design Philosophy
 
@@ -8,7 +8,7 @@
 
 ## Core Principle: Modisteria, Not Engineering
 
-| Engineering Term | OpenClo Term |
+| Engineering Term | Vina Term |
 |------------------|--------------|
 | NURBS curve | Curva (just "curve") |
 | Tessellation | (hidden from user) |
@@ -53,7 +53,7 @@ The user sees: pattern pieces, seams, darts, fabrics, measurements. Everything e
 
 ```
 +------------------+
-| OpenClo          |
+| Vina          |
 +------------------+
 |                  |
 |  Chat messages   |
