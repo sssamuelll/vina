@@ -17,8 +17,8 @@ The engine offsets a closed polygon outward by a given width. At each vertex, a 
 ## Quick Example
 
 ```ts
-import { generateSeamAllowance } from '@openclo/utils/seam';
-import type { PathCommand } from '@openclo/types';
+import { generateSeamAllowance } from '@vina/utils/seam';
+import type { PathCommand } from '@vina/types';
 
 const outline: PathCommand[] = [
   { type: 'M', values: [0, 0] },
@@ -35,8 +35,8 @@ const seamPath = generateSeamAllowance(outline, 10);
 ### Advanced: Per-Point Control
 
 ```ts
-import { generateSeamAllowanceAdvanced, AngleType } from '@openclo/utils/seam';
-import type { SAPoint } from '@openclo/utils/seam';
+import { generateSeamAllowanceAdvanced, AngleType } from '@vina/utils/seam';
+import type { SAPoint } from '@vina/utils/seam';
 
 const points: SAPoint[] = [
   { x: 0, y: 0, saBefore: 10, saAfter: 10, angleType: AngleType.ByLength },

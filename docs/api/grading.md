@@ -16,7 +16,7 @@ A built-in **standard grade table** provides chest, waist, and hip measurements 
 ## Quick Example
 
 ```ts
-import { gradePiece, standardGradeTable } from '@openclo/utils/grading';
+import { gradePiece, standardGradeTable } from '@vina/utils/grading';
 
 const table = standardGradeTable();
 const baseMeasurements = table.sizes['M'];   // { chest: 88, waist: 72, hips: 96 }
@@ -29,8 +29,8 @@ const gradedPiece = gradePiece(piece, baseMeasurements, targetMeasurements, 'che
 ### Rule-Based Grading
 
 ```ts
-import { gradePoints, standardGradeTable } from '@openclo/utils/grading';
-import type { GradedPoint } from '@openclo/utils/grading';
+import { gradePoints, standardGradeTable } from '@vina/utils/grading';
+import type { GradedPoint } from '@vina/utils/grading';
 
 const points: GradedPoint[] = [
   { x: 0, y: 0, rules: [{ measurement: 'chest', deltaX: 0.25, deltaY: 0 }] },

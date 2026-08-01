@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-REPO="sssamuelll/openclo"
+REPO="sssamuelll/vina"
 DELAY=2  # seconds between API calls to avoid rate limiting
 
 # Ensure labels exist

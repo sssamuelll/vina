@@ -9,7 +9,7 @@
 
 ---
 
-# OpenClo UI Polish Spec — For UX/UI Design Team
+# Vina UI Polish Spec — For UX/UI Design Team
 
 > **Date:** 2026-03-05
 > **Target:** Production-quality visual polish across all interface components
@@ -20,7 +20,7 @@
 
 ## 1. Current State Overview
 
-OpenClo is a browser-based garment CAD with a VS Code-inspired layout. The interface is functional but visually rough — it needs a polish pass to reach professional-grade quality comparable to CLO3D, Browzwear, or Figma.
+Vina is a browser-based garment CAD with a VS Code-inspired layout. The interface is functional but visually rough — it needs a polish pass to reach professional-grade quality comparable to CLO3D, Browzwear, or Figma.
 
 ### Current Screenshot
 
@@ -288,7 +288,7 @@ font-size: 13px;              /* Base */
 ### 3.11 Status Bar
 
 **Current issues:**
-- Blue background (#007acc) is very VS Code — consider whether this fits OpenClo's brand
+- Blue background (#007acc) is very VS Code — consider whether this fits Vina's brand
 - Information density is good but items lack visual separation
 - Status dots (solver health) are hard to read at 6px
 

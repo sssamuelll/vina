@@ -1,4 +1,4 @@
-# OpenClo AI Agent Specification
+# Vina AI Agent Specification
 
 > Blueprint for an AI pattern-making copilot that speaks the language of patronaje.
 > Version 1.0 — February 2026
@@ -61,7 +61,7 @@ Streamed response to UnifiedBar chat panel
 
 ### 1.2 State Access
 
-The agent connects to OpenClo's Redux store through two pathways:
+The agent connects to Vina's Redux store through two pathways:
 
 **READ (Context Building):**
 ```typescript
@@ -96,7 +96,7 @@ The agent returns `AgentCommand[]` which map to Redux dispatches. The `commandEx
 
 ### 1.3 Existing Infrastructure
 
-OpenClo already has the bones:
+Vina already has the bones:
 
 | Component | File | Status |
 |-----------|------|--------|
@@ -553,7 +553,7 @@ Generate the complete size range at once.
 ```typescript
 {
   name: "saveProject",
-  description: "Save the current project to an .openclo file.",
+  description: "Save the current project to an .vina file.",
   parameters: {
     filename: { type: "string" }
   },
@@ -874,9 +874,9 @@ The agent personality is loaded as a system prompt prefix, separate from tool de
 ### PATRONAJE_SOUL.md
 
 ```markdown
-# OpenClo Agent — Patronaje Soul
+# Vina Agent — Patronaje Soul
 
-You are an AI pattern-making assistant inside OpenClo. You think like a patronista.
+You are an AI pattern-making assistant inside Vina. You think like a patronista.
 
 ## Identity
 - You are a skilled modista/patronista who happens to exist inside a computer
@@ -1452,7 +1452,7 @@ interface ProjectMemory {
 }
 
 // Stored in localStorage per project:
-// `openclo-memory-${projectId}`
+// `vina-memory-${projectId}`
 ```
 
 The agent updates memory after each interaction:
@@ -1516,7 +1516,7 @@ The agent receives the error and can:
 For v1, a minimal Express server alongside Vite dev server:
 
 ```
-openclo/
+vina/
 ├── src/                    # Frontend (existing)
 ├── server/                 # New: API server
 │   ├── index.ts           # Express app
@@ -1543,7 +1543,7 @@ For production, the server runs on the same EC2 or can be serverless (Vercel Edg
 
 See `OPENCLAW_PATTERNS.md` for the detailed analysis. Summary:
 
-| OpenClaw Pattern | OpenClo Equivalent |
+| OpenClaw Pattern | Vina Equivalent |
 |------------------|-------------------|
 | SOUL.md personality layer | PATRONAJE_SOUL.md — bilingual, modistería terms |
 | Skill system (SKILL.md + scripts) | Pattern-making skills (bodice, sleeve, collar types) |
@@ -1577,9 +1577,9 @@ See `OPENCLAW_PATTERNS.md` for the detailed analysis. Summary:
 - No AI pattern generation
 - No conversational interface
 
-### OpenClo Advantages
+### Vina Advantages
 
-| Feature | CLO3D | Browzwear | OpenClo |
+| Feature | CLO3D | Browzwear | Vina |
 |---------|-------|-----------|---------|
 | Price | $50/mo | $$$ | Free / open source |
 | Platform | Desktop | Desktop | Browser (any device) |
@@ -1611,7 +1611,7 @@ See `OPENCLAW_PATTERNS.md` for the detailed analysis. Summary:
 - Enterprise integrations (PLM, ERP)
 - Industry adoption (everyone knows CLO3D)
 
-**Our bet:** AI-native wins in the long run. CLO3D is adding AI on top of a 2010s architecture. OpenClo is building AI into the foundation.
+**Our bet:** AI-native wins in the long run. CLO3D is adding AI on top of a 2010s architecture. Vina is building AI into the foundation.
 
 ---
 

@@ -3,6 +3,8 @@
 All notable changes to OpenClo are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## Unreleased — El proyecto pasa a llamarse Vina (antes OpenClo). Formato .vina (los .openclo se siguen abriendo), claves de datos migradas automáticamente, dominio vina.sdar.dev.
+
 ## [Unreleased]
 
 ### Added

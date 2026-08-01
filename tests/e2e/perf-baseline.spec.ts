@@ -1,7 +1,7 @@
 /**
  * F0 (#897): baseline de perf con el patrón real de María, GPU real (config
  * webgpu, sin SwiftShader). No asserta umbrales — imprime el baseline.
- * Correr: OPENCLO_PERF=1 npm run test:e2e:gpu -- perf-baseline
+ * Correr: VINA_PERF=1 npm run test:e2e:gpu -- perf-baseline
  *
  * Mecánica de import/cosido copiada del replay M4 (seam-parity-replay.spec.ts):
  * DXF por file input, Auto-Sew vía ⌘K, tier por defecto 'wasm'.
@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { switchView, startSimulation } from './helpers/sim';
 
-const RUN = process.env.OPENCLO_PERF === '1';
+const RUN = process.env.VINA_PERF === '1';
 const FIXTURE = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../fixtures/garments/maria_patrones_samuel_2M.dxf',
@@ -30,7 +30,7 @@ async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
 }
 
 test.describe('perf baseline @gpu-local — camisa de María', () => {
-  test.skip(!RUN, 'OPENCLO_PERF=1 para correr el baseline');
+  test.skip(!RUN, 'VINA_PERF=1 para correr el baseline');
 
   test('mide FPS de solver y de render en el tier por defecto', async ({ page }) => {
     test.setTimeout(240_000);

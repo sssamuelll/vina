@@ -20,7 +20,7 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 
-const BASE = process.env.OPENCLO_BASE ?? 'http://localhost:5173';
+const BASE = process.env.VINA_BASE ?? 'http://localhost:5173';
 const DIR = 'screenshots/seam-allowance';
 mkdirSync(DIR, { recursive: true });
 const shot = (page, n) => page.screenshot({ path: `${DIR}/${n}.png` });
@@ -36,11 +36,11 @@ page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 try {
   await page.goto(BASE);
   await page.waitForSelector('.canvas-area', { timeout: 20000 });
-  await page.waitForFunction(() => Boolean(window.__OPENCLO_STORE__), { timeout: 15000 });
+  await page.waitForFunction(() => Boolean(window.__VINA_STORE__), { timeout: 15000 });
   await page.waitForTimeout(1200);
 
-  const dispatch = (a) => page.evaluate((x) => window.__OPENCLO_STORE__.dispatch(x), a);
-  const state = () => page.evaluate(() => window.__OPENCLO_STORE__.getState());
+  const dispatch = (a) => page.evaluate((x) => window.__VINA_STORE__.dispatch(x), a);
+  const state = () => page.evaluate(() => window.__VINA_STORE__.getState());
 
   // ── Setup: a bodice-front piece (edges get real garment names), SA 10 ──
   await dispatch({
@@ -69,7 +69,7 @@ try {
     const p = (await state()).project.pieces.find((x) => x.id === 'evidence-front');
     return Object.fromEntries(p.edges.map((e) => [e.name, e.seamAllowanceWidth]));
   };
-  const edges = await page.evaluate(() => (window.__OPENCLO_STORE__.getState().project.pieces.find((x) => x.id === 'evidence-front').edges ?? [])
+  const edges = await page.evaluate(() => (window.__VINA_STORE__.getState().project.pieces.find((x) => x.id === 'evidence-front').edges ?? [])
     .map((e) => ({ name: e.name, range: e.segmentRange })));
   const nameForCmd = (c) => (edges.find((e) => e.range[0] <= c && c < e.range[1]) || {}).name;
   const hemName = nameForCmd(3), sideName = nameForCmd(2);

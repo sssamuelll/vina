@@ -11,10 +11,10 @@ The exporter flattens each piece's outline to a 2D polygon, triangulates it via 
 ## Quick Example
 
 ```ts
-import { generateOBJ, downloadOBJ } from '@openclo/utils/export/exportOBJ';
+import { generateOBJ, downloadOBJ } from '@vina/utils/export/exportOBJ';
 
 const objString = generateOBJ(pieces);
-// # OpenClo OBJ Export
+// # Vina OBJ Export
 // o Front_Bodice
 // v 0.0000 0.0000 0.0000
 // v 100.0000 0.0000 0.0000
@@ -72,7 +72,7 @@ Ear-clipping triangulation of a simple polygon.
 Standard Wavefront OBJ:
 
 ```
-# OpenClo OBJ Export
+# Vina OBJ Export
 o Piece_Name
 v 0.0000 150.0000 0.0000
 v 100.0000 150.0000 0.0000

@@ -1,7 +1,7 @@
 /**
  * Anthropic Claude Provider — Messages API with tool use.
  *
- * In production (openclo.sdar.dev), routes through /api/anthropic/ proxy
+ * In production (vina.sdar.dev), routes through /api/anthropic/ proxy
  * to avoid CORS issues with direct browser→API calls.
  *
  * @module anthropicProvider

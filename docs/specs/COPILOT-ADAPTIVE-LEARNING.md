@@ -1,7 +1,7 @@
 # Copilot Spec: Adaptive Learning Skills (User Preference Overrides)
 
 ## 1. Overview
-Currently, OpenClo's **Pattern Skills** (e.g., `bodiceSkill.ts`) are static libraries. To achieve the brilliance of **OpenClaw**, the agent must learn from the user's manual corrections. This system enables the Copilot to transition from a generic assistant to a personalized digital partner that understands the specific drafting style and proportions of each pattern maker.
+Currently, Vina's **Pattern Skills** (e.g., `bodiceSkill.ts`) are static libraries. To achieve the brilliance of **OpenClaw**, the agent must learn from the user's manual corrections. This system enables the Copilot to transition from a generic assistant to a personalized digital partner that understands the specific drafting style and proportions of each pattern maker.
 
 ## 2. The Learning Loop
 We will implement an observer pattern that monitors the delta between AI-generated geometry and subsequent manual edits by the user.

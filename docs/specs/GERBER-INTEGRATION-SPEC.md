@@ -2,17 +2,17 @@
 
 > Date: 2026-03-06
 > Status: Planned
-> Scope: 16 features adapted from Gerber AccuMark for OpenClo.ai
+> Scope: 16 features adapted from Gerber AccuMark for Vina.ai
 
 ---
 
 ## Overview
 
-This spec defines 16 features inspired by Gerber AccuMark that we will integrate into OpenClo.ai. These are **not direct ports** — each feature is re-imagined for a browser-based, AI-assisted CAD environment. The goal is to make OpenClo patterns **production-ready** so they can be directly consumed by AccuNest/AccuMark or any AAMA/ASTM-compatible system.
+This spec defines 16 features inspired by Gerber AccuMark that we will integrate into Vina.ai. These are **not direct ports** — each feature is re-imagined for a browser-based, AI-assisted CAD environment. The goal is to make Vina patterns **production-ready** so they can be directly consumed by AccuNest/AccuMark or any AAMA/ASTM-compatible system.
 
 ### Guiding Principles
 
-1. **Production-ready output** — patterns exported from OpenClo should require zero rework in a production CAD
+1. **Production-ready output** — patterns exported from Vina should require zero rework in a production CAD
 2. **Browser-native** — all features run in-browser, no desktop dependencies
 3. **AI-enhanced** — copilot can invoke any of these features via natural language
 4. **Open formats** — everything exports to DXF/AAMA/ASTM, no proprietary lock-in
@@ -27,7 +27,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Walk Seam — interactive seam matching between pieces.
 
-**OpenClo approach**:
+**Vina approach**:
 - Select two sewn edges → tool reports length delta, ease %, and mismatch location
 - Visual overlay: superimpose two edges aligned at a reference notch
 - Tolerance config: warn if delta > threshold (default 3mm)
@@ -44,7 +44,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Mitered, double mitered, envelope, squared, slant, match, trim mirrored.
 
-**OpenClo approach**:
+**Vina approach**:
 - Extend existing seam allowance engine (`docs/api/seam-allowance.md`)
 - Per-corner type selection (currently only equidistant offset)
 - Add corner types: `mitered | doubleMitered | envelope | squared | slant | match | trimMirrored`
@@ -62,7 +62,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Linear or % shrink per fabric; auto-updates grades.
 
-**OpenClo approach**:
+**Vina approach**:
 - Per-piece shrinkage values: `shrinkWarp%`, `shrinkWeft%`
 - Linked to fabric code — changing fabric auto-applies its shrinkage profile
 - Compensation applied as affine scale along grain direction
@@ -80,7 +80,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Piece bookmarks — save/compare piece versions (V2024.1).
 
-**OpenClo approach**:
+**Vina approach**:
 - Bookmark = serialized piece state (points, curves, seam allowance, notches, grainline)
 - Up to 5 bookmarks per piece
 - Compare overlay: semi-transparent bookmark vs current piece
@@ -98,7 +98,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Multi-dimensional grading — grade across bust + height + hip.
 
-**OpenClo approach**:
+**Vina approach**:
 - Grade table axes: primary (e.g., bust) + secondary (e.g., height) + optional tertiary
 - Size matrix: e.g., 12P / 12R / 12T (same bust, different length)
 - Per-point grade rules support multi-axis deltas
@@ -117,7 +117,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Fabric code assignment — mandatory piece classification.
 
-**OpenClo approach**:
+**Vina approach**:
 - Each piece gets a `fabricCode` string (e.g., "SELF", "LINING", "INTERLINING", "CONTRAST-1")
 - Fabric code → links to a `PhysicalFabric` entry for simulation
 - Fabric code → included in DXF/AAMA export metadata
@@ -136,7 +136,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Accordion pleats — auto pre-folded pattern for 3D; fold/crease lines for collars/cuffs.
 
-**OpenClo approach**:
+**Vina approach**:
 - Extends existing #226 (Pleats, Folds, Elastic)
 - Pleat types: knife, box, accordion, inverted box
 - Fold lines: define fold/crease as internal line → XPBD solver pre-folds during simulation
@@ -157,7 +157,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Pattern Wizard — record/replay; 3 custom groups × 25 scripts.
 
-**OpenClo approach**:
+**Vina approach**:
 - Record mode: capture tool invocations as an ordered list of steps
 - Replay mode: execute recorded steps on selected piece(s)
 - Macro = JSON array of tool calls with relative references
@@ -175,7 +175,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Pre-Marking Rules — automated placement before manual marking.
 
-**OpenClo approach**:
+**Vina approach**:
 - Rule types: "always at fold", "always at left edge", "pair with X", "minimum distance from Y"
 - Rules stored per piece as metadata
 - Nesting engine (#233) consumes rules as constraints before optimization
@@ -192,7 +192,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Walk/Measure along line — rolling ruler for curves.
 
-**OpenClo approach**:
+**Vina approach**:
 - Arc-length measurement along any edge or internal line
 - Support for Bezier/spline arc-length (numerical integration)
 - Compare two curves: show length delta at N sample points
@@ -210,7 +210,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: DXF Wizard — auto-identifies DXF file type (V10.4+).
 
-**OpenClo approach**:
+**Vina approach**:
 - Analyze DXF layer names, entity structure, and metadata to detect format
 - Detection heuristics: AAMA layers (1-15), ASTM D6673 layers, Gerber AM layer names, Lectra IBA format
 - Auto-select correct parser pipeline based on detection
@@ -228,7 +228,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Colorway support — multiple color combos per model.
 
-**OpenClo approach**:
+**Vina approach**:
 - Extends existing #221 (Colorway Management System)
 - Colorway = map of `fabricCode → { color, material, texture }` overrides
 - Gerber-compatible: colorway is fabric code remapping, not model duplication
@@ -249,7 +249,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Annotation library (V16.1) — shared templates.
 
-**OpenClo approach**:
+**Vina approach**:
 - Annotation types: text label, production note, QC instruction, care label
 - Template library: pre-defined annotations (e.g., "CUT 2 ON FOLD", "NOTCH HERE", "GRAIN →")
 - Per-piece annotation list stored in piece metadata
@@ -267,7 +267,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Group pieces (V2025.1) — batch PDS actions on grouped pieces.
 
-**OpenClo approach**:
+**Vina approach**:
 - Multi-select pieces → create named group
 - Group operations: move, scale, mirror, set fabric code, apply seam allowance, export
 - Persistent groups stored in project data
@@ -285,7 +285,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Click'n'Go preference — reduces confirmation clicks.
 
-**OpenClo approach**:
+**Vina approach**:
 - Preference toggle: "Expert mode" (skip confirmations for non-destructive operations)
 - Per-tool setting: some tools always confirm (delete, merge), some can skip
 - Configurable via settings panel
@@ -303,7 +303,7 @@ This spec defines 16 features inspired by Gerber AccuMark that we will integrate
 
 **Gerber equivalent**: Digital print file generation — automated with batch processing.
 
-**OpenClo approach**:
+**Vina approach**:
 - Compose nested marker with artwork/graphics overlaid per piece
 - Export as high-resolution image (PNG/TIFF) or PDF at print DPI (150-300)
 - Respect fabric repeat, colorway, and piece orientation

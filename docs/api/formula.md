@@ -11,7 +11,7 @@ The formula engine lets users write expressions like `chest / 4 + 2` or `sqrt(a 
 ## Quick Example
 
 ```ts
-import { evaluateFormula, getFormulaVariables, validateFormula } from '@openclo/utils/formula';
+import { evaluateFormula, getFormulaVariables, validateFormula } from '@vina/utils/formula';
 
 const context = {
   variables: { chest: 88, ease: 4 },

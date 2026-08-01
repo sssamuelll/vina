@@ -1,6 +1,6 @@
-# OpenClo
+# Vina
 
-[![Build](https://img.shields.io/github/actions/workflow/status/sssamuelll/openclo/deploy.yml?branch=main)](https://github.com/sssamuelll/openclo/actions)
+[![Build](https://img.shields.io/github/actions/workflow/status/sssamuelll/vina/deploy.yml?branch=main)](https://github.com/sssamuelll/vina/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 [![WebGPU](https://img.shields.io/badge/WebGPU-TSL-6B4BFF?logo=webgpu&logoColor=white)](src/utils/cloth/gpu)
@@ -9,9 +9,9 @@
 
 **Browser-based garment CAD with real-time cloth simulation and an AI copilot.**
 
-OpenClo lets a patternmaker bring a flat pattern into the browser, sew it in 3D, and watch it drape on an avatar with GPU-accelerated cloth physics. No install, no plugin, no server for design work. The pattern stays on your machine.
+Vina lets a patternmaker bring a flat pattern into the browser, sew it in 3D, and watch it drape on an avatar with GPU-accelerated cloth physics. No install, no plugin, no server for design work. The pattern stays on your machine.
 
-**[Try it → openclo.sdar.dev](https://openclo.sdar.dev)**  ·  [Contributing](CONTRIBUTING.md)  ·  [Architecture](docs/specs/ARCHITECTURE.md)
+**[Try it → vina.sdar.dev](https://vina.sdar.dev)**  ·  [Contributing](CONTRIBUTING.md)  ·  [Architecture](docs/specs/ARCHITECTURE.md)
 
 > **Status — v0.11.0 (July 2026).** The core loop works end to end: import a DXF/AAMA pattern → auto-detect edges → sew pieces in 3D → drape on an avatar with WebGPU cloth simulation. Size grading and production output (nesting, BOM) are in the tool; per-point grading of imported patterns and drafting-from-scratch are on the [roadmap](ROADMAP.md). We build in the open — expect rough edges and honest labels where a feature isn't finished yet.
 
@@ -45,8 +45,8 @@ React 18 · Redux Toolkit + Zustand · Three.js (WebGPU renderer) · Vite 6 · R
 ## Quick start
 
 ```bash
-git clone https://github.com/sssamuelll/openclo.git
-cd openclo
+git clone https://github.com/sssamuelll/vina.git
+cd vina
 npm install
 npm run dev        # workspace at http://localhost:5173
 npm test           # ~6,000 unit tests
@@ -56,7 +56,7 @@ WebGPU runs in current Chrome, Edge, and Chromium-based browsers. Where WebGPU i
 
 ## Contributing
 
-We'd love the help. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the commit gate, and code conventions, then browse [open issues](https://github.com/sssamuelll/openclo/issues) — issues labeled `roadmap` describe larger pieces of the vision, and smaller bugs make good first contributions.
+We'd love the help. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the commit gate, and code conventions, then browse [open issues](https://github.com/sssamuelll/vina/issues) — issues labeled `roadmap` describe larger pieces of the vision, and smaller bugs make good first contributions.
 
 The commit gate is three commands, and a pre-commit hook runs the fast half automatically:
 
@@ -97,4 +97,4 @@ The application UI is in Spanish, aimed at professional patternmakers. Project d
 
 ---
 
-**OpenClo** — the Cognitive Design Engine for professional fashion engineering. MIT Licensed.
+**Vina** — the Cognitive Design Engine for professional fashion engineering. MIT Licensed.

@@ -1,5 +1,5 @@
 /**
- * eslint-plugin-openclo — local custom ESLint plugin.
+ * eslint-plugin-vina — local custom ESLint plugin.
  *
  * Local plugin (not published to npm). Loaded by `eslint.config.js` via direct
  * relative import; no package install required.
@@ -15,7 +15,7 @@ import requireUseDisposable from './rules/require-use-disposable.js';
 
 export default {
   meta: {
-    name: 'eslint-plugin-openclo',
+    name: 'eslint-plugin-vina',
     version: '0.1.0',
   },
   rules: {

@@ -1,4 +1,4 @@
-# Competitive Gap Analysis: OpenClo vs CLO3D & Browzwear
+# Competitive Gap Analysis: Vina vs CLO3D & Browzwear
 
 > Date: 2026-03-06
 > Status: Draft
@@ -6,7 +6,7 @@
 
 ## Purpose
 
-This document catalogs every major feature in the two leading garment CAD platforms — CLO3D and Browzwear VStitcher — and maps them against OpenClo.ai's current capabilities. Each gap is classified by competitive impact to guide roadmap prioritization.
+This document catalogs every major feature in the two leading garment CAD platforms — CLO3D and Browzwear VStitcher — and maps them against Vina.ai's current capabilities. Each gap is classified by competitive impact to guide roadmap prioritization.
 
 ---
 
@@ -33,7 +33,7 @@ This document catalogs every major feature in the two leading garment CAD platfo
 | Feature | CLO3D | Browzwear | Priority | Notes |
 |---------|-------|-----------|----------|-------|
 | 3D Pen (draw on avatar) | Yes | No | **Tier 2** | Draw garment silhouette on 3D avatar, auto-flatten to 2D |
-| AI Pattern Drafter | Yes (2025.0) | No | **Tier 3** | Parametric generation from measurements; OpenClo copilot covers some of this |
+| AI Pattern Drafter | Yes (2025.0) | No | **Tier 3** | Parametric generation from measurements; Vina copilot covers some of this |
 | Trace Tool (over image) | Yes | No | **Tier 3** | Trace imported reference images to create patterns |
 | Spiral pattern tool | Yes | No | Low | Niche use case |
 
@@ -371,7 +371,7 @@ Three.js / R3F already supports PBR and HDRI. Key work:
 
 ### Tier 1 — Critical (users won't switch without these)
 
-These features are table-stakes for any professional garment CAD. Missing them means OpenClo cannot replace CLO3D/Browzwear for production workflows.
+These features are table-stakes for any professional garment CAD. Missing them means Vina cannot replace CLO3D/Browzwear for production workflows.
 
 | # | Feature | Effort | Impact | Dependencies |
 |---|---------|--------|--------|--------------|
@@ -417,9 +417,9 @@ These are polishing features or niche capabilities that add depth but aren't blo
 
 ---
 
-## OpenClo Competitive Advantages
+## Vina Competitive Advantages
 
-Areas where OpenClo already leads or differentiates:
+Areas where Vina already leads or differentiates:
 
 | Advantage | Details |
 |-----------|---------|
@@ -436,7 +436,7 @@ Areas where OpenClo already leads or differentiates:
 
 ## Appendix: Feature Count Summary
 
-| Category | CLO3D | Browzwear | OpenClo | Coverage |
+| Category | CLO3D | Browzwear | Vina | Coverage |
 |----------|-------|-----------|---------|----------|
 | 2D Pattern Tools | 25+ | 20+ | 20+ | ~80% |
 | Sewing & Construction | 12 | 10 | 6 | ~50% |

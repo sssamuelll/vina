@@ -1,4 +1,4 @@
-# Seam System Analysis — OpenClo vs CLO3D
+# Seam System Analysis — Vina vs CLO3D
 
 **Date:** 2026-03-26
 **Status:** Critical gaps identified
@@ -22,7 +22,7 @@ if (!edgeADef || !edgeBDef) continue;  // SILENTLY SKIPS
 
 When a piece has no `edges` array (common for hand-drawn or imported pieces), `edgeADef` is undefined, and the seam constraint is **silently skipped**. No warning, no error. The solver runs with zero constraints. Pieces fall through each other.
 
-**CLO3D approach**: CLO3D always has edge definitions because pieces are created from parametric blocks. OpenClo allows freeform pieces without edge metadata, but the seam system assumes edges always exist.
+**CLO3D approach**: CLO3D always has edge definitions because pieces are created from parametric blocks. Vina allows freeform pieces without edge metadata, but the seam system assumes edges always exist.
 
 **Fix needed**: Fall back to edge-index-based resolution when semantic names aren't available. The seam tool stores `edgeName: "edge-0"` as a fallback, but `buildSeamConstraints` doesn't parse this pattern.
 
@@ -50,7 +50,7 @@ Since the app defaults to GPU or WASM (higher performance tiers), most users nev
 
 ### 4. SEAM RENDERING DOESN'T MATCH CLO3D
 
-**Current OpenClo**: Red/orange lines on edges + dotted connection line between midpoints.
+**Current Vina**: Red/orange lines on edges + dotted connection line between midpoints.
 
 **CLO3D**:
 - Sew-able edges **bold** during tool activation
@@ -61,7 +61,7 @@ Since the app defaults to GPU or WASM (higher performance tiers), most users nev
 - **Type-specific styles**: French = dashed, overlock = zigzag, standard = solid
 - **Selected seam** = bright green highlight
 
-**OpenClo issues**:
+**Vina issues**:
 - Only uses red/orange colors (no color-coding per seam)
 - Renders `<line>` elements for edges (straight lines) instead of following the actual piece outline curves
 - No sew-able edge highlighting during tool activation
@@ -94,10 +94,10 @@ All seams render in the same red/orange color. With multiple seams, it's impossi
 ## Feature Gaps vs CLO3D
 
 ### 7. NO 3D SEWING TOOL
-CLO3D can create seams by clicking edges directly in the 3D viewport. OpenClo only supports 2D seam creation.
+CLO3D can create seams by clicking edges directly in the 3D viewport. Vina only supports 2D seam creation.
 
 ### 8. NO SHRINKAGE/GATHERING CONTROL
-CLO3D has a `shrinkage` property (0-100%) that controls fabric gathering along the seam. OpenClo has `tension` (0-200) but it's not equivalent — it modifies rest length, not gathering distribution.
+CLO3D has a `shrinkage` property (0-100%) that controls fabric gathering along the seam. Vina has `tension` (0-200) but it's not equivalent — it modifies rest length, not gathering distribution.
 
 ### 9. NO FRENCH/OVERLOCK VISUAL DISTINCTION
 Seam types are stored (`standard`, `french`, `flat-felled`, `overlock`) but all render identically in 2D. CLO3D uses dashed lines for French, zigzag for overlock, etc.

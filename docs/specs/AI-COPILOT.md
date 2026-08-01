@@ -1,8 +1,8 @@
-# OpenClo.ai — AI Copilot Spec (v0.7)
+# Vina.ai — AI Copilot Spec (v0.7)
 
 ## Overview
 
-The AI Copilot is the primary interface for professional fashion engineering in OpenClo.ai. It is built as a **Situated Agent** that understands garment anatomy, technical constraints, and user preferences in real-time.
+The AI Copilot is the primary interface for professional fashion engineering in Vina.ai. It is built as a **Situated Agent** that understands garment anatomy, technical constraints, and user preferences in real-time.
 
 **Core Philosophy**: The agent is a **Co-Designer** that operates on a Semantic Graph, not just a text-to-CAD translator.
 

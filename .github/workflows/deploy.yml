@@ -1,4 +1,4 @@
-name: Deploy OpenClo
+name: Deploy Vina
 on:
   push:
     branches: [main]
@@ -25,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/key
           cp "$GITHUB_WORKSPACE/deploy/known_hosts" ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
-          ssh -i ~/.ssh/key -o StrictHostKeyChecking=yes ubuntu@$DEPLOY_HOST "mkdir -p /tmp/openclo-deploy/assets /tmp/openclo-deploy/wasm"
-          rsync -az --delete --no-inc-recursive -e "ssh -i ~/.ssh/key -o StrictHostKeyChecking=yes" dist/ ubuntu@$DEPLOY_HOST:/tmp/openclo-deploy/
-          ssh -i ~/.ssh/key -o StrictHostKeyChecking=yes ubuntu@$DEPLOY_HOST "sudo rsync -a --delete /tmp/openclo-deploy/ /var/www/openclo/ && sudo chown -R www-data:www-data /var/www/openclo/"
+          ssh -i ~/.ssh/key -o StrictHostKeyChecking=yes ubuntu@$DEPLOY_HOST "mkdir -p /tmp/vina-deploy/assets /tmp/vina-deploy/wasm"
+          rsync -az --delete --no-inc-recursive -e "ssh -i ~/.ssh/key -o StrictHostKeyChecking=yes" dist/ ubuntu@$DEPLOY_HOST:/tmp/vina-deploy/
+          ssh -i ~/.ssh/key -o StrictHostKeyChecking=yes ubuntu@$DEPLOY_HOST "sudo rsync -a --delete /tmp/vina-deploy/ /var/www/vina/ && sudo chown -R www-data:www-data /var/www/vina/"
           rm -f ~/.ssh/key

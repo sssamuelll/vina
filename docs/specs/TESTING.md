@@ -1,4 +1,4 @@
-# OpenClo — Testing Spec (v0.7)
+# Vina — Testing Spec (v0.7)
 
 ## Current Coverage
 

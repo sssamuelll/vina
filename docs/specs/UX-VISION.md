@@ -1,4 +1,4 @@
-# openclo — UX Vision
+# vina — UX Vision
 
 > Canonical UX direction. One page. Future UI decisions are checked against this document.
 
@@ -28,7 +28,7 @@ These are not preferences. They are constraints. A PR that violates one of these
 7. **Menus exist for discovery only.** The LogoMenu (or any future menu chrome) lists what is *possible*, with each entry being a learn-this-exists affordance — not a do-this-now shortcut. The shortcut is ⌘K + describe the intent.
 8. **One project in memory at a time.** No multi-project chrome. No tabs. No project switcher in the always-visible UI. If the user needs to switch, they ask the agent.
 9. **The agent narrates, doesn't lecture.** Status updates are single updatable lines (not scrolling logs). The agent explains when asked, not preemptively.
-10. **Reverse the CLO3D pattern.** Where CLO3D and Lectra present hundreds of always-visible tools to a professional who knows what they need, openclo presents one input and lets the user describe what they need.
+10. **Reverse the CLO3D pattern.** Where CLO3D and Lectra present hundreds of always-visible tools to a professional who knows what they need, vina presents one input and lets the user describe what they need.
 
 ---
 

@@ -1,12 +1,12 @@
 {
-  "name": "openclo",
+  "name": "vina",
   "private": false,
   "version": "0.11.0",
   "type": "module",
   "description": "Cognitive Design Engine for Professional Fashion Engineering — Semantic Pattern Editor + XPBD Simulation + Situated AI Copilot",
   "bin": {
-    "openclo": "./dist-cli/index.js",
-    "openclo-server": "./dist-server/index.js"
+    "vina": "./dist-cli/index.js",
+    "vina-server": "./dist-server/index.js"
   },
   "scripts": {
     "dev": "vite",

@@ -1,9 +1,9 @@
-# OpenClo.ai — Functional Skill Ecosystem (Marketplace) (v0.7)
+# Vina.ai — Functional Skill Ecosystem (Marketplace) (v0.7)
 
 ## 1. Vision: Content vs. Capability
-To protect the intellectual property of pattern makers and designers, OpenClo.ai maintains a strict separation between **Content** and **Capability**.
+To protect the intellectual property of pattern makers and designers, Vina.ai maintains a strict separation between **Content** and **Capability**.
 
-- **Patterns (`.openclo`)**: The proprietary geometry and formulas created by the designer.
+- **Patterns (`.vina`)**: The proprietary geometry and formulas created by the designer.
 - **Skills (`.oskill`)**: **Functional Capabilities** that expand the Copilot's "intelligence" (e.g., how to grade a specific style, how to generate a tech pack, or how to import legacy formats).
 
 The Marketplace is a hub for **Capabilities**, not a library of static patterns.
@@ -32,7 +32,7 @@ const skill = SkillBuilder
 ```
 
 ### Silent Ingestion (Seamly2D Converter)
-An intelligent service that parses legacy `.val` and `.vit` files and "elevates" them into functional OpenClo.ai Skills.
+An intelligent service that parses legacy `.val` and `.vit` files and "elevates" them into functional Vina.ai Skills.
 
 ## 4. Marketplace Module (v0.7)
 

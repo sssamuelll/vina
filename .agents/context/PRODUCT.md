@@ -1,4 +1,4 @@
-# PRODUCT.md — OpenClo.ai
+# PRODUCT.md — Vina.ai
 
 > DRAFT sintetizado 2026-07-16 desde docs/reports, memoria de proyecto y dirección de Samuel.
 > Revisar y ajustar; no fue dictado en entrevista.
