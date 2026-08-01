@@ -13,7 +13,7 @@ export type {
   PluginFabric,
   PluginTemplate,
   PluginManifest,
-  OpenCloPlugin,
+  VinaPlugin,
   InstalledPlugin,
   ValidationResult,
 } from './types';

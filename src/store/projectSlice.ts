@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, NotchAnchor, NotchOptions, NotchPair, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, VinaProject, InternalLine, NotchAnchor, NotchOptions, NotchPair, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage } from '../types/types';
 import type { ArrangementBinding, ArrangementOverride } from '../utils/cloth/arrangement/arrangementBinding';
 import type { Trim } from '../types/trim';
 import type { PieceArtwork } from '../types/artwork';
@@ -252,7 +252,7 @@ const initialState: ProjectState = {
  * (auto-rename duplicates, auto-sew) — a faithful RESTORE (boot autosave)
  * must return exactly what the user had saved, never invent seams or names.
  */
-function applyProjectPayload(state: ProjectState, payload: OpenCloProject, generative: boolean): void {
+function applyProjectPayload(state: ProjectState, payload: VinaProject, generative: boolean): void {
   const { project: validated, diagnostics, quarantine } = validateAndRepairProject(payload);
   state.loadDiagnostics = diagnostics;
   state.loadQuarantine = quarantine;
@@ -347,7 +347,7 @@ const projectSlice = createSlice({
     restoreState(_state, action: PayloadAction<any>) {
       return action.payload;
     },
-    loadProject(state, action: PayloadAction<OpenCloProject>) {
+    loadProject(state, action: PayloadAction<VinaProject>) {
       applyProjectPayload(state, action.payload, true);
     },
     /**
@@ -355,7 +355,7 @@ const projectSlice = createSlice({
      * backfill only — no auto-rename, no auto-sew. What was saved is what
      * comes back.
      */
-    restoreProject(state, action: PayloadAction<OpenCloProject>) {
+    restoreProject(state, action: PayloadAction<VinaProject>) {
       applyProjectPayload(state, action.payload, false);
     },
     clearLoadDiagnostics(state) {

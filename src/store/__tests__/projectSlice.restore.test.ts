@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import reducer, { restoreProject, loadProject } from '../projectSlice';
-import type { OpenCloProject } from '../../types/types';
+import type { VinaProject } from '../../types/types';
 
 const initial = reducer(undefined, { type: '@@INIT' });
 
@@ -38,7 +38,7 @@ function makePiece(id: string, name: string): any {
   };
 }
 
-function makeProject(overrides: Partial<OpenCloProject> = {}): OpenCloProject {
+function makeProject(overrides: Partial<VinaProject> = {}): VinaProject {
   return {
     id: 'proj-1',
     name: 'Saved work',
@@ -49,7 +49,7 @@ function makeProject(overrides: Partial<OpenCloProject> = {}): OpenCloProject {
     createdAt: 1000,
     updatedAt: 1000,
     ...overrides,
-  } as OpenCloProject;
+  } as VinaProject;
 }
 
 describe('projectSlice — restoreProject (faithful restore)', () => {

@@ -661,7 +661,7 @@ export interface NotchPair {
 
 // ─── Project ───
 
-export interface OpenCloProject {
+export interface VinaProject {
   id: string;
   name: string;
   description?: string;

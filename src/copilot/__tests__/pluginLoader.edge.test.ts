@@ -23,7 +23,7 @@ import {
   getPluginStorageKey,
   checkPermissions,
 } from '../plugins/pluginLoader';
-import type { PluginManifest, OpenCloPlugin, PluginPermission } from '../plugins/types';
+import type { PluginManifest, VinaPlugin, PluginPermission } from '../plugins/types';
 
 // ─── Mock localStorage ──────────────────────────────────────────────────────
 const store: Record<string, string> = {};
@@ -54,7 +54,7 @@ function validManifest(overrides?: Partial<PluginManifest>): PluginManifest {
   };
 }
 
-function validPlugin(overrides?: Partial<OpenCloPlugin>): OpenCloPlugin {
+function validPlugin(overrides?: Partial<VinaPlugin>): VinaPlugin {
   return {
     id: 'com.test.plugin',
     name: 'Test Plugin',
@@ -175,25 +175,25 @@ describe('validateManifest — extended edge cases', () => {
 
 describe('validatePlugin — extended edge cases', () => {
   it('should reject non-array tools', () => {
-    const result = validatePlugin(validPlugin({ tools: 'not-an-array' as unknown as OpenCloPlugin['tools'] }));
+    const result = validatePlugin(validPlugin({ tools: 'not-an-array' as unknown as VinaPlugin['tools'] }));
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.includes('tools must be an array'))).toBe(true);
   });
 
   it('should reject non-array skills', () => {
-    const result = validatePlugin(validPlugin({ skills: {} as unknown as OpenCloPlugin['skills'] }));
+    const result = validatePlugin(validPlugin({ skills: {} as unknown as VinaPlugin['skills'] }));
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.includes('skills must be an array'))).toBe(true);
   });
 
   it('should reject non-array fabrics', () => {
-    const result = validatePlugin(validPlugin({ fabrics: 'nope' as unknown as OpenCloPlugin['fabrics'] }));
+    const result = validatePlugin(validPlugin({ fabrics: 'nope' as unknown as VinaPlugin['fabrics'] }));
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.includes('fabrics must be an array'))).toBe(true);
   });
 
   it('should reject non-array templates', () => {
-    const result = validatePlugin(validPlugin({ templates: true as unknown as OpenCloPlugin['templates'] }));
+    const result = validatePlugin(validPlugin({ templates: true as unknown as VinaPlugin['templates'] }));
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.includes('templates must be an array'))).toBe(true);
   });

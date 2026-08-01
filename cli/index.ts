@@ -161,9 +161,9 @@ async function cmdValidate(): Promise<void> {
   const project = loadProject(projectPath);
 
   // Use the shared projectValidator for full validation
-  type OpenCloProject = import('../src/types/types').OpenCloProject;
+  type VinaProject = import('../src/types/types').VinaProject;
   const { validateAndRepairProject } = await import('../src/utils/projectValidator.js');
-  const { diagnostics } = validateAndRepairProject(project as unknown as OpenCloProject);
+  const { diagnostics } = validateAndRepairProject(project as unknown as VinaProject);
 
   const pieces = (project.pieces || []) as unknown[];
   const seams = (project.seams || []) as unknown[];

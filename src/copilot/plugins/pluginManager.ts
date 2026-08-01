@@ -7,7 +7,7 @@
  * @module plugins/pluginManager
  */
 
-import type { InstalledPlugin, PluginManifest, OpenCloPlugin } from './types';
+import type { InstalledPlugin, PluginManifest, VinaPlugin } from './types';
 import {
   loadPluginDirect,
   unloadPlugin,
@@ -411,11 +411,11 @@ export async function loadEnabledPlugins(): Promise<{
 /**
  * Load and register a single plugin directly (bypasses network).
  *
- * @param plugin - The pre-constructed OpenCloPlugin
+ * @param plugin - The pre-constructed VinaPlugin
  * @param permissions - Permissions to grant
  */
 export function loadAndRegisterPlugin(
-  plugin: OpenCloPlugin,
+  plugin: VinaPlugin,
   permissions: readonly string[],
 ): void {
   loadPluginDirect(plugin);

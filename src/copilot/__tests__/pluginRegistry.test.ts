@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PluginRegistry } from '../plugins/pluginRegistry';
-import type { OpenCloPlugin, PluginPermission } from '../plugins/types';
+import type { VinaPlugin, PluginPermission } from '../plugins/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function makePlugin(id: string, overrides?: Partial<OpenCloPlugin>): OpenCloPlugin {
+function makePlugin(id: string, overrides?: Partial<VinaPlugin>): VinaPlugin {
   return {
     id,
     name: `Plugin ${id}`,
@@ -21,7 +21,7 @@ function makePluginWithTool(
   id: string,
   toolName: string,
   permissions: PluginPermission[] = ['read-pieces'],
-): OpenCloPlugin {
+): VinaPlugin {
   return makePlugin(id, {
     tools: [{
       name: toolName,
@@ -33,7 +33,7 @@ function makePluginWithTool(
   });
 }
 
-function makePluginWithSkill(id: string, skillName: string): OpenCloPlugin {
+function makePluginWithSkill(id: string, skillName: string): VinaPlugin {
   return makePlugin(id, {
     skills: [{
       skill: {

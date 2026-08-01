@@ -10,7 +10,7 @@
 import type { PieceGroup, ReferenceImage } from '../types/types';
 import type { Trim } from '../types/trim';
 import { saveProject, loadProject as loadProjectFromIDB, clearProject } from './storage';
-import { parseOpenCloProject } from './projectSchema';
+import { parseVinaProject } from './projectSchema';
 import type { ProjectParseResult, ParseError } from './projectSchema';
 
 export type { ProjectParseResult, ParseError } from './projectSchema';
@@ -104,7 +104,7 @@ export function loadProjectFromJSON(json: string): ProjectParseResult {
       error: { code: 'invalid_json', message: e instanceof Error ? e.message : 'invalid JSON' },
     };
   }
-  return parseOpenCloProject(deserializeDates(raw));
+  return parseVinaProject(deserializeDates(raw));
 }
 
 // ─── IndexedDB Autosave (async) ─────────────────────────────────────────────
@@ -128,7 +128,7 @@ export async function saveToStorage(state: ProjectState): Promise<void> {
 export async function loadFromStorage(): Promise<ProjectParseResult | null> {
   const raw = await loadProjectFromIDB();
   if (!raw) return null;
-  const result = parseOpenCloProject(deserializeDates(raw));
+  const result = parseVinaProject(deserializeDates(raw));
   if (!result.ok) quarantineCorruptAutosave(raw, result.error);
   return result;
 }

@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { validateAndRepairProject } from '../projectValidator';
-import type { OpenCloProject, PatternPiece, Seam, SeamGroup, PointOfMeasure, Fabric } from '../../types/types';
+import type { VinaProject, PatternPiece, Seam, SeamGroup, PointOfMeasure, Fabric } from '../../types/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -45,7 +45,7 @@ function makeValidOutline() {
   ];
 }
 
-function makeProject(overrides: Partial<OpenCloProject> = {}): OpenCloProject {
+function makeProject(overrides: Partial<VinaProject> = {}): VinaProject {
   return {
     id: 'proj-1',
     name: 'Test Project',

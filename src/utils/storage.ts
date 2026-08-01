@@ -294,7 +294,7 @@ const LEGACY_AUTOSAVE_KEY = 'openclo-autosave';
 
 /** Save project to IndexedDB autosave slot. */
 export async function saveProject(project: unknown): Promise<void> {
-  // shape: OpenCloProject v1 — opt-in envelope: no (zod-parsed on read via
+  // shape: VinaProject v1 — opt-in envelope: no (zod-parsed on read via
   // projectIO.loadFromStorage; unversioned legacy treated as v1 per B6 §3.2)
   await storageSet('projects', AUTOSAVE_KEY, project);
 }

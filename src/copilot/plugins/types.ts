@@ -161,7 +161,7 @@ export interface PluginManifest {
  * OpenClo's core functionality. They follow a lifecycle of load/unload
  * and can only access subsystems granted by their permissions.
  */
-export interface OpenCloPlugin {
+export interface VinaPlugin {
   /** Unique plugin identifier (matches manifest id) */
   id: string;
   /** Display name */

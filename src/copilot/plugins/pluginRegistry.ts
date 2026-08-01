@@ -10,7 +10,7 @@
 
 import type { ToolDefinition, ToolResult } from '../action/tools/registry';
 import type {
-  OpenCloPlugin,
+  VinaPlugin,
   PluginFabric,
   PluginPermission,
   PluginSkill,
@@ -111,7 +111,7 @@ export class PluginRegistry {
    * @param grantedPermissions - Permissions granted to this plugin
    * @returns Array of conflicts encountered (empty if none)
    */
-  registerPlugin(plugin: OpenCloPlugin, grantedPermissions: PluginPermission[]): PluginConflict[] {
+  registerPlugin(plugin: VinaPlugin, grantedPermissions: PluginPermission[]): PluginConflict[] {
     const newConflicts: PluginConflict[] = [];
     this.pluginPermissions.set(plugin.id, grantedPermissions);
 
