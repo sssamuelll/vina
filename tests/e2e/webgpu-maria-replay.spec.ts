@@ -65,7 +65,7 @@ async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
 async function importSewAndSimulate(page: Page) {
   // F4.1: el bypass fue eliminado y la capability está flipped — el único
   // switch es el opt-in de usuario, y debe existir ANTES de cargar la app.
-  await page.addInitScript(() => localStorage.setItem('openclo-use-webgpu', 'true'));
+  await page.addInitScript(() => localStorage.setItem('vina-use-webgpu', 'true'));
 
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });

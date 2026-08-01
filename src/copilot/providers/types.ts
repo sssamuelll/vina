@@ -180,7 +180,7 @@ export const MODEL_OPTIONS: Record<string, string[]> = {
 
 // ─── Provider Config from localStorage ──────────────────────────────────────
 
-const PROVIDER_STORAGE_KEY = 'openclo-provider-config';
+const PROVIDER_STORAGE_KEY = 'vina-provider-config';
 
 /**
  * Provider config stored in localStorage (no secrets).

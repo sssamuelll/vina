@@ -5,7 +5,7 @@
  * key migration of the WebGPU feature flag.
  *
  * The migration only handles the single `webclo-use-webgpu` →
- * `openclo-use-webgpu` rename. Future key renames should NOT extend this
+ * `vina-use-webgpu` rename. Future key renames should NOT extend this
  * function — that would shade into a "migration helper pattern" which
  * pre-empts B6-state (Persistence). One key, one function, idempotent.
  */

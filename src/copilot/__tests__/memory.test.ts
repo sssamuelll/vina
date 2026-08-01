@@ -140,10 +140,10 @@ describe('ProjectMemory', () => {
     memory.addMessage({ role: 'user', content: 'Hello', timestamp: 1000 });
     memory.save();
 
-    expect(localStorageMock.getItem('openclo_memory_project-1')).not.toBeNull();
+    expect(localStorageMock.getItem('vina_memory_project-1')).not.toBeNull();
 
     memory.delete();
-    expect(localStorageMock.getItem('openclo_memory_project-1')).toBeNull();
+    expect(localStorageMock.getItem('vina_memory_project-1')).toBeNull();
   });
 
   it('should limit decisions to 20', () => {

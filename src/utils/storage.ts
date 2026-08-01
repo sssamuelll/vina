@@ -18,7 +18,7 @@ import { safeGetItem, safeSetItem, safeRemoveItem, setLocalStorageQuotaHook } fr
 
 // ─── Schema ─────────────────────────────────────────────────────────────────
 
-const DB_NAME = 'openclo';
+const DB_NAME = 'vina';
 const DB_VERSION = 1;
 
 type StoreNames = 'projects' | 'avatars' | 'plugins' | 'settings';

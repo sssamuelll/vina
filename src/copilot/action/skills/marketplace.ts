@@ -16,10 +16,10 @@ import { safeGetItem, safeSetItem, safeRemoveItem } from '../../../utils/safeSto
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 /** localStorage key for the skill registry URL */
-const REGISTRY_URL_KEY = 'openclo_skill_registry_url';
+const REGISTRY_URL_KEY = 'vina_skill_registry_url';
 
 /** localStorage key for installed community skills */
-const INSTALLED_SKILLS_KEY = 'openclo_installed_community_skills';
+const INSTALLED_SKILLS_KEY = 'vina_installed_community_skills';
 
 /**
  * Get the configured skill registry URL.

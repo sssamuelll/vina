@@ -35,7 +35,7 @@ import ConnectionsList from './connections/ConnectionsList';
 
 export type LanguagePreference = 'auto' | 'es' | 'en';
 
-const LANGUAGE_STORAGE_KEY = 'openclo-language-pref';
+const LANGUAGE_STORAGE_KEY = 'vina-language-pref';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function loadLanguagePreference(): LanguagePreference {

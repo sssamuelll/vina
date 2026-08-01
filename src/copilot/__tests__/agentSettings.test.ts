@@ -41,27 +41,27 @@ describe('loadLanguagePreference', () => {
   });
 
   it('should return "es" when saved', () => {
-    localStorageMock.setItem('openclo-language-pref', 'es');
+    localStorageMock.setItem('vina-language-pref', 'es');
     expect(loadLanguagePreference()).toBe('es');
   });
 
   it('should return "en" when saved', () => {
-    localStorageMock.setItem('openclo-language-pref', 'en');
+    localStorageMock.setItem('vina-language-pref', 'en');
     expect(loadLanguagePreference()).toBe('en');
   });
 
   it('should return "auto" when saved', () => {
-    localStorageMock.setItem('openclo-language-pref', 'auto');
+    localStorageMock.setItem('vina-language-pref', 'auto');
     expect(loadLanguagePreference()).toBe('auto');
   });
 
   it('should return "auto" for invalid value', () => {
-    localStorageMock.setItem('openclo-language-pref', 'fr');
+    localStorageMock.setItem('vina-language-pref', 'fr');
     expect(loadLanguagePreference()).toBe('auto');
   });
 
   it('should return "auto" for empty string', () => {
-    localStorageMock.setItem('openclo-language-pref', '');
+    localStorageMock.setItem('vina-language-pref', '');
     expect(loadLanguagePreference()).toBe('auto');
   });
 });
@@ -73,17 +73,17 @@ describe('saveLanguagePreference', () => {
 
   it('should save "es"', () => {
     saveLanguagePreference('es');
-    expect(localStorageMock.getItem('openclo-language-pref')).toBe('es');
+    expect(localStorageMock.getItem('vina-language-pref')).toBe('es');
   });
 
   it('should save "en"', () => {
     saveLanguagePreference('en');
-    expect(localStorageMock.getItem('openclo-language-pref')).toBe('en');
+    expect(localStorageMock.getItem('vina-language-pref')).toBe('en');
   });
 
   it('should save "auto"', () => {
     saveLanguagePreference('auto');
-    expect(localStorageMock.getItem('openclo-language-pref')).toBe('auto');
+    expect(localStorageMock.getItem('vina-language-pref')).toBe('auto');
   });
 
   it('should round-trip correctly', () => {

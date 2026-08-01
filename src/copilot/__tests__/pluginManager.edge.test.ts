@@ -120,19 +120,19 @@ describe('Plugin Manager — edge cases', () => {
 
   describe('localStorage corruption recovery', () => {
     it('should return empty array when localStorage has invalid JSON', () => {
-      localStorage.setItem('openclo_installed_plugins', 'not-valid-json{{{');
+      localStorage.setItem('vina_installed_plugins', 'not-valid-json{{{');
       const list = loadInstalledPluginsList();
       expect(list).toEqual([]);
     });
 
     it('should return empty array when localStorage has non-array JSON', () => {
-      localStorage.setItem('openclo_installed_plugins', '{"object": true}');
+      localStorage.setItem('vina_installed_plugins', '{"object": true}');
       const list = loadInstalledPluginsList();
       expect(list).toEqual([]);
     });
 
     it('should return empty array when localStorage has null', () => {
-      localStorage.setItem('openclo_installed_plugins', 'null');
+      localStorage.setItem('vina_installed_plugins', 'null');
       const list = loadInstalledPluginsList();
       expect(list).toEqual([]);
     });

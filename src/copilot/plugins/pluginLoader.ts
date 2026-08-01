@@ -433,7 +433,7 @@ export function resetLoadedPlugins(): void {
  * @returns The localStorage key prefix for this plugin
  */
 export function getPluginStorageKey(pluginId: string): string {
-  return `openclo_plugins_${pluginId}`;
+  return `vina_plugins_${pluginId}`;
 }
 
 /**

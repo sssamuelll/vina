@@ -207,7 +207,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // Dev A/B del face-poke (track piel): forzar el pase sin recompilar.
   const facePokeForced = useRef(
     typeof window !== 'undefined' &&
-      (window as unknown as { localStorage?: Storage }).localStorage?.getItem('openclo-facepoke-on') === 'true',
+      (window as unknown as { localStorage?: Storage }).localStorage?.getItem('vina-facepoke-on') === 'true',
   );
   // Renderer WebGPU device-loss latch (#901). Set the instant the renderer's
   // device.lost resolves so useFrame stops dispatching renderer.compute() on a
@@ -375,9 +375,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // la almendra une bordes a lados opuestos del brazo). Se stashean con
     // sus compuertas y el settle (frame 150, mismo readback del tether)
     // aplica solo los COSIDOS vía filterSewnBridges.
-    // Kill-switch dev: localStorage 'openclo-seamfill' = 'off'.
+    // Kill-switch dev: localStorage 'vina-seamfill' = 'off'.
     const seamFillEnabled = typeof window === 'undefined'
-      || window.localStorage?.getItem('openclo-seamfill') !== 'off';
+      || window.localStorage?.getItem('vina-seamfill') !== 'off';
     if (seamFillEnabled && seamInitData.length > 0) {
       const offsets = new Map<string, number>();
       let acc = 0;
@@ -636,13 +636,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // colisión de cuerpo y antes de postSolve: la corrección queda excluida
       // de la velocidad vía preCollisionPos, igual que el push del cuerpo (el
       // monolito v1 corría 1×/frame post-substeps y los 15 substeps lo
-      // deshacían). Gate = capability + dev flag 'openclo-facepoke-on'.
+      // deshacían). Gate = capability + dev flag 'vina-facepoke-on'.
       // A4 face-poke Pass B (solve) — DENTRO del substep loop, tras el par de
       // colisión de cuerpo y antes de postSolve: corrección excluida de la
       // velocidad vía preCollisionPos + fricción Coulomb propia. CADA substep:
       // a substeps alternos la retención de manga cae (medido 6151 → 3945 —
       // el par push+grip por substep es protector). Gate = capability + dev
-      // flag 'openclo-facepoke-on'.
+      // flag 'vina-facepoke-on'.
       const facePokeOn = (GPU_CAPABILITIES.facePoke || facePokeForced.current) && solver.facePokeNodes;
       if (facePokeOn && solver.facePokeNodes) {
         substepNodes.push(solver.facePokeNodes.solve);

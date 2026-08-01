@@ -3,7 +3,7 @@
  *
  * B1 (plan drape profesional 2026-07-02): off-switch del settle-tether.
  * Semántica opt-in disable: el tether corre por default; SOLO el valor literal
- * 'true' en localStorage('openclo-tether-disabled') suprime la captura.
+ * 'true' en localStorage('vina-tether-disabled') suprime la captura.
  * Lo consume el gate Cusick (B2): el tether congelaría a 2.5s el drape del
  * disco que el gate mide a 5s.
  */

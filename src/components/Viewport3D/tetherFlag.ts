@@ -10,13 +10,13 @@
  * Consumidor principal: el gate Cusick virtual (B2) — mide un drape de disco
  * a 5 s de settle, y el tether capturaría/congelaría la pose a 2.5 s,
  * arrestando exactamente el drape que el gate existe para medir. También
- * sirve como escape hatch de debugging (espejo de 'openclo-use-webgpu').
+ * sirve como escape hatch de debugging (espejo de 'vina-use-webgpu').
  *
  * Opt-in disable: default = tether ON; solo el literal 'true' lo apaga.
  */
 import { safeGetItem } from '../../utils/safeStorage';
 
-export const TETHER_DISABLED_FLAG_KEY = 'openclo-tether-disabled';
+export const TETHER_DISABLED_FLAG_KEY = 'vina-tether-disabled';
 
 export function isTetherDisabled(): boolean {
   return safeGetItem(TETHER_DISABLED_FLAG_KEY) === 'true';

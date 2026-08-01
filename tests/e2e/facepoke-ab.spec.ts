@@ -2,7 +2,7 @@
  * A4 face-poke A/B harness @gpu-local (maintainer-run) — el runner del
  * veredicto de flip de GPU_CAPABILITIES.facePoke.
  *
- * ON (default): fuerza el pase vía localStorage 'openclo-facepoke-on'.
+ * ON (default): fuerza el pase vía localStorage 'vina-facepoke-on'.
  * OFF (baseline): correr con FP_OFF=1.
  *   FP_OFF=1 npx playwright test --config playwright.webgpu.config.ts facepoke-ab
  *
@@ -70,8 +70,8 @@ test('facepoke A/B metric @gpu-local', async ({ page }) => {
   test.setTimeout(240_000);
   const fpOff = !!process.env.FP_OFF;
   await page.addInitScript((off) => {
-    localStorage.setItem('openclo-use-webgpu', 'true');
-    if (!off) localStorage.setItem('openclo-facepoke-on', 'true');
+    localStorage.setItem('vina-use-webgpu', 'true');
+    if (!off) localStorage.setItem('vina-facepoke-on', 'true');
   }, fpOff);
   page.on('console', (msg) => {
     const t = msg.text();

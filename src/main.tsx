@@ -43,12 +43,20 @@ document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('gesturechange', (e) => e.preventDefault());
 document.addEventListener('gestureend', (e) => e.preventDefault());
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <AppErrorBoundary>
-      <ShortcutProvider>
-        <App />
-      </ShortcutProvider>
-    </AppErrorBoundary>
-  </StrictMode>,
-);
+// One-shot client-data migration OpenClo → Vina. Runs before the app mounts
+// so storage.ts opens the renamed IDB database with data already in place.
+// No top-level await (would change the chunk graph) — render moves inside
+// .finally() instead.
+import { migrateFromOpenClo } from './utils/renameMigration';
+
+migrateFromOpenClo().finally(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <AppErrorBoundary>
+        <ShortcutProvider>
+          <App />
+        </ShortcutProvider>
+      </AppErrorBoundary>
+    </StrictMode>,
+  );
+});

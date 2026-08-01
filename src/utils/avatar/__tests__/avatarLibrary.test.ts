@@ -260,14 +260,14 @@ describe('parseProfilesJson', () => {
 
 describe('loadProfiles with corrupt storage', () => {
   it('falls back to defaults when storage holds non-array', () => {
-    localStorage.setItem('openclo-avatar-profiles', JSON.stringify({ oops: true }));
+    localStorage.setItem('vina-avatar-profiles', JSON.stringify({ oops: true }));
     const loaded = loadProfiles();
     expect(loaded.length).toBe(4);
     expect(loaded[0].name).toBe('Standard Male');
   });
 
   it('falls back to defaults when storage holds invalid JSON', () => {
-    localStorage.setItem('openclo-avatar-profiles', '{not json');
+    localStorage.setItem('vina-avatar-profiles', '{not json');
     const loaded = loadProfiles();
     expect(loaded.length).toBe(4);
   });
@@ -281,14 +281,14 @@ describe('loadProfiles with corrupt storage', () => {
       updatedAt: 1_700_000_000_000,
     };
     const bad = { id: 'bad', name: 'Bad', measurements: { height: 'tall' } };
-    localStorage.setItem('openclo-avatar-profiles', JSON.stringify([good, bad]));
+    localStorage.setItem('vina-avatar-profiles', JSON.stringify([good, bad]));
     const loaded = loadProfiles();
     expect(loaded.length).toBe(1);
     expect(loaded[0].id).toBe('good');
   });
 
   it('falls back to defaults when every profile is corrupt', () => {
-    localStorage.setItem('openclo-avatar-profiles', JSON.stringify([{ id: 'x' }, null]));
+    localStorage.setItem('vina-avatar-profiles', JSON.stringify([{ id: 'x' }, null]));
     const loaded = loadProfiles();
     expect(loaded.length).toBe(4);
   });
@@ -302,18 +302,18 @@ describe('loadProfiles telemetry', () => {
   });
 
   it('emits json_parse failure when storage holds malformed JSON', () => {
-    localStorage.setItem('openclo-avatar-profiles', '{not json');
+    localStorage.setItem('vina-avatar-profiles', '{not json');
     loadProfiles();
     const snap = getStorageParseFailureSnapshot();
     expect(snap.total).toBe(1);
-    expect(snap.byKey['openclo-avatar-profiles']).toBe(1);
+    expect(snap.byKey['vina-avatar-profiles']).toBe(1);
     expect(snap.byReason.json_parse).toBe(1);
     expect(snap.recent[0].droppedCount).toBe(1);
     expect(snap.recent[0].keptCount).toBe(0);
   });
 
   it('emits schema_root failure when root is not an array', () => {
-    localStorage.setItem('openclo-avatar-profiles', JSON.stringify({ oops: true }));
+    localStorage.setItem('vina-avatar-profiles', JSON.stringify({ oops: true }));
     loadProfiles();
     const snap = getStorageParseFailureSnapshot();
     expect(snap.total).toBe(1);
@@ -330,7 +330,7 @@ describe('loadProfiles telemetry', () => {
       updatedAt: 1_700_000_000_000,
     };
     const bad = { id: 'bad', name: 'Bad', measurements: { height: 'tall' } };
-    localStorage.setItem('openclo-avatar-profiles', JSON.stringify([good, bad]));
+    localStorage.setItem('vina-avatar-profiles', JSON.stringify([good, bad]));
     loadProfiles();
     const snap = getStorageParseFailureSnapshot();
     expect(snap.total).toBe(1);
@@ -353,7 +353,7 @@ describe('loadProfiles telemetry', () => {
       createdAt: 1_700_000_000_000,
       updatedAt: 1_700_000_000_000,
     };
-    localStorage.setItem('openclo-avatar-profiles', JSON.stringify([good]));
+    localStorage.setItem('vina-avatar-profiles', JSON.stringify([good]));
     loadProfiles();
     expect(getStorageParseFailureSnapshot().total).toBe(0);
   });

@@ -329,7 +329,7 @@ export function parseUserPreferences(
 /**
  * Storage key for preferences.
  */
-const STORAGE_KEY = 'openclo_copilot_preferences';
+const STORAGE_KEY = 'vina_copilot_preferences';
 
 /**
  * Manages user preferences with persistence.

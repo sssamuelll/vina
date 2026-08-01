@@ -22,7 +22,7 @@ test('settings persist in localStorage across reloads', async ({ page }) => {
 
   // Write a workflow setting (expert mode) via localStorage
   await page.evaluate(() => {
-    const key = 'openclo-workflow';
+    const key = 'vina-workflow';
     const data = { v: 1, expertMode: true, confirmOverrides: {}, toolMemory: {} };
     localStorage.setItem(key, JSON.stringify(data));
   });
@@ -33,7 +33,7 @@ test('settings persist in localStorage across reloads', async ({ page }) => {
 
   // Verify the setting survived the reload
   const persisted = await page.evaluate(() => {
-    const raw = localStorage.getItem('openclo-workflow');
+    const raw = localStorage.getItem('vina-workflow');
     if (!raw) return null;
     return JSON.parse(raw);
   });
@@ -42,7 +42,7 @@ test('settings persist in localStorage across reloads', async ({ page }) => {
   expect(persisted.expertMode).toBe(true);
 
   // Clean up
-  await page.evaluate(() => localStorage.removeItem('openclo-workflow'));
+  await page.evaluate(() => localStorage.removeItem('vina-workflow'));
 });
 
 // ─── Test 2: Private browsing — toast + app works ───────────────────────────

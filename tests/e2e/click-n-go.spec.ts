@@ -94,7 +94,7 @@ test.describe('Tool Memory', () => {
     await page.waitForTimeout(1000);
 
     const stored = await page.evaluate(() => {
-      const raw = localStorage.getItem('openclo-workflow');
+      const raw = localStorage.getItem('vina-workflow');
       return raw ? JSON.parse(raw) : null;
     });
 
@@ -112,7 +112,7 @@ test.describe('Tool Memory', () => {
     await page.waitForTimeout(1000);
 
     const before = await page.evaluate(() => {
-      const raw = localStorage.getItem('openclo-workflow');
+      const raw = localStorage.getItem('vina-workflow');
       return raw ? JSON.parse(raw) : null;
     });
     expect(before?.data?.expertMode).toBe(true);

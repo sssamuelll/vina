@@ -36,7 +36,7 @@ async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
 
 test('arrangement flow: binding → preview → seed → drape @gpu-local', async ({ page }) => {
   test.setTimeout(240_000);
-  await page.addInitScript(() => localStorage.setItem('openclo-use-webgpu', 'true'));
+  await page.addInitScript(() => localStorage.setItem('vina-use-webgpu', 'true'));
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
   await page.waitForFunction(

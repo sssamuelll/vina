@@ -106,9 +106,9 @@ export interface CostSummary {
 }
 
 /** localStorage key prefix for project usage */
-const USAGE_STORAGE_PREFIX = 'openclo_usage_';
+const USAGE_STORAGE_PREFIX = 'vina_usage_';
 /** localStorage key for budget setting */
-const BUDGET_STORAGE_KEY = 'openclo_budget';
+const BUDGET_STORAGE_KEY = 'vina_budget';
 /** Default monthly budget in USD */
 const DEFAULT_BUDGET = 5.00;
 

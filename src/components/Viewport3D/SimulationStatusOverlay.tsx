@@ -165,7 +165,7 @@ export function SimulationStatusOverlay() {
           style={{ color: '#fb923c', fontSize: 10, maxWidth: 200, marginTop: 2 }}
           title={
             activeTool3D === 'steamBrush'
-              ? 'La plancha a vapor requiere el tier WebGPU (los kernels TSL escriben el amortiguado de velocidad por partícula). El tier WebGPU viene activado por defecto; si lo desactivaste, limpia localStorage(\'openclo-use-webgpu\'). Ver RFC C4 § 2.3.'
+              ? 'La plancha a vapor requiere el tier WebGPU (los kernels TSL escriben el amortiguado de velocidad por partícula). El tier WebGPU viene activado por defecto; si lo desactivaste, limpia localStorage(\'vina-use-webgpu\'). Ver RFC C4 § 2.3.'
               : 'El agarre de malla requiere el tier WebGPU o WASM (CPU no tiene pin posicional; Neural no tiene interactividad por partícula). Cambia al tier WASM o WebGPU. Ver RFC C4 § 2.3.'
           }
         >

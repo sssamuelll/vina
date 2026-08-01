@@ -157,7 +157,7 @@ export function createDebugAgenticLoop(
   };
 
   if (typeof window !== 'undefined') {
-    (window as unknown as Record<string, unknown>).__openclo_debug =
+    (window as unknown as Record<string, unknown>).__vina_debug =
       createDebugAPI(debugStore);
   }
 

@@ -52,8 +52,8 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
   mkdirSync(OUT_DIR, { recursive: true });
   // CROSSBEND=off — A/B del kill-switch del bend cross-seam (acta costura-real).
   await page.addInitScript((crossbendOff) => {
-    localStorage.setItem('openclo-use-webgpu', 'true');
-    if (crossbendOff) localStorage.setItem('openclo-crossbend', 'off');
+    localStorage.setItem('vina-use-webgpu', 'true');
+    if (crossbendOff) localStorage.setItem('vina-crossbend', 'off');
   }, process.env.CROSSBEND === 'off');
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });

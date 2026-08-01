@@ -11,7 +11,7 @@ export interface WorkflowState {
   dxfPreferredFormat: FormatId | null;
 }
 
-const STORAGE_KEY = 'openclo-workflow';
+const STORAGE_KEY = 'vina-workflow';
 const STORAGE_VERSION = 1;
 
 // ─── Bounds for the persisted envelope (defense-in-depth at the boundary) ────

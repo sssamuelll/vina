@@ -46,7 +46,7 @@ function isQuotaError(err: unknown): boolean {
 export function isStorageAvailable(): boolean {
   if (_available !== null) return _available;
   try {
-    const key = '__openclo_storage_test__';
+    const key = '__vina_storage_test__';
     localStorage.setItem(key, '1');
     localStorage.removeItem(key);
     _available = true;

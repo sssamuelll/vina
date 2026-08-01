@@ -11,7 +11,7 @@ import type { NSID } from './nsid';
 import type { RegisteredSkill, TriggerPreference } from './registryTypes';
 import { safeGetItem, safeRemoveItem } from '../../../utils/safeStorage';
 
-const DB_NAME = 'openclo_skills_v1';
+const DB_NAME = 'vina_skills_v1';
 const DB_VERSION = 1;
 const SKILLS_STORE = 'skills';
 const PREFERENCES_STORE = 'preferences';
@@ -203,7 +203,7 @@ export class SkillPersistence {
    * @returns Number of skills migrated
    */
   async migrateLegacySkills(): Promise<number> {
-    const INSTALLED_SKILLS_KEY = 'openclo_installed_community_skills';
+    const INSTALLED_SKILLS_KEY = 'vina_installed_community_skills';
     let count = 0;
 
     try {

@@ -172,17 +172,17 @@ describe('Skill Marketplace — edge cases', () => {
 
   describe('localStorage corruption for installed skills', () => {
     it('should return empty array for corrupt JSON', () => {
-      localStorage.setItem('openclo_installed_community_skills', '{corrupt');
+      localStorage.setItem('vina_installed_community_skills', '{corrupt');
       expect(loadInstalledCommunitySkills()).toEqual([]);
     });
 
     it('should return empty array for non-array JSON', () => {
-      localStorage.setItem('openclo_installed_community_skills', '"string"');
+      localStorage.setItem('vina_installed_community_skills', '"string"');
       expect(loadInstalledCommunitySkills()).toEqual([]);
     });
 
     it('should return empty array for null JSON', () => {
-      localStorage.setItem('openclo_installed_community_skills', 'null');
+      localStorage.setItem('vina_installed_community_skills', 'null');
       expect(loadInstalledCommunitySkills()).toEqual([]);
     });
   });

@@ -133,7 +133,7 @@ export async function loadFromStorage(): Promise<ProjectParseResult | null> {
   return result;
 }
 
-const QUARANTINE_KEY_PREFIX = 'openclo-autosave-quarantine-';
+const QUARANTINE_KEY_PREFIX = 'vina-autosave-quarantine-';
 // Cap the per-quarantine entry to ~5MB so we never fill localStorage with one blob.
 const MAX_QUARANTINE_BYTES = 5_000_000;
 

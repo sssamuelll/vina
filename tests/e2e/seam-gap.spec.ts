@@ -116,8 +116,8 @@ const fmt = (r: SeamGapRow) =>
 test(`seam-gap: residual de cierre por costura (tether ${TETHER_OFF ? 'OFF' : 'ON'}) @gpu-local`, async ({ page }) => {
   test.setTimeout(300_000);
   await page.addInitScript((tetherOff) => {
-    localStorage.setItem('openclo-use-webgpu', 'true');
-    if (tetherOff) localStorage.setItem('openclo-tether-disabled', 'true');
+    localStorage.setItem('vina-use-webgpu', 'true');
+    if (tetherOff) localStorage.setItem('vina-tether-disabled', 'true');
   }, TETHER_OFF);
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });

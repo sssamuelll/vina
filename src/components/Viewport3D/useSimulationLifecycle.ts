@@ -176,7 +176,7 @@ interface UseSimulationLifecycleResult {
 
 /** WebGPU cloth-solver tier opt-out flag. Default: ENABLED.
  *  Opt-out semantics mirror the renderer flag (webgpuDetect.isWebGPURendererActive):
- *  the tier runs unless localStorage('openclo-use-webgpu') is explicitly 'false'.
+ *  the tier runs unless localStorage('vina-use-webgpu') is explicitly 'false'.
  *  Hardware support is still gated by isWebGPUAvailable() at the callsite, so
  *  browsers without WebGPU fall back to WASM regardless.
  *  Default flipped ON in #897 after the tier reached ≥30fps prod-verified on the

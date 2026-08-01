@@ -6,7 +6,7 @@
  *
  * MVP v1 state (dark surface, ratified 2026-05-28 in #827):
  * These tools remain registered. The agent can WRITE to project memory
- * (`openclo_memory_<projectId>` localStorage) via `rememberDecision` /
+ * (`vina_memory_<projectId>` localStorage) via `rememberDecision` /
  * `setUserPreference` / `addNote`, and READ via `getMemory`. There is no
  * user-reachable UI to inspect or clear this state in MVP v1 — AgentSettings
  * exposes a Clear-memory button only when its host wires `onClearMemory`, and

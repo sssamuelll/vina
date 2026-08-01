@@ -621,7 +621,7 @@ describe('Fallback Provider', () => {
     // inside storageSet writes to a *different* key (`openclo:settings:...`).
     // Either way the legacy key has no API key — verify the legacy key is
     // empty AND none of the LS values contains the secret string.
-    expect(localStorageMock.getItem('openclo-fallback-provider')).toBeNull();
+    expect(localStorageMock.getItem('vina-fallback-provider')).toBeNull();
     for (let i = 0; i < localStorageMock.length; i++) {
       const key = localStorageMock.key(i)!;
       const value = localStorageMock.getItem(key);
@@ -635,8 +635,8 @@ describe('Fallback Provider', () => {
       apiKey: 'sk-secret-key',
       model: 'gpt-4o-mini',
     });
-    // SecureStorage uses 'openclo-secure-' prefix + AES-GCM encryption
-    const stored = sessionStorageMock.getItem('openclo-secure-fallback-apikey');
+    // SecureStorage uses 'vina-secure-' prefix + AES-GCM encryption
+    const stored = sessionStorageMock.getItem('vina-secure-fallback-apikey');
     expect(stored).not.toBeNull();
     // Value must NOT be plaintext or simple base64 of the plaintext
     expect(stored).not.toBe('sk-secret-key');
@@ -665,19 +665,19 @@ describe('Fallback Provider', () => {
   });
 
   it('should handle corrupted localStorage for fallback', async () => {
-    localStorageMock.setItem('openclo-fallback-provider', 'not-json{');
+    localStorageMock.setItem('vina-fallback-provider', 'not-json{');
     expect(await loadFallbackProvider()).toBeNull();
   });
 
   it('should strip legacy API keys from localStorage on migration', async () => {
     // Simulate legacy format: full config with API key in localStorage
-    localStorageMock.setItem('openclo-fallback-provider', JSON.stringify({
+    localStorageMock.setItem('vina-fallback-provider', JSON.stringify({
       provider: 'openai',
       apiKey: 'sk-leaked-key',
       model: 'gpt-4o-mini',
     }));
     await clearLegacyFallbackKeys();
-    const raw = localStorageMock.getItem('openclo-fallback-provider');
+    const raw = localStorageMock.getItem('vina-fallback-provider');
     const parsed = JSON.parse(raw!);
     expect(parsed.apiKey).toBeUndefined();
     expect(parsed.provider).toBe('openai');
@@ -685,7 +685,7 @@ describe('Fallback Provider', () => {
   });
 
   it('should migrate legacy API key to SecureStorage for current session', async () => {
-    localStorageMock.setItem('openclo-fallback-provider', JSON.stringify({
+    localStorageMock.setItem('vina-fallback-provider', JSON.stringify({
       provider: 'openai',
       apiKey: 'sk-migrate-me',
       model: 'gpt-4o-mini',
@@ -700,19 +700,19 @@ describe('Fallback Provider', () => {
   });
 
   it('should not crash on corrupted JSON during migration', async () => {
-    localStorageMock.setItem('openclo-fallback-provider', 'not-json{');
+    localStorageMock.setItem('vina-fallback-provider', 'not-json{');
     await expect(clearLegacyFallbackKeys()).resolves.not.toThrow();
     // Corrupted entry should be removed entirely
-    expect(localStorageMock.getItem('openclo-fallback-provider')).toBeNull();
+    expect(localStorageMock.getItem('vina-fallback-provider')).toBeNull();
   });
 
   it('should be idempotent (no-op on already-migrated data)', async () => {
-    localStorageMock.setItem('openclo-fallback-provider', JSON.stringify({
+    localStorageMock.setItem('vina-fallback-provider', JSON.stringify({
       provider: 'openai',
       model: 'gpt-4o-mini',
     }));
     await clearLegacyFallbackKeys();
-    const raw = localStorageMock.getItem('openclo-fallback-provider');
+    const raw = localStorageMock.getItem('vina-fallback-provider');
     expect(JSON.parse(raw!)).toEqual({ provider: 'openai', model: 'gpt-4o-mini' });
   });
 
@@ -760,7 +760,7 @@ describe('Fallback Provider', () => {
   });
 
   it('should return empty apiKey when sessionStorage has no key', async () => {
-    localStorageMock.setItem('openclo-fallback-provider', JSON.stringify({
+    localStorageMock.setItem('vina-fallback-provider', JSON.stringify({
       provider: 'openai',
       model: 'gpt-4o-mini',
     }));

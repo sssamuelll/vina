@@ -27,7 +27,7 @@ export interface CopilotMessage {
 
 // ─── Class-based API (localStorage, synchronous) ─────────────────────────────
 
-const STORAGE_PREFIX = 'openclo_memory_';
+const STORAGE_PREFIX = 'vina_memory_';
 const MAX_MESSAGES = 50;
 const MAX_DECISIONS = 20;
 

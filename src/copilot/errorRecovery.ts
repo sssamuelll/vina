@@ -304,7 +304,7 @@ export function simplifyOutline(
  * the API key. clearLegacyFallbackKeys() strips the apiKey field from any existing
  * entry at this key and migrates it to SecureStorage for the current session.
  */
-const FALLBACK_PROVIDER_KEY = 'openclo-fallback-provider';
+const FALLBACK_PROVIDER_KEY = 'vina-fallback-provider';
 /** SecureStorage key for fallback provider API key */
 const FALLBACK_APIKEY_SECURE_KEY = 'fallback-apikey';
 

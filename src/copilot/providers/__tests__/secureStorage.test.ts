@@ -52,7 +52,7 @@ describe('SecureStorage (AES-GCM)', () => {
 
   it('stores encrypted data in sessionStorage (not plaintext)', async () => {
     await SecureStorage.set('api-key', 'sk-ant-secret-12345');
-    const raw = sessionStorage.getItem('openclo-secure-api-key');
+    const raw = sessionStorage.getItem('vina-secure-api-key');
     expect(raw).not.toBeNull();
     // The raw value must NOT be the plaintext or simple base64 of the plaintext
     expect(raw).not.toBe('sk-ant-secret-12345');
@@ -66,7 +66,7 @@ describe('SecureStorage (AES-GCM)', () => {
     // get() should fail decryption and return null
     expect(await SecureStorage.get('stale')).toBeNull();
     // Stale entry should have been removed
-    expect(sessionStorage.getItem('openclo-secure-stale')).toBeNull();
+    expect(sessionStorage.getItem('vina-secure-stale')).toBeNull();
   });
 
   it('uses in-memory cache for repeated reads', async () => {

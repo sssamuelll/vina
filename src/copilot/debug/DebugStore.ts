@@ -1,7 +1,7 @@
 import type { AgenticRecord } from './types';
 import { safeGetItem, safeSetItem, safeRemoveItem } from '../../utils/safeStorage';
 
-const STORAGE_KEY = 'openclo-debug-records';
+const STORAGE_KEY = 'vina-debug-records';
 const MAX_RECORDS = 100;
 
 export class DebugStore {

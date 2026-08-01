@@ -261,10 +261,10 @@ describe('workflowSlice', () => {
       };
       persistWorkflow(wf);
       expect(localStorage.setItem).toHaveBeenCalledWith(
-        'openclo-workflow',
+        'vina-workflow',
         expect.any(String)
       );
-      const stored = JSON.parse(mockStorage['openclo-workflow']);
+      const stored = JSON.parse(mockStorage['vina-workflow']);
       expect(stored.version).toBe(1);
       expect(stored.data).toEqual(wf);
     });
@@ -313,12 +313,12 @@ describe('workflowSlice', () => {
     });
 
     it('returns null for corrupt JSON', () => {
-      mockStorage['openclo-workflow'] = 'not-valid-json{{{';
+      mockStorage['vina-workflow'] = 'not-valid-json{{{';
       expect(loadWorkflow()).toBeNull();
     });
 
     it('returns null when version does not match', () => {
-      mockStorage['openclo-workflow'] = JSON.stringify({
+      mockStorage['vina-workflow'] = JSON.stringify({
         version: 99,
         data: { expertMode: false, confirmOverrides: {}, toolMemory: {} },
       });
@@ -326,7 +326,7 @@ describe('workflowSlice', () => {
     });
 
     it('returns null when data field is missing', () => {
-      mockStorage['openclo-workflow'] = JSON.stringify({ version: 1 });
+      mockStorage['vina-workflow'] = JSON.stringify({ version: 1 });
       expect(loadWorkflow()).toBeNull();
     });
   });
@@ -352,7 +352,7 @@ describe('workflowSlice', () => {
 
     // 1. Required field absent
     it('rejects envelope when expertMode is missing', () => {
-      mockStorage['openclo-workflow'] = JSON.stringify({
+      mockStorage['vina-workflow'] = JSON.stringify({
         version: 1,
         data: { confirmOverrides: {}, toolMemory: {}, dxfPreferredFormat: null },
       });
@@ -360,7 +360,7 @@ describe('workflowSlice', () => {
     });
 
     it('rejects envelope when confirmOverrides is missing', () => {
-      mockStorage['openclo-workflow'] = JSON.stringify({
+      mockStorage['vina-workflow'] = JSON.stringify({
         version: 1,
         data: { expertMode: false, toolMemory: {}, dxfPreferredFormat: null },
       });
@@ -369,40 +369,40 @@ describe('workflowSlice', () => {
 
     // 2. Required field of wrong type
     it('rejects expertMode as string "true" (truthy hijack)', () => {
-      mockStorage['openclo-workflow'] = envelope(validData({ expertMode: 'true' }));
+      mockStorage['vina-workflow'] = envelope(validData({ expertMode: 'true' }));
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects expertMode as number 1', () => {
-      mockStorage['openclo-workflow'] = envelope(validData({ expertMode: 1 }));
+      mockStorage['vina-workflow'] = envelope(validData({ expertMode: 1 }));
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects confirmOverrides as array', () => {
-      mockStorage['openclo-workflow'] = envelope(validData({ confirmOverrides: [] }));
+      mockStorage['vina-workflow'] = envelope(validData({ confirmOverrides: [] }));
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects toolMemory as string', () => {
-      mockStorage['openclo-workflow'] = envelope(validData({ toolMemory: 'corrupt' }));
+      mockStorage['vina-workflow'] = envelope(validData({ toolMemory: 'corrupt' }));
       expect(loadWorkflow()).toBeNull();
     });
 
     // 3. Numeric edge cases
     it('rejects Infinity in toolMemory leaf (via 1e500 JSON literal)', () => {
-      mockStorage['openclo-workflow'] =
+      mockStorage['vina-workflow'] =
         '{"version":1,"data":{"expertMode":false,"confirmOverrides":{},"toolMemory":{"hem":{"depth":1e500}},"dxfPreferredFormat":null}}';
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects -Infinity in toolMemory leaf', () => {
-      mockStorage['openclo-workflow'] =
+      mockStorage['vina-workflow'] =
         '{"version":1,"data":{"expertMode":false,"confirmOverrides":{},"toolMemory":{"hem":{"depth":-1e500}},"dxfPreferredFormat":null}}';
       expect(loadWorkflow()).toBeNull();
     });
 
     it('accepts -0 in toolMemory leaf (it is finite)', () => {
-      mockStorage['openclo-workflow'] = envelope(
+      mockStorage['vina-workflow'] = envelope(
         validData({ toolMemory: { hem: { depth: -0 } } })
       );
       expect(loadWorkflow()).not.toBeNull();
@@ -410,14 +410,14 @@ describe('workflowSlice', () => {
 
     // 4. String boundaries
     it('rejects empty string as toolMemory tool key', () => {
-      mockStorage['openclo-workflow'] = envelope(
+      mockStorage['vina-workflow'] = envelope(
         validData({ toolMemory: { '': { depth: 1 } } })
       );
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects null byte in confirmOverrides operation key', () => {
-      mockStorage['openclo-workflow'] = envelope(
+      mockStorage['vina-workflow'] = envelope(
         validData({ confirmOverrides: { 'remove Piece': 'never' } })
       );
       expect(loadWorkflow()).toBeNull();
@@ -425,14 +425,14 @@ describe('workflowSlice', () => {
 
     it('rejects oversized toolMemory option key (> 80 chars)', () => {
       const big = 'k'.repeat(81);
-      mockStorage['openclo-workflow'] = envelope(
+      mockStorage['vina-workflow'] = envelope(
         validData({ toolMemory: { hem: { [big]: 1 } } })
       );
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects oversized string value in toolMemory leaf (> 1024 chars)', () => {
-      mockStorage['openclo-workflow'] = envelope(
+      mockStorage['vina-workflow'] = envelope(
         validData({ toolMemory: { hem: { fabric: 'x'.repeat(1025) } } })
       );
       expect(loadWorkflow()).toBeNull();
@@ -440,7 +440,7 @@ describe('workflowSlice', () => {
 
     // 5. Extra fields (strict — documented in PR body)
     it('rejects extra field at envelope level (strict)', () => {
-      mockStorage['openclo-workflow'] = JSON.stringify({
+      mockStorage['vina-workflow'] = JSON.stringify({
         version: 1,
         data: validData(),
         extraneous: 'evil',
@@ -449,48 +449,48 @@ describe('workflowSlice', () => {
     });
 
     it('rejects extra field at data level (strict)', () => {
-      mockStorage['openclo-workflow'] = envelope(validData({ futureField: 42 }));
+      mockStorage['vina-workflow'] = envelope(validData({ futureField: 42 }));
       expect(loadWorkflow()).toBeNull();
     });
 
     // 6. Sentinel values
     it('rejects raw null as envelope', () => {
-      mockStorage['openclo-workflow'] = 'null';
+      mockStorage['vina-workflow'] = 'null';
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects array as envelope', () => {
-      mockStorage['openclo-workflow'] = '[]';
+      mockStorage['vina-workflow'] = '[]';
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects empty object as envelope', () => {
-      mockStorage['openclo-workflow'] = '{}';
+      mockStorage['vina-workflow'] = '{}';
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects envelope with null data field', () => {
-      mockStorage['openclo-workflow'] = JSON.stringify({ version: 1, data: null });
+      mockStorage['vina-workflow'] = JSON.stringify({ version: 1, data: null });
       expect(loadWorkflow()).toBeNull();
     });
 
     // 7. Semantically impossible values
     it('rejects confirmOverrides value "yes" (not in enum)', () => {
-      mockStorage['openclo-workflow'] = envelope(
+      mockStorage['vina-workflow'] = envelope(
         validData({ confirmOverrides: { removePiece: 'yes' } })
       );
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects dxfPreferredFormat = "DROP-TABLE" (not in FormatId enum)', () => {
-      mockStorage['openclo-workflow'] = envelope(
+      mockStorage['vina-workflow'] = envelope(
         validData({ dxfPreferredFormat: 'DROP-TABLE' })
       );
       expect(loadWorkflow()).toBeNull();
     });
 
     it('accepts dxfPreferredFormat = "aama" (valid FormatId)', () => {
-      mockStorage['openclo-workflow'] = envelope(
+      mockStorage['vina-workflow'] = envelope(
         validData({ dxfPreferredFormat: 'aama' })
       );
       const loaded = loadWorkflow();
@@ -499,20 +499,20 @@ describe('workflowSlice', () => {
 
     // 8. Prototype-pollution-shaped keys
     it('rejects __proto__ as confirmOverrides key', () => {
-      mockStorage['openclo-workflow'] =
+      mockStorage['vina-workflow'] =
         '{"version":1,"data":{"expertMode":false,"confirmOverrides":{"__proto__":"never"},"toolMemory":{},"dxfPreferredFormat":null}}';
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects constructor as toolMemory tool key', () => {
-      mockStorage['openclo-workflow'] = envelope(
+      mockStorage['vina-workflow'] = envelope(
         validData({ toolMemory: { constructor: { mode: 'a' } } })
       );
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects prototype as toolMemory option key', () => {
-      mockStorage['openclo-workflow'] = envelope(
+      mockStorage['vina-workflow'] = envelope(
         validData({ toolMemory: { hem: { prototype: 'a' } } })
       );
       expect(loadWorkflow()).toBeNull();
@@ -520,14 +520,14 @@ describe('workflowSlice', () => {
 
     // 9. Nested object/array as tool option value (must be primitive)
     it('rejects nested object in toolMemory leaf', () => {
-      mockStorage['openclo-workflow'] = envelope(
+      mockStorage['vina-workflow'] = envelope(
         validData({ toolMemory: { hem: { complex: { nested: 1 } } } })
       );
       expect(loadWorkflow()).toBeNull();
     });
 
     it('rejects array in toolMemory leaf', () => {
-      mockStorage['openclo-workflow'] = envelope(
+      mockStorage['vina-workflow'] = envelope(
         validData({ toolMemory: { hem: { list: [1, 2] } } })
       );
       expect(loadWorkflow()).toBeNull();
@@ -537,7 +537,7 @@ describe('workflowSlice', () => {
     it('rejects toolMemory with too many tools (> 200)', () => {
       const huge: Record<string, Record<string, number>> = {};
       for (let i = 0; i < 201; i++) huge[`tool${i}`] = { x: 1 };
-      mockStorage['openclo-workflow'] = envelope(validData({ toolMemory: huge }));
+      mockStorage['vina-workflow'] = envelope(validData({ toolMemory: huge }));
       expect(loadWorkflow()).toBeNull();
     });
 
@@ -555,7 +555,7 @@ describe('workflowSlice', () => {
         },
         dxfPreferredFormat: 'gerber' as const,
       };
-      mockStorage['openclo-workflow'] = envelope(wf);
+      mockStorage['vina-workflow'] = envelope(wf);
       expect(loadWorkflow()).toEqual(wf);
     });
   });

@@ -243,7 +243,7 @@ export function designLogToMarkdown(log: DesignLog): string {
 }
 
 /** LocalStorage key prefix for persisting design logs */
-export const DESIGN_LOG_STORAGE_KEY = 'openclo:designLog';
+export const DESIGN_LOG_STORAGE_KEY = 'vina:designLog';
 
 /**
  * Get the storage key for a specific project.

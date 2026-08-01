@@ -651,7 +651,7 @@ export class GpuSolverClient implements ClothSolverClient {
     // cientos de encodes extra por frame → los quads se EXCLUYEN con warn
     // (la feature no se shipea rota, degrada a bisagra).
     //
-    // Kill-switch dev: localStorage 'openclo-crossbend' = 'off'.
+    // Kill-switch dev: localStorage 'vina-crossbend' = 'off'.
     let bendAll = bend;
     let crossQuadCount = 0;
     let bendColorDelta = 0;
@@ -659,7 +659,7 @@ export class GpuSolverClient implements ClothSolverClient {
     // proyecto nuevo con otro layout de quads lo envenenaría.
     this.crossQuadPartners = null;
     const crossBendEnabled = typeof window === 'undefined'
-      || window.localStorage?.getItem('openclo-crossbend') !== 'off';
+      || window.localStorage?.getItem('vina-crossbend') !== 'off';
     if (crossBendEnabled && seamGlobalPairs.length > 0) {
       const cross = buildCrossSeamBendQuads(triangles, seamGlobalPairs);
       if (cross.ids.length > 0) {
@@ -762,9 +762,9 @@ export class GpuSolverClient implements ClothSolverClient {
       // en contacto POR DISEÑO, no en colisión. floor==thickness==2mm es
       // equilibrio exacto y F2 densifica pares justo en ese umbral (el
       // escéptico runtime lo subió de condicional a listo-en-el-PR).
-      // Kill-switch dev: localStorage 'openclo-seamscx' = 'off'.
+      // Kill-switch dev: localStorage 'vina-seamscx' = 'off'.
       const seamScExclEnabled = typeof window === 'undefined'
-        || window.localStorage?.getItem('openclo-seamscx') !== 'off';
+        || window.localStorage?.getItem('vina-seamscx') !== 'off';
       if (seamScExclEnabled) {
         for (const pairs of seamGlobalPairs) {
           for (let k = 0; k + 1 < pairs.length; k += 2) {

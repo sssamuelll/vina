@@ -64,7 +64,7 @@ export async function downloadGLTF(
   object: THREE.Object3D,
   options: GLTFExportOptions = {},
 ): Promise<void> {
-  const { binary = true, filename = 'openclo-export' } = options;
+  const { binary = true, filename = 'vina-export' } = options;
   const data = await exportToGLTF(object, options);
 
   let blob: Blob;

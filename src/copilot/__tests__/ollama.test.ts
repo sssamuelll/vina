@@ -753,7 +753,7 @@ describe('OllamaConfig persistence', () => {
   });
 
   it('should handle corrupted localStorage', () => {
-    localStorageMock.setItem('openclo-ollama-config', 'not-json!!!');
+    localStorageMock.setItem('vina-ollama-config', 'not-json!!!');
     const config = loadOllamaConfig();
     // Should return defaults
     expect(config.url).toBe(OLLAMA_DEFAULT_URL);

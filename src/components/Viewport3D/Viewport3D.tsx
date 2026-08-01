@@ -515,7 +515,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     const canvas = renderer.domElement;
 
     const link = document.createElement('a');
-    link.download = `openclo-fitmap-${Date.now()}.png`;
+    link.download = `vina-fitmap-${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   }, []);
@@ -575,7 +575,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       videoFormat,
     });
     const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-    downloadBlob(blob, `openclo-turntable-${Date.now()}.${ext}`);
+    downloadBlob(blob, `vina-turntable-${Date.now()}.${ext}`);
   }, []);
 
   const handleExportAllViews = useCallback(async (width: number, height: number, transparent: boolean) => {
@@ -629,13 +629,13 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     const timestamp = Date.now();
     try {
       if (format === '3d-usdz') {
-        await downloadUSDZ(group, { filename: `openclo-${timestamp}` });
+        await downloadUSDZ(group, { filename: `vina-${timestamp}` });
       } else {
         const binary = format === '3d-glb';
         await downloadGLTF(group, {
           binary,
           scale: 1, // scale already applied by collector
-          filename: `openclo-${timestamp}`,
+          filename: `vina-${timestamp}`,
         });
       }
     } catch (err) {

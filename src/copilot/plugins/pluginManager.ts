@@ -61,7 +61,7 @@ export function resetPluginHost(): void {
 }
 
 /** localStorage key for the installed plugins list */
-const INSTALLED_PLUGINS_KEY = 'openclo_installed_plugins';
+const INSTALLED_PLUGINS_KEY = 'vina_installed_plugins';
 
 // ─── Persistence ────────────────────────────────────────────────────────────
 

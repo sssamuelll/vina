@@ -318,6 +318,6 @@ describe('Plugin loading lifecycle', () => {
 
 describe('getPluginStorageKey', () => {
   it('should return namespaced key', () => {
-    expect(getPluginStorageKey('com.test.plugin')).toBe('openclo_plugins_com.test.plugin');
+    expect(getPluginStorageKey('com.test.plugin')).toBe('vina_plugins_com.test.plugin');
   });
 });

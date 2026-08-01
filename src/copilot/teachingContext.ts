@@ -23,7 +23,7 @@ export interface TeachingSnippet {
 }
 
 /** Storage key for teaching mode preference */
-const TEACHING_MODE_KEY = 'openclo-teaching-mode';
+const TEACHING_MODE_KEY = 'vina-teaching-mode';
 
 /**
  * Check if teaching mode is enabled.
