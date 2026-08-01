@@ -191,12 +191,14 @@ export class SkillPersistence {
    */
   async getAllPreferences(): Promise<TriggerPreference[]> {
     const db = this.ensureOpen();
-    return new Promise((resolve, reject) => {
+    const prefs = await new Promise<TriggerPreference[]>((resolve, reject) => {
       const tx = db.transaction(PREFERENCES_STORE, 'readonly');
       const request = tx.objectStore(PREFERENCES_STORE).getAll();
       request.onsuccess = () => resolve(request.result ?? []);
       request.onerror = () => reject(request.error);
     });
+    // Alias legacy 'openclo:*' NSIDs read from disk to 'vina:*' — see normalizeLegacyNSID.
+    return prefs.map(p => ({ ...p, preferredNsid: normalizeLegacyNSID(p.preferredNsid) as NSID }));
   }
 
   // ─── Migration ───────────────────────────────────────────────────────────
@@ -221,7 +223,10 @@ export class SkillPersistence {
       for (const cs of parsed) {
         if (cs.metadata?.id && cs.skill) {
           const registered: RegisteredSkill = {
-            nsid: cs.metadata.id as NSID,
+            // Normalize at write: the store's keyPath is 'nsid', so a raw legacy
+            // id here would persist under the old key forever (getAllSkills
+            // masks it on read, but deleteSkill('vina-...') would silently miss).
+            nsid: normalizeLegacyNSID(cs.metadata.id) as NSID,
             source: 'community',
             version: cs.metadata.version || '1.0.0',
             checksum: '',
