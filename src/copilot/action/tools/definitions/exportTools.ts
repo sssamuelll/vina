@@ -198,7 +198,7 @@ const export3DGLTFTool: ToolDefinition = {
 const saveProjectTool: ToolDefinition = {
   name: 'saveProject',
   description:
-    'Save the current project to an .openclo file. / Guardar el proyecto actual en un archivo .openclo.',
+    'Save the current project to a .vina file. / Guardar el proyecto actual en un archivo .vina.',
   parameters: {
     type: 'object',
     properties: {
@@ -213,7 +213,7 @@ const saveProjectTool: ToolDefinition = {
       const filename = (params.filename as string) || state.project.name || 'project';
       downloadProjectFile(state.project, filename);
 
-      return { success: true, data: { filename: filename + '.openclo' } };
+      return { success: true, data: { filename: filename + '.vina' } };
     } catch (e: unknown) {
       return { success: false, error: (e as Error).message };
     }

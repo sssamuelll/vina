@@ -1,7 +1,7 @@
 /**
  * NSID (Namespace Identifier) — unique skill identification.
  *
- * Format: "author:slug" e.g. "openclo:bodice", "sdar:stretch_bodice"
+ * Format: "author:slug" e.g. "vina:bodice", "sdar:stretch_bodice"
  *
  * Used to prevent namespace collisions when multiple skills have
  * similar triggers. Every skill must have a unique NSID.
@@ -45,7 +45,7 @@ const NSID_REGEX = /^([a-z0-9_-]+):([a-z0-9_-]+)$/i;
  * @returns True if valid NSID format
  *
  * @example
- * isValidNSID('openclo:bodice') // true
+ * isValidNSID('vina:bodice') // true
  * isValidNSID('invalid') // false
  */
 export function isValidNSID(value: string): value is NSID {
@@ -63,8 +63,8 @@ export function isValidNSID(value: string): value is NSID {
  * @throws Error if NSID is invalid
  *
  * @example
- * const { author, slug } = parseNSID('openclo:bodice');
- * // author = 'openclo', slug = 'bodice'
+ * const { author, slug } = parseNSID('vina:bodice');
+ * // author = 'vina', slug = 'bodice'
  */
 export function parseNSID(nsid: string): ParsedNSID {
   if (!nsid || typeof nsid !== 'string') {
@@ -92,8 +92,8 @@ export function parseNSID(nsid: string): ParsedNSID {
  * @throws Error if author or slug is invalid
  *
  * @example
- * const nsid = createNSID('openclo', 'bodice');
- * // nsid = 'openclo:bodice'
+ * const nsid = createNSID('vina', 'bodice');
+ * // nsid = 'vina:bodice'
  */
 export function createNSID(author: string, slug: string): NSID {
   if (!author || typeof author !== 'string' || !author.trim()) {
@@ -172,4 +172,15 @@ export function validateNSID(nsid: string): NSIDValidationResult {
   }
 
   return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Alias de lectura para NSIDs persistidos antes del rename a Vina (2026-08-01).
+ * Solo remapea el autor; el slug queda igual. Aplicar en TODO punto de lectura
+ * de NSIDs persistidos (skillPersistence: preferencias + instalados).
+ */
+export function normalizeLegacyNSID(nsid: string): string {
+  if (nsid.startsWith('openclo:')) return `vina:${nsid.slice('openclo:'.length)}`;
+  if (nsid.startsWith('openclo-community:')) return `vina-community:${nsid.slice('openclo-community:'.length)}`;
+  return nsid;
 }

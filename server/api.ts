@@ -50,13 +50,15 @@ export async function handleAPI(
   }
 
   // ─── Projects ───
+  // Dual-read: '.vina' is canonical (what we now write), '.openclo' is the
+  // legacy extension — existing files must keep opening forever (Task 5).
   if (pathname === '/api/projects' && method === 'GET') {
-    const files = fs.readdirSync(projectsDir).filter(f => f.endsWith('.openclo'));
+    const files = fs.readdirSync(projectsDir).filter(f => f.endsWith('.vina') || f.endsWith('.openclo'));
     const projects = files.map(f => {
       try {
         const data = JSON.parse(fs.readFileSync(path.join(projectsDir, f), 'utf-8'));
         return {
-          id: data.id || path.basename(f, '.openclo'),
+          id: data.id || path.basename(f, path.extname(f)),
           name: data.name || f,
           filename: f,
           updatedAt: data.updatedAt,
@@ -70,7 +72,8 @@ export async function handleAPI(
 
   if (pathname.startsWith('/api/projects/') && method === 'GET') {
     const id = pathname.split('/')[3];
-    const filePath = path.join(projectsDir, `${id}.openclo`);
+    let filePath = path.join(projectsDir, `${id}.vina`);
+    if (!fs.existsSync(filePath)) filePath = path.join(projectsDir, `${id}.openclo`);
     if (!fs.existsSync(filePath)) return json(res, { error: 'Not found' }, 404);
     const data = fs.readFileSync(filePath, 'utf-8');
     return json(res, JSON.parse(data));
@@ -82,7 +85,9 @@ export async function handleAPI(
     const id = project.id || `project-${Date.now()}`;
     project.id = id;
     project.updatedAt = new Date().toISOString();
-    fs.writeFileSync(path.join(projectsDir, `${id}.openclo`), JSON.stringify(project, null, 2));
+    fs.writeFileSync(path.join(projectsDir, `${id}.vina`), JSON.stringify(project, null, 2));
+    const legacyPath = path.join(projectsDir, `${id}.openclo`);
+    if (fs.existsSync(legacyPath)) fs.unlinkSync(legacyPath);
     return json(res, { id, saved: true }, 201);
   }
 
@@ -92,14 +97,18 @@ export async function handleAPI(
     const project = JSON.parse(body);
     project.id = id;
     project.updatedAt = new Date().toISOString();
-    fs.writeFileSync(path.join(projectsDir, `${id}.openclo`), JSON.stringify(project, null, 2));
+    fs.writeFileSync(path.join(projectsDir, `${id}.vina`), JSON.stringify(project, null, 2));
+    const legacyPath = path.join(projectsDir, `${id}.openclo`);
+    if (fs.existsSync(legacyPath)) fs.unlinkSync(legacyPath);
     return json(res, { id, saved: true });
   }
 
   if (pathname.startsWith('/api/projects/') && method === 'DELETE') {
     const id = pathname.split('/')[3];
-    const filePath = path.join(projectsDir, `${id}.openclo`);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    const vinaPath = path.join(projectsDir, `${id}.vina`);
+    const legacyPath = path.join(projectsDir, `${id}.openclo`);
+    if (fs.existsSync(vinaPath)) fs.unlinkSync(vinaPath);
+    if (fs.existsSync(legacyPath)) fs.unlinkSync(legacyPath);
     return json(res, { deleted: true });
   }
 

@@ -202,7 +202,7 @@ export function downloadProjectFile(state: ProjectState, filename?: string): voi
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = (filename || state.name || 'project') + '.openclo';
+  a.download = (filename || state.name || 'project') + '.vina';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -213,7 +213,8 @@ export function uploadProjectFile(): Promise<ProjectParseResult> {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.openclo,.json';
+    // '.openclo' legacy: se abre para siempre, solo cambió lo que se escribe
+    input.accept = '.vina,.openclo,.json';
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) { reject(new Error('No file selected')); return; }

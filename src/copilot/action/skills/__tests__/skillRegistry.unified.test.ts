@@ -33,8 +33,8 @@ describe('SkillRegistry (Unified)', () => {
     it('loads core skills on initialize', async () => {
       const registry = SkillRegistry.getInstance();
       await registry.initialize();
-      expect(registry.has('openclo:bodice')).toBe(true);
-      expect(registry.has('openclo:sleeve')).toBe(true);
+      expect(registry.has('vina:bodice')).toBe(true);
+      expect(registry.has('vina:sleeve')).toBe(true);
       expect(registry.coreCount).toBe(5);
     });
   });
@@ -73,7 +73,7 @@ describe('SkillRegistry (Unified)', () => {
     it('throws when unregistering core skill', async () => {
       const registry = SkillRegistry.getInstance();
       await registry.initialize();
-      await expect(registry.unregister('openclo:bodice')).rejects.toThrow('core');
+      await expect(registry.unregister('vina:bodice')).rejects.toThrow('core');
     });
   });
 
@@ -83,7 +83,7 @@ describe('SkillRegistry (Unified)', () => {
       await registry.initialize();
       const skill = registry.findByTrigger('bodice');
       expect(skill).toBeDefined();
-      expect(skill!.nsid).toBe('openclo:bodice');
+      expect(skill!.nsid).toBe('vina:bodice');
     });
 
     it('returns undefined for unknown trigger', async () => {
@@ -117,12 +117,12 @@ describe('SkillRegistry (Unified)', () => {
       const registry = SkillRegistry.getInstance();
       await registry.initialize();
 
-      await registry.disable('openclo:bodice');
-      let skill = registry.get('openclo:bodice');
+      await registry.disable('vina:bodice');
+      let skill = registry.get('vina:bodice');
       expect(skill!.enabled).toBe(false);
 
-      await registry.enable('openclo:bodice');
-      skill = registry.get('openclo:bodice');
+      await registry.enable('vina:bodice');
+      skill = registry.get('vina:bodice');
       expect(skill!.enabled).toBe(true);
     });
   });

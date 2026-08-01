@@ -67,6 +67,12 @@ describe('SkillPersistence', () => {
       const all = await persistence.getAllSkills();
       expect(all).toEqual([]);
     });
+
+    it('normalizes a legacy openclo NSID in the installed skills list', async () => {
+      await persistence.saveSkill({ ...mockSkill, nsid: 'openclo-community:pleats' as NSID });
+      const all = await persistence.getAllSkills();
+      expect(all.map(s => s.nsid)).toContain('vina-community:pleats');
+    });
   });
 
   describe('deleteSkill', () => {
@@ -96,9 +102,15 @@ describe('SkillPersistence', () => {
       expect(pref).toBeUndefined();
     });
 
+    it('normalizes a legacy openclo NSID read from preferences', async () => {
+      await persistence.setPreference('bodice', 'openclo:bodice' as NSID);
+      const pref = await persistence.getPreference('bodice');
+      expect(pref).toBe('vina:bodice');
+    });
+
     it('getAllPreferences returns all preferences', async () => {
       await persistence.setPreference('bodice', 'sdar:bodice' as NSID);
-      await persistence.setPreference('skirt', 'openclo:skirt' as NSID);
+      await persistence.setPreference('skirt', 'vina:skirt' as NSID);
       const all = await persistence.getAllPreferences();
       expect(all).toHaveLength(2);
     });

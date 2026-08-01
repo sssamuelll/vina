@@ -7,12 +7,13 @@ import {
   parseNSID,
   createNSID,
   validateNSID,
+  normalizeLegacyNSID,
 } from '../nsid';
 
 describe('nsid', () => {
   describe('isValidNSID', () => {
     it('returns true for valid NSID format', () => {
-      expect(isValidNSID('openclo:bodice')).toBe(true);
+      expect(isValidNSID('vina:bodice')).toBe(true);
       expect(isValidNSID('sdar:stretch_bodice')).toBe(true);
       expect(isValidNSID('user123:my-skill')).toBe(true);
       expect(isValidNSID('a:b')).toBe(true);
@@ -21,20 +22,20 @@ describe('nsid', () => {
     it('returns false for invalid formats', () => {
       expect(isValidNSID('nobodice')).toBe(false);
       expect(isValidNSID(':bodice')).toBe(false);
-      expect(isValidNSID('openclo:')).toBe(false);
+      expect(isValidNSID('vina:')).toBe(false);
       expect(isValidNSID('')).toBe(false);
       expect(isValidNSID('a:b:c')).toBe(false);
       expect(isValidNSID('open clo:bodice')).toBe(false);
-      expect(isValidNSID('openclo:bod ice')).toBe(false);
+      expect(isValidNSID('vina:bod ice')).toBe(false);
     });
   });
 
   describe('parseNSID', () => {
     it('parses valid NSID into components', () => {
-      const parsed = parseNSID('openclo:bodice');
-      expect(parsed.author).toBe('openclo');
+      const parsed = parseNSID('vina:bodice');
+      expect(parsed.author).toBe('vina');
       expect(parsed.slug).toBe('bodice');
-      expect(parsed.full).toBe('openclo:bodice');
+      expect(parsed.full).toBe('vina:bodice');
     });
 
     it('parses NSID with underscores and hyphens', () => {
@@ -52,8 +53,8 @@ describe('nsid', () => {
 
   describe('createNSID', () => {
     it('creates NSID from author and slug', () => {
-      const nsid = createNSID('openclo', 'bodice');
-      expect(nsid).toBe('openclo:bodice');
+      const nsid = createNSID('vina', 'bodice');
+      expect(nsid).toBe('vina:bodice');
     });
 
     it('creates NSID with special characters', () => {
@@ -66,18 +67,18 @@ describe('nsid', () => {
     });
 
     it('throws for empty slug', () => {
-      expect(() => createNSID('openclo', '')).toThrow();
+      expect(() => createNSID('vina', '')).toThrow();
     });
 
     it('throws for invalid characters', () => {
       expect(() => createNSID('open clo', 'bodice')).toThrow();
-      expect(() => createNSID('openclo', 'bod ice')).toThrow();
+      expect(() => createNSID('vina', 'bod ice')).toThrow();
     });
   });
 
   describe('validateNSID', () => {
     it('returns valid result for correct NSID', () => {
-      const result = validateNSID('openclo:bodice');
+      const result = validateNSID('vina:bodice');
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
@@ -95,7 +96,7 @@ describe('nsid', () => {
     });
 
     it('returns errors for empty slug', () => {
-      const result = validateNSID('openclo:');
+      const result = validateNSID('vina:');
       expect(result.valid).toBe(false);
       expect(result.errors.some(e => e.includes('slug'))).toBe(true);
     });
@@ -109,6 +110,17 @@ describe('nsid', () => {
     it('returns errors for multiple colons', () => {
       const result = validateNSID('a:b:c');
       expect(result.valid).toBe(false);
+    });
+  });
+
+  describe('normalizeLegacyNSID', () => {
+    it('mapea autores legacy openclo → vina', () => {
+      expect(normalizeLegacyNSID('openclo:bodice')).toBe('vina:bodice');
+      expect(normalizeLegacyNSID('openclo-community:pleats')).toBe('vina-community:pleats');
+    });
+    it('deja intactos los demás autores', () => {
+      expect(normalizeLegacyNSID('sdar:stretch_bodice')).toBe('sdar:stretch_bodice');
+      expect(normalizeLegacyNSID('vina:bodice')).toBe('vina:bodice');
     });
   });
 });

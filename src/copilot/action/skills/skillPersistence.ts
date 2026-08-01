@@ -8,6 +8,7 @@
  */
 
 import type { NSID } from './nsid';
+import { normalizeLegacyNSID } from './nsid';
 import type { RegisteredSkill, TriggerPreference } from './registryTypes';
 import { safeGetItem, safeRemoveItem } from '../../../utils/safeStorage';
 
@@ -128,12 +129,14 @@ export class SkillPersistence {
    */
   async getAllSkills(): Promise<RegisteredSkill[]> {
     const db = this.ensureOpen();
-    return new Promise((resolve, reject) => {
+    const skills = await new Promise<RegisteredSkill[]>((resolve, reject) => {
       const tx = db.transaction(SKILLS_STORE, 'readonly');
       const request = tx.objectStore(SKILLS_STORE).getAll();
       request.onsuccess = () => resolve(request.result ?? []);
       request.onerror = () => reject(request.error);
     });
+    // Alias legacy 'openclo:*' NSIDs read from disk to 'vina:*' — see normalizeLegacyNSID.
+    return skills.map(s => ({ ...s, nsid: normalizeLegacyNSID(s.nsid) as NSID }));
   }
 
   /**
@@ -173,12 +176,14 @@ export class SkillPersistence {
    */
   async getPreference(trigger: string): Promise<NSID | undefined> {
     const db = this.ensureOpen();
-    return new Promise((resolve, reject) => {
+    const preferredNsid = await new Promise<NSID | undefined>((resolve, reject) => {
       const tx = db.transaction(PREFERENCES_STORE, 'readonly');
       const request = tx.objectStore(PREFERENCES_STORE).get(trigger);
       request.onsuccess = () => resolve(request.result?.preferredNsid);
       request.onerror = () => reject(request.error);
     });
+    // Alias legacy 'openclo:*' NSIDs read from disk to 'vina:*' — see normalizeLegacyNSID.
+    return preferredNsid ? (normalizeLegacyNSID(preferredNsid) as NSID) : undefined;
   }
 
   /**

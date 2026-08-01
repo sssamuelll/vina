@@ -23,11 +23,11 @@ import { gradingSkill } from './definitions/gradingSkill';
 
 /** Core skill NSIDs */
 export const CORE_NSIDS = {
-  BODICE: 'openclo:bodice' as NSID,
-  SLEEVE: 'openclo:sleeve' as NSID,
-  SKIRT: 'openclo:skirt' as NSID,
-  COLLAR: 'openclo:collar' as NSID,
-  GRADING: 'openclo:grading' as NSID,
+  BODICE: 'vina:bodice' as NSID,
+  SLEEVE: 'vina:sleeve' as NSID,
+  SKIRT: 'vina:skirt' as NSID,
+  COLLAR: 'vina:collar' as NSID,
+  GRADING: 'vina:grading' as NSID,
 } as const;
 
 /** All core NSIDs as a set for fast lookup */

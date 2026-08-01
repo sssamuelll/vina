@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * OpenClo Local Server
- * 
+ * Vina Local Server
+ *
  * Runs on the user's machine. Serves the UI and provides:
  * - Static file serving (the built frontend)
  * - Project file I/O (save/load from filesystem)
  * - Copilot bridge (proxies to user's connected agent)
  * - WebSocket for real-time agent communication
- * 
+ *
  * Usage:
- *   openclo                    # start on default port 7700
- *   openclo --port 8080        # custom port
- *   OPENCLO_PORT=7700 openclo  # env var
+ *   vina                    # start on default port 7700
+ *   vina --port 8080        # custom port
+ *   VINA_PORT=7700 vina     # env var
  */
 
 import http from 'node:http';
@@ -21,9 +21,14 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { handleAPI } from './api.js';
 import { CopilotBridge } from './copilotBridge.js';
 
-const PORT = parseInt(process.env.OPENCLO_PORT || '7700', 10);
+const HOME = process.env.HOME || process.env.USERPROFILE || '.';
+// Migración one-shot del dir de datos: ~/.openclo → ~/.vina (rename entero)
+if (!fs.existsSync(path.join(HOME, '.vina')) && fs.existsSync(path.join(HOME, '.openclo'))) {
+  fs.renameSync(path.join(HOME, '.openclo'), path.join(HOME, '.vina'));
+}
+const PORT = parseInt(process.env.VINA_PORT || process.env.OPENCLO_PORT || '7700', 10);
 const DIST_DIR = path.resolve(import.meta.dirname, '..', 'dist');
-const PROJECTS_DIR = path.join(process.env.HOME || process.env.USERPROFILE || '.', '.openclo', 'projects');
+const PROJECTS_DIR = path.join(HOME, '.vina', 'projects');
 
 // Ensure directories exist
 if (!fs.existsSync(PROJECTS_DIR)) {
@@ -103,7 +108,7 @@ wss.on('connection', (ws: WebSocket) => {
 server.listen(PORT, () => {
   console.log(`
   ╔═══════════════════════════════════════╗
-  ║          OpenClo v0.4.0               ║
+  ║          Vina v0.4.0                  ║
   ║  http://localhost:${PORT}               ║
   ╚═══════════════════════════════════════╝
 
