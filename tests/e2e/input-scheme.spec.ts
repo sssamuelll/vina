@@ -48,7 +48,7 @@ async function waitForApp(page: Page) {
 async function dispatchAction(page: Page, type: string, payload?: unknown) {
   await page.evaluate(
     ({ t, p }) => {
-      const store = (window as unknown as { __OPENCLO_STORE__?: StoreLike }).__OPENCLO_STORE__;
+      const store = (window as unknown as { __VINA_STORE__?: StoreLike }).__VINA_STORE__;
       store?.dispatch({ type: t, payload: p });
     },
     { t: type, p: payload },
@@ -67,7 +67,7 @@ test.describe('input scheme', () => {
     await dispatchAction(page, 'inputScheme/setUserScheme', 'trackpad');
 
     const before = await page.evaluate(() => {
-      const store = (window as unknown as { __OPENCLO_STORE__?: StoreLike }).__OPENCLO_STORE__;
+      const store = (window as unknown as { __VINA_STORE__?: StoreLike }).__VINA_STORE__;
       if (!store) throw new Error('store missing');
       const s = store.getState();
       return { zoom: s.editor.zoom2D, pan: s.editor.pan2D };
@@ -82,7 +82,7 @@ test.describe('input scheme', () => {
     await expect.poll(
       async () => {
         const s = await page.evaluate(() => {
-          const store = (window as unknown as { __OPENCLO_STORE__?: StoreLike }).__OPENCLO_STORE__;
+          const store = (window as unknown as { __VINA_STORE__?: StoreLike }).__VINA_STORE__;
           return store?.getState().editor.pan2D.y;
         });
         return s;
@@ -92,7 +92,7 @@ test.describe('input scheme', () => {
 
     // Zoom must not change (plain wheel → pan, not zoom)
     const zoomAfter = await page.evaluate(() => {
-      const store = (window as unknown as { __OPENCLO_STORE__?: StoreLike }).__OPENCLO_STORE__;
+      const store = (window as unknown as { __VINA_STORE__?: StoreLike }).__VINA_STORE__;
       return store?.getState().editor.zoom2D;
     });
     expect(zoomAfter).toBeCloseTo(before.zoom, 5);
@@ -101,13 +101,13 @@ test.describe('input scheme', () => {
   test('mouse preset (default): plain wheel zooms the 2D canvas', async ({ page }) => {
     // Default scheme is 'mouse' — no dispatch needed; verify via state for robustness
     const initialScheme = await page.evaluate(() => {
-      const store = (window as unknown as { __OPENCLO_STORE__?: StoreLike }).__OPENCLO_STORE__;
+      const store = (window as unknown as { __VINA_STORE__?: StoreLike }).__VINA_STORE__;
       return store?.getState().inputScheme.scheme;
     });
     expect(initialScheme).toBe('mouse');
 
     const before = await page.evaluate(() => {
-      const store = (window as unknown as { __OPENCLO_STORE__?: StoreLike }).__OPENCLO_STORE__;
+      const store = (window as unknown as { __VINA_STORE__?: StoreLike }).__VINA_STORE__;
       if (!store) throw new Error('store not ready: zoom2D missing');
       return store.getState().editor.zoom2D;
     });
@@ -121,7 +121,7 @@ test.describe('input scheme', () => {
     await expect.poll(
       async () => {
         return page.evaluate(() => {
-          const store = (window as unknown as { __OPENCLO_STORE__?: StoreLike }).__OPENCLO_STORE__;
+          const store = (window as unknown as { __VINA_STORE__?: StoreLike }).__VINA_STORE__;
           return store?.getState().editor.zoom2D;
         });
       },
@@ -142,7 +142,7 @@ test.describe('input scheme', () => {
     await expect.poll(
       async () => {
         return page.evaluate(() => {
-          const store = (window as unknown as { __OPENCLO_STORE__?: StoreLike }).__OPENCLO_STORE__;
+          const store = (window as unknown as { __VINA_STORE__?: StoreLike }).__VINA_STORE__;
           return store?.getState().inputScheme;
         });
       },

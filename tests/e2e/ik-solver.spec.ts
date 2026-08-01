@@ -197,7 +197,7 @@ test.describe('IK Solver', () => {
     // Move the left hand target 0.3m forward (Z+) and 0.2m up (Y+) from current position.
     await page.evaluate((pos) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const store = (window as any).__OPENCLO_STORE__;
+      const store = (window as any).__VINA_STORE__;
       if (!store) return;
       store.dispatch({
         type: 'avatar/setIKTarget',

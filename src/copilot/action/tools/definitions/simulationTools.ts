@@ -195,7 +195,7 @@ const saveSimulationStateTool: ToolDefinition = {
     dispatch(setActiveSnapshot(id));
 
     // Emit custom event for GarmentSimulation to pick up
-    window.dispatchEvent(new CustomEvent('openclo:snapshotSave', { detail: { id } }));
+    window.dispatchEvent(new CustomEvent('vina:snapshotSave', { detail: { id } }));
 
     return { success: true, data: { id, name, particleCount } };
   },
@@ -225,7 +225,7 @@ const restoreSimulationStateTool: ToolDefinition = {
     }
 
     dispatch(setActiveSnapshot(snap.id));
-    window.dispatchEvent(new CustomEvent('openclo:snapshotRestore', { detail: { id: snap.id } }));
+    window.dispatchEvent(new CustomEvent('vina:snapshotRestore', { detail: { id: snap.id } }));
 
     return { success: true, data: { restored: true, name: snap.name } };
   },
@@ -285,7 +285,7 @@ const deleteSimulationStateTool: ToolDefinition = {
     }
 
     dispatch(removeSnapshot(snap.id));
-    window.dispatchEvent(new CustomEvent('openclo:snapshotDelete', { detail: { id: snap.id } }));
+    window.dispatchEvent(new CustomEvent('vina:snapshotDelete', { detail: { id: snap.id } }));
 
     return { success: true, data: { deleted: true, name } };
   },

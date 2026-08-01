@@ -105,10 +105,10 @@ describe('collectExportScene', () => {
     expect(hasSkinnedMesh).toBe(true);
   });
 
-  it('includes mannequin (plain mesh) with userData.opencloRole marker', () => {
+  it('includes mannequin (plain mesh) with userData.vinaRole marker', () => {
     const scene = new THREE.Scene();
     const mannequinGroup = new THREE.Group();
-    mannequinGroup.userData = { opencloRole: 'avatar' };
+    mannequinGroup.userData = { vinaRole: 'avatar' };
     const bodyMesh = new THREE.Mesh(
       new THREE.SphereGeometry(0.2),
       new THREE.MeshStandardMaterial(),
@@ -125,7 +125,7 @@ describe('collectExportScene', () => {
   it('excludes mannequin when includeAvatar is false', () => {
     const scene = new THREE.Scene();
     const mannequinGroup = new THREE.Group();
-    mannequinGroup.userData = { opencloRole: 'avatar' };
+    mannequinGroup.userData = { vinaRole: 'avatar' };
     mannequinGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshStandardMaterial()));
     scene.add(mannequinGroup);
 

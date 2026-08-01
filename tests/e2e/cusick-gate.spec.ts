@@ -49,13 +49,13 @@ async function runCusick(page: Page, fabricId: string): Promise<CusickGpuResult>
   await page.goto(`/?testScene=cusick&fabric=${fabricId}`);
   await page.waitForFunction(
     () =>
-      (window as unknown as { __OPENCLO_CUSICK__?: { done?: boolean } }).__OPENCLO_CUSICK__
+      (window as unknown as { __VINA_CUSICK__?: { done?: boolean } }).__VINA_CUSICK__
         ?.done === true,
     undefined,
     { timeout: 120_000 },
   );
   const r = await page.evaluate(
-    () => (window as unknown as { __OPENCLO_CUSICK__: CusickGpuResult }).__OPENCLO_CUSICK__,
+    () => (window as unknown as { __VINA_CUSICK__: CusickGpuResult }).__VINA_CUSICK__,
   );
   // Línea estructurada en el reporte Playwright (el harness ya la logueó en consola del browser).
   console.log(

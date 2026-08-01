@@ -672,5 +672,5 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
     });
   }, [importedScene, avatarRenderStyle]);
 
-  return <group ref={groupRef} onPointerDown={onPointerDown} userData={{ opencloRole: 'avatar' }} />;
+  return <group ref={groupRef} onPointerDown={onPointerDown} userData={{ vinaRole: 'avatar' }} />;
 }

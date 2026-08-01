@@ -19,11 +19,11 @@ import './tools';
 // Global error tracking (captures unhandled errors + rejections)
 import { initErrorTracker, getTrackedErrors, getErrorCount } from './utils/errorTracker';
 initErrorTracker();
-// Expose for devtools: __OPENCLO_ERRORS__() returns tracked errors
+// Expose for devtools: __VINA_ERRORS__() returns tracked errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-(window as any).__OPENCLO_ERRORS__ = getTrackedErrors;
+(window as any).__VINA_ERRORS__ = getTrackedErrors;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-(window as any).__OPENCLO_ERROR_COUNT__ = getErrorCount;
+(window as any).__VINA_ERROR_COUNT__ = getErrorCount;
 
 // Security: clear any API keys from legacy localStorage fallback storage
 import { clearLegacyFallbackKeys } from './copilot/errorRecovery';

@@ -5,14 +5,14 @@
  * ActivityBar (`.activity-bar-*`) and SimulationView (`.simulation-view`)
  * surfaces. The current shell has no wind/freeze/quality-preset UI — those
  * are product backlog — so setup is store-driven (the dress-avatar-dod.spec.ts
- * pattern): expose the Redux store at `window.__OPENCLO_STORE__`, dispatch a
+ * pattern): expose the Redux store at `window.__VINA_STORE__`, dispatch a
  * rectangle piece into `project`, switch to 3D so GarmentSimulation mounts,
  * then start the sim via dispatch (or the RightDock Simulate button).
  *
- * Mesh observable: `window.__OPENCLO_CLOTH_MESH__` (GarmentSimulation.tsx:521).
+ * Mesh observable: `window.__VINA_CLOTH_MESH__` (GarmentSimulation.tsx:521).
  *
  * NOTE: do NOT use `window.__REDUX_STORE__` — that name is not exposed by the
- * app. The canonical handle is `__OPENCLO_STORE__` (src/store/index.ts).
+ * app. The canonical handle is `__VINA_STORE__` (src/store/index.ts).
  */
 import { expect, type Page } from '@playwright/test';
 
@@ -20,11 +20,11 @@ import { expect, type Page } from '@playwright/test';
 export async function waitForApp(page: Page) {
   await page.goto('/');
   await page
-    .waitForFunction(() => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__), {
+    .waitForFunction(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__), {
       timeout: 15_000,
     })
     .catch(() => {
-      throw new Error('window.__OPENCLO_STORE__ never appeared within 15s — dev server not serving the app?');
+      throw new Error('window.__VINA_STORE__ never appeared within 15s — dev server not serving the app?');
     });
   // RightDock Simulate button is part of the shell in split/3D view; its
   // presence implies the shell mounted (UnifiedBar + 3D viewport present).
@@ -38,10 +38,10 @@ export async function waitForApp(page: Page) {
  */
 export async function addRectanglePiece(page: Page, name = 'Rect'): Promise<string> {
   return page.evaluate((pieceName) => {
-    const store = (window as unknown as { __OPENCLO_STORE__?: {
+    const store = (window as unknown as { __VINA_STORE__?: {
       dispatch: (a: unknown) => void;
       getState: () => { project?: { pieces?: Array<{ id: string }> } };
-    } }).__OPENCLO_STORE__;
+    } }).__VINA_STORE__;
     if (!store) throw new Error('store not exposed');
     const id = (crypto as Crypto & { randomUUID: () => string }).randomUUID();
     const now = Date.now();
@@ -80,9 +80,9 @@ export async function switchView(page: Page, mode: '2D' | 'Split' | '3D') {
 /** Read the current simulation state from the store. */
 export async function getSimulationState(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const store = (window as unknown as { __OPENCLO_STORE__?: {
+    const store = (window as unknown as { __VINA_STORE__?: {
       getState: () => { simulation?: { simulationState?: string } };
-    } }).__OPENCLO_STORE__;
+    } }).__VINA_STORE__;
     return store?.getState().simulation?.simulationState ?? 'unknown';
   });
 }
@@ -95,9 +95,9 @@ export async function getSimulationState(page: Page): Promise<string> {
  */
 export async function getSolverTier(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const store = (window as unknown as { __OPENCLO_STORE__?: {
+    const store = (window as unknown as { __VINA_STORE__?: {
       getState: () => { simulation?: { solverTier?: string } };
-    } }).__OPENCLO_STORE__;
+    } }).__VINA_STORE__;
     return store?.getState().simulation?.solverTier ?? 'none';
   });
 }
@@ -105,15 +105,15 @@ export async function getSolverTier(page: Page): Promise<string> {
 /** Start the simulation via store dispatch and poll until it reports 'running'. */
 export async function startSimulation(page: Page) {
   await page.evaluate(() => {
-    const store = (window as unknown as { __OPENCLO_STORE__?: { dispatch: (a: unknown) => void } }).__OPENCLO_STORE__;
+    const store = (window as unknown as { __VINA_STORE__?: { dispatch: (a: unknown) => void } }).__VINA_STORE__;
     store?.dispatch({ type: 'simulation/setViewMode3D', payload: 'simulate' });
     store?.dispatch({ type: 'simulation/startSimulation' });
   });
   await page.waitForFunction(
     () => {
-      const store = (window as unknown as { __OPENCLO_STORE__?: {
+      const store = (window as unknown as { __VINA_STORE__?: {
         getState: () => { simulation?: { simulationState?: string } };
-      } }).__OPENCLO_STORE__;
+      } }).__VINA_STORE__;
       return store?.getState().simulation?.simulationState === 'running';
     },
     { timeout: 10_000 },
@@ -123,7 +123,7 @@ export async function startSimulation(page: Page) {
 /** Dispatch an arbitrary action onto the store. */
 export async function dispatch(page: Page, action: Record<string, unknown>) {
   await page.evaluate((a) => {
-    const store = (window as unknown as { __OPENCLO_STORE__?: { dispatch: (x: unknown) => void } }).__OPENCLO_STORE__;
+    const store = (window as unknown as { __VINA_STORE__?: { dispatch: (x: unknown) => void } }).__VINA_STORE__;
     store?.dispatch(a);
   }, action);
 }
@@ -136,7 +136,7 @@ export async function dispatch(page: Page, action: Record<string, unknown>) {
 export async function waitForClothMesh(page: Page, budgetMs = 20_000): Promise<boolean> {
   return page
     .waitForFunction(
-      () => Boolean((window as unknown as { __OPENCLO_CLOTH_MESH__?: { geometry?: unknown } }).__OPENCLO_CLOTH_MESH__?.geometry),
+      () => Boolean((window as unknown as { __VINA_CLOTH_MESH__?: { geometry?: unknown } }).__VINA_CLOTH_MESH__?.geometry),
       { timeout: budgetMs, polling: 250 },
     )
     .then(() => true)
@@ -146,9 +146,9 @@ export async function waitForClothMesh(page: Page, budgetMs = 20_000): Promise<b
 /** Aggregate position diagnostics from the cloth mesh: NaN/Inf/zero counts + avg center. */
 export async function readMeshPositions(page: Page) {
   return page.evaluate(() => {
-    const mesh = (window as unknown as { __OPENCLO_CLOTH_MESH__?: {
+    const mesh = (window as unknown as { __VINA_CLOTH_MESH__?: {
       geometry?: { getAttribute(n: string): { count: number; getX(i: number): number; getY(i: number): number; getZ(i: number): number } | null };
-    } }).__OPENCLO_CLOTH_MESH__;
+    } }).__VINA_CLOTH_MESH__;
     if (!mesh?.geometry) return { found: false as const };
     const pos = mesh.geometry.getAttribute('position');
     if (!pos || pos.count === 0) return { found: false as const };

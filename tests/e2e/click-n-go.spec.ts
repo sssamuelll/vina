@@ -29,21 +29,21 @@ interface StoreLike {
 
 async function dispatch(page: Page, action: { type: string; payload?: unknown }) {
   await page.evaluate((a) => {
-    const store = (window as unknown as { __OPENCLO_STORE__?: StoreLike }).__OPENCLO_STORE__;
+    const store = (window as unknown as { __VINA_STORE__?: StoreLike }).__VINA_STORE__;
     store?.dispatch(a);
   }, action);
 }
 
 async function getExpertMode(page: Page): Promise<boolean | null> {
   return page.evaluate(() => {
-    const store = (window as unknown as { __OPENCLO_STORE__?: StoreLike }).__OPENCLO_STORE__;
+    const store = (window as unknown as { __VINA_STORE__?: StoreLike }).__VINA_STORE__;
     return store ? store.getState().workflow.expertMode : null;
   });
 }
 
 async function getToolMemory(page: Page): Promise<Record<string, Record<string, unknown>>> {
   return page.evaluate(() => {
-    const store = (window as unknown as { __OPENCLO_STORE__?: StoreLike }).__OPENCLO_STORE__;
+    const store = (window as unknown as { __VINA_STORE__?: StoreLike }).__VINA_STORE__;
     return store ? store.getState().workflow.toolMemory : {};
   });
 }

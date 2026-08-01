@@ -26,7 +26,7 @@ async function waitForApp(page: Page) {
 
 async function dispatch(page: Page, action: { type: string; payload?: unknown }) {
   await page.evaluate((act) => {
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as
       | { dispatch: (a: unknown) => void }
       | undefined;
     store?.dispatch(act);
@@ -35,7 +35,7 @@ async function dispatch(page: Page, action: { type: string; payload?: unknown })
 
 async function getState<T = unknown>(page: Page, path: string): Promise<T> {
   return page.evaluate((sel) => {
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as
       | { getState: () => unknown }
       | undefined;
     if (!store) return null;

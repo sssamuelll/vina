@@ -13,7 +13,7 @@ import {
  * 3. Redux steam brush state updates / clamps via dispatch.
  * 4. Simulation runs while steam brush is active — no errors.
  *
- * Setup retargeted (2026-06-04): store handle is `__OPENCLO_STORE__` (NOT
+ * Setup retargeted (2026-06-04): store handle is `__VINA_STORE__` (NOT
  * `__REDUX_STORE__`); pieces are dispatched into project state; the sim is
  * started via store dispatch. The 'b' shortcut maps to `tool3d.steamBrush`
  * (src/shortcuts/defaults.ts) which only resolves in the 3D shortcut context —
@@ -28,7 +28,7 @@ test.describe('Steam Brush Tool (issue #303)', () => {
   test('steam brush Redux state has correct defaults', async ({ page }) => {
     await waitForApp(page);
     const state = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: { getState: () => { simulation: { steamBrush: unknown } } } }).__OPENCLO_STORE__;
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => { simulation: { steamBrush: unknown } } } }).__VINA_STORE__;
       return s.getState().simulation.steamBrush;
     });
     expect(state).toEqual({ active: false, radius: 0.05, strength: 0.3 });
@@ -46,7 +46,7 @@ test.describe('Steam Brush Tool (issue #303)', () => {
     await page.waitForTimeout(300);
 
     const activeTool = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: { getState: () => { tools: { activeTool3D: string } } } }).__OPENCLO_STORE__;
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => { tools: { activeTool3D: string } } } }).__VINA_STORE__;
       return s.getState().tools.activeTool3D;
     });
     expect(activeTool).toBe('steamBrush');
@@ -55,10 +55,10 @@ test.describe('Steam Brush Tool (issue #303)', () => {
   test('steam brush state updates via Redux dispatch', async ({ page }) => {
     await waitForApp(page);
     const updated = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: {
+      const s = (window as unknown as { __VINA_STORE__: {
         dispatch: (a: unknown) => void;
         getState: () => { simulation: { steamBrush: { radius: number; strength: number; active: boolean } } };
-      } }).__OPENCLO_STORE__;
+      } }).__VINA_STORE__;
       s.dispatch({ type: 'simulation/setSteamBrushRadius', payload: 0.1 });
       s.dispatch({ type: 'simulation/setSteamBrushStrength', payload: 0.8 });
       s.dispatch({ type: 'simulation/setSteamBrushActive', payload: true });
@@ -72,10 +72,10 @@ test.describe('Steam Brush Tool (issue #303)', () => {
   test('steam brush clamping works via Redux', async ({ page }) => {
     await waitForApp(page);
     const clamped = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: {
+      const s = (window as unknown as { __VINA_STORE__: {
         dispatch: (a: unknown) => void;
         getState: () => { simulation: { steamBrush: { radius: number; strength: number } } };
-      } }).__OPENCLO_STORE__;
+      } }).__VINA_STORE__;
       s.dispatch({ type: 'simulation/setSteamBrushRadius', payload: 0 });
       const r1 = s.getState().simulation.steamBrush.radius;
       s.dispatch({ type: 'simulation/setSteamBrushRadius', payload: 2 });

@@ -19,7 +19,7 @@ async function getSvgCenter(page: Page) {
 // `.tool-btn[title*="..."]` selectors — buttons no longer expose `title`.
 async function getActiveTool2D(page: Page): Promise<string | null> {
   return page.evaluate(() => {
-    const store = (window as unknown as { __OPENCLO_STORE__?: { getState: () => { tools: { activeTool2D: string } } } }).__OPENCLO_STORE__;
+    const store = (window as unknown as { __VINA_STORE__?: { getState: () => { tools: { activeTool2D: string } } } }).__VINA_STORE__;
     return store ? store.getState().tools.activeTool2D : null;
   });
 }
@@ -27,7 +27,7 @@ async function getActiveTool2D(page: Page): Promise<string | null> {
 // Piece count straight from Redux — deterministic, replaces the dead `.status-bar`.
 async function getPieceCount(page: Page): Promise<number> {
   return page.evaluate(() => {
-    const store = (window as unknown as { __OPENCLO_STORE__?: { getState: () => { project: { pieces: unknown[] } } } }).__OPENCLO_STORE__;
+    const store = (window as unknown as { __VINA_STORE__?: { getState: () => { project: { pieces: unknown[] } } } }).__VINA_STORE__;
     return store ? store.getState().project.pieces.length : -1;
   });
 }
@@ -134,7 +134,7 @@ test.describe('Select Tool', () => {
     await page.waitForTimeout(500);
     // Selection lives in Redux (editor.selectedPieceIds). The piece survives.
     const selectedCount = await page.evaluate(() => {
-      const store = (window as unknown as { __OPENCLO_STORE__?: { getState: () => { editor: { selectedPieceIds?: unknown[]; selectedIds?: unknown[] } } } }).__OPENCLO_STORE__;
+      const store = (window as unknown as { __VINA_STORE__?: { getState: () => { editor: { selectedPieceIds?: unknown[]; selectedIds?: unknown[] } } } }).__VINA_STORE__;
       if (!store) return -1;
       const ed = store.getState().editor;
       const ids = ed.selectedPieceIds ?? ed.selectedIds ?? [];

@@ -18,7 +18,7 @@
  * captura — B1), face-poke, brush/grab, wind (windForce=0 sería no-op).
  *
  * Al frame 300: readback GPU→CPU (readPositionsToCPU), DC + folds + minY con
- * cusickMetric, y publica `window.__OPENCLO_CUSICK__` + una línea
+ * cusickMetric, y publica `window.__VINA_CUSICK__` + una línea
  * `[cusick-gpu] ...` estructurada. Después del frame 300 el dispatch se
  * detiene (pose congelada) para que Samuel inspeccione el drape.
  */
@@ -60,7 +60,7 @@ export interface CusickGpuResult {
 }
 
 function publish(result: CusickGpuResult): void {
-  (window as unknown as Record<string, unknown>).__OPENCLO_CUSICK__ = result;
+  (window as unknown as Record<string, unknown>).__VINA_CUSICK__ = result;
 }
 
 /**

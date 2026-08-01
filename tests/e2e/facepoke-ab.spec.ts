@@ -28,7 +28,7 @@ const SHOT = path.resolve(
 
 async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
   return page.evaluate((p) => {
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as
       | { getState: () => unknown }
       | undefined;
     if (!store) return null;
@@ -41,7 +41,7 @@ async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
 async function readFacePoke(page: Page) {
   return page.evaluate(() => {
     const w = window as unknown as Record<string, unknown>;
-    return (w.__OPENCLO_FACE_POKE__ as {
+    return (w.__VINA_FACE_POKE__ as {
       visible: number; visibleShallow: number; visibleAligned: number; visibleTrue: number; near: number; maxDepth: number; sampledFaces: number; stride: number;
     } | undefined) ?? null;
   });
@@ -50,7 +50,7 @@ async function readFacePoke(page: Page) {
 async function readDrape(page: Page) {
   return page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mesh = (window as any).__OPENCLO_CLOTH_MESH__;
+    const mesh = (window as any).__VINA_CLOTH_MESH__;
     if (!mesh) return null;
     const pos = mesh.geometry.attributes.position;
     let nan = 0, belowHip = 0, sleeve = 0;
@@ -80,7 +80,7 @@ test('facepoke A/B metric @gpu-local', async ({ page }) => {
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
   await page.waitForFunction(
-    () => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__),
+    () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),
     { timeout: 15_000 },
   );
   await page.waitForTimeout(500);
@@ -99,7 +99,7 @@ test('facepoke A/B metric @gpu-local', async ({ page }) => {
 
   await page.evaluate(() => {
     const w = window as unknown as Record<string, unknown>;
-    const store = w.__OPENCLO_STORE__ as {
+    const store = w.__VINA_STORE__ as {
       getState: () => { simulation: { frameTimeMs: number } };
       subscribe: (f: () => void) => void;
     };
@@ -131,7 +131,7 @@ test('facepoke A/B metric @gpu-local', async ({ page }) => {
 
   const triCount = await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const m = (window as any).__OPENCLO_COLLISION_MESH__;
+    const m = (window as any).__VINA_COLLISION_MESH__;
     return m ? m.triCount : null;
   });
   console.log(`[A4-collider] triCount=${triCount}`);
@@ -160,7 +160,7 @@ test('facepoke A/B metric @gpu-local', async ({ page }) => {
   );
   const pairs = await page.evaluate(() => {
     const w = window as unknown as Record<string, unknown>;
-    const fp = w.__OPENCLO_FACE_POKE__ as { pairs?: number[][] } | undefined;
+    const fp = w.__VINA_FACE_POKE__ as { pairs?: number[][] } | undefined;
     return fp?.pairs ?? null;
   });
   for (const pr of pairs ?? []) {
@@ -173,7 +173,7 @@ test('facepoke A/B metric @gpu-local', async ({ page }) => {
   const rays = await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const w = window as any;
-    const cloth = w.__OPENCLO_CLOTH_MESH__;
+    const cloth = w.__VINA_CLOTH_MESH__;
     if (!cloth) return null;
     let scene = cloth;
     while (scene.parent) scene = scene.parent;
@@ -181,7 +181,7 @@ test('facepoke A/B metric @gpu-local', async ({ page }) => {
     scene.traverse((o: { isSkinnedMesh?: boolean; isMesh?: boolean; name?: string }) => {
       if (o.isSkinnedMesh) skinned.push(o);
     });
-    const THREE = w.__OPENCLO_THREE__;
+    const THREE = w.__VINA_THREE__;
     if (!THREE || skinned.length === 0) {
       return { error: `THREE=${!!THREE} skinned=${skinned.length}` };
     }
@@ -210,7 +210,7 @@ test('facepoke A/B metric @gpu-local', async ({ page }) => {
   console.log(`[A4-rays] ${JSON.stringify(rays)}`);
   const collZ = await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mesh = (window as any).__OPENCLO_COLLISION_MESH__ as
+    const mesh = (window as any).__VINA_COLLISION_MESH__ as
       | { vertices: Float32Array; triCount: number }
       | undefined;
     if (!mesh) return null;
@@ -256,8 +256,8 @@ test('facepoke A/B metric @gpu-local', async ({ page }) => {
   const profile = await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const w = window as any;
-    const coll = w.__OPENCLO_COLLISION_MESH__ as { vertices: Float32Array; triCount: number } | undefined;
-    const cloth = w.__OPENCLO_CLOTH_MESH__;
+    const coll = w.__VINA_COLLISION_MESH__ as { vertices: Float32Array; triCount: number } | undefined;
+    const cloth = w.__VINA_CLOTH_MESH__;
     if (!coll || !cloth) return null;
     let scene = cloth;
     while (scene.parent) scene = scene.parent;
@@ -265,7 +265,7 @@ test('facepoke A/B metric @gpu-local', async ({ page }) => {
     const skinned: any[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     scene.traverse((o: any) => { if (o.isSkinnedMesh) skinned.push(o); });
-    const THREE = w.__OPENCLO_THREE__;
+    const THREE = w.__VINA_THREE__;
     const bands = [1.0, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4];
     const half = 0.025;
     const out: Record<string, { collF: number | null; rendF: number | null; collB: number | null; rendB: number | null }> = {};

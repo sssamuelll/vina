@@ -516,8 +516,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     if (isPlayingBack) return;
     // Dev-only freeze: congela el loop de sim SIN desmontar (pausar por store
     // desmonta via useClothSim). Lo usa el probe del face-poke @gpu-local para
-    // leer posiciones quietas; setear window.__OPENCLO_FREEZE_FRAME__=true.
-    if (import.meta.env.DEV && (window as unknown as Record<string, unknown>).__OPENCLO_FREEZE_FRAME__) return;
+    // leer posiciones quietas; setear window.__VINA_FREEZE_FRAME__=true.
+    if (import.meta.env.DEV && (window as unknown as Record<string, unknown>).__VINA_FREEZE_FRAME__) return;
 
     const solver = tslSolverRef.current;
     // 2a (init-race, plan §6bis): sin colisión cargada NO se stepea — los
@@ -752,9 +752,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
             const { count, minSignedDist } = computePenetrationMetric(positions, body, {
               stride: penetrationStrideFor(posAttr.count),
             });
-            // e2e §8 debug global — same window-cast pattern as __OPENCLO_CLOTH_MESH__.
+            // e2e §8 debug global — same window-cast pattern as __VINA_CLOTH_MESH__.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (window as any).__OPENCLO_PENETRATION_COUNT__ = count;
+            (window as any).__VINA_PENETRATION_COUNT__ = count;
             if (Number.isFinite(minSignedDist)) {
               // Inspector rules (fit:body-penetration / fit:pressure-point) compare in mm.
               dispatch(setCollisionDistance(minSignedDist * 1000));
@@ -773,7 +773,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
                 { stride: facePokeStrideFor(idxAttr.count / 3), debugPairs: 24 },
               );
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (window as any).__OPENCLO_FACE_POKE__ = fp;
+              (window as any).__VINA_FACE_POKE__ = fp;
             }
           });
         }
@@ -834,14 +834,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   useEffect(() => {
     if (typeof window !== 'undefined' && meshRef.current) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__OPENCLO_CLOTH_MESH__ = meshRef.current;
+      (window as any).__VINA_CLOTH_MESH__ = meshRef.current;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__OPENCLO_THREE__ = THREE;
+      (window as any).__VINA_THREE__ = THREE;
     }
     return () => {
       if (typeof window !== 'undefined') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (window as any).__OPENCLO_CLOTH_MESH__;
+        delete (window as any).__VINA_CLOTH_MESH__;
       }
     };
   }, [staticGeometry]);
@@ -887,8 +887,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         console.error('[GarmentSimulation] 3D export failed:', err);
       }
     };
-    window.addEventListener('openclo:export3d', handler);
-    return () => window.removeEventListener('openclo:export3d', handler);
+    window.addEventListener('vina:export3d', handler);
+    return () => window.removeEventListener('vina:export3d', handler);
   }, []);
 
   // Derive render params from selected fabric

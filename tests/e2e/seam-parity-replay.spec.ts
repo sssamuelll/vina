@@ -8,7 +8,7 @@
  * refactor debe dejarlos verdes.
  *
  * Convenciones del harness (sewing-tools.spec.ts / helpers/sim.ts):
- * estado vía `window.__OPENCLO_STORE__` dispatch (geometría determinista),
+ * estado vía `window.__VINA_STORE__` dispatch (geometría determinista),
  * interacción real solo donde el comportamiento ES la interacción (clicks de
  * cosido, Ctrl+B).
  */
@@ -21,7 +21,7 @@ async function waitFor2D(page: Page) {
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
   await page.waitForFunction(
-    () => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__),
+    () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),
     { timeout: 15000 },
   );
   await page.waitForTimeout(500);
@@ -29,7 +29,7 @@ async function waitFor2D(page: Page) {
 
 async function dispatch(page: Page, action: { type: string; payload?: unknown }) {
   await page.evaluate((act) => {
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as
       | { dispatch: (a: unknown) => void }
       | undefined;
     store?.dispatch(act);
@@ -38,7 +38,7 @@ async function dispatch(page: Page, action: { type: string; payload?: unknown })
 
 async function getState<T = unknown>(page: Page, path: string): Promise<T> {
   return page.evaluate((sel) => {
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as
       | { getState: () => unknown }
       | undefined;
     if (!store) return null;
@@ -619,7 +619,7 @@ test.describe('Seam parity replay — arrange→solver (M2)', () => {
     // posible si el override llegó a placedMeshes (antes del fix: max |x|
     // anatómico ≈ 0.6m y el assert falla).
     const maxX = await page.evaluate(() => {
-      const mesh = (window as unknown as { __OPENCLO_CLOTH_MESH__?: { geometry: { getAttribute: (n: string) => { array: Float32Array } } } }).__OPENCLO_CLOTH_MESH__;
+      const mesh = (window as unknown as { __VINA_CLOTH_MESH__?: { geometry: { getAttribute: (n: string) => { array: Float32Array } } } }).__VINA_CLOTH_MESH__;
       if (!mesh) return null;
       const arr = mesh.geometry.getAttribute('position').array;
       let mx = -Infinity;
@@ -759,9 +759,9 @@ test.describe('Seam parity replay — drape sobre el avatar (M4)', () => {
     await page.waitForTimeout(25_000);
 
     const drape = await page.evaluate(() => {
-      const mesh = (window as unknown as { __OPENCLO_CLOTH_MESH__?: {
+      const mesh = (window as unknown as { __VINA_CLOTH_MESH__?: {
         geometry: { attributes: { position: { count: number; getY: (i: number) => number } } };
-      } }).__OPENCLO_CLOTH_MESH__;
+      } }).__VINA_CLOTH_MESH__;
       if (!mesh) return null;
       const pos = mesh.geometry.attributes.position;
       const n = pos.count;

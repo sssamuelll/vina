@@ -9,7 +9,7 @@ test.describe('Seam curved edge highlights', () => {
 
   test('renders seam highlights as SVG paths that preserve Q/C curves and piece offsets', async ({ page }) => {
     await page.evaluate(() => {
-      const store = (window as unknown as { __OPENCLO_STORE__?: { dispatch: (action: unknown) => void } }).__OPENCLO_STORE__;
+      const store = (window as unknown as { __VINA_STORE__?: { dispatch: (action: unknown) => void } }).__VINA_STORE__;
       if (!store) throw new Error('OpenClo store not found on window');
 
       const curvedPieceA = {
@@ -154,7 +154,7 @@ test.describe('Seam curved edge highlights', () => {
 
   test('renders cubic seam highlights as SVG path C commands', async ({ page }) => {
     await page.evaluate(() => {
-      const store = (window as unknown as { __OPENCLO_STORE__?: { dispatch: (action: unknown) => void } }).__OPENCLO_STORE__;
+      const store = (window as unknown as { __VINA_STORE__?: { dispatch: (action: unknown) => void } }).__VINA_STORE__;
       if (!store) throw new Error('OpenClo store not found on window');
 
       const cubicPiece = {
@@ -258,7 +258,7 @@ test.describe('Seam curved edge highlights', () => {
 
   test('renders linear seam highlights as path L commands after the renderer switch', async ({ page }) => {
     await page.evaluate(() => {
-      const store = (window as unknown as { __OPENCLO_STORE__?: { dispatch: (action: unknown) => void } }).__OPENCLO_STORE__;
+      const store = (window as unknown as { __VINA_STORE__?: { dispatch: (action: unknown) => void } }).__VINA_STORE__;
       if (!store) throw new Error('OpenClo store not found on window');
 
       const left = {

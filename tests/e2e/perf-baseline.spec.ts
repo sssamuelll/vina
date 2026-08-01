@@ -19,7 +19,7 @@ const FIXTURE = path.resolve(
 
 async function getState<T = unknown>(page: Page, sel: string): Promise<T> {
   return page.evaluate((p) => {
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as
       | { getState: () => unknown }
       | undefined;
     if (!store) return null;
@@ -38,7 +38,7 @@ test.describe('perf baseline @gpu-local — camisa de María', () => {
     await page.goto('/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
     await page.waitForFunction(
-      () => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__),
+      () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),
       { timeout: 15_000 },
     );
     await page.waitForTimeout(500);
@@ -73,7 +73,7 @@ test.describe('perf baseline @gpu-local — camisa de María', () => {
     // re-lee valores stale y la mediana colapsa a una sola ventana.
     await page.evaluate(() => {
       const w = window as unknown as Record<string, unknown>;
-      const store = w.__OPENCLO_STORE__ as {
+      const store = w.__VINA_STORE__ as {
         getState: () => { simulation: { frameTimeMs: number } };
         subscribe: (f: () => void) => void;
       };

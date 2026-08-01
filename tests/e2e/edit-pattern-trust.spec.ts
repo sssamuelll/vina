@@ -10,8 +10,8 @@ const FIXTURE = path.resolve(
 async function activeTool2D(page: Page): Promise<string | null> {
   return page.evaluate(() => {
     const store = (window as unknown as {
-      __OPENCLO_STORE__?: { getState: () => { tools: { activeTool2D: string } } };
-    }).__OPENCLO_STORE__;
+      __VINA_STORE__?: { getState: () => { tools: { activeTool2D: string } } };
+    }).__VINA_STORE__;
     return store?.getState().tools.activeTool2D ?? null;
   });
 }
@@ -19,10 +19,10 @@ async function activeTool2D(page: Page): Promise<string | null> {
 async function commandValues(page: Page, pieceId: string, commandIndex: number): Promise<number[]> {
   return page.evaluate(({ id, index }) => {
     const store = (window as unknown as {
-      __OPENCLO_STORE__: { getState: () => {
+      __VINA_STORE__: { getState: () => {
         project: { pieces: Array<{ id: string; outline: Array<{ values: number[] }> }> };
       } };
-    }).__OPENCLO_STORE__;
+    }).__VINA_STORE__;
     const piece = store.getState().project.pieces.find((item) => item.id === id)!;
     return [...piece.outline[index].values];
   }, { id: pieceId, index: commandIndex });

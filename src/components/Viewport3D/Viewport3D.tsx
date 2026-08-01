@@ -439,12 +439,12 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   useEffect(() => {
     if (typeof window !== 'undefined') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__OPENCLO_FIT_MAP_STATS__ = fitMapStats;
+      (window as any).__VINA_FIT_MAP_STATS__ = fitMapStats;
     }
     return () => {
       if (typeof window !== 'undefined') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (window as any).__OPENCLO_FIT_MAP_STATS__;
+        delete (window as any).__VINA_FIT_MAP_STATS__;
       }
     };
   }, [fitMapStats]);
@@ -543,7 +543,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     const sc = refs.__scene as THREE.Scene | undefined;
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as { getState: () => { renderSettings: { imageFormat: 'png' | 'jpeg' | 'exr'; jpegQuality: number; samplesPerPixel: number; denoiserEnabled: boolean } } } | undefined;
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as { getState: () => { renderSettings: { imageFormat: 'png' | 'jpeg' | 'exr'; jpegQuality: number; samplesPerPixel: number; denoiserEnabled: boolean } } } | undefined;
     const rs = store?.getState().renderSettings;
     await exportStill(gl, sc, cam, {
       width,
@@ -565,7 +565,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
     // Read config from Redux store directly
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as { getState: () => { renderSettings: { turntableFrameCount: number; turntableDirection: 'cw' | 'ccw'; videoFps: number; videoFormat: 'webm' | 'mp4' } } } | undefined;
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as { getState: () => { renderSettings: { turntableFrameCount: number; turntableDirection: 'cw' | 'ccw'; videoFps: number; videoFormat: 'webm' | 'mp4' } } } | undefined;
     const config = store?.getState().renderSettings;
     const videoFormat = config?.videoFormat ?? 'webm';
     const blob = await renderTurntable(gl, sc, cam, {
@@ -586,7 +586,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     const sc = refs.__scene as THREE.Scene | undefined;
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as { getState: () => { renderSettings: { imageFormat: 'png' | 'jpeg' | 'exr'; jpegQuality: number } } } | undefined;
+    const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as { getState: () => { renderSettings: { imageFormat: 'png' | 'jpeg' | 'exr'; jpegQuality: number } } } | undefined;
     const rs = store?.getState().renderSettings;
     await exportAllViews(gl, sc, cam, {
       width,
@@ -610,7 +610,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
 
     // Get garment mesh from window global (set by GarmentSimulation when simulation is active)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const garmentMesh = (window as any).__OPENCLO_CLOTH_MESH__ as THREE.Mesh | undefined;
+    const garmentMesh = (window as any).__VINA_CLOTH_MESH__ as THREE.Mesh | undefined;
 
     if (!garmentMesh && !includeAvatar) {
       console.warn('[3D Export] Nothing to export: simulation is not running and avatar is excluded.');

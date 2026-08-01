@@ -112,7 +112,7 @@ export default function Mannequin() {
   useDisposable(standGeometry);
 
   return (
-    <group userData={{ opencloRole: 'avatar' }}>
+    <group userData={{ vinaRole: 'avatar' }}>
       {/* Body */}
       <mesh geometry={bodyGeometry} castShadow receiveShadow>
         <meshStandardMaterial

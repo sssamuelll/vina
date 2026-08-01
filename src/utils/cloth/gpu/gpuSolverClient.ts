@@ -258,7 +258,7 @@ export class GpuSolverClient implements ClothSolverClient {
   constructor(device: GPUDevice, config?: Partial<GpuSolverConfig>) {
     this.device = device;
     // Install debug instrumentation BEFORE solver/pipeline construction so every
-    // shader module created during init is captured into window.__OPENCLO_SHADERS__
+    // shader module created during init is captured into window.__VINA_SHADERS__
     // and `[WebGPU shader] compile error` diagnostics are surfaced.
     //
     // instrumentShaderCapture is dev-only (no-op in production).
@@ -851,7 +851,7 @@ export class GpuSolverClient implements ClothSolverClient {
       // que inicializo (el avatar-set tambien lo re-escribe; dispose lo limpia
       // solo si le pertenece — StrictMode double-mount).
       if (import.meta.env.DEV && typeof window !== 'undefined') {
-        (window as unknown as Record<string, unknown>).__OPENCLO_GPU_CLIENT__ = this;
+        (window as unknown as Record<string, unknown>).__VINA_GPU_CLIENT__ = this;
       }
       console.log('[GpuSolverClient] TSL solver initialized:', {
         particles: totalVerts,
@@ -1148,7 +1148,7 @@ export class GpuSolverClient implements ClothSolverClient {
     // si el handle es NUESTRO; el cliente vivo lo re-puebla en su avatar-set.
     if (import.meta.env.DEV && typeof window !== 'undefined') {
       const w = window as unknown as Record<string, unknown>;
-      if (w.__OPENCLO_GPU_CLIENT__ === this) delete w.__OPENCLO_GPU_CLIENT__;
+      if (w.__VINA_GPU_CLIENT__ === this) delete w.__VINA_GPU_CLIENT__;
     }
     this.stop();
     this.positionAttr = null;
@@ -1357,7 +1357,7 @@ export class GpuSolverClient implements ClothSolverClient {
       // Dev-only console handle (freeze-frame flag, ad-hoc @gpu-local probes):
       // the client instance is otherwise unreachable from the browser console.
       if (import.meta.env.DEV && typeof window !== 'undefined') {
-        (window as unknown as Record<string, unknown>).__OPENCLO_GPU_CLIENT__ = this;
+        (window as unknown as Record<string, unknown>).__VINA_GPU_CLIENT__ = this;
       }
     }
 

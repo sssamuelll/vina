@@ -24,14 +24,14 @@ const COMMAND_BTN = `${PANEL} button`;
 
 async function getViewMode(page: Page): Promise<string | null> {
   return page.evaluate(() => {
-    const store = (window as unknown as { __OPENCLO_STORE__?: { getState: () => { editor: { viewMode: string } } } }).__OPENCLO_STORE__;
+    const store = (window as unknown as { __VINA_STORE__?: { getState: () => { editor: { viewMode: string } } } }).__VINA_STORE__;
     return store ? store.getState().editor.viewMode : null;
   });
 }
 
 async function setViewMode(page: Page, mode: string) {
   await page.evaluate((m) => {
-    const store = (window as unknown as { __OPENCLO_STORE__?: { dispatch: (a: unknown) => void } }).__OPENCLO_STORE__;
+    const store = (window as unknown as { __VINA_STORE__?: { dispatch: (a: unknown) => void } }).__VINA_STORE__;
     store?.dispatch({ type: 'editor/setViewMode', payload: m });
   }, mode);
 }

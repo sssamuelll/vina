@@ -18,7 +18,7 @@ test.describe('Cloth Simulation', () => {
     // Expose the cloth mesh for testing (set by GarmentSimulation.tsx)
     const getClothPositions = () => page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mesh = (window as any).__OPENCLO_CLOTH_MESH__;
+      const mesh = (window as any).__VINA_CLOTH_MESH__;
       if (!mesh?.geometry) return null;
       const posAttr = mesh.geometry.getAttribute('position');
       if (!posAttr) return null;

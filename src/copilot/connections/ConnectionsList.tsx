@@ -63,7 +63,7 @@ interface Props {
   /**
    * Fired after any persisted change (add / update / delete / active
    * switch). The host can use this to dispatch the
-   * `openclo:provider-config-changed` event for downstream consumers.
+   * `vina:provider-config-changed` event for downstream consumers.
    */
   onStateChange?: (state: ConnectionsState) => void;
 }
@@ -84,7 +84,7 @@ export default function ConnectionsList({ onStateChange }: Props) {
       setState(next);
       await saveConnectionsState(next);
       onStateChange?.(next);
-      window.dispatchEvent(new CustomEvent('openclo:provider-config-changed'));
+      window.dispatchEvent(new CustomEvent('vina:provider-config-changed'));
     },
     [onStateChange],
   );

@@ -18,7 +18,7 @@ import { ALL_PLUGIN_PERMISSIONS } from './types';
 import { safeGetItem, safeRemoveItem } from '../../utils/safeStorage';
 
 /** Current OpenClo version — used for plugin compatibility checks */
-const OPENCLO_VERSION = '0.4.0';
+const VINA_VERSION = '0.4.0';
 
 /** Loaded plugin instances keyed by plugin id */
 const loadedPlugins: Map<string, OpenCloPlugin> = new Map();
@@ -109,9 +109,9 @@ export function validateManifest(manifest: PluginManifest): ValidationResult {
   }
 
   // Compatibility check
-  if (manifest.compatibleWith && !satisfiesSemver(OPENCLO_VERSION, manifest.compatibleWith)) {
+  if (manifest.compatibleWith && !satisfiesSemver(VINA_VERSION, manifest.compatibleWith)) {
     warnings.push(
-      `Plugin requires OpenClo ${manifest.compatibleWith}, current version is ${OPENCLO_VERSION}`,
+      `Plugin requires OpenClo ${manifest.compatibleWith}, current version is ${VINA_VERSION}`,
     );
   }
 

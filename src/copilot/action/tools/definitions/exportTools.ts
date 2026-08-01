@@ -161,7 +161,7 @@ const export3DOBJTool: ToolDefinition = {
   execute: async (params): Promise<ToolResult> => {
     const filename = (params.filename as string) || 'garment-3d';
     const scale = (params.scale as number) || 0.1;
-    window.dispatchEvent(new CustomEvent('openclo:export3d', {
+    window.dispatchEvent(new CustomEvent('vina:export3d', {
       detail: { format: 'obj', filename, scale },
     }));
     return { success: true, data: { filename: `${filename}.obj`, format: 'OBJ', note: 'Export triggered via 3D viewport' } };
@@ -186,7 +186,7 @@ const export3DGLTFTool: ToolDefinition = {
   execute: async (params): Promise<ToolResult> => {
     const filename = (params.filename as string) || 'garment-3d';
     const binary = (params.binary as boolean) ?? true;
-    window.dispatchEvent(new CustomEvent('openclo:export3d', {
+    window.dispatchEvent(new CustomEvent('vina:export3d', {
       detail: { format: binary ? 'glb' : 'gltf', filename, binary },
     }));
     return { success: true, data: { filename: `${filename}.${binary ? 'glb' : 'gltf'}`, format: binary ? 'GLB' : 'glTF' } };
@@ -311,7 +311,7 @@ const export3DFBXTool: ToolDefinition = {
   execute: async (params): Promise<ToolResult> => {
     const filename = (params.filename as string) || 'garment-3d';
     const scale = (params.scale as number) || 0.1;
-    window.dispatchEvent(new CustomEvent('openclo:export3d', {
+    window.dispatchEvent(new CustomEvent('vina:export3d', {
       detail: { format: 'fbx', filename, scale },
     }));
     return { success: true, data: { filename: `${filename}.fbx`, format: 'FBX' } };
@@ -338,7 +338,7 @@ const exportOBJSequenceTool: ToolDefinition = {
     const fps = (params.fps as number) || 24;
     const filename = (params.filename as string) || 'simulation-sequence';
 
-    window.dispatchEvent(new CustomEvent('openclo:exportObjSequence', {
+    window.dispatchEvent(new CustomEvent('vina:exportObjSequence', {
       detail: { frameCount, fps, filename },
     }));
 

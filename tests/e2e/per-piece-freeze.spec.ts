@@ -27,7 +27,7 @@ test.describe('Per-Piece Freeze (engine-level, issue #302)', () => {
     const pieceId = await addRectanglePiece(page);
 
     const state0 = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: { getState: () => { simulation: { frozenPieceIds: string[] } } } }).__OPENCLO_STORE__;
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => { simulation: { frozenPieceIds: string[] } } } }).__VINA_STORE__;
       return s.getState().simulation.frozenPieceIds;
     });
     expect(state0).toEqual([]);
@@ -36,7 +36,7 @@ test.describe('Per-Piece Freeze (engine-level, issue #302)', () => {
     await dispatch(page, { type: 'simulation/toggleFreezePiece', payload: pieceId });
     await page.waitForTimeout(100);
     const state1 = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: { getState: () => { simulation: { frozenPieceIds: string[] } } } }).__OPENCLO_STORE__;
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => { simulation: { frozenPieceIds: string[] } } } }).__VINA_STORE__;
       return s.getState().simulation.frozenPieceIds;
     });
     expect(state1).toEqual([pieceId]);
@@ -45,7 +45,7 @@ test.describe('Per-Piece Freeze (engine-level, issue #302)', () => {
     await dispatch(page, { type: 'simulation/toggleFreezePiece', payload: pieceId });
     await page.waitForTimeout(100);
     const state2 = await page.evaluate(() => {
-      const s = (window as unknown as { __OPENCLO_STORE__: { getState: () => { simulation: { frozenPieceIds: string[] } } } }).__OPENCLO_STORE__;
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => { simulation: { frozenPieceIds: string[] } } } }).__VINA_STORE__;
       return s.getState().simulation.frozenPieceIds;
     });
     expect(state2).toEqual([]);
