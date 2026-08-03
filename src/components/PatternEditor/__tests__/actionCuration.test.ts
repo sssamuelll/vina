@@ -193,7 +193,7 @@ describe('convertSegment alcanzable desde el clic derecho sobre la pieza (nota d
 
   it('sigue disponible dentro de "Editar patrón" (fila point.segment intacta)', () => {
     const ctx = makeCtx({ targetKind: 'point.segment', altitude: 'point', segmentIndex: 2 });
-    expect(resolveMenuActions(ctx).map(d => d.id)).toEqual(['convertSegment']);
+    expect(resolveMenuActions(ctx).map(d => d.id)).toEqual(['convertSegment', 'convertSegmentToPoints']);
   });
 
   it('la etiqueta nombra el resultado, no el estado actual', () => {
@@ -207,5 +207,49 @@ describe('convertSegment alcanzable desde el clic derecho sobre la pieza (nota d
     const ctx = makeCtx({ pieceId: 'p9', segmentIndex: 3, segmentIsCurve: false, cb: { onConvertSegment } });
     ACTIONS.convertSegment.run(ctx);
     expect(onConvertSegment).toHaveBeenCalledWith(3, true, 'p9');
+  });
+});
+
+// ── Nota de María #197, la otra mitad ──────────────────────────────────────
+// "No utilizo nunca curvas bezier... es muy limitante tener solo curvas bezier."
+// El verbo nuevo crea la curva con los puntos SOBRE la línea. Convive con el
+// bezier en vez de sustituirlo: el que quiera manejadores los sigue teniendo.
+describe('convertir en curva por puntos (nota de María #197)', () => {
+  const onConvertSegmentToPoints = vi.fn();
+
+  it('se ofrece sobre un lado recto', () => {
+    const ids = resolveMenuActions(makeCtx({ segmentIndex: 1, segmentIsCurve: false })).map(d => d.id);
+    expect(ids).toContain('convertSegmentToPoints');
+  });
+
+  it('NO se ofrece sobre un lado que ya es curva — rehacerlo tiraría su forma', () => {
+    const ids = resolveMenuActions(makeCtx({ segmentIndex: 1, segmentIsCurve: true })).map(d => d.id);
+    expect(ids).not.toContain('convertSegmentToPoints');
+    // El de bezier sí sigue, porque ahí sirve para volver a recta.
+    expect(ids).toContain('convertSegment');
+  });
+
+  it('se oculta sin segmento bajo el cursor y en pieza bloqueada', () => {
+    expect(resolveMenuActions(makeCtx({ segmentIndex: undefined })).map(d => d.id))
+      .not.toContain('convertSegmentToPoints');
+    expect(resolveMenuActions(makeCtx({ segmentIndex: 1, piece: pieceFix(true) })).map(d => d.id))
+      .not.toContain('convertSegmentToPoints');
+  });
+
+  it('los dos verbos se distinguen por su etiqueta, no sólo por el icono', () => {
+    const ctx = makeCtx({ segmentIndex: 1, segmentIsCurve: false });
+    const labelOf = (id: ActionId) => {
+      const def = ACTIONS[id];
+      return typeof def.label === 'function' ? def.label(ctx) : def.label;
+    };
+    expect(labelOf('convertSegment')).toBe('Convertir en curva');
+    expect(labelOf('convertSegmentToPoints')).toBe('Convertir en curva por puntos');
+    expect(ACTIONS.convertSegment.icon).not.toBe(ACTIONS.convertSegmentToPoints.icon);
+  });
+
+  it('pasa el índice del segmento y el pieceId del hit-test', () => {
+    const ctx = makeCtx({ pieceId: 'p7', segmentIndex: 3, cb: { onConvertSegmentToPoints } });
+    ACTIONS.convertSegmentToPoints.run(ctx);
+    expect(onConvertSegmentToPoints).toHaveBeenCalledWith(3, 'p7');
   });
 });

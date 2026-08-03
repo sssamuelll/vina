@@ -960,6 +960,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
         onRename={(id) => setEditingPieceNameId(id)}
         onConvertSegment={(idx, toCurve, pieceId) => editPatternTool.convertSegment(idx, toCurve, pieceId)}
+        onConvertSegmentToPoints={(idx, pieceId) => editPatternTool.convertSegmentToPoints(idx, pieceId)}
         onZoomToFit={handleZoomToFit}
         onUnfold={handleUnfold}
         onOffsetInternalLine={handleOffsetInternalLine}

@@ -35,6 +35,7 @@ import {
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { rotatePoint } from '../../utils/geometry/transform';
 import { reanchorNotches } from '../../utils/notchReanchor';
+import { convertSegmentToSpline, resmoothAfterMove } from './splineSegment';
 import { showInfoToast } from '../../store/copilotUISlice';
 import {
   compensatePositionForPivotChange,
@@ -471,6 +472,14 @@ export function useEditPattern(zoom: number, pan: Point2D) {
             outline = applyNodeMove(outline, cmdIdx, 'anchor', newPos);
           }
 
+          // Curva por puntos (#197): en un tramo gestionado los manejadores se
+          // rehacen desde las anclas, así que la curva sigue pasando por el
+          // punto y sin picos. `piece.outline` es el contorno previo al frame,
+          // que es donde vive la marca — después del movimiento ya no coincide.
+          for (const cmdIdx of drag.startPositions.keys()) {
+            outline = resmoothAfterMove(piece.outline, outline, cmdIdx);
+          }
+
           dispatchAndRefresh(piece, outline, undoBatchToken);
           return true;
         }
@@ -669,6 +678,18 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     [state.editingPieceId, getPiece, dispatchAndRefresh],
   );
 
+  // ─── convertSegmentToPoints ───
+
+  /** Curva por puntos: la que pidió María, con los puntos SOBRE la línea (#197). */
+  const convertSegmentToPoints = useCallback(
+    (commandIndex: number, pieceId?: string) => {
+      const piece = getPiece(pieceId ?? state.editingPieceId);
+      if (!piece) return;
+      dispatchAndRefresh(piece, convertSegmentToSpline(piece.outline, commandIndex));
+    },
+    [state.editingPieceId, getPiece, dispatchAndRefresh],
+  );
+
   // ─── getCursor ───
 
   const getCursor = useCallback((): string => {
@@ -693,6 +714,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     handleKeyDown,
     handleDoubleClick,
     convertSegment,
+    convertSegmentToPoints,
     getCursor,
   };
 }
