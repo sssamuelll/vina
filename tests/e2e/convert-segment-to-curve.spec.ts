@@ -11,8 +11,6 @@ import { test, expect, Page } from '@playwright/test';
  * momento, y comprueba que el lado quedó convertido en curva de verdad.
  */
 
-const SHOT_DIR = 'C:/Users/simon/Desktop/para maria';
-
 interface StoreWindow {
   __VINA_STORE__: {
     getState: () => {
@@ -73,8 +71,6 @@ test.describe('maria-197 — convertir un lado recto en curva', () => {
     const item = page.getByText('Convertir en curva', { exact: true });
     await expect(item).toBeVisible();
 
-    await page.screenshot({ path: `${SHOT_DIR}/06-convertir-en-curva.png`, fullPage: false });
-
     await item.click();
     await page.waitForTimeout(400);
 
@@ -84,10 +80,6 @@ test.describe('maria-197 — convertir un lado recto en curva', () => {
     // Sigue siendo la misma pieza cerrada de cuatro lados.
     expect(after.filter(t => t === 'M')).toHaveLength(1);
     expect(after.filter(t => t === 'L' || t === 'C')).toHaveLength(3);
-
-    await page.evaluate(() => (window as unknown as StoreWindow).__VINA_STORE__.dispatch({ type: 'editor/clearSelection' }));
-    await page.waitForTimeout(300);
-    await svg.screenshot({ path: `${SHOT_DIR}/07-lado-convertido-en-curva.png` });
   });
 
   test('el clic derecho lejos del contorno no ofrece la opción', async ({ page }) => {
