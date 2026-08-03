@@ -875,19 +875,26 @@ export function generateSeamAllowanceWithCorners(
   // is keyed by COMMAND index). Per-edge offsets carry the per-edge SA widths.
   const data = buildOffsetEdges(outline, saWidth, semanticEdges);
   if (!data) return [];
-  const { sourced, offsetEdges, n } = data;
+  const { sourced, n } = data;
 
   // ── Step 4 + 5: Assemble the SA outline, one array of points per vertex ────
-  // out[i] = [nextOffsetEdge.start, ...cornerGeometry]. Flattened in order this
-  // is byte-identical to the legacy single-pass emit; the per-vertex structure
-  // lets the `match` post-pass rewrite a vertex and trim the slots its
-  // retraction consumes, without disturbing any other vertex.
+  // out[i] = the corner bundle at vertex i, and NOTHING else. A bundle is already
+  // ordered prev-side → next-side and already ends on the next edge's offset start
+  // (see cornerSquared: [prevOffsetEdge.end, corner, nextOffsetEdge.start]), so
+  // concatenating the bundles in vertex order IS the closed cut line.
+  //
+  // This used to also unshift `offsetEdges[i].start` ahead of the bundle. That is
+  // the same point the bundle already ends on, emitted one slot too early — the
+  // contour left vertex i toward edge i BEFORE turning the corner at vertex i, so
+  // every piece's SA zigzagged across itself. It survived because the SA tests
+  // only asserted a bounding box, which a scrambled contour still satisfies.
+  // Fixing it makes a 300x150 rect at SA 10 return exactly the 4 points
+  // (90,90) (410,90) (410,260) (90,260) — see seamAllowanceGeometry.test.ts.
   const out: Point2D[][] = [];
 
   for (let i = 0; i < n; i++) {
     const type: CornerType = cornerTypes[sourced[i].cmd] ?? defaultCornerType;
-    const cornerPts = cornerBundleAt(data, i, type);
-    out.push([{ ...offsetEdges[i].start }, ...cornerPts]);
+    out.push(cornerBundleAt(data, i, type));
   }
 
   // ── Step 5b: Matched corners ──────────────────────────────────────────────

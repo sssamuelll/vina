@@ -7,8 +7,7 @@
  */
 
 import type { PatternPiece, PathCommand, Point2D, Seam } from '../../types/types';
-import { generateSeamAllowance, flattenPath } from '../seam/index';
-import type { SeamJoinType } from '../seam/index';
+import { flattenPath } from '../seam/index';
 import { generateSeamAllowanceWithCorners, type MatchLookup } from '../seam/cornerTypes';
 import { buildMatchLookup } from '../seam/matchResolver';
 
@@ -41,8 +40,6 @@ export interface PreparedPiece {
 }
 
 export interface PipelineOptions {
-  /** Seam allowance corner join type (default: 'round') */
-  seamJoinType?: SeamJoinType;
   /** Spacing between pieces in mm (default: 30) */
   spacing?: number;
   /** Curve flattening resolution for flattenPath (default: 12) */
@@ -99,7 +96,6 @@ export function preparePiece(
   matchLookup?: MatchLookup,
 ): Omit<PreparedPiece, 'offsetX' | 'offsetY'> {
   const resolution = opts.curveResolution ?? 12;
-  const joinType = opts.seamJoinType ?? 'round';
 
   const flatOutline = flattenPath(piece.outline, resolution);
   const boundingBox = computeBBox(piece.outline);
@@ -108,14 +104,13 @@ export function preparePiece(
   let flatSeamOutline: Point2D[] = [];
 
   if (piece.seamAllowance > 0) {
-    const hasCustomCorners = (piece.cornerTypes && Object.keys(piece.cornerTypes).length > 0)
-      || (piece.defaultCornerType && piece.defaultCornerType !== 'mitered');
-    // Per-edge SA widths also require the edge-walk generator — and this is the
-    // EXPORT path, so per-edge widths must reach the factory DXF/PDF.
-    const hasPerEdgeWidths = piece.edges?.some((e) => e.seamAllowanceWidth != null) ?? false;
-    seamOutline = hasCustomCorners || hasPerEdgeWidths
-      ? generateSeamAllowanceWithCorners(piece.outline, piece.seamAllowance, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {}, piece.edges, matchLookup)
-      : generateSeamAllowance(piece.outline, piece.seamAllowance, joinType);
+    // ALWAYS the edge-walk generator — this is the EXPORT path, so the cut line
+    // here becomes the factory DXF/PDF. The old "plain piece" fast path went to
+    // Clipper's ClipperOffset, which is broken in clipper2-js 1.2.4 and was
+    // shipping scrambled cut lines to production files. maria-190.
+    seamOutline = generateSeamAllowanceWithCorners(
+      piece.outline, piece.seamAllowance, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {}, piece.edges, matchLookup,
+    );
     if (seamOutline.length > 0) {
       flatSeamOutline = flattenPath(seamOutline, resolution);
     }

@@ -490,18 +490,43 @@ describe('generateSeamAllowanceWithCorners', () => {
     expect(sa[sa.length - 1].type).toBe('Z');
   });
 
+  // These two used to override with 'squared'. They passed for the wrong reason:
+  // the emit bug (see maria-190) injected a spurious point per vertex, inflating
+  // the count. `squared` is geometrically IDENTICAL to `mitered` at a 90° corner,
+  // and `square` here has only 90° corners — so a real point-count difference was
+  // never available. 'doubleMitered' genuinely adds geometry, so it discriminates.
   it('per-vertex corner type overrides defaultCornerType', () => {
-    // vertex 0 = squared, rest = mitered
-    const saOverride = generateSeamAllowanceWithCorners(square, 10, 'mitered', { 0: 'squared' });
+    // vertex 0 = doubleMitered, rest = mitered
+    const saOverride = generateSeamAllowanceWithCorners(square, 10, 'mitered', { 0: 'doubleMitered' });
     const saAllMitered = generateSeamAllowanceWithCorners(square, 10, 'mitered', {});
-    // squared adds 2 extra pts vs 1 for miter at that vertex
+    // doubleMitered returns 2 points at that vertex vs 1 for miter
     expect(saOverride.length).toBeGreaterThan(saAllMitered.length);
   });
 
-  it('all-squared default corner type produces more points than all-mitered', () => {
-    const saSquared = generateSeamAllowanceWithCorners(square, 10, 'squared', {});
+  it('all-doubleMitered default corner type produces more points than all-mitered', () => {
+    const saDouble = generateSeamAllowanceWithCorners(square, 10, 'doubleMitered', {});
     const saMitered = generateSeamAllowanceWithCorners(square, 10, 'mitered', {});
-    expect(saSquared.length).toBeGreaterThan(saMitered.length);
+    expect(saDouble.length).toBeGreaterThan(saMitered.length);
+  });
+
+  // Records a KNOWN DEFECT, not desired behaviour. cornerSquared builds its
+  // corner by intersecting the two offset edges extended along their own
+  // directions — which is the definition of the miter point — so the bundle is
+  // [prevOffsetEdge.end, miterPoint, nextOffsetEdge.start], all three collinear
+  // with the edges they came from. simplifyPaths then collapses it back to the
+  // miter at ANY angle, not just 90°. Fixing cornerSquared is queued separately;
+  // this test fails loudly the day it is fixed, which is the point.
+  it('KNOWN DEFECT: squared collapses to mitered at every angle', () => {
+    const pentagon: PathCommand[] = [];
+    for (let i = 0; i < 5; i++) {
+      const t = (i / 5) * Math.PI * 2;
+      pentagon.push({ type: i === 0 ? 'M' : 'L', values: [500 + 200 * Math.cos(t), 500 + 200 * Math.sin(t)] });
+    }
+    pentagon.push({ type: 'Z', values: [] });
+
+    const sq = generateSeamAllowanceWithCorners(pentagon, 10, 'squared', {});
+    const mit = generateSeamAllowanceWithCorners(pentagon, 10, 'mitered', {});
+    expect(sq.length).toBe(mit.length);
   });
 
   // ── Curve index-mismatch regression ──────────────────────────────────────
@@ -529,9 +554,11 @@ describe('generateSeamAllowanceWithCorners', () => {
     cmds.filter(c => c.type === 'M' || c.type === 'L').map(c => ({ x: c.values[0], y: c.values[1] }));
 
   it('applies a corner override at the correct geometric corner on a curved piece', () => {
-    // Override 'squared' on command-index 2 = the real corner (100,100).
+    // Override on command-index 2 = the real corner (100,100). 'doubleMitered'
+    // rather than 'squared': squared is a no-op against mitered (see the
+    // KNOWN DEFECT test above), so it cannot localize anything.
     const baseline = generateSeamAllowanceWithCorners(curvedLeft, 10, 'mitered', {});
-    const override = generateSeamAllowanceWithCorners(curvedLeft, 10, 'mitered', { 2: 'squared' });
+    const override = generateSeamAllowanceWithCorners(curvedLeft, 10, 'mitered', { 2: 'doubleMitered' });
 
     const basePts = ptsOf(baseline);
     const ovrPts = ptsOf(override);
@@ -569,7 +596,7 @@ describe('generateSeamAllowanceWithCorners', () => {
     // Only command-3 (corner (100,0)) is overridden; the curved left edge
     // (command 1) must remain identical to the all-mitered baseline.
     const baseline = generateSeamAllowanceWithCorners(curvedLeft, 10, 'mitered', {});
-    const override = generateSeamAllowanceWithCorners(curvedLeft, 10, 'mitered', { 3: 'squared' });
+    const override = generateSeamAllowanceWithCorners(curvedLeft, 10, 'mitered', { 3: 'doubleMitered' });
 
     const basePts = ptsOf(baseline);
     const ovrPts = ptsOf(override);
