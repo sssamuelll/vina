@@ -300,10 +300,20 @@ export type SeamJoinType = 'round' | 'miter' | 'square';
 /**
  * Convert outline PathCommand[] + width → offset PathCommand[] using Clipper2.
  *
- * Uses Clipper2's robust polygon offsetting which correctly handles:
- * - Concave corners (no self-intersections)
- * - Acute angles (proper miter limiting)
- * - Complex shapes with loops
+ * ⚠️ BROKEN — DO NOT USE FOR SEAM ALLOWANCE. clipper2-js 1.2.4's ClipperOffset
+ * returns wrong geometry for every polygon we tested: a convex quad offset with
+ * a miter join comes back with 6 points instead of 4, and an 80-gon offset
+ * OUTWARD comes back with less area than it went in with. Reproduced against the
+ * raw library API (addPath / addPaths / Clipper.InflatePaths) across all 20
+ * JoinType × EndType combinations, so it is not our call site. 1.2.4 is the
+ * latest published version; there is no upgrade. `Clipper.simplifyPaths` in the
+ * same library is fine — the fault is specific to the offset module.
+ *
+ * All seam allowance now goes through `generateSeamAllowanceWithCorners`
+ * (src/utils/seam/cornerTypes.ts), a pure edge-walk. This function survives only
+ * because `offsetPieceOutline` (the offset tool + its copilot tool) still calls
+ * it for arbitrary inside/outside offsets; that path is equally wrong and is
+ * queued separately. Do not add callers. maria-190.
  *
  * @param outline  Source path commands
  * @param width    Seam allowance width in mm (positive = outward)

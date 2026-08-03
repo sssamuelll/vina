@@ -5,7 +5,7 @@ import { RootState } from '../../../store';
 import { PatternPiece, PathCommand, UnitSystem } from '../../../types/types';
 import LineLengthLabels from './LineLengthLabels';
 import { pathToSVG } from '../utils';
-import { generateSeamAllowance, effectiveSeamAllowanceWidth } from '../../../utils/seam';
+import { effectiveSeamAllowanceWidth } from '../../../utils/seam';
 import { generateSeamAllowanceWithCorners, type MatchLookup } from '../../../utils/seam/cornerTypes';
 import { buildMatchLookup } from '../../../utils/seam/matchResolver';
 import { extractNodes } from '../nodeEditorUtils';
@@ -91,14 +91,14 @@ const SinglePiece = memo(function SinglePiece({
   const saPath = useMemo(() => {
     const saWidth = effectiveSeamAllowanceWidth(piece);
     if (!(showSeamAllowance && saWidth > 0 && (piece.outline?.length ?? 0) >= 2)) return [];
-    const hasCustomCorners = (piece.cornerTypes && Object.keys(piece.cornerTypes).length > 0)
-      || (piece.defaultCornerType && piece.defaultCornerType !== 'mitered');
-    // Per-edge SA widths also require the edge-walk generator (the uniform Clipper
-    // offset can't vary width per edge).
-    const hasPerEdgeWidths = piece.edges?.some((e) => e.seamAllowanceWidth != null) ?? false;
-    return hasCustomCorners || hasPerEdgeWidths
-      ? generateSeamAllowanceWithCorners(piece.outline, saWidth, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {}, piece.edges, matchLookup)
-      : generateSeamAllowance(piece.outline, saWidth);
+    // ALWAYS the edge-walk generator. There used to be a "fast path" here that
+    // sent plain pieces (no corner overrides, no per-edge widths — i.e. every
+    // freshly drawn rectangle) to Clipper's ClipperOffset instead. That offset is
+    // broken in clipper2-js 1.2.4: it returns 6 points for a convex quad and can
+    // return LESS area than the input for an outward offset. maria-190.
+    return generateSeamAllowanceWithCorners(
+      piece.outline, saWidth, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {}, piece.edges, matchLookup,
+    );
     // piece is an immutable Redux object — a stable ref until it actually changes.
   }, [showSeamAllowance, piece, matchLookup]);
   const hasSA = saPath.length > 0;
@@ -162,6 +162,7 @@ const SinglePiece = memo(function SinglePiece({
 
       {/* Cut line (solid, exterior). With SA it's the offset contour; else the outline. */}
       <path
+        data-testid="piece-cut-line"
         d={hasSA ? saD : outlineD}
         fill="none"
         style={{ stroke: cutStroke }}
