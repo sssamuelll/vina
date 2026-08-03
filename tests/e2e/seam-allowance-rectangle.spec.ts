@@ -6,10 +6,12 @@ import { test, expect, Page } from '@playwright/test';
  *
  * Drives her exact flow through the real UI: draw a rectangle with the rectangle
  * tool, give it a seam allowance, look at the cut line. Asserts the rendered SVG
- * cut-line path, then leaves screenshots in a folder for her.
+ * cut-line path.
+ *
+ * Sin capturas: escribir en una ruta absoluta de un escritorio Windows desde un
+ * test commiteado crea un directorio literal `C:` en la raíz del repo cuando
+ * corre en CI de Linux. Las capturas para María se generan aparte.
  */
-
-const SHOT_DIR = 'C:/Users/simon/Desktop/para maria';
 
 async function waitForApp(page: Page) {
   await page.goto('/');
@@ -29,16 +31,6 @@ async function activateTool(page: Page, shortcut: string, toolId: string) {
   await expect.poll(() => getActiveTool2D(page), { timeout: 2000 }).toBe(toolId);
   await page.locator('[data-testid="empty-state-2d"]').waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
   await page.waitForTimeout(100);
-}
-
-/** Drop the selection so the margin band renders in its own colours, not the
- *  selection fill — the band is the whole point of these screenshots. */
-async function deselect(page: Page) {
-  await page.evaluate(() => {
-    (window as unknown as { __VINA_STORE__: { dispatch: (a: unknown) => void } })
-      .__VINA_STORE__.dispatch({ type: 'editor/clearSelection' });
-  });
-  await page.waitForTimeout(300);
 }
 
 /** Apply a seam allowance to every piece, exactly as the properties panel does. */
@@ -121,27 +113,6 @@ test.describe('maria-190 — seam allowance on a drafted rectangle', () => {
     expect(has(outline.maxX + SA, outline.minY - SA)).toBe(true);
     expect(has(outline.maxX + SA, outline.maxY + SA)).toBe(true);
     expect(has(outline.minX - SA, outline.maxY + SA)).toBe(true);
-
-    // ── Screenshots for María ────────────────────────────────────────────
-    await deselect(page);
-    await page.screenshot({ path: `${SHOT_DIR}/01-rectangulo-con-margen.png`, fullPage: false });
-    await svg.screenshot({ path: `${SHOT_DIR}/02-solo-el-patron.png` });
-
-    // Close-up centred on the top-right corner — the one that came out rounded
-    // in her photo.
-    const cut = await page.locator('svg.pattern-svg [data-testid="piece-cut-line"]').first().boundingBox();
-    if (cut) {
-      const W = 260, H = 220;
-      await page.screenshot({
-        path: `${SHOT_DIR}/03-esquina-superior-derecha.png`,
-        clip: {
-          x: Math.max(0, cut.x + cut.width - W / 2),
-          y: Math.max(0, cut.y - H / 2),
-          width: W,
-          height: H,
-        },
-      });
-    }
   });
 
   test('a five-sided piece also offsets cleanly (non-right angles)', async ({ page }) => {
@@ -164,8 +135,41 @@ test.describe('maria-190 — seam allowance on a drafted rectangle', () => {
     await page.mouse.click(pts[0][0], pts[0][1]); // close
     await page.waitForTimeout(600);
 
-    await setSeamAllowance(page, 15);
-    await deselect(page);
-    await svg.screenshot({ path: `${SHOT_DIR}/04-pentagono-con-margen.png` });
+    const SA = 15;
+    await setSeamAllowance(page, SA);
+
+    const corners = await page.evaluate(() => {
+      const store = (window as unknown as {
+        __VINA_STORE__: { getState: () => { project: { pieces: Array<{ outline: Array<{ type: string; values: number[] }> }> } } };
+      }).__VINA_STORE__;
+      return store.getState().project.pieces[0].outline
+        .filter(c => c.type === 'M' || c.type === 'L')
+        .map(c => ({ x: c.values[0], y: c.values[1] }));
+    });
+    expect(corners).toHaveLength(5);
+
+    const cutLine = await page.locator('svg.pattern-svg [data-testid="piece-cut-line"]').first().getAttribute('d');
+    const verts = [...(cutLine as string).matchAll(/[ML]\s*(-?[\d.]+)[ ,]+(-?[\d.]+)/g)]
+      .map(m => ({ x: Number(m[1]), y: Number(m[2]) }));
+    expect(verts).toHaveLength(5);
+    expect(cutLine).not.toMatch(/[ACQSTacqst]/);
+
+    // Un vértice miterado se aleja SA / sin(θ/2) de su esquina, donde θ es el
+    // ángulo interior. En 90° eso es SA·√2; en los 108° del pentágono, ~1.24·SA.
+    // La fórmula sale de la trigonometría de la esquina, no del código que
+    // estamos probando — si el motor cambia de convención, esto lo cata.
+    for (let i = 0; i < 5; i++) {
+      const v = corners[i];
+      const a = corners[(i + 4) % 5];
+      const b = corners[(i + 1) % 5];
+      const u1 = Math.atan2(a.y - v.y, a.x - v.x);
+      const u2 = Math.atan2(b.y - v.y, b.x - v.x);
+      let theta = Math.abs(u1 - u2);
+      if (theta > Math.PI) theta = 2 * Math.PI - theta;
+      const expected = SA / Math.sin(theta / 2);
+
+      const nearest = Math.min(...verts.map(p => Math.hypot(p.x - v.x, p.y - v.y)));
+      expect(nearest, `esquina ${i}: θ=${((theta * 180) / Math.PI).toFixed(1)}°`).toBeCloseTo(expected, 0);
+    }
   });
 });
