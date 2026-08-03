@@ -42,7 +42,7 @@ export const GROUP_ORDER: GroupId[] = ['clipboard', 'transform', 'order', 'organ
 export type ActionId =
   | 'copy' | 'paste' | 'pasteMirror'
   | 'rotate90' | 'flipH' | 'flipV'
-  | 'reverseSeam' | 'reverseGrainline' | 'unfold' | 'unfoldOutlineOnly' | 'offsetInternalLine' | 'optimizeCurves' | 'optimizeAllCurves' | 'convertSegment'
+  | 'reverseSeam' | 'reverseGrainline' | 'unfold' | 'unfoldOutlineOnly' | 'offsetInternalLine' | 'optimizeCurves' | 'optimizeAllCurves' | 'convertSegment' | 'convertSegmentToPoints'
   | 'order' | 'layer' | 'lockToggle' | 'activeToggle' | 'groupCreate' | 'addToGroup' | 'removeFromGroup'
   | 'unlinkPieces' | 'selectLinkedPartner' | 'linkSymmetry' | 'linkInstance' | 'cloneLinkedSymmetry' | 'cloneLinkedInstance'
   | 'duplicate' | 'duplicateAll' | 'rename' | 'properties' | 'select' | 'inspect' | 'selectPieceOfLine' | 'selectSeamA' | 'selectSeamB' | 'zoomToFit'
@@ -52,6 +52,7 @@ export type ActionId =
 export interface CurationCallbacks {
   onRename?: (pieceId: string) => void;
   onConvertSegment?: (commandIndex: number, toCurve: boolean, pieceId?: string) => void;
+  onConvertSegmentToPoints?: (commandIndex: number, pieceId?: string) => void;
   onZoomToFit?: () => void;
   onUnfold?: (pieceId: string, foldLineId: string, outlineOnly?: boolean) => void;
   onOffsetInternalLine?: (pieceId: string, lineId: string) => void;
@@ -182,6 +183,12 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     // contorno: sin segmento bajo el cursor el ítem se OCULTA (§4 hide-not-disable).
     gate: (ctx) => ctx.segmentIndex !== undefined && notLocked(ctx),
     run: (ctx) => ctx.cb.onConvertSegment?.(ctx.segmentIndex!, !ctx.segmentIsCurve, ctx.pieceId ?? undefined) },
+  convertSegmentToPoints: { id: 'convertSegmentToPoints', group: 'transform', icon: '⌣',
+    label: 'Convertir en curva por puntos',
+    // Sólo sobre un lado RECTO: sobre una curva no hay nada que convertir, y
+    // rehacer una ya curvada tirando sus manejadores sería destruir trabajo.
+    gate: (ctx) => ctx.segmentIndex !== undefined && !ctx.segmentIsCurve && notLocked(ctx),
+    run: (ctx) => ctx.cb.onConvertSegmentToPoints?.(ctx.segmentIndex!, ctx.pieceId ?? undefined) },
 
   // order (submenú z-order — colapsa 4 ítems planos en uno)
   order: { id: 'order', group: 'order', icon: '⇅', label: 'Orden', run: () => {},
@@ -282,7 +289,7 @@ export const CURATION: CurationRow[] = [
     bar: ['rotate90', 'duplicate', 'flipH', 'properties', 'lockToggle'],
     menu: [
       'copy', 'paste', 'pasteMirror',
-      'rotate90', 'flipH', 'flipV', 'optimizeAllCurves', 'convertSegment',
+      'rotate90', 'flipH', 'flipV', 'optimizeAllCurves', 'convertSegment', 'convertSegmentToPoints',
       'order',
       'layer', 'lockToggle', 'activeToggle', 'groupCreate', 'addToGroup', 'removeFromGroup',
       'unlinkPieces', 'selectLinkedPartner', 'linkSymmetry', 'linkInstance', 'cloneLinkedSymmetry', 'cloneLinkedInstance',
@@ -312,7 +319,7 @@ export const CURATION: CurationRow[] = [
   },
   { targetKind: 'il.dart', stage: '*', altitude: 'body', bar: [], menu: ['optimizeCurves', 'selectPieceOfLine', 'deleteInternalLine'] },
   { targetKind: 'il.other', stage: '*', altitude: 'body', bar: [], menu: ['offsetInternalLine', 'optimizeCurves', 'selectPieceOfLine', 'deleteInternalLine'] },
-  { targetKind: 'point.segment', stage: '*', altitude: 'point', bar: [], menu: ['convertSegment'] },
+  { targetKind: 'point.segment', stage: '*', altitude: 'point', bar: [], menu: ['convertSegment', 'convertSegmentToPoints'] },
   { targetKind: 'point.node', stage: '*', altitude: 'point', bar: [], menu: [] },
   { targetKind: 'emptyCanvas', stage: '*', altitude: 'body', bar: [], menu: ['paste', 'pasteMirror', 'zoomToFit'] },
 ];
