@@ -12,8 +12,7 @@ import { findOutlineIntersections, splitOutlineAtPoints } from './geometry/split
 import { findSharedEdge, mergeOutlines } from './geometry/mergeOutline';
 import { detectSemanticEdges } from './semanticEdges';
 import { getEdgeEndpoints } from './geometry/path';
-import { generateSeamAllowance, flattenPath } from './seam';
-import { ClipperOffset, Path64, Point64, Paths64, JoinType, EndType } from 'clipper2-js';
+import { offsetOutline, type OffsetJoin } from './seam/cornerTypes';
 import { samplePathAtIntervals } from './geometry/arcLength';
 import { fitCubicBezier, rdpSimplify } from './geometry/bezier';
 import { linePolylineIntersections } from './geometry/lineIntersect';
@@ -552,83 +551,22 @@ export function findCutEdgePair(
 
 // ─── offsetPieceOutline ──────────────────────────────────────────────────────
 
-const CLIPPER_SCALE = 100;
-
 /**
  * Offset a piece's outline by a distance. Positive = outward, negative = inward.
  * Returns new PathCommand[] or null if the offset collapses the shape.
+ *
+ * Delegates to the seam engine's edge-walk. This used to drive Clipper's
+ * `ClipperOffset` directly (outward via generateSeamAllowance, inward via a
+ * hand-rolled call), which is broken in clipper2-js 1.2.4 for every polygon —
+ * it returned 6 points for a convex quad and could shrink a shape on an outward
+ * offset. See the banner on `generateSeamAllowance` in utils/seam/index.ts.
  */
 export function offsetPieceOutline(
   piece: PatternPiece,
   distance: number,
-  joinType: 'round' | 'miter' | 'square' = 'round',
+  joinType: OffsetJoin = 'round',
 ): PathCommand[] | null {
-  if (distance === 0) return piece.outline.map(c => ({ type: c.type, values: [...c.values] }));
-
-  // Positive offset can use the existing seam allowance helper
-  if (distance > 0) {
-    const result = generateSeamAllowance(piece.outline, distance, joinType);
-    return result.length > 0 ? result : null;
-  }
-
-  // Negative (inward) offset — call Clipper2 directly since generateSeamAllowance
-  // only supports positive widths.
-  const flat = flattenPath(piece.outline);
-  if (flat.length < 3) return null;
-
-  // Remove closing duplicate if present
-  const last = flat[flat.length - 1];
-  const pts = (Math.abs(flat[0].x - last.x) < 0.001 && Math.abs(flat[0].y - last.y) < 0.001)
-    ? flat.slice(0, -1)
-    : flat;
-  if (pts.length < 3) return null;
-
-  const clipperPath = new Path64();
-  for (const p of pts) {
-    clipperPath.push(new Point64(
-      Math.round(p.x * CLIPPER_SCALE),
-      Math.round(p.y * CLIPPER_SCALE),
-    ));
-  }
-
-  const jt = joinType === 'miter' ? JoinType.Miter
-    : joinType === 'square' ? JoinType.Square
-    : JoinType.Round;
-
-  const co = new ClipperOffset();
-  co.addPath(clipperPath as unknown as Point64[], jt, EndType.Polygon);
-
-  const result = new Paths64();
-  co.execute(distance * CLIPPER_SCALE, result); // negative delta = inward
-
-  if (result.length === 0) return null;
-
-  // Take the largest remaining path
-  let largest = result[0];
-  let largestArea = 0;
-  for (const path of result) {
-    let area = 0;
-    for (let i = 0, n = path.length; i < n; i++) {
-      const j = (i + 1) % n;
-      area += Number(path[i].x) * Number(path[j].y);
-      area -= Number(path[j].x) * Number(path[i].y);
-    }
-    area = Math.abs(area);
-    if (area > largestArea) {
-      largestArea = area;
-      largest = path;
-    }
-  }
-
-  const commands: PathCommand[] = [
-    { type: 'M', values: [Number(largest[0].x) / CLIPPER_SCALE, Number(largest[0].y) / CLIPPER_SCALE] },
-  ];
-  for (let i = 1; i < largest.length; i++) {
-    commands.push({ type: 'L', values: [Number(largest[i].x) / CLIPPER_SCALE, Number(largest[i].y) / CLIPPER_SCALE] });
-  }
-  commands.push({ type: 'Z', values: [] });
-
-  return commands;
+  return offsetOutline(piece.outline, distance, joinType);
 }
 
 // ─── extendEdge ──────────────────────────────────────────────────────────────

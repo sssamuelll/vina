@@ -1,6 +1,6 @@
 import type { PathCommand, Point2D, SemanticEdge } from '../../types/types';
 import type { CornerType } from '../../types/types';
-import { Clipper, Paths64, Path64, Point64 } from 'clipper2-js';
+import { Clipper, Clipper64, Paths64, Path64, Point64, ClipType, FillRule } from 'clipper2-js';
 import { flattenPathWithSource } from './index';
 import type { SourcedPoint } from './index';
 
@@ -257,8 +257,31 @@ export function cornerDoubleMitered(
 // ─── cornerSquared ────────────────────────────────────────────────────────
 
 /**
- * Squared corner: right-angle box built from prevOffsetEdge.end through the
- * miter corner to nextOffsetEdge.start.
+ * Squared corner — "right-angle extension (belt loops, tabs)" per #253.
+ *
+ * The seam allowance runs along the previous edge's offset, then turns a true
+ * 90° and cuts straight across to meet the next edge's offset. That makes the
+ * corner a square end rather than the spike a miter grows at an acute angle.
+ *
+ * Construction: with P = prevOffsetEdge.end and Q = nextOffsetEdge.start, the
+ * corner R is the projection of Q onto the line through P along prevDir. By
+ * construction P→R is along the previous edge and R→Q is perpendicular to it,
+ * so the angle at R is exactly 90°.
+ *
+ * At a 90° vertex this lands exactly on the miter point — which is required,
+ * not a coincidence: a rectangle's seam allowance corner IS square, and any
+ * definition that moved it there would break every rectangle.
+ *
+ * ⚠️ The previous implementation intersected the two offset edges extended
+ * along their OWN directions, which is the definition of the miter point — so
+ * `squared` silently rendered identical to `mitered` at every angle. The UI
+ * chip did nothing. maria-190 follow-up.
+ *
+ * ASSUMPTION PENDING RATIFICATION: this squares relative to the PREVIOUS edge.
+ * The mirror convention (square to the next edge) is equally defensible and
+ * Gerber may define it the other way; #253 only says "right-angle extension"
+ * and carries no geometry. Needs a patternmaker's call before it is presented
+ * as Gerber-compatible.
  *
  * Returns 3 points: [prevOffsetEdge.end, corner, nextOffsetEdge.start].
  */
@@ -270,43 +293,22 @@ export function cornerSquared(
   nextWidth: number,
   angle: number,
 ): Point2D[] {
-  // The "corner" is the right-angle intersection formed by extending
-  // prevOffsetEdge.end perpendicular to the prev edge, and
-  // nextOffsetEdge.start perpendicular to the next edge.
-  //
-  // We construct it as the miter intersection of:
-  //   - A line through prevOffsetEdge.end in the direction of nextOffsetEdge
-  //   - A line through nextOffsetEdge.start in the direction of prevOffsetEdge
+  const P = prevOffsetEdge.end;
+  const Q = nextOffsetEdge.start;
   const prevDir = lineDir(prevOffsetEdge);
-  const nextDir = lineDir(nextOffsetEdge);
 
-  // Line through prevOffsetEdge.end extended along prevOffsetEdge direction.
-  // This forms one side of the right-angle box.
-  const lineA: Line2D = {
-    start: prevOffsetEdge.end,
-    end: {
-      x: prevOffsetEdge.end.x + prevDir.x,
-      y: prevOffsetEdge.end.y + prevDir.y,
-    },
-  };
-  // Line through nextOffsetEdge.start extended along nextOffsetEdge direction.
-  // This forms the other side of the right-angle box.
-  const lineB: Line2D = {
-    start: nextOffsetEdge.start,
-    end: {
-      x: nextOffsetEdge.start.x + nextDir.x,
-      y: nextOffsetEdge.start.y + nextDir.y,
-    },
-  };
+  // Projection of Q onto the ray from P along the previous edge.
+  const t = (Q.x - P.x) * prevDir.x + (Q.y - P.y) * prevDir.y;
 
-  const corner = lineIntersection(lineA, lineB);
-  if (corner !== null) {
-    return [{ ...prevOffsetEdge.end }, corner, { ...nextOffsetEdge.start }];
+  // t < 0 means squaring off would walk backwards along the previous edge —
+  // a reflex vertex, where there is no outward corner to square. Miter it.
+  if (t <= 0 || (prevDir.x === 0 && prevDir.y === 0)) {
+    const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, angle)[0];
+    return [{ ...P }, miter, { ...Q }];
   }
 
-  // Degenerate fallback: use the standard miter point
-  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, angle)[0];
-  return [{ ...prevOffsetEdge.end }, miter, { ...nextOffsetEdge.start }];
+  const corner: Point2D = { x: P.x + prevDir.x * t, y: P.y + prevDir.y * t };
+  return [{ ...P }, corner, { ...Q }];
 }
 
 // ─── cornerSlant ──────────────────────────────────────────────────────────
@@ -916,8 +918,19 @@ export function generateSeamAllowanceWithCorners(
   const resultPoints: Point2D[] = out.flat();
   if (resultPoints.length < 3) return [];
 
-  // ── Step 6: Self-intersection cleanup via Clipper2 SimplifyPaths ──────────
-  // Convert to Clipper2 integer path
+  // ── Step 6: Reduce vertices ───────────────────────────────────────────────
+  // NOTE: this does NOT remove self-intersections, despite what this step used
+  // to claim. `Clipper.simplifyPaths` is a vertex-reduction pass — feed it a
+  // bowtie and the bowtie comes straight back (verified). The boolean Union in
+  // `cleanClosedContour` is what actually removes them.
+  //
+  // Union is deliberately NOT used here yet. Running it revealed that the
+  // doubleMitered walk self-intersects: cornerDoubleMitered returns its two
+  // points without tying the perpendicular's sign to the walk direction, so at
+  // some corners the pair is emitted crossed. Union removes those lobes and
+  // collapses the blunting entirely. Fixing that ordering is a separate change;
+  // until then, keeping simplify-only preserves today's rendered geometry.
+  // ponytail: concave pieces with a wide SA can still self-intersect here.
   const clipperPath = new Path64();
   for (const pt of resultPoints) {
     clipperPath.push(new Point64(
@@ -928,8 +941,6 @@ export function generateSeamAllowanceWithCorners(
 
   const inputPaths = new Paths64();
   inputPaths.push(clipperPath);
-
-  // SimplifyPaths removes self-intersecting regions and collapses degenerate edges
   const simplified = Clipper.simplifyPaths(inputPaths, 0.01 * CLIPPER_SCALE, true);
 
   if (simplified.length === 0) {
@@ -961,7 +972,6 @@ export function generateSeamAllowanceWithCorners(
     }
   }
 
-  // Convert back to PathCommand[]
   const commands: PathCommand[] = [
     {
       type: 'M',
@@ -1001,4 +1011,188 @@ export function getCornerFunction(type: CornerType): CornerFunction {
     case 'trimMirrored':
       return cornerTrimMirrored;
   }
+}
+
+// ─── Generic signed outline offset ────────────────────────────────────────
+
+/** Shoelace signed area of a closed vertex ring. */
+function ringArea(pts: Point2D[]): number {
+  let a = 0;
+  for (let i = 0, n = pts.length; i < n; i++) {
+    const j = (i + 1) % n;
+    a += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+  }
+  return a / 2;
+}
+
+/**
+ * Normalise a raw closed contour: drop self-intersecting lobes, collapse
+ * duplicate/near-collinear vertices, and return the largest remaining ring.
+ *
+ * A boolean Union under NonZero is what actually removes self-intersections —
+ * `Clipper.simplifyPaths` alone does NOT (feed it a bowtie and it hands the
+ * bowtie straight back; verified). simplifyPaths only reduces vertices, which
+ * is still wanted afterwards because Union emits duplicates at every original
+ * vertex. Both of these clipper2-js entry points return correct results; it is
+ * `ClipperOffset` specifically that is broken in 1.2.4 (see seam/index.ts).
+ *
+ * Returns [] when the contour degenerates to nothing.
+ */
+export function cleanClosedContour(points: Point2D[]): Point2D[] {
+  if (points.length < 3) return [];
+
+  const path = new Path64();
+  for (const p of points) {
+    path.push(new Point64(Math.round(p.x * CLIPPER_SCALE), Math.round(p.y * CLIPPER_SCALE)));
+  }
+  const subject = new Paths64();
+  subject.push(path);
+
+  const clipper = new Clipper64();
+  clipper.addSubjectPaths(subject);
+  const unioned = new Paths64();
+  clipper.execute(ClipType.Union, FillRule.NonZero, unioned);
+  if (unioned.length === 0) return [];
+
+  const simplified = Clipper.simplifyPaths(unioned, 0.01 * CLIPPER_SCALE, true);
+  const rings = simplified.length > 0 ? simplified : unioned;
+
+  let best: Point2D[] = [];
+  let bestArea = -1;
+  for (const ring of rings) {
+    const pts = [...ring].map((q: { x: number; y: number }) => ({
+      x: q.x / CLIPPER_SCALE,
+      y: q.y / CLIPPER_SCALE,
+    }));
+    const a = Math.abs(ringArea(pts));
+    if (a > bestArea) {
+      bestArea = a;
+      best = pts;
+    }
+  }
+  return best.length >= 3 ? best : [];
+}
+
+/** Join style for {@link offsetOutline}. Mirrors the offsetOutline tool options. */
+export type OffsetJoin = 'round' | 'miter' | 'square';
+
+/** Points per quarter-turn of a rounded join. */
+const ARC_SEGMENTS_PER_QUARTER = 4;
+
+/**
+ * Signed parallel offset of a closed outline. Positive = outward, negative =
+ * inward. Returns null when the shape collapses.
+ *
+ * Replaces the Clipper `ClipperOffset` path, which is broken in clipper2-js
+ * 1.2.4 for every polygon (see the banner on `generateSeamAllowance`). This is
+ * the same edge-walk the seam allowance engine uses — offset each edge along
+ * its normal, then resolve each vertex — with the join styles the offset tool
+ * exposes, plus a Union-based cleanup for the self-intersections an inward
+ * offset can create.
+ *
+ * The outline's winding is normalised first, so `distance > 0` means outward
+ * regardless of how the piece was authored.
+ */
+export function offsetOutline(
+  outline: PathCommand[],
+  distance: number,
+  join: OffsetJoin = 'round',
+): PathCommand[] | null {
+  if (distance === 0) {
+    return outline.map((c) => ({ type: c.type, values: [...c.values] }));
+  }
+
+  const probe = buildOffsetEdges(outline, Math.abs(distance));
+  if (!probe) return null;
+
+  // Normalise winding: offsetEdge's normal is orientation-relative, so a
+  // negatively-wound piece would otherwise offset the wrong way.
+  const flipped = ringArea(probe.vertices) < 0;
+  const source = flipped ? reverseOutline(outline) : outline;
+
+  const data = buildOffsetEdges(source, distance);
+  if (!data) return null;
+  const { vertices, edges, offsetEdges, n } = data;
+
+  // Collapse guard. An inward offset larger than the shape's inradius produces
+  // an INVERTED result — for a 60x60 square inset 40mm you get a tidy 20x20
+  // rectangle with the right winding and a positive area, so neither
+  // orientation nor area catches it. What does catch it: an edge that reverses
+  // direction. A valid offset may shorten an edge to nothing, never flip it.
+  for (let i = 0; i < n; i++) {
+    const a = miterAt(offsetEdges, n, i);
+    const b = miterAt(offsetEdges, n, (i + 1) % n);
+    const src = edges[i];
+    const dot =
+      (b.x - a.x) * (src.end.x - src.start.x) + (b.y - a.y) * (src.end.y - src.start.y);
+    if (dot < 0) return null;
+  }
+
+  const raw: Point2D[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = offsetEdges[(i + n - 1) % n];
+    const next = offsetEdges[i];
+    const prevDir = lineDir(prev);
+    const nextDir = lineDir(next);
+    // Turn direction at this vertex. With normalised winding, a positive cross
+    // is the side the offset expands into — the only side that needs an arc or
+    // a bevel. The other side is a plain miter (the offset lines already cross).
+    const cross = prevDir.x * nextDir.y - prevDir.y * nextDir.x;
+    const expanding = cross * distance > 0;
+
+    if (!expanding || join === 'miter') {
+      raw.push(miterAt(offsetEdges, n, i));
+      continue;
+    }
+
+    const from = { ...prev.end };
+    const to = { ...next.start };
+    if (join === 'square') {
+      raw.push(from, to);
+      continue;
+    }
+    raw.push(...arcBetween(vertices[i], from, to, Math.abs(distance)));
+  }
+
+  const cleaned = cleanClosedContour(raw);
+  if (cleaned.length < 3) return null;
+
+  const commands: PathCommand[] = [{ type: 'M', values: [cleaned[0].x, cleaned[0].y] }];
+  for (let i = 1; i < cleaned.length; i++) {
+    commands.push({ type: 'L', values: [cleaned[i].x, cleaned[i].y] });
+  }
+  commands.push({ type: 'Z', values: [] });
+  return commands;
+}
+
+/** Reverse a closed outline's vertex order, preserving the M/L/Z shape. */
+function reverseOutline(outline: PathCommand[]): PathCommand[] {
+  const pts = flattenPathWithSource(outline).map((p) => ({ x: p.x, y: p.y }));
+  if (pts.length >= 2) {
+    const a = pts[0];
+    const b = pts[pts.length - 1];
+    if (Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6) pts.pop();
+  }
+  pts.reverse();
+  const out: PathCommand[] = [{ type: 'M', values: [pts[0].x, pts[0].y] }];
+  for (let i = 1; i < pts.length; i++) out.push({ type: 'L', values: [pts[i].x, pts[i].y] });
+  out.push({ type: 'Z', values: [] });
+  return out;
+}
+
+/** Circular arc from `from` to `to` around `centre`, taking the short way. */
+function arcBetween(centre: Point2D, from: Point2D, to: Point2D, radius: number): Point2D[] {
+  const a0 = Math.atan2(from.y - centre.y, from.x - centre.x);
+  const a1 = Math.atan2(to.y - centre.y, to.x - centre.x);
+  let sweep = a1 - a0;
+  while (sweep > Math.PI) sweep -= Math.PI * 2;
+  while (sweep < -Math.PI) sweep += Math.PI * 2;
+
+  const steps = Math.max(1, Math.ceil((Math.abs(sweep) / (Math.PI / 2)) * ARC_SEGMENTS_PER_QUARTER));
+  const pts: Point2D[] = [];
+  for (let k = 0; k <= steps; k++) {
+    const a = a0 + (sweep * k) / steps;
+    pts.push({ x: centre.x + Math.cos(a) * radius, y: centre.y + Math.sin(a) * radius });
+  }
+  return pts;
 }

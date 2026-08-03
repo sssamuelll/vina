@@ -509,14 +509,20 @@ describe('generateSeamAllowanceWithCorners', () => {
     expect(saDouble.length).toBeGreaterThan(saMitered.length);
   });
 
-  // Records a KNOWN DEFECT, not desired behaviour. cornerSquared builds its
-  // corner by intersecting the two offset edges extended along their own
-  // directions — which is the definition of the miter point — so the bundle is
-  // [prevOffsetEdge.end, miterPoint, nextOffsetEdge.start], all three collinear
-  // with the edges they came from. simplifyPaths then collapses it back to the
-  // miter at ANY angle, not just 90°. Fixing cornerSquared is queued separately;
-  // this test fails loudly the day it is fixed, which is the point.
-  it('KNOWN DEFECT: squared collapses to mitered at every angle', () => {
+  // At a 90° vertex a squared corner IS the miter — a rectangle's seam
+  // allowance corner is square. Any definition that moved it would break every
+  // rectangle, so this equality is a requirement, not a defect.
+  it('squared equals mitered at a 90 degree corner', () => {
+    const sq = generateSeamAllowanceWithCorners(square, 10, 'squared', {});
+    const mit = generateSeamAllowanceWithCorners(square, 10, 'mitered', {});
+    expect(sq.length).toBe(mit.length);
+  });
+
+  // ...but at any other angle it must differ, and the corner must be a real
+  // right angle. The old implementation intersected the two offset edges along
+  // their own directions — the definition of the miter — so 'squared' was a
+  // silent no-op everywhere.
+  it('squared differs from mitered at non-right angles', () => {
     const pentagon: PathCommand[] = [];
     for (let i = 0; i < 5; i++) {
       const t = (i / 5) * Math.PI * 2;
@@ -526,7 +532,25 @@ describe('generateSeamAllowanceWithCorners', () => {
 
     const sq = generateSeamAllowanceWithCorners(pentagon, 10, 'squared', {});
     const mit = generateSeamAllowanceWithCorners(pentagon, 10, 'mitered', {});
-    expect(sq.length).toBe(mit.length);
+    expect(sq.length).toBeGreaterThan(mit.length);
+  });
+
+  it('the squared corner really is 90 degrees', () => {
+    // Prev edge runs +x; next edge leaves at 45°.
+    const prev: Line2D = { start: { x: 0, y: -10 }, end: { x: 100, y: -10 } };
+    const next: Line2D = { start: { x: 107.071, y: -7.071 }, end: { x: 207.071, y: 92.929 } };
+    const [P, R, Q] = cornerSquared(prev, next, { x: 100, y: 0 }, 10, 10, Math.PI / 4);
+
+    const a = { x: R.x - P.x, y: R.y - P.y };
+    const b = { x: Q.x - R.x, y: Q.y - R.y };
+    expect(Math.hypot(a.x, a.y)).toBeGreaterThan(0.01);
+    expect(Math.hypot(b.x, b.y)).toBeGreaterThan(0.01);
+    const cosine = (a.x * b.x + a.y * b.y) / (Math.hypot(a.x, a.y) * Math.hypot(b.x, b.y));
+    expect(cosine).toBeCloseTo(0, 6);
+
+    // And it is NOT the miter, which for this corner sits elsewhere.
+    const miter = cornerMitered(prev, next, { x: 100, y: 0 }, 10, 10, Math.PI / 4)[0];
+    expect(Math.hypot(R.x - miter.x, R.y - miter.y)).toBeGreaterThan(1);
   });
 
   // ── Curve index-mismatch regression ──────────────────────────────────────
