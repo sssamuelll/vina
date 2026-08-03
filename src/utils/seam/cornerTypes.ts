@@ -168,6 +168,37 @@ function lineDir(line: Line2D): Point2D {
   return { x: dx / len, y: dy / len };
 }
 
+// ─── Helper: order a symmetric pair along the walk ────────────────────────
+
+/**
+ * Order a two-point corner bundle so the first point is the one that meets the
+ * PREVIOUS offset edge and the second meets the NEXT one.
+ *
+ * cornerDoubleMitered and cornerTrimMirrored both build their pair by stepping
+ * ±perp from a centre point, where perp is a 90° rotation of a bisector or of
+ * the vertex→miter axis. That sign is unrelated to the direction the contour is
+ * walked, so at roughly half the vertices the pair came out reversed and the
+ * cut line crossed itself in a small bowtie at that corner. It went unnoticed
+ * because the only cleanup downstream was simplifyPaths, which does not remove
+ * self-intersections — it faithfully preserved the crossing.
+ *
+ * The bundle contract is prev-side first; see measureBorderCutLength, which
+ * reads bundle[length-1] as the next-side touch point and bundle[0] as the
+ * prev-side one.
+ */
+function orderPrevToNext(
+  a: Point2D,
+  b: Point2D,
+  prevOffsetEdge: Line2D,
+  nextOffsetEdge: Line2D,
+): Point2D[] {
+  const P = prevOffsetEdge.end;
+  const Q = nextOffsetEdge.start;
+  const asIs = Math.hypot(a.x - P.x, a.y - P.y) + Math.hypot(b.x - Q.x, b.y - Q.y);
+  const swapped = Math.hypot(b.x - P.x, b.y - P.y) + Math.hypot(a.x - Q.x, a.y - Q.y);
+  return swapped < asIs ? [b, a] : [a, b];
+}
+
 // ─── cornerMitered ────────────────────────────────────────────────────────
 
 /**
@@ -248,10 +279,12 @@ export function cornerDoubleMitered(
   const perpX = -mvDir.y;
   const perpY = mvDir.x;
 
-  return [
+  return orderPrevToNext(
     { x: midPt.x - perpX * depth, y: midPt.y - perpY * depth },
     { x: midPt.x + perpX * depth, y: midPt.y + perpY * depth },
-  ];
+    prevOffsetEdge,
+    nextOffsetEdge,
+  );
 }
 
 // ─── cornerSquared ────────────────────────────────────────────────────────
@@ -475,10 +508,12 @@ export function cornerTrimMirrored(
   const perpX = -bis.y;
   const perpY = bis.x;
 
-  return [
+  return orderPrevToNext(
     { x: miter.x - perpX * trimAmount, y: miter.y - perpY * trimAmount },
     { x: miter.x + perpX * trimAmount, y: miter.y + perpY * trimAmount },
-  ];
+    prevOffsetEdge,
+    nextOffsetEdge,
+  );
 }
 
 // ─── shiftCornerTypes ─────────────────────────────────────────────────────
@@ -919,18 +954,23 @@ export function generateSeamAllowanceWithCorners(
   if (resultPoints.length < 3) return [];
 
   // ── Step 6: Reduce vertices ───────────────────────────────────────────────
-  // NOTE: this does NOT remove self-intersections, despite what this step used
-  // to claim. `Clipper.simplifyPaths` is a vertex-reduction pass — feed it a
-  // bowtie and the bowtie comes straight back (verified). The boolean Union in
-  // `cleanClosedContour` is what actually removes them.
+  // NOTE: simplifyPaths does NOT remove self-intersections, despite what this
+  // step used to claim — feed it a bowtie and the bowtie comes straight back.
+  // It only reduces vertices. `cleanClosedContour` is the pass that removes
+  // them, via a boolean Union.
   //
-  // Union is deliberately NOT used here yet. Running it revealed that the
-  // doubleMitered walk self-intersects: cornerDoubleMitered returns its two
-  // points without tying the perpendicular's sign to the walk direction, so at
-  // some corners the pair is emitted crossed. Union removes those lobes and
-  // collapses the blunting entirely. Fixing that ordering is a separate change;
-  // until then, keeping simplify-only preserves today's rendered geometry.
-  // ponytail: concave pieces with a wide SA can still self-intersect here.
+  // Union is still NOT used here, but the reason has moved. The paired corner
+  // bundles no longer self-cross (see orderPrevToNext), so that blocker is
+  // gone. What blocks it now: this generator does not normalise the outline's
+  // winding, and `offsetEdge`'s normal is orientation-relative — so a
+  // negatively-wound piece gets its seam allowance generated INWARD. An inward
+  // offset legitimately self-intersects, and Union would then delete the lobes
+  // and flatten real geometry (it collapses the curved-piece fixtures in
+  // cornerTypes.test.ts from a visible override to nothing).
+  //
+  // Fix the winding first — offsetOutline() in this file already shows the
+  // shape of it — then this can become `cleanClosedContour(resultPoints)`.
+  // ponytail: until then, concave pieces with a wide SA can self-intersect here.
   const clipperPath = new Path64();
   for (const pt of resultPoints) {
     clipperPath.push(new Point64(
