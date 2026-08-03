@@ -654,10 +654,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   // ─── convertSegment ───
 
   const convertSegment = useCallback(
-    (commandIndex: number, toCurve: boolean) => {
-      if (!state.editingPieceId) return;
-
-      const piece = getPiece(state.editingPieceId);
+    // `pieceId` explícito para el clic derecho FUERA de "Editar patrón" (#197):
+    // ahí no hay pieza en edición y el hit-test es quien sabe cuál se tocó.
+    (commandIndex: number, toCurve: boolean, pieceId?: string) => {
+      const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece) return;
 
       const newOutline = toCurve

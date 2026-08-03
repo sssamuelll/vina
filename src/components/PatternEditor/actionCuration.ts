@@ -51,7 +51,7 @@ export type ActionId =
 /** Callbacks que Surface B pasa como props (verbos que no son dispatches puros). */
 export interface CurationCallbacks {
   onRename?: (pieceId: string) => void;
-  onConvertSegment?: (commandIndex: number, toCurve: boolean) => void;
+  onConvertSegment?: (commandIndex: number, toCurve: boolean, pieceId?: string) => void;
   onZoomToFit?: () => void;
   onUnfold?: (pieceId: string, foldLineId: string, outlineOnly?: boolean) => void;
   onOffsetInternalLine?: (pieceId: string, lineId: string) => void;
@@ -177,7 +177,11 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     gate: notLocked, run: (ctx) => ctx.cb.onOptimizeCurves?.(ctx.pieceId!) },                             // parity restore: old ContextMenu piece-level item (no lineId) — F2-hardened vs. old ungated item
   convertSegment: { id: 'convertSegment', group: 'transform', icon: '⌒',
     label: (ctx) => (ctx.segmentIsCurve ? 'Convertir en línea' : 'Convertir en curva'),
-    run: (ctx) => ctx.cb.onConvertSegment?.(ctx.segmentIndex!, !ctx.segmentIsCurve) },
+    // En `point.segment` el gate es tautológico (el segmentHit ES lo que elige esa
+    // fila). Trabaja en la fila `piece`, donde el clic derecho puede caer lejos del
+    // contorno: sin segmento bajo el cursor el ítem se OCULTA (§4 hide-not-disable).
+    gate: (ctx) => ctx.segmentIndex !== undefined && notLocked(ctx),
+    run: (ctx) => ctx.cb.onConvertSegment?.(ctx.segmentIndex!, !ctx.segmentIsCurve, ctx.pieceId ?? undefined) },
 
   // order (submenú z-order — colapsa 4 ítems planos en uno)
   order: { id: 'order', group: 'order', icon: '⇅', label: 'Orden', run: () => {},
@@ -278,7 +282,7 @@ export const CURATION: CurationRow[] = [
     bar: ['rotate90', 'duplicate', 'flipH', 'properties', 'lockToggle'],
     menu: [
       'copy', 'paste', 'pasteMirror',
-      'rotate90', 'flipH', 'flipV', 'optimizeAllCurves',
+      'rotate90', 'flipH', 'flipV', 'optimizeAllCurves', 'convertSegment',
       'order',
       'layer', 'lockToggle', 'activeToggle', 'groupCreate', 'addToGroup', 'removeFromGroup',
       'unlinkPieces', 'selectLinkedPartner', 'linkSymmetry', 'linkInstance', 'cloneLinkedSymmetry', 'cloneLinkedInstance',

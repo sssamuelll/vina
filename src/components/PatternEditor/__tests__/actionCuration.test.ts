@@ -166,3 +166,46 @@ describe('resolveBarActions — cap, no-danger y BAR_ENABLED_KINDS', () => {
     expect(resolveMenuActions(withClip).map(d => d.id)).toContain('paste');
   });
 });
+
+// ── Nota de María #197: "¿cómo hago curva una recta? No encuentro herramienta" ──
+// El verbo `convertSegment` existía desde siempre, pero SOLO en la fila
+// `point.segment`, que se alcanza únicamente dentro de "Editar patrón". La barra
+// no era salida posible: está suprimida en altitud POINT por construcción (G7).
+// Así que el verbo sube a la fila `piece` y el gate lo esconde cuando el clic
+// derecho no cae sobre el contorno.
+describe('convertSegment alcanzable desde el clic derecho sobre la pieza (nota de María #197)', () => {
+  const onConvertSegment = vi.fn();
+
+  it('aparece en el menú de pieza cuando el cursor cae sobre un segmento', () => {
+    const ctx = makeCtx({ segmentIndex: 2, segmentIsCurve: false });
+    expect(resolveMenuActions(ctx).map(d => d.id)).toContain('convertSegment');
+  });
+
+  it('se oculta cuando el clic derecho no cae sobre el contorno', () => {
+    const ctx = makeCtx({ segmentIndex: undefined });
+    expect(resolveMenuActions(ctx).map(d => d.id)).not.toContain('convertSegment');
+  });
+
+  it('se oculta en una pieza bloqueada aunque haya segmento bajo el cursor', () => {
+    const ctx = makeCtx({ segmentIndex: 2, piece: pieceFix(true) });
+    expect(resolveMenuActions(ctx).map(d => d.id)).not.toContain('convertSegment');
+  });
+
+  it('sigue disponible dentro de "Editar patrón" (fila point.segment intacta)', () => {
+    const ctx = makeCtx({ targetKind: 'point.segment', altitude: 'point', segmentIndex: 2 });
+    expect(resolveMenuActions(ctx).map(d => d.id)).toEqual(['convertSegment']);
+  });
+
+  it('la etiqueta nombra el resultado, no el estado actual', () => {
+    const def = ACTIONS.convertSegment;
+    const label = (c: CurationCtx) => (typeof def.label === 'function' ? def.label(c) : def.label);
+    expect(label(makeCtx({ segmentIndex: 0, segmentIsCurve: false }))).toBe('Convertir en curva');
+    expect(label(makeCtx({ segmentIndex: 0, segmentIsCurve: true }))).toBe('Convertir en línea');
+  });
+
+  it('pasa el pieceId del hit-test: fuera de edición no hay pieza en edición que deducir', () => {
+    const ctx = makeCtx({ pieceId: 'p9', segmentIndex: 3, segmentIsCurve: false, cb: { onConvertSegment } });
+    ACTIONS.convertSegment.run(ctx);
+    expect(onConvertSegment).toHaveBeenCalledWith(3, true, 'p9');
+  });
+});

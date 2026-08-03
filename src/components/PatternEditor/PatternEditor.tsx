@@ -23,6 +23,7 @@ import { newId } from '../../utils/ids';
 import { useGrainlineTool } from './useGrainlineTool';
 import { useEditCurve } from './useEditCurve';
 import { useEditPattern } from './useEditPattern';
+import { patternToPieceLocal } from './pieceTransform';
 import { nearestSegment } from './nodeEditorUtils';
 import { useMeasureTool } from './useMeasureTool';
 import { useTransformTool, type TransformUpdate } from './useTransformTool';
@@ -464,8 +465,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
 
     let segmentIndex: number | undefined;
     let segmentIsCurve: boolean | undefined;
-    if (editPatternTool.isEditing && editPatternTool.editingPieceId && hitPiece?.id === editPatternTool.editingPieceId) {
-      const localPt = { x: canvasX - (hitPiece.position?.x ?? 0), y: canvasY - (hitPiece.position?.y ?? 0) };
+    // Nota de María #197: "¿cómo hago curva una recta? No encuentro herramienta".
+    // El verbo existía pero solo se alcanzaba DENTRO de "Editar patrón". El
+    // hit-test corre ahora sobre cualquier pieza bajo el cursor; el ítem lo
+    // esconde el gate de `convertSegment` cuando el clic cae lejos del contorno.
+    if (hitPiece) {
+      const localPt = patternToPieceLocal({ x: canvasX, y: canvasY }, hitPiece);
       const segHit = nearestSegment(localPt, hitPiece.outline);
       if (segHit && segHit.distance <= screenToPatternLength(8, zoom2D)) {
         segmentIndex = segHit.commandIndex;
@@ -488,7 +493,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       internalLineType: hitInternalLineType,
       isEditingNodes: editPatternTool.isEditing,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.editingPieceId]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
@@ -954,7 +959,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         menu={ctxMenu}
         onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
         onRename={(id) => setEditingPieceNameId(id)}
-        onConvertSegment={(idx, toCurve) => editPatternTool.convertSegment(idx, toCurve)}
+        onConvertSegment={(idx, toCurve, pieceId) => editPatternTool.convertSegment(idx, toCurve, pieceId)}
         onZoomToFit={handleZoomToFit}
         onUnfold={handleUnfold}
         onOffsetInternalLine={handleOffsetInternalLine}
