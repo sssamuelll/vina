@@ -13,6 +13,7 @@ import { ANNOTATION_CATEGORY_COLORS } from '../../../utils/annotationTemplates';
 import { resolveColorway } from '../../../utils/colorwayResolver';
 import { formatPieceLabel } from '../../../utils/pieceLabel';
 import { dartApexPoint, internalLineColor } from './internalLineStyle';
+import { pieceBodyStyle } from './pieceBodyStyle';
 import { PHYSICAL_FABRIC_LIBRARY } from '../../../utils/cloth/physicalFabric';
 import { outlineBBoxCenter } from '../../../utils/geometry/transform';
 import { grainlineArrowheads } from '../../../utils/grainLine';
@@ -105,12 +106,10 @@ const SinglePiece = memo(function SinglePiece({
   const outlineD = piece.outline?.length ? pathToSVG(piece.outline) : '';
   const saD = hasSA ? pathToSVG(saPath) : '';
   const cutStroke = isSelected ? 'var(--accent-2d)' : 'var(--ink-on-light)';
-  const interiorFill =
-    renderMode2D === 'wireframe' ? 'none'
-    : colorwayColor ? (isSelected ? colorwayColor + '40' : colorwayColor + '25')
-    : isSelected ? 'color-mix(in oklab, var(--accent-2d) 14%, var(--piece-fill-2d))'
-    : renderMode2D === 'translucent' ? 'rgba(255,255,255,0.45)'
-    : 'var(--piece-fill-2d)';
+  // Hueca + contorno de trazos cuando está bloqueada (nota de María #192).
+  const { fill: interiorFill, cutDash } = pieceBodyStyle({
+    locked: piece.locked, renderMode2D, colorwayColor, isSelected, zoom2D,
+  });
 
   // Layer-locked: reduce opacity and disable pointer events
   const groupOpacity = piece.active === false ? 0.3 : isLayerLocked ? 0.5 : 1;
@@ -168,6 +167,7 @@ const SinglePiece = memo(function SinglePiece({
         style={{ stroke: cutStroke }}
         strokeWidth={1.4 / zoom2D}
         strokeLinejoin="round"
+        strokeDasharray={cutDash}
         pointerEvents="none"
       />
 
@@ -473,7 +473,9 @@ const SinglePiece = memo(function SinglePiece({
             pointerEvents="none"
             style={{ fontFamily: 'var(--font-mono-2d)', fill: 'var(--piece-locked-2d)' }}
           >
-            locked
+            {/* En español, como el resto de la interfaz — decía `locked` sobre
+                menús que dicen "Bloquear"/"Desbloquear" (nota de María #192). */}
+            bloqueada
           </text>
         );
       })()}
