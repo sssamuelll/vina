@@ -59,7 +59,22 @@ function toInitData(seams: Seam[]): SeamInitData[] {
 }
 
 describe('seamCoverage — las medias costuras de sisa cubren mitades DISJUNTAS del cap (ruta de producción)', () => {
-  it('María: cero doble-reclamo y cero mitad desnuda en los caps', { timeout: 120_000 }, () => {
+  // Presupuesto de 300 s, y no por capricho. Medido el 2026-08-03 con perfilado
+  // por fases: el 98% del test es `meshPiece` a 5 mm sobre las 5 piezas — el
+  // resto (importar, autoSew, refinar, resolver pares) no llega a 0.1 s junto.
+  //
+  //   sin cobertura, máquina libre     9 s
+  //   con cobertura, máquina libre    49 s   ← 5.4x: el mesher CDT es un bucle
+  //                                            numérico, el peor caso para la
+  //                                            instrumentación por sentencia
+  //   con cobertura, suite completa  106-122 s  ← rozando el techo de 120
+  //
+  // Con 120 s el test caía por timeout en 3 de 6 corridas completas del mismo
+  // día, sin que cambiara una línea de producción. No es lentitud a arreglar:
+  // el mallado a 5 mm ES lo que la sonda mide (`union.size > 90` cuenta los
+  // vértices de frontera del cap a esa densidad), así que abaratarlo sería
+  // aflojar la aserción. Lo que sobraba era el presupuesto.
+  it('María: cero doble-reclamo y cero mitad desnuda en los caps', { timeout: 300_000 }, () => {
     const pieces = importMariaClassified();
     const seams = refineSeamsInWorld(
       autoSew(pieces, { minConfidence: 0.3 }).seams.map(s => s.seam),
@@ -74,8 +89,6 @@ describe('seamCoverage — las medias costuras de sisa cubren mitades DISJUNTAS 
         meshMaxEdgeLength: 5,
       };
     });
-    const pairs = seamInitDataToPairs(toInitData(seams), meshed);
-
     // Por manga: las 2 medias de sisa (armhole↔sleeveCap) y sus vértices del cap
     const isCapEdge = (n: string) => /^sleevecap/i.test(n.replace(/-\d+$/, ''));
     const bySleeve = new Map<string, Array<Set<number>>>();
@@ -84,14 +97,14 @@ describe('seamCoverage — las medias costuras de sisa cubren mitades DISJUNTAS 
       const capSide = isCapEdge(s.pieceA.edgeName) ? 'A' : isCapEdge(s.pieceB.edgeName) ? 'B' : null;
       const otherName = capSide === 'A' ? s.pieceB.edgeName : capSide === 'B' ? s.pieceA.edgeName : '';
       if (!capSide || !/^armhole/i.test(otherName.replace(/-\d+$/, ''))) continue;
-      const pair = pairs.find(p =>
-        (p.pieceAId === s.pieceA.pieceId && p.pieceBId === s.pieceB.pieceId)
-        || (p.pieceAId === s.pieceB.pieceId && p.pieceBId === s.pieceA.pieceId));
       // Emparejar seam↔SeamPair por orden no basta (hay 2 medias por manga):
       // re-resuelve UNA costura a la vez para atribuir sus pares.
+      //
+      // Hubo aquí una resolución de TODAS las costuras cuyo resultado se
+      // buscaba con `pairs.find(...)` y se tiraba acto seguido con `void pair`
+      // — resto de un enfoque anterior que este `solo` sustituyó.
       const solo = seamInitDataToPairs(toInitData([s]), meshed);
       expect(solo.length, `${s.pieceA.edgeName}↔${s.pieceB.edgeName} resuelve`).toBe(1);
-      void pair;
       const sp = solo[0];
       const sleeveId = capSide === 'A' ? s.pieceA.pieceId : s.pieceB.pieceId;
       const capIsA = sp.pieceAId === sleeveId;
