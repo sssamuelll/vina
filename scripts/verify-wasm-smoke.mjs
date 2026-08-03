@@ -24,7 +24,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -32,7 +32,12 @@ const repoRoot = resolve(__dirname, '..');
 const wasmJsPath = resolve(repoRoot, 'public/wasm/xpbd_wasm.js');
 const wasmBinPath = resolve(repoRoot, 'public/wasm/xpbd_wasm_bg.wasm');
 
-const { default: init, XpbdSolver } = await import(wasmJsPath);
+// `import()` exige una URL, no una ruta del sistema. En Linux una ruta absoluta
+// (`/home/...`) cuela porque ya parece una URL sin esquema; en Windows `D:\...`
+// revienta con ERR_UNSUPPORTED_ESM_URL_SCHEME, y `D:` se lee como esquema. Este
+// gate corría sólo en CI, así que el fallo vivió sin que nadie lo notara: con
+// CI apagado y los deploys hechos a mano desde Windows, era un gate muerto.
+const { default: init, XpbdSolver } = await import(pathToFileURL(wasmJsPath).href);
 const wasm = await init({ module_or_path: readFileSync(wasmBinPath) });
 
 // Two particles 1m apart on the x-axis, both unit mass. One stretch
