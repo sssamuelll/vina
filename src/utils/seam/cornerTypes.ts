@@ -647,7 +647,21 @@ export function buildOffsetEdges(
   const edges: Line2D[] = [];
   for (let i = 0; i < n; i++) edges.push({ start: vertices[i], end: vertices[(i + 1) % n] });
   const edgeWidths = perEdgeWidths(sourced.map((p) => p.cmd), semanticEdges, saWidth);
-  const offsetEdges = edges.map((e, i) => offsetEdge(e, edgeWidths[i]));
+
+  // `offsetEdge` shifts along the left-perpendicular of the edge direction, so
+  // which side is OUTWARD depends entirely on how the outline is wound. A
+  // negatively-wound piece used to get its seam allowance generated INWARD —
+  // silently, and differently per piece depending on how it was authored (the
+  // rectangle tool winds one way, some imports the other).
+  //
+  // The sign is applied to the offset DIRECTION, never to the vertex order:
+  // `cornerTypes` and `semanticEdges` are keyed by outline COMMAND index, which
+  // `sourced` carries, so reversing the ring would silently re-target every
+  // per-vertex override. `edgeWidths` also stays positive — the corner
+  // functions consume it as a scalar setback (doubleMitered's depth, envelope's
+  // tab), and a negative width there would invert that geometry too.
+  const winding = ringArea(vertices) < 0 ? -1 : 1;
+  const offsetEdges = edges.map((e, i) => offsetEdge(e, edgeWidths[i] * winding));
   return { sourced, vertices, edges, edgeWidths, offsetEdges, n };
 }
 
@@ -953,38 +967,21 @@ export function generateSeamAllowanceWithCorners(
   const resultPoints: Point2D[] = out.flat();
   if (resultPoints.length < 3) return [];
 
-  // ── Step 6: Reduce vertices ───────────────────────────────────────────────
-  // NOTE: simplifyPaths does NOT remove self-intersections, despite what this
-  // step used to claim — feed it a bowtie and the bowtie comes straight back.
-  // It only reduces vertices. `cleanClosedContour` is the pass that removes
-  // them, via a boolean Union.
+  // ── Step 6: Clean up the assembled contour ────────────────────────────────
+  // Corner bundles can overlap each other on a concave vertex or a wide SA, so
+  // the raw walk may self-intersect. cleanClosedContour runs the boolean Union
+  // that removes those, then simplifies, then keeps the largest ring.
   //
-  // Union is still NOT used here, but the reason has moved. The paired corner
-  // bundles no longer self-cross (see orderPrevToNext), so that blocker is
-  // gone. What blocks it now: this generator does not normalise the outline's
-  // winding, and `offsetEdge`'s normal is orientation-relative — so a
-  // negatively-wound piece gets its seam allowance generated INWARD. An inward
-  // offset legitimately self-intersects, and Union would then delete the lobes
-  // and flatten real geometry (it collapses the curved-piece fixtures in
-  // cornerTypes.test.ts from a visible override to nothing).
-  //
-  // Fix the winding first — offsetOutline() in this file already shows the
-  // shape of it — then this can become `cleanClosedContour(resultPoints)`.
-  // ponytail: until then, concave pieces with a wide SA can self-intersect here.
-  const clipperPath = new Path64();
-  for (const pt of resultPoints) {
-    clipperPath.push(new Point64(
-      Math.round(pt.x * CLIPPER_SCALE),
-      Math.round(pt.y * CLIPPER_SCALE),
-    ));
-  }
+  // simplifyPaths alone — all this step used to do — does NOT remove
+  // self-intersections. Feed it a bowtie and the bowtie comes straight back; it
+  // is a vertex reducer, not a topology pass. Two bugs hid behind that:
+  // the paired corner bundles walked backwards at half the vertices
+  // (orderPrevToNext) and a negatively-wound piece offset inward
+  // (buildOffsetEdges). Both are fixed, so Union is safe here now.
+  const cleaned = cleanClosedContour(resultPoints);
 
-  const inputPaths = new Paths64();
-  inputPaths.push(clipperPath);
-  const simplified = Clipper.simplifyPaths(inputPaths, 0.01 * CLIPPER_SCALE, true);
-
-  if (simplified.length === 0) {
-    // Fallback: return raw assembled path without cleanup
+  if (cleaned.length < 3) {
+    // Fallback: return the raw assembled path rather than nothing.
     const commands: PathCommand[] = [
       { type: 'M', values: [resultPoints[0].x, resultPoints[0].y] },
     ];
@@ -995,34 +992,9 @@ export function generateSeamAllowanceWithCorners(
     return commands;
   }
 
-  // Take the largest path by area (outermost polygon)
-  let largest = simplified[0];
-  let largestArea = 0;
-  for (const path of simplified) {
-    let area = 0;
-    for (let i = 0, len = path.length; i < len; i++) {
-      const j = (i + 1) % len;
-      area += Number(path[i].x) * Number(path[j].y);
-      area -= Number(path[j].x) * Number(path[i].y);
-    }
-    area = Math.abs(area);
-    if (area > largestArea) {
-      largestArea = area;
-      largest = path;
-    }
-  }
-
-  const commands: PathCommand[] = [
-    {
-      type: 'M',
-      values: [Number(largest[0].x) / CLIPPER_SCALE, Number(largest[0].y) / CLIPPER_SCALE],
-    },
-  ];
-  for (let i = 1; i < largest.length; i++) {
-    commands.push({
-      type: 'L',
-      values: [Number(largest[i].x) / CLIPPER_SCALE, Number(largest[i].y) / CLIPPER_SCALE],
-    });
+  const commands: PathCommand[] = [{ type: 'M', values: [cleaned[0].x, cleaned[0].y] }];
+  for (let i = 1; i < cleaned.length; i++) {
+    commands.push({ type: 'L', values: [cleaned[i].x, cleaned[i].y] });
   }
   commands.push({ type: 'Z', values: [] });
 
@@ -1142,15 +1114,9 @@ export function offsetOutline(
     return outline.map((c) => ({ type: c.type, values: [...c.values] }));
   }
 
-  const probe = buildOffsetEdges(outline, Math.abs(distance));
-  if (!probe) return null;
-
-  // Normalise winding: offsetEdge's normal is orientation-relative, so a
-  // negatively-wound piece would otherwise offset the wrong way.
-  const flipped = ringArea(probe.vertices) < 0;
-  const source = flipped ? reverseOutline(outline) : outline;
-
-  const data = buildOffsetEdges(source, distance);
+  // buildOffsetEdges normalises the winding, so a positive distance is outward
+  // regardless of how the piece was authored.
+  const data = buildOffsetEdges(outline, distance);
   if (!data) return null;
   const { vertices, edges, offsetEdges, n } = data;
 
@@ -1203,21 +1169,6 @@ export function offsetOutline(
   }
   commands.push({ type: 'Z', values: [] });
   return commands;
-}
-
-/** Reverse a closed outline's vertex order, preserving the M/L/Z shape. */
-function reverseOutline(outline: PathCommand[]): PathCommand[] {
-  const pts = flattenPathWithSource(outline).map((p) => ({ x: p.x, y: p.y }));
-  if (pts.length >= 2) {
-    const a = pts[0];
-    const b = pts[pts.length - 1];
-    if (Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6) pts.pop();
-  }
-  pts.reverse();
-  const out: PathCommand[] = [{ type: 'M', values: [pts[0].x, pts[0].y] }];
-  for (let i = 1; i < pts.length; i++) out.push({ type: 'L', values: [pts[i].x, pts[i].y] });
-  out.push({ type: 'Z', values: [] });
-  return out;
 }
 
 /** Circular arc from `from` to `to` around `centre`, taking the short way. */
