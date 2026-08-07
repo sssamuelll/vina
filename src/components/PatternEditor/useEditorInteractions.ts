@@ -270,6 +270,10 @@ export function useEditorInteractions(
   const marqueeRef = useRef<{ startPattern: Point2D; currentPattern: Point2D; shiftKey: boolean } | null>(null);
   const [selectMarquee, setSelectMarquee] = useState<{ start: Point2D; current: Point2D } | null>(null);
   const [hoverCursor, setHoverCursor] = useState<string | null>(null);
+  /** true mientras una pieza se arrastra de verdad (≥ MIN_DRAG_PX). Suprime la
+   *  caja de transformación y la barra flotante, que se pintan desde Redux y se
+   *  quedaban clavadas en el origen durante el drag por DOM (maria-200). */
+  const [isDraggingPiece, setIsDraggingPiece] = useState(false);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
   const { pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool } = tools;
@@ -282,7 +286,7 @@ export function useEditorInteractions(
     isNodeEditing: nodeEditor.isEditing,
     selectedCount: selectedPieceIds.length,
     selectionHasLocked,
-  });
+  }) && !isDraggingPiece;
 
   /** Check if a click is near an anchor point of a piece */
   const findClickedAnchorPoint = useCallback((
@@ -772,6 +776,11 @@ export function useEditorInteractions(
         }
       }
       dragRef.current.lastPos = { x: newX, y: newY };
+      // Mismo umbral que el commit: un temblor de clic no esconde la caja.
+      // setState repetido con true es no-op para React — no re-renderiza.
+      if (Math.hypot(e.clientX - dragRef.current.startMouse.x, e.clientY - dragRef.current.startMouse.y) >= MIN_DRAG_PX) {
+        setIsDraggingPiece(true);
+      }
       return;
     }
     if (marqueeRef.current && activeTool === 'select') {
@@ -892,8 +901,19 @@ export function useEditorInteractions(
       const moved = Math.hypot(d.lastPos.x - d.startPos.x, d.lastPos.y - d.startPos.y);
       if (moved >= screenToPatternLength(MIN_DRAG_PX, zoom2D)) {
         dispatch(movePiece({ id: d.pieceId, x: d.lastPos.x, y: d.lastPos.y }));
+      } else {
+        // Sin commit no hay re-render que corrija el transform manual: la
+        // pieza quedaba desplazada esos px sin estado que la respalde
+        // (maria-200). Devolver el DOM a la verdad de Redux.
+        const pieceG = svgRef.current?.querySelector<SVGGElement>(`[data-piece-id="${d.pieceId}"]`);
+        const piece = pieces.find(p => p.id === d.pieceId);
+        if (pieceG && piece) {
+          const { cx, cy } = piece.outline?.length ? getOutlineCenterForDrag(piece.outline) : { cx: 0, cy: 0 };
+          pieceG.setAttribute('transform', `translate(${piece.position.x}, ${piece.position.y}) rotate(${piece.rotation}, ${cx}, ${cy})`);
+        }
       }
     }
+    setIsDraggingPiece(false);
     panRef.current = null;
     dragRef.current = null;
     internalLineDragRef.current = null;
