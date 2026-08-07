@@ -41,7 +41,7 @@ async function drawRectAndSelect(page: Page) {
   await page.waitForTimeout(400);
 
   await page.keyboard.press('z');
-  await expect.poll(() => editorTool(page), { timeout: 2000 }).toBe('select');
+  await expect.poll(() => editorTool(page)).toBe('select');
   const px = cx - 65, py = cy - 95;
   await page.mouse.click(px, py);
   await page.waitForTimeout(400);

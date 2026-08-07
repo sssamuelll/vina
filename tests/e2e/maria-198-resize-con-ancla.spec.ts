@@ -84,11 +84,11 @@ async function addAndSelectPiece(page: Page) {
 
   await page.keyboard.press('z');
   await expect
-    .poll(() => page.evaluate(() => (window as unknown as StoreWindow).__VINA_STORE__.getState().editor.activeTool), { timeout: 2000 })
+    .poll(() => page.evaluate(() => (window as unknown as StoreWindow).__VINA_STORE__.getState().editor.activeTool))
     .toBe('select');
   await page.mouse.click(box.x + 190, box.y + 250);
   await expect
-    .poll(() => page.evaluate(() => (window as unknown as StoreWindow).__VINA_STORE__.getState().editor.selectedPieceIds.length), { timeout: 2000 })
+    .poll(() => page.evaluate(() => (window as unknown as StoreWindow).__VINA_STORE__.getState().editor.selectedPieceIds.length))
     .toBe(1);
   await page.waitForTimeout(300);
   return box;
