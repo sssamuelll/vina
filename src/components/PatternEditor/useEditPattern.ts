@@ -248,6 +248,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       endDragBatch();
       const piece = pieces.find(p => p.id === pieceId);
       if (!piece) return;
+      if (piece.locked) {
+        // Bloqueada = no editable (maria-204). Sin aviso sería otro "clicaba
+        // y nada pasaba"; el toast enseña la regla y la salida.
+        dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+        return;
+      }
       seenOutlineRef.current = piece.outline;
       expectedOutlineRef.current = null;
       setState({
@@ -263,7 +269,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       });
       dragRef.current = null;
     },
-    [pieces, endDragBatch],
+    [pieces, endDragBatch, dispatch],
   );
 
   // ─── exitEdit ───

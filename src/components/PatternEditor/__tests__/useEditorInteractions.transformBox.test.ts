@@ -8,6 +8,12 @@ describe('shouldShowTransformBox', () => {
     })).toBe(true);
   });
 
+  it('oculta para transform con pieza bloqueada — era el bypass del lock (maria-204)', () => {
+    expect(shouldShowTransformBox({
+      activeTool: 'transform', isNodeEditing: false, selectedCount: 1, selectionHasLocked: true,
+    })).toBe(false);
+  });
+
   it('muestra en select con una pieza seleccionada, desbloqueada y sin editar nodos', () => {
     expect(shouldShowTransformBox({
       activeTool: 'select', isNodeEditing: false, selectedCount: 1, selectionHasLocked: false,

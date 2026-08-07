@@ -18,6 +18,7 @@ import {
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { rotatePoint } from '../../utils/geometry/transform';
+import { showInfoToast } from '../../store/copilotUISlice';
 import { reanchorNotches } from '../../utils/notchReanchor';
 import {
   compensatePositionForPivotChange,
@@ -106,6 +107,11 @@ export function useEditCurve(zoom: number, pan: Point2D) {
     endDragBatch();
     const piece = pieces.find(p => p.id === pieceId);
     if (!piece) return;
+    if (piece.locked) {
+      // Bloqueada = no editable (maria-204). Mismo aviso que useEditPattern.
+      dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+      return;
+    }
     // Seed the seen-outline identity so the resync effect first run is a
     // no-op — otherwise it would immediately clear the node just selected.
     seenOutlineRef.current = piece.outline;
@@ -118,7 +124,7 @@ export function useEditCurve(zoom: number, pan: Point2D) {
       nodes: extractNodes(piece),
     });
     dragRef.current = null;
-  }, [pieces, endDragBatch]);
+  }, [pieces, endDragBatch, dispatch]);
 
   const exitEdit = useCallback(() => {
     endDragBatch();

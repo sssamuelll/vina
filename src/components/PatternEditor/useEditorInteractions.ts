@@ -243,11 +243,14 @@ export function shouldShowTransformBox(opts: {
   selectedCount: number;
   selectionHasLocked: boolean;
 }): boolean {
+  // Una pieza bloqueada nunca enseña el box, tampoco en el tool transform:
+  // sus handles redimensionan/rotan, y eso es modificar (maria-204 cerró
+  // este bypass — el lock solo cubría el verbo select).
+  if (opts.selectionHasLocked) return false;
   if (opts.activeTool === 'transform') return true;
   return opts.activeTool === 'select'
     && !opts.isNodeEditing
-    && opts.selectedCount > 0
-    && !opts.selectionHasLocked;
+    && opts.selectedCount > 0;
 }
 
 export function useEditorInteractions(
@@ -663,9 +666,10 @@ export function useEditorInteractions(
           } else {
             dispatch(selectPiece(pieceId));
           }
-          if (!piece.locked) {
-            dragRef.current = { pieceId, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...piece.position } };
-          }
+          // Bloqueada = geometría intocable, no el sitio (maria-204): mover
+          // se permite; modificar sigue bloqueado en sus superficies (box de
+          // transform oculto, editores de nodos con guard, curation gates).
+          dragRef.current = { pieceId, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...piece.position } };
         }
       } else {
         // Empty area: start marquee selection
