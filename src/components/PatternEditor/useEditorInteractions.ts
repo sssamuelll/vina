@@ -102,6 +102,14 @@ interface ToolHooks {
   lineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   notchTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
+  pointTool: {
+    armed: boolean;
+    handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleKeyDown: (e: KeyboardEvent) => void;
+    getCursor: () => string;
+  };
   seamAllowanceTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
   trimTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
   grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
@@ -279,7 +287,7 @@ export function useEditorInteractions(
   const [isDraggingPiece, setIsDraggingPiece] = useState(false);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
-  const { pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool } = tools;
+  const { pen, rectTool, lineTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool } = tools;
 
   const selectionHasLocked = selectedPieceIds.some(
     id => pieces.find(p => p.id === id)?.locked,
@@ -398,6 +406,12 @@ export function useEditorInteractions(
   useEffect(() => {
     const onEscapeCapture = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // Tool Punto armado: cancelar SOLO la colocación pendiente (el hook hace
+      // preventDefault + stopPropagation). Sin armar, el Esc fluye normal.
+      if (activeTool === 'point' && pointTool.armed) {
+        pointTool.handleKeyDown(e);
+        return;
+      }
       if (activeTool !== 'select') return;
       if (!transformTool.isDragging) return;
       transformTool.handleKeyDown(e);
@@ -406,7 +420,7 @@ export function useEditorInteractions(
     };
     window.addEventListener('keydown', onEscapeCapture, { capture: true });
     return () => window.removeEventListener('keydown', onEscapeCapture, { capture: true });
-  }, [activeTool, transformTool]);
+  }, [activeTool, transformTool, pointTool]);
 
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);
@@ -562,6 +576,7 @@ export function useEditorInteractions(
     if (activeTool === 'line') { lineTool.handleMouseDown(e); return; }
     if (activeTool === 'seam') { seamTool.handleMouseDown(e); return; }
     if (activeTool === 'notch') { notchTool.handleMouseDown(e); return; }
+    if (activeTool === 'point') { pointTool.handleMouseDown(e); return; }
     if (activeTool === 'seamAllowance') { seamAllowanceTool.handleMouseDown(e); return; }
     if (activeTool === 'trimPlace') { trimTool.handleMouseDown(e); return; }
     if (activeTool === 'grainline') { grainlineTool.handleMouseDown(e); return; }
@@ -703,7 +718,7 @@ export function useEditorInteractions(
         };
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -823,6 +838,7 @@ export function useEditorInteractions(
     if (activeTool === 'line') lineTool.handleMouseMove(e);
     if (activeTool === 'seam') seamTool.handleMouseMove(e);
     if (activeTool === 'notch') notchTool.handleMouseMove(e);
+    if (activeTool === 'point') pointTool.handleMouseMove(e);
     if (activeTool === 'trimPlace') trimTool.handleMouseMove(e);
     if (activeTool === 'seamAllowance') seamAllowanceTool.handleMouseMove(e);
     if (activeTool === 'grainline') grainlineTool.handleMouseMove(e);
@@ -840,7 +856,7 @@ export function useEditorInteractions(
     if (activeTool === 'internalShape') internalShapeTool.handleMouseMove(e);
     if (activeTool === 'pleat') pleatTool.handleMouseMove(e);
     if (activeTool === 'elastic') elasticTool.handleMouseMove(e);
-  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
+  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, pointTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseUp = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
     // Resolve marquee selection
@@ -935,7 +951,8 @@ export function useEditorInteractions(
     if (activeTool === 'extendTrim') extendTrimTool.handleMouseUp();
     if (activeTool === 'polyPen' && e) polyPenTool.handleMouseUp(e);
     if (activeTool === 'internalShape' && e) internalShapeTool.handleMouseUp(e);
-  }, [activeTool, pen, rectTool, seamAllowanceTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, dispatch, pieces, zoom2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool]);
+    if (activeTool === 'point' && e) pointTool.handleMouseUp(e);
+  }, [activeTool, pen, rectTool, seamAllowanceTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, dispatch, pieces, zoom2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pointTool]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
@@ -950,6 +967,7 @@ export function useEditorInteractions(
       case 'editPattern': return editPattern.isEditing ? editPattern.getCursor() : 'default';
       case 'seam': return 'crosshair';
       case 'notch': return 'crosshair';
+      case 'point': return pointTool.getCursor();
       case 'seamAllowance': return 'crosshair';
       case 'trimPlace': return 'crosshair';
       case 'grainline': return 'crosshair';

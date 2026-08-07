@@ -715,6 +715,7 @@ export type Tool2D =
   | 'transform'    // move/rotate/scale with gizmo
   | 'editPattern'  // edit points and segments (Q key)
   | 'editCurve'    // edit curve points
+  | 'point'        // add point / convert side to curve-by-points or bezier (maria-203)
   | 'editConstrain' // edit with constraints
   | 'movePattern'  // move pattern pieces
   | 'copyPattern'  // copy/paste pattern pieces

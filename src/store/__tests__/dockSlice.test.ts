@@ -5,8 +5,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import dockReducer, {
   pinAuto, unpinAuto, persistDocks, loadDocks, toggleDockSignaling,
   rehydrateDocks, addDockTool, removeDockTool, resetDockTools,
-  reorderDockTool, LEGACY_DEFAULT_DOCK_2D_IDS, DEFAULT_DOCK_2D_IDS,
-  migrateDefaultDockTools,
+  reorderDockTool, LEGACY_DEFAULT_DOCK_2D_IDS, LEGACY_DEFAULT_DOCK_2D_IDS_V2,
+  DEFAULT_DOCK_2D_IDS, migrateDefaultDockTools,
 } from '../dockSlice';
 
 const initial = () => dockReducer(undefined, { type: '@@INIT' });
@@ -86,16 +86,17 @@ describe('dockSlice signaling', () => {
 describe('dockSlice tools2d', () => {
   beforeEach(() => localStorage.clear());
 
-  it('defaults tools2d to the 8 ids with editPattern immediately after select', () => {
+  it('defaults tools2d to the 9 ids with point between editPattern and pen (maria-203)', () => {
     expect(initial().tools2d).toEqual(DEFAULT_DOCK_2D_IDS);
     expect(DEFAULT_DOCK_2D_IDS).toEqual([
-      'select', 'editPattern', 'pen', 'line',
+      'select', 'editPattern', 'point', 'pen', 'line',
       'rectangle', 'scissors', 'measure', 'seam',
     ]);
   });
 
-  it('migrates only the exact ordered historical default', () => {
+  it('migrates only the exact ordered historical defaults (v1 and v2)', () => {
     expect(migrateDefaultDockTools(LEGACY_DEFAULT_DOCK_2D_IDS)).toEqual(DEFAULT_DOCK_2D_IDS);
+    expect(migrateDefaultDockTools(LEGACY_DEFAULT_DOCK_2D_IDS_V2)).toEqual(DEFAULT_DOCK_2D_IDS);
     expect(migrateDefaultDockTools([...LEGACY_DEFAULT_DOCK_2D_IDS].reverse()))
       .toEqual([...LEGACY_DEFAULT_DOCK_2D_IDS].reverse());
     expect(migrateDefaultDockTools(['select', 'pen', 'notch']))

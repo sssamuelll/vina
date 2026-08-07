@@ -15,6 +15,7 @@ import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { useNotchTool } from './useNotchTool';
+import { usePointTool } from './usePointTool';
 import { useSeamAllowanceTool } from './useSeamAllowanceTool';
 import { useNotchMirrorPreview } from './useNotchMirrorPreview';
 import SeamAllowanceSelectionOverlay from './renderers/overlays/SeamAllowanceSelectionOverlay';
@@ -271,6 +272,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const grainlineTool = useGrainlineTool(zoom2D, pan2D, pieces, handleGrainlineSet);
   const nodeEditor = useEditCurve(zoom2D, pan2D);
   const editPatternTool = useEditPattern(zoom2D, pan2D);
+  // Tool Punto (maria-203): despacha los tres verbos de useEditPattern — una
+  // puerta común con el menú contextual, mismo candado, mismo re-anclaje.
+  const pointToolHook = usePointTool(zoom2D, pan2D, pieces, {
+    addPointOnSegment: editPatternTool.addPointOnSegment,
+    convertSegment: editPatternTool.convertSegment,
+    convertSegmentToPoints: editPatternTool.convertSegmentToPoints,
+  });
 
   /**
    * maria-203: tras convertir un lado desde el clic derecho, además de mutar
@@ -549,7 +557,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
+      pen, rectTool, lineTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
     });
 
   // Mouse capture fallback for gestures that leave the SVG. Keep the latest
@@ -821,6 +829,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             lineCursor={lineTool.cursorPos}
             lineLength={lineTool.lineLength}
             notchHoveredPoint={notchTool.hoveredPoint}
+            pointToolHover={pointToolHook.hover}
+            pointToolMode={pointToolHook.mode}
             notchRefineMarker={notchTool.refining ? { refWorld: notchTool.refining.refWorld, notchWorld: notchTool.refining.notchWorld, previewWorld: notchTool.refining.previewWorld } : null}
             notchMirrorGhost={notchMirrorGhost}
             grainlineIsDragging={grainlineTool.isDragging}

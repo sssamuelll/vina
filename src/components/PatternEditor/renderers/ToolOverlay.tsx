@@ -70,6 +70,9 @@ interface ToolOverlayProps {
   seamHoveredEdge: FreeEdgeSelection | null;
   seamMode: 'free' | 'point';
   notchHoveredPoint: NotchHover | null;
+  /** Tool Punto (maria-203): preview solo cuando reason === 'ok'. */
+  pointToolHover?: import('../usePointTool').PointToolHover | null;
+  pointToolMode?: import('../usePointTool').PointToolMode;
   notchRefineMarker?: import('./overlays/NotchToolOverlay').NotchRefineMarker | null;
   /** F3 mirror-notch ghost — shown whenever a notch is selected and maps to a
    *  paired edge, regardless of activeTool (gated by presence, not tool). */
@@ -193,6 +196,38 @@ export default function ToolOverlay(props: ToolOverlayProps) {
 
       {/* Mirror-notch ghost (F3) — gated by presence, not activeTool. */}
       <NotchMirrorOverlay ghost={props.notchMirrorGhost ?? null} zoom={zoom2D} />
+
+      {/* Tool Punto: el preview delata la granularidad del chip ANTES del
+          clic — un punto en la proyección (chip 'point') vs el lado completo
+          iluminado (chips de conversión). Sin preview cuando el contexto
+          niega (ancla / curva con chip de conversión / bloqueada). */}
+      {activeTool === 'point' && props.pointToolHover?.reason === 'ok' && props.pointToolHover.target && (
+        <g className="point-tool-preview" pointerEvents="none">
+          {props.pointToolMode === 'point' ? (
+            <circle
+              cx={props.pointToolHover.target.world.x}
+              cy={props.pointToolHover.target.world.y}
+              r={4 / zoom2D}
+              fill="#4a9eff"
+              stroke="#fff"
+              strokeWidth={1.2 / zoom2D}
+            />
+          ) : (
+            props.pointToolHover.target.sideEnds && (
+              <line
+                x1={props.pointToolHover.target.sideEnds[0].x}
+                y1={props.pointToolHover.target.sideEnds[0].y}
+                x2={props.pointToolHover.target.sideEnds[1].x}
+                y2={props.pointToolHover.target.sideEnds[1].y}
+                stroke="#4a9eff"
+                strokeWidth={3 / zoom2D}
+                strokeLinecap="round"
+                opacity={0.6}
+              />
+            )
+          )}
+        </g>
+      )}
 
       {activeTool === 'trimPlace' && props.trimHoveredEdge && (
         <TrimToolOverlay zoom2D={zoom2D} hoveredEdge={props.trimHoveredEdge} />
