@@ -811,6 +811,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             previewPath={pen.previewPath}
             guidePath={pen.guidePath}
             penDistance={pen.lastPointDistance}
+            penWillClose={pen.willClose}
             rectPreview={rectTool.previewRect}
             rectDimensions={rectTool.rectDimensions}
             seamFirstEdge={seamTool.firstEdge}

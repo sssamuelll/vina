@@ -60,6 +60,7 @@ interface ToolOverlayProps {
   previewPath: string;
   guidePath: string | null;
   penDistance: { distance: number; position: Point2D } | null;
+  penWillClose: boolean;
   rectPreview: { x: number; y: number; width: number; height: number } | null;
   rectDimensions: { width: number; height: number; center: Point2D } | null;
   lineStart: Point2D | null;
@@ -202,7 +203,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
       )}
 
       {activeTool === 'pen' && (
-        <PenToolOverlay zoom2D={zoom2D} units={units} penNodes={props.penNodes} previewPath={props.previewPath} guidePath={props.guidePath} penDistance={props.penDistance} />
+        <PenToolOverlay zoom2D={zoom2D} units={units} penNodes={props.penNodes} previewPath={props.previewPath} guidePath={props.guidePath} penDistance={props.penDistance} penWillClose={props.penWillClose} />
       )}
 
       {activeTool === 'line' && props.lineStart && (

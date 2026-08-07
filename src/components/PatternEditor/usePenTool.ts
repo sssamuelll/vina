@@ -197,8 +197,19 @@ export function usePenTool(
     }
   }, [nodesToCommands, onComplete]);
 
-  // Distance from last node to cursor for dimension label
-  const lastPointDistance = state.nodes.length > 0 && state.cursorPos && !state.isClosed
+  // ¿El próximo clic cierra el contorno? Mismo umbral que el snap real de
+  // handleMouseDown — el aviso y el comportamiento no pueden discrepar
+  // (maria-196: el cierre existía pero era invisible).
+  const willClose =
+    state.nodes.length > 2 &&
+    !!state.cursorPos &&
+    !state.isClosed &&
+    dist(state.cursorPos, state.nodes[0].anchor) * zoom < CLOSE_THRESHOLD;
+
+  // Distance from last node to cursor for dimension label. Se apaga cuando
+  // el cierre está armado: en ese momento la medida es ruido y era
+  // exactamente lo que tapaba el punto de origen (maria-196).
+  const lastPointDistance = state.nodes.length > 0 && state.cursorPos && !state.isClosed && !willClose
     ? {
         distance: dist(state.nodes[state.nodes.length - 1].anchor, state.cursorPos),
         position: state.cursorPos,
@@ -209,6 +220,7 @@ export function usePenTool(
     nodes: state.nodes,
     isDragging: state.isDragging,
     isClosed: state.isClosed,
+    willClose,
     previewPath: buildPreviewPath(),
     guidePath: buildGuidePath(),
     lastPointDistance,
