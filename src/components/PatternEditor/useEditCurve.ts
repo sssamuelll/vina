@@ -173,14 +173,18 @@ export function useEditCurve(zoom: number, pan: Point2D) {
 
     const HIT = screenToPatternLength(8, zoom);
 
-    // Check control points first (they should be clickable above anchors)
+    // Check control points first (they should be clickable above anchors).
+    // Each handle carries its own drag ref (maria-203): cp1 = incoming
+    // (C:'cp2' / Q:'cp1' slot), cp2 = outgoing (next command's 'cp1' slot).
     for (const node of state.nodes) {
-      if (node.cp1) {
-        const d = Math.hypot(pt.x - node.cp1.x, pt.y - node.cp1.y);
+      const handles: Array<{ pos: Point2D; ref: NodeRef }> = [];
+      if (node.cp1 && node.cp1Ref) handles.push({ pos: node.cp1, ref: node.cp1Ref });
+      if (node.cp2 && node.cp2Ref) handles.push({ pos: node.cp2, ref: node.cp2Ref });
+      for (const h of handles) {
+        const d = Math.hypot(pt.x - h.pos.x, pt.y - h.pos.y);
         if (d < HIT) {
-          const ref: NodeRef = { ...node.ref, pointType: 'cp2' }; // cp1 in EditableNode = incoming handle = cp2 in command
-          setState(s => ({ ...s, selectedNode: ref }));
-          dragRef.current = { nodeRef: ref, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...node.cp1! } };
+          setState(s => ({ ...s, selectedNode: h.ref }));
+          dragRef.current = { nodeRef: h.ref, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...h.pos } };
           return true;
         }
       }
@@ -260,9 +264,13 @@ export function useEditCurve(zoom: number, pan: Point2D) {
 
     let hovered: NodeRef | null = null;
     for (const node of state.nodes) {
-      if (node.cp1) {
+      if (node.cp1 && node.cp1Ref) {
         const d = Math.hypot(pt.x - node.cp1.x, pt.y - node.cp1.y);
-        if (d < HIT) { hovered = { ...node.ref, pointType: 'cp2' }; break; }
+        if (d < HIT) { hovered = node.cp1Ref; break; }
+      }
+      if (node.cp2 && node.cp2Ref) {
+        const d = Math.hypot(pt.x - node.cp2.x, pt.y - node.cp2.y);
+        if (d < HIT) { hovered = node.cp2Ref; break; }
       }
       const d = Math.hypot(pt.x - node.position.x, pt.y - node.position.y);
       if (d < HIT) { hovered = node.ref; break; }

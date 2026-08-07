@@ -112,6 +112,45 @@ describe('extractNodes', () => {
       expect(node.ref.pieceId).toBe('p1');
     }
   });
+
+  // maria-203: el handle de salida (v[0],v[1] del C siguiente) no existía para
+  // render ni hit-test — el bezier era inmodelable (solo medio par de handles).
+  it('exposes the outgoing handle as cp2 on the node BEFORE a C command', () => {
+    const piece = makeCurvePiece();
+    const nodes = extractNodes(piece);
+
+    // node[0] (M at 0,0) precede al C: su handle de salida es v[0],v[1] del C
+    expect(nodes[0].cp2).toEqual({ x: 33, y: -20 });
+    // …y arrastrarlo escribe cp1 del comando SIGUIENTE
+    expect(nodes[0].cp2Ref).toEqual({ pieceId: 'p2', commandIndex: 1, pointType: 'cp1' });
+  });
+
+  it('keeps the incoming handle as cp1 with a ref that maps to cp2 of the C', () => {
+    const piece = makeCurvePiece();
+    const nodes = extractNodes(piece);
+
+    expect(nodes[1].cp1).toEqual({ x: 66, y: -20 });
+    expect(nodes[1].cp1Ref).toEqual({ pieceId: 'p2', commandIndex: 1, pointType: 'cp2' });
+  });
+
+  it('maps a Q command handle to pointType cp1 (not the C mapping)', () => {
+    // applyNodeMove sobre Q ignora 'cp2' en silencio: el mapeo duro a 'cp2'
+    // hacía el handle de una Q inarrastrable.
+    const piece: PatternPiece = {
+      ...makeSquarePiece(),
+      id: 'pq',
+      outline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'Q', values: [50, -30, 100, 0] },
+        { type: 'L', values: [0, 100] },
+        { type: 'Z', values: [] },
+      ],
+    };
+    const nodes = extractNodes(piece);
+
+    expect(nodes[1].cp1).toEqual({ x: 50, y: -30 });
+    expect(nodes[1].cp1Ref).toEqual({ pieceId: 'pq', commandIndex: 1, pointType: 'cp1' });
+  });
 });
 
 // ─── hitTestNode ───

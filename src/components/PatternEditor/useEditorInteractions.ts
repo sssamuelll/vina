@@ -110,6 +110,7 @@ interface ToolHooks {
     isEditing: boolean;
     hoveredNode: unknown;
     enterEdit: (pieceId: string, selectedNode?: NodeRef) => void;
+    exitEdit: () => void;
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseUp: () => void;
@@ -501,7 +502,7 @@ export function useEditorInteractions(
       panRef.current = { startMouse: { x: e.clientX, y: e.clientY }, startPan: { ...pan2D } };
       return;
     }
-    if (nodeEditor.isEditing && activeTool === 'select') {
+    if (nodeEditor.isEditing && (activeTool === 'select' || activeTool === 'editCurve')) {
       const handled = nodeEditor.handleMouseDown(e);
       if (handled) return;
     }
@@ -531,6 +532,21 @@ export function useEditorInteractions(
         editPattern.enterEdit(pieceId);
       } else {
         editPattern.exitEdit();
+      }
+      return;
+    }
+    if (activeTool === 'editCurve') {
+      // El dock tool "Edit Curve Points" existía pero ningún handler ruteaba
+      // hacia él — clicar la pieza no hacía nada (maria-203). Mismo patrón de
+      // entrada que editPattern; el bloque isEditing de arriba ya cubre el
+      // resto del ciclo, y un clic sobre OTRA pieza cae aquí y cambia el
+      // objetivo de edición.
+      const target = e.target as SVGElement;
+      const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');
+      if (pieceId) {
+        nodeEditor.enterEdit(pieceId);
+      } else {
+        nodeEditor.exitEdit();
       }
       return;
     }
@@ -768,7 +784,7 @@ export function useEditorInteractions(
       }
       return;
     }
-    if (nodeEditor.isEditing && activeTool === 'select') {
+    if (nodeEditor.isEditing && (activeTool === 'select' || activeTool === 'editCurve')) {
       const handled = nodeEditor.handleMouseMove(e);
       if (handled) return;
     }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
 import { batchUndo } from '../../store/undoMiddleware';
+import { activate2DTool } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
@@ -270,6 +271,20 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const grainlineTool = useGrainlineTool(zoom2D, pan2D, pieces, handleGrainlineSet);
   const nodeEditor = useEditCurve(zoom2D, pan2D);
   const editPatternTool = useEditPattern(zoom2D, pan2D);
+
+  /**
+   * maria-203: tras convertir un lado desde el clic derecho, además de mutar
+   * el outline hay que ENSEÑAR el resultado — editor de nodos abierto sobre la
+   * pieza y el dock en "Edit Curve Points". Sin esto los puntos nuevos existían
+   * pero ningún overlay los pintaba y María veía "ningún cambio". Si la
+   * edición de patrón (Q) ya está abierta, esa superficie ya los enseña: no se
+   * le roba el modo.
+   */
+  const showConvertedPoints = useCallback((pieceId?: string) => {
+    if (!pieceId || editPatternTool.isEditing) return;
+    nodeEditor.enterEdit(pieceId);
+    if (activeTool !== 'editCurve') activate2DTool(dispatch, 'editCurve');
+  }, [editPatternTool.isEditing, nodeEditor, activeTool, dispatch]);
   const scissorsTool = useScissorsTool(zoom2D, pan2D);
   const slashAndSpreadTool = useSlashAndSpreadTool(zoom2D, pan2D);
   const mergeTool = useMergeTool(zoom2D, pan2D);
@@ -959,8 +974,14 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         menu={ctxMenu}
         onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
         onRename={(id) => setEditingPieceNameId(id)}
-        onConvertSegment={(idx, toCurve, pieceId) => editPatternTool.convertSegment(idx, toCurve, pieceId)}
-        onConvertSegmentToPoints={(idx, pieceId) => editPatternTool.convertSegmentToPoints(idx, pieceId)}
+        onConvertSegment={(idx, toCurve, pieceId) => {
+          editPatternTool.convertSegment(idx, toCurve, pieceId);
+          showConvertedPoints(pieceId);
+        }}
+        onConvertSegmentToPoints={(idx, pieceId) => {
+          editPatternTool.convertSegmentToPoints(idx, pieceId);
+          showConvertedPoints(pieceId);
+        }}
         onZoomToFit={handleZoomToFit}
         onUnfold={handleUnfold}
         onOffsetInternalLine={handleOffsetInternalLine}

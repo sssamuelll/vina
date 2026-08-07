@@ -27,8 +27,12 @@ export interface EditableNode {
   position: Point2D;
   /** Control point 1 (incoming handle before anchor, for C: v[2],v[3]) */
   cp1?: Point2D;
-  /** Control point 2 (outgoing handle after anchor) */
+  /** Drag target for cp1 — the command slot applyNodeMove writes (C: 'cp2', Q: 'cp1') */
+  cp1Ref?: NodeRef;
+  /** Control point 2 (outgoing handle after anchor) = v[0],v[1] of the NEXT C command */
   cp2?: Point2D;
+  /** Drag target for cp2 → { commandIndex: i+1, pointType: 'cp1' } */
+  cp2Ref?: NodeRef;
 }
 
 export interface SegmentHit {
@@ -105,40 +109,50 @@ export function extractNodes(piece: PatternPiece): EditableNode[] {
   for (let i = 0; i < cmds.length; i++) {
     const cmd = cmds[i];
     const v = cmd.values;
+    let node: EditableNode | null = null;
 
     switch (cmd.type) {
       case 'M':
-        nodes.push({
-          ref: { pieceId: piece.id, commandIndex: i, pointType: 'anchor' },
-          position: { x: v[0], y: v[1] },
-        });
-        break;
       case 'L':
-        nodes.push({
+        node = {
           ref: { pieceId: piece.id, commandIndex: i, pointType: 'anchor' },
           position: { x: v[0], y: v[1] },
-        });
+        };
         break;
       case 'C': {
         // Cubic bezier: cp1(v[0],v[1]), cp2(v[2],v[3]), anchor(v[4],v[5])
-        nodes.push({
+        node = {
           ref: { pieceId: piece.id, commandIndex: i, pointType: 'anchor' },
           position: { x: v[4], y: v[5] },
-          cp1: { x: v[2], y: v[3] }, // control point before this anchor
-          cp2: undefined,
-        });
+          cp1: { x: v[2], y: v[3] }, // incoming handle of this anchor
+          cp1Ref: { pieceId: piece.id, commandIndex: i, pointType: 'cp2' },
+        };
         break;
       }
       case 'Q': {
-        // Quadratic bezier: cp1(v[0],v[1]), anchor(v[2],v[3])
-        nodes.push({
+        // Quadratic bezier: cp1(v[0],v[1]), anchor(v[2],v[3]). Its only
+        // handle writes the 'cp1' slot — the hardcoded 'cp2' mapping made a
+        // Q handle drag a silent no-op (maria-203).
+        node = {
           ref: { pieceId: piece.id, commandIndex: i, pointType: 'anchor' },
           position: { x: v[2], y: v[3] },
           cp1: { x: v[0], y: v[1] },
-        });
+          cp1Ref: { pieceId: piece.id, commandIndex: i, pointType: 'cp1' },
+        };
         break;
       }
       // Z doesn't add a node
+    }
+
+    if (node) {
+      // maria-203: the outgoing handle of this anchor lives in the NEXT C
+      // command (its v[0],v[1]). Without it only half the bezier is editable.
+      const next = cmds[i + 1];
+      if (next?.type === 'C') {
+        node.cp2 = { x: next.values[0], y: next.values[1] };
+        node.cp2Ref = { pieceId: piece.id, commandIndex: i + 1, pointType: 'cp1' };
+      }
+      nodes.push(node);
     }
   }
 
