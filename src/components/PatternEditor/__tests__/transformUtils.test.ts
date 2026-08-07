@@ -3,6 +3,7 @@ import {
   computeBoundingBox,
   computeHandlePositions,
   scaleOutline,
+  scaleAnchorForHandle,
   rotateOutline,
   rotatePoint,
   outlineBBoxCenter,
@@ -134,6 +135,28 @@ describe('scaleOutline', () => {
     expect(result[1].values[0]).toBe(-30);
     // C: cp1y=-20 -> (-20-0)*2+0 = -40
     expect(result[1].values[1]).toBe(-40);
+  });
+});
+
+// maria-198: el resize ancla el lado/esquina OPUESTO al handle arrastrado —
+// arrastrar `e` deja el oeste plantado, no crece simétrico desde el centro.
+describe('scaleAnchorForHandle', () => {
+  const bbox = { x: 10, y: 20, width: 100, height: 50 };
+
+  it('el handle e ancla el lado oeste', () => {
+    expect(scaleAnchorForHandle('e', bbox)).toEqual({ x: 10, y: 45 });
+  });
+
+  it('el handle se ancla la esquina nw', () => {
+    expect(scaleAnchorForHandle('se', bbox)).toEqual({ x: 10, y: 20 });
+  });
+
+  it('el handle nw ancla la esquina se', () => {
+    expect(scaleAnchorForHandle('nw', bbox)).toEqual({ x: 110, y: 70 });
+  });
+
+  it('el handle n ancla el lado sur', () => {
+    expect(scaleAnchorForHandle('n', bbox)).toEqual({ x: 60, y: 70 });
   });
 });
 

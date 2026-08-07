@@ -6,6 +6,7 @@ import {
   hitTestHandle,
   computeScaleFromDrag,
   computeRotationFromDrag,
+  scaleAnchorForHandle,
   scaleOutline,
   rotateOutline,
   rotatePoint,
@@ -172,15 +173,18 @@ export function useTransformTool(
     } else {
       const uniform = ['nw', 'ne', 'sw', 'se'].includes(d.handleId) && !shiftRef.current;
       const { scaleX, scaleY } = computeScaleFromDrag(d.handleId, snappedBbox, d.origin, d.current, uniform);
+      // maria-198: el pivote del resize es el lado/esquina OPUESTO al handle
+      // — lo que no arrastras queda plantado. Solo rotar pivota en el centro.
+      const anchor = scaleAnchorForHandle(d.handleId, snappedBbox);
       for (const snap of d.piecesSnapshot) {
         const ox = snap.position.x;
         const oy = snap.position.y;
-        const localCenter = { x: center.x - ox, y: center.y - oy };
+        const localCenter = { x: anchor.x - ox, y: anchor.y - oy };
         const newOutline = scaleOutline(snap.outline, localCenter, scaleX, scaleY);
-        // Scale position offset relative to center
+        // Scale position offset relative to the anchor
         const newPos = {
-          x: center.x + (ox - center.x) * scaleX,
-          y: center.y + (oy - center.y) * scaleY,
+          x: anchor.x + (ox - anchor.x) * scaleX,
+          y: anchor.y + (oy - anchor.y) * scaleY,
         };
         updates.push({
           id: snap.id,
@@ -222,7 +226,10 @@ export function useTransformTool(
     } else {
       const uniform = ['nw', 'ne', 'sw', 'se'].includes(drag.handleId) && !shiftRef.current;
       const { scaleX, scaleY } = computeScaleFromDrag(drag.handleId, previewBbox, drag.origin, drag.current, uniform);
-      preview = { scaleX, scaleY, rotation: 0, centerX: center.x, centerY: center.y };
+      // Mismo ancla que el commit (maria-198): el fantasma crece desde el
+      // lado opuesto, no desde el centro — si no, el preview miente.
+      const anchor = scaleAnchorForHandle(drag.handleId, previewBbox);
+      preview = { scaleX, scaleY, rotation: 0, centerX: anchor.x, centerY: anchor.y };
     }
   }
 

@@ -82,13 +82,14 @@ const byId = (internals: InternalLine[], id: string) => internals.find(l => l.id
 describe('useTransformTool carries the internals with the outline', () => {
   it('scales a grainline by the same factor as the outline', () => {
     const { hook, onTransform } = setup();
-    // 'e' handle sits at (200,100) on a 200×200 box; scaling is about the
-    // box center (100,100), so the internals must scale about it too.
+    // 'e' handle sits at (200,100) on a 200×200 box; the pivot is the
+    // OPPOSITE side — the west edge x=0 (maria-198) — so the internals must
+    // scale about it too. Anchor at x=0 → new x = old x × scaleX.
     const u = drag(hook, onTransform, [200, 100], [300, 100]);
 
-    const scaleX = (u.outline[1].values[0] - 100) / 100;
+    const scaleX = u.outline[1].values[0] / 200;
     expect(scaleX).toBeGreaterThan(1);
-    expect(byId(u.internals, 'g1').path[0].values[0]).toBeCloseTo(100 + (50 - 100) * scaleX);
+    expect(byId(u.internals, 'g1').path[0].values[0]).toBeCloseTo(50 * scaleX);
     expect(byId(u.internals, 'g1').path[0].values[1]).toBeCloseTo(20);
   });
 
@@ -96,15 +97,15 @@ describe('useTransformTool carries the internals with the outline', () => {
     const { hook, onTransform } = setup();
     const u = drag(hook, onTransform, [200, 100], [300, 100]);
 
-    const scaleX = (u.outline[1].values[0] - 100) / 100;
+    const scaleX = u.outline[1].values[0] / 200;
     const notch = byId(u.internals, 'n1');
-    // The bottom edge does not move under a horizontal scale, and the notch
-    // sat at its midpoint — it must still sit exactly there.
-    expect(notch.path[0].values[0]).toBeCloseTo(100);
+    // The top edge y does not move under a horizontal scale; the notch x
+    // scales about the west anchor like every other coordinate.
+    expect(notch.path[0].values[0]).toBeCloseTo(100 * scaleX);
     expect(notch.path[0].values[1]).toBeCloseTo(0);
-    // The anchor now names the scaled corner, at the scaled arc distance,
-    // instead of coordinates the outline no longer has.
-    expect(notch.notchAnchor!.refPoint.x).toBeCloseTo(100 - 100 * scaleX);
+    // The anchor corner (0,0) IS the pivot side: it stays put, and the arc
+    // distance to the notch scales.
+    expect(notch.notchAnchor!.refPoint.x).toBeCloseTo(0);
     expect(notch.notchAnchor!.distanceMm).toBeCloseTo(100 * scaleX);
   });
 
