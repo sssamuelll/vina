@@ -635,6 +635,70 @@ describe('generateSeamAllowanceWithCorners', () => {
   });
 });
 
+// ─── generateSeamAllowanceWithCorners — duplicate consecutive vertices ───────
+//
+// CLO's DXF exports carry duplicate consecutive vertices where curve samples
+// join (zero-length L commands). A zero-length edge cannot be offset —
+// offsetEdge returns it in place — so the cut line dipped down to touch the
+// outline at every duplicate, exactly the irregular SA band María photographed
+// on her imported blouse (maria-202).
+
+describe('generateSeamAllowanceWithCorners — duplicate consecutive vertices (maria-202)', () => {
+  const distToOutline = (p: { x: number; y: number }, poly: { x: number; y: number }[]) => {
+    let best = Infinity;
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const lenSq = dx * dx + dy * dy;
+      const t = lenSq < 1e-12 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+      best = Math.min(best, Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy)));
+    }
+    return best;
+  };
+  const saPts = (cmds: PathCommand[]) =>
+    cmds.filter((c) => c.type === 'M' || c.type === 'L').map((c) => ({ x: c.values[0], y: c.values[1] }));
+
+  it('a zero-length L mid-edge does not pull the cut line onto the outline', () => {
+    const square: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 50] },
+      { type: 'L', values: [100, 50] }, // CLO-style duplicate vertex
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ];
+    const outline = [
+      { x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 },
+    ];
+    const sa = generateSeamAllowanceWithCorners(square, 10, 'mitered', {});
+    expect(sa.length).toBeGreaterThan(0);
+    for (const p of saPts(sa)) {
+      expect(distToOutline(p, outline)).toBeGreaterThanOrEqual(10 - 0.01);
+    }
+  });
+
+  it('SA with a duplicate vertex equals the SA of the clean outline', () => {
+    const clean: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ];
+    const withDupe: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 0] }, // duplicate at a corner
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ];
+    expect(generateSeamAllowanceWithCorners(withDupe, 10, 'mitered', {}))
+      .toEqual(generateSeamAllowanceWithCorners(clean, 10, 'mitered', {}));
+  });
+});
+
 // ─── getCornerFunction ───────────────────────────────────────────────────────
 
 describe('getCornerFunction', () => {
