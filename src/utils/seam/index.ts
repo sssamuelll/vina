@@ -148,14 +148,42 @@ export function commandRangeToFlattened(
 }
 
 /**
+ * Parse a legacy "edge-N" fallback name into the outline COMMAND index of the
+ * edge command it names.
+ *
+ * N is the index the sewing tools' `resolveEdgeName` writes (`snapToEdge`
+ * walks command indices 1..len-1), so command space is the only space with a
+ * live writer — every consumer must read it the same way and convert to its
+ * own space at the boundary (`commandRangeToFlattened([N, N+1])` for the
+ * flattened-point consumers).
+ *
+ * Before this helper the three consumer families disagreed: SeamRenderer read
+ * N+1 as a command index while the solver pipelines (buildSeamConstraints,
+ * seamPairs, resolveEdgePolyline) indexed the FLATTENED outline with N — the
+ * two only coincided on straight-only outlines, and even there both were one
+ * edge off from what the user clicked. On curved outlines the solver sewed an
+ * arbitrary mid-curve micro-segment.
+ *
+ * Returns null for non-edge-N names and for an N with no edge command
+ * (N = 0 is the M; N >= outline.length is out of range).
+ */
+export function edgeNToCommandIndex(outline: PathCommand[], edgeName: string): number | null {
+  const m = edgeName.match(/^edge-(\d+)$/);
+  if (!m) return null;
+  const idx = parseInt(m[1], 10);
+  return idx >= 1 && idx < outline.length ? idx : null;
+}
+
+/**
  * Resolve a seam half's edge name to its sub-polyline over the FLATTENED
  * outline, in traversal order (parity plan Fase 5 — direction-aware
  * rendering).
  *
  * Resolution mirrors the solver pipeline (`buildSeamConstraints` /
  * `seamPairs.resolveSegmentRange`): semantic edge names map through
- * `commandRangeToFlattened` (command space → flattened space, BP-3);
- * the legacy "edge-N" fallback indexes the flattened outline directly.
+ * `commandRangeToFlattened` (command space → flattened space, BP-3); the
+ * legacy "edge-N" fallback names a COMMAND index (`edgeNToCommandIndex`)
+ * and converts through the same boundary.
  *
  * `reversed` flips the point order — the renderer's "start" then matches
  * what `parameterizeEdge(..., reverse=true)` treats as t=0, so connection
@@ -179,11 +207,10 @@ export function resolveEdgePolyline(
   if (semantic) {
     range = commandRangeToFlattened(outline, semantic.segmentRange, resolution);
   } else {
-    const m = edgeName.match(/^edge-(\d+)$/);
-    if (m) {
-      const idx = parseInt(m[1], 10);
-      if (idx < flat.length) range = [idx, (idx + 1) % flat.length];
-    }
+    // Legacy "edge-N": N is the outline COMMAND index (edgeNToCommandIndex
+    // contract) — convert to flattened space exactly like a semantic range.
+    const cmdIdx = edgeNToCommandIndex(outline, edgeName);
+    if (cmdIdx !== null) range = commandRangeToFlattened(outline, [cmdIdx, cmdIdx + 1], resolution);
   }
   if (!range) return [];
 

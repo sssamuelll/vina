@@ -127,10 +127,28 @@ describe('resolveEdgePolyline', () => {
     expect(rev).toEqual([...fwd].reverse());
   });
 
-  it('falls back to edge-N names over the flattened outline', () => {
-    const flat = flattenPath(square);
+  it('falls back to edge-N names as COMMAND indices (the resolveEdgeName producer contract)', () => {
+    // 'edge-1' nombra el COMANDO 1 (top) — la misma línea que el productor
+    // (snapToEdge camina índices de comando) quiso decir al escribirlo. El
+    // pin viejo lo leía como índice aplanado ([flat[1], flat[2]] = right):
+    // una arista corrida respecto a lo que el usuario clicó.
     const pts = resolveEdgePolyline(square, undefined, 'edge-1');
-    expect(pts).toEqual([flat[1], flat[2]]);
+    expect(pts).toEqual(resolveEdgePolyline(square, edges, 'top'));
+  });
+
+  it('edge-N on a curve resolves identically to its semantic edge (the divergence bug)', () => {
+    // Con la lectura aplanada vieja, 'edge-2' sobre `curved` devolvía un
+    // micro-segmento de dos muestras dentro de la curva; el solver cosía
+    // eso mientras el renderer pintaba otra arista.
+    const semantic = resolveEdgePolyline(curved, [{ name: 'right', segmentRange: [2, 3] }], 'right');
+    const fallback = resolveEdgePolyline(curved, undefined, 'edge-2');
+    expect(fallback).toHaveLength(13);
+    expect(fallback).toEqual(semantic);
+  });
+
+  it('rejects edge-N with no edge command: edge-0 (the M) and out-of-range N', () => {
+    expect(resolveEdgePolyline(square, undefined, 'edge-0')).toEqual([]);
+    expect(resolveEdgePolyline(square, undefined, 'edge-99')).toEqual([]);
   });
 
   it('returns [] for unknown edge names and empty outlines', () => {

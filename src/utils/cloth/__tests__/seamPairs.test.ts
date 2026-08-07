@@ -120,7 +120,12 @@ describe('seamInitDataToPairs', () => {
     expect(maxB).toBeLessThan(SINGLE_PIECE_VERTEX_BOUND);
   });
 
-  it('produces same pair count via "edge-N" fallback as via semantic edge names', () => {
+  it('resolves "edge-N" fallback identically to the semantic edge it names (command index)', () => {
+    // N es índice de COMANDO (el contrato del productor resolveEdgeName):
+    // 'edge-1' = top ([1,2]), 'edge-3' = bottom ([3,4]). El pin viejo usaba
+    // 'edge-0'/'edge-2' (lectura aplanada) y solo comparaba CONTEOS — la
+    // igualdad exacta de pares es lo que ata renderer y solver a la misma
+    // arista.
     const semanticPieces = [makeSquarePiece('A'), makeSquarePiece('B')];
     const fallbackPieces: PieceWithOutline[] = [
       { pieceId: 'A', outline: squareOutline },
@@ -128,12 +133,46 @@ describe('seamInitDataToPairs', () => {
     ];
 
     const seamSemantic = makeSeam();
-    const seamFallback = makeSeam({ pieceAEdgeName: 'edge-0', pieceBEdgeName: 'edge-2' });
+    const seamFallback = makeSeam({ pieceAEdgeName: 'edge-1', pieceBEdgeName: 'edge-3' });
 
     const semantic = seamInitDataToPairs([seamSemantic], semanticPieces);
     const fallback = seamInitDataToPairs([seamFallback], fallbackPieces);
 
-    expect(fallback[0].vertexPairs.length).toBe(semantic[0].vertexPairs.length);
+    expect(fallback[0].vertexPairs.length).toBeGreaterThan(0);
+    expect(fallback[0].vertexPairs).toEqual(semantic[0].vertexPairs);
+  });
+
+  it('resolves "edge-N" on a CURVED outline identically to its semantic edge (divergence bug)', () => {
+    // Con la lectura aplanada vieja, edge-N sobre una pieza con curvas cosía
+    // un micro-segmento de dos muestras dentro de la curva — mientras el
+    // renderer pintaba otra arista. Índice de comando + conversión BP-3
+    // hace que ambos caminos resuelvan la MISMA sisa completa.
+    const curvedOutline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [30, -40, 70, -40, 100, 0] }, // 1: sisa (curva)
+      { type: 'L', values: [100, 100] },                 // 2
+      { type: 'L', values: [0, 100] },                   // 3
+      { type: 'L', values: [0, 0] },                     // 4
+      { type: 'Z', values: [] },
+    ];
+    const semanticPieces: PieceWithOutline[] = [
+      { pieceId: 'A', outline: curvedOutline, edges: [{ name: 'sisa', segmentRange: [1, 2] }] },
+      { pieceId: 'B', outline: curvedOutline, edges: [{ name: 'sisa', segmentRange: [1, 2] }] },
+    ];
+    const fallbackPieces: PieceWithOutline[] = [
+      { pieceId: 'A', outline: curvedOutline },
+      { pieceId: 'B', outline: curvedOutline },
+    ];
+
+    const semantic = seamInitDataToPairs(
+      [makeSeam({ pieceAEdgeName: 'sisa', pieceBEdgeName: 'sisa' })], semanticPieces,
+    );
+    const fallback = seamInitDataToPairs(
+      [makeSeam({ pieceAEdgeName: 'edge-1', pieceBEdgeName: 'edge-1' })], fallbackPieces,
+    );
+
+    expect(fallback[0].vertexPairs.length).toBeGreaterThan(0);
+    expect(fallback[0].vertexPairs).toEqual(semantic[0].vertexPairs);
   });
 
   it('applies tStart/tEnd filtering on both sides', () => {
