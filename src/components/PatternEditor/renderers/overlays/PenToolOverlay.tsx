@@ -15,9 +15,11 @@ interface PenToolOverlayProps {
   previewPath: string;
   guidePath: string | null;
   penDistance: { distance: number; position: Point2D } | null;
+  /** El próximo clic cierra el contorno — enciende el anillo del origen (maria-196) */
+  penWillClose: boolean;
 }
 
-export default function PenToolOverlay({ zoom2D, units, penNodes, previewPath, guidePath, penDistance }: PenToolOverlayProps) {
+export default function PenToolOverlay({ zoom2D, units, penNodes, previewPath, guidePath, penDistance, penWillClose }: PenToolOverlayProps) {
   return (
     <>
       {penNodes.length > 0 && (
@@ -94,11 +96,27 @@ export default function PenToolOverlay({ zoom2D, units, penNodes, previewPath, g
               pointerEvents="none"
             />
           )}
+          {/* Cierre armado (maria-196): el origen se enciende — el próximo
+              clic cierra la pieza AQUÍ. Sin esto el snap era invisible. */}
+          {penWillClose && penNodes[0] && (
+            <circle
+              className="pen-close-ring"
+              cx={penNodes[0].anchor.x}
+              cy={penNodes[0].anchor.y}
+              r={HANDLE_RADIUS * 3.5 / zoom2D}
+              fill="rgba(255, 215, 0, 0.25)"
+              stroke="#ffd700"
+              strokeWidth={2 / zoom2D}
+              pointerEvents="none"
+            />
+          )}
         </g>
       )}
 
       {penDistance && (
-        <g transform={`translate(${penDistance.position.x}, ${penDistance.position.y})`}>
+        // Desplazado arriba-derecha del cursor (maria-196): centrado en él
+        // tapaba justo lo que estás a punto de clicar.
+        <g className="pen-distance-label" transform={`translate(${penDistance.position.x + 22 / zoom2D}, ${penDistance.position.y - 18 / zoom2D})`}>
           <rect
             x={-25 / zoom2D} y={-8 / zoom2D}
             width={50 / zoom2D} height={16 / zoom2D}
