@@ -82,7 +82,7 @@ test.describe('maria-204 — pieza bloqueada: mover sí, modificar no', () => {
 
     await page.keyboard.press('z');
     await expect
-      .poll(() => page.evaluate(() => (window as unknown as StoreWindow).__VINA_STORE__.getState().editor.activeTool), { timeout: 2000 })
+      .poll(() => page.evaluate(() => (window as unknown as StoreWindow).__VINA_STORE__.getState().editor.activeTool))
       .toBe('select');
 
     await page.mouse.move(bx, by);

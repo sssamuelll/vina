@@ -38,7 +38,7 @@ test.describe('maria-196 — cerrar con la pluma se ve venir', () => {
     await waitForApp(page);
 
     await page.keyboard.press('h');
-    await expect.poll(() => editorTool(page), { timeout: 2000 }).toBe('pen');
+    await expect.poll(() => editorTool(page)).toBe('pen');
 
     const svg = page.locator('svg.pattern-svg');
     const box = await svg.boundingBox();
@@ -72,7 +72,7 @@ test.describe('maria-196 — cerrar con la pluma se ve venir', () => {
     // Y clicar ahí cierra la pieza de verdad
     await page.mouse.click(ox + 5, oy + 3);
     await expect
-      .poll(() => page.evaluate(() => (window as unknown as StoreWindow).__VINA_STORE__.getState().project.pieces.length), { timeout: 2000 })
+      .poll(() => page.evaluate(() => (window as unknown as StoreWindow).__VINA_STORE__.getState().project.pieces.length))
       .toBe(1);
   });
 });

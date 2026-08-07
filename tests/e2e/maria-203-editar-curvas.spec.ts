@@ -35,7 +35,7 @@ const activeTool = (page: Page) =>
 
 async function drawRect(page: Page) {
   await page.keyboard.press('s');
-  await expect.poll(() => activeTool(page), { timeout: 2000 }).toBe('rectangle');
+  await expect.poll(() => activeTool(page)).toBe('rectangle');
   await page.waitForTimeout(100);
   const svg = page.locator('svg.pattern-svg');
   const box = await svg.boundingBox();
@@ -59,7 +59,7 @@ test.describe('maria-203 — editar puntos de curva', () => {
     const { cx, top } = await drawRect(page);
 
     await page.keyboard.press('v');
-    await expect.poll(() => activeTool(page), { timeout: 2000 }).toBe('editCurve');
+    await expect.poll(() => activeTool(page)).toBe('editCurve');
 
     // Clic sobre la pieza → editor de nodos montado con sus anclas
     await page.mouse.click(cx, top + 40);
