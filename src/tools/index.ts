@@ -4,6 +4,7 @@ import { toolRegistry } from './registry';
 import { selectTool } from './definitions/select';
 import { editCurveTool } from './definitions/editCurve';
 import { editPatternTool } from './definitions/editPattern';
+import { pointTool } from './definitions/point';
 import { editConstrainTool } from './definitions/editConstrain';
 import { movePatternTool } from './definitions/movePattern';
 import { copyPatternTool } from './definitions/copyPattern';
@@ -68,6 +69,7 @@ const allTools = [
   // 2D Tools — Selection & Transform
   selectTool,
   editPatternTool,
+  pointTool,
   editCurveTool,
   editConstrainTool,
   movePatternTool,

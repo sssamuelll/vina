@@ -241,6 +241,24 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     [dispatch],
   );
 
+  // ─── Helper: candado en los verbos ───
+
+  /**
+   * Candado (maria-204) en la puerta común: los verbos de este hook son el
+   * único camino compartido de TODOS sus callers (menú contextual + tool
+   * Punto). El gate `notLocked` de actionCuration protege solo la puerta del
+   * menú — sin este guard, el tool Punto escribiría sobre piezas bloqueadas.
+   * Mismo aviso que enterEdit.
+   */
+  const guardLocked = useCallback(
+    (piece: PatternPiece): boolean => {
+      if (!piece.locked) return false;
+      dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+      return true;
+    },
+    [dispatch],
+  );
+
   // ─── enterEdit ───
 
   const enterEdit = useCallback(
@@ -673,7 +691,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     // ahí no hay pieza en edición y el hit-test es quien sabe cuál se tocó.
     (commandIndex: number, toCurve: boolean, pieceId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
-      if (!piece) return;
+      if (!piece || guardLocked(piece)) return;
 
       const newOutline = toCurve
         ? convertToCurve(piece.outline, commandIndex)
@@ -681,7 +699,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
       dispatchAndRefresh(piece, newOutline);
     },
-    [state.editingPieceId, getPiece, dispatchAndRefresh],
+    [state.editingPieceId, getPiece, dispatchAndRefresh, guardLocked],
   );
 
   // ─── convertSegmentToPoints ───
@@ -690,10 +708,27 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   const convertSegmentToPoints = useCallback(
     (commandIndex: number, pieceId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
-      if (!piece) return;
+      if (!piece || guardLocked(piece)) return;
       dispatchAndRefresh(piece, convertSegmentToSpline(piece.outline, commandIndex));
     },
-    [state.editingPieceId, getPiece, dispatchAndRefresh],
+    [state.editingPieceId, getPiece, dispatchAndRefresh, guardLocked],
+  );
+
+  // ─── addPointOnSegment ───
+
+  /**
+   * Punto sobre un lado, por la misma puerta que el doble clic (maria-203 /
+   * tool Punto): pasa por dispatchAndRefresh, que compensa el pivote y
+   * re-ancla piquetes — un splitSegmentAt + updatePiece crudo los dejaría
+   * varados. `pieceId` explícito para callers fuera del modo edición.
+   */
+  const addPointOnSegment = useCallback(
+    (commandIndex: number, t: number, pieceId?: string) => {
+      const piece = getPiece(pieceId ?? state.editingPieceId);
+      if (!piece || guardLocked(piece)) return;
+      dispatchAndRefresh(piece, splitSegmentAt(piece.outline, commandIndex, t));
+    },
+    [state.editingPieceId, getPiece, dispatchAndRefresh, guardLocked],
   );
 
   // ─── getCursor ───
@@ -721,6 +756,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     handleDoubleClick,
     convertSegment,
     convertSegmentToPoints,
+    addPointOnSegment,
     getCursor,
   };
 }

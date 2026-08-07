@@ -3,8 +3,8 @@ import { DOCK_2D_CATALOG, getDockToolById } from '../dock2dTools';
 import { DEFAULT_DOCK_2D_IDS } from '../../../store/dockSlice';
 
 describe('dock2dTools catalog', () => {
-  it('has 12 entries (3 unwired phantom tools removed, #529)', () => {
-    expect(DOCK_2D_CATALOG).toHaveLength(12);
+  it('has 13 entries (3 unwired phantom tools removed #529; point añadido maria-203)', () => {
+    expect(DOCK_2D_CATALOG).toHaveLength(13);
   });
 
   it('drops the unwired phantom tools but keeps internalShape (María needs Forma interna)', () => {
@@ -24,6 +24,18 @@ describe('dock2dTools catalog', () => {
     expect(sa!.shortcut).toBe('O');
   });
 
+  it('surfaces the point tool between editar y pluma, sin atajo a propósito (maria-203)', () => {
+    const point = getDockToolById('point');
+    expect(point).toBeTruthy();
+    expect(point!.label).toBe('Punto');
+    // Sin shortcut: el catálogo documenta atajos reales de CLO3D y CLO no le
+    // da atajo a su Add Point — inventarle uno enseñaría un hábito falso.
+    expect(point!.shortcut).toBeUndefined();
+    const ids = DOCK_2D_CATALOG.map((t) => t.id);
+    expect(ids.indexOf('point')).toBe(ids.indexOf('editPattern') + 1);
+    expect(ids.indexOf('pen')).toBe(ids.indexOf('point') + 1);
+  });
+
   it('getDockToolById resolves a member and is undefined for an unknown id', () => {
     expect(getDockToolById('select')?.label).toBe('Seleccionar');
     expect(getDockToolById('nope')).toBeUndefined();
@@ -40,8 +52,8 @@ describe('dock2dTools catalog', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('the first 8 catalog ids are the defaults in order', () => {
-    expect(DOCK_2D_CATALOG.slice(0, 8).map((tool) => tool.id))
+  it('the first 9 catalog ids are the defaults in order', () => {
+    expect(DOCK_2D_CATALOG.slice(0, 9).map((tool) => tool.id))
       .toEqual(DEFAULT_DOCK_2D_IDS);
   });
 });

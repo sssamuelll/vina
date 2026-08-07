@@ -27,17 +27,28 @@ export const LEGACY_DEFAULT_DOCK_2D_IDS = [
   'select', 'pen', 'line', 'rectangle', 'scissors', 'measure', 'seam',
 ] as const;
 
-/** Current default left-dock 2D tool ids, in render order. */
-export const DEFAULT_DOCK_2D_IDS = [
+/** Pre-`point` eight-tool default. Kept only for exact migration matching. */
+export const LEGACY_DEFAULT_DOCK_2D_IDS_V2 = [
   'select', 'editPattern', 'pen', 'line',
   'rectangle', 'scissors', 'measure', 'seam',
 ] as const;
 
+/** Current default left-dock 2D tool ids, in render order. `point` entre
+ *  editar y pluma: es hermano de editar, no de dibujar (maria-203). */
+export const DEFAULT_DOCK_2D_IDS = [
+  'select', 'editPattern', 'point', 'pen', 'line',
+  'rectangle', 'scissors', 'measure', 'seam',
+] as const;
+
+/** Un set persistido que sea EXACTAMENTE un default histórico migra al default
+ *  vigente; cualquier set personalizado se respeta byte a byte. */
 export function migrateDefaultDockTools(ids: readonly string[]): string[] {
-  const isHistoricalDefault =
-    ids.length === LEGACY_DEFAULT_DOCK_2D_IDS.length &&
-    ids.every((id, index) => id === LEGACY_DEFAULT_DOCK_2D_IDS[index]);
-  return isHistoricalDefault ? [...DEFAULT_DOCK_2D_IDS] : [...ids];
+  const matches = (def: readonly string[]) =>
+    ids.length === def.length && ids.every((id, index) => id === def[index]);
+  if (matches(LEGACY_DEFAULT_DOCK_2D_IDS) || matches(LEGACY_DEFAULT_DOCK_2D_IDS_V2)) {
+    return [...DEFAULT_DOCK_2D_IDS];
+  }
+  return [...ids];
 }
 
 const idString = z
