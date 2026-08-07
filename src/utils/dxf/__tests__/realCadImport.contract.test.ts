@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { entityToPath, importDXFContent, parseDXF } from '../index';
 import { classifyPiece } from '../../pieceClassifier';
+import { generateSeamAllowanceWithCorners } from '../../seam/cornerTypes';
+import { flattenPath } from '../../seam';
 
 const GARMENT_FIXTURES = resolve(__dirname, '../../../../tests/fixtures/garments');
 const MARIA_FIXTURE = resolve(GARMENT_FIXTURES, 'maria_patrones_samuel_2M.dxf');
@@ -57,6 +59,33 @@ describe('real CAD import contract', () => {
       expect(imported).toBeDefined();
       expect(imported!.outline).toEqual(flipPathY(densePath));
       expect(imported!.internals.some(line => line.type === 'seam')).toBe(false);
+    }
+  });
+
+  it('generates a sane seam allowance on María\'s pieces — the cut line never touches the outline (maria-202)', () => {
+    // CLO repeats the shared vertex where curve samples join. Those duplicates
+    // STAY in the outline (they are semantic — anchorRoles reads them), but
+    // buildOffsetEdges must not choke on them: pre-fix the zero-length edges
+    // could not be offset and the SA band collapsed onto the outline at 6-10
+    // spots per piece — the broken margin María photographed.
+    const result = importFixture(MARIA_FIXTURE);
+    const SA = 10;
+
+    for (const piece of result.pieces) {
+      const outline = flattenPath(piece.outline);
+      const sa = generateSeamAllowanceWithCorners(piece.outline, SA, 'mitered', {});
+      expect(sa.length).toBeGreaterThan(0);
+      for (const p of flattenPath(sa)) {
+        let best = Infinity;
+        for (let i = 0; i < outline.length; i++) {
+          const a = outline[i], b = outline[(i + 1) % outline.length];
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const lenSq = dx * dx + dy * dy;
+          const t = lenSq < 1e-12 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+          best = Math.min(best, Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy)));
+        }
+        expect(best).toBeGreaterThanOrEqual(SA - 0.05);
+      }
     }
   });
 

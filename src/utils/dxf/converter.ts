@@ -86,6 +86,12 @@ function polyVertexToPath(vertices: { x: number; y: number; bulge: number }[], c
     const next = vertices[(i + 1) % vertices.length];
     if (i === vertices.length - 1 && !closed) break;
 
+    // NO deduplicar los vértices coincidentes de CLO: son semánticos — marcan
+    // los puntos reales del patrón (anchorRoles los clasifica corner/lineEnd
+    // frente a smoothSample). El dedupe vive en el consumidor que no los
+    // tolera (buildOffsetEdges, maria-202), nunca aquí. Ver el contrato en
+    // anchorRoles.maria.test.ts.
+
     if (Math.abs(v.bulge) < 1e-10) {
       cmds.push({ type: 'L', values: [next.x, next.y] });
     } else {

@@ -632,7 +632,18 @@ export function buildOffsetEdges(
   saWidth: number,
   semanticEdges?: SemanticEdge[],
 ): OffsetEdgeData | null {
-  const sourced = flattenPathWithSource(outline);
+  const raw = flattenPathWithSource(outline);
+  // Consecutive duplicates (CLO DXFs repeat the shared vertex where curve
+  // samples join) become zero-length edges, and a zero-length edge cannot be
+  // offset — offsetEdge returns it in place, pinning the cut line to the
+  // outline at that vertex (maria-202). Keep the FIRST occurrence: its cmd
+  // tag stays valid for cornerTypes / perEdgeWidths lookups.
+  const sourced: SourcedPoint[] = [];
+  for (const p of raw) {
+    const prev = sourced[sourced.length - 1];
+    if (prev && Math.abs(p.x - prev.x) < 1e-6 && Math.abs(p.y - prev.y) < 1e-6) continue;
+    sourced.push(p);
+  }
   if (sourced.length >= 2) {
     const first = sourced[0];
     const last = sourced[sourced.length - 1];
