@@ -265,35 +265,36 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
                   <circle cx={midB.x} cy={midB.y} r={3 / zoom2D} style={{ fill: baseColor }} />
                 </>
               )}
+              {/* Mismatch y tensión viven AQUÍ dentro (maria-201): escritos
+                  fijos en pantalla estorbaban al transformar el patrón. El
+                  hover del tramo cosido los enseña, como CLO3D. El layout
+                  anticolisión se conserva para cuando hover y selección
+                  muestren varios a la vez. */}
+              {hasMismatch && (
+                <text
+                  x={labelPos.get(seam.id)?.x ?? (midA.x + midB.x) / 2}
+                  y={labelPos.get(seam.id)?.y ?? (midA.y + midB.y) / 2 - 8 / zoom2D}
+                  fontSize={labelFont}
+                  textAnchor="middle"
+                  fontWeight={600}
+                  style={{ fill: 'var(--piece-error-2d)', fontFamily: 'var(--font-mono-2d)' }}
+                >
+                  ⚠ {mismatchMm.toFixed(1)}mm de diferencia
+                </text>
+              )}
+              {seam.tension !== 100 && !isInactive && (
+                <text
+                  x={(midA.x + midB.x) / 2}
+                  y={(midA.y + midB.y) / 2 + (hasMismatch ? 14 : -8) / zoom2D}
+                  fontSize={8 / zoom2D}
+                  textAnchor="middle"
+                  fontWeight={600}
+                  style={{ fill: seam.tension < 100 ? 'var(--seam-tension-gather-2d)' : 'var(--seam-tension-ease-2d)', fontFamily: 'var(--font-mono-2d)' }}
+                >
+                  {seam.tension}%{seam.tension < 100 ? ' fruncido' : ' embebido'}
+                </text>
+              )}
             </g>
-
-            {/* Length mismatch warning — posición del layout anticolisión */}
-            {hasMismatch && (
-              <text
-                x={labelPos.get(seam.id)?.x ?? (midA.x + midB.x) / 2}
-                y={labelPos.get(seam.id)?.y ?? (midA.y + midB.y) / 2 - 8 / zoom2D}
-                fontSize={labelFont}
-                textAnchor="middle"
-                fontWeight={600}
-                style={{ fill: 'var(--piece-error-2d)', fontFamily: 'var(--font-mono-2d)' }}
-              >
-                ⚠ {mismatchMm.toFixed(1)}mm de diferencia
-              </text>
-            )}
-
-            {/* Tension label */}
-            {seam.tension !== 100 && !isInactive && (
-              <text
-                x={(midA.x + midB.x) / 2}
-                y={(midA.y + midB.y) / 2 + (hasMismatch ? 14 : -8) / zoom2D}
-                fontSize={8 / zoom2D}
-                textAnchor="middle"
-                fontWeight={600}
-                style={{ fill: seam.tension < 100 ? 'var(--seam-tension-gather-2d)' : 'var(--seam-tension-ease-2d)', fontFamily: 'var(--font-mono-2d)' }}
-              >
-                {seam.tension}%{seam.tension < 100 ? ' fruncido' : ' embebido'}
-              </text>
-            )}
 
             {/* Length labels (on selected) */}
             {isSelected && (
