@@ -50,30 +50,35 @@ export default function NodeEditorOverlay({ zoom2D, units, pieces, nodeEditorEdi
             : isNodeHovered(node.ref)
               ? 'hovered'
               : 'idle';
+          // maria-203: ambos manejadores del ancla — entrada (cp1) y salida
+          // (cp2) — con el ref de arrastre que le corresponde a cada uno.
+          const handles: Array<{ key: string; pos: NonNullable<EditableNode['cp1']>; ref: NodeRef }> = [];
+          if (node.cp1 && node.cp1Ref) handles.push({ key: 'in', pos: node.cp1, ref: node.cp1Ref });
+          if (node.cp2 && node.cp2Ref) handles.push({ key: 'out', pos: node.cp2, ref: node.cp2Ref });
           return (
             <g key={node.ref.commandIndex} data-command-index={node.ref.commandIndex}>
-              {node.cp1 && (
-                <>
+              {handles.map(h => (
+                <g key={h.key}>
                   <line
                     x1={node.position.x} y1={node.position.y}
-                    x2={node.cp1.x} y2={node.cp1.y}
+                    x2={h.pos.x} y2={h.pos.y}
                     stroke="rgba(255, 107, 107, 0.5)"
                     strokeWidth={0.8 / zoom2D}
                   />
                   <rect
                     className="node-editor__control-handle"
-                    x={node.cp1.x - 3.5 / zoom2D}
-                    y={node.cp1.y - 3.5 / zoom2D}
+                    x={h.pos.x - 3.5 / zoom2D}
+                    y={h.pos.y - 3.5 / zoom2D}
                     width={7 / zoom2D}
                     height={7 / zoom2D}
-                    fill={isNodeSelected({ ...node.ref, pointType: 'cp2' }) ? '#ff6b6b' : '#fff'}
+                    fill={isNodeSelected(h.ref) ? '#ff6b6b' : '#fff'}
                     stroke="#ff6b6b"
                     strokeWidth={1 / zoom2D}
                     style={{ cursor: 'move' }}
                     rx={1 / zoom2D}
                   />
-                </>
-              )}
+                </g>
+              ))}
               <AnchorGlyph
                 role={role}
                 position={node.position}
