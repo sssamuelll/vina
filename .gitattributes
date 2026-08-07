@@ -9,3 +9,7 @@ tests/fixtures/garments/*.dxf text eol=lf
 # SSH known_hosts consumed by the deploy runner: a trailing CR on a key line
 # breaks host-key verification. Force LF everywhere.
 deploy/known_hosts text eol=lf
+
+# Shell scripts run via bash (Git Bash local): a CRLF checkout under Windows
+# autocrlf breaks the parser mid-script. Force LF.
+scripts/*.sh text eol=lf
