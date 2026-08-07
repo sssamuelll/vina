@@ -30,7 +30,7 @@ export default function TransformHandlesOverlay({
   const topCenter = handles.find(h => h.id === 'n');
 
   return (
-    <>
+    <g className="transform-handles">
       {/* Bounding box */}
       <rect
         x={bbox.x}
@@ -103,6 +103,6 @@ export default function TransformHandlesOverlay({
           pointerEvents="none"
         />
       )}
-    </>
+    </g>
   );
 }
