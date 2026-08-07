@@ -9,7 +9,7 @@
  */
 
 import type { PathCommand, Point2D, Seam, SemanticEdge } from '../../types/types';
-import { flattenPath, commandRangeToFlattened } from '../seam/index';
+import { flattenPath, commandRangeToFlattened, edgeNToCommandIndex } from '../seam/index';
 import { renormalizeFilteredT } from '../seam/seamRange';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -705,26 +705,21 @@ export function buildSeamConstraints(
       ? commandRangeToFlattened(outlineB, semanticB.segmentRange, SEAM_CURVE_RESOLUTION)
       : undefined;
 
-    // Fallback: parse "edge-N" pattern — N indexes the FLATTENED outline
-    // (legacy auto-naming), so no conversion applies here.
+    // Fallback: legacy "edge-N" names a COMMAND index (the resolveEdgeName
+    // producer contract — see edgeNToCommandIndex), converted through the
+    // same boundary as a semantic range. This used to index the FLATTENED
+    // outline with N instead, which sewed a mid-curve micro-segment on any
+    // curved piece and disagreed with SeamRenderer's reading.
     if (!rangeA) {
-      const match = seam.pieceA.edgeName.match(/^edge-(\d+)$/);
-      if (match) {
-        const idx = parseInt(match[1], 10);
-        const numSegments = flattenPath(outlineA).length;
-        if (idx < numSegments) {
-          rangeA = [idx, (idx + 1) % numSegments];
-        }
+      const cmdIdx = edgeNToCommandIndex(outlineA, seam.pieceA.edgeName);
+      if (cmdIdx !== null) {
+        rangeA = commandRangeToFlattened(outlineA, [cmdIdx, cmdIdx + 1], SEAM_CURVE_RESOLUTION);
       }
     }
     if (!rangeB) {
-      const match = seam.pieceB.edgeName.match(/^edge-(\d+)$/);
-      if (match) {
-        const idx = parseInt(match[1], 10);
-        const numSegments = flattenPath(outlineB).length;
-        if (idx < numSegments) {
-          rangeB = [idx, (idx + 1) % numSegments];
-        }
+      const cmdIdx = edgeNToCommandIndex(outlineB, seam.pieceB.edgeName);
+      if (cmdIdx !== null) {
+        rangeB = commandRangeToFlattened(outlineB, [cmdIdx, cmdIdx + 1], SEAM_CURVE_RESOLUTION);
       }
     }
 

@@ -10,7 +10,7 @@
 
 import { PatternPiece, Point2D, Seam } from '../../../types/types';
 import { getEdgeEndpoints, getEdgeArcLength, getEdgePathD } from '../../../utils/geometry/path';
-import { resolveEdgePolyline } from '../../../utils/seam/index';
+import { resolveEdgePolyline, edgeNToCommandIndex } from '../../../utils/seam/index';
 import { samplePolyline, perpendicular } from '../../../utils/pleatGeometry';
 import { seamPairColor, seamMismatchMm, layoutMismatchLabels, SEAM_MISMATCH_THRESHOLD_MM } from './seamVisuals';
 
@@ -49,14 +49,15 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         const semEdgeB = pieceB.edges?.find(e => e.name === seam.pieceB.edgeName);
         let segIdxA = semEdgeA?.segmentRange[0] ?? -1;
         let segIdxB = semEdgeB?.segmentRange[0] ?? -1;
-        // Fallback: parse "edge-N" pattern
+        // Fallback: legacy "edge-N" IS a command index already (the
+        // resolveEdgeName producer contract — edgeNToCommandIndex). The old
+        // `N + 1` here read one edge past the one the user clicked, and
+        // disagreed with what the solver sewed.
         if (segIdxA < 0) {
-          const m = seam.pieceA.edgeName.match(/^edge-(\d+)$/);
-          segIdxA = m ? parseInt(m[1], 10) + 1 : 1; // +1: command index (skip M)
+          segIdxA = edgeNToCommandIndex(pieceA.outline, seam.pieceA.edgeName) ?? 1;
         }
         if (segIdxB < 0) {
-          const m = seam.pieceB.edgeName.match(/^edge-(\d+)$/);
-          segIdxB = m ? parseInt(m[1], 10) + 1 : 1;
+          segIdxB = edgeNToCommandIndex(pieceB.outline, seam.pieceB.edgeName) ?? 1;
         }
 
         const epA = getEdgeEndpoints(pieceA.outline, segIdxA);
