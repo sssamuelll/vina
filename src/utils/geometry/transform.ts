@@ -193,6 +193,23 @@ export function hitTestHandle(
 }
 
 /**
+ * Anchor (fixed point) for a resize drag: the side/corner OPPOSITE the
+ * dragged handle. CAD standard (maria-198): dragging `e` keeps the west edge
+ * planted instead of growing symmetric from the center — what you don't
+ * drag, doesn't move. Only rotation pivots on the bbox center.
+ */
+export function scaleAnchorForHandle(handleId: HandleId, bbox: BBox): Point2D {
+  const isLeft = ['nw', 'w', 'sw'].includes(handleId);
+  const isRight = ['ne', 'e', 'se'].includes(handleId);
+  const isTop = ['nw', 'n', 'ne'].includes(handleId);
+  const isBottom = ['sw', 's', 'se'].includes(handleId);
+  return {
+    x: isLeft ? bbox.x + bbox.width : isRight ? bbox.x : bbox.x + bbox.width / 2,
+    y: isTop ? bbox.y + bbox.height : isBottom ? bbox.y : bbox.y + bbox.height / 2,
+  };
+}
+
+/**
  * Compute scale factors from a drag on a resize handle.
  * Returns { scaleX, scaleY } relative to the bounding box.
  */
