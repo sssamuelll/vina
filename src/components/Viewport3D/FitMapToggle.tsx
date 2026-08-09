@@ -245,10 +245,13 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
     dispatch(setFitMapMode(fitMapMode === mode ? 'none' : mode));
   }, [dispatch, fitMapMode]);
 
-  if (simulationState === 'idle') return null;
+  // #1010 punto 4: en idle la barra se mostraba vacía (`return null`), así que
+  // los fit maps eran indescubribles para quien nunca simuló. Ahora se ve, en
+  // gris y sin escala, con la pista de qué hacer para encenderlos.
+  const idle = simulationState === 'idle';
 
-  const showScale = fitMapMode === 'stress' || fitMapMode === 'strain';
-  const showFitTable = fitMapMode === 'fit' && stats;
+  const showScale = !idle && (fitMapMode === 'stress' || fitMapMode === 'strain');
+  const showFitTable = !idle && fitMapMode === 'fit' && stats;
 
   return (
     <>
@@ -260,8 +263,9 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
             onClick={() => toggle(mode)}
             onMouseEnter={() => setHovered(mode)}
             onMouseLeave={() => setHovered(null)}
-            title={`${label} (${shortcut})`}
-            style={S.toggleBtn(fitMapMode === mode)}
+            disabled={idle}
+            title={idle ? `${label} — simula para ver los mapas de ajuste` : `${label} (${shortcut})`}
+            style={{ ...S.toggleBtn(!idle && fitMapMode === mode), cursor: idle ? 'default' : 'pointer', opacity: idle ? 0.4 : 1 }}
           >
             <svg
               viewBox="0 0 24 24"
@@ -270,7 +274,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
               strokeWidth={1.8}
               strokeLinecap="round"
               strokeLinejoin="round"
-              style={S.toggleIcon(fitMapMode === mode)}
+              style={S.toggleIcon(!idle && fitMapMode === mode)}
             >
               <path d={icon} />
             </svg>

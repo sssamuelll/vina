@@ -9,8 +9,9 @@ import { test, expect, Page } from '@playwright/test';
  * survives simulation lifecycle events.
  *
  * Prerequisites:
- * - The fit map toggle bar only renders when simulation is NOT idle
- *   (simulationState !== 'idle')
+ * - La barra de toggles se renderiza siempre; en idle sale deshabilitada con
+ *   la pista "simula para ver..." (#1010 punto 4). Los selectores por título
+ *   con atajo (`Mapa de tensión (Alt+6)`) solo casan con la barra VIVA.
  * - A pattern piece must be drawn and simulation started before
  *   any fit-map UI becomes visible
  */
@@ -78,8 +79,11 @@ async function addPiece(page: Page) {
 
 async function startSimulation(page: Page) {
   // Switch to the 3D view so Viewport3D (which hosts FitMapToggle) is mounted.
+  // Por condición, no por timeout: si se despacha startSimulation contra un
+  // árbol 3D sin montar, el store queda en 'running' pero el useFrame de la
+  // simulación no corre nunca y los datos no llegan jamás (#1010).
   await page.click('button:has-text("3D")');
-  await page.waitForTimeout(2000);
+  await page.waitForSelector('canvas', { state: 'visible', timeout: 60_000 });
 
   // Drive the simulation lifecycle through the store: arrange snapshot is not
   // required for the fit-map UI, only simulationState !== 'idle'.
@@ -89,13 +93,11 @@ async function startSimulation(page: Page) {
   // Poll the canonical truth: the toggle bar renders once state leaves 'idle'.
   await expect.poll(
     async () => getState<string>(page, 'simulation.simulationState'),
-    { timeout: 15000 },
+    { timeout: 30_000 },
   ).toBe('running');
 
   // The toggle bar should now be visible in the 3D viewport.
-  await expect(page.locator('button[title="Mapa de tensión (Alt+6)"]')).toBeVisible({ timeout: 5000 });
-  // Let physics settle a bit so stats can be computed.
-  await page.waitForTimeout(2000);
+  await expect(page.locator('button[title="Mapa de tensión (Alt+6)"]')).toBeVisible({ timeout: 10_000 });
 }
 
 /**
@@ -112,8 +114,11 @@ async function setupSimulation(page: Page) {
 
 test.describe('Fit Map UI', () => {
   test.beforeEach(async ({ page }) => {
-    // Generous timeout for CI — simulation involves Wasm/Worker init
-    test.setTimeout(120_000);
+    // Generous timeout for CI — simulation involves Wasm/Worker init.
+    test.setTimeout(180_000);
+    // Tier determinista: sin esto la cascada puede caer hasta neural-drape,
+    // que no expone edge data y por diseño no produce fit maps (A7).
+    await page.addInitScript(() => localStorage.setItem('vina-use-webgpu', 'false'));
     await setupSimulation(page);
   });
 
@@ -190,42 +195,49 @@ test.describe('Fit Map UI', () => {
     const strainBtn = page.locator('button[title="Mapa de estiramiento (Alt+7)"]');
     await strainBtn.click({ force: true });
 
-    // Give the simulation a moment to compute fit map stats
-    await page.waitForTimeout(3000);
+    // #1009: contrato, no soft-skip. Las stats llegan con la cadencia del
+    // readback del solver (~4 Hz) después de la init — se espera POR CONDICIÓN.
+    // El `waitForTimeout(3000)` ciego que había aquí vencía antes de la primera
+    // publicación y el test se saltaba en silencio justo lo que venía a probar.
+    // Skip EXPLÍCITO y anotado (no verde silencioso): el tier neural no tiene
+    // ruta de edge data — sin ella no hay fit map que medir. Es un hueco de
+    // capacidad conocido, no una degradación del entorno de test.
+    const tier = await getState<string>(page, 'simulation.solverTier');
+    test.skip(tier === 'neural-drape', `tier ${tier}: sin edge data, no soporta fit maps (A7)`);
 
-    // Check the window global exposed for E2E testing
-    const statsCheck = await page.evaluate(() => {
-      const stats = (window as any).__VINA_FIT_MAP_STATS__;
-      if (!stats) return { found: false, reason: 'global not set' };
+    await expect.poll(
+      () => page.evaluate(() => {
+        const w = window as any;
+        if (w.__VINA_FIT_MAP_STATS__) return 'PUBLICADAS';
+        const d = w.__VINA_FITMAP_DIAG__;
+        if (!d) return 'SIN SIMULACIÓN (useFrame no corrió)';
+        const tier = w.__VINA_STORE__?.getState().simulation.solverTier;
+        return `PENDIENTE tier=${tier} path=${d.path} frames=${d.frames} mode=${d.fitMapMode} edgeData=${d.edgeDataPresent} blockRan=${d.fitMapBlockRan}`;
+      }),
+      { timeout: 60_000, message: 'la simulación nunca publicó __VINA_FIT_MAP_STATS__' },
+    ).toBe('PUBLICADAS');
 
+    const stats = await page.evaluate(() => {
+      const w = window as any;
+      const s = w.__VINA_FIT_MAP_STATS__;
       return {
-        found: true,
-        hasMin: typeof stats.min === 'number' && !isNaN(stats.min),
-        hasMax: typeof stats.max === 'number' && !isNaN(stats.max),
-        hasMean: typeof stats.mean === 'number' && !isNaN(stats.mean),
-        min: stats.min,
-        max: stats.max,
-        mean: stats.mean,
+        min: s.min as number, max: s.max as number, mean: s.mean as number,
+        tier: w.__VINA_STORE__?.getState().simulation.solverTier as string,
+        path: w.__VINA_FITMAP_DIAG__?.path as string,
       };
     });
+    console.log('Fit map stats:', stats);
 
-    console.log('Fit map stats check:', statsCheck);
+    expect(Number.isFinite(stats.min), `min no finito: ${stats.min}`).toBe(true);
+    expect(Number.isFinite(stats.max), `max no finito: ${stats.max}`).toBe(true);
+    expect(Number.isFinite(stats.mean), `mean no finito: ${stats.mean}`).toBe(true);
+    // Red de regresión del bug de edges degenerados (#1010): un restLen ~1e-7
+    // daba strains de 10^6 %. Se asserta la MEDIA, no el máximo: el máximo lo
+    // domina la cola de edges sub-milimétricos de la malla (990 % sobre el DXF
+    // de María) y sería un umbral al borde; la media es estable (100-130 %) y
+    // se dispara igual si vuelven a colarse edges degenerados.
+    expect(stats.mean, `strain medio absurdo: ${stats.mean}`).toBeLessThan(500);
 
-    if (statsCheck.found) {
-      // Stats should have valid numeric values (not NaN)
-      expect(statsCheck.hasMin).toBe(true);
-      expect(statsCheck.hasMax).toBe(true);
-      expect(statsCheck.hasMean).toBe(true);
-    } else {
-      // Stats might not be populated yet if edge data isn't available
-      // This is acceptable in a headless/SW-rendered environment
-      console.warn(
-        'FitMapStats global not found — edge data may not be available in CI. ' +
-        'Skipping numeric assertions.'
-      );
-    }
-
-    // Regardless of stats availability, the canvas should be alive
     await expect(page.locator('canvas')).toBeVisible();
   });
 
@@ -345,7 +357,7 @@ test.describe('Fit Map UI', () => {
     await page.waitForTimeout(800);
 
     // After reset, the app should still be alive (no crash). The toggle bar
-    // hides while idle (FitMapToggle returns null), but the canvas persists.
+    // stays mounted but disabled while idle (#1010), and the canvas persists.
     await expect(page.locator('canvas')).toBeVisible();
     expect(await getState<string>(page, 'simulation.simulationState')).toBe('idle');
 
