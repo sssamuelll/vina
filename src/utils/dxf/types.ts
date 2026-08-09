@@ -120,7 +120,16 @@ export const AAMA_LAYERS = {
   FOLD_DIR: '15',         // fold direction markers (mountain/valley)
 } as const;
 
-export type LayerRole = 'cut' | 'notch' | 'grainline' | 'draw' | 'intcut' | 'label' | 'seam' | 'unknown';
+/**
+ * Rol semántico de una capa DXF.
+ *
+ * `'draw'` (líneas de dibujo: estilo, STRIPE, PLAID) e `'intcut'` (cortes
+ * internos genéricos) son líneas internas que NO son pinzas — se importan
+ * como `type:'reference'`. `'dart'` es el rol de las capas que sí traen
+ * pinzas (hoy solo `PINCE` de Lectra); esas sí llegan como `type:'dart'`
+ * y las lee `extractDarts`. Ver #1019/#1020.
+ */
+export type LayerRole = 'cut' | 'notch' | 'grainline' | 'draw' | 'intcut' | 'dart' | 'label' | 'seam' | 'unknown';
 
 /** Map AAMA numbered layers and named layers to semantic roles */
 export function layerRole(layerName: string): LayerRole {

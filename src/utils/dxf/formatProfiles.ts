@@ -59,12 +59,16 @@ export const FORMAT_PROFILES: Record<FormatId, FormatProfile> = {
     id: 'lectra', name: 'Lectra IBA',
     layerMap: {
       'CONTOUR': 'cut', 'COUTURE': 'seam', 'DROIT_FIL': 'grainline',
-      'CRAN': 'notch', 'INT': 'intcut', 'PINCE': 'intcut', 'TEXTE': 'label',
+      // 'PINCE' = pinza. Es la única capa del vocabulario que trae darts
+      // reales; 'INT' es corte interno genérico. Meterlas en el mismo rol
+      // hacía que ambas llegaran como type:'dart' (#1020).
+      'CRAN': 'notch', 'INT': 'intcut', 'PINCE': 'dart', 'TEXTE': 'label',
     },
     layerPatterns: [
       { pattern: /contour/i, role: 'cut' },
       { pattern: /couture/i, role: 'seam' },
       { pattern: /droit.fil/i, role: 'grainline' },
+      { pattern: /pince/i, role: 'dart' },
     ],
     detectHook: lectraDetectHook,
   },

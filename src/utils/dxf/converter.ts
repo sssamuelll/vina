@@ -366,7 +366,7 @@ export function dxfToPatternPieces(doc: DXFDocument, options?: DXFImportOptions)
       piece.internals = piece.internals.filter(internal => {
         if (internal.type === 'notch' && options.importNotches === false) return false;
         if (internal.type === 'grainline' && options.importGrainlines === false) return false;
-        if ((internal.type === 'dart' || internal.type === 'topstitch') && options.importInternalLines === false) return false;
+        if ((internal.type === 'dart' || internal.type === 'reference' || internal.type === 'topstitch') && options.importInternalLines === false) return false;
         return true;
       });
     }
@@ -504,6 +504,13 @@ function entitiesToPiece(
         break;
       case 'draw':
       case 'intcut':
+        // Líneas internas genéricas: estilo, colocación de bolsillo, cortes
+        // internos. NO son pinzas — marcarlas type:'dart' hacía que
+        // extractDarts() las leyera como tales y el validador avisara sobre
+        // bolsillos (#1020). 'reference' renderiza punteado y exporta a AAMA.
+        internals.push({ id: crypto.randomUUID(), type: 'reference', path: flipPathY(path) });
+        break;
+      case 'dart':
         internals.push({ id: crypto.randomUUID(), type: 'dart', path: flipPathY(path) });
         break;
       case 'seam':

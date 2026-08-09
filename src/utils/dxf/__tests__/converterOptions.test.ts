@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { dxfToPatternPieces } from '../converter';
+import { FORMAT_PROFILES } from '../formatProfiles';
 import type { DXFDocument, DXFEntity } from '../types';
 
 /** Build a minimal DXFDocument with a single rectangle (100x200) on cut layer. */
@@ -238,19 +239,19 @@ describe('dxfToPatternPieces with DXFImportOptions', () => {
       expect(without[0].internals.some(i => i.type === 'grainline')).toBe(false);
     });
 
-    it('filters out darts when importInternalLines is false', () => {
-      const withDarts = dxfToPatternPieces(makeDocWithInternals());
+    it('filters out internal lines when importInternalLines is false', () => {
+      const withLines = dxfToPatternPieces(makeDocWithInternals());
       const without = dxfToPatternPieces(makeDocWithInternals(), { importInternalLines: false });
 
-      expect(withDarts[0].internals.some(i => i.type === 'dart')).toBe(true);
-      expect(without[0].internals.some(i => i.type === 'dart')).toBe(false);
+      expect(withLines[0].internals.some(i => i.type === 'reference')).toBe(true);
+      expect(without[0].internals.some(i => i.type === 'reference')).toBe(false);
     });
 
     it('keeps all internals when no filter options are set', () => {
       const pieces = dxfToPatternPieces(makeDocWithInternals(), { scale: 100 });
       expect(pieces[0].internals.some(i => i.type === 'notch')).toBe(true);
       expect(pieces[0].internals.some(i => i.type === 'grainline')).toBe(true);
-      expect(pieces[0].internals.some(i => i.type === 'dart')).toBe(true);
+      expect(pieces[0].internals.some(i => i.type === 'reference')).toBe(true);
     });
 
     it('can filter multiple types at once', () => {
@@ -260,6 +261,53 @@ describe('dxfToPatternPieces with DXFImportOptions', () => {
         importInternalLines: false,
       });
       expect(pieces[0].internals).toHaveLength(0);
+    });
+  });
+
+  // ─── Tipado semántico de líneas internas (#1020) ───
+  //
+  // Los roles 'draw' (capa 8/15, STRIPE, PLAID) e 'intcut' (capa 11, INTERNAL
+  // LINE, INT) son líneas internas genéricas: de estilo, de colocación de
+  // bolsillo, cortes internos. NO son pinzas. Marcarlas type:'dart' hacía que
+  // extractDarts() las leyera como pinzas y el validador avisara sobre ellas.
+  describe('internal line typing', () => {
+    function docWithLayer(layer: string): DXFDocument {
+      const entities: DXFEntity[] = [
+        {
+          type: 'LWPOLYLINE', layer: '1',
+          data: {
+            closed: true,
+            vertices: [
+              { x: 0, y: 0, bulge: 0 }, { x: 100, y: 0, bulge: 0 },
+              { x: 100, y: 200, bulge: 0 }, { x: 0, y: 200, bulge: 0 },
+            ],
+          },
+        },
+        // Línea interna de 3 puntos: la forma que extractDarts SÍ parsea.
+        { type: 'LWPOLYLINE', layer, data: {
+          closed: false,
+          vertices: [{ x: 20, y: 50, bulge: 0 }, { x: 50, y: 60, bulge: 0 }, { x: 80, y: 50, bulge: 0 }],
+        } },
+      ];
+      return { header: new Map(), layers: [], blocks: new Map(), entities };
+    }
+
+    it('una línea de dibujo (capa 8, rol draw) es reference, no dart', () => {
+      const internals = dxfToPatternPieces(docWithLayer('8'))[0].internals;
+      expect(internals.some(i => i.type === 'reference')).toBe(true);
+      expect(internals.some(i => i.type === 'dart')).toBe(false);
+    });
+
+    it('un corte interno (capa 11, rol intcut) es reference, no dart', () => {
+      const internals = dxfToPatternPieces(docWithLayer('11'))[0].internals;
+      expect(internals.some(i => i.type === 'reference')).toBe(true);
+      expect(internals.some(i => i.type === 'dart')).toBe(false);
+    });
+
+    // 'PINCE' es "pinza" en francés: la capa de Lectra que sí trae darts
+    // reales. Tiene que conservar su identidad, no caer en el saco genérico.
+    it('la capa PINCE de Lectra conserva el rol dart', () => {
+      expect(FORMAT_PROFILES.lectra.layerMap['PINCE']).toBe('dart');
     });
   });
 
