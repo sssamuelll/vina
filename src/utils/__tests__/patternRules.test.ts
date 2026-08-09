@@ -6,7 +6,7 @@ import {
   PATTERN_RULES,
   type ProjectContext,
 } from '../patternRules';
-import type { PatternPiece, Dart } from '../../types/types';
+import type { PatternPiece, Dart, InternalLine } from '../../types/types';
 
 function makePiece(overrides: Partial<PatternPiece> = {}): PatternPiece {
   return {
@@ -41,6 +41,13 @@ function makeDart(overrides: Partial<Dart> = {}): Dart {
 
 function ctx(pieces: PatternPiece[], fabricWeight?: 'light' | 'medium' | 'heavy'): ProjectContext {
   return { pieces, fabricWeight };
+}
+
+// #1019: pinza dibujada con la herramienta 2D o importada por DXF — vive solo
+// en `internals`, nunca en `piece.darts` (ese campo lo pueblan solo los tools
+// de pinzas del copilot).
+function makeDartLine(path: InternalLine['path']): InternalLine {
+  return { id: 'internal-dart', type: 'dart', path };
 }
 
 describe('PatternRules', () => {
@@ -100,6 +107,20 @@ describe('PatternRules', () => {
       const v = validatePiece(piece, ctx([piece]), ['fit']);
       expect(v.some(r => r.ruleId === 'DART_APEX_DISTANCE')).toBe(false);
     });
+
+    it('warns on a dart that lives only in internals (no piece.darts)', () => {
+      const piece = makePiece({
+        category: 'bodice',
+        internals: [makeDartLine([
+          { type: 'M', values: [95, 400] },
+          { type: 'L', values: [100, 392] },
+          { type: 'L', values: [105, 400] },
+        ])],
+      });
+      expect(piece.darts).toBeUndefined();
+      const v = validatePiece(piece, ctx([piece]), ['fit']);
+      expect(v.some(r => r.ruleId === 'DART_APEX_DISTANCE')).toBe(true);
+    });
   });
 
   describe('DART_ANGLE_RANGE', () => {
@@ -117,6 +138,35 @@ describe('PatternRules', () => {
       });
       const v = validatePiece(piece, ctx([piece]), ['fit']);
       expect(v.some(r => r.ruleId === 'DART_ANGLE_RANGE')).toBe(true);
+    });
+
+    // Criterio de éxito de #1019: pieza dibujada con la herramienta 2D, sin
+    // pasar por ningún tool del copilot, dispara DART_ANGLE_RANGE.
+    it('dispara con una pinza dibujada en la herramienta 2D, sin piece.darts (#1019)', () => {
+      const piece = makePiece({
+        internals: [makeDartLine([
+          { type: 'M', values: [99, 400] },
+          { type: 'L', values: [100, 300] }, // angle ≈ 1.1°
+          { type: 'L', values: [101, 400] },
+        ])],
+      });
+      expect(piece.darts).toBeUndefined();
+      const v = validatePiece(piece, ctx([piece]), ['fit']);
+      expect(v.some(r => r.ruleId === 'DART_ANGLE_RANGE')).toBe(true);
+    });
+  });
+
+  describe('DART_LEGS_EQUAL', () => {
+    it('warns on uneven legs read from internals (no piece.darts, no prior test coverage at all)', () => {
+      const piece = makePiece({
+        internals: [makeDartLine([
+          { type: 'M', values: [100, 400] },
+          { type: 'L', values: [110, 300] },
+          { type: 'L', values: [200, 400] }, // leg2 ≈ 34% longer than leg1
+        ])],
+      });
+      const v = validatePiece(piece, ctx([piece]), ['construction']);
+      expect(v.some(r => r.ruleId === 'DART_LEGS_EQUAL')).toBe(true);
     });
   });
 
@@ -200,6 +250,18 @@ describe('PatternRules', () => {
     it('informs about darts in heavy fabric', () => {
       const piece = makePiece({
         darts: [makeDart()],
+      });
+      const v = validatePiece(piece, ctx([piece], 'heavy'), ['fabric']);
+      expect(v.some(r => r.ruleId === 'FABRIC_WEIGHT_DART')).toBe(true);
+    });
+
+    it('informs about a dart that lives only in internals (no piece.darts)', () => {
+      const piece = makePiece({
+        internals: [makeDartLine([
+          { type: 'M', values: [100, 400] },
+          { type: 'L', values: [110, 300] },
+          { type: 'L', values: [120, 400] },
+        ])],
       });
       const v = validatePiece(piece, ctx([piece], 'heavy'), ['fabric']);
       expect(v.some(r => r.ruleId === 'FABRIC_WEIGHT_DART')).toBe(true);

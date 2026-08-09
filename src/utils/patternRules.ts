@@ -5,6 +5,7 @@
  */
 
 import type { PatternPiece, SemanticEdge, GrainLine, PathCommand } from '../types/types';
+import { extractDarts } from './dartEntity';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -165,9 +166,10 @@ export const PATTERN_RULES: PatternRule[] = [
     description: 'Dart apex should be 20-30mm from bust point, not directly on it',
     severity: 'warning',
     check: (piece) => {
-      if (!piece.darts || piece.darts.length === 0) return null;
+      const darts = piece.darts ?? extractDarts(piece);
+      if (darts.length === 0) return null;
       if (piece.category !== 'bodice') return null;
-      for (const dart of piece.darts) {
+      for (const dart of darts) {
         if (dart.depth !== undefined && dart.depth < 15) {
           return `Dart "${dart.id}" depth is ${dart.depth.toFixed(0)}mm — apex may be too close to bust point (recommend 20-30mm)`;
         }
@@ -182,8 +184,8 @@ export const PATTERN_RULES: PatternRule[] = [
     description: 'Dart intake angle should typically be 5-25° for bodice darts',
     severity: 'warning',
     check: (piece) => {
-      if (!piece.darts) return null;
-      for (const dart of piece.darts) {
+      const darts = piece.darts ?? extractDarts(piece);
+      for (const dart of darts) {
         // Estimate angle from intake and depth: angle ≈ 2 * atan(intake/2 / depth)
         if (!dart.depth || dart.depth === 0) continue;
         const angle = 2 * Math.atan2(dart.intake / 2, dart.depth) * 180 / Math.PI;
@@ -204,8 +206,8 @@ export const PATTERN_RULES: PatternRule[] = [
     description: 'Dart legs should be within 5% of each other for clean sewing',
     severity: 'info',
     check: (piece) => {
-      if (!piece.darts) return null;
-      for (const dart of piece.darts) {
+      const darts = piece.darts ?? extractDarts(piece);
+      for (const dart of darts) {
         if (!dart.legs || dart.legs.length < 2) continue;
         // Compute leg lengths from point arrays
         const legLen = (pts: { x: number; y: number }[]): number => {
@@ -502,9 +504,10 @@ export const PATTERN_RULES: PatternRule[] = [
     description: 'Heavy/stiff fabrics may not press darts well; consider seam shaping instead',
     severity: 'info',
     check: (piece, ctx) => {
-      if (!piece.darts || piece.darts.length === 0) return null;
+      const darts = piece.darts ?? extractDarts(piece);
+      if (darts.length === 0) return null;
       if (ctx.fabricWeight === 'heavy') {
-        return `Piece "${piece.name}" has ${piece.darts.length} dart(s) — heavy fabric may not press darts cleanly; consider seam shaping`;
+        return `Piece "${piece.name}" has ${darts.length} dart(s) — heavy fabric may not press darts cleanly; consider seam shaping`;
       }
       return null;
     },
