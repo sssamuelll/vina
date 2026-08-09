@@ -83,8 +83,6 @@ Each closed eje has a full RFC in `docs/reports/`. Read the doc before introduci
 - Cloth simulation: `docs/research/cloth-simulation-research.md`, `docs/research/fabric-calibration-guide.md`
 - Copilot bridge (AgenticLoop + planner/): `docs/plans/2026-03-02-copilot-bridge-architecture-design.md`
 - Reactive solver middleware: `docs/plans/2026-02-27-reactive-solver-middleware-design.md`
-- Click'n'Go (expert mode): `docs/superpowers/specs/2026-03-18-click-n-go-design.md`
-- Diagnostic Inspector: `docs/superpowers/specs/2026-03-18-diagnostic-inspector-design.md`
 
 ## After Every Task
 

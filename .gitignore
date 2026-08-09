@@ -89,3 +89,10 @@ scripts/walk-*.mjs
 # guarded here so it never commits. New evidence goes to screenshots/ (above).
 design-handoff/ui-screenshots/verify-*.png
 design-handoff/ui-screenshots/walk-*.png
+
+# Corpus de research (papers PDF/XML + índices generados) — local-only, ~470 MB.
+# Los 18 issues del programa research 2026-08 (#993-#1010, índice #1011) citan
+# rutas bajo docs/research/; el corpus vive en la máquina, no en el historial.
+# Los 3 .md curados ya trackeados aquí siguen versionados (git ignora la regla
+# para archivos ya trackeados) — son los que enlaza CLAUDE.md.
+docs/research/
