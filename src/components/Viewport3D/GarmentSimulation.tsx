@@ -163,6 +163,23 @@ interface GarmentSimulationProps {
  * Merged multi-piece simulation component.
  * Renders all pieces as a single merged mesh with vertex colors.
  */
+// #1010: fallback de FabricFitParams cuando la tela activa no está en la
+// librería (compartido por el bloque TSL y el CPU readback path).
+const DEFAULT_FIT_PARAMS = {
+  maxStretchRatio: 0.08, weight: 150, thickness: 0.4, avgStretch: 0.025,
+};
+
+// #1010 diag — evidencia e2e de la ruta de datos del fit map por tier.
+// Mutado in-place en useFrame (cero alloc); mismo patrón window-global que
+// __VINA_CLOTH_MESH__. Lo lee tests/e2e/fit-maps-diagnosis.spec.ts.
+const fitMapDiag = {
+  path: 'none' as 'none' | 'tsl' | 'cpu',
+  frames: 0,
+  fitMapMode: 'none' as string,
+  edgeDataPresent: false,
+  fitMapBlockRan: false,
+};
+
 const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationProps>(function MergedSimulation({ pieces, seams, onFitMapStats }, ref) {
   const dispatch = useDispatch();
   // Renderer obtained early (before the lifecycle hook) so we can seed the
@@ -188,6 +205,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // §A1: completed-readback counter — the penetration metric runs on every
   // PENETRATION_READBACK_CADENCE-th resolved readback.
   const tslReadbackCount = useRef(0);
+  // #1010: hay stats de fit map publicadas desde el readback TSL (para
+  // limpiarlas una sola vez al apagar el modo).
+  const tslFitStatsActive = useRef(false);
   // Body-tether (frente#2) settle-capture state. Targets MUST be captured from
   // the SETTLED drape (cloth wrapped on the body), NOT at init where positions
   // are the pre-wrap spread-out layout (~0.6 m mean from the body → garbage
@@ -682,6 +702,15 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         renderer.compute(solver.normalWeld);
       }
 
+      // #1010 slice 2: overlay de fit map GPU-nativo — zero → accum (uno por
+      // stretch color group) → colorize, cada frame mientras el modo esté
+      // activo. Con 'none' no se despacha nada (cero costo).
+      if (fitMapMode !== 'none') {
+        renderer.compute(solver.fitMapNodes.zero);
+        for (const accumNode of solver.fitMapNodes.accum) renderer.compute(accumNode);
+        renderer.compute(solver.fitMapNodes.colorize);
+      }
+
       // F0 (#897): en TSL la cadencia de render == cadencia de sim.
       recordFrameTick();
 
@@ -741,6 +770,39 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           tslReadbackPending.current = true;
           gpuClient.readbackPositionsToGeometry(renderer, staticGeometry).then(() => {
             tslReadbackPending.current = false;
+            // #1010: stats de fit map en tier TSL sobre el readback periódico
+            // (~4 Hz) — el overlay visual 60 Hz es GPU-nativo (kernel
+            // colorize → material.colorNode; slice 2).
+            if (fitMapMode !== 'none' && edgeDataRef.current) {
+              const posAttr2 = staticGeometry.getAttribute('position');
+              if (posAttr2) {
+                const fabric2 = PHYSICAL_FABRIC_LIBRARY.find((f: { id: string }) => f.id === fabricId);
+                const mapData = computeFitMapData(
+                  fitMapMode, posAttr2.array as Float32Array, posAttr2.count,
+                  edgeDataRef.current, fabric2 ? fabricToFitParams(fabric2) : DEFAULT_FIT_PARAMS,
+                  null, fitMapConfig,
+                );
+                if (mapData) {
+                  fitMapDiag.fitMapBlockRan = true; // #1010 diag
+                  tslFitStatsActive.current = true;
+                  onFitMapStats?.(mapData.stats);
+                  dispatch(setFitMapStats(mapData.stats));
+                  // #1010 diag paridad (solo DEV): muestra GPU vs CPU del
+                  // mismo readback — el e2e @gpu-local asserta que el kernel
+                  // colorize replica los ramps de fitMaps.ts.
+                  if (import.meta.env.DEV) {
+                    gpuClient.readFitColorsToCPU(renderer).then((gpuColors) => {
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      (window as any).__VINA_FITMAP_PARITY__ = {
+                        gpu: Array.from(gpuColors.slice(0, 300)),
+                        cpu: Array.from(mapData.colors.slice(0, 300)),
+                        n: mapData.colors.length,
+                      };
+                    }).catch(() => { /* readback de diag: best-effort */ });
+                  }
+                }
+              }
+            }
             // §A1 penetration metric — slow cadence over the freshly-read
             // positions. No-op while no avatar body is registered.
             tslReadbackCount.current++;
@@ -779,6 +841,23 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         }
       }
 
+      // #1010: al apagar el modo, limpiar las stats publicadas por el bloque
+      // de readback de arriba (espejo del else del CPU path).
+      if (fitMapMode === 'none' && tslFitStatsActive.current) {
+        tslFitStatsActive.current = false;
+        onFitMapStats?.(null);
+        dispatch(setFitMapStats(null));
+      }
+
+      // #1010 diag — la rama TSL retorna AQUÍ. Los fit maps del tier TSL se
+      // computan en el bloque de readback de arriba (~4 Hz); edgeDataRef lo
+      // publica GpuSolverClient.onEdgeData desde el lifecycle.
+      fitMapDiag.path = 'tsl';
+      fitMapDiag.frames++;
+      fitMapDiag.fitMapMode = fitMapMode;
+      fitMapDiag.edgeDataPresent = edgeDataRef.current !== null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__VINA_FITMAP_DIAG__ = fitMapDiag;
       return;
     }
 
@@ -799,19 +878,25 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // Fit map overlay (CPU readback path only)
     const positions = positionsRef.current;
     const colorAttr = staticGeometry.getAttribute('color') as THREE.BufferAttribute;
+    // #1010 diag — espejo de la rama TSL (ver arriba).
+    fitMapDiag.path = 'cpu';
+    fitMapDiag.frames++;
+    fitMapDiag.fitMapMode = fitMapMode;
+    fitMapDiag.edgeDataPresent = edgeDataRef.current !== null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__VINA_FITMAP_DIAG__ = fitMapDiag;
     if (fitMapMode !== 'none' && edgeDataRef.current && colorAttr && positions && positions.length > 0) {
       if (!pieceColorsRef.current) {
         pieceColorsRef.current = new Float32Array(colorAttr.array as Float32Array);
       }
       const numP = positions.length / 3;
       const fabric = PHYSICAL_FABRIC_LIBRARY.find((f: { id: string }) => f.id === fabricId);
-      const fitParams = fabric ? fabricToFitParams(fabric) : {
-        maxStretchRatio: 0.08, weight: 150, thickness: 0.4, avgStretch: 0.025,
-      };
+      const fitParams = fabric ? fabricToFitParams(fabric) : DEFAULT_FIT_PARAMS;
       const mapData = computeFitMapData(
         fitMapMode, positions, numP, edgeDataRef.current, fitParams, null, fitMapConfig,
       );
       if (mapData) {
+        fitMapDiag.fitMapBlockRan = true; // #1010 diag
         (colorAttr.array as Float32Array).set(mapData.colors);
         colorAttr.needsUpdate = true;
         onFitMapStats?.(mapData.stats);
@@ -943,6 +1028,12 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // Creating new storage() nodes would get separate GPU bindings/buffers.
     mat.positionNode = solver.positionBufNode.toAttribute();
     mat.normalNode = solver.normalBufNode.toAttribute();
+    // #1010 slice 2: overlay de fit map GPU-nativo — colorNode lee fitColorSBA
+    // (escrito por el kernel colorize cada frame). Con modo 'none' el material
+    // se recrea sin colorNode (dep abajo) y vuelve al color/tint normal.
+    if (fitMapMode !== 'none') {
+      mat.colorNode = solver.fitColorBufNode.toAttribute();
+    }
     mat.side = THREE.DoubleSide;
     mat.transparent = true;
     mat.roughness = renderParams.roughness;
@@ -954,7 +1045,18 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       setTslMaterial(null);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tslSolverRef.current, staticGeometry]);
+  }, [tslSolverRef.current, staticGeometry, fitMapMode]);
+
+  // #1010 slice 2: empuja modo+config+tela a los uniforms del kernel de fit
+  // map (patrón setBrushParams). Re-corre al re-init del solver (la identidad
+  // de tslSolverRef.current cambia vía setTslGeneration).
+  useEffect(() => {
+    const gpu = clients.gpu;
+    if (!gpu || !tslSolverRef.current) return;
+    const fabric = PHYSICAL_FABRIC_LIBRARY.find((f: { id: string }) => f.id === fabricId);
+    gpu.setFitMapParams(fitMapMode, fitMapConfig, fabric ? fabricToFitParams(fabric) : DEFAULT_FIT_PARAMS);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients.gpu, tslSolverRef.current, fitMapMode, fitMapConfig, fabricId]);
 
   // Effective tint: first active piece with a custom tint, or fallback to fabric color
   const effectiveTint = useMemo(() => {

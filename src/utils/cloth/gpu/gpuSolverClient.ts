@@ -32,6 +32,7 @@ import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities
 import { DEFAULT_SEAM_CONFIG } from '../seamAssembly';
 import { dihedralAngle } from '../dihedral';
 import { fabricInvMassScale } from '../physicalFabric';
+import type { FitMapMode, FitMapConfig, FabricFitParams } from '../fitMaps';
 import type { ClothSolverClient } from '../solverProtocol';
 import type { LocalVertexIndex, SeamPair } from '../seamPairs';
 import type { StorageBufferAttribute } from 'three/webgpu';
@@ -138,6 +139,30 @@ function closestPointOnTriangle(
 const AVATAR_FRICTION = 0.4;
 const AVATAR_MARGIN = 0.008;
 
+/** Default de FabricFitParams para el tier GPU (#1010) — espejo del fallback
+ *  de GarmentSimulation cuando la tela activa no está en la librería. */
+const DEFAULT_FIT_FABRIC: FabricFitParams = {
+  maxStretchRatio: 0.08,
+  weight: 150,
+  thickness: 0.4,
+  avgStretch: 0.025,
+};
+
+/**
+ * Escala de stress del fit map (#1010) — replica la fórmula de
+ * computeStressMap (fitMaps.ts): E ≈ (weight·50)/maxStretch Pa (crossSection
+ * = thickness(m)·0.05), stressKPa = (E·elongación)/1000. Devuelve E/1000:
+ * kPa por unidad de elongación, el p2 del kernel colorize.
+ */
+function fitStressScaleKPa(fabric?: FabricFitParams): number {
+  const f = fabric ?? DEFAULT_FIT_FABRIC;
+  const thicknessM = f.thickness / 1000; // mmToM
+  const crossSection = thicknessM * 0.05;
+  const maxStretch = Math.max(f.maxStretchRatio, 0.01);
+  const E = crossSection > 0 ? (f.weight * 50) / maxStretch : 10000;
+  return E / 1000;
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface PieceMeshData {
@@ -199,6 +224,11 @@ export class GpuSolverClient implements ClothSolverClient {
   private tslBuffers: TslBufferSet | null = null;
   private pieceVertexRanges: Map<string, { start: number; count: number }> | null = null;
   private originalInvMass: Float32Array | null = null;
+
+  /** Edge data retenida en init (#1010): ids globales [a,b,...] (Int32Array,
+   *  contrato SolverEdgeData/fitMaps.ts) + restLengths. La entrega
+   *  requestEdgeData(); dispose la limpia para que nunca dispare después. */
+  private edgeData: { ids: Int32Array; lengths: Float32Array } | null = null;
 
   /**
    * F1 planchado (acta costura-proceso-real 2026-07-05): metadata de los
@@ -497,6 +527,10 @@ export class GpuSolverClient implements ClothSolverClient {
     // Extract constraints with UV-based edge classification
     const uvArg = hasUvs ? mergedUvs : undefined;
     const stretch = extractStretchConstraints(positions, triangles, uvArg);
+    // Bridge edge data (#1010): retener copia (ids Uint32→Int32, contrato
+    // SolverEdgeData/fitMaps.ts) para requestEdgeData() — el tier GPU publica
+    // el MISMO contrato que WasmSolverClient/ClothWorkerClient.
+    this.edgeData = { ids: new Int32Array(stretch.ids), lengths: stretch.restLengths };
     const bend = extractBendConstraints(positions, triangles, uvArg);
 
     // Compute per-constraint compliance from edge types + fabric config
@@ -947,6 +981,44 @@ export class GpuSolverClient implements ClothSolverClient {
   }
 
   /**
+   * Fit-map GPU params (#1010 slice 2): traduce (FitMapMode, FitMapConfig)
+   * → uniforms del kernel fitMapNodes (patrón setBrushParams — mutación
+   * directa de uniform().value). Mapping de modo: none=0, stress=1, strain=2,
+   * fit=3, pressure=4. p0/p1 = rango/thresholds del modo; p2 = escala
+   * precomputada (stress → E/1000 de computeStressMap, fit → 1/maxStretch).
+   * No-op silencioso antes de init.
+   */
+  setFitMapParams(mode: FitMapMode, config: FitMapConfig, fabric?: FabricFitParams): void {
+    if (!this.tslSolver) return;
+    const u = this.tslSolver.fitMapNodes.uniforms;
+    const MODE: Record<FitMapMode, number> = { none: 0, stress: 1, strain: 2, fit: 3, pressure: 4 };
+    u.mode.value = MODE[mode];
+    switch (mode) {
+      case 'stress':
+        u.p0.value = config.stressRange[0];
+        u.p1.value = config.stressRange[1];
+        u.p2.value = fitStressScaleKPa(fabric);
+        break;
+      case 'strain':
+        u.p0.value = config.strainRange[0];
+        u.p1.value = config.strainRange[1];
+        break;
+      case 'fit':
+        u.p0.value = config.fitThresholds[0];
+        u.p1.value = config.fitThresholds[1];
+        u.p2.value = 1 / Math.max(fabric?.maxStretchRatio ?? DEFAULT_FIT_FABRIC.maxStretchRatio, 0.001);
+        break;
+      case 'pressure':
+        // Sin avatar (camino GPU actual) el colorize escribe el color
+        // no-contact constante; p0 queda como presión de contacto de referencia.
+        u.p0.value = config.pressureDistance;
+        break;
+      case 'none':
+        break;
+    }
+  }
+
+  /**
    * Start grab at the given center position.
    * Sets uniforms and flags grabInitPending so the next useFrame dispatches
    * the one-shot GPU init kernel (fills mask + offset on GPU, no CPU upload).
@@ -1132,6 +1204,62 @@ export class GpuSolverClient implements ClothSolverClient {
   }
 
   /**
+   * Readback GPU→CPU de los colores del fit map (#1010 slice 2) — espejo de
+   * readPositionsToCPU: `renderer.getArrayBufferAsync(fitColorSBA)` → copia
+   * Float32Array (itemSize 3, RGB 0..1; sin W-strip: es un storage 'vec3'
+   * declarado con count N, no el stride-4 de posiciones). Throw si no hay
+   * renderer disponible (mismo patrón de error que readPositionsToCPU).
+   */
+  async readFitColorsToCPU(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    renderer?: any,
+  ): Promise<Float32Array> {
+    if (!this.tslSolver) {
+      throw new Error(
+        '[GpuSolverClient] readFitColorsToCPU requires an initialized TSL solver.',
+      );
+    }
+    const r = renderer ?? this.rendererRef;
+    if (!r) {
+      throw new Error(
+        '[GpuSolverClient] readFitColorsToCPU (TSL) requires a WebGPURenderer. ' +
+          'Pass one explicitly or call readbackPositionsToGeometry first to cache one.',
+      );
+    }
+    if (!this.rendererRef) this.rendererRef = r;
+    const ab: ArrayBuffer = await r.getArrayBufferAsync(this.tslSolver.fitColorSBA);
+    const raw = new Float32Array(ab);
+    const n = this.tslSolver.fitColorSBA.count;
+    // W-strip vec4→vec3 (espejo de readPositionsToCPU): el storage buffer
+    // vec3 viene paddeado a vec4 en GPU — sin strip el stream se desfasa
+    // ([r,g,b,W,...] leído como tripletas).
+    if (raw.length === n * 4) {
+      const out = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        out[i * 3] = raw[i * 4];
+        out[i * 3 + 1] = raw[i * 4 + 1];
+        out[i * 3 + 2] = raw[i * 4 + 2];
+      }
+      return out;
+    }
+    return raw;
+  }
+
+  /** Callback de edge data (#1010) — mismo contrato que ClothWorkerClient:
+   *  (Int32Array ids [a,b,...], Float32Array restLengths). Null por defecto. */
+  onEdgeData: ((stretchingIds: Int32Array, stretchingLengths: Float32Array) => void) | null = null;
+
+  /**
+   * Request edge constraint data (for fit map computation). Síncrono: entrega
+   * los arrays retenidos en init. No-op silencioso antes de init o tras
+   * dispose (#1010).
+   */
+  requestEdgeData(): void {
+    if (!this.edgeData) return;
+    this.onEdgeData?.(this.edgeData.ids, this.edgeData.lengths);
+  }
+
+  /**
    * Clean up all resources.
    *
    * Order matters: TSL GPU buffers must be released BEFORE `solver.destroy()`
@@ -1156,6 +1284,7 @@ export class GpuSolverClient implements ClothSolverClient {
     this.disposeTslResources();
     this.pieceVertexRanges = null;
     this.originalInvMass = null;
+    this.edgeData = null; // #1010: sin edge data tras dispose → requestEdgeData no-op
     this.rendererRef = null;
     this.solver.destroy();
   }

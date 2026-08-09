@@ -460,3 +460,33 @@ describe('edge cases', () => {
     expect(Number.isFinite(result.values[0])).toBe(true);
   });
 });
+
+// ─── #1010: edges degenerados (restLen≈0) en mallas DXF reales ──────────────
+// Un restLen de 1e-7 m con longitud real de centímetros daba strains de 10^5+
+// que ensuciaban las stats (max 3.68M% observado con el patrón de María) y
+// desbordaban el fixed-point i32 del kernel GPU. El filtro `=== 0` no los
+// atrapaba; se excluyen bajo un epsilon físico (0.1 mm).
+describe('computePerVertexStrain — degenerate edges (#1010)', () => {
+  it('excludes near-zero rest length edges from strain', () => {
+    // Dos partículas a 0.5m con restLen 1e-7 (degenerado) — sin filtro daría
+    // strain 5e6; el vértice debe quedarse en rest (1.0).
+    const positions = new Float32Array([0, 0, 0, 0.5, 0, 0]);
+    const edges = {
+      stretchingIds: new Int32Array([0, 1]),
+      stretchingLengths: new Float32Array([1e-7]),
+    };
+    const strain = computePerVertexStrain(positions, 2, edges);
+    expect(strain[0]).toBe(1.0);
+    expect(strain[1]).toBe(1.0);
+  });
+
+  it('keeps small-but-physical edges (1 mm) above the epsilon', () => {
+    const positions = new Float32Array([0, 0, 0, 0.0012, 0, 0]);
+    const edges = {
+      stretchingIds: new Int32Array([0, 1]),
+      stretchingLengths: new Float32Array([0.001]),
+    };
+    const strain = computePerVertexStrain(positions, 2, edges);
+    expect(strain[0]).toBeCloseTo(1.2, 5);
+  });
+});

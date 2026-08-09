@@ -142,6 +142,12 @@ export interface TslBufferSet {
   facePokeCsrSBA: StorageBufferAttribute;         // uint — [offsets(N+1), list(numTri*3), triIds(numTri*3)] (packFacePokeCsr)
   facePokeContactSBA: StorageBufferAttribute;     // uint, numTriangles — per-face contact slot (soupIdx+1, 0=none; A4 Pass A writes, Pass B reads)
 
+  // Fit-map overlay (#1010): per-vertex strain acumulado en GPU cada frame +
+  // color RGB consumido por material.colorNode. El strain usa fixed-point
+  // i32 (escala 1e6) + atomicMax, mismo patrón que normalAccumSBA.
+  fitStrainAccumSBA: StorageBufferAttribute;      // flat int32 — strain atómico (ratio × 1e6)
+  fitColorSBA: StorageBufferAttribute;            // vec3 float — RGB 0..1 (colorize kernel)
+
   // Counts
   numParticles: number;
   numTriangles: number;
@@ -302,6 +308,13 @@ export function createTslBuffers(
   const normalAccumSBA = new StorageBufferAttribute(new Int32Array(N * 3), 1);
   const triangleIdsSBA = new StorageBufferAttribute(new Uint32Array(mesh.triangles), 1);
 
+  // ─── Fit-map overlay buffers (#1010) ────────────────────────────────
+  // Strain por vértice en fixed-point i32 (escala 1e6, atomicMax en el
+  // kernel accum) + color RGB 0..1 escrito por el kernel colorize y
+  // consumido por material.colorNode vía fitColorBufNode.
+  const fitStrainAccumSBA = new StorageBufferAttribute(new Int32Array(N), 1);
+  const fitColorSBA = new StorageBufferAttribute(new Float32Array(N * 3), 3);
+
   // ─── Incident-face CSR + face-poke snapshot (face-poke v1) ────────────────
   // Build CSR from the same cloth triangle indices already uploaded as
   // triangleIdsSBA; no extra data source needed.
@@ -326,6 +339,8 @@ export function createTslBuffers(
     normalSBA,
     normalAccumSBA,
     triangleIdsSBA,
+    fitStrainAccumSBA, // #1010 fit-map overlay
+    fitColorSBA,       // #1010 fit-map overlay
     tetherTargetSBA,
     tetherMaxDistSBA,
     facePokeCsrSBA,
