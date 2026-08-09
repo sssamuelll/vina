@@ -31,8 +31,20 @@ describe('detectDXFFormat', () => {
     expect(results[0].confidence).toBeGreaterThanOrEqual(70);
   });
 
+  // El umbral bajó de 80 a 70 (el mismo que ASTM y Gerber, que también se
+  // prueban con 4 capas) porque el vocabulario de Lectra creció de 6 roles a
+  // 7 al separar 'PINCE' → 'dart' de 'INT' → 'intcut' (#1020). El score es
+  // recall sobre los roles del perfil, así que una muestra de 4 capas ahora
+  // cubre 4/7 en vez de 4/6. Consecuencia real y asumida: un Lectra sin capa
+  // de pinzas puntúa ~72 en vez de ~82. Sigue ganando por amplio margen.
   it('detects Lectra from IBA layers', () => {
     const results = detectDXFFormat(makeDoc(['CONTOUR', 'COUTURE', 'DROIT_FIL', 'CRAN']));
+    expect(results[0].profileId).toBe('lectra');
+    expect(results[0].confidence).toBeGreaterThanOrEqual(70);
+  });
+
+  it('sube la confianza cuando el archivo Lectra sí trae capa de pinzas', () => {
+    const results = detectDXFFormat(makeDoc(['CONTOUR', 'COUTURE', 'DROIT_FIL', 'CRAN', 'PINCE']));
     expect(results[0].profileId).toBe('lectra');
     expect(results[0].confidence).toBeGreaterThanOrEqual(80);
   });

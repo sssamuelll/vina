@@ -42,6 +42,33 @@ describe('extractDartFromInternal', () => {
     expect(dart).toBeNull();
   });
 
+  // #1020: una pinza es una cuña — dos piernas que se juntan en un ápice
+  // separado de la base. Un path colineal no tiene ápice: es una recta, y
+  // leerla como pinza produce depth=0 y avisos falsos del validador.
+  it('devuelve null para un path colineal (recta, no cuña)', () => {
+    const line: InternalLine = {
+      id: 'straight', type: 'dart',
+      path: [
+        { type: 'M', values: [30, 50] },
+        { type: 'L', values: [30, 62] },
+        { type: 'L', values: [30, 74] },
+      ],
+    };
+    expect(extractDartFromInternal(line)).toBeNull();
+  });
+
+  it('una cuña de ápice poco profundo pero real sigue siendo pinza', () => {
+    const line: InternalLine = {
+      id: 'shallow', type: 'dart',
+      path: [
+        { type: 'M', values: [100, 400] },
+        { type: 'L', values: [110, 397] }, // 3mm de profundidad: poco, pero es cuña
+        { type: 'L', values: [120, 400] },
+      ],
+    };
+    expect(extractDartFromInternal(line)).not.toBeNull();
+  });
+
   // #1016: el Dart hereda el id de su línea. Sin ese puntero de vuelta no hay
   // forma de escribir el cambio al almacenamiento, que es lo único que el
   // lienzo 2D dibuja.

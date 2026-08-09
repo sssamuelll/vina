@@ -78,6 +78,19 @@ export function extractDartFromInternal(line: InternalLine, edges?: SemanticEdge
   };
   const depth = Math.sqrt((apex.x - midBase.x) ** 2 + (apex.y - midBase.y) ** 2);
 
+  // #1020: una pinza es una CUÑA — dos piernas que se juntan en un ápice
+  // separado de la base. Dos formas la descalifican y ambas producían avisos
+  // falsos del validador sobre líneas internas que no son pinzas:
+  //
+  //   baseLen ≈ 0  → la base se cierra sobre sí misma (contorno de bolsillo).
+  //   depth < 1mm  → no hay ápice: es una recta (ojal, línea de corte).
+  //
+  // El piso de 1mm está por debajo de la precisión de patronaje y muy lejos
+  // de los umbrales de las reglas (DART_APEX_DISTANCE avisa bajo 15mm), así
+  // que rechaza no-pinzas sin tragarse pinzas malas — que es justo lo que las
+  // reglas tienen que seguir viendo.
+  if (baseLen < 0.01 || depth < 1) return null;
+
   // Try to find which edge the dart sits on
   let edgeId: string | undefined;
   if (edges) {

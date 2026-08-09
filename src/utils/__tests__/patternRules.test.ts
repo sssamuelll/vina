@@ -157,6 +157,18 @@ describe('PatternRules', () => {
   });
 
   describe('DART_LEGS_EQUAL', () => {
+    // Pin de precedencia: `piece.darts` manda sobre `internals` cuando existe.
+    // Sin este test, quitarle el `piece.darts ??` a ESTA regla no lo atrapa
+    // nada (las otras tres sí lo tienen pinneado por sus tests viejos).
+    it('lee piece.darts cuando existe, no lo deriva de internals', () => {
+      const piece = makePiece({
+        darts: [makeDart({ legs: [[{ x: 0, y: 0 }, { x: 0, y: 100 }], [{ x: 50, y: 0 }, { x: 0, y: 100 }]] })],
+        internals: [],
+      });
+      const v = validatePiece(piece, ctx([piece]), ['construction']);
+      expect(v.some(r => r.ruleId === 'DART_LEGS_EQUAL')).toBe(true);
+    });
+
     it('warns on uneven legs read from internals (no piece.darts, no prior test coverage at all)', () => {
       const piece = makePiece({
         internals: [makeDartLine([
