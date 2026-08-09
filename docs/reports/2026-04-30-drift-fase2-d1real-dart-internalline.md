@@ -13,6 +13,25 @@
 
 ---
 
+> ### ⚠️ Enmienda 2026-08-09 (#1016) — disparó el reopen trigger § 7.1
+>
+> El trigger 1 (**"un consumer muta `piece.darts` sin re-syncear `piece.internals`"**) se cumplió: aparecieron **dos** consumers así — `transferDart` (`patternOps.ts`) y el tool `adjustDartIntake` (`dartTools.ts`). Ambos movían la pinza en el estado de dominio y el lienzo 2D seguía dibujándola donde estaba, porque el render lee **solo** `piece.internals` (`PieceRenderer.tsx:209`). El copilot reportaba el cambio, María no lo veía.
+>
+> La afirmación de **§ 2.6** — *"0 dual maintenance accidental observado"* — era cierta al escribir el RFC y dejó de serlo. Queda corregida acá; el texto original se conserva como registro.
+>
+> **La decisión 3.1.A (dual representation con bridge) se mantiene.** Reabierta y re-evaluada, no revocada: matar `piece.darts` (variante de 3.1.B) sigue costando lo que decía el RFC —`slashAndSpread.ts` produce `Dart[]` como salida real de una transformación geométrica, y `patternRules.ts` / `getPieceDetails.ts` / `uiStateTools.ts` lo leen. La causa del bug no era la dualidad; era que **el bridge no tenía vuelta**. Dos enmiendas cierran eso:
+>
+> - **Espacio de ids unificado.** `extractDartFromInternal` devuelve `id: line.id` en vez de acuñar un UUID (`dartEntity.ts:88` en la versión vieja). El `Dart` es la vista rica *de una línea concreta*, y ese puntero de vuelta es lo que hace posible escribir el cambio. Efecto lateral buscado: `listDarts` ahora devuelve ids que `segmentDart` y `shapeDartCap` aceptan — las dos mitades de la familia de tools hablaban espacios de ids distintos.
+> - **Escritura de vuelta obligatoria.** Nuevo export del bridge `applyDartsToInternals(piece, darts)`, inverso de `extractDarts`. **Toda op que actualice `piece.darts` tiene que pasar el resultado por ahí**; si no, es un no-op visible. `Dart.capShape` se hidrata desde `line.dartOptions?.capShape` para que la vuelta no aplane una punta curva a pico.
+>
+> El diagrama de **§ 2.6** queda con la flecha de vuelta completa (antes solo `segmentDart` volvía al almacenamiento, y emitiendo líneas nuevas, no actualizando las existentes).
+>
+> **Límite honesto:** un proyecto viejo con `piece.darts` persistido de antes de la unificación tiene ids que no matchean sus líneas; la primera op sobre él borra esas líneas y las re-crea con el id del dart. La geometría queda igual salvo la punta. No se migró: `piece.darts` solo lo poblaban los tools del copilot, que hasta #1009 eran no-ops.
+>
+> **Fuera de alcance, sigue abierto:** `patternRules.ts:168/185/207/505` lee `piece.darts` sin el fallback `?? extractDarts(piece)` que usan los tools, así que esas 4 reglas del validador no disparan nunca en piezas dibujadas o importadas. Es el mismo síntoma de "cache opcional tratado como fuente de verdad", pero tocarlo cambia el comportamiento del validador para todo proyecto existente — issue aparte.
+
+---
+
 ## Sección 1 — Decide / NO decide
 
 ### Decide en este eje

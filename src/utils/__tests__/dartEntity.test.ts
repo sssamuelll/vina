@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractDartFromInternal, extractDarts, adjustDartIntake, segmentDart, shapeDartCap } from '../dartEntity';
+import { extractDartFromInternal, extractDarts, adjustDartIntake, segmentDart, shapeDartCap, applyDartsToInternals } from '../dartEntity';
 import type { InternalLine, PatternPiece } from '../../types/types';
 
 // V-shaped dart: base at (100,400)→(120,400), apex at (110,300)
@@ -40,6 +40,18 @@ describe('extractDartFromInternal', () => {
     };
     const dart = extractDartFromInternal(line);
     expect(dart).toBeNull();
+  });
+
+  // #1016: el Dart hereda el id de su línea. Sin ese puntero de vuelta no hay
+  // forma de escribir el cambio al almacenamiento, que es lo único que el
+  // lienzo 2D dibuja.
+  it('hereda el id de la línea de origen', () => {
+    expect(extractDartFromInternal(dartLine)!.id).toBe('dart-1');
+  });
+
+  it('lee la forma de punta guardada en dartOptions', () => {
+    const curved: InternalLine = { ...dartLine, dartOptions: { capShape: 'curved' } };
+    expect(extractDartFromInternal(curved)!.capShape).toBe('curved');
   });
 });
 
@@ -181,5 +193,65 @@ describe('shapeDartCap', () => {
       (flatR[0] - flatL[0]) ** 2 + (flatR[1] - flatL[1]) ** 2
     );
     expect(flatWidth).toBeLessThan(20); // original intake is 20mm
+  });
+});
+
+// #1016 — la vuelta al almacenamiento. Es el inverso de extractDarts y el
+// único camino por el que una op de dominio llega al lienzo.
+describe('applyDartsToInternals', () => {
+  const grainline: InternalLine = { id: 'gl', type: 'grainline', path: [{ type: 'M', values: [0, 0] }] };
+
+  it('reescribe el path de la línea con la geometría del dart', () => {
+    const piece = makePiece([dartLine, grainline]);
+    const widened = adjustDartIntake(extractDartFromInternal(dartLine)!, 20);
+
+    const internals = applyDartsToInternals(piece, [widened]);
+    const line = internals.find(l => l.id === 'dart-1')!;
+
+    // Base ensanchada 20mm: de (100,400)-(120,400) a (90,400)-(130,400).
+    expect(line.path[0].values).toEqual([90, 400]);
+    expect(line.path[2].values).toEqual([130, 400]);
+  });
+
+  it('no toca los internals que no son dart', () => {
+    const piece = makePiece([dartLine, grainline]);
+    const internals = applyDartsToInternals(piece, extractDarts(piece));
+    expect(internals.find(l => l.id === 'gl')).toEqual(grainline);
+  });
+
+  it('borra las líneas de dart que ya no están en el juego', () => {
+    const piece = makePiece([dartLine, grainline]);
+    const internals = applyDartsToInternals(piece, []);
+    expect(internals.map(l => l.id)).toEqual(['gl']);
+  });
+
+  it('agrega línea para un dart sin línea previa', () => {
+    const piece = makePiece([grainline]);
+    const nuevo = { ...extractDartFromInternal(dartLine)!, id: 'dart-nuevo' };
+
+    const internals = applyDartsToInternals(piece, [nuevo]);
+    const added = internals.find(l => l.id === 'dart-nuevo')!;
+
+    expect(added.type).toBe('dart');
+    expect(added.path[0].values).toEqual([100, 400]);
+  });
+
+  it('conserva la punta curva en vez de aplanarla a pico', () => {
+    const curvedLine: InternalLine = {
+      ...dartLine,
+      path: shapeDartCap(extractDartFromInternal(dartLine)!, 'curved'),
+      dartOptions: { capShape: 'curved' },
+    };
+    const piece = makePiece([curvedLine]);
+
+    const darts = extractDarts(piece);
+    const internals = applyDartsToInternals(piece, darts);
+
+    expect(internals[0].path.some(c => c.type === 'C')).toBe(true);
+  });
+
+  it('ida y vuelta sin cambios deja la geometría igual', () => {
+    const piece = makePiece([dartLine, grainline]);
+    expect(applyDartsToInternals(piece, extractDarts(piece))).toEqual(piece.internals);
   });
 });

@@ -7,12 +7,18 @@
  *
  * Conversion is bidirectional:
  * - InternalLine → Dart: `extractDartFromInternal`, `extractDarts`.
- * - Dart → InternalLine: `segmentDart` (writes new InternalLines),
- *   `shapeDartCap` (returns new path).
+ * - Dart → InternalLine: `applyDartsToInternals` (write-back of a full dart
+ *   set), `segmentDart` (writes new InternalLines), `shapeDartCap` (path).
  *
  * Domain operations (`adjustDartIntake`, `segmentDart`, `shapeDartCap`)
  * live here intentionally — concentrating bridge + ops in a single
  * cohesive module.
+ *
+ * **La escritura de vuelta es obligatoria** (#1016, enmienda a D1-real § 3.1):
+ * `piece.darts` es cache de dominio y el lienzo 2D no lo mira. Una op que
+ * actualiza `piece.darts` sin pasar el resultado por `applyDartsToInternals`
+ * es un no-op visible — el bug que cerró #1016. El id del Dart ES el id de su
+ * InternalLine; ese es el enlace que hace posible la vuelta.
  *
  * Cross-ref: `docs/reports/2026-04-30-drift-fase2-d1real-dart-internalline.md`.
  *
@@ -85,13 +91,17 @@ export function extractDartFromInternal(line: InternalLine, edges?: SemanticEdge
   const foldDirection: Dart['foldDirection'] = cross > 0 ? 'right' : cross < 0 ? 'left' : 'toward-center';
 
   return {
-    id: dartId(),
+    // #1016: el Dart hereda el id de su línea. Es el puntero de vuelta que hace
+    // posible `applyDartsToInternals`, y lo que unifica el espacio de ids de la
+    // familia de tools (`listDarts` devuelve ids que `segmentDart` acepta).
+    id: line.id,
     intake: Math.round(intake * 100) / 100,
     apex,
     legs: [leg1, leg2],
     edgeId,
     foldDirection,
     depth: Math.round(depth * 100) / 100,
+    capShape: line.dartOptions?.capShape,
   };
 }
 
@@ -129,6 +139,49 @@ export function extractDarts(piece: PatternPiece): Dart[] {
   return dartLines
     .map(l => extractDartFromInternal(l, piece.edges))
     .filter((d): d is Dart => d !== null);
+}
+
+/**
+ * Escribir un juego COMPLETO de darts de vuelta al almacenamiento (#1016).
+ *
+ * Es el inverso de `extractDarts` y el único camino por el que una op de
+ * dominio llega al lienzo: el render 2D dibuja `piece.internals`
+ * (`PieceRenderer.tsx:209`), nunca `piece.darts`. Toda op que toque
+ * `piece.darts` tiene que pasar por acá — es la enmienda a D1-real § 3.1.
+ *
+ * `darts` tiene que ser el juego completo de la pieza (`piece.darts ??
+ * extractDarts(piece)`): las líneas `type:'dart'` cuyo id no aparezca ahí se
+ * borran, que es como una transferencia se lleva la pinza vieja. El resto de
+ * los internals (grainline, notch, fold…) pasa intacto.
+ */
+export function applyDartsToInternals(piece: PatternPiece, darts: Dart[]): InternalLine[] {
+  const pending = new Map(darts.map(d => [d.id, d]));
+
+  const updated = piece.internals.flatMap(line => {
+    if (line.type !== 'dart') return [line];
+    const dart = pending.get(line.id);
+    if (!dart) return [];              // pinza eliminada
+    pending.delete(line.id);
+    return [{ ...line, path: dartToPath(dart) }];
+  });
+
+  // Lo que queda no tenía línea: pinza nacida de una op, o de un `piece.darts`
+  // viejo cuyos ids son de antes de unificar el espacio.
+  for (const dart of pending.values()) {
+    updated.push({
+      id: dart.id,
+      type: 'dart',
+      path: dartToPath(dart),
+      ...(dart.capShape ? { dartOptions: { capShape: dart.capShape } } : {}),
+    });
+  }
+
+  return updated;
+}
+
+/** Dart → path de almacenamiento, respetando la punta que la pinza ya tenía. */
+function dartToPath(dart: Dart): PathCommand[] {
+  return shapeDartCap(dart, dart.capShape ?? 'pointed');
 }
 
 /**
@@ -180,7 +233,7 @@ export function segmentDart(
   if (!dartLine) throw new Error(`dart ${targetDartId} not found`);
 
   const dart = extractDartFromInternal(dartLine, piece.edges);
-  if (!dart) throw new Error(`could not parse dart ${dartId}`);
+  if (!dart) throw new Error(`could not parse dart ${targetDartId}`);
 
   const leg1Base = dart.legs[0][0];
   const leg2Base = dart.legs[1][dart.legs[1].length - 1];
