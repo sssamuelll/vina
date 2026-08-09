@@ -544,3 +544,38 @@ export function fabricToFitParams(fabric: {
     avgStretch: ((fabric.stretchWarp + fabric.stretchWeft) / 2) / 100,
   };
 }
+
+/**
+ * ¿Toca (re)pedir el edge data al solver? — #1010
+ *
+ * El edge data (ids + rest lengths de las aristas) se pide una sola vez, al
+ * init de cada tier, con un `postMessage` a fondo perdido: nadie verifica que
+ * la respuesta llegue. Si no llega, `edgeDataRef` queda `null` para siempre y
+ * el fit map no pinta nada — sin error, sin log, sin manera de que el usuario
+ * lo note. Se observó en ~1 de cada 5 corridas e2e en paralelo.
+ *
+ * En vez de hacer fiable cada tier por separado, el consumidor pide de nuevo
+ * mientras le falte el dato. El intervalo evita inundar al worker mientras la
+ * primera respuesta viene en camino.
+ *
+ * Un edge data VACÍO cuenta como ausente: es lo que responde el worker cuando
+ * el solver todavía no existe (`wasmSolverWorker.ts:845`), y dejaría el fit
+ * map computando sobre cero aristas para siempre.
+ *
+ * @param fitMapMode  modo activo; con 'none' no hace falta edge data
+ * @param edgeData    el edge data disponible, o null si aún no llegó
+ * @param nowMs       reloj actual (performance.now())
+ * @param lastRequestMs  cuándo se pidió por última vez (-Infinity si nunca)
+ * @param intervalMs  espera mínima entre peticiones
+ */
+export function shouldRequestEdgeData(
+  fitMapMode: FitMapMode,
+  edgeData: SolverEdgeData | null,
+  nowMs: number,
+  lastRequestMs: number,
+  intervalMs = 1000,
+): boolean {
+  if (fitMapMode === 'none') return false;
+  if (edgeData && edgeData.stretchingIds.length > 0) return false;
+  return nowMs - lastRequestMs >= intervalMs;
+}

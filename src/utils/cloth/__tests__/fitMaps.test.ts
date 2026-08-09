@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computePerVertexStrain,
+  shouldRequestEdgeData,
   computeStressMap,
   computeStrainMap,
   computeFitMap,
@@ -488,5 +489,58 @@ describe('computePerVertexStrain — degenerate edges (#1010)', () => {
     };
     const strain = computePerVertexStrain(positions, 2, edges);
     expect(strain[0]).toBeCloseTo(1.2, 5);
+  });
+});
+
+// ─── #1010: reintento de edge data ──────────────────────────────────────────
+//
+// El edge data se pide UNA sola vez, al init de cada tier, con un postMessage
+// a fondo perdido (wasmSolverClient.ts:336, clothWorkerClient.ts:300; el
+// cliente GPU además hace no-op si aún no lo tiene). Si esa respuesta no
+// aterriza, edgeDataRef queda null para siempre y el fit map no pinta nada,
+// en silencio — observado ~1 de cada 5 corridas e2e en paralelo.
+
+describe('shouldRequestEdgeData (#1010)', () => {
+  const EDGE_DATA: SolverEdgeData = {
+    stretchingIds: new Int32Array([0, 1]),
+    stretchingLengths: new Float32Array([0.05]),
+  };
+  /** Lo que responde el worker cuando el solver aún no existe (wasmSolverWorker.ts:845). */
+  const EMPTY_EDGE_DATA: SolverEdgeData = {
+    stretchingIds: new Int32Array(0),
+    stretchingLengths: new Float32Array(0),
+  };
+
+  it('no pide nada con el fit map apagado', () => {
+    expect(shouldRequestEdgeData('none', null, 10_000, 0)).toBe(false);
+  });
+
+  it('no pide nada si el edge data ya llegó', () => {
+    expect(shouldRequestEdgeData('strain', EDGE_DATA, 10_000, 0)).toBe(false);
+  });
+
+  it('pide cuando el fit map está activo y falta el edge data', () => {
+    expect(shouldRequestEdgeData('strain', null, 10_000, 0)).toBe(true);
+  });
+
+  it('trata la respuesta vacía del worker como dato ausente', () => {
+    // Segundo modo de fallo silencioso: el worker contesta con arrays vacíos
+    // si el solver no está listo. edgeDataRef queda no-nulo pero inservible —
+    // el fit map computaría sobre cero aristas para siempre.
+    expect(shouldRequestEdgeData('strain', EMPTY_EDGE_DATA, 10_000, 0)).toBe(true);
+  });
+
+  it('no reinunda al worker mientras la respuesta puede venir en camino', () => {
+    // Petición hecha en t=10000; a los 300 ms todavía no se reintenta.
+    expect(shouldRequestEdgeData('strain', null, 10_300, 10_000)).toBe(false);
+  });
+
+  it('reintenta una vez cumplido el intervalo', () => {
+    expect(shouldRequestEdgeData('strain', null, 11_000, 10_000)).toBe(true);
+  });
+
+  it('pide en el primer frame, sin esperar un intervalo', () => {
+    // lastRequestMs = -Infinity es el estado inicial del ref.
+    expect(shouldRequestEdgeData('fit', null, 0, -Infinity)).toBe(true);
   });
 });

@@ -32,7 +32,7 @@ import { resolveArrangementWithFrames } from '../../utils/cloth/arrangement/arra
 import { computeEffectiveRegions } from '../../utils/cloth/garmentPlacement';
 import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
 import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
-import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
+import { computeFitMapData, fabricToFitParams, shouldRequestEdgeData } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { addPin, setCollisionDistance, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
 import { showErrorToast } from '../../store/copilotUISlice';
@@ -208,6 +208,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // #1010: hay stats de fit map publicadas desde el readback TSL (para
   // limpiarlas una sola vez al apagar el modo).
   const tslFitStatsActive = useRef(false);
+  /** #1010: última petición de edge data (performance.now()); -Infinity = nunca. */
+  const lastEdgeDataRequestRef = useRef(-Infinity);
   // Body-tether (frente#2) settle-capture state. Targets MUST be captured from
   // the SETTLED drape (cloth wrapped on the body), NOT at init where positions
   // are the pre-wrap spread-out layout (~0.6 m mean from the body → garbage
@@ -561,6 +563,16 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       tetherReady.current = false;
     }
 
+    // #1010: el edge data se pide UNA vez al init de cada tier, con un
+    // postMessage a fondo perdido que nadie verifica. Si esa respuesta no
+    // aterriza, edgeDataRef queda null para siempre y el fit map no pinta
+    // nada, en silencio. Acá se re-pide mientras haga falta — antes del
+    // branch de tier, porque los tres caminos sufren lo mismo.
+    if (shouldRequestEdgeData(fitMapMode, edgeDataRef.current, performance.now(), lastEdgeDataRequestRef.current)) {
+      lastEdgeDataRequestRef.current = performance.now();
+      (clients.wasm ?? clients.cpu ?? clients.gpu)?.requestEdgeData();
+    }
+
     // ─── TSL zero-copy path ──────────────────────────────────────────
     // rendererDeviceLostRef gate (#901): once the renderer device is lost,
     // dispatching compute on it is futile; bail to the CPU-readback path until
@@ -855,7 +867,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       fitMapDiag.path = 'tsl';
       fitMapDiag.frames++;
       fitMapDiag.fitMapMode = fitMapMode;
-      fitMapDiag.edgeDataPresent = edgeDataRef.current !== null;
+      // "Presente" = utilizable: la respuesta vacía del worker no cuenta (#1010).
+    fitMapDiag.edgeDataPresent = (edgeDataRef.current?.stretchingIds.length ?? 0) > 0;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__VINA_FITMAP_DIAG__ = fitMapDiag;
       return;
@@ -882,7 +895,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     fitMapDiag.path = 'cpu';
     fitMapDiag.frames++;
     fitMapDiag.fitMapMode = fitMapMode;
-    fitMapDiag.edgeDataPresent = edgeDataRef.current !== null;
+    // "Presente" = utilizable: la respuesta vacía del worker no cuenta (#1010).
+    fitMapDiag.edgeDataPresent = (edgeDataRef.current?.stretchingIds.length ?? 0) > 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__VINA_FITMAP_DIAG__ = fitMapDiag;
     if (fitMapMode !== 'none' && edgeDataRef.current && colorAttr && positions && positions.length > 0) {

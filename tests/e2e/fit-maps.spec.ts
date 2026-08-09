@@ -115,7 +115,10 @@ async function setupSimulation(page: Page) {
 test.describe('Fit Map UI', () => {
   test.beforeEach(async ({ page }) => {
     // Generous timeout for CI — simulation involves Wasm/Worker init.
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
+    // Tier determinista: sin esto la cascada puede caer hasta neural-drape,
+    // que no expone edge data y por diseño no produce fit maps (A7).
+    await page.addInitScript(() => localStorage.setItem('vina-use-webgpu', 'false'));
     await setupSimulation(page);
   });
 
@@ -196,19 +199,32 @@ test.describe('Fit Map UI', () => {
     // readback del solver (~4 Hz) después de la init — se espera POR CONDICIÓN.
     // El `waitForTimeout(3000)` ciego que había aquí vencía antes de la primera
     // publicación y el test se saltaba en silencio justo lo que venía a probar.
+    // Skip EXPLÍCITO y anotado (no verde silencioso): el tier neural no tiene
+    // ruta de edge data — sin ella no hay fit map que medir. Es un hueco de
+    // capacidad conocido, no una degradación del entorno de test.
+    const tier = await getState<string>(page, 'simulation.solverTier');
+    test.skip(tier === 'neural-drape', `tier ${tier}: sin edge data, no soporta fit maps (A7)`);
+
     await expect.poll(
       () => page.evaluate(() => {
         const w = window as any;
         if (w.__VINA_FIT_MAP_STATS__) return 'PUBLICADAS';
         const d = w.__VINA_FITMAP_DIAG__;
-        return d ? `PENDIENTE frames=${d.frames} mode=${d.fitMapMode} edgeData=${d.edgeDataPresent}` : 'SIN SIMULACIÓN (useFrame no corrió)';
+        if (!d) return 'SIN SIMULACIÓN (useFrame no corrió)';
+        const tier = w.__VINA_STORE__?.getState().simulation.solverTier;
+        return `PENDIENTE tier=${tier} path=${d.path} frames=${d.frames} mode=${d.fitMapMode} edgeData=${d.edgeDataPresent} blockRan=${d.fitMapBlockRan}`;
       }),
       { timeout: 60_000, message: 'la simulación nunca publicó __VINA_FIT_MAP_STATS__' },
     ).toBe('PUBLICADAS');
 
     const stats = await page.evaluate(() => {
-      const s = (window as any).__VINA_FIT_MAP_STATS__;
-      return { min: s.min as number, max: s.max as number, mean: s.mean as number };
+      const w = window as any;
+      const s = w.__VINA_FIT_MAP_STATS__;
+      return {
+        min: s.min as number, max: s.max as number, mean: s.mean as number,
+        tier: w.__VINA_STORE__?.getState().simulation.solverTier as string,
+        path: w.__VINA_FITMAP_DIAG__?.path as string,
+      };
     });
     console.log('Fit map stats:', stats);
 
