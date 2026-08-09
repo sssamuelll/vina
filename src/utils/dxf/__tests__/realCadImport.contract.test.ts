@@ -5,6 +5,7 @@ import { entityToPath, importDXFContent, parseDXF } from '../index';
 import { classifyPiece } from '../../pieceClassifier';
 import { generateSeamAllowanceWithCorners } from '../../seam/cornerTypes';
 import { flattenPath } from '../../seam';
+import { extractDarts } from '../../dartEntity';
 
 const GARMENT_FIXTURES = resolve(__dirname, '../../../../tests/fixtures/garments');
 const MARIA_FIXTURE = resolve(GARMENT_FIXTURES, 'maria_patrones_samuel_2M.dxf');
@@ -37,6 +38,20 @@ describe('real CAD import contract', () => {
     const notches = result.pieces.flatMap(piece => piece.internals.filter(line => line.type === 'notch'));
     expect(notches).toHaveLength(8);
     expect(notches.every(notch => notch.notchAnchor)).toBe(true);
+  });
+
+  // #1020: las líneas internas genéricas de María (rol 'draw'/'intcut') llegan
+  // como 'reference', no como 'dart'. Antes entraban etiquetadas de pinza y el
+  // validador avisaba sobre ellas; y `extractDarts` no saca ninguna pinza real
+  // de este archivo porque cada una viene partida en piernas de 2 puntos
+  // (#1021, sin resolver). Este test fija ambas mitades sobre datos reales.
+  it('tipa las líneas internas de María como reference, y no produce pinzas legibles', () => {
+    const pieces = importFixture(MARIA_FIXTURE).pieces;
+    const internals = pieces.flatMap(piece => piece.internals);
+
+    expect(internals.filter(line => line.type === 'reference')).toHaveLength(10);
+    expect(internals.some(line => line.type === 'dart')).toBe(false);
+    expect(pieces.flatMap(extractDarts)).toHaveLength(0);
   });
 
   it('promotes María\'s dense layer-84 curves to their parsed blocks\' imported outlines', () => {

@@ -173,7 +173,15 @@ export function applyDartsToInternals(piece: PatternPiece, darts: Dart[]): Inter
   const updated = piece.internals.flatMap(line => {
     if (line.type !== 'dart') return [line];
     const dart = pending.get(line.id);
-    if (!dart) return [];              // pinza eliminada
+    if (!dart) {
+      // Que no esté en el juego tiene dos causas distintas (#1020):
+      //   - la op la quitó (una transferencia se lleva la pinza) → borrar;
+      //   - `extractDarts` no supo leerla, así que nunca estuvo en el juego
+      //     → preservarla. Borrarla sería pérdida de datos silenciosa: el
+      //     lienzo dibuja `internals` y la línea desaparecería sola al tocar
+      //     OTRA pinza de la misma pieza.
+      return extractDartFromInternal(line) ? [] : [line];
+    }
     pending.delete(line.id);
     return [{ ...line, path: dartToPath(dart) }];
   });

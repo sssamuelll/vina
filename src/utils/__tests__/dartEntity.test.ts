@@ -281,4 +281,41 @@ describe('applyDartsToInternals', () => {
     const piece = makePiece([dartLine, grainline]);
     expect(applyDartsToInternals(piece, extractDarts(piece))).toEqual(piece.internals);
   });
+
+  // #1020: la ausencia de una línea en el juego tiene DOS causas distintas y
+  // hasta acá se trataban igual (borrar). Si `extractDarts` no supo leerla,
+  // nunca estuvo en el juego — no es que la op la quitara. Borrarla es
+  // pérdida de datos silenciosa: el lienzo dibuja `internals`.
+  describe('líneas type:dart que extractDarts no sabe leer', () => {
+    const straight: InternalLine = {
+      id: 'legacy-straight', type: 'dart',
+      path: [
+        { type: 'M', values: [30, 50] },
+        { type: 'L', values: [30, 62] },
+        { type: 'L', values: [30, 74] },
+      ],
+    };
+    const twoPoint: InternalLine = {
+      id: 'legacy-2pt', type: 'dart',
+      path: [{ type: 'M', values: [200, 600] }, { type: 'L', values: [210, 500] }],
+    };
+
+    it('sobreviven a una op sobre otra pinza de la misma pieza', () => {
+      const piece = makePiece([dartLine, straight, twoPoint, grainline]);
+      const darts = extractDarts(piece);
+      expect(darts.map(d => d.id)).toEqual(['dart-1']); // solo lee la buena
+
+      const internals = applyDartsToInternals(piece, [adjustDartIntake(darts[0], 10)]);
+
+      expect(internals.map(l => l.id)).toEqual(['dart-1', 'legacy-straight', 'legacy-2pt', 'gl']);
+      expect(internals.find(l => l.id === 'legacy-straight')).toEqual(straight);
+      expect(internals.find(l => l.id === 'legacy-2pt')).toEqual(twoPoint);
+    });
+
+    it('pero una pinza legible ausente del juego sí se borra', () => {
+      const piece = makePiece([dartLine, straight]);
+      const internals = applyDartsToInternals(piece, []);
+      expect(internals.map(l => l.id)).toEqual(['legacy-straight']);
+    });
+  });
 });
