@@ -88,14 +88,28 @@ async function addPiece(page: Page) {
 async function setupSimulation(page: Page) {
   await waitForApp(page);
   await addPiece(page);
+
+  // El viewport 3D debe existir ANTES de arrancar la sim. Con el
+  // `waitForTimeout(2000)` que había aquí, bajo carga se despachaba
+  // startSimulation contra un árbol 3D todavía sin montar: el store quedaba en
+  // 'running' y el useFrame no corría nunca (diag=AUSENTE) — el test esperaba
+  // 2 minutos datos de una simulación inexistente.
   await page.click('button:has-text("3D")');
-  await page.waitForTimeout(2000);
+  await page.waitForSelector('canvas', { state: 'visible', timeout: 60_000 });
+
   await dispatch(page, { type: 'simulation/setViewMode3D', payload: 'simulate' });
   await dispatch(page, { type: 'simulation/startSimulation' });
   await expect.poll(
     async () => getState<string>(page, 'simulation.simulationState'),
     { timeout: 30000 },
   ).toBe('running');
+
+  // Loop de la sim vivo: el diag se publica en el primer useFrame. Sin esta
+  // guarda, un 3D que no arrancó falla tarde y sin explicación.
+  await expect.poll(
+    () => page.evaluate(() => Boolean((window as any).__VINA_FITMAP_DIAG__)),
+    { timeout: 60_000, message: 'useFrame nunca corrió — la simulación no arrancó' },
+  ).toBe(true);
 }
 
 interface Diag {
@@ -114,24 +128,26 @@ interface Evidence {
 
 /**
  * Activa el modo strain vía store y espera (por condición, no por timeout
- * ciego) a que el useFrame acumule frames CON el modo activo. Devuelve la
- * foto completa de la evidencia.
+ * ciego) a que se cumpla el contrato. Devuelve la foto de la evidencia.
  */
 async function collectEvidence(page: Page): Promise<Evidence> {
   await dispatch(page, { type: 'simulation/setFitMapMode', payload: 'strain' });
 
-  // El diag se publica desde el primer frame del useFrame; esperamos a que
-  // registre frames con el modo strain ya visible para la rama que corra.
-  const framesAtStrain = await page.evaluate(
-    () => ((window as any).__VINA_FITMAP_DIAG__?.frames ?? 0) as number,
-  );
+  // Se espera por el CONTRATO — "el bloque de fit map corrió con el modo activo
+  // y publicó stats" — no por un proxy de N frames acumulados.
+  // El poll devuelve la foto del diag, no un booleano: cuando falla, Playwright
+  // imprime el último valor recibido y se ve EN QUÉ eslabón murió el dato
+  // (¿frames congelados? ¿modo no propagado? ¿edge data ausente?).
   await expect.poll(
     () => page.evaluate(() => {
-      const d = (window as any).__VINA_FITMAP_DIAG__;
-      return d && d.fitMapMode === 'strain' ? d.frames : 0;
+      const w = window as any;
+      const d = w.__VINA_FITMAP_DIAG__;
+      if (!d) return 'diag=AUSENTE (useFrame nunca corrió)';
+      const ready = d.fitMapMode === 'strain' && d.fitMapBlockRan && Boolean(w.__VINA_FIT_MAP_STATS__);
+      return `${ready ? 'READY' : 'PENDIENTE'} path=${d.path} frames=${d.frames} mode=${d.fitMapMode} edgeData=${d.edgeDataPresent} blockRan=${d.fitMapBlockRan} stats=${Boolean(w.__VINA_FIT_MAP_STATS__)} tier=${w.__VINA_STORE__?.getState().simulation.solverTier}`;
     }),
-    { timeout: 20000, message: 'useFrame nunca registró frames con fitMapMode=strain' },
-  ).toBeGreaterThan(framesAtStrain + 30);
+    { timeout: 60_000, message: 'el bloque de fit map nunca publicó stats con fitMapMode=strain' },
+  ).toContain('READY');
 
   return page.evaluate(() => {
     const w = window as any;
@@ -152,7 +168,7 @@ test.describe('diagnóstico #1010 — tier WASM/CPU (webgpu OFF)', () => {
     await setupSimulation(page);
   });
 
-  test('control: edge data llega, el bloque de fit map corre y publica stats', async ({ page }) => {
+  test('control: edge data llega, el bloque de fit map corre y publica stats', async ({ page }, testInfo) => {
     const ev = await collectEvidence(page);
     console.log('[diag WASM/CPU]', JSON.stringify(ev, null, 2));
 
@@ -165,6 +181,16 @@ test.describe('diagnóstico #1010 — tier WASM/CPU (webgpu OFF)', () => {
     expect(Number.isFinite(ev.stats!.min), `min no finito: ${ev.stats!.min}`).toBe(true);
     expect(Number.isFinite(ev.stats!.max), `max no finito: ${ev.stats!.max}`).toBe(true);
     expect(Number.isFinite(ev.stats!.mean), `mean no finito: ${ev.stats!.mean}`).toBe(true);
+    // Red de regresión del bug de edges degenerados (#1010): un restLen ~1e-7
+    // daba strains de 10^6 %. El fix vive en fitMaps.ts (epsilon de 0.1 mm),
+    // compartido por los tres tiers — este assert lo cubre en el tier CI.
+    // Sobre la media, no el máximo (ver nota en fit-maps.spec.ts).
+    expect(ev.stats!.mean, `strain medio absurdo: ${ev.stats!.mean}`).toBeLessThan(500);
+
+    // #1010 CE2: evidencia de que el tier WASM produce el mismo dato.
+    const shot = testInfo.outputPath('fitmap-strain-wasm.png');
+    await page.screenshot({ path: shot });
+    await testInfo.attach('fitmap-strain-wasm', { path: shot, contentType: 'image/png' });
   });
 });
 
@@ -300,6 +326,11 @@ test.describe('diagnóstico #1010 — fit map sobre el patrón real de María @g
     // Prenda cosida sobre María: la costura tracciona — deformación no
     // degenerada (max > min). El valor exacto es evidencia, no assert.
     expect(ev.stats!.max).toBeGreaterThan(ev.stats!.min);
+    // Techo del bug de edges degenerados (#1010) sobre geometría DXF real —
+    // esta era exactamente la malla que daba 3.68M %. Media, no máximo: el
+    // máximo aquí es ~990 % por la cola de edges sub-mm de la malla (ver nota
+    // en fit-maps.spec.ts); la media se queda en ~129 %.
+    expect(ev.stats!.mean, `strain medio absurdo: ${ev.stats!.mean}`).toBeLessThan(500);
 
     // Paridad GPU↔CPU sobre geometría real.
     const parity = await page.evaluate(() => {

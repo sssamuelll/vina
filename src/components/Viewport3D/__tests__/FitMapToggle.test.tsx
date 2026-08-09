@@ -12,16 +12,16 @@ import FitMapToggle from '../FitMapToggle';
 
 afterEach(cleanup);
 
-function createTestStore() {
+function createTestStore(overrides: { simulationState?: SimulationState; fitMapMode?: FitMapMode } = {}) {
   return configureStore({
     reducer: {
       simulation: simulationReducer,
     },
     preloadedState: {
       simulation: {
-        simulationState: 'running' as SimulationState,
+        simulationState: (overrides.simulationState ?? 'running') as SimulationState,
         renderSettingsOpen: false,
-        fitMapMode: 'stress' as FitMapMode,
+        fitMapMode: (overrides.fitMapMode ?? 'stress') as FitMapMode,
         fitMapConfig: {
           stressRange: [0, 100] as [number, number],
           strainRange: [1.0, 1.2] as [number, number],
@@ -116,5 +116,44 @@ describe('FitMapToggle config popover', () => {
     fireEvent.change(maxInput, { target: { value: '200' } });
     const state = store.getState().simulation;
     expect(state.fitMapConfig.stressRange[1]).toBe(200);
+  });
+});
+
+// #1010 punto 4: en idle la barra desaparecía por completo (`return null`), así
+// que un usuario que nunca simuló no tenía cómo enterarse de que los fit maps
+// existen. Ahora se muestra deshabilitada con la pista de qué hacer.
+describe('FitMapToggle idle state (#1010)', () => {
+  it('renders the bar disabled with a hint instead of vanishing', () => {
+    const store = createTestStore({ simulationState: 'idle' });
+    render(
+      <Provider store={store}>
+        <FitMapToggle stats={null} />
+      </Provider>,
+    );
+    const strainBtn = screen.getByTitle(/Mapa de estiramiento/) as HTMLButtonElement;
+    expect(strainBtn.disabled).toBe(true);
+    expect(strainBtn.title).toMatch(/simula/i);
+  });
+
+  it('does not change fit map mode when clicked in idle', () => {
+    const store = createTestStore({ simulationState: 'idle', fitMapMode: 'none' });
+    render(
+      <Provider store={store}>
+        <FitMapToggle stats={null} />
+      </Provider>,
+    );
+    fireEvent.click(screen.getByTitle(/Mapa de estiramiento/));
+    expect(store.getState().simulation.fitMapMode).toBe('none');
+  });
+
+  it('keeps the buttons live while the simulation runs', () => {
+    const store = createTestStore();
+    render(
+      <Provider store={store}>
+        <FitMapToggle stats={testStats} />
+      </Provider>,
+    );
+    const strainBtn = screen.getByTitle('Mapa de estiramiento (Alt+7)') as HTMLButtonElement;
+    expect(strainBtn.disabled).toBe(false);
   });
 });
