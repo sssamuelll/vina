@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint, unfoldPiece, optimizeCurvePoints, optimizePieceCurves, offsetInternalLine, replaceAsPatternOutline } from '../patternOps';
+import { extractDarts } from '../dartEntity';
 import type { PatternPiece, SemanticEdge, PathCommand } from '../../types/types';
 
 function makeRect(name: string, w: number, h: number): PatternPiece {
@@ -117,6 +118,30 @@ describe('transferDart', () => {
     expect(result.darts).toHaveLength(1);
     expect(result.darts![0].intake).toBe(25);
     expect(result.darts![0].edgeId).toBe('e2');
+  });
+
+  // #1016: la op también deja el cambio en `internals`, que es lo único que el
+  // lienzo 2D dibuja. Sin esto la pinza se movía solo en el estado.
+  it('escribe la pinza de vuelta en internals', () => {
+    const piece = makeRect('Front Bodice', 400, 600);
+    piece.internals = [{
+      id: 'dart-1', type: 'dart',
+      path: [
+        { type: 'M', values: [188, 0] },
+        { type: 'L', values: [200, 300] },
+        { type: 'L', values: [212, 0] },
+      ],
+    }];
+    piece.edges = [
+      { id: 'e1', name: 'shoulder', segmentRange: [1, 2], edgeType: 'seam' },
+      { id: 'e2', name: 'sideSeam', segmentRange: [2, 3], edgeType: 'seam' },
+    ];
+    piece.darts = extractDarts(piece);
+
+    const dartLines = transferDart(piece, 'dart-1', 'sideSeam').internals.filter(l => l.type === 'dart');
+    expect(dartLines).toHaveLength(1);
+    expect(dartLines[0].id).toBe('dart-1');              // misma pinza, no un clon
+    expect(dartLines[0].path[0].values[1]).toBeCloseTo(120, 6); // ya no en el escote (y=0)
   });
 });
 

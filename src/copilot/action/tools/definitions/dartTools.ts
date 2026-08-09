@@ -64,7 +64,7 @@ export const tools: ToolDefinition[] = [
       dispatch: AppDispatch,
       getState: () => RootState,
     ): Promise<ToolResult> => {
-      const { adjustDartIntake, extractDarts } = await import('../../../../utils/dartEntity');
+      const { adjustDartIntake, extractDarts, applyDartsToInternals } = await import('../../../../utils/dartEntity');
       const { updatePiece } = await import('../../../../store/projectSlice');
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
@@ -79,7 +79,13 @@ export const tools: ToolDefinition[] = [
       const newDarts = [...darts];
       newDarts[dartIdx] = updated;
 
-      dispatch(updatePiece({ ...piece, darts: newDarts }));
+      dispatch(updatePiece({
+        ...piece,
+        darts: newDarts,
+        // El lienzo 2D dibuja `internals`. Sin la vuelta al almacenamiento el
+        // ajuste queda invisible (#1016).
+        internals: applyDartsToInternals(piece, newDarts),
+      }));
 
       return {
         success: true,

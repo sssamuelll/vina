@@ -1,25 +1,22 @@
 /**
- * #1009 — camino real del copilot para `transferDart`:
- * registro → tool → op geométrica → dispatch → estado.
+ * `transferDart` de punta a punta: registro → tool → op geométrica → dispatch →
+ * estado → **lo que el lienzo dibuja**.
  *
  * Corre contra el registry de verdad (`getDefaultRegistry`) y un store de
  * verdad, no contra mocks: si el tool se desregistra, si cambia la firma, o si
  * el dispatch deja de aplicarse, esto se pone rojo.
  *
- * Por qué NO es un e2e de navegador (#1009 pedía uno): el render 2D
- * (`PieceRenderer.tsx:209`) dibuja `piece.internals`; `transferDart`
- * (`patternOps.ts:365`) escribe `piece.darts`. Nada sincroniza los dos lados,
- * así que un navegador no puede observar el cambio — levantar Chromium para
- * leer un campo de Redux sería exactamente el verde vacío que este issue vino
- * a cerrar. El hueco del bridge está declarado abajo con `it.todo` y trackeado
- * en #1016 (dispara la condición de reapertura de D1-real § 8).
+ * Nacido en #1009 (donde solo llegaba hasta `piece.darts`) y completado en
+ * #1016: el render 2D dibuja `piece.internals` (`PieceRenderer.tsx:209`), así
+ * que las aserciones que valen son las que miran ahí. Ver la enmienda de
+ * D1-real § 3.1 — el bridge ahora tiene escritura de vuelta obligatoria.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, { addPiece } from '../../../../store/projectSlice';
 import { getDefaultRegistry, resetDefaultRegistry } from '../registry';
 import type { AppDispatch, RootState } from '../../../../store';
-import type { Dart, PatternPiece } from '../../../../types/types';
+import type { Dart, InternalLine, PatternPiece } from '../../../../types/types';
 
 const PIECE_ID = 'front-bodice';
 
@@ -79,7 +76,12 @@ function pieceFrom(store: ReturnType<typeof makeStore>): PatternPiece {
   return piece;
 }
 
-describe('transferDart — camino copilot→tool→estado (#1009)', () => {
+/** Lo que el lienzo 2D dibuja de esta pieza. */
+function dartLinesFrom(store: ReturnType<typeof makeStore>): InternalLine[] {
+  return pieceFrom(store).internals.filter(l => l.type === 'dart');
+}
+
+describe('transferDart — camino copilot→tool→lienzo (#1009, #1016)', () => {
   let store: ReturnType<typeof makeStore>;
 
   beforeEach(() => {
@@ -125,43 +127,90 @@ describe('transferDart — camino copilot→tool→estado (#1009)', () => {
     expect(after[0].legs[0][0].y).toBeGreaterThan(before[0].legs[0][0].y);
   });
 
-  it('falla con un dartId inexistente en vez de reportar éxito vacío', async () => {
+  // El corazón de #1016: sin esto la pinza se movía en Redux y en pantalla se
+  // quedaba clavada en el escote.
+  it('mueve la línea que el lienzo dibuja, no solo el estado de dominio', async () => {
     const registry = getDefaultRegistry();
     await registry.execute('extractDarts', { pieceId: PIECE_ID });
-    const before = pieceFrom(store).darts as Dart[];
+    const dartId = (pieceFrom(store).darts as Dart[])[0].id;
 
-    const result = await registry.execute('transferDart', {
+    await registry.execute('transferDart', { pieceId: PIECE_ID, dartId, toEdge: 'sideSeam' });
+
+    const lines = dartLinesFrom(store);
+    expect(lines).toHaveLength(1);            // ni duplicada ni huérfana
+
+    // Bases sobre el borde destino (y ≈ 120 = 20% del alto), centradas en x=200
+    // con el intake de 24 intacto. Antes: bases en y=0, x≈88/112.
+    const [base1, apex, base2] = lines[0].path.map(c => c.values);
+    expect(base1[0]).toBeCloseTo(188, 6);
+    expect(base1[1]).toBeCloseTo(120, 6);
+    expect(base2[0]).toBeCloseTo(212, 6);
+    expect(base2[1]).toBeCloseTo(120, 6);
+    expect(apex[0]).toBeCloseTo(200, 6);
+    expect(apex[1]).toBeCloseTo(300, 6);
+  });
+
+  // Espacio de ids unificado (#1016): el dart de dominio y su línea de
+  // almacenamiento son el mismo id, así que `listDarts` devuelve ids que
+  // `segmentDart` y `shapeDartCap` aceptan.
+  it('el id del dart es el de su línea, y sobrevive a la transferencia', async () => {
+    const registry = getDefaultRegistry();
+    await registry.execute('extractDarts', { pieceId: PIECE_ID });
+    expect((pieceFrom(store).darts as Dart[])[0].id).toBe('dart-line-1');
+
+    await registry.execute('transferDart', { pieceId: PIECE_ID, dartId: 'dart-line-1', toEdge: 'sideSeam' });
+
+    expect((pieceFrom(store).darts as Dart[])[0].id).toBe('dart-line-1');
+    expect(dartLinesFrom(store)[0].id).toBe('dart-line-1');
+
+    // Y el tool de la otra convención lo acepta: era el síntoma que separaba
+    // las dos mitades de la familia de tools.
+    const shaped = await registry.execute('shapeDartCap', {
+      pieceId: PIECE_ID, dartId: 'dart-line-1', capShape: 'curved',
+    });
+    expect(shaped.success).toBe(true);
+  });
+
+  // El camino que recorre María: pedirle al copilot que mueva la pinza sin
+  // haber corrido `extractDarts` a mano antes.
+  it('funciona sin extractDarts previo (piece.darts viene undefined)', async () => {
+    expect(pieceFrom(store).darts).toBeUndefined();
+
+    const result = await getDefaultRegistry().execute('transferDart', {
+      pieceId: PIECE_ID,
+      dartId: 'dart-line-1',
+      toEdge: 'sideSeam',
+    });
+
+    expect(result.success).toBe(true);
+    expect(dartLinesFrom(store)[0].path[0].values[1]).toBeCloseTo(120, 6);
+  });
+
+  it('devuelve success:false con el motivo si el dart no existe', async () => {
+    const before = dartLinesFrom(store)[0];
+
+    const result = await getDefaultRegistry().execute('transferDart', {
       pieceId: PIECE_ID,
       dartId: 'no-existe',
       toEdge: 'sideSeam',
     });
 
-    // El tool devuelve success con la pieza intacta — no hay forma de que el
-    // llamador sepa que no pasó nada. Se fija el estado observable de hoy para
-    // que el día que se endurezca el contrato, esto avise.
-    const after = pieceFrom(store).darts as Dart[];
-    expect(after[0].id).toBe(before[0].id);
-    expect(after[0].apex).toEqual(before[0].apex);
-    expect(result.success).toBe(true); // ← contrato flojo, #1016
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/no-existe/);
+    expect(dartLinesFrom(store)[0]).toEqual(before); // y no tocó nada
   });
 
-  it('deja la pieza intacta si el borde destino no existe', async () => {
-    const registry = getDefaultRegistry();
-    await registry.execute('extractDarts', { pieceId: PIECE_ID });
-    const before = pieceFrom(store).darts as Dart[];
+  it('devuelve success:false con el motivo si el borde destino no existe', async () => {
+    const before = dartLinesFrom(store)[0];
 
-    await registry.execute('transferDart', {
+    const result = await getDefaultRegistry().execute('transferDart', {
       pieceId: PIECE_ID,
-      dartId: before[0].id,
+      dartId: 'dart-line-1',
       toEdge: 'costadillo-que-no-existe',
     });
 
-    expect((pieceFrom(store).darts as Dart[])[0].apex).toEqual(before[0].apex);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/costadillo-que-no-existe/);
+    expect(dartLinesFrom(store)[0]).toEqual(before);
   });
-
-  // Huecos declarados, no saltados en silencio (#1009). Ambos dependen de
-  // cerrar la divergencia storage↔dominio de D1-real (#1016); no se arreglan
-  // acá porque el propio RFC manda reabrir la decisión 3.1 cuando aparece.
-  it.todo('sincroniza el InternalLine para que el render 2D refleje la transferencia');
-  it.todo('devuelve success:false cuando el dart o el borde no existen');
 });

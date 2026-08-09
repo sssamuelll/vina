@@ -311,13 +311,33 @@ export const tools: ToolDefinition[] = [
     },
     execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
       const { transferDart } = await import('../../../../utils/patternOps');
+      const { extractDarts } = await import('../../../../utils/dartEntity');
+      const { findEdgeByName } = await import('../../../../utils/semanticEdges');
       const { updatePiece } = await import('../../../../store/projectSlice');
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
-      const result = transferDart(piece, params.dartId as string, params.toEdge as string);
+
+      // `piece.darts` es cache de dominio: en una pieza dibujada o importada
+      // viene undefined y la op pura no encontraría nada que mover. Derivar
+      // antes de operar es lo que hace que esto sirva sin pedirle al copilot
+      // que corra `extractDarts` primero.
+      const darts = piece.darts ?? extractDarts(piece);
+      const dartId = params.dartId as string;
+      const toEdge = params.toEdge as string;
+
+      // Las dos salidas tempranas de `transferDart` devolvían la pieza intacta
+      // y el tool reportaba éxito. Se chequea acá, donde hay ToolResult (#1016).
+      if (!darts.some(d => d.id === dartId)) {
+        return { success: false, error: `Dart "${dartId}" not found on piece "${piece.id}". Available: ${darts.map(d => d.id).join(', ') || '(none)'}` };
+      }
+      if (!findEdgeByName(piece.edges ?? [], toEdge)) {
+        return { success: false, error: `Edge "${toEdge}" not found on piece "${piece.id}". Available: ${(piece.edges ?? []).map(e => e.name).join(', ') || '(none)'}` };
+      }
+
+      const result = transferDart({ ...piece, darts }, dartId, toEdge);
       dispatch(updatePiece(result));
-      return { success: true, data: { pieceId: result.id, dartTransferred: params.dartId, toEdge: params.toEdge } };
+      return { success: true, data: { pieceId: result.id, dartTransferred: dartId, toEdge } };
     },
   },
   {

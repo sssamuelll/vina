@@ -10,7 +10,8 @@
 import type { PatternPiece, PathCommand, SemanticEdge, Dart, Point2D } from '../types/types';
 import { findOutlineIntersections, splitOutlineAtPoints } from './geometry/splitOutline';
 import { findSharedEdge, mergeOutlines } from './geometry/mergeOutline';
-import { detectSemanticEdges } from './semanticEdges';
+import { detectSemanticEdges, findEdgeByName } from './semanticEdges';
+import { applyDartsToInternals } from './dartEntity';
 import { getEdgeEndpoints } from './geometry/path';
 import { offsetOutline, type OffsetJoin } from './seam/cornerTypes';
 import { samplePathAtIntervals } from './geometry/arcLength';
@@ -379,9 +380,7 @@ export function transferDart(
   if (dartIdx === -1) return result;
 
   const oldDart = darts[dartIdx];
-  const targetEdge = result.edges?.find(e =>
-    e.name.toLowerCase().includes(toEdgeName.toLowerCase())
-  );
+  const targetEdge = findEdgeByName(result.edges ?? [], toEdgeName);
 
   if (!targetEdge) return result;
 
@@ -393,7 +392,9 @@ export function transferDart(
     : bbox.maxY - (bbox.maxY - bbox.minY) * 0.2; // bottom edge
 
   const newDart: Dart = {
-    id: uid('dart'),
+    // Misma pinza, otro borde: conservar el id mantiene viva la referencia que
+    // el copilot ya tiene y deja la escritura de vuelta como update en sitio.
+    id: oldDart.id,
     intake: oldDart.intake,
     apex: { x: edgeMidX, y: (bbox.minY + bbox.maxY) / 2 },
     legs: [
@@ -408,6 +409,9 @@ export function transferDart(
   // Remove old, add new
   darts.splice(dartIdx, 1, newDart);
   result.darts = darts;
+  // Y de vuelta al almacenamiento: el lienzo 2D dibuja `internals`, no `darts`.
+  // Sin esta línea la pinza se mueve solo en Redux (#1016).
+  result.internals = applyDartsToInternals(result, darts);
 
   return result;
 }
