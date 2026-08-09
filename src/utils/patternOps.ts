@@ -26,6 +26,11 @@ function uid(_prefix: string): string { return newId(); }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// OJO con el id: clona con identidad NUEVA porque el caso original era partir
+// una pieza en dos. Toda op que modifica en sitio tiene que pasar
+// `{ id: piece.id }` — si no, el `updatePiece(result)` del tool matchea por id,
+// no encuentra nada y no hace NADA, mientras el tool responde success. Así
+// estuvieron mudos `addFullness` y `transferDart` hasta #1009.
 function clonePiece(piece: PatternPiece, overrides?: Partial<PatternPiece>): PatternPiece {
   return {
     ...piece,
@@ -213,6 +218,7 @@ export function addFullness(
   method: FullnessMethod = 'gather',
 ): PatternPiece {
   const result = clonePiece(piece, {
+    id: piece.id, // modifica en sitio: el tool despacha updatePiece
     name: piece.name,
     edges: undefined, // Edges invalidated
   });
@@ -367,7 +373,7 @@ export function transferDart(
   fromDartId: string,
   toEdgeName: string,
 ): PatternPiece {
-  const result = clonePiece(piece);
+  const result = clonePiece(piece, { id: piece.id }); // modifica en sitio
   const darts = result.darts ?? [];
   const dartIdx = darts.findIndex(d => d.id === fromDartId);
   if (dartIdx === -1) return result;

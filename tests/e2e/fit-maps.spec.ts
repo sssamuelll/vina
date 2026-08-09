@@ -296,46 +296,34 @@ test.describe('Fit Map UI', () => {
   // ── Test 5: Keyboard shortcut Alt+6 toggles stress map ────────────────
 
   test('keyboard shortcut Alt+6 toggles stress map', async ({ page }) => {
-    // Make sure canvas / 3D view is focused for shortcuts to work
-    const canvas = page.locator('canvas');
-    // Centro del canvas: la esquina (10,10) la intercepta el HUD colapsado (Fase1-H2).
-    await canvas.click({ position: { x: 300, y: 300 } });
-    await page.waitForTimeout(300);
+    // #1009: antes, si el atajo no disparaba esto avisaba por console.warn y
+    // probaba el BOTÓN — que ya cubren los tests 1 y 2. O sea: el atajo nunca
+    // se probaba y el test pasaba igual. Ahora se assertea siempre.
+    //
+    // El atajo vive en contexto '3d' (shortcuts/defaults.ts:105) y el listener
+    // global ignora eventos cuyo target sea un input: si la caja de chat tiene
+    // el foco, la tecla se descarta. Blur → activeElement es <body> → el
+    // contexto pasa a ['global','2d','3d'] y el atajo entra. Mismo patrón de
+    // re-press en poll que sewing-tools.spec.ts.
+    const pressUntilMode = async (key: string, expected: string) => {
+      await expect.poll(
+        async () => {
+          await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+          await page.keyboard.press(key);
+          await page.waitForTimeout(150);
+          return getState<string>(page, 'simulation.fitMapMode');
+        },
+        { timeout: 15_000, intervals: [250], message: `${key} nunca llegó al registro de atajos` },
+      ).toBe(expected);
+    };
 
-    // Press Alt+6 to activate stress map
-    await page.keyboard.press('Alt+6');
-    await page.waitForTimeout(500);
+    await pressUntilMode('Alt+6', 'stress');
+    // La escala de tensión se rotula en kPa: prueba que el modo llegó al render.
+    await expect(page.locator('text=/kPa/').first()).toBeVisible({ timeout: 5000 });
 
-    // Legend should show "kPa" label(s) in the scale bar. Stress mode renders
-    // several kPa labels, so scope to the first and gate on the count.
-    const kpaVisible = (await page.locator('text=/kPa/').count()) > 0;
-
-    if (kpaVisible) {
-      await expect(page.locator('text=/kPa/').first()).toBeVisible();
-
-      // Press Alt+0 to turn off all fit maps
-      await page.keyboard.press('Alt+0');
-      await page.waitForTimeout(500);
-
-      // kPa labels should disappear (scale bar unmounts when mode is none).
-      await expect(page.locator('text=/kPa/')).toHaveCount(0, { timeout: 3000 }).catch(() => {
-        // The scale bar may still exist but be hidden — acceptable.
-        console.log('kPa text may still exist in DOM but should be hidden');
-      });
-    } else {
-      // Shortcuts may not fire in headless mode due to focus/context issues
-      // Fall back to verifying the button-based toggle still works
-      console.warn(
-        'Alt+6 shortcut did not activate stress map — ' +
-        'keyboard shortcuts require 3D context focus which may not be available in headless CI.'
-      );
-
-      // Verify the button-based approach works as a fallback
-      const stressBtn = page.locator('button[title="Mapa de tensión (Alt+6)"]');
-      await stressBtn.click({ force: true });
-      await page.waitForTimeout(500);
-      await expect(page.locator('text=/kPa/').first()).toBeVisible({ timeout: 3000 });
-    }
+    // Alt+0 apaga todos los mapas (idempotente, no togglea).
+    await pressUntilMode('Alt+0', 'none');
+    await expect(page.locator('text=/kPa/')).toHaveCount(0, { timeout: 5000 });
   });
 
   // ── Test 6: Fit map survives simulation reset ──────────────────────────
@@ -346,10 +334,7 @@ test.describe('Fit Map UI', () => {
     await fitBtn.click({ force: true });
     await page.waitForTimeout(500);
 
-    // Verify fit map table is present (or at least the button is active)
-    // The fit table shows "Fit Map" heading when stats are available
-    const fitTableVisible = await page.locator('text=Fit Map').first().isVisible().catch(() => false);
-    console.log('Fit map table visible before reset:', fitTableVisible);
+    expect(await getState<string>(page, 'simulation.fitMapMode')).toBe('fit');
 
     // Reset the simulation through the store (no StatusBar / sidebar in the
     // current shell). This returns simulationState to 'idle'.
@@ -370,7 +355,9 @@ test.describe('Fit Map UI', () => {
     ).toBe('running');
     await page.waitForTimeout(1000);
 
-    // The toggle bar should reappear and the canvas should still render.
+    // "Sobrevive" de verdad: el modo elegido sigue puesto tras el ciclo, y la
+    // barra vuelva a estar viva. Antes esto solo miraba que el canvas existiera.
+    expect(await getState<string>(page, 'simulation.fitMapMode')).toBe('fit');
     await expect(page.locator('button[title="Mapa de ajuste (Alt+8)"]')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('canvas')).toBeVisible();
   });

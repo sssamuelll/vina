@@ -17,6 +17,33 @@ function makeRect(name: string, w: number, h: number): PatternPiece {
   };
 }
 
+// #1009: las ops que modifican en sitio tienen que conservar el id. Si lo
+// pierden, el `updatePiece(result)` del tool del copilot no matchea ninguna
+// pieza y se traga el cambio en silencio, respondiendo success igual.
+describe('identidad de las ops en sitio', () => {
+  it('addFullness conserva el id de la pieza', () => {
+    const piece = makeRect('Skirt', 300, 500);
+    expect(addFullness(piece, 'bottom', 100, 'gather').id).toBe(piece.id);
+  });
+
+  it('transferDart conserva el id de la pieza', () => {
+    const piece = makeRect('Front Bodice', 400, 600);
+    piece.darts = [{
+      id: 'dart-1', intake: 25, apex: { x: 200, y: 300 },
+      legs: [[{ x: 188, y: 0 }, { x: 200, y: 300 }], [{ x: 200, y: 300 }, { x: 212, y: 0 }]],
+      foldDirection: 'toward-center', depth: 300,
+    }];
+    piece.edges = [{ id: 'e2', name: 'sideSeam', segmentRange: [2, 3], edgeType: 'seam' }];
+    expect(transferDart(piece, 'dart-1', 'sideSeam').id).toBe(piece.id);
+  });
+
+  it('extendEdge y trimEdgeAtPoint también', () => {
+    const piece = makeRect('Panel', 400, 600);
+    expect(extendEdge(piece, 1, 'end', 50).id).toBe(piece.id);
+    expect(trimEdgeAtPoint(piece, 1, { x: 200, y: 0 }, 'before').id).toBe(piece.id);
+  });
+});
+
 describe('splitPiece', () => {
   it('splits horizontally into two pieces', () => {
     const [a, b] = splitPiece(makeRect('Panel', 400, 600), 'horizontal', 300);
