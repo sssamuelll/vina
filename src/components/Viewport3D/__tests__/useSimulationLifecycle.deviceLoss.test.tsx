@@ -83,6 +83,9 @@ vi.mock('../../../utils/cloth/clothWorkerClient', () => ({
 vi.mock('../../../utils/cloth/gpu/gpuSolverClient', () => ({
   GpuSolverClient: class {
     onFrame: ((positions: Float32Array) => void) | null = null;
+    // #1010: contrato edge-data (behavior #16) — el lifecycle lo llama en init TSL.
+    onEdgeData: ((ids: Int32Array, lengths: Float32Array) => void) | null = null;
+    requestEdgeData = vi.fn();
     initMultiPieceTsl = gpuMocks.initMultiPieceTsl;
     getTslSolver = () => ({});
     getPieceVertexRanges = () => null;

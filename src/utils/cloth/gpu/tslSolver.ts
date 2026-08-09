@@ -38,9 +38,13 @@ import {
   instanceIndex,
   atomicStore,
   atomicAdd,
+  atomicMax,
   atomicLoad,
   cross,
   clamp,
+  mix,
+  floor,
+  distance,
   atan,
 } from 'three/tsl';
 import type { StorageBufferAttribute } from 'three/webgpu';
@@ -192,6 +196,31 @@ export interface TslSolver {
   brushNodes: BrushComputeNodes;
   /** Mesh grab position displacement compute nodes (always created; grabActive=0 is a no-op) */
   grabNodes: GrabComputeNodes;
+  /**
+   * Fit-map overlay (#1010 slice 2): strain por vértice acumulado en GPU cada
+   * frame (fixed-point i32, escala 1e6, atomicMax) y colorizado a
+   * fitColorSBA (consumido por material.colorNode). zero/colorize dispatchean
+   * numParticles; accum = UN kernel por stretch color group (reusa
+   * idsSBA/restLengthsSBA del mismo grupo). uniforms: mode 0=none..4=pressure,
+   * p0/p1 rango o thresholds, p2 escala precomputada (stress → E/1000,
+   * fit → 1/maxStretch), p3 reservado.
+   */
+  fitMapNodes: {
+    zero: ComputeNode;
+    accum: ComputeNode[];
+    colorize: ComputeNode;
+    uniforms: {
+      mode: FloatUniform;
+      p0: FloatUniform;
+      p1: FloatUniform;
+      p2: FloatUniform;
+      p3: FloatUniform;
+    };
+  };
+  /** Storage node sobre fitColorSBA — consumido por material.colorNode */
+  fitColorBufNode: TslNode;
+  /** Passthrough de buffers.fitColorSBA (readback readFitColorsToCPU) */
+  fitColorSBA: StorageBufferAttribute;
   /**
    * Update the TSL grab uniforms (`grabNodes.*`) without reaching into the
    * raw `{value: number}` proxies. Per C4 follow-up #703 — encapsulates the
@@ -795,6 +824,14 @@ function makePostSolveFn(
 const NORMAL_SCALE = 1000000.0;
 
 /**
+ * Fixed-point scale for fit-map strain accumulation (#1010).
+ * Per-vertex strain ratio (len/restLen, 1.0 = no deformation) is multiplied
+ * by this before conversion to int32; colorize divides back. Same 1e-6
+ * precision rationale as NORMAL_SCALE.
+ */
+const FIT_SCALE = 1000000.0;
+
+/**
  * Zero the normal accumulation buffer before each frame's normal recompute.
  * Uses atomicStore since the buffer is declared atomic (for atomicAdd in accum pass).
  */
@@ -959,6 +996,149 @@ function makeNormalWeldFn(
   })();
 }
 
+// ─── Fit-map kernels (#1010 slice 2 — overlay GPU-nativo 60 Hz) ─────────────
+
+/**
+ * Zero the fit strain accumulation buffer: seed each vertex with the
+ * fixed-point encoding of ratio 1.0 (no deformation) so isolated vertices
+ * (sin constraints incidentes) leen "rest" en colorize. atomicStore — el
+ * buffer está declarado atómico (para el atomicMax del pase accum).
+ */
+function makeFitZeroFn(fitAccumBuf: TslNode) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
+    const i = instanceIndex;
+    // toVar() fuerza i32 explícito en WGSL (AbstractInt — mismo rationale
+    // que makeNormalZeroFn).
+    atomicStore(fitAccumBuf.element(i), int(FIT_SCALE).toVar());
+  })();
+}
+
+/**
+ * Accumulate per-vertex strain via atomicMax sobre fixed-point i32.
+ * UN compute node por stretch color group (dispatch = count del grupo). El
+ * constraint e lee su par (a,b) de idsBuf y su rest length de restBuf, y
+ * escribe el strain max (len/restLen) en ambos extremos — strain por
+ * vértice conservador = max sobre aristas incidentes (espejo de
+ * computePerVertexStrain en fitMaps.ts).
+ */
+function makeFitAccumFn(
+  posBuf: TslNode,
+  idsBuf: TslNode,
+  restBuf: TslNode,
+  fitAccumBuf: TslNode,
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
+    const e = instanceIndex;
+    const base = uint(e).mul(uint(2));
+    const a = idsBuf.element(base);
+    const b = idsBuf.element(base.add(uint(1)));
+    const rest = restBuf.element(e);
+    // restLen 0 → constraint degenerado: saltar (espejo del
+    // `if (restLen === 0) continue` de fitMaps.ts).
+    If(rest.greaterThan(float(0.0)), () => {
+      const len = distance(posBuf.element(a), posBuf.element(b));
+      // Clamp anti-overflow: ratio×FIT_SCALE debe caber en i32 (2^31 ≈
+      // 2147×1e6). Edges degenerados (restLen≈0 en mallas DXF reales) daban
+      // ratios de 10^4+ que desbordaban y ensuciaban el atomicMax. 2000 está
+      // MUY por encima de cualquier strain físico; el colorize clampa t a 1
+      // mucho antes, así que el color no cambia.
+      const ratio = clamp(len.div(rest), float(0.0), float(2000.0));
+      const v = int(ratio.mul(float(FIT_SCALE)));
+      atomicMax(fitAccumBuf.element(a), v);
+      atomicMax(fitAccumBuf.element(b), v);
+    });
+  })();
+}
+
+/**
+ * 8-stop CLO3D blue→red gradient — espejo de STRESS_STRAIN_COLORS +
+ * sampleColorScale de fitMaps.ts: t∈[0,1] → idx = t·7, segmento floor(idx),
+ * lerp entre stops adyacentes (hi clamps a 7). Compartido por stress
+ * (t = stress normalizado) y strain (t = ratio normalizado).
+ */
+function assignStressStrainColor(target: TslNode, t: TslNode): void {
+  // Composición inline dentro del kernel llamante — NO un Fn anidado: el
+  // callback de Fn recibe sus args como ARRAY, y pasarle nodos directos
+  // rompía en runtime con "this.aNode.getNodeType is not a function".
+  const stops = [
+    vec3(0.0, 0.0, 1.0),
+    vec3(0.0, 0.4, 1.0),
+    vec3(0.0, 0.8, 0.8),
+    vec3(0.0, 1.0, 0.4),
+    vec3(0.4, 1.0, 0.0),
+    vec3(1.0, 1.0, 0.0),
+    vec3(1.0, 0.5, 0.0),
+    vec3(1.0, 0.0, 0.0),
+  ];
+  const tc = clamp(t, float(0.0), float(1.0));
+  const idx = tc.mul(float(7.0));
+  const lo = floor(idx);
+  const frac = idx.sub(lo);
+  let chain = If(lo.equal(float(0.0)), () => { target.assign(mix(stops[0], stops[1], frac)); });
+  for (let s = 1; s < 7; s++) {
+    chain = chain.ElseIf(lo.equal(float(s)), () => { target.assign(mix(stops[s], stops[s + 1], frac)); });
+  }
+  chain.Else(() => { target.assign(stops[7]); });
+}
+
+/**
+ * Colorize fitColorSBA per-vertex — replica los ramps CPU de fitMaps.ts
+ * (paridad validada por e2e @gpu-local; aquí se pinnea el plumbing).
+ * uniforms.mode: 0=none (base blanca — el kernel no se despacha en none),
+ * 1=stress, 2=strain, 3=fit, 4=pressure. p0/p1/p2 los precomputa
+ * GpuSolverClient.setFitMapParams (ver fitMaps.ts para el detalle CPU).
+ */
+function makeFitColorizeFn(
+  fitAccumBuf: TslNode,
+  fitColorBuf: TslNode,
+  uniforms: { mode: TslNode; p0: TslNode; p1: TslNode; p2: TslNode; p3: TslNode },
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
+    const i = instanceIndex;
+    const ratio = float(atomicLoad(fitAccumBuf.element(i))).div(float(FIT_SCALE));
+    const { mode, p0, p1, p2 } = uniforms;
+    If(mode.equal(float(0.0)), () => {
+      // none — base blanca (defensivo; no se despacha en modo none).
+      fitColorBuf.element(i).assign(vec3(1.0, 1.0, 1.0));
+    }).ElseIf(mode.equal(float(1.0)), () => {
+      // stress: stress = elongación × p2 (p2 = E/1000, kPa por unidad de
+      // elongación — formula de computeStressMap); t = (stress-p0)/(p1-p0);
+      // gradiente CLO3D idéntico al CPU.
+      const stress: TslNode = ratio.sub(float(1.0)).max(float(0.0)).mul(p2);
+      const t: TslNode = clamp(stress.sub(p0).div(p1.sub(p0)), float(0.0), float(1.0));
+      assignStressStrainColor(fitColorBuf.element(i), t);
+    }).ElseIf(mode.equal(float(2.0)), () => {
+      // strain: ratio YA es el strain (1.0 = sin deformar); t =
+      // (ratio-p0)/(p1-p0); gradiente CLO3D (el CPU usa pct = ratio·100).
+      const t: TslNode = clamp(ratio.sub(p0).div(p1.sub(p0)), float(0.0), float(1.0));
+      assignStressStrainColor(fitColorBuf.element(i), t);
+    }).ElseIf(mode.equal(float(3.0)), () => {
+      // fit con avatarPositions null → contactMask todo 1 (espejo de
+      // computeFitMap): fitRatio = max(0, ratio-1) × p2 (p2 = 1/maxStretch).
+      // Zonas: >p1 rojo; >p0 amarillo→rojo lerp; ≤p0 blanco→amarillo lerp.
+      const fitRatio: TslNode = ratio.sub(float(1.0)).max(float(0.0)).mul(p2);
+      If(fitRatio.greaterThan(p1), () => {
+        fitColorBuf.element(i).assign(vec3(1.0, 0.0, 0.0));
+      }).ElseIf(fitRatio.greaterThan(p0), () => {
+        const t: TslNode = clamp(fitRatio.sub(p0).div(p1.sub(p0)), float(0.0), float(1.0));
+        fitColorBuf.element(i).assign(mix(vec3(1.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), t));
+      }).Else(() => {
+        const t: TslNode = clamp(fitRatio.div(p0), float(0.0), float(1.0));
+        fitColorBuf.element(i).assign(mix(vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, 0.0), t));
+      });
+    }).ElseIf(mode.equal(float(4.0)), () => {
+      // pressure con avatar null → todo no-contact (espejo de
+      // computePressurePoints): NO_PRESSURE_COLOR [0.3, 0.3, 0.3].
+      fitColorBuf.element(i).assign(vec3(0.3, 0.3, 0.3));
+    }).Else(() => {
+      fitColorBuf.element(i).assign(vec3(1.0, 1.0, 1.0));
+    });
+  })();
+}
+
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 /**
@@ -1096,6 +1276,40 @@ export function createTslSolver(
       [64],
     );
   }
+
+  // ─── Fit-map overlay (#1010 slice 2 — GPU-native fit maps) ─────────
+  // Strain por vértice en fixed-point i32 (FIT_SCALE 1e6) acumulado con
+  // atomicMax; colorize escribe RGB a fitColorSBA, que el material consume
+  // vía fitColorBufNode (material.colorNode — wiring en GarmentSimulation).
+  const fitAccumBuf = makeAtomicStorage(buffers.fitStrainAccumSBA, 'int', N);
+  const fitColorBuf = storage(buffers.fitColorSBA, 'vec3', N);
+  const fitUniforms = {
+    mode: uniform(0), // 0=none (el kernel no se despacha en none)
+    p0: uniform(0),
+    p1: uniform(0),
+    p2: uniform(0),
+    p3: uniform(0),
+  };
+  const fitZero = compute(makeFitZeroFn(fitAccumBuf), N, [64]);
+  // UN kernel de acumulación por stretch color group — re-wrap de los MISMOS
+  // idsSBA/restLengthsSBA que el solver de distancia (mismo SBA, nodo
+  // independiente).
+  const fitAccum = buffers.stretchColors.map((color) => {
+    const idsBuf = storage(color.idsSBA, 'uint', color.count * 2);
+    const restBuf = storage(color.restLengthsSBA, 'float', color.count);
+    return compute(makeFitAccumFn(posBuf, idsBuf, restBuf, fitAccumBuf), color.count, [64]);
+  });
+  const fitColorize = compute(
+    makeFitColorizeFn(fitAccumBuf, fitColorBuf, fitUniforms),
+    N,
+    [64],
+  );
+  const fitMapNodes = {
+    zero: fitZero,
+    accum: fitAccum,
+    colorize: fitColorize,
+    uniforms: fitUniforms,
+  };
 
   // ─── Collision body management ──────────────────────────────────────
   const collisionBodies: TslCollisionBody[] = [];
@@ -1270,6 +1484,10 @@ export function createTslSolver(
     windNodes,
     brushNodes,
     grabNodes,
+    // #1010 fit-map overlay (zero/accum per color group/colorize + uniforms)
+    fitMapNodes,
+    fitColorBufNode: fitColorBuf,
+    fitColorSBA: buffers.fitColorSBA,
     setGrabUniforms,
     collisionBodies,
     setCollisionBody,

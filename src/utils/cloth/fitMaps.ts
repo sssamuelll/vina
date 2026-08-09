@@ -171,7 +171,11 @@ export function computePerVertexStrain(
     const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
     const restLen = edges.stretchingLengths[i];
 
-    if (restLen === 0) continue;
+    // #1010: epsilon físico (0.1 mm), no solo cero exacto — mallas DXF reales
+    // traen edges degenerados (restLen ~1e-7 m) que daban strains de 10^5+
+    // (max 3.68M% observado con el patrón de María) y desbordaban el
+    // fixed-point i32 del kernel GPU.
+    if (restLen < 1e-4) continue;
     const edgeStrain = len / restLen;
 
     // Take the max strain at each vertex (worst case)

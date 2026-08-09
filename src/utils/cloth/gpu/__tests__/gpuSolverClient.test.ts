@@ -106,6 +106,7 @@ const { sharedMock, setAtomicCalls, uniformCalls } = vi.hoisted(() => {
     atomicAdd: () => createChainProxy(),
     atomicLoad: () => createChainProxy(),
     atomicMin: () => createChainProxy(),
+    atomicMax: () => createChainProxy(),
   });
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -1518,5 +1519,160 @@ describe('banda de margen F3 + exclusión seam↔SC F4a (behavior #18)', () => {
     // Simetría: vértice 4 (pieza b, local 0) incluye a 0.
     const p4 = Array.from(neighbors.slice(offsets[4], offsets[5])).sort((a, b) => a - b);
     expect(p4).toContain(0);
+  });
+});
+
+// ─── Behavior #16 — edge data bridge (#1010) ─────────────────────────────────
+//
+// El tier GPU debe publicar sus stretch edges con el MISMO contrato que
+// WasmSolverClient/ClothWorkerClient (`onEdgeData` + `requestEdgeData()`),
+// para que useSimulationLifecycle pueble `edgeDataRef` y los fit maps tengan
+// datos en el tier default. Shape del callback: (Int32Array ids [a,b,...],
+// Float32Array restLengths) — `SolverEdgeData` (fitMaps.ts). El cliente GPU
+// extrae Uint32Array en init (gpuBuffers.extractStretchConstraints) → debe
+// convertir/retener y responder de forma síncrona o asíncrona al request.
+
+describe('edge data bridge (behavior #16 — #1010)', () => {
+  it('has requestEdgeData method and onEdgeData property slot', () => {
+    expect(typeof GpuSolverClient.prototype.requestEdgeData).toBe('function');
+  });
+
+  it('fires onEdgeData with Int32Array ids + Float32Array restLengths after init', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    const cb = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (client as any).onEdgeData = cb;
+    client.requestEdgeData();
+    await Promise.resolve(); // el contrato admite entrega asíncrona (microtask)
+
+    expect(cb).toHaveBeenCalledTimes(1);
+    const [ids, lengths] = cb.mock.calls[0] as [Int32Array, Float32Array];
+    expect(ids).toBeInstanceOf(Int32Array);
+    expect(lengths).toBeInstanceOf(Float32Array);
+    // Pares [a,b] por edge: ids.length = 2 × número de edges.
+    expect(ids.length).toBe(lengths.length * 2);
+    // Quad de 2 triángulos → 5 edges únicos (4 perímetro + 1 diagonal).
+    expect(lengths.length).toBe(5);
+    // Índices válidos dentro del rango de partículas.
+    for (const id of ids) {
+      expect(id).toBeGreaterThanOrEqual(0);
+      expect(id).toBeLessThan(4);
+    }
+    // Rest lengths positivos y finitos.
+    for (const l of lengths) {
+      expect(l).toBeGreaterThan(0);
+      expect(Number.isFinite(l)).toBe(true);
+    }
+  });
+
+  it('spans global indices across pieces (multi-piece)', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')]);
+
+    const cb = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (client as any).onEdgeData = cb;
+    client.requestEdgeData();
+    await Promise.resolve();
+
+    const [ids, lengths] = cb.mock.calls[0] as [Int32Array, Float32Array];
+    expect(lengths.length).toBe(10); // 5 edges por quad × 2 piezas
+    // La segunda pieza vive en índices globales 4..7.
+    expect(Math.max(...ids)).toBeGreaterThanOrEqual(4);
+    expect(Math.max(...ids)).toBeLessThan(8);
+  });
+
+  it('requestEdgeData before init is a silent no-op (no throw, no callback)', () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    const cb = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (client as any).onEdgeData = cb;
+    expect(() => client.requestEdgeData()).not.toThrow();
+    expect(cb).not.toHaveBeenCalled();
+  });
+
+  it('does not fire after dispose', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+    client.dispose();
+
+    const cb = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (client as any).onEdgeData = cb;
+    client.requestEdgeData();
+    await Promise.resolve();
+    expect(cb).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Behavior #17 — fit map GPU params + readback (#1010 slice 2) ────────────
+//
+// El cliente traduce (FitMapMode, FitMapConfig) → uniforms del kernel
+// (patrón setBrushParams: mutación directa de uniform().value). Mapping de
+// modo: none=0, stress=1, strain=2, fit=3, pressure=4. readFitColorsToCPU
+// es el observable del e2e de paridad (@gpu-local) — mismo camino
+// getArrayBufferAsync que readPositionsToCPU.
+
+describe('fit map GPU params (behavior #17 — #1010 slice 2)', () => {
+  const config = {
+    stressRange: [0, 100] as [number, number],
+    strainRange: [1.0, 1.2] as [number, number],
+    fitThresholds: [0.8, 1.0] as [number, number],
+    pressureDistance: 0.002,
+  };
+
+  it('has setFitMapParams and readFitColorsToCPU methods', () => {
+    expect(typeof GpuSolverClient.prototype.setFitMapParams).toBe('function');
+    expect(typeof GpuSolverClient.prototype.readFitColorsToCPU).toBe('function');
+  });
+
+  it('maps mode names to the mode uniform (none=0..pressure=4)', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fm = (client.getTslSolver() as any).fitMapNodes;
+
+    const cases: Array<[string, number]> = [
+      ['stress', 1], ['strain', 2], ['fit', 3], ['pressure', 4], ['none', 0],
+    ];
+    for (const [mode, expected] of cases) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      client.setFitMapParams(mode as any, config);
+      expect(fm.uniforms.mode.value, `mode ${mode}`).toBe(expected);
+    }
+  });
+
+  it('wires strain range into p0/p1 for strain mode', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fm = (client.getTslSolver() as any).fitMapNodes;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    client.setFitMapParams('strain' as any, config);
+    expect(fm.uniforms.p0.value).toBe(1.0);
+    expect(fm.uniforms.p1.value).toBe(1.2);
+  });
+
+  it('setFitMapParams before init is a silent no-op', () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(() => client.setFitMapParams('strain' as any, config)).not.toThrow();
   });
 });

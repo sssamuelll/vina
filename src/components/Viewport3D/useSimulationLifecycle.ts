@@ -524,6 +524,12 @@ export function useSimulationLifecycle({
                 const gpuClient = new GpuSolverClient(device);
                 gpuClientRef.current = gpuClient;
                 gpuClient.onFrame = onFrame;
+                // #1010: mismo contrato edge-data que WASM/CPU — los fit maps
+                // del tier default leen edgeDataRef (GarmentSimulation).
+                gpuClient.onEdgeData = (ids, lengths) => {
+                  edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
+                  stretchingIdsRef.current = ids;
+                };
 
                 // #gummy STEP 3: wire the active fabric's BEND compliance to the GPU
                 // (was dead data, omitted — like frictionBody pre-F0). Bend is the
@@ -588,6 +594,7 @@ export function useSimulationLifecycle({
                   'TSL solver init',
                 );
                 if (cancelled) return;
+                gpuClient.requestEdgeData(); // #1010: síncrono, puebla edgeDataRef
                 tslSolverRef.current = gpuClient.getTslSolver();
                 setTslGeneration(g => g + 1);
 

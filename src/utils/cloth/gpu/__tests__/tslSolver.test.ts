@@ -124,6 +124,7 @@ const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls, uniformNodes, stor
     Loop: (_count: unknown, cb?: (...args: any[]) => any) => { tryInvoke(cb, { i: 0 }); },
     atomicStore: () => {},
     atomicAdd: () => mockElement(),
+    atomicMax: () => mockElement(),
     // atomicLoad: required for read-side of atomic<i32> buffers (#554 fix).
     // Records each invocation for the #554 spec-compliance regression test.
     atomicLoad: (dest: unknown) => {
@@ -227,6 +228,9 @@ function makeMockBufferSet(options?: {
     tetherMaxDistSBA: new StorageBufferAttribute(new Float32Array(numParticles).fill(0.06), 1),
     facePokeCsrSBA: new StorageBufferAttribute(new Uint32Array(numParticles + 1 + 6 + 6), 1),
     facePokeContactSBA: new StorageBufferAttribute(new Uint32Array(2), 1),
+    // #1010 fit map kernels
+    fitStrainAccumSBA: new StorageBufferAttribute(new Int32Array(numParticles), 1),
+    fitColorSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
     numParticles,
     numTriangles: 2,
     scBuffers: null,
@@ -826,5 +830,67 @@ describe('#897 F2.3 snapshotPreCollision', () => {
     createTslSolver(buffers, { ...defaultConfig });
 
     expect(storageCalls).toContain(buffers.preCollisionPosSBA);
+  });
+});
+
+// ─── #1010 fit map kernels (slice 2 — overlay GPU-nativo 60 Hz) ──────────────
+//
+// Contrato: createTslSolver expone `fitMapNodes` (zero / accum[] por color
+// group / colorize + uniforms) y `fitColorSBA`/`fitColorBufNode` para
+// material.colorNode. El strain por vértice se acumula con atomicMax sobre
+// fixed-point i32 (mismo patrón fixed-point que el trío de normales), y
+// colorize replica los ramps CPU de fitMaps.ts (paridad validada por e2e
+// @gpu-local; aquí se pinea el plumbing).
+
+describe('#1010 fit map kernels', () => {
+  it('exposes fitMapNodes with zero/accum/colorize and mode+param uniforms', () => {
+    const buffers = makeMockBufferSet();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const solver = createTslSolver(buffers, defaultConfig) as any;
+
+    expect(solver.fitMapNodes).toBeDefined();
+    const fm = solver.fitMapNodes;
+    expect(fm.zero).toBeDefined();
+    expect(fm.colorize).toBeDefined();
+    expect(Array.isArray(fm.accum)).toBe(true);
+    // Un kernel de acumulación por stretch color group (reusa idsSBA/restLengthsSBA).
+    expect(fm.accum.length).toBe(2);
+    // Uniforms con .value mutable (patrón brushNodes/grabNodes).
+    expect(fm.uniforms.mode.value).toBe(0); // arranca en 'none'
+    for (const key of ['p0', 'p1', 'p2', 'p3']) {
+      expect(fm.uniforms[key], `uniform ${key}`).toBeDefined();
+      expect(typeof fm.uniforms[key].value).toBe('number');
+    }
+  });
+
+  it('dispatch counts: zero/colorize per-particle, accum per color-group count', () => {
+    const buffers = makeMockBufferSet();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const solver = createTslSolver(buffers, defaultConfig) as any;
+
+    const fm = solver.fitMapNodes;
+    expect(fm.zero.dispatchCount).toBe(4);      // numParticles
+    expect(fm.colorize.dispatchCount).toBe(4);  // numParticles
+    expect(fm.accum[0].dispatchCount).toBe(3);  // color 0: 3 constraints
+    expect(fm.accum[1].dispatchCount).toBe(2);  // color 1: 2 constraints
+  });
+
+  it('wraps fitColorSBA as storage and exposes fitColorBufNode for material.colorNode', () => {
+    const buffers = makeMockBufferSet();
+    storageCalls.length = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const solver = createTslSolver(buffers, defaultConfig) as any;
+
+    expect(storageCalls).toContain(buffers.fitColorSBA);
+    expect(solver.fitColorBufNode).toBeDefined();
+  });
+
+  it('fitStrainAccumSBA is declared atomic (setAtomic(true)) — WGSL atomicMax requirement', () => {
+    const buffers = makeMockBufferSet();
+    setAtomicCalls.length = 0;
+    createTslSolver(buffers, defaultConfig);
+
+    const atomicSbas = setAtomicCalls.filter((c) => c.value === true).map((c) => c.sba);
+    expect(atomicSbas).toContain(buffers.fitStrainAccumSBA);
   });
 });
