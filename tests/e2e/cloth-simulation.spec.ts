@@ -1,97 +1,71 @@
-import { test, expect } from '@playwright/test';
+/**
+ * Simulación de tela — E2E.
+ *
+ * Reescrito 2026-08-09 (#1009). Los dos tests de este archivo reportaban verde
+ * sin asertar nada: corrida real = `2 skipped`.
+ *   - "cloth pieces move": nunca sembraba una pieza, así que no había malla que
+ *     encontrar y caía en `test.skip('No cloth mesh found — may not have loaded')`.
+ *   - "solver tier": leía `window.__REDUX_STORE__`, un global que la app no
+ *     expone (el canónico es `__VINA_STORE__`), así que siempre daba null y
+ *     caía en `test.skip('Redux store not exposed')`. Es el mismo error que ya
+ *     estaba corregido en mesh-grab y steam-brush y advertido en helpers/sim.ts:14.
+ *
+ * Ahora el setup usa los helpers del cluster de simulación y la ausencia de
+ * malla es un fallo duro, no un skip: si la sim no arranca, esto se pone rojo.
+ */
+import { test, expect, type Page } from '@playwright/test';
+import {
+  waitForApp,
+  addRectanglePiece,
+  switchView,
+  startSimulation,
+  waitForClothMesh,
+  getSolverTier,
+} from './helpers/sim';
 
-// Cloth simulation tests need time for avatar + sim init + physics settling
+/** Primeros 30 valores del atributo position — sensible a cualquier vértice que se mueva. */
+async function clothPositions(page: Page): Promise<number[] | null> {
+  return page.evaluate(() => {
+    const mesh = (window as unknown as { __VINA_CLOTH_MESH__?: {
+      geometry?: { getAttribute(n: string): { array: ArrayLike<number> } | null };
+    } }).__VINA_CLOTH_MESH__;
+    const pos = mesh?.geometry?.getAttribute('position');
+    if (!pos) return null;
+    return Array.from(pos.array).slice(0, 30);
+  });
+}
+
 test.describe('Cloth Simulation', () => {
   test.setTimeout(120_000);
 
   test('cloth pieces move after simulation starts', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
+    await waitForApp(page);
+    await addRectanglePiece(page, 'Panel');
+    await switchView(page, '3D');
+    await startSimulation(page);
 
-    // Switch to 3D view
-    await page.click('button:has-text("3D")');
-    await page.waitForTimeout(3000);
+    expect(await waitForClothMesh(page, 40_000), 'la malla de tela nunca apareció tras arrancar la sim').toBe(true);
 
-    const canvas = page.locator('canvas');
-    await expect(canvas).toBeVisible();
+    const before = await clothPositions(page);
+    expect(before, 'atributo position ausente en la malla').not.toBeNull();
 
-    // Expose the cloth mesh for testing (set by GarmentSimulation.tsx)
-    const getClothPositions = () => page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mesh = (window as any).__VINA_CLOTH_MESH__;
-      if (!mesh?.geometry) return null;
-      const posAttr = mesh.geometry.getAttribute('position');
-      if (!posAttr) return null;
-      // Return first 30 position values (10 vertices) for comparison
-      return Array.from(posAttr.array.slice(0, 30) as Float32Array);
-    });
-
-    // Capture initial positions before simulation starts
-    const initialPositions = await getClothPositions();
-    if (!initialPositions) {
-      test.skip(true, 'No cloth mesh found — simulation may not have loaded');
-      return;
-    }
-
-    // Start simulation by clicking the play button
-    const playButton = page.locator('button[title*="Start"], button[aria-label*="Start"], button[title*="Play"], button[aria-label*="Play"], button:has-text("▶"), button:has-text("Iniciar"), button:has-text("Start")');
-    const simButton = playButton.first();
-    if (await simButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await simButton.click();
-    } else {
-      // Try finding the simulate button by other means
-      const altButton = page.locator('[data-testid="simulate-button"], button:has-text("Simular")').first();
-      if (await altButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await altButton.click();
-      } else {
-        test.skip(true, 'Could not find simulation start button');
-        return;
-      }
-    }
-
-    // Wait for simulation to run and physics to update positions
-    await page.waitForTimeout(5000);
-
-    // Check that positions have changed (cloth has moved)
-    const afterPositions = await getClothPositions();
-    if (!afterPositions) {
-      test.skip(true, 'Cloth mesh no longer available after sim start');
-      return;
-    }
-
-    // Compute position delta — at least some vertices should have moved
-    let totalDelta = 0;
-    for (let i = 0; i < Math.min(initialPositions.length, afterPositions.length); i++) {
-      totalDelta += Math.abs(afterPositions[i] - initialPositions[i]);
-    }
-
-    // If cloth is simulating, gravity alone should cause visible movement (> 0.01 total)
-    expect(totalDelta).toBeGreaterThan(0.01);
+    // La gravedad sola tiene que mover vértices. Poll en vez de espera fija:
+    // el primer frame de física puede tardar según el tier que resuelva.
+    await expect.poll(
+      async () => {
+        const after = await clothPositions(page);
+        if (!after) return -1;
+        return before!.reduce((acc, v, i) => acc + Math.abs(after[i] - v), 0);
+      },
+      { timeout: 30_000, intervals: [1000], message: 'la tela no se movió: el solver no está integrando' },
+    ).toBeGreaterThan(0.01);
   });
 
   test('solver tier is reported in redux state', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
+    await waitForApp(page);
+    await switchView(page, '3D');
 
-    // Switch to 3D view
-    await page.click('button:has-text("3D")');
-    await page.waitForTimeout(3000);
-
-    // Check the solver tier from redux
-    const solverTier = await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const store = (window as any).__REDUX_STORE__;
-      if (!store) return null;
-      return store.getState()?.simulation?.solverTier ?? null;
-    });
-
-    // Before simulation starts, tier should be 'none'
-    // (If we can't access redux, skip gracefully)
-    if (solverTier === null) {
-      test.skip(true, 'Redux store not exposed for testing');
-      return;
-    }
-
-    expect(solverTier).toBe('none');
+    // Antes de arrancar no hay solver montado.
+    expect(await getSolverTier(page)).toBe('none');
   });
 });
