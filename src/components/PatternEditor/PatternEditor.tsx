@@ -71,6 +71,12 @@ import './PatternEditor.css';
 // Module-level map: imageId → blob URL (outside Redux for non-serializable data)
 const objectUrlMap = new Map<string, string>();
 
+/** Herramientas que SON el menú de costuras. Fuera de acá el patrón se está
+ *  editando, no cosiendo (nota de María #210: "eso solo debería verse al
+ *  activar el menu de costuras porque es información que molesta y no debería
+ *  mostrarse mientras editamos el patron"). */
+const SEWING_TOOL_IDS = new Set(['seam', 'segmentSewing', 'freesewing', 'walkSeam']);
+
 interface PatternEditorProps {
   /** Opens the DXF file picker; wired by AppShell to its hidden <input>. */
   onImportDXF?: () => void;
@@ -555,10 +561,19 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     setEditingPieceNameId(null);
   }, []);
 
-  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox } =
+  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox, isDraggingPiece } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
       pen, rectTool, lineTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
     });
+
+  /** Los overlays de anclas (editPattern y editCurve) se pintan bajo
+   *  `translate(piece.position)` — la posición de REDUX — mientras el arrastre
+   *  mueve el grupo de la pieza por DOM directo. Durante el arrastre quedaban
+   *  clavados en el sitio viejo: el "recuerdo con los puntos" que María
+   *  fotografió (#194), reproducido entrando a "Editar patrón", volviendo a la
+   *  flecha sin Esc y arrastrando. Mismo trato que la caja de transformación en
+   *  maria-200: se esconden mientras dura el arrastre y vuelven al soltar. */
+  const showAnchorOverlays = !isDraggingPiece;
 
   // Mouse capture fallback for gestures that leave the SVG. Keep the latest
   // release authorities in refs so the global listeners stay stable across
@@ -793,7 +808,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             onPieceNameCancel={handlePieceNameCancel}
           />
           <ConstructionOverlay zoom2D={zoom2D} pieces={pieces} />
-          {showSewingLines && (
+          {/* `showSewingLines` sigue siendo el interruptor maestro del usuario
+              (menú del logo → "Líneas de costura"); lo que se le suma es el
+              contexto: las costuras se pintan cuando estás en el menú de
+              costuras o tienes una seleccionada, no mientras dibujas el patrón
+              (#210). Medido antes: con la flecha activa se pintaban 2 resaltes
+              y el hover sacaba la info a opacidad 1. */}
+          {showSewingLines && (SEWING_TOOL_IDS.has(activeTool) || editor.selectedSeamId != null) && (
             <SeamRenderer
               seams={seams}
               pieces={pieces}
@@ -848,7 +869,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             measureHoverDistance={measureTool.hoverDistance}
             measureCompareEdgeA={measureTool.compareEdgeA}
             measureComparison={measureTool.comparison}
-            nodeEditorIsEditing={nodeEditor.isEditing}
+            nodeEditorIsEditing={nodeEditor.isEditing && showAnchorOverlays}
             nodeEditorEditingPieceId={nodeEditor.editingPieceId}
             nodeEditorNodes={nodeEditor.nodes}
             selectedNode={nodeEditor.selectedNode}
@@ -857,7 +878,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             transformBbox={transformTool.bbox}
             transformHandles={transformTool.handles}
             transformPreview={transformTool.preview}
-            editPatternIsEditing={editPatternTool.isEditing}
+            editPatternIsEditing={editPatternTool.isEditing && showAnchorOverlays}
             editPatternEditingPieceId={editPatternTool.editingPieceId}
             editPatternNodes={editPatternTool.nodes}
             editPatternSelectedNodes={editPatternTool.selectedNodes}

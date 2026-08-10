@@ -36,6 +36,14 @@ async function dispatch(page: Page, action: { type: string; payload?: unknown })
   }, action);
 }
 
+/** maria-210: el SeamRenderer solo pinta dentro de la superficie de costura
+ *  (herramienta de coser activa o seam seleccionado). Los tests que asertan
+ *  el render de costuras deben entrar primero. */
+async function enterSewingSurface(page: Page) {
+  await dispatch(page, { type: 'editor/setActiveTool', payload: 'segmentSewing' });
+  await dispatch(page, { type: 'tools/setActiveTool2D', payload: 'segmentSewing' });
+}
+
 async function getState<T = unknown>(page: Page, path: string): Promise<T> {
   return page.evaluate((sel) => {
     const store = (window as unknown as Record<string, unknown>).__VINA_STORE__ as
@@ -209,11 +217,13 @@ test.describe('Seam parity replay — lote 1', () => {
     await expect(page.locator('g.seam-connection')).toHaveCount(1);
   });
 
-  // CLO3D Segment Sewing: "Cose segmentos completos" — 2 clicks por mitad +
-  // Enter. La mitigación Fase 5 pinneada E2E: el seam resultante NO lleva
-  // tStart/tEnd (full-segment snap; despachar t-ranges sin renormalización
-  // arma el bug del solver).
-  test('segment sewing full-segment: 4 clicks + Enter, sin t-ranges', async ({ page }) => {
+  // CLO3D Segment Sewing: 2 clicks por mitad + Enter. Los clicks caen a
+  // t≈0.3/0.7 de cada borde → el seam despachado LLEVA ese sub-rango (#1022).
+  // (Pin invertido: la mitigación full-segment-snap de Fase 5 § 5 descartaba
+  // los t citando un solver sin renormalización — renormalizeFilteredT existe
+  // hoy en ambos tiers y el escenario está verificado en
+  // src/utils/cloth/__tests__/seamPartialRange.test.ts.)
+  test('segment sewing parcial: 4 clicks + Enter despachan tStart/tEnd', async ({ page }) => {
     await waitFor2D(page);
     await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pa', 'Front', 40, 40) });
     await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 220, 40) });
@@ -243,13 +253,28 @@ test.describe('Seam parity replay — lote 1', () => {
       .toBe(1);
 
     const seam = (await getState<
-      Array<{ pieceA: Record<string, unknown>; pieceB: Record<string, unknown> }>
+      Array<{ pieceA: Record<string, number>; pieceB: Record<string, number> }>
     >(page, 'project.seams'))![0];
-    // Full-segment snap (plan § 5): nada de t-ranges en el seam despachado.
-    expect(seam.pieceA.tStart).toBeUndefined();
-    expect(seam.pieceA.tEnd).toBeUndefined();
-    expect(seam.pieceB.tStart).toBeUndefined();
-    expect(seam.pieceB.tEnd).toBeUndefined();
+    // El tramo clicado (y 70→110 sobre bordes de 100) viaja como t-range.
+    // Tolerancia por redondeo de píxel en el click sintético.
+    expect(seam.pieceA.tStart).toBeCloseTo(0.3, 1);
+    expect(seam.pieceA.tEnd).toBeCloseTo(0.7, 1);
+    expect(seam.pieceB.tStart).toBeCloseTo(0.3, 1);
+    expect(seam.pieceB.tEnd).toBeCloseTo(0.7, 1);
+
+    // Y el 2D pinta el SUB-TRAMO (#1022): los bordes son verticales, así que
+    // la altura del resalte es ~40 unidades de patrón, no las 100 del borde.
+    const highlightHeights = await page.evaluate(() => {
+      const paths = Array.from(document.querySelectorAll(
+        'g.seam-connection path[fill="none"]:not(.seam-direction-tick):not(.seam-selection-glow)',
+      )) as SVGGraphicsElement[];
+      return paths.map(p => p.getBBox().height);
+    });
+    expect(highlightHeights.length).toBeGreaterThanOrEqual(2);
+    for (const h of highlightHeights) {
+      expect(h).toBeGreaterThan(30);
+      expect(h).toBeLessThan(50);
+    }
   });
 
   // El núcleo del plan: el seam VIVE en el tier por defecto (WASM). Este
@@ -336,6 +361,7 @@ test.describe('Seam parity replay — lote 1', () => {
       type: 'project/addSeam',
       payload: makeSeam('s-x', 'pa', 'right', 'pb', 'left'),
     });
+    await enterSewingSurface(page);
     await page.waitForTimeout(400);
 
     const lines = await readConnectionLines(page);
@@ -400,6 +426,7 @@ test.describe('Seam parity replay — lote 1', () => {
     await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pc', 'Sleeve', 400, 40) });
     await dispatch(page, { type: 'project/addSeam', payload: makeSeam('s-1', 'pa', 'right', 'pb', 'left') });
     await dispatch(page, { type: 'project/addSeam', payload: makeSeam('s-2', 'pb', 'right', 'pc', 'left') });
+    await enterSewingSurface(page);
     await page.waitForTimeout(400);
 
     const readStroke = () =>
@@ -438,6 +465,7 @@ test.describe('Seam parity replay — lote 1', () => {
       type: 'project/addSeam',
       payload: makeSeam('s-mm', 'pa', 'right', 'pb', 'left'),
     });
+    await enterSewingSurface(page);
     await page.waitForTimeout(400);
 
     // Label del SeamRenderer: "⚠ 19.0mm de diferencia".
@@ -549,6 +577,7 @@ test.describe('Seam parity replay — patrón real de María', () => {
         payload: makeSeam(`maria-side-${i}`, front.id, aEdge as string, back.id, bEdge as string),
       });
     }
+    await enterSewingSurface(page);
     await expect(page.locator('g.seam-connection')).toHaveCount(2);
 
     // Sim en el tier por defecto: los dos costadillos de 340mm resuelven a

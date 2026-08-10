@@ -1,4 +1,5 @@
 import type { PathCommand, PatternPiece, Point2D, SemanticEdge } from '../../types/types';
+import { flattenPathWithSource } from './index';
 
 /** Distance from point p to segment a→b. */
 function distToSegment(p: Point2D, a: Point2D, b: Point2D): number {
@@ -14,12 +15,21 @@ function distToSegment(p: Point2D, a: Point2D, b: Point2D): number {
  * Pick the SemanticEdge nearest a click point (piece-local coords), for the
  * seam-allowance tool's per-edge width gesture.
  *
- * Finds the nearest outline segment by COMMAND index (the same index space
- * `detectSemanticEdges`/`segmentRange` use — curves use their endpoint chord,
- * matching the detector), then returns the SemanticEdge whose segmentRange
- * [start,end) covers that command. Returns null when the click is beyond
- * `maxDist`, or the nearest segment has no covering edge (e.g. the closing
- * edge of an implicitly-closed outline, which carries no SemanticEdge).
+ * Finds the nearest outline segment over the FLATTENED outline — curves are
+ * sampled, not reduced to their endpoint chord — and maps the winning sample
+ * back to its source COMMAND index through `flattenPathWithSource`'s tag (the
+ * same index space `detectSemanticEdges`/`segmentRange` use). Then returns the
+ * SemanticEdge whose segmentRange [start,end) covers that command. Returns null
+ * when the click is beyond `maxDist`, or the nearest segment has no covering
+ * edge (e.g. the closing edge of an implicitly-closed outline, which carries no
+ * SemanticEdge — `flattenPathWithSource` tags the Z point with the M's index).
+ *
+ * This used to walk commands and measure a C/Q against the straight line
+ * between its endpoints. On a curved border that is the wrong geometry by the
+ * whole sagitta: with the arc of María's piece (90mm off its chord, #213),
+ * clicking exactly ON the border measured 90mm away and resolved to nothing —
+ * the edge was unselectable — while clicking in open space over the chord
+ * selected it. Both directions are fixed by measuring the real trace.
  */
 export function pickEdgeForSeamAllowance(
   outline: PathCommand[],
@@ -29,25 +39,16 @@ export function pickEdgeForSeamAllowance(
 ): SemanticEdge | null {
   if (!edges.length) return null;
 
+  const flat = flattenPathWithSource(outline);
   let bestCmd = -1;
   let bestDist = Infinity;
-  let cx = 0, cy = 0;
 
-  for (let i = 0; i < outline.length; i++) {
-    const cmd = outline[i];
-    let ex = cx, ey = cy;
-    switch (cmd.type) {
-      case 'M': ex = cmd.values[0]; ey = cmd.values[1]; cx = ex; cy = ey; continue;
-      case 'L': ex = cmd.values[0]; ey = cmd.values[1]; break;
-      case 'H': ex = cmd.values[0]; break;
-      case 'V': ey = cmd.values[0]; break;
-      case 'C': ex = cmd.values[4]; ey = cmd.values[5]; break;
-      case 'Q': ex = cmd.values[2]; ey = cmd.values[3]; break;
-      default: continue; // Z and others: no addressable segment
-    }
-    const d = distToSegment(point, { x: cx, y: cy }, { x: ex, y: ey });
-    if (d < bestDist) { bestDist = d; bestCmd = i; }
-    cx = ex; cy = ey;
+  // Segment j→j+1 belongs to the command that EMITTED its endpoint: a C command
+  // emits `resolution` points that all carry its index, so every sub-segment of
+  // the curve resolves to the curve's own command.
+  for (let j = 0; j + 1 < flat.length; j++) {
+    const d = distToSegment(point, flat[j], flat[j + 1]);
+    if (d < bestDist) { bestDist = d; bestCmd = flat[j + 1].cmd; }
   }
 
   if (bestCmd < 0 || bestDist > maxDist) return null;

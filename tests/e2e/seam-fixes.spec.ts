@@ -120,6 +120,11 @@ test.describe('Seam P0+P1 Fixes', () => {
     dispatch(page, { type: 'project/addSeam', payload: { id: 'cs1', pieceA: { pieceId: 'color-p1', edgeName: 'edge-1' }, pieceB: { pieceId: 'color-p2', edgeName: 'edge-3' }, type: 'standard', tension: 100, strength: 1, active: true, taped: false, tapeWidth: 10 } });
     dispatch(page, { type: 'project/addSeam', payload: { id: 'cs2', pieceA: { pieceId: 'color-p2', edgeName: 'edge-1' }, pieceB: { pieceId: 'color-p3', edgeName: 'edge-3' }, type: 'standard', tension: 100, strength: 1, active: true, taped: false, tapeWidth: 10 } });
 
+    // Las costuras se pintan en su propio menú (maria-210) — este spec mide el
+    // color del render, así que entra a la superficie de costura.
+    dispatch(page, { type: 'editor/setActiveTool', payload: 'segmentSewing' });
+    dispatch(page, { type: 'tools/setActiveTool2D', payload: 'segmentSewing' });
+
     await page.waitForTimeout(500);
 
     // Each seam renders as a `.seam-connection` <g>. Straight outlines resolve to

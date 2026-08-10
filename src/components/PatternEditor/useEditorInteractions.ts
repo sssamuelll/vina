@@ -282,8 +282,11 @@ export function useEditorInteractions(
   const [selectMarquee, setSelectMarquee] = useState<{ start: Point2D; current: Point2D } | null>(null);
   const [hoverCursor, setHoverCursor] = useState<string | null>(null);
   /** true mientras una pieza se arrastra de verdad (≥ MIN_DRAG_PX). Suprime la
-   *  caja de transformación y la barra flotante, que se pintan desde Redux y se
-   *  quedaban clavadas en el origen durante el drag por DOM (maria-200). */
+   *  cromía que se pinta desde Redux y se quedaba clavada en el origen durante
+   *  el drag por DOM: la caja de transformación y la barra flotante (maria-200)
+   *  y los overlays de anclas de editPattern / editCurve (maria-194 — el rastro
+   *  de puntos que ella fotografió aparece al entrar a "Editar patrón", volver a
+   *  la flecha sin Esc y arrastrar). Se exporta para ese segundo grupo. */
   const [isDraggingPiece, setIsDraggingPiece] = useState(false);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
@@ -988,5 +991,5 @@ export function useEditorInteractions(
     }
   };
 
-  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox };
+  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox, isDraggingPiece };
 }

@@ -10,7 +10,7 @@
 
 import { PatternPiece, Point2D, Seam } from '../../../types/types';
 import { getEdgeEndpoints, getEdgeArcLength, getEdgePathD } from '../../../utils/geometry/path';
-import { resolveEdgePolyline, edgeNToCommandIndex } from '../../../utils/seam/index';
+import { resolveEdgePolyline, edgeNToCommandIndex, slicePolylineByT } from '../../../utils/seam/index';
 import { samplePolyline, perpendicular } from '../../../utils/pleatGeometry';
 import { seamPairColor, seamMismatchMm, layoutMismatchLabels, SEAM_MISMATCH_THRESHOLD_MM } from './seamVisuals';
 
@@ -67,9 +67,38 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         const offA = pieceA.position;
         const offB = pieceB.position;
 
-        // SVG path data following curves (not straight lines)
-        const pathDA = getEdgePathD(pieceA.outline, segIdxA, offA.x, offA.y);
-        const pathDB = getEdgePathD(pieceB.outline, segIdxB, offB.x, offB.y);
+        // Rango parcial cosido (#1022): el render pinta el SUB-TRAMO, no el
+        // borde entero. El rango de B se aplica sobre la polilínea ya
+        // invertida por `reversed` — vive en dirección de cosido, igual que
+        // el filtro del solver (convención seamRange.ts).
+        const rangeA = seam.pieceA.tStart != null && seam.pieceA.tEnd != null
+          ? [seam.pieceA.tStart, seam.pieceA.tEnd] as [number, number] : null;
+        const rangeB = seam.pieceB.tStart != null && seam.pieceB.tEnd != null
+          ? [seam.pieceB.tStart, seam.pieceB.tEnd] as [number, number] : null;
+
+        // ─── Direction-aware geometry (Fase 5) ───
+        // Resolve each half's sub-polyline in TRAVERSAL order (B honors
+        // `reversed`), same resolution pipeline as the solver. Falls back
+        // to the legacy midpoint connection when an edge can't resolve.
+        const toCanvas = (pts: Point2D[], off: { x: number; y: number }) =>
+          pts.map(p => ({ x: p.x + off.x, y: p.y + off.y }));
+        const fullPolyA = resolveEdgePolyline(pieceA.outline, pieceA.edges, seam.pieceA.edgeName);
+        const fullPolyB = resolveEdgePolyline(pieceB.outline, pieceB.edges, seam.pieceB.edgeName, seam.pieceB.reversed === true);
+        const polyA = toCanvas(rangeA ? slicePolylineByT(fullPolyA, rangeA[0], rangeA[1]) : fullPolyA, offA);
+        const polyB = toCanvas(rangeB ? slicePolylineByT(fullPolyB, rangeB[0], rangeB[1]) : fullPolyB, offB);
+        const hasDirection = polyA.length >= 2 && polyB.length >= 2;
+
+        // SVG path data following curves (not straight lines). Un half con
+        // rango parcial usa su polilínea recortada (misma resolución que el
+        // solver) en vez del path exacto del comando completo.
+        const polyToPathD = (pts: Point2D[]): string =>
+          'M' + pts.map(p => `${p.x},${p.y}`).join(' L');
+        const pathDA = rangeA && polyA.length >= 2
+          ? polyToPathD(polyA)
+          : getEdgePathD(pieceA.outline, segIdxA, offA.x, offA.y);
+        const pathDB = rangeB && polyB.length >= 2
+          ? polyToPathD(polyB)
+          : getEdgePathD(pieceB.outline, segIdxB, offB.x, offB.y);
 
         const midA = {
           x: (epA.start.x + epA.end.x) / 2 + offA.x,
@@ -87,8 +116,10 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         // Mismatch in ABSOLUTE mm, red above 1mm (Fase 6 / CLO3D parity):
         // 5% relative hid a 19mm error on a 400mm side seam and cried wolf
         // at 0.6mm on a 10mm notch seam. The craft works in mm.
-        const lenA = getEdgeArcLength(pieceA.outline, segIdxA);
-        const lenB = getEdgeArcLength(pieceB.outline, segIdxB);
+        // Largo COSIDO (sewnLengthMm): un half parcial compara su sub-tramo,
+        // no el borde entero — si no, todo seam parcial gritaba mismatch.
+        const lenA = getEdgeArcLength(pieceA.outline, segIdxA) * (rangeA ? rangeA[1] - rangeA[0] : 1);
+        const lenB = getEdgeArcLength(pieceB.outline, segIdxB) * (rangeB ? rangeB[1] - rangeB[0] : 1);
         const mismatchMm = seamMismatchMm(lenA, lenB);
         const hasMismatch = mismatchMm > SEAM_MISMATCH_THRESHOLD_MM;
 
@@ -115,22 +146,6 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
           }
         }
         const edgeWidth = (isSelected ? 4 : seam.taped ? 4 : 2.5) / zoom2D;
-
-        // ─── Direction-aware geometry (Fase 5) ───
-        // Resolve each half's sub-polyline in TRAVERSAL order (B honors
-        // `reversed`), same resolution pipeline as the solver. Falls back
-        // to the legacy midpoint connection when an edge can't resolve.
-        const toCanvas = (pts: Point2D[], off: { x: number; y: number }) =>
-          pts.map(p => ({ x: p.x + off.x, y: p.y + off.y }));
-        const polyA = toCanvas(
-          resolveEdgePolyline(pieceA.outline, pieceA.edges, seam.pieceA.edgeName),
-          offA,
-        );
-        const polyB = toCanvas(
-          resolveEdgePolyline(pieceB.outline, pieceB.edges, seam.pieceB.edgeName, seam.pieceB.reversed === true),
-          offB,
-        );
-        const hasDirection = polyA.length >= 2 && polyB.length >= 2;
 
         // Directional notches (perpendicular tick near each start, t≈0.05)
         const tickA = hasDirection ? directionTick(polyA, zoom2D) : null;
