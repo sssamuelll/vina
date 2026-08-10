@@ -1,4 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+/** Las costuras se pintan solo en el menú de costuras (nota de María #210):
+ *  editar el patrón ya no arrastra el sombreado de lo cosido. Estos specs
+ *  miden el RENDER de la costura, así que se colocan en su superficie. */
+async function enterSewingSurface(page: Page) {
+  await page.evaluate(() => {
+    const store = (window as unknown as { __VINA_STORE__: { dispatch: (a: unknown) => void } }).__VINA_STORE__;
+    store.dispatch({ type: 'editor/setActiveTool', payload: 'segmentSewing' });
+    store.dispatch({ type: 'tools/setActiveTool2D', payload: 'segmentSewing' });
+  });
+}
 
 test.describe('Seam curved edge highlights', () => {
   test.beforeEach(async ({ page }) => {
@@ -119,6 +130,7 @@ test.describe('Seam curved edge highlights', () => {
       });
     });
 
+    await enterSewingSurface(page);
     await page.waitForTimeout(500);
 
     const seamGroups = page.locator('g.seam-connection');
@@ -243,6 +255,7 @@ test.describe('Seam curved edge highlights', () => {
       });
     });
 
+    await enterSewingSurface(page);
     await page.waitForTimeout(500);
 
     const highlightPaths = page.locator('g.seam-connection path[fill="none"]:not(.seam-direction-tick)');
@@ -343,6 +356,7 @@ test.describe('Seam curved edge highlights', () => {
       });
     });
 
+    await enterSewingSurface(page);
     await page.waitForTimeout(500);
 
     const highlightPaths = page.locator('g.seam-connection path[fill="none"]:not(.seam-direction-tick)');

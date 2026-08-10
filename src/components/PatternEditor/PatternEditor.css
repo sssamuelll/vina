@@ -10,20 +10,19 @@
   display: block;
 }
 
-.pattern-piece {
-  cursor: pointer;
-}
+/* La pieza NO declara cursor propio (nota de María #207). Antes ponía
+   `pointer`, que ganaba sobre el cursor que la herramienta activa pide en el
+   style inline del <svg> — y como las herramientas de punto solo se usan
+   ENCIMA de una pieza, su cursor ("crosshair" cuando se puede colocar,
+   "not-allowed" cuando no) no se veía nunca. Medido antes del fix: getCursor()
+   pedía "crosshair" y el usuario veía "pointer". `cursor` se hereda, así que
+   basta con no declararlo acá para que el del SVG llegue hasta la pieza. */
 
-/* Hover highlight (design surface 5, P1.5). A dedicated overlay path whose
-   opacity toggles on :hover — NO CSS transition: per DESIGN-NOTES §8, animating
-   opacity on frequently-re-rendered SVG nodes leaves them stuck on a stale frame. */
-.pattern-piece .piece-hover-fill {
-  opacity: 0;
-}
-
-.pattern-piece:hover .piece-hover-fill {
-  opacity: 0.1;
-}
+/* El resaltado al pasar el ratón (design surface 5, P1.5) se eliminó por
+   pedido explícito de María (#207): iluminaba la pieza entera al 10% de forma
+   persistente mientras se trabaja encima, molesto y un riesgo para personas
+   con epilepsia. La selección se sigue viendo (línea de corte en acento +
+   anclas); el hover ya no dice nada. */
 
 /* Selection is drawn in the renderer (accent cut line + anchor handles); the
    piece body fill stays neutral. */

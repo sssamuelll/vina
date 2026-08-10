@@ -137,15 +137,10 @@ const SinglePiece = memo(function SinglePiece({
         stroke="none"
       />
 
-      {/* Hover highlight overlay — opacity toggled via CSS :hover (no transition,
-          per DESIGN-NOTES §8: animated opacity on re-rendering SVG nodes sticks). */}
-      <path
-        className="piece-hover-fill"
-        d={outlineD}
-        style={{ fill: 'var(--accent-2d)' }}
-        stroke="none"
-        pointerEvents="none"
-      />
+      {/* Sin overlay de hover: María pidió quitarlo (#207) — la iluminación
+          persistente al pasar el ratón estorbaba para trabajar encima de la
+          pieza. Lo que dice que una pieza está seleccionada es la línea de
+          corte en acento + las anclas, no el relleno. */}
 
       {/* Seam-allowance band: faint shade between cut and seam contours */}
       {hasSA && (
