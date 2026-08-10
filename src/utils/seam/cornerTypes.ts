@@ -202,25 +202,52 @@ function orderPrevToNext(
 // ─── cornerMitered ────────────────────────────────────────────────────────
 
 /**
- * Standard miter: single intersection point of prevOffsetEdge and nextOffsetEdge.
+ * Cota de la punta del miter, en múltiplos del ancho del margen. Es el
+ * `stroke-miterlimit` por defecto de SVG y CSS; acá significa que el trazo del
+ * margen nunca se aleja del vértice más de 4 veces lo que el usuario pidió.
+ *
+ * Sin cota, la excursión en un vértice de ángulo interior θ es SA / sin(θ/2),
+ * que diverge: medido sobre una cuña, un margen de 10mm llegaba a 114.7mm en
+ * una punta de 10° y a 1145.9mm en una de 1° — el pincho que María fotografió
+ * en el #213 sin haberlo dibujado. Con 4, todo vértice de 29° o más queda
+ * byte-idéntico a como estaba (90° → 14.1mm, 45° → 26.1mm): solo se recortan
+ * las puntas patológicas.
+ */
+const MITER_LIMIT = 4;
+
+/**
+ * Standard miter: single intersection point of prevOffsetEdge and nextOffsetEdge,
+ * clamped to MITER_LIMIT × the widest of the two allowances.
  * Falls back to the endpoint of prevOffsetEdge when the lines are parallel.
  *
- * Returns 1 point.
+ * Returns 1 point. El recorte conserva la DIRECCIÓN vértice→miter (que con
+ * anchos distintos no es la bisectriz) y solo acorta la distancia, así que la
+ * punta se despunta en su sitio en vez de irse al infinito. Devolver 1 punto es
+ * contrato: cornerDoubleMitered / cornerSquared / cornerSlant / cornerEnvelope
+ * consumen `cornerMitered(...)[0]`, y así heredan la cota sin tocarlos.
  */
 export function cornerMitered(
   prevOffsetEdge: Line2D,
   nextOffsetEdge: Line2D,
-  _vertex: Point2D,
-  _prevWidth: number,
-  _nextWidth: number,
+  vertex: Point2D,
+  prevWidth: number,
+  nextWidth: number,
   _angle: number,
 ): Point2D[] {
   // Geometric: the intersection of the two offset edges already encodes their
   // (possibly different) offset distances — no width factor needed.
   const pt = lineIntersection(prevOffsetEdge, nextOffsetEdge);
-  if (pt !== null) return [pt];
-  // Parallel fallback: endpoint of prevOffsetEdge
-  return [{ ...prevOffsetEdge.end }];
+  if (pt === null) {
+    // Parallel fallback: endpoint of prevOffsetEdge
+    return [{ ...prevOffsetEdge.end }];
+  }
+  const maxDist = MITER_LIMIT * Math.max(prevWidth, nextWidth);
+  if (maxDist <= 0) return [pt];
+  const dx = pt.x - vertex.x;
+  const dy = pt.y - vertex.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist <= maxDist || dist < 1e-12) return [pt];
+  return [{ x: vertex.x + (dx / dist) * maxDist, y: vertex.y + (dy / dist) * maxDist }];
 }
 
 // ─── cornerDoubleMitered ──────────────────────────────────────────────────

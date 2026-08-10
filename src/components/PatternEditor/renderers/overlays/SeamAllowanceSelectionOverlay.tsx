@@ -1,27 +1,10 @@
-import type { PathCommand, PatternPiece, SaSelection } from '../../../../types/types';
+import type { PatternPiece, SaSelection } from '../../../../types/types';
+import { flattenPath, commandRangeToFlattened } from '../../../../utils/seam';
 
 interface Props {
   saSelection: SaSelection | null;
   pieces: PatternPiece[];
   zoom: number;
-}
-
-/** Endpoint of each outline command (where it draws to), in piece-local coords. */
-function commandEndpoints(outline: PathCommand[]): { x: number; y: number }[] {
-  const pts: { x: number; y: number }[] = [];
-  let sx = 0, sy = 0;
-  for (const cmd of outline) {
-    const v = cmd.values;
-    switch (cmd.type) {
-      case 'M': sx = v[0]; sy = v[1]; pts.push({ x: v[0], y: v[1] }); break;
-      case 'L': pts.push({ x: v[0], y: v[1] }); break;
-      case 'C': pts.push({ x: v[4], y: v[5] }); break;
-      case 'Q': pts.push({ x: v[2], y: v[3] }); break;
-      case 'Z': pts.push({ x: sx, y: sy }); break;
-      default: pts.push(pts[pts.length - 1] ?? { x: 0, y: 0 });
-    }
-  }
-  return pts;
 }
 
 /**
@@ -62,17 +45,21 @@ export default function SeamAllowanceSelectionOverlay({ saSelection, pieces, zoo
         if (!piece || !edge || !piece.outline?.length) return null;
         const ox = piece.position?.x ?? 0;
         const oy = piece.position?.y ?? 0;
-        const ends = commandEndpoints(piece.outline);
-        const [start, end] = edge.segmentRange;
-        // The edge spans command endpoints [start-1 .. end-1].
-        const from = Math.max(0, start - 1);
-        const pts: string[] = [];
-        for (let j = from; j < end && j < ends.length; j++) {
-          pts.push(`${ox + ends[j].x},${oy + ends[j].y}`);
-        }
+        // El resalte sigue el TRAZO, no la cuerda. Antes se pintaba un punto
+        // por comando (el endpoint de cada uno), así que un borde curvo salía
+        // como la recta entre sus extremos: la "V en azul" de la foto del #213,
+        // desviada de la curva real por toda la flecha del arco. `flattenPath`
+        // + `commandRangeToFlattened` son el mismo boundary comando→aplanado
+        // (BP-3) que ya usan el solver y el SeamRenderer.
+        const flat = flattenPath(piece.outline);
+        const [from, to] = commandRangeToFlattened(piece.outline, edge.segmentRange);
+        const span = to >= from
+          ? flat.slice(from, to + 1)
+          : [...flat.slice(from), ...flat.slice(0, to + 1)];
+        const pts = span.map(p => `${ox + p.x},${oy + p.y}`);
         if (pts.length < 2) return null;
         return (
-          <polyline key={`${pieceId}:${edgeId}:${i}`} points={pts.join(' ')}
+          <polyline key={`${pieceId}:${edgeId}:${i}`} data-testid="sa-edge-highlight" points={pts.join(' ')}
             fill="none" stroke="var(--accent-2d)" strokeWidth={stroke * 1.6}
             strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
         );
