@@ -352,6 +352,42 @@ describe('reverseSeam', () => {
     expect(next.seams[0].pieceB.reversed).toBeUndefined();
     expect(next.isDirty).toBe(false);
   });
+
+  it('espeja el rango parcial del half B al togglear (contrato mirrorPctRange)', () => {
+    // seamRange.ts: el rango almacenado de B se interpreta en dirección de
+    // COSIDO (el filtro corre tras la inversión de parameterizeEdge), así que
+    // quien escribe `reversed` DEBE espejar [s,e] → [1−e,1−s] o el solver
+    // cose la mitad física equivocada. Alcanzable desde el panel de
+    // porcentajes desde siempre; rutinario desde que el segment sewing
+    // despacha t-ranges (#1022).
+    const state = baseState({
+      seams: [makeSeam('s1', {
+        pieceA: { pieceId: 'p1', edgeName: 'sideSeam', tStart: 0.1, tEnd: 0.4 },
+        pieceB: { pieceId: 'p2', edgeName: 'sideSeam', tStart: 0.2, tEnd: 0.5 },
+      })],
+    });
+
+    const once = reducer(state, reverseSeam('s1'));
+    expect(once.seams[0].pieceB.reversed).toBe(true);
+    expect(once.seams[0].pieceB.tStart).toBeCloseTo(0.5, 10);
+    expect(once.seams[0].pieceB.tEnd).toBeCloseTo(0.8, 10);
+    // El half A es la referencia: su rango NO se toca.
+    expect(once.seams[0].pieceA.tStart).toBe(0.1);
+    expect(once.seams[0].pieceA.tEnd).toBe(0.4);
+
+    // Doble toggle = identidad, también para el rango.
+    const twice = reducer(once, reverseSeam('s1'));
+    expect(twice.seams[0].pieceB.reversed).toBe(false);
+    expect(twice.seams[0].pieceB.tStart).toBeCloseTo(0.2, 10);
+    expect(twice.seams[0].pieceB.tEnd).toBeCloseTo(0.5, 10);
+  });
+
+  it('togglear un half B sin rango parcial no inventa campos', () => {
+    const state = baseState({ seams: [makeSeam('s1')] });
+    const next = reducer(state, reverseSeam('s1'));
+    expect(next.seams[0].pieceB.tStart).toBeUndefined();
+    expect(next.seams[0].pieceB.tEnd).toBeUndefined();
+  });
 });
 
 // ─── Per-edge SA widths sobreviven el generative load (Fase 6) ───────────────

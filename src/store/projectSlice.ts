@@ -11,6 +11,7 @@ import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator
 import { uid } from '../utils/pathHelpers';
 import { newId } from '../utils/ids';
 import { detectSemanticEdges, preserveEdgeWidthsByName } from '../utils/semanticEdges';
+import { mirrorPctRange } from '../utils/seam/seamRange';
 import { autoSew } from '../utils/autoSew';
 
 // ─── Auto-rename duplicate pieces (e.g., all named "Detail" from Seamly2D) ────
@@ -817,6 +818,15 @@ const projectSlice = createSlice({
       const seam = state.seams.find(s => s.id === action.payload);
       if (seam) {
         seam.pieceB.reversed = seam.pieceB.reversed !== true;
+        // Contrato seamRange.ts: el rango parcial de B vive en dirección de
+        // COSIDO, así que todo toggle de `reversed` debe espejarlo con
+        // mirrorPctRange o el solver cose la mitad física equivocada.
+        if (seam.pieceB.tStart != null && seam.pieceB.tEnd != null) {
+          [seam.pieceB.tStart, seam.pieceB.tEnd] = mirrorPctRange([
+            seam.pieceB.tStart,
+            seam.pieceB.tEnd,
+          ]);
+        }
         state.isDirty = true;
       }
     },
