@@ -261,6 +261,20 @@ test.describe('Seam parity replay — lote 1', () => {
     expect(seam.pieceA.tEnd).toBeCloseTo(0.7, 1);
     expect(seam.pieceB.tStart).toBeCloseTo(0.3, 1);
     expect(seam.pieceB.tEnd).toBeCloseTo(0.7, 1);
+
+    // Y el 2D pinta el SUB-TRAMO (#1022): los bordes son verticales, así que
+    // la altura del resalte es ~40 unidades de patrón, no las 100 del borde.
+    const highlightHeights = await page.evaluate(() => {
+      const paths = Array.from(document.querySelectorAll(
+        'g.seam-connection path[fill="none"]:not(.seam-direction-tick):not(.seam-selection-glow)',
+      )) as SVGGraphicsElement[];
+      return paths.map(p => p.getBBox().height);
+    });
+    expect(highlightHeights.length).toBeGreaterThanOrEqual(2);
+    for (const h of highlightHeights) {
+      expect(h).toBeGreaterThan(30);
+      expect(h).toBeLessThan(50);
+    }
   });
 
   // El núcleo del plan: el seam VIVE en el tier por defecto (WASM). Este

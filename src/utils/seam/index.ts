@@ -222,6 +222,51 @@ export function resolveEdgePolyline(
 }
 
 /**
+ * Recorta una polilínea al sub-rango [t0, t1] de su ARCO (fracciones 0-1,
+ * la parametrización de tStart/tEnd en seamRange.ts), interpolando los
+ * extremos y conservando los vértices interiores del rango.
+ *
+ * Consumidor: SeamRenderer (#1022) — un seam parcial se pinta sobre el
+ * sub-tramo cosido, no sobre el borde entero. Para el half B ya invertido
+ * por `resolveEdgePolyline(reversed)`, el rango almacenado se aplica
+ * DIRECTO: la convención (header de seamRange.ts) es que vive en dirección
+ * de cosido, igual que el filtro del solver.
+ *
+ * Rango completo, polilínea degenerada (<2 puntos o arco 0) → intacta.
+ */
+export function slicePolylineByT(pts: Point2D[], t0: number, t1: number): Point2D[] {
+  if (pts.length < 2 || (t0 <= 0 && t1 >= 1)) return pts;
+  const cum: number[] = [0];
+  for (let i = 1; i < pts.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+  }
+  const total = cum[cum.length - 1];
+  if (total <= 0) return pts;
+
+  const at = (t: number): Point2D => {
+    const target = Math.min(1, Math.max(0, t)) * total;
+    let i = 1;
+    while (i < cum.length - 1 && cum[i] < target) i++;
+    const segLen = cum[i] - cum[i - 1];
+    const f = segLen > 0 ? (target - cum[i - 1]) / segLen : 0;
+    return {
+      x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * f,
+      y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * f,
+    };
+  };
+
+  const a = Math.min(t0, t1);
+  const b = Math.max(t0, t1);
+  const EPS = 1e-9;
+  const out: Point2D[] = [at(a)];
+  for (let i = 0; i < pts.length; i++) {
+    if (cum[i] > a * total + EPS && cum[i] < b * total - EPS) out.push(pts[i]);
+  }
+  out.push(at(b));
+  return out;
+}
+
+/**
  * Flatten PathCommand[] (including curves) to Point2D[].
  */
 export function flattenPath(commands: PathCommand[], resolution: number = CURVE_RESOLUTION): Point2D[] {
