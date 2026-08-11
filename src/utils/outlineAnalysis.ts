@@ -270,6 +270,29 @@ function buildTram(
 }
 
 /**
+ * Índices de COMANDO de las esquinas reales del contorno — los vértices donde
+ * el trazo dobla de verdad (|giro| > CORNER_DEG), no las muestras de una curva.
+ *
+ * La distinción no es cosmética: un DXF entrega las curvas como polilíneas
+ * densas de `L`, así que "es un comando `L`" no dice nada sobre si el usuario
+ * dibujó ahí una esquina. Medido sobre el patrón de producción de María, sus
+ * curvas muestrean a ≤5° por vértice y sus esquinas doblan >60°, sin población
+ * intermedia (la calibración de la cabecera de este módulo).
+ *
+ * A diferencia de `analyzeOutline().corners`, esto NO añade el corte implícito
+ * en el punto 0 ni cae al fallback de "los dos giros más marcados": aquí la
+ * pregunta es si un vértice es una esquina, y el arranque del contorno no lo es
+ * por serlo. Un contorno sin esquinas (una elipse) devuelve el conjunto vacío,
+ * que es la respuesta honesta.
+ */
+export function detectCornerCommands(outline: PathCommand[]): Set<number> {
+  const { points, pointCmd } = dedupe(flattenPathWithSource(outline));
+  if (points.length < 3) return new Set();
+  const turns = turningAngles(points);
+  return new Set(detectCorners(points, turns).map(i => pointCmd[i]));
+}
+
+/**
  * Analyze a pattern outline: dedupe → corners → anatomical trams with real
  * curvature. Works identically for dense polylines (real CAD) and sparse
  * synthetic outlines with C/Q curves (which flatten first).
