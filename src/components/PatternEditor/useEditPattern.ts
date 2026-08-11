@@ -181,6 +181,13 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   const expectedOutlineRef = useRef<PathCommand[] | null>(null);
   /** Last outline (by identity) of the edited piece this hook has seen. */
   const seenOutlineRef = useRef<PathCommand[] | null>(null);
+  /**
+   * Espejo de `state.editingPieceId` para `dispatchAndRefresh`, que necesita
+   * saber a quién pertenece el overlay sin re-crearse en cada cambio de estado
+   * (su identidad alimenta media docena de useCallback aguas abajo).
+   */
+  const editingPieceIdRef = useRef<string | null>(null);
+  editingPieceIdRef.current = state.editingPieceId;
 
   // ─── Coordinate helpers ───
 
@@ -231,11 +238,19 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         internals: reanchorNotches(piece.internals, newOutline, piece.outline),
         updatedAt: Date.now(),
       };
-      expectedOutlineRef.current = newOutline;
       const action = updatePiece(updated);
       dispatch(undoBatchToken ? withUndoBatchToken(action, undoBatchToken) : action);
       const newNodes = extractNodes(updated);
-      setState(s => ({ ...s, nodes: newNodes }));
+      // El overlay pinta `nodes` con la transformada de `editingPieceId`, así
+      // que un verbo sobre OTRA pieza no puede reescribirlos: serían las
+      // coordenadas LOCALES de una pieza dibujadas en el sitio de otra. Ese es
+      // el eco del #218 — el tool Punto pasa su propio `pieceId` ("callers
+      // fuera del modo edición") y con Editar patrón abierto sobre A, poner un
+      // punto en B dejaba las anclas de B flotando sobre la lona.
+      if (piece.id === editingPieceIdRef.current) {
+        expectedOutlineRef.current = newOutline;
+        setState(s => ({ ...s, nodes: newNodes }));
+      }
       return newNodes;
     },
     [dispatch],

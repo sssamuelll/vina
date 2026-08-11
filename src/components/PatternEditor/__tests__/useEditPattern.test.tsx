@@ -404,3 +404,93 @@ describe('useEditPattern resync after restoreState', () => {
     expect(hook.result.current.isEditing).toBe(false);
   });
 });
+
+/**
+ * maria-218 — "cuando he creado un punto, clicando en la linea de la pieza, se
+ * crea automáticamente el nuevo punto pero tambien aparece como un marco con
+ * los mismos puntos de la pieza pero trasladados en otro sitio, como si fuera
+ * un eco."
+ *
+ * Los fantasmas de su foto son glifos `bezierAnchor` — círculos huecos con halo
+ * blanco — flotando sobre lona vacía, lejos de cualquier pieza.
+ *
+ * De dónde salen: los verbos de este hook aceptan un `pieceId` explícito
+ * "para callers fuera del modo edición" (el tool Punto es uno). Pero
+ * `dispatchAndRefresh` pisaba `state.nodes` con las anclas de LA PIEZA QUE
+ * TOCÓ EL VERBO, sin mirar cuál se está editando. Con "Editar patrón" abierto
+ * sobre la pieza A y un punto puesto sobre la pieza B, el overlay quedaba con
+ * las anclas de B y la posición de A: las coordenadas locales de una pieza
+ * pintadas en el sitio de otra. Eso es exactamente "los mismos puntos de la
+ * pieza pero trasladados en otro sitio".
+ *
+ * No es el #194 otra vez: aquel era el arrastre (posición de Redux contra
+ * transform de DOM) y se cerró escondiendo las anclas mientras dura. Este no
+ * necesita ningún arrastre.
+ */
+describe('maria-218 — un verbo sobre otra pieza no reescribe las anclas del overlay', () => {
+  const otherOutline = [
+    { type: 'M', values: [0, 0] },
+    { type: 'L', values: [50, 0] },
+    { type: 'L', values: [50, 40] },
+    { type: 'L', values: [0, 40] },
+    { type: 'Z', values: [] },
+  ] as PatternPiece['outline'];
+
+  function twoPieces() {
+    const a = piece();                                    // 'p' en (0,0), 200x200
+    const b = {
+      ...piece(otherOutline),
+      id: 'q',
+      name: 'Otra',
+      position: { x: 400, y: 300 },
+    } as PatternPiece;
+    const store = configureStore({ reducer: { project: projectReducer } });
+    store.dispatch(restoreState({ ...store.getState().project, pieces: [a, b] }));
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <Provider store={store}>{children}</Provider>
+    );
+    const hook = renderHook(() => useEditPattern(1, { x: 0, y: 0 }), { wrapper });
+    return { store, hook };
+  }
+
+  it('addPointOnSegment sobre otra pieza deja intactas las anclas de la que se edita', () => {
+    const { hook } = twoPieces();
+    act(() => hook.result.current.enterEdit('p'));
+    const antes = hook.result.current.nodes.map(n => ({ ...n.position }));
+    expect(antes).toHaveLength(4);
+
+    act(() => hook.result.current.addPointOnSegment(1, 0.5, 'q'));
+
+    expect(hook.result.current.editingPieceId).toBe('p');
+    expect(hook.result.current.nodes.map(n => ({ ...n.position }))).toEqual(antes);
+  });
+
+  it('pero el punto SÍ se crea en la otra pieza', () => {
+    const { store, hook } = twoPieces();
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => hook.result.current.addPointOnSegment(1, 0.5, 'q'));
+    const pieces = (store.getState() as { project: { pieces: PatternPiece[] } }).project.pieces;
+    expect(pieces.find(p => p.id === 'q')!.outline).toHaveLength(6);
+    expect(pieces.find(p => p.id === 'p')!.outline).toHaveLength(5);
+  });
+
+  it('convertSegmentToPoints sobre otra pieza tampoco las toca', () => {
+    const { hook } = twoPieces();
+    act(() => hook.result.current.enterEdit('p'));
+    const antes = hook.result.current.nodes.map(n => ({ ...n.position }));
+
+    act(() => hook.result.current.convertSegmentToPoints(1, 'q'));
+
+    expect(hook.result.current.nodes.map(n => ({ ...n.position }))).toEqual(antes);
+  });
+
+  it('sobre la pieza que SÍ se edita, las anclas se refrescan como siempre', () => {
+    const { hook } = twoPieces();
+    act(() => hook.result.current.enterEdit('p'));
+    expect(hook.result.current.nodes).toHaveLength(4);
+
+    act(() => hook.result.current.addPointOnSegment(1, 0.5, 'p'));
+
+    expect(hook.result.current.nodes).toHaveLength(5);
+  });
+});
