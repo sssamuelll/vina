@@ -175,7 +175,7 @@ export function useTopstitchTool(
         } else {
           const piece = pieces.find(p => p.id === prev.segSnapA!.pieceId);
           if (!piece) return prev;
-          const snap = snapToEdge(pt, piece, zoom2D, prev.segSnapA!.edgeIndex);
+          const snap = snapToEdge(pt, piece, zoom2D, [prev.segSnapA!.edgeIndex, prev.segSnapA!.edgeIndex + 1]);
           if (!snap) return prev;
           if (Math.abs(snap.t - prev.segSnapA!.t) < 0.01) return prev;
 
@@ -241,7 +241,7 @@ export function useTopstitchTool(
         if (prev.segSnapA) {
           const piece = pieces.find(p => p.id === prev.segSnapA!.pieceId);
           if (piece) {
-            const snap = snapToEdge(pt, piece, zoom2D, prev.segSnapA!.edgeIndex);
+            const snap = snapToEdge(pt, piece, zoom2D, [prev.segSnapA!.edgeIndex, prev.segSnapA!.edgeIndex + 1]);
             return { ...prev, segHover: snap, hoveredSnapPoint: snap?.point ?? null };
           }
         } else {
