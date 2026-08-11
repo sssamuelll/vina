@@ -80,7 +80,52 @@ describe('ContextMenu curado (Surface B)', () => {
 
   it('point.node (edición de nodos, sin segmento) no monta menú', () => {
     const { container } = renderMenu(
-      { ...base, pieceId: 'p1', isEditingNodes: true },
+      { ...base, pieceId: 'p1', isEditingNodes: true, activeTool: 'editPattern' },
+      [piece('p1')],
+    );
+    expect(container.querySelector('.context-menu')).toBeNull();
+  });
+});
+
+/**
+ * samuel-214 — "Error en la seleccion de una herramienta, cuando estamos en
+ * puntero a veces no puedo utilizar el click derecho a pesar de que tengo
+ * seleccionado un contexto por ejemplo una pieza."
+ *
+ * El "a veces" es Editar patrón LATENTE. `editPatternTool.isEditing` no se
+ * apaga al cambiar de herramienta — solo con Esc — así que se puede estar con la
+ * flecha en la mano y el modo nodo encendido por debajo. Ese es el mismo estado
+ * latente del rastro del #194.
+ *
+ * Y en altitud 'point', `resolveTargetKind` devuelve `point.node` para
+ * CUALQUIER clic que no caiga a 8px de un segmento del contorno. `point.node`
+ * tiene `menu: []`, y `ContextMenu` devuelve null cuando no hay verbos. O sea:
+ * clic derecho muerto en toda la lona, con la flecha activa, y sin ninguna
+ * señal de por qué.
+ *
+ * La altitud es del MODO, no del estado colgado: solo vale mientras la
+ * herramienta activa sea la de editar patrón.
+ */
+describe('samuel-214 — el clic derecho con el puntero no se queda mudo', () => {
+  it('con la flecha activa y Editar patrón latente, el menú de pieza aparece', () => {
+    renderMenu(
+      { ...base, pieceId: 'p1', pieceName: 'P1', isEditingNodes: true, activeTool: 'select' },
+      [piece('p1')],
+    );
+    expect(screen.getByText('Rotar 90°')).toBeTruthy();
+  });
+
+  it('la lona vacía tampoco se queda muda con el modo latente', () => {
+    renderMenu(
+      { ...base, isEditingNodes: true, activeTool: 'select' },
+      [piece('p1')],
+    );
+    expect(screen.getByText('Ajustar zoom al patrón')).toBeTruthy();
+  });
+
+  it('dentro de Editar patrón el menú de nodo sigue mudo, como estaba', () => {
+    const { container } = renderMenu(
+      { ...base, pieceId: 'p1', isEditingNodes: true, activeTool: 'editPattern' },
       [piece('p1')],
     );
     expect(container.querySelector('.context-menu')).toBeNull();

@@ -102,7 +102,17 @@ export default function ContextMenu(props: ContextMenuProps) {
   const piece = menu.pieceId ? pieces.find(p => p.id === menu.pieceId) ?? null : null;
   const seam = menu.seamId ? seams.find(s => s.id === menu.seamId) ?? null : null;
   const internalLine = (piece && menu.internalLineId) ? piece.internals.find(l => l.id === menu.internalLineId) ?? null : null;
-  const altitude: 'body' | 'point' = menu.isEditingNodes ? 'point' : 'body';
+  // La altitud 'point' es la del MODO nodo, y solo vale mientras la herramienta
+  // activa sea la de editar patrón. `editPatternTool.isEditing` no se apaga al
+  // cambiar de herramienta — solo con Esc — así que se puede tener la flecha en
+  // la mano y el modo nodo encendido por debajo (el mismo estado latente del
+  // rastro del #194). Colgando la altitud de ese flag a secas, con la flecha
+  // activa `resolveTargetKind` devolvía `point.node` para cualquier clic que no
+  // cayera a 8px de un segmento; `point.node` no tiene verbos y este componente
+  // devuelve null sin verbos. Resultado: clic derecho mudo en toda la lona, sin
+  // ninguna señal de por qué (samuel #214).
+  const altitude: 'body' | 'point' =
+    menu.isEditingNodes && menu.activeTool === 'editPattern' ? 'point' : 'body';
   const targetKind = resolveTargetKind({
     seamId: menu.seamId ?? null,
     pieceId: menu.pieceId,
