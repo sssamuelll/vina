@@ -124,4 +124,23 @@ describe('useEdgeGesture', () => {
     expect(result.current.liveRange).not.toBeNull();
     expect(result.current.liveRange![1]).toBeCloseTo(0.8, 5);
   });
+
+  it('cruzó el umbral, vuelve cerca del press y suelta ahí: sigue siendo ARRASTRE (borde curvo)', () => {
+    // resolveReleaseT fijo en 0.8 a propósito: en un borde curvo la cuerda en
+    // pantalla puede volver casi al origen mientras el arco sigue lejísimos.
+    // El umbral, una vez cruzado, no se re-evalúa (spec § 6, conflicto 2).
+    const onCommit = vi.fn();
+    const { result } = renderHook(() => useEdgeGesture({
+      resolveTarget: () => target,
+      resolveReleaseT: () => 0.8,
+      onCommit,
+    }));
+    act(() => { result.current.handleMouseDown(mouseEvent(100, 100)); });
+    act(() => { result.current.handleMouseMove(mouseEvent(140, 100)); }); // cruza el umbral
+    act(() => { result.current.handleMouseUp(mouseEvent(101, 100)); }); // vuelve a 1px del press
+    const commit = onCommit.mock.calls[0][0];
+    expect(commit.kind).toBe('drag');
+    expect(commit.range[0]).toBeCloseTo(0.2, 5);
+    expect(commit.range[1]).toBeCloseTo(0.8, 5);
+  });
 });

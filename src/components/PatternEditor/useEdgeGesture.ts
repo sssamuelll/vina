@@ -96,7 +96,7 @@ export function useEdgeGesture(opts: EdgeGestureOptions) {
     const a = armed.current;
     if (!a) return;
     const t = a.moved ? resolveReleaseT(e, a.press) : null;
-    const commit = resolveEdgeCommit(a.press, t, e.clientX - a.startX, e.clientY - a.startY);
+    const commit = resolveEdgeCommit(a.press, t, a.moved);
     reset();
     onCommit(commit);
   }, [resolveReleaseT, onCommit, reset]);

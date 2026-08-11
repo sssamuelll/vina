@@ -1,5 +1,4 @@
 import type { Point2D } from '../../types/types';
-import { isDrag } from './gestureConstants';
 
 /** Tramo más corto que esto = el press y el release son el mismo sitio. */
 export const MIN_SEGMENT_T = 0.01;
@@ -39,10 +38,13 @@ export type EdgeCommit =
 export function resolveEdgeCommit(
   press: EdgeTarget,
   releaseT: number | null,
-  dx: number,
-  dy: number,
+  /** ¿El gesto llegó a cruzar el umbral en algún momento? Es histórico, no la
+   *  posición final: una vez cruzado no se re-evalúa (spec § 6, conflicto 2).
+   *  Volver el cursor cerca del punto de partida NO devuelve el gesto a clic —
+   *  sobre un borde curvo la cuerda en pantalla miente y el arco manda. */
+  crossedThreshold: boolean,
 ): EdgeCommit {
-  if (releaseT === null || !isDrag(dx, dy)) return { kind: 'click', target: press };
+  if (releaseT === null || !crossedThreshold) return { kind: 'click', target: press };
   if (Math.abs(releaseT - press.t) < MIN_SEGMENT_T) return { kind: 'click', target: press };
 
   let t0 = Math.min(press.t, releaseT);
