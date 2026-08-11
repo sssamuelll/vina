@@ -235,9 +235,24 @@ export function commandPolyline(
   cmdIndex: number,
   resolution: number = CURVE_RESOLUTION,
 ): Point2D[] {
+  return edgeRangePolyline(outline, [cmdIndex, cmdIndex + 1], resolution);
+}
+
+/**
+ * Igual que `commandPolyline` pero sobre un RANGO de comandos — el
+ * `segmentRange` de un borde semántico, que es la unidad en la que el usuario
+ * ve (y clica) un borde. En un patrón importado un lado recto son varios
+ * comandos `L`, así que "el comando" y "el borde" no son lo mismo (maria
+ * #199a).
+ */
+export function edgeRangePolyline(
+  outline: PathCommand[],
+  range: [number, number],
+  resolution: number = CURVE_RESOLUTION,
+): Point2D[] {
   const flat = flattenPath(outline, resolution);
   if (flat.length === 0) return [];
-  const [from, to] = commandRangeToFlattened(outline, [cmdIndex, cmdIndex + 1], resolution);
+  const [from, to] = commandRangeToFlattened(outline, range, resolution);
   const pts = to >= from
     ? flat.slice(from, to + 1)
     : [...flat.slice(from), ...flat.slice(0, to + 1)];

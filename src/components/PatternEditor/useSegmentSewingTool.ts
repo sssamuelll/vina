@@ -24,7 +24,11 @@ export interface SnapResult {
 
 export interface SegmentSelection {
   pieceId: string;
+  /** Comando del PRIMER clic — con él se resuelve el nombre del borde. */
   edgeIndex: number;
+  /** Rango de comandos del borde semántico que contiene el tramo. */
+  edgeRange: [number, number];
+  /** Fracción de ARCO sobre el borde completo (no sobre el comando clicado). */
   startT: number;
   endT: number;
   startPoint: Point2D;
@@ -45,11 +49,33 @@ const SNAP_THRESHOLD = 8;
 
 // ─── Pure functions (exported for testing) ────────────────────────────
 
+/**
+ * Rango de comandos del borde semántico que contiene `cmdIndex`, o el comando
+ * suelto si la pieza no tiene bordes detectados.
+ *
+ * Es la unidad del gesto. La pista de pantalla siempre dijo "el mismo BORDE" y
+ * el código constreñía al mismo COMANDO: coinciden solo en un rectángulo
+ * dibujado a mano. En un DXF los contornos vienen como polilíneas densas de
+ * `L` (cabecera de outlineAnalysis.ts), y basta añadir un punto a un lado
+ * recto para partirlo en dos — ahí el segundo clic caía fuera y el gesto se
+ * quedaba mudo (maria #199a).
+ */
+export function semanticEdgeRange(
+  piece: PatternPiece | undefined,
+  cmdIndex: number,
+): [number, number] {
+  const semantic = piece?.edges?.find(
+    e => cmdIndex >= e.segmentRange[0] && cmdIndex < e.segmentRange[1],
+  );
+  return semantic ? semantic.segmentRange : [cmdIndex, cmdIndex + 1];
+}
+
 export function snapToEdge(
   pt: Point2D,
   piece: PatternPiece,
   zoom: number,
-  edgeConstraint?: number,
+  /** Rango de comandos [inicio, fin) al que confinar el snap. */
+  edgeConstraint?: [number, number],
 ): SnapResult | null {
   const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom);
   const cmds = piece.outline;
@@ -61,7 +87,7 @@ export function snapToEdge(
   let bestDist = Infinity;
 
   for (let i = 1; i < cmds.length; i++) {
-    if (edgeConstraint !== undefined && i !== edgeConstraint) continue;
+    if (edgeConstraint && (i < edgeConstraint[0] || i >= edgeConstraint[1])) continue;
 
     // Contra el TRAZO aplanado, no contra la cuerda. Medir contra la cuerda de
     // un comando curvo miente por los dos lados: clicar encima del arco no
@@ -114,7 +140,7 @@ function snapToAnyEdge(
   pieces: PatternPiece[],
   zoom: number,
   constrainPieceId?: string,
-  constrainEdge?: number,
+  constrainEdge?: [number, number],
 ): SnapResult | null {
   if (constrainPieceId) {
     const piece = pieces.find(p => p.id === constrainPieceId);
@@ -171,6 +197,42 @@ function commandTToEdgeT(
   return (arc(from, cmdFrom) + tLocal * arc(cmdFrom, cmdTo)) / total;
 }
 
+/** Tramo más corto que esto = los dos clics son el mismo sitio. */
+const MIN_SEGMENT_T = 0.01;
+
+/**
+ * Cierra el tramo con los dos clics de una fase, en espacio de ARCO DEL BORDE.
+ *
+ * La conversión comando→borde ocurre aquí, en el gesto, y no más abajo: los
+ * dos clics pueden caer en comandos DISTINTOS del mismo borde, y sus `t`
+ * locales no son comparables entre sí (0.5 del primer comando puede ir después
+ * de 0.2 del segundo). Convertidos a arco del borde sí lo son, y de paso es la
+ * unidad en la que ya viajaba el dato (`Seam.tStart/tEnd`, seamRange.ts).
+ *
+ * Devuelve null si los dos clics caen prácticamente encima.
+ */
+export function closeSegment(
+  first: SnapResult,
+  second: SnapResult,
+  piece: PatternPiece | undefined,
+): SegmentSelection | null {
+  const edgeRange = semanticEdgeRange(piece, first.edgeIndex);
+  const tA = piece ? commandTToEdgeT(piece.outline, edgeRange, first.edgeIndex, first.t) : first.t;
+  const tB = piece ? commandTToEdgeT(piece.outline, edgeRange, second.edgeIndex, second.t) : second.t;
+  if (Math.abs(tB - tA) < MIN_SEGMENT_T) return null;
+
+  const forward = tA <= tB;
+  return {
+    pieceId: first.pieceId,
+    edgeIndex: first.edgeIndex,
+    edgeRange,
+    startT: forward ? tA : tB,
+    endT: forward ? tB : tA,
+    startPoint: forward ? first.point : second.point,
+    endPoint: forward ? second.point : first.point,
+  };
+}
+
 function segmentToSeamHalf(
   piece: PatternPiece | undefined,
   segment: SegmentSelection,
@@ -182,14 +244,9 @@ function segmentToSeamHalf(
     pieceId: segment.pieceId,
     edgeName: semantic?.name ?? `edge-${segment.edgeIndex}`,
   };
-  // Sin pieza no hay outline para medir arcos: seam de borde completo (legacy).
-  if (!piece) return base;
-
-  const edgeRange: [number, number] = semantic
-    ? semantic.segmentRange
-    : [segment.edgeIndex, segment.edgeIndex + 1];
-  let t0 = commandTToEdgeT(piece.outline, edgeRange, segment.edgeIndex, segment.startT);
-  let t1 = commandTToEdgeT(piece.outline, edgeRange, segment.edgeIndex, segment.endT);
+  // startT/endT ya vienen en arco del borde desde closeSegment.
+  let t0 = segment.startT;
+  let t1 = segment.endT;
   if (t0 < EDGE_ENDPOINT_SNAP_T) t0 = 0;
   if (t1 > 1 - EDGE_ENDPOINT_SNAP_T) t1 = 1;
   return applyPctRange(base, t0 * 100, t1 * 100);
@@ -223,6 +280,23 @@ export function buildSegmentSeam(
     taped: false,
     tapeWidth: 10,
   };
+}
+
+/** Segundo clic de una fase: snap confinado al borde del primero, y cierre. */
+function closeAgainstPending(
+  pending: SnapResult | null,
+  pt: Point2D,
+  pieces: PatternPiece[],
+  zoom: number,
+): SegmentSelection | null {
+  if (!pending) return null;
+  const piece = pieces.find(p => p.id === pending.pieceId);
+  const snap = snapToAnyEdge(
+    pt, pieces, zoom,
+    pending.pieceId,
+    semanticEdgeRange(piece, pending.edgeIndex),
+  );
+  return snap ? closeSegment(pending, snap, piece) : null;
 }
 
 // ─── Hook ──────────────────────────────────────────────────────────────
@@ -283,34 +357,9 @@ export function useSegmentSewingTool(
           }
 
           case 'a_start': {
-            if (!prev.pendingSnap) return prev;
-            const snap = snapToAnyEdge(
-              pt, pieces, zoom2D,
-              prev.pendingSnap.pieceId,
-              prev.pendingSnap.edgeIndex,
-            );
-            if (!snap) return prev;
-
-            const startT = Math.min(prev.pendingSnap.t, snap.t);
-            const endT = Math.max(prev.pendingSnap.t, snap.t);
-            const startPt = startT === prev.pendingSnap.t ? prev.pendingSnap.point : snap.point;
-            const endPt = endT === snap.t ? snap.point : prev.pendingSnap.point;
-
-            if (Math.abs(endT - startT) < 0.01) return prev;
-
-            return {
-              ...prev,
-              phase: 'a_end',
-              segmentA: {
-                pieceId: prev.pendingSnap.pieceId,
-                edgeIndex: prev.pendingSnap.edgeIndex,
-                startT,
-                endT,
-                startPoint: startPt,
-                endPoint: endPt,
-              },
-              pendingSnap: null,
-            };
+            const segment = closeAgainstPending(prev.pendingSnap, pt, pieces, zoom2D);
+            if (!segment) return prev;
+            return { ...prev, phase: 'a_end', segmentA: segment, pendingSnap: null };
           }
 
           case 'a_end': {
@@ -325,34 +374,9 @@ export function useSegmentSewingTool(
           }
 
           case 'b_start': {
-            if (!prev.pendingSnap) return prev;
-            const snap = snapToAnyEdge(
-              pt, pieces, zoom2D,
-              prev.pendingSnap.pieceId,
-              prev.pendingSnap.edgeIndex,
-            );
-            if (!snap) return prev;
-
-            const startT = Math.min(prev.pendingSnap.t, snap.t);
-            const endT = Math.max(prev.pendingSnap.t, snap.t);
-            const startPt = startT === prev.pendingSnap.t ? prev.pendingSnap.point : snap.point;
-            const endPt = endT === snap.t ? snap.point : prev.pendingSnap.point;
-
-            if (Math.abs(endT - startT) < 0.01) return prev;
-
-            return {
-              ...prev,
-              phase: 'b_end',
-              segmentB: {
-                pieceId: prev.pendingSnap.pieceId,
-                edgeIndex: prev.pendingSnap.edgeIndex,
-                startT,
-                endT,
-                startPoint: startPt,
-                endPoint: endPt,
-              },
-              pendingSnap: null,
-            };
+            const segment = closeAgainstPending(prev.pendingSnap, pt, pieces, zoom2D);
+            if (!segment) return prev;
+            return { ...prev, phase: 'b_end', segmentB: segment, pendingSnap: null };
           }
 
           default:
@@ -369,14 +393,14 @@ export function useSegmentSewingTool(
 
       setState(prev => {
         let constrainPiece: string | undefined;
-        let constrainEdge: number | undefined;
+        let constrainEdge: [number, number] | undefined;
 
-        if (prev.phase === 'a_start' && prev.pendingSnap) {
+        if ((prev.phase === 'a_start' || prev.phase === 'b_start') && prev.pendingSnap) {
           constrainPiece = prev.pendingSnap.pieceId;
-          constrainEdge = prev.pendingSnap.edgeIndex;
-        } else if (prev.phase === 'b_start' && prev.pendingSnap) {
-          constrainPiece = prev.pendingSnap.pieceId;
-          constrainEdge = prev.pendingSnap.edgeIndex;
+          constrainEdge = semanticEdgeRange(
+            pieces.find(p => p.id === constrainPiece),
+            prev.pendingSnap.edgeIndex,
+          );
         }
 
         const snap = snapToAnyEdge(pt, pieces, zoom2D, constrainPiece, constrainEdge);

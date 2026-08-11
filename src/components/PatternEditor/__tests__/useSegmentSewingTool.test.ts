@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { snapToEdge, buildSegmentSeam, type SegmentSelection } from '../useSegmentSewingTool';
+import {
+  snapToEdge, buildSegmentSeam, closeSegment, semanticEdgeRange,
+  type SegmentSelection, type SnapResult,
+} from '../useSegmentSewingTool';
 import type { PatternPiece, SemanticEdge } from '../../../types/types';
 
 // A simple square piece: M 0,0 L 100,0 L 100,100 L 0,100 Z
@@ -58,7 +61,7 @@ describe('snapToEdge', () => {
   });
 
   it('constrains to same edge when edgeConstraint is given', () => {
-    const result = snapToEdge({ x: 95, y: 5 }, squarePiece, 1, 1);
+    const result = snapToEdge({ x: 95, y: 5 }, squarePiece, 1, [1, 2]);
     expect(result).not.toBeNull();
     expect(result!.edgeIndex).toBe(1);
   });
@@ -86,7 +89,15 @@ const squareEdges = [
 ] as SemanticEdge[];
 
 function seg(pieceId: string, edgeIndex: number, startT: number, endT: number): SegmentSelection {
-  return { pieceId, edgeIndex, startT, endT, startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 0 } };
+  return {
+    pieceId, edgeIndex, edgeRange: [edgeIndex, edgeIndex + 1], startT, endT,
+    startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 0 },
+  };
+}
+
+/** Snap sintético: lo que devolvería un clic sobre `edgeIndex` a la `t` dada. */
+function snap(pieceId: string, edgeIndex: number, t: number): SnapResult {
+  return { pieceId, edgeIndex, t, point: { x: 0, y: 0 } };
 }
 
 describe('buildSegmentSeam', () => {
@@ -110,7 +121,11 @@ describe('buildSegmentSeam', () => {
     expect(seam.pieceB.tEnd).toBeUndefined();
   });
 
-  it('edge semántico multi-comando: t del comando se convierte a fracción de arco del edge', () => {
+  // La conversión comando→arco-del-borde vive en `closeSegment` (el gesto), no
+  // aquí: los dos clics pueden caer en comandos distintos y sus `t` locales no
+  // son comparables entre sí hasta convertirlos (maria #199a). Este caso probaba
+  // esa conversión y se muda con ella, con los mismos números.
+  it('edge semántico multi-comando: el gesto convierte el t del comando a arco del edge', () => {
     // Top partido en dos comandos de largos 30 y 70: el edge 'top' cubre [1,3).
     const splitTop: PatternPiece = {
       ...squarePiece,
@@ -129,12 +144,14 @@ describe('buildSegmentSeam', () => {
       ] as SemanticEdge[],
     };
     // Todo el comando 2 = del 30% al 100% del arco del edge 'top'.
-    const seam = buildSegmentSeam(seg('pSplit', 2, 0, 1), seg('pB', 3, 0, 1), [splitTop, pB], 'standard');
+    const selA = closeSegment(snap('pSplit', 2, 0), snap('pSplit', 2, 1), splitTop)!;
+    const seam = buildSegmentSeam(selA, seg('pB', 3, 0, 1), [splitTop, pB], 'standard');
     expect(seam.pieceA.edgeName).toBe('top');
     expect(seam.pieceA.tStart).toBeCloseTo(0.3, 5);
     expect(seam.pieceA.tEnd).toBeCloseTo(1.0, 5);
     // Mitad final del comando 1 = del 15% al 30% del arco.
-    const seam2 = buildSegmentSeam(seg('pSplit', 1, 0.5, 1), seg('pB', 3, 0, 1), [splitTop, pB], 'standard');
+    const selB = closeSegment(snap('pSplit', 1, 0.5), snap('pSplit', 1, 1), splitTop)!;
+    const seam2 = buildSegmentSeam(selB, seg('pB', 3, 0, 1), [splitTop, pB], 'standard');
     expect(seam2.pieceA.tStart).toBeCloseTo(0.15, 5);
     expect(seam2.pieceA.tEnd).toBeCloseTo(0.3, 5);
   });
@@ -228,5 +245,112 @@ describe('maria-199 — coser un borde curvo lo clica donde de verdad pasa', () 
 
   it('lejos del contorno sigue sin haber snap', () => {
     expect(snapToEdge({ x: 170, y: 195 }, arcoPiece, 1)).toBeNull();
+  });
+});
+
+/**
+ * maria-199a, tercera vuelta (2026-08-10) — "NO CONSIGO CLICAR DOLO CIERTO
+ * TRAMO DE UNA LINEA RECTA".
+ *
+ * El #1022 soltó el freno del dato (el sub-rango ya viaja al Seam) pero el
+ * GESTO seguía atado al comando. La pista dice "clic más adelante en el mismo
+ * BORDE" y el código constreñía al mismo COMANDO (`edgeConstraint =
+ * pendingSnap.edgeIndex`). Coinciden solo cuando el borde es un único comando
+ * — o sea, en un rectángulo dibujado a mano, que es justo con lo que estaban
+ * escritos todos los tests.
+ *
+ * En un patrón de verdad no coinciden nunca:
+ *   - los DXF traen los contornos como polilíneas densas de `L`
+ *     (outlineAnalysis.ts lo dice en su cabecera), y
+ *   - basta que ella añada UN punto a un lado recto (la herramienta punto, o
+ *     "convertir en puntos") para partirlo en dos comandos.
+ *
+ * Entonces el segundo clic cae en otro comando, `snapToEdge` devuelve null y
+ * el reductor hace `return prev`: no pasa absolutamente nada, sin ninguna
+ * señal. Literalmente no consigue marcar el tramo.
+ *
+ * La unidad del gesto pasa a ser el BORDE SEMÁNTICO, que es la unidad en la
+ * que ya vivía el dato (`Seam.tStart/tEnd` = fracción de arco del edge, ver
+ * seamRange.ts). Sin edges semánticos se cae al comando, como antes.
+ */
+const rectaPartida: PatternPiece = {
+  ...squarePiece,
+  id: 'p-partida',
+  outline: [
+    { type: 'M', values: [0, 0] },
+    { type: 'L', values: [30, 0] },    // 1: primer tercio del lado de arriba
+    { type: 'L', values: [100, 0] },   // 2: el resto del MISMO lado recto
+    { type: 'L', values: [100, 100] }, // 3: derecha
+    { type: 'L', values: [0, 100] },   // 4: abajo
+    { type: 'Z', values: [] },         // 5: izquierda
+  ],
+  edges: [
+    { id: 'e-top', name: 'top', segmentRange: [1, 3] },
+    { id: 'e-right', name: 'right', segmentRange: [3, 4] },
+    { id: 'e-bottom', name: 'bottom', segmentRange: [4, 5] },
+  ] as SemanticEdge[],
+};
+
+describe('maria-199a — marcar un tramo dentro de un borde de varios comandos', () => {
+  it('el snap constreñido acepta cualquier comando del borde, no solo uno', () => {
+    // Clic al 60% del lado de arriba, con el gesto ya anclado al borde [1,3).
+    const snap = snapToEdge({ x: 60, y: 2 }, rectaPartida, 1, [1, 3]);
+    expect(snap).not.toBeNull();
+    expect(snap!.edgeIndex).toBe(2); // otro comando, mismo borde
+    expect(snap!.point.x).toBeCloseTo(60, 0);
+  });
+
+  it('el rango sigue siendo una frontera: fuera del borde no engancha', () => {
+    // (100,50) está en el lado derecho, que es otro borde.
+    expect(snapToEdge({ x: 100, y: 50 }, rectaPartida, 1, [1, 3])).toBeNull();
+  });
+
+  it('dos clics en comandos distintos cierran el tramo (hoy no pasa nada)', () => {
+    const a = snapToEdge({ x: 20, y: 2 }, rectaPartida, 1)!;
+    expect(a.edgeIndex).toBe(1);
+    const b = snapToEdge({ x: 60, y: 2 }, rectaPartida, 1, semanticEdgeRange(rectaPartida, a.edgeIndex))!;
+    expect(b.edgeIndex).toBe(2);
+
+    const sel = closeSegment(a, b, rectaPartida);
+    expect(sel).not.toBeNull();
+    expect(sel!.edgeRange).toEqual([1, 3]);
+    // t en arco del BORDE entero (largo 100), no del comando clicado.
+    expect(sel!.startT).toBeCloseTo(0.2, 3);
+    expect(sel!.endT).toBeCloseTo(0.6, 3);
+  });
+
+  it('el tramo cruzado llega al Seam como fracción de arco del borde', () => {
+    const a = snapToEdge({ x: 20, y: 2 }, rectaPartida, 1)!;
+    const b = snapToEdge({ x: 60, y: 2 }, rectaPartida, 1, [1, 3])!;
+    const sel = closeSegment(a, b, rectaPartida)!;
+    const otro = closeSegment(
+      snapToEdge({ x: 50, y: 98 }, squarePiece, 1)!,
+      snapToEdge({ x: 20, y: 98 }, squarePiece, 1)!,
+      squarePiece,
+    )!;
+    const seam = buildSegmentSeam(sel, otro, [rectaPartida, squarePiece], 'standard');
+    expect(seam.pieceA.edgeName).toBe('top');
+    expect(seam.pieceA.tStart).toBeCloseTo(0.2, 3);
+    expect(seam.pieceA.tEnd).toBeCloseTo(0.6, 3);
+  });
+
+  it('un borde de un solo comando se comporta igual que siempre', () => {
+    const a = snapToEdge({ x: 100, y: 20 }, rectaPartida, 1)!;
+    const b = snapToEdge({ x: 100, y: 80 }, rectaPartida, 1, semanticEdgeRange(rectaPartida, a.edgeIndex))!;
+    const sel = closeSegment(a, b, rectaPartida)!;
+    expect(sel.edgeRange).toEqual([3, 4]);
+    expect(sel.startT).toBeCloseTo(0.2, 3);
+    expect(sel.endT).toBeCloseTo(0.8, 3);
+  });
+
+  it('sin edges semánticos el gesto se queda en su comando, como antes', () => {
+    // squarePiece no trae `edges`: cada comando es su propio borde.
+    expect(semanticEdgeRange(squarePiece, 2)).toEqual([2, 3]);
+    expect(snapToEdge({ x: 50, y: 2 }, squarePiece, 1, [2, 3])).toBeNull();
+  });
+
+  it('dos clics en el mismo sitio no cierran tramo', () => {
+    const a = snapToEdge({ x: 60, y: 2 }, rectaPartida, 1)!;
+    expect(closeSegment(a, a, rectaPartida)).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import type { PatternPiece, Point2D } from '../../../../types/types';
 import type { SegmentSelection, SnapResult } from '../../useSegmentSewingTool';
 import { getEdgeEndpoints } from '../../../../utils/geometry/path';
-import { commandPolyline, slicePolylineByT } from '../../../../utils/seam';
+import { edgeRangePolyline, slicePolylineByT } from '../../../../utils/seam';
 import { SEWING_PICK_FIRST, SEWING_PICK_SECOND } from '../seamVisuals';
 
 interface SegmentSewingOverlayProps {
@@ -30,12 +30,14 @@ function SegmentHighlight({
   const ox = piece.position?.x ?? 0;
   const oy = piece.position?.y ?? 0;
 
-  // El tramo se recorta del TRAZO del comando por fracción de arco — la misma
-  // parametrización con la que `snapToEdge` devuelve su `t`. Antes se
+  // El tramo se recorta del TRAZO del BORDE por fracción de arco — la misma
+  // parametrización con la que `closeSegment` devuelve startT/endT. Antes se
   // interpolaba linealmente entre los dos extremos, así que sobre una curva ni
-  // la línea ni las dos marcas caían donde ella había clicado (maria #199).
+  // la línea ni las dos marcas caían donde ella había clicado (maria #199); y
+  // se recortaba del comando en vez del borde, así que un tramo que cruzaba
+  // dos comandos se pintaba encogido dentro del primero (maria #199a).
   // La cuerda queda de reserva para lo que el aplanado no cubre (el cierre Z).
-  const local = commandPolyline(piece.outline, segment.edgeIndex);
+  const local = edgeRangePolyline(piece.outline, segment.edgeRange);
   let tramo: Point2D[];
   if (local.length >= 2) {
     tramo = slicePolylineByT(local, segment.startT, segment.endT);

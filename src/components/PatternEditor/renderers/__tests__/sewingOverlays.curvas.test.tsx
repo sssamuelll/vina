@@ -76,6 +76,7 @@ describe('SegmentSewingOverlay — el tramo marcado sigue la curva', () => {
   const tramo: SegmentSelection = {
     pieceId: 'p-arco',
     edgeIndex: 1,
+    edgeRange: [1, 2],
     startT: 0.25,
     endT: 0.75,
     startPoint: { x: 0, y: 0 },
@@ -107,5 +108,48 @@ describe('SegmentSewingOverlay — el tramo marcado sigue la curva', () => {
       // Interpolar sobre la cuerda las dejaba en y=100 clavado.
       expect(parseFloat(m.getAttribute('cy')!)).toBeLessThan(80);
     }
+  });
+});
+
+/**
+ * maria-199a — el resalte se recortaba del COMANDO clicado, no del BORDE. Un
+ * tramo que cruza el corte entre dos comandos del mismo lado recto se pintaba
+ * encogido dentro del primero, así que ella veía una marca que no era la suya.
+ */
+describe('SegmentSewingOverlay — un tramo que cruza dos comandos del mismo borde', () => {
+  const partida = {
+    ...arco,
+    id: 'p-partida',
+    outline: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [30, 0] },    // 1: primer tramo del lado de arriba
+      { type: 'L', values: [100, 0] },   // 2: el resto del MISMO lado
+      { type: 'L', values: [100, 100] },
+      { type: 'Z', values: [] },
+    ],
+  } as unknown as PatternPiece;
+
+  /** X mínima y máxima que alcanza un `d` de solo M/L. */
+  const rangoX = (d: string) => {
+    const xs = [...d.matchAll(/[ML]\s*(-?[\d.]+)[ ,]+(-?[\d.]+)/g)].map(m => parseFloat(m[1]));
+    return [Math.min(...xs), Math.max(...xs)];
+  };
+
+  it('el resalte llega hasta donde ella clicó, cruzando el corte', () => {
+    const tramo: SegmentSelection = {
+      pieceId: 'p-partida', edgeIndex: 1, edgeRange: [1, 3],
+      startT: 0.2, endT: 0.6,
+      startPoint: { x: 20, y: 0 }, endPoint: { x: 60, y: 0 },
+    };
+    const c = svg(
+      <SegmentSewingOverlay
+        zoom2D={1} pieces={[partida]} phase="a_end"
+        segmentA={tramo} segmentB={null} pendingSnap={null} hoveredSnap={null}
+      />,
+    );
+    const d = c.querySelector('path')!.getAttribute('d')!;
+    const [minX, maxX] = rangoX(d);
+    expect(minX).toBeCloseTo(20, 0);
+    expect(maxX).toBeCloseTo(60, 0); // recortado al comando 1 se quedaba en 30
   });
 });
