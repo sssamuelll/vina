@@ -1,6 +1,6 @@
 import type { PatternPiece, Point2D } from '../../types/types';
-import { distToSegment } from '../../utils/geometry/distance';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
+import { commandPolyline, closestOnPolyline } from '../../utils/seam';
 
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 
@@ -17,6 +17,13 @@ export interface FreeEdgeSelection {
   end: Point2D;
   /** Midpoint in world space */
   midpoint: Point2D;
+  /**
+   * Trazo del borde en mundo: la polilínea aplanada del comando, o sus dos
+   * extremos si es recto. Sin esto `EdgePairOverlay` solo podía dibujar la
+   * recta entre extremos, y el resalte de un borde curvo salía como su cuerda
+   * — "CREA COSTURA EN RECTA, SIN SEGUIR LA CURVA" (maria #199).
+   */
+  path: Point2D[];
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -49,12 +56,19 @@ export function buildEdgeSelection(piece: PatternPiece, edgeIndex: number): Free
   if (!ep) return null;
   const start = { x: ep.start.x + piece.position.x, y: ep.start.y + piece.position.y };
   const end = { x: ep.end.x + piece.position.x, y: ep.end.y + piece.position.y };
+  // El trazo real del comando, en mundo. Un recto aplanado son sus dos
+  // extremos, así que esto no cambia nada para ellos; una curva trae su arco.
+  const local = commandPolyline(piece.outline, edgeIndex);
+  const path = local.length >= 2
+    ? local.map(p => ({ x: p.x + piece.position.x, y: p.y + piece.position.y }))
+    : [start, end];
   return {
     pieceId: piece.id,
     edgeIndex,
     start,
     end,
     midpoint: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
+    path,
   };
 }
 
@@ -90,7 +104,12 @@ export function findClosestEdge(
           best = sel;
         }
       } else {
-        const d = distToSegment(pt, sel.start, sel.end) * zoom;
+        // Contra el TRAZO, no contra la cuerda: sobre un arco abombado, clicar
+        // encima de la línea caía fuera del umbral y clicar en el aire sobre la
+        // cuerda caía dentro (maria #199, mismo fallo que el margen en #213).
+        const hit = closestOnPolyline(pt, sel.path);
+        if (!hit) continue;
+        const d = hit.dist * zoom;
         if (d < EDGE_HIT_THRESHOLD && d < bestDist) {
           bestDist = d;
           best = sel;

@@ -160,3 +160,73 @@ describe('buildSegmentSeam', () => {
     expect(seam.type).toBe('overlock');
   });
 });
+
+/**
+ * maria-199, segunda vuelta (2026-08-10) — "Y YA CLICAR CURVAS AL HACER LA
+ * COSTURA ES OTRO TEMA Y FUNCIONA FATAL, CREA COSTYRA EN RECTA, SIN SEGUIR LA
+ * CURVA".
+ *
+ * `snapToEdge` proyectaba el clic sobre la CUERDA del comando: `getEdgeEndpoints`
+ * devuelve los dos extremos y el umbral de 8px se medía contra la recta entre
+ * ellos. Sobre un arco abombado eso significa dos cosas a la vez:
+ *
+ *   - clicar justo ENCIMA de la curva no engancha nada, porque la cuerda está
+ *     lejos (el mismo fallo que tenía el margen de costura en el #213);
+ *   - y cuando engancha, el punto marcado y su `t` viven en la cuerda, no en el
+ *     trazo — así que la marca cae fuera de la línea.
+ *
+ * Es el mismo arco de la pieza de su foto: se despega 90mm de su cuerda.
+ */
+const arcoPiece: PatternPiece = {
+  ...squarePiece,
+  id: 'p-arco',
+  outline: [
+    { type: 'M', values: [0, 100] },
+    { type: 'C', values: [113, -20, 227, -20, 340, 100] }, // edge 1: el arco
+    { type: 'L', values: [340, 290] },                     // edge 2: recta
+    { type: 'L', values: [0, 290] },                       // edge 3: recta
+    { type: 'Z', values: [] },
+  ],
+};
+
+/** Punto medio real del bezier (t=0.5). La cuerda pasa 90mm por debajo. */
+const APEX = { x: 170, y: 10 };
+
+describe('maria-199 — coser un borde curvo lo clica donde de verdad pasa', () => {
+  it('clicar encima del arco engancha ese borde', () => {
+    const snap = snapToEdge(APEX, arcoPiece, 1);
+    expect(snap).not.toBeNull();
+    expect(snap!.edgeIndex).toBe(1);
+  });
+
+  it('la marca cae SOBRE la curva, no sobre la cuerda', () => {
+    const snap = snapToEdge(APEX, arcoPiece, 1);
+    // La cuerda está en y=100; el trazo real pasa por y=10.
+    expect(snap!.point.y).toBeLessThan(40);
+  });
+
+  it('la t es fracción de ARCO del comando: el ápex cae a la mitad', () => {
+    const snap = snapToEdge(APEX, arcoPiece, 1);
+    expect(snap!.t).toBeCloseTo(0.5, 1);
+  });
+
+  it('clicar sobre la CUERDA del arco ya no cuenta como el arco', () => {
+    // (170,100) es el punto medio de la cuerda: 90mm por debajo del trazo.
+    const snap = snapToEdge({ x: 170, y: 100 }, arcoPiece, 1);
+    expect(snap?.edgeIndex).not.toBe(1);
+  });
+
+  it('los bordes rectos siguen enganchando exactamente igual', () => {
+    const der = snapToEdge({ x: 340, y: 200 }, arcoPiece, 1);
+    expect(der?.edgeIndex).toBe(2);
+    expect(der!.t).toBeCloseTo(0.5263, 3); // (200-100)/190
+
+    const abajo = snapToEdge({ x: 170, y: 290 }, arcoPiece, 1);
+    expect(abajo?.edgeIndex).toBe(3);
+    expect(abajo!.t).toBeCloseTo(0.5, 3);
+  });
+
+  it('lejos del contorno sigue sin haber snap', () => {
+    expect(snapToEdge({ x: 170, y: 195 }, arcoPiece, 1)).toBeNull();
+  });
+});
