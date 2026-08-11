@@ -202,29 +202,73 @@ function orderPrevToNext(
 // ─── cornerMitered ────────────────────────────────────────────────────────
 
 /**
- * Cota de la punta del miter, en múltiplos del ancho del margen. Es el
- * `stroke-miterlimit` por defecto de SVG y CSS; acá significa que el trazo del
- * margen nunca se aleja del vértice más de 4 veces lo que el usuario pidió.
+ * Cota de la punta del miter, en múltiplos del ancho del margen. Pasada esta
+ * cota el vértice se BISELA (ver `cornerMitered`), que es lo que hace SVG con
+ * `stroke-linejoin: miter` cuando se supera `stroke-miterlimit`.
  *
  * Sin cota, la excursión en un vértice de ángulo interior θ es SA / sin(θ/2),
- * que diverge: medido sobre una cuña, un margen de 10mm llegaba a 114.7mm en
- * una punta de 10° y a 1145.9mm en una de 1° — el pincho que María fotografió
- * en el #213 sin haberlo dibujado. Con 4, todo vértice de 29° o más queda
- * byte-idéntico a como estaba (90° → 14.1mm, 45° → 26.1mm): solo se recortan
- * las puntas patológicas.
+ * que diverge: un margen de 10mm llegaba a 114.7mm en una punta de 10° y a
+ * 1145.9mm en una de 1° — el pincho que María fotografió en el #213 sin
+ * haberlo dibujado.
+ *
+ * Valía 4 (el default de SVG y CSS) y era demasiado flojo. Ese 4 es razonable
+ * para un TRAZO de 1-2 px, donde son 8px; traducido a geometría de patrón
+ * significa cuatro veces el margen pedido. Con 4, el límite solo entraba por
+ * debajo de 29°, y la punta que ella volvió a fotografiar el 2026-08-10 es de
+ * 36°: nunca se disparó. La constante se había copiado sin traducir la unidad.
+ *
+ * Con 2 la regla se dice en una frase: un margen mitrado nunca se aleja más del
+ * DOBLE de lo pedido, y en cuanto lo pasaría corta plano y no se aleja más de
+ * lo pedido a secas. Los rectángulos no cambian (90° → 1.41×) y el bisel
+ * empieza por debajo de 60°.
  */
-const MITER_LIMIT = 4;
+const MITER_LIMIT = 2;
 
 /**
- * Standard miter: single intersection point of prevOffsetEdge and nextOffsetEdge,
- * clamped to MITER_LIMIT × the widest of the two allowances.
+ * Punto de miter acotado: la intersección de los dos offsets, y si se aleja del
+ * vértice más de `MITER_LIMIT` anchos, el mismo punto acercado sobre la
+ * dirección vértice→miter (que con anchos distintos no es la bisectriz).
+ *
+ * Es la REFERENCIA geométrica que consumen las otras esquinas — doubleMitered,
+ * squared (su caída reflex), slant, envelope, trimMirrored construyen su forma
+ * alrededor de este punto y necesitan uno solo. `cornerMitered` no les sirve
+ * porque al biselar devuelve dos.
+ */
+function miterPointClamped(
+  prevOffsetEdge: Line2D,
+  nextOffsetEdge: Line2D,
+  vertex: Point2D,
+  prevWidth: number,
+  nextWidth: number,
+): Point2D {
+  const pt = lineIntersection(prevOffsetEdge, nextOffsetEdge);
+  if (pt === null) return { ...prevOffsetEdge.end };
+  const maxDist = MITER_LIMIT * Math.max(prevWidth, nextWidth);
+  if (maxDist <= 0) return pt;
+  const dx = pt.x - vertex.x;
+  const dy = pt.y - vertex.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist <= maxDist || dist < 1e-12) return pt;
+  return { x: vertex.x + (dx / dist) * maxDist, y: vertex.y + (dy / dist) * maxDist };
+}
+
+/**
+ * Standard miter: single intersection point of prevOffsetEdge and nextOffsetEdge.
  * Falls back to the endpoint of prevOffsetEdge when the lines are parallel.
  *
- * Returns 1 point. El recorte conserva la DIRECCIÓN vértice→miter (que con
- * anchos distintos no es la bisectriz) y solo acorta la distancia, así que la
- * punta se despunta en su sitio en vez de irse al infinito. Devolver 1 punto es
- * contrato: cornerDoubleMitered / cornerSquared / cornerSlant / cornerEnvelope
- * consumen `cornerMitered(...)[0]`, y así heredan la cota sin tocarlos.
+ * Devuelve 1 punto mientras la punta quepa dentro de `MITER_LIMIT` anchos, y 2
+ * cuando no: el BISEL, o sea el corte plano entre `prevOffsetEdge.end` y
+ * `nextOffsetEdge.start`. Esos dos puntos son el mismo vértice desplazado
+ * perpendicularmente por cada borde, así que el margen biselado no se aleja del
+ * vértice más de lo que el usuario pidió — ni un milímetro más.
+ *
+ * El paquete ya sale ordenado lado-prev → lado-next, que es el contrato que
+ * `generateSeamAllowanceWithCorners` espera de cualquier esquina (el mismo de
+ * cornerSquared: `[prevOffsetEdge.end, corner, nextOffsetEdge.start]`).
+ *
+ * Truncar el pico en vez de biselar — lo que hacía antes — dejaba una punta más
+ * corta pero punta al fin, y a 4 anchos de distancia. SVG no trunca: cae a
+ * bevel. Acá también.
  */
 export function cornerMitered(
   prevOffsetEdge: Line2D,
@@ -243,11 +287,9 @@ export function cornerMitered(
   }
   const maxDist = MITER_LIMIT * Math.max(prevWidth, nextWidth);
   if (maxDist <= 0) return [pt];
-  const dx = pt.x - vertex.x;
-  const dy = pt.y - vertex.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist <= maxDist || dist < 1e-12) return [pt];
-  return [{ x: vertex.x + (dx / dist) * maxDist, y: vertex.y + (dy / dist) * maxDist }];
+  const dist = Math.hypot(pt.x - vertex.x, pt.y - vertex.y);
+  if (dist <= maxDist) return [pt];
+  return [{ ...prevOffsetEdge.end }, { ...nextOffsetEdge.start }];
 }
 
 // ─── cornerDoubleMitered ──────────────────────────────────────────────────
@@ -286,7 +328,7 @@ export function cornerDoubleMitered(
   const bis = bisectorDirection(prevProxy, nextProxy);
 
   // Miter intersection point.
-  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, 0)[0];
+  const miter = miterPointClamped(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth);
 
   // Move from miter back toward vertex by saWidth * 0.3.
   // Use the actual direction from miter to vertex so that midPt stays on the
@@ -351,7 +393,7 @@ export function cornerSquared(
   vertex: Point2D,
   prevWidth: number,
   nextWidth: number,
-  angle: number,
+  _angle: number,
 ): Point2D[] {
   const P = prevOffsetEdge.end;
   const Q = nextOffsetEdge.start;
@@ -363,7 +405,7 @@ export function cornerSquared(
   // t < 0 means squaring off would walk backwards along the previous edge —
   // a reflex vertex, where there is no outward corner to square. Miter it.
   if (t <= 0 || (prevDir.x === 0 && prevDir.y === 0)) {
-    const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, angle)[0];
+    const miter = miterPointClamped(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth);
     return [{ ...P }, miter, { ...Q }];
   }
 
@@ -389,7 +431,7 @@ export function cornerSlant(
   _angle: number,
 ): Point2D[] {
   // Geometric: the slant passes through the (asymmetric) miter; no width factor.
-  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, 0)[0];
+  const miter = miterPointClamped(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth);
 
   const prevDir = lineDir(prevOffsetEdge);
   const nextDir = lineDir(nextOffsetEdge);
@@ -439,7 +481,7 @@ export function cornerEnvelope(
 ): Point2D[] {
   // Tab extension uses the mean width (identical to legacy when equal).
   const ext = ((prevWidth + nextWidth) / 2) * 0.75;
-  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, 0)[0];
+  const miter = miterPointClamped(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth);
 
   const prevDir = lineDir(prevOffsetEdge);
   const nextDir = lineDir(nextOffsetEdge);
@@ -516,7 +558,7 @@ export function cornerTrimMirrored(
 ): Point2D[] {
   // Trim amount uses the mean width (identical to legacy when equal).
   const trimAmount = ((prevWidth + nextWidth) / 2) * 0.2;
-  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, 0)[0];
+  const miter = miterPointClamped(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth);
 
   const prevDir = lineDir(prevOffsetEdge);
   const nextDir = lineDir(nextOffsetEdge);
