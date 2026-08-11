@@ -62,6 +62,19 @@ const editorSlice = createSlice({
       } else {
         state.selectedPieceIds.splice(idx, 1);
       }
+      // Una línea seleccionada es una sub-selección DENTRO de una pieza, así que
+      // solo sobrevive mientras esa pieza SEA la selección, a secas. Este era el
+      // único camino de cambio de pieza que no la soltaba (samuel #215), y no es
+      // cosmético: Delete/Backspace cuelgan de `selectedInternalLine` y borran su
+      // `{pieceId, lineId}` tal cual, así que una selección colgada de la pieza
+      // anterior borra geometría que no se está mirando.
+      if (
+        state.selectedInternalLine
+        && !(state.selectedPieceIds.length === 1
+          && state.selectedPieceIds[0] === state.selectedInternalLine.pieceId)
+      ) {
+        state.selectedInternalLine = null;
+      }
     },
     clearSelection(state) {
       state.selectedPieceIds = [];
