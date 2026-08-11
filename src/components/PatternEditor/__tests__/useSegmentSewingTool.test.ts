@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  snapToEdge, buildSegmentSeam, closeSegment, semanticEdgeRange,
+  snapToEdge, buildSegmentSeam, closeSegment,
   type SegmentSelection, type SnapResult,
 } from '../useSegmentSewingTool';
+import { edgeRangeForCommand } from '../../../utils/semanticEdges';
 import type { PatternPiece, SemanticEdge } from '../../../types/types';
 
 // A simple square piece: M 0,0 L 100,0 L 100,100 L 0,100 Z
@@ -308,7 +309,7 @@ describe('maria-199a — marcar un tramo dentro de un borde de varios comandos',
   it('dos clics en comandos distintos cierran el tramo (hoy no pasa nada)', () => {
     const a = snapToEdge({ x: 20, y: 2 }, rectaPartida, 1)!;
     expect(a.edgeIndex).toBe(1);
-    const b = snapToEdge({ x: 60, y: 2 }, rectaPartida, 1, semanticEdgeRange(rectaPartida, a.edgeIndex))!;
+    const b = snapToEdge({ x: 60, y: 2 }, rectaPartida, 1, edgeRangeForCommand(rectaPartida, a.edgeIndex))!;
     expect(b.edgeIndex).toBe(2);
 
     const sel = closeSegment(a, b, rectaPartida);
@@ -336,7 +337,7 @@ describe('maria-199a — marcar un tramo dentro de un borde de varios comandos',
 
   it('un borde de un solo comando se comporta igual que siempre', () => {
     const a = snapToEdge({ x: 100, y: 20 }, rectaPartida, 1)!;
-    const b = snapToEdge({ x: 100, y: 80 }, rectaPartida, 1, semanticEdgeRange(rectaPartida, a.edgeIndex))!;
+    const b = snapToEdge({ x: 100, y: 80 }, rectaPartida, 1, edgeRangeForCommand(rectaPartida, a.edgeIndex))!;
     const sel = closeSegment(a, b, rectaPartida)!;
     expect(sel.edgeRange).toEqual([3, 4]);
     expect(sel.startT).toBeCloseTo(0.2, 3);
@@ -345,7 +346,7 @@ describe('maria-199a — marcar un tramo dentro de un borde de varios comandos',
 
   it('sin edges semánticos el gesto se queda en su comando, como antes', () => {
     // squarePiece no trae `edges`: cada comando es su propio borde.
-    expect(semanticEdgeRange(squarePiece, 2)).toEqual([2, 3]);
+    expect(edgeRangeForCommand(squarePiece, 2)).toEqual([2, 3]);
     expect(snapToEdge({ x: 50, y: 2 }, squarePiece, 1, [2, 3])).toBeNull();
   });
 
