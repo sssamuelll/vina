@@ -32,12 +32,9 @@ function getOutlineCenterForDrag(outline: PathCommand[]): { cx: number; cy: numb
 import { extractNodes, NodeRef } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { patternToPieceLocal } from './pieceTransform';
+import { DRAG_THRESHOLD_PX } from './gestureConstants';
 
 const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
-
-/** Umbral de arrastre (px de pantalla). Debajo de esto, un mousedown+up es un
- *  clic, no un movimiento — no ensucia el historial de undo (EB-1/EB-2). */
-const MIN_DRAG_PX = 3;
 
 /** Distance from point (px,py) to line segment (x1,y1)-(x2,y2) */
 function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
@@ -800,7 +797,7 @@ export function useEditorInteractions(
       dragRef.current.lastPos = { x: newX, y: newY };
       // Mismo umbral que el commit: un temblor de clic no esconde la caja.
       // setState repetido con true es no-op para React — no re-renderiza.
-      if (Math.hypot(e.clientX - dragRef.current.startMouse.x, e.clientY - dragRef.current.startMouse.y) >= MIN_DRAG_PX) {
+      if (Math.hypot(e.clientX - dragRef.current.startMouse.x, e.clientY - dragRef.current.startMouse.y) >= DRAG_THRESHOLD_PX) {
         setIsDraggingPiece(true);
       }
       return;
@@ -869,7 +866,7 @@ export function useEditorInteractions(
       const my1 = Math.min(mq.startPattern.y, mq.currentPattern.y);
       const mx2 = Math.max(mq.startPattern.x, mq.currentPattern.x);
       const my2 = Math.max(mq.startPattern.y, mq.currentPattern.y);
-      const MIN_DRAG = screenToPatternLength(MIN_DRAG_PX, zoom2D);
+      const MIN_DRAG = screenToPatternLength(DRAG_THRESHOLD_PX, zoom2D);
       if (mx2 - mx1 > MIN_DRAG || my2 - my1 > MIN_DRAG) {
         const hitIds: string[] = [];
         for (const piece of pieces) {
@@ -922,7 +919,7 @@ export function useEditorInteractions(
     const d = dragRef.current;
     if (d?.lastPos) {
       const moved = Math.hypot(d.lastPos.x - d.startPos.x, d.lastPos.y - d.startPos.y);
-      if (moved >= screenToPatternLength(MIN_DRAG_PX, zoom2D)) {
+      if (moved >= screenToPatternLength(DRAG_THRESHOLD_PX, zoom2D)) {
         dispatch(movePiece({ id: d.pieceId, x: d.lastPos.x, y: d.lastPos.y }));
       } else {
         // Sin commit no hay re-render que corrija el transform manual: la

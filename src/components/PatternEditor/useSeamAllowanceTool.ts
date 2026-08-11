@@ -4,11 +4,7 @@ import type { RootState } from '../../store';
 import type { PatternPiece, Point2D } from '../../types/types';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { resolveSeamAllowanceClick } from '../../utils/seam/edgeHitTest';
-
-/** Screen-pixel displacement past which a body press is treated as a drag
- *  (mirrors MIN_DRAG in useEditorInteractions). Below this a press+release is
- *  a single body-click, preserving the ratified click-to-apply behavior. */
-const DRAG_THRESHOLD_PX = 3;
+import { DRAG_THRESHOLD_PX } from './gestureConstants';
 
 /**
  * Seam allowance tool — left-click and drag-to-all interaction.
