@@ -11,6 +11,7 @@ import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator
 import { uid } from '../utils/pathHelpers';
 import { newId } from '../utils/ids';
 import { detectSemanticEdges, preserveEdgeWidthsByName } from '../utils/semanticEdges';
+import { reindexEdges, sameSegmentRanges } from '../utils/edgeReindex';
 import { mirrorPctRange } from '../utils/seam/seamRange';
 import { autoSew } from '../utils/autoSew';
 
@@ -401,7 +402,27 @@ const projectSlice = createSlice({
     updatePiece(state, action: PayloadAction<PatternPiece>) {
       const idx = state.pieces.findIndex(p => p.id === action.payload.id);
       if (idx !== -1) {
-        state.pieces[idx] = action.payload;
+        const prev = state.pieces[idx];
+        const next = action.payload;
+        // `segmentRange` es un rango de ÍNDICES sobre el contorno. Si el verbo
+        // insertó o quitó comandos y el llamador se limitó a arrastrar los
+        // bordes viejos, los índices apuntan al sitio equivocado — y como
+        // `resolveEdgeName` saca de ahí el nombre que persiste en el `Seam`,
+        // coser un lado podía guardarse como si fuera otro (#1043). Este es el
+        // único sitio que ve el contorno viejo y el nuevo a la vez.
+        // Un llamador que YA recalculó los bordes (tijeras, offset, unir) trae
+        // rangos distintos y `sameSegmentRanges` lo deja pasar intacto.
+        if (
+          prev.outline?.length !== next.outline?.length
+          && sameSegmentRanges(prev.edges, next.edges)
+        ) {
+          state.pieces[idx] = {
+            ...next,
+            edges: reindexEdges(next.edges, prev.outline, next.outline),
+          };
+        } else {
+          state.pieces[idx] = next;
+        }
         state.isDirty = true;
       }
     },
