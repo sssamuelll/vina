@@ -1,67 +1,65 @@
-import type { Point2D } from '../../../../types/types';
-import type { FreeEdgeSelection } from '../../sewingUtils';
+import type { PatternPiece } from '../../../../types/types';
+import type { SegmentSelection } from '../../useSegmentSewingTool';
+import type { EdgeTarget } from '../../edgeGesture';
+import { SegmentHighlight } from './SegmentSewingOverlay';
 import { SEWING_PICK_FIRST, SEWING_PICK_SECOND } from '../seamVisuals';
 
 interface EdgePairOverlayProps {
   zoom2D: number;
-  firstEdge: FreeEdgeSelection | null;
-  hoveredEdge: FreeEdgeSelection | null;
-  mode?: 'free' | 'point';
+  pieces: PatternPiece[];
+  /** La mitad ya cerrada (clic o arrastre) — se pinta con el trazo real del
+   *  borde, arco a arco (maria #199). */
+  segmentA: SegmentSelection | null;
+  /** Lo que hay bajo el ratón ANTES de apretar (fuera de gesto). Sin rango:
+   *  un clic todavía significa "el borde entero" (spec § 4.2). */
+  hoveredTarget: EdgeTarget | null;
 }
 
-/**
- * `d` de una polilínea. El resalte se pinta con el TRAZO del borde, que para un
- * recto son sus dos extremos y para una curva es su arco aplanado. Antes era un
- * `<line>` de extremo a extremo, así que un borde curvo se resaltaba con su
- * cuerda: "CREA COSTURA EN RECTA, SIN SEGUIR LA CURVA" (maria #199).
- */
-const polyD = (pts: Point2D[]) =>
-  pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+/** `EdgeTarget` no trae t0/t1 — solo el punto bajo el cursor. Se sintetiza un
+ *  `SegmentSelection` de arco completo (0..1) para reutilizar el mismo trazo
+ *  de `SegmentHighlight` que ya sigue la curva en vez de la cuerda. */
+function wholeEdgeAsSegment(target: EdgeTarget): SegmentSelection {
+  return {
+    pieceId: target.pieceId,
+    edgeIndex: target.edgeIndex,
+    edgeRange: target.edgeRange,
+    startT: 0,
+    endT: 1,
+    startPoint: target.point,
+    endPoint: target.point,
+  };
+}
 
-export default function EdgePairOverlay({ zoom2D, firstEdge, hoveredEdge, mode = 'free' }: EdgePairOverlayProps) {
-  const dotR = 4 / zoom2D;
+export default function EdgePairOverlay({ zoom2D, pieces, segmentA, hoveredTarget }: EdgePairOverlayProps) {
+  const hoveredSegment = hoveredTarget ? wholeEdgeAsSegment(hoveredTarget) : null;
 
   return (
     <g className="edge-pair-overlay">
-      {firstEdge && (
-        <>
-          <path
-            d={polyD(firstEdge.path)}
-            fill="none"
-            stroke={SEWING_PICK_FIRST}
-            strokeWidth={3 / zoom2D}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <circle cx={firstEdge.start.x} cy={firstEdge.start.y} r={dotR} fill={SEWING_PICK_FIRST} />
-          <circle cx={firstEdge.end.x} cy={firstEdge.end.y} r={dotR} fill={SEWING_PICK_FIRST} />
-        </>
+      {segmentA && (
+        <SegmentHighlight
+          segment={segmentA}
+          piece={pieces.find(p => p.id === segmentA.pieceId)}
+          color={SEWING_PICK_FIRST}
+          zoom2D={zoom2D}
+        />
       )}
 
-      {hoveredEdge && (
-        <>
-          <path
-            d={polyD(hoveredEdge.path)}
-            fill="none"
-            stroke={firstEdge ? SEWING_PICK_SECOND : SEWING_PICK_FIRST}
-            strokeWidth={2.5 / zoom2D}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={0.7}
-          />
-          {mode === 'point' && (
-            <>
-              <circle cx={hoveredEdge.start.x} cy={hoveredEdge.start.y} r={dotR} fill={firstEdge ? SEWING_PICK_SECOND : SEWING_PICK_FIRST} opacity={0.7} />
-              <circle cx={hoveredEdge.end.x} cy={hoveredEdge.end.y} r={dotR} fill={firstEdge ? SEWING_PICK_SECOND : SEWING_PICK_FIRST} opacity={0.7} />
-            </>
-          )}
-        </>
+      {hoveredSegment && (
+        <SegmentHighlight
+          segment={hoveredSegment}
+          piece={pieces.find(p => p.id === hoveredSegment.pieceId)}
+          color={segmentA ? SEWING_PICK_SECOND : SEWING_PICK_FIRST}
+          zoom2D={zoom2D}
+          opacity={0.7}
+        />
       )}
 
-      {firstEdge && hoveredEdge && firstEdge.pieceId !== hoveredEdge.pieceId && (
+      {segmentA && hoveredTarget && segmentA.pieceId !== hoveredTarget.pieceId && (
         <line
-          x1={firstEdge.midpoint.x} y1={firstEdge.midpoint.y}
-          x2={hoveredEdge.midpoint.x} y2={hoveredEdge.midpoint.y}
+          x1={(segmentA.startPoint.x + segmentA.endPoint.x) / 2}
+          y1={(segmentA.startPoint.y + segmentA.endPoint.y) / 2}
+          x2={hoveredTarget.point.x}
+          y2={hoveredTarget.point.y}
           stroke={SEWING_PICK_FIRST}
           strokeWidth={1 / zoom2D}
           strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`}

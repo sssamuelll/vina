@@ -115,7 +115,7 @@ export function snapToEdge(
   return best;
 }
 
-function snapToAnyEdge(
+export function snapToAnyEdge(
   pt: Point2D,
   pieces: PatternPiece[],
   zoom: number,
@@ -158,7 +158,7 @@ const EDGE_ENDPOINT_SNAP_T = 0.01;
  * comando CURVO, tLocal viene de la proyección sobre la cuerda (snapToEdge) y
  * se escala al arco aplanado del comando — exacto en L/H/V, aproximado en C/Q.
  */
-function commandTToEdgeT(
+export function commandTToEdgeT(
   outline: PathCommand[],
   edgeRange: [number, number],
   cmdIndex: number,

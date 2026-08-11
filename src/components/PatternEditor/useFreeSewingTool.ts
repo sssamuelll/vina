@@ -2,101 +2,130 @@ import { useState, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { PatternPiece, Point2D, Seam } from '../../types/types';
+import { screenToPattern } from './sewingUtils';
+import { edgeRangeForCommand } from '../../utils/semanticEdges';
 import {
-  screenToPattern,
-  resolveEdgeName,
-  findClosestEdge,
-  type FreeEdgeSelection,
-} from './sewingUtils';
+  snapToAnyEdge, commandTToEdgeT, buildSegmentSeam,
+  type SegmentSelection,
+} from './useSegmentSewingTool';
+import { useEdgeGesture } from './useEdgeGesture';
+import type { EdgeCommit, EdgeTarget } from './edgeGesture';
 
-// Re-export for consumers
-export type { FreeEdgeSelection } from './sewingUtils';
-
-interface FreeSewingToolState {
-  firstEdge: FreeEdgeSelection | null;
-  hoveredEdge: FreeEdgeSelection | null;
-}
-
+/**
+ * La herramienta de coser, unificada (#199, #1022, #1029).
+ *
+ * Un clic marca el borde entero — exactamente lo que hacía antes, y produce el
+ * mismo `Seam`. Un arrastre marca el tramo. Dos gestos, uno por pieza, cierran
+ * la costura: sin `Enter`, sin fases.
+ *
+ * Spec: docs/superpowers/specs/2026-08-11-arrastre-unificado-2d-design.md § 4.2
+ */
 export function useFreeSewingTool(
   zoom: number,
   pan: Point2D,
   pieces: PatternPiece[],
   onComplete: (seam: Omit<Seam, 'id'>) => void,
-  mode: 'free' | 'point' = 'free',
 ) {
-  const [state, setState] = useState<FreeSewingToolState>({
-    firstEdge: null,
-    hoveredEdge: null,
-  });
+  const [segmentA, setSegmentA] = useState<SegmentSelection | null>(null);
 
-  // Seam construction type — shared option surface for the seam tool family
-  // (toolOptions.seam.seamType), mirroring useSegmentSewingTool's convention.
   const seamType = useSelector(
     (s: RootState) => (s.tools.toolOptions?.seam?.seamType as Seam['type']) ?? 'standard',
   );
 
-  const toPattern = useCallback((screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
-    screenToPattern(screenX, screenY, svgRect, zoom, pan),
-  [zoom, pan]);
+  const toPattern = useCallback((e: React.MouseEvent<SVGSVGElement>): Point2D => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return screenToPattern(e.clientX, e.clientY, rect, zoom, pan);
+  }, [zoom, pan]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (e.button !== 0) return;
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    const pt = toPattern(e.clientX, e.clientY, rect);
+  /** El press: qué borde enganchó, y en qué punto de su arco. */
+  const resolveTarget = useCallback((e: React.MouseEvent<SVGSVGElement>): EdgeTarget | null => {
+    const pt = toPattern(e);
+    // Sosteniendo la mitad A, el segundo gesto va contra OTRA pieza.
+    const snap = snapToAnyEdge(pt, pieces, zoom, undefined, undefined);
+    if (!snap) return null;
+    if (segmentA && snap.pieceId === segmentA.pieceId) return null;
 
-    const edge = findClosestEdge(pt, pieces, zoom, mode);
-    if (!edge) {
-      setState({ firstEdge: null, hoveredEdge: null });
-      return;
-    }
+    const piece = pieces.find(p => p.id === snap.pieceId);
+    const edgeRange = edgeRangeForCommand(piece, snap.edgeIndex);
+    const t = piece
+      ? commandTToEdgeT(piece.outline, edgeRange, snap.edgeIndex, snap.t)
+      : snap.t;
+    return { pieceId: snap.pieceId, edgeIndex: snap.edgeIndex, edgeRange, t, point: snap.point };
+  }, [toPattern, pieces, zoom, segmentA]);
 
-    if (!state.firstEdge) {
-      setState(prev => ({ ...prev, firstEdge: edge }));
-    } else {
-      if (edge.pieceId === state.firstEdge.pieceId) return;
+  /** El release: el t sobre el MISMO borde del press. Fuera del borde → null,
+   *  y el gesto cae a clic (spec § 3.4). */
+  const resolveReleaseT = useCallback((
+    e: React.MouseEvent<SVGSVGElement>,
+    press: EdgeTarget,
+  ): number | null => {
+    const pt = toPattern(e);
+    const snap = snapToAnyEdge(pt, pieces, zoom, press.pieceId, press.edgeRange);
+    if (!snap) return null;
+    const piece = pieces.find(p => p.id === press.pieceId);
+    return piece
+      ? commandTToEdgeT(piece.outline, press.edgeRange, snap.edgeIndex, snap.t)
+      : snap.t;
+  }, [toPattern, pieces, zoom]);
 
-      const pieceAObj = pieces.find(p => p.id === state.firstEdge!.pieceId);
-      const pieceBObj = pieces.find(p => p.id === edge.pieceId);
-      const edgeAName = pieceAObj ? resolveEdgeName(pieceAObj, state.firstEdge.edgeIndex) : `edge-${state.firstEdge.edgeIndex}`;
-      const edgeBName = pieceBObj ? resolveEdgeName(pieceBObj, edge.edgeIndex) : `edge-${edge.edgeIndex}`;
+  const onCommit = useCallback((commit: EdgeCommit) => {
+    const { target } = commit;
+    const [startT, endT] = commit.kind === 'drag' ? commit.range : [0, 1];
+    const segment: SegmentSelection = {
+      pieceId: target.pieceId,
+      edgeIndex: target.edgeIndex,
+      edgeRange: target.edgeRange,
+      startT,
+      endT,
+      startPoint: target.point,
+      endPoint: target.point,
+    };
 
-      onComplete({
-        pieceA: { pieceId: state.firstEdge.pieceId, edgeName: edgeAName },
-        pieceB: { pieceId: edge.pieceId, edgeName: edgeBName },
-        type: seamType,
-        tension: 100,
-        strength: 1.0,
-        active: true,
-        taped: false,
-        tapeWidth: 10,
-      });
-      setState({ firstEdge: null, hoveredEdge: null });
-    }
-  }, [toPattern, pieces, zoom, mode, state.firstEdge, onComplete, seamType]);
+    if (!segmentA) { setSegmentA(segment); return; }
+    onComplete(buildSegmentSeam(segmentA, segment, pieces, seamType));
+    setSegmentA(null);
+  }, [segmentA, onComplete, pieces, seamType]);
+
+  const gesture = useEdgeGesture({ resolveTarget, resolveReleaseT, onCommit });
+
+  // El resalte al pasar el ratón es independiente del gesto: sin él, el borde
+  // solo se encendería mientras se arrastra, y María no vería qué va a coser
+  // ANTES de apretar. `gesture.press` solo existe durante el gesto, así que no
+  // sirve para esto.
+  const [hoveredTarget, setHoveredTarget] = useState<EdgeTarget | null>(null);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    const pt = toPattern(e.clientX, e.clientY, rect);
-
-    const excludeId = state.firstEdge?.pieceId;
-    const edge = findClosestEdge(pt, pieces, zoom, mode, state.firstEdge ? excludeId : undefined);
-    setState(prev => ({ ...prev, hoveredEdge: edge }));
-  }, [toPattern, pieces, zoom, mode, state.firstEdge]);
+    gesture.handleMouseMove(e);
+    if (gesture.isArmed()) return;   // durante el gesto manda el press, no el hover
+    setHoveredTarget(resolveTarget(e));
+  }, [gesture, resolveTarget]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      setState({ firstEdge: null, hoveredEdge: null });
+    if (e.key !== 'Escape') return;
+    // Un Esc = una acción (spec § 6, conflicto 7): si cancelamos algo, el evento
+    // no sigue viajando hasta `selection.deselect`.
+    if (gesture.isArmed()) {
+      gesture.cancel();
+      e.preventDefault();
+      e.stopPropagation();
+      return;
     }
-  }, []);
+    if (segmentA) {
+      setSegmentA(null);
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, [gesture, segmentA]);
 
   return {
-    firstEdge: state.firstEdge,
-    hoveredEdge: state.hoveredEdge,
-    handleMouseDown,
+    segmentA,
+    phase: segmentA ? ('holdingA' as const) : ('idle' as const),
+    hoveredTarget,
+    liveRange: gesture.liveRange,
+    handleMouseDown: gesture.handleMouseDown,
     handleMouseMove,
+    handleMouseUp: gesture.handleMouseUp,
     handleKeyDown,
-    mode,
+    isArmed: gesture.isArmed,
   };
 }

@@ -26,7 +26,7 @@ import TrimToolOverlay from './overlays/TrimToolOverlay';
 import type { TrimHover } from '../useTrimTool';
 import type { SegmentSelection, SnapResult } from '../useSegmentSewingTool';
 import type { WalkSeamEdge, GhostTransform, MismatchSample, WalkSeamMetrics } from '../useWalkSeamTool';
-import type { FreeEdgeSelection } from '../sewingUtils';
+import type { EdgeTarget } from '../edgeGesture';
 import type { BBox, HandlePosition } from '../../../utils/geometry/transform';
 import type { TransformPreview } from '../useTransformTool';
 import type { SlashAndSpreadPhase } from '../useSlashAndSpreadTool';
@@ -66,9 +66,8 @@ interface ToolOverlayProps {
   lineStart: Point2D | null;
   lineCursor: Point2D | null;
   lineLength: { length: number; midpoint: Point2D } | null;
-  seamFirstEdge: FreeEdgeSelection | null;
-  seamHoveredEdge: FreeEdgeSelection | null;
-  seamMode: 'free' | 'point';
+  seamSegmentA: SegmentSelection | null;
+  seamHoveredTarget: EdgeTarget | null;
   notchHoveredPoint: NotchHover | null;
   /** Tool Punto (maria-203): preview solo cuando reason === 'ok'. */
   pointToolHover?: import('../usePointTool').PointToolHover | null;
@@ -163,9 +162,8 @@ interface ToolOverlayProps {
   walkSeamFormatDistance: (d: number) => string;
   walkSeamHoveredSnapPoint: Point2D | null;
   // Free Sewing
-  freeSewingFirstEdge: FreeEdgeSelection | null;
-  freeSewingHoveredEdge: FreeEdgeSelection | null;
-  freeSewingMode: 'free' | 'point';
+  freeSewingSegmentA: SegmentSelection | null;
+  freeSewingHoveredTarget: EdgeTarget | null;
   // Offset Preview
   offsetPreviewOutline: PathCommand[] | null;
   offsetPreviewPiecePosition: Point2D | null;
@@ -183,7 +181,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
       <POMOverlay poms={poms} pieces={pieces} zoom2D={zoom2D} selectedPOMId={selectedPOMId} />
 
       {activeTool === 'seam' && (
-        <EdgePairOverlay zoom2D={zoom2D} firstEdge={props.seamFirstEdge} hoveredEdge={props.seamHoveredEdge} mode={props.seamMode} />
+        <EdgePairOverlay zoom2D={zoom2D} pieces={pieces} segmentA={props.seamSegmentA} hoveredTarget={props.seamHoveredTarget} />
       )}
 
       {activeTool === 'notch' && (props.notchHoveredPoint || props.notchRefineMarker) && (
@@ -388,9 +386,9 @@ export default function ToolOverlay(props: ToolOverlayProps) {
       {activeTool === 'freesewing' && (
         <EdgePairOverlay
           zoom2D={zoom2D}
-          firstEdge={props.freeSewingFirstEdge}
-          hoveredEdge={props.freeSewingHoveredEdge}
-          mode={props.freeSewingMode}
+          pieces={pieces}
+          segmentA={props.freeSewingSegmentA}
+          hoveredTarget={props.freeSewingHoveredTarget}
         />
       )}
 

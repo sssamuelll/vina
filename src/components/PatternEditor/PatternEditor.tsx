@@ -196,7 +196,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     dispatch(selectSeam(fullSeam.id));
   }, [dispatch]);
 
-  const seamTool = useFreeSewingTool(zoom2D, pan2D, pieces, handleSeamComplete, 'free');
+  const seamTool = useFreeSewingTool(zoom2D, pan2D, pieces, handleSeamComplete);
 
   const handleNotchAdd = useCallback((pieceId: string, notch: InternalLine) => {
     dispatch(addInternalLine({ pieceId, line: notch }));
@@ -308,8 +308,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const walkSeamTool = useWalkSeamTool(zoom2D, pan2D);
   const offsetTool = useOffsetTool(zoom2D, pan2D);
   const extendTrimTool = useExtendTrimTool(zoom2D, pan2D);
-  const freeSewingMode = (toolOptions?.freesewing?.sewingType as 'free' | 'point') ?? 'free';
-  const freeSewingTool = useFreeSewingTool(zoom2D, pan2D, pieces, handleSeamComplete, freeSewingMode);
+  const freeSewingTool = seamTool; // TAREA 7 lo borra junto con el tool `freesewing`
 
   // PolyPen tool options
   const polyPenMode = (toolOptions?.polyPen?.mode as 'piece' | 'internalLine') ?? 'piece';
@@ -843,9 +842,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             penWillClose={pen.willClose}
             rectPreview={rectTool.previewRect}
             rectDimensions={rectTool.rectDimensions}
-            seamFirstEdge={seamTool.firstEdge}
-            seamHoveredEdge={seamTool.hoveredEdge}
-            seamMode={seamTool.mode}
+            seamSegmentA={seamTool.segmentA}
+            seamHoveredTarget={seamTool.hoveredTarget}
             lineStart={lineTool.startPoint}
             lineCursor={lineTool.cursorPos}
             lineLength={lineTool.lineLength}
@@ -929,9 +927,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             walkSeamMetrics={walkSeamTool.metrics}
             walkSeamFormatDistance={walkSeamTool.formatDistance}
             walkSeamHoveredSnapPoint={walkSeamTool.hoveredSnapPoint}
-            freeSewingFirstEdge={freeSewingTool.firstEdge}
-            freeSewingHoveredEdge={freeSewingTool.hoveredEdge}
-            freeSewingMode={freeSewingTool.mode}
+            freeSewingSegmentA={freeSewingTool.segmentA}
+            freeSewingHoveredTarget={freeSewingTool.hoveredTarget}
             offsetPreviewOutline={offsetTool.previewOutline}
             offsetPreviewPiecePosition={
               editor.selectedPieceIds.length === 1
@@ -976,7 +973,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           segmentSewingPhase={segmentSewingTool.phase}
           topstitchMode={topstitchTool.mode}
           walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
-          seamHasFirstEdge={activeTool === 'seam' ? !!seamTool.firstEdge : !!freeSewingTool.firstEdge}
+          seamHasFirstEdge={activeTool === 'seam' ? !!seamTool.segmentA : !!freeSewingTool.segmentA}
           saDefaultWidthMm={seamAllowanceTool.widthMm}
         />
 

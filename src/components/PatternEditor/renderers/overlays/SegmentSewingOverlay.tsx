@@ -14,16 +14,20 @@ interface SegmentSewingOverlayProps {
   hoveredSnap: SnapResult | null;
 }
 
-function SegmentHighlight({
+export function SegmentHighlight({
   segment,
   piece,
   color,
   zoom2D,
+  opacity = 1,
 }: {
   segment: SegmentSelection;
   piece: PatternPiece | undefined;
   color: string;
   zoom2D: number;
+  /** Reusado por `EdgePairOverlay` para el hover pre-press (spec § 3): más
+   *  tenue que la mitad ya cerrada, misma geometría de arco. */
+  opacity?: number;
 }) {
   if (!piece) return null;
 
@@ -59,7 +63,7 @@ function SegmentHighlight({
   const r = 5 / zoom2D;
 
   return (
-    <g>
+    <g opacity={opacity}>
       <path
         d={d} fill="none"
         stroke={color} strokeWidth={3.5 / zoom2D}

@@ -97,7 +97,7 @@ interface ToolHooks {
   pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => void; reset: () => void };
   rectTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
   lineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
-  seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
+  seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   notchTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
   pointTool: {
     armed: boolean;
@@ -412,6 +412,13 @@ export function useEditorInteractions(
         pointTool.handleKeyDown(e);
         return;
       }
+      // Coser: con un gesto armado o una mitad sostenida, el Esc es del tool.
+      // El hook hace preventDefault + stopPropagation cuando cancela algo; si
+      // no hay nada que cancelar, el Esc fluye normal → deseleccionar.
+      if (activeTool === 'seam') {
+        seamTool.handleKeyDown(e);
+        return;
+      }
       if (activeTool !== 'select') return;
       if (!transformTool.isDragging) return;
       transformTool.handleKeyDown(e);
@@ -420,7 +427,7 @@ export function useEditorInteractions(
     };
     window.addEventListener('keydown', onEscapeCapture, { capture: true });
     return () => window.removeEventListener('keydown', onEscapeCapture, { capture: true });
-  }, [activeTool, transformTool, pointTool]);
+  }, [activeTool, transformTool, pointTool, seamTool]);
 
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);
@@ -952,7 +959,8 @@ export function useEditorInteractions(
     if (activeTool === 'polyPen' && e) polyPenTool.handleMouseUp(e);
     if (activeTool === 'internalShape' && e) internalShapeTool.handleMouseUp(e);
     if (activeTool === 'point' && e) pointTool.handleMouseUp(e);
-  }, [activeTool, pen, rectTool, seamAllowanceTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, dispatch, pieces, zoom2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pointTool]);
+    if (activeTool === 'seam' && e) seamTool.handleMouseUp(e);
+  }, [activeTool, pen, rectTool, seamAllowanceTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, dispatch, pieces, zoom2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pointTool, seamTool]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
