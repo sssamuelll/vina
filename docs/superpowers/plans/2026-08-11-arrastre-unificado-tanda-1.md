@@ -189,7 +189,9 @@ git commit -m "feat(2d): un solo umbral de arrastre, 4px, para todo el editor (#
   - `type EdgeGesturePhase = 'idle' | 'armed' | 'dragging'`
   - `interface EdgeTarget { pieceId: string; edgeIndex: number; edgeRange: [number, number]; t: number; point: Point2D }`
   - `type EdgeCommit = { kind: 'click'; target: EdgeTarget } | { kind: 'drag'; target: EdgeTarget; range: [number, number] }`
-  - `function resolveEdgeCommit(press: EdgeTarget, releaseT: number | null, dx: number, dy: number): EdgeCommit`
+  - `function resolveEdgeCommit(press: EdgeTarget, releaseT: number | null, crossedThreshold: boolean): EdgeCommit`
+
+> **Corrección 2026-08-11, tras la revisión de la Tarea 2.** La primera versión de este brief pasaba `dx, dy` y volvía a llamar a `isDrag` dentro de `resolveEdgeCommit`. Eso **contradice el spec**: § 4.1 resuelve el pointerup desde `DRAGGING` solo por `|Δt|`, y § 6 (conflicto 2) dice que el umbral de pantalla, *una vez cruzado, no se re-evalúa*. Con la firma vieja, sobre un borde curvo —una sisa, un escote en U— el cursor puede volver **cerca en pantalla** del punto de partida con el **arco lejísimos**, y el gesto commiteaba un clic ("borde entero") después de haberle enseñado el rango en vivo. `crossedThreshold` es el flag histórico `moved` del hook, que se pone una vez y no se desactiva. `isDrag` se usa **solo** en `useEdgeGesture` para la transición ARMED→DRAGGING, que es su único sitio correcto.
   - `function useEdgeGesture(opts: { resolveTarget: (e: React.MouseEvent<SVGSVGElement>) => EdgeTarget | null; resolveReleaseT: (e: React.MouseEvent<SVGSVGElement>, press: EdgeTarget) => number | null; onCommit: (c: EdgeCommit) => void }): { phase: EdgeGesturePhase; press: EdgeTarget | null; liveRange: [number, number] | null; handleMouseDown; handleMouseMove; handleMouseUp; cancel: () => void; isArmed: () => boolean }`
 
 `isArmed()` es la que consultan el guard de Escape (Tarea 3) y el del menú contextual (Tarea 6): las dos necesitan saber si hay un gesto vivo **sin** provocar un re-render, por eso es una función sobre un ref y no un booleano de estado.
