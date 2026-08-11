@@ -222,6 +222,66 @@ export function resolveEdgePolyline(
 }
 
 /**
+ * Polilínea aplanada de UN comando del contorno, en coordenadas locales de la
+ * pieza. Es `resolveEdgePolyline` pero por índice de comando en vez de por
+ * nombre de borde semántico — lo que necesitan las herramientas de coser, que
+ * trabajan con `edgeIndex`.
+ *
+ * Devuelve [] cuando el comando no aporta tramo (el flattener no lo cubre);
+ * el llamador decide si cae a la cuerda.
+ */
+export function commandPolyline(
+  outline: PathCommand[],
+  cmdIndex: number,
+  resolution: number = CURVE_RESOLUTION,
+): Point2D[] {
+  const flat = flattenPath(outline, resolution);
+  if (flat.length === 0) return [];
+  const [from, to] = commandRangeToFlattened(outline, [cmdIndex, cmdIndex + 1], resolution);
+  const pts = to >= from
+    ? flat.slice(from, to + 1)
+    : [...flat.slice(from), ...flat.slice(0, to + 1)];
+  return pts.length >= 2 ? pts : [];
+}
+
+/**
+ * Punto de la polilínea más cercano a `pt`, con su fracción de ARCO y la
+ * distancia. La `t` es arco acumulado / arco total, o sea la misma
+ * parametrización que usan `slicePolylineByT` y el `tStart`/`tEnd` de un Seam.
+ *
+ * Existe porque medir contra la CUERDA de un comando curvo miente por los dos
+ * lados: un clic encima del trazo sale lejísimos, y un clic en el aire sobre la
+ * cuerda sale encima. Es el mismo arreglo que recibió el hit-test del margen de
+ * costura en el #213, ahora para las herramientas de coser (#1026).
+ */
+export function closestOnPolyline(
+  pt: Point2D,
+  poly: Point2D[],
+): { point: Point2D; t: number; dist: number } | null {
+  if (poly.length < 2) return null;
+  const cum: number[] = [0];
+  for (let i = 1; i < poly.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(poly[i].x - poly[i - 1].x, poly[i].y - poly[i - 1].y));
+  }
+  const total = cum[cum.length - 1];
+  let best: { point: Point2D; t: number; dist: number } = {
+    point: { ...poly[0] }, t: 0, dist: Infinity,
+  };
+  for (let i = 1; i < poly.length; i++) {
+    const a = poly[i - 1], b = poly[i];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const l2 = dx * dx + dy * dy;
+    const u = l2 > 0 ? Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / l2)) : 0;
+    const p = { x: a.x + u * dx, y: a.y + u * dy };
+    const dist = Math.hypot(pt.x - p.x, pt.y - p.y);
+    if (dist < best.dist) {
+      best = { point: p, t: total > 0 ? (cum[i - 1] + u * Math.sqrt(l2)) / total : 0, dist };
+    }
+  }
+  return best;
+}
+
+/**
  * Recorta una polilínea al sub-rango [t0, t1] de su ARCO (fracciones 0-1,
  * la parametrización de tStart/tEnd en seamRange.ts), interpolando los
  * extremos y conservando los vértices interiores del rango.

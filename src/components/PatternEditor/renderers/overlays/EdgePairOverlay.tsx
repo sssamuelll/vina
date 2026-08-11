@@ -1,3 +1,4 @@
+import type { Point2D } from '../../../../types/types';
 import type { FreeEdgeSelection } from '../../sewingUtils';
 import { SEWING_PICK_FIRST, SEWING_PICK_SECOND } from '../seamVisuals';
 
@@ -8,6 +9,15 @@ interface EdgePairOverlayProps {
   mode?: 'free' | 'point';
 }
 
+/**
+ * `d` de una polilínea. El resalte se pinta con el TRAZO del borde, que para un
+ * recto son sus dos extremos y para una curva es su arco aplanado. Antes era un
+ * `<line>` de extremo a extremo, así que un borde curvo se resaltaba con su
+ * cuerda: "CREA COSTURA EN RECTA, SIN SEGUIR LA CURVA" (maria #199).
+ */
+const polyD = (pts: Point2D[]) =>
+  pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
 export default function EdgePairOverlay({ zoom2D, firstEdge, hoveredEdge, mode = 'free' }: EdgePairOverlayProps) {
   const dotR = 4 / zoom2D;
 
@@ -15,12 +25,13 @@ export default function EdgePairOverlay({ zoom2D, firstEdge, hoveredEdge, mode =
     <g className="edge-pair-overlay">
       {firstEdge && (
         <>
-          <line
-            x1={firstEdge.start.x} y1={firstEdge.start.y}
-            x2={firstEdge.end.x} y2={firstEdge.end.y}
+          <path
+            d={polyD(firstEdge.path)}
+            fill="none"
             stroke={SEWING_PICK_FIRST}
             strokeWidth={3 / zoom2D}
             strokeLinecap="round"
+            strokeLinejoin="round"
           />
           <circle cx={firstEdge.start.x} cy={firstEdge.start.y} r={dotR} fill={SEWING_PICK_FIRST} />
           <circle cx={firstEdge.end.x} cy={firstEdge.end.y} r={dotR} fill={SEWING_PICK_FIRST} />
@@ -29,12 +40,13 @@ export default function EdgePairOverlay({ zoom2D, firstEdge, hoveredEdge, mode =
 
       {hoveredEdge && (
         <>
-          <line
-            x1={hoveredEdge.start.x} y1={hoveredEdge.start.y}
-            x2={hoveredEdge.end.x} y2={hoveredEdge.end.y}
+          <path
+            d={polyD(hoveredEdge.path)}
+            fill="none"
             stroke={firstEdge ? SEWING_PICK_SECOND : SEWING_PICK_FIRST}
             strokeWidth={2.5 / zoom2D}
             strokeLinecap="round"
+            strokeLinejoin="round"
             opacity={0.7}
           />
           {mode === 'point' && (

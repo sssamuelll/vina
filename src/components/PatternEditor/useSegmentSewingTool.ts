@@ -7,7 +7,9 @@ import type { PathCommand, PatternPiece, Point2D, Seam } from '../../types/types
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern } from './sewingUtils';
 import { screenToPatternLength } from '../../utils/geometry';
-import { flattenPathWithSource, commandRangeToFlattened } from '../../utils/seam';
+import {
+  flattenPathWithSource, commandRangeToFlattened, commandPolyline, closestOnPolyline,
+} from '../../utils/seam';
 import { applyPctRange } from '../../utils/seam/seamRange';
 import { newId } from '../../utils/ids';
 
@@ -61,26 +63,35 @@ export function snapToEdge(
   for (let i = 1; i < cmds.length; i++) {
     if (edgeConstraint !== undefined && i !== edgeConstraint) continue;
 
-    const ep = getEdgeEndpoints(cmds, i);
-    if (!ep) continue;
-
-    const dx = ep.end.x - ep.start.x;
-    const dy = ep.end.y - ep.start.y;
-    const lenSq = dx * dx + dy * dy;
-
-    let t: number;
+    // Contra el TRAZO aplanado, no contra la cuerda. Medir contra la cuerda de
+    // un comando curvo miente por los dos lados: clicar encima del arco no
+    // enganchaba nada (la cuerda queda lejísimos) y clicar en el aire sobre la
+    // cuerda sí enganchaba. Es el fallo del #213 en las tijeras de coser
+    // (maria #199 vuelta 2). La cuerda queda de reserva para los comandos que
+    // el aplanado no cubre — el cierre Z, entre otros.
+    const poly = commandPolyline(cmds, i);
     let closest: Point2D;
+    let t: number;
 
-    if (lenSq === 0) {
-      t = 0;
-      closest = ep.start;
+    if (poly.length >= 2) {
+      const hit = closestOnPolyline(localPt, poly);
+      if (!hit) continue;
+      closest = hit.point;
+      t = hit.t;
     } else {
-      t = ((localPt.x - ep.start.x) * dx + (localPt.y - ep.start.y) * dy) / lenSq;
-      t = Math.max(0, Math.min(1, t));
-      closest = {
-        x: ep.start.x + t * dx,
-        y: ep.start.y + t * dy,
-      };
+      const ep = getEdgeEndpoints(cmds, i);
+      if (!ep) continue;
+      const dx = ep.end.x - ep.start.x;
+      const dy = ep.end.y - ep.start.y;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) {
+        t = 0;
+        closest = ep.start;
+      } else {
+        t = Math.max(0, Math.min(1,
+          ((localPt.x - ep.start.x) * dx + (localPt.y - ep.start.y) * dy) / lenSq));
+        closest = { x: ep.start.x + t * dx, y: ep.start.y + t * dy };
+      }
     }
 
     const dist = Math.hypot(localPt.x - closest.x, localPt.y - closest.y);
