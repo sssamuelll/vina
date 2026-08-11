@@ -11,6 +11,7 @@ import {
   flattenPathWithSource, commandRangeToFlattened, commandPolyline, closestOnPolyline,
 } from '../../utils/seam';
 import { applyPctRange } from '../../utils/seam/seamRange';
+import { edgeRangeForCommand } from '../../utils/semanticEdges';
 import { newId } from '../../utils/ids';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -48,27 +49,6 @@ interface SegmentSewingState {
 const SNAP_THRESHOLD = 8;
 
 // ─── Pure functions (exported for testing) ────────────────────────────
-
-/**
- * Rango de comandos del borde semántico que contiene `cmdIndex`, o el comando
- * suelto si la pieza no tiene bordes detectados.
- *
- * Es la unidad del gesto. La pista de pantalla siempre dijo "el mismo BORDE" y
- * el código constreñía al mismo COMANDO: coinciden solo en un rectángulo
- * dibujado a mano. En un DXF los contornos vienen como polilíneas densas de
- * `L` (cabecera de outlineAnalysis.ts), y basta añadir un punto a un lado
- * recto para partirlo en dos — ahí el segundo clic caía fuera y el gesto se
- * quedaba mudo (maria #199a).
- */
-export function semanticEdgeRange(
-  piece: PatternPiece | undefined,
-  cmdIndex: number,
-): [number, number] {
-  const semantic = piece?.edges?.find(
-    e => cmdIndex >= e.segmentRange[0] && cmdIndex < e.segmentRange[1],
-  );
-  return semantic ? semantic.segmentRange : [cmdIndex, cmdIndex + 1];
-}
 
 export function snapToEdge(
   pt: Point2D,
@@ -216,7 +196,7 @@ export function closeSegment(
   second: SnapResult,
   piece: PatternPiece | undefined,
 ): SegmentSelection | null {
-  const edgeRange = semanticEdgeRange(piece, first.edgeIndex);
+  const edgeRange = edgeRangeForCommand(piece, first.edgeIndex);
   const tA = piece ? commandTToEdgeT(piece.outline, edgeRange, first.edgeIndex, first.t) : first.t;
   const tB = piece ? commandTToEdgeT(piece.outline, edgeRange, second.edgeIndex, second.t) : second.t;
   if (Math.abs(tB - tA) < MIN_SEGMENT_T) return null;
@@ -294,7 +274,7 @@ function closeAgainstPending(
   const snap = snapToAnyEdge(
     pt, pieces, zoom,
     pending.pieceId,
-    semanticEdgeRange(piece, pending.edgeIndex),
+    edgeRangeForCommand(piece, pending.edgeIndex),
   );
   return snap ? closeSegment(pending, snap, piece) : null;
 }
@@ -397,7 +377,7 @@ export function useSegmentSewingTool(
 
         if ((prev.phase === 'a_start' || prev.phase === 'b_start') && prev.pendingSnap) {
           constrainPiece = prev.pendingSnap.pieceId;
-          constrainEdge = semanticEdgeRange(
+          constrainEdge = edgeRangeForCommand(
             pieces.find(p => p.id === constrainPiece),
             prev.pendingSnap.edgeIndex,
           );

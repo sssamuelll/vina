@@ -220,6 +220,31 @@ export function detectSemanticEdges(piece: PatternPiece): SemanticEdge[] {
 }
 
 /**
+ * Rango de comandos del borde semántico que contiene `cmdIndex`, o el comando
+ * suelto si la pieza no tiene bordes detectados.
+ *
+ * Es la unidad en la que el usuario VE un borde, y por tanto la unidad en la
+ * que tienen que trabajar las herramientas que lo tocan. En un rectángulo
+ * dibujado a mano un borde es un comando y da igual; en un patrón importado un
+ * borde son 14-20 comandos (los contornos vienen como polilíneas densas de
+ * `L`, cabecera de outlineAnalysis.ts) y confundir las dos unidades hace que
+ * el gesto no llegue (#1025) o que el resalte enseñe una parte de lo que se va
+ * a coser (#1042).
+ *
+ * Hermana de `resolveEdgeName`: la misma búsqueda, devolviendo el rango en vez
+ * del nombre.
+ */
+export function edgeRangeForCommand(
+  piece: Pick<PatternPiece, 'edges'> | undefined,
+  cmdIndex: number,
+): [number, number] {
+  const semantic = piece?.edges?.find(
+    e => cmdIndex >= e.segmentRange[0] && cmdIndex < e.segmentRange[1],
+  );
+  return semantic ? semantic.segmentRange : [cmdIndex, cmdIndex + 1];
+}
+
+/**
  * Find an edge by name (case-insensitive, partial match).
  */
 export function findEdgeByName(edges: SemanticEdge[], query: string): SemanticEdge | undefined {

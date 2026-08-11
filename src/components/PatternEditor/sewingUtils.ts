@@ -1,6 +1,7 @@
 import type { PatternPiece, Point2D } from '../../types/types';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
-import { commandPolyline, closestOnPolyline } from '../../utils/seam';
+import { edgeRangePolyline, closestOnPolyline } from '../../utils/seam';
+import { edgeRangeForCommand } from '../../utils/semanticEdges';
 
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 
@@ -18,10 +19,11 @@ export interface FreeEdgeSelection {
   /** Midpoint in world space */
   midpoint: Point2D;
   /**
-   * Trazo del borde en mundo: la polilínea aplanada del comando, o sus dos
-   * extremos si es recto. Sin esto `EdgePairOverlay` solo podía dibujar la
-   * recta entre extremos, y el resalte de un borde curvo salía como su cuerda
-   * — "CREA COSTURA EN RECTA, SIN SEGUIR LA CURVA" (maria #199).
+   * Trazo en mundo del BORDE SEMÁNTICO entero — lo que se va a coser. Sin esto
+   * `EdgePairOverlay` solo podía dibujar la recta entre extremos y el resalte
+   * de un borde curvo salía como su cuerda ("CREA COSTURA EN RECTA, SIN SEGUIR
+   * LA CURVA", maria #199); y mientras salió del comando clicado, enseñaba una
+   * fracción de lo que la costura acababa cogiendo (#1042).
    */
   path: Point2D[];
 }
@@ -50,18 +52,37 @@ export function resolveEdgeName(piece: PatternPiece, edgeIndex: number): string 
   )?.name ?? `edge-${edgeIndex}`;
 }
 
-/** Build a FreeEdgeSelection from a piece + edge index */
+/**
+ * Build a FreeEdgeSelection from a piece + edge index.
+ *
+ * La selección describe el BORDE SEMÁNTICO entero, que es lo que se va a
+ * coser: `resolveEdgeName` resuelve el borde completo y ese nombre es el que
+ * viaja al `Seam`. Antes el trazo se sacaba del COMANDO clicado, así que en un
+ * patrón importado —donde un borde son 14-20 comandos— ella clicaba un lado,
+ * se le iluminaba una veinteava parte, y la costura cosía el lado entero
+ * (#1042). El resalte no es un adorno: es la única señal de qué se va a coser.
+ *
+ * Sin bordes detectados el rango cae al comando suelto y todo queda como
+ * estaba.
+ */
 export function buildEdgeSelection(piece: PatternPiece, edgeIndex: number): FreeEdgeSelection | null {
-  const ep = getEdgeEndpoints(piece.outline, edgeIndex);
-  if (!ep) return null;
-  const start = { x: ep.start.x + piece.position.x, y: ep.start.y + piece.position.y };
-  const end = { x: ep.end.x + piece.position.x, y: ep.end.y + piece.position.y };
-  // El trazo real del comando, en mundo. Un recto aplanado son sus dos
-  // extremos, así que esto no cambia nada para ellos; una curva trae su arco.
-  const local = commandPolyline(piece.outline, edgeIndex);
-  const path = local.length >= 2
-    ? local.map(p => ({ x: p.x + piece.position.x, y: p.y + piece.position.y }))
-    : [start, end];
+  const ox = piece.position.x;
+  const oy = piece.position.y;
+  const local = edgeRangePolyline(piece.outline, edgeRangeForCommand(piece, edgeIndex));
+  let path: Point2D[];
+  if (local.length >= 2) {
+    path = local.map(p => ({ x: p.x + ox, y: p.y + oy }));
+  } else {
+    // Lo que el aplanado no cubre (el cierre Z, entre otros): la cuerda.
+    const ep = getEdgeEndpoints(piece.outline, edgeIndex);
+    if (!ep) return null;
+    path = [
+      { x: ep.start.x + ox, y: ep.start.y + oy },
+      { x: ep.end.x + ox, y: ep.end.y + oy },
+    ];
+  }
+  const start = path[0];
+  const end = path[path.length - 1];
   return {
     pieceId: piece.id,
     edgeIndex,
@@ -96,8 +117,16 @@ export function findClosestEdge(
       if (!sel) continue;
 
       if (mode === 'point') {
-        const dStart = Math.hypot(pt.x - sel.start.x, pt.y - sel.start.y) * zoom;
-        const dEnd = Math.hypot(pt.x - sel.end.x, pt.y - sel.end.y) * zoom;
+        // Los vértices siguen siendo los del COMANDO: lo que este modo promete
+        // es "clica cerca de un punto del contorno", y los vértices intermedios
+        // de una polilínea densa son puntos del contorno. Lo que cambió con el
+        // #1042 es lo que se DEVUELVE (el borde entero), no dónde se engancha.
+        const ep = getEdgeEndpoints(piece.outline, i);
+        if (!ep) continue;
+        const vIni = { x: ep.start.x + piece.position.x, y: ep.start.y + piece.position.y };
+        const vFin = { x: ep.end.x + piece.position.x, y: ep.end.y + piece.position.y };
+        const dStart = Math.hypot(pt.x - vIni.x, pt.y - vIni.y) * zoom;
+        const dEnd = Math.hypot(pt.x - vFin.x, pt.y - vFin.y) * zoom;
         const d = Math.min(dStart, dEnd);
         if (d < VERTEX_SNAP_THRESHOLD && d < bestDist) {
           bestDist = d;
