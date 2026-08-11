@@ -278,7 +278,7 @@ export function useEditorInteractions(
   const marqueeRef = useRef<{ startPattern: Point2D; currentPattern: Point2D; shiftKey: boolean } | null>(null);
   const [selectMarquee, setSelectMarquee] = useState<{ start: Point2D; current: Point2D } | null>(null);
   const [hoverCursor, setHoverCursor] = useState<string | null>(null);
-  /** true mientras una pieza se arrastra de verdad (≥ MIN_DRAG_PX). Suprime la
+  /** true mientras una pieza se arrastra de verdad (≥ DRAG_THRESHOLD_PX). Suprime la
    *  cromía que se pinta desde Redux y se quedaba clavada en el origen durante
    *  el drag por DOM: la caja de transformación y la barra flotante (maria-200)
    *  y los overlays de anclas de editPattern / editCurve (maria-194 — el rastro

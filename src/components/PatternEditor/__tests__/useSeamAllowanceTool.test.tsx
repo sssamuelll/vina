@@ -138,7 +138,7 @@ describe('useSeamAllowanceTool left-click', () => {
   it('a sub-threshold jitter on the body is still a single click, not a drag', () => {
     const { onApply, onApplyAll, hook } = setup([piece(0)]);
     act(() => hook.result.current.handleMouseDown(clickAt(100, 100)));
-    act(() => hook.result.current.handleMouseMove(clickAt(101, 101))); // <3px
+    act(() => hook.result.current.handleMouseMove(clickAt(101, 101))); // <4px (SM_CXDRAG de Windows)
     act(() => hook.result.current.handleMouseUp());
     expect(onApply).toHaveBeenCalledWith('p', 9.5, 0);
     expect(onApplyAll).not.toHaveBeenCalled();

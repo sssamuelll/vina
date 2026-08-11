@@ -121,7 +121,7 @@ function projPos(store: ReturnType<typeof setup>['store']) {
 }
 
 describe('gate de phantom-move (EB-1/EB-2)', () => {
-  it('no despacha movePiece en un clic con jitter sub-3px', () => {
+  it('no despacha movePiece en un clic con jitter sub-4px (SM_CXDRAG de Windows)', () => {
     const tools = makeTools({ nodeEditor: idleNodeEditor(), transformTool: idleTransform() });
     const { hook, store } = setup('select', [pieceP1()], tools);
     act(() => { hook.result.current.handleMouseDown(downOn('p1', 100, 100)); });
@@ -130,7 +130,7 @@ describe('gate de phantom-move (EB-1/EB-2)', () => {
     expect(projPos(store)).toEqual({ x: 0, y: 0 });
   });
 
-  it('despacha movePiece pasado el umbral de 3px', () => {
+  it('despacha movePiece pasado el umbral de 4px (SM_CXDRAG de Windows)', () => {
     const tools = makeTools({ nodeEditor: idleNodeEditor(), transformTool: idleTransform() });
     const { hook, store } = setup('select', [pieceP1()], tools);
     act(() => { hook.result.current.handleMouseDown(downOn('p1', 100, 100)); });
