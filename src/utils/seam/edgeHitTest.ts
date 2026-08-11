@@ -1,5 +1,6 @@
 import type { PathCommand, PatternPiece, Point2D, SemanticEdge } from '../../types/types';
 import { flattenPathWithSource } from './index';
+import { detectCornerCommands } from '../outlineAnalysis';
 
 /** Distance from point p to segment a→b. */
 function distToSegment(p: Point2D, a: Point2D, b: Point2D): number {
@@ -56,20 +57,37 @@ export function pickEdgeForSeamAllowance(
 }
 
 /**
- * Nearest M/L outline vertex to a piece-local point, within `maxDist`. Returns
- * the vertex's COMMAND index (the same key space as cornerTypes / corner
- * editing), or null. Curve endpoints are not targeted (matches the existing
- * corner-edit behavior).
+ * Nearest outline CORNER to a piece-local point, within `maxDist`. Returns the
+ * corner's COMMAND index (the same key space as cornerTypes / corner editing),
+ * or null. Curve endpoints are not targeted (matches the existing corner-edit
+ * behavior).
+ *
+ * Solo las esquinas de verdad son blanco. Esto antes aceptaba cualquier `M`/`L`,
+ * lo cual es lo mismo en un rectángulo dibujado a mano y es ruido en un patrón
+ * importado: un DXF entrega las curvas como polilíneas densas de `L`, así que
+ * cada muestra de la curva era un blanco de vértice — y el vértice gana siempre
+ * al borde en `resolveSeamAllowanceClick`. Medido sobre el DXF de producción de
+ * María, al zoom con el que se ve el patrón entero: 862 de 882 clics ENCIMA del
+ * contorno (98%) seleccionaban un "vértice" que nadie había dibujado, en vez del
+ * borde cuyo margen ella quería editar ("hay veces que clicando curvas no hace
+ * nada", maria #220). Zoom 15× adentro las muestras se separan lo bastante y
+ * caía al 29%: de ahí su "hay veces".
+ *
+ * El tipo de esquina en un vértice que gira 0.5° tampoco pinta nada distinto,
+ * así que no se pierde ningún blanco útil.
  */
 export function findNearestOutlineVertex(
   outline: PathCommand[],
   point: Point2D,
   maxDist: number,
 ): { index: number; dist: number } | null {
+  const corners = detectCornerCommands(outline);
+  if (corners.size === 0) return null;
   let best: { index: number; dist: number } | null = null;
   for (let i = 0; i < outline.length; i++) {
     const cmd = outline[i];
     if (cmd.type !== 'M' && cmd.type !== 'L') continue;
+    if (!corners.has(i)) continue;
     const d = Math.hypot(cmd.values[0] - point.x, cmd.values[1] - point.y);
     if (d <= maxDist && (!best || d < best.dist)) best = { index: i, dist: d };
   }

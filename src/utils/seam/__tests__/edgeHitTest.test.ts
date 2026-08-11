@@ -62,6 +62,71 @@ describe('resolveSeamAllowanceClick', () => {
   });
 });
 
+/**
+ * maria-220 — "cuando clico una curva y la lee (porque hay veces que clicando
+ * curvas no hace nada) se selecciona una parte random de la curva".
+ *
+ * Un DXF real no trae béziers: los lados curvos vienen como POLILÍNEAS DENSAS
+ * de `L` (cabecera de outlineAnalysis.ts). Su patrón tiene 194-276 comandos por
+ * pieza, con las muestras a ~5mm una de otra. Como el blanco de VÉRTICE aceptaba
+ * cualquier `M`/`L`, cada muestra de la curva era un blanco — y el vértice gana
+ * siempre al borde. Medido sobre su DXF de producción: al zoom con el que se ve
+ * el patrón entero (0.53 px/mm), 862 de 882 clics ENCIMA del contorno (98%)
+ * caían en un "vértice" que nadie dibujó.
+ */
+const arcoDenso = (() => {
+  // M(0,0) → L(0,100) → 20 muestras de un arco hasta (200,100) → L(200,0) → Z.
+  const cmds: PathCommand[] = [
+    { type: 'M', values: [0, 0] },
+    { type: 'L', values: [0, 100] },
+  ];
+  for (let i = 1; i <= 20; i++) {
+    const x = (200 * i) / 20;
+    cmds.push({ type: 'L', values: [x, 100 + 30 * Math.sin((Math.PI * x) / 200)] });
+  }
+  cmds.push({ type: 'L', values: [200, 0] });
+  cmds.push({ type: 'Z', values: [] });
+  return cmds;
+})();
+
+const arcoEdges: SemanticEdge[] = [
+  { id: 'cad:izq', name: 'left', segmentRange: [1, 2], edgeType: 'seam' },
+  { id: 'cad:arco', name: 'arc', segmentRange: [2, 22], edgeType: 'seam' },
+  { id: 'cad:der', name: 'right', segmentRange: [22, 23], edgeType: 'seam' },
+];
+
+describe('maria-220 — el clic sobre una polilínea densa llega al borde', () => {
+  const piece = {
+    id: 'cad', name: 'CAD', outline: arcoDenso, position: { x: 0, y: 0 },
+    edges: arcoEdges, seamAllowance: 10, internals: [],
+  } as unknown as PatternPiece;
+  const pieces = [piece];
+
+  /** Punto medio del tramo entre dos muestras de la curva — a ~5mm de ambas. */
+  const entreMuestras = {
+    x: (arcoDenso[11].values[0] + arcoDenso[12].values[0]) / 2,
+    y: (arcoDenso[11].values[1] + arcoDenso[12].values[1]) / 2,
+  };
+
+  it('clicar encima de la curva selecciona el BORDE, no un punto de muestreo', () => {
+    const r = resolveSeamAllowanceClick(pieces, entreMuestras, 10, 12);
+    expect(r).toEqual({ kind: 'edge', pieceId: 'cad', edgeId: 'cad:arco' });
+  });
+
+  it('una muestra intermedia de la curva no es un blanco de vértice', () => {
+    // Clic EXACTAMENTE encima de una muestra: sigue sin ser una esquina.
+    const muestra = { x: arcoDenso[11].values[0], y: arcoDenso[11].values[1] };
+    expect(findNearestOutlineVertex(arcoDenso, muestra, 10)).toBeNull();
+  });
+
+  it('las esquinas de verdad siguen siendo blancos de vértice', () => {
+    // (0,100): el lado izquierdo se encuentra con el arco — gira 59°.
+    expect(findNearestOutlineVertex(arcoDenso, { x: 2, y: 98 }, 10)?.index).toBe(1);
+    expect(resolveSeamAllowanceClick(pieces, { x: 2, y: 98 }, 10, 12))
+      .toEqual({ kind: 'vertex', pieceId: 'cad', vertexIndex: 1 });
+  });
+});
+
 describe('pickEdgeForSeamAllowance', () => {
   it('picks the top edge when clicking near the top segment', () => {
     const e = pickEdgeForSeamAllowance(square, edges, { x: 100, y: 2 }, 10);
