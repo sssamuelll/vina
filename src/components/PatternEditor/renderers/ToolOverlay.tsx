@@ -68,6 +68,10 @@ interface ToolOverlayProps {
   lineLength: { length: number; midpoint: Point2D } | null;
   seamSegmentA: SegmentSelection | null;
   seamHoveredTarget: EdgeTarget | null;
+  /** El borde del press mientras el gesto de coser sigue vivo, y el tramo que
+   *  lleva marcado el arrastre — el tramo en vivo que sustituye al hover. */
+  seamActiveTarget: EdgeTarget | null;
+  seamLiveRange: [number, number] | null;
   notchHoveredPoint: NotchHover | null;
   /** Tool Punto (maria-203): preview solo cuando reason === 'ok'. */
   pointToolHover?: import('../usePointTool').PointToolHover | null;
@@ -164,6 +168,8 @@ interface ToolOverlayProps {
   // Free Sewing
   freeSewingSegmentA: SegmentSelection | null;
   freeSewingHoveredTarget: EdgeTarget | null;
+  freeSewingActiveTarget: EdgeTarget | null;
+  freeSewingLiveRange: [number, number] | null;
   // Offset Preview
   offsetPreviewOutline: PathCommand[] | null;
   offsetPreviewPiecePosition: Point2D | null;
@@ -181,7 +187,14 @@ export default function ToolOverlay(props: ToolOverlayProps) {
       <POMOverlay poms={poms} pieces={pieces} zoom2D={zoom2D} selectedPOMId={selectedPOMId} />
 
       {activeTool === 'seam' && (
-        <EdgePairOverlay zoom2D={zoom2D} pieces={pieces} segmentA={props.seamSegmentA} hoveredTarget={props.seamHoveredTarget} />
+        <EdgePairOverlay
+          zoom2D={zoom2D}
+          pieces={pieces}
+          segmentA={props.seamSegmentA}
+          hoveredTarget={props.seamHoveredTarget}
+          activeTarget={props.seamActiveTarget}
+          liveRange={props.seamLiveRange}
+        />
       )}
 
       {activeTool === 'notch' && (props.notchHoveredPoint || props.notchRefineMarker) && (
@@ -389,6 +402,8 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           pieces={pieces}
           segmentA={props.freeSewingSegmentA}
           hoveredTarget={props.freeSewingHoveredTarget}
+          activeTarget={props.freeSewingActiveTarget}
+          liveRange={props.freeSewingLiveRange}
         />
       )}
 

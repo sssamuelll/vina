@@ -121,6 +121,9 @@ export function useFreeSewingTool(
     segmentA,
     phase: segmentA ? ('holdingA' as const) : ('idle' as const),
     hoveredTarget,
+    /** El borde que enganchó el press, mientras el gesto sigue vivo. Con
+     *  `liveRange` compone el tramo que se está marcando ahora mismo. */
+    activeTarget: gesture.press,
     liveRange: gesture.liveRange,
     handleMouseDown: gesture.handleMouseDown,
     handleMouseMove,

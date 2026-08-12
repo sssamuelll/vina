@@ -57,7 +57,7 @@ describe('EdgePairOverlay — el resalte de un borde curvo sigue la curva', () =
       startT: 0, endT: 1,
       startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 0 },
     };
-    const c = svg(<EdgePairOverlay zoom2D={1} pieces={[arco]} segmentA={seg} hoveredTarget={null} />);
+    const c = svg(<EdgePairOverlay zoom2D={1} pieces={[arco]} segmentA={seg} hoveredTarget={null} activeTarget={null} liveRange={null} />);
 
     // Nada de <line> para el borde: una recta entre extremos es justo el fallo.
     const paths = Array.from(c.querySelectorAll('path')) as SVGPathElement[];
@@ -74,7 +74,7 @@ describe('EdgePairOverlay — el resalte de un borde curvo sigue la curva', () =
       startT: 0, endT: 1,
       startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 0 },
     };
-    const c = svg(<EdgePairOverlay zoom2D={1} pieces={[arco]} segmentA={seg} hoveredTarget={null} />);
+    const c = svg(<EdgePairOverlay zoom2D={1} pieces={[arco]} segmentA={seg} hoveredTarget={null} activeTarget={null} liveRange={null} />);
     const d = c.querySelector('path')!.getAttribute('d')!;
     expect(puntos(d)).toBe(2);
   });
