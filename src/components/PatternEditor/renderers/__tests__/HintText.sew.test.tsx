@@ -15,22 +15,32 @@ const svg = (ui: React.ReactNode) => render(<svg>{ui}</svg>);
 // `npx tsc -b --noEmit` rompe el gate aunque vitest corra igual.
 const base = { pieces: [], penNodesLength: 0, nodeEditorIsEditing: false };
 
+// Las aserciones apuntan al SIGNIFICADO que la frase tiene que transmitir, no
+// a su redacción: el texto lo afina `solace-wren` y no debería romper el test
+// cada vez que cambia una palabra. Lo que sí tiene que seguir estando es la
+// información — que es lo único que la usuaria necesita del pie del lienzo.
 describe('HintText — coser', () => {
-  it('en reposo enseña las dos mitades del gesto', () => {
+  it('en reposo contrasta los dos gestos y sus dos extensiones', () => {
     svg(<HintText {...base} activeTool="seam" seamPhase="idle" />);
-    expect(screen.getByText(/clic/i)).toBeTruthy();
-    expect(screen.getByText(/arrastra/i)).toBeTruthy();
+    const hint = screen.getByText(/clic/i).textContent ?? '';
+    expect(hint).toMatch(/arrastr/i);      // arrastra / arrastre
+    expect(hint).toMatch(/entero/i);       // lo que da el clic
+    expect(hint).toMatch(/tramo/i);        // lo que da el arrastre
   });
 
-  it('sosteniendo la primera mitad pide la segunda pieza', () => {
+  it('sosteniendo la primera mitad pide la segunda pieza y ofrece salida', () => {
     svg(<HintText {...base} activeTool="seam" seamPhase="holdingA" />);
-    expect(screen.getByText(/otra pieza/i)).toBeTruthy();
+    const hint = screen.getByText(/otra pieza/i).textContent ?? '';
+    // Sin una salida nombrada, se queda atrapada sosteniendo la mitad A: la
+    // regresión que cazó la revisión final de la tanda.
+    expect(hint).toMatch(/esc/i);
   });
 });
 
 describe('HintText — editar costuras', () => {
-  it('dice qué hace el clic', () => {
+  it('dice que el clic revela con qué está cosido', () => {
     svg(<HintText {...base} activeTool="seamEdit" />);
-    expect(screen.getByText(/costura/i)).toBeTruthy();
+    const hint = screen.getByText(/clic/i).textContent ?? '';
+    expect(hint).toMatch(/cosid|costura/i);
   });
 });
