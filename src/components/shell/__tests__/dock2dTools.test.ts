@@ -3,8 +3,8 @@ import { DOCK_2D_CATALOG, getDockToolById } from '../dock2dTools';
 import { DEFAULT_DOCK_2D_IDS } from '../../../store/dockSlice';
 
 describe('dock2dTools catalog', () => {
-  it('has 13 entries (3 unwired phantom tools removed #529; point añadido maria-203)', () => {
-    expect(DOCK_2D_CATALOG).toHaveLength(13);
+  it('has 14 entries (3 unwired phantom tools removed #529; point y seamEdit añadidos)', () => {
+    expect(DOCK_2D_CATALOG).toHaveLength(14);
   });
 
   it('drops the unwired phantom tools but keeps internalShape (María needs Forma interna)', () => {
@@ -52,8 +52,19 @@ describe('dock2dTools catalog', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('the first 9 catalog ids are the defaults in order', () => {
-    expect(DOCK_2D_CATALOG.slice(0, 9).map((tool) => tool.id))
+  it('the first 10 catalog ids are the defaults in order', () => {
+    expect(DOCK_2D_CATALOG.slice(0, 10).map((tool) => tool.id))
       .toEqual(DEFAULT_DOCK_2D_IDS);
+  });
+
+  it('el catálogo tiene las dos mitades del menú coser', () => {
+    const ids = DOCK_2D_CATALOG.map(t => t.id);
+    expect(ids).toContain('seam');
+    expect(ids).toContain('seamEdit');
+  });
+
+  it('coser lleva N y editar costuras lleva B, como CLO3D', () => {
+    expect(getDockToolById('seam')?.shortcut).toBe('N');
+    expect(getDockToolById('seamEdit')?.shortcut).toBe('B');
   });
 });

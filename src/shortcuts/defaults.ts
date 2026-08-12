@@ -63,13 +63,11 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'tool.seamAllowance', key: 'o', label: 'Seam Allowance', category: '2D Tools', context: '2d' },
 
   // ─── Sewing ─────────────────────────────────────────────────────────────────
-  { id: 'tool.seam', key: 'b', label: 'Edit Sewing (Seam)', category: 'Sewing', context: '2d' },
-  { id: 'tool.freeSewing', key: 'f', label: 'Free Sewing', category: 'Sewing', context: '2d' },
-  { id: 'tool.segmentSewing', key: 'n', label: 'Segment Sewing', category: 'Sewing', context: '2d' },
+  { id: 'tool.seamEdit', key: 'b', label: 'Edit Sewing', category: 'Sewing', context: '2d' },
+  { id: 'tool.seam', key: 'n', label: 'Segment Sewing', category: 'Sewing', context: '2d' },
 
   // ─── Shift+Key tools (displaced) ────────────────────────────────────────────
   { id: 'tool.grainline', key: 'g', shift: true, label: 'Grainline Tool', category: '2D Tools', context: '2d' },
-  { id: 'tool.freeSewingAlt', key: 'f', shift: true, label: 'Free Sewing (Alt)', category: 'Sewing', context: '2d' },
   { id: 'tool.notch', key: 'n', shift: true, label: 'Notch Tool', category: '2D Tools', context: '2d' },
   { id: 'tool.line', key: 'l', shift: true, label: 'Line Tool', category: '2D Tools', context: '2d' },
 
