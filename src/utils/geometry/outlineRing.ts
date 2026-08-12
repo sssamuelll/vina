@@ -482,6 +482,170 @@ function evaluateSegment(segment: RingSegment, arcFraction: number): Point2D {
   }
 }
 
+function squaredDistance(a: Point2D, b: Point2D): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return dx * dx + dy * dy;
+}
+
+function evaluateNativeSegment(segment: RingSegment, t: number): Point2D {
+  switch (segment.kind) {
+    case 'line':
+      return interpolate(segment.from, segment.to, t);
+    case 'cubic':
+      return evalCubic(segment.from, segment.cp1!, segment.cp2!, segment.to, t);
+    case 'quadratic':
+      return evalQuadratic(segment.from, segment.cp1!, segment.to, t);
+  }
+}
+
+/** Refine one sampled local minimum of the point-to-curve distance. */
+function refineCurveProjection(
+  segment: RingSegment,
+  p: Point2D,
+  leftStart: number,
+  rightStart: number,
+): number {
+  const goldenRatio = (Math.sqrt(5) - 1) / 2;
+  let left = leftStart;
+  let right = rightStart;
+  let tLeft = right - goldenRatio * (right - left);
+  let tRight = left + goldenRatio * (right - left);
+  let distLeft = squaredDistance(evaluateNativeSegment(segment, tLeft), p);
+  let distRight = squaredDistance(evaluateNativeSegment(segment, tRight), p);
+
+  for (let iteration = 0; iteration < 64; iteration++) {
+    if (distLeft <= distRight) {
+      right = tRight;
+      tRight = tLeft;
+      distRight = distLeft;
+      tLeft = right - goldenRatio * (right - left);
+      distLeft = squaredDistance(evaluateNativeSegment(segment, tLeft), p);
+    } else {
+      left = tLeft;
+      tLeft = tRight;
+      distLeft = distRight;
+      tRight = left + goldenRatio * (right - left);
+      distRight = squaredDistance(evaluateNativeSegment(segment, tRight), p);
+    }
+  }
+
+  return (left + right) / 2;
+}
+
+function closestNativeT(segment: RingSegment, p: Point2D): number {
+  const sampleCount = 64;
+  const sampledDistances: number[] = [];
+  let bestT = 0;
+  let bestDistance = squaredDistance(segment.from, p);
+
+  for (let index = 0; index <= sampleCount; index++) {
+    const t = index / sampleCount;
+    const distance = squaredDistance(evaluateNativeSegment(segment, t), p);
+    sampledDistances.push(distance);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestT = t;
+    }
+  }
+
+  for (let index = 1; index < sampleCount; index++) {
+    if (
+      sampledDistances[index] <= sampledDistances[index - 1]
+      && sampledDistances[index] <= sampledDistances[index + 1]
+    ) {
+      const t = refineCurveProjection(
+        segment,
+        p,
+        (index - 1) / sampleCount,
+        (index + 1) / sampleCount,
+      );
+      const distance = squaredDistance(evaluateNativeSegment(segment, t), p);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestT = t;
+      }
+    }
+  }
+
+  return bestT;
+}
+
+function projectToLegacyRing(ring: OutlineRing, p: Point2D): { distanceMm: number; point: Point2D } {
+  const fallback = ring.segments[0]?.from ?? { x: 0, y: 0 };
+  let acc = 0;
+  let best = { distanceMm: 0, point: fallback, distance: Infinity };
+
+  // Keep this arithmetic in lockstep with notchAnchor.ts's legacy
+  // arcPositionOf. In particular, recompute and accumulate each chord length
+  // sequentially: changing the floating-point sum moves persisted v1 notches.
+  for (const segment of ring.segments) {
+    const a = segment.from;
+    const b = segment.to;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const segLen = Math.hypot(dx, dy);
+    if (segLen < 1e-9) continue;
+    let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / (segLen * segLen);
+    t = Math.max(0, Math.min(1, t));
+    const px = a.x + t * dx;
+    const py = a.y + t * dy;
+    const distance = Math.hypot(p.x - px, p.y - py);
+    if (distance < best.distance) {
+      best = {
+        distanceMm: acc + t * segLen,
+        point: { x: px, y: py },
+        distance,
+      };
+    }
+    acc += segLen;
+  }
+
+  return { distanceMm: best.distanceMm, point: best.point };
+}
+
+/** Project a plane point to the closest point on the closed outline ring. */
+export function projectToRing(
+  ring: OutlineRing,
+  p: Point2D,
+): { distanceMm: number; point: Point2D } {
+  if (ring.metric === 1) return projectToLegacyRing(ring, p);
+
+  const fallback = ring.segments[0]?.from ?? { x: 0, y: 0 };
+  let best = { distanceMm: 0, point: fallback, distance: Infinity };
+  for (const segment of ring.segments) {
+    let t: number;
+    if (segment.kind === 'line') {
+      const dx = segment.to.x - segment.from.x;
+      const dy = segment.to.y - segment.from.y;
+      const lengthSquared = segment.length * segment.length;
+      t = lengthSquared > 0
+        ? ((p.x - segment.from.x) * dx + (p.y - segment.from.y) * dy) / lengthSquared
+        : 0;
+      t = Math.max(0, Math.min(1, t));
+    } else {
+      t = closestNativeT(segment, p);
+    }
+
+    const point = evaluateNativeSegment(segment, t);
+    const distance = Math.hypot(p.x - point.x, p.y - point.y);
+    if (distance < best.distance) {
+      const offsetMm = segment.kind === 'line'
+        ? t * segment.length
+        : segment.kind === 'cubic'
+          ? cubicPrefixLength(segment, t)
+          : quadraticPrefixLength(segment, t);
+      best = {
+        distanceMm: segment.startMm + offsetMm,
+        point,
+        distance,
+      };
+    }
+  }
+
+  return { distanceMm: best.distanceMm, point: best.point };
+}
+
 export function pointAt(ring: OutlineRing, distanceMm: number): RingPoint {
   const target = normalizeDistance(distanceMm, ring.totalMm);
   const tolerance = ring.metric === 1 ? 1e-9 : 0;
