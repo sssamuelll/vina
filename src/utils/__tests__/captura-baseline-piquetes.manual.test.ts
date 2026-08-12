@@ -1,7 +1,14 @@
 /**
  * Herramienta manual de captura de evidencia; NO es un test de regresión.
- * Ejecutar a mano con:
- * npx vitest run src/utils/__tests__/captura-baseline-piquetes.manual.test.ts
+ *
+ * Se SALTA en la suite normal: no comprueba nada, escribe un archivo, y en
+ * cuanto el baseline existe se negaría a sobrescribirlo y dejaría la suite
+ * en rojo para siempre. Para correrla hay que pedirlo:
+ *
+ *   CAPTURAR_BASELINE=1 npx vitest run src/utils/__tests__/captura-baseline-piquetes.manual.test.ts
+ *
+ * Y aun así se niega si el archivo ya existe — un baseline solo vale si se
+ * capturó ANTES del cambio que se quiere verificar.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -16,7 +23,7 @@ const SOURCE_PATH = resolve(REPO_ROOT, SOURCE_RELATIVE_PATH);
 const OUTPUT_PATH = resolve(REPO_ROOT, 'docs/reports/2026-08-12-baseline-piquetes-maria.json');
 
 describe('captura manual del baseline de piquetes de María', () => {
-  it('escribe las posiciones resueltas actuales como evidencia JSON', () => {
+  it.skipIf(process.env.CAPTURAR_BASELINE !== '1')('escribe las posiciones resueltas actuales como evidencia JSON', () => {
     const { pieces } = importDXFContent(readFileSync(SOURCE_PATH, 'utf8'), {
       unit: 'auto',
       autoDetect: true,

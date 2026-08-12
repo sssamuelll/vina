@@ -29,7 +29,7 @@ const REF_POINT_SNAP_TOL = 1e-3;
  * endpoints), and a zero-length wedge side would make the corner detector
  * skip precisely the corners it exists to find — and the Z-closing vertex.
  */
-function ringOf(outline: PathCommand[]): Point2D[] {
+export function ringOf(outline: PathCommand[]): Point2D[] {
   const raw = flattenPath(outline);
   const pts: Point2D[] = [];
   for (const p of raw) {
