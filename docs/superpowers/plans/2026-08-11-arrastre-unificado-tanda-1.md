@@ -1825,9 +1825,11 @@ Cambiar la cabecera del archivo por:
 - `src/components/PatternEditor/useEditorInteractions.ts`: borrar las líneas de ruteo de `segmentSewing` (keyDown `:389`, mouseDown `:590`, mouseMove `:852`, cursor `:981`), la entrada `segmentSewingTool` del tipo de `tools` (`:173`) y del destructuring (`:293`), más `freeSewingTool` en los mismos sitios, y quitarlos de los arrays de dependencias.
 - `src/components/PatternEditor/renderers/ToolOverlay.tsx`: borrar las cinco props `segmentSewing*` de la interfaz (líneas 141-145) y el bloque de render `{activeTool === 'segmentSewing' && (...)}` (líneas 338-347). Si el componente que ese bloque renderizaba queda sin usar, bórralo también.
 
-- [ ] **Step 4: Podar el test viejo**
+- [ ] **Step 4: Podar los tests que guardaban lo que acabas de borrar**
 
 En `src/components/PatternEditor/__tests__/useSegmentSewingTool.test.ts`, borrar cualquier `describe`/`it` que instancie el hook o que afirme transiciones de fase. **Conservar íntegros** los de `snapToEdge`, `closeSegment` y `buildSegmentSeam`: son el contrato de la geometría que ahora sostiene la herramienta de coser.
+
+**Y uno que se te va a poner rojo si no lo ves venir.** La Tarea 3 dejó en `src/components/PatternEditor/__tests__/useFreeSewingTool.tramo.test.ts` un test de regresión que lee el fuente de `useEditorInteractions.ts` y afirma que contiene la línea de ruteo de mouseUp de `freesewing`. Era andamio a propósito, para que esa herramienta no quedara inerte mientras llegaba esta tarea. Al borrar `freesewing` aquí, **borra también ese test** — no lo adaptes ni lo dejes pasar. El de `seam`, si lo hay, se queda.
 
 - [ ] **Step 5: Comprobar que no queda nada colgando**
 
