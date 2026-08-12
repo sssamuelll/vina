@@ -18,15 +18,14 @@ import TransformHandlesOverlay from './overlays/TransformHandlesOverlay';
 import ScissorsOverlay from './overlays/ScissorsOverlay';
 import SlashAndSpreadOverlay from './overlays/SlashAndSpreadOverlay';
 import MergeOverlay from './overlays/MergeOverlay';
-import SegmentSewingOverlay from './overlays/SegmentSewingOverlay';
 import TopstitchOverlay from './overlays/TopstitchOverlay';
 import WalkSeamOverlay from './overlays/WalkSeamOverlay';
 import OffsetPreviewOverlay from './overlays/OffsetPreviewOverlay';
 import TrimToolOverlay from './overlays/TrimToolOverlay';
 import type { TrimHover } from '../useTrimTool';
-import type { SegmentSelection, SnapResult } from '../useSegmentSewingTool';
+import type { SegmentSelection } from '../useSegmentSewingTool';
 import type { WalkSeamEdge, GhostTransform, MismatchSample, WalkSeamMetrics } from '../useWalkSeamTool';
-import type { FreeEdgeSelection } from '../sewingUtils';
+import type { EdgeTarget } from '../edgeGesture';
 import type { BBox, HandlePosition } from '../../../utils/geometry/transform';
 import type { TransformPreview } from '../useTransformTool';
 import type { SlashAndSpreadPhase } from '../useSlashAndSpreadTool';
@@ -66,9 +65,12 @@ interface ToolOverlayProps {
   lineStart: Point2D | null;
   lineCursor: Point2D | null;
   lineLength: { length: number; midpoint: Point2D } | null;
-  seamFirstEdge: FreeEdgeSelection | null;
-  seamHoveredEdge: FreeEdgeSelection | null;
-  seamMode: 'free' | 'point';
+  seamSegmentA: SegmentSelection | null;
+  seamHoveredTarget: EdgeTarget | null;
+  /** El borde del press mientras el gesto de coser sigue vivo, y el tramo que
+   *  lleva marcado el arrastre — el tramo en vivo que sustituye al hover. */
+  seamActiveTarget: EdgeTarget | null;
+  seamLiveRange: [number, number] | null;
   notchHoveredPoint: NotchHover | null;
   /** Tool Punto (maria-203): preview solo cuando reason === 'ok'. */
   pointToolHover?: import('../usePointTool').PointToolHover | null;
@@ -137,12 +139,6 @@ interface ToolOverlayProps {
   mergePieceIdB: string | null;
   mergeSharedEdgeFound: boolean;
   mergeError: string | null;
-  // Segment Sewing
-  segmentSewingPhase: string;
-  segmentSewingSegmentA: SegmentSelection | null;
-  segmentSewingSegmentB: SegmentSelection | null;
-  segmentSewingPendingSnap: SnapResult | null;
-  segmentSewingHoveredSnap: SnapResult | null;
   // Topstitch
   topstitchMode: string;
   topstitchHoveredEdge: { pieceId: string; edgeIndex: number; start: Point2D; end: Point2D } | null;
@@ -162,10 +158,6 @@ interface ToolOverlayProps {
   walkSeamMetrics: WalkSeamMetrics | null;
   walkSeamFormatDistance: (d: number) => string;
   walkSeamHoveredSnapPoint: Point2D | null;
-  // Free Sewing
-  freeSewingFirstEdge: FreeEdgeSelection | null;
-  freeSewingHoveredEdge: FreeEdgeSelection | null;
-  freeSewingMode: 'free' | 'point';
   // Offset Preview
   offsetPreviewOutline: PathCommand[] | null;
   offsetPreviewPiecePosition: Point2D | null;
@@ -183,7 +175,14 @@ export default function ToolOverlay(props: ToolOverlayProps) {
       <POMOverlay poms={poms} pieces={pieces} zoom2D={zoom2D} selectedPOMId={selectedPOMId} />
 
       {activeTool === 'seam' && (
-        <EdgePairOverlay zoom2D={zoom2D} firstEdge={props.seamFirstEdge} hoveredEdge={props.seamHoveredEdge} mode={props.seamMode} />
+        <EdgePairOverlay
+          zoom2D={zoom2D}
+          pieces={pieces}
+          segmentA={props.seamSegmentA}
+          hoveredTarget={props.seamHoveredTarget}
+          activeTarget={props.seamActiveTarget}
+          liveRange={props.seamLiveRange}
+        />
       )}
 
       {activeTool === 'notch' && (props.notchHoveredPoint || props.notchRefineMarker) && (
@@ -335,18 +334,6 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         />
       )}
 
-      {activeTool === 'segmentSewing' && (
-        <SegmentSewingOverlay
-          zoom2D={zoom2D}
-          pieces={pieces}
-          phase={props.segmentSewingPhase}
-          segmentA={props.segmentSewingSegmentA}
-          segmentB={props.segmentSewingSegmentB}
-          pendingSnap={props.segmentSewingPendingSnap}
-          hoveredSnap={props.segmentSewingHoveredSnap}
-        />
-      )}
-
       {(activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') && (
         <TopstitchOverlay
           zoom2D={zoom2D}
@@ -382,15 +369,6 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           previewOutline={props.offsetPreviewOutline}
           piecePosition={props.offsetPreviewPiecePosition}
           zoom2D={zoom2D}
-        />
-      )}
-
-      {activeTool === 'freesewing' && (
-        <EdgePairOverlay
-          zoom2D={zoom2D}
-          firstEdge={props.freeSewingFirstEdge}
-          hoveredEdge={props.freeSewingHoveredEdge}
-          mode={props.freeSewingMode}
         />
       )}
 

@@ -33,11 +33,19 @@ export const LEGACY_DEFAULT_DOCK_2D_IDS_V2 = [
   'rectangle', 'scissors', 'measure', 'seam',
 ] as const;
 
-/** Current default left-dock 2D tool ids, in render order. `point` entre
- *  editar y pluma: es hermano de editar, no de dibujar (maria-203). */
-export const DEFAULT_DOCK_2D_IDS = [
+/** Default de nueve, previo a partir coser en crear/editar (#1028). */
+export const LEGACY_DEFAULT_DOCK_2D_IDS_V3 = [
   'select', 'editPattern', 'point', 'pen', 'line',
   'rectangle', 'scissors', 'measure', 'seam',
+] as const;
+
+/** Current default left-dock 2D tool ids, in render order. `point` entre
+ *  editar y pluma: es hermano de editar, no de dibujar (maria-203).
+ *  `seamEdit` justo detrás de `seam`: son las dos mitades del menú coser de
+ *  CLO3D y María las busca juntas (#219). */
+export const DEFAULT_DOCK_2D_IDS = [
+  'select', 'editPattern', 'point', 'pen', 'line',
+  'rectangle', 'scissors', 'measure', 'seam', 'seamEdit',
 ] as const;
 
 /** Un set persistido que sea EXACTAMENTE un default histórico migra al default
@@ -45,7 +53,11 @@ export const DEFAULT_DOCK_2D_IDS = [
 export function migrateDefaultDockTools(ids: readonly string[]): string[] {
   const matches = (def: readonly string[]) =>
     ids.length === def.length && ids.every((id, index) => id === def[index]);
-  if (matches(LEGACY_DEFAULT_DOCK_2D_IDS) || matches(LEGACY_DEFAULT_DOCK_2D_IDS_V2)) {
+  if (
+    matches(LEGACY_DEFAULT_DOCK_2D_IDS) ||
+    matches(LEGACY_DEFAULT_DOCK_2D_IDS_V2) ||
+    matches(LEGACY_DEFAULT_DOCK_2D_IDS_V3)
+  ) {
     return [...DEFAULT_DOCK_2D_IDS];
   }
   return [...ids];

@@ -212,13 +212,11 @@ export function useKeyboardShortcuts() {
       ['tool.seamAllowance', () => activate2DTool(dispatch, 'seamAllowance')],
 
       // Sewing
+      ['tool.seamEdit', () => activate2DTool(dispatch, 'seamEdit')],
       ['tool.seam', () => activate2DTool(dispatch, 'seam')],
-      ['tool.freeSewing', () => activate2DTool(dispatch, 'freesewing')],
-      ['tool.segmentSewing', () => activate2DTool(dispatch, 'segmentSewing')],
 
       // Shift+Key tools
       ['tool.grainline', () => activate2DTool(dispatch, 'grainline')],
-      ['tool.freeSewingAlt', () => activate2DTool(dispatch, 'freesewing')],
       ['tool.notch', () => activate2DTool(dispatch, 'notch')],
       ['tool.line', () => activate2DTool(dispatch, 'line')],
 

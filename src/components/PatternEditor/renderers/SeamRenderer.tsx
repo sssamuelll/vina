@@ -19,6 +19,10 @@ interface SeamRendererProps {
   pieces: PatternPiece[];
   zoom2D: number;
   selectedSeamId: string | null;
+  /** 'full' en la herramienta de editar (las costuras son la capa protagonista);
+   *  'muted' en la de crear, donde estorban. Spec § 4.3. */
+  emphasis?: 'full' | 'muted';
+  hoveredSeamId?: string | null;
 }
 
 /**
@@ -35,7 +39,9 @@ function directionTick(pts: Point2D[], zoom: number): string | null {
   return `M${point.x - perp.x * s},${point.y - perp.y * s} L${point.x + perp.x * s},${point.y + perp.y * s}`;
 }
 
-export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: SeamRendererProps) {
+export default function SeamRenderer({
+  seams, pieces, zoom2D, selectedSeamId, emphasis = 'full', hoveredSeamId = null,
+}: SeamRendererProps) {
   // Pre-pass (Fase1-H1): resolver la geometría de todos los seams ANTES de
   // renderizar, para que los labels de mismatch puedan hacer layout
   // anticolisión entre seams (anclados al mismo punto se apilaban ilegibles).
@@ -123,7 +129,9 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         const mismatchMm = seamMismatchMm(lenA, lenB);
         const hasMismatch = mismatchMm > SEAM_MISMATCH_THRESHOLD_MM;
 
-        const isSelected = selectedSeamId === seam.id;
+        // El hover de editar costuras enciende igual que la selección — un
+        // solo canal visual para "esto es lo protagonista ahora" (spec § 4.3).
+        const isLit = selectedSeamId === seam.id || hoveredSeamId === seam.id;
         const isInactive = seam.active === false;
         // One channel per concern (Fase 6, Iris N3): the pair color is
         // IDENTITY and never changes under interaction — selection shows as
@@ -145,7 +153,7 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
             default: edgeDash = undefined; break;                                         // solid (standard)
           }
         }
-        const edgeWidth = (isSelected ? 4 : seam.taped ? 4 : 2.5) / zoom2D;
+        const edgeWidth = (isLit ? 4 : seam.taped ? 4 : 2.5) / zoom2D;
 
         // Directional notches (perpendicular tick near each start, t≈0.05)
         const tickA = hasDirection ? directionTick(polyA, zoom2D) : null;
@@ -153,7 +161,7 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
 
         return [{
           seam, epA, epB, offA, offB, pathDA, pathDB, midA, midB, lenA, lenB,
-          mismatchMm, hasMismatch, isSelected, isInactive, baseColor, edgeDash,
+          mismatchMm, hasMismatch, isLit, isInactive, baseColor, edgeDash,
           edgeWidth, polyA, polyB, hasDirection, tickA, tickB,
         }];
   });
@@ -176,22 +184,24 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
     <>
       {entries.map(({
         seam, epA, epB, offA, offB, pathDA, pathDB, midA, midB, lenA, lenB,
-        mismatchMm, hasMismatch, isSelected, isInactive, baseColor, edgeDash,
+        mismatchMm, hasMismatch, isLit, isInactive, baseColor, edgeDash,
         edgeWidth, polyA, polyB, hasDirection, tickA, tickB,
       }) => {
         return (
           <g
             key={seam.id}
-            className={`seam-connection${isSelected ? ' seam-connection--selected' : ''}`}
-            opacity={isInactive ? 0.5 : 1}
+            className={`seam-connection${isLit ? ' seam-connection--selected' : ''}`}
+            // 'muted' en la herramienta de crear (Coser): las costuras están
+            // ahí de referencia, no son la capa protagonista — spec § 4.3.
+            opacity={(isInactive ? 0.5 : 1) * (emphasis === 'muted' ? 0.45 : 1)}
           >
             {/* Selection glow (wider semi-transparent halo BEHIND the pair
                 color — selection is weight, never recolor, Fase 6). The class
                 lets E2E specs separate the halo from the edge highlights. */}
-            {isSelected && pathDA && (
+            {isLit && pathDA && (
               <path className="seam-selection-glow" d={pathDA} fill="none" style={{ stroke: 'var(--accent-2d)' }} strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
             )}
-            {isSelected && pathDB && (
+            {isLit && pathDB && (
               <path className="seam-selection-glow" d={pathDB} fill="none" style={{ stroke: 'var(--accent-2d)' }} strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
             )}
             {/* Edge A highlight (follows curves) */}
@@ -312,8 +322,8 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
               )}
             </g>
 
-            {/* Length labels (on selected) */}
-            {isSelected && (
+            {/* Length labels (on selected/hovered) */}
+            {isLit && (
               <>
                 <text
                   x={midA.x} y={midA.y - 8 / zoom2D}

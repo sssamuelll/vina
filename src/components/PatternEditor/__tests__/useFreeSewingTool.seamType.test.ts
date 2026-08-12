@@ -45,6 +45,8 @@ const fakeEvent = (x: number, y: number) =>
     clientX: x,
     clientY: y,
     currentTarget: {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
       getBoundingClientRect: () => ({
         left: 0, top: 0, width: 800, height: 600,
         right: 800, bottom: 600, x: 0, y: 0,
@@ -63,12 +65,14 @@ function setup(seamType?: string) {
   const wrapper = ({ children }: { children: React.ReactNode }) =>
     createElement(Provider, { store, children });
   const { result } = renderHook(
-    () => useFreeSewingTool(1, { x: 0, y: 0 }, pieces, onComplete, 'free'),
+    () => useFreeSewingTool(1, { x: 0, y: 0 }, pieces, onComplete),
     { wrapper },
   );
-  // Click the top edge of piece A, then the top edge of piece B.
+  // Click (down+up, sin arrastre) el borde de arriba de la pieza A, luego el de B.
   act(() => { result.current.handleMouseDown(fakeEvent(50, 0)); });
+  act(() => { result.current.handleMouseUp(fakeEvent(50, 0)); });
   act(() => { result.current.handleMouseDown(fakeEvent(350, 0)); });
+  act(() => { result.current.handleMouseUp(fakeEvent(350, 0)); });
   return onComplete;
 }
 

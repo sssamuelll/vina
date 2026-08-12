@@ -6,19 +6,19 @@ interface HintTextProps {
   pieces: PatternPiece[];
   penNodesLength: number;
   nodeEditorIsEditing: boolean;
-  segmentSewingPhase?: string;
+  /** Fase del gesto de coser unificado (#199, #1029): 'idle' antes del primer
+   *  borde, 'holdingA' sosteniendo la primera mitad. */
+  seamPhase?: 'idle' | 'holdingA';
   topstitchMode?: string;
   walkSeamPhase?: string;
-  /** Whether the seam/freesewing tool already holds its first edge */
-  seamHasFirstEdge?: boolean;
   /** Width the seamAllowance tool will apply on click (editor.defaultSeamAllowanceWidth) */
   saDefaultWidthMm?: number;
 }
 
 export default function HintText({
   activeTool, pieces, penNodesLength,
-  nodeEditorIsEditing, segmentSewingPhase, topstitchMode, walkSeamPhase,
-  seamHasFirstEdge, saDefaultWidthMm,
+  nodeEditorIsEditing, seamPhase, topstitchMode, walkSeamPhase,
+  saDefaultWidthMm,
 }: HintTextProps) {
   const hasPieces = pieces.length > 0;
 
@@ -42,30 +42,21 @@ export default function HintText({
         </text>
       )}
 
-      {(activeTool === 'seam' || activeTool === 'freesewing') && (
+      {activeTool === 'seam' && (
         <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
           fill="rgba(255, 215, 0, 0.5)" fontSize="11">
-          {seamHasFirstEdge
-            ? 'Clic en un borde de otra pieza para coser · Esc cancela'
-            : 'Clic en un borde de la primera pieza para empezar la costura'}
+          {seamPhase === 'holdingA'
+            ? 'Ahora marca en la otra pieza · clic en vacío o Esc suelta'
+            : 'Clic cose el lado entero · arrastre cose solo un tramo'}
         </text>
       )}
 
-      {activeTool === 'segmentSewing' && (() => {
-        const msgs: Record<string, string> = {
-          idle: 'Clic en un borde para empezar el segmento A',
-          a_start: 'Clic más adelante en el mismo borde para cerrar el segmento A',
-          a_end: 'Clic en otra pieza para empezar el segmento B',
-          b_start: 'Clic más adelante en el mismo borde para cerrar el segmento B',
-          b_end: 'Enter cose · Retroceso deshace · Esc cancela',
-        };
-        return (
-          <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
-            fill="rgba(255, 215, 0, 0.5)" fontSize="11">
-            {msgs[segmentSewingPhase ?? 'idle'] ?? msgs.idle}
-          </text>
-        );
-      })()}
+      {activeTool === 'seamEdit' && (
+        <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
+          fill="rgba(255, 215, 0, 0.5)" fontSize="11">
+          Clic en un lado para ver con qué está cosido
+        </text>
+      )}
 
       {(activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree' || activeTool === 'topstitchEdit') && (() => {
         const msgs: Record<string, string> = {

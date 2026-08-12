@@ -6,8 +6,8 @@ import { test, expect, type Page } from '@playwright/test';
 async function enterSewingSurface(page: Page) {
   await page.evaluate(() => {
     const store = (window as unknown as { __VINA_STORE__: { dispatch: (a: unknown) => void } }).__VINA_STORE__;
-    store.dispatch({ type: 'editor/setActiveTool', payload: 'segmentSewing' });
-    store.dispatch({ type: 'tools/setActiveTool2D', payload: 'segmentSewing' });
+    store.dispatch({ type: 'editor/setActiveTool', payload: 'seam' });
+    store.dispatch({ type: 'tools/setActiveTool2D', payload: 'seam' });
   });
 }
 

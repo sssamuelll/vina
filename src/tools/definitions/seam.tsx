@@ -23,7 +23,6 @@ export const seamTool: ToolDefinition = {
   name: 'Seam',
   description: 'Connect pattern pieces with sewing seams',
   context: '2d',
-  shortcut: 'b',
   icon: SeamIcon,
   cursor: 'pointer',
   group: 'sewing',

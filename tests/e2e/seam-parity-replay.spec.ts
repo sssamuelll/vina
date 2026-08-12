@@ -40,8 +40,8 @@ async function dispatch(page: Page, action: { type: string; payload?: unknown })
  *  (herramienta de coser activa o seam seleccionado). Los tests que asertan
  *  el render de costuras deben entrar primero. */
 async function enterSewingSurface(page: Page) {
-  await dispatch(page, { type: 'editor/setActiveTool', payload: 'segmentSewing' });
-  await dispatch(page, { type: 'tools/setActiveTool2D', payload: 'segmentSewing' });
+  await dispatch(page, { type: 'editor/setActiveTool', payload: 'seam' });
+  await dispatch(page, { type: 'tools/setActiveTool2D', payload: 'seam' });
 }
 
 async function getState<T = unknown>(page: Page, path: string): Promise<T> {
@@ -193,7 +193,7 @@ test.describe('Seam parity replay — lote 1', () => {
     await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 220, 40) });
     await page.waitForTimeout(300);
 
-    await activateToolKey(page, 'b', 'seam');
+    await activateToolKey(page, 'n', 'seam');
 
     // Click 1: borde derecho de A (midpoint). Click 2: borde izquierdo de B.
     const c1 = await patternToScreen(page, 140, 90);
@@ -215,66 +215,6 @@ test.describe('Seam parity replay — lote 1', () => {
     expect(seam.pieceA.pieceId).toBe('pa');
     expect(seam.pieceB.pieceId).toBe('pb');
     await expect(page.locator('g.seam-connection')).toHaveCount(1);
-  });
-
-  // CLO3D Segment Sewing: 2 clicks por mitad + Enter. Los clicks caen a
-  // t≈0.3/0.7 de cada borde → el seam despachado LLEVA ese sub-rango (#1022).
-  // (Pin invertido: la mitigación full-segment-snap de Fase 5 § 5 descartaba
-  // los t citando un solver sin renormalización — renormalizeFilteredT existe
-  // hoy en ambos tiers y el escenario está verificado en
-  // src/utils/cloth/__tests__/seamPartialRange.test.ts.)
-  test('segment sewing parcial: 4 clicks + Enter despachan tStart/tEnd', async ({ page }) => {
-    await waitFor2D(page);
-    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pa', 'Front', 40, 40) });
-    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 220, 40) });
-    await page.waitForTimeout(300);
-
-    await activateToolKey(page, 'n', 'segmentSewing');
-
-    // Mitad A: dos clicks sobre el borde derecho de A (start + end del tramo).
-    for (const [px, py] of [[140, 70], [140, 110]]) {
-      const c = await patternToScreen(page, px, py);
-      await page.mouse.click(c.x, c.y);
-      await page.waitForTimeout(200);
-    }
-    // Mitad B: dos clicks sobre el borde izquierdo de B.
-    for (const [px, py] of [[220, 70], [220, 110]]) {
-      const c = await patternToScreen(page, px, py);
-      await page.mouse.click(c.x, c.y);
-      await page.waitForTimeout(200);
-    }
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
-    await page.keyboard.press('Enter');
-
-    await expect
-      .poll(async () => ((await getState<unknown[]>(page, 'project.seams')) ?? []).length, {
-        timeout: 5000,
-      })
-      .toBe(1);
-
-    const seam = (await getState<
-      Array<{ pieceA: Record<string, number>; pieceB: Record<string, number> }>
-    >(page, 'project.seams'))![0];
-    // El tramo clicado (y 70→110 sobre bordes de 100) viaja como t-range.
-    // Tolerancia por redondeo de píxel en el click sintético.
-    expect(seam.pieceA.tStart).toBeCloseTo(0.3, 1);
-    expect(seam.pieceA.tEnd).toBeCloseTo(0.7, 1);
-    expect(seam.pieceB.tStart).toBeCloseTo(0.3, 1);
-    expect(seam.pieceB.tEnd).toBeCloseTo(0.7, 1);
-
-    // Y el 2D pinta el SUB-TRAMO (#1022): los bordes son verticales, así que
-    // la altura del resalte es ~40 unidades de patrón, no las 100 del borde.
-    const highlightHeights = await page.evaluate(() => {
-      const paths = Array.from(document.querySelectorAll(
-        'g.seam-connection path[fill="none"]:not(.seam-direction-tick):not(.seam-selection-glow)',
-      )) as SVGGraphicsElement[];
-      return paths.map(p => p.getBBox().height);
-    });
-    expect(highlightHeights.length).toBeGreaterThanOrEqual(2);
-    for (const h of highlightHeights) {
-      expect(h).toBeGreaterThan(30);
-      expect(h).toBeLessThan(50);
-    }
   });
 
   // El núcleo del plan: el seam VIVE en el tier por defecto (WASM). Este

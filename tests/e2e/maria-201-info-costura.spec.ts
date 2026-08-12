@@ -56,8 +56,8 @@ async function sewMismatchedPieces(page: Page) {
   await dispatch(page, { type: 'project/addSeam', payload: { id: 'm201-s', pieceA: { pieceId: 'm201-a', edgeName: 'edge-0' }, pieceB: { pieceId: 'm201-b', edgeName: 'edge-0' }, type: 'standard', tension: 80, strength: 1, active: true, taped: false, tapeWidth: 10 } });
   // La info de costura vive en el menú de costuras (maria-210): fuera de él ya
   // no se pinta nada. Este spec mide ESA info, así que entra a su superficie.
-  await dispatch(page, { type: 'editor/setActiveTool', payload: 'segmentSewing' });
-  await dispatch(page, { type: 'tools/setActiveTool2D', payload: 'segmentSewing' });
+  await dispatch(page, { type: 'editor/setActiveTool', payload: 'seam' });
+  await dispatch(page, { type: 'tools/setActiveTool2D', payload: 'seam' });
   await page.waitForTimeout(500);
 }
 

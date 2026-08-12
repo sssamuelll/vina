@@ -1,18 +1,21 @@
-import { useState, useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '../../store';
-import { addSeam } from '../../store/projectSlice';
-import { selectSeam } from '../../store/editorSlice';
+/**
+ * Geometría del tramo de borde — de cursor a `t` en arco del borde semántico.
+ *
+ * Fue un hook con máquina de cuatro fases (`segmentSewing`, tecla `N` sin botón
+ * en el dock). La máquina murió al fusionarse con la herramienta de coser
+ * (#1029): hoy un arrastre dice lo mismo en un gesto. Lo que queda es la
+ * geometría, que es lo único que sabía hacer lo que María pide, y la consumen
+ * `useFreeSewingTool` y `useSeamEditTool`.
+ */
 import type { PathCommand, PatternPiece, Point2D, Seam } from '../../types/types';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
-import { screenToPattern } from './sewingUtils';
 import { screenToPatternLength } from '../../utils/geometry';
 import {
   flattenPathWithSource, commandRangeToFlattened, commandPolyline, closestOnPolyline,
 } from '../../utils/seam';
 import { applyPctRange } from '../../utils/seam/seamRange';
 import { edgeRangeForCommand } from '../../utils/semanticEdges';
-import { newId } from '../../utils/ids';
+import { EDGE_HIT_PX } from './gestureConstants';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -36,18 +39,6 @@ export interface SegmentSelection {
   endPoint: Point2D;
 }
 
-type Phase = 'idle' | 'a_start' | 'a_end' | 'b_start' | 'b_end';
-
-interface SegmentSewingState {
-  phase: Phase;
-  segmentA: SegmentSelection | null;
-  segmentB: SegmentSelection | null;
-  pendingSnap: SnapResult | null;
-  hoveredSnap: SnapResult | null;
-}
-
-const SNAP_THRESHOLD = 8;
-
 // ─── Pure functions (exported for testing) ────────────────────────────
 
 export function snapToEdge(
@@ -57,7 +48,7 @@ export function snapToEdge(
   /** Rango de comandos [inicio, fin) al que confinar el snap. */
   edgeConstraint?: [number, number],
 ): SnapResult | null {
-  const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom);
+  const threshold = screenToPatternLength(EDGE_HIT_PX, zoom);
   const cmds = piece.outline;
   const ox = piece.position?.x ?? 0;
   const oy = piece.position?.y ?? 0;
@@ -115,7 +106,7 @@ export function snapToEdge(
   return best;
 }
 
-function snapToAnyEdge(
+export function snapToAnyEdge(
   pt: Point2D,
   pieces: PatternPiece[],
   zoom: number,
@@ -158,7 +149,7 @@ const EDGE_ENDPOINT_SNAP_T = 0.01;
  * comando CURVO, tLocal viene de la proyección sobre la cuerda (snapToEdge) y
  * se escala al arco aplanado del comando — exacto en L/H/V, aproximado en C/Q.
  */
-function commandTToEdgeT(
+export function commandTToEdgeT(
   outline: PathCommand[],
   edgeRange: [number, number],
   cmdIndex: number,
@@ -259,188 +250,5 @@ export function buildSegmentSeam(
     active: true,
     taped: false,
     tapeWidth: 10,
-  };
-}
-
-/** Segundo clic de una fase: snap confinado al borde del primero, y cierre. */
-function closeAgainstPending(
-  pending: SnapResult | null,
-  pt: Point2D,
-  pieces: PatternPiece[],
-  zoom: number,
-): SegmentSelection | null {
-  if (!pending) return null;
-  const piece = pieces.find(p => p.id === pending.pieceId);
-  const snap = snapToAnyEdge(
-    pt, pieces, zoom,
-    pending.pieceId,
-    edgeRangeForCommand(piece, pending.edgeIndex),
-  );
-  return snap ? closeSegment(pending, snap, piece) : null;
-}
-
-// ─── Hook ──────────────────────────────────────────────────────────────
-
-export function useSegmentSewingTool(
-  zoom2D: number,
-  pan2D: Point2D,
-  pieces: PatternPiece[],
-) {
-  const dispatch = useDispatch();
-  const seamType = useSelector(
-    (s: RootState) => (s.tools.toolOptions?.segmentSewing?.seamType as string) ?? 'standard',
-  );
-
-  const [state, setState] = useState<SegmentSewingState>({
-    phase: 'idle',
-    segmentA: null,
-    segmentB: null,
-    pendingSnap: null,
-    hoveredSnap: null,
-  });
-
-  const toPattern = useCallback(
-    (e: React.MouseEvent<SVGSVGElement>): Point2D => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      return screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
-    },
-    [zoom2D, pan2D],
-  );
-
-  const reset = useCallback(() => {
-    setState({
-      phase: 'idle',
-      segmentA: null,
-      segmentB: null,
-      pendingSnap: null,
-      hoveredSnap: null,
-    });
-  }, []);
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent<SVGSVGElement>) => {
-      if (e.button !== 0) return;
-      const pt = toPattern(e);
-
-      setState(prev => {
-        switch (prev.phase) {
-          case 'idle': {
-            const snap = snapToAnyEdge(pt, pieces, zoom2D);
-            if (!snap) return prev;
-            return {
-              ...prev,
-              phase: 'a_start',
-              pendingSnap: snap,
-              segmentA: null,
-              segmentB: null,
-            };
-          }
-
-          case 'a_start': {
-            const segment = closeAgainstPending(prev.pendingSnap, pt, pieces, zoom2D);
-            if (!segment) return prev;
-            return { ...prev, phase: 'a_end', segmentA: segment, pendingSnap: null };
-          }
-
-          case 'a_end': {
-            if (!prev.segmentA) return prev;
-            const snap = snapToAnyEdge(pt, pieces, zoom2D);
-            if (!snap || snap.pieceId === prev.segmentA.pieceId) return prev;
-            return {
-              ...prev,
-              phase: 'b_start',
-              pendingSnap: snap,
-            };
-          }
-
-          case 'b_start': {
-            const segment = closeAgainstPending(prev.pendingSnap, pt, pieces, zoom2D);
-            if (!segment) return prev;
-            return { ...prev, phase: 'b_end', segmentB: segment, pendingSnap: null };
-          }
-
-          default:
-            return prev;
-        }
-      });
-    },
-    [toPattern, pieces, zoom2D],
-  );
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<SVGSVGElement>) => {
-      const pt = toPattern(e);
-
-      setState(prev => {
-        let constrainPiece: string | undefined;
-        let constrainEdge: [number, number] | undefined;
-
-        if ((prev.phase === 'a_start' || prev.phase === 'b_start') && prev.pendingSnap) {
-          constrainPiece = prev.pendingSnap.pieceId;
-          constrainEdge = edgeRangeForCommand(
-            pieces.find(p => p.id === constrainPiece),
-            prev.pendingSnap.edgeIndex,
-          );
-        }
-
-        const snap = snapToAnyEdge(pt, pieces, zoom2D, constrainPiece, constrainEdge);
-        return { ...prev, hoveredSnap: snap };
-      });
-    },
-    [toPattern, pieces, zoom2D],
-  );
-
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        reset();
-        return;
-      }
-      if (e.key === 'Backspace') {
-        setState(prev => {
-          switch (prev.phase) {
-            case 'a_start':
-              return { ...prev, phase: 'idle' as Phase, pendingSnap: null };
-            case 'a_end':
-              return { ...prev, phase: 'idle' as Phase, segmentA: null, pendingSnap: null };
-            case 'b_start':
-              return { ...prev, phase: 'a_end' as Phase, pendingSnap: null };
-            case 'b_end':
-              return { ...prev, phase: 'a_end' as Phase, segmentB: null, pendingSnap: null };
-            default:
-              return prev;
-          }
-        });
-        return;
-      }
-      if (e.key === 'Enter' && state.phase === 'b_end' && state.segmentA && state.segmentB) {
-        const fullSeam: Seam = {
-          ...buildSegmentSeam(state.segmentA, state.segmentB, pieces, seamType),
-          id: newId(),
-        };
-        dispatch(addSeam(fullSeam));
-        dispatch(selectSeam(fullSeam.id));
-        reset();
-      }
-    },
-    [state.phase, state.segmentA, state.segmentB, seamType, dispatch, reset, pieces],
-  );
-
-  const getCursor = useCallback((): string => {
-    if (state.hoveredSnap) return 'crosshair';
-    return 'default';
-  }, [state.hoveredSnap]);
-
-  return {
-    phase: state.phase,
-    segmentA: state.segmentA,
-    segmentB: state.segmentB,
-    pendingSnap: state.pendingSnap,
-    hoveredSnap: state.hoveredSnap,
-    handleMouseDown,
-    handleMouseMove,
-    handleKeyDown,
-    getCursor,
-    reset,
   };
 }

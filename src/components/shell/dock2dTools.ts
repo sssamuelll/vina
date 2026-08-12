@@ -1,7 +1,7 @@
 import {
   MousePointer2, PenTool, Minus, Square, Scissors, Ruler, Spline,
   PenLine, Shapes, Triangle, MoveVertical,
-  SquareDashed, GitCommitHorizontal,
+  SquareDashed, GitCommitHorizontal, Waypoints,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -15,8 +15,8 @@ export interface DockToolDef {
 }
 
 /** Curated catalog of dock-eligible 2D tools. Render order = this order; the
- *  first 8 are the default set (DEFAULT_DOCK_2D_IDS in dockSlice). Every id is a
- *  real Tool2D union member with a canvas handler in useEditorInteractions —
+ *  first 10 are the default set (DEFAULT_DOCK_2D_IDS in dockSlice). Every id is
+ *  a real Tool2D union member with a canvas handler in useEditorInteractions —
  *  except internalShape, whose handler is not built yet (kept because María
  *  wants "Forma interna"; the other unwired tools were removed per #529). */
 export const DOCK_2D_CATALOG: DockToolDef[] = [
@@ -31,7 +31,8 @@ export const DOCK_2D_CATALOG: DockToolDef[] = [
   { id: 'rectangle', icon: Square, label: 'Rectángulo', shortcut: 'S' },
   { id: 'scissors', icon: Scissors, label: 'Tijeras', shortcut: 'X' },
   { id: 'measure', icon: Ruler, label: 'Medir', shortcut: 'M' },
-  { id: 'seam', icon: Spline, label: 'Coser', shortcut: 'B' },
+  { id: 'seam', icon: Spline, label: 'Coser', shortcut: 'N' },
+  { id: 'seamEdit', icon: Waypoints, label: 'Editar costuras', shortcut: 'B' },
   { id: 'internalShape', icon: Shapes, label: 'Forma interna', shortcut: 'G' },
   { id: 'notch', icon: Triangle, label: 'Piquete' },
   { id: 'seamAllowance', icon: SquareDashed, label: 'Margen de costura', shortcut: 'O' },

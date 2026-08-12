@@ -6,7 +6,7 @@ import dockReducer, {
   pinAuto, unpinAuto, persistDocks, loadDocks, toggleDockSignaling,
   rehydrateDocks, addDockTool, removeDockTool, resetDockTools,
   reorderDockTool, LEGACY_DEFAULT_DOCK_2D_IDS, LEGACY_DEFAULT_DOCK_2D_IDS_V2,
-  DEFAULT_DOCK_2D_IDS, migrateDefaultDockTools,
+  LEGACY_DEFAULT_DOCK_2D_IDS_V3, DEFAULT_DOCK_2D_IDS, migrateDefaultDockTools,
 } from '../dockSlice';
 
 const initial = () => dockReducer(undefined, { type: '@@INIT' });
@@ -86,11 +86,11 @@ describe('dockSlice signaling', () => {
 describe('dockSlice tools2d', () => {
   beforeEach(() => localStorage.clear());
 
-  it('defaults tools2d to the 9 ids with point between editPattern and pen (maria-203)', () => {
+  it('defaults tools2d to the 10 ids with point between editPattern and pen (maria-203)', () => {
     expect(initial().tools2d).toEqual(DEFAULT_DOCK_2D_IDS);
     expect(DEFAULT_DOCK_2D_IDS).toEqual([
       'select', 'editPattern', 'point', 'pen', 'line',
-      'rectangle', 'scissors', 'measure', 'seam',
+      'rectangle', 'scissors', 'measure', 'seam', 'seamEdit',
     ]);
   });
 
@@ -101,6 +101,21 @@ describe('dockSlice tools2d', () => {
       .toEqual([...LEGACY_DEFAULT_DOCK_2D_IDS].reverse());
     expect(migrateDefaultDockTools(['select', 'pen', 'notch']))
       .toEqual(['select', 'pen', 'notch']);
+  });
+
+  it('el default vigente de 9 migra al de 10 con seamEdit', () => {
+    expect(migrateDefaultDockTools([...LEGACY_DEFAULT_DOCK_2D_IDS_V3]))
+      .toEqual(DEFAULT_DOCK_2D_IDS);
+  });
+
+  it('seamEdit va justo detrás de seam', () => {
+    const i = DEFAULT_DOCK_2D_IDS.indexOf('seam');
+    expect(DEFAULT_DOCK_2D_IDS[i + 1]).toBe('seamEdit');
+  });
+
+  it('un set personalizado sigue respetándose byte a byte', () => {
+    const custom = ['select', 'seam'];
+    expect(migrateDefaultDockTools(custom)).toEqual(custom);
   });
 
   it('does not duplicate editPattern in an already-current or customized dock', () => {

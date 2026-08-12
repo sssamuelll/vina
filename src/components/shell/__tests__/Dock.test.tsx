@@ -109,7 +109,7 @@ function renderLeftDock(onOpenPanel = vi.fn()) {
 describe('LeftDock (container)', () => {
   it('activates a tool in BOTH slices on click (convergence guard)', () => {
     const { store } = renderLeftDock();
-    fireEvent.click(screen.getByRole('button', { name: /coser · b/i }));
+    fireEvent.click(screen.getByRole('button', { name: /coser · n/i }));
     expect(store.getState().editor.activeTool).toBe('seam');
     expect(store.getState().tools.activeTool2D).toBe('seam');
   });
@@ -204,11 +204,11 @@ describe('LeftDock (container)', () => {
   it('renders tools in tools2d order; reordering moves the tool in the DOM', () => {
     const { store } = renderLeftDock();
     const select1 = screen.getByRole('button', { name: /seleccionar · z/i });
-    const sew1 = screen.getByRole('button', { name: /coser · b/i });
+    const sew1 = screen.getByRole('button', { name: /coser · n/i });
     expect(select1.compareDocumentPosition(sew1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     act(() => { store.dispatch(reorderDockTool({ fromId: 'seam', toId: 'select' })); });
     const select2 = screen.getByRole('button', { name: /seleccionar · z/i });
-    const sew2 = screen.getByRole('button', { name: /coser · b/i });
+    const sew2 = screen.getByRole('button', { name: /coser · n/i });
     expect(sew2.compareDocumentPosition(select2) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

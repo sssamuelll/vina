@@ -17,7 +17,6 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import EdgePairOverlay from '../overlays/EdgePairOverlay';
 import SegmentSewingOverlay from '../overlays/SegmentSewingOverlay';
-import { buildEdgeSelection } from '../../sewingUtils';
 import type { PatternPiece } from '../../../../types/types';
 import type { SegmentSelection } from '../../useSegmentSewingTool';
 
@@ -52,8 +51,13 @@ function svg(node: React.ReactElement) {
 
 describe('EdgePairOverlay — el resalte de un borde curvo sigue la curva', () => {
   it('el borde elegido se dibuja con el trazo, no con su cuerda', () => {
-    const sel = buildEdgeSelection(arco, 1)!;
-    const c = svg(<EdgePairOverlay zoom2D={1} firstEdge={sel} hoveredEdge={null} />);
+    // segmentA de arco 0..1 = "el borde entero", lo que produce un clic.
+    const seg: SegmentSelection = {
+      pieceId: 'p-arco', edgeIndex: 1, edgeRange: [1, 2],
+      startT: 0, endT: 1,
+      startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 0 },
+    };
+    const c = svg(<EdgePairOverlay zoom2D={1} pieces={[arco]} segmentA={seg} hoveredTarget={null} activeTarget={null} liveRange={null} />);
 
     // Nada de <line> para el borde: una recta entre extremos es justo el fallo.
     const paths = Array.from(c.querySelectorAll('path')) as SVGPathElement[];
@@ -65,8 +69,12 @@ describe('EdgePairOverlay — el resalte de un borde curvo sigue la curva', () =
   });
 
   it('un borde recto sigue saliendo con dos puntos', () => {
-    const sel = buildEdgeSelection(arco, 2)!;
-    const c = svg(<EdgePairOverlay zoom2D={1} firstEdge={sel} hoveredEdge={null} />);
+    const seg: SegmentSelection = {
+      pieceId: 'p-arco', edgeIndex: 2, edgeRange: [2, 3],
+      startT: 0, endT: 1,
+      startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 0 },
+    };
+    const c = svg(<EdgePairOverlay zoom2D={1} pieces={[arco]} segmentA={seg} hoveredTarget={null} activeTarget={null} liveRange={null} />);
     const d = c.querySelector('path')!.getAttribute('d')!;
     expect(puntos(d)).toBe(2);
   });

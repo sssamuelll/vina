@@ -1,5 +1,12 @@
 /**
- * E2E tests for sewing tools: Seam, Segment Sewing, Walk Seam, Free Sewing.
+ * E2E tests for sewing tools: Seam and Walk Seam.
+ *
+ * Retargeted for the B/N key swap (#1028, paridad CLO3D): seam moved from 'b'
+ * to 'n'. The Segment Sewing (n) and Free Sewing (f) describes were DELETED
+ * wholesale — every test in them entered the tool via the now-dead keyboard
+ * shortcut (no dock/store alternative existed in this file), and both tools
+ * lost their shortcut on purpose in the same task. Not a fix-the-symptom
+ * deletion: the shortcut path they exercised no longer exists.
  *
  * Retargeted onto the current shell (2026-06-04):
  * - Tool activation is verified by reading the Redux store
@@ -149,13 +156,13 @@ async function patternToScreen(page: Page, px: number, py: number) {
   return { x: box.x + pan.x + px * zoom, y: box.y + pan.y + py * zoom };
 }
 
-// ─── Seam Tool (b) ────────────────────────────────────────────────────────────
+// ─── Seam Tool (n) ────────────────────────────────────────────────────────────
 
-test.describe('Seam Tool (b)', () => {
+test.describe('Seam Tool (n)', () => {
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
-  test('shortcut B activates seam tool', async ({ page }) => {
-    await activateToolKey(page, 'b', 'seam');
+  test('shortcut N activates seam tool', async ({ page }) => {
+    await activateToolKey(page, 'n', 'seam');
     const tool = await activeTool(page);
     expect(tool.editor).toBe('seam');
     expect(tool.tools).toBe('seam');
@@ -163,7 +170,7 @@ test.describe('Seam Tool (b)', () => {
 
   test('hovering piece edge surfaces the edge-pair overlay group', async ({ page }) => {
     await seedPiecesAndSeam(page);
-    await activateToolKey(page, 'b', 'seam');
+    await activateToolKey(page, 'n', 'seam');
 
     // The edge-pair overlay <g> renders whenever the seam tool is active.
     const overlay = page.locator('.edge-pair-overlay');
@@ -181,7 +188,7 @@ test.describe('Seam Tool (b)', () => {
 
   test('clicking piece edge then Escape clears selection', async ({ page }) => {
     await seedPiecesAndSeam(page);
-    await activateToolKey(page, 'b', 'seam');
+    await activateToolKey(page, 'n', 'seam');
 
     const { cx, cy } = await getSvgCenter(page);
     await page.mouse.click(cx, cy);
@@ -192,34 +199,6 @@ test.describe('Seam Tool (b)', () => {
 
     const count = await page.locator('.edge-pair-overlay line').count();
     expect(count).toBe(0);
-  });
-});
-
-// ─── Segment Sewing Tool (n) ──────────────────────────────────────────────────
-
-test.describe('Segment Sewing Tool (n)', () => {
-  test.beforeEach(async ({ page }) => { await waitForApp(page); });
-
-  test('shortcut N activates segment sewing tool', async ({ page }) => {
-    await activateToolKey(page, 'n', 'segmentSewing');
-    const tool = await activeTool(page);
-    expect(tool.editor).toBe('segmentSewing');
-    expect(tool.tools).toBe('segmentSewing');
-  });
-
-  test('hovering near piece edge does not crash the canvas', async ({ page }) => {
-    await seedPiecesAndSeam(page);
-    await activateToolKey(page, 'n', 'segmentSewing');
-
-    const { cx, cy } = await getSvgCenter(page);
-    for (let dx = -150; dx <= 150; dx += 30) {
-      await page.mouse.move(cx + dx, cy);
-      await page.waitForTimeout(40);
-    }
-    // Snap indicators are circles in the SVG; non-binding count.
-    const circleCount = await page.locator('svg.pattern-svg circle').count();
-    console.log(`Circles in SVG (possible snap indicators): ${circleCount}`);
-    await expect(page.locator('svg.pattern-svg')).toBeVisible();
   });
 });
 
@@ -255,70 +234,6 @@ test.describe('Walk Seam Tool (Shift+M)', () => {
     await page.waitForTimeout(300);
 
     await expect(page.locator('svg.pattern-svg')).toBeVisible();
-  });
-});
-
-// ─── Free Sewing Tool (f) ─────────────────────────────────────────────────────
-
-test.describe('Free Sewing Tool (f)', () => {
-  test.beforeEach(async ({ page }) => { await waitForApp(page); });
-
-  test('shortcut F activates free sewing tool', async ({ page }) => {
-    // F maps to the lowercase 'freesewing' tool id.
-    await activateToolKey(page, 'f', 'freesewing');
-    const tool = await activeTool(page);
-    expect(tool.editor).toBe('freesewing');
-    expect(tool.tools).toBe('freesewing');
-  });
-
-  test('free sewing surfaces the edge-pair overlay group', async ({ page }) => {
-    await seedPiecesAndSeam(page);
-    await activateToolKey(page, 'f', 'freesewing');
-
-    await expect(page.locator('.edge-pair-overlay')).toHaveCount(1);
-
-    // Hover along the left edge of the first piece (non-binding line count).
-    const piece = page.locator('.pattern-piece').first();
-    const box = await piece.boundingBox();
-    if (box) {
-      for (let dy = 0; dy <= box.height; dy += box.height / 5) {
-        await page.mouse.move(box.x, box.y + dy);
-        await page.waitForTimeout(60);
-      }
-    }
-    const lineCount = await page.locator('.edge-pair-overlay line').count();
-    console.log(`Free sewing overlay lines after hover: ${lineCount}`);
-  });
-
-  test('clicking empty area leaves no dangling overlay lines', async ({ page }) => {
-    await seedPiecesAndSeam(page);
-    await activateToolKey(page, 'f', 'freesewing');
-
-    const { box } = await getSvgCenter(page);
-    // Click far from any piece (top-right corner of the canvas).
-    await page.mouse.click(box.x + box.width - 20, box.y + 20);
-    await page.waitForTimeout(300);
-
-    const count = await page.locator('.edge-pair-overlay line').count();
-    expect(count).toBe(0);
-  });
-
-  test('Escape cancels first edge selection', async ({ page }) => {
-    await seedPiecesAndSeam(page);
-    await activateToolKey(page, 'f', 'freesewing');
-
-    const piece = page.locator('.pattern-piece').first();
-    const box = await piece.boundingBox();
-    if (box) {
-      await page.mouse.click(box.x, box.y + box.height / 2);
-      await page.waitForTimeout(200);
-    }
-
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
-
-    const count = await page.locator('.edge-pair-overlay line').count();
-    expect(count).toBe(0);
   });
 });
 
