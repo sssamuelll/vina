@@ -53,14 +53,23 @@ export function useFreeSewingTool(
     return { pieceId: snap.pieceId, edgeIndex: snap.edgeIndex, edgeRange, t, point: snap.point };
   }, [toPattern, pieces, zoom, segmentA]);
 
-  /** El release: el t sobre el MISMO borde del press. Fuera del borde → null,
-   *  y el gesto cae a clic (spec § 3.4). */
+  /** El release: el t sobre el MISMO borde del press, SIN radio de enganche.
+   *
+   *  El § 3.4 del spec tiene cuatro filas para "soltar fuera" — más allá del
+   *  extremo, fuera de la pieza, sobre otro borde, sobre otra pieza — y las
+   *  cuatro dicen CLAMPEAR al borde del press. El release no vuelve a apuntar:
+   *  el objeto ya lo eligió el press y soltar lejos solo dice "hasta el final".
+   *
+   *  Antes se llamaba con el radio del press y el `null` de "no enganché"
+   *  caía a clic, o sea al borde ENTERO. Ese fallo no se ve como fallo: cose
+   *  una costura válida y plausible, así que no se reporta como bug — se
+   *  aprende como maña. */
   const resolveReleaseT = useCallback((
     e: React.MouseEvent<SVGSVGElement>,
     press: EdgeTarget,
   ): number | null => {
     const pt = toPattern(e);
-    const snap = snapToAnyEdge(pt, pieces, zoom, press.pieceId, press.edgeRange);
+    const snap = snapToAnyEdge(pt, pieces, zoom, press.pieceId, press.edgeRange, Infinity);
     if (!snap) return null;
     const piece = pieces.find(p => p.id === press.pieceId);
     return piece

@@ -196,3 +196,64 @@ describe('useFreeSewingTool — la fusión', () => {
     expect(result.current.segmentA).toBeNull();
   });
 });
+
+// El § 3.4 del spec tiene una tabla de cuatro filas para "soltar fuera", y las
+// cuatro dicen CLAMPEAR. El release no es una segunda oportunidad de apuntar:
+// el borde ya lo eligió el press, y soltar lejos solo dice "hasta el final".
+//
+// Caer a clic ahí es peor que no hacer nada, porque no hace nada visible mal:
+// cose el borde ENTERO, que es una costura válida y plausible. María no ve un
+// error, ve que "a veces coge todo el lado" — y eso no se reporta como bug,
+// se aprende como maña.
+describe('soltar fuera del borde clampea, no cae a clic (spec § 3.4)', () => {
+  const dragAndRelease = (releaseX: number, releaseY: number) => {
+    const onComplete = vi.fn();
+    const { result } = renderHook(
+      () => useFreeSewingTool(1, { x: 0, y: 0 }, pieces, onComplete),
+      { wrapper },
+    );
+    // Press en el 25% del borde de arriba de pA (y=0, x de 0 a 100).
+    act(() => { result.current.handleMouseDown(ev(25, 0)); });
+    act(() => { result.current.handleMouseMove(ev(releaseX, releaseY)); });
+    act(() => { result.current.handleMouseUp(ev(releaseX, releaseY)); });
+    // Clic de borde entero en pB para cerrar la costura y poder inspeccionarla.
+    act(() => { result.current.handleMouseDown(ev(350, 0)); });
+    act(() => { result.current.handleMouseUp(ev(350, 0)); });
+    return onComplete.mock.calls[0]?.[0];
+  };
+
+  it('soltar lejos del borde proyecta sobre él en vez de coserlo entero', () => {
+    // 60 px por debajo del borde: cinco veces el umbral de enganche de 12.
+    const seam = dragAndRelease(75, 60);
+    expect(seam.pieceA.tStart).toBeCloseTo(0.25, 1);
+    expect(seam.pieceA.tEnd).toBeCloseTo(0.75, 1);
+  });
+
+  it('soltar más allá del extremo clampea a 1, no cose el borde entero', () => {
+    // x=150 se pasa del final del borde (x=100). El tramo llega hasta la punta.
+    const seam = dragAndRelease(150, 0);
+    expect(seam.pieceA.tStart).toBeCloseTo(0.25, 1);
+    expect(seam.pieceA.tEnd).toBe(1);
+  });
+
+  it('soltar sobre otra pieza sigue clampeado al borde del press', () => {
+    // (350,0) es el borde de arriba de pB. El press mandó pA y no se re-apunta.
+    const seam = dragAndRelease(350, 0);
+    expect(seam.pieceA.pieceId).toBe('pA');
+    expect(seam.pieceA.tEnd).toBe(1);
+  });
+
+  it('el borde entero sigue siendo lo que da un clic sin moverse', () => {
+    // La no-regresión: sin este caso, el arreglo podría matar el clic.
+    const onComplete = vi.fn();
+    const { result } = renderHook(
+      () => useFreeSewingTool(1, { x: 0, y: 0 }, pieces, onComplete),
+      { wrapper },
+    );
+    act(() => { result.current.handleMouseDown(ev(25, 0)); });
+    act(() => { result.current.handleMouseUp(ev(25, 0)); });
+    act(() => { result.current.handleMouseDown(ev(350, 0)); });
+    act(() => { result.current.handleMouseUp(ev(350, 0)); });
+    expect(onComplete.mock.calls[0][0].pieceA.tStart).toBeUndefined();
+  });
+});

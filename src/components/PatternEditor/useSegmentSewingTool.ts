@@ -47,8 +47,13 @@ export function snapToEdge(
   zoom: number,
   /** Rango de comandos [inicio, fin) al que confinar el snap. */
   edgeConstraint?: [number, number],
+  /** Radio de enganche en px de PANTALLA. `Infinity` = proyectar sin radio,
+   *  que es lo que necesita el RELEASE de un gesto: el borde ya lo eligió el
+   *  press y soltar lejos significa "hasta el final", no "no enganché nada"
+   *  (spec § 3.4). El press sigue con el radio de siempre. */
+  thresholdPx: number = EDGE_HIT_PX,
 ): SnapResult | null {
-  const threshold = screenToPatternLength(EDGE_HIT_PX, zoom);
+  const threshold = screenToPatternLength(thresholdPx, zoom);
   const cmds = piece.outline;
   const ox = piece.position?.x ?? 0;
   const oy = piece.position?.y ?? 0;
@@ -112,18 +117,20 @@ export function snapToAnyEdge(
   zoom: number,
   constrainPieceId?: string,
   constrainEdge?: [number, number],
+  /** Ver `snapToEdge`: `Infinity` proyecta sin radio, para el release. */
+  thresholdPx: number = EDGE_HIT_PX,
 ): SnapResult | null {
   if (constrainPieceId) {
     const piece = pieces.find(p => p.id === constrainPieceId);
     if (!piece) return null;
-    return snapToEdge(pt, piece, zoom, constrainEdge);
+    return snapToEdge(pt, piece, zoom, constrainEdge, thresholdPx);
   }
 
   let best: SnapResult | null = null;
   let bestDist = Infinity;
 
   for (const piece of pieces) {
-    const snap = snapToEdge(pt, piece, zoom);
+    const snap = snapToEdge(pt, piece, zoom, undefined, thresholdPx);
     if (snap) {
       const dist = Math.hypot(pt.x - snap.point.x, pt.y - snap.point.y);
       if (dist < bestDist) {
