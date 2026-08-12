@@ -122,8 +122,8 @@ test.describe('Seam P0+P1 Fixes', () => {
 
     // Las costuras se pintan en su propio menú (maria-210) — este spec mide el
     // color del render, así que entra a la superficie de costura.
-    dispatch(page, { type: 'editor/setActiveTool', payload: 'segmentSewing' });
-    dispatch(page, { type: 'tools/setActiveTool2D', payload: 'segmentSewing' });
+    dispatch(page, { type: 'editor/setActiveTool', payload: 'seam' });
+    dispatch(page, { type: 'tools/setActiveTool2D', payload: 'seam' });
 
     await page.waitForTimeout(500);
 

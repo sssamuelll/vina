@@ -14,7 +14,6 @@ import { lineTool } from './definitions/line';
 import { internalShapeTool } from './definitions/internalShape';
 import { rectangleTool } from './definitions/rectangle';
 import { seamTool } from './definitions/seam';
-import { segmentSewingTool } from './definitions/segmentSewing';
 import { topstitchSeamlineTool } from './definitions/topstitchSeamline';
 import { topstitchSegmentTool } from './definitions/topstitchSegment';
 import { topstitchFreeTool } from './definitions/topstitchFree';
@@ -51,7 +50,6 @@ import { polyPenTool } from './definitions/polyPen';
 import { mirrorTool } from './definitions/mirror';
 import { traceTool } from './definitions/trace';
 import { autoTraceTool } from './definitions/autoTrace';
-import { freeSewingTool } from './definitions/freeSewing';
 import { trimPlaceTool } from './definitions/trimPlace';
 import { arrangementTool } from './definitions/arrangement';
 import { pinTool } from './definitions/pin';
@@ -101,7 +99,6 @@ const allTools = [
   
   // 2D Tools — Sewing
   seamTool,
-  segmentSewingTool,
   topstitchSeamlineTool,
   topstitchSegmentTool,
   topstitchFreeTool,
@@ -109,7 +106,6 @@ const allTools = [
   seamAllowanceTool,
   elasticTool,
   pleatTool,
-  freeSewingTool,
   trimPlaceTool,
 
   // 2D Tools — Annotation

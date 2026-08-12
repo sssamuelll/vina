@@ -1,7 +1,5 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { buildSegmentSeam, type SegmentSelection } from '../useSegmentSewingTool';
 import type { PatternPiece } from '../../../types/types';
 
@@ -176,32 +174,5 @@ describe('useFreeSewingTool — la fusión', () => {
     expect(result.current.segmentA).not.toBeNull();
     act(() => { result.current.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' })); });
     expect(result.current.segmentA).toBeNull();
-  });
-});
-
-describe('useEditorInteractions — el mouseUp cierra el gesto para las DOS herramientas que comparten hook', () => {
-  /**
-   * Regresión, ronda de arreglo 1 (#1029). `freesewing` quedó armando el
-   * gesto sin cerrarlo NUNCA: comparte instancia con `seamTool` (paso 10 de
-   * esta tarea) y mouseDown/mouseMove seguían ruteados, pero nadie ruteaba
-   * mouseUp para `freesewing` — y en la arquitectura del gesto unificado
-   * (Tarea 2) TODO commit, clic incluido, se resuelve en `handleMouseUp`
-   * (ahí corre `resolveEdgeCommit`). Sin esa línea, `onCommit` no dispara
-   * jamás: ni costura, ni reset del `armed.current` de `useEdgeGesture`.
-   *
-   * Probar esto con un `renderHook(useEditorInteractions, ...)` real exige
-   * stubbear las ~25 herramientas de `ToolHooks` — desproporcionado para lo
-   * que hay que cazar. En su lugar, se afirma sobre el propio módulo: que
-   * las dos ramas de ruteo existen, literales. No es un test de
-   * comportamiento, pero SÍ es honesto — falla si cualquiera de las dos
-   * líneas desaparece o cambia el handler que llama.
-   */
-  it('el ruteo de mouseUp incluye seam Y freesewing, no solo seam', () => {
-    const src = readFileSync(
-      join(__dirname, '../useEditorInteractions.ts'),
-      'utf-8',
-    );
-    expect(src).toContain("if (activeTool === 'seam' && e) seamTool.handleMouseUp(e);");
-    expect(src).toContain("if (activeTool === 'freesewing' && e) freeSewingTool.handleMouseUp(e);");
   });
 });

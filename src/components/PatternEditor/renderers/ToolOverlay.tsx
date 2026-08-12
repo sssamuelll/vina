@@ -18,13 +18,12 @@ import TransformHandlesOverlay from './overlays/TransformHandlesOverlay';
 import ScissorsOverlay from './overlays/ScissorsOverlay';
 import SlashAndSpreadOverlay from './overlays/SlashAndSpreadOverlay';
 import MergeOverlay from './overlays/MergeOverlay';
-import SegmentSewingOverlay from './overlays/SegmentSewingOverlay';
 import TopstitchOverlay from './overlays/TopstitchOverlay';
 import WalkSeamOverlay from './overlays/WalkSeamOverlay';
 import OffsetPreviewOverlay from './overlays/OffsetPreviewOverlay';
 import TrimToolOverlay from './overlays/TrimToolOverlay';
 import type { TrimHover } from '../useTrimTool';
-import type { SegmentSelection, SnapResult } from '../useSegmentSewingTool';
+import type { SegmentSelection } from '../useSegmentSewingTool';
 import type { WalkSeamEdge, GhostTransform, MismatchSample, WalkSeamMetrics } from '../useWalkSeamTool';
 import type { EdgeTarget } from '../edgeGesture';
 import type { BBox, HandlePosition } from '../../../utils/geometry/transform';
@@ -140,12 +139,6 @@ interface ToolOverlayProps {
   mergePieceIdB: string | null;
   mergeSharedEdgeFound: boolean;
   mergeError: string | null;
-  // Segment Sewing
-  segmentSewingPhase: string;
-  segmentSewingSegmentA: SegmentSelection | null;
-  segmentSewingSegmentB: SegmentSelection | null;
-  segmentSewingPendingSnap: SnapResult | null;
-  segmentSewingHoveredSnap: SnapResult | null;
   // Topstitch
   topstitchMode: string;
   topstitchHoveredEdge: { pieceId: string; edgeIndex: number; start: Point2D; end: Point2D } | null;
@@ -165,11 +158,6 @@ interface ToolOverlayProps {
   walkSeamMetrics: WalkSeamMetrics | null;
   walkSeamFormatDistance: (d: number) => string;
   walkSeamHoveredSnapPoint: Point2D | null;
-  // Free Sewing
-  freeSewingSegmentA: SegmentSelection | null;
-  freeSewingHoveredTarget: EdgeTarget | null;
-  freeSewingActiveTarget: EdgeTarget | null;
-  freeSewingLiveRange: [number, number] | null;
   // Offset Preview
   offsetPreviewOutline: PathCommand[] | null;
   offsetPreviewPiecePosition: Point2D | null;
@@ -346,18 +334,6 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         />
       )}
 
-      {activeTool === 'segmentSewing' && (
-        <SegmentSewingOverlay
-          zoom2D={zoom2D}
-          pieces={pieces}
-          phase={props.segmentSewingPhase}
-          segmentA={props.segmentSewingSegmentA}
-          segmentB={props.segmentSewingSegmentB}
-          pendingSnap={props.segmentSewingPendingSnap}
-          hoveredSnap={props.segmentSewingHoveredSnap}
-        />
-      )}
-
       {(activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') && (
         <TopstitchOverlay
           zoom2D={zoom2D}
@@ -393,17 +369,6 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           previewOutline={props.offsetPreviewOutline}
           piecePosition={props.offsetPreviewPiecePosition}
           zoom2D={zoom2D}
-        />
-      )}
-
-      {activeTool === 'freesewing' && (
-        <EdgePairOverlay
-          zoom2D={zoom2D}
-          pieces={pieces}
-          segmentA={props.freeSewingSegmentA}
-          hoveredTarget={props.freeSewingHoveredTarget}
-          activeTarget={props.freeSewingActiveTarget}
-          liveRange={props.freeSewingLiveRange}
         />
       )}
 

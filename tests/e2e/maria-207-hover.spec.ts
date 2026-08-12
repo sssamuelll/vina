@@ -138,7 +138,7 @@ test.describe('maria-210 — la info de costura solo con el menú de costuras', 
     await waitForApp(page);
     await sewTwoPieces(page);
 
-    await setTool(page, 'segmentSewing');
+    await setTool(page, 'seam');
     await page.waitForTimeout(300);
     await expect(page.locator('.seam-connection')).toHaveCount(1);
   });

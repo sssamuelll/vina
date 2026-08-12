@@ -725,7 +725,6 @@ export type Tool2D =
   | 'rectangle'    // quick rectangular pieces
   | 'seam'         // connect edges between pieces
   | 'seamEdit'     // inspect existing seams — the CLO3D "Edit Sewing" half (#219)
-  | 'segmentSewing' // connect partial edge segments
   | 'topstitchSeamline'  // topstitch along seam edge
   | 'topstitchSegment'   // topstitch partial edge segment
   | 'topstitchFree'      // freeform topstitch polyline
@@ -748,7 +747,6 @@ export type Tool2D =
   | 'scissors'     // split pattern pieces
   | 'slashAndSpread' // slash and spread for fullness
   | 'merge'        // merge adjacent pattern pieces
-  | 'freesewing'   // free sewing between edges
   | 'offsetOutline' // offset piece outline inward/outward
   | 'extendTrim'   // extend or trim edges
   | 'polyPen'      // combined straight + bezier pen

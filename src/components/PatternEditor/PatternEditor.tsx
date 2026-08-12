@@ -32,7 +32,6 @@ import { useTransformTool, type TransformUpdate } from './useTransformTool';
 import { useScissorsTool } from './useScissorsTool';
 import { useSlashAndSpreadTool } from './useSlashAndSpreadTool';
 import { useMergeTool } from './useMergeTool';
-import { useSegmentSewingTool } from './useSegmentSewingTool';
 import { useSeamEditTool } from './useSeamEditTool';
 import { useTopstitchTool } from './useTopstitchTool';
 import { useWalkSeamTool } from './useWalkSeamTool';
@@ -76,7 +75,7 @@ const objectUrlMap = new Map<string, string>();
  *  editando, no cosiendo (nota de María #210: "eso solo debería verse al
  *  activar el menu de costuras porque es información que molesta y no debería
  *  mostrarse mientras editamos el patron"). */
-const SEWING_TOOL_IDS = new Set(['seam', 'seamEdit', 'segmentSewing', 'freesewing', 'walkSeam']);
+const SEWING_TOOL_IDS = new Set(['seam', 'seamEdit', 'walkSeam']);
 
 interface PatternEditorProps {
   /** Opens the DXF file picker; wired by AppShell to its hidden <input>. */
@@ -304,13 +303,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const slashAndSpreadTool = useSlashAndSpreadTool(zoom2D, pan2D);
   const mergeTool = useMergeTool(zoom2D, pan2D);
   const measureTool = useMeasureTool(zoom2D, pan2D);
-  const segmentSewingTool = useSegmentSewingTool(zoom2D, pan2D, pieces);
   const seamEditTool = useSeamEditTool(zoom2D, pan2D, pieces, seams);
   const topstitchTool = useTopstitchTool(zoom2D, pan2D, pieces);
   const walkSeamTool = useWalkSeamTool(zoom2D, pan2D);
   const offsetTool = useOffsetTool(zoom2D, pan2D);
   const extendTrimTool = useExtendTrimTool(zoom2D, pan2D);
-  const freeSewingTool = seamTool; // TAREA 7 lo borra junto con el tool `freesewing`
 
   // PolyPen tool options
   const polyPenMode = (toolOptions?.polyPen?.mode as 'piece' | 'internalLine') ?? 'piece';
@@ -574,7 +571,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox, isDraggingPiece } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, seamEditTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
+      pen, rectTool, lineTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
     });
 
   /** Los overlays de anclas (editPattern y editCurve) se pintan bajo
@@ -921,11 +918,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             mergePieceIdB={mergeTool.pieceIdB}
             mergeSharedEdgeFound={mergeTool.sharedEdgeFound}
             mergeError={mergeTool.error}
-            segmentSewingPhase={segmentSewingTool.phase}
-            segmentSewingSegmentA={segmentSewingTool.segmentA}
-            segmentSewingSegmentB={segmentSewingTool.segmentB}
-            segmentSewingPendingSnap={segmentSewingTool.pendingSnap}
-            segmentSewingHoveredSnap={segmentSewingTool.hoveredSnap}
             topstitchMode={topstitchTool.mode}
             topstitchHoveredEdge={topstitchTool.hoveredEdge}
             topstitchSegSnapA={topstitchTool.segSnapA}
@@ -943,10 +935,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             walkSeamMetrics={walkSeamTool.metrics}
             walkSeamFormatDistance={walkSeamTool.formatDistance}
             walkSeamHoveredSnapPoint={walkSeamTool.hoveredSnapPoint}
-            freeSewingSegmentA={freeSewingTool.segmentA}
-            freeSewingHoveredTarget={freeSewingTool.hoveredTarget}
-            freeSewingActiveTarget={freeSewingTool.activeTarget}
-            freeSewingLiveRange={freeSewingTool.liveRange}
             offsetPreviewOutline={offsetTool.previewOutline}
             offsetPreviewPiecePosition={
               editor.selectedPieceIds.length === 1
