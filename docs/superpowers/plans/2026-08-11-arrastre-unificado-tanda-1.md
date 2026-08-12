@@ -1786,13 +1786,20 @@ git commit -m "feat(2d): el lienzo distingue coser de editar, y el hint enseña 
 - Consumes: nada nuevo.
 - Produces: `useSegmentSewingTool.ts` sin export de hook. Siguen exportados: `snapToEdge`, `snapToAnyEdge`, `commandTToEdgeT`, `closeSegment`, `buildSegmentSeam`, `type SnapResult`, `type SegmentSelection`.
 
-- [ ] **Step 1: Confirmar quién depende todavía del hook**
+- [ ] **Step 1: Confirmar quién depende todavía del hook — en `src/` Y en `tests/`**
 
 ```bash
 grep -rn "useSegmentSewingTool\|segmentSewing" src/ --include=*.ts --include=*.tsx | grep -v "__tests__"
+grep -rln "segmentSewing\|freesewing" tests/e2e/
 ```
 
-Anota la lista. Cada línea que nombre el HOOK o el TOOL se borra; las que importan geometría (`snapToEdge`, `buildSegmentSeam`, `commandTToEdgeT`, `closeSegment`, `SnapResult`, `SegmentSelection`) se quedan.
+Anota las dos listas. Cada línea que nombre el HOOK o el TOOL se borra; las que importan geometría (`snapToEdge`, `snapToAnyEdge`, `buildSegmentSeam`, `commandTToEdgeT`, `closeSegment`, `SnapResult`, `SegmentSelection`) se quedan.
+
+> **El segundo grep no es opcional.** La Tarea 5 se limitó a `src/` y dejó catorce aserciones de e2e apuntando a teclas que ya no existían. Aquí el riesgo es mayor: **seis specs de e2e activan `segmentSewing` por el store** (`editor-tools`, `maria-201-info-costura`, `maria-207-hover`, `seam-curved-edges`, `seam-fixes`, `seam-parity-replay`), no por tecla, y por eso sobrevivieron a aquella limpieza.
+
+**Qué hacer con esos seis.** No se borran: lo que hacen sigue teniendo sentido. Usaban `segmentSewing` solo como puerta de entrada a la superficie de costuras, y esa puerta ahora es `seam`, que ya está en `SEWING_TOOL_IDS` y hace el mismo trabajo. **Remapea el despacho de `'segmentSewing'` a `'seam'`** y comprueba que cada spec siga afirmando lo mismo. La excepción es el test que la Tarea 5 dejó señalizado con un comentario inline en `seam-parity-replay.spec.ts` (`segment sewing parcial: 4 clicks + Enter`): ese ejercita la máquina de cuatro fases que esta tarea borra, así que **muere aquí** — bórralo junto con el comentario, y di en el commit por qué.
+
+**Y un tercer test andamio que también muere aquí:** el de `useFreeSewingTool.tramo.test.ts` que lee el fuente de `useEditorInteractions.ts` y afirma que contiene la línea de ruteo de mouseUp de `freesewing`. Lo puso la Tarea 3 para que esa herramienta no quedara inerte mientras llegaba esta tarea. Al borrar `freesewing`, bórralo. El de `seam`, si lo hay, se queda.
 
 - [ ] **Step 2: Borrar la máquina de fases**
 
@@ -1831,13 +1838,20 @@ En `src/components/PatternEditor/__tests__/useSegmentSewingTool.test.ts`, borrar
 
 **Y uno que se te va a poner rojo si no lo ves venir.** La Tarea 3 dejó en `src/components/PatternEditor/__tests__/useFreeSewingTool.tramo.test.ts` un test de regresión que lee el fuente de `useEditorInteractions.ts` y afirma que contiene la línea de ruteo de mouseUp de `freesewing`. Era andamio a propósito, para que esa herramienta no quedara inerte mientras llegaba esta tarea. Al borrar `freesewing` aquí, **borra también ese test** — no lo adaptes ni lo dejes pasar. El de `seam`, si lo hay, se queda.
 
-- [ ] **Step 5: Comprobar que no queda nada colgando**
+- [ ] **Step 5: Comprobar que no queda nada colgando — en los dos sitios**
 
 ```bash
 grep -rn "segmentSewing\|freeSewing\|freesewing" src/ --include=*.ts --include=*.tsx
+grep -rn "segmentSewing\|freesewing" tests/e2e/
 ```
 
-Esperado: solo aciertos dentro de `useSegmentSewingTool.ts` (el nombre del archivo y su comentario de cabecera) y en el nombre del archivo de test. Ninguna referencia a un tool id, una tecla o un hook.
+Del primero se espera: solo aciertos dentro de `useSegmentSewingTool.ts` (el nombre del archivo y su comentario de cabecera) y en el nombre del archivo de test. Ninguna referencia a un tool id, una tecla o un hook.
+
+Del segundo se espera: **vacío**.
+
+**Además, quita `'segmentSewing'` de `SEWING_TOOL_IDS`** en `PatternEditor.tsx`. La Tarea 6 lo conservó a propósito, contra la letra de su brief, porque esos seis specs lo necesitaban; una vez remapeados en el paso 1, ya no hace falta y dejarlo sería un id fantasma en un `Set` que decide qué se pinta.
+
+> Nota heredada de la revisión de la Tarea 6: mientras `'segmentSewing'` siguió en ese `Set`, esa herramienta se pintaba a opacidad reducida (`emphasis: 'muted'`) sin que nadie lo hubiera decidido. Al borrarla, ese efecto de segundo orden desaparece solo. No hay nada que arreglar, solo que no te extrañe si lo ves al leer el diff.
 
 - [ ] **Step 6: Gates completos**
 
