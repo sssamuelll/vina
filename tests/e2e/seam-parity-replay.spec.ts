@@ -193,7 +193,7 @@ test.describe('Seam parity replay — lote 1', () => {
     await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 220, 40) });
     await page.waitForTimeout(300);
 
-    await activateToolKey(page, 'b', 'seam');
+    await activateToolKey(page, 'n', 'seam');
 
     // Click 1: borde derecho de A (midpoint). Click 2: borde izquierdo de B.
     const c1 = await patternToScreen(page, 140, 90);
@@ -229,6 +229,11 @@ test.describe('Seam parity replay — lote 1', () => {
     await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 220, 40) });
     await page.waitForTimeout(300);
 
+    // NO tocar por Tarea 5 (#1028): 'n' ya no activa segmentSewing por teclado
+    // (se movió a seam) — este replay queda roto a propósito. Su destino
+    // (adaptar a store-dispatch, fusionar con el replay de seam, o borrar) lo
+    // decide la Tarea 7, que retira la herramienta segmentSewing. Ver informe
+    // de la Ronda de arreglo 1 de la Tarea 5.
     await activateToolKey(page, 'n', 'segmentSewing');
 
     // Mitad A: dos clicks sobre el borde derecho de A (start + end del tramo).

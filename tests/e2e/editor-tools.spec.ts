@@ -151,15 +151,16 @@ test.describe('Tool keyboard shortcuts', () => {
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
   // shortcuts ↔ tool ids defined in src/tools/definitions/*.tsx
+  // seam pasó de 'b' a 'n' (#1028, paridad CLO3D); segmentSewing y freesewing
+  // se quedaron sin atajo a propósito en la misma tarea — sus filas de tecla
+  // se borraron, no se adaptaron (no hay tecla que las active hoy).
   const toolShortcuts: [string, string][] = [
     ['z', 'select'],
     ['h', 'pen'],
     ['s', 'rectangle'],
     ['e', 'circle'],
     ['d', 'dart'],
-    ['b', 'seam'],
-    ['n', 'segmentSewing'],
-    ['f', 'freesewing'],
+    ['n', 'seam'],
     ['m', 'measure'],
     ['x', 'scissors'],
   ];
