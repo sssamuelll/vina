@@ -2,6 +2,8 @@ import type { PatternPiece } from '../../../../types/types';
 import type { SegmentSelection } from '../../useSegmentSewingTool';
 import type { EdgeTarget } from '../../edgeGesture';
 import { SegmentHighlight } from './SegmentSewingOverlay';
+import { segmentArcPoints } from './segmentArc';
+import { sewnLengthMm } from '../../../../utils/seam/seamRange';
 import { SEWING_PICK_FIRST, SEWING_PICK_SECOND } from '../seamVisuals';
 
 interface EdgePairOverlayProps {
@@ -35,6 +37,14 @@ function wholeEdgeAsSegment(target: EdgeTarget): SegmentSelection {
   };
 }
 
+/** Largo (mm) del borde semántico que coincide con `edgeRange` — el target
+ *  del gesto no trae `edgeName`, solo el rango de comandos, la misma unidad
+ *  que produce `edgeRangeForCommand`. Sin match (borde dibujado a mano,
+ *  legacy sin `SemanticEdge`): `undefined`, nunca 0 ni NaN. */
+function resolveEdgeLengthMm(piece: PatternPiece | undefined, edgeRange: [number, number]): number | undefined {
+  return piece?.edges?.find(e => e.segmentRange[0] === edgeRange[0] && e.segmentRange[1] === edgeRange[1])?.length;
+}
+
 export default function EdgePairOverlay({ zoom2D, pieces, segmentA, hoveredTarget, activeTarget, liveRange }: EdgePairOverlayProps) {
   const hoveredSegment = hoveredTarget ? wholeEdgeAsSegment(hoveredTarget) : null;
 
@@ -55,6 +65,27 @@ export default function EdgePairOverlay({ zoom2D, pieces, segmentA, hoveredTarge
   // El tramo en vivo SUSTITUYE al resalte de hover, no se suma: son dos
   // lecturas del mismo sitio en pantalla (spec § 4.2 ampliación 2026-08-12).
   const displaySegment = liveSegment ?? hoveredSegment;
+
+  // "El momento del descubrimiento" (spec § 4.2 ampliación): el número en mm
+  // del tramo, solo mientras hay arrastre vivo — nunca en hover. `liveRange`
+  // sale siempre ordenado [t0,t1] ascendente, así que el extremo del arco
+  // donde está el CURSOR no siempre es t1: si el press fue el extremo
+  // superior (arrastre hacia t decreciente), el cursor vive en t0.
+  let liveLengthLabel: { x: number; y: number; mm: number } | null = null;
+  if (liveSegment && activeTarget) {
+    const piece = pieces.find(p => p.id === liveSegment.pieceId);
+    const mm = sewnLengthMm(
+      resolveEdgeLengthMm(piece, liveSegment.edgeRange),
+      { tStart: liveSegment.startT, tEnd: liveSegment.endT },
+    );
+    const pts = piece ? segmentArcPoints(piece, liveSegment) : null;
+    if (mm != null && pts) {
+      const pressIsLowerBound = Math.abs(activeTarget.t - liveSegment.startT)
+        <= Math.abs(activeTarget.t - liveSegment.endT);
+      const cursorPoint = pressIsLowerBound ? pts[pts.length - 1] : pts[0];
+      liveLengthLabel = { x: cursorPoint.x, y: cursorPoint.y, mm };
+    }
+  }
 
   return (
     <g className="edge-pair-overlay">
@@ -77,6 +108,26 @@ export default function EdgePairOverlay({ zoom2D, pieces, segmentA, hoveredTarge
           // mismo no es una insinuación, como sí lo es el hover pre-gesto.
           opacity={liveSegment ? 1 : 0.7}
         />
+      )}
+
+      {liveLengthLabel && (
+        // Desplazado arriba del cursor (mismo criterio que el de pen-tool:
+        // centrado en el punto tapa el marcador de extremo que pinta
+        // `SegmentHighlight` ahí mismo, radio 5/zoom2D).
+        <g className="live-length-label" transform={`translate(${liveLengthLabel.x}, ${liveLengthLabel.y - 22 / zoom2D})`}>
+          <rect
+            x={-24 / zoom2D} y={-8 / zoom2D}
+            width={48 / zoom2D} height={16 / zoom2D}
+            rx={8 / zoom2D} fill="rgba(0,0,0,0.75)"
+            pointerEvents="none"
+          />
+          <text
+            textAnchor="middle" dominantBaseline="central"
+            fill="#fff" fontSize={10 / zoom2D} pointerEvents="none"
+          >
+            {`${liveLengthLabel.mm.toFixed(1)} mm`}
+          </text>
+        </g>
       )}
 
       {segmentA && hoveredTarget && segmentA.pieceId !== hoveredTarget.pieceId && (

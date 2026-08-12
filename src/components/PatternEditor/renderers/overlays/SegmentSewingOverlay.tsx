@@ -1,8 +1,7 @@
-import type { PatternPiece, Point2D } from '../../../../types/types';
+import type { PatternPiece } from '../../../../types/types';
 import type { SegmentSelection, SnapResult } from '../../useSegmentSewingTool';
-import { getEdgeEndpoints } from '../../../../utils/geometry/path';
-import { edgeRangePolyline, slicePolylineByT } from '../../../../utils/seam';
 import { SEWING_PICK_FIRST, SEWING_PICK_SECOND } from '../seamVisuals';
+import { segmentArcPoints } from './segmentArc';
 
 interface SegmentSewingOverlayProps {
   zoom2D: number;
@@ -31,32 +30,9 @@ export function SegmentHighlight({
 }) {
   if (!piece) return null;
 
-  const ox = piece.position?.x ?? 0;
-  const oy = piece.position?.y ?? 0;
+  const pts = segmentArcPoints(piece, segment);
+  if (!pts) return null;
 
-  // El tramo se recorta del TRAZO del BORDE por fracción de arco — la misma
-  // parametrización con la que `closeSegment` devuelve startT/endT. Antes se
-  // interpolaba linealmente entre los dos extremos, así que sobre una curva ni
-  // la línea ni las dos marcas caían donde ella había clicado (maria #199); y
-  // se recortaba del comando en vez del borde, así que un tramo que cruzaba
-  // dos comandos se pintaba encogido dentro del primero (maria #199a).
-  // La cuerda queda de reserva para lo que el aplanado no cubre (el cierre Z).
-  const local = edgeRangePolyline(piece.outline, segment.edgeRange);
-  let tramo: Point2D[];
-  if (local.length >= 2) {
-    tramo = slicePolylineByT(local, segment.startT, segment.endT);
-  } else {
-    const ep = getEdgeEndpoints(piece.outline, segment.edgeIndex);
-    if (!ep) return null;
-    const at = (t: number) => ({
-      x: ep.start.x + (ep.end.x - ep.start.x) * t,
-      y: ep.start.y + (ep.end.y - ep.start.y) * t,
-    });
-    tramo = [at(segment.startT), at(segment.endT)];
-  }
-  if (tramo.length < 2) return null;
-
-  const pts = tramo.map(p => ({ x: ox + p.x, y: oy + p.y }));
   const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
   const ini = pts[0];
   const fin = pts[pts.length - 1];

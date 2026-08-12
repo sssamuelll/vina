@@ -175,4 +175,24 @@ describe('useFreeSewingTool — la fusión', () => {
     act(() => { result.current.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' })); });
     expect(result.current.segmentA).toBeNull();
   });
+
+  it('un clic en vacío sosteniendo la mitad A la suelta (#1029 tanda 1 pt.2)', () => {
+    // Antes de la unificación, un clic en lona vacía soltaba segmentA
+    // (resolveTarget devuelve null y el press "no pasaba nada"). Hoy
+    // resolveTarget también devuelve null ahí, pero handleMouseDown salía
+    // sin escribir nada: la usuaria quedaba atrapada sosteniendo la mitad A
+    // sin ninguna salida (el único camino visible era Escape).
+    const onComplete = vi.fn();
+    const { result } = renderHook(
+      () => useFreeSewingTool(1, { x: 0, y: 0 }, pieces, onComplete),
+      { wrapper },
+    );
+    act(() => { result.current.handleMouseDown(ev(50, 0)); });
+    act(() => { result.current.handleMouseUp(ev(50, 0)); });
+    expect(result.current.segmentA).not.toBeNull();
+
+    // Lona vacía: muy lejos de cualquier borde de pA o pB.
+    act(() => { result.current.handleMouseDown(ev(5000, 5000)); });
+    expect(result.current.segmentA).toBeNull();
+  });
 });

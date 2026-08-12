@@ -1,5 +1,5 @@
 /**
- * E2E tests for sewing tools: Seam, Segment Sewing, Walk Seam, Free Sewing.
+ * E2E tests for sewing tools: Seam and Walk Seam.
  *
  * Retargeted for the B/N key swap (#1028, paridad CLO3D): seam moved from 'b'
  * to 'n'. The Segment Sewing (n) and Free Sewing (f) describes were DELETED

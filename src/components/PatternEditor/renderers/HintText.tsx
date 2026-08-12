@@ -46,7 +46,7 @@ export default function HintText({
         <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
           fill="rgba(255, 215, 0, 0.5)" fontSize="11">
           {seamPhase === 'holdingA'
-            ? 'Ahora marca en la otra pieza. Clic para el lado entero, o arrastra el tramo.'
+            ? 'Ahora marca en la otra pieza. Clic para el lado entero, o arrastra el tramo. Clic en vacío o Esc suelta.'
             : 'Clic en un lado para coserlo entero. Arrastra para coser solo un tramo.'}
         </text>
       )}

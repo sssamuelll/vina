@@ -88,6 +88,19 @@ export function useFreeSewingTool(
 
   const gesture = useEdgeGesture({ resolveTarget, resolveReleaseT, onCommit });
 
+  /** El press manda el objeto (spec § 4.1): sin un borde bajo el cursor el
+   *  gesto no se arma. Pero si se está sosteniendo la mitad A, ese mismo
+   *  clic en vacío SÍ tiene que soltarla — máquina de estados HOLDING_A
+   *  --clic vacío | Escape--> IDLE. Sin esto la usuaria queda atrapada
+   *  sosteniendo la mitad A para siempre (#1029 tanda 1 pt.2). */
+  const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (e.button === 0 && segmentA && !resolveTarget(e)) {
+      setSegmentA(null);
+      return;
+    }
+    gesture.handleMouseDown(e);
+  }, [gesture, segmentA, resolveTarget]);
+
   // El resalte al pasar el ratón es independiente del gesto: sin él, el borde
   // solo se encendería mientras se arrastra, y María no vería qué va a coser
   // ANTES de apretar. `gesture.press` solo existe durante el gesto, así que no
@@ -125,7 +138,7 @@ export function useFreeSewingTool(
      *  `liveRange` compone el tramo que se está marcando ahora mismo. */
     activeTarget: gesture.press,
     liveRange: gesture.liveRange,
-    handleMouseDown: gesture.handleMouseDown,
+    handleMouseDown,
     handleMouseMove,
     handleMouseUp: gesture.handleMouseUp,
     handleKeyDown,

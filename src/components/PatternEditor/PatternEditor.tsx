@@ -828,7 +828,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
               pieces={pieces}
               zoom2D={zoom2D}
               selectedSeamId={editor.selectedSeamId}
-              emphasis={activeTool === 'seamEdit' ? 'full' : 'muted'}
+              emphasis={activeTool === 'seam' ? 'muted' : 'full'}
               hoveredSeamId={activeTool === 'seamEdit' ? seamEditTool.hoveredSeamId : null}
             />
           )}
