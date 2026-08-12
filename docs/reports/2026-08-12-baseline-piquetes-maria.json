@@ -1,0 +1,184 @@
+{
+  "capturadoEn": "d6cfd6cc6c9b195eaa23db2ba32f68b6251bc32b",
+  "fuente": "tests/fixtures/garments/maria_patrones_samuel_2M.dxf",
+  "totalPiezas": 5,
+  "totalPiquetesConAncla": 8,
+  "piquetes": [
+    {
+      "clave": "PATRONES PARA SAMUEL-4|364.428345,-1278.391357|ccw|59.83352696226052",
+      "piezaId": "b0fe0716-16a4-4acd-9f49-2c8fe44254f0",
+      "piezaNombre": "PATRONES PARA SAMUEL-4",
+      "piqueteId": "82d46bc9-8809-4121-9797-0e99df898737",
+      "ancla": {
+        "refPoint": {
+          "x": 364.428345,
+          "y": -1278.391357
+        },
+        "direction": "ccw",
+        "distanceMm": 59.83352696226052
+      },
+      "posicionResuelta": {
+        "x": 419.8283642829812,
+        "y": -1298.351935542314
+      },
+      "normalResuelta": {
+        "x": 0.5848396645571468,
+        "y": 0.8111489177461091
+      }
+    },
+    {
+      "clave": "PATRONES PARA SAMUEL-4|364.428345,-1278.391357|ccw|43.846616251234764",
+      "piezaId": "b0fe0716-16a4-4acd-9f49-2c8fe44254f0",
+      "piezaNombre": "PATRONES PARA SAMUEL-4",
+      "piqueteId": "261a56f5-1819-45a1-a8ba-f4a166903ba3",
+      "ancla": {
+        "refPoint": {
+          "x": 364.428345,
+          "y": -1278.391357
+        },
+        "direction": "ccw",
+        "distanceMm": 43.846616251234764
+      },
+      "posicionResuelta": {
+        "x": 406.25632448093575,
+        "y": -1289.9166697220435
+      },
+      "normalResuelta": {
+        "x": 0.4737316641205202,
+        "y": 0.8806692400723457
+      }
+    },
+    {
+      "clave": "PATRONES PARA SAMUEL-5|255.834259,-1264.663696|cw|43.93870924044904",
+      "piezaId": "5dc27880-24ba-4464-8766-894ac3f136ef",
+      "piezaNombre": "PATRONES PARA SAMUEL-5",
+      "piqueteId": "35cc2796-5c34-45e6-be6e-e5b95e6148ab",
+      "ancla": {
+        "refPoint": {
+          "x": 255.834259,
+          "y": -1264.663696
+        },
+        "direction": "cw",
+        "distanceMm": 43.93870924044904
+      },
+      "posicionResuelta": {
+        "x": 221.26236238820604,
+        "y": -1288.6044934314677
+      },
+      "normalResuelta": {
+        "x": -0.8577235099180323,
+        "y": 0.5141112530706666
+      }
+    },
+    {
+      "clave": "PATRONES PARA SAMUEL-5|255.834259,-1264.663696|cw|60.792200006032544",
+      "piezaId": "5dc27880-24ba-4464-8766-894ac3f136ef",
+      "piezaNombre": "PATRONES PARA SAMUEL-5",
+      "piqueteId": "7bd4bee7-eb18-4e67-bfaa-7a2133ec31b7",
+      "ancla": {
+        "refPoint": {
+          "x": 255.834259,
+          "y": -1264.663696
+        },
+        "direction": "cw",
+        "distanceMm": 60.792200006032544
+      },
+      "posicionResuelta": {
+        "x": 213.6239870617454,
+        "y": -1303.6066865720704
+      },
+      "normalResuelta": {
+        "x": -0.9256210531175881,
+        "y": 0.37845166933901514
+      }
+    },
+    {
+      "clave": "PATRONES PARA SAMUEL-5|-264.365326,-1264.66394|ccw|60.791809958563135",
+      "piezaId": "5dc27880-24ba-4464-8766-894ac3f136ef",
+      "piezaNombre": "PATRONES PARA SAMUEL-5",
+      "piqueteId": "4ca27ed7-09dc-4d9e-a8cb-cfa0699fa571",
+      "ancla": {
+        "refPoint": {
+          "x": -264.365326,
+          "y": -1264.66394
+        },
+        "direction": "ccw",
+        "distanceMm": 60.791809958563135
+      },
+      "posicionResuelta": {
+        "x": -222.15524658683523,
+        "y": -1303.6066904665263
+      },
+      "normalResuelta": {
+        "x": 0.925620682116463,
+        "y": 0.3784525767361796
+      }
+    },
+    {
+      "clave": "PATRONES PARA SAMUEL-5|-264.365326,-1264.66394|ccw|43.938962034855194",
+      "piezaId": "5dc27880-24ba-4464-8766-894ac3f136ef",
+      "piezaNombre": "PATRONES PARA SAMUEL-5",
+      "piqueteId": "1ec590ee-d38a-472d-8291-5b0f5b10c213",
+      "ancla": {
+        "refPoint": {
+          "x": -264.365326,
+          "y": -1264.66394
+        },
+        "direction": "ccw",
+        "distanceMm": 43.938962034855194
+      },
+      "posicionResuelta": {
+        "x": -229.79338690314336,
+        "y": -1288.6050975472815
+      },
+      "normalResuelta": {
+        "x": 0.857717277998207,
+        "y": 0.5141216500239477
+      }
+    },
+    {
+      "clave": "PATRONES PARA SAMUEL-1|-436.742554,-1278.391357|ccw|59.83352695446615",
+      "piezaId": "944a1468-0fbf-4c4a-a743-a93f19776df4",
+      "piezaNombre": "PATRONES PARA SAMUEL-1",
+      "piqueteId": "c8088d1b-8162-48dc-b1f2-3baaed982893",
+      "ancla": {
+        "refPoint": {
+          "x": -436.742554,
+          "y": -1278.391357
+        },
+        "direction": "ccw",
+        "distanceMm": 59.83352695446615
+      },
+      "posicionResuelta": {
+        "x": -492.14257328298123,
+        "y": -1298.351935542314
+      },
+      "normalResuelta": {
+        "x": -0.5848396645571468,
+        "y": 0.8111489177461091
+      }
+    },
+    {
+      "clave": "PATRONES PARA SAMUEL-1|-436.742554,-1278.391357|ccw|43.84661624344062",
+      "piezaId": "944a1468-0fbf-4c4a-a743-a93f19776df4",
+      "piezaNombre": "PATRONES PARA SAMUEL-1",
+      "piqueteId": "fd92d37d-06c0-4bf0-9b8c-8a9d02cd5fe6",
+      "ancla": {
+        "refPoint": {
+          "x": -436.742554,
+          "y": -1278.391357
+        },
+        "direction": "ccw",
+        "distanceMm": 43.84661624344062
+      },
+      "posicionResuelta": {
+        "x": -478.57053348093575,
+        "y": -1289.9166697220435
+      },
+      "normalResuelta": {
+        "x": -0.4737316641205202,
+        "y": 0.8806692400723457
+      }
+    }
+  ]
+}
