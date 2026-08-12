@@ -35,6 +35,14 @@ const REF_POINT_SNAP_TOL = 1e-3;
  * — CLO exports double the vertex exactly at corners (curve segment
  * endpoints), and a zero-length wedge side would make the corner detector
  * skip precisely the corners it exists to find — and the Z-closing vertex.
+ *
+ * Ésta es LA implementación del aplanado v1, y la flecha de dependencia va
+ * hacia afuera: `outlineRing.ts` la consume para su métrica v1 (:2), y
+ * `notchMirror.ts` la importa en vez de tener copia. Invertirla — que ésta
+ * delegara en `outlineRing` — sería un ciclo, y reimplementarla en el otro
+ * lado perdería la garantía que importa: el orden algebraico del aplanado
+ * decide el último bit IEEE-754, y de ese bit dependen las posiciones de los
+ * piquetes que la usuaria ya tiene guardados (#1029).
  */
 export function ringOf(outline: PathCommand[]): Point2D[] {
   const raw = flattenPath(outline);

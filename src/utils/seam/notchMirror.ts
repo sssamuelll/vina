@@ -19,9 +19,11 @@ import type {
   NotchAnchor,
 } from '../../types/types';
 import { computePathArcLength, pointAtPathDistance, distanceAlongPath } from '../geometry/arcLength';
-import { flattenPath } from './index';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../notches';
-import { computeNotchAnchor } from '../notchAnchor';
+// `ringOf` es EL aplanado del contorno, y vive en notchAnchor: este módulo
+// tenía su propia copia literal, y dos copias del mismo aplanado derivan —
+// alguien arregla una y no la otra (#1029).
+import { computeNotchAnchor, ringOf } from '../notchAnchor';
 import { lineId } from '../pathHelpers';
 
 export interface SeamPartner {
@@ -50,19 +52,6 @@ export function findEdgeByName(piece: PatternPiece, edgeName: string): SemanticE
   const m = /^edge-(\d+)$/.exec(edgeName);
   if (m && piece.edges) return piece.edges[Number(m[1])] ?? null;
   return null;
-}
-
-function ringOf(outline: PathCommand[]): Point2D[] {
-  const raw = flattenPath(outline);
-  const pts: Point2D[] = [];
-  for (const p of raw) {
-    const prev = pts[pts.length - 1];
-    if (!prev || Math.hypot(p.x - prev.x, p.y - prev.y) > 1e-9) pts.push(p);
-  }
-  if (pts.length >= 2 && Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 1e-9) {
-    pts.pop();
-  }
-  return pts;
 }
 
 /**
