@@ -1691,7 +1691,60 @@ y usarlas: cuando `emphasis === 'muted'`, multiplicar la opacidad del grupo por 
 
 En las props del `HintText` (líneas 971-981), sustituir `segmentSewingPhase={...}` por `seamPhase={seamTool.phase}` y borrar el `seamHasFirstEdge`.
 
-- [ ] **Step 6: El guard del menú contextual**
+**Y el tramo en vivo mientras arrastra.** Ampliación añadida el 2026-08-12, tras la revisión de la Tarea 3: hoy, durante el arrastre, `EdgePairOverlay` sigue pintando el **borde entero** resaltado, porque `hoveredTarget` se congela al armarse el gesto y `liveRange` no lo consume nadie. No es que falte feedback: es feedback **contrario** a lo que está pasando. Ella arrastra para marcar medio lado y el lienzo le dice "vas a coser el lado entero". Eso genera otra tarjeta seguro.
+
+Primero, en `src/components/PatternEditor/useFreeSewingTool.ts`, añade el objetivo del gesto vivo a lo que devuelve el hook (el gesto ya lo tiene; solo no se re-exponía):
+
+```ts
+    /** El borde que enganchó el press, mientras el gesto sigue vivo. Con
+     *  `liveRange` compone el tramo que se está marcando ahora mismo. */
+    activeTarget: gesture.press,
+```
+
+Después, en `EdgePairOverlay.tsx`, añade la prop y el tramo en vivo:
+
+```tsx
+  /** El borde del press mientras el gesto sigue vivo (null fuera de gesto). */
+  activeTarget: EdgeTarget | null;
+  /** El rango que lleva marcado el arrastre ahora mismo (null si aún no cruzó
+   *  el umbral, o si el cursor se salió del borde). */
+  liveRange: [number, number] | null;
+```
+
+```tsx
+  // Mientras arrastra manda el tramo en vivo. Sin esto se le sigue pintando el
+  // borde entero, que es justo lo contrario de lo que está haciendo.
+  const liveSegment: SegmentSelection | null = activeTarget && liveRange
+    ? {
+        pieceId: activeTarget.pieceId,
+        edgeIndex: activeTarget.edgeIndex,
+        edgeRange: activeTarget.edgeRange,
+        startT: liveRange[0],
+        endT: liveRange[1],
+        startPoint: activeTarget.point,
+        endPoint: activeTarget.point,
+      }
+    : null;
+```
+
+y en el render, el tramo en vivo **sustituye** al resalte de hover (no se suman): donde hoy se pinta `hoveredSegment`, pinta `liveSegment ?? hoveredSegment`. El color sigue la misma regla que ya usa el hover — `segmentA ? SEWING_PICK_SECOND : SEWING_PICK_FIRST` — y el tramo en vivo va a opacidad plena (1), no a 0.7: lo que está marcando ahora mismo no es una insinuación.
+
+Pásale las dos props desde `PatternEditor.tsx`, donde ya se pasan `segmentA` y `hoveredTarget`.
+
+- [ ] **Step 6: Test del tramo en vivo**
+
+Añadir a `src/components/PatternEditor/renderers/__tests__/` (o al archivo de overlays que ya exista para esto) un test que afirme la sustitución, no solo la presencia:
+
+```tsx
+it('mientras arrastra pinta el tramo en vivo, NO el borde entero', () => {
+  // activeTarget + liveRange presentes → el resalte va de 0.25 a 0.75,
+  // no de 0 a 1 como haría el hover de borde entero.
+});
+```
+
+Si el `SegmentHighlight` no expone su rango de forma afirmable desde el DOM, afirma sobre el `d` del path o sobre las props con las que se le llama. Lo que no vale es un test que solo compruebe que se renderizó algo.
+
+- [ ] **Step 7: El guard del menú contextual**
 
 Spec § 3.5: durante un arrastre, el botón derecho **cancela el gesto y suprime el menú de ese evento**. Sin esto, el menú se abre a mitad de gesto y hay que navegarlo con el botón izquierdo apretado — un cuasi-modo dentro de otro.
 
@@ -1706,7 +1759,7 @@ En `src/components/PatternEditor/PatternEditor.tsx`, al principio de `handleCont
     }
 ```
 
-- [ ] **Step 7: Gates y commit**
+- [ ] **Step 8: Gates y commit**
 
 ```bash
 npx tsc -b --noEmit && npm run lint && npm run test
