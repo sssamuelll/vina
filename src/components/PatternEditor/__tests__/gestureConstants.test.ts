@@ -1,9 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { DRAG_THRESHOLD_PX, isDrag } from '../gestureConstants';
+import { DRAG_THRESHOLD_PX, isDrag, EDGE_HIT_PX } from '../gestureConstants';
 
 describe('DRAG_THRESHOLD_PX', () => {
   it('vale 4 — SM_CXDRAG de Windows', () => {
     expect(DRAG_THRESHOLD_PX).toBe(4);
+  });
+});
+
+describe('EDGE_HIT_PX', () => {
+  it('vale 12 — el valor del spec § 7, no los 8 que la fusión del #1029 dejó', () => {
+    expect(EDGE_HIT_PX).toBe(12);
   });
 });
 

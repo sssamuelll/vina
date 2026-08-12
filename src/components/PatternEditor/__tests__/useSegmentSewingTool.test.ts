@@ -66,6 +66,18 @@ describe('snapToEdge', () => {
     expect(result).not.toBeNull();
     expect(result!.edgeIndex).toBe(1);
   });
+
+  // Ronda de arreglo 1 (#1029): la fusión con la Tarea 3 dejó este umbral en 8
+  // px (el de tramos), encogiendo a la mitad el objetivo de 15 px que coser
+  // usaba de siempre. El spec § 7 manda 12 (ver `EDGE_HIT_PX`). 10 px es la
+  // franja que antes fallaba y ahora tiene que acertar — cae fuera del viejo
+  // umbral (8) y dentro del nuevo (12). Fija la regresión: si el umbral se cae
+  // de vuelta a 8 sin que nadie se entere, este test lo dice primero.
+  it('a 10px del borde engancha — dentro del umbral de 12, fuera del viejo de 8', () => {
+    const result = snapToEdge({ x: 50, y: 10 }, squarePiece, 1);
+    expect(result).not.toBeNull();
+    expect(result!.edgeIndex).toBe(1);
+  });
 });
 
 // ─── buildSegmentSeam — issue #1022: los tramos parciales viajan al Seam ─────

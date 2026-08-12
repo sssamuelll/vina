@@ -315,7 +315,7 @@ El único cambio real es el piquete, de commit-en-press a commit-en-release. No 
 | **Umbral de arrastre** | **4 px, euclidiano (`hypot`), pantalla** | `SM_CXDRAG` de Windows vale 4; la mano de María ya está calibrada a ese número por el SO. Los dos 3 px de hoy no notan la diferencia: son gestos que siguen decenas de píxeles |
 | ¿Global o por herramienta? | **Global. Una constante exportada.** | El mismo gesto se siente igual en todas partes. Un umbral por herramienta enseña "en esta hay que moverse más". Si una herramienta pide otro número, es olor de diseño |
 | Comparación | `≥ 4` es arrastre; `< 4` es clic | dicho para que nadie implemente `>` |
-| Enganche de borde | **12 px** | unifica 8/12/15/20. 12 = `eThresh` de SA (`:65`) y `HIT_RADIUS_PX` de `point` (`:50`), ya calibrados contra María |
+| Enganche de borde | **12 px** | 12 = `eThresh` de SA (`:65`) y `HIT_RADIUS_PX` de `point` (`:50`), ya calibrados contra María. **Unificación PARCIAL — ver el aviso bajo la tabla** |
 | Enganche de vértice | **10 px** | el `vThresh` de hoy (`:64`). Menor que el de borde: en una esquina gana el vértice |
 | Enganche de referencia (distancia) | **12 px** | mismo radio que el borde: una sola distancia que aprender |
 | Tramo degenerado | `|Δt| < 0.01` → cae a CLIC | `MIN_SEGMENT_T` ya existe (`:181`) |
@@ -327,6 +327,26 @@ El único cambio real es el piquete, de commit-en-press a commit-en-release. No 
 | Temporizador de pulsación | **ninguno** | los modos por tiempo son invisibles |
 
 Los cuatro primeros son perillas de calibración: si a María "se le escapa el borde", sube el 12; si "se le mueve sola", sube el 4. Una constante, un sitio.
+
+### 7.1 Aviso: la unificación del enganche es PARCIAL en la tanda 1
+
+Añadido el 2026-08-12, tras medir el árbol de verdad. Esta sección decía "unifica 8/12/15/20" como si fuera un hecho de la tanda 1. **No lo es**, y dejarlo escrito así sería vender cobertura que no existe.
+
+Lo que la tanda 1 **sí** hace: crea `EDGE_HIT_PX = 12` en `gestureConstants.ts` y lo aplica a la geometría de cosido (`snapToEdge` / `snapToAnyEdge`). Eso cubre **cuatro** herramientas activas: coser, `freesewing` mientras exista, `seamEdit` y **pespunte** — esta última llevaba a 8 px desde mucho antes de esta tanda.
+
+Por qué hizo falta: la fusión de coser (tarea 3) sustituyó `findClosestEdge` (que enganchaba a **15**) por `snapToAnyEdge` (que enganchaba a **8**), encogiendo a la mitad el objetivo de la herramienta que María usa a diario. Eso violaba la cláusula de compatibilidad del § 5 y se arregló al detectarlo.
+
+Lo que la tanda 1 **no** hace, y queda pendiente con nombre y apellido:
+
+| Umbral | Dónde | Quién lo usa hoy |
+|---|---|---|
+| `EDGE_HIT_THRESHOLD = 15` | `sewingUtils.ts:33` | pliegue, elástico |
+| `VERTEX_SNAP_THRESHOLD = 10` | `sewingUtils.ts:34` | pliegue, elástico |
+| locales de 8 / 10 / 15 / 20 | medir, recortar, extender-recortar, slash-and-spread, tijeras, piquete | cada herramienta el suyo |
+
+La dispersión real es más ancha que "8/12/15/20": es casi una constante por herramienta. Unificarlas de verdad es trabajo propio, con su propia verificación contra María, y no cabía en esta tanda sin engordarla. Queda para la tanda 2 o para un issue aparte.
+
+**Regla que sí vale desde ya:** ninguna herramienta nueva declara su propio umbral de enganche de borde. Importa `EDGE_HIT_PX`.
 
 ---
 

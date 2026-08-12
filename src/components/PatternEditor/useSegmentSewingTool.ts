@@ -13,6 +13,7 @@ import {
 import { applyPctRange } from '../../utils/seam/seamRange';
 import { edgeRangeForCommand } from '../../utils/semanticEdges';
 import { newId } from '../../utils/ids';
+import { EDGE_HIT_PX } from './gestureConstants';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -46,8 +47,6 @@ interface SegmentSewingState {
   hoveredSnap: SnapResult | null;
 }
 
-const SNAP_THRESHOLD = 8;
-
 // ─── Pure functions (exported for testing) ────────────────────────────
 
 export function snapToEdge(
@@ -57,7 +56,7 @@ export function snapToEdge(
   /** Rango de comandos [inicio, fin) al que confinar el snap. */
   edgeConstraint?: [number, number],
 ): SnapResult | null {
-  const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom);
+  const threshold = screenToPatternLength(EDGE_HIT_PX, zoom);
   const cmds = piece.outline;
   const ox = piece.position?.x ?? 0;
   const oy = piece.position?.y ?? 0;
