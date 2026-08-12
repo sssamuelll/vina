@@ -33,6 +33,7 @@ import { useScissorsTool } from './useScissorsTool';
 import { useSlashAndSpreadTool } from './useSlashAndSpreadTool';
 import { useMergeTool } from './useMergeTool';
 import { useSegmentSewingTool } from './useSegmentSewingTool';
+import { useSeamEditTool } from './useSeamEditTool';
 import { useTopstitchTool } from './useTopstitchTool';
 import { useWalkSeamTool } from './useWalkSeamTool';
 import { useOffsetTool } from './useOffsetTool';
@@ -304,6 +305,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const mergeTool = useMergeTool(zoom2D, pan2D);
   const measureTool = useMeasureTool(zoom2D, pan2D);
   const segmentSewingTool = useSegmentSewingTool(zoom2D, pan2D, pieces);
+  const seamEditTool = useSeamEditTool(zoom2D, pan2D, pieces, seams);
   const topstitchTool = useTopstitchTool(zoom2D, pan2D, pieces);
   const walkSeamTool = useWalkSeamTool(zoom2D, pan2D);
   const offsetTool = useOffsetTool(zoom2D, pan2D);
@@ -562,7 +564,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox, isDraggingPiece } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
+      pen, rectTool, lineTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, seamEditTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
     });
 
   /** Los overlays de anclas (editPattern y editCurve) se pintan bajo

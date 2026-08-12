@@ -724,6 +724,7 @@ export type Tool2D =
   | 'internalShape' // internal shape (dashed rectangle)
   | 'rectangle'    // quick rectangular pieces
   | 'seam'         // connect edges between pieces
+  | 'seamEdit'     // inspect existing seams — the CLO3D "Edit Sewing" half (#219)
   | 'segmentSewing' // connect partial edge segments
   | 'topstitchSeamline'  // topstitch along seam edge
   | 'topstitchSegment'   // topstitch partial edge segment

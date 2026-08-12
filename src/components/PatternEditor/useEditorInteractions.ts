@@ -174,6 +174,11 @@ interface ToolHooks {
     getCursor: () => string;
     reset: () => void;
   };
+  seamEditTool: {
+    handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleKeyDown: (e: KeyboardEvent) => void;
+  };
   topstitchTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -288,7 +293,7 @@ export function useEditorInteractions(
   const [isDraggingPiece, setIsDraggingPiece] = useState(false);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
-  const { pen, rectTool, lineTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool } = tools;
+  const { pen, rectTool, lineTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, seamEditTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool } = tools;
 
   const selectionHasLocked = selectedPieceIds.some(
     id => pieces.find(p => p.id === id)?.locked,
@@ -385,6 +390,7 @@ export function useEditorInteractions(
     if (activeTool === 'scissors') handlers.push(scissorsTool.handleKeyDown);
     if (activeTool === 'merge') handlers.push(mergeTool.handleKeyDown);
     if (activeTool === 'segmentSewing') handlers.push(segmentSewingTool.handleKeyDown);
+    if (activeTool === 'seamEdit') handlers.push(seamEditTool.handleKeyDown);
     if (activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') handlers.push(topstitchTool.handleKeyDown);
     if (activeTool === 'walkSeam') handlers.push(walkSeamTool.handleKeyDown);
     if (activeTool === 'freesewing') handlers.push(freeSewingTool.handleKeyDown);
@@ -397,7 +403,7 @@ export function useEditorInteractions(
     const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, pen.handleKeyDown, lineTool.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, segmentSewingTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown, freeSewingTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown, polyPenTool.handleKeyDown, internalShapeTool.handleKeyDown]);
+  }, [activeTool, pen.handleKeyDown, lineTool.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, segmentSewingTool.handleKeyDown, seamEditTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown, freeSewingTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown, polyPenTool.handleKeyDown, internalShapeTool.handleKeyDown]);
 
   // Coordinación de Escape (CF-1): un solo Esc = una sola acción. Durante un
   // transform drag en select, la fase de CAPTURA en window corre antes que el
@@ -593,6 +599,7 @@ export function useEditorInteractions(
     if (activeTool === 'slashAndSpread') { slashAndSpreadTool.handleMouseDown(e); return; }
     if (activeTool === 'merge') { mergeTool.handleMouseDown(e); return; }
     if (activeTool === 'segmentSewing') { segmentSewingTool.handleMouseDown(e); return; }
+    if (activeTool === 'seamEdit') { seamEditTool.handleMouseDown(e); return; }
     if (activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') { topstitchTool.handleMouseDown(e); return; }
     if (activeTool === 'walkSeam') { walkSeamTool.handleMouseDown(e); return; }
     if (activeTool === 'freesewing') { freeSewingTool.handleMouseDown(e); return; }
@@ -726,7 +733,7 @@ export function useEditorInteractions(
         };
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, seamEditTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -855,6 +862,7 @@ export function useEditorInteractions(
     if (activeTool === 'slashAndSpread') slashAndSpreadTool.handleMouseMove(e);
     if (activeTool === 'merge') mergeTool.handleMouseMove(e);
     if (activeTool === 'segmentSewing') segmentSewingTool.handleMouseMove(e);
+    if (activeTool === 'seamEdit') seamEditTool.handleMouseMove(e);
     if (activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') topstitchTool.handleMouseMove(e);
     if (activeTool === 'walkSeam') walkSeamTool.handleMouseMove(e);
     if (activeTool === 'freesewing') freeSewingTool.handleMouseMove(e);
@@ -864,7 +872,7 @@ export function useEditorInteractions(
     if (activeTool === 'internalShape') internalShapeTool.handleMouseMove(e);
     if (activeTool === 'pleat') pleatTool.handleMouseMove(e);
     if (activeTool === 'elastic') elasticTool.handleMouseMove(e);
-  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, pointTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
+  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, pointTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, seamEditTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseUp = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
     // Resolve marquee selection
@@ -986,6 +994,7 @@ export function useEditorInteractions(
       case 'slashAndSpread': return slashAndSpreadTool.getCursor();
       case 'merge': return mergeTool.getCursor();
       case 'segmentSewing': return segmentSewingTool.getCursor();
+      case 'seamEdit': return 'pointer';
       case 'topstitchSeamline': case 'topstitchSegment': case 'topstitchFree': return topstitchTool.getCursor();
       case 'walkSeam': return walkSeamTool.getCursor();
       case 'freesewing': return 'crosshair';
