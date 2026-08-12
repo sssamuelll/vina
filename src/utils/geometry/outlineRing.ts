@@ -227,6 +227,7 @@ function parseV2(outline: PathCommand[]): ParsedV2 {
     const command = outline[commandIndex];
     switch (command.type) {
       case 'M':
+        if (subpathStart) addLine(subpathStart, outline.length);
         cursor = { x: command.values[0], y: command.values[1] };
         subpathStart = cursor;
         previousCubicControl = null;
@@ -356,6 +357,8 @@ function parseV2(outline: PathCommand[]): ParsedV2 {
     }
     previousType = command.type;
   }
+
+  if (subpathStart) addLine(subpathStart, outline.length);
 
   return { seeds, sawPoint };
 }

@@ -98,7 +98,12 @@ export function detectCorners(
  * would otherwise wrap silently (resolveNotchAnchor wraps by design for
  * programmatic callers like scaled grading anchors).
  */
-export function outlinePerimeter(outline: PathCommand[]): number {
+export function outlinePerimeter(outline: PathCommand[], metric: RingMetric = 1): number {
+  if (metric === 2) {
+    const built = buildRing(outline, 2);
+    if (built.ok) return built.value.totalMm;
+  }
+
   const ring = ringOf(outline);
   const n = ring.length;
   if (n < 2) return 0;

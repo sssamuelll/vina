@@ -124,9 +124,14 @@ describe('v2 — la métrica correcta', () => {
   });
 
   it('mide el ARCO de las curvas, no su poligonal ni su cuerda', () => {
+    // Se mide el arco del COMANDO de curva, no el total del anillo: el anillo
+    // cierra siempre (igual que v1), así que en estas figuras abiertas su
+    // total incluye además la cuerda de vuelta al origen. Apoyarse en que
+    // coincidían era apoyarse en el bug del cierre (#1029).
     for (const [nombre, { cmds, arcoReal }] of Object.entries(CURVAS)) {
-      const total = ok(buildRing(cmds, 2)).totalMm;
-      expect(total, `${nombre}: se esperaba el arco real`).toBeCloseTo(arcoReal, 2);
+      const ring = ok(buildRing(cmds, 2));
+      const arco = distanceAt(ring, { commandIndex: 1, tLocal: 1 });
+      expect(arco, `${nombre}: se esperaba el arco real`).toBeCloseTo(arcoReal, 2);
     }
   });
 
@@ -184,9 +189,17 @@ describe('v2 — la métrica correcta', () => {
   });
 
   it('no mide a través de un salto entre subpaths', () => {
-    const total = ok(buildRing(dosSubpaths, 2)).totalMm;
-    expect(total).toBeLessThan(ok(buildRing(dosSubpaths, 1)).totalMm);
-    expect(total).toBeCloseTo(20, 6);   // los dos tramos reales, sin puentes
+    // Lo que este test defiende es la AUSENCIA DE PUENTES, no un total.
+    // Cada subpath cierra sobre sí mismo — los dos son tramos de 10mm, así
+    // que ida y vuelta son 20 cada uno: 40. v1 da 220 porque sí puentea.
+    const ring = ok(buildRing(dosSubpaths, 2));
+    expect(ring.totalMm).toBeLessThan(ok(buildRing(dosSubpaths, 1)).totalMm);
+    expect(ring.totalMm).toBeCloseTo(40, 6);
+    // Y ningún punto del anillo cae en el hueco de 90mm entre los dos.
+    for (let d = 0; d < ring.totalMm; d += 1) {
+      const { x } = pointAt(ring, d).point;
+      expect(x <= 10.001 || x >= 99.999, `puente en d=${d}: x=${x}`).toBe(true);
+    }
   });
 
   it('sabe cuántos subpaths tiene', () => {
@@ -222,7 +235,10 @@ describe('ida y vuelta — contra un oráculo externo, no contra sí misma', () 
     // sitios distintos; se compara contra la integración numérica.
     const { cmds } = CURVAS.cadera;
     const ring = ok(buildRing(cmds, 2));
-    const mitad = pointAt(ring, ring.totalMm / 2);
+    // La mitad del ARCO DE LA CURVA, dicho explícitamente. Antes se escribía
+    // `ring.totalMm / 2`, que solo coincidía porque el anillo no cerraba;
+    // decirlo así deja de depender de una propiedad accidental de la figura.
+    const mitad = pointAt(ring, CURVAS.cadera.arcoReal / 2);
 
     const P = [{ x: 0, y: 0 }, { x: 40, y: 30 }, { x: 20, y: 90 }, { x: 60, y: 130 }];
     const en = (t: number) => {

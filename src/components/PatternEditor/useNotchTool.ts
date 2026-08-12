@@ -189,7 +189,7 @@ export function useNotchTool(
               y: notch.notchAnchor.refPoint.y + piece.position.y,
             },
             notchWorld: { x: hit.point.x, y: hit.point.y },
-            maxDistanceMm: outlinePerimeter(piece.outline),
+            maxDistanceMm: outlinePerimeter(piece.outline, notch.notchAnchor.metric ?? 1),
           });
         }
         return;
