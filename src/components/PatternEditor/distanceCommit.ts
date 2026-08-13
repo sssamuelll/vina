@@ -2,6 +2,25 @@ import type { NotchAnchor } from '../../types/types';
 import type { DistanceRef } from '../../utils/geometry/distanceRef';
 import type { OutlineRing } from '../../utils/geometry/outlineRing';
 
+/** Lleva una distancia de anillo al marco creciente de un borde que cruza 0. */
+export function unwrapOnSpan(
+  ring: OutlineRing,
+  edgeSpanMm: [number, number],
+  mm: number,
+): number {
+  const [spanStartMm, spanEndMm] = edgeSpanMm;
+  return spanStartMm > spanEndMm && mm < spanStartMm ? mm + ring.totalMm : mm;
+}
+
+/** Longitud del borde en su marco desenrollado, incluido el tramo que cruza 0. */
+export function spanLengthMm(
+  ring: OutlineRing,
+  edgeSpanMm: [number, number],
+): number {
+  const [spanStartMm, spanEndMm] = edgeSpanMm;
+  return (spanStartMm > spanEndMm ? spanEndMm + ring.totalMm : spanEndMm) - spanStartMm;
+}
+
 /**
  * Convierte un arrastre sobre un borde en un ancla de distancia precisa.
  *
@@ -26,19 +45,14 @@ export function distanceAnchorFrom(
   // Se resuelve desenrollando: en ese marco el borde vuelve a ser un intervalo
   // creciente y todo lo demás funciona igual. Para un borde que no cruza, el
   // desenrollado es la identidad y no cambia nada.
-  const [spanStartMm, spanEndMm] = edgeSpanMm;
-  const wraps = spanStartMm > spanEndMm;
-  const unwrap = (distanceMm: number): number => (
-    wraps && distanceMm < spanStartMm ? distanceMm + ring.totalMm : distanceMm
-  );
-
+  const spanStartMm = edgeSpanMm[0];
   const edgeMinMm = spanStartMm;
-  const edgeMaxMm = wraps ? spanEndMm + ring.totalMm : spanEndMm;
+  const edgeMaxMm = spanStartMm + spanLengthMm(ring, edgeSpanMm);
   const clampToEdge = (distanceMm: number): number => (
-    Math.max(edgeMinMm, Math.min(edgeMaxMm, unwrap(distanceMm)))
+    Math.max(edgeMinMm, Math.min(edgeMaxMm, unwrapOnSpan(ring, edgeSpanMm, distanceMm)))
   );
 
-  const refMm = unwrap(ref.distanceMm);
+  const refMm = unwrapOnSpan(ring, edgeSpanMm, ref.distanceMm);
   const clampedReleaseMm = clampToEdge(releaseMm);
   const directionMm = firstDragMm === null
     ? clampedReleaseMm

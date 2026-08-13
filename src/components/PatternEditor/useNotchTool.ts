@@ -1,11 +1,24 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { PatternPiece, Point2D, InternalLine, NotchOptions } from '../../types/types';
+import type { PatternPiece, Point2D, InternalLine, NotchOptions } from '../../types/types';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
-import { computeNotchAnchor, resolveNotchAnchor, outlinePerimeter } from '../../utils/notchAnchor';
-import { screenToPattern } from '../../utils/geometry';
+import { computeNotchAnchor, resolveNotchAnchor, resolveNotchAnchorV2, outlinePerimeter } from '../../utils/notchAnchor';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
+import {
+  buildRing,
+  distanceAt,
+  projectToRing,
+  type OutlineRing,
+} from '../../utils/geometry/outlineRing';
+import { resolveDistanceRef } from '../../utils/geometry/distanceRef';
+import { edgeRangeForCommand } from '../../utils/semanticEdges';
 import { newId } from '../../utils/ids';
+import { snapToAnyEdge, type SnapResult } from './useSegmentSewingTool';
+import { useEdgeGesture } from './useEdgeGesture';
+import type { EdgeCommit, EdgeTarget } from './edgeGesture';
+import { EDGE_HIT_PX } from './gestureConstants';
+import { distanceAnchorFrom, spanLengthMm, unwrapOnSpan } from './distanceCommit';
 
 /**
  * Notch tool: click on a piece edge to place a notch mark.
@@ -13,7 +26,6 @@ import { newId } from '../../utils/ids';
  * alignment points for sewing pieces together.
  */
 
-const EDGE_HIT_THRESHOLD = 20; // px screen space
 const NOTCH_SIZE = 8; // mm in pattern space
 void NOTCH_SIZE; // reserved for future use
 
@@ -38,66 +50,46 @@ export interface NotchRefineState {
   previewWorld?: Point2D | null;
 }
 
-/** Get closest point on piece outline to a given point */
-function closestPointOnOutline(
-  pt: Point2D,
-  piece: PatternPiece,
-  zoom: number,
-): { point: Point2D; normal: Point2D; dist: number } | null {
-  const cmds = piece.outline;
-  let best: { point: Point2D; normal: Point2D; dist: number } | null = null;
+function spanForEdge(
+  ring: OutlineRing,
+  edgeRange: [number, number],
+): [number, number] {
+  const startMm = distanceAt(ring, { commandIndex: edgeRange[0], tLocal: 0 });
+  const rawEndMm = distanceAt(ring, { commandIndex: edgeRange[1] - 1, tLocal: 1 });
+  // `distanceAt` nombra el final del cierre como `totalMm`, pero `projectToRing`
+  // llama 0 a ese mismo punto: son la misma esquina con dos nombres. Si el borde
+  // se queda leído como [inicio … totalMm], una referencia que vuelva como 0
+  // cae FUERA de él y la resta da casi el perímetro entero.
+  //
+  // Medido sobre la figura de los tests: un piquete arrastrado a 60 mm de esa
+  // esquina se colocaba a 544,88 — 485 mm de error, casi la vuelta completa.
+  // Dejando que el borde cruce el origen, el desenrollado de `distanceCommit`
+  // lo resuelve igual que cualquier otro tramo. Hay test.
+  //
+  // La comparación va con tolerancia y no con `===`: los dos números salen de
+  // sumas distintas del mismo recorrido y no tienen por qué coincidir bit a bit.
+  const cierraEnElOrigen = startMm > 0 && rawEndMm >= ring.totalMm - 1e-6;
+  const endMm = cierraEnElOrigen ? 0 : rawEndMm;
+  return [startMm, endMm];
+}
 
-  let cx = 0, cy = 0;
-  for (let i = 0; i < cmds.length; i++) {
-    const cmd = cmds[i];
-    const v = cmd.values;
-    let ex: number, ey: number;
+function mmForSnap(ring: OutlineRing, snap: SnapResult): number {
+  return distanceAt(ring, { commandIndex: snap.edgeIndex, tLocal: snap.t });
+}
 
-    switch (cmd.type) {
-      case 'M': cx = v[0]; cy = v[1]; continue;
-      case 'L': ex = v[0]; ey = v[1]; break;
-      case 'C': ex = v[4]; ey = v[5]; break;
-      case 'Q': ex = v[2]; ey = v[3]; break;
-      case 'Z': {
-        const m = cmds[0];
-        if (m.type !== 'M') continue;
-        ex = m.values[0]; ey = m.values[1];
-        break;
-      }
-      default: continue;
-    }
+/**
+ * `useFreeSewingTool` usa `commandTToEdgeT`, medido sobre el trazo aplanado
+ * (métrica 1). Aquí el gesto representa milímetros legibles y re-editables:
+ * su ida y vuelta t ↔ mm debe usar el arco exacto de la métrica 2.
+ */
+function tForMm(ring: OutlineRing, spanMm: [number, number], mm: number): number {
+  const lengthMm = spanLengthMm(ring, spanMm);
+  if (lengthMm === 0) return 0;
+  return (unwrapOnSpan(ring, spanMm, mm) - spanMm[0]) / lengthMm;
+}
 
-    // Project pt onto segment cx,cy → ex,ey
-    const sx = piece.position.x + cx;
-    const sy = piece.position.y + cy;
-    const exx = piece.position.x + ex;
-    const eyy = piece.position.y + ey;
-    const dx = exx - sx, dy = eyy - sy;
-    const lenSq = dx * dx + dy * dy;
-    if (lenSq === 0) { cx = ex; cy = ey; continue; }
-
-    let t = ((pt.x - sx) * dx + (pt.y - sy) * dy) / lenSq;
-    t = Math.max(0, Math.min(1, t));
-    const projX = sx + t * dx;
-    const projY = sy + t * dy;
-    const d = Math.hypot(pt.x - projX, pt.y - projY) * zoom;
-
-    if (d < EDGE_HIT_THRESHOLD && (!best || d < best.dist)) {
-      // Normal = perpendicular to edge, pointing inward
-      const len = Math.sqrt(lenSq);
-      const nx = -dy / len;
-      const ny = dx / len;
-      best = {
-        point: { x: projX, y: projY },
-        normal: { x: nx, y: ny },
-        dist: d,
-      };
-    }
-
-    cx = ex; cy = ey;
-  }
-
-  return best;
+function mmForT(ring: OutlineRing, spanMm: [number, number], t: number): number {
+  return spanMm[0] + t * spanLengthMm(ring, spanMm);
 }
 
 /**
@@ -159,43 +151,143 @@ export function useNotchTool(
     [storeNotchOptions, notchOptions],
   );
 
+  const ringData = useMemo(() => {
+    const rings = new Map<string, OutlineRing>();
+    const eligiblePieces: PatternPiece[] = [];
+    for (const piece of pieces) {
+      const built = buildRing(piece.outline, 2);
+      if (!built.ok) continue;
+      rings.set(piece.id, built.value);
+      eligiblePieces.push(piece);
+    }
+    return { rings, pieces: eligiblePieces };
+  }, [pieces]);
+
   const toPattern = useCallback(
     (screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
       screenToPattern(screenX, screenY, svgRect, zoom, pan),
     [zoom, pan],
   );
 
-  const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (e.button !== 0) return;
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
+  /** El press fija la pieza, el borde semántico y su posición de arco métrica 2. */
+  const resolveTarget = useCallback((e: React.MouseEvent<SVGSVGElement>): EdgeTarget | null => {
+    const rect = e.currentTarget.getBoundingClientRect();
     const pt = toPattern(e.clientX, e.clientY, rect);
+    const snap = snapToAnyEdge(pt, ringData.pieces, zoom);
+    if (!snap) return null;
 
-    for (const piece of pieces) {
-      const hit = closestPointOnOutline(pt, piece, zoom);
-      if (hit) {
-        const notch = createNotchLine(hit.point, hit.normal, piece, effectiveOptions);
-        onAddNotch(piece.id, notch);
-        // Click-then-refine (D-4): the notch is committed; if it anchored,
-        // open the refine state so the precision modal can adjust it. An
-        // anchor-less notch (cornerless outline) has nothing to refine
-        // numerically — the click placement stands.
-        if (notch.notchAnchor) {
-          setRefining({
-            pieceId: piece.id,
-            notch,
-            refWorld: {
-              x: notch.notchAnchor.refPoint.x + piece.position.x,
-              y: notch.notchAnchor.refPoint.y + piece.position.y,
-            },
-            notchWorld: { x: hit.point.x, y: hit.point.y },
-            maxDistanceMm: outlinePerimeter(piece.outline, notch.notchAnchor.metric ?? 1),
-          });
-        }
-        return;
+    const piece = ringData.pieces.find(candidate => candidate.id === snap.pieceId);
+    const ring = ringData.rings.get(snap.pieceId);
+    if (!piece || !ring) return null;
+    const edgeRange = edgeRangeForCommand(piece, snap.edgeIndex);
+    const spanMm = spanForEdge(ring, edgeRange);
+    const t = tForMm(ring, spanMm, mmForSnap(ring, snap));
+    return { pieceId: snap.pieceId, edgeIndex: snap.edgeIndex, edgeRange, t, point: snap.point };
+  }, [toPattern, ringData, zoom]);
+
+  /** El release solo aporta un t sobre el MISMO borde que fijó el press. */
+  const resolveReleaseT = useCallback((
+    e: React.MouseEvent<SVGSVGElement>,
+    press: EdgeTarget,
+  ): number | null => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pt = toPattern(e.clientX, e.clientY, rect);
+    const snap = snapToAnyEdge(pt, ringData.pieces, zoom, press.pieceId, press.edgeRange);
+    if (!snap) return null;
+    const ring = ringData.rings.get(press.pieceId);
+    if (!ring) return null;
+    const spanMm = spanForEdge(ring, press.edgeRange);
+    return tForMm(ring, spanMm, mmForSnap(ring, snap));
+  }, [toPattern, ringData, zoom]);
+
+  const resolveTargetOnRing = useCallback((target: EdgeTarget) => {
+    const piece = ringData.pieces.find(candidate => candidate.id === target.pieceId);
+    const ring = ringData.rings.get(target.pieceId);
+    if (!piece || !ring) return null;
+    const pressLocal = {
+      x: target.point.x - piece.position.x,
+      y: target.point.y - piece.position.y,
+    };
+    const projected = projectToRing(ring, pressLocal).point;
+    // Se resuelve un ancla de distancia 0 desde el propio punto: el punto sale
+    // asentado sobre la curva de verdad —el snap viene del trazo aplanado— y la
+    // normal sale de quien ya sabía calcularla, sin reimplementarla aquí.
+    //
+    // Con el anillo ya construido, y no con `resolveNotchAnchor`, que lo
+    // reconstruiría: esto corre en cada movimiento del ratón sobre un borde.
+    const resolved = resolveNotchAnchorV2(piece.outline, {
+      refPoint: projected,
+      direction: 'cw',
+      distanceMm: 0,
+      metric: 2,
+    }, ring);
+    if (!resolved) return null;
+    return {
+      piece,
+      ring,
+      localPoint: resolved.point,
+      worldPoint: {
+        x: resolved.point.x + piece.position.x,
+        y: resolved.point.y + piece.position.y,
+      },
+      normal: resolved.normal,
+    };
+  }, [ringData]);
+
+  const onCommit = useCallback((commit: EdgeCommit) => {
+    const { target } = commit;
+    const piece = ringData.pieces.find(candidate => candidate.id === target.pieceId);
+    const ring = ringData.rings.get(target.pieceId);
+    if (!piece || !ring) return;
+
+    const spanMm = spanForEdge(ring, target.edgeRange);
+    const pressLocal = {
+      x: target.point.x - piece.position.x,
+      y: target.point.y - piece.position.y,
+    };
+    const hitMm = screenToPatternLength(EDGE_HIT_PX, zoom);
+
+    if (commit.kind === 'click') {
+      const exact = resolveTargetOnRing(target);
+      if (!exact) return;
+      const notch = createNotchLine(exact.worldPoint, exact.normal, piece, effectiveOptions);
+      onAddNotch(piece.id, notch);
+      // Click-then-refine (D-4): el modal solo abre cuando la posición fue una
+      // adivinanza. Un piquete sin ancla conserva el clic, pero no puede refinarse.
+      if (notch.notchAnchor) {
+        setRefining({
+          pieceId: piece.id,
+          notch,
+          refWorld: {
+            x: notch.notchAnchor.refPoint.x + piece.position.x,
+            y: notch.notchAnchor.refPoint.y + piece.position.y,
+          },
+          notchWorld: exact.worldPoint,
+          maxDistanceMm: outlinePerimeter(piece.outline, notch.notchAnchor.metric ?? 1),
+        });
       }
+      return;
     }
-  }, [toPattern, pieces, zoom, onAddNotch, effectiveOptions]);
+
+    const ref = resolveDistanceRef(ring, piece, pressLocal, spanMm, hitMm);
+    const releaseMm = mmForT(ring, spanMm, commit.releaseT);
+    const firstMm = commit.firstDragT === null
+      ? null
+      : mmForT(ring, spanMm, commit.firstDragT);
+    const anchor = distanceAnchorFrom(ring, ref, releaseMm, firstMm, spanMm);
+    const resolved = resolveNotchAnchor(piece.outline, anchor);
+    if (!resolved) return;
+    onAddNotch(piece.id, {
+      id: newId(),
+      type: 'notch',
+      path: generateNotchPath(resolved.point, resolved.normal, effectiveOptions),
+      notchOptions: effectiveOptions,
+      notchAnchor: anchor,
+    });
+  }, [ringData, zoom, resolveTargetOnRing, effectiveOptions, onAddNotch]);
+
+  const gesture = useEdgeGesture({ resolveTarget, resolveReleaseT, onCommit });
+  const handleMouseDown = gesture.handleMouseDown;
 
   /** Apply edited distance/depth: resolve the anchor and regenerate the path. */
   const confirmRefine = useCallback((distanceMm: number, depthMm: number) => {
@@ -251,24 +343,22 @@ export function useNotchTool(
   const cancelRefine = useCallback(() => setRefining(null), []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    const pt = toPattern(e.clientX, e.clientY, rect);
-
-    for (const piece of pieces) {
-      const hit = closestPointOnOutline(pt, piece, zoom);
-      if (hit) {
-        setState({ hoveredPoint: { pieceId: piece.id, point: hit.point, normal: hit.normal } });
-        return;
-      }
-    }
-    setState({ hoveredPoint: null });
-  }, [toPattern, pieces, zoom]);
+    gesture.handleMouseMove(e);
+    if (gesture.isArmed()) return;
+    const target = resolveTarget(e);
+    const exact = target ? resolveTargetOnRing(target) : null;
+    setState({
+      hoveredPoint: exact && target
+        ? { pieceId: target.pieceId, point: exact.worldPoint, normal: exact.normal }
+        : null,
+    });
+  }, [gesture, resolveTarget, resolveTargetOnRing]);
 
   return {
     hoveredPoint: state.hoveredPoint,
     handleMouseDown,
     handleMouseMove,
+    handleMouseUp: gesture.handleMouseUp,
     refining,
     confirmRefine,
     previewRefine,

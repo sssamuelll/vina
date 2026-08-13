@@ -70,7 +70,11 @@ function setup(options?: Record<string, unknown>, harness?: { withEditor?: boole
       useNotchTool(1, { x: 0, y: 0 }, pieces, onAddNotch, undefined, onUpdateNotch),
     { wrapper, initialProps: { pieces: [makeSquare()] } },
   );
+  // El piquete nace en el mouseup desde la tanda 2b (#1029): el press solo
+  // arma. Soltar donde se apretó es la ruta de clic, que es la que estos
+  // tests contratan.
   act(() => { result.current.handleMouseDown(fakeEvent(30, 0)); });
+  act(() => { result.current.handleMouseUp(fakeEvent(30, 0)); });
   return { onAddNotch, onUpdateNotch, result, rerender, store };
 }
 
@@ -203,6 +207,7 @@ describe('useNotchTool — click-then-refine (notch-precision F3, D-4)', () => {
       { wrapper },
     );
     act(() => { result.current.handleMouseDown(fakeEvent(100, 50)); });
+    act(() => { result.current.handleMouseUp(fakeEvent(100, 50)); });
     expect(onAddNotch).toHaveBeenCalledTimes(1); // notch still created
     expect(result.current.refining).toBeNull();  // but nothing to refine numerically
   });
