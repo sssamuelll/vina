@@ -16,6 +16,15 @@ import { mirrorPctRange } from '../utils/seam/seamRange';
 import { normalizeSpans } from '../utils/seam/allowanceSpans';
 import { autoSew } from '../utils/autoSew';
 
+function validSeamAllowanceSpan(span: SeamAllowanceSpan): SeamAllowanceSpan | null {
+  if (![span.tStart, span.tEnd, span.width].every(Number.isFinite)) return null;
+  const tStart = Math.max(0, Math.min(1, Math.min(span.tStart, span.tEnd)));
+  const tEnd = Math.max(0, Math.min(1, Math.max(span.tStart, span.tEnd)));
+  // El mismo mínimo del gesto evita que el panel fabrique restos invisibles.
+  if (tEnd - tStart < 0.01) return null;
+  return { tStart, tEnd, width: Math.max(0, span.width) };
+}
+
 // ─── Auto-rename duplicate pieces (e.g., all named "Detail" from Seamly2D) ────
 
 /**
@@ -1153,16 +1162,53 @@ const projectSlice = createSlice({
       const edge = piece?.edges?.find(candidate => candidate.id === action.payload.edgeId);
       if (!piece || !edge) return;
 
-      const source = action.payload.span;
-      if (![source.tStart, source.tEnd, source.width].every(Number.isFinite)) return;
-      const tStart = Math.max(0, Math.min(1, Math.min(source.tStart, source.tEnd)));
-      const tEnd = Math.max(0, Math.min(1, Math.max(source.tStart, source.tEnd)));
-      if (tEnd - tStart < 0.01) return;
+      const span = validSeamAllowanceSpan(action.payload.span);
+      if (!span) return;
 
       edge.seamAllowanceSpans = normalizeSpans([
         ...(edge.seamAllowanceSpans ?? []),
-        { tStart, tEnd, width: Math.max(0, source.width) },
+        span,
       ]);
+      piece.updatedAt = Date.now();
+      state.isDirty = true;
+    },
+    /**
+     * El índice identifica la fila visible en el arreglo ya normalizado. La
+     * edición vuelve a entrar como última escritura para resolver solapes igual
+     * que un arrastre nuevo, sin una segunda regla escondida en el panel.
+     */
+    updateEdgeSeamAllowanceSpan(state, action: PayloadAction<{
+      pieceId: string;
+      edgeId: string;
+      spanIndex: number;
+      span: SeamAllowanceSpan;
+    }>) {
+      const piece = state.pieces.find(candidate => candidate.id === action.payload.pieceId);
+      const edge = piece?.edges?.find(candidate => candidate.id === action.payload.edgeId);
+      const spans = edge?.seamAllowanceSpans;
+      const span = validSeamAllowanceSpan(action.payload.span);
+      if (!piece || !edge || !spans?.[action.payload.spanIndex] || !span) return;
+
+      edge.seamAllowanceSpans = normalizeSpans([
+        ...spans.filter((_, index) => index !== action.payload.spanIndex),
+        span,
+      ]);
+      piece.updatedAt = Date.now();
+      state.isDirty = true;
+    },
+    /** Quitar la excepción devuelve esa zona al ancho heredado del borde. */
+    removeEdgeSeamAllowanceSpan(state, action: PayloadAction<{
+      pieceId: string;
+      edgeId: string;
+      spanIndex: number;
+    }>) {
+      const piece = state.pieces.find(candidate => candidate.id === action.payload.pieceId);
+      const edge = piece?.edges?.find(candidate => candidate.id === action.payload.edgeId);
+      const spans = edge?.seamAllowanceSpans;
+      if (!piece || !edge || !spans?.[action.payload.spanIndex]) return;
+
+      const remaining = spans.filter((_, index) => index !== action.payload.spanIndex);
+      edge.seamAllowanceSpans = remaining.length > 0 ? remaining : undefined;
       piece.updatedAt = Date.now();
       state.isDirty = true;
     },
@@ -1616,6 +1662,7 @@ export const {
   linkPieces, unlinkPieces, cloneAsLinked,
   // Per-edge seam allowance
   setEdgeSeamAllowance, setEdgesSeamAllowance, addEdgeSeamAllowanceSpan,
+  updateEdgeSeamAllowanceSpan, removeEdgeSeamAllowanceSpan,
   // Layers
   setLayer, setSublayer, cloneToLayer, superimposePiece,
   renameLayer, deleteLayerName, setLayerLocked, addLayer, removeLayer,

@@ -14,6 +14,7 @@ import { useLineTool } from './useLineTool';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
+import { resolveSeamAllowanceClick } from '../../utils/seam/edgeHitTest';
 import { useNotchTool } from './useNotchTool';
 import { usePointTool } from './usePointTool';
 import { useSeamAllowanceTool } from './useSeamAllowanceTool';
@@ -42,6 +43,7 @@ import { toPieceLocalPath } from './internalShapePath';
 import { usePleatTool } from '../../hooks/usePleatTool';
 import { useEditorInteractions } from './useEditorInteractions';
 import { useElasticTool } from '../../hooks/useElasticTool';
+import { EDGE_HIT_PX } from './gestureConstants';
 import PolyPenToolOverlay from './renderers/overlays/PolyPenToolOverlay';
 import GridLayer from './renderers/GridLayer';
 import RulerLayer from './renderers/RulerLayer';
@@ -398,11 +400,27 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       e.preventDefault();
       return;
     }
+    if (activeTool === 'seamAllowance' && seamAllowanceTool.isArmed()) {
+      seamAllowanceTool.cancel();
+      return;
+    }
 
     // Determine which piece (if any) is under the cursor
     const svg = e.currentTarget as SVGSVGElement;
     const rect = svg.getBoundingClientRect();
     const { x: canvasX, y: canvasY } = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
+
+    const seamAllowanceTarget = activeTool === 'seamAllowance'
+      ? resolveSeamAllowanceClick(
+          pieces,
+          { x: canvasX, y: canvasY },
+          screenToPatternLength(10, zoom2D),
+          screenToPatternLength(EDGE_HIT_PX, zoom2D),
+        )
+      : null;
+    const hitSaEdgeId = seamAllowanceTarget?.kind === 'edge'
+      ? seamAllowanceTarget.edgeId
+      : null;
 
     // Per-edge width and corner type are edited via left-click selection + the
     // Properties panel (Direction A), so right-click is always the general piece
@@ -429,11 +447,16 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         break;
       }
     }
+    // Un borde se puede alcanzar unos píxeles por fuera del bbox. En ese caso
+    // el hit preciso sigue siendo dueño del menú, no la ausencia del body-hit.
+    if (seamAllowanceTarget?.kind === 'edge') {
+      hitPiece = pieces.find(piece => piece.id === seamAllowanceTarget.pieceId) ?? hitPiece;
+    }
 
     // Hit-test seams: check proximity to seam connection lines and edge highlights
     let hitSeamId: string | null = null;
     const SEAM_THRESHOLD = screenToPatternLength(8, zoom2D);
-    for (const seam of seams) {
+    for (const seam of hitSaEdgeId ? [] : seams) {
       const pieceA = pieces.find(p => p.id === seam.pieceA.pieceId);
       const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
       if (!pieceA || !pieceB) continue;
@@ -471,7 +494,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // Hit-test internal lines on the hit piece
     let hitInternalLineId: string | null = null;
     let hitInternalLineType: string | null = null;
-    if (hitPiece && !hitSeamId) {
+    if (hitPiece && !hitSeamId && !hitSaEdgeId) {
       const IL_THRESHOLD = screenToPatternLength(6, zoom2D);
       let nearestDist = Infinity;
       for (const line of hitPiece.internals) {
@@ -535,6 +558,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       pieceId: hitSeamId ? null : (hitPiece?.id ?? null),
       pieceName: hitSeamId ? undefined : hitPiece?.name,
       seamId: hitSeamId,
+      saEdgeId: hitSaEdgeId,
       segmentIndex,
       segmentIsCurve,
       activeTool,
@@ -542,7 +566,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       internalLineType: hitInternalLineType,
       isEditingNodes: editPatternTool.isEditing,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool, notchTool]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool, notchTool, seamAllowanceTool]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
@@ -1036,6 +1060,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onOffsetInternalLine={handleOffsetInternalLine}
         onOptimizeCurves={handleOptimizeCurves}
         onRefineNotch={notchTool.refineExisting}
+        onOpenSeamAllowanceProperties={() => onOpenPanel?.('Properties')}
         onOpenProperties={(pieceId) => {
           dispatch(selectPiece(pieceId));
           onOpenPanel?.('Properties');

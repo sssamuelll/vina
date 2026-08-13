@@ -34,6 +34,13 @@ function mount(node: React.ReactElement, p: PatternPiece) {
 }
 
 describe('EdgePropertiesSection', () => {
+  it('un borde sin tramos enseña el panel de hoy, sin filas nuevas', () => {
+    mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
+
+    expect(screen.queryByText('Tramos del margen')).toBeNull();
+    expect((screen.getByLabelText('Ancho (mm)') as HTMLInputElement).value).toBe('10');
+  });
+
   it('shows the edge name and the effective width (inherited)', () => {
     mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
     expect(screen.getByText(/hem/i)).toBeTruthy();
@@ -74,6 +81,95 @@ describe('EdgePropertiesSection', () => {
     const edges = store.getState().project.pieces[0].edges!;
     expect(edges.find(x => x.id === 'p:hem')!.seamAllowanceWidth).toBe(12);
     expect(edges.find(x => x.id === 'p:side')!.seamAllowanceWidth).toBe(12);
+  });
+
+  it('un borde con tramos enseña una fila por tramo y el ancho heredado', () => {
+    const edgeWithSpans: SemanticEdge = {
+      ...hem,
+      seamAllowanceSpans: [
+        { tStart: 0.1, tEnd: 0.3, width: 8 },
+        { tStart: 0.5, tEnd: 0.8, width: 14 },
+      ],
+    };
+    mount(
+      <EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />,
+      piece({ edges: [edgeWithSpans] }),
+    );
+
+    expect(screen.getByText('Tramos del margen')).toBeTruthy();
+    expect(screen.getByText('Tramo 1')).toBeTruthy();
+    expect(screen.getByText('Tramo 2')).toBeTruthy();
+    expect((screen.getByLabelText('Ancho fuera de los tramos (mm)') as HTMLInputElement).value).toBe('10');
+  });
+
+  it('editar el ancho de un tramo despacha solo ese tramo', () => {
+    const edgeWithSpans: SemanticEdge = {
+      ...hem,
+      seamAllowanceSpans: [
+        { tStart: 0.1, tEnd: 0.3, width: 8 },
+        { tStart: 0.5, tEnd: 0.8, width: 14 },
+      ],
+    };
+    const store = mount(
+      <EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />,
+      piece({ edges: [edgeWithSpans] }),
+    );
+
+    const widths = screen.getAllByLabelText('Ancho (mm)');
+    fireEvent.change(widths[1], { target: { value: '18' } });
+    fireEvent.blur(widths[1]);
+
+    expect(store.getState().project.pieces[0].edges?.[0].seamAllowanceSpans).toEqual([
+      { tStart: 0.1, tEnd: 0.3, width: 8 },
+      { tStart: 0.5, tEnd: 0.8, width: 18 },
+    ]);
+  });
+
+  it('eliminar un tramo devuelve esa zona a heredar', () => {
+    const edgeWithSpans: SemanticEdge = {
+      ...hem,
+      seamAllowanceSpans: [
+        { tStart: 0.1, tEnd: 0.3, width: 8 },
+        { tStart: 0.5, tEnd: 0.8, width: 14 },
+      ],
+    };
+    const store = mount(
+      <EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />,
+      piece({ edges: [edgeWithSpans] }),
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Eliminar tramo' })[0]);
+
+    expect(store.getState().project.pieces[0].edges?.[0].seamAllowanceSpans).toEqual([
+      { tStart: 0.5, tEnd: 0.8, width: 14 },
+    ]);
+  });
+
+  it('los extremos se leen y se editan en mm de arco, no en fracción', () => {
+    const edgeWithSpan: SemanticEdge = {
+      ...hem,
+      // El borde recto mide 100 mm: 0,25–0,75 son exactamente 25–75 mm.
+      seamAllowanceSpans: [{ tStart: 0.25, tEnd: 0.75, width: 12 }],
+    };
+    const store = mount(
+      <EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />,
+      piece({ edges: [edgeWithSpan] }),
+    );
+
+    const from = screen.getByLabelText('Desde (mm)') as HTMLInputElement;
+    const to = screen.getByLabelText('Hasta (mm)') as HTMLInputElement;
+    expect(from.value).toBe('25');
+    expect(to.value).toBe('75');
+
+    fireEvent.change(from, { target: { value: '20' } });
+    fireEvent.blur(from);
+    const nextTo = screen.getByLabelText('Hasta (mm)');
+    fireEvent.change(nextTo, { target: { value: '90' } });
+    fireEvent.blur(nextTo);
+
+    expect(store.getState().project.pieces[0].edges?.[0].seamAllowanceSpans).toEqual([
+      { tStart: 0.2, tEnd: 0.9, width: 12 },
+    ]);
   });
 });
 

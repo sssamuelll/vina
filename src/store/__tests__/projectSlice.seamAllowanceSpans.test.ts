@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import projectReducer, {
   addEdgeSeamAllowanceSpan,
   addPiece,
+  removeEdgeSeamAllowanceSpan,
+  updateEdgeSeamAllowanceSpan,
 } from '../projectSlice';
 import type { PatternPiece, SemanticEdge } from '../../types/types';
 
@@ -64,6 +66,56 @@ describe('projectSlice — tramos de margen', () => {
       { tStart: 0.1, tEnd: 0.4, width: 8 },
       { tStart: 0.4, tEnd: 0.6, width: 15 },
       { tStart: 0.6, tEnd: 0.9, width: 8 },
+    ]);
+  });
+
+  it('edita un tramo por índice sin cambiar los demás', () => {
+    let state = projectReducer(undefined, { type: '@@INIT' });
+    state = projectReducer(state, addPiece({
+      ...piece,
+      edges: [{
+        ...edge,
+        seamAllowanceSpans: [
+          { tStart: 0.1, tEnd: 0.3, width: 8 },
+          { tStart: 0.5, tEnd: 0.8, width: 14 },
+        ],
+      }],
+    }));
+
+    state = projectReducer(state, updateEdgeSeamAllowanceSpan({
+      pieceId: 'p',
+      edgeId: 'p:top',
+      spanIndex: 1,
+      span: { tStart: 0.5, tEnd: 0.9, width: 18 },
+    }));
+
+    expect(state.pieces[0].edges?.[0].seamAllowanceSpans).toEqual([
+      { tStart: 0.1, tEnd: 0.3, width: 8 },
+      { tStart: 0.5, tEnd: 0.9, width: 18 },
+    ]);
+  });
+
+  it('elimina un tramo sin borrar los que no tocó', () => {
+    let state = projectReducer(undefined, { type: '@@INIT' });
+    state = projectReducer(state, addPiece({
+      ...piece,
+      edges: [{
+        ...edge,
+        seamAllowanceSpans: [
+          { tStart: 0.1, tEnd: 0.3, width: 8 },
+          { tStart: 0.5, tEnd: 0.8, width: 14 },
+        ],
+      }],
+    }));
+
+    state = projectReducer(state, removeEdgeSeamAllowanceSpan({
+      pieceId: 'p',
+      edgeId: 'p:top',
+      spanIndex: 0,
+    }));
+
+    expect(state.pieces[0].edges?.[0].seamAllowanceSpans).toEqual([
+      { tStart: 0.5, tEnd: 0.8, width: 14 },
     ]);
   });
 });

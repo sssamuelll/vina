@@ -23,7 +23,7 @@ import {
   setLayer, setSublayer, cloneToLayer, removeInternalLine, updateInternalLine,
 } from '../../store/projectSlice';
 import { reverseGrainline } from '../../utils/grainLine';
-import { selectPiece, clearSelection, copyPieces, createPastedPieces, enterSuperimposePickMode } from '../../store/editorSlice';
+import { selectPiece, selectSaEdges, clearSelection, copyPieces, createPastedPieces, enterSuperimposePickMode } from '../../store/editorSlice';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
 
 // ── Vocabulario ──────────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ export type ActionId =
   | 'reverseSeam' | 'reverseGrainline' | 'unfold' | 'unfoldOutlineOnly' | 'offsetInternalLine' | 'optimizeCurves' | 'optimizeAllCurves' | 'convertSegment' | 'convertSegmentToPoints'
   | 'order' | 'layer' | 'lockToggle' | 'activeToggle' | 'groupCreate' | 'addToGroup' | 'removeFromGroup'
   | 'unlinkPieces' | 'selectLinkedPartner' | 'linkSymmetry' | 'linkInstance' | 'cloneLinkedSymmetry' | 'cloneLinkedInstance'
-  | 'duplicate' | 'duplicateAll' | 'rename' | 'properties' | 'select' | 'inspect' | 'selectPieceOfLine' | 'selectSeamA' | 'selectSeamB' | 'zoomToFit' | 'notchExactDistance'
+  | 'duplicate' | 'duplicateAll' | 'rename' | 'properties' | 'select' | 'inspect' | 'selectPieceOfLine' | 'selectSeamA' | 'selectSeamB' | 'zoomToFit' | 'notchExactDistance' | 'saExactWidth'
   | 'deletePiece' | 'deleteSeam' | 'deleteInternalLine';
 
 /** Callbacks que Surface B pasa como props (verbos que no son dispatches puros). */
@@ -58,6 +58,7 @@ export interface CurationCallbacks {
   onOffsetInternalLine?: (pieceId: string, lineId: string) => void;
   onOptimizeCurves?: (pieceId: string, lineId?: string) => void;
   onOpenProperties?: (pieceId: string) => void;
+  onOpenSeamAllowanceProperties?: () => void;
   onRefineNotch?: (pieceId: string, line: InternalLine) => void;
 }
 
@@ -73,6 +74,8 @@ export interface CurationCtx {
   selectedPieceIds: string[];
   seamId: string | null;
   seam: Seam | null;
+  /** Borde semántico alcanzado por el clic derecho en la herramienta Margen. */
+  saEdgeId?: string | null;
   internalLineId: string | null;
   internalLineType: InternalLineType | null;
   internalLine: InternalLine | null;
@@ -278,6 +281,14 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     run: (ctx) => {
       if (ctx.pieceId && ctx.internalLine) ctx.cb.onRefineNotch?.(ctx.pieceId, ctx.internalLine);
     } },
+  saExactWidth: { id: 'saExactWidth', group: 'transform', icon: '↔', label: 'Ancho exacto…',
+    gate: (ctx) => !!ctx.pieceId && !!ctx.saEdgeId,
+    run: (ctx) => {
+      ctx.dispatch(selectSaEdges({
+        items: [{ pieceId: ctx.pieceId!, edgeId: ctx.saEdgeId! }],
+      }));
+      ctx.cb.onOpenSeamAllowanceProperties?.();
+    } },
 
   // danger (destructivos → gate !locked donde aplica, F2)
   deletePiece: { id: 'deletePiece', group: 'danger', icon: '🗑', label: 'Eliminar pieza', shortcut: 'Del', danger: true,
@@ -297,7 +308,7 @@ export const CURATION: CurationRow[] = [
     bar: ['rotate90', 'duplicate', 'flipH', 'properties', 'lockToggle'],
     menu: [
       'copy', 'paste', 'pasteMirror',
-      'rotate90', 'flipH', 'flipV', 'optimizeAllCurves', 'convertSegment', 'convertSegmentToPoints',
+      'rotate90', 'flipH', 'flipV', 'optimizeAllCurves', 'convertSegment', 'convertSegmentToPoints', 'saExactWidth',
       'order',
       'layer', 'lockToggle', 'activeToggle', 'groupCreate', 'addToGroup', 'removeFromGroup',
       'unlinkPieces', 'selectLinkedPartner', 'linkSymmetry', 'linkInstance', 'cloneLinkedSymmetry', 'cloneLinkedInstance',
