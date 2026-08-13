@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, VinaProject, InternalLine, NotchAnchor, NotchOptions, NotchPair, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, VinaProject, InternalLine, NotchAnchor, NotchOptions, NotchPair, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage, SeamAllowanceSpan } from '../types/types';
 import type { ArrangementBinding, ArrangementOverride } from '../utils/cloth/arrangement/arrangementBinding';
 import type { Trim } from '../types/trim';
 import type { PieceArtwork } from '../types/artwork';
@@ -13,6 +13,7 @@ import { newId } from '../utils/ids';
 import { detectSemanticEdges, preserveEdgeWidthsByName } from '../utils/semanticEdges';
 import { reindexEdges, sameSegmentRanges } from '../utils/edgeReindex';
 import { mirrorPctRange } from '../utils/seam/seamRange';
+import { normalizeSpans } from '../utils/seam/allowanceSpans';
 import { autoSew } from '../utils/autoSew';
 
 // ─── Auto-rename duplicate pieces (e.g., all named "Detail" from Seamly2D) ────
@@ -1140,6 +1141,32 @@ const projectSlice = createSlice({
       state.isDirty = true;
     },
     /**
+     * Añade la última intención sobre el borde sin conservar dos verdades para
+     * el mismo punto. Un gesto produce un solo action y, por tanto, un solo undo.
+     */
+    addEdgeSeamAllowanceSpan(state, action: PayloadAction<{
+      pieceId: string;
+      edgeId: string;
+      span: SeamAllowanceSpan;
+    }>) {
+      const piece = state.pieces.find(candidate => candidate.id === action.payload.pieceId);
+      const edge = piece?.edges?.find(candidate => candidate.id === action.payload.edgeId);
+      if (!piece || !edge) return;
+
+      const source = action.payload.span;
+      if (![source.tStart, source.tEnd, source.width].every(Number.isFinite)) return;
+      const tStart = Math.max(0, Math.min(1, Math.min(source.tStart, source.tEnd)));
+      const tEnd = Math.max(0, Math.min(1, Math.max(source.tStart, source.tEnd)));
+      if (tEnd - tStart < 0.01) return;
+
+      edge.seamAllowanceSpans = normalizeSpans([
+        ...(edge.seamAllowanceSpans ?? []),
+        { tStart, tEnd, width: Math.max(0, source.width) },
+      ]);
+      piece.updatedAt = Date.now();
+      state.isDirty = true;
+    },
+    /**
      * Bulk per-edge seam allowance (multi-select Shift: edit N edges' width in
      * ONE action). `width: null` clears the override (Inherit) on all. Grouped by
      * piece so state.pieces is scanned once, not per edge — one project/* dispatch
@@ -1588,7 +1615,7 @@ export const {
   addNotchPair, removeNotchPair,
   linkPieces, unlinkPieces, cloneAsLinked,
   // Per-edge seam allowance
-  setEdgeSeamAllowance, setEdgesSeamAllowance,
+  setEdgeSeamAllowance, setEdgesSeamAllowance, addEdgeSeamAllowanceSpan,
   // Layers
   setLayer, setSublayer, cloneToLayer, superimposePiece,
   renameLayer, deleteLayerName, setLayerLocked, addLayer, removeLayer,

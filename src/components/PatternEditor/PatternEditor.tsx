@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
+import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
 import { batchUndo } from '../../store/undoMiddleware';
 import { activate2DTool } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
@@ -263,6 +263,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const seamAllowanceTool = useSeamAllowanceTool(pieces, zoom2D, pan2D, {
     onApply: handleApplySeamAllowance,
     onApplyAll: handleApplySeamAllowanceAll,
+    onApplySpan: (pieceId, edgeId, range, width) => {
+      dispatch(addEdgeSeamAllowanceSpan({
+        pieceId,
+        edgeId,
+        span: { tStart: range[0], tEnd: range[1], width },
+      }));
+    },
     // Selecting an edge/vertex opens the Properties panel — its docked home for
     // editing the width / corner type (CLO3D's persistent Property Editor).
     onSelectEdge: (pieceId, edgeId, additive) => { dispatch(selectSaEdges({ items: [{ pieceId, edgeId }], additive })); onOpenPanel?.('Properties'); },
