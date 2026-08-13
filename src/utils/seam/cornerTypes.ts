@@ -617,6 +617,101 @@ export function shiftCornerTypes(
 
 // ─── perEdgeWidths ────────────────────────────────────────────────────────
 
+type AllowanceSourcedPoint = SourcedPoint & { allowanceBoundary?: true };
+
+function edgeIndicesInRange(
+  vertexCmds: number[],
+  range: [number, number],
+): number[] {
+  const indices: number[] = [];
+  for (let index = 0; index < vertexCmds.length; index += 1) {
+    const owningCmd = vertexCmds[(index + 1) % vertexCmds.length];
+    if (owningCmd >= range[0] && owningCmd < range[1]) indices.push(index);
+  }
+  return indices;
+}
+
+/**
+ * Una recta produce un solo segmento aplanado, así que sus límites de tramo
+ * necesitan vértices reales antes del offset; de otro modo el punto medio solo
+ * podría asignarle un ancho a la recta completa.
+ */
+function splitAtAllowanceBoundaries(
+  sourced: SourcedPoint[],
+  semanticEdges: SemanticEdge[] | undefined,
+): AllowanceSourcedPoint[] {
+  if (!semanticEdges?.some((edge) => edge.seamAllowanceSpans?.length)) return sourced;
+
+  const vertexCmds = sourced.map((point) => point.cmd);
+  const splits = new Map<number, number[]>();
+  const boundaryVertices = new Set<number>();
+  const epsilon = 1e-9;
+
+  for (const semanticEdge of semanticEdges) {
+    const boundaries = semanticEdge.seamAllowanceSpans
+      ?.flatMap((span) => [span.tStart, span.tEnd])
+      .filter((t) => t > epsilon && t < 1 - epsilon);
+    if (!boundaries?.length) continue;
+
+    const edgeIndices = edgeIndicesInRange(vertexCmds, semanticEdge.segmentRange);
+    const lengths = edgeIndices.map((index) => {
+      const start = sourced[index];
+      const end = sourced[(index + 1) % sourced.length];
+      return Math.hypot(end.x - start.x, end.y - start.y);
+    });
+    const totalLength = lengths.reduce((sum, length) => sum + length, 0);
+    if (totalLength <= epsilon) continue;
+
+    for (const boundary of new Set(boundaries)) {
+      const targetLength = boundary * totalLength;
+      let traversed = 0;
+      for (let runIndex = 0; runIndex < edgeIndices.length; runIndex += 1) {
+        const edgeIndex = edgeIndices[runIndex];
+        const length = lengths[runIndex];
+        const edgeEnd = traversed + length;
+
+        if (Math.abs(targetLength - traversed) <= epsilon) {
+          boundaryVertices.add(edgeIndex);
+          break;
+        }
+        if (Math.abs(targetLength - edgeEnd) <= epsilon) {
+          boundaryVertices.add((edgeIndex + 1) % sourced.length);
+          break;
+        }
+        if (targetLength > traversed && targetLength < edgeEnd) {
+          const localT = (targetLength - traversed) / length;
+          const edgeSplits = splits.get(edgeIndex) ?? [];
+          if (!edgeSplits.some((existing) => Math.abs(existing - localT) <= epsilon)) {
+            edgeSplits.push(localT);
+            splits.set(edgeIndex, edgeSplits);
+          }
+          break;
+        }
+        traversed = edgeEnd;
+      }
+    }
+  }
+
+  if (splits.size === 0 && boundaryVertices.size === 0) return sourced;
+
+  const result: AllowanceSourcedPoint[] = [];
+  for (let index = 0; index < sourced.length; index += 1) {
+    const start = sourced[index];
+    result.push(boundaryVertices.has(index) ? { ...start, allowanceBoundary: true } : start);
+
+    const end = sourced[(index + 1) % sourced.length];
+    for (const localT of (splits.get(index) ?? []).sort((a, b) => a - b)) {
+      result.push({
+        x: start.x + (end.x - start.x) * localT,
+        y: start.y + (end.y - start.y) * localT,
+        cmd: end.cmd,
+        allowanceBoundary: true,
+      });
+    }
+  }
+  return result;
+}
+
 /**
  * Resolve the seam-allowance width of each flattened outline edge.
  *
@@ -633,11 +728,14 @@ export function shiftCornerTypes(
  * @param vertexCmds    source command index per flattened vertex (from flattenPathWithSource)
  * @param semanticEdges piece.edges; `segmentRange` is [start,end) in command space
  * @param fallbackWidth piece-level SA width (mm)
+ * @param vertices      Hace posible resolver la fracción de arco dentro del
+ *                      borde; si falta, se conserva la lectura anterior por comando.
  */
 export function perEdgeWidths(
   vertexCmds: number[],
   semanticEdges: SemanticEdge[] | undefined,
   fallbackWidth: number,
+  vertices?: Point2D[],
 ): number[] {
   const n = vertexCmds.length;
   const widths = new Array<number>(n).fill(fallbackWidth);
@@ -650,12 +748,34 @@ export function perEdgeWidths(
     const [start, end] = se.segmentRange;
     for (let c = start; c < end; c++) commandWidth.set(c, se.seamAllowanceWidth);
   }
-  if (commandWidth.size === 0) return widths;
-
   for (let i = 0; i < n; i++) {
     const owningCmd = vertexCmds[(i + 1) % n];
     const w = commandWidth.get(owningCmd);
     if (w != null) widths[i] = w;
+  }
+
+  if (!vertices || vertices.length !== n) return widths;
+  for (const semanticEdge of semanticEdges) {
+    if (!semanticEdge.seamAllowanceSpans?.length) continue;
+    const edgeIndices = edgeIndicesInRange(vertexCmds, semanticEdge.segmentRange);
+    const lengths = edgeIndices.map((index) => {
+      const start = vertices[index];
+      const end = vertices[(index + 1) % n];
+      return Math.hypot(end.x - start.x, end.y - start.y);
+    });
+    const totalLength = lengths.reduce((sum, length) => sum + length, 0);
+    if (totalLength <= 1e-9) continue;
+
+    let traversed = 0;
+    for (let runIndex = 0; runIndex < edgeIndices.length; runIndex += 1) {
+      const edgeIndex = edgeIndices[runIndex];
+      const midpointT = (traversed + lengths[runIndex] / 2) / totalLength;
+      const span = semanticEdge.seamAllowanceSpans.find(
+        (candidate) => midpointT >= candidate.tStart && midpointT < candidate.tEnd,
+      );
+      if (span) widths[edgeIndex] = span.width;
+      traversed += lengths[runIndex];
+    }
   }
   return widths;
 }
@@ -682,7 +802,7 @@ export type MatchLookup = Record<number, MatchTarget>;
 /** The flattened + offset scaffolding the edge-walk operates on (Steps 1-3). */
 export interface OffsetEdgeData {
   /** Flattened outline points (closing duplicate removed), tagged by source command. */
-  sourced: SourcedPoint[];
+  sourced: AllowanceSourcedPoint[];
   vertices: Point2D[];
   edges: Line2D[];
   edgeWidths: number[];
@@ -707,7 +827,7 @@ export function buildOffsetEdges(
   // offset — offsetEdge returns it in place, pinning the cut line to the
   // outline at that vertex (maria-202). Keep the FIRST occurrence: its cmd
   // tag stays valid for cornerTypes / perEdgeWidths lookups.
-  const sourced: SourcedPoint[] = [];
+  let sourced: AllowanceSourcedPoint[] = [];
   for (const p of raw) {
     const prev = sourced[sourced.length - 1];
     if (prev && Math.abs(p.x - prev.x) < 1e-6 && Math.abs(p.y - prev.y) < 1e-6) continue;
@@ -722,11 +842,18 @@ export function buildOffsetEdges(
   }
   if (sourced.length < 3) return null;
 
+  sourced = splitAtAllowanceBoundaries(sourced, semanticEdges);
+
   const vertices: Point2D[] = sourced.map((p) => ({ x: p.x, y: p.y }));
   const n = vertices.length;
   const edges: Line2D[] = [];
   for (let i = 0; i < n; i++) edges.push({ start: vertices[i], end: vertices[(i + 1) % n] });
-  const edgeWidths = perEdgeWidths(sourced.map((p) => p.cmd), semanticEdges, saWidth);
+  const edgeWidths = perEdgeWidths(
+    sourced.map((p) => p.cmd),
+    semanticEdges,
+    saWidth,
+    vertices,
+  );
 
   // `offsetEdge` shifts along the left-perpendicular of the edge direction, so
   // which side is OUTWARD depends entirely on how the outline is wound. A
@@ -790,12 +917,19 @@ function edgesInBorder(sourced: SourcedPoint[], n: number, range: [number, numbe
  * required cases (mitered/squared/envelope/slant).
  */
 function cornerBundleAt(data: OffsetEdgeData, i: number, type: CornerType): Point2D[] {
-  const { vertices, edges, edgeWidths, offsetEdges, n } = data;
+  const { sourced, vertices, edges, edgeWidths, offsetEdges, n } = data;
   const prevOffsetEdge = offsetEdges[(i + n - 1) % n];
   const nextOffsetEdge = offsetEdges[i];
-  const angle = interiorAngle(edges[(i + n - 1) % n], edges[i]);
   const prevWidth = edgeWidths[(i + n - 1) % n];
   const nextWidth = edgeWidths[i];
+  if (sourced[i].allowanceBoundary && lineIntersection(prevOffsetEdge, nextOffsetEdge) === null) {
+    // Dos puntos son indispensables cuando cambia el ancho: uno solo uniría
+    // los offsets paralelos en diagonal y convertiría el escalón en una rampa.
+    return Math.abs(prevWidth - nextWidth) > 1e-9
+      ? [{ ...prevOffsetEdge.end }, { ...nextOffsetEdge.start }]
+      : [{ ...prevOffsetEdge.end }];
+  }
+  const angle = interiorAngle(edges[(i + n - 1) % n], edges[i]);
   return getCornerFunction(type)(prevOffsetEdge, nextOffsetEdge, vertices[i], prevWidth, nextWidth, angle);
 }
 
