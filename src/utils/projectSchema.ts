@@ -129,6 +129,43 @@ const internalLineSchema = z
   .loose();
 
 // ─── Semantic edges ──────────────────────────────────────────────────────────
+const seamAllowanceSpanSchema = z
+  .object({
+    tStart: finiteNumber.refine((n) => n >= 0 && n <= 1, { message: 'must be in [0,1]' }),
+    tEnd: finiteNumber.refine((n) => n >= 0 && n <= 1, { message: 'must be in [0,1]' }),
+    width: finiteNumber.refine((n) => n >= 0, { message: 'must be >= 0' }),
+  })
+  .superRefine((span, ctx) => {
+    if (span.tEnd <= span.tStart) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['tEnd'],
+        message: 'must be greater than tStart',
+      });
+    }
+  });
+
+const seamAllowanceSpansSchema = z
+  .array(seamAllowanceSpanSchema)
+  .max(MAX_OUTLINE_CMDS)
+  .superRefine((spans, ctx) => {
+    const ordered = spans
+      .map((span, index) => ({ span, index }))
+      .sort((a, b) => a.span.tStart - b.span.tStart || a.span.tEnd - b.span.tEnd);
+
+    for (let index = 1; index < ordered.length; index += 1) {
+      const previous = ordered[index - 1];
+      const current = ordered[index];
+      if (current.span.tStart < previous.span.tEnd) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [current.index],
+          message: 'seam allowance spans must not overlap',
+        });
+      }
+    }
+  });
+
 const semanticEdgeSchema = z
   .object({
     id: idString,
@@ -141,6 +178,7 @@ const semanticEdgeSchema = z
     matchHint: boundedString(MAX_NAME_LEN).optional(),
     length: finiteNumber.optional(),
     seamAllowanceWidth: finiteNumber.refine((n) => n >= 0, { message: 'must be >= 0' }).optional(),
+    seamAllowanceSpans: seamAllowanceSpansSchema.optional(),
   })
   .loose();
 
