@@ -1,7 +1,7 @@
 import { useDispatch } from 'react-redux';
 import { updateSeam, setSeamTension, deactivateSeam, removeSeam, reverseSeam } from '../../store/projectSlice';
 import type { Seam } from '../../types/types';
-import { applyPctRange, clampPctRange, sewnLengthMm, tRangeToPct } from '../../utils/seam/seamRange';
+import { applyPctRange, sewnLengthMm } from '../../utils/seam/seamRange';
 import PropertySection from './PropertySection';
 
 interface SeamPropertiesPanelProps {
@@ -15,23 +15,100 @@ interface SeamPropertiesPanelProps {
   onToggle: (id: string) => void;
 }
 
+type SeamHalf = Seam['pieceA'] | Seam['pieceB'];
+
+function usableEdgeLength(lengthMm: number | undefined): lengthMm is number {
+  return lengthMm != null && Number.isFinite(lengthMm) && lengthMm > 0;
+}
+
+function displayMm(value: number): string {
+  // Las cifras significativas esconden ruido binario sin redondear una medida
+  // decimal que la patronista escribió de forma deliberada.
+  return String(Number(value.toPrecision(12)));
+}
+
+function tRangeToMm(edgeLengthMm: number | undefined, half: SeamHalf): [number, number] | null {
+  if (!usableEdgeLength(edgeLengthMm)) return null;
+  return [
+    (half.tStart ?? 0) * edgeLengthMm,
+    (half.tEnd ?? 1) * edgeLengthMm,
+  ];
+}
+
+function clampMmRange(
+  startMm: number,
+  endMm: number,
+  edgeLengthMm: number,
+  edited: 'start' | 'end',
+): [number, number] {
+  const minimumSpanMm = edgeLengthMm / 100;
+  let start = Math.min(edgeLengthMm, Math.max(0, startMm));
+  let end = Math.min(edgeLengthMm, Math.max(0, endMm));
+  if (start >= end) {
+    // El control anterior garantizaba al menos 1% de rango; conservarlo evita
+    // introducir costuras vacías al cambiar únicamente la unidad visible.
+    if (edited === 'start') {
+      start = Math.min(start, edgeLengthMm - minimumSpanMm);
+      end = start + minimumSpanMm;
+    } else {
+      end = Math.max(end, minimumSpanMm);
+      start = end - minimumSpanMm;
+    }
+  }
+  return [start, end];
+}
+
 export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, edgeALengthMm, edgeBLengthMm, collapsed, onToggle }: SeamPropertiesPanelProps) {
   const dispatch = useDispatch();
 
-  const setHalfRange = (halfKey: 'pieceA' | 'pieceB', startPct: number, endPct: number, edited: 'start' | 'end') => {
-    const [s, e] = clampPctRange(startPct, endPct, edited);
-    dispatch(updateSeam({ ...seam, [halfKey]: applyPctRange(seam[halfKey], s, e) }));
+  const setHalfRange = (
+    halfKey: 'pieceA' | 'pieceB',
+    edgeLengthMm: number | undefined,
+    startMm: number,
+    endMm: number,
+    edited: 'start' | 'end',
+  ) => {
+    if (
+      !usableEdgeLength(edgeLengthMm)
+      || !Number.isFinite(startMm)
+      || !Number.isFinite(endMm)
+    ) return;
+    const [start, end] = clampMmRange(startMm, endMm, edgeLengthMm, edited);
+    dispatch(updateSeam({
+      ...seam,
+      [halfKey]: applyPctRange(
+        seam[halfKey],
+        (start / edgeLengthMm) * 100,
+        (end / edgeLengthMm) * 100,
+      ),
+    }));
   };
 
-  const sewnA = sewnLengthMm(edgeALengthMm, seam.pieceA);
-  const sewnB = sewnLengthMm(edgeBLengthMm, seam.pieceB);
+  const sewnA = usableEdgeLength(edgeALengthMm)
+    ? sewnLengthMm(edgeALengthMm, seam.pieceA)
+    : undefined;
+  const sewnB = usableEdgeLength(edgeBLengthMm)
+    ? sewnLengthMm(edgeBLengthMm, seam.pieceB)
+    : undefined;
   const mismatch = sewnA != null && sewnB != null && Math.max(sewnA, sewnB) > 0
     ? Math.abs(sewnA - sewnB) / Math.max(sewnA, sewnB)
     : undefined;
 
   const halves = [
-    { key: 'pieceA' as const, name: pieceAName, pct: tRangeToPct(seam.pieceA), sewn: sewnA },
-    { key: 'pieceB' as const, name: pieceBName, pct: tRangeToPct(seam.pieceB), sewn: sewnB },
+    {
+      key: 'pieceA' as const,
+      name: pieceAName,
+      edgeLengthMm: edgeALengthMm,
+      rangeMm: tRangeToMm(edgeALengthMm, seam.pieceA),
+      sewn: sewnA,
+    },
+    {
+      key: 'pieceB' as const,
+      name: pieceBName,
+      edgeLengthMm: edgeBLengthMm,
+      rangeMm: tRangeToMm(edgeBLengthMm, seam.pieceB),
+      sewn: sewnB,
+    },
   ];
 
   return (
@@ -51,31 +128,51 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, edge
         </select>
       </div>
 
-      {/* Sewn range (CLO3D-style seam extents): how much of each edge is
-          sewn, in % along the sewing direction. Full range (0–100) is
-          stored as undefined tStart/tEnd — applyPctRange normalizes. */}
-      {halves.map(({ key, name, pct: [startPct, endPct], sewn }) => (
-        <div className="panel-field" key={key}>
-          <label>Rango cosido — {name}</label>
-          <div className="panel-action-row">
-            <input
-              type="number" className="panel-input narrow"
-              min={0} max={99} step={1} value={startPct}
-              aria-label={`Inicio de rango cosido % (${name})`}
-              onChange={e => setHalfRange(key, Number(e.target.value), endPct, 'start')}
-            />
-            <span className="panel-value">–</span>
-            <input
-              type="number" className="panel-input narrow"
-              min={1} max={100} step={1} value={endPct}
-              aria-label={`Fin de rango cosido % (${name})`}
-              onChange={e => setHalfRange(key, startPct, Number(e.target.value), 'end')}
-            />
-            <span className="panel-value">%</span>
-            {sewn != null && <span className="panel-value">{(sewn / 10).toFixed(1)} cm cosidos</span>}
+      {/* El rango completo sigue omitiendo tStart/tEnd; los milímetros son
+          solo la unidad de la puerta humana, no una segunda representación. */}
+      {halves.map(({ key, name, edgeLengthMm, rangeMm, sewn }) => {
+        const startMm = rangeMm == null ? '' : displayMm(rangeMm[0]);
+        const endMm = rangeMm == null ? '' : displayMm(rangeMm[1]);
+        const disabled = rangeMm == null;
+        return (
+          <div className="panel-field" key={key}>
+            <label>Rango cosido — {name}</label>
+            <div className="panel-action-row">
+              <input
+                type="number" className="panel-input narrow"
+                min={0} max={edgeLengthMm} step="any" value={startMm}
+                disabled={disabled}
+                aria-label={`Desde (mm) — ${name}`}
+                onChange={e => setHalfRange(
+                  key,
+                  edgeLengthMm,
+                  Number(e.target.value),
+                  rangeMm?.[1] ?? 0,
+                  'start',
+                )}
+              />
+              <span className="panel-value">–</span>
+              <input
+                type="number" className="panel-input narrow"
+                min={0} max={edgeLengthMm} step="any" value={endMm}
+                disabled={disabled}
+                aria-label={`Hasta (mm) — ${name}`}
+                onChange={e => setHalfRange(
+                  key,
+                  edgeLengthMm,
+                  rangeMm?.[0] ?? 0,
+                  Number(e.target.value),
+                  'end',
+                )}
+              />
+              <span className="panel-value">mm</span>
+              {sewn != null && (
+                <span className="panel-value">{displayMm(sewn)} mm cosidos</span>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
       {mismatch !== undefined && mismatch > 0.1 && (
         <div className="panel-field">
           <span className="panel-tension-tag panel-tension-tag--gather">
