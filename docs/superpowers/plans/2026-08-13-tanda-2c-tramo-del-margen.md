@@ -26,9 +26,17 @@ El spec dice, en su § 2: *"**No hay modelo de datos nuevo.** Ambos destinos exi
 
 Un grep de `allowanceRange|seamAllowanceRange|tStart.*allowance` en `src/` no devuelve nada. **El tramo del margen no tiene hoy dónde aterrizar.** Es el único hueco real de la tanda 2 y por eso es la Task 2 de este plan, antes que el gesto.
 
-**La buena noticia, también medida:** la geometría **ya está preparada**. `generateSeamAllowanceWithCorners` (`cornerTypes.ts:992`) aplana el contorno y llama a `perEdgeWidths` (`:637`), que devuelve **un ancho por segmento aplanado** (`:643`, `const widths = new Array<number>(n)`), no uno por borde. El offset se aplica segmento a segmento (`:744`). Un ancho que cambia a mitad de borde no rompe nada: solo hay que resolverlo por posición en vez de por índice de comando.
+**La media noticia, corregida por el review adversarial del 2026-08-13.** El borrador de este plan decía que la geometría "ya está preparada" y que el escalón salía gratis. **Las dos mitades de esa frase eran falsas** y conviene dejar dicho por qué, porque la parte verdadera sigue en pie.
 
-Y en la discontinuidad — donde el ancho salta de 10 a 0 — el corner cae al *fallback* de paralelas de `miterAt` (`:749-754`, `lineIntersection` devuelve `null` entre paralelas y se toma `prev.end`). Eso pinta un **escalón perpendicular**, que es exactamente la forma que tiene un margen escalonado de verdad. No hay que diseñar una esquina nueva.
+Lo verdadero: `generateSeamAllowanceWithCorners` (`cornerTypes.ts:992`) aplana el contorno y llama a `perEdgeWidths` (`:637`), que devuelve **un ancho por segmento aplanado** (`:643`), no uno por borde, y el offset se aplica segmento a segmento (`:744`). Esa parte del andamio sí sirve.
+
+Lo falso, y lo que cuesta:
+
+1. **Un borde recto es UN solo segmento aplanado.** Una `L` no se subdivide. Clasificar su punto medio contra los tramos no puede representar un `[0,25 – 0,75]`: el segmento entero se lleva un único ancho, o el de dentro o el de fuera. **Hay que insertar vértices exactamente en los límites del tramo** antes de calcular los offsets. Sin eso, el test *"un tramo ensancha SOLO su trozo"* no puede pasar sobre un borde recto — que es justo el caso que María describe («una línea de punto a punto»).
+
+2. **En la discontinuidad no hay escalón.** El generador no usa `miterAt` para sus esquinas: usa `cornerBundleAt` (`:792-800`) → `cornerMitered` (`:273`), y su fallback de paralelas devuelve **un solo punto**, `[{...prevOffsetEdge.end}]` (`:284-287`). Con un punto, el contorno sale del ancho viejo y llega al nuevo **en diagonal a lo largo del segmento siguiente** — una rampa, no un escalón. Un margen que se ensancha progresivamente durante un centímetro no es lo que se pidió ni lo que se corta. **Hace falta una unión explícita de dos puntos en el salto.**
+
+Ninguna de las dos es cara, pero las dos son trabajo con su test, y el plan que las daba por regaladas habría llegado a la Task 3 creyendo que ya estaba hecha.
 
 ### Las tres quejas del #220, separadas
 
@@ -43,7 +51,8 @@ La nota de María es una sola frase pero contiene tres cosas distintas, y solo u
 ## Global Constraints
 
 - **Ausente = como hoy.** El campo nuevo es opcional y su ausencia reproduce el comportamiento actual **bit a bit**. Es la misma convención no-retroactiva que la tanda 2a usó para `NotchAnchor.metric`, y por la misma razón: el trabajo guardado de María no se toca.
-- **El campo va al schema o se borra al guardar.** `notchAnchorSchema` enseñó esto por las malas en la 2a: un `z.object` anidado **no hereda el `.loose()` del padre** y zod tira los campos que no declara. Sin la Task 2 completa, cada guardado pierde los tramos en silencio.
+- **El campo va al schema para VALIDARSE, no para sobrevivir.** El borrador decía que sin declararlo zod lo borraría, por analogía con `notchAnchorSchema` en la 2a. **Es falso aquí y lo comprobó el review:** `semanticEdgeSchema` **ya termina en `.loose()`** (`projectSchema.ts:145`), así que un `seamAllowanceSpans` sin declarar sobrevive al round-trip. La lección de la 2a no se transfiere: aquel era un `z.object` pelado. Lo que sí compra declararlo es **validación** — hoy un `tStart` de 7, un `tEnd` menor que su `tStart` o un ancho negativo entrarían tal cual.
+- **Las piezas nacen NETAS.** `seamAllowance: 0` (`defaults.ts:35`, con el comentario `// born net`) y el generador corta en seco con `if (saWidth <= 0) return []` (`cornerTypes.ts:1001`). Marcar un tramo sobre una pieza que nunca recibió un margen base **no pinta absolutamente nada** si el ancho efectivo no tiene en cuenta los tramos. Es la Task 3b.
 - **La precedencia del mousedown es la del spec § 3.3**, y el invariante que la sostiene: *"El objetivo del mousedown es dueño del gesto hasta el mouseup. La posición posterior del cursor nunca lo re-apunta."*
 - **La cláusula de compatibilidad (spec § 5).** Clic en vértice, clic en borde, clic en cuerpo y arrastre por el cuerpo siguen haciendo exactamente lo de hoy.
 - **Ninguna herramienta declara su propio umbral.** `DRAG_THRESHOLD_PX` ya se importa en `useSeamAllowanceTool.ts:7`; los `vThresh`/`eThresh` locales (`:60-61`) apuntan a `EDGE_HIT_PX`.
@@ -450,6 +459,42 @@ Spec § 12: *"Si un test de `seamPairs`/`seamAssembly` se pone rojo, es señal d
 git add src/components/PropertiesPanel/SeamPropertiesPanel.tsx src/components/PropertiesPanel/__tests__/SeamPropertiesPanel.test.tsx
 git commit -m "feat(seam): el rango cosido se edita en milímetros (#1029, #199)"
 ```
+
+---
+
+## Correcciones del review adversarial (2026-08-13)
+
+El plan pasó por `codex review` contra el árbol en el corte `851f5544`. Dos premisas suyas eran falsas y ya están corregidas arriba (la geometría y el zod). Lo que sigue **manda sobre las tareas 2 a 6**.
+
+### C-8 · La secuencia TDD de la Task 2 no puede salir roja como promete
+
+Como `semanticEdgeSchema` ya es `.loose()`, el test de round-trip **pasa antes de escribir el schema**. Un test que nace verde no es TDD, es decoración. Corrección: el test de la Task 2 prueba **validación** —rechazo de `tStart` fuera de [0,1], de `tEnd <= tStart`, de ancho negativo y de tramos solapados—, no supervivencia. La supervivencia se prueba igual, pero como test de regresión, y se dice que hoy ya pasa.
+
+### C-9 · `normalizeSpans` no tiene casa, y hay una segunda puerta que los borra
+
+El plan nombra `normalizeSpans` en tres sitios y **no le asigna archivo, export ni firma**, y el commit de la Task 2 no añade ningún módulo. Peor: `loadProject` **re-detecta los bordes** (`projectSlice.ts:299`) y `preserveEdgeWidthsByName` (`semanticEdges.ts:298`) solo copia `seamAllowanceWidth` — **no los spans**. O sea que el modo de fallo silencioso que el plan temía de zod existe de verdad, pero está en otra puerta.
+
+Corrección: `normalizeSpans` vive en `src/utils/seam/allowanceSpans.ts` con su firma declarada, y `preserveEdgeWidthsByName` gana los spans, con su test. *Verificar la puerta, no solo el cuarto.*
+
+### C-10 · Una pieza neta no enseña nada (Task 3b, nueva)
+
+`seamAllowance: 0` de nacimiento (`defaults.ts:35`) + `if (saWidth <= 0) return []` (`cornerTypes.ts:1001`) + el guard del renderer (`PieceRenderer.tsx:92`) = marcar un tramo sobre una pieza que nunca recibió margen base **no pinta nada**. Es el primer gesto que hará cualquiera que pruebe esto.
+
+Corrección: el ancho efectivo de la pieza tiene en cuenta los tramos, o el guard cambia. Task propio, porque toca el renderer y el generador y necesita su test de "pieza neta + un tramo = se ve el tramo".
+
+### C-11 · El gesto no cabe en la herramienta de margen tal cual (Task 4)
+
+La rama de borde obtiene hoy `{pieceId, edgeId}` (`edgeHitTest.ts:98`) — **insuficiente para los cinco campos de `EdgeTarget`**. Y hay dos cosas más que el plan no vio: el router llama `handleMouseUp()` **sin evento** (`useEditorInteractions.ts:110`), mientras `useEdgeGesture` necesita el evento del release; y no hay dónde conservar el `shiftKey` del press, así que **Shift+clic dejaría de ser aditivo**.
+
+Corrección: el task incluye `useEditorInteractions.ts` y la suite existente `useSeamAllowanceTool.test.tsx`, cuyos tests esperan hoy selección en el mousedown y un `handleMouseUp()` sin argumento. Se van a poner rojos: **eso no es un accidente que se silencia, es alcance del task.**
+
+### C-12 · La Task 6 apunta a un test que no existe
+
+`SeamPropertiesPanel.test.tsx` no existe; la suite real es `SeamPropertiesPanel.range.test.tsx` y conserva asserts en `%` — no está en el commit del task y se pondrá roja. Y `sewnLengthMm` (`seamRange.ts:99`) **calcula el largo total cosido, no convierte cada extremo a mm**, que es lo que el campo necesita. Corrección: la conversión por extremo hay que escribirla, y la suite real entra en el task.
+
+### C-13 · Faltan dos superficies que el spec pide
+
+No hay task para editar los extremos del tramo numéricamente, ni para el hit-test y la fila "Ancho exacto…" del clic derecho sobre un borde de margen (spec § 3.5, que además la ata a extender el hit-test de `PatternEditor.tsx`). Sin ellas, 2c no cierra el § 3.5 y el diferimiento de las manijas en el lienzo (The Cut #3) se queda sin la justificación que lo sostenía.
 
 ---
 

@@ -85,11 +85,13 @@ Y hay una segunda razón para medirlo aquí: eso es **exactamente** la queja 2 d
 
 | Pieza | comandos | bordes | comandos por borde | comandos fuera de todo borde |
 |---|---|---|---|---|
-| SAMUEL-1 | 202 | 4 | 1, 67, 1, 127 | 8 (4,0 %) |
-| SAMUEL-2 | 18 | 5 | 1, 3, 3, 3, 1 | 9 (50 %) |
-| SAMUEL-3 | 194 | 9 | 1, 1, 58, 1, 61, 1, 58, 1, 1 | 17 (8,8 %) |
-| SAMUEL-4 | 202 | 4 | 1, 67, 1, 127 | 8 (4,0 %) |
-| SAMUEL-5 | 276 | 9 | 1, 1, 77, 1, 105, 1, 77, 1, 1 | 17 (6,2 %) |
+| SAMUEL-1 | 202 | 4 | 1, 67, 1, 127 | 6 (3,0 %) |
+| SAMUEL-2 | 18 | 5 | 1, 3, 3, 3, 1 | 7 (38,9 %) |
+| SAMUEL-3 | 194 | 9 | 1, 1, 58, 1, 61, 1, 58, 1, 1 | 11 (5,7 %) |
+| SAMUEL-4 | 202 | 4 | 1, 67, 1, 127 | 6 (3,0 %) |
+| SAMUEL-5 | 276 | 9 | 1, 1, 77, 1, 105, 1, 77, 1, 1 | 11 (5,7 %) |
+
+> **La última columna se midió dos veces.** La primera cuenta salió inflada —8 y 17 en vez de 6 y 11— por un oráculo que confundía dos cosas: un comando descubierto (el fallback, que sí es el bug) y un comando dentro de un borde semántico legítimo de un solo comando (un hombro recto, que no lo es). Lo cazó el review adversarial y está corregido en `bordesSemanticosMaria.test.ts`. Los `1` de la columna anterior son exactamente esos bordes legítimos, y por eso las dos columnas se leen juntas o no se leen.
 
 **El veredicto, en tres partes:**
 
@@ -940,6 +942,50 @@ Expected: los tres verdes.
 git add src/components/PatternEditor/actionCuration.ts src/components/PatternEditor/__tests__/actionCuration.test.ts
 git commit -m "feat(2d): el clic derecho de un piquete abre su distancia exacta (#1029)"
 ```
+
+---
+
+## Correcciones del review adversarial (2026-08-13)
+
+El plan pasó por `codex review` contra el árbol en el corte `851f5544`. Veredicto: *"no ejecutaría los planes tal como están"*. Las tareas 0, 1 y 2 sobrevivieron (la bisección se verificó correcta punto por punto); **las tareas 3 a 7 quedan corregidas por esta sección, que manda sobre lo escrito arriba.**
+
+Lo que confirmó que está bien, y ahorra volver a comprobarlo: `buildRing`, `projectToRing`, `pointAt`, `distanceAt`, `advance`, las dos cuadraturas de Bézier, `detectCornerCommands` en `outlineAnalysis.ts:288`, `splitSegmentAt` con `t` nativo, y que `perEdgeWidths` admite un cuarto parámetro opcional sin romper llamadores.
+
+### C-1 · La referencia no puede resolver lo que promete (Task 3)
+
+`RefKind` declara `'point'` y `'seamEnd'`, pero `candidatos()` solo construye esquinas y piquetes. Peor: la firma recibe una `PatternPiece`, así que **no puede ver las costuras del proyecto** — viven en `project.seams`, no en la pieza. Y `detectCornerCommands` solo marca comandos `M`/`L`, así que **una esquina cuyo comando fuente sea `C`/`Q` se descarta**.
+
+Corrección: la firma toma también las costuras de la pieza (o el plan renuncia a `'seamEnd'` y lo dice), y los candidatos incluyen los nodos del contorno que no son esquina pero sí son puntos que ella insertó. Mientras no estén, `RefKind` no debe declarar variantes que nadie produce.
+
+### C-2 · La dirección se fija en los primeros 4 px, no al soltar (Task 4)
+
+El spec § 3.2 es literal: *"la fijan los primeros 4 px de recorrido proyectados sobre el borde"*. El plan la derivaba del signo de `releaseT − press.t`, que es el signo **final**. Si ella arranca hacia un lado y vuelve antes de soltar, el ancla queda guardada con la dirección contraria a la que hizo.
+
+`useEdgeGesture` hoy solo conserva `moved: boolean` (`:22`): **no guarda el primer `t` que cruzó el umbral**. Hace falta un campo más en `ArmedRef`, y es un cambio en el hook compartido — o sea, con su test de no-regresión de coser.
+
+### C-3 · El piquete no tiene con qué construir un `EdgeTarget` (Task 4)
+
+`closestPointOnOutline` (`useNotchTool.ts:42`) devuelve `{point, normal, dist}` — **ni comando, ni borde semántico, ni `t`** — y sobre `C`/`Q` proyecta contra la cuerda entre extremos, que es el error de medida que toda esta tanda existe para eliminar. Además `pointAt` devuelve un `RingPoint` **sin normal**, así que el `pointAt(ring, …).normal` que el plan escribía no compila.
+
+Corrección: sustituir ese hit-test por uno que dé comando + `t`, y derivar la normal por diferencia finita sobre el anillo — que es lo que ya hace `resolveNotchAnchorV2` en `notchAnchor.ts` desde la 2a. **Reusarlo, no reimplementarlo.**
+
+### C-4 · La herramienta de Punto no encaja en el gesto tal cual (Task 5)
+
+Tres cosas a la vez: `PointToolTarget` no tiene `edgeIndex` ni `edgeRange`; su `t` es **parámetro nativo del comando**, no fracción de arco del borde, que es lo que `EdgeTarget` significa; y el test del plan exige que el clic inserte donde se suelta mientras el texto ordena usar el `t` del press. Las dos cosas no pueden ser verdad: bajo umbral están a < 4 px, pero eso **no** es cero.
+
+Corrección: decidir explícitamente que bajo umbral manda el press (es la ley del § 2) y ajustar el test, o declarar la excepción y justificarla. Y los modos `curvePoints`/`bezier` necesitan una rama propia, o al cruzar el umbral se quedan en no-op.
+
+### C-5 · El overlay no tiene por dónde recibir los datos (Task 6)
+
+La Task 6 no toca `PatternEditor.tsx` ni los hooks, así que el `dragPreview` local no llega a `ToolOverlay`. Y el overlay "hermano" que el plan manda copiar (`SegmentSewingOverlay.tsx:33`) **aplana el arco y emite solo `M`/`L`**, mientras el test nuevo exige comandos de curva. Corrección: añadir los archivos del cableado al task, y para el arco curvo extraer el sub-path con los comandos originales en vez de copiar el aplanado.
+
+### C-6 · "Distancia exacta…" no tiene circuito (Task 7)
+
+`setRefining` es privado del hook (`useNotchTool.ts:138`) y no hay callback de curación que lo abra; el commit del task solo incluye `actionCuration.ts`. Faltan como mínimo `useNotchTool.ts` y `PatternEditor.tsx`. Y la cita `PatternEditor.tsx:380` del spec está corrida: esa línea está vacía y el dueño del contextmenu empieza en `:378`.
+
+### C-7 · Falta media máquina de estados (transversal)
+
+Ningún task registra Piquete ni Punto en el guard de contextmenu (hoy solo conoce `seam`) ni en el Escape (hoy solo Punto y Coser, `useEditorInteractions.ts:398`), ni añade `pointercancel`, ni implementa `Shift` para milímetros enteros, ni `Alt` para el par simétrico de piquetes, ni toca los hints (`HintText.tsx:45` no tiene frase de Punto ni de Piquete). Todo eso lo exige el spec (§ 4.1, § 8) y sin ello el gesto funciona pero incumple la gramática. **Es un task nuevo, el 8.**
 
 ---
 
