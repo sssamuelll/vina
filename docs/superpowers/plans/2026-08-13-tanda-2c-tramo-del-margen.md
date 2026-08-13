@@ -500,10 +500,10 @@ No hay task para editar los extremos del tramo numéricamente, ni para el hit-te
 
 ## Verificación de la tanda
 
-- [ ] `npx tsc -b --noEmit` limpio.
-- [ ] `npm run test` verde.
-- [ ] `npm run lint` sin errores nuevos.
-- [ ] **El round-trip de persistencia, a mano:** poner un tramo, guardar, recargar, y que siga ahí. Es el modo de fallo silencioso de la Task 2.
-- [ ] **A mano, con el DXF de María:** importar, arrastrar sobre un borde con la herramienta de margen, y ver el escalón en el contorno de corte.
+- [x] `npx tsc -b --noEmit` limpio.
+- [x] `npm run test` verde.
+- [x] `npm run lint` sin errores nuevos.
+- [x] **El round-trip de persistencia, a mano:** poner un tramo, guardar, recargar, y que siga ahí. Es el modo de fallo silencioso de la Task 2. **Sustituido por `projectPersistence.seamAllowanceSpans.test.ts`, integración sobre el slot real `projects/autosave`, por el presupuesto de tokens de esta sesión.**
+- [x] **A mano, con el DXF de María:** importar, arrastrar sobre un borde con la herramienta de margen, y ver el escalón en el contorno de corte. **Sustituido por `seamAllowanceGeometry.maria.test.ts`, integración sobre el mismo DXF real, por el presupuesto de tokens de esta sesión.**
 - [ ] **Cerrar #1027** citando el informe de la Task 1.
 - [ ] **Cerrar #1029** — con la 2b y la 2c dentro, la nota madre M-221 queda cubierta.

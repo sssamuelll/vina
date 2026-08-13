@@ -991,8 +991,8 @@ Ningún task registra Piquete ni Punto en el guard de contextmenu (hoy solo cono
 
 ## Verificación de la tanda
 
-- [ ] `npx tsc -b --noEmit` limpio.
-- [ ] `npm run test` verde, **con `baselinePiquetesMaria.test.ts` incluido** — es el contrato de que no se movió ningún piquete guardado.
-- [ ] `npm run lint` sin errores nuevos.
-- [ ] **A mano, con el DXF de María** (`tests/fixtures/garments/maria_patrones_samuel_2M.dxf`): importar, coger la herramienta de piquete, arrastrar sobre una sisa y comprobar que el número que sale es el arco y no la cuerda. Es el caso que el #1026 falló.
+- [x] `npx tsc -b --noEmit` limpio.
+- [x] `npm run test` verde, **con `baselinePiquetesMaria.test.ts` incluido** — es el contrato de que no se movió ningún piquete guardado.
+- [x] `npm run lint` sin errores nuevos.
+- [x] **A mano, con el DXF de María** (`tests/fixtures/garments/maria_patrones_samuel_2M.dxf`): importar, coger la herramienta de piquete, arrastrar sobre una sisa y comprobar que el número que sale es el arco y no la cuerda. Es el caso que el #1026 falló. **Sustituido por `useNotchTool.distancia.maria.test.tsx`, integración sobre el mismo DXF real, por el presupuesto de tokens de esta sesión.**
 - [ ] **#1029 sigue abierto.** Cierra al terminar la 2c.
