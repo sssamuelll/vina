@@ -422,6 +422,17 @@ export function useNotchTool(
   /** Keep the clicked placement; just close the refine state. */
   const cancelRefine = useCallback(() => setRefining(null), []);
 
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    // Un Esc = una acción: cancelar el gesto evita que el mismo evento siga
+    // hasta la deselección global y borre un contexto que ella no pidió tocar.
+    if (gesture.isArmed()) {
+      gesture.cancel();
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, [gesture]);
+
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     gesture.handleMouseMove(e);
     if (gesture.isArmed()) return;
@@ -441,6 +452,9 @@ export function useNotchTool(
     handleMouseDown,
     handleMouseMove,
     handleMouseUp: gesture.handleMouseUp,
+    handleKeyDown,
+    cancel: gesture.cancel,
+    isArmed: gesture.isArmed,
     refining,
     confirmRefine,
     previewRefine,

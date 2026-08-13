@@ -386,6 +386,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       e.preventDefault();
       return;
     }
+    if (activeTool === 'notch' && notchTool.isArmed()) {
+      notchTool.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+      e.preventDefault();
+      return;
+    }
 
     // Determine which piece (if any) is under the cursor
     const svg = e.currentTarget as SVGSVGElement;
@@ -530,7 +535,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       internalLineType: hitInternalLineType,
       isEditingNodes: editPatternTool.isEditing,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool, notchTool]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
@@ -569,7 +574,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     setEditingPieceNameId(null);
   }, []);
 
-  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox, isDraggingPiece } =
+  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
       pen, rectTool, lineTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
     });
@@ -785,6 +790,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleHostMouseUp}
+        onPointerCancel={handlePointerCancel}
         onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
