@@ -72,6 +72,8 @@ interface ToolOverlayProps {
   seamActiveTarget: EdgeTarget | null;
   seamLiveRange: [number, number] | null;
   notchHoveredPoint: NotchHover | null;
+  notchDragPreview?: import('../useNotchTool').NotchDragPreview | null;
+  notchDragSegment?: SegmentSelection | null;
   /** Tool Punto (maria-203): preview solo cuando reason === 'ok'. */
   pointToolHover?: import('../usePointTool').PointToolHover | null;
   pointToolMode?: import('../usePointTool').PointToolMode;
@@ -185,11 +187,16 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         />
       )}
 
-      {activeTool === 'notch' && (props.notchHoveredPoint || props.notchRefineMarker) && (
+      {/* El modal de una línea existente puede abrirse desde Seleccionar: su
+          referencia sigue siendo necesaria aunque Piquete no esté activo. */}
+      {(props.notchRefineMarker || (activeTool === 'notch' && (props.notchHoveredPoint || props.notchDragPreview))) && (
         <NotchToolOverlay
           zoom2D={zoom2D}
-          notchHoveredPoint={props.notchHoveredPoint}
+          pieces={pieces}
+          notchHoveredPoint={activeTool === 'notch' ? props.notchHoveredPoint : null}
           refineMarker={props.notchRefineMarker}
+          dragPreview={activeTool === 'notch' ? props.notchDragPreview : null}
+          dragSegment={activeTool === 'notch' ? props.notchDragSegment : null}
         />
       )}
 

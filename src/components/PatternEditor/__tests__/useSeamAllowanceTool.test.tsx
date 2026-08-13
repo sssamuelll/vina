@@ -52,16 +52,23 @@ function setup(pieces: PatternPiece[] = [piece()]) {
   const store = makeStore();
   const onApply = vi.fn();
   const onApplyAll = vi.fn();
+  const onApplySpan = vi.fn();
   const onSelectEdge = vi.fn();
   const onSelectVertex = vi.fn();
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <Provider store={store}>{children}</Provider>
   );
   const hook = renderHook(
-    () => useSeamAllowanceTool(pieces, 1, { x: 0, y: 0 }, { onApply, onApplyAll, onSelectEdge, onSelectVertex }),
+    () => useSeamAllowanceTool(pieces, 1, { x: 0, y: 0 }, {
+      onApply,
+      onApplyAll,
+      onApplySpan,
+      onSelectEdge,
+      onSelectVertex,
+    }),
     { wrapper },
   );
-  return { store, onApply, onApplyAll, onSelectEdge, onSelectVertex, hook };
+  return { store, onApply, onApplyAll, onApplySpan, onSelectEdge, onSelectVertex, hook };
 }
 
 // zoom=1, pan=0, rect at origin → pattern point === client point.
@@ -86,7 +93,7 @@ describe('useSeamAllowanceTool left-click', () => {
   it('selecting a vertex does not arm a drag — a later mouseUp is a no-op', () => {
     const { onSelectVertex, onApply, onApplyAll, hook } = setup();
     act(() => hook.result.current.handleMouseDown(clickAt(2, 2)));
-    act(() => hook.result.current.handleMouseUp());
+    act(() => hook.result.current.handleMouseUp(clickAt(50, 2)));
     expect(onSelectVertex).toHaveBeenCalledWith('p', 0);
     expect(onApply).not.toHaveBeenCalled();
     expect(onApplyAll).not.toHaveBeenCalled();
@@ -95,6 +102,8 @@ describe('useSeamAllowanceTool left-click', () => {
   it('clicking near an edge midpoint selects that edge (non-additive)', () => {
     const { onSelectEdge, onApply, hook } = setup();
     act(() => hook.result.current.handleMouseDown(clickAt(100, 2)));
+    expect(onSelectEdge).not.toHaveBeenCalled();
+    act(() => hook.result.current.handleMouseUp(clickAt(100, 2)));
     expect(onSelectEdge).toHaveBeenCalledWith('p', 'p:top', false);
     expect(onApply).not.toHaveBeenCalled();
   });
@@ -102,13 +111,16 @@ describe('useSeamAllowanceTool left-click', () => {
   it('Shift+click on an edge selects it additively', () => {
     const { onSelectEdge, hook } = setup();
     act(() => hook.result.current.handleMouseDown(clickAt(100, 2, 0, true)));
+    // El modificador pertenece al press; soltar Shift antes del release no
+    // puede convertir una selección aditiva en una selección simple.
+    act(() => hook.result.current.handleMouseUp(clickAt(100, 2, 0, false)));
     expect(onSelectEdge).toHaveBeenCalledWith('p', 'p:top', true);
   });
 
   it('press+release on the piece body (no drag) applies the default width to the whole piece', () => {
     const { onApply, onApplyAll, onSelectEdge, hook } = setup([piece(8)]);
     act(() => hook.result.current.handleMouseDown(clickAt(100, 100)));
-    act(() => hook.result.current.handleMouseUp());
+    act(() => hook.result.current.handleMouseUp(clickAt(100, 100)));
     expect(onApply).toHaveBeenCalledWith('p', 9.5, 8); // default 9.5, prev 8
     expect(onApplyAll).not.toHaveBeenCalled();
     expect(onSelectEdge).not.toHaveBeenCalled();
@@ -118,7 +130,7 @@ describe('useSeamAllowanceTool left-click', () => {
     const { store, onApply, hook } = setup();
     act(() => store.dispatch(setDefaultSAWidth(25)));
     act(() => hook.result.current.handleMouseDown(clickAt(100, 100)));
-    act(() => hook.result.current.handleMouseUp());
+    act(() => hook.result.current.handleMouseUp(clickAt(100, 100)));
     expect(onApply).toHaveBeenCalledWith('p', 25, 0);
   });
 
@@ -127,7 +139,7 @@ describe('useSeamAllowanceTool left-click', () => {
     // Press on piece p body, drag right across to piece q body, release.
     act(() => hook.result.current.handleMouseDown(clickAt(100, 100)));
     act(() => hook.result.current.handleMouseMove(clickAt(400, 100)));
-    act(() => hook.result.current.handleMouseUp());
+    act(() => hook.result.current.handleMouseUp(clickAt(400, 100)));
     expect(onApplyAll).toHaveBeenCalledTimes(1);
     const [ids, width] = onApplyAll.mock.calls[0];
     expect(new Set(ids)).toEqual(new Set(['p', 'q']));
@@ -139,7 +151,7 @@ describe('useSeamAllowanceTool left-click', () => {
     const { onApply, onApplyAll, hook } = setup([piece(0)]);
     act(() => hook.result.current.handleMouseDown(clickAt(100, 100)));
     act(() => hook.result.current.handleMouseMove(clickAt(101, 101))); // <4px (SM_CXDRAG de Windows)
-    act(() => hook.result.current.handleMouseUp());
+    act(() => hook.result.current.handleMouseUp(clickAt(101, 101)));
     expect(onApply).toHaveBeenCalledWith('p', 9.5, 0);
     expect(onApplyAll).not.toHaveBeenCalled();
   });

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * usePointTool — la gramática del tool Punto (maria-203):
- * press-track-release con el release mandando, guard de ancla, curva solo
+ * press-track-release donde el press fija el objetivo, guard de ancla, curva solo
  * con el chip 'point', Esc cancela la colocación armada, y el candado se
  * delega al verbo (una sola puerta).
  */

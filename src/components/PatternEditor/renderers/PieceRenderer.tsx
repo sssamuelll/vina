@@ -6,7 +6,11 @@ import { PatternPiece, PathCommand, UnitSystem } from '../../../types/types';
 import LineLengthLabels from './LineLengthLabels';
 import { pathToSVG } from '../utils';
 import { effectiveSeamAllowanceWidth } from '../../../utils/seam';
-import { generateSeamAllowanceWithCorners, type MatchLookup } from '../../../utils/seam/cornerTypes';
+import {
+  generateSeamAllowanceWithCorners,
+  hasPositiveEdgeAllowance,
+  type MatchLookup,
+} from '../../../utils/seam/cornerTypes';
 import { buildMatchLookup } from '../../../utils/seam/matchResolver';
 import { extractNodes } from '../nodeEditorUtils';
 import { ANNOTATION_CATEGORY_COLORS } from '../../../utils/annotationTemplates';
@@ -85,13 +89,15 @@ const SinglePiece = memo(function SinglePiece({
   // only the styling is the redesign. When SA is hidden, the outline is itself
   // the cut line. The accent is reserved for selection; the band is a faint shade
   // between the two contours.
-  // Hallazgo #2: pieces are NET — the margin renders ONLY when the piece's own
-  // seamAllowance was explicitly set. No editor-wide default fallback.
+  // Las piezas siguen naciendo netas y no recuperan un fallback global; un
+  // tramo o borde con ancho propio sí cuenta porque también fue pedido de forma
+  // explícita por el usuario.
   // Memoized so the partner-SA regen a `match` corner triggers doesn't run every
   // render frame — only when the piece geometry, widths, or its match lookup change.
   const saPath = useMemo(() => {
     const saWidth = effectiveSeamAllowanceWidth(piece);
-    if (!(showSeamAllowance && saWidth > 0 && (piece.outline?.length ?? 0) >= 2)) return [];
+    const hasExplicitAllowance = saWidth > 0 || hasPositiveEdgeAllowance(piece.edges);
+    if (!(showSeamAllowance && hasExplicitAllowance && (piece.outline?.length ?? 0) >= 2)) return [];
     // ALWAYS the edge-walk generator. There used to be a "fast path" here that
     // sent plain pieces (no corner overrides, no per-edge widths — i.e. every
     // freshly drawn rectangle) to Clipper's ClipperOffset instead. That offset is

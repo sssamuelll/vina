@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { PathCommand, Point2D } from '../../../types/types';
+import type { PathCommand, Point2D, SemanticEdge } from '../../../types/types';
 import { generateSeamAllowanceWithCorners } from '../cornerTypes';
 
 /**
@@ -45,7 +45,121 @@ function rect(x: number, y: number, w: number, h: number): PathCommand[] {
   ];
 }
 
+function topEdge(
+  allowance: Pick<SemanticEdge, 'seamAllowanceWidth' | 'seamAllowanceSpans'> = {},
+): SemanticEdge {
+  return {
+    id: 'piece:top',
+    name: 'top',
+    segmentRange: [1, 2],
+    edgeType: 'seam',
+    ...allowance,
+  };
+}
+
 describe('seam allowance geometry (maria-190)', () => {
+  it('sin tramos conserva byte a byte el contorno de corte anterior', () => {
+    expect(generateSeamAllowanceWithCorners(
+      rect(100, 100, 300, 150),
+      10,
+      'mitered',
+      {},
+      [topEdge()],
+    )).toEqual([
+      { type: 'M', values: [410, 260] },
+      { type: 'L', values: [90, 260] },
+      { type: 'L', values: [90, 90] },
+      { type: 'L', values: [410, 90] },
+      { type: 'Z', values: [] },
+    ]);
+  });
+
+  it('un tramo con ancho propio ensancha solamente su trozo del borde', () => {
+    const sa = ptsOf(generateSeamAllowanceWithCorners(
+      rect(100, 100, 300, 150),
+      10,
+      'mitered',
+      {},
+      [topEdge({ seamAllowanceSpans: [{ tStart: 0.25, tEnd: 0.75, width: 20 }] })],
+    ));
+
+    expect(hasPoint(sa, 175, 80)).toBe(true);
+    expect(hasPoint(sa, 325, 80)).toBe(true);
+    expect(hasPoint(sa, 90, 90)).toBe(true);
+    expect(hasPoint(sa, 410, 90)).toBe(true);
+    expect(sa.some((point) => point.y < 89.99 && point.x < 174.99)).toBe(false);
+    expect(sa.some((point) => point.y < 89.99 && point.x > 325.01)).toBe(false);
+  });
+
+  it('cada discontinuidad forma un escalón perpendicular y no una rampa', () => {
+    const sa = ptsOf(generateSeamAllowanceWithCorners(
+      rect(100, 100, 300, 150),
+      10,
+      'mitered',
+      {},
+      [topEdge({ seamAllowanceSpans: [{ tStart: 0.25, tEnd: 0.75, width: 20 }] })],
+    ));
+    const hasStep = (x: number) => sa.some((point, index) => {
+      const next = sa[(index + 1) % sa.length];
+      return Math.abs(point.x - x) < 0.01
+        && Math.abs(next.x - x) < 0.01
+        && Math.abs(Math.abs(next.y - point.y) - 10) < 0.01;
+    });
+
+    expect(hasStep(175)).toBe(true);
+    expect(hasStep(325)).toBe(true);
+  });
+
+  it('un tramo de ancho cero queda pegado al contorno de la pieza', () => {
+    const sa = ptsOf(generateSeamAllowanceWithCorners(
+      rect(100, 100, 300, 150),
+      10,
+      'mitered',
+      {},
+      [topEdge({ seamAllowanceSpans: [{ tStart: 0.25, tEnd: 0.75, width: 0 }] })],
+    ));
+
+    expect(hasPoint(sa, 175, 100)).toBe(true);
+    expect(hasPoint(sa, 325, 100)).toBe(true);
+    expect(hasPoint(sa, 175, 90)).toBe(true);
+    expect(hasPoint(sa, 325, 90)).toBe(true);
+  });
+
+  it('un tramo que cubre todo el borde equivale al ancho del borde entero', () => {
+    const outline = rect(100, 100, 300, 150);
+    const fromSpan = generateSeamAllowanceWithCorners(
+      outline,
+      10,
+      'mitered',
+      {},
+      [topEdge({ seamAllowanceSpans: [{ tStart: 0, tEnd: 1, width: 20 }] })],
+    );
+    const fromEdge = generateSeamAllowanceWithCorners(
+      outline,
+      10,
+      'mitered',
+      {},
+      [topEdge({ seamAllowanceWidth: 20 })],
+    );
+
+    expect(fromSpan).toEqual(fromEdge);
+  });
+
+  it('una pieza neta genera el margen cuando un tramo tiene ancho positivo', () => {
+    const sa = ptsOf(generateSeamAllowanceWithCorners(
+      rect(100, 100, 300, 150),
+      0,
+      'mitered',
+      {},
+      [topEdge({ seamAllowanceSpans: [{ tStart: 0.25, tEnd: 0.75, width: 20 }] })],
+    ));
+
+    expect(hasPoint(sa, 175, 80)).toBe(true);
+    expect(hasPoint(sa, 325, 80)).toBe(true);
+    expect(hasPoint(sa, 175, 100)).toBe(true);
+    expect(hasPoint(sa, 325, 100)).toBe(true);
+  });
+
   it('a drafted rectangle offsets to exactly four corners', () => {
     const sa = ptsOf(generateSeamAllowanceWithCorners(rect(100, 100, 300, 150), 10, 'mitered', {}));
 

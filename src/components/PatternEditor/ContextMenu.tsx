@@ -30,6 +30,8 @@ export interface ContextMenuState {
   pieceName?: string;
   /** ID of seam under cursor, or null */
   seamId?: string | null;
+  /** Borde alcanzado con Margen activo; añade el acelerador numérico. */
+  saEdgeId?: string | null;
   /** Segment command index for convert options (set when right-clicking in edit pattern mode) */
   segmentIndex?: number;
   /** Whether the segment is currently a curve */
@@ -126,6 +128,7 @@ export default function ContextMenu(props: ContextMenuProps) {
     dispatch, targetKind, stage, altitude,
     pieceId: menu.pieceId, piece, selectedPieceIds,
     seamId: menu.seamId ?? null, seam,
+    saEdgeId: menu.saEdgeId ?? null,
     internalLineId: menu.internalLineId ?? null,
     internalLineType: (menu.internalLineType as InternalLineType | null) ?? null,
     internalLine,

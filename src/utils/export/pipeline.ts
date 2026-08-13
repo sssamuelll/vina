@@ -8,7 +8,11 @@
 
 import type { PatternPiece, PathCommand, Point2D, Seam } from '../../types/types';
 import { flattenPath } from '../seam/index';
-import { generateSeamAllowanceWithCorners, type MatchLookup } from '../seam/cornerTypes';
+import {
+  generateSeamAllowanceWithCorners,
+  hasPositiveEdgeAllowance,
+  type MatchLookup,
+} from '../seam/cornerTypes';
 import { buildMatchLookup } from '../seam/matchResolver';
 
 // ─── Types ───
@@ -27,7 +31,7 @@ export interface PreparedPiece {
   piece: PatternPiece;
   /** Flattened outline as Point2D[] (for formats that need flat points) */
   flatOutline: Point2D[];
-  /** SA offset outline as PathCommand[] (empty if SA=0 or generation failed) */
+  /** SA offset outline as PathCommand[] (empty without any explicit width or if generation failed) */
   seamOutline: PathCommand[];
   /** Flattened SA outline as Point2D[] */
   flatSeamOutline: Point2D[];
@@ -103,7 +107,7 @@ export function preparePiece(
   let seamOutline: PathCommand[] = [];
   let flatSeamOutline: Point2D[] = [];
 
-  if (piece.seamAllowance > 0) {
+  if (piece.seamAllowance > 0 || hasPositiveEdgeAllowance(piece.edges)) {
     // ALWAYS the edge-walk generator — this is the EXPORT path, so the cut line
     // here becomes the factory DXF/PDF. The old "plain piece" fast path went to
     // Clipper's ClipperOffset, which is broken in clipper2-js 1.2.4 and was

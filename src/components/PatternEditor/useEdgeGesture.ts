@@ -20,6 +20,9 @@ interface ArmedRef {
   startX: number;
   startY: number;
   moved: boolean;
+  /** Sin este recuerdo, devolverse antes de soltar invertiría el sentido que
+   *  la mano fijó al arrancar. `null` también cubre cruces fuera del borde. */
+  firstDragT: number | null;
   /** El elemento que capturó el puntero, para soltarlo al terminar. */
   captured: Element | null;
   pointerId: number | null;
@@ -71,7 +74,7 @@ export function useEdgeGesture(opts: EdgeGestureOptions) {
 
     armed.current = {
       press: target, startX: e.clientX, startY: e.clientY,
-      moved: false, captured, pointerId,
+      moved: false, firstDragT: null, captured, pointerId,
     };
     setPhase('armed');
     setPress(target);
@@ -89,6 +92,9 @@ export function useEdgeGesture(opts: EdgeGestureOptions) {
     if (!a.moved) return;
 
     const t = resolveReleaseT(e, a.press);
+    // Si el cruce ocurrió fuera del borde, esperamos la primera proyección
+    // válida. Una vez fijada no se toca: el resto del recorrido puede volver.
+    if (a.firstDragT === null && t !== null) a.firstDragT = t;
     setLiveRange(t === null ? null : [Math.min(a.press.t, t), Math.max(a.press.t, t)]);
   }, [resolveReleaseT]);
 
@@ -96,7 +102,10 @@ export function useEdgeGesture(opts: EdgeGestureOptions) {
     const a = armed.current;
     if (!a) return;
     const t = a.moved ? resolveReleaseT(e, a.press) : null;
-    const commit = resolveEdgeCommit(a.press, t, a.moved);
+    // El mouseup también puede ser la primera proyección válida tras un
+    // cruce fuera del borde; solo llena el hueco, nunca reemplaza el arranque.
+    if (a.firstDragT === null && t !== null) a.firstDragT = t;
+    const commit = resolveEdgeCommit(a.press, t, a.moved, a.firstDragT);
     reset();
     onCommit(commit);
   }, [resolveReleaseT, onCommit, reset]);
@@ -105,6 +114,9 @@ export function useEdgeGesture(opts: EdgeGestureOptions) {
     phase, press, liveRange,
     handleMouseDown, handleMouseMove, handleMouseUp,
     cancel: reset,
+    /** La DISTANCIA necesita el sentido que ya fijó el gesto; exponer el
+     *  valor vivo evita volver a deducirlo desde el cursor final. */
+    firstDragT: () => armed.current?.firstDragT ?? null,
     /** ¿Hay un gesto vivo? Lo usa el guard de Escape y el del contextmenu. */
     isArmed: () => armed.current !== null,
   };

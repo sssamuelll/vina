@@ -1,19 +1,153 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { setEdgesSeamAllowance } from '../../store/projectSlice';
+import {
+  removeEdgeSeamAllowanceSpan,
+  setEdgesSeamAllowance,
+  updateEdgeSeamAllowanceSpan,
+} from '../../store/projectSlice';
+import type { SeamAllowanceSpan } from '../../types/types';
+import { computePathArcLength } from '../../utils/geometry/arcLength';
 
 interface Props {
-  /** The SA-tool edge selection — one OR many edges (multi-select Shift). */
+  /** La selección del margen admite uno o varios bordes con Shift. */
   items: { pieceId: string; edgeId: string }[];
 }
 
+interface SpanFieldsProps {
+  index: number;
+  span: SeamAllowanceSpan;
+  edgeLengthMm: number;
+  onCommit: (span: SeamAllowanceSpan) => void;
+  onRemove: () => void;
+}
+
+function displayMm(value: number): string {
+  if (!Number.isFinite(value)) return '';
+  // Doce cifras significativas esconden el ruido binario sin convertir 47,3
+  // en 47 ni cambiar el valor almacenado mientras nadie edite el campo.
+  return String(Number(value.toPrecision(12)));
+}
+
+function spanDraft(span: SeamAllowanceSpan, edgeLengthMm: number) {
+  return {
+    from: displayMm(span.tStart * edgeLengthMm),
+    to: displayMm(span.tEnd * edgeLengthMm),
+    width: displayMm(span.width),
+  };
+}
+
+function SpanFields({ index, span, edgeLengthMm, onCommit, onRemove }: SpanFieldsProps) {
+  const [draft, setDraft] = useState(() => spanDraft(span, edgeLengthMm));
+
+  useEffect(() => {
+    setDraft(spanDraft(span, edgeLengthMm));
+  }, [span, edgeLengthMm]);
+
+  const reset = () => setDraft(spanDraft(span, edgeLengthMm));
+  const commit = () => {
+    const fromMm = Number(draft.from);
+    const toMm = Number(draft.to);
+    const width = Number(draft.width);
+    if (
+      edgeLengthMm <= 0
+      || ![fromMm, toMm, width].every(Number.isFinite)
+      || fromMm < 0
+      || toMm > edgeLengthMm
+      || fromMm >= toMm
+      || width < 0
+      || (toMm - fromMm) / edgeLengthMm < 0.01
+    ) {
+      reset();
+      return;
+    }
+
+    const next = {
+      tStart: fromMm / edgeLengthMm,
+      tEnd: toMm / edgeLengthMm,
+      width,
+    };
+    if (
+      next.tStart === span.tStart
+      && next.tEnd === span.tEnd
+      && next.width === span.width
+    ) return;
+    onCommit(next);
+  };
+
+  const blurOnEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    // Blur es la única puerta de commit para que Enter no cree dos entradas de
+    // deshacer cuando el foco abandone el campo un instante después.
+    if (event.key === 'Enter') event.currentTarget.blur();
+  };
+
+  const suffix = index + 1;
+  return (
+    <div className="panel-subblock">
+      <div className="panel-subtitle">Tramo {suffix}</div>
+      <div className="panel-field">
+        <label htmlFor={`edge-span-${index}-from`}>Desde (mm)</label>
+        <input
+          id={`edge-span-${index}-from`}
+          type="number"
+          className="panel-input narrow"
+          min={0}
+          max={edgeLengthMm}
+          step="any"
+          disabled={edgeLengthMm <= 0}
+          value={draft.from}
+          onChange={event => setDraft(current => ({ ...current, from: event.target.value }))}
+          onKeyDown={blurOnEnter}
+          onBlur={commit}
+        />
+      </div>
+      <div className="panel-field">
+        <label htmlFor={`edge-span-${index}-to`}>Hasta (mm)</label>
+        <input
+          id={`edge-span-${index}-to`}
+          type="number"
+          className="panel-input narrow"
+          min={0}
+          max={edgeLengthMm}
+          step="any"
+          disabled={edgeLengthMm <= 0}
+          value={draft.to}
+          onChange={event => setDraft(current => ({ ...current, to: event.target.value }))}
+          onKeyDown={blurOnEnter}
+          onBlur={commit}
+        />
+      </div>
+      <div className="panel-field">
+        <label htmlFor={`edge-span-${index}-width`}>Ancho (mm)</label>
+        <input
+          id={`edge-span-${index}-width`}
+          type="number"
+          className="panel-input narrow"
+          min={0}
+          max={100}
+          step="any"
+          value={draft.width}
+          onChange={event => setDraft(current => ({ ...current, width: event.target.value }))}
+          onKeyDown={blurOnEnter}
+          onBlur={commit}
+        />
+      </div>
+      <div className="panel-field panel-field--row">
+        <button
+          type="button"
+          className="panel-chip-btn panel-chip-btn--destructive"
+          onClick={onRemove}
+        >
+          Eliminar tramo
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /**
- * Per-edge seam-allowance width for the seamAllowance-tool selection (one or many
- * edges). Commits the whole set on Enter or blur via setEdgesSeamAllowance (one
- * undo entry); Inherit clears the override on all. With divergent values the
- * field shows a `Mixed` placeholder. The controlled buffer re-seeds when the set
- * or its shown value changes — replaces the per-edge `key` remount hack (PR #865).
+ * El ancho del borde sigue admitiendo selección múltiple. Los tramos aparecen
+ * solo con un borde, porque un índice no identifica la misma zona en dos arcos.
  */
 export default function EdgePropertiesSection({ items }: Props) {
   const dispatch = useDispatch();
@@ -21,45 +155,68 @@ export default function EdgePropertiesSection({ items }: Props) {
 
   const resolved = items
     .map(({ pieceId, edgeId }) => {
-      const piece = pieces.find(p => p.id === pieceId);
-      const edge = piece?.edges?.find(e => e.id === edgeId);
+      const piece = pieces.find(candidate => candidate.id === pieceId);
+      const edge = piece?.edges?.find(candidate => candidate.id === edgeId);
       if (!piece || !edge) return null;
       const pieceDefault = piece.seamAllowance ?? 0;
       return {
-        pieceId, edgeId, edgeName: edge.name, pieceDefault,
+        piece,
+        edge,
+        pieceId,
+        edgeId,
+        edgeName: edge.name,
+        pieceDefault,
         effective: edge.seamAllowanceWidth ?? pieceDefault,
         isOverridden: edge.seamAllowanceWidth != null,
       };
     })
-    .filter((r): r is NonNullable<typeof r> => r != null);
+    .filter((value): value is NonNullable<typeof value> => value != null);
 
   const count = resolved.length;
-  const allSame = count > 0 && resolved.every(r => r.effective === resolved[0].effective);
+  const allSame = count > 0 && resolved.every(item => item.effective === resolved[0].effective);
   const displayValue = allSame ? String(resolved[0].effective) : '';
-  const anyOverridden = resolved.some(r => r.isOverridden);
-  // Set identity + shown value: re-seeds the editing buffer on selection change.
-  const setKey = resolved.map(r => `${r.pieceId}:${r.edgeId}`).sort().join('|');
+  const anyOverridden = resolved.some(item => item.isOverridden);
+  const setKey = resolved.map(item => `${item.pieceId}:${item.edgeId}`).sort().join('|');
 
   const [value, setValue] = useState(displayValue);
   useEffect(() => { setValue(displayValue); }, [setKey, displayValue]);
 
   if (count === 0) return null;
 
-  const commitItems = resolved.map(r => ({ pieceId: r.pieceId, edgeId: r.edgeId }));
+  const commitItems = resolved.map(item => ({ pieceId: item.pieceId, edgeId: item.edgeId }));
+  const spanTarget = count === 1 ? resolved[0] : null;
+  const spans = spanTarget?.edge.seamAllowanceSpans ?? [];
+  const edgeLengthMm = spanTarget
+    ? (
+        Number.isFinite(spanTarget.edge.length)
+          ? Math.max(0, spanTarget.edge.length ?? 0)
+          : computePathArcLength(
+              spanTarget.piece.outline,
+              spanTarget.edge.segmentRange[0],
+              spanTarget.edge.segmentRange[1],
+            )
+      )
+    : 0;
 
-  const commit = () => {
-    const w = parseFloat(value);
-    if (!Number.isFinite(w) || w < 0) { setValue(displayValue); return; }
-    dispatch(setEdgesSeamAllowance({ items: commitItems, width: w }));
+  const commitWidth = () => {
+    const width = parseFloat(value);
+    if (!Number.isFinite(width) || width < 0) {
+      setValue(displayValue);
+      return;
+    }
+    dispatch(setEdgesSeamAllowance({ items: commitItems, width }));
   };
 
   const subtitle = count === 1 ? `Borde · ${resolved[0].edgeName}` : `${count} bordes`;
+  const widthLabel = spans.length > 0
+    ? 'Ancho fuera de los tramos (mm)'
+    : 'Ancho (mm)';
 
   return (
     <section className="panel-section">
       <div className="panel-subtitle panel-subtitle--spaced">{subtitle}</div>
       <div className="panel-field">
-        <label htmlFor="edge-prop-width">Ancho (mm)</label>
+        <label htmlFor="edge-prop-width">{widthLabel}</label>
         <input
           id="edge-prop-width"
           type="number"
@@ -68,9 +225,9 @@ export default function EdgePropertiesSection({ items }: Props) {
           max={100}
           value={value}
           placeholder={allSame ? undefined : 'Varios'}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
-          onBlur={commit}
+          onChange={event => setValue(event.target.value)}
+          onKeyDown={event => { if (event.key === 'Enter') commitWidth(); }}
+          onBlur={commitWidth}
         />
       </div>
       <div className="panel-field panel-field--row">
@@ -85,6 +242,31 @@ export default function EdgePropertiesSection({ items }: Props) {
           {count === 1 ? `Heredar (${resolved[0].pieceDefault})` : 'Heredar'}
         </button>
       </div>
+
+      {spanTarget && spans.length > 0 && (
+        <div className="panel-subblock">
+          <div className="panel-subtitle">Tramos del margen</div>
+          {spans.map((span, index) => (
+            <SpanFields
+              key={`${spanTarget.edgeId}:${index}`}
+              index={index}
+              span={span}
+              edgeLengthMm={edgeLengthMm}
+              onCommit={next => dispatch(updateEdgeSeamAllowanceSpan({
+                pieceId: spanTarget.pieceId,
+                edgeId: spanTarget.edgeId,
+                spanIndex: index,
+                span: next,
+              }))}
+              onRemove={() => dispatch(removeEdgeSeamAllowanceSpan({
+                pieceId: spanTarget.pieceId,
+                edgeId: spanTarget.edgeId,
+                spanIndex: index,
+              }))}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }

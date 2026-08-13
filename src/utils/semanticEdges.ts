@@ -291,22 +291,30 @@ export function findMatchingEdges(
  * user set with the Seam Allowance tool silently vanished on every
  * load→save→reload round trip.
  *
- * Only widths whose edge NAME survives the re-detection are preserved; a
- * width on a renamed/vanished edge is dropped (there is no honest target
- * to re-attach it to).
+ * El nombre es la única identidad que sobrevive a la re-detección; copiar
+ * ancho y tramos por esa clave evita perder intención sin inventar un destino
+ * para un borde renombrado o desaparecido.
  */
 export function preserveEdgeWidthsByName(
   oldEdges: SemanticEdge[] | undefined,
   newEdges: SemanticEdge[],
 ): SemanticEdge[] {
   if (!oldEdges || oldEdges.length === 0) return newEdges;
-  const widthByName = new Map<string, number>();
+  const allowanceByName = new Map<
+    string,
+    Pick<SemanticEdge, 'seamAllowanceWidth' | 'seamAllowanceSpans'>
+  >();
   for (const e of oldEdges) {
-    if (e.seamAllowanceWidth != null) widthByName.set(e.name, e.seamAllowanceWidth);
+    if (e.seamAllowanceWidth != null || e.seamAllowanceSpans != null) {
+      allowanceByName.set(e.name, {
+        seamAllowanceWidth: e.seamAllowanceWidth,
+        seamAllowanceSpans: e.seamAllowanceSpans?.map((span) => ({ ...span })),
+      });
+    }
   }
-  if (widthByName.size === 0) return newEdges;
+  if (allowanceByName.size === 0) return newEdges;
   return newEdges.map(e => {
-    const w = widthByName.get(e.name);
-    return w != null ? { ...e, seamAllowanceWidth: w } : e;
+    const allowance = allowanceByName.get(e.name);
+    return allowance ? { ...e, ...allowance } : e;
   });
 }

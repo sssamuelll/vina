@@ -98,7 +98,14 @@ interface ToolHooks {
   rectTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
   lineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
-  notchTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
+  notchTool: {
+    handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleKeyDown: (e: KeyboardEvent) => void;
+    cancel: () => void;
+    isArmed: () => boolean;
+  };
   pointTool: {
     armed: boolean;
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -107,7 +114,14 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     getCursor: () => string;
   };
-  seamAllowanceTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
+  seamAllowanceTool: {
+    handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleKeyDown: (e: KeyboardEvent) => void;
+    cancel: () => void;
+    isArmed: () => boolean;
+  };
   trimTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
   grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
   measureTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void; clear: () => void };
@@ -404,6 +418,18 @@ export function useEditorInteractions(
         pointTool.handleKeyDown(e);
         return;
       }
+      // El piquete comparte la misma ley que Coser: mientras el press siga
+      // vivo, Escape pertenece al gesto y no a la selección.
+      if (activeTool === 'notch' && notchTool.isArmed()) {
+        notchTool.handleKeyDown(e);
+        return;
+      }
+      // El tramo de margen ya fijó su borde en el press; Escape pertenece a
+      // ese gesto y no debe caer además en la deselección global.
+      if (activeTool === 'seamAllowance' && seamAllowanceTool.isArmed()) {
+        seamAllowanceTool.handleKeyDown(e);
+        return;
+      }
       // Coser: con un gesto armado o una mitad sostenida, el Esc es del tool.
       // El hook hace preventDefault + stopPropagation cuando cancela algo; si
       // no hay nada que cancelar, el Esc fluye normal → deseleccionar.
@@ -419,7 +445,7 @@ export function useEditorInteractions(
     };
     window.addEventListener('keydown', onEscapeCapture, { capture: true });
     return () => window.removeEventListener('keydown', onEscapeCapture, { capture: true });
-  }, [activeTool, transformTool, pointTool, seamTool]);
+  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool]);
 
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);
@@ -936,7 +962,12 @@ export function useEditorInteractions(
     internalLineDragRef.current = null;
     if (activeTool === 'pen') pen.handleMouseUp();
     if (activeTool === 'rectangle') rectTool.handleMouseUp();
-    if (activeTool === 'seamAllowance') seamAllowanceTool.handleMouseUp();
+    if (activeTool === 'seamAllowance') {
+      // Blur no trae un release geométrico fiable. La captura de puntero hace
+      // llegar el evento real incluso fuera del SVG; sin evento se cancela.
+      if (e) seamAllowanceTool.handleMouseUp(e);
+      else seamAllowanceTool.cancel();
+    }
     if (activeTool === 'grainline') grainlineTool.handleMouseUp();
     if (activeTool === 'transform' || (activeTool === 'select' && transformTool.isDragging)) transformTool.handleMouseUp();
     if (nodeEditor.isEditing) nodeEditor.handleMouseUp();
@@ -950,7 +981,16 @@ export function useEditorInteractions(
     if (activeTool === 'internalShape' && e) internalShapeTool.handleMouseUp(e);
     if (activeTool === 'point' && e) pointTool.handleMouseUp(e);
     if (activeTool === 'seam' && e) seamTool.handleMouseUp(e);
-  }, [activeTool, pen, rectTool, seamAllowanceTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, dispatch, pieces, zoom2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pointTool, seamTool]);
+    if (activeTool === 'notch' && e) notchTool.handleMouseUp(e);
+  }, [activeTool, pen, rectTool, seamAllowanceTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, dispatch, pieces, zoom2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pointTool, seamTool, notchTool]);
+
+  const handlePointerCancel = useCallback(() => {
+    // `pointercancel` no trae una posición final fiable. Tratarlo como mouseup
+    // inventaría un valor; tratarlo como Escape conserva el último estado
+    // estable y deja el siguiente gesto limpio.
+    if (activeTool === 'notch' && notchTool.isArmed()) notchTool.cancel();
+    if (activeTool === 'seamAllowance' && seamAllowanceTool.isArmed()) seamAllowanceTool.cancel();
+  }, [activeTool, notchTool, seamAllowanceTool]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
@@ -985,5 +1025,5 @@ export function useEditorInteractions(
     }
   };
 
-  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee, showTransformBox, isDraggingPiece };
+  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece };
 }

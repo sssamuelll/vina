@@ -54,6 +54,25 @@ describe('ContextMenu curado (Surface B)', () => {
     expect(screen.getByText('Eliminar pieza')).toBeTruthy();
   });
 
+  it('un borde de margen añade Ancho exacto al menú de pieza', () => {
+    renderMenu(
+      { ...base, pieceId: 'p1', pieceName: 'P1', activeTool: 'seamAllowance', saEdgeId: 'p1:top' },
+      [piece('p1')],
+    );
+
+    expect(screen.getByText('Ancho exacto…')).toBeTruthy();
+    expect(screen.getByText('Rotar 90°')).toBeTruthy();
+  });
+
+  it('el menú de pieza no inventa Ancho exacto lejos de un borde de margen', () => {
+    renderMenu(
+      { ...base, pieceId: 'p1', pieceName: 'P1', activeTool: 'seamAllowance' },
+      [piece('p1')],
+    );
+
+    expect(screen.queryByText('Ancho exacto…')).toBeNull();
+  });
+
   it('piquete: sin Offset ni Optimizar; con Seleccionar pieza y Eliminar piquete (curación por subtipo)', () => {
     renderMenu(
       { ...base, pieceId: 'p1', internalLineId: 'l1', internalLineType: 'notch' },

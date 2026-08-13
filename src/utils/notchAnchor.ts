@@ -209,7 +209,14 @@ export function computeNotchAnchor(
   return best;
 }
 
-function resolveNotchAnchorV2(
+/**
+ * Igual que {@link resolveNotchAnchor} para la métrica 2, pero con el anillo
+ * ya construido. Exportado porque `resolveNotchAnchor` lo construye por dentro
+ * en cada llamada, y quien resuelve un ancla por movimiento de ratón —el hover
+ * del piquete— no puede permitirse aplanar el contorno sesenta veces por
+ * segundo teniendo el anillo memoizado a mano.
+ */
+export function resolveNotchAnchorV2(
   outline: PathCommand[],
   anchor: NotchAnchor,
   ring: OutlineRing,

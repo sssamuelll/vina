@@ -357,6 +357,12 @@ export type PieceSide = 'front' | 'back' | 'left' | 'right' | 'center' | 'both';
 
 export type SemanticEdgeType = 'seam' | 'fold' | 'hem' | 'opening' | 'dart-leg' | 'unknown';
 
+export interface SeamAllowanceSpan {
+  tStart: number;
+  tEnd: number;
+  width: number;
+}
+
 /**
  * A named edge on a pattern piece — enables copilot reasoning,
  * auto-sew matching, and labeled export (DXF/PDF).
@@ -381,6 +387,12 @@ export interface SemanticEdge {
    * so it survives outline mutations that renumber positional indices.
    */
   seamAllowanceWidth?: number;
+  /**
+   * `tStart` y `tEnd` usan fracción de arco para que el tramo conserve su
+   * intención aunque cambie el muestreo interno de una curva. Fuera de estos
+   * rangos se hereda el ancho del borde y luego el de la pieza.
+   */
+  seamAllowanceSpans?: SeamAllowanceSpan[];
 }
 
 // ─── Seams (connections between pieces) ───
