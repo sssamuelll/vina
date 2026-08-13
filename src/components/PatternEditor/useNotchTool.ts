@@ -46,6 +46,7 @@ interface NotchToolState {
 export interface NotchRefineState {
   pieceId: string;
   notch: InternalLine;
+  source: 'placement' | 'existing';
   refWorld: Point2D;   // reference corner, world coords (canvas marker)
   notchWorld: Point2D; // notch entry point, world coords (canvas marker)
   /** Outline perimeter — the modal's distance ceiling (a longer distance would wrap). */
@@ -146,14 +147,15 @@ export function useNotchTool(
   const [state, setState] = useState<NotchToolState>({ hoveredPoint: null });
   const [refining, setRefining] = useState<NotchRefineState | null>(null);
 
-  // Leaving the notch tool cancels any pending refine — otherwise the modal
-  // lingers orphaned while its canvas marker (gated on activeTool in
-  // ToolOverlay) vanishes. Mirrors the reset-on-tool-change effects in
-  // useEditorInteractions. Optional chain: test stores may omit the editor
-  // slice; an undefined activeTool must not clear anything.
+  // El refinamiento nacido del gesto pertenece a Piquete y muere al salir de
+  // esa herramienta. El de una línea existente nace del menú contextual y no
+  // puede cerrarse solo porque Seleccionar ya estaba activo al abrirlo.
+  // El encadenado opcional permite los stores mínimos de los tests del hook.
   const activeTool = useSelector((s: RootState) => s.editor?.activeTool);
   useEffect(() => {
-    if (refining && activeTool && activeTool !== 'notch') setRefining(null);
+    if (refining?.source === 'placement' && activeTool && activeTool !== 'notch') {
+      setRefining(null);
+    }
   }, [activeTool, refining]);
 
   // toolOptions.notch (G6, mirrors the toolOptions.seam convention): canonical
@@ -323,6 +325,7 @@ export function useNotchTool(
         setRefining({
           pieceId: piece.id,
           notch,
+          source: 'placement',
           refWorld: {
             x: notch.notchAnchor.refPoint.x + piece.position.x,
             y: notch.notchAnchor.refPoint.y + piece.position.y,
@@ -368,6 +371,32 @@ export function useNotchTool(
       }
     : null;
   const dragSegment = draggedPlacement?.segment ?? null;
+
+  const refineExisting = useCallback((pieceId: string, line: InternalLine) => {
+    const piece = pieces.find(candidate => candidate.id === pieceId);
+    const liveLine = piece?.internals.find(candidate => candidate.id === line.id);
+    if (!piece || liveLine?.type !== 'notch' || !liveLine.notchAnchor) return;
+
+    const resolved = resolveNotchAnchor(piece.outline, liveLine.notchAnchor);
+    if (!resolved) return;
+
+    // Se reconstruye desde la versión viva de Redux para que un menú abierto
+    // antes de otra edición no reviva geometría ni distancia obsoletas.
+    setRefining({
+      pieceId,
+      notch: liveLine,
+      source: 'existing',
+      refWorld: {
+        x: liveLine.notchAnchor.refPoint.x + piece.position.x,
+        y: liveLine.notchAnchor.refPoint.y + piece.position.y,
+      },
+      notchWorld: {
+        x: resolved.point.x + piece.position.x,
+        y: resolved.point.y + piece.position.y,
+      },
+      maxDistanceMm: outlinePerimeter(piece.outline, liveLine.notchAnchor.metric ?? 1),
+    });
+  }, [pieces]);
 
   /** Apply edited distance/depth: resolve the anchor and regenerate the path. */
   const confirmRefine = useCallback((distanceMm: number, depthMm: number) => {
@@ -456,6 +485,7 @@ export function useNotchTool(
     cancel: gesture.cancel,
     isArmed: gesture.isArmed,
     refining,
+    refineExisting,
     confirmRefine,
     previewRefine,
     cancelRefine,

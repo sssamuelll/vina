@@ -45,7 +45,7 @@ export type ActionId =
   | 'reverseSeam' | 'reverseGrainline' | 'unfold' | 'unfoldOutlineOnly' | 'offsetInternalLine' | 'optimizeCurves' | 'optimizeAllCurves' | 'convertSegment' | 'convertSegmentToPoints'
   | 'order' | 'layer' | 'lockToggle' | 'activeToggle' | 'groupCreate' | 'addToGroup' | 'removeFromGroup'
   | 'unlinkPieces' | 'selectLinkedPartner' | 'linkSymmetry' | 'linkInstance' | 'cloneLinkedSymmetry' | 'cloneLinkedInstance'
-  | 'duplicate' | 'duplicateAll' | 'rename' | 'properties' | 'select' | 'inspect' | 'selectPieceOfLine' | 'selectSeamA' | 'selectSeamB' | 'zoomToFit'
+  | 'duplicate' | 'duplicateAll' | 'rename' | 'properties' | 'select' | 'inspect' | 'selectPieceOfLine' | 'selectSeamA' | 'selectSeamB' | 'zoomToFit' | 'notchExactDistance'
   | 'deletePiece' | 'deleteSeam' | 'deleteInternalLine';
 
 /** Callbacks que Surface B pasa como props (verbos que no son dispatches puros). */
@@ -58,6 +58,7 @@ export interface CurationCallbacks {
   onOffsetInternalLine?: (pieceId: string, lineId: string) => void;
   onOptimizeCurves?: (pieceId: string, lineId?: string) => void;
   onOpenProperties?: (pieceId: string) => void;
+  onRefineNotch?: (pieceId: string, line: InternalLine) => void;
 }
 
 /** Contexto resuelto que consumen gate/label/run/submenu. Lo arma cada superficie
@@ -270,6 +271,13 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     run: (ctx) => ctx.dispatch(selectPiece(ctx.seam!.pieceB.pieceId)) },
   zoomToFit: { id: 'zoomToFit', group: 'identity', icon: '⊞', label: 'Ajustar zoom al patrón',
     run: (ctx) => ctx.cb.onZoomToFit?.() },                                                                  // Surface B prop
+  notchExactDistance: { id: 'notchExactDistance', group: 'transform', icon: '⌖', label: 'Ajustar distancia…',
+    // Un path legado sin ancla conserva su dibujo, pero no sabe desde qué
+    // referencia medir: ocultarlo evita ofrecer una precisión que no existe.
+    gate: (ctx) => ctx.internalLine?.type === 'notch' && !!ctx.internalLine.notchAnchor,
+    run: (ctx) => {
+      if (ctx.pieceId && ctx.internalLine) ctx.cb.onRefineNotch?.(ctx.pieceId, ctx.internalLine);
+    } },
 
   // danger (destructivos → gate !locked donde aplica, F2)
   deletePiece: { id: 'deletePiece', group: 'danger', icon: '🗑', label: 'Eliminar pieza', shortcut: 'Del', danger: true,
@@ -310,7 +318,7 @@ export const CURATION: CurationRow[] = [
     bar: ['reverseSeam', 'selectSeamA', 'selectSeamB'], // data v2 (apagada por BAR_ENABLED_KINDS)
     menu: ['reverseSeam', 'selectSeamA', 'selectSeamB', 'deleteSeam'],
   },
-  { targetKind: 'il.notch', stage: '*', altitude: 'body', bar: [], menu: ['selectPieceOfLine', 'deleteInternalLine'] },
+  { targetKind: 'il.notch', stage: '*', altitude: 'body', bar: [], menu: ['notchExactDistance', 'selectPieceOfLine', 'deleteInternalLine'] },
   { targetKind: 'il.grainline', stage: '*', altitude: 'body', bar: ['reverseGrainline'], menu: ['reverseGrainline', 'selectPieceOfLine', 'deleteInternalLine'] },
   {
     targetKind: 'il.fold', stage: '*', altitude: 'body',

@@ -1028,6 +1028,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onUnfold={handleUnfold}
         onOffsetInternalLine={handleOffsetInternalLine}
         onOptimizeCurves={handleOptimizeCurves}
+        onRefineNotch={notchTool.refineExisting}
         onOpenProperties={(pieceId) => {
           dispatch(selectPiece(pieceId));
           onOpenPanel?.('Properties');

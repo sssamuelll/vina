@@ -187,14 +187,16 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         />
       )}
 
-      {activeTool === 'notch' && (props.notchHoveredPoint || props.notchRefineMarker || props.notchDragPreview) && (
+      {/* El modal de una línea existente puede abrirse desde Seleccionar: su
+          referencia sigue siendo necesaria aunque Piquete no esté activo. */}
+      {(props.notchRefineMarker || (activeTool === 'notch' && (props.notchHoveredPoint || props.notchDragPreview))) && (
         <NotchToolOverlay
           zoom2D={zoom2D}
           pieces={pieces}
-          notchHoveredPoint={props.notchHoveredPoint}
+          notchHoveredPoint={activeTool === 'notch' ? props.notchHoveredPoint : null}
           refineMarker={props.notchRefineMarker}
-          dragPreview={props.notchDragPreview}
-          dragSegment={props.notchDragSegment}
+          dragPreview={activeTool === 'notch' ? props.notchDragPreview : null}
+          dragSegment={activeTool === 'notch' ? props.notchDragSegment : null}
         />
       )}
 
