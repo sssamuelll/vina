@@ -35,6 +35,12 @@ export type EdgeCommit =
        * extremo, el colapso lo vuelve indistinguible del otro borde del rango.
        */
       releaseT: number;
+      /**
+       * La primera proyección válida después de cruzar el umbral conserva
+       * el sentido con el que arrancó la mano. El release no sirve para
+       * reconstruirlo: el cursor puede haberse devuelto antes de soltar.
+       */
+      firstDragT: number | null;
     };
 
 /**
@@ -57,6 +63,9 @@ export function resolveEdgeCommit(
    *  Volver el cursor cerca del punto de partida NO devuelve el gesto a clic —
    *  sobre un borde curvo la cuerda en pantalla miente y el arco manda. */
   crossedThreshold: boolean,
+  /** Se recibe ya fijado por el gesto; deducirlo aquí desde el release
+   *  invertiría la dirección cuando la mano se devuelve antes de soltar. */
+  firstDragT?: number | null,
 ): EdgeCommit {
   if (releaseT === null || !crossedThreshold) return { kind: 'click', target: press };
   if (Math.abs(releaseT - press.t) < MIN_SEGMENT_T) return { kind: 'click', target: press };
@@ -66,5 +75,11 @@ export function resolveEdgeCommit(
   if (t0 < EDGE_ENDPOINT_SNAP_T) t0 = 0;
   if (t1 > 1 - EDGE_ENDPOINT_SNAP_T) t1 = 1;
 
-  return { kind: 'drag', target: press, range: [t0, t1], releaseT };
+  return {
+    kind: 'drag',
+    target: press,
+    range: [t0, t1],
+    releaseT,
+    firstDragT: firstDragT ?? null,
+  };
 }

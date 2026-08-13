@@ -101,4 +101,35 @@ describe('resolveEdgeCommit', () => {
     expect(c.range[1]).toBe(1);
     expect(c.releaseT).toBe(0.997);
   });
+
+  // ─── La dirección se fija al CRUZAR el umbral, no al soltar ──────────────
+  // Spec § 3.2, literal: "la fijan los primeros 4 px de recorrido proyectados
+  // sobre el borde". El signo final es otra cosa, y difiere en el caso que
+  // más importa: arrancar hacia un lado y volverse antes de soltar.
+
+  it('conserva el t del primer cruce del umbral', () => {
+    const c = resolveEdgeCommit(press(0.5), 0.7, true, 0.55);
+    if (c.kind !== 'drag') throw new Error('unreachable');
+    expect(c.firstDragT).toBe(0.55);
+  });
+
+  it('el primer cruce y el release pueden apuntar a lados CONTRARIOS', () => {
+    // Arranca hacia arriba (0.5 → 0.55) y se vuelve más allá del press
+    // (→ 0.3). La dirección es la del arranque; el rango es el del release.
+    const c = resolveEdgeCommit(press(0.5), 0.3, true, 0.55);
+    if (c.kind !== 'drag') throw new Error('unreachable');
+    expect(c.firstDragT).toBe(0.55);
+    expect(c.releaseT).toBe(0.3);
+    expect(c.range).toEqual([0.3, 0.5]);
+    // Quien lea la dirección del signo final se equivocaría de sentido aquí:
+    expect(Math.sign(c.releaseT - c.target.t)).not.toBe(Math.sign(c.firstDragT! - c.target.t));
+  });
+
+  it('sin primer cruce registrado devuelve null, no adivina', () => {
+    // Los llamadores de la tanda 1 no lo pasan. Inventarlo desde el release
+    // sería justo el bug que este campo existe para evitar.
+    const c = resolveEdgeCommit(press(0.2), 0.8, true);
+    if (c.kind !== 'drag') throw new Error('unreachable');
+    expect(c.firstDragT).toBeNull();
+  });
 });

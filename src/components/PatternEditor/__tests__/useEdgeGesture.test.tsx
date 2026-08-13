@@ -143,4 +143,76 @@ describe('useEdgeGesture', () => {
     expect(commit.range[0]).toBeCloseTo(0.2, 5);
     expect(commit.range[1]).toBeCloseTo(0.8, 5);
   });
+
+  // ─── El primer cruce del umbral (familia DISTANCIA, tanda 2b) ────────────
+  // Spec § 3.2: la dirección la fijan "los primeros 4 px de recorrido
+  // proyectados sobre el borde". El hook tiene que RECORDAR ese instante: al
+  // soltar ya no se puede reconstruir.
+
+  /** `resolveReleaseT` que va devolviendo una lista, un valor por llamada. */
+  function setupSecuencia(ts: number[], onCommit: (c: EdgeCommit) => void) {
+    let i = 0;
+    return renderHook(() => useEdgeGesture({
+      resolveTarget: () => target,
+      resolveReleaseT: () => ts[Math.min(i++, ts.length - 1)],
+      onCommit,
+    }));
+  }
+
+  it('guarda el t del instante en que se cruzó el umbral', () => {
+    const onCommit = vi.fn();
+    // Al cruzar devuelve 0.35; después el cursor sigue hasta 0.9.
+    const { result } = setupSecuencia([0.35, 0.6, 0.9], onCommit);
+    act(() => { result.current.handleMouseDown(mouseEvent(100, 100)); });
+    act(() => { result.current.handleMouseMove(mouseEvent(140, 100)); }); // cruza
+    act(() => { result.current.handleMouseMove(mouseEvent(200, 100)); });
+    act(() => { result.current.handleMouseUp(mouseEvent(260, 100)); });
+    const commit = onCommit.mock.calls[0][0];
+    expect(commit.firstDragT).toBeCloseTo(0.35, 6);
+  });
+
+  it('el primer cruce NO se re-escribe en los movimientos siguientes', () => {
+    // Es el fallo que este campo existe para evitar: si se sobrescribiera, al
+    // volverse el cursor la dirección cambiaría a mitad de gesto.
+    const onCommit = vi.fn();
+    const { result } = setupSecuencia([0.35, 0.1, 0.05], onCommit);
+    act(() => { result.current.handleMouseDown(mouseEvent(100, 100)); });
+    act(() => { result.current.handleMouseMove(mouseEvent(140, 100)); }); // cruza en 0.35
+    act(() => { result.current.handleMouseMove(mouseEvent(160, 100)); }); // se vuelve
+    act(() => { result.current.handleMouseUp(mouseEvent(180, 100)); });   // suelta antes del press
+    const commit = onCommit.mock.calls[0][0];
+    expect(commit.firstDragT).toBeCloseTo(0.35, 6);
+    expect(commit.releaseT).toBeCloseTo(0.05, 6);
+    // Arrancó hacia arriba del press (0.2) y soltó por debajo: los dos signos
+    // discrepan, y ese es justo el caso en que el spec manda el del arranque.
+    expect(commit.firstDragT).toBeGreaterThan(target.t);
+    expect(commit.releaseT).toBeLessThan(target.t);
+  });
+
+  it('si el cursor se sale del borde al cruzar, el primer cruce queda sin fijar', () => {
+    // `resolveReleaseT` null = fuera del borde. No hay proyección, así que no
+    // hay dirección todavía; la fija el primer movimiento que sí proyecte.
+    const onCommit = vi.fn();
+    let i = 0;
+    const ts: (number | null)[] = [null, 0.7, 0.9];
+    const { result } = renderHook(() => useEdgeGesture({
+      resolveTarget: () => target,
+      resolveReleaseT: () => ts[Math.min(i++, ts.length - 1)],
+      onCommit,
+    }));
+    act(() => { result.current.handleMouseDown(mouseEvent(100, 100)); });
+    act(() => { result.current.handleMouseMove(mouseEvent(140, 100)); }); // cruza, pero fuera
+    act(() => { result.current.handleMouseMove(mouseEvent(160, 100)); }); // ya proyecta: 0.7
+    act(() => { result.current.handleMouseUp(mouseEvent(180, 100)); });
+    const commit = onCommit.mock.calls[0][0];
+    expect(commit.firstDragT).toBeCloseTo(0.7, 6);
+  });
+
+  it('un clic no produce primer cruce', () => {
+    const onCommit = vi.fn();
+    const { result } = setupSecuencia([0.8], onCommit);
+    act(() => { result.current.handleMouseDown(mouseEvent(100, 100)); });
+    act(() => { result.current.handleMouseUp(mouseEvent(101, 100)); });
+    expect(onCommit.mock.calls[0][0].kind).toBe('click');
+  });
 });
