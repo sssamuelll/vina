@@ -1,5 +1,7 @@
 // ─── Geometry Primitives ───
 
+import type { RingMetric } from '../utils/geometry/outlineRing';
+
 export interface Point2D {
   x: number;
   y: number;
@@ -240,15 +242,20 @@ export interface NotchOptions {
  * resolved reference point (a detected corner, stored as coordinates so the
  * data survives detector changes). The frozen `path` remains the source of
  * truth for render/export (D-2: path manda); the anchor feeds the precision
- * modal and manual pair-matching. Transforms that change the outline:
- * uniform grading scales `distanceMm` by the same factor; mirroring drops
- * the anchor (edge identity flips — re-mapping is the future "anchor manda"
- * upgrade, not this MVP).
+ * modal and manual pair-matching. Transforms that change the outline preserve
+ * the metric: uniform grading scales `distanceMm` by the same factor, while a
+ * mirror recomputes an independent anchor on the paired outline and inherits
+ * the source metric (an anchor-less source starts with the current metric).
  */
 export interface NotchAnchor {
   refPoint: Point2D;       // reference corner/point, piece-local coords
   direction: 'cw' | 'ccw'; // measuring direction along the outline
   distanceMm: number;      // arc distance from refPoint, >= 0
+  /** Con qué métrica se midió `distanceMm`. Ausente = 1, la de los proyectos
+   * guardados antes de #1029: el contorno aplanado a 12 subdivisiones. Nunca
+   * se rellena retroactivamente — un ancla sin este campo se re-deriva con la
+   * métrica vieja para que el piquete no se mueva del sitio donde estaba. */
+  metric?: RingMetric;
 }
 
 /**

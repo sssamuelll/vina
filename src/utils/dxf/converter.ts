@@ -723,6 +723,7 @@ function interpretNotchMark(
         refPoint: { x: anchor.refPoint.x * mmPerUnit, y: anchor.refPoint.y * mmPerUnit },
         direction: anchor.direction,
         distanceMm: anchor.distanceMm * mmPerUnit,
+        ...(anchor.metric !== undefined ? { metric: anchor.metric } : {}),
       },
     } : {}),
   };

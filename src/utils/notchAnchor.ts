@@ -15,6 +15,13 @@
  * preview, not by label).
  */
 import type { NotchAnchor, PathCommand, Point2D } from '../types/types';
+import {
+  buildRing,
+  pointAt,
+  projectToRing,
+  type OutlineRing,
+  type RingMetric,
+} from './geometry/outlineRing';
 import { flattenPath } from './seam';
 
 /** Angular deviation (degrees) above which a vertex counts as a corner. */
@@ -28,8 +35,16 @@ const REF_POINT_SNAP_TOL = 1e-3;
  * — CLO exports double the vertex exactly at corners (curve segment
  * endpoints), and a zero-length wedge side would make the corner detector
  * skip precisely the corners it exists to find — and the Z-closing vertex.
+ *
+ * Ésta es LA implementación del aplanado v1, y la flecha de dependencia va
+ * hacia afuera: `outlineRing.ts` la consume para su métrica v1 (:2), y
+ * `notchMirror.ts` la importa en vez de tener copia. Invertirla — que ésta
+ * delegara en `outlineRing` — sería un ciclo, y reimplementarla en el otro
+ * lado perdería la garantía que importa: el orden algebraico del aplanado
+ * decide el último bit IEEE-754, y de ese bit dependen las posiciones de los
+ * piquetes que la usuaria ya tiene guardados (#1029).
  */
-function ringOf(outline: PathCommand[]): Point2D[] {
+export function ringOf(outline: PathCommand[]): Point2D[] {
   const raw = flattenPath(outline);
   const pts: Point2D[] = [];
   for (const p of raw) {
@@ -83,7 +98,12 @@ export function detectCorners(
  * would otherwise wrap silently (resolveNotchAnchor wraps by design for
  * programmatic callers like scaled grading anchors).
  */
-export function outlinePerimeter(outline: PathCommand[]): number {
+export function outlinePerimeter(outline: PathCommand[], metric: RingMetric = 1): number {
+  if (metric === 2) {
+    const built = buildRing(outline, 2);
+    if (built.ok) return built.value.totalMm;
+  }
+
   const ring = ringOf(outline);
   const n = ring.length;
   if (n < 2) return 0;
@@ -123,11 +143,51 @@ function arcPositionOf(ring: Point2D[], pt: Point2D): { s: number; dist: number;
  * corners (e.g. a circle) — such notches stay anchor-less, which the
  * model allows (`notchAnchor` is optional).
  */
-export function computeNotchAnchor(outline: PathCommand[], snapPoint: Point2D): NotchAnchor | null {
+export function computeNotchAnchor(
+  outline: PathCommand[],
+  snapPoint: Point2D,
+  metric: RingMetric = 2,
+): NotchAnchor | null {
   const ring = ringOf(outline);
   if (ring.length < 3) return null;
   const corners = detectCorners(outline);
   if (corners.length === 0) return null;
+
+  if (metric === 2) {
+    const built = buildRing(outline, 2);
+    if (built.ok) {
+      const exactRing = built.value;
+      const s = projectToRing(exactRing, snapPoint).distanceMm;
+      const perimeter = exactRing.totalMm;
+      if (perimeter < 1e-9) return null;
+
+      let best: NotchAnchor | null = null;
+      let bestDist = Infinity;
+      for (const corner of corners) {
+        const sc = projectToRing(exactRing, corner).distanceMm;
+        const forward = (s - sc + perimeter) % perimeter;
+        const backward = (sc - s + perimeter) % perimeter;
+        if (forward <= backward && forward < bestDist) {
+          bestDist = forward;
+          best = {
+            refPoint: { x: corner.x, y: corner.y },
+            direction: 'cw',
+            distanceMm: forward,
+            metric: 2,
+          };
+        } else if (backward < forward && backward < bestDist) {
+          bestDist = backward;
+          best = {
+            refPoint: { x: corner.x, y: corner.y },
+            direction: 'ccw',
+            distanceMm: backward,
+            metric: 2,
+          };
+        }
+      }
+      return best;
+    }
+  }
 
   const { s, perimeter } = arcPositionOf(ring, snapPoint);
   if (perimeter < 1e-9) return null;
@@ -147,6 +207,51 @@ export function computeNotchAnchor(outline: PathCommand[], snapPoint: Point2D): 
     }
   }
   return best;
+}
+
+function resolveNotchAnchorV2(
+  outline: PathCommand[],
+  anchor: NotchAnchor,
+  ring: OutlineRing,
+): { point: Point2D; normal: Point2D } | null {
+  const flatRing = ringOf(outline);
+  const n = flatRing.length;
+  if (n < 3 || !(anchor.distanceMm >= 0) || !Number.isFinite(anchor.distanceMm)) return null;
+
+  const projectedRef = projectToRing(ring, anchor.refPoint);
+  const refDistance = Math.hypot(
+    anchor.refPoint.x - projectedRef.point.x,
+    anchor.refPoint.y - projectedRef.point.y,
+  );
+  const tol = Math.max(REF_POINT_SNAP_TOL, ring.totalMm * 1e-6);
+  if (refDistance > tol) return null;
+
+  const d = anchor.distanceMm % ring.totalMm;
+  const target = anchor.direction === 'cw'
+    ? (projectedRef.distanceMm + d) % ring.totalMm
+    : (projectedRef.distanceMm - d + ring.totalMm) % ring.totalMm;
+  const point = pointAt(ring, target).point;
+
+  const epsilonMm = 1e-3;
+  const before = pointAt(ring, target - epsilonMm).point;
+  const after = pointAt(ring, target + epsilonMm).point;
+  const tangentX = after.x - before.x;
+  const tangentY = after.y - before.y;
+  const tangentLength = Math.hypot(tangentX, tangentY);
+  if (tangentLength < 1e-9) return null;
+  const tx = tangentX / tangentLength;
+  const ty = tangentY / tangentLength;
+
+  let area2 = 0;
+  for (let index = 0; index < n; index++) {
+    const a = flatRing[index];
+    const b = flatRing[(index + 1) % n];
+    area2 += a.x * b.y - b.x * a.y;
+  }
+  const normal = area2 > 0
+    ? { x: -ty, y: tx }
+    : { x: ty, y: -tx };
+  return { point, normal };
 }
 
 /** Index of the entry in `pts` closest to `pt`, or -1 for an empty list. */
@@ -204,6 +309,11 @@ export function resolveNotchAnchor(
   outline: PathCommand[],
   anchor: NotchAnchor,
 ): { point: Point2D; normal: Point2D } | null {
+  if (anchor.metric === 2) {
+    const built = buildRing(outline, 2);
+    if (built.ok) return resolveNotchAnchorV2(outline, anchor, built.value);
+  }
+
   const ring = ringOf(outline);
   const n = ring.length;
   if (n < 3 || !(anchor.distanceMm >= 0)) return null;

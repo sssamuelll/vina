@@ -55,7 +55,7 @@ export function gaussLegendreCubicBezierLength(
   return sum * 0.5;
 }
 
-function gaussLegendreQuadBezierLength(p0: Point2D, p1: Point2D, p2: Point2D): number {
+export function gaussLegendreQuadBezierLength(p0: Point2D, p1: Point2D, p2: Point2D): number {
   let sum = 0;
   for (let i = 0; i < 5; i++) {
     const t = 0.5 * (1 + GL_X[i]);

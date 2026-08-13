@@ -9,11 +9,21 @@
  * tool runs live). `SemanticEdge.segmentRange` is the [startIdx, endIdx) the
  * arc-length helpers expect directly.
  */
-import type { PatternPiece, SemanticEdge, Seam, Point2D, PathCommand, InternalLine } from '../../types/types';
+import type {
+  PatternPiece,
+  SemanticEdge,
+  Seam,
+  Point2D,
+  PathCommand,
+  InternalLine,
+  NotchAnchor,
+} from '../../types/types';
 import { computePathArcLength, pointAtPathDistance, distanceAlongPath } from '../geometry/arcLength';
-import { flattenPath } from './index';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../notches';
-import { computeNotchAnchor } from '../notchAnchor';
+// `ringOf` es EL aplanado del contorno, y vive en notchAnchor: este módulo
+// tenía su propia copia literal, y dos copias del mismo aplanado derivan —
+// alguien arregla una y no la otra (#1029).
+import { computeNotchAnchor, ringOf } from '../notchAnchor';
 import { lineId } from '../pathHelpers';
 
 export interface SeamPartner {
@@ -42,19 +52,6 @@ export function findEdgeByName(piece: PatternPiece, edgeName: string): SemanticE
   const m = /^edge-(\d+)$/.exec(edgeName);
   if (m && piece.edges) return piece.edges[Number(m[1])] ?? null;
   return null;
-}
-
-function ringOf(outline: PathCommand[]): Point2D[] {
-  const raw = flattenPath(outline);
-  const pts: Point2D[] = [];
-  for (const p of raw) {
-    const prev = pts[pts.length - 1];
-    if (!prev || Math.hypot(p.x - prev.x, p.y - prev.y) > 1e-9) pts.push(p);
-  }
-  if (pts.length >= 2 && Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 1e-9) {
-    pts.pop();
-  }
-  return pts;
 }
 
 /**
@@ -172,16 +169,23 @@ export function mapNotchAcrossSeam(args: {
 /**
  * Build the mirror notch InternalLine for the paired piece from a successful
  * mapping. The created notch is INDEPENDENT (own frozen path + recomputed
- * anchor on the paired outline — D-2 "path manda" intact); no persistent pair
- * link. Shared by the copilot `mirrorNotch` tool and the F3 panel control.
+ * anchor on the paired outline, inheriting the source anchor's ring metric —
+ * D-2 "path manda" intact); no persistent pair link. Shared by the copilot
+ * `mirrorNotch` tool and the F3 panel control.
  */
 export function createMirrorNotchLine(
   pairedOutline: PathCommand[],
   mapped: { point: Point2D; normal: Point2D },
-  sourceNotch: { notchOptions?: InternalLine['notchOptions'] },
+  sourceNotch: {
+    notchOptions?: InternalLine['notchOptions'];
+    notchAnchor?: NotchAnchor;
+  },
 ): InternalLine {
   const options = sourceNotch.notchOptions ?? DEFAULT_NOTCH_OPTIONS;
-  const anchor = computeNotchAnchor(pairedOutline, mapped.point);
+  const metric = sourceNotch.notchAnchor
+    ? (sourceNotch.notchAnchor.metric ?? 1)
+    : 2;
+  const anchor = computeNotchAnchor(pairedOutline, mapped.point, metric);
   return {
     id: lineId(),
     type: 'notch',

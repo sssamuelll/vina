@@ -112,6 +112,7 @@ const notchAnchorSchema = z.object({
   refPoint: point2DSchema,
   direction: z.enum(['cw', 'ccw']),
   distanceMm: finiteNumber.refine((n) => n >= 0, { message: 'must be >= 0' }),
+  metric: z.union([z.literal(1), z.literal(2)]).optional(),
 });
 
 const internalLineSchema = z
@@ -175,6 +176,10 @@ const patternPieceSchema = z
     active: z.boolean(),
     createdAt: finiteNumber,
     updatedAt: finiteNumber,
+    // `gradeRules` stays intentionally undeclared and passes through `.loose()`
+    // without validation. An invalid nested anchor.metric therefore reaches
+    // resolveNotchAnchor, where anything other than 2 silently degrades to v1:
+    // the fail-safe direction is to preserve the point instead of moving it.
   })
   .loose();
 

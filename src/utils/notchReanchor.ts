@@ -48,7 +48,11 @@ export function reanchorTransformedNotches(
     if (line.type !== 'notch' || !line.notchAnchor) return line;
     const before = resolveNotchAnchor(prevOutline, line.notchAnchor);
     if (!before) return line;
-    const anchor = computeNotchAnchor(outline, mapPoint(before.point));
+    const anchor = computeNotchAnchor(
+      outline,
+      mapPoint(before.point),
+      line.notchAnchor.metric ?? 1,
+    );
     if (!anchor) return line;
     const resolved = resolveNotchAnchor(outline, anchor);
     if (!resolved) return line;
