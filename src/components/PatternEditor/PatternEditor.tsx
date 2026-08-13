@@ -861,6 +861,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             lineCursor={lineTool.cursorPos}
             lineLength={lineTool.lineLength}
             notchHoveredPoint={notchTool.hoveredPoint}
+            notchDragPreview={notchTool.dragPreview}
+            notchDragSegment={notchTool.dragSegment}
             pointToolHover={pointToolHook.hover}
             pointToolMode={pointToolHook.mode}
             notchRefineMarker={notchTool.refining ? { refWorld: notchTool.refining.refWorld, notchWorld: notchTool.refining.notchWorld, previewWorld: notchTool.refining.previewWorld } : null}

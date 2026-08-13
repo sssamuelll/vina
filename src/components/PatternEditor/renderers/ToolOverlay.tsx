@@ -72,6 +72,8 @@ interface ToolOverlayProps {
   seamActiveTarget: EdgeTarget | null;
   seamLiveRange: [number, number] | null;
   notchHoveredPoint: NotchHover | null;
+  notchDragPreview?: import('../useNotchTool').NotchDragPreview | null;
+  notchDragSegment?: SegmentSelection | null;
   /** Tool Punto (maria-203): preview solo cuando reason === 'ok'. */
   pointToolHover?: import('../usePointTool').PointToolHover | null;
   pointToolMode?: import('../usePointTool').PointToolMode;
@@ -185,11 +187,14 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         />
       )}
 
-      {activeTool === 'notch' && (props.notchHoveredPoint || props.notchRefineMarker) && (
+      {activeTool === 'notch' && (props.notchHoveredPoint || props.notchRefineMarker || props.notchDragPreview) && (
         <NotchToolOverlay
           zoom2D={zoom2D}
+          pieces={pieces}
           notchHoveredPoint={props.notchHoveredPoint}
           refineMarker={props.notchRefineMarker}
+          dragPreview={props.notchDragPreview}
+          dragSegment={props.notchDragSegment}
         />
       )}
 

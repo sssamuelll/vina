@@ -1,4 +1,7 @@
-import { Point2D } from '../../../../types/types';
+import type { PatternPiece, Point2D } from '../../../../types/types';
+import type { NotchDragPreview } from '../../useNotchTool';
+import type { SegmentSelection } from '../../useSegmentSewingTool';
+import { segmentArcPoints } from './segmentArc';
 
 interface NotchHover {
   point: Point2D;
@@ -15,14 +18,31 @@ export interface NotchRefineMarker {
 
 interface NotchToolOverlayProps {
   zoom2D: number;
+  pieces?: PatternPiece[];
   notchHoveredPoint: NotchHover | null;
   refineMarker?: NotchRefineMarker | null;
+  dragPreview?: NotchDragPreview | null;
+  dragSegment?: SegmentSelection | null;
 }
 
-export default function NotchToolOverlay({ zoom2D, notchHoveredPoint, refineMarker }: NotchToolOverlayProps) {
+export default function NotchToolOverlay({
+  zoom2D,
+  pieces = [],
+  notchHoveredPoint,
+  refineMarker,
+  dragPreview,
+  dragSegment,
+}: NotchToolOverlayProps) {
+  const dragPiece = dragSegment
+    ? pieces.find(piece => piece.id === dragSegment.pieceId)
+    : undefined;
+  const dragArc = dragPiece && dragSegment
+    ? segmentArcPoints(dragPiece, dragSegment)
+    : null;
+
   return (
     <g className="notch-preview">
-      {notchHoveredPoint && (
+      {notchHoveredPoint && !dragPreview && (
         <>
           <line
             x1={notchHoveredPoint.point.x - notchHoveredPoint.normal.x * 4}
@@ -87,6 +107,64 @@ export default function NotchToolOverlay({ zoom2D, notchHoveredPoint, refineMark
                 opacity={0.9}
               />
             )}
+          </g>
+        );
+      })()}
+      {dragPreview && dragArc && (() => {
+        const d = dragArc.map((point, index) => (
+          `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`
+        )).join(' ');
+        return (
+          <g className="notch-drag-preview" pointerEvents="none">
+            <circle
+              cx={dragPreview.refWorld.x}
+              cy={dragPreview.refWorld.y}
+              r={5 / zoom2D}
+              fill="none"
+              style={{ stroke: 'var(--notch-2d)' }}
+              strokeWidth={1.6 / zoom2D}
+            />
+            <circle
+              cx={dragPreview.refWorld.x}
+              cy={dragPreview.refWorld.y}
+              r={1.6 / zoom2D}
+              style={{ fill: 'var(--notch-2d)' }}
+            />
+            <path
+              d={d}
+              fill="none"
+              style={{ stroke: 'var(--notch-2d)' }}
+              strokeWidth={2 / zoom2D}
+              strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle
+              cx={dragPreview.currentWorld.x}
+              cy={dragPreview.currentWorld.y}
+              r={3 / zoom2D}
+              fill="none"
+              style={{ stroke: 'var(--notch-2d)' }}
+              strokeWidth={1.4 / zoom2D}
+            />
+            <g transform={`translate(${dragPreview.currentWorld.x}, ${dragPreview.currentWorld.y - 12 / zoom2D})`}>
+              <rect
+                x={-24 / zoom2D}
+                y={-8 / zoom2D}
+                width={48 / zoom2D}
+                height={16 / zoom2D}
+                rx={8 / zoom2D}
+                fill="rgba(0,0,0,0.75)"
+              />
+              <text
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill="#fff"
+                fontSize={10 / zoom2D}
+              >
+                {`${dragPreview.distanceMm.toFixed(1).replace('.', ',')} mm`}
+              </text>
+            </g>
           </g>
         );
       })()}

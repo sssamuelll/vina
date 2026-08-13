@@ -14,7 +14,11 @@ import {
 import { resolveDistanceRef } from '../../utils/geometry/distanceRef';
 import { edgeRangeForCommand } from '../../utils/semanticEdges';
 import { newId } from '../../utils/ids';
-import { snapToAnyEdge, type SnapResult } from './useSegmentSewingTool';
+import {
+  snapToAnyEdge,
+  type SegmentSelection,
+  type SnapResult,
+} from './useSegmentSewingTool';
 import { useEdgeGesture } from './useEdgeGesture';
 import type { EdgeCommit, EdgeTarget } from './edgeGesture';
 import { EDGE_HIT_PX } from './gestureConstants';
@@ -48,6 +52,12 @@ export interface NotchRefineState {
   maxDistanceMm: number;
   /** Live landing point while the user types a distance (canvas ghost marker). */
   previewWorld?: Point2D | null;
+}
+
+export interface NotchDragPreview {
+  refWorld: Point2D;
+  currentWorld: Point2D;
+  distanceMm: number;
 }
 
 function spanForEdge(
@@ -90,6 +100,13 @@ function tForMm(ring: OutlineRing, spanMm: [number, number], mm: number): number
 
 function mmForT(ring: OutlineRing, spanMm: [number, number], t: number): number {
   return spanMm[0] + t * spanLengthMm(ring, spanMm);
+}
+
+/** `liveRange` va ordenado; el extremo que no es el press es el cursor. */
+function liveTFromRange(pressT: number, liveRange: [number, number]): number {
+  const pressIsLowerBound = Math.abs(pressT - liveRange[0])
+    <= Math.abs(pressT - liveRange[1]);
+  return pressIsLowerBound ? liveRange[1] : liveRange[0];
 }
 
 /**
@@ -234,18 +251,66 @@ export function useNotchTool(
     };
   }, [ringData]);
 
-  const onCommit = useCallback((commit: EdgeCommit) => {
-    const { target } = commit;
+  /**
+   * El lector y el commit pasan por esta misma resolución para que el número
+   * prometido durante el gesto no pueda separarse del ancla que queda guardada.
+   */
+  const resolveDraggedNotch = useCallback((
+    target: EdgeTarget,
+    releaseT: number,
+    firstDragT: number | null,
+  ) => {
     const piece = ringData.pieces.find(candidate => candidate.id === target.pieceId);
     const ring = ringData.rings.get(target.pieceId);
-    if (!piece || !ring) return;
+    if (!piece || !ring) return null;
 
     const spanMm = spanForEdge(ring, target.edgeRange);
     const pressLocal = {
       x: target.point.x - piece.position.x,
       y: target.point.y - piece.position.y,
     };
-    const hitMm = screenToPatternLength(EDGE_HIT_PX, zoom);
+    const ref = resolveDistanceRef(
+      ring,
+      piece,
+      pressLocal,
+      spanMm,
+      screenToPatternLength(EDGE_HIT_PX, zoom),
+    );
+    const anchor = distanceAnchorFrom(
+      ring,
+      ref,
+      mmForT(ring, spanMm, releaseT),
+      firstDragT === null ? null : mmForT(ring, spanMm, firstDragT),
+      spanMm,
+    );
+    const resolved = resolveNotchAnchorV2(piece.outline, anchor, ring);
+    if (!resolved) return null;
+
+    const refT = tForMm(ring, spanMm, ref.distanceMm);
+    const currentT = tForMm(ring, spanMm, projectToRing(ring, resolved.point).distanceMm);
+    const segment: SegmentSelection = {
+      pieceId: target.pieceId,
+      edgeIndex: target.edgeIndex,
+      edgeRange: target.edgeRange,
+      startT: Math.min(refT, currentT),
+      endT: Math.max(refT, currentT),
+      startPoint: {
+        x: ref.point.x + piece.position.x,
+        y: ref.point.y + piece.position.y,
+      },
+      endPoint: {
+        x: resolved.point.x + piece.position.x,
+        y: resolved.point.y + piece.position.y,
+      },
+    };
+
+    return { piece, anchor, resolved, segment };
+  }, [ringData, zoom]);
+
+  const onCommit = useCallback((commit: EdgeCommit) => {
+    const { target } = commit;
+    const piece = ringData.pieces.find(candidate => candidate.id === target.pieceId);
+    if (!piece) return;
 
     if (commit.kind === 'click') {
       const exact = resolveTargetOnRing(target);
@@ -269,25 +334,40 @@ export function useNotchTool(
       return;
     }
 
-    const ref = resolveDistanceRef(ring, piece, pressLocal, spanMm, hitMm);
-    const releaseMm = mmForT(ring, spanMm, commit.releaseT);
-    const firstMm = commit.firstDragT === null
-      ? null
-      : mmForT(ring, spanMm, commit.firstDragT);
-    const anchor = distanceAnchorFrom(ring, ref, releaseMm, firstMm, spanMm);
-    const resolved = resolveNotchAnchor(piece.outline, anchor);
-    if (!resolved) return;
+    const placement = resolveDraggedNotch(target, commit.releaseT, commit.firstDragT);
+    if (!placement) return;
     onAddNotch(piece.id, {
       id: newId(),
       type: 'notch',
-      path: generateNotchPath(resolved.point, resolved.normal, effectiveOptions),
+      path: generateNotchPath(placement.resolved.point, placement.resolved.normal, effectiveOptions),
       notchOptions: effectiveOptions,
-      notchAnchor: anchor,
+      notchAnchor: placement.anchor,
     });
-  }, [ringData, zoom, resolveTargetOnRing, effectiveOptions, onAddNotch]);
+  }, [ringData, resolveTargetOnRing, resolveDraggedNotch, effectiveOptions, onAddNotch]);
 
   const gesture = useEdgeGesture({ resolveTarget, resolveReleaseT, onCommit });
   const handleMouseDown = gesture.handleMouseDown;
+  const draggedPlacement = gesture.phase === 'dragging' && gesture.press && gesture.liveRange
+    ? resolveDraggedNotch(
+        gesture.press,
+        liveTFromRange(gesture.press.t, gesture.liveRange),
+        gesture.firstDragT(),
+      )
+    : null;
+  const dragPreview: NotchDragPreview | null = draggedPlacement
+    ? {
+        refWorld: {
+          x: draggedPlacement.anchor.refPoint.x + draggedPlacement.piece.position.x,
+          y: draggedPlacement.anchor.refPoint.y + draggedPlacement.piece.position.y,
+        },
+        currentWorld: {
+          x: draggedPlacement.resolved.point.x + draggedPlacement.piece.position.x,
+          y: draggedPlacement.resolved.point.y + draggedPlacement.piece.position.y,
+        },
+        distanceMm: draggedPlacement.anchor.distanceMm,
+      }
+    : null;
+  const dragSegment = draggedPlacement?.segment ?? null;
 
   /** Apply edited distance/depth: resolve the anchor and regenerate the path. */
   const confirmRefine = useCallback((distanceMm: number, depthMm: number) => {
@@ -356,6 +436,8 @@ export function useNotchTool(
 
   return {
     hoveredPoint: state.hoveredPoint,
+    dragPreview,
+    dragSegment,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp: gesture.handleMouseUp,

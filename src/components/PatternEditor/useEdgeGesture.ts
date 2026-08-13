@@ -114,6 +114,9 @@ export function useEdgeGesture(opts: EdgeGestureOptions) {
     phase, press, liveRange,
     handleMouseDown, handleMouseMove, handleMouseUp,
     cancel: reset,
+    /** La DISTANCIA necesita el sentido que ya fijó el gesto; exponer el
+     *  valor vivo evita volver a deducirlo desde el cursor final. */
+    firstDragT: () => armed.current?.firstDragT ?? null,
     /** ¿Hay un gesto vivo? Lo usa el guard de Escape y el del contextmenu. */
     isArmed: () => armed.current !== null,
   };
