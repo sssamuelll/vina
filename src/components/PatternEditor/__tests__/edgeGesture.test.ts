@@ -70,4 +70,35 @@ describe('resolveEdgeCommit', () => {
     if (c.kind !== 'drag') throw new Error('unreachable');
     expect(c.range).toEqual([0.2, 0.8]);
   });
+
+  // ─── El sentido del recorrido (familia DISTANCIA, tanda 2b) ──────────────
+  // `range` va ordenado, que es lo correcto para un TRAMO: un tramo no tiene
+  // sentido de recorrido. Una DISTANCIA sí lo tiene — el signo es la
+  // `direction` del ancla (spec § 3.2) — y del rango ordenado no se recupera.
+
+  it('el commit de arrastre conserva el t del release, sin ordenar', () => {
+    const c = resolveEdgeCommit(press(0.8), 0.2, true);
+    if (c.kind !== 'drag') throw new Error('unreachable');
+    expect(c.range).toEqual([0.2, 0.8]);
+    expect(c.releaseT).toBe(0.2);
+  });
+
+  it('conserva el release aunque el press se colapse a un extremo', () => {
+    // Aquí es donde el rango ordenado deja de bastar: press.t = 0.005 colapsa
+    // a 0 dentro de `range`, así que mirando solo el rango no hay forma de
+    // saber cuál de sus dos bordes era el press.
+    const c = resolveEdgeCommit(press(0.005), 0.6, true);
+    if (c.kind !== 'drag') throw new Error('unreachable');
+    expect(c.range).toEqual([0, 0.6]);
+    expect(c.releaseT).toBe(0.6);
+    expect(c.target.t).toBe(0.005);
+  });
+
+  it('el release conservado es el crudo, sin el colapso a extremo', () => {
+    // range[1] se colapsa a 1; releaseT sigue diciendo dónde soltó de verdad.
+    const c = resolveEdgeCommit(press(0.3), 0.997, true);
+    if (c.kind !== 'drag') throw new Error('unreachable');
+    expect(c.range[1]).toBe(1);
+    expect(c.releaseT).toBe(0.997);
+  });
 });
