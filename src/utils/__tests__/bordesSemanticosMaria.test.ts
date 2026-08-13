@@ -71,24 +71,46 @@ describe('los bordes semánticos del patrón real de María', () => {
   it('los comandos huérfanos son la excepción, y cuántos son queda escrito', () => {
     // La puerta, no el cuarto: que existan bordes no prueba que el gesto los
     // alcance desde cualquier punto del contorno. Un comando que no cae en
-    // ningún borde hace que `edgeRangeForCommand` devuelva [i, i+1] — el
+    // NINGÚN borde hace que `edgeRangeForCommand` devuelva [i, i+1] — el
     // sliver de la queja 2 de su #220 ("una parte random de la curva, que
     // parece que es entre punto de curva y punto extremo").
     //
-    // Medido el 2026-08-13: 4,0 % (SAMUEL-1 y -4), 8,8 % (-3), 6,2 % (-5).
-    // El umbral de 15 % no dice "esto está bien": dice "no ha empeorado sin
-    // que nadie se entere". El hueco vive en el #1027.
+    // El oráculo mira la COBERTURA, no el ancho del rango. Medir `b - a <= 1`
+    // sobre la salida de `edgeRangeForCommand` confunde dos cosas que no lo
+    // son: un comando descubierto (fallback, y sí es el bug) y un borde
+    // semántico legítimo de un solo comando (un hombro recto, y no lo es).
+    // Esa confusión inflaba la cuenta: decía 8 donde hay 6, y 17 donde hay 11.
+    //
+    // Medido el 2026-08-13, ya sin la confusión: 3,0 % (SAMUEL-1 y -4),
+    // 5,7 % (-3), 4,0 % (-5). El umbral de 10 % no dice "esto está bien":
+    // dice "no ha empeorado sin que nadie se entere". El hueco vive en #1027.
     for (const piece of pieces) {
-      if (piece.outline.length <= GRANDES) continue; // la chica es 50 % y es su forma
-      const conEdges = { ...piece, edges: detectSemanticEdges(piece) };
+      if (piece.outline.length <= GRANDES) continue; // la chica es 39 % y es su forma
+      const edges = detectSemanticEdges(piece);
       let huerfanos = 0;
-      for (let i = 0; i < conEdges.outline.length; i++) {
-        const [a, b] = edgeRangeForCommand(conEdges, i);
-        if (b - a <= 1) huerfanos++;
+      for (let i = 0; i < piece.outline.length; i++) {
+        const cubierto = edges.some(e => i >= e.segmentRange[0] && i < e.segmentRange[1]);
+        if (!cubierto) huerfanos++;
       }
-      const pct = (huerfanos / conEdges.outline.length) * 100;
-      expect(pct, `pieza ${piece.name}: ${huerfanos}/${conEdges.outline.length} huérfanos`)
-        .toBeLessThan(15);
+      const pct = (huerfanos / piece.outline.length) * 100;
+      expect(pct, `pieza ${piece.name}: ${huerfanos}/${piece.outline.length} huérfanos`)
+        .toBeLessThan(10);
+    }
+  });
+
+  it('un comando huérfano SÍ cae al sliver — el mecanismo, no solo la cuenta', () => {
+    // Cierra el oráculo por el otro lado: comprueba que un comando descubierto
+    // es exactamente el que `edgeRangeForCommand` resuelve a [i, i+1]. Sin
+    // esto, el test de arriba contaría algo que podría no tener consecuencia.
+    for (const piece of pieces) {
+      const edges = detectSemanticEdges(piece);
+      const conEdges = { ...piece, edges };
+      for (let i = 0; i < piece.outline.length; i++) {
+        const cubierto = edges.some(e => i >= e.segmentRange[0] && i < e.segmentRange[1]);
+        if (cubierto) continue;
+        expect(edgeRangeForCommand(conEdges, i), `pieza ${piece.name}, comando ${i}`)
+          .toEqual([i, i + 1]);
+      }
     }
   });
 

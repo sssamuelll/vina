@@ -56,10 +56,14 @@ function invertir(objetivo: number, arcoHasta: (t: number) => number): number {
  * Spec: docs/superpowers/specs/2026-08-11-arrastre-unificado-2d-design.md § 3.2
  */
 export function arcToNativeT(command: PathCommand, start: Point2D, tArc: number): number {
-  const curva = command.type === 'C' || command.type === 'Q';
-  if (!curva) return tArc;
+  // El clampeo va ANTES de la salida rápida de las rectas, no después: el
+  // contrato dice "fuera de [0,1] se clampea" para todo comando, y sobre una
+  // `L` el que extrapolaría es `splitSegmentAt`, que partiría fuera del
+  // segmento. Tenerlo solo en la rama de curva era prometer una cosa y
+  // cumplirla en la mitad de los casos.
   if (tArc <= 0) return 0;
   if (tArc >= 1) return 1;
+  if (command.type !== 'C' && command.type !== 'Q') return tArc;
 
   if (command.type === 'C') {
     const [c1x, c1y, c2x, c2y, ex, ey] = command.values;

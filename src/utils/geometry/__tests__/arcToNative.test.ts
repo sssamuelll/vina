@@ -81,6 +81,16 @@ describe('arcToNativeT', () => {
     expect(arcToNativeT(SISA, O, 1.7)).toBe(1);
   });
 
+  it('clampea TAMBIÉN sobre una recta, no solo sobre la curva', () => {
+    // El agujero que dejó la primera versión: salía por la vía rápida de las
+    // rectas antes de clampear, así que un 1.7 sobre una `L` salía tal cual y
+    // `splitSegmentAt` partiría fuera del segmento. Un contrato que solo se
+    // cumple en la mitad de los comandos no es un contrato.
+    const L: PathCommand = { type: 'L', values: [100, 0] };
+    expect(arcToNativeT(L, O, -0.3)).toBe(0);
+    expect(arcToNativeT(L, O, 1.7)).toBe(1);
+  });
+
   it('un comando degenerado devuelve tArc sin inventar nada', () => {
     const nulo: PathCommand = { type: 'C', values: [0, 0, 0, 0, 0, 0] };
     expect(arcToNativeT(nulo, O, 0.42)).toBe(0.42);
