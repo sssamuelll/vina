@@ -780,6 +780,15 @@ export function perEdgeWidths(
   return widths;
 }
 
+export function hasPositiveEdgeAllowance(
+  semanticEdges: SemanticEdge[] | undefined,
+): boolean {
+  return semanticEdges?.some(
+    (edge) => (edge.seamAllowanceWidth ?? 0) > 0
+      || edge.seamAllowanceSpans?.some((span) => span.width > 0),
+  ) ?? false;
+}
+
 // ─── Matched corner ("Empatada") support ─────────────────────────────────
 //
 // A `match` corner slides the sewn border's cut-line endpoint at the vertex so
@@ -1113,7 +1122,8 @@ function resolveMatchVertex(
  *     that can arise from concave corners.
  *
  * @param outline           Source path (M/L/Z commands)
- * @param saWidth           Seam allowance width in mm (must be > 0)
+ * @param saWidth           Seam allowance width in mm; puede ser 0 cuando un
+ *                          borde o tramo explícito sí aporta ancho.
  * @param defaultCornerType Corner type used when a vertex has no explicit override
  * @param cornerTypes       Per-vertex overrides (key = vertex index in outline)
  * @param semanticEdges     Optional piece.edges — supplies per-edge SA widths via
@@ -1132,7 +1142,9 @@ export function generateSeamAllowanceWithCorners(
   matchLookup?: MatchLookup,
 ): PathCommand[] {
   // ── Guard: degenerate inputs ──────────────────────────────────────────────
-  if (saWidth <= 0) return [];
+  // Una pieza nace neta, pero un ancho explícito en su borde o tramo también
+  // es una orden de corte; bloquearla por el cero base la volvía invisible.
+  if (saWidth < 0 || (saWidth === 0 && !hasPositiveEdgeAllowance(semanticEdges))) return [];
 
   // ── Steps 1-3: Flatten + build per-edge offsets ───────────────────────────
   // flattenPathWithSource linearizes C/Q/A commands so the edge-walk handles

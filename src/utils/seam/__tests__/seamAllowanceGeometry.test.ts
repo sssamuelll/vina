@@ -145,6 +145,21 @@ describe('seam allowance geometry (maria-190)', () => {
     expect(fromSpan).toEqual(fromEdge);
   });
 
+  it('una pieza neta genera el margen cuando un tramo tiene ancho positivo', () => {
+    const sa = ptsOf(generateSeamAllowanceWithCorners(
+      rect(100, 100, 300, 150),
+      0,
+      'mitered',
+      {},
+      [topEdge({ seamAllowanceSpans: [{ tStart: 0.25, tEnd: 0.75, width: 20 }] })],
+    ));
+
+    expect(hasPoint(sa, 175, 80)).toBe(true);
+    expect(hasPoint(sa, 325, 80)).toBe(true);
+    expect(hasPoint(sa, 175, 100)).toBe(true);
+    expect(hasPoint(sa, 325, 100)).toBe(true);
+  });
+
   it('a drafted rectangle offsets to exactly four corners', () => {
     const sa = ptsOf(generateSeamAllowanceWithCorners(rect(100, 100, 300, 150), 10, 'mitered', {}));
 

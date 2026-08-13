@@ -45,12 +45,10 @@ describe('Seam Allowance Rendering', () => {
     });
   });
 
-  describe('effectiveSeamAllowanceWidth — explicit-only (hallazgo #2: pieces are NET)', () => {
-    // Seam allowance is an explicit finishing step, never a default. The
-    // editor-wide 10mm fallback is gone: a piece renders a margin ONLY when
-    // its own seamAllowance was explicitly set. This unifies M3.5 (sew-line
-    // suppression) and junta F1 (import provenance) — both are now just
-    // "no explicit SA → no margin".
+  describe('effectiveSeamAllowanceWidth — ancho base explícito (hallazgo #2: pieces are NET)', () => {
+    // El cero sigue sin revivir el fallback global. Los anchos explícitos de
+    // borde o tramo se resuelven en la geometría y su guard, sin convertirlos
+    // en un margen base que ensancharía el resto de la pieza.
     const seamInternal: InternalLine = {
       id: 'seam-1',
       type: 'seam',
