@@ -23,7 +23,12 @@ snapshot-*.md
 # screenshots/seam-allowance/). Keep curated DESIGN artifacts in
 # design-handoff/ui-screenshots/ (committed); never mix test evidence there.
 screenshots/
-.claude/
+# .claude/ es local (settings.local.json, worktrees) EXCEPTO las skills del
+# proyecto: esas son contrato compartido y tienen que viajar con el repo, igual
+# que .husky/. Una skill sin versionar es una skill que para las demás sesiones
+# no existe — el mismo modo de falla que el hook gitignoreado.
+.claude/*
+!.claude/skills/
 # Ad-hoc scratch: probe screenshots, measurement scripts, demo captures from manual runs.
 .tmp/
 
