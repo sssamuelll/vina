@@ -6,7 +6,7 @@
   position: fixed;
   bottom: 8px;
   right: 8px;
-  z-index: 9999;
+  z-index: var(--z-panel);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
   font-size: 10px;
 }

@@ -6,7 +6,7 @@
   position: fixed;
   top: calc(var(--top-bar-h) + 24px);
   right: 24px;
-  z-index: 1000;
+  z-index: var(--z-menu);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);

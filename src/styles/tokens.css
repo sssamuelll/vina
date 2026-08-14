@@ -182,4 +182,9 @@
   --z-context-menu: 1000;
   --z-modal: 1100;
   --z-toast: 1200;
+  /* Overlay transitorio de arrastre (aviso de soltar-DXF). Mismo valor que
+   * --z-menu (200) porque comparte su urgencia — algo que hay que ver de
+   * inmediato mientras dura, pero no bloquea como un modal — con rol propio
+   * porque semánticamente no es un menú. */
+  --z-hint: 200;
 }

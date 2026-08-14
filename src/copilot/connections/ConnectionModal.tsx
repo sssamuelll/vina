@@ -39,7 +39,7 @@ const overlayStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 200,
+  zIndex: 'var(--z-modal)',
 };
 
 const dialogStyle: React.CSSProperties = {
