@@ -12,6 +12,8 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { useDispatch } from 'react-redux';
+import { requestConfirmation } from '../../hooks/useGuardedAction';
 import type { AIConnection, ConnectionsState } from './types';
 import {
   loadConnectionsState,
@@ -69,6 +71,7 @@ interface Props {
 }
 
 export default function ConnectionsList({ onStateChange }: Props) {
+  const dispatch = useDispatch();
   const [state, setState] = useState<ConnectionsState | null>(null);
   const [modal, setModal] = useState<
     { mode: 'add' } | { mode: 'edit'; connection: AIConnection } | null
@@ -123,9 +126,14 @@ export default function ConnectionsList({ onStateChange }: Props) {
     persist(setActiveConnection(state, c.id));
   };
 
-  const handleDelete = (c: AIConnection) => {
-    if (!confirm(`¿Eliminar la conexión "${c.label}"?`)) return;
-    persist(removeConnection(state, c.id));
+  const handleDelete = async (c: AIConnection) => {
+    const ok = await requestConfirmation(dispatch, {
+      title: '¿Eliminar la conexión?',
+      description: `Se borra «${c.label}» de la lista de conexiones.`,
+      consequences: ['Hay que volver a escribir la clave si la agregas de nuevo'],
+      confirmLabel: 'Eliminar la conexión',
+    });
+    if (ok) persist(removeConnection(state, c.id));
   };
 
   return (

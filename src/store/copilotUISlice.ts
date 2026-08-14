@@ -102,6 +102,10 @@ export interface CopilotConfirmation {
   consequences: string[];
   /** Whether the action is destructive */
   destructive: boolean;
+  /** Texto del botón de acción. Debe NOMBRAR EL RESULTADO ("Eliminar el
+   *  perfil"), no ser un "OK" genérico. Si falta, el diálogo cae a
+   *  "Eliminar" / "Confirmar" según `destructive`. */
+  confirmLabel?: string;
   /** Action to execute if confirmed (copilot source) */
   action?: unknown;
   /** Redux action to dispatch if confirmed (middleware source) */

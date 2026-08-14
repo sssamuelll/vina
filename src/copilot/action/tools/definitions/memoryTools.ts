@@ -16,7 +16,9 @@
  * clear surface is queued for M2+ together with the ProjectMemory UI binding.
  */
 
+import type { UnknownAction } from '@reduxjs/toolkit';
 import type { ToolDefinition } from '../registry';
+import { requestConfirmation } from '../../../../hooks/useGuardedAction';
 import { loadLongTermMemory, addLongTermDecision, setLongTermPreference, addLongTermNote, clearLongTermMemory, longTermMemoryToContext } from '../../../memory';
 import { DesignLogManager, generateEntryId } from '../../../perception/designLog';
 import { detectFormulaDelta, generateOverrideId } from '../../../perception/preferenceLearner';
@@ -27,16 +29,31 @@ function getProjectId(getState: () => any): string {
 }
 
 /**
- * Gate an irreversible clear behind a blocking native confirm. Unlike the
- * piece/seam deletes (Ctrl+Z-undoable, so they don't confirm by default), these
- * two tools have NO undo, yet the agent can invoke them — a crafted or misread
- * instruction must not silently wipe memory. The Redux confirmation dialog is a
- * dark surface (nothing renders `pendingConfirmation`), so we use the native
- * confirm; a non-browser context (no window) proceeds. (Security study #4.)
+ * Gate an irreversible clear behind a confirmation. Unlike the piece/seam
+ * deletes (Ctrl+Z-undoable, so they don't confirm by default), these two tools
+ * have NO undo, yet the agent can invoke them — a crafted or misread
+ * instruction must not silently wipe memory. (Security study #4.)
+ *
+ * Hasta 2026-08-14 esto usaba `window.confirm()` y el comentario decía por qué:
+ * *"the Redux confirmation dialog is a dark surface (nothing renders
+ * `pendingConfirmation`)"*. Ya no es oscura — `ConfirmDialog` la pinta —, así
+ * que se usa la superficie propia. El nativo era peor de lo que parecía: el
+ * navegador puede desactivarlo y entonces `confirm()` devuelve `false` sin
+ * preguntar, o sea que el borrado se volvía un no-op silencioso.
+ *
+ * Sin `dispatch` (contexto no-navegador, pruebas headless) procede, como antes.
  */
-function confirmIrreversible(message: string): boolean {
-  if (typeof window === 'undefined' || typeof window.confirm !== 'function') return true;
-  return window.confirm(message);
+async function confirmIrreversible(
+  dispatch: ((a: UnknownAction) => unknown) | undefined,
+  opts: { title: string; description: string },
+): Promise<boolean> {
+  if (!dispatch) return true;
+  return requestConfirmation(dispatch, {
+    title: opts.title,
+    description: opts.description,
+    consequences: ['No se puede deshacer'],
+    confirmLabel: 'Borrar de todos modos',
+  });
 }
 
 export const tools: ToolDefinition[] = [
@@ -113,8 +130,12 @@ export const tools: ToolDefinition[] = [
     name: 'clearProjectMemory',
     description: 'Clear all copilot memory for the current project. Use with caution.',
     parameters: { type: 'object', properties: {} },
-    execute: async (_params, _dispatch, getState) => {
-      if (!confirmIrreversible('Clear ALL copilot memory for this project? This cannot be undone.')) {
+    execute: async (_params, dispatch, getState) => {
+      const ok = await confirmIrreversible(dispatch, {
+        title: '¿Borrar toda la memoria del proyecto?',
+        description: 'El copiloto pierde las decisiones, preferencias y notas guardadas de este proyecto.',
+      });
+      if (!ok) {
         return { success: false, message: 'Cancelled — memory was not cleared.' };
       }
       const projectId = getProjectId(getState);
@@ -210,8 +231,12 @@ export const tools: ToolDefinition[] = [
     name: 'clearDesignLog',
     description: 'Clear the design log for the current project. Use with caution — this removes all persisted design decisions.',
     parameters: { type: 'object', properties: {} },
-    execute: async (_params, _dispatch, getState) => {
-      if (!confirmIrreversible('Clear the design log for this project? This cannot be undone.')) {
+    execute: async (_params, dispatch, getState) => {
+      const ok = await confirmIrreversible(dispatch, {
+        title: '¿Borrar el registro de diseño?',
+        description: 'Se borran todas las decisiones de diseño guardadas de este proyecto.',
+      });
+      if (!ok) {
         return { success: false, message: 'Cancelled — design log was not cleared.' };
       }
       const projectId = getProjectId(getState);

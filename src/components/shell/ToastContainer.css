@@ -4,7 +4,9 @@
   position: fixed;
   right: 16px;
   bottom: 56px; /* clear the bottom-right Solver pill */
-  z-index: 300;
+  /* Por encima del modal: una notificación tiene que verse aunque haya un
+   * diálogo abierto. Antes era 300 contra el 1000 del modal, o sea al revés. */
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column-reverse; /* newest toast sits at the bottom edge */
   gap: 8px;

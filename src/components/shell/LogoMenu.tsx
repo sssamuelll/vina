@@ -12,6 +12,8 @@ import {
   toggleGarment, toggleSeamlines3D, toggleSimSeamLines, toggleInternalLines3D,
 } from '../../store/simulationSlice';
 import { toggleDockSignaling } from '../../store/dockSlice';
+import { requestConfirmation } from '../../hooks/useGuardedAction';
+import { showInfoToast } from '../../store/copilotUISlice';
 import { duplicatePiece, removePieces, removeSeam } from '../../store/projectSlice';
 import { runAutoSew } from '../../store/autoSewThunk';
 import { openRenderSettings } from '../../store/renderSettingsThunk';
@@ -39,10 +41,15 @@ interface MenuItem {
 const FILE_MENU: MenuItem[] = [
   // New Project must clear the IDB autosave BEFORE reloading — otherwise boot
   // hydration (projectAutosave) restores the project the user just abandoned.
-  { label: 'Proyecto nuevo', shortcut: '⌘N', action: () => {
-    if (confirm('¿Crear un proyecto nuevo? Los cambios sin guardar se pierden.')) {
-      void clearStorageProject().finally(() => window.location.reload());
-    }
+  { label: 'Proyecto nuevo', shortcut: '⌘N', action: (d) => {
+    void requestConfirmation(d, {
+      title: '¿Empezar un proyecto nuevo?',
+      description: 'Se cierra el patrón que tienes abierto y la ventana se recarga.',
+      consequences: ['Se pierde lo que no se haya guardado'],
+      confirmLabel: 'Empezar de cero',
+    }).then((ok) => {
+      if (ok) void clearStorageProject().finally(() => window.location.reload());
+    });
   } },
   { separator: true, label: '' },
   { label: 'Importar DXF...', action: () => {} }, // wired via callback (opens file picker)
@@ -130,7 +137,9 @@ const HELP_MENU: MenuItem[] = [
   { label: 'Documentación', action: () => window.open('https://github.com/sssamuelll/vina', '_blank') },
   { label: 'Reportar un error', action: () => window.open('https://github.com/sssamuelll/vina/issues', '_blank') },
   { separator: true, label: '' },
-  { label: 'Acerca de Vina', action: () => alert('Vina v0.11.0\nMotor de diseño cognitivo para ingeniería de moda') },
+  // Informativo, no bloqueante: un `alert()` detiene el hilo y el navegador
+  // puede desactivarlo. El toast es la superficie canónica para avisar.
+  { label: 'Acerca de Vina', action: (d) => d(showInfoToast('Vina v0.11.0 · Motor de diseño cognitivo para ingeniería de moda')) },
 ];
 
 interface TopLevelItem {

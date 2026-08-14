@@ -375,3 +375,22 @@
   gap: 3px;
   align-items: center;
 }
+
+/* Entrada de nombre en línea, en lugar del `prompt()` nativo que bloqueaba el
+ * hilo y se llevaba el foco fuera del panel (contrato de interfaz § 4). */
+.ap-name-input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: var(--text-xs);
+  padding: 3px 6px;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.ap-name-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
