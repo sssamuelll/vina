@@ -101,10 +101,14 @@ const S = {
     display: 'flex',
     gap: 1,
     zIndex: 10,
-    background: '#2a2a2a',
-    borderRadius: 4,
+    // Material `chrome` del contrato de interfaz: esta barra va acoplada al
+    // borde del visor, igual que los docks. Antes era #2a2a2a con radio 4 y su
+    // propia sombra — un cuarto negro y un quinto radio, decididos aquí solos.
+    background: 'var(--surface-chrome-bg)',
+    border: 'var(--surface-chrome-border)',
+    borderRadius: 'var(--surface-chrome-radius)',
     padding: 2,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+    boxShadow: 'var(--surface-chrome-shadow)',
   },
   toggleBtn: (active: boolean) => ({
     width: 32,

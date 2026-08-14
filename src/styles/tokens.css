@@ -107,4 +107,52 @@
   --blur: blur(12px);
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;
+
+  /* ── Materiales de superficie ─────────────────────────────────────────
+   * Ley de materiales del contrato de interfaz
+   * (docs/reports/2026-08-14-auditoria-ui-deriva-de-diseno.md § 5.1).
+   *
+   * Vina es cromo oscuro sobre un documento claro. Cada vez que alguien
+   * agregaba una superficie tenía que re-resolver por su cuenta "¿cómo
+   * separo esta cosa oscura del papel crema de abajo?", y cada quien lo
+   * resolvió distinto: la auditoría midió SIETE materiales para una sola
+   * idea — cuatro negros, cinco radios (4/6/12/14/29), tres opacidades
+   * (.78/.92/.95), dos desenfoques (12/16), dos colores de borde, y uno de
+   * ellos —justo el que se para sobre el lienzo dibujado— sin sombra.
+   *
+   * Hay DOS materiales y se usan ENTEROS. No se mezclan piezas de dos.
+   *
+   *   chrome  → acoplado a una canaleta. Opaco: nada se ve a través.
+   *             dock 2D, dock 3D, controles del visor.
+   *   overlay → flota de verdad sobre el documento y se va. Translúcido
+   *             con desenfoque, para que se lea que está POR ENCIMA.
+   *             menús contextuales, paneles, barras de acción, tooltips.
+   *
+   * Más una tercera familia que no es una superficie sino tinta: `ink-*`,
+   * lo que se dibuja SOBRE el papel (ver --ink-hint arriba).
+   */
+  --surface-chrome-bg: var(--bg-surface);
+  --surface-chrome-border: 1px solid var(--border);
+  --surface-chrome-radius: var(--radius-xl);
+  --surface-chrome-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  --surface-overlay-bg: rgba(8, 8, 15, 0.92);
+  --surface-overlay-border: 1px solid rgba(99, 102, 241, 0.15);
+  --surface-overlay-radius: var(--radius-xl);
+  --surface-overlay-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --surface-overlay-blur: blur(16px);
+
+  /* Única excepción de FORMA, y es de rol, no de capricho: una barra de
+   * comando con forma de cápsula (la barra de IA) no puede llevar el radio
+   * de panel sin leerse como un panel y competir con los paneles de verdad.
+   * Es un rol declarado, no un quinto radio suelto. */
+  --surface-overlay-radius-pill: 999px;
+
+  /* Variante REPOSO de overlay, solo para la barra de IA: en reposo se
+   * hunde para que el patrón gane la jerarquía sobre el papel claro, y sube
+   * a --surface-overlay-bg al enfocarla. La decisión es anterior a esta
+   * auditoría y está razonada en unified-bar.css; se tokeniza para que sea
+   * una variante declarada del material y no una tercera opacidad suelta. */
+  --surface-overlay-bg-recessed: rgba(8, 8, 15, 0.78);
+  --surface-overlay-shadow-recessed: 0 4px 18px rgba(0, 0, 0, 0.22);
 }
