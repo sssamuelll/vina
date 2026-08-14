@@ -1,6 +1,6 @@
 # Fase 3+4 del contrato de interfaz: emplazamiento y modelo de paneles — diseño
 
-**Estado:** aprobado por secciones en brainstorming, pendiente de tu revisión final de este documento.
+**Estado:** aprobado por secciones en brainstorming; corregido después de una vuelta más con Samuel (ver nota al final de § 2.1) que **recorta** el alcance de las canaletas — solo los paneles de contenido las usan, los docks de herramientas y la barra de IA se quedan flotando tal como están, a propósito. Pendiente de tu revisión final de este documento.
 
 **Origen:** `docs/reports/2026-08-14-auditoria-ui-deriva-de-diseno.md`, secciones 4.2 (causa raíz: el cromo flota encima del documento), 5.2 (ley de emplazamiento), 5.4 (ley de puertas) y 6 (Fases 3 y 4 del plan). Contrato vigente: `.claude/skills/contrato-de-interfaz/`. Guardián: `scripts/ui-contract-lint.mjs`.
 
@@ -20,28 +20,31 @@
 
 ## 2. Qué cambia
 
-### 2.1 Layout real (canaletas)
+### 2.1 Layout real (canaletas) — solo los paneles de contenido
 
-`canvas-area` pasa a ser una fila con hasta cinco hijos reales, en este orden:
+**Corrección tras una vuelta más con Samuel, después de la primera aprobación de esta sección.** Él quiere que dos cosas se queden **flotando tal como están hoy, a propósito**: la barra de IA, y los docks de herramientas (`LeftDock`, `RightDock` — son puros botones de acción, "seleccionar", "pluma", "coser", "colocar", "simular"; no son paneles de contenido). Solo los **7 paneles de contenido** (Avatar, BOM, Grading, Inspector, Nesting, Layers, Properties) pasan a empujar el lienzo. Esto hace la Ola 2 más chica y de menos riesgo que el primer borrador — el ejemplo concreto: `canvas-area` ya es `display:flex` hoy (`layout.css:31`), así que **no hace falta tocar nada dentro de** `canvas-area__2d`/`__3d` — los docks siguen flotando encima del SVG/visor exactamente como ahora.
+
+`canvas-area` pasa a ser una fila con hasta cinco hijos, en este orden:
 
 ```
 canvas-area
 ├─ panel izquierdo?  (300px, si hay uno abierto — Properties/Grading)
-├─ canvas-area__2d   (fila interna: LeftDock | PatternEditor)
+├─ canvas-area__2d   (SIN cambios internos — LeftDock sigue flotando encima del SVG)
 ├─ divisor?          (solo en modo Split)
-├─ canvas-area__3d   (fila interna: Viewport3D | RightDock)
+├─ canvas-area__3d   (SIN cambios internos — RightDock sigue flotando encima del visor)
 └─ panel derecho?    (300px, si hay uno abierto — Avatar/BOM/Inspector/Nesting/Layers)
 ```
 
-`LeftDock`/`RightDock` dejan de ser `position: absolute` (con el truco `top:50%; transform:translateY(-50%)` para centrar) y pasan a ser hijos flex reales de `canvas-area__2d`/`__3d`, centrados con `align-items: center` en el contenedor. Visualmente no cambian — su material (`chrome`, ya definido en la Fase 2) no se toca.
+`ContextPanel` deja de ser `position: absolute` con offset (`top/right: var(--sp-3)`) y pasa a ser un hijo flex real de `canvas-area`, con ancho fijo (300px, sin `flex-grow`/`flex-shrink`). Conserva su material `overlay` (fondo, blur, borde, sombra, radio) — cambia el *mecanismo* de posición, no el aspecto.
 
-`ContextPanel` deja de ser `position: absolute` con offset (`top/right: var(--sp-3)`) y pasa a ser un hijo flex real de `canvas-area`, con ancho fijo (300px). Conserva su material `overlay` (fondo, blur, borde, sombra, radio) — cambia el *mecanismo* de posición, no el aspecto.
+**Trampa técnica real, verificada leyendo el código, no supuesta:** `canvas-area__2d`/`__3d` hoy reciben su ancho como **porcentaje calculado contra el 100% del contenedor** (`get2dWidth()`/`get3dWidth()` en `AppShell.tsx:203-212`, p. ej. `${splitRatio * 100}%`). Si a esos mismos hermanos se les agregan `panel izquierdo`/`panel derecho` de 300px cada uno sin tocar esa cuenta, el total se desborda 300-600px cada vez que un panel está abierto — los porcentajes no saben que ahora hay menos espacio disponible. El arreglo correcto no es matemática nueva a mano: es dejar que el propio flexbox reparta lo que sobra. Los paneles se fijan con `flex: 0 0 300px` (no crecen, no encogen) y `canvas-area__2d`/`__3d` pasan de `width: N%` a `flex-grow` (`splitRatio` y `1 - splitRatio`, `flex-basis: 0`) — con eso, CSS reparte automáticamente el 100% de lo que **queda** después de los paneles, sin que nadie tenga que calcular cuánto es "lo que queda". Bonus: `get2dWidth()`/`get3dWidth()` se simplifican a pasar el valor de `flexGrow` directo, ya no hace falta la función.
 
-`UnifiedBar` deja de ser `position: fixed` y pasa a ser una fila real al fondo de `.app-shell` (que ya es `display:flex; flex-direction:column`), igual que `TopBar` arriba. Consecuencia: nunca puede volver a cruzar el divisor 2D/3D, porque ya no comparte espacio con `canvas-area` — vive debajo de ella en el flujo normal.
+Lo que **sigue flotando, a propósito, sin cambiar su mecanismo de posición en esta fase:**
+- La barra de IA (`UnifiedBar`) — sigue `position: fixed`, sigue arrastrable por el usuario (`barPosition.ts`, con su propio sistema de límites que ya evita la barra superior). El hallazgo de la auditoría ("cruza el divisor 2D/3D") viene de que su posición **por defecto** se calcula contra el ancho de toda la ventana (`barPosition.ts:52`, `(window.innerWidth - BAR_WIDTH) / 2`) sin saber nada del divisor — en la configuración más común (split 50/50 recién abierto) el centro por defecto de la barra y el divisor casi coinciden. Es un detalle estético de la posición inicial, no una función rota, y como Samuel quiere la barra flotando tal cual está, **no se toca `barPosition.ts` en esta fase** — inventarle una lógica nueva de centrado sería resolver algo que él no pidió con esa precisión.
+- Los docks de herramientas (`DockShell.tsx`, usado por `Dock.tsx` del 2D y `RightDock.tsx` del 3D) — siguen `position: absolute`, mismo material `chrome`, sin cambios.
+- Lo que ya estaba fuera de alcance por el contrato — menús transitorios, tooltips, submenús, `ConfirmDialog`, `ToastContainer`, `Ctrl+K`, el aviso de soltar-DXF.
 
-**Riesgo de implementación conocido, no oculto:** el contenedor del SVG dentro de `PatternEditor` (hoy ocupa el 100% del ancho de `canvas-area__2d` porque es el único hijo real junto al dock absoluto) necesita `flex: 1; min-width: 0;` para no desbordar el nuevo layout flex — el `min-width: 0` es la trampa clásica de flexbox con contenido ancho (un SVG) que si no se declara, el hijo se niega a angostarse y el layout completo se rompe. Se verifica en el primer task de implementación, con captura antes/después.
-
-Lo que **sigue siendo overlay a propósito** (excepción explícita del contrato — "solo tres cosas pueden taparlo: menús transitorios, toasts y la paleta de comandos"): el aviso de soltar-DXF, menús contextuales, tooltips, submenús, `ConfirmDialog`, `ToastContainer`, `Ctrl+K`. Ninguno de estos cambia de mecanismo de posición en esta fase.
+**Consecuencia honesta de dejar los docks flotando:** el "ajustar a la vista" se arregla solo **para los paneles** (el SVG mide su rectángulo real, ya angostado). Para los docks, no — como siguen sin reservar espacio real, `computeFitView` (`editorSlice.ts:320`) sigue sin saber que hay ~54-68px de dock tapando el borde. Es un solape chico (medido en vivo: 4px de una pieza, en un caso concreto) y arreglarlo es barato porque el ancho del dock es una constante fija, no dinámica: se resta un margen conocido antes de calcular el encuadre. Se incluye en esta fase por ser de bajo costo y cerrar un hallazgo real de la auditoría, no por ser parte del pedido de Samuel — si al verlo en el navegador no vale la pena, se puede dejar fuera sin rehacer nada más.
 
 ### 2.2 Modelo de paneles: dos ranuras, dos operaciones
 
@@ -108,15 +111,13 @@ Nota sobre `LayerPanel`: su menú contextual (`.layer-context-menu`) es `positio
 **Nuevo:**
 - `src/hooks/usePanelHost.ts` + `src/hooks/__tests__/usePanelHost.test.ts`
 
-**Modificado — layout:**
-- `src/components/shell/AppShell.tsx` — reemplaza `contextPanel`/`setContextPanel` por `usePanelHost()`; reestructura el JSX de `canvas-area` con las cinco posiciones de 2.1; los cinco sitios de apertura usan `openPanel`/`togglePanel` según 2.2; el aviso de soltar-DXF usa `var(--z-hint)`.
-- `src/components/shell/ContextPanel.tsx` + `.css` — de tarjeta flotante con offset a hijo flex real; usa `closePanel`.
-- `src/components/shell/DockShell.tsx` + `Dock.css` — el envoltorio compartido de verdad (lo usan `Dock.tsx` del lado 2D **y** `RightDock.tsx` del lado 3D, verificado leyendo el código, no asumido): de `position:absolute` a hijo flex, centrado por el contenedor.
-- `src/styles/layout.css` — `.canvas-area` gana `isolation:isolate`; `.canvas-area__2d`/`__3d` pasan a `display:flex`; `.top-bar` migra su z-index.
-- `src/styles/unified-bar.css` — quita `position:fixed`, migra z-index.
-- `src/styles/floating.css` — migra los z-index del menú del logo, su submenú y el menú contextual; `.context-panel` deja de usar `position:absolute` (pasa a ser un hijo flex, 2.1) y pierde su `z-index` (2.3).
+**Modificado — layout (Ola 2, solo paneles de contenido):**
+- `src/components/shell/AppShell.tsx` — reemplaza `contextPanel`/`setContextPanel` por `usePanelHost()`; agrega los dos hijos `panel izquierdo?`/`panel derecho?` a `canvas-area` (docks y barra de IA **sin tocar**); los cinco sitios de apertura usan `openPanel`/`togglePanel` según 2.2; `get2dWidth()`/`get3dWidth()` se simplifican a valores de `flexGrow` (ya no calculan porcentaje); el aviso de soltar-DXF usa `var(--z-hint)`.
+- `src/components/shell/ContextPanel.tsx` + `.css` — de tarjeta flotante con offset a hijo flex real (`flex: 0 0 300px`); usa `closePanel`.
+- `src/styles/layout.css` — `.canvas-area` gana `isolation:isolate`; `.canvas-area__2d`/`__3d` cambian de `width: N%` a `flex-grow`/`flex-basis: 0` (la trampa de desbordamiento explicada arriba); `.top-bar` migra su z-index (mecánico, Ola 1).
+- `src/components/PatternEditor/PatternEditor.tsx` — la llamada a `computeFitView(pieces, rect.width, rect.height)` (línea 672) resta el ancho fijo del dock antes de pasar `rect.width`, para que el encuadre no quede corrido por el dock que sigue flotando. Cambio de una línea; opcional según lo que se vea en el navegador (ver 2.1).
 
-**Modificado — z-index (Grupo 1, tabla de 2.3):** `src/components/shared/SubMenu.css`, `src/copilot/connections/ConnectionModal.tsx`, `src/components/PatternEditor/CalibrationModal.css`, `src/components/PatternEditor/NotchPrecisionModal.css`, `src/components/Debug/SolverMetrics.css`, `src/components/shell/ToolTooltip.css`.
+**Modificado — z-index, Ola 1, mecánico, sin relación con el layout (Grupo 1, tabla de 2.3):** `src/components/shell/Dock.css` (envoltorio de `DockShell.tsx`, usado por `Dock.tsx` y `RightDock.tsx` — solo el z-index, no su posición), `src/styles/unified-bar.css` (solo el z-index, no su posición ni su arrastre), `src/components/shared/SubMenu.css`, `src/copilot/connections/ConnectionModal.tsx`, `src/components/PatternEditor/CalibrationModal.css`, `src/components/PatternEditor/NotchPrecisionModal.css`, `src/components/Debug/SolverMetrics.css`, `src/components/shell/ToolTooltip.css`, `src/styles/floating.css` (menú del logo, su submenú, el menú contextual).
 
 **Modificado — aislamiento (Grupo 2):** `FitMapToggle.tsx`, `PanCrosshair.tsx`, `SelectionOverlay.tsx`, `SimulationStatusOverlay.tsx`, `Viewport3D.tsx`, `FloatingActionBar.tsx`, `BOMTab.css`, `GradingTab.css`, `LayerPanel.css`, `CalibrationModal.css`, `EmptyState2D.css`, `AvatarPanel.css`, `CollisionBodyPanel.css`, `RenderSettingsPanel.css`, `SnapshotBar.css`, `SurfaceModePill.css`, `RightDock.tsx` (el control `.floating-3d`), `UnifiedBar.tsx` (su propio aviso de soltar-DXF).
 
@@ -136,8 +137,9 @@ Nota sobre `LayerPanel`: su menú contextual (`.layer-context-menu`) es `positio
 **Con el navegador, contra el DXF real de María (jsdom no calcula layout — `getBoundingClientRect()` da 0 siempre, esto no es opcional, es la única forma de verlo):**
 - El ancho real del SVG baja al abrir un panel (medido antes/después, no solo "se ve bien").
 - Capas y Propiedades conviven en pantalla a la vez.
+- En modo Split, con un panel abierto de un lado, las dos mitades 2D/3D siguen sumando el 100% del espacio que queda — sin desborde ni hueco (la trampa de la sección 2.1).
 - "Ajustar a la vista" encuadra sin que el panel tape nada, con un panel abierto.
-- La barra de IA no cruza el divisor en modo Split.
+- Los docks de herramientas y la barra de IA se ven y se comportan exactamente igual que hoy — sin cambios, es la prueba de que no se tocaron por accidente.
 - El toast sigue viéndose por encima de un modal abierto (no debe regresar el bug que se arregló en la Fase 1).
 
 ## 5. Orden de implementación
@@ -145,10 +147,13 @@ Nota sobre `LayerPanel`: su menú contextual (`.layer-context-menu`) es `positio
 Un solo diseño, dos olas — no porque sean proyectos distintos, sino porque tienen perfiles de riesgo muy distintos y una depende poco de la otra:
 
 1. **Ola 1 — z-index (2.3 y 2.4).** Mecánico, ~40 archivos, cada cambio es una línea. Sin riesgo visual: los valores migran uno a uno y `ui-contract-lint.mjs` certifica que ninguno queda suelto. Sale primero, en su propio PR, y deja el terreno limpio para la Ola 2.
-2. **Ola 2 — canaletas y modelo de paneles (2.1 y 2.2).** El cambio arquitectónico de verdad, con riesgo visual real sobre el 2D de María. Sale después, verificado en el navegador contra su DXF real antes de mergear.
+2. **Ola 2 — canaletas y modelo de paneles (2.1 y 2.2).** Con el recorte de alcance (solo los 7 paneles de contenido, docks y barra de IA intactos) es más chica de lo que se diseñó al principio: básicamente `AppShell.tsx`, `ContextPanel`, `usePanelHost` y el cambio de `width:%` a `flex-grow` en `layout.css`. Aun así es la parte con riesgo visual real sobre el 2D de María — sale después de la Ola 1, verificada en el navegador contra su DXF real antes de mergear.
 
 ## 6. Fuera de alcance, a propósito
 
 - Paneles múltiples del mismo lado (Avatar + BOM). Necesitaría pestañas o apilado — pieza de interfaz nueva, no solo re-plomería de layout. Se revisita si se pide.
 - Breakpoints/diseño responsive de los paneles (300px fijo se mantiene). La auditoría lo señaló como hueco aparte; no es este alcance.
 - Tocar el visor 3D — ya reacciona solo a los cambios de su contenedor.
+- Que los docks de herramientas y la barra de IA dejen de flotar. Samuel los quiere así, a propósito — son botones de acción, no paneles de contenido.
+- La posición **por defecto** de la barra de IA respecto al divisor 2D/3D (el hallazgo original de la auditoría). Se acepta el solape estético inicial; la barra sigue flotando y arrastrable exactamente como hoy, y su lógica de posición (`barPosition.ts`) no se toca en esta fase.
+- "Interfaz inteligente" que solo despliegue lo que hace falta en cada momento (idea de Samuel, del 2026-08-14). Es un proyecto propio, más grande que esta fase — se brainstormea aparte, cuando se pida.
