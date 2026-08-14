@@ -86,11 +86,15 @@ describe('dockSlice signaling', () => {
 describe('dockSlice tools2d', () => {
   beforeEach(() => localStorage.clear());
 
-  it('defaults tools2d to the 10 ids with point between editPattern and pen (maria-203)', () => {
+  // 12 desde la auditoría de UI del 2026-08-14: `seamAllowance` y `notch` —las
+  // herramientas de #1027 y #1029— no tenían puerta en el shell; para llegar a
+  // piquete había que abrir el personalizador del dock. Ley de puertas (§ 5.6).
+  it('defaults tools2d to the 12 ids with point between editPattern and pen (maria-203)', () => {
     expect(initial().tools2d).toEqual(DEFAULT_DOCK_2D_IDS);
     expect(DEFAULT_DOCK_2D_IDS).toEqual([
       'select', 'editPattern', 'point', 'pen', 'line',
       'rectangle', 'scissors', 'measure', 'seam', 'seamEdit',
+      'seamAllowance', 'notch',
     ]);
   });
 
