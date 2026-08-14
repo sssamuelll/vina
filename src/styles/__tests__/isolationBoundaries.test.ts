@@ -25,6 +25,7 @@ const ARCHIVOS_CSS = [
   'src/components/Viewport3D/RenderSettingsPanel.css',
   'src/components/Viewport3D/SnapshotBar.css',
   'src/components/Viewport3D/SurfaceModePill.css',
+  'src/components/shell/Dock.css',
 ];
 
 describe('Grupo 2 — aislamiento en los archivos .css', () => {

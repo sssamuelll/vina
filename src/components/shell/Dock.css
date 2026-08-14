@@ -117,7 +117,7 @@
 .dock__badge--auto { color: var(--dock-auto); }
 
 /* ── ＋ customize editor (slice 4) ── */
-.dock-editor { position: relative; display: flex; }
+.dock-editor { position: relative; display: flex; isolation: isolate; }
 
 .dock__add {
   width: 38px;
@@ -139,7 +139,8 @@
   position: absolute;
   left: calc(100% + 8px);
   bottom: 0;
-  z-index: 20;
+  --capa-picker: 20;
+  z-index: var(--capa-picker);
   width: 220px;
   max-height: 60vh;
   overflow-y: auto;
