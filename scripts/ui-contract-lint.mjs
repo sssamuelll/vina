@@ -202,8 +202,8 @@ const RULES = [
     label: 'z-index literal',
     why: '41 valores en un único contexto de apilamiento plano, con escaladas hasta 10000.',
     run: () => [
-      ...countMatches(cssFiles(), /z-index:\s*-?\d/),
-      ...countMatches(codeFiles(), /zIndex:\s*-?\d/),
+      ...countMatches(cssFiles(), /z-index:\s*-?\d+/),
+      ...countMatches(codeFiles(), /zIndex:\s*-?\d+/),
     ],
   },
 ];
