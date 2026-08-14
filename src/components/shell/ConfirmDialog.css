@@ -1,0 +1,138 @@
+/* ConfirmDialog — material `overlay` del contrato de interfaz.
+ * Ver .claude/skills/contrato-de-interfaz/ y
+ * docs/reports/2026-08-14-auditoria-ui-deriva-de-diseno.md § 5.1 */
+
+.confirm-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+  animation: confirm-fade var(--transition-fast) ease-out;
+}
+
+.confirm-dialog {
+  width: min(380px, calc(100vw - var(--sp-8)));
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  /* Material `overlay`, entero. */
+  background: var(--surface-overlay-bg);
+  backdrop-filter: var(--surface-overlay-blur);
+  -webkit-backdrop-filter: var(--surface-overlay-blur);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
+  animation: confirm-rise var(--transition-normal) ease-out;
+}
+
+.confirm-dialog__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.confirm-dialog__icon {
+  color: var(--destructive);
+  flex: none;
+}
+
+.confirm-dialog__title {
+  margin: 0;
+  font-size: var(--text-heading);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.confirm-dialog__desc {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+  text-wrap: pretty;
+}
+
+.confirm-dialog__consequences {
+  margin: 0;
+  padding-left: 1.1em;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.confirm-dialog__consequences li::marker {
+  color: var(--text-ghost);
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.confirm-dialog__btn {
+  padding: 6px 14px;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.confirm-dialog__btn:hover {
+  background: var(--bg-elevated);
+}
+
+/* Ley de estado: todo lo que tiene :hover tiene :focus-visible. */
+.confirm-dialog__btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.confirm-dialog__btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.confirm-dialog__btn--primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+/* El botón destructivo no puede parecerse al primario: es la última pantalla
+ * antes de perder algo. */
+.confirm-dialog__btn--destructive {
+  background: var(--destructive);
+  border-color: var(--destructive);
+  color: var(--on-accent);
+}
+
+.confirm-dialog__btn--destructive:hover {
+  background: var(--destructive-hover);
+  border-color: var(--destructive-hover);
+}
+
+@keyframes confirm-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes confirm-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confirm-scrim,
+  .confirm-dialog { animation: none; }
+}

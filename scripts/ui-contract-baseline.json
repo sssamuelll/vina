@@ -7,8 +7,8 @@
     "tokenDefinitionFiles": 2,
     "hoverWithoutFocus": 65,
     "outlineNone": 9,
-    "nativeDialog": 8,
-    "zIndexLiteral": 42
+    "nativeDialog": 0,
+    "zIndexLiteral": 41
   },
   "_actualizado": "2026-08-14"
 }

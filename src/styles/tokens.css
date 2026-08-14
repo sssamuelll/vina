@@ -20,6 +20,10 @@
   --dock-auto: #a78bfa;   /* AI-suggested dock tools (violet), distinct from the indigo --accent */
   --success: #22c55e;
   --destructive: #ef4444;
+  /* Hermano de --accent-hover: el acento aclara al pasar el mouse, y lo
+   * destructivo tiene que seguir la misma regla o el botón de borrar se siente
+   * de otro sistema. */
+  --destructive-hover: #f87171;
   --warning: #f59e0b;
 
   /* ── 2D pattern canvas (design surface 5 — light "paper" CAD surface) ──
@@ -155,4 +159,27 @@
    * una variante declarada del material y no una tercera opacidad suelta. */
   --surface-overlay-bg-recessed: rgba(8, 8, 15, 0.78);
   --surface-overlay-shadow-recessed: 0 4px 18px rgba(0, 0, 0, 0.22);
+
+  /* ── Escala de capas ──────────────────────────────────────────────────
+   * Ley de emplazamiento (§ 5.2 del informe 2026-08-14): nada de z-index
+   * literal. La app llegó a tener 15 valores sueltos en un único contexto de
+   * apilamiento plano, con escaladas hasta 9999 y 10000.
+   *
+   * El orden es de URGENCIA, no de antigüedad. Lo que más urge va más arriba:
+   * una notificación tiene que verse incluso sobre un modal — hoy el modal
+   * (1000) entierra al toast (300), que es justo al revés.
+   *
+   * Los valores literales que quedan en el resto del CSS se migran en la fase
+   * de emplazamiento; esta escala es la que usa todo lo nuevo. */
+  /* Velo detrás de un modal. No es negro puro: sale de la familia azulada del
+   * cromo, si no se lee como un agujero recortado sobre el papel del lienzo. */
+  --scrim: rgb(8 8 15 / 55%);
+
+  --z-dock: 5;
+  --z-panel: 25;
+  --z-bar: 100;
+  --z-menu: 200;
+  --z-context-menu: 1000;
+  --z-modal: 1100;
+  --z-toast: 1200;
 }

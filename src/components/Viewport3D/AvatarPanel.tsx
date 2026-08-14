@@ -15,6 +15,7 @@ import {
 import type { AvatarProfile } from '../../utils/avatar/avatarLibrary';
 import type { BodyMeasurements } from '../../types/types';
 import type { AvatarMode } from '../../store/projectSlice';
+import { requestConfirmation } from '../../hooks/useGuardedAction';
 import './AvatarPanel.css';
 
 interface SliderDef {
@@ -82,6 +83,9 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragover, setDragover] = useState(false);
   const [modelName, setModelName] = useState<string | null>(null);
+  /** Qué se está nombrando en línea ('perfil' | 'pose'), en vez de un prompt(). */
+  const [nombrando, setNombrando] = useState<'perfil' | 'pose' | null>(null);
+  const [borradorNombre, setBorradorNombre] = useState('');
 
   useEffect(() => {
     // Sync stub for legacy LS users; async hydrate replaces with IDB-backed value.
@@ -135,13 +139,15 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
     }
   }, [dispatch, profiles]);
 
-  const handleSave = useCallback(() => {
-    const name = prompt('Nombre del perfil:');
-    if (!name) return;
+  /** Nombrar en línea, no con `prompt()`: el nativo bloquea el hilo, no se
+   *  puede estilar, el navegador puede desactivarlo y se lleva el foco fuera
+   *  del panel. Contrato de interfaz § 4. */
+  const handleSave = useCallback((name: string) => {
+    if (!name.trim()) return;
     const now = Date.now();
     const profile: AvatarProfile = {
       id: activeProfileId ?? `profile-${now}`,
-      name,
+      name: name.trim(),
       measurements: { ...measurements },
       createdAt: now,
       updatedAt: now,
@@ -154,11 +160,17 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
     }
   }, [dispatch, measurements, activeProfileId, profiles]);
 
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback(async () => {
     if (!activeProfileId) return;
-    if (!confirm('¿Eliminar este perfil?')) return;
-    dispatch(deleteProfile(activeProfileId));
-  }, [dispatch, activeProfileId]);
+    const perfil = profiles.find((p) => p.id === activeProfileId);
+    const ok = await requestConfirmation(dispatch, {
+      title: '¿Eliminar el perfil?',
+      description: `Se borra «${perfil?.name ?? 'sin nombre'}» y las medidas que tiene guardadas.`,
+      consequences: ['Las medidas que el avatar tiene puestas ahora no cambian'],
+      confirmLabel: 'Eliminar el perfil',
+    });
+    if (ok) dispatch(deleteProfile(activeProfileId));
+  }, [dispatch, activeProfileId, profiles]);
 
   const handleMeasurement = useCallback((key: keyof BodyMeasurements, value: number) => {
     dispatch(updateMeasurements({ [key]: value }));
@@ -251,8 +263,39 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                   ))}
                 </select>
                 <div className="ap-btn-row">
-                  <button className="ap-btn" onClick={handleSave}>Guardar perfil</button>
-                  <button className="ap-btn" onClick={handleDelete} disabled={!activeProfileId}>Eliminar</button>
+                  {nombrando === 'perfil' ? (
+                    <>
+                      <input
+                        className="ap-name-input"
+                        autoFocus
+                        value={borradorNombre}
+                        onChange={(e) => setBorradorNombre(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { handleSave(borradorNombre); setNombrando(null); }
+                          if (e.key === 'Escape') { e.stopPropagation(); setNombrando(null); }
+                        }}
+                        placeholder="Nombre del perfil"
+                        aria-label="Nombre del perfil"
+                      />
+                      <button
+                        className="ap-btn"
+                        onClick={() => { handleSave(borradorNombre); setNombrando(null); }}
+                        disabled={!borradorNombre.trim()}
+                      >Guardar</button>
+                      <button className="ap-btn" onClick={() => setNombrando(null)}>Cancelar</button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className="ap-btn"
+                        onClick={() => {
+                          setBorradorNombre(profiles.find((p) => p.id === activeProfileId)?.name ?? '');
+                          setNombrando('perfil');
+                        }}
+                      >Guardar perfil</button>
+                      <button className="ap-btn" onClick={handleDelete} disabled={!activeProfileId}>Eliminar</button>
+                    </>
+                  )}
                 </div>
 
                 {/* Measurements */}
@@ -344,10 +387,36 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   <button className="ap-btn" style={{ flex: 1 }} onClick={() => dispatch(resetPose())}>Restablecer todo</button>
-                  <button className="ap-btn" style={{ flex: 1 }} onClick={() => {
-                    const name = prompt('Nombre de la pose:');
-                    if (name) dispatch(savePose(name));
-                  }}>Guardar pose</button>
+                  {nombrando === 'pose' ? (
+                    <>
+                      <input
+                        className="ap-name-input"
+                        style={{ flex: 1 }}
+                        autoFocus
+                        value={borradorNombre}
+                        onChange={(e) => setBorradorNombre(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && borradorNombre.trim()) {
+                            dispatch(savePose(borradorNombre.trim())); setNombrando(null);
+                          }
+                          if (e.key === 'Escape') { e.stopPropagation(); setNombrando(null); }
+                        }}
+                        placeholder="Nombre de la pose"
+                        aria-label="Nombre de la pose"
+                      />
+                      <button
+                        className="ap-btn"
+                        onClick={() => { dispatch(savePose(borradorNombre.trim())); setNombrando(null); }}
+                        disabled={!borradorNombre.trim()}
+                      >Guardar</button>
+                    </>
+                  ) : (
+                    <button
+                      className="ap-btn"
+                      style={{ flex: 1 }}
+                      onClick={() => { setBorradorNombre(''); setNombrando('pose'); }}
+                    >Guardar pose</button>
+                  )}
                   <button
                     className={`ik-toggle-btn ${ikEnabled ? 'active' : ''}`}
                     onClick={() => dispatch(toggleIK())}
@@ -379,7 +448,15 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                         <button
                           className="ap-btn"
                           style={{ padding: '1px 5px', fontSize: 9, flexShrink: 0 }}
-                          onClick={() => { if (confirm(`¿Eliminar "${p.name}"?`)) dispatch(deleteSavedPose(p.id)); }}
+                          onClick={async () => {
+                            const ok = await requestConfirmation(dispatch, {
+                              title: '¿Eliminar la pose?',
+                              description: `Se borra «${p.name}» de las poses guardadas.`,
+                              consequences: ['La pose que el avatar tiene puesta ahora no cambia'],
+                              confirmLabel: 'Eliminar la pose',
+                            });
+                            if (ok) dispatch(deleteSavedPose(p.id));
+                          }}
                           title="Eliminar pose"
                         >×</button>
                       </div>

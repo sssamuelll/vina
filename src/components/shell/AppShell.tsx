@@ -18,6 +18,7 @@ import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import ContextPanel from './ContextPanel';
 import ToastContainer from './ToastContainer';
+import ConfirmDialog from './ConfirmDialog';
 import { getPanelSide } from './panelSide';
 import type { Tool3D } from '../../types/types';
 
@@ -294,6 +295,10 @@ export default function AppShell() {
         onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)}
       />
       <ToastContainer />
+      {/* Enciende `copilotUI.pendingConfirmation`, que estuvo siendo una
+          superficie oscura: useGuardedAction lo despachaba (Tijeras, Fusionar)
+          y nada lo pintaba. Ver ConfirmDialog.tsx. */}
+      <ConfirmDialog />
     </div>
   );
 }
