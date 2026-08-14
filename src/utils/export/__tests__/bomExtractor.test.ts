@@ -119,8 +119,8 @@ describe('extractFabrics', () => {
 
     expect(entries).toHaveLength(2);
     const names = entries.map((e) => e.name);
-    expect(names).toContain('Fabric — SELF');
-    expect(names).toContain('Fabric — LINING');
+    expect(names).toContain('Tela — SELF');
+    expect(names).toContain('Tela — LINING');
   });
 
   it('handles pieces with no fabricCode', () => {
@@ -128,7 +128,7 @@ describe('extractFabrics', () => {
     const entries = extractFabrics(pieces, [makeFabric()]);
 
     expect(entries).toHaveLength(1);
-    expect(entries[0].name).toContain('Unassigned');
+    expect(entries[0].name).toContain('Sin asignar');
   });
 
   it('returns empty array for no pieces', () => {
@@ -148,7 +148,7 @@ describe('extractInterfacing', () => {
 
     expect(entries).toHaveLength(1);
     expect(entries[0].category).toBe('interfacing');
-    expect(entries[0].name).toContain('fusible-medium');
+    expect(entries[0].name).toContain('fusible media');
     // 2 * 0.02 m²
     expect(entries[0].quantity).toBeCloseTo(0.04, 4);
   });
@@ -249,7 +249,7 @@ describe('extractSeamTape', () => {
 
     expect(entries).toHaveLength(1);
     expect(entries[0].category).toBe('seam-tape');
-    expect(entries[0].name).toContain('10mm');
+    expect(entries[0].name).toContain('10 mm');
     // Edge length 300mm = 0.3m
     expect(entries[0].quantity).toBeCloseTo(0.3, 2);
   });
@@ -316,8 +316,8 @@ describe('extractElastics', () => {
 
     expect(entries).toHaveLength(2);
     const types = entries.map((e) => e.name);
-    expect(types.some((t) => t.includes('band'))).toBe(true);
-    expect(types.some((t) => t.includes('shirring'))).toBe(true);
+    expect(types.some((t) => t.includes('banda'))).toBe(true);
+    expect(types.some((t) => t.includes('fruncidor'))).toBe(true);
   });
 });
 

@@ -19,13 +19,13 @@ export default function RenderQualitySection({ open, onToggle }: SectionProps) {
     <div className="ap-section">
       <button className="ap-section-header" onClick={onToggle}>
         <span className={`ap-chevron ${open ? 'open' : ''}`}>&#9656;</span>
-        Render
+        Renderizado
       </button>
       {open && (
         <div className="ap-section-body">
           <div>
             <div className="ap-slider-label">
-              <span>Tone Mapping</span>
+              <span>Mapeo tonal</span>
             </div>
             <select
               className="ap-select"
@@ -65,7 +65,7 @@ export default function RenderQualitySection({ open, onToggle }: SectionProps) {
 
           <div>
             <div className="ap-slider-label">
-              <span>Muestras de export</span>
+              <span>Muestras de exportación</span>
               <span>{samplesPerPixel}</span>
             </div>
             <div className="ap-slider-control">
@@ -86,7 +86,7 @@ export default function RenderQualitySection({ open, onToggle }: SectionProps) {
                 onChange={e => dispatch(setSamplesPerPixel(Number(e.target.value)))}
               />
             </div>
-            <div className="ap-hint">Más = export más suave, render más lento</div>
+            <div className="ap-hint">Más = exportación más suave, renderizado más lento</div>
           </div>
 
           <label
@@ -97,7 +97,7 @@ export default function RenderQualitySection({ open, onToggle }: SectionProps) {
               checked={denoiserEnabled}
               onChange={e => dispatch(setDenoiserEnabled(e.target.checked))}
             />
-            Denoiser al exportar
+            Reductor de ruido al exportar
           </label>
         </div>
       )}

@@ -10,6 +10,7 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { seamResolutionFailureLabel } from '../solverTierDisplay';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 
@@ -49,9 +50,9 @@ describe('SimulationStatusOverlay — colapsado por defecto (Fase1-H2)', () => {
 
   it('starts collapsed: tier label visible, telemetry detail hidden', () => {
     renderOverlay({ totalConstraints: 124, zeroConstraintSeams: [] });
-    expect(screen.getByText(/Wasm XPBD/)).toBeTruthy();
+    expect(screen.getByText(/WASM XPBD/)).toBeTruthy();
     expect(screen.queryByText(/partículas/)).toBeNull();
-    expect(screen.queryByText(/constraints de costura/)).toBeNull();
+    expect(screen.queryByText(/restricciones de costura/)).toBeNull();
     expect(screen.queryByText(/Modo:/)).toBeNull();
   });
 
@@ -81,7 +82,7 @@ describe('SimulationStatusOverlay — seam observability (Fase 4, tras expandir)
   it('shows the total seam constraint count when a summary exists', () => {
     renderOverlay({ totalConstraints: 124, zeroConstraintSeams: [] });
     expandOverlay();
-    expect(screen.getByText(/124 constraints de costura/)).toBeTruthy();
+    expect(screen.getByText(/124 restricciones de costura/)).toBeTruthy();
     expect(screen.queryByText(/no va a coser/)).toBeNull();
   });
 
@@ -91,10 +92,13 @@ describe('SimulationStatusOverlay — seam observability (Fase 4, tras expandir)
       zeroConstraintSeams: [{ seamId: 'seam-7', reason: 'unknown-edge' }],
     });
     expandOverlay();
-    const warning = screen.getByText(/1 costura sin constraints — no va a coser/);
+    const warning = screen.getByText(/1 costura sin restricciones — no va a coser/);
     expect(warning).toBeTruthy();
     expect(warning.style.color).toBe('rgb(239, 68, 68)');
-    expect(warning.title).toContain('seam-7 (unknown-edge)');
+    // Atado al mapa de etiquetas, no a la cadena: la causa se le muestra a María
+    // traducida, y el enum crudo («unknown-edge») no debe llegarle nunca.
+    expect(warning.title).toContain(`seam-7 (${seamResolutionFailureLabel('unknown-edge')})`);
+    expect(warning.title).not.toContain('unknown-edge');
   });
 
   it('pluralizes the zero-constraint warning', () => {
@@ -106,13 +110,13 @@ describe('SimulationStatusOverlay — seam observability (Fase 4, tras expandir)
       ],
     });
     expandOverlay();
-    expect(screen.getByText(/2 costuras sin constraints/)).toBeTruthy();
+    expect(screen.getByText(/2 costuras sin restricciones/)).toBeTruthy();
   });
 
   it('renders no seam line at all when the summary is null (project without seams)', () => {
     renderOverlay(null);
     expandOverlay();
-    expect(screen.queryByText(/constraints de costura/)).toBeNull();
+    expect(screen.queryByText(/restricciones de costura/)).toBeNull();
     expect(screen.queryByText(/no va a coser/)).toBeNull();
   });
 });

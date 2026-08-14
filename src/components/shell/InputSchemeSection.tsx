@@ -2,11 +2,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import { setUserScheme } from '../../store/inputSchemeSlice';
 import type { InputSchemeId } from '../../input/wheelIntents';
-import { IS_MAC } from './shortcutDisplay';
+import { displayShortcut } from './shortcutDisplay';
 
 const OPTIONS: Array<{ id: InputSchemeId; label: string; hint: string }> = [
-  { id: 'mouse',    label: 'Mouse (CLO3D)', hint: 'botón derecho: orbitar · botón central: desplazar · rueda: zoom' },
-  { id: 'trackpad', label: 'Trackpad',      hint: `dos dedos: orbitar (3D) / desplazar (2D) · pellizco: zoom · ${IS_MAC ? '⌥' : 'Alt'}+arrastre: desplazar` },
+  { id: 'mouse',    label: 'Ratón (CLO3D)', hint: 'botón derecho: orbitar · botón central: desplazar · rueda: zoom' },
+  { id: 'trackpad', label: 'Panel táctil',   hint: `dos dedos: orbitar (3D) / desplazar (2D) · pellizco: zoom · ${displayShortcut('⌥')}arrastrar: desplazar` },
 ];
 
 /** Input scheme picker — UnifiedBar settings mode (spec 2026-06-04 § UI). */

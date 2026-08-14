@@ -304,7 +304,7 @@ export default function MeasureToolOverlay({
       {measureMode === 'compare' && !comparison && compareEdgeA && (
         <>
           <EdgeHighlight edge={compareEdgeA} zoom2D={zoom2D} formatDistance={formatDistance} />
-          <HintLabel text="Click second edge to compare" cursorPos={cursorPos} zoom2D={zoom2D} />
+          <HintLabel text="Haz clic en el segundo borde para comparar" cursorPos={cursorPos} zoom2D={zoom2D} />
         </>
       )}
     </g>

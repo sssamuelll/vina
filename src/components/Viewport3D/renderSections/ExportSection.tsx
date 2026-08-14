@@ -153,7 +153,7 @@ export default function ExportSection({
               <option value={72}>72</option>
             </select>
 
-            <label style={{ fontSize: 10, color: '#888' }}>FPS</label>
+            <label style={{ fontSize: 10, color: '#888' }}>fps</label>
             <select
               className="ap-select"
               style={{ width: 'auto' }}

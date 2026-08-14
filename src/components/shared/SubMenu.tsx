@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { displayShortcut } from '../shell/shortcutDisplay';
 import './SubMenu.css';
 
 export interface SubMenuItem {
@@ -54,7 +55,7 @@ export default function SubMenu({ label, icon, items }: SubMenuProps) {
               >
                 {item.icon && <span className="submenu-icon">{item.icon}</span>}
                 <span className="submenu-label">{item.label}</span>
-                {item.shortcut && <span className="submenu-shortcut">{item.shortcut}</span>}
+                {item.shortcut && <span className="submenu-shortcut">{displayShortcut(item.shortcut)}</span>}
               </button>
             </div>
           ))}

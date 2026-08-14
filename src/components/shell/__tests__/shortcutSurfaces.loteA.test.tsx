@@ -1,0 +1,64 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { Minus } from 'lucide-react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import Dock from '../Dock';
+import DockToolPicker from '../DockToolPicker';
+import ToolTooltip from '../ToolTooltip';
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+
+const LINE_TOOL = {
+  id: 'line',
+  icon: Minus,
+  label: 'Línea',
+  shortcut: '⇧L',
+};
+
+describe('notación de atajos en las superficies del dock', () => {
+  it('normaliza el aria-label del dock', () => {
+    render(
+      <Dock
+        domainLabel="2D"
+        tools={[LINE_TOOL]}
+        activeToolId="line"
+        onSelectTool={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Línea · Shift+L' })).toBeTruthy();
+  });
+
+  it('normaliza la columna de teclas del personalizador', () => {
+    const { container } = render(
+      <DockToolPicker
+        catalog={[LINE_TOOL]}
+        selectedIds={['line']}
+        onAdd={() => {}}
+        onRemove={() => {}}
+        onReset={() => {}}
+      />,
+    );
+
+    expect(container.querySelector('.dock-picker__kbd')?.textContent).toBe('Shift+L');
+  });
+
+  it('normaliza el chip del tooltip', () => {
+    vi.useFakeTimers();
+    const { container } = render(
+      <ToolTooltip name="Línea" shortcut="Shift+L">
+        <button type="button">Línea</button>
+      </ToolTooltip>,
+    );
+
+    fireEvent.mouseEnter(container.querySelector('.tool-tooltip-wrapper')!);
+    act(() => { vi.advanceTimersByTime(500); });
+
+    expect(document.querySelector('.tool-tooltip-shortcut')?.textContent).toBe('Shift+L');
+  });
+});

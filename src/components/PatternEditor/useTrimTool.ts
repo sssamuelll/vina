@@ -150,7 +150,7 @@ export function useTrimTool(
       active: true,
     };
 
-    batchUndo(dispatch, placementMode === 'distribute' ? 'Distribute trims' : 'Place trim', () => {
+    batchUndo(dispatch, placementMode === 'distribute' ? 'Distribuir avíos' : 'Colocar avío', () => {
       dispatch(addTrim(trim));
     });
   }, [toPattern, pieces, zoom, dispatch, toolOptions]);

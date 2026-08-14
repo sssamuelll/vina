@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import DockShell from './DockShell';
 import ToolTooltip from './ToolTooltip';
 import type { DockToolDef } from './dock2dTools';
+import { displayShortcut } from './shortcutDisplay';
 import './Dock.css';
 
 interface DockProps {
@@ -44,7 +45,7 @@ export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, a
               type="button"
               className={`dock__tool ${active ? 'dock__tool--active' : ''} ${dragging ? 'dock__tool--dragging' : ''} ${isDropTarget ? 'dock__tool--drop-target' : ''}`}
               onClick={() => onSelectTool(tool.id)}
-              aria-label={tool.shortcut ? `${tool.label} · ${tool.shortcut}` : tool.label}
+              aria-label={tool.shortcut ? `${tool.label} · ${displayShortcut(tool.shortcut)}` : tool.label}
               aria-pressed={active}
               draggable={reorderable}
               onDragStart={reorderable ? (e) => { e.dataTransfer.setData('text/plain', tool.id); e.dataTransfer.effectAllowed = 'move'; setDraggingId(tool.id); } : undefined}

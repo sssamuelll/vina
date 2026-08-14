@@ -106,6 +106,7 @@ import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
 import { setSolverTier, setFrameTime, setBodyCollision, setIsWarmStarting, setSeamResolution } from '../../store/simulationSlice';
 import { setSeamResolutionErrors } from '../../store/inspectorSlice';
 import { showWarningToast, showErrorToast } from '../../store/copilotUISlice';
+import { seamResolutionFailureLabel } from './solverTierDisplay';
 import { GPU_CAPABILITIES, NEURAL_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { safeGetItem } from '../../utils/safeStorage';
 import { getPhysicalFabric, toXPBDParams } from '../../utils/cloth/physicalFabric';
@@ -473,15 +474,15 @@ export function useSimulationLifecycle({
           dispatch(setSeamResolutionErrors(zero.map(e => ({
             seamId: e.seamId,
             reason: e.failure ?? 'empty-match',
-            message: `Seam ${e.seamId} resolved to 0 constraints (${e.failure ?? 'empty-match'})`,
+            message: `La costura ${e.seamId} se resolvió con 0 restricciones (${seamResolutionFailureLabel(e.failure ?? 'empty-match')})`,
             timestamp: Date.now(),
           }))));
           if (zero.length > 0) {
             console.warn('[SimLifecycle] Seams resolved to 0 constraints (will not sew):', zero);
             dispatch(showErrorToast(
               zero.length === 1
-                ? '1 seam could not be resolved and will not sew — check its edge pairing'
-                : `${zero.length} seams could not be resolved and will not sew — check their edge pairing`,
+                ? '1 costura no se pudo resolver y no va a coser — revisa el emparejado de bordes'
+                : `${zero.length} costuras no se pudieron resolver y no van a coser — revisa el emparejado de bordes`,
             ));
           }
         } else {
@@ -502,7 +503,7 @@ export function useSimulationLifecycle({
           // only fires again if the capability ever regresses — and then it
           // falls through to WASM with a visible notice, never silently.
           console.warn('[SimLifecycle] Project has seams — WebGPU tier declares seams:false, skipping to WASM');
-          dispatch(showWarningToast('Sewing is not supported on the WebGPU solver yet — using the WASM solver for this project'));
+          dispatch(showWarningToast('El solver WebGPU todavía no admite costura — este proyecto usará el solver WASM'));
         } else if (wantsWebGPU) {
           try {
             let device = gpuDeviceRef.current;

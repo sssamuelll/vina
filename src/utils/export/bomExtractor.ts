@@ -5,7 +5,15 @@
  * All functions are pure: (state) → BOMEntry[], no side effects.
  */
 
-import type { PatternPiece, Fabric, Seam, Elastic, Point2D } from '../../types/types';
+import type {
+  PatternPiece,
+  Fabric,
+  Seam,
+  Elastic,
+  ElasticType,
+  InterfacingType,
+  Point2D,
+} from '../../types/types';
 import type { Trim } from '../../types/trim';
 import type { BOMEntry } from '../../types/bom';
 import { flattenPath } from '../seam/index';
@@ -124,6 +132,28 @@ const THREAD_MULTIPLIERS: Record<Seam['type'], number> = {
   overlock: 4.0,
 };
 
+const INTERFACING_LABELS: Record<Exclude<InterfacingType, 'none'>, string> = {
+  'fusible-light': 'fusible ligera',
+  'fusible-medium': 'fusible media',
+  'fusible-heavy': 'fusible pesada',
+  'sew-in-light': 'de coser ligera',
+  'sew-in-heavy': 'de coser pesada',
+  canvas: 'de lienzo',
+};
+
+const SEAM_LABELS: Record<Seam['type'], string> = {
+  standard: 'estándar',
+  french: 'francesa',
+  'flat-felled': 'plana abatida',
+  overlock: 'overlock',
+};
+
+const ELASTIC_LABELS: Record<ElasticType, string> = {
+  band: 'banda',
+  shirring: 'fruncidor',
+  drawstring: 'cordón',
+};
+
 // ─── ID Generation ───
 
 let _idCounter = 0;
@@ -164,7 +194,7 @@ export function extractFabrics(
   const groups = new Map<string, { area: number; pieceIds: string[] }>();
 
   for (const piece of pieces) {
-    const code = piece.fabricCode || 'Unassigned';
+    const code = piece.fabricCode || 'Sin asignar';
     const group = groups.get(code) || { area: 0, pieceIds: [] };
     group.area += pieceAreaM2(piece);
     group.pieceIds.push(piece.id);
@@ -177,8 +207,8 @@ export function extractFabrics(
       makeEntry({
         id: nextId('bom-fabric'),
         category: 'fabric',
-        name: `Fabric — ${code}`,
-        description: `Total fabric for ${code} pieces`,
+        name: `Tela — ${code}`,
+        description: `Tela total de las piezas con código ${code}`,
         quantity: group.area,
         unit: 'meters',
         sourcePieceIds: group.pieceIds,
@@ -208,12 +238,13 @@ export function extractInterfacing(pieces: PatternPiece[]): BOMEntry[] {
 
   const entries: BOMEntry[] = [];
   for (const [iType, group] of groups) {
+    const label = INTERFACING_LABELS[iType as Exclude<InterfacingType, 'none'>] ?? iType;
     entries.push(
       makeEntry({
         id: nextId('bom-interfacing'),
         category: 'interfacing',
-        name: `Interfacing — ${iType}`,
-        description: `${iType} interfacing`,
+        name: `Entretela — ${label}`,
+        description: `Entretela ${label}`,
         quantity: group.area,
         unit: 'meters',
         sourcePieceIds: group.pieceIds,
@@ -253,12 +284,13 @@ export function extractThread(seams: Seam[], pieces: PatternPiece[]): BOMEntry[]
 
   const entries: BOMEntry[] = [];
   for (const [type, group] of groups) {
+    const label = SEAM_LABELS[type as Seam['type']] ?? type;
     entries.push(
       makeEntry({
         id: nextId('bom-thread'),
         category: 'thread',
-        name: `Thread — ${type}`,
-        description: `Thread for ${type} seams (${THREAD_MULTIPLIERS[type as Seam['type']] ?? 2.5}× multiplier)`,
+        name: `Hilo — ${label}`,
+        description: `Hilo para costuras ${label} (multiplicador ×${THREAD_MULTIPLIERS[type as Seam['type']] ?? 2.5})`,
         quantity: group.lengthMM / 1000, // mm → m
         unit: 'meters',
         sourcePieceIds: [...group.pieceIds],
@@ -299,8 +331,8 @@ export function extractSeamTape(seams: Seam[], pieces: PatternPiece[]): BOMEntry
       makeEntry({
         id: nextId('bom-tape'),
         category: 'seam-tape',
-        name: `Seam Tape — ${width}mm`,
-        description: `${width}mm seam tape`,
+        name: `Cinta de costura — ${width} mm`,
+        description: `Cinta de costura de ${width} mm`,
         quantity: group.lengthMM / 1000, // mm → m
         unit: 'meters',
         sourcePieceIds: [...group.pieceIds],
@@ -339,12 +371,13 @@ export function extractElastics(elastics: Elastic[], pieces: PatternPiece[]): BO
 
   const entries: BOMEntry[] = [];
   for (const [type, group] of groups) {
+    const label = ELASTIC_LABELS[type as ElasticType] ?? type;
     entries.push(
       makeEntry({
         id: nextId('bom-elastic'),
         category: 'elastic',
-        name: `Elastic — ${type}`,
-        description: `${type} elastic`,
+        name: `Elástico — ${label}`,
+        description: `Elástico tipo ${label}`,
         quantity: group.lengthMM / 1000, // mm → m
         unit: 'meters',
         sourcePieceIds: [...group.pieceIds],

@@ -26,7 +26,7 @@ describe('ContextPanel side routing', () => {
     const onClose = vi.fn();
     render(<ContextPanel title="Avatar" side="right" onClose={onClose}>body</ContextPanel>);
     expect(screen.getByText('Avatar')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /close panel/i }));
+    fireEvent.click(screen.getByRole('button', { name: /cerrar panel/i }));
     expect(onClose).toHaveBeenCalledTimes(1);
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(2);

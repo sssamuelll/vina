@@ -7,6 +7,7 @@
  */
 import { useState, useRef, useCallback, useLayoutEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { displayShortcut } from './shortcutDisplay';
 import './ToolTooltip.css';
 
 export interface ToolTooltipProps {
@@ -66,27 +67,18 @@ export default function ToolTooltip({ name, shortcut, description, descriptionTo
           <div className="tool-tooltip-header">
             <span className="tool-tooltip-name">{name}</span>
             {shortcut && (
-              <kbd className="tool-tooltip-shortcut">{formatShortcut(shortcut)}</kbd>
+              <kbd className="tool-tooltip-shortcut">{displayShortcut(shortcut)}</kbd>
             )}
           </div>
           {description && (
             <div className={`tool-tooltip-desc${descriptionTone ? ` tool-tooltip-desc--${descriptionTone}` : ''}`}>{description}</div>
           )}
           {hasSubTools && (
-            <div className="tool-tooltip-hint">Hold to see variants</div>
+            <div className="tool-tooltip-hint">Mantén pulsado para ver variantes</div>
           )}
         </div>,
         document.body,
       )}
     </div>
   );
-}
-
-function formatShortcut(s: string): string {
-  return s
-    .replace('space', '␣')
-    .replace('ctrl+', '⌘')
-    .replace('shift+', '⇧')
-    .replace('alt+', '⌥')
-    .toUpperCase();
 }

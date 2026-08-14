@@ -174,7 +174,7 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     run: (ctx) => ctx.cb.onUnfold?.(ctx.pieceId!, ctx.internalLineId!) },                                // Surface B prop
   unfoldOutlineOnly: { id: 'unfoldOutlineOnly', group: 'transform', icon: '⇔', label: 'Desplegar solo el contorno',
     run: (ctx) => ctx.cb.onUnfold?.(ctx.pieceId!, ctx.internalLineId!, true) },
-  offsetInternalLine: { id: 'offsetInternalLine', group: 'transform', icon: '⏛', label: 'Offset como línea interna',
+  offsetInternalLine: { id: 'offsetInternalLine', group: 'transform', icon: '⏛', label: 'Desplazamiento como línea interna',
     run: (ctx) => ctx.cb.onOffsetInternalLine?.(ctx.pieceId!, ctx.internalLineId!) },
   optimizeCurves: { id: 'optimizeCurves', group: 'transform', icon: '◇', label: 'Optimizar puntos de curva',
     gate: hasCurveCmds, run: (ctx) => ctx.cb.onOptimizeCurves?.(ctx.pieceId!, ctx.internalLineId!) },

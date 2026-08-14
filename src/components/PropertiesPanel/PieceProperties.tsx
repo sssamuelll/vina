@@ -81,7 +81,7 @@ export default function PieceProperties({ piece, collapsed, simCollapsed, onTogg
         />
       </div>
       <div className="panel-field panel-field--wrap">
-        <label>Presets de margen</label>
+        <label>Preajustes de margen</label>
         <div className="panel-preset-row">
           {([['Overlock', 8], ['Estándar', 10], ['Sobrecargada', 12], ['Francesa', 15]] as const).map(([label, width]) => (
             <button

@@ -1,4 +1,5 @@
 import type { DockToolDef } from './dock2dTools';
+import { displayShortcut } from './shortcutDisplay';
 
 interface DockToolPickerProps {
   catalog: DockToolDef[];
@@ -18,7 +19,7 @@ interface DockToolPickerProps {
 export default function DockToolPicker({ catalog, selectedIds, onAdd, onRemove, onReset }: DockToolPickerProps) {
   return (
     <div className="dock-picker" role="group" aria-label="Personalizar herramientas del dock">
-      <div className="dock-picker__title">Dock tools</div>
+      <div className="dock-picker__title">Herramientas del dock</div>
       <ul className="dock-picker__list">
         {catalog.map((tool) => {
           const Icon = tool.icon;
@@ -36,14 +37,14 @@ export default function DockToolPicker({ catalog, selectedIds, onAdd, onRemove, 
               >
                 <Icon size={15} />
                 <span className="dock-picker__label">{tool.label}</span>
-                {tool.shortcut && <kbd className="dock-picker__kbd">{tool.shortcut}</kbd>}
+                {tool.shortcut && <kbd className="dock-picker__kbd">{displayShortcut(tool.shortcut)}</kbd>}
                 <span className="dock-picker__check">{selected ? '✓' : ''}</span>
               </button>
             </li>
           );
         })}
       </ul>
-      <button type="button" className="dock-picker__reset" onClick={onReset}>Reset to defaults</button>
+      <button type="button" className="dock-picker__reset" onClick={onReset}>Restablecer valores</button>
     </div>
   );
 }

@@ -12,8 +12,8 @@ function generateSuggestions(data: InspectionData, diagnostics: Diagnostic[]): A
       case 'fabric':
         if (!data.fabric) {
           suggestions.push({
-            description: 'Assign a fabric to this piece',
-            impact: 'Required for accurate simulation and production',
+            description: 'Asignar una tela a esta pieza',
+            impact: 'Necesaria para simular y producir con precisión',
             toolCall: { name: 'setFabric', params: { pieceId: data.piece.id, fabricId: 'cotton-poplin' } },
           });
         }
@@ -25,25 +25,25 @@ function generateSuggestions(data: InspectionData, diagnostics: Diagnostic[]): A
         // warning, which needs the user's intent, not an auto-fix.
         break;
       case 'internals':
-        if (d.message.includes('grainline')) {
+        if (!data.internals.some((internal) => internal.type === 'grainline')) {
           suggestions.push({
-            description: 'Add a grainline to this piece',
-            impact: 'Required for correct fabric grain alignment in production',
+            description: 'Añadir dirección de hilo a esta pieza',
+            impact: 'Necesaria para alinear el hilo de la tela al producir',
             toolCall: { name: 'addGrainline', params: { pieceId: data.piece.id } },
           });
         }
         break;
       case 'seam':
         suggestions.push({
-          description: 'Connect this piece to adjacent pieces with seams',
-          impact: 'Required for garment assembly',
+          description: 'Conectar esta pieza con las piezas adyacentes',
+          impact: 'Necesaria para ensamblar la prenda',
         });
         break;
       case 'fit':
         if (d.severity === 'critical') {
           suggestions.push({
-            description: 'Add ease to resolve body penetration',
-            impact: 'Prevents intersection with avatar body',
+            description: 'Añadir holgura para corregir la penetración',
+            impact: 'Evita que la tela atraviese el cuerpo del avatar',
             toolCall: { name: 'adjustFit', params: { pieceId: data.piece.id, amount: 10 } },
           });
         }
@@ -51,8 +51,8 @@ function generateSuggestions(data: InspectionData, diagnostics: Diagnostic[]): A
       case 'geometry':
         if (d.message.startsWith(TINY_PIECE_MESSAGE_PREFIX)) {
           suggestions.push({
-            description: 'Remove this orphaned tiny piece',
-            impact: 'Improves simulation stability and cleanliness',
+            description: 'Eliminar esta pieza pequeña y aislada',
+            impact: 'Mejora la estabilidad y la limpieza de la simulación',
             toolCall: { name: 'removePiece', params: { pieceId: data.piece.id } },
           });
         }
@@ -70,7 +70,7 @@ export async function analyzeInspection(
   signal?: AbortSignal,
 ): Promise<AgentAnalysis> {
   // Check for cancellation
-  if (signal?.aborted) throw new Error('Analysis aborted');
+  if (signal?.aborted) throw new Error('Análisis cancelado');
 
   // For v1: rule-based analysis (LLM integration deferred)
   // Generate analysis from diagnostics directly
@@ -80,11 +80,16 @@ export async function analyzeInspection(
 
   let summary: string;
   if (errors.length > 0 || criticals.length > 0) {
-    summary = `${data.piece.name} has ${errors.length + criticals.length} critical issue${errors.length + criticals.length !== 1 ? 's' : ''} that need attention.`;
+    const count = errors.length + criticals.length;
+    summary = count === 1
+      ? `${data.piece.name} tiene 1 problema crítico que requiere atención.`
+      : `${data.piece.name} tiene ${count} problemas críticos que requieren atención.`;
   } else if (warnings.length > 0) {
-    summary = `${data.piece.name} has ${warnings.length} warning${warnings.length !== 1 ? 's' : ''} to review.`;
+    summary = warnings.length === 1
+      ? `${data.piece.name} tiene 1 aviso por revisar.`
+      : `${data.piece.name} tiene ${warnings.length} avisos por revisar.`;
   } else {
-    summary = `${data.piece.name} looks good — no issues detected.`;
+    summary = `${data.piece.name} no tiene problemas detectados.`;
   }
 
   const explanations = diagnostics

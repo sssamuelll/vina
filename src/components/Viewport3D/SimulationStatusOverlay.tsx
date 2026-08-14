@@ -20,6 +20,12 @@ import {
   GPU_CAPABILITIES,
   NEURAL_CAPABILITIES,
 } from '../../utils/cloth/solverCapabilities';
+import {
+  particleCountLabel,
+  seamResolutionFailureLabel,
+  SIMULATION_MODE_LABELS,
+  SOLVER_TIER_INFO,
+} from './solverTierDisplay';
 
 // ponytail: static map — tier strings are a closed enum (SolverTier), no dynamic lookup needed.
 const TIER_CAPS = {
@@ -29,14 +35,6 @@ const TIER_CAPS = {
   'neural-drape': NEURAL_CAPABILITIES,
   'none':         CPU_CAPABILITIES,
 } as const satisfies Record<SolverTier, typeof CPU_CAPABILITIES>;
-
-const TIER_INFO: Record<SolverTier, { label: string; color: string }> = {
-  'none':          { label: 'En reposo',    color: '#666'    },
-  'webgpu':        { label: 'WebGPU',       color: '#4ade80' },
-  'wasm':          { label: 'Wasm XPBD',    color: '#fb923c' },
-  'cpu-worker':    { label: 'CPU Worker',   color: '#facc15' },
-  'neural-drape':  { label: 'Neural Drape', color: '#60a5fa' },
-};
 
 export function SimulationStatusOverlay() {
   const [expanded, setExpanded] = useState(false);
@@ -62,7 +60,7 @@ export function SimulationStatusOverlay() {
   // silent-skip with zero feedback).
   if (simulationState === 'idle' && !toolUnsupported) return null;
 
-  const tier = TIER_INFO[solverTier] ?? TIER_INFO['none'];
+  const tier = SOLVER_TIER_INFO[solverTier] ?? SOLVER_TIER_INFO.none;
   const fps = frameTimeMs > 0 ? Math.round(1000 / frameTimeMs) : 0;
   const isMobile = typeof navigator !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent);
 
@@ -113,30 +111,32 @@ export function SimulationStatusOverlay() {
       {expanded && <>
       {fps > 0 && (
         <div style={{ color: fps >= 50 ? '#4ade80' : fps >= 30 ? '#facc15' : '#ef4444' }}>
-          {fps} FPS ({frameTimeMs.toFixed(1)}ms)
+          {fps} fps ({frameTimeMs.toFixed(1)} ms)
         </div>
       )}
       {particleCount > 0 && (
-        <div>{particleCount.toLocaleString()} partículas</div>
+        <div>{particleCountLabel(particleCount)}</div>
       )}
       {seamResolution && (
-        <div>🧵 {seamResolution.totalConstraints.toLocaleString()} constraints de costura</div>
+        <div>🧵 {seamResolution.totalConstraints.toLocaleString('es-ES')} restricciones de costura</div>
       )}
       {seamResolution && seamResolution.zeroConstraintSeams.length > 0 && (
         <div
           style={{ color: '#ef4444', fontSize: 10, maxWidth: 200, marginTop: 2 }}
           title={
-            'Estas costuras resolvieron a 0 constraints XPBD: el solver no puede unirlas. ' +
+            'Estas costuras se resolvieron con 0 restricciones XPBD: el solver no puede unirlas. ' +
             'Causa por costura: ' +
-            seamResolution.zeroConstraintSeams.map(z => `${z.seamId} (${z.reason})`).join(', ') +
-            '. Revisa el emparejado de bordes en 2D. Parity plan Fase 4.'
+            seamResolution.zeroConstraintSeams
+              .map(z => `${z.seamId} (${seamResolutionFailureLabel(z.reason)})`)
+              .join(', ') +
+            '. Revisa el emparejado de bordes en 2D.'
           }
         >
-          ⚠️ {seamResolution.zeroConstraintSeams.length} costura{seamResolution.zeroConstraintSeams.length === 1 ? '' : 's'} sin constraints — no va a coser
+          ⚠️ {seamResolution.zeroConstraintSeams.length} costura{seamResolution.zeroConstraintSeams.length === 1 ? '' : 's'} sin restricciones — no va a coser
         </div>
       )}
       <div style={{ opacity: 0.6 }}>
-        Modo: {simulationMode}{isMobile ? ' · móvil' : ''}
+        Modo: {SIMULATION_MODE_LABELS[simulationMode]}{isMobile ? ' · móvil' : ''}
       </div>
       {solverTier !== 'none' && !bodyCollision && (
         <div style={{ color: '#fb923c', fontSize: 10 }}>
@@ -145,7 +145,7 @@ export function SimulationStatusOverlay() {
       )}
       {solverTier !== 'none' && bodyCollision && !TIER_CAPS[solverTier].facePoke && (
         <div style={{ color: '#fb923c', fontSize: 10 }}>
-          ⚠️ El cuerpo puede asomar a través de la tela — face-poke no disponible en este tier
+          ⚠️ El cuerpo puede asomar a través de la tela — la detección de penetración no está disponible en este motor
         </div>
       )}
       {solverTier === 'wasm' && (
@@ -155,9 +155,9 @@ export function SimulationStatusOverlay() {
         // honestly CPU-only (WASM_CAPABILITIES, A7).
         <div
           style={{ color: '#fb923c', fontSize: 10, maxWidth: 200, marginTop: 2 }}
-          title="El tier WASM no soporta LRA (long range attachments), constraints de pliegue, presión por pieza ni rigidez por pieza. Cambia al tier CPU para paridad completa. Ver RFC A7."
+          title="El motor WASM no admite LRA (anclajes de largo alcance), restricciones de pliegue, presión por pieza ni rigidez por pieza. Cambia al motor CPU para tener todas las funciones. Ver RFC A7."
         >
-          ⚠️ Funciones limitadas (LRA, pliegues, presión y rigidez por pieza apagados — usa el tier CPU)
+          ⚠️ Funciones limitadas (LRA, pliegues, presión y rigidez por pieza desactivados — usa el motor CPU)
         </div>
       )}
       {toolUnsupported && (
@@ -165,11 +165,11 @@ export function SimulationStatusOverlay() {
           style={{ color: '#fb923c', fontSize: 10, maxWidth: 200, marginTop: 2 }}
           title={
             activeTool3D === 'steamBrush'
-              ? 'La plancha a vapor requiere el tier WebGPU (los kernels TSL escriben el amortiguado de velocidad por partícula). El tier WebGPU viene activado por defecto; si lo desactivaste, limpia localStorage(\'vina-use-webgpu\'). Ver RFC C4 § 2.3.'
-              : 'El agarre de malla requiere el tier WebGPU o WASM (CPU no tiene pin posicional; Neural no tiene interactividad por partícula). Cambia al tier WASM o WebGPU. Ver RFC C4 § 2.3.'
+              ? 'La plancha a vapor requiere el motor WebGPU (los kernels TSL escriben el amortiguado de velocidad por partícula). WebGPU viene activado por defecto; si lo desactivaste, limpia localStorage(\'vina-use-webgpu\'). Ver RFC C4 § 2.3.'
+              : 'El agarre de malla requiere el motor WebGPU o WASM (CPU no tiene anclaje posicional; Neural no tiene interacción por partícula). Cambia a WASM o WebGPU. Ver RFC C4 § 2.3.'
           }
         >
-          ⚠️ La herramienta activa ({activeTool3D === 'steamBrush' ? 'plancha a vapor' : 'agarre de malla'}) no funciona en este tier
+          ⚠️ La herramienta activa ({activeTool3D === 'steamBrush' ? 'plancha a vapor' : 'agarre de malla'}) no funciona con este motor
         </div>
       )}
       </>}

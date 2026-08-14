@@ -395,7 +395,7 @@ const SinglePiece = memo(function SinglePiece({
         } else {
           // Label block (design surface 5, P0.2): headline name·num + monospace
           // meta lines (CUT ×N / size / fabric / mirror). Derived, no model change.
-          const fabricName = PHYSICAL_FABRIC_LIBRARY.find(f => f.id === piece.fabricId)?.name;
+          const fabricName = PHYSICAL_FABRIC_LIBRARY.find(f => f.id === piece.fabricId)?.nameEs;
           const { name, meta } = formatPieceLabel(piece, pieceNumber, fabricName);
           // Name outranks meta by 13:9 (1.44×), clearing the 1.25× contrast
           // threshold so the headline reads as a headline, not decoration.

@@ -353,7 +353,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                     onClick={() => dispatch(toggleIK())}
                     title={ikEnabled ? 'Cambiar a FK (rotación directa de articulaciones)' : 'Cambiar a IK (arrastrar efectores finales)'}
                   >
-                    {ikEnabled ? 'IK Mode' : 'FK Mode'}
+                    {ikEnabled ? 'Modo IK' : 'Modo FK'}
                   </button>
                 </div>
 

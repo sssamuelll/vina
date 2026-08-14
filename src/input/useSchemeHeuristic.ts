@@ -28,7 +28,7 @@ export function useSchemeHeuristic(): void {
       if (fired) return;
       fired = true;
       dispatch(autoDetectTrackpad());
-      dispatch(showInfoToast('Modo trackpad activado — cámbialo cuando quieras en Ajustes ▸ Entrada'));
+      dispatch(showInfoToast('Modo de panel táctil activado — cámbialo cuando quieras en Ajustes ▸ Entrada'));
     };
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey && !e.metaKey) fire();

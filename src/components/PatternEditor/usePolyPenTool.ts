@@ -64,7 +64,7 @@ export function usePolyPenTool(
     const cmds = nodesToCommands(nodes, closed);
     if (mode === 'piece') {
       onCompletePiece({
-        name: 'Poly Pen Piece',
+        name: 'Pieza de pluma poligonal',
         outline: cmds,
         ...draftedPieceDefaults(),
       });

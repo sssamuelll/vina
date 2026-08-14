@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import SubMenu from '../shared/SubMenu';
 import type { SubMenuItem } from '../shared/SubMenu';
+import { displayShortcut } from '../shell/shortcutDisplay';
 
 export interface ContextMenu3DState {
   visible: boolean;
@@ -277,7 +278,7 @@ export default function ContextMenu3D({
               <span className="context-menu__icon">{item.icon}</span>
               <span className="context-menu__label">{item.label}</span>
               {item.shortcut && (
-                <span className="context-menu__shortcut">{item.shortcut}</span>
+                <span className="context-menu__shortcut">{displayShortcut(item.shortcut)}</span>
               )}
             </button>
           )}
