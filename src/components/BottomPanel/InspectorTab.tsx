@@ -1,6 +1,10 @@
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { DiagnosticSeverity, AgentSuggestion } from '../../diagnostics/types';
+import {
+  inspectionEdgeTypeLabel,
+  inspectionInternalTypeLabel,
+} from '../../diagnostics/displayLabels';
 import { useInspector } from '../../hooks/useInspector';
 import './InspectorTab.css';
 
@@ -54,7 +58,10 @@ export default function InspectorTab() {
   }
 
   const issueCount = diagnostics.filter((d) => d.severity !== 'info').length;
-  const fabricName = data?.fabric?.name;
+  const fabricName = data?.fabric?.nameEs;
+  const pieceName = data?.piece.name === 'Unknown'
+    ? 'Pieza desconocida'
+    : (data?.piece.name ?? target.pieceId);
 
   return (
     <div className="inspector-tab">
@@ -62,7 +69,7 @@ export default function InspectorTab() {
       <div className="inspector-header">
         <div className="inspector-header-left">
           <span className="inspector-piece-name">
-            {data?.piece.name ?? target.pieceId}
+            {pieceName}
           </span>
           {target.edgeName && (
             <>
@@ -142,7 +149,7 @@ export default function InspectorTab() {
               <div className="inspector-raw-group">
                 <div className="inspector-raw-label">Borde</div>
                 <div>nombre: {data.edge.name}</div>
-                <div>tipo: {data.edge.type}</div>
+                <div>tipo: {inspectionEdgeTypeLabel(data.edge.type)}</div>
                 <div>largo: {data.edge.length.toFixed(2)}mm</div>
               </div>
             )}
@@ -150,7 +157,9 @@ export default function InspectorTab() {
               <div className="inspector-raw-group">
                 <div className="inspector-raw-label">Costuras ({data.seams.length})</div>
                 {data.seams.map((seam, i) => (
-                  <div key={i}>{seam.edgeName} → {seam.partnerPieceName}</div>
+                  <div key={i}>
+                    {seam.edgeName} → {seam.partnerPieceName === 'Unknown' ? 'Pieza desconocida' : seam.partnerPieceName}
+                  </div>
                 ))}
               </div>
             )}
@@ -158,7 +167,7 @@ export default function InspectorTab() {
               <div className="inspector-raw-group">
                 <div className="inspector-raw-label">Internos</div>
                 {data.internals.map((int, i) => (
-                  <div key={i}>{int.type}: {int.count}</div>
+                  <div key={i}>{inspectionInternalTypeLabel(int.type)}: {int.count}</div>
                 ))}
               </div>
             )}

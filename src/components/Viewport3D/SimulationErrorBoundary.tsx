@@ -43,10 +43,10 @@ export class SimulationErrorBoundary extends Component<Props, State> {
         }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
-            3D Viewport Error
+            Error del visor 3D
           </div>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 16, textAlign: 'center', maxWidth: 300 }}>
-            {this.state.errorMessage || 'An error occurred in the 3D rendering engine.'}
+            {this.state.errorMessage || 'Ocurrió un error en el motor de renderizado 3D.'}
           </div>
           <button
             onClick={this.handleReset}
@@ -55,7 +55,7 @@ export class SimulationErrorBoundary extends Component<Props, State> {
               background: '#2a2a2a', color: '#e0d8cc', cursor: 'pointer', fontSize: 12,
             }}
           >
-            Reset Viewport
+            Restablecer visor
           </button>
         </div>
       );

@@ -5,6 +5,12 @@ import { setViewMode, undo, redo } from '../../store/editorSlice';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { useState } from 'react';
 import LogoMenu from './LogoMenu';
+import { displayShortcut } from './shortcutDisplay';
+import {
+  particleCountLabel,
+  pieceCountLabel,
+  SOLVER_TIER_INFO,
+} from '../Viewport3D/solverTierDisplay';
 
 type ViewMode = '2d' | 'split' | '3d';
 
@@ -24,7 +30,6 @@ export default function TopBar({ onOpenPanel, onImportDXF }: TopBarProps) {
 
   const modes: ViewMode[] = ['2d', 'split', '3d'];
   const labels: Record<ViewMode, string> = { '2d': '2D', split: 'Split', '3d': '3D' };
-  const formatCount = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
   const dotClass = simState === 'running' ? 'dot dot--success' : 'dot dot--idle';
 
   const handleUndo = () => { dispatch(undo()); forceUpdate(n => n + 1); };
@@ -40,7 +45,7 @@ export default function TopBar({ onOpenPanel, onImportDXF }: TopBarProps) {
         className="icon-btn"
         onClick={handleUndo}
         disabled={!canUndo()}
-        title="Deshacer (⌘Z)"
+        title={`Deshacer (${displayShortcut('⌘Z')})`}
         aria-label="Deshacer"
         style={{ opacity: canUndo() ? 1 : 0.3 }}
       >
@@ -50,7 +55,7 @@ export default function TopBar({ onOpenPanel, onImportDXF }: TopBarProps) {
         className="icon-btn"
         onClick={handleRedo}
         disabled={!canRedo()}
-        title="Rehacer (⌘⇧Z)"
+        title={`Rehacer (${displayShortcut('⌘⇧Z')})`}
         aria-label="Rehacer"
         style={{ opacity: canRedo() ? 1 : 0.3 }}
       >
@@ -73,12 +78,14 @@ export default function TopBar({ onOpenPanel, onImportDXF }: TopBarProps) {
 
       <div className="top-bar__spacer" />
 
-      <div className="top-bar__status">
-        <span className={dotClass} />
-        <span>{solverTier ?? 'idle'}</span>
-        {particleCount > 0 && <span>· {formatCount(particleCount)}</span>}
-        {pieces.length > 0 && <span>· {pieces.length}p</span>}
-      </div>
+      {import.meta.env.DEV && (
+        <div className="top-bar__status" aria-label="Estado técnico de la simulación">
+          <span className={dotClass} aria-hidden />
+          <span>{SOLVER_TIER_INFO[solverTier].label}</span>
+          {particleCount > 0 && <span>· {particleCountLabel(particleCount)}</span>}
+          {pieces.length > 0 && <span>· {pieceCountLabel(pieces.length)}</span>}
+        </div>
+      )}
     </div>
   );
 }

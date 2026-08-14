@@ -52,8 +52,10 @@ describe('dock2dTools catalog', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('the first 10 catalog ids are the defaults in order', () => {
-    expect(DOCK_2D_CATALOG.slice(0, 10).map((tool) => tool.id))
+  // 12 desde la auditoría de UI del 2026-08-14: seamAllowance y notch entraron
+  // al default porque no tenían puerta (ley de puertas, § 5.6 del informe).
+  it('the first 12 catalog ids are the defaults in order', () => {
+    expect(DOCK_2D_CATALOG.slice(0, DEFAULT_DOCK_2D_IDS.length).map((tool) => tool.id))
       .toEqual(DEFAULT_DOCK_2D_IDS);
   });
 

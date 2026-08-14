@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { PatternPiece } from '../../../types/types';
 import type { Trim } from '../../../types/trim';
-import { extractTrims } from '../trimExtractor';
+import { extractTrims , TRIM_TYPE_LABELS } from '../trimExtractor';
 
 // ─── Test helpers ───────────────────────────────────────────────────────────
 
@@ -74,7 +74,7 @@ describe('extractTrims', () => {
     expect(result).toHaveLength(1);
     expect(result[0].quantity).toBe(7);
     expect(result[0].unit).toBe('pieces');
-    expect(result[0].name).toBe('button \u2014 Flat 15mm');
+    expect(result[0].name).toBe(`${TRIM_TYPE_LABELS.button} — Flat 15mm`);
     expect(result[0].sourcePieceIds).toContain('p1');
     expect(result[0].sourcePieceIds).toContain('p2');
   });
@@ -93,7 +93,7 @@ describe('extractTrims', () => {
     expect(result[0].unit).toBe('meters');
     // 100mm + 100mm = 200mm = 0.2m
     expect(result[0].quantity).toBe(0.2);
-    expect(result[0].name).toBe('zipper \u2014 Invisible');
+    expect(result[0].name).toBe(`${TRIM_TYPE_LABELS.zipper} — Invisible`);
     expect(result[0].sourcePieceIds).toContain('p1');
     expect(result[0].sourcePieceIds).toContain('p2');
   });
@@ -108,8 +108,8 @@ describe('extractTrims', () => {
     const result = extractTrims(trims, pieces);
     expect(result).toHaveLength(2);
     const names = result.map(e => e.name);
-    expect(names).toContain('button \u2014 Flat');
-    expect(names).toContain('snap \u2014 Prong');
+    expect(names).toContain(`${TRIM_TYPE_LABELS.button} — Flat`);
+    expect(names).toContain(`${TRIM_TYPE_LABELS.snap} — Prong`);
   });
 
   it('includes unitCost from trim data', () => {
@@ -137,12 +137,12 @@ describe('extractTrims', () => {
 
     const countEntry = result.find(e => e.unit === 'pieces')!;
     expect(countEntry.quantity).toBe(5);
-    expect(countEntry.name).toBe('button \u2014 Flat');
+    expect(countEntry.name).toBe(`${TRIM_TYPE_LABELS.button} — Flat`);
 
     const edgeEntry = result.find(e => e.unit === 'meters')!;
     // "bottom" edge: points[1]->(100,0) to points[2]->(100,200) = 200mm = 0.2m
     expect(edgeEntry.quantity).toBe(0.2);
-    expect(edgeEntry.name).toBe('zipper \u2014 Metal');
+    expect(edgeEntry.name).toBe(`${TRIM_TYPE_LABELS.zipper} — Metal`);
     expect(edgeEntry.unitCost).toBe(2.50);
   });
 
@@ -171,7 +171,7 @@ describe('extractTrims', () => {
     // 3 positions + 4 positions = 7
     expect(result[0].quantity).toBe(7);
     expect(result[0].unit).toBe('pieces');
-    expect(result[0].name).toBe('rivet \u2014 Copper Rivet');
+    expect(result[0].name).toBe(`${TRIM_TYPE_LABELS.rivet} — Copper Rivet`);
     expect(result[0].sourcePieceIds).toContain('p1');
     expect(result[0].sourcePieceIds).toContain('p2');
   });
@@ -201,7 +201,7 @@ describe('extractTrims', () => {
     expect(result).toHaveLength(1);
     expect(result[0].quantity).toBe(5);
     expect(result[0].unit).toBe('pieces');
-    expect(result[0].name).toBe('button \u2014 Flat 20mm');
+    expect(result[0].name).toBe(`${TRIM_TYPE_LABELS.button} — Flat 20mm`);
   });
 
   it('handles mixed count, edge, and point trims', () => {
@@ -215,14 +215,14 @@ describe('extractTrims', () => {
     const result = extractTrims(trims, pieces);
     expect(result).toHaveLength(3);
 
-    const countEntry = result.find(e => e.name === 'button \u2014 Flat')!;
+    const countEntry = result.find(e => e.name === `${TRIM_TYPE_LABELS.button} — Flat`)!;
     expect(countEntry.unit).toBe('pieces');
     expect(countEntry.quantity).toBe(5);
 
-    const edgeEntry = result.find(e => e.name === 'zipper \u2014 Metal')!;
+    const edgeEntry = result.find(e => e.name === `${TRIM_TYPE_LABELS.zipper} — Metal`)!;
     expect(edgeEntry.unit).toBe('meters');
 
-    const pointEntry = result.find(e => e.name === 'rivet \u2014 Brass')!;
+    const pointEntry = result.find(e => e.name === `${TRIM_TYPE_LABELS.rivet} — Brass`)!;
     expect(pointEntry.unit).toBe('pieces');
     expect(pointEntry.quantity).toBe(2);
   });

@@ -42,7 +42,7 @@ export default function ContextPanel({ title, onClose, children, side = 'right' 
     <div className={`context-panel context-panel--${side}`} ref={panelRef}>
       <div className="context-panel__header">
         <span>{title}</span>
-        <button className="icon-btn" onClick={onClose} aria-label="Close panel">
+        <button className="icon-btn" onClick={onClose} aria-label="Cerrar panel">
           <X size={14} />
         </button>
       </div>

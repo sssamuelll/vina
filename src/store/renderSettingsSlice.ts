@@ -75,7 +75,7 @@ export interface RenderSettingsState {
 export const HDRI_PRESETS: HdriPreset[] = [
   { id: 'studio-soft',       name: 'Estudio suave', file: '/hdri/studio-soft.hdr',       thumbnail: '/hdri/thumb-studio-soft.jpg' },
   { id: 'studio-hard',       name: 'Estudio duro',  file: '/hdri/studio-hard.hdr',       thumbnail: '/hdri/thumb-studio-hard.jpg' },
-  { id: 'showroom',          name: 'Showroom',      file: '/hdri/showroom.hdr',          thumbnail: '/hdri/thumb-showroom.jpg' },
+  { id: 'showroom',          name: 'Sala de exposición', file: '/hdri/showroom.hdr',       thumbnail: '/hdri/thumb-showroom.jpg' },
   { id: 'outdoor-daylight',  name: 'Exterior',      file: '/hdri/outdoor-daylight.hdr',  thumbnail: '/hdri/thumb-outdoor-daylight.jpg' },
   { id: 'sunset',            name: 'Atardecer',     file: '/hdri/sunset.hdr',            thumbnail: '/hdri/thumb-sunset.jpg' },
   { id: 'neutral-grey',      name: 'Neutro',        file: '/hdri/neutral-grey.hdr',      thumbnail: '/hdri/thumb-neutral-grey.jpg' },

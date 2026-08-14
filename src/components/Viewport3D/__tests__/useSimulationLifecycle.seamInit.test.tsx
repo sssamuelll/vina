@@ -261,7 +261,7 @@ describe('useSimulationLifecycle — tier WASM (cascade por defecto)', () => {
     const toasts = store.getState().copilotUI.toasts;
     expect(toasts).toHaveLength(1);
     expect(toasts[0].type).toBe('error');
-    expect(toasts[0].message).toMatch(/will not sew/);
+    expect(toasts[0].message).toMatch(/no va a coser/);
 
     expect(store.getState().simulation.seamResolution).toEqual({
       totalConstraints: 0,

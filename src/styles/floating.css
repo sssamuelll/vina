@@ -22,10 +22,15 @@
   right: var(--sp-3);
   width: 300px;
   max-height: calc(100vh - var(--top-bar-h) - var(--unified-bar-h) - var(--sp-8));
-  background: rgba(8, 8, 15, 0.95);
-  backdrop-filter: var(--blur);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+  /* Material `overlay`: flota sobre el lienzo dibujado. Antes de la
+   * auditoría era el único que NO llevaba sombra — o sea, justo el que más
+   * necesita separarse del fondo era el que menos se separaba. */
+  background: var(--surface-overlay-bg);
+  backdrop-filter: var(--surface-overlay-blur);
+  -webkit-backdrop-filter: var(--surface-overlay-blur);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
   overflow-y: auto;
   z-index: 25;
   animation: slide-down var(--transition-normal) ease-out;
@@ -87,12 +92,14 @@
   top: calc(100% + 6px);
   left: 0;
   /* Same glassmorphic as the floating capsule bar */
-  background: rgba(8, 8, 15, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(99, 102, 241, 0.15);
-  border-radius: 14px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  /* Material `overlay`. El radio era 14px a mano — un quinto radio suelto
+   * que no correspondía a ningún rol. */
+  background: var(--surface-overlay-bg);
+  backdrop-filter: var(--surface-overlay-blur);
+  -webkit-backdrop-filter: var(--surface-overlay-blur);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
   z-index: 200;
   min-width: 240px;
   padding: 6px;
@@ -160,12 +167,13 @@
   position: absolute;
   left: calc(100% + 4px);
   top: -6px;
-  /* Same glassmorphic as parent menu */
-  background: rgba(8, 8, 15, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(99, 102, 241, 0.15);
-  border-radius: 12px;
+  /* Mismo material `overlay` que el menú padre — ahora por token, no por
+   * copiar el bloque a mano, que es como llegaron a divergir. */
+  background: var(--surface-overlay-bg);
+  backdrop-filter: var(--surface-overlay-blur);
+  -webkit-backdrop-filter: var(--surface-overlay-blur);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   padding: 6px;
   min-width: 220px;
@@ -184,12 +192,14 @@
      finding, properties re-home). */
   max-height: calc(100vh - 16px);
   overflow-y: auto;
-  background: rgba(8, 8, 15, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(99, 102, 241, 0.15);
-  border-radius: 14px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  /* Material `overlay`. El radio era 14px a mano — un quinto radio suelto
+   * que no correspondía a ningún rol. */
+  background: var(--surface-overlay-bg);
+  backdrop-filter: var(--surface-overlay-blur);
+  -webkit-backdrop-filter: var(--surface-overlay-blur);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
   padding: 6px;
   font-family: var(--font-sans);
   font-size: var(--text-sm);

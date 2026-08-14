@@ -16,4 +16,14 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# Contrato de interfaz (trinquete): ~0.9 s, solo falla si un contador SUBE.
+# Existe porque la auditoría 2026-08-14 encontró 8 contratos escritos y los 8
+# rodeados: la regla sin guardián es una sugerencia.
+echo "🔍 Contrato de interfaz..."
+node scripts/ui-contract-lint.mjs
+if [ $? -ne 0 ]; then
+  echo "❌ Un contador del contrato de UI subió. Ver docs/reports/2026-08-14-auditoria-ui-deriva-de-diseno.md"
+  exit 1
+fi
+
 echo "✅ Pre-commit checks passed!"

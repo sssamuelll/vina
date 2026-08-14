@@ -18,6 +18,7 @@ import { RootState } from '../../store';
 import { setFitMapMode, updateFitMapConfig } from '../../store/simulationSlice';
 import type { FitMapMode, FitMapStats } from '../../utils/cloth/fitMaps';
 import { DEFAULT_FIT_MAP_CONFIG } from '../../utils/cloth/fitMaps';
+import { displayShortcut } from '../shell/shortcutDisplay';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -101,10 +102,14 @@ const S = {
     display: 'flex',
     gap: 1,
     zIndex: 10,
-    background: '#2a2a2a',
-    borderRadius: 4,
+    // Material `chrome` del contrato de interfaz: esta barra va acoplada al
+    // borde del visor, igual que los docks. Antes era #2a2a2a con radio 4 y su
+    // propia sombra — un cuarto negro y un quinto radio, decididos aquí solos.
+    background: 'var(--surface-chrome-bg)',
+    border: 'var(--surface-chrome-border)',
+    borderRadius: 'var(--surface-chrome-radius)',
     padding: 2,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+    boxShadow: 'var(--surface-chrome-shadow)',
   },
   toggleBtn: (active: boolean) => ({
     width: 32,
@@ -264,7 +269,8 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
             onMouseEnter={() => setHovered(mode)}
             onMouseLeave={() => setHovered(null)}
             disabled={idle}
-            title={idle ? `${label} — simula para ver los mapas de ajuste` : `${label} (${shortcut})`}
+            title={idle ? `${label} — simula para ver los mapas de ajuste` : `${label} (${displayShortcut(shortcut)})`}
+            aria-label={label}
             style={{ ...S.toggleBtn(!idle && fitMapMode === mode), cursor: idle ? 'default' : 'pointer', opacity: idle ? 0.4 : 1 }}
           >
             <svg
@@ -284,7 +290,8 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
         <div style={{ width: 1, background: '#555', margin: '4px 2px' }} />
         <button
           onClick={onToggleAvatar}
-          title={`${avatarHidden ? 'Mostrar' : 'Ocultar'} avatar (Shift+A)`}
+          title={`${avatarHidden ? 'Mostrar' : 'Ocultar'} avatar (${displayShortcut('⇧A')})`}
+          aria-label={`${avatarHidden ? 'Mostrar' : 'Ocultar'} avatar`}
           style={S.toggleBtn(!avatarHidden)}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={S.toggleIcon(!avatarHidden)}>
@@ -295,7 +302,8 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
 
         <button
           onClick={onSnapshot}
-          title="Captura del visor 3D (F10)"
+          title={`Captura del visor 3D (${displayShortcut('F10')})`}
+          aria-label="Capturar visor 3D"
           style={S.toggleBtn(false)}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={S.toggleIcon(false)}>
@@ -456,7 +464,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
             left: '50%',
             transform: 'translateX(-50%)',
           }}>
-            {MODES.find(m => m.mode === hovered)?.label} ({MODES.find(m => m.mode === hovered)?.shortcut})
+            {MODES.find(m => m.mode === hovered)?.label} ({displayShortcut(MODES.find(m => m.mode === hovered)?.shortcut ?? '')})
           </div>
         )}
       </div>
@@ -489,8 +497,8 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
               fontSize: 8,
               opacity: 0.7,
             }}>
-              <div>max {fitMapMode === 'stress' ? `${stats.max.toFixed(1)} kPa` : `${stats.max.toFixed(1)}%`}</div>
-              <div>avg {fitMapMode === 'stress' ? `${stats.mean.toFixed(1)} kPa` : `${stats.mean.toFixed(1)}%`}</div>
+              <div>máx. {fitMapMode === 'stress' ? `${stats.max.toFixed(1)} kPa` : `${stats.max.toFixed(1)}%`}</div>
+              <div>prom. {fitMapMode === 'stress' ? `${stats.mean.toFixed(1)} kPa` : `${stats.mean.toFixed(1)}%`}</div>
             </div>
           )}
         </div>

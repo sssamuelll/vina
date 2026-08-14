@@ -31,8 +31,8 @@ const ruleNoFabric: Rule = (data) => {
       {
         severity: 'error',
         category: 'fabric',
-        message: 'No fabric assigned',
-        detail: 'A fabric must be assigned before the piece can be simulated or exported.',
+        message: 'Sin tela asignada',
+        detail: 'Asigna una tela antes de simular o exportar la pieza.',
       },
     ];
   }
@@ -45,9 +45,9 @@ const ruleFabricHeavyWeight: Rule = (data) => {
       {
         severity: 'warning',
         category: 'fabric',
-        message: `Fabric weight is ${data.fabric.weight} gsm (> 400 gsm)`,
+        message: `El gramaje de la tela es ${data.fabric.weight} g/m² (> 400 g/m²)`,
         detail:
-          'Heavy fabrics may cause simulation instability and require increased substeps.',
+          'Las telas pesadas pueden desestabilizar la simulación y requieren más subpasos.',
       },
     ];
   }
@@ -67,8 +67,8 @@ const ruleSeamAllowanceTooSmall: Rule = (data) => {
       {
         severity: 'warning',
         category: 'seam-allowance',
-        message: `Seam allowance is ${sa} mm (< 3 mm)`,
-        detail: 'Very small seam allowances are difficult to sew and prone to fraying.',
+        message: `El margen de costura es ${sa} mm (< 3 mm)`,
+        detail: 'Los márgenes tan pequeños son difíciles de coser y propensos a deshilacharse.',
       },
     ];
   }
@@ -76,6 +76,14 @@ const ruleSeamAllowanceTooSmall: Rule = (data) => {
 };
 
 // ─── Seam connection rules ────────────────────────────────────────────────────
+
+/** Mensaje de "esta pieza no está cosida a nada", exportado por el mismo motivo
+ *  que TINY_PIECE_MESSAGE_PREFIX: los `Diagnostic` no llevan código estable, así
+ *  que su identidad la carga el mensaje. Cuando el mensaje se tradujo al español
+ *  (contrato de interfaz, 2026-08-14) los tests que lo husmeaban en inglés se
+ *  rompieron. Una constante compartida hace que la próxima traducción no rompa
+ *  nada — la solución de fondo sería un `code` en el tipo Diagnostic. */
+export const NO_SEAM_CONNECTIONS_MESSAGE = 'No hay conexiones de costura';
 
 const ruleNoSeamConnections: Rule = (data) => {
   if (data.seams.length === 0) {
@@ -87,8 +95,8 @@ const ruleNoSeamConnections: Rule = (data) => {
       {
         severity: 'warning',
         category: 'seam',
-        message: 'No seam connections defined',
-        detail: 'This piece has no seam connections to other pieces.',
+        message: NO_SEAM_CONNECTIONS_MESSAGE,
+        detail: 'Esta pieza no tiene costuras que la conecten con otras piezas.',
       },
     ];
   }
@@ -104,9 +112,9 @@ const ruleNoGrainline: Rule = (data) => {
       {
         severity: 'warning',
         category: 'internals',
-        message: 'No grainline defined',
+        message: 'No hay dirección de hilo',
         detail:
-          'A grainline is required for correct fabric alignment during simulation and cutting.',
+          'La dirección de hilo permite alinear correctamente la tela al simular y cortar.',
       },
     ];
   }
@@ -120,8 +128,8 @@ const ruleNoNotches: Rule = (data) => {
       {
         severity: 'info',
         category: 'internals',
-        message: 'No notches defined',
-        detail: 'Notches help align pieces during sewing. Consider adding them to seam edges.',
+        message: 'No hay piquetes',
+        detail: 'Los piquetes ayudan a alinear las piezas al coser. Puedes añadirlos a los bordes de costura.',
       },
     ];
   }
@@ -140,9 +148,9 @@ const ruleFitBodyPenetration: Rule = (data) => {
       {
         severity: 'critical',
         category: 'fit',
-        message: `Body penetration detected (collision distance: ${data.simulation.collisionDistance.toFixed(1)} mm)`,
+        message: `Penetración del cuerpo detectada (distancia de colisión: ${data.simulation.collisionDistance.toFixed(1)} mm)`,
         detail:
-          'The cloth is intersecting the avatar body. Check simulation collision settings.',
+          'La tela atraviesa el cuerpo del avatar. Revisa los ajustes de colisión de la simulación.',
       },
     ];
   }
@@ -160,9 +168,9 @@ const ruleFitPressurePoint: Rule = (data) => {
       {
         severity: 'warning',
         category: 'fit',
-        message: `Pressure point detected (collision distance: ${data.simulation.collisionDistance.toFixed(1)} mm)`,
+        message: `Posible punto de presión (distancia de colisión: ${data.simulation.collisionDistance.toFixed(1)} mm)`,
         detail:
-          'Cloth is very close to the body surface. This may indicate a tight spot or pressure point.',
+          'La tela está muy cerca del cuerpo. Puede indicar una zona apretada o un punto de presión.',
       },
     ];
   }
@@ -181,8 +189,8 @@ const ruleNotSimulated: Rule = (data) => {
       {
         severity: 'warning',
         category: 'simulation',
-        message: 'Piece has not been simulated (particle count is 0)',
-        detail: 'Run the cloth simulation to generate fit diagnostics for this piece.',
+        message: 'La pieza no se ha simulado (0 partículas)',
+        detail: 'Simula la tela para generar diagnósticos de ajuste de esta pieza.',
       },
     ];
   }
@@ -197,8 +205,8 @@ const ruleNoEdgesDefined: Rule = (data) => {
       {
         severity: 'warning',
         category: 'construction',
-        message: 'Piece has no edges defined',
-        detail: 'Edges are required for seam connections, SA application, and simulation meshing.',
+        message: 'La pieza no tiene bordes definidos',
+        detail: 'Los bordes son necesarios para conectar costuras, aplicar márgenes y mallar la simulación.',
       },
     ];
   }
@@ -217,7 +225,9 @@ const ruleUnresolvedPoints: Rule = (data) => {
     {
       severity: 'error',
       category: 'construction',
-      message: `${count} construction point(s) failed to resolve`,
+      message: count === 1
+        ? '1 punto de construcción no se pudo resolver'
+        : `${count} puntos de construcción no se pudieron resolver`,
       detail,
     },
   ];
@@ -232,18 +242,18 @@ const ruleSeamTension: Rule = (data) => {
       diags.push({
         severity: 'warning',
         category: 'seam',
-        message: `Seam "${seam.edgeName}" → ${seam.partnerPieceName}: extreme gathering (${seam.tension}%)`,
+        message: `Costura "${seam.edgeName}" → ${seam.partnerPieceName}: fruncido extremo (${seam.tension}%)`,
         detail:
-          'Tension below 50% causes heavy gathering. This may distort the garment shape or cause simulation instability.',
+          'Una tensión menor de 50 % produce mucho fruncido. Puede deformar la prenda o desestabilizar la simulación.',
       });
     }
     if (seam.tension !== undefined && seam.tension > 150) {
       diags.push({
         severity: 'warning',
         category: 'seam',
-        message: `Seam "${seam.edgeName}" → ${seam.partnerPieceName}: extreme easing (${seam.tension}%)`,
+        message: `Costura "${seam.edgeName}" → ${seam.partnerPieceName}: embebido extremo (${seam.tension}%)`,
         detail:
-          'Tension above 150% causes heavy easing. The seam may pucker or pull adjacent fabric.',
+          'Una tensión mayor de 150 % produce mucho embebido. La costura puede arrugar o tirar de la tela adyacente.',
       });
     }
   }
@@ -258,8 +268,8 @@ const ruleInactivePieceWithActiveSeams: Rule = (data) => {
         {
           severity: 'info',
           category: 'seam',
-          message: 'Inactive piece has active seam connections',
-          detail: `This piece is inactive but has ${activeSeams.length} active seam connection(s). Consider deactivating the seams or reactivating the piece.`,
+          message: 'La pieza inactiva tiene costuras activas',
+          detail: `Esta pieza está inactiva, pero tiene ${activeSeams.length} ${activeSeams.length === 1 ? 'costura activa' : 'costuras activas'}. Desactiva las costuras o reactiva la pieza.`,
         },
       ];
     }
@@ -279,8 +289,8 @@ const ruleLayerOverlap: Rule = (data) => {
       diags.push({
         severity: 'warning',
         category: 'layer',
-        message: `Same layer and body region as: ${names}`,
-        detail: 'Pieces on the same layer in the same body region may overlap. Consider assigning different layers.',
+        message: `Misma capa y zona del cuerpo que: ${names}`,
+        detail: 'Las piezas de una misma capa y zona del cuerpo pueden solaparse. Asigna capas distintas.',
       });
     }
   }
@@ -298,7 +308,7 @@ const ruleMissingInterfacing: Rule = (data) => {
     return [{
       severity: 'info',
       category: 'simulation',
-      message: 'No interfacing applied — consider adding interfacing for structural support',
+      message: 'Sin entretela — añade una para dar soporte estructural',
     }];
   }
   return [];
@@ -315,7 +325,7 @@ const ruleNoPOMs: Rule = (data) => {
       {
         severity: 'info',
         category: 'measurement',
-        message: 'No POMs reference this piece — consider adding measurements for tech pack completeness',
+        message: 'Ninguna medida POM referencia esta pieza — añade medidas para completar la ficha técnica',
       },
     ];
   }
@@ -328,7 +338,7 @@ const ruleNoPOMs: Rule = (data) => {
 export const TINY_PIECE_THRESHOLD_MM2 = 1000;
 
 /** Stable prefix shared with agentAnalyzer for suggestion matching. */
-export const TINY_PIECE_MESSAGE_PREFIX = 'Orphaned tiny piece detected';
+export const TINY_PIECE_MESSAGE_PREFIX = 'Pieza pequeña aislada detectada';
 
 // ─── Geometry rules ───────────────────────────────────────────────────────────
 
@@ -343,7 +353,7 @@ const ruleTinyPiece: Rule = (data) => {
         category: 'geometry',
         message: `${TINY_PIECE_MESSAGE_PREFIX} (${Math.round(data.piece.area)} mm²)`,
         detail:
-          'Small orphaned scraps can cause simulation jitter and are typically residues of edit operations. Consider deleting this piece.',
+          'Los retazos pequeños y aislados pueden desestabilizar la simulación y suelen quedar tras una edición. Elimina esta pieza si es un residuo.',
       },
     ];
   }

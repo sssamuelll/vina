@@ -152,7 +152,7 @@ export function generateBOM(
     const widthCM = bbox.width / 10;
     const heightCM = bbox.height / 10;
 
-    const fabricName = fabricMap.get(piece.fabricId ?? '') ?? (piece.fabricId ?? 'Unassigned');
+    const fabricName = fabricMap.get(piece.fabricId ?? '') ?? (piece.fabricId ?? 'Sin asignar');
     const cutCount = piece.mirrored ? 2 : 1;
     const grainDir = resolveGrainDirection(piece);
 

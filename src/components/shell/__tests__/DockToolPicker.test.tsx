@@ -42,9 +42,9 @@ describe('DockToolPicker', () => {
     expect(onRemove).not.toHaveBeenCalled();
   });
 
-  it('Reset to defaults calls onReset', () => {
+  it('«Restablecer valores» llama a onReset', () => {
     const { onReset } = setup(['select', 'notch']);
-    fireEvent.click(screen.getByRole('button', { name: /reset to defaults/i }));
+    fireEvent.click(screen.getByRole('button', { name: /restablecer valores/i }));
     expect(onReset).toHaveBeenCalled();
   });
 });

@@ -40,7 +40,7 @@ export default function ReferenceImageLayer({
                 textAnchor="middle" dominantBaseline="central"
                 fill="#666" fontSize={12}
               >
-                Missing: {img.filename}
+                Falta: {img.filename}
               </text>
             </g>
           );

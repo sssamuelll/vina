@@ -2,12 +2,39 @@ import { useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { setFabric, setPieceTint, setPieceUVTransform, setPieceTextureOverride, setPieceOpacity, setPieceEmission, clearPieceEmission, DEFAULT_UV_TRANSFORM } from '../../store/simulationSlice';
-import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric } from '../../utils/cloth/physicalFabric';
+import {
+  PHYSICAL_FABRIC_LIBRARY,
+  getPhysicalFabric,
+  type WeaveType,
+} from '../../utils/cloth/physicalFabric';
+
+type TextureSlotId = 'diffuse' | 'normal' | 'roughness' | 'ao';
+
+const TEXTURE_SLOT_LABELS: Record<TextureSlotId, string> = {
+  diffuse: 'color',
+  normal: 'normales',
+  roughness: 'rugosidad',
+  ao: 'oclusión ambiental',
+};
+
+const WEAVE_TYPE_LABELS: Record<WeaveType, string> = {
+  plain: 'tejido plano',
+  twill: 'sarga',
+  satin: 'satén',
+  'knit-jersey': 'punto jersey',
+  'knit-rib': 'punto canalé',
+  'knit-interlock': 'punto interlock',
+  nonwoven: 'no tejido',
+  leather: 'cuero',
+  mesh: 'malla',
+  pile: 'pelo',
+  technical: 'tejido técnico',
+};
 
 // Note: Drag-drop textures use blob URLs which are session-scoped and won't
 // survive page reload. This is intentional for quick previews — persistent
 // texture storage would require a backend or IndexedDB, which is out of scope.
-function TextureSlot({ slot, pieceId }: { slot: 'diffuse' | 'normal' | 'roughness' | 'ao'; pieceId: string }) {
+function TextureSlot({ slot, pieceId }: { slot: TextureSlotId; pieceId: string }) {
   const dispatch = useDispatch();
   const overrides = useSelector((s: RootState) => s.simulation.pieceTextureOverrides[pieceId]);
   const url = overrides?.[slot];
@@ -31,16 +58,16 @@ function TextureSlot({ slot, pieceId }: { slot: 'diffuse' | 'normal' | 'roughnes
     <div className="material-texture-slot" onDrop={handleDrop} onDragOver={handleDragOver}>
       <div className="material-texture-thumb">
         {url ? (
-          <img src={url} alt={slot} />
+          <img src={url} alt={`Textura de ${TEXTURE_SLOT_LABELS[slot]}`} />
         ) : (
           <span className="material-texture-plus">+</span>
         )}
       </div>
-      <span className="material-texture-name">{slot}</span>
+      <span className="material-texture-name">{TEXTURE_SLOT_LABELS[slot]}</span>
       {url && (
         <button
           className="panel-btn-sm"
-          aria-label={`Quitar textura ${slot}`}
+          aria-label={`Quitar textura de ${TEXTURE_SLOT_LABELS[slot]}`}
           onClick={() => {
             if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
             dispatch(setPieceTextureOverride({ pieceId, slot, url: null }));
@@ -89,22 +116,22 @@ export default function MaterialTab() {
     <div className="material-tab">
       {/* Fabric Preset Grid */}
       <div className="material-block">
-        <div className="panel-subtitle">Preset de tela</div>
+        <div className="panel-subtitle">Preajuste de tela</div>
         <div className="material-grid">
           {PHYSICAL_FABRIC_LIBRARY.map(f => (
             <button
               key={f.id}
               className={`material-swatch ${f.id === fabricId ? 'material-swatch--active' : ''}`}
               onClick={() => handleFabricSelect(f.id)}
-              title={`${f.name} — ${f.weight}gsm ${f.weaveType}`}
+              title={`${f.nameEs} — ${f.weight} g/m² — ${WEAVE_TYPE_LABELS[f.weaveType]}`}
             >
-              {f.name.split(' ').slice(0, 2).join(' ')}
+              {f.nameEs.split(' ').slice(0, 2).join(' ')}
             </button>
           ))}
         </div>
         {fabric && (
           <div className="panel-hint">
-            {fabric.name} — {fabric.weight}gsm — {fabric.weaveType}
+            {fabric.nameEs} — {fabric.weight} g/m² — {WEAVE_TYPE_LABELS[fabric.weaveType]}
           </div>
         )}
       </div>
@@ -193,7 +220,7 @@ export default function MaterialTab() {
 
         {/* Repeat Presets */}
         <div className="panel-field panel-field--row">
-          <label>Presets</label>
+          <label>Preajustes</label>
           <div className="panel-preset-row">
             {[1, 2, 4, 8].map(n => (
               <button

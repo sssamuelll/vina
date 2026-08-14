@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateRules, TINY_PIECE_THRESHOLD_MM2, TINY_PIECE_MESSAGE_PREFIX } from '../ruleEngine';
+import { evaluateRules, TINY_PIECE_THRESHOLD_MM2, TINY_PIECE_MESSAGE_PREFIX, NO_SEAM_CONNECTIONS_MESSAGE } from '../ruleEngine';
 import type { InspectionData } from '../types';
 import type { PhysicalFabric } from '../../utils/cloth/physicalFabric';
 
@@ -310,7 +310,7 @@ describe('evaluateRules', () => {
       const diagnostics = evaluateRules(data);
       const found = diagnostics.find(d => d.category === 'construction' && d.severity === 'error');
       expect(found).toBeDefined();
-      expect(found!.message).toMatch(/1 construction point/);
+      expect(found!.message).toMatch(/1 punto de construcción/);
     });
 
     it('does not fire when unresolvedPoints is absent', () => {
@@ -473,7 +473,7 @@ describe('evaluateRules', () => {
       });
       const diags = evaluateRules(data);
       expect(diags.some(d => d.message.startsWith(TINY_PIECE_MESSAGE_PREFIX))).toBe(true);
-      expect(diags.some(d => d.category === 'seam' && d.message.includes('No seam connections'))).toBe(false);
+      expect(diags.some(d => d.category === 'seam' && d.message.includes(NO_SEAM_CONNECTIONS_MESSAGE))).toBe(false);
     });
 
     it('still fires seam:no-connections for normal-sized pieces with no seams', () => {
@@ -482,7 +482,7 @@ describe('evaluateRules', () => {
         seams: [],
       });
       const diags = evaluateRules(data);
-      expect(diags.some(d => d.category === 'seam' && d.message.includes('No seam connections'))).toBe(true);
+      expect(diags.some(d => d.category === 'seam' && d.message.includes(NO_SEAM_CONNECTIONS_MESSAGE))).toBe(true);
       expect(diags.some(d => d.category === 'geometry')).toBe(false);
     });
 

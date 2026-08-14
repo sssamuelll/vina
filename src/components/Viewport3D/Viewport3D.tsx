@@ -65,6 +65,7 @@ import { resolveAnchorClick, selectionNamespace } from './anchorClick';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
 import { useDispatch } from 'react-redux';
 import { toolRegistry } from '../../tools';
+import { displayShortcut } from '../shell/shortcutDisplay';
 import './Viewport3D.css';
 
 /** Error boundary so a WebGL crash doesn't take down the 2D editor */
@@ -991,10 +992,11 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
             fontSize: 12,
             fontFamily: 'var(--font-sans)',
           }}
-          title="Collision Bodies"
+          title="Cuerpos de colisión"
+          aria-label="Cuerpos de colisión"
           onClick={() => setCollisionPanelOpen(!collisionPanelOpen)}
         >
-          CB
+          CC
         </button>
       )}
       <CollisionBodyPanel
@@ -1010,7 +1012,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
 
       {!cameraMode && (
         <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9, pointerEvents: 'none' }}>
-          {poseEditorOpen ? '● MODO POSE' : activeTool3D === 'arrangement' ? '⊕ COLOCAR — clic en la pieza, luego clic en el punto de colocación' : '✏️ MODO EDICIÓN'} — {inputScheme === 'trackpad' ? 'orbitar con dos dedos · zoom con pellizco · ⌥+arrastrar panea' : 'clic derecho orbita · clic central/⌥+arrastrar panea'}
+          {poseEditorOpen ? '● MODO POSE' : activeTool3D === 'arrangement' ? '⊕ COLOCAR — clic en la pieza, luego clic en el punto de colocación' : '✏️ MODO EDICIÓN'} — {inputScheme === 'trackpad' ? `orbitar con dos dedos · zoom con pellizco · ${displayShortcut('⌥')}arrastrar panea` : `clic derecho orbita · clic central/${displayShortcut('⌥')}arrastrar panea`}
         </div>
       )}
 

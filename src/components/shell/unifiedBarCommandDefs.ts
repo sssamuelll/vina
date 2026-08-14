@@ -66,11 +66,11 @@ export const COMMANDS: CommandDef[] = [
   { id: 'view-2d', category: 'Vista', name: 'Vista: solo 2D', description: 'Solo el patrón 2D', icon: Eye, action: (d) => d(setViewMode('2d')) },
   { id: 'view-3d', category: 'Vista', name: 'Vista: solo 3D', description: 'Solo la simulación 3D', icon: Eye, action: (d) => d(setViewMode('3d')) },
   { id: 'view-split', category: 'Vista', name: 'Vista: dividida', description: '2D y 3D lado a lado', icon: Layers, action: (d) => d(setViewMode('split')) },
-  { id: 'input-trackpad', category: 'Vista', name: 'Controles de trackpad', description: 'Orbitar con dos dedos, zoom con pellizco', icon: Hand, action: (d) => d(setUserScheme('trackpad')) },
-  { id: 'input-mouse', category: 'Vista', name: 'Controles de mouse', description: 'Estilo CLO3D: orbitar con clic derecho, zoom con rueda', icon: MousePointer2, action: (d) => d(setUserScheme('mouse')) },
+  { id: 'input-trackpad', category: 'Vista', name: 'Controles de panel táctil', description: 'Orbitar con dos dedos, zoom con pellizco', icon: Hand, action: (d) => d(setUserScheme('trackpad')) },
+  { id: 'input-mouse', category: 'Vista', name: 'Controles de ratón', description: 'Estilo CLO3D: orbitar con clic derecho, zoom con rueda', icon: MousePointer2, action: (d) => d(setUserScheme('mouse')) },
 
   // ─── Toggles ───
-  { id: 'toggle-grid', category: 'Vista', name: 'Mostrar u ocultar cuadrícula', description: 'La cuadrícula del canvas', icon: Grid3x3, shortcut: 'G', action: (d) => d(toggleSnapToGrid()) },
+  { id: 'toggle-grid', category: 'Vista', name: 'Mostrar u ocultar cuadrícula', description: 'La cuadrícula del lienzo', icon: Grid3x3, shortcut: 'G', action: (d) => d(toggleSnapToGrid()) },
   { id: 'toggle-seam-allowance', category: 'Vista', name: 'Mostrar u ocultar margen de costura', description: 'El margen alrededor de cada pieza', icon: ScanLine, shortcut: '⇧S', action: (d) => d(toggleSeamAllowance()) },
   { id: 'toggle-grainlines', category: 'Vista', name: 'Mostrar u ocultar hilos', description: 'Las flechas de dirección de hilo', icon: PenLine, action: (d) => d(toggleGrainlines()) },
   { id: 'toggle-piece-names', category: 'Vista', name: 'Mostrar u ocultar nombres de pieza', description: 'Las etiquetas de cada pieza', icon: Tag, action: (d) => d(togglePieceNames()) },

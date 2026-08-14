@@ -15,6 +15,29 @@ interface HintTextProps {
   saDefaultWidthMm?: number;
 }
 
+/**
+ * Pista al pie del lienzo: la única cosa que le explica a María cómo se usa la
+ * herramienta activa.
+ *
+ * Tinta: `--ink-hint`, NUNCA un literal ni un `--text-*`. Los `--text-*` son la
+ * tinta del cromo oscuro; sobre el crema del lienzo desaparecen. Hasta el
+ * 2026-08-14 esto se pintaba con `rgba(255, 215, 0, 0.5)` —oro al 50%— y daba
+ * 1.05:1 de contraste, o sea que el gesto de arrastre de #1029 se explicaba con
+ * un texto invisible. Lo fija HintText.legibilidad.test.tsx.
+ */
+function Pie({ children }: { children: React.ReactNode }) {
+  return (
+    <text
+      x="50%" y="98%"
+      textAnchor="middle" dominantBaseline="auto"
+      fill="var(--ink-hint)"
+      fontSize="11"
+    >
+      {children}
+    </text>
+  );
+}
+
 export default function HintText({
   activeTool, pieces, penNodesLength,
   nodeEditorIsEditing, seamPhase, topstitchMode, walkSeamPhase,
@@ -25,37 +48,26 @@ export default function HintText({
   return (
     <>
       {nodeEditorIsEditing && (
-        <text
-          x="50%" y="98%"
-          textAnchor="middle" dominantBaseline="auto"
-          fill="rgba(255, 215, 0, 0.5)"
-          fontSize="11"
-        >
-          Editing nodes — Drag to move · Esc to exit
-        </text>
+        <Pie>Editando nodos · arrastra para mover · Esc para salir</Pie>
       )}
 
       {!hasPieces && activeTool === 'pen' && penNodesLength === 0 && (
         <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
-          fill="rgba(0,0,0,0.2)" fontSize="13">
+          fill="var(--ink-hint)" fontSize="13">
           Clic para añadir puntos · arrastra para curvar · clic en el primer punto para cerrar · Enter termina abierto · Esc cancela
         </text>
       )}
 
       {activeTool === 'seam' && (
-        <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
-          fill="rgba(255, 215, 0, 0.5)" fontSize="11">
+        <Pie>
           {seamPhase === 'holdingA'
             ? 'Ahora marca en la otra pieza · clic en vacío o Esc suelta'
             : 'Clic cose el lado entero · arrastre cose solo un tramo'}
-        </text>
+        </Pie>
       )}
 
       {activeTool === 'seamEdit' && (
-        <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
-          fill="rgba(255, 215, 0, 0.5)" fontSize="11">
-          Clic en un lado para ver con qué está cosido
-        </text>
+        <Pie>Clic en un lado para ver con qué está cosido</Pie>
       )}
 
       {(activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree' || activeTool === 'topstitchEdit') && (() => {
@@ -65,19 +77,13 @@ export default function HintText({
           free: 'Clic añade puntos · Enter confirma · Retroceso deshace · Esc cancela',
           edit: 'Clic en un pespunte para seleccionarlo y editarlo',
         };
-        return (
-          <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
-            fill="rgba(255, 215, 0, 0.5)" fontSize="11">
-            {msgs[topstitchMode ?? 'seamline'] ?? msgs.seamline}
-          </text>
-        );
+        return <Pie>{msgs[topstitchMode ?? 'seamline'] ?? msgs.seamline}</Pie>;
       })()}
 
       {activeTool === 'seamAllowance' && (
-        <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
-          fill="rgba(255, 215, 0, 0.5)" fontSize="11">
-          {`Click a piece to apply ${saDefaultWidthMm ?? DEFAULT_SEAM_ALLOWANCE}mm · drag across pieces to apply to all · click an edge for its width · a corner for corner type`}
-        </text>
+        <Pie>
+          {`Clic en una pieza aplica ${saDefaultWidthMm ?? DEFAULT_SEAM_ALLOWANCE} mm · arrastra sobre varias para aplicarlo a todas · clic en un borde para su ancho · en una esquina para su tipo`}
+        </Pie>
       )}
 
       {activeTool === 'walkSeam' && (() => {
@@ -86,12 +92,7 @@ export default function HintText({
           stationary: 'Shift+clic en otro borde para par manual · o auto-emparejado por la costura',
           walking: 'Recorre el borde con el cursor · clic reinicia · Esc limpia',
         };
-        return (
-          <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
-            fill="rgba(255, 215, 0, 0.5)" fontSize="11">
-            {msgs[walkSeamPhase ?? 'idle'] ?? msgs.idle}
-          </text>
-        );
+        return <Pie>{msgs[walkSeamPhase ?? 'idle'] ?? msgs.idle}</Pie>;
       })()}
     </>
   );

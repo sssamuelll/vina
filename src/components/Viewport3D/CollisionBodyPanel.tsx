@@ -60,8 +60,14 @@ export default function CollisionBodyPanel({ open, onClose }: CollisionBodyPanel
     <div className="cb-panel-wrapper">
       <div className="cb-panel">
         <div className="cb-panel-header">
-          <h3>Collision Bodies</h3>
-          <button className="cb-panel-close" onClick={onClose}>&times;</button>
+          <h3>Cuerpos de colisión</h3>
+          <button
+            className="cb-panel-close"
+            onClick={onClose}
+            aria-label="Cerrar panel de cuerpos de colisión"
+          >
+            &times;
+          </button>
         </div>
         <div className="cb-panel-scroll">
           <input
@@ -81,7 +87,7 @@ export default function CollisionBodyPanel({ open, onClose }: CollisionBodyPanel
             onDragOver={e => e.preventDefault()}
             onDrop={handleDrop}
           >
-            + Import Collision Body (.obj .fbx .glb .gltf)
+            + Importar cuerpo de colisión (.obj .fbx .glb .gltf)
           </button>
 
           {bodies.map(body => (
@@ -115,6 +121,7 @@ function BodyItem({
       <div className="cb-body-header">
         <input
           className="cb-body-name"
+          aria-label="Nombre del cuerpo de colisión"
           value={body.name}
           onChange={e => dispatch(setCollisionBodyName({ id: body.id, name: e.target.value }))}
           onClick={e => e.stopPropagation()}
@@ -122,21 +129,24 @@ function BodyItem({
         <div className="cb-body-actions">
           <button
             className={`cb-icon-btn ${body.visible ? 'active' : ''}`}
-            title={body.visible ? 'Hide' : 'Show'}
+            title={body.visible ? 'Ocultar cuerpo' : 'Mostrar cuerpo'}
+            aria-label={body.visible ? 'Ocultar cuerpo' : 'Mostrar cuerpo'}
             onClick={e => { e.stopPropagation(); dispatch(setCollisionBodyVisibility({ id: body.id, visible: !body.visible })); }}
           >
             {body.visible ? '\u25C9' : '\u25CB'}
           </button>
           <button
             className={`cb-icon-btn ${body.collision.enabled ? 'active' : ''}`}
-            title={body.collision.enabled ? 'Disable collision' : 'Enable collision'}
+            title={body.collision.enabled ? 'Desactivar colisión' : 'Activar colisión'}
+            aria-label={body.collision.enabled ? 'Desactivar colisión' : 'Activar colisión'}
             onClick={e => { e.stopPropagation(); dispatch(updateCollisionBodyCollision({ id: body.id, collision: { enabled: !body.collision.enabled } })); }}
           >
             {body.collision.enabled ? '\u26A1' : '\u26AA'}
           </button>
           <button
             className="cb-icon-btn danger"
-            title="Delete"
+            title="Eliminar cuerpo"
+            aria-label="Eliminar cuerpo"
             onClick={e => { e.stopPropagation(); dispatch(removeCollisionBody(body.id)); }}
           >
             &times;
@@ -147,9 +157,10 @@ function BodyItem({
       {isSelected && (
         <>
           <div className="cb-slider-row">
-            <span className="cb-slider-label">Friction</span>
+            <span className="cb-slider-label">Fricción</span>
             <input
               type="range"
+              aria-label="Fricción"
               min={0} max={1} step={0.05}
               value={body.collision.friction}
               onChange={e => dispatch(updateCollisionBodyCollision({ id: body.id, collision: { friction: Number(e.target.value) } }))}
@@ -157,9 +168,10 @@ function BodyItem({
             <span className="cb-slider-value">{body.collision.friction.toFixed(2)}</span>
           </div>
           <div className="cb-slider-row">
-            <span className="cb-slider-label">Offset</span>
+            <span className="cb-slider-label">Separación</span>
             <input
               type="range"
+              aria-label="Separación"
               min={0.001} max={0.05} step={0.001}
               value={body.collision.offset}
               onChange={e => dispatch(updateCollisionBodyCollision({ id: body.id, collision: { offset: Number(e.target.value) } }))}

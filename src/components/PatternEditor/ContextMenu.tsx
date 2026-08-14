@@ -14,6 +14,7 @@ import { RootState, AppDispatch } from '../../store';
 import { selectWorkflowStage } from '../../store/selectors';
 import type { InternalLineType } from '../../types/types';
 import SubMenu from '../../components/shared/SubMenu';
+import { displayShortcut } from '../shell/shortcutDisplay';
 import {
   GROUP_ORDER, resolveMenuActions, resolveTargetKind,
   type CurationCtx, type CurationCallbacks,
@@ -167,7 +168,7 @@ export default function ContextMenu(props: ContextMenuProps) {
               >
                 <span className="context-menu__icon">{def.icon}</span>
                 <span className="context-menu__label">{label}</span>
-                {def.shortcut && <span className="context-menu__shortcut">{def.shortcut}</span>}
+                {def.shortcut && <span className="context-menu__shortcut">{displayShortcut(def.shortcut)}</span>}
               </button>
             );
           })}

@@ -123,7 +123,7 @@ export function useAvatarTape(activeTool3D: string) {
           pointA: pA,
           pointB: pB,
           measurement: distMm,
-          label: 'Distance',
+          label: 'Distancia',
           color: pendingTape.color ?? nextColor(),
           visible: true,
         }));

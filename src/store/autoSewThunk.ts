@@ -82,13 +82,13 @@ export function runAutoSew(minConfidence: number = DEFAULT_MIN_CONFIDENCE) {
 
     if (added > 0) {
       dispatch(showSuccessToast(
-        `Auto-sew: ${added} costura${added === 1 ? '' : 's'} propuesta${added === 1 ? '' : 's'} (ámbar = revisar y confirmar)`,
+        `Costura automática: ${added} propuesta${added === 1 ? '' : 's'} (ámbar = revisar y confirmar)`,
       ));
     } else if (result.seams.length > 0) {
-      dispatch(showInfoToast('Auto-sew: las costuras propuestas ya existen'));
+      dispatch(showInfoToast('Costura automática: las propuestas ya existen'));
     } else {
       dispatch(showInfoToast(
-        'Auto-sew: sin costuras con confianza suficiente — ¿las piezas están clasificadas?',
+        'Costura automática: no hay propuestas con confianza suficiente — ¿las piezas están clasificadas?',
       ));
     }
 
@@ -125,7 +125,7 @@ export function resewAiSeams(minConfidence: number = DEFAULT_MIN_CONFIDENCE) {
 
     if (refined.length === 0) {
       dispatch(showInfoToast(
-        'Re-coser: el motor no propuso costuras — no borré nada. ¿Las piezas están clasificadas?',
+        'Recoser: el motor no propuso costuras — no se eliminó nada. ¿Las piezas están clasificadas?',
       ));
       return { removed: 0, added: 0 };
     }
@@ -134,7 +134,7 @@ export function resewAiSeams(minConfidence: number = DEFAULT_MIN_CONFIDENCE) {
     // snapshotea los removes y los adds por separado y un solo Ctrl+Z
     // aterrizaba en el intermedio "todo borrado, nada re-añadido".
     let added = 0;
-    batchUndo(dispatch, 'Re-coser', () => {
+    batchUndo(dispatch, 'Recoser', () => {
       // 2. Borrar las stale (meta.skipConfirmation: el gate de confirmación es
       // para borrados del usuario, no para este reemplazo atómico ofrecido).
       for (const s of stale) {
@@ -150,7 +150,7 @@ export function resewAiSeams(minConfidence: number = DEFAULT_MIN_CONFIDENCE) {
     });
 
     dispatch(showSuccessToast(
-      `Re-cosido: ${stale.length} costura${stale.length === 1 ? '' : 's'} vieja${stale.length === 1 ? '' : 's'} → ${added} nueva${added === 1 ? '' : 's'} con el motor actual`,
+      `Recosido: ${stale.length} costura${stale.length === 1 ? '' : 's'} vieja${stale.length === 1 ? '' : 's'} → ${added} nueva${added === 1 ? '' : 's'} con el motor actual`,
     ));
 
     return { removed: stale.length, added };

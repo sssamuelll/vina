@@ -26,7 +26,7 @@ export default function LightingSection({ open, onToggle }: SectionProps) {
               Estudio 3 puntos
             </button>
             <button className="ap-btn" onClick={() => dispatch(applyLightPreset('softBox'))}>
-              Softbox
+              Caja de luz
             </button>
             <button className="ap-btn" onClick={() => dispatch(applyLightPreset('dramatic'))}>
               Dramática

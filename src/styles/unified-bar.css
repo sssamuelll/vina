@@ -10,16 +10,18 @@
      — a softer, more translucent dark capsule that lets the pattern win the
      hierarchy. It comes forward the moment you reach for it (see below). On the
      dark 3D view this is benign: dark-on-dark either way. */
-  background: rgba(8, 8, 15, 0.78);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(99, 102, 241, 0.15);
-  border-radius: 29px;
+  background: var(--surface-overlay-bg-recessed);
+  backdrop-filter: var(--surface-overlay-blur);
+  -webkit-backdrop-filter: var(--surface-overlay-blur);
+  border: var(--surface-overlay-border);
+  /* Rol cápsula del material `overlay`: una barra de comando con forma de
+   * píldora no puede llevar el radio de panel sin leerse como panel. */
+  border-radius: var(--surface-overlay-radius-pill);
   display: flex;
   align-items: center;
   padding: 0 10px 0 12px;
   gap: 10px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--surface-overlay-shadow-recessed);
   opacity: 0.92;
   transition: border-radius 0.15s ease, background 0.18s ease,
     box-shadow 0.18s ease, opacity 0.18s ease;
@@ -31,8 +33,9 @@
 .unified-bar:hover,
 .unified-bar:focus-within,
 .unified-bar--panel-open {
-  background: rgba(8, 8, 15, 0.92);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  /* Sube del reposo al material `overlay` pleno. */
+  background: var(--surface-overlay-bg);
+  box-shadow: var(--surface-overlay-shadow);
   opacity: 1;
 }
 /* When panel is open, flatten the top edge for seamless connection */
@@ -145,12 +148,14 @@
   left: 0;
   right: 0;
   width: 560px;
-  background: rgba(8, 8, 15, 0.95);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(99, 102, 241, 0.15);
+  /* Material `overlay`. El borde inferior se quita y las esquinas de abajo
+   * se cuadran a propósito: va pegado encima de la barra, no flota solo. */
+  background: var(--surface-overlay-bg);
+  backdrop-filter: var(--surface-overlay-blur);
+  -webkit-backdrop-filter: var(--surface-overlay-blur);
+  border: var(--surface-overlay-border);
   border-bottom: none;
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--surface-overlay-radius) var(--surface-overlay-radius) 0 0;
   max-height: 50vh;
   overflow-y: auto;
   animation: slide-up var(--transition-normal) ease-out;

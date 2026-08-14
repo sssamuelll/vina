@@ -91,9 +91,9 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Imágenes de referencia', action: (d) => d(toggleReferenceImages()), checked: (s) => s.editor.showReferenceImages },
   { label: 'Largos de línea', action: (d) => d(toggleLineLengths()), checked: (s) => s.editor.showLineLengths },
   { separator: true, label: '' },
-  { label: 'Render: texturizado', action: (d) => d(setRenderMode2D('textured')), checked: (s) => s.editor.renderMode2D === 'textured' },
-  { label: 'Render: translúcido', action: (d) => d(setRenderMode2D('translucent')), checked: (s) => s.editor.renderMode2D === 'translucent' },
-  { label: 'Render: alambre', action: (d) => d(setRenderMode2D('wireframe')), checked: (s) => s.editor.renderMode2D === 'wireframe' },
+  { label: 'Renderizado: texturizado', action: (d) => d(setRenderMode2D('textured')), checked: (s) => s.editor.renderMode2D === 'textured' },
+  { label: 'Renderizado: translúcido', action: (d) => d(setRenderMode2D('translucent')), checked: (s) => s.editor.renderMode2D === 'translucent' },
+  { label: 'Renderizado: alambre', action: (d) => d(setRenderMode2D('wireframe')), checked: (s) => s.editor.renderMode2D === 'wireframe' },
   { separator: true, label: '' },
   { label: '3D: prenda', action: (d) => d(toggleGarment()), checked: (s) => s.simulation.showGarment },
   { label: '3D: líneas de costura', action: (d) => d(toggleSeamlines3D()), checked: (s) => s.simulation.showSeamlines3D },
@@ -128,7 +128,7 @@ const PREFERENCES_MENU: MenuItem[] = [
 
 const HELP_MENU: MenuItem[] = [
   { label: 'Documentación', action: () => window.open('https://github.com/sssamuelll/vina', '_blank') },
-  { label: 'Reportar un bug', action: () => window.open('https://github.com/sssamuelll/vina/issues', '_blank') },
+  { label: 'Reportar un error', action: () => window.open('https://github.com/sssamuelll/vina/issues', '_blank') },
   { separator: true, label: '' },
   { label: 'Acerca de Vina', action: () => alert('Vina v0.11.0\nMotor de diseño cognitivo para ingeniería de moda') },
 ];

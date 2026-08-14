@@ -1,6 +1,6 @@
 // src/utils/trim/trimExtractor.ts
 import type { PatternPiece } from '../../types/types';
-import type { Trim } from '../../types/trim';
+import type { Trim, TrimType } from '../../types/trim';
 import { flattenPath } from '../seam/index';
 
 function computePerimeter(points: { x: number; y: number }[]): number {
@@ -50,6 +50,21 @@ export interface TrimBOMEntry {
   sourcePieceIds: string[];
 }
 
+/** Etiquetas visibles de los tipos de avío. Exportado para que los tests se
+ *  aten al mapa y no a la cadena: el enum es la identidad, el texto es solo
+ *  presentación y se traduce (contrato de interfaz, 2026-08-14). */
+export const TRIM_TYPE_LABELS: Record<TrimType, string> = {
+  button: 'botón',
+  zipper: 'cierre',
+  snap: 'broche',
+  rivet: 'remache',
+  buckle: 'hebilla',
+  ring: 'aro',
+  'hook-eye': 'corchete',
+  'drawstring-stop': 'tope de cordón',
+  custom: 'personalizado',
+};
+
 export function extractTrims(trims: Trim[], pieces: PatternPiece[]): TrimBOMEntry[] {
   const active = trims.filter(t => t.active);
   if (active.length === 0) return [];
@@ -94,7 +109,7 @@ export function extractTrims(trims: Trim[], pieces: PatternPiece[]): TrimBOMEntr
     entries.push({
       id: crypto.randomUUID(),
       category: 'trim',
-      name: `${g.type} \u2014 ${g.name}`,
+      name: `${TRIM_TYPE_LABELS[g.type as TrimType] ?? g.type} \u2014 ${g.name}`,
       description: `${g.quantity} \u00d7 ${g.name}`,
       quantity: g.quantity,
       unit: 'pieces',
@@ -110,8 +125,8 @@ export function extractTrims(trims: Trim[], pieces: PatternPiece[]): TrimBOMEntr
     entries.push({
       id: crypto.randomUUID(),
       category: 'trim',
-      name: `${g.type} \u2014 ${g.name}`,
-      description: `${g.name} along edge`,
+      name: `${TRIM_TYPE_LABELS[g.type as TrimType] ?? g.type} \u2014 ${g.name}`,
+      description: `${g.name} a lo largo del borde`,
       quantity: Math.round((g.lengthMM / 1000) * 100) / 100,
       unit: 'meters',
       unitCost: g.unitCost,

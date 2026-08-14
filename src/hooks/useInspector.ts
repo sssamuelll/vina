@@ -57,7 +57,7 @@ export function useInspector() {
       }
     }).catch((err) => {
       if (!controller.signal.aborted) {
-        dispatch(setAgentError(err instanceof Error ? err.message : 'Analysis failed'));
+        dispatch(setAgentError(err instanceof Error ? err.message : 'Falló el análisis'));
       }
     });
 

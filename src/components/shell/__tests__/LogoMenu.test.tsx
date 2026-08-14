@@ -77,14 +77,14 @@ describe('LogoMenu ▸ View — 2D display toggles', () => {
     const store = renderMenu();
     expect(store.getState().editor.renderMode2D).toBe('textured');
     openViewMenu();
-    expect(isChecked('Render: texturizado')).toBe(true);
-    expect(isChecked('Render: alambre')).toBe(false);
-    fireEvent.click(screen.getByText('Render: alambre'));
+    expect(isChecked('Renderizado: texturizado')).toBe(true);
+    expect(isChecked('Renderizado: alambre')).toBe(false);
+    fireEvent.click(screen.getByText('Renderizado: alambre'));
     expect(store.getState().editor.renderMode2D).toBe('wireframe');
     // menu closed on click — reopen and re-assert exclusivity
     openViewMenu();
-    expect(isChecked('Render: alambre')).toBe(true);
-    expect(isChecked('Render: texturizado')).toBe(false);
+    expect(isChecked('Renderizado: alambre')).toBe(true);
+    expect(isChecked('Renderizado: texturizado')).toBe(false);
   });
 });
 

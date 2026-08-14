@@ -72,7 +72,7 @@ describe('ToastContainer', () => {
       store.dispatch(showToast({ type: 'success', message: 'Exported', duration: 5000 }));
     });
     const container = renderWithStore(store);
-    const dismiss = container.querySelector('button[aria-label="Dismiss notification"]');
+    const dismiss = container.querySelector('button[aria-label="Cerrar notificación"]');
     expect(dismiss).toBeTruthy();
     fireEvent.click(dismiss!);
     expect(store.getState().copilotUI.toasts.length).toBe(0);

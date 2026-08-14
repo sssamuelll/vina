@@ -10,10 +10,11 @@
   align-items: center;
   gap: 5px;
   padding: 7px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  /* Material `chrome`: va acoplado a la canaleta, así que es opaco. */
+  background: var(--surface-chrome-bg);
+  border: var(--surface-chrome-border);
+  border-radius: var(--surface-chrome-radius);
+  box-shadow: var(--surface-chrome-shadow);
 }
 
 .dock--left { left: 14px; }
@@ -52,9 +53,19 @@
   outline-offset: -2px;
 }
 
-.dock__tool--active {
-  background: var(--accent-subtle);
-  color: var(--accent);
+/* Ley de estado: seleccionado > hover > reposo, siempre.
+ * Hasta 2026-08-14 esto era `--accent-subtle` (lavado 13%) + icono índigo, y
+ * perdía contra el `:hover` de arriba, que pinta un fondo OPACO + icono blanco:
+ * la herramienta apenas rozada se veía más seleccionada que la activa.
+ * El relleno lleno es además la señal NO cromática que la regla exige — no se
+ * puede depender del tono en un icono de 16px.
+ * La variante `:hover` es explícita a propósito: sin ella, cuál gana depende
+ * del orden de las reglas en el archivo, que es el acuerdo tácito que produjo
+ * la deriva. Lo fija Dock.jerarquiaDeEstado.test.ts. */
+.dock__tool--active,
+.dock__tool--active:hover {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .dock__sep {

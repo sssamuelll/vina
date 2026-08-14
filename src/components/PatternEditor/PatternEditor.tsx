@@ -258,7 +258,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // clones the tree once (not per piece) and Ctrl+Z reverts the whole gesture.
   const handleApplySeamAllowanceAll = useCallback((pieceIds: string[], widthMm: number) => {
     if (pieceIds.length === 0) return;
-    batchUndo(dispatch, `Apply ${widthMm}mm seam allowance to ${pieceIds.length} piece(s)`, () => {
+    batchUndo(dispatch, `Aplicar margen de costura de ${widthMm} mm a ${pieceIds.length} ${pieceIds.length === 1 ? 'pieza' : 'piezas'}`, () => {
       dispatch(batchSetSeamAllowance({ pieceIds, width: widthMm }));
     });
   }, [dispatch]);

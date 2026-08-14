@@ -1,0 +1,14 @@
+{
+  "_doc": "Techos del contrato de UI. Solo bajan. Ver scripts/ui-contract-lint.mjs",
+  "rules": {
+    "varFallback": 142,
+    "phantomTokenRefs": 50,
+    "literalColor": 966,
+    "tokenDefinitionFiles": 2,
+    "hoverWithoutFocus": 65,
+    "outlineNone": 9,
+    "nativeDialog": 8,
+    "zIndexLiteral": 42
+  },
+  "_actualizado": "2026-08-14"
+}

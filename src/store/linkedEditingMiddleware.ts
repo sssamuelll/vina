@@ -30,11 +30,11 @@ interface ProjectStateShape {
 }
 
 const BATCH_LABELS: Record<string, string> = {
-  'project/updatePiece': 'Edit Linked Piece',
-  'project/addInternalLine': 'Add Internal Line (Linked)',
-  'project/updateInternalLine': 'Edit Internal Line (Linked)',
-  'project/flipPieceH': 'Flip Linked Piece Horizontal',
-  'project/flipPieceV': 'Flip Linked Piece Vertical',
+  'project/updatePiece': 'Editar pieza vinculada',
+  'project/addInternalLine': 'Añadir línea interna vinculada',
+  'project/updateInternalLine': 'Editar línea interna vinculada',
+  'project/flipPieceH': 'Voltear pieza vinculada en horizontal',
+  'project/flipPieceV': 'Voltear pieza vinculada en vertical',
 };
 
 // Pure: (action, state) → boolean. No side effects, no dispatches, no state mutation.
@@ -93,7 +93,7 @@ export const linkedEditingMiddleware: Middleware = (store) => (next) => (action:
     return next(action);
   }
 
-  const label = BATCH_LABELS[act.type] ?? 'Linked Edit';
+  const label = BATCH_LABELS[act.type] ?? 'Edición vinculada';
 
   // Open capture-all mode before the original action reaches undoMiddleware so
   // both the source action and its synchronous partner cascade stay atomic.

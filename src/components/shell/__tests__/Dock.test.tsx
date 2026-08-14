@@ -167,11 +167,14 @@ describe('LeftDock (container)', () => {
     expect(screen.queryByRole('button', { name: 'Soltar Escalar' })).toBeNull();
   });
 
+  // Usaba 'notch' (Piquete), que desde la auditoría de UI del 2026-08-14 viene
+  // en el dock por defecto — ya no sirve para probar "agregar algo que no está".
+  // 'grainline' (Hilo) sí queda fuera del default.
   it('adds a catalog tool to the dock when dispatched', () => {
     const { store } = renderLeftDock();
-    expect(screen.queryByRole('button', { name: /piquete/i })).toBeNull();
-    act(() => { store.dispatch(addDockTool('notch')); });
-    expect(screen.getByRole('button', { name: /piquete/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /hilo/i })).toBeNull();
+    act(() => { store.dispatch(addDockTool('grainline')); });
+    expect(screen.getByRole('button', { name: /hilo/i })).toBeTruthy();
   });
 
   it('removes a default tool from the dock when dispatched', () => {
