@@ -16,30 +16,43 @@
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--border);
 }
 
 .nesting-toolbar button {
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 3px 8px;
-  background: var(--button-bg, #2a2a2a);
-  color: var(--text-color, #ccc);
-  border: 1px solid var(--border-color, #333);
-  border-radius: 3px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   white-space: nowrap;
 }
 
-.nesting-toolbar button:hover {
-  background: var(--button-hover-bg, #3a3a3a);
+/* `:not(:disabled)` no es adorno: sin él, el botón «Nest» deshabilitado se
+ * ilumina al pasar el mouse y promete que se puede pulsar. Lo fija
+ * NestingTab.botonDeshabilitado.test.ts. */
+.nesting-toolbar button:hover:not(:disabled) {
+  background: var(--bg-elevated);
+}
+
+.nesting-toolbar button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.nesting-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .nesting-toolbar select {
   font-size: 11px;
   padding: 3px 6px;
-  background: var(--button-bg, #2a2a2a);
-  color: var(--text-color, #ccc);
-  border: 1px solid var(--border-color, #333);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   border-radius: 3px;
   cursor: pointer;
 }
@@ -54,16 +67,16 @@
   width: 50px;
   font-size: 11px;
   padding: 2px 4px;
-  background: var(--button-bg, #2a2a2a);
-  color: var(--text-color, #ccc);
-  border: 1px solid var(--border-color, #333);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   border-radius: 3px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 .nesting-toolbar input[type='number']:focus {
-  border-color: var(--accent-color, #3b82f6);
+  border-color: var(--accent);
   outline: none;
 }
 
@@ -95,7 +108,7 @@
 }
 
 .nesting-stat strong {
-  color: var(--text-color, #ccc);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
