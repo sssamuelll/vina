@@ -8,7 +8,9 @@
   flex-direction: column;
   pointer-events: auto;
   isolation: isolate;
-  --capa-panel: 1;
+  /* Grupo 2 (Task 4, revisor): raíz aislada — local = original (20) para
+     no invertir el orden con SurfaceModePill/RenderSettingsPanel. */
+  --capa-panel: 20;
   z-index: var(--capa-panel);
 }
 

@@ -88,3 +88,31 @@ describe('.floating-3d (RightDock) — el z-index real vive en floating.css, no 
     expect(regla).not.toMatch(/z-index:\s*-?\d/);
   });
 });
+
+/**
+ * Fix 3 (revisor, ronda de review de Task 4): nada atrapaba un --capa-X mal
+ * escrito o borrado — `var(--capa-X)` sin su `--capa-X:` resuelve a `auto`
+ * (o hereda de un ancestro, dado que nombres como `--capa-bar`/`--capa-panel`
+ * se repiten sin problema entre archivos distintos — están pensados para
+ * shadowear localmente) sin que ningún gate ni test lo note. Por archivo:
+ * cada `var(--capa-X)` referenciada debe tener su `--capa-X:` definida en
+ * ESE MISMO archivo (self-contained, o en el root que la declaró).
+ */
+function capaRefs(contenido: string): Set<string> {
+  return new Set([...contenido.matchAll(/var\(\s*(--capa-[\w-]+)/g)].map((m) => m[1]));
+}
+function capaDefs(contenido: string): Set<string> {
+  // CSS: `--capa-x:`; TSX (clave de objeto): `'--capa-x':` — comilla opcional.
+  return new Set([...contenido.matchAll(/(--capa-[\w-]+)['"]?\s*:/g)].map((m) => m[1]));
+}
+
+describe('cada var(--capa-X) referenciada tiene su --capa-X definida en el mismo archivo', () => {
+  it.each([...ARCHIVOS_CSS, ...ARCHIVOS_TSX])('%s: ninguna var(--capa-X) huérfana', (ruta) => {
+    const contenido = leer(ruta);
+    const refs = capaRefs(contenido);
+    const defs = capaDefs(contenido);
+    for (const ref of refs) {
+      expect(defs.has(ref)).toBe(true);
+    }
+  });
+});

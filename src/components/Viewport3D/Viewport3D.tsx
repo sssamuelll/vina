@@ -731,16 +731,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     <div
       className="viewport3d"
       ref={containerRef}
-      style={{
-        position: 'relative',
-        cursor: toolCursor,
-        // Grupo 2 (§2.3 emplazamiento): root real de todo lo que este
-        // componente devuelve — el box-select overlay y el botón de cuerpos
-        // de colisión solo necesitan ganarle a sus hermanos aquí dentro.
-        isolation: 'isolate',
-        '--capa-box-overlay': 10,
-        '--capa-collision-btn': 25,
-      } as React.CSSProperties}
+      style={{ position: 'relative', cursor: toolCursor }}
       onPointerDown={(e) => { handlePointerDown(e); onPanPointerDown(e); }}
       onPointerMove={(e) => {
         onPanPointerMove(e);
@@ -815,9 +806,14 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
           warnings), not legacy chrome. Caught by the R1 replay specs:
           the Fase 4 "aviso explícito" was invisible in the real shell. */}
       <SimulationStatusOverlay />
+      {/* Grupo 2 (§2.3 emplazamiento, Task 4 revisor): isolation en el overlay
+          mismo, NO en la raíz .viewport3d — de lo contrario atrapa a
+          ContextMenu3D (más abajo) y le rompe el token global --z-context-menu
+          que Task 3 le dio para ganarle SIEMPRE al dock/la barra. */}
       <div ref={boxOverlayRef} style={{
         display: 'none', position: 'absolute', border: '1px dashed #00e5ff',
-        backgroundColor: 'rgba(0, 229, 255, 0.08)', pointerEvents: 'none', zIndex: 'var(--capa-box-overlay)',
+        backgroundColor: 'rgba(0, 229, 255, 0.08)', pointerEvents: 'none',
+        isolation: 'isolate', '--capa-box-overlay': 10, zIndex: 'var(--capa-box-overlay)',
       } as React.CSSProperties} />
       <PanCrosshair ref={crosshairRef} />
       <Canvas
@@ -991,6 +987,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
             position: 'absolute',
             top: 8,
             right: collisionPanelOpen ? 290 : 8,
+            // Grupo 2 (Task 4 revisor): isolation propia, no la de .viewport3d
+            // — ver nota junto al box overlay más arriba.
+            isolation: 'isolate',
+            '--capa-collision-btn': 25,
             zIndex: 'var(--capa-collision-btn)',
             background: collisionPanelOpen ? 'rgba(74, 158, 255, 0.2)' : 'rgba(30, 30, 30, 0.8)',
             border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -1000,7 +1000,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
             cursor: 'pointer',
             fontSize: 12,
             fontFamily: 'var(--font-sans)',
-          }}
+          } as React.CSSProperties}
           title="Cuerpos de colisión"
           aria-label="Cuerpos de colisión"
           onClick={() => setCollisionPanelOpen(!collisionPanelOpen)}

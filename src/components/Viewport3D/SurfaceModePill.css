@@ -6,7 +6,10 @@
      DEBAJO de los iconos cuando la simulación corría. */
   right: 8px;
   isolation: isolate;
-  --capa-pill: 1;
+  /* Grupo 2 (Task 4, revisor): raíz aislada — sigue compitiendo con sus
+     hermanos reales (RenderSettingsPanel, CollisionBodyPanel, etc.) en el
+     cluster flotante del visor 3D, así que el local es el original (25). */
+  --capa-pill: 25;
   z-index: var(--capa-pill);
 }
 
@@ -41,7 +44,10 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   padding: 6px;
-  --capa-menu: 2;
+  /* Nombrado explícitamente por el revisor pese a ser descendiente de
+     .surface-pill: mismo original (30) por consistencia con el resto del
+     cluster, cero costo. */
+  --capa-menu: 30;
   z-index: var(--capa-menu);
 }
 

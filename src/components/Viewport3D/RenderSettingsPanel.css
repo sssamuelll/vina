@@ -10,8 +10,12 @@
   pointer-events: auto;
   isolation: isolate;
   /* Por encima del SurfaceModePill (z-25): a z-20 el pill tapaba el header
-     y el botón de cerrar del drawer abierto (Fase 2, puerta-export). */
-  --capa-panel: 1;
+     y el botón de cerrar del drawer abierto (Fase 2, puerta-export).
+     Grupo 2 (Task 4, revisor): esta raíz aislada sigue compitiendo con sus
+     hermanos REALES en el contexto de apilamiento de su padre (el cluster
+     flotante del visor 3D) — el valor local tiene que ser el original
+     global (30), no un número reiniciado, o ese orden se invierte. */
+  --capa-panel: 30;
   z-index: var(--capa-panel);
 }
 

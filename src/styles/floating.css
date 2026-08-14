@@ -2,7 +2,9 @@
 .floating-3d {
   position: absolute;
   isolation: isolate;
-  --capa-badge: 1;
+  /* Grupo 2 (Task 4, revisor, hallazgo de auditoría): raíz aislada del
+     mismo cluster flotante del visor 3D — local = original (15). */
+  --capa-badge: 15;
   z-index: var(--capa-badge);
 }
 .floating-3d--bottom-left {
