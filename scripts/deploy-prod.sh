@@ -43,6 +43,9 @@ npx tsc -b --noEmit
 echo "✓ typecheck"
 npm run lint > /dev/null
 echo "✓ lint"
+node scripts/ui-contract-lint.mjs > /tmp/vina-ui-contract.log 2>&1 \
+  || { cat /tmp/vina-ui-contract.log >&2; exit 1; }
+echo "✓ contrato de interfaz (trinquete)"
 npx vitest run > /tmp/vina-deploy-vitest.log 2>&1 || { tail -20 /tmp/vina-deploy-vitest.log >&2; exit 1; }
 grep -E "Test Files|Tests " /tmp/vina-deploy-vitest.log | sed 's/^ */✓ /'
 node scripts/verify-wasm-smoke.mjs
