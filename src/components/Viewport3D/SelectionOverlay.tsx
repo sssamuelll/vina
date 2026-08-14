@@ -18,13 +18,15 @@ export default function SelectionOverlay() {
             border: '1px dashed #00e5ff',
             backgroundColor: 'rgba(0, 229, 255, 0.08)',
             pointerEvents: 'none',
-            zIndex: 10,
-          }}
+            isolation: 'isolate',
+            '--capa-box': 10,
+            zIndex: 'var(--capa-box)',
+          } as React.CSSProperties}
         />
       )}
       {selectLasso && selectLasso.length > 1 && (
         <svg
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', isolation: 'isolate', '--capa-lasso': 10, zIndex: 'var(--capa-lasso)' } as React.CSSProperties}
         >
           <polyline
             points={selectLasso.map(p => `${p.x},${p.y}`).join(' ')}

@@ -8,9 +8,11 @@
   display: flex;
   flex-direction: column;
   pointer-events: auto;
+  isolation: isolate;
   /* Por encima del SurfaceModePill (z-25): a z-20 el pill tapaba el header
      y el botón de cerrar del drawer abierto (Fase 2, puerta-export). */
-  z-index: 30;
+  --capa-panel: 1;
+  z-index: var(--capa-panel);
 }
 
 .render-panel {

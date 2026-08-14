@@ -21,9 +21,11 @@ const PanCrosshair = forwardRef<HTMLDivElement>(function PanCrosshair(_props, re
         top: '50%',
         transform: 'translate(-50%, -50%)',
         pointerEvents: 'none',
-        zIndex: 20,
+        isolation: 'isolate',
+        '--capa-crosshair': 20,
+        zIndex: 'var(--capa-crosshair)',
         filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.6))',
-      }}
+      } as React.CSSProperties}
     >
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="var(--accent)" strokeWidth="1.5">
         <line x1="14" y1="2" x2="14" y2="10" />

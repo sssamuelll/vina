@@ -68,7 +68,9 @@ export default function FloatingActionBar({
         left,
         top,
         transform,
-        zIndex: 90,
+        isolation: 'isolate',
+        '--capa-bar': 90,
+        zIndex: 'var(--capa-bar)',
         display: 'flex',
         alignItems: 'center',
         gap: 2,
@@ -77,7 +79,7 @@ export default function FloatingActionBar({
         border: '1px solid #333',
         borderRadius: 6,
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
-      }}
+      } as React.CSSProperties}
     >
       {actions.map((def) => {
         const Icon = BAR_ICONS[def.id];

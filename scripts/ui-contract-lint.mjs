@@ -32,6 +32,18 @@ const BASELINE_PATH = join(ROOT, 'scripts', 'ui-contract-baseline.json');
 /** El archivo donde SÍ es legal escribir un color literal. */
 const TOKEN_FILES = ['src/styles/tokens.css'];
 
+/**
+ * `--capa-*` (Task 4, Grupo 2 de la ley de emplazamiento, § 2.3): variables
+ * CSS deliberadamente LOCALES a un `isolation: isolate` de un solo
+ * componente — nunca un token global, nunca pensadas para reusarse fuera de
+ * su propio archivo. R2 (tokens fantasma) y R4 (archivos que definen
+ * tokens) existen para cazar drift de VOCABULARIO GLOBAL; una `--capa-x`
+ * definida y usada dentro del mismo árbol aislado no es ese caso — así que
+ * ambas reglas la ignoran a propósito, por nombre, en vez de perseguir cada
+ * sitio nuevo uno por uno.
+ */
+const isLocalCapaVar = (name) => name.startsWith('--capa-');
+
 // ── utilidades ──────────────────────────────────────────────────────────────
 
 /** git ls-files, no `find`: excluye node_modules, dist y worktrees sin pensarlo. */
@@ -115,7 +127,7 @@ const RULES = [
       return countMatches(
         [...cssFiles(), ...codeFiles()],
         /var\(\s*(--[\w-]+)/,
-        (m) => !defined.has(m[1]),
+        (m) => !isLocalCapaVar(m[1]) && !defined.has(m[1]),
       );
     },
   },
@@ -138,7 +150,10 @@ const RULES = [
     run: () => {
       const hits = [];
       for (const f of cssFiles()) {
-        const first = scan(f).find(({ line }) => /^\s*--[\w-]+\s*:/.test(line));
+        const first = scan(f).find(({ line }) => {
+          const m = line.match(/^\s*(--[\w-]+)\s*:/);
+          return m && !isLocalCapaVar(m[1]);
+        });
         if (first) hits.push({ file: f, n: first.n, text: f, line: first.line.trim() });
       }
       return hits;

@@ -207,7 +207,7 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
     <div
       ref={barRef}
       className={barClasses}
-      style={{ left: position.x, top: position.y }}
+      style={{ left: position.x, top: position.y, isolation: 'isolate' } as React.CSSProperties}
       onMouseDown={handleMouseDown}
       onDragEnter={handleDxfDragEnter}
       onDragOver={handleDxfDragOver}
@@ -220,7 +220,8 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
           style={{
             position: 'absolute',
             inset: 0,
-            zIndex: 10,
+            '--capa-dxf-hint': 10,
+            zIndex: 'var(--capa-dxf-hint)',
             pointerEvents: 'none',
             display: 'flex',
             alignItems: 'center',
@@ -228,7 +229,7 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
             background: 'rgba(99, 102, 241, 0.14)',
             border: '2px dashed var(--accent, #6366f1)',
             borderRadius: 12,
-          }}
+          } as React.CSSProperties}
         >
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
             Suelta tu .dxf para adjuntarlo

@@ -1,5 +1,5 @@
 /* LayerPanel */
-.layer-panel { font-size: 12px; overflow-y: auto; height: 100%; position: relative; }
+.layer-panel { font-size: 12px; overflow-y: auto; height: 100%; position: relative; isolation: isolate; }
 .layer-panel-toolbar { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--panel-border, #2a2a3e); }
 .layer-panel-toolbar button { background: var(--panel-section-bg, #2a2a3e); border: 1px solid transparent; border-radius: 4px; color: var(--text-secondary, #ccc); cursor: pointer; font-size: 11px; padding: 3px 8px; }
 .layer-panel-toolbar button:hover { background: #3a3a4e; color: var(--text-primary, #e0e0e0); }
@@ -28,11 +28,11 @@
 .layer-inline-rename { background: #2a2a3e; border: 1px solid #6366f1; border-radius: 3px; color: white; font-size: 11px; padding: 1px 4px; width: 100%; outline: none; }
 .layer-color-dot { width: 12px; height: 12px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0; }
 .layer-color-dot:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.3); }
-.layer-color-popover { position: absolute; background: #1e1e1e; border: 1px solid #3a3a3a; border-radius: 6px; padding: 6px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.4); top: 100%; left: 0; margin-top: 4px; }
+.layer-color-popover { position: absolute; background: #1e1e1e; border: 1px solid #3a3a3a; border-radius: 6px; padding: 6px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; --capa-color-popover: 1; z-index: var(--capa-color-popover); box-shadow: 0 4px 12px rgba(0,0,0,0.4); top: 100%; left: 0; margin-top: 4px; }
 .layer-color-swatch { width: 20px; height: 20px; border-radius: 4px; border: 2px solid transparent; cursor: pointer; padding: 0; }
 .layer-color-swatch:hover { border-color: rgba(255,255,255,0.5); }
 .layer-color-swatch.active { border-color: white; }
-.layer-context-menu { position: fixed; background: #1e1e2e; border: 1px solid #3a3a4e; border-radius: 6px; padding: 4px 0; z-index: 200; box-shadow: 0 4px 16px rgba(0,0,0,0.5); min-width: 140px; }
+.layer-context-menu { position: fixed; background: #1e1e2e; border: 1px solid #3a3a4e; border-radius: 6px; padding: 4px 0; --capa-context-menu: 2; z-index: var(--capa-context-menu); box-shadow: 0 4px 16px rgba(0,0,0,0.5); min-width: 140px; }
 .layer-context-menu button { display: block; width: 100%; background: none; border: none; color: var(--text-secondary, #ccc); font-size: 12px; padding: 6px 12px; text-align: left; cursor: pointer; }
 .layer-context-menu button:hover { background: rgba(99,102,241,0.15); color: var(--text-primary, #e0e0e0); }
 .layer-context-menu button:disabled { color: var(--text-muted, #555); cursor: not-allowed; }

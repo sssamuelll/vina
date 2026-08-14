@@ -5,7 +5,9 @@
      izquierda desde right:130 (Fase1-S3) — a right:116 el pill quedaba
      DEBAJO de los iconos cuando la simulación corría. */
   right: 8px;
-  z-index: 25;
+  isolation: isolate;
+  --capa-pill: 1;
+  z-index: var(--capa-pill);
 }
 
 .surface-pill__trigger {
@@ -39,7 +41,8 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   padding: 6px;
-  z-index: 30;
+  --capa-menu: 2;
+  z-index: var(--capa-menu);
 }
 
 .surface-pill__option {

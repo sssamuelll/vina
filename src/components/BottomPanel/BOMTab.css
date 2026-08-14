@@ -6,6 +6,7 @@
   height: 100%;
   overflow: hidden;
   font-size: 12px;
+  isolation: isolate;
 }
 
 /* ─── Toolbar ────────────────────────────────────────────────────────────── */
@@ -114,7 +115,8 @@
   padding: 4px 8px;
   border-bottom: 1px solid var(--border-color, #333);
   white-space: nowrap;
-  z-index: 1;
+  --capa-th: 1;
+  z-index: var(--capa-th);
 }
 
 .bom-table td {

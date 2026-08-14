@@ -75,13 +75,14 @@ export function SimulationStatusOverlay() {
 
   return (
     <div style={{
-      position: 'absolute', top: 8, left: 8, zIndex: 100,
+      position: 'absolute', top: 8, left: 8,
+      isolation: 'isolate', '--capa-overlay': 100, zIndex: 'var(--capa-overlay)',
       background: 'rgba(0,0,0,0.75)', borderRadius: 6,
       padding: '4px 8px', fontFamily: 'monospace', fontSize: 11,
       color: '#e0e0e0',
       backdropFilter: 'blur(4px)', lineHeight: 1.6,
       border: `1px solid ${tier.color}33`,
-    }}>
+    } as React.CSSProperties}>
       <button
         type="button"
         aria-label="Estado de la simulación"

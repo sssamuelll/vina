@@ -1,7 +1,9 @@
 /* 3D floating controls */
 .floating-3d {
   position: absolute;
-  z-index: 15;
+  isolation: isolate;
+  --capa-badge: 1;
+  z-index: var(--capa-badge);
 }
 .floating-3d--bottom-left {
   /* Por encima del UnifiedBar en su posición default (58px alto + 24px de

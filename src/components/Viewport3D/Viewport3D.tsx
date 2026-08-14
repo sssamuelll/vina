@@ -731,7 +731,16 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     <div
       className="viewport3d"
       ref={containerRef}
-      style={{ position: 'relative', cursor: toolCursor }}
+      style={{
+        position: 'relative',
+        cursor: toolCursor,
+        // Grupo 2 (§2.3 emplazamiento): root real de todo lo que este
+        // componente devuelve — el box-select overlay y el botón de cuerpos
+        // de colisión solo necesitan ganarle a sus hermanos aquí dentro.
+        isolation: 'isolate',
+        '--capa-box-overlay': 10,
+        '--capa-collision-btn': 25,
+      } as React.CSSProperties}
       onPointerDown={(e) => { handlePointerDown(e); onPanPointerDown(e); }}
       onPointerMove={(e) => {
         onPanPointerMove(e);
@@ -808,8 +817,8 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       <SimulationStatusOverlay />
       <div ref={boxOverlayRef} style={{
         display: 'none', position: 'absolute', border: '1px dashed #00e5ff',
-        backgroundColor: 'rgba(0, 229, 255, 0.08)', pointerEvents: 'none', zIndex: 10,
-      }} />
+        backgroundColor: 'rgba(0, 229, 255, 0.08)', pointerEvents: 'none', zIndex: 'var(--capa-box-overlay)',
+      } as React.CSSProperties} />
       <PanCrosshair ref={crosshairRef} />
       <Canvas
         camera={{ position: [0, 0.85, 3.0], fov: 50 }}
@@ -982,7 +991,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
             position: 'absolute',
             top: 8,
             right: collisionPanelOpen ? 290 : 8,
-            zIndex: 25,
+            zIndex: 'var(--capa-collision-btn)',
             background: collisionPanelOpen ? 'rgba(74, 158, 255, 0.2)' : 'rgba(30, 30, 30, 0.8)',
             border: '1px solid rgba(255, 255, 255, 0.15)',
             borderRadius: 6,

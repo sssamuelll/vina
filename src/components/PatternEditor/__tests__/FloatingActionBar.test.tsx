@@ -82,12 +82,16 @@ describe('FloatingActionBar — anclaje (F4: contrato de transformTool.bbox)', (
 });
 
 describe('FloatingActionBar — superficie neutral-dark (nunca azul de selección)', () => {
-  it('fondo #1a1a1a, z-index 90; NO el azul de selección #4A9EFF', () => {
+  it('fondo #1a1a1a, z-index 90 (local a su isolation:isolate); NO el azul de selección #4A9EFF', () => {
     const { container } = renderBar();
     const bar = container.querySelector('.floating-action-bar') as HTMLElement;
     expect(bar.style.backgroundColor).toBe('rgb(26, 26, 26)');       // #1a1a1a
     expect(bar.style.backgroundColor).not.toBe('rgb(74, 158, 255)'); // #4A9EFF
-    expect(bar.style.zIndex).toBe('90');
+    // Grupo 2 (§2.3 emplazamiento, Task 4): el 90 dejó de ser literal — vive
+    // en --capa-bar, local al isolation:isolate de este mismo elemento.
+    expect(bar.style.isolation).toBe('isolate');
+    expect(bar.style.getPropertyValue('--capa-bar')).toBe('90');
+    expect(bar.style.zIndex).toBe('var(--capa-bar)');
   });
 });
 

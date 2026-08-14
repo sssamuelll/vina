@@ -21,6 +21,7 @@
   font-size: 12px;
   display: flex;
   flex-direction: column;
+  isolation: isolate;
 }
 
 .avatar-panel-header {
@@ -318,7 +319,8 @@
   position: absolute;
   top: 8px;
   right: 108px;
-  z-index: 10;
+  --capa-avatar-toggle: 1;
+  z-index: var(--capa-avatar-toggle);
   padding: 6px 14px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;

@@ -91,6 +91,10 @@ const MODES: ModeInfo[] = [
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
+/** CSSProperties + `--capa-*` custom properties (Grupo 2, § 2.3 emplazamiento).
+ *  csstype no tipa índices `--${string}` en esta versión, de ahí la extensión. */
+type CapaStyle = React.CSSProperties & { [key: `--${string}`]: string | number };
+
 const S = {
   // Toggle bar — CLO3D uses a compact dark bar with small square icons
   toggleBar: {
@@ -101,7 +105,11 @@ const S = {
     right: 130,
     display: 'flex',
     gap: 1,
-    zIndex: 10,
+    // Grupo 2 (§2.3 emplazamiento): aísla este árbol — configPanel/tooltip
+    // (hijos) solo necesitan ganarle a SUS hermanos, no al resto de la app.
+    isolation: 'isolate',
+    '--capa-bar': 10,
+    zIndex: 'var(--capa-bar)',
     // Material `chrome` del contrato de interfaz: esta barra va acoplada al
     // borde del visor, igual que los docks. Antes era #2a2a2a con radio 4 y su
     // propia sombra — un cuarto negro y un quinto radio, decididos aquí solos.
@@ -110,7 +118,7 @@ const S = {
     borderRadius: 'var(--surface-chrome-radius)',
     padding: 2,
     boxShadow: 'var(--surface-chrome-shadow)',
-  },
+  } as CapaStyle,
   toggleBtn: (active: boolean) => ({
     width: 32,
     height: 32,
@@ -136,12 +144,15 @@ const S = {
     right: 12,
     bottom: 48,
     width: 28,
-    zIndex: 10,
+    // Root propio (sibling de toggleBar, no un descendiente): mismo patrón.
+    isolation: 'isolate',
+    '--capa-scale': 10,
+    zIndex: 'var(--capa-scale)',
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center' as const,
     pointerEvents: 'none' as const,
-  },
+  } as CapaStyle,
   scaleBar: {
     width: 14,
     flex: 1,
@@ -164,13 +175,16 @@ const S = {
     background: 'rgba(30,30,30,0.92)',
     borderRadius: 4,
     padding: '8px 12px',
-    zIndex: 10,
+    // Root propio (2 usos condicionales mutuamente excluyentes, ambos siblings).
+    isolation: 'isolate',
+    '--capa-table': 10,
+    zIndex: 'var(--capa-table)',
     fontFamily: 'var(--font-sans)',
     fontSize: 11,
     color: '#fff',
     boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
     minWidth: 140,
-  },
+  } as CapaStyle,
   // Inspected value tooltip
   inspectTooltip: {
     position: 'absolute' as const,
@@ -182,10 +196,15 @@ const S = {
     fontFamily: 'var(--font-mono)',
     fontWeight: 600 as const,
     pointerEvents: 'none' as const,
-    zIndex: 20,
+    // Self-contenido: se usa tanto anidado en toggleBar (hover tooltip) como
+    // standalone (click-to-inspect) — la var se declara y se lee en el mismo
+    // elemento, así que funciona en ambos sitios sin depender de un ancestro.
+    isolation: 'isolate',
+    '--capa-tooltip': 20,
+    zIndex: 'var(--capa-tooltip)',
     whiteSpace: 'nowrap' as const,
     boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-  },
+  } as CapaStyle,
   // Config popover panel
   configPanel: {
     position: 'absolute' as const,
@@ -194,13 +213,17 @@ const S = {
     background: 'rgba(30,30,30,0.96)',
     borderRadius: 4,
     padding: '10px 14px',
-    zIndex: 20,
+    // Anidado dentro de toggleBar (root ya aislado) — self-contenido igual,
+    // para que la regla no dependa de dónde termine renderizándose.
+    isolation: 'isolate',
+    '--capa-popover': 20,
+    zIndex: 'var(--capa-popover)',
     fontFamily: 'var(--font-sans)',
     fontSize: 11,
     color: '#fff',
     boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
     minWidth: 200,
-  },
+  } as CapaStyle,
   configRow: {
     display: 'flex' as const,
     alignItems: 'center' as const,

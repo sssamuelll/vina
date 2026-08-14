@@ -8,7 +8,9 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  z-index: 1;
+  isolation: isolate;
+  --capa-empty-state: 1;
+  z-index: var(--capa-empty-state);
 }
 
 .empty-state-2d__inner {
