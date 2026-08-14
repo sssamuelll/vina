@@ -50,6 +50,18 @@
   --topstitch-2d: #333333;                  /* topstitch default when the thread has no color set */
   --notch-2d: oklch(0.52 0.115 165);        /* notch — montage registration mark; teal-green, the open hue between cool blue (255) and warm (50), so a frequent fine marker reads ≠ cut line and ≠ fold/seam at zoom */
   --annotation-2d: #808080;                 /* annotation fallback when its category has no color */
+  /* Tinta de texto instructivo dibujado SOBRE el papel (pistas de herramienta
+   * al pie del lienzo). NO usar --text-* aquí: esos son la tinta del cromo
+   * OSCURO y sobre el crema quedan invisibles — el defecto medido el
+   * 2026-08-14 daba 1.05:1. Éste da 5.08:1 sobre --canvas-2d y 5.84:1 sobre
+   * --piece-fill-2d: pasa AA en los dos suelos del 2D, y se queda en gris
+   * cálido para no competir con el trazo del patrón. Lo verifica
+   * HintText.legibilidad.test.tsx. */
+  --ink-hint: #6b6459;
+  /* Tinta sobre un relleno de --accent (herramienta activa del dock, botones
+   * primarios). Blanco puro da 4.47:1 contra #6366f1 — pasa el mínimo de 3:1
+   * de elemento gráfico con margen, y el de texto casi exacto. */
+  --on-accent: #ffffff;
   /* Seam overlay (SeamRenderer) on the paper ground. State colors borrow the
      piece selection/error language (--accent-2d / --piece-error-2d / --ink-on-light-3);
      tension labels are muted warm (gather) / cool (ease). */
