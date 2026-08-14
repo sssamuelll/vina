@@ -90,6 +90,25 @@ describe('.floating-3d (RightDock) — el z-index real vive en floating.css, no 
 });
 
 /**
+ * `.canvas-area__divider` (`src/styles/layout.css`) — el sitio real del
+ * divisor de la pantalla de 2D/3D. Sigue el mismo patrón acotado que
+ * `.floating-3d`: cada `var(--capa-X)` referenciada tiene su `--capa-X:`
+ * definida en ESE MISMO archivo.
+ */
+describe('.canvas-area aísla el divisor', () => {
+  it('.canvas-area declara isolation: isolate', () => {
+    const css = leer('src/styles/layout.css');
+    expect(css).toMatch(/\.canvas-area\s*\{[^}]*isolation:\s*isolate/);
+  });
+
+  it('.canvas-area__divider no tiene z-index literal', () => {
+    const css = leer('src/styles/layout.css');
+    const seccionDivider = css.match(/\.canvas-area__divider\s*\{[^}]*\}/)?.[0] ?? '';
+    expect(seccionDivider).not.toMatch(/z-index:\s*-?\d/);
+  });
+});
+
+/**
  * Fix 3 (revisor, ronda de review de Task 4): nada atrapaba un --capa-X mal
  * escrito o borrado — `var(--capa-X)` sin su `--capa-X:` resuelve a `auto`
  * (o hereda de un ancestro, dado que nombres como `--capa-bar`/`--capa-panel`

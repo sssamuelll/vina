@@ -32,6 +32,8 @@
   display: flex;
   position: relative;
   overflow: hidden;
+  isolation: isolate;
+  --capa-divisor: 1;
 }
 .canvas-area__2d {
   position: relative;
@@ -44,7 +46,7 @@
   cursor: col-resize;
   flex-shrink: 0;
   position: relative;
-  z-index: 5;
+  z-index: var(--capa-divisor);
   transition: background 0.15s ease;
 }
 /* Visible line in the center of the grab area */
