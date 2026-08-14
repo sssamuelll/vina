@@ -213,10 +213,21 @@ Al activar **Coser**, la única cosa que le explica a María el gesto nuevo dice
 
 Medido en vivo:
 
-- color del texto: `rgb(226,232,240)` = `#e2e8f0` (casi blanco)
+- tinta real del texto: `rgba(255, 215, 0, 0.5)` — oro al 50%, escrito a mano
 - fondo efectivo: `rgb(245,243,240)` = `#f5f3f0` (el papel crema del lienzo)
-- **razón de contraste: 1.11:1.** WCAG AA exige 4.5:1.
+- **razón de contraste: 1.05:1.** WCAG AA exige 4.5:1.
 - tamaño: 11px, a 14px del borde inferior de la ventana, medio tapado por la barra de IA.
+
+> **Corrección al primer diagnóstico.** En la auditoría leí este defecto como
+> "`--text-primary` (`#e2e8f0`) aplicado a un `<text>` de SVG sobre el crema", y
+> di 1.11:1. Era incorrecto: mi medición leyó la propiedad `color`, que en un
+> `<text>` de SVG **no pinta** cuando hay un `fill` explícito. El `fill` real era
+> `rgba(255, 215, 0, 0.5)`, repetido a mano siete veces en el mismo archivo, y el
+> contraste verdadero es **1.05:1** — todavía peor. El hallazgo se sostiene; el
+> mecanismo que le atribuí no. Y el mecanismo verdadero es más elocuente: oro
+> sobre oscuro es una elección razonable, así que alguien escribió esa tinta
+> pensando en un lienzo oscuro y nadie volvió a mirarla cuando el lienzo se
+> volvió papel.
 
 O sea: **la funcionalidad de arrastre que acabamos de construir en #1029 se
 explica con un texto prácticamente invisible.** Y la causa es exactamente la
@@ -263,11 +274,21 @@ Del catálogo en `src/components/shell/dock2dTools.ts`:
 | `grainline` — **Hilo** | no | ninguno |
 | `internalShape` — **Forma interna** | no | `G` |
 
-**Piquete no tiene ni botón ni atajo.** La única forma de llegar es abrir el
-personalizador del dock (el `+`) y agregarla a mano. Margen de costura tampoco
-tiene botón: depende de que María sepa que existe la tecla `O`.
+**Piquete no tiene botón.** La única forma de llegar es abrir el personalizador
+del dock (el `+`) y agregarla a mano. Margen de costura tampoco tiene botón:
+depende de que María sepa que existe la tecla `O`.
 
 Son justo las dos herramientas sobre las que trabajamos #1027 y #1029.
+
+> **Corrección, y el hallazgo mejora.** Escribí que Piquete "no tiene ni botón ni
+> atajo". La mitad es falsa: `tool.notch` **sí** tiene atajo registrado —
+> `Shift+N`, en `src/shortcuts/defaults.ts:71`, junto con `Shift+G` para Hilo—.
+> Lo que pasa es que el catálogo del dock (`dock2dTools.ts`) no declaraba ese
+> atajo, y el catálogo es lo único que la interfaz muestra. O sea: **hay dos
+> fuentes de verdad para el mismo atajo, están en desacuerdo, y la que ve la
+> usuaria es la que está vacía.** Eso es mejor evidencia de la tesis que el
+> hallazgo original, porque no es una omisión: es que dos sistemas que se
+> escribieron en ráfagas distintas nunca se cruzaron.
 
 ### 2.4 Siete diálogos nativos bloqueantes en acciones destructivas
 

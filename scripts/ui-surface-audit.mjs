@@ -44,6 +44,19 @@ let activeStateName = 'arranque';
 let browser;
 let context;
 let page;
+const frozenResponses = new Map();
+const networkSnapshot = {
+  habilitado: true,
+  capturadoEn: null,
+  respuestasGrafoInicial: 0,
+  respuestasTotales: 0,
+  bytesTotales: 0,
+  aciertosCache: 0,
+  recursosNoFuenteCapturadosTarde: 0,
+  websocketsHmrInterceptados: 0,
+  candidatos404Ignorados: 0,
+  fuentesNoCapturadas: [],
+};
 
 function assertSafeOutputDirectory() {
   const reportsRoot = path.resolve(REPO_ROOT, 'docs', 'reports');
@@ -74,6 +87,166 @@ function slugify(value) {
 
 function relativeToRepo(filePath) {
   return path.relative(REPO_ROOT, filePath).replaceAll('\\', '/');
+}
+
+function responseHeadersWithoutTransport(headers) {
+  const normalized = headers instanceof Headers
+    ? Object.fromEntries(headers.entries())
+    : { ...headers };
+  delete normalized['content-encoding'];
+  delete normalized['content-length'];
+  delete normalized['transfer-encoding'];
+  return normalized;
+}
+
+function isViteGraphUrl(value) {
+  const url = new URL(value, BASE_URL);
+  if (url.origin !== ORIGIN) return false;
+  const pathname = url.pathname;
+  return pathname === '/'
+    || pathname.startsWith('/src/')
+    || pathname.startsWith('/@')
+    || pathname.startsWith('/node_modules/.vite/')
+    || /\.(?:[cm]?[jt]sx?|css|html)$/.test(pathname)
+    || url.searchParams.has('worker_file');
+}
+
+function extractViteGraphUrls(source, baseUrl) {
+  const rawSpecifiers = new Set();
+  const patterns = [
+    /\b(?:import|export)\s+(?:[^"'();]*?\s+from\s*)?["']([^"']+)["']/g,
+    /\bimport\s*\(\s*(?:\/\*[\s\S]*?\*\/\s*)?["'`]([^"'`]+)["'`]\s*\)/g,
+    /\b(?:src|href)=["']([^"']+)["']/g,
+    /\bnew\s+URL\(\s*["'`]([^"'`]+)["'`]/g,
+    /["'`]((?:\/src\/|\/@|\/node_modules\/\.vite\/|\.\.?\/)[^"'`]+)["'`]/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) rawSpecifiers.add(match[1]);
+  }
+
+  const urls = [];
+  for (const specifier of rawSpecifiers) {
+    if (!specifier || specifier.startsWith('data:') || specifier.startsWith('blob:') || specifier.startsWith('#')) continue;
+    try {
+      const resolved = new URL(specifier, baseUrl);
+      resolved.hash = '';
+      if (isViteGraphUrl(resolved)) urls.push(resolved.href);
+    } catch {
+      // Una cadena que parece URL pero no se puede resolver no pertenece al
+      // grafo HTTP transformado por Vite.
+    }
+  }
+  return urls;
+}
+
+async function captureViteModuleGraph() {
+  frozenResponses.clear();
+  const queued = new Set([`${BASE_URL}/`]);
+  let frontier = [`${BASE_URL}/`];
+  const maxEntries = 5_000;
+  const maxBytes = 300 * 1024 * 1024;
+  let totalBytes = 0;
+
+  while (frontier.length > 0) {
+    const next = new Set();
+    for (let offset = 0; offset < frontier.length; offset += 16) {
+      const batch = frontier.slice(offset, offset + 16);
+      const results = await Promise.all(batch.map(async (url) => {
+        const response = await fetch(url, {
+          // Vite usa `Accept: text/css` para decidir que una hoja se pide en
+          // modo directo. Los imports ESM del navegador usan `*/*` y reciben
+          // el wrapper JavaScript que inyecta el estilo.
+          headers: { accept: '*/*' },
+        });
+        if (!response.ok) {
+          if (url === `${BASE_URL}/`) throw new Error(`No se pudo congelar ${url}: HTTP ${response.status}`);
+          networkSnapshot.candidatos404Ignorados += 1;
+          return null;
+        }
+        const body = Buffer.from(await response.arrayBuffer());
+        const headers = responseHeadersWithoutTransport(response.headers);
+        const key = new URL(url).href;
+        frozenResponses.set(key, { status: response.status, headers, body });
+        totalBytes += body.byteLength;
+        if (frozenResponses.size > maxEntries || totalBytes > maxBytes) {
+          throw new Error(`Snapshot Vite excedió el límite (${frozenResponses.size} respuestas, ${totalBytes} bytes)`);
+        }
+        return {
+          url: key,
+          body,
+          contentType: headers['content-type'] || '',
+        };
+      }));
+
+      for (const result of results) {
+        if (!result) continue;
+        const pathname = new URL(result.url).pathname;
+        const isText = /(?:javascript|typescript|text\/css|text\/html)/i.test(result.contentType)
+          || /\.(?:[cm]?[jt]sx?|css|html)$/.test(pathname);
+        if (!isText) continue;
+        const source = result.body.toString('utf8');
+        for (const candidate of extractViteGraphUrls(source, result.url)) {
+          if (queued.has(candidate)) continue;
+          queued.add(candidate);
+          next.add(candidate);
+        }
+      }
+    }
+    frontier = [...next];
+  }
+
+  networkSnapshot.capturadoEn = new Date().toISOString();
+  networkSnapshot.respuestasGrafoInicial = frozenResponses.size;
+  networkSnapshot.respuestasTotales = frozenResponses.size;
+  networkSnapshot.bytesTotales = totalBytes;
+}
+
+async function installFrozenNetworkSnapshot() {
+  await captureViteModuleGraph();
+
+  // Vite no puede empujar HMR dentro del contexto auditado: cada reload debe
+  // ejecutar exactamente los mismos módulos transformados del snapshot.
+  await context.routeWebSocket(/.*/, (webSocket) => {
+    networkSnapshot.websocketsHmrInterceptados += 1;
+    webSocket.onMessage(() => {});
+  });
+
+  await context.route(`${ORIGIN}/**`, async (route) => {
+    const request = route.request();
+    if (request.method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+
+    const key = new URL(request.url()).href;
+    const cached = frozenResponses.get(key);
+    if (cached) {
+      networkSnapshot.aciertosCache += 1;
+      await route.fulfill(cached);
+      return;
+    }
+
+    if (isViteGraphUrl(key)) {
+      if (!networkSnapshot.fuentesNoCapturadas.includes(key)) networkSnapshot.fuentesNoCapturadas.push(key);
+      await route.abort('blockedbyclient');
+      return;
+    }
+
+    // Binarios y assets no pertenecen al grafo de código. Se fijan en su
+    // primera lectura para que las recargas siguientes tampoco cambien.
+    const response = await route.fetch();
+    const body = await response.body();
+    const entry = {
+      status: response.status(),
+      headers: responseHeadersWithoutTransport(response.headers()),
+      body,
+    };
+    frozenResponses.set(key, entry);
+    networkSnapshot.recursosNoFuenteCapturadosTarde += 1;
+    networkSnapshot.respuestasTotales = frozenResponses.size;
+    networkSnapshot.bytesTotales += body.byteLength;
+    await route.fulfill(entry);
+  });
 }
 
 function attachPageDiagnostics(targetPage) {
@@ -1328,12 +1501,14 @@ function buildSummary(report) {
     .filter((button) => button.className.includes('logo-menu__trigger'));
   const logoNamed = logoButtons.some((button) => button.nombreAccesible === 'Vina');
   const approximateContrastCount = agregado.fallosContraste.filter((item) => item.aproximadoPorImagenOGradiente).length;
+  const snapshotRed = report.metadata.snapshotRed;
 
   return `# Auditoría de superficies de UI de Vina\n\n` +
     `Fecha del censo: ${AUDIT_DATE}. Generado: ${report.metadata.generadoEn}.\n\n` +
     `URL auditada: \`${report.metadata.url}\`. Cobertura: **${agregado.cobertura.alcanzados}/${agregado.cobertura.solicitados} estados alcanzados**; ${agregado.cobertura.noAlcanzados} no alcanzados.\n\n` +
     `## Criterios y límites\n\n` +
     `El script usa un BrowserContext efímero y, antes de cargar la app, limpia cookies, localStorage, sessionStorage e IndexedDB del origen mediante CDP. El estado vacío es por eso un vacío real. Después importa el DXF de María, espera cinco piezas en \`window.__VINA_STORE__\`, hace un flush con el \`saveToStorage\` canónico de la app y espera las mismas cinco piezas en \`vina/projects/autosave\`; cada visita cargada parte de un reload de ese autosave.\n\n` +
+    `Para que las decenas de recargas midan una sola versión, el script congela antes de navegar el grafo transformado por Vite (${snapshotRed.respuestasGrafoInicial} respuestas), intercepta el WebSocket de HMR y sirve los mismos bytes desde memoria durante todo el recorrido. Los assets binarios fuera del grafo se fijan en su primera lectura. Fuentes pedidas pero ausentes del snapshot: ${snapshotRed.fuentesNoCapturadas.length}.\n\n` +
     `Las firmas de superficie agrupan solo propiedades visuales; el rect queda en \`censo.json\` como dato de cada instancia. Incluir el rect dentro de la clave haría que dos superficies idénticas en posiciones distintas nunca compartieran firma y volvería inútil el agrupamiento pedido.\n\n` +
     `El menú de una línea de pieza no es un componente separado: la app abre el menú general de la pieza y agrega acciones de segmento. La visita valida el hit exacto por la presencia de “Convertir en línea” o “Convertir en curva”; la visita de pieza exige el menú de cuerpo sin acciones de segmento ni de línea interna.\n\n` +
     `El contraste compone colores sólidos de ancestros. Cuando hay gradientes, imágenes o contenido de canvas, el ratio queda marcado como aproximado porque los estilos computados no revelan el píxel real detrás de cada glifo. Hay ${approximateContrastCount} grupos de fallos aproximados por esa causa. Los botones deshabilitados quedan en el dato crudo, pero no cuentan como fallo de foco porque no son objetivos del teclado.\n\n` +
@@ -1478,7 +1653,9 @@ async function runVisits() {
 
   await visit('Solver Metrics expandido', 'diagnóstico', {
     action: async () => {
-      await page.getByTitle('Solver Metrics', { exact: true }).click();
+      // El título visible se localizó durante el encargo ("Solver Metrics" →
+      // "Métricas del solver"). La clase del componente es el ancla estable.
+      await page.locator('.solver-metrics-toggle').click();
       await page.locator('.solver-metrics--expanded').waitFor({ state: 'visible' });
     },
   });
@@ -1533,6 +1710,8 @@ async function main() {
   page.setDefaultTimeout(20_000);
   page.setDefaultNavigationTimeout(90_000);
   attachPageDiagnostics(page);
+  activeStateName = 'snapshot de red y grafo Vite';
+  await installFrozenNetworkSnapshot();
 
   const cdp = await context.newCDPSession(page);
   await context.clearCookies();
@@ -1558,6 +1737,10 @@ async function main() {
       chromiumArgs: ['--use-gl=angle', '--use-angle=swiftshader'],
       navegador: EXTERNAL_CDP_URL ? `CDP externo (${EXTERNAL_CDP_URL})` : 'chromium.launch() standalone',
       viewportBase: DEFAULT_VIEWPORT,
+      snapshotRed: {
+        ...networkSnapshot,
+        fuentesNoCapturadas: [...networkSnapshot.fuentesNoCapturadas],
+      },
       herramientasDockDescubiertas: discovery.dockTools,
       descargasDisparadas: downloads,
       eventosRuntime: runtimeEvents,
