@@ -4,6 +4,24 @@
 
 **Origen:** `docs/reports/2026-08-14-auditoria-ui-deriva-de-diseno.md`, secciones 4.2 (causa raíz: el cromo flota encima del documento), 5.2 (ley de emplazamiento), 5.4 (ley de puertas) y 6 (Fases 3 y 4 del plan). Contrato vigente: `.claude/skills/contrato-de-interfaz/`. Guardián: `scripts/ui-contract-lint.mjs`.
 
+---
+
+> ## ⚠️ Enmienda 2026-08-15 — el Grupo 2 (§ 2.3) y el aislamiento de `.canvas-area` (§ 2.4) quedan RETIRADOS
+>
+> Se implementaron y se sacaron del PR antes de mergear, tras un review adversarial. **La premisa era falsa y el documento contiene su propia refutación.**
+>
+> **Lo que este documento asume:** que ponerle `isolation: isolate` a un elemento saca su `z-index` de la competencia global, y que por eso 26 valores pequeños "solo parecían" competir.
+>
+> **Lo que hace CSS de verdad:** un elemento con `position` (no `static`) y `z-index` numérico **ya establece un contexto de apilamiento**. Agregarle `isolation: isolate` al MISMO elemento no cambia nada de cómo su propio `z-index` compite con sus hermanos — solo afecta a sus hijos. En ~20 de los 26 sitios la declaración quedó **inerte**: el literal se convirtió en variable, el contador R8 del trinquete bajó, y el apilamiento real no se movió ni un milímetro. Para aislar de verdad, la declaración va en el **ancestro común** del racimo que compite, no en cada competidor.
+>
+> **La señal que estaba a la vista y no se leyó:** durante la implementación, aplanar los valores a números locales arbitrarios (25 → 1) invirtió el orden de pintado entre paneles del visor 3D. Se "arregló" restaurando los valores originales. Pero *que los valores originales siguieran importando* era exactamente la prueba de que no se estaba aislando nada. El arreglo tapó el síntoma y enterró la causa.
+>
+> **§ 2.4 es peor que inerte: es una regresión activa.** `.canvas-area` es uno de los pocos sitios donde el aislamiento SÍ funciona — y funciona en la dirección equivocada. `CalibrationModal` (`--z-modal`, 1100), los dos menús contextuales (1000) y `NotchPrecisionModal` se renderizan DENTRO de `.canvas-area`; aislarla los encierra en una caja con `z-index: auto`, y la barra de IA (`--z-bar`, 100, hermana posterior) les pinta encima. La nota de este mismo § 2.3 sobre `LayerPanel` explica **correctamente** esa mecánica —«la especificación de CSS trata `position: fixed` como contenido por el ancestro más cercano que establece contexto de apilamiento»— y la presenta como una ventaja, sin notar que dos secciones más abajo es el defecto.
+>
+> **Qué sigue vigente:** el § 2.3 **Grupo 1** (13 sitios globales → escala con nombre) es correcto y se mergea. Los §§ 2.1 y 2.2 (canaletas y `usePanelHost`) no dependen de esto.
+>
+> **Qué falta decidir antes de reintentar el Grupo 2:** aislar siempre tiene un costo — lo de adentro deja de poder escapar. Hay que decidir **racimo por racimo** quién se aísla y qué tiene permitido salir a la escala global (los menús contextuales, sin duda; los modales, sin duda). Eso es diseño, y no se hizo. Sin esa decisión, el Grupo 2 no vuelve.
+
 ## 1. Qué hay hoy, medido
 
 - `LeftDock`, `RightDock` y `ContextPanel` son `position: absolute`/`fixed`, flotan **encima** del lienzo. El "ajustar a la vista" (`computeFitView`, `PatternEditor.tsx:672`) mide `svg.getBoundingClientRect()` — un rectángulo que **no sabe** que hay cromo tapando parte de lo que mide.
@@ -94,7 +112,7 @@ Alcance explícito: esto resuelve el caso medido (Capas a la derecha + Propiedad
 
 Solape de baja severidad, dicho explícitamente: `NotchPrecisionModal` y el menú del logo quedan en el mismo nivel (`--z-menu`). En la práctica no coexisten (uno se abre desde una herramienta del lienzo, el otro desde el logo, y el logo se cierra solo al hacer clic afuera). Si algún día chocan, gana el que esté después en el DOM. No se resuelve con un token nuevo porque sería un rol de uno solo — se documenta y se sigue.
 
-**Grupo 2 — local (26 sitios):** se les agrega `isolation: isolate` a su contenedor. Los archivos: `FitMapToggle`, `PanCrosshair`, `SelectionOverlay`, `SimulationStatusOverlay`, `Viewport3D` (en sus dos overlays propios), `FloatingActionBar`, `BOMTab`, `GradingTab`, `LayerPanel`, `EmptyState2D`, `AvatarPanel`, `CollisionBodyPanel`, `RenderSettingsPanel`, `SnapshotBar`, `SurfaceModePill`, y dos que no había nombrado en la primera pasada de este documento: `RightDock` (el control `.floating-3d`, un botón que flota sobre el visor 3D con el mismo rol que `SurfaceModePill`) y `UnifiedBar` (un segundo aviso de soltar-DXF, local a la barra e independiente del que ya tiene `AppShell.tsx`).
+**Grupo 2 — local (26 sitios):** ⚠️ **RETIRADO — ver la enmienda del 2026-08-15 al principio de este documento.** Lo que sigue quedó escrito sobre una premisa falsa y se conserva como registro, no como instrucción. Se le agrega `isolation: isolate` a su contenedor. Los archivos: `FitMapToggle`, `PanCrosshair`, `SelectionOverlay`, `SimulationStatusOverlay`, `Viewport3D` (en sus dos overlays propios), `FloatingActionBar`, `BOMTab`, `GradingTab`, `LayerPanel`, `EmptyState2D`, `AvatarPanel`, `CollisionBodyPanel`, `RenderSettingsPanel`, `SnapshotBar`, `SurfaceModePill`, y dos que no había nombrado en la primera pasada de este documento: `RightDock` (el control `.floating-3d`, un botón que flota sobre el visor 3D con el mismo rol que `SurfaceModePill`) y `UnifiedBar` (un segundo aviso de soltar-DXF, local a la barra e independiente del que ya tiene `AppShell.tsx`).
 
 Sus valores pequeños (1–90) se extraen a variables CSS **locales al propio archivo** (p. ej. `.fit-map-toggle { --capa-barra: 1; --capa-escala: 2; }`), no a la escala global — la regla del contrato se cumple (ningún literal suelto) sin inflar la escala compartida con roles que nadie más usa.
 
@@ -103,6 +121,8 @@ Sus valores pequeños (1–90) se extraen a variables CSS **locales al propio ar
 Nota sobre `LayerPanel`: su menú contextual (`.layer-context-menu`) es `position: fixed`, no `absolute` — pero un `isolation: isolate` en el contenedor del panel sí lo contiene para efectos de apilamiento (la especificación de CSS trata `position: fixed` como contenido por el ancestro más cercano que establece contexto de apilamiento, aunque su posición visual siga calculándose contra el viewport). No necesita escapar a la escala global.
 
 ### 2.4 `.canvas-area` como límite de aislamiento
+
+⚠️ **RETIRADO — regresión activa, ver la enmienda del 2026-08-15 al principio.** Aislar `.canvas-area` encierra los modales y los menús contextuales que se renderizan dentro de ella, y la barra de IA les pinta encima. Se conserva como registro, no como instrucción.
 
 `.canvas-area` gana su propio `isolation: isolate`. Con eso, `.canvas-area__divider` (hoy z:5) deja de necesitar un rol global — es orden local dentro de ese límite, igual que el Grupo 2.
 
