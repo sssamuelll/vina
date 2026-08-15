@@ -10,11 +10,39 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-14-fase-3-4-emplazamiento-paneles-design.md`
 
+> ## ⚠️ Enmienda 2026-08-15 — las Tasks 4 y 5 están RETIRADAS
+>
+> La Ola 1 se ejecutó entera y un review adversarial del PR completo encontró
+> que el **Grupo 2 (Tasks 4 y 5) descansaba sobre una premisa falsa**: un
+> elemento con `position` (no `static`) y `z-index` numérico **ya es** contexto
+> de apilamiento, así que agregarle `isolation: isolate` al MISMO elemento no
+> cambia cómo compite con sus hermanos. En ~20 de los 26 sitios la declaración
+> era inerte, y la Task 5 era peor que inerte: aislar `.canvas-area` **encerraba**
+> los modales y menús contextuales que se renderizan dentro, y la barra de IA les
+> pintaba encima. Regresión confirmada con un A/B en el navegador.
+>
+> **Lo que sí se mergeó** (PR #1057): Tasks 1, 2, 3 y 6 — los 13 sitios globales
+> a la escala con nombre, más `--z-tooltip` y `--z-debug`, verificados en Chrome
+> y fijados con `tests/e2e/emplazamiento-modales.spec.ts`.
+>
+> **No reintentar el Grupo 2 tal como está escrito aquí.** Su motivación era bajar
+> el contador de literales del trinquete — una meta de medición, no de usuaria.
+> Si algún día hace falta aislar de verdad un racimo, la declaración va en el
+> **ancestro común**, decidida racimo por racimo, y con la contrapartida en la
+> mano: lo de adentro deja de poder escapar.
+>
+> Registro completo en la enmienda de la spec y en la ley de emplazamiento de
+> `.claude/skills/contrato-de-interfaz/SKILL.md`.
+>
+> **La Ola 2 (Tasks 7-13) no depende de nada de esto** — verificado: en toda la
+> Parte 2 no aparece `isolation`, ni la Task 4, ni la Task 5. Es sobre los hijos
+> flex de `canvas-area`, que es estructura, no apilamiento.
+
 ## Global Constraints
 
 - **Sin `--no-verify`.** El hook de pre-commit corre `tsc -b --noEmit`, `lint-staged` y `node scripts/ui-contract-lint.mjs`. Ninguno se salta.
 - **El trinquete solo baja.** Si una tarea sube algún contador de `ui-contract-lint.mjs`, es un fallo de esa tarea — se arregla, nunca se toca `scripts/ui-contract-baseline.json` a mano salvo con `--update` cuando el contador bajó de verdad.
-- **`jsdom` no calcula layout.** `getBoundingClientRect()` da 0 siempre — ninguna aserción de ancho/alto real de un elemento va en vitest; esas verificaciones son manuales, en el navegador, contra el DXF real de María (`tests/fixtures/garments/maria_patrones_samuel_2M.dxf`).
+- **`jsdom` no calcula layout.** `getBoundingClientRect()` da 0 siempre y no existe `elementFromPoint` — ninguna aserción de ancho/alto real ni de quién tapa a quién va en vitest. **Enmienda 2026-08-15:** verificar a mano en el navegador NO alcanza. La Ola 1 llevó dentro una regresión de apilamiento con 6889 tests en verde, y verificarla a mano tampoco alcanzó el flujo donde vivía un segundo defecto real. Todo cambio de `z-index`, `isolation`, `position`, `overflow` o `backdrop-filter` **se fija con un e2e que mida el resultado**, no el valor declarado — patrón en `tests/e2e/emplazamiento-modales.spec.ts`. La verificación a mano contra el DXF real de María (`tests/fixtures/garments/maria_patrones_samuel_2M.dxf`) sigue valiendo para lo que es de encuadre y densidad, no como red.
 - **Los docks y la barra de IA no se tocan.** `DockShell.tsx`, `Dock.css` (salvo su z-index), `barPosition.ts`, y el mecanismo de posición de `UnifiedBar` quedan exactamente como están. Solo cambia su z-index (Ola 1, mecánico).
 - **`getPanelSide()` no cambia.** Sigue siendo la única fuente de verdad de qué panel va a cuál lado.
 - **Corrección encontrada al escribir este plan, no en la spec:** los 7 archivos de test y 4 specs e2e que la spec marcaba como "a actualizar" **no necesitan ningún cambio** — los 7 tests mockean `onOpenPanel` como prop genérica de los componentes hijos (que no cambia de nombre ni de firma) y solo comprueban con qué string se llamó; los 4 e2e comprueban `.context-panel__header` y clases que el diseño conserva. Quedan como tarea de **verificación** (correr y confirmar verdes), no de edición.
@@ -293,7 +321,11 @@ git commit -m "feat(ui): migrar 13 z-index globales a la escala con nombre"
 
 ---
 
-## Task 4: Aislamiento local — Grupo 2 (26 sitios, 18 archivos)
+## Task 4: ⚠️ RETIRADA — Aislamiento local — Grupo 2 (26 sitios, 18 archivos)
+
+> **No ejecutar.** Premisa falsa: `isolation: isolate` sobre un elemento que ya
+> tiene `position` + `z-index` es inerte. Ver la enmienda del encabezado. Se
+> conserva el texto como registro de qué se intentó y por qué no funcionó.
 
 **Files:**
 - Modify: `src/components/Viewport3D/FitMapToggle.tsx`, `src/components/Viewport3D/PanCrosshair.tsx`, `src/components/Viewport3D/SelectionOverlay.tsx`, `src/components/Viewport3D/SimulationStatusOverlay.tsx`, `src/components/Viewport3D/Viewport3D.tsx`, `src/components/PatternEditor/FloatingActionBar.tsx`, `src/components/BottomPanel/BOMTab.css`, `src/components/BottomPanel/GradingTab.css`, `src/components/LayerPanel/LayerPanel.css`, `src/components/PatternEditor/CalibrationModal.css`, `src/components/PatternEditor/EmptyState2D.css`, `src/components/Viewport3D/AvatarPanel.css`, `src/components/Viewport3D/CollisionBodyPanel.css`, `src/components/Viewport3D/RenderSettingsPanel.css`, `src/components/Viewport3D/SnapshotBar.css`, `src/components/Viewport3D/SurfaceModePill.css`, `src/components/shell/RightDock.tsx`, `src/components/shell/UnifiedBar.tsx`
@@ -436,7 +468,12 @@ git commit -m "feat(ui): aislar 18 componentes — sus z-index dejan de competir
 
 ---
 
-## Task 5: `.canvas-area` como límite de aislamiento + el divisor
+## Task 5: ⚠️ RETIRADA — `.canvas-area` como límite de aislamiento + el divisor
+
+> **No ejecutar.** Era una regresión activa, no solo inerte: aislar
+> `.canvas-area` encierra los modales y menús contextuales que se renderizan
+> dentro, y la barra de IA les pinta encima. Confirmado con un A/B en el
+> navegador. Ver la enmienda del encabezado.
 
 **Files:**
 - Modify: `src/styles/layout.css`
@@ -1123,7 +1160,36 @@ npx vitest run
 
 Esperado: sin regresiones. Prestar atención particular a `LogoMenu.test.tsx`, `Dock.test.tsx`, `RightDock.test.tsx` (Global Constraints — no deberían necesitar cambios porque mockean `onOpenPanel` como prop genérica, pero confirmarlo aquí, no asumirlo).
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 9: Verificar en el navegador ANTES de commitear (enmienda 2026-08-15)**
+
+Este paso no se difiere a la Task 12. Convertir `ContextPanel` de tarjeta
+flotante a hijo flex de `canvas-area` cambia quién es ancestro de quién, y eso
+es justo lo que ni vitest ni una lectura del diff pueden ver. Con `npm run dev`
+corriendo, abrir Propiedades y correr esto en la consola:
+
+```js
+// ¿El panel encierra a sus descendientes?
+const p = document.querySelector('.context-panel');
+const s = getComputedStyle(p);
+console.log({
+  backdropFilter: s.backdropFilter,   // != 'none' ⇒ captura los position:fixed de adentro
+  isolation: s.isolation,
+  zIndex: s.zIndex, position: s.position,
+  overflow: s.overflow,               // != 'visible' ⇒ recorta lo que sobresalga
+});
+```
+
+Un panel acoplado a una canaleta es material `chrome` (opaco), no `overlay`.
+Si sobrevive un `backdrop-filter`, entonces todo modal o menú contextual que se
+renderice **desde dentro** de un panel queda encerrado — el defecto que ya nos
+costó dos veces. El arreglo es `createPortal(..., document.body)`; el patrón está
+en `ConnectionModal.tsx` y `ToolTooltip`.
+
+Si el panel resulta ser contexto de apilamiento, extender
+`tests/e2e/emplazamiento-modales.spec.ts` con el caso antes de seguir. Un check
+de consola prueba que hoy está bien; el e2e es lo que impide que vuelva.
+
+- [ ] **Step 10: Commit**
 
 ```bash
 git add src/components/shell/AppShell.tsx src/components/shell/ContextPanel.tsx \
@@ -1312,6 +1378,13 @@ No hay "Step 4" de edición por defecto — si algo falla de verdad, es un halla
 ## Task 12: Verificación en el navegador — contra el DXF real de María
 
 **Files:** ninguno. Verificación manual con las herramientas de navegador.
+
+> **Enmienda 2026-08-15:** esta ya no es la primera vez que la Ola 2 toca un
+> navegador. El apilamiento se comprueba dentro de la Task 9, donde se cambia —
+> diferirlo hasta aquí, cerrando tareas como completas mientras tanto, es la
+> forma exacta del error que dejó pasar al Grupo 2. Lo que queda en esta tarea es
+> lo que solo se puede juzgar con el patrón real de María en pantalla: encuadre,
+> densidad, convivencia de los dos paneles.
 
 - [ ] **Step 1: Cargar la app con el patrón real**
 
