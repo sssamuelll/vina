@@ -100,7 +100,7 @@
   border: var(--surface-overlay-border);
   border-radius: var(--surface-overlay-radius);
   box-shadow: var(--surface-overlay-shadow);
-  z-index: 200;
+  z-index: var(--z-menu);
   min-width: 240px;
   padding: 6px;
   animation: slide-down 0.1s ease-out;
@@ -177,7 +177,7 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   padding: 6px;
   min-width: 220px;
-  z-index: 210;
+  z-index: calc(var(--z-menu) + 10);
 }
 
 /* ─── Canvas context menu (right-click, 2D editor) ───
@@ -185,7 +185,7 @@
    one-off (#1e1e1e) that clashed with every other floating surface. */
 .context-menu {
   position: fixed;
-  z-index: 1000;
+  z-index: var(--z-context-menu);
   min-width: 180px;
   /* Long piece menus (groups + linked editing + …) can outgrow short
      viewports; without this the bottom items are unreachable (review

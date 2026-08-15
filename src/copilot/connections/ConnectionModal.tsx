@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { AIConnection, ProviderId } from './types';
 import { PROVIDER_REGISTRY, PROVIDER_LIST } from './registry';
 import DynamicProviderForm, { type ProviderFormValues } from './DynamicProviderForm';
@@ -39,7 +40,7 @@ const overlayStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 200,
+  zIndex: 'var(--z-modal)',
 };
 
 const dialogStyle: React.CSSProperties = {
@@ -164,7 +165,17 @@ export default function ConnectionModal(props: Props) {
     }
   };
 
-  return (
+  // Se monta en <body>, no donde vive el árbol. Este modal se renderiza desde
+  // ConnectionsList → AgentSettings → dentro del div de la barra de IA, y esa
+  // barra lleva `backdrop-filter: var(--surface-overlay-blur)` por la ley de
+  // materiales. Un `backdrop-filter` captura el bloque contenedor de sus
+  // descendientes `position: fixed` Y establece contexto de apilamiento: sin
+  // portal, este overlay se recortaba al panel de la barra (medido: 558×359 en
+  // un viewport de 1280×720), sus botones de guardar quedaban fuera de vista,
+  // el velo no oscurecía nada, y su `--z-modal` era decorativo — encerrado en
+  // un contexto que tope en `--z-bar`. El portal es lo que hace verdadero el
+  // rol declarado. Mismo patrón que ToolTooltip, por la misma razón.
+  return createPortal(
     <div
       style={overlayStyle}
       onMouseDown={(e) => {
@@ -235,6 +246,7 @@ export default function ConnectionModal(props: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -177,9 +177,26 @@
 
   --z-dock: 5;
   --z-panel: 25;
+  /* Aviso transitorio sobre el lienzo (el "suelta el DXF aquí"). Va encima del
+   * documento y de los paneles, pero DEBAJO del cromo de la app: el aviso
+   * pertenece al lienzo, no tapa la barra superior ni la de IA. Conserva el 50
+   * que ya tenía; que quede entre --z-panel y --z-bar no es casualidad, es el
+   * rol. */
+  --z-hint: 50;
   --z-bar: 100;
   --z-menu: 200;
   --z-context-menu: 1000;
   --z-modal: 1100;
+  /* Un tooltip explica un control; una notificación avisa de algo que pasó.
+   * Si empatan, gana la notificación — por eso este escalón está DEBAJO de
+   * --z-toast y no empatado con él. Empatados, el desempate lo decidía el
+   * orden de inserción del portal, que no es una decisión de diseño. */
+  --z-tooltip: 1150;
   --z-toast: 1200;
+  /* Diagnóstico de desarrollo (SolverMetrics). Deliberadamente por encima de
+   * toda la escala: su trabajo es no ocultarse nunca, y solo existe con
+   * import.meta.env.DEV, así que no compite con nada en producción. Es el
+   * único rol que puede estar arriba del toast, y está nombrado justo para
+   * que se note que es la excepción. */
+  --z-debug: 1300;
 }

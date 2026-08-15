@@ -75,12 +75,51 @@ Variantes declaradas (no inventes más): `--surface-overlay-radius-pill` para
 barras con forma de cápsula, y `--surface-overlay-bg-recessed` para el reposo de
 la barra de IA.
 
+> **Estas dos leyes pelean, y hay que saberlo antes de escribir (medido el
+> 2026-08-15).** `--surface-overlay-blur` es un `backdrop-filter`, y un
+> `backdrop-filter` hace **dos cosas** que no tienen nada que ver con verse
+> bonito: establece **contexto de apilamiento** y captura el **bloque
+> contenedor** de sus descendientes `position: fixed`.
+>
+> O sea: **nada `position: fixed` puede escapar desde dentro de una superficie
+> `overlay`.** Ni por z-index, ni por `inset: 0`.
+>
+> Lo que costó: `ConnectionModal` se renderiza dentro del div de la barra de IA
+> (vía `ConnectionsList` → `AgentSettings`). Pedía `inset: 0` con `--z-modal`, y
+> en un viewport de 1280×720 se recortaba a **558×359** dentro del panel de la
+> barra — botones de guardar fuera de vista, velo que no oscurecía nada, y el
+> 1100 topado en `--z-bar`. Los 6889 tests unitarios en verde: jsdom no calcula
+> layout.
+>
+> **La regla:** antes de darle a una superficie un rol alto de la escala
+> (`--z-menu` para arriba), pregunta **desde dónde se renderiza**, no solo qué
+> valor declara. Si su árbol pasa por la barra de IA, un panel o un menú
+> —cualquier cosa con material `overlay`— el valor es decorativo y hace falta
+> `createPortal(..., document.body)`. `ToolTooltip` y `ConnectionModal` ya lo
+> hacen; es el patrón a copiar.
+>
+> Y al revés: una superficie con material `overlay` **ya es** contexto de
+> apilamiento. No le agregues `isolation: isolate` "para aislarla" — no hace
+> nada nuevo.
+
 ## 3. Ley de emplazamiento
 
 - El cromo se **acopla en canaletas**; el documento tiene área segura.
 - Solo tres cosas pueden taparlo: menús transitorios, toasts y la paleta.
 - Un panel nuevo NO se abre encima de la regla ni del patrón.
 - Nada de `z-index` literal. Si necesitas una capa, es que falta un rol.
+- **`isolation: isolate` no hace lo que parece.** Un elemento con `position` (no
+  `static`) y `z-index` numérico **ya es** contexto de apilamiento; agregarle
+  `isolation` al MISMO elemento solo afecta a sus hijos, nunca a cómo su propio
+  z-index compite con sus hermanos. Para aislar de verdad un racimo, la
+  declaración va en el **ancestro común**, no en cada competidor. Esta premisa
+  falsa se implementó entera en 26 sitios antes de que alguien la midiera; el
+  registro está en la enmienda de
+  `docs/superpowers/specs/2026-08-14-fase-3-4-emplazamiento-paneles-design.md`.
+- **Aislar tiene un costo simétrico:** lo de adentro deja de poder escapar. Si
+  aíslas un contenedor, todo modal, menú contextual o toast que se renderice
+  dentro pierde su rol global. Decidir qué se aísla y qué tiene permitido salir
+  es diseño, no una mecánica que se aplique en lote.
 
 ## 4. Ley de estado
 
@@ -138,6 +177,19 @@ cuántos materiales hay de verdad en pantalla— existe el censo contra la app v
 ```bash
 npm run audit:ui        # requiere el server de dev corriendo
 ```
+
+> **La suite unitaria es CIEGA al apilamiento.** jsdom no calcula layout: no
+> tiene `elementFromPoint` y `getBoundingClientRect()` devuelve 0. Un modal
+> enterrado bajo una barra, un panel recortado, un tooltip que tapa un toast —
+> todo eso pasa los tests en verde. Ya ocurrió: la Ola 1 de la Fase 3+4 llevó
+> dentro una regresión de apilamiento con 6889 tests pasando.
+>
+> Si tocas z-index, `isolation`, `position`, `overflow` o `backdrop-filter`,
+> **la prueba es un navegador**, y la forma de que quede fijada es un e2e que
+> mida el resultado, no el valor declarado. El patrón está en
+> `tests/e2e/emplazamiento-modales.spec.ts`: recorre los ancestros buscando
+> contextos de apilamiento y pregunta con `elementFromPoint` quién pinta
+> encima de quién.
 
 ---
 

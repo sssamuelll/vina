@@ -237,7 +237,7 @@ export default function AppShell() {
             style={{
               position: 'absolute',
               inset: 0,
-              zIndex: 50,
+              zIndex: 'var(--z-hint)',
               pointerEvents: 'none', // let the drop event pass through to canvas-area
               display: 'flex',
               alignItems: 'center',
