@@ -23,7 +23,7 @@ const WalkSeamIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const walkSeamTool: ToolDefinition = {
   id: 'walkSeam',
-  name: 'Walk Seam',
+  name: 'Recorrer costura',
   description: 'Walk along sewn edges to verify length matching and ease distribution',
   context: '2d',
   icon: WalkSeamIcon,
@@ -32,18 +32,18 @@ export const walkSeamTool: ToolDefinition = {
   options: [
     {
       id: 'tolerance',
-      label: 'Tolerance',
+      label: 'Tolerancia',
       type: 'select',
       value: '3',
       choices: [
-        { label: '1mm', value: '1' },
-        { label: '3mm', value: '3' },
-        { label: '5mm', value: '5' },
+        { label: '1 mm', value: '1' },
+        { label: '3 mm', value: '3' },
+        { label: '5 mm', value: '5' },
       ],
     },
     {
       id: 'ghostOpacity',
-      label: 'Ghost Opacity',
+      label: 'Opacidad del calco',
       type: 'number',
       value: 30,
       min: 10,

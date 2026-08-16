@@ -20,7 +20,7 @@ const MeasureIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const measureTool: ToolDefinition = {
   id: 'measure',
-  name: 'Measure',
+  name: 'Medir',
   description: 'Measure point-to-point distances on pattern pieces',
   context: '2d',
   icon: MeasureIcon,
@@ -30,13 +30,13 @@ export const measureTool: ToolDefinition = {
   options: [
     {
       id: 'showAngle',
-      label: 'Show Angle',
+      label: 'Mostrar el ángulo',
       type: 'toggle',
       value: false,
     },
     {
       id: 'cumulative',
-      label: 'Cumulative Distance',
+      label: 'Distancia acumulada',
       type: 'toggle',
       value: false,
     },

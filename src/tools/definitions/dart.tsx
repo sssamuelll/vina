@@ -22,7 +22,7 @@ const DartIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const dartTool: ToolDefinition = {
   id: 'dart',
-  name: 'Dart',
+  name: 'Pinza',
   context: '2d',
   shortcut: 'd',
   icon: DartIcon,
@@ -31,7 +31,7 @@ export const dartTool: ToolDefinition = {
   options: [
     {
       id: 'dartWidth',
-      label: 'Width (mm)',
+      label: 'Ancho (mm)',
       type: 'number',
       value: 20,
       min: 5,
@@ -40,7 +40,7 @@ export const dartTool: ToolDefinition = {
     },
     {
       id: 'dartDepth',
-      label: 'Depth (mm)',
+      label: 'Largo (mm)',
       type: 'number',
       value: 100,
       min: 20,
@@ -49,19 +49,19 @@ export const dartTool: ToolDefinition = {
     },
     {
       id: 'capShape',
-      label: 'Cap Shape',
+      label: 'Forma de la punta',
       type: 'select',
       value: 'pointed',
       choices: [
-        { label: 'Pointed', value: 'pointed' },
-        { label: 'Curved', value: 'curved' },
-        { label: 'Flat', value: 'flat' },
-        { label: 'Diamond', value: 'diamond' },
+        { label: 'En punta', value: 'pointed' },
+        { label: 'Curva', value: 'curved' },
+        { label: 'Plana', value: 'flat' },
+        { label: 'Rombo', value: 'diamond' },
       ],
     },
     {
       id: 'segments',
-      label: 'Segments',
+      label: 'Tramos',
       type: 'number',
       value: 1,
       min: 1,

@@ -21,7 +21,7 @@ const MergeIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const mergeTool: ToolDefinition = {
   id: 'merge',
-  name: 'Merge Patterns',
+  name: 'Unir patrones',
   context: '2d',
   shortcut: 'j',
   icon: MergeIcon,

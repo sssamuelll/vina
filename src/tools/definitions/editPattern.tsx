@@ -24,7 +24,7 @@ const EditPatternIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const editPatternTool: ToolDefinition = {
   id: 'editPattern',
-  name: 'Edit Pattern',
+  name: 'Editar patrón',
   context: '2d',
   shortcut: 'q',
   icon: EditPatternIcon,

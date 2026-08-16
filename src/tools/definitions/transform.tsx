@@ -23,7 +23,7 @@ const TransformIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const transformTool: ToolDefinition = {
   id: 'transform',
-  name: 'Transform',
+  name: 'Transformar patrón',
   context: '2d',
   shortcut: 'a',
   icon: TransformIcon,
@@ -32,18 +32,18 @@ export const transformTool: ToolDefinition = {
   options: [
     {
       id: 'mode',
-      label: 'Transform Mode',
+      label: 'Transformación',
       type: 'select',
       value: 'scale',
       choices: [
-        { label: 'Scale', value: 'scale' },
-        { label: 'Rotate', value: 'rotate' },
-        { label: 'Skew', value: 'skew' },
+        { label: 'Escalar', value: 'scale' },
+        { label: 'Girar', value: 'rotate' },
+        { label: 'Inclinar', value: 'skew' },
       ],
     },
     {
       id: 'uniform',
-      label: 'Uniform Scale',
+      label: 'Escalar proporcional',
       type: 'toggle',
       value: true,
     },

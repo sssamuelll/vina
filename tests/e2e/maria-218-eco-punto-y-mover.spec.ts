@@ -50,6 +50,13 @@ const activeTool = (page: Page) =>
 const pieceCount = (page: Page) =>
   page.evaluate(() => (window as unknown as StoreWindow).__VINA_STORE__.getState().project.pieces.length);
 
+/** Vértices del contorno de cada pieza. Poner un punto hace crecer uno. */
+const outlineLengths = (page: Page): Promise<number[]> =>
+  page.evaluate(() =>
+    (window as unknown as StoreWindow).__VINA_STORE__.getState().project.pieces.map(
+      (p) => (p as unknown as { outline: unknown[] }).outline.length,
+    ));
+
 /** Dibuja un rectángulo entre dos esquinas de pantalla. */
 async function drawRectAt(page: Page, x1: number, y1: number, x2: number, y2: number) {
   await page.keyboard.press('s');
@@ -92,8 +99,17 @@ test.describe('maria-218 — el eco de la pieza al crear un punto', () => {
     await expect.poll(() => pieceCount(page)).toBe(2);
 
     // Editar patrón sobre A: sus anclas quedan pintadas.
+    //
+    // El clic va al INTERIOR de A, no a su borde inferior. Antes iba al borde
+    // y eso lo hacía depender de un píxel de frontera: con `snapToGrid`, el
+    // borde dibujado no cae exactamente donde el arrastre lo pidió, así que
+    // acertar dependía de dónde cayera el centro del lienzo. Medido el
+    // 2026-08-16 con la canaleta de opciones (#1049), que le quita 41px de
+    // alto: el borde real quedaba 2px por encima del punto clicado y la pieza
+    // no se seleccionaba. Seleccionar A es PREPARACIÓN, no lo que este test
+    // vigila; clicar dentro lo consigue igual y no depende del subpíxel.
     await setTool(page, 'editPattern');
-    await page.mouse.click((A.left + A.right) / 2, A.bottom);
+    await page.mouse.click((A.left + A.right) / 2, (A.top + A.bottom) / 2);
     await page.waitForTimeout(400);
     const enA = await anchorCentres(page);
     expect(enA.length).toBeGreaterThan(0);
@@ -101,8 +117,19 @@ test.describe('maria-218 — el eco de la pieza al crear un punto', () => {
     // Sin salir de la edición, herramienta punto y clic sobre el borde de B.
     await setTool(page, 'point');
     await page.waitForTimeout(300);
+    const vérticesAntes = await outlineLengths(page);
     await page.mouse.click((B.left + B.right) / 2, B.top);
     await page.waitForTimeout(600);
+
+    // El punto TIENE que haberse insertado. Sin esta comprobación, un clic que
+    // falle el borde deja el test en verde sin haber ejercido nada: la
+    // aserción de abajo cuenta anclas fuera de sitio, y si nunca se puso el
+    // punto no hay ninguna. Un verde vacío es peor que un rojo.
+    const vérticesDespués = await outlineLengths(page);
+    expect(
+      vérticesDespués.some((n, i) => n > vérticesAntes[i]),
+      `ninguna pieza ganó un vértice: antes ${vérticesAntes}, después ${vérticesDespués}`,
+    ).toBe(true);
 
     // Ni una sola ancla puede caer fuera de la caja de A. Antes del fix, las de
     // B aparecían con la posición de A: sobre lona vacía.

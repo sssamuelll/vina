@@ -19,6 +19,7 @@ import { topstitchSegmentTool } from './definitions/topstitchSegment';
 import { topstitchFreeTool } from './definitions/topstitchFree';
 import { topstitchEditTool } from './definitions/topstitchEdit';
 import { seamAllowanceTool } from './definitions/seamAllowance';
+import { seamEditTool } from './definitions/seamEdit';
 import { notchTool } from './definitions/notch';
 import { grainlineTool } from './definitions/grainline';
 import { duplicateTool } from './definitions/duplicate';
@@ -104,6 +105,7 @@ const allTools = [
   topstitchFreeTool,
   topstitchEditTool,
   seamAllowanceTool,
+  seamEditTool,
   elasticTool,
   pleatTool,
   trimPlaceTool,

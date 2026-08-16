@@ -14,7 +14,7 @@ const TopstitchSegmentIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const topstitchSegmentTool: ToolDefinition = {
   id: 'topstitchSegment',
-  name: 'Segment Topstitch',
+  name: 'Pespunte por tramo',
   description: 'Add topstitch to a specific edge segment',
   context: '2d',
   shortcut: 'k',
@@ -22,11 +22,11 @@ export const topstitchSegmentTool: ToolDefinition = {
   cursor: 'crosshair',
   group: 'sewing',
   options: [
-    { id: 'stitchType', label: 'Stitch Type', type: 'select', value: 'straight',
-      choices: [{ label: 'Straight', value: 'straight' }, { label: 'Zigzag', value: 'zigzag' }, { label: 'Triple', value: 'triple' }] },
-    { id: 'stitchLength', label: 'Stitch Length (mm)', type: 'number', value: 3.0, min: 1.0, max: 8.0, step: 0.5 },
-    { id: 'offset', label: 'Offset (mm)', type: 'number', value: 5.0, min: 1.0, max: 20.0, step: 0.5 },
-    { id: 'threadColor', label: 'Thread Color', type: 'color', value: '#333333' },
+    { id: 'stitchType', label: 'Tipo de puntada', type: 'select', value: 'straight',
+      choices: [{ label: 'Recta', value: 'straight' }, { label: 'Zigzag', value: 'zigzag' }, { label: 'Triple', value: 'triple' }] },
+    { id: 'stitchLength', label: 'Largo de puntada (mm)', type: 'number', value: 3.0, min: 1.0, max: 8.0, step: 0.5 },
+    { id: 'offset', label: 'Separación (mm)', type: 'number', value: 5.0, min: 1.0, max: 20.0, step: 0.5 },
+    { id: 'threadColor', label: 'Color del hilo', type: 'color', value: '#333333' },
   ],
   copilot: {
     description: 'Add topstitch to a partial edge segment. Click two points on an edge to define the segment.',

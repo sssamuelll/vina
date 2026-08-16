@@ -22,7 +22,7 @@ const OffsetOutlineIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const offsetOutlineTool: ToolDefinition = {
   id: 'offsetOutline',
-  name: 'Offset Outline',
+  name: 'Desplazar contorno',
   context: '2d',
   shortcut: 'r',
   icon: OffsetOutlineIcon,
@@ -31,7 +31,7 @@ export const offsetOutlineTool: ToolDefinition = {
   options: [
     {
       id: 'distance',
-      label: 'Distance (mm)',
+      label: 'Distancia (mm)',
       type: 'number',
       value: 10,
       min: 1,
@@ -40,29 +40,29 @@ export const offsetOutlineTool: ToolDefinition = {
     },
     {
       id: 'direction',
-      label: 'Direction',
+      label: 'Dirección',
       type: 'select',
       value: 'outward',
       choices: [
-        { label: 'Outward', value: 'outward' },
-        { label: 'Inward', value: 'inward' },
-        { label: 'Both', value: 'both' },
+        { label: 'Hacia afuera', value: 'outward' },
+        { label: 'Hacia adentro', value: 'inward' },
+        { label: 'Las dos', value: 'both' },
       ],
     },
     {
       id: 'joinType',
-      label: 'Join Type',
+      label: 'Unión de esquinas',
       type: 'select',
       value: 'round',
       choices: [
-        { label: 'Round', value: 'round' },
-        { label: 'Miter', value: 'miter' },
-        { label: 'Square', value: 'square' },
+        { label: 'Redondeada', value: 'round' },
+        { label: 'En punta', value: 'miter' },
+        { label: 'Achaflanada', value: 'square' },
       ],
     },
     {
       id: 'replace',
-      label: 'Replace Original',
+      label: 'Reemplazar el original',
       type: 'toggle',
       value: false,
     },

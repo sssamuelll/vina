@@ -13,7 +13,7 @@ const PolyPenIcon = () => (
 
 export const polyPenTool: ToolDefinition = {
   id: 'polyPen',
-  name: 'Poly Pen',
+  name: 'Pluma poligonal',
   description: 'Draw pattern shapes with combined straight lines and bezier curves',
   context: '2d',
   shortcut: 'y',
@@ -23,28 +23,28 @@ export const polyPenTool: ToolDefinition = {
   options: [
     {
       id: 'mode',
-      label: 'Mode',
+      label: 'Modo de dibujo',
       type: 'select',
       value: 'piece',
       choices: [
-        { label: 'New Piece', value: 'piece' },
-        { label: 'Internal Line', value: 'internalLine' },
+        { label: 'Pieza nueva', value: 'piece' },
+        { label: 'Línea interna', value: 'internalLine' },
       ],
     },
     {
       id: 'lineType',
-      label: 'Line Type',
+      label: 'Tipo de línea',
       type: 'select',
       value: 'fold',
       choices: [
-        { label: 'Fold', value: 'fold' },
-        { label: 'Reference', value: 'reference' },
-        { label: 'Topstitch', value: 'topstitch' },
+        { label: 'Doblez', value: 'fold' },
+        { label: 'Referencia', value: 'reference' },
+        { label: 'Pespunte', value: 'topstitch' },
       ],
     },
     {
       id: 'snapGrid',
-      label: 'Snap to Grid',
+      label: 'Ajustar a la cuadrícula',
       type: 'toggle',
       value: true,
     },

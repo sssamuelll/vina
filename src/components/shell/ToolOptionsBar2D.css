@@ -1,0 +1,125 @@
+/* Canaleta superior del lienzo 2D. Material `chrome` ENTERO, en su variante a
+   ras: va acoplada, así que es opaca, sin radio y sin sombra de flotación.
+   Nada de `overlay` — su backdrop-filter la volvería bloque contenedor de
+   cualquier descendiente `position: fixed`, que ya costó tres bugs.
+
+   Las cuatro piezas salen de tokens; el radio y la sombra por la variante
+   `-flush` declarada en tokens.css, no omitidas aquí. El único otro consumidor
+   de `chrome` es el dock (Dock.css:14-17), que sí flota y por eso usa el set
+   base. */
+.tool-options-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  /* Desborda dentro de sí misma; nunca empuja el layout. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--surface-chrome-bg);
+  border-bottom: var(--surface-chrome-border);
+  border-radius: var(--surface-chrome-radius-flush);
+  box-shadow: var(--surface-chrome-shadow-flush);
+  color: var(--text-primary);
+}
+
+/* Alto de contenido constante en TODOS los estados. Sin esto la canaleta mide
+   distinto según lo que pinte —medido: 1px entre Punto y Seleccionar, y sería
+   más con un `color`, que los navegadores dibujan más alto que un `select`— y
+   entonces el patrón se mueve al cambiar de herramienta, que es exactamente lo
+   que el canal permanente existe para evitar. */
+.tool-options-bar__tool,
+.tool-options-bar__shortcut,
+.tool-options-bar__label,
+.tool-options-bar__valor,
+.tool-options-bar__item {
+  line-height: 24px;
+}
+
+.tool-options-bar__select,
+.tool-options-bar__slider,
+.tool-options-bar__color,
+.tool-options-bar__toggle {
+  height: 24px;
+  box-sizing: border-box;
+}
+
+.tool-options-bar__tool {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tool-options-bar__shortcut {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.tool-options-bar__sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border-subtle);
+}
+
+.tool-options-bar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  white-space: nowrap;
+}
+
+.tool-options-bar__label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.tool-options-bar__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: var(--surface-chrome-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* El activo cambia RELLENO, no solo tono: un control de 16px que solo cambia
+   de color no comunica nada y falla para quien no distingue colores. */
+.tool-options-bar__toggle--activo {
+  color: var(--text-primary);
+  background: var(--accent-subtle);
+  border-color: var(--accent-border);
+}
+
+.tool-options-bar__marca {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+}
+
+.tool-options-bar__toggle--activo .tool-options-bar__marca {
+  background: currentColor;
+}
+
+.tool-options-bar__toggle:hover {
+  color: var(--text-primary);
+}
+
+/* Toda regla :hover trae su :focus-visible — si no, el trinquete R5 sube y el
+   gate falla solo.
+
+   Los cuatro selectores van en UNA línea a propósito: `ui-contract-lint.mjs`
+   empareja hover con focus leyendo línea a línea (`^([^{}]+)\{`, regla R5),
+   así que de una lista repartida en varias líneas solo registra la que lleva
+   la llave. Escrito bonito, el toggle contaba como :hover sin foco y el
+   trinquete subía por un falso positivo. Limitación del guardián, no del
+   contrato: anotada como cabo suelto. */
+.tool-options-bar__toggle:focus-visible, .tool-options-bar__select:focus-visible, .tool-options-bar__slider:focus-visible, .tool-options-bar__color:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

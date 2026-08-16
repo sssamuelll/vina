@@ -140,6 +140,18 @@
   --surface-chrome-radius: var(--radius-xl);
   --surface-chrome-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 
+  /* Variante A RAS de chrome, para el cromo acoplado que ocupa el ancho
+   * completo de su área: la barra de opciones de herramienta (#1049). El
+   * radio y la sombra de arriba describen algo que FLOTA —el dock, que es
+   * `position: absolute`—; una canaleta a ras muere contra los bordes de su
+   * contenedor, así que un radio xl le dejaría huecos y una sombra de 32px
+   * mentiría sobre su altura. Se declara aquí, y no se omite razonándolo en
+   * el CSS del componente, porque una pieza que falta razonada en prosa es
+   * justo cómo la auditoría del 2026-08-14 llegó a siete materiales para la
+   * misma idea. Mismo criterio que --surface-overlay-radius-pill. */
+  --surface-chrome-radius-flush: 0;
+  --surface-chrome-shadow-flush: none;
+
   --surface-overlay-bg: rgba(8, 8, 15, 0.92);
   --surface-overlay-border: 1px solid rgba(99, 102, 241, 0.15);
   --surface-overlay-radius: var(--radius-xl);

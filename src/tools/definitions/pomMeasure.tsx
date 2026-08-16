@@ -15,7 +15,7 @@ const POMIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const pomMeasureTool: ToolDefinition = {
   id: 'pomMeasure',
-  name: 'POM Measure',
+  name: 'Medir POM',
   description: 'Create persistent named measurements (Points of Measure)',
   context: '2d',
   shortcut: 'p',
@@ -23,8 +23,8 @@ export const pomMeasureTool: ToolDefinition = {
   cursor: 'crosshair',
   group: 'annotation',
   options: [
-    { id: 'method', label: 'Method', type: 'select', value: 'straight', choices: [{ label: 'Straight', value: 'straight' }, { label: 'Along Edge', value: 'alongEdge' }] },
-    { id: 'defaultCategory', label: 'Category', type: 'select', value: 'custom', choices: [{ label: 'Length', value: 'length' }, { label: 'Width', value: 'width' }, { label: 'Custom', value: 'custom' }] },
+    { id: 'method', label: 'Método', type: 'select', value: 'straight', choices: [{ label: 'En línea recta', value: 'straight' }, { label: 'Siguiendo el borde', value: 'alongEdge' }] },
+    { id: 'defaultCategory', label: 'Categoría', type: 'select', value: 'custom', choices: [{ label: 'Largo', value: 'length' }, { label: 'Ancho', value: 'width' }, { label: 'Otra', value: 'custom' }] },
   ],
   copilot: {
     description: 'Create a persistent named measurement (Point of Measure) on the 2D pattern. Straight mode measures point-to-point, along-edge mode measures full edge arc-length.',

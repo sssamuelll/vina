@@ -19,7 +19,7 @@ const NotchIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const notchTool: ToolDefinition = {
   id: 'notch',
-  name: 'Notch',
+  name: 'Piquete',
   context: '2d',
   icon: NotchIcon,
   cursor: 'pointer',
@@ -29,22 +29,22 @@ export const notchTool: ToolDefinition = {
   options: [
     {
       id: 'shape',
-      label: 'Notch Shape',
+      label: 'Forma del piquete',
       type: 'select',
       value: 'slit',
       choices: [
-        { label: 'Slit', value: 'slit' },
-        { label: 'T-Notch', value: 't-notch' },
-        { label: 'V Internal', value: 'v-internal' },
-        { label: 'V External', value: 'v-external' },
-        { label: 'U-Notch', value: 'u-notch' },
-        { label: 'Castle', value: 'castle' },
-        { label: 'Diamond', value: 'diamond' },
+        { label: 'Recta', value: 'slit' },
+        { label: 'En T', value: 't-notch' },
+        { label: 'V hacia adentro', value: 'v-internal' },
+        { label: 'V hacia afuera', value: 'v-external' },
+        { label: 'En U', value: 'u-notch' },
+        { label: 'Almena', value: 'castle' },
+        { label: 'Rombo', value: 'diamond' },
       ],
     },
     {
       id: 'length',
-      label: 'Depth (mm)',
+      label: 'Profundidad (mm)',
       type: 'number',
       value: 8,
       min: 3,
@@ -53,13 +53,13 @@ export const notchTool: ToolDefinition = {
     },
     {
       id: 'count',
-      label: 'Count',
+      label: 'Cantidad',
       type: 'select',
       value: 1,
       choices: [
-        { label: 'Single', value: 1 },
-        { label: 'Double', value: 2 },
-        { label: 'Triple', value: 3 },
+        { label: 'Uno', value: 1 },
+        { label: 'Dos', value: 2 },
+        { label: 'Tres', value: 3 },
       ],
     },
   ],

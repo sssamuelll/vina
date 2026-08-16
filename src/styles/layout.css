@@ -36,7 +36,21 @@
 .canvas-area__2d {
   position: relative;
   overflow: hidden;
+  /* Columna: la canaleta de opciones (#1049) es un hijo en flujo que reserva
+     alto de verdad, y el lienzo se queda con lo que sobra. El dock sigue
+     flotando (absolute, centrado) y por eso no entra en este reparto. */
+  display: flex;
+  flex-direction: column;
   background: #f5f3f0; /* Warm paper — 2D canvas needs a light bg for pattern visibility */
+}
+
+/* `.pattern-editor` es width/height 100%. En columna flex un alto en
+   porcentaje se resuelve contra el contenedor IGNORANDO que un hermano ya se
+   llevó espacio, así que desbordaría por debajo de la barra. `flex-basis: 0`
+   gana sobre `height` para el tamaño base y `flex-grow` reparte lo que queda. */
+.canvas-area__2d > .pattern-editor {
+  flex: 1 1 0;
+  min-height: 0;
 }
 .canvas-area__divider {
   width: 4px;

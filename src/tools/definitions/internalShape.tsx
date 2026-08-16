@@ -21,7 +21,7 @@ const InternalShapeIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const internalShapeTool: ToolDefinition = {
   id: 'internalShape',
-  name: 'Internal Shape',
+  name: 'Forma interna',
   context: '2d',
   shortcut: 'g',
   icon: InternalShapeIcon,

@@ -22,7 +22,7 @@ const ScissorsIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const scissorsTool: ToolDefinition = {
   id: 'scissors',
-  name: 'Scissors (Split)',
+  name: 'Tijeras',
   context: '2d',
   shortcut: 'x',
   icon: ScissorsIcon,
@@ -31,34 +31,34 @@ export const scissorsTool: ToolDefinition = {
   options: [
     {
       id: 'cutType',
-      label: 'Cut Type',
+      label: 'Tipo de corte',
       type: 'select',
       value: 'straight',
       choices: [
-        { label: 'Straight', value: 'straight' },
-        { label: 'Curved', value: 'curved' },
+        { label: 'Recto', value: 'straight' },
+        { label: 'Curvo', value: 'curved' },
       ],
     },
     {
       id: 'keepBoth',
-      label: 'Keep Both Sides',
+      label: 'Conservar las dos partes',
       type: 'toggle',
       value: true,
     },
     {
       id: 'autoSew',
-      label: 'Auto-Sew Cut',
+      label: 'Coser el corte automáticamente',
       type: 'toggle',
       value: true,
     },
     {
       id: 'seamType',
-      label: 'Seam Type',
+      label: 'Tipo de costura',
       type: 'select',
       value: 'standard',
       choices: [
-        { label: 'Standard', value: 'standard' },
-        { label: 'French', value: 'french' },
+        { label: 'Normal', value: 'standard' },
+        { label: 'Francesa', value: 'french' },
         { label: 'Flat-felled', value: 'flat-felled' },
         { label: 'Overlock', value: 'overlock' },
       ],

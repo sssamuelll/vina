@@ -22,7 +22,7 @@ const SeamAllowanceIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const seamAllowanceTool: ToolDefinition = {
   id: 'seamAllowance',
-  name: 'Seam Allowance',
+  name: 'Margen de costura',
   context: '2d',
   icon: SeamAllowanceIcon,
   cursor: 'default',

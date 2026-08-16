@@ -19,7 +19,7 @@ const CircleIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const circleTool: ToolDefinition = {
   id: 'circle',
-  name: 'Circle/Curve Tool',
+  name: 'Elipse (círculo)',
   context: '2d',
   shortcut: 'e',
   icon: CircleIcon,
@@ -28,18 +28,18 @@ export const circleTool: ToolDefinition = {
   options: [
     {
       id: 'shapeType',
-      label: 'Shape Type',
+      label: 'Figura',
       type: 'select',
       value: 'circle',
       choices: [
-        { label: 'Circle', value: 'circle' },
-        { label: 'Ellipse', value: 'ellipse' },
-        { label: 'Arc', value: 'arc' },
+        { label: 'Círculo', value: 'circle' },
+        { label: 'Elipse', value: 'ellipse' },
+        { label: 'Arco', value: 'arc' },
       ],
     },
     {
       id: 'radius',
-      label: 'Radius',
+      label: 'Radio',
       type: 'number',
       value: 50,
       min: 5,

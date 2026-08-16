@@ -19,7 +19,7 @@ const LineIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const lineTool: ToolDefinition = {
   id: 'line',
-  name: 'Line Tool',
+  name: 'Línea',
   context: '2d',
   icon: LineIcon,
   cursor: 'crosshair',
