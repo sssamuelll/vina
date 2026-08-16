@@ -10,25 +10,30 @@ import ContextPanel from '../ContextPanel';
 afterEach(cleanup);
 
 // H-2: reproduce el mecanismo real, no solo el síntoma. El bug no es que
-// ContextPanel "a veces no cierra" — es que AppShell.tsx pasa un `onClose`
+// ContextPanel "a veces no cierra" — es que AppShell.tsx pasaba un `onClose`
 // en flecha en línea (`() => closePanel(leftPanel)`), que cambia de
 // identidad en cada render. Ese cambio re-suscribe el efecto de Escape: si
 // ALGO vacía la actualización entre los dos listeners de `window` (React 18
-// lo hace para prioridad discreta en la app real; el propio informe avisa
-// que esto depende de un detalle de implementación que un upgrade de React
-// puede voltear en silencio), el listener que se quitó durante el propio
+// lo hace para prioridad discreta en la app real; es un detalle de
+// implementación, no una decisión de diseño — un upgrade de React puede
+// voltearlo en silencio), el listener que se quitó durante el propio
 // despacho del evento ya no se invoca — el de la izquierda gana siempre
 // porque su efecto se registra primero.
 //
-// jsdom despacha los listeners de `window` en un solo tick síncrono, sin
-// ceder al checkpoint de microtareas entre ellos — por eso un `fireEvent`
-// liso no interpone nada entre los dos listeners y el bug no se ve ahí.
-// Envolver el primer `onClose` (el izquierdo, que se registra primero) en
-// `flushSync` fija ESE punto de interleaving de forma determinista: fuerza
-// el re-render (y por tanto, SI la identidad de onClose cambia, la
-// re-suscripción) antes de que el segundo listener sea invocado.
+// jsdom despacha los dos listeners de `window` en un solo tick síncrono, sin
+// ceder a ningún checkpoint de microtareas entre ellos — así que un
+// `fireEvent` liso no interpone nada entre los dos y el bug, que depende
+// justo de ese interleaving, no se ve ahí. Esperar a que jsdom lo reprodujera
+// solo habría sido un test que pasa o falla por una razón que no
+// controlamos. En vez de eso, `flushSync` alrededor del primer `onClose` (el
+// izquierdo, que se registra primero) PROVOCA DETERMINISTAMENTE, a propósito,
+// la misma carrera que en el navegador ocurre sola: fuerza el re-render (y
+// por tanto, si la identidad de onClose cambia, la re-suscripción del
+// efecto) antes de que el segundo listener sea invocado. Forzar el punto de
+// carrera es más honesto que rezarle al timing.
 //
-// Esto probó dos cosas, comprobadas a mano antes de fijar esta versión:
+// Lo que este test AFIRMA no es un timing — es la estabilidad de la
+// referencia. Comprobado a mano antes de fijar esta versión:
 // - Con `onClose` recreado en línea en cada render (el patrón viejo de
 //   AppShell.tsx, `() => closePanel(x)`), este mismo arnés con el mismo
 //   `flushSync` deja "Capas" sin cerrar — falla exactamente como describe
@@ -37,8 +42,9 @@ afterEach(cleanup);
 //   `closeLeft`/`closeRight` de usePanelHost, pasados directo sin flecha),
 //   el mismo `flushSync` deja de importar: la identidad no cambia, el
 //   efecto no se re-suscribe, y los dos listeners siguen registrados
-//   durante todo el despacho. Esta es la versión que se queda: fija el
-//   arreglo, no solo el síntoma en el timing de jsdom.
+//   durante todo el despacho, sin importar cuándo caiga el re-render. Esta
+//   es la versión que se queda: fija el arreglo (estabilidad referencial),
+//   no un síntoma que depende del timing de jsdom.
 function DosPanelesConCierresEstables() {
   const [abiertoA, setAbiertoA] = useState(true);
   const [abiertoB, setAbiertoB] = useState(true);

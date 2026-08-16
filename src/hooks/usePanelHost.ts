@@ -6,7 +6,6 @@ export interface PanelHost {
   rightPanel: string | null;
   openPanel: (name: string) => void;
   togglePanel: (name: string) => void;
-  closePanel: (name: string) => void;
   /** Cierre sin argumentos, identidad estable entre renders — ver H-2 abajo. */
   closeLeft: () => void;
   closeRight: () => void;
@@ -41,14 +40,6 @@ export function usePanelHost(): PanelHost {
     }
   }, []);
 
-  const closePanel = useCallback((name: string) => {
-    if (getPanelSide(name) === 'left') {
-      setLeftPanel((prev) => (prev === name ? null : prev));
-    } else {
-      setRightPanel((prev) => (prev === name ? null : prev));
-    }
-  }, []);
-
   // H-2: Escape en ContextPanel.tsx registra un keydown propio por
   // instancia; con dos paneles montados, AppShell antes pasaba
   // `onClose={() => closePanel(leftPanel)}` — una flecha en línea que
@@ -70,5 +61,5 @@ export function usePanelHost(): PanelHost {
   const closeLeft = useCallback(() => setLeftPanel(null), []);
   const closeRight = useCallback(() => setRightPanel(null), []);
 
-  return { leftPanel, rightPanel, openPanel, togglePanel, closePanel, closeLeft, closeRight };
+  return { leftPanel, rightPanel, openPanel, togglePanel, closeLeft, closeRight };
 }
