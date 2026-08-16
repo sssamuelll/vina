@@ -19,7 +19,7 @@ import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import ContextPanel from './ContextPanel';
 import ToastContainer from './ToastContainer';
 import ConfirmDialog from './ConfirmDialog';
-import { getPanelSide } from './panelSide';
+import { usePanelHost } from '../../hooks/usePanelHost';
 import type { Tool3D } from '../../types/types';
 
 // Lazy-load panel content
@@ -81,7 +81,7 @@ export default function AppShell() {
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
   const splitRatio = useSelector((s: RootState) => s.layout.splitRatio);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
-  const [contextPanel, setContextPanel] = useState<string | null>(null);
+  const { leftPanel, rightPanel, openPanel, togglePanel, closePanel } = usePanelHost();
   const canvasRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const [dxfDragActive, setDxfDragActive] = useState(false);
@@ -199,22 +199,22 @@ export default function AppShell() {
     document.addEventListener('mouseup', onMouseUp);
   }, [dispatch]);
 
-  // ─── Width calculations ─────────────────────────────────────────────
-  const get2dWidth = () => {
-    if (viewMode === '2d') return '100%';
-    if (viewMode === '3d') return '0%';
-    return `${splitRatio * 100}%`;
+  // ─── Flex-grow calculations ─────────────────────────────────────────
+  const get2dFlexGrow = () => {
+    if (viewMode === '2d') return 1;
+    if (viewMode === '3d') return 0;
+    return splitRatio;
   };
-  const get3dWidth = () => {
-    if (viewMode === '3d') return '100%';
-    if (viewMode === '2d') return '0%';
-    return `${(1 - splitRatio) * 100}%`;
+  const get3dFlexGrow = () => {
+    if (viewMode === '3d') return 1;
+    if (viewMode === '2d') return 0;
+    return 1 - splitRatio;
   };
 
   return (
     <div className="app-shell">
       <TopBar
-        onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)}
+        onOpenPanel={togglePanel}
         onImportDXF={() => dxfInputRef.current?.click()}
       />
       <input
@@ -262,14 +262,19 @@ export default function AppShell() {
             </div>
           </div>
         )}
+        {leftPanel && (
+          <ContextPanel title={PANEL_LABELS[leftPanel] ?? leftPanel} onClose={() => closePanel(leftPanel)}>
+            {renderPanelContent(leftPanel)}
+          </ContextPanel>
+        )}
         <div
           className="canvas-area__2d"
-          style={{ width: get2dWidth(), display: viewMode === '3d' ? 'none' : undefined }}
+          style={{ flex: `${get2dFlexGrow()} 1 0px`, display: viewMode === '3d' ? 'none' : undefined }}
         >
-          <LeftDock onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)} />
+          <LeftDock onOpenPanel={togglePanel} />
           <PatternEditor
             onImportDXF={() => dxfInputRef.current?.click()}
-            onOpenPanel={(name) => setContextPanel(name)}
+            onOpenPanel={openPanel}
           />
         </div>
         {viewMode === 'split' && (
@@ -278,21 +283,21 @@ export default function AppShell() {
         <div
           className="canvas-area__3d"
           data-shortcut-context="3d"
-          style={{ width: get3dWidth(), display: viewMode === '2d' ? 'none' : undefined }}
+          style={{ flex: `${get3dFlexGrow()} 1 0px`, display: viewMode === '2d' ? 'none' : undefined }}
         >
-          <RightDock onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)} />
+          <RightDock onOpenPanel={togglePanel} />
           <Viewport3DErrorBoundary>
             <Viewport3D activeTool3D={activeTool3D as Tool3D} hideChrome />
           </Viewport3DErrorBoundary>
         </div>
-        {contextPanel && (
-          <ContextPanel title={PANEL_LABELS[contextPanel] ?? contextPanel} side={getPanelSide(contextPanel)} onClose={() => setContextPanel(null)}>
-            {renderPanelContent(contextPanel)}
+        {rightPanel && (
+          <ContextPanel title={PANEL_LABELS[rightPanel] ?? rightPanel} onClose={() => closePanel(rightPanel)}>
+            {renderPanelContent(rightPanel)}
           </ContextPanel>
         )}
       </div>
       <UnifiedBar
-        onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)}
+        onOpenPanel={togglePanel}
       />
       <ToastContainer />
       {/* Enciende `copilotUI.pendingConfirmation`, que estuvo siendo una
