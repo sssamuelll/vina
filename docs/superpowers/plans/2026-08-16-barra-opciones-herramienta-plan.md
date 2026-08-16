@@ -401,8 +401,8 @@ Crear `src/components/shell/ToolOptionsBar2D.css`. **Todos los valores salen de 
    de color no comunica nada y falla para quien no distingue colores. */
 .tool-options-bar__toggle--activo {
   color: var(--text-primary);
-  background: var(--accent-soft);
-  border-color: var(--accent);
+  background: var(--accent-subtle);
+  border-color: var(--accent-border);
 }
 
 .tool-options-bar__marca {

@@ -1,0 +1,102 @@
+/* Canaleta superior del lienzo 2D. Material `chrome`: va acoplada, así que es
+   opaca. Nada de `overlay` — su backdrop-filter la volvería bloque contenedor
+   de cualquier descendiente `position: fixed`.
+
+   Toma `--surface-chrome-bg` y `--surface-chrome-border`, y NO toma
+   `--surface-chrome-radius` ni `--surface-chrome-shadow`. No es media mezcla:
+   son piezas de UN solo material, y las dos que faltan describen algo que
+   flota. Esta canaleta va a ras —sus esquinas mueren contra el borde del área
+   y su separación del documento la hace el borde inferior—, así que un radio
+   xl dejaría huecos y una sombra de 32px mentiría sobre su altura. El único
+   otro consumidor de `chrome` es el dock (Dock.css:14-17), que sí flota y por
+   eso sí usa las cuatro. Si aparece una segunda canaleta a ras, ahí se declara
+   la variante; con una sola, declararla sería ceremonia. */
+.tool-options-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  /* Desborda dentro de sí misma; nunca empuja el layout. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--surface-chrome-bg);
+  border-bottom: var(--surface-chrome-border);
+  color: var(--text-primary);
+}
+
+.tool-options-bar__tool {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tool-options-bar__shortcut {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.tool-options-bar__sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border-subtle);
+}
+
+.tool-options-bar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  white-space: nowrap;
+}
+
+.tool-options-bar__label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.tool-options-bar__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: var(--surface-chrome-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* El activo cambia RELLENO, no solo tono: un control de 16px que solo cambia
+   de color no comunica nada y falla para quien no distingue colores. */
+.tool-options-bar__toggle--activo {
+  color: var(--text-primary);
+  background: var(--accent-subtle);
+  border-color: var(--accent-border);
+}
+
+.tool-options-bar__marca {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+}
+
+.tool-options-bar__toggle--activo .tool-options-bar__marca {
+  background: currentColor;
+}
+
+.tool-options-bar__toggle:hover {
+  color: var(--text-primary);
+}
+
+/* Toda regla :hover trae su :focus-visible — si no, el trinquete R5 sube y el
+   gate falla solo. */
+.tool-options-bar__toggle:focus-visible,
+.tool-options-bar__select:focus-visible,
+.tool-options-bar__slider:focus-visible,
+.tool-options-bar__color:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
