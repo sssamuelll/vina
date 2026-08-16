@@ -263,15 +263,50 @@ test.describe('Ola 2 — los paneles ocupan canaleta, no flotan', () => {
     expect(sonda.flexBasis).toBe('300px');
 
     // Y lo que hay que saber a ciencia cierta, no suponer: el panel conserva
-    // el material `overlay` por mandato de la spec, y ese material lleva
-    // `backdrop-filter`. Si lo lleva, ES bloque contenedor, y cualquier
-    // superficie `position: fixed` que se renderice DESDE DENTRO de un panel
-    // necesita portal a `document.body`. Este aserto documenta cuál de las dos
-    // realidades es la vigente en vez de dejarlo a la suerte.
-    if (sonda.backdropFilter !== 'none') {
-      expect(sonda.sondaEnOrigen).toBe(false);
-    } else {
-      expect(sonda.sondaEnOrigen).toBe(true);
+    // el material `overlay` por mandato de Samuel (decisión consciente, no
+    // un bug), y ese material lleva `backdrop-filter`. Si lo lleva, ES
+    // bloque contenedor, y cualquier superficie `position: fixed` que se
+    // renderice DESDE DENTRO de un panel necesita portal a `document.body`.
+    // Un if/else que afirma una cosa u otra según el propio valor medido
+    // DOCUMENTA la realidad, no la VIGILA — pasaría igual si alguien le
+    // quita el backdrop-filter al material sin querer. Aquí se fija la
+    // realidad vigente como aserto duro: si algún día backdropFilter deja
+    // de ser 'none', esto revienta y avisa que el mundo cambió.
+    expect(sonda.backdropFilter).not.toBe('none');
+    expect(sonda.sondaEnOrigen).toBe(false);
+  });
+
+  // H-3: el aserto de arriba fija QUE el panel es bloque contenedor; este
+  // vigila la CONSECUENCIA — que nada renderizado dentro de un panel
+  // dependa de resolverse contra el viewport. Hoy el único caso conocido
+  // (.layer-context-menu) ya salió a un portal de document.body (ver el
+  // siguiente test); esto vela para que no vuelva a aparecer uno sin que
+  // alguien lo note. Si este aserto revienta, el arreglo es
+  // createPortal(..., document.body) — el patrón que ya usan
+  // ToolTooltip.tsx y ConnectionModal.tsx.
+  test('ningún descendiente de un panel abierto usa position: fixed', async ({ page }) => {
+    const PANELES = ['Avatar', 'Lista de materiales', 'Escalado', 'Inspector', 'Marcada', 'Capas', 'Propiedades'];
+
+    for (const nombre of PANELES) {
+      await abrirPanel(page, nombre);
+      await page.waitForTimeout(300); // deja asentar el contenido lazy (Suspense)
+
+      const culpable = await page.evaluate(() => {
+        const panel = document.querySelector('.context-panel');
+        if (!panel) return null;
+        for (const el of panel.querySelectorAll('*')) {
+          if (getComputedStyle(el).position === 'fixed') {
+            const clase = typeof el.className === 'string' ? el.className : '';
+            return `<${el.tagName.toLowerCase()}${clase ? ` class="${clase}"` : ''}>`;
+          }
+        }
+        return null;
+      });
+
+      expect(culpable, `panel "${nombre}" tiene un descendiente position:fixed: ${culpable}`).toBeNull();
+
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(200);
     }
   });
 
