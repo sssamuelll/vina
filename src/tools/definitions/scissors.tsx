@@ -59,7 +59,7 @@ export const scissorsTool: ToolDefinition = {
       choices: [
         { label: 'Normal', value: 'standard' },
         { label: 'Francesa', value: 'french' },
-        { label: 'Rebatida', value: 'flat-felled' },
+        { label: 'Flat-felled', value: 'flat-felled' },
         { label: 'Overlock', value: 'overlock' },
       ],
     },

@@ -31,6 +31,8 @@ Cada tarea hereda esto. Vienen del contrato de interfaz (`.claude/skills/contrat
 
 **Supuesto declarado:** `flat-felled` se escribe **"Rebatida"**. Es el único término del lote sin confirmar (spec §5.3). Antes de que salga una entrega a María hay que confirmarlo con ella o con Samuel.
 
+> **✅ Resuelto 2026-08-16, al cierre.** Samuel decidió no arriesgar la palabra: `flat-felled` **se queda en inglés**, por la misma regla que `overlock` — término de industria que no se traduce. Las tablas de las Tasks 4 y 5 que dicen "Rebatida" quedan como registro de lo que se planeó; lo que se entregó dice `Flat-felled`. El valor del `choices` nunca cambió.
+
 ---
 
 ## File Structure

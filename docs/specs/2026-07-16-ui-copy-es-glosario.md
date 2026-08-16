@@ -18,7 +18,7 @@ exclamaciones, verbos que nombran el resultado (protocolo de microcopy solace-wr
 | notch | piquete | |
 | grainline | hilo | "dirección de hilo" si hay espacio |
 | thread (hilo de coser) | hilo | Comparte palabra con grainline **a propósito**. "Color del hilo" vive en las tres herramientas de pespunte, entre "Tipo de puntada" y "Largo de puntada": ahí nadie lo lee como la dirección del tejido, y grainline tiene su forma larga para desambiguar por el otro lado. Decidido en #1049. |
-| flat-felled | rebatida | ⚠ **Sin confirmar con María.** Es la operación de industria en Venezuela y Colombia. Se descartaron *ribeteada* (en taller suele significar overlock) y *tipo jean* (exacto pero coloquial). Confirmar antes de que salga una entrega. #1049 |
+| flat-felled | Flat-felled | **No se traduce**, misma regla que `overlock`: término de industria que se conserva. Las tres candidatas en español tenían problema — *ribeteada* en taller suele significar overlock y quedaría en el MISMO desplegable, *rebatida* es regional y no consta que sea la palabra de María, *tipo jean* es exacta pero coloquial para una herramienta profesional. Decisión de Samuel (#1049): antes que arriesgar una palabra equivocada, se deja el término del oficio. Si María usa uno propio, se cambia en un sitio. |
 | french seam | costura francesa | |
 | overlock | overlock | término de industria, no se traduce |
 | grading | escalado | "escalado de tallas" en descripciones |

@@ -148,7 +148,9 @@ Nadie lo notaba porque nunca aparecían juntos en pantalla. La barra los pone al
 
 **`hilo` estaba pedido dos veces.** El glosario le asigna `hilo` a *grainline*, y *thread* también es hilo. Se queda **"Color del hilo"** en las tres herramientas de pespunte: en una barra que ya dice "Tipo de puntada" y "Largo de puntada", nadie lo lee como la dirección del tejido, y el glosario ya deja abierta la forma larga de grainline ("dirección de hilo si hay espacio") que desambigua por el otro lado. **Va como enmienda al glosario**, no como excepción tácita.
 
-**`flat-felled` queda por confirmar.** Es el único término del lote donde equivocarse le cuesta a María, y las tres candidatas se pisan con otra cosa: *ribeteada* en taller suele significar overlock, *rebatida* es la operación de industria en Venezuela y Colombia pero no todo el mundo la nombra así, y *tipo jean* es exacto y coloquial. El plan escribe **"Rebatida"** como supuesto declarado. **Antes de que salga una entrega a María hay que confirmarlo con ella o con Samuel**; las otras tres del mismo desplegable (Normal, Francesa, Overlock) no tienen duda.
+**`flat-felled` no se traduce.** Era el único término del lote donde equivocarse le cuesta a María, y las tres candidatas se pisaban con otra cosa: *ribeteada* en taller suele significar overlock —y quedaría en el MISMO desplegable que "Overlock"—, *rebatida* es la operación de industria en Venezuela y Colombia pero no consta que sea su palabra, y *tipo jean* es exacto y coloquial para una herramienta profesional.
+
+**Decisión de Samuel: se conserva `Flat-felled` en inglés**, por la misma regla que ya tiene `overlock` — término de industria que no se traduce (glosario, regla 4). Antes que arriesgar una palabra equivocada en la pantalla de una patronista, se deja la del oficio. No es una mezcla de idiomas: los dos términos ingleses de ese desplegable lo son por la misma razón declarada. Si María usa uno propio, se cambia en un sitio.
 
 ### 5.4 Tres cambios que no son traducción
 

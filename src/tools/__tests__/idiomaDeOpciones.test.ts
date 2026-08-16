@@ -18,9 +18,12 @@ import { toolRegistry } from '../index';
  * Los `value` de los `choices` NO se traducen: son identificadores
  * ('curvePoints', 'flat-felled', 'outward'), no texto.
  *
- * Término sin confirmar: 'Rebatida' para `flat-felled`. Es la operación de
- * industria en Venezuela y Colombia, pero no consta que sea la palabra de
- * María. Spec §5.3 — confirmar antes de que salga una entrega.
+ * `flat-felled` se queda en inglés, igual que `overlock`: término de industria
+ * que no se traduce (glosario, regla 4). Las tres candidatas en español tenían
+ * problema — *ribeteada* en taller suele significar overlock y caería en ESTE
+ * mismo desplegable, *rebatida* es regional, *tipo jean* es coloquial. Antes
+ * que arriesgar una palabra equivocada en la pantalla de una patronista, se
+ * deja la del oficio. Spec §5.3.
  */
 
 /** toolId → optionId → [label, ...etiquetas de los choices] */
@@ -43,14 +46,14 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
     cutType: ['Tipo de corte', 'Recto', 'Curvo'],
     keepBoth: ['Conservar las dos partes'],
     autoSew: ['Coser el corte automáticamente'],
-    seamType: ['Tipo de costura', 'Normal', 'Francesa', 'Rebatida', 'Overlock'],
+    seamType: ['Tipo de costura', 'Normal', 'Francesa', 'Flat-felled', 'Overlock'],
   },
   measure: {
     showAngle: ['Mostrar el ángulo'],
     cumulative: ['Distancia acumulada'],
   },
   seam: {
-    seamType: ['Tipo de costura', 'Normal', 'Francesa', 'Rebatida', 'Overlock'],
+    seamType: ['Tipo de costura', 'Normal', 'Francesa', 'Flat-felled', 'Overlock'],
     stitchLength: ['Largo de puntada'],
   },
   notch: {
