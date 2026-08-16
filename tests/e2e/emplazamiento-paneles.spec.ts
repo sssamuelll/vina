@@ -278,12 +278,16 @@ test.describe('Ola 2 — los paneles ocupan canaleta, no flotan', () => {
   });
 
   test('ajustar a la vista respeta la faja del dock 2D — el patrón no queda tapado', async ({ page }) => {
-    // Pieza deliberadamente ancha y baja (5000×200): el ancho manda sobre el
-    // alto para cualquier tamaño de ventana de test razonable (el aspecto del
-    // contenido, 25:1, es muchísimo más extremo que el de cualquier viewport),
-    // así que el caso discrimina el arreglo sin depender del tamaño exacto de
-    // la ventana. Task 10 — jsdom no puede ver dónde cae el patrón; este e2e
-    // es lo único que de verdad prueba que el dock deja de tapar el borde.
+    // Pieza deliberadamente ancha y baja (5000×200). computeFitView calcula
+    // una bbox ÚNICA sobre TODAS las piezas del proyecto, y el beforeEach de
+    // este describe ya sembró "panel-rect" (300×400 en x:120-420, y:120-520)
+    // antes de que esta pieza se agregue — la bbox real que ve el fit es la
+    // combinada: x:0-5000, y:0-520, aspecto ~9.6:1. Sigue siendo muchísimo
+    // más extremo que el de cualquier viewport de test razonable, así que el
+    // ancho manda igual y el caso discrimina el arreglo sin depender del
+    // tamaño exacto de la ventana. Task 10 — jsdom no puede ver dónde cae el
+    // patrón; este e2e es lo único que de verdad prueba que el dock deja de
+    // tapar el borde.
     await page.evaluate(() => {
       const w = window as unknown as VentanaConStore;
       w.__VINA_STORE__.dispatch({

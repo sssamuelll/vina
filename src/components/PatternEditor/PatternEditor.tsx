@@ -79,6 +79,13 @@ const objectUrlMap = new Map<string, string>();
  *  mostrarse mientras editamos el patron"). */
 const SEWING_TOOL_IDS = new Set(['seam', 'seamEdit', 'walkSeam']);
 
+/** Faja del dock 2D izquierdo, medida en navegador (no calculada): `.dock--left`
+ *  da `x=14, ancho=54` — el borde derecho cae en 68. Los 54 salen de
+ *  `Dock.css`: 7px de padding + 38px de icono + 7px de padding + 1px de
+ *  `--surface-chrome-border` a cada lado (2px). Exportada para que el test
+ *  de `handleZoomToFit` use el mismo valor en vez de repetirlo. */
+export const DOCK_WIDTH_PX = 68;
+
 interface PatternEditorProps {
   /** Opens the DXF file picker; wired by AppShell to its hidden <input>. */
   onImportDXF?: () => void;
@@ -670,11 +677,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     if (!svgEl || pieces.length === 0) return;
     const rect = svgEl.getBoundingClientRect();
     // El dock 2D flota (no reserva espacio real, § 2.1), así que el encuadre
-    // tiene que descontar su faja a mano: 14px de margen + 7px de padding +
-    // 38px de icono + 7px de padding. Se resta del ancho Y se desplaza el
-    // paneo por lo mismo — encuadrar en [DOCK, ancho], no en [0, ancho-DOCK].
-    // Restar sin desplazar corre el patrón HACIA el dock, que es lo contrario.
-    const DOCK_WIDTH_PX = 66;
+    // tiene que descontar su faja a mano (ver DOCK_WIDTH_PX arriba). Se resta
+    // del ancho Y se desplaza el paneo por lo mismo — encuadrar en
+    // [DOCK, ancho], no en [0, ancho-DOCK]. Restar sin desplazar corre el
+    // patrón HACIA el dock, que es lo contrario.
     const fit = computeFitView(pieces, Math.max(0, rect.width - DOCK_WIDTH_PX), rect.height);
     if (fit) {
       dispatch(setZoom2D(fit.zoom));

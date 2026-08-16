@@ -21,9 +21,12 @@ import simulationReducer from '../../../store/simulationSlice';
 import toolReducer from '../../../store/toolSlice';
 import workflowReducer from '../../../store/workflowSlice';
 import type { PatternPiece } from '../../../types/types';
-import PatternEditor from '../PatternEditor';
+import PatternEditor, { DOCK_WIDTH_PX } from '../PatternEditor';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 // Pieza ancha y baja: con padding=1.2 el ANCHO manda sobre el alto para el
 // viewport de abajo (1000/(800*1.2)=1.04 < 800/(100*1.2)=6.67), así que el
@@ -52,7 +55,7 @@ const piece: PatternPiece = {
 
 const VIEWPORT_WIDTH = 1000;
 const VIEWPORT_HEIGHT = 800;
-const DOCK_WIDTH_PX = 66;
+// DOCK_WIDTH_PX viene de PatternEditor.tsx — no se repite el literal acá.
 
 function setup() {
   const store = configureStore({
@@ -117,7 +120,5 @@ describe('PatternEditor — ajustar a la vista respeta la faja del dock', () => 
     expect(store.getState().editor.zoom2D).toBeCloseTo(esperado.zoom, 5);
     expect(store.getState().editor.pan2D.x).toBeCloseTo(esperado.pan.x + DOCK_WIDTH_PX, 5);
     expect(store.getState().editor.pan2D.y).toBeCloseTo(esperado.pan.y, 5);
-
-    vi.unstubAllGlobals();
   });
 });
