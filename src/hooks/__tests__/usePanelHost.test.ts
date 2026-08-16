@@ -72,4 +72,47 @@ describe('usePanelHost', () => {
     act(() => result.current.closePanel('Grading')); // mismo lado, otro panel
     expect(result.current.leftPanel).toBe('Properties');
   });
+
+  // H-2: closeLeft/closeRight existen para que AppShell deje de pasarle a
+  // ContextPanel una flecha en línea (`() => closePanel(leftPanel)`), que
+  // cambia de identidad en cada render y re-suscribe el listener de Escape
+  // — el mecanismo detrás de "Escape cierra siempre el izquierdo" con dos
+  // paneles abiertos. Ver el comentario junto a su definición.
+  it('closeLeft cierra el panel izquierdo sin importar cuál esté abierto', () => {
+    const { result } = renderHook(() => usePanelHost());
+    act(() => result.current.openPanel('Properties'));
+    act(() => result.current.closeLeft());
+    expect(result.current.leftPanel).toBeNull();
+  });
+
+  it('closeLeft no toca el panel derecho', () => {
+    const { result } = renderHook(() => usePanelHost());
+    act(() => result.current.openPanel('Layers')); // derecho
+    act(() => result.current.closeLeft());
+    expect(result.current.rightPanel).toBe('Layers');
+  });
+
+  it('closeRight cierra el panel derecho sin importar cuál esté abierto', () => {
+    const { result } = renderHook(() => usePanelHost());
+    act(() => result.current.openPanel('Layers'));
+    act(() => result.current.closeRight());
+    expect(result.current.rightPanel).toBeNull();
+  });
+
+  it('closeRight no toca el panel izquierdo', () => {
+    const { result } = renderHook(() => usePanelHost());
+    act(() => result.current.openPanel('Properties')); // izquierdo
+    act(() => result.current.closeRight());
+    expect(result.current.leftPanel).toBe('Properties');
+  });
+
+  it('closeLeft y closeRight mantienen la misma identidad entre renders — la esencia del arreglo', () => {
+    const { result, rerender } = renderHook(() => usePanelHost());
+    const closeLeftAntes = result.current.closeLeft;
+    const closeRightAntes = result.current.closeRight;
+    act(() => result.current.openPanel('Properties')); // fuerza un re-render
+    rerender();
+    expect(result.current.closeLeft).toBe(closeLeftAntes);
+    expect(result.current.closeRight).toBe(closeRightAntes);
+  });
 });

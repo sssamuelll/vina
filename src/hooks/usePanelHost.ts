@@ -7,6 +7,9 @@ export interface PanelHost {
   openPanel: (name: string) => void;
   togglePanel: (name: string) => void;
   closePanel: (name: string) => void;
+  /** Cierre sin argumentos, identidad estable entre renders — ver H-2 abajo. */
+  closeLeft: () => void;
+  closeRight: () => void;
 }
 
 /**
@@ -46,5 +49,26 @@ export function usePanelHost(): PanelHost {
     }
   }, []);
 
-  return { leftPanel, rightPanel, openPanel, togglePanel, closePanel };
+  // H-2: Escape en ContextPanel.tsx registra un keydown propio por
+  // instancia; con dos paneles montados, AppShell antes pasaba
+  // `onClose={() => closePanel(leftPanel)}` — una flecha en línea que
+  // cambia de identidad EN CADA RENDER de AppShell. Eso re-suscribe el
+  // efecto de Escape de cada ContextPanel, y si algo vacía la actualización
+  // entre los dos listeners de `window` durante el propio despacho del
+  // evento (que es justo lo que un runtime puede hacer y un upgrade de
+  // React puede voltear en silencio — no es una decisión de diseño),
+  // el listener que se quitó a mitad del despacho ya no se invoca. Medido:
+  // Escape cerraba siempre el izquierdo, porque su efecto se registra
+  // primero.
+  //
+  // El arreglo es estructural: cierres SIN argumentos, memoizados con
+  // dependencias vacías, para que su identidad nunca cambie entre renders
+  // de AppShell. Con la identidad estable, ningún re-render (venga cuando
+  // venga) re-suscribe el efecto, así que los dos listeners de `window`
+  // siguen registrados durante todo el despacho y los dos se ejecutan —
+  // Escape cierra los dos paneles, de forma determinista.
+  const closeLeft = useCallback(() => setLeftPanel(null), []);
+  const closeRight = useCallback(() => setRightPanel(null), []);
+
+  return { leftPanel, rightPanel, openPanel, togglePanel, closePanel, closeLeft, closeRight };
 }

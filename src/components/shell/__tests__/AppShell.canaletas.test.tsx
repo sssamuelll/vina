@@ -22,7 +22,12 @@ describe('AppShell usa usePanelHost, no un estado de una sola ranura', () => {
   });
 
   it('usa usePanelHost', () => {
-    expect(src).toMatch(/const \{ leftPanel, rightPanel, openPanel, togglePanel, closePanel \} = usePanelHost\(\)/);
+    // H-2: `closePanel` (por nombre) salió de la destructuración de AppShell.
+    // Los botones X de ContextPanel ahora usan `closeLeft`/`closeRight` —
+    // cierres sin argumentos, identidad estable — para que Escape con dos
+    // paneles abiertos no dependa de qué re-render caiga entre dos listeners
+    // de `window`. Ver usePanelHost.ts.
+    expect(src).toMatch(/const \{ leftPanel, rightPanel, openPanel, togglePanel, closeLeft, closeRight \} = usePanelHost\(\)/);
   });
 });
 
@@ -55,20 +60,24 @@ describe('canvas-area tiene los cinco hijos en el orden de la spec § 2.1', () =
   // Comparación de posiciones sobre el ARCHIVO COMPLETO, no sobre un
   // "bloque" recortado — JS no hace balanced-brace matching, y recortar con
   // un regex hasta el primer </div> corta en el div del aviso de soltar-DXF
-  // (que cierra mucho antes que canvas-area), no en el cierre real. Cada uno
-  // de estos cuatro marcadores solo aparece una vez en el archivo, así que
-  // comparar sus índices directamente sobre `src` es correcto y más simple.
+  // (que cierra mucho antes que canvas-area), no en el cierre real.
+  //
+  // Marcador exacto `className="canvas-area__2d"` (no el bare 'canvas-area__2d'):
+  // desde H-1, handleDividerMouseDown mide la región repartible con
+  // `querySelector('.canvas-area__2d')` — esa llamada vive ANTES del JSX en
+  // el archivo y también contiene el substring, así que un indexOf sin
+  // comillas encuentra la llamada, no el elemento real.
 
   it('el panel izquierdo aparece antes de canvas-area__2d', () => {
     const idxLeft = src.indexOf('leftPanel &&');
-    const idx2d = src.indexOf('canvas-area__2d');
+    const idx2d = src.indexOf('className="canvas-area__2d"');
     expect(idxLeft).toBeGreaterThan(-1);
     expect(idx2d).toBeGreaterThan(-1);
     expect(idxLeft).toBeLessThan(idx2d);
   });
 
   it('el panel derecho aparece después de canvas-area__3d', () => {
-    const idx3d = src.indexOf('canvas-area__3d');
+    const idx3d = src.indexOf('className="canvas-area__3d"');
     const idxRight = src.indexOf('rightPanel &&');
     expect(idx3d).toBeGreaterThan(-1);
     expect(idxRight).toBeGreaterThan(-1);

@@ -81,7 +81,7 @@ export default function AppShell() {
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
   const splitRatio = useSelector((s: RootState) => s.layout.splitRatio);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
-  const { leftPanel, rightPanel, openPanel, togglePanel, closePanel } = usePanelHost();
+  const { leftPanel, rightPanel, openPanel, togglePanel, closeLeft, closeRight } = usePanelHost();
   const canvasRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const [dxfDragActive, setDxfDragActive] = useState(false);
@@ -281,7 +281,7 @@ export default function AppShell() {
           </div>
         )}
         {leftPanel && (
-          <ContextPanel title={PANEL_LABELS[leftPanel] ?? leftPanel} onClose={() => closePanel(leftPanel)}>
+          <ContextPanel title={PANEL_LABELS[leftPanel] ?? leftPanel} onClose={closeLeft}>
             {renderPanelContent(leftPanel)}
           </ContextPanel>
         )}
@@ -309,7 +309,7 @@ export default function AppShell() {
           </Viewport3DErrorBoundary>
         </div>
         {rightPanel && (
-          <ContextPanel title={PANEL_LABELS[rightPanel] ?? rightPanel} onClose={() => closePanel(rightPanel)}>
+          <ContextPanel title={PANEL_LABELS[rightPanel] ?? rightPanel} onClose={closeRight}>
             {renderPanelContent(rightPanel)}
           </ContextPanel>
         )}
