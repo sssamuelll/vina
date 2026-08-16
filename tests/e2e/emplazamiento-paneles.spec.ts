@@ -355,6 +355,15 @@ test.describe('Ola 2 — los paneles ocupan canaleta, no flotan', () => {
     // tamaño exacto de la ventana. Task 10 — jsdom no puede ver dónde cae el
     // patrón; este e2e es lo único que de verdad prueba que el dock deja de
     // tapar el borde.
+    //
+    // H-4: la spec pide verificar esto CON UN PANEL ABIERTO — Propiedades
+    // (izquierda), porque es el que de verdad desplaza el origen del lienzo
+    // 2D (el dock y el patrón se corren juntos hacia la derecha). Verificado
+    // a mano contra el DXF real de María: el patrón arrancaba en 404 con el
+    // dock terminando en 392. Sin este panel abierto, el caso corría sin la
+    // faja que motivó el fix y no lo fijaba de verdad.
+    await abrirPanel(page, 'Propiedades');
+
     await page.evaluate(() => {
       const w = window as unknown as VentanaConStore;
       w.__VINA_STORE__.dispatch({
