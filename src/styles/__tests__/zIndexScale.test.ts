@@ -94,6 +94,7 @@ const SITIOS_GLOBALES: Array<{ archivo: string; patron: RegExp; nota: string }> 
   { archivo: 'src/components/shell/AppShell.tsx', patron: /zIndex:\s*'var\(--z-hint\)'/, nota: 'aviso de soltar-DXF: encima del lienzo, debajo de las barras' },
   { archivo: 'src/components/Debug/SolverMetrics.css', patron: /z-index:\s*var\(--z-debug\)/, nota: 'el 9999 era pánico, pero 25 lo enterraba bajo las barras: es diagnóstico de dev, tiene rol propio' },
   { archivo: 'src/components/shell/ToolTooltip.css', patron: /z-index:\s*var\(--z-tooltip\)/, nota: 'escalón propio: empatado con el toast, el desempate lo decidía el portal' },
+  { archivo: 'src/components/LayerPanel/LayerPanel.css', patron: /\.layer-context-menu\s*\{[^}]*z-index:\s*var\(--z-context-menu\)/, nota: 'menú contextual de Capas — no --z-menu (ese es el menú del logo); portado a body, un empate en 200 lo desempataría el orden del DOM' },
 ];
 
 /**
@@ -106,7 +107,7 @@ const SITIOS_GLOBALES: Array<{ archivo: string; patron: RegExp; nota: string }> 
  * que leer ahí es una promesa de que el submenú le gana a algo de afuera.
  */
 
-describe('los 13 sitios verificables por texto usan el token que les toca', () => {
+describe('los 14 sitios verificables por texto usan el token que les toca', () => {
   it.each(SITIOS_GLOBALES)('$archivo — $nota', ({ archivo, patron }) => {
     const contenido = leer(archivo);
     expect(contenido).toMatch(patron);
