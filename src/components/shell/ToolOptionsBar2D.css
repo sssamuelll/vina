@@ -25,6 +25,27 @@
   color: var(--text-primary);
 }
 
+/* Alto de contenido constante en TODOS los estados. Sin esto la canaleta mide
+   distinto según lo que pinte —medido: 1px entre Punto y Seleccionar, y sería
+   más con un `color`, que los navegadores dibujan más alto que un `select`— y
+   entonces el patrón se mueve al cambiar de herramienta, que es exactamente lo
+   que el canal permanente existe para evitar. */
+.tool-options-bar__tool,
+.tool-options-bar__shortcut,
+.tool-options-bar__label,
+.tool-options-bar__valor,
+.tool-options-bar__item {
+  line-height: 24px;
+}
+
+.tool-options-bar__select,
+.tool-options-bar__slider,
+.tool-options-bar__color,
+.tool-options-bar__toggle {
+  height: 24px;
+  box-sizing: border-box;
+}
+
 .tool-options-bar__tool {
   font-weight: 600;
   white-space: nowrap;
@@ -92,11 +113,15 @@
 }
 
 /* Toda regla :hover trae su :focus-visible — si no, el trinquete R5 sube y el
-   gate falla solo. */
-.tool-options-bar__toggle:focus-visible,
-.tool-options-bar__select:focus-visible,
-.tool-options-bar__slider:focus-visible,
-.tool-options-bar__color:focus-visible {
+   gate falla solo.
+
+   Los cuatro selectores van en UNA línea a propósito: `ui-contract-lint.mjs`
+   empareja hover con focus leyendo línea a línea (`^([^{}]+)\{`, regla R5),
+   así que de una lista repartida en varias líneas solo registra la que lleva
+   la llave. Escrito bonito, el toggle contaba como :hover sin foco y el
+   trinquete subía por un falso positivo. Limitación del guardián, no del
+   contrato: anotada como cabo suelto. */
+.tool-options-bar__toggle:focus-visible, .tool-options-bar__select:focus-visible, .tool-options-bar__slider:focus-visible, .tool-options-bar__color:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
