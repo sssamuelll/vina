@@ -588,6 +588,45 @@ Rama nueva desde `main` con estos commits, PR con el resumen de la Ola 1 (mecán
 
 **Precondición:** la Ola 1 está mergeada en `main`. Todas las tareas de esta parte parten de ese estado.
 
+> ## ✅ Enmienda 2026-08-16 — la Ola 2 se ejecutó. Qué cambió respecto a este texto
+>
+> Las Tasks 7, 8, 9, 11, 12 y 13 salieron como están escritas. Lo demás no:
+>
+> **La Task 10 estaba mal planteada y se implementó distinto.** El plan manda
+> pasar `rect.width - 66` a `computeFitView` y ya. Pero esa función **centra**
+> (`pan.x = viewportWidth / 2 - centerX * zoom`), así que centrar en 934 dentro
+> de un lienzo que sigue midiendo 1000 corre el patrón 33px **hacia** el dock y
+> encima lo achica. Con `padding = 1.2` el patrón ya arrancaba en x≈83, libre de
+> la faja; con el cambio del plan arrancaría en x≈78. Peor en las dos cuentas.
+> Lo correcto es restar la faja del ancho **y** desplazar el paneo por lo mismo
+> — encuadrar en `[faja, ancho]`, no en `[0, ancho-faja]`. Y la faja mide **68px**
+> medidos en navegador, no 66: el cálculo del plan no contó el borde del dock.
+> Su test tampoco podía correr, por dos razones distintas: `vi.spyOn` sobre el
+> objeto de módulo no intercepta un binding importado por nombre, y el disparo
+> depende de un `ResizeObserver` que jsdom no tiene y que el componente saltea.
+>
+> **Dos tareas que no estaban:**
+> - **9b** — el menú contextual de Capas aterrizaba a 969px del cursor. `.context-panel`
+>   conserva `backdrop-filter`, y eso lo vuelve bloque contenedor de sus
+>   descendientes `position: fixed`. Preexistente en `main`; la ola lo destapó.
+>   Portal a `document.body` + `var(--z-context-menu)`.
+> - **14** — cinco hallazgos del review de la rama entera, uno grave: el divisor
+>   2D/3D dejaba de seguir al cursor con un panel abierto, porque medía contra
+>   `.canvas-area`, que ahora incluye los paneles. Ningún commit tocó el divisor,
+>   así que ninguna revisión por tarea tenía motivo para mirarlo.
+>
+> **Dos decisiones de comportamiento que el plan no contemplaba:**
+> - Se eliminó el cierre por clic afuera de `ContextPanel`. Con dos paneles
+>   montados hacía que cada uno cerrara al otro y que clicar el lienzo los
+>   cerrara los dos — reimponía la exclusión mutua que la ola existe para matar.
+> - Escape cierra **todos** los paneles. Antes cerraba uno solo y siempre el
+>   izquierdo, por una carrera entre los listeners de `window` que un upgrade de
+>   React habría volteado en silencio.
+>
+> Red: `tests/e2e/emplazamiento-paneles.spec.ts`, 9 casos que miden resultado.
+> Registro completo de decisiones, con su costo-si-me-equivoco, en el ledger de
+> la sesión.
+
 ## Task 7: `usePanelHost` — el hook de dos ranuras
 
 **Files:**
@@ -1201,7 +1240,11 @@ git commit -m "feat(shell): AppShell usa usePanelHost — dos ranuras, flex-grow
 
 ---
 
-## Task 10: `computeFitView` — descontar el ancho del dock (opcional, bajo costo)
+## Task 10: ⚠️ SUPERADA — `computeFitView` — descontar el ancho del dock
+
+> **No sigas este texto.** Su aritmética tiene el signo equivocado y su test no
+> puede correr. Ver la enmienda del 2026-08-16 al principio de esta parte. Se
+> conserva como registro de qué se intentó.
 
 **Files:**
 - Modify: `src/components/PatternEditor/PatternEditor.tsx`
