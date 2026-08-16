@@ -29,7 +29,7 @@ const EditConstrainIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const editConstrainTool: ToolDefinition = {
   id: 'editConstrain',
-  name: 'Edit Pattern (Constrained)',
+  name: 'Editar curvatura',
   context: '2d',
   shortcut: 'c',
   icon: EditConstrainIcon,

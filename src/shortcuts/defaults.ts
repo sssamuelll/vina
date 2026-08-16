@@ -38,7 +38,7 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'tool.editPattern', key: 'q', label: 'Editar patrón', category: '2D Tools', context: '2d' },
   { id: 'tool.editCurve', key: 'v', label: 'Editar punto de curva', category: '2D Tools', context: '2d' },
   { id: 'tool.editConstrain', key: 'c', label: 'Editar curvatura', category: '2D Tools', context: '2d' },
-  { id: 'tool.pen', key: 'h', label: 'Polígono (pluma)', category: '2D Tools', context: '2d' },
+  { id: 'tool.pen', key: 'h', label: 'Pluma', category: '2D Tools', context: '2d' },
   { id: 'tool.rectangle', key: 's', label: 'Rectángulo', category: '2D Tools', context: '2d' },
   { id: 'tool.circle', key: 'e', label: 'Elipse (círculo)', category: '2D Tools', context: '2d' },
   { id: 'tool.internalShape', key: 'g', label: 'Forma interna', category: '2D Tools', context: '2d' },
@@ -64,7 +64,7 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
 
   // ─── Sewing ─────────────────────────────────────────────────────────────────
   { id: 'tool.seamEdit', key: 'b', label: 'Editar costuras', category: 'Sewing', context: '2d' },
-  { id: 'tool.seam', key: 'n', label: 'Coser por tramo', category: 'Sewing', context: '2d' },
+  { id: 'tool.seam', key: 'n', label: 'Coser', category: 'Sewing', context: '2d' },
 
   // ─── Shift+Key tools (displaced) ────────────────────────────────────────────
   { id: 'tool.grainline', key: 'g', shift: true, label: 'Hilo', category: '2D Tools', context: '2d' },

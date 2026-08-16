@@ -106,6 +106,20 @@ test.describe('barra de opciones de herramienta', () => {
     expect(modo).toBe('curvePoints');
   });
 
+  test('la barra nunca pinta un identificador crudo', async ({ page }) => {
+    // `seamEdit` está en el dock de FÁBRICA y no tenía definición, así que la
+    // barra hacía `definicion?.name ?? id` y escribía la palabra "seamEdit" en
+    // pantalla, con un "B" al lado. Lo encontró la revisión de la rama entera:
+    // ninguna revisión por tarea podía verlo, porque el alcance de las tareas
+    // de idioma eran las herramientas CON OPCIONES y la barra pinta el nombre
+    // de cualquiera.
+    await botonDeHerramienta(page, 'Editar costuras').click();
+    await page.waitForTimeout(200);
+
+    const nombre = await page.locator('.tool-options-bar__tool').innerText();
+    expect(nombre).toBe('Editar costuras');
+  });
+
   test('en ventana angosta la barra desborda dentro de sí misma, no empuja', async ({ page }) => {
     // Tijeras declara 4 opciones: es la primera que no cabe. Angostar la
     // ventana es más duro y más determinista que abrir un panel, y mide la

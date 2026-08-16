@@ -24,7 +24,7 @@ const EditCurveIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const editCurveTool: ToolDefinition = {
   id: 'editCurve',
-  name: 'Edit Curve Points',
+  name: 'Editar punto de curva',
   context: '2d',
   shortcut: 'v',
   icon: EditCurveIcon,
