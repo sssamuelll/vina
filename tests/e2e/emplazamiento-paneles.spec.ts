@@ -276,4 +276,48 @@ test.describe('Ola 2 — los paneles ocupan canaleta, no flotan', () => {
     });
     expect(recortado).toBe(false);
   });
+
+  test('ajustar a la vista respeta la faja del dock 2D — el patrón no queda tapado', async ({ page }) => {
+    // Pieza deliberadamente ancha y baja (5000×200): el ancho manda sobre el
+    // alto para cualquier tamaño de ventana de test razonable (el aspecto del
+    // contenido, 25:1, es muchísimo más extremo que el de cualquier viewport),
+    // así que el caso discrimina el arreglo sin depender del tamaño exacto de
+    // la ventana. Task 10 — jsdom no puede ver dónde cae el patrón; este e2e
+    // es lo único que de verdad prueba que el dock deja de tapar el borde.
+    await page.evaluate(() => {
+      const w = window as unknown as VentanaConStore;
+      w.__VINA_STORE__.dispatch({
+        type: 'project/addPiece',
+        payload: {
+          id: 'ancha-baja',
+          name: 'Ancha y baja',
+          outline: [
+            { type: 'M', values: [0, 0] },
+            { type: 'L', values: [5000, 0] },
+            { type: 'L', values: [5000, 200] },
+            { type: 'L', values: [0, 200] },
+            { type: 'Z', values: [] },
+          ],
+          position: { x: 0, y: 0 },
+          internals: [], edges: [], rotation: 0, mirrored: false, seamAllowance: 0,
+          layer: 1, sublayer: 0, active: true, createdAt: 1, updatedAt: 1,
+        },
+      });
+      w.__VINA_STORE__.dispatch({ type: 'editor/requestFitView' });
+    });
+    await page.waitForTimeout(500);
+
+    const bordeIzquierdoDelPatron = await page.evaluate(() => {
+      const g = document.querySelector('[data-piece-id="ancha-baja"]');
+      return g ? g.getBoundingClientRect().left : -1;
+    });
+    const bordeDerechoDelDock = await page.evaluate(() => {
+      const dock = document.querySelector('.dock--left');
+      return dock ? dock.getBoundingClientRect().right : -1;
+    });
+
+    expect(bordeIzquierdoDelPatron).toBeGreaterThan(0);
+    expect(bordeDerechoDelDock).toBeGreaterThan(0);
+    expect(bordeIzquierdoDelPatron).toBeGreaterThan(bordeDerechoDelDock);
+  });
 });

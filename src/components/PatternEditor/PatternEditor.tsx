@@ -669,10 +669,16 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     const svgEl = svgRef.current;
     if (!svgEl || pieces.length === 0) return;
     const rect = svgEl.getBoundingClientRect();
-    const fit = computeFitView(pieces, rect.width, rect.height);
+    // El dock 2D flota (no reserva espacio real, § 2.1), así que el encuadre
+    // tiene que descontar su faja a mano: 14px de margen + 7px de padding +
+    // 38px de icono + 7px de padding. Se resta del ancho Y se desplaza el
+    // paneo por lo mismo — encuadrar en [DOCK, ancho], no en [0, ancho-DOCK].
+    // Restar sin desplazar corre el patrón HACIA el dock, que es lo contrario.
+    const DOCK_WIDTH_PX = 66;
+    const fit = computeFitView(pieces, Math.max(0, rect.width - DOCK_WIDTH_PX), rect.height);
     if (fit) {
       dispatch(setZoom2D(fit.zoom));
-      dispatch(setPan2D(fit.pan));
+      dispatch(setPan2D({ x: fit.pan.x + DOCK_WIDTH_PX, y: fit.pan.y }));
     }
   }, [pieces, dispatch, svgRef]);
 
