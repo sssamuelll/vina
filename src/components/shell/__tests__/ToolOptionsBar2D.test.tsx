@@ -72,10 +72,6 @@ function crearStore(activeTool2D: string) {
         activeTool3D: 'camera',
         toolOptions: {},
         recentTools: [],
-        // Los dos siguen en ToolState hasta la Task 6, que los borra junto
-        // con estas dos líneas.
-        optionsPanelCollapsed: false,
-        expertShowOverride: false,
       },
     },
   });
