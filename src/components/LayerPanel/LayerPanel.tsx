@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import {
@@ -382,8 +383,15 @@ export default function LayerPanel() {
         );
       })}
 
-      {/* Context menu */}
-      {contextMenu && (
+      {/* Context menu. Se monta en <body>, no donde vive el árbol: LayerPanel
+          se renderiza dentro de ContextPanel, que lleva
+          `backdrop-filter: var(--surface-overlay-blur)` por la ley de
+          materiales. Un backdrop-filter distinto de none es bloque contenedor
+          de sus descendientes `position: fixed` — sin portal, este menú se
+          posicionaba con coordenadas de viewport pero resolvía contra el
+          panel (medido: 969px de desvío en X). Mismo patrón que ToolTooltip y
+          ConnectionModal, por la misma razón. */}
+      {contextMenu && createPortal(
         <div
           ref={contextMenuRef}
           className="layer-context-menu"
@@ -403,7 +411,8 @@ export default function LayerPanel() {
           <button onClick={handleContextLock}>
             {layerLocked[contextMenu.layer] ? 'Desbloquear capa' : 'Bloquear capa'}
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

@@ -17,14 +17,8 @@
 }
 /* Context panel */
 .context-panel {
-  position: absolute;
-  top: var(--sp-3);
-  right: var(--sp-3);
-  width: 300px;
+  flex: 0 0 300px;
   max-height: calc(100vh - var(--top-bar-h) - var(--unified-bar-h) - var(--sp-8));
-  /* Material `overlay`: flota sobre el lienzo dibujado. Antes de la
-   * auditoría era el único que NO llevaba sombra — o sea, justo el que más
-   * necesita separarse del fondo era el que menos se separaba. */
   background: var(--surface-overlay-bg);
   backdrop-filter: var(--surface-overlay-blur);
   -webkit-backdrop-filter: var(--surface-overlay-blur);
@@ -32,19 +26,8 @@
   border-radius: var(--surface-overlay-radius);
   box-shadow: var(--surface-overlay-shadow);
   overflow-y: auto;
-  z-index: 25;
+  margin: var(--sp-3);
   animation: slide-down var(--transition-normal) ease-out;
-}
-/* Right-routed panels (default, e.g. Avatar/BOM). Explicit so the base rule's
-   anchor can be refactored without silently breaking right placement. */
-.context-panel--right {
-  right: var(--sp-3);
-  left: auto;
-}
-/* Left-routed panels (2D-domain, e.g. Grading) anchor past the left 2D dock. */
-.context-panel--left {
-  left: calc(14px + 52px + 12px); /* dock at left:14px, ~52px wide, + 12px gap */
-  right: auto;
 }
 .context-panel__header {
   display: flex;

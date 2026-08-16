@@ -176,6 +176,17 @@
   --scrim: rgb(8 8 15 / 55%);
 
   --z-dock: 5;
+  /* H-5 (2026-08-16, Ola 2 de emplazamiento): sin consumidor real desde que
+   * `60643b35` le quitó el z-index a `.context-panel` — los paneles pasaron
+   * de tarjeta flotante a hijo flex de `.canvas-area`, así que ya no
+   * compiten por capa. Hoy solo lo referencian este comentario y
+   * `zIndexScale.test.ts`. Se queda de todos modos: la escala es un mapa de
+   * ROLES, no un inventario de usos — que hoy ningún panel necesite z-index
+   * no dice que el rol esté mal, dice que los paneles dejaron de flotar. La
+   * próxima superficie de rango panel que sí flote (un panel-tarjeta suelto,
+   * no acoplado a `.canvas-area`) lo va a necesitar, y el hueco entre
+   * --z-dock (5) y --z-hint (50) tiene que seguir existiendo para que la
+   * escalera se lea completa. */
   --z-panel: 25;
   /* Aviso transitorio sobre el lienzo (el "suelta el DXF aquí"). Va encima del
    * documento y de los paneles, pero DEBAJO del cromo de la app: el aviso

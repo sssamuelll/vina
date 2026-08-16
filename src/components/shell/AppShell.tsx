@@ -19,7 +19,7 @@ import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import ContextPanel from './ContextPanel';
 import ToastContainer from './ToastContainer';
 import ConfirmDialog from './ConfirmDialog';
-import { getPanelSide } from './panelSide';
+import { usePanelHost } from '../../hooks/usePanelHost';
 import type { Tool3D } from '../../types/types';
 
 // Lazy-load panel content
@@ -81,7 +81,7 @@ export default function AppShell() {
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
   const splitRatio = useSelector((s: RootState) => s.layout.splitRatio);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
-  const [contextPanel, setContextPanel] = useState<string | null>(null);
+  const { leftPanel, rightPanel, openPanel, togglePanel, closeLeft, closeRight } = usePanelHost();
   const canvasRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const [dxfDragActive, setDxfDragActive] = useState(false);
@@ -173,17 +173,35 @@ export default function AppShell() {
   }, [importDXFFile]);
 
   // ─── Divider drag ───────────────────────────────────────────────────
-  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
+  // H-1: `canvasRef` (.canvas-area) ya no es la región repartible — desde que
+  // los paneles pasaron a ser hijos flex reales, puede tener hasta dos
+  // paneles de 324px de cada lado ocupando ese mismo rect. La región real va
+  // del borde izquierdo de .canvas-area__2d al borde derecho de
+  // .canvas-area__3d, midiendo los elementos (nunca 300/324 a mano, eso es
+  // lo que sobrevive a que cambie el ancho del panel), y hay que descontar
+  // el ancho del propio divisor del espacio repartible. Se captura todo UNA
+  // vez al empezar el arrastre, no en cada mousemove.
+  const handleDividerMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
+    if (!canvasRef.current) return;
+    const twoDEl = canvasRef.current.querySelector<HTMLElement>('.canvas-area__2d');
+    const threeDEl = canvasRef.current.querySelector<HTMLElement>('.canvas-area__3d');
+    if (!twoDEl || !threeDEl) return;
+
+    const regionLeft = twoDEl.getBoundingClientRect().left;
+    const regionWidth = threeDEl.getBoundingClientRect().right - regionLeft;
+    const dividerWidth = e.currentTarget.getBoundingClientRect().width;
+    const usableWidth = regionWidth - dividerWidth;
+    if (usableWidth <= 0) return;
+
     isDragging.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
 
     const onMouseMove = (ev: MouseEvent) => {
-      if (!isDragging.current || !canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = ev.clientX - rect.left;
-      const ratio = Math.max(0.15, Math.min(0.85, x / rect.width));
+      if (!isDragging.current) return;
+      const x = ev.clientX - regionLeft;
+      const ratio = Math.max(0.15, Math.min(0.85, x / usableWidth));
       dispatch(setSplitRatio(ratio));
     };
 
@@ -199,22 +217,22 @@ export default function AppShell() {
     document.addEventListener('mouseup', onMouseUp);
   }, [dispatch]);
 
-  // ─── Width calculations ─────────────────────────────────────────────
-  const get2dWidth = () => {
-    if (viewMode === '2d') return '100%';
-    if (viewMode === '3d') return '0%';
-    return `${splitRatio * 100}%`;
+  // ─── Flex-grow calculations ─────────────────────────────────────────
+  const get2dFlexGrow = () => {
+    if (viewMode === '2d') return 1;
+    if (viewMode === '3d') return 0;
+    return splitRatio;
   };
-  const get3dWidth = () => {
-    if (viewMode === '3d') return '100%';
-    if (viewMode === '2d') return '0%';
-    return `${(1 - splitRatio) * 100}%`;
+  const get3dFlexGrow = () => {
+    if (viewMode === '3d') return 1;
+    if (viewMode === '2d') return 0;
+    return 1 - splitRatio;
   };
 
   return (
     <div className="app-shell">
       <TopBar
-        onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)}
+        onOpenPanel={togglePanel}
         onImportDXF={() => dxfInputRef.current?.click()}
       />
       <input
@@ -262,14 +280,19 @@ export default function AppShell() {
             </div>
           </div>
         )}
+        {leftPanel && (
+          <ContextPanel title={PANEL_LABELS[leftPanel] ?? leftPanel} onClose={closeLeft}>
+            {renderPanelContent(leftPanel)}
+          </ContextPanel>
+        )}
         <div
           className="canvas-area__2d"
-          style={{ width: get2dWidth(), display: viewMode === '3d' ? 'none' : undefined }}
+          style={{ flex: `${get2dFlexGrow()} 1 0px`, display: viewMode === '3d' ? 'none' : undefined }}
         >
-          <LeftDock onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)} />
+          <LeftDock onOpenPanel={togglePanel} />
           <PatternEditor
             onImportDXF={() => dxfInputRef.current?.click()}
-            onOpenPanel={(name) => setContextPanel(name)}
+            onOpenPanel={openPanel}
           />
         </div>
         {viewMode === 'split' && (
@@ -278,21 +301,21 @@ export default function AppShell() {
         <div
           className="canvas-area__3d"
           data-shortcut-context="3d"
-          style={{ width: get3dWidth(), display: viewMode === '2d' ? 'none' : undefined }}
+          style={{ flex: `${get3dFlexGrow()} 1 0px`, display: viewMode === '2d' ? 'none' : undefined }}
         >
-          <RightDock onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)} />
+          <RightDock onOpenPanel={togglePanel} />
           <Viewport3DErrorBoundary>
             <Viewport3D activeTool3D={activeTool3D as Tool3D} hideChrome />
           </Viewport3DErrorBoundary>
         </div>
-        {contextPanel && (
-          <ContextPanel title={PANEL_LABELS[contextPanel] ?? contextPanel} side={getPanelSide(contextPanel)} onClose={() => setContextPanel(null)}>
-            {renderPanelContent(contextPanel)}
+        {rightPanel && (
+          <ContextPanel title={PANEL_LABELS[rightPanel] ?? rightPanel} onClose={closeRight}>
+            {renderPanelContent(rightPanel)}
           </ContextPanel>
         )}
       </div>
       <UnifiedBar
-        onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)}
+        onOpenPanel={togglePanel}
       />
       <ToastContainer />
       {/* Enciende `copilotUI.pendingConfirmation`, que estuvo siendo una
