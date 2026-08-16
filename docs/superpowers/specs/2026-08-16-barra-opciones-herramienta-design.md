@@ -82,7 +82,9 @@ Después:
 
 **El nombre sale de `ToolDefinition.name`** (`src/tools/types.ts:28`). Es el mismo objeto que declara `options`, así que la barra lee una sola cosa. Hoy ese campo está en inglés para casi todas (`'Circle/Curve Tool'`, `'Dart'`, `'Add Piece'`); se traduce ahí — ver §5.
 
-**El atajo sale de `src/shortcuts/defaults.ts`, formateado con `displayShortcutBinding()`** (`src/components/shell/shortcutDisplay.ts:33`). Es la notación única que manda la ley de atajos (§5.5). Las herramientas sin atajo simplemente no lo muestran.
+**El atajo sale del atajo efectivo, no del predeterminado.** `useShortcutRegistry().getBinding('tool.<id>')` (`src/shortcuts/ShortcutRegistry.ts:53`) devuelve el `KeyCombo` real — el que la usuaria remapeó si lo remapeó, porque `ShortcutRegistry` persiste sobrescrituras en `vina-shortcut-overrides`. Se formatea con `displayShortcutBinding()` (`src/components/shell/shortcutDisplay.ts:33`), la notación única que manda la ley de atajos (§5.5). Las herramientas sin atajo no lo muestran.
+
+> El dock **no** hace esto: `DOCK_2D_CATALOG` escribe `shortcut: 'Z'` a mano, así que enseña el predeterminado aunque esté remapeado. Es la misma deuda de las dos notaciones (§10), y la barra no la hereda.
 
 **Cuando la herramienta activa no tiene opciones, el canal sigue ahí** con el nombre y el atajo. No se colapsa. Razón medida: 7 de las 14 herramientas del dock no tienen opciones, así que un canal que aparece y desaparece haría saltar el patrón ~36px en cada cambio de herramienta. El componente borrado hacía `return null`, pero él **flotaba**: no saltaba nada. Acoplado, esa misma línea es un defecto.
 
@@ -109,9 +111,18 @@ Ningún color literal: todo sale de `src/styles/tokens.css` (R3 está en 966 y t
 
 ## 5. Idioma
 
-**52 etiquetas de opción** en 20 herramientas alcanzables, más **unas 60 etiquetas de desplegable** — del orden de **110 cadenas**. De las 91 opciones del repo, hoy exactamente una tiene la etiqueta en español: `point.mode`.
+Desglosado exacto:
+
+| Qué | Cuántas | Estado hoy |
+|---|---|---|
+| Nombres de herramienta (`ToolDefinition.name`) | 21 | 20 en inglés, 1 en español (`point`) |
+| Etiquetas de opción (`ToolOption.label`) | 52 | 51 en inglés, 1 en español (`point.mode`) |
+| Etiquetas de desplegable (`choices[].label`) | 72 | 69 en inglés, 3 en español (las de `point.mode`) |
+| **Total** | **145** | **140 en inglés** |
 
 Todas a español, **en la definición** (`src/tools/definitions/*.tsx`), no en la barra: un solo sitio, el mismo donde ya vive `name`.
+
+Los `value` de los `choices` **no se tocan**: siguen siendo `'curvePoints'`, `'flat-felled'`, `'outward'`. Son identificadores, no texto.
 
 El término lo manda el glosario `docs/specs/2026-07-16-ui-copy-es-glosario.md` — pieza, costura, margen, piquete, pinza, tramo. Un término por concepto.
 
@@ -130,6 +141,20 @@ Dos cosas que esto destapa, y cómo se resuelven:
 Nadie lo notaba porque nunca aparecían juntos en pantalla. La barra los pone al lado del dock, así que la deriva se vuelve visible.
 
 **Se resuelve con un test-guardia**, no con una elección silenciosa: una prueba ata `DOCK_2D_CATALOG[i].label` a `ToolDefinition.name` del mismo id. Convierte una deriva invisible en un fallo de test que hay que resolver una vez, aquí. `seamEdit` se exceptúa explícitamente: está en el catálogo del dock y **no tiene definición** en `src/tools/definitions/` (su handler vive en `useSeamEditTool`).
+
+### 5.3 Dos términos que el glosario no resolvía
+
+**`hilo` estaba pedido dos veces.** El glosario le asigna `hilo` a *grainline*, y *thread* también es hilo. Se queda **"Color del hilo"** en las tres herramientas de pespunte: en una barra que ya dice "Tipo de puntada" y "Largo de puntada", nadie lo lee como la dirección del tejido, y el glosario ya deja abierta la forma larga de grainline ("dirección de hilo si hay espacio") que desambigua por el otro lado. **Va como enmienda al glosario**, no como excepción tácita.
+
+**`flat-felled` queda por confirmar.** Es el único término del lote donde equivocarse le cuesta a María, y las tres candidatas se pisan con otra cosa: *ribeteada* en taller suele significar overlock, *rebatida* es la operación de industria en Venezuela y Colombia pero no todo el mundo la nombra así, y *tipo jean* es exacto y coloquial. El plan escribe **"Rebatida"** como supuesto declarado. **Antes de que salga una entrega a María hay que confirmarlo con ella o con Samuel**; las otras tres del mismo desplegable (Normal, Francesa, Overlock) no tienen duda.
+
+### 5.4 Tres cambios que no son traducción
+
+Salieron al traducir y son correcciones de oficio, no de idioma:
+
+- **`dart.dartDepth`** está etiquetada `Depth (mm)`. En una pinza eso es el **largo** —de la boca al vértice—, no la profundidad. Se traduce como "Largo (mm)". El piquete sí lleva profundidad y ahí se queda.
+- **`walkSeam.ghostOpacity`** → "Opacidad del calco". El *ghost* es la copia translúcida de la pieza que se recorre; en el oficio eso es un calco.
+- **`scissors.autoSew`** → "Coser el corte automáticamente", que usa el verbo del glosario ("coser automáticamente") en vez de inventar uno.
 
 ---
 
@@ -196,7 +221,7 @@ TDD estricto: test primero, verlo fallar por la razón correcta, implementación
 
 ### 8.2 Guardia de idioma
 
-Instantánea congelada de las cadenas de las 20 herramientas del grupo A — sus 52 etiquetas de opción y sus ~60 etiquetas de desplegable. Una etiqueta nueva en inglés rompe el test. Es lo único que impide que la próxima herramienta reintroduzca la deriva que este documento arregla.
+Instantánea congelada de las 145 cadenas del grupo A — 21 nombres, 52 etiquetas de opción, 72 de desplegable. Una etiqueta nueva en inglés rompe el test. Es lo único que impide que la próxima herramienta reintroduzca la deriva que este documento arregla.
 
 ### 8.3 Guardia de nombre
 
