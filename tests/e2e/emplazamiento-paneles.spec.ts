@@ -199,6 +199,38 @@ test.describe('Ola 2 — los paneles ocupan canaleta, no flotan', () => {
     expect(medida.suma).toBeGreaterThan(medida.area - 2);
   });
 
+  // H-1: `handleDividerMouseDown` medía contra `.canvas-area` completo, que
+  // desde esta ola incluye hasta dos paneles de 324px. Sin panel abierto la
+  // cuenta vieja coincidía por casualidad (.canvas-area == la región
+  // repartible); con un panel abierto, no — 1px de arrastre podía saltar
+  // >100px. Este caso es justo el que ningún test cubría: el de "no se
+  // desborda ni deja hueco" de arriba SUMA anchos en reposo, no arrastra.
+  test('arrastrar el divisor con un panel abierto lo deja donde soltó el cursor', async ({ page }) => {
+    await abrirPanel(page, 'Capas'); // derecha — angosta la región repartible desde el otro extremo
+
+    const divider = page.locator('.canvas-area__divider');
+    await expect(divider).toBeVisible();
+    const cajaInicial = await divider.boundingBox();
+    if (!cajaInicial) throw new Error('no hay divisor');
+    const y = cajaInicial.y + cajaInicial.height / 2;
+
+    // Mueve el divisor bien lejos de su reposo (splitRatio 0.5) pero dentro
+    // del clamp [0.15, 0.85] de la región repartible con Capas abierto.
+    const objetivoX = cajaInicial.x - 150;
+
+    await page.mouse.move(cajaInicial.x + cajaInicial.width / 2, y);
+    await page.mouse.down();
+    await page.mouse.move(objetivoX, y, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+
+    const cajaFinal = await divider.boundingBox();
+    if (!cajaFinal) throw new Error('no hay divisor tras soltar');
+    const xFinal = cajaFinal.x + cajaFinal.width / 2;
+    // Tolerancia de unos pocos píxeles (redondeo de flex-grow + subpixel).
+    expect(Math.abs(xFinal - objetivoX)).toBeLessThan(6);
+  });
+
   test('el panel no encierra a sus descendientes por accidente', async ({ page }) => {
     await abrirPanel(page, 'Capas');
 
