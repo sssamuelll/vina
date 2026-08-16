@@ -44,7 +44,9 @@ Después:
 
 - **Los tres modos de Punto se alcanzan.** Punto, Curva por puntos, Curva bezier — lo que la NOTA le prometió.
 - **Cada herramienta declara lo suyo y se ve.** Piquete enseña forma, profundidad y cantidad. Tijeras enseña si cose el corte y con qué costura. Coser enseña el tipo de costura.
-- **La barra dice qué herramienta está activa y con qué tecla se llama**, incluso cuando esa herramienta no tiene opciones. Piquete tenía `⇧N` registrado y ningún sitio lo mostraba (auditoría §5.5): para ella no existía.
+- **La barra dice qué herramienta está activa y con qué tecla se llama**, incluso cuando esa herramienta no tiene opciones. El dock ya enseña el atajo en su tooltip, pero solo al pasar el mouse por encima y solo de las 14 que están en él; la barra lo dice sin gesto, y de las 31 alcanzables. Y lo dice del **atajo efectivo**: el dock escribe el suyo a mano y miente si la usuaria remapeó.
+
+  > La primera versión de este renglón decía que Piquete tenía `⇧N` registrado "y ningún sitio lo mostraba", citando la auditoría §5.5. Es falso hoy: `Dock.tsx:43-48` lo pinta en el tooltip y en el `aria-label`. Corregido tras la revisión de la rama — la afirmación estaba escrita más fuerte de lo que es.
 - **Todo en español.** De las 91 opciones declaradas en el repo, hoy exactamente **una** tiene la etiqueta en español.
 
 ---
