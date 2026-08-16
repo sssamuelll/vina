@@ -56,7 +56,7 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
   notch: {
     shape: [
       'Forma del piquete',
-      'Corte',
+      'Recta',
       'En T',
       'V hacia adentro',
       'V hacia afuera',
@@ -98,7 +98,7 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
     ghostOpacity: ['Opacidad del calco'],
   },
   polyPen: {
-    mode: ['Dibujar', 'Pieza nueva', 'Línea interna'],
+    mode: ['Modo de dibujo', 'Pieza nueva', 'Línea interna'],
     lineType: ['Tipo de línea', 'Doblez', 'Referencia', 'Pespunte'],
     snapGrid: ['Ajustar a la cuadrícula'],
   },
@@ -109,7 +109,7 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
   offsetOutline: {
     distance: ['Distancia (mm)'],
     direction: ['Dirección', 'Hacia afuera', 'Hacia adentro', 'Las dos'],
-    joinType: ['Unión de esquinas', 'Redondeada', 'En punta', 'Recta'],
+    joinType: ['Unión de esquinas', 'Redondeada', 'En punta', 'Achaflanada'],
     replace: ['Reemplazar el original'],
   },
   extendTrim: {

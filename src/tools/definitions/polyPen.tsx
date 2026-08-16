@@ -23,7 +23,7 @@ export const polyPenTool: ToolDefinition = {
   options: [
     {
       id: 'mode',
-      label: 'Dibujar',
+      label: 'Modo de dibujo',
       type: 'select',
       value: 'piece',
       choices: [

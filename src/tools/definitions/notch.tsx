@@ -33,7 +33,7 @@ export const notchTool: ToolDefinition = {
       type: 'select',
       value: 'slit',
       choices: [
-        { label: 'Corte', value: 'slit' },
+        { label: 'Recta', value: 'slit' },
         { label: 'En T', value: 't-notch' },
         { label: 'V hacia adentro', value: 'v-internal' },
         { label: 'V hacia afuera', value: 'v-external' },

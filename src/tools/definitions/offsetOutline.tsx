@@ -57,7 +57,7 @@ export const offsetOutlineTool: ToolDefinition = {
       choices: [
         { label: 'Redondeada', value: 'round' },
         { label: 'En punta', value: 'miter' },
-        { label: 'Recta', value: 'square' },
+        { label: 'Achaflanada', value: 'square' },
       ],
     },
     {
