@@ -17,6 +17,10 @@ exclamaciones, verbos que nombran el resultado (protocolo de microcopy solace-wr
 | dart | pinza | |
 | notch | piquete | |
 | grainline | hilo | "dirección de hilo" si hay espacio |
+| thread (hilo de coser) | hilo | Comparte palabra con grainline **a propósito**. "Color del hilo" vive en las tres herramientas de pespunte, entre "Tipo de puntada" y "Largo de puntada": ahí nadie lo lee como la dirección del tejido, y grainline tiene su forma larga para desambiguar por el otro lado. Decidido en #1049. |
+| flat-felled | rebatida | ⚠ **Sin confirmar con María.** Es la operación de industria en Venezuela y Colombia. Se descartaron *ribeteada* (en taller suele significar overlock) y *tipo jean* (exacto pero coloquial). Confirmar antes de que salga una entrega. #1049 |
+| french seam | costura francesa | |
+| overlock | overlock | término de industria, no se traduce |
 | grading | escalado | "escalado de tallas" en descripciones |
 | interfacing | entretela | |
 | fabric | tela | |
