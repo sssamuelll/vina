@@ -19,7 +19,7 @@ const RectangleIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const rectangleTool: ToolDefinition = {
   id: 'rectangle',
-  name: 'Rectangle Tool',
+  name: 'Rectángulo',
   context: '2d',
   shortcut: 's',
   icon: RectangleIcon,

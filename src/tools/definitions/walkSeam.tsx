@@ -23,7 +23,7 @@ const WalkSeamIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const walkSeamTool: ToolDefinition = {
   id: 'walkSeam',
-  name: 'Walk Seam',
+  name: 'Recorrer costura',
   description: 'Walk along sewn edges to verify length matching and ease distribution',
   context: '2d',
   icon: WalkSeamIcon,

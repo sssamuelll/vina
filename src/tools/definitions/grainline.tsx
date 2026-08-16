@@ -21,7 +21,7 @@ const GrainlineIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const grainlineTool: ToolDefinition = {
   id: 'grainline',
-  name: 'Grainline',
+  name: 'Hilo',
   context: '2d',
   icon: GrainlineIcon,
   cursor: 'pointer',

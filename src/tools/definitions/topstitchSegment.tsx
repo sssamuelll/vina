@@ -14,7 +14,7 @@ const TopstitchSegmentIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const topstitchSegmentTool: ToolDefinition = {
   id: 'topstitchSegment',
-  name: 'Segment Topstitch',
+  name: 'Pespunte por tramo',
   description: 'Add topstitch to a specific edge segment',
   context: '2d',
   shortcut: 'k',

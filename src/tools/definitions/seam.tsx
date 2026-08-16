@@ -20,7 +20,7 @@ const SeamIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const seamTool: ToolDefinition = {
   id: 'seam',
-  name: 'Seam',
+  name: 'Coser',
   description: 'Connect pattern pieces with sewing seams',
   context: '2d',
   icon: SeamIcon,

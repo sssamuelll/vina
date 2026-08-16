@@ -13,7 +13,7 @@ const TopstitchEditIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const topstitchEditTool: ToolDefinition = {
   id: 'topstitchEdit',
-  name: 'Edit Topstitch',
+  name: 'Editar pespunte',
   description: 'Select and modify existing topstitch lines',
   context: '2d',
   shortcut: 't',

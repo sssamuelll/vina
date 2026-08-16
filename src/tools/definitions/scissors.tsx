@@ -22,7 +22,7 @@ const ScissorsIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const scissorsTool: ToolDefinition = {
   id: 'scissors',
-  name: 'Scissors (Split)',
+  name: 'Tijeras',
   context: '2d',
   shortcut: 'x',
   icon: ScissorsIcon,

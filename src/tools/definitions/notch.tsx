@@ -19,7 +19,7 @@ const NotchIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const notchTool: ToolDefinition = {
   id: 'notch',
-  name: 'Notch',
+  name: 'Piquete',
   context: '2d',
   icon: NotchIcon,
   cursor: 'pointer',

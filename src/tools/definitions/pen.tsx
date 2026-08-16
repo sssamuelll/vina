@@ -20,7 +20,7 @@ const PenIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const penTool: ToolDefinition = {
   id: 'pen',
-  name: 'Pen Tool',
+  name: 'Pluma',
   description: 'Draw custom pattern shapes point by point',
   context: '2d',
   shortcut: 'h',

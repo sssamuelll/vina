@@ -13,7 +13,7 @@ const TopstitchSeamlineIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const topstitchSeamlineTool: ToolDefinition = {
   id: 'topstitchSeamline',
-  name: 'Seamline Topstitch',
+  name: 'Pespunte sobre costura',
   description: 'Add topstitch along a seam edge',
   context: '2d',
   shortcut: ';',

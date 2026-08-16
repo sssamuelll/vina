@@ -13,7 +13,7 @@ const PolyPenIcon = () => (
 
 export const polyPenTool: ToolDefinition = {
   id: 'polyPen',
-  name: 'Poly Pen',
+  name: 'Pluma poligonal',
   description: 'Draw pattern shapes with combined straight lines and bezier curves',
   context: '2d',
   shortcut: 'y',

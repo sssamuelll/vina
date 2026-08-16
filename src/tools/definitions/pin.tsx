@@ -2,7 +2,7 @@ import { ToolDefinition } from '../types';
 
 export const pinTool: ToolDefinition = {
   id: 'pin',
-  name: 'Pin',
+  name: 'Fijar',
   description: 'Fix cloth points in place during simulation',
   context: '3d',
   shortcut: 'w',

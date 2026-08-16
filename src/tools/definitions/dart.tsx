@@ -22,7 +22,7 @@ const DartIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const dartTool: ToolDefinition = {
   id: 'dart',
-  name: 'Dart',
+  name: 'Pinza',
   context: '2d',
   shortcut: 'd',
   icon: DartIcon,

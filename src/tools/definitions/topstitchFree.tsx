@@ -11,7 +11,7 @@ const TopstitchFreeIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const topstitchFreeTool: ToolDefinition = {
   id: 'topstitchFree',
-  name: 'Free Topstitch',
+  name: 'Pespunte libre',
   description: 'Draw freeform topstitch lines on a piece',
   context: '2d',
   shortcut: 'l',

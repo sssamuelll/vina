@@ -24,7 +24,7 @@ const TraceIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const traceTool: ToolDefinition = {
   id: 'trace',
-  name: 'Trace',
+  name: 'Trazar',
   context: '2d',
   shortcut: 'i',
   icon: TraceIcon,

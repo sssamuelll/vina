@@ -20,7 +20,7 @@ const SelectIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const selectTool: ToolDefinition = {
   id: 'select',
-  name: 'Select/Move',
+  name: 'Seleccionar',
   description: 'Select and move pattern pieces, points, or edges',
   context: '2d',
   shortcut: 'z',

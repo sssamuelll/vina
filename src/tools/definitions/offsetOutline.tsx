@@ -22,7 +22,7 @@ const OffsetOutlineIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const offsetOutlineTool: ToolDefinition = {
   id: 'offsetOutline',
-  name: 'Offset Outline',
+  name: 'Desplazar contorno',
   context: '2d',
   shortcut: 'r',
   icon: OffsetOutlineIcon,

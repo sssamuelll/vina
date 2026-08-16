@@ -23,7 +23,7 @@ const ExtendTrimIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const extendTrimTool: ToolDefinition = {
   id: 'extendTrim',
-  name: 'Extend / Trim',
+  name: 'Extender / recortar',
   context: '2d',
   shortcut: 'u',
   icon: ExtendTrimIcon,

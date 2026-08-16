@@ -23,7 +23,7 @@ const TransformIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const transformTool: ToolDefinition = {
   id: 'transform',
-  name: 'Transform',
+  name: 'Transformar patrón',
   context: '2d',
   shortcut: 'a',
   icon: TransformIcon,

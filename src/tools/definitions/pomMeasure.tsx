@@ -15,7 +15,7 @@ const POMIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const pomMeasureTool: ToolDefinition = {
   id: 'pomMeasure',
-  name: 'POM Measure',
+  name: 'Medir POM',
   description: 'Create persistent named measurements (Points of Measure)',
   context: '2d',
   shortcut: 'p',
