@@ -9,6 +9,8 @@ import { configureStore } from '@reduxjs/toolkit';
 import toolReducer from '../../../store/toolSlice';
 import { toolRegistry } from '../../../tools';
 import type { ToolDefinition } from '../../../tools/types';
+import { ShortcutProvider, DEFAULT_SHORTCUTS } from '../../../shortcuts';
+import { displayShortcutBinding } from '../shortcutDisplay';
 import ToolOptionsBar2D from '../ToolOptionsBar2D';
 
 /**
@@ -109,6 +111,41 @@ describe('ToolOptionsBar2D', () => {
     fireEvent.change(screen.getByLabelText('Una lista'), { target: { value: 'b' } });
 
     expect(store.getState().tools.toolOptions.__prueba_con_opciones.lista).toBe('b');
+  });
+
+  it('coerce a número al mover un deslizador', () => {
+    // `Number(e.target.value)` es lo único que separa un 7 de un "7" en el
+    // store, y los consumidores leen el valor sin volver a convertirlo.
+    const { store } = montar('__prueba_con_opciones');
+
+    fireEvent.change(screen.getByLabelText('Un número'), { target: { value: '7' } });
+
+    expect(store.getState().tools.toolOptions.__prueba_con_opciones.numero).toBe(7);
+  });
+
+  it('muestra el atajo efectivo cuando la herramienta tiene uno', () => {
+    // Sin ShortcutProvider, `useShortcutRegistry()` devuelve null y la rama
+    // del <kbd> no corre NUNCA: el atajo es una de las tres razones de ser de
+    // esta barra y se quedaba sin red. `notch` es real y trae atajo.
+    const store = crearStore('notch');
+    render(
+      <Provider store={store}>
+        <ShortcutProvider>
+          <ToolOptionsBar2D />
+        </ShortcutProvider>
+      </Provider>,
+    );
+
+    const def = DEFAULT_SHORTCUTS.find((s) => s.id === 'tool.notch')!;
+    const esperado = displayShortcutBinding({
+      key: def.key,
+      ctrl: def.ctrl,
+      shift: def.shift,
+      alt: def.alt,
+    });
+
+    expect(esperado).not.toBe('');
+    expect(screen.getByText(esperado).tagName).toBe('KBD');
   });
 
   it('despacha setToolOption al pulsar un interruptor', () => {

@@ -1,16 +1,12 @@
-/* Canaleta superior del lienzo 2D. Material `chrome`: va acoplada, así que es
-   opaca. Nada de `overlay` — su backdrop-filter la volvería bloque contenedor
-   de cualquier descendiente `position: fixed`.
+/* Canaleta superior del lienzo 2D. Material `chrome` ENTERO, en su variante a
+   ras: va acoplada, así que es opaca, sin radio y sin sombra de flotación.
+   Nada de `overlay` — su backdrop-filter la volvería bloque contenedor de
+   cualquier descendiente `position: fixed`, que ya costó tres bugs.
 
-   Toma `--surface-chrome-bg` y `--surface-chrome-border`, y NO toma
-   `--surface-chrome-radius` ni `--surface-chrome-shadow`. No es media mezcla:
-   son piezas de UN solo material, y las dos que faltan describen algo que
-   flota. Esta canaleta va a ras —sus esquinas mueren contra el borde del área
-   y su separación del documento la hace el borde inferior—, así que un radio
-   xl dejaría huecos y una sombra de 32px mentiría sobre su altura. El único
-   otro consumidor de `chrome` es el dock (Dock.css:14-17), que sí flota y por
-   eso sí usa las cuatro. Si aparece una segunda canaleta a ras, ahí se declara
-   la variante; con una sola, declararla sería ceremonia. */
+   Las cuatro piezas salen de tokens; el radio y la sombra por la variante
+   `-flush` declarada en tokens.css, no omitidas aquí. El único otro consumidor
+   de `chrome` es el dock (Dock.css:14-17), que sí flota y por eso usa el set
+   base. */
 .tool-options-bar {
   flex: 0 0 auto;
   display: flex;
@@ -22,6 +18,8 @@
   overflow-y: hidden;
   background: var(--surface-chrome-bg);
   border-bottom: var(--surface-chrome-border);
+  border-radius: var(--surface-chrome-radius-flush);
+  box-shadow: var(--surface-chrome-shadow-flush);
   color: var(--text-primary);
 }
 
