@@ -30,13 +30,13 @@ export const measureTool: ToolDefinition = {
   options: [
     {
       id: 'showAngle',
-      label: 'Show Angle',
+      label: 'Mostrar el ángulo',
       type: 'toggle',
       value: false,
     },
     {
       id: 'cumulative',
-      label: 'Cumulative Distance',
+      label: 'Distancia acumulada',
       type: 'toggle',
       value: false,
     },

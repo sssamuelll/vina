@@ -30,23 +30,23 @@ export const penTool: ToolDefinition = {
   options: [
     {
       id: 'smoothing',
-      label: 'Smoothing',
+      label: 'Suavizar',
       type: 'toggle',
       value: true,
     },
     {
       id: 'snapGrid',
-      label: 'Snap to Grid',
+      label: 'Ajustar a la cuadrícula',
       type: 'toggle',
       value: false,
     },
     {
       id: 'constrainAngles',
-      label: 'Constrain Angles',
+      label: 'Restringir ángulos',
       type: 'select',
       value: 'none',
       choices: [
-        { label: 'None', value: 'none' },
+        { label: 'Libre', value: 'none' },
         { label: '45°', value: '45' },
         { label: '90°', value: '90' },
       ],

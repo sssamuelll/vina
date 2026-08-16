@@ -28,7 +28,7 @@ export const rectangleTool: ToolDefinition = {
   options: [
     {
       id: 'width',
-      label: 'Width',
+      label: 'Ancho',
       type: 'number',
       value: 100,
       min: 10,
@@ -37,7 +37,7 @@ export const rectangleTool: ToolDefinition = {
     },
     {
       id: 'height',
-      label: 'Height',
+      label: 'Alto',
       type: 'number',
       value: 100,
       min: 10,
@@ -46,13 +46,13 @@ export const rectangleTool: ToolDefinition = {
     },
     {
       id: 'cornerStyle',
-      label: 'Corner Style',
+      label: 'Esquinas',
       type: 'select',
       value: 'square',
       choices: [
-        { label: 'Square', value: 'square' },
-        { label: 'Rounded', value: 'rounded' },
-        { label: 'Chamfered', value: 'chamfered' },
+        { label: 'Rectas', value: 'square' },
+        { label: 'Redondeadas', value: 'rounded' },
+        { label: 'Achaflanadas', value: 'chamfered' },
       ],
     },
   ],

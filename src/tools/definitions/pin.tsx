@@ -27,13 +27,13 @@ export const pinTool: ToolDefinition = {
   options: [
     {
       id: 'pinStrength',
-      label: 'Pin Strength',
+      label: 'Fuerza de la fijación',
       type: 'select',
       value: 'strong',
       choices: [
-        { label: 'Weak', value: 'weak' },
-        { label: 'Medium', value: 'medium' },
-        { label: 'Strong', value: 'strong' },
+        { label: 'Suave', value: 'weak' },
+        { label: 'Media', value: 'medium' },
+        { label: 'Fuerte', value: 'strong' },
       ],
     },
   ],

@@ -33,7 +33,7 @@ export const traceTool: ToolDefinition = {
   options: [
     {
       id: 'offset',
-      label: 'Offset (mm)',
+      label: 'Separación (mm)',
       type: 'number',
       value: 0,
       min: -50,
