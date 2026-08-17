@@ -617,14 +617,22 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       pen, rectTool, lineTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
     });
 
-  /** Los overlays de anclas (editPattern y editCurve) se pintan bajo
-   *  `translate(piece.position)` — la posición de REDUX — mientras el arrastre
-   *  mueve el grupo de la pieza por DOM directo. Durante el arrastre quedaban
-   *  clavados en el sitio viejo: el "recuerdo con los puntos" que María
-   *  fotografió (#194), reproducido entrando a "Editar patrón", volviendo a la
-   *  flecha sin Esc y arrastrando. Mismo trato que la caja de transformación en
-   *  maria-200: se esconden mientras dura el arrastre y vuelven al soltar. */
-  const showAnchorOverlays = !isDraggingPiece;
+  /* Durante el arrastre el grupo de la pieza se mueve por DOM directo
+   * (`useEditorInteractions.ts:818`), mientras TODA superficie que se coloque
+   * sumando `piece.position` —la posición de REDUX— se queda clavada en el
+   * sitio viejo. Es el "recuerdo con los puntos" que María fotografió (#194),
+   * y la segunda mitad de su #218: "las líneas se ven discontinuas trasladadas
+   * en otro sitio".
+   *
+   * El #194 tapó los overlays de anclas UNO A UNO y dejó nueve hermanos con la
+   * misma exposición; `POMOverlay` es el que se ve porque se monta sin
+   * condición de herramienta. Por eso el candado ya no se pone por overlay: se
+   * pone donde se monta `ToolOverlay`, que es el árbol donde viven todos, y así
+   * una superficie nueva nace tapada en vez de nacer rota.
+   *
+   * `showTransformBox` conserva su propio `!isDraggingPiece` a propósito: no es
+   * solo pintura, gobierna el hit-test de los tiradores y la barra flotante,
+   * que viven fuera de este árbol. */
 
   // Mouse capture fallback for gestures that leave the SVG. Keep the latest
   // release authorities in refs so the global listeners stay stable across
@@ -890,6 +898,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
               zoom={zoom2D}
             />
           )}
+          {/* UN candado para todas las superficies que se colocan con Redux.
+              Ver el comentario de `isDraggingPiece` arriba: dentro de este
+              árbol viven los overlays que suman `piece.position`, y ninguno
+              puede seguir a la pieza mientras el arrastre la mueve por DOM.
+              Estaba puesto a mano en dos de ellos; el resto quedó fuera. */}
+          {!isDraggingPiece && (
           <ToolOverlay
             activeTool={activeTool}
             zoom2D={zoom2D}
@@ -931,7 +945,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             measureHoverDistance={measureTool.hoverDistance}
             measureCompareEdgeA={measureTool.compareEdgeA}
             measureComparison={measureTool.comparison}
-            nodeEditorIsEditing={nodeEditor.isEditing && showAnchorOverlays}
+            nodeEditorIsEditing={nodeEditor.isEditing}
             nodeEditorEditingPieceId={nodeEditor.editingPieceId}
             nodeEditorNodes={nodeEditor.nodes}
             selectedNode={nodeEditor.selectedNode}
@@ -940,7 +954,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             transformBbox={transformTool.bbox}
             transformHandles={transformTool.handles}
             transformPreview={transformTool.preview}
-            editPatternIsEditing={editPatternTool.isEditing && showAnchorOverlays}
+            editPatternIsEditing={editPatternTool.isEditing}
             editPatternEditingPieceId={editPatternTool.editingPieceId}
             editPatternNodes={editPatternTool.nodes}
             editPatternSelectedNodes={editPatternTool.selectedNodes}
@@ -995,6 +1009,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             trimHoveredEdge={trimTool.hoveredEdge}
             selectMarquee={selectMarquee}
           />
+          )}
           {activeTool === 'polyPen' && (
             <PolyPenToolOverlay
               nodes={polyPenTool.nodes}
