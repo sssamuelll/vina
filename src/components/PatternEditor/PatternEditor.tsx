@@ -27,6 +27,7 @@ import { useGrainlineTool } from './useGrainlineTool';
 import { useEditCurve } from './useEditCurve';
 import { useEditPattern } from './useEditPattern';
 import { patternToPieceLocal } from './pieceTransform';
+import { hitTestPieceBBox } from '../../utils/geometry/hitTest';
 import { nearestSegment } from './nodeEditorUtils';
 import { useMeasureTool } from './useMeasureTool';
 import { useTransformTool, type TransformUpdate } from './useTransformTool';
@@ -433,27 +434,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // Properties panel (Direction A), so right-click is always the general piece
     // menu — one gesture, one meaning, no proximity guessing.
 
-    // Hit-test: find piece whose bounding box contains the point
-    let hitPiece: typeof pieces[0] | null = null;
-    for (const piece of pieces) {
-      if (!piece.outline?.length) continue;
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      for (const cmd of piece.outline) {
-        const v = cmd.values;
-        for (let i = 0; i < v.length; i += 2) {
-          const px = v[i] + (piece.position?.x ?? 0);
-          const py = v[i + 1] + (piece.position?.y ?? 0);
-          if (px < minX) minX = px;
-          if (px > maxX) maxX = px;
-          if (py < minY) minY = py;
-          if (py > maxY) maxY = py;
-        }
-      }
-      if (canvasX >= minX && canvasX <= maxX && canvasY >= minY && canvasY <= maxY) {
-        hitPiece = piece;
-        break;
-      }
-    }
+    // Hit-test: find piece whose bounding box contains the point.
+    // Vía `hitTestPieceBBox` y no con una copia local del bucle: era la misma
+    // caja calculada dos veces, y la de aquí se quedó midiendo contra el
+    // fantasma sin girar cuando #1033 volvió el giro declarativo (#1064).
+    let hitPiece: typeof pieces[0] | null =
+      hitTestPieceBBox({ x: canvasX, y: canvasY }, pieces.filter(p => p.outline?.length))
+      ?? null;
     // Un borde se puede alcanzar unos píxeles por fuera del bbox. En ese caso
     // el hit preciso sigue siendo dueño del menú, no la ausencia del body-hit.
     if (seamAllowanceTarget?.kind === 'edge') {
@@ -504,9 +491,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     if (hitPiece && !hitSeamId && !hitSaEdgeId) {
       const IL_THRESHOLD = screenToPatternLength(6, zoom2D);
       let nearestDist = Infinity;
+      // Las internas viven en el marco local de la pieza, así que el cursor
+      // tiene que llegar hasta ahí por el mismo transform del renderizador
+      // — con giro, restar solo la posición apunta fuera de la pieza (#1064).
+      const { x: localX, y: localY } = patternToPieceLocal(
+        { x: canvasX, y: canvasY }, hitPiece,
+      );
       for (const line of hitPiece.internals) {
-        const localX = canvasX - (hitPiece.position?.x ?? 0);
-        const localY = canvasY - (hitPiece.position?.y ?? 0);
         let prevX = 0, prevY = 0;
         for (const cmd of line.path) {
           if (cmd.type === 'M') {

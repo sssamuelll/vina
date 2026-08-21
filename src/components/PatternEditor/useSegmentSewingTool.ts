@@ -15,6 +15,7 @@ import {
 } from '../../utils/seam';
 import { applyPctRange } from '../../utils/seam/seamRange';
 import { edgeRangeForCommand } from '../../utils/semanticEdges';
+import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 import { EDGE_HIT_PX } from './gestureConstants';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -50,9 +51,12 @@ export function snapToEdge(
 ): SnapResult | null {
   const threshold = screenToPatternLength(EDGE_HIT_PX, zoom);
   const cmds = piece.outline;
-  const ox = piece.position?.x ?? 0;
-  const oy = piece.position?.y ?? 0;
-  const localPt = { x: pt.x - ox, y: pt.y - oy };
+  // Entra y sale por el mismo transform que usa el renderizador. Restar solo
+  // `position` medía contra el fantasma de la pieza SIN girar: desde #1033 el
+  // ángulo vive en `piece.rotation` y no en las coordenadas del contorno, así
+  // que clicar encima del borde no enganchaba nada y clicar en el aire sí
+  // (#1064). La vuelta es igual de obligatoria — `point` se dibuja.
+  const localPt = patternToPieceLocal(pt, piece);
 
   let best: SnapResult | null = null;
   let bestDist = Infinity;
@@ -95,7 +99,7 @@ export function snapToEdge(
     if (dist < threshold && dist < bestDist) {
       bestDist = dist;
       best = {
-        point: { x: closest.x + ox, y: closest.y + oy },
+        point: pieceLocalToPattern(closest, piece),
         edgeIndex: i,
         t,
         pieceId: piece.id,

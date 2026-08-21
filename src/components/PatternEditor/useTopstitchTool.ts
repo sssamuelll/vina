@@ -6,6 +6,7 @@ import { selectInternalLine } from '../../store/editorSlice';
 import type { PatternPiece, Point2D, PathCommand, InternalLine, TopstitchOptions, Tool2D } from '../../types/types';
 import { getEdgeEndpoints, computeOffsetPath, computeSegmentOffsetPath } from '../../utils/geometry/path';
 import { snapToEdge } from './useSegmentSewingTool';
+import { pieceLocalToPattern } from './pieceTransform';
 import { screenToPattern } from './sewingUtils';
 import { screenToPatternLength } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
@@ -112,13 +113,14 @@ export function useTopstitchTool(
 
     for (const piece of pieces) {
       const cmds = piece.outline;
-      const ox = piece.position?.x ?? 0;
-      const oy = piece.position?.y ?? 0;
       for (let i = 1; i < cmds.length; i++) {
         const ep = getEdgeEndpoints(cmds, i);
         if (!ep) continue;
-        const s = { x: ep.start.x + ox, y: ep.start.y + oy };
-        const e = { x: ep.end.x + ox, y: ep.end.y + oy };
+        // Por el transform del renderizador: sumar solo la posición colocaba
+        // el borde donde la pieza estaría SIN girar, y desde #1033 el ángulo
+        // vive en `piece.rotation` (#1064).
+        const s = pieceLocalToPattern(ep.start, piece);
+        const e = pieceLocalToPattern(ep.end, piece);
         const dx = e.x - s.x, dy = e.y - s.y;
         const lenSq = dx * dx + dy * dy;
         if (lenSq === 0) continue;
