@@ -47,6 +47,7 @@ type Update = {
   outline: PatternPiece['outline'];
   position: { x: number; y: number };
   internals: InternalLine[];
+  rotation: number;
 };
 
 function setup() {
@@ -120,15 +121,22 @@ describe('useTransformTool carries the internals with the outline', () => {
     expect(Math.hypot(tx - bx, ty - by)).toBeCloseTo(DEFAULT_NOTCH_OPTIONS.length);
   });
 
-  it('rotates the internals with the outline', () => {
+  it('deja las internas quietas al girar — el grupo entero gira en el renderizador', () => {
+    // Cambió de contrato en #1033. Antes el giro reescribía las coordenadas
+    // del contorno y arrastraba las internas con él; ahora escribe
+    // `piece.rotation` y el `rotate(piece.rotation, cx, cy)` del grupo mueve
+    // todo junto. Tocar las internas aquí las giraría DOS veces.
+    //
+    // El stranding de la nota de María #171 sigue cubierto por los tres casos
+    // de arriba: es al ESTIRAR donde las internas tienen que viajar, porque
+    // ahí sí se reescriben coordenadas.
     const { hook, onTransform } = setup();
-    // The rotate handle sits one arm above the box top (100,-25); swing it a
-    // quarter turn, to straight-right of the center (100,100).
+    // El tirador de giro está un brazo por encima del techo de la caja
+    // (100,-25); llévalo a un cuarto de vuelta, a la derecha del centro.
     const u = drag(hook, onTransform, [100, -25], [300, 100]);
 
-    const grain = byId(u.internals, 'g1').path[0].values;
-    // (50,20) about (100,100) by +90°: (100+80, 100-50) = (180,50).
-    expect(grain[0]).toBeCloseTo(180);
-    expect(grain[1]).toBeCloseTo(50);
+    expect(u.rotation).toBeCloseTo(90);
+    expect(byId(u.internals, 'g1').path[0].values).toEqual([50, 20]);
+    expect(u.outline).toEqual(OUTLINE);
   });
 });

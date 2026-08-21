@@ -8,11 +8,13 @@ import {
   computeRotationFromDrag,
   scaleAnchorForHandle,
   scaleOutline,
-  rotateOutline,
   rotatePoint,
+  bboxPivot,
+  outlineBBoxCenter,
   type HandleId,
   type BBox,
 } from '../../utils/geometry/transform';
+import { pieceLocalToPattern } from './pieceTransform';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { reanchorTransformedNotches } from '../../utils/notchReanchor';
 
@@ -27,9 +29,12 @@ interface TransformDragState {
 export interface TransformPreview {
   scaleX: number;
   scaleY: number;
-  rotation: number;
-  centerX: number;
-  centerY: number;
+  /** Grados, TOTAL: el que la pieza ya traía más lo que va del arrastre. */
+  rotationDeg: number;
+  /** Punto de giro, en espacio de patrón. */
+  pivot: Point2D;
+  /** Punto fijo del escalado, en el marco sin girar de la caja. */
+  anchor: Point2D;
 }
 
 const HANDLE_HIT_THRESHOLD = 8; // screen pixels
@@ -39,6 +44,8 @@ export interface TransformUpdate {
   outline: PatternPiece['outline'];
   position: Point2D;
   internals: PatternPiece['internals'];
+  /** Grados. El giro es declarativo desde #1033 — ver `handleMouseUp`. */
+  rotation: number;
 }
 
 /**
@@ -138,36 +145,33 @@ export function useTransformTool(
     }
 
     const snappedBbox = d.bboxSnapshot;
-    const center: Point2D = { x: snappedBbox.x + snappedBbox.width / 2, y: snappedBbox.y + snappedBbox.height / 2 };
     const updates: TransformUpdate[] = [];
 
     if (d.handleId === 'rotate') {
+      // El giro es DECLARATIVO: escribe `piece.rotation`, el mismo canal que ya
+      // usa el menú del clic derecho (`actionCuration.ts:161`). Antes horneaba
+      // el ángulo dentro de las coordenadas del contorno, y como la caja se
+      // recalculaba desde esas coordenadas, el pivote se mudaba en cada giro:
+      // medido en #1033, ida y vuelta dejaba la pieza 5.176 unidades más allá.
+      // Con el contorno quieto el pivote no se puede mudar.
       const angle = computeRotationFromDrag(snappedBbox, d.origin, d.current, shiftRef.current);
+      const angleDeg = (angle * 180) / Math.PI;
+      const groupPivot = bboxPivot(snappedBbox);
       for (const snap of d.piecesSnapshot) {
-        const ox = snap.position.x;
-        const oy = snap.position.y;
-        // Rotate outline points relative to global center (adjusted for piece position)
-        const localCenter = { x: center.x - ox, y: center.y - oy };
-        const newOutline = rotateOutline(snap.outline, localCenter, angle);
-        // Also rotate the piece position around global center
-        const dx = ox - center.x;
-        const dy = oy - center.y;
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        const newPos = {
-          x: center.x + dx * cos - dy * sin,
-          y: center.y + dx * sin + dy * cos,
-        };
+        // Cada pieza gira sobre su propio centro local; lo que orbita
+        // alrededor del pivote del grupo es ese centro. Con una sola pieza
+        // seleccionada los dos coinciden y `position` no se mueve ni un pelo.
+        const localCenter = outlineBBoxCenter(snap.outline);
+        const pivot = { x: snap.position.x + localCenter.x, y: snap.position.y + localCenter.y };
+        const moved = rotatePoint(pivot, groupPivot, angle);
         updates.push({
           id: snap.id,
-          outline: newOutline,
-          position: newPos,
-          internals: transformInternals(
-            snap,
-            newOutline,
-            path => rotateOutline(path, localCenter, angle),
-            pt => rotatePoint(pt, localCenter, angle),
-          ),
+          // Contorno e internas intactos: el grupo entero gira en el
+          // renderizador. Tocarlos aquí los giraría DOS veces.
+          outline: snap.outline,
+          internals: snap.internals,
+          position: { x: moved.x - localCenter.x, y: moved.y - localCenter.y },
+          rotation: (snap.rotation ?? 0) + angleDeg,
         });
       }
     } else {
@@ -175,21 +179,39 @@ export function useTransformTool(
       const { scaleX, scaleY } = computeScaleFromDrag(d.handleId, snappedBbox, d.origin, d.current, uniform);
       // maria-198: el pivote del resize es el lado/esquina OPUESTO al handle
       // — lo que no arrastras queda plantado. Solo rotar pivota en el centro.
+      // El ancla llega en el marco SIN girar de la caja, que es el espacio en
+      // el que vive el contorno. Lo que hubo que des-girar es el arrastre, y
+      // eso ya pasó dentro de `computeScaleFromDrag`.
       const anchor = scaleAnchorForHandle(d.handleId, snappedBbox);
+      const rad = ((snappedBbox.rotation ?? 0) * Math.PI) / 180;
       for (const snap of d.piecesSnapshot) {
         const ox = snap.position.x;
         const oy = snap.position.y;
         const localCenter = { x: anchor.x - ox, y: anchor.y - oy };
         const newOutline = scaleOutline(snap.outline, localCenter, scaleX, scaleY);
-        // Scale position offset relative to the anchor
-        const newPos = {
-          x: anchor.x + (ox - anchor.x) * scaleX,
-          y: anchor.y + (oy - anchor.y) * scaleY,
-        };
+        // Escalar mueve el centro del contorno, que ES el pivote del
+        // renderizador: sin compensar, la pieza girada pega un salto al
+        // soltar. Con la caja sin girar (incluida toda selección múltiple) se
+        // conserva la aritmética de maria-198 tal cual.
+        const newPos = rad
+          ? (() => {
+              const plantado = pieceLocalToPattern(localCenter, snap);
+              const nuevoCentro = outlineBBoxCenter(newOutline);
+              const giradoAlNuevoPivote = rotatePoint(localCenter, nuevoCentro, rad);
+              return {
+                x: plantado.x - giradoAlNuevoPivote.x,
+                y: plantado.y - giradoAlNuevoPivote.y,
+              };
+            })()
+          : {
+              x: anchor.x + (ox - anchor.x) * scaleX,
+              y: anchor.y + (oy - anchor.y) * scaleY,
+            };
         updates.push({
           id: snap.id,
           outline: newOutline,
           position: newPos,
+          rotation: snap.rotation ?? 0,
           internals: transformInternals(
             snap,
             newOutline,
@@ -219,17 +241,22 @@ export function useTransformTool(
   let preview: TransformPreview | null = null;
   if (drag) {
     const previewBbox = drag.bboxSnapshot;
-    const center = { x: previewBbox.x + previewBbox.width / 2, y: previewBbox.y + previewBbox.height / 2 };
+    const base = previewBbox.rotation ?? 0;
+    const pivot = bboxPivot(previewBbox);
     if (drag.handleId === 'rotate') {
       const angle = computeRotationFromDrag(previewBbox, drag.origin, drag.current, shiftRef.current);
-      preview = { scaleX: 1, scaleY: 1, rotation: angle, centerX: center.x, centerY: center.y };
+      preview = {
+        scaleX: 1, scaleY: 1,
+        rotationDeg: base + (angle * 180) / Math.PI,
+        pivot, anchor: pivot,
+      };
     } else {
       const uniform = ['nw', 'ne', 'sw', 'se'].includes(drag.handleId) && !shiftRef.current;
       const { scaleX, scaleY } = computeScaleFromDrag(drag.handleId, previewBbox, drag.origin, drag.current, uniform);
       // Mismo ancla que el commit (maria-198): el fantasma crece desde el
       // lado opuesto, no desde el centro — si no, el preview miente.
       const anchor = scaleAnchorForHandle(drag.handleId, previewBbox);
-      preview = { scaleX, scaleY, rotation: 0, centerX: anchor.x, centerY: anchor.y };
+      preview = { scaleX, scaleY, rotationDeg: base, pivot, anchor };
     }
   }
 

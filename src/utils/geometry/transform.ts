@@ -14,7 +14,26 @@ export interface BBox {
   y: number;
   width: number;
   height: number;
+  /**
+   * Orientación de la caja, en grados — la de la pieza. Ausente o 0 = caja
+   * eje-alineada, que es todo el comportamiento anterior a #1033.
+   *
+   * `x/y/width/height` describen la caja SIN girar; `rotation` y `pivot` dicen
+   * cómo colocarla. Es el mismo par que aplica `PieceRenderer.tsx:130`
+   * (`rotate(piece.rotation, cx, cy)`), y por eso la caja le cae encima a la
+   * pieza por construcción y no por coincidencia.
+   */
+  rotation?: number;
+  /** Punto de giro en espacio de patrón. Ausente = centro de la caja. */
+  pivot?: Point2D;
 }
+
+/** El punto sobre el que gira una caja. Sin `pivot` explícito, su centro. */
+export function bboxPivot(bbox: BBox): Point2D {
+  return bbox.pivot ?? { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 };
+}
+
+const bboxRad = (bbox: BBox): number => ((bbox.rotation ?? 0) * Math.PI) / 180;
 
 const ROTATION_ARM_LENGTH = 25; // pixels (will be divided by zoom)
 
@@ -33,28 +52,64 @@ export function computeBoundingBox(
   const selected = pieces.filter(p => selectedIds.includes(p.id));
   if (selected.length === 0) return null;
 
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-
-  for (const piece of selected) {
-    const ox = piece.position?.x ?? 0;
-    const oy = piece.position?.y ?? 0;
-    for (const cmd of piece.outline) {
-      if (NON_XY_PAIR_COMMANDS.has(cmd.type)) continue;
-      const v = cmd.values;
-      for (let i = 0; i < v.length; i += 2) {
-        const px = v[i] + ox;
-        const py = v[i + 1] + oy;
-        if (px < minX) minX = px;
-        if (px > maxX) maxX = px;
-        if (py < minY) minY = py;
-        if (py > maxY) maxY = py;
-      }
-    }
+  // Una sola pieza: la caja se orienta como ella. Sale del contorno CRUDO
+  // (sin girar) más `rotation`/`pivot`, que es exactamente el transform que el
+  // renderizador ya aplica — así la caja y la pieza no pueden separarse.
+  if (selected.length === 1) {
+    const piece = selected[0];
+    const box = aabbOfPoints(piecePoints(piece, false));
+    if (!box) return null;
+    const c = outlineBBoxCenter(piece.outline);
+    return {
+      ...box,
+      rotation: piece.rotation ?? 0,
+      pivot: {
+        x: (piece.position?.x ?? 0) + c.x,
+        y: (piece.position?.y ?? 0) + c.y,
+      },
+    };
   }
 
+  // Varias piezas: cada una gira sobre SU propio centro, así que no existe una
+  // caja orientada honesta para el grupo — sería inventarle al conjunto una
+  // orientación que ninguna de sus partes tiene. Se devuelve la eje-alineada
+  // de la geometría YA girada, que además arregla el caso de hoy: antes la
+  // selección múltiple ignoraba la rotación y encuadraba mal cualquier pieza
+  // girada.
+  return aabbOfPoints(selected.flatMap(p => piecePoints(p, true)));
+}
+
+/**
+ * Los puntos de una pieza en espacio de patrón. Con `rotated`, pasados por el
+ * giro del renderizador; sin él, el contorno crudo desplazado por `position`.
+ */
+function piecePoints(piece: PatternPiece, rotated: boolean): Point2D[] {
+  const ox = piece.position?.x ?? 0;
+  const oy = piece.position?.y ?? 0;
+  const rad = ((piece.rotation ?? 0) * Math.PI) / 180;
+  const center = rotated && rad ? outlineBBoxCenter(piece.outline) : null;
+  const out: Point2D[] = [];
+  for (const cmd of piece.outline) {
+    if (NON_XY_PAIR_COMMANDS.has(cmd.type)) continue;
+    const v = cmd.values;
+    for (let i = 0; i + 1 < v.length; i += 2) {
+      const pt = center
+        ? rotatePoint({ x: v[i], y: v[i + 1] }, center, rad)
+        : { x: v[i], y: v[i + 1] };
+      out.push({ x: pt.x + ox, y: pt.y + oy });
+    }
+  }
+  return out;
+}
+
+function aabbOfPoints(pts: Point2D[]): BBox | null {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
   if (!isFinite(minX)) return null;
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
@@ -68,7 +123,7 @@ export function computeHandlePositions(bbox: BBox, zoom = 1): HandlePosition[] {
   const cy = y + height / 2;
   const armLen = screenToPatternLength(ROTATION_ARM_LENGTH, zoom);
 
-  return [
+  const handles: HandlePosition[] = [
     { id: 'nw', pos: { x, y }, cursor: 'nwse-resize' },
     { id: 'n', pos: { x: cx, y }, cursor: 'ns-resize' },
     { id: 'ne', pos: { x: x + width, y }, cursor: 'nesw-resize' },
@@ -79,6 +134,17 @@ export function computeHandlePositions(bbox: BBox, zoom = 1): HandlePosition[] {
     { id: 'se', pos: { x: x + width, y: y + height }, cursor: 'nwse-resize' },
     { id: 'rotate', pos: { x: cx, y: y - armLen }, cursor: 'grab' },
   ];
+
+  // Los tiradores viajan con la caja. Antes se quedaban donde la pieza SIN
+  // girar: medido en #1033, el de giro caía en el mismo punto para 0°, 45° y
+  // 90°, así que se agarraba donde no estaba.
+  const rad = bboxRad(bbox);
+  if (!rad) return handles;
+  const pivot = bboxPivot(bbox);
+  // ponytail: el `cursor` no rota con el tirador — a 45° la flecha apunta
+  // torcida. Se corrige mapeando el ángulo a los 4 cursores diagonales si
+  // alguien lo reporta; no vale una tabla de 8 entradas por adelantado.
+  return handles.map(h => ({ ...h, pos: rotatePoint(h.pos, pivot, rad) }));
 }
 
 /**
@@ -220,6 +286,15 @@ export function computeScaleFromDrag(
   dragCurrent: Point2D,
   uniform: boolean,
 ): { scaleX: number; scaleY: number } {
+  // El arrastre llega en espacio de patrón, pero la caja mide en el marco
+  // propio de la pieza. Sin des-girarlo, arrastrar el tirador `e` de una pieza
+  // a 90° crecería a lo alto en vez de a lo ancho.
+  const rad = bboxRad(bbox);
+  if (rad) {
+    const pivot = bboxPivot(bbox);
+    dragStart = rotatePoint(dragStart, pivot, -rad);
+    dragCurrent = rotatePoint(dragCurrent, pivot, -rad);
+  }
   const dx = dragCurrent.x - dragStart.x;
   const dy = dragCurrent.y - dragStart.y;
   let scaleX = 1;
@@ -261,8 +336,11 @@ export function computeRotationFromDrag(
   dragCurrent: Point2D,
   snapToIncrement: boolean,
 ): number {
-  const cx = bbox.x + bbox.width / 2;
-  const cy = bbox.y + bbox.height / 2;
+  // Sobre el pivote del RENDERIZADOR, no sobre el centro geométrico de la
+  // caja: son el mismo punto mientras el contorno no cambie, y con el giro
+  // declarativo el contorno ya no cambia. De ahí sale que ida y vuelta sea
+  // exacta en vez de aproximada (#1033).
+  const { x: cx, y: cy } = bboxPivot(bbox);
   const startAngle = Math.atan2(dragStart.y - cy, dragStart.x - cx);
   const currentAngle = Math.atan2(dragCurrent.y - cy, dragCurrent.x - cx);
   let angle = currentAngle - startAngle;

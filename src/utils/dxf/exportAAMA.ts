@@ -14,6 +14,7 @@ import { AAMA_LAYERS, DXFExportOptions } from './types';
 import { preparePieces, computeBBox } from '../export/pipeline';
 import { escapeDxfString } from '../sanitizeName';
 import { grainlineArrowheads, grainlineEndpoints } from '../grainLine';
+import { outlineBBoxCenter, rotateOutline } from '../geometry/transform';
 
 const DEFAULT_OPTIONS: DXFExportOptions = { version: 'R2000', aamaLayers: true };
 
@@ -280,7 +281,39 @@ ENDSEC
 
 // ─── Piece Entities (inside block) ───
 
-function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DXFExportOptions): string {
+/**
+ * Aplica `piece.rotation` a la geometría, sobre el mismo pivote que usa el
+ * editor 2D (`outlineBBoxCenter` del contorno original), y sobre el margen y
+ * las internas con él.
+ *
+ * Hace falta desde #1033: el tirador de giro dejó de hornear el ángulo dentro
+ * de las coordenadas y pasó a escribir `piece.rotation`. Sin esto el giro se
+ * perdería al exportar y la pantalla diría una cosa y la tela otra — que es lo
+ * que ya pasaba con el "girar 90°" del menú del clic derecho, porque este
+ * archivo no mencionaba `rotation` ni una vez.
+ */
+function bakeRotation(
+  piece: PatternPiece,
+  seamOutline: PathCommand[],
+): { piece: PatternPiece; seamOutline: PathCommand[] } {
+  const deg = piece.rotation ?? 0;
+  if (!deg) return { piece, seamOutline };
+  const rad = (deg * Math.PI) / 180;
+  const pivot = outlineBBoxCenter(piece.outline);
+  return {
+    piece: {
+      ...piece,
+      outline: rotateOutline(piece.outline, pivot, rad),
+      internals: piece.internals.map(l => ({ ...l, path: rotateOutline(l.path, pivot, rad) })),
+    },
+    seamOutline: rotateOutline(seamOutline, pivot, rad),
+  };
+}
+
+function pieceEntities(rawPiece: PatternPiece, rawSeamOutline: PathCommand[], opts: DXFExportOptions): string {
+  // Una sola vez, acá: así el contorno, el margen, las internas, la etiqueta y
+  // el bbox de abajo ven todos la misma geometría ya girada.
+  const { piece, seamOutline } = bakeRotation(rawPiece, rawSeamOutline);
   let s = '';
 
   // Layer 8 (DRAW) = original design outline (uses SPLINE for beziers)

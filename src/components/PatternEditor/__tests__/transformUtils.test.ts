@@ -35,16 +35,20 @@ const makePiece = (id: string, outline: PathCommand[], pos = { x: 0, y: 0 }): Pa
 });
 
 describe('computeBoundingBox', () => {
+  // `toMatchObject` y no `toEqual` desde #1033: la caja de una pieza sola
+  // ganó `rotation` y `pivot` para poder orientarse como ella. Los valores de
+  // x/y/width/height siguen siendo los de siempre — describen la caja SIN
+  // girar, que es lo que estas dos afirmaciones fijan.
   it('returns bbox for a single piece at origin', () => {
     const pieces = [makePiece('p1', makeRect(0, 0, 100, 50))];
     const bbox = computeBoundingBox(pieces, ['p1']);
-    expect(bbox).toEqual({ x: 0, y: 0, width: 100, height: 50 });
+    expect(bbox).toMatchObject({ x: 0, y: 0, width: 100, height: 50 });
   });
 
   it('accounts for piece position offset', () => {
     const pieces = [makePiece('p1', makeRect(0, 0, 100, 50), { x: 30, y: 20 })];
     const bbox = computeBoundingBox(pieces, ['p1']);
-    expect(bbox).toEqual({ x: 30, y: 20, width: 100, height: 50 });
+    expect(bbox).toMatchObject({ x: 30, y: 20, width: 100, height: 50 });
   });
 
   it('returns combined bbox for multiple pieces', () => {
