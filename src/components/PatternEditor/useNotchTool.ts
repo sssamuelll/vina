@@ -13,6 +13,7 @@ import {
 } from '../../utils/geometry/outlineRing';
 import { resolveDistanceRef } from '../../utils/geometry/distanceRef';
 import { edgeRangeForCommand } from '../../utils/semanticEdges';
+import { patternToPieceLocal, patternToPieceLocalDirection } from './pieceTransform';
 import { newId } from '../../utils/ids';
 import {
   snapToAnyEdge,
@@ -118,13 +119,17 @@ function liveTFromRange(pressT: number, liveRange: [number, number]): number {
  * Exported for unit tests.
  */
 export function createNotchLine(point: Point2D, normal: Point2D, piece: PatternPiece, notchOptions?: NotchOptions): InternalLine {
-  const localPt = { x: point.x - piece.position.x, y: point.y - piece.position.y };
+  // Punto y normal llegan en espacio de patrón. El PUNTO pierde posición y
+  // giro; la NORMAL solo gira — trasladar una dirección la manda a la otra
+  // punta de la pieza.
+  const localPt = patternToPieceLocal(point, piece);
+  const localNormal = patternToPieceLocalDirection(normal, piece);
   const opts = notchOptions || DEFAULT_NOTCH_OPTIONS;
   const anchor = computeNotchAnchor(piece.outline, localPt);
   return {
     id: newId(),
     type: 'notch',
-    path: generateNotchPath(localPt, normal, opts),
+    path: generateNotchPath(localPt, localNormal, opts),
     notchOptions: opts,
     ...(anchor ? { notchAnchor: anchor } : {}),
   };
@@ -223,10 +228,7 @@ export function useNotchTool(
     const piece = ringData.pieces.find(candidate => candidate.id === target.pieceId);
     const ring = ringData.rings.get(target.pieceId);
     if (!piece || !ring) return null;
-    const pressLocal = {
-      x: target.point.x - piece.position.x,
-      y: target.point.y - piece.position.y,
-    };
+    const pressLocal = patternToPieceLocal(target.point, piece);
     const projected = projectToRing(ring, pressLocal).point;
     // Se resuelve un ancla de distancia 0 desde el propio punto: el punto sale
     // asentado sobre la curva de verdad —el snap viene del trazo aplanado— y la
@@ -267,10 +269,7 @@ export function useNotchTool(
     if (!piece || !ring) return null;
 
     const spanMm = spanForEdge(ring, target.edgeRange);
-    const pressLocal = {
-      x: target.point.x - piece.position.x,
-      y: target.point.y - piece.position.y,
-    };
+    const pressLocal = patternToPieceLocal(target.point, piece);
     const ref = resolveDistanceRef(
       ring,
       piece,

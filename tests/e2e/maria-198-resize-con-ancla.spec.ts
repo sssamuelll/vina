@@ -136,4 +136,39 @@ test.describe('maria-198 — resize con ancla en el lado opuesto', () => {
     expect(Math.abs(after.minY - 200)).toBeLessThan(1);
     expect(after.maxX).toBeGreaterThan(300);
   });
+
+  /**
+   * Los dos casos de arriba son `e` y `se`, y los dos pasaban en verde con el
+   * fallo dentro: su ancla coincide con el origen del contorno, así que la
+   * doble compensación se cancelaba sola. `w` es la familia donde se ve.
+   *
+   * Hasta 2026-08-21 esto daba minX 160 **y** maxX 300: la pieza encogía lo
+   * arrastrado y además se corría lo mismo, justo la mitad de la queja de
+   * María ("la pieza se mueve de sitio teniendo que ajustar el zoom e ir a
+   * buscarla") que se había dado por cerrada.
+   */
+  test('arrastrar el handle oeste deja el borde este clavado', async ({ page }) => {
+    await waitForApp(page);
+    const box = await addAndSelectPiece(page);
+
+    const before = await pieceBBox(page);
+    expect(before).toEqual({ minX: 120, maxX: 260, minY: 200, maxY: 300 });
+
+    // Handle 'w' en pattern (120, 250) → adentro 40
+    await page.mouse.move(box.x + 120, box.y + 250);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 160, box.y + 250, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+
+    const after = await pieceBBox(page);
+    // El este NO se mueve: es el ancla.
+    expect(Math.abs(after.maxX - 260)).toBeLessThan(1);
+    // El oeste entra lo arrastrado y la pieza encoge de verdad.
+    expect(after.minX).toBeGreaterThan(140);
+    expect(after.maxX - after.minX).toBeLessThan(before.maxX - before.minX);
+    // Los lados horizontales quedan quietos.
+    expect(Math.abs(after.minY - 200)).toBeLessThan(1);
+    expect(Math.abs(after.maxY - 300)).toBeLessThan(1);
+  });
 });

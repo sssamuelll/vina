@@ -15,6 +15,7 @@ import { setToolOption } from '../../store/toolSlice';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import { flattenPath } from '../../utils/seam/index';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
+import { patternToPieceLocal } from './pieceTransform';
 import {
   findSlashIntersections,
   splitOutlineAtSlash,
@@ -99,7 +100,7 @@ function snapToOutline(
   piece: PatternPiece,
   zoom2D: number,
 ): Point2D | null {
-  const localPt = { x: pt.x - piece.position.x, y: pt.y - piece.position.y };
+  const localPt = patternToPieceLocal(pt, piece);
   const flatPoints = flattenPath(piece.outline);
   let bestDist = Infinity;
   let bestPt: Point2D | null = null;
@@ -210,14 +211,8 @@ export function transitionMouseDown(
 
     try {
       // Convert to local coords for geometry
-      const localStart = {
-        x: state.startPoint.x - piece.position.x,
-        y: state.startPoint.y - piece.position.y,
-      };
-      const localEnd = {
-        x: endPt.x - piece.position.x,
-        y: endPt.y - piece.position.y,
-      };
+      const localStart = patternToPieceLocal(state.startPoint, piece);
+      const localEnd = patternToPieceLocal(endPt, piece);
 
       const [h1, h2] = findSlashIntersections(piece.outline, localStart, localEnd);
       const { halfA: hA, halfB: hB } = splitOutlineAtSlash(piece.outline, h1, h2);
@@ -244,10 +239,7 @@ export function transitionMouseDown(
   if (state.phase === 'slashComplete') {
     if (!state.halfA || !state.halfB) return { ...state };
 
-    const localPt = {
-      x: pt.x - piece.position.x,
-      y: pt.y - piece.position.y,
-    };
+    const localPt = patternToPieceLocal(pt, piece);
 
     const inA = pointInPolygon(localPt, state.halfA);
     const inB = pointInPolygon(localPt, state.halfB);
@@ -271,10 +263,7 @@ export function transitionMouseDown(
   if (state.phase === 'halfConfirmed') {
     if (!state.hit1 || !state.hit2) return { ...state };
 
-    const localPt = {
-      x: pt.x - piece.position.x,
-      y: pt.y - piece.position.y,
-    };
+    const localPt = patternToPieceLocal(pt, piece);
 
     const threshold = screenToPatternLength(PIVOT_THRESHOLD, zoom2D);
     const d1 = dist2D(localPt, state.hit1.point);
@@ -335,10 +324,7 @@ export function transitionMouseMove(
   if (state.phase === 'slashComplete') {
     if (!state.halfA || !state.halfB) return { ...state };
 
-    const localPt = {
-      x: pt.x - piece.position.x,
-      y: pt.y - piece.position.y,
-    };
+    const localPt = patternToPieceLocal(pt, piece);
 
     const inA = pointInPolygon(localPt, state.halfA);
     const inB = pointInPolygon(localPt, state.halfB);
@@ -356,10 +342,7 @@ export function transitionMouseMove(
       return { ...state };
     }
 
-    const localPt = {
-      x: pt.x - piece.position.x,
-      y: pt.y - piece.position.y,
-    };
+    const localPt = patternToPieceLocal(pt, piece);
 
     const mode = (toolOptions.mode as 'pivot' | 'parallel') ?? 'pivot';
     const gapFill = (toolOptions.gapFill as 'straight' | 'smooth') ?? 'straight';

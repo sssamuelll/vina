@@ -583,6 +583,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           ...piece,
           outline: u.outline,
           position: u.position,
+          // El giro va por `rotation` desde #1033 — el mismo canal que el menú
+          // del clic derecho. Al estirar viaja sin cambios.
+          rotation: u.rotation,
           // The internals ride the same transform (nota de María #171): a
           // scaled outline over un-scaled grainlines and piquetes is the
           // stranding bug wearing a different handle.

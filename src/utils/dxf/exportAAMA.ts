@@ -280,6 +280,10 @@ ENDSEC
 
 // ─── Piece Entities (inside block) ───
 
+// El giro de la pieza NO se aplica acá: lo hace `preparePiece`
+// (`utils/export/pipeline.ts`) antes de medir la caja, porque si se girara a
+// esta altura `preparePieces` ya habría emplazado las piezas con el ancho sin
+// girar y los bloques se pisarían. Lo que llega aquí ya viene girado.
 function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DXFExportOptions): string {
   let s = '';
 
