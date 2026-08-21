@@ -48,8 +48,24 @@ export function snapToEdge(
   zoom: number,
   /** Rango de comandos [inicio, fin) al que confinar el snap. */
   edgeConstraint?: [number, number],
+  /**
+   * Sin radio de enganche: la proyección sobre el borde gana siempre, esté el
+   * cursor donde esté. Es lo que necesita el RELEASE de la familia TRAMO.
+   *
+   * El press y el release no hacen la misma pregunta. El press pregunta *qué
+   * agarro*, y ahí el radio es la respuesta correcta: hay que apretar cerca de
+   * un borde. El release solo pregunta *hasta dónde*, sobre un borde que ya
+   * está elegido y que el gesto no re-apunta nunca (spec § 4.1, "el press
+   * manda el objeto"). Un radio ahí no puede escoger mejor objeto — solo puede
+   * negar el valor, y negarlo tiraba el gesto entero a clic: el borde COMPLETO
+   * en vez del tramo marcado (#1061).
+   *
+   * Solo tiene sentido junto a `edgeConstraint`: sin un borde ya fijado, el
+   * radio es lo único que decide qué se engancha.
+   */
+  unbounded = false,
 ): SnapResult | null {
-  const threshold = screenToPatternLength(EDGE_HIT_PX, zoom);
+  const threshold = unbounded ? Infinity : screenToPatternLength(EDGE_HIT_PX, zoom);
   const cmds = piece.outline;
   // Entra y sale por el mismo transform que usa el renderizador. Restar solo
   // `position` medía contra el fantasma de la pieza SIN girar: desde #1033 el
@@ -116,11 +132,14 @@ export function snapToAnyEdge(
   zoom: number,
   constrainPieceId?: string,
   constrainEdge?: [number, number],
+  /** Ver `snapToEdge`. Se ignora sin pieza fijada: ahí el radio es lo único
+   *  que decide cuál de todas se engancha, y quitarlo elegiría una cualquiera. */
+  unbounded = false,
 ): SnapResult | null {
   if (constrainPieceId) {
     const piece = pieces.find(p => p.id === constrainPieceId);
     if (!piece) return null;
-    return snapToEdge(pt, piece, zoom, constrainEdge);
+    return snapToEdge(pt, piece, zoom, constrainEdge, unbounded);
   }
 
   let best: SnapResult | null = null;

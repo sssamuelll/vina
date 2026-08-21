@@ -1,11 +1,28 @@
 import { useCallback, useRef, useState } from 'react';
 import {
+  MIN_SEGMENT_T,
   resolveEdgeCommit,
   type EdgeCommit,
   type EdgeGesturePhase,
   type EdgeTarget,
 } from './edgeGesture';
 import { isDrag } from './gestureConstants';
+
+/**
+ * ¿Esta proyección dice ya algún sentido, o sigue encima del press?
+ *
+ * El umbral de arrastre se mide en PANTALLA, así que un movimiento
+ * perpendicular al borde lo cruza sin avanzar nada a lo largo del borde. Su
+ * proyección cae sobre el press: no señala ningún lado. Antes de #1061 ese
+ * caso ni se planteaba —fuera del radio la proyección era `null`— y al quitar
+ * el radio empezó a llegar un cero que el signo leía como "hacia adelante".
+ *
+ * Medido en piquete: bajar perpendicular, irse a la izquierda y soltar ponía
+ * la marca en el lado contrario, a la misma distancia. El espejo exacto.
+ */
+function separadaDelPress(pressT: number, t: number | null): t is number {
+  return t !== null && Math.abs(t - pressT) >= MIN_SEGMENT_T;
+}
 
 interface EdgeGestureOptions {
   /** Qué hay bajo el cursor en el press. `null` = no hay objetivo, no se arma. */
@@ -21,7 +38,8 @@ interface ArmedRef {
   startY: number;
   moved: boolean;
   /** Sin este recuerdo, devolverse antes de soltar invertiría el sentido que
-   *  la mano fijó al arrancar. `null` también cubre cruces fuera del borde. */
+   *  la mano fijó al arrancar. `null` mientras el recorrido no haya dicho
+   *  todavía ningún sentido — ver `separadaDelPress`. */
   firstDragT: number | null;
   /** El elemento que capturó el puntero, para soltarlo al terminar. */
   captured: Element | null;
@@ -92,9 +110,10 @@ export function useEdgeGesture(opts: EdgeGestureOptions) {
     if (!a.moved) return;
 
     const t = resolveReleaseT(e, a.press);
-    // Si el cruce ocurrió fuera del borde, esperamos la primera proyección
-    // válida. Una vez fijada no se toca: el resto del recorrido puede volver.
-    if (a.firstDragT === null && t !== null) a.firstDragT = t;
+    // Esperamos la primera proyección que de verdad se haya SEPARADO del press
+    // a lo largo del borde. Una vez fijada no se toca: el resto del recorrido
+    // puede volver, y el sentido lo manda el arranque.
+    if (a.firstDragT === null && separadaDelPress(a.press.t, t)) a.firstDragT = t;
     setLiveRange(t === null ? null : [Math.min(a.press.t, t), Math.max(a.press.t, t)]);
   }, [resolveReleaseT]);
 
@@ -102,9 +121,10 @@ export function useEdgeGesture(opts: EdgeGestureOptions) {
     const a = armed.current;
     if (!a) return;
     const t = a.moved ? resolveReleaseT(e, a.press) : null;
-    // El mouseup también puede ser la primera proyección válida tras un
-    // cruce fuera del borde; solo llena el hueco, nunca reemplaza el arranque.
-    if (a.firstDragT === null && t !== null) a.firstDragT = t;
+    // El mouseup también puede ser la primera proyección separada del press,
+    // si todo el recorrido anterior fue perpendicular; solo llena el hueco,
+    // nunca reemplaza el arranque.
+    if (a.firstDragT === null && separadaDelPress(a.press.t, t)) a.firstDragT = t;
     const commit = resolveEdgeCommit(a.press, t, a.moved, a.firstDragT);
     reset();
     onCommit(commit);
