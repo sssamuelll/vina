@@ -1,6 +1,7 @@
 import type { PathCommand, PatternPiece, Point2D, SemanticEdge } from '../../types/types';
 import { flattenPathWithSource } from './index';
 import { detectCornerCommands } from '../outlineAnalysis';
+import { patternToPieceLocal } from '../geometry/pieceSpace';
 
 /** Distance from point p to segment a→b. */
 function distToSegment(p: Point2D, a: Point2D, b: Point2D): number {
@@ -116,10 +117,10 @@ export function resolveSeamAllowanceClick(
   // Pass 1: precise vertex/edge targets (across all pieces).
   for (const piece of pieces) {
     if (!piece.outline?.length) continue;
-    const local = {
-      x: patternPoint.x - (piece.position?.x ?? 0),
-      y: patternPoint.y - (piece.position?.y ?? 0),
-    };
+    // Por el transform del renderizador, no restando solo la posición: desde
+    // #1033 el giro vive en `piece.rotation` y no en el contorno, así que una
+    // pieza girada se estaba midiendo contra su fantasma sin girar (#1064).
+    const local = patternToPieceLocal(patternPoint, piece);
     const v = findNearestOutlineVertex(piece.outline, local, maxVertexDist);
     if (v) return { kind: 'vertex', pieceId: piece.id, vertexIndex: v.index };
     const edge = piece.edges?.length
@@ -130,18 +131,21 @@ export function resolveSeamAllowanceClick(
   // Pass 2: the piece body (bbox containment) — the whole-piece apply target.
   for (const piece of pieces) {
     if (!piece.outline?.length) continue;
-    const ox = piece.position?.x ?? 0;
-    const oy = piece.position?.y ?? 0;
+    // La caja se mide en LOCAL y el punto se trae hasta ahí. Construirla en
+    // espacio de patrón sumando la posición daba la caja del fantasma sin
+    // girar; traer el punto, además, da la caja ORIENTADA de balde — que es la
+    // que de verdad ocupa la pieza, no su envolvente eje-alineada.
+    const local = patternToPieceLocal(patternPoint, piece);
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const cmd of piece.outline) {
       const vals = cmd.values;
       for (let i = 0; i + 1 < vals.length; i += 2) {
-        const px = vals[i] + ox, py = vals[i + 1] + oy;
+        const px = vals[i], py = vals[i + 1];
         if (px < minX) minX = px; if (px > maxX) maxX = px;
         if (py < minY) minY = py; if (py > maxY) maxY = py;
       }
     }
-    if (patternPoint.x >= minX && patternPoint.x <= maxX && patternPoint.y >= minY && patternPoint.y <= maxY) {
+    if (local.x >= minX && local.x <= maxX && local.y >= minY && local.y <= maxY) {
       return { kind: 'piece', pieceId: piece.id };
     }
   }
