@@ -209,14 +209,20 @@ export function useNotchTool(
     return { pieceId: snap.pieceId, edgeIndex: snap.edgeIndex, edgeRange, t, point: snap.point };
   }, [toPattern, ringData, zoom]);
 
-  /** El release solo aporta un t sobre el MISMO borde que fijó el press. */
+  /**
+   * El release solo aporta un t sobre el MISMO borde que fijó el press, y por
+   * eso va sin radio de enganche: no hay objeto que escoger, solo un valor que
+   * leer (spec § 3.4). Con radio, soltar a 13 px del borde tiraba el arrastre
+   * a clic y el piquete nacía en el press con el modal abierto, borrando la
+   * distancia recién arrastrada (#1061).
+   */
   const resolveReleaseT = useCallback((
     e: React.MouseEvent<SVGSVGElement>,
     press: EdgeTarget,
   ): number | null => {
     const rect = e.currentTarget.getBoundingClientRect();
     const pt = toPattern(e.clientX, e.clientY, rect);
-    const snap = snapToAnyEdge(pt, ringData.pieces, zoom, press.pieceId, press.edgeRange);
+    const snap = snapToAnyEdge(pt, ringData.pieces, zoom, press.pieceId, press.edgeRange, true);
     if (!snap) return null;
     const ring = ringData.rings.get(press.pieceId);
     if (!ring) return null;

@@ -53,14 +53,20 @@ export function useFreeSewingTool(
     return { pieceId: snap.pieceId, edgeIndex: snap.edgeIndex, edgeRange, t, point: snap.point };
   }, [toPattern, pieces, zoom, segmentA]);
 
-  /** El release: el t sobre el MISMO borde del press. Fuera del borde → null,
-   *  y el gesto cae a clic (spec § 3.4). */
+  /**
+   * El release: el t sobre el MISMO borde del press, sin radio de enganche.
+   *
+   * Soltar lejos del borde no es soltar en el vacío — el borde ya lo fijó el
+   * press y aquí solo se pregunta hasta dónde (spec § 3.4: clampeado al borde
+   * del press, nunca caída a clic). Con radio, soltar a 13 px del borde cosía
+   * el LADO COMPLETO en vez del tramo marcado (#1061).
+   */
   const resolveReleaseT = useCallback((
     e: React.MouseEvent<SVGSVGElement>,
     press: EdgeTarget,
   ): number | null => {
     const pt = toPattern(e);
-    const snap = snapToAnyEdge(pt, pieces, zoom, press.pieceId, press.edgeRange);
+    const snap = snapToAnyEdge(pt, pieces, zoom, press.pieceId, press.edgeRange, true);
     if (!snap) return null;
     const piece = pieces.find(p => p.id === press.pieceId);
     return piece

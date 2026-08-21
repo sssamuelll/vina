@@ -49,9 +49,18 @@ export type EdgeCommit =
  * Soltar sin haberse movido = clic ("esto entero", y qué signifique eso lo
  * decide la herramienta). Soltar habiéndose movido = arrastre con su rango.
  *
- * Dos caídas a clic que NO son "no pasó nada":
- *  - soltar fuera del borde (`releaseT === null`)
- *  - cruzar el umbral en pantalla con el t colapsado (arrastre perpendicular)
+ * Una sola caída a clic que NO es "no pasó nada": cruzar el umbral en pantalla
+ * con el t colapsado (el arrastre perpendicular), § 4.1.
+ *
+ * Aquí decía que había DOS, y que la otra era soltar fuera del borde. Esa
+ * cláusula no está en el spec — § 3.4 tiene cinco filas para "soltar fuera" y
+ * las cinco clampean al borde del press. El comentario se la inventó y la
+ * firmó con la sección que dice lo contrario, así que durante tres rondas el
+ * fallo pareció una decisión ratificada (#1061).
+ *
+ * `releaseT === null` sigue cayendo a clic, pero ya solo puede llegar de una
+ * pieza que desapareció a mitad del gesto: desde #1061 el release proyecta
+ * sobre el borde sin radio y siempre tiene un valor que dar.
  *
  * Spec: docs/superpowers/specs/2026-08-11-arrastre-unificado-2d-design.md § 4.1
  */
