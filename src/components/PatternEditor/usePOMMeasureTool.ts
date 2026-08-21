@@ -9,6 +9,7 @@ import { addPOM } from '../../store/projectSlice';
 import { selectPOM } from '../../store/editorSlice';
 import { uid } from '../../utils/pathHelpers';
 import { screenToPattern } from './sewingUtils';
+import { patternToPieceLocal } from './pieceTransform';
 
 // ─── Types ───
 
@@ -29,10 +30,7 @@ function snapToPOMPoint(
   segmentIndex: number,
   piece: PatternPiece,
 ): POMPoint {
-  const localPosition: Point2D = {
-    x: snapPoint.x - piece.position.x,
-    y: snapPoint.y - piece.position.y,
-  };
+  const localPosition: Point2D = patternToPieceLocal(snapPoint, piece);
 
   const edge = findEdgeForSegment(piece, segmentIndex);
   let edgeName: string | undefined;

@@ -57,7 +57,7 @@ describe('computeBoundingBox', () => {
       makePiece('p2', makeRect(0, 0, 80, 60), { x: 120, y: 10 }),
     ];
     const bbox = computeBoundingBox(pieces, ['p1', 'p2']);
-    expect(bbox).toEqual({ x: 0, y: 0, width: 200, height: 70 });
+    expect(bbox).toMatchObject({ x: 0, y: 0, width: 200, height: 70 });
   });
 
   it('returns null when no pieces selected', () => {

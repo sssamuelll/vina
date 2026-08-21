@@ -9,6 +9,7 @@ import type { ArcLengthSample } from '../../utils/geometry/arcLength';
 import { screenToPattern } from './sewingUtils';
 import { screenToPatternLength } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
+import { patternToPieceLocal } from './pieceTransform';
 
 // ─── Types ───
 
@@ -69,7 +70,7 @@ export function snapToOutline(
   piece: PatternPiece,
   zoom: number,
 ): SnapResult | null {
-  const localPt = { x: pt.x - piece.position.x, y: pt.y - piece.position.y };
+  const localPt = patternToPieceLocal(pt, piece);
   const flatPoints = flattenPath(piece.outline);
   let bestDist = Infinity;
   let bestPt: Point2D | null = null;

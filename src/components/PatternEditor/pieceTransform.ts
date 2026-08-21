@@ -24,6 +24,24 @@ export function patternToPieceLocal(
   );
 }
 
+/**
+ * Igual que {@link patternToPieceLocal} pero para una DIRECCIÓN — una normal,
+ * un eje, un vector de arrastre: se gira, no se traslada.
+ *
+ * Existe porque tratar una dirección como punto la manda a la otra punta de la
+ * pieza: la traslación no tiene sentido sobre algo que solo lleva sentido y
+ * magnitud. `createNotchLine` recibe un punto Y una normal, y cada uno va por
+ * su lado.
+ */
+export function patternToPieceLocalDirection(
+  dir: Point2D,
+  piece: TransformablePiece,
+): Point2D {
+  const rotation = piece.rotation ?? 0;
+  if (!rotation) return dir;
+  return rotatePoint(dir, { x: 0, y: 0 }, -rotation * Math.PI / 180);
+}
+
 /** Project an unrotated piece-local point through the piece's render transform. */
 export function pieceLocalToPattern(
   localPt: Point2D,

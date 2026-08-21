@@ -658,8 +658,7 @@ export function useEditorInteractions(
           if (ilLine) {
             const endpoints = getInternalLineEndpoints(ilLine);
             if (endpoints) {
-              const localX = clickX - ilPiece.position.x;
-              const localY = clickY - ilPiece.position.y;
+              const { x: localX, y: localY } = patternToPieceLocal({ x: clickX, y: clickY }, ilPiece);
               const EP_THRESHOLD = screenToPatternLength(8, zoom2D);
               for (let i = 0; i < 2; i++) {
                 if (Math.hypot(localX - endpoints[i].x, localY - endpoints[i].y) <= EP_THRESHOLD) {
@@ -702,8 +701,7 @@ export function useEditorInteractions(
           }
 
           // Check if clicking on an internal line
-          const localX = clickX - piece.position.x;
-          const localY = clickY - piece.position.y;
+          const { x: localX, y: localY } = patternToPieceLocal({ x: clickX, y: clickY }, piece);
           const LINE_THRESHOLD = screenToPatternLength(5, zoom2D);
           let nearestLine: InternalLine | null = null;
           let nearestDist = Infinity;

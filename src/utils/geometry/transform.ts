@@ -76,7 +76,25 @@ export function computeBoundingBox(
   // de la geometría YA girada, que además arregla el caso de hoy: antes la
   // selección múltiple ignoraba la rotación y encuadraba mal cualquier pieza
   // girada.
-  return aabbOfPoints(selected.flatMap(p => piecePoints(p, true)));
+  const box = aabbOfPoints(selected.flatMap(p => piecePoints(p, true)));
+  if (!box) return null;
+  // El pivote NO puede ser el centro de esa caja: el AABB de geometría girada
+  // se muda al girar, así que girar el grupo y desgirarlo lo dejaría corrido.
+  // El centroide de los pivotes propios sí sobrevive — rotar un conjunto de
+  // puntos alrededor de su centroide conserva el centroide.
+  return { ...box, rotation: 0, pivot: centroidOfPivots(selected) };
+}
+
+/** Centroide de los pivotes de giro propios de cada pieza. Invariante bajo
+ *  una rotación rígida del grupo alrededor de él mismo. */
+function centroidOfPivots(pieces: PatternPiece[]): Point2D {
+  let sx = 0, sy = 0;
+  for (const p of pieces) {
+    const c = outlineBBoxCenter(p.outline);
+    sx += (p.position?.x ?? 0) + c.x;
+    sy += (p.position?.y ?? 0) + c.y;
+  }
+  return { x: sx / pieces.length, y: sy / pieces.length };
 }
 
 /**

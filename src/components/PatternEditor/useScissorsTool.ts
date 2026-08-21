@@ -9,6 +9,7 @@ import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { splitPieceAtLine, findCutEdgePair } from '../../utils/patternOps';
 import { useGuardedAction } from '../../hooks/useGuardedAction';
 import { newId } from '../../utils/ids';
+import { patternToPieceLocal } from './pieceTransform';
 
 export interface ScissorsState {
   targetPieceId: string | null;
@@ -53,7 +54,7 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
   /** Find nearest point on piece outline to a pattern-space point */
   const snapToOutline = useCallback(
     (pt: Point2D, piece: PatternPiece): Point2D | null => {
-      const localPt = { x: pt.x - piece.position.x, y: pt.y - piece.position.y };
+      const localPt = patternToPieceLocal(pt, piece);
       const flatPoints = flattenPath(piece.outline);
       let bestDist = Infinity;
       let bestPt: Point2D | null = null;
@@ -85,8 +86,8 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
   /** Check if the cut line produces exactly 2 intersections */
   const validateCut = useCallback(
     (piece: PatternPiece, start: Point2D, end: Point2D): boolean => {
-      const localStart = { x: start.x - piece.position.x, y: start.y - piece.position.y };
-      const localEnd = { x: end.x - piece.position.x, y: end.y - piece.position.y };
+      const localStart = patternToPieceLocal(start, piece);
+      const localEnd = patternToPieceLocal(end, piece);
       const flatPoints = flattenPath(piece.outline);
       const hits = linePolylineIntersections(localStart, localEnd, flatPoints);
       return hits.length >= 2;

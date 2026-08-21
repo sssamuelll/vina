@@ -8,6 +8,7 @@
 
 import type { PatternPiece, PathCommand, Point2D, Seam } from '../../types/types';
 import { flattenPath } from '../seam/index';
+import { outlineBBoxCenter, rotateOutline } from '../geometry/transform';
 import {
   generateSeamAllowanceWithCorners,
   hasPositiveEdgeAllowance,
@@ -94,12 +95,43 @@ export function computeBBoxFromPoints(points: Point2D[]): BBox {
  * Prepare a single piece: flatten outline, compute SA, compute bbox.
  * Does NOT assign layout position (offsetX/offsetY default to 0).
  */
+/**
+ * Devuelve la pieza con su `rotation` ya aplicada a la geometría, sobre el
+ * mismo pivote que usa el editor 2D (`outlineBBoxCenter` del contorno
+ * original) — así lo que sale en el archivo coincide con lo que se ve en
+ * pantalla. Sin rotación devuelve la misma pieza, sin copiar.
+ */
+function applyPieceRotation(piece: PatternPiece): PatternPiece {
+  const deg = piece.rotation ?? 0;
+  if (!deg) return piece;
+  const rad = (deg * Math.PI) / 180;
+  const pivot = outlineBBoxCenter(piece.outline);
+  return {
+    ...piece,
+    outline: rotateOutline(piece.outline, pivot, rad),
+    internals: piece.internals.map(l => ({ ...l, path: rotateOutline(l.path, pivot, rad) })),
+    // El giro ya está en las coordenadas: dejarlo en el campo lo aplicaría dos
+    // veces si alguien río abajo lo volviera a leer.
+    rotation: 0,
+  };
+}
+
 export function preparePiece(
-  piece: PatternPiece,
+  rawPiece: PatternPiece,
   opts: PipelineOptions = {},
   matchLookup?: MatchLookup,
 ): Omit<PreparedPiece, 'offsetX' | 'offsetY'> {
   const resolution = opts.curveResolution ?? 12;
+
+  // El giro entra ACÁ, antes de medir nada. Desde #1033 el tirador de giro
+  // escribe `piece.rotation` en vez de hornear el ángulo en las coordenadas,
+  // así que sin esto el archivo saldría sin girar.
+  //
+  // Y tiene que ser antes de `computeBBox`: si se gira más abajo (por ejemplo
+  // dentro del emisor de un formato), `preparePieces` ya decidió `currentX`
+  // con el ancho SIN girar y las piezas se pisan. Girar aquí lo arregla para
+  // los cuatro consumidores a la vez — AAMA, PDF, DXF plano y layout de corte.
+  const piece = applyPieceRotation(rawPiece);
 
   const flatOutline = flattenPath(piece.outline, resolution);
   const boundingBox = computeBBox(piece.outline);

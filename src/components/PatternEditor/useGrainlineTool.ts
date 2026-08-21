@@ -3,6 +3,7 @@ import { PatternPiece, Point2D, InternalLine } from '../../types/types';
 import { hitTestPieceBBox } from '../../utils/geometry/hitTest';
 import { screenToPattern } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
+import { patternToPieceLocal } from './pieceTransform';
 
 /**
  * Grainline tool: click+drag inside a piece to draw an arrow
@@ -56,7 +57,7 @@ export function useGrainlineTool(
     const piece = hitTestPieceBBox(pt, pieces);
     if (!piece) return;
 
-    const local = { x: pt.x - piece.position.x, y: pt.y - piece.position.y };
+    const local = patternToPieceLocal(pt, piece);
     setState({ pieceId: piece.id, startPoint: local, endPoint: local, isDragging: true });
   }, [toPattern, pieces]);
 
@@ -68,7 +69,7 @@ export function useGrainlineTool(
     const piece = pieces.find(p => p.id === state.pieceId);
     if (!piece) return;
 
-    const local = { x: pt.x - piece.position.x, y: pt.y - piece.position.y };
+    const local = patternToPieceLocal(pt, piece);
     setState(prev => ({ ...prev, endPoint: local }));
   }, [state.isDragging, state.pieceId, toPattern, pieces]);
 

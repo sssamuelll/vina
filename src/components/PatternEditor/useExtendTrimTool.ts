@@ -6,6 +6,7 @@ import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import { extendEdge, trimEdgeAtPoint } from '../../utils/patternOps';
 import { flattenPath } from '../../utils/seam/index';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
+import { patternToPieceLocal } from './pieceTransform';
 
 export interface ExtendTrimState {
   /** Currently hovered snap point (endpoint for extend, point-on-edge for trim) */
@@ -56,7 +57,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
   /** Find the nearest edge endpoint on the selected piece */
   const findNearestEndpoint = useCallback(
     (pt: Point2D, piece: PatternPiece): ExtendTrimState['hoveredSnap'] => {
-      const localPt = { x: pt.x - piece.position.x, y: pt.y - piece.position.y };
+      const localPt = patternToPieceLocal(pt, piece);
       const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom2D);
       let best: ExtendTrimState['hoveredSnap'] = null;
       let bestDist = Infinity;
@@ -118,7 +119,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
   /** Find nearest point on any edge segment of the selected piece (for trim mode) */
   const findNearestEdgePoint = useCallback(
     (pt: Point2D, piece: PatternPiece): ExtendTrimState['hoveredSnap'] => {
-      const localPt = { x: pt.x - piece.position.x, y: pt.y - piece.position.y };
+      const localPt = patternToPieceLocal(pt, piece);
       const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom2D);
       let best: ExtendTrimState['hoveredSnap'] = null;
       let bestDist = Infinity;
@@ -223,10 +224,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
 
         if (!s.selectedSnap) {
           // First click: select the trim point and preview
-          const localTrimPt = {
-            x: snap.point.x - piece.position.x,
-            y: snap.point.y - piece.position.y,
-          };
+          const localTrimPt = patternToPieceLocal(snap.point, piece);
           const trimmed = trimEdgeAtPoint(piece, snap.segmentIndex, localTrimPt, 'before');
           setState({
             hoveredSnap: null,
@@ -236,15 +234,9 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
           });
         } else {
           // Second click: confirm trim (keep the side closer to this click)
-          const localTrimPt = {
-            x: s.selectedSnap.point.x - piece.position.x,
-            y: s.selectedSnap.point.y - piece.position.y,
-          };
+          const localTrimPt = patternToPieceLocal(s.selectedSnap.point, piece);
           const clickPt = toPattern(e);
-          const localClick = {
-            x: clickPt.x - piece.position.x,
-            y: clickPt.y - piece.position.y,
-          };
+          const localClick = patternToPieceLocal(clickPt, piece);
 
           // Determine which side to keep based on where the confirmation click is
           const flatPoints = flattenPath(piece.outline);
@@ -320,10 +312,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
               const extended = extendEdge(piece, snap.segmentIndex, snap.endpoint, distance);
               dispatch(updatePiece(extended));
             } else {
-              const localTrimPt = {
-                x: snap.point.x - piece.position.x,
-                y: snap.point.y - piece.position.y,
-              };
+              const localTrimPt = patternToPieceLocal(snap.point, piece);
               const trimmed = trimEdgeAtPoint(piece, snap.segmentIndex, localTrimPt, 'before');
               dispatch(updatePiece(trimmed));
             }

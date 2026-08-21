@@ -91,6 +91,32 @@ describe('computeBoundingBox — la caja sigue la orientación de la pieza', () 
     expect(box.rotation ?? 0).toBe(0);
   });
 
+  it('el pivote del grupo sobrevive al giro del grupo', () => {
+    // Sin esto, girar un grupo +37° y luego −37° lo devuelve a su rotación
+    // pero CORRIDO: el pivote salía del centro del AABB de la geometría ya
+    // girada, y ese AABB se muda al girar. Es el mecanismo del #1033 mudado
+    // de la pieza al grupo, y 4×90° no lo delata porque el AABB vuelve solo.
+    const a = piece(0, { x: 0, y: 0 }, 'a');
+    const b = piece(0, { x: 200, y: 0 }, 'b');
+    const antes = computeBoundingBox([a, b], ['a', 'b'])!.pivot!;
+
+    const rad = (37 * Math.PI) / 180;
+    const girar = (p: PatternPiece): PatternPiece => {
+      const c = outlineBBoxCenter(p.outline);
+      const propio = { x: p.position.x + c.x, y: p.position.y + c.y };
+      const movido = rotatePoint(propio, antes, rad);
+      return {
+        ...p,
+        position: { x: movido.x - c.x, y: movido.y - c.y },
+        rotation: (p.rotation ?? 0) + 37,
+      } as PatternPiece;
+    };
+
+    const despues = computeBoundingBox([girar(a), girar(b)], ['a', 'b'])!.pivot!;
+    expect(despues.x).toBeCloseTo(antes.x);
+    expect(despues.y).toBeCloseTo(antes.y);
+  });
+
   it('con varias piezas de giros distintos NO inventa una orientación', () => {
     // Cada pieza gira sobre su propio centro: no existe una caja orientada
     // honesta para el grupo. Se devuelve la eje-alineada de la geometría YA
