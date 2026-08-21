@@ -189,24 +189,26 @@ export function useTransformTool(
         const oy = snap.position.y;
         const localCenter = { x: anchor.x - ox, y: anchor.y - oy };
         const newOutline = scaleOutline(snap.outline, localCenter, scaleX, scaleY);
-        // Escalar mueve el centro del contorno, que ES el pivote del
-        // renderizador: sin compensar, la pieza girada pega un salto al
-        // soltar. Con la caja sin girar (incluida toda selección múltiple) se
-        // conserva la aritmética de maria-198 tal cual.
-        const newPos = rad
-          ? (() => {
-              const plantado = pieceLocalToPattern(localCenter, snap);
-              const nuevoCentro = outlineBBoxCenter(newOutline);
-              const giradoAlNuevoPivote = rotatePoint(localCenter, nuevoCentro, rad);
-              return {
-                x: plantado.x - giradoAlNuevoPivote.x,
-                y: plantado.y - giradoAlNuevoPivote.y,
-              };
-            })()
-          : {
-              x: anchor.x + (ox - anchor.x) * scaleX,
-              y: anchor.y + (oy - anchor.y) * scaleY,
-            };
+        // Un solo camino, y sale bien girada o no.
+        //
+        // El ancla LOCAL ya es punto fijo del escalado: el contorno se estira
+        // alrededor de ella y ese punto no se mueve. Lo único que puede
+        // moverlo en pantalla es que escalar corre el centro del contorno, que
+        // es el pivote del renderizador — y eso es lo que se compensa acá.
+        //
+        // Con rotación 0 la fórmula devuelve `position` intacta. Eso es lo que
+        // maria-198 pedía, y lo que el ajuste viejo rompía: escalaba la
+        // posición ADEMÁS de escalar el contorno alrededor del ancla, o sea
+        // compensaba dos veces el mismo efecto. Encogía 20 y se corría 20.
+        // Sólo se veía en `w`/`n`/`nw`: en `e`/`s`/`se` el ancla coincide con
+        // el origen del contorno y el error se cancelaba solo.
+        const plantado = pieceLocalToPattern(localCenter, snap);
+        const nuevoCentro = outlineBBoxCenter(newOutline);
+        const alNuevoPivote = rotatePoint(localCenter, nuevoCentro, rad);
+        const newPos = {
+          x: plantado.x - alNuevoPivote.x,
+          y: plantado.y - alNuevoPivote.y,
+        };
         updates.push({
           id: snap.id,
           outline: newOutline,
