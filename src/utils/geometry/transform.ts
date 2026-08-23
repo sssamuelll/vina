@@ -331,10 +331,22 @@ export function computeScaleFromDrag(
     scaleY = 1 + (isTop ? -dy : dy) / bbox.height;
   }
 
-  if (uniform && affectsX && affectsY) {
-    const avg = (scaleX + scaleY) / 2;
-    scaleX = avg;
-    scaleY = avg;
+  // Un tirador de LADO solo toca un eje, asi que pedirle "uniforme" no hacia
+  // nada: el otro se quedaba en 1 y el escalado seguia siendo no-uniforme. Eso
+  // bastaba mientras `uniform` solo llegaba desde las esquinas, pero #1066 lo
+  // pide tambien de lado — un grupo con piezas giradas NO puede escalarse en un
+  // solo eje sin producir un paralelogramo, y `outline + rotation + position`
+  // no sabe representarlo. Aca el factor del eje arrastrado se propaga al otro.
+  if (uniform) {
+    if (affectsX && affectsY) {
+      const avg = (scaleX + scaleY) / 2;
+      scaleX = avg;
+      scaleY = avg;
+    } else if (affectsX) {
+      scaleY = scaleX;
+    } else if (affectsY) {
+      scaleX = scaleY;
+    }
   }
 
   // Prevent negative/zero scale

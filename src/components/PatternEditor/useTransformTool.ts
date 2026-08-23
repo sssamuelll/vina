@@ -14,7 +14,8 @@ import {
   type HandleId,
   type BBox,
 } from '../../utils/geometry/transform';
-import { pieceLocalToPattern } from './pieceTransform';
+import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
+import { isDrag } from './gestureConstants';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { reanchorTransformedNotches } from '../../utils/notchReanchor';
 
@@ -64,6 +65,24 @@ function transformInternals(
 ): PatternPiece['internals'] {
   const mapped = snap.internals.map(line => ({ ...line, path: mapPath(line.path) }));
   return reanchorTransformedNotches(mapped, snap.outline, newOutline, mapPoint);
+}
+
+/**
+ * Los ejes de la caja, ¿son los de todas las piezas que envuelve?
+ *
+ * `computeBoundingBox` devuelve dos cosas distintas: con una pieza, una caja
+ * orientada como ella; con varias, la eje-alineada del grupo con `rotation: 0`.
+ * En el primer caso los ejes de escala son los de la pieza y estirar un lado
+ * es representable. En el segundo, si alguna pieza gira, el eje X del grupo no
+ * es el suyo — estirarla solo en X la convierte en un paralelogramo, y
+ * `outline + rotation + position` no sabe escribir eso (#1066).
+ *
+ * Cuando los ejes se cruzan el escalado se fuerza uniforme, que es la única
+ * transformación que conmuta con el giro y por tanto siempre representable.
+ */
+function ejesCruzados(piezas: PatternPiece[], bbox: BBox): boolean {
+  const rotacionCaja = bbox.rotation ?? 0;
+  return piezas.some(p => (p.rotation ?? 0) !== rotacionCaja);
 }
 
 export function useTransformTool(
@@ -144,6 +163,17 @@ export function useTransformTool(
       return;
     }
 
+    // #1067: enganchar el tirador no es arrastrarlo. Sin esto, un clic sobre
+    // un tirador commiteaba una transformación de escala 1 — una entrada de
+    // deshacer vacía y un reanclado de piquetes por nada. El umbral es el
+    // mismo de todo el editor (`DRAG_THRESHOLD_PX`, 4 px de pantalla): es
+    // global a propósito, para que ningún gesto enseñe su propio número.
+    if (!isDrag((d.current.x - d.origin.x) * zoom2D, (d.current.y - d.origin.y) * zoom2D)) {
+      dragRef.current = null;
+      setDrag(null);
+      return;
+    }
+
     const snappedBbox = d.bboxSnapshot;
     const updates: TransformUpdate[] = [];
 
@@ -175,19 +205,31 @@ export function useTransformTool(
         });
       }
     } else {
-      const uniform = ['nw', 'ne', 'sw', 'se'].includes(d.handleId) && !shiftRef.current;
+      const uniform =
+        (['nw', 'ne', 'sw', 'se'].includes(d.handleId) && !shiftRef.current) ||
+        ejesCruzados(d.piecesSnapshot, snappedBbox);
       const { scaleX, scaleY } = computeScaleFromDrag(d.handleId, snappedBbox, d.origin, d.current, uniform);
       // maria-198: el pivote del resize es el lado/esquina OPUESTO al handle
       // — lo que no arrastras queda plantado. Solo rotar pivota en el centro.
-      // El ancla llega en el marco SIN girar de la caja, que es el espacio en
-      // el que vive el contorno. Lo que hubo que des-girar es el arrastre, y
-      // eso ya pasó dentro de `computeScaleFromDrag`.
+      // El ancla llega en el marco SIN girar de la caja. Lo que hubo que
+      // des-girar es el arrastre, y eso ya pasó dentro de
+      // `computeScaleFromDrag`.
       const anchor = scaleAnchorForHandle(d.handleId, snappedBbox);
-      const rad = ((snappedBbox.rotation ?? 0) * Math.PI) / 180;
+      const radCaja = ((snappedBbox.rotation ?? 0) * Math.PI) / 180;
+      // El ancla nace en el marco SIN girar de la caja. Colocarla con el propio
+      // transform de la caja la lleva a espacio de patrón, y de ahí cada pieza
+      // la baja a SU local. Antes se restaba la posición a pelo, que solo
+      // acierta cuando los dos marcos coinciden — o sea con una pieza sola
+      // (#1066). Con `radCaja` 0 la fórmula devuelve el ancla intacta, así que
+      // el camino de una pieza sale byte por byte igual que antes.
+      const anchorPatron = radCaja
+        ? rotatePoint(anchor, bboxPivot(snappedBbox), radCaja)
+        : anchor;
       for (const snap of d.piecesSnapshot) {
-        const ox = snap.position.x;
-        const oy = snap.position.y;
-        const localCenter = { x: anchor.x - ox, y: anchor.y - oy };
+        const localCenter = patternToPieceLocal(anchorPatron, snap);
+        // El pivote del renderizador es el de ESTA pieza, no el de la caja: en
+        // grupo la caja no gira (`rotation: 0`) y la pieza sí.
+        const rad = ((snap.rotation ?? 0) * Math.PI) / 180;
         const newOutline = scaleOutline(snap.outline, localCenter, scaleX, scaleY);
         // Un solo camino, y sale bien girada o no.
         //
@@ -230,7 +272,7 @@ export function useTransformTool(
     onTransform(updates);
     dragRef.current = null;
     setDrag(null);
-  }, [onTransform]);
+  }, [onTransform, zoom2D]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && dragRef.current) {
@@ -253,7 +295,9 @@ export function useTransformTool(
         pivot, anchor: pivot,
       };
     } else {
-      const uniform = ['nw', 'ne', 'sw', 'se'].includes(drag.handleId) && !shiftRef.current;
+      const uniform =
+        (['nw', 'ne', 'sw', 'se'].includes(drag.handleId) && !shiftRef.current) ||
+        ejesCruzados(drag.piecesSnapshot, previewBbox);
       const { scaleX, scaleY } = computeScaleFromDrag(drag.handleId, previewBbox, drag.origin, drag.current, uniform);
       // Mismo ancla que el commit (maria-198): el fantasma crece desde el
       // lado opuesto, no desde el centro — si no, el preview miente.
