@@ -13,7 +13,7 @@ import {
 } from '../../utils/geometry/outlineRing';
 import { resolveDistanceRef } from '../../utils/geometry/distanceRef';
 import { edgeRangeForCommand } from '../../utils/semanticEdges';
-import { patternToPieceLocal, patternToPieceLocalDirection } from './pieceTransform';
+import { patternToPieceLocal, patternToPieceLocalDirection, pieceLocalToPattern } from './pieceTransform';
 import { newId } from '../../utils/ids';
 import {
   snapToAnyEdge,
@@ -253,10 +253,7 @@ export function useNotchTool(
       piece,
       ring,
       localPoint: resolved.point,
-      worldPoint: {
-        x: resolved.point.x + piece.position.x,
-        y: resolved.point.y + piece.position.y,
-      },
+      worldPoint: pieceLocalToPattern(resolved.point, piece),
       normal: resolved.normal,
     };
   }, [ringData]);
@@ -301,14 +298,8 @@ export function useNotchTool(
       edgeRange: target.edgeRange,
       startT: Math.min(refT, currentT),
       endT: Math.max(refT, currentT),
-      startPoint: {
-        x: ref.point.x + piece.position.x,
-        y: ref.point.y + piece.position.y,
-      },
-      endPoint: {
-        x: resolved.point.x + piece.position.x,
-        y: resolved.point.y + piece.position.y,
-      },
+      startPoint: pieceLocalToPattern(ref.point, piece),
+      endPoint: pieceLocalToPattern(resolved.point, piece),
     };
 
     return { piece, anchor, resolved, segment };
@@ -331,10 +322,7 @@ export function useNotchTool(
           pieceId: piece.id,
           notch,
           source: 'placement',
-          refWorld: {
-            x: notch.notchAnchor.refPoint.x + piece.position.x,
-            y: notch.notchAnchor.refPoint.y + piece.position.y,
-          },
+          refWorld: pieceLocalToPattern(notch.notchAnchor.refPoint, piece),
           notchWorld: exact.worldPoint,
           maxDistanceMm: outlinePerimeter(piece.outline, notch.notchAnchor.metric ?? 1),
         });
@@ -364,14 +352,8 @@ export function useNotchTool(
     : null;
   const dragPreview: NotchDragPreview | null = draggedPlacement
     ? {
-        refWorld: {
-          x: draggedPlacement.anchor.refPoint.x + draggedPlacement.piece.position.x,
-          y: draggedPlacement.anchor.refPoint.y + draggedPlacement.piece.position.y,
-        },
-        currentWorld: {
-          x: draggedPlacement.resolved.point.x + draggedPlacement.piece.position.x,
-          y: draggedPlacement.resolved.point.y + draggedPlacement.piece.position.y,
-        },
+        refWorld: pieceLocalToPattern(draggedPlacement.anchor.refPoint, draggedPlacement.piece),
+        currentWorld: pieceLocalToPattern(draggedPlacement.resolved.point, draggedPlacement.piece),
         distanceMm: draggedPlacement.anchor.distanceMm,
       }
     : null;
@@ -391,14 +373,8 @@ export function useNotchTool(
       pieceId,
       notch: liveLine,
       source: 'existing',
-      refWorld: {
-        x: liveLine.notchAnchor.refPoint.x + piece.position.x,
-        y: liveLine.notchAnchor.refPoint.y + piece.position.y,
-      },
-      notchWorld: {
-        x: resolved.point.x + piece.position.x,
-        y: resolved.point.y + piece.position.y,
-      },
+      refWorld: pieceLocalToPattern(liveLine.notchAnchor.refPoint, piece),
+      notchWorld: pieceLocalToPattern(resolved.point, piece),
       maxDistanceMm: outlinePerimeter(piece.outline, liveLine.notchAnchor.metric ?? 1),
     });
   }, [pieces]);
@@ -445,10 +421,7 @@ export function useNotchTool(
       if (!resolved) return { ...prev, previewWorld: null };
       return {
         ...prev,
-        previewWorld: {
-          x: resolved.point.x + piece.position.x,
-          y: resolved.point.y + piece.position.y,
-        },
+        previewWorld: pieceLocalToPattern(resolved.point, piece),
       };
     });
   }, [pieces]);

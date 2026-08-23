@@ -50,9 +50,7 @@ const HELPERS = new Set([
  * Cuando un archivo llegue a 0, quítalo de aquí — el trinquete lo exige.
  */
 const TECHO: Record<string, number> = {
-  'src/components/PatternEditor/renderers/TrimMarkers.tsx': 2,
   'src/components/PatternEditor/renderers/TrimRenderer.tsx': 5,
-  'src/components/PatternEditor/renderers/overlays/GrainlineToolOverlay.tsx': 4,
   'src/components/PatternEditor/renderers/overlays/POMOverlay.tsx': 8,
   'src/components/PatternEditor/renderers/overlays/WalkSeamOverlay.tsx': 2,
   'src/components/PatternEditor/sewingUtils.ts': 4,
@@ -60,7 +58,6 @@ const TECHO: Record<string, number> = {
   'src/components/PatternEditor/useExtendTrimTool.ts': 3,
   'src/components/PatternEditor/useMeasureTool.ts': 5,
   'src/components/PatternEditor/useMergeTool.ts': 2,
-  'src/components/PatternEditor/useNotchTool.ts': 14,
   'src/components/PatternEditor/usePOMMeasureTool.ts': 2,
   'src/components/PatternEditor/useScissorsTool.ts': 1,
   'src/components/PatternEditor/useSlashAndSpreadTool.ts': 1,
