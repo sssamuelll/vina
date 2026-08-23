@@ -1,4 +1,5 @@
 import { PatternPiece, Point2D } from '../../../../types/types';
+import { pieceLocalToPattern } from '../../pieceTransform';
 
 interface GrainlineToolOverlayProps {
   zoom2D: number;
@@ -11,10 +12,12 @@ interface GrainlineToolOverlayProps {
 export default function GrainlineToolOverlay({ zoom2D, pieces, grainlineStartPoint, grainlineEndPoint, grainlinePieceId }: GrainlineToolOverlayProps) {
   const piece = pieces.find(p => p.id === grainlinePieceId);
   if (!piece) return null;
-  const sx = grainlineStartPoint.x + piece.position.x;
-  const sy = grainlineStartPoint.y + piece.position.y;
-  const ex = grainlineEndPoint.x + piece.position.x;
-  const ey = grainlineEndPoint.y + piece.position.y;
+  // Los dos puntos llegan en LOCAL desde `useGrainlineTool`, que los pasa por
+  // `patternToPieceLocal`. Este overlay cuelga de `ToolOverlay`, o sea espacio
+  // de patron: hay que devolverlos con el giro puesto, no solo desplazados
+  // (#1068).
+  const { x: sx, y: sy } = pieceLocalToPattern(grainlineStartPoint, piece);
+  const { x: ex, y: ey } = pieceLocalToPattern(grainlineEndPoint, piece);
   const dx = ex - sx, dy = ey - sy;
   const len = Math.hypot(dx, dy);
   if (len < 2) return null;
