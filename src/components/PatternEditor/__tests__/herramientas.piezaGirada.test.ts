@@ -1,6 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
 import { createNotchLine } from '../useNotchTool';
 import { rotatePoint, outlineBBoxCenter } from '../../../utils/geometry/transform';
 import { DEFAULT_NOTCH_OPTIONS } from '../../../utils/notches';
@@ -83,26 +81,12 @@ describe('piquete sobre una pieza girada', () => {
   });
 });
 
-describe('trinquete: ninguna herramienta convierte a local restando la posición', () => {
-  // Verifica los 24 sitios de una vez, y frena el sitio 25. `pieceTransform.ts`
-  // es el helper: es el único que tiene derecho a restar la posición a mano.
-  const DIR = join(__dirname, '..');
-  const EXENTOS = new Set(['pieceTransform.ts']);
-  // `- piece.position.x` y variantes (`ilPiece`, `hoverPiece`…). El nombre
-  // tiene que contener "piece": `node.position` es la de un NODO, y restarla
-  // es correcto porque ya vive en espacio local.
-  const CRUDO = /-\s*\w*[Pp]iece\.position\.[xy]/;
-
-  it('no queda ningún sitio con la resta cruda', () => {
-    const culpables: string[] = [];
-    for (const nombre of readdirSync(DIR)) {
-      if (!nombre.endsWith('.ts') && !nombre.endsWith('.tsx')) continue;
-      if (EXENTOS.has(nombre)) continue;
-      const texto = readFileSync(join(DIR, nombre), 'utf8');
-      texto.split('\n').forEach((linea, i) => {
-        if (CRUDO.test(linea)) culpables.push(`${nombre}:${i + 1}  ${linea.trim()}`);
-      });
-    }
-    expect(culpables).toEqual([]);
-  });
-});
+/*
+ * El trinquete que vivía aquí se mudó a
+ * `src/utils/geometry/__tests__/pieceSpace.trinquete.test.ts` (#1069).
+ *
+ * Decía cubrir "los 24 sitios" y tenía tres puntos ciegos: solo miraba la
+ * resta, no era recursivo, y se rodeaba capturando la posición en una
+ * variable. El censo real, con las dos direcciones y `src/` entero, son 74
+ * sitios en 21 archivos — la deuda de #1068.
+ */
