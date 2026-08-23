@@ -51,10 +51,8 @@ const HELPERS = new Set([
  */
 const TECHO: Record<string, number> = {
   'src/components/PatternEditor/renderers/overlays/WalkSeamOverlay.tsx': 2,
-  'src/components/PatternEditor/sewingUtils.ts': 4,
   'src/components/PatternEditor/useEditorInteractions.ts': 3,
   'src/components/PatternEditor/useExtendTrimTool.ts': 3,
-  'src/components/PatternEditor/useMeasureTool.ts': 5,
   'src/components/PatternEditor/useMergeTool.ts': 2,
   'src/components/PatternEditor/usePOMMeasureTool.ts': 2,
   'src/components/PatternEditor/useScissorsTool.ts': 1,

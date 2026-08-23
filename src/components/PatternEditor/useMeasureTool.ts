@@ -9,7 +9,7 @@ import type { ArcLengthSample } from '../../utils/geometry/arcLength';
 import { screenToPattern } from './sewingUtils';
 import { screenToPatternLength } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
-import { patternToPieceLocal } from './pieceTransform';
+import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 
 // ─── Types ───
 
@@ -89,7 +89,10 @@ export function snapToOutline(
     const dist = Math.hypot(localPt.x - proj.x, localPt.y - proj.y);
     if (dist < bestDist) {
       bestDist = dist;
-      bestPt = { x: proj.x + piece.position.x, y: proj.y + piece.position.y };
+      // Entraba por `patternToPieceLocal` y salia sumando solo la posicion:
+      // sobre una pieza girada el snap devolvia un punto que no esta donde se
+      // ve (#1068). Si una direccion necesita el helper, la otra tambien.
+      bestPt = pieceLocalToPattern(proj, piece);
       bestSegment = i;
     }
   }
@@ -124,15 +127,9 @@ export function findEdgeForSegment(piece: PatternPiece, segmentIndex: number): S
 export function buildEdgeInfo(piece: PatternPiece, edge: SemanticEdge, markerInterval: number): SelectedEdgeInfo {
   const arcLength = computePathArcLength(piece.outline, edge.segmentRange[0], edge.segmentRange[1]);
   const markers = samplePathAtIntervals(piece.outline, markerInterval, edge.segmentRange[0], edge.segmentRange[1]);
-  const pathPoints = markers.map(m => ({
-    x: m.point.x + piece.position.x,
-    y: m.point.y + piece.position.y,
-  }));
+  const pathPoints = markers.map(m => pieceLocalToPattern(m.point, piece));
   const rawWalk = samplePathDense(piece.outline, 3, edge.segmentRange[0], edge.segmentRange[1]);
-  const walkPoints = rawWalk.map(p => ({
-    x: p.x + piece.position.x,
-    y: p.y + piece.position.y,
-  }));
+  const walkPoints = rawWalk.map(p => pieceLocalToPattern(p, piece));
   return { pieceId: piece.id, piece, edge, arcLength, markers, pathPoints, walkPoints };
 }
 
@@ -270,8 +267,8 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
                 info.edge.segmentRange[0], info.edge.segmentRange[1],
               );
               if (ptA && ptB) {
-                const worldA = { x: ptA.x + edgeA.piece.position.x, y: ptA.y + edgeA.piece.position.y };
-                const worldB = { x: ptB.x + info.piece.position.x, y: ptB.y + info.piece.position.y };
+                const worldA = pieceLocalToPattern(ptA, edgeA.piece);
+                const worldB = pieceLocalToPattern(ptB, info.piece);
                 // Local-space divergence: compare shape geometry only, ignore piece positioning
                 const ld = Math.abs(dA - dB);
                 if (ld > maxLocalDelta) maxLocalDelta = ld;
@@ -317,10 +314,7 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
 
     if (measureMode === 'along-curve' && selectedEdge) {
       // Compute hover distance along the selected edge
-      const localPt = {
-        x: rawPt.x - selectedEdge.piece.position.x,
-        y: rawPt.y - selectedEdge.piece.position.y,
-      };
+      const localPt = patternToPieceLocal(rawPt, selectedEdge.piece);
       const d = distanceAlongPath(
         selectedEdge.piece.outline,
         localPt,
