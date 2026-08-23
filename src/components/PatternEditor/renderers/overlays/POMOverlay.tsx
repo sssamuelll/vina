@@ -9,6 +9,7 @@
 
 import type { PointOfMeasure, PatternPiece, Point2D } from '../../../../types/types';
 import { getEdgeEndpoints } from '../../../../utils/geometry/path';
+import { pieceLocalToPattern } from '../../pieceTransform';
 
 // ─── Colours ────────────────────────────────────────────────────────────────
 
@@ -31,10 +32,9 @@ export interface POMOverlayProps {
 function resolveWorld(pt: { pieceId: string; localPosition: Point2D }, pieces: PatternPiece[]): Point2D | null {
   const piece = pieces.find(p => p.id === pt.pieceId);
   if (!piece) return null;
-  return {
-    x: (piece.position.x ?? 0) + pt.localPosition.x,
-    y: (piece.position.y ?? 0) + pt.localPosition.y,
-  };
+  // El campo se llama `localPosition` y este overlay se pinta en espacio de
+  // patrón: hay que aplicarle el giro, no solo el desplazamiento (#1068).
+  return pieceLocalToPattern(pt.localPosition, piece);
 }
 
 /** Average character width factor (Inter digits ~0.55em) */
@@ -187,10 +187,12 @@ function AlongEdgePOM({
     if (!ep) continue;
 
     const cmd = piece.outline[i];
-    const sx = ep.start.x + piece.position.x;
-    const sy = ep.start.y + piece.position.y;
-    const ex = ep.end.x + piece.position.x;
-    const ey = ep.end.y + piece.position.y;
+    // Todo lo que sale del `outline` está en local, puntos de control
+    // incluidos: cada uno pasa por el mismo transform que el renderizador
+    // aplica al grupo de la pieza (#1068).
+    const aPatron = (x: number, y: number) => pieceLocalToPattern({ x, y }, piece);
+    const { x: sx, y: sy } = aPatron(ep.start.x, ep.start.y);
+    const { x: ex, y: ey } = aPatron(ep.end.x, ep.end.y);
 
     const commonProps = {
       stroke: color,
@@ -201,14 +203,13 @@ function AlongEdgePOM({
     };
 
     if (cmd.type === 'C' && cmd.values.length >= 6) {
-      const ox = piece.position.x;
-      const oy = piece.position.y;
-      const d = `M ${sx} ${sy} C ${cmd.values[0] + ox} ${cmd.values[1] + oy} ${cmd.values[2] + ox} ${cmd.values[3] + oy} ${ex} ${ey}`;
+      const c1 = aPatron(cmd.values[0], cmd.values[1]);
+      const c2 = aPatron(cmd.values[2], cmd.values[3]);
+      const d = `M ${sx} ${sy} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${ex} ${ey}`;
       segments.push(<path key={i} d={d} {...commonProps} />);
     } else if (cmd.type === 'Q' && cmd.values.length >= 4) {
-      const ox = piece.position.x;
-      const oy = piece.position.y;
-      const d = `M ${sx} ${sy} Q ${cmd.values[0] + ox} ${cmd.values[1] + oy} ${ex} ${ey}`;
+      const c1 = aPatron(cmd.values[0], cmd.values[1]);
+      const d = `M ${sx} ${sy} Q ${c1.x} ${c1.y} ${ex} ${ey}`;
       segments.push(<path key={i} d={d} {...commonProps} />);
     } else {
       segments.push(<line key={i} x1={sx} y1={sy} x2={ex} y2={ey} {...commonProps} />);

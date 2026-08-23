@@ -2,6 +2,9 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../../store';
 import type { Trim, TrimType } from '../../../types/trim';
 import type { PatternPiece, Point2D } from '../../../types/types';
+// Todo lo que se dibuja aqui sale del `outline` (local) y este renderer vive
+// en espacio de patron: el giro va puesto, no solo el desplazamiento (#1068).
+import { pieceLocalToPattern } from '../pieceTransform';
 import { interpolateEdgePoint } from '../../../utils/geometry/edgeInterpolation';
 
 interface TrimIconProps {
@@ -117,8 +120,7 @@ function TrimOnPiece({ trim, piece, zoom }: { trim: Trim; piece: PatternPiece; z
           return (
             <TrimIcon
               key={`${trim.id}-${i}`}
-              x={piece.position.x + result.point.x}
-              y={piece.position.y + result.point.y}
+              {...pieceLocalToPattern(result.point, piece)}
               size={trim.size}
               color={trim.color}
               type={trim.type}
@@ -139,7 +141,7 @@ function TrimOnPiece({ trim, piece, zoom }: { trim: Trim; piece: PatternPiece; z
       const t = tStart + (i / steps) * (tEnd - tStart);
       const result = interpolateEdgePoint(piece, edgeName, t);
       if (result) {
-        points.push({ x: piece.position.x + result.point.x, y: piece.position.y + result.point.y });
+        points.push(pieceLocalToPattern(result.point, piece));
       }
     }
     if (points.length < 2) return null;
@@ -164,8 +166,7 @@ function TrimOnPiece({ trim, piece, zoom }: { trim: Trim; piece: PatternPiece; z
         {positions.map((pos, i) => (
           <TrimIcon
             key={`${trim.id}-${i}`}
-            x={piece.position.x + pos.x}
-            y={piece.position.y + pos.y}
+            {...pieceLocalToPattern(pos, piece)}
             size={trim.size}
             color={trim.color}
             type={trim.type}
