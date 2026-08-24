@@ -13,7 +13,7 @@ import {
 } from '../../utils/geometry/outlineRing';
 import { resolveDistanceRef } from '../../utils/geometry/distanceRef';
 import { edgeRangeForCommand } from '../../utils/semanticEdges';
-import { patternToPieceLocal, patternToPieceLocalDirection, pieceLocalToPattern } from './pieceTransform';
+import { patternToPieceLocal, patternToPieceLocalDirection, pieceLocalToPattern, pieceLocalToPatternDirection } from './pieceTransform';
 import { newId } from '../../utils/ids';
 import {
   snapToAnyEdge,
@@ -254,7 +254,11 @@ export function useNotchTool(
       ring,
       localPoint: resolved.point,
       worldPoint: pieceLocalToPattern(resolved.point, piece),
-      normal: resolved.normal,
+      // La normal viaja con el punto: sus dos consumidores —el hover de
+      // `NotchToolOverlay` y `createNotchLine`— esperan espacio de patrón.
+      // Girar solo el punto dejaba la marca paralela al borde y el piquete
+      // guardado apuntando de lado (#1068).
+      normal: pieceLocalToPatternDirection(resolved.normal, piece),
     };
   }, [ringData]);
 

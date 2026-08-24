@@ -2,15 +2,19 @@ import type { PatternPiece, Point2D } from '../../types/types';
 import { outlineBBoxCenter, rotatePoint } from '../../utils/geometry/transform';
 
 /**
- * Las tres conversiones patrón ↔ local viven en `utils/geometry/pieceSpace.ts`
+ * Las conversiones patrón ↔ local viven en `utils/geometry/pieceSpace.ts`
  * desde #1064: los hit-tests de `utils/seam/` también las necesitan y no pueden
  * importar hacia `components/`. Se re-exportan desde aquí para no mover los
  * callsites que ya las traían por esta puerta.
+ *
+ * Son cuatro: punto y dirección, en cada sentido. Un punto se traslada y gira;
+ * una dirección solo gira.
  */
 export {
   patternToPieceLocal,
   patternToPieceLocalDirection,
   pieceLocalToPattern,
+  pieceLocalToPatternDirection,
 } from '../../utils/geometry/pieceSpace';
 
 type TransformablePiece = Pick<PatternPiece, 'position' | 'outline' | 'rotation'>;
