@@ -2,6 +2,7 @@ import type { PatternPiece, Point2D } from '../../types/types';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { edgeRangePolyline, closestOnPolyline } from '../../utils/seam';
 import { edgeRangeForCommand } from '../../utils/semanticEdges';
+import { pieceLocalToPattern } from './pieceTransform';
 
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 
@@ -66,20 +67,21 @@ export function resolveEdgeName(piece: PatternPiece, edgeIndex: number): string 
  * estaba.
  */
 export function buildEdgeSelection(piece: PatternPiece, edgeIndex: number): FreeEdgeSelection | null {
-  const ox = piece.position.x;
-  const oy = piece.position.y;
+  // El contorno vive en local y el cursor llega en espacio de patrón, así que
+  // el `path` tiene que pasar por el giro y no solo por el desplazamiento. Sin
+  // esto, sobre una pieza girada se comparaba contra la sombra sin girar y
+  // `findClosestEdge` no enganchaba NADA (#1068) — no es cosmético: esto
+  // decide qué borde se cose.
+  const aPatron = (p: Point2D) => pieceLocalToPattern(p, piece);
   const local = edgeRangePolyline(piece.outline, edgeRangeForCommand(piece, edgeIndex));
   let path: Point2D[];
   if (local.length >= 2) {
-    path = local.map(p => ({ x: p.x + ox, y: p.y + oy }));
+    path = local.map(aPatron);
   } else {
     // Lo que el aplanado no cubre (el cierre Z, entre otros): la cuerda.
     const ep = getEdgeEndpoints(piece.outline, edgeIndex);
     if (!ep) return null;
-    path = [
-      { x: ep.start.x + ox, y: ep.start.y + oy },
-      { x: ep.end.x + ox, y: ep.end.y + oy },
-    ];
+    path = [aPatron(ep.start), aPatron(ep.end)];
   }
   const start = path[0];
   const end = path[path.length - 1];
@@ -123,8 +125,8 @@ export function findClosestEdge(
         // #1042 es lo que se DEVUELVE (el borde entero), no dónde se engancha.
         const ep = getEdgeEndpoints(piece.outline, i);
         if (!ep) continue;
-        const vIni = { x: ep.start.x + piece.position.x, y: ep.start.y + piece.position.y };
-        const vFin = { x: ep.end.x + piece.position.x, y: ep.end.y + piece.position.y };
+        const vIni = pieceLocalToPattern(ep.start, piece);
+        const vFin = pieceLocalToPattern(ep.end, piece);
         const dStart = Math.hypot(pt.x - vIni.x, pt.y - vIni.y) * zoom;
         const dEnd = Math.hypot(pt.x - vFin.x, pt.y - vFin.y) * zoom;
         const d = Math.min(dStart, dEnd);

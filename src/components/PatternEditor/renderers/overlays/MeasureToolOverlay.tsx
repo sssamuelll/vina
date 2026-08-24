@@ -98,10 +98,16 @@ function EdgeHighlight({ edge, zoom2D, formatDistance }: {
     <g>
       <polyline points={d} fill="none" stroke="#9c27b0" strokeWidth={3 / zoom2D} opacity={0.7} />
       {edge.markers.map((m, i) => {
-        const wx = m.point.x + edge.piece.position.x;
-        const wy = m.point.y + edge.piece.position.y;
+        // `pathPoints[i]` es ESTE marcador ya en espacio de patrón —
+        // `buildEdgeInfo` lo calcula con el helper y su comentario dice
+        // literalmente "for overlay dots". Reconvertirlo aquí a mano sumando
+        // la posición dejaba los puntos sin girar mientras la polilínea de
+        // arriba (`walkPoints`) sí giraba: la curva en su sitio y sus propios
+        // marcadores a 40 mm de ella (#1068).
+        const p = edge.pathPoints[i];
+        if (!p) return null;
         return (
-          <g key={i} transform={`translate(${wx}, ${wy})`}>
+          <g key={i} transform={`translate(${p.x}, ${p.y})`}>
             <circle r={2.5 / zoom2D} fill="#9c27b0" />
             {i > 0 && (
               <MeasurementLabel

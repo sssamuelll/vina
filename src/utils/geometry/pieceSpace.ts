@@ -56,6 +56,24 @@ export function patternToPieceLocalDirection(
   return rotatePoint(dir, { x: 0, y: 0 }, -rotation * Math.PI / 180);
 }
 
+/**
+ * Igual que {@link pieceLocalToPattern} pero para una DIRECCIÓN — se gira, no
+ * se traslada. Es el inverso exacto de {@link patternToPieceLocalDirection}.
+ *
+ * Existe porque `resolveTargetOnRing` devuelve un punto Y una normal juntos, y
+ * girar solo el punto deja la marca de hover paralela al borde en vez de
+ * perpendicular — y hace que `createNotchLine`, que espera ambos en espacio de
+ * patrón, le quite a la normal un giro que nadie le había puesto (#1068).
+ */
+export function pieceLocalToPatternDirection(
+  dir: Point2D,
+  piece: TransformablePiece,
+): Point2D {
+  const rotation = piece.rotation ?? 0;
+  if (!rotation) return dir;
+  return rotatePoint(dir, { x: 0, y: 0 }, rotation * Math.PI / 180);
+}
+
 /** Project an unrotated piece-local point through the piece's render transform. */
 export function pieceLocalToPattern(
   localPt: Point2D,

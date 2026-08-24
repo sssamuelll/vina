@@ -2,6 +2,7 @@ import type { PatternPiece, Point2D } from '../../../../types/types';
 import type { SegmentSelection } from '../../useSegmentSewingTool';
 import { getEdgeEndpoints } from '../../../../utils/geometry/path';
 import { edgeRangePolyline, slicePolylineByT } from '../../../../utils/seam';
+import { pieceLocalToPattern } from '../../../../utils/geometry/pieceSpace';
 
 /**
  * Los puntos del arco de un tramo, en coordenadas de patrón (con el offset
@@ -16,9 +17,6 @@ import { edgeRangePolyline, slicePolylineByT } from '../../../../utils/seam';
  * de componentes dispara el warning de react-refresh/only-export-components.
  */
 export function segmentArcPoints(piece: PatternPiece, segment: SegmentSelection): Point2D[] | null {
-  const ox = piece.position?.x ?? 0;
-  const oy = piece.position?.y ?? 0;
-
   // El tramo se recorta del TRAZO del BORDE por fracción de arco — la misma
   // parametrización con la que `closeSegment` devuelve startT/endT. Antes se
   // interpolaba linealmente entre los dos extremos, así que sobre una curva ni
@@ -41,5 +39,5 @@ export function segmentArcPoints(piece: PatternPiece, segment: SegmentSelection)
   }
   if (tramo.length < 2) return null;
 
-  return tramo.map(p => ({ x: ox + p.x, y: oy + p.y }));
+  return tramo.map(p => pieceLocalToPattern(p, piece));
 }

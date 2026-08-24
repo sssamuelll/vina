@@ -178,10 +178,16 @@ function GhostPiece({
 }) {
   if (!piece.outline?.length) return null;
 
+  // Este `<g>` envuelve el outline CRUDO y le aplica translate+rotate como
+  // manda #1033; el `+ tx` es el arrastre en vivo. Pasarlo por
+  // `pieceLocalToPattern` rompería el fantasma — no es un punto local.
+  // espacio-de-patrón: transform del renderizador con arrastre en vivo.
+  const transformDelFantasma = `translate(${piece.position.x + transform.tx}, ${piece.position.y + transform.ty}) rotate(${transform.angleDeg}, ${transform.pivotX}, ${transform.pivotY})`;
+
   return (
     <g
       opacity={opacity / 100}
-      transform={`translate(${piece.position.x + transform.tx}, ${piece.position.y + transform.ty}) rotate(${transform.angleDeg}, ${transform.pivotX}, ${transform.pivotY})`}
+      transform={transformDelFantasma}
       pointerEvents="none"
     >
       <path
