@@ -16,6 +16,7 @@ import {
   pointAtPathDistance,
   distanceAlongPath,
 } from '../../utils/geometry/arcLength';
+import { patternToPieceLocal } from '../../utils/geometry/pieceSpace';
 import { snapToOutline, findEdgeForSegment, buildEdgeInfo, buildOutlineInfo } from './useMeasureTool';
 import { formatDimension } from '../../utils/units';
 import { screenToPattern } from './sewingUtils';
@@ -288,6 +289,28 @@ export function sampleMismatch(
 
 // ─── Hook ───────────────────────────────────────────────────────────────────
 
+/**
+ * Cuanto se lleva recorrido del borde `edge` cuando el cursor esta en
+ * `patternPt` (espacio de patron).
+ *
+ * Se saca del hook por el mismo motivo que `computeGhostTransform` y
+ * `sampleMismatch`: es geometria pura y aqui se puede probar. El giro importa
+ * —`piece.outline` esta SIN girar, asi que restar solo `position` proyecta el
+ * cursor contra la sombra y devuelve casi el borde entero (#1068).
+ */
+export function walkDistanceAt(
+  patternPt: Point2D,
+  piece: PatternPiece,
+  edge: SemanticEdge,
+): number {
+  return distanceAlongPath(
+    piece.outline,
+    patternToPieceLocal(patternPt, piece),
+    edge.segmentRange[0],
+    edge.segmentRange[1],
+  );
+}
+
 export function useWalkSeamTool(zoom: number, pan: Point2D) {
   const units = useSelector((s: RootState) => s.editor.units);
   const pieces = useSelector((s: RootState) => s.project.pieces);
@@ -459,16 +482,7 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
 
     if (stationary && mobile) {
       // Compute walk distance along stationary edge
-      const localPt = {
-        x: rawPt.x - stationary.piece.position.x,
-        y: rawPt.y - stationary.piece.position.y,
-      };
-      const d = distanceAlongPath(
-        stationary.piece.outline,
-        localPt,
-        stationary.edge.segmentRange[0],
-        stationary.edge.segmentRange[1],
-      );
+      const d = walkDistanceAt(rawPt, stationary.piece, stationary.edge);
       setWalkDistance(d);
 
       const transform = computeGhostTransform(
