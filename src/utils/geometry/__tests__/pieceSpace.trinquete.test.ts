@@ -35,11 +35,24 @@ import { join, relative, sep } from 'node:path';
  *     aparecieron al cerrarlo.
  *  6. **Alias del objeto entero.** `const pos = piece.position;` y la
  *     aritmética en la línea siguiente, que ni siquiera contiene "position".
+ *  7. **Coalescencia inline.** `(piece.position?.x ?? 0) + cmd.values[0]` —
+ *     el `?? 0` y su paréntesis se meten ENTRE la coordenada y el operador, y
+ *     el regex lo exigía pegado. Es la forma inline del alias del punto 5, y
+ *     se le escapaba por la misma puerta.
  *
  * Cerrarlos destapó 32 sitios que ningún censo anterior había contado, así que
- * el "74" que decía esta prosa era un subconteo. Hoy son 64.
+ * el "74" que decía esta prosa era un subconteo; pasó a 64, y arreglar los dos
+ * sitios de impacto confirmado lo dejó en 60.
  *
- * Es un TRINQUETE, no una prohibición: esos 64 son deuda declarada (#1068), no
+ * Cerrar el 7º rodeo destapó 14 más: +2 en `SeamAllowanceSelectionOverlay` y
+ * +2 en `editorSlice`, y 10 en dos archivos que NINGÚN censo había mirado —
+ * `useSeamAllowanceTool` (6) y `projectSlice` (4). Hoy son 74.
+ *
+ * El patrón se repite y conviene nombrarlo: cada vez que se cierra un rodeo
+ * aparecen sitios, así que un censo solo mide lo que su regex sabe ver. El
+ * número no es "cuánta deuda hay" sino "cuánta deuda se puede ver hoy".
+ *
+ * Es un TRINQUETE, no una prohibición: esos 74 son deuda declarada (#1068), no
  * código aprobado. Falla si un archivo sube su cuenta, si aparece un archivo
  * nuevo, o si uno baja y nadie fijó el techo nuevo.
  */
@@ -67,8 +80,18 @@ const LECTURA = new RegExp(COORD);
 const ALIAS_COORD = new RegExp(String.raw`(?:const|let|var)\s+[\w$]+\s*=\s*${COORD}[^+\-]*$`);
 /** `const pos = edge.piece.position;` — se lleva el objeto entero y la aritmética se esconde en la línea siguiente. */
 const ALIAS_OBJETO = new RegExp(String.raw`(?:const|let|var)\s+[\w$]+\s*=\s*(?:[A-Za-z_$][\w$]*\??\.)*([A-Za-z_$][\w$]*)\??\.position\s*;?\s*$`);
+/**
+ * Lo que puede meterse ENTRE la coordenada y el operador sin cambiar que esto
+ * sea una conversión a mano: el valor por defecto de una coalescencia y el
+ * paréntesis que la envuelve. `(piece.position?.x ?? 0) + cmd.values[0]` es la
+ * forma inline del alias, y era el 7º rodeo — el regex exigía el operador
+ * PEGADO a la coordenada.
+ */
+const COALESCENCIA = String.raw`(?:\s*\?\?\s*[\w.$]+)?\s*\)?`;
 /** La posición sumada o restada a otra coordenada, en cualquier orden. */
-const ARITMETICA = new RegExp(String.raw`[+-]\s*${COORD}|${COORD}\s*[+-]`);
+const ARITMETICA = new RegExp(
+  String.raw`[+-]\s*\(?\s*${COORD}|${COORD}${COALESCENCIA}\s*[+-]`,
+);
 
 /**
  * Vía de escape para el código que SÍ tiene derecho a componer la posición a
@@ -103,7 +126,7 @@ const TECHO: Record<string, number> = {
   'src/components/PatternEditor/PatternEditor.tsx': 4,
   'src/components/PatternEditor/renderers/ElasticRenderer.tsx': 1,
   'src/components/PatternEditor/renderers/SeamRenderer.tsx': 2,
-  'src/components/PatternEditor/renderers/overlays/SeamAllowanceSelectionOverlay.tsx': 2,
+  'src/components/PatternEditor/renderers/overlays/SeamAllowanceSelectionOverlay.tsx': 4,
   'src/components/PatternEditor/renderers/overlays/SlashAndSpreadOverlay.tsx': 2,
   'src/components/PatternEditor/renderers/overlays/TopstitchOverlay.tsx': 2,
   'src/components/PatternEditor/useLineTool.ts': 2,
@@ -116,10 +139,12 @@ const TECHO: Record<string, number> = {
   'src/components/PatternEditor/useMergeTool.ts': 2,
   'src/components/PatternEditor/usePOMMeasureTool.ts': 2,
   'src/components/PatternEditor/useScissorsTool.ts': 1,
+  'src/components/PatternEditor/useSeamAllowanceTool.ts': 6,
   'src/components/PatternEditor/useSlashAndSpreadTool.ts': 1,
   'src/components/PatternEditor/useTransformTool.ts': 1,
   'src/copilot/action/tools/definitions/patternOpsTools.ts': 3,
-  'src/store/editorSlice.ts': 2,
+  'src/store/editorSlice.ts': 4,
+  'src/store/projectSlice.ts': 4,
   'src/utils/grading/gradeAllSizes.ts': 1,
   'src/utils/patternOps.ts': 7,
   'src/utils/pom/pomCompute.ts': 2,
@@ -204,6 +229,21 @@ describe('el trinquete trinca — los seis puntos ciegos que llegó a tener', ()
     expect(infringe('  const ox = piece.position?.x ?? 0;')).toBe(true);
     expect(infringe('  const oy = piece?.position?.y ?? 0;')).toBe(true);
     expect(infringe('  const lx = pt.x - piece.position?.x;')).toBe(true);
+  });
+
+  it('ve la COALESCENCIA inline, con el operador despegado', () => {
+    // 7º rodeo (2026-08-26). El `?? 0` y su parentesis se meten ENTRE la
+    // coordenada y el operador, y ARITMETICA lo exigia pegado. Destapo 14
+    // sitios, 10 de ellos en dos archivos que ningun censo habia mirado.
+    expect(infringe('  const cx = (piece.position?.x ?? 0) + cmd.values[0];')).toBe(true);
+    expect(infringe('  cx={(piece.position?.x ?? 0) + cmd.values[0]}')).toBe(true);
+    expect(infringe('  x1={(p.position?.x ?? 0) + a.x}')).toBe(true);
+    // Y al otro lado del operador, que es donde el regex ya miraba.
+    expect(infringe('  const v = a.x + (piece.position?.x ?? 0);')).toBe(true);
+    // El alias puro sigue siendo alias: no lleva operador y lo ve la otra rama.
+    expect(infringe('  const ox = piece.position?.x ?? 0;')).toBe(true);
+    // Y lo que no es una pieza sigue en paz aunque use la misma forma.
+    expect(infringe('  const cx = (node.position?.x ?? 0) + d.x;')).toBe(false);
   });
 
   it('ve el alias del OBJETO entero, no solo el de la coordenada', () => {
