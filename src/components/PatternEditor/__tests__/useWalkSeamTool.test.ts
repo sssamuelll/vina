@@ -191,8 +191,8 @@ describe('computeGhostTransform', () => {
   it('returns ~0 deg rotation for two parallel horizontal edges', () => {
     // pieceA top (horizontal) vs pieceB top (horizontal)
     const transform = computeGhostTransform(
-      pieceA.outline, [1, 2] as [number, number], pieceA.position,
-      pieceB.outline, [1, 2] as [number, number], pieceB.position,
+      pieceA, [1, 2] as [number, number],
+      pieceB, [1, 2] as [number, number],
       50, // walkDistance at midpoint
     );
     expect(transform).not.toBeNull();
@@ -202,8 +202,8 @@ describe('computeGhostTransform', () => {
   it('returns ~90 deg rotation for perpendicular edges (horizontal vs vertical)', () => {
     // pieceA top (horizontal, tangent ~(1,0)) vs pieceC left (vertical, tangent ~(0,1))
     const transform = computeGhostTransform(
-      pieceA.outline, [1, 2] as [number, number], pieceA.position,
-      pieceC.outline, [1, 2] as [number, number], pieceC.position,
+      pieceA, [1, 2] as [number, number],
+      pieceC, [1, 2] as [number, number],
       50, // walkDistance at midpoint
     );
     expect(transform).not.toBeNull();
@@ -214,8 +214,8 @@ describe('computeGhostTransform', () => {
   it('clamps walkDistance to stationary arc length', () => {
     // Walk distance beyond end of stationary edge (100mm)
     const transform = computeGhostTransform(
-      pieceA.outline, [1, 2] as [number, number], pieceA.position,
-      pieceB.outline, [1, 2] as [number, number], pieceB.position,
+      pieceA, [1, 2] as [number, number],
+      pieceB, [1, 2] as [number, number],
       999, // way beyond edge length
     );
     expect(transform).not.toBeNull();
@@ -226,8 +226,8 @@ describe('computeGhostTransform', () => {
 
   it('returns valid transform at walkDistance 0', () => {
     const transform = computeGhostTransform(
-      pieceA.outline, [1, 2] as [number, number], pieceA.position,
-      pieceB.outline, [1, 2] as [number, number], pieceB.position,
+      pieceA, [1, 2] as [number, number],
+      pieceB, [1, 2] as [number, number],
       0,
     );
     expect(transform).not.toBeNull();

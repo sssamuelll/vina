@@ -40,21 +40,35 @@ import { join, relative, sep } from 'node:path';
  *     el regex lo exigía pegado. Es la forma inline del alias del punto 5, y
  *     se le escapaba por la misma puerta.
  *
+ * Y uno que NO es de esta lista, porque ningún regex lo va a ver:
+ *
+ *  8. **La posición pasada como parámetro suelto.** `computeGhostTransform`
+ *     recibía `stationaryPos: Point2D` y `mobilePos: Point2D` en vez de las
+ *     piezas, así que el cuerpo de la función no menciona `piece.position`
+ *     ni una vez y el censo lo cuenta en cero. El rodeo aquí es
+ *     ARQUITECTÓNICO, no sintáctico: desacoplar la posición de su pieza
+ *     esconde la conversión de cualquier detector de texto. Se cerró
+ *     cambiando la firma para que pida la pieza entera (#1068).
+ *
+ *     No hay regla que agregar. Lo que queda es la advertencia: una función
+ *     que recibe `Point2D` de posición y `PathCommand[]` de contorno por
+ *     separado ya perdió el giro, y el trinquete dirá que está limpia.
+ *
  * Cerrarlos destapó 32 sitios que ningún censo anterior había contado, así que
  * el "74" que decía esta prosa era un subconteo; pasó a 64, y arreglar los dos
  * sitios de impacto confirmado lo dejó en 60.
  *
  * Cerrar el 7º rodeo destapó 14 más: +2 en `SeamAllowanceSelectionOverlay` y
  * +2 en `editorSlice`, y 10 en dos archivos que NINGÚN censo había mirado —
- * `useSeamAllowanceTool` (6) y `projectSlice` (4). Eso los llevó a 74, y
+ * `useSeamAllowanceTool` (6) y `projectSlice` (4). Eso los llevó a 74;
  * arreglar el margen de costura entero —los 10 del hook y su overlay— los
- * dejó en 64.
+ * dejó en 64, y coser caminando —los 7 de su overlay— en 57.
  *
  * El patrón se repite y conviene nombrarlo: cada vez que se cierra un rodeo
  * aparecen sitios, así que un censo solo mide lo que su regex sabe ver. El
  * número no es "cuánta deuda hay" sino "cuánta deuda se puede ver hoy".
  *
- * Es un TRINQUETE, no una prohibición: esos 64 son deuda declarada (#1068), no
+ * Es un TRINQUETE, no una prohibición: esos 57 son deuda declarada (#1068), no
  * código aprobado. Falla si un archivo sube su cuenta, si aparece un archivo
  * nuevo, o si uno baja y nadie fijó el techo nuevo.
  */
@@ -134,7 +148,6 @@ const TECHO: Record<string, number> = {
   'src/components/PatternEditor/useTopstitchTool.ts': 6,
   'src/hooks/useElasticTool.ts': 4,
 
-  'src/components/PatternEditor/renderers/overlays/WalkSeamOverlay.tsx': 7,
   'src/components/PatternEditor/useEditorInteractions.ts': 3,
   'src/components/PatternEditor/useExtendTrimTool.ts': 3,
   'src/components/PatternEditor/useMergeTool.ts': 2,
