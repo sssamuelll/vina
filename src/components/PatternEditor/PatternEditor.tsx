@@ -332,14 +332,18 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
 
   const handlePolyPenCompleteInternalLine = useCallback((path: import('../../types/types').PathCommand[], lineType: import('../../types/types').InternalLineType) => {
     // Attach to the first selected piece, or the last piece if none selected
-    const targetPieceId = selectedPieceIds[0] ?? pieces[pieces.length - 1]?.id;
-    if (!targetPieceId) return;
+    const target = pieces.find((p) => p.id === selectedPieceIds[0]) ?? pieces[pieces.length - 1];
+    if (!target) return;
+    // La pluma dibuja en espacio de PATRÓN y los internals se guardan locales.
+    // Esta puerta no convertía NADA: sobre una pieza que no está en el origen
+    // la línea se guardaba corrida por la posición entera. Su hermana —Forma
+    // interna— sí convertía, a medias. Las dos usan ahora el mismo puente.
     const line: InternalLine = {
       id: newId(),
       type: lineType,
-      path,
+      path: toPieceLocalPath(path, target),
     };
-    dispatch(addInternalLine({ pieceId: targetPieceId, line }));
+    dispatch(addInternalLine({ pieceId: target.id, line }));
   }, [selectedPieceIds, pieces, dispatch]);
 
   const polyPenTool = usePolyPenTool(zoom2D, pan2D, handlePieceComplete, handlePolyPenCompleteInternalLine, polyPenMode, polyPenLineType);
@@ -350,7 +354,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     if (!target) return;
     dispatch(addInternalLine({
       pieceId: target.id,
-      line: { id: newId(), type: 'reference', path: toPieceLocalPath(path, target.position) },
+      line: { id: newId(), type: 'reference', path: toPieceLocalPath(path, target) },
     }));
   }, [pieces, selectedPieceIds, dispatch]);
 
