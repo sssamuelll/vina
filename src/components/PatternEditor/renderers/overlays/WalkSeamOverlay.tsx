@@ -2,6 +2,8 @@ import type { Point2D, PatternPiece } from '../../../../types/types';
 import type { WalkSeamEdge, GhostTransform, MismatchSample, WalkSeamMetrics } from '../../useWalkSeamTool';
 import { pathToSVG } from '../../utils';
 import { pointAtPathDistance, computePathArcLength } from '../../../../utils/geometry/arcLength';
+import { pieceLocalToPattern } from '../../../../utils/geometry/pieceSpace';
+import { outlineBBoxCenter } from '../../../../utils/geometry/transform';
 
 interface WalkSeamOverlayProps {
   zoom2D: number;
@@ -52,8 +54,9 @@ function MetricsPanel({
   );
   if (!midPt) return null;
 
-  const px = midPt.x + stationaryEdge.piece.position.x;
-  const py = midPt.y + stationaryEdge.piece.position.y - 30 / zoom2D;
+  const anclaje = pieceLocalToPattern(midPt, stationaryEdge.piece);
+  const px = anclaje.x;
+  const py = anclaje.y - 30 / zoom2D;
 
   const sign = metrics.delta >= 0 ? '+' : '';
   const lines = [
@@ -111,12 +114,7 @@ function EdgeHighlight({
   for (let i = 0; i < numSamples; i++) {
     const d = (i / (numSamples - 1)) * arcLen;
     const pt = pointAtPathDistance(edge.piece.outline, d, segStart, segEnd);
-    if (pt) {
-      points.push({
-        x: pt.x + edge.piece.position.x,
-        y: pt.y + edge.piece.position.y,
-      });
-    }
+    if (pt) points.push(pieceLocalToPattern(pt, edge.piece));
   }
 
   if (points.length < 2) return null;
@@ -144,18 +142,18 @@ function MismatchStripe({
 }) {
   if (samples.length < 2) return null;
 
-  const pos = stationaryEdge.piece.position;
-
   return (
     <g pointerEvents="none">
       {samples.map((sample, i) => {
         if (i === 0) return null;
-        const prev = samples[i - 1];
+        // `pointA` viene del muestreo sobre el contorno CRUDO, o sea local.
+        const desde = pieceLocalToPattern(samples[i - 1].pointA, stationaryEdge.piece);
+        const hasta = pieceLocalToPattern(sample.pointA, stationaryEdge.piece);
         return (
           <line
             key={i}
-            x1={prev.pointA.x + pos.x} y1={prev.pointA.y + pos.y}
-            x2={sample.pointA.x + pos.x} y2={sample.pointA.y + pos.y}
+            x1={desde.x} y1={desde.y}
+            x2={hasta.x} y2={hasta.y}
             stroke={COLORS[sample.color]}
             strokeWidth={5 / zoom2D}
             opacity={0.6}
@@ -178,11 +176,19 @@ function GhostPiece({
 }) {
   if (!piece.outline?.length) return null;
 
-  // Este `<g>` envuelve el outline CRUDO y le aplica translate+rotate como
-  // manda #1033; el `+ tx` es el arrastre en vivo. Pasarlo por
-  // `pieceLocalToPattern` rompería el fantasma — no es un punto local.
-  // espacio-de-patrón: transform del renderizador con arrastre en vivo.
-  const transformDelFantasma = `translate(${piece.position.x + transform.tx}, ${piece.position.y + transform.ty}) rotate(${transform.angleDeg}, ${transform.pivotX}, ${transform.pivotY})`;
+  // El fantasma se COMPONE sobre la pose real de la pieza, nunca en vez de
+  // ella. Leído de derecha a izquierda: la pose del renderizador —la misma
+  // cadena de `PieceRenderer.tsx:130`, giro incluido—, luego el giro que le
+  // falta para acostarse sobre el borde estacionario, luego el arrastre hasta
+  // el punto de caminado.
+  //
+  // Antes esto SUSTITUÍA a la pose y no llevaba `rotate(piece.rotation, …)`,
+  // así que una pieza móvil girada se dibujaba sin girar (#1068). La marca de
+  // exención estaba puesta y decía la verdad a medias: es un transform de
+  // renderizador, sí, pero le faltaba media cadena.
+  const c = outlineBBoxCenter(piece.outline);
+  // espacio-de-patrón: transform del renderizador más el arrastre en vivo.
+  const transformDelFantasma = `translate(${transform.tx}, ${transform.ty}) rotate(${transform.angleDeg}, ${transform.pivotX}, ${transform.pivotY}) translate(${piece.position.x}, ${piece.position.y}) rotate(${piece.rotation ?? 0}, ${c.x}, ${c.y})`;
 
   return (
     <g
@@ -215,8 +221,7 @@ function WalkIndicator({
   );
   if (!pt) return null;
 
-  const wx = pt.x + stationaryEdge.piece.position.x;
-  const wy = pt.y + stationaryEdge.piece.position.y;
+  const { x: wx, y: wy } = pieceLocalToPattern(pt, stationaryEdge.piece);
 
   return (
     <circle

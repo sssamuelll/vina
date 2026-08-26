@@ -16,7 +16,11 @@ import {
   pointAtPathDistance,
   distanceAlongPath,
 } from '../../utils/geometry/arcLength';
-import { patternToPieceLocal } from '../../utils/geometry/pieceSpace';
+import {
+  patternToPieceLocal,
+  pieceLocalToPattern,
+  pieceLocalToPatternDirection,
+} from '../../utils/geometry/pieceSpace';
 import { snapToOutline, findEdgeForSegment, buildEdgeInfo, buildOutlineInfo } from './useMeasureTool';
 import { formatDimension } from '../../utils/units';
 import { screenToPattern } from './sewingUtils';
@@ -38,10 +42,23 @@ export interface MismatchSample {
   color: 'green' | 'yellow' | 'red';
 }
 
+/**
+ * El fantasma, en tres capas que se aplican SOBRE la pose real de la pieza
+ * móvil — nunca en vez de ella. De dentro hacia afuera:
+ *
+ *   `translate(tx, ty) rotate(angleDeg, pivot) [pose del renderizador]`
+ *
+ * Antes esto reemplazaba a la pose y omitía su `rotate(piece.rotation, …)`,
+ * así que una pieza móvil girada se dibujaba sin girar (#1068). Componer en
+ * vez de sustituir es lo que hace imposible volver a perder ese giro.
+ */
 export interface GhostTransform {
+  /** Lleva el punto de contacto hasta el punto de caminado, ya en patrón. */
   tx: number;
   ty: number;
+  /** Giro que le FALTA a la pieza móvil para acostarse sobre el estacionario. */
   angleDeg: number;
+  /** El punto de contacto en espacio de patrón: el giro no lo mueve. */
   pivotX: number;
   pivotY: number;
 }
@@ -134,14 +151,18 @@ export function computeEdgeTangent(
  *  - The mobile edge tangent is rotated to align with the stationary tangent.
  */
 export function computeGhostTransform(
-  stationaryOutline: PathCommand[],
+  stationaryPiece: PatternPiece,
   stationaryRange: [number, number],
-  stationaryPos: Point2D,
-  mobileOutline: PathCommand[],
+  mobilePiece: PatternPiece,
   mobileRange: [number, number],
-  mobilePos: Point2D,
   walkDistance: number,
 ): GhostTransform {
+  // Recibe las PIEZAS, no `outline` + `position` sueltos. Con la posición
+  // suelta el archivo no mencionaba `piece.position` ni una vez, así que el
+  // trinquete del #1068 no podía verlo: el rodeo era arquitectónico, no
+  // sintáctico. Pedir la pieza entera hace imposible olvidar su giro.
+  const stationaryOutline = stationaryPiece.outline;
+  const mobileOutline = mobilePiece.outline;
   const stationaryArcLen = computePathArcLength(
     stationaryOutline, stationaryRange[0], stationaryRange[1],
   );
@@ -164,37 +185,33 @@ export function computeGhostTransform(
     mobileOutline, dM, mobileRange[0], mobileRange[1],
   ) ?? { x: 0, y: 0 };
 
-  // Get tangents
-  const tS = computeEdgeTangent(stationaryOutline, dS, stationaryRange[0], stationaryRange[1]);
-  const tM = computeEdgeTangent(mobileOutline, dM, mobileRange[0], mobileRange[1]);
+  // Las tangentes se comparan en espacio de PATRÓN. Medidas sobre el contorno
+  // crudo el ángulo ignora los dos giros, y con una pieza girada el fantasma
+  // se acuesta sobre una dirección que no existe en pantalla.
+  const tS = pieceLocalToPatternDirection(
+    computeEdgeTangent(stationaryOutline, dS, stationaryRange[0], stationaryRange[1]),
+    stationaryPiece,
+  );
+  const tM = pieceLocalToPatternDirection(
+    computeEdgeTangent(mobileOutline, dM, mobileRange[0], mobileRange[1]),
+    mobilePiece,
+  );
 
-  // Angle difference: rotate mobile tangent to match stationary tangent
-  const angleS = Math.atan2(tS.y, tS.x);
-  const angleM = Math.atan2(tM.y, tM.x);
-  const angleDiff = angleS - angleM; // radians
-  const angleDeg = angleDiff * (180 / Math.PI); // for SVG transform
+  // Lo que le FALTA a la móvil para quedar paralela al borde estacionario.
+  const angleDeg = (Math.atan2(tS.y, tS.x) - Math.atan2(tM.y, tM.x)) * (180 / Math.PI);
 
-  // World-space stationary point
-  const worldSx = localStatPt.x + stationaryPos.x;
-  const worldSy = localStatPt.y + stationaryPos.y;
+  // Los dos puntos, por el transform del renderizador.
+  const walkPt = pieceLocalToPattern(localStatPt, stationaryPiece);
+  const contactPt = pieceLocalToPattern(localMobPt, mobilePiece);
 
-  // Rotate the mobile local point around origin by the angle, then translate
-  const cosA = Math.cos(angleDiff);
-  const sinA = Math.sin(angleDiff);
-  const rotMx = localMobPt.x * cosA - localMobPt.y * sinA;
-  const rotMy = localMobPt.x * sinA + localMobPt.y * cosA;
-
-  // Translation: worldS = mobilePos + translate + rotatedLocalMobPt
-  // So translate = worldS - mobilePos - rotatedLocalMobPt
-  const tx = worldSx - mobilePos.x - rotMx;
-  const ty = worldSy - mobilePos.y - rotMy;
-
+  // El giro es alrededor del punto de contacto, así que no lo mueve: la
+  // traslación es la diferencia directa entre los dos puntos.
   return {
-    tx,
-    ty,
+    tx: walkPt.x - contactPt.x,
+    ty: walkPt.y - contactPt.y,
     angleDeg,
-    pivotX: mobilePos.x,
-    pivotY: mobilePos.y,
+    pivotX: contactPt.x,
+    pivotY: contactPt.y,
   };
 }
 
@@ -486,12 +503,10 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
       setWalkDistance(d);
 
       const transform = computeGhostTransform(
-        stationary.piece.outline,
+        stationary.piece,
         stationary.edge.segmentRange,
-        stationary.piece.position,
-        mobile.piece.outline,
+        mobile.piece,
         mobile.edge.segmentRange,
-        mobile.piece.position,
         d,
       );
       setGhostTransform(transform);
