@@ -108,7 +108,6 @@ const TECHO: Record<string, number> = {
   'src/components/PatternEditor/renderers/overlays/TopstitchOverlay.tsx': 2,
   'src/components/PatternEditor/useLineTool.ts': 2,
   'src/components/PatternEditor/useTopstitchTool.ts': 6,
-  'src/components/PatternEditor/useWalkSeamTool.ts': 2,
   'src/hooks/useElasticTool.ts': 4,
 
   'src/components/PatternEditor/renderers/overlays/WalkSeamOverlay.tsx': 7,
@@ -119,7 +118,6 @@ const TECHO: Record<string, number> = {
   'src/components/PatternEditor/useScissorsTool.ts': 1,
   'src/components/PatternEditor/useSlashAndSpreadTool.ts': 1,
   'src/components/PatternEditor/useTransformTool.ts': 1,
-  'src/components/PatternEditor/useTrimTool.ts': 2,
   'src/copilot/action/tools/definitions/patternOpsTools.ts': 3,
   'src/store/editorSlice.ts': 2,
   'src/utils/grading/gradeAllSizes.ts': 1,

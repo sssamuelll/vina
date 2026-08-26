@@ -9,6 +9,7 @@ import { getTrimPreset } from '../../utils/trim/trimLibrary';
 import { TRIM_DEFAULTS } from '../../types/trim';
 import { interpolateEdgePoint, computeEdgeLengthMM } from '../../utils/geometry/edgeInterpolation';
 import { screenToPattern } from '../../utils/geometry';
+import { pieceLocalToPattern } from '../../utils/geometry/pieceSpace';
 import { uid } from '../../utils/pathHelpers';
 
 const EDGE_HIT_THRESHOLD = 20; // px screen space
@@ -25,7 +26,7 @@ export interface TrimHover {
  * Iterates all pieces and their semantic edges, projects the mouse point
  * onto each edge, and returns the closest hit within threshold.
  */
-function findClosestEdgePoint(
+export function findClosestEdgePoint(
   pt: Point2D,
   pieces: PatternPiece[],
   zoom: number,
@@ -44,9 +45,10 @@ function findClosestEdgePoint(
         const result = interpolateEdgePoint(piece, edge.name, t);
         if (!result) continue;
 
-        // Convert to world space (add piece position)
-        const wx = piece.position.x + result.point.x;
-        const wy = piece.position.y + result.point.y;
+        // A espacio de patron. Sumar solo `position` apunta a donde la
+        // pieza estaba ANTES de girar, y con el umbral de 20px eso no
+        // engancha nada sobre una pieza girada (#1068).
+        const { x: wx, y: wy } = pieceLocalToPattern(result.point, piece);
         const dist = Math.hypot(pt.x - wx, pt.y - wy) * zoom;
 
         if (dist < EDGE_HIT_THRESHOLD && dist < bestDist) {
