@@ -1,5 +1,6 @@
 import type { PatternPiece, SaSelection } from '../../../../types/types';
 import { flattenPath, commandRangeToFlattened } from '../../../../utils/seam';
+import { pieceLocalToPattern } from '../../../../utils/geometry/pieceSpace';
 
 interface Props {
   saSelection: SaSelection | null;
@@ -26,8 +27,14 @@ export default function SeamAllowanceSelectionOverlay({ saSelection, pieces, zoo
           const piece = pieces.find((p) => p.id === pieceId);
           const cmd = piece?.outline?.[vertexIndex];
           if (!piece || !cmd || (cmd.type !== 'M' && cmd.type !== 'L')) return null;
-          const cx = (piece.position?.x ?? 0) + cmd.values[0];
-          const cy = (piece.position?.y ?? 0) + cmd.values[1];
+          // El overlay vive en espacio de PATRÓN, colgado del grupo de
+          // pan/zoom. Sumar solo `position` lo pinta sobre el fantasma sin
+          // girar: la usuaria clica el borde que ve, el hit-test acierta
+          // —#1064— y el resalte sale en otro sitio (#1068).
+          const { x: cx, y: cy } = pieceLocalToPattern(
+            { x: cmd.values[0], y: cmd.values[1] },
+            piece,
+          );
           return (
             <circle key={`${pieceId}:${vertexIndex}:${i}`} cx={cx} cy={cy} r={r}
               fill="none" stroke="var(--accent-2d)" strokeWidth={stroke} pointerEvents="none" />
@@ -43,8 +50,6 @@ export default function SeamAllowanceSelectionOverlay({ saSelection, pieces, zoo
         const piece = pieces.find((p) => p.id === pieceId);
         const edge = piece?.edges?.find((e) => e.id === edgeId);
         if (!piece || !edge || !piece.outline?.length) return null;
-        const ox = piece.position?.x ?? 0;
-        const oy = piece.position?.y ?? 0;
         // El resalte sigue el TRAZO, no la cuerda. Antes se pintaba un punto
         // por comando (el endpoint de cada uno), así que un borde curvo salía
         // como la recta entre sus extremos: la "V en azul" de la foto del #213,
@@ -56,7 +61,10 @@ export default function SeamAllowanceSelectionOverlay({ saSelection, pieces, zoo
         const span = to >= from
           ? flat.slice(from, to + 1)
           : [...flat.slice(from), ...flat.slice(0, to + 1)];
-        const pts = span.map(p => `${ox + p.x},${oy + p.y}`);
+        const pts = span.map(p => {
+          const w = pieceLocalToPattern(p, piece);
+          return `${w.x},${w.y}`;
+        });
         if (pts.length < 2) return null;
         return (
           <polyline key={`${pieceId}:${edgeId}:${i}`} data-testid="sa-edge-highlight" points={pts.join(' ')}
