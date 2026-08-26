@@ -10,6 +10,10 @@ import {
   projectToRing,
   type OutlineRing,
 } from '../../utils/geometry/outlineRing';
+import {
+  patternToPieceLocal,
+  pieceLocalToPattern,
+} from '../../utils/geometry/pieceSpace';
 import { resolveSeamAllowanceClick } from '../../utils/seam/edgeHitTest';
 import { spanLengthMm, unwrapOnSpan } from './distanceCommit';
 import type { EdgeCommit, EdgeTarget } from './edgeGesture';
@@ -135,11 +139,11 @@ export function useSeamAllowanceTool(
     if (!piece || !ring) return null;
     const rect = e.currentTarget.getBoundingClientRect();
     const world = screenToPattern(e.clientX, e.clientY, rect, zoom, pan);
-    const local = {
-      x: world.x - (piece.position?.x ?? 0),
-      y: world.y - (piece.position?.y ?? 0),
-    };
-    return edgeTForPoint(ring, press.edgeRange, local);
+    // Por el transform, no restando solo `position`: el anillo se construye
+    // sobre el contorno CRUDO, así que un release traído a medias cae sobre
+    // otro pedazo del borde — o fuera de él, y lo clampea al extremo que no
+    // es. Este `t` es lo que `onApplySpan` escribe en el patrón (#1068).
+    return edgeTForPoint(ring, press.edgeRange, patternToPieceLocal(world, piece));
   }, [pieces, ringsByPiece, zoom, pan]);
 
   const onCommit = useCallback((commit: EdgeCommit) => {
@@ -189,10 +193,7 @@ export function useSeamAllowanceTool(
       const edge = piece?.edges?.find(candidate => candidate.id === target.edgeId);
       const ring = ringsByPiece.get(target.pieceId);
       if (!piece || !edge || !ring) return;
-      const local = {
-        x: world.x - (piece.position?.x ?? 0),
-        y: world.y - (piece.position?.y ?? 0),
-      };
+      const local = patternToPieceLocal(world, piece);
       const t = edgeTForPoint(ring, edge.segmentRange, local);
       const point = edgePointAtT(ring, edge.segmentRange, t);
       primedEdgeRef.current = {
@@ -201,10 +202,10 @@ export function useSeamAllowanceTool(
         edgeIndex: edge.segmentRange[0],
         edgeRange: edge.segmentRange,
         t,
-        point: {
-          x: point.x + (piece.position?.x ?? 0),
-          y: point.y + (piece.position?.y ?? 0),
-        },
+        // `EdgeTarget.point` va en espacio de PATRÓN — así lo lee
+        // `useNotchTool`, que se lo pasa de vuelta a `patternToPieceLocal`. El
+        // anillo trabaja en local, así que la vuelta deshace el giro también.
+        point: pieceLocalToPattern(point, piece),
         additive: !!e.shiftKey,
       };
       edgeGesture.handleMouseDown(e);

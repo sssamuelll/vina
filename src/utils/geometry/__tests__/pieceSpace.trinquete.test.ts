@@ -46,13 +46,15 @@ import { join, relative, sep } from 'node:path';
  *
  * Cerrar el 7º rodeo destapó 14 más: +2 en `SeamAllowanceSelectionOverlay` y
  * +2 en `editorSlice`, y 10 en dos archivos que NINGÚN censo había mirado —
- * `useSeamAllowanceTool` (6) y `projectSlice` (4). Hoy son 74.
+ * `useSeamAllowanceTool` (6) y `projectSlice` (4). Eso los llevó a 74, y
+ * arreglar el margen de costura entero —los 10 del hook y su overlay— los
+ * dejó en 64.
  *
  * El patrón se repite y conviene nombrarlo: cada vez que se cierra un rodeo
  * aparecen sitios, así que un censo solo mide lo que su regex sabe ver. El
  * número no es "cuánta deuda hay" sino "cuánta deuda se puede ver hoy".
  *
- * Es un TRINQUETE, no una prohibición: esos 74 son deuda declarada (#1068), no
+ * Es un TRINQUETE, no una prohibición: esos 64 son deuda declarada (#1068), no
  * código aprobado. Falla si un archivo sube su cuenta, si aparece un archivo
  * nuevo, o si uno baja y nadie fijó el techo nuevo.
  */
@@ -126,7 +128,6 @@ const TECHO: Record<string, number> = {
   'src/components/PatternEditor/PatternEditor.tsx': 4,
   'src/components/PatternEditor/renderers/ElasticRenderer.tsx': 1,
   'src/components/PatternEditor/renderers/SeamRenderer.tsx': 2,
-  'src/components/PatternEditor/renderers/overlays/SeamAllowanceSelectionOverlay.tsx': 4,
   'src/components/PatternEditor/renderers/overlays/SlashAndSpreadOverlay.tsx': 2,
   'src/components/PatternEditor/renderers/overlays/TopstitchOverlay.tsx': 2,
   'src/components/PatternEditor/useLineTool.ts': 2,
@@ -139,7 +140,6 @@ const TECHO: Record<string, number> = {
   'src/components/PatternEditor/useMergeTool.ts': 2,
   'src/components/PatternEditor/usePOMMeasureTool.ts': 2,
   'src/components/PatternEditor/useScissorsTool.ts': 1,
-  'src/components/PatternEditor/useSeamAllowanceTool.ts': 6,
   'src/components/PatternEditor/useSlashAndSpreadTool.ts': 1,
   'src/components/PatternEditor/useTransformTool.ts': 1,
   'src/copilot/action/tools/definitions/patternOpsTools.ts': 3,
