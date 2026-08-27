@@ -11,11 +11,11 @@ import type {
 import { AgenticRecorder } from './AgenticRecorder';
 import { AgenticConsoleLogger } from './AgenticConsoleLogger';
 import { DebugStore } from './DebugStore';
-import { createDebugAPI } from './debugAPI';
+import { safeGetItem } from '../../utils/safeStorage';
+import { createDebugAPI, DEBUG_BRIDGE_STORAGE_KEY } from './debugAPI';
 
 export function isDebugEnabled(): boolean {
-  // TODO: re-gate behind localStorage once stable
-  return true;
+  return safeGetItem(DEBUG_BRIDGE_STORAGE_KEY) === 'true';
 }
 
 // ─── Agentic Loop Debug Factory ──────────────────────────────────────────────
@@ -99,18 +99,22 @@ export function createDebugAgenticLoop(
     onEvent: (event: AgenticEvent) => void,
   ): Promise<string> => {
     turnNumber = 0;
+    let firstToolError: string | undefined;
     recorder.start(userRequest);
     logger.logStart(userRequest);
 
     const wrappedOnEvent = (event: AgenticEvent) => {
-      if (event.type === 'tool:complete' || event.type === 'tool:error') {
+      if (event.type === 'tool:error') firstToolError ??= event.error;
+
+      if (
+        event.type === 'tool:complete'
+        || event.type === 'tool:cancelled'
+        || event.type === 'tool:error'
+      ) {
         const allCalls = loop.getLastToolCalls();
         const lastCall = allCalls[allCalls.length - 1];
         if (lastCall) {
-          const error =
-            event.type === 'tool:error'
-              ? (event as Extract<AgenticEvent, { type: 'tool:error' }>).error
-              : undefined;
+          const error = event.type === 'tool:error' ? event.error : undefined;
           recorder.recordTurnToolResult(
             lastCall.name,
             lastCall.arguments,
@@ -137,7 +141,11 @@ export function createDebugAgenticLoop(
         logger.logTurnEnd();
         recorder.endTurn();
       }
-      const record = recorder.finalize(result, true);
+      const record = recorder.finalize(
+        result,
+        firstToolError === undefined,
+        firstToolError,
+      );
       logger.logEnd(record);
       debugStore.save(record);
       recorder.reset();

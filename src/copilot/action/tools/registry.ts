@@ -10,6 +10,7 @@
 
 import { z } from 'zod';
 import type { AppDispatch, RootState } from '../../../store';
+import { withAgentHistorySource } from '../../../store/undoMiddleware';
 import { validateToolParams } from './validation';
 import { tools as pieceToolDefs } from './definitions/pieceTools';
 import { tools as internalToolDefs } from './definitions/internalTools';
@@ -308,7 +309,11 @@ export class ToolRegistry {
       validatedParams = validated.data as Record<string, unknown>;
     }
 
-    return tool.execute(validatedParams, this.dispatch, this.getState);
+    const dispatchAsAgent = ((action: Parameters<AppDispatch>[0]) =>
+      withAgentHistorySource(name, () => this.dispatch!(action))
+    ) as AppDispatch;
+
+    return tool.execute(validatedParams, dispatchAsAgent, this.getState);
   }
 
   /**

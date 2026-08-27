@@ -15,7 +15,7 @@ import { showErrorToast } from '../../store/copilotUISlice';
 
 export interface ToolCallProgress {
   name: string;
-  status: 'running' | 'done' | 'error';
+  status: 'running' | 'done' | 'cancelled' | 'error';
   result?: unknown;
   error?: string;
   /** The agent's one-line rationale for the round this tool belongs to —
@@ -42,6 +42,25 @@ export interface UseAgenticLoopReturn {
   clearHistory: () => void;
 }
 
+function settleLatestRunning(
+  prev: ToolCallProgress[],
+  name: string,
+  settled: Partial<ToolCallProgress> & Pick<ToolCallProgress, 'status'>,
+): ToolCallProgress[] {
+  let index = -1;
+  for (let currentIndex = prev.length - 1; currentIndex >= 0; currentIndex -= 1) {
+    const toolCall = prev[currentIndex];
+    if (toolCall.name === name && toolCall.status === 'running') {
+      index = currentIndex;
+      break;
+    }
+  }
+  if (index < 0) return prev;
+  return prev.map((toolCall, currentIndex) =>
+    currentIndex === index ? { ...toolCall, ...settled } : toolCall
+  );
+}
+
 /**
  * Process an AgenticEvent and return updated tool calls array.
  * Exported for testing.
@@ -51,17 +70,17 @@ export function reduceToolCalls(prev: ToolCallProgress[], event: AgenticEvent): 
     case 'tool:start':
       return [...prev, { name: event.name, status: 'running' }];
     case 'tool:complete':
-      return prev.map((tc, idx) =>
-        tc.name === event.name && tc.status === 'running' && !prev.slice(idx + 1).some(t => t.name === event.name && t.status === 'running')
-          ? { ...tc, status: 'done' as const, result: event.result }
-          : tc
-      );
+      return settleLatestRunning(prev, event.name, {
+        status: 'done',
+        result: event.result,
+      });
+    case 'tool:cancelled':
+      return settleLatestRunning(prev, event.name, { status: 'cancelled' });
     case 'tool:error':
-      return prev.map((tc, idx) =>
-        tc.name === event.name && tc.status === 'running' && !prev.slice(idx + 1).some(t => t.name === event.name && t.status === 'running')
-          ? { ...tc, status: 'error' as const, error: event.error }
-          : tc
-      );
+      return settleLatestRunning(prev, event.name, {
+        status: 'error',
+        error: event.error,
+      });
     default:
       return prev;
   }
@@ -81,8 +100,8 @@ export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopRetur
   // Mid-conversation provider switch is out of scope per the M2 spec.
   const loop = useMemo(
     () => createDebugAgenticLoop(options).loop,
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: rebuild
-    // only on send/registry change so history survives between turns
+    // intentional: rebuild only on send/registry change so history survives between turns
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [options.send, options.registry],
   );
 
@@ -119,6 +138,7 @@ export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopRetur
           break;
         }
         case 'tool:complete':
+        case 'tool:cancelled':
         case 'tool:error':
           runToolCalls = reduceToolCalls(runToolCalls, event);
           setToolCalls(runToolCalls);

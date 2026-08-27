@@ -27,12 +27,17 @@ import { buildDomainBootstrap } from './domainBootstrap';
 import { PRESENT_TO_USER_TOOL_NAME } from './meta-tools/presentToUser';
 import { getKnowledgeStore } from '../../knowledge/KnowledgeStore';
 import type { KnowledgeSearchResult } from '../../knowledge/types';
+import {
+  pushToolExecution,
+  type ToolExecutionRecord,
+} from '../../debug/toolExecutionTracker';
 
 // ─── Event Types ─────────────────────────────────────────────────────────────
 
 export type AgenticEvent =
   | { type: 'tool:start'; name: string; args: Record<string, unknown> }
   | { type: 'tool:complete'; name: string; result: unknown }
+  | { type: 'tool:cancelled'; name: string; message: string }
   | { type: 'tool:error'; name: string; error: string }
   | { type: 'text:delta'; content: string }
   | { type: 'complete'; content: string }
@@ -71,6 +76,52 @@ export interface ToolCallRecord {
   result: unknown;
   duration: number;
   isMetaTool: boolean;
+}
+
+type ToolOutcome =
+  | { kind: 'complete' }
+  | { kind: 'cancelled'; message: string }
+  | { kind: 'error'; error: string };
+
+function classifyReturnedToolResult(name: string, result: unknown): ToolOutcome {
+  if (typeof result !== 'object' || result === null || Array.isArray(result)) {
+    return { kind: 'complete' };
+  }
+
+  const value = result as {
+    success?: unknown;
+    error?: unknown;
+    message?: unknown;
+  };
+  if (value.success !== false) return { kind: 'complete' };
+  if (typeof value.error === 'string' && value.error.trim()) {
+    return { kind: 'error', error: value.error };
+  }
+  if (typeof value.message === 'string' && value.message.trim()) {
+    return { kind: 'cancelled', message: value.message };
+  }
+  return { kind: 'error', error: `Tool "${name}" returned success:false` };
+}
+
+function toRingRecord(
+  toolName: string,
+  args: Record<string, unknown>,
+  outcome: ToolOutcome,
+  timestamp: number,
+  durationMs: number,
+): ToolExecutionRecord {
+  return {
+    toolName,
+    args,
+    success: outcome.kind === 'complete'
+      ? true
+      : outcome.kind === 'error'
+        ? false
+        : null,
+    error: outcome.kind === 'error' ? outcome.error : null,
+    timestamp,
+    durationMs,
+  };
 }
 
 // ─── AgenticLoop ─────────────────────────────────────────────────────────────
@@ -247,6 +298,13 @@ export class AgenticLoop {
             duration: 0,
             isMetaTool: true,
           });
+          pushToolExecution(toRingRecord(
+            PRESENT_TO_USER_TOOL_NAME,
+            presentArgs as Record<string, unknown>,
+            { kind: 'error', error: errorMsg },
+            Date.now(),
+            0,
+          ));
           onEvent({ type: 'tool:start', name: PRESENT_TO_USER_TOOL_NAME, args: presentArgs as Record<string, unknown> });
           onEvent({ type: 'tool:error', name: PRESENT_TO_USER_TOOL_NAME, error: errorMsg });
           continue;
@@ -331,6 +389,13 @@ export class AgenticLoop {
               duration: 0,
               isMetaTool: true,
             });
+            pushToolExecution(toRingRecord(
+              PRESENT_TO_USER_TOOL_NAME,
+              presentArgs as Record<string, unknown>,
+              { kind: 'error', error: errorMsg },
+              Date.now(),
+              0,
+            ));
             onEvent({ type: 'tool:start', name: PRESENT_TO_USER_TOOL_NAME, args: presentArgs as Record<string, unknown> });
             onEvent({ type: 'tool:error', name: PRESENT_TO_USER_TOOL_NAME, error: errorMsg });
 
@@ -365,8 +430,23 @@ export class AgenticLoop {
         this.conversationHistory = messages.slice(1);
         // Surface as a normal tool:start/complete pair so the UI animation
         // is consistent with any other tool call.
+        const presentResult = { success: true, data: presentArgs };
+        this.lastToolCalls.push({
+          name: PRESENT_TO_USER_TOOL_NAME,
+          arguments: presentArgs as Record<string, unknown>,
+          result: presentResult,
+          duration: 0,
+          isMetaTool: true,
+        });
+        pushToolExecution(toRingRecord(
+          PRESENT_TO_USER_TOOL_NAME,
+          presentArgs as Record<string, unknown>,
+          { kind: 'complete' },
+          Date.now(),
+          0,
+        ));
         onEvent({ type: 'tool:start', name: PRESENT_TO_USER_TOOL_NAME, args: presentArgs as Record<string, unknown> });
-        onEvent({ type: 'tool:complete', name: PRESENT_TO_USER_TOOL_NAME, result: { success: true, data: presentArgs } });
+        onEvent({ type: 'tool:complete', name: PRESENT_TO_USER_TOOL_NAME, result: presentResult });
         onEvent({ type: 'complete', content: message });
         return message;
       }
@@ -408,6 +488,8 @@ export class AgenticLoop {
 
       // Execute each tool call and append results
       for (const toolCall of response.toolCalls) {
+        const timestamp = Date.now();
+        const start = performance.now();
         let args: Record<string, unknown> = {};
         let parseError: string | undefined;
 
@@ -417,14 +499,13 @@ export class AgenticLoop {
           parseError = err instanceof Error ? err.message : String(err);
         }
 
-        const start = performance.now();
         let result: unknown;
         let isMetaTool = false;
-        let toolError: string | undefined;
+        let forcedError: string | undefined;
 
         if (parseError) {
           result = { success: false, error: parseError };
-          toolError = parseError;
+          forcedError = parseError;
         } else {
           onEvent({ type: 'tool:start', name: toolCall.name, args });
           try {
@@ -440,12 +521,15 @@ export class AgenticLoop {
           } catch (err) {
             const errorMsg = err instanceof Error ? err.message : String(err);
             result = { success: false, error: errorMsg };
-            toolError = errorMsg;
+            forcedError = errorMsg;
           }
         }
 
         // Record BEFORE firing event so getLastToolCalls() is up-to-date
         const duration = performance.now() - start;
+        const outcome: ToolOutcome = forcedError
+          ? { kind: 'error', error: forcedError }
+          : classifyReturnedToolResult(toolCall.name, result);
         this.lastToolCalls.push({
           name: toolCall.name,
           arguments: args,
@@ -453,9 +537,22 @@ export class AgenticLoop {
           duration,
           isMetaTool,
         });
+        pushToolExecution(toRingRecord(
+          toolCall.name,
+          args,
+          outcome,
+          timestamp,
+          duration,
+        ));
 
-        if (toolError) {
-          onEvent({ type: 'tool:error', name: toolCall.name, error: toolError });
+        if (outcome.kind === 'error') {
+          onEvent({ type: 'tool:error', name: toolCall.name, error: outcome.error });
+        } else if (outcome.kind === 'cancelled') {
+          onEvent({
+            type: 'tool:cancelled',
+            name: toolCall.name,
+            message: outcome.message,
+          });
         } else {
           onEvent({ type: 'tool:complete', name: toolCall.name, result });
         }
