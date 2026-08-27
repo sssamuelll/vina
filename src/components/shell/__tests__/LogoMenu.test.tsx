@@ -21,12 +21,24 @@ import dockReducer from '../../../store/dockSlice';
 import projectReducer from '../../../store/projectSlice';
 import toolsReducer from '../../../store/toolSlice';
 import constructionReducer from '../../../store/constructionSlice';
+import copilotUIReducer from '../../../store/copilotUISlice';
+import { store as appStore } from '../../../store';
 import LogoMenu from '../LogoMenu';
+
+const { downloadDiagnosticBundleMock } = vi.hoisted(() => ({
+  downloadDiagnosticBundleMock: vi.fn(),
+}));
 
 // uiExport pulls export-heavy deps (pdf/dxf writers) — irrelevant here.
 vi.mock('../../../utils/export/uiExport', () => ({ runUiExport: vi.fn() }));
+vi.mock('../../../utils/export/diagnosticExporter', () => ({
+  downloadDiagnosticBundle: downloadDiagnosticBundleMock,
+}));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 function renderMenu() {
   const store = configureStore({
@@ -37,6 +49,7 @@ function renderMenu() {
       project: projectReducer,
       tools: toolsReducer,
       construction: constructionReducer,
+      copilotUI: copilotUIReducer,
     },
   });
   render(<Provider store={store}><LogoMenu onOpenPanel={() => {}} onImportDXF={() => {}} /></Provider>);
@@ -47,6 +60,12 @@ function renderMenu() {
 function openViewMenu() {
   fireEvent.click(screen.getByRole('button', { name: /vina/i }));
   fireEvent.mouseEnter(screen.getByText('Vista'));
+}
+
+/** Abre el menú y monta el submenú Archivo. */
+function openFileMenu() {
+  fireEvent.click(screen.getByRole('button', { name: /vina/i }));
+  fireEvent.mouseEnter(screen.getByText('Archivo'));
 }
 
 function isChecked(label: string): boolean {
@@ -124,6 +143,35 @@ describe('LogoMenu ▸ submenu hover persistence', () => {
 
     expect(screen.queryByText('Exportar DXF')).toBeNull();
     expect(screen.queryByText('Zoom 100%')).toBeTruthy();
+  });
+});
+
+describe('LogoMenu ▸ Archivo — diagnóstico', () => {
+  it('descarga el diagnóstico desde la puerta visible de Archivo', () => {
+    renderMenu();
+    openFileMenu();
+
+    fireEvent.click(screen.getByText('Exportar diagnóstico'));
+
+    expect(downloadDiagnosticBundleMock).toHaveBeenCalledTimes(1);
+    expect(downloadDiagnosticBundleMock).toHaveBeenCalledWith(appStore.getState());
+  });
+
+  it('avisa en la superficie canónica cuando el navegador no crea el archivo', () => {
+    downloadDiagnosticBundleMock.mockImplementationOnce(() => {
+      throw new Error('descarga bloqueada');
+    });
+    const store = renderMenu();
+    openFileMenu();
+
+    fireEvent.click(screen.getByText('Exportar diagnóstico'));
+
+    expect(store.getState().copilotUI.toasts).toContainEqual(
+      expect.objectContaining({
+        type: 'error',
+        message: 'No pude exportar el diagnóstico: el navegador no creó el archivo. Inténtalo de nuevo.',
+      }),
+    );
   });
 });
 

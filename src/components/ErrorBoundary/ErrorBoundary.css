@@ -45,6 +45,17 @@
   background: #333;
 }
 
+.error-boundary-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.panel-error-reset:focus-visible,
+.app-error-reload:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ─── App-level error boundary ─── */
 
 .app-error-boundary {

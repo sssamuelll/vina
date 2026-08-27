@@ -109,6 +109,10 @@ import { showWarningToast, showErrorToast } from '../../store/copilotUISlice';
 import { seamResolutionFailureLabel } from './solverTierDisplay';
 import { GPU_CAPABILITIES, NEURAL_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { safeGetItem } from '../../utils/safeStorage';
+import {
+  clearActiveSolverTier,
+  setActiveSolverTier,
+} from '../../utils/cloth/solverRuntimeTracker';
 import { getPhysicalFabric, toXPBDParams } from '../../utils/cloth/physicalFabric';
 import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
 import { registerPenetrationBody } from '../../utils/cloth/penetrationMetric';
@@ -443,6 +447,7 @@ export function useSimulationLifecycle({
 
   // ─── Tier cascade ─── (Start/stop simulation — solver tier cascade)
   useEffect(() => {
+    clearActiveSolverTier();
     if (simulationState === 'running' && placedMeshes.length > 0) {
       let cancelled = false;
       const cancelFlag = { get value() { return cancelled; } };
@@ -605,6 +610,7 @@ export function useSimulationLifecycle({
                 // 2a: colisión lista → el frame loop puede stepear. Si
                 // loadCollision throwea caemos al tier WASM (catch de arriba);
                 // si resuelve degradado (warning), corre bodiless como antes.
+                if (cancelled) return;
                 simReadyRef.current = true;
 
                 // Push pre-existing freeze state — the separate freeze useEffect
@@ -612,6 +618,7 @@ export function useSimulationLifecycle({
                 if (frozenPieceIds.length > 0) gpuClient.freezePieces(frozenPieceIds);
 
                 // Don't call gpuClient.start() — TSL compute is driven by useFrame.
+                setActiveSolverTier('webgpu');
                 return;
             }
           } catch (e) {
@@ -664,6 +671,7 @@ export function useSimulationLifecycle({
                 if (windEnabled) wasmClient.setWind(windForce);
                 // Push pre-existing elastic constraints
                 if (elasticsRef.current.length > 0) wasmClient.setElastics(elasticsRef.current);
+                setActiveSolverTier('wasm');
               }
               return;
             } else if (!cancelled) {
@@ -712,6 +720,7 @@ export function useSimulationLifecycle({
               client.start();
               // Push pre-existing elastic constraints
               if (elasticsRef.current.length > 0) client.setElastics(elasticsRef.current);
+              setActiveSolverTier('cpu-worker');
             }
             return;
           } catch (e) {
@@ -736,13 +745,17 @@ export function useSimulationLifecycle({
         neuralClientRef.current = neuralClient;
         neuralClient.onFrame = onFrame;
         await neuralClient.initMultiPiece(placedMeshes);
-        if (!cancelled) neuralClient.start();
+        if (!cancelled) {
+          neuralClient.start();
+          setActiveSolverTier('neural-drape');
+        }
       };
 
       startSim().catch(e => console.error('[SimLifecycle] Start failed:', e));
 
       // ─── Cleanup cascade ─── (running → state-change effect cleanup)
       return () => {
+        clearActiveSolverTier();
         if (warmStartTimerRef.current) {
           clearTimeout(warmStartTimerRef.current);
           warmStartTimerRef.current = null;
@@ -762,6 +775,7 @@ export function useSimulationLifecycle({
       };
     } else if (simulationState === 'idle') {
       // ─── Cleanup cascade ─── (idle branch)
+      clearActiveSolverTier();
       if (warmStartTimerRef.current) {
         clearTimeout(warmStartTimerRef.current);
         warmStartTimerRef.current = null;

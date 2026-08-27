@@ -6,6 +6,7 @@
  */
 
 import React, { Component, type ReactNode } from 'react';
+import { pushError } from '../../utils/errorTracker';
 
 interface Props {
   children: ReactNode;
@@ -26,6 +27,14 @@ export class SimulationErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[SimulationErrorBoundary]', error, info.componentStack);
+    pushError({
+      message: error.message,
+      source: 'SimulationErrorBoundary',
+      timestamp: Date.now(),
+      stack: [error.stack, info.componentStack]
+        .filter(Boolean)
+        .join('\n') || undefined,
+    }, { persistForReload: true });
   }
 
   handleReset = () => {
