@@ -52,7 +52,9 @@ export async function initProjectPersistence(store: PersistenceStore): Promise<v
       if (hasContent) {
         // restoreProject, NOT loadProject: the import pipeline's generative
         // enrichment (auto-rename/auto-sew) must not run on a faithful restore.
-        store.dispatch(restoreProject(project));
+        // La hidratación establece el estado base de la sesión; no es una
+        // edición de la usuaria y, por tanto, reinicia la historia de deshacer.
+        store.dispatch({ ...restoreProject(project), meta: { resetUndoHistory: true } });
         store.dispatch(requestFitView()); // frame the restored work (no blank canvas)
         store.dispatch(showToast({
           type: 'info',
