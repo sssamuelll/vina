@@ -13,3 +13,6 @@ deploy/known_hosts text eol=lf
 # Shell scripts run via bash (Git Bash local): a CRLF checkout under Windows
 # autocrlf breaks the parser mid-script. Force LF.
 scripts/*.sh text eol=lf
+
+# El gate de push corre la suite completa; mismas razones de LF que pre-commit.
+.husky/pre-push text eol=lf
