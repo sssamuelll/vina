@@ -17,6 +17,8 @@
  *   branches reset NaN positions to `prevView` (continuity preserved) and
  *   increment cumulative telemetry counter via `nanLogLimiter`. Rate-limited
  *   console.warn (first occurrence + every 100th) signals NaN events without spam.
+ *   El contador cruza al main thread como mensaje `diagnostic` (caja negra 3D,
+ *   2026-08-28) y el cliente lo vuelca al ring de `solverRuntimeTracker`.
  *
  * - **Zero-copy positions reads** (hot path): `Float32Array` views over WASM
  *   memory. No Result types in signatures — fallibility implicit. Forward-only
@@ -286,6 +288,11 @@ function guardNaN(
   if (nanThisStep > 0) {
     if (nanLogLimiter.tryEmit(nanThisStep)) {
       console.warn(`[WasmWorker] NaN detected in positions buffer: ${nanThisStep} this step, ${nanLogLimiter.count} cumulative (${branchLabel})`);
+      // Caja negra 3D: mismo rate-limit que el warn; el cliente coalesce.
+      (self as unknown as Worker).postMessage({
+        type: 'diagnostic', code: 'nan_reset',
+        count: nanThisStep, cumulative: nanLogLimiter.count, branch: branchLabel,
+      });
     }
   }
 }
@@ -579,6 +586,7 @@ self.onmessage = async (event: MessageEvent) => {
             `Self-collision will no-op for this session. This is a worker bug — ` +
             `the happy-path buildAdjacencyCSR output should always be well-formed.`,
           );
+          (self as unknown as Worker).postMessage({ type: 'diagnostic', code: 'self_collision_disabled', message });
         }
 
         // Cache outline and edge data for elastic constraint building.
@@ -864,6 +872,7 @@ self.onmessage = async (event: MessageEvent) => {
       case 'updateConstraints': {
         // TODO: Wasm solver needs Rust-side update_rest_lengths binding
         console.warn('[WasmWorker] updateConstraints not yet supported for Wasm solver');
+        (self as unknown as Worker).postMessage({ type: 'diagnostic', code: 'warm_start_unsupported' });
         self.postMessage({ type: 'constraintsUpdated' });
         break;
       }

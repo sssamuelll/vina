@@ -74,6 +74,23 @@ export function pushSolverEvent(
   if (events.length > SOLVER_EVENTS_MAX) events.shift();
 }
 
+/**
+ * Para diagnósticos repetitivos (NaN sostenido en WASM): el último evento del
+ * mismo kind+tier+code se actualiza en sitio en vez de inundar el ring.
+ */
+export function coalesceSolverEvent(
+  kind: SolverEventKind,
+  data: Record<string, unknown>,
+): void {
+  const last = events[events.length - 1];
+  if (last && last.kind === kind && last.data.tier === data.tier && last.data.code === data.code) {
+    last.timestamp = Date.now();
+    last.data = data;
+    return;
+  }
+  pushSolverEvent(kind, data);
+}
+
 export function getSolverEvents(): readonly SolverEvent[] {
   return events;
 }

@@ -28,7 +28,7 @@
  */
 
 import type { SeamInitData } from '../clothWorker';
-import { pushSolverEvent } from '../solverRuntimeTracker';
+import { coalesceSolverEvent, pushSolverEvent } from '../solverRuntimeTracker';
 import type { CollisionMeshData } from '../collisionMesh';
 import { type SolverCapabilities, WASM_CAPABILITIES } from '../solverCapabilities';
 import type { ClothSolverClient } from '../solverProtocol';
@@ -374,6 +374,14 @@ export class WasmSolverClient implements ClothSolverClient {
         break;
       case 'stopped':
         break;
+      case 'diagnostic': {
+        // Caja negra 3D: NaN reseteados, auto-colisión desactivada, warm-start
+        // no soportado — no son errores de init (no tocan readyReject) y los
+        // repetidos se coalescen para no inundar el ring.
+        const { type: _type, ...rest } = msg as { type: string } & Record<string, unknown>;
+        coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', ...rest });
+        break;
+      }
       case 'error':
         // Caja negra 3D: el `code` tipado del worker se conserva en el ring
         // antes de degradarse a string para onError/readyReject.

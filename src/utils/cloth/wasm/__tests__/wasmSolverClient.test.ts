@@ -96,6 +96,24 @@ describe('WasmSolverClient', () => {
 
   // ── Contract #2 — init error path (postMessage 'error') ─────────────────
   describe('init error path (#2)', () => {
+    it('dos "diagnostic" seguidos del mismo code quedan como UN evento y no rechazan el init', async () => {
+      const { worker } = stubWorkerGlobal();
+      const client = new WasmSolverClient();
+      const initPromise = client.initMultiPiece([makePiece()]);
+
+      worker.emitMessage({ type: 'diagnostic', code: 'nan_reset', count: 2, cumulative: 2, branch: 'collision branch' });
+      worker.emitMessage({ type: 'diagnostic', code: 'nan_reset', count: 4, cumulative: 6, branch: 'collision branch' });
+      worker.emitMessage({ type: 'ready', numParticles: 3 });
+
+      await expect(initPromise).resolves.toBeUndefined();
+      expect(getSolverEvents()).toEqual([
+        expect.objectContaining({
+          kind: 'tier:diagnostic',
+          data: { tier: 'wasm', code: 'nan_reset', count: 4, cumulative: 6, branch: 'collision branch' },
+        }),
+      ]);
+    });
+
     it('un mensaje "error" del worker deja tier:runtime-error{wasm} con su code en el ring', async () => {
       const { worker } = stubWorkerGlobal();
       const client = new WasmSolverClient();

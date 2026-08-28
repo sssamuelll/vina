@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   beginCascade,
   clearSolverEvents,
+  coalesceSolverEvent,
   currentCascadeGeneration,
   getSolverEvents,
   pushSolverEvent,
@@ -40,5 +41,20 @@ describe('solverRuntimeTracker — ring de eventos', () => {
     expect(events).toHaveLength(SOLVER_EVENTS_MAX);
     expect(events[0].data.i).toBe(5);
     expect(events[events.length - 1].data.i).toBe(SOLVER_EVENTS_MAX + 4);
+  });
+});
+
+describe('solverRuntimeTracker — coalescencia de diagnósticos repetidos', () => {
+  beforeEach(clearSolverEvents);
+
+  it('coalesceSolverEvent sobreescribe el último evento si coincide kind+tier+code, y añade si no', () => {
+    coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', code: 'nan_reset', count: 3, cumulative: 3 });
+    coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', code: 'nan_reset', count: 5, cumulative: 8 });
+    coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', code: 'self_collision_disabled' });
+    coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', code: 'nan_reset', count: 1, cumulative: 9 });
+
+    const events = getSolverEvents();
+    expect(events.map(e => e.data.code)).toEqual(['nan_reset', 'self_collision_disabled', 'nan_reset']);
+    expect(events[0].data.cumulative).toBe(8);
   });
 });
