@@ -6,10 +6,18 @@ import {
   getToolExecutions,
   pushToolExecution,
 } from '../../../copilot/debug/toolExecutionTracker';
+import { clearTrackedErrors, getTrackedErrors } from '../../errorTracker';
+import { downloadBlob } from '../turntableRenderer';
 import {
+  base64ToFloat32,
   buildDiagnosticBundle,
+  CLOTH_SNAPSHOT_MAX_VERTICES,
+  downloadDiagnosticBundle,
+  float32ToBase64,
   type DiagnosticSources,
 } from '../diagnosticExporter';
+
+vi.mock('../turntableRenderer', () => ({ downloadBlob: vi.fn() }));
 
 const state = {
   project: { id: 'project-1', pieces: [{ id: 'piece-1' }] },
@@ -178,5 +186,78 @@ describe('bundle de diagnóstico puro', () => {
       }),
     ]);
     expect(JSON.stringify(bundle)).not.toContain(sentinel);
+  });
+});
+
+function geometryOf(
+  positions: Float32Array,
+  manifest: Array<{ pieceId: string; vertexOffset: number; vertexCount: number; triCount: number }>,
+) {
+  return { geometry: { attributes: { position: { array: positions } } } as never, manifest };
+}
+
+describe('foto física de la tela', () => {
+  it('base64 ↔ Float32Array es exacto', () => {
+    const arr = new Float32Array([0, 1.5, -2.25, 3.14159, 1e-7]);
+    expect(base64ToFloat32(float32ToBase64(arr))).toEqual(arr);
+  });
+
+  it('exporta las posiciones en base64 y el manifiesto corta cada pieza en su rango', () => {
+    const positions = new Float32Array([0, 0, 0,  1, 0, 0,  0, 1, 0,   5, 5, 5,  6, 5, 5]);
+    const s = sources(false);
+    s.getClothGeometry = vi.fn(() => geometryOf(positions, [
+      { pieceId: 'a', vertexOffset: 0, vertexCount: 3, triCount: 1 },
+      { pieceId: 'b', vertexOffset: 3, vertexCount: 2, triCount: 0 },
+    ]));
+
+    const snap = buildDiagnosticBundle(state, undefined, s).solver.clothSnapshot!;
+
+    expect(snap).toMatchObject({ vertexCount: 5, encoding: 'float32-base64', positionsOmitted: false, manifestMismatch: false });
+    const decoded = base64ToFloat32(snap.positions!);
+    expect(decoded).toEqual(positions);
+    expect(Array.from(decoded.subarray(3 * 3, 5 * 3))).toEqual([5, 5, 5, 6, 5, 5]);
+  });
+
+  it('por encima del techo omite las posiciones pero conserva el conteo', () => {
+    const s = sources(false);
+    s.getClothGeometry = vi.fn(() => geometryOf(new Float32Array((CLOTH_SNAPSHOT_MAX_VERTICES + 1) * 3), [
+      { pieceId: 'a', vertexOffset: 0, vertexCount: CLOTH_SNAPSHOT_MAX_VERTICES + 1, triCount: 0 },
+    ]));
+    const snap = buildDiagnosticBundle(state, undefined, s).solver.clothSnapshot!;
+    expect(snap).toMatchObject({ vertexCount: CLOTH_SNAPSHOT_MAX_VERTICES + 1, positions: null, positionsOmitted: true });
+  });
+
+  it('marca manifestMismatch cuando el manifiesto no suma los vértices del buffer', () => {
+    const s = sources(false);
+    s.getClothGeometry = vi.fn(() => geometryOf(new Float32Array(4 * 3), [
+      { pieceId: 'a', vertexOffset: 0, vertexCount: 3, triCount: 1 },
+    ]));
+    expect(buildDiagnosticBundle(state, undefined, s).solver.clothSnapshot?.manifestMismatch).toBe(true);
+  });
+
+  it('sin geometría registrada la foto es null', () => {
+    expect(buildDiagnosticBundle(state, undefined, sources(false)).solver.clothSnapshot).toBeNull();
+  });
+});
+
+describe('downloadDiagnosticBundle — red en el botón', () => {
+  beforeEach(() => {
+    clearTrackedErrors();
+    vi.mocked(downloadBlob).mockClear();
+  });
+
+  it('si la serialización lanza, reintenta sin la foto y registra el fallo', () => {
+    const s = sources(false);
+    s.getClothGeometry = vi.fn(() => geometryOf(new Float32Array(3), [{ pieceId: 'a', vertexOffset: 0, vertexCount: 1, triCount: 0 }]));
+    const stringify = vi.spyOn(JSON, 'stringify');
+    stringify.mockImplementationOnce(() => { throw new TypeError('Do not know how to serialize a BigInt'); });
+
+    downloadDiagnosticBundle(state, s);
+
+    expect(downloadBlob).toHaveBeenCalledTimes(1);
+    const blob = vi.mocked(downloadBlob).mock.calls[0][0];
+    expect(blob.size).toBeGreaterThan(0);
+    expect(getTrackedErrors()).toContainEqual(expect.objectContaining({ source: 'diagnosticExporter' }));
+    stringify.mockRestore();
   });
 });

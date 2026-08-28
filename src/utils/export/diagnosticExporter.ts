@@ -8,10 +8,59 @@ import {
   getAppliedSolverConfig,
   getClothGeometry,
   getSolverEvents,
+  type ClothGeometryRecord,
   type MeshManifestEntry,
 } from '../cloth/solverRuntimeTracker';
-import { getTrackedErrors } from '../errorTracker';
+import { getTrackedErrors, pushError } from '../errorTracker';
 import { downloadBlob } from './turntableRenderer';
+
+// ─── Foto física de la tela ─────────────────────────────────────────────────
+
+/** ponytail: techo fijo; si un bundle real lo pisa, decidir entonces. */
+export const CLOTH_SNAPSHOT_MAX_VERTICES = 100_000;
+
+export interface ClothSnapshot {
+  vertexCount: number;
+  /** Float32 little-endian, base64 — una cadena, no 300 000 números indentados. */
+  encoding: 'float32-base64';
+  positions: string | null;
+  positionsOmitted: boolean;
+  /** `vertexCount` no coincide con la suma del manifiesto: no cortar por pieza. */
+  manifestMismatch: boolean;
+}
+
+export function float32ToBase64(arr: Float32Array): string {
+  const bytes = new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
+  let binary = '';
+  const CHUNK = 0x8000; // String.fromCharCode con spread revienta la pila por encima de esto
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)));
+  }
+  return btoa(binary);
+}
+
+export function base64ToFloat32(b64: string): Float32Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Float32Array(bytes.buffer);
+}
+
+function snapshotOf(record: ClothGeometryRecord | null): ClothSnapshot | null {
+  if (!record) return null;
+  const array = record.geometry.attributes.position?.array as ArrayLike<number> | undefined;
+  if (!array) return null;
+  const vertexCount = array.length / 3;
+  const manifestTotal = record.manifest.reduce((sum, m) => sum + m.vertexCount, 0);
+  const omit = vertexCount > CLOTH_SNAPSHOT_MAX_VERTICES;
+  return {
+    vertexCount,
+    encoding: 'float32-base64',
+    positions: omit ? null : float32ToBase64(array instanceof Float32Array ? array : Float32Array.from(array)),
+    positionsOmitted: omit,
+    manifestMismatch: vertexCount !== manifestTotal,
+  };
+}
 
 type DiagnosticState = Pick<
   RootState,
@@ -44,6 +93,11 @@ export interface DiagnosticBundle {
     appliedConfig: ReturnType<typeof getAppliedSolverConfig>;
     /** Desglose por pieza de la geometría renderizada — corta `clothSnapshot.positions`. */
     meshManifest: MeshManifestEntry[] | null;
+    /**
+     * Posiciones de la geometría renderizada al exportar (≤15 frames de
+     * retraso en el tier GPU; sin velocidades — ningún tier las expone).
+     */
+    clothSnapshot: ClothSnapshot | null;
   };
   inspector: Pick<
     RootState['inspector'],
@@ -84,6 +138,7 @@ export function buildDiagnosticBundle(
       events: sources.getSolverEvents(),
       appliedConfig: sources.getAppliedSolverConfig(),
       meshManifest: sources.getClothGeometry()?.manifest ?? null,
+      clothSnapshot: snapshotOf(sources.getClothGeometry()),
     },
     inspector: {
       lastSolverError: state.inspector.lastSolverError,
@@ -96,11 +151,30 @@ export function buildDiagnosticBundle(
   };
 }
 
-export function downloadDiagnosticBundle(state: DiagnosticState): void {
-  const bundle = buildDiagnosticBundle(state);
+export function downloadDiagnosticBundle(
+  state: DiagnosticState,
+  sources: DiagnosticSources = browserSources,
+): void {
+  let bundle: DiagnosticBundle;
+  let json: string;
+  try {
+    bundle = buildDiagnosticBundle(state, undefined, sources);
+    json = JSON.stringify(bundle, null, 2);
+  } catch (e) {
+    // El botón vive en el fallback de un boundary caído: ningún boundary
+    // atrapa un throw de este onClick. Reintento sin la parte pesada y
+    // registro del fallo para que el propio bundle lo cuente.
+    pushError({
+      message: `Exportación sin foto: ${e instanceof Error ? e.message : String(e)}`,
+      source: 'diagnosticExporter',
+      timestamp: Date.now(),
+    });
+    bundle = buildDiagnosticBundle(state, undefined, { ...sources, getClothGeometry: () => null });
+    json = JSON.stringify(bundle, null, 2);
+  }
   const safeTimestamp = bundle.exportedAt.replace(/[:.]/g, '-');
   downloadBlob(
-    new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' }),
+    new Blob([json], { type: 'application/json' }),
     `vina-diagnostico-${safeTimestamp}.json`,
   );
 }
