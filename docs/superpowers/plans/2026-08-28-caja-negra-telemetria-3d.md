@@ -77,7 +77,7 @@
   El `tier` va dentro de `data.tier` (string de `SolverTier`).
 - Produces (exporter): `DiagnosticBundle.solver.events: readonly SolverEvent[]`; `DiagnosticSources.getSolverEvents: typeof getSolverEvents`.
 
-- [ ] **Paso 1: test del tracker en rojo**
+- [x] **Paso 1: test del tracker en rojo**
 
 Crear `src/utils/cloth/__tests__/solverRuntimeTracker.test.ts`:
 
@@ -128,12 +128,12 @@ describe('solverRuntimeTracker — ring de eventos', () => {
 });
 ```
 
-- [ ] **Paso 2: correr y ver el rojo**
+- [x] **Paso 2: correr y ver el rojo**
 
 Run: `npx vitest run src/utils/cloth/__tests__/solverRuntimeTracker.test.ts`
 Expected: FAIL — `beginCascade` / `pushSolverEvent` no se exportan.
 
-- [ ] **Paso 3: implementar el tracker**
+- [x] **Paso 3: implementar el tracker**
 
 Reemplazar el contenido de `src/utils/cloth/solverRuntimeTracker.ts`:
 
@@ -224,12 +224,12 @@ export function clearSolverEvents(): void {
 }
 ```
 
-- [ ] **Paso 4: verde del tracker**
+- [x] **Paso 4: verde del tracker**
 
 Run: `npx vitest run src/utils/cloth/__tests__/solverRuntimeTracker.test.ts`
 Expected: PASS (3 tests).
 
-- [ ] **Paso 5: tests del lifecycle en rojo**
+- [x] **Paso 5: tests del lifecycle en rojo**
 
 En `src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx`:
 
@@ -375,12 +375,12 @@ describe('useSimulationLifecycle — caja negra 3D: la cascada contada', () => {
 
 Añadir `act` al import de Testing Library: `import { act, renderHook, waitFor } from '@testing-library/react';`.
 
-- [ ] **Paso 6: correr y ver el rojo**
+- [x] **Paso 6: correr y ver el rojo**
 
 Run: `npx vitest run src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx`
 Expected: FAIL — los tres casos nuevos: `getSolverEvents` vacío; en el tercero, además, `instances[1].dispose` **sí** fue llamado (el bug preexistente). Los casos viejos siguen en verde.
 
-- [ ] **Paso 7: instrumentar la cascada y cerrar la carrera**
+- [x] **Paso 7: instrumentar la cascada y cerrar la carrera**
 
 En `src/components/Viewport3D/useSimulationLifecycle.ts`:
 
@@ -495,12 +495,12 @@ por:
       });
 ```
 
-- [ ] **Paso 8: verde del lifecycle**
+- [x] **Paso 8: verde del lifecycle**
 
 Run: `npx vitest run src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx`
 Expected: PASS (todos, incluidos los tres nuevos).
 
-- [ ] **Paso 9: test del exporter en rojo**
+- [x] **Paso 9: test del exporter en rojo**
 
 En `src/utils/export/__tests__/diagnosticExporter.test.ts`, en el helper `sources()` añadir la fuente nueva:
 
@@ -527,7 +527,7 @@ y un caso nuevo dentro del `describe('bundle de diagnóstico puro')`:
 Run: `npx vitest run src/utils/export/__tests__/diagnosticExporter.test.ts`
 Expected: FAIL — `solver.events` undefined.
 
-- [ ] **Paso 10: exporter**
+- [x] **Paso 10: exporter**
 
 En `src/utils/export/diagnosticExporter.ts`:
 
@@ -536,12 +536,12 @@ import { getActiveSolverTier, getSolverEvents } from '../cloth/solverRuntimeTrac
 ```
 `DiagnosticSources` gana `getSolverEvents: typeof getSolverEvents;`; `DiagnosticBundle.solver` gana `events: ReturnType<typeof getSolverEvents>;`; `browserSources` gana `getSolverEvents,`; y en `buildDiagnosticBundle` dentro de `solver: { … }` añadir `events: sources.getSolverEvents(),`.
 
-- [ ] **Paso 11: verde y gate**
+- [x] **Paso 11: verde y gate**
 
 Run: `npx vitest run src/utils/export/__tests__/diagnosticExporter.test.ts` → PASS.
 Run: `npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui` → todo verde.
 
-- [ ] **Paso 12: commit**
+- [x] **Paso 12: commit**
 
 ```bash
 git add src/utils/cloth/solverRuntimeTracker.ts src/utils/cloth/__tests__/solverRuntimeTracker.test.ts src/components/Viewport3D/useSimulationLifecycle.ts src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx src/utils/export/diagnosticExporter.ts src/utils/export/__tests__/diagnosticExporter.test.ts
@@ -562,7 +562,7 @@ git commit -m "feat(diagnostico): ring de eventos del solver — la cascada cont
 - Consumes: `pushSolverEvent` (Tarea 1); `pushError(entry, { persistForReload: true })` de `src/utils/errorTracker.ts` (ya existe).
 - Produces: eventos `device:lost { source: 'renderer' | 'previous-mount' | 'idle' | 'lifecycle-decoy', reason?, message? }` y `tier:runtime-error { tier:'webgpu', code:'uncaptured-error', message }`; error persistido con `source: 'webgpu-device-lost'`; global DEV `window.__VINA_RENDERER_DEVICE__`.
 
-- [ ] **Paso 1: test del errorTracker en rojo (contrato del source)**
+- [x] **Paso 1: test del errorTracker en rojo (contrato del source)**
 
 Añadir al final de `src/utils/__tests__/errorTracker.test.ts`:
 
@@ -586,7 +586,7 @@ it('un error de device perdido persistido con persistForReload vuelve al ring tr
 
 Run: `npx vitest run src/utils/__tests__/errorTracker.test.ts` → debe pasar YA (el mecanismo existe); este caso pinea el `source` que GarmentSimulation va a usar. Si pasa, seguir; no es un rojo, es un contrato.
 
-- [ ] **Paso 2: GarmentSimulation**
+- [x] **Paso 2: GarmentSimulation**
 
 Imports (junto a los existentes de `../../store/copilotUISlice` y `./useSimulationLifecycle`):
 
@@ -638,7 +638,7 @@ Reemplazar el cuerpo del efecto de `:1436-1462` (desde `const device = rendererD
 
 (El texto del toast no cambia: es la cadena existente, copiada tal cual.)
 
-- [ ] **Paso 3: Viewport3D (pérdida en idle)**
+- [x] **Paso 3: Viewport3D (pérdida en idle)**
 
 `src/components/Viewport3D/Viewport3D.tsx:158-159`: import `pushSolverEvent` de `'../../utils/cloth/solverRuntimeTracker'` y reemplazar
 
@@ -653,11 +653,11 @@ por
     });
 ```
 
-- [ ] **Paso 4: lifecycle (device señuelo)**
+- [x] **Paso 4: lifecycle (device señuelo)**
 
 `useSimulationLifecycle.ts:521-525`, dentro del `device.lost.then((info) => { … })` añadir tras el `console.warn`: `pushSolverEvent('device:lost', { source: 'lifecycle-decoy', reason: info.reason, message: info.message }, generation);`
 
-- [ ] **Paso 5: gate y commit**
+- [x] **Paso 5: gate y commit**
 
 Run: `npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui` → verde.
 
@@ -684,7 +684,7 @@ git commit -m "feat(diagnostico): la pérdida del device WebGPU entra al ring y 
 - Consumes: `pushSolverEvent` (Tarea 1). Los clientes no reciben generación: usan la corriente.
 - Produces: `tier:runtime-error { tier, code, message }`, `nan:detected { tier:'webgpu', phase:'input', count } | { tier:'webgpu', frame, particleIndex, component }`, `nan:solver-stopped { tier:'webgpu' }`, `collision:degraded { tier:'webgpu', id, reason }`, `tier:diagnostic { tier:'neural-drape', code }`, `meshing:piece-failed { pieceId, message }`.
 
-- [ ] **Paso 1: test WASM en rojo**
+- [x] **Paso 1: test WASM en rojo**
 
 En `src/utils/cloth/wasm/__tests__/wasmSolverClient.test.ts`, import `{ clearSolverEvents, getSolverEvents } from '../../solverRuntimeTracker'`, `clearSolverEvents()` en el `beforeEach` existente, y dentro de `describe('init lifecycle (#1)')`:
 
@@ -708,7 +708,7 @@ En `src/utils/cloth/wasm/__tests__/wasmSolverClient.test.ts`, import `{ clearSol
 
 Run: `npx vitest run src/utils/cloth/wasm/__tests__/wasmSolverClient.test.ts` → FAIL (ring vacío).
 
-- [ ] **Paso 2: wasmSolverClient**
+- [x] **Paso 2: wasmSolverClient**
 
 Import `import { pushSolverEvent } from '../solverRuntimeTracker';`.
 
@@ -720,7 +720,7 @@ Import `import { pushSolverEvent } from '../solverRuntimeTracker';`.
 
 Run: mismo archivo → PASS.
 
-- [ ] **Paso 3: test CPU en rojo**
+- [x] **Paso 3: test CPU en rojo**
 
 En `src/utils/cloth/__tests__/clothWorkerClient.test.ts`, import `{ clearSolverEvents, getSolverEvents } from '../solverRuntimeTracker'`; en el `afterEach` existente añadir `clearSolverEvents();`; caso nuevo dentro del `describe('ClothWorkerClient')` (usar el mismo patrón de los casos de `error` existentes en ese archivo — el helper `stubWorkerGlobal()` de `./fakeClothWorker` y el handler `worker.onmessage`):
 
@@ -746,13 +746,13 @@ En `src/utils/cloth/__tests__/clothWorkerClient.test.ts`, import `{ clearSolverE
 
 Run: `npx vitest run src/utils/cloth/__tests__/clothWorkerClient.test.ts` → FAIL.
 
-- [ ] **Paso 4: clothWorkerClient**
+- [x] **Paso 4: clothWorkerClient**
 
 Import `import { pushSolverEvent } from './solverRuntimeTracker';`. En los tres sitios (`worker.onerror` de `init` `:81-88`, `worker.onerror` de `initMultiPiece` `:124-131`, `case 'error'` `:391-396`) añadir, antes de `this.onError?.(…)`, `pushSolverEvent('tier:runtime-error', { tier: 'cpu-worker', code: 'worker_error', message: msg /* o msg.message en el case */ });`.
 
 Run: mismo archivo → PASS.
 
-- [ ] **Paso 5: tests GPU en rojo**
+- [x] **Paso 5: tests GPU en rojo**
 
 En `src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts`, import `{ clearSolverEvents, getSolverEvents } from '../../solverRuntimeTracker'` y un `beforeEach(clearSolverEvents)` a nivel de archivo; `describe` nuevo al final:
 
@@ -808,7 +808,7 @@ describe('caja negra 3D — eventos del tier GPU', () => {
 
 Run: `npx vitest run src/utils/cloth/gpu/__tests__/gpuSolverClient.test.ts` → FAIL (tres casos).
 
-- [ ] **Paso 6: gpuSolverClient**
+- [x] **Paso 6: gpuSolverClient**
 
 Import `import { pushSolverEvent } from '../solverRuntimeTracker';`.
 
@@ -824,13 +824,13 @@ Import `import { pushSolverEvent } from '../solverRuntimeTracker';`.
 
 Run: mismo archivo → PASS.
 
-- [ ] **Paso 7: Neural e init client (sin test unitario propio: tres líneas cada uno, cubiertas por el gate de tipos)**
+- [x] **Paso 7: Neural e init client (sin test unitario propio: tres líneas cada uno, cubiertas por el gate de tipos)**
 
 `neuralDrapeClient.ts`: import `import { pushSolverEvent } from '../solverRuntimeTracker';`. `:177` (tras el `console.warn` del ONNX): `pushSolverEvent('tier:diagnostic', { tier: 'neural-drape', code: 'analytical-fallback', message: String(err) });`. `:339` (tras el `console.warn` de inferencia): `pushSolverEvent('tier:diagnostic', { tier: 'neural-drape', code: 'inference-failed', message: String(err) });`.
 
 `simulationInitClient.ts:139-141`: import `import { pushSolverEvent } from './solverRuntimeTracker';` y tras el `console.warn`: `pushSolverEvent('meshing:piece-failed', { pieceId: piece.id, message: err instanceof Error ? err.message : String(err) });`.
 
-- [ ] **Paso 8: gate y commit**
+- [x] **Paso 8: gate y commit**
 
 Run: `npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui` → verde.
 
@@ -854,7 +854,7 @@ git commit -m "feat(diagnostico): los errores runtime de cada tier entran al rin
 - Produces (tracker): `export function coalesceSolverEvent(kind: SolverEventKind, data: Record<string, unknown>): void` — si el último evento del ring tiene el mismo `kind`, `data.tier` y `data.code`, lo sobreescribe (timestamp y data); si no, `pushSolverEvent`.
 - Produces (worker→cliente): mensaje `{ type: 'diagnostic', code: 'nan_reset' | 'self_collision_disabled' | 'warm_start_unsupported', message?: string, count?: number, cumulative?: number, branch?: string }`.
 
-- [ ] **Paso 1: test del tracker en rojo**
+- [x] **Paso 1: test del tracker en rojo**
 
 Añadir a `src/utils/cloth/__tests__/solverRuntimeTracker.test.ts` (import `coalesceSolverEvent`):
 
@@ -873,7 +873,7 @@ Añadir a `src/utils/cloth/__tests__/solverRuntimeTracker.test.ts` (import `coal
 
 Run: `npx vitest run src/utils/cloth/__tests__/solverRuntimeTracker.test.ts` → FAIL.
 
-- [ ] **Paso 2: tracker**
+- [x] **Paso 2: tracker**
 
 Añadir en `solverRuntimeTracker.ts` tras `pushSolverEvent`:
 
@@ -898,7 +898,7 @@ export function coalesceSolverEvent(
 
 Run: mismo archivo → PASS.
 
-- [ ] **Paso 3: test del cliente en rojo**
+- [x] **Paso 3: test del cliente en rojo**
 
 En `wasmSolverClient.test.ts`, dentro de `describe('init lifecycle (#1)')`:
 
@@ -924,7 +924,7 @@ En `wasmSolverClient.test.ts`, dentro de `describe('init lifecycle (#1)')`:
 
 Run → FAIL.
 
-- [ ] **Paso 4: cliente**
+- [x] **Paso 4: cliente**
 
 `wasmSolverClient.ts`: ampliar el import a `{ coalesceSolverEvent, pushSolverEvent }`; en `handleMessage` añadir antes de `case 'error':`:
 
@@ -938,7 +938,7 @@ Run → FAIL.
 
 Run → PASS.
 
-- [ ] **Paso 5: worker**
+- [x] **Paso 5: worker**
 
 `wasmSolverWorker.ts`:
 
@@ -963,7 +963,7 @@ Run → PASS.
 
 `:18-23` (comentario de cabecera): cambiar la frase de la deuda por *«El contador cruza al main thread como mensaje `diagnostic` (caja negra 3D, 2026-08-28) y el cliente lo vuelca al ring de `solverRuntimeTracker`.»*
 
-- [ ] **Paso 6: gate y commit**
+- [x] **Paso 6: gate y commit**
 
 Run: `npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui` → verde.
 
@@ -997,7 +997,7 @@ git commit -m "feat(diagnostico): NaN y auto-colisión del worker WASM salen del
   ```
 - Produces (exporter): `solver.appliedConfig: AppliedSolverConfig | null`, `solver.meshManifest: MeshManifestEntry[] | null`; **se elimina `solver.config`**. `DiagnosticSources` gana `getAppliedSolverConfig` y `getClothGeometry`.
 
-- [ ] **Paso 1: tests del tracker en rojo**
+- [x] **Paso 1: tests del tracker en rojo**
 
 Añadir a `solverRuntimeTracker.test.ts` (imports: `setAppliedSolverConfig`, `getAppliedSolverConfig`, `clearActiveSolverTier`, `setActiveSolverTier`, `registerClothGeometry`, `getClothGeometry`; y `import { BufferGeometry } from 'three';`):
 
@@ -1026,7 +1026,7 @@ describe('solverRuntimeTracker — config aplicada y geometría retenida', () =>
 
 Run → FAIL.
 
-- [ ] **Paso 2: tracker**
+- [x] **Paso 2: tracker**
 
 Añadir a `solverRuntimeTracker.ts` (`import type { BufferGeometry } from 'three';` arriba):
 
@@ -1090,7 +1090,7 @@ y en `clearActiveSolverTier()` añadir `appliedConfig = null;`.
 
 Run → PASS.
 
-- [ ] **Paso 3: test del lifecycle en rojo**
+- [x] **Paso 3: test del lifecycle en rojo**
 
 En el `describe('useSimulationLifecycle — caja negra 3D: la cascada contada')` (Tarea 1) añadir (import `getAppliedSolverConfig`):
 
@@ -1119,7 +1119,7 @@ En el `describe('useSimulationLifecycle — caja negra 3D: la cascada contada')`
 
 Run → FAIL.
 
-- [ ] **Paso 4: lifecycle**
+- [x] **Paso 4: lifecycle**
 
 Import `setAppliedSolverConfig` del tracker. En `:649-660` la llamada a `wasmClient.initMultiPiece(...)` recibe un objeto de config construido inline; extraerlo a `const wasmInitConfig = { … }` justo antes del `await withTimeout(` y pasar `wasmInitConfig` en su lugar (misma forma, mismo contenido). Después de `:673` (`if (elasticsRef.current.length > 0) wasmClient.setElastics(...)`) y antes de `setActiveSolverTier('wasm')`:
 
@@ -1135,7 +1135,7 @@ Mismo patrón en CPU (`:703-724`: extraer `cpuInitConfig`, registrar tras `setEl
 
 Run → PASS.
 
-- [ ] **Paso 5: GarmentSimulation — el manifiesto en el mismo loop que la geometría**
+- [x] **Paso 5: GarmentSimulation — el manifiesto en el mismo loop que la geometría**
 
 `GarmentSimulation.tsx`:
 
@@ -1157,7 +1157,7 @@ Run → PASS.
 
 Import: `import { pushSolverEvent, registerClothGeometry, type MeshManifestEntry } from '../../utils/cloth/solverRuntimeTracker';` (fusionar con el import de la Tarea 2).
 
-- [ ] **Paso 6: test del exporter en rojo**
+- [x] **Paso 6: test del exporter en rojo**
 
 En `diagnosticExporter.test.ts`, en `sources()` añadir:
 
@@ -1196,13 +1196,13 @@ Caso nuevo:
 
 Run → FAIL.
 
-- [ ] **Paso 7: exporter**
+- [x] **Paso 7: exporter**
 
 `diagnosticExporter.ts`: import `getAppliedSolverConfig`, `getClothGeometry` del tracker; `DiagnosticSources` gana ambos; `browserSources` también. En `DiagnosticBundle.solver`: **quitar `config`**, añadir `appliedConfig: ReturnType<typeof getAppliedSolverConfig>; meshManifest: MeshManifestEntry[] | null;`. En `buildDiagnosticBundle`: quitar `config: state.simulation,`; añadir `appliedConfig: sources.getAppliedSolverConfig(), meshManifest: sources.getClothGeometry()?.manifest ?? null,`.
 
 Run → PASS.
 
-- [ ] **Paso 8: gate y commit**
+- [x] **Paso 8: gate y commit**
 
 Run: `npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui` → verde.
 
@@ -1235,7 +1235,7 @@ git commit -m "feat(diagnostico): config aplicada por tier y manifiesto por piez
   ```
   `solver.clothSnapshot: ClothSnapshot | null`. `downloadDiagnosticBundle` reintenta sin foto si `build + stringify` lanza.
 
-- [ ] **Paso 1: tests en rojo**
+- [x] **Paso 1: tests en rojo**
 
 Añadir a `diagnosticExporter.test.ts` (imports: `base64ToFloat32`, `CLOTH_SNAPSHOT_MAX_VERTICES`, `downloadDiagnosticBundle`, `float32ToBase64`; y `import * as turntable from '../turntableRenderer';`, `import { getTrackedErrors, clearTrackedErrors } from '../../errorTracker';`):
 
@@ -1312,7 +1312,7 @@ describe('downloadDiagnosticBundle — red en el botón', () => {
 
 (`downloadDiagnosticBundle` gana un segundo parámetro opcional `sources` para el test.) Run → FAIL.
 
-- [ ] **Paso 2: exporter**
+- [x] **Paso 2: exporter**
 
 En `diagnosticExporter.ts`:
 
@@ -1406,7 +1406,7 @@ Verificar que `downloadBlob` se importa como `import { downloadBlob } from './tu
 
 Run → PASS.
 
-- [ ] **Paso 3: gate y commit**
+- [x] **Paso 3: gate y commit**
 
 Run: `npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui` → verde.
 
