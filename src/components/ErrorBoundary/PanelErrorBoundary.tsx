@@ -1,4 +1,7 @@
 import { Component, type ReactNode } from 'react';
+import { store } from '../../store';
+import { pushError } from '../../utils/errorTracker';
+import { downloadDiagnosticBundle } from '../../utils/export/diagnosticExporter';
 import './ErrorBoundary.css';
 
 interface Props {
@@ -10,10 +13,11 @@ interface Props {
 interface State {
   hasError: boolean;
   errorMessage: string;
+  exportFailed: boolean;
 }
 
 export class PanelErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false, errorMessage: '' };
+  state: State = { hasError: false, errorMessage: '', exportFailed: false };
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, errorMessage: error.message };
@@ -21,11 +25,28 @@ export class PanelErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error(`[PanelErrorBoundary:${this.props.panelName}]`, error, info.componentStack);
+    pushError({
+      message: error.message,
+      source: `PanelErrorBoundary:${this.props.panelName}`,
+      timestamp: Date.now(),
+      stack: [error.stack, info.componentStack]
+        .filter(Boolean)
+        .join('\n') || undefined,
+    }, { persistForReload: true });
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, errorMessage: '' });
+    this.setState({ hasError: false, errorMessage: '', exportFailed: false });
     this.props.onReset?.();
+  };
+
+  handleExportDiagnostic = () => {
+    try {
+      downloadDiagnosticBundle(store.getState());
+      this.setState({ exportFailed: false });
+    } catch {
+      this.setState({ exportFailed: true });
+    }
   };
 
   render() {
@@ -37,9 +58,19 @@ export class PanelErrorBoundary extends Component<Props, State> {
           <div className="panel-error-message">
             {this.state.errorMessage || 'Un error inesperado ocurrió en este panel.'}
           </div>
-          <button className="panel-error-reset" onClick={this.handleReset}>
-            Reiniciar el panel
-          </button>
+          <div className="error-boundary-actions">
+            <button className="panel-error-reset" onClick={this.handleExportDiagnostic}>
+              Exportar diagnóstico
+            </button>
+            <button className="panel-error-reset" onClick={this.handleReset}>
+              Reiniciar el panel
+            </button>
+          </div>
+          {this.state.exportFailed && (
+            <div className="app-error-save-status app-error-save-fail" role="alert">
+              No pude crear el archivo de diagnóstico. Inténtalo de nuevo antes de reiniciar.
+            </div>
+          )}
         </div>
       );
     }

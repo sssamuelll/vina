@@ -7,6 +7,8 @@
  * @module errorTracker
  */
 
+import { safeGetItem, safeRemoveItem, safeSetItem } from './safeStorage';
+
 export interface TrackedError {
   message: string;
   source?: string;
@@ -18,6 +20,8 @@ const MAX_ERRORS = 50;
 const errors: TrackedError[] = [];
 let _initialized = false;
 
+export const LAST_BOUNDARY_ERROR_KEY = 'vina-last-boundary-error';
+
 /** Get all tracked errors (newest first). */
 export function getTrackedErrors(): readonly TrackedError[] {
   return errors;
@@ -26,6 +30,8 @@ export function getTrackedErrors(): readonly TrackedError[] {
 /** Clear all tracked errors. */
 export function clearTrackedErrors(): void {
   errors.length = 0;
+  // LS-only: borra la misma ranura síncrona de crash; no existe copia IDB paralela.
+  safeRemoveItem(LAST_BOUNDARY_ERROR_KEY);
 }
 
 /** Get error count. */
@@ -33,9 +39,29 @@ export function getErrorCount(): number {
   return errors.length;
 }
 
-function pushError(entry: TrackedError): void {
+export function pushError(
+  entry: TrackedError,
+  options: { persistForReload?: boolean } = {},
+): void {
   errors.push(entry);
   if (errors.length > MAX_ERRORS) errors.shift();
+  if (options.persistForReload) {
+    // LS-only: React componentDidCatch debe sobrevivir un reload y no puede esperar IDB.
+    safeSetItem(LAST_BOUNDARY_ERROR_KEY, JSON.stringify(entry));
+  }
+}
+
+function readPersistedBoundaryError(): TrackedError | null {
+  try {
+    const raw = safeGetItem(LAST_BOUNDARY_ERROR_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<TrackedError>;
+    return typeof value.message === 'string' && typeof value.timestamp === 'number'
+      ? value as TrackedError
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -45,6 +71,8 @@ function pushError(entry: TrackedError): void {
 export function initErrorTracker(): void {
   if (_initialized || typeof window === 'undefined') return;
   _initialized = true;
+  const persisted = readPersistedBoundaryError();
+  if (persisted) pushError(persisted);
 
   window.addEventListener('error', (event) => {
     pushError({

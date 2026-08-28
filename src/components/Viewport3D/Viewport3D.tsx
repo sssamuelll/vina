@@ -66,6 +66,7 @@ import { dispatchInspectPiece } from '../../store/inspectorSlice';
 import { useDispatch } from 'react-redux';
 import { toolRegistry } from '../../tools';
 import { displayShortcut } from '../shell/shortcutDisplay';
+import { pushError } from '../../utils/errorTracker';
 import './Viewport3D.css';
 
 /** Error boundary so a WebGL crash doesn't take down the 2D editor */
@@ -73,6 +74,17 @@ class Viewport3DErrorBoundary extends Component<{ children: ReactNode }, { hasEr
   state = { hasError: false, error: '' };
   static getDerivedStateFromError(err: Error) {
     return { hasError: true, error: err.message };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[Viewport3DErrorBoundary]', error, info.componentStack);
+    pushError({
+      message: error.message,
+      source: 'Viewport3DErrorBoundary',
+      timestamp: Date.now(),
+      stack: [error.stack, info.componentStack]
+        .filter(Boolean)
+        .join('\n') || undefined,
+    }, { persistForReload: true });
   }
   render() {
     if (this.state.hasError) {

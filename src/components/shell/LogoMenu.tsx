@@ -13,13 +13,14 @@ import {
 } from '../../store/simulationSlice';
 import { toggleDockSignaling } from '../../store/dockSlice';
 import { requestConfirmation } from '../../hooks/useGuardedAction';
-import { showInfoToast } from '../../store/copilotUISlice';
+import { showErrorToast, showInfoToast } from '../../store/copilotUISlice';
 import { duplicatePiece, removePieces, removeSeam } from '../../store/projectSlice';
 import { runAutoSew } from '../../store/autoSewThunk';
 import { openRenderSettings } from '../../store/renderSettingsThunk';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { store } from '../../store';
 import { runUiExport } from '../../utils/export/uiExport';
+import { downloadDiagnosticBundle } from '../../utils/export/diagnosticExporter';
 import { clearStorageProject } from '../../utils/projectIO';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { displayShortcut } from './shortcutDisplay';
@@ -61,6 +62,19 @@ const FILE_MENU: MenuItem[] = [
   { label: 'Exportar PDF (1:1)', action: (d) => runUiExport('pdf', store.getState().project, d) },
   { label: 'Exportar BOM (CSV)', action: (d) => runUiExport('bom', store.getState().project, d) },
   { label: 'Exportar 3D / Vuelta 360°...', action: (d) => d(openRenderSettings()) },
+  { separator: true, label: '' },
+  {
+    label: 'Exportar diagnóstico',
+    action: (dispatch) => {
+      try {
+        downloadDiagnosticBundle(store.getState());
+      } catch {
+        dispatch(showErrorToast(
+          'No pude exportar el diagnóstico: el navegador no creó el archivo. Inténtalo de nuevo.',
+        ));
+      }
+    },
+  },
 ];
 
 const EDIT_MENU: MenuItem[] = [

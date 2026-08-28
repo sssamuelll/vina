@@ -1,6 +1,8 @@
 import { Component, type ReactNode } from 'react';
 import { store } from '../../store';
 import { saveToStorage } from '../../utils/projectIO';
+import { pushError } from '../../utils/errorTracker';
+import { downloadDiagnosticBundle } from '../../utils/export/diagnosticExporter';
 import './ErrorBoundary.css';
 
 interface Props {
@@ -11,10 +13,16 @@ interface State {
   hasError: boolean;
   errorMessage: string;
   didAutoSave: boolean | null; // null = not attempted, true/false = result
+  exportFailed: boolean;
 }
 
 export class AppErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false, errorMessage: '', didAutoSave: null };
+  state: State = {
+    hasError: false,
+    errorMessage: '',
+    didAutoSave: null,
+    exportFailed: false,
+  };
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, errorMessage: error.message };
@@ -22,6 +30,14 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[AppErrorBoundary] Fatal error', error, info.componentStack);
+    pushError({
+      message: error.message,
+      source: 'AppErrorBoundary',
+      timestamp: Date.now(),
+      stack: [error.stack, info.componentStack]
+        .filter(Boolean)
+        .join('\n') || undefined,
+    }, { persistForReload: true });
 
     // Attempt emergency auto-save
     try {
@@ -36,6 +52,15 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   handleReload = () => {
     window.location.reload();
+  };
+
+  handleExportDiagnostic = () => {
+    try {
+      downloadDiagnosticBundle(store.getState());
+      this.setState({ exportFailed: false });
+    } catch {
+      this.setState({ exportFailed: true });
+    }
   };
 
   render() {
@@ -57,9 +82,19 @@ export class AppErrorBoundary extends Component<Props, State> {
               El auto-guardado falló: los últimos cambios pueden perderse.
             </div>
           )}
-          <button className="app-error-reload" onClick={this.handleReload}>
-            Recargar la aplicación
-          </button>
+          <div className="error-boundary-actions">
+            <button className="app-error-reload" onClick={this.handleExportDiagnostic}>
+              Exportar diagnóstico
+            </button>
+            <button className="app-error-reload" onClick={this.handleReload}>
+              Recargar la aplicación
+            </button>
+          </div>
+          {this.state.exportFailed && (
+            <div className="app-error-save-status app-error-save-fail" role="alert">
+              No pude crear el archivo de diagnóstico. Inténtalo de nuevo antes de recargar.
+            </div>
+          )}
         </div>
       );
     }

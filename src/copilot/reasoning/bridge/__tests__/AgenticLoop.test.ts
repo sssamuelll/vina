@@ -1,8 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { AgenticLoop } from '../AgenticLoop';
 import type { ProviderResponse, ProviderToolCall, ProviderToolDef } from '../../../providers/types';
 import type { MetaToolDefinition } from '../meta-tools/types';
 import type { AgenticEvent } from '../AgenticLoop';
+import { PRESENT_TO_USER_TOOL_NAME } from '../meta-tools/presentToUser';
+import {
+  clearToolExecutions,
+  getToolExecutions,
+} from '../../../debug/toolExecutionTracker';
 
 // Helper: create mock LLM send function from a sequence of responses
 function createMockSend(responses: ProviderResponse[]) {
@@ -15,6 +20,8 @@ function createMockSend(responses: ProviderResponse[]) {
 }
 
 describe('AgenticLoop', () => {
+  beforeEach(clearToolExecutions);
+
   it('returns text response when LLM responds without tool calls', async () => {
     const send = createMockSend([
       { content: 'Done! Neckline reduced by 2cm.', toolCalls: [] },
@@ -118,6 +125,237 @@ describe('AgenticLoop', () => {
 
     expect(result).toBe('Edge modified successfully.');
     expect(mockExecute).toHaveBeenCalledWith('modifyEdge', { pieceId: 'p1', edge: 'neckline', delta: -20 });
+  });
+
+  it('separa fallo retornado, cancelación y shape ajeno', async () => {
+    const runReturnedResult = async (
+      name: string,
+      returnedResult: unknown,
+    ): Promise<AgenticEvent[]> => {
+      const send = createMockSend([
+        { content: '', toolCalls: [{ id: 'tc1', name, arguments: '{}' }] },
+        { content: 'Listo.', toolCalls: [] },
+      ]);
+      const loop = new AgenticLoop({
+        send,
+        metaTools: [],
+        actionToolDefs: [{
+          name,
+          description: 'Tool de prueba',
+          parameters: { type: 'object', properties: {} },
+        }],
+        getState: () => ({}) as never,
+        dispatch: vi.fn(),
+        registry: {
+          execute: vi.fn(async () => returnedResult),
+          get: vi.fn(() => ({ name })),
+        } as never,
+      });
+      const events: AgenticEvent[] = [];
+
+      await loop.run('ejecuta el tool', (event) => events.push(event));
+
+      return events;
+    };
+
+    const errorEvents = await runReturnedResult('modifyEdge', {
+      success: false,
+      error: 'Piece not found',
+    });
+    expect(errorEvents).toContainEqual({
+      type: 'tool:error',
+      name: 'modifyEdge',
+      error: 'Piece not found',
+    });
+    expect(getToolExecutions().at(-1)).toMatchObject({
+      toolName: 'modifyEdge',
+      success: false,
+      error: 'Piece not found',
+    });
+
+    const cancelEvents = await runReturnedResult('clearProjectMemory', {
+      success: false,
+      message: 'Cancelled — memory was not cleared.',
+    });
+    expect(cancelEvents).toContainEqual({
+      type: 'tool:cancelled',
+      name: 'clearProjectMemory',
+      message: 'Cancelled — memory was not cleared.',
+    });
+    expect(cancelEvents.some((event) =>
+      event.type === 'tool:complete' || event.type === 'tool:error'
+    )).toBe(false);
+    expect(getToolExecutions().at(-1)).toMatchObject({
+      toolName: 'clearProjectMemory',
+      success: null,
+      error: null,
+    });
+
+    const foreignEvents = await runReturnedResult('readLegacy', { ok: false });
+    expect(foreignEvents).toContainEqual(expect.objectContaining({
+      type: 'tool:complete',
+      name: 'readLegacy',
+    }));
+    expect(getToolExecutions().at(-1)).toMatchObject({
+      toolName: 'readLegacy',
+      success: true,
+      error: null,
+    });
+  });
+
+  it('registra el rechazo de presentToUser sin grounding en el ring', async () => {
+    const send = createMockSend([
+      {
+        content: '',
+        toolCalls: [{
+          id: 'present-1',
+          name: PRESENT_TO_USER_TOOL_NAME,
+          arguments: JSON.stringify({ message: 'Propuesta', awaiting: 'confirmation' }),
+        }],
+      },
+      { content: 'No pude continuar.', toolCalls: [] },
+    ]);
+    const loop = new AgenticLoop({
+      send,
+      metaTools: [],
+      actionToolDefs: [],
+      getState: () => ({}) as never,
+      dispatch: vi.fn(),
+    });
+    const events: AgenticEvent[] = [];
+
+    await loop.run('propón algo', (event) => events.push(event));
+
+    const terminalEvents = events.filter((event) =>
+      event.type === 'tool:complete' || event.type === 'tool:error'
+    );
+    const presentRecords = getToolExecutions().filter(
+      (record) => record.toolName === PRESENT_TO_USER_TOOL_NAME,
+    );
+    expect(terminalEvents).toHaveLength(1);
+    expect(terminalEvents[0]).toMatchObject({
+      type: 'tool:error',
+      name: PRESENT_TO_USER_TOOL_NAME,
+    });
+    expect(presentRecords).toHaveLength(1);
+    expect(presentRecords[0]).toMatchObject({
+      success: false,
+      error: expect.stringContaining('cannot speak to the user'),
+    });
+  });
+
+  it('registra el rechazo de presentToUser done sin acción en el ring', async () => {
+    const readTool: MetaToolDefinition = {
+      name: 'getGarmentState',
+      description: 'Lee el estado',
+      parameters: { type: 'object', properties: {} },
+      execute: vi.fn(async () => ({ success: true, data: { pieces: [] } })),
+    };
+    const send = createMockSend([
+      {
+        content: '',
+        toolCalls: [{ id: 'read-1', name: 'getGarmentState', arguments: '{}' }],
+      },
+      {
+        content: '',
+        toolCalls: [{
+          id: 'present-1',
+          name: PRESENT_TO_USER_TOOL_NAME,
+          arguments: JSON.stringify({ message: 'Terminé', awaiting: 'done' }),
+        }],
+      },
+      { content: 'No pude continuar.', toolCalls: [] },
+    ]);
+    const loop = new AgenticLoop({
+      send,
+      metaTools: [readTool],
+      actionToolDefs: [],
+      getState: () => ({}) as never,
+      dispatch: vi.fn(),
+    });
+    const events: AgenticEvent[] = [];
+
+    await loop.run('termina el trabajo', (event) => events.push(event));
+
+    const presentTerminalEvents = events.filter((event) =>
+      (event.type === 'tool:complete' || event.type === 'tool:error')
+      && event.name === PRESENT_TO_USER_TOOL_NAME
+    );
+    const presentRecords = getToolExecutions().filter(
+      (record) => record.toolName === PRESENT_TO_USER_TOOL_NAME,
+    );
+    expect(presentTerminalEvents).toHaveLength(1);
+    expect(presentTerminalEvents[0]).toMatchObject({ type: 'tool:error' });
+    expect(presentRecords).toHaveLength(1);
+    expect(presentRecords[0]).toMatchObject({
+      success: false,
+      error: expect.stringContaining('No action tool has been called'),
+    });
+  });
+
+  it('registra presentToUser aceptado y lo deja como último tool verboso', async () => {
+    const sentinel = 'SECRETO_LLM_PRESENT_TO_USER_27_AGOSTO';
+    const readTool: MetaToolDefinition = {
+      name: 'getGarmentState',
+      description: 'Lee el estado',
+      parameters: { type: 'object', properties: {} },
+      execute: vi.fn(async () => ({ success: true, data: { pieces: [] } })),
+    };
+    const presentArgs = { message: sentinel, awaiting: 'confirmation' };
+    const send = createMockSend([
+      {
+        content: '',
+        toolCalls: [{ id: 'read-1', name: 'getGarmentState', arguments: '{}' }],
+      },
+      {
+        content: '',
+        toolCalls: [{
+          id: 'present-1',
+          name: PRESENT_TO_USER_TOOL_NAME,
+          arguments: JSON.stringify(presentArgs),
+        }],
+      },
+    ]);
+    const loop = new AgenticLoop({
+      send,
+      metaTools: [readTool],
+      actionToolDefs: [],
+      getState: () => ({}) as never,
+      dispatch: vi.fn(),
+    });
+    const events: AgenticEvent[] = [];
+
+    await expect(loop.run('haz una propuesta', (event) => events.push(event)))
+      .resolves.toBe(sentinel);
+
+    expect(events).toContainEqual({
+      type: 'tool:complete',
+      name: PRESENT_TO_USER_TOOL_NAME,
+      result: { success: true, data: presentArgs },
+    });
+    expect(getToolExecutions().filter(
+      (record) => record.toolName === PRESENT_TO_USER_TOOL_NAME,
+    )).toEqual([
+      expect.objectContaining({
+        args: { awaiting: 'confirmation' },
+        success: true,
+        error: null,
+        durationMs: 0,
+      }),
+    ]);
+    const presentRecord = getToolExecutions().find(
+      (record) => record.toolName === PRESENT_TO_USER_TOOL_NAME,
+    );
+    expect(presentRecord?.args).not.toHaveProperty('message');
+    expect(JSON.stringify(presentRecord)).not.toContain(sentinel);
+    // No es una aserción debilitada: el canal verboso sí conserva el mensaje.
+    expect(loop.getLastToolCalls().at(-1)).toMatchObject({
+      name: PRESENT_TO_USER_TOOL_NAME,
+      arguments: presentArgs,
+      result: { success: true, data: presentArgs },
+      duration: 0,
+      isMetaTool: true,
+    });
   });
 
   it('handles tool errors gracefully — LLM sees error and recovers', async () => {
@@ -261,6 +499,12 @@ describe('AgenticLoop', () => {
     const toolResult = JSON.parse(toolMsg!.content);
     expect(toolResult.success).toBe(false);
     expect(toolResult.error).toContain('Malformed JSON');
+    expect(getToolExecutions().at(-1)).toMatchObject({
+      toolName: 'modifyEdge',
+      args: {},
+      success: false,
+      error: expect.stringContaining('Malformed JSON'),
+    });
   });
 
   it('emits loop-level error event and rethrows when send throws', async () => {
@@ -313,6 +557,11 @@ describe('AgenticLoop', () => {
 
     const errorEvents = events.filter(e => e.type === 'tool:error');
     expect(errorEvents).toHaveLength(1);
+    expect(getToolExecutions().at(-1)).toMatchObject({
+      toolName: 'modifyEdge',
+      success: false,
+      error: 'kaboom',
+    });
   });
 
   // ─── Multi-turn conversation history (M2 dressing intent gate) ────────────

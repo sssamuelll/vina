@@ -144,6 +144,10 @@ import avatarReducer from '../../../store/avatarSlice';
 import collisionBodyReducer from '../../../store/collisionBodySlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
 import inspectorReducer from '../../../store/inspectorSlice';
+import {
+  clearActiveSolverTier,
+  getActiveSolverTier,
+} from '../../../utils/cloth/solverRuntimeTracker';
 
 function makeStore() {
   return configureStore({
@@ -195,10 +199,13 @@ function makeSeam(overrides: Partial<SeamInitData> = {}): SeamInitData {
 
 const seamInitData: SeamInitData[] = [makeSeam()];
 
-function renderLifecycle(store: ReturnType<typeof makeStore>, seams: SeamInitData[]) {
+function renderLifecycleWithHandle(
+  store: ReturnType<typeof makeStore>,
+  seams: SeamInitData[],
+) {
   const placedMeshes = [makePlacedMesh('a'), makePlacedMesh('b')];
   const stretchingIdsRef = { current: null as Int32Array | null };
-  renderHook(
+  const hook = renderHook(
     () =>
       useSimulationLifecycle({
         placedMeshes,
@@ -209,11 +216,16 @@ function renderLifecycle(store: ReturnType<typeof makeStore>, seams: SeamInitDat
       }),
     { wrapper: wrapperFor(store) },
   );
-  return placedMeshes;
+  return { placedMeshes, ...hook };
+}
+
+function renderLifecycle(store: ReturnType<typeof makeStore>, seams: SeamInitData[]) {
+  return renderLifecycleWithHandle(store, seams).placedMeshes;
 }
 
 describe('useSimulationLifecycle — tier WASM (cascade por defecto)', () => {
   afterEach(() => {
+    clearActiveSolverTier();
     vi.clearAllMocks();
     localStorage.removeItem(WEBGPU_FEATURE_FLAG_KEY);
     webgpuMocks.isWebGPUAvailable.mockReturnValue(false);
@@ -244,6 +256,22 @@ describe('useSimulationLifecycle — tier WASM (cascade por defecto)', () => {
     expect(summary?.totalConstraints).toBeGreaterThan(0);
     expect(summary?.zeroConstraintSeams).toEqual([]);
     expect(store.getState().inspector.seamResolutionErrors).toEqual([]);
+  });
+
+  it('limpia activeTier al desmontar sin falsificar lastSelectedTier', async () => {
+    wasmMocks.isWasmSolverAvailable.mockResolvedValue(true);
+    wasmMocks.initMultiPiece.mockResolvedValue(undefined);
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    const { unmount } = renderLifecycleWithHandle(store, seamInitData);
+
+    await waitFor(() => expect(getActiveSolverTier()).toBe('wasm'));
+    expect(store.getState().simulation.solverTier).toBe('wasm');
+
+    unmount();
+
+    expect(getActiveSolverTier()).toBe('none');
+    expect(store.getState().simulation.solverTier).toBe('wasm');
   });
 
   it('FASE 4: seam que resuelve a 0 constraints → toast de error + inspector + summary del overlay', async () => {

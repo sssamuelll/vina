@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Middleware } from '@reduxjs/toolkit';
-import { RootState } from './index';
+import type { RootState } from './index';
 import { newId } from '../utils/ids';
+import {
+  appendHistoryTimelineEvent,
+  getHistoryTimeline,
+  resetHistoryTimeline,
+  type HistoryTimelineEvent,
+} from './historyTimeline';
 
 // ─── Simulation Snapshot Integration ────────────────────────────────────────
 
@@ -28,6 +34,7 @@ export function registerSimulationCallbacks(
 
 const MAX_HISTORY = 50;
 const UNDO_BATCH_MS = 500; // Batch rapid changes (e.g. slider drags) into one undo step
+export const AGENT_UNDO_WINDOW_MS = 10_000;
 
 export interface HistoryEntry {
   /** Human-readable description of the action */
@@ -36,6 +43,26 @@ export interface HistoryEntry {
   actionType: string;
   /** Timestamp */
   timestamp: number;
+  /** Procedencia efímera del tool; no viaja en la action Redux. */
+  agent?: {
+    toolName: string;
+    lastMutationAt: number;
+  };
+}
+
+let activeAgentToolName: string | null = null;
+
+export function withAgentHistorySource<T>(
+  toolName: string,
+  dispatch: () => T,
+): T {
+  const previous = activeAgentToolName;
+  activeAgentToolName = toolName;
+  try {
+    return dispatch();
+  } finally {
+    activeAgentToolName = previous;
+  }
 }
 
 declare const undoBatchTokenBrand: unique symbol;
@@ -67,6 +94,10 @@ interface UndoState {
   batchLabel: string | null;
   /** Whether a project action occurred inside the outermost explicit batch. */
   batchDirty: boolean;
+  /** Procedencia capturada por la primera mutación del batch explícito. */
+  batchAgentToolName: string | null;
+  /** Instante de la última mutación capturada por el batch explícito. */
+  batchLastMutationAt: number;
   /** The first owned mutation already handled the simulation snapshot contract. */
   batchSimulationSnapshotHandled: boolean;
 }
@@ -82,6 +113,8 @@ const undoState: UndoState = {
   batchSnapshot: null,
   batchLabel: null,
   batchDirty: false,
+  batchAgentToolName: null,
+  batchLastMutationAt: 0,
   batchSimulationSnapshotHandled: false,
 };
 
@@ -92,12 +125,23 @@ export function canRedo() { return undoState.future.length > 0; }
 export function getUndoLength() { return undoState.past.length; }
 export function getRedoLength() { return undoState.future.length; }
 
-/** Get the full history for the History Panel UI */
-export function getHistory(): { past: HistoryEntry[]; future: HistoryEntry[] } {
+/** Devuelve los stacks vivos de undo y el timeline diagnóstico independiente. */
+export function getHistory(): {
+  past: HistoryEntry[];
+  future: HistoryEntry[];
+  timeline: HistoryTimelineEvent[];
+} {
   return {
-    past: [...undoState.pastEntries],
-    future: [...undoState.futureEntries],
+    past: undoState.pastEntries.map(cloneHistoryEntry),
+    future: undoState.futureEntries.map(cloneHistoryEntry),
+    timeline: [...getHistoryTimeline()],
   };
+}
+
+function cloneHistoryEntry(entry: HistoryEntry): HistoryEntry {
+  return entry.agent
+    ? { ...entry, agent: { ...entry.agent } }
+    : { ...entry };
 }
 
 /** Jump to a specific point in the past (index into pastEntries) */
@@ -198,24 +242,55 @@ function resetExplicitBatchState(): void {
   undoState.batchSnapshot = null;
   undoState.batchLabel = null;
   undoState.batchDirty = false;
+  undoState.batchAgentToolName = null;
+  undoState.batchLastMutationAt = 0;
   undoState.batchSimulationSnapshotHandled = false;
   undoState.batchingAction = null;
   undoState.lastSnapshotTime = 0;
+}
+
+function makeHistoryEntry(
+  label: string,
+  actionType: string,
+  timestamp: number,
+  agentToolName = activeAgentToolName,
+): HistoryEntry {
+  return {
+    label,
+    actionType,
+    timestamp,
+    ...(agentToolName
+      ? { agent: { toolName: agentToolName, lastMutationAt: timestamp } }
+      : {}),
+  };
+}
+
+function rememberHistoryEntry(entry: HistoryEntry): void {
+  undoState.pastEntries.push(entry);
+  appendHistoryTimelineEvent({
+    kind: 'historyEntry',
+    label: entry.label,
+    actionType: entry.actionType,
+    timestamp: entry.timestamp,
+    ...(entry.agent
+      ? { agent: { toolName: entry.agent.toolName } }
+      : {}),
+  });
 }
 
 function finalizeExplicitBatch(): void {
   const snapshot = undoState.batchSnapshot;
   const label = undoState.batchLabel || 'Batch Operation';
   const dirty = undoState.batchDirty;
+  const agentToolName = undoState.batchAgentToolName;
+  const lastMutationAt = undoState.batchLastMutationAt;
   resetExplicitBatchState();
   if (!dirty || !snapshot) return;
 
   undoState.past.push(snapshot);
-  undoState.pastEntries.push({
-    label,
-    actionType: 'batch',
-    timestamp: Date.now(),
-  });
+  const entry = makeHistoryEntry(label, 'batch', Date.now(), agentToolName);
+  if (entry.agent) entry.agent.lastMutationAt = lastMutationAt;
+  rememberHistoryEntry(entry);
   if (undoState.past.length > MAX_HISTORY) {
     undoState.past.shift();
     undoState.pastEntries.shift();
@@ -324,6 +399,7 @@ function snapshotSimulationForFirstBatchMutation(store: { getState: () => unknow
  * meta-flags: `meta.resetUndoHistory` — declara una nueva base de sesión (hidratación del autoguardado): limpia el historial y no genera snapshot. Tercer flag `meta.*` del store, junto a `meta.skipConfirmation` y `meta.fromToolMemory` (B3-state P4).
  * guard: identified batch stack suppresses snapshots only for owned actions
  * undo: this middleware IS the grouping mechanism for other cascades
+ * side effect: append/reset del timeline; el writer IDB debounced no despacha
  * cap-depth: n/a (self-dispatch is idempotent — each editor/undo consumes stack)
  * cross-ref: `docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md`,
  *            BUG-7 fix-options doc (batch grouping precedent)
@@ -335,6 +411,7 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     || action?.meta?.resetUndoHistory === true;
 
   if (actionType === 'editor/undo') {
+    const undoRequestedByAgent = activeAgentToolName !== null;
     if (undoState.batchStack.length > 0) {
       finalizeExplicitBatch();
     }
@@ -344,7 +421,28 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     if (!snapshot) return; // abort undo — can't save current state for redo
     undoState.future.push(snapshot);
     const entry = undoState.pastEntries.pop();
-    if (entry) undoState.futureEntries.push(entry);
+    if (entry) {
+      undoState.futureEntries.push(entry);
+      const undoneAt = Date.now();
+      const lastMutationAt = entry.agent?.lastMutationAt ?? entry.timestamp;
+      const latencyMs = undoneAt - lastMutationAt;
+      if (
+        !undoRequestedByAgent
+        && entry.agent
+        && latencyMs >= 0
+        && latencyMs <= AGENT_UNDO_WINDOW_MS
+      ) {
+        appendHistoryTimelineEvent({
+          kind: 'rapidUndoAfterAgent',
+          timestamp: undoneAt,
+          toolName: entry.agent.toolName,
+          actionType: entry.actionType,
+          actionTimestamp: entry.timestamp,
+          lastMutationAt,
+          latencyMs,
+        });
+      }
+    }
     const previous = undoState.past.pop()!;
     bumpRevision();
     const result = next({ type: 'project/restoreState', payload: previous });
@@ -414,12 +512,19 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     }
 
     const now = Date.now();
-    const isSameAction = actionType === undoState.batchingAction;
+    const previousEntry = undoState.pastEntries.at(-1);
+    const previousSource = previousEntry?.agent?.toolName ?? null;
+    const isSameSource = previousSource === activeAgentToolName;
+    const isSameAction = actionType === undoState.batchingAction && isSameSource;
     const isRecent = (now - undoState.lastSnapshotTime) < UNDO_BATCH_MS;
 
     if (capturedByBatch) {
       snapshotSimulationForFirstBatchMutation(store);
+      if (!undoState.batchDirty) {
+        undoState.batchAgentToolName = activeAgentToolName;
+      }
       undoState.batchDirty = true;
+      undoState.batchLastMutationAt = now;
       undoState.future.length = 0;
       undoState.futureEntries.length = 0;
       undoState.lastSnapshotTime = now;
@@ -441,15 +546,18 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
       const snapshot = safeClone(currentProject);
       if (!snapshot) return next(action); // skip snapshot on clone failure — don't corrupt history
       undoState.past.push(snapshot);
-      undoState.pastEntries.push({
-        label: getActionLabel(actionType),
+      rememberHistoryEntry(makeHistoryEntry(
+        getActionLabel(actionType),
         actionType,
-        timestamp: now,
-      });
+        now,
+      ));
       if (undoState.past.length > MAX_HISTORY) {
         undoState.past.shift();
         undoState.pastEntries.shift();
       }
+    } else if (previousEntry?.agent) {
+      // Solo cambia el índice vivo; el evento append-only conserva su copia original.
+      previousEntry.agent.lastMutationAt = now;
     }
     // Always clear redo on any new project action (even batched)
     undoState.future.length = 0;
@@ -466,6 +574,7 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     undoState.future.length = 0;
     undoState.pastEntries.length = 0;
     undoState.futureEntries.length = 0;
+    resetHistoryTimeline();
     resetExplicitBatchState();
     bumpRevision();
   }

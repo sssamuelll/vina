@@ -57,6 +57,17 @@ describe('reduceToolCalls', () => {
     ]);
   });
 
+  it('saca una cancelación del estado running sin marcar éxito ni error', () => {
+    expect(reduceToolCalls(
+      [{ name: 'clearProjectMemory', status: 'running' }],
+      {
+        type: 'tool:cancelled',
+        name: 'clearProjectMemory',
+        message: 'Cancelled — memory was not cleared.',
+      },
+    )).toEqual([{ name: 'clearProjectMemory', status: 'cancelled' }]);
+  });
+
   it('does not modify state on unrelated event types', () => {
     const prev: ToolCallProgress[] = [
       { name: 'getGarmentState', status: 'done', result: {} },

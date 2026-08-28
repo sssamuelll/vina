@@ -30,6 +30,7 @@ import { linkedEditingMiddleware } from './linkedEditingMiddleware';
 import { reactiveSolverMiddleware } from './reactiveSolverMiddleware';
 import { gradingStalenessMiddleware } from './gradingStalenessMiddleware';
 import { resewBridgeMiddleware } from './resewBridgeMiddleware';
+import { initHistoryTimelinePersistence } from './historyTimeline';
 
 export const store = configureStore({
   reducer: {
@@ -79,6 +80,8 @@ export const store = configureStore({
       },
     }).concat(confirmationMiddleware, linkedEditingMiddleware, undoMiddleware, reactiveSolverMiddleware, gradingStalenessMiddleware, resewBridgeMiddleware),
 });
+
+void initHistoryTimelinePersistence();
 
 const savedWorkflow = loadWorkflow();
 if (savedWorkflow) {
