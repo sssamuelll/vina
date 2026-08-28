@@ -67,6 +67,7 @@ import { useDispatch } from 'react-redux';
 import { toolRegistry } from '../../tools';
 import { displayShortcut } from '../shell/shortcutDisplay';
 import { pushError } from '../../utils/errorTracker';
+import { pushSolverEvent } from '../../utils/cloth/solverRuntimeTracker';
 import './Viewport3D.css';
 
 /** Error boundary so a WebGL crash doesn't take down the 2D editor */
@@ -156,7 +157,10 @@ function createWebGPURenderer(canvas: HTMLCanvasElement): WebGPURenderer {
     // while idle — GarmentSimulation (the in-sim watcher) is unmounted then, so
     // this renderer-scoped listener is the only one that catches an idle loss.
     const device = (renderer as unknown as { backend?: { device?: GPUDevice } }).backend?.device;
-    if (device) device.lost.then(() => markRendererDeviceLost(device));
+    if (device) device.lost.then((info) => {
+      markRendererDeviceLost(device);
+      pushSolverEvent('device:lost', { source: 'idle', reason: info?.reason, message: info?.message });
+    });
   }).catch((err) => {
     console.warn('[Viewport3D] WebGPURenderer.init() failed:', err);
     // Allow render anyway — may work with degraded fallback

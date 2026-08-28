@@ -44,6 +44,8 @@ import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
+import { pushSolverEvent } from '../../utils/cloth/solverRuntimeTracker';
+import { pushError } from '../../utils/errorTracker';
 import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { FACE_POKE_GENERATE_CADENCE } from '../../utils/cloth/gpu/tslFacePoke';
 import { isRendererDeviceLost, markRendererDeviceLost } from './rendererDeviceLost';
@@ -1437,10 +1439,16 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // of latching device-loss detection to a single mount-time read.
     const device = rendererDevice;
     if (!device) return;
+    if (import.meta.env.DEV) {
+      // Puerta de verificación manual (plan caja negra 3D § 5, escenario 3):
+      // `window.__VINA_RENDERER_DEVICE__.destroy()` pierde EL device del renderer.
+      (window as unknown as Record<string, unknown>).__VINA_RENDERER_DEVICE__ = device;
+    }
     // Ya muerto desde un montaje anterior (Stop→Start sobre el mismo renderer):
     // re-latchear sin re-enganchar un listener nuevo.
     if (isRendererDeviceLost(device)) {
       rendererDeviceLostRef.current = true;
+      pushSolverEvent('device:lost', { source: 'previous-mount' });
       handleGpuDeviceLost();
       return;
     }
@@ -1449,12 +1457,21 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       markRendererDeviceLost(device);
       if (cancelled) return;
       console.error('[GarmentSimulation] WebGPU device lost:', info?.message);
+      pushSolverEvent('device:lost', { source: 'renderer', reason: info?.reason, message: info?.message });
+      // El toast pide recargar — la ranura LS (la misma de los boundaries) es
+      // la única forma de que el dato sobreviva a ese reload.
+      pushError(
+        { message: `${info?.reason ?? 'unknown'}: ${info?.message ?? ''}`, source: 'webgpu-device-lost', timestamp: Date.now() },
+        { persistForReload: true },
+      );
       rendererDeviceLostRef.current = true;
       handleGpuDeviceLost();
       dispatch(showErrorToast('Se perdió el dispositivo WebGPU — la simulación sigue en el solver de respaldo. Recarga la página para restaurar la vista 3D.'));
     });
     const onUncaptured = (e: Event) => {
-      console.error('[GarmentSimulation] uncaptured GPU error:', (e as { error?: { message?: string } }).error?.message);
+      const message = (e as { error?: { message?: string } }).error?.message;
+      console.error('[GarmentSimulation] uncaptured GPU error:', message);
+      pushSolverEvent('tier:runtime-error', { tier: 'webgpu', code: 'uncaptured-error', message });
     };
     device.addEventListener?.('uncapturederror', onUncaptured);
     return () => { cancelled = true; device.removeEventListener?.('uncapturederror', onUncaptured); };

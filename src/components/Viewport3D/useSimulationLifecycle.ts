@@ -547,6 +547,7 @@ export function useSimulationLifecycle({
               gpuDeviceLostRef.current = false;
               device.lost.then((info) => {
                 console.warn('[SimLifecycle] GPU device lost:', info.reason, info.message);
+                pushSolverEvent('device:lost', { source: 'lifecycle-decoy', reason: info.reason, message: info.message }, generation);
                 gpuDeviceLostRef.current = true;
                 gpuDeviceRef.current = null;
               });
