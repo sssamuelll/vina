@@ -21,7 +21,7 @@
  * arquitectónica) y como guardarraíl ante una regresión de capability.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import type { ReactNode } from 'react';
@@ -44,6 +44,7 @@ const webgpuMocks = vi.hoisted(() => ({
 }));
 const gpuMocks = vi.hoisted(() => ({
   initMultiPieceTsl: vi.fn(),
+  instances: [] as Array<{ dispose: ReturnType<typeof vi.fn> }>,
 }));
 
 vi.mock('../../../utils/cloth/wasm/wasmSolverClient', () => {
@@ -93,6 +94,9 @@ vi.mock('../../../utils/cloth/clothWorkerClient', () => ({
 // de viento), stop/dispose (cleanup cascade).
 vi.mock('../../../utils/cloth/gpu/gpuSolverClient', () => ({
   GpuSolverClient: class {
+    constructor() {
+      gpuMocks.instances.push(this as unknown as { dispose: ReturnType<typeof vi.fn> });
+    }
     onFrame: ((positions: Float32Array) => void) | null = null;
     // #1010: contrato edge-data (behavior #16) — el lifecycle lo llama en init TSL.
     onEdgeData: ((ids: Int32Array, lengths: Float32Array) => void) | null = null;
@@ -139,14 +143,16 @@ import { useSimulationLifecycle, type PlacedMesh } from '../useSimulationLifecyc
 import type { SeamInitData } from '../../../utils/cloth/clothWorker';
 import { WEBGPU_FEATURE_FLAG_KEY } from '../../../utils/cloth/gpu/webgpuDetect';
 import projectReducer from '../../../store/projectSlice';
-import simulationReducer, { startSimulation } from '../../../store/simulationSlice';
+import simulationReducer, { pauseSimulation, startSimulation } from '../../../store/simulationSlice';
 import avatarReducer from '../../../store/avatarSlice';
 import collisionBodyReducer from '../../../store/collisionBodySlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
 import inspectorReducer from '../../../store/inspectorSlice';
 import {
   clearActiveSolverTier,
+  clearSolverEvents,
   getActiveSolverTier,
+  getSolverEvents,
 } from '../../../utils/cloth/solverRuntimeTracker';
 
 function makeStore() {
@@ -226,6 +232,8 @@ function renderLifecycle(store: ReturnType<typeof makeStore>, seams: SeamInitDat
 describe('useSimulationLifecycle — tier WASM (cascade por defecto)', () => {
   afterEach(() => {
     clearActiveSolverTier();
+    clearSolverEvents();
+    gpuMocks.instances.length = 0;
     vi.clearAllMocks();
     localStorage.removeItem(WEBGPU_FEATURE_FLAG_KEY);
     webgpuMocks.isWebGPUAvailable.mockReturnValue(false);
@@ -464,5 +472,109 @@ describe('useSimulationLifecycle — tier WASM (cascade por defecto)', () => {
     await waitFor(() => expect(neuralMocks.initMultiPiece).toHaveBeenCalledTimes(1));
     expect(store.getState().simulation.solverTier).toBe('neural-drape');
     expect(store.getState().copilotUI.toasts).toHaveLength(0);
+  });
+});
+
+describe('useSimulationLifecycle — caja negra 3D: la cascada contada', () => {
+  afterEach(() => {
+    clearActiveSolverTier();
+    clearSolverEvents();
+    gpuMocks.instances.length = 0;
+    vi.clearAllMocks();
+    localStorage.removeItem(WEBGPU_FEATURE_FLAG_KEY);
+    delete (globalThis.navigator as { gpu?: unknown }).gpu;
+  });
+
+  function installFakeGpu() {
+    const fakeDevice = {
+      lost: new Promise(() => {}),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      pushErrorScope: vi.fn(),
+      popErrorScope: vi.fn().mockResolvedValue(null),
+    };
+    (globalThis.navigator as { gpu?: unknown }).gpu = {
+      requestAdapter: async () => ({ requestDevice: async () => fakeDevice }),
+    };
+  }
+
+  it('flag apagado: tier:skipped{webgpu, flag-off} → tier:selected{wasm}, misma generación', async () => {
+    localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'false');
+    webgpuMocks.isWebGPUAvailable.mockReturnValue(true);
+    wasmMocks.isWasmSolverAvailable.mockResolvedValue(true);
+    wasmMocks.initMultiPiece.mockResolvedValue(undefined);
+
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    renderLifecycle(store, seamInitData);
+
+    await waitFor(() => expect(getActiveSolverTier()).toBe('wasm'));
+
+    const kinds = getSolverEvents().map(e => [e.kind, e.data.tier, e.data.reason]);
+    expect(kinds).toEqual([
+      ['cascade:start', undefined, undefined],
+      ['tier:skipped', 'webgpu', 'flag-off'],
+      ['tier:selected', 'wasm', undefined],
+    ]);
+    const generations = new Set(getSolverEvents().map(e => e.generation));
+    expect(generations.size).toBe(1);
+  });
+
+  it('el init de TSL rechaza: tier:failed{webgpu} con mensaje y stack, luego tier:selected{wasm}', async () => {
+    localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'true');
+    webgpuMocks.isWebGPUAvailable.mockReturnValue(true);
+    installFakeGpu();
+    gpuMocks.initMultiPieceTsl.mockRejectedValue(new Error('shader compile failed'));
+    wasmMocks.isWasmSolverAvailable.mockResolvedValue(true);
+    wasmMocks.initMultiPiece.mockResolvedValue(undefined);
+
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    renderLifecycle(store, seamInitData);
+
+    await waitFor(() => expect(getActiveSolverTier()).toBe('wasm'));
+
+    const failed = getSolverEvents().find(e => e.kind === 'tier:failed');
+    expect(failed).toMatchObject({
+      data: { tier: 'webgpu', phase: 'init', message: 'shader compile failed', stale: false },
+    });
+    expect(typeof failed!.data.stack).toBe('string');
+    const order = getSolverEvents().map(e => e.kind);
+    expect(order.indexOf('tier:failed')).toBeLessThan(order.lastIndexOf('tier:selected'));
+  });
+
+  it('la carrera: un init viejo que rechaza tras Stop→Play no dispone el cliente de la corrida nueva', async () => {
+    localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'true');
+    webgpuMocks.isWebGPUAvailable.mockReturnValue(true);
+    installFakeGpu();
+    let rejectFirst: (e: Error) => void = () => {};
+    gpuMocks.initMultiPieceTsl
+      .mockImplementationOnce(() => new Promise<void>((_, rej) => { rejectFirst = rej; }))
+      .mockResolvedValue(undefined);
+
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    renderLifecycle(store, seamInitData);
+    await waitFor(() => expect(gpuMocks.initMultiPieceTsl).toHaveBeenCalledTimes(1));
+
+    // Stop→Play: el efecto se limpia (cancelled=true) y arranca una generación nueva.
+    act(() => { store.dispatch(pauseSimulation()); });
+    act(() => { store.dispatch(startSimulation()); });
+    await waitFor(() => expect(gpuMocks.initMultiPieceTsl).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(getActiveSolverTier()).toBe('webgpu'));
+    expect(gpuMocks.instances).toHaveLength(2);
+
+    // La promesa de la generación 1 rechaza tarde.
+    rejectFirst(new Error('adapter died late'));
+    await waitFor(() =>
+      expect(getSolverEvents().some(e => e.kind === 'tier:failed' && e.data.stale === true)).toBe(true),
+    );
+
+    const stale = getSolverEvents().find(e => e.kind === 'tier:failed')!;
+    const liveGeneration = getSolverEvents().filter(e => e.kind === 'tier:selected').at(-1)!.generation;
+    expect(stale.generation).toBeLessThan(liveGeneration);
+    // El cliente de la generación 2 sigue vivo: el catch viejo no lo tocó.
+    expect(gpuMocks.instances[1].dispose).not.toHaveBeenCalled();
+    expect(getActiveSolverTier()).toBe('webgpu');
   });
 });

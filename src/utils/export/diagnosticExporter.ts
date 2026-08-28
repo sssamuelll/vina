@@ -3,7 +3,7 @@ import { DebugStore } from '../../copilot/debug/DebugStore';
 import { isDebugEnabled } from '../../copilot/debug/createDebugBridge';
 import { getToolExecutions } from '../../copilot/debug/toolExecutionTracker';
 import { getHistory } from '../../store/undoMiddleware';
-import { getActiveSolverTier } from '../cloth/solverRuntimeTracker';
+import { getActiveSolverTier, getSolverEvents } from '../cloth/solverRuntimeTracker';
 import { getTrackedErrors } from '../errorTracker';
 import { downloadBlob } from './turntableRenderer';
 
@@ -17,6 +17,7 @@ export interface DiagnosticSources {
   getTrackedErrors: typeof getTrackedErrors;
   getToolExecutions: typeof getToolExecutions;
   getActiveSolverTier: typeof getActiveSolverTier;
+  getSolverEvents: typeof getSolverEvents;
   isDebugEnabled: typeof isDebugEnabled;
   getDebugRecords: () => ReturnType<DebugStore['getAll']>;
 }
@@ -30,6 +31,8 @@ export interface DiagnosticBundle {
     activeTier: ReturnType<typeof getActiveSolverTier>;
     lastSelectedTier: RootState['simulation']['solverTier'];
     config: RootState['simulation'];
+    /** Ring de la cascada: qué tier corrió, cuáles se saltaron y por qué, errores por corrida. */
+    events: ReturnType<typeof getSolverEvents>;
   };
   inspector: Pick<
     RootState['inspector'],
@@ -46,6 +49,7 @@ const browserSources: DiagnosticSources = {
   getTrackedErrors,
   getToolExecutions,
   getActiveSolverTier,
+  getSolverEvents,
   isDebugEnabled,
   getDebugRecords: () => new DebugStore().getAll(),
 };
@@ -65,6 +69,7 @@ export function buildDiagnosticBundle(
       activeTier: sources.getActiveSolverTier(),
       lastSelectedTier: state.simulation.solverTier,
       config: state.simulation,
+      events: sources.getSolverEvents(),
     },
     inspector: {
       lastSolverError: state.inspector.lastSolverError,

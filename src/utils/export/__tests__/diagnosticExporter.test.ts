@@ -42,6 +42,12 @@ function sources(debugEnabled: boolean): DiagnosticSources {
       durationMs: 4,
     }]),
     getActiveSolverTier: vi.fn(() => 'none'),
+    getSolverEvents: vi.fn(() => [{
+      kind: 'tier:failed',
+      timestamp: 50,
+      generation: 3,
+      data: { tier: 'webgpu', phase: 'timeout', message: 'TSL solver init timed out (12000ms)', stale: false },
+    }]),
     isDebugEnabled: vi.fn(() => debugEnabled),
     getDebugRecords: vi.fn(() => [{ id: 'verbose-1' }]),
   } as unknown as DiagnosticSources;
@@ -76,6 +82,17 @@ describe('bundle de diagnóstico puro', () => {
     expect(off.getDebugRecords).not.toHaveBeenCalled();
     expect(bundle).not.toHaveProperty('version');
     expect(bundle).not.toHaveProperty('traceId');
+  });
+
+  it('lleva el ring de eventos del solver en solver.events', () => {
+    const bundle = buildDiagnosticBundle(state, undefined, sources(false));
+    expect(bundle.solver.events).toEqual([
+      expect.objectContaining({
+        kind: 'tier:failed',
+        generation: 3,
+        data: expect.objectContaining({ tier: 'webgpu' }),
+      }),
+    ]);
   });
 
   it('incluye records verbosos únicamente con el gate encendido', () => {

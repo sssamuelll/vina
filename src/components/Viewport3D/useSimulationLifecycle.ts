@@ -110,7 +110,9 @@ import { seamResolutionFailureLabel } from './solverTierDisplay';
 import { GPU_CAPABILITIES, NEURAL_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { safeGetItem } from '../../utils/safeStorage';
 import {
+  beginCascade,
   clearActiveSolverTier,
+  pushSolverEvent,
   setActiveSolverTier,
 } from '../../utils/cloth/solverRuntimeTracker';
 import { getPhysicalFabric, toXPBDParams } from '../../utils/cloth/physicalFabric';
@@ -197,6 +199,18 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
     p,
     new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${label} timed out (${ms}ms)`)), ms)),
   ]);
+}
+
+/** Fase de un fallo de tier, deducida del mensaje (labels de withTimeout y throws del cascade). */
+function failurePhase(message: string): 'adapter' | 'timeout' | 'init' {
+  if (message.includes('adapter')) return 'adapter';
+  if (message.includes('timed out')) return 'timeout';
+  return 'init';
+}
+
+function describeFailure(e: unknown): { message: string; stack: string | undefined; phase: string } {
+  const err = e instanceof Error ? e : new Error(String(e));
+  return { message: err.message, stack: err.stack, phase: failurePhase(err.message) };
 }
 
 /** Load avatar collision mesh and custom bodies into a solver client (shared between WASM and CPU paths) */
@@ -451,6 +465,9 @@ export function useSimulationLifecycle({
     if (simulationState === 'running' && placedMeshes.length > 0) {
       let cancelled = false;
       const cancelFlag = { get value() { return cancelled; } };
+      // Caja negra 3D: cada corrida de la cascada lleva su generación para que
+      // un evento de una corrida cancelada no se confunda con la viva.
+      const generation = beginCascade();
       // 2a: cada (re)init re-arma el gate — el solver nuevo no stepea hasta
       // que SU colisión cargue.
       simReadyRef.current = false;
@@ -461,6 +478,7 @@ export function useSimulationLifecycle({
         // when the project has active seams. Honest capability declaration
         // per A7/C4 doctrine.
         const projectHasSeams = seamInitData.some(s => s.active !== false);
+        pushSolverEvent('cascade:start', { pieces: placedMeshes.length, seams: projectHasSeams }, generation);
 
         // ─── Seam observability (parity plan Fase 4) ──────────────────
         // Same resolution the workers run (`summarizeSeamResolution` shares
@@ -500,8 +518,17 @@ export function useSimulationLifecycle({
         // tier is unusable for the renderer's life, so skip the whole GPU
         // section and fall straight to WASM on the re-run handleGpuDeviceLost
         // triggers.
-        const wantsWebGPU = isWebGPUFeatureEnabled() && isWebGPUAvailable() && !gpuDowngradedRef.current;
+        const flagEnabled = isWebGPUFeatureEnabled();
+        const webgpuAvailable = isWebGPUAvailable();
+        const wantsWebGPU = flagEnabled && webgpuAvailable && !gpuDowngradedRef.current;
+        if (!wantsWebGPU) {
+          pushSolverEvent('tier:skipped', {
+            tier: 'webgpu',
+            reason: !flagEnabled ? 'flag-off' : !webgpuAvailable ? 'unavailable' : 'downgraded',
+          }, generation);
+        }
         if (wantsWebGPU && projectHasSeams && !GPU_CAPABILITIES.seams) {
+          pushSolverEvent('tier:skipped', { tier: 'webgpu', reason: 'no-seams-capability' }, generation);
           // Honest capability gate (parity plan Fase 4). Since #897 F4 the
           // GPU tier declares `seams: true` (closure parity verified on the
           // real María pattern), so this branch is a dormant guardrail: it
@@ -527,6 +554,7 @@ export function useSimulationLifecycle({
             if (!cancelled) {
                 console.log('[SimLifecycle] 🟢 Using WebGPU TSL solver (zero-copy)');
                 dispatch(setSolverTier('webgpu'));
+                pushSolverEvent('tier:selected', { tier: 'webgpu' }, generation);
                 const gpuClient = new GpuSolverClient(device);
                 gpuClientRef.current = gpuClient;
                 gpuClient.onFrame = onFrame;
@@ -622,6 +650,11 @@ export function useSimulationLifecycle({
                 return;
             }
           } catch (e) {
+            pushSolverEvent('tier:failed', { tier: 'webgpu', ...describeFailure(e), stale: cancelled }, generation);
+            // Corrida reemplazada (Stop→Play o device lost): las refs ya son de
+            // otra generación — no tocarlas. El cleanup del efecto viejo ya
+            // dispuso ESTE cliente.
+            if (cancelled) return;
             console.warn('[SimLifecycle] TSL solver failed, falling through to WASM:', e);
             gpuClientRef.current?.dispose();
             gpuClientRef.current = null;
@@ -635,6 +668,7 @@ export function useSimulationLifecycle({
             if (wasmAvailable && !cancelled) {
               console.log('[SimLifecycle] 🟠 Using Wasm XPBD solver');
               dispatch(setSolverTier('wasm'));
+              pushSolverEvent('tier:selected', { tier: 'wasm' }, generation);
               const wasmClient = new WasmSolverClient();
               wasmClientRef.current = wasmClient;
               wasmClient.onFrame = onFrame;
@@ -675,9 +709,12 @@ export function useSimulationLifecycle({
               }
               return;
             } else if (!cancelled) {
+              pushSolverEvent('tier:failed', { tier: 'wasm', phase: 'availability', message: 'Wasm solver not available', stale: false }, generation);
               console.warn('[SimLifecycle] Wasm solver not available');
             }
           } catch (e) {
+            pushSolverEvent('tier:failed', { tier: 'wasm', ...describeFailure(e), stale: cancelled }, generation);
+            if (cancelled) return;
             console.warn('[SimLifecycle] Wasm failed, falling back to CPU:', e);
             // Clean up broken WASM client before falling through
             wasmClientRef.current?.dispose();
@@ -690,6 +727,7 @@ export function useSimulationLifecycle({
           try {
             console.log('[SimLifecycle] 🟡 Using CPU solver (Web Worker fallback)');
             dispatch(setSolverTier('cpu-worker'));
+            pushSolverEvent('tier:selected', { tier: 'cpu-worker' }, generation);
             const client = new ClothWorkerClient();
             clientRef.current = client;
             client.onFrame = onFrame;
@@ -724,6 +762,8 @@ export function useSimulationLifecycle({
             }
             return;
           } catch (e) {
+            pushSolverEvent('tier:failed', { tier: 'cpu-worker', ...describeFailure(e), stale: cancelled }, generation);
+            if (cancelled) return;
             console.warn('[SimLifecycle] CPU worker failed, falling back to Neural Drape:', e);
           }
         }
@@ -734,6 +774,7 @@ export function useSimulationLifecycle({
           // Last tier in the cascade and it cannot sew (`initMultiPiece`
           // takes no seam parameter) — starting it would silently drop
           // every seam. Honest failure instead: no tier, visible error.
+          pushSolverEvent('start:failed', { reason: 'neural-cannot-sew' }, generation);
           console.error('[SimLifecycle] All seam-capable tiers failed and Neural Drape cannot sew — simulation not started');
           dispatch(showErrorToast('La simulación no pudo arrancar: ningún solver disponible en este equipo soporta costura. Prueba en un navegador con WebGPU (Chrome o Edge actuales).'));
           dispatch(setSolverTier('none'));
@@ -741,6 +782,7 @@ export function useSimulationLifecycle({
         }
         console.log('[SimLifecycle] 🔵 Using Neural Drape (analytical preview)');
         dispatch(setSolverTier('neural-drape'));
+        pushSolverEvent('tier:selected', { tier: 'neural-drape' }, generation);
         const neuralClient = new NeuralDrapeClient();
         neuralClientRef.current = neuralClient;
         neuralClient.onFrame = onFrame;
@@ -751,7 +793,10 @@ export function useSimulationLifecycle({
         }
       };
 
-      startSim().catch(e => console.error('[SimLifecycle] Start failed:', e));
+      startSim().catch(e => {
+        pushSolverEvent('start:failed', { ...describeFailure(e), stale: cancelled }, generation);
+        console.error('[SimLifecycle] Start failed:', e);
+      });
 
       // ─── Cleanup cascade ─── (running → state-change effect cleanup)
       return () => {
