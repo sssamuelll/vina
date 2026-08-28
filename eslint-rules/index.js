@@ -12,6 +12,7 @@
  * (lint rule pending follow-up issue).
  */
 import requireUseDisposable from './rules/require-use-disposable.js';
+import conversionEspacioDePieza from './rules/conversion-espacio-de-pieza.js';
 
 export default {
   meta: {
@@ -20,5 +21,6 @@ export default {
   },
   rules: {
     'require-use-disposable': requireUseDisposable,
+    'conversion-espacio-de-pieza': conversionEspacioDePieza,
   },
 };

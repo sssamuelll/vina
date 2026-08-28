@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# Gate de push: la suite completa de unit tests (~75 s).
+#
+# Por qué acá y no en pre-commit: 75 s por commit es insoportable y empuja al
+# --no-verify, que es peor que no tener gate. Por push es tolerable.
+#
+# Por qué existe: la CI está apagada a propósito desde 2026-08-01 (repo
+# privado, no pagamos Actions) y el deploy es manual. Sin esto, entre el
+# pre-commit —que solo corre typecheck + eslint de lo staged + el trinquete de
+# UI— y producción no hay NADA que corra un test. El caso que lo motivó:
+# dxfImport.test.ts se quedó rojo dos semanas tras a00851c0 y nadie lo vio.
+echo "🔍 Suite de tests (~75 s)..."
+npm run test
+if [ $? -ne 0 ]; then
+  echo "❌ Tests en rojo. No se sube."
+  exit 1
+fi
+
+echo "✅ Pre-push checks passed!"

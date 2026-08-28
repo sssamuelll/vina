@@ -9,6 +9,11 @@ import { parseDXF } from '../parser';
 import { dxfToPatternPieces } from '../converter';
 import { getProfile } from '../formatProfiles';
 
+// OJO: esta fixture vive FUERA del repo, en la carpeta de descargas de quien
+// desarrolla. Donde no está, el bloque entero se salta en silencio — nunca ha
+// corrido en CI. Por eso la aserción de la capa 8 se quedó vencida dos semanas
+// tras a00851c0 sin que nada avisara. Mudar el archivo a tests/fixtures/ es la
+// cura de fondo y está pendiente de decisión (procedencia del archivo de CAD).
 const DXF_PATH = join(process.env.HOME ?? '', 'Downloads/CAD/DXF AAMA/5000.dxf');
 const hasTestFile = existsSync(DXF_PATH);
 
@@ -53,10 +58,17 @@ describe.skipIf(!hasTestFile)('DXF-AAMA Import (model 5000)', () => {
     expect(notches.length).toBeGreaterThan(0);
   });
 
-  it('Front piece has draw/internal lines (layer 8)', () => {
+  // Desde a00851c0 (#1019/#1020) la capa 8 ('draw') importa como
+  // type:'reference', no como 'dart': una línea de estilo o un contorno de
+  // bolsillo no es una pinza, y etiquetarlas así hacía que el validador
+  // avisara sobre bolsillos. Este test pinea las DOS mitades del contrato —
+  // que las líneas siguen llegando, y que ya no se llaman pinzas.
+  it('Front piece has draw/internal lines (layer 8) typed as reference, not dart', () => {
     const front = pieces.find(p => p.name === 'Front')!;
+    const references = front.internals.filter(i => i.type === 'reference');
+    expect(references.length).toBeGreaterThan(0);
     const darts = front.internals.filter(i => i.type === 'dart');
-    expect(darts.length).toBeGreaterThan(0);
+    expect(darts.length).toBe(0);
   });
 
   it('outline coordinates are reasonable (not all zeros)', () => {
