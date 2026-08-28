@@ -69,4 +69,57 @@ describe('import_dxf executor — loadType "open" is a faithful import (no auto-
       project.loadDiagnostics.filter(d => d.code === 'AUTO_SEAMS_DETECTED'),
     ).toHaveLength(0);
   });
+
+  it('el import fiel del copiloto crea historia y deshacer restaura el proyecto anterior', async () => {
+    const { CopilotActionExecutor } = await import('../actionExecutor');
+    const { default: projectReducer, loadProject } = await import('../../../store/projectSlice');
+    const editorReducer = (await import('../../../store/editorSlice')).default;
+    const { canUndo, getHistory, undoMiddleware } = await import('../../../store/undoMiddleware');
+    const realStore = configureStore({
+      reducer: { project: projectReducer, editor: editorReducer },
+      middleware: (getDefault) => getDefault({ serializableCheck: false }).concat(undoMiddleware),
+    });
+    realStore.dispatch(loadProject({
+      ...realStore.getState().project,
+      id: 'proyecto-anterior',
+      name: 'Proyecto anterior',
+      pieces: [{
+        id: 'pieza-anterior',
+        name: 'Pieza anterior',
+        outline: [{ type: 'M', values: [0, 0] }, { type: 'Z', values: [] }],
+        internals: [],
+        position: { x: 0, y: 0 },
+        rotation: 0,
+        mirrored: false,
+        seamAllowance: 10,
+        layer: 1,
+        sublayer: 0,
+        active: true,
+        createdAt: 1,
+        updatedAt: 1,
+      }],
+      seams: [],
+      createdAt: 1,
+      updatedAt: 1,
+    }));
+    const executor = new CopilotActionExecutor(
+      realStore.dispatch as never,
+      realStore.getState as never,
+    );
+
+    const result = await executor.execute({
+      action: 'import_dxf',
+      fileContent: MINIMAL_DXF,
+      loadType: 'open',
+    });
+
+    expect(result.success).toBe(true);
+    expect(canUndo()).toBe(true);
+    expect(getHistory().past).toHaveLength(1);
+
+    realStore.dispatch({ type: 'editor/undo' });
+
+    expect(realStore.getState().project.id).toBe('proyecto-anterior');
+    expect(realStore.getState().project.pieces.map(piece => piece.id)).toEqual(['pieza-anterior']);
+  });
 });

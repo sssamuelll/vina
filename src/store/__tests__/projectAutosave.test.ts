@@ -11,7 +11,7 @@
  * style per Epic-746); projectIO is mocked at the module boundary.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { UnknownAction } from '@reduxjs/toolkit';
+import { configureStore, type UnknownAction } from '@reduxjs/toolkit';
 
 vi.mock('../../utils/projectIO', () => ({
   loadFromStorage: vi.fn(),
@@ -21,6 +21,8 @@ vi.mock('../../utils/projectIO', () => ({
 import { loadFromStorage, saveToStorage } from '../../utils/projectIO';
 import { initProjectPersistence, AUTOSAVE_DEBOUNCE_MS } from '../projectAutosave';
 import { NEW_PROJECT, RESEW_AI_SEAMS } from '../actions';
+import projectReducer, { loadProject } from '../projectSlice';
+import { canUndo, getHistory, undoMiddleware } from '../undoMiddleware';
 
 const mockedLoad = vi.mocked(loadFromStorage);
 const mockedSave = vi.mocked(saveToStorage);
@@ -44,6 +46,13 @@ function makeFakeStore(project: FakeProject) {
   };
 }
 
+function makeStoreWithUndo() {
+  return configureStore({
+    reducer: { project: projectReducer },
+    middleware: (getDefault) => getDefault({ serializableCheck: false }).concat(undoMiddleware),
+  });
+}
+
 const emptyProject = (): FakeProject => ({ id: 'p0', pieces: [], seams: [] });
 const projectWith = (n: number): FakeProject =>
   ({ id: 'p1', pieces: Array.from({ length: n }, (_, i) => ({ id: `piece-${i}` })), seams: [] });
@@ -64,6 +73,47 @@ afterEach(() => {
 // ─── Hydration ───
 
 describe('initProjectPersistence — boot hydration', () => {
+  it('la hidratación del arranque no crea historia de deshacer', async () => {
+    const store = makeStoreWithUndo();
+    store.dispatch(loadProject({
+      ...store.getState().project,
+      id: 'proyecto-vacío',
+      name: 'Proyecto vacío',
+      pieces: [],
+      seams: [],
+      createdAt: 1,
+      updatedAt: 1,
+    }));
+    const saved = {
+      ...store.getState().project,
+      id: 'proyecto-guardado',
+      name: 'Proyecto guardado',
+      pieces: [{
+        id: 'pieza-guardada',
+        name: 'Pieza guardada',
+        outline: [{ type: 'M', values: [0, 0] }, { type: 'Z', values: [] }],
+        internals: [],
+        position: { x: 0, y: 0 },
+        rotation: 0,
+        mirrored: false,
+        seamAllowance: 10,
+        layer: 1,
+        sublayer: 0,
+        active: true,
+        createdAt: 1,
+        updatedAt: 1,
+      }],
+      seams: [],
+    };
+    mockedLoad.mockResolvedValue({ ok: true, project: saved, warnings: [] } as never);
+
+    await initProjectPersistence(store);
+
+    expect(store.getState().project.id).toBe('proyecto-guardado');
+    expect(canUndo()).toBe(false);
+    expect(getHistory().past).toEqual([]);
+  });
+
   it('restores a saved project FAITHFULLY: restoreProject + requestFitView + restore toast with "Empezar de cero"', async () => {
     const saved = { id: 'saved', pieces: [{}, {}], seams: [] };
     mockedLoad.mockResolvedValue({ ok: true, project: saved, warnings: [] } as never);

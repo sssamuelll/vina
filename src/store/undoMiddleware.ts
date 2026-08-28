@@ -321,6 +321,7 @@ function snapshotSimulationForFirstBatchMutation(store: { getState: () => unknow
  * triggers (self): editor/undo, editor/redo (also dispatched by jumpToIndex)
  * triggers (control): undo/startBatch, undo/endBatch
  * dispatches: project/restoreState (on undo/redo)
+ * meta-flags: `meta.resetUndoHistory` — declara una nueva base de sesión (hidratación del autoguardado): limpia el historial y no genera snapshot. Tercer flag `meta.*` del store, junto a `meta.skipConfirmation` y `meta.fromToolMemory` (B3-state P4).
  * guard: identified batch stack suppresses snapshots only for owned actions
  * undo: this middleware IS the grouping mechanism for other cascades
  * cap-depth: n/a (self-dispatch is idempotent — each editor/undo consumes stack)
@@ -329,6 +330,9 @@ function snapshotSimulationForFirstBatchMutation(store: { getState: () => unknow
  */
 export const undoMiddleware: Middleware = (store) => (next) => (action: any) => {
   const actionType: string = action?.type ?? '';
+  const resetsUndoHistory = actionType === 'project/loadProject'
+    || actionType === 'global/newProject'
+    || action?.meta?.resetUndoHistory === true;
 
   if (actionType === 'editor/undo') {
     if (undoState.batchStack.length > 0) {
@@ -398,8 +402,9 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     return;
   }
 
-  // Track project actions (except restoreState and loadProject)
-  if (actionType.startsWith('project/') && actionType !== 'project/restoreState' && actionType !== 'project/loadProject') {
+  // Registra mutaciones de proyecto salvo restauraciones internas o acciones
+  // que declaran un nuevo estado base (como la hidratación del autoguardado).
+  if (actionType.startsWith('project/') && actionType !== 'project/restoreState' && !resetsUndoHistory) {
     const hadActiveBatch = undoState.batchStack.length > 0;
     const capturedByBatch = hadActiveBatch && activeBatchCaptures(action);
     if (hadActiveBatch && !capturedByBatch) {
@@ -455,8 +460,8 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     bumpRevision();
   }
 
-  // On loadProject or newProject, clear history and batching state
-  if (actionType === 'project/loadProject' || actionType === 'global/newProject') {
+  // Un proyecto cargado, nuevo o hidratado establece una nueva base de sesión.
+  if (resetsUndoHistory) {
     undoState.past.length = 0;
     undoState.future.length = 0;
     undoState.pastEntries.length = 0;
