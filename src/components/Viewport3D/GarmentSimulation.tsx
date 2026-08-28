@@ -44,7 +44,7 @@ import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
-import { pushSolverEvent } from '../../utils/cloth/solverRuntimeTracker';
+import { pushSolverEvent, registerClothGeometry, type MeshManifestEntry } from '../../utils/cloth/solverRuntimeTracker';
 import { pushError } from '../../utils/errorTracker';
 import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { FACE_POKE_GENERATE_CADENCE } from '../../utils/cloth/gpu/tslFacePoke';
@@ -310,8 +310,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // los pares de costura para puentear la ranura del piso físico en el render.
   const seamInitData = useMemo(() => seamsToInitData(seams, seamGroups), [seams, seamGroups]);
 
-  const { staticGeometry } = useMemo(() => {
-    if (pieceMeshes.length === 0) return { staticGeometry: null };
+  const { staticGeometry, meshManifest } = useMemo(() => {
+    if (pieceMeshes.length === 0) return { staticGeometry: null, meshManifest: [] as MeshManifestEntry[] };
 
     const axisHints = buildAxisHints(activePieces, armAxis);
     const arrangement = resolveArrangementWithFrames(activePieces, avatarMeasurements, arrangementOverrides, { axisHints, skeletonReady: armAxis.ready });
@@ -324,7 +324,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // mesh but no frame. The old `?? arrangement[pi]` fallback destructured
     // `undefined` here and crashed the memo (#924).
     const validMeshes = pieceMeshes.filter(p => arrangeById.has(p.pieceId));
-    if (validMeshes.length === 0) return { staticGeometry: null };
+    if (validMeshes.length === 0) return { staticGeometry: null, meshManifest: [] as MeshManifestEntry[] };
 
     let totalVerts = 0;
     for (const p of validMeshes) {
@@ -341,6 +341,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // Piezas con vértices ENVUELTOS — el seam fill resuelve pares sobre la
     // misma pose que el solver (placedMeshes) para paridad exacta de conteo.
     const wrappedMeshes: Array<(typeof validMeshes)[number]> = [];
+    // Caja negra 3D: el manifiesto por pieza sale de ESTE loop, con el mismo
+    // vOffset que concatena la geometría — así los offsets describen el
+    // buffer que la foto física lee.
+    const meshManifest: MeshManifestEntry[] = [];
 
     for (let pi = 0; pi < validMeshes.length; pi++) {
       const p = validMeshes[pi];
@@ -372,6 +376,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         indices.push(p.triIds[i] + vOffset);
       }
 
+      meshManifest.push({ pieceId: p.pieceId, vertexOffset: vOffset, vertexCount: numVerts, triCount: p.triIds.length / 3 });
       vOffset += numVerts;
     }
 
@@ -413,7 +418,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       geo.userData.seamFillBaseIndices = indices;
     }
 
-    return { staticGeometry: geo };
+    return { staticGeometry: geo, meshManifest };
   }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis, seamInitData]);
   useDisposable(staticGeometry);
 
@@ -929,7 +934,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   useEffect(() => {
     geometryRef.current = staticGeometry;
-  }, [staticGeometry]);
+    // Caja negra 3D: la foto física sale de ESTA geometría, retenida en el
+    // tracker sin unregister (sobrevive al unmount por un boundary caído).
+    registerClothGeometry(staticGeometry, meshManifest);
+  }, [staticGeometry, meshManifest]);
 
   // Debug hook for E2E testing — exposes mesh to window for Playwright
   useEffect(() => {

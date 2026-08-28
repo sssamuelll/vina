@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { BufferGeometry } from 'three';
 import {
   beginCascade,
+  clearActiveSolverTier,
   clearSolverEvents,
   coalesceSolverEvent,
   currentCascadeGeneration,
+  getAppliedSolverConfig,
+  getClothGeometry,
   getSolverEvents,
   pushSolverEvent,
+  registerClothGeometry,
+  setActiveSolverTier,
+  setAppliedSolverConfig,
   SOLVER_EVENTS_MAX,
 } from '../solverRuntimeTracker';
 
@@ -56,5 +63,26 @@ describe('solverRuntimeTracker — coalescencia de diagnósticos repetidos', () 
     const events = getSolverEvents();
     expect(events.map(e => e.data.code)).toEqual(['nan_reset', 'self_collision_disabled', 'nan_reset']);
     expect(events[0].data.cumulative).toBe(8);
+  });
+});
+
+describe('solverRuntimeTracker — config aplicada y geometría retenida', () => {
+  it('la config aplicada se limpia con clearActiveSolverTier', () => {
+    setActiveSolverTier('wasm');
+    setAppliedSolverConfig({ tier: 'wasm', init: { substeps: 8 }, postInit: { wind: null } });
+    expect(getAppliedSolverConfig()).toEqual({ tier: 'wasm', init: { substeps: 8 }, postInit: { wind: null } });
+
+    clearActiveSolverTier();
+    expect(getAppliedSolverConfig()).toBeNull();
+  });
+
+  it('la geometría registrada NO se limpia con clearActiveSolverTier: la reemplaza la siguiente', () => {
+    const geo = new BufferGeometry();
+    registerClothGeometry(geo, [{ pieceId: 'a', vertexOffset: 0, vertexCount: 3, triCount: 1 }]);
+    clearActiveSolverTier();
+    expect(getClothGeometry()?.geometry).toBe(geo);
+
+    registerClothGeometry(null, []);
+    expect(getClothGeometry()).toBeNull();
   });
 });

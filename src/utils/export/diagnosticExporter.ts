@@ -3,7 +3,13 @@ import { DebugStore } from '../../copilot/debug/DebugStore';
 import { isDebugEnabled } from '../../copilot/debug/createDebugBridge';
 import { getToolExecutions } from '../../copilot/debug/toolExecutionTracker';
 import { getHistory } from '../../store/undoMiddleware';
-import { getActiveSolverTier, getSolverEvents } from '../cloth/solverRuntimeTracker';
+import {
+  getActiveSolverTier,
+  getAppliedSolverConfig,
+  getClothGeometry,
+  getSolverEvents,
+  type MeshManifestEntry,
+} from '../cloth/solverRuntimeTracker';
 import { getTrackedErrors } from '../errorTracker';
 import { downloadBlob } from './turntableRenderer';
 
@@ -18,6 +24,8 @@ export interface DiagnosticSources {
   getToolExecutions: typeof getToolExecutions;
   getActiveSolverTier: typeof getActiveSolverTier;
   getSolverEvents: typeof getSolverEvents;
+  getAppliedSolverConfig: typeof getAppliedSolverConfig;
+  getClothGeometry: typeof getClothGeometry;
   isDebugEnabled: typeof isDebugEnabled;
   getDebugRecords: () => ReturnType<DebugStore['getAll']>;
 }
@@ -30,9 +38,12 @@ export interface DiagnosticBundle {
   solver: {
     activeTier: ReturnType<typeof getActiveSolverTier>;
     lastSelectedTier: RootState['simulation']['solverTier'];
-    config: RootState['simulation'];
     /** Ring de la cascada: qué tier corrió, cuáles se saltaron y por qué, errores por corrida. */
     events: ReturnType<typeof getSolverEvents>;
+    /** Lo que el solver recibió de verdad (tras configBridge, preset y tejido), no lo que Redux guarda. */
+    appliedConfig: ReturnType<typeof getAppliedSolverConfig>;
+    /** Desglose por pieza de la geometría renderizada — corta `clothSnapshot.positions`. */
+    meshManifest: MeshManifestEntry[] | null;
   };
   inspector: Pick<
     RootState['inspector'],
@@ -50,6 +61,8 @@ const browserSources: DiagnosticSources = {
   getToolExecutions,
   getActiveSolverTier,
   getSolverEvents,
+  getAppliedSolverConfig,
+  getClothGeometry,
   isDebugEnabled,
   getDebugRecords: () => new DebugStore().getAll(),
 };
@@ -68,8 +81,9 @@ export function buildDiagnosticBundle(
     solver: {
       activeTier: sources.getActiveSolverTier(),
       lastSelectedTier: state.simulation.solverTier,
-      config: state.simulation,
       events: sources.getSolverEvents(),
+      appliedConfig: sources.getAppliedSolverConfig(),
+      meshManifest: sources.getClothGeometry()?.manifest ?? null,
     },
     inspector: {
       lastSolverError: state.inspector.lastSolverError,

@@ -48,6 +48,8 @@ function sources(debugEnabled: boolean): DiagnosticSources {
       generation: 3,
       data: { tier: 'webgpu', phase: 'timeout', message: 'TSL solver init timed out (12000ms)', stale: false },
     }]),
+    getAppliedSolverConfig: vi.fn(() => ({ tier: 'wasm', init: { substeps: 8 }, postInit: { wind: null, elastics: 0 } })),
+    getClothGeometry: vi.fn(() => null),
     isDebugEnabled: vi.fn(() => debugEnabled),
     getDebugRecords: vi.fn(() => [{ id: 'verbose-1' }]),
   } as unknown as DiagnosticSources;
@@ -72,13 +74,17 @@ describe('bundle de diagnóstico puro', () => {
       solver: {
         activeTier: 'none',
         lastSelectedTier: 'webgpu',
-        config: state.simulation,
       },
       inspector: state.inspector,
       errors: [{ message: 'boom', timestamp: 30 }],
       toolExecutions: [expect.objectContaining({ toolName: 'sewWalking' })],
       agentDebugRecords: [],
     });
+    // `solver.config` era `simulation` repetido byte a byte; con
+    // `appliedConfig` en el bundle habría tres cosas llamadas config.
+    expect(bundle.solver).not.toHaveProperty('config');
+    expect(bundle.solver.appliedConfig).toEqual({ tier: 'wasm', init: { substeps: 8 }, postInit: { wind: null, elastics: 0 } });
+    expect(bundle.solver.meshManifest).toBeNull();
     expect(off.getDebugRecords).not.toHaveBeenCalled();
     expect(bundle).not.toHaveProperty('version');
     expect(bundle).not.toHaveProperty('traceId');
@@ -92,6 +98,22 @@ describe('bundle de diagnóstico puro', () => {
         generation: 3,
         data: expect.objectContaining({ tier: 'webgpu' }),
       }),
+    ]);
+  });
+
+  it('lleva el manifiesto por pieza de la geometría registrada', () => {
+    const s = sources(false);
+    s.getClothGeometry = vi.fn(() => ({
+      geometry: { attributes: { position: { array: new Float32Array(6 * 3) } } } as never,
+      manifest: [
+        { pieceId: 'a', vertexOffset: 0, vertexCount: 4, triCount: 2 },
+        { pieceId: 'b', vertexOffset: 4, vertexCount: 2, triCount: 0 },
+      ],
+    }));
+    const bundle = buildDiagnosticBundle(state, undefined, s);
+    expect(bundle.solver.meshManifest).toEqual([
+      { pieceId: 'a', vertexOffset: 0, vertexCount: 4, triCount: 2 },
+      { pieceId: 'b', vertexOffset: 4, vertexCount: 2, triCount: 0 },
     ]);
   });
 

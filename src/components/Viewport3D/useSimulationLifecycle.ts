@@ -114,6 +114,7 @@ import {
   clearActiveSolverTier,
   pushSolverEvent,
   setActiveSolverTier,
+  setAppliedSolverConfig,
 } from '../../utils/cloth/solverRuntimeTracker';
 import { getPhysicalFabric, toXPBDParams } from '../../utils/cloth/physicalFabric';
 import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
@@ -647,6 +648,11 @@ export function useSimulationLifecycle({
                 if (frozenPieceIds.length > 0) gpuClient.freezePieces(frozenPieceIds);
 
                 // Don't call gpuClient.start() — TSL compute is driven by useFrame.
+                setAppliedSolverConfig({
+                  tier: 'webgpu',
+                  init: { solverConfig: tslSolverConfig, fabricCompliance },
+                  postInit: { frozenPieces: frozenPieceIds.length },
+                });
                 setActiveSolverTier('webgpu');
                 return;
             }
@@ -681,16 +687,15 @@ export function useSimulationLifecycle({
               const wasmMode = SIMULATION_MODES[simulationModeRef.current];
               // P7-density: el peso GSM de la tela activa entra al invMass.
               const pfWasm = getPhysicalFabric(fabricId);
+              // Caja negra 3D: ESTE objeto es lo que el solver recibe (tras
+              // configBridge y el preset); Redux guarda otra cosa.
+              const wasmInitConfig = mapClothSimConfigToWasmSolverConfig({
+                numSubsteps: wasmMode.substeps,
+                selfCollision: wasmMode.selfCollision,
+                fabricDensity: pfWasm ? toXPBDParams(pfWasm).density : undefined,
+              });
               await withTimeout(
-                wasmClient.initMultiPiece(
-                  placedMeshes,
-                  seamInitData,
-                  mapClothSimConfigToWasmSolverConfig({
-                    numSubsteps: wasmMode.substeps,
-                    selfCollision: wasmMode.selfCollision,
-                    fabricDensity: pfWasm ? toXPBDParams(pfWasm).density : undefined,
-                  }),
-                ),
+                wasmClient.initMultiPiece(placedMeshes, seamInitData, wasmInitConfig),
                 12000, 'Wasm solver init',
               );
               wasmClient.requestEdgeData();
@@ -706,6 +711,11 @@ export function useSimulationLifecycle({
                 if (windEnabled) wasmClient.setWind(windForce);
                 // Push pre-existing elastic constraints
                 if (elasticsRef.current.length > 0) wasmClient.setElastics(elasticsRef.current);
+                setAppliedSolverConfig({
+                  tier: 'wasm',
+                  init: wasmInitConfig,
+                  postInit: { wind: windEnabled ? windForce : null, elastics: elasticsRef.current.length },
+                });
                 setActiveSolverTier('wasm');
               }
               return;
@@ -739,13 +749,14 @@ export function useSimulationLifecycle({
             // Preset config at init (M4-D — see simulationModeRef note).
             const cpuMode = SIMULATION_MODES[simulationModeRef.current];
             const pfCpu = getPhysicalFabric(fabricId);
+            const cpuInitConfig = {
+              numSubsteps: cpuMode.substeps,
+              // P7-density (espejo del branch WASM/GPU)
+              fabricDensity: pfCpu ? toXPBDParams(pfCpu).density : undefined,
+              selfCollision: cpuMode.selfCollision,
+            };
             await withTimeout(
-              client.initMultiPiece(placedMeshes, seamInitData, {
-                numSubsteps: cpuMode.substeps,
-                // P7-density (espejo del branch WASM/GPU)
-                fabricDensity: pfCpu ? toXPBDParams(pfCpu).density : undefined,
-                selfCollision: cpuMode.selfCollision,
-              }),
+              client.initMultiPiece(placedMeshes, seamInitData, cpuInitConfig),
               15000, 'CPU worker init',
             );
             client.setFabric(fabricId);
@@ -759,6 +770,11 @@ export function useSimulationLifecycle({
               client.start();
               // Push pre-existing elastic constraints
               if (elasticsRef.current.length > 0) client.setElastics(elasticsRef.current);
+              setAppliedSolverConfig({
+                tier: 'cpu-worker',
+                init: cpuInitConfig,
+                postInit: { elastics: elasticsRef.current.length },
+              });
               setActiveSolverTier('cpu-worker');
             }
             return;
@@ -790,6 +806,7 @@ export function useSimulationLifecycle({
         await neuralClient.initMultiPiece(placedMeshes);
         if (!cancelled) {
           neuralClient.start();
+          setAppliedSolverConfig({ tier: 'neural-drape', init: { pieces: placedMeshes.length }, postInit: {} });
           setActiveSolverTier('neural-drape');
         }
       };

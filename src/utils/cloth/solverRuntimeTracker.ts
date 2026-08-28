@@ -1,3 +1,4 @@
+import type { BufferGeometry } from 'three';
 import type { SolverTier } from '../../store/simulationSlice';
 
 /**
@@ -16,10 +17,65 @@ export function setActiveSolverTier(
 
 export function clearActiveSolverTier(): void {
   activeTier = 'none';
+  appliedConfig = null;
 }
 
 export function getActiveSolverTier(): SolverTier {
   return activeTier;
+}
+
+// ─── Config aplicada por tier ───────────────────────────────────────────────
+
+export interface AppliedSolverConfig {
+  tier: SolverTier;
+  /** Lo que se pasó al initMultiPiece* — tras configBridge, preset de modo y tejido. */
+  init: unknown;
+  /** Lo aplicado con llamadas posteriores al init (viento, elásticos). */
+  postInit: Record<string, unknown>;
+}
+
+let appliedConfig: AppliedSolverConfig | null = null;
+
+export function setAppliedSolverConfig(config: AppliedSolverConfig): void {
+  appliedConfig = config;
+}
+
+export function getAppliedSolverConfig(): AppliedSolverConfig | null {
+  return appliedConfig;
+}
+
+// ─── Geometría de la tela retenida para la foto física ──────────────────────
+
+export interface MeshManifestEntry {
+  pieceId: string;
+  vertexOffset: number;
+  vertexCount: number;
+  triCount: number;
+}
+
+export interface ClothGeometryRecord {
+  geometry: BufferGeometry;
+  manifest: MeshManifestEntry[];
+}
+
+let clothGeometry: ClothGeometryRecord | null = null;
+
+/**
+ * Sin unregister a propósito: un boundary caído desmonta GarmentSimulation y
+ * el fallback exporta DESPUÉS — la referencia tiene que sobrevivir al unmount.
+ * La reemplaza la siguiente simulación (o `null` cuando no hay piezas).
+ * ponytail: retiene una geometría entre simulaciones; si un perfil de memoria
+ * lo acusa, copiar positions al registrar y soltar la geometría.
+ */
+export function registerClothGeometry(
+  geometry: BufferGeometry | null,
+  manifest: MeshManifestEntry[],
+): void {
+  clothGeometry = geometry ? { geometry, manifest } : null;
+}
+
+export function getClothGeometry(): ClothGeometryRecord | null {
+  return clothGeometry;
 }
 
 // ─── Ring de eventos de la cascada ──────────────────────────────────────────

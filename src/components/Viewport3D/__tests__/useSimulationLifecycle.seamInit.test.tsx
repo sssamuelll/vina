@@ -152,6 +152,7 @@ import {
   clearActiveSolverTier,
   clearSolverEvents,
   getActiveSolverTier,
+  getAppliedSolverConfig,
   getSolverEvents,
 } from '../../../utils/cloth/solverRuntimeTracker';
 
@@ -541,6 +542,25 @@ describe('useSimulationLifecycle — caja negra 3D: la cascada contada', () => {
     expect(typeof failed!.data.stack).toBe('string');
     const order = getSolverEvents().map(e => e.kind);
     expect(order.indexOf('tier:failed')).toBeLessThan(order.lastIndexOf('tier:selected'));
+  });
+
+  it('registra la config que WASM recibió de verdad: substeps del preset y el viento post-init', async () => {
+    localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'false');
+    wasmMocks.isWasmSolverAvailable.mockResolvedValue(true);
+    wasmMocks.initMultiPiece.mockResolvedValue(undefined);
+
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    renderLifecycle(store, seamInitData);
+    await waitFor(() => expect(getActiveSolverTier()).toBe('wasm'));
+
+    const applied = getAppliedSolverConfig();
+    expect(applied?.tier).toBe('wasm');
+    const initConfig = wasmMocks.initMultiPiece.mock.calls[0][2];
+    expect(applied?.init).toBe(initConfig);
+    expect(applied?.init).toHaveProperty('substeps');
+    expect(applied?.init).not.toHaveProperty('numSubsteps');
+    expect(applied?.postInit).toEqual({ wind: null, elastics: 0 });
   });
 
   it('la carrera: un init viejo que rechaza tras Stop→Play no dispone el cliente de la corrida nueva', async () => {
