@@ -198,10 +198,10 @@ describe('gate del recorder verboso', () => {
 });
 ```
 
-- [ ] Ejecutar en rojo: `npx vitest run src/copilot/debug/__tests__/createDebugBridge.test.ts`.
-- [ ] Confirmar que el caso por defecto recibe `true` antes del cambio.
-- [ ] Aplicar el diff de producción.
-- [ ] Ejecutar de nuevo y confirmar `2 passed`.
+- [x] Ejecutar en rojo: `npx vitest run src/copilot/debug/__tests__/createDebugBridge.test.ts`.
+- [x] Confirmar que el caso por defecto recibe `true` antes del cambio.
+- [x] Aplicar el diff de producción.
+- [x] Ejecutar de nuevo y confirmar `2 passed`.
 
 ### 4. Verificación
 
@@ -229,7 +229,7 @@ npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui
 - Estimación: 8-12 líneas de producción modificadas y 45-65 líneas de prueba.
 - Mergeable solo: sí; no depende de los pasos 1-5.
 
-- [ ] Commit:
+- [x] Commit:
 
 ```bash
 git add src/copilot/debug/debugAPI.ts src/copilot/debug/createDebugBridge.ts src/copilot/debug/__tests__/createDebugBridge.test.ts
@@ -538,10 +538,10 @@ expect(reduceToolCalls(
 )).toEqual([{ name: 'clearProjectMemory', status: 'cancelled' }]);
 ```
 
-- [ ] Ejecutar los cuatro archivos en rojo.
-- [ ] Confirmar hoy: `success:false` retornado emite complete; no existe cancelled ni el ring.
-- [ ] Implementar clasificador, ring, consumo UI y agregación del recorder.
-- [ ] Ejecutar de nuevo y confirmar todos los casos en verde.
+- [x] Ejecutar los cuatro archivos en rojo.
+- [x] Confirmar hoy: `success:false` retornado emite complete; no existe cancelled ni el ring.
+- [x] Implementar clasificador, ring, consumo UI y agregación del recorder.
+- [x] Ejecutar de nuevo y confirmar todos los casos en verde.
 
 ### 4. Verificación
 
@@ -575,7 +575,7 @@ npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui
 - Estimación: 85-120 líneas de producción y 130-180 líneas de prueba.
 - Mergeable solo: sí después del paso 0; el ring no depende del exporter.
 
-- [ ] Commit:
+- [x] Commit:
 
 ```bash
 git add src/copilot/debug/toolExecutionTracker.ts src/copilot/debug/__tests__/toolExecutionTracker.test.ts src/copilot/reasoning/bridge/AgenticLoop.ts src/copilot/reasoning/bridge/__tests__/AgenticLoop.test.ts src/copilot/debug/createDebugBridge.ts src/copilot/debug/__tests__/createDebugBridge.test.ts src/copilot/hooks/useAgenticLoop.ts src/copilot/hooks/__tests__/useAgenticLoop.test.ts
@@ -931,10 +931,10 @@ fireEvent.click(screen.getByText('Exportar diagnóstico'));
 expect(downloadDiagnosticBundleMock).toHaveBeenCalledTimes(1);
 ```
 
-- [ ] Invocar `contrato-de-interfaz` antes de tocar UI.
-- [ ] Ejecutar los tres archivos en rojo: exporter/tracker no existen y el menú no contiene la puerta.
-- [ ] Crear tracker/exporter y conectar lifecycle/menú.
-- [ ] Ejecutar de nuevo en verde.
+- [x] Invocar `contrato-de-interfaz` antes de tocar UI.
+- [x] Ejecutar los tres archivos en rojo: exporter/tracker no existen y el menú no contiene la puerta.
+- [x] Crear tracker/exporter y conectar lifecycle/menú.
+- [x] Ejecutar de nuevo en verde.
 
 ### 4. Verificación
 
@@ -971,7 +971,7 @@ npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui
 - Estimación: 100-140 líneas de producción y 120-170 líneas de prueba.
 - Mergeable solo: sí sobre los pasos 0 y 1; todavía funciona antes de que los pasos 3-5 enriquezcan errores/timeline.
 
-- [ ] Commit:
+- [x] Commit:
 
 ```bash
 git add src/utils/cloth/solverRuntimeTracker.ts src/components/Viewport3D/useSimulationLifecycle.ts src/components/Viewport3D/__tests__/useSimulationLifecycle.seamInit.test.tsx src/utils/export/diagnosticExporter.ts src/utils/export/__tests__/diagnosticExporter.test.ts src/components/shell/LogoMenu.tsx src/components/shell/__tests__/LogoMenu.test.tsx
@@ -1179,9 +1179,9 @@ it('persiste antes del autosave y los fallbacks exportan sin AppShell', () => {
 
 Añadir el equivalente de `PanelErrorBoundary` y un caso directo que llama los cuatro `componentDidCatch` y espera las cuatro fuentes exactas. Mockear `downloadDiagnosticBundle` para que lance y comprobar el `role="alert"`; el botón debe seguir montado.
 
-- [ ] Ejecutar en rojo: hoy `pushError` no es pública, no hay persistencia ni botones.
-- [ ] Implementar tracker, cuatro catches, fallbacks y foco.
-- [ ] Ejecutar de nuevo en verde.
+- [x] Ejecutar en rojo: hoy `pushError` no es pública, no hay persistencia ni botones.
+- [x] Implementar tracker, cuatro catches, fallbacks y foco.
+- [x] Ejecutar de nuevo en verde.
 
 ### 4. Verificación
 
@@ -1219,7 +1219,7 @@ npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui
 - Estimación: 85-120 líneas de producción/CSS y 100-150 líneas de prueba.
 - Mergeable solo: sí sobre el paso 2, porque los botones consumen el exporter ya creado.
 
-- [ ] Commit:
+- [x] Commit:
 
 ```bash
 git add src/utils/errorTracker.ts src/utils/__tests__/errorTracker.test.ts src/components/ErrorBoundary/AppErrorBoundary.tsx src/components/ErrorBoundary/PanelErrorBoundary.tsx src/components/ErrorBoundary/ErrorBoundary.css src/components/Viewport3D/SimulationErrorBoundary.tsx src/components/Viewport3D/Viewport3D.tsx src/components/ErrorBoundary/__tests__/errorTrackerBoundaries.test.tsx
@@ -1572,10 +1572,10 @@ it('un reset durante la lectura descarta el proyecto anterior', async () => {
 });
 ```
 
-- [ ] Ejecutar en rojo: el módulo y `timeline` no existen.
-- [ ] Implementar primero el writer y demostrar debounce/serialización.
-- [ ] Integrar luego `undoMiddleware` e hidratación.
-- [ ] Ejecutar en verde y comprobar que ningún test rehidrata `past`/`future`.
+- [x] Ejecutar en rojo: el módulo y `timeline` no existen.
+- [x] Implementar primero el writer y demostrar debounce/serialización.
+- [x] Integrar luego `undoMiddleware` e hidratación.
+- [x] Ejecutar en verde y comprobar que ningún test rehidrata `past`/`future`.
 
 ### 4. Verificación
 
@@ -1611,7 +1611,7 @@ npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui
 - Estimación: 130-180 líneas de producción y 140-200 líneas de prueba.
 - Mergeable solo: sí; el paso 2 recoge `timeline` automáticamente por `getHistory()`.
 
-- [ ] Commit:
+- [x] Commit:
 
 ```bash
 git add src/store/historyTimeline.ts src/store/undoMiddleware.ts src/store/index.ts src/store/__tests__/historyTimeline.persistence.test.ts
@@ -1863,10 +1863,10 @@ Añadir cuatro contratos:
 
 Comprobar además que el evento nuevo se persiste mediante el writer del paso 4 y aparece en `buildDiagnosticBundle(...).history.timeline`.
 
-- [ ] Ejecutar en rojo: no existen procedencia, evento ni constante.
-- [ ] Implementar procedencia/batching y dejar los tests de señal todavía rojos.
-- [ ] Añadir el evento append-only en undo.
-- [ ] Ejecutar los seis casos en verde.
+- [x] Ejecutar en rojo: no existen procedencia, evento ni constante.
+- [x] Implementar procedencia/batching y dejar los tests de señal todavía rojos.
+- [x] Añadir el evento append-only en undo.
+- [x] Ejecutar los seis casos en verde.
 
 ### 4. Verificación
 
@@ -1904,7 +1904,7 @@ npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui
 - Estimación: 75-110 líneas de producción y 150-210 líneas de prueba.
 - Mergeable solo: sí sobre el paso 4; no requiere cambios adicionales al exporter.
 
-- [ ] Commit:
+- [x] Commit:
 
 ```bash
 git add src/store/historyTimeline.ts src/store/undoMiddleware.ts src/copilot/action/tools/registry.ts src/store/__tests__/undoMiddleware.agentFeedback.test.ts
@@ -1926,7 +1926,7 @@ Cada paso termina compilable, probado y revertible con un commit propio. No junt
 
 ## Fuera de alcance
 
-- **Drapeado 3D:** buffers vivos, velocidades, snapshots físicos reales y contenido detrás de `blob:` no entran. Reabrir con el primer reporte de drapeado de María que este bundle no reproduzca.
+- **Drapeado 3D:** buffers vivos, velocidades, snapshots físicos reales y contenido detrás de `blob:` no entran. Reabrir con el primer reporte de drapeado de María que este bundle no reproduzca. **Reabierto el 2026-08-28** por decisión de Samuel, antes del disparador: ver `docs/plans/2026-08-28-caja-negra-telemetria-3d.md`.
 - **Envelope y `traceId`:** reabrir cuando existan sesiones o loops concurrentes que el orden temporal no pueda desentrelazar.
 - **Sanitización/redacción:** reabrir cuando el bundle salga de la máquina de María hacia un tercero o una política de datos lo exija.
 - **Consentimiento `off/local/soporte/mejoras` y sink remoto:** reabrir únicamente al diseñar una transferencia remota.

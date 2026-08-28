@@ -18,6 +18,7 @@ The work in flight — deepening the beachhead so the pattern that comes in gets
 
 - **Real grading of imported patterns.** Today an imported DXF grades by proportional scaling, honestly labeled. Next is per-point grading — reading grade data the file carries, or letting the user author grade rules — so a size run reflects how each point actually moves.
 - **Simulation you can trust.** Drape realism and stability under long-horizon simulation: the cloth should settle the way real fabric does, deterministically.
+- **Bugs you can hand over.** A local diagnostic export (no server, no account) that turns a patternmaker's "it broke" into a reproducible test. The 2D half ships with #1084; the 3D half — which solver tier actually ran, why the cascade fell back, and a physical snapshot of the cloth — is the follow-up (`docs/plans/2026-08-28-caja-negra-telemetria-3d.md`).
 - **A capability registry.** A single source for the app's commands and panels so every new feature appears coherently in the menu, the command palette, and the agent's toolset — human and agent affordances stay in sync as the surface grows.
 
 ## Next

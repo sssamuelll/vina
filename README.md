@@ -13,7 +13,7 @@ Vina lets a patternmaker bring a flat pattern into the browser, sew it in 3D, an
 
 **[Try it → vina.sdar.dev](https://vina.sdar.dev)**  ·  [Contributing](CONTRIBUTING.md)  ·  [Architecture](docs/specs/ARCHITECTURE.md)
 
-> **Status — v0.11.0 (July 2026).** The core loop works end to end: import a DXF/AAMA pattern → auto-detect edges → sew pieces in 3D → drape on an avatar with WebGPU cloth simulation. Size grading and production output (nesting, BOM) are in the tool; per-point grading of imported patterns and drafting-from-scratch are on the [roadmap](ROADMAP.md). We build in the open — expect rough edges and honest labels where a feature isn't finished yet.
+> **Status — v0.11.0 (August 2026).** The core loop works end to end: import a DXF/AAMA pattern → auto-detect edges → sew pieces in 3D → drape on an avatar with WebGPU cloth simulation. Since July the 2D editor has been hardened against a professional patternmaker's daily notes (rotated pieces, seam allowance on real DXFs, drag-to-measure). Size grading and production output (nesting, BOM) are in the tool; per-point grading of imported patterns and drafting-from-scratch are on the [roadmap](ROADMAP.md). A local diagnostic export (`Archivo ▸ Exportar diagnóstico`) bundles state and error history for bug reports — it reproduces 2D pattern bugs today; 3D drape bugs are next. We build in the open — expect rough edges and honest labels where a feature isn't finished yet.
 
 ---
 
