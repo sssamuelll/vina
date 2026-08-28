@@ -10,6 +10,7 @@
  */
 
 import { GpuClothSolver, type GpuSolverConfig } from './gpuSolver';
+import { pushSolverEvent } from '../solverRuntimeTracker';
 import { extractStretchConstraints, extractBendConstraints, buildCrossSeamBendQuads, colorConstraints, type SeamConstraintData } from './gpuBuffers';
 import { createPositionStorageAttribute, createNormalStorageAttribute } from './gpuStorageAttributes';
 import {
@@ -359,14 +360,7 @@ export class GpuSolverClient implements ClothSolverClient {
       tOff += p.triIds.length;
     }
 
-    // Validate input data for NaN before sending to GPU
-    let inputNaN = 0;
-    for (let i = 0; i < positions.length; i++) {
-      if (!isFinite(positions[i])) inputNaN++;
-    }
-    if (inputNaN > 0) {
-      console.error(`[GpuSolverClient] ❌ Input mesh has ${inputNaN} NaN/Infinity values in positions!`);
-    }
+    this.reportInputNaN(positions);
 
     // Extract constraints from merged mesh
     const stretch = extractStretchConstraints(positions, triangles);
@@ -513,6 +507,8 @@ export class GpuSolverClient implements ClothSolverClient {
       vOff += numV;
       tOff += p.triIds.length;
     }
+
+    this.reportInputNaN(positions);
 
     // NOTA: el snapshot originalInvMass se toma DESPUÉS de aplicar la masa
     // de banda F3 (más abajo) — freeze/unfreeze debe restaurar la nervadura,
@@ -1365,6 +1361,7 @@ export class GpuSolverClient implements ClothSolverClient {
   ): void {
     if (!this.tslSolver || !this.tslBuffers) {
       console.warn('[GpuSolverClient] setTslCollisionBody called but no TSL solver active');
+      pushSolverEvent('collision:degraded', { tier: 'webgpu', id, reason: 'no-tsl-solver' });
       return;
     }
     if (mesh.triCount === 0) {
@@ -1372,6 +1369,7 @@ export class GpuSolverClient implements ClothSolverClient {
         `[GpuSolverClient] setTslCollisionBody '${id}': input mesh has triCount=0, skipping. ` +
           `Avatar collision is not degradable — particles will fall through any region this body would have covered.`,
       );
+      pushSolverEvent('collision:degraded', { tier: 'webgpu', id, reason: 'zero-triangles' });
       return;
     }
 
@@ -1382,6 +1380,7 @@ export class GpuSolverClient implements ClothSolverClient {
         `[GpuSolverClient] setTslCollisionBody '${id}': BVH build produced 0 nodes from ${mesh.triCount} triangles, skipping. ` +
           `Likely a degenerate mesh; avatar collision will be absent for this body.`,
       );
+      pushSolverEvent('collision:degraded', { tier: 'webgpu', id, reason: 'empty-bvh', triCount: mesh.triCount });
       return;
     }
 
@@ -1803,6 +1802,22 @@ export class GpuSolverClient implements ClothSolverClient {
   // ─── Private ────────────────────────────────────────────────────────────
 
   /**
+   * Validate input mesh data for NaN before sending to GPU. Does not abort
+   * the init (pre-existing behaviour); the count goes to console and to the
+   * diagnostic ring so the bundle can tell a bad mesh from a bad solver.
+   */
+  private reportInputNaN(positions: Float32Array): void {
+    let inputNaN = 0;
+    for (let i = 0; i < positions.length; i++) {
+      if (!isFinite(positions[i])) inputNaN++;
+    }
+    if (inputNaN > 0) {
+      console.error(`[GpuSolverClient] ❌ Input mesh has ${inputNaN} NaN/Infinity values in positions!`);
+      pushSolverEvent('nan:detected', { tier: 'webgpu', phase: 'input', count: inputNaN });
+    }
+  }
+
+  /**
    * Check a position array for NaN/Infinity values. Returns true if valid.
    */
   private validatePositions(positions: Float32Array): boolean {
@@ -1815,6 +1830,7 @@ export class GpuSolverClient implements ClothSolverClient {
         console.error(
           `[GpuSolverClient] ❌ NaN/Inf at particle ${particleIdx}.${component} (frame ${this.frameCount}, positions[${i}] = ${positions[i]})`,
         );
+        pushSolverEvent('nan:detected', { tier: 'webgpu', frame: this.frameCount, particleIndex: particleIdx, component });
         return false;
       }
     }
@@ -1847,6 +1863,7 @@ export class GpuSolverClient implements ClothSolverClient {
           // NaN validation (intensive on first 3 frames, sampled thereafter)
           if (!this.validatePositions(positions)) {
             console.error('[GpuSolverClient] Stopping solver due to NaN positions');
+            pushSolverEvent('nan:solver-stopped', { tier: 'webgpu', frame: this.frameCount });
             this.stop();
             return;
           }

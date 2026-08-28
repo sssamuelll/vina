@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { FakeGPUDevice, FakeRenderer } from './fakeDevice';
+import { clearSolverEvents, getSolverEvents } from '../../solverRuntimeTracker';
 import { dihedralAngle } from '../../dihedral';
 
 // vi.hoisted runs before vi.mock hoisting, so the shared MockSBA + setAtomicCalls
@@ -1674,5 +1675,53 @@ describe('fit map GPU params (behavior #17 — #1010 slice 2)', () => {
     const client = new GpuSolverClient(device as any);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(() => client.setFitMapParams('strain' as any, config)).not.toThrow();
+  });
+});
+
+describe('caja negra 3D — eventos del tier GPU', () => {
+  beforeEach(clearSolverEvents);
+
+  it('NaN en la malla de entrada deja nan:detected{phase:input} con el conteo', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    const piece = makeQuadPiece();
+    piece.vertices[0] = NaN;
+    piece.vertices[4] = Infinity;
+
+    await client.initMultiPieceTsl([piece]);
+
+    expect(getSolverEvents()).toContainEqual(
+      expect.objectContaining({ kind: 'nan:detected', data: { tier: 'webgpu', phase: 'input', count: 2 } }),
+    );
+  });
+
+  it('validatePositions deja nan:detected con partícula y componente', () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any) as any;
+    const positions = new Float32Array([0, 0, 0, 1, NaN, 1]);
+
+    expect(client.validatePositions(positions)).toBe(false);
+
+    expect(getSolverEvents()).toEqual([
+      expect.objectContaining({
+        kind: 'nan:detected',
+        data: { tier: 'webgpu', frame: 0, particleIndex: 1, component: 'y' },
+      }),
+    ]);
+  });
+
+  it('un colisionador con 0 triángulos deja collision:degraded{zero-triangles}', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    client.setTslCollisionBody('avatar', { vertices: new Float32Array(0), normals: new Float32Array(0), triCount: 0 });
+
+    expect(getSolverEvents()).toContainEqual(
+      expect.objectContaining({ kind: 'collision:degraded', data: { tier: 'webgpu', id: 'avatar', reason: 'zero-triangles' } }),
+    );
   });
 });

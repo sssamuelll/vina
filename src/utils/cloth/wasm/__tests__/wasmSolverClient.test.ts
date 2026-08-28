@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { type PieceMeshData, WasmSolverClient } from '../wasmSolverClient';
 import type { SeamInitData } from '../../clothWorker';
 import { stubWorkerGlobal } from './fakeWorker';
+import { clearSolverEvents, getSolverEvents } from '../../solverRuntimeTracker';
 
 /**
  * Boundary-contract coverage for the main-thread bridge between
@@ -48,6 +49,7 @@ describe('WasmSolverClient', () => {
     // ReferenceError at runtime. Stubbing on globalThis lets the free
     // identifier resolve through the global scope chain.
     vi.stubGlobal('__BUILD_TIMESTAMP__', 'test-stamp');
+    clearSolverEvents();
 
     // Bridge logs `[WasmSolver] Initialized in worker: ...` on every ready
     // and `[WasmSolver] Worker error: ...` on every error path. Silence
@@ -94,6 +96,22 @@ describe('WasmSolverClient', () => {
 
   // ── Contract #2 — init error path (postMessage 'error') ─────────────────
   describe('init error path (#2)', () => {
+    it('un mensaje "error" del worker deja tier:runtime-error{wasm} con su code en el ring', async () => {
+      const { worker } = stubWorkerGlobal();
+      const client = new WasmSolverClient();
+      const initPromise = client.initMultiPiece([makePiece()]);
+
+      worker.emitMessage({ type: 'error', code: 'wasm_memory_unavailable', message: 'WASM memory unavailable' });
+
+      await expect(initPromise).rejects.toThrow();
+      expect(getSolverEvents()).toEqual([
+        expect.objectContaining({
+          kind: 'tier:runtime-error',
+          data: { tier: 'wasm', code: 'wasm_memory_unavailable', message: 'WASM memory unavailable' },
+        }),
+      ]);
+    });
+
     it('rejects init Promise + fires onError on worker "error" message', async () => {
       const { worker } = stubWorkerGlobal();
       const client = new WasmSolverClient();

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import { ClothWorkerClient } from '../clothWorkerClient';
 import { stubWorkerGlobal } from './fakeClothWorker';
+import { clearSolverEvents, getSolverEvents } from '../solverRuntimeTracker';
 
 /**
  * Boundary-contract coverage for the main-thread bridge between
@@ -56,6 +57,7 @@ function makeCollisionMesh(): { vertices: Float32Array; normals: Float32Array; t
 describe('ClothWorkerClient', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    clearSolverEvents();
   });
 
   // ── Contract #1 — init lifecycle ────────────────────────────────────────
@@ -148,6 +150,22 @@ describe('ClothWorkerClient', () => {
       await expect(initPromise).rejects.toThrow(/solver build failed/);
       expect(onError).toHaveBeenCalledOnce();
       expect(onError).toHaveBeenCalledWith('solver build failed');
+    });
+
+    it('un mensaje "error" del worker deja tier:runtime-error{cpu-worker} en el ring', async () => {
+      const { worker } = stubWorkerGlobal();
+      const client = new ClothWorkerClient();
+      const initPromise = client.init(makeMesh());
+
+      worker.emitMessage({ type: 'error', message: 'Solver not initialized' });
+
+      await expect(initPromise).rejects.toThrow('Solver not initialized');
+      expect(getSolverEvents()).toEqual([
+        expect.objectContaining({
+          kind: 'tier:runtime-error',
+          data: { tier: 'cpu-worker', code: 'worker_error', message: 'Solver not initialized' },
+        }),
+      ]);
     });
   });
 

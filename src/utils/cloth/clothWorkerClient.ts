@@ -8,6 +8,7 @@
  */
 
 import type { ClothSimConfig, SphereCollider, CapsuleCollider } from './xpbdSolver';
+import { pushSolverEvent } from './solverRuntimeTracker';
 import type { WorkerInMessage, WorkerOutMessage, SeamInitData } from './clothWorker';
 import { type SolverCapabilities, CPU_CAPABILITIES } from './solverCapabilities';
 import type { ClothSolverClient } from './solverProtocol';
@@ -81,6 +82,7 @@ export class ClothWorkerClient implements ClothSolverClient {
     this.worker.onerror = (err) => {
       err.preventDefault();
       const msg = err.message || 'Cloth worker crashed';
+      pushSolverEvent('tier:runtime-error', { tier: 'cpu-worker', code: 'worker_error', message: msg });
       this.readyReject?.(new Error(msg));
       this.readyReject = null;
       this.readyResolve = null;
@@ -122,6 +124,7 @@ export class ClothWorkerClient implements ClothSolverClient {
     this.worker.onerror = (err) => {
       err.preventDefault();
       const msg = err.message || 'Cloth worker crashed';
+      pushSolverEvent('tier:runtime-error', { tier: 'cpu-worker', code: 'worker_error', message: msg });
       this.readyReject?.(new Error(msg));
       this.readyReject = null;
       this.readyResolve = null;
@@ -389,6 +392,7 @@ export class ClothWorkerClient implements ClothSolverClient {
         break;
 
       case 'error':
+        pushSolverEvent('tier:runtime-error', { tier: 'cpu-worker', code: 'worker_error', message: msg.message });
         this.readyReject?.(new Error(msg.message));
         this.readyReject = null;
         this.readyResolve = null;
