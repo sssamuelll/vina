@@ -49,3 +49,19 @@ it('limpia la memoria y la ranura síncrona del último boundary', async () => {
   expect(tracker.getTrackedErrors()).toEqual([]);
   expect(localStorage.getItem(tracker.LAST_BOUNDARY_ERROR_KEY)).toBeNull();
 });
+
+it('un error de device perdido persistido con persistForReload vuelve al ring tras recargar', async () => {
+  const firstLoad = await import('../errorTracker');
+  const pushError = (firstLoad as typeof firstLoad & { pushError?: PushError }).pushError;
+  const entry = {
+    message: 'destroyed: GPU device was destroyed',
+    source: 'webgpu-device-lost',
+    timestamp: 30,
+  };
+  pushError!(entry, { persistForReload: true });
+
+  vi.resetModules();
+  const afterReload = await import('../errorTracker');
+  afterReload.initErrorTracker();
+  expect(afterReload.getTrackedErrors()).toContainEqual(entry);
+});

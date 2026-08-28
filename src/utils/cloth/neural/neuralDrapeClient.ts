@@ -46,6 +46,7 @@
  */
 
 import { type SolverCapabilities, NEURAL_CAPABILITIES } from '../solverCapabilities';
+import { pushSolverEvent } from '../solverRuntimeTracker';
 import type { ClothSolverClient } from '../solverProtocol';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -175,6 +176,7 @@ export class NeuralDrapeClient implements ClothSolverClient {
         await this.loadOnnxModel();
       } catch (err) {
         console.warn('[NeuralDrape] ONNX model failed, using analytical fallback:', err);
+        pushSolverEvent('tier:diagnostic', { tier: 'neural-drape', code: 'analytical-fallback', message: String(err) });
         this.config.useAnalytical = true;
       }
     }
@@ -337,6 +339,7 @@ export class NeuralDrapeClient implements ClothSolverClient {
         })
         .catch(err => {
           console.warn('[NeuralDrape] Inference failed, switching to analytical:', err);
+          pushSolverEvent('tier:diagnostic', { tier: 'neural-drape', code: 'inference-failed', message: String(err) });
           this.config.useAnalytical = true;
           this.onError?.(`Neural inference failed: ${err}`);
         });

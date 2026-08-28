@@ -1,6 +1,6 @@
 # Caja negra 3D — que el bundle cuente qué motor corrió, por qué cayó y cómo estaba la tela
 
-**Fecha:** 2026-08-28 · **Estado:** propuesta v2, pendiente de aprobación de Samuel · **Continúa:** `docs/plans/2026-08-27-caja-negra-telemetria-local.md` (v1 2D, PR #1084)
+**Fecha:** 2026-08-28 · **Estado:** aprobada por Samuel el 2026-08-28; pasos 0–5 implementados el mismo día en el PR #1086 (plan ejecutable: `docs/superpowers/plans/2026-08-28-caja-negra-telemetria-3d.md`); el replay (§ 4 paso 6) es el issue #1087 con sus dos precondiciones · **Continúa:** `docs/plans/2026-08-27-caja-negra-telemetria-local.md` (v1 2D, PR #1084)
 
 > **Para agentes ejecutores:** este documento es la propuesta. Cuando Samuel la apruebe, se convierte en plan ejecutable con diffs esbozados y tests en rojo por paso (mismo formato que el plan v1), y se ejecuta con `superpowers:subagent-driven-development`. No implementar desde esta versión.
 

@@ -44,6 +44,8 @@ import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
+import { pushSolverEvent, registerClothGeometry, type MeshManifestEntry } from '../../utils/cloth/solverRuntimeTracker';
+import { pushError } from '../../utils/errorTracker';
 import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { FACE_POKE_GENERATE_CADENCE } from '../../utils/cloth/gpu/tslFacePoke';
 import { isRendererDeviceLost, markRendererDeviceLost } from './rendererDeviceLost';
@@ -308,8 +310,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // los pares de costura para puentear la ranura del piso físico en el render.
   const seamInitData = useMemo(() => seamsToInitData(seams, seamGroups), [seams, seamGroups]);
 
-  const { staticGeometry } = useMemo(() => {
-    if (pieceMeshes.length === 0) return { staticGeometry: null };
+  const { staticGeometry, meshManifest } = useMemo(() => {
+    if (pieceMeshes.length === 0) return { staticGeometry: null, meshManifest: [] as MeshManifestEntry[] };
 
     const axisHints = buildAxisHints(activePieces, armAxis);
     const arrangement = resolveArrangementWithFrames(activePieces, avatarMeasurements, arrangementOverrides, { axisHints, skeletonReady: armAxis.ready });
@@ -322,7 +324,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // mesh but no frame. The old `?? arrangement[pi]` fallback destructured
     // `undefined` here and crashed the memo (#924).
     const validMeshes = pieceMeshes.filter(p => arrangeById.has(p.pieceId));
-    if (validMeshes.length === 0) return { staticGeometry: null };
+    if (validMeshes.length === 0) return { staticGeometry: null, meshManifest: [] as MeshManifestEntry[] };
 
     let totalVerts = 0;
     for (const p of validMeshes) {
@@ -339,6 +341,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // Piezas con vértices ENVUELTOS — el seam fill resuelve pares sobre la
     // misma pose que el solver (placedMeshes) para paridad exacta de conteo.
     const wrappedMeshes: Array<(typeof validMeshes)[number]> = [];
+    // Caja negra 3D: el manifiesto por pieza sale de ESTE loop, con el mismo
+    // vOffset que concatena la geometría — así los offsets describen el
+    // buffer que la foto física lee.
+    const meshManifest: MeshManifestEntry[] = [];
 
     for (let pi = 0; pi < validMeshes.length; pi++) {
       const p = validMeshes[pi];
@@ -370,6 +376,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         indices.push(p.triIds[i] + vOffset);
       }
 
+      meshManifest.push({ pieceId: p.pieceId, vertexOffset: vOffset, vertexCount: numVerts, triCount: p.triIds.length / 3 });
       vOffset += numVerts;
     }
 
@@ -411,7 +418,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       geo.userData.seamFillBaseIndices = indices;
     }
 
-    return { staticGeometry: geo };
+    return { staticGeometry: geo, meshManifest };
   }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis, seamInitData]);
   useDisposable(staticGeometry);
 
@@ -927,7 +934,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   useEffect(() => {
     geometryRef.current = staticGeometry;
-  }, [staticGeometry]);
+    // Caja negra 3D: la foto física sale de ESTA geometría, retenida en el
+    // tracker sin unregister (sobrevive al unmount por un boundary caído).
+    registerClothGeometry(staticGeometry, meshManifest);
+  }, [staticGeometry, meshManifest]);
 
   // Debug hook for E2E testing — exposes mesh to window for Playwright
   useEffect(() => {
@@ -1437,10 +1447,16 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // of latching device-loss detection to a single mount-time read.
     const device = rendererDevice;
     if (!device) return;
+    if (import.meta.env.DEV) {
+      // Puerta de verificación manual (plan caja negra 3D § 5, escenario 3):
+      // `window.__VINA_RENDERER_DEVICE__.destroy()` pierde EL device del renderer.
+      (window as unknown as Record<string, unknown>).__VINA_RENDERER_DEVICE__ = device;
+    }
     // Ya muerto desde un montaje anterior (Stop→Start sobre el mismo renderer):
     // re-latchear sin re-enganchar un listener nuevo.
     if (isRendererDeviceLost(device)) {
       rendererDeviceLostRef.current = true;
+      pushSolverEvent('device:lost', { source: 'previous-mount' });
       handleGpuDeviceLost();
       return;
     }
@@ -1449,12 +1465,21 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       markRendererDeviceLost(device);
       if (cancelled) return;
       console.error('[GarmentSimulation] WebGPU device lost:', info?.message);
+      pushSolverEvent('device:lost', { source: 'renderer', reason: info?.reason, message: info?.message });
+      // El toast pide recargar — la ranura LS (la misma de los boundaries) es
+      // la única forma de que el dato sobreviva a ese reload.
+      pushError(
+        { message: `${info?.reason ?? 'unknown'}: ${info?.message ?? ''}`, source: 'webgpu-device-lost', timestamp: Date.now() },
+        { persistForReload: true },
+      );
       rendererDeviceLostRef.current = true;
       handleGpuDeviceLost();
       dispatch(showErrorToast('Se perdió el dispositivo WebGPU — la simulación sigue en el solver de respaldo. Recarga la página para restaurar la vista 3D.'));
     });
     const onUncaptured = (e: Event) => {
-      console.error('[GarmentSimulation] uncaptured GPU error:', (e as { error?: { message?: string } }).error?.message);
+      const message = (e as { error?: { message?: string } }).error?.message;
+      console.error('[GarmentSimulation] uncaptured GPU error:', message);
+      pushSolverEvent('tier:runtime-error', { tier: 'webgpu', code: 'uncaptured-error', message });
     };
     device.addEventListener?.('uncapturederror', onUncaptured);
     return () => { cancelled = true; device.removeEventListener?.('uncapturederror', onUncaptured); };

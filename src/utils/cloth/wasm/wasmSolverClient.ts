@@ -28,6 +28,7 @@
  */
 
 import type { SeamInitData } from '../clothWorker';
+import { coalesceSolverEvent, pushSolverEvent } from '../solverRuntimeTracker';
 import type { CollisionMeshData } from '../collisionMesh';
 import { type SolverCapabilities, WASM_CAPABILITIES } from '../solverCapabilities';
 import type { ClothSolverClient } from '../solverProtocol';
@@ -144,7 +145,10 @@ export class WasmSolverClient implements ClothSolverClient {
         new URL('./wasmSolverWorker.ts', import.meta.url),
         { type: 'module' },
       );
-    } catch {
+    } catch (e) {
+      // Caja negra 3D: la causa real (CSP, URL rota, sin Worker) queda en el
+      // ring; el mensaje que ve el cascade no cambia.
+      pushSolverEvent('tier:runtime-error', { tier: 'wasm', code: 'worker_unavailable', message: e instanceof Error ? e.message : String(e) });
       throw new Error('Wasm solver worker not available');
     }
 
@@ -154,6 +158,7 @@ export class WasmSolverClient implements ClothSolverClient {
       e.preventDefault();
       const msg = e.message || 'Wasm worker crashed';
       console.warn('[WasmSolver] Worker error event:', msg);
+      pushSolverEvent('tier:runtime-error', { tier: 'wasm', code: 'worker_error', message: msg });
       this.readyReject?.(new Error(msg));
       this.readyReject = null;
       this.readyResolve = null;
@@ -369,7 +374,18 @@ export class WasmSolverClient implements ClothSolverClient {
         break;
       case 'stopped':
         break;
+      case 'diagnostic': {
+        // Caja negra 3D: NaN reseteados, auto-colisión desactivada, warm-start
+        // no soportado — no son errores de init (no tocan readyReject) y los
+        // repetidos se coalescen para no inundar el ring.
+        const { type: _type, ...rest } = msg as { type: string } & Record<string, unknown>;
+        coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', ...rest });
+        break;
+      }
       case 'error':
+        // Caja negra 3D: el `code` tipado del worker se conserva en el ring
+        // antes de degradarse a string para onError/readyReject.
+        pushSolverEvent('tier:runtime-error', { tier: 'wasm', code: msg.code ?? 'unknown', message: msg.message });
         console.warn('[WasmSolver] Worker error:', msg.message);
         this.readyReject?.(new Error(msg.message));
         this.readyReject = null;

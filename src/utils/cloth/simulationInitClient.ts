@@ -8,6 +8,7 @@
  */
 
 import type { PatternPiece } from '../../types/types';
+import { pushSolverEvent } from './solverRuntimeTracker';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -138,6 +139,7 @@ export class SimulationInitClient {
         }
       } catch (err) {
         console.warn(`[SimInitClient] Meshing failed for piece ${piece.id}:`, err);
+        pushSolverEvent('meshing:piece-failed', { pieceId: piece.id, message: err instanceof Error ? err.message : String(err) });
       }
     }
 

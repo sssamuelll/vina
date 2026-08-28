@@ -1,4 +1,11 @@
+import type { BufferGeometry } from 'three';
 import type { SolverTier } from '../../store/simulationSlice';
+
+/**
+ * Hechos del runtime del solver que Redux no guarda: el tier realmente
+ * activo, y (caja negra 3D) el ring de eventos de la cascada. Módulo sin
+ * React ni Redux — lo leen el exporter de diagnóstico y los tests.
+ */
 
 let activeTier: SolverTier = 'none';
 
@@ -10,8 +17,141 @@ export function setActiveSolverTier(
 
 export function clearActiveSolverTier(): void {
   activeTier = 'none';
+  appliedConfig = null;
 }
 
 export function getActiveSolverTier(): SolverTier {
   return activeTier;
+}
+
+// ─── Config aplicada por tier ───────────────────────────────────────────────
+
+export interface AppliedSolverConfig {
+  tier: SolverTier;
+  /** Lo que se pasó al initMultiPiece* — tras configBridge, preset de modo y tejido. */
+  init: unknown;
+  /** Lo aplicado con llamadas posteriores al init (viento, elásticos). */
+  postInit: Record<string, unknown>;
+}
+
+let appliedConfig: AppliedSolverConfig | null = null;
+
+export function setAppliedSolverConfig(config: AppliedSolverConfig): void {
+  appliedConfig = config;
+}
+
+export function getAppliedSolverConfig(): AppliedSolverConfig | null {
+  return appliedConfig;
+}
+
+// ─── Geometría de la tela retenida para la foto física ──────────────────────
+
+export interface MeshManifestEntry {
+  pieceId: string;
+  vertexOffset: number;
+  vertexCount: number;
+  triCount: number;
+}
+
+export interface ClothGeometryRecord {
+  geometry: BufferGeometry;
+  manifest: MeshManifestEntry[];
+}
+
+let clothGeometry: ClothGeometryRecord | null = null;
+
+/**
+ * Sin unregister a propósito: un boundary caído desmonta GarmentSimulation y
+ * el fallback exporta DESPUÉS — la referencia tiene que sobrevivir al unmount.
+ * La reemplaza la siguiente simulación (o `null` cuando no hay piezas).
+ * ponytail: retiene una geometría entre simulaciones; si un perfil de memoria
+ * lo acusa, copiar positions al registrar y soltar la geometría.
+ */
+export function registerClothGeometry(
+  geometry: BufferGeometry | null,
+  manifest: MeshManifestEntry[],
+): void {
+  clothGeometry = geometry ? { geometry, manifest } : null;
+}
+
+export function getClothGeometry(): ClothGeometryRecord | null {
+  return clothGeometry;
+}
+
+// ─── Ring de eventos de la cascada ──────────────────────────────────────────
+
+export type SolverEventKind =
+  | 'cascade:start'
+  | 'tier:skipped'
+  | 'tier:selected'
+  | 'tier:failed'
+  | 'tier:runtime-error'
+  | 'tier:diagnostic'
+  | 'device:lost'
+  | 'nan:detected'
+  | 'nan:solver-stopped'
+  | 'collision:degraded'
+  | 'meshing:piece-failed'
+  | 'start:failed';
+
+export interface SolverEvent {
+  kind: SolverEventKind;
+  timestamp: number;
+  /** Corrida de la cascada a la que pertenece (ver `beginCascade`). */
+  generation: number;
+  data: Record<string, unknown>;
+}
+
+export const SOLVER_EVENTS_MAX = 200;
+
+const events: SolverEvent[] = [];
+let generation = 0;
+
+/** Cada corrida de la cascada (Play, Stop→Play, pérdida de device) abre una generación. */
+export function beginCascade(): number {
+  generation += 1;
+  return generation;
+}
+
+export function currentCascadeGeneration(): number {
+  return generation;
+}
+
+/**
+ * Log de sesión: siempre encendido, en memoria, cap 200. No se limpia por
+ * proyecto — `generation` + `timestamp` distinguen corridas.
+ */
+export function pushSolverEvent(
+  kind: SolverEventKind,
+  data: Record<string, unknown> = {},
+  eventGeneration: number = generation,
+): void {
+  events.push({ kind, timestamp: Date.now(), generation: eventGeneration, data });
+  if (events.length > SOLVER_EVENTS_MAX) events.shift();
+}
+
+/**
+ * Para diagnósticos repetitivos (NaN sostenido en WASM): el último evento del
+ * mismo kind+tier+code se actualiza en sitio en vez de inundar el ring.
+ */
+export function coalesceSolverEvent(
+  kind: SolverEventKind,
+  data: Record<string, unknown>,
+): void {
+  const last = events[events.length - 1];
+  if (last && last.kind === kind && last.data.tier === data.tier && last.data.code === data.code) {
+    last.timestamp = Date.now();
+    last.data = data;
+    return;
+  }
+  pushSolverEvent(kind, data);
+}
+
+export function getSolverEvents(): readonly SolverEvent[] {
+  return events;
+}
+
+/** Solo para tests. */
+export function clearSolverEvents(): void {
+  events.length = 0;
 }

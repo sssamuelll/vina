@@ -1,0 +1,88 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { BufferGeometry } from 'three';
+import {
+  beginCascade,
+  clearActiveSolverTier,
+  clearSolverEvents,
+  coalesceSolverEvent,
+  currentCascadeGeneration,
+  getAppliedSolverConfig,
+  getClothGeometry,
+  getSolverEvents,
+  pushSolverEvent,
+  registerClothGeometry,
+  setActiveSolverTier,
+  setAppliedSolverConfig,
+  SOLVER_EVENTS_MAX,
+} from '../solverRuntimeTracker';
+
+describe('solverRuntimeTracker — ring de eventos', () => {
+  beforeEach(clearSolverEvents);
+
+  it('beginCascade incrementa la generación y los eventos la llevan por defecto', () => {
+    const g1 = beginCascade();
+    pushSolverEvent('cascade:start');
+    const g2 = beginCascade();
+    pushSolverEvent('tier:selected', { tier: 'wasm' });
+
+    expect(g2).toBe(g1 + 1);
+    expect(currentCascadeGeneration()).toBe(g2);
+    const [first, second] = getSolverEvents();
+    expect(first).toMatchObject({ kind: 'cascade:start', generation: g1, data: {} });
+    expect(second).toMatchObject({ kind: 'tier:selected', generation: g2, data: { tier: 'wasm' } });
+    expect(typeof second.timestamp).toBe('number');
+  });
+
+  it('un evento con generación explícita conserva la suya aunque haya una corrida más nueva', () => {
+    const old = beginCascade();
+    beginCascade();
+    pushSolverEvent('tier:failed', { tier: 'webgpu', stale: true }, old);
+    expect(getSolverEvents()[0].generation).toBe(old);
+  });
+
+  it('conserva como máximo SOLVER_EVENTS_MAX entradas, desalojando la más vieja', () => {
+    for (let i = 0; i < SOLVER_EVENTS_MAX + 5; i++) {
+      pushSolverEvent('tier:diagnostic', { i });
+    }
+    const events = getSolverEvents();
+    expect(events).toHaveLength(SOLVER_EVENTS_MAX);
+    expect(events[0].data.i).toBe(5);
+    expect(events[events.length - 1].data.i).toBe(SOLVER_EVENTS_MAX + 4);
+  });
+});
+
+describe('solverRuntimeTracker — coalescencia de diagnósticos repetidos', () => {
+  beforeEach(clearSolverEvents);
+
+  it('coalesceSolverEvent sobreescribe el último evento si coincide kind+tier+code, y añade si no', () => {
+    coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', code: 'nan_reset', count: 3, cumulative: 3 });
+    coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', code: 'nan_reset', count: 5, cumulative: 8 });
+    coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', code: 'self_collision_disabled' });
+    coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', code: 'nan_reset', count: 1, cumulative: 9 });
+
+    const events = getSolverEvents();
+    expect(events.map(e => e.data.code)).toEqual(['nan_reset', 'self_collision_disabled', 'nan_reset']);
+    expect(events[0].data.cumulative).toBe(8);
+  });
+});
+
+describe('solverRuntimeTracker — config aplicada y geometría retenida', () => {
+  it('la config aplicada se limpia con clearActiveSolverTier', () => {
+    setActiveSolverTier('wasm');
+    setAppliedSolverConfig({ tier: 'wasm', init: { substeps: 8 }, postInit: { wind: null } });
+    expect(getAppliedSolverConfig()).toEqual({ tier: 'wasm', init: { substeps: 8 }, postInit: { wind: null } });
+
+    clearActiveSolverTier();
+    expect(getAppliedSolverConfig()).toBeNull();
+  });
+
+  it('la geometría registrada NO se limpia con clearActiveSolverTier: la reemplaza la siguiente', () => {
+    const geo = new BufferGeometry();
+    registerClothGeometry(geo, [{ pieceId: 'a', vertexOffset: 0, vertexCount: 3, triCount: 1 }]);
+    clearActiveSolverTier();
+    expect(getClothGeometry()?.geometry).toBe(geo);
+
+    registerClothGeometry(null, []);
+    expect(getClothGeometry()).toBeNull();
+  });
+});
