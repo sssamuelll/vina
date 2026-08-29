@@ -114,6 +114,14 @@ describe('usePolyPenTool — anfitriona y nodos', () => {
     act(() => tool().handleMouseUp(ev(150, 150, 2)));
     expect(tool().nodes).toEqual([]);
   });
+
+  it('el release del botón derecho a mitad de press no confirma el nodo', () => {
+    const { tool } = setup();
+    act(() => tool().handleMouseDown(ev(150, 150)));
+    act(() => tool().handleMouseUp(ev(150, 150, 2)));
+    expect(tool().nodes).toEqual([]);
+    expect(tool().isArmed()).toBe(true);
+  });
 });
 
 describe('usePolyPenTool — enganche', () => {

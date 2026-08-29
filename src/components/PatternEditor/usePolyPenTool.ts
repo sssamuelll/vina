@@ -263,6 +263,9 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
   const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const press = pressRef.current;
     if (!press) return;
+    // Solo el botón izquierdo confirma: un release del derecho a mitad de
+    // press no es un nodo (el mismo agujero que tenía el rectángulo).
+    if (e.button !== 0) return;
     pressRef.current = null;
     lastWorldRef.current = toWorld(e);
     if (press.closes) {
