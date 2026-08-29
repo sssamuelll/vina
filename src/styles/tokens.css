@@ -53,6 +53,15 @@
   --fold-valley-2d: oklch(0.50 0.11 255);   /* valley-fold direction — blue, kept clear of the selection accent (248) */
   --topstitch-2d: #333333;                  /* topstitch default when the thread has no color set */
   --notch-2d: oklch(0.52 0.115 165);        /* notch — montage registration mark; teal-green, the open hue between cool blue (255) and warm (50), so a frequent fine marker reads ≠ cut line and ≠ fold/seam at zoom */
+  /* Enganche de la herramienta de línea interna (spec 2026-08-29 § 4.6): el
+   * anillo que dice "el próximo clic cae AQUÍ". Ámbar, más claro que
+   * --piece-locked-2d para que no se lea como candado. */
+  --snap-2d: oklch(0.72 0.15 80);
+  /* Píldora de medida dibujada sobre el papel (largo y ángulo del tramo en
+   * curso). Tinta clara sobre fondo oscuro translúcido: es cromo pequeño que
+   * flota sobre el lienzo, no tinta del patrón. */
+  --readout-bg-2d: rgba(43, 45, 51, 0.85);
+  --readout-ink-2d: #ffffff;
   --annotation-2d: #808080;                 /* annotation fallback when its category has no color */
   /* Tinta de texto instructivo dibujado SOBRE el papel (pistas de herramienta
    * al pie del lienzo). NO usar --text-* aquí: esos son la tinta del cromo

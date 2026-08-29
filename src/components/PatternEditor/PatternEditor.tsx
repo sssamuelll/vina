@@ -7,10 +7,9 @@ import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../util
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, PathCommand } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
-import { useLineTool } from './useLineTool';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
@@ -20,7 +19,7 @@ import { usePointTool } from './usePointTool';
 import { useSeamAllowanceTool } from './useSeamAllowanceTool';
 import { useNotchMirrorPreview } from './useNotchMirrorPreview';
 import SeamAllowanceSelectionOverlay from './renderers/overlays/SeamAllowanceSelectionOverlay';
-import { showUndoToast } from '../../store/copilotUISlice';
+import { showUndoToast, showInfoToast } from '../../store/copilotUISlice';
 import { useTrimTool } from './useTrimTool';
 import { newId } from '../../utils/ids';
 import { useGrainlineTool } from './useGrainlineTool';
@@ -194,12 +193,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const pen = usePenTool(zoom2D, pan2D, handlePieceComplete);
   const rectTool = useRectangleTool(zoom2D, pan2D, handlePieceComplete);
 
-  const handleInternalLineAdd = useCallback((pieceId: string, line: InternalLine) => {
-    dispatch(addInternalLine({ pieceId, line }));
-  }, [dispatch]);
-
-  const lineTool = useLineTool(zoom2D, pan2D, pieces, handleInternalLineAdd);
-
   const handleSeamComplete = useCallback((seam: Omit<Seam, 'id'>) => {
     const fullSeam: Seam = { ...seam, id: newId() };
     dispatch(addSeam(fullSeam));
@@ -326,39 +319,47 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const offsetTool = useOffsetTool(zoom2D, pan2D);
   const extendTrimTool = useExtendTrimTool(zoom2D, pan2D);
 
-  // PolyPen tool options
-  const polyPenMode = (toolOptions?.polyPen?.mode as 'piece' | 'internalLine') ?? 'piece';
-  const polyPenLineType = (toolOptions?.polyPen?.lineType as import('../../types/types').InternalLineType) ?? 'fold';
+  // ─── Línea interna (spec 2026-08-29 § 4) ─────────────────────────────────
+  // Las piezas que el motor puede enganchar y adoptar: las VISIBLES, en el
+  // orden de dibujo de PieceRenderer (la última está arriba). Las de capa
+  // oculta no son anfitrionas ni objetivo.
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
+  const drawablePieces = useMemo(
+    () => [...pieces]
+      .filter(p => !hiddenLayerIds.includes(p.layer ?? 1))
+      .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
+    [pieces, hiddenLayerIds],
+  );
+  const internalLineType = (toolOptions?.internalShape?.lineType as InternalLineType | undefined) ?? 'reference';
+  const internalNodeType = (toolOptions?.internalShape?.nodeType as 'straight' | 'curvePoints' | undefined) ?? 'straight';
 
-  const handlePolyPenCompleteInternalLine = useCallback((path: import('../../types/types').PathCommand[], lineType: import('../../types/types').InternalLineType) => {
-    // Attach to the first selected piece, or the last piece if none selected
-    const target = pieces.find((p) => p.id === selectedPieceIds[0]) ?? pieces[pieces.length - 1];
-    if (!target) return;
-    // La pluma dibuja en espacio de PATRÓN y los internals se guardan locales.
-    // Esta puerta no convertía NADA: sobre una pieza que no está en el origen
-    // la línea se guardaba corrida por la posición entera. Su hermana —Forma
-    // interna— sí convertía, a medias. Las dos usan ahora el mismo puente.
-    const line: InternalLine = {
-      id: newId(),
-      type: lineType,
-      path: toPieceLocalPath(path, target),
-    };
-    dispatch(addInternalLine({ pieceId: target.id, line }));
-  }, [selectedPieceIds, pieces, dispatch]);
-
-  const polyPenTool = usePolyPenTool(zoom2D, pan2D, handlePieceComplete, handlePolyPenCompleteInternalLine, polyPenMode, polyPenLineType);
-
-  const handleInternalShapeComplete = useCallback((path: PathCommand[]) => {
-    // polyPen produces a pattern-space path; internals are stored piece-local.
-    const target = pieces.find((p) => p.id === selectedPieceIds[0]) ?? pieces[pieces.length - 1];
-    if (!target) return;
+  const handleInternalShapeComplete = useCallback((hostId: string, path: PathCommand[]) => {
+    // La anfitriona la fijó el primer press; aquí se resuelve por id en el
+    // instante del commit — si desapareció a mitad de trazo (undo, Supr), el
+    // trazo se descarta con aviso en vez de caer en silencio.
+    const host = pieces.find(p => p.id === hostId);
+    if (!host) {
+      dispatch(showInfoToast('La pieza ya no existe: el trazo se descartó.'));
+      return;
+    }
+    // El motor dibuja en espacio de PATRÓN; los internals se guardan locales
+    // y `toPieceLocalPath` deshace posición y giro (#1068).
     dispatch(addInternalLine({
-      pieceId: target.id,
-      line: { id: newId(), type: 'reference', path: toPieceLocalPath(path, target) },
+      pieceId: host.id,
+      line: { id: newId(), type: internalLineType, path: toPieceLocalPath(path, host) },
     }));
-  }, [pieces, selectedPieceIds, dispatch]);
+  }, [pieces, dispatch, internalLineType]);
 
-  const internalShapeTool = usePolyPenTool(zoom2D, pan2D, handlePieceComplete, handleInternalShapeComplete, 'internalLine', 'reference');
+  const handleInternalShapeLockedPress = useCallback(() => {
+    dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+  }, [dispatch]);
+
+  const internalShapeTool = usePolyPenTool(zoom2D, pan2D, {
+    nodeType: internalNodeType,
+    pieces: drawablePieces,
+    onComplete: handleInternalShapeComplete,
+    onLockedPress: handleInternalShapeLockedPress,
+  });
   const pleatTool = usePleatTool(zoom2D, pan2D);
   const elasticTool = useElasticTool(zoom2D, pan2D, pieces);
 
@@ -414,6 +415,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     }
     if (activeTool === 'seamAllowance' && seamAllowanceTool.isArmed()) {
       seamAllowanceTool.cancel();
+      return;
+    }
+    // Línea interna con trazo vivo: el botón derecho no hace nada y el menú
+    // no se abre (spec 2026-08-29 § 4.3). Sin trazo, el menú de siempre.
+    if (activeTool === 'internalShape' && internalShapeTool.isTracing()) {
       return;
     }
 
@@ -568,7 +574,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       internalLineType: hitInternalLineType,
       isEditingNodes: editPatternTool.isEditing,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool, notchTool, seamAllowanceTool]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool, notchTool, seamAllowanceTool, internalShapeTool]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
@@ -612,7 +618,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool,
+      pen, rectTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool,
     });
 
   /* Durante el arrastre el grupo de la pieza se mueve por DOM directo
@@ -918,9 +924,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             seamHoveredTarget={seamTool.hoveredTarget}
             seamActiveTarget={seamTool.activeTarget}
             seamLiveRange={seamTool.liveRange}
-            lineStart={lineTool.startPoint}
-            lineCursor={lineTool.cursorPos}
-            lineLength={lineTool.lineLength}
             notchHoveredPoint={notchTool.hoveredPoint}
             notchDragPreview={notchTool.dragPreview}
             notchDragSegment={notchTool.dragSegment}
@@ -1008,22 +1011,18 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             selectMarquee={selectMarquee}
           />
           )}
-          {activeTool === 'polyPen' && (
-            <PolyPenToolOverlay
-              nodes={polyPenTool.nodes}
-              previewPoint={polyPenTool.previewPoint}
-              isDragging={polyPenTool.isDragging}
-              dragHandle={polyPenTool.dragHandle}
-              zoom2D={zoom2D}
-            />
-          )}
           {activeTool === 'internalShape' && (
             <PolyPenToolOverlay
               nodes={internalShapeTool.nodes}
               previewPoint={internalShapeTool.previewPoint}
+              pressPoint={internalShapeTool.pressPoint}
               isDragging={internalShapeTool.isDragging}
               dragHandle={internalShapeTool.dragHandle}
+              hover={internalShapeTool.hover}
+              nodeType={internalNodeType}
+              closeArmed={internalShapeTool.closeArmed}
               zoom2D={zoom2D}
+              units={units}
             />
           )}
           {calibrationMode && (

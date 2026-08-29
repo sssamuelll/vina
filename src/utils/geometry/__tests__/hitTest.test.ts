@@ -1,6 +1,6 @@
 // src/utils/geometry/__tests__/hitTest.test.ts
 import { describe, it, expect } from 'vitest';
-import { hitTestPieceBBox, findNearestPiece } from '../hitTest';
+import { hitTestPieceBBox } from '../hitTest';
 import type { PatternPiece } from '../../../types/types';
 
 function makePiece(id: string, x: number, y: number, size: number): PatternPiece {
@@ -37,15 +37,5 @@ describe('hitTestPieceBBox', () => {
   });
   it('returns first matching piece', () => {
     expect(hitTestPieceBBox({ x: 210, y: 210 }, pieces)?.id).toBe('B');
-  });
-});
-
-describe('findNearestPiece', () => {
-  const pieces = [makePiece('A', 0, 0, 100), makePiece('B', 200, 200, 50)];
-  it('returns nearest piece within margin', () => {
-    expect(findNearestPiece({ x: 50, y: 50 }, pieces)).toBe('A');
-  });
-  it('returns null when outside margin', () => {
-    expect(findNearestPiece({ x: 500, y: 500 }, pieces, 10)).toBeNull();
   });
 });

@@ -27,7 +27,7 @@ import toolReducer from '../../../store/toolSlice';
 import editorReducer from '../../../store/editorSlice';
 import { snapToEdge } from '../useSegmentSewingTool';
 import { resolveSeamAllowanceClick } from '../../../utils/seam/edgeHitTest';
-import { hitTestPieceBBox, findNearestPiece } from '../../../utils/geometry/hitTest';
+import { hitTestPieceBBox } from '../../../utils/geometry/hitTest';
 import { pieceLocalToPattern } from '../pieceTransform';
 import { useTopstitchTool } from '../useTopstitchTool';
 import type { PatternPiece, Point2D, SemanticEdge } from '../../../types/types';
@@ -133,7 +133,7 @@ describe('#1064 — margen de costura (resolveSeamAllowanceClick)', () => {
   });
 });
 
-describe('#1064 — línea y hilo (hitTestPieceBBox / findNearestPiece)', () => {
+describe('#1064 — hilo (hitTestPieceBBox)', () => {
   /** Punto del escalón interior de la L: dentro de la caja, y con la pieza a
    *  90° cae MUY lejos de donde la caja sin girar lo pone. */
   const DENTRO: Point2D = { x: 30, y: 200 };
@@ -141,13 +141,11 @@ describe('#1064 — línea y hilo (hitTestPieceBBox / findNearestPiece)', () => 
   it('sin girar el punto cae dentro de la pieza', () => {
     const p = pieza(0);
     expect(hitTestPieceBBox(enPantalla(DENTRO, p), [p])?.id).toBe('p1');
-    expect(findNearestPiece(enPantalla(DENTRO, p), [p], 0)).toBe('p1');
   });
 
   it('girada 90° el punto sigue cayendo dentro', () => {
     const p = pieza(90);
     expect(hitTestPieceBBox(enPantalla(DENTRO, p), [p])?.id).toBe('p1');
-    expect(findNearestPiece(enPantalla(DENTRO, p), [p], 0)).toBe('p1');
   });
 
   it('girada, un punto claramente fuera sigue fuera', () => {

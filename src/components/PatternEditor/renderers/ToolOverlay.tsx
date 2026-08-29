@@ -9,7 +9,6 @@ import NotchToolOverlay from './overlays/NotchToolOverlay';
 import NotchMirrorOverlay from './overlays/NotchMirrorOverlay';
 import GrainlineToolOverlay from './overlays/GrainlineToolOverlay';
 import PenToolOverlay from './overlays/PenToolOverlay';
-import LineToolOverlay from './overlays/LineToolOverlay';
 import RectangleToolOverlay from './overlays/RectangleToolOverlay';
 import MeasureToolOverlay from './overlays/MeasureToolOverlay';
 import NodeEditorOverlay from './overlays/NodeEditorOverlay';
@@ -62,9 +61,6 @@ interface ToolOverlayProps {
   penWillClose: boolean;
   rectPreview: { x: number; y: number; width: number; height: number } | null;
   rectDimensions: { width: number; height: number; center: Point2D } | null;
-  lineStart: Point2D | null;
-  lineCursor: Point2D | null;
-  lineLength: { length: number; midpoint: Point2D } | null;
   seamSegmentA: SegmentSelection | null;
   seamHoveredTarget: EdgeTarget | null;
   /** El borde del press mientras el gesto de coser sigue vivo, y el tramo que
@@ -245,10 +241,6 @@ export default function ToolOverlay(props: ToolOverlayProps) {
 
       {activeTool === 'pen' && (
         <PenToolOverlay zoom2D={zoom2D} units={units} penNodes={props.penNodes} previewPath={props.previewPath} guidePath={props.guidePath} penDistance={props.penDistance} penWillClose={props.penWillClose} />
-      )}
-
-      {activeTool === 'line' && props.lineStart && (
-        <LineToolOverlay zoom2D={zoom2D} units={units} lineStart={props.lineStart} lineCursor={props.lineCursor} lineLength={props.lineLength} />
       )}
 
       {activeTool === 'rectangle' && (

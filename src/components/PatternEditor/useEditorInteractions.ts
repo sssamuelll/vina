@@ -30,11 +30,19 @@ function getOutlineCenterForDrag(outline: PathCommand[]): { cx: number; cy: numb
   return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
 }
 import { extractNodes, NodeRef } from './nodeEditorUtils';
+import { getInternalLineEndpoints } from './internalShapePath';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { patternToPieceLocal } from './pieceTransform';
 import { DRAG_THRESHOLD_PX } from './gestureConstants';
 
 const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
+
+/** Un campo editable es dueño de sus teclas: el router no las toca (spec 2026-08-29 § 8). */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
+}
 
 /** Distance from point (px,py) to line segment (x1,y1)-(x2,y2) */
 function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
@@ -73,30 +81,10 @@ function distToInternalLine(px: number, py: number, path: PathCommand[]): number
   return minDist;
 }
 
-/** Get the two endpoints of an internal line path */
-function getInternalLineEndpoints(line: InternalLine): [Point2D, Point2D] | null {
-  if (line.path.length < 2) return null;
-  const first = line.path[0];
-  if (first.type !== 'M' || first.values.length < 2) return null;
-  const startPt: Point2D = { x: first.values[0], y: first.values[1] };
-  const last = line.path[line.path.length - 1];
-  let endPt: Point2D;
-  if (last.type === 'L' && last.values.length >= 2) {
-    endPt = { x: last.values[0], y: last.values[1] };
-  } else if (last.type === 'C' && last.values.length >= 6) {
-    endPt = { x: last.values[4], y: last.values[5] };
-  } else if (last.type === 'Q' && last.values.length >= 4) {
-    endPt = { x: last.values[2], y: last.values[3] };
-  } else {
-    return null;
-  }
-  return [startPt, endPt];
-}
-
 interface ToolHooks {
-  pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => void; reset: () => void };
+  /** `handleKeyDown` devuelve si consumió la tecla (la captura CF-1 detiene la propagación solo entonces). */
+  pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => boolean; reset: () => void };
   rectTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
-  lineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   notchTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -216,21 +204,19 @@ interface ToolHooks {
     getCursor: () => string;
     reset: () => void;
   };
-  polyPenTool: {
-    handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
-    handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
-    handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void;
-    handleKeyDown: (e: KeyboardEvent) => void;
-    handleDoubleClick: () => void;
-    reset: () => void;
-  };
+  /** El motor de "Línea interna" (`usePolyPenTool`). */
   internalShapeTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void;
-    handleKeyDown: (e: KeyboardEvent) => void;
+    /** true = consumió la tecla. */
+    handleKeyDown: (e: KeyboardEvent) => boolean;
     handleDoubleClick: () => void;
+    /** Descarta solo el press vivo (pointercancel, blur). */
+    cancelPress: () => void;
     reset: () => void;
+    isTracing: () => boolean;
+    isArmed: () => boolean;
   };
   pleatTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -294,7 +280,7 @@ export function useEditorInteractions(
   const [isDraggingPiece, setIsDraggingPiece] = useState(false);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
-  const { pen, rectTool, lineTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool } = tools;
+  const { pen, rectTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool } = tools;
 
   const selectionHasLocked = selectedPieceIds.some(
     id => pieces.find(p => p.id === id)?.locked,
@@ -361,11 +347,6 @@ export function useEditorInteractions(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTool, pen.reset]);
 
-  useEffect(() => {
-    if (activeTool !== 'polyPen') polyPenTool.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTool, polyPenTool.reset]);
-
   // Delete/Backspace handler for selected internal line
   const handleInternalLineKeyDown = useCallback((e: KeyboardEvent) => {
     if (selectedInternalLine && (e.key === 'Delete' || e.key === 'Backspace')) {
@@ -378,11 +359,10 @@ export function useEditorInteractions(
     }
   }, [selectedInternalLine, dispatch]);
 
-  // Keyboard events
+  // Keyboard events (burbuja). La pluma y la línea interna NO están aquí: sus
+  // teclas viven en la captura CF-1 de abajo — una tecla, un sitio.
   useEffect(() => {
     const handlers: ((e: KeyboardEvent) => void)[] = [];
-    if (activeTool === 'pen') handlers.push(pen.handleKeyDown);
-    if (activeTool === 'line') handlers.push(lineTool.handleKeyDown);
     if (activeTool === 'seam') handlers.push(seamTool.handleKeyDown);
     if (MEASURE_TOOL_IDS.has(activeTool)) handlers.push(measureTool.handleKeyDown);
     if (activeTool === 'transform') handlers.push(transformTool.handleKeyDown);
@@ -395,22 +375,42 @@ export function useEditorInteractions(
     if (activeTool === 'walkSeam') handlers.push(walkSeamTool.handleKeyDown);
     if (activeTool === 'offsetOutline') handlers.push(offsetTool.handleKeyDown);
     if (activeTool === 'extendTrim') handlers.push(extendTrimTool.handleKeyDown);
-    if (activeTool === 'polyPen') handlers.push(polyPenTool.handleKeyDown);
-    if (activeTool === 'internalShape') handlers.push(internalShapeTool.handleKeyDown);
     if (activeTool === 'select' && selectedInternalLine) handlers.push(handleInternalLineKeyDown);
     if (handlers.length === 0) return;
     const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, pen.handleKeyDown, lineTool.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, seamEditTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown, polyPenTool.handleKeyDown, internalShapeTool.handleKeyDown]);
+  }, [activeTool, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, seamEditTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown]);
 
-  // Coordinación de Escape (CF-1): un solo Esc = una sola acción. Durante un
-  // transform drag en select, la fase de CAPTURA en window corre antes que el
-  // listener de document del ShortcutProvider; cancelamos el drag y detenemos la
-  // propagación para que clearSelection no dispare doble. Sin drag activo el
-  // Escape fluye normal → deseleccionar.
+  // Coordinación de teclas (CF-1): un gesto vivo es dueño de sus teclas, EN
+  // CAPTURA. `ShortcutProvider` escucha en `document` (burbuja) y corre antes
+  // que el router de herramientas en `window` (burbuja): un Retroceso con la
+  // anfitriona seleccionada borraba la pieza antes de que el trazo lo viera.
+  // Solo la captura en `window` llega primero. Cuando el gesto consume, se
+  // detiene la propagación; si no, la tecla fluye al global.
+  // Spec: docs/superpowers/specs/2026-08-29-linea-interna-y-medidas-design.md § 8
   useEffect(() => {
-    const onEscapeCapture = (e: KeyboardEvent) => {
+    const onKeyCapture = (e: KeyboardEvent) => {
+      // Las teclas que nacen dentro de un campo editable pertenecen al campo.
+      if (isEditableTarget(e.target)) return;
+      // Línea interna: con trazo vivo, Escape / Enter / Retroceso / Supr son
+      // del motor. `handleKeyDown` dice si consumió.
+      if (activeTool === 'internalShape' && internalShapeTool.isTracing()) {
+        if (internalShapeTool.handleKeyDown(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        return;
+      }
+      // Pluma: Escape con trazo y Enter con ≥ 2 nodos. Antes vivía en la
+      // burbuja y el Escape disparaba además la deselección global.
+      if (activeTool === 'pen') {
+        if (pen.handleKeyDown(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        return;
+      }
       if (e.key !== 'Escape') return;
       // Tool Punto armado: cancelar SOLO la colocación pendiente (el hook hace
       // preventDefault + stopPropagation). Sin armar, el Esc fluye normal.
@@ -443,9 +443,9 @@ export function useEditorInteractions(
       e.preventDefault();
       e.stopPropagation();
     };
-    window.addEventListener('keydown', onEscapeCapture, { capture: true });
-    return () => window.removeEventListener('keydown', onEscapeCapture, { capture: true });
-  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool]);
+    window.addEventListener('keydown', onKeyCapture, { capture: true });
+    return () => window.removeEventListener('keydown', onKeyCapture, { capture: true });
+  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen]);
 
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);
@@ -526,10 +526,6 @@ export function useEditorInteractions(
       const handled = editPattern.handleDoubleClick(e);
       if (handled) return;
     }
-    if (activeTool === 'polyPen') {
-      polyPenTool.handleDoubleClick();
-      return;
-    }
     if (activeTool === 'internalShape') {
       internalShapeTool.handleDoubleClick();
       return;
@@ -541,7 +537,7 @@ export function useEditorInteractions(
         nodeEditor.enterEdit(pieceId);
       }
     }
-  }, [activeTool, nodeEditor, editPattern, polyPenTool, internalShapeTool]);
+  }, [activeTool, nodeEditor, editPattern, internalShapeTool]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button === 1) {
@@ -598,7 +594,6 @@ export function useEditorInteractions(
     }
     if (activeTool === 'pen') { pen.handleMouseDown(e); return; }
     if (activeTool === 'rectangle') { rectTool.handleMouseDown(e); return; }
-    if (activeTool === 'line') { lineTool.handleMouseDown(e); return; }
     if (activeTool === 'seam') { seamTool.handleMouseDown(e); return; }
     if (activeTool === 'notch') { notchTool.handleMouseDown(e); return; }
     if (activeTool === 'point') { pointTool.handleMouseDown(e); return; }
@@ -614,7 +609,6 @@ export function useEditorInteractions(
     if (activeTool === 'walkSeam') { walkSeamTool.handleMouseDown(e); return; }
     if (activeTool === 'offsetOutline') { offsetTool.handleMouseDown(e); return; }
     if (activeTool === 'extendTrim') { extendTrimTool.handleMouseDown(e); return; }
-    if (activeTool === 'polyPen') { polyPenTool.handleMouseDown(e); return; }
     if (activeTool === 'internalShape') { internalShapeTool.handleMouseDown(e); return; }
     if (activeTool === 'pleat') { pleatTool.handleMouseDown(e); return; }
     if (activeTool === 'elastic') { elasticTool.handleMouseDown(e); return; }
@@ -740,7 +734,7 @@ export function useEditorInteractions(
         };
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -857,7 +851,6 @@ export function useEditorInteractions(
     }
     if (activeTool === 'pen') pen.handleMouseMove(e);
     if (activeTool === 'rectangle') rectTool.handleMouseMove(e);
-    if (activeTool === 'line') lineTool.handleMouseMove(e);
     if (activeTool === 'seam') seamTool.handleMouseMove(e);
     if (activeTool === 'notch') notchTool.handleMouseMove(e);
     if (activeTool === 'point') pointTool.handleMouseMove(e);
@@ -873,11 +866,10 @@ export function useEditorInteractions(
     if (activeTool === 'walkSeam') walkSeamTool.handleMouseMove(e);
     if (activeTool === 'offsetOutline') offsetTool.handleMouseMove(e);
     if (activeTool === 'extendTrim') extendTrimTool.handleMouseMove(e);
-    if (activeTool === 'polyPen') polyPenTool.handleMouseMove(e);
     if (activeTool === 'internalShape') internalShapeTool.handleMouseMove(e);
     if (activeTool === 'pleat') pleatTool.handleMouseMove(e);
     if (activeTool === 'elastic') elasticTool.handleMouseMove(e);
-  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, pointTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
+  }, [activeTool, zoom2D, pan2D, pen, rectTool, seamTool, notchTool, pointTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseUp = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
     // Resolve marquee selection
@@ -975,12 +967,16 @@ export function useEditorInteractions(
     if (activeTool === 'merge') mergeTool.handleMouseUp();
     if (activeTool === 'offsetOutline') offsetTool.handleMouseUp();
     if (activeTool === 'extendTrim') extendTrimTool.handleMouseUp();
-    if (activeTool === 'polyPen' && e) polyPenTool.handleMouseUp(e);
-    if (activeTool === 'internalShape' && e) internalShapeTool.handleMouseUp(e);
+    if (activeTool === 'internalShape') {
+      // Sin evento (blur, reentrada con buttons === 0) no hay release
+      // geométrico fiable: se descarta el press, no el trazo.
+      if (e) internalShapeTool.handleMouseUp(e);
+      else internalShapeTool.cancelPress();
+    }
     if (activeTool === 'point' && e) pointTool.handleMouseUp(e);
     if (activeTool === 'seam' && e) seamTool.handleMouseUp(e);
     if (activeTool === 'notch' && e) notchTool.handleMouseUp(e);
-  }, [activeTool, pen, rectTool, seamAllowanceTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, dispatch, pieces, zoom2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, internalShapeTool, pointTool, seamTool, notchTool]);
+  }, [activeTool, pen, rectTool, seamAllowanceTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, dispatch, pieces, zoom2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool, internalShapeTool, pointTool, seamTool, notchTool]);
 
   const handlePointerCancel = useCallback(() => {
     // `pointercancel` no trae una posición final fiable. Tratarlo como mouseup
@@ -988,7 +984,11 @@ export function useEditorInteractions(
     // estable y deja el siguiente gesto limpio.
     if (activeTool === 'notch' && notchTool.isArmed()) notchTool.cancel();
     if (activeTool === 'seamAllowance' && seamAllowanceTool.isArmed()) seamAllowanceTool.cancel();
-  }, [activeTool, notchTool, seamAllowanceTool]);
+    // La línea interna descarta solo el press vivo (los nodos quedan); la
+    // pluma no separa press de trazo y suelta el trazo entero.
+    if (activeTool === 'internalShape') internalShapeTool.cancelPress();
+    if (activeTool === 'pen') pen.reset();
+  }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
