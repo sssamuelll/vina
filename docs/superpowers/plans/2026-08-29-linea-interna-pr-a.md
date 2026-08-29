@@ -43,7 +43,7 @@
   ```
 - Reglas (spec § 4.5): cada tramo toma en cada extremo el manejador que su nodo aporta; bloque = corrida maximal de `curvePoints`, anclas `[vecino anterior, …bloque, vecino siguiente]`, manejadores por `chainHandles(anclas, false)` de `src/utils/geometry/catmullRom.ts`; recta–recta → `L`; si alguno aporta → `C` (el que no aporta pone su ancla como control); cadenas abiertas; al cerrar, el tramo último→primero es un tramo más, `C`+`Z` si alguno aporta, `Z` si ninguno; con < 2 nodos → `[]`.
 
-- [ ] **Step 1: escribir el test rojo** en `__tests__/polyPenGeometry.test.ts`:
+- [x] **Step 1: escribir el test rojo** en `__tests__/polyPenGeometry.test.ts`:
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -132,8 +132,8 @@ describe('commandsToPathD', () => {
 });
 ```
 
-- [ ] **Step 2:** `npx vitest run src/components/PatternEditor/__tests__/polyPenGeometry.test.ts` → falla: módulo no existe.
-- [ ] **Step 3:** implementar `polyPenGeometry.ts`:
+- [x] **Step 2:** `npx vitest run src/components/PatternEditor/__tests__/polyPenGeometry.test.ts` → falla: módulo no existe.
+- [x] **Step 3:** implementar `polyPenGeometry.ts`:
 
 ```ts
 import type { PathCommand, Point2D } from '../../types/types';
@@ -218,9 +218,9 @@ export function commandsToPathD(cmds: PathCommand[]): string {
 }
 ```
 
-- [ ] **Step 4:** correr el test → verde. Si "las cadenas son abiertas" falla por los vecinos envueltos, revisar `prevIdx`/`nextIdx`: en un trazo cerrado el bloque `[n3]` de la prueba tiene vecinos `n2` y `n0`, y el bloque `[n0]` tiene vecinos `n3`... — **no**: el spec dice cadenas abiertas, así que el vecino anterior de `n0` en un cerrado sí es `n3` como PUNTO de contexto, pero cada bloque se calcula por separado. La prueba fija: bloque A = `[n0, n1]` con phantom (sin `n3`), bloque B = `[n2, n3, n0]`. Ajustar: `prevIdx` **no** envuelve (`closed` solo aporta el vecino SIGUIENTE para el bloque que termina en el último nodo). Reescribir la línea de `prevIdx` como `const prevIdx = i - 1;` y dejar `nextIdx` como está.
-- [ ] **Step 5:** `npx eslint src/components/PatternEditor/polyPenGeometry.ts src/components/PatternEditor/__tests__/polyPenGeometry.test.ts --max-warnings=0` y `npx tsc -b --noEmit`.
-- [ ] **Step 6:** commit `feat(2d): geometría pura del trazo de línea interna (nodos → comandos)`.
+- [x] **Step 4:** correr el test → verde. Si "las cadenas son abiertas" falla por los vecinos envueltos, revisar `prevIdx`/`nextIdx`: en un trazo cerrado el bloque `[n3]` de la prueba tiene vecinos `n2` y `n0`, y el bloque `[n0]` tiene vecinos `n3`... — **no**: el spec dice cadenas abiertas, así que el vecino anterior de `n0` en un cerrado sí es `n3` como PUNTO de contexto, pero cada bloque se calcula por separado. La prueba fija: bloque A = `[n0, n1]` con phantom (sin `n3`), bloque B = `[n2, n3, n0]`. Ajustar: `prevIdx` **no** envuelve (`closed` solo aporta el vecino SIGUIENTE para el bloque que termina en el último nodo). Reescribir la línea de `prevIdx` como `const prevIdx = i - 1;` y dejar `nextIdx` como está.
+- [x] **Step 5:** `npx eslint src/components/PatternEditor/polyPenGeometry.ts src/components/PatternEditor/__tests__/polyPenGeometry.test.ts --max-warnings=0` y `npx tsc -b --noEmit`.
+- [x] **Step 6:** commit `feat(2d): geometría pura del trazo de línea interna (nodos → comandos)`.
 
 ---
 
@@ -260,7 +260,7 @@ export function commandsToPathD(cmds: PathCommand[]): string {
 - Reglas del motor (spec § 4.3–§ 4.6): press b0 solamente; press ≤ `EDGE_HIT_PX` del último nodo → no arma; press sobre el nodo 1 con ≥ 3 nodos → arma cierre, commit en release; **zona muerta**: tras un commit en P, un press a ≤ radio de P no arma hasta que un mousemove salga del radio; primer press: anfitriona = pieza del objetivo si engancha, si no la de más arriba con `pointInPolygon(local, outline)`, bloqueada → `onLockedPress` y no arma; nodos siguientes libres; arrastre ≥ 4 px → bezier; release → nodo del tipo latcheado (o bezier); `handleKeyDown`: Escape con press vivo → `cancelPress()` (consumido); Escape con nodos → reset (consumido); Enter con ≥ 2 → commit abierto (consumido); Backspace/Delete con nodos → quita el último (con 1 → reset) (consumido); nada que consumir → `false`. Doble clic con ≥ 2 → commit abierto. `onComplete` se lee de un ref para no cerrar sobre un `pieces` viejo.
 - Enganche (hover y press), memos por identidad de `opts.pieces`: `nodesByPiece` (`extractNodes`), `endsByPiece` (primer/último ancla de cada `internals[].path` vía `getInternalLineEndpoints`, que se exporta desde `useEditorInteractions.ts`), `ringsByPiece` (`buildRing(outline, 2)` si `ok`). Prioridad: primer nodo (≥ 3) → vértice (piezas de arriba primero) → extremo de interna → contorno (`projectToRing`, distancia euclídea ≤ radio) → nada. Radio en patrón = `screenToPatternLength(EDGE_HIT_PX, zoom)`.
 
-- [ ] **Step 1: test rojo** `usePolyPenTool.test.tsx` (renderHook, sin Redux). Fixture: pieza A 200×100 en (100,100) sin giro, pieza B 200×100 en (100,300) con `rotation: 90`, y un `svgRect = {left:0, top:0}`; eventos sintéticos `{button, clientX, clientY, currentTarget:{getBoundingClientRect:()=>svgRect}}` con zoom 1, pan 0. Casos (cada `it` es un contrato de § 12.1 #2, #4, #5):
+- [x] **Step 1: test rojo** `usePolyPenTool.test.tsx` (renderHook, sin Redux). Fixture: pieza A 200×100 en (100,100) sin giro, pieza B 200×100 en (100,300) con `rotation: 90`, y un `svgRect = {left:0, top:0}`; eventos sintéticos `{button, clientX, clientY, currentTarget:{getBoundingClientRect:()=>svgRect}}` con zoom 1, pan 0. Casos (cada `it` es un contrato de § 12.1 #2, #4, #5):
   1. `press dentro de A + release → 1 nodo straight; hostId = A`.
   2. `press fuera de toda pieza → 0 nodos, hostId null`.
   3. `press sobre pieza bloqueada → onLockedPress(id) y 0 nodos`.
@@ -283,8 +283,8 @@ export function commandsToPathD(cmds: PathCommand[]): string {
   20. `doble clic: tres clics, el tercero seguido de press/release en el mismo sitio (no arma) y handleDoubleClick → onComplete con 3 nodos abierto`.
   21. `reset() con press vivo → release posterior no añade`.
   22. `pieza oculta (no incluida en pieces) no es objetivo` (se prueba pasando solo A y clicando cerca del vértice de B → sin enganche).
-- [ ] **Step 2:** correr → rojo (firma vieja).
-- [ ] **Step 3:** implementar el hook. Esqueleto de estado:
+- [x] **Step 2:** correr → rojo (firma vieja).
+- [x] **Step 3:** implementar el hook. Esqueleto de estado:
 
 ```ts
 interface Press { world: Point2D; screen: Point2D; snap: SnapTarget | null; closes: boolean; moved: boolean; drag: Point2D | null }
@@ -300,9 +300,9 @@ const [state, setState] = useState<{ nodes; previewPoint; isDragging; dragHandle
 
   `finish(closed)`: `const cmds = nodesToCommands(nodesRef.current, closed); const host = hostRef.current; const p = nodesRef.current[…]; reset(); if (cmds.length && host) optsRef.current.onComplete(host, cmds, closed); deadZoneRef.current = lastCommitPoint;`
 
-- [ ] **Step 4:** verde en los 22 `it`. Ajustar hasta que cada uno pase por su razón.
-- [ ] **Step 5:** eslint + tsc del archivo (el resto del árbol puede estar rojo hasta Task 3; anotar los errores que sean solo de llamadores viejos).
-- [ ] **Step 6:** commit `feat(2d): motor de línea interna — enganche, anfitriona por primer press, cierre en el release`.
+- [x] **Step 4:** verde en los 22 `it`. Ajustar hasta que cada uno pase por su razón.
+- [x] **Step 5:** eslint + tsc del archivo (el resto del árbol puede estar rojo hasta Task 3; anotar los errores que sean solo de llamadores viejos).
+- [x] **Step 6:** commit `feat(2d): motor de línea interna — enganche, anfitriona por primer press, cierre en el release`.
 
 ---
 
@@ -319,14 +319,14 @@ const [state, setState] = useState<{ nodes; previewPoint; isDragging; dragHandle
 - Consumes: el motor (Task 2). `getInternalLineEndpoints` pasa a `export function`.
 - Produces en `useEditorInteractions`: `ToolHooks.internalShapeTool` = `{ handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick, handleKeyDown(e): boolean, cancelPress, reset, isTracing(): boolean, isArmed(): boolean }`; `ToolHooks.pen.handleKeyDown` pasa a devolver `boolean`. Desaparecen `lineTool` y `polyPenTool`.
 
-- [ ] **Step 1: test rojo** `useEditorInteractions.teclado.test.tsx` (mismo `makeTools`/`setup` de `useEditorInteractions.reset.test.tsx`, con `document.body` como target por defecto):
+- [x] **Step 1: test rojo** `useEditorInteractions.teclado.test.tsx` (mismo `makeTools`/`setup` de `useEditorInteractions.reset.test.tsx`, con `document.body` como target por defecto):
   1. `con internalShape activa y el motor diciendo isTracing() === true, un Escape en window (captura) llama internalShapeTool.handleKeyDown y NO llega a un listener de document` (se registra un `document.addEventListener('keydown', spy)`; el hook mock devuelve `true`).
   2. `si el motor devuelve false, el Escape sí llega a document`.
   3. `Backspace con trazo vivo se consume (no llega a document)`.
   4. `un keydown cuyo target es un <input> no toca el motor` (dispatch del evento sobre un input montado en el body).
   5. `con pen activa, Enter consumido por pen.handleKeyDown → no llega a document`.
-- [ ] **Step 2:** rojo.
-- [ ] **Step 3:** en `useEditorInteractions.ts`:
+- [x] **Step 2:** rojo.
+- [x] **Step 3:** en `useEditorInteractions.ts`:
   - Importar `isEditableTarget` (crear inline: `const isEditableTarget = (t: EventTarget | null) => t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);`).
   - En el efecto CF-1 (`:412-448`), renombrar el handler a `onKeyCapture`, quitar el `if (e.key !== 'Escape') return;` de arriba y poner al principio: `if (isEditableTarget(e.target)) return;`. Añadir ANTES de las ramas existentes:
     ```ts
@@ -343,8 +343,8 @@ const [state, setState] = useState<{ nodes; previewPoint; isDragging; dragHandle
   - `handleMouseUp`: `if (activeTool === 'internalShape') { if (e) internalShapeTool.handleMouseUp(e); else internalShapeTool.cancelPress(); }`.
   - `handlePointerCancel`: añadir `if (activeTool === 'internalShape') internalShapeTool.cancelPress(); if (activeTool === 'pen') pen.reset();` (la pluma no tiene press separable; `rectangle` entra en PR B).
   - `export function getInternalLineEndpoints`.
-- [ ] **Step 4:** en `usePenTool.ts`, `handleKeyDown` devuelve `boolean`: Escape con nodos → limpia y `true`; Enter con ≥ 2 → completa y `true`; si no, `false`.
-- [ ] **Step 5:** en `PatternEditor.tsx`:
+- [x] **Step 4:** en `usePenTool.ts`, `handleKeyDown` devuelve `boolean`: Escape con nodos → limpia y `true`; Enter con ≥ 2 → completa y `true`; si no, `false`.
+- [x] **Step 5:** en `PatternEditor.tsx`:
   - Borrar `useLineTool` import/instancia/`handleInternalLineAdd`, `usePolyPenTool` viejo (`polyPenMode`, `polyPenLineType`, `handlePolyPenCompleteInternalLine`, `polyPenTool`), y el overlay de `polyPen` (`:1011-1019`).
   - Añadir `const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);` y
     ```ts
@@ -369,10 +369,10 @@ const [state, setState] = useState<{ nodes; previewPoint; isDragging; dragHandle
   - `ToolOverlay`: quitar `lineStart/lineCursor/lineLength`.
   - Overlay: `{activeTool === 'internalShape' && <PolyPenToolOverlay nodes={…} previewPoint={…} isDragging={…} dragHandle={…} hover={internalShapeTool.hover} nodeType={internalNodeType} closeArmed={internalShapeTool.closeArmed} zoom2D={zoom2D} units={units} />}` (las props nuevas las consume Task 5; hasta entonces el overlay las ignora).
   - `HintText`: pasar `internalShapeNodesLength={internalShapeTool.nodes.length}` (Task 7 lo pinta).
-- [ ] **Step 6:** `ToolOverlay.tsx`: borrar import y render de `LineToolOverlay` y las tres props.
-- [ ] **Step 7:** borrar `useLineTool.ts`, `LineToolOverlay.tsx`, `findNearestPiece` (+ export en `geometry/index.ts` + sus `it` en los dos tests). Quitar `'line'` y `'polyPen'` de `Tool2D`. `npx tsc -b --noEmit` es el guardia: arreglar cada referencia que quede (incluye `useEditorInteractions.reset.test.tsx` si Task 4 aún no lo tocó).
-- [ ] **Step 8:** `npx vitest run src/components/PatternEditor src/utils/geometry` → verde; eslint de los tocados.
-- [ ] **Step 9:** commit `feat(2d): una sola herramienta de línea interna — cableado, teclado en captura, adiós line y polyPen`.
+- [x] **Step 6:** `ToolOverlay.tsx`: borrar import y render de `LineToolOverlay` y las tres props.
+- [x] **Step 7:** borrar `useLineTool.ts`, `LineToolOverlay.tsx`, `findNearestPiece` (+ export en `geometry/index.ts` + sus `it` en los dos tests). Quitar `'line'` y `'polyPen'` de `Tool2D`. `npx tsc -b --noEmit` es el guardia: arreglar cada referencia que quede (incluye `useEditorInteractions.reset.test.tsx` si Task 4 aún no lo tocó).
+- [x] **Step 8:** `npx vitest run src/components/PatternEditor src/utils/geometry` → verde; eslint de los tocados.
+- [x] **Step 9:** commit `feat(2d): una sola herramienta de línea interna — cableado, teclado en captura, adiós line y polyPen`.
 
 ---
 
@@ -386,7 +386,7 @@ const [state, setState] = useState<{ nodes; previewPoint; isDragging; dragHandle
 
 **No tocar:** `src/types/types.ts`, `useEditorInteractions.ts`, `PatternEditor.tsx`, `useLineTool.ts`, `hitTest.ts` (los borra Task 3).
 
-- [ ] **Step 1: tests rojos primero.**
+- [x] **Step 1: tests rojos primero.**
   - `dockSlice.test.ts`: cambiar la expectativa del default (`:94-98`) a `['select','editPattern','point','pen','internalShape','rectangle','scissors','measure','seam','seamEdit','seamAllowance','notch']`; añadir `LEGACY_DEFAULT_DOCK_2D_IDS_V5` al import y dos `it`:
     ```ts
     it('el default V5 (con line) migra al vigente (con internalShape)', () => {
@@ -402,8 +402,8 @@ const [state, setState] = useState<{ nodes; previewPoint; isDragging; dragHandle
   - `nombresDeHerramienta.test.ts`: en `NOMBRES` quitar `line` y `polyPen`; `internalShape: 'Línea interna'`.
   - `idiomaDeOpciones.test.ts`: `pen: {}` → **quitar la clave `pen`** del objeto y añadir un `it('la pluma no declara opciones que no lee', () => expect(toolRegistry.getTool('pen')!.options ?? []).toEqual([]))`; `rectangle: { width: ['Ancho'], height: ['Alto'] }`; quitar el bloque `polyPen`; añadir `internalShape: { nodeType: ['Tipo de punto', 'Recta', 'Curva por puntos'], lineType: ['Tipo de línea', 'Referencia', 'Doblez', 'Pespunte'] }`.
   - `useEditorInteractions.reset.test.tsx`: el tercer `it` pasa a `setup('internalShape')` y `tools.internalShapeTool.reset`.
-- [ ] **Step 2:** correr los cinco archivos → rojos.
-- [ ] **Step 3:** implementar:
+- [x] **Step 2:** correr los cinco archivos → rojos.
+- [x] **Step 3:** implementar:
   - `internalShape.tsx`: `name: 'Línea interna'`, `shortcut: 'g'`, `options: [ { id: 'nodeType', label: 'Tipo de punto', type: 'select', value: 'straight', choices: [{ label: 'Recta', value: 'straight' }, { label: 'Curva por puntos', value: 'curvePoints' }] }, { id: 'lineType', label: 'Tipo de línea', type: 'select', value: 'reference', choices: [{ label: 'Referencia', value: 'reference' }, { label: 'Doblez', value: 'fold' }, { label: 'Pespunte', value: 'topstitch' }] } ]`; `copilot.description` en inglés actualizada ("Draw internal lines: straight, curve-by-points or bezier nodes, snapping to corners and edges…"); `parameterHints` para `nodeType` y `lineType`.
   - `pen.tsx`: borrar `options` y `parameterHints` (dejar `copilot.description` sin mencionar smoothing/grid/angles).
   - `rectangle.tsx`: borrar `cornerStyle` (y su `parameterHint`); `width`/`height` quedan (PR B les pone `control: 'input'` y el rango).
@@ -423,8 +423,8 @@ const [state, setState] = useState<{ nodes; previewPoint; isDragging; dragHandle
   - `defaults.ts`: `tool.internalShape` label `'Línea interna'`; borrar `tool.polyPen` (`:60`) y `tool.line` (`:72`).
   - `useKeyboardShortcuts.ts`: borrar las dos entradas `tool.polyPen` (`:211`) y `tool.line` (`:221`).
   - README: en "Tool Options", quitar la línea de Pen y dejar Rectangle como `width, height`.
-- [ ] **Step 4:** `npx vitest run src/tools src/components/shell src/store/__tests__/dockSlice.test.ts src/components/PatternEditor/__tests__/useEditorInteractions.reset.test.tsx` → verde. `npx eslint <tocados> --max-warnings=0`. `npx tsc -b --noEmit` (reportar solo errores en archivos de esta tarea; los de `useLineTool`/`PatternEditor` son de Task 3).
-- [ ] **Step 5:** NO commitear (lo commitea el orquestador tras revisar el diff).
+- [x] **Step 4:** `npx vitest run src/tools src/components/shell src/store/__tests__/dockSlice.test.ts src/components/PatternEditor/__tests__/useEditorInteractions.reset.test.tsx` → verde. `npx eslint <tocados> --max-warnings=0`. `npx tsc -b --noEmit` (reportar solo errores en archivos de esta tarea; los de `useLineTool`/`PatternEditor` son de Task 3).
+- [x] **Step 5:** NO commitear (lo commitea el orquestador tras revisar el diff).
 
 ---
 
@@ -439,11 +439,11 @@ const [state, setState] = useState<{ nodes; previewPoint; isDragging; dragHandle
 - Props: `{ nodes, previewPoint, isDragging, dragHandle, hover: SnapTarget | null, nodeType: 'straight' | 'curvePoints', closeArmed: boolean, zoom2D, units }`.
 - Tokens nuevos en `tokens.css` (junto a `--notch-2d`): `--snap-2d: oklch(0.72 0.15 80);` (ámbar del enganche), `--readout-bg-2d: rgba(43, 45, 51, 0.85);`, `--readout-ink-2d: #ffffff;`.
 
-- [ ] **Step 1: test rojo** (render con `@testing-library/react` dentro de un `<svg>`): (a) sin nodos ni hover no pinta nada; (b) con 2 nodos y `previewPoint`, pinta `path` con `d` igual a `commandsToPathD(nodesToCommands(nodes,false))`, la goma termina en `previewPoint`, y la píldora dice largo y ángulo (`formatDimension(hypot)` y `"45.0°"` para un tramo a 45°); (c) con `hover` la goma termina en `hover.point` y hay un `circle.snap-ring` en `hover.point`; (d) el fantasma del nodo lleva `data-node-type` con el tipo latcheado y `fill` `var(--accent-2d)` si es curvePoints / `var(--piece-fill-2d)` si es recta; (e) ningún atributo `fill`/`stroke` del árbol renderizado contiene `#` ni `rgba(` (R3 en runtime).
-- [ ] **Step 2:** rojo.
-- [ ] **Step 3:** reescribir el overlay: `pathD` desde la geometría compartida; nodos con la regla de relleno (`straight` hueco = `var(--piece-fill-2d)` con borde `var(--accent-2d)`; `curvePoints`/`bezier` rellenos `var(--accent-2d)`); manejadores en `var(--ink-on-light-3)`; goma punteada de último nodo a `hover?.point ?? previewPoint`; anillo `className="snap-ring"` en `hover.point` (`r = EDGE_HIT_PX / zoom2D * 0.5`, `stroke: var(--snap-2d)`, `fill: none`, `strokeWidth: 2/zoom2D`); cuando `closeArmed`, el anillo va sobre el nodo 0; fantasma del nodo en el objetivo con `data-node-type`; píldora (rect `rx` + text) con `fill: var(--readout-bg-2d)` / `var(--readout-ink-2d)`, desplazada `+22/zoom, −18/zoom` del cursor, texto `${formatDimension(len, units)} · ${ang.toFixed(1)}°` con el ángulo 0° a la derecha, 90° arriba (`Math.atan2(-(dy), dx)`). Sin `#2196f3`, sin `#999`, sin `#ff9800`, sin `#4caf50`.
-- [ ] **Step 4:** verde; `node scripts/ui-contract-lint.mjs` → R3 debe haber **bajado** (murió `LineToolOverlay`, y el overlay viejo tenía literales); `node scripts/ui-contract-lint.mjs --update` y commitear el baseline.
-- [ ] **Step 5:** commit `feat(2d): overlay de línea interna — anillo de enganche, fantasma del nodo, píldora de largo y ángulo (tokens, no literales)`.
+- [x] **Step 1: test rojo** (render con `@testing-library/react` dentro de un `<svg>`): (a) sin nodos ni hover no pinta nada; (b) con 2 nodos y `previewPoint`, pinta `path` con `d` igual a `commandsToPathD(nodesToCommands(nodes,false))`, la goma termina en `previewPoint`, y la píldora dice largo y ángulo (`formatDimension(hypot)` y `"45.0°"` para un tramo a 45°); (c) con `hover` la goma termina en `hover.point` y hay un `circle.snap-ring` en `hover.point`; (d) el fantasma del nodo lleva `data-node-type` con el tipo latcheado y `fill` `var(--accent-2d)` si es curvePoints / `var(--piece-fill-2d)` si es recta; (e) ningún atributo `fill`/`stroke` del árbol renderizado contiene `#` ni `rgba(` (R3 en runtime).
+- [x] **Step 2:** rojo.
+- [x] **Step 3:** reescribir el overlay: `pathD` desde la geometría compartida; nodos con la regla de relleno (`straight` hueco = `var(--piece-fill-2d)` con borde `var(--accent-2d)`; `curvePoints`/`bezier` rellenos `var(--accent-2d)`); manejadores en `var(--ink-on-light-3)`; goma punteada de último nodo a `hover?.point ?? previewPoint`; anillo `className="snap-ring"` en `hover.point` (`r = EDGE_HIT_PX / zoom2D * 0.5`, `stroke: var(--snap-2d)`, `fill: none`, `strokeWidth: 2/zoom2D`); cuando `closeArmed`, el anillo va sobre el nodo 0; fantasma del nodo en el objetivo con `data-node-type`; píldora (rect `rx` + text) con `fill: var(--readout-bg-2d)` / `var(--readout-ink-2d)`, desplazada `+22/zoom, −18/zoom` del cursor, texto `${formatDimension(len, units)} · ${ang.toFixed(1)}°` con el ángulo 0° a la derecha, 90° arriba (`Math.atan2(-(dy), dx)`). Sin `#2196f3`, sin `#999`, sin `#ff9800`, sin `#4caf50`.
+- [x] **Step 4:** verde; `node scripts/ui-contract-lint.mjs` → R3 debe haber **bajado** (murió `LineToolOverlay`, y el overlay viejo tenía literales); `node scripts/ui-contract-lint.mjs --update` y commitear el baseline.
+- [x] **Step 5:** commit `feat(2d): overlay de línea interna — anillo de enganche, fantasma del nodo, píldora de largo y ángulo (tokens, no literales)`.
 
 ---
 
@@ -453,9 +453,9 @@ const [state, setState] = useState<{ nodes; previewPoint; isDragging; dragHandle
 - Modify: `src/utils/dxf/exportAAMA.ts` (`pieceEntities`, :301-340)
 - Test: el archivo de tests existente de `exportAAMA` (`src/utils/dxf/__tests__/exportAAMA*.test.ts`; localizar con Glob) — añadir dos `it`.
 
-- [ ] **Step 1: tests rojos**: (a) una interna `type:'fold'` con path `M(0,0) L(50,0) L(50,30) L(0,30)` exporta **una** `LWPOLYLINE` de 4 vértices en la capa DRAW (`AAMA_LAYERS.DRAW`) — hoy sale una sola `LINE` (0,0)-(50,0); (b) la anotación `MTN`/`VAL` de esa `fold` se coloca en el punto medio del **arco** de la polilínea (arco total 130 → medio a 65 → punto (50, 15); en DXF la y va negada: `-(15)`), no en el punto medio del primer tramo.
-- [ ] **Step 2:** rojo.
-- [ ] **Step 3:** implementar: antes del `if (line.path.length >= 2 && …)`, añadir
+- [x] **Step 1: tests rojos**: (a) una interna `type:'fold'` con path `M(0,0) L(50,0) L(50,30) L(0,30)` exporta **una** `LWPOLYLINE` de 4 vértices en la capa DRAW (`AAMA_LAYERS.DRAW`) — hoy sale una sola `LINE` (0,0)-(50,0); (b) la anotación `MTN`/`VAL` de esa `fold` se coloca en el punto medio del **arco** de la polilínea (arco total 130 → medio a 65 → punto (50, 15); en DXF la y va negada: `-(15)`), no en el punto medio del primer tramo.
+- [x] **Step 2:** rojo.
+- [x] **Step 3:** implementar: antes del `if (line.path.length >= 2 && …)`, añadir
   ```ts
   const anchors = line.path.filter(c => c.type !== 'Z').length;
   const curved = line.path.some(c => c.type === 'C' || c.type === 'Q');
@@ -471,8 +471,8 @@ const [state, setState] = useState<{ nodes; previewPoint; isDragging; dragHandle
   }
   ```
   `midpointAlongPath` usa `flattenPath` (ya importado o importable de `../geometry/path`); si el arco total es 0 devuelve el primer punto.
-- [ ] **Step 4:** verde en el archivo de tests del exportador completo (los `it` viejos de `reference`, grainline y notch no cambian). eslint del archivo.
-- [ ] **Step 5:** NO commitear (lo commitea el orquestador).
+- [x] **Step 4:** verde en el archivo de tests del exportador completo (los `it` viejos de `reference`, grainline y notch no cambian). eslint del archivo.
+- [x] **Step 5:** NO commitear (lo commitea el orquestador).
 
 ---
 
@@ -483,14 +483,14 @@ const [state, setState] = useState<{ nodes; previewPoint; isDragging; dragHandle
 - Create: `tests/e2e/maria-205-linea-interna.spec.ts`
 - Delete: `tests/e2e/_repro_lote_lineas.spec.ts` (tras sacar las capturas "antes" para la entrega — Task 8 del lote, fuera de este plan)
 
-- [ ] **Step 1:** `HintText`: con `activeTool === 'internalShape'`: sin nodos → `Clic dentro de una pieza para empezar · las esquinas y los bordes enganchan`; con nodos → `Clic añade · arrastra para curvar · doble clic o Enter termina · clic en el primer punto cierra · Retroceso quita el último · Esc descarta`. Test unitario del texto (dos `it`).
-- [ ] **Step 2:** e2e `maria-205-linea-interna.spec.ts` (mismos helpers que el spec temporal: `waitForApp`, `addPiece`, `toScreen`, `clickAt`, `tool`), cuatro `test`:
+- [x] **Step 1:** `HintText`: con `activeTool === 'internalShape'`: sin nodos → `Clic dentro de una pieza para empezar · las esquinas y los bordes enganchan`; con nodos → `Clic añade · arrastra para curvar · doble clic o Enter termina · clic en el primer punto cierra · Retroceso quita el último · Esc descarta`. Test unitario del texto (dos `it`).
+- [x] **Step 2:** e2e `maria-205-linea-interna.spec.ts` (mismos helpers que el spec temporal: `waitForApp`, `addPiece`, `toScreen`, `clickAt`, `tool`), cuatro `test`:
   1. `cambiar de herramienta no deja un inicio fantasma`: `g`, clic en (200,200), `z`, `g`, clic en (260,230) → `internals.length === 0`; Enter → sigue 0 (un solo nodo no termina).
   2. `Enter termina una línea abierta y el doble clic también`: tres clics + Enter → 1 interna, tipos `MLL`; luego tres clics + dblclick → 2 internas, la segunda `MLL` (sin nodo repetido).
   3. `clicar a 5 px de un vértice engancha exacto, también con la pieza girada`: pieza A sin giro: clic a (154,153) + clic (250,220) + Enter → `path[0].values` ≈ `[0,0]` (`toBeCloseTo` 6); pieza B con `rotation: 90` en (500,150): clic a 5 px del vértice girado (calcular con `pieceLocalToPattern` en el test vía la fórmula de `pieceSpace.ts`: rotación alrededor del centro del bbox) → `path[0].values` ≈ `[0,0]`.
   4. `la línea cae en la pieza bajo el cursor y el doble clic sobre el primer nodo cierra sin fantasma`: A y B; trazar dentro de A → la interna está en A con `path[0]` ≈ local esperado; después tres clics y dblclick sobre el nodo 1 → una interna con `Z` y `internalShapeTool` sin trazo (probar: `Enter` después no crea nada nuevo).
   Todos con `test.setTimeout(90_000)` y `--workers=1` en local.
-- [ ] **Step 3:** correr `npx playwright test tests/e2e/maria-205-linea-interna.spec.ts --workers=1 --retries=0 > log` con el servidor de Vite en 5174 caliente.
-- [ ] **Step 4:** gate completo: `npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui`.
-- [ ] **Step 5:** `CHANGELOG.md` (Unreleased › Added/Changed/Fixed: la herramienta única, el enganche, la muerte de `line`/`polyPen`, `⇧L`/`Y` libres, el tipo por omisión, los cinco defectos vivos) y `docs/plans/…` no aplica.
-- [ ] **Step 6:** commit, push, PR `feat(2d): línea interna única con enganche y medidas en la píldora (María #205 #206 #209 #193)` con cuerpo: qué cambia para María, los cinco defectos cerrados, lo que NO entra (PR B), y "Closes" en inglés solo si hay issues de GitHub asociados (no los hay: las tarjetas son de Trello).
+- [x] **Step 3:** correr `npx playwright test tests/e2e/maria-205-linea-interna.spec.ts --workers=1 --retries=0 > log` con el servidor de Vite en 5174 caliente.
+- [x] **Step 4:** gate completo: `npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui`.
+- [x] **Step 5:** `CHANGELOG.md` (Unreleased › Added/Changed/Fixed: la herramienta única, el enganche, la muerte de `line`/`polyPen`, `⇧L`/`Y` libres, el tipo por omisión, los cinco defectos vivos) y `docs/plans/…` no aplica.
+- [x] **Step 6:** commit, push, PR `feat(2d): línea interna única con enganche y medidas en la píldora (María #205 #206 #209 #193)` con cuerpo: qué cambia para María, los cinco defectos cerrados, lo que NO entra (PR B), y "Closes" en inglés solo si hay issues de GitHub asociados (no los hay: las tarjetas son de Trello).

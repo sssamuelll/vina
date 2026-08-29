@@ -1043,6 +1043,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           topstitchMode={topstitchTool.mode}
           walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
           saDefaultWidthMm={seamAllowanceTool.widthMm}
+          internalShapeNodesLength={internalShapeTool.nodes.length}
         />
 
         <RulerLayer
