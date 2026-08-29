@@ -35,6 +35,16 @@ const CON_OPCIONES: ToolDefinition = {
   options: [
     { id: 'numero', label: 'Un número', type: 'number', value: 5, min: 0, max: 10, step: 1 },
     {
+      id: 'medida',
+      label: 'Una medida',
+      type: 'number',
+      value: 100,
+      min: 1,
+      max: 3000,
+      step: 1,
+      control: 'input',
+    },
+    {
       id: 'lista',
       label: 'Una lista',
       type: 'select',
@@ -117,6 +127,24 @@ describe('ToolOptionsBar2D', () => {
     fireEvent.change(screen.getByLabelText('Un número'), { target: { value: '7' } });
 
     expect(store.getState().tools.toolOptions.__prueba_con_opciones.numero).toBe(7);
+  });
+
+  it('con control: "input" pinta un input[type=number] y no reemplaza el deslizador de las demás opciones numéricas', () => {
+    montar('__prueba_con_opciones');
+
+    expect(screen.getByLabelText('Una medida').getAttribute('type')).toBe('number');
+    expect(screen.getByLabelText('Un número').getAttribute('type')).toBe('range');
+  });
+
+  it('el input numérico despacha con Number() y no despacha si el campo queda vacío', () => {
+    const { store } = montar('__prueba_con_opciones');
+    const medida = screen.getByLabelText('Una medida');
+
+    fireEvent.change(medida, { target: { value: '300' } });
+    expect(store.getState().tools.toolOptions.__prueba_con_opciones.medida).toBe(300);
+
+    fireEvent.change(medida, { target: { value: '' } });
+    expect(store.getState().tools.toolOptions.__prueba_con_opciones.medida).toBe(300);
   });
 
   it('muestra el atajo efectivo cuando la herramienta tiene uno', () => {

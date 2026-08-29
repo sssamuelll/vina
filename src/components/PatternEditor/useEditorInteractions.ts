@@ -83,8 +83,16 @@ function distToInternalLine(px: number, py: number, path: PathCommand[]): number
 
 interface ToolHooks {
   /** `handleKeyDown` devuelve si consumió la tecla (la captura CF-1 detiene la propagación solo entonces). */
-  pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => boolean; reset: () => void };
-  rectTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
+  pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => boolean; handleDoubleClick: () => void; reset: () => void };
+  rectTool: {
+    handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseUp: (e?: React.MouseEvent<SVGSVGElement>) => void;
+    /** true = consumió (Escape con press vivo). */
+    handleKeyDown: (e: KeyboardEvent) => boolean;
+    cancel: () => void;
+    isArmed: () => boolean;
+  };
   seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   notchTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -411,6 +419,14 @@ export function useEditorInteractions(
         }
         return;
       }
+      // Rectángulo: Escape con press vivo cancela el arrastre (spec § 6).
+      if (activeTool === 'rectangle' && rectTool.isArmed()) {
+        if (rectTool.handleKeyDown(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        return;
+      }
       if (e.key !== 'Escape') return;
       // Tool Punto armado: cancelar SOLO la colocación pendiente (el hook hace
       // preventDefault + stopPropagation). Sin armar, el Esc fluye normal.
@@ -445,7 +461,7 @@ export function useEditorInteractions(
     };
     window.addEventListener('keydown', onKeyCapture, { capture: true });
     return () => window.removeEventListener('keydown', onKeyCapture, { capture: true });
-  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen]);
+  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool]);
 
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);
@@ -530,6 +546,10 @@ export function useEditorInteractions(
       internalShapeTool.handleDoubleClick();
       return;
     }
+    if (activeTool === 'pen') {
+      pen.handleDoubleClick();
+      return;
+    }
     if (activeTool === 'select') {
       const target = e.target as SVGElement;
       const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');
@@ -537,7 +557,7 @@ export function useEditorInteractions(
         nodeEditor.enterEdit(pieceId);
       }
     }
-  }, [activeTool, nodeEditor, editPattern, internalShapeTool]);
+  }, [activeTool, nodeEditor, editPattern, internalShapeTool, pen]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button === 1) {
@@ -951,7 +971,12 @@ export function useEditorInteractions(
     dragRef.current = null;
     internalLineDragRef.current = null;
     if (activeTool === 'pen') pen.handleMouseUp();
-    if (activeTool === 'rectangle') rectTool.handleMouseUp();
+    if (activeTool === 'rectangle') {
+      // Sin evento (blur, reentrada con buttons === 0) no hay release fiable:
+      // se cancela el press en vez de crear un rectángulo inventado.
+      if (e) rectTool.handleMouseUp(e);
+      else rectTool.cancel();
+    }
     if (activeTool === 'seamAllowance') {
       // Blur no trae un release geométrico fiable. La captura de puntero hace
       // llegar el evento real incluso fuera del SVG; sin evento se cancela.
@@ -988,7 +1013,8 @@ export function useEditorInteractions(
     // pluma no separa press de trazo y suelta el trazo entero.
     if (activeTool === 'internalShape') internalShapeTool.cancelPress();
     if (activeTool === 'pen') pen.reset();
-  }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen]);
+    if (activeTool === 'rectangle') rectTool.cancel();
+  }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';

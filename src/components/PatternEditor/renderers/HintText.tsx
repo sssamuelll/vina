@@ -57,8 +57,16 @@ export default function HintText({
         <Pie>
           {internalShapeNodesLength === 0
             ? 'Clic dentro de una pieza para empezar · las esquinas y los bordes enganchan'
-            : 'Clic añade · arrastra para curvar · doble clic o Enter termina · clic en el primer punto cierra · Retroceso quita el último · Esc descarta'}
+            : 'Clic añade · arrastra para curvar · Tab escribe largo y ángulo · doble clic o Enter termina · clic en el primer punto cierra · Retroceso quita el último · Esc descarta'}
         </Pie>
+      )}
+
+      {activeTool === 'pen' && penNodesLength > 0 && (
+        <Pie>Clic añade · arrastra para curvar · Tab escribe largo y ángulo · clic en el primer punto cierra · Enter o doble clic termina · Retroceso quita el último · Esc cancela</Pie>
+      )}
+
+      {activeTool === 'rectangle' && (
+        <Pie>Arrastra para dibujar · un clic crea con el Ancho y el Alto de la barra · Esc cancela</Pie>
       )}
 
       {!hasPieces && activeTool === 'pen' && penNodesLength === 0 && (

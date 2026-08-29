@@ -59,6 +59,7 @@ import ReferenceImageLayer from './renderers/ReferenceImageLayer';
 import CalibrationOverlay from './renderers/overlays/CalibrationOverlay';
 import CalibrationModal from './CalibrationModal';
 import NotchPrecisionModal from './NotchPrecisionModal';
+import NextPointPanel from './NextPointPanel';
 import { DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 import ReferenceImageSettings from './ReferenceImageSettings';
 import { computePixelsPerMm } from '../../utils/geometry/calibration';
@@ -422,6 +423,16 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     if (activeTool === 'internalShape' && internalShapeTool.isTracing()) {
       return;
     }
+    // Rectángulo a mitad de arrastre: cancela y suprime el menú (spec § 6).
+    if (activeTool === 'rectangle' && rectTool.isArmed()) {
+      rectTool.cancel();
+      return;
+    }
+    // Pluma con trazo vivo: el botón derecho no hace nada y el menú no se
+    // abre (spec § 5), igual que en la línea interna.
+    if (activeTool === 'pen' && pen.nodes.length > 0) {
+      return;
+    }
 
     // Determine which piece (if any) is under the cursor
     const svg = e.currentTarget as SVGSVGElement;
@@ -574,7 +585,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       internalLineType: hitInternalLineType,
       isEditingNodes: editPatternTool.isEditing,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool, notchTool, seamAllowanceTool, internalShapeTool]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, pen.nodes.length]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
@@ -1096,6 +1107,27 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           pixelDistance={calibrationPixelDist}
           onConfirm={handleCalibrationConfirm}
           onCancel={handleCalibrationCancel}
+        />
+      )}
+      {/* "Siguiente punto" (spec 2026-08-29 § 7.2): Tab lo abre en la pluma y
+          en la línea interna; se queda abierto mientras trazas. La `key`
+          reinicia sus campos al cambiar de herramienta. */}
+      {activeTool === 'pen' && pen.nextPoint && (
+        <NextPointPanel
+          key="pen"
+          initialLengthMm={pen.nextPoint.lengthMm}
+          initialAngleDeg={pen.nextPoint.angleDeg}
+          onPlace={pen.placePolar}
+          onClose={pen.closeNextPoint}
+        />
+      )}
+      {activeTool === 'internalShape' && internalShapeTool.nextPoint && (
+        <NextPointPanel
+          key="internalShape"
+          initialLengthMm={internalShapeTool.nextPoint.lengthMm}
+          initialAngleDeg={internalShapeTool.nextPoint.angleDeg}
+          onPlace={internalShapeTool.placePolar}
+          onClose={internalShapeTool.closeNextPoint}
         />
       )}
       {notchTool.refining?.notch.notchAnchor && (

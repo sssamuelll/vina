@@ -27,5 +27,27 @@ describe('HintText — línea interna', () => {
     expect(hint).toMatch(/cierra|cerrar/i);
     expect(hint).toMatch(/retroceso/i);
     expect(hint).toMatch(/esc/i);
+    // La puerta visible de "Siguiente punto" (spec § 7.2): Tab se nombra aquí.
+    expect(hint).toMatch(/tab/i);
+  });
+});
+
+describe('HintText — pluma y rectángulo (medidas escritas)', () => {
+  it('la pluma con trazo nombra Tab, cerrar, terminar, retroceder y salir', () => {
+    svg(<HintText {...base} activeTool="pen" penNodesLength={2} />);
+    const hint = screen.getByText(/clic/i).textContent ?? '';
+    expect(hint).toMatch(/tab/i);
+    expect(hint).toMatch(/cierra|cerrar/i);
+    expect(hint).toMatch(/enter/i);
+    expect(hint).toMatch(/retroceso/i);
+    expect(hint).toMatch(/esc/i);
+  });
+
+  it('el rectángulo dice que un clic crea con las medidas de la barra', () => {
+    svg(<HintText {...base} activeTool="rectangle" />);
+    const hint = screen.getByText(/clic/i).textContent ?? '';
+    expect(hint).toMatch(/barra/i);
+    expect(hint).toMatch(/ancho/i);
+    expect(hint).toMatch(/arrastr/i);
   });
 });

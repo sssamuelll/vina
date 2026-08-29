@@ -277,3 +277,35 @@ describe('usePolyPenTool — terminar, cerrar, cancelar', () => {
     expect(tool().isTracing()).toBe(false);
   });
 });
+
+describe('usePolyPenTool — siguiente punto (Tab, placePolar)', () => {
+  it('Tab con un nodo abre el panel prefijado con la goma; sin nodos no', () => {
+    const { tool, click, move } = setup();
+    let consumed = true;
+    act(() => { consumed = tool().handleKeyDown(key('Tab')); });
+    expect(consumed).toBe(false);
+    click(150, 150);
+    move(200, 150);
+    act(() => { consumed = tool().handleKeyDown(key('Tab')); });
+    expect(consumed).toBe(true);
+    expect(tool().nextPoint).toEqual({ from: { x: 150, y: 150 }, lengthMm: 50, angleDeg: 0 });
+  });
+
+  it('placePolar coloca un nodo del tipo latcheado: −90° es hacia abajo', () => {
+    const { tool, click } = setup({ nodeType: 'curvePoints' });
+    click(150, 150);
+    act(() => tool().placePolar(80, -90));
+    expect(tool().nodes[1].type).toBe('curvePoints');
+    expect(tool().nodes[1].point.x).toBeCloseTo(150, 6);
+    expect(tool().nodes[1].point.y).toBeCloseTo(230, 6);
+  });
+
+  it('terminar el trazo cierra el panel', () => {
+    const { tool, click } = setup();
+    click(150, 150); click(200, 150);
+    act(() => { tool().handleKeyDown(key('Tab')); });
+    expect(tool().nextPoint).not.toBeNull();
+    act(() => { tool().handleKeyDown(key('Enter')); });
+    expect(tool().nextPoint).toBeNull();
+  });
+});

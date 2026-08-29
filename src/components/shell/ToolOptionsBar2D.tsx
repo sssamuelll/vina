@@ -7,7 +7,7 @@
  * opciones, y no lee `optionsPanelCollapsed` ni el modo experto, porque
  * ninguno de los dos tiene puerta en la app.
  */
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { setToolOption } from '../../store/toolSlice';
@@ -69,6 +69,41 @@ export default function ToolOptionsBar2D() {
   );
 }
 
+/**
+ * Campo numérico escrito (`control: 'input'`). Lleva un borrador local: la
+ * usuaria tiene que poder vaciar el campo y escribir "300" tecla a tecla, y
+ * un campo vaciado no es 0 — el store solo recibe números; al salir del
+ * campo el borrador se suelta y vuelve a leerse el valor guardado.
+ */
+function NumberInput({
+  id, opcion, valor, alCambiar,
+}: {
+  id: string;
+  opcion: ToolOption;
+  valor: number;
+  alCambiar: (v: unknown) => void;
+}) {
+  const [borrador, setBorrador] = useState<string | null>(null);
+  return (
+    <input
+      id={id}
+      type="number"
+      className="tool-options-bar__input"
+      min={opcion.min ?? 0}
+      max={opcion.max ?? 100}
+      step={opcion.step ?? 1}
+      value={borrador ?? String(valor)}
+      onChange={(e) => {
+        const texto = e.target.value;
+        setBorrador(texto);
+        if (texto === '' || Number.isNaN(Number(texto))) return;
+        alCambiar(Number(texto));
+      }}
+      onBlur={() => setBorrador(null)}
+    />
+  );
+}
+
 function Control({
   opcion,
   valor,
@@ -82,6 +117,16 @@ function Control({
 
   switch (opcion.type) {
     case 'number':
+      if (opcion.control === 'input') {
+        return (
+          <div className="tool-options-bar__item">
+            <label className="tool-options-bar__label" htmlFor={id}>
+              {opcion.label}
+            </label>
+            <NumberInput id={id} opcion={opcion} valor={Number(valor)} alCambiar={alCambiar} />
+          </div>
+        );
+      }
       return (
         <div className="tool-options-bar__item">
           <label className="tool-options-bar__label" htmlFor={id}>

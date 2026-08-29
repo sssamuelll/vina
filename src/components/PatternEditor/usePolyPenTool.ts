@@ -7,9 +7,16 @@ import { buildRing, projectToRing, type OutlineRing } from '../../utils/geometry
 import { extractNodes, type EditableNode } from './nodeEditorUtils';
 import { getInternalLineEndpoints } from './internalShapePath';
 import { EDGE_HIT_PX, isDrag } from './gestureConstants';
-import { nodesToCommands, type PolyPenNode } from './polyPenGeometry';
+import { nodesToCommands, polarOf, polarPoint, type PolyPenNode } from './polyPenGeometry';
 
 export type { PolyPenNode, PolyPenNodeType } from './polyPenGeometry';
+
+/** El panel "Siguiente punto" abierto: desde dónde y con qué prefijado. */
+export interface NextPointState {
+  from: Point2D;
+  lengthMm: number;
+  angleDeg: number;
+}
 
 /**
  * El motor de "Línea interna" (spec 2026-08-29 § 4.3–§ 4.6).
@@ -63,10 +70,11 @@ interface ViewState {
   hover: SnapTarget | null;
   hostId: string | null;
   closeArmed: boolean;
+  nextPoint: NextPointState | null;
 }
 
 const EMPTY: ViewState = {
-  nodes: [], previewPoint: null, pressPoint: null, isDragging: false, dragHandle: null, hover: null, hostId: null, closeArmed: false,
+  nodes: [], previewPoint: null, pressPoint: null, isDragging: false, dragHandle: null, hover: null, hostId: null, closeArmed: false, nextPoint: null,
 };
 
 const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -84,6 +92,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
   const deadZoneRef = useRef<Point2D | null>(null);
   const lastWorldRef = useRef<Point2D | null>(null);
   const hoverRef = useRef<SnapTarget | null>(null);
+  const nextPointRef = useRef<NextPointState | null>(null);
   const [view, setView] = useState<ViewState>(EMPTY);
 
   const { pieces } = opts;
@@ -190,6 +199,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       hover,
       hostId: hostRef.current,
       closeArmed: !!press?.closes || hover?.kind === 'firstNode',
+      nextPoint: nextPointRef.current,
     });
   }, []);
 
@@ -198,6 +208,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     pressRef.current = null;
     hostRef.current = null;
     hoverRef.current = null;
+    nextPointRef.current = null;
     publish();
   }, [publish]);
 
@@ -296,6 +307,35 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     if (nodesRef.current.length >= 2) finish(false);
   }, [finish]);
 
+  // ─── Siguiente punto (spec 2026-08-29 § 7.2) ─────────────────────────────
+
+  /** Tab: abre el panel prefijado con la goma (último nodo → cursor). */
+  const openNextPoint = useCallback(() => {
+    const nodes = nodesRef.current;
+    if (nodes.length === 0) return;
+    const from = nodes[nodes.length - 1].point;
+    const { lengthMm, angleDeg } = polarOf(from, lastWorldRef.current ?? from);
+    nextPointRef.current = { from, lengthMm, angleDeg };
+    publish();
+  }, [publish]);
+
+  const closeNextPoint = useCallback(() => {
+    if (!nextPointRef.current) return;
+    nextPointRef.current = null;
+    publish();
+  }, [publish]);
+
+  /** Coloca un nodo del tipo latcheado a largo y ángulo del último (sin enganche). */
+  const placePolar = useCallback((lengthMm: number, angleDeg: number) => {
+    const nodes = nodesRef.current;
+    if (nodes.length === 0) return;
+    const from = nodes[nodes.length - 1].point;
+    const point = polarPoint(from, lengthMm, angleDeg);
+    nodesRef.current = [...nodes, { point, type: optsRef.current.nodeType }];
+    if (nextPointRef.current) nextPointRef.current = { ...nextPointRef.current, from: point };
+    publish();
+  }, [publish]);
+
   /** true = la tecla era del trazo y se consumió. */
   const handleKeyDown = useCallback((e: KeyboardEvent): boolean => {
     const nodes = nodesRef.current;
@@ -307,6 +347,10 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       case 'Enter':
         if (nodes.length >= 2) { finish(false); return true; }
         return false;
+      case 'Tab':
+        if (nodes.length === 0) return false;
+        openNextPoint();
+        return true;
       case 'Backspace':
       case 'Delete':
         if (nodes.length === 0) return false;
@@ -317,7 +361,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       default:
         return false;
     }
-  }, [cancelPress, reset, finish, publish]);
+  }, [cancelPress, reset, finish, publish, openNextPoint]);
 
   const isTracing = useCallback(() => nodesRef.current.length > 0 || pressRef.current !== null, []);
   const isArmed = useCallback(() => pressRef.current !== null, []);
@@ -331,11 +375,15 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     hover: view.hover,
     hostId: view.hostId,
     closeArmed: view.closeArmed,
+    nextPoint: view.nextPoint,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
     handleDoubleClick,
     handleKeyDown,
+    openNextPoint,
+    closeNextPoint,
+    placePolar,
     cancelPress,
     reset,
     isTracing,
