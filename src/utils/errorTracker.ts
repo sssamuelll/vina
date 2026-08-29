@@ -8,6 +8,7 @@
  */
 
 import { safeGetItem, safeRemoveItem, safeSetItem } from './safeStorage';
+import { pushJournal } from './telemetry/journal';
 
 export interface TrackedError {
   message: string;
@@ -39,16 +40,22 @@ export function getErrorCount(): number {
   return errors.length;
 }
 
+/** Solo el array + el cap — sin espejo ni persistencia. La rehidratación de arranque usa esto directo (no `pushError`) para no re-fechar en la bitácora un error de la sesión anterior. */
+function appendError(entry: TrackedError): void {
+  errors.push(entry);
+  if (errors.length > MAX_ERRORS) errors.shift();
+}
+
 export function pushError(
   entry: TrackedError,
   options: { persistForReload?: boolean } = {},
 ): void {
-  errors.push(entry);
-  if (errors.length > MAX_ERRORS) errors.shift();
+  appendError(entry);
   if (options.persistForReload) {
     // LS-only: React componentDidCatch debe sobrevivir un reload y no puede esperar IDB.
     safeSetItem(LAST_BOUNDARY_ERROR_KEY, JSON.stringify(entry));
   }
+  pushJournal('error', 'error', { source: entry.source, message: entry.message.slice(0, 200) });
 }
 
 function readPersistedBoundaryError(): TrackedError | null {
@@ -72,7 +79,7 @@ export function initErrorTracker(): void {
   if (_initialized || typeof window === 'undefined') return;
   _initialized = true;
   const persisted = readPersistedBoundaryError();
-  if (persisted) pushError(persisted);
+  if (persisted) appendError(persisted);
 
   window.addEventListener('error', (event) => {
     pushError({

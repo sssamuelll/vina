@@ -23,6 +23,7 @@ import { initProjectPersistence, AUTOSAVE_DEBOUNCE_MS } from '../projectAutosave
 import { NEW_PROJECT, RESEW_AI_SEAMS } from '../actions';
 import projectReducer, { loadProject } from '../projectSlice';
 import { canUndo, getHistory, undoMiddleware } from '../undoMiddleware';
+import { clearJournal, getJournal } from '../../utils/telemetry/journal';
 
 const mockedLoad = vi.mocked(loadFromStorage);
 const mockedSave = vi.mocked(saveToStorage);
@@ -65,6 +66,7 @@ beforeEach(() => {
   mockedLoad.mockReset();
   mockedSave.mockClear();
   mockedSave.mockResolvedValue(undefined);
+  clearJournal();
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -278,5 +280,28 @@ describe('initProjectPersistence — debounced save', () => {
     document.dispatchEvent(new Event('visibilitychange'));
 
     expect(mockedSave).not.toHaveBeenCalled();
+  });
+
+  it('un guardado exitoso deja storage/autosave { ok: true, ms } en la bitácora', async () => {
+    const store = await bootedStore();
+    store.setProject(projectWith(1));
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS + 10);
+
+    const events = getJournal().events.filter((e) => e.kind === 'storage' && e.name === 'autosave');
+    expect(events).toHaveLength(1);
+    expect(events[0].data).toMatchObject({ ok: true });
+    expect(typeof events[0].data?.ms).toBe('number');
+  });
+
+  it('un guardado fallido deja storage/autosave { ok: false, error } en la bitácora', async () => {
+    mockedSave.mockRejectedValueOnce(new Error('disco lleno'));
+    const store = await bootedStore();
+    store.setProject(projectWith(1));
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS + 10);
+
+    const events = getJournal().events.filter((e) => e.kind === 'storage' && e.name === 'autosave');
+    expect(events).toHaveLength(1);
+    expect(events[0].data).toMatchObject({ ok: false, error: 'disco lleno' });
+    expect(typeof events[0].data?.ms).toBe('number');
   });
 });

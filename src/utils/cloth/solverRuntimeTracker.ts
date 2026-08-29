@@ -1,5 +1,6 @@
 import type { BufferGeometry } from 'three';
 import type { SolverTier } from '../../store/simulationSlice';
+import { pushJournal } from '../telemetry/journal';
 
 /**
  * Hechos del runtime del solver que Redux no guarda: el tier realmente
@@ -128,6 +129,8 @@ export function pushSolverEvent(
 ): void {
   events.push({ kind, timestamp: Date.now(), generation: eventGeneration, data });
   if (events.length > SOLVER_EVENTS_MAX) events.shift();
+  // Solo la fila nueva espeja — coalesceSolverEvent actualiza en sitio sin pasar por aquí.
+  pushJournal('solver', kind, { generation: eventGeneration });
 }
 
 /**
