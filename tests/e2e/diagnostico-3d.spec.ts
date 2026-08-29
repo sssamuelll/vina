@@ -13,8 +13,8 @@
  * tardan más que el presupuesto del test.
  */
 import { test, expect, type Page } from '@playwright/test';
-import { readFileSync } from 'node:fs';
 import { addRectanglePiece, waitForApp } from './helpers/sim';
+import { exportBundle as exportBundleRaw } from './helpers/diagnostico';
 
 interface SolverEventLike {
   kind: string;
@@ -61,19 +61,9 @@ async function enter3DAndStart(page: Page) {
   await dispatch(page, 'simulation/startSimulation');
 }
 
+/** Mecanismo (menú por dispatchEvent + waitForEvent('download')) vive en el helper; aquí solo se recupera el tipo local. */
 async function exportBundle(page: Page): Promise<BundleLike> {
-  await page.getByRole('button', { name: /vina/i }).first().dispatchEvent('click');
-  // React implementa onMouseEnter sobre mouseover/mouseout (mouseenter nativo
-  // no burbujea y React no lo escucha): hay que despachar mouseover.
-  await page.getByText('Archivo', { exact: true }).dispatchEvent('mouseover');
-  await expect(page.getByText('Exportar diagnóstico', { exact: true })).toBeVisible({ timeout: 10_000 });
-  const [download] = await Promise.all([
-    page.waitForEvent('download'),
-    page.getByText('Exportar diagnóstico', { exact: true }).dispatchEvent('click'),
-  ]);
-  const path = await download.path();
-  expect(path).toBeTruthy();
-  return JSON.parse(readFileSync(path!, 'utf8')) as BundleLike;
+  return (await exportBundleRaw(page)) as unknown as BundleLike;
 }
 
 test.beforeEach(async ({ page }) => {

@@ -13,6 +13,7 @@ import {
   buildDiagnosticBundle,
   CLOTH_SNAPSHOT_MAX_VERTICES,
   downloadDiagnosticBundle,
+  EXPORTED_SLICES,
   float32ToBase64,
   type DiagnosticSources,
 } from '../diagnosticExporter';
@@ -32,10 +33,14 @@ const state = {
       timestamp: 21,
     }],
   },
-} as unknown as Pick<
-  RootState,
-  'project' | 'avatar' | 'simulation' | 'inspector'
->;
+} as unknown as RootState;
+
+const EMPTY_STORAGE_SNAPSHOT = {
+  total: 0,
+  byKey: {},
+  byReason: { json_parse: 0, schema_root: 0, schema_record: 0, storage_read: 0 },
+  recent: [],
+};
 
 function sources(debugEnabled: boolean): DiagnosticSources {
   return {
@@ -60,6 +65,11 @@ function sources(debugEnabled: boolean): DiagnosticSources {
     getClothGeometry: vi.fn(() => null),
     isDebugEnabled: vi.fn(() => debugEnabled),
     getDebugRecords: vi.fn(() => [{ id: 'verbose-1' }]),
+    // Las tres fuentes nuevas de la caja negra (Tarea 4): mocks benignos por
+    // defecto — cada test que las necesita las pisa con `{ ...sources(x), … }`.
+    getJournal: vi.fn(() => ({ events: [], dropped: 0 })),
+    getEnvironment: vi.fn(() => ({})),
+    getStorageSnapshot: vi.fn(() => EMPTY_STORAGE_SNAPSHOT),
   } as unknown as DiagnosticSources;
 }
 
@@ -189,6 +199,74 @@ describe('bundle de diagnóstico puro', () => {
   });
 });
 
+describe('bundle extendido: journal, environment, slices, storage', () => {
+  // `state` (arriba) solo puebla project/avatar/simulation/inspector — a
+  // propósito, para no interferir con el resto del archivo. Esta réplica
+  // añade los 20 slices de EXPORTED_SLICES con un marcador propio por clave,
+  // más un campo fuera del Pick viejo en `inspector`, para probar que viajan
+  // completos.
+  const richState = {
+    ...state,
+    inspector: { ...state.inspector, unresolvedCount: 7 },
+    ...Object.fromEntries(EXPORTED_SLICES.map((key) => [key, { marker: key }])),
+  } as unknown as RootState;
+
+  function richSources(overrides: Partial<DiagnosticSources> = {}): DiagnosticSources {
+    return { ...sources(false), ...overrides };
+  }
+
+  it('lleva journal, environment, storage, los 20 slices e inspector completo', () => {
+    const s = richSources({
+      getJournal: vi.fn(() => ({ events: [{ t: 1, kind: 'action' as const, name: 'x' }], dropped: 2 })),
+      getEnvironment: vi.fn(() => ({ webgpu: true, viewport: { w: 10, h: 20 } })),
+    });
+
+    const bundle = buildDiagnosticBundle(richState, undefined, s);
+
+    expect(bundle.journal).toEqual({ events: [{ t: 1, kind: 'action', name: 'x' }], dropped: 2 });
+    expect(bundle.environment).toEqual({ webgpu: true, viewport: { w: 10, h: 20 } });
+    expect(bundle.storage).toEqual(EMPTY_STORAGE_SNAPSHOT);
+    expect(Object.keys(bundle.slices).sort()).toEqual([...EXPORTED_SLICES].sort());
+    for (const key of EXPORTED_SLICES) {
+      expect(bundle.slices[key]).toEqual({ marker: key });
+    }
+    expect(bundle.inspector).toEqual({ ...state.inspector, unresolvedCount: 7 });
+  });
+
+  it('un slice con ciclo sale como { unserializable } y el resto del bundle se construye', () => {
+    const cyc: Record<string, unknown> = { id: 'x' };
+    cyc.self = cyc;
+    const cyclicState = { ...richState, plugins: cyc } as unknown as RootState;
+
+    const bundle = buildDiagnosticBundle(cyclicState, undefined, richSources());
+
+    expect(bundle.slices.plugins).toMatchObject({ unserializable: expect.stringContaining('circular') });
+    expect(bundle.slices.editor).toEqual({ marker: 'editor' });
+    expect(bundle.exportedAt).toBeTruthy();
+    expect(() => JSON.stringify(bundle)).not.toThrow();
+  });
+
+  it('un journal con ciclo en data sale como { unserializable }', () => {
+    const cyc: Record<string, unknown> = { id: 'x' };
+    cyc.self = cyc;
+    const s = richSources({
+      getJournal: vi.fn(() => ({ events: [{ t: 1, kind: 'action' as const, name: 'x', data: cyc }], dropped: 0 })),
+    });
+
+    const bundle = buildDiagnosticBundle(richState, undefined, s);
+
+    expect(bundle.journal).toMatchObject({ unserializable: expect.stringContaining('circular') });
+  });
+
+  it('las fuentes inyectadas no tocan el navegador: getEnvironment se llama una sola vez', () => {
+    const s = richSources();
+
+    buildDiagnosticBundle(richState, undefined, s);
+
+    expect(s.getEnvironment).toHaveBeenCalledTimes(1);
+  });
+});
+
 function geometryOf(
   positions: Float32Array,
   manifest: Array<{ pieceId: string; vertexOffset: number; vertexCount: number; triCount: number }>,
@@ -249,8 +327,23 @@ describe('downloadDiagnosticBundle — red en el botón', () => {
   it('si la serialización lanza, reintenta sin la foto y registra el fallo', () => {
     const s = sources(false);
     s.getClothGeometry = vi.fn(() => geometryOf(new Float32Array(3), [{ pieceId: 'a', vertexOffset: 0, vertexCount: 1, triCount: 0 }]));
+    const originalStringify = JSON.stringify.bind(JSON);
     const stringify = vi.spyOn(JSON, 'stringify');
-    stringify.mockImplementationOnce(() => { throw new TypeError('Do not know how to serialize a BigInt'); });
+    // `safeJson` (guardia por slice) también llama a `JSON.stringify`, con un
+    // solo argumento — antes de que este test llegue a la línea que arma el
+    // archivo final, y otra vez en el reintento. Para simular "la
+    // serialización del bundle completo lanza una vez" sin pisar esas
+    // llamadas internas ni la del reintento (que debe salir bien), el mock
+    // lanza solo la primera vez que ve la llamada de tres argumentos
+    // (`JSON.stringify(bundle, null, 2)`).
+    let thrown = false;
+    stringify.mockImplementation((value, replacer, space) => {
+      if (space !== undefined && !thrown) {
+        thrown = true;
+        throw new TypeError('Do not know how to serialize a BigInt');
+      }
+      return originalStringify(value as never, replacer as never);
+    });
 
     downloadDiagnosticBundle(state, s);
 

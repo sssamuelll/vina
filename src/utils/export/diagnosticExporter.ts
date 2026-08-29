@@ -12,6 +12,12 @@ import {
   type MeshManifestEntry,
 } from '../cloth/solverRuntimeTracker';
 import { getTrackedErrors, pushError } from '../errorTracker';
+import { getEnvironment, type Environment } from '../telemetry/environment';
+import { getJournal, type JournalEvent } from '../telemetry/journal';
+import {
+  getStorageParseFailureSnapshot,
+  type StorageParseFailureSnapshot,
+} from '../telemetry/storageTelemetry';
 import { downloadBlob } from './turntableRenderer';
 
 // ─── Foto física de la tela ─────────────────────────────────────────────────
@@ -62,10 +68,13 @@ function snapshotOf(record: ClothGeometryRecord | null): ClothSnapshot | null {
   };
 }
 
-type DiagnosticState = Pick<
-  RootState,
-  'project' | 'avatar' | 'simulation' | 'inspector'
->;
+/** Los 20 slices del store fuera de `project`/`avatar`/`simulation`/`inspector` (exportados aparte). Trinquete: `exportedSlices.ratchet.test.ts`. */
+export const EXPORTED_SLICES = [
+  'editor', 'tools', 'dock', 'inputScheme', 'layout', 'workflow',
+  'renderSettings', 'camera', 'copilotUI', 'collisionBody', 'plugins',
+  'blueprints', 'marker', 'nesting', 'grading', 'bom', 'parametric',
+  'construction', 'animation', 'avatarTape',
+] as const;
 
 export interface DiagnosticSources {
   getHistory: typeof getHistory;
@@ -77,6 +86,9 @@ export interface DiagnosticSources {
   getClothGeometry: typeof getClothGeometry;
   isDebugEnabled: typeof isDebugEnabled;
   getDebugRecords: () => ReturnType<DebugStore['getAll']>;
+  getJournal: typeof getJournal;
+  getEnvironment: typeof getEnvironment;
+  getStorageSnapshot: typeof getStorageParseFailureSnapshot;
 }
 
 export interface DiagnosticBundle {
@@ -99,14 +111,17 @@ export interface DiagnosticBundle {
      */
     clothSnapshot: ClothSnapshot | null;
   };
-  inspector: Pick<
-    RootState['inspector'],
-    'lastSolverError' | 'seamResolutionErrors'
-  >;
+  inspector: RootState['inspector'];
   history: ReturnType<typeof getHistory>;
   errors: ReturnType<typeof getTrackedErrors>;
   toolExecutions: ReturnType<typeof getToolExecutions>;
   agentDebugRecords: ReturnType<DebugStore['getAll']>;
+  /** La bitácora completa (spec § 2). Un ciclo en algún `data` nombra al culpable en vez de tumbar el bundle entero. */
+  journal: { events: JournalEvent[]; dropped: number } | { unserializable: string };
+  environment: Environment;
+  /** Los 20 slices de `EXPORTED_SLICES`, cada uno pasado por `safeJson`. */
+  slices: Record<(typeof EXPORTED_SLICES)[number], unknown>;
+  storage: StorageParseFailureSnapshot;
 }
 
 const browserSources: DiagnosticSources = {
@@ -119,10 +134,34 @@ const browserSources: DiagnosticSources = {
   getClothGeometry,
   isDebugEnabled,
   getDebugRecords: () => new DebugStore().getAll(),
+  getJournal,
+  getEnvironment,
+  getStorageSnapshot: getStorageParseFailureSnapshot,
 };
 
+/**
+ * Guardia por slice (spec § 4): un valor no serializable (ciclo, `BigInt`)
+ * nombra al culpable en `{ unserializable }` en vez de tumbar el resto del
+ * bundle. El reintento sin foto de la tela sigue viviendo en
+ * `downloadDiagnosticBundle` para el caso en que el veneno esté fuera de
+ * `slices`/`journal` (p. ej. en `solver.clothSnapshot`).
+ */
+function safeJson(value: unknown): unknown {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (e) {
+    return { unserializable: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+function buildSlices(state: RootState): Record<(typeof EXPORTED_SLICES)[number], unknown> {
+  const slices = {} as Record<(typeof EXPORTED_SLICES)[number], unknown>;
+  for (const key of EXPORTED_SLICES) slices[key] = safeJson(state[key]);
+  return slices;
+}
+
 export function buildDiagnosticBundle(
-  state: DiagnosticState,
+  state: RootState,
   exportedAt = new Date().toISOString(),
   sources: DiagnosticSources = browserSources,
 ): DiagnosticBundle {
@@ -140,19 +179,20 @@ export function buildDiagnosticBundle(
       meshManifest: sources.getClothGeometry()?.manifest ?? null,
       clothSnapshot: snapshotOf(sources.getClothGeometry()),
     },
-    inspector: {
-      lastSolverError: state.inspector.lastSolverError,
-      seamResolutionErrors: state.inspector.seamResolutionErrors,
-    },
+    inspector: state.inspector,
     history: sources.getHistory(),
     errors: sources.getTrackedErrors(),
     toolExecutions: sources.getToolExecutions(),
     agentDebugRecords: debugEnabled ? sources.getDebugRecords() : [],
+    journal: safeJson(sources.getJournal()) as DiagnosticBundle['journal'],
+    environment: sources.getEnvironment(),
+    slices: buildSlices(state),
+    storage: sources.getStorageSnapshot(),
   };
 }
 
 export function downloadDiagnosticBundle(
-  state: DiagnosticState,
+  state: RootState,
   sources: DiagnosticSources = browserSources,
 ): void {
   let bundle: DiagnosticBundle;
