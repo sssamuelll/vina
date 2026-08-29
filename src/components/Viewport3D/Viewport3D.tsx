@@ -7,6 +7,7 @@ import { WebGPURenderer } from 'three/webgpu';
 import type { AnyRenderer } from '../../types/renderer';
 import { isWebGPURendererActive } from '../../utils/cloth/gpu/webgpuDetect';
 import { cmToM } from '../../utils/geometry';
+import { pushJournal } from '../../utils/telemetry/journal';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import DraggablePiece from './DraggablePiece';
@@ -748,7 +749,11 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       className="viewport3d"
       ref={containerRef}
       style={{ position: 'relative', cursor: toolCursor }}
-      onPointerDown={(e) => { handlePointerDown(e); onPanPointerDown(e); }}
+      onPointerDown={(e) => {
+        // Bitácora: la única sonda 3D — el press y el release en el visor (spec caja-negra § 3.2).
+        pushJournal('gesture', 'down', { surface: '3d', button: e.button, tool: activeTool3D });
+        handlePointerDown(e); onPanPointerDown(e);
+      }}
       onPointerMove={(e) => {
         onPanPointerMove(e);
         if (boxSelectStart.current && activeTool3D === 'meshSelectBox') {
@@ -768,6 +773,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         }
       }}
       onPointerUp={(e) => {
+        pushJournal('gesture', 'up', { surface: '3d', button: e.button, tool: activeTool3D });
         onPanPointerUp(e);
         if (boxSelectStart.current && boxSelectEnd.current && activeTool3D === 'meshSelectBox') {
           // Hide overlay

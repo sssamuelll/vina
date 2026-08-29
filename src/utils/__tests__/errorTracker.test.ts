@@ -65,3 +65,31 @@ it('un error de device perdido persistido con persistForReload vuelve al ring tr
   afterReload.initErrorTracker();
   expect(afterReload.getTrackedErrors()).toContainEqual(entry);
 });
+
+it('pushError deja error/error en la bitácora; la rehidratación de initErrorTracker no espeja', async () => {
+  const firstLoad = await import('../errorTracker');
+  const firstJournal = await import('../telemetry/journal');
+  firstJournal.clearJournal();
+
+  const pushError = (firstLoad as typeof firstLoad & { pushError?: PushError }).pushError;
+  const entry = { message: 'fatal en vivo', source: 'test-source', timestamp: 60 };
+  pushError!(entry, { persistForReload: true });
+
+  expect(firstJournal.getJournal().events).toContainEqual(
+    expect.objectContaining({
+      kind: 'error',
+      name: 'error',
+      data: { source: 'test-source', message: 'fatal en vivo' },
+    }),
+  );
+
+  vi.resetModules();
+  const afterReload = await import('../errorTracker');
+  const journalAfterReload = await import('../telemetry/journal');
+  journalAfterReload.clearJournal();
+
+  afterReload.initErrorTracker();
+
+  expect(afterReload.getTrackedErrors()).toContainEqual(entry);
+  expect(journalAfterReload.getJournal().events.some((e) => e.kind === 'error')).toBe(false);
+});

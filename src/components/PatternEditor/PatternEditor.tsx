@@ -66,6 +66,7 @@ import { computePixelsPerMm } from '../../utils/geometry/calibration';
 import { importReferenceImage } from '../../utils/import/imageImporter';
 import { storeImageBlob, loadImageBlob } from '../../utils/import/referenceImageStore';
 import ContextMenu, { type ContextMenuState } from './ContextMenu';
+import { pushJournal } from '../../utils/telemetry/journal';
 import FloatingActionBar from './FloatingActionBar';
 import { resolveTargetKind, type CurationCtx } from './actionCuration';
 import { selectWorkflowStage } from '../../store/selectors';
@@ -400,39 +401,49 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    // Bitácora: el menú suprimido por un gesto vivo es mudo para Redux
+    // (spec caja-negra § 3.5); `tool` ya dice qué gesto lo suprimió.
+    const suppressed = () => pushJournal('ui', 'contextmenu', { tool: activeTool, opened: false });
 
     // Botón derecho con un gesto de borde vivo: cancela y no abre menú. Sin
     // esto el menú se abre a mitad de gesto y hay que navegarlo con el botón
     // izquierdo apretado — un cuasi-modo dentro de otro (spec § 3.5).
     if (activeTool === 'seam' && seamTool.isArmed()) {
+      suppressed();
       seamTool.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
       e.preventDefault();
       return;
     }
     if (activeTool === 'notch' && notchTool.isArmed()) {
+      suppressed();
       notchTool.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
       e.preventDefault();
       return;
     }
     if (activeTool === 'seamAllowance' && seamAllowanceTool.isArmed()) {
+      suppressed();
       seamAllowanceTool.cancel();
       return;
     }
     // Línea interna con trazo vivo: el botón derecho no hace nada y el menú
     // no se abre (spec 2026-08-29 § 4.3). Sin trazo, el menú de siempre.
     if (activeTool === 'internalShape' && internalShapeTool.isTracing()) {
+      suppressed();
       return;
     }
     // Rectángulo a mitad de arrastre: cancela y suprime el menú (spec § 6).
     if (activeTool === 'rectangle' && rectTool.isArmed()) {
+      suppressed();
       rectTool.cancel();
       return;
     }
     // Pluma con trazo vivo: el botón derecho no hace nada y el menú no se
     // abre (spec § 5), igual que en la línea interna.
     if (activeTool === 'pen' && pen.nodes.length > 0) {
+      suppressed();
       return;
     }
+    pushJournal('ui', 'contextmenu', { tool: activeTool, opened: true });
 
     // Determine which piece (if any) is under the cursor
     const svg = e.currentTarget as SVGSVGElement;

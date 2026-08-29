@@ -33,7 +33,8 @@ import { extractNodes, NodeRef } from './nodeEditorUtils';
 import { getInternalLineEndpoints } from './internalShapePath';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { patternToPieceLocal } from './pieceTransform';
-import { DRAG_THRESHOLD_PX } from './gestureConstants';
+import { DRAG_THRESHOLD_PX, isDrag } from './gestureConstants';
+import { pushJournal } from '../../utils/telemetry/journal';
 
 const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
 
@@ -42,6 +43,29 @@ function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
+}
+
+// ─── Sondas de la bitácora (spec caja-negra-bitacora § 3.2) ─────────────────
+// El router es la puerta por la que pasan todos los mousedown/up/keydown de
+// todas las herramientas: una sonda aquí las cubre a todas. Los ganchos solo
+// añaden lo que únicamente ellos saben (enganche, anfitriona, desenlace).
+
+/** Qué había bajo el cursor, en una palabra: rol de ancla, pieza, o el tag. */
+function describeTarget(target: EventTarget | null | undefined): string {
+  const el = target as (Partial<Element> & { tagName?: string }) | null | undefined;
+  if (!el) return 'none';
+  const role = typeof el.getAttribute === 'function' ? el.getAttribute('data-anchor-role') : null;
+  if (role) return role;
+  if (typeof el.closest === 'function' && el.closest('[data-piece-id]')) return 'piece';
+  return typeof el.tagName === 'string' ? el.tagName.toLowerCase() : 'unknown';
+}
+
+/** Punto de patrón redondeado a 1 decimal; `null` si el evento no trae con qué medirlo. */
+function worldOf(e: React.MouseEvent<SVGSVGElement>, zoom: number, pan: Point2D): { x: number; y: number } | null {
+  const rect = e.currentTarget?.getBoundingClientRect?.();
+  if (!rect || typeof e.clientX !== 'number') return null;
+  const p = screenToPattern(e.clientX, e.clientY, rect, zoom, pan);
+  return { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 };
 }
 
 /** Distance from point (px,py) to line segment (x1,y1)-(x2,y2) */
@@ -270,6 +294,8 @@ export function useEditorInteractions(
   const dispatch = useDispatch();
   const selectedInternalLine = useSelector((s: RootState) => s.editor.selectedInternalLine);
   const svgRef = useRef<SVGSVGElement>(null);
+  /** Posición de pantalla del último press, para que la bitácora mida `drag` en el release. */
+  const pressRef = useRef<{ x: number; y: number } | null>(null);
   const dragRef = useRef<{ pieceId: string; startMouse: Point2D; startPos: Point2D; lastPos?: Point2D } | null>(null);
   const panRef = useRef<{ startMouse: Point2D; startPan: Point2D; lastPos?: Point2D } | null>(null);
   const internalLineDragRef = useRef<{
@@ -398,17 +424,20 @@ export function useEditorInteractions(
   // detiene la propagación; si no, la tecla fluye al global.
   // Spec: docs/superpowers/specs/2026-08-29-linea-interna-y-medidas-design.md § 8
   useEffect(() => {
-    const onKeyCapture = (e: KeyboardEvent) => {
-      // Las teclas que nacen dentro de un campo editable pertenecen al campo.
-      if (isEditableTarget(e.target)) return;
+    // Quién consumió la tecla, si alguien lo dijo. Solo los tres ganchos cuyo
+    // `handleKeyDown` devuelve boolean pueden decirlo; los demás se ven en la
+    // bitácora por lo que despachan.
+    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | null;
+    const routeKey = (e: KeyboardEvent): KeyConsumer => {
       // Línea interna: con trazo vivo, Escape / Enter / Retroceso / Supr son
       // del motor. `handleKeyDown` dice si consumió.
       if (activeTool === 'internalShape' && internalShapeTool.isTracing()) {
         if (internalShapeTool.handleKeyDown(e)) {
           e.preventDefault();
           e.stopPropagation();
+          return 'internalShape';
         }
-        return;
+        return null;
       }
       // Pluma: Escape con trazo y Enter con ≥ 2 nodos. Antes vivía en la
       // burbuja y el Escape disparaba además la deselección global.
@@ -416,48 +445,65 @@ export function useEditorInteractions(
         if (pen.handleKeyDown(e)) {
           e.preventDefault();
           e.stopPropagation();
+          return 'pen';
         }
-        return;
+        return null;
       }
       // Rectángulo: Escape con press vivo cancela el arrastre (spec § 6).
       if (activeTool === 'rectangle' && rectTool.isArmed()) {
         if (rectTool.handleKeyDown(e)) {
           e.preventDefault();
           e.stopPropagation();
+          return 'rectangle';
         }
-        return;
+        return null;
       }
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape') return null;
       // Tool Punto armado: cancelar SOLO la colocación pendiente (el hook hace
       // preventDefault + stopPropagation). Sin armar, el Esc fluye normal.
       if (activeTool === 'point' && pointTool.armed) {
         pointTool.handleKeyDown(e);
-        return;
+        return null;
       }
       // El piquete comparte la misma ley que Coser: mientras el press siga
       // vivo, Escape pertenece al gesto y no a la selección.
       if (activeTool === 'notch' && notchTool.isArmed()) {
         notchTool.handleKeyDown(e);
-        return;
+        return null;
       }
       // El tramo de margen ya fijó su borde en el press; Escape pertenece a
       // ese gesto y no debe caer además en la deselección global.
       if (activeTool === 'seamAllowance' && seamAllowanceTool.isArmed()) {
         seamAllowanceTool.handleKeyDown(e);
-        return;
+        return null;
       }
       // Coser: con un gesto armado o una mitad sostenida, el Esc es del tool.
       // El hook hace preventDefault + stopPropagation cuando cancela algo; si
       // no hay nada que cancelar, el Esc fluye normal → deseleccionar.
       if (activeTool === 'seam') {
         seamTool.handleKeyDown(e);
-        return;
+        return null;
       }
-      if (activeTool !== 'select') return;
-      if (!transformTool.isDragging) return;
+      if (activeTool !== 'select') return null;
+      if (!transformTool.isDragging) return null;
       transformTool.handleKeyDown(e);
       e.preventDefault();
       e.stopPropagation();
+      return null;
+    };
+    const onKeyCapture = (e: KeyboardEvent) => {
+      // Las teclas que nacen dentro de un campo editable pertenecen al campo.
+      if (isEditableTarget(e.target)) return;
+      // La tecla entra a la bitácora ANTES de sus consecuencias (la acción que
+      // despache el gancho); quién la consumió se completa al volver. La
+      // repetición automática de una tecla sostenida no es un gesto nuevo.
+      const entry = e.repeat ? null : pushJournal('gesture', 'key', {
+        tool: activeTool, key: e.key,
+        ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, alt: e.altKey,
+        consumedBy: null,
+      });
+      const consumedBy = routeKey(e);
+      if (entry?.data) entry.data.consumedBy = consumedBy;
     };
     window.addEventListener('keydown', onKeyCapture, { capture: true });
     return () => window.removeEventListener('keydown', onKeyCapture, { capture: true });
@@ -538,6 +584,7 @@ export function useEditorInteractions(
   const handleWheel = useCallback((_e: React.WheelEvent) => { /* handled by native listener */ }, []);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    pushJournal('gesture', 'dblclick', { tool: activeTool });
     if (activeTool === 'editPattern') {
       const handled = editPattern.handleDoubleClick(e);
       if (handled) return;
@@ -560,6 +607,12 @@ export function useEditorInteractions(
   }, [activeTool, nodeEditor, editPattern, internalShapeTool, pen]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    pressRef.current = { x: e.clientX, y: e.clientY };
+    pushJournal('gesture', 'down', {
+      tool: activeTool, button: e.button, ...(worldOf(e, zoom2D, pan2D) ?? {}),
+      target: describeTarget(e.target),
+      shift: !!e.shiftKey, ctrl: !!(e.ctrlKey || e.metaKey), alt: !!e.altKey,
+    });
     if (e.button === 1) {
       panRef.current = { startMouse: { x: e.clientX, y: e.clientY }, startPan: { ...pan2D } };
       return;
@@ -892,6 +945,17 @@ export function useEditorInteractions(
   }, [activeTool, zoom2D, pan2D, pen, rectTool, seamTool, notchTool, pointTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseUp = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
+    const press = pressRef.current;
+    pressRef.current = null;
+    if (e) {
+      pushJournal('gesture', 'up', {
+        tool: activeTool, button: e.button, ...(worldOf(e, zoom2D, pan2D) ?? {}),
+        drag: press ? isDrag(e.clientX - press.x, e.clientY - press.y) : false,
+      });
+    } else {
+      // Sin evento (blur, reentrada con buttons === 0): el release es sintético.
+      pushJournal('gesture', 'up', { tool: activeTool, synthetic: true });
+    }
     // Resolve marquee selection
     if (marqueeRef.current) {
       const mq = marqueeRef.current;
@@ -1001,9 +1065,10 @@ export function useEditorInteractions(
     if (activeTool === 'point' && e) pointTool.handleMouseUp(e);
     if (activeTool === 'seam' && e) seamTool.handleMouseUp(e);
     if (activeTool === 'notch' && e) notchTool.handleMouseUp(e);
-  }, [activeTool, pen, rectTool, seamAllowanceTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, dispatch, pieces, zoom2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool, internalShapeTool, pointTool, seamTool, notchTool]);
+  }, [activeTool, pen, rectTool, seamAllowanceTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, dispatch, pieces, zoom2D, pan2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool, internalShapeTool, pointTool, seamTool, notchTool]);
 
   const handlePointerCancel = useCallback(() => {
+    pushJournal('gesture', 'cancel', { tool: activeTool });
     // `pointercancel` no trae una posición final fiable. Tratarlo como mouseup
     // inventaría un valor; tratarlo como Escape conserva el último estado
     // estable y deja el siguiente gesto limpio.

@@ -16,6 +16,12 @@ installEarlyDeviceHook();
 // Initialize tool registry
 import './tools';
 
+// Caja negra: la bitácora — sondas del navegador (sesión, consola, storage,
+// tareas largas). Antes de initErrorTracker para que la bitácora ya esté
+// armada si algo dispara un error en el primer tick.
+import { initJournal } from './utils/telemetry/journalProbes';
+initJournal();
+
 // Global error tracking (captures unhandled errors + rejections)
 import { initErrorTracker, getTrackedErrors, getErrorCount } from './utils/errorTracker';
 initErrorTracker();

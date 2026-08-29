@@ -15,6 +15,7 @@ import {
   setAppliedSolverConfig,
   SOLVER_EVENTS_MAX,
 } from '../solverRuntimeTracker';
+import { clearJournal, getJournal } from '../../telemetry/journal';
 
 describe('solverRuntimeTracker — ring de eventos', () => {
   beforeEach(clearSolverEvents);
@@ -84,5 +85,47 @@ describe('solverRuntimeTracker — config aplicada y geometría retenida', () =>
 
     registerClothGeometry(null, []);
     expect(getClothGeometry()).toBeNull();
+  });
+});
+
+describe('solverRuntimeTracker — espejo en la bitácora', () => {
+  beforeEach(() => {
+    clearSolverEvents();
+    clearJournal();
+  });
+
+  it('pushSolverEvent al crear fila nueva espeja solver/<kind> con generation', () => {
+    const gen = beginCascade();
+    pushSolverEvent('tier:selected', { tier: 'wasm' });
+
+    const solverEvents = getJournal().events.filter((e) => e.kind === 'solver');
+    expect(solverEvents).toHaveLength(1);
+    expect(solverEvents[0]).toMatchObject({ kind: 'solver', name: 'tier:selected', data: { generation: gen } });
+  });
+
+  it('coalesceSolverEvent actualizando en sitio no añade otro espejo', () => {
+    coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', code: 'nan_reset', count: 1 });
+    coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', code: 'nan_reset', count: 2 });
+
+    const events = getSolverEvents();
+    expect(events).toHaveLength(1); // la segunda llamada actualizó en sitio, no creó fila
+
+    const solverEvents = getJournal().events.filter((e) => e.kind === 'solver');
+    expect(solverEvents).toHaveLength(1); // un solo espejo — solo la fila nueva de la primera llamada
+  });
+
+  it('coalesceSolverEvent SIN coincidencia delega en pushSolverEvent y ese camino sí espeja', () => {
+    coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', code: 'nan_reset' });
+    coalesceSolverEvent('tier:diagnostic', { tier: 'wasm', code: 'self_collision_disabled' }); // code distinto → fila nueva en el tracker
+
+    expect(getSolverEvents()).toHaveLength(2); // el tracker sí distingue por code
+
+    // La bitácora funde por kind/name (no mira data.code): dos pushJournal de
+    // 'solver'/'tier:diagnostic' en la misma ráfaga son UNA entrada con n:2 —
+    // eso prueba que el espejo disparó las dos veces (si solo una hubiera
+    // espejado, n sería undefined).
+    const solverEvents = getJournal().events.filter((e) => e.kind === 'solver');
+    expect(solverEvents).toHaveLength(1);
+    expect(solverEvents[0].n).toBe(2);
   });
 });

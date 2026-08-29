@@ -3,6 +3,7 @@ import { Point2D, PathCommand, PatternPiece } from '../../types/types';
 import { screenToPattern } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
 import { polarOf, polarPoint } from './polyPenGeometry';
+import { pushJournal } from '../../utils/telemetry/journal';
 
 /**
  * A node in the pen path. Each node has an anchor point and optional
@@ -144,12 +145,14 @@ export function usePenTool(
     if (nodes.length > 2) {
       const first = nodes[0].anchor;
       if (dist(pt, first) * zoom < CLOSE_THRESHOLD) {
+        pushJournal('gesture', 'pen:press', { closes: true, nodes: nodes.length });
         complete(nodes, true);
         return;
       }
     }
 
     // Add new node
+    pushJournal('gesture', 'pen:press', { closes: false, nodes: nodes.length + 1 });
     const newNode: PenNode = { anchor: pt, handleIn: null, handleOut: null };
     setState(prev => ({
       ...prev,
@@ -219,11 +222,15 @@ export function usePenTool(
   }, []);
 
   const closeNextPoint = useCallback(() => {
+    // Escape y "Cerrar" nacen dentro del panel: invisibles para el router.
+    pushJournal('gesture', 'pen:nextPoint', { op: 'close' });
     setState(prev => (prev.nextPoint ? { ...prev, nextPoint: null } : prev));
   }, []);
 
   /** Coloca un nodo esquina a largo y ángulo del último; el panel sigue abierto desde el nuevo. */
   const placePolar = useCallback((lengthMm: number, angleDeg: number) => {
+    if (nodesRef.current.length === 0) return;
+    pushJournal('gesture', 'pen:nextPoint', { op: 'place', length: lengthMm, angle: angleDeg, nodes: nodesRef.current.length + 1 });
     setState(prev => {
       if (prev.nodes.length === 0) return prev;
       const from = prev.nodes[prev.nodes.length - 1].anchor;

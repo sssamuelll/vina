@@ -3,6 +3,25 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useEdgeGesture } from '../useEdgeGesture';
 import type { EdgeTarget, EdgeCommit } from '../edgeGesture';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
+
+describe('useEdgeGesture — bitácora de salidas mudas', () => {
+  it('el press que encuentra borde deja el objetivo; el que no, deja el fallo', () => {
+    clearJournal();
+    const hit = renderHook(() => useEdgeGesture({
+      resolveTarget: () => ({ pieceId: 'p1', edgeIndex: 1, edgeRange: [1, 2], t: 0.2, point: { x: 0, y: 0 } }),
+      resolveReleaseT: () => 0.8,
+      onCommit: vi.fn(),
+    }));
+    const miss = renderHook(() => useEdgeGesture({ resolveTarget: () => null, resolveReleaseT: () => null, onCommit: vi.fn() }));
+    act(() => { hit.result.current.handleMouseDown(mouseEvent(100, 100)); });
+    act(() => { miss.result.current.handleMouseDown(mouseEvent(100, 100)); });
+    expect(getJournal().events.map((e) => [e.name, e.data])).toEqual([
+      ['edge:press', { pieceId: 'p1', edgeIndex: 1, t: 0.2 }],
+      ['edge:miss', undefined],
+    ]);
+  });
+});
 
 const target: EdgeTarget = {
   pieceId: 'p1', edgeIndex: 1, edgeRange: [1, 2], t: 0.2, point: { x: 0, y: 0 },

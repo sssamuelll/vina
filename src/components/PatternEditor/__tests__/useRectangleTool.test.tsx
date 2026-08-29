@@ -13,8 +13,29 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import toolReducer, { setToolOption } from '../../../store/toolSlice';
 import { useRectangleTool } from '../useRectangleTool';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 
 afterEach(cleanup);
+
+describe('useRectangleTool — bitácora de salidas mudas', () => {
+  const releases = () => getJournal().events.filter((e) => e.name === 'rectangle:release').map((e) => e.data);
+
+  it('el release del botón derecho y un tamaño de barra en cero quedan registrados; crear no (ya es una acción)', () => {
+    clearJournal();
+    const { store, tool, press, move, release, onComplete } = setup();
+    press(100, 100); move(180, 160);
+    act(() => tool().handleMouseUp(ev(180, 160, 2)));
+    release(180, 160);
+    act(() => { store.dispatch(setToolOption({ toolId: 'rectangle', optionId: 'width', value: 0 })); });
+    press(400, 300); release(400, 300);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(releases()).toEqual([
+      { outcome: 'ignoredButton', button: 2 },
+      // el arrastre anterior dejó Alto 60 en la barra; Ancho 0 es lo que la anula
+      { outcome: 'tooSmall', width: 0, height: 60, source: 'bar' },
+    ]);
+  });
+});
 
 const ev = (x: number, y: number, button = 0) => ({
   button, clientX: x, clientY: y,

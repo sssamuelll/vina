@@ -89,13 +89,19 @@ export default function ContextMenu3D({
 }: ContextMenu3DProps) {
   const ref = useRef<HTMLDivElement>(null);
 
+  // `onClose` por ref, no en las dependencias: mismo mecanismo que el menú 2D
+  // (`PatternEditor/ContextMenu.tsx`) — un Escape real dispara antes el atajo
+  // global, que re-renderiza al padre en medio del dispatch y, con `onClose`
+  // inline, este listener se quitaba y volvía a registrar sin llegar a correr.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     if (!menu.visible) return;
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      if (ref.current && !ref.current.contains(e.target as Node)) onCloseRef.current();
     };
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('mousedown', handleClick);
     document.addEventListener('keydown', handleKey);
@@ -103,7 +109,7 @@ export default function ContextMenu3D({
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('keydown', handleKey);
     };
-  }, [menu.visible, onClose]);
+  }, [menu.visible]);
 
   const act = useCallback((fn: () => void) => {
     fn();

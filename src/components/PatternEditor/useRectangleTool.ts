@@ -6,6 +6,7 @@ import { Point2D, PathCommand, InternalLine } from '../../types/types';
 import { screenToPattern } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
 import { isDrag } from './gestureConstants';
+import { pushJournal } from '../../utils/telemetry/journal';
 
 interface NewPieceData {
   name: string;
@@ -109,11 +110,16 @@ export function useRectangleTool(
     // del botón derecho llegaba aquí como un release normal y creaba el
     // rectángulo justo antes de que el menú se abriera (e2e, 2026-08-29). El
     // `contextmenu` que sigue es quien cancela el press.
-    if (e && e.button !== 0) return;
+    if (e && e.button !== 0) {
+      pushJournal('gesture', 'rectangle:release', { outcome: 'ignoredButton', button: e.button });
+      return;
+    }
     pressRef.current = null;
+    // Bitácora: solo las salidas mudas; crear ya es el `project/addPiece`.
     if (!p.moved) {
       const { w, h } = barRef.current;
       if (w > 0 && h > 0) create(p.start.x, p.start.y, w, h);
+      else pushJournal('gesture', 'rectangle:release', { outcome: 'tooSmall', width: w, height: h, source: 'bar' });
     } else {
       const end = e ? toPattern(e) : p.current;
       const w = Math.abs(end.x - p.start.x);
@@ -122,6 +128,8 @@ export function useRectangleTool(
         create(Math.min(p.start.x, end.x), Math.min(p.start.y, end.y), w, h);
         dispatch(setToolOption({ toolId: 'rectangle', optionId: 'width', value: round1(w) }));
         dispatch(setToolOption({ toolId: 'rectangle', optionId: 'height', value: round1(h) }));
+      } else {
+        pushJournal('gesture', 'rectangle:release', { outcome: 'tooSmall', width: round1(w), height: round1(h), source: 'drag' });
       }
     }
     publish();

@@ -30,6 +30,7 @@ import { showToast, showErrorToast } from './copilotUISlice';
 import { NEW_PROJECT, RESEW_AI_SEAMS } from './actions';
 import { isStaleAiSeam } from '../utils/autoSew';
 import type { Seam } from '../types/types';
+import { pushJournal } from '../utils/telemetry/journal';
 
 export const AUTOSAVE_DEBOUNCE_MS = 1500;
 
@@ -91,8 +92,18 @@ export async function initProjectPersistence(store: PersistenceStore): Promise<v
   // ── 2. Then subscribe (focused, debounced) ──
   const save = () => {
     // Fire-and-forget: silent-degradable write per B6 §3.8 (telemetry hook
-    // inside storageSet owns quota/unavailable signals).
-    void saveToStorage(store.getState().project as Parameters<typeof saveToStorage>[0]).catch(() => {});
+    // inside storageSet owns quota/unavailable signals). Único cambio de
+    // control de flujo de la caja negra: then(ok, fail) en vez de catch
+    // mudo, para que la bitácora vea éxito/fallo y duración (spec § 3.7).
+    const t0 = performance.now();
+    void saveToStorage(store.getState().project as Parameters<typeof saveToStorage>[0]).then(
+      () => pushJournal('storage', 'autosave', { ok: true, ms: Math.round(performance.now() - t0) }),
+      (e) => pushJournal('storage', 'autosave', {
+        ok: false,
+        ms: Math.round(performance.now() - t0),
+        error: e instanceof Error ? e.message : String(e),
+      }),
+    );
   };
 
   let prev = store.getState().project;

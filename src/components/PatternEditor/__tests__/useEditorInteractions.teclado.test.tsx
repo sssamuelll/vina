@@ -18,11 +18,15 @@ import projectReducer from '../../../store/projectSlice';
 import inputSchemeReducer from '../../../store/inputSchemeSlice';
 import { useEditorInteractions } from '../useEditorInteractions';
 import type { Tool2D } from '../../../types/types';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 
 afterEach(() => {
   cleanup();
   document.body.innerHTML = '';
+  clearJournal();
 });
+
+const keysJournaled = () => getJournal().events.filter((e) => e.kind === 'gesture' && e.name === 'key');
 
 type Tools = Parameters<typeof useEditorInteractions>[4];
 type Fn = ReturnType<typeof vi.fn>;
@@ -117,5 +121,39 @@ describe('teclado en captura — pluma', () => {
     (tools.pen.handleKeyDown as unknown as Fn).mockReturnValue(false);
     press(document.body, 'Escape');
     expect(documentSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('la bitácora ve cada tecla en la puerta', () => {
+  it('registra la tecla y quién la consumió', () => {
+    const { tools } = setup('internalShape');
+    (tools.internalShapeTool.isTracing as unknown as Fn).mockReturnValue(true);
+    (tools.internalShapeTool.handleKeyDown as unknown as Fn).mockReturnValue(true);
+    press(document.body, 'Enter');
+    expect(keysJournaled()).toEqual([
+      expect.objectContaining({ data: { tool: 'internalShape', key: 'Enter', ctrl: false, shift: false, alt: false, consumedBy: 'internalShape' } }),
+    ]);
+  });
+
+  it('una tecla que nadie consume queda con consumedBy null', () => {
+    const { tools } = setup('pen');
+    (tools.pen.handleKeyDown as unknown as Fn).mockReturnValue(false);
+    press(document.body, 'Escape');
+    expect(keysJournaled()[0].data).toMatchObject({ tool: 'pen', key: 'Escape', consumedBy: null });
+  });
+
+  it('una tecla nacida en un campo editable no se registra', () => {
+    setup('select');
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    press(input, 'Escape');
+    expect(keysJournaled()).toHaveLength(0);
+  });
+
+  it('la repetición automática de una tecla sostenida no se registra', () => {
+    setup('select');
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', repeat: true, bubbles: true }));
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(keysJournaled()).toHaveLength(1);
   });
 });
