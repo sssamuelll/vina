@@ -14,6 +14,7 @@ import projectReducer, { restoreState } from '../../../store/projectSlice';
 import inputSchemeReducer from '../../../store/inputSchemeSlice';
 import { useEditorInteractions } from '../useEditorInteractions';
 import type { PatternPiece, Tool2D } from '../../../types/types';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 
 afterEach(cleanup);
 
@@ -119,6 +120,32 @@ function moveTo(x: number, y: number) {
 function projPos(store: ReturnType<typeof setup>['store']) {
   return (store.getState() as { project: { pieces: PatternPiece[] } }).project.pieces[0].position;
 }
+
+describe('la bitácora ve el press y el release en la puerta', () => {
+  it('registra down con target y up con drag pasado el umbral', () => {
+    clearJournal();
+    const { hook } = setup('select', [pieceP1()], makeTools({ nodeEditor: idleNodeEditor(), transformTool: idleTransform() }));
+    act(() => { hook.result.current.handleMouseDown(downOn('p1', 50, 50)); });
+    act(() => { hook.result.current.handleMouseMove(moveTo(70, 50)); });
+    act(() => { hook.result.current.handleMouseUp(moveTo(70, 50)); });
+    const gestures = getJournal().events.filter((e) => e.kind === 'gesture');
+    expect(gestures).toEqual([
+      expect.objectContaining({ name: 'down', data: { tool: 'select', button: 0, x: 50, y: 50, target: 'piece', shift: false, ctrl: false, alt: false } }),
+      expect.objectContaining({ name: 'up', data: expect.objectContaining({ tool: 'select', x: 70, y: 50, drag: true }) }),
+    ]);
+  });
+
+  it('un clic sin movimiento deja drag false, y un up sin evento queda marcado como sintético', () => {
+    clearJournal();
+    const { hook } = setup('select', [pieceP1()], makeTools({ nodeEditor: idleNodeEditor(), transformTool: idleTransform() }));
+    act(() => { hook.result.current.handleMouseDown(downOn(null, 200, 200)); });
+    act(() => { hook.result.current.handleMouseUp(moveTo(201, 200)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    const ups = getJournal().events.filter((e) => e.kind === 'gesture' && e.name === 'up');
+    expect(ups[0].data).toMatchObject({ drag: false });
+    expect(ups[1].data).toMatchObject({ tool: 'select', synthetic: true });
+  });
+});
 
 describe('gate de phantom-move (EB-1/EB-2)', () => {
   it('no despacha movePiece en un clic con jitter sub-4px (SM_CXDRAG de Windows)', () => {

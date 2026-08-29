@@ -68,11 +68,17 @@ function expelOldest(): void {
   if (lastByKey.get(key) === old) lastByKey.delete(key);
 }
 
+/**
+ * Devuelve el evento que quedó en el ring (el nuevo, o aquel en el que se
+ * fundió) para que una sonda pueda completar `data` después de enrutar — el
+ * router registra la tecla ANTES de sus consecuencias y solo entonces sabe
+ * quién la consumió.
+ */
 export function pushJournal(
   kind: JournalKind,
   name: string,
   data?: Record<string, unknown>,
-): void {
+): JournalEvent {
   const now = Date.now();
   const ev: JournalEvent = data ? { t: now, kind, name, data } : { t: now, kind, name };
   if (!UNFUSED.has(kind)) {
@@ -82,12 +88,13 @@ export function pushJournal(
       prev.n = (prev.n ?? 1) + 1;
       prev.tLast = now;
       if (data) prev.data = data;
-      return;
+      return prev;
     }
     lastByKey.set(key, ev);
   }
   events.push(ev);
   if (events.length > JOURNAL_MAX) expelOldest();
+  return ev;
 }
 
 export function getJournal(): { events: readonly JournalEvent[]; dropped: number } {
