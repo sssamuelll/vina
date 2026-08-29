@@ -27,31 +27,6 @@ export const penTool: ToolDefinition = {
   icon: PenIcon,
   cursor: 'crosshair',
   group: 'draw',
-  options: [
-    {
-      id: 'smoothing',
-      label: 'Suavizar',
-      type: 'toggle',
-      value: true,
-    },
-    {
-      id: 'snapGrid',
-      label: 'Ajustar a la cuadrícula',
-      type: 'toggle',
-      value: false,
-    },
-    {
-      id: 'constrainAngles',
-      label: 'Restringir ángulos',
-      type: 'select',
-      value: 'none',
-      choices: [
-        { label: 'Libre', value: 'none' },
-        { label: '45°', value: '45' },
-        { label: '90°', value: '90' },
-      ],
-    },
-  ],
   copilot: {
     description: 'Draw custom pattern pieces by placing points. Click to place corner points, drag to create curved segments. Double-click or press Enter to close the shape and create a new pattern piece.',
     examples: [
@@ -64,10 +39,5 @@ export const penTool: ToolDefinition = {
     requiresSelection: 'none',
     produces: 'piece',
     undoable: true,
-    parameterHints: {
-      smoothing: 'Automatically smooth corners into curves',
-      snapGrid: 'Snap points to the grid for precise placement',
-      constrainAngles: 'Lock lines to 45° or 90° angles',
-    },
   },
 };

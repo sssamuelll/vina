@@ -208,7 +208,6 @@ export function useKeyboardShortcuts() {
       ['tool.pomMeasure', () => activate2DTool(dispatch, 'pomMeasure')],
       ['tool.offsetOutline', () => activate2DTool(dispatch, 'offsetOutline')],
       ['tool.extendTrim', () => activate2DTool(dispatch, 'extendTrim')],
-      ['tool.polyPen', () => activate2DTool(dispatch, 'polyPen')],
       ['tool.seamAllowance', () => activate2DTool(dispatch, 'seamAllowance')],
 
       // Sewing
@@ -218,7 +217,6 @@ export function useKeyboardShortcuts() {
       // Shift+Key tools
       ['tool.grainline', () => activate2DTool(dispatch, 'grainline')],
       ['tool.notch', () => activate2DTool(dispatch, 'notch')],
-      ['tool.line', () => activate2DTool(dispatch, 'line')],
 
       // 3D Tools
       ['tool3d.steamBrush', () => dispatch(setActiveTool3D('steamBrush'))],

@@ -44,17 +44,6 @@ export const rectangleTool: ToolDefinition = {
       max: 1000,
       step: 5,
     },
-    {
-      id: 'cornerStyle',
-      label: 'Esquinas',
-      type: 'select',
-      value: 'square',
-      choices: [
-        { label: 'Rectas', value: 'square' },
-        { label: 'Redondeadas', value: 'rounded' },
-        { label: 'Achaflanadas', value: 'chamfered' },
-      ],
-    },
   ],
   copilot: {
     description:
@@ -62,7 +51,7 @@ export const rectangleTool: ToolDefinition = {
     examples: [
       'Draw a rectangle 100mm by 150mm',
       'Create a square pocket piece',
-      'Make a rectangular facing with rounded corners',
+      'Make a rectangular facing piece',
       'Add a 200x300mm pattern block',
     ],
     keywords: [
@@ -83,7 +72,6 @@ export const rectangleTool: ToolDefinition = {
     parameterHints: {
       width: 'Width of the rectangle in millimeters',
       height: 'Height of the rectangle in millimeters',
-      cornerStyle: 'Corner treatment: square, rounded, or chamfered (angled)',
     },
   },
 };

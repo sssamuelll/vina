@@ -1,5 +1,5 @@
 import {
-  MousePointer2, PenTool, Minus, Square, Scissors, Ruler, Spline,
+  MousePointer2, PenTool, Square, Scissors, Ruler, Spline,
   PenLine, Shapes, Triangle, MoveVertical,
   SquareDashed, GitCommitHorizontal, Waypoints,
   type LucideIcon,
@@ -16,9 +16,7 @@ export interface DockToolDef {
 
 /** Curated catalog of dock-eligible 2D tools. Render order = this order; the
  *  first 12 are the default set (DEFAULT_DOCK_2D_IDS in dockSlice). Every id is
- *  a real Tool2D union member with a canvas handler in useEditorInteractions —
- *  except internalShape, whose handler is not built yet (kept because María
- *  wants "Forma interna"; the other unwired tools were removed per #529). */
+ *  a real Tool2D union member with a canvas handler in useEditorInteractions. */
 export const DOCK_2D_CATALOG: DockToolDef[] = [
   { id: 'select', icon: MousePointer2, label: 'Seleccionar', shortcut: 'Z' },
   { id: 'editPattern', icon: PenLine, label: 'Editar patrón', shortcut: 'Q' },
@@ -27,7 +25,9 @@ export const DOCK_2D_CATALOG: DockToolDef[] = [
   // que CLO rompe (maria-203).
   { id: 'point', icon: GitCommitHorizontal, label: 'Punto' },
   { id: 'pen', icon: PenTool, label: 'Pluma', shortcut: 'H' },
-  { id: 'line', icon: Minus, label: 'Línea', shortcut: '⇧L' },
+  // 'line' murió en la unificación de líneas internas (spec 2026-08-29):
+  // internalShape hereda su ranura y su atajo de dock, con G.
+  { id: 'internalShape', icon: Shapes, label: 'Línea interna', shortcut: 'G' },
   { id: 'rectangle', icon: Square, label: 'Rectángulo', shortcut: 'S' },
   { id: 'scissors', icon: Scissors, label: 'Tijeras', shortcut: 'X' },
   { id: 'measure', icon: Ruler, label: 'Medir', shortcut: 'M' },
@@ -40,7 +40,6 @@ export const DOCK_2D_CATALOG: DockToolDef[] = [
   { id: 'seamAllowance', icon: SquareDashed, label: 'Margen de costura', shortcut: 'O' },
   { id: 'notch', icon: Triangle, label: 'Piquete', shortcut: '⇧N' },
   // Fuera del default:
-  { id: 'internalShape', icon: Shapes, label: 'Forma interna', shortcut: 'G' },
   { id: 'grainline', icon: MoveVertical, label: 'Hilo', shortcut: '⇧G' },
 ];
 

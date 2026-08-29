@@ -58,10 +58,9 @@ This tool system is designed to match CLO3D's professional workflow, making it f
 
 Each tool shows context-sensitive options in the options bar:
 
-- **Pen**: smoothing, snap to grid, constrain angles (45°/90°)
 - **Seam**: seam type, stitch length
 - **Notch**: shape, size, count
-- **Rectangle**: width, height, corner style
+- **Rectangle**: width, height
 - **Scissors**: cut type, keep both sides [Coming Soon]
 - **Measure**: show angle, cumulative distance
 - **Pose**: sensitivity, constraint toggle

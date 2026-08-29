@@ -6,7 +6,8 @@ import dockReducer, {
   pinAuto, unpinAuto, persistDocks, loadDocks, toggleDockSignaling,
   rehydrateDocks, addDockTool, removeDockTool, resetDockTools,
   reorderDockTool, LEGACY_DEFAULT_DOCK_2D_IDS, LEGACY_DEFAULT_DOCK_2D_IDS_V2,
-  LEGACY_DEFAULT_DOCK_2D_IDS_V3, DEFAULT_DOCK_2D_IDS, migrateDefaultDockTools,
+  LEGACY_DEFAULT_DOCK_2D_IDS_V3, LEGACY_DEFAULT_DOCK_2D_IDS_V5,
+  DEFAULT_DOCK_2D_IDS, migrateDefaultDockTools,
 } from '../dockSlice';
 
 const initial = () => dockReducer(undefined, { type: '@@INIT' });
@@ -92,7 +93,7 @@ describe('dockSlice tools2d', () => {
   it('defaults tools2d to the 12 ids with point between editPattern and pen (maria-203)', () => {
     expect(initial().tools2d).toEqual(DEFAULT_DOCK_2D_IDS);
     expect(DEFAULT_DOCK_2D_IDS).toEqual([
-      'select', 'editPattern', 'point', 'pen', 'line',
+      'select', 'editPattern', 'point', 'pen', 'internalShape',
       'rectangle', 'scissors', 'measure', 'seam', 'seamEdit',
       'seamAllowance', 'notch',
     ]);
@@ -101,10 +102,21 @@ describe('dockSlice tools2d', () => {
   it('migrates only the exact ordered historical defaults (v1 and v2)', () => {
     expect(migrateDefaultDockTools(LEGACY_DEFAULT_DOCK_2D_IDS)).toEqual(DEFAULT_DOCK_2D_IDS);
     expect(migrateDefaultDockTools(LEGACY_DEFAULT_DOCK_2D_IDS_V2)).toEqual(DEFAULT_DOCK_2D_IDS);
+    // Orden distinto al de cualquier default histórico: no migra al vigente,
+    // pero 'line' sigue muerto en cualquier posición (remap de id, no de set).
     expect(migrateDefaultDockTools([...LEGACY_DEFAULT_DOCK_2D_IDS].reverse()))
-      .toEqual([...LEGACY_DEFAULT_DOCK_2D_IDS].reverse());
+      .toEqual(['seam', 'measure', 'scissors', 'rectangle', 'internalShape', 'pen', 'select']);
     expect(migrateDefaultDockTools(['select', 'pen', 'notch']))
       .toEqual(['select', 'pen', 'notch']);
+  });
+
+  it('el default V5 (con line) migra al vigente (con internalShape)', () => {
+    expect(migrateDefaultDockTools([...LEGACY_DEFAULT_DOCK_2D_IDS_V5])).toEqual(DEFAULT_DOCK_2D_IDS);
+  });
+
+  it('un dock personalizado recibe internalShape en la ranura de line, sin duplicar', () => {
+    expect(migrateDefaultDockTools(['select', 'line', 'notch'])).toEqual(['select', 'internalShape', 'notch']);
+    expect(migrateDefaultDockTools(['internalShape', 'line', 'notch'])).toEqual(['internalShape', 'notch']);
   });
 
   it('el default vigente de 9 migra al de 10 con seamEdit', () => {
@@ -199,27 +211,27 @@ describe('dockSlice reorderDockTool', () => {
   const seed = (ids: string[]) => dockReducer(initial(), rehydrateDocks({ pinnedExtra: { left: [], right: [] }, signaling: 'subtle', tools2d: ids }));
 
   it('up-move: dragging a lower tool onto a higher one lands it before the target', () => {
-    const s = dockReducer(seed(['select', 'pen', 'line']), reorderDockTool({ fromId: 'line', toId: 'select' }));
-    expect(s.tools2d).toEqual(['line', 'select', 'pen']);
+    const s = dockReducer(seed(['select', 'pen', 'notch']), reorderDockTool({ fromId: 'notch', toId: 'select' }));
+    expect(s.tools2d).toEqual(['notch', 'select', 'pen']);
   });
 
   it('down-move: dragging a higher tool onto a lower one lands it immediately before the target', () => {
-    const s = dockReducer(seed(['select', 'pen', 'line']), reorderDockTool({ fromId: 'select', toId: 'line' }));
-    expect(s.tools2d).toEqual(['pen', 'select', 'line']);
+    const s = dockReducer(seed(['select', 'pen', 'notch']), reorderDockTool({ fromId: 'select', toId: 'notch' }));
+    expect(s.tools2d).toEqual(['pen', 'select', 'notch']);
   });
 
   it('fromId === toId is a no-op', () => {
-    const s = dockReducer(seed(['select', 'pen', 'line']), reorderDockTool({ fromId: 'pen', toId: 'pen' }));
-    expect(s.tools2d).toEqual(['select', 'pen', 'line']);
+    const s = dockReducer(seed(['select', 'pen', 'notch']), reorderDockTool({ fromId: 'pen', toId: 'pen' }));
+    expect(s.tools2d).toEqual(['select', 'pen', 'notch']);
   });
 
   it('an absent id is a no-op', () => {
-    const s = dockReducer(seed(['select', 'pen', 'line']), reorderDockTool({ fromId: 'zzz', toId: 'select' }));
-    expect(s.tools2d).toEqual(['select', 'pen', 'line']);
+    const s = dockReducer(seed(['select', 'pen', 'notch']), reorderDockTool({ fromId: 'zzz', toId: 'select' }));
+    expect(s.tools2d).toEqual(['select', 'pen', 'notch']);
   });
 
   it('preserves length', () => {
-    const s = dockReducer(seed(['select', 'pen', 'line']), reorderDockTool({ fromId: 'pen', toId: 'select' }));
+    const s = dockReducer(seed(['select', 'pen', 'notch']), reorderDockTool({ fromId: 'pen', toId: 'select' }));
     expect(s.tools2d).toHaveLength(3);
   });
 });

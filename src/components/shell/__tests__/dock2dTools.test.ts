@@ -3,18 +3,26 @@ import { DOCK_2D_CATALOG, getDockToolById } from '../dock2dTools';
 import { DEFAULT_DOCK_2D_IDS } from '../../../store/dockSlice';
 
 describe('dock2dTools catalog', () => {
-  it('has 14 entries (3 unwired phantom tools removed #529; point y seamEdit añadidos)', () => {
-    expect(DOCK_2D_CATALOG).toHaveLength(14);
+  it('has 13 entries (3 unwired phantom tools removed #529; point y seamEdit añadidos; line retirado en internalShape)', () => {
+    expect(DOCK_2D_CATALOG).toHaveLength(13);
   });
 
-  it('drops the unwired phantom tools but keeps internalShape (María needs Forma interna)', () => {
+  it('drops the unwired phantom tools and the retired line tool', () => {
     // grading / textAnnotation / addPiece had no canvas mousedown handler → silent
     // no-op; their real behavior lives in the Grading panel, Properties panel, and
-    // pen/rectangle respectively. internalShape stays: María wants it (to be wired).
+    // pen/rectangle respectively. line died in the internal-line unification
+    // (spec 2026-08-29): internalShape inherits its dock slot as "Línea interna".
     expect(getDockToolById('grading')).toBeUndefined();
     expect(getDockToolById('textAnnotation')).toBeUndefined();
     expect(getDockToolById('addPiece')).toBeUndefined();
-    expect(getDockToolById('internalShape')?.label).toBe('Forma interna');
+    expect(getDockToolById('line')).toBeUndefined();
+    expect(getDockToolById('internalShape')?.label).toBe('Línea interna');
+  });
+
+  it('línea interna ocupa la ranura de línea, con G', () => {
+    const ids = DOCK_2D_CATALOG.map((t) => t.id);
+    expect(ids.indexOf('internalShape')).toBe(ids.indexOf('pen') + 1);
+    expect(getDockToolById('internalShape')?.shortcut).toBe('G');
   });
 
   it('surfaces the seamAllowance tool (reachability — María, hallazgo #2)', () => {
