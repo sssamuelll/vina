@@ -46,6 +46,15 @@ export const LEGACY_DEFAULT_DOCK_2D_IDS_V4 = [
   'rectangle', 'scissors', 'measure', 'seam', 'seamEdit',
 ] as const;
 
+/** Default de doce, previo a retirar `line` en la unificación de líneas
+ *  internas (spec 2026-08-29). Se conserva solo para el emparejado exacto de
+ *  la migración. */
+export const LEGACY_DEFAULT_DOCK_2D_IDS_V5 = [
+  'select', 'editPattern', 'point', 'pen', 'line',
+  'rectangle', 'scissors', 'measure', 'seam', 'seamEdit',
+  'seamAllowance', 'notch',
+] as const;
+
 /** Current default left-dock 2D tool ids, in render order. `point` entre
  *  editar y pluma: es hermano de editar, no de dibujar (maria-203).
  *  `seamEdit` justo detrás de `seam`: son las dos mitades del menú coser de
@@ -55,15 +64,19 @@ export const LEGACY_DEFAULT_DOCK_2D_IDS_V4 = [
  *  de #1027 y #1029 y hasta la auditoría del 2026-08-14 NO tenían puerta —
  *  para llegar a piquete había que abrir el personalizador del dock y
  *  agregarla a mano. Ley de puertas (§ 5.6): una función que se despacha tiene
- *  entrada visible en el shell. Lo fija dock2dTools.puertas.test.ts. */
+ *  entrada visible en el shell. Lo fija dock2dTools.puertas.test.ts.
+ *
+ *  `internalShape` en la ranura de `line`: `line` murió en la unificación de
+ *  líneas internas (spec 2026-08-29). */
 export const DEFAULT_DOCK_2D_IDS = [
-  'select', 'editPattern', 'point', 'pen', 'line',
+  'select', 'editPattern', 'point', 'pen', 'internalShape',
   'rectangle', 'scissors', 'measure', 'seam', 'seamEdit',
   'seamAllowance', 'notch',
 ] as const;
 
 /** Un set persistido que sea EXACTAMENTE un default histórico migra al default
- *  vigente; cualquier set personalizado se respeta byte a byte. */
+ *  vigente; cualquier set personalizado se respeta byte a byte, salvo que
+ *  `line` retirado se remapea a `internalShape` en cualquier posición. */
 export function migrateDefaultDockTools(ids: readonly string[]): string[] {
   const matches = (def: readonly string[]) =>
     ids.length === def.length && ids.every((id, index) => id === def[index]);
@@ -71,11 +84,19 @@ export function migrateDefaultDockTools(ids: readonly string[]): string[] {
     matches(LEGACY_DEFAULT_DOCK_2D_IDS) ||
     matches(LEGACY_DEFAULT_DOCK_2D_IDS_V2) ||
     matches(LEGACY_DEFAULT_DOCK_2D_IDS_V3) ||
-    matches(LEGACY_DEFAULT_DOCK_2D_IDS_V4)
+    matches(LEGACY_DEFAULT_DOCK_2D_IDS_V4) ||
+    matches(LEGACY_DEFAULT_DOCK_2D_IDS_V5)
   ) {
     return [...DEFAULT_DOCK_2D_IDS];
   }
-  return [...ids];
+  // 'line' murió en la unificación de líneas internas (spec 2026-08-29): su
+  // ranura la hereda internalShape, sin duplicar si ya estaba.
+  const out: string[] = [];
+  for (const id of ids) {
+    const mapped = id === 'line' ? 'internalShape' : id;
+    if (!out.includes(mapped)) out.push(mapped);
+  }
+  return out;
 }
 
 const idString = z

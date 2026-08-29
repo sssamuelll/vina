@@ -41,7 +41,7 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'tool.pen', key: 'h', label: 'Pluma', category: '2D Tools', context: '2d' },
   { id: 'tool.rectangle', key: 's', label: 'Rectángulo', category: '2D Tools', context: '2d' },
   { id: 'tool.circle', key: 'e', label: 'Elipse (círculo)', category: '2D Tools', context: '2d' },
-  { id: 'tool.internalShape', key: 'g', label: 'Forma interna', category: '2D Tools', context: '2d' },
+  { id: 'tool.internalShape', key: 'g', label: 'Línea interna', category: '2D Tools', context: '2d' },
   { id: 'tool.trace', key: 'i', label: 'Trazar', category: '2D Tools', context: '2d' },
   { id: 'tool.dart', key: 'd', label: 'Pinza', category: '2D Tools', context: '2d' },
   { id: 'tool.scissors', key: 'x', label: 'Tijeras', category: '2D Tools', context: '2d' },
@@ -57,7 +57,6 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'tool.pomMeasure', key: 'p', label: 'Medir POM', category: '2D Tools', context: '2d' },
   { id: 'tool.offsetOutline', key: 'r', label: 'Desplazar contorno', category: '2D Tools', context: '2d' },
   { id: 'tool.extendTrim', key: 'u', label: 'Extender / recortar', category: '2D Tools', context: '2d' },
-  { id: 'tool.polyPen', key: 'y', label: 'Pluma poligonal', category: '2D Tools', context: '2d' },
   // Dual-context key (precedent: 'w' = tool.pin 2d + tool3d.pin 3d): plain 'o'
   // is tool3d.meshGrab when the 3D viewport has focus.
   { id: 'tool.seamAllowance', key: 'o', label: 'Margen de costura', category: '2D Tools', context: '2d' },
@@ -69,7 +68,6 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   // ─── Shift+Key tools (displaced) ────────────────────────────────────────────
   { id: 'tool.grainline', key: 'g', shift: true, label: 'Hilo', category: '2D Tools', context: '2d' },
   { id: 'tool.notch', key: 'n', shift: true, label: 'Piquete', category: '2D Tools', context: '2d' },
-  { id: 'tool.line', key: 'l', shift: true, label: 'Línea', category: '2D Tools', context: '2d' },
 
   // ─── View ───────────────────────────────────────────────────────────────────
   { id: 'view.toggleSeamAllowance', key: 's', shift: true, label: 'Mostrar u ocultar margen de costura', category: 'View', context: 'global' },

@@ -1,5 +1,30 @@
-import type { PathCommand, PatternPiece, Point2D } from '../../types/types';
+import type { InternalLine, PathCommand, PatternPiece, Point2D } from '../../types/types';
 import { patternToPieceLocal } from '../../utils/geometry/pieceSpace';
+
+/**
+ * Los dos extremos (locales a la pieza) de una línea interna, o `null` si el
+ * path no empieza en `M` o su último comando no lleva ancla. Vivía como
+ * función privada de `useEditorInteractions`; el enganche de la herramienta
+ * de línea interna la necesita también, así que se mudó al módulo puro.
+ */
+export function getInternalLineEndpoints(line: InternalLine): [Point2D, Point2D] | null {
+  if (line.path.length < 2) return null;
+  const first = line.path[0];
+  if (first.type !== 'M' || first.values.length < 2) return null;
+  const startPt: Point2D = { x: first.values[0], y: first.values[1] };
+  const last = line.path[line.path.length - 1];
+  let endPt: Point2D;
+  if (last.type === 'L' && last.values.length >= 2) {
+    endPt = { x: last.values[0], y: last.values[1] };
+  } else if (last.type === 'C' && last.values.length >= 6) {
+    endPt = { x: last.values[4], y: last.values[5] };
+  } else if (last.type === 'Q' && last.values.length >= 4) {
+    endPt = { x: last.values[2], y: last.values[3] };
+  } else {
+    return null;
+  }
+  return [startPt, endPt];
+}
 
 /**
  * Lleva un path de espacio de PATRÓN al espacio local de una pieza, par de

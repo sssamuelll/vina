@@ -9,8 +9,10 @@ import { toolRegistry } from '../index';
  * el único consumidor de `tool.options` era el schema del copiloto. Encender
  * la barra las pone en pantalla.
  *
- * Esta instantánea congelada cubre las 20 herramientas 2D que María puede
- * activar hoy — 7 por el dock, 13 por atajo. Una etiqueta nueva en inglés
+ * Esta instantánea congelada cubre las 19 herramientas 2D que María puede
+ * activar hoy — 7 por el dock, 12 por atajo (`polyPen` murió con la
+ * unificación de líneas internas, spec 2026-08-29; `pen` sigue activable pero
+ * sin opciones, cubierta aparte). Una etiqueta nueva en inglés
  * rompe el test, y el último caso rompe también si alguien AÑADE una opción a
  * una herramienta cubierta sin traducirla. Es lo único que impide que la
  * próxima herramienta reintroduzca la deriva que esta rama arregla.
@@ -32,15 +34,13 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
   point: {
     mode: ['Tipo de punto', 'Punto', 'Curva por puntos', 'Curva bezier'],
   },
-  pen: {
-    smoothing: ['Suavizar'],
-    snapGrid: ['Ajustar a la cuadrícula'],
-    constrainAngles: ['Restringir ángulos', 'Libre', '45°', '90°'],
-  },
   rectangle: {
     width: ['Ancho'],
     height: ['Alto'],
-    cornerStyle: ['Esquinas', 'Rectas', 'Redondeadas', 'Achaflanadas'],
+  },
+  internalShape: {
+    nodeType: ['Tipo de punto', 'Recta', 'Curva por puntos'],
+    lineType: ['Tipo de línea', 'Referencia', 'Doblez', 'Pespunte'],
   },
   scissors: {
     cutType: ['Tipo de corte', 'Recto', 'Curvo'],
@@ -100,11 +100,6 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
     // oficio eso es un calco.
     ghostOpacity: ['Opacidad del calco'],
   },
-  polyPen: {
-    mode: ['Modo de dibujo', 'Pieza nueva', 'Línea interna'],
-    lineType: ['Tipo de línea', 'Doblez', 'Referencia', 'Pespunte'],
-    snapGrid: ['Ajustar a la cuadrícula'],
-  },
   pomMeasure: {
     method: ['Método', 'En línea recta', 'Siguiendo el borde'],
     defaultCategory: ['Categoría', 'Largo', 'Ancho', 'Otra'],
@@ -156,6 +151,12 @@ describe('idioma de las opciones de herramienta', () => {
       }
     });
   }
+
+  it('la pluma no declara opciones que no lee', () => {
+    // smoothing / snapGrid / constrainAngles se pintaban y usePenTool nunca las
+    // leía (§ 2 del spec 2026-08-29): se borran en vez de implementarse.
+    expect(toolRegistry.getTool('pen')!.options ?? []).toEqual([]);
+  });
 
   it('no hay opciones sin cubrir en las herramientas listadas', () => {
     // El trinquete de verdad: si alguien AÑADE una opción a una herramienta

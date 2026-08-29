@@ -182,11 +182,19 @@ export function usePenTool(
     setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
   }, []);
 
-  /** Escape = cancel, Enter = finalize open path */
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+  /**
+   * Escape = cancel, Enter = finalize open path. Devuelve si consumió la
+   * tecla: la captura CF-1 detiene la propagación solo entonces, así un
+   * Escape sin trazo sigue deseleccionando y uno con trazo no hace las dos
+   * cosas (spec 2026-08-29 § 8).
+   */
+  const handleKeyDown = useCallback((e: KeyboardEvent): boolean => {
     if (e.key === 'Escape') {
+      if (nodesRef.current.length === 0) return false;
       setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
-    } else if (e.key === 'Enter' && nodesRef.current.length > 1) {
+      return true;
+    }
+    if (e.key === 'Enter' && nodesRef.current.length > 1) {
       const commands = nodesToCommands(nodesRef.current, false);
       onComplete({
         name: `Piece ${Date.now().toString(36)}`,
@@ -194,7 +202,9 @@ export function usePenTool(
         ...draftedPieceDefaults(),
       });
       setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
+      return true;
     }
+    return false;
   }, [nodesToCommands, onComplete]);
 
   // ¿El próximo clic cierra el contorno? Mismo umbral que el snap real de

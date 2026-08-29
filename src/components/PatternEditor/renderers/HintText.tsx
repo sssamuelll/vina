@@ -13,6 +13,8 @@ interface HintTextProps {
   walkSeamPhase?: string;
   /** Width the seamAllowance tool will apply on click (editor.defaultSeamAllowanceWidth) */
   saDefaultWidthMm?: number;
+  /** Nodos del trazo de línea interna en curso: 0 = sin trazo. */
+  internalShapeNodesLength?: number;
 }
 
 /**
@@ -41,7 +43,7 @@ function Pie({ children }: { children: React.ReactNode }) {
 export default function HintText({
   activeTool, pieces, penNodesLength,
   nodeEditorIsEditing, seamPhase, topstitchMode, walkSeamPhase,
-  saDefaultWidthMm,
+  saDefaultWidthMm, internalShapeNodesLength = 0,
 }: HintTextProps) {
   const hasPieces = pieces.length > 0;
 
@@ -49,6 +51,14 @@ export default function HintText({
     <>
       {nodeEditorIsEditing && (
         <Pie>Editando nodos · arrastra para mover · Esc para salir</Pie>
+      )}
+
+      {activeTool === 'internalShape' && (
+        <Pie>
+          {internalShapeNodesLength === 0
+            ? 'Clic dentro de una pieza para empezar · las esquinas y los bordes enganchan'
+            : 'Clic añade · arrastra para curvar · doble clic o Enter termina · clic en el primer punto cierra · Retroceso quita el último · Esc descarta'}
+        </Pie>
       )}
 
       {!hasPieces && activeTool === 'pen' && penNodesLength === 0 && (

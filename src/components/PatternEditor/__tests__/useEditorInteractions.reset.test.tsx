@@ -66,10 +66,10 @@ describe('reset-on-tool-switch wiring', () => {
     expect(tools.pen.reset).not.toHaveBeenCalled();
   });
 
-  it('resets polyPen when switching away from it', () => {
-    const { hook, tools } = setup('polyPen');
-    (tools.polyPenTool.reset as ReturnType<typeof vi.fn>).mockClear();
+  it('resets internalShape when switching away from it', () => {
+    const { hook, tools } = setup('internalShape');
+    (tools.internalShapeTool.reset as ReturnType<typeof vi.fn>).mockClear();
     hook.rerender({ tool: 'select' });
-    expect(tools.polyPenTool.reset).toHaveBeenCalled();
+    expect(tools.internalShapeTool.reset).toHaveBeenCalled();
   });
 });

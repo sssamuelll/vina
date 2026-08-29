@@ -9,11 +9,12 @@
  * - Text height = 2.5 (AAMA standard)
  * - Supports R12 (POLYLINE) and R2000+ (LWPOLYLINE)
  */
-import { PatternPiece, PathCommand, Seam } from '../../types/types';
+import { PatternPiece, PathCommand, Point2D, Seam } from '../../types/types';
 import { AAMA_LAYERS, DXFExportOptions } from './types';
 import { preparePieces, computeBBox } from '../export/pipeline';
 import { escapeDxfString } from '../sanitizeName';
 import { grainlineArrowheads, grainlineEndpoints } from '../grainLine';
+import { flattenPath } from '../seam';
 
 const DEFAULT_OPTIONS: DXFExportOptions = { version: 'R2000', aamaLayers: true };
 
@@ -280,6 +281,40 @@ ENDSEC
 
 // ─── Piece Entities (inside block) ───
 
+/**
+ * Punto en el medio del ARCO de un path (posiblemente curvo, posiblemente de
+ * más de dos anclas) — para colocar la anotación de doblez en el medio real
+ * de la polilínea completa, no en el medio de su primer tramo (spec § 9,
+ * 2026-08-29). Si el arco total es 0 (un solo punto, o todos coincidentes)
+ * devuelve el primer punto.
+ */
+function midpointAlongPath(path: PathCommand[]): Point2D {
+  const pts = flattenPath(path);
+  if (pts.length === 0) return { x: 0, y: 0 };
+
+  const segLens: number[] = [];
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const d = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    segLens.push(d);
+    total += d;
+  }
+  if (total === 0) return pts[0];
+
+  const target = total / 2;
+  let acc = 0;
+  for (let i = 0; i < segLens.length; i++) {
+    const d = segLens[i];
+    if (acc + d >= target) {
+      const t = d === 0 ? 0 : (target - acc) / d;
+      const a = pts[i], b = pts[i + 1];
+      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    }
+    acc += d;
+  }
+  return pts[pts.length - 1];
+}
+
 // El giro de la pieza NO se aplica acá: lo hace `preparePiece`
 // (`utils/export/pipeline.ts`) antes de medir la caja, porque si se girara a
 // esta altura `preparePieces` ya habría emplazado las piezas con el ancho sin
@@ -309,6 +344,23 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
     let layer: string = AAMA_LAYERS.DRAW;
     if (line.type === 'notch') layer = AAMA_LAYERS.NOTCH;
     else if (line.type === 'grainline') layer = AAMA_LAYERS.GRAINLINE;
+
+    // Línea interna unificada (2026-08-29): la herramienta nueva puede dejar
+    // N nodos y curvas en un fold/topstitch/etc., no solo dos. grainline y
+    // notch conservan su ruta de siempre (endpoint / primer tramo); todo lo
+    // demás con más de dos anclas o un C/Q sale por pathToEntities entero,
+    // en su capa — y el doblez anota en el medio del ARCO, no del 1.er tramo.
+    const anchors = line.path.filter((c) => c.type !== 'Z').length;
+    const curved = line.path.some((c) => c.type === 'C' || c.type === 'Q');
+    if ((anchors > 2 || curved) && line.type !== 'grainline' && line.type !== 'notch') {
+      s += pathToEntities(line.path, layer, opts);
+      if (line.type === 'fold') {
+        const mid = midpointAlongPath(line.path);
+        const dir = line.foldOptions?.direction === 'valley' ? 'VAL' : 'MTN';
+        s += textToDXF(dir, mid.x, -(mid.y), 1.5, AAMA_LAYERS.FOLD_DIR);
+      }
+      continue;
+    }
 
     if (line.path.length >= 2 && line.path[0].type === 'M' && line.path[1].type === 'L') {
       // A grainline is straight by definition, so its shaft runs end-to-end —

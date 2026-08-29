@@ -39,31 +39,3 @@ export function hitTestPieceBBox(pt: Point2D, pieces: PatternPiece[]): PatternPi
   }
   return null;
 }
-
-/**
- * Find the nearest piece to a point by bounding-box containment with margin,
- * then ranking by distance to bbox center.
- */
-export function findNearestPiece(pt: Point2D, pieces: PatternPiece[], margin = 50): string | null {
-  let bestId: string | null = null;
-  let bestDist = Infinity;
-
-  for (const piece of pieces) {
-    const { minX, minY, maxX, maxY } = localBBox(piece);
-    const local = patternToPieceLocal(pt, piece);
-    if (local.x >= minX - margin && local.x <= maxX + margin &&
-        local.y >= minY - margin && local.y <= maxY + margin) {
-      // El centro también en local: comparar una distancia medida en local
-      // contra otra medida en patrón mezclaría dos marcos, y el giro es una
-      // isometría — la distancia sale igual en los dos.
-      const cx = (minX + maxX) / 2;
-      const cy = (minY + maxY) / 2;
-      const d = Math.hypot(local.x - cx, local.y - cy);
-      if (d < bestDist) {
-        bestDist = d;
-        bestId = piece.id;
-      }
-    }
-  }
-  return bestId;
-}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateDXFAAMA } from '../exportAAMA';
-import type { PatternPiece } from '../../../types/types';
+import type { PatternPiece, PathCommand } from '../../../types/types';
 
 function makePiece(overrides?: Partial<PatternPiece>): PatternPiece {
   return {
@@ -121,6 +121,41 @@ describe('AAMA DXF metadata layers', () => {
         }),
       ]);
       expect(dxf).toContain('MTN');
+    });
+  });
+
+  describe('multi-anchor internal line polylines (línea interna unificada, 2026-08-29)', () => {
+    // Zigzag with 4 anchors and no curve — arc length 50 + 30 + 50 = 130.
+    const ZIGZAG_PATH: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [50, 0] },
+      { type: 'L', values: [50, 30] },
+      { type: 'L', values: [0, 30] },
+    ];
+
+    it('exports a fold with more than two anchors as one full LWPOLYLINE on DRAW, not just the first tramo', () => {
+      const dxf = generateDXFAAMA([
+        makePiece({ internals: [{ id: 'f4', type: 'fold', path: ZIGZAG_PATH }] }),
+      ]);
+      // Layer 8 (DRAW), open (70=0), 4 vertices — distinct from the piece's
+      // own closed 4-vertex outline (70=1), also on layer 8.
+      expect(dxf).toMatch(/0\nLWPOLYLINE\n5\n[0-9A-F]+\n8\n8\n90\n4\n70\n0\n/);
+      // Vertices 3 and 4 (y negated in DXF) only land in the file if the
+      // whole path is walked — the old code stopped at vertex 2 with a lone LINE.
+      expect(dxf).toContain('50.0000\n20\n-30.0000');
+      expect(dxf).toContain('0.0000\n20\n-30.0000');
+    });
+
+    it('places the MTN annotation at the midpoint of the arc of the whole polyline, not the first segment', () => {
+      const dxf = generateDXFAAMA([
+        makePiece({ internals: [{ id: 'f5', type: 'fold', path: ZIGZAG_PATH }] }),
+      ]);
+      // Arc = 130 → half = 65 → walking from (0,0) lands at (50,15); DXF
+      // negates y. First-tramo placement would give (25,0) instead.
+      const m = dxf.match(/10\n(-?[\d.]+)\n20\n(-?[\d.]+)\n40\n[\d.]+\n1\nMTN\n/);
+      expect(m).not.toBeNull();
+      expect(m![1]).toBe('50.0000');
+      expect(m![2]).toBe('-15.0000');
     });
   });
 

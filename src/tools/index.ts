@@ -10,7 +10,6 @@ import { movePatternTool } from './definitions/movePattern';
 import { copyPatternTool } from './definitions/copyPattern';
 import { transformTool } from './definitions/transform';
 import { penTool } from './definitions/pen';
-import { lineTool } from './definitions/line';
 import { internalShapeTool } from './definitions/internalShape';
 import { rectangleTool } from './definitions/rectangle';
 import { seamTool } from './definitions/seam';
@@ -47,7 +46,6 @@ import { slashAndSpreadTool } from './definitions/slashAndSpread';
 import { mergeTool } from './definitions/merge';
 import { dartTool } from './definitions/dart';
 import { circleTool } from './definitions/circle';
-import { polyPenTool } from './definitions/polyPen';
 import { mirrorTool } from './definitions/mirror';
 import { traceTool } from './definitions/trace';
 import { autoTraceTool } from './definitions/autoTrace';
@@ -77,14 +75,12 @@ const allTools = [
   
   // 2D Tools — Drawing
   penTool,
-  lineTool,
   internalShapeTool,
   rectangleTool,
   dartTool,
   traceTool,
   autoTraceTool,
   circleTool,
-  polyPenTool,
 
   // 2D Tools — Pattern Editing
   scissorsTool,

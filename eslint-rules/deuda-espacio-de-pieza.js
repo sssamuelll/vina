@@ -45,7 +45,6 @@ export const TECHOS = {
   'src/components/PatternEditor/renderers/overlays/TopstitchOverlay.tsx': 2,
   'src/components/PatternEditor/useEditorInteractions.ts': 6,
   'src/components/PatternEditor/useExtendTrimTool.ts': 6,
-  'src/components/PatternEditor/useLineTool.ts': 2,
   'src/components/PatternEditor/useMergeTool.ts': 2,
   'src/components/PatternEditor/usePOMMeasureTool.ts': 2,
   'src/components/PatternEditor/useScissorsTool.ts': 2,

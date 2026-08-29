@@ -739,8 +739,7 @@ export type Tool2D =
   | 'movePattern'  // move pattern pieces
   | 'copyPattern'  // copy/paste pattern pieces
   | 'pen'          // draw piece outlines (bezier)
-  | 'line'         // straight lines / darts
-  | 'internalShape' // internal shape (dashed rectangle)
+  | 'internalShape' // "Línea interna": recta / curva por puntos / bezier con enganche (spec 2026-08-29)
   | 'rectangle'    // quick rectangular pieces
   | 'seam'         // connect edges between pieces
   | 'seamEdit'     // inspect existing seams — the CLO3D "Edit Sewing" half (#219)
@@ -768,7 +767,6 @@ export type Tool2D =
   | 'merge'        // merge adjacent pattern pieces
   | 'offsetOutline' // offset piece outline inward/outward
   | 'extendTrim'   // extend or trim edges
-  | 'polyPen'      // combined straight + bezier pen
   | 'pleat'        // add/edit pleats along piece edges
   | 'trimPlace'    // place trims on piece edges
   | 'hand'         // pan
