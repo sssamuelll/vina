@@ -428,6 +428,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       rectTool.cancel();
       return;
     }
+    // Pluma con trazo vivo: el botón derecho no hace nada y el menú no se
+    // abre (spec § 5), igual que en la línea interna.
+    if (activeTool === 'pen' && pen.nodes.length > 0) {
+      return;
+    }
 
     // Determine which piece (if any) is under the cursor
     const svg = e.currentTarget as SVGSVGElement;
@@ -580,7 +585,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       internalLineType: hitInternalLineType,
       isEditingNodes: editPatternTool.isEditing,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, pen.nodes.length]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {

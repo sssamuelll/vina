@@ -105,6 +105,11 @@ export function useRectangleTool(
   const handleMouseUp = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
     const p = pressRef.current;
     if (!p) return;
+    // Solo el botón izquierdo confirma. Con el izquierdo apretado, el release
+    // del botón derecho llegaba aquí como un release normal y creaba el
+    // rectángulo justo antes de que el menú se abriera (e2e, 2026-08-29). El
+    // `contextmenu` que sigue es quien cancela el press.
+    if (e && e.button !== 0) return;
     pressRef.current = null;
     if (!p.moved) {
       const { w, h } = barRef.current;

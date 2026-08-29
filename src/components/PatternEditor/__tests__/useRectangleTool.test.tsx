@@ -80,6 +80,14 @@ describe('useRectangleTool — el arrastre dibuja y escribe en la barra', () => 
     expect(onComplete).not.toHaveBeenCalled();
   });
 
+  it('el release del botón derecho a mitad de arrastre no crea nada y el press sigue vivo', () => {
+    const { tool, press, move, onComplete } = setup();
+    press(100, 100); move(180, 160);
+    act(() => tool().handleMouseUp(ev(180, 160, 2)));
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(tool().isArmed()).toBe(true);
+  });
+
   it('Escape con press vivo cancela y se consume; el release ya no crea', () => {
     const { tool, press, release, onComplete } = setup();
     press(100, 100);
