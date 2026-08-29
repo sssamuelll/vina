@@ -109,7 +109,7 @@ Una sonda por puerta, antes de enrutar a la herramienta:
 | `handleMouseUp` (:874) | `gesture/up` | `tool, button, x, y, drag` (`isDrag` contra el press guardado), `synthetic: true` si llegó sin evento (mouseleave) |
 | `handleDoubleClick` (:524) | `gesture/dblclick` | `tool` |
 | `handlePointerCancel` (:981) | `gesture/cancel` | `tool` |
-| CF-1 `onKeyCapture` (:392-446) | `gesture/key` | `tool, key, ctrl, shift, alt, consumedBy: 'internalShape' \| 'pen' \| 'rectangle' \| null` (los únicos ganchos cuyo `handleKeyDown` devuelve `boolean`; los demás se ven por lo que despachan). No registra targets editables ni `e.repeat` |
+| CF-1 `onKeyCapture` (:392-446) | `gesture/key` | `tool, key, ctrl, shift, alt, consumedBy: 'internalShape' \| 'pen' \| 'rectangle' \| null` (los únicos ganchos cuyo `handleKeyDown` devuelve `boolean`; los demás se ven por lo que despachan). No registra targets editables ni `e.repeat`. **La tecla entra ANTES de sus consecuencias** (la acción que despache el gancho) y `consumedBy` se completa al volver: por eso `pushJournal` devuelve el evento |
 
 Y en **`Viewport3D.tsx`**, dentro de los `onPointerDown` / `onPointerUp` que **ya existen** en el contenedor (:751, :770): `gesture/down` y `gesture/up` con `surface: '3d'`, `button`. Sin `addEventListener`, sin efecto, sin doble montaje (Halberg 9).
 
@@ -254,3 +254,8 @@ E2E (`tests/e2e/caja-negra-bitacora.spec.ts`): tecla `g` → clic en un vértice
 | `DiagnosticState` es `Pick`, no `RootState` | Halberg 5 | baja | Ensanchado (§ 4) |
 | `suppressedBy` para `rectangle`/`pen` sin rama | Serrano 6 | — | Artefacto: leyó la rama A; las ramas existen en B. El campo se cortó igual |
 | Cita de `solverRuntimeTracker` como "mismo algoritmo" | Serrano 13 | baja | Reformulada (§ 2) |
+
+## 11. Lo que el e2e de la puerta encontró al implementar (29-08)
+
+- **Escape no cerraba el menú contextual 2D en navegador real.** Un `Escape` de teclado (`isTrusted`) golpea primero el atajo global `selection.deselect` en `document`; su dispatch re-renderiza `PatternEditor` de forma síncrona, y como `onClose` era una flecha inline, el efecto de `ContextMenu` quitaba y volvía a registrar su listener de `keydown` **en medio del mismo dispatch** — el DOM no invoca listeners quitados ni añadidos durante el dispatch. Un `keydown` sintético (jsdom, `dispatchEvent`) no pasa por ese camino: por eso todos los tests unitarios lo daban por bueno. Arreglado con `onClose` por ref en `ContextMenu`, `ContextMenu3D` y `ContextPanel` (mismo mecanismo); el camino de la tecla real queda fijado por `tests/e2e/caja-negra-bitacora.spec.ts`. En la bitácora ese bug se lee como `ui/contextmenu {opened:true}` → `shortcut/selection.deselect {handled:true}` → y el menú sigue: exactamente la clase de bug de orden de eventos que motivó este trabajo.
+- **En vista dividida el panel 2D mide ≈ 638 px** (1280×720): un clic derecho a x=600 del patrón cae en el visor 3D, cuyo menú también usa `.context-menu`. Los e2e que abren el menú 2D deben apuntar dentro del `svg` (el helper `toScreen` no lo garantiza).
