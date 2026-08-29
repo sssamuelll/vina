@@ -9,9 +9,18 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import type React from 'react';
+import React from 'react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import toolReducer from '../../../store/toolSlice';
 import { useRectangleTool } from '../useRectangleTool';
 import { draftedPieceDefaults } from '../../../utils/defaults';
+
+// El rectángulo lee Ancho/Alto de `toolOptions` (spec 2026-08-29 § 6): el
+// hook vive dentro de un Provider.
+const store = configureStore({ reducer: { tools: toolReducer } });
+const wrapper = ({ children }: { children: React.ReactNode }) =>
+  React.createElement(Provider, { store, children });
 
 const fakeEvent = (x: number, y: number) =>
   ({
@@ -34,8 +43,9 @@ describe('drafted pieces are born NET (hallazgo #2)', () => {
 
   it('rectangle tool completes a piece with zero seam allowance', () => {
     const onComplete = vi.fn();
-    const { result } = renderHook(() =>
-      useRectangleTool(1, { x: 0, y: 0 }, onComplete),
+    const { result } = renderHook(
+      () => useRectangleTool(1, { x: 0, y: 0 }, onComplete),
+      { wrapper },
     );
 
     act(() => { result.current.handleMouseDown(fakeEvent(10, 10)); });

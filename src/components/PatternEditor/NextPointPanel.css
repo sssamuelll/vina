@@ -1,0 +1,91 @@
+/* Panel "Siguiente punto" — hermano de NotchPrecisionModal.css: flotante al
+   borde derecho, sin velo, el lienzo sigue vivo. Todo sale de tokens (R3) y
+   los controles llevan :focus-visible (R5). */
+.next-point-panel {
+  position: fixed;
+  top: calc(var(--top-bar-h) + 24px);
+  right: 24px;
+  z-index: var(--z-menu);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--surface-overlay-shadow);
+  padding: 20px;
+  width: 300px;
+  color: var(--text-primary);
+  font-size: var(--text-ui);
+}
+
+.next-point-panel h3 {
+  margin: 0 0 12px 0;
+  font-size: var(--text-heading);
+  color: var(--text-primary);
+}
+
+.next-point-panel p {
+  margin: 0 0 14px 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.next-point-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  gap: 12px;
+}
+
+.next-point-row label {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.next-point-row input[type='number'] {
+  flex: 1;
+  padding: 4px 8px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--text-input);
+  min-width: 0;
+  max-width: 90px;
+}
+
+.next-point-row input[type='number'].invalid {
+  border-color: var(--destructive);
+}
+
+.next-point-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.next-point-actions button {
+  padding: 6px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: var(--text-ui);
+}
+
+.next-point-actions button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.next-point-actions button.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.next-point-row input[type='number']:focus-visible, .next-point-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

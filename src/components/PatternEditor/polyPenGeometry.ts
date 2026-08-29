@@ -102,3 +102,22 @@ export function nodesToCommands(nodes: PolyPenNode[], closed: boolean): PathComm
 export function commandsToPathD(cmds: PathCommand[]): string {
   return cmds.map(c => `${c.type}${c.values.join(',')}`).join(' ');
 }
+
+/**
+ * Convención del panel "Siguiente punto" (spec 2026-08-29 § 7.2): 0° a la
+ * derecha, 90° hacia ARRIBA tal como se ve en pantalla. En coordenadas de
+ * patrón y crece hacia abajo, así que `dy = −L·sin θ`.
+ */
+export function polarPoint(from: Point2D, lengthMm: number, angleDeg: number): Point2D {
+  const rad = (angleDeg * Math.PI) / 180;
+  return { x: from.x + lengthMm * Math.cos(rad), y: from.y - lengthMm * Math.sin(rad) };
+}
+
+/** Largo y ángulo (misma convención) del tramo `from → to`. */
+export function polarOf(from: Point2D, to: Point2D): { lengthMm: number; angleDeg: number } {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const angleDeg = (Math.atan2(-dy, dx) * 180) / Math.PI;
+  // `atan2(-0, x)` devuelve −0, que un campo de texto pintaría como "-0.0".
+  return { lengthMm: Math.hypot(dx, dy), angleDeg: angleDeg === 0 ? 0 : angleDeg };
+}

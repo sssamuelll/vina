@@ -2,11 +2,12 @@ import { useState, useCallback, useRef } from 'react';
 import { Point2D, PathCommand, PatternPiece } from '../../types/types';
 import { screenToPattern } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
+import { polarOf, polarPoint } from './polyPenGeometry';
 
-/** 
+/**
  * A node in the pen path. Each node has an anchor point and optional
  * control handles for cubic bezier curves.
- * 
+ *
  * Click = sharp corner (no handles)
  * Click+drag = smooth curve (symmetric handles)
  * Alt+drag handle = break tangent (asymmetric)
@@ -19,6 +20,13 @@ export interface PenNode {
   handleOut: Point2D | null;
 }
 
+/** El panel "Siguiente punto" abierto: desde dónde y con qué prefijado. */
+export interface NextPointState {
+  from: Point2D;
+  lengthMm: number;
+  angleDeg: number;
+}
+
 interface PenState {
   nodes: PenNode[];
   /** Currently being dragged to create handles */
@@ -27,23 +35,23 @@ interface PenState {
   cursorPos: Point2D | null;
   /** Is the path closed? */
   isClosed: boolean;
+  nextPoint: NextPointState | null;
 }
 
 const CLOSE_THRESHOLD = 12; // px — snap to first node to close
+
+const EMPTY: PenState = { nodes: [], isDragging: false, cursorPos: null, isClosed: false, nextPoint: null };
 
 export function usePenTool(
   zoom: number,
   pan: Point2D,
   onComplete: (piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => void,
 ) {
-  const [state, setState] = useState<PenState>({
-    nodes: [],
-    isDragging: false,
-    cursorPos: null,
-    isClosed: false,
-  });
+  const [state, setState] = useState<PenState>(EMPTY);
   const nodesRef = useRef<PenNode[]>([]);
   nodesRef.current = state.nodes;
+  const cursorRef = useRef<Point2D | null>(null);
+  cursorRef.current = state.cursorPos;
 
   /** Convert screen coords to pattern space */
   const toPattern = useCallback(
@@ -115,6 +123,16 @@ export function usePenTool(
     return `M${last.anchor.x},${last.anchor.y} C${cp1.x},${cp1.y} ${state.cursorPos.x},${state.cursorPos.y} ${state.cursorPos.x},${state.cursorPos.y}`;
   }, [state.nodes, state.cursorPos, state.isClosed]);
 
+  const complete = useCallback((nodes: PenNode[], closed: boolean) => {
+    const commands = nodesToCommands(nodes, closed);
+    onComplete({
+      name: `Piece ${Date.now().toString(36)}`,
+      outline: commands,
+      ...draftedPieceDefaults(),
+    });
+    setState(EMPTY);
+  }, [nodesToCommands, onComplete]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return; // left click only
     const svg = e.currentTarget;
@@ -126,14 +144,7 @@ export function usePenTool(
     if (nodes.length > 2) {
       const first = nodes[0].anchor;
       if (dist(pt, first) * zoom < CLOSE_THRESHOLD) {
-        // Close path
-        const commands = nodesToCommands(nodes, true);
-        onComplete({
-          name: `Piece ${Date.now().toString(36)}`,
-          outline: commands,
-          ...draftedPieceDefaults(),
-        });
-        setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
+        complete(nodes, true);
         return;
       }
     }
@@ -145,7 +156,7 @@ export function usePenTool(
       nodes: [...prev.nodes, newNode],
       isDragging: true,
     }));
-  }, [toPattern, zoom, nodesToCommands, onComplete]);
+  }, [toPattern, zoom, complete]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;
@@ -179,33 +190,82 @@ export function usePenTool(
 
   /** Clear any in-progress stroke (used when switching away from the tool). */
   const reset = useCallback(() => {
-    setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
+    setState(EMPTY);
+  }, []);
+
+  /** Doble clic = terminar abierta (= Enter). El nodo duplicado que deja el
+   *  segundo par down/up cae encima del último: se descarta. */
+  const handleDoubleClick = useCallback(() => {
+    let nodes = nodesRef.current;
+    if (nodes.length >= 2) {
+      const a = nodes[nodes.length - 1].anchor;
+      const b = nodes[nodes.length - 2].anchor;
+      if (dist(a, b) * zoom < CLOSE_THRESHOLD) nodes = nodes.slice(0, -1);
+    }
+    if (nodes.length < 2) return;
+    complete(nodes, false);
+  }, [zoom, complete]);
+
+  // ─── Siguiente punto (spec 2026-08-29 § 7.2) ─────────────────────────────
+
+  /** Tab: abre el panel prefijado con la goma (último nodo → cursor). */
+  const openNextPoint = useCallback(() => {
+    const nodes = nodesRef.current;
+    if (nodes.length === 0) return;
+    const from = nodes[nodes.length - 1].anchor;
+    const cursor = cursorRef.current ?? from;
+    const { lengthMm, angleDeg } = polarOf(from, cursor);
+    setState(prev => ({ ...prev, nextPoint: { from, lengthMm, angleDeg } }));
+  }, []);
+
+  const closeNextPoint = useCallback(() => {
+    setState(prev => (prev.nextPoint ? { ...prev, nextPoint: null } : prev));
+  }, []);
+
+  /** Coloca un nodo esquina a largo y ángulo del último; el panel sigue abierto desde el nuevo. */
+  const placePolar = useCallback((lengthMm: number, angleDeg: number) => {
+    setState(prev => {
+      if (prev.nodes.length === 0) return prev;
+      const from = prev.nodes[prev.nodes.length - 1].anchor;
+      const anchor = polarPoint(from, lengthMm, angleDeg);
+      const node: PenNode = { anchor, handleIn: null, handleOut: null };
+      return {
+        ...prev,
+        nodes: [...prev.nodes, node],
+        nextPoint: prev.nextPoint ? { ...prev.nextPoint, from: anchor } : prev.nextPoint,
+      };
+    });
   }, []);
 
   /**
-   * Escape = cancel, Enter = finalize open path. Devuelve si consumió la
-   * tecla: la captura CF-1 detiene la propagación solo entonces, así un
-   * Escape sin trazo sigue deseleccionando y uno con trazo no hace las dos
-   * cosas (spec 2026-08-29 § 8).
+   * Escape = cancel, Enter = finalize open path, Tab = siguiente punto,
+   * Retroceso/Supr = quitar el último. Devuelve si consumió la tecla: la
+   * captura CF-1 detiene la propagación solo entonces (spec 2026-08-29 § 8).
    */
   const handleKeyDown = useCallback((e: KeyboardEvent): boolean => {
-    if (e.key === 'Escape') {
-      if (nodesRef.current.length === 0) return false;
-      setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
-      return true;
+    const nodes = nodesRef.current;
+    switch (e.key) {
+      case 'Escape':
+        if (nodes.length === 0) return false;
+        setState(EMPTY);
+        return true;
+      case 'Enter':
+        if (nodes.length < 2) return false;
+        complete(nodes, false);
+        return true;
+      case 'Tab':
+        if (nodes.length === 0) return false;
+        openNextPoint();
+        return true;
+      case 'Backspace':
+      case 'Delete':
+        if (nodes.length === 0) return false;
+        setState(prev => (prev.nodes.length <= 1 ? EMPTY : { ...prev, nodes: prev.nodes.slice(0, -1) }));
+        return true;
+      default:
+        return false;
     }
-    if (e.key === 'Enter' && nodesRef.current.length > 1) {
-      const commands = nodesToCommands(nodesRef.current, false);
-      onComplete({
-        name: `Piece ${Date.now().toString(36)}`,
-        outline: commands,
-        ...draftedPieceDefaults(),
-      });
-      setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
-      return true;
-    }
-    return false;
-  }, [nodesToCommands, onComplete]);
+  }, [complete, openNextPoint]);
 
   // ¿El próximo clic cierra el contorno? Mismo umbral que el snap real de
   // handleMouseDown — el aviso y el comportamiento no pueden discrepar
@@ -234,10 +294,15 @@ export function usePenTool(
     previewPath: buildPreviewPath(),
     guidePath: buildGuidePath(),
     lastPointDistance,
+    nextPoint: state.nextPoint,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
+    handleDoubleClick,
     handleKeyDown,
+    openNextPoint,
+    closeNextPoint,
+    placePolar,
     reset,
   };
 }
