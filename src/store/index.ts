@@ -25,6 +25,7 @@ import gradingReducer from './gradingSlice';
 import inputSchemeReducer, { hydrateInputScheme, rehydrateInputScheme, persistInputScheme } from './inputSchemeSlice';
 import { initProjectPersistence } from './projectAutosave';
 import { confirmationMiddleware } from './confirmationMiddleware';
+import { journalMiddleware } from './journalMiddleware';
 import { undoMiddleware } from './undoMiddleware';
 import { linkedEditingMiddleware } from './linkedEditingMiddleware';
 import { reactiveSolverMiddleware } from './reactiveSolverMiddleware';
@@ -78,7 +79,7 @@ export const store = configureStore({
         ignoredPaths: ['project.pieces', 'project.avatar', 'collisionBody.bodies', 'copilotUI.pendingConfirmation'],
         ignoredActions: ['project/loadProject', 'project/restoreState', 'copilotUI/showConfirmation'],
       },
-    }).concat(confirmationMiddleware, linkedEditingMiddleware, undoMiddleware, reactiveSolverMiddleware, gradingStalenessMiddleware, resewBridgeMiddleware),
+    }).concat(journalMiddleware, confirmationMiddleware, linkedEditingMiddleware, undoMiddleware, reactiveSolverMiddleware, gradingStalenessMiddleware, resewBridgeMiddleware),
 });
 
 void initHistoryTimelinePersistence();
