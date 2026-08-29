@@ -30,10 +30,10 @@
 - La barra, para `type: 'number'` con `control: 'input'`, pinta `<input type="number" className="tool-options-bar__input" id={opcion-<id>} min max step value>` y despacha `setToolOption` con `Number(e.target.value)`; con el campo vacío o no numérico **no despacha** (un campo vaciado no es 0).
 - `rectangle.tsx`: `width` y `height` con `control: 'input'`, `min: 1`, `max: 3000`, `step: 1`, valores por omisión 100 / 100. Las etiquetas "Ancho" / "Alto" no cambian (la instantánea de `idiomaDeOpciones.test.ts` sigue igual).
 
-- [ ] **Step 1 (rojo):** en `ToolOptionsBar2D.test.tsx`, añadir a `CON_OPCIONES.options` `{ id: 'medida', label: 'Una medida', type: 'number', value: 100, min: 1, max: 3000, step: 1, control: 'input' }` y dos `it`: (a) `screen.getByLabelText('Una medida').getAttribute('type')` es `'number'` y sigue habiendo un `range` para "Un número"; (b) `fireEvent.change(medida, { target: { value: '300' } })` deja `toolOptions.__prueba_con_opciones.medida === 300`, y `fireEvent.change(medida, { target: { value: '' } })` **no** la cambia. Correr → rojo.
-- [ ] **Step 2:** implementar el tipo, la rama `case 'number'` con `opcion.control === 'input'` (mismo `label htmlFor`), la clase CSS `.tool-options-bar__input` (alto 24 px, `width: 64px`, `background: var(--bg-base)`, `border: var(--surface-chrome-border)`, `border-radius: var(--radius-sm)`, `color: var(--text-primary)`, `font-size: 12px`; añadir el selector a la regla de `:focus-visible` existente **en la misma línea** que los demás — el trinquete R5 lee línea a línea) y las opciones del rectángulo.
-- [ ] **Step 3:** `npx vitest run src/components/shell src/tools` verde; `npx eslint <tocados> --max-warnings=0`; `node scripts/ui-contract-lint.mjs` sin subir.
-- [ ] **Step 4:** NO commitear (lo commitea el orquestador).
+- [x] **Step 1 (rojo):** en `ToolOptionsBar2D.test.tsx`, añadir a `CON_OPCIONES.options` `{ id: 'medida', label: 'Una medida', type: 'number', value: 100, min: 1, max: 3000, step: 1, control: 'input' }` y dos `it`: (a) `screen.getByLabelText('Una medida').getAttribute('type')` es `'number'` y sigue habiendo un `range` para "Un número"; (b) `fireEvent.change(medida, { target: { value: '300' } })` deja `toolOptions.__prueba_con_opciones.medida === 300`, y `fireEvent.change(medida, { target: { value: '' } })` **no** la cambia. Correr → rojo.
+- [x] **Step 2:** implementar el tipo, la rama `case 'number'` con `opcion.control === 'input'` (mismo `label htmlFor`), la clase CSS `.tool-options-bar__input` (alto 24 px, `width: 64px`, `background: var(--bg-base)`, `border: var(--surface-chrome-border)`, `border-radius: var(--radius-sm)`, `color: var(--text-primary)`, `font-size: 12px`; añadir el selector a la regla de `:focus-visible` existente **en la misma línea** que los demás — el trinquete R5 lee línea a línea) y las opciones del rectángulo.
+- [x] **Step 3:** `npx vitest run src/components/shell src/tools` verde; `npx eslint <tocados> --max-warnings=0`; `node scripts/ui-contract-lint.mjs` sin subir.
+- [x] **Step 4:** NO commitear (lo commitea el orquestador).
 
 ---
 
@@ -47,10 +47,10 @@
 - `useRectangleTool(zoom, pan, onComplete)` lee `toolOptions.rectangle.{width,height}` del store (`useSelector`) y despacha `setToolOption` al terminar un arrastre. Devuelve además `handleKeyDown(e): boolean` (Escape con press vivo → cancela, `true`), `cancel()`, `isArmed()`.
 - Gramática (spec § 6): press solo con botón 0; release sin cruzar `isDrag` → pieza `width × height` de la barra con la esquina superior izquierda en el press; release con arrastre → pieza de lo dibujado (si ancho o alto es 0 no crea) y `setToolOption` de `width`/`height` redondeados a un decimal; Escape / botón derecho / `pointercancel` / blur cancelan el press.
 
-- [ ] **Step 1 (rojo):** `useRectangleTool.test.tsx` con un store real (`tools` slice) y `renderHook` dentro de `<Provider>`: (1) clic sin arrastre crea 100×100 con `outline[0] = M(press)`; (2) con `toolOptions.rectangle = {width: 300, height: 150}` el clic crea 300×150; (3) arrastre de (100,100) a (180,160) crea 80×60 y deja `toolOptions.rectangle` en `{width: 80, height: 60}`; (4) `button: 2` no arma; (5) press + Escape → `handleKeyDown` devuelve `true` y el release no crea; (6) un arrastre de 3 px cae a clic (crea con la barra, no 3×3).
-- [ ] **Step 2:** implementar. Borrar `MIN_SIZE`. `previewRect`/`rectDimensions` solo con arrastre real (≥ 4 px).
-- [ ] **Step 3:** `useEditorInteractions.ts`: en CF-1, antes de `if (e.key !== 'Escape') return;`: `if (activeTool === 'rectangle' && rectTool.isArmed()) { if (rectTool.handleKeyDown(e)) { e.preventDefault(); e.stopPropagation(); } return; }`; `handlePointerCancel`: `if (activeTool === 'rectangle') rectTool.cancel();`; `handleMouseUp`: `if (activeTool === 'rectangle') { if (e) rectTool.handleMouseUp(e); else rectTool.cancel(); }` (la firma pasa a recibir el evento). `ToolHooks.rectTool` con las tres funciones nuevas. `PatternEditor.handleContextMenu`: `if (activeTool === 'rectangle' && rectTool.isArmed()) { rectTool.cancel(); return; }`.
-- [ ] **Step 4:** verde + eslint + commit `feat(2d): el rectángulo se crea con el Ancho y el Alto de la barra; el arrastre los escribe`.
+- [x] **Step 1 (rojo):** `useRectangleTool.test.tsx` con un store real (`tools` slice) y `renderHook` dentro de `<Provider>`: (1) clic sin arrastre crea 100×100 con `outline[0] = M(press)`; (2) con `toolOptions.rectangle = {width: 300, height: 150}` el clic crea 300×150; (3) arrastre de (100,100) a (180,160) crea 80×60 y deja `toolOptions.rectangle` en `{width: 80, height: 60}`; (4) `button: 2` no arma; (5) press + Escape → `handleKeyDown` devuelve `true` y el release no crea; (6) un arrastre de 3 px cae a clic (crea con la barra, no 3×3).
+- [x] **Step 2:** implementar. Borrar `MIN_SIZE`. `previewRect`/`rectDimensions` solo con arrastre real (≥ 4 px).
+- [x] **Step 3:** `useEditorInteractions.ts`: en CF-1, antes de `if (e.key !== 'Escape') return;`: `if (activeTool === 'rectangle' && rectTool.isArmed()) { if (rectTool.handleKeyDown(e)) { e.preventDefault(); e.stopPropagation(); } return; }`; `handlePointerCancel`: `if (activeTool === 'rectangle') rectTool.cancel();`; `handleMouseUp`: `if (activeTool === 'rectangle') { if (e) rectTool.handleMouseUp(e); else rectTool.cancel(); }` (la firma pasa a recibir el evento). `ToolHooks.rectTool` con las tres funciones nuevas. `PatternEditor.handleContextMenu`: `if (activeTool === 'rectangle' && rectTool.isArmed()) { rectTool.cancel(); return; }`.
+- [x] **Step 4:** verde + eslint + commit `feat(2d): el rectángulo se crea con el Ancho y el Alto de la barra; el arrastre los escribe`.
 
 ---
 
@@ -72,8 +72,8 @@ interface NextPointPanelProps {
 ```
 - Sin oyente en `window` (spec § 7.0): `onKeyDown` en la raíz del panel — Enter válido → `onPlace` y foco de vuelta a Largo (seleccionado); Escape → `onClose`; **todo `keydown` detiene la propagación** (`e.stopPropagation()`), Tab navega nativo entre los dos campos. `autoFocus` en Largo. Estado en string; Largo válido si `> 0` y finito; Ángulo válido si finito y en `[-360, 360]`. Botón primario "Colocar punto", secundario "Cerrar". `role="dialog"`, `aria-label="Siguiente punto"`. CSS calcada de `NotchPrecisionModal.css` pero sin literales (`box-shadow: var(--surface-overlay-shadow)`, botón primario con `color: var(--on-accent)`) y con `:focus-visible` en inputs y botones.
 
-- [ ] **Step 1 (rojo):** test: (a) prefijado `80.0` / `-90.0`; (b) Enter en Largo con valores válidos → `onPlace(80, -90)`, el campo sigue con `80.0` y `document.activeElement` es Largo; (c) Escape → `onClose`; (d) Largo vacío o `0` → Enter no llama a `onPlace`; (e) un `keydown` de Backspace sobre el input **no llega** a un listener de `window` en burbuja ni a uno de `document`; (f) ningún `fill`/color literal: el `.css` no contiene `#` ni `rgba(` (leer el archivo con `fs` en el test).
-- [ ] **Step 2:** implementar. **Step 3:** verde + eslint + `lint:ui` sin subir + commit `feat(2d): panel "Siguiente punto" — largo y ángulo, sin oyente global`.
+- [x] **Step 1 (rojo):** test: (a) prefijado `80.0` / `-90.0`; (b) Enter en Largo con valores válidos → `onPlace(80, -90)`, el campo sigue con `80.0` y `document.activeElement` es Largo; (c) Escape → `onClose`; (d) Largo vacío o `0` → Enter no llama a `onPlace`; (e) un `keydown` de Backspace sobre el input **no llega** a un listener de `window` en burbuja ni a uno de `document`; (f) ningún `fill`/color literal: el `.css` no contiene `#` ni `rgba(` (leer el archivo con `fs` en el test).
+- [x] **Step 2:** implementar. **Step 3:** verde + eslint + `lint:ui` sin subir + commit `feat(2d): panel "Siguiente punto" — largo y ángulo, sin oyente global`.
 
 ---
 
@@ -95,8 +95,8 @@ placePolar(lengthMm: number, angleDeg: number): void;  // nodo nuevo desde el ú
 - `useEditorInteractions.handleDoubleClick`: `if (activeTool === 'pen') { pen.handleDoubleClick(); return; }`.
 - `PatternEditor`: `const nextPoint = activeTool === 'pen' ? pen.nextPoint : activeTool === 'internalShape' ? internalShapeTool.nextPoint : null;` y `{nextPoint && <NextPointPanel key={activeTool} initialLengthMm={nextPoint.lengthMm} initialAngleDeg={nextPoint.angleDeg} onPlace={tool.placePolar} onClose={tool.closeNextPoint} />}` (la `key` reinicia el estado al cambiar de herramienta).
 
-- [ ] **Step 1 (rojo):** pluma: (1) Tab sin nodos → `false` y `nextPoint` null; (2) un nodo en (100,100), cursor en (150,100) (mousemove), Tab → `true`, `nextPoint = {from:(100,100), lengthMm: 50, angleDeg: 0}`; (3) `placePolar(80, 90)` → segundo nodo en (100, 20); (4) `placePolar(50, 0)` → tercero en (150, 20); (5) Backspace → dos nodos; (6) `handleDoubleClick` con 2 nodos → `onComplete` con outline abierto y `nextPoint` null; (7) Escape cierra… (Escape del trazo ya está: con panel abierto y foco fuera, Escape descarta el trazo — es el spec). Línea interna: (8) Tab con un nodo abre con prefijado de la goma; (9) `placePolar(80, -90)` → nodo en (x, y+80) del tipo latcheado; (10) `finish` por Enter cierra el panel.
-- [ ] **Step 2:** implementar; **Step 3:** verde + eslint + commit `feat(2d): Tab abre "Siguiente punto" en pluma y línea interna; el punto cae a largo y ángulo`.
+- [x] **Step 1 (rojo):** pluma: (1) Tab sin nodos → `false` y `nextPoint` null; (2) un nodo en (100,100), cursor en (150,100) (mousemove), Tab → `true`, `nextPoint = {from:(100,100), lengthMm: 50, angleDeg: 0}`; (3) `placePolar(80, 90)` → segundo nodo en (100, 20); (4) `placePolar(50, 0)` → tercero en (150, 20); (5) Backspace → dos nodos; (6) `handleDoubleClick` con 2 nodos → `onComplete` con outline abierto y `nextPoint` null; (7) Escape cierra… (Escape del trazo ya está: con panel abierto y foco fuera, Escape descarta el trazo — es el spec). Línea interna: (8) Tab con un nodo abre con prefijado de la goma; (9) `placePolar(80, -90)` → nodo en (x, y+80) del tipo latcheado; (10) `finish` por Enter cierra el panel.
+- [x] **Step 2:** implementar; **Step 3:** verde + eslint + commit `feat(2d): Tab abre "Siguiente punto" en pluma y línea interna; el punto cae a largo y ángulo`.
 
 ---
 
@@ -104,13 +104,13 @@ placePolar(lengthMm: number, angleDeg: number): void;  // nodo nuevo desde el ú
 
 **Files:** `HintText.tsx`, `__tests__/HintText.lineaInterna.test.tsx` (ampliar), `PatternEditor.tsx` (prop `penNodesLength` ya existe)
 
-- [ ] Pluma con trazo (`penNodesLength > 0`): `Pie` "Clic añade · arrastra para curvar · clic en el primer punto cierra · Enter o doble clic termina · Tab escribe largo y ángulo · Retroceso quita el último · Esc cancela". Línea interna con trazo: añadir " · Tab escribe largo y ángulo". Rectángulo: "Arrastra para dibujar · un clic crea con el Ancho y el Alto de la barra · Esc cancela". Tests: las tres frases nombran Tab / la barra.
+- [x] Pluma con trazo (`penNodesLength > 0`): `Pie` "Clic añade · arrastra para curvar · clic en el primer punto cierra · Enter o doble clic termina · Tab escribe largo y ángulo · Retroceso quita el último · Esc cancela". Línea interna con trazo: añadir " · Tab escribe largo y ángulo". Rectángulo: "Arrastra para dibujar · un clic crea con el Ancho y el Alto de la barra · Esc cancela". Tests: las tres frases nombran Tab / la barra.
 
 ---
 
 ### Task B6: e2e, changelog, PR
 
-- [ ] `tests/e2e/maria-191-rectangulo-con-medidas.spec.ts`: `s`; fijar Ancho 300 / Alto 150 escribiendo en `#opcion-width` / `#opcion-height` (`fill` + `Enter`/blur — verificar que el store recibe 300/150); clic en (400,300) → pieza de 300×150 con `outline[0] = M(400,300)`; arrastre de (100,500) a (180,560) → pieza 80×60 y la barra en 80/60.
-- [ ] `tests/e2e/maria-195-siguiente-punto.spec.ts`: `h`; clic en (300,400); Tab → `[role=dialog][aria-label="Siguiente punto"]` visible; escribir 80 y 90, Enter → `pen` con 2 nodos (leer el segundo nodo del outline al terminar); escribir 50 y 0, Enter; Escape → el panel se cierra y el trazo sigue; Enter (foco en el cuerpo) → pieza con 3 puntos: (300,400), (300,320), (350,320).
-- [ ] CHANGELOG (Added: medidas escritas; Changed: control numérico en la barra; Fixed: el clic del rectángulo y el botón derecho).
-- [ ] Gate completo, commit, push, PR B contra `feat/lineas-internas-y-medidas`.
+- [x] `tests/e2e/maria-191-rectangulo-con-medidas.spec.ts`: `s`; fijar Ancho 300 / Alto 150 escribiendo en `#opcion-width` / `#opcion-height` (`fill` + `Enter`/blur — verificar que el store recibe 300/150); clic en (400,300) → pieza de 300×150 con `outline[0] = M(400,300)`; arrastre de (100,500) a (180,560) → pieza 80×60 y la barra en 80/60.
+- [x] `tests/e2e/maria-195-siguiente-punto.spec.ts`: `h`; clic en (300,400); Tab → `[role=dialog][aria-label="Siguiente punto"]` visible; escribir 80 y 90, Enter → `pen` con 2 nodos (leer el segundo nodo del outline al terminar); escribir 50 y 0, Enter; Escape → el panel se cierra y el trazo sigue; Enter (foco en el cuerpo) → pieza con 3 puntos: (300,400), (300,320), (350,320).
+- [x] CHANGELOG (Added: medidas escritas; Changed: control numérico en la barra; Fixed: el clic del rectángulo y el botón derecho).
+- [x] Gate completo, commit, push, PR B contra `feat/lineas-internas-y-medidas`.
