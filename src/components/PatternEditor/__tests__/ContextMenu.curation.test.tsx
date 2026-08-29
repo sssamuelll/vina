@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import editorReducer from '../../../store/editorSlice';
@@ -52,6 +53,15 @@ describe('ContextMenu curado (Surface B)', () => {
     renderMenu({ ...base, pieceId: 'p1', pieceName: 'P1' }, [piece('p1')]);
     expect(screen.getByText('Rotar 90°')).toBeTruthy();
     expect(screen.getByText('Eliminar pieza')).toBeTruthy();
+  });
+
+  it('la fila ejecutada queda en la bitácora con su id', () => {
+    clearJournal();
+    renderMenu({ ...base, pieceId: 'p1', pieceName: 'P1' }, [piece('p1')]);
+    fireEvent.click(screen.getByText('Rotar 90°'));
+    expect(getJournal().events.filter((e) => e.kind === 'ui')).toEqual([
+      expect.objectContaining({ name: 'menu:action', data: { id: 'rotate90' } }),
+    ]);
   });
 
   it('un borde de margen añade Ancho exacto al menú de pieza', () => {

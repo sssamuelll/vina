@@ -11,6 +11,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, Fragment } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../../store';
+import { pushJournal } from '../../utils/telemetry/journal';
 import { selectWorkflowStage } from '../../store/selectors';
 import type { InternalLineType } from '../../types/types';
 import SubMenu from '../../components/shared/SubMenu';
@@ -82,14 +83,27 @@ export default function ContextMenu(props: ContextMenuProps) {
     });
   }, [menu.visible, menu.x, menu.y]);
 
-  // Close on click outside or Escape
+  // Close on click outside or Escape.
+  //
+  // `onClose` va por ref y NO en las dependencias del efecto. Medido en
+  // navegador real (2026-08-29, e2e de la bitácora): con un Escape de
+  // teclado, `ShortcutProvider` (también en `document`, registrado antes)
+  // despacha `selection.deselect`, eso re-renderiza PatternEditor de forma
+  // síncrona (useSyncExternalStore), y como `onClose` es una flecha inline
+  // el efecto quitaba y volvía a registrar ESTE listener en medio del mismo
+  // dispatch — el DOM no invoca listeners quitados ni añadidos durante el
+  // dispatch, así que Escape nunca cerraba el menú. Un keydown sintético
+  // (jsdom, dispatchEvent) no pasa por ese camino, y por eso los tests
+  // unitarios lo daban por bueno.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     if (!menu.visible) return;
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      if (ref.current && !ref.current.contains(e.target as Node)) onCloseRef.current();
     };
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('mousedown', handleClick);
     document.addEventListener('keydown', handleKey);
@@ -97,7 +111,7 @@ export default function ContextMenu(props: ContextMenuProps) {
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('keydown', handleKey);
     };
-  }, [menu.visible, onClose]);
+  }, [menu.visible]);
 
   if (!menu.visible) return null;
 
@@ -163,7 +177,7 @@ export default function ContextMenu(props: ContextMenuProps) {
             return (
               <button
                 key={def.id}
-                onClick={() => { def.run(ctx); onClose(); }}
+                onClick={() => { pushJournal('ui', 'menu:action', { id: def.id }); def.run(ctx); onClose(); }}
                 className={`context-menu__item${def.danger ? ' context-menu__item--danger' : ''}`}
               >
                 <span className="context-menu__icon">{def.icon}</span>
