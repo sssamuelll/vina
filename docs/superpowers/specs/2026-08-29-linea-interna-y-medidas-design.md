@@ -151,7 +151,7 @@ TRAZANDO         · trazo + goma + píldora
  └─ cambio de herramienta ─────────────────────► reset total (nodos y press)
 ```
 
-**Zona muerta tras un commit.** Tras `commit(cerrada|abierta)` en el punto P, un press a ≤ `EDGE_HIT_PX` de P **no arma nada** hasta que el cursor se aleje más de ese radio. Sin temporizador: es un latch de distancia. Es lo que impide que el segundo par de un doble clic sobre el nodo 1 nazca como trazo fantasma (§ 1.3).
+**Zona muerta tras cerrar con el puntero.** Tras `commit(cerrada)` por release sobre el nodo 1 (punto P), un press a ≤ `EDGE_HIT_PX` de P **no arma nada** hasta que el cursor se aleje más de ese radio. Sin temporizador: es un latch de distancia. Es lo que impide que el segundo par de un doble clic sobre el nodo 1 nazca como trazo fantasma (§ 1.3). **Solo ahí** (enmendado el 2026-08-29 al implementar): tras Enter no sigue ningún par de clics, y una zona muerta tras Enter bloqueaba el clic que continúa desde el extremo recién terminado — "clico y nada pasa". Tras terminar por doble clic tampoco hace falta: el segundo par del doble clic ya cae sobre el último nodo y no arma.
 
 **Cláusulas:** `commit(cerrada)` pide ≥ 3 nodos, `commit(abierta)` ≥ 2; con menos se descarta. **La anfitriona la fija el primer press y no se re-apunta**; el commit la resuelve **por id en el instante del commit** (no por closure: `handleInternalShapeComplete` cierra sobre `pieces`, `PatternEditor.tsx:351-359`). Si ya no existe, el trazo se descarta con toast. Si se movió o giró a mitad de trazo, los nodos están en mundo y el commit convierte con el transform vigente: la línea queda donde los nodos se ven. **Un trazo = una entrada de deshacer.**
 

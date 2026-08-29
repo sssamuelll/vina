@@ -210,11 +210,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const nodes = nodesRef.current;
     const host = hostRef.current;
     const cmds = nodesToCommands(nodes, closed);
-    const lastPoint = closed ? nodes[0]?.point : nodes[nodes.length - 1]?.point;
     reset();
-    // Zona muerta de distancia, no de tiempo: el segundo par de un doble clic
-    // cae aquí y no arma un trazo nuevo.
-    deadZoneRef.current = lastPoint ?? null;
     if (cmds.length && host) optsRef.current.onComplete(host, cmds, closed);
   }, [reset]);
 
@@ -270,7 +266,14 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     pressRef.current = null;
     lastWorldRef.current = toWorld(e);
     if (press.closes) {
+      // Zona muerta de distancia, no de tiempo, y SOLO tras cerrar con el
+      // puntero: el segundo par de un doble clic sobre el nodo 1 cae aquí y no
+      // arma un trazo nuevo. Tras Enter no sigue ningún par, y una zona muerta
+      // ahí bloqueaba el clic que continúa desde el extremo recién terminado
+      // (lo cazó el e2e de la gramática, 2026-08-29).
+      const origin = nodesRef.current[0]?.point ?? null;
       finish(true);
+      deadZoneRef.current = origin;
       return;
     }
     const point = press.snap?.point ?? press.world;

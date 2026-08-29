@@ -236,14 +236,23 @@ describe('usePolyPenTool — terminar, cerrar, cancelar', () => {
     expect(tool().nodes).toEqual([]);
   });
 
-  it('zona muerta tras un commit: un press en el mismo sitio no arma hasta alejarse', () => {
+  it('zona muerta tras cerrar con el puntero: un press en el mismo sitio no arma hasta alejarse', () => {
     const { tool, click, move } = setup();
+    click(120, 120); click(150, 150); click(180, 120);
+    click(122, 121);                       // cierra sobre el nodo 1
+    expect(tool().nodes).toEqual([]);
+    click(123, 122);                       // el segundo par de un doble clic
+    expect(tool().nodes).toEqual([]);
+    move(200, 200);
+    click(120, 120);
+    expect(tool().nodes).toHaveLength(1);
+  });
+
+  it('tras Enter NO hay zona muerta: el siguiente clic continúa desde el extremo', () => {
+    const { tool, click } = setup();
     click(120, 120); click(150, 150);
     act(() => { tool().handleKeyDown(key('Enter')); });
     click(152, 151);
-    expect(tool().nodes).toEqual([]);
-    move(200, 200);
-    click(150, 150);
     expect(tool().nodes).toHaveLength(1);
   });
 
