@@ -7,6 +7,7 @@ import {
   type EdgeTarget,
 } from './edgeGesture';
 import { isDrag } from './gestureConstants';
+import { pushJournal } from '../../utils/telemetry/journal';
 
 /**
  * ¿Esta proyección dice ya algún sentido, o sigue encima del press?
@@ -76,7 +77,15 @@ export function useEdgeGesture(opts: EdgeGestureOptions) {
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
     const target = resolveTarget(e);
-    if (!target) return;
+    // Bitácora: el press que no encuentra borde es mudo para Redux; el que lo
+    // encuentra fija el objeto del gesto entero (el commit ya despacha).
+    if (!target) {
+      pushJournal('gesture', 'edge:miss');
+      return;
+    }
+    pushJournal('gesture', 'edge:press', {
+      pieceId: target.pieceId, edgeIndex: target.edgeIndex, t: Math.round(target.t * 1000) / 1000,
+    });
 
     // Captura de puntero: sin esto, soltar fuera del lienzo pierde el mouseup y
     // el gesto se queda armado para siempre.

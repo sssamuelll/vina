@@ -12,6 +12,7 @@ import { renderHook, act } from '@testing-library/react';
 import type { PatternPiece, PathCommand } from '../../../types/types';
 import { usePolyPenTool, type InternalLineToolOptions } from '../usePolyPenTool';
 import { pieceLocalToPattern } from '../../../utils/geometry/pieceSpace';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 
 const RECT: PathCommand[] = [
   { type: 'M', values: [0, 0] }, { type: 'L', values: [200, 0] },
@@ -307,5 +308,50 @@ describe('usePolyPenTool — siguiente punto (Tab, placePolar)', () => {
     expect(tool().nextPoint).not.toBeNull();
     act(() => { tool().handleKeyDown(key('Enter')); });
     expect(tool().nextPoint).toBeNull();
+  });
+});
+
+/** Lo que el motor decide en silencio queda en la bitácora (spec caja-negra § 3.3). */
+describe('usePolyPenTool — bitácora de salidas mudas', () => {
+  const journal = (name: string) => getJournal().events.filter((e) => e.kind === 'gesture' && e.name === name).map((e) => e.data);
+
+  it('el press deja el enganche y la anfitriona; el release deja el nodo', () => {
+    clearJournal();
+    const { click } = setup();
+    click(104, 103);
+    expect(journal('internalShape:press')).toEqual([{ armed: true, snap: 'vertex', hostId: 'A', closes: false, nodes: 0 }]);
+    expect(journal('internalShape:release')).toEqual([{ outcome: 'node', bezier: false, nodes: 1 }]);
+  });
+
+  it('un press sin anfitriona, sobre una pieza bloqueada o en la zona muerta dice por qué no armó', () => {
+    clearJournal();
+    const { tool, click } = setup({ pieces: [A, B, LOCKED] });
+    click(50, 50);
+    click(450, 150);
+    click(150, 150); click(250, 150); click(250, 180); click(150, 150);
+    act(() => tool().handleMouseDown(ev(150, 150)));
+    expect(journal('internalShape:press').map((d) => d?.why)).toEqual(['noHost', 'locked', undefined, undefined, undefined, undefined, 'deadZone']);
+    expect(journal('internalShape:release').at(-1)).toMatchObject({ outcome: 'close' });
+  });
+
+  it('el release del botón derecho a mitad de press queda como ignorado', () => {
+    clearJournal();
+    const { tool } = setup();
+    act(() => tool().handleMouseDown(ev(150, 150)));
+    act(() => tool().handleMouseUp(ev(150, 150, 2)));
+    expect(journal('internalShape:release')).toEqual([{ outcome: 'ignored', why: 'button', button: 2, nodes: 0 }]);
+  });
+
+  it('colocar y cerrar desde el panel quedan registrados: nacen en un input, invisibles para el router', () => {
+    clearJournal();
+    const { tool, click } = setup();
+    click(150, 150);
+    act(() => tool().placePolar(80, -90));
+    act(() => { tool().handleKeyDown(key('Tab')); });
+    act(() => tool().closeNextPoint());
+    expect(journal('internalShape:nextPoint')).toEqual([
+      { op: 'place', length: 80, angle: -90, nodes: 2 },
+      { op: 'close' },
+    ]);
   });
 });

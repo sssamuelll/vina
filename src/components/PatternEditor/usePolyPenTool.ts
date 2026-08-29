@@ -8,6 +8,7 @@ import { extractNodes, type EditableNode } from './nodeEditorUtils';
 import { getInternalLineEndpoints } from './internalShapePath';
 import { EDGE_HIT_PX, isDrag } from './gestureConstants';
 import { nodesToCommands, polarOf, polarPoint, type PolyPenNode } from './polyPenGeometry';
+import { pushJournal } from '../../utils/telemetry/journal';
 
 export type { PolyPenNode, PolyPenNodeType } from './polyPenGeometry';
 
@@ -230,28 +231,43 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const world = toWorld(e);
     lastWorldRef.current = world;
     const r = radius();
-    if (deadZoneRef.current && dist(world, deadZoneRef.current) <= r) return;
-
     const nodes = nodesRef.current;
+    // Bitácora: cada press deja su desenlace (spec caja-negra § 3.3). Un press
+    // que no arma es mudo para Redux; sin esto no queda rastro.
+    const journalPress = (fields: Record<string, unknown>) =>
+      pushJournal('gesture', 'internalShape:press', { hostId: hostRef.current, nodes: nodes.length, ...fields });
+    if (deadZoneRef.current && dist(world, deadZoneRef.current) <= r) {
+      journalPress({ armed: false, why: 'deadZone' });
+      return;
+    }
+
     const closes = nodes.length >= 3 && dist(world, nodes[0].point) <= r;
     // Encima del último nodo: un tramo de largo cero es basura, y es lo que
     // el segundo clic de un doble clic pondría.
-    if (!closes && nodes.length >= 1 && dist(world, nodes[nodes.length - 1].point) <= r) return;
+    if (!closes && nodes.length >= 1 && dist(world, nodes[nodes.length - 1].point) <= r) {
+      journalPress({ armed: false, why: 'lastNode' });
+      return;
+    }
 
     const snap = closes ? null : resolveSnap(world, false);
     if (nodes.length === 0) {
       // La anfitriona la fija el primer press: la pieza del objetivo si
       // engancha, si no la de arriba cuyo CONTORNO contiene el press.
       const hostId = snap?.pieceId ?? topmostContaining(world);
-      if (!hostId) return;
+      if (!hostId) {
+        journalPress({ armed: false, why: 'noHost', snap: snap?.kind ?? null });
+        return;
+      }
       const host = optsRef.current.pieces.find(p => p.id === hostId);
       if (host?.locked) {
+        journalPress({ armed: false, why: 'locked', hostId });
         optsRef.current.onLockedPress?.(hostId);
         return;
       }
       hostRef.current = hostId;
     }
     pressRef.current = { world, screen: { x: e.clientX, y: e.clientY }, snap, closes, moved: false, drag: null };
+    journalPress({ armed: true, snap: snap?.kind ?? null, hostId: hostRef.current, closes });
     publish();
   }, [toWorld, radius, resolveSnap, topmostContaining, publish]);
 
@@ -273,10 +289,18 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
 
   const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const press = pressRef.current;
-    if (!press) return;
+    const journalRelease = (fields: Record<string, unknown>) =>
+      pushJournal('gesture', 'internalShape:release', { nodes: nodesRef.current.length, ...fields });
+    if (!press) {
+      journalRelease({ outcome: 'ignored', why: 'noPress' });
+      return;
+    }
     // Solo el botón izquierdo confirma: un release del derecho a mitad de
     // press no es un nodo (el mismo agujero que tenía el rectángulo).
-    if (e.button !== 0) return;
+    if (e.button !== 0) {
+      journalRelease({ outcome: 'ignored', why: 'button', button: e.button });
+      return;
+    }
     pressRef.current = null;
     lastWorldRef.current = toWorld(e);
     if (press.closes) {
@@ -286,12 +310,14 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       // ahí bloqueaba el clic que continúa desde el extremo recién terminado
       // (lo cazó el e2e de la gramática, 2026-08-29).
       const origin = nodesRef.current[0]?.point ?? null;
+      journalRelease({ outcome: 'close' });
       finish(true);
       deadZoneRef.current = origin;
       return;
     }
     const point = press.snap?.point ?? press.world;
-    const node: PolyPenNode = press.moved && press.drag
+    const bezier = !!(press.moved && press.drag);
+    const node: PolyPenNode = bezier && press.drag
       ? {
           point,
           type: 'bezier',
@@ -300,6 +326,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
         }
       : { point, type: optsRef.current.nodeType };
     nodesRef.current = [...nodesRef.current, node];
+    journalRelease({ outcome: 'node', bezier });
     publish();
   }, [toWorld, finish, publish]);
 
@@ -322,6 +349,8 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
   const closeNextPoint = useCallback(() => {
     if (!nextPointRef.current) return;
     nextPointRef.current = null;
+    // Escape y "Cerrar" nacen dentro del panel: invisibles para el router.
+    pushJournal('gesture', 'internalShape:nextPoint', { op: 'close' });
     publish();
   }, [publish]);
 
@@ -333,6 +362,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const point = polarPoint(from, lengthMm, angleDeg);
     nodesRef.current = [...nodes, { point, type: optsRef.current.nodeType }];
     if (nextPointRef.current) nextPointRef.current = { ...nextPointRef.current, from: point };
+    pushJournal('gesture', 'internalShape:nextPoint', { op: 'place', length: lengthMm, angle: angleDeg, nodes: nodes.length + 1 });
     publish();
   }, [publish]);
 

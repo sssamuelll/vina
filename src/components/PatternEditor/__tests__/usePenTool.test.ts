@@ -7,8 +7,25 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, cleanup, act } from '@testing-library/react';
 import { usePenTool } from '../usePenTool';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 
 afterEach(cleanup);
+
+describe('usePenTool — bitácora de salidas mudas', () => {
+  it('cada press deja si cierra y cuántos nodos; colocar desde el panel también', () => {
+    clearJournal();
+    const onComplete = vi.fn();
+    const { result } = renderHook(() => usePenTool(1, { x: 0, y: 0 }, onComplete));
+    act(() => result.current.handleMouseDown(clickAt(10, 10)));
+    act(() => result.current.handleMouseUp());
+    act(() => result.current.placePolar(50, 0));
+    const gestures = getJournal().events.filter((e) => e.kind === 'gesture').map((e) => [e.name, e.data]);
+    expect(gestures).toEqual([
+      ['pen:press', { closes: false, nodes: 1 }],
+      ['pen:nextPoint', { op: 'place', length: 50, angle: 0, nodes: 2 }],
+    ]);
+  });
+});
 
 function clickAt(x: number, y: number) {
   return {
