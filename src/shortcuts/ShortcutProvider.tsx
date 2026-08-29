@@ -11,6 +11,7 @@ import React, { useEffect, useRef, useMemo } from 'react';
 import { ShortcutRegistry, type ShortcutContext as ShortcutCtx } from './ShortcutRegistry';
 import { DEFAULT_SHORTCUTS } from './defaults';
 import { ShortcutContext } from './ShortcutContext';
+import { pushJournal } from '../utils/telemetry/journal';
 
 /** Determine which panel has focus based on the active element */
 function getActiveContext(): ShortcutCtx[] {
@@ -67,6 +68,12 @@ export function ShortcutProvider({ children }: ShortcutProviderProps) {
 
       if (actionId) {
         const actionHandler = registryRef.current.getHandler(actionId);
+        // Bitácora: el atajo que se disparó, y si alguien lo atendió. Un match
+        // sin handler era silencio (spec caja-negra § 3.4).
+        pushJournal('shortcut', actionId, {
+          key: e.key, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, alt: e.altKey,
+          handled: !!actionHandler,
+        });
         if (actionHandler) {
           e.preventDefault();
           actionHandler();

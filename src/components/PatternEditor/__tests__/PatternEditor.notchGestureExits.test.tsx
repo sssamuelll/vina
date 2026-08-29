@@ -20,6 +20,7 @@ import toolReducer, { setActiveTool2D } from '../../../store/toolSlice';
 import workflowReducer from '../../../store/workflowSlice';
 import type { PatternPiece } from '../../../types/types';
 import PatternEditor from '../PatternEditor';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 
 afterEach(cleanup);
 
@@ -127,12 +128,17 @@ describe('PatternEditor — salidas del gesto de piquete', () => {
   it('clic derecho cancela el gesto y suprime el menú contextual', () => {
     const { view, svg, notchCount } = setup();
     armNotch(svg);
+    clearJournal();
 
     fireEvent.contextMenu(svg, { clientX: 50, clientY: 50 });
     releaseNotch(svg);
 
     expect(view.container.querySelector('.context-menu')).toBeNull();
     expect(notchCount()).toBe(0);
+    // La supresión es muda para Redux: la bitácora es su único rastro.
+    expect(getJournal().events.filter((e) => e.kind === 'ui')).toEqual([
+      expect.objectContaining({ name: 'contextmenu', data: { tool: 'notch', opened: false } }),
+    ]);
   });
 
   it('pointercancel resetea el gesto para que un mouseup tardío no commitee', () => {
