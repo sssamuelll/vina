@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
-import type { Point2D, PathCommand, PatternPiece } from '../../types/types';
+import type { Point2D, PatternPiece } from '../../types/types';
 import {
   computeBoundingBox,
   computeHandlePositions,
@@ -7,17 +7,15 @@ import {
   computeScaleFromDrag,
   computeRotationFromDrag,
   scaleAnchorForHandle,
-  scaleOutline,
   rotatePoint,
   bboxPivot,
   outlineBBoxCenter,
   type HandleId,
   type BBox,
 } from '../../utils/geometry/transform';
-import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 import { isDrag } from './gestureConstants';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
-import { reanchorTransformedNotches } from '../../utils/notchReanchor';
+import { scalePiecesAroundAnchor, type TransformUpdate } from './pieceResize';
 
 interface TransformDragState {
   handleId: HandleId;
@@ -40,32 +38,8 @@ export interface TransformPreview {
 
 const HANDLE_HIT_THRESHOLD = 8; // screen pixels
 
-export interface TransformUpdate {
-  id: string;
-  outline: PatternPiece['outline'];
-  position: Point2D;
-  internals: PatternPiece['internals'];
-  /** Grados. El giro es declarativo desde #1033 — ver `handleMouseUp`. */
-  rotation: number;
-}
+export type { TransformUpdate } from './pieceResize';
 
-/**
- * Carry a piece's internals through the same transform as its outline. The box
- * moves the piece as a plane, so grainlines, darts and piquetes have to move
- * with it — rewriting the outline alone strands every one of them at its old
- * coordinates (nota de María #171, reached by a handle instead of a node).
- * Notches then get their anchors re-derived, which also redraws the mark at
- * its true size rather than stretching it with the piece.
- */
-function transformInternals(
-  snap: PatternPiece,
-  newOutline: PatternPiece['outline'],
-  mapPath: (path: PathCommand[]) => PathCommand[],
-  mapPoint: (pt: Point2D) => Point2D,
-): PatternPiece['internals'] {
-  const mapped = snap.internals.map(line => ({ ...line, path: mapPath(line.path) }));
-  return reanchorTransformedNotches(mapped, snap.outline, newOutline, mapPoint);
-}
 
 /**
  * Los ejes de la caja, ¿son los de todas las piezas que envuelve?
@@ -215,58 +189,7 @@ export function useTransformTool(
       // des-girar es el arrastre, y eso ya pasó dentro de
       // `computeScaleFromDrag`.
       const anchor = scaleAnchorForHandle(d.handleId, snappedBbox);
-      const radCaja = ((snappedBbox.rotation ?? 0) * Math.PI) / 180;
-      // El ancla nace en el marco SIN girar de la caja. Colocarla con el propio
-      // transform de la caja la lleva a espacio de patrón, y de ahí cada pieza
-      // la baja a SU local. Antes se restaba la posición a pelo, que solo
-      // acierta cuando los dos marcos coinciden — o sea con una pieza sola
-      // (#1066). Con `radCaja` 0 la fórmula devuelve el ancla intacta, así que
-      // el camino de una pieza sale byte por byte igual que antes.
-      const anchorPatron = radCaja
-        ? rotatePoint(anchor, bboxPivot(snappedBbox), radCaja)
-        : anchor;
-      for (const snap of d.piecesSnapshot) {
-        const localCenter = patternToPieceLocal(anchorPatron, snap);
-        // El pivote del renderizador es el de ESTA pieza, no el de la caja: en
-        // grupo la caja no gira (`rotation: 0`) y la pieza sí.
-        const rad = ((snap.rotation ?? 0) * Math.PI) / 180;
-        const newOutline = scaleOutline(snap.outline, localCenter, scaleX, scaleY);
-        // Un solo camino, y sale bien girada o no.
-        //
-        // El ancla LOCAL ya es punto fijo del escalado: el contorno se estira
-        // alrededor de ella y ese punto no se mueve. Lo único que puede
-        // moverlo en pantalla es que escalar corre el centro del contorno, que
-        // es el pivote del renderizador — y eso es lo que se compensa acá.
-        //
-        // Con rotación 0 la fórmula devuelve `position` intacta. Eso es lo que
-        // maria-198 pedía, y lo que el ajuste viejo rompía: escalaba la
-        // posición ADEMÁS de escalar el contorno alrededor del ancla, o sea
-        // compensaba dos veces el mismo efecto. Encogía 20 y se corría 20.
-        // Sólo se veía en `w`/`n`/`nw`: en `e`/`s`/`se` el ancla coincide con
-        // el origen del contorno y el error se cancelaba solo.
-        const plantado = pieceLocalToPattern(localCenter, snap);
-        const nuevoCentro = outlineBBoxCenter(newOutline);
-        const alNuevoPivote = rotatePoint(localCenter, nuevoCentro, rad);
-        const newPos = {
-          x: plantado.x - alNuevoPivote.x,
-          y: plantado.y - alNuevoPivote.y,
-        };
-        updates.push({
-          id: snap.id,
-          outline: newOutline,
-          position: newPos,
-          rotation: snap.rotation ?? 0,
-          internals: transformInternals(
-            snap,
-            newOutline,
-            path => scaleOutline(path, localCenter, scaleX, scaleY),
-            pt => ({
-              x: localCenter.x + (pt.x - localCenter.x) * scaleX,
-              y: localCenter.y + (pt.y - localCenter.y) * scaleY,
-            }),
-          ),
-        });
-      }
+      updates.push(...scalePiecesAroundAnchor(d.piecesSnapshot, snappedBbox, scaleX, scaleY, anchor));
     }
 
     onTransform(updates);
