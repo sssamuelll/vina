@@ -1295,9 +1295,9 @@ Añadir, cerca de `handleTransform` (`:601`):
   }), shallowEqual);
   const sujeto = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
-    lastCreatedId: rectTool.lastCreatedId, isDragging: interactions.isDraggingPiece || transformTool.isDragging,
+    lastCreatedId: rectTool.lastCreatedId, isDragging: isDraggingPiece || transformTool.isDragging,
     contextMenuOpen: ctxMenu.visible, calibrationActive: calibrationMode !== null,
-  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, rectTool.lastCreatedId, interactions.isDraggingPiece, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect]);
+  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, rectTool.lastCreatedId, isDraggingPiece, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect]);
 
   const aplicarCota = useCallback((cota: Cota, valueMm: number, token?: UndoBatchToken) => {
     const update = cota.apply(valueMm);
@@ -1332,7 +1332,7 @@ Añadir, cerca de `handleTransform` (`:601`):
   const cotasRef = useRef<CotasLayerHandle>(null);
 ```
 
-(`isDraggingPiece` lo exporta `useEditorInteractions` — ver `:308`; si el objeto que devuelve se llama distinto, usar ese nombre. `UndoBatchToken`, `beginUndoBatch`, `endUndoBatch`, `withUndoBatchToken` vienen de `../../store/undoMiddleware`.)
+(`isDraggingPiece` ya se destructura de `useEditorInteractions` en `PatternEditor.tsx:641`; el `useMemo` del sujeto va DESPUÉS de esa línea. `UndoBatchToken`, `beginUndoBatch`, `endUndoBatch`, `withUndoBatchToken` vienen de `../../store/undoMiddleware`.)
 
 Montaje: dentro de `<g data-pan-zoom-group>` justo después de `<PieceRenderer …/>`: `<CotaLines cotas={sujeto.cotas} zoom2D={zoom2D} />`. Después de `<FloatingActionBar …/>`: 
 
@@ -1603,7 +1603,11 @@ test.describe('cotas de pieza (María #223/#225)', () => {
     const s = await toScreen(page, { x: 250, y: 250 });
     await page.mouse.click(s.x, s.y);
     const id = (await st(page)).project.pieces[0].id;
-    await page.evaluate((pid) => (window as unknown as StoreWindow).__VINA_STORE__.dispatch({ type: 'project/togglePieceLock', payload: pid }), id);
+    await page.evaluate((pid) => {
+      const store = (window as unknown as StoreWindow).__VINA_STORE__;
+      const piece = store.getState().project.pieces.find(p => p.id === pid)!;
+      store.dispatch({ type: 'project/updatePiece', payload: { ...piece, locked: true, updatedAt: Date.now() } });
+    }, id);
     await expect(cota(page, 'Ancho')).toHaveAttribute('aria-disabled', 'true');
     await cota(page, 'Ancho').click();
     expect(await page.getByRole('textbox').count()).toBe(0);
@@ -1611,7 +1615,7 @@ test.describe('cotas de pieza (María #223/#225)', () => {
 });
 ```
 
-(Si la acción de bloquear se llama distinto, buscarla en `projectSlice.ts` con `grep -n "lock" src/store/projectSlice.ts`.)
+(No hay acción de bloqueo por pieza en `projectSlice.ts` — solo `setLayerLocked`; el candado de pieza es el campo `locked` y se escribe con `updatePiece`, igual que hace el menú contextual.)
 
 - [ ] **Step 2: `emplazamiento-tira.spec.ts`**
 
