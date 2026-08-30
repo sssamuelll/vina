@@ -30,16 +30,6 @@ export const scissorsTool: ToolDefinition = {
   group: 'pattern',
   options: [
     {
-      id: 'cutType',
-      label: 'Tipo de corte',
-      type: 'select',
-      value: 'straight',
-      choices: [
-        { label: 'Recto', value: 'straight' },
-        { label: 'Curvo', value: 'curved' },
-      ],
-    },
-    {
       id: 'autoSew',
       label: 'Coser el corte automáticamente',
       type: 'toggle',
@@ -78,12 +68,9 @@ export const scissorsTool: ToolDefinition = {
       'style line',
       'partition',
     ],
-    requiresSelection: 'piece',
+    requiresSelection: 'none',
     produces: 'piece',
     undoable: true,
     dangerous: true,
-    parameterHints: {
-      cutType: 'Whether to cut along a straight line or a curved path',
-    },
   },
 };

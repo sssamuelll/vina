@@ -21,7 +21,7 @@ import {
   createPastedPieces,
 } from '../store/editorSlice';
 import { setActiveTool3D } from '../store/toolSlice';
-import { activate2DTool } from '../store/toolActivation';
+import { activate2DTool, SEWING_TOOL_IDS } from '../store/toolActivation';
 import { removePieces, removeSeam, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
 import {
   startSimulation,
@@ -83,7 +83,7 @@ export function useKeyboardShortcuts() {
     };
 
     const deleteSelection = () => {
-      if (activeTool === 'seam' || activeTool === 'seamEdit') {
+      if (SEWING_TOOL_IDS.has(activeTool)) {
         if (selectedSeamId) dispatch(removeSeam(selectedSeamId));
         return;
       }

@@ -3,7 +3,7 @@ import { useSelector, useDispatch, shallowEqual } from 'react-redux';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
 import { setToolOption } from '../../store/toolSlice';
-import { activate2DTool } from '../../store/toolActivation';
+import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
@@ -80,12 +80,6 @@ import './PatternEditor.css';
 
 // Module-level map: imageId → blob URL (outside Redux for non-serializable data)
 const objectUrlMap = new Map<string, string>();
-
-/** Herramientas que SON el menú de costuras. Fuera de acá el patrón se está
- *  editando, no cosiendo (nota de María #210: "eso solo debería verse al
- *  activar el menu de costuras porque es información que molesta y no debería
- *  mostrarse mientras editamos el patron"). */
-const SEWING_TOOL_IDS = new Set(['seam', 'seamEdit', 'walkSeam']);
 
 /** Faja del dock 2D izquierdo, medida en navegador (no calculada): `.dock--left`
  *  da `x=14, ancho=54` — el borde derecho cae en 68. Los 54 salen de

@@ -277,6 +277,7 @@ export function usePenTool(
       case 'Backspace':
       case 'Delete':
         if (nodes.length === 0) return false;
+        pressRef.current = null;
         setState(prev => (prev.nodes.length <= 1 ? EMPTY : { ...prev, nodes: prev.nodes.slice(0, -1) }));
         return true;
       default:

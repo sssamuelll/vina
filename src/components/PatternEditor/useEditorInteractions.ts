@@ -365,6 +365,12 @@ export function useEditorInteractions(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTool, walkSeamTool.reset]);
 
+  // Limpia Tijeras al cambiar de herramienta
+  useEffect(() => {
+    if (activeTool !== 'scissors') scissorsTool.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool, scissorsTool.reset]);
+
   // Clear slash-and-spread when switching away
   useEffect(() => {
     if (activeTool !== 'slashAndSpread') slashAndSpreadTool.reset();
