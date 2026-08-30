@@ -1,0 +1,69 @@
+/* La tira de herramienta (spec 2026-08-30 § 6): overlay persistente en la
+   esquina superior derecha del lienzo 2D — excepción declarada al contrato
+   § 2. Material overlay entero en su variante sin borde: la sombra separa. */
+.tool-strip {
+  position: absolute;
+  top: 28px; /* 20 px de regla + 8 de aire: nunca sobre la regla */
+  right: 12px;
+  width: min(300px, calc(100% - 24px));
+  z-index: var(--z-menu);
+  padding: 14px 16px;
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border-flush);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow-sheet);
+  color: var(--text-primary);
+  font-size: var(--text-ui);
+}
+
+.tool-strip__head { display: flex; align-items: baseline; gap: 8px; }
+.tool-strip__tool { font-weight: 600; font-size: var(--text-heading); }
+.tool-strip__shortcut {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.tool-strip__subject { margin-top: 2px; font-size: var(--text-sm); color: var(--text-secondary); }
+
+.tool-strip__options { display: grid; gap: 6px; margin-top: 10px; }
+.tool-strip__item { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tool-strip__label { color: var(--text-secondary); font-size: var(--text-sm); }
+
+.tool-strip__input, .tool-strip__select {
+  height: 26px;
+  min-width: 90px;
+  padding: 0 8px;
+  background: var(--bg-base);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.tool-strip__slider { height: 26px; }
+.tool-strip__color { height: 26px; width: 40px; border: 0; background: transparent; }
+.tool-strip__valor { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-secondary); }
+
+.tool-strip__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+/* El activo cambia RELLENO, no solo tono (ley de estado). */
+.tool-strip__toggle--activo { color: var(--text-primary); background: var(--accent-subtle); }
+.tool-strip__marca { width: 8px; height: 8px; border-radius: 2px; border: 1px solid currentColor; }
+.tool-strip__toggle--activo .tool-strip__marca { background: currentColor; }
+
+/* hover y focus-visible en UNA línea cada uno: R5 empareja línea a línea. El
+   foco es el riel de 3 px (sombra interior), sin anillo. */
+.tool-strip__toggle:hover { color: var(--text-primary); }
+.tool-strip__toggle:focus-visible, .tool-strip__input:focus-visible, .tool-strip__select:focus-visible, .tool-strip__slider:focus-visible, .tool-strip__color:focus-visible { outline: 0; box-shadow: var(--focus-rail-inset); }

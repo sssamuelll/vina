@@ -45,7 +45,8 @@ const round1 = (v: number) => Math.round(v * 10) / 10;
 export function useRectangleTool(
   zoom2D: number,
   pan2D: Point2D,
-  onComplete: (piece: NewPieceData) => void,
+  /** Devuelve el id de la pieza creada: la creación caliente (spec cotas vivas § 3.1) lo necesita. */
+  onComplete: (piece: NewPieceData) => string,
 ) {
   const dispatch = useDispatch();
   const barWidth = useSelector((s: RootState) => Number(s.tools.toolOptions?.rectangle?.width ?? DEFAULT_MM));
@@ -54,6 +55,11 @@ export function useRectangleTool(
   barRef.current = { w: barWidth, h: barHeight };
 
   const pressRef = useRef<Press | null>(null);
+  /** La pieza que este hook acaba de crear, mientras siga seleccionada y la
+   *  herramienta sea Rectángulo. `PatternEditor` la enfría (a null) en cuanto
+   *  eso deja de ser cierto, y no vuelve a calentarse sola (spec § 3.1). */
+  const [hotId, setHotId] = useState<string | null>(null);
+  const enfriar = useCallback(() => setHotId(null), []);
   const [previewRect, setPreviewRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   const toPattern = useCallback((e: React.MouseEvent<SVGSVGElement>): Point2D => {
@@ -80,11 +86,12 @@ export function useRectangleTool(
       { type: 'L', values: [x, y + h] },
       { type: 'Z', values: [] },
     ];
-    onComplete({
+    const id = onComplete({
       name: `Rect ${Date.now().toString(36)}`,
       outline,
       ...draftedPieceDefaults(),
     });
+    setHotId(id);
   }, [onComplete]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
@@ -164,5 +171,7 @@ export function useRectangleTool(
     handleKeyDown,
     cancel,
     isArmed,
+    hotId,
+    enfriar,
   };
 }

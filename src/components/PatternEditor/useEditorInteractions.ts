@@ -1,3 +1,4 @@
+import type { CotasLayerHandle } from './cotas/CotasLayer';
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
@@ -106,6 +107,8 @@ function distToInternalLine(px: number, py: number, path: PathCommand[]): number
 }
 
 interface ToolHooks {
+  /** Capa de cotas vivas: Tab desde el lienzo enfoca el primer chip (spec 2026-08-30 § 5.3). */
+  cotas?: React.RefObject<CotasLayerHandle>;
   /** `handleKeyDown` devuelve si consumió la tecla (la captura CF-1 detiene la propagación solo entonces). */
   pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => boolean; handleDoubleClick: () => void; reset: () => void };
   rectTool: {
@@ -314,7 +317,7 @@ export function useEditorInteractions(
   const [isDraggingPiece, setIsDraggingPiece] = useState(false);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
-  const { pen, rectTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool } = tools;
+  const { pen, rectTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas } = tools;
 
   const selectionHasLocked = selectedPieceIds.some(
     id => pieces.find(p => p.id === id)?.locked,
@@ -427,7 +430,7 @@ export function useEditorInteractions(
     // Quién consumió la tecla, si alguien lo dijo. Solo los tres ganchos cuyo
     // `handleKeyDown` devuelve boolean pueden decirlo; los demás se ven en la
     // bitácora por lo que despachan.
-    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | null;
+    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | 'cotas' | null;
     const routeKey = (e: KeyboardEvent): KeyConsumer => {
       // Línea interna: con trazo vivo, Escape / Enter / Retroceso / Supr son
       // del motor. `handleKeyDown` dice si consumió.
@@ -457,6 +460,19 @@ export function useEditorInteractions(
           return 'rectangle';
         }
         return null;
+      }
+      // Tab desde el lienzo: a la primera cota viva (spec cotas vivas § 5.3).
+      // Solo desde el <svg> o el body — desde el dock o desde un chip en
+      // reposo, Tab es el nativo (si no, un Tab desde un chip volvería al
+      // primero en bucle).
+      if (e.key === 'Tab' && !e.shiftKey) {
+        const t = e.target as HTMLElement | null;
+        const desdeElLienzo = t === document.body || (t?.tagName ?? '').toLowerCase() === 'svg';
+        if (desdeElLienzo && cotas?.current?.focusFirst()) {
+          e.preventDefault();
+          e.stopPropagation();
+          return 'cotas';
+        }
       }
       if (e.key !== 'Escape') return null;
       // Tool Punto armado: cancelar SOLO la colocación pendiente (el hook hace
@@ -507,7 +523,7 @@ export function useEditorInteractions(
     };
     window.addEventListener('keydown', onKeyCapture, { capture: true });
     return () => window.removeEventListener('keydown', onKeyCapture, { capture: true });
-  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool]);
+  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, cotas]);
 
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);

@@ -75,6 +75,16 @@ Variantes declaradas (no inventes más): `--surface-overlay-radius-pill` para
 barras con forma de cápsula, y `--surface-overlay-bg-recessed` para el reposo de
 la barra de IA.
 
+> **Y `--surface-overlay-border-flush`** (bordes → tono: la sombra en capas
+> `--surface-overlay-shadow-sheet` separa, el borde queda para los campos). La
+> usan la tira de herramienta del lienzo 2D y los chips de cota
+> (`docs/superpowers/specs/2026-08-30-cotas-vivas-design.md` § 9-10).
+> **Excepción dicha:** la tira es un `overlay` que NO se va — está mientras hay
+> herramienta 2D activa, bajo la regla (28 px) y nunca sobre ella. Y las cotas
+> van sobre el patrón por definición: son parte del objeto, como los tiradores
+> del transform box, no un panel. Lo pidió Samuel el 2026-08-30; queda escrito
+> para que no se vuelva regla tácita.
+
 > **Estas dos leyes pelean, y hay que saberlo antes de escribir (medido el
 > 2026-08-15).** `--surface-overlay-blur` es un `backdrop-filter`, y un
 > `backdrop-filter` hace **dos cosas** que no tienen nada que ver con verse

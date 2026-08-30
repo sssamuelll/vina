@@ -1,0 +1,55 @@
+/* Chips de cota (spec 2026-08-30 § 5). Capa HTML hermana del <svg>: la capa
+   no recibe punteros, solo los chips. Todo sale de tokens (R3); cada :hover
+   trae su :focus-visible (R5); sin z-index literal (R8): el orden del DOM
+   la pone encima del svg. */
+.cotas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cota {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--cota-bg-2d);
+  color: var(--cota-ink-2d);
+  font-family: var(--font-mono-2d);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 22px;
+  white-space: nowrap;
+  cursor: ew-resize;
+  box-shadow: var(--surface-overlay-shadow-recessed);
+  transition: transform 120ms ease-out, opacity 120ms ease-out;
+}
+
+/* Cota de verificación (§ 3.4): mismo acento, menos peso. */
+.cota--hueca {
+  background: var(--cota-edit-bg-2d);
+  color: var(--cota-line-2d);
+  border: 1px solid var(--cota-line-2d);
+}
+
+/* hover y focus-visible en UNA línea: el trinquete R5 empareja línea a línea. */
+.cota:hover, .cota:focus-visible { transform: translate(-50%, calc(-50% - 1px)); }
+.cota:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.cota[aria-disabled='true'] { opacity: 0.45; cursor: default; }
+.cota[aria-disabled='true']:hover, .cota[aria-disabled='true']:focus-visible { transform: translate(-50%, -50%); }
+
+/* En edición el chip es un campo blanco sobre el papel, con el riel de foco. */
+.cota--editando {
+  width: 72px;
+  cursor: text;
+  background: var(--cota-edit-bg-2d);
+  color: var(--cota-edit-ink-2d);
+  border-left: var(--focus-rail);
+  text-align: right;
+}
+.cota--editando:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cota--invalida { border-left-color: var(--destructive); }

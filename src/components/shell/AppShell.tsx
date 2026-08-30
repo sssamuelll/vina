@@ -14,7 +14,6 @@ import TopBar from './TopBar';
 import UnifiedBar from './UnifiedBar';
 import LeftDock from './LeftDock';
 import RightDock from './RightDock';
-import ToolOptionsBar2D from './ToolOptionsBar2D';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import ContextPanel from './ContextPanel';
@@ -290,7 +289,6 @@ export default function AppShell() {
           className="canvas-area__2d"
           style={{ flex: `${get2dFlexGrow()} 1 0px`, display: viewMode === '3d' ? 'none' : undefined }}
         >
-          <ToolOptionsBar2D />
           <LeftDock onOpenPanel={togglePanel} />
           <PatternEditor
             onImportDXF={() => dxfInputRef.current?.click()}

@@ -1,0 +1,12 @@
+SCENE — Internal line selected; THE DIMENSIONS ARE THE FORM (direct manipulation on canvas):
+- Active tool in the dock: the polyline icon (5th) filled indigo = "Línea interna".
+- Canvas: one large bodice-like pattern piece (thin dark outline #2A2A30, ~380px wide x 520px tall, shaped shoulders and neckline, straight sides) centered. Inside it EXACTLY ONE internal line, selected, drawn in indigo (2px): a single straight segment from a point on the LEFT edge (about 40% down the side) to a point on the BOTTOM edge (about 25% from the left), with round node handles at both ends (white fill, indigo stroke). No other internal lines.
+- Dimension callouts (thin 1px indigo lines with end ticks, chips at midpoints):
+  1. Along the left edge, from the left endpoint UP to the top-left corner: this chip is IN EDIT MODE — it is an inline text field right there on the canvas: white rounded field (radius 6px, soft shadow, 3px indigo rail on its left edge) containing "100" in indigo tabular digits with a blinking caret, and a muted "mm" suffix; the dimension line and the endpoint are drawn in a lighter "preview" indigo showing the endpoint moved up slightly.
+  2. Along the left edge, from the left endpoint DOWN to the bottom-left corner: quiet indigo chip "180 mm".
+  3. Along the bottom edge, endpoint → bottom-left corner: chip "95 mm".
+  4. Along the bottom edge, endpoint → bottom-right corner: chip "285 mm".
+  5. Midpoint of the internal line, offset: chip "213,5 mm · 37°".
+  One of the quiet chips (the "180 mm") shows a HOVER state: slightly lifted, with a tiny horizontal double-arrow cursor over it (meaning: drag to scrub).
+- Hint line at the bottom: "Clic en una cota para escribirla · arrástrala para ajustar · Tab pasa a la siguiente · Enter aplica · Esc suelta".
+- THE PANEL is now a SLIM STRIP in the top-right corner (300px wide, surface #1C1C24, radius 14px, no border, soft shadow, 14px padding): line 1: "Línea interna" in semibold white + muted mono "G"; line 2: small muted "Editando: la línea seleccionada · 5 cotas"; then two compact select rows only: "Tipo de punto" → "Recta" and "Tipo de línea" → "Referencia". NO number fields in the panel, NO Aplicar button — the numbers live on the canvas.
