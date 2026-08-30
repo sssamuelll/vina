@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { addPiece, removePiece, addSeam, updatePiece } from '../../store/projectSlice';
+import { selectAllPieces } from '../../store/editorSlice';
 import type { Point2D, PatternPiece, Seam } from '../../types/types';
 import { flattenPath } from '../../utils/seam/index';
 import { linePolylineIntersections } from '../../utils/geometry/lineIntersect';
@@ -105,25 +106,15 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
       const s = stateRef.current;
 
       if (!s.targetPieceId) {
-        // First: target a piece (use selected piece or click on one)
-        const targetId = selectedPieceIds[0] ?? null;
-        if (targetId) {
-          const piece = pieces.find(p => p.id === targetId);
-          if (piece) {
-            const snap = snapToOutline(pt, piece);
-            if (snap) {
-              setState({
-                targetPieceId: targetId,
-                startPoint: snap,
-                endPoint: null,
-                hoveredEdgePoint: null,
-                previewValid: false,
-                error: null,
-              });
-            } else {
-              setState({ ...INITIAL_STATE, targetPieceId: targetId });
-            }
-          }
+        const orderedPieces = [
+          ...pieces.filter(piece => selectedPieceIds.includes(piece.id)),
+          ...pieces.filter(piece => !selectedPieceIds.includes(piece.id)),
+        ];
+        for (const piece of orderedPieces) {
+          const snap = snapToOutline(pt, piece);
+          if (!snap) continue;
+          setState({ ...INITIAL_STATE, targetPieceId: piece.id, startPoint: snap });
+          return;
         }
         return;
       }
@@ -154,6 +145,7 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
           dispatch({ ...removePiece(piece.id), meta: { skipConfirmation: true } });
           dispatch(addPiece(pieceA));
           dispatch(addPiece(pieceB));
+          dispatch(selectAllPieces([pieceA.id, pieceB.id]));
 
           // Auto-sew: detect edges and create seam on cut edges
           if (autoSew) {

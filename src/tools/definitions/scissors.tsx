@@ -40,12 +40,6 @@ export const scissorsTool: ToolDefinition = {
       ],
     },
     {
-      id: 'keepBoth',
-      label: 'Conservar las dos partes',
-      type: 'toggle',
-      value: true,
-    },
-    {
       id: 'autoSew',
       label: 'Coser el corte automáticamente',
       type: 'toggle',
@@ -90,7 +84,6 @@ export const scissorsTool: ToolDefinition = {
     dangerous: true,
     parameterHints: {
       cutType: 'Whether to cut along a straight line or a curved path',
-      keepBoth: 'Whether to keep both resulting pieces or discard one side',
     },
   },
 };
