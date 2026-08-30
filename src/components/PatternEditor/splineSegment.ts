@@ -159,7 +159,7 @@ export function convertSegmentToSpline(
 ): PathCommand[] {
   const cmds = outline.map(c => ({ ...c, values: [...c.values] }));
   const cmd = cmds[commandIndex];
-  if (!cmd || cmd.type !== 'L' || segments < 2) return cmds;
+  if (!cmd || (cmd.type !== 'L' && cmd.type !== 'Z') || segments < 2) return cmds;
 
   let from: Point2D | null = null;
   for (let i = commandIndex - 1; i >= 0; i--) {
@@ -167,7 +167,8 @@ export function convertSegmentToSpline(
     if (from) break;
   }
   if (!from) return cmds;
-  const to = getAnchor(cmd)!;
+  const to = cmd.type === 'Z' ? getAnchor(cmds[0]) : getAnchor(cmd);
+  if (!to) return cmds;
   if (Math.hypot(to.x - from.x, to.y - from.y) === 0) return cmds;
 
   const points: Point2D[] = [from];
@@ -182,7 +183,7 @@ export function convertSegmentToSpline(
   points[points.length - 1] = { ...to };
 
   const placeholders: PathCommand[] = points.slice(1).map(p => ({ type: 'C', values: [0, 0, 0, 0, p.x, p.y] }));
-  cmds.splice(commandIndex, 1, ...placeholders);
+  cmds.splice(commandIndex, cmd.type === 'Z' ? 0 : 1, ...placeholders);
 
   return withHandles(cmds, { start: commandIndex, end: commandIndex + segments - 1 }, points);
 }

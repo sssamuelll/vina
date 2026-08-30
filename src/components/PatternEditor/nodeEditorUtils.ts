@@ -519,7 +519,7 @@ export function convertToCurve(
   const cmds = outline.map(c => ({ ...c, values: [...c.values] }));
   const cmd = cmds[commandIndex];
 
-  if (!cmd || cmd.type !== 'L') return cmds;
+  if (!cmd || (cmd.type !== 'L' && cmd.type !== 'Z')) return cmds;
 
   // Find previous anchor
   let prevAnchor: Point2D | null = null;
@@ -529,7 +529,8 @@ export function convertToCurve(
   }
   if (!prevAnchor) return cmds;
 
-  const anchor = getAnchor(cmd)!;
+  const anchor = cmd.type === 'Z' ? getAnchor(cmds[0]) : getAnchor(cmd);
+  if (!anchor) return cmds;
 
   // Control points at 1/3 and 2/3
   const cp1x = prevAnchor.x + (anchor.x - prevAnchor.x) / 3;
@@ -537,10 +538,17 @@ export function convertToCurve(
   const cp2x = prevAnchor.x + (2 * (anchor.x - prevAnchor.x)) / 3;
   const cp2y = prevAnchor.y + (2 * (anchor.y - prevAnchor.y)) / 3;
 
-  cmds[commandIndex] = {
+  const curve: PathCommand = {
     type: 'C',
     values: [cp1x, cp1y, cp2x, cp2y, anchor.x, anchor.y],
   };
+
+  if (cmd.type === 'Z') {
+    // El cierre se materializa antes del Z; el Z sigue cerrando el contorno.
+    cmds.splice(commandIndex, 0, curve);
+  } else {
+    cmds[commandIndex] = curve;
+  }
 
   return cmds;
 }

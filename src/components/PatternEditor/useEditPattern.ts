@@ -435,9 +435,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         const startPositions = new Map<number, Point2D>();
         for (const segIdx of selectedAfterClick) {
           // "to" node — the destination of this segment
-          const toNode = state.nodes.find(n => n.ref.commandIndex === segIdx);
+          const toIndex = piece.outline[segIdx]?.type === 'Z' ? 0 : segIdx;
+          const toNode = state.nodes.find(n => n.ref.commandIndex === toIndex);
           if (toNode) {
-            startPositions.set(segIdx, { ...toNode.position });
+            startPositions.set(toIndex, { ...toNode.position });
           }
           // "from" node — the previous command's anchor
           const fromNode = findFromNode(state.nodes, segIdx);
