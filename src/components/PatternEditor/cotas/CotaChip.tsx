@@ -70,7 +70,10 @@ export default function CotaChip({
     const hermanos = chipsHermanos(boton);
     const i = hermanos.indexOf(boton);
     const vecino = hermanos[i + (destino === 'siguiente' ? 1 : -1)];
-    (vecino ?? boton).focus();
+    if (!vecino) { boton.focus(); return; }
+    // Tab aterriza listo para teclear: el vecino abre su edicion (300, Tab, 150, Enter).
+    vecino.focus();
+    vecino.click();
   }, [editing]);
 
   // Un scrub que se queda sin puntero (cancel, captura perdida, desmontaje)

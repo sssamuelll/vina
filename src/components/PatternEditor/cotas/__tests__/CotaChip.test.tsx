@@ -89,7 +89,7 @@ describe('CotaChip - edición', () => {
     expect(screen.getByRole('button').textContent).toBe('100 mm');
     expect(document.activeElement).toBe(screen.getByRole('button'));
   });
-  it('Tab confirma, detiene el Tab nativo y enfoca el chip vecino de la capa', () => {
+  it('Tab confirma, detiene el Tab nativo y abre la edicion del chip vecino de la capa', () => {
     const onCommit = vi.fn();
     const noop = { onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn() };
     render(
@@ -104,7 +104,10 @@ describe('CotaChip - edición', () => {
     const noPrevenido = fireEvent.keyDown(input, { key: 'Tab' });
     expect(noPrevenido).toBe(false);
     expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ id: 'ancho' }), 150);
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: /^Alto/ }));
+    // el vecino abre su edicion, listo para teclear
+    const siguiente = screen.getByRole('textbox', { name: 'Alto de la pieza' }) as HTMLInputElement;
+    expect(document.activeElement).toBe(siguiente);
+    expect(siguiente.value).toBe('50');
   });
   it('blur descarta siempre: ni con valor válido y distinto confirma', () => {
     const p = monta();
