@@ -88,6 +88,14 @@ describe('#1094 — Supr en Coser', () => {
     expect(ids()).toEqual(['A', 'B']);
   });
 
+  it('en Recorrer costura también: es el tercer miembro del menú de costuras (SEWING_TOOL_IDS)', () => {
+    // Review de codex (HIGH 7): el predicado solo miraba seam/seamEdit y el
+    // conjunto canónico de PatternEditor incluye walkSeam. Un solo conjunto.
+    const { tecla, ids } = montar('walkSeam', (d) => d(selectPiece('A')));
+    tecla('Delete');
+    expect(ids()).toEqual(['A', 'B']);
+  });
+
   it('en Seleccionar, Supr sigue borrando la selección (nada cambia para ella ahí)', () => {
     const { tecla, ids } = montar('select', (d) => d(selectPiece('B')));
     tecla('Delete');

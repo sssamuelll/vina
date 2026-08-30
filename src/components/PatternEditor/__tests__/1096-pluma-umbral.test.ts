@@ -69,4 +69,21 @@ describe('#1096 — la pluma respeta el umbral de arrastre', () => {
     expect(tool().nodes[0].handleOut).toEqual({ x: 11, y: 10 });
     expect(tool().nodes[0].handleIn).toEqual({ x: 9, y: 10 });
   });
+
+  it('Supr a mitad de un press cierra el press: mover después no curva el nodo anterior', () => {
+    // Review de codex (MEDIUM 9): down crea B y deja el press abierto; Supr
+    // quitaba B sin cerrar el press, y el siguiente movimiento (pasado el
+    // umbral) escribía las manijas de A.
+    const onComplete = vi.fn();
+    const { result } = renderHook(() => usePenTool(1, { x: 0, y: 0 }, onComplete));
+    const tool = () => result.current;
+    act(() => { tool().handleMouseDown(ev(10, 10)); tool().handleMouseUp(); });
+    act(() => tool().handleMouseDown(ev(100, 10)));
+    act(() => { tool().handleKeyDown(new KeyboardEvent('keydown', { key: 'Delete' })); });
+    expect(tool().nodes).toHaveLength(1);
+    act(() => tool().handleMouseMove(ev(130, 10)));
+    act(() => tool().handleMouseUp());
+    expect(tool().nodes[0].handleOut).toBeNull();
+    expect(tool().nodes[0].handleIn).toBeNull();
+  });
 });

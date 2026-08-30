@@ -43,7 +43,6 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
     lineType: ['Tipo de línea', 'Referencia', 'Doblez', 'Pespunte'],
   },
   scissors: {
-    cutType: ['Tipo de corte', 'Recto', 'Curvo'],
     autoSew: ['Coser el corte automáticamente'],
     seamType: ['Tipo de costura', 'Normal', 'Francesa', 'Flat-felled', 'Overlock'],
   },
