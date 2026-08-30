@@ -18,7 +18,7 @@ const cota = (over: Partial<Cota>): Cota => ({
   id: 'ancho', kind: 'ancho', label: 'Ancho de la pieza', valueMm: 200, unit: 'mm', min: 1, max: 3000, primary: true,
   a: { x: 10, y: 20 }, b: { x: 210, y: 20 }, outward: { x: 0, y: -1 }, apply: () => null, ...over,
 });
-const noop = { onCommit: vi.fn(), onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn() };
+const noop = { onCommit: vi.fn(), onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn(), onScrubCancel: vi.fn() };
 
 describe('chipScreenPosition', () => {
   it('punto medio del segmento en pantalla, desplazado 18 px hacia fuera', () => {

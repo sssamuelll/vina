@@ -27,6 +27,10 @@ export interface Cota {
   apply(valueMm: number): TransformUpdate | null;
 }
 
+/** Lo que `computeBoundingBox` y `scaleOutline` entienden. `H`, `V` y `A` son válidos en el esquema
+ *  pero ninguno de los dos los recorre: una cota sobre ese contorno mediría mal y escribiría peor. */
+const COMANDOS_SOPORTADOS: ReadonlySet<string> = new Set(['M', 'L', 'C', 'Q', 'Z']);
+
 /** El mismo rango que declara `rectangle.tsx` para Ancho y Alto. */
 const MEDIDA_MIN = 1;
 const MEDIDA_MAX = 3000;
@@ -47,6 +51,7 @@ function giraVector(v: Point2D, rad: number): Point2D {
  * manejador inferior derecho" (maria-198).
  */
 export function cotasDePieza(piece: PatternPiece): Cota[] {
+  if (piece.outline.some(c => !COMANDOS_SOPORTADOS.has(c.type))) return [];
   const bbox = computeBoundingBox([piece], [piece.id]);
   if (!bbox || bbox.width <= 0 || bbox.height <= 0) return [];
   const rad = ((bbox.rotation ?? 0) * Math.PI) / 180;

@@ -45,6 +45,11 @@ describe('cotasDePieza', () => {
     expect(v.outline[2].values).toEqual([200, 50]);
   });
 
+  it('contorno con H/V/A (válido en el esquema, no soportado por el escalado) → sin cotas, no cotas falsas', () => {
+    const conH = pieza({ outline: [{ type: 'M', values: [0, 0] }, { type: 'H', values: [200] }, { type: 'V', values: [300] }, { type: 'H', values: [0] }, { type: 'Z', values: [] }] });
+    expect(cotasDePieza(conH)).toEqual([]);
+  });
+
   it('pieza sin área → sin cotas', () => {
     expect(cotasDePieza(pieza({ outline: [] }))).toEqual([]);
   });

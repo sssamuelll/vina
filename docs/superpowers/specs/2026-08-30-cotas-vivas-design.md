@@ -373,3 +373,7 @@ Veredicto: *"la v2 no está lista como contrato de implementación"* — 7 BLOCK
 | 18 | Shift con dos ganancias | Shift ×10, Alt ×0,1, en scrub y flechas | § 5.3; test |
 
 Descartado por la propia revisión: teclear dígitos no mueve la cámara 3D (`Viewport3D.tsx:668` ya excluye targets editables); el conflicto real es `Escape`/`Space` en `ShortcutProvider`, cerrado en #4.
+
+### 13.3 Revisión del diff del PR A (`codex review --base main`, 2026-08-30, 21 min)
+
+Seis hallazgos, todos reales, todos corregidos en el mismo PR: (1) el sujeto ignoraba capas ocultas y bloqueadas — ahora una pieza en capa oculta no tiene cotas y en capa bloqueada las tiene apagadas; (2) contornos con `H`/`V`/`A` (válidos en el esquema) daban cotas falsas — ahora no dan cotas; (3) cancelar un scrub confirmaba el valor de partida y tragaba el clic siguiente — ahora `onScrubCancel` devuelve la pieza al valor de partida dentro del batch, sin clic fantasma; (4) `NextPointPanel` a 300 px fijos se recortaba en un panel angosto — `min(300px, calc(100% - 24px))`; (5) cambiar de herramienta entre rectángulo/seleccionar con la misma pieza no cerraba el batch — la limpieza va también por herramienta; (6) Tab desde el último chip se quedaba en el mismo botón — sale a la tira.

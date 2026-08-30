@@ -16,8 +16,9 @@ const pieza = (id: string, over: Partial<PatternPiece> = {}): PatternPiece => ({
   seamAllowance: 0, active: true, createdAt: 0, updatedAt: 0, ...over,
 } as PatternPiece);
 const base = {
-  pieces: [pieza('a'), pieza('b', { locked: true })], selectedInternalLine: null, hotId: null,
+  pieces: [pieza('a'), pieza('b', { locked: true }), pieza('c', { layer: 2 })], selectedInternalLine: null, hotId: null,
   isDragging: false, contextMenuOpen: false, calibrationActive: false,
+  hiddenLayerIds: [] as number[], layerLocked: {} as Record<number, boolean>,
 };
 const def = { width: 300, height: 150 };
 
@@ -44,7 +45,13 @@ describe('cotasDelSujeto', () => {
     expect(s.disabled).toBe(true);
     expect(s.cotas).toHaveLength(2);
   });
+  it('capa bloqueada: cotas presentes pero deshabilitadas, como el candado de pieza', () => {
+    const s = cotasDelSujeto({ ...base, activeTool: 'select', selectedPieceIds: ['c'], layerLocked: { 2: true } }, def);
+    expect(s.disabled).toBe(true);
+    expect(s.cotas).toHaveLength(2);
+  });
   it.each([
+    ['capa oculta', { selectedPieceIds: ['c'], hiddenLayerIds: [2] }],
     ['dos piezas', { selectedPieceIds: ['a', 'b'] }],
     ['una interna seleccionada', { selectedPieceIds: ['a'], selectedInternalLine: { pieceId: 'a', lineId: 'l' } }],
     ['arrastrando', { selectedPieceIds: ['a'], isDragging: true }],

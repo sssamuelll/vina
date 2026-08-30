@@ -12,6 +12,10 @@ export interface SujetoInput {
   isDragging: boolean;
   contextMenuOpen: boolean;
   calibrationActive: boolean;
+  /** Capas ocultas (`simulation.hiddenLayerIds`): una pieza oculta no tiene cotas. */
+  hiddenLayerIds: readonly number[];
+  /** Capas bloqueadas (`project.layerLocked`): misma regla que el candado de pieza. */
+  layerLocked: Readonly<Record<number, boolean>>;
 }
 
 export interface Sujeto {
@@ -46,12 +50,14 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
   if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada(lineaRect);
   const piece = input.pieces.find(p => p.id === input.selectedPieceIds[0]) ?? null;
   if (!piece) return nada(lineaRect);
+  const capa = piece.layer ?? 1;
+  if (input.hiddenLayerIds.includes(capa)) return nada(lineaRect);
   const caliente = input.activeTool === 'rectangle' && input.hotId === piece.id;
   return {
     piece,
     caliente,
     cotas: cotasDePieza(piece),
-    disabled: Boolean(piece.locked),
+    disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
     lineaDeSujeto: caliente ? 'Editando: la pieza nueva' : 'Editando: la pieza seleccionada',
   };
 }

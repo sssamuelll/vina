@@ -22,7 +22,7 @@ const cota = (over: Partial<Cota> = {}): Cota => ({
 function monta(over: Partial<ComponentProps<typeof CotaChip>> = {}) {
   const props = {
     cota: cota(), left: 50, top: 20, zoom2D: 1,
-    onCommit: vi.fn(), onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn(),
+    onCommit: vi.fn(), onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn(), onScrubCancel: vi.fn(),
     ...over,
   };
   render(<CotaChip {...props} />);
@@ -91,7 +91,7 @@ describe('CotaChip - edición', () => {
   });
   it('Tab confirma, detiene el Tab nativo y abre la edicion del chip vecino de la capa', () => {
     const onCommit = vi.fn();
-    const noop = { onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn() };
+    const noop = { onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn(), onScrubCancel: vi.fn() };
     render(
       <div className="cotas">
         <CotaChip cota={cota()} left={0} top={0} zoom2D={1} onCommit={onCommit} {...noop} />
@@ -199,13 +199,16 @@ describe('CotaChip - scrub', () => {
     expect(p.onScrub).toHaveBeenLastCalledWith(p.cota, 1);
     pointer(b, 'pointerup', -5000);
   });
-  it('pointercancel termina el scrub con el valor de partida; lostpointercapture, con el último', () => {
+  it('pointercancel CANCELA el scrub (no lo confirma) y el clic siguiente vuelve a abrir la edición; lostpointercapture termina con el último', () => {
     const p = monta();
     let b = botonConCaptura();
     pointer(b, 'pointerdown', 0);
     pointer(b, 'pointermove', 30);
     pointer(b, 'pointercancel', 30);
-    expect(p.onScrubEnd).toHaveBeenLastCalledWith(p.cota, 100);
+    expect(p.onScrubCancel).toHaveBeenCalledWith(p.cota);
+    expect(p.onScrubEnd).not.toHaveBeenCalled();
+    fireEvent.click(b);
+    expect(screen.getByRole('textbox')).toBeTruthy();
     cleanup();
     const q = monta();
     b = botonConCaptura();
@@ -214,12 +217,26 @@ describe('CotaChip - scrub', () => {
     fireEvent(b, new Event('lostpointercapture', { bubbles: true }));
     expect(q.onScrubEnd).toHaveBeenLastCalledWith(q.cota, 130);
   });
-  it('desmontar el chip a mitad de un scrub lo termina con el valor de partida (nunca queda un batch abierto)', () => {
+  it('desmontar el chip a mitad de un scrub lo cancela (nunca queda un batch abierto)', () => {
     const p = monta();
     const b = botonConCaptura();
     pointer(b, 'pointerdown', 0);
     pointer(b, 'pointermove', 30);
     cleanup();
-    expect(p.onScrubEnd).toHaveBeenCalledWith(p.cota, 100);
+    expect(p.onScrubCancel).toHaveBeenCalledWith(p.cota);
+    expect(p.onScrubEnd).not.toHaveBeenCalled();
+  });
+
+  it('Tab desde el último chip sale del grupo hacia la tira de herramienta', () => {
+    const noop = { onCommit: vi.fn(), onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn(), onScrubCancel: vi.fn() };
+    render(
+      <div>
+        <div className="cotas"><CotaChip cota={cota()} left={0} top={0} zoom2D={1} {...noop} /></div>
+        <div className="tool-strip"><select aria-label="Tipo"><option>a</option></select></div>
+      </div>,
+    );
+    fireEvent.click(screen.getByRole('button'));
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Tab' });
+    expect(document.activeElement).toBe(screen.getByRole('combobox', { name: 'Tipo' }));
   });
 });

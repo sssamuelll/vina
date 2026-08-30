@@ -15,6 +15,8 @@ export interface CotaChipProps {
   onScrubStart: (cota: Cota) => void;
   onScrub: (cota: Cota, valueMm: number) => void;
   onScrubEnd: (cota: Cota, valueMm: number) => void;
+  /** El scrub se cancela (pointercancel, desmontaje): la pieza vuelve al valor de partida, sin clic fantasma. */
+  onScrubCancel: (cota: Cota) => void;
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
@@ -42,7 +44,7 @@ function chipsHermanos(el: HTMLElement | null): HTMLElement[] {
  * ignora targets editables; esto es el cinturón.
  */
 export default function CotaChip({
-  cota, left, top, zoom2D, disabled = false, onCommit, onScrubStart, onScrub, onScrubEnd,
+  cota, left, top, zoom2D, disabled = false, onCommit, onScrubStart, onScrub, onScrubEnd, onScrubCancel,
 }: CotaChipProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -70,7 +72,15 @@ export default function CotaChip({
     const hermanos = chipsHermanos(boton);
     const i = hermanos.indexOf(boton);
     const vecino = hermanos[i + (destino === 'siguiente' ? 1 : -1)];
-    if (!vecino) { boton.focus(); return; }
+    if (!vecino) {
+      // Borde del grupo: hacia adelante sale a la tira (el siguiente control del
+      // lienzo); hacia atrás se queda en el botón. Sin esto Tab se comía un paso.
+      const fuera = destino === 'siguiente'
+        ? document.querySelector<HTMLElement>('.tool-strip input, .tool-strip select, .tool-strip button')
+        : null;
+      (fuera ?? boton).focus();
+      return;
+    }
     // Tab aterriza listo para teclear: el vecino abre su edicion (300, Tab, 150, Enter).
     vecino.focus();
     vecino.click();
@@ -81,7 +91,7 @@ export default function CotaChip({
   useEffect(() => () => {
     const s = scrub.current;
     scrub.current = null;
-    if (s?.moved) onScrubEnd(cota, s.v0);
+    if (s?.moved) onScrubCancel(cota);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -117,6 +127,12 @@ export default function CotaChip({
       skipClick.current = true;
       onScrubEnd(cota, valor(s));
     }
+  };
+  // Cancelar no es soltar: no hay clic después que tragar, y el valor vuelve al de partida.
+  const cancelarScrub = () => {
+    const s = scrub.current;
+    scrub.current = null;
+    if (s?.moved) onScrubCancel(cota);
   };
 
   if (editing) {
@@ -196,7 +212,7 @@ export default function CotaChip({
         e.currentTarget.releasePointerCapture?.(e.pointerId);
         terminarScrub(s => s.last);
       }}
-      onPointerCancel={() => terminarScrub(s => s.v0)}
+      onPointerCancel={cancelarScrub}
       onLostPointerCapture={() => terminarScrub(s => s.last)}
     >
       {formatMedida(cota.valueMm, cota.unit)}

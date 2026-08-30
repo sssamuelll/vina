@@ -658,11 +658,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     height: Number(s.tools.toolOptions?.rectangle?.height ?? 100),
   }), shallowEqual);
   const { hotId: rectHotId, enfriar: enfriarRect } = rectTool;
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
   const sujeto = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
     hotId: rectHotId, isDragging: isDraggingPiece || transformTool.isDragging,
     contextMenuOpen: ctxMenu.visible, calibrationActive: calibrationMode !== null,
-  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, rectHotId, isDraggingPiece, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect]);
+    hiddenLayerIds, layerLocked,
+  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, rectHotId, isDraggingPiece, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked]);
 
   // Enfriamiento irreversible (spec § 3.1): en cuanto la selección deja de ser
   // la pieza nueva, cambia la herramienta o la pieza desaparece, se enfría y
@@ -705,7 +707,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // como máximo, cada valor derivado del snapshot de la cota de partida. Todos
   // los terminales cierran el batch; un undo ajeno que invalide el token lo
   // termina sin escribir más (spec § 5.3).
-  const scrubRef = useRef<{ token: UndoBatchToken; cota: Cota; valor: number; raf: number | null } | null>(null);
+  const scrubRef = useRef<{ token: UndoBatchToken; cota: Cota; v0: number; valor: number; raf: number | null } | null>(null);
   const cerrarScrub = useCallback(() => {
     const s = scrubRef.current;
     if (!s) return;
@@ -715,7 +717,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   }, [dispatch]);
   const handleCotaScrubStart = useCallback((cota: Cota) => {
     cerrarScrub();
-    scrubRef.current = { token: beginUndoBatch(dispatch, `Ajustar ${cota.label.toLowerCase()}`), cota, valor: cota.valueMm, raf: null };
+    scrubRef.current = { token: beginUndoBatch(dispatch, `Ajustar ${cota.label.toLowerCase()}`), cota, v0: cota.valueMm, valor: cota.valueMm, raf: null };
   }, [cerrarScrub, dispatch]);
   const handleCotaScrub = useCallback((_cota: Cota, valueMm: number) => {
     const s = scrubRef.current;
@@ -740,9 +742,21 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     escribirDefault(cota, valueMm);
     pushJournal('gesture', 'cota:scrub', { id: cota.id, value: valueMm, caliente: sujeto.caliente });
   }, [cerrarScrub, escribirDefault, sujeto.caliente]);
-  // Cambia el sujeto o se desmonta el editor con un scrub vivo: se cierra aquí.
+  // Cancelar (pointercancel, desmontaje del chip): la pieza vuelve al valor de
+  // partida dentro del mismo batch y el batch se cierra. Sin clic fantasma.
+  const handleCotaScrubCancel = useCallback((_cota: Cota) => {
+    const s = scrubRef.current;
+    if (!s) return;
+    if (s.raf !== null) { cancelAnimationFrame(s.raf); s.raf = null; }
+    if (isUndoBatchTokenActive(s.token)) aplicarRef.current(s.cota, s.v0, s.token);
+    cerrarScrub();
+    pushJournal('gesture', 'cota:scrub', { id: s.cota.id, outcome: 'cancel' });
+  }, [cerrarScrub]);
+  // Cambia el sujeto o la herramienta, o se desmonta el editor, con un scrub
+  // vivo: se cierra aquí. La herramienta va aparte porque rectangle → select
+  // conserva el mismo id de pieza y el contrato pide cerrar igual.
   const sujetoId = sujeto.piece?.id ?? null;
-  useEffect(() => () => cerrarScrub(), [sujetoId, cerrarScrub]);
+  useEffect(() => () => cerrarScrub(), [sujetoId, activeTool, cerrarScrub]);
 
   /* Durante el arrastre el grupo de la pieza se mueve por DOM directo
    * (`useEditorInteractions.ts:818`), mientras TODA superficie que se coloque
@@ -1200,6 +1214,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onScrubStart={handleCotaScrubStart}
         onScrub={handleCotaScrub}
         onScrubEnd={handleCotaScrubEnd}
+        onScrubCancel={handleCotaScrubCancel}
       />
       {/* La tira cede la esquina al gesto vivo: mientras "Siguiente punto" esta abierto no se pinta (spec 2026-08-30 § 12). */}
       {!(pen.nextPoint || internalShapeTool.nextPoint) && <ToolStrip2D lineaDeSujeto={sujeto.lineaDeSujeto} />}
