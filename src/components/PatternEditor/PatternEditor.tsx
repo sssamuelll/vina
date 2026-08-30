@@ -14,6 +14,7 @@ import { useRectangleTool } from './useRectangleTool';
 import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import CotaLines from './cotas/CotaLines';
 import { cotasDelSujeto } from './cotas/sujeto';
+import ToolStrip2D from './ToolStrip2D';
 import type { Cota } from './cotas/cotas';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
@@ -1199,6 +1200,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onScrub={handleCotaScrub}
         onScrubEnd={handleCotaScrubEnd}
       />
+      {/* La tira cede la esquina al gesto vivo: mientras "Siguiente punto" esta abierto no se pinta (spec 2026-08-30 § 12). */}
+      {!(pen.nextPoint || internalShapeTool.nextPoint) && <ToolStrip2D lineaDeSujeto={sujeto.lineaDeSujeto} />}
       {shouldShowEmptyState(pieces.length, activeTool) && (
         <EmptyState2D onImportDXF={onImportDXF} />
       )}
