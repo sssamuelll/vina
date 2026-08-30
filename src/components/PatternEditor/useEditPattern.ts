@@ -30,6 +30,7 @@ import {
   convertToCurve,
   convertToLine,
   anchorGroupOf,
+  coincidentAnchorGroups,
   type EditableNode,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
@@ -640,8 +641,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
         // All-or-nothing: deleting part of a coincident group would leave a
         // stranded twin, and a partial multi-delete is worse than none.
-        const anchorCount = piece.outline.filter(c => c.type !== 'Z').length;
-        if (anchorCount - indices.length < 3) {
+        const remainingAnchorCount = coincidentAnchorGroups(
+          piece.outline.filter((_, index) => !state.selectedNodes.has(index)),
+        ).size;
+        if (remainingAnchorCount < 3) {
           dispatch(showInfoToast('No se puede borrar: la pieza necesita al menos 3 puntos'));
           // Early return skips preventDefault, which is safe: the global
           // delete shortcut runs on a document listener (ShortcutProvider)
