@@ -181,6 +181,24 @@
   --surface-overlay-bg-recessed: rgba(8, 8, 15, 0.78);
   --surface-overlay-shadow-recessed: 0 4px 18px rgba(0, 0, 0, 0.22);
 
+  /* Bordes → tono (cotas vivas, spec 2026-08-30 § 9): la tira de herramienta
+   * y los chips de cota se separan por sombra en capas, no por línea; el
+   * borde queda para los campos. Variante declarada del material overlay. */
+  --surface-overlay-border-flush: 1px solid transparent;
+  --surface-overlay-shadow-sheet: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.35);
+
+  /* Cotas sobre el papel: el número que se escribe donde mide. Mismo acento
+   * que la selección 2D; en edición el chip es un campo blanco sobre el papel. */
+  --cota-bg-2d: var(--accent-2d);
+  --cota-ink-2d: #ffffff;
+  --cota-line-2d: var(--accent-2d);
+  --cota-edit-bg-2d: #ffffff;
+  --cota-edit-ink-2d: var(--ink-on-light);
+
+  /* Foco como riel de 3 px a la izquierda del campo (no anillo), en el cromo. */
+  --focus-rail: 3px solid var(--accent);
+  --focus-rail-inset: inset 3px 0 0 0 var(--accent);
+
   /* ── Escala de capas ──────────────────────────────────────────────────
    * Ley de emplazamiento (§ 5.2 del informe 2026-08-14): nada de z-index
    * literal. La app llegó a tener 15 valores sueltos en un único contexto de
