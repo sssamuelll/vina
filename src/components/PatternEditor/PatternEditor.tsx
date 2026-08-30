@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector, useDispatch, shallowEqual } from 'react-redux';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
-import { batchUndo } from '../../store/undoMiddleware';
+import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
+import { setToolOption } from '../../store/toolSlice';
 import { activate2DTool } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
@@ -10,6 +11,10 @@ import type { RootState } from '../../store';
 import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
+import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
+import CotaLines from './cotas/CotaLines';
+import { cotasDelSujeto } from './cotas/sujeto';
+import type { Cota } from './cotas/cotas';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
@@ -190,6 +195,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     };
     dispatch(addPiece(fullPiece));
     dispatch(selectPiece(fullPiece.id));
+    return fullPiece.id;
   }, [dispatch]);
 
   const pen = usePenTool(zoom2D, pan2D, handlePieceComplete);
@@ -638,10 +644,104 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     setEditingPieceNameId(null);
   }, []);
 
+  const cotasRef = useRef<CotasLayerHandle>(null);
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool,
+      pen, rectTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas: cotasRef,
     });
+
+  // ── Cotas vivas (spec 2026-08-30 § 3, § 5): la pieza nueva o seleccionada
+  // muestra Ancho/Alto sobre el lienzo y se editan ahí mismo. ────────────────
+  const defaultRect = useSelector((s: RootState) => ({
+    width: Number(s.tools.toolOptions?.rectangle?.width ?? 100),
+    height: Number(s.tools.toolOptions?.rectangle?.height ?? 100),
+  }), shallowEqual);
+  const { hotId: rectHotId, enfriar: enfriarRect } = rectTool;
+  const sujeto = useMemo(() => cotasDelSujeto({
+    activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
+    hotId: rectHotId, isDragging: isDraggingPiece || transformTool.isDragging,
+    contextMenuOpen: ctxMenu.visible, calibrationActive: calibrationMode !== null,
+  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, rectHotId, isDraggingPiece, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect]);
+
+  // Enfriamiento irreversible (spec § 3.1): en cuanto la selección deja de ser
+  // la pieza nueva, cambia la herramienta o la pieza desaparece, se enfría y
+  // no vuelve a calentarse sola.
+  useEffect(() => {
+    if (!rectHotId) return;
+    const viva = pieces.some(p => p.id === rectHotId);
+    if (activeTool !== 'rectangle' || selectedPieceIds.length !== 1 || selectedPieceIds[0] !== rectHotId || !viva) enfriarRect();
+  }, [activeTool, selectedPieceIds, pieces, rectHotId, enfriarRect]);
+
+  const aplicarCota = useCallback((cota: Cota, valueMm: number, token?: UndoBatchToken) => {
+    const update = cota.apply(valueMm);
+    if (!update) return;
+    // Liveness: si el sujeto murió (undo, borrado), no se escribe nada.
+    const piece = pieces.find(p => p.id === update.id);
+    if (!piece) return;
+    const accion = updatePiece({
+      ...piece, outline: update.outline, position: update.position, rotation: update.rotation,
+      internals: update.internals, updatedAt: Date.now(),
+    });
+    dispatch(token ? withUndoBatchToken(accion, token) : accion);
+  }, [pieces, dispatch]);
+  const aplicarRef = useRef(aplicarCota);
+  aplicarRef.current = aplicarCota;
+
+  // Solo en caliente se escribe el default del próximo rectángulo (Blender:
+  // Adjust Last Operation). Fuera del historial de deshacer, a propósito.
+  const escribirDefault = useCallback((cota: Cota, valueMm: number) => {
+    if (!sujeto.caliente) return;
+    dispatch(setToolOption({ toolId: 'rectangle', optionId: cota.kind === 'ancho' ? 'width' : 'height', value: Math.round(valueMm * 10) / 10 }));
+  }, [sujeto.caliente, dispatch]);
+
+  const handleCotaCommit = useCallback((cota: Cota, valueMm: number) => {
+    aplicarCota(cota, valueMm);
+    escribirDefault(cota, valueMm);
+    pushJournal('gesture', 'cota:commit', { id: cota.id, value: valueMm, caliente: sujeto.caliente });
+  }, [aplicarCota, escribirDefault, sujeto.caliente]);
+
+  // Scrub: un batch de deshacer con token (una entrada), un despacho por frame
+  // como máximo, cada valor derivado del snapshot de la cota de partida. Todos
+  // los terminales cierran el batch; un undo ajeno que invalide el token lo
+  // termina sin escribir más (spec § 5.3).
+  const scrubRef = useRef<{ token: UndoBatchToken; cota: Cota; valor: number; raf: number | null } | null>(null);
+  const cerrarScrub = useCallback(() => {
+    const s = scrubRef.current;
+    if (!s) return;
+    scrubRef.current = null;
+    if (s.raf !== null) cancelAnimationFrame(s.raf);
+    if (isUndoBatchTokenActive(s.token)) endUndoBatch(dispatch, s.token);
+  }, [dispatch]);
+  const handleCotaScrubStart = useCallback((cota: Cota) => {
+    cerrarScrub();
+    scrubRef.current = { token: beginUndoBatch(dispatch, `Ajustar ${cota.label.toLowerCase()}`), cota, valor: cota.valueMm, raf: null };
+  }, [cerrarScrub, dispatch]);
+  const handleCotaScrub = useCallback((_cota: Cota, valueMm: number) => {
+    const s = scrubRef.current;
+    if (!s) return;
+    s.valor = valueMm;
+    if (s.raf !== null) return;
+    s.raf = requestAnimationFrame(() => {
+      const t = scrubRef.current;
+      if (!t) return;
+      t.raf = null;
+      if (!isUndoBatchTokenActive(t.token)) { scrubRef.current = null; return; }
+      aplicarRef.current(t.cota, t.valor, t.token);
+    });
+  }, []);
+  const handleCotaScrubEnd = useCallback((_cota: Cota, valueMm: number) => {
+    const s = scrubRef.current;
+    if (!s) return;
+    if (s.raf !== null) { cancelAnimationFrame(s.raf); s.raf = null; }
+    if (isUndoBatchTokenActive(s.token)) aplicarRef.current(s.cota, valueMm, s.token);
+    const { cota } = s;
+    cerrarScrub();
+    escribirDefault(cota, valueMm);
+    pushJournal('gesture', 'cota:scrub', { id: cota.id, value: valueMm, caliente: sujeto.caliente });
+  }, [cerrarScrub, escribirDefault, sujeto.caliente]);
+  // Cambia el sujeto o se desmonta el editor con un scrub vivo: se cierra aquí.
+  const sujetoId = sujeto.piece?.id ?? null;
+  useEffect(() => () => cerrarScrub(), [sujetoId, cerrarScrub]);
 
   /* Durante el arrastre el grupo de la pieza se mueve por DOM directo
    * (`useEditorInteractions.ts:818`), mientras TODA superficie que se coloque
@@ -898,6 +998,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             onPieceNameSave={handlePieceNameSave}
             onPieceNameCancel={handlePieceNameCancel}
           />
+          <CotaLines cotas={sujeto.cotas} zoom2D={zoom2D} />
           <ConstructionOverlay zoom2D={zoom2D} pieces={pieces} />
           {/* `showSewingLines` sigue siendo el interruptor maestro del usuario
               (menú del logo → "Líneas de costura"); lo que se le suma es el
@@ -1086,6 +1187,17 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         contextMenuOpen={ctxMenu.visible}
         calibrationActive={calibrationMode !== null}
         ctx={barCtx}
+      />
+      <CotasLayer
+        ref={cotasRef}
+        cotas={sujeto.cotas}
+        pan2D={pan2D}
+        zoom2D={zoom2D}
+        disabled={sujeto.disabled}
+        onCommit={handleCotaCommit}
+        onScrubStart={handleCotaScrubStart}
+        onScrub={handleCotaScrub}
+        onScrubEnd={handleCotaScrubEnd}
       />
       {shouldShowEmptyState(pieces.length, activeTool) && (
         <EmptyState2D onImportDXF={onImportDXF} />

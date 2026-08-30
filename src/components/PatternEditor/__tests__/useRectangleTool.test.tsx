@@ -128,3 +128,17 @@ describe('useRectangleTool — el arrastre dibuja y escribe en la barra', () => 
     expect(consumed).toBe(false);
   });
 });
+
+describe('useRectangleTool — creación caliente (cotas vivas, spec 2026-08-30 § 3.1)', () => {
+  it('tras crear, hotId es el id que devolvió onComplete; enfriar lo borra y un clic nuevo lo vuelve a poner', () => {
+    const { tool, press, release, onComplete } = setup();
+    onComplete.mockReturnValueOnce('id-1').mockReturnValueOnce('id-2');
+    expect(tool().hotId).toBeNull();
+    press(400, 300); release(400, 300);
+    expect(tool().hotId).toBe('id-1');
+    act(() => tool().enfriar());
+    expect(tool().hotId).toBeNull();
+    press(600, 300); release(600, 300);
+    expect(tool().hotId).toBe('id-2');
+  });
+});
