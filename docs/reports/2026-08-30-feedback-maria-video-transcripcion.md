@@ -1,0 +1,349 @@
+# Feedback de María en audio, 2026-08-30 — transcripción íntegra
+
+> Dos grabaciones de pantalla hechas con la Game Bar de Windows en su laptop; las dos grabaron la ventana de la terminal (la que tenía el foco al arrancar), así que **solo sirve el audio**. Transcritas en local con `speechtotext` (faster-whisper `small`, español). Tiempos en mm:ss. La grabación 1 (2:15) es la queja de la barra de opciones (#223/#225); la 2 (38:08) recorre todas las herramientas del dock 2D contra el build desplegado el 2026-08-29 (antes del PR #1091).
+
+
+## Grabación 1
+
+- **[00:02]** Bueno, entonces vamos a empezar, me voy al Explorer de Vina y ahora estoy en esta
+- **[00:10]** herramienta, que guay, que aquí aparece seleccionar Z, voy a ir a la prueba de
+- **[00:17]** hacer los rectángulos, entonces, qué bien, está el menú de arriba,
+- **[00:26]** entonces lo voy a intentar editar pero no puedo editarlo porque cuando he ido a
+- **[00:33]** editarlo arriba se acrea ya el rectángulo pero tampoco cambia
+- **[00:45]** luego aparte estas medidas supongo que estarán en milímetros pero no lo
+- **[00:53]** poner ningún sitio, quizás si lo edito, no, ya no me deja editar las medidas, vaya, no,
+- **[01:19]** no me deja editar las medidas, no se voy a volver a intentar crearlo y si no suelto el
+- **[01:26]** ratón y me voy aquí para clicarlo nada, esto es con el derecho, con el derecho no
+- **[01:38]** hace nada y con el izquierdo es que lo tengo clicado ahora pero no sé cómo hacerlo. No
+- **[01:48]** me deja crear un rectángulo con, no me deja editar este menú y bueno aparte el menú
+- **[01:56]** de los comandos acaba chocando con el menú este arriba de editar que bueno no está
+- **[02:03]** funciona ahora mismo.
+
+## Grabación 2
+
+- **[00:02]** Vale, sigo con las pruebas, los rectángulos se mueven muy bien, se suprimen muy bien, otra
+- **[00:14]** cosa es, yo ahora mismo no estoy pudiendo crear círculos ni triángulos y otras formas geométricas
+- **[00:21]** que me pueden ayudar para el patronaje, círculo es indispensable y creo que deberían estar
+- **[00:26]** integradas en este comando de formas geométricas y por ejemplo a mí me confunde mucho
+- **[00:33]** el icono este de línea interna porque parece que aquí pueda crear triángulos cuadrados y círculos
+- **[00:41]** yo más bien no sé dibujaría como una línea intermitente que es como
+- **[00:47]** realmente se dibuja hoy se dibuja luego la línea interna
+- **[00:55]** o no sé pero no como está ahora porque aquí a mí mismo no hay un menú líneas
+- **[01:01]** esta línea interna si ya está, puntos y editar patrón. Vale, en editar patrón me gusta que estoy
+- **[01:14]** pudiendo mover este punto, la línea, este punto, o sea tampoco raro lo de que aparezca este punto azul
+- **[01:29]** porque en realidad no me aporta nada, estoy moviendo una línea, pero también te digo que cuando
+- **[01:37]** yo lo muevo cómo sé cuánto lo muevo será yo quiero mover esta línea de aquí que debería
+- **[01:47]** iluminarse la línea y no salirme a este punto que arrastra si ya la arrastro a la izquierda
+- **[01:55]** no me arrastra toda la línea aparte se ha quedado fijo el de arriba y se mueve el de abajo y bueno
+- **[02:01]** es un poco random porque yo precisamente quería mover la línea no es como como sé que puedo
+- **[02:09]** controlar lo que quiero controlar. Esta función está muy guay y me ayudaría a
+- **[02:12]** muchos casos pero entonces que sepa que es esta función la de mantener un punto
+- **[02:16]** fijo y mover solo el otro extremo y aparte eso no es lo mismo que hacer esto, sí.
+- **[02:22]** Por ejemplo, ahora estoy dando al botón derecho y se me ha quedado
+- **[02:29]** trabado ese punto, se han convertido en puntos otra vez.
+- **[02:34]** Si yo vuelvo a editar y le doy al clic derecho como encloaría me saldría un
+- **[02:40]** submenú que diría vale cuánto lo quieres mover en esa dirección. Necesito poder controlar
+- **[02:48]** de alguna manera lo que yo muevo ahora aquí, mi punto, respecto a este punto, respecto a
+- **[02:57]** este punto y respecto a donde estaba el anterior, obvio, porque sino como controlo cuál
+- **[03:03]** es el cambio de mi patrón. Bueno, entonces entiendo que esta herramienta de editar está
+- **[03:13]** preparada para puntos externos, porque eso la línea, ahora sí que se mueve la
+- **[03:19]** línea entera, acaro porque la he clicado antes, pero sí que aparece, pero antes
+- **[03:28]** verdad que la he clicado aquí y no se mueve entera, se mueve solo un punto
+- **[03:37]** es porque el primer punto que he clicado del cuadrado desde el principio ha
+- **[03:41]** sido éste. A ver, si yo creo un rectángulo le doy a editar y ahora el primer punto que
+- **[03:50]** muevo ever es éste. Y ahora sigo en editar. Ah no, mira. No me mueve la línea entera
+- **[03:59]** solo el punto de abajo. Aquí me mueve la línea entera, aquí la línea entera y hago
+- **[04:06]** lo mismo. Siempre es esta línea, porque este es el punto cero y van este sentido. Esto
+- **[04:19]** está raro, necesito como más opciones, categorías para, no sé, para manejar como
+- **[04:26]** muevo las cosas, unas líneas, unas líneas, un punto, un punto. Luego, ahora estoy buscando
+- **[04:37]** tema de convertir una recta en curva que es vital para hacer patrones está aquí no me acaba de
+- **[04:45]** convencer creo que igual un comando aquí línea que pudiera líneas y curvas o algo así porque
+- **[04:53]** igualmente cuando yo clico con el derecho no acabo de tener muy claro que esté clicando sobre esa línea
+- **[04:57]** no queda tan claro a nivel usuario no a vez le da a convertir en curva y ahora mismo por
+- **[05:09]** por ejemplo, no sé en qué comando estoy, estaba en el de editar, esto está cortado y no sé
+- **[05:14]** muy bien lo que pone, la curva, bueno, le voy a clicar a la V y se me crea una curva de
+- **[05:23]** besier, pero igualmente cuando creo la curva de besier creo que esta línea nueva modelada
+- **[05:31]** debería estar modelada por micropuntos y esos micropuntos deberían ser visibles
+- **[05:35]** yo creo, para que también pudiera editar esos puntos. Creo yo. Y luego la opción que hable y
+- **[05:45]** en verdad no sé si tengo que ir aquí para crear curva a ver. No, puedo hacer la curva. Si creo
+- **[05:51]** curva por puntos, que en verdad yo es lo que más utilizo como patronista, pero creo que deben
+- **[05:56]** estar las dos besiris para todos los usuarios. Esto no es lo que yo necesito porque esto es
+- **[06:04]** como un híbrido raro entre Vesier y los micropuntos de curva que ocupan puntos de curva que son
+- **[06:14]** puntos pequeñitos que modelan esta nueva línea que es una curva porque bueno el sistema híbrido
+- **[06:23]** para mí siempre va a ser el de Vesier porque aunque yo genere, construya, mueva la curva con
+- **[06:30]** besier estos palitos en verdad lo que te he dicho aquí hay creadas un montón de
+- **[06:39]** puntos que modelan esta curva y se sería para mi librido siempre que uno crea
+- **[06:45]** besier siempre también va a tener la posibilidad de editar los puntos de
+- **[06:49]** curva y aquí quería solamente curva sin estas cosas de besier y ni siquiera
+- **[06:56]** veo los puntos de curva y tengo besier es muy raro es como que me ha
+- **[06:59]** me ha agregado puntos estos aquí, no acabo de tener muy claro porque algunos
+- **[07:07]** son redondos y otros cuadrados, a mí me daba la impresión de que los redondos
+- **[07:10]** serán de curva pero hace lo mismo que estos puntos extremos, soy como que de
+- **[07:16]** una línea ahora he creado una ni siquiera una dos tres y cuatro
+- **[07:24]** líneas, aparte ha creado la separación y nuevas líneas dentro de
+- **[07:29]** la línea que al programa le ha dado la gana ni siquiera me pregunta. Bueno, aquí para
+- **[07:36]** empezar ya no me la está creando como lo has podido comprobar. Supongo que igual si salgo
+- **[07:42]** el menú voy a par con la V, es que no sé qué de curva pone que es con el atajo V pero
+- **[07:52]** aquí no hace nada, estoy clicando en la V y no pasa nada y ahora lo hago así y tampoco
+- **[08:01]** me he creado la curva, a la me la he creado ahí, pero aquí no me la crea, es como que
+- **[08:09]** esta línea se comporta siempre rara y distinta a las demás, eso sería interesante estudiarlo
+- **[08:15]** a ver si está, convertir, ah, en línea porque ya es una curva, lo voy a convertir en línea
+- **[08:22]** así, entonces, o convertir todas menos esta, que es la que también se movía distinto
+- **[08:30]** cuando quería mover la línea. Interesante. Bueno, voy a pasar a otro tema. Elimino ese
+- **[08:44]** patrón. De momento estoy contenta con cómo se mueven las piezas y no se mueven raras.
+- **[08:50]** Vale, luego esta herramienta que ya la de pluma. Ah, es como de líneas, permite crear líneas,
+- **[09:05]** no sé muy bien se prepara o sea ya me ha creado tipo VCR, si yo no hecho nada, si hablo de escape vale, funciona,
+- **[09:17]** clic para añadir puntos, arrastra para curvar a porque habrá arrastrado sin querer, ok, si eso tiene sentido,
+- **[09:24]** poco que es como illustrator, si yo solo clico ahora, pero ahora por ejemplo como sé que estoy haciendo una línea recta,
+- **[09:34]** otra vez me falta como un menú flotante o algo en el que yo le puedo decir ok como las líneas internas
+- **[09:40]** en los grados los grados en largo porque bueno está muy guay que hay una parezca de milímetros que
+- **[09:49]** pone el algo que estoy creando pero también quiero controlarlo no está como a ver qué llegue esto
+- **[09:57]** parece por ejemplo en la línea larga de
+- **[10:00]** A ver, quiero hacer de 50, que difícil.
+- **[10:04]** Esto parece una línea angulo recto, o sea, 0° de 50, pero está siendo muy difícil hacerlo.
+- **[10:12]** Ahora como sé que estoy creando una perpendicular,
+- **[10:17]** ahí creo que estoy en 0°50 ahora,
+- **[10:23]** pero la experiencia de su área es muy mala.
+- **[10:27]** y a ver, ahí creo que no estoy tan recta, bueno, ahí 50 y ok, cierro, el rectángulo no ha
+- **[10:39]** quedado perfecto, creo, y debería ser una experiencia mejor. Obviamente para eso me
+- **[10:46]** voy a la herramienta del rectángulo, pero el poder crear líneas que sean externas
+- **[10:52]** no internas con la pluma me parece un plus porque no sé cómo el programa manejará esto manejará
+- **[11:06]** porque son líneas no sin como sin o sea no es un contorno que contiene no es raro pero
+- **[11:16]** yo lo veo útil porque hay gente que puede querer crear patrones así lo que no me gusta
+- **[11:23]** es, si yo ahora quiero crear una línea nueva que empiece desde aquí nos está iluminando,
+- **[11:28]** claro, la herramienta se ha quedado como ahí, era en pluma, o sea, para mí estas líneas
+- **[11:38]** ahora deberían tener como puntos, es curioso que por ejemplo los puntos aquí en el cuadrado
+- **[11:45]** solo aparecen una vez que clicó el cuadrado, pero yo creo que siempre en los extremos
+- **[11:53]** los puntos deberían aparecer, porque esos puntos son indispensables, igual que en las líneas.
+- **[12:02]** Y bueno, los de curva igual no, porque son muchos puntos, y los de curva creo que solo deberían
+- **[12:11]** verse, igual cuando uno clica como el menú curva, de hecho aquí ni siquiera se están
+- **[12:18]** viendo, está viendo los nuevos puntos que ha creado el cuadrado para poder modelar con
+- **[12:24]** Vesier, pero no está viendo todos los puntos que hay aquí que modelan la curva y eso
+- **[12:28]** está guay, pero me está faltando verlos, que yo cuando fuera una función curva ya
+- **[12:32]** sea V o el comando que sea aquí, yo pueda moverlos, igual que
+- **[12:41]** muevo aquí estos puntos que no son de curva, pero es curioso que estos puntos
+- **[12:48]** los puedo mover con el comando seleccionar o con el de editar, creo, y esto es mi pregunta
+- **[12:58]** es cuál es la diferente, ahí está un poco raro, se duplica y es como que no está bien
+- **[13:03]** definido para que es cada comando. Luego si me voy a tijeras, me gusta mucho que hay
+- **[13:13]** un menú, por tanto quiero decir que voy a poder controlar algo, estaría más guay
+- **[13:17]** así por aflotante otra vez porque, bueno, a ver, de repente está aquí tapado y que
+- **[13:23]** se activará el yo clicado el comando. Vale, quiero hacer un corte curva, vamos a decir,
+- **[13:30]** conservo las dos partes y no sé, a mí lo de la costura no me convence. Creo que las
+- **[13:41]** costuras deberían estar como en otra fase del proceso de patronaje, porque sí, puede
+- **[13:50]** ser que en algún caso muy específico diga que es guay y ya puedo controlar la costura,
+- **[13:54]** pero no hace falta, eso es, las costuras vienen en un proceso distinto del proceso de creación,
+- **[14:02]** pero bueno, vale, yo he elegido lo que quería y la curioso es que ahora por ejemplo si me
+- **[14:06]** me pongo en este cuadrado, que es el que voy a cortar, no se me ilumina por ejemplo
+- **[14:11]** donde, vale, he clicado allí, pero yo no estaba segura de cómo sé que distancia tengo de
+- **[14:19]** aquí, aquí o de aquí, aquí, porque yo quería cortar de aquí a quince, por ejemplo. Bueno,
+- **[14:28]** aquí por lo guay es que se ilumina esta línea, pero tampoco me podía poner las
+- **[14:33]** distantes ahora o que yo pudiera editarlas en este minuflotante de alguna manera, dividirá
+- **[14:44]** la pieza y será ok. Me parece muy guay, es como ok, pero lo de eliminarlo lo entiendo.
+- **[14:51]** Cancelar es que no se haga la opción ni eliminar. Claro, elimina la pieza anterior,
+- **[14:57]** pero creo que lo de eliminar no es muy intuitivo, parece que vaya a eliminar la pieza cuando
+- **[15:02]** no la elimina. O sea, como goajeto, aceptar, no sé. Igualmente, dar tantos detalles,
+- **[15:15]** creo que no es suficiente porque uno ya cuando empieza a aprender a manejar el
+- **[15:19]** programa ya sabe que estaba a cortar la pieza. Igual en el menú flotante, la opción
+- **[15:25]** que te dijera si te duplica la pieza tipo conservando la original y cortando que
+- **[15:33]** te elimine la original. Pero otra vez voy a hacer la opción. Ahora, ah, será porque
+- **[15:41]** tengo que... ah, porque estoy seleccionando esa. Ah, pero ya sigo en el menú cortar y
+- **[15:54]** no me detecta nada. Tengo que salir y volver a entrar. Oye, oye, oye, no me hace nada.
+- **[16:07]** A ver, no me detecta ninguna pieza, a ver, así que yo quiero un corte recto, y nada, no
+- **[16:24]** quiero coser, no me corta, no hay nada, bueno, aquí cositas que mejorar, es lo que pasa
+- **[16:36]** a veces que nos iluminan las tonas o no hay un proceso de visualizar al usuario que controláis
+- **[16:47]** sobre lo que está haciendo. Vale, ahora voy a medir mis nuevas piezas. Aquí está muy
+- **[16:54]** guay porque aparece el punto de donde estoy, donde me empezará a medir, pero igualmente
+- **[16:58]** me faltaría visualizar por los extremos de mi pieza, porque aquí como sé que estoy
+- **[17:04]** en la punta, punta del extremo, o estoy a, imagínate, una milésima, necesito esa
+- **[17:12]** actitud, es patronaje. No sé, o sea, veo el punto, pero no sé exactamente si estoy
+- **[17:16]** en la cuspidio del punto. Me gusta que uno pueda medir así donde uno quiera pero también
+- **[17:30]** otra vez estaría guay si uno pudiera que yo al clicar aquí sepa que aquí estoy
+- **[17:40]** clicando a tres milímetros de este punto. El tema del control de los puntos es muy
+- **[17:46]** importante. Incluso, creo que a veces debería aparecer un menú, no hayas fijado que había
+- **[17:56]** un menú, que otra vez esto sigue cortado, no veo que hay aquí debajo, y que en ese menú
+- **[18:03]** yo si clic una línea, podría medir una línea, al clicar la línea va a aparecer la medida
+- **[18:08]** de la línea entera, o si yo quiero medir de un punto a otro punto pues que aparezca
+- **[18:14]** como está funcionando ahora, pero veis que en el tema de los puntos hayan más control
+- **[18:19]** de a dónde voy porque ahora no puedo hacer más zoom, estoy al toque del zoom, pues chis,
+- **[18:25]** lo que es un poco raro, que ahí no, por ejemplo, no he cogido el cuspide del triángulo,
+- **[18:36]** pero bueno, está guay, esta medición que sea como he dicho uno de los tipos, si yo
+- **[18:43]** de las capas se sale, genial. Si yo quiero seguir midiendo mide, si yo quiero ir a otra
+- **[18:50]** pieza va, genial. Ahora desaparecen. Entonces estaría muy bien que hubiera como un botón
+- **[18:59]** aquí en la pantalla 2D que pudiera decirme borrar, ¿no? Tema de mediciones, por ejemplo,
+- **[19:13]** porque igual la quiero recordar durante un rato mientras estoy haciendo una cosa y luego
+- **[19:18]** ya está ya pase página, ya no quiero seguir guardando, luego mira al hacer zoom que se
+- **[19:23]** quedan estas rayitas así como pixelada de las piezas, eso da una sensación un poco
+- **[19:28]** profesional, no sé rara, también estoy echando de menos como un... que aparece aquí el
+- **[19:36]** maniquí para poner como el zoom correcto, porque yo por ejemplo estaba pensando que
+- **[19:40]** piezas más grandes, no a pesar de que estoy controlando las medidas, pero mira a
+- **[19:43]** aquí en el menú 3D o minúsculas. O sea, los patrones van a ser para una persona como
+- **[19:49]** ésta. Y al final entonces, wow, no sé si se cruzan los números. A ver.
+- **[19:59]** Ah bueno, pero estás muy grande, pero no te creas, o sea, bueno, es como de la altura del...
+- **[20:08]** ah, aquí para mover en 3D era con las flechas, que bueno, es un poco incómodo porque...
+- **[20:16]** también me gustaría que se pudiera mover con el ratón.
+- **[20:21]** Pero esas llegamos, pues, como la altura del maniquí, y mira aquí se cruzan los números,
+- **[20:26]** entonces es como ruido visual, ¿no?, de qué me sirve.
+- **[20:36]** Vale, provela de medir, me faltan opciones, con el clicar salga al menú flotante como en todas,
+- **[20:42]** con más opciones como hemos visto, salga a mover también que pudieran medir ángulos,
+- **[20:48]** pues todo tipo de mediciones geométricas que un patronista puede necesitar, según sus habilidades,
+- **[20:55]** más matemáticas o no, para el control del patrón.
+- **[20:59]** Corsair, vale, que es un tema, entiendo, voy a crear otro rectángulo entonces,
+- **[21:05]** porque si solo tengo una pieza, que tiene impacto de coser en el plano 3D. Igualmente el icono
+- **[21:18]** está raro, parece que ahí es el icono de crear curvas. Me permite coser clicando una
+- **[21:26]** línea con otra línea. Ahora mismo he salido del menú coser y si vuelvo a clicar no sé
+- **[21:43]** muy bien que está cosido con qué. Si me quedo aquí quieta, me saca una línea, entonces
+- **[21:49]** ya sé que están cosidas. Quizá las líneas deberían... quizá cuando uno clica aquí el
+- **[21:54]** menú coser se debería activar por colores, tipo que esto está cosido con esto. Y cuando
+- **[22:04]** uno se ponga en la línea, por lo menos que sí que se activen las dos líneas del mismo
+- **[22:11]** color que están cosidas y me gusta que ponga la diferencia y ahora por ejemplo puedo editarlo
+- **[22:17]** si quiero no me crea una nueva si yo quiero corregirlo y al aquilo de largo de puntada
+- **[22:24]** no sirve de nada porque entiendo me va eso que dice que me va a crear una puntada en
+- **[22:30]** el 3d eso lo dejaría para otro menú que es el menú en el que uno puede elegir las
+- **[22:38]** costuras visuales como se van a ver las costuras luego, esto no viene aquí, este menú comando
+- **[22:47]** de coser debería servir solo desde un lado técnico de que el lado se va a juntar con
+- **[22:52]** que en el 3D. Y lo mismo, esto es como una visualización de cómo queda luego cosido.
+- **[23:04]** submen 1 me sirve más bien, debéis salir el men un flotante en el que me dijera si quiero
+- **[23:12]** coser línea con línea, si quiero coger un punto y arrastrar que ahora mismo no puedo, si
+- **[23:17]** clicó este punto se me ilumina toda la línea, yo quería de este punto decirle hasta aquí
+- **[23:23]** y esta llamó que pudiera decirte este punto hasta y que yo al menú le diga hasta 10
+- **[23:29]** milímetros, entonces me coja los 10 milímetros y ahora me vaya a toda línea, le diga
+- **[23:32]** de aquí hasta estos 10 o de la misma pieza. Hay poco control. Necesito un submenú flotante
+- **[23:41]** distinto a este y con tipos que me deje coser de distintas maneras y también editar lo
+- **[23:47]** que ya está cosido porque no se puede. Incluso si clicó y le da a su primer, suprime la
+- **[23:52]** pieza, suprime, bueno parece, no claro, muy raro, va el margen de costura, guay, lo
+- **[24:09]** mismo, ahora mismo vale tiene un atajo muy guay que apareciera un menú flotante poniendo
+- **[24:18]** cual es el latajo, la letra, como se la acabo aprendiendo y que siempre esté ahí, muy
+- **[24:24]** guay. Supongo como no me da opciones de si le quiero dar costuradora pieza a una línea
+- **[24:29]** y a ver voy a probar qué pasa. Vale, o sea no me gusta que la pieza esté cortada si
+- **[24:36]** yo la quiero. Vale, está en milímetros, lo que está muy bien, entonces le digo
+- **[24:45]** que 10, pero, o sea, lo que ponga ancho, como que no me convence. Bueno, o sea, en español
+- **[25:01]** es más margen de costura, ¿no? Y en inglés sí, mal-awens. Esto de heredar, no sé muy
+- **[25:08]** bien a qué se refiere, creo que es, no, no me ilatura un poco antiguo en español,
+- **[25:14]** igual, heredar en margen de la pizas a dejarlo a cero. Está igual que haya un botón
+- **[25:20]** de cero pero claro otra vez le da hasta dando cero a la pieza, uy, no, ahora le da a la pieza y me
+- **[25:26]** pone le da 9,5 ¿ok? Ya no sé lo que estoy haciendo. Me ha creado un margen a toda la pieza de 9,5
+- **[25:38]** por ejemplo ahora si me voy a menú de margen de costura igual que cuando estaban de coser
+- **[25:44]** estaría guay que si yo me pongo encima me dijera ¿cuánto es el margen de costura aquí?
+- **[25:50]** que yo pongo aquí y me pongo no hay contínuo aquí no hay contínuo y vaya
+- **[25:56]** desapareciendo según quito o incluso haya un botón en el submenu que aparece que es
+- **[26:01]** como visualizar todos los margenes visualizar margenes cuando clicke no es
+- **[26:08]** que hay poco control vale entonces estoy en margen de costura clicó vale o sea
+- **[26:15]** por pieza no funciona funciona por línea
+- **[26:19]** supongo que es una memoria de lo anterior, porque no sé por qué aparece directamente 9.5
+- **[26:25]** pero vamos a decir, vale, aquí lo veinte
+- **[26:28]** subo un intro
+- **[26:30]** y entonces tengo dos centímetros, veinte milímetros aquí y aquí no sé lo que tengo
+- **[26:41]** y esto hoy
+- **[26:44]** esto es como demasiado sofisticado técnico para un usuario, a ver
+- **[26:53]** O sea, esto crea como un objeto de la costura con este nombre tan...
+- **[26:58]** ¡Uff!
+- **[27:01]** Que ni siquiera puedo editar el nombre o...
+- **[27:05]** Esto está raro.
+- **[27:07]** A nivel usuario esto que... a uno que la aporta, si hago así...
+- **[27:11]** Margen de costura por defecto, ok.
+- **[27:20]** No sé, está raro. Y eso porque me lo ponen, porque no...
+- **[27:26]** O sea, algo muy contra...
+- **[27:29]** una línea
+- **[27:31]** ah, he clicado a la línea pero se me ha iluminado toda la pieza
+- **[27:37]** necesito más opciones en ese menú flotante
+- **[27:43]** se me ha iluminado toda la pieza pero solo cambia esa línea
+- **[27:46]** no sé
+- **[27:55]** falta control
+- **[27:56]** luego en este menú
+- **[27:58]** flotante ideal que saldría cuando yo clico aquí
+- **[28:01]** idealmente saldría lo del tema de los tacones de costura
+- **[28:06]** y eso es bueno, es un tema para más adelante
+- **[28:09]** va del comando de piquete por ejemplo
+- **[28:14]** yo pensaría que va a quedar un triángulo
+- **[28:18]** yo igual lo cambiaría se podía poner como una línea
+- **[28:21]** y otra línea perpendicular que es como
+- **[28:25]** o una muesca pero no sé
+- **[28:28]** te está raro
+- **[28:31]** y supongo que va a ser lo mismo que siempre porque como no hay aquí
+- **[28:35]** puntos de referencia, es como imagínate, yo quiero crear un piquete
+- **[28:39]** vale, de este punto
+- **[28:45]** de este punto, aquí a
+- **[28:47]** no sé ni cuánto hay, es problema, a dos centímetros, lo voy a inventar
+- **[28:51]** y eso como lo hago, como le digo al programa que lo quiero
+- **[28:54]** ahora estoy aquí, vale, perdón
+- **[28:59]** lo voy a
+- **[29:01]** vale, sale un submenú
+- **[29:04]** forma del piquete interesante
+- **[29:10]** voy hacia adentro
+- **[29:13]** ¡Muy bien!
+- **[29:15]** ¡Uy, me dejé hacer hasta 3!
+- **[29:17]** Pero, ¿mi pregunta es cómo lo va a hacer o dónde?
+- **[29:20]** ¡Ah! Aquí sí que aparece un menú de colocación.
+- **[29:23]** Esto no lo ha hecho ningún otro comando.
+- **[29:29]** Está muy bien. Yo esto, por ejemplo, no haría como igual un comando nuevo,
+- **[29:32]** pero lo pondría todo en el menú flotante que saliera igual.
+- **[29:36]** Mantener el clic, colocar exacto todo la distancia.
+- **[29:41]** ¡Muy demasiadas letras!
+- **[29:48]** de guay conforme le lo muevo, por ejemplo se vaya moviendo, si yo le digo a 239 que se
+- **[29:54]** ponga 239 para que yo pueda visualizar. Uy, que estoy haciendo.
+- **[30:02]** colocar exacto, claro como no sé cuánto humide esto a ver porque ahora mismo
+- **[30:10]** estoy haciendo pruebas, no estoy haciendo un patrón real otra vez me ha cogido el
+- **[30:13]** punto donde no era, esto humide 1.502 milímetros, entonces podría colocarlo a
+- **[30:20]** 500 milímetros
+- **[30:23]** vamos a decir hoy, colocación del piquete a 500, no me ha creado nada
+- **[30:39]** Luego, por ejemplo, una vez he creado costuras que yo pudiera ver la pieza con y sin costuras,
+- **[30:48]** porque ahora, por ejemplo, mi línea de manipulación de patrones que sería sin la costura está
+- **[30:55]** como intermitente, estaría guay. Por ejemplo, yendo al menú costuras, que el menú flotante
+- **[31:06]** yo dijera ver las piezas con costura o no sé también porque se puede elegir porque
+- **[31:15]** igual a algunas las quieres ver con costura pero ahora mismo quiero seguir manipulando
+- **[31:21]** estas piezas sin ver las costuras y que estas sean mis líneas fijas y sobre todo
+- **[31:28]** ver los puntos extremos como se veían aquí ahora hace un segundo y que el sí
+- **[31:36]** el piquete siempre lo traslado, igual el piquete no lo está creando porque
+- **[31:40]** he dado costuras, a ver voy a crear este rectángulo que no he podido gestionar el tamaño, voy
+- **[31:49]** a hacer un piquete sobre una pieza que no tiene costuras pues, o hay que me pregunta
+- **[31:55]** que distancia lo quiero, lo he clicado 4 porque estaba muy cerca y no lo quiero, oh está
+- **[31:59]** no sé cuánto mide, voy a tirar 200, bien eso me gusta, pero eso no estaba pasando
+- **[32:07]** la otra antes. No me ha creado nada porque le he dado a enter, voy a ver si 200 hará
+- **[32:19]** 200, me lo coge por abajo porque cada vez he clicado tirando en esa línea. Le voy a colocar
+- **[32:24]** exacto, no me lo crea, que ladilla. Le voy a dar a mantener el clic, no creo o los está
+- **[32:38]** creando y no los veo. Tipo un botón de visualizar o ocultar piquetes. Yo no veo nada, no
+- **[32:47]** no está creando nada. Vale, lo vuelve el tema del hilo de la prenda, he clickado y bueno no hay mucha información,
+- **[32:58]** ahí parece que es un atajo pero no se ve. Otra vez como con todos los comandos ya haría un menú flotante que saliera.
+- **[33:04]** Vale, vamos a por ejemplo a clickar esta pieza, a ver qué pasa.
+- **[33:11]** oye, no se lo que he hecho. Ah, hay como que clicar sin soltar y un poco es como que uno
+- **[33:23]** pudiera crear uno recto, pero tampoco estoy segura que sea recto. Podría indicarme aquí,
+- **[33:29]** por ejemplo, que yo pudiera escribir los grados a cero y entonces sería tal, si me pongo
+- **[33:35]** ¿Por qué? ¿Cómo sé que este es cero? Exacto. Está raro. Y si quiero editarlo, ver,
+- **[33:53]** quizá con este no lo había pensado. Editar. No. Me lo reemplata porque obviamente no
+- **[34:06]** puede haber dos hilos. Punto. Y este menú. Tipo de punto. Carlos, para crear puntos.
+- **[34:24]** y por qué este punto redondo esto es cuadrado, yo pensaría que estos son de curva
+- **[34:28]** no me deja modificarlo solo crear, ¿vale?
+- **[34:32]** si das algo...
+- **[34:34]** ¡Uhhh!
+- **[34:36]** siguen estando distintos, parecen que son puntos distintos
+- **[34:42]** pero ahora en cuanto los muevo
+- **[34:46]** algunos se quedan cuadrados, otros en curva
+- **[34:52]** no entiendo por qué
+- **[34:56]** este es el que ya había creado antes
+- **[34:58]** y a por la cara pues habría creado otro y no me he dado cuenta vale había creado dos no entiendo
+- **[35:12]** cada vez es para poner puntos en la línea que estaba no lo había hecho porque estaba jugando
+- **[35:20]** con lo de este menú que en verdad no me estaba visualizando los puntos de curva sino como
+- **[35:26]** estos puntos que estoy viendo ahora. No sé, debería igual haber un comando de
+- **[35:34]** puntos y controlar a este tipo de puntos de extremo de línea y luz de curva, pero
+- **[35:40]** repito los puntos de extrema línea deberían visualizarse ahora, sin que
+- **[35:45]** fueran muy grandes porque no sé, está raro. No, hay un comando que es editar
+- **[35:53]** Editar costuras, claro que no tengo costuras, pero ¿y por qué editar costuras no están
+- **[36:00]** el mismo que más gente costura?
+- **[36:02]** Por lo que yo cuando creé cliques tengas un menú flotante.
+- **[36:05]** Uy, vale, ya la he clicando a la pieza así que me ha dado.
+- **[36:10]** Eso es lo cuando pico una leña que me aparece como un menú.
+- **[36:14]** Pero cuando pico la pieza también quiero una medida específica que debería dejarme elegir.
+- **[36:20]** Bueno, editar costura. Igual, este está por el tipo de los tacones.
+- **[36:29]** Uy, ahí ha creado un tacón. Señor decirle nada.
+- **[36:34]** Ajá, interesante. Porque debería ser yo la que le diga que quiero un tacón o no.
+- **[36:40]** No acabo de entender muy bien cómo va este comando. Voy a darle otra oportunidad.
+- **[36:47]** Esto ahora mismo no sé qué hacer. Le doy muy intro para asegurarme.
+- **[36:59]** o cierro esto, pero eso es gracias a que al clicarla aquí se siga iluminada hasta
+- **[37:06]** línea, entonces como que tengo que salir
+- **[37:12]** y si le doy a editar costuras no pasa absolutamente nada, tan raro, luego el tema
+- **[37:26]** del hilo que estaba trabajando antes pues lo mismo que con las costuras con los
+- **[37:30]** piquetes que hubiera una forma de que estén allí pero ocultar, no ocultar porque sea la costura,
+- **[37:38]** el recto de hilo, todas esas cosas no interfieren con que yo muevo aquí puntos. Bueno, el tema es que
+- **[37:48]** ahora mismo lo voy a revisar, no me quiero centrar en eso cuando hay que arreglar tantas cosas aquí,
+- **[37:52]** creo que ya tenía clicado todos los comandos posibles, así que este es el trabajo de hoy y bueno,
+- **[38:03]** cuando solucionemos esas cosas, pues seguimos con más.
