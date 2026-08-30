@@ -8,16 +8,24 @@
  * (spec 2026-08-11 § 4.1): el borde bajo el cursor es el sujeto del corte.
  */
 import { test, expect } from '@playwright/test';
-import { waitForApp, switchView } from './helpers/sim';
+import { waitForApp } from './helpers/sim';
 import { st, dispatch, addPiece, clickAt, activarHerramienta, confirmarDialogo } from './helpers/lienzo';
 import { leerBitacora, guardarEvidencia, indiceDe } from './helpers/bitacora';
 
 test.use({ viewport: { width: 1366, height: 643 } });
 
+// Sin WebGPU en el runner (como caja-negra-bitacora.spec.ts). Y sin cambiar a
+// la vista 2D: desmontar el visor 3D con SwiftShader dejaba a Chromium sin poder
+// crear el SIGUIENTE contexto ("Failed to find browser context", 30 s en
+// "setting up context"; medido 5 de 5 corridas el 2026-08-30). En vista
+// dividida el lienzo mide ~640 px: las coordenadas caben ahí.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('vina-use-webgpu', 'false'));
+});
+
 test('#1093 — dos cortes seguidos sin salir de Tijeras', async ({ page }) => {
   test.setTimeout(90_000);
   await waitForApp(page);
-  await switchView(page, '2D');
   await addPiece(page, 'A', { x: 100, y: 100 }); // 200 × 150
   await dispatch(page, 'editor/selectPiece', 'A'); // como queda al crearla por clic
 
