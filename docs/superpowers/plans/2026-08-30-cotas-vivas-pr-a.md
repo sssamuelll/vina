@@ -42,6 +42,7 @@
 | `src/components/PatternEditor/PatternEditor.tsx` (mod.) | monta capas y tira; `handleCotaCommit` / scrub; `handlePieceComplete` devuelve el id; línea de sujeto |
 | `src/components/PatternEditor/useEditorInteractions.ts` (mod. `routeKey`) | `Tab` desde el lienzo enfoca el primer chip |
 | `src/components/PatternEditor/renderers/HintText.tsx` (mod.) | pista del rectángulo y de pieza con cotas |
+| `src/components/PatternEditor/NextPointPanel.css` (mod.) | de `fixed` a `absolute` dentro de `.pattern-editor` (se conserva hasta el PR B); la tira se oculta mientras está abierto |
 | `src/components/shell/AppShell.tsx` (mod. `:293`), `src/styles/layout.css` (mod. `:36-54`) | desmontar la canaleta |
 | `src/components/shell/ToolOptionsBar2D.tsx` + `.css` + test (borrar) | muere |
 | `src/styles/tokens.css` (mod.) | tokens de § 9 |
@@ -1160,7 +1161,7 @@ export default function CotaLines({ cotas, zoom2D }: { cotas: Cota[]; zoom2D: nu
 - Test: `src/components/PatternEditor/__tests__/useRectangleTool.test.tsx` (añadir caso), `src/components/PatternEditor/__tests__/cotasDeSujeto.test.ts` (nuevo, función pura `cotasDelSujeto`)
 
 **Interfaces:**
-- `useRectangleTool(zoom2D, pan2D, onComplete: (piece) => string)` devuelve además `lastCreatedId: string | null`.
+- `useRectangleTool(zoom2D, pan2D, onComplete: (piece) => string)` devuelve además `hotId: string | null` y `enfriar(): void`. **Enfriamiento irreversible** (revisión § 13.2 #1): `PatternEditor` llama `enfriar()` en un efecto cuando `selectedPieceIds[0] !== hotId`, cuando `activeTool !== 'rectangle'`, o cuando la pieza ya no existe.
 - Nueva función pura en `src/components/PatternEditor/cotas/sujeto.ts`:
 
 ```ts
@@ -1280,7 +1281,7 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
 }
 ```
 
-- [ ] **Step 4: `useRectangleTool`** — `onComplete: (piece: NewPieceData) => string`; añadir `const [lastCreatedId, setLastCreatedId] = useState<string | null>(null)`; en `create`: `const id = onComplete({...}); setLastCreatedId(id);`; devolver `lastCreatedId` en el objeto del hook. Test nuevo en `useRectangleTool.test.tsx`: tras un clic, `result.current.lastCreatedId` es el id que devolvió `onComplete` (mockear `onComplete` con `vi.fn(() => 'id-1')`).
+- [ ] **Step 4: `useRectangleTool`** — `onComplete: (piece: NewPieceData) => string`; añadir `const [hotId, setHotId] = useState<string | null>(null)`; en `create`: `const id = onComplete({...}); setHotId(id);`; `const enfriar = useCallback(() => setHotId(null), [])`; devolver `hotId` y `enfriar`. Tests en `useRectangleTool.test.tsx`: tras un clic `hotId` es el id que devolvió `onComplete` (`vi.fn(() => 'id-1')`); `enfriar()` lo deja en `null` y un segundo clic lo vuelve a poner.
 
 - [ ] **Step 5: `PatternEditor.tsx`**
 
@@ -1330,7 +1331,23 @@ Añadir, cerca de `handleTransform` (`:601`):
     pushJournal('gesture', 'cota:scrub', { id: cota.id, value: valueMm, caliente: sujeto.caliente });
   }, [aplicarCota, escribirDefault, dispatch, sujeto.caliente]);
   const cotasRef = useRef<CotasLayerHandle>(null);
+  // Enfriamiento irreversible (spec § 3.1): en cuanto la selección deja de ser
+  // la pieza nueva, cambia la herramienta o la pieza desaparece, se enfría y
+  // no vuelve a calentarse sola.
+  useEffect(() => {
+    const hot = rectTool.hotId;
+    if (!hot) return;
+    const viva = pieces.some(p => p.id === hot);
+    if (activeTool !== 'rectangle' || selectedPieceIds[0] !== hot || selectedPieceIds.length !== 1 || !viva) rectTool.enfriar();
+  }, [activeTool, selectedPieceIds, pieces, rectTool]);
+  // Un batch de scrub nunca queda abierto: si el sujeto cambia o el editor se
+  // desmonta con un token vivo, se cierra aquí (terminales, spec § 5.3).
+  useEffect(() => () => {
+    if (scrubToken.current) { endUndoBatch(dispatch, scrubToken.current); scrubToken.current = null; }
+  }, [sujeto.piece?.id, dispatch]);
 ```
+
+El scrub va **coalescido a un frame** y **derivado del snapshot**: `handleCotaScrubStart` guarda `scrubCota.current = cota` (la cota de partida, con su `apply` sobre la pieza de partida); `handleCotaScrub` guarda el último valor en `scrubValor.current` y, si no hay rAF pendiente, programa uno que despacha `aplicarCota(scrubCota.current, scrubValor.current, token)` **si el token sigue activo** (`isUndoBatchTokenActive`); si un undo ajeno lo invalidó, termina el scrub sin despachar. `handleCotaScrubEnd` cancela el rAF pendiente, despacha el valor final una vez y cierra el batch.
 
 (`isDraggingPiece` ya se destructura de `useEditorInteractions` en `PatternEditor.tsx:641`; el `useMemo` del sujeto va DESPUÉS de esa línea. `UndoBatchToken`, `beginUndoBatch`, `endUndoBatch`, `withUndoBatchToken` vienen de `../../store/undoMiddleware`.)
 
@@ -1355,9 +1372,12 @@ Pasar `cotas: cotasRef` en el objeto `tools` que recibe `useEditorInteractions` 
 - [ ] **Step 6: `Tab` en CF-1** — en `routeKey`, antes de `if (e.key !== 'Escape') return null;`:
 
 ```ts
-      // Tab desde el lienzo: a la primera cota (spec cotas vivas § 5.3). Solo si
-      // hay cotas; si no, Tab sigue siendo el de siempre.
-      if (e.key === 'Tab' && !e.shiftKey && tools.cotas?.current?.focusFirst()) {
+      // Tab desde el lienzo: a la primera cota (spec cotas vivas § 5.3). Solo
+      // desde el <svg> o el body — desde el dock o desde un chip en reposo, Tab
+      // es el nativo (si no, un Tab desde un chip volvería al primero en bucle).
+      const t = e.target as HTMLElement | null;
+      const desdeElLienzo = t === document.body || (t?.tagName ?? '').toLowerCase() === 'svg';
+      if (e.key === 'Tab' && !e.shiftKey && desdeElLienzo && tools.cotas?.current?.focusFirst()) {
         e.preventDefault();
         e.stopPropagation();
         return 'cotas';

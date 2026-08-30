@@ -69,7 +69,7 @@ Lo que NO muestra cotas en esta tanda: extremos interiores de una interna (no es
 
 ### 3.1 Regla del sujeto
 
-Un sujeto a la vez, y **gana el más reciente**: trazo vivo > pieza recién creada por esta herramienta > selección. No hay heurística de "acción ajena": la creación caliente es `useRectangleTool.lastCreatedId === selectedPieceIds[0]` mientras la herramienta siga siendo `rectangle`; se enfría al cambiar la selección o la herramienta. Solo en ese estado, confirmar una cota **también escribe el default** del próximo rectángulo (`setToolOption`), como Blender *Adjust Last Operation*. Con una pieza simplemente seleccionada, no: seleccionar un DXF de 892 mm no puede volver 892 el ancho del próximo rectángulo.
+Un sujeto a la vez, y **gana el más reciente**: trazo vivo > pieza recién creada por esta herramienta > selección. No hay heurística de "acción ajena": `handlePieceComplete` devuelve el id y `useRectangleTool` lo guarda como `hotId`; la pieza está caliente mientras `hotId === selectedPieceIds[0]` y la herramienta siga siendo `rectangle`. **El enfriamiento es irreversible**: `hotId` se borra (a `null`) en cuanto la selección deja de ser esa pieza, cambia la herramienta, o la pieza desaparece del proyecto (undo). Volver a seleccionarla, volver a Rectángulo o rehacerla la encuentra **fría** — nunca vuelve a escribir el default por su cuenta (revisión § 13.2, #1). Solo en ese estado, confirmar una cota **también escribe el default** del próximo rectángulo (`setToolOption`), como Blender *Adjust Last Operation*. Con una pieza simplemente seleccionada, no: seleccionar un DXF de 892 mm no puede volver 892 el ancho del próximo rectángulo.
 
 ### 3.2 Piezas bloqueadas
 
@@ -114,11 +114,11 @@ Usa `polarOf` (`polyPenGeometry.ts:117`, 0° a la derecha, 90° arriba en pantal
 
 ### 4.3 `resizePieceTo(piece, bbox, wMm, hMm)`
 
-No es `scaleOutline` a secas. El flujo real del arrastre (`useTransformTool.ts:207-269`) des-gira el ancla, la baja al local de la pieza, escala el contorno alrededor, **compensa la posición** por el cambio de pivote y **transforma internas y re-ancla piquetes** (`transformInternals`). Ese bloque se **extrae** a una función pura `scalePiecesAroundAnchor(snapshot, bbox, scaleX, scaleY, anchorUnrotated)` que usan los dos caminos — el handle y la cota — y `resizePieceTo` es `scaleX = w/bbox.width`, `scaleY = h/bbox.height`, ancla = `scaleAnchorForHandle('se', bbox)` (la esquina superior izquierda queda plantada: "como si arrastraras el manejador inferior derecho", que es la definición que María ya conoce por maria-198). Test de igualdad: el resultado numérico coincide byte por byte con el del arrastre para una pieza girada con internas y piquetes.
+No es `scaleOutline` a secas. El flujo real del arrastre (`useTransformTool.ts:207-269`) des-gira el ancla, la baja al local de la pieza, escala el contorno alrededor, **compensa la posición** por el cambio de pivote y **transforma internas y re-ancla piquetes** (`transformInternals`). Ese bloque se **extrae** a una función pura `scalePiecesAroundAnchor(snapshot, bbox, scaleX, scaleY, anchorUnrotated)` que usan los dos caminos — el handle y la cota — y `resizePieceTo` es `scaleX = w/bbox.width`, `scaleY = h/bbox.height`, ancla = `scaleAnchorForHandle('se', bbox)` (la esquina superior izquierda queda plantada: "como si arrastraras el manejador inferior derecho", que es la definición que María ya conoce por maria-198). Test de igualdad: el resultado coincide con el de `scalePiecesAroundAnchor` para el mismo `scaleX/scaleY` y ancla — **mismo motor**, no mismo gesto: el arrastre de una esquina sin Shift fuerza escala uniforme y clampa a 0,01; la cota escrita es no uniforme por definición.
 
 ### 4.4 `parseMedida(texto)`
 
-`"300"`, `"300,5"`, `"300.5"`, `" 12 "` → número; `""`, `"abc"`, `"1e3"` → `null`. Sin unidades en esta tanda (todo en mm; `formatDimension` sigue pintando según `UnitSystem`).
+`"300"`, `"300,5"`, `"300.5"`, `" 12 "` → número; `""`, `"abc"`, `"1e3"` → `null`. Sin unidades en esta tanda: **los chips leen y escriben en mm** aunque `editor.units` sea cm o pulgadas (el resto de etiquetas sigue con `formatDimension`). Convertir el chip a la unidad de la usuaria es una decisión aparte (§ 11): no se mezcla "30,0 cm" en el botón con "300" en el campo.
 
 ---
 
@@ -127,7 +127,7 @@ No es `scaleOutline` a secas. El flujo real del arrastre (`useTransformTool.ts:2
 ### 5.1 Dos capas, un solo origen
 
 - **Las líneas de cota** (1 px con ticks) son SVG dentro de `<g data-pan-zoom-group>`, con grosor `1/z` como el readout actual (`PolyPenToolOverlay.tsx:141-148`).
-- **Los chips** son HTML: un `<div class="cotas">` hermano del `<svg>` dentro de `.pattern-editor` (`position: relative`, `PatternEditor.tsx:860`), posicionado con la misma fórmula bbox→pantalla de `FloatingActionBar.tsx:54-61`. Cada chip es un `<button>` en reposo y un `<input>` en edición. Razones: son inputs nativos (el guard de CF-1 `isEditableTarget` los respeta sin tocar nada), Tab entre chips es el orden nativo del DOM, y el foco se maneja con `.focus()` de verdad — lo que un `<foreignObject>` bajo `scale(1/z)` no da limpio.
+- **Los chips** son HTML: un `<div class="cotas">` hermano del `<svg>` dentro de `.pattern-editor` (`position: relative`, `PatternEditor.tsx:860`), posicionado con la fórmula pan + patrón × zoom de `FloatingActionBar.tsx:54-61` **aplicada a los extremos ya girados de la cota** (`cotasDePieza` rota `a`, `b` y `outward` con el pivote de la caja, como `computeHandlePositions`; la barra, que no gira, no sirve de molde para eso). Cada chip es un `<button>` en reposo y un `<input>` en edición. Razones: son inputs nativos (el guard de CF-1 `isEditableTarget` los respeta sin tocar nada), Tab entre chips es el orden nativo del DOM, y el foco se maneja con `.focus()` de verdad — lo que un `<foreignObject>` bajo `scale(1/z)` no da limpio.
 - Las dos capas leen `pan2D`/`zoom2D` de Redux en el mismo render: no hay "sincronizar".
 - **La capa HTML no tapa el lienzo:** el `<div class="cotas">` lleva `pointer-events: none` y solo los chips `pointer-events: auto`. El `wheel` del pan/zoom está atado **al nodo `<svg>`** (`useEditorInteractions.ts:575`), así que sobre un chip la rueda no hace zoom — son 56×22 px por chip; se acepta y se dice. Un chip **no** consume el clic derecho (menú contextual de siempre) ni el botón medio.
 
@@ -154,28 +154,28 @@ No es `scaleOutline` a secas. El flujo real del arrastre (`useTransformTool.ts:2
 |---|---|
 | hover | se levanta 1 px, cursor `ew-resize`: "esto se arrastra" |
 | **clic** (< 4 px, `DRAG_THRESHOLD_PX`) | entra en **edición**: el chip se vuelve `<input>` con el valor en texto, seleccionado |
-| **arrastre** (≥ 4 px) | **scrub**: `setPointerCapture`; `Δvalor = Δx_pantalla / zoom2D` mm (o grados para ángulo) — el número sigue al cursor 1:1 con la geometría; con `Shift`, `Δ/10`. Cada movimiento despacha la mutación real (como hace hoy el arrastre de extremo, `useEditorInteractions.ts:863`) **dentro de un batch de deshacer** (`beginUndoBatch` al empezar, `withUndoBatchToken` en cada acción, `endUndoBatch` al soltar — el patrón de `useEditCurve.ts:78`): **una entrada** por scrub, independiente de los 500 ms |
-| `Enter` / `Espacio` con el foco en el botón | entra en edición (a11y nativa del botón) |
+| **arrastre** (≥ 4 px) | **scrub**: `setPointerCapture`; `Δvalor = Δx_pantalla / zoom2D` mm (o grados para ángulo) — el número sigue al cursor 1:1 con la geometría; **`Shift` ×10 (grueso), `Alt` ×0,1 (fino)**, una sola escala para scrub y flechas (Figma). Cada movimiento se deriva del **snapshot** de la cota al empezar (valor absoluto sobre la pieza de partida: sin deriva), y se despacha **como máximo una vez por frame** (`requestAnimationFrame`). Cada frame despacha la mutación real **dentro de un batch de deshacer** (`beginUndoBatch` al empezar, `withUndoBatchToken` en cada acción, `endUndoBatch` al terminar — el patrón de `useEditCurve.ts:78`): **una entrada** por scrub, independiente de los 500 ms. **Terminales del scrub, todos:** `pointerup`, `pointercancel`, `lostpointercapture`, desmontaje del chip o de la capa, cambio de sujeto o de herramienta, y token invalidado por un undo ajeno (`isUndoBatchTokenActive`) — en cualquiera de ellos se cierra el batch y no se despacha más |
+| `Enter` / `Espacio` con el foco en el botón | entra en edición (a11y nativa del botón); el chip **detiene la propagación** de esas dos teclas para que `Espacio` no llegue al atajo global de simular (`ShortcutProvider` escucha en `document`) |
 | `Tab` / `⇧Tab` | siguiente / anterior chip — orden **fijo** del DOM: largo → ángulo (por tramo, en orden del trazo) → extremo A hacia atrás → A hacia adelante → B atrás → B adelante → el select "Tipo de línea" de la tira → sale. Tab desde un extremo hace aparecer sus cotas de borde (§ 3.4) |
-| clic derecho | el menú contextual de siempre (el chip no lo toma) |
+| clic derecho / botón medio | **nada**: un evento sobre el chip HTML no llega al `<svg>` hermano (burbujea por `.cotas` y `.pattern-editor`, no lateralmente). Se evita el menú nativo del navegador con `preventDefault`; son 56×22 px por chip y se acepta |
 
 **Chip en edición (`<input type="text" inputMode="decimal">`)**
 
 | Tecla | Qué pasa |
 |---|---|
 | dígitos, `,` `.` `-`, Retroceso, Supr, flechas ←→ | edición nativa del campo. Ninguna llega al lienzo (`isEditableTarget`, `useEditorInteractions.ts:496`) — Retroceso **no** borra la pieza, `S` **no** cambia de herramienta |
-| `↑` / `↓` | ±1 (con `Shift` ±10) en la unidad de la cota |
-| **`Enter`** | **confirma**: un solo `dispatch` (una entrada de deshacer); el chip vuelve a reposo **con el foco en el botón** (Tab sigue al siguiente) |
-| **`Tab`** | confirma y pasa al siguiente chip (el "300 Tab 150 Enter" de María) |
+| `↑` / `↓` | ±1; con `Shift` ±10; con `Alt` ±0,1 — la misma escala que el scrub |
+| **`Enter`** | **confirma**: **una acción `project/*`** (= una entrada de deshacer) y, solo en caliente, además un `tools/setToolOption` (fuera del historial, como Blender); el chip vuelve a reposo **con el foco en el botón** (Tab sigue al siguiente) |
+| **`Tab`** / `⇧Tab` | confirma y **mueve el foco al chip siguiente/anterior por su cuenta** (`preventDefault`): el input se desmonta en el mismo tick y la navegación nativa perdería el punto de partida (revisión § 13.2, #4). El "300 Tab 150 Enter" de María |
 | **`Escape`** | descarta el borrador, vuelve a reposo con el foco en el botón. Un segundo `Escape` es el de siempre (deselecciona) |
-| blur (clic fuera) | confirma si el texto es válido y distinto; si no, descarta. Es lo de Excalidraw `DragInput`; el clic en el lienzo ya cambió la selección, así que el commit comprueba primero que el sujeto **sigue vivo** (`pieces.find` / `internals.find`) |
+| blur (clic fuera) | **descarta**, siempre. La selección cambia en `mousedown`, antes del blur, y a veces el input se desmonta sin blur: confirmar ahí sería una carrera con dos resultados (revisión § 13.2, #10). Solo Enter y Tab confirman — lo que ya hace "Siguiente punto"; la pista lo dice |
 | rueda | nada (no es `type="number"`) |
 
 **Desde el lienzo (foco en `svg`/`body`, sin campo editable):**
 
 | Tecla | Qué pasa |
 |---|---|
-| `Tab` | con cotas visibles, **enfoca el primer chip** (`preventDefault`); en trazo vivo, **congela el chip del tramo en curso** y lo abre en edición (Largo). Va en CF-1 (`routeKey`), donde hoy `Tab` abre "Siguiente punto" (`usePolyPenTool.ts:380`, `usePenTool.ts:263`): una tecla, un significado, más alcance |
+| `Tab` | **solo si `e.target` es el `<svg>` o `document.body`** (desde el dock o desde un chip en reposo, Tab es el nativo — si no, un Tab desde un chip volvería al primero en bucle): con cotas visibles, **enfoca el primer chip** (`preventDefault`); en trazo vivo, **congela el chip del tramo en curso** y lo abre en edición (Largo). Va en CF-1 (`routeKey`), donde hoy `Tab` abre "Siguiente punto" (`usePolyPenTool.ts:380`, `usePenTool.ts:263`): una tecla, un significado, más alcance |
 | dígitos | **no se capturan** (el visor 3D escucha `0-9` desde `body`, `inputBindings.ts:44`; y hay overrides de la usuaria). Se descarta el "teclear sin clicar" |
 | resto | lo de siempre |
 
@@ -321,7 +321,7 @@ La gramática que Atrium validó lado a lado (`Atrium/docs/superpowers/specs/202
 | `--text-*` sobre el papel es invisible (1.05:1) | los chips usan solo `--cota-*` / `--ink-on-light-*`; `HintText.legibilidad.test.tsx` es el patrón |
 | jsdom ciego al layout y al foco real | todo emplazamiento y toda tecla real van en e2e (8.3) |
 | Densidad a 1366 px | colapso por 56 px y cap de 8 (5.2); e2e 8.3.5 |
-| Tamaño | **L.** Motores (3) + capa de cotas (SVG + HTML) + chip con scrub + congelado del tramo + tira + mudanza de controles + desmontaje + 7 e2e. Se entrega en **dos PR**: A) motores + cotas de pieza (rectángulo, #223) + tira + desmontaje; B) cotas de línea interna (#226) + congelado del tramo. Cada PR con su NOTA para María |
+| Tamaño | **L.** Motores (3) + capa de cotas (SVG + HTML) + chip con scrub + congelado del tramo + tira + mudanza de controles + desmontaje + 7 e2e. Se entrega en **dos PR**: A) motores + cotas de pieza (rectángulo, #223/#225) + tira + desmontaje **de la barra** — `NextPointPanel` se conserva en A (pasa de `fixed` a `absolute` dentro de `.pattern-editor` y la tira se oculta mientras está abierto: el gesto vivo gana la esquina); B) cotas de línea interna (#226) + congelado del tramo, que es cuando `NextPointPanel` muere. La revisión (§ 13.2, #15) tasa A como XL si se mide por superficie tocada; el núcleo M es resize + cotas de pieza, y la tira/desmontaje van en commits separables para poder partir el PR |
 
 ---
 
@@ -347,6 +347,29 @@ Lo que este documento **toma** de ellas:
 
 Lo que **no** toma: la previsualización por tecla mientras se escribe (las tres la proponían; sin canal de render sombra queda para después de medir el scrub, § 11); las etiquetas "Izq. arriba…" como texto (mueren; sobreviven como `aria-label`); el arco de ángulo dibujado (ruido; el chip dice los grados); la ficha plegable estilo Blender (la tira no se pliega en esta tanda).
 
-### 13.2 Revisión adversarial (codex, Serrano/Halberg/Vex)
+### 13.2 Revisión adversarial (codex `ultra`, Serrano/Halberg/Vex, 2026-08-30, 21 min)
 
-(Se completa antes del primer test.)
+Veredicto: *"la v2 no está lista como contrato de implementación"* — 7 BLOCKER, 8 HIGH, 3 MEDIUM, 15 premisas falsas. Cada hallazgo, su decisión y dónde se fija:
+
+| # | Hallazgo | Decisión | Dónde |
+|---|---|---|---|
+| 1 | La creación caliente no enfría de forma irreversible: reseleccionar la pieza o volver a Rectángulo la volvía caliente | `hotId` en el hook, se borra al cambiar selección/herramienta o al desaparecer la pieza; nunca vuelve | § 3.1; test 8.3.2 con reselección e ida y vuelta de herramienta |
+| 2 | `cw`/`ccw` invertidos en § 4.1 y coincidencia exacta con una esquina devuelve dos ceros | **PR B**: `cw` = orden almacenado (`notchAnchor.ts:12`); la esquina "anterior" es `advance(corner, s, 'cw')` con `corner ≤ s`; en coincidencia exacta la esquina propia no cuenta, se toman las dos vecinas | § 4.1 (reescribir en PR B) |
+| 3 | El scrub cerraba el batch solo al soltar | Terminales completos: `pointerup`, `pointercancel`, `lostpointercapture`, desmontaje, cambio de sujeto/herramienta, token invalidado | § 5.3; tests de `CotaChip` (cancel, lost capture, unmount) |
+| 4 | Tab: CF-1 capturaba desde el dock y desde un chip (bucle); el input se desmonta antes del Tab nativo; `Space` en el botón dispara simular; `Escape` desde inputs es excepción del guard global | Tab en CF-1 **solo** con target `svg`/`body`; el chip mueve el foco al vecino por su cuenta; `Space`/`Enter` en el botón detienen la propagación; el input detiene todo `keydown` | § 5.3; tests de `CotaChip` |
+| 5 | PR A borraba `NextPointPanel` antes de su reemplazo | Se conserva en A: pasa a `absolute` dentro de `.pattern-editor`; la tira se oculta mientras está abierto | § 12 |
+| 6 | Contornos multi-subpath sin dominio de adyacencia; `detectCorners` (v1) vs anillo metric 2 | **PR B**: `subpathCount > 1` → sin cotas de borde (dicho); esquinas proyectadas al anillo metric 2 y ordenadas por arco | § 4.1 (PR B) |
+| 7 | Dispatch por movimiento sin presupuesto de frame; invalida el memo de anillos de `usePolyPenTool` | rAF: una acción por frame como máximo; cada valor se deriva del snapshot; el e2e de scrub corre sobre la pieza; presupuesto DXF queda como medición pendiente (§ 11) | § 5.3 |
+| 8 | La fórmula de `FloatingActionBar` no gira | Los extremos de la cota ya vienen girados de `cotasDePieza` (pivote de la caja); la fórmula solo proyecta | § 5.1; test `cotas.test.ts` (90°) |
+| 9 | Clic derecho / botón medio no atraviesan al `<svg>` | Aceptado y dicho: nada sobre el chip; `preventDefault` del menú nativo | § 5.3 |
+| 10 | Blur vs cambio de selección en `mousedown`: dos resultados posibles | **El blur descarta**; solo Enter y Tab confirman | § 5.3; test |
+| 11 | Undo deja `selectedInternalLine` colgante | **PR B**: la compuerta de § 3.5 exige que la línea exista (`internals.find`) | § 3.5 (PR B) |
+| 12 | `internalLineDragRef` no es observable | **PR B**: `useEditorInteractions` expone `isDraggingEndpoint` como estado, igual que `isDraggingPiece` | § 5.2 (PR B) |
+| 13 | Unidades: el botón en cm/pulgadas y el campo en mm | Los chips leen y escriben en **mm** siempre en esta tanda; dicho en § 4.4 y § 11 | § 4.4 |
+| 14 | Dominio de `PathCommand` (H/V/S/T/A; contornos de dos puntos sin esquinas) | **PR B**: solo `L` produce cota de tramo; `A` y `subpathCount > 1` sin cotas de borde; cero esquinas → sin cotas de borde | § 4.1-4.2 (PR B) |
+| 15 | Tamaño XL, no L; PR A mezcla dominios | Núcleo M confirmado (resize + cotas de pieza); tira/desmontaje en commits separables; se reporta XL si se mide por superficie | § 12 |
+| 16 | "Igual al handle `se`" mezcla contratos (uniforme vs no uniforme) | Mismo motor, no mismo gesto — reescrito | § 4.3 |
+| 17 | "Un dispatch" con creación caliente son dos acciones | Una `project/*` (undo) + un `tools/*` (fuera del historial) | § 5.3 |
+| 18 | Shift con dos ganancias | Shift ×10, Alt ×0,1, en scrub y flechas | § 5.3; test |
+
+Descartado por la propia revisión: teclear dígitos no mueve la cámara 3D (`Viewport3D.tsx:668` ya excluye targets editables); el conflicto real es `Escape`/`Space` en `ShortcutProvider`, cerrado en #4.
