@@ -62,6 +62,14 @@ export function getAnchor(cmd: PathCommand): Point2D | null {
   }
 }
 
+/** Devuelve el ancla del M que posee el cierre indicado. */
+export function getClosingAnchor(outline: PathCommand[], zIndex: number): Point2D | null {
+  for (let i = zIndex; i >= 0; i--) {
+    if (outline[i]?.type === 'M') return getAnchor(outline[i]);
+  }
+  return null;
+}
+
 /** Grouping key for an anchor: exact coordinate quantised to the nanometre. */
 function anchorKey(point: Point2D): string {
   return `${Math.round(point.x * 1e6)}|${Math.round(point.y * 1e6)}`;
@@ -198,11 +206,16 @@ function moveOneCommand(
 ): void {
   const cmd = cmds[commandIndex];
   if (!cmd) return;
+  let anchorDelta: Point2D | null = null;
 
   switch (cmd.type) {
     case 'M':
     case 'L':
       if (pointType === 'anchor') {
+        anchorDelta = {
+          x: newPos.x - cmd.values[0],
+          y: newPos.y - cmd.values[1],
+        };
         cmd.values[0] = newPos.x;
         cmd.values[1] = newPos.y;
       }
@@ -212,17 +225,12 @@ function moveOneCommand(
         // Move anchor (v[4], v[5]) and drag control points with it
         const dx = newPos.x - cmd.values[4];
         const dy = newPos.y - cmd.values[5];
+        anchorDelta = { x: dx, y: dy };
         cmd.values[4] = newPos.x;
         cmd.values[5] = newPos.y;
         // Move cp2 (incoming handle) with anchor
         cmd.values[2] += dx;
         cmd.values[3] += dy;
-        // Also move cp1 of NEXT command if it's a C
-        const nextIdx = commandIndex + 1;
-        if (nextIdx < cmds.length && cmds[nextIdx].type === 'C') {
-          cmds[nextIdx].values[0] += dx;
-          cmds[nextIdx].values[1] += dy;
-        }
       } else if (pointType === 'cp1') {
         // cp1 = outgoing handle of PREVIOUS node = values[0,1]
         cmd.values[0] = newPos.x;
@@ -237,6 +245,7 @@ function moveOneCommand(
       if (pointType === 'anchor') {
         const qdx = newPos.x - cmd.values[2];
         const qdy = newPos.y - cmd.values[3];
+        anchorDelta = { x: qdx, y: qdy };
         cmd.values[2] = newPos.x;
         cmd.values[3] = newPos.y;
         cmd.values[0] += qdx;
@@ -246,6 +255,13 @@ function moveOneCommand(
         cmd.values[1] = newPos.y;
       }
       break;
+  }
+
+  const next = cmds[commandIndex + 1];
+  if (anchorDelta && next?.type === 'C') {
+    // El cp1 es el manejador saliente del ancla anterior.
+    next.values[0] += anchorDelta.x;
+    next.values[1] += anchorDelta.y;
   }
 }
 
@@ -481,15 +497,15 @@ export function deletePoint(
 ): PathCommand[] {
   const cmds = outline.map(c => ({ ...c, values: [...c.values] }));
 
-  // Count current anchor points (non-Z commands)
-  const anchorCount = cmds.filter(c => c.type !== 'Z').length;
+  // Elimina el comando antes de contar el contorno resultante.
+  cmds.splice(commandIndex, 1);
 
-  if (anchorCount <= 3) {
+  // Las anclas coincidentes son un solo punto geométrico.
+  const remainingAnchorCount = coincidentAnchorGroups(cmds).size;
+
+  if (remainingAnchorCount < 3) {
     throw new Error('Cannot delete point: piece must have at least 3 anchor points');
   }
-
-  // Remove the command
-  cmds.splice(commandIndex, 1);
 
   // Ensure first command is M
   if (cmds.length > 0 && cmds[0].type !== 'M') {
@@ -508,10 +524,7 @@ export function deletePoint(
   return cmds;
 }
 
-/**
- * Convert an L command to a C command with control points at 1/3 and 2/3
- * along the straight segment. If the command is already C, returns unchanged.
- */
+/** Convierte un L en C; si recibe un Z, inserta la curva antes del cierre. */
 export function convertToCurve(
   outline: PathCommand[],
   commandIndex: number,
@@ -529,7 +542,7 @@ export function convertToCurve(
   }
   if (!prevAnchor) return cmds;
 
-  const anchor = cmd.type === 'Z' ? getAnchor(cmds[0]) : getAnchor(cmd);
+  const anchor = cmd.type === 'Z' ? getClosingAnchor(cmds, commandIndex) : getAnchor(cmd);
   if (!anchor) return cmds;
 
   // Control points at 1/3 and 2/3

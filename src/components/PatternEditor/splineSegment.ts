@@ -1,6 +1,6 @@
 import type { PathCommand, Point2D } from '../../types/types';
 import { chainHandles } from '../../utils/geometry/catmullRom';
-import { getAnchor } from './nodeEditorUtils';
+import { getAnchor, getClosingAnchor } from './nodeEditorUtils';
 
 /**
  * "Curva por puntos" — el modelo que pidió María en la nota #197.
@@ -167,7 +167,7 @@ export function convertSegmentToSpline(
     if (from) break;
   }
   if (!from) return cmds;
-  const to = cmd.type === 'Z' ? getAnchor(cmds[0]) : getAnchor(cmd);
+  const to = cmd.type === 'Z' ? getClosingAnchor(cmds, commandIndex) : getAnchor(cmd);
   if (!to) return cmds;
   if (Math.hypot(to.x - from.x, to.y - from.y) === 0) return cmds;
 

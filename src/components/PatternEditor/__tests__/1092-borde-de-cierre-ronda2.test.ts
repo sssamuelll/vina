@@ -102,6 +102,20 @@ describe('#1092 ronda 2 — arrastrar un ancla lleva sus manejadores', () => {
     expect(movido[3].values[3]).toBeCloseTo(antes[3] - 40, 9);
   });
 
+  it('y una Q igual: los cuatro tipos de ancla llevan el manejador del C vecino', () => {
+    // La asimetría entre ramas es justo lo que originó este bug; que quede
+    // una sola fuera sería sembrar el siguiente.
+    const conQ: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'Q', values: [50, -20, 100, 0] },
+      { type: 'C', values: [110, 20, 90, 60, 50, 80] },
+      { type: 'Z', values: [] },
+    ];
+    const movido = applyNodeMove(conQ, 1, 'anchor', { x: 120, y: 10 });
+    expect(movido[1].values.slice(2)).toEqual([120, 10]);
+    expect(movido[2].values.slice(0, 2)).toEqual([130, 30]);
+  });
+
   it('mover un ancla L con un C detrás también arrastra su manejador', () => {
     const mixto: PathCommand[] = [
       { type: 'M', values: [0, 0] },
