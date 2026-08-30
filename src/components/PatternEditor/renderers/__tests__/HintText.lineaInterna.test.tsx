@@ -43,11 +43,19 @@ describe('HintText — pluma y rectángulo (medidas escritas)', () => {
     expect(hint).toMatch(/esc/i);
   });
 
-  it('el rectángulo dice que un clic crea con las medidas de la barra', () => {
+  it('el rectángulo dice que un clic crea con el último tamaño y que sus cotas se escriben', () => {
     svg(<HintText {...base} activeTool="rectangle" />);
     const hint = screen.getByText(/clic/i).textContent ?? '';
-    expect(hint).toMatch(/barra/i);
-    expect(hint).toMatch(/ancho/i);
+    expect(hint).toMatch(/último tamaño/i);
+    expect(hint).toMatch(/cotas/i);
     expect(hint).toMatch(/arrastr/i);
+  });
+
+  it('con cotas visibles y Seleccionar, la pista nombra la cota, el arrastre y Tab', () => {
+    svg(<HintText {...base} activeTool="select" cotasVisibles />);
+    const hint = screen.getByText(/cota/i).textContent ?? '';
+    expect(hint).toMatch(/escribirla/i);
+    expect(hint).toMatch(/arrástrala/i);
+    expect(hint).toMatch(/tab/i);
   });
 });

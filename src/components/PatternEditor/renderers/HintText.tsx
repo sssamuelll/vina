@@ -15,6 +15,8 @@ interface HintTextProps {
   saDefaultWidthMm?: number;
   /** Nodos del trazo de línea interna en curso: 0 = sin trazo. */
   internalShapeNodesLength?: number;
+  /** Hay cotas vivas sobre la pieza seleccionada (spec 2026-08-30 § 7). */
+  cotasVisibles?: boolean;
 }
 
 /**
@@ -43,7 +45,7 @@ function Pie({ children }: { children: React.ReactNode }) {
 export default function HintText({
   activeTool, pieces, penNodesLength,
   nodeEditorIsEditing, seamPhase, topstitchMode, walkSeamPhase,
-  saDefaultWidthMm, internalShapeNodesLength = 0,
+  saDefaultWidthMm, internalShapeNodesLength = 0, cotasVisibles = false,
 }: HintTextProps) {
   const hasPieces = pieces.length > 0;
 
@@ -66,7 +68,11 @@ export default function HintText({
       )}
 
       {activeTool === 'rectangle' && (
-        <Pie>Arrastra para dibujar · un clic crea con el Ancho y el Alto de la barra · Esc cancela</Pie>
+        <Pie>Arrastra para dibujar · un clic crea con el último tamaño · escribe en sus cotas para cambiarlo · Esc cancela</Pie>
+      )}
+
+      {cotasVisibles && (activeTool === 'select' || activeTool === 'transform') && (
+        <Pie>Clic en una cota para escribirla · arrástrala para ajustar · Tab pasa a la siguiente · Esc suelta</Pie>
       )}
 
       {!hasPieces && activeTool === 'pen' && penNodesLength === 0 && (
