@@ -227,6 +227,30 @@ describe('CotaChip - scrub', () => {
     expect(p.onScrubEnd).not.toHaveBeenCalled();
   });
 
+  // PR B (spec § 5.3, juicio de Petra): el ángulo NO es una medida espacial —
+  // su ganancia es fija en 0,5°/px, sin dividir por zoom (a diferencia de mm,
+  // donde 1 px de pantalla = 1/zoom mm). El mismo scrub a zoom alto movería
+  // un ángulo casi nada si usara la fórmula de mm.
+  it('cota en grados: la ganancia del scrub es 0,5°/px, SIN dividir por zoom', () => {
+    const anguloCota = cota({ id: 'tramo-1-angulo', kind: 'tramo-angulo', label: 'Ángulo', valueMm: 0, unit: 'deg', min: -180, max: 180 });
+    const p = monta({ cota: anguloCota, zoom2D: 4 }); // zoom alto: si usara mm/zoom, el movimiento casi no cambiaría el valor
+    const b = botonConCaptura();
+    pointer(b, 'pointerdown', 0);
+    pointer(b, 'pointermove', 20); // 20px × 0.5°/px = 10°, sin importar zoom2D=4
+    expect(p.onScrub).toHaveBeenLastCalledWith(p.cota, 10);
+    pointer(b, 'pointerup', 20);
+  });
+
+  it('cota en grados: Shift/Alt multiplican la MISMA ganancia de 0,5°/px', () => {
+    const anguloCota = cota({ id: 'tramo-1-angulo', kind: 'tramo-angulo', label: 'Ángulo', valueMm: 0, unit: 'deg', min: -180, max: 180 });
+    const p = monta({ cota: anguloCota, zoom2D: 1 });
+    const b = botonConCaptura();
+    pointer(b, 'pointerdown', 0);
+    pointer(b, 'pointermove', 4, { shiftKey: true }); // 4px × 0.5°/px × 10 = 20°
+    expect(p.onScrub).toHaveBeenLastCalledWith(p.cota, 20);
+    pointer(b, 'pointerup', 4);
+  });
+
   it('Tab desde el último chip sale del grupo hacia la tira de herramienta', () => {
     const noop = { onCommit: vi.fn(), onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn(), onScrubCancel: vi.fn() };
     render(

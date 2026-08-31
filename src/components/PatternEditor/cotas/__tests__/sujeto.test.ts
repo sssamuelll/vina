@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { cotasDelSujeto } from '../sujeto';
-import type { PatternPiece, PathCommand } from '../../../../types/types';
+import type { PatternPiece, PathCommand, InternalLine } from '../../../../types/types';
 
 /**
  * Regla del sujeto (spec 2026-08-30 § 3.1): un sujeto, el más reciente;
@@ -53,7 +53,6 @@ describe('cotasDelSujeto', () => {
   it.each([
     ['capa oculta', { selectedPieceIds: ['c'], hiddenLayerIds: [2] }],
     ['dos piezas', { selectedPieceIds: ['a', 'b'] }],
-    ['una interna seleccionada', { selectedPieceIds: ['a'], selectedInternalLine: { pieceId: 'a', lineId: 'l' } }],
     ['arrastrando', { selectedPieceIds: ['a'], isDragging: true }],
     ['menú abierto', { selectedPieceIds: ['a'], contextMenuOpen: true }],
     ['calibrando', { selectedPieceIds: ['a'], calibrationActive: true }],
@@ -62,5 +61,54 @@ describe('cotasDelSujeto', () => {
   ])('sin cotas: %s', (_n, over) => {
     const s = cotasDelSujeto({ ...base, activeTool: 'select', ...over } as Parameters<typeof cotasDelSujeto>[0], def);
     expect(s.cotas).toEqual([]);
+  });
+
+  // PR B (spec § 3, § 13.2 hallazgo #11): la interna seleccionada tiene sus
+  // propias cotas — antes de esta ronda, `selectedInternalLine` siempre
+  // devolvía nada().
+  describe('una interna seleccionada (PR B)', () => {
+    const linea: InternalLine = {
+      id: 'l1', type: 'reference',
+      path: [{ type: 'M', values: [0, 20] }, { type: 'L', values: [50, 20] }],
+    };
+    const conLinea = pieza('a', { internals: [linea] });
+    const baseConLinea = { ...base, pieces: [conLinea, base.pieces[1], base.pieces[2]] };
+
+    it('con la línea presente en la pieza: cotas de tramo, "Editando: la línea seleccionada"', () => {
+      const s = cotasDelSujeto({
+        ...baseConLinea, activeTool: 'select', selectedPieceIds: ['a'],
+        selectedInternalLine: { pieceId: 'a', lineId: 'l1' },
+      }, def);
+      expect(s.cotas.length).toBeGreaterThan(0);
+      expect(s.cotas.some(c => c.kind === 'tramo-largo')).toBe(true);
+      expect(s.lineaDeSujeto).toBe(`Editando: la línea seleccionada · ${s.cotas.length} cotas`);
+    });
+
+    it('hallazgo #11 — lineId colgante (la línea ya no existe, p.ej. tras un undo): sin cotas, sin crash', () => {
+      const s = cotasDelSujeto({
+        ...baseConLinea, activeTool: 'select', selectedPieceIds: ['a'],
+        selectedInternalLine: { pieceId: 'a', lineId: 'no-existe' },
+      }, def);
+      expect(s.cotas).toEqual([]);
+    });
+
+    it('hallazgo #11 — pieceId colgante (la pieza ya no existe): sin cotas, sin crash', () => {
+      const s = cotasDelSujeto({
+        ...baseConLinea, activeTool: 'select', selectedPieceIds: [],
+        selectedInternalLine: { pieceId: 'no-existe', lineId: 'l1' },
+      }, def);
+      expect(s.cotas).toEqual([]);
+    });
+
+    it('la línea de una pieza bloqueada: cotas presentes pero deshabilitadas', () => {
+      const bloqueada = pieza('a', { internals: [linea], locked: true });
+      const s = cotasDelSujeto({
+        ...baseConLinea, pieces: [bloqueada, base.pieces[1], base.pieces[2]],
+        activeTool: 'select', selectedPieceIds: ['a'],
+        selectedInternalLine: { pieceId: 'a', lineId: 'l1' },
+      }, def);
+      expect(s.disabled).toBe(true);
+      expect(s.cotas.length).toBeGreaterThan(0);
+    });
   });
 });

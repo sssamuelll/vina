@@ -36,12 +36,15 @@ describe('cotasDePieza', () => {
     expect(ancho.outward.x).toBeCloseTo(1, 6);
   });
 
-  it('apply escribe esa dimensión y conserva la otra', () => {
+  it('apply escribe esa dimensión y conserva la otra (CotaUpdate discriminado: kind "piece")', () => {
     const [ancho, alto] = cotasDePieza(pieza());
     const u = ancho.apply(400)!;
+    expect(u.kind).toBe('piece');
+    if (u.kind !== 'piece') throw new Error('esperado kind piece');
     expect(u.outline[1].values).toEqual([400, 0]);
     expect(u.outline[2].values).toEqual([400, 300]);
     const v = alto.apply(50)!;
+    if (v.kind !== 'piece') throw new Error('esperado kind piece');
     expect(v.outline[2].values).toEqual([200, 50]);
   });
 
