@@ -3,7 +3,9 @@ import { PatternPiece, Point2D, InternalLine } from '../../types/types';
 import { hitTestPieceBBox } from '../../utils/geometry/hitTest';
 import { screenToPattern } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
-import { patternToPieceLocal } from './pieceTransform';
+import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
+import { isDrag } from './gestureConstants';
+import { polarOf, polarPoint } from './polyPenGeometry';
 
 /**
  * Grainline tool: click+drag inside a piece to draw an arrow
@@ -18,6 +20,8 @@ interface GrainlineState {
   startPoint: Point2D | null;
   /** Current drag point */
   endPoint: Point2D | null;
+  /** Press crudo en pantalla: el umbral del gesto no cambia con el zoom. */
+  pressScreen: Point2D | null;
   isDragging: boolean;
 }
 
@@ -39,7 +43,7 @@ export function useGrainlineTool(
   onSetGrainline: (pieceId: string, grainline: InternalLine) => void,
 ) {
   const [state, setState] = useState<GrainlineState>({
-    pieceId: null, startPoint: null, endPoint: null, isDragging: false,
+    pieceId: null, startPoint: null, endPoint: null, pressScreen: null, isDragging: false,
   });
 
   const toPattern = useCallback(
@@ -58,7 +62,13 @@ export function useGrainlineTool(
     if (!piece) return;
 
     const local = patternToPieceLocal(pt, piece);
-    setState({ pieceId: piece.id, startPoint: local, endPoint: local, isDragging: true });
+    setState({
+      pieceId: piece.id,
+      startPoint: local,
+      endPoint: local,
+      pressScreen: { x: e.clientX, y: e.clientY },
+      isDragging: true,
+    });
   }, [toPattern, pieces]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
@@ -69,24 +79,37 @@ export function useGrainlineTool(
     const piece = pieces.find(p => p.id === state.pieceId);
     if (!piece) return;
 
-    const local = patternToPieceLocal(pt, piece);
+    let endPattern = pt;
+    if (e.shiftKey && state.startPoint) {
+      // El enganche se decide en patrón, no en el espacio local de una pieza
+      // girada: 0° debe seguir siendo la horizontal que María ve en pantalla.
+      const startPattern = pieceLocalToPattern(state.startPoint, piece);
+      const { lengthMm, angleDeg } = polarOf(startPattern, endPattern);
+      endPattern = polarPoint(startPattern, lengthMm, Math.round(angleDeg / 45) * 45);
+    }
+    const local = patternToPieceLocal(endPattern, piece);
     setState(prev => ({ ...prev, endPoint: local }));
-  }, [state.isDragging, state.pieceId, toPattern, pieces]);
+  }, [state.isDragging, state.pieceId, state.startPoint, toPattern, pieces]);
 
-  const handleMouseUp = useCallback(() => {
-    if (!state.isDragging || !state.pieceId || !state.startPoint || !state.endPoint) {
-      setState({ pieceId: null, startPoint: null, endPoint: null, isDragging: false });
+  const handleMouseUp = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
+    if (
+      !e || !state.isDragging || !state.pieceId || !state.startPoint
+      || !state.endPoint || !state.pressScreen
+    ) {
+      // Blur y cancelaciones no traen una posición final fiable de pantalla;
+      // confirmar con el último mousemove convertiría un gesto incompleto en hilo.
+      setState({ pieceId: null, startPoint: null, endPoint: null, pressScreen: null, isDragging: false });
       return;
     }
 
-    const dx = state.endPoint.x - state.startPoint.x;
-    const dy = state.endPoint.y - state.startPoint.y;
-    if (Math.hypot(dx, dy) > 5) {
+    const dx = e.clientX - state.pressScreen.x;
+    const dy = e.clientY - state.pressScreen.y;
+    if (isDrag(dx, dy)) {
       const grainline = createGrainline(state.startPoint, state.endPoint);
       onSetGrainline(state.pieceId, grainline);
     }
 
-    setState({ pieceId: null, startPoint: null, endPoint: null, isDragging: false });
+    setState({ pieceId: null, startPoint: null, endPoint: null, pressScreen: null, isDragging: false });
   }, [state, onSetGrainline]);
 
   return {

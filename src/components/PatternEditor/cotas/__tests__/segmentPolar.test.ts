@@ -27,7 +27,7 @@ describe('segmentPolar — largo y ángulo por tramo recto', () => {
     expect(tramos[1].from).toEqual({ x: 100, y: 0 });
     expect(tramos[1].to).toEqual({ x: 100, y: 50 });
     expect(tramos[1].lengthMm).toBeCloseTo(50, 6);
-    expect(tramos[1].angleDeg).toBeCloseTo(90, 6); // hacia arriba en pantalla
+    expect(tramos[1].angleDeg).toBeCloseTo(-90, 6); // y crece: hacia abajo en pantalla
   });
 
   it('escribir el largo mueve el nodo final y conserva el ángulo', () => {
@@ -41,7 +41,7 @@ describe('segmentPolar — largo y ángulo por tramo recto', () => {
     const tramos = segmentPolar(DOS_TRAMOS);
     const nuevo = tramos[0].writeAngle(90);
     expect(nuevo.x).toBeCloseTo(0, 6);
-    expect(nuevo.y).toBeCloseTo(100, 6); // mismo largo (100), ahora hacia arriba
+    expect(nuevo.y).toBeCloseTo(-100, 6); // mismo largo (100), 90° es arriba: y negativo
   });
 
   it('un tramo C o Q no produce cota (sin infraestructura de nodos para manejadores en esta tanda)', () => {

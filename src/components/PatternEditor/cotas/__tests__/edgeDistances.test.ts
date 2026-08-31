@@ -11,7 +11,6 @@
 import { describe, it, expect } from 'vitest';
 import type { PathCommand } from '../../../../types/types';
 import { edgeDistances } from '../edgeDistances';
-import { outlinePerimeter } from '../../../../utils/notchAnchor';
 
 /** Rectángulo 100×60 en coordenadas LOCALES de pieza: M(0,0) L(100,0) L(100,60) L(0,60) Z. */
 const RECT: PathCommand[] = [
@@ -55,9 +54,12 @@ describe('edgeDistances — el arco desde cada esquina vecina', () => {
     expect(edgeDistances(RECT, { x: 50, y: 30 })).toBeNull();
   });
 
-  it('pieza con un lado curvo: la suma de arcos coincide con outlinePerimeter (metric 2, no la cuerda)', () => {
+  it('pieza con un lado curvo: el punto de la curva con la recta SIGUE siendo esquina vecina', () => {
     // M(0,0) → curva hasta (100,0) → recta → recta → cierra. El punto está en
-    // la recta de abajo-derecha a arriba-derecha (100,0)-(100,60): a 20mm de (100,0).
+    // la recta de abajo-derecha a arriba-derecha (100,0)-(100,60): a 20mm de
+    // (100,0). (100,0) es donde la curva entrega la recta: aunque venga de un
+    // `C`, sigue siendo una esquina real (la tangente cambia ahí), así que es
+    // la vecina cw — no hay que rodear toda la curva para encontrarla.
     const outline: PathCommand[] = [
       { type: 'M', values: [0, 0] },
       { type: 'C', values: [30, -20, 70, -20, 100, 0] },
@@ -67,21 +69,23 @@ describe('edgeDistances — el arco desde cada esquina vecina', () => {
     ];
     const r = edgeDistances(outline, { x: 100, y: 20 });
     expect(r).not.toBeNull();
+    expect(r!.cw.corner).toEqual({ x: 100, y: 0 });
+    expect(r!.cw.mm).toBeCloseTo(20, 3);
+    expect(r!.ccw.corner).toEqual({ x: 100, y: 60 });
     expect(r!.ccw.mm).toBeCloseTo(40, 3); // hacia (100,60), en línea recta
-    // La suma total de las 4 esquinas alrededor del anillo tiene que dar el
-    // perímetro completo (arco de la curva, no su cuerda de 100mm).
-    const total = outlinePerimeter(outline, 2);
-    const ladoSuperior = 100; // (100,60)-(0,60)
-    const ladoIzquierdo = 60; // (0,60)-(0,0)
-    expect(r!.cw.mm + r!.ccw.mm + ladoSuperior + ladoIzquierdo).toBeCloseTo(total, 3);
   });
 
-  it('pieza girada: trabaja en coordenadas LOCALES, la rotación no la toca (mismo resultado que sin girar)', () => {
-    // edgeDistances recibe el outline y el endpoint ya en local — girar la
-    // pieza en el store no cambia esos números.
-    const r1 = edgeDistances(RECT, { x: 0, y: 20 });
-    const r2 = edgeDistances(RECT, { x: 0, y: 20 });
-    expect(r2).toEqual(r1);
+  it('es determinista: mismas coordenadas locales dan el mismo resultado (la firma ni ve la rotación)', () => {
+    // edgeDistances recibe el outline y el endpoint ya en LOCAL — la rotación
+    // de la pieza vive en otra capa y nunca llega hasta acá.
+    const r1 = edgeDistances(RECT, { x: 0, y: 20 })!;
+    const r2 = edgeDistances(RECT, { x: 0, y: 20 })!;
+    // Comparar solo los datos: `write` es una closure nueva en cada llamada,
+    // y dos funciones distintas nunca son iguales para `toEqual`.
+    expect(r2.cw.corner).toEqual(r1.cw.corner);
+    expect(r2.cw.mm).toBeCloseTo(r1.cw.mm, 6);
+    expect(r2.ccw.corner).toEqual(r1.ccw.corner);
+    expect(r2.ccw.mm).toBeCloseTo(r1.ccw.mm, 6);
   });
 
   it('escribir una distancia nueva: pointAt cae sobre el borde y projectToRing lo confirma', () => {

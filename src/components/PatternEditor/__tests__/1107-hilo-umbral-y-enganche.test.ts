@@ -38,7 +38,7 @@ describe('#1107 — el umbral clic/arrastre del hilo es de PANTALLA, no de patr�
     const { result } = renderHook(() => useGrainlineTool(10, { x: 0, y: 0 }, [pieza], onSetGrainline));
     act(() => result.current.handleMouseDown(ev(100, 100)));
     act(() => result.current.handleMouseMove(ev(120, 100)));
-    act(() => result.current.handleMouseUp());
+    act(() => result.current.handleMouseUp(ev(120, 100)));
     expect(onSetGrainline).toHaveBeenCalledTimes(1);
   });
 
@@ -47,7 +47,7 @@ describe('#1107 — el umbral clic/arrastre del hilo es de PANTALLA, no de patr�
     const { result } = renderHook(() => useGrainlineTool(0.1, { x: 0, y: 0 }, [pieza], onSetGrainline));
     act(() => result.current.handleMouseDown(ev(100, 100)));
     act(() => result.current.handleMouseMove(ev(102, 100)));
-    act(() => result.current.handleMouseUp());
+    act(() => result.current.handleMouseUp(ev(102, 100)));
     expect(onSetGrainline).not.toHaveBeenCalled();
   });
 
@@ -56,7 +56,7 @@ describe('#1107 — el umbral clic/arrastre del hilo es de PANTALLA, no de patr�
     const { result } = renderHook(() => useGrainlineTool(1, { x: 0, y: 0 }, [pieza], onSetGrainline));
     act(() => result.current.handleMouseDown(ev(100, 100)));
     act(() => result.current.handleMouseMove(ev(103, 100))); // 3px: no arma
-    act(() => result.current.handleMouseUp());
+    act(() => result.current.handleMouseUp(ev(103, 100)));
     expect(onSetGrainline).not.toHaveBeenCalled();
   });
 });
@@ -67,7 +67,7 @@ describe('#1107 — Shift engancha el ángulo del hilo a 0°/45°/90°', () => {
     const { result } = renderHook(() => useGrainlineTool(1, { x: 0, y: 0 }, [pieza], onSetGrainline));
     act(() => result.current.handleMouseDown(ev(100, 100)));
     act(() => result.current.handleMouseMove(ev(150, 130))); // ángulo oblicuo, no 0/45/90
-    act(() => result.current.handleMouseUp());
+    act(() => result.current.handleMouseUp(ev(150, 130)));
     const [, grainline] = onSetGrainline.mock.calls[0];
     const [x0, y0] = grainline.path[0].values;
     const [x1, y1] = grainline.path[1].values;
@@ -80,8 +80,8 @@ describe('#1107 — Shift engancha el ángulo del hilo a 0°/45°/90°', () => {
     const onSetGrainline = vi.fn();
     const { result } = renderHook(() => useGrainlineTool(1, { x: 0, y: 0 }, [pieza], onSetGrainline));
     act(() => result.current.handleMouseDown(ev(100, 100)));
-    act(() => result.current.handleMouseMove(ev(150, 108), { shiftKey: true })); // casi horizontal, con ruido
-    act(() => result.current.handleMouseUp());
+    act(() => result.current.handleMouseMove(ev(150, 108, { shiftKey: true }))); // casi horizontal, con ruido
+    act(() => result.current.handleMouseUp(ev(150, 108)));
     const [, grainline] = onSetGrainline.mock.calls[0];
     const [x0, y0] = grainline.path[0].values;
     const [x1, y1] = grainline.path[1].values;

@@ -71,6 +71,10 @@ export default function HintText({
         <Pie>Arrastra para dibujar · un clic crea con el último tamaño · escribe en sus cotas para cambiarlo · Esc cancela</Pie>
       )}
 
+      {activeTool === 'grainline' && (
+        <Pie>Arrastra dentro de la pieza para el hilo · Shift ajusta a 0°/45°/90°</Pie>
+      )}
+
       {cotasVisibles && (activeTool === 'select' || activeTool === 'transform') && (
         <Pie>Clic en una cota para escribirla · arrástrala para ajustar · Tab pasa a la siguiente · Esc suelta</Pie>
       )}

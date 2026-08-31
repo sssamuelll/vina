@@ -55,15 +55,12 @@ describe('cotasDeLineaInterna — línea interna enganchada de un lado al otro',
     const cotas = cotasDeLineaInterna(pieza, linea);
     const largo = cotas.find(c => c.kind === 'tramo-largo')!;
     const update = largo.apply(80);
-    expect(update).not.toBeNull();
-    expect(update!.kind).toBe('internal');
-    if (update!.kind === 'internal') {
-      expect(update.pieceId).toBe('p1');
-      expect(update.lineId).toBe('l1');
-      expect(update.path[0]).toEqual({ type: 'M', values: [0, 20] }); // el inicio no se toca
-      expect(update.path[1].values[0]).toBeCloseTo(80, 3);
-      expect(update.path[1].values[1]).toBeCloseTo(20, 3);
-    }
+    if (!update || update.kind !== 'internal') throw new Error('se esperaba una actualización interna');
+    expect(update.pieceId).toBe('p1');
+    expect(update.lineId).toBe('l1');
+    expect(update.path[0]).toEqual({ type: 'M', values: [0, 20] }); // el inicio no se toca
+    expect(update.path[1].values[0]).toBeCloseTo(80, 3);
+    expect(update.path[1].values[1]).toBeCloseTo(20, 3);
   });
 
   it('escribir una distancia de borde mueve SOLO ese extremo por el contorno, la línea sigue enganchada', () => {
@@ -76,13 +73,11 @@ describe('cotasDeLineaInterna — línea interna enganchada de un lado al otro',
     const bordeDesdeOrigen = cotas.find(c => c.kind === 'borde' && c.label.includes('(0, 0)'))
       ?? cotas.filter(c => c.kind === 'borde')[0];
     const update = bordeDesdeOrigen.apply(30);
-    expect(update).not.toBeNull();
-    if (update!.kind === 'internal') {
-      // El nodo que se movió sigue sobre el contorno (x=0 o y=0/60, según el lado).
-      const [nx, ny] = update.path[0].values;
-      const sobreElBorde = Math.abs(nx) < 1e-6 || Math.abs(ny) < 1e-6 || Math.abs(ny - 60) < 1e-6;
-      expect(sobreElBorde).toBe(true);
-    }
+    if (!update || update.kind !== 'internal') throw new Error('se esperaba una actualización interna');
+    // El nodo que se movió sigue sobre el contorno (x=0 o y=0/60, según el lado).
+    const [nx, ny] = update.path[0].values;
+    const sobreElBorde = Math.abs(nx) < 1e-6 || Math.abs(ny) < 1e-6 || Math.abs(ny - 60) < 1e-6;
+    expect(sobreElBorde).toBe(true);
   });
 
   it('varias líneas internas en la pieza: solo se toca la línea pedida, las demás quedan igual', () => {
@@ -92,7 +87,8 @@ describe('cotasDeLineaInterna — línea interna enganchada de un lado al otro',
     const cotas = cotasDeLineaInterna(pieza, l1);
     const largo = cotas.find(c => c.kind === 'tramo-largo')!;
     const update = largo.apply(200);
-    if (update!.kind === 'internal') expect(update.lineId).toBe('l1');
+    if (!update || update.kind !== 'internal') throw new Error('se esperaba una actualización interna');
+    expect(update.lineId).toBe('l1');
   });
 
   it('el hilo (#1107): 2 cotas de tramo (largo, ángulo), sin cotas de borde si no toca el contorno', () => {
@@ -114,9 +110,8 @@ describe('cotasDeLineaInterna — línea interna enganchada de un lado al otro',
     const cotas = cotasDeLineaInterna(piezaBase([hilo]), hilo);
     const angulo = cotas.find(c => c.kind === 'tramo-angulo')!;
     const update = angulo.apply(0);
-    if (update!.kind === 'internal') {
-      expect(update.path[1].values[1]).toBeCloseTo(10, 3); // mismo y que el origen: horizontal
-    }
+    if (!update || update.kind !== 'internal') throw new Error('se esperaba una actualización interna');
+    expect(update.path[1].values[1]).toBeCloseTo(10, 3); // mismo y que el origen: horizontal
   });
 
   it('línea con más de un subpath propio: sin cotas de borde (misma regla que la pieza)', () => {

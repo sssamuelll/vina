@@ -1,5 +1,5 @@
 import type { PatternPiece, Tool2D } from '../../../types/types';
-import { cotasDePieza, type Cota } from './cotas';
+import { cotasDeLineaInterna, cotasDePieza, type Cota } from './cotas';
 import { formatMedida } from './parseMedida';
 
 export interface SujetoInput {
@@ -37,16 +37,36 @@ const CON_COTAS_DE_PIEZA: ReadonlySet<Tool2D> = new Set<Tool2D>(['select', 'tran
  * seleccionar una pieza cualquiera nunca escribe el default (un DXF de 892 mm
  * no puede volverse el ancho del próximo rectángulo). Las cotas se ocultan
  * mientras se arrastra, con el menú abierto o en calibración (la compuerta
- * de `FloatingActionBar`), y no existen con dos piezas ni con una interna
- * seleccionada (PR B le da las suyas).
+ * de `FloatingActionBar`), y no existen con dos piezas. Una interna
+ * seleccionada gana sobre la pieza que la contiene y recibe sus propias cotas.
  */
 export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number; height: number }): Sujeto {
   const nada = (linea: string | null): Sujeto => ({ piece: null, caliente: false, cotas: [], disabled: false, lineaDeSujeto: linea });
   const lineaRect = input.activeTool === 'rectangle'
     ? `Un clic crea ${formatMedida(defaultRect.width, 'mm').replace(' mm', '')} × ${formatMedida(defaultRect.height, 'mm')} · arrastra para dibujar`
     : null;
+
+  if (input.selectedInternalLine) {
+    if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada(lineaRect);
+    const piece = input.pieces.find(p => p.id === input.selectedInternalLine!.pieceId) ?? null;
+    const line = piece?.internals.find(internal => (
+      internal.id === input.selectedInternalLine!.lineId
+    )) ?? null;
+    if (!piece || !line) return nada(lineaRect);
+    const capa = piece.layer ?? 1;
+    if (input.hiddenLayerIds.includes(capa)) return nada(lineaRect);
+    const cotas = cotasDeLineaInterna(piece, line);
+    return {
+      piece,
+      caliente: false,
+      cotas,
+      disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
+      lineaDeSujeto: `Editando: la línea seleccionada · ${cotas.length} cotas`,
+    };
+  }
+
   if (!CON_COTAS_DE_PIEZA.has(input.activeTool)) return nada(null);
-  if (input.selectedInternalLine || input.selectedPieceIds.length !== 1) return nada(lineaRect);
+  if (input.selectedPieceIds.length !== 1) return nada(lineaRect);
   if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada(lineaRect);
   const piece = input.pieces.find(p => p.id === input.selectedPieceIds[0]) ?? null;
   if (!piece) return nada(lineaRect);
