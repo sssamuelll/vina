@@ -50,9 +50,12 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
     showAngle: ['Mostrar el ángulo'],
     cumulative: ['Distancia acumulada'],
   },
+  // #1110 (María audio 30-08): `stitchLength` era decorativo — ningún
+  // consumidor de `toolOptions.seam` lo lee (ni 2D, ni 3D, ni WASM), y
+  // `Seam` ni siquiera tiene el campo. Se quitó en vez de mudarlo a un
+  // sitio "por decidir" — ver docs/reports (#1110).
   seam: {
     seamType: ['Tipo de costura', 'Normal', 'Francesa', 'Flat-felled', 'Overlock'],
-    stitchLength: ['Largo de puntada'],
   },
   notch: {
     shape: [
