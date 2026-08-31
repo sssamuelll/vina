@@ -85,8 +85,20 @@ describe('convertSegmentToSpline (nota de María #197)', () => {
     const curved = convertToCurve(rect(), 1);
     expect(convertSegmentToSpline(curved, 1, 4)).toEqual(curved);
     expect(convertSegmentToSpline(rect(), 0, 4)).toEqual(rect());   // la M
-    expect(convertSegmentToSpline(rect(), 4, 4)).toEqual(rect());   // la Z
     expect(convertSegmentToSpline(rect(), 1, 1)).toEqual(rect());   // sin tramos
+  });
+
+  it('el cierre SÍ es un lado recto: la Z dibuja el cuarto lado (#1092)', () => {
+    // Este assert vivía arriba con el comentario "// la Z", ratificando como
+    // correcto el no-op que María notó: "estoy clicando en la V y no pasa
+    // nada… esta línea se comporta siempre rara y distinta a las demás".
+    // El índice 4 es exactamente lo que devuelve `nearestSegment` al clicar el
+    // cuarto lado del rectángulo real, y ese lado se curva como los otros tres
+    // — insertando los tramos ANTES del Z, que sigue cerrando el contorno.
+    const out = convertSegmentToSpline(rect(), 4, 4);
+    expect(out).not.toEqual(rect());
+    expect(out.filter(c => c.type === 'C')).toHaveLength(4);
+    expect(out[out.length - 1].type).toBe('Z');
   });
 });
 
