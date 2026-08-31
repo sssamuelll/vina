@@ -312,12 +312,12 @@ describe('editorSlice', () => {
     expect(store.getState().editor.selectedPieceIds).toEqual([]);
   });
 
-  it('clamps zoom', () => {
+  it('clamps zoom (#1097: tope subió de 10 a 40)', () => {
     const store = createStore();
     store.dispatch(setZoom2D(0.001));
     expect(store.getState().editor.zoom2D).toBe(0.1);
     store.dispatch(setZoom2D(999));
-    expect(store.getState().editor.zoom2D).toBe(10);
+    expect(store.getState().editor.zoom2D).toBe(40);
   });
 
   it('sets pan', () => {

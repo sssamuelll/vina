@@ -102,7 +102,8 @@ describe('#1095 — "Duplicar" se pliega en submenú (baja el piso de filas)', (
 
   it('"Duplicar" del submenú dispara el mismo verbo que el duplicate suelto (duplicatePiece)', () => {
     const dispatched: unknown[] = [];
-    const ctx = baseCtx({ dispatch: (a: unknown) => { dispatched.push(a); } });
+    const fakeDispatch = ((a: unknown) => { dispatched.push(a); }) as unknown as CurationCtx['dispatch'];
+    const ctx = baseCtx({ dispatch: fakeDispatch });
     const items = ACTIONS.duplicateGroup.submenu!(ctx);
     items[0].action!();
     expect(dispatched).toHaveLength(1);
