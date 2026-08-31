@@ -8,7 +8,7 @@
  * SOLO se puede fijar en un navegador real, con elementFromPoint.
  */
 import { test, expect } from '@playwright/test';
-import { addPiece } from './helpers/lienzo';
+import { addPiece, dispatch } from './helpers/lienzo';
 import { leerBitacora, guardarEvidencia } from './helpers/bitacora';
 
 test.use({ viewport: { width: 1366, height: 643 } });
@@ -22,6 +22,14 @@ test.describe('#1095 — el menú avisa cuando hay más filas abajo', () => {
     // Pieza baja en el lienzo, igual que la reproducción del issue: el clic
     // derecho cae en la mitad inferior de una laptop de 768px.
     await addPiece(page, 'p1', { x: 100, y: 250 }, 300, 300);
+    // Consolidar "Duplicar" en submenú (este mismo fix) bajó el piso de filas
+    // lo suficiente para que una pieza desnuda YA NO desborde a 1366×643 —
+    // eso es el resultado querido, pero deja sin cubrir el caso real (una
+    // pieza organizada en grupos SIGUE desbordando). Dos grupos activan
+    // addToGroup y removeFromGroup, que es exactamente ese caso.
+    await addPiece(page, 'p2', { x: 500, y: 500 }, 50, 50);
+    await dispatch(page, 'project/createGroup', { name: 'Contiene a p1', pieceIds: ['p1'] });
+    await dispatch(page, 'project/createGroup', { name: 'No contiene a p1', pieceIds: ['p2'] });
     const box = await page.locator('svg.pattern-svg').boundingBox();
     const x = box!.x + box!.width * 0.4;
     const y = box!.y + box!.height * 0.75;
@@ -78,8 +86,15 @@ test.describe('#1095 — el menú avisa cuando hay más filas abajo', () => {
     await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
     await page.waitForTimeout(500);
 
+    // Con el proyecto vacío, el placeholder "Trae tu patrón" cubre el lienzo
+    // y se traga el clic derecho — una pieza cualquiera lo quita de en medio.
+    await addPiece(page, 'p1', { x: 0, y: 0 }, 50, 50);
+
     // emptyCanvas: 3 filas (pegar/pegar espejo/ajustar zoom), nunca desborda.
-    await page.mouse.click(300, 300, { button: 'right' });
+    // Lejos de la pieza (arriba-izquierda) y de la tira de herramienta 2D
+    // (franja superior): un punto a media altura del lienzo cae en el fondo.
+    const box = await page.locator('svg.pattern-svg').boundingBox();
+    await page.mouse.click(box!.x + box!.width * 0.8, box!.y + box!.height * 0.6, { button: 'right' });
     const menu = page.locator('.context-menu');
     await expect(menu).toBeVisible();
     await expect(page.locator('.context-menu__fade--top')).toHaveCount(0);
