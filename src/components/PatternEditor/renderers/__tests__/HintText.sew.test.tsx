@@ -43,4 +43,19 @@ describe('HintText — editar costuras', () => {
     const hint = screen.getByText(/clic/i).textContent ?? '';
     expect(hint).toMatch(/cosid|costura/i);
   });
+
+  // #1098 (María audio 30-08): "si le doy a editar costuras no pasa
+  // absolutamente nada" — sin ninguna costura en el proyecto, el clic
+  // invitado por el hint de siempre es un no-op silencioso. La pista lo
+  // dice antes de que clique.
+  it('sin ninguna costura en el proyecto, invita a coser primero en vez de a un clic mudo', () => {
+    svg(<HintText {...base} activeTool="seamEdit" hasSeams={false} />);
+    const hint = screen.getByText(/cose|costuras/i).textContent ?? '';
+    expect(hint).toMatch(/cose/i);
+  });
+
+  it('con costuras en el proyecto (o sin decirlo), mantiene el hint de siempre', () => {
+    svg(<HintText {...base} activeTool="seamEdit" hasSeams={true} />);
+    expect(screen.getByText(/cosid|costura/i)).toBeTruthy();
+  });
 });

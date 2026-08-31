@@ -17,6 +17,9 @@ interface HintTextProps {
   internalShapeNodesLength?: number;
   /** Hay cotas vivas sobre la pieza seleccionada (spec 2026-08-30 § 7). */
   cotasVisibles?: boolean;
+  /** Hay al menos una costura en el proyecto. Sin ninguna, el clic de
+   *  `seamEdit` es un no-op silencioso (#1098) — el hint cambia. */
+  hasSeams?: boolean;
 }
 
 /**
@@ -45,7 +48,7 @@ function Pie({ children }: { children: React.ReactNode }) {
 export default function HintText({
   activeTool, pieces, penNodesLength,
   nodeEditorIsEditing, seamPhase, topstitchMode, walkSeamPhase,
-  saDefaultWidthMm, internalShapeNodesLength = 0, cotasVisibles = false,
+  saDefaultWidthMm, internalShapeNodesLength = 0, cotasVisibles = false, hasSeams,
 }: HintTextProps) {
   const hasPieces = pieces.length > 0;
 
@@ -95,7 +98,9 @@ export default function HintText({
       )}
 
       {activeTool === 'seamEdit' && (
-        <Pie>Clic en un lado para ver con qué está cosido</Pie>
+        hasSeams === false
+          ? <Pie>No hay costuras: cose primero con N</Pie>
+          : <Pie>Clic en un lado para ver con qué está cosido</Pie>
       )}
 
       {(activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree' || activeTool === 'topstitchEdit') && (() => {

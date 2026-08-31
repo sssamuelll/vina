@@ -87,7 +87,7 @@ describe('PropertiesPanel content', () => {
     store.dispatch(setActiveTool('seamAllowance'));
     renderPanel(store);
     expect(screen.getByText('Margen de costura por defecto')).toBeTruthy();
-    const input = screen.getByLabelText('Ancho (mm)') as HTMLInputElement;
+    const input = screen.getByLabelText('Margen (mm)') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '12' } });
     fireEvent.blur(input);
     expect(store.getState().editor.defaultSeamAllowanceWidth).toBe(12);

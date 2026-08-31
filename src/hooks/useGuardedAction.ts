@@ -91,13 +91,25 @@ export function requestConfirmation(
 // ─── Operation metadata ─────────────────────────────────────────────────────
 
 const HOOK_CONSEQUENCES: Record<string, string[]> = {
-  splitPiece: ['Original piece will be replaced by two new pieces'],
+  // #1105 (María audio 30-08): "eliminar... elimina la pieza anterior, pero
+  // no es muy intuitivo". No hay una variante que conserve la original —
+  // el corte SIEMPRE la sustituye por 2 piezas nuevas — así que el copy
+  // dice eso, no una elección que la herramienta no ofrece.
+  splitPiece: ['La pieza original se sustituye por 2 piezas nuevas'],
   mergePieces: ['Both pieces will be replaced by a single merged piece'],
 };
 
 const HOOK_TITLES: Record<string, string> = {
-  splitPiece: 'Split piece?',
+  splitPiece: '¿Dividir la pieza?',
   mergePieces: 'Merge pieces?',
+};
+
+const HOOK_DESCRIPTIONS: Record<string, string> = {
+  splitPiece: 'La pieza original se sustituye por dos piezas nuevas.',
+};
+
+const HOOK_CONFIRM_LABELS: Record<string, string> = {
+  splitPiece: 'Dividir en 2',
 };
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -122,9 +134,11 @@ export function useGuardedAction() {
         showConfirmation({
           source: 'hook',
           title: HOOK_TITLES[operationName] ?? `Confirm ${operationName}?`,
-          description: `This will ${operationName.replace(/([A-Z])/g, ' $1').toLowerCase()}.`,
+          description: HOOK_DESCRIPTIONS[operationName]
+            ?? `This will ${operationName.replace(/([A-Z])/g, ' $1').toLowerCase()}.`,
           consequences: HOOK_CONSEQUENCES[operationName] ?? [],
           destructive: true,
+          confirmLabel: HOOK_CONFIRM_LABELS[operationName],
           callbackKey: key,
         }),
       );

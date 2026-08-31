@@ -38,18 +38,18 @@ describe('EdgePropertiesSection', () => {
     mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
 
     expect(screen.queryByText('Tramos del margen')).toBeNull();
-    expect((screen.getByLabelText('Ancho (mm)') as HTMLInputElement).value).toBe('10');
+    expect((screen.getByLabelText('Margen (mm)') as HTMLInputElement).value).toBe('10');
   });
 
   it('shows the edge name and the effective width (inherited)', () => {
     mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
     expect(screen.getByText(/hem/i)).toBeTruthy();
-    expect((screen.getByLabelText(/ancho/i) as HTMLInputElement).value).toBe('10');
+    expect((screen.getByLabelText(/margen/i) as HTMLInputElement).value).toBe('10');
   });
 
   it('commits a per-edge width on Enter', () => {
     const store = mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
-    const input = screen.getByLabelText(/ancho/i);
+    const input = screen.getByLabelText(/margen/i);
     fireEvent.change(input, { target: { value: '40' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     const e = store.getState().project.pieces[0].edges!.find(x => x.id === 'p:hem')!;
@@ -58,9 +58,16 @@ describe('EdgePropertiesSection', () => {
 
   it('Inherit clears the per-edge override', () => {
     const store = mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece({ edges: [{ ...hem, seamAllowanceWidth: 40 }] }));
-    fireEvent.click(screen.getByRole('button', { name: /heredar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /usar el de la pieza/i }));
     const e = store.getState().project.pieces[0].edges!.find(x => x.id === 'p:hem')!;
     expect(e.seamAllowanceWidth).toBeUndefined();
+  });
+
+  it('revisión #1106: "Sin margen (0)" escribe 0 explícito, sin importar si ya había override', () => {
+    const store = mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece({ edges: [{ ...hem, seamAllowanceWidth: 40 }] }));
+    fireEvent.click(screen.getByRole('button', { name: /sin margen/i }));
+    const e = store.getState().project.pieces[0].edges!.find(x => x.id === 'p:hem')!;
+    expect(e.seamAllowanceWidth).toBe(0);
   });
 
   it('multi-edge: divergent widths show Mixed; commit writes the same width to all', () => {
@@ -73,7 +80,7 @@ describe('EdgePropertiesSection', () => {
       piece({ edges: twoEdges }),
     );
     expect(screen.getByText('2 bordes')).toBeTruthy();
-    const input = screen.getByLabelText(/ancho/i) as HTMLInputElement;
+    const input = screen.getByLabelText(/margen/i) as HTMLInputElement;
     expect(input.value).toBe('');                       // divergent → Varios (empty)
     expect(input.placeholder).toBe('Varios');
     fireEvent.change(input, { target: { value: '12' } });
@@ -99,7 +106,7 @@ describe('EdgePropertiesSection', () => {
     expect(screen.getByText('Tramos del margen')).toBeTruthy();
     expect(screen.getByText('Tramo 1')).toBeTruthy();
     expect(screen.getByText('Tramo 2')).toBeTruthy();
-    expect((screen.getByLabelText('Ancho fuera de los tramos (mm)') as HTMLInputElement).value).toBe('10');
+    expect((screen.getByLabelText('Margen fuera de los tramos (mm)') as HTMLInputElement).value).toBe('10');
   });
 
   it('editar el ancho de un tramo despacha solo ese tramo', () => {
@@ -115,7 +122,7 @@ describe('EdgePropertiesSection', () => {
       piece({ edges: [edgeWithSpans] }),
     );
 
-    const widths = screen.getAllByLabelText('Ancho (mm)');
+    const widths = screen.getAllByLabelText('Margen (mm)');
     fireEvent.change(widths[1], { target: { value: '18' } });
     fireEvent.blur(widths[1]);
 
@@ -184,10 +191,10 @@ describe('PropertiesPanel edge switching', () => {
     render(<Provider store={store}><PropertiesPanel /></Provider>);
 
     act(() => { store.dispatch(selectSaEdges({ items: [{ pieceId: 'p', edgeId: 'p:hem' }] })); });
-    expect((screen.getByLabelText(/ancho/i) as HTMLInputElement).value).toBe('40');
+    expect((screen.getByLabelText(/margen/i) as HTMLInputElement).value).toBe('40');
 
     act(() => { store.dispatch(selectSaEdges({ items: [{ pieceId: 'p', edgeId: 'p:side' }] })); });
-    expect((screen.getByLabelText(/ancho/i) as HTMLInputElement).value).toBe('10');
+    expect((screen.getByLabelText(/margen/i) as HTMLInputElement).value).toBe('10');
   });
 });
 
@@ -211,5 +218,29 @@ describe('VertexPropertiesSection', () => {
     expect(chip.disabled).toBe(false);
     fireEvent.click(chip);
     expect(store.getState().project.pieces[0].cornerTypes?.[2]).toBe('match');
+  });
+
+  // Revisión #1098 (María audio 30-08): el panel pintaba "Inglete" como
+  // elegido cuando en realidad nadie había tocado nada — era el fallback
+  // `?? 'mitered'` colapsado con una elección real.
+  it('#1098 — sin elección explícita, ningún chip se pinta activo y aparece de qué se aplica por defecto', () => {
+    mount(<VertexPropertiesSection pieceId="p" vertexIndex={2} />, piece());
+    const inglete = screen.getByRole('button', { name: /^inglete$/i }) as HTMLButtonElement;
+    expect(inglete.className).not.toMatch(/panel-chip-btn--active/);
+    expect(screen.getByText(/por defecto/i).textContent).toMatch(/inglete/i);
+  });
+
+  it('#1098 — con un tipo elegido para toda la pieza, su chip se pinta activo y no hay aviso de "por defecto"', () => {
+    mount(<VertexPropertiesSection pieceId="p" vertexIndex={2} />, piece({ defaultCornerType: 'squared' }));
+    const chip = screen.getByRole('button', { name: /^cuadrada$/i }) as HTMLButtonElement;
+    expect(chip.className).toMatch(/panel-chip-btn--active/);
+    expect(screen.queryByText(/por defecto/i)).toBeNull();
+  });
+
+  it('#1098 — con un override por vértice, ese chip se pinta activo aunque el default de la pieza sea otro', () => {
+    mount(<VertexPropertiesSection pieceId="p" vertexIndex={2} />, piece({ defaultCornerType: 'squared', cornerTypes: { 2: 'match' } }));
+    const chip = screen.getByRole('button', { name: /^empatada$/i }) as HTMLButtonElement;
+    expect(chip.className).toMatch(/panel-chip-btn--active/);
+    expect(screen.queryByText(/por defecto/i)).toBeNull();
   });
 });

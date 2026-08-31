@@ -28,7 +28,9 @@ export default function VertexPropertiesSection({ pieceId, vertexIndex }: Props)
   const piece = useSelector((s: RootState) => s.project.pieces.find(p => p.id === pieceId));
   if (!piece) return null;
 
-  const current: CornerType = piece.cornerTypes?.[vertexIndex] ?? piece.defaultCornerType ?? 'mitered';
+  const explicit: CornerType | undefined = piece.cornerTypes?.[vertexIndex] ?? piece.defaultCornerType;
+  const current: CornerType = explicit ?? 'mitered';
+  const isExplicit = explicit !== undefined;
 
   const setForVertex = (type: CornerType) => {
     dispatch(updatePiece({
@@ -48,7 +50,7 @@ export default function VertexPropertiesSection({ pieceId, vertexIndex }: Props)
         {CORNER_TYPES.map(({ type, label, disabled }) => (
           <button
             key={type}
-            className={`panel-chip-btn ${type === current ? 'panel-chip-btn--active' : ''}`}
+            className={`panel-chip-btn ${isExplicit && type === current ? 'panel-chip-btn--active' : ''}`}
             disabled={disabled}
             onClick={() => setForVertex(type)}
           >
@@ -56,6 +58,11 @@ export default function VertexPropertiesSection({ pieceId, vertexIndex }: Props)
           </button>
         ))}
       </div>
+      {!isExplicit && (
+        <div className="panel-hint">
+          Por defecto: {CORNER_TYPES.find(c => c.type === current)?.label}
+        </div>
+      )}
       <div className="panel-field panel-field--row">
         <button className="panel-chip-btn" onClick={() => setForAll(current)}>
           Aplicar a todas las esquinas

@@ -1187,6 +1187,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           saDefaultWidthMm={seamAllowanceTool.widthMm}
           internalShapeNodesLength={internalShapeTool.nodes.length}
           cotasVisibles={sujeto.cotas.length > 0}
+          hasSeams={seams.length > 0}
         />
 
         <RulerLayer
