@@ -89,3 +89,33 @@ describe('#1107 — Shift engancha el ángulo del hilo a 0°/45°/90°', () => {
     expect(x1).not.toBeCloseTo(x0, 6); // conserva el largo real, no lo colapsa
   });
 });
+
+// Revisión adversarial de codex (`codex review --base main`, tanda 4): el
+// listener global `mouseup` de PatternEditor.tsx (soltar fuera del <svg>) no
+// reenvía el evento — llama a handleMouseUp() a secas. Antes de #1107 el
+// hilo terminaba igual (nunca miraba el evento); el fix del umbral lo
+// rompió. `cancel()` (pointercancel/Escape) sigue siendo el descarte real.
+describe('#1107 — soltar fuera del <svg> completa igual (regresión P2), Escape sigue cancelando', () => {
+  it('handleMouseUp() sin evento completa con el último mousemove conocido, no descarta', () => {
+    const onSetGrainline = vi.fn();
+    const { result } = renderHook(() => useGrainlineTool(1, { x: 0, y: 0 }, [pieza], onSetGrainline));
+    act(() => result.current.handleMouseDown(ev(100, 100)));
+    act(() => result.current.handleMouseMove(ev(150, 100)));
+    act(() => result.current.handleMouseUp()); // release fuera del lienzo: sin evento
+    expect(onSetGrainline).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancel() descarta el trazo aunque el arrastre ya haya superado el umbral', () => {
+    const onSetGrainline = vi.fn();
+    const { result } = renderHook(() => useGrainlineTool(1, { x: 0, y: 0 }, [pieza], onSetGrainline));
+    act(() => result.current.handleMouseDown(ev(100, 100)));
+    act(() => result.current.handleMouseMove(ev(150, 100)));
+    act(() => result.current.cancel());
+    expect(onSetGrainline).not.toHaveBeenCalled();
+    // El siguiente press arranca limpio — cancel() de verdad soltó el estado.
+    act(() => result.current.handleMouseDown(ev(200, 200)));
+    act(() => result.current.handleMouseMove(ev(250, 200)));
+    act(() => result.current.handleMouseUp(ev(250, 200)));
+    expect(onSetGrainline).toHaveBeenCalledTimes(1);
+  });
+});

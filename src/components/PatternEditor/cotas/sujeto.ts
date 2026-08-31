@@ -52,17 +52,21 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
     const line = piece?.internals.find(internal => (
       internal.id === input.selectedInternalLine!.lineId
     )) ?? null;
-    if (!piece || !line) return nada(lineaRect);
-    const capa = piece.layer ?? 1;
-    if (input.hiddenLayerIds.includes(capa)) return nada(lineaRect);
-    const cotas = cotasDeLineaInterna(piece, line);
-    return {
-      piece,
-      caliente: false,
-      cotas,
-      disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
-      lineaDeSujeto: `Editando: la línea seleccionada · ${cotas.length} cotas`,
-    };
+    // Colgante (undo borró la línea, el par pieza/línea sigue en Redux): no
+    // hay cotas de interna que mostrar, pero la pieza sigue siendo un sujeto
+    // válido — cae al camino de abajo en vez de dejar la tira en blanco.
+    if (piece && line) {
+      const capa = piece.layer ?? 1;
+      if (input.hiddenLayerIds.includes(capa)) return nada(lineaRect);
+      const cotas = cotasDeLineaInterna(piece, line);
+      return {
+        piece,
+        caliente: false,
+        cotas,
+        disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
+        lineaDeSujeto: `Editando: la línea seleccionada · ${cotas.length} cotas`,
+      };
+    }
   }
 
   if (!CON_COTAS_DE_PIEZA.has(input.activeTool)) return nada(null);

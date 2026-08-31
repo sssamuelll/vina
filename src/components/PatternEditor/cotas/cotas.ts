@@ -5,12 +5,13 @@ import type {
   Point2D,
 } from '../../../types/types';
 import { buildRing, projectToRing } from '../../../utils/geometry/outlineRing';
-import { pieceLocalToPattern } from '../../../utils/geometry/pieceSpace';
+import { patternToPieceLocal, pieceLocalToPattern } from '../../../utils/geometry/pieceSpace';
 import { computeBoundingBox, bboxPivot, rotatePoint } from '../../../utils/geometry/transform';
 import { detectCorners } from '../../../utils/notchAnchor';
 import { getAnchor } from '../nodeEditorUtils';
 import { resizePieceTo } from '../pieceResize';
 import type { TransformUpdate } from '../pieceResize';
+import { polarOf, polarPoint } from '../polyPenGeometry';
 import { edgeDistances, type EdgeDistance } from './edgeDistances';
 import { segmentPolar } from './segmentPolar';
 
@@ -138,8 +139,17 @@ function copiaConExtremo(
   if (endpointIndex === 0) {
     const first = copy[0];
     if (!first || first.values.length < 2) return null;
+    const dx = point.x - first.values[0];
+    const dy = point.y - first.values[1];
     first.values[0] = point.x;
     first.values[1] = point.y;
+    // Simétrico al extremo final: si lo que sale de M es una curva, su
+    // control de salida viaja con el mismo delta para no torcer la tangente.
+    const next = copy[1];
+    if (next && (next.type === 'C' || next.type === 'Q') && next.values.length >= 2) {
+      next.values[0] += dx;
+      next.values[1] += dy;
+    }
     return copy;
   }
 
@@ -218,6 +228,10 @@ export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine): Co
     const from = pieceLocalToPattern(segment.from, piece);
     const to = pieceLocalToPattern(segment.to, piece);
     const outward = normalHaciaFuera(from, to, centro);
+    // El ángulo que ve María es el de PATRÓN (pantalla), no el local: en una
+    // pieza girada ambos difieren por la rotación. El largo sí es invariante
+    // (girar no estira nada), así que ese sigue viniendo de segmentPolar.
+    const anguloPatron = polarOf(from, to).angleDeg;
     cotas.push({
       id: `${idBase}-tramo-${segment.toCommandIndex}-largo`,
       kind: 'tramo-largo',
@@ -245,7 +259,7 @@ export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine): Co
       id: `${idBase}-tramo-${segment.toCommandIndex}-angulo`,
       kind: 'tramo-angulo',
       label: 'Ángulo',
-      valueMm: segment.angleDeg,
+      valueMm: anguloPatron,
       unit: 'deg',
       min: -180,
       max: 180,
@@ -254,10 +268,11 @@ export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine): Co
       b: to,
       outward,
       apply: (deg) => {
+        const nuevoPatron = polarPoint(from, segment.lengthMm, deg);
         const path = copiaConNodoFinal(
           line.path,
           segment.toCommandIndex,
-          segment.writeAngle(deg),
+          patternToPieceLocal(nuevoPatron, piece),
         );
         return path
           ? { kind: 'internal', pieceId: piece.id, lineId: line.id, path }

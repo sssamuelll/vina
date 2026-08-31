@@ -84,12 +84,13 @@ describe('cotasDelSujeto', () => {
       expect(s.lineaDeSujeto).toBe(`Editando: la línea seleccionada · ${s.cotas.length} cotas`);
     });
 
-    it('hallazgo #11 — lineId colgante (la línea ya no existe, p.ej. tras un undo): sin cotas, sin crash', () => {
+    it('hallazgo #11 — lineId colgante (la línea ya no existe, p.ej. tras un undo): cae a las cotas de la pieza, no deja la tira en blanco', () => {
       const s = cotasDelSujeto({
         ...baseConLinea, activeTool: 'select', selectedPieceIds: ['a'],
         selectedInternalLine: { pieceId: 'a', lineId: 'no-existe' },
       }, def);
-      expect(s.cotas).toEqual([]);
+      expect(s.cotas.map(c => c.id)).toEqual(['ancho', 'alto']);
+      expect(s.lineaDeSujeto).toBe('Editando: la pieza seleccionada');
     });
 
     it('hallazgo #11 — pieceId colgante (la pieza ya no existe): sin cotas, sin crash', () => {

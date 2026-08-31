@@ -22,8 +22,17 @@ interface GrainlineState {
   endPoint: Point2D | null;
   /** Press crudo en pantalla: el umbral del gesto no cambia con el zoom. */
   pressScreen: Point2D | null;
+  /** Último mousemove crudo en pantalla: respaldo para el release cuando el
+   *  evento no llega (soltar fuera del `<svg>` — el listener global de
+   *  `PatternEditor` no lo reenvía; sin esto el hilo se descartaba en vez de
+   *  confirmarse, aunque el arrastre haya sido real). */
+  moveScreen: Point2D | null;
   isDragging: boolean;
 }
+
+const RESET_STATE: GrainlineState = {
+  pieceId: null, startPoint: null, endPoint: null, pressScreen: null, moveScreen: null, isDragging: false,
+};
 
 function createGrainline(start: Point2D, end: Point2D): InternalLine {
   return {
@@ -42,9 +51,7 @@ export function useGrainlineTool(
   pieces: PatternPiece[],
   onSetGrainline: (pieceId: string, grainline: InternalLine) => void,
 ) {
-  const [state, setState] = useState<GrainlineState>({
-    pieceId: null, startPoint: null, endPoint: null, pressScreen: null, isDragging: false,
-  });
+  const [state, setState] = useState<GrainlineState>(RESET_STATE);
 
   const toPattern = useCallback(
     (screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
@@ -67,6 +74,7 @@ export function useGrainlineTool(
       startPoint: local,
       endPoint: local,
       pressScreen: { x: e.clientX, y: e.clientY },
+      moveScreen: { x: e.clientX, y: e.clientY },
       isDragging: true,
     });
   }, [toPattern, pieces]);
@@ -88,28 +96,35 @@ export function useGrainlineTool(
       endPattern = polarPoint(startPattern, lengthMm, Math.round(angleDeg / 45) * 45);
     }
     const local = patternToPieceLocal(endPattern, piece);
-    setState(prev => ({ ...prev, endPoint: local }));
+    setState(prev => ({ ...prev, endPoint: local, moveScreen: { x: e.clientX, y: e.clientY } }));
   }, [state.isDragging, state.pieceId, state.startPoint, toPattern, pieces]);
 
+  /** Cancelación real (Escape/pointercancel): descarta el trazo sin mirar
+   *  cuánto se arrastró — a diferencia de `handleMouseUp`, aquí no hay
+   *  ambigüedad de evento que resolver. */
+  const cancel = useCallback(() => setState(RESET_STATE), []);
+
   const handleMouseUp = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
-    if (
-      !e || !state.isDragging || !state.pieceId || !state.startPoint
-      || !state.endPoint || !state.pressScreen
-    ) {
-      // Blur y cancelaciones no traen una posición final fiable de pantalla;
-      // confirmar con el último mousemove convertiría un gesto incompleto en hilo.
-      setState({ pieceId: null, startPoint: null, endPoint: null, pressScreen: null, isDragging: false });
+    if (!state.isDragging || !state.pieceId || !state.startPoint || !state.endPoint || !state.pressScreen) {
+      setState(RESET_STATE);
       return;
     }
 
-    const dx = e.clientX - state.pressScreen.x;
-    const dy = e.clientY - state.pressScreen.y;
-    if (isDrag(dx, dy)) {
-      const grainline = createGrainline(state.startPoint, state.endPoint);
-      onSetGrainline(state.pieceId, grainline);
+    // Soltar fuera del `<svg>` llega aquí sin evento (el listener global de
+    // PatternEditor no lo reenvía, por el mismo riesgo que tienen rectángulo/
+    // margen de costura con `e.currentTarget`); usar el último mousemove en
+    // vez de cancelar de una es lo que este hilo ya hacía antes de #1107.
+    const screen = e ? { x: e.clientX, y: e.clientY } : state.moveScreen;
+    if (screen) {
+      const dx = screen.x - state.pressScreen.x;
+      const dy = screen.y - state.pressScreen.y;
+      if (isDrag(dx, dy)) {
+        const grainline = createGrainline(state.startPoint, state.endPoint);
+        onSetGrainline(state.pieceId, grainline);
+      }
     }
 
-    setState({ pieceId: null, startPoint: null, endPoint: null, pressScreen: null, isDragging: false });
+    setState(RESET_STATE);
   }, [state, onSetGrainline]);
 
   return {
@@ -120,5 +135,6 @@ export function useGrainlineTool(
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
+    cancel,
   };
 }

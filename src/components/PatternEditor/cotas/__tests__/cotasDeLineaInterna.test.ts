@@ -125,4 +125,57 @@ describe('cotasDeLineaInterna — línea interna enganchada de un lado al otro',
     const cotas = cotasDeLineaInterna(piezaBase([linea]), linea);
     expect(cotas.filter(c => c.kind === 'borde')).toHaveLength(0);
   });
+
+  // Revisión adversarial de codex (`codex review --base main`, tanda 4).
+  describe('pieza girada — el ángulo es de PANTALLA, no local (hallazgo P1)', () => {
+    const piezaGirada = (rotation: number, internals: InternalLine[]): PatternPiece => ({
+      ...piezaBase(internals), rotation,
+    } as PatternPiece);
+
+    it('un tramo horizontal en local, en una pieza girada 90°, se lee -90° (vertical hacia abajo en pantalla), no 0°', () => {
+      const linea: InternalLine = {
+        id: 'l1', type: 'reference',
+        path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [100, 0] }],
+      };
+      const cotas = cotasDeLineaInterna(piezaGirada(90, [linea]), linea);
+      const angulo = cotas.find(c => c.kind === 'tramo-angulo')!;
+      expect(angulo.valueMm).toBeCloseTo(-90, 3);
+    });
+
+    it('escribir el ángulo recién leído no mueve el punto (round-trip patrón→local→patrón)', () => {
+      const linea: InternalLine = {
+        id: 'l1', type: 'reference',
+        path: [{ type: 'M', values: [10, 10] }, { type: 'L', values: [60, 25] }],
+      };
+      const cotas = cotasDeLineaInterna(piezaGirada(37, [linea]), linea);
+      const angulo = cotas.find(c => c.kind === 'tramo-angulo')!;
+      const update = angulo.apply(angulo.valueMm);
+      if (!update || update.kind !== 'internal') throw new Error('se esperaba una actualización interna');
+      expect(update.path[1].values[0]).toBeCloseTo(60, 3);
+      expect(update.path[1].values[1]).toBeCloseTo(25, 3);
+    });
+  });
+
+  it('revisión adversarial (hallazgo P2): mover un extremo enganchado que ABRE en curva también traslada su control de salida', () => {
+    // M(0,20) está sobre el lado de cierre; la curva sale de ahí hacia (50,50).
+    const linea: InternalLine = {
+      id: 'l1', type: 'reference',
+      path: [
+        { type: 'M', values: [0, 20] },
+        { type: 'C', values: [20, 20, 40, 40, 50, 50] },
+      ],
+    };
+    const cotas = cotasDeLineaInterna(piezaBase([linea]), linea);
+    const borde = cotas.find(c => c.kind === 'borde')!;
+    const update = borde.apply(30);
+    if (!update || update.kind !== 'internal') throw new Error('se esperaba una actualización interna');
+    const [mx, my] = update.path[0].values;
+    const dx = mx - 0;
+    const dy = my - 20;
+    // El control de salida (los dos primeros valores de la C) viaja por el
+    // MISMO delta que M: si no, la tangente con la que la curva sale queda
+    // torcida hacia el punto viejo.
+    expect(update.path[1].values[0]).toBeCloseTo(20 + dx, 3);
+    expect(update.path[1].values[1]).toBeCloseTo(20 + dy, 3);
+  });
 });

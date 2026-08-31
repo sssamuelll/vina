@@ -146,7 +146,7 @@ interface ToolHooks {
     isArmed: () => boolean;
   };
   trimTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
-  grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e?: React.MouseEvent<SVGSVGElement>) => void };
+  grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e?: React.MouseEvent<SVGSVGElement>) => void; cancel: () => void };
   measureTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void; clear: () => void };
   nodeEditor: {
     isEditing: boolean;
@@ -328,12 +328,20 @@ export function useEditorInteractions(
   const selectionHasLocked = selectedPieceIds.some(
     id => pieces.find(p => p.id === id)?.locked,
   );
+  // Un undo puede borrar la línea y dejar el par pieza/línea colgando en
+  // Redux: sin este chequeo de vida, la caja de transformación se queda
+  // apagada (cree que sigue habiendo una interna seleccionada) y la usuaria
+  // se queda sin ningún control hasta volver a hacer clic en la pieza.
+  const selectedInternalLineIsLive = selectedInternalLine !== null && pieces.some(
+    p => p.id === selectedInternalLine.pieceId
+      && p.internals.some(l => l.id === selectedInternalLine.lineId),
+  );
   const showTransformBox = shouldShowTransformBox({
     activeTool,
     isNodeEditing: nodeEditor.isEditing,
     selectedCount: selectedPieceIds.length,
     selectionHasLocked,
-    hasSelectedInternalLine: selectedInternalLine !== null,
+    hasSelectedInternalLine: selectedInternalLineIsLive,
   }) && !isDraggingPiece;
 
   /** Check if a click is near an anchor point of a piece */
@@ -1110,7 +1118,7 @@ export function useEditorInteractions(
     if (activeTool === 'internalShape') internalShapeTool.cancelPress();
     if (activeTool === 'pen') pen.reset();
     if (activeTool === 'rectangle') rectTool.cancel();
-    if (activeTool === 'grainline') grainlineTool.handleMouseUp();
+    if (activeTool === 'grainline') grainlineTool.cancel();
     internalLineDragRef.current = null;
     setIsDraggingEndpoint(false);
   }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, grainlineTool]);
