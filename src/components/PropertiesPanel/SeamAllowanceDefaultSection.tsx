@@ -29,7 +29,7 @@ export default function SeamAllowanceDefaultSection() {
     <section className="panel-section">
       <div className="panel-subtitle panel-subtitle--spaced">Margen de costura por defecto</div>
       <div className="panel-field">
-        <label htmlFor="sa-default-width">Ancho (mm)</label>
+        <label htmlFor="sa-default-width">Margen (mm)</label>
         <input
           id="sa-default-width"
           type="number"

@@ -118,7 +118,7 @@ function SpanFields({ index, span, edgeLengthMm, onCommit, onRemove }: SpanField
         />
       </div>
       <div className="panel-field">
-        <label htmlFor={`edge-span-${index}-width`}>Ancho (mm)</label>
+        <label htmlFor={`edge-span-${index}-width`}>Margen (mm)</label>
         <input
           id={`edge-span-${index}-width`}
           type="number"
@@ -209,8 +209,8 @@ export default function EdgePropertiesSection({ items }: Props) {
 
   const subtitle = count === 1 ? `Borde · ${resolved[0].edgeName}` : `${count} bordes`;
   const widthLabel = spans.length > 0
-    ? 'Ancho fuera de los tramos (mm)'
-    : 'Ancho (mm)';
+    ? 'Margen fuera de los tramos (mm)'
+    : 'Margen (mm)';
 
   return (
     <section className="panel-section">
@@ -236,10 +236,16 @@ export default function EdgePropertiesSection({ items }: Props) {
           disabled={!anyOverridden}
           onClick={() => dispatch(setEdgesSeamAllowance({ items: commitItems, width: null }))}
           title={count === 1
-            ? `Heredar el margen de la pieza (${resolved[0].pieceDefault}mm)`
-            : 'Heredar el margen de la pieza en todos los bordes seleccionados'}
+            ? `Usar el margen de la pieza (${resolved[0].pieceDefault}mm)`
+            : 'Usar el margen de la pieza en todos los bordes seleccionados'}
         >
-          {count === 1 ? `Heredar (${resolved[0].pieceDefault})` : 'Heredar'}
+          {count === 1 ? `Usar el de la pieza (${resolved[0].pieceDefault})` : 'Usar el de la pieza'}
+        </button>
+        <button
+          className="panel-chip-btn"
+          onClick={() => dispatch(setEdgesSeamAllowance({ items: commitItems, width: 0 }))}
+        >
+          Sin margen (0)
         </button>
       </div>
 

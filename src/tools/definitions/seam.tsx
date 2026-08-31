@@ -39,15 +39,6 @@ export const seamTool: ToolDefinition = {
         { label: 'Overlock', value: 'overlock' },
       ],
     },
-    {
-      id: 'stitchLength',
-      label: 'Largo de puntada',
-      type: 'number',
-      value: 2.5,
-      min: 1.0,
-      max: 6.0,
-      step: 0.1,
-    },
   ],
   copilot: {
     description: 'Create seams to connect pattern pieces. Click on an edge of one piece, then click on the corresponding edge of another piece to create a seam. Seams define how pieces are sewn together in 3D simulation.',
@@ -63,7 +54,6 @@ export const seamTool: ToolDefinition = {
     undoable: true,
     parameterHints: {
       seamType: 'Type of seam construction: standard, French (enclosed), flat-felled (visible topstitch), or overlock (serged)',
-      stitchLength: 'Length of each stitch in millimeters (affects simulation behavior)',
     },
   },
 };
