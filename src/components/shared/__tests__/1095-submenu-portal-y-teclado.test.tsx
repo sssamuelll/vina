@@ -17,7 +17,7 @@
  * "Portal-rendered to escape overflow:hidden") + teclado real.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, within, act } from '@testing-library/react';
 import SubMenu, { type SubMenuItem } from '../SubMenu';
 
 afterEach(cleanup);
@@ -33,7 +33,7 @@ describe('#1095 ronda 2 — SubMenu escapa por portal (no queda recortado)', () 
     const { container } = render(<SubMenu label="Duplicar" items={items()} />);
     const trigger = screen.getByRole('button', { name: /duplicar/i });
     fireEvent.mouseEnter(trigger.closest('.submenu-trigger')!);
-    vi.advanceTimersByTime(250);
+    act(() => { vi.advanceTimersByTime(250); });
 
     const panel = document.querySelector('.submenu-panel');
     expect(panel).not.toBeNull();
@@ -48,7 +48,7 @@ describe('#1095 ronda 2 — SubMenu escapa por portal (no queda recortado)', () 
     const trigger = screen.getByRole('button', { name: /orden/i });
     fireEvent.mouseEnter(trigger.closest('.submenu-trigger')!);
     expect(document.querySelector('.submenu-panel')).toBeNull(); // aún no, faltan los 200ms
-    vi.advanceTimersByTime(200);
+    act(() => { vi.advanceTimersByTime(200); });
     expect(document.querySelector('.submenu-panel')).not.toBeNull();
     vi.useRealTimers();
   });

@@ -38,10 +38,14 @@ test.describe('#1095 — el menú avisa cuando hay más filas abajo', () => {
 
     const menu = page.locator('.context-menu');
     await expect(menu).toBeVisible();
+    // Ronda 2: el marco (.context-menu) ya no scrollea — el scrollport real
+    // es el wrapper interior que separa marco de contenido para que los
+    // fades no viajen con el scroll.
+    const menuScroll = page.locator('.context-menu__scroll');
 
     // El propio menú tiene que desbordar en esta pieza (control, como el
     // issue): si no desborda el test no está probando nada.
-    const overflows = await menu.evaluate(el => el.scrollHeight > el.clientHeight + 1);
+    const overflows = await menuScroll.evaluate(el => el.scrollHeight > el.clientHeight + 1);
     expect(overflows, 'el menú de esta pieza no desbordó — la reproducción no es la del issue').toBe(true);
 
     // Señal de fondo visible al abrir (scrollTop=0): la fila real de María.
@@ -65,7 +69,7 @@ test.describe('#1095 — el menú avisa cuando hay más filas abajo', () => {
 
     // Bajar hasta el fondo real del scroll: la señal de abajo se apaga, la
     // de arriba se prende, y "Eliminar pieza" pasa a ser clicable de verdad.
-    await menu.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await menuScroll.evaluate(el => { el.scrollTop = el.scrollHeight; });
     await page.waitForTimeout(150);
     await expect(page.locator('.context-menu__fade--bottom')).toHaveCount(0);
     const fadeTop = page.locator('.context-menu__fade--top');
