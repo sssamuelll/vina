@@ -3,6 +3,14 @@ import { setActiveTool } from './editorSlice';
 import { setActiveTool2D } from './toolSlice';
 import type { Tool2D } from '../types/types';
 
+/** Herramientas que SON el menú de costuras. Fuera de acá el patrón se está
+ *  editando, no cosiendo (nota de María #210: "eso solo debería verse al
+ *  activar el menu de costuras porque es información que molesta y no debería
+ *  mostrarse mientras editamos el patron"). Es el único conjunto: lo lee el
+ *  render de costuras (PatternEditor) y la regla de Supr (useKeyboardShortcuts,
+ *  #1094) — dos listas se desincronizan, como pasó con walkSeam. */
+export const SEWING_TOOL_IDS = new Set(['seam', 'seamEdit', 'walkSeam']);
+
 /**
  * The single writer for 2D tool activation.
  *

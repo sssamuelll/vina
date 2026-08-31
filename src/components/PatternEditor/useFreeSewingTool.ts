@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
+import { clearSelection } from '../../store/editorSlice';
 import type { PatternPiece, Point2D, Seam } from '../../types/types';
 import { screenToPattern } from './sewingUtils';
 import { edgeRangeForCommand } from '../../utils/semanticEdges';
@@ -26,6 +27,7 @@ export function useFreeSewingTool(
   pieces: PatternPiece[],
   onComplete: (seam: Omit<Seam, 'id'>) => void,
 ) {
+  const dispatch = useDispatch();
   const [segmentA, setSegmentA] = useState<SegmentSelection | null>(null);
 
   const seamType = useSelector(
@@ -87,10 +89,14 @@ export function useFreeSewingTool(
       endPoint: target.point,
     };
 
-    if (!segmentA) { setSegmentA(segment); return; }
+    if (!segmentA) {
+      dispatch(clearSelection());
+      setSegmentA(segment);
+      return;
+    }
     onComplete(buildSegmentSeam(segmentA, segment, pieces, seamType));
     setSegmentA(null);
-  }, [segmentA, onComplete, pieces, seamType]);
+  }, [segmentA, onComplete, pieces, seamType, dispatch]);
 
   const gesture = useEdgeGesture({ resolveTarget, resolveReleaseT, onCommit });
 

@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import type { RootState } from '../../store';
 import { addPiece, removePiece, addSeam, updatePiece } from '../../store/projectSlice';
+import { selectAllPieces } from '../../store/editorSlice';
 import type { Point2D, PatternPiece, Seam } from '../../types/types';
 import { flattenPath } from '../../utils/seam/index';
 import { linePolylineIntersections } from '../../utils/geometry/lineIntersect';
@@ -33,6 +34,7 @@ const SNAP_THRESHOLD = 8; // screen pixels
 
 export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
   const dispatch = useDispatch();
+  const store = useStore<RootState>();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const autoSew = useSelector((s: RootState) => s.tools.toolOptions?.scissors?.autoSew ?? true) as boolean;
@@ -42,6 +44,8 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
   const [state, setState] = useState<ScissorsState>(INITIAL_STATE);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const piecesRef = useRef(pieces);
+  piecesRef.current = pieces;
 
   const toPattern = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D => {
@@ -104,32 +108,45 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
       const pt = toPattern(e);
       const s = stateRef.current;
 
-      if (!s.targetPieceId) {
-        // First: target a piece (use selected piece or click on one)
-        const targetId = selectedPieceIds[0] ?? null;
-        if (targetId) {
-          const piece = pieces.find(p => p.id === targetId);
-          if (piece) {
-            const snap = snapToOutline(pt, piece);
-            if (snap) {
-              setState({
-                targetPieceId: targetId,
-                startPoint: snap,
-                endPoint: null,
-                hoveredEdgePoint: null,
-                previewValid: false,
-                error: null,
-              });
-            } else {
-              setState({ ...INITIAL_STATE, targetPieceId: targetId });
-            }
-          }
+      // El press manda el objeto (spec 2026-08-11 § 4.1): la pieza cuyo
+      // contorno está bajo el cursor. Solo lo que se ve y se puede editar —
+      // el mismo filtro que pinta PieceRenderer — y, entre superpuestas, la
+      // de arriba. Capas y bloqueos se leen del store en el momento del
+      // press, no del render: un toggle de capa justo antes del clic no
+      // puede dejar una pieza invisible como objetivo.
+      const resolveInitialPress = () => {
+        const { simulation: { hiddenLayerIds }, project: { layerLocked } } = store.getState();
+        const orderedPieces = pieces
+          .filter(piece => (
+            !hiddenLayerIds.includes(piece.layer ?? 1)
+            && !piece.locked
+            && !layerLocked[piece.layer ?? 1]
+          ))
+          .sort((a, b) => {
+            const aSelected = selectedPieceIds.includes(a.id);
+            const bSelected = selectedPieceIds.includes(b.id);
+            if (aSelected !== bSelected) return aSelected ? -1 : 1;
+            return (b.zOrder ?? 0) - (a.zOrder ?? 0);
+          });
+        for (const piece of orderedPieces) {
+          const snap = snapToOutline(pt, piece);
+          if (!snap) continue;
+          setState({ ...INITIAL_STATE, targetPieceId: piece.id, startPoint: snap });
+          return;
         }
+        setState(INITIAL_STATE);
+      };
+
+      if (!s.targetPieceId) {
+        resolveInitialPress();
         return;
       }
 
       const piece = pieces.find(p => p.id === s.targetPieceId);
-      if (!piece) return;
+      if (!piece) {
+        resolveInitialPress();
+        return;
+      }
 
       if (!s.startPoint) {
         // Set start point
@@ -148,12 +165,16 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
       if (!startPoint || !validateCut(piece, startPoint, snap)) return;
 
       guardAction('splitPiece', () => {
+        const currentPiece = piecesRef.current.find(p => p.id === piece.id);
+        if (!currentPiece) return;
+
         try {
-          const [pieceA, pieceB] = splitPieceAtLine(piece, startPoint, snap);
+          const [pieceA, pieceB] = splitPieceAtLine(currentPiece, startPoint, snap);
           // Use meta.skipConfirmation to bypass confirmationMiddleware
-          dispatch({ ...removePiece(piece.id), meta: { skipConfirmation: true } });
+          dispatch({ ...removePiece(currentPiece.id), meta: { skipConfirmation: true } });
           dispatch(addPiece(pieceA));
           dispatch(addPiece(pieceB));
+          dispatch(selectAllPieces([pieceA.id, pieceB.id]));
 
           // Auto-sew: detect edges and create seam on cut edges
           if (autoSew) {
@@ -180,7 +201,7 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
         }
       });
     },
-    [toPattern, pieces, selectedPieceIds, snapToOutline, validateCut, dispatch, reset, guardAction, autoSew, seamType],
+    [toPattern, pieces, selectedPieceIds, store, snapToOutline, validateCut, dispatch, reset, guardAction, autoSew, seamType],
   );
 
   const handleMouseMove = useCallback(

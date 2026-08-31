@@ -21,7 +21,7 @@ import {
   createPastedPieces,
 } from '../store/editorSlice';
 import { setActiveTool3D } from '../store/toolSlice';
-import { activate2DTool } from '../store/toolActivation';
+import { activate2DTool, SEWING_TOOL_IDS } from '../store/toolActivation';
 import { removePieces, removeSeam, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
 import {
   startSimulation,
@@ -55,6 +55,7 @@ export function useKeyboardShortcuts() {
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const selectedSeamId = useSelector((s: RootState) => s.editor.selectedSeamId);
+  const activeTool = useSelector((s: RootState) => s.editor.activeTool);
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
   const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
   const avatar = useSelector((s: RootState) => s.project.avatar);
@@ -79,6 +80,18 @@ export function useKeyboardShortcuts() {
 
     const wrapHandler = (handler: () => void) => () => {
       if (canFireShortcut()) handler();
+    };
+
+    const deleteSelection = () => {
+      if (SEWING_TOOL_IDS.has(activeTool)) {
+        if (selectedSeamId) dispatch(removeSeam(selectedSeamId));
+        return;
+      }
+      if (selectedPieceIds.length > 0) {
+        dispatch(removePieces(selectedPieceIds));
+      } else if (selectedSeamId) {
+        dispatch(removeSeam(selectedSeamId));
+      }
     };
 
     // ─── Define all handlers ────────────────────────────────────────────
@@ -120,20 +133,8 @@ export function useKeyboardShortcuts() {
       ['edit.duplicate', wrapHandler(() => {
         for (const id of selectedPieceIds) dispatch(duplicatePiece(id));
       })],
-      ['edit.delete', wrapHandler(() => {
-        if (selectedPieceIds.length > 0) {
-          dispatch(removePieces(selectedPieceIds));
-        } else if (selectedSeamId) {
-          dispatch(removeSeam(selectedSeamId));
-        }
-      })],
-      ['edit.deleteAlt', wrapHandler(() => {
-        if (selectedPieceIds.length > 0) {
-          dispatch(removePieces(selectedPieceIds));
-        } else if (selectedSeamId) {
-          dispatch(removeSeam(selectedSeamId));
-        }
-      })],
+      ['edit.delete', wrapHandler(deleteSelection)],
+      ['edit.deleteAlt', wrapHandler(deleteSelection)],
 
       // Selection
       ['selection.selectAll', wrapHandler(() => dispatch(selectAllVisiblePieces({ pieces, layerLocked })))],
@@ -241,5 +242,5 @@ export function useKeyboardShortcuts() {
         registry.unregisterHandler(id);
       }
     };
-  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, viewMode3D, fitMapMode, avatar, projectState, clipboard, xrayMode, layerLocked]);
+  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, activeTool, viewMode3D, fitMapMode, avatar, projectState, clipboard, xrayMode, layerLocked]);
 }

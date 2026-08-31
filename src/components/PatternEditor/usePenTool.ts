@@ -4,6 +4,7 @@ import { screenToPattern } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
 import { polarOf, polarPoint } from './polyPenGeometry';
 import { pushJournal } from '../../utils/telemetry/journal';
+import { isDrag } from './gestureConstants';
 
 /**
  * A node in the pen path. Each node has an anchor point and optional
@@ -53,6 +54,7 @@ export function usePenTool(
   nodesRef.current = state.nodes;
   const cursorRef = useRef<Point2D | null>(null);
   cursorRef.current = state.cursorPos;
+  const pressRef = useRef<{ screen: Point2D; moved: boolean } | null>(null);
 
   /** Convert screen coords to pattern space */
   const toPattern = useCallback(
@@ -131,6 +133,7 @@ export function usePenTool(
       outline: commands,
       ...draftedPieceDefaults(),
     });
+    pressRef.current = null;
     setState(EMPTY);
   }, [nodesToCommands, onComplete]);
 
@@ -154,10 +157,11 @@ export function usePenTool(
     // Add new node
     pushJournal('gesture', 'pen:press', { closes: false, nodes: nodes.length + 1 });
     const newNode: PenNode = { anchor: pt, handleIn: null, handleOut: null };
+    pressRef.current = { screen: { x: e.clientX, y: e.clientY }, moved: false };
     setState(prev => ({
       ...prev,
       nodes: [...prev.nodes, newNode],
-      isDragging: true,
+      isDragging: false,
     }));
   }, [toPattern, zoom, complete]);
 
@@ -165,9 +169,13 @@ export function usePenTool(
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
     const pt = toPattern(e.clientX, e.clientY, rect);
+    const press = pressRef.current;
+    if (press && !press.moved && isDrag(e.clientX - press.screen.x, e.clientY - press.screen.y)) {
+      press.moved = true;
+    }
 
     setState(prev => {
-      if (prev.isDragging && prev.nodes.length > 0) {
+      if (press?.moved && prev.nodes.length > 0) {
         // Dragging = creating handles on last node
         const nodes = [...prev.nodes];
         const lastIdx = nodes.length - 1;
@@ -181,18 +189,20 @@ export function usePenTool(
           y: 2 * anchor.y - pt.y,
         };
         nodes[lastIdx] = last;
-        return { ...prev, nodes, cursorPos: pt };
+        return { ...prev, nodes, cursorPos: pt, isDragging: true };
       }
       return { ...prev, cursorPos: pt };
     });
   }, [toPattern]);
 
   const handleMouseUp = useCallback(() => {
+    pressRef.current = null;
     setState(prev => ({ ...prev, isDragging: false }));
   }, []);
 
   /** Clear any in-progress stroke (used when switching away from the tool). */
   const reset = useCallback(() => {
+    pressRef.current = null;
     setState(EMPTY);
   }, []);
 
@@ -267,6 +277,7 @@ export function usePenTool(
       case 'Backspace':
       case 'Delete':
         if (nodes.length === 0) return false;
+        pressRef.current = null;
         setState(prev => (prev.nodes.length <= 1 ? EMPTY : { ...prev, nodes: prev.nodes.slice(0, -1) }));
         return true;
       default:
