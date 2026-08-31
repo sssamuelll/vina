@@ -17,6 +17,7 @@ import type { InternalLineType } from '../../types/types';
 import SubMenu from '../../components/shared/SubMenu';
 import { displayShortcut } from '../shell/shortcutDisplay';
 import { computeScrollFade, type ScrollFade } from './menuOverflow';
+import { instrumentSubmenuItems } from './menuInstrumentation';
 import {
   GROUP_ORDER, resolveMenuActions, resolveTargetKind,
   type CurationCtx, type CurationCallbacks,
@@ -67,6 +68,7 @@ export default function ContextMenu(props: ContextMenuProps) {
   const groups = useSelector((s: RootState) => s.project.groups);
   const stage = useSelector(selectWorkflowStage);
   const ref = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [fade, setFade] = useState<ScrollFade>({ top: false, bottom: false });
 
   // Clamp the menu into the viewport: long piece menus (25+ rows) opened
@@ -88,10 +90,10 @@ export default function ContextMenu(props: ContextMenuProps) {
   useLayoutEffect(() => {
     if (!menu.visible) return;
     const updateFade = () => {
-      const el = ref.current;
+      const el = scrollRef.current;
       if (el) setFade(computeScrollFade(el));
     };
-    const el = ref.current;
+    const el = scrollRef.current;
     updateFade();
     el?.addEventListener('scroll', updateFade);
     window.addEventListener('resize', updateFade);
@@ -179,34 +181,36 @@ export default function ContextMenu(props: ContextMenuProps) {
 
   return (
     <div ref={ref} className="context-menu" style={{ left: pos.x, top: pos.y }}>
-      {menu.seamId && (
-        <div className="context-menu__header context-menu__header--seam">Costura</div>
-      )}
-      {menu.pieceId && !menu.seamId && (
-        <div className="context-menu__header">{menu.pieceName || menu.pieceId}</div>
-      )}
-      {present.map((group, gi) => (
-        <Fragment key={gi}>
-          {group.map((def) => {
-            const label = typeof def.label === 'function' ? def.label(ctx) : def.label;
-            if (def.submenu) {
-              return <SubMenu key={def.id} label={label} icon={def.icon} items={def.submenu(ctx)} />;
-            }
-            return (
-              <button
-                key={def.id}
-                onClick={() => { pushJournal('ui', 'menu:action', { id: def.id }); def.run(ctx); onClose(); }}
-                className={`context-menu__item${def.danger ? ' context-menu__item--danger' : ''}`}
-              >
-                <span className="context-menu__icon">{def.icon}</span>
-                <span className="context-menu__label">{label}</span>
-                {def.shortcut && <span className="context-menu__shortcut">{displayShortcut(def.shortcut)}</span>}
-              </button>
-            );
-          })}
-          {gi < present.length - 1 && <div className="context-menu__separator" />}
-        </Fragment>
-      ))}
+      <div className="context-menu__scroll" ref={scrollRef}>
+        {menu.seamId && (
+          <div className="context-menu__header context-menu__header--seam">Costura</div>
+        )}
+        {menu.pieceId && !menu.seamId && (
+          <div className="context-menu__header">{menu.pieceName || menu.pieceId}</div>
+        )}
+        {present.map((group, gi) => (
+          <Fragment key={gi}>
+            {group.map((def) => {
+              const label = typeof def.label === 'function' ? def.label(ctx) : def.label;
+              if (def.submenu) {
+                return <SubMenu key={def.id} label={label} icon={def.icon} items={instrumentSubmenuItems(def.id, def.submenu(ctx))} />;
+              }
+              return (
+                <button
+                  key={def.id}
+                  onClick={() => { pushJournal('ui', 'menu:action', { id: def.id }); def.run(ctx); onClose(); }}
+                  className={`context-menu__item${def.danger ? ' context-menu__item--danger' : ''}`}
+                >
+                  <span className="context-menu__icon">{def.icon}</span>
+                  <span className="context-menu__label">{label}</span>
+                  {def.shortcut && <span className="context-menu__shortcut">{displayShortcut(def.shortcut)}</span>}
+                </button>
+              );
+            })}
+            {gi < present.length - 1 && <div className="context-menu__separator" />}
+          </Fragment>
+        ))}
+      </div>
       {fade.bottom && <div className="context-menu__fade context-menu__fade--bottom"><span className="context-menu__fade-chevron">⌄</span></div>}
       {fade.top && <div className="context-menu__fade context-menu__fade--top"><span className="context-menu__fade-chevron">⌃</span></div>}
     </div>

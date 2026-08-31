@@ -264,7 +264,7 @@ export default function ContextMenu3D({
   return (
     <div
       ref={ref}
-      className="context-menu"
+      className="context-menu context-menu--scroll"
       style={{ left: menu.x, top: menu.y }}
     >
       {menu.target === 'piece' && menu.pieceName && (

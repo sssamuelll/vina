@@ -170,11 +170,6 @@
   position: fixed;
   z-index: var(--z-context-menu);
   min-width: 180px;
-  /* Long piece menus (groups + linked editing + …) can outgrow short
-     viewports; without this the bottom items are unreachable (review
-     finding, properties re-home). */
-  max-height: calc(100vh - 16px);
-  overflow-y: auto;
   /* Material `overlay`. El radio era 14px a mano — un quinto radio suelto
    * que no correspondía a ningún rol. */
   background: var(--surface-overlay-bg);
@@ -188,6 +183,16 @@
   font-size: var(--text-sm);
   color: var(--text-primary);
   user-select: none;
+}
+.context-menu__scroll {
+  /* El marco queda fijo; solo el contenido viaja bajo los fades. */
+  max-height: calc(100vh - 16px - 12px);
+  overflow-y: auto;
+}
+.context-menu--scroll {
+  /* El menú 3D conserva el scroll directo que tenía antes de separar el 2D. */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
 }
 .context-menu__header {
   padding: 6px 12px 4px;
