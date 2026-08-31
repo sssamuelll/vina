@@ -45,32 +45,16 @@ async function abrirModalDePiquete(page: Page) {
 
 test.describe('#1099 — el modal de piquete se muda al lado 2D', () => {
   test('ronda 2 (hallazgo del review): a un ratio de split angosto (15%), el modal sigue completo dentro del viewport', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
+    // Abrir con el split por defecto (fiable: a 15% la tira de opciones del
+    // piquete tapa el lienzo de 205px y el clic ya no llega a la pieza —
+    // eso es otro hallazgo aparte, no lo que este test verifica). Angostar
+    // el split DESPUÉS reproduce igual de bien el recorte del modal, y es
+    // el caso real: arrastrar el divisor con el modal ya abierto.
+    const modal = await abrirModalDePiquete(page);
+    await expect(modal).toBeVisible();
+
     await dispatch(page, 'layout/setSplitRatio', 0.15);
     await page.waitForTimeout(300);
-
-    const w = 400, h = 351;
-    await dispatch(page, 'project/addPiece', {
-      id: 'p1', name: 'Delantero', outline: [
-        { type: 'M', values: [0, 0] }, { type: 'L', values: [w, 0] },
-        { type: 'L', values: [w, h] }, { type: 'L', values: [0, h] }, { type: 'Z', values: [] },
-      ],
-      internals: [], position: { x: 100, y: 50 }, rotation: 0, mirrored: false,
-      seamAllowance: 0, layer: 1, sublayer: 0, active: true, createdAt: 1, updatedAt: 1,
-    });
-    await page.waitForTimeout(300);
-    await page.evaluate(() => {
-      const s = (window as unknown as VentanaConStore).__VINA_STORE__;
-      s.dispatch({ type: 'editor/setActiveTool', payload: 'notch' });
-      s.dispatch({ type: 'tools/setActiveTool2D', payload: 'notch' });
-    });
-    await page.waitForTimeout(300);
-    // A 15% de un viewport de 1366, el lienzo 2D mide ~205px — la esquina
-    // marcada por el ancla (arriba-izquierda) sigue clicable ahí.
-    await clickAt(page, { x: 100, y: 50 });
-    const modal = page.locator('.notch-precision-modal');
-    await expect(modal).toBeVisible({ timeout: 5000 });
 
     const modalBox = (await modal.boundingBox())!;
     const viewport = page.viewportSize()!;

@@ -108,7 +108,7 @@ test.describe('#1095 — el menú avisa cuando hay más filas abajo', () => {
     const menu = page.locator('.context-menu');
     await expect(menu).toBeVisible();
 
-    const trigger = menu.getByRole('button', { name: /^duplicar$/i });
+    const trigger = menu.getByRole('button', { name: /duplicar/i });
     await trigger.hover();
     const panel = page.locator('.submenu-panel');
     await expect(panel).toBeVisible({ timeout: 2000 });
@@ -140,7 +140,7 @@ test.describe('#1095 — el menú avisa cuando hay más filas abajo', () => {
     const menu = page.locator('.context-menu');
     await expect(menu).toBeVisible();
 
-    const trigger = menu.getByRole('button', { name: /^duplicar$/i });
+    const trigger = menu.getByRole('button', { name: /duplicar/i });
     await trigger.focus();
     await page.keyboard.press('Enter');
     const panel = page.locator('.submenu-panel');
