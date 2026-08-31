@@ -45,7 +45,7 @@ export type ActionId =
   | 'reverseSeam' | 'reverseGrainline' | 'unfold' | 'unfoldOutlineOnly' | 'offsetInternalLine' | 'optimizeCurves' | 'optimizeAllCurves' | 'convertSegment' | 'convertSegmentToPoints'
   | 'order' | 'layer' | 'lockToggle' | 'activeToggle' | 'groupCreate' | 'addToGroup' | 'removeFromGroup'
   | 'unlinkPieces' | 'selectLinkedPartner' | 'linkSymmetry' | 'linkInstance' | 'cloneLinkedSymmetry' | 'cloneLinkedInstance'
-  | 'duplicate' | 'duplicateAll' | 'rename' | 'properties' | 'select' | 'inspect' | 'selectPieceOfLine' | 'selectSeamA' | 'selectSeamB' | 'zoomToFit' | 'notchExactDistance' | 'saExactWidth'
+  | 'duplicate' | 'duplicateGroup' | 'duplicateAll' | 'rename' | 'properties' | 'select' | 'inspect' | 'selectPieceOfLine' | 'selectSeamA' | 'selectSeamB' | 'zoomToFit' | 'notchExactDistance' | 'saExactWidth'
   | 'deletePiece' | 'deleteSeam' | 'deleteInternalLine';
 
 /** Callbacks que Surface B pasa como props (verbos que no son dispatches puros). */
@@ -254,6 +254,14 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
   // identity
   duplicate: { id: 'duplicate', group: 'identity', icon: '⧉', label: 'Duplicar', shortcut: 'Ctrl+D',
     run: (ctx) => ctx.dispatch(duplicatePiece(ctx.pieceId!)) },                                              // duplicatePiece
+  duplicateGroup: { id: 'duplicateGroup', group: 'identity', icon: '⧉', label: 'Duplicar', run: () => {},
+    submenu: (ctx): SubMenuItem[] => [
+      { label: 'Duplicar', action: () => { ACTIONS.duplicate.run(ctx); ctx.onClose(); } },
+      ...(cloneable(ctx) ? [
+        { label: 'Con edición vinculada – simetría', action: () => { ACTIONS.cloneLinkedSymmetry.run(ctx); ctx.onClose(); } },
+        { label: 'Con edición vinculada – instancia', action: () => { ACTIONS.cloneLinkedInstance.run(ctx); ctx.onClose(); } },
+      ] : []),
+    ] },
   duplicateAll: { id: 'duplicateAll', group: 'identity', icon: '⧉', label: 'Duplicar',
     run: (ctx) => ctx.selectedPieceIds.forEach(id => ctx.dispatch(duplicatePiece(id))) },                    // loop pieza-a-pieza (verbo existente)
   rename: { id: 'rename', group: 'identity', icon: '✏️', label: 'Renombrar…', shortcut: 'F2',
@@ -311,8 +319,8 @@ export const CURATION: CurationRow[] = [
       'rotate90', 'flipH', 'flipV', 'optimizeAllCurves', 'convertSegment', 'convertSegmentToPoints', 'saExactWidth',
       'order',
       'layer', 'lockToggle', 'activeToggle', 'groupCreate', 'addToGroup', 'removeFromGroup',
-      'unlinkPieces', 'selectLinkedPartner', 'linkSymmetry', 'linkInstance', 'cloneLinkedSymmetry', 'cloneLinkedInstance',
-      'duplicate', 'rename', 'properties', 'select', 'inspect',
+      'unlinkPieces', 'selectLinkedPartner', 'linkSymmetry', 'linkInstance',
+      'duplicateGroup', 'rename', 'properties', 'select', 'inspect',
       'deletePiece',
     ],
   },

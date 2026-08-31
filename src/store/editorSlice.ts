@@ -4,6 +4,7 @@ import { NEW_PROJECT } from './actions';
 import { removeReferenceImage } from './projectSlice';
 import { newId } from '../utils/ids';
 import { DEFAULT_SEAM_ALLOWANCE } from '../utils/defaults';
+import { ZOOM_MAX, ZOOM_MIN } from '../input/zoom2d';
 
 const initialState: EditorState = {
   viewMode: 'split',
@@ -163,7 +164,7 @@ const editorSlice = createSlice({
       state.notchMirrorInvert = action.payload;
     },
     setZoom2D(state, action: PayloadAction<number>) {
-      state.zoom2D = Math.max(0.1, Math.min(10, action.payload));
+      state.zoom2D = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, action.payload));
     },
     setPan2D(state, action: PayloadAction<Point2D>) {
       state.pan2D = action.payload;

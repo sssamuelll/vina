@@ -16,6 +16,7 @@ import { selectWorkflowStage } from '../../store/selectors';
 import type { InternalLineType } from '../../types/types';
 import SubMenu from '../../components/shared/SubMenu';
 import { displayShortcut } from '../shell/shortcutDisplay';
+import { computeScrollFade, type ScrollFade } from './menuOverflow';
 import {
   GROUP_ORDER, resolveMenuActions, resolveTargetKind,
   type CurationCtx, type CurationCallbacks,
@@ -66,6 +67,7 @@ export default function ContextMenu(props: ContextMenuProps) {
   const groups = useSelector((s: RootState) => s.project.groups);
   const stage = useSelector(selectWorkflowStage);
   const ref = useRef<HTMLDivElement>(null);
+  const [fade, setFade] = useState<ScrollFade>({ top: false, bottom: false });
 
   // Clamp the menu into the viewport: long piece menus (25+ rows) opened
   // mid-canvas extend past the fold, leaving the bottom items unreachable
@@ -81,6 +83,22 @@ export default function ContextMenu(props: ContextMenuProps) {
       x: Math.min(menu.x, Math.max(pad, window.innerWidth - r.width - pad)),
       y: Math.min(menu.y, Math.max(pad, window.innerHeight - r.height - pad)),
     });
+  }, [menu.visible, menu.x, menu.y]);
+
+  useLayoutEffect(() => {
+    if (!menu.visible) return;
+    const updateFade = () => {
+      const el = ref.current;
+      if (el) setFade(computeScrollFade(el));
+    };
+    const el = ref.current;
+    updateFade();
+    el?.addEventListener('scroll', updateFade);
+    window.addEventListener('resize', updateFade);
+    return () => {
+      el?.removeEventListener('scroll', updateFade);
+      window.removeEventListener('resize', updateFade);
+    };
   }, [menu.visible, menu.x, menu.y]);
 
   // Close on click outside or Escape.
@@ -189,6 +207,8 @@ export default function ContextMenu(props: ContextMenuProps) {
           {gi < present.length - 1 && <div className="context-menu__separator" />}
         </Fragment>
       ))}
+      {fade.bottom && <div className="context-menu__fade context-menu__fade--bottom"><span className="context-menu__fade-chevron">⌄</span></div>}
+      {fade.top && <div className="context-menu__fade context-menu__fade--top"><span className="context-menu__fade-chevron">⌃</span></div>}
     </div>
   );
 }

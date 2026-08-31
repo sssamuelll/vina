@@ -66,6 +66,7 @@ import ReferenceImageLayer from './renderers/ReferenceImageLayer';
 import CalibrationOverlay from './renderers/overlays/CalibrationOverlay';
 import CalibrationModal from './CalibrationModal';
 import NotchPrecisionModal from './NotchPrecisionModal';
+import { notchPlacedMessage } from './notchPrecisionCopy';
 import NextPointPanel from './NextPointPanel';
 import { DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 import ReferenceImageSettings from './ReferenceImageSettings';
@@ -219,6 +220,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     options: NonNullable<InternalLine['notchOptions']>,
   ) => {
     dispatch(updateInternalLine({ pieceId, lineId, path, notchAnchor, notchOptions: options }));
+    dispatch(showInfoToast(notchPlacedMessage(notchAnchor.distanceMm)));
   }, [dispatch]);
 
   const notchTool = useNotchTool(zoom2D, pan2D, pieces, handleNotchAdd, undefined, handleNotchUpdate);
