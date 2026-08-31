@@ -44,6 +44,40 @@ async function abrirModalDePiquete(page: Page) {
 }
 
 test.describe('#1099 — el modal de piquete se muda al lado 2D', () => {
+  test('ronda 2 (hallazgo del review): a un ratio de split angosto (15%), el modal sigue completo dentro del viewport', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
+    await dispatch(page, 'layout/setSplitRatio', 0.15);
+    await page.waitForTimeout(300);
+
+    const w = 400, h = 351;
+    await dispatch(page, 'project/addPiece', {
+      id: 'p1', name: 'Delantero', outline: [
+        { type: 'M', values: [0, 0] }, { type: 'L', values: [w, 0] },
+        { type: 'L', values: [w, h] }, { type: 'L', values: [0, h] }, { type: 'Z', values: [] },
+      ],
+      internals: [], position: { x: 100, y: 50 }, rotation: 0, mirrored: false,
+      seamAllowance: 0, layer: 1, sublayer: 0, active: true, createdAt: 1, updatedAt: 1,
+    });
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      const s = (window as unknown as VentanaConStore).__VINA_STORE__;
+      s.dispatch({ type: 'editor/setActiveTool', payload: 'notch' });
+      s.dispatch({ type: 'tools/setActiveTool2D', payload: 'notch' });
+    });
+    await page.waitForTimeout(300);
+    // A 15% de un viewport de 1366, el lienzo 2D mide ~205px — la esquina
+    // marcada por el ancla (arriba-izquierda) sigue clicable ahí.
+    await clickAt(page, { x: 100, y: 50 });
+    const modal = page.locator('.notch-precision-modal');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    const modalBox = (await modal.boundingBox())!;
+    const viewport = page.viewportSize()!;
+    expect(modalBox.x, 'el modal se recorta por la izquierda — negativo').toBeGreaterThanOrEqual(0);
+    expect(modalBox.x + modalBox.width, 'el modal se sale del viewport por la derecha').toBeLessThanOrEqual(viewport.width);
+  });
+
   test('el modal no invade el visor 3D en vista split', async ({ page }) => {
     const modal = await abrirModalDePiquete(page);
 

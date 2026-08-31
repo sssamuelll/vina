@@ -68,7 +68,17 @@ test.describe('#1095 — el menú avisa cuando hay más filas abajo', () => {
     await menu.evaluate(el => { el.scrollTop = el.scrollHeight; });
     await page.waitForTimeout(150);
     await expect(page.locator('.context-menu__fade--bottom')).toHaveCount(0);
-    await expect(page.locator('.context-menu__fade--top')).toBeVisible();
+    const fadeTop = page.locator('.context-menu__fade--top');
+    await expect(fadeTop).toBeVisible();
+
+    // Ronda 2 (hallazgo del review): `toBeVisible()` solo mira CSS, no
+    // posición. Si el fade es hijo del MISMO elemento que hace scroll, viaja
+    // con el contenido y termina fuera del scrollport (y negativa) aunque
+    // "exista" y su CSS diga visible. Tiene que seguir DENTRO del menú.
+    const menuBox = (await menu.boundingBox())!;
+    const fadeBox = (await fadeTop.boundingBox())!;
+    expect(fadeBox.y, 'el fade superior se fue fuera del menú al bajar el scroll').toBeGreaterThanOrEqual(menuBox.y - 1);
+    expect(fadeBox.y + fadeBox.height).toBeLessThanOrEqual(menuBox.y + menuBox.height + 1);
 
     const deleteReachableNow = await page.evaluate(() => {
       const btn = [...document.querySelectorAll('.context-menu__item--danger')]
@@ -79,6 +89,64 @@ test.describe('#1095 — el menú avisa cuando hay más filas abajo', () => {
       return btn.contains(hit) || hit === btn;
     });
     expect(deleteReachableNow).toBe(true);
+  });
+
+  test('ronda 2 (hallazgo del review): el submenú "Duplicar" es alcanzable con el mouse, no queda recortado', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
+    await page.waitForTimeout(500);
+    await addPiece(page, 'p1', { x: 100, y: 100 }, 200, 200);
+
+    const box = await page.locator('svg.pattern-svg').boundingBox();
+    const x = box!.x + box!.width * 0.4;
+    const y = box!.y + box!.height * 0.4;
+    await page.mouse.click(x, y, { button: 'right' });
+    const menu = page.locator('.context-menu');
+    await expect(menu).toBeVisible();
+
+    const trigger = menu.getByRole('button', { name: /^duplicar$/i });
+    await trigger.hover();
+    const panel = page.locator('.submenu-panel');
+    await expect(panel).toBeVisible({ timeout: 2000 });
+
+    const item = panel.getByRole('button', { name: 'Duplicar' });
+    const r = (await item.boundingBox())!;
+    const hit = await page.evaluate(([px, py]) => {
+      const el = document.elementFromPoint(px, py);
+      return el?.textContent ?? null;
+    }, [r.x + r.width / 2, r.y + r.height / 2]);
+    expect(hit, 'elementFromPoint no alcanzó "Duplicar" — el submenú está recortado').toBe('Duplicar');
+
+    await item.click();
+    await expect(menu).toHaveCount(0);
+    const state = await page.evaluate(() => (window as unknown as {
+      __VINA_STORE__: { getState: () => { project: { pieces: Array<{ id: string }> } } };
+    }).__VINA_STORE__.getState().project.pieces.length);
+    expect(state).toBe(2); // p1 + su duplicado
+  });
+
+  test('ronda 2: el submenú "Duplicar" también se abre y se ejecuta por teclado', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
+    await page.waitForTimeout(500);
+    await addPiece(page, 'p1', { x: 100, y: 100 }, 200, 200);
+
+    const box = await page.locator('svg.pattern-svg').boundingBox();
+    await page.mouse.click(box!.x + box!.width * 0.4, box!.y + box!.height * 0.4, { button: 'right' });
+    const menu = page.locator('.context-menu');
+    await expect(menu).toBeVisible();
+
+    const trigger = menu.getByRole('button', { name: /^duplicar$/i });
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    const panel = page.locator('.submenu-panel');
+    await expect(panel).toBeVisible({ timeout: 2000 });
+    await panel.getByRole('button', { name: 'Duplicar' }).click();
+
+    const count = await page.evaluate(() => (window as unknown as {
+      __VINA_STORE__: { getState: () => { project: { pieces: Array<{ id: string }> } } };
+    }).__VINA_STORE__.getState().project.pieces.length);
+    expect(count).toBe(2);
   });
 
   test('un menú corto (sin overflow) no muestra ninguna señal', async ({ page }) => {
