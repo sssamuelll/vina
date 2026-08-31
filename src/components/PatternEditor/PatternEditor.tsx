@@ -5,7 +5,7 @@ import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatc
 import { setToolOption } from '../../store/toolSlice';
 import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
-import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
+import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, selectInternalLine, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
 import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand } from '../../types/types';
@@ -347,10 +347,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     }
     // El motor dibuja en espacio de PATRÓN; los internals se guardan locales
     // y `toPieceLocalPath` deshace posición y giro (#1068).
+    const lineId = newId();
     dispatch(addInternalLine({
       pieceId: host.id,
-      line: { id: newId(), type: internalLineType, path: toPieceLocalPath(path, host) },
+      line: { id: lineId, type: internalLineType, path: toPieceLocalPath(path, host) },
     }));
+    dispatch(selectInternalLine({ pieceId: host.id, lineId }));
   }, [pieces, dispatch, internalLineType]);
 
   const handleInternalShapeLockedPress = useCallback(() => {
@@ -640,7 +642,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   }, []);
 
   const cotasRef = useRef<CotasLayerHandle>(null);
-  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece } =
+  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
       pen, rectTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas: cotasRef,
     });
@@ -655,10 +657,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
   const sujeto = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
-    hotId: rectHotId, isDragging: isDraggingPiece || transformTool.isDragging,
+    hotId: rectHotId, isDragging: isDraggingPiece || transformTool.isDragging || isDraggingEndpoint,
     contextMenuOpen: ctxMenu.visible, calibrationActive: calibrationMode !== null,
     hiddenLayerIds, layerLocked,
-  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, rectHotId, isDraggingPiece, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked]);
+  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, rectHotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked]);
 
   // Enfriamiento irreversible (spec § 3.1): en cuanto la selección deja de ser
   // la pieza nueva, cambia la herramienta o la pieza desaparece, se enfría y
@@ -673,13 +675,21 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     const update = cota.apply(valueMm);
     if (!update) return;
     // Liveness: si el sujeto murió (undo, borrado), no se escribe nada.
-    const piece = pieces.find(p => p.id === update.id);
-    if (!piece) return;
-    const accion = updatePiece({
-      ...piece, outline: update.outline, position: update.position, rotation: update.rotation,
-      internals: update.internals, updatedAt: Date.now(),
-    });
-    dispatch(token ? withUndoBatchToken(accion, token) : accion);
+    if (update.kind === 'piece') {
+      const piece = pieces.find(p => p.id === update.id);
+      if (!piece) return;
+      const accion = updatePiece({
+        ...piece, outline: update.outline, position: update.position, rotation: update.rotation,
+        internals: update.internals, updatedAt: Date.now(),
+      });
+      dispatch(token ? withUndoBatchToken(accion, token) : accion);
+    } else {
+      const piece = pieces.find(p => p.id === update.pieceId);
+      if (!piece) return;
+      if (!piece.internals.some(line => line.id === update.lineId)) return;
+      const accion = updateInternalLine({ pieceId: update.pieceId, lineId: update.lineId, path: update.path });
+      dispatch(token ? withUndoBatchToken(accion, token) : accion);
+    }
   }, [pieces, dispatch]);
   const aplicarRef = useRef(aplicarCota);
   aplicarRef.current = aplicarCota;

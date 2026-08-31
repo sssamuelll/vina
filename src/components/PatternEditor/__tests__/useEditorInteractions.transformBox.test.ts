@@ -37,4 +37,19 @@ describe('shouldShowTransformBox', () => {
       activeTool: 'select', isNodeEditing: false, selectedCount: 0, selectionHasLocked: false,
     })).toBe(false);
   });
+
+  // PR B, spec § 3.5: con una interna seleccionada, la pieza no compite —
+  // se suprimen el box Y la FloatingActionBar (comparten este mismo booleano).
+  it('oculta con una interna seleccionada, aunque la pieza esté seleccionada y desbloqueada', () => {
+    expect(shouldShowTransformBox({
+      activeTool: 'select', isNodeEditing: false, selectedCount: 1, selectionHasLocked: false,
+      hasSelectedInternalLine: true,
+    })).toBe(false);
+  });
+
+  it('el parámetro es opcional y por defecto no cambia el comportamiento de siempre', () => {
+    expect(shouldShowTransformBox({
+      activeTool: 'select', isNodeEditing: false, selectedCount: 1, selectionHasLocked: false,
+    })).toBe(true);
+  });
 });

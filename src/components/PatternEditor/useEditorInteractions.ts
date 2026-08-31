@@ -146,7 +146,7 @@ interface ToolHooks {
     isArmed: () => boolean;
   };
   trimTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
-  grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
+  grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e?: React.MouseEvent<SVGSVGElement>) => void; cancel: () => void };
   measureTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void; clear: () => void };
   nodeEditor: {
     isEditing: boolean;
@@ -276,7 +276,9 @@ export function shouldShowTransformBox(opts: {
   isNodeEditing: boolean;
   selectedCount: number;
   selectionHasLocked: boolean;
+  hasSelectedInternalLine?: boolean;
 }): boolean {
+  if (opts.hasSelectedInternalLine) return false;
   // Una pieza bloqueada nunca enseña el box, tampoco en el tool transform:
   // sus handles redimensionan/rotan, y eso es modificar (maria-204 cerró
   // este bypass — el lock solo cubría el verbo select).
@@ -315,6 +317,10 @@ export function useEditorInteractions(
    *  de puntos que ella fotografió aparece al entrar a "Editar patrón", volver a
    *  la flecha sin Esc y arrastrar). Se exporta para ese segundo grupo. */
   const [isDraggingPiece, setIsDraggingPiece] = useState(false);
+  /** El ref mueve el extremo sin renderizar por sí solo; este espejo observable
+   *  apaga las cotas que, si no, ofrecerían otro mando durante el gesto y
+   *  quedarían visualmente ancladas a la geometría anterior. */
+  const [isDraggingEndpoint, setIsDraggingEndpoint] = useState(false);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
   const { pen, rectTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas } = tools;
@@ -322,11 +328,20 @@ export function useEditorInteractions(
   const selectionHasLocked = selectedPieceIds.some(
     id => pieces.find(p => p.id === id)?.locked,
   );
+  // Un undo puede borrar la línea y dejar el par pieza/línea colgando en
+  // Redux: sin este chequeo de vida, la caja de transformación se queda
+  // apagada (cree que sigue habiendo una interna seleccionada) y la usuaria
+  // se queda sin ningún control hasta volver a hacer clic en la pieza.
+  const selectedInternalLineIsLive = selectedInternalLine !== null && pieces.some(
+    p => p.id === selectedInternalLine.pieceId
+      && p.internals.some(l => l.id === selectedInternalLine.lineId),
+  );
   const showTransformBox = shouldShowTransformBox({
     activeTool,
     isNodeEditing: nodeEditor.isEditing,
     selectedCount: selectedPieceIds.length,
     selectionHasLocked,
+    hasSelectedInternalLine: selectedInternalLineIsLive,
   }) && !isDraggingPiece;
 
   /** Check if a click is near an anchor point of a piece */
@@ -758,6 +773,7 @@ export function useEditorInteractions(
                     startMouse: { x: e.clientX, y: e.clientY },
                     startPos: { ...endpoints[i] },
                   };
+                  setIsDraggingEndpoint(true);
                   return;
                 }
               }
@@ -1056,6 +1072,7 @@ export function useEditorInteractions(
     panRef.current = null;
     dragRef.current = null;
     internalLineDragRef.current = null;
+    setIsDraggingEndpoint(false);
     if (activeTool === 'pen') pen.handleMouseUp();
     if (activeTool === 'rectangle') {
       // Sin evento (blur, reentrada con buttons === 0) no hay release fiable:
@@ -1069,7 +1086,7 @@ export function useEditorInteractions(
       if (e) seamAllowanceTool.handleMouseUp(e);
       else seamAllowanceTool.cancel();
     }
-    if (activeTool === 'grainline') grainlineTool.handleMouseUp();
+    if (activeTool === 'grainline') grainlineTool.handleMouseUp(e);
     if (activeTool === 'transform' || (activeTool === 'select' && transformTool.isDragging)) transformTool.handleMouseUp();
     if (nodeEditor.isEditing) nodeEditor.handleMouseUp();
     if (activeTool === 'editPattern') editPattern.handleMouseUp();
@@ -1101,7 +1118,10 @@ export function useEditorInteractions(
     if (activeTool === 'internalShape') internalShapeTool.cancelPress();
     if (activeTool === 'pen') pen.reset();
     if (activeTool === 'rectangle') rectTool.cancel();
-  }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool]);
+    if (activeTool === 'grainline') grainlineTool.cancel();
+    internalLineDragRef.current = null;
+    setIsDraggingEndpoint(false);
+  }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, grainlineTool]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
@@ -1136,5 +1156,5 @@ export function useEditorInteractions(
     }
   };
 
-  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece };
+  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint };
 }

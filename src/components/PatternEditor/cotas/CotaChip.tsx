@@ -203,8 +203,10 @@ export default function CotaChip({
           s.moved = true;
           onScrubStart(cota);
         }
-        // 1 px de pantalla = 1/zoom mm: la geometría sigue al cursor 1:1.
-        const v = acota(round1(s.v0 + (dx / zoom2D) * ganancia(e)), cota);
+        // El ángulo no es una distancia sobre el patrón: dividirlo por zoom
+        // haría que el mismo gesto cambiara según cuánto amplió María el lienzo.
+        const tasa = cota.unit === 'deg' ? 0.5 : 1 / zoom2D;
+        const v = acota(round1(s.v0 + dx * tasa * ganancia(e)), cota);
         s.last = v;
         onScrub(cota, v);
       }}
