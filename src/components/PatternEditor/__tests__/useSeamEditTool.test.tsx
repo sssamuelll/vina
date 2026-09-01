@@ -81,7 +81,7 @@ describe('useSeamEditTool', () => {
       { wrapper },
     );
     act(() => { result.current.handleMouseMove(ev(50, 0)); });
-    expect(result.current.hoveredSeamId).toBe('s1');
+    expect(result.current.hoveredSeamIds).toEqual(['s1']);
   });
 
   it('salirse del borde apaga el hover', () => {
@@ -91,7 +91,7 @@ describe('useSeamEditTool', () => {
     );
     act(() => { result.current.handleMouseMove(ev(50, 0)); });
     act(() => { result.current.handleMouseMove(ev(50, 50)); }); // centro de la pieza
-    expect(result.current.hoveredSeamId).toBeNull();
+    expect(result.current.hoveredSeamIds).toEqual([]);
   });
 
   it('Escape deselecciona', () => {

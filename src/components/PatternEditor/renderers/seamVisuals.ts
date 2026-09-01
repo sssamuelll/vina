@@ -13,11 +13,19 @@
 
 /**
  * Categorical palette for distinguishing seam pairs — muted for the cream
- * paper ground. Three hues (Iris cut 3): beyond three, adjacent seams read
- * as a parade of color rather than groups; cycling three keeps neighbors
- * distinct without competing with the selection/error language.
+ * paper ground. Eight hues prevent neighboring pairs from collapsing into
+ * the same identity while keeping luminance separate from the state channel.
  */
-export const SEAM_PALETTE = ['#4a7fb5', '#b56d8a', '#5a9e72'];
+export const SEAM_PALETTE = [
+  'var(--seam-pair-1)',
+  'var(--seam-pair-2)',
+  'var(--seam-pair-3)',
+  'var(--seam-pair-4)',
+  'var(--seam-pair-5)',
+  'var(--seam-pair-6)',
+  'var(--seam-pair-7)',
+  'var(--seam-pair-8)',
+];
 
 /**
  * Stable pair color: deterministic hash of the seam id → palette entry.

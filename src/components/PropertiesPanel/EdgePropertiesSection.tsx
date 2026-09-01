@@ -230,6 +230,9 @@ export default function EdgePropertiesSection({ items }: Props) {
           onBlur={commitWidth}
         />
       </div>
+      {!anyOverridden && displayValue !== '' && value === displayValue && (
+        <div className="panel-hint">Heredado de la pieza</div>
+      )}
       <div className="panel-field panel-field--row">
         <button
           className="panel-chip-btn"

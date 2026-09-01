@@ -962,7 +962,10 @@ export function useEditorInteractions(
     }
     if (activeTool === 'pen') pen.handleMouseMove(e);
     if (activeTool === 'rectangle') rectTool.handleMouseMove(e);
-    if (activeTool === 'seam') seamTool.handleMouseMove(e);
+    if (activeTool === 'seam') {
+      seamTool.handleMouseMove(e);
+      seamEditTool.handleMouseMove(e);
+    }
     if (activeTool === 'notch') notchTool.handleMouseMove(e);
     if (activeTool === 'point') pointTool.handleMouseMove(e);
     if (activeTool === 'trimPlace') trimTool.handleMouseMove(e);

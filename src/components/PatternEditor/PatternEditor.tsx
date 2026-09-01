@@ -317,7 +317,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const slashAndSpreadTool = useSlashAndSpreadTool(zoom2D, pan2D);
   const mergeTool = useMergeTool(zoom2D, pan2D);
   const measureTool = useMeasureTool(zoom2D, pan2D);
-  const seamEditTool = useSeamEditTool(zoom2D, pan2D, pieces, seams);
+  const seamEditTool = useSeamEditTool(
+    zoom2D,
+    pan2D,
+    pieces,
+    seams,
+    activeTool === 'seam' || activeTool === 'seamEdit',
+  );
   const topstitchTool = useTopstitchTool(zoom2D, pan2D, pieces);
   const walkSeamTool = useWalkSeamTool(zoom2D, pan2D);
   const offsetTool = useOffsetTool(zoom2D, pan2D);
@@ -1034,7 +1040,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
               zoom2D={zoom2D}
               selectedSeamId={editor.selectedSeamId}
               emphasis={activeTool === 'seam' ? 'muted' : 'full'}
-              hoveredSeamId={activeTool === 'seamEdit' ? seamEditTool.hoveredSeamId : null}
+              hoveredSeamIds={activeTool === 'seam' || activeTool === 'seamEdit'
+                ? seamEditTool.hoveredSeamIds
+                : undefined}
             />
           )}
           <ElasticRenderer zoom2D={zoom2D} />

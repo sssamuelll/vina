@@ -31,10 +31,11 @@ describe('seamPairColor', () => {
     expect(afterDeletion).toEqual(before.slice(1));
   });
 
-  it('distributes across the palette (not everything one hue)', () => {
+  it('distributes across every available tone, with more than three identities', () => {
     const colors = new Set(
       Array.from({ length: 40 }, (_, i) => seamPairColor(`seam-${i}-${i * 7}`)),
     );
+    expect(colors.size).toBeGreaterThan(3);
     expect(colors.size).toBe(SEAM_PALETTE.length);
   });
 });
