@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { selectSeam, clearSelection } from '../../store/editorSlice';
@@ -25,10 +25,16 @@ export function useSeamEditTool(
   pan: Point2D,
   pieces: PatternPiece[],
   seams: Seam[],
+  isHoverEnabled = true,
 ) {
   const dispatch = useDispatch();
   const selectedSeamId = useSelector((s: RootState) => s.editor.selectedSeamId);
-  const [hoveredSeamId, setHoveredSeamId] = useState<string | null>(null);
+  const [hoveredSeamIds, setHoveredSeamIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (isHoverEnabled) return;
+    setHoveredSeamIds(current => current.length === 0 ? current : []);
+  }, [isHoverEnabled]);
 
   /** Qué costuras hay bajo el cursor, por el borde que engancha. */
   const seamsUnder = useCallback((e: React.MouseEvent<SVGSVGElement>): Seam[] => {
@@ -51,13 +57,20 @@ export function useSeamEditTool(
   }, [seamsUnder, selectedSeamId, dispatch]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    const onEdge = seamsUnder(e);
-    setHoveredSeamId(onEdge[0]?.id ?? null);
+    const nextIds = seamsUnder(e).map(seam => seam.id);
+    setHoveredSeamIds(current => (
+      current.length === nextIds.length && current.every((id, index) => id === nextIds[index])
+        ? current
+        : nextIds
+    ));
   }, [seamsUnder]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') dispatch(clearSelection());
   }, [dispatch]);
 
-  return { hoveredSeamId, handleMouseDown, handleMouseMove, handleKeyDown };
+  // Solo la lista: un borde puede llevar varias costuras (`seamsOnEdge` devuelve
+  // todas), y dejar tambien un `hoveredSeamId` singular invita a que el proximo
+  // consumidor pierda en silencio las demas — que era justo el bug de #1110.
+  return { hoveredSeamIds, handleMouseDown, handleMouseMove, handleKeyDown };
 }

@@ -126,6 +126,27 @@ export function snapToEdge(
   return best;
 }
 
+/**
+ * Memo de UNA entrada para la busqueda sin pieza fijada (#1110).
+ *
+ * Con Coser activa, dos consumidores distintos resuelven el MISMO punto en el
+ * mismo movimiento del raton: el selector de bordes (`useFreeSewingTool`) y el
+ * encendido del par ya cosido (`useSeamEditTool`). La funcion es pura —
+ * (pt, pieces, zoom) manda y nada mas— asi que la segunda llamada sale gratis
+ * en vez de volver a aplanar la geometria de todas las piezas. `pieces` viene
+ * de Redux, que da una referencia nueva cuando cambia, asi que comparar por
+ * identidad basta.
+ *
+ * El camino con `constrainPieceId` no pasa por aqui: ya es barato (una pieza).
+ */
+let memoSinFijar: {
+  x: number;
+  y: number;
+  pieces: PatternPiece[];
+  zoom: number;
+  out: SnapResult | null;
+} | null = null;
+
 export function snapToAnyEdge(
   pt: Point2D,
   pieces: PatternPiece[],
@@ -142,6 +163,16 @@ export function snapToAnyEdge(
     return snapToEdge(pt, piece, zoom, constrainEdge, unbounded);
   }
 
+  if (
+    memoSinFijar
+    && memoSinFijar.zoom === zoom
+    && memoSinFijar.pieces === pieces
+    && memoSinFijar.x === pt.x
+    && memoSinFijar.y === pt.y
+  ) {
+    return memoSinFijar.out;
+  }
+
   let best: SnapResult | null = null;
   let bestDist = Infinity;
 
@@ -156,6 +187,7 @@ export function snapToAnyEdge(
     }
   }
 
+  memoSinFijar = { x: pt.x, y: pt.y, pieces, zoom, out: best };
   return best;
 }
 

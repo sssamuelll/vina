@@ -3,11 +3,11 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import toolReducer from '../../../store/toolSlice';
-import editorReducer, { setActiveTool } from '../../../store/editorSlice';
+import editorReducer, { setActiveTool, setDefaultSAWidth } from '../../../store/editorSlice';
 import { toolRegistry } from '../../../tools';
 import type { ToolDefinition } from '../../../tools/types';
 import type { Tool2D } from '../../../types/types';
@@ -127,6 +127,38 @@ describe('ToolStrip2D', () => {
     expect(screen.queryByLabelText('Alto')).toBeNull();
     expect(screen.getByText('Rectángulo')).toBeTruthy();
     expect(screen.getByText('Un clic crea 300 × 150 mm · arrastra para dibujar')).toBeTruthy();
+  });
+
+  it('#1100 — el margen del próximo clic se confirma con Enter y refleja cambios del store', () => {
+    const { store } = montar('seamAllowance');
+    const input = screen.getByLabelText('Margen del próximo clic') as HTMLInputElement;
+
+    expect(input.value).toBe('9.5');
+    expect(screen.getByText('mm')).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: '18.5' } });
+    expect(store.getState().editor.defaultSeamAllowanceWidth).toBe(9.5);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(store.getState().editor.defaultSeamAllowanceWidth).toBe(18.5);
+
+    act(() => { store.dispatch(setDefaultSAWidth(12)); });
+    expect(input.value).toBe('12');
+  });
+
+  it('#1100 — el margen del próximo clic se confirma al salir del campo', () => {
+    const { store } = montar('seamAllowance');
+    const input = screen.getByLabelText('Margen del próximo clic');
+
+    fireEvent.change(input, { target: { value: '24' } });
+    expect(store.getState().editor.defaultSeamAllowanceWidth).toBe(9.5);
+    fireEvent.blur(input);
+    expect(store.getState().editor.defaultSeamAllowanceWidth).toBe(24);
+  });
+
+  it('#1100 — otras herramientas no muestran ni modifican el margen por accidente', () => {
+    const { store } = montar('__tira_sin_opciones');
+    expect(screen.queryByLabelText('Margen del próximo clic')).toBeNull();
+    expect(store.getState().editor.defaultSeamAllowanceWidth).toBe(9.5);
   });
 
   it('el selector devuelve una referencia estable cuando no hay valores guardados', () => {

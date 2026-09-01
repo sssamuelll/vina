@@ -47,6 +47,30 @@ describe('EdgePropertiesSection', () => {
     expect((screen.getByLabelText(/margen/i) as HTMLInputElement).value).toBe('10');
   });
 
+  it('#1100 — anuncia cuando el margen mostrado se hereda de la pieza', () => {
+    mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
+    expect(screen.getByText('Heredado de la pieza')).toBeTruthy();
+  });
+
+  it('#1100 — no anuncia herencia cuando el borde tiene un margen propio', () => {
+    mount(
+      <EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />,
+      piece({ edges: [{ ...hem, seamAllowanceWidth: 40 }] }),
+    );
+    expect(screen.queryByText('Heredado de la pieza')).toBeNull();
+  });
+
+  it('#1100 — deja de anunciar herencia mientras el campo muestra un borrador local', () => {
+    mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
+    const input = screen.getByLabelText(/margen/i) as HTMLInputElement;
+
+    expect(screen.getByText('Heredado de la pieza')).toBeTruthy();
+    fireEvent.change(input, { target: { value: '12' } });
+
+    expect(input.value).toBe('12');
+    expect(screen.queryByText('Heredado de la pieza')).toBeNull();
+  });
+
   it('commits a per-edge width on Enter', () => {
     const store = mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
     const input = screen.getByLabelText(/margen/i);
