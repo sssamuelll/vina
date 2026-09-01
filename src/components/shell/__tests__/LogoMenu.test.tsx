@@ -92,6 +92,19 @@ describe('LogoMenu ▸ View — 2D display toggles', () => {
     expect(store.getState().editor.showLineLengths).toBe(!before);
   });
 
+  it('toggles Piquetes and reflects checked state', () => {
+    const store = renderMenu();
+    const before = store.getState().editor.showNotches;
+    openViewMenu();
+    expect(isChecked('Piquetes')).toBe(before);
+
+    fireEvent.click(screen.getByText('Piquetes'));
+    expect(store.getState().editor.showNotches).toBe(!before);
+
+    openViewMenu();
+    expect(isChecked('Piquetes')).toBe(!before);
+  });
+
   it('Render trio is a radio group: selecting Wireframe unchecks Textured', () => {
     const store = renderMenu();
     expect(store.getState().editor.renderMode2D).toBe('textured');

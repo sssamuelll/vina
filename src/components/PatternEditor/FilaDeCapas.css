@@ -1,0 +1,58 @@
+/* Fila persistente de visibilidad (#1109): hermana de la tira de herramienta y
+   anclada en la esquina opuesta del lienzo para no competir con ella ni con la
+   regla. Mismo material que `.tool-strip` — overlay en su variante sin borde,
+   la sombra separa — y sin `backdrop-filter`, igual que ella: el blur crearia
+   un contexto de apilamiento que esta fila no necesita (contrato § 2). */
+.fila-de-capas {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: var(--z-menu);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 24px);
+  padding: 6px;
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border-flush);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow-sheet);
+  color: var(--text-primary);
+  font-size: var(--text-ui);
+}
+
+.fila-de-capas__toggle {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fila-de-capas__toggle--activo {
+  color: var(--text-primary);
+  background: var(--accent-subtle);
+}
+
+.fila-de-capas__marca {
+  width: 8px;
+  height: 8px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+}
+
+.fila-de-capas__toggle--activo .fila-de-capas__marca {
+  background: currentColor;
+}
+
+.fila-de-capas__toggle:hover { color: var(--text-primary); }
+.fila-de-capas__toggle:focus-visible { outline: 0; color: var(--text-primary); box-shadow: var(--focus-rail-inset); }

@@ -15,6 +15,7 @@ import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import CotaLines from './cotas/CotaLines';
 import { cotasDelSujeto } from './cotas/sujeto';
 import ToolStrip2D from './ToolStrip2D';
+import FilaDeCapas from './FilaDeCapas';
 import type { Cota } from './cotas/cotas';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
@@ -100,7 +101,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const pieces = useSelector(selectPieces);
   const seams = useSelector(selectSeams);
   const editor = useSelector(selectEditor);
-  const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, showPieceNames, showSewingLines, showLineLengths, renderMode2D, gridSize, units, fitViewToken } = editor;
+  const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, showNotches, showPieceNames, showSewingLines, showLineLengths, renderMode2D, gridSize, units, fitViewToken } = editor;
   const selectedPieceIds = editor.selectedPieceIds;
   const toolOptions = useSelector(selectToolOptions);
   const groups = useSelector((s: RootState) => s.project.groups);
@@ -1006,6 +1007,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             zoom2D={zoom2D}
             showSeamAllowance={showSeamAllowance}
             showGrainlines={showGrainlines}
+            showNotches={showNotches}
             showPieceNames={showPieceNames}
             renderMode2D={renderMode2D}
             showLineLengths={showLineLengths}
@@ -1223,6 +1225,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       />
       {/* La tira cede la esquina al gesto vivo: mientras "Siguiente punto" esta abierto no se pinta (spec 2026-08-30 § 12). */}
       {!(pen.nextPoint || internalShapeTool.nextPoint) && <ToolStrip2D lineaDeSujeto={sujeto.lineaDeSujeto} />}
+      <FilaDeCapas />
       {shouldShowEmptyState(pieces.length, activeTool) && (
         <EmptyState2D onImportDXF={onImportDXF} />
       )}

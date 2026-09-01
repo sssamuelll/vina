@@ -57,6 +57,7 @@ describe('PieceRenderer — tramo de margen en pieza neta', () => {
             zoom2D={1}
             showSeamAllowance
             showGrainlines={false}
+            showNotches
             showPieceNames={false}
             renderMode2D="wireframe"
             showLineLengths={false}

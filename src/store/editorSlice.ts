@@ -21,6 +21,7 @@ const initialState: EditorState = {
   showSeamAllowance: true,
   defaultSeamAllowanceWidth: DEFAULT_SEAM_ALLOWANCE,
   showGrainlines: true,
+  showNotches: true,
   showAnchorPoints: false,
   showPieceNames: false,
   showLineLengths: false,
@@ -182,6 +183,9 @@ const editorSlice = createSlice({
     toggleGrainlines(state) {
       state.showGrainlines = !state.showGrainlines;
     },
+    toggleNotches(state) {
+      state.showNotches = !state.showNotches;
+    },
     toggleAnchorPoints(state) {
       state.showAnchorPoints = !state.showAnchorPoints;
     },
@@ -275,7 +279,7 @@ export const {
   setViewMode, setActiveTool,
   selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectAllVisiblePieces, selectSeam, selectPOM, selectInternalLine, selectSaEdges, selectSaVertices, clearSaSelection,
   setZoom2D, setPan2D, requestFitView,
-  toggleSeamAllowance, setDefaultSAWidth, setNotchMirrorInvert, toggleGrainlines, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
+  toggleSeamAllowance, setDefaultSAWidth, setNotchMirrorInvert, toggleGrainlines, toggleNotches, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
   togglePieceNames, toggleLineLengths, toggleSewingLines, setRenderMode2D,
   toggleReferenceImages, setShowReferenceImages, setSelectedReferenceImage,
   startCalibration, setCalibrationPoint1, cancelCalibration,

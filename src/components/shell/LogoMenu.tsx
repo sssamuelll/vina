@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import {
   setViewMode, undo, redo, toggleSnapToGrid, toggleSeamAllowance,
-  toggleGrainlines, togglePieceNames, toggleSewingLines,
+  toggleGrainlines, toggleNotches, togglePieceNames, toggleSewingLines,
   toggleReferenceImages, toggleLineLengths, setRenderMode2D,
   clearSelection, setZoom2D, setUnits,
 } from '../../store/editorSlice';
@@ -107,6 +107,7 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Cuadrícula', shortcut: 'G', action: (d) => d(toggleSnapToGrid()), checked: (s) => s.editor.snapToGrid },
   { label: 'Margen de costura', shortcut: '⇧S', action: (d) => d(toggleSeamAllowance()), checked: (s) => s.editor.showSeamAllowance },
   { label: 'Hilos', action: (d) => d(toggleGrainlines()), checked: (s) => s.editor.showGrainlines },
+  { label: 'Piquetes', action: (d) => d(toggleNotches()), checked: (s) => s.editor.showNotches },
   { label: 'Nombres de pieza', action: (d) => d(togglePieceNames()), checked: (s) => s.editor.showPieceNames },
   { label: 'Líneas de costura', action: (d) => d(toggleSewingLines()), checked: (s) => s.editor.showSewingLines },
   { label: 'Imágenes de referencia', action: (d) => d(toggleReferenceImages()), checked: (s) => s.editor.showReferenceImages },
