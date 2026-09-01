@@ -104,6 +104,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       showSeamAllowance: true,
       defaultSeamAllowanceWidth: 10,
       showGrainlines: true,
+      showNotches: true,
       showAnchorPoints: true,
       showPieceNames: false,
       showLineLengths: false,

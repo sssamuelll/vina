@@ -34,6 +34,7 @@ interface SinglePieceProps {
   zoom2D: number;
   showSeamAllowance: boolean;
   showGrainlines: boolean;
+  showNotches: boolean;
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
   showLineLengths: boolean;
@@ -64,6 +65,7 @@ const SinglePiece = memo(function SinglePiece({
   zoom2D,
   showSeamAllowance,
   showGrainlines,
+  showNotches,
   showPieceNames,
   renderMode2D,
   showLineLengths,
@@ -209,6 +211,7 @@ const SinglePiece = memo(function SinglePiece({
 
       {piece.internals.map(line => {
         const isNotch = line.type === 'notch';
+        if (isNotch && !showNotches) return null;
         const hasFill = isNotch && line.notchOptions?.shape === 'diamond';
         const isLineSelected = isInternalLineSelected && selectedLineId === line.id;
 
@@ -269,6 +272,7 @@ const SinglePiece = memo(function SinglePiece({
         return (
           <g key={line.id}>
             <path
+              data-internal-line-type={line.type}
               d={pathToSVG(line.path)}
               style={{ stroke: lineColor, fill: hasFill ? lineColor : 'none' }}
               strokeWidth={isLineSelected ? 2 / zoom2D : 0.8 / zoom2D}
@@ -510,6 +514,7 @@ interface PieceRendererProps {
   zoom2D: number;
   showSeamAllowance: boolean;
   showGrainlines: boolean;
+  showNotches: boolean;
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
   showLineLengths: boolean;
@@ -529,6 +534,7 @@ export default function PieceRenderer({
   zoom2D,
   showSeamAllowance,
   showGrainlines,
+  showNotches,
   showPieceNames,
   renderMode2D,
   showLineLengths,
@@ -615,6 +621,7 @@ export default function PieceRenderer({
           zoom2D={zoom2D}
           showSeamAllowance={showSeamAllowance}
           showGrainlines={showGrainlines}
+          showNotches={showNotches}
           showPieceNames={showPieceNames}
           renderMode2D={renderMode2D}
           showLineLengths={showLineLengths}

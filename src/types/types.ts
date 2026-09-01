@@ -808,6 +808,7 @@ export interface EditorState {
   showSeamAllowance: boolean;
   defaultSeamAllowanceWidth: number;  // mm fallback when piece has no SA set
   showGrainlines: boolean;
+  showNotches: boolean;
   showAnchorPoints: boolean;
   showPieceNames: boolean;
   showLineLengths: boolean;
