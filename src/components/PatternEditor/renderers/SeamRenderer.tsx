@@ -22,8 +22,10 @@ interface SeamRendererProps {
   /** 'full' en la herramienta de editar (las costuras son la capa protagonista);
    *  'muted' en la de crear, donde estorban. Spec § 4.3. */
   emphasis?: 'full' | 'muted';
-  hoveredSeamId?: string | null;
+  hoveredSeamIds?: readonly string[];
 }
+
+const NO_HOVERED_SEAMS: readonly string[] = [];
 
 /**
  * Directional notch (CLO3D parity, Fase 5): a short tick perpendicular to
@@ -40,7 +42,8 @@ function directionTick(pts: Point2D[], zoom: number): string | null {
 }
 
 export default function SeamRenderer({
-  seams, pieces, zoom2D, selectedSeamId, emphasis = 'full', hoveredSeamId = null,
+  seams, pieces, zoom2D, selectedSeamId, emphasis = 'full',
+  hoveredSeamIds = NO_HOVERED_SEAMS,
 }: SeamRendererProps) {
   // Pre-pass (Fase1-H1): resolver la geometría de todos los seams ANTES de
   // renderizar, para que los labels de mismatch puedan hacer layout
@@ -129,9 +132,9 @@ export default function SeamRenderer({
         const mismatchMm = seamMismatchMm(lenA, lenB);
         const hasMismatch = mismatchMm > SEAM_MISMATCH_THRESHOLD_MM;
 
-        // El hover de editar costuras enciende igual que la selección — un
-        // solo canal visual para "esto es lo protagonista ahora" (spec § 4.3).
-        const isLit = selectedSeamId === seam.id || hoveredSeamId === seam.id;
+        // El hover de coser/editar enciende igual que la selección. La lista
+        // conserva todos los pares cuando un mismo borde lleva varias costuras.
+        const isLit = selectedSeamId === seam.id || hoveredSeamIds.includes(seam.id);
         const isInactive = seam.active === false;
         // One channel per concern (Fase 6, Iris N3): the pair color is
         // IDENTITY and never changes under interaction — selection shows as
