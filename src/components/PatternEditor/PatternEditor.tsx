@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch, shallowEqual } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
+import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
 import { setToolOption } from '../../store/toolSlice';
 import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
@@ -242,9 +242,19 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     };
   }, [notchMirror, pieces]);
 
+  // Solo lo que se dibuja puede prometer una lectura o recibir el clic. El
+  // orden ascendente es el de PieceRenderer; el hook lo invierte una sola vez.
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
+  const drawablePieces = useMemo(
+    () => [...pieces]
+      .filter(p => !hiddenLayerIds.includes(p.layer ?? 1))
+      .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
+    [pieces, hiddenLayerIds],
+  );
+
   // Explicit apply-SA command (pieces are born net; this puts allowance back
   // on purpose). Width comes from editor.defaultSeamAllowanceWidth inside the
-  // hook; per-piece scalar is the ratified model — per-edge is future work.
+  // hook; el clic al cuerpo conserva el escalar ratificado de la pieza.
   // Overwriting a deliberate custom width gets an undo toast (review finding:
   // an accidental click in SA mode must not silently reset María's 8mm to 10).
   const handleApplySeamAllowance = useCallback((pieceId: string, widthMm: number, prevWidthMm: number) => {
@@ -267,7 +277,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       dispatch(batchSetSeamAllowance({ pieceIds, width: widthMm }));
     });
   }, [dispatch]);
-  const seamAllowanceTool = useSeamAllowanceTool(pieces, zoom2D, pan2D, {
+  const seamAllowanceTool = useSeamAllowanceTool(drawablePieces, zoom2D, pan2D, {
     onApply: handleApplySeamAllowance,
     onApplyAll: handleApplySeamAllowanceAll,
     onApplySpan: (pieceId, edgeId, range, width) => {
@@ -277,11 +287,15 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         span: { tStart: range[0], tEnd: range[1], width },
       }));
     },
-    // Selecting an edge/vertex opens the Properties panel — its docked home for
-    // editing the width / corner type (CLO3D's persistent Property Editor).
-    onSelectEdge: (pieceId, edgeId, additive) => { dispatch(selectSaEdges({ items: [{ pieceId, edgeId }], additive })); onOpenPanel?.('Properties'); },
+    // El borde ya NO abre el panel de Propiedades por su cuenta (spec 2026-09-02
+    // § 6): su número se escribe en el chip sobre el lienzo, y abrir el panel
+    // empujaba el lienzo y dejaba el chip recién abierto bajo la tira (medido
+    // en las capturas de la entrega 33). Si el panel está abierto, se
+    // actualiza igual; "Usar el de la pieza" y los tramos siguen viviendo ahí.
+    // La esquina sí lo abre: su tipo no tiene otra puerta.
+    onSelectEdge: (pieceId, edgeId, additive) => { dispatch(selectSaEdges({ items: [{ pieceId, edgeId }], additive })); },
     onSelectVertex: (pieceId, vertexIndex) => { dispatch(selectSaVertices({ pieceId, vertexIndex })); onOpenPanel?.('Properties'); },
-  });
+  }, activeTool === 'seamAllowance');
 
   const trimTool = useTrimTool(zoom2D, pan2D, pieces, dispatch);
 
@@ -330,16 +344,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const extendTrimTool = useExtendTrimTool(zoom2D, pan2D);
 
   // ─── Línea interna (spec 2026-08-29 § 4) ─────────────────────────────────
-  // Las piezas que el motor puede enganchar y adoptar: las VISIBLES, en el
-  // orden de dibujo de PieceRenderer (la última está arriba). Las de capa
-  // oculta no son anfitrionas ni objetivo.
-  const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
-  const drawablePieces = useMemo(
-    () => [...pieces]
-      .filter(p => !hiddenLayerIds.includes(p.layer ?? 1))
-      .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
-    [pieces, hiddenLayerIds],
-  );
   const internalLineType = (toolOptions?.internalShape?.lineType as InternalLineType | undefined) ?? 'reference';
   const internalNodeType = (toolOptions?.internalShape?.nodeType as 'straight' | 'curvePoints' | undefined) ?? 'straight';
 
@@ -649,7 +653,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   }, []);
 
   const cotasRef = useRef<CotasLayerHandle>(null);
-  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint } =
+  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
       pen, rectTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas: cotasRef,
     });
@@ -666,8 +670,20 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
     hotId: rectHotId, isDragging: isDraggingPiece || transformTool.isDragging || isDraggingEndpoint,
     contextMenuOpen: ctxMenu.visible, calibrationActive: calibrationMode !== null,
-    hiddenLayerIds, layerLocked,
-  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, rectHotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked]);
+    hiddenLayerIds, layerLocked, saSelection: editor.saSelection,
+    saAncla: seamAllowanceTool.ancla, saHover: seamAllowanceTool.hover,
+  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, rectHotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover]);
+
+  const abrirChipVisto = useRef(0);
+  useEffect(() => {
+    if (abrirChipVisto.current === seamAllowanceTool.abrirChip) return;
+    abrirChipVisto.current = seamAllowanceTool.abrirChip;
+    const ancla = seamAllowanceTool.ancla;
+    if (!ancla) return;
+    if (cotasRef.current?.abrirPrimero()) {
+      pushJournal('gesture', 'sa:chip:abre', { pieceId: ancla.pieceId, edgeId: ancla.edgeId });
+    }
+  }, [seamAllowanceTool.abrirChip, seamAllowanceTool.ancla]);
 
   // Enfriamiento irreversible (spec § 3.1): en cuanto la selección deja de ser
   // la pieza nueva, cambia la herramienta o la pieza desaparece, se enfría y
@@ -682,7 +698,29 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     const update = cota.apply(valueMm);
     if (!update) return;
     // Liveness: si el sujeto murió (undo, borrado), no se escribe nada.
-    if (update.kind === 'piece') {
+    if (update.kind === 'margen') {
+      const piece = pieces.find(p => p.id === update.pieceId);
+      const edge = piece?.edges?.find(candidate => candidate.id === update.edgeId);
+      if (!piece || !edge) return;
+      if (update.fuente === 'tramo') {
+        if (update.spanIndex == null) return;
+        const span = edge.seamAllowanceSpans?.[update.spanIndex];
+        if (!span) return;
+        const action = updateEdgeSeamAllowanceSpan({
+          pieceId: update.pieceId,
+          edgeId: update.edgeId,
+          spanIndex: update.spanIndex,
+          span: { ...span, width: update.width },
+        });
+        dispatch(token ? withUndoBatchToken(action, token) : action);
+      } else {
+        const action = setEdgesSeamAllowance({
+          items: [{ pieceId: update.pieceId, edgeId: update.edgeId }],
+          width: update.width,
+        });
+        dispatch(token ? withUndoBatchToken(action, token) : action);
+      }
+    } else if (update.kind === 'piece') {
       const piece = pieces.find(p => p.id === update.id);
       if (!piece) return;
       const accion = updatePiece({
@@ -711,7 +749,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const handleCotaCommit = useCallback((cota: Cota, valueMm: number) => {
     aplicarCota(cota, valueMm);
     escribirDefault(cota, valueMm);
-    pushJournal('gesture', 'cota:commit', { id: cota.id, value: valueMm, caliente: sujeto.caliente });
+    pushJournal('gesture', 'cota:commit', {
+      id: cota.id,
+      kind: cota.kind,
+      prev: cota.valueMm,
+      value: valueMm,
+      caliente: sujeto.caliente,
+    });
   }, [aplicarCota, escribirDefault, sujeto.caliente]);
 
   // Scrub: un batch de deshacer con token (una entrada), un despacho por frame
@@ -993,6 +1037,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleHostMouseUp}
+        onMouseLeave={handleMouseLeave}
         onPointerCancel={handlePointerCancel}
         onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}
@@ -1050,6 +1095,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           {activeTool === 'seamAllowance' && (
             <SeamAllowanceSelectionOverlay
               saSelection={editor.saSelection}
+              hoverEdge={sujeto.bordeLeido}
               pieces={pieces}
               zoom={zoom2D}
             />
@@ -1222,6 +1268,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       <CotasLayer
         ref={cotasRef}
         cotas={sujeto.cotas}
+        lectura={sujeto.lectura}
+        lecturaApagada={sujeto.lecturaApagada}
         pan2D={pan2D}
         zoom2D={zoom2D}
         disabled={sujeto.disabled}

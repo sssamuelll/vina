@@ -68,3 +68,4 @@ exclamaciones, verbos que nombran el resultado (protocolo de microcopy solace-wr
 3. Los `aria-label` también van en español (los lee el screen reader de María, no el test runner) — los tests se actualizan con ellos.
 4. Términos técnicos del motor (WebGPU, WASM, fps) no se traducen; sus MENSAJES sí.
 5. Sin "por favor", sin "¡", sin title case en body copy.
+6. «Heredar» y «heredado» están prohibidos en copy visible. Se nombra la relación concreta: «usa el margen de la pieza». María [25:01]: «Esto de heredar, no sé muy bien a qué se refiere… un poco antiguo en español».

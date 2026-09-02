@@ -15,7 +15,8 @@ export default function CotaLines({ cotas, zoom2D }: { cotas: Cota[]; zoom2D: nu
   const tick = TICK_PX / z;
   return (
     <g className="cota-lineas" pointerEvents="none">
-      {cotas.filter((c) => c.kind !== 'tramo-largo' && c.kind !== 'tramo-angulo').map((c) => {
+      {/* El margen no lleva hilo (spec 2026-09-02 § 4.3): a = b, y el tick quedaría bajo el chip. */}
+      {cotas.filter((c) => c.kind !== 'tramo-largo' && c.kind !== 'tramo-angulo' && c.kind !== 'margen').map((c) => {
         const ax = c.a.x + c.outward.x * off;
         const ay = c.a.y + c.outward.y * off;
         const bx = c.b.x + c.outward.x * off;

@@ -1,5 +1,6 @@
 import { PatternPiece, Tool2D } from '../../../types/types';
 import { DEFAULT_SEAM_ALLOWANCE } from '../../../utils/defaults';
+import { formatMedida } from '../cotas/parseMedida';
 
 interface HintTextProps {
   activeTool: Tool2D;
@@ -115,7 +116,7 @@ export default function HintText({
 
       {activeTool === 'seamAllowance' && (
         <Pie>
-          {`Clic en una pieza aplica ${saDefaultWidthMm ?? DEFAULT_SEAM_ALLOWANCE} mm · arrastra sobre varias para aplicarlo a todas · clic en un borde para su ancho · en una esquina para su tipo`}
+          {`Pasa por un borde para leer su margen · clic para escribirlo · pieza entera: ${formatMedida(saDefaultWidthMm ?? DEFAULT_SEAM_ALLOWANCE, 'mm')} · esquina: su tipo`}
         </Pie>
       )}
 

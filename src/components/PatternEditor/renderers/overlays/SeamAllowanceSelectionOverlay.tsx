@@ -4,8 +4,33 @@ import { pieceLocalToPattern } from '../../../../utils/geometry/pieceSpace';
 
 interface Props {
   saSelection: SaSelection | null;
+  hoverEdge?: { pieceId: string; edgeId: string } | null;
   pieces: PatternPiece[];
   zoom: number;
+}
+
+/** Con hover esto corre por movimiento: el aplanado se memoiza por identidad del contorno. */
+const aplanados = new WeakMap<PatternPiece['outline'], ReturnType<typeof flattenPath>>();
+function aplanado(outline: PatternPiece['outline']) {
+  let flat = aplanados.get(outline);
+  if (!flat) { flat = flattenPath(outline); aplanados.set(outline, flat); }
+  return flat;
+}
+
+function edgeTracePoints(pieces: PatternPiece[], pieceId: string, edgeId: string): string[] | null {
+  const piece = pieces.find(candidate => candidate.id === pieceId);
+  const edge = piece?.edges?.find(candidate => candidate.id === edgeId);
+  if (!piece || !edge || !piece.outline?.length) return null;
+  const flat = aplanado(piece.outline);
+  const [from, to] = commandRangeToFlattened(piece.outline, edge.segmentRange);
+  const span = to >= from
+    ? flat.slice(from, to + 1)
+    : [...flat.slice(from), ...flat.slice(0, to + 1)];
+  const points = span.map(point => {
+    const world = pieceLocalToPattern(point, piece);
+    return `${world.x},${world.y}`;
+  });
+  return points.length >= 2 ? points : null;
 }
 
 /**
@@ -15,14 +40,36 @@ interface Props {
  * in the set (multi-select Shift). Inside the pan/zoom group, so sizes are
  * divided by zoom to stay constant on screen.
  */
-export default function SeamAllowanceSelectionOverlay({ saSelection, pieces, zoom }: Props) {
-  const stroke = 2.5 / zoom;
+export default function SeamAllowanceSelectionOverlay({ saSelection, hoverEdge, pieces, zoom }: Props) {
+  const thinStroke = 2.5 / zoom;
+  const selectionStroke = 4 / zoom;
   const r = 5 / zoom;
-  if (!saSelection) return null;
+  const hoverIsSelected = Boolean(hoverEdge && saSelection?.kind === 'edge'
+    && saSelection.items.some(item => item.pieceId === hoverEdge.pieceId && item.edgeId === hoverEdge.edgeId));
+  const hoverPoints = hoverEdge && !hoverIsSelected
+    ? edgeTracePoints(pieces, hoverEdge.pieceId, hoverEdge.edgeId)
+    : null;
+
+  const hover = hoverPoints ? (
+    <polyline
+      data-testid="sa-edge-hover"
+      points={hoverPoints.join(' ')}
+      fill="none"
+      stroke="var(--accent-2d)"
+      strokeWidth={thinStroke}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      pointerEvents="none"
+      opacity={0.55}
+    />
+  ) : null;
+
+  if (!saSelection) return hover;
 
   if (saSelection.kind === 'vertex') {
     return (
       <>
+        {hover}
         {saSelection.items.map(({ pieceId, vertexIndex }, i) => {
           const piece = pieces.find((p) => p.id === pieceId);
           const cmd = piece?.outline?.[vertexIndex];
@@ -37,7 +84,7 @@ export default function SeamAllowanceSelectionOverlay({ saSelection, pieces, zoo
           );
           return (
             <circle key={`${pieceId}:${vertexIndex}:${i}`} cx={cx} cy={cy} r={r}
-              fill="none" stroke="var(--accent-2d)" strokeWidth={stroke} pointerEvents="none" />
+              fill="none" stroke="var(--accent-2d)" strokeWidth={thinStroke} pointerEvents="none" />
           );
         })}
       </>
@@ -46,29 +93,19 @@ export default function SeamAllowanceSelectionOverlay({ saSelection, pieces, zoo
 
   return (
     <>
+      {hover}
       {saSelection.items.map(({ pieceId, edgeId }, i) => {
-        const piece = pieces.find((p) => p.id === pieceId);
-        const edge = piece?.edges?.find((e) => e.id === edgeId);
-        if (!piece || !edge || !piece.outline?.length) return null;
+        const points = edgeTracePoints(pieces, pieceId, edgeId);
+        if (!points) return null;
         // El resalte sigue el TRAZO, no la cuerda. Antes se pintaba un punto
         // por comando (el endpoint de cada uno), así que un borde curvo salía
         // como la recta entre sus extremos: la "V en azul" de la foto del #213,
         // desviada de la curva real por toda la flecha del arco. `flattenPath`
         // + `commandRangeToFlattened` son el mismo boundary comando→aplanado
         // (BP-3) que ya usan el solver y el SeamRenderer.
-        const flat = flattenPath(piece.outline);
-        const [from, to] = commandRangeToFlattened(piece.outline, edge.segmentRange);
-        const span = to >= from
-          ? flat.slice(from, to + 1)
-          : [...flat.slice(from), ...flat.slice(0, to + 1)];
-        const pts = span.map(p => {
-          const w = pieceLocalToPattern(p, piece);
-          return `${w.x},${w.y}`;
-        });
-        if (pts.length < 2) return null;
         return (
-          <polyline key={`${pieceId}:${edgeId}:${i}`} data-testid="sa-edge-highlight" points={pts.join(' ')}
-            fill="none" stroke="var(--accent-2d)" strokeWidth={stroke * 1.6}
+          <polyline key={`${pieceId}:${edgeId}:${i}`} data-testid="sa-edge-highlight" points={points.join(' ')}
+            fill="none" stroke="var(--accent-2d)" strokeWidth={selectionStroke}
             strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
         );
       })}

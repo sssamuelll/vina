@@ -296,7 +296,8 @@ La gramática que Atrium validó lado a lado (`Atrium/docs/superpowers/specs/202
 | **Ancla paramétrica persistente** en `InternalLine` (que la cota se conserve cuando se edita el contorno, como `NotchAnchor`) | es la generalización de `notchAnchor.ts`; cambia el modelo de datos y el DXF | tanda 2; hoy la cota se **deriva** de la geometría cada vez |
 | Tramos **curvos** (C/Q) con cota | operan sobre `path` con manejadores sin infraestructura de nodos | tanda 2 |
 | Piquetes en chips | `NotchPrecisionModal` funciona y tiene su gramática; dos dueños es el BLOCKER #2 de la revisión | tanda 2, cuando el chip de borde esté probado |
-| Multi-selección, costuras, márgenes, pinzas con cotas | un sujeto a la vez | después |
+| Multi-selección, costuras, pinzas con cotas | un sujeto a la vez | después |
+| ~~Márgenes~~ — **enmendado 2026-09-02:** el margen de un borde entra como cota viva (lectura al pasar, edición al clicar, sin scrub) | tanda 5b-3, pedido literal de María [25:44] | `docs/superpowers/specs/2026-09-02-margen-en-el-borde-design.md` |
 | Previsualización **por tecla** | sin canal de render sombra; el scrub ya da lo vivo | si María la pide |
 | Teclear dígitos sin clicar (VCB) | colisión con el visor 3D desde `body` y con overrides | no |
 | Plegar / arrastrar la tira; volteo por oclusión | estado y ciclo de vida extra | si María lo pide |

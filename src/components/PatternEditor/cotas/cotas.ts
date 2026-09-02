@@ -17,7 +17,15 @@ import { segmentPolar } from './segmentPolar';
 
 export type CotaUpdate =
   | ({ kind: 'piece' } & TransformUpdate)
-  | { kind: 'internal'; pieceId: string; lineId: string; path: PathCommand[] };
+  | { kind: 'internal'; pieceId: string; lineId: string; path: PathCommand[] }
+  | {
+      kind: 'margen';
+      pieceId: string;
+      edgeId: string;
+      fuente: 'tramo' | 'borde' | 'pieza';
+      spanIndex?: number;
+      width: number;
+    };
 
 /**
  * Una cota viva (spec 2026-08-30 § 3, § 5): la medida que el objeto enseña
@@ -29,7 +37,7 @@ export type CotaUpdate =
  */
 export interface Cota {
   id: string;
-  kind: 'ancho' | 'alto' | 'tramo-largo' | 'tramo-angulo' | 'borde';
+  kind: 'ancho' | 'alto' | 'tramo-largo' | 'tramo-angulo' | 'borde' | 'margen';
   /** Nombre accesible, en español: "Ancho de la pieza". */
   label: string;
   valueMm: number;
@@ -38,6 +46,10 @@ export interface Cota {
   max: number;
   /** Relleno (mando principal) o hueco (verificación) — § 3.4. */
   primary: boolean;
+  /** Procedencia visible del número cuando hace falta decirla. */
+  rotulo?: string;
+  /** Ausente conserva el scrub; `false` deja el chip solo para teclado. */
+  scrub?: boolean;
   a: Point2D;
   b: Point2D;
   outward: Point2D;
@@ -99,7 +111,7 @@ export function cotasDePieza(piece: PatternPiece): Cota[] {
   ];
 }
 
-function normalHaciaFuera(a: Point2D, b: Point2D, centro: Point2D): Point2D {
+export function normalHaciaFuera(a: Point2D, b: Point2D, centro: Point2D): Point2D {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const largo = Math.hypot(dx, dy);

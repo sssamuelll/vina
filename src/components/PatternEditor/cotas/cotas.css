@@ -53,3 +53,27 @@
 }
 .cota--editando:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cota--invalida { border-left-color: var(--destructive); }
+
+/* La lectura (spec 2026-09-02 § 4.2 R2, § 4.4): no es un blanco y pesa menos
+   que el chip anclado — contrato § 4, seleccionado > hover — por opacidad y
+   sin sombra, no solo por tono. */
+.cota--lectura { pointer-events: none; cursor: default; opacity: 0.8; box-shadow: none; }
+/* El chip de margen se clica para escribir; no se arrastra. */
+.cota--sin-scrub { cursor: pointer; }
+/* El rótulo de procedencia ("de la pieza" / "del tramo") va del lado de fuera
+   de la pieza: arriba por defecto, abajo cuando la normal apunta hacia abajo.
+   Tinta de apoyo, no el acento: el acento a 11 px daba 2,7:1 sobre el papel. */
+.cota[data-rotulo]::before {
+  content: attr(data-rotulo);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 2px);
+  transform: translateX(-50%);
+  font-family: var(--font-ui-2d);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-on-light-2);
+  white-space: nowrap;
+}
+.cota[data-rotulo][data-lado='abajo']::before { bottom: auto; top: calc(100% + 2px); }
+.cotas:has(.cota--editando) .cota--lectura { display: none; }

@@ -28,3 +28,6 @@ export function isDrag(dx: number, dy: number): boolean {
  * Spec: docs/superpowers/specs/2026-08-11-arrastre-unificado-2d-design.md § 7
  */
 export const EDGE_HIT_PX = 12;
+
+/** Radio de enganche de una ESQUINA; comparte la gramática del margen. */
+export const VERTEX_HIT_PX = 10;

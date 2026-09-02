@@ -75,7 +75,7 @@ const cloneToLayerTool: ToolDefinition = {
     'Clone a pattern piece to the layer immediately above or below its current layer. ' +
     'The clone inherits the original\'s 3D arrangement position. ' +
     '/ Clonar una pieza de patrón a la capa inmediatamente superior o inferior a su capa actual. ' +
-    'El clon hereda la posición de disposición 3D del original.',
+    'El clon toma la posición de disposición 3D del original.',
   parameters: {
     type: 'object',
     properties: {

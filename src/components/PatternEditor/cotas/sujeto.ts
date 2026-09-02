@@ -1,6 +1,14 @@
-import type { PatternPiece, Tool2D } from '../../../types/types';
+import type { PatternPiece, SaSelection, Tool2D } from '../../../types/types';
+import { margenEnPunto } from '../../../utils/seam/margenEnPunto';
+import { cotaDeMargen } from './cotaDeMargen';
 import { cotasDeLineaInterna, cotasDePieza, type Cota } from './cotas';
 import { formatMedida } from './parseMedida';
+
+export interface SeamAllowanceAnchor {
+  pieceId: string;
+  edgeId: string;
+  t: number;
+}
 
 export interface SujetoInput {
   activeTool: Tool2D;
@@ -16,6 +24,10 @@ export interface SujetoInput {
   hiddenLayerIds: readonly number[];
   /** Capas bloqueadas (`project.layerLocked`): misma regla que el candado de pieza. */
   layerLocked: Readonly<Record<number, boolean>>;
+  /** Opcionales para que los consumidores anteriores conserven su firma. */
+  saSelection?: SaSelection | null;
+  saAncla?: SeamAllowanceAnchor | null;
+  saHover?: SeamAllowanceAnchor | null;
 }
 
 export interface Sujeto {
@@ -23,6 +35,12 @@ export interface Sujeto {
   /** Creación caliente: confirmar una cota también escribe el default del próximo rectángulo. */
   caliente: boolean;
   cotas: Cota[];
+  /** Lectura transitoria del borde bajo el ratón; nunca es un blanco. */
+  lectura: Cota | null;
+  /** La lectura viene de una pieza o capa bloqueada: se ve apagada. Independiente de `disabled` (el ancla). */
+  lecturaApagada: boolean;
+  /** El borde bajo el ratón que pasó las compuertas, para el resalte — aunque la lectura se suprima. */
+  bordeLeido: { pieceId: string; edgeId: string } | null;
   /** Pieza bloqueada: las cotas se ven apagadas y no se editan. */
   disabled: boolean;
   /** La línea de la tira que nombra qué se edita; `null` si no hay nada que decir. */
@@ -41,10 +59,69 @@ const CON_COTAS_DE_PIEZA: ReadonlySet<Tool2D> = new Set<Tool2D>(['select', 'tran
  * seleccionada gana sobre la pieza que la contiene y recibe sus propias cotas.
  */
 export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number; height: number }): Sujeto {
-  const nada = (linea: string | null): Sujeto => ({ piece: null, caliente: false, cotas: [], disabled: false, lineaDeSujeto: linea });
+  const nada = (linea: string | null): Sujeto => ({
+    piece: null,
+    caliente: false,
+    cotas: [],
+    lectura: null,
+    lecturaApagada: false,
+    bordeLeido: null,
+    disabled: false,
+    lineaDeSujeto: linea,
+  });
   const lineaRect = input.activeTool === 'rectangle'
     ? `Un clic crea ${formatMedida(defaultRect.width, 'mm').replace(' mm', '')} × ${formatMedida(defaultRect.height, 'mm')} · arrastra para dibujar`
     : null;
+
+  if (input.activeTool === 'seamAllowance') {
+    if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada(null);
+
+    const selection = input.saSelection;
+    const selected = selection?.kind === 'edge' && selection.items.length === 1
+      ? selection.items[0]
+      : null;
+    const ancla = selected
+      && input.saAncla?.pieceId === selected.pieceId
+      && input.saAncla.edgeId === selected.edgeId
+      ? input.saAncla
+      : null;
+
+    const resolve = (anchor: SeamAllowanceAnchor | null | undefined) => {
+      if (!anchor) return null;
+      const piece = input.pieces.find(candidate => candidate.id === anchor.pieceId);
+      const edge = piece?.edges?.find(candidate => candidate.id === anchor.edgeId);
+      if (!piece || !edge) return null;
+      const capa = piece.layer ?? 1;
+      if (input.hiddenLayerIds.includes(capa)) return null;
+      const cota = cotaDeMargen(piece, edge, anchor.t);
+      if (!cota) return null;
+      return { piece, edge, cota, margen: margenEnPunto(piece, edge, anchor.t), capa };
+    };
+
+    const anclada = resolve(ancla);
+    const leida = resolve(input.saHover);
+    const mismaFuente = Boolean(anclada && leida
+      && anclada.piece.id === leida.piece.id
+      && anclada.edge.id === leida.edge.id
+      && (anclada.margen.fuente === 'tramo'
+        ? leida.margen.fuente === 'tramo' && anclada.margen.spanIndex === leida.margen.spanIndex
+        : anclada.margen.fuente === leida.margen.fuente));
+    // Dos chips, dos piezas posibles, dos candados (revisión 2026-09-02): el
+    // ancla apaga sus chips y la lectura se apaga sola. Colapsarlos en una
+    // bandera prometía escritura sobre una pieza bloqueada.
+    const apagada = (r: NonNullable<typeof anclada>) => Boolean(r.piece.locked) || Boolean(input.layerLocked[r.capa]);
+
+    return {
+      piece: (anclada ?? leida)?.piece ?? null,
+      caliente: false,
+      cotas: anclada ? [anclada.cota] : [],
+      lectura: mismaFuente ? null : leida?.cota ?? null,
+      lecturaApagada: leida ? apagada(leida) : false,
+      bordeLeido: leida ? { pieceId: leida.piece.id, edgeId: leida.edge.id } : null,
+      disabled: anclada ? apagada(anclada) : false,
+      lineaDeSujeto: anclada ? 'Editando: este borde' : null,
+    };
+  }
 
   if (input.selectedInternalLine) {
     if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada(lineaRect);
@@ -63,6 +140,9 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
         piece,
         caliente: false,
         cotas,
+        lectura: null,
+        lecturaApagada: false,
+        bordeLeido: null,
         disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
         lineaDeSujeto: `Editando: la línea seleccionada · ${cotas.length} cotas`,
       };
@@ -81,6 +161,9 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
     piece,
     caliente,
     cotas: cotasDePieza(piece),
+    lectura: null,
+    lecturaApagada: false,
+    bordeLeido: null,
     disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
     lineaDeSujeto: caliente ? 'Editando: la pieza nueva' : 'Editando: la pieza seleccionada',
   };

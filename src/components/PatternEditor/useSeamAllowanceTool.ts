@@ -1,23 +1,19 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { PatternPiece, Point2D } from '../../types/types';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import {
-  buildRing,
-  distanceAt,
-  pointAt,
-  projectToRing,
-  type OutlineRing,
-} from '../../utils/geometry/outlineRing';
-import {
   patternToPieceLocal,
   pieceLocalToPattern,
 } from '../../utils/geometry/pieceSpace';
 import { resolveSeamAllowanceClick } from '../../utils/seam/edgeHitTest';
-import { spanLengthMm, unwrapOnSpan } from './distanceCommit';
+import { margenEnPunto, type MargenEnPunto } from '../../utils/seam/margenEnPunto';
+import { pushJournal } from '../../utils/telemetry/journal';
+import type { SeamAllowanceAnchor } from './cotas/sujeto';
+import { edgePointAtT, edgeTForPoint, ringForOutline } from './edgeArc';
 import type { EdgeCommit, EdgeTarget } from './edgeGesture';
-import { DRAG_THRESHOLD_PX, EDGE_HIT_PX } from './gestureConstants';
+import { DRAG_THRESHOLD_PX, EDGE_HIT_PX, VERTEX_HIT_PX } from './gestureConstants';
 import { useEdgeGesture } from './useEdgeGesture';
 
 interface SeamAllowanceEdgeTarget extends EdgeTarget {
@@ -35,53 +31,10 @@ interface BodyDrag {
   prevWidth: number;
 }
 
-/** Distancias de anillo que delimitan un borde, incluido el cierre que cruza 0. */
-function edgeSpanMm(ring: OutlineRing, edgeRange: [number, number]): [number, number] {
-  const startMm = distanceAt(ring, { commandIndex: edgeRange[0], tLocal: 0 });
-  const rawEndMm = distanceAt(ring, { commandIndex: edgeRange[1] - 1, tLocal: 1 });
-  // El cierre termina donde empieza el anillo. Conservar ese cruce evita que
-  // un borde de cierre se convierta accidentalmente en su complemento.
-  return startMm > 0 && rawEndMm >= ring.totalMm - 1e-6
-    ? [startMm, 0]
-    : [startMm, rawEndMm];
-}
-
-/**
- * Proyecta sobre el borde fijado por el press. Si la proyección global cae en
- * otro borde, el extremo físicamente más cercano decide el clamp: ordenar solo
- * las distancias del anillo elegiría el extremo equivocado al cruzar su cero.
- */
-function edgeTForPoint(
-  ring: OutlineRing,
-  edgeRange: [number, number],
-  localPoint: Point2D,
-): number {
-  const spanMm = edgeSpanMm(ring, edgeRange);
-  const lengthMm = spanLengthMm(ring, spanMm);
-  if (lengthMm <= 0) return 0;
-
-  const projectedMm = projectToRing(ring, localPoint).distanceMm;
-  const unwrappedMm = unwrapOnSpan(ring, spanMm, projectedMm);
-  const startMm = spanMm[0];
-  const endMm = startMm + lengthMm;
-  if (unwrappedMm >= startMm - 1e-6 && unwrappedMm <= endMm + 1e-6) {
-    return Math.max(0, Math.min(1, (unwrappedMm - startMm) / lengthMm));
-  }
-
-  const start = pointAt(ring, startMm).point;
-  const end = pointAt(ring, endMm).point;
-  const startDistance = Math.hypot(localPoint.x - start.x, localPoint.y - start.y);
-  const endDistance = Math.hypot(localPoint.x - end.x, localPoint.y - end.y);
-  return startDistance <= endDistance ? 0 : 1;
-}
-
-function edgePointAtT(
-  ring: OutlineRing,
-  edgeRange: [number, number],
-  t: number,
-): Point2D {
-  const spanMm = edgeSpanMm(ring, edgeRange);
-  return pointAt(ring, spanMm[0] + t * spanLengthMm(ring, spanMm)).point;
+interface LastPointer {
+  clientX: number;
+  clientY: number;
+  rect: DOMRect;
 }
 
 /**
@@ -105,24 +58,61 @@ export function useSeamAllowanceTool(
     onSelectEdge: (pieceId: string, edgeId: string, additive: boolean) => void;
     onSelectVertex: (pieceId: string, vertexIndex: number) => void;
   },
+  active = true,
 ) {
   const widthMm = useSelector((s: RootState) => s.editor.defaultSeamAllowanceWidth);
   const { onApply, onApplyAll, onApplySpan, onSelectEdge, onSelectVertex } = callbacks;
-
-  const ringsByPiece = useMemo(() => {
-    const rings = new Map<string, OutlineRing>();
-    for (const piece of pieces) {
-      const exact = buildRing(piece.outline, 2);
-      const built = exact.ok ? exact : buildRing(piece.outline, 1);
-      if (built.ok) rings.set(piece.id, built.value);
-    }
-    return rings;
-  }, [pieces]);
+  const panX = pan.x;
+  const panY = pan.y;
+  const [hover, setHover] = useState<SeamAllowanceAnchor | null>(null);
+  const [ancla, setAncla] = useState<SeamAllowanceAnchor | null>(null);
+  const [abrirChip, setAbrirChip] = useState(0);
+  /** Lo último que se enseñó, con su identidad (borde + fuente + tramo) para la bitácora. */
+  const hoverRef = useRef<{ anchor: SeamAllowanceAnchor; identity: string } | null>(null);
+  const ultimoPuntero = useRef<LastPointer | null>(null);
+  const hitOrder = useMemo(() => [...pieces].reverse(), [pieces]);
 
   const bodyDragRef = useRef<BodyDrag | null>(null);
+  // Un press que no armó gesto (esquina, vacío) también apaga la lectura
+  // hasta soltar: con el botón abajo no se lee (spec § 4.5 #5).
+  const presionado = useRef(false);
   // `useEdgeGesture` resuelve su objetivo durante el mismo mousedown. Este ref
   // evita repetir el hit-test y, sobre todo, fija exactamente la rama que ganó.
   const primedEdgeRef = useRef<SeamAllowanceEdgeTarget | null>(null);
+
+  const setHoverResuelto = useCallback((next: SeamAllowanceAnchor | null, margen?: MargenEnPunto) => {
+    if (!next || !margen) {
+      if (!hoverRef.current) return;
+      hoverRef.current = null;
+      setHover(null);
+      return;
+    }
+
+    const spanIndex = margen.fuente === 'tramo' ? margen.spanIndex : '';
+    const identity = `${next.pieceId}\u0000${next.edgeId}\u0000${margen.fuente}\u0000${spanIndex}`;
+    // El chip sigue al cursor a lo largo del borde (spec § 4.3: el punto
+    // proyectado, no el de entrada): `t` se actualiza; la guarda solo evita
+    // un objeto nuevo cuando nada cambió, y la bitácora solo oye la identidad.
+    const previo = hoverRef.current;
+    if (previo?.anchor.pieceId === next.pieceId && previo.anchor.edgeId === next.edgeId && previo.anchor.t === next.t) return;
+
+    hoverRef.current = { anchor: next, identity };
+    setHover(next);
+    if (previo?.identity !== identity) {
+      pushJournal('gesture', 'sa:hover', {
+        pieceId: next.pieceId,
+        edgeId: next.edgeId,
+        fuente: margen.fuente,
+        mm: margen.mm,
+      });
+    }
+  }, []);
+
+  const limpiarHover = useCallback(() => {
+    // Fuera del SVG ya no existe un punto de pantalla que se pueda revalidar.
+    ultimoPuntero.current = null;
+    setHoverResuelto(null);
+  }, [setHoverResuelto]);
 
   const resolveEdgeTarget = useCallback((): SeamAllowanceEdgeTarget | null => {
     const target = primedEdgeRef.current;
@@ -135,7 +125,7 @@ export function useSeamAllowanceTool(
     press: EdgeTarget,
   ): number | null => {
     const piece = pieces.find(candidate => candidate.id === press.pieceId);
-    const ring = ringsByPiece.get(press.pieceId);
+    const ring = piece ? ringForOutline(piece.outline) : null;
     if (!piece || !ring) return null;
     const rect = e.currentTarget.getBoundingClientRect();
     const world = screenToPattern(e.clientX, e.clientY, rect, zoom, pan);
@@ -144,7 +134,7 @@ export function useSeamAllowanceTool(
     // otro pedazo del borde — o fuera de él, y lo clampea al extremo que no
     // es. Este `t` es lo que `onApplySpan` escribe en el patrón (#1068).
     return edgeTForPoint(ring, press.edgeRange, patternToPieceLocal(world, piece));
-  }, [pieces, ringsByPiece, zoom, pan]);
+  }, [pieces, zoom, pan]);
 
   const onCommit = useCallback((commit: EdgeCommit) => {
     const target = commit.target as SeamAllowanceEdgeTarget;
@@ -153,6 +143,14 @@ export function useSeamAllowanceTool(
     onSelectEdge(target.pieceId, target.edgeId, target.additive);
     if (commit.kind === 'drag') {
       onApplySpan(target.pieceId, target.edgeId, commit.range, widthMm);
+      setAncla({
+        pieceId: target.pieceId,
+        edgeId: target.edgeId,
+        t: (commit.range[0] + commit.range[1]) / 2,
+      });
+    } else {
+      setAncla({ pieceId: target.pieceId, edgeId: target.edgeId, t: target.t });
+      setAbrirChip(value => value + 1);
     }
   }, [onApplySpan, onSelectEdge, widthMm]);
 
@@ -162,8 +160,56 @@ export function useSeamAllowanceTool(
     onCommit,
   });
 
+  // Por el ref (`isArmed`, identidad estable), no por el estado `phase`: entre
+  // el mouseup y el render que lo confirma llegan movimientos que el estado
+  // descartaría. Cuerpo y herramienta ya los filtran los llamadores.
+  const { isArmed: gestoArmado } = edgeGesture;
+  const resolveHover = useCallback((pointer: LastPointer) => {
+    if (gestoArmado()) return;
+    const world = screenToPattern(
+      pointer.clientX,
+      pointer.clientY,
+      pointer.rect,
+      zoom,
+      { x: panX, y: panY },
+    );
+    const target = resolveSeamAllowanceClick(
+      hitOrder,
+      world,
+      screenToPatternLength(VERTEX_HIT_PX, zoom),
+      screenToPatternLength(EDGE_HIT_PX, zoom),
+    );
+    if (target?.kind !== 'edge') {
+      setHoverResuelto(null);
+      return;
+    }
+    const piece = pieces.find(candidate => candidate.id === target.pieceId);
+    const edge = piece?.edges?.find(candidate => candidate.id === target.edgeId);
+    const ring = piece ? ringForOutline(piece.outline) : null;
+    if (!piece || !edge || !ring) {
+      setHoverResuelto(null);
+      return;
+    }
+    const t = edgeTForPoint(ring, edge.segmentRange, patternToPieceLocal(world, piece));
+    setHoverResuelto({ pieceId: piece.id, edgeId: edge.id, t }, margenEnPunto(piece, edge, t));
+  }, [gestoArmado, hitOrder, panX, panY, pieces, setHoverResuelto, zoom]);
+
+  // Zoom, pan o piezas cambian `resolveHover`; con el puntero quieto se vuelve
+  // a leer desde el último punto de pantalla (§ 4.5 #11-13).
+  useEffect(() => {
+    if (!active) {
+      limpiarHover();
+      setAncla(null);
+      return;
+    }
+    const pointer = ultimoPuntero.current;
+    if (pointer) resolveHover(pointer);
+  }, [active, limpiarHover, resolveHover]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    limpiarHover();
     if (e.button !== 0) return;
+    presionado.current = true;
     // Un press nuevo reemplaza cualquier gesto cuyo release no llegó. La rama
     // que gane abajo será la única dueña hasta soltar.
     bodyDragRef.current = null;
@@ -172,10 +218,10 @@ export function useSeamAllowanceTool(
 
     const rect = e.currentTarget.getBoundingClientRect();
     const world = screenToPattern(e.clientX, e.clientY, rect, zoom, pan);
-    const vertexThreshold = screenToPatternLength(10, zoom);
+    const vertexThreshold = screenToPatternLength(VERTEX_HIT_PX, zoom);
     const edgeThreshold = screenToPatternLength(EDGE_HIT_PX, zoom);
     const target = resolveSeamAllowanceClick(
-      pieces,
+      hitOrder,
       world,
       vertexThreshold,
       edgeThreshold,
@@ -191,7 +237,7 @@ export function useSeamAllowanceTool(
     if (target.kind === 'edge') {
       const piece = pieces.find(candidate => candidate.id === target.pieceId);
       const edge = piece?.edges?.find(candidate => candidate.id === target.edgeId);
-      const ring = ringsByPiece.get(target.pieceId);
+      const ring = piece ? ringForOutline(piece.outline) : null;
       if (!piece || !edge || !ring) return;
       const local = patternToPieceLocal(world, piece);
       const t = edgeTForPoint(ring, edge.segmentRange, local);
@@ -222,12 +268,23 @@ export function useSeamAllowanceTool(
       singlePieceId: target.pieceId,
       prevWidth,
     };
-  }, [edgeGesture, onSelectVertex, pan, pieces, ringsByPiece, zoom]);
+  }, [edgeGesture, hitOrder, limpiarHover, onSelectVertex, pan, pieces, zoom]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const bodyDrag = bodyDragRef.current;
     if (!bodyDrag) {
-      edgeGesture.handleMouseMove(e);
+      if (edgeGesture.isArmed()) {
+        edgeGesture.handleMouseMove(e);
+        return;
+      }
+      if (presionado.current) return;
+      const pointer = {
+        clientX: e.clientX,
+        clientY: e.clientY,
+        rect: e.currentTarget.getBoundingClientRect(),
+      };
+      ultimoPuntero.current = pointer;
+      resolveHover(pointer);
       return;
     }
 
@@ -239,16 +296,17 @@ export function useSeamAllowanceTool(
     const rect = e.currentTarget.getBoundingClientRect();
     const world = screenToPattern(e.clientX, e.clientY, rect, zoom, pan);
     const target = resolveSeamAllowanceClick(
-      pieces,
+      hitOrder,
       world,
-      screenToPatternLength(10, zoom),
+      screenToPatternLength(VERTEX_HIT_PX, zoom),
       screenToPatternLength(EDGE_HIT_PX, zoom),
     );
     // El cuerpo que ganó el press no se convierte en tramo al rozar un borde.
     if (target?.kind === 'piece') bodyDrag.touched.add(target.pieceId);
-  }, [edgeGesture, pan, pieces, zoom]);
+  }, [edgeGesture, hitOrder, pan, resolveHover, zoom]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    presionado.current = false;
     const bodyDrag = bodyDragRef.current;
     if (!bodyDrag) {
       edgeGesture.handleMouseUp(e);
@@ -266,8 +324,12 @@ export function useSeamAllowanceTool(
   const cancel = useCallback(() => {
     bodyDragRef.current = null;
     primedEdgeRef.current = null;
+    presionado.current = false;
     edgeGesture.cancel();
-  }, [edgeGesture]);
+    // `pointercancel` (lápiz, táctil, el navegador se queda el puntero): no
+    // va a llegar ningún mousemove que corrija la lectura (spec § 4.5 #22).
+    limpiarHover();
+  }, [edgeGesture, limpiarHover]);
 
   const isArmed = useCallback(
     () => bodyDragRef.current !== null || edgeGesture.isArmed(),
@@ -289,5 +351,9 @@ export function useSeamAllowanceTool(
     cancel,
     isArmed,
     widthMm,
+    hover,
+    ancla,
+    abrirChip,
+    limpiarHover,
   };
 }
