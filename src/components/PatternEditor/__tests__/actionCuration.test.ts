@@ -73,10 +73,18 @@ describe('integridad de CURATION', () => {
       }
     }
   });
-  it('paridad: bar ⊆ menu en cada fila', () => {
+  // #1095: 'duplicate' se pliega en el submenú 'duplicateGroup' dentro de
+  // `menu` (el menú de pieza tenía 20 filas sin ninguna señal de overflow);
+  // la barra (Surface A) sigue usando el verbo plano — su primer ítem del
+  // submenú ES 'Duplicar' (lo verifica 1095-menu-avisa-que-hay-mas.test.ts).
+  const FOLDED_INTO_SUBMENU: Partial<Record<ActionId, ActionId>> = { duplicate: 'duplicateGroup' };
+
+  it('paridad: bar ⊆ menu en cada fila (o su verbo se plegó en un submenú del menú)', () => {
     for (const row of CURATION) {
       for (const id of row.bar) {
-        expect(row.menu, `${row.targetKind}: ${id} en bar pero no en menu`).toContain(id);
+        const foldedInto = FOLDED_INTO_SUBMENU[id];
+        const present = row.menu.includes(id) || (foldedInto !== undefined && row.menu.includes(foldedInto));
+        expect(present, `${row.targetKind}: ${id} en bar pero no en menu (ni plegado)`).toBe(true);
       }
     }
   });

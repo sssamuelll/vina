@@ -13,9 +13,9 @@ describe('zoomAtPoint — cursor-anchored, range-clamped (preserves today\'s 2D 
     expect(after.pan.y + py * after.zoom).toBeCloseTo(cy, 10);
   });
 
-  it('clamps zoom to [0.1, 10] — pan unchanged when already at the limit', () => {
-    const atMax = zoomAtPoint({ zoom: 10, pan: { x: 0, y: 0 } }, 2, 100, 100);
-    expect(atMax.zoom).toBe(10);
+  it('clamps zoom to [0.1, 40] — pan unchanged when already at the limit (#1097: tope subió de 10 a 40)', () => {
+    const atMax = zoomAtPoint({ zoom: 40, pan: { x: 0, y: 0 } }, 2, 100, 100);
+    expect(atMax.zoom).toBe(40);
     // identity return: zoomAtPoint returns the SAME view object when clamped (scale===1)
     expect(atMax.pan).toEqual({ x: 0, y: 0 });
     expect(zoomAtPoint({ zoom: 0.1, pan: { x: 5, y: 5 } }, 0.5, 0, 0).zoom).toBe(0.1);

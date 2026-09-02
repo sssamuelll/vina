@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { displayShortcut } from '../shell/shortcutDisplay';
 import './SubMenu.css';
 
@@ -19,6 +20,8 @@ interface SubMenuProps {
 
 export default function SubMenu({ label, icon, items }: SubMenuProps) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const enterTimer = useRef<ReturnType<typeof setTimeout>>();
   const leaveTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -32,19 +35,51 @@ export default function SubMenu({ label, icon, items }: SubMenuProps) {
     leaveTimer.current = setTimeout(() => setOpen(false), 150);
   }, []);
 
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) { setPos(null); return; }
+    const r = triggerRef.current.getBoundingClientRect();
+    setPos({ top: r.top, left: r.right + 4 });
+  }, [open]);
+
   return (
     <div
+      ref={triggerRef}
       className="submenu-trigger"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <button className="submenu-trigger-btn">
+      <button
+        className="submenu-trigger-btn"
+        aria-haspopup="true"
+        aria-expanded={open}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            clearTimeout(enterTimer.current);
+            clearTimeout(leaveTimer.current);
+            setOpen(true);
+          } else if (e.key === 'Escape' && open) {
+            e.preventDefault();
+            e.stopPropagation();
+            clearTimeout(enterTimer.current);
+            clearTimeout(leaveTimer.current);
+            setOpen(false);
+            e.currentTarget.focus();
+          }
+        }}
+      >
         {icon && <span className="submenu-icon">{icon}</span>}
         <span className="submenu-label">{label}</span>
         <span className="submenu-arrow">▸</span>
       </button>
-      {open && (
-        <div className="submenu-panel" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+      {open && pos && createPortal(
+        <div
+          className="submenu-panel"
+          style={{ position: 'fixed', top: pos.top, left: pos.left }}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           {items.map((item, i) => (
             <div key={i}>
               {item.separator && <div className="submenu-separator" />}
@@ -59,7 +94,8 @@ export default function SubMenu({ label, icon, items }: SubMenuProps) {
               </button>
             </div>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

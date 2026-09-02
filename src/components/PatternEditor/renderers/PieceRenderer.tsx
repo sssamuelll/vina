@@ -21,6 +21,7 @@ import { pieceBodyStyle } from './pieceBodyStyle';
 import { PHYSICAL_FABRIC_LIBRARY } from '../../../utils/cloth/physicalFabric';
 import { outlineBBoxCenter } from '../../../utils/geometry/transform';
 import { grainlineArrowheads } from '../../../utils/grainLine';
+import { zoomAwareStroke } from './zoomAwareStroke';
 
 /** Rotation pivot: bbox center of an outline. Shared with edit overlays/hit-tests. */
 function getOutlineCenter(outline: PathCommand[]): { cx: number; cy: number } {
@@ -168,7 +169,7 @@ const SinglePiece = memo(function SinglePiece({
         d={hasSA ? saD : outlineD}
         fill="none"
         style={{ stroke: cutStroke }}
-        strokeWidth={1.4 / zoom2D}
+        strokeWidth={zoomAwareStroke(1.4, zoom2D)}
         strokeLinejoin="round"
         strokeDasharray={cutDash}
         pointerEvents="none"
@@ -180,8 +181,8 @@ const SinglePiece = memo(function SinglePiece({
           d={outlineD}
           fill="none"
           style={{ stroke: 'var(--ink-on-light-2)' }}
-          strokeWidth={0.8 / zoom2D}
-          strokeDasharray={`${3 / zoom2D} ${3 / zoom2D}`}
+          strokeWidth={zoomAwareStroke(0.8, zoom2D)}
+          strokeDasharray={`${zoomAwareStroke(3, zoom2D)} ${zoomAwareStroke(3, zoom2D)}`}
           pointerEvents="none"
         />
       )}

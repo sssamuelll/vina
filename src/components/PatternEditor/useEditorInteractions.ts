@@ -6,7 +6,9 @@ import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, sel
 import { movePiece, updateInternalLine, removeInternalLine } from '../../store/projectSlice';
 import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine } from '../../types/types';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
-import { zoomAtPoint } from '../../input/zoom2d';
+import { isPinnedAtZoomCeiling, zoomAtPoint } from '../../input/zoom2d';
+import { showInfoToast } from '../../store/copilotUISlice';
+import { createTimeWindowLimiter } from '../../utils/rateLimit';
 
 /** Compute bounding box center (duplicated from PieceRenderer for drag transform). */
 function getOutlineCenterForDrag(outline: PathCommand[]): { cx: number; cy: number } {
@@ -38,6 +40,7 @@ import { DRAG_THRESHOLD_PX, isDrag } from './gestureConstants';
 import { pushJournal } from '../../utils/telemetry/journal';
 
 const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
+const zoomCeilingToastLimiter = createTimeWindowLimiter(3000);
 
 /** Un campo editable es dueño de sus teclas: el router no las toca (spec 2026-08-29 § 8). */
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -575,12 +578,16 @@ export function useEditorInteractions(
       rafId = 0;
       let basePan = panRef2.current;
       if (zoomAcc.factor !== 1) {
+        const zoomFactorForFrame = zoomAcc.factor;
         const next = zoomAtPoint(
           { zoom: zoomRef.current, pan: basePan },
-          zoomAcc.factor, zoomAcc.cx, zoomAcc.cy,
+          zoomFactorForFrame, zoomAcc.cx, zoomAcc.cy,
         );
         dispatch(setPan2D(next.pan));
         dispatch(setZoom2D(next.zoom));
+        if (isPinnedAtZoomCeiling(zoomRef.current, zoomFactorForFrame) && zoomCeilingToastLimiter.tryEmit()) {
+          dispatch(showInfoToast('Zoom máximo'));
+        }
         basePan = next.pan;
         zoomAcc = { factor: 1, cx: 0, cy: 0 };
       }
