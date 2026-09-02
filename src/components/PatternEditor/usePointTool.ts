@@ -19,7 +19,6 @@ import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { arcToNativeT } from '../../utils/geometry/arcToNative';
 import {
   buildRing,
-  distanceAt,
   pointAt,
   projectToRing,
   type OutlineRing,
@@ -29,6 +28,7 @@ import { edgeRangeForCommand } from '../../utils/semanticEdges';
 import { patternToPieceLocal, pieceLocalToPattern } from './useEditPattern';
 import { extractNodes, hitTestNode, nearestSegment, type EditableNode } from './nodeEditorUtils';
 import { spanLengthMm, unwrapOnSpan } from './distanceCommit';
+import { edgeSpanMm } from './edgeArc';
 import type { EdgeCommit, EdgeTarget } from './edgeGesture';
 import { EDGE_HIT_PX } from './gestureConstants';
 import { useEdgeGesture } from './useEdgeGesture';
@@ -61,17 +61,6 @@ interface PointEdgeTarget extends EdgeTarget {
   /** El clic no necesita ir arco→nativo→arco: `nearestSegment` ya resolvió
    *  el parámetro que consume De Casteljau y el press tiene que conservarlo. */
   nativeT: number;
-}
-
-/** Distancias de anillo que delimitan un borde, incluido el cierre que cruza 0. */
-function edgeSpanMm(ring: OutlineRing, edgeRange: [number, number]): [number, number] {
-  const startMm = distanceAt(ring, { commandIndex: edgeRange[0], tLocal: 0 });
-  const rawEndMm = distanceAt(ring, { commandIndex: edgeRange[1] - 1, tLocal: 1 });
-  // El cierre termina en el origen: 0 y el perímetro son el mismo punto. Si
-  // no se deja cruzar el origen, clampear ese borde escogería su complemento.
-  return startMm > 0 && rawEndMm >= ring.totalMm - 1e-6
-    ? [startMm, 0]
-    : [startMm, rawEndMm];
 }
 
 function edgeTAtMm(ring: OutlineRing, spanMm: [number, number], mm: number): number {

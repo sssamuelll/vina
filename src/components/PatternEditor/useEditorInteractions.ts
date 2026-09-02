@@ -144,6 +144,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     cancel: () => void;
     isArmed: () => boolean;
+    limpiarHover: () => void;
   };
   trimTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
   grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e?: React.MouseEvent<SVGSVGElement>) => void; cancel: () => void };
@@ -651,6 +652,7 @@ export function useEditorInteractions(
       shift: !!e.shiftKey, ctrl: !!(e.ctrlKey || e.metaKey), alt: !!e.altKey,
     });
     if (e.button === 1) {
+      if (activeTool === 'seamAllowance') seamAllowanceTool.limpiarHover();
       panRef.current = { startMouse: { x: e.clientX, y: e.clientY }, startPan: { ...pan2D } };
       return;
     }
@@ -1115,7 +1117,10 @@ export function useEditorInteractions(
     // inventaría un valor; tratarlo como Escape conserva el último estado
     // estable y deja el siguiente gesto limpio.
     if (activeTool === 'notch' && notchTool.isArmed()) notchTool.cancel();
-    if (activeTool === 'seamAllowance' && seamAllowanceTool.isArmed()) seamAllowanceTool.cancel();
+    // Sin condición de armado: un press sobre una esquina o el vacío no arma
+    // gesto pero sí deja el botón "abajo" para la lectura del margen; si el
+    // navegador se queda el puntero, solo `cancel()` lo suelta (5b-3).
+    if (activeTool === 'seamAllowance') seamAllowanceTool.cancel();
     // La línea interna descarta solo el press vivo (los nodos quedan); la
     // pluma no separa press de trazo y suelta el trazo entero.
     if (activeTool === 'internalShape') internalShapeTool.cancelPress();
@@ -1125,6 +1130,10 @@ export function useEditorInteractions(
     internalLineDragRef.current = null;
     setIsDraggingEndpoint(false);
   }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, grainlineTool]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (activeTool === 'seamAllowance') seamAllowanceTool.limpiarHover();
+  }, [activeTool, seamAllowanceTool]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
@@ -1159,5 +1168,5 @@ export function useEditorInteractions(
     }
   };
 
-  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint };
+  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint };
 }

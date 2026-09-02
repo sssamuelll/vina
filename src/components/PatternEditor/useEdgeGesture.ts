@@ -139,6 +139,10 @@ export function useEdgeGesture(opts: EdgeGestureOptions) {
     onCommit(commit);
   }, [resolveReleaseT, onCommit, reset]);
 
+  // Identidad estable: quien lo ponga en las deps de un efecto no quiere un
+  // disparo por render, quiere el ref exacto (5b-3, hover del margen).
+  const isArmed = useCallback(() => armed.current !== null, []);
+
   return {
     phase, press, liveRange,
     handleMouseDown, handleMouseMove, handleMouseUp,
@@ -147,6 +151,6 @@ export function useEdgeGesture(opts: EdgeGestureOptions) {
      *  valor vivo evita volver a deducirlo desde el cursor final. */
     firstDragT: () => armed.current?.firstDragT ?? null,
     /** ¿Hay un gesto vivo? Lo usa el guard de Escape y el del contextmenu. */
-    isArmed: () => armed.current !== null,
+    isArmed,
   };
 }

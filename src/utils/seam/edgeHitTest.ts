@@ -3,6 +3,84 @@ import { flattenPathWithSource } from './index';
 import { detectCornerCommands } from '../outlineAnalysis';
 import { patternToPieceLocal } from '../geometry/pieceSpace';
 
+interface OutlineBBox {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+interface OutlineMemo {
+  flat: ReturnType<typeof flattenPathWithSource> | null;
+  bbox: OutlineBBox;
+}
+
+/** Immer cambia la identidad del contorno solo cuando cambia su geometría. */
+const outlineMemo = new WeakMap<PathCommand[], OutlineMemo>();
+const cornerMemo = new WeakMap<PathCommand[], Set<number>>();
+
+function memoForOutline(outline: PathCommand[]): OutlineMemo {
+  const cached = outlineMemo.get(outline);
+  if (cached) return cached;
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let currentX = 0, currentY = 0, startX = 0, startY = 0;
+  const seen = (x: number, y: number) => {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  };
+  for (const command of outline) {
+    const values = command.values;
+    if (command.type === 'M' || command.type === 'L') {
+      currentX = values[0]; currentY = values[1];
+      if (command.type === 'M') { startX = currentX; startY = currentY; }
+      seen(currentX, currentY);
+    } else if (command.type === 'H') {
+      currentX = values[0];
+      seen(currentX, currentY);
+    } else if (command.type === 'V') {
+      currentY = values[0];
+      seen(currentX, currentY);
+    } else if (command.type === 'A') {
+      const endX = values[5];
+      const endY = values[6];
+      // El aplanador canónico representa A por su extremo; la caja sigue esa
+      // misma geometría para no convertir el radio en un blanco de cuerpo.
+      seen(currentX, currentY);
+      seen(endX, endY);
+      currentX = endX; currentY = endY;
+    } else if (command.type === 'Z') {
+      currentX = startX; currentY = startY;
+      seen(currentX, currentY);
+    } else {
+      // C/Q/S/T: sus controles y extremo vienen como pares absolutos; la
+      // envolvente de los controles contiene la curva de Bézier.
+      for (let i = 0; i + 1 < values.length; i += 2) seen(values[i], values[i + 1]);
+      if (values.length >= 2) {
+        currentX = values[values.length - 2];
+        currentY = values[values.length - 1];
+      }
+    }
+  }
+
+  const entry = { flat: null, bbox: { minX, maxX, minY, maxY } };
+  outlineMemo.set(outline, entry);
+  return entry;
+}
+
+function flattenedOutline(outline: PathCommand[]) {
+  const memo = memoForOutline(outline);
+  memo.flat ??= flattenPathWithSource(outline);
+  return memo.flat;
+}
+
+function bboxContains(bbox: OutlineBBox, point: Point2D, margin = 0): boolean {
+  return point.x >= bbox.minX - margin && point.x <= bbox.maxX + margin
+    && point.y >= bbox.minY - margin && point.y <= bbox.maxY + margin;
+}
+
 /** Distance from point p to segment a→b. */
 function distToSegment(p: Point2D, a: Point2D, b: Point2D): number {
   const dx = b.x - a.x, dy = b.y - a.y;
@@ -41,7 +119,7 @@ export function pickEdgeForSeamAllowance(
 ): SemanticEdge | null {
   if (!edges.length) return null;
 
-  const flat = flattenPathWithSource(outline);
+  const flat = flattenedOutline(outline);
   let bestCmd = -1;
   let bestDist = Infinity;
 
@@ -82,7 +160,13 @@ export function findNearestOutlineVertex(
   point: Point2D,
   maxDist: number,
 ): { index: number; dist: number } | null {
-  const corners = detectCornerCommands(outline);
+  // Las esquinas se detectan una vez por contorno: con hover esto corre en
+  // cada movimiento y `detectCornerCommands` aplana el contorno entero.
+  let corners = cornerMemo.get(outline);
+  if (!corners) {
+    corners = detectCornerCommands(outline);
+    cornerMemo.set(outline, corners);
+  }
   if (corners.size === 0) return null;
   let best: { index: number; dist: number } | null = null;
   for (let i = 0; i < outline.length; i++) {
@@ -103,7 +187,8 @@ export type SAClickTarget =
 
 /**
  * Classify a seamAllowance-tool left-click (pattern-space point) against the
- * pieces. Precise targets win: a nearby VERTEX (corner editing) first, then a
+ * pieces. La primera pieza gana; el llamador pasa las dibujables de arriba a
+ * abajo. Precise targets win: a nearby VERTEX (corner editing) first, then a
  * nearby EDGE (per-edge width), across all pieces; falling back to the PIECE
  * whose bbox contains the point (whole-piece apply — the bulk seed). Returns
  * null on empty canvas. Precedence (vertex > edge) mirrors the tighter target.
@@ -114,6 +199,7 @@ export function resolveSeamAllowanceClick(
   maxVertexDist: number,
   maxEdgeDist: number,
 ): SAClickTarget | null {
+  const preciseMargin = Math.max(maxVertexDist, maxEdgeDist);
   // Pass 1: precise vertex/edge targets (across all pieces).
   for (const piece of pieces) {
     if (!piece.outline?.length) continue;
@@ -121,6 +207,8 @@ export function resolveSeamAllowanceClick(
     // #1033 el giro vive en `piece.rotation` y no en el contorno, así que una
     // pieza girada se estaba midiendo contra su fantasma sin girar (#1064).
     const local = patternToPieceLocal(patternPoint, piece);
+    // Con hover, este rechazo evita aplanar cada pieza lejana en cada frame.
+    if (!bboxContains(memoForOutline(piece.outline).bbox, local, preciseMargin)) continue;
     const v = findNearestOutlineVertex(piece.outline, local, maxVertexDist);
     if (v) return { kind: 'vertex', pieceId: piece.id, vertexIndex: v.index };
     const edge = piece.edges?.length
@@ -136,16 +224,7 @@ export function resolveSeamAllowanceClick(
     // girar; traer el punto, además, da la caja ORIENTADA de balde — que es la
     // que de verdad ocupa la pieza, no su envolvente eje-alineada.
     const local = patternToPieceLocal(patternPoint, piece);
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const cmd of piece.outline) {
-      const vals = cmd.values;
-      for (let i = 0; i + 1 < vals.length; i += 2) {
-        const px = vals[i], py = vals[i + 1];
-        if (px < minX) minX = px; if (px > maxX) maxX = px;
-        if (py < minY) minY = py; if (py > maxY) maxY = py;
-      }
-    }
-    if (local.x >= minX && local.x <= maxX && local.y >= minY && local.y <= maxY) {
+    if (bboxContains(memoForOutline(piece.outline).bbox, local)) {
       return { kind: 'piece', pieceId: piece.id };
     }
   }

@@ -231,7 +231,9 @@ export default function EdgePropertiesSection({ items }: Props) {
         />
       </div>
       {!anyOverridden && displayValue !== '' && value === displayValue && (
-        <div className="panel-hint">Heredado de la pieza</div>
+        <div className="panel-hint">
+          {count === 1 ? 'Este borde usa el margen de la pieza' : 'Estos bordes usan el margen de la pieza'}
+        </div>
       )}
       <div className="panel-field panel-field--row">
         <button
@@ -239,16 +241,16 @@ export default function EdgePropertiesSection({ items }: Props) {
           disabled={!anyOverridden}
           onClick={() => dispatch(setEdgesSeamAllowance({ items: commitItems, width: null }))}
           title={count === 1
-            ? `Usar el margen de la pieza (${resolved[0].pieceDefault}mm)`
+            ? `Usar el margen de la pieza (${String(resolved[0].pieceDefault).replace('.', ',')} mm)`
             : 'Usar el margen de la pieza en todos los bordes seleccionados'}
         >
-          {count === 1 ? `Usar el de la pieza (${resolved[0].pieceDefault})` : 'Usar el de la pieza'}
+          {count === 1 ? `Usar el de la pieza (${String(resolved[0].pieceDefault).replace('.', ',')})` : 'Usar el de la pieza'}
         </button>
         <button
           className="panel-chip-btn"
           onClick={() => dispatch(setEdgesSeamAllowance({ items: commitItems, width: 0 }))}
         >
-          Sin margen (0)
+          Sin margen
         </button>
       </div>
 

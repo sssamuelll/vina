@@ -47,28 +47,47 @@ describe('EdgePropertiesSection', () => {
     expect((screen.getByLabelText(/margen/i) as HTMLInputElement).value).toBe('10');
   });
 
-  it('#1100 — anuncia cuando el margen mostrado se hereda de la pieza', () => {
+  // Tanda 5b-3 (spec 2026-09-02 § 5.9): muere "heredado" — María, audio
+  // 30-08 [25:01]: «Esto de heredar, no sé muy bien a qué se refiere… un poco
+  // antiguo en español». La pista lo dice en una frase; ninguna cadena visible
+  // del panel lleva la raíz "hered".
+  it('#1100 — anuncia cuando el margen mostrado es el de la pieza, sin la palabra "heredado"', () => {
     mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
-    expect(screen.getByText('Heredado de la pieza')).toBeTruthy();
+    expect(screen.getByText('Este borde usa el margen de la pieza')).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/hered/i);
   });
 
-  it('#1100 — no anuncia herencia cuando el borde tiene un margen propio', () => {
+  it('#1100 — en plural cuando son varios bordes sin margen propio', () => {
+    mount(
+      <EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }, { pieceId: 'p', edgeId: 'p:side' }]} />,
+      piece({ edges: [hem, { id: 'p:side', name: 'side', segmentRange: [2, 3], edgeType: 'seam' }] }),
+    );
+    expect(screen.getByText('Estos bordes usan el margen de la pieza')).toBeTruthy();
+  });
+
+  it('#1100 — no lo anuncia cuando el borde tiene un margen propio', () => {
     mount(
       <EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />,
       piece({ edges: [{ ...hem, seamAllowanceWidth: 40 }] }),
     );
-    expect(screen.queryByText('Heredado de la pieza')).toBeNull();
+    expect(screen.queryByText(/usa el margen de la pieza/)).toBeNull();
   });
 
-  it('#1100 — deja de anunciar herencia mientras el campo muestra un borrador local', () => {
+  it('#1100 — deja de anunciarlo mientras el campo muestra un borrador local', () => {
     mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
     const input = screen.getByLabelText(/margen/i) as HTMLInputElement;
 
-    expect(screen.getByText('Heredado de la pieza')).toBeTruthy();
+    expect(screen.getByText('Este borde usa el margen de la pieza')).toBeTruthy();
     fireEvent.change(input, { target: { value: '12' } });
 
     expect(input.value).toBe('12');
-    expect(screen.queryByText('Heredado de la pieza')).toBeNull();
+    expect(screen.queryByText(/usa el margen de la pieza/)).toBeNull();
+  });
+
+  it('5b-3 — el botón de cero dice "Sin margen", sin "(0)": con la pieza en 0 los dos botones decían (0) y parecían el mismo', () => {
+    mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece({ seamAllowance: 0 }));
+    expect(screen.getByRole('button', { name: 'Sin margen' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Usar el de la pieza (0)' })).toBeTruthy();
   });
 
   it('commits a per-edge width on Enter', () => {

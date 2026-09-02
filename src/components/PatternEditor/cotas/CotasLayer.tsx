@@ -3,14 +3,20 @@ import type { Point2D } from '../../../types/types';
 import type { Cota } from './cotas';
 import CotaChip, { type CotaChipProps } from './CotaChip';
 import { chipScreenPosition } from './cotasGeometry';
+import { formatMedida } from './parseMedida';
 
 export interface CotasLayerHandle {
   /** Enfoca el primer chip vivo; `false` si no hay ninguno (Tab sigue siendo el de siempre). */
   focusFirst(): boolean;
+  /** Enfoca y abre el primer chip vivo; el clic del borde usa esta puerta. */
+  abrirPrimero(): boolean;
 }
 
 export interface CotasLayerProps {
   cotas: Cota[];
+  lectura?: Cota | null;
+  /** La lectura viene de una pieza bloqueada: apagada, con independencia de `disabled` (el ancla). */
+  lecturaApagada?: boolean;
   pan2D: Point2D;
   zoom2D: number;
   disabled?: boolean;
@@ -29,20 +35,41 @@ export interface CotasLayerProps {
  * de Redux en el mismo render: no hay nada que sincronizar.
  */
 export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function CotasLayer(
-  { cotas, pan2D, zoom2D, disabled, onCommit, onScrubStart, onScrub, onScrubEnd, onScrubCancel },
+  { cotas, lectura, lecturaApagada, pan2D, zoom2D, disabled, onCommit, onScrubStart, onScrub, onScrubEnd, onScrubCancel },
   ref,
 ) {
   const root = useRef<HTMLDivElement>(null);
+  const primerChip = () => root.current?.querySelector<HTMLButtonElement>('button.cota:not([aria-disabled="true"])') ?? null;
   useImperativeHandle(ref, () => ({
     focusFirst() {
-      const primero = root.current?.querySelector<HTMLElement>('button.cota:not([aria-disabled="true"])');
+      const primero = primerChip();
       if (!primero) return false;
       primero.focus();
       return true;
     },
+    abrirPrimero() {
+      const primero = primerChip();
+      if (!primero) return false;
+      primero.focus();
+      primero.click();
+      return true;
+    },
   }), []);
+  const lecturaPosition = lectura ? chipScreenPosition(lectura, pan2D, zoom2D) : null;
   return (
     <div ref={root} className="cotas" style={{ pointerEvents: 'none' }} data-testid="cotas">
+      {lectura && lecturaPosition && (
+        <div
+          className={`cota cota--lectura${lectura.primary ? '' : ' cota--hueca'}`}
+          aria-hidden="true"
+          aria-disabled={lecturaApagada || undefined}
+          data-rotulo={lectura.rotulo}
+          data-lado={lectura.outward.y > 0 ? 'abajo' : undefined}
+          style={{ left: lecturaPosition.left, top: lecturaPosition.top, pointerEvents: 'none' }}
+        >
+          {formatMedida(lectura.valueMm, lectura.unit)}
+        </div>
+      )}
       {cotas.map((cota) => {
         const { left, top } = chipScreenPosition(cota, pan2D, zoom2D);
         return (

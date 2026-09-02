@@ -29,7 +29,7 @@ const ganancia = (e: { shiftKey: boolean; altKey: boolean }) => (e.shiftKey ? 10
 /** Los chips de la capa, en orden del DOM: es el orden del Tab. */
 function chipsHermanos(el: HTMLElement | null): HTMLElement[] {
   const capa = el?.closest('.cotas');
-  return capa ? Array.from(capa.querySelectorAll<HTMLElement>('.cota:not([aria-disabled="true"])')) : [];
+  return capa ? Array.from(capa.querySelectorAll<HTMLElement>('button.cota:not([aria-disabled="true"])')) : [];
 }
 
 /**
@@ -145,6 +145,8 @@ export default function CotaChip({
         style={{ left, top }}
         aria-label={cota.label}
         aria-invalid={invalid || undefined}
+        data-rotulo={cota.rotulo}
+        data-lado={cota.outward.y > 0 ? 'abajo' : undefined}
         value={draft}
         onChange={(e) => { setDraft(e.target.value); setInvalid(false); }}
         onKeyDown={(e) => {
@@ -175,10 +177,12 @@ export default function CotaChip({
     <button
       ref={buttonRef}
       type="button"
-      className={`cota${cota.primary ? '' : ' cota--hueca'}`}
+      className={`cota${cota.primary ? '' : ' cota--hueca'}${cota.scrub === false ? ' cota--sin-scrub' : ''}`}
       style={{ left, top }}
       aria-label={`${cota.label}: ${formatMedida(cota.valueMm, cota.unit)}`}
       aria-disabled={disabled || undefined}
+      data-rotulo={cota.rotulo}
+      data-lado={cota.outward.y > 0 ? 'abajo' : undefined}
       onClick={() => {
         if (skipClick.current) { skipClick.current = false; return; }
         abrir();
@@ -190,7 +194,7 @@ export default function CotaChip({
       }}
       onContextMenu={(e) => e.preventDefault()}
       onPointerDown={(e) => {
-        if (disabled || e.button !== 0) return;
+        if (disabled || e.button !== 0 || cota.scrub === false) return;
         scrub.current = { x0: e.clientX, v0: cota.valueMm, moved: false, last: cota.valueMm };
         e.currentTarget.setPointerCapture?.(e.pointerId);
       }}
