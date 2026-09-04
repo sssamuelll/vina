@@ -6,7 +6,10 @@
   top: 28px; /* 20 px de regla + 8 de aire: nunca sobre la regla */
   right: 12px;
   width: min(300px, calc(100% - 24px));
-  z-index: var(--z-menu);
+  /* Cromo acoplado al lienzo, no menú: la tira vive mientras haya herramienta
+     2D activa. En --z-menu empataba con el modal de piquete, que declara esta
+     misma esquina (enmienda 2026-09-05 del spec de emplazamiento). */
+  z-index: var(--z-canvas-chrome);
   padding: 14px 16px;
   background: var(--surface-overlay-bg);
   border: var(--surface-overlay-border-flush);

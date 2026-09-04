@@ -36,6 +36,10 @@ function valorDeToken(css: string, token: string): number {
 const tokens = leer('src/styles/tokens.css');
 const ZD = valorDeToken(tokens, '--z-dock');
 const ZP = valorDeToken(tokens, '--z-panel');
+// Cromo acoplado al lienzo 2D: la tira de herramienta y la fila de capas. No
+// son menús transitorios —no se van—, y por eso salieron de `--z-menu` el
+// 2026-09-05 (hallazgo F10 de la revisión adversarial del 04-09).
+const ZCC = valorDeToken(tokens, '--z-canvas-chrome');
 const ZHint = valorDeToken(tokens, '--z-hint');
 const ZBar = valorDeToken(tokens, '--z-bar');
 const ZM = valorDeToken(tokens, '--z-menu');
@@ -48,7 +52,8 @@ const ZDbg = valorDeToken(tokens, '--z-debug');
 describe('la escala de z-index ordena por urgencia, no por antigüedad', () => {
   it('la cadena completa está ordenada, escalón por escalón', () => {
     expect(ZD).toBeLessThan(ZP);
-    expect(ZP).toBeLessThan(ZHint);
+    expect(ZP).toBeLessThan(ZCC);
+    expect(ZCC).toBeLessThan(ZHint);
     expect(ZHint).toBeLessThan(ZBar);
     expect(ZBar).toBeLessThan(ZM);
     expect(ZM).toBeLessThan(ZCM);
@@ -66,7 +71,7 @@ describe('la escala de z-index ordena por urgencia, no por antigüedad', () => {
   });
 
   it('ningún rol empata con otro: un empate lo desempata el DOM, no el diseño', () => {
-    const valores = [ZD, ZP, ZHint, ZBar, ZM, ZCM, ZMod, ZTip, ZT, ZDbg];
+    const valores = [ZD, ZP, ZCC, ZHint, ZBar, ZM, ZCM, ZMod, ZTip, ZT, ZDbg];
     expect(new Set(valores).size).toBe(valores.length);
   });
 
@@ -82,6 +87,8 @@ describe('la escala de z-index ordena por urgencia, no por antigüedad', () => {
  *  var(--token) + N para los anidados), y una nota de por qué. */
 const SITIOS_GLOBALES: Array<{ archivo: string; patron: RegExp; nota: string }> = [
   { archivo: 'src/components/shell/Dock.css', patron: /z-index:\s*var\(--z-dock\)/, nota: 'dock' },
+  { archivo: 'src/components/PatternEditor/ToolStrip2D.css', patron: /\.tool-strip\s*\{[^}]*z-index:\s*var\(--z-canvas-chrome\)/, nota: 'tira de herramienta 2D' },
+  { archivo: 'src/components/PatternEditor/FilaDeCapas.css', patron: /\.fila-de-capas\s*\{[^}]*z-index:\s*var\(--z-canvas-chrome\)/, nota: 'fila de capas' },
   { archivo: 'src/styles/layout.css', patron: /\.top-bar\s*\{[^}]*z-index:\s*var\(--z-bar\)/, nota: 'top-bar' },
   { archivo: 'src/styles/unified-bar.css', patron: /z-index:\s*var\(--z-bar\)/, nota: 'unified-bar' },
   { archivo: 'src/styles/floating.css', patron: /\.logo-menu\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú del logo' },
@@ -107,7 +114,7 @@ const SITIOS_GLOBALES: Array<{ archivo: string; patron: RegExp; nota: string }> 
  * que leer ahí es una promesa de que el submenú le gana a algo de afuera.
  */
 
-describe('los 14 sitios verificables por texto usan el token que les toca', () => {
+describe('los 16 sitios verificables por texto usan el token que les toca', () => {
   it.each(SITIOS_GLOBALES)('$archivo — $nota', ({ archivo, patron }) => {
     const contenido = leer(archivo);
     expect(contenido).toMatch(patron);

@@ -22,6 +22,65 @@
 >
 > **Qué falta decidir antes de reintentar el Grupo 2:** aislar siempre tiene un costo — lo de adentro deja de poder escapar. Hay que decidir **racimo por racimo** quién se aísla y qué tiene permitido salir a la escala global (los menús contextuales, sin duda; los modales, sin duda). Eso es diseño, y no se hizo. Sin esa decisión, el Grupo 2 no vuelve.
 
+---
+
+> ## Enmienda 2026-09-05 — la tira y la fila salen de `--z-menu`: escalón nuevo `--z-canvas-chrome` (40)
+>
+> Cierra el hallazgo **F10** de `docs/reports/2026-09-04-revision-adversarial-ui.md`, que lo dejó *declarado y no arreglado* a propósito: con F1 resuelto por posición no quedaba colisión viva, y mover un rol de la escala sin decisión escrita es exactamente cómo se llegó a la enmienda de arriba. Esta es la decisión escrita.
+>
+> ### Qué se movió
+>
+> | Archivo | Antes | Ahora |
+> |---|---|---|
+> | `ToolStrip2D.css` (`.tool-strip`) | `var(--z-menu)` (200) | `var(--z-canvas-chrome)` (40) |
+> | `FilaDeCapas.css` (`.fila-de-capas`) | `var(--z-menu)` (200) | `var(--z-canvas-chrome)` (40) |
+> | `tokens.css` | — | escalón nuevo entre `--z-panel` (25) y `--z-hint` (50) |
+>
+> `NotchPrecisionModal.css` **no se toca.** Su `--z-menu` es una reclasificación a la baja deliberada (§ 2.3, *"deliberately no scrim/backdrop"*) que `zIndexScale.test.ts` fija con su razón escrita. F9 ya había refutado que fuera deriva: el defecto de esa esquina era de foco, no de pintado, y se cerró con `inert` en #1125.
+>
+> ### Por qué
+>
+> `--z-menu` es el rol de lo **transitorio**: algo que aparece, se usa y se va — el menú del logo, su submenú. La tira y la fila son lo contrario: duran lo que dura su contexto (mientras haya herramienta 2D activa, mientras haya capas). Con el rol prestado, dos superficies que nunca se cierran le ganaban a todo lo que sí se cierra.
+>
+> El escalón nuevo dice **cromo acoplado al lienzo**: encima del dock (5) y de los paneles (25) porque es la cabina de la herramienta y no se puede enterrar; debajo del aviso del lienzo (50), de las barras (100) y de los menús (200) porque todo eso o urge más o dura menos. No se reusó `--z-panel` porque la escala pide que la cabina quede **encima** de un panel-tarjeta flotante, no empatada con él; y un empate lo desempataría el orden del DOM, que no es una decisión de diseño (mismo criterio que el escalón propio de `--z-tooltip`).
+>
+> **Capa ≠ material.** `--z-canvas-chrome` dice dónde se pinta; las dos superficies siguen hechas de material `overlay` en su variante sin borde. Los dos ejes son ortogonales y el nombre no las reclasifica de material.
+>
+> ### Qué se comprobó antes de moverlo
+>
+> Los seis consumidores de `--z-menu`, uno por uno, y qué relación cambia:
+>
+> | Consumidor | ¿Cambia algo? |
+> |---|---|
+> | `floating.css:88` `.logo-menu` | No hay solape geométrico (el menú cae de la esquina superior izquierda). Y el 200 del menú nunca compitió con la tira: vive dentro de `.top-bar`, que es un ítem flex con `z-index: var(--z-bar)` — en flexbox eso establece contexto de apilamiento aunque la posición sea `static`, así que el menú está encerrado en el 100 de la barra. Lo que sí cambia: la tira deja de poder pintar por encima de ese 100. Mejora, no regresión. |
+> | `floating.css:165` `.logo-menu__submenu` | Nada: `calc(var(--z-menu) + 10)` dentro de su menú padre, que ya es contexto de apilamiento. Solo ordena contra sus hermanos. |
+> | `NextPointPanel.css:12` | Misma esquina que la tira, pero `PatternEditor.tsx:1375` desmonta la tira mientras el panel está abierto. Si algún día conviven, ahora gana el panel — que es el orden que pide la lista de prioridad del spec `2026-09-05-dueno-del-emplazamiento-2d-design.md` § 2.3. |
+> | `NotchPrecisionModal.css:11` | **La relación que había que proteger.** Comparten los mismos cuatro números (`top:28px`, `right:12px`, ancho, z). Hoy empataban en 200 y el desempate lo decidía el orden del DOM; ahora el modal gana por diseño. La tira no le pasa por encima en ningún caso. |
+> | `SurfaceModePill.css:54` `.surface-pill__flyout` | Nada: vive dentro de `.surface-pill` (`--z-panel` + `position:absolute` = contexto de apilamiento) y en `.canvas-area__3d`, que es `overflow: hidden` — no puede alcanzar el lienzo 2D. |
+> | `tokens.css:294` (la declaración) | Sin tocar. |
+>
+> Y una corrección de método, porque es lo que va a copiar el próximo que mueva un
+> rol: el riesgo de bajar de 200 a 40 **no** es quién usa `--z-menu`, es todo lo
+> declarado en la banda (40, 200] que pueda solapar geométricamente. Revisada la
+> banda entera: `--z-hint` (50), `--z-bar` (100) y el literal 100 de
+> `.layer-color-popover` (`LayerPanel.css:45`), que no aparecía en la tabla de
+> consumidores. Este último no puede solapar: vive dentro del panel de Capas
+> —hermano flex de `.canvas-area`, no encima del lienzo— y se abre hacia abajo
+> dentro de su propia fila. La tabla de arriba salió bien por el eje correcto de
+> casualidad; el eje correcto es la banda, no el token viejo.
+>
+> Y los dos cambios de comportamiento reales, dichos en voz alta:
+>
+> 1. **El aviso de soltar el DXF** (`--z-hint`, 50, `inset: 0` sobre `.canvas-area`) ahora las cubre en vez de quedar agujereado por ellas. Es lo correcto: es un aviso de superficie completa, y lleva `pointer-events: none`, así que no se pierde ninguna interacción.
+> 2. **La barra de IA arrastrada** (`--z-bar`, 100) ahora les gana. En su posición por defecto no hay solape —la fila se ancla a `--band-bar` justo para eso, y `emplazamiento-lienzo-2d.spec.ts` lo mide en 0 px²—, pero si la usuaria mueve la barra encima, gana la barra que ella colocó, no el cromo que se colocó solo. Es la misma frase que ya está escrita en `FilaDeCapas.css` y en `floating.css`: *"si la usuaria arrastra la barra, ese es su layout"*.
+>
+> ### Qué no se rompe
+>
+> - `zIndexScale.test.ts` no se toca y sigue verde: prueba la cadena `--z-dock < --z-panel < --z-hint < …`, que un escalón intermedio nuevo no altera, y desde el 05-09 sus sitios verificados por texto son 16: se le añadieron la tira y la fila, y el escalón nuevo entró en la cadena y en la comprobación de unicidad. Sin eso el 40 se podía mover a 5000 y los gates seguían verdes.
+> - Los e2e de emplazamiento miden **resultado** (`elementFromPoint`, px² de solape), no valores declarados: `emplazamiento-tira.spec.ts` pide que el dock (5) no pinte sobre la tira — sigue 5 < 40 —, y `emplazamiento-lienzo-2d.spec.ts` pide 0 px² de solape entre la fila y la barra y que los toggles de la fila sean alcanzables — ninguna superficie del tramo 40–200 la solapa.
+> - `ui-contract-lint.mjs` R8 cuenta `z-index` **literales**; aquí no nace ninguno, el contador no se mueve.
+> - Lo que quedó fuera a propósito, y con la distinción bien hecha: `Dock.css:142` (`z-index: 20`) **sí** está encerrado — `.dock` lleva `z-index: var(--z-dock)` y posición, o sea contexto de apilamiento propio. `EmptyState2D.css:11` (`z-index: 1`) **no**: su único ancestro candidato es `.pattern-editor`, que es `position: relative` SIN z-index (`PatternEditor.css:6`), y `overflow: hidden` no crea contexto. Ese 1 compite en la raíz; hoy no molesta porque queda por debajo de todo el cromo, pero no es local. Los dos siguen siendo Grupo 2, y el Grupo 2 no vuelve sin la decisión racimo por racimo que pide la enmienda de arriba. Se escribe la diferencia a propósito: dar por «encerrado» lo que compite en la raíz es el error de signo exacto que tumbó al Grupo 2 la primera vez.
+
 ## 1. Qué hay hoy, medido
 
 - `LeftDock`, `RightDock` y `ContextPanel` son `position: absolute`/`fixed`, flotan **encima** del lienzo. El "ajustar a la vista" (`computeFitView`, `PatternEditor.tsx:672`) mide `svg.getBoundingClientRect()` — un rectángulo que **no sabe** que hay cromo tapando parte de lo que mide.

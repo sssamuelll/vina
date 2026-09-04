@@ -13,7 +13,10 @@
      pista de la herramienta, que quedaba cortada a media frase. Si la usuaria
      arrastra la barra, ese es su layout. */
   bottom: var(--band-bar);
-  z-index: var(--z-menu);
+  /* Cromo acoplado al lienzo, no menú: la fila vive mientras haya capas. Mismo
+     escalón que su hermana la tira (enmienda 2026-09-05 del spec de
+     emplazamiento). */
+  z-index: var(--z-canvas-chrome);
   display: flex;
   align-items: center;
   gap: 2px;
