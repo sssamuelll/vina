@@ -558,3 +558,28 @@ trinquete con tres reglas abajo y ninguna arriba.
 Todo lo que toca al navegador se verificó en el navegador, no solo en jsdom: los
 dos gestos del transform box, el canal nuevo de la tira, el gesto del círculo de
 punta a punta, y el solape barra↔pista en tres viewports.
+
+### 12.7 El gate nuevo falló en su primer uso, y eso es parte del resultado
+
+El deploy abortó en el gate de emplazamiento que este mismo trabajo añadió: seis
+timeouts de `waitForSelector` esperando a que la app montara, más tres flaky que
+pasaron al reintentar. **No era una regresión** — los mismos cinco specs daban
+24/24 minutos antes. Era el patrón ya medido en este repo: Vite arrancando en
+frío con tantos workers como CPUs se queda sin aire, y los tests se caen
+esperando el montaje, no por lo que miden.
+
+Con `--workers=2`, 24/24 y cero flaky, verificado dos veces antes de tocar nada.
+
+Vale la pena dejarlo escrito porque es la crítica que este mismo informe le hizo
+al censo de `audit:ui` —«sus contadores bajan cuando un estado no carga»— y el
+gate nuevo estuvo a una corrida de merecerla igual. **Un gate que da falsos rojos
+se acaba desactivando, y entonces no protege de nada.**
+
+Commit `ed94d993`, directo a `main` en vez de por PR: es una línea del script de
+deploy y estaba bloqueando el despliegue. Queda dicho, no como norma.
+
+### 12.8 Desplegado
+
+`main` en `ed94d993`. `https://vina.sdar.dev/` responde 200 y sirve
+`assets/index-C7xdqEqO.js`, el bundle recién compilado. Gates del deploy en
+verde de punta a punta, incluido el smoke del WASM y los 24 e2e de emplazamiento.
