@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import {
-  MousePointer2, PenTool, Square, Scissors, Ruler,
+  MousePointer2, PenTool, Square, Circle, Scissors, Ruler,
   PenLine, MoveVertical,
   SquareDashed, GitCommitHorizontal, Waypoints,
 } from 'lucide-react';
@@ -52,6 +52,11 @@ export const DOCK_2D_CATALOG: DockToolDef[] = [
   // exactamente lo que ella esperaba que dibujara la herramienta.
   { id: 'notch', icon: NotchIcon, label: 'Piquete', shortcut: '⇧N' },
   // Fuera del default:
+  // El círculo (#1111) entra al catálogo, no al default: las doce de fábrica
+  // están medidas contra el trabajo diario de María y sacar una para meterlo
+  // sería cambiarle el dock sin haberlo pedido. Con su tecla E y el
+  // personalizador ya tiene puerta.
+  { id: 'circle', icon: Circle, label: 'Elipse (círculo)', shortcut: 'E' },
   { id: 'grainline', icon: MoveVertical, label: 'Hilo', shortcut: '⇧G' },
 ];
 

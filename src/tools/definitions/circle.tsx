@@ -31,10 +31,12 @@ export const circleTool: ToolDefinition = {
       label: 'Figura',
       type: 'select',
       value: 'circle',
+      // Sin Arco: un arco es un camino ABIERTO y `addPiece` asume pieza cerrada
+      // (el 3D extruye con THREE.Shape). Como PIEZA no significa nada; como
+      // línea interna ya existe `internalShape` (#1111).
       choices: [
         { label: 'Círculo', value: 'circle' },
         { label: 'Elipse', value: 'ellipse' },
-        { label: 'Arco', value: 'arc' },
       ],
     },
     {
@@ -47,23 +49,18 @@ export const circleTool: ToolDefinition = {
       step: 5,
     },
   ],
-  onActivate: () => {
-    console.log('Circle/Curve tool - Coming soon!');
-  },
   copilot: {
     description:
-      'Draw circular or elliptical pattern pieces and shapes. Creates round shapes including full circles, ellipses, and arcs. Useful for circular skirts, curved design elements, and rounded pattern components.',
+      'Draw circular or elliptical pattern pieces. Creates closed round shapes — full circles and ellipses. Useful for circular skirts, curved design elements, and rounded pattern components.',
     examples: [
       'Draw a circle with 50mm radius',
       'Create an ellipse for the neckline',
       'Add a circular skirt piece',
-      'Make an arc for the armhole curve',
     ],
     keywords: [
       'circle',
       'ellipse',
       'oval',
-      'arc',
       'round',
       'curve',
       'radius',
@@ -75,7 +72,7 @@ export const circleTool: ToolDefinition = {
     undoable: true,
     dangerous: false,
     parameterHints: {
-      shapeType: 'Type of shape: circle, ellipse, or arc segment',
+      shapeType: 'Type of shape: circle or ellipse',
       radius: 'Radius of the circle or base radius for ellipse in millimeters',
     },
   },

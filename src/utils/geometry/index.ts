@@ -5,6 +5,7 @@ export { cmToM, mToCm, mmToM, mToMm, cmToMm, mmToCm } from './units';
 export { metresToImporter, importerToMetres } from './boundaries';
 export { getEdgeEndpoints, getEdgeLength, getEdgeArcLength, computeOffsetPath, computeSegmentOffsetPath } from './path';
 export { hitTestPieceBBox } from './hitTest';
+export { ellipseToPath } from './ellipse';
 export {
   computeBoundingBox, computeHandlePositions, scaleOutline, rotateOutline,
   hitTestHandle, computeScaleFromDrag, computeRotationFromDrag,

@@ -86,11 +86,11 @@ describe('F7 — ninguna tecla activa una herramienta que el despachador no sabe
     ).toEqual([]);
   });
 
-  it('las siete que no tienen gesto quedan escritas, no borradas', () => {
+  it('las que no tienen gesto quedan escritas, no borradas', () => {
     // Se documentan con su tecla reservada para que, cuando la herramienta
-    // exista, el atajo vuelva al sitio que ya era suyo (#1111 es el primero).
+    // exista, el atajo vuelva al sitio que ya era suyo. Quedan seis: el círculo
+    // ya nació (#1111) y se llevó su E de vuelta a DEFAULT_SHORTCUTS.
     expect(ATAJOS_2D_SIN_GESTO.map((s) => s.id).sort()).toEqual([
-      'tool.circle',
       'tool.dart',
       'tool.editConstrain',
       'tool.pin',
@@ -121,9 +121,11 @@ describe('F7 — ninguna tecla activa una herramienta que el despachador no sabe
   });
 
   it('las teclas que quedan libres no se las queda nadie por accidente', () => {
-    // c, d, e, i, p, t, w quedan sin dueño. Que ninguna otra acción las tome
+    // c, d, i, p, t, w quedan sin dueño. Que ninguna otra acción las tome
     // en silencio: si alguien las quiere, que sea una decisión escrita.
-    const libres = new Set(['c', 'd', 'e', 'i', 'p', 't', 'w']);
+    // La 'e' salió de esta lista porque volvió a tener dueño: el círculo
+    // (#1111) — que es exactamente lo que la reserva estaba esperando.
+    const libres = new Set(['c', 'd', 'i', 'p', 't', 'w']);
     const ocupadas = DEFAULT_SHORTCUTS.filter(
       (s) => s.context === '2d' && !s.ctrl && !s.alt && !s.shift && libres.has(s.key),
     );

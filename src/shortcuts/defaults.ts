@@ -39,6 +39,8 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'tool.editCurve', key: 'v', label: 'Editar punto de curva', category: '2D Tools', context: '2d' },
   { id: 'tool.pen', key: 'h', label: 'Pluma', category: '2D Tools', context: '2d' },
   { id: 'tool.rectangle', key: 's', label: 'Rectángulo', category: '2D Tools', context: '2d' },
+  // La E vuelve de la reserva de F7: el círculo ya tiene gesto (#1111).
+  { id: 'tool.circle', key: 'e', label: 'Elipse (círculo)', category: '2D Tools', context: '2d' },
   { id: 'tool.internalShape', key: 'g', label: 'Línea interna', category: '2D Tools', context: '2d' },
   { id: 'tool.scissors', key: 'x', label: 'Tijeras', category: '2D Tools', context: '2d' },
   { id: 'tool.measure', key: 'm', label: 'Medir', category: '2D Tools', context: '2d' },
@@ -118,13 +120,12 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
  * ids. Se sacaron de `DEFAULT_SHORTCUTS` para que la tecla no prometa nada.
  *
  * No se borran, se reservan: cuando la herramienta exista, su atajo vuelve
- * intacto al sitio que ya era suyo. El primero de la cola es el círculo
- * (#1111, María: «círculo es indispensable»).
+ * intacto al sitio que ya era suyo. Quedan SEIS: el círculo ya cobró su E
+ * (#1111, María: «círculo es indispensable»), que era el primero de la cola.
  *
  * Ver docs/reports/2026-09-04-revision-adversarial-ui.md § 2 F7.
  */
 export const ATAJOS_2D_SIN_GESTO: ShortcutDef[] = [
-  { id: 'tool.circle', key: 'e', label: 'Elipse (círculo)', category: '2D Tools', context: '2d' },
   { id: 'tool.dart', key: 'd', label: 'Pinza', category: '2D Tools', context: '2d' },
   { id: 'tool.editConstrain', key: 'c', label: 'Editar curvatura', category: '2D Tools', context: '2d' },
   { id: 'tool.pin', key: 'w', label: 'Fijar', category: '2D Tools', context: '2d' },

@@ -1,35 +1,50 @@
 import { Point2D, UnitSystem } from '../../../../types/types';
 import { formatDimension } from '../../../../utils/units';
 
-interface RectangleToolOverlayProps {
+interface ShapeToolOverlayProps {
   zoom2D: number;
   units: string;
-  rectPreview: { x: number; y: number; width: number; height: number } | null;
-  rectDimensions: { width: number; height: number; center: Point2D } | null;
+  /** 'rect' para Rectángulo, 'elipse' para Círculo. */
+  figura?: 'rect' | 'elipse';
+  /** La CAJA de la figura en curso; la elipse se dibuja inscrita en ella. */
+  preview: { x: number; y: number; width: number; height: number } | null;
+  dimensions: { width: number; height: number; center: Point2D } | null;
 }
 
-export default function RectangleToolOverlay({ zoom2D, units, rectPreview, rectDimensions }: RectangleToolOverlayProps) {
+/**
+ * Vista previa de las dos herramientas que dibujan una pieza arrastrando:
+ * Rectángulo y Círculo (#1111). Un solo componente a propósito — el trazo
+ * punteado y la píldora de medidas son la misma promesa visual, y duplicarlos
+ * era duplicar también los cuatro colores que la ley de materiales cuenta.
+ */
+export default function ShapeToolOverlay({ zoom2D, units, figura = 'rect', preview, dimensions }: ShapeToolOverlayProps) {
+  const trazo = {
+    fill: 'rgba(74, 158, 255, 0.15)',
+    stroke: '#4a9eff',
+    strokeWidth: 1.5 / zoom2D,
+    strokeDasharray: `${4 / zoom2D}`,
+  };
+
   return (
     <>
-      {rectPreview && (
-        <rect
-          x={rectPreview.x}
-          y={rectPreview.y}
-          width={rectPreview.width}
-          height={rectPreview.height}
-          fill="rgba(74, 158, 255, 0.15)"
-          stroke="#4a9eff"
-          strokeWidth={1.5 / zoom2D}
-          strokeDasharray={`${4 / zoom2D}`}
+      {preview && (figura === 'elipse' ? (
+        <ellipse
+          cx={preview.x + preview.width / 2}
+          cy={preview.y + preview.height / 2}
+          rx={preview.width / 2}
+          ry={preview.height / 2}
+          {...trazo}
         />
-      )}
+      ) : (
+        <rect x={preview.x} y={preview.y} width={preview.width} height={preview.height} {...trazo} />
+      ))}
 
-      {rectDimensions && (() => {
-        const dimText = `${formatDimension(rectDimensions.width, units as UnitSystem)} × ${formatDimension(rectDimensions.height, units as UnitSystem)}`;
+      {dimensions && (() => {
+        const dimText = `${formatDimension(dimensions.width, units as UnitSystem)} × ${formatDimension(dimensions.height, units as UnitSystem)}`;
         const charWidth = 5.5;
         const pillWidth = Math.max(60, dimText.length * charWidth + 16);
         return (
-          <g transform={`translate(${rectDimensions.center.x}, ${rectDimensions.center.y})`}>
+          <g transform={`translate(${dimensions.center.x}, ${dimensions.center.y})`}>
             <rect
               x={-pillWidth / 2 / zoom2D} y={-8 / zoom2D}
               width={pillWidth / zoom2D} height={16 / zoom2D}

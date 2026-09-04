@@ -3,6 +3,9 @@
  * Parses SVG files from Illustrator, Inkscape, Figma into PatternPieces.
  */
 import { PatternPiece, PathCommand } from '../../types/types';
+// La elipse en cuatro cúbicas se mudó a `geometry/` cuando nació la herramienta
+// Círculo (#1111): una sola fórmula para el importador y para el lienzo.
+import { ellipseToPath } from '../geometry/ellipse';
 
 // ─── Public API ───
 
@@ -265,20 +268,6 @@ function circleToCommands(a: Record<string, string>): PathCommand[] {
 function ellipseToCommands(a: Record<string, string>): PathCommand[] {
   const cx = num(a['cx']), cy = num(a['cy']), rx = num(a['rx']), ry = num(a['ry']);
   return ellipseToPath(cx, cy, rx, ry);
-}
-
-function ellipseToPath(cx: number, cy: number, rx: number, ry: number): PathCommand[] {
-  // Approximate with 4 cubic beziers
-  const k = 0.5522847498; // magic number for circle approximation
-  const ox = rx * k, oy = ry * k;
-  return [
-    { type: 'M', values: [cx - rx, cy] },
-    { type: 'C', values: [cx - rx, cy - oy, cx - ox, cy - ry, cx, cy - ry] },
-    { type: 'C', values: [cx + ox, cy - ry, cx + rx, cy - oy, cx + rx, cy] },
-    { type: 'C', values: [cx + rx, cy + oy, cx + ox, cy + ry, cx, cy + ry] },
-    { type: 'C', values: [cx - ox, cy + ry, cx - rx, cy + oy, cx - rx, cy] },
-    { type: 'Z', values: [] },
-  ];
 }
 
 function polygonToCommands(a: Record<string, string>, closed: boolean): PathCommand[] {
