@@ -1,8 +1,8 @@
-import { forwardRef, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 import type { Point2D } from '../../../types/types';
 import type { Cota } from './cotas';
 import CotaChip, { type CotaChipProps } from './CotaChip';
-import { chipScreenPosition } from './cotasGeometry';
+import { chipScreenPosition, separarChips, type ChipPuesto } from './cotasGeometry';
 import { formatMedida } from './parseMedida';
 
 export interface CotasLayerHandle {
@@ -55,7 +55,27 @@ export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function
       return true;
     },
   }), []);
-  const lecturaPosition = lectura ? chipScreenPosition(lectura, pan2D, zoom2D) : null;
+  // Los chips y la lectura se colocan en UNA sola pasada: si se separan por
+  // separado se vuelven a pisar entre ellos. La lectura cede el sitio para que
+  // pasar el ratón por un borde no haga saltar a los chips anclados.
+  const puestos = useMemo(() => {
+    const items: ChipPuesto[] = cotas.map((cota) => ({
+      cota,
+      ...chipScreenPosition(cota, pan2D, zoom2D),
+      texto: formatMedida(cota.valueMm, cota.unit),
+    }));
+    if (lectura) {
+      items.push({
+        cota: lectura,
+        ...chipScreenPosition(lectura, pan2D, zoom2D),
+        texto: formatMedida(lectura.valueMm, lectura.unit),
+        cede: true,
+      });
+    }
+    const separados = separarChips(items);
+    return { chips: separados, lectura: lectura ? separados[cotas.length] : null };
+  }, [cotas, lectura, pan2D, zoom2D]);
+  const lecturaPosition = puestos.lectura;
   return (
     <div ref={root} className="cotas" style={{ pointerEvents: 'none' }} data-testid="cotas">
       {lectura && lecturaPosition && (
@@ -70,8 +90,8 @@ export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function
           {formatMedida(lectura.valueMm, lectura.unit)}
         </div>
       )}
-      {cotas.map((cota) => {
-        const { left, top } = chipScreenPosition(cota, pan2D, zoom2D);
+      {cotas.map((cota, i) => {
+        const { left, top } = puestos.chips[i];
         return (
           <CotaChip
             key={cota.id}

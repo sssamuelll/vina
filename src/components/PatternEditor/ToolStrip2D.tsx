@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { setDefaultSAWidth } from '../../store/editorSlice';
@@ -27,9 +27,16 @@ const OCULTAS_EN_LA_TIRA: Record<string, ReadonlySet<string>> = {
  * defaults de la herramienta. Repone la puerta de la barra desmontada
  * (`ToolOptionsBar2D`, #1049) en la esquina del lienzo, donde el dock no la
  * tapa. Lee `editor.activeTool`, la autoridad de `PatternEditor`.
+ *
+ * `falta`: lo que a la herramienta le falta para trabajar (#1117). `inerte`:
+ * hay un modal encima y la tira no debe recibir el foco (#1125).
  */
-export default function ToolStrip2D({ lineaDeSujeto }: { lineaDeSujeto: string | null }) {
+export default function ToolStrip2D(
+  { lineaDeSujeto, falta = null, inerte = false }:
+  { lineaDeSujeto: string | null; falta?: string | null; inerte?: boolean },
+) {
   const dispatch = useDispatch();
+  const raiz = useRef<HTMLDivElement>(null);
   const registroDeAtajos = useShortcutRegistry();
   const activeTool = useSelector((s: RootState) => s.editor.activeTool);
   const defaultSeamAllowanceWidth = useSelector(
@@ -43,6 +50,12 @@ export default function ToolStrip2D({ lineaDeSujeto }: { lineaDeSujeto: string |
   useEffect(() => {
     setSeamAllowanceValue(String(defaultSeamAllowanceWidth));
   }, [defaultSeamAllowanceWidth]);
+
+  // `inert` no existe en los tipos de React 18: se pone en el DOM a mano. Va en
+  // el contenedor, no en cada control, para que no se olvide ninguno (#1125).
+  useEffect(() => {
+    raiz.current?.toggleAttribute('inert', inerte);
+  }, [inerte]);
 
   const definicion = toolRegistry.getTool(activeTool);
   const ocultas = OCULTAS_EN_LA_TIRA[activeTool];
@@ -75,11 +88,12 @@ export default function ToolStrip2D({ lineaDeSujeto }: { lineaDeSujeto: string |
   };
 
   return (
-    <div className="tool-strip" role="group" aria-label="Herramienta activa">
+    <div className="tool-strip" role="group" aria-label="Herramienta activa" ref={raiz}>
       <div className="tool-strip__head">
         <span className="tool-strip__tool">{definicion?.name ?? activeTool}</span>
         {atajo && <kbd className="tool-strip__shortcut">{atajo}</kbd>}
       </div>
+      {falta && <div className="tool-strip__falta">{falta}</div>}
       {lineaDeSujeto && <div className="tool-strip__subject">{lineaDeSujeto}</div>}
       {activeTool === 'seamAllowance' && (
         <div className="tool-strip__options">

@@ -198,6 +198,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   const pieceFabrics = useSelector((s: RootState) => s.simulation.pieceFabrics);
   const defaultFabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
+  /** Modo de superficie del shell (2d / split / 3d). Lo lee el oyente crudo de
+   *  teclado de abajo, que no pasa por el registro de atajos y por tanto no
+   *  hereda su filtro de contexto. */
+  const viewMode = useSelector((s: RootState) => s.editor.viewMode);
   const showGarment = useSelector((s: RootState) => s.simulation.showGarment);
   const showSeamlines3D = useSelector((s: RootState) => s.simulation.showSeamlines3D);
   const hiddenPieceIds = useSelector((s: RootState) => s.simulation.hiddenPieceIds);
@@ -677,6 +681,14 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         if (tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable) return;
       }
 
+      // Este oyente se salta el registro de atajos, que sí filtra por contexto
+      // (`context: '3d'` en shortcuts/defaults.ts). Sin esta guarda, estando en
+      // el lienzo 2D —donde AppShell monta el visor igual, solo con
+      // `display:none`— pulsar W cambiaba la herramienta 3D en silencio, y
+      // Shift+A, Shift+F y F10 hacían lo suyo sin ninguna superficie que lo
+      // dijera. Medido en la revisión adversarial del 2026-09-04.
+      if (viewMode === '2d') return;
+
       if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
         setAvatarHidden(h => !h);
@@ -726,7 +738,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool3D, dispatch, cameraPresets, selectedPieceIds, snapshot3D, poseEditorOpen]);
+  }, [activeTool3D, dispatch, cameraPresets, selectedPieceIds, snapshot3D, poseEditorOpen, viewMode]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -1005,10 +1017,15 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
             top: 8,
             right: collisionPanelOpen ? 290 : 8,
             zIndex: 25,
-            background: collisionPanelOpen ? 'rgba(74, 158, 255, 0.2)' : 'rgba(30, 30, 30, 0.8)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            borderRadius: 6,
-            color: collisionPanelOpen ? '#4a9eff' : '#ccc',
+            // Gemelo de .surface-pill__trigger: mismo material `overlay` y el
+            // mismo acento al abrirse. Antes traía su propio gris y su propio
+            // azul, que no salía de ningún token.
+            background: collisionPanelOpen ? 'var(--accent-subtle)' : 'var(--surface-overlay-bg)',
+            backdropFilter: 'var(--surface-overlay-blur)',
+            border: collisionPanelOpen ? '1px solid var(--accent)' : 'var(--surface-overlay-border)',
+            borderRadius: 'var(--surface-overlay-radius)',
+            boxShadow: 'var(--surface-overlay-shadow)',
+            color: collisionPanelOpen ? 'var(--text-primary)' : 'var(--text-secondary)',
             padding: '6px 10px',
             cursor: 'pointer',
             fontSize: 12,

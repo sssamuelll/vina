@@ -429,7 +429,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                 {/* Saved custom poses */}
                 {savedPoses.length > 0 && (
                   <div className="ap-saved-poses">
-                    <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>Poses guardadas</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Poses guardadas</div>
                     {savedPoses.map(p => (
                       <div key={p.id} className="ap-saved-pose-row">
                         <button
@@ -513,7 +513,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                                   min={min} max={max}
                                   value={jointRotation[axis]}
                                   onChange={e => handleJointChange(axis, Number(e.target.value))}
-                                  style={{ flex: 1, height: 4, appearance: 'none', background: 'var(--border-color, #444)', borderRadius: 2 }}
+                                  style={{ flex: 1, height: 4, appearance: 'none', background: 'var(--border)', borderRadius: 2 }}
                                 />
                                 <span>{jointRotation[axis]}°</span>
                               </div>

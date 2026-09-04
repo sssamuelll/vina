@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
+import { showErrorToast } from '../../store/copilotUISlice';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import { extendEdge, trimEdgeAtPoint } from '../../utils/patternOps';
 import { flattenPath } from '../../utils/seam/index';
@@ -15,15 +16,12 @@ export interface ExtendTrimState {
   selectedSnap: { point: Point2D; segmentIndex: number; endpoint: 'start' | 'end' } | null;
   /** Preview outline showing the result before confirmation */
   previewOutline: PathCommand[] | null;
-  /** Error message if operation failed */
-  error: string | null;
 }
 
 const INITIAL_STATE: ExtendTrimState = {
   hoveredSnap: null,
   selectedSnap: null,
   previewOutline: null,
-  error: null,
 };
 
 const SNAP_THRESHOLD = 10; // screen pixels
@@ -183,6 +181,8 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
+      // Sin una sola pieza seleccionada la herramienta no tiene sujeto, y eso
+      // lo dice la tira ANTES del clic (`faltaSujeto`, #1117).
       if (selectedPieceIds.length !== 1) return;
       const piece = pieces.find(p => p.id === selectedPieceIds[0]);
       if (!piece) return;
@@ -202,7 +202,6 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
               hoveredSnap: null,
               selectedSnap: snap,
               previewOutline: extended.outline,
-              error: null,
             });
           }
         } else {
@@ -213,7 +212,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
             dispatch(updatePiece(extended));
             reset();
           } catch {
-            setState(prev => ({ ...prev, error: 'Failed to extend edge' }));
+            dispatch(showErrorToast('No se pudo extender el borde'));
           }
         }
       } else {
@@ -230,7 +229,6 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
             hoveredSnap: null,
             selectedSnap: snap,
             previewOutline: trimmed.outline,
-            error: null,
           });
         } else {
           // Second click: confirm trim (keep the side closer to this click)
@@ -254,7 +252,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
             dispatch(updatePiece(trimmed));
             reset();
           } catch {
-            setState(prev => ({ ...prev, error: 'Failed to trim edge' }));
+            dispatch(showErrorToast('No se pudo recortar el borde'));
           }
         }
       }
@@ -293,7 +291,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
         const s = stateRef.current;
         if (s.selectedSnap) {
           // Cancel current selection, go back to hovering
-          setState(prev => ({ ...prev, selectedSnap: null, previewOutline: null, error: null }));
+          setState(prev => ({ ...prev, selectedSnap: null, previewOutline: null }));
         } else {
           reset();
         }
@@ -318,7 +316,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
             }
             reset();
           } catch {
-            setState(prev => ({ ...prev, error: 'Operation failed' }));
+            dispatch(showErrorToast(mode === 'extend' ? 'No se pudo extender el borde' : 'No se pudo recortar el borde'));
           }
         }
       }
@@ -336,7 +334,6 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
     hoveredSnap: state.hoveredSnap,
     selectedSnap: state.selectedSnap,
     previewOutline: state.previewOutline,
-    error: state.error,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,

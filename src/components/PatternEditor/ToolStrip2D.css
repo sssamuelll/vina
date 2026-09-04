@@ -25,6 +25,16 @@
   color: var(--text-muted);
 }
 .tool-strip__subject { margin-top: 2px; font-size: var(--text-sm); color: var(--text-secondary); }
+/* Lo que falta para poder trabajar (#1117): se distingue de la línea de sujeto
+   por RELLENO y por texto a plena luz, no solo por tono (ley de estado). */
+.tool-strip__falta {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
 
 .tool-strip__options { display: grid; gap: 6px; margin-top: 10px; }
 .tool-strip__item { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

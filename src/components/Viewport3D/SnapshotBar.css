@@ -1,16 +1,19 @@
 .snapshot-bar {
   position: absolute;
   /* Por encima del UnifiedBar default (58+24, barPosition.ts) — a bottom:12
-     el capsule quedaba medio recortado detrás del bar (Fase1-S3). */
-  bottom: 94px;
+     el capsule quedaba medio recortado detrás del bar (Fase1-S3). El número
+     ahora sale del token `--band-bar`, compartido con los controles del visor
+     3D y la fila de capas del lienzo 2D. */
+  bottom: var(--band-bar);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(30, 30, 30, 0.85);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Material `overlay` del contrato: la cápsula flota sobre el visor. */
+  background: var(--surface-overlay-bg);
+  backdrop-filter: var(--surface-overlay-blur);
+  border: var(--surface-overlay-border);
   border-radius: 20px;
   padding: 6px 12px;
   z-index: 10;
@@ -23,9 +26,9 @@
   gap: 4px;
   padding: 4px 10px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
   font-size: 11px;
   font-family: var(--font-sans);
   cursor: pointer;
@@ -33,15 +36,20 @@
   white-space: nowrap;
 }
 
-.snapshot-bar .snap-chip:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.9);
+.snapshot-bar .snap-chip:hover,
+.snapshot-bar .snap-chip:focus-visible {
+  border-color: var(--accent-border);
+  color: var(--text-primary);
 }
 
+/* Un solo azul dentro del control: antes el fondo era un azul inventado y el
+   borde y el texto --accent — dos acentos distintos a 4 px uno del otro. Va
+   relleno porque lleva el nombre de la captura encima: blanco sobre
+   --accent-fuerte da 6,29:1, sobre --accent se quedaba en 4,47:1. */
 .snapshot-bar .snap-chip.active {
-  background: rgba(74, 158, 255, 0.2);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--accent-fuerte);
+  border-color: var(--accent-fuerte);
+  color: var(--on-accent);
 }
 
 .snapshot-bar .snap-chip .snap-delete {
@@ -65,9 +73,12 @@
   opacity: 0.6;
 }
 
-.snapshot-bar .snap-chip .snap-delete:hover {
+/* Con el mouse la equis aparece al pasar por el chip; con el teclado aparece
+   al enfocarla, que si no nunca se ve. */
+.snapshot-bar .snap-chip .snap-delete:hover,
+.snapshot-bar .snap-chip .snap-delete:focus-visible {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--accent-subtle);
 }
 
 .snapshot-bar .snap-save-btn {
@@ -77,18 +88,19 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border: 1px dashed var(--border);
   background: transparent;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-ghost);
   font-size: 14px;
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.snapshot-bar .snap-save-btn:hover {
-  border-color: rgba(255, 255, 255, 0.4);
-  color: rgba(255, 255, 255, 0.8);
-  background: rgba(255, 255, 255, 0.06);
+.snapshot-bar .snap-save-btn:hover,
+.snapshot-bar .snap-save-btn:focus-visible {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
 }
 
 .snapshot-bar .snap-save-btn:disabled {

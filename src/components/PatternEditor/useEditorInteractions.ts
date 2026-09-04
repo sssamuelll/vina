@@ -3,7 +3,7 @@ import { useRef, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectInternalLine, setZoom2D, setPan2D } from '../../store/editorSlice';
-import { movePiece, updateInternalLine, removeInternalLine } from '../../store/projectSlice';
+import { movePiece, updateInternalLine } from '../../store/projectSlice';
 import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine } from '../../types/types';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
 import { isPinnedAtZoomCeiling, zoomAtPoint } from '../../input/zoom2d';
@@ -409,17 +409,13 @@ export function useEditorInteractions(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTool, pen.reset]);
 
-  // Delete/Backspace handler for selected internal line
-  const handleInternalLineKeyDown = useCallback((e: KeyboardEvent) => {
-    if (selectedInternalLine && (e.key === 'Delete' || e.key === 'Backspace')) {
-      dispatch(removeInternalLine({
-        pieceId: selectedInternalLine.pieceId,
-        lineId: selectedInternalLine.lineId,
-      }));
-      dispatch(clearSelection());
-      e.preventDefault();
-    }
-  }, [selectedInternalLine, dispatch]);
+  // El borrado de la línea interna seleccionada YA NO vive aquí (#1115). Tenía
+  // un duelo perdido de antemano: el atajo global escucha en `document` en
+  // burbuja y corre antes que este router en `window`, así que la pieza se
+  // borraba primero y la línea se iba en cascada. Ahora el sujeto lo decide
+  // `resolverBorrado` (src/store/borradoDeSeleccion.ts) y lo despacha el atajo
+  // global — un solo dueño, sin doble despacho. Un manejador local aquí solo
+  // volvería a borrar lo mismo un tick después.
 
   // Keyboard events (burbuja). La pluma y la línea interna NO están aquí: sus
   // teclas viven en la captura CF-1 de abajo — una tecla, un sitio.
@@ -431,18 +427,20 @@ export function useEditorInteractions(
     if (nodeEditor.isEditing) handlers.push(nodeEditor.handleKeyDown);
     if (activeTool === 'editPattern') handlers.push(editPattern.handleKeyDown);
     if (activeTool === 'scissors') handlers.push(scissorsTool.handleKeyDown);
+    // F8 (#1115): estaba en las dependencias pero nadie lo montaba, así que
+    // Escape en Corte y apertura no hacía nada.
+    if (activeTool === 'slashAndSpread') handlers.push(slashAndSpreadTool.handleKeyDown);
     if (activeTool === 'merge') handlers.push(mergeTool.handleKeyDown);
     if (activeTool === 'seamEdit') handlers.push(seamEditTool.handleKeyDown);
     if (activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') handlers.push(topstitchTool.handleKeyDown);
     if (activeTool === 'walkSeam') handlers.push(walkSeamTool.handleKeyDown);
     if (activeTool === 'offsetOutline') handlers.push(offsetTool.handleKeyDown);
     if (activeTool === 'extendTrim') handlers.push(extendTrimTool.handleKeyDown);
-    if (activeTool === 'select' && selectedInternalLine) handlers.push(handleInternalLineKeyDown);
     if (handlers.length === 0) return;
     const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, seamEditTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown]);
+  }, [activeTool, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, seamEditTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown]);
 
   // Coordinación de teclas (CF-1): un gesto vivo es dueño de sus teclas, EN
   // CAPTURA. `ShortcutProvider` escucha en `document` (burbuja) y corre antes

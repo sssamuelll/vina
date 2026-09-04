@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import {
@@ -14,7 +14,8 @@ import {
 import { toggleDockSignaling } from '../../store/dockSlice';
 import { requestConfirmation } from '../../hooks/useGuardedAction';
 import { showErrorToast, showInfoToast } from '../../store/copilotUISlice';
-import { duplicatePiece, removePieces, removeSeam } from '../../store/projectSlice';
+import { duplicatePiece, removePieces, removeSeam, removeInternalLine, removePOM } from '../../store/projectSlice';
+import { resolverBorrado } from '../../store/borradoDeSeleccion';
 import { runAutoSew } from '../../store/autoSewThunk';
 import { openRenderSettings } from '../../store/renderSettingsThunk';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
@@ -24,6 +25,7 @@ import { downloadDiagnosticBundle } from '../../utils/export/diagnosticExporter'
 import { clearStorageProject } from '../../utils/projectIO';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { displayShortcut } from './shortcutDisplay';
+import { computeScrollFade, encajarSubmenu, type Encaje, type ScrollFade } from '../PatternEditor/menuOverflow';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -86,10 +88,34 @@ const EDIT_MENU: MenuItem[] = [
   { label: 'Duplicar', shortcut: '⌘D', action: (d) => {
     for (const id of store.getState().editor.selectedPieceIds) d(duplicatePiece(id));
   } },
+  // El sujeto lo decide `resolverBorrado` (#1115) — la MISMA función que usa el
+  // atajo Supr. Antes esta acción reimplementaba la decisión a mano y se había
+  // quedado tres semanas atrás: sin la regla de costuras de #1094 (en Coser
+  // borraba la pieza) y sin el candado.
   { label: 'Eliminar', shortcut: '⌫', action: (d) => {
-    const { selectedPieceIds, selectedSeamId } = store.getState().editor;
-    if (selectedPieceIds.length > 0) d(removePieces(selectedPieceIds));
-    else if (selectedSeamId) d(removeSeam(selectedSeamId));
+    const { editor, project } = store.getState();
+    const sujeto = resolverBorrado({
+      activeTool: editor.activeTool,
+      selectedPieceIds: editor.selectedPieceIds,
+      selectedSeamId: editor.selectedSeamId,
+      selectedPOMId: editor.selectedPOMId,
+      selectedInternalLine: editor.selectedInternalLine,
+      piezasBloqueadas: new Set(project.pieces.filter(p => p.locked === true).map(p => p.id)),
+    });
+    switch (sujeto.kind) {
+      case 'seam': d(removeSeam(sujeto.id)); break;
+      case 'internalLine':
+        d(removeInternalLine({ pieceId: sujeto.pieceId, lineId: sujeto.lineId }));
+        d(clearSelection());
+        break;
+      case 'pom': d(removePOM(sujeto.id)); break;
+      case 'pieces': d(removePieces(sujeto.ids)); break;
+      case 'nada':
+        if (sujeto.motivo === 'bloqueada') {
+          d(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+        }
+        break;
+    }
   } },
   { separator: true, label: '' },
   { label: 'Seleccionar todo', shortcut: '⌘A', action: (d) => { const ids = store.getState().project.pieces.map(p => p.id); d({ type: 'editor/selectAllPieces', payload: ids }); } },
@@ -174,6 +200,68 @@ const TOP_LEVEL: TopLevelItem[] = [
   { label: 'Ayuda', submenu: HELP_MENU },
 ];
 
+// ─── Submenú ─────────────────────────────────────────────────────────────────
+
+/**
+ * Submenú del menú de aplicación, con la misma señal de "hay más" que ya lleva
+ * el menú contextual del lienzo (#1095): el marco se queda quieto y solo el
+ * contenido viaja, con un chevrón arriba y otro abajo cuando queda algo fuera.
+ *
+ * El de Vista son 24 ítems y 6 separadores, 956 px de alto: en la laptop de
+ * María se salía 426 px por abajo, sin scroll y sin ninguna señal de que ahí
+ * seguía habiendo ítems.
+ *
+ * El alto máximo se mide en vez de escribirse en CSS porque el submenú cuelga
+ * del ítem que lo abrió (`position: absolute`), así que su borde de arriba
+ * depende de cuál de los siete ítems del menú padre sea — CSS no puede saberlo.
+ */
+function Submenu({ children }: { children: ReactNode }) {
+  const cajaRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [fade, setFade] = useState<ScrollFade>({ top: false, bottom: false });
+  const [encaje, setEncaje] = useState<Encaje>();
+
+  // `altoMax` está en las dependencias a propósito: la primera pasada mide con
+  // el submenú a su alto natural (todo cabe, ningún chevrón), y hasta que no se
+  // aplica el recorte no hay nada que desbordar que señalar.
+  useLayoutEffect(() => {
+    const medir = () => {
+      const caja = cajaRef.current;
+      if (caja) {
+        setEncaje(encajarSubmenu({
+          topPx: caja.getBoundingClientRect().top,
+          innerHeight: window.innerHeight,
+          // 12 px de aire hasta el pie de la ventana + los 12 de padding del marco.
+          aire: 24,
+          // Por debajo de tres filas el submenú deja de ser usable; si no caben,
+          // se sube en vez de desbordar (ver `encajarSubmenu`).
+          minimo: 96,
+        }));
+      }
+      const scroll = scrollRef.current;
+      if (scroll) setFade(computeScrollFade(scroll));
+    };
+    medir();
+    const scroll = scrollRef.current;
+    scroll?.addEventListener('scroll', medir);
+    window.addEventListener('resize', medir);
+    return () => {
+      scroll?.removeEventListener('scroll', medir);
+      window.removeEventListener('resize', medir);
+    };
+  }, [encaje?.altoMax, encaje?.subir]);
+
+  return (
+    <div ref={cajaRef} className="logo-menu__submenu" style={encaje?.subir ? { marginTop: -encaje.subir } : undefined}>
+      <div ref={scrollRef} className="logo-menu__submenu-scroll" style={{ maxHeight: encaje?.altoMax }}>
+        {children}
+      </div>
+      {fade.top && <div className="logo-menu__fade logo-menu__fade--top"><span className="logo-menu__fade-chevron">⌃</span></div>}
+      {fade.bottom && <div className="logo-menu__fade logo-menu__fade--bottom"><span className="logo-menu__fade-chevron">⌄</span></div>}
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface LogoMenuProps {
@@ -249,9 +337,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
         {item.shortcut && <span className="logo-menu__shortcut">{displayShortcut(item.shortcut)}</span>}
         {hasSubmenu && <ChevronRight size={14} className="logo-menu__chevron" />}
         {hasSubmenu && hoveredSub === item.label && (
-          <div className="logo-menu__submenu">
-            {item.submenu!.map((sub, si) => renderMenuItem(sub, si))}
-          </div>
+          <Submenu>{item.submenu!.map((sub, si) => renderMenuItem(sub, si))}</Submenu>
         )}
       </div>
     );
@@ -294,9 +380,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
 
                 {/* Submenu flies out to the right */}
                 {hoveredTop === item.label && (
-                  <div className="logo-menu__submenu">
-                    {item.submenu.map((sub, si) => renderMenuItem(sub, si))}
-                  </div>
+                  <Submenu>{item.submenu.map((sub, si) => renderMenuItem(sub, si))}</Submenu>
                 )}
               </div>
             );

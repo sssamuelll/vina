@@ -13,7 +13,7 @@ import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
 import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import CotaLines from './cotas/CotaLines';
-import { cotasDelSujeto } from './cotas/sujeto';
+import { cotasDelSujeto, faltaSujeto } from './cotas/sujeto';
 import ToolStrip2D from './ToolStrip2D';
 import FilaDeCapas from './FilaDeCapas';
 import type { Cota } from './cotas/cotas';
@@ -675,6 +675,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     hiddenLayerIds, layerLocked, saSelection: editor.saSelection,
     saAncla: seamAllowanceTool.ancla, saHover: seamAllowanceTool.hover,
   }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, rectHotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover]);
+  // Las cuatro herramientas que toman el sujeto de la selección lo dicen en la
+  // tira antes del clic, en vez de morirse mudas (#1117).
+  const falta = faltaSujeto(activeTool, selectedPieceIds);
 
   const abrirChipVisto = useRef(0);
   useEffect(() => {
@@ -1282,7 +1285,15 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onScrubCancel={handleCotaScrubCancel}
       />
       {/* La tira cede la esquina al gesto vivo: mientras "Siguiente punto" esta abierto no se pinta (spec 2026-08-30 § 12). */}
-      {!(pen.nextPoint || internalShapeTool.nextPoint) && <ToolStrip2D lineaDeSujeto={sujeto.lineaDeSujeto} />}
+      {!(pen.nextPoint || internalShapeTool.nextPoint) && (
+        <ToolStrip2D
+          lineaDeSujeto={sujeto.lineaDeSujeto}
+          falta={falta}
+          /* El modal de piquete no usa portal ni atrapa el foco, y la tira vive
+             en su misma esquina: se declara inerte mientras esté abierto (#1125). */
+          inerte={Boolean(notchTool.refining?.notch.notchAnchor)}
+        />
+      )}
       <FilaDeCapas />
       {shouldShowEmptyState(pieces.length, activeTool) && (
         <EmptyState2D onImportDXF={onImportDXF} />

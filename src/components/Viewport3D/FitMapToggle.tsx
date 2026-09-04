@@ -117,7 +117,9 @@ const S = {
     display: 'flex',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    background: active ? '#4a90d9' : 'transparent',
+    // Relleno del botón activo: lleva el icono encima en blanco, así que va el
+    // paso fuerte del acento (6,29:1). Era un azul suelto que daba 2,75:1.
+    background: active ? 'var(--accent-fuerte)' : 'transparent',
     border: 'none',
     borderRadius: 3,
     cursor: 'pointer',
@@ -127,7 +129,7 @@ const S = {
   toggleIcon: (active: boolean) => ({
     width: 18,
     height: 18,
-    color: active ? '#fff' : '#999',
+    color: active ? 'var(--on-accent)' : 'var(--text-muted)',
   }),
   // Vertical scale bar — right edge, CLO3D style
   scaleContainer: {

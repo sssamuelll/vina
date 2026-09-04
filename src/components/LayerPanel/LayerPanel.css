@@ -1,40 +1,56 @@
 /* LayerPanel */
+/* Deuda de tokens cerrada el 2026-09-04: los `var(--fantasma, respaldo)` de este
+ * archivo (--panel-border, --panel-section-bg) nombraban tokens que no existen;
+ * el respaldo los hacía renderizar bien y por eso nadie los vio. Ahora consume
+ * el sistema. Par reposo/hover: el reposo es --bg-surface y el hover
+ * --bg-elevated, como el hermano ya tokenizado NestingTab.css. */
 .layer-panel { font-size: 12px; overflow-y: auto; height: 100%; position: relative; }
-.layer-panel-toolbar { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--panel-border, #2a2a3e); }
-.layer-panel-toolbar button { background: var(--panel-section-bg, #2a2a3e); border: 1px solid transparent; border-radius: 4px; color: var(--text-secondary, #ccc); cursor: pointer; font-size: 11px; padding: 3px 8px; }
-.layer-panel-toolbar button:hover { background: #3a3a4e; color: var(--text-primary, #e0e0e0); }
-.layer-panel-toolbar button.active { background: rgba(99,102,241,0.3); color: #6366f1; }
+.layer-panel-toolbar { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); }
+.layer-panel-toolbar button { background: var(--bg-surface); border: 1px solid transparent; border-radius: 4px; color: var(--text-secondary); cursor: pointer; font-size: 11px; padding: 3px 8px; }
+.layer-panel-toolbar button:hover { background: var(--bg-elevated); color: var(--text-primary); }
+.layer-panel-toolbar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.layer-panel-toolbar button.active { background: var(--accent-subtle); color: var(--accent-ink); }
 .layer-group { margin-bottom: 4px; }
-.layer-group.drop-target { outline: 2px solid #6366f1; outline-offset: -2px; border-radius: 4px; }
-.layer-group.drop-rejected { outline: 2px solid #f43f5e; outline-offset: -2px; border-radius: 4px; }
-.layer-group-header { display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: var(--panel-section-bg, #1e1e3a); border-radius: 4px; cursor: pointer; user-select: none; }
-.layer-group-header:hover { background: #282848; }
-.layer-group-title { flex: 1; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-primary, #e0e0e0); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.layer-group-count { color: var(--text-muted, #888); font-size: 10px; min-width: 16px; text-align: center; }
-.layer-collapse-chevron { color: var(--text-muted, #888); font-size: 10px; width: 14px; text-align: center; }
+.layer-group.drop-target { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
+.layer-group.drop-rejected { outline: 2px solid var(--destructive); outline-offset: -2px; border-radius: 4px; }
+.layer-group-header { display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: var(--bg-surface); border-radius: 4px; cursor: pointer; user-select: none; }
+.layer-group-header:hover { background: var(--bg-elevated); }
+.layer-group-title { flex: 1; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-group-count { color: var(--text-muted); font-size: 10px; min-width: 16px; text-align: center; }
+.layer-collapse-chevron { color: var(--text-muted); font-size: 10px; width: 14px; text-align: center; }
 .layer-group-pieces { padding-left: 8px; }
-.layer-piece-row { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 3px; cursor: pointer; color: var(--text-secondary, #ccc); border-top: 2px solid transparent; }
-.layer-piece-row:hover { background: rgba(99,102,241,0.1); }
-.layer-piece-row.selected { background: rgba(99,102,241,0.2); color: var(--text-primary, #e0e0e0); }
-.layer-piece-row.drag-over { border-top: 2px solid #6366f1; }
-.layer-piece-drag-handle { color: var(--text-muted, #888); cursor: grab; font-size: 10px; user-select: none; }
+.layer-piece-row { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 3px; cursor: pointer; color: var(--text-secondary); border-top: 2px solid transparent; }
+/* Al pasar sube de superficie; seleccionada se tiñe del acento. Son dos señales
+ * distintas — si las dos fueran tinte, la fila bajo el mouse se leería como
+ * seleccionada. Mismo criterio que .icon-btn / .icon-btn--active en base.css. */
+.layer-piece-row:hover { background: var(--bg-elevated); }
+.layer-piece-row.selected { background: var(--accent-subtle); color: var(--text-primary); }
+.layer-piece-row.drag-over { border-top: 2px solid var(--accent); }
+.layer-piece-drag-handle { color: var(--text-muted); cursor: grab; font-size: 10px; user-select: none; }
 .layer-piece-drag-handle:active { cursor: grabbing; }
 .layer-piece-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.layer-piece-sublayer { color: var(--text-muted, #888); font-size: 10px; }
-.layer-piece-fabric { color: var(--text-muted, #888); font-size: 10px; }
-.layer-icon-btn { background: none; border: none; cursor: pointer; padding: 2px; color: var(--text-muted, #888); font-size: 14px; line-height: 1; display: inline-flex; align-items: center; }
-.layer-icon-btn:hover { color: var(--text-primary, #e0e0e0); }
-.layer-icon-btn.active { color: #6366f1; }
-.layer-inline-rename { background: #2a2a3e; border: 1px solid #6366f1; border-radius: 3px; color: white; font-size: 11px; padding: 1px 4px; width: 100%; outline: none; }
+.layer-piece-sublayer { color: var(--text-muted); font-size: 10px; }
+.layer-piece-fabric { color: var(--text-muted); font-size: 10px; }
+.layer-icon-btn { background: none; border: none; cursor: pointer; padding: 2px; color: var(--text-muted); font-size: 14px; line-height: 1; display: inline-flex; align-items: center; }
+.layer-icon-btn:hover { color: var(--text-primary); }
+.layer-icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.layer-icon-btn.active { color: var(--accent-ink); }
+.layer-inline-rename { background: var(--bg-elevated); border: 1px solid var(--accent); border-radius: 3px; color: var(--text-primary); font-size: 11px; padding: 1px 4px; width: 100%; outline: none; }
 .layer-color-dot { width: 12px; height: 12px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0; }
-.layer-color-dot:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.3); }
-.layer-color-popover { position: absolute; background: #1e1e1e; border: 1px solid #3a3a3a; border-radius: 6px; padding: 6px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.4); top: 100%; left: 0; margin-top: 4px; }
+/* El anillo va sobre un color de DATO (el color de la capa, que lo elige la
+ * usuaria), así que la tinta clara del sistema es lo único que se ve encima de
+ * cualquiera de ellos: apagada al pasar, plena cuando está elegido. */
+.layer-color-dot:hover { box-shadow: 0 0 0 2px var(--text-muted); }
+.layer-color-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.layer-color-popover { position: absolute; background: var(--surface-overlay-bg); backdrop-filter: var(--surface-overlay-blur); -webkit-backdrop-filter: var(--surface-overlay-blur); border: var(--surface-overlay-border); border-radius: 6px; padding: 6px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; z-index: 100; box-shadow: var(--surface-overlay-shadow); top: 100%; left: 0; margin-top: 4px; }
 .layer-color-swatch { width: 20px; height: 20px; border-radius: 4px; border: 2px solid transparent; cursor: pointer; padding: 0; }
-.layer-color-swatch:hover { border-color: rgba(255,255,255,0.5); }
-.layer-color-swatch.active { border-color: white; }
-.layer-context-menu { position: fixed; background: #1e1e2e; border: 1px solid #3a3a4e; border-radius: 6px; padding: 4px 0; z-index: var(--z-context-menu); box-shadow: 0 4px 16px rgba(0,0,0,0.5); min-width: 140px; }
-.layer-context-menu button { display: block; width: 100%; background: none; border: none; color: var(--text-secondary, #ccc); font-size: 12px; padding: 6px 12px; text-align: left; cursor: pointer; }
-.layer-context-menu button:hover { background: rgba(99,102,241,0.15); color: var(--text-primary, #e0e0e0); }
-.layer-context-menu button:disabled { color: var(--text-muted, #555); cursor: not-allowed; }
+.layer-color-swatch:hover { border-color: var(--text-muted); }
+.layer-color-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.layer-color-swatch.active { border-color: var(--text-primary); }
+.layer-context-menu { position: fixed; background: var(--surface-overlay-bg); backdrop-filter: var(--surface-overlay-blur); -webkit-backdrop-filter: var(--surface-overlay-blur); border: var(--surface-overlay-border); border-radius: 6px; padding: 4px 0; z-index: var(--z-context-menu); box-shadow: var(--surface-overlay-shadow); min-width: 140px; }
+.layer-context-menu button { display: block; width: 100%; background: none; border: none; color: var(--text-secondary); font-size: 12px; padding: 6px 12px; text-align: left; cursor: pointer; }
+.layer-context-menu button:hover { background: var(--accent-subtle); color: var(--text-primary); }
+.layer-context-menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.layer-context-menu button:disabled { color: var(--text-dim); cursor: not-allowed; }
 .layer-context-menu button:disabled:hover { background: none; }
-.layer-empty { color: var(--text-muted, #888); padding: 16px; text-align: center; }
+.layer-empty { color: var(--text-muted); padding: 16px; text-align: center; }

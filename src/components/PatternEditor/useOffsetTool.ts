@@ -1,20 +1,11 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { addPiece, updatePiece } from '../../store/projectSlice';
+import { showErrorToast } from '../../store/copilotUISlice';
 import type { Point2D, PathCommand, PatternPiece } from '../../types/types';
 import { offsetPieceOutline } from '../../utils/patternOps';
 import { uid } from '../../utils/pathHelpers';
-
-export interface OffsetState {
-  previewOutline: PathCommand[] | null;
-  error: string | null;
-}
-
-const INITIAL_STATE: OffsetState = {
-  previewOutline: null,
-  error: null,
-};
 
 export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
   void zoom2D; void pan2D; // reserved for future distance-from-cursor preview
@@ -22,8 +13,6 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const toolOptions = useSelector((s: RootState) => s.tools.toolOptions);
-
-  const [state, setState] = useState<OffsetState>(INITIAL_STATE);
 
   /** Read current tool options */
   const getOptions = useCallback(() => {
@@ -53,16 +42,12 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
 
   /** Execute the offset operation */
   const execute = useCallback(() => {
-    if (selectedPieceIds.length !== 1) {
-      setState({ previewOutline: null, error: 'Select a single piece to offset' });
-      return;
-    }
+    // Sin una pieza seleccionada no hay nada que desplazar, y eso lo dice la
+    // tira ANTES del clic (`faltaSujeto`, #1117): un toast por clic sería ruido.
+    if (selectedPieceIds.length !== 1) return;
 
     const piece = pieces.find(p => p.id === selectedPieceIds[0]);
-    if (!piece) {
-      setState({ previewOutline: null, error: 'Selected piece not found' });
-      return;
-    }
+    if (!piece) return;
 
     const { distance, direction, joinType, replace } = getOptions();
 
@@ -76,7 +61,7 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
       const inward = createOffset(-distance);
 
       if (!outward && !inward) {
-        setState({ previewOutline: null, error: 'Offset collapsed the shape in both directions' });
+        dispatch(showErrorToast('El contorno se cerró sobre sí mismo en las dos direcciones. Prueba una distancia menor'));
         return;
       }
 
@@ -116,7 +101,7 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
       const result = createOffset(effectiveDistance);
 
       if (!result) {
-        setState({ previewOutline: null, error: 'Offset collapsed the shape — try a smaller distance' });
+        dispatch(showErrorToast('El contorno se cerró sobre sí mismo. Prueba una distancia menor'));
         return;
       }
 
@@ -137,15 +122,9 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
       }
     }
 
-    setState({ previewOutline: null, error: null });
   }, [selectedPieceIds, pieces, getOptions, dispatch]);
 
-  const reset = useCallback(() => {
-    setState(INITIAL_STATE);
-  }, []);
-
   const handleMouseDown = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     (_e: React.MouseEvent<SVGSVGElement>) => {
       // Click on a piece to select it (handled by useEditorInteractions select fallback)
     },
@@ -153,7 +132,6 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
   );
 
   const handleMouseMove = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     (_e: React.MouseEvent<SVGSVGElement>) => {
       // No mouse-move behavior — preview is computed from selection
     },
@@ -162,16 +140,18 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
 
   const handleMouseUp = useCallback(() => {}, []);
 
+  // Esta herramienta ya no guarda estado propio —el preview se deriva de la
+  // selección—, pero `useEditorInteractions` exige `reset` en la forma de toda
+  // herramienta 2D. ponytail: no-op hasta que esa forma se limpie.
+  const reset = useCallback(() => {}, []);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Enter' && canExecute) {
         execute();
       }
-      if (e.key === 'Escape') {
-        reset();
-      }
     },
-    [canExecute, execute, reset],
+    [canExecute, execute],
   );
 
   const getCursor = useCallback((): string => {
@@ -180,7 +160,6 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
 
   return {
     previewOutline,
-    error: state.error,
     canExecute,
     execute,
     handleMouseDown,

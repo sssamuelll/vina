@@ -138,7 +138,7 @@ export default function DynamicProviderForm({ provider, values, onChange, provid
                 href={meta.helpUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: 'var(--text-accent, var(--accent, #6366f1))' }}
+                style={{ color: 'var(--accent)' }}
               >
                 {meta.helpUrl.replace(/^https?:\/\//, '')}
               </a>
