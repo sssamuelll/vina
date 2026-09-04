@@ -184,7 +184,14 @@ const RULES = [
     key: 'outlineNone',
     label: 'outline:none',
     why: 'Quitarle el contorno a un control sin poner otra señal es una barrera de teclado.',
-    run: () => countMatches(cssFiles(), /outline:\s*none/),
+    // Mira TAMBIÉN los estilos en línea. Mirando solo CSS el censo daba un piso
+    // falso: `PieceRenderer.tsx:372` suprimía el contorno del campo de renombrar
+    // una pieza, sin ninguna otra señal, y no salía en la lista (revisión
+    // adversarial del 2026-09-05). R1, R3 y R8 ya recorrían `codeFiles()`.
+    run: () => [
+      ...countMatches(cssFiles(), /outline:\s*none/),
+      ...countMatches(codeFiles(), /outline:\s*['"`]none['"`]/),
+    ],
   },
   {
     id: 'R7',

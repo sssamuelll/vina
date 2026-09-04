@@ -300,7 +300,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
                       display: 'flex',
                       alignItems: 'baseline',
                       gap: 'var(--sp-1)',
-                      color: tc.status === 'error' ? 'var(--color-error, #f87171)' : 'var(--text-ghost)',
+                      color: tc.status === 'error' ? 'var(--color-error)' : 'var(--text-ghost)',
                     }}
                   >
                     <span style={{ flexShrink: 0 }}>
@@ -339,7 +339,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
           {agenticHook.toolCalls.map((tc, i) => (
             <div key={i} style={{
               fontSize: 'var(--text-xs)',
-              color: tc.status === 'error' ? 'var(--color-error, #f87171)' : 'var(--text-ghost)',
+              color: tc.status === 'error' ? 'var(--color-error)' : 'var(--text-ghost)',
               display: 'flex',
               alignItems: 'center',
               gap: 'var(--sp-1)',

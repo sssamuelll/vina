@@ -15,7 +15,24 @@
   background: rgba(74, 158, 255, 0.12);
   border: 1px solid rgba(74, 158, 255, 0.3);
   border-radius: 5px;
-  color: var(--accent, #4a9eff);
+  /* OJO: este panel NO SE VE. Medido el 2026-09-05 a 1366x768, se pinta en
+   * y=768 con la ventana en 768 — es el último hijo en flujo normal de
+   * `.pattern-editor` (width/height 100%, overflow hidden) y el hermano que va
+   * antes es el <svg> a 100%x100%, así que empieza justo donde el padre acaba
+   * y el overflow se lo come. Es una violación de la ley de puertas del
+   * contrato (§ 6) anterior a este cambio, y emplazarlo es una decisión de
+   * dónde va, no un arreglo de CSS: va con el spec del dueño del emplazamiento
+   * (docs/superpowers/specs/2026-09-05-dueno-del-emplazamiento-2d-design.md).
+   *
+   * El respaldo que había aquí (#4a9eff) estaba muerto: tokens.css entra global
+   * y --accent resolvía siempre. Sobre el tinte propio del chip
+   * —rgba(74,158,255,.12) compuesto sobre la superficie— los valores REALES son
+   * --accent 2,74-3,51:1 y --accent-ink 4,10-5,26:1 según lo que haya detrás.
+   * O sea que --accent-ink cumple AA sobre --bg-primary y --panel-bg pero NO
+   * sobre --bg-elevated (4,10:1). Se deja --accent-ink porque es el mejor de
+   * los tres y el panel hoy no se pinta; cuando se emplace hay que fijar la
+   * superficie de debajo y volver a medir, no heredar este número. */
+  color: var(--accent-ink);
   font-size: 11px;
   cursor: pointer;
   transition: background 0.12s;
@@ -97,7 +114,7 @@
 }
 
 .ref-img-btn.active {
-  color: var(--accent, #4a9eff);
+  color: var(--accent-ink);
 }
 
 .ref-img-btn-calibrate:hover {
@@ -122,7 +139,7 @@
   flex: 1;
   min-width: 0;
   height: 2px;
-  accent-color: var(--accent, #4a9eff);
+  accent-color: var(--accent);
   cursor: pointer;
 }
 

@@ -34,7 +34,7 @@ const cardStyle: React.CSSProperties = {
 };
 
 const cardActiveStyle: React.CSSProperties = {
-  borderColor: 'var(--accent, #6366f1)',
+  borderColor: 'var(--accent)',
   background: 'rgba(99, 102, 241, 0.08)',
 };
 
@@ -62,7 +62,7 @@ const subLabelStyle: React.CSSProperties = {
 const badgeStyle: React.CSSProperties = {
   fontSize: 10,
   color: 'white',
-  background: 'var(--accent, #6366f1)',
+  background: 'var(--accent)',
   padding: '2px 8px',
   borderRadius: 999,
   fontWeight: 700,
@@ -101,7 +101,7 @@ const toggleKnobStyle = (enabled: boolean): React.CSSProperties => ({
   width: 16,
   height: 16,
   borderRadius: '50%',
-  background: enabled ? 'var(--accent, #6366f1)' : 'var(--text-muted)',
+  background: enabled ? 'var(--accent)' : 'var(--text-muted)',
   transition: 'left 0.15s ease, background 0.15s ease',
 });
 
@@ -157,7 +157,7 @@ export default function ConnectionCard({
             <span
               style={{
                 ...badgeStyle,
-                background: 'var(--color-warning, #ca8a04)',
+                background: 'var(--color-warning)',
               }}
             >
               Sin clave
@@ -174,7 +174,7 @@ export default function ConnectionCard({
       </button>
       <button
         type="button"
-        style={{ ...iconBtnStyle, color: 'var(--color-error, #f87171)' }}
+        style={{ ...iconBtnStyle, color: 'var(--color-error)' }}
         onClick={onDelete}
         aria-label="Eliminar"
       >

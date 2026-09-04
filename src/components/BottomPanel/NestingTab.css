@@ -59,7 +59,7 @@
 
 .nesting-toolbar label {
   font-size: 11px;
-  color: var(--text-muted, #999);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -88,7 +88,7 @@
 
 .nesting-toolbar .nesting-unit-suffix {
   font-size: 11px;
-  color: var(--text-muted, #999);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -103,7 +103,7 @@
 
 .nesting-stat {
   font-size: 11px;
-  color: var(--text-muted, #999);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -132,7 +132,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted, #999);
+  color: var(--text-muted);
   height: 100%;
   padding: 20px;
   text-align: center;
