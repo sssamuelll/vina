@@ -245,16 +245,6 @@ async function installFrozenNetworkSnapshot() {
 
   await context.route(`${ORIGIN}/**`, async (route) => {
     const request = route.request();
-    const marca = `${request.method()} ${request.resourceType()} ${request.url()}`;
-    DIAG_PENDIENTES.set(marca, Date.now());
-    try {
-      await manejarRuta(route, request);
-    } finally {
-      DIAG_PENDIENTES.delete(marca);
-    }
-  });
-
-  async function manejarRuta(route, request) {
     if (request.method() !== 'GET') {
       await route.continue();
       return;
@@ -288,21 +278,11 @@ async function installFrozenNetworkSnapshot() {
     networkSnapshot.respuestasTotales = frozenResponses.size;
     networkSnapshot.bytesTotales += body.byteLength;
     await route.fulfill(entry);
-  }
+  });
 }
-
-const DIAG_PENDIENTES = new Map();
-setInterval(() => {
-  const ahora = Date.now();
-  const viejos = [...DIAG_PENDIENTES.entries()].filter(([, t]) => ahora - t > 10_000);
-  if (viejos.length === 0) return;
-  console.log(`DIAG pendientes (${viejos.length}) en "${activeStateName}":`);
-  for (const [marca, t] of viejos.slice(0, 10)) console.log(`  ${Math.round((ahora - t) / 1000)}s  ${marca}`);
-}, 15_000).unref();
 
 function attachPageDiagnostics(targetPage) {
   targetPage.on('pageerror', (error) => {
-    console.log(`DIAG pageerror [${activeStateName}]: ${error.message.split('\n')[0]}`);
     runtimeEvents.push({
       estado: activeStateName,
       tipo: 'pageerror',
@@ -312,7 +292,6 @@ function attachPageDiagnostics(targetPage) {
   });
   targetPage.on('console', (message) => {
     if (message.type() !== 'error') return;
-    console.log(`DIAG console.error [${activeStateName}]: ${message.text().slice(0, 200)}`);
     runtimeEvents.push({
       estado: activeStateName,
       tipo: 'console.error',

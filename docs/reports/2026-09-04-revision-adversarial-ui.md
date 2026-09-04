@@ -365,3 +365,49 @@ Coincido con Plumb en el tamaño y con Petra en la dirección, y los junto así:
 | Ningún test mide la fila | `grep -rln fila-de-capas tests/e2e` (vacío); `grep -c "getBoundingClientRect\|elementFromPoint" FilaDeCapas.test.tsx` (0) | § 2 F12 |
 | Issues abiertos sin commit que los toque | `gh issue list` cruzado con `git log --grep="#N"` para #1092-#1136: sin commit #1102, #1103, #1104, #1108, #1111, #1115, #1117, #1122, #1124, #1125, #1126, #1135, #1136; con commit pero abiertos (verificar antes de tocar): #1092-#1099, #1105, #1106, #1110, #1132 | § 4, § 7 |
 | El badge Solver solo en dev | `SolverMetrics.tsx:36` | § 2 |
+
+---
+
+## 11. Qué se arregló, el mismo día
+
+Commit `28455c04` en `fix/revision-ui-2026-09-04`. 47 archivos, +3137 −373. Los tests se escribieron **primero y en rojo**, con sus hashes congelados antes de implementar; la implementación fue de nueve lotes en paralelo con archivos disjuntos, cada uno con una revisión adversarial encima.
+
+| Hallazgo | Estado | Cómo se cerró |
+|---|---|---|
+| **F1 · F2** fila de capas ↔ barra ↔ pista | **arreglado** | La fila reserva la franja de la barra con `--band-bar`, el token que ahora comparten los tres sitios que ya calculaban ese 94 a mano (`floating.css`, `SnapshotBar.css`, `FilaDeCapas.css`). e2e a 1366×643, 1280×720 y 1366×768 |
+| **F3** submenú Vista fuera de pantalla | **arreglado** | Pasa por el patrón de desborde de #1095: `computeScrollFade`, contenedor con scroll y la señal de "hay más". El e2e exige además que la página no desborde |
+| **F4** chips de cota que se pisan | **arreglado** | Pasada de colisión en `separarChips`, generalizando el `pairOffset` que ya existía. Cada chip se desliza por su línea; el de margen, que no tiene línea, por la perpendicular de su normal — o sea a lo largo del borde que mide |
+| **F5** contraste de las cotas | **arreglado** | Nace `--accent-2d-fuerte` (mismo tono, 5,04:1 con blanco). `--accent-2d` no se toca: es el azul aprobado con mockups |
+| **F6** rótulos de la regla | **arreglado** | El paso del rótulo escala por la escalera 1-2-5. La marca larga se queda donde estaba; solo se ralea el número. Barrido de 30 780 combinaciones: hueco mínimo 2,00 px → 44,30 px |
+| **F7** siete teclas muertas | **arreglado** | Salen de `DEFAULT_SHORTCUTS` a `ATAJOS_2D_SIN_GESTO` con su tecla reservada. El e2e que certificaba la activación del modo inerte ahora afirma lo contrario |
+| **F8** Escape de Slash & Spread | **arreglado** | Su `handlers.push`, más un test que exige que dependencias y registros cuadren en los dos sentidos |
+| **F9** tira alcanzable bajo el modal (#1125) | **arreglado** | `inert` en la tira mientras el modal está abierto. El z-index NO se tocó |
+| **F10** roles de capa de tira y fila | **declarado, no arreglado** | Sin colisión ya no hay síntoma, y mover un rol de la escala sin decisión escrita es la premisa falsa del 15-08 otra vez. Sí se cerró el `25` literal de `SurfaceModePill.css` |
+| **F11** cuatro azules y el material 3D | **arreglado** | Un solo azul de estado; lo que codifica dato (escala del mapa de tensión, leyenda de ajuste, familia de los anclajes 3D) queda intacto y con test que lo protege |
+| **F12** ninguna prueba medía la posición | **arreglado** | Dos suites e2e nuevas (13 casos) que miden con `elementFromPoint` en el viewport de María |
+| **Supr A · B · C** (#1115) | **arreglado** | `resolverBorrado` decide una vez y la usan las dos puertas. La línea interna se borra a sí misma, el candado protege, y el menú obedece la regla de #1094 |
+| **G** silencio sin sujeto (#1117) | **arreglado** | Las cuatro herramientas que toman el sujeto de la selección lo dicen en la tira antes del clic. Mueren tres cadenas de error en inglés que nadie pintaba |
+| **K** deuda de tokens | **arreglado en su 80 %** | R1 142→25, R2 50→**0**, R3 941→711, R5 64→39, R8 26→24. Techo nuevo fijado |
+| **N** censo vivo | **arreglado** | 90 s de espera en los dos `goto` y la fecha de salida por argumento, para que no vuelva a pisar la evidencia del 14-08 |
+
+### 11.1 Lo que la revisión adversarial encontró encima
+
+Los nueve revisores no fueron decorativos. Lo que cazaron y se arregló después:
+
+- **Una regresión de contraste que el arreglo mismo introdujo.** Al pasar literales a tokens, seis sitios que pintaban texto con un azul claro quedaron en `var(--accent)`: de ~5,0:1 a ~4,1:1 sobre el cromo, **cruzando AA de cumplir a no cumplir**. El trinquete no lo ve porque cuenta literales, no mide contraste. De ahí sale `--accent-ink` y un test que fija el contraste de los tres roles del acento.
+- **Dos realces invisibles**: el `:hover` de la equis de una captura y el del botón de un cuerpo de colisión se pintaban con el mismo token que el fondo sobre el que caen.
+- **Un escape más ancho que la tecla.** El oyente crudo de teclado del visor 3D se salta el registro de atajos y su filtro de contexto: en modo 2D, `W` cambiaba la herramienta 3D en silencio, y `Shift+A`, `Shift+F` y `F10` hacían lo suyo. Quitar la mitad 2D de `w` habría dejado la causa. Ahora el oyente comprueba el modo.
+- **Que "deslizar por la tangente" no aplicaba al único par que de verdad convive**, el del margen, porque su cota tiene `a === b` y no dibuja hilo.
+
+### 11.2 Qué NO se hizo, y por qué
+
+- **Las tres unificaciones grandes** (seis campos de selección, once hit-tests, cuatro superficies para escribir un número). Plumb las midió en L y con 3+ decisiones de diseño cada una; el informe de la mañana ya decía que se disuelven a medida que el sujeto activo y el resolutor único les quitan lectores, no como proyecto. Siguen siendo el spec de la tanda 6.
+- **Los dos specs cortos** (el dueño del emplazamiento; el "no pasó nada" para las 19 herramientas). Lo que entró es la mitad acotada de cada uno: el token compartido de la franja, y las cuatro herramientas que de verdad piden selección.
+- **Renombrar "Slash & Spread"**. Es el nombre con el que la herramienta está rotulada en el dock, la tira y la paleta. Escribir otro en la pista rompería la ley de un-término-por-concepto, que es peor. El nombre en inglés es deuda real y anterior, de toda la herramienta, y se arregla en su registro.
+- **Las siete herramientas sin gesto.** Cuáles nacen y cuáles mueren es decisión de producto. Lo que se quitó es la trampa; el círculo (#1111) es el primero de la cola y su tecla lo espera.
+
+### 11.3 Gates
+
+`npx tsc -b --noEmit` limpio · **7742 unitarios en verde** · **65 e2e en Chromium** sobre las once suites afectadas · `eslint --max-warnings=0` sin nada en lo tocado · trinquete sin subidas, con el techo nuevo fijado.
+
+Un rojo preexistente, verificado contra `main` sin tocar y por tanto ajeno a este cambio: `maria-198-resize-con-ancla` › "agranda solo hacia el este".
