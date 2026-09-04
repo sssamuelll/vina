@@ -3,9 +3,15 @@
 /**
  * Auditoría mecánica de superficies de UI de Vina.
  *
- * Uso:
- *   node scripts/ui-surface-audit.mjs
- *   VINA_URL=http://localhost:5173 node scripts/ui-surface-audit.mjs
+ * Uso (la fecha es obligatoria; no hay valor por defecto):
+ *   node scripts/ui-surface-audit.mjs --fecha=2026-09-04
+ *   VINA_AUDIT_DATE=2026-09-04 node scripts/ui-surface-audit.mjs
+ *   VINA_URL=http://localhost:5174 node scripts/ui-surface-audit.mjs --fecha=2026-09-04
+ *
+ * La salida va a docs/reports/ui-audit-<fecha> y esa carpeta se BORRA antes de
+ * empezar. Por eso la fecha se pide de fuera en vez de leerla del reloj: con la
+ * fecha de hoy por defecto, dos corridas del mismo día se pisarían igual y el
+ * destino dejaría de ser reproducible.
  *
  * Política de storage:
  * - Chromium corre en un BrowserContext efímero, aislado del perfil del usuario.
@@ -28,7 +34,33 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
-const AUDIT_DATE = '2026-08-14';
+function resolveAuditDate() {
+  const flag = '--fecha=';
+  const fromArgv = process.argv.slice(2).find((arg) => arg.startsWith(flag))?.slice(flag.length);
+  const raw = (fromArgv ?? process.env.VINA_AUDIT_DATE ?? '').trim();
+  const fail = (detalle) => {
+    console.error(
+      `${detalle}\n`
+      + 'Pásala como argumento o por entorno:\n'
+      + '  node scripts/ui-surface-audit.mjs --fecha=YYYY-MM-DD\n'
+      + '  VINA_AUDIT_DATE=YYYY-MM-DD node scripts/ui-surface-audit.mjs\n'
+      + 'No hay fecha por defecto a propósito: el censo borra docs/reports/ui-audit-<fecha> '
+      + 'antes de escribir, y tomarla del reloj pisaría la corrida anterior del mismo día.',
+    );
+    process.exit(1);
+  };
+  if (!raw) fail('Falta la fecha del censo.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) fail(`Fecha del censo con formato inválido: ${raw}`);
+  // Descarta un 2026-13-01 o un 2026-02-31, que pasarían el patrón y crearían
+  // una carpeta que nadie va a volver a encontrar.
+  const asDate = new Date(`${raw}T00:00:00Z`);
+  if (Number.isNaN(asDate.getTime()) || !asDate.toISOString().startsWith(raw)) {
+    fail(`Fecha del censo inexistente: ${raw}`);
+  }
+  return raw;
+}
+
+const AUDIT_DATE = resolveAuditDate();
 const OUTPUT_DIR = path.resolve(REPO_ROOT, 'docs', 'reports', `ui-audit-${AUDIT_DATE}`);
 const FIXTURE = path.resolve(REPO_ROOT, 'tests', 'fixtures', 'garments', 'maria_patrones_samuel_2M.dxf');
 const DEFAULT_VIEWPORT = { width: 1600, height: 1000 };
@@ -213,6 +245,16 @@ async function installFrozenNetworkSnapshot() {
 
   await context.route(`${ORIGIN}/**`, async (route) => {
     const request = route.request();
+    const marca = `${request.method()} ${request.resourceType()} ${request.url()}`;
+    DIAG_PENDIENTES.set(marca, Date.now());
+    try {
+      await manejarRuta(route, request);
+    } finally {
+      DIAG_PENDIENTES.delete(marca);
+    }
+  });
+
+  async function manejarRuta(route, request) {
     if (request.method() !== 'GET') {
       await route.continue();
       return;
@@ -246,11 +288,21 @@ async function installFrozenNetworkSnapshot() {
     networkSnapshot.respuestasTotales = frozenResponses.size;
     networkSnapshot.bytesTotales += body.byteLength;
     await route.fulfill(entry);
-  });
+  }
 }
+
+const DIAG_PENDIENTES = new Map();
+setInterval(() => {
+  const ahora = Date.now();
+  const viejos = [...DIAG_PENDIENTES.entries()].filter(([, t]) => ahora - t > 10_000);
+  if (viejos.length === 0) return;
+  console.log(`DIAG pendientes (${viejos.length}) en "${activeStateName}":`);
+  for (const [marca, t] of viejos.slice(0, 10)) console.log(`  ${Math.round((ahora - t) / 1000)}s  ${marca}`);
+}, 15_000).unref();
 
 function attachPageDiagnostics(targetPage) {
   targetPage.on('pageerror', (error) => {
+    console.log(`DIAG pageerror [${activeStateName}]: ${error.message.split('\n')[0]}`);
     runtimeEvents.push({
       estado: activeStateName,
       tipo: 'pageerror',
@@ -260,6 +312,7 @@ function attachPageDiagnostics(targetPage) {
   });
   targetPage.on('console', (message) => {
     if (message.type() !== 'error') return;
+    console.log(`DIAG console.error [${activeStateName}]: ${message.text().slice(0, 200)}`);
     runtimeEvents.push({
       estado: activeStateName,
       tipo: 'console.error',
@@ -391,7 +444,10 @@ async function clickViewMode(label) {
 async function prepareEmptyBase(viewport = DEFAULT_VIEWPORT) {
   await ensurePage();
   await page.setViewportSize(viewport);
-  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+  // 90 s por la misma razón que la espera de `.app-shell` en waitForApp: con Vite
+  // frío, el grafo transformado tarda más que los 30 s por defecto. Si cambias uno,
+  // cambia el otro.
+  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 90_000 });
   await waitForApp(0);
   await dismissToasts();
   await settleUI();
@@ -400,7 +456,8 @@ async function prepareEmptyBase(viewport = DEFAULT_VIEWPORT) {
 async function prepareLoadedBase(viewport = DEFAULT_VIEWPORT) {
   await ensurePage();
   await page.setViewportSize(viewport);
-  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+  // Mismo 90 s que prepareEmptyBase y que waitForApp (ver el comentario de ambas).
+  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 90_000 });
   await waitForApp(EXPECTED_PIECES);
   await clickViewMode('Split');
   await dismissToasts();

@@ -150,7 +150,8 @@ test.describe('Select Tool', () => {
 test.describe('Tool keyboard shortcuts', () => {
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
-  // shortcuts ↔ tool ids defined in src/tools/definitions/*.tsx
+  // El enlace tecla ↔ id de herramienta vive en src/shortcuts/defaults.ts (el
+  // campo `shortcut` de src/tools/definitions/*.tsx no lo lee nadie).
   // seam pasó de 'b' a 'n' (#1028, paridad CLO3D); las dos herramientas que
   // absorbió (tramos parciales por clic-clic-Enter, coser sin snap de borde)
   // se retiraron del todo en la Tarea 7 (#1029) — ya no existen como tool.
@@ -158,8 +159,6 @@ test.describe('Tool keyboard shortcuts', () => {
     ['z', 'select'],
     ['h', 'pen'],
     ['s', 'rectangle'],
-    ['e', 'circle'],
-    ['d', 'dart'],
     ['n', 'seam'],
     ['m', 'measure'],
     ['x', 'scissors'],
@@ -169,6 +168,23 @@ test.describe('Tool keyboard shortcuts', () => {
     test(`pressing '${key}' activates ${toolId} tool`, async ({ page }) => {
       await page.keyboard.press(key);
       expect(await getActiveTool2D(page)).toBe(toolId);
+    });
+  }
+
+  // Antes este bloque afirmaba que 'e' activaba circle y 'd' activaba dart, y
+  // pasaba: la activación ocurría de verdad. Lo que no ocurría era nada más.
+  // Hallazgo F7 de la revisión adversarial del 2026-09-04: siete teclas del
+  // lienzo metían a María en un modo inerte —la tira le dibujaba la cabina, el
+  // cursor se ponía en cruz, y ningún clic hacía nada— porque el despachador
+  // (src/components/PatternEditor/useEditorInteractions.ts) no conduce esos
+  // ids. El test certificaba el bug como si fuera la promesa. Ahora afirma lo
+  // contrario. Las teclas quedan reservadas en ATAJOS_2D_SIN_GESTO
+  // (src/shortcuts/defaults.ts) y vuelven cuando la herramienta exista.
+  for (const [key, toolId] of [['e', 'circle'], ['d', 'dart']] as const) {
+    test(`pressing '${key}' no activa ${toolId}: la herramienta no existe (F7)`, async ({ page }) => {
+      const antes = await getActiveTool2D(page);
+      await page.keyboard.press(key);
+      expect(await getActiveTool2D(page)).toBe(antes);
     });
   }
 });

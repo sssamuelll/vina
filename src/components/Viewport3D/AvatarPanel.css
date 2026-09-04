@@ -1,4 +1,9 @@
 /* AvatarPanel — sidebar that pushes the 3D viewport horizontally instead of overlaying. */
+/* Deuda de tokens cerrada el 2026-09-04: este archivo llamaba a --border-color y
+ * --bg-hover, dos nombres que no existen en ningun sitio, y pintaba el resto con
+ * rgba(255,255,255,.) a ojo. Ahora consume el sistema: reposo --bg-surface,
+ * hover --bg-elevated, y el relleno activo con --accent-fuerte, que es el paso
+ * del acento que aguanta texto blanco encima. */
 .avatar-panel-wrapper {
   flex-shrink: 0;
   overflow: hidden;
@@ -15,9 +20,9 @@
 .avatar-panel {
   width: 260px;
   height: 100%;
-  background: var(--bg-secondary, #1e1e1e);
-  border-left: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  color: var(--text-primary, #ccc);
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border);
+  color: var(--text-primary);
   font-size: 12px;
   display: flex;
   flex-direction: column;
@@ -28,7 +33,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -36,7 +41,7 @@
   margin: 0;
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-primary, #ddd);
+  color: var(--text-primary);
 }
 
 .avatar-panel-close {
@@ -44,7 +49,7 @@
   height: 24px;
   border: none;
   background: none;
-  color: var(--text-secondary, #999);
+  color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -54,8 +59,13 @@
 }
 
 .avatar-panel-close:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.avatar-panel-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .avatar-panel-scroll {
@@ -66,7 +76,7 @@
 
 /* Sections */
 .ap-section {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border);
 }
 
 .ap-section-header {
@@ -77,7 +87,7 @@
   padding: 8px 12px;
   border: none;
   background: none;
-  color: var(--text-primary, #ccc);
+  color: var(--text-primary);
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
@@ -85,7 +95,12 @@
 }
 
 .ap-section-header:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-elevated);
+}
+
+.ap-section-header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .ap-chevron {
@@ -107,11 +122,11 @@
 
 /* GLB loader */
 .ap-dropzone {
-  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border: 1px dashed var(--border);
   border-radius: 6px;
   padding: 12px;
   text-align: center;
-  color: var(--text-secondary, #999);
+  color: var(--text-secondary);
   font-size: 11px;
   cursor: pointer;
   transition: border-color 0.15s;
@@ -119,8 +134,8 @@
 
 .ap-dropzone:hover,
 .ap-dropzone.dragover {
-  border-color: var(--accent, #007acc);
-  color: var(--accent, #007acc);
+  border-color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .ap-model-info {
@@ -128,17 +143,17 @@
   align-items: center;
   justify-content: space-between;
   font-size: 11px;
-  color: var(--text-secondary, #999);
+  color: var(--text-secondary);
 }
 
 /* Shared controls */
 .ap-select {
   width: 100%;
   padding: 4px 6px;
-  border: 1px solid var(--border-color, #444);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--bg-secondary, #2a2a2a);
-  color: var(--text-primary, #ccc);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   font-size: 11px;
 }
 
@@ -150,17 +165,19 @@
 .ap-btn {
   flex: 1;
   padding: 4px 8px;
-  border: 1px solid var(--border-color, #444);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--bg-secondary, #2a2a2a);
-  color: var(--text-primary, #ccc);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 11px;
 }
 
 .ap-btn:hover {
-  background: var(--bg-hover, #333);
+  background: var(--bg-elevated);
 }
+
+.ap-btn:focus-visible, .ap-btn.accent:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .ap-btn:disabled {
   opacity: 0.4;
@@ -168,9 +185,9 @@
 }
 
 .ap-btn.accent {
-  background: var(--accent, #007acc);
-  border-color: var(--accent, #007acc);
-  color: #fff;
+  background: var(--accent-fuerte);
+  border-color: var(--accent-fuerte);
+  color: var(--on-accent);
 }
 
 .ap-btn.accent:hover {
@@ -180,7 +197,7 @@
 /* Mode toggle */
 .ap-mode-toggle {
   display: flex;
-  border: 1px solid var(--border-color, #444);
+  border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -189,15 +206,15 @@
   flex: 1;
   padding: 4px 0;
   border: none;
-  background: var(--bg-secondary, #2a2a2a);
-  color: var(--text-secondary, #999);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
   font-size: 11px;
   cursor: pointer;
 }
 
 .ap-mode-toggle button.active {
-  background: var(--accent, #007acc);
-  color: #fff;
+  background: var(--accent-fuerte);
+  color: var(--on-accent);
 }
 
 /* Slider rows */
@@ -211,7 +228,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  color: var(--text-secondary, #999);
+  color: var(--text-secondary);
 }
 
 .ap-slider-control {
@@ -225,7 +242,7 @@
   height: 4px;
   -webkit-appearance: none;
   appearance: none;
-  background: var(--border-color, #444);
+  background: var(--border);
   border-radius: 2px;
   outline: none;
 }
@@ -235,17 +252,17 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--accent, #007acc);
+  background: var(--accent);
   cursor: pointer;
 }
 
 .ap-slider-control input[type="number"] {
   width: 46px;
   padding: 2px 4px;
-  border: 1px solid var(--border-color, #444);
+  border: 1px solid var(--border);
   border-radius: 3px;
-  background: var(--bg-secondary, #2a2a2a);
-  color: var(--text-primary, #ccc);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   font-size: 10px;
   text-align: right;
 }
@@ -259,22 +276,27 @@
 
 .ap-preset-btn {
   padding: 4px 8px;
-  border: 1px solid var(--border-color, #444);
+  border: 1px solid var(--border);
   border-radius: 3px;
-  background: var(--bg-secondary, #2a2a2a);
-  color: var(--text-primary, #ccc);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 11px;
 }
 
 .ap-preset-btn.active {
-  background: var(--accent, #007acc);
-  color: #fff;
-  border-color: var(--accent, #007acc);
+  background: var(--accent-fuerte);
+  color: var(--on-accent);
+  border-color: var(--accent-fuerte);
 }
 
 .ap-preset-btn:hover {
-  background: var(--bg-hover, #333);
+  background: var(--bg-elevated);
+}
+
+.ap-preset-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Joint detail */
@@ -287,7 +309,7 @@
 
 .ap-hint {
   font-size: 11px;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -301,45 +323,54 @@
 .ap-joint-axis label {
   width: 12px;
   font-weight: 600;
-  color: var(--text-secondary, #999);
+  color: var(--text-secondary);
   font-size: 10px;
 }
 
 .ap-joint-axis span {
   width: 36px;
   text-align: right;
-  color: var(--text-secondary, #999);
+  color: var(--text-secondary);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
 
 /* Toggle button in viewport */
+/* Flota de verdad sobre el visor y se va: es el material `overlay` del contrato
+ * de interfaz. En reposo usa la variante hundida y sube al material pleno al
+ * pasar el mouse. */
 .viewport3d-avatar-toggle {
   position: absolute;
   top: 8px;
   right: 108px;
   z-index: 10;
   padding: 6px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: var(--surface-overlay-border);
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
-  backdrop-filter: blur(8px);
-  background: rgba(0, 0, 0, 0.5);
-  color: #ccc;
+  backdrop-filter: var(--surface-overlay-blur);
+  -webkit-backdrop-filter: var(--surface-overlay-blur);
+  background: var(--surface-overlay-bg-recessed);
+  color: var(--text-secondary);
 }
 
 .viewport3d-avatar-toggle:hover {
-  background: rgba(0, 0, 0, 0.7);
-  color: #fff;
+  background: var(--surface-overlay-bg);
+  color: var(--text-primary);
+}
+
+.viewport3d-avatar-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .viewport3d-avatar-toggle.active {
-  background: rgba(68, 136, 255, 0.3);
-  color: #6aafff;
-  border-color: rgba(68, 136, 255, 0.4);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+  border-color: var(--accent-border);
 }
 
 /* IK/FK Toggle */
@@ -347,20 +378,24 @@
   flex: none;
   padding: 4px 12px;
   border-radius: 4px;
-  border: 1px solid var(--border-color, #444);
-  background: var(--bg-secondary, #2a2a2a);
-  color: #ccc;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 11px;
   font-family: var(--font-sans);
 }
 .ik-toggle-btn:hover {
-  background: var(--bg-hover, #333);
+  background: var(--bg-elevated);
+}
+.ik-toggle-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .ik-toggle-btn.active {
-  background: rgba(74, 158, 255, 0.2);
-  color: #4a9eff;
-  border-color: rgba(74, 158, 255, 0.4);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+  border-color: var(--accent-border);
 }
 
 /* Saved poses */

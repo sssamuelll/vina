@@ -6,8 +6,10 @@
 .floating-3d--bottom-left {
   /* Por encima del UnifiedBar en su posición default (58px alto + 24px de
      offset, barPosition.ts) — a bottom:12 quedaba recortado DETRÁS del bar
-     (Fase1-S3). Si el usuario arrastra el bar, ese es su layout. */
-  bottom: 94px;
+     (Fase1-S3). Si el usuario arrastra el bar, ese es su layout. El número
+     ahora sale del token `--band-bar`, compartido con la barra de instantáneas
+     y la fila de capas del lienzo 2D. */
+  bottom: var(--band-bar);
   left: var(--sp-3);
   display: flex;
   align-items: center;
@@ -163,6 +165,14 @@
   z-index: calc(var(--z-menu) + 10);
 }
 
+.logo-menu__submenu-scroll {
+  /* El marco queda quieto; solo el contenido viaja bajo los chevrones, igual
+     que en el menú contextual del lienzo. El `max-height` lo pone LogoMenu.tsx
+     medido: el submenú cuelga del ítem que lo abrió y CSS no sabe a qué altura
+     de la pantalla quedó. */
+  overflow-y: auto;
+}
+
 /* ─── Canvas context menu (right-click, 2D editor) ───
    Same glass language as the logo menu — it used to be a flat VSCode-dark
    one-off (#1e1e1e) that clashed with every other floating surface. */
@@ -246,7 +256,8 @@
   background: rgba(99, 102, 241, 0.08);
   margin: 4px 10px;
 }
-.context-menu__fade {
+.context-menu__fade,
+.logo-menu__fade {
   position: absolute;
   left: 0;
   right: 0;
@@ -257,19 +268,22 @@
   justify-content: center;
   border-radius: inherit;
 }
-.context-menu__fade--bottom {
+.context-menu__fade--bottom,
+.logo-menu__fade--bottom {
   bottom: 0;
   background: linear-gradient(to bottom, transparent, var(--surface-overlay-bg));
   align-items: flex-end;
   padding-bottom: 4px;
 }
-.context-menu__fade--top {
+.context-menu__fade--top,
+.logo-menu__fade--top {
   top: 0;
   background: linear-gradient(to top, transparent, var(--surface-overlay-bg));
   align-items: flex-start;
   padding-top: 4px;
 }
-.context-menu__fade-chevron {
+.context-menu__fade-chevron,
+.logo-menu__fade-chevron {
   width: 18px;
   height: 18px;
   display: flex;

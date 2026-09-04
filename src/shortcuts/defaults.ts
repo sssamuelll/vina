@@ -37,28 +37,23 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'tool.select', key: 'z', label: 'Seleccionar', category: '2D Tools', context: '2d' },
   { id: 'tool.editPattern', key: 'q', label: 'Editar patrón', category: '2D Tools', context: '2d' },
   { id: 'tool.editCurve', key: 'v', label: 'Editar punto de curva', category: '2D Tools', context: '2d' },
-  { id: 'tool.editConstrain', key: 'c', label: 'Editar curvatura', category: '2D Tools', context: '2d' },
   { id: 'tool.pen', key: 'h', label: 'Pluma', category: '2D Tools', context: '2d' },
   { id: 'tool.rectangle', key: 's', label: 'Rectángulo', category: '2D Tools', context: '2d' },
-  { id: 'tool.circle', key: 'e', label: 'Elipse (círculo)', category: '2D Tools', context: '2d' },
   { id: 'tool.internalShape', key: 'g', label: 'Línea interna', category: '2D Tools', context: '2d' },
-  { id: 'tool.trace', key: 'i', label: 'Trazar', category: '2D Tools', context: '2d' },
-  { id: 'tool.dart', key: 'd', label: 'Pinza', category: '2D Tools', context: '2d' },
   { id: 'tool.scissors', key: 'x', label: 'Tijeras', category: '2D Tools', context: '2d' },
-  { id: 'tool.pin', key: 'w', label: 'Fijar', category: '2D Tools', context: '2d' },
   { id: 'tool.measure', key: 'm', label: 'Medir', category: '2D Tools', context: '2d' },
   { id: 'tool.walkSeam', key: 'm', shift: true, label: 'Recorrer costura', category: '2D Tools', context: '2d' },
   { id: 'tool.merge', key: 'j', label: 'Unir patrones', category: '2D Tools', context: '2d' },
-  { id: 'tool.topstitchEdit', key: 't', label: 'Editar pespunte', category: '2D Tools', context: '2d' },
   { id: 'tool.topstitchSegment', key: 'k', label: 'Pespunte por tramo', category: '2D Tools', context: '2d' },
   { id: 'tool.topstitchFree', key: 'l', label: 'Pespunte libre', category: '2D Tools', context: '2d' },
   { id: 'tool.topstitchSeamline', key: ';', label: 'Pespunte sobre costura', category: '2D Tools', context: '2d' },
 
-  { id: 'tool.pomMeasure', key: 'p', label: 'Medir POM', category: '2D Tools', context: '2d' },
   { id: 'tool.offsetOutline', key: 'r', label: 'Desplazar contorno', category: '2D Tools', context: '2d' },
   { id: 'tool.extendTrim', key: 'u', label: 'Extender / recortar', category: '2D Tools', context: '2d' },
-  // Dual-context key (precedent: 'w' = tool.pin 2d + tool3d.pin 3d): plain 'o'
-  // is tool3d.meshGrab when the 3D viewport has focus.
+  // Tecla de doble contexto: 'o' es tool3d.meshGrab cuando el foco está en la
+  // vista 3D. (El precedente que citaba este comentario, 'w' = tool.pin 2d +
+  // tool3d.pin 3d, dejó de existir: tool.pin se reservó en F7 y hoy 'w' es solo
+  // de 3D.)
   { id: 'tool.seamAllowance', key: 'o', label: 'Margen de costura', category: '2D Tools', context: '2d' },
 
   // ─── Sewing ─────────────────────────────────────────────────────────────────
@@ -110,4 +105,30 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
 
   // ─── Command Palette ────────────────────────────────────────────────────────
   { id: 'app.commandPalette', key: 'k', ctrl: true, label: 'Paleta de comandos', category: 'View', context: 'global' },
+];
+
+/**
+ * Atajos 2D reservados: la tecla existe, la herramienta todavía no.
+ *
+ * Revisión adversarial de UI del 2026-09-04, hallazgo F7. Un barrido de las 52
+ * teclas contra la app viva encontró siete que metían a María en un modo
+ * inerte: la tira le dibujaba la cabina (nombre, atajo, opciones), el cursor se
+ * ponía en cruz, y ningún clic hacía nada, porque el despachador
+ * (`src/components/PatternEditor/useEditorInteractions.ts`) no conduce esos
+ * ids. Se sacaron de `DEFAULT_SHORTCUTS` para que la tecla no prometa nada.
+ *
+ * No se borran, se reservan: cuando la herramienta exista, su atajo vuelve
+ * intacto al sitio que ya era suyo. El primero de la cola es el círculo
+ * (#1111, María: «círculo es indispensable»).
+ *
+ * Ver docs/reports/2026-09-04-revision-adversarial-ui.md § 2 F7.
+ */
+export const ATAJOS_2D_SIN_GESTO: ShortcutDef[] = [
+  { id: 'tool.circle', key: 'e', label: 'Elipse (círculo)', category: '2D Tools', context: '2d' },
+  { id: 'tool.dart', key: 'd', label: 'Pinza', category: '2D Tools', context: '2d' },
+  { id: 'tool.editConstrain', key: 'c', label: 'Editar curvatura', category: '2D Tools', context: '2d' },
+  { id: 'tool.pin', key: 'w', label: 'Fijar', category: '2D Tools', context: '2d' },
+  { id: 'tool.pomMeasure', key: 'p', label: 'Medir POM', category: '2D Tools', context: '2d' },
+  { id: 'tool.topstitchEdit', key: 't', label: 'Editar pespunte', category: '2D Tools', context: '2d' },
+  { id: 'tool.trace', key: 'i', label: 'Trazar', category: '2D Tools', context: '2d' },
 ];

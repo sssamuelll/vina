@@ -1,5 +1,10 @@
 /* ─── Grading Tab ────────────────────────────────────────────────────────── */
 
+/* Deuda de tokens cerrada el 2026-09-04: mismos cinco nombres inexistentes que
+ * BOMTab.css (--border-color, --button-bg, --button-hover-bg, --text-color,
+ * --accent-color), misma equivalencia, tomada del hermano ya tokenizado
+ * NestingTab.css. */
+
 .grading-tab {
   display: flex;
   flex-direction: column;
@@ -16,22 +21,29 @@
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--border);
 }
 
 .grading-toolbar button {
   font-size: 11px;
   padding: 3px 8px;
-  background: var(--button-bg, #2a2a2a);
-  color: var(--text-color, #ccc);
-  border: 1px solid var(--border-color, #333);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   border-radius: 3px;
   cursor: pointer;
   white-space: nowrap;
 }
 
-.grading-toolbar button:hover {
-  background: var(--button-hover-bg, #3a3a3a);
+/* `:not(:disabled)` como en NestingTab: sin él, un botón apagado se ilumina al
+ * pasar el mouse y promete que se puede pulsar. */
+.grading-toolbar button:hover:not(:disabled) {
+  background: var(--bg-elevated);
+}
+
+.grading-toolbar button:not(:disabled):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .grading-toolbar button:disabled {
@@ -42,15 +54,15 @@
 .grading-toolbar select {
   font-size: 11px;
   padding: 3px 6px;
-  background: var(--button-bg, #2a2a2a);
-  color: var(--text-color, #ccc);
-  border: 1px solid var(--border-color, #333);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   border-radius: 3px;
   cursor: pointer;
 }
 
 .grading-stale-badge {
-  color: #f59e0b;
+  color: var(--warning);
   font-size: 10px;
   font-weight: 600;
   margin-left: 4px;
@@ -65,12 +77,12 @@
   padding: 5px 10px;
   font-size: 11px;
   line-height: 1.4;
-  color: var(--text-muted, #999);
-  border-bottom: 1px solid var(--border-subtle, #2a2a2a);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .grading-provenance-warn {
-  color: #f59e0b;
+  color: var(--warning);
 }
 
 /* ─── Table Container ────────────────────────────────────────────────────── */
@@ -92,23 +104,22 @@
   white-space: nowrap;
   position: sticky;
   top: 0;
-  background: var(--panel-bg, #1e1e1e);
+  background: var(--bg-surface);
   font-size: 11px;
-  color: var(--text-muted, #999);
+  color: var(--text-muted);
   text-align: left;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 4px 8px;
-  border-bottom: 1px solid var(--border-color, #333);
-  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
   z-index: 1;
 }
 
 .grading-table td {
   padding: 3px 8px;
-  color: var(--text-color, #ccc);
+  color: var(--text-primary);
   font-size: 11px;
-  border-bottom: 1px solid var(--border-subtle, #2a2a2a);
+  border-bottom: 1px solid var(--border-subtle);
   white-space: nowrap;
 }
 
@@ -118,7 +129,7 @@
 
 .grading-table td input[type='number'] {
   background: transparent;
-  color: var(--text-color, #ccc);
+  color: var(--text-primary);
   border: 1px solid transparent;
   border-radius: 3px;
   padding: 1px 4px;
@@ -131,14 +142,14 @@
 }
 
 .grading-table td input[type='number']:focus {
-  border-color: var(--accent-color, #3b82f6);
-  background: var(--panel-bg, #1e1e1e);
+  border-color: var(--accent);
+  background: var(--bg-surface);
 }
 
 /* ─── Base Row Highlight ────────────────────────────────────────────────── */
 
 .grading-base-row {
-  background: rgba(59, 130, 246, 0.08);
+  background: var(--accent-subtle);
 }
 
 .grading-base-row td {
@@ -152,9 +163,9 @@
   align-items: center;
   gap: 12px;
   padding: 4px 10px;
-  border-top: 1px solid var(--border-color, #333);
+  border-top: 1px solid var(--border);
   font-size: 11px;
-  color: var(--text-muted, #999);
+  color: var(--text-muted);
 }
 
 .grading-stats span {
@@ -167,7 +178,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted, #999);
+  color: var(--text-muted);
   height: 100%;
   padding: 20px;
   text-align: center;

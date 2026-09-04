@@ -21,8 +21,9 @@ import {
   createPastedPieces,
 } from '../store/editorSlice';
 import { setActiveTool3D } from '../store/toolSlice';
-import { activate2DTool, SEWING_TOOL_IDS } from '../store/toolActivation';
-import { removePieces, removeSeam, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
+import { activate2DTool } from '../store/toolActivation';
+import { resolverBorrado } from '../store/borradoDeSeleccion';
+import { removePieces, removeSeam, removeInternalLine, removePOM, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
 import {
   startSimulation,
   resetSimulation,
@@ -36,7 +37,7 @@ import {
 } from '../store/simulationSlice';
 import { placeGarmentPieces } from '../utils/cloth/garmentPlacement';
 import { saveToStorage } from '../utils/projectIO';
-import { showSuccessToast } from '../store/copilotUISlice';
+import { showSuccessToast, showInfoToast } from '../store/copilotUISlice';
 import { useShortcutRegistry } from '../shortcuts/useShortcut';
 
 // Re-export ShortcutEntry type for backwards compatibility
@@ -55,6 +56,8 @@ export function useKeyboardShortcuts() {
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const selectedSeamId = useSelector((s: RootState) => s.editor.selectedSeamId);
+  const selectedPOMId = useSelector((s: RootState) => s.editor.selectedPOMId);
+  const selectedInternalLine = useSelector((s: RootState) => s.editor.selectedInternalLine);
   const activeTool = useSelector((s: RootState) => s.editor.activeTool);
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
   const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
@@ -82,15 +85,36 @@ export function useKeyboardShortcuts() {
       if (canFireShortcut()) handler();
     };
 
+    // El sujeto lo decide `resolverBorrado` (#1115) — la misma función que usa
+    // el menú Edición ▸ Eliminar. Aquí solo se despacha lo que ella dijo.
     const deleteSelection = () => {
-      if (SEWING_TOOL_IDS.has(activeTool)) {
-        if (selectedSeamId) dispatch(removeSeam(selectedSeamId));
-        return;
-      }
-      if (selectedPieceIds.length > 0) {
-        dispatch(removePieces(selectedPieceIds));
-      } else if (selectedSeamId) {
-        dispatch(removeSeam(selectedSeamId));
+      const sujeto = resolverBorrado({
+        activeTool,
+        selectedPieceIds,
+        selectedSeamId,
+        selectedPOMId,
+        selectedInternalLine,
+        piezasBloqueadas: new Set(pieces.filter(p => p.locked === true).map(p => p.id)),
+      });
+      switch (sujeto.kind) {
+        case 'seam':
+          dispatch(removeSeam(sujeto.id));
+          break;
+        case 'internalLine':
+          dispatch(removeInternalLine({ pieceId: sujeto.pieceId, lineId: sujeto.lineId }));
+          dispatch(clearSelection());
+          break;
+        case 'pom':
+          dispatch(removePOM(sujeto.id));
+          break;
+        case 'pieces':
+          dispatch(removePieces(sujeto.ids));
+          break;
+        case 'nada':
+          if (sujeto.motivo === 'bloqueada') {
+            dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+          }
+          break;
       }
     };
 
@@ -242,5 +266,5 @@ export function useKeyboardShortcuts() {
         registry.unregisterHandler(id);
       }
     };
-  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, activeTool, viewMode3D, fitMapMode, avatar, projectState, clipboard, xrayMode, layerLocked]);
+  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, selectedPOMId, selectedInternalLine, activeTool, viewMode3D, fitMapMode, avatar, projectState, clipboard, xrayMode, layerLocked]);
 }

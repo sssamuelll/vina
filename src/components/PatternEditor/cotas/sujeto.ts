@@ -50,6 +50,43 @@ export interface Sujeto {
 const CON_COTAS_DE_PIEZA: ReadonlySet<Tool2D> = new Set<Tool2D>(['select', 'transform', 'rectangle']);
 
 /**
+ * Las cuatro herramientas 2D que toman el sujeto de la SELECCIÓN y no del
+ * cursor (#1117). Las otras veinte son de hit-test: ahí el silencio dice lo
+ * mismo que el cursor. Estas mueren mudas de verdad — María entra, hace clic
+ * sobre la pieza y no pasa nada, porque la pieza no estaba *seleccionada*.
+ *
+ * `requiresSelection` de las definiciones NO sirve de puerta: es metadata del
+ * copiloto, no del ratón, y `seamAllowance`, `grainline`, `internalShape` y
+ * `point` la declaran sin necesitarla. Estas cuatro están medidas una a una.
+ */
+export const HERRAMIENTAS_QUE_PIDEN_PIEZA = ['offsetOutline', 'slashAndSpread', 'extendTrim', 'transform'] as const;
+
+/**
+ * Qué pide cada una, con el nombre que ya tiene escrito (`shortcuts/defaults.ts`
+ * y el registro de herramientas): un nombre por concepto. `maximo` es cuántas
+ * piezas aguanta — desplazar y extender trabajan sobre una sola, y con dos
+ * seleccionadas mueren igual de silenciosas que con cero.
+ */
+const PIDEN: Record<string, { pista: string; maximo: number }> = {
+  offsetOutline: { pista: 'Selecciona una sola pieza para usar Desplazar contorno', maximo: 1 },
+  extendTrim: { pista: 'Selecciona una sola pieza para usar Extender / recortar', maximo: 1 },
+  slashAndSpread: { pista: 'Selecciona la pieza que vas a abrir con Slash & Spread', maximo: Infinity },
+  transform: { pista: 'Selecciona la pieza o piezas para usar Transformar patrón', maximo: Infinity },
+};
+
+/**
+ * Lo que a la herramienta le falta para poder trabajar, dicho ANTES del clic
+ * (#1117). `null` = no hay nada que decir: o no es de las que piden pieza, o
+ * ya tiene su selección.
+ */
+export function faltaSujeto(activeTool: string, selectedPieceIds: string[]): string | null {
+  const piden = PIDEN[activeTool];
+  if (!piden) return null;
+  const cuantas = selectedPieceIds.length;
+  return cuantas >= 1 && cuantas <= piden.maximo ? null : piden.pista;
+}
+
+/**
  * Regla del sujeto (spec 2026-08-30 § 3.1): un sujeto, el más reciente.
  * Caliente solo si Rectángulo acaba de crear la pieza y sigue seleccionada;
  * seleccionar una pieza cualquiera nunca escribe el default (un DXF de 892 mm

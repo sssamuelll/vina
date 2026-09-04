@@ -6,7 +6,13 @@
 .fila-de-capas {
   position: absolute;
   right: 12px;
-  bottom: 12px;
+  /* Por encima de la barra de IA en su posición por defecto (`--band-bar`, el
+     mismo número que ya usaban los controles del visor 3D y la barra de
+     instantáneas). A bottom:12 la fila se comía 10 108 px² de la barra —los
+     tres botones de modo dejaban de responder al clic— y otros 3 612 px² de la
+     pista de la herramienta, que quedaba cortada a media frase. Si la usuaria
+     arrastra la barra, ese es su layout. */
+  bottom: var(--band-bar);
   z-index: var(--z-menu);
   display: flex;
   align-items: center;

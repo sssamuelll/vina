@@ -14,6 +14,20 @@
   --text-ghost: #6a6a8a;
   --text-dim: #4a4a6a;
   --accent: #6366f1;
+  /* Relleno sólido de un control activo que lleva TEXTO encima: blanco da
+   * 6,29:1 contra este paso. --accent se queda para bordes, tintes y
+   * superficies sutiles — con blanco encima da 4,47:1, justo por debajo del
+   * 4,5:1 que pide AA (revisión adversarial 2026-09-04). */
+  --accent-fuerte: #4f46e5;
+  /* El acento cuando es TINTA sobre el cromo oscuro (texto de pestaña activa,
+   * icono activo, etiqueta destacada). --accent como texto se queda en 3,8-4,3:1
+   * contra los fondos del cromo, por debajo del 4,5:1 de AA; este paso claro da
+   * 5,7-6,4:1. Los tres roles del acento no son intercambiables:
+   *   --accent         → bordes, tintes y superficies
+   *   --accent-fuerte  → relleno sólido que lleva texto blanco encima
+   *   --accent-ink     → el acento escrito sobre el cromo
+   * (revisión adversarial 2026-09-04). */
+  --accent-ink: #818cf8;
   --accent-hover: #818cf8;
   --accent-subtle: rgba(99, 102, 241, 0.13);
   --accent-border: rgba(99, 102, 241, 0.27);
@@ -48,6 +62,11 @@
   --seam-pair-7: oklch(0.55 0.10 105);
   --seam-pair-8: oklch(0.55 0.11 20);
   --accent-2d: oklch(0.66 0.16 248);   /* selection + seams only */
+  /* Paso oscuro del MISMO tono (248), para lo que lleva TEXTO encima o tiene
+   * que verse sobre el papel. --accent-2d se eligió para dibujar una LÍNEA
+   * sobre el crema: con blanco encima da 3,10:1 y AA pide 4,5:1 a 11 px. Este
+   * paso da blanco a 5,04:1 y 4,55:1 contra --canvas-2d. */
+  --accent-2d-fuerte: oklch(0.54 0.15 248);
   --ai-2d: oklch(0.72 0.13 295);       /* AI-authored annotations */
   --font-mono-2d: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace;
   --font-ui-2d: 'Schibsted Grotesk', var(--font-sans);   /* UI support text on the paper canvas */
@@ -126,6 +145,11 @@
   --top-bar-h: clamp(36px, 2.5vw, 48px);
   --unified-bar-h: clamp(44px, 3vw, 56px);
   --toolbar-btn: clamp(28px, 2vw, 38px);
+  /* Franja inferior que ocupa la barra de IA en su posición por defecto, para
+   * que nada acoplado abajo se le meta debajo. 94 = 24 de separación al borde
+   * + 58 de alto (BAR_HEIGHT) + 12 de aire; las dos primeras salen de
+   * src/components/shell/barPosition.ts. */
+  --band-bar: 94px;
 
   /* Effects */
   --blur: blur(12px);
@@ -198,11 +222,15 @@
   --surface-overlay-border-flush: 1px solid transparent;
   --surface-overlay-shadow-sheet: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.35);
 
-  /* Cotas sobre el papel: el número que se escribe donde mide. Mismo acento
-   * que la selección 2D; en edición el chip es un campo blanco sobre el papel. */
-  --cota-bg-2d: var(--accent-2d);
+  /* Cotas sobre el papel: el número que se escribe donde mide. Usa el paso
+   * FUERTE del acento 2D, no el de la selección: el chip lleva texto encima y
+   * la línea tiene que verse sobre el crema, y --accent-2d se eligió para
+   * dibujar una línea, no para escribir sobre él (daba 3,10:1 con blanco).
+   * La selección y las costuras siguen con --accent-2d. En edición el chip es
+   * un campo blanco sobre el papel. */
+  --cota-bg-2d: var(--accent-2d-fuerte);
   --cota-ink-2d: #ffffff;
-  --cota-line-2d: var(--accent-2d);
+  --cota-line-2d: var(--accent-2d-fuerte);
   --cota-edit-bg-2d: #ffffff;
   --cota-edit-ink-2d: var(--ink-on-light);
 

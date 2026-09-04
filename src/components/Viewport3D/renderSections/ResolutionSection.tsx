@@ -45,7 +45,7 @@ export default function ResolutionSection({ open, onToggle }: SectionProps) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <label style={{ fontSize: 10, color: '#888' }}>An</label>
+            <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>An</label>
             <input
               type="number"
               min={256}
@@ -56,10 +56,10 @@ export default function ResolutionSection({ open, onToggle }: SectionProps) {
               style={{
                 width: 64,
                 padding: '2px 4px',
-                border: '1px solid var(--border-color, #444)',
+                border: '1px solid var(--border)',
                 borderRadius: 3,
-                background: 'var(--bg-secondary, #2a2a2a)',
-                color: '#ccc',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
                 fontSize: 11,
                 textAlign: 'right',
               }}
@@ -72,7 +72,7 @@ export default function ResolutionSection({ open, onToggle }: SectionProps) {
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: aspectRatioLocked ? '#4a9eff' : '#666',
+                color: aspectRatioLocked ? 'var(--accent)' : 'var(--text-dim)',
                 padding: 2,
                 display: 'flex',
                 alignItems: 'center',
@@ -81,7 +81,7 @@ export default function ResolutionSection({ open, onToggle }: SectionProps) {
               {aspectRatioLocked ? <Lock size={12} /> : <Unlock size={12} />}
             </button>
 
-            <label style={{ fontSize: 10, color: '#888' }}>Al</label>
+            <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>Al</label>
             <input
               type="number"
               min={256}
@@ -92,10 +92,10 @@ export default function ResolutionSection({ open, onToggle }: SectionProps) {
               style={{
                 width: 64,
                 padding: '2px 4px',
-                border: '1px solid var(--border-color, #444)',
+                border: '1px solid var(--border)',
                 borderRadius: 3,
-                background: 'var(--bg-secondary, #2a2a2a)',
-                color: '#ccc',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
                 fontSize: 11,
                 textAlign: 'right',
               }}

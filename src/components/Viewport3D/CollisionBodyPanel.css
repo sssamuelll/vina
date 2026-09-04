@@ -11,12 +11,12 @@
 }
 
 .cb-panel {
-  background: rgba(30, 30, 30, 0.95);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   height: 100%;
-  color: #ccc;
+  color: var(--text-secondary);
   font-family: var(--font-sans);
   font-size: 12px;
 }
@@ -26,25 +26,26 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border);
 }
 
 .cb-panel-header h3 {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .cb-panel-close {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   font-size: 16px;
   cursor: pointer;
   padding: 2px 6px;
 }
-.cb-panel-close:hover { color: #fff; }
+.cb-panel-close:hover,
+.cb-panel-close:focus-visible { color: var(--text-primary); }
 
 .cb-panel-scroll {
   flex: 1;
@@ -52,32 +53,36 @@
   padding: 10px 14px;
 }
 
+/* El punteado dice "suelta un archivo aquí", así que se queda; el que cambia
+   es el azul, que no salía de ningún token. La etiqueta va en tinta clara:
+   --accent sobre su propio tinte da 3,71:1 y AA pide 4,5:1 a 12 px. */
 .cb-import-btn {
   width: 100%;
   padding: 8px;
-  background: rgba(74, 158, 255, 0.15);
-  border: 1px dashed rgba(74, 158, 255, 0.4);
+  background: var(--accent-subtle);
+  border: 1px dashed var(--accent);
   border-radius: 6px;
-  color: #4a9eff;
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 12px;
   margin-bottom: 10px;
 }
-.cb-import-btn:hover {
-  background: rgba(74, 158, 255, 0.25);
+.cb-import-btn:hover,
+.cb-import-btn:focus-visible {
+  background: var(--accent-border);
 }
 
 .cb-body-item {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px;
   margin-bottom: 8px;
 }
 
 .cb-body-item.selected {
-  border-color: rgba(74, 158, 255, 0.5);
-  background: rgba(74, 158, 255, 0.08);
+  border-color: var(--accent);
+  background: var(--accent-subtle);
 }
 
 .cb-body-header {
@@ -90,7 +95,7 @@
 .cb-body-name {
   background: none;
   border: none;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 12px;
   font-weight: 500;
   padding: 2px 4px;
@@ -98,8 +103,8 @@
   width: 120px;
 }
 .cb-body-name:focus {
-  outline: 1px solid rgba(74, 158, 255, 0.5);
-  background: rgba(0, 0, 0, 0.3);
+  outline: 1px solid var(--accent);
+  background: var(--bg-deeper);
 }
 
 .cb-body-actions {
@@ -110,15 +115,20 @@
 .cb-icon-btn {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   cursor: pointer;
   padding: 2px 5px;
   font-size: 13px;
   border-radius: 3px;
 }
-.cb-icon-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
-.cb-icon-btn.active { color: #4a9eff; }
-.cb-icon-btn.danger:hover { color: #ff5252; }
+/* El botón vive dentro de `.cb-body-item`, que YA es --bg-elevated: pintar el
+   realce con ese mismo token lo dejaba invisible. Un tinte del acento sí se ve
+   sobre el cromo (revisión adversarial 2026-09-04). */
+.cb-icon-btn:hover,
+.cb-icon-btn:focus-visible { color: var(--text-primary); background: var(--accent-subtle); }
+.cb-icon-btn.active { color: var(--accent-ink); }
+.cb-icon-btn.danger:hover,
+.cb-icon-btn.danger:focus-visible { color: var(--destructive-hover); }
 
 .cb-slider-row {
   display: flex;
@@ -130,18 +140,18 @@
 .cb-slider-label {
   width: 55px;
   font-size: 11px;
-  color: #999;
+  color: var(--text-muted);
 }
 
 .cb-slider-row input[type="range"] {
   flex: 1;
   height: 3px;
-  accent-color: #4a9eff;
+  accent-color: var(--accent);
 }
 
 .cb-slider-value {
   width: 40px;
   font-size: 11px;
   text-align: right;
-  color: #bbb;
+  color: var(--text-secondary);
 }
