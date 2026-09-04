@@ -63,7 +63,13 @@ echo "✓ smoke del WASM commiteado"
 # estado no carga (42/42 con 136 fallos de contraste el 14-08; 39/42 con 107 el
 # 09-04). Un techo sobre esos números se gana dejando que algo se rompa. El
 # censo sigue siendo la herramienta de diagnóstico manual que dice ser.
-npx playwright test \
+# --workers=2 NO es cosmético: sin él este gate falló en su primer uso real con
+# seis timeouts de `waitForSelector` sobre la carga de la app y tres flaky, y
+# los mismos cinco specs dan verde con 2. Es el patrón ya medido en este repo:
+# Vite arrancando en frío con tantos workers como CPUs se queda sin aire y los
+# tests se caen esperando a que monte, no por lo que miden. Un gate que da
+# falsos rojos se acaba desactivando, que es peor que no tenerlo.
+npx playwright test --workers=2 \
   tests/e2e/emplazamiento-lienzo-2d.spec.ts \
   tests/e2e/emplazamiento-modales.spec.ts \
   tests/e2e/emplazamiento-paneles.spec.ts \
