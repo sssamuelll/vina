@@ -2,7 +2,7 @@ import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 import type { Point2D } from '../../../types/types';
 import type { Cota } from './cotas';
 import CotaChip, { type CotaChipProps } from './CotaChip';
-import { chipScreenPosition, separarChips, type ChipPuesto } from './cotasGeometry';
+import { chipScreenPosition, separarChips, type ChipPuesto, type Estorbo } from './cotasGeometry';
 import { formatMedida } from './parseMedida';
 
 export interface CotasLayerHandle {
@@ -19,6 +19,10 @@ export interface CotasLayerProps {
   lecturaApagada?: boolean;
   pan2D: Point2D;
   zoom2D: number;
+  /** Cajas de pantalla que los chips deben esquivar: los tiradores del
+   *  transform box. Sin esto el chip del alto se come el asa este y el del
+   *  ancho la de giro — medido el 2026-09-04. */
+  estorbos?: readonly Estorbo[];
   disabled?: boolean;
   onCommit: CotaChipProps['onCommit'];
   onScrubStart: CotaChipProps['onScrubStart'];
@@ -35,7 +39,7 @@ export interface CotasLayerProps {
  * de Redux en el mismo render: no hay nada que sincronizar.
  */
 export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function CotasLayer(
-  { cotas, lectura, lecturaApagada, pan2D, zoom2D, disabled, onCommit, onScrubStart, onScrub, onScrubEnd, onScrubCancel },
+  { cotas, lectura, lecturaApagada, pan2D, zoom2D, estorbos, disabled, onCommit, onScrubStart, onScrub, onScrubEnd, onScrubCancel },
   ref,
 ) {
   const root = useRef<HTMLDivElement>(null);
@@ -72,9 +76,9 @@ export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function
         cede: true,
       });
     }
-    const separados = separarChips(items);
+    const separados = separarChips(items, estorbos);
     return { chips: separados, lectura: lectura ? separados[cotas.length] : null };
-  }, [cotas, lectura, pan2D, zoom2D]);
+  }, [cotas, lectura, pan2D, zoom2D, estorbos]);
   const lecturaPosition = puestos.lectura;
   return (
     <div ref={root} className="cotas" style={{ pointerEvents: 'none' }} data-testid="cotas">

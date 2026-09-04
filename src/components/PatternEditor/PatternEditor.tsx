@@ -14,6 +14,7 @@ import { useRectangleTool } from './useRectangleTool';
 import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import CotaLines from './cotas/CotaLines';
 import { cotasDelSujeto, faltaSujeto } from './cotas/sujeto';
+import { cajasDeAsas } from './cotas/cotasGeometry';
 import ToolStrip2D from './ToolStrip2D';
 import FilaDeCapas from './FilaDeCapas';
 import type { Cota } from './cotas/cotas';
@@ -818,6 +819,24 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const sujetoId = sujeto.piece?.id ?? null;
   useEffect(() => () => cerrarScrub(), [sujetoId, activeTool, cerrarScrub]);
 
+  /* Los tiradores del transform box son estorbos para los chips de cota.
+   *
+   * Sin esto se pisaban, y no de forma inocua: medido el 2026-09-04, el chip
+   * del alto tapaba entero el asa `e` y el del ancho la de giro, así que
+   * `elementFromPoint` sobre los dos devolvia `button.cota`. El gesto no se
+   * perdia — se convertia en un scrub del chip —, o sea que tirar del "asa
+   * este" para ensanchar le subia el ALTO a Maria: su queja de #198 entrando
+   * por otra puerta. Es tambien la causa real del e2e
+   * `maria-198-resize-con-ancla` en rojo, que se leia como matematica de
+   * resize rota cuando la matematica estaba bien.
+   *
+   * Solo estorban mientras la caja se pinta: `showTransformBox` gobierna el
+   * hit-test de los tiradores, asi que es la misma condicion. */
+  const estorbosDeLasAsas = useMemo(
+    () => (showTransformBox ? cajasDeAsas(transformTool.handles, pan2D, zoom2D) : undefined),
+    [showTransformBox, transformTool.handles, pan2D, zoom2D],
+  );
+
   /* Durante el arrastre el grupo de la pieza se mueve por DOM directo
    * (`useEditorInteractions.ts:818`), mientras TODA superficie que se coloque
    * sumando `piece.position` —la posición de REDUX— se queda clavada en el
@@ -1277,6 +1296,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         lecturaApagada={sujeto.lecturaApagada}
         pan2D={pan2D}
         zoom2D={zoom2D}
+        estorbos={estorbosDeLasAsas}
         disabled={sujeto.disabled}
         onCommit={handleCotaCommit}
         onScrubStart={handleCotaScrubStart}

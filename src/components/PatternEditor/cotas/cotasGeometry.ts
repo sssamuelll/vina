@@ -37,6 +37,44 @@ const MAX_CORRIMIENTO_PX = 160;
 
 interface Caja { left: number; top: number; right: number; bottom: number }
 
+/**
+ * Un obstáculo fijo que los chips deben esquivar: hoy, los tiradores del
+ * transform box. En px de PANTALLA, como todo lo que toca `separarChips`.
+ */
+export type Estorbo = Caja;
+
+/** Lado del tirador más grande que pinta `TransformHandlesOverlay`: el círculo
+ *  de giro, `ROTATE_RADIUS = 4` → 8 px de diámetro. Los cuadrados son 6. */
+const LADO_ASA_PX = 8;
+/** Aire alrededor del asa. Sin él el chip queda pegado y el clic sigue siendo
+ *  una lotería de un píxel. */
+const AIRE_ASA_PX = 4;
+
+/**
+ * Las asas del transform box como estorbos, en coordenadas de pantalla.
+ *
+ * Existe porque los chips de cota se comían dos de los diez mandos de la caja
+ * (medido el 2026-09-04): el asa `e` caía bajo el chip del alto y la de giro
+ * bajo el del ancho. Y el gesto robado no se perdía —se volvía un scrub del
+ * chip—, así que tirar del "asa este" para ensanchar le subía el ALTO a María.
+ *
+ * El tamaño es de pantalla y NO escala con el zoom, igual que el que dibuja
+ * `TransformHandlesOverlay` (`HANDLE_SIZE / zoom2D` en unidades de patrón es
+ * un tamaño constante en pantalla).
+ */
+export function cajasDeAsas(
+  handles: Array<{ pos: Point2D }>,
+  pan2D: Point2D,
+  zoom2D: number,
+): Estorbo[] {
+  const medio = LADO_ASA_PX / 2 + AIRE_ASA_PX;
+  return handles.map((h) => {
+    const cx = pan2D.x + h.pos.x * zoom2D;
+    const cy = pan2D.y + h.pos.y * zoom2D;
+    return { left: cx - medio, right: cx + medio, top: cy - medio, bottom: cy + medio };
+  });
+}
+
 /** El chip se dibuja centrado en (left, top): `transform: translate(-50%,-50%)`. */
 function caja(left: number, top: number, ancho: number): Caja {
   return {
@@ -89,8 +127,17 @@ function tangenteDe(cota: Cota): Point2D {
  * el resultado no depende de en qué orden llegó la lista, y el que ya está
  * puesto no se vuelve a mover. Cada uno prueba 0, ±4, ±8… hasta el tope y se
  * queda en el primer hueco libre; si no hay ninguno, en el que menos pisa.
+ *
+ * `estorbos` son cajas que ya estaban ahí y NO se mueven —los tiradores del
+ * transform box—: entran a la pasada como si fueran chips ya colocados. Se
+ * descartó corregir el aire de `chipScreenPosition` en su lugar porque no
+ * alcanza: el asa de giro cuelga de un brazo, fuera de la banda del offset, y
+ * ningún ajuste del offset la libera.
  */
-export function separarChips(items: ChipPuesto[]): Array<{ left: number; top: number }> {
+export function separarChips(
+  items: ChipPuesto[],
+  estorbos: readonly Estorbo[] = [],
+): Array<{ left: number; top: number }> {
   const anchos = items.map((it) => anchoEstimadoDeChip(it.texto ?? it.cota.label));
   const orden = items.map((_, i) => i).sort((i, j) => {
     const a = items[i];
@@ -101,7 +148,7 @@ export function separarChips(items: ChipPuesto[]): Array<{ left: number; top: nu
       || (a.cota.id < b.cota.id ? -1 : a.cota.id > b.cota.id ? 1 : 0);
   });
   const salida = items.map(({ left, top }) => ({ left, top }));
-  const puestas: Caja[] = [];
+  const puestas: Caja[] = [...estorbos];
   for (const i of orden) {
     const item = items[i];
     const tangent = tangenteDe(item.cota);
