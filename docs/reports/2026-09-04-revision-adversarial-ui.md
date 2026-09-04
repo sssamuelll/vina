@@ -411,3 +411,150 @@ Los nueve revisores no fueron decorativos. Lo que cazaron y se arregló después
 `npx tsc -b --noEmit` limpio · **7742 unitarios en verde** · **65 e2e en Chromium** sobre las once suites afectadas · `eslint --max-warnings=0` sin nada en lo tocado · trinquete sin subidas, con el techo nuevo fijado.
 
 Un rojo preexistente, verificado contra `main` sin tocar y por tanto ajeno a este cambio: `maria-198-resize-con-ancla` › "agranda solo hacia el este".
+
+---
+
+## 12. La cola, cerrada — noche del 2026-09-05
+
+Seis commits en `fix/cotas-no-tapan-las-asas`, cada uno con sus tests escritos
+primero y en rojo, la implementación delegada con los hashes congelados, y una
+revisión adversarial encima que en los cuatro lotes encontró cosas ciertas.
+
+### 12.1 Lo peor no estaba en el informe
+
+Antes de tocar la cola, reproduje el rojo de `maria-198-resize-con-ancla`, que
+llevaba días leyéndose como «matemática de resize rota». No lo era.
+
+**Los chips de cota se comían dos de los diez mandos del transform box.**
+Medido con una pieza de 140×100 seleccionada: `elementFromPoint` sobre el centro
+del asa `e` y de la de giro devolvía `button.cota`. El A/B de apagar los chips
+no deja lugar a interpretación:
+
+| Gesto | Con chips (como estaba) | Sin chips |
+|---|---|---|
+| Asa este | 260 → **260** | 260 → **320** |
+| Asa de rotación | 0° → **0°** | 0° → **90°** |
+
+Y el gesto robado **no se perdía: se convertía en un scrub del chip**. Tirar del
+«asa este» 60 px a la derecha dejaba el ancho clavado en 140 y subía el ALTO de
+100 a 160 mm. O sea que María tiraba para ensanchar y la pieza le crecía hacia
+abajo, escribiéndole una medida que no pidió — su queja literal de #198
+(«necesito que se mueva solo lo arrastrado») entrando por otra puerta.
+
+Desde que existen las cotas, **no se podía rotar una pieza ni estirarla por el
+este**, y solo la mitad estaba reportada: el e2e probaba el resize y nadie probó
+la rotación. Es el caso «buscar los hermanos antes de cerrar» otra vez.
+
+El arreglo reusa lo que ya había: `separarChips` deslizaba cada chip por la
+tangente de su cota para no pisar a otro chip; ahora las asas entran a esa misma
+pasada como estorbos fijos. Se descartó corregir el aire de `chipScreenPosition`
+—que es un defecto real y aparte, el chip empieza 10 px DENTRO del borde que
+mide— porque no alcanza: el asa de giro cuelga de un brazo, fuera de la banda
+del offset, y ningún ajuste del offset la libera.
+
+`maria-198` se puso verde sin tocarle una línea.
+
+### 12.2 Lo que se cerró de la cola
+
+| Frente | Estado | Cómo |
+|---|---|---|
+| **El censo antes del deploy** (§ 7.1 punto 7) | **hecho, con otra herramienta** | Se cablearon los cinco e2e de emplazamiento al gate, no `audit:ui`. El censo tarda 13,6 min, tuvo 3 timeouts reales, y —lo que lo descalifica— sus contadores BAJAN cuando un estado no carga (42/42 con 136 fallos de contraste el 14-08; 39/42 con 107 el 09-04). Un techo sobre esos números se gana dejando que algo se rompa |
+| **El "no pasó nada"** (#1117) | **hecho** | Censo de los 26 hooks: de ~96 `return` tempranos, 20 eran mudos de verdad. `noPasoNada.ts` escribe en la bitácora y lo dice en la tira. Toast nunca: un gesto mudo se repite cinco veces en tres segundos |
+| **F10** roles de capa | **hecho** | Nace `--z-canvas-chrome: 40` para el cromo acoplado, con la decisión escrita en el spec y el trinquete de la escala extendido para custodiarla |
+| **La piel** | **hecho** | R1 25→0, R3 711→687, R6 9→8. Techo nuevo fijado |
+| **El círculo** (#1111) | **hecho** | Herramienta aparte, arrastre anclado en la esquina como el rectángulo, sin Arco. Cero geometría nueva |
+| **El dueño del emplazamiento** | **spec escrito** | `docs/superpowers/specs/2026-09-05-dueno-del-emplazamiento-2d-design.md` |
+| **Renombrar "Slash & Spread"** | **no se hizo, y por una razón mejor** | Ver § 12.4 |
+| **`maria-198` en rojo** | **verde** | Nunca fue suyo el fallo |
+
+### 12.3 Lo que los revisores cazaron encima
+
+Los cuatro lotes se revisaron adversarialmente y los cuatro tenían algo:
+
+- **Un aviso inalcanzable justo donde su comentario decía arreglar.** El de POM
+  vivía detrás del `trySnap`, así que solo hablaba el clic que ACERTABA un
+  contorno — el que menos se siente muerto. María, cuando cree que la
+  herramienta se trabó, clica en el vacío.
+- **El mensaje pegado a la herramienta equivocada.** Fallar un piquete y pasarse
+  a Hilo dentro de los 4 s dejaba «Hilo» en la cabecera con el mensaje del
+  piquete debajo.
+- **Una región viva que se montaba con su contenido.** Los lectores de pantalla
+  anuncian cambios DENTRO de una región que ya existía. El patrón correcto
+  estaba escrito a dos carpetas, en `ToastContainer`.
+- **Dos comentarios con una premisa falsa.** Decían que borrar el respaldo de
+  `var()` era lo que bajaba el texto de AA. No: el respaldo estaba muerto —
+  `tokens.css` es global— y el contraste ya era malo desde el primer día.
+- **Tres cifras de contraste inventadas**, presentadas como medición. Eran los
+  rangos genéricos del cromo, no medidas del botón, que tiene fondo propio.
+  Recalculadas componiendo el alfa: `--accent-ink` da 4,10-5,26:1 según lo que
+  haya detrás, o sea que NO cumple AA sobre `--bg-elevated`.
+- **Y ese panel no se ve.** Medido a 1366×768: `.ref-img-settings` se pinta en
+  y=768 con la ventana en 768. Violación de la ley de puertas anterior a este
+  trabajo. Se deja escrita, no parcheada a ciegas: emplazarlo es decidir dónde va.
+- **El censo de R6 era ciego a los estilos en línea.** El 9 era un piso falso:
+  no veía `PieceRenderer.tsx:372`, donde el campo de renombrar una pieza suprime
+  el contorno sin ninguna otra señal — una barrera de teclado real.
+- **El trinquete rojo por un número de issue.** `#1111` en cola de una línea de
+  código lo lee el detector de color literal como hexadecimal.
+- **Mi propio test de contrato no verificaba nada.** `ellipse.test.ts` llamaba a
+  `computeBoundingBox` con un argumento; tres de sus siete casos reventaban
+  dentro de `transform.ts` en vez de medir. Un verde que no existía.
+- **El escalón nuevo de la escala no entraba en su trinquete.** El único
+  argumento para el 40 es su POSICIÓN, y esa posición no la fijaba nadie: el
+  token se podía mover a 5000 y los gates seguían verdes.
+- **En modo Círculo, escribir una cota lo volvía elipse en silencio.**
+
+### 12.4 El hallazgo que sustituye al renombre
+
+El informe pedía renombrar «Slash & Spread», «el nombre en inglés en la interfaz
+en español». Al ir a hacerlo, dos correcciones:
+
+1. **No está donde el informe decía.** No aparece en el dock ni en la paleta,
+   solo en el campo `name` de su definición y en una pista.
+2. **No es el único.** Hay treinta nombres de herramienta en inglés.
+
+Y al medir por qué, salió algo mejor que un renombre: **siete herramientas
+tienen el gesto completo y ninguna puerta.**
+
+```
+compareCurves   Compare Curves        measureCurve   Measure Along Curve
+elastic         Elastic / Gathering   pleat          Pleat
+hand            Hand/Pan              slashAndSpread Slash & Spread
+trimPlace       Place Trim
+```
+
+El despachador las conduce en sus cinco enganches, tienen overlay y hooks, y no
+hay botón ni atajo: solo se alcanzan si el copiloto las activa. **Es el espejo
+exacto de F7**, que encontró siete teclas que activaban herramientas SIN gesto.
+Siete y siete.
+
+Y explica el inglés: **las siete sin puerta son las que nadie tradujo.** Nadie
+tradujo lo que nadie podía ver. Renombrar una de ellas habría sido arreglar la
+mitad de la mitad.
+
+`herramienta-con-gesto-tiene-puerta.test.ts` fija el techo en siete para que la
+octava no pase en silencio. Cuáles merecen botón, con qué icono y en qué orden
+es decisión de producto — igual que en F7 lo era cuáles herramientas nacen. Los
+nombres en español vienen con la puerta, no antes.
+
+### 12.5 Qué queda, después de esta noche
+
+- **Las tres unificaciones L** (seis campos de selección, once hit-tests, cuatro
+  superficies de número) y **la gramática de la tanda 6**. Siguen siendo el spec
+  que las disuelve, no un proyecto.
+- **Abrir las siete puertas** y traducir esos siete nombres. Decisión de producto.
+- **Emplazar `ReferenceImageSettings`**, que hoy se pinta fuera de pantalla.
+- **Implementar el spec del dueño del emplazamiento** (familia `--franja-*`,
+  regla R9, la esquina como lista de prioridad).
+- El aire de `chipScreenPosition`, que mide hasta el centro del chip en vez de
+  hasta su borde. Defecto real, sin síntoma vivo ya.
+
+### 12.6 Gates
+
+`npx tsc -b --noEmit` limpio · **7822 unitarios en verde**, 13 skipped · 24 e2e
+de emplazamiento en Chromium · `eslint --max-warnings=0` sin nada en lo tocado ·
+trinquete con tres reglas abajo y ninguna arriba.
+
+Todo lo que toca al navegador se verificó en el navegador, no solo en jsdom: los
+dos gestos del transform box, el canal nuevo de la tira, el gesto del círculo de
+punta a punta, y el solape barra↔pista en tres viewports.

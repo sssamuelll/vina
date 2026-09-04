@@ -78,7 +78,11 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
     uniform: ['Escalar proporcional'],
   },
   circle: {
-    shapeType: ['Figura', 'Círculo', 'Elipse', 'Arco'],
+    // El Arco salió del selector al nacer la herramienta: es un camino ABIERTO
+    // y `addPiece` asume pieza cerrada (el 3D extruye con THREE.Shape, y
+    // `commandsToShape` descarta el comando 'A' en silencio). Como línea
+    // interna ya existe `internalShape`.
+    shapeType: ['Figura', 'Círculo', 'Elipse'],
     radius: ['Radio'],
   },
   trace: {

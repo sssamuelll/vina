@@ -47,7 +47,11 @@ export interface Sujeto {
   lineaDeSujeto: string | null;
 }
 
-const CON_COTAS_DE_PIEZA: ReadonlySet<Tool2D> = new Set<Tool2D>(['select', 'transform', 'rectangle']);
+const CON_COTAS_DE_PIEZA: ReadonlySet<Tool2D> = new Set<Tool2D>(['select', 'transform', 'rectangle', 'circle']);
+
+/** Las que crean una pieza arrastrando: la recién nacida sale caliente y sus
+ *  cotas escriben el default de la próxima (#1111 le dio la del círculo). */
+const CREAN_EN_CALIENTE: ReadonlySet<Tool2D> = new Set<Tool2D>(['rectangle', 'circle']);
 
 /**
  * Las cuatro herramientas 2D que toman el sujeto de la SELECCIÓN y no del
@@ -193,7 +197,7 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
   if (!piece) return nada(lineaRect);
   const capa = piece.layer ?? 1;
   if (input.hiddenLayerIds.includes(capa)) return nada(lineaRect);
-  const caliente = input.activeTool === 'rectangle' && input.hotId === piece.id;
+  const caliente = CREAN_EN_CALIENTE.has(input.activeTool) && input.hotId === piece.id;
   return {
     piece,
     caliente,

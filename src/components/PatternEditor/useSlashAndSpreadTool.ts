@@ -23,6 +23,7 @@ import {
   buildSpreadPiece,
   type OutlineHit,
 } from '../../utils/geometry/slashAndSpread';
+import { noPasoNada } from './noPasoNada';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -228,9 +229,13 @@ export function transitionMouseDown(
         error: null,
       };
     } catch (err) {
+      // `error` no llega a ninguna prop: `PatternEditor` nunca se la pasa a
+      // `SlashAndSpreadOverlay`. El canal de verdad es la tira (#1117); el
+      // campo se queda porque la máquina de estados lo lee en sus pruebas.
+      noPasoNada('abrir:linea-invalida', { pieceId: state.targetPieceId ?? undefined });
       return {
         ...state,
-        error: err instanceof Error ? err.message : 'Invalid slash line',
+        error: err instanceof Error ? err.message : null,
       };
     }
   }

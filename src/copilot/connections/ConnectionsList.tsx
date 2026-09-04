@@ -40,7 +40,7 @@ const headerStyle: React.CSSProperties = {
 };
 
 const addBtnStyle: React.CSSProperties = {
-  background: 'var(--accent, #6366f1)',
+  background: 'var(--accent)',
   color: 'white',
   border: 'none',
   padding: '7px 14px',

@@ -9,7 +9,7 @@ import NotchToolOverlay from './overlays/NotchToolOverlay';
 import NotchMirrorOverlay from './overlays/NotchMirrorOverlay';
 import GrainlineToolOverlay from './overlays/GrainlineToolOverlay';
 import PenToolOverlay from './overlays/PenToolOverlay';
-import RectangleToolOverlay from './overlays/RectangleToolOverlay';
+import ShapeToolOverlay from './overlays/ShapeToolOverlay';
 import MeasureToolOverlay from './overlays/MeasureToolOverlay';
 import NodeEditorOverlay from './overlays/NodeEditorOverlay';
 import EditPatternOverlay from './overlays/EditPatternOverlay';
@@ -61,6 +61,9 @@ interface ToolOverlayProps {
   penWillClose: boolean;
   rectPreview: { x: number; y: number; width: number; height: number } | null;
   rectDimensions: { width: number; height: number; center: Point2D } | null;
+  /** Círculo (#1111): la caja de la elipse en curso, no la del arrastre. */
+  circlePreview: { x: number; y: number; width: number; height: number } | null;
+  circleDimensions: { width: number; height: number; center: Point2D } | null;
   seamSegmentA: SegmentSelection | null;
   seamHoveredTarget: EdgeTarget | null;
   /** El borde del press mientras el gesto de coser sigue vivo, y el tramo que
@@ -244,7 +247,11 @@ export default function ToolOverlay(props: ToolOverlayProps) {
       )}
 
       {activeTool === 'rectangle' && (
-        <RectangleToolOverlay zoom2D={zoom2D} units={units} rectPreview={props.rectPreview} rectDimensions={props.rectDimensions} />
+        <ShapeToolOverlay zoom2D={zoom2D} units={units} preview={props.rectPreview} dimensions={props.rectDimensions} />
+      )}
+
+      {activeTool === 'circle' && (
+        <ShapeToolOverlay figura="elipse" zoom2D={zoom2D} units={units} preview={props.circlePreview} dimensions={props.circleDimensions} />
       )}
 
       {(activeTool === 'measure' || activeTool === 'measureCurve' || activeTool === 'compareCurves') && (

@@ -3,8 +3,8 @@ import { DOCK_2D_CATALOG, getDockToolById } from '../dock2dTools';
 import { DEFAULT_DOCK_2D_IDS } from '../../../store/dockSlice';
 
 describe('dock2dTools catalog', () => {
-  it('has 13 entries (3 unwired phantom tools removed #529; point y seamEdit añadidos; line retirado en internalShape)', () => {
-    expect(DOCK_2D_CATALOG).toHaveLength(13);
+  it('has 14 entries (3 unwired phantom tools removed #529; point y seamEdit añadidos; line retirado en internalShape; circle nace en #1111)', () => {
+    expect(DOCK_2D_CATALOG).toHaveLength(14);
   });
 
   it('drops the unwired phantom tools and the retired line tool', () => {

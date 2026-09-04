@@ -123,6 +123,16 @@ interface ToolHooks {
     cancel: () => void;
     isArmed: () => boolean;
   };
+  /** Círculo / elipse (#1111): misma superficie que el rectángulo, hermano suyo. */
+  circleTool: {
+    handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseUp: (e?: React.MouseEvent<SVGSVGElement>) => void;
+    /** true = consumió (Escape con press vivo). */
+    handleKeyDown: (e: KeyboardEvent) => boolean;
+    cancel: () => void;
+    isArmed: () => boolean;
+  };
   seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   notchTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -327,7 +337,7 @@ export function useEditorInteractions(
   const [isDraggingEndpoint, setIsDraggingEndpoint] = useState(false);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
-  const { pen, rectTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas } = tools;
+  const { pen, rectTool, circleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas } = tools;
 
   const selectionHasLocked = selectedPieceIds.some(
     id => pieces.find(p => p.id === id)?.locked,
@@ -453,7 +463,7 @@ export function useEditorInteractions(
     // Quién consumió la tecla, si alguien lo dijo. Solo los tres ganchos cuyo
     // `handleKeyDown` devuelve boolean pueden decirlo; los demás se ven en la
     // bitácora por lo que despachan.
-    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | 'cotas' | null;
+    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | 'circle' | 'cotas' | null;
     const routeKey = (e: KeyboardEvent): KeyConsumer => {
       // Línea interna: con trazo vivo, Escape / Enter / Retroceso / Supr son
       // del motor. `handleKeyDown` dice si consumió.
@@ -481,6 +491,15 @@ export function useEditorInteractions(
           e.preventDefault();
           e.stopPropagation();
           return 'rectangle';
+        }
+        return null;
+      }
+      // Círculo: la misma ley que el rectángulo, su hermano (#1111).
+      if (activeTool === 'circle' && circleTool.isArmed()) {
+        if (circleTool.handleKeyDown(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return 'circle';
         }
         return null;
       }
@@ -546,7 +565,7 @@ export function useEditorInteractions(
     };
     window.addEventListener('keydown', onKeyCapture, { capture: true });
     return () => window.removeEventListener('keydown', onKeyCapture, { capture: true });
-  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, cotas]);
+  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, cotas]);
 
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);
@@ -711,6 +730,7 @@ export function useEditorInteractions(
     }
     if (activeTool === 'pen') { pen.handleMouseDown(e); return; }
     if (activeTool === 'rectangle') { rectTool.handleMouseDown(e); return; }
+    if (activeTool === 'circle') { circleTool.handleMouseDown(e); return; }
     if (activeTool === 'seam') { seamTool.handleMouseDown(e); return; }
     if (activeTool === 'notch') { notchTool.handleMouseDown(e); return; }
     if (activeTool === 'point') { pointTool.handleMouseDown(e); return; }
@@ -852,7 +872,7 @@ export function useEditorInteractions(
         };
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, circleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -969,6 +989,7 @@ export function useEditorInteractions(
     }
     if (activeTool === 'pen') pen.handleMouseMove(e);
     if (activeTool === 'rectangle') rectTool.handleMouseMove(e);
+    if (activeTool === 'circle') circleTool.handleMouseMove(e);
     if (activeTool === 'seam') {
       seamTool.handleMouseMove(e);
       seamEditTool.handleMouseMove(e);
@@ -990,7 +1011,7 @@ export function useEditorInteractions(
     if (activeTool === 'internalShape') internalShapeTool.handleMouseMove(e);
     if (activeTool === 'pleat') pleatTool.handleMouseMove(e);
     if (activeTool === 'elastic') elasticTool.handleMouseMove(e);
-  }, [activeTool, zoom2D, pan2D, pen, rectTool, seamTool, notchTool, pointTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
+  }, [activeTool, zoom2D, pan2D, pen, rectTool, circleTool, seamTool, notchTool, pointTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
 
   const handleMouseUp = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
     const press = pressRef.current;
@@ -1090,6 +1111,11 @@ export function useEditorInteractions(
       if (e) rectTool.handleMouseUp(e);
       else rectTool.cancel();
     }
+    if (activeTool === 'circle') {
+      // Misma ley que el rectángulo: sin evento no se inventa geometría.
+      if (e) circleTool.handleMouseUp(e);
+      else circleTool.cancel();
+    }
     if (activeTool === 'seamAllowance') {
       // Blur no trae un release geométrico fiable. La captura de puntero hace
       // llegar el evento real incluso fuera del SVG; sin evento se cancela.
@@ -1114,7 +1140,7 @@ export function useEditorInteractions(
     if (activeTool === 'point' && e) pointTool.handleMouseUp(e);
     if (activeTool === 'seam' && e) seamTool.handleMouseUp(e);
     if (activeTool === 'notch' && e) notchTool.handleMouseUp(e);
-  }, [activeTool, pen, rectTool, seamAllowanceTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, dispatch, pieces, zoom2D, pan2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool, internalShapeTool, pointTool, seamTool, notchTool]);
+  }, [activeTool, pen, rectTool, circleTool, seamAllowanceTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, dispatch, pieces, zoom2D, pan2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool, internalShapeTool, pointTool, seamTool, notchTool]);
 
   const handlePointerCancel = useCallback(() => {
     pushJournal('gesture', 'cancel', { tool: activeTool });
@@ -1131,10 +1157,11 @@ export function useEditorInteractions(
     if (activeTool === 'internalShape') internalShapeTool.cancelPress();
     if (activeTool === 'pen') pen.reset();
     if (activeTool === 'rectangle') rectTool.cancel();
+    if (activeTool === 'circle') circleTool.cancel();
     if (activeTool === 'grainline') grainlineTool.cancel();
     internalLineDragRef.current = null;
     setIsDraggingEndpoint(false);
-  }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, grainlineTool]);
+  }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, grainlineTool]);
 
   const handleMouseLeave = useCallback(() => {
     if (activeTool === 'seamAllowance') seamAllowanceTool.limpiarHover();

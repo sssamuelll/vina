@@ -226,7 +226,7 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
             alignItems: 'center',
             justifyContent: 'center',
             background: 'rgba(99, 102, 241, 0.14)',
-            border: '2px dashed var(--accent, #6366f1)',
+            border: '2px dashed var(--accent)',
             borderRadius: 12,
           }}
         >

@@ -266,6 +266,24 @@
    * --z-dock (5) y --z-hint (50) tiene que seguir existiendo para que la
    * escalera se lea completa. */
   --z-panel: 25;
+  /* Cromo acoplado al lienzo: superficies PERSISTENTES que duran lo que dura
+   * su contexto —la tira de la herramienta activa, la fila de capas—, no lo
+   * que dura un gesto. Las dos estaban en --z-menu (200), que es el rol de lo
+   * TRANSITORIO: algo que aparece, se usa y se va. Con ese rol prestado, una
+   * superficie que nunca se cierra empataba con el modal de piquete —misma
+   * esquina, mismos cuatro números— y el desempate lo decidía el orden del
+   * DOM, no el diseño; y le ganaba al aviso de soltar el DXF, que cubre el
+   * lienzo entero.
+   *
+   * Va encima del dock (5) y de los paneles (25) porque es la cabina de la
+   * herramienta y no se puede enterrar; debajo del aviso del lienzo (50), de
+   * las barras (100) y de los menús (200) porque todo eso o urge más o dura
+   * menos. La CAPA dice dónde se pinta; el MATERIAL dice de qué está hecha:
+   * estas dos siguen usando el material `overlay`, y eso no cambia.
+   *
+   * Hallazgo F10 de docs/reports/2026-09-04-revision-adversarial-ui.md;
+   * decisión escrita en la enmienda 2026-09-05 del spec de emplazamiento. */
+  --z-canvas-chrome: 40;
   /* Aviso transitorio sobre el lienzo (el "suelta el DXF aquí"). Va encima del
    * documento y de los paneles, pero DEBAJO del cromo de la app: el aviso
    * pertenece al lienzo, no tapa la barra superior ni la de IA. Conserva el 50

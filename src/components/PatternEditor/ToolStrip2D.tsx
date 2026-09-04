@@ -28,12 +28,14 @@ const OCULTAS_EN_LA_TIRA: Record<string, ReadonlySet<string>> = {
  * (`ToolOptionsBar2D`, #1049) en la esquina del lienzo, donde el dock no la
  * tapa. Lee `editor.activeTool`, la autoridad de `PatternEditor`.
  *
- * `falta`: lo que a la herramienta le falta para trabajar (#1117). `inerte`:
- * hay un modal encima y la tira no debe recibir el foco (#1125).
+ * `falta`: lo que a la herramienta le falta para trabajar (#1117).
+ * `desenlace`: el gesto que se armó y murió sin dejar nada (#1117, hallazgo G);
+ * lo escribe `noPasoNada` y `PatternEditor` lo borra a los 4 s. `inerte`: hay
+ * un modal encima y la tira no debe recibir el foco (#1125).
  */
 export default function ToolStrip2D(
-  { lineaDeSujeto, falta = null, inerte = false }:
-  { lineaDeSujeto: string | null; falta?: string | null; inerte?: boolean },
+  { lineaDeSujeto, falta = null, desenlace = null, inerte = false }:
+  { lineaDeSujeto: string | null; falta?: string | null; desenlace?: string | null; inerte?: boolean },
 ) {
   const dispatch = useDispatch();
   const raiz = useRef<HTMLDivElement>(null);
@@ -95,6 +97,13 @@ export default function ToolStrip2D(
       </div>
       {falta && <div className="tool-strip__falta">{falta}</div>}
       {lineaDeSujeto && <div className="tool-strip__subject">{lineaDeSujeto}</div>}
+      {/* La region viva va montada SIEMPRE y solo cambia su contenido: los
+          lectores de pantalla anuncian cambios DENTRO de una region que ya
+          existia; insertar la region misma se anuncia distinto entre NVDA y
+          JAWS. El precedente correcto es ToastContainer.tsx:41. */}
+      <div className="tool-strip__desenlace-viva" aria-live="polite">
+        {desenlace && <div className="tool-strip__desenlace">{desenlace}</div>}
+      </div>
       {activeTool === 'seamAllowance' && (
         <div className="tool-strip__options">
           <div className="tool-strip__item">

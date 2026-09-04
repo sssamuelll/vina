@@ -368,7 +368,12 @@ const SinglePiece = memo(function SinglePiece({
                   width: '100%',
                   height: '100%',
                   background: 'transparent',
-                  border: 'none',
+                  // El contorno se quita y se repone: sin esto el unico indicio
+                  // de foco era el resaltado de seleccion de `onFocus`, que se
+                  // pierde en cuanto se escribe. Mismo par que su hermano
+                  // `.layer-inline-rename` (LayerPanel.css:38). El censo de R6
+                  // no lo veia: solo miraba CSS, y este estilo va en linea.
+                  border: '1px solid var(--accent)',
                   outline: 'none',
                   fontSize: `${11 / zoom2D}px`,
                   fontFamily: 'var(--font-mono-2d)',

@@ -51,6 +51,27 @@ grep -E "Test Files|Tests " /tmp/vina-deploy-vitest.log | sed 's/^ */✓ /'
 node scripts/verify-wasm-smoke.mjs
 echo "✓ smoke del WASM commiteado"
 
+# Emplazamiento: el trinquete estático cuenta literales, no ve QUIÉN TAPA A
+# QUIÉN. La revisión adversarial del 2026-09-04 encontró tres colisiones vivas
+# con los 7742 unitarios en verde (jsdom no calcula apilamiento) y una cuarta
+# el 09-05: los chips de cota se comían dos mandos del transform box, y tirar
+# del "asa este" le subía el ALTO a María en vez del ancho.
+#
+# Se corren estos y no `npm run audit:ui`, que era lo que pedía el informe
+# (§ 7.1 punto 7): el censo tarda 13,6 min, tuvo 3 timeouts reales en su última
+# corrida, y —lo que lo descalifica como gate— sus contadores BAJAN cuando un
+# estado no carga (42/42 con 136 fallos de contraste el 14-08; 39/42 con 107 el
+# 09-04). Un techo sobre esos números se gana dejando que algo se rompa. El
+# censo sigue siendo la herramienta de diagnóstico manual que dice ser.
+npx playwright test \
+  tests/e2e/emplazamiento-lienzo-2d.spec.ts \
+  tests/e2e/emplazamiento-modales.spec.ts \
+  tests/e2e/emplazamiento-paneles.spec.ts \
+  tests/e2e/emplazamiento-tira.spec.ts \
+  tests/e2e/cotas-no-tapan-el-transform-box.spec.ts \
+  > /tmp/vina-deploy-e2e.log 2>&1 || { tail -30 /tmp/vina-deploy-e2e.log >&2; exit 1; }
+grep -E "passed|failed" /tmp/vina-deploy-e2e.log | tail -1 | sed 's/^ */✓ emplazamiento: /'
+
 echo "── Build ──────────────────────────────────────────────"
 npm run build > /tmp/vina-deploy-build.log 2>&1 || { tail -20 /tmp/vina-deploy-build.log >&2; exit 1; }
 # Del index.html, no por glob: assets/ puede tener más de un index-*.js

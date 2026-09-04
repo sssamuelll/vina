@@ -6,7 +6,10 @@
   top: 28px; /* 20 px de regla + 8 de aire: nunca sobre la regla */
   right: 12px;
   width: min(300px, calc(100% - 24px));
-  z-index: var(--z-menu);
+  /* Cromo acoplado al lienzo, no menú: la tira vive mientras haya herramienta
+     2D activa. En --z-menu empataba con el modal de piquete, que declara esta
+     misma esquina (enmienda 2026-09-05 del spec de emplazamiento). */
+  z-index: var(--z-canvas-chrome);
   padding: 14px 16px;
   background: var(--surface-overlay-bg);
   border: var(--surface-overlay-border-flush);
@@ -33,6 +36,26 @@
   border-radius: var(--radius-sm);
   background: var(--accent-subtle);
   color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+/* El envoltorio de la región viva está SIEMPRE montado (ToolStrip2D.tsx) para
+   que el lector de pantalla anuncie el cambio dentro de una región que ya
+   existía. Vacío no ocupa: `.tool-strip` es un bloque sin `gap`, así que un
+   div sin contenido mide 0. Nada de `display:none` ni `:empty` — eso lo
+   sacaría del árbol de accesibilidad, que es justo lo que se quiere evitar. */
+.tool-strip__desenlace-viva { margin: 0; padding: 0; }
+
+/* El desenlace de un gesto que no pasó nada (#1117): va DEBAJO de las otras dos
+   ranuras y dura 4 s. Se distingue de `__falta` por FORMA —riel a la izquierda,
+   sin relleno— y no solo por tono: las dos pueden estar en pantalla a la vez. */
+.tool-strip__desenlace {
+  margin-top: 6px;
+  padding: 2px 0 2px 8px;
+  /* --accent es el rol de BORDES del token (tokens.css:26); a 2 px sobre el
+     overlay casi negro da ~3,5:1, por encima del 3:1 de un elemento gráfico. */
+  border-left: 2px solid var(--accent);
+  color: var(--text-secondary);
   font-size: var(--text-sm);
 }
 

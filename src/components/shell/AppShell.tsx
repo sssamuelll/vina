@@ -261,14 +261,14 @@ export default function AppShell() {
               alignItems: 'center',
               justifyContent: 'center',
               background: 'rgba(99, 102, 241, 0.12)',
-              border: '2px dashed var(--accent, #6366f1)',
+              border: '2px dashed var(--accent)',
               borderRadius: 8,
             }}
           >
             <div
               style={{
-                background: 'var(--bg-elevated, #1e1e1e)',
-                color: 'var(--text-primary, #fff)',
+                background: 'var(--bg-elevated)',
+                color: 'var(--text-primary)',
                 padding: '14px 22px',
                 borderRadius: 8,
                 fontSize: 15,

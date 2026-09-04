@@ -29,8 +29,8 @@
   border-radius: 10px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
   font-size: 13px;
-  font-family: var(--font-sans, Inter, sans-serif);
-  color: var(--text-primary, #f0f0f0);
+  font-family: var(--font-sans);
+  color: var(--text-primary);
   line-height: 1.4;
   pointer-events: auto;
   animation: toast-enter 0.16s ease-out both;
@@ -70,7 +70,7 @@
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 6px;
   cursor: pointer;
-  color: var(--text-primary, #f0f0f0);
+  color: var(--text-primary);
   font-size: 12px;
   font-family: inherit;
   line-height: 1.4;
@@ -97,7 +97,14 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  color: var(--text-dim, rgba(255, 255, 255, 0.45));
+  /* Esto NO es consecuencia de limpiar el respaldo: es un arreglo de contraste
+   * aparte. El respaldo que había (blanco al 45%) estaba MUERTO —tokens.css
+   * entra global vía base.css:1, así que --text-dim resolvía siempre—, o sea
+   * que la equis llevaba 1,96:1 desde el primer día y borrarlo no cambia un
+   * píxel. --text-dim es la tinta de lo inerte (deshabilitado); un botón que se
+   * pulsa lleva --text-muted, que da 4,87:1 y ya es el par reposo/hover con
+   * --text-primary en .layer-icon-btn. */
+  color: var(--text-muted);
   font-size: 14px;
   line-height: 1;
   border-radius: 4px;
@@ -106,7 +113,7 @@
 }
 
 .toast__dismiss:hover {
-  color: var(--text-primary, #f0f0f0);
+  color: var(--text-primary);
   background: rgba(255, 255, 255, 0.08);
 }
 

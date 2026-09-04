@@ -741,6 +741,10 @@ export type Tool2D =
   | 'pen'          // draw piece outlines (bezier)
   | 'internalShape' // "Línea interna": recta / curva por puntos / bezier con enganche (spec 2026-08-29)
   | 'rectangle'    // quick rectangular pieces
+  // Circulo y elipse, hermanos del rectangulo. El numero del issue va en su
+  // propia linea: R3 del contrato lee un `#1111` en cola de una linea de
+  // CODIGO como color hexadecimal, y el trinquete se pone rojo. Issue 1111.
+  | 'circle'
   | 'seam'         // connect edges between pieces
   | 'seamEdit'     // inspect existing seams — the CLO3D "Edit Sewing" half (#219)
   | 'topstitchSeamline'  // topstitch along seam edge

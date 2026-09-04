@@ -11,10 +11,14 @@ import type { RootState } from '../../store';
 import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
+import { useCircleTool } from './useCircleTool';
 import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import CotaLines from './cotas/CotaLines';
 import { cotasDelSujeto, faltaSujeto } from './cotas/sujeto';
+import { cajasDeAsas } from './cotas/cotasGeometry';
+import { resizePieceTo } from './pieceResize';
 import ToolStrip2D from './ToolStrip2D';
+import { suscribirNoPasoNada } from './noPasoNada';
 import FilaDeCapas from './FilaDeCapas';
 import type { Cota } from './cotas/cotas';
 import { useFreeSewingTool } from './useFreeSewingTool';
@@ -89,6 +93,10 @@ const objectUrlMap = new Map<string, string>();
  *  `--surface-chrome-border` a cada lado (2px). Exportada para que el test
  *  de `handleZoomToFit` use el mismo valor en vez de repetirlo. */
 export const DOCK_WIDTH_PX = 68;
+
+/** Lo que dura en la tira el desenlace de un gesto que no pasó nada (#1117):
+ *  suficiente para leerlo, corto para no quedarse contestando el gesto de antes. */
+const DESENLACE_MS = 4000;
 
 interface PatternEditorProps {
   /** Opens the DXF file picker; wired by AppShell to its hidden <input>. */
@@ -197,6 +205,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
 
   const pen = usePenTool(zoom2D, pan2D, handlePieceComplete);
   const rectTool = useRectangleTool(zoom2D, pan2D, handlePieceComplete);
+  // El círculo nace de la misma puerta que la pluma y el rectángulo (#1111).
+  const circleTool = useCircleTool(zoom2D, pan2D, handlePieceComplete);
 
   const handleSeamComplete = useCallback((seam: Omit<Seam, 'id'>) => {
     const fullSeam: Seam = { ...seam, id: newId() };
@@ -453,6 +463,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       rectTool.cancel();
       return;
     }
+    // Círculo: la misma ley que su hermano el rectángulo (#1111).
+    if (activeTool === 'circle' && circleTool.isArmed()) {
+      suppressed();
+      circleTool.cancel();
+      return;
+    }
     // Pluma con trazo vivo: el botón derecho no hace nada y el menú no se
     // abre (spec § 5), igual que en la línea interna.
     if (activeTool === 'pen' && pen.nodes.length > 0) {
@@ -612,7 +628,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       internalLineType: hitInternalLineType,
       isEditingNodes: editPatternTool.isEditing,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, pen.nodes.length]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, pen.nodes.length]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
@@ -657,27 +673,55 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const cotasRef = useRef<CotasLayerHandle>(null);
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas: cotasRef,
+      pen, rectTool, circleTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas: cotasRef,
     });
 
   // ── Cotas vivas (spec 2026-08-30 § 3, § 5): la pieza nueva o seleccionada
   // muestra Ancho/Alto sobre el lienzo y se editan ahí mismo. ────────────────
+  // La figura que la cabina del círculo tiene puesta. La necesita `aplicarCota`
+  // para no romper la promesa de la herramienta al escribir una sola medida.
+  const figuraDelCirculo = useSelector(
+    (s: RootState) => String(s.tools.toolOptions?.circle?.shapeType ?? 'circle'),
+  );
   const defaultRect = useSelector((s: RootState) => ({
     width: Number(s.tools.toolOptions?.rectangle?.width ?? 100),
     height: Number(s.tools.toolOptions?.rectangle?.height ?? 100),
   }), shallowEqual);
   const { hotId: rectHotId, enfriar: enfriarRect } = rectTool;
+  const { hotId: circleHotId, enfriar: enfriarCircle } = circleTool;
+  // Solo una herramienta está activa a la vez, y cada una enfría la suya en
+  // cuanto deja de serlo: el sujeto caliente es el de la herramienta en curso.
+  const hotId = activeTool === 'circle' ? circleHotId : rectHotId;
   const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
   const sujeto = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
-    hotId: rectHotId, isDragging: isDraggingPiece || transformTool.isDragging || isDraggingEndpoint,
+    hotId, isDragging: isDraggingPiece || transformTool.isDragging || isDraggingEndpoint,
     contextMenuOpen: ctxMenu.visible, calibrationActive: calibrationMode !== null,
     hiddenLayerIds, layerLocked, saSelection: editor.saSelection,
     saAncla: seamAllowanceTool.ancla, saHover: seamAllowanceTool.hover,
-  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, rectHotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover]);
+  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover]);
   // Las cuatro herramientas que toman el sujeto de la selección lo dicen en la
   // tira antes del clic, en vez de morirse mudas (#1117).
   const falta = faltaSujeto(activeTool, selectedPieceIds);
+
+  // El desenlace de un gesto que se armó y no dejó nada (#1117, hallazgo G).
+  // Va a la tira y no a un toast: el mismo gesto se repite cinco veces en tres
+  // segundos y serían cinco toasts encima del lienzo.
+  const [desenlace, setDesenlace] = useState<string | null>(null);
+  useEffect(() => {
+    let borrado: ReturnType<typeof setTimeout> | undefined;
+    const cancelar = suscribirNoPasoNada((aviso) => {
+      setDesenlace(aviso.texto);
+      clearTimeout(borrado);
+      borrado = setTimeout(() => setDesenlace(null), DESENLACE_MS);
+    });
+    return () => { cancelar(); clearTimeout(borrado); };
+  }, []);
+  // La tira pinta el nombre de la herramienta activa en su cabecera. Sin esto,
+  // fallar un piquete y pasarse a Hilo dentro de los 4 s deja «Hilo» arriba y
+  // el mensaje del piquete debajo: el aviso queda atribuido a la herramienta
+  // equivocada. Es el mismo defecto que este canal vino a arreglar, al reves.
+  useEffect(() => setDesenlace(null), [activeTool]);
 
   const abrirChipVisto = useRef(0);
   useEffect(() => {
@@ -698,9 +742,25 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     const viva = pieces.some(p => p.id === rectHotId);
     if (activeTool !== 'rectangle' || selectedPieceIds.length !== 1 || selectedPieceIds[0] !== rectHotId || !viva) enfriarRect();
   }, [activeTool, selectedPieceIds, pieces, rectHotId, enfriarRect]);
+  useEffect(() => {
+    if (!circleHotId) return;
+    const viva = pieces.some(p => p.id === circleHotId);
+    if (activeTool !== 'circle' || selectedPieceIds.length !== 1 || selectedPieceIds[0] !== circleHotId || !viva) enfriarCircle();
+  }, [activeTool, selectedPieceIds, pieces, circleHotId, enfriarCircle]);
 
   const aplicarCota = useCallback((cota: Cota, valueMm: number, token?: UndoBatchToken) => {
-    const update = cota.apply(valueMm);
+    // Un círculo escrito por UNA sola cota dejaba de ser círculo. La cota de una
+    // pieza es su caja (2rx × 2ry), así que escribir el Ancho estiraba solo la
+    // X: dibujar 120×120 en modo «Círculo», escribir 200 en Ancho y quedarse con
+    // 200×120 —un óvalo— mientras el selector seguía diciendo «Círculo». Medido
+    // en Chrome el 2026-09-05 por la revisión adversarial. Con la figura puesta
+    // en Círculo, la medida escrita manda en las dos dimensiones; en Elipse cada
+    // cota sigue siendo suya, que es lo que una elipse significa.
+    const circuloVivo = activeTool === 'circle' && figuraDelCirculo === 'circle'
+      && (cota.kind === 'ancho' || cota.kind === 'alto');
+    const piezaDeLaCota = circuloVivo ? pieces.find(p => p.id === sujeto.piece?.id) : undefined;
+    const uniforme = piezaDeLaCota ? resizePieceTo(piezaDeLaCota, valueMm, valueMm) : null;
+    const update = uniforme ? { kind: 'piece' as const, ...uniforme } : cota.apply(valueMm);
     if (!update) return;
     // Liveness: si el sujeto murió (undo, borrado), no se escribe nada.
     if (update.kind === 'margen') {
@@ -740,7 +800,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       const accion = updateInternalLine({ pieceId: update.pieceId, lineId: update.lineId, path: update.path });
       dispatch(token ? withUndoBatchToken(accion, token) : accion);
     }
-  }, [pieces, dispatch]);
+  }, [pieces, dispatch, activeTool, figuraDelCirculo, sujeto.piece?.id]);
   const aplicarRef = useRef(aplicarCota);
   aplicarRef.current = aplicarCota;
 
@@ -748,8 +808,14 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // Adjust Last Operation). Fuera del historial de deshacer, a propósito.
   const escribirDefault = useCallback((cota: Cota, valueMm: number) => {
     if (!sujeto.caliente) return;
+    if (activeTool === 'circle') {
+      // La barra del círculo tiene un solo número, el Radio, y la cota es la
+      // caja de la elipse (2rx × 2ry): la mitad de lo que se escribió.
+      dispatch(setToolOption({ toolId: 'circle', optionId: 'radius', value: Math.round(valueMm / 2 * 10) / 10 }));
+      return;
+    }
     dispatch(setToolOption({ toolId: 'rectangle', optionId: cota.kind === 'ancho' ? 'width' : 'height', value: Math.round(valueMm * 10) / 10 }));
-  }, [sujeto.caliente, dispatch]);
+  }, [sujeto.caliente, activeTool, dispatch]);
 
   const handleCotaCommit = useCallback((cota: Cota, valueMm: number) => {
     aplicarCota(cota, valueMm);
@@ -817,6 +883,24 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // conserva el mismo id de pieza y el contrato pide cerrar igual.
   const sujetoId = sujeto.piece?.id ?? null;
   useEffect(() => () => cerrarScrub(), [sujetoId, activeTool, cerrarScrub]);
+
+  /* Los tiradores del transform box son estorbos para los chips de cota.
+   *
+   * Sin esto se pisaban, y no de forma inocua: medido el 2026-09-04, el chip
+   * del alto tapaba entero el asa `e` y el del ancho la de giro, así que
+   * `elementFromPoint` sobre los dos devolvia `button.cota`. El gesto no se
+   * perdia — se convertia en un scrub del chip —, o sea que tirar del "asa
+   * este" para ensanchar le subia el ALTO a Maria: su queja de #198 entrando
+   * por otra puerta. Es tambien la causa real del e2e
+   * `maria-198-resize-con-ancla` en rojo, que se leia como matematica de
+   * resize rota cuando la matematica estaba bien.
+   *
+   * Solo estorban mientras la caja se pinta: `showTransformBox` gobierna el
+   * hit-test de los tiradores, asi que es la misma condicion. */
+  const estorbosDeLasAsas = useMemo(
+    () => (showTransformBox ? cajasDeAsas(transformTool.handles, pan2D, zoom2D) : undefined),
+    [showTransformBox, transformTool.handles, pan2D, zoom2D],
+  );
 
   /* Durante el arrastre el grupo de la pieza se mueve por DOM directo
    * (`useEditorInteractions.ts:818`), mientras TODA superficie que se coloque
@@ -1123,6 +1207,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             penWillClose={pen.willClose}
             rectPreview={rectTool.previewRect}
             rectDimensions={rectTool.rectDimensions}
+            circlePreview={circleTool.previewRect}
+            circleDimensions={circleTool.circleDimensions}
             seamSegmentA={seamTool.segmentA}
             seamHoveredTarget={seamTool.hoveredTarget}
             seamActiveTarget={seamTool.activeTarget}
@@ -1277,6 +1363,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         lecturaApagada={sujeto.lecturaApagada}
         pan2D={pan2D}
         zoom2D={zoom2D}
+        estorbos={estorbosDeLasAsas}
         disabled={sujeto.disabled}
         onCommit={handleCotaCommit}
         onScrubStart={handleCotaScrubStart}
@@ -1289,6 +1376,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         <ToolStrip2D
           lineaDeSujeto={sujeto.lineaDeSujeto}
           falta={falta}
+          desenlace={desenlace}
           /* El modal de piquete no usa portal ni atrapa el foco, y la tira vive
              en su misma esquina: se declara inerte mientras esté abierto (#1125). */
           inerte={Boolean(notchTool.refining?.notch.notchAnchor)}
