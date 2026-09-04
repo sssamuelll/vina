@@ -5,6 +5,7 @@ import { screenToPattern } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
 import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 import { isDrag } from './gestureConstants';
+import { noPasoNada } from './noPasoNada';
 import { polarOf, polarPoint } from './polyPenGeometry';
 
 /**
@@ -66,7 +67,12 @@ export function useGrainlineTool(
     const pt = toPattern(e.clientX, e.clientY, rect);
 
     const piece = hitTestPieceBBox(pt, pieces);
-    if (!piece) return;
+    if (!piece) {
+      // Hilo no pinta hover en ningún momento del gesto: aquí el silencio es
+      // total, y apretar fuera de una pieza no dejaba ni rastro (#1117).
+      noPasoNada('grainline:fuera-de-pieza');
+      return;
+    }
 
     const local = patternToPieceLocal(pt, piece);
     setState({

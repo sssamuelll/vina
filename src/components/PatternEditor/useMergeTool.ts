@@ -7,6 +7,7 @@ import { mergePieces } from '../../utils/patternOps';
 import { findSharedEdge } from '../../utils/geometry/mergeOutline';
 import { screenToPattern } from '../../utils/geometry';
 import { useGuardedAction } from '../../hooks/useGuardedAction';
+import { noPasoNada } from './noPasoNada';
 
 export interface MergeState {
   pieceIdA: string | null;
@@ -91,7 +92,11 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
         return;
       }
 
-      if (clickedPiece.id === s.pieceIdA) return; // clicked same piece
+      if (clickedPiece.id === s.pieceIdA) {
+        // Clic otra vez sobre la pieza ya elegida: unir necesita dos.
+        noPasoNada('unir:misma-pieza', { pieceId: clickedPiece.id });
+        return;
+      }
 
       // Select second piece and try to merge
       const pieceA = pieces.find(p => p.id === s.pieceIdA);
@@ -108,7 +113,9 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
           ...prev,
           pieceIdB: clickedPiece.id,
           sharedEdgeFound: false,
-          error: 'No adjacent edge found between these pieces',
+          // Este texto SÍ se pinta (MergeOverlay), y va como texto SVG sobre el
+          // lienzo: en español y corto, que ahí no hay dónde envolverlo.
+          error: 'Esas piezas no se tocan; acerca una al borde de la otra',
         }));
         return;
       }
@@ -142,7 +149,7 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
 
           reset();
         } catch {
-          setState(prev => ({ ...prev, error: 'Failed to merge pieces' }));
+          setState(prev => ({ ...prev, error: 'Esas dos piezas no se pudieron unir; prueba con otro par' }));
         }
       });
     },

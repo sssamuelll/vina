@@ -24,6 +24,7 @@ import {
 import { snapToOutline, findEdgeForSegment, buildEdgeInfo, buildOutlineInfo } from './useMeasureTool';
 import { formatDimension } from '../../utils/units';
 import { screenToPattern } from './sewingUtils';
+import { noPasoNada } from './noPasoNada';
 
 // ─── Exported Types ─────────────────────────────────────────────────────────
 
@@ -461,7 +462,12 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
     if (!snap) return;
 
     const clickedEdge = resolveEdge(snap);
-    if (!clickedEdge) return;
+    if (!clickedEdge) {
+      // El enganche acertó un borde y aquí la pieza ya no aparece: sin esto
+      // caminar la costura no arranca y nada lo dice (#1117).
+      noPasoNada('walkseam:borde-sin-resolver', { pieceId: snap.pieceId });
+      return;
+    }
 
     const stationary = stationaryEdgeRef.current;
     const mobile = mobileEdgeRef.current;

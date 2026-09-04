@@ -11,6 +11,7 @@ import { interpolateEdgePoint, computeEdgeLengthMM } from '../../utils/geometry/
 import { screenToPattern } from '../../utils/geometry';
 import { pieceLocalToPattern } from '../../utils/geometry/pieceSpace';
 import { uid } from '../../utils/pathHelpers';
+import { noPasoNada } from './noPasoNada';
 
 const EDGE_HIT_THRESHOLD = 20; // px screen space
 
@@ -122,7 +123,12 @@ export function useTrimTool(
       const endOffset = (toolOptions.endOffset as number) ?? 10;
 
       const edgeLen = computeEdgeLengthMM(piece, hit.edgeName);
-      if (edgeLen <= 0) return;
+      if (edgeLen <= 0) {
+        // El clic acertó un borde, pero repartir avíos sobre un borde de largo
+        // cero no da ninguno: sin aviso, el clic bueno se ve como uno fallado.
+        noPasoNada('trim:borde-sin-largo', { pieceId: hit.pieceId, edgeName: hit.edgeName });
+        return;
+      }
 
       const tStart = Math.min(startOffset / edgeLen, 0.49);
       const tEnd = Math.max(1 - endOffset / edgeLen, 0.51);

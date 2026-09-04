@@ -31,6 +31,7 @@ import { spanLengthMm, unwrapOnSpan } from './distanceCommit';
 import { edgeSpanMm } from './edgeArc';
 import type { EdgeCommit, EdgeTarget } from './edgeGesture';
 import { EDGE_HIT_PX } from './gestureConstants';
+import { noPasoNada } from './noPasoNada';
 import { useEdgeGesture } from './useEdgeGesture';
 
 export type PointToolMode = 'point' | 'curvePoints' | 'bezier';
@@ -248,7 +249,12 @@ export function usePointTool(
     const at = pointOnPressedEdge(ring, target.edgeRange, commit.releaseT);
     const command = piece.outline[at.commandIndex];
     const endpoints = command && getEdgeEndpoints(piece.outline, at.commandIndex);
-    if (!command || !endpoints) return;
+    if (!command || !endpoints) {
+      // El press acertó el borde y el release cayó fuera de todo comando: sin
+      // esto el punto no nace y el gesto se ve igual que uno bueno (#1117).
+      noPasoNada('point:sin-comando', { pieceId: target.pieceId, commandIndex: at.commandIndex });
+      return;
+    }
     // `pointAt` habla en fracción de ARCO del comando; `splitSegmentAt`, al
     // final del verbo, habla en parámetro nativo de De Casteljau. En una sisa
     // esos números no coinciden, de ahí la conversión explícita.

@@ -10,6 +10,7 @@ import { selectPOM } from '../../store/editorSlice';
 import { uid } from '../../utils/pathHelpers';
 import { screenToPattern } from './sewingUtils';
 import { patternToPieceLocal } from './pieceTransform';
+import { noPasoNada } from './noPasoNada';
 
 // ─── Types ───
 
@@ -164,6 +165,17 @@ export function usePOMMeasureTool(zoom: number, pan: Point2D, pieces: PatternPie
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
+
+    // La fase se comprueba ANTES del enganche, no después. Con el campo de
+    // nombre abierto los clics se ignoran a proposito, pero puesto detras del
+    // `trySnap` el aviso solo hablaba cuando el clic ACERTABA un contorno —
+    // que es justo el clic que no se siente muerto. Maria, cuando cree que la
+    // herramienta se trabo, clica en el vacio. (Revision adversarial, 09-05.)
+    if (phaseRef.current === 'naming') {
+      noPasoNada('pom:nombre-abierto');
+      return;
+    }
+
     const rawPt = toPattern(e);
     const snap = trySnap(rawPt);
     if (!snap) return; // POM points must snap to an outline
@@ -206,7 +218,6 @@ export function usePOMMeasureTool(zoom: number, pan: Point2D, pieces: PatternPie
       setNameValue('');
       setPhase('naming');
     }
-    // In 'naming' phase, clicks are ignored (user must press Enter or Escape)
   }, [toPattern, trySnap, pieces]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {

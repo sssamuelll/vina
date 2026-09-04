@@ -16,6 +16,7 @@ import CotaLines from './cotas/CotaLines';
 import { cotasDelSujeto, faltaSujeto } from './cotas/sujeto';
 import { cajasDeAsas } from './cotas/cotasGeometry';
 import ToolStrip2D from './ToolStrip2D';
+import { suscribirNoPasoNada } from './noPasoNada';
 import FilaDeCapas from './FilaDeCapas';
 import type { Cota } from './cotas/cotas';
 import { useFreeSewingTool } from './useFreeSewingTool';
@@ -90,6 +91,10 @@ const objectUrlMap = new Map<string, string>();
  *  `--surface-chrome-border` a cada lado (2px). Exportada para que el test
  *  de `handleZoomToFit` use el mismo valor en vez de repetirlo. */
 export const DOCK_WIDTH_PX = 68;
+
+/** Lo que dura en la tira el desenlace de un gesto que no pasó nada (#1117):
+ *  suficiente para leerlo, corto para no quedarse contestando el gesto de antes. */
+const DESENLACE_MS = 4000;
 
 interface PatternEditorProps {
   /** Opens the DXF file picker; wired by AppShell to its hidden <input>. */
@@ -679,6 +684,25 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // Las cuatro herramientas que toman el sujeto de la selección lo dicen en la
   // tira antes del clic, en vez de morirse mudas (#1117).
   const falta = faltaSujeto(activeTool, selectedPieceIds);
+
+  // El desenlace de un gesto que se armó y no dejó nada (#1117, hallazgo G).
+  // Va a la tira y no a un toast: el mismo gesto se repite cinco veces en tres
+  // segundos y serían cinco toasts encima del lienzo.
+  const [desenlace, setDesenlace] = useState<string | null>(null);
+  useEffect(() => {
+    let borrado: ReturnType<typeof setTimeout> | undefined;
+    const cancelar = suscribirNoPasoNada((aviso) => {
+      setDesenlace(aviso.texto);
+      clearTimeout(borrado);
+      borrado = setTimeout(() => setDesenlace(null), DESENLACE_MS);
+    });
+    return () => { cancelar(); clearTimeout(borrado); };
+  }, []);
+  // La tira pinta el nombre de la herramienta activa en su cabecera. Sin esto,
+  // fallar un piquete y pasarse a Hilo dentro de los 4 s deja «Hilo» arriba y
+  // el mensaje del piquete debajo: el aviso queda atribuido a la herramienta
+  // equivocada. Es el mismo defecto que este canal vino a arreglar, al reves.
+  useEffect(() => setDesenlace(null), [activeTool]);
 
   const abrirChipVisto = useRef(0);
   useEffect(() => {
@@ -1309,6 +1333,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         <ToolStrip2D
           lineaDeSujeto={sujeto.lineaDeSujeto}
           falta={falta}
+          desenlace={desenlace}
           /* El modal de piquete no usa portal ni atrapa el foco, y la tira vive
              en su misma esquina: se declara inerte mientras esté abierto (#1125). */
           inerte={Boolean(notchTool.refining?.notch.notchAnchor)}

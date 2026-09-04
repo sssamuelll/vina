@@ -14,6 +14,7 @@ import type { SeamAllowanceAnchor } from './cotas/sujeto';
 import { edgePointAtT, edgeTForPoint, ringForOutline } from './edgeArc';
 import type { EdgeCommit, EdgeTarget } from './edgeGesture';
 import { DRAG_THRESHOLD_PX, EDGE_HIT_PX, VERTEX_HIT_PX } from './gestureConstants';
+import { noPasoNada } from './noPasoNada';
 import { useEdgeGesture } from './useEdgeGesture';
 
 interface SeamAllowanceEdgeTarget extends EdgeTarget {
@@ -238,7 +239,12 @@ export function useSeamAllowanceTool(
       const piece = pieces.find(candidate => candidate.id === target.pieceId);
       const edge = piece?.edges?.find(candidate => candidate.id === target.edgeId);
       const ring = piece ? ringForOutline(piece.outline) : null;
-      if (!piece || !edge || !ring) return;
+      if (!piece || !edge || !ring) {
+        // El hit-test resolvió un borde y aquí no se pudo reconstruir: el
+        // margen no se arma y el clic bueno se ve como uno fallado (#1117).
+        noPasoNada('margen:borde-sin-anillo', { pieceId: target.pieceId, edgeId: target.edgeId });
+        return;
+      }
       const local = patternToPieceLocal(world, piece);
       const t = edgeTForPoint(ring, edge.segmentRange, local);
       const point = edgePointAtT(ring, edge.segmentRange, t);

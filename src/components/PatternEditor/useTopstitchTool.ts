@@ -10,6 +10,7 @@ import { pieceLocalToPattern } from './pieceTransform';
 import { screenToPattern } from './sewingUtils';
 import { screenToPatternLength } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
+import { noPasoNada } from './noPasoNada';
 
 // Re-export pure functions for backward compatibility
 export { computeOffsetPath, computeSegmentOffsetPath } from '../../utils/geometry/path';
@@ -162,7 +163,10 @@ export function useTopstitchTool(
       if (!ep) return;
       const opts = getOptions();
       const path = computeOffsetPath(ep.start, ep.end, opts.offset);
+      // Borde de largo cero o desplazamiento que no cabe: el clic acertó el
+      // borde y no nació ningún pespunte (#1117).
       if (path.length > 0) addTopstitch(edge.pieceId, path);
+      else noPasoNada('pespunte:desplazamiento-no-cabe', { pieceId: edge.pieceId, offset: opts.offset });
       return;
     }
 
@@ -178,8 +182,21 @@ export function useTopstitchTool(
           const piece = pieces.find(p => p.id === prev.segSnapA!.pieceId);
           if (!piece) return prev;
           const snap = snapToEdge(pt, piece, zoom2D, [prev.segSnapA!.edgeIndex, prev.segSnapA!.edgeIndex + 1]);
-          if (!snap) return prev;
-          if (Math.abs(snap.t - prev.segSnapA!.t) < 0.01) return prev;
+          // El aviso viaja dentro del updater, igual que el `addTopstitch` de
+          // abajo: el segundo clic no tiene otra puerta donde decidirse.
+          // ponytail: en dev, StrictMode invoca los updaters dos veces, así que
+          // estas líneas se duplican en la bitácora LOCAL. En producción sale
+          // una sola vez, o sea que la bitácora que llega de María es correcta;
+          // el daño es a quien depure aquí. Sacarlo pide un `stateRef` y
+          // reescribir la rama, y hoy no compra lo que cuesta.
+          if (!snap) {
+            noPasoNada('pespunte:tramo-invalido', { pieceId: prev.segSnapA!.pieceId, motivo: 'otroBorde' });
+            return prev;
+          }
+          if (Math.abs(snap.t - prev.segSnapA!.t) < 0.01) {
+            noPasoNada('pespunte:tramo-invalido', { pieceId: prev.segSnapA!.pieceId, motivo: 'pegadoAlPrimero' });
+            return prev;
+          }
 
           const ep = getEdgeEndpoints(piece.outline, prev.segSnapA!.edgeIndex);
           if (!ep) return prev;
@@ -188,6 +205,7 @@ export function useTopstitchTool(
           const opts = getOptions();
           const path = computeSegmentOffsetPath(ep.start, ep.end, t0, t1, opts.offset);
           if (path.length > 0) addTopstitch(prev.segSnapA!.pieceId, path);
+          else noPasoNada('pespunte:desplazamiento-no-cabe', { pieceId: prev.segSnapA!.pieceId, offset: opts.offset });
           return { ...prev, segSnapA: null, segSnapB: null };
         }
       });

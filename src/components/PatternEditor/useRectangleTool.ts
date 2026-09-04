@@ -7,6 +7,7 @@ import { screenToPattern } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
 import { isDrag } from './gestureConstants';
 import { pushJournal } from '../../utils/telemetry/journal';
+import { noPasoNada } from './noPasoNada';
 
 interface NewPieceData {
   name: string;
@@ -126,7 +127,12 @@ export function useRectangleTool(
     if (!p.moved) {
       const { w, h } = barRef.current;
       if (w > 0 && h > 0) create(p.start.x, p.start.y, w, h);
-      else pushJournal('gesture', 'rectangle:release', { outcome: 'tooSmall', width: w, height: h, source: 'bar' });
+      else {
+        pushJournal('gesture', 'rectangle:release', { outcome: 'tooSmall', width: w, height: h, source: 'bar' });
+        // Ya estaba en la bitácora desde el 08-29; ahora además se dice, que es
+        // lo único que María puede ver (#1117).
+        noPasoNada('rectangulo:medida-en-cero', { width: w, height: h });
+      }
     } else {
       const end = e ? toPattern(e) : p.current;
       const w = Math.abs(end.x - p.start.x);

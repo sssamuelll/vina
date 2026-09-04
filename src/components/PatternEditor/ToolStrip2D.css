@@ -36,6 +36,26 @@
   font-size: var(--text-sm);
 }
 
+/* El envoltorio de la región viva está SIEMPRE montado (ToolStrip2D.tsx) para
+   que el lector de pantalla anuncie el cambio dentro de una región que ya
+   existía. Vacío no ocupa: `.tool-strip` es un bloque sin `gap`, así que un
+   div sin contenido mide 0. Nada de `display:none` ni `:empty` — eso lo
+   sacaría del árbol de accesibilidad, que es justo lo que se quiere evitar. */
+.tool-strip__desenlace-viva { margin: 0; padding: 0; }
+
+/* El desenlace de un gesto que no pasó nada (#1117): va DEBAJO de las otras dos
+   ranuras y dura 4 s. Se distingue de `__falta` por FORMA —riel a la izquierda,
+   sin relleno— y no solo por tono: las dos pueden estar en pantalla a la vez. */
+.tool-strip__desenlace {
+  margin-top: 6px;
+  padding: 2px 0 2px 8px;
+  /* --accent es el rol de BORDES del token (tokens.css:26); a 2 px sobre el
+     overlay casi negro da ~3,5:1, por encima del 3:1 de un elemento gráfico. */
+  border-left: 2px solid var(--accent);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
 .tool-strip__options { display: grid; gap: 6px; margin-top: 10px; }
 .tool-strip__item { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .tool-strip__label { color: var(--text-secondary); font-size: var(--text-sm); }

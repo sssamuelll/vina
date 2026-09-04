@@ -20,6 +20,7 @@ import {
   type SegmentSelection,
   type SnapResult,
 } from './useSegmentSewingTool';
+import { noPasoNada } from './noPasoNada';
 import { useEdgeGesture } from './useEdgeGesture';
 import type { EdgeCommit, EdgeTarget } from './edgeGesture';
 import { EDGE_HIT_PX } from './gestureConstants';
@@ -316,7 +317,12 @@ export function useNotchTool(
 
     if (commit.kind === 'click') {
       const exact = resolveTargetOnRing(target);
-      if (!exact) return;
+      if (!exact) {
+        // El gesto YA se armó sobre un borde válido: si el piquete no nace
+        // aquí, el clic acertado se ve idéntico a uno fallado (#1117).
+        noPasoNada('notch:sin-sitio', { pieceId: piece.id, edgeIndex: target.edgeIndex });
+        return;
+      }
       const notch = createNotchLine(exact.worldPoint, exact.normal, piece, effectiveOptions);
       onAddNotch(piece.id, notch);
       // Click-then-refine (D-4): el modal solo abre cuando la posición fue una
@@ -335,7 +341,10 @@ export function useNotchTool(
     }
 
     const placement = resolveDraggedNotch(target, commit.releaseT, commit.firstDragT);
-    if (!placement) return;
+    if (!placement) {
+      noPasoNada('notch:sin-emplazamiento', { pieceId: piece.id, edgeIndex: target.edgeIndex });
+      return;
+    }
     onAddNotch(piece.id, {
       id: newId(),
       type: 'notch',
