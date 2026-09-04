@@ -107,6 +107,19 @@ describe('F7 — ninguna tecla activa una herramienta que el despachador no sabe
     }
   });
 
+  it('la reserva caduca sola: en cuanto una tenga gesto, este test avisa', () => {
+    // Sin esto la lista se pudre. El día que se implemente el círculo (#1111),
+    // nada obligaría a devolverle su tecla: seguiría reservada para siempre.
+    // Que falle aquí es el recordatorio de moverla de vuelta a DEFAULT_SHORTCUTS.
+    const yaImplementadas = ATAJOS_2D_SIN_GESTO
+      .map((s) => s.id.slice('tool.'.length))
+      .filter((toolId) => CONDUCIDOS.has(toolId));
+    expect(
+      yaImplementadas,
+      'estas herramientas ya tienen gesto: devuélveles su tecla, que está reservada esperándolas',
+    ).toEqual([]);
+  });
+
   it('las teclas que quedan libres no se las queda nadie por accidente', () => {
     // c, d, e, i, p, t, w quedan sin dueño. Que ninguna otra acción las tome
     // en silencio: si alguien las quiere, que sea una decisión escrita.

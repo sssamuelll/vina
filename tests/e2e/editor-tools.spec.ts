@@ -182,9 +182,15 @@ test.describe('Tool keyboard shortcuts', () => {
   // (src/shortcuts/defaults.ts) y vuelven cuando la herramienta exista.
   for (const [key, toolId] of [['e', 'circle'], ['d', 'dart']] as const) {
     test(`pressing '${key}' no activa ${toolId}: la herramienta no existe (F7)`, async ({ page }) => {
-      const antes = await getActiveTool2D(page);
+      // Se ancla a una herramienta CONCRETA antes de pulsar. Comparar el
+      // después con el antes a secas pasaba en vacío si `__VINA_STORE__` no
+      // estaba: las dos lecturas daban null y el test se felicitaba solo.
+      await page.keyboard.press('z');
+      await expect.poll(() => getActiveTool2D(page), { timeout: 3000 }).toBe('select');
+
       await page.keyboard.press(key);
-      expect(await getActiveTool2D(page)).toBe(antes);
+      await page.waitForTimeout(200);
+      expect(await getActiveTool2D(page), `'${key}' metió a la usuaria en ${toolId}, que no tiene gesto`).toBe('select');
     });
   }
 });

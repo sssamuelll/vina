@@ -25,7 +25,7 @@ import { downloadDiagnosticBundle } from '../../utils/export/diagnosticExporter'
 import { clearStorageProject } from '../../utils/projectIO';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { displayShortcut } from './shortcutDisplay';
-import { computeScrollFade, type ScrollFade } from '../PatternEditor/menuOverflow';
+import { computeScrollFade, encajarSubmenu, type Encaje, type ScrollFade } from '../PatternEditor/menuOverflow';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -219,7 +219,7 @@ function Submenu({ children }: { children: ReactNode }) {
   const cajaRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fade, setFade] = useState<ScrollFade>({ top: false, bottom: false });
-  const [altoMax, setAltoMax] = useState<number>();
+  const [encaje, setEncaje] = useState<Encaje>();
 
   // `altoMax` está en las dependencias a propósito: la primera pasada mide con
   // el submenú a su alto natural (todo cabe, ningún chevrón), y hasta que no se
@@ -227,8 +227,17 @@ function Submenu({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     const medir = () => {
       const caja = cajaRef.current;
-      // 12 px de aire hasta el pie de la ventana + los 12 de padding del marco.
-      if (caja) setAltoMax(Math.max(96, window.innerHeight - caja.getBoundingClientRect().top - 24));
+      if (caja) {
+        setEncaje(encajarSubmenu({
+          topPx: caja.getBoundingClientRect().top,
+          innerHeight: window.innerHeight,
+          // 12 px de aire hasta el pie de la ventana + los 12 de padding del marco.
+          aire: 24,
+          // Por debajo de tres filas el submenú deja de ser usable; si no caben,
+          // se sube en vez de desbordar (ver `encajarSubmenu`).
+          minimo: 96,
+        }));
+      }
       const scroll = scrollRef.current;
       if (scroll) setFade(computeScrollFade(scroll));
     };
@@ -240,11 +249,11 @@ function Submenu({ children }: { children: ReactNode }) {
       scroll?.removeEventListener('scroll', medir);
       window.removeEventListener('resize', medir);
     };
-  }, [altoMax]);
+  }, [encaje?.altoMax, encaje?.subir]);
 
   return (
-    <div ref={cajaRef} className="logo-menu__submenu">
-      <div ref={scrollRef} className="logo-menu__submenu-scroll" style={{ maxHeight: altoMax }}>
+    <div ref={cajaRef} className="logo-menu__submenu" style={encaje?.subir ? { marginTop: -encaje.subir } : undefined}>
+      <div ref={scrollRef} className="logo-menu__submenu-scroll" style={{ maxHeight: encaje?.altoMax }}>
         {children}
       </div>
       {fade.top && <div className="logo-menu__fade logo-menu__fade--top"><span className="logo-menu__fade-chevron">⌃</span></div>}
