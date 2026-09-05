@@ -35,6 +35,16 @@ interface ArrangeGizmoProps {
   /** Fin del drag con el delta final. */
   onDragEnd: (delta: [number, number, number]) => void;
   setOrbitEnabled: (enabled: boolean) => void;
+  /**
+   * Presta el arrastre libre (el de la esfera central) a quien quiera
+   * empezarlo desde fuera — hoy, el propio cuerpo de la pieza (#1108).
+   *
+   * Se presta la función en vez de copiar la matemática: el plano ⊥ cámara,
+   * la captura global del puntero, el corte del orbit y la cancelación
+   * al desmontar a mitad de arrastre (#935) son un solo camino o no son
+   * ninguno.
+   */
+  prestarArrastreLibre?: (iniciar: (e: ThreeEvent<PointerEvent>) => void) => void;
   size?: number;
 }
 
@@ -71,6 +81,7 @@ export default function ArrangeGizmo({
   onDrag,
   onDragEnd,
   setOrbitEnabled,
+  prestarArrastreLibre,
   size = 0.16,
 }: ArrangeGizmoProps) {
   const { camera, gl } = useThree();
@@ -159,6 +170,11 @@ export default function ArrangeGizmo({
       setOrbitEnabled(true);
     };
   }, [grabPoint, origin, camera, gl, onDrag, onDragEnd, setOrbitEnabled]);
+
+  const iniciarLibre = useMemo(() => handleDown('center'), [handleDown]);
+  useEffect(() => {
+    prestarArrastreLibre?.(iniciarLibre);
+  }, [prestarArrastreLibre, iniciarLibre]);
 
   const over = useCallback((h: Handle) => (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();

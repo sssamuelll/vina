@@ -83,7 +83,25 @@ export default function DraggablePiece({
     groupRef.current?.position.set(...actualPos);
   }, [actualPos]);
 
+  // El arrastre libre que presta el gizmo, para poder empezarlo agarrando la
+  // PIEZA y no su esfera central — que mide `size * 0.11`, o sea un radio de
+  // ~1,8 cm de mundo: una cabeza de alfiler. María [20:08]: «para mover en 3D
+  // era con las flechas, es un poco incómodo… me gustaría que se pudiera
+  // mover con el ratón» — las flechas son las del gizmo (#1108).
+  const arrastreLibre = useRef<((e: ThreeEvent<PointerEvent>) => void) | null>(null);
+  const prestarArrastreLibre = useCallback((iniciar: (e: ThreeEvent<PointerEvent>) => void) => {
+    arrastreLibre.current = iniciar;
+  }, []);
+
   const showGizmo = canDrag && isSelected;
+
+  // Solo arrastra el cuerpo de una pieza YA seleccionada. Con eso no hace
+  // falta umbral de arrastre ni desambiguar clic-vs-arrastre: el primer clic
+  // elige, los siguientes mueven.
+  const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
+    if (!showGizmo || !arrastreLibre.current) return;
+    arrastreLibre.current(e);
+  }, [showGizmo]);
 
   // Si el gizmo desaparece sin escritura al store (deselección/Escape a mitad de
   // drag), `actualPos` no cambia y el efecto de arriba no corre — revierte el
@@ -97,6 +115,7 @@ export default function DraggablePiece({
       <group
         ref={groupRef}
         onClick={handleClick}
+        onPointerDown={handlePointerDown}
         position={actualPos}
         scale={[1, 1, isFlipped ? -1 : 1]}
       >
@@ -116,6 +135,7 @@ export default function DraggablePiece({
           onDrag={handleGizmoDrag}
           onDragEnd={handleGizmoDragEnd}
           setOrbitEnabled={setOrbitEnabled}
+          prestarArrastreLibre={prestarArrastreLibre}
         />
       )}
     </>

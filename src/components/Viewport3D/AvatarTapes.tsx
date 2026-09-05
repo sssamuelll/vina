@@ -7,8 +7,10 @@
 
 import * as THREE from 'three';
 import { Html, Line } from '@react-three/drei';
+import { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
+import { separarEtiquetas } from './separarEtiquetas';
 
 const TAPE_SEGMENTS = 64;
 
@@ -30,9 +32,25 @@ export default function AvatarTapes() {
   const tapes = useSelector((s: RootState) => s.avatarTape.tapes);
   const pendingTape = useSelector((s: RootState) => s.avatarTape.pendingTape);
 
+  const visibles = useMemo(() => tapes.filter(t => t.visible), [tapes]);
+
+  // Las etiquetas de contorno se apartan entre sí antes de pintarse: cada
+  // cinta sabe su altura pero ninguna sabe de las demás, y dos anillos
+  // cercanos escribían sus números uno encima del otro (#1108). El anillo no
+  // se mueve — solo el número.
+  const alturaDeEtiqueta = useMemo(() => {
+    const conAltura = visibles
+      .map((t, i) => ({ t, i }))
+      .filter(({ t }) => t.type === 'circumference' && t.height !== undefined);
+    const puestas = separarEtiquetas(conAltura.map(({ t }) => t.height!));
+    const porIndice = new Map<number, number>();
+    conAltura.forEach(({ i }, k) => porIndice.set(i, puestas[k]));
+    return porIndice;
+  }, [visibles]);
+
   return (
     <group>
-      {tapes.filter(t => t.visible).map(tape => {
+      {visibles.map((tape, indiceVisible) => {
         if (tape.type === 'circumference' && tape.height !== undefined) {
           // Derive approximate radius from measurement (C = 2πr → r = C/2π)
           const radius = (tape.measurement / 1000) / (2 * Math.PI);
@@ -43,7 +61,7 @@ export default function AvatarTapes() {
               <Line points={pts} color={tape.color} lineWidth={2} depthTest={false} />
               {/* Label at front of ring */}
               <Html
-                position={[0, tape.height + 0.02, radius + 0.01]}
+                position={[0, (alturaDeEtiqueta.get(indiceVisible) ?? tape.height) + 0.02, radius + 0.01]}
                 center
                 distanceFactor={3}
                 style={{
