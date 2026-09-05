@@ -2,6 +2,7 @@ import type { PatternPiece, SaSelection, Tool2D } from '../../../types/types';
 import { margenEnPunto } from '../../../utils/seam/margenEnPunto';
 import { cotaDeMargen } from './cotaDeMargen';
 import { cotasDeLineaInterna, cotasDePieza, type Cota } from './cotas';
+import { cotasDelTramoEnCurso, type TramoEnCurso } from './tramoEnCurso';
 import { formatMedida } from './parseMedida';
 
 export interface SeamAllowanceAnchor {
@@ -28,6 +29,12 @@ export interface SujetoInput {
   saSelection?: SaSelection | null;
   saAncla?: SeamAllowanceAnchor | null;
   saHover?: SeamAllowanceAnchor | null;
+  /**
+   * El tramo congelado con Tab mientras se dibuja (#1129). Vive en el estado
+   * local del hook de la pluma o de la línea interna, no en Redux, así que
+   * llega como argumento — igual que le pasará a la selección de nodos.
+   */
+  tramoEnCurso?: TramoEnCurso | null;
 }
 
 export interface Sujeto {
@@ -113,6 +120,22 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
     disabled: false,
     lineaDeSujeto: linea,
   });
+  // Un trazo vivo gana a cualquier selección: la regla del sujeto es «el más
+  // reciente», y no hay nada más reciente que lo que se está dibujando ahora
+  // mismo. Va antes que todo lo demás por eso.
+  if (input.tramoEnCurso) {
+    return {
+      piece: null,
+      caliente: false,
+      cotas: cotasDelTramoEnCurso(input.tramoEnCurso),
+      lectura: null,
+      lecturaApagada: false,
+      bordeLeido: null,
+      disabled: false,
+      lineaDeSujeto: 'Editando: el tramo en curso',
+    };
+  }
+
   const lineaRect = input.activeTool === 'rectangle'
     ? `Un clic crea ${formatMedida(defaultRect.width, 'mm').replace(' mm', '')} × ${formatMedida(defaultRect.height, 'mm')} · arrastra para dibujar`
     : null;

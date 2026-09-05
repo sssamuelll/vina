@@ -11,7 +11,7 @@ export interface CotaChipProps {
   top: number;
   zoom2D: number;
   disabled?: boolean;
-  onCommit: (cota: Cota, valueMm: number) => void;
+  onCommit: (cota: Cota, valueMm: number, motivo: 'enter' | 'tab') => void;
   onScrubStart: (cota: Cota) => void;
   onScrub: (cota: Cota, valueMm: number) => void;
   onScrubEnd: (cota: Cota, valueMm: number) => void;
@@ -111,13 +111,20 @@ export default function CotaChip({
     const v = parseMedida(draft);
     return v !== null && v >= cota.min && v <= cota.max ? round1(v) : null;
   };
-  const confirmar = (): boolean => {
+  /**
+   * `motivo` existe por #1129. Para una cota de un objeto Enter y Tab son lo
+   * mismo —los dos escriben en Redux—, pero los chips del tramo en curso los
+   * necesitan distintos: Tab salta de Largo a Ángulo y Enter COLOCA el punto.
+   * Sin el dato, Tab colocaría, y el encadenado «80, Tab, −90, Enter» que pide
+   * la § 5.4 del spec de cotas vivas sería imposible.
+   */
+  const confirmar = (motivo: 'enter' | 'tab'): boolean => {
     const v = parsea();
     if (v === null) {
       setInvalid(true);
       return false;
     }
-    if (v !== round1(cota.valueMm)) onCommit(cota, v);
+    if (v !== round1(cota.valueMm)) onCommit(cota, v, motivo);
     return true;
   };
   const terminarScrub = (valor: (s: { v0: number; last: number }) => number) => {
@@ -153,13 +160,13 @@ export default function CotaChip({
           e.stopPropagation();
           if (e.key === 'Enter') {
             e.preventDefault();
-            if (confirmar()) cerrar('boton');
+            if (confirmar('enter')) cerrar('boton');
           } else if (e.key === 'Escape') {
             e.preventDefault();
             cerrar('boton');
           } else if (e.key === 'Tab') {
             e.preventDefault();
-            if (confirmar()) cerrar(e.shiftKey ? 'anterior' : 'siguiente');
+            if (confirmar('tab')) cerrar(e.shiftKey ? 'anterior' : 'siguiente');
           } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
             e.preventDefault();
             const base = parseMedida(draft) ?? cota.valueMm;

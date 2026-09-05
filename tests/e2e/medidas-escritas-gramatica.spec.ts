@@ -59,29 +59,49 @@ const anchors = (path: Cmd[]) => path.filter(c => c.type !== 'Z').map(c => [c.va
 test.describe('medidas escritas — gramática', () => {
   test.setTimeout(90_000);
 
-  test('línea interna: Tab abre el panel, Enter dentro coloca, Retroceso dentro no toca el trazo, Escape cierra y el trazo sigue', async ({ page }) => {
+  test('línea interna: Tab congela el tramo en dos chips, Enter coloca, Retroceso dentro no toca el trazo, y el trazo sigue', async ({ page }) => {
+    // Reescrito el 2026-09-06: `NextPointPanel` murió y su gramática vive en
+    // los chips del tramo en curso (#1129). Lo que se prueba es lo mismo — que
+    // el número escrito coloca el punto exacto y que las teclas nacidas dentro
+    // del campo no se las lleve el lienzo —, contra la superficie nueva.
+    const campo = (nombre: string) => page.locator(`input.cota--editando[aria-label="${nombre}"]`);
+    const chip = (nombre: string) => page.locator(`.cotas button.cota[aria-label^="${nombre}:"]`);
+
     await waitForApp(page);
     await addPiece(page, 'A', { x: 150, y: 150 });
     await tool(page, 'g', 'internalShape');
     await clickAt(page, { x: 200, y: 250 });
+
     await page.keyboard.press('Tab');
-    const panel = page.getByRole('dialog', { name: 'Siguiente punto' });
-    await expect(panel).toBeVisible();
-    await page.locator('#next-point-length').fill('80');
-    await page.locator('#next-point-angle').fill('90');
+    await expect(campo('Largo'), 'Tab no congeló el tramo').toBeVisible({ timeout: 5000 });
+    await page.keyboard.press('Control+a');
+    await page.keyboard.type('80');
+    await page.keyboard.press('Tab');
+    await expect(campo('Ángulo')).toBeVisible();
+    await page.keyboard.press('Control+a');
+    await page.keyboard.type('90');
     await page.keyboard.press('Enter');
-    await expect(panel).toBeVisible();
-    // Retroceso dentro del campo es del campo: no quita nodos.
-    await page.locator('#next-point-length').focus();
+    await page.waitForTimeout(300);
+    await expect(chip('Ángulo'), 'los chips no sobrevivieron a colocar').toHaveCount(1);
+
+    // Retroceso dentro del campo es del campo: no quita nodos del trazo. Es la
+    // misma promesa que tenía el panel, sobre otra superficie.
+    await expect(campo('Largo')).toBeVisible();
     await page.keyboard.press('Backspace');
     await page.keyboard.press('Backspace');
+
+    // Dos Escapes: el primero descarta el borrador, el segundo suelta el tramo.
     await page.keyboard.press('Escape');
-    await expect(panel).toBeHidden();
+    await page.waitForTimeout(150);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    await expect(chip('Largo')).toHaveCount(0);
+
     await clickAt(page, { x: 300, y: 170 });
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(300);
     const ils = (await st(page)).project.pieces[0].internals;
-    expect(ils).toHaveLength(1);
+    expect(ils, 'el trazo no sobrevivió a los chips').toHaveLength(1);
     const pts = anchors(ils[0].path);
     expect(pts).toHaveLength(3);
     expect(pts[0]).toEqual([50, 100]);

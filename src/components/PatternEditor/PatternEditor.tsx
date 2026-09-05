@@ -71,7 +71,6 @@ import CalibrationOverlay from './renderers/overlays/CalibrationOverlay';
 import CalibrationModal from './CalibrationModal';
 import NotchPrecisionModal from './NotchPrecisionModal';
 import { notchPlacedMessage } from './notchPrecisionCopy';
-import NextPointPanel from './NextPointPanel';
 import { DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 import { computePixelsPerMm } from '../../utils/geometry/calibration';
 import { useReferenceImages } from './useReferenceImages';
@@ -680,13 +679,29 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // cuanto deja de serlo: el sujeto caliente es el de la herramienta en curso.
   const hotId = activeTool === 'circle' ? circleHotId : rectHotId;
   const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
+  // Refs para que `aplicarCota` no se recree en cada render de la pluma: la
+  // rama del tramo en curso necesita la herramienta viva, no una copia vieja.
+  const penRef = useRef(pen);
+  penRef.current = pen;
+  const internalShapeRef = useRef(internalShapeTool);
+  internalShapeRef.current = internalShapeTool;
+
+  // El tramo congelado con Tab, venga de la pluma o de la línea interna: las
+  // dos son la misma gramática y solo una puede estar viva a la vez (#1129).
+  const tramoEnCurso = activeTool === 'pen'
+    ? pen.nextPoint
+    : activeTool === 'internalShape'
+      ? internalShapeTool.nextPoint
+      : null;
+
   const sujeto = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
     hotId, isDragging: isDraggingPiece || transformTool.isDragging || isDraggingEndpoint,
     contextMenuOpen: ctxMenu.visible, calibrationActive: calibrationMode !== null,
     hiddenLayerIds, layerLocked, saSelection: editor.saSelection,
     saAncla: seamAllowanceTool.ancla, saHover: seamAllowanceTool.hover,
-  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover]);
+    tramoEnCurso,
+  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso]);
   // Las cuatro herramientas que toman el sujeto de la selección lo dicen en la
   // tira antes del clic, en vez de morirse mudas (#1117).
   const falta = faltaSujeto(activeTool, selectedPieceIds);
@@ -721,6 +736,21 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     }
   }, [seamAllowanceTool.abrirChip, seamAllowanceTool.ancla]);
 
+  // Congelar con Tab abre el chip de Largo (spec de cotas vivas § 5.4). El
+  // chip no existe hasta el render siguiente, así que se espera a que el
+  // `tramoEnCurso` esté puesto y entonces se enfoca — no se puede enfocar lo
+  // que todavía no está en el DOM.
+  const tramoVisto = useRef<string | null>(null);
+  useEffect(() => {
+    const marca = tramoEnCurso ? `${tramoEnCurso.from.x},${tramoEnCurso.from.y}` : null;
+    if (tramoVisto.current === marca) return;
+    tramoVisto.current = marca;
+    if (!tramoEnCurso) return;
+    if (cotasRef.current?.abrirPrimero()) {
+      pushJournal('gesture', 'tramo:congelado', { largo: tramoEnCurso.lengthMm, angulo: tramoEnCurso.angleDeg });
+    }
+  }, [tramoEnCurso]);
+
   // Enfriamiento irreversible (spec § 3.1): en cuanto la selección deja de ser
   // la pieza nueva, cambia la herramienta o la pieza desaparece, se enfría y
   // no vuelve a calentarse sola.
@@ -735,7 +765,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     if (activeTool !== 'circle' || selectedPieceIds.length !== 1 || selectedPieceIds[0] !== circleHotId || !viva) enfriarCircle();
   }, [activeTool, selectedPieceIds, pieces, circleHotId, enfriarCircle]);
 
-  const aplicarCota = useCallback((cota: Cota, valueMm: number, token?: UndoBatchToken) => {
+  const aplicarCota = useCallback((cota: Cota, valueMm: number, token?: UndoBatchToken, motivo: 'enter' | 'tab' = 'enter') => {
     // Un círculo escrito por UNA sola cota dejaba de ser círculo. La cota de una
     // pieza es su caja (2rx × 2ry), así que escribir el Ancho estiraba solo la
     // X: dibujar 120×120 en modo «Círculo», escribir 200 en Ancho y quedarse con
@@ -780,6 +810,16 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         internals: update.internals, updatedAt: Date.now(),
       });
       dispatch(token ? withUndoBatchToken(accion, token) : accion);
+    } else if (update.kind === 'tramoEnCurso') {
+      // El único `CotaUpdate` que no toca Redux: no hay objeto que mutar
+      // todavía. Enter coloca el punto; Tab solo reescribe el par pendiente y
+      // salta al otro chip (#1129, spec de cotas vivas § 5.4).
+      const herramienta = activeTool === 'pen' ? penRef.current
+        : activeTool === 'internalShape' ? internalShapeRef.current
+          : null;
+      if (!herramienta) return;
+      if (motivo === 'tab') herramienta.setNextPointValues(update.largoMm, update.anguloDeg);
+      else herramienta.placePolar(update.largoMm, update.anguloDeg);
     } else {
       const piece = pieces.find(p => p.id === update.pieceId);
       if (!piece) return;
@@ -804,8 +844,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     dispatch(setToolOption({ toolId: 'rectangle', optionId: cota.kind === 'ancho' ? 'width' : 'height', value: Math.round(valueMm * 10) / 10 }));
   }, [sujeto.caliente, activeTool, dispatch]);
 
-  const handleCotaCommit = useCallback((cota: Cota, valueMm: number) => {
-    aplicarCota(cota, valueMm);
+  const handleCotaCommit = useCallback((cota: Cota, valueMm: number, motivo: 'enter' | 'tab' = 'enter') => {
+    aplicarCota(cota, valueMm, undefined, motivo);
     escribirDefault(cota, valueMm);
     pushJournal('gesture', 'cota:commit', {
       id: cota.id,
@@ -813,6 +853,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       prev: cota.valueMm,
       value: valueMm,
       caliente: sujeto.caliente,
+      motivo,
     });
   }, [aplicarCota, escribirDefault, sujeto.caliente]);
 
@@ -1312,17 +1353,17 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onScrubEnd={handleCotaScrubEnd}
         onScrubCancel={handleCotaScrubCancel}
       />
-      {/* La tira cede la esquina al gesto vivo: mientras "Siguiente punto" esta abierto no se pinta (spec 2026-08-30 § 12). */}
-      {!(pen.nextPoint || internalShapeTool.nextPoint) && (
-        <ToolStrip2D
-          lineaDeSujeto={sujeto.lineaDeSujeto}
-          falta={falta}
-          desenlace={desenlace}
-          /* El modal de piquete no usa portal ni atrapa el foco, y la tira vive
-             en su misma esquina: se declara inerte mientras esté abierto (#1125). */
-          inerte={Boolean(notchTool.refining?.notch.notchAnchor)}
-        />
-      )}
+      {/* La tira ya no cede la esquina a nadie. La cedía porque `NextPointPanel`
+          vivía en ella; los chips del tramo en curso viven sobre el trazo, que
+          es donde está el gesto, así que no hay nada que esquivar (#1129). */}
+      <ToolStrip2D
+        lineaDeSujeto={sujeto.lineaDeSujeto}
+        falta={falta}
+        desenlace={desenlace}
+        /* El modal de piquete no usa portal ni atrapa el foco, y la tira vive
+           en su misma esquina: se declara inerte mientras esté abierto (#1125). */
+        inerte={Boolean(notchTool.refining?.notch.notchAnchor)}
+      />
       <FilaDeCapas />
       {shouldShowEmptyState(pieces.length, activeTool) && (
         <EmptyState2D onImportDXF={onImportDXF} />
@@ -1355,27 +1396,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           pixelDistance={calibrationPixelDist}
           onConfirm={handleCalibrationConfirm}
           onCancel={handleCalibrationCancel}
-        />
-      )}
-      {/* "Siguiente punto" (spec 2026-08-29 § 7.2): Tab lo abre en la pluma y
-          en la línea interna; se queda abierto mientras trazas. La `key`
-          reinicia sus campos al cambiar de herramienta. */}
-      {activeTool === 'pen' && pen.nextPoint && (
-        <NextPointPanel
-          key="pen"
-          initialLengthMm={pen.nextPoint.lengthMm}
-          initialAngleDeg={pen.nextPoint.angleDeg}
-          onPlace={pen.placePolar}
-          onClose={pen.closeNextPoint}
-        />
-      )}
-      {activeTool === 'internalShape' && internalShapeTool.nextPoint && (
-        <NextPointPanel
-          key="internalShape"
-          initialLengthMm={internalShapeTool.nextPoint.lengthMm}
-          initialAngleDeg={internalShapeTool.nextPoint.angleDeg}
-          onPlace={internalShapeTool.placePolar}
-          onClose={internalShapeTool.closeNextPoint}
         />
       )}
       {notchTool.refining?.notch.notchAnchor && (

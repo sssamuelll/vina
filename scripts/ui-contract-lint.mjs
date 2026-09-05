@@ -59,7 +59,12 @@ function* lines(file) {
       if (t.includes('*/')) inBlock = false;
       return;
     }
-    if (t.startsWith('/*')) {
+    // `{/*` es el comentario de JSX, y era el ciego del detector: un `#1129`
+    // escrito dentro contaba como color literal (cuatro dígitos hex), así que
+    // citar el número de un issue en un comentario de JSX rompía el trinquete.
+    // El defecto ya estaba —`PatternEditor.tsx` traía un `#210` fantasma— y se
+    // vio al escribir otro. Un detector que cuenta prosa mide otra cosa.
+    if (t.startsWith('/*') || t.startsWith('{/*')) {
       if (!t.includes('*/')) inBlock = true;
       return;
     }

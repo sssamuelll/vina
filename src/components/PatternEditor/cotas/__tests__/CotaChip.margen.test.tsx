@@ -78,7 +78,7 @@ describe('CotaChip — margen', () => {
     const input = screen.getByRole('textbox');
     fireEvent.change(input, { target: { value: '0' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(p.onCommit).toHaveBeenCalledWith(p.cota, 0);
+    expect(p.onCommit).toHaveBeenCalledWith(p.cota, 0, 'enter');
   });
 
   it('las flechas siguen: ↑ +1, Shift ↑ +10, Alt ↑ +0,1', () => {

@@ -25,7 +25,15 @@ export type CotaUpdate =
       fuente: 'tramo' | 'borde' | 'pieza';
       spanIndex?: number;
       width: number;
-    };
+    }
+  /**
+   * El tramo que se está dibujando (#1129). NO es una mutación de proyecto:
+   * todavía no hay objeto que mutar. La resuelve `PatternEditor` contra el hook
+   * de la herramienta viva —`placePolar` si se confirmó con Enter, actualizar
+   * los valores pendientes si fue con Tab—, que es la única forma de que un
+   * chip escriba en un gesto en vez de en Redux.
+   */
+  | { kind: 'tramoEnCurso'; largoMm: number; anguloDeg: number };
 
 /**
  * Una cota viva (spec 2026-08-30 § 3, § 5): la medida que el objeto enseña

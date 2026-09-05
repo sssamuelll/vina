@@ -11,7 +11,7 @@ import { pushJournal } from '../../utils/telemetry/journal';
 
 export type { PolyPenNode, PolyPenNodeType } from './polyPenGeometry';
 
-/** El panel "Siguiente punto" abierto: desde dónde y con qué prefijado. */
+/** El tramo congelado con Tab: desde dónde y con qué par prefijado (#1129). */
 export interface NextPointState {
   from: Point2D;
   lengthMm: number;
@@ -270,7 +270,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     if (nodesRef.current.length >= 2) finish(false);
   }, [finish]);
 
-  // ─── Siguiente punto (spec 2026-08-29 § 7.2) ─────────────────────────────
+  // ─── El tramo en curso, congelado (cotas vivas § 5.4, #1129) ─────────────
 
   /** Tab: abre el panel prefijado con la goma (último nodo → cursor). */
   const openNextPoint = useCallback(() => {
@@ -279,6 +279,18 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const from = nodes[nodes.length - 1].point;
     const { lengthMm, angleDeg } = polarOf(from, lastWorldRef.current ?? from);
     nextPointRef.current = { from, lengthMm, angleDeg };
+    publish();
+  }, [publish]);
+
+  /**
+   * Reescribe el par pendiente SIN colocar (#1129). Es lo que hace Tab dentro
+   * de un chip: pasa de Largo a Angulo conservando lo escrito. Enter, en
+   * cambio, va por `placePolar`.
+   */
+  const setNextPointValues = useCallback((lengthMm: number, angleDeg: number) => {
+    const np = nextPointRef.current;
+    if (!np) return;
+    nextPointRef.current = { ...np, lengthMm, angleDeg };
     publish();
   }, [publish]);
 
@@ -297,7 +309,9 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const from = nodes[nodes.length - 1].point;
     const point = polarPoint(from, lengthMm, angleDeg);
     nodesRef.current = [...nodes, { point, type: optsRef.current.nodeType }];
-    if (nextPointRef.current) nextPointRef.current = { ...nextPointRef.current, from: point };
+    // Re-ancla al nodo nuevo Y conserva el par que se acaba de colocar, para
+    // que encadenar repita el mismo tramo (#1129). Hermano del de la pluma.
+    if (nextPointRef.current) nextPointRef.current = { from: point, lengthMm, angleDeg };
     pushJournal('gesture', 'internalShape:nextPoint', { op: 'place', length: lengthMm, angle: angleDeg, nodes: nodes.length + 1 });
     publish();
   }, [publish]);
@@ -307,6 +321,12 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const nodes = nodesRef.current;
     switch (e.key) {
       case 'Escape':
+        // Peldaño nuevo (#1129): con el tramo congelado, Escape lo SUELTA y el
+        // trazo sigue vivo — «vuelve a seguir al cursor», spec de cotas vivas
+        // § 5.4. Antes esto no existía porque el Escape del panel nacía DENTRO
+        // del panel y el router no lo veía; los chips sí están en el lienzo, y
+        // sin este peldaño Escape se llevaba el trazo entero por delante.
+        if (nextPointRef.current) { closeNextPoint(); return true; }
         if (pressRef.current) { cancelPress(); return true; }
         if (nodes.length > 0) { reset(); return true; }
         return false;
@@ -327,7 +347,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       default:
         return false;
     }
-  }, [cancelPress, reset, finish, publish, openNextPoint]);
+  }, [cancelPress, reset, finish, publish, openNextPoint, closeNextPoint]);
 
   const isTracing = useCallback(() => nodesRef.current.length > 0 || pressRef.current !== null, []);
   const isArmed = useCallback(() => pressRef.current !== null, []);
@@ -349,6 +369,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     handleKeyDown,
     openNextPoint,
     closeNextPoint,
+    setNextPointValues,
     placePolar,
     cancelPress,
     reset,

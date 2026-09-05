@@ -104,7 +104,7 @@ export function commandsToPathD(cmds: PathCommand[]): string {
 }
 
 /**
- * Convención del panel "Siguiente punto" (spec 2026-08-29 § 7.2): 0° a la
+ * Convención del tramo escrito (spec 2026-08-29 § 7.2): 0° a la
  * derecha, 90° hacia ARRIBA tal como se ve en pantalla. En coordenadas de
  * patrón y crece hacia abajo, así que `dy = −L·sin θ`.
  */

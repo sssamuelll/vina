@@ -26,7 +26,7 @@ export interface PenNode {
   handleOut: Point2D | null;
 }
 
-/** El panel "Siguiente punto" abierto: desde dónde y con qué prefijado. */
+/** El tramo congelado con Tab: desde dónde y con qué par prefijado (#1129). */
 export interface NextPointState {
   from: Point2D;
   lengthMm: number;
@@ -73,6 +73,10 @@ export function usePenTool(
   nodesRef.current = state.nodes;
   const cursorRef = useRef<Point2D | null>(null);
   cursorRef.current = state.cursorPos;
+  // Espejo del par congelado: `handleKeyDown` es un callback estable y no
+  // puede leer `state` sin recrearse en cada tecla.
+  const nextPointRef = useRef<NextPointState | null>(null);
+  nextPointRef.current = state.nextPoint;
   const pressRef = useRef<{ screen: Point2D; moved: boolean } | null>(null);
 
   /** Convert screen coords to pattern space */
@@ -256,9 +260,9 @@ export function usePenTool(
     complete(nodes, false);
   }, [zoom, complete]);
 
-  // ─── Siguiente punto (spec 2026-08-29 § 7.2) ─────────────────────────────
+  // ─── El tramo en curso, congelado (cotas vivas § 5.4, #1129) ─────────────
 
-  /** Tab: abre el panel prefijado con la goma (último nodo → cursor). */
+  /** Tab: congela el tramo, prefijado con la goma (último nodo → cursor). */
   const openNextPoint = useCallback(() => {
     const nodes = nodesRef.current;
     if (nodes.length === 0) return;
@@ -268,13 +272,22 @@ export function usePenTool(
     setState(prev => ({ ...prev, nextPoint: { from, lengthMm, angleDeg } }));
   }, []);
 
+  /**
+   * Reescribe el par pendiente SIN colocar (#1129). Es lo que hace Tab dentro
+   * de un chip: pasa de Largo a Angulo conservando lo escrito. Enter, en
+   * cambio, va por `placePolar`.
+   */
+  const setNextPointValues = useCallback((lengthMm: number, angleDeg: number) => {
+    setState(prev => (prev.nextPoint ? { ...prev, nextPoint: { ...prev.nextPoint, lengthMm, angleDeg } } : prev));
+  }, []);
+
   const closeNextPoint = useCallback(() => {
-    // Escape y "Cerrar" nacen dentro del panel: invisibles para el router.
+    // Soltar el congelado sin tocar el trazo: el primer peldaño del Escape.
     pushJournal('gesture', 'pen:nextPoint', { op: 'close' });
     setState(prev => (prev.nextPoint ? { ...prev, nextPoint: null } : prev));
   }, []);
 
-  /** Coloca un nodo esquina a largo y ángulo del último; el panel sigue abierto desde el nuevo. */
+  /** Coloca un nodo esquina a largo y ángulo del último; el par se re-ancla al nuevo. */
   const placePolar = useCallback((lengthMm: number, angleDeg: number) => {
     if (nodesRef.current.length === 0) return;
     pushJournal('gesture', 'pen:nextPoint', { op: 'place', length: lengthMm, angle: angleDeg, nodes: nodesRef.current.length + 1 });
@@ -286,7 +299,11 @@ export function usePenTool(
       return {
         ...prev,
         nodes: [...prev.nodes, node],
-        nextPoint: prev.nextPoint ? { ...prev.nextPoint, from: anchor } : prev.nextPoint,
+        // Re-ancla al nodo nuevo Y conserva el par que se acaba de colocar.
+        // Antes conservaba el par ANTERIOR: tras escribir 80/90 y Enter, el
+        // chip del ángulo volvía a 0 y repetir el mismo tramo con otro Enter
+        // colocaba un tramo distinto. Encadenar es el punto de esta gramática.
+        nextPoint: prev.nextPoint ? { from: anchor, lengthMm, angleDeg } : prev.nextPoint,
       };
     });
   }, []);
@@ -300,6 +317,12 @@ export function usePenTool(
     const nodes = nodesRef.current;
     switch (e.key) {
       case 'Escape':
+        // Peldaño nuevo (#1129): con el tramo congelado, Escape lo SUELTA y el
+        // trazo sigue vivo — «vuelve a seguir al cursor», spec de cotas vivas
+        // § 5.4. Antes esto no existía porque el Escape del panel nacía DENTRO
+        // del panel y el router no lo veía; los chips sí están en el lienzo, y
+        // sin este peldaño Escape se llevaba el trazo entero por delante.
+        if (nextPointRef.current) { closeNextPoint(); return true; }
         if (nodes.length === 0) return false;
         setState(EMPTY);
         return true;
@@ -320,7 +343,7 @@ export function usePenTool(
       default:
         return false;
     }
-  }, [complete, openNextPoint]);
+  }, [complete, openNextPoint, closeNextPoint]);
 
   // ¿El próximo clic cierra el contorno? Mismo umbral que el snap real de
   // handleMouseDown — el aviso y el comportamiento no pueden discrepar
@@ -361,6 +384,7 @@ export function usePenTool(
     handleKeyDown,
     openNextPoint,
     closeNextPoint,
+    setNextPointValues,
     placePolar,
     reset,
   };
