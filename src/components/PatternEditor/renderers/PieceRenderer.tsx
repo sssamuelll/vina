@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { PatternPiece, PathCommand, UnitSystem } from '../../../types/types';
 import LineLengthLabels from './LineLengthLabels';
+import PuntosDelContorno from './PuntosDelContorno';
 import { pathToSVG } from '../utils';
 import { effectiveSeamAllowanceWidth } from '../../../utils/seam';
 import {
@@ -12,7 +13,6 @@ import {
   type MatchLookup,
 } from '../../../utils/seam/cornerTypes';
 import { buildMatchLookup } from '../../../utils/seam/matchResolver';
-import { extractNodes } from '../nodeEditorUtils';
 import { ANNOTATION_CATEGORY_COLORS } from '../../../utils/annotationTemplates';
 import { resolveColorway } from '../../../utils/colorwayResolver';
 import { formatPieceLabel } from '../../../utils/pieceLabel';
@@ -39,6 +39,8 @@ interface SinglePieceProps {
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
   showLineLengths: boolean;
+  /** Hay una herramienta de curva activa: solo entonces salen los puntos de curva (#1103). */
+  mostrarPuntosDeCurva: boolean;
   units: UnitSystem;
   isInternalLineSelected: boolean;
   selectedLineId?: string;
@@ -70,6 +72,7 @@ const SinglePiece = memo(function SinglePiece({
   showPieceNames,
   renderMode2D,
   showLineLengths,
+  mostrarPuntosDeCurva,
   units,
   isInternalLineSelected,
   selectedLineId,
@@ -491,25 +494,16 @@ const SinglePiece = memo(function SinglePiece({
         );
       })()}
 
-      {isSelected && (() => {
-        const nodes = extractNodes(piece);
-        return (
-          <g className="anchor-points">
-            {nodes.map((node, i) => (
-              <circle
-                key={i}
-                cx={node.position.x}
-                cy={node.position.y}
-                r={3 / zoom2D}
-                style={{ fill: 'var(--accent-2d)', stroke: 'var(--accent-2d)' }}
-                fillOpacity={0.55}
-                strokeWidth={1 / zoom2D}
-                pointerEvents="none"
-              />
-            ))}
-          </g>
-        );
-      })()}
+      {/* Los extremos, SIEMPRE — no solo con la pieza elegida (#1103). El
+          bloque de antes pintaba todos los nodos como el mismo círculo, sin
+          decir cuál es esquina y cuál de curva, y sin deduplicar el vértice
+          repetido que trae el DXF de CLO. */}
+      <PuntosDelContorno
+        piece={piece}
+        zoom2D={zoom2D}
+        isSelected={isSelected}
+        mostrarPuntosDeCurva={mostrarPuntosDeCurva}
+      />
     </g>
   );
 });
@@ -524,6 +518,8 @@ interface PieceRendererProps {
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
   showLineLengths: boolean;
+  /** Hay una herramienta de curva activa: solo entonces salen los puntos de curva (#1103). */
+  mostrarPuntosDeCurva: boolean;
   units: UnitSystem;
   /** Map of piece ID to group color for visual indicators */
   groupColors?: Record<string, string>;
@@ -544,6 +540,7 @@ export default function PieceRenderer({
   showPieceNames,
   renderMode2D,
   showLineLengths,
+  mostrarPuntosDeCurva,
   units,
   groupColors,
   selectedInternalLine,
@@ -631,6 +628,7 @@ export default function PieceRenderer({
           showPieceNames={showPieceNames}
           renderMode2D={renderMode2D}
           showLineLengths={showLineLengths}
+          mostrarPuntosDeCurva={mostrarPuntosDeCurva}
           units={units}
           groupColor={groupColors?.[piece.id]}
           isLayerLocked={!!layerLocked[piece.layer ?? 1]}

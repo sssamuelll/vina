@@ -90,6 +90,21 @@ export default function HintText({
         <Pie>Clic en una cota para escribirla · arrástrala para ajustar · Tab pasa a la siguiente · Esc suelta</Pie>
       )}
 
+      {/* María [12:48]: «estos puntos los puedo mover con el comando
+          seleccionar o con el de editar… cuál es la diferencia… no está bien
+          definido para qué es cada comando». La respuesta es corta y no estaba
+          escrita en ninguna parte (#1103). */}
+      {activeTool === 'select' && !cotasVisibles && !nodeEditorIsEditing && (
+        <Pie>Seleccionar mueve la pieza entera · para mover un punto suelto, Editar patrón</Pie>
+      )}
+
+      {/* Y [34:24]: «por qué este punto es redondo y este cuadrado, yo pensaría
+          que estos son de curva… no entiendo por qué». La forma SÍ dice el tipo
+          — lo que faltaba era decirle cuál es cuál. */}
+      {activeTool === 'editPattern' && !nodeEditorIsEditing && (
+        <Pie>Cuadrado es esquina · redondo es punto de curva · rombo es extremo abierto · arrastra para mover</Pie>
+      )}
+
       {!hasPieces && activeTool === 'pen' && penNodesLength === 0 && (
         <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
           fill="var(--ink-hint)" fontSize="13">

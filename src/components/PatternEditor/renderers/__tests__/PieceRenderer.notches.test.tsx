@@ -69,6 +69,7 @@ function renderPiece(showNotches: boolean) {
           showPieceNames={false}
           renderMode2D="wireframe"
           showLineLengths={false}
+      mostrarPuntosDeCurva={false}
           units="mm"
         />
       </svg>

@@ -1185,6 +1185,15 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             showPieceNames={showPieceNames}
             renderMode2D={renderMode2D}
             showLineLengths={showLineLengths}
+            mostrarPuntosDeCurva={
+              // María [11:38]: «los de curva igual no, porque son muchos
+              // puntos… solo deberían verse cuando uno clica como el menú
+              // curva». Los dos modos de editar nodos cuentan como ese menú:
+              // en los dos los puntos de curva son manipulables (#1103).
+              activeTool === 'editCurve'
+              || activeTool === 'editPattern'
+              || nodeEditor.isEditing
+            }
             units={units}
             groupColors={groupColors}
             selectedInternalLine={editor.selectedInternalLine}
