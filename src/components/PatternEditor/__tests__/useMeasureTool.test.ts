@@ -165,8 +165,13 @@ describe('buildEdgeInfo', () => {
 describe('buildOutlineInfo', () => {
   it('uses full outline length', () => {
     const info = buildOutlineInfo(pieceWithEdges, 50);
-    // Full outline: (0,0)→(100,0)→(100,80)→(0,80) = 100+80+100 = 280mm (Z is 0-length)
-    expect(info.arcLength).toBeCloseTo(280, 0);
+    // CORREGIDO 2026-09-05: eran 280 y el comentario decía «(Z is 0-length)».
+    // La `Z` de este contorno NO mide cero: cierra de (0,80) a (0,0), o sea
+    // 80 mm. `parseSegments` no la emitía, así que «Medir el contorno» le
+    // enseñaba a María el perímetro MENOS un lado. El test tenía el defecto
+    // escrito dentro como si fuera un hecho.
+    // (0,0)→(100,0)→(100,80)→(0,80)→(0,0) = 100+80+100+80 = 360 mm.
+    expect(info.arcLength).toBeCloseTo(360, 0);
   });
 
   it('creates synthetic edge with __outline__ id', () => {

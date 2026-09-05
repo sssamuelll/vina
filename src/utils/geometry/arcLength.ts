@@ -108,12 +108,24 @@ function advanceCursor(cmd: PathCommand, cursor: Point2D): Point2D {
 function parseSegments(commands: PathCommand[], startIdx?: number, endIdx?: number): PathSegment[] {
   const segments: PathSegment[] = [];
   let cursor: Point2D = { x: 0, y: 0 };
+  /** Punto al que vuelve la `Z`: el de la última `M`. */
+  let subpathStart: Point2D = { x: 0, y: 0 };
   const start = startIdx ?? 0;
   const end = endIdx ?? commands.length;
 
-  // Pre-scan commands [0, start) to establish correct cursor position
+  // Pre-scan commands [0, start) to establish correct cursor position.
+  // Lleva la misma contabilidad de subtrazo que el bucle de abajo: un rango
+  // que empieza DESPUÉS de una `Z` arrancaba del punto equivocado.
   for (let i = 0; i < start; i++) {
-    cursor = advanceCursor(commands[i], cursor);
+    const cmd = commands[i];
+    if (cmd.type === 'M') {
+      cursor = { x: cmd.values[0], y: cmd.values[1] };
+      subpathStart = { ...cursor };
+    } else if (cmd.type === 'Z') {
+      cursor = { ...subpathStart };
+    } else {
+      cursor = advanceCursor(cmd, cursor);
+    }
   }
 
   for (let i = start; i < end; i++) {
@@ -121,6 +133,7 @@ function parseSegments(commands: PathCommand[], startIdx?: number, endIdx?: numb
     switch (cmd.type) {
       case 'M':
         cursor = { x: cmd.values[0], y: cmd.values[1] };
+        subpathStart = { ...cursor };
         break;
       case 'L': {
         const to = { x: cmd.values[0], y: cmd.values[1] };
@@ -195,8 +208,22 @@ function parseSegments(commands: PathCommand[], startIdx?: number, endIdx?: numb
         }
         cursor = { x: cmd.values[5], y: cmd.values[6] };
         break;
-      case 'Z':
+      case 'Z': {
+        // El tramo de cierre ES un tramo: en un rectángulo es un lado entero.
+        // Saltárselo dejaba el perímetro corto por un lado y hacía que el
+        // borde de cierre midiera CERO en todo lo que pide un rango
+        // (`measureCurve`, `walkSeam`, `computeEdgeLengthMM`). Se emite con el
+        // índice de la propia `Z`, que es lo que lo vuelve direccionable.
+        // El umbral copia el de `flattenPathWithSource`: un contorno que ya
+        // termina en su punto de partida no gana un tramo de largo cero.
+        const to = { ...subpathStart };
+        const length = Math.hypot(to.x - cursor.x, to.y - cursor.y);
+        if (length > 0.001) {
+          segments.push({ type: 'line', from: cursor, to, length, cmdIndex: i });
+        }
+        cursor = to;
         break;
+      }
     }
   }
   return segments;

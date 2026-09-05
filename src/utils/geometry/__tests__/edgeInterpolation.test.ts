@@ -19,11 +19,23 @@ function makeRectPiece(): PatternPiece {
     mirrored: false,
     seamAllowance: 0,
     active: true,
+    // CORREGIDO 2026-09-05. Estos rangos estaban en espacio de PUNTOS y ningún
+    // productor los emite así: `segmentRange` es espacio de COMANDOS (contrato
+    // escrito en `outlineAnalysis.ts:15`, y `detectSemanticEdges` sobre este
+    // mismo rectángulo devuelve [1,2] [2,3] [3,4] [0,1]). El fixture congelaba
+    // el convenio equivocado con una pieza que no existe, así que estos ocho
+    // casos pasaban en verde mientras `trimPlace` guardaba el avío un borde
+    // corrido en la app viva. Es el caso de "un test verde certifica nuestra
+    // promesa, no la de María": las aserciones eran buenas, la pieza no.
+    //
+    // `left` es el tramo de CIERRE y ahora se direcciona por el índice de la
+    // `Z` (comando 4), que es lo que lo hace medible. Ver
+    // `el-borde-de-cierre-mide.test.ts`.
     edges: [
-      { id: 'e1', name: 'top', segmentRange: [0, 1] as [number, number], edgeType: 'seam' as const },
-      { id: 'e2', name: 'right', segmentRange: [1, 2] as [number, number], edgeType: 'seam' as const },
-      { id: 'e3', name: 'bottom', segmentRange: [2, 3] as [number, number], edgeType: 'seam' as const },
-      { id: 'e4', name: 'left', segmentRange: [3, 4] as [number, number], edgeType: 'seam' as const },
+      { id: 'e1', name: 'top', segmentRange: [1, 2] as [number, number], edgeType: 'seam' as const },
+      { id: 'e2', name: 'right', segmentRange: [2, 3] as [number, number], edgeType: 'seam' as const },
+      { id: 'e3', name: 'bottom', segmentRange: [3, 4] as [number, number], edgeType: 'seam' as const },
+      { id: 'e4', name: 'left', segmentRange: [4, 5] as [number, number], edgeType: 'seam' as const },
     ],
   } as unknown as PatternPiece;
 }

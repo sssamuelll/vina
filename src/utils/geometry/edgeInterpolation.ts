@@ -1,10 +1,26 @@
 import type { PatternPiece, Point2D } from '../../types/types';
-import { flattenPath } from '../seam/index';
+import { computePathArcLength, pointAtPathDistance } from './arcLength';
+import { rangoMedibleDeBorde } from '../semanticEdges';
 
 /**
- * Interpolate a parametric position (t: 0–1) along a named semantic edge.
- * Uses the same flattenPath + segmentRange model as edgeLengthMM in the BOM extractor
- * for path representation consistency (see spec diagnostic #1–2).
+ * Un punto sobre un borde semántico, dado t entre 0 y 1.
+ *
+ * `SemanticEdge.segmentRange` está en espacio de COMANDOS — es el contrato del
+ * productor, escrito en `outlineAnalysis.ts:15` («Trams carry their range in
+ * COMMAND space»). Este archivo lo leía como índices sobre `flattenPath`, que
+ * es espacio de PUNTOS, y las dos cosas solo coinciden por casualidad.
+ *
+ * Lo que costaba, medido en Chrome el 2026-09-05 con un rectángulo de 200×150:
+ * `trimPlace` guardaba el avío un borde corrido — clic ARRIBA guardaba
+ * `leftEdge`, DERECHA guardaba `topEdge`, y así las cuatro. Invisible en el
+ * lienzo, porque el renderizador usa esta misma función y se equivoca igual;
+ * visible en cuanto el dato sale a un tech pack, al 3D o al copiloto. Y en una
+ * pieza importada, donde un borde son 14-20 comandos y `flattenPath` además
+ * densifica las curvas, no es un corrimiento de uno: descuadra del todo.
+ *
+ * Ahora las dos funciones delegan en la familia de `arcLength`, que trabaja en
+ * espacio de comandos y mide curvas de verdad (Gauss-Legendre) en vez de
+ * poligonizarlas. Ver `el-borde-de-cierre-mide.test.ts`.
  */
 export function interpolateEdgePoint(
   piece: PatternPiece,
@@ -14,98 +30,35 @@ export function interpolateEdgePoint(
   const edge = piece.edges?.find(e => e.name === edgeName);
   if (!edge) return null;
 
-  const pts = flattenPath(piece.outline);
-  const n = pts.length;
-  if (n < 2) return null;
+  const [from, to] = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
+  const total = computePathArcLength(piece.outline, from, to);
+  if (total <= 0) return null;
 
-  const start = Math.max(0, Math.min(edge.segmentRange[0], n - 1));
-  const end = Math.max(0, Math.min(edge.segmentRange[1], n - 1));
-
-  // Collect edge segment points
-  const edgePts: Point2D[] = [];
-  let i = start;
-  edgePts.push(pts[i]);
-  while (i !== end) {
-    i = (i + 1) % n;
-    edgePts.push(pts[i]);
-    if (edgePts.length > n + 1) break; // safety
-  }
-
-  if (edgePts.length < 2) return null;
-
-  // Compute cumulative arc lengths
-  const cumLen: number[] = [0];
-  for (let j = 1; j < edgePts.length; j++) {
-    const dx = edgePts[j].x - edgePts[j - 1].x;
-    const dy = edgePts[j].y - edgePts[j - 1].y;
-    cumLen.push(cumLen[j - 1] + Math.sqrt(dx * dx + dy * dy));
-  }
-
-  const totalLen = cumLen[cumLen.length - 1];
-  if (totalLen === 0) return { point: { ...edgePts[0] }, tangent: { x: 1, y: 0 } };
-
-  // Clamp t
   const clampedT = Math.max(0, Math.min(1, t));
-  const targetLen = clampedT * totalLen;
+  const d = clampedT * total;
+  const point = pointAtPathDistance(piece.outline, d, from, to);
+  if (!point) return null;
 
-  // Find the segment containing targetLen
-  let segIdx = 0;
-  for (let j = 1; j < cumLen.length; j++) {
-    if (cumLen[j] >= targetLen) {
-      segIdx = j - 1;
-      break;
-    }
-    segIdx = j - 1;
+  // Tangente por diferencia finita sobre el propio arco: sirve igual para una
+  // recta que para una curva, y no hace falta que el evaluador la exponga.
+  const eps = Math.min(0.5, total / 100);
+  const antes = pointAtPathDistance(piece.outline, Math.max(0, d - eps), from, to);
+  const despues = pointAtPathDistance(piece.outline, Math.min(total, d + eps), from, to);
+  let tangent: Point2D = { x: 1, y: 0 };
+  if (antes && despues) {
+    const dx = despues.x - antes.x;
+    const dy = despues.y - antes.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 0) tangent = { x: dx / len, y: dy / len };
   }
-
-  const segStart = cumLen[segIdx];
-  const segEnd = cumLen[segIdx + 1];
-  const segLen = segEnd - segStart;
-  const localT = segLen === 0 ? 0 : (targetLen - segStart) / segLen;
-
-  const p0 = edgePts[segIdx];
-  const p1 = edgePts[segIdx + 1];
-
-  const point: Point2D = {
-    x: p0.x + localT * (p1.x - p0.x),
-    y: p0.y + localT * (p1.y - p0.y),
-  };
-
-  const dx = p1.x - p0.x;
-  const dy = p1.y - p0.y;
-  const len = Math.sqrt(dx * dx + dy * dy);
-  const tangent: Point2D = len === 0
-    ? { x: 1, y: 0 }
-    : { x: dx / len, y: dy / len };
 
   return { point, tangent };
 }
 
-/**
- * Compute total arc length (mm) of a named semantic edge.
- * Uses same flattenPath + segmentRange model as interpolateEdgePoint.
- */
+/** Largo (mm) de un borde semántico, en el mismo espacio de comandos. */
 export function computeEdgeLengthMM(piece: PatternPiece, edgeName: string): number {
   const edge = piece.edges?.find(e => e.name === edgeName);
   if (!edge) return 0;
-
-  const pts = flattenPath(piece.outline);
-  const n = pts.length;
-  if (n < 2) return 0;
-
-  const start = Math.max(0, Math.min(edge.segmentRange[0], n - 1));
-  const end = Math.max(0, Math.min(edge.segmentRange[1], n - 1));
-
-  let len = 0;
-  let i = start;
-  while (i !== end) {
-    const next = (i + 1) % n;
-    const dx = pts[next].x - pts[i].x;
-    const dy = pts[next].y - pts[i].y;
-    len += Math.sqrt(dx * dx + dy * dy);
-    i = next;
-    if (len > 100000) break; // safety
-  }
-
-  return len;
+  const [from, to] = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
+  return computePathArcLength(piece.outline, from, to);
 }
