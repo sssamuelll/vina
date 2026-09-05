@@ -374,7 +374,13 @@ test.describe('las dos que estaban rotas por dentro', () => {
     await dispatch(page, 'tools/setActiveTool2D', 'pleat');
     await page.waitForTimeout(300);
 
-    const nodosAntes = await page.evaluate(() => document.querySelectorAll('svg.pattern-svg *').length);
+    // Línea base de LAS DOS cosas. `<polygon>` no es exclusivo del pliegue —lo
+    // emiten también la punta del hilo, los avíos y los glifos de ancla—, así
+    // que sin base el «> 0» quedaría vacío el día que la escena traiga otro.
+    const antes = await page.evaluate(() => ({
+      nodos: document.querySelectorAll('svg.pattern-svg *').length,
+      marcas: document.querySelectorAll('svg.pattern-svg polygon').length,
+    }));
 
     await clickAt(page, bordeDeArriba);
     await page.waitForTimeout(400);
@@ -398,9 +404,12 @@ test.describe('las dos que estaban rotas por dentro', () => {
     expect(estado.dobleces, 'el pliegue se guardó sin una sola línea de doblez').toBeGreaterThan(0);
     expect(
       despues.nodos,
-      `el SVG no cambió: ${nodosAntes} nodos antes y ${despues.nodos} después`,
-    ).toBeGreaterThan(nodosAntes);
-    expect(despues.marcas, 'las líneas están pero sin sus marcas de monte/valle').toBeGreaterThan(0);
+      `el SVG no cambió: ${antes.nodos} nodos antes y ${despues.nodos} después`,
+    ).toBeGreaterThan(antes.nodos);
+    expect(
+      despues.marcas,
+      `las líneas están pero sin sus marcas de monte/valle (${antes.marcas} polígonos antes, ${despues.marcas} después)`,
+    ).toBeGreaterThan(antes.marcas);
   });
 
   test('Elástico: se pone, se resalta y Supr lo quita sin llevarse la pieza', async ({ page }) => {
@@ -428,6 +437,12 @@ test.describe('las dos que estaban rotas por dentro', () => {
       () => document.querySelectorAll('svg.pattern-svg [data-elastic-selected="true"], svg.pattern-svg .elastic--selected').length,
     );
 
+    // Con la pieza SELECCIONADA. Sin esto, `deleteSelection` era un no-op pase
+    // lo que pasase y el aserto de abajo pasaba igual con el `handleKeyDown` en
+    // la burbuja, o sin consumir, o sin existir — o sea, sin cubrir la razón
+    // entera por la que se eligió la captura.
+    await dispatch(page, 'editor/selectPiece', 'p1');
+    await page.waitForTimeout(200);
     await page.mouse.move(200, 300);
     await page.keyboard.press('Delete');
     await page.waitForTimeout(400);

@@ -136,3 +136,54 @@ describe('el pliegue se dibuja', () => {
     expect(largo).toBeCloseTo(15, 5);
   });
 });
+
+/**
+ * Y el pliegue va HACIA DENTRO, con el contorno en cualquier sentido.
+ *
+ * La cabecera de `pleatGeometry.ts` lo promete desde siempre: «extends inward
+ * by the pleat depth». Pero la dirección salía de `perpendicular(tangente)`,
+ * que rota 90° a un lado fijo sin mirar el sentido del contorno. Con un
+ * contorno horario —que un DXF puede traer perfectamente, `polyVertexToPath`
+ * conserva el orden del archivo— los pliegues nacían FUERA de la pieza.
+ *
+ * El defecto es viejo, pero mientras `generatePleatFoldLines` devolvía `[]`
+ * nadie podía verlo. Arreglar el silencio sin arreglar esto habría cambiado
+ * «no pasa nada» por «pasa al revés», que es peor de diagnosticar: lo primero
+ * se reporta, lo segundo se aprende como maña.
+ *
+ * El oráculo no mira el signo de nada: mira si el pliegue ACABA más cerca del
+ * centro de la pieza de lo que empieza. Eso es lo que «hacia dentro» significa,
+ * y no depende de ningún convenio.
+ */
+describe('el pliegue va hacia dentro', () => {
+  const ANTIHORARIO: PathCommand[] = RECT;
+  const HORARIO: PathCommand[] = [
+    { type: 'M', values: [0, 150] },
+    { type: 'L', values: [200, 150] },
+    { type: 'L', values: [200, 0] },
+    { type: 'L', values: [0, 0] },
+    { type: 'Z', values: [] },
+  ];
+
+  const centro = { x: 100, y: 75 };
+  const aCentro = (p: { x: number; y: number }) => Math.hypot(p.x - centro.x, p.y - centro.y);
+
+  it.each([['antihorario', ANTIHORARIO], ['horario', HORARIO]] as const)(
+    'con el contorno %s, cada pliegue acaba MÁS CERCA del centro que donde empieza',
+    (_nombre, outline) => {
+      const piece = piezaConBordesDeVerdad(outline as PathCommand[]);
+      for (const e of piece.edges!) {
+        const lineas = generatePleatFoldLines(pliegue({ edgeName: e.name, count: 2 }), piece);
+        expect(lineas.length, `${e.name} no generó pliegues`).toBe(2);
+        for (const l of lineas) {
+          const ini = { x: l.path[0].values[0], y: l.path[0].values[1] };
+          const fin = { x: l.path[1].values[0], y: l.path[1].values[1] };
+          expect(
+            aCentro(fin),
+            `un pliegue de ${e.name} sale HACIA FUERA: (${ini.x},${ini.y}) → (${fin.x},${fin.y})`,
+          ).toBeLessThan(aCentro(ini));
+        }
+      }
+    },
+  );
+});

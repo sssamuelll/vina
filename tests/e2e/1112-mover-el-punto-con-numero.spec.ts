@@ -129,4 +129,55 @@ test.describe('mover el punto con número', () => {
       '«Mover exacto…» no llevó al número: sería una puerta a ningún sitio',
     ).toBeVisible();
   });
+
+  test('con la esquina DUPLICADA de un DXF real, los chips salen igual', async ({ page }) => {
+    // El fallo que ningún test de esta rama veía. Un clic sobre un nodo
+    // selecciona el GRUPO de anclas coincidentes, y CLO duplica el vértice en
+    // cada esquina: sobre el patrón de María, `selectedNodes.size` es 2 para UN
+    // punto. Con la condición ingenua (`size !== 1`), los chips y el menú de
+    // #1112 se apagaban en silencio justo sobre los datos para los que se
+    // hicieron. `addPiece` construye un rectángulo sintético con anclas únicas,
+    // así que los otros tres tests de este archivo no podían verlo.
+    await page.goto('/');
+    await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
+    await page.waitForTimeout(600);
+    await dispatch(page, 'project/addPiece', {
+      id: 'dup', name: 'dup',
+      outline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [200, 0] },
+        { type: 'L', values: [200, 0] },      // la esquina, repetida como la deja CLO
+        { type: 'L', values: [200, 150] },
+        { type: 'L', values: [0, 150] },
+        { type: 'Z', values: [] },
+      ],
+      internals: [], position: { x: 200, y: 200 }, rotation: 0, mirrored: false,
+      seamAllowance: 0, layer: 1, sublayer: 0, active: true, createdAt: 1, updatedAt: 1,
+    });
+    await page.waitForTimeout(300);
+    await dispatch(page, 'editor/setActiveTool', 'editPattern');
+    await dispatch(page, 'tools/setActiveTool2D', 'editPattern');
+    await page.waitForTimeout(300);
+    const dentro = await toScreen(page, { x: 300, y: 275 });
+    await page.mouse.dblclick(dentro.x, dentro.y);
+    await page.waitForTimeout(400);
+
+    await clickAt(page, { x: 400, y: 200 });   // la esquina duplicada
+    await page.waitForTimeout(400);
+
+    const elegidos = await page.evaluate(() => {
+      const svg = document.querySelector('svg.pattern-svg');
+      return svg ? svg.querySelectorAll('[data-anchor-state="selected"]').length : -1;
+    });
+
+    await expect(
+      chip(page, 'Al punto anterior'),
+      `la esquina duplicada no enseña sus cotas (glifos elegidos: ${elegidos})`,
+    ).toHaveCount(1);
+    await expect(chip(page, 'Al punto siguiente')).toHaveCount(1);
+
+    // Y el vecino que enseña NO es su gemelo a distancia cero.
+    const anterior = await chip(page, 'Al punto anterior').getAttribute('aria-label');
+    expect(anterior, `la cota mide contra el gemelo: ${anterior}`).not.toMatch(/[^0-9]0[.,]0/);
+  });
 });

@@ -225,6 +225,15 @@ export function useElasticTool(
   const handleKeyDown = useCallback(
     (e: KeyboardEvent): boolean => {
       if (!isActive || !selectedElasticId) return false;
+      // El sujeto vive en estado local y NADIE lo sincroniza con el store: tras
+      // un Ctrl+Z que deshaga la creación, el id sigue apuntando a un elástico
+      // que ya no existe. Sin esta comprobación, `handleKeyDown` devolvía
+      // `true`, el router paraba el evento, y Supr dejaba de borrar la PIEZA
+      // seleccionada — muerto y sin explicación hasta pulsar Escape.
+      if (!elastics.some(el => el.id === selectedElasticId)) {
+        setSelectedElasticId(null);
+        return false;
+      }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         dispatch(removeElastic(selectedElasticId));
@@ -239,7 +248,7 @@ export function useElasticTool(
 
       return false;
     },
-    [isActive, selectedElasticId, dispatch],
+    [isActive, selectedElasticId, elastics, dispatch],
   );
 
   return {

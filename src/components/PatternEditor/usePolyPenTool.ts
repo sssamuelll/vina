@@ -67,10 +67,11 @@ interface ViewState {
   hostId: string | null;
   closeArmed: boolean;
   nextPoint: NextPointState | null;
+  nextPointSeq: number;
 }
 
 const EMPTY: ViewState = {
-  nodes: [], previewPoint: null, pressPoint: null, isDragging: false, dragHandle: null, hover: null, hostId: null, closeArmed: false, nextPoint: null,
+  nodes: [], previewPoint: null, pressPoint: null, isDragging: false, dragHandle: null, hover: null, hostId: null, closeArmed: false, nextPoint: null, nextPointSeq: 0,
 };
 
 const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -89,6 +90,9 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
   const lastWorldRef = useRef<Point2D | null>(null);
   const hoverRef = useRef<SnapTarget | null>(null);
   const nextPointRef = useRef<NextPointState | null>(null);
+  /** Sube en cada Tab, para que reabrir el chip no dependa de que el tramo se
+   *  haya movido. Hermano del de la pluma (#1129). */
+  const nextPointSeqRef = useRef(0);
   const [view, setView] = useState<ViewState>(EMPTY);
 
   const { pieces } = opts;
@@ -137,6 +141,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       hostId: hostRef.current,
       closeArmed: !!press?.closes || hover?.kind === 'firstNode',
       nextPoint: nextPointRef.current,
+      nextPointSeq: nextPointSeqRef.current,
     });
   }, []);
 
@@ -279,6 +284,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const from = nodes[nodes.length - 1].point;
     const { lengthMm, angleDeg } = polarOf(from, lastWorldRef.current ?? from);
     nextPointRef.current = { from, lengthMm, angleDeg };
+    nextPointSeqRef.current += 1;
     publish();
   }, [publish]);
 
@@ -362,6 +368,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     hostId: view.hostId,
     closeArmed: view.closeArmed,
     nextPoint: view.nextPoint,
+    nextPointSeq: view.nextPointSeq,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,

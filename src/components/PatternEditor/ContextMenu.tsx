@@ -48,8 +48,8 @@ export interface ContextMenuState {
   internalLineType?: string | null;
   /** True cuando el hit-test ocurrió en altitud POINT (edición de nodos). */
   isEditingNodes?: boolean;
-  /** Cuántos puntos hay seleccionados en «Editar patrón» (#1112). */
-  nodosSeleccionados?: number;
+  /** El clic derecho cayó sobre el punto ya elegido en «Editar patrón» (#1112). */
+  derechoSobreElPuntoElegido?: boolean;
 }
 
 interface ContextMenuProps extends CurationCallbacks {
@@ -170,7 +170,7 @@ export default function ContextMenu(props: ContextMenuProps) {
     internalLineType: (menu.internalLineType as InternalLineType | null) ?? null,
     internalLine,
     segmentIndex: menu.segmentIndex, segmentIsCurve: menu.segmentIsCurve,
-    nodosSeleccionados: menu.nodosSeleccionados,
+    derechoSobreElPuntoElegido: menu.derechoSobreElPuntoElegido,
     clipboard, groups, pieces, cb, onClose,
   };
 

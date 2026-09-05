@@ -15,6 +15,7 @@ import { useCircleTool } from './useCircleTool';
 import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import CotaLines from './cotas/CotaLines';
 import { cotasDelSujeto, faltaSujeto } from './cotas/sujeto';
+import { puntoUnicoSeleccionado } from './cotas/nodo';
 import { cajasDeAsas } from './cotas/cotasGeometry';
 import { resizePieceTo } from './pieceResize';
 import ToolStrip2D from './ToolStrip2D';
@@ -38,7 +39,7 @@ import { useEditCurve } from './useEditCurve';
 import { useEditPattern } from './useEditPattern';
 import { patternToPieceLocal } from './pieceTransform';
 import { hitTestPieceBBox } from '../../utils/geometry/hitTest';
-import { nearestSegment } from './nodeEditorUtils';
+import { hitTestNode, nearestSegment } from './nodeEditorUtils';
 import { useMeasureTool } from './useMeasureTool';
 import { useTransformTool, type TransformUpdate } from './useTransformTool';
 import { useScissorsTool } from './useScissorsTool';
@@ -599,6 +600,22 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       }
     }
 
+    // ¿El clic derecho cayó sobre el punto que está elegido? Sin esta
+    // pregunta, «Mover exacto…» salía con CUALQUIER clic derecho estando en
+    // modo nodo —lienzo vacío incluido, porque `resolveTargetKind` decide la
+    // altitud antes de mirar nada— y abría el chip del punto elegido, que
+    // podía estar al otro lado de la pieza. Ella pediría mover B y se movería A.
+    const elegido = puntoUnicoSeleccionado(
+      pieces.find(p => p.id === editPatternTool.editingPieceId),
+      editPatternTool.selectedNodes,
+    );
+    let derechoSobreElPuntoElegido = false;
+    if (elegido && hitPiece?.id === editPatternTool.editingPieceId) {
+      const localPt = patternToPieceLocal({ x: canvasX, y: canvasY }, hitPiece);
+      const golpe = hitTestNode(localPt, editPatternTool.nodes, screenToPatternLength(8, zoom2D));
+      derechoSobreElPuntoElegido = !!golpe && editPatternTool.selectedNodes.has(golpe.commandIndex);
+    }
+
     setCtxMenu({
       visible: true,
       x: e.clientX,
@@ -613,9 +630,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       internalLineId: hitInternalLineId,
       internalLineType: hitInternalLineType,
       isEditingNodes: editPatternTool.isEditing,
-      nodosSeleccionados: editPatternTool.selectedNodes.size,
+      derechoSobreElPuntoElegido,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.selectedNodes, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, pen.nodes.length]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.selectedNodes, editPatternTool.editingPieceId, editPatternTool.nodes, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, pen.nodes.length]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
@@ -696,15 +713,32 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     : activeTool === 'internalShape'
       ? internalShapeTool.nextPoint
       : null;
+  const tramoSeq = activeTool === 'pen'
+    ? pen.nextPointSeq
+    : activeTool === 'internalShape'
+      ? internalShapeTool.nextPointSeq
+      : -1;
 
-  // El nodo en edición, solo cuando hay UNO: con dos o más, lo único que
-  // comparten es el desplazamiento del grupo, que es otra cota y no está hecha.
-  const nodoSeleccionado = useMemo(() => {
-    if (activeTool !== 'editPattern' || !editPatternTool.editingPieceId) return null;
-    const nodos = [...editPatternTool.selectedNodes];
-    if (nodos.length !== 1) return null;
-    return { pieceId: editPatternTool.editingPieceId, commandIndex: nodos[0] };
-  }, [activeTool, editPatternTool.editingPieceId, editPatternTool.selectedNodes]);
+  // El punto en edición, solo cuando hay UNO — que no es lo mismo que un
+  // índice de comando.
+  //
+  // Un clic sobre un nodo selecciona el GRUPO de anclas coincidentes
+  // (`useEditPattern.ts:367`), porque CLO duplica el vértice en cada esquina y
+  // moverlas por separado rompería el contorno en una púa. En el DXF de María
+  // eso significa `selectedNodes.size === 2` para UN SOLO punto: con la
+  // condición ingenua (`length !== 1`), los chips y el menú de #1112 se
+  // apagaban en silencio **justo sobre los datos para los que se hicieron**.
+  // El e2e no lo veía porque su rectángulo sintético tiene anclas únicas.
+  //
+  // Con dos o más PUNTOS distintos sigue sin haber cotas: lo único que
+  // comparten es su desplazamiento, y esa es otra cota que no está hecha.
+  const nodoSeleccionado = useMemo(
+    () => puntoUnicoSeleccionado(
+      activeTool === 'editPattern' ? pieces.find(p => p.id === editPatternTool.editingPieceId) : undefined,
+      editPatternTool.selectedNodes,
+    ),
+    [activeTool, editPatternTool.editingPieceId, editPatternTool.selectedNodes, pieces],
+  );
 
   const sujeto = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
@@ -752,16 +786,20 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // chip no existe hasta el render siguiente, así que se espera a que el
   // `tramoEnCurso` esté puesto y entonces se enfoca — no se puede enfocar lo
   // que todavía no está en el DOM.
-  const tramoVisto = useRef<string | null>(null);
+  const tramoVisto = useRef<number>(-1);
   useEffect(() => {
-    const marca = tramoEnCurso ? `${tramoEnCurso.from.x},${tramoEnCurso.from.y}` : null;
-    if (tramoVisto.current === marca) return;
-    tramoVisto.current = marca;
+    // La marca es la SECUENCIA del Tab, no la posición del tramo. Con la
+    // posición, pulsar Tab una segunda vez sin haber colocado nada dejaba la
+    // marca igual, el efecto salía temprano y el chip no se reabría — y como el
+    // router ya había hecho `preventDefault`, el Tab nativo tampoco navegaba.
+    // Tecla muerta, encontrada por la revisión adversarial del 06-09.
+    if (tramoVisto.current === tramoSeq) return;
+    tramoVisto.current = tramoSeq;
     if (!tramoEnCurso) return;
     if (cotasRef.current?.abrirPrimero()) {
       pushJournal('gesture', 'tramo:congelado', { largo: tramoEnCurso.lengthMm, angulo: tramoEnCurso.angleDeg });
     }
-  }, [tramoEnCurso]);
+  }, [tramoSeq, tramoEnCurso]);
 
   // Enfriamiento irreversible (spec § 3.1): en cuanto la selección deja de ser
   // la pieza nueva, cambia la herramienta o la pieza desaparece, se enfría y
@@ -1404,9 +1442,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onRefineNotch={notchTool.refineExisting}
         onMoverPuntoExacto={() => {
           // No abre nada nuevo: lleva el foco al chip que ya está en pantalla.
-          if (cotasRef.current?.abrirPrimero()) {
-            pushJournal('gesture', 'nodo:moverExacto', { via: 'menu' });
-          }
+          // El caso en que NO hay chip también se registra: un verbo que no
+          // hace nada Y no deja rastro es la salida muda que el repo persigue.
+          const abrio = cotasRef.current?.abrirPrimero() ?? false;
+          pushJournal('gesture', 'nodo:moverExacto', { via: 'menu', abrio });
         }}
         onOpenSeamAllowanceProperties={() => onOpenPanel?.('Properties')}
         onOpenProperties={(pieceId) => {

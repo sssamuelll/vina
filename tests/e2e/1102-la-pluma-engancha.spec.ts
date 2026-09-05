@@ -34,8 +34,12 @@ test.describe('la pluma engancha, y se ve que engancha', () => {
     await dispatch(page, 'tools/setActiveTool2D', 'pen');
     await page.waitForTimeout(400);
 
+    // Exactamente cuatro, no «al menos cuatro»: un rectángulo tiene cuatro
+    // esquinas, y con `>=` una regresión de vértices duplicados —ocho círculos
+    // en cuatro sitios— pasaría desapercibida. El duplicado de anclas es un caso
+    // real en este repo: es lo que trae el DXF de María.
     const conPluma = await page.locator('.pen-piece-vertices circle').count();
-    expect(conPluma, 'con la pluma activa los puntos no aparecen').toBeGreaterThanOrEqual(4);
+    expect(conPluma, 'con la pluma activa los puntos no aparecen, o salen repetidos').toBe(4);
   });
 
   test('acercarse a un vértice enciende el anillo y el clic cae exacto', async ({ page }) => {

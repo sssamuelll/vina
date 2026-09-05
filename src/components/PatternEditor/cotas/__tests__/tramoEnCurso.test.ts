@@ -56,6 +56,16 @@ describe('las dos cotas del tramo en curso', () => {
     expect(angulo.apply(0)).toEqual({ kind: 'tramoEnCurso', largoMm: 80, anguloDeg: 0 });
   });
 
+  it('confirmar con Enter vale aunque el número no haya cambiado: aquí confirmar COLOCA', () => {
+    // Para una cota de objeto, «no cambió → no despacho» ahorra una escritura.
+    // Aquí no hay objeto: confirmar es la orden de colocar el punto. Sin esto,
+    // congelar el tramo, ver el número que ya se quiere y pulsar Enter no hacía
+    // absolutamente nada — el caso más simple del encadenado.
+    for (const c of cotasDelTramoEnCurso({ from, lengthMm: 80, angleDeg: 90 })) {
+      expect(c.confirmaSinCambio, `«${c.label}» no coloca si el número no cambia`).toBe(true);
+    }
+  });
+
   it('el largo no acepta cero ni negativo: un tramo de largo cero no es un tramo', () => {
     const [largo] = cotasDelTramoEnCurso({ from, lengthMm: 80, angleDeg: 90 });
     expect(largo.min).toBeGreaterThan(0);
@@ -70,9 +80,9 @@ describe('las dos cotas del tramo en curso', () => {
   it('ninguno se arrastra: escribir un tramo que aún no existe es de teclado', () => {
     // El scrub tira de un objeto que está en pantalla. Aquí no hay objeto
     // todavía — hay una intención — y arrastrarlo colocaría puntos sin querer.
-    for (const c of cotasDelTramoEnCurso({ from, lengthMm: 80, angleDeg: 90 })) {
-      expect(c.scrub).toBe(false);
-    }
+    const cotas = cotasDelTramoEnCurso({ from, lengthMm: 80, angleDeg: 90 });
+    expect(cotas, 'sin cotas el `for` de abajo pasa en vacío').toHaveLength(2);
+    for (const c of cotas) expect(c.scrub).toBe(false);
   });
 });
 

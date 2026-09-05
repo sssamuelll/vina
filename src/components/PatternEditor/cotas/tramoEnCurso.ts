@@ -46,7 +46,12 @@ export function cotasDelTramoEnCurso(tramo: TramoEnCurso): Cota[] {
     ? { x: 0, y: -1 }
     : { x: -dy / largo, y: dx / largo };
 
-  const base = { a: from, b: to, outward, primary: true, scrub: false, rotulo: 'del tramo' };
+  // `confirmaSinCambio`: aquí confirmar no escribe un valor, COLOCA un punto.
+  // Enter con el número que ya se ve tiene que colocar igual.
+  const base = {
+    a: from, b: to, outward, primary: true, scrub: false,
+    rotulo: 'del tramo', confirmaSinCambio: true,
+  };
 
   return [
     {

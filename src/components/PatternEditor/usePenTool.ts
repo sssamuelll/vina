@@ -42,6 +42,14 @@ interface PenState {
   /** Is the path closed? */
   isClosed: boolean;
   nextPoint: NextPointState | null;
+  /**
+   * Sube en cada Tab. La abre-el-chip de `PatternEditor` se enganchaba a la
+   * posición del tramo, y `openNextPoint` conserva `from` mientras no se
+   * coloque un punto: pulsar Tab una segunda vez no reabría el chip y, como el
+   * router ya había hecho `preventDefault`, el Tab nativo tampoco navegaba.
+   * Tecla muerta.
+   */
+  nextPointSeq: number;
 }
 
 // El radio de cierre es el MISMO que el del enganche. El spec de la línea
@@ -51,7 +59,7 @@ interface PenState {
 // decisión, y con la pluma enganchando de verdad (#1102) ya no es cosmético:
 // dos radios distintos en la misma herramienta se notan.
 
-const EMPTY: PenState = { nodes: [], isDragging: false, cursorPos: null, isClosed: false, nextPoint: null };
+const EMPTY: PenState = { nodes: [], isDragging: false, cursorPos: null, isClosed: false, nextPoint: null, nextPointSeq: 0 };
 
 /** Identidad estable: un `[]` nuevo por render reharía el índice en cada frame. */
 const VACIO: PatternPiece[] = [];
@@ -164,6 +172,11 @@ export function usePenTool(
       ...draftedPieceDefaults(),
     });
     pressRef.current = null;
+    // El anillo de enganche también se apaga: si no, cerrar una pieza lo deja
+    // pintado sobre el último objetivo hasta el siguiente movimiento del ratón,
+    // y volver a la pluma lo enseña apuntando a donde estuvo el cursor hace
+    // tres gestos.
+    setHover(null);
     setState(EMPTY);
   }, [nodesToCommands, onComplete]);
 
@@ -178,7 +191,12 @@ export function usePenTool(
     // una pieza, que es donde más se dibuja.
     if (nodes.length > 2) {
       const first = nodes[0].anchor;
-      if (dist(pt, first) * zoom < EDGE_HIT_PX) {
+      // `<=`, igual que el enganche (`snapIndex` compara `<= radius`). Con `<`,
+      // a EXACTAMENTE 12 px el enganche disparaba y el cierre no: el clic
+      // colocaba un nodo encima del primero en vez de cerrar la pieza. Un
+      // valor de ancho, pero es el caso que unificar la constante venía a
+      // quitar.
+      if (dist(pt, first) * zoom <= EDGE_HIT_PX) {
         pushJournal('gesture', 'pen:press', { closes: true, nodes: nodes.length });
         complete(nodes, true);
         return;
@@ -243,6 +261,7 @@ export function usePenTool(
 
   /** Clear any in-progress stroke (used when switching away from the tool). */
   const reset = useCallback(() => {
+    setHover(null);
     pressRef.current = null;
     setState(EMPTY);
   }, []);
@@ -269,7 +288,7 @@ export function usePenTool(
     const from = nodes[nodes.length - 1].anchor;
     const cursor = cursorRef.current ?? from;
     const { lengthMm, angleDeg } = polarOf(from, cursor);
-    setState(prev => ({ ...prev, nextPoint: { from, lengthMm, angleDeg } }));
+    setState(prev => ({ ...prev, nextPoint: { from, lengthMm, angleDeg }, nextPointSeq: prev.nextPointSeq + 1 }));
   }, []);
 
   /**
@@ -377,6 +396,7 @@ export function usePenTool(
     /** Los vértices de las piezas visibles — #1102 [11:38]. */
     verticesDePiezas,
     nextPoint: state.nextPoint,
+    nextPointSeq: state.nextPointSeq,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,

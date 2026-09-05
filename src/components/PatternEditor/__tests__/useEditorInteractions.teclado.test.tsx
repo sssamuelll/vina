@@ -157,3 +157,53 @@ describe('la bitácora ve cada tecla en la puerta', () => {
     expect(keysJournaled()).toHaveLength(1);
   });
 });
+
+/**
+ * El Supr del Elástico vive en la CAPTURA, y esa decisión es la mitad del
+ * arreglo (#1112 / puertas del 06-09).
+ *
+ * `edit.delete` es un atajo GLOBAL: `ShortcutProvider` escucha en `document` en
+ * burbuja, o sea ANTES que el router de herramientas, que escucha en `window`
+ * también en burbuja. Desde ahí, Supr habría borrado la pieza seleccionada
+ * ADEMÁS del elástico — dos acciones por una tecla, que es exactamente el
+ * defecto que la escalera de Escape documenta para otras catorce herramientas.
+ *
+ * El e2e lo mira desde fuera; esto fija la decisión donde se tomó, y prueba
+ * también el caso que de verdad importa: que SIN sujeto la tecla siga su
+ * camino, porque quedársela en vacío deja a María sin poder borrar una pieza.
+ */
+describe('teclado en captura — elástico', () => {
+  it('con uno seleccionado, el elástico consume Supr y no llega al borrado global', () => {
+    const { tools, documentSpy } = setup('elastic');
+    (tools.elasticTool.handleKeyDown as unknown as Fn).mockReturnValue(true);
+    press(document.body, 'Delete');
+    expect(tools.elasticTool.handleKeyDown).toHaveBeenCalledTimes(1);
+    expect(documentSpy, 'Supr llegó al global: borraría también la pieza').not.toHaveBeenCalled();
+  });
+
+  it('sin sujeto NO se lo queda: la tecla sigue, y la pieza se puede borrar', () => {
+    const { tools, documentSpy } = setup('elastic');
+    (tools.elasticTool.handleKeyDown as unknown as Fn).mockReturnValue(false);
+    press(document.body, 'Delete');
+    expect(tools.elasticTool.handleKeyDown).toHaveBeenCalledTimes(1);
+    expect(documentSpy, 'se quedó el Supr en vacío: la pieza ya no se puede borrar').toHaveBeenCalledTimes(1);
+  });
+
+  it('y la bitácora dice quién se la quedó, en vez de mentir con `null`', () => {
+    // Nueve herramientas del router paran el evento por dentro y dejan
+    // `consumedBy: null` en la caja negra. Esta usa el protocolo que devuelve
+    // boolean justo para no sumarse a esa lista.
+    const { tools } = setup('elastic');
+    (tools.elasticTool.handleKeyDown as unknown as Fn).mockReturnValue(true);
+    press(document.body, 'Delete');
+    expect(keysJournaled().at(-1)?.data?.consumedBy).toBe('elastic');
+  });
+
+  it('una tecla nacida en un campo no llega al elástico', () => {
+    const { tools } = setup('elastic');
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    press(input, 'Delete');
+    expect(tools.elasticTool.handleKeyDown).not.toHaveBeenCalled();
+  });
+});

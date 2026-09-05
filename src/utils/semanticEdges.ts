@@ -282,7 +282,14 @@ export function rangoMedibleDeBorde(
   if (!outline || hasta !== desde + 1 || outline[desde]?.type !== 'M') {
     return [desde, hasta];
   }
-  for (let i = outline.length - 1; i > desde; i--) {
+  // Hacia DELANTE hasta la primera `Z`, que es la de este subcamino. Buscar la
+  // última hacia atrás parecía equivalente y no lo es: con dos subcaminos
+  // —una pieza con agujero— devolvía el cierre del OTRO, y el elástico o el
+  // pliegue se dibujaban sobre un borde ajeno. Lo cazó la revisión adversarial
+  // del 06-09, midiéndolo: `M0 L1 L2 Z3 M4 L5 L6 Z7`, el cierre del primer
+  // subcamino daba `[7,8]`.
+  for (let i = desde + 1; i < outline.length; i++) {
+    if (outline[i].type === 'M') break;
     if (outline[i].type === 'Z') return [i, i + 1];
   }
   return [desde, hasta];

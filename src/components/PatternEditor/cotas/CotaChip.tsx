@@ -124,7 +124,7 @@ export default function CotaChip({
       setInvalid(true);
       return false;
     }
-    if (v !== round1(cota.valueMm)) onCommit(cota, v, motivo);
+    if (v !== round1(cota.valueMm) || cota.confirmaSinCambio) onCommit(cota, v, motivo);
     return true;
   };
   const terminarScrub = (valor: (s: { v0: number; last: number }) => number) => {

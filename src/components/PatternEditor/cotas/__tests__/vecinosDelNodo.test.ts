@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cotasDelNodo, vecinosDelNodo } from '../nodo';
+import { cotasDelNodo, puntoUnicoSeleccionado, vecinosDelNodo } from '../nodo';
 import { cotasDelSujeto, type SujetoInput } from '../sujeto';
 import { pieceLocalToPattern } from '../../../../utils/geometry/pieceSpace';
 import type { PathCommand, PatternPiece } from '../../../../types/types';
@@ -134,7 +134,9 @@ describe('las cotas del punto — «respecto a este punto, respecto a este punto
   });
 
   it('las dos son `tramo-largo`: son largos, y el kind no se usa para robar layout', () => {
-    for (const c of cotasDelNodo(PIEZA, 1)) expect(c.kind).toBe('tramo-largo');
+    const cotas = cotasDelNodo(PIEZA, 1);
+    expect(cotas, 'sin cotas el `for` de abajo pasa en vacío').toHaveLength(2);
+    for (const c of cotas) expect(c.kind).toBe('tramo-largo');
   });
 
   it('el segmento que dibuja cada una va del vecino al nodo, en patrón', () => {
@@ -162,6 +164,27 @@ describe('las cotas del punto — «respecto a este punto, respecto a este punto
     const esperado = pieceLocalToPattern({ x: 200, y: 0 }, girada);
     expect(alAnterior.b.x).toBeCloseTo(esperado.x, 6);
     expect(alAnterior.b.y).toBeCloseTo(esperado.y, 6);
+  });
+
+  it('y su normal sigue siendo PERPENDICULAR al segmento tras el giro', () => {
+    // El chip se coloca en el punto medio del segmento desplazado 18 px por
+    // `outward`. Si la normal se queda sin girar mientras `a` y `b` sí giran,
+    // queda paralela al segmento y el chip aterriza ENCIMA de su propia línea.
+    // Medido sobre una pieza a 90° antes del arreglo: las dos cotas lo hacían.
+    for (const rot of [0, 30, 90, 180]) {
+      const girada = { ...PIEZA, rotation: rot } as PatternPiece;
+      for (const c of cotasDelNodo(girada, 1)) {
+        const dx = c.b.x - c.a.x;
+        const dy = c.b.y - c.a.y;
+        const largo = Math.hypot(dx, dy);
+        const producto = (dx / largo) * c.outward.x + (dy / largo) * c.outward.y;
+        expect(
+          Math.abs(producto),
+          `a ${rot}°, «${c.label}» tiene la normal paralela a su segmento`,
+        ).toBeLessThan(1e-6);
+        expect(Math.hypot(c.outward.x, c.outward.y), 'la normal dejó de ser unitaria').toBeCloseTo(1, 6);
+      }
+    }
   });
 
   it('escribir la distancia mueve el nodo POR esa recta, sin girar el tramo', () => {
@@ -224,5 +247,56 @@ describe('el punto como sujeto', () => {
     );
     expect(s.cotas).toHaveLength(2);
     expect(s.disabled).toBe(true);
+  });
+});
+
+/**
+ * «Un punto» no es «un índice de comando», y confundirlos apagaba #1112 entero
+ * sobre el DXF de María.
+ *
+ * Un clic sobre un nodo selecciona el GRUPO de anclas coincidentes, porque CLO
+ * duplica el vértice en cada esquina y moverlas por separado rompería el
+ * contorno en una púa. Con la condición ingenua —`selectedNodes.size !== 1`—
+ * eso significaba: sobre su patrón real, clicar una esquina no sacaba ni un
+ * chip ni una entrada de menú. En silencio.
+ *
+ * El e2e no lo veía porque `addPiece` construye un rectángulo sintético con
+ * anclas únicas. Es literalmente «un test verde certifica nuestra promesa, no
+ * la de María»: la lección estaba escrita y el fixture la esquivaba.
+ */
+describe('un punto no es un índice de comando', () => {
+  const conGemelo = {
+    ...PIEZA,
+    outline: CON_GEMELO,
+  } as PatternPiece;
+
+  it('con la esquina duplicada de un DXF, DOS índices son UN punto', () => {
+    // `anchorGroupOf(CON_GEMELO, 1)` es [1, 2]: los dos comandos de la esquina.
+    expect(puntoUnicoSeleccionado(conGemelo, new Set([1, 2]))).toEqual({
+      pieceId: 'p1', commandIndex: 1,
+    });
+  });
+
+  it('y ese punto SÍ tiene sus dos cotas', () => {
+    const punto = puntoUnicoSeleccionado(conGemelo, new Set([1, 2]));
+    expect(punto, 'la esquina duplicada no cuenta como punto').not.toBeNull();
+    expect(cotasDelNodo(conGemelo, punto!.commandIndex)).toHaveLength(2);
+  });
+
+  it('una selección PARCIAL del grupo no cuenta: sería media esquina', () => {
+    // No debería poder ocurrir —el clic selecciona el grupo entero— pero si un
+    // día ocurre, mejor sin cotas que con una que miente sobre qué mueve.
+    expect(puntoUnicoSeleccionado(conGemelo, new Set([1]))).toBeNull();
+  });
+
+  it('dos puntos DISTINTOS siguen sin tener cotas', () => {
+    // Lo único que comparten es su desplazamiento, y esa cota no está hecha.
+    expect(puntoUnicoSeleccionado(conGemelo, new Set([1, 2, 4]))).toBeNull();
+    expect(puntoUnicoSeleccionado(PIEZA, new Set([1, 2]))).toBeNull();
+  });
+
+  it('sin selección, o sin pieza, no hay punto', () => {
+    expect(puntoUnicoSeleccionado(PIEZA, new Set())).toBeNull();
+    expect(puntoUnicoSeleccionado(undefined, new Set([1]))).toBeNull();
   });
 });

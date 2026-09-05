@@ -84,8 +84,13 @@ export interface CurationCtx {
   internalLine: InternalLine | null;
   segmentIndex?: number;
   segmentIsCurve?: boolean;
-  /** Cuántos puntos hay seleccionados en «Editar patrón» (#1112). */
-  nodosSeleccionados?: number;
+  /**
+   * El clic derecho cayó sobre el punto que ya está elegido en «Editar patrón»
+   * (#1112). Un booleano y no un conteo, porque las dos preguntas que había que
+   * hacer son «¿hay UN punto elegido?» —y un punto son varios índices de
+   * comando en el DXF de María— y «¿es ESE el que tengo debajo?».
+   */
+  derechoSobreElPuntoElegido?: boolean;
   clipboard: { pieces: PatternPiece[] } | null;
   groups: PieceGroup[];
   pieces: PatternPiece[];
@@ -312,7 +317,7 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
    * `findInsertTarget` ya documenta.
    */
   moverPuntoExacto: { id: 'moverPuntoExacto', group: 'transform', icon: '⌖', label: 'Mover exacto…',
-    gate: (ctx) => ctx.nodosSeleccionados === 1,
+    gate: (ctx) => ctx.derechoSobreElPuntoElegido === true,
     run: (ctx) => { ctx.cb.onMoverPuntoExacto?.(); } },
   saExactWidth: { id: 'saExactWidth', group: 'transform', icon: '↔', label: 'Ancho exacto…',
     gate: (ctx) => !!ctx.pieceId && !!ctx.saEdgeId,

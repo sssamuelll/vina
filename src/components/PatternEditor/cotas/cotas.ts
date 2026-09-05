@@ -62,6 +62,16 @@ export interface Cota {
   max: number;
   /** Relleno (mando principal) o hueco (verificación) — § 3.4. */
   primary: boolean;
+  /**
+   * Confirmar con Enter vale aunque el valor no haya cambiado (#1129).
+   *
+   * Para la cota de un objeto, «no cambió → no despacho» es correcto: evita
+   * escribir en el store por nada. Para el tramo en curso NO lo es, porque ahí
+   * confirmar no es una mutación: es la orden de COLOCAR el punto. Sin esto,
+   * María congela el tramo, ve `80 mm / −90°` —que es justo lo que quiere—,
+   * pulsa Enter y no pasa nada: el caso más simple del encadenado, muerto.
+   */
+  confirmaSinCambio?: boolean;
   /** Procedencia visible del número cuando hace falta decirla. */
   rotulo?: string;
   /** Ausente conserva el scrub; `false` deja el chip solo para teclado. */

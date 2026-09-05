@@ -161,15 +161,25 @@ describe('el cierre de la pluma, con la deuda del spec saldada', () => {
     expect(tool().nodes).toHaveLength(4);
   });
 
-  it('el cierre gana al enganche: con una pieza debajo, el primer nodo manda', () => {
-    // Si el enganche a una pieza se resolviera antes que el cierre, el trazo no
-    // se podría cerrar encima de una pieza — que es donde más se dibuja.
+  it('el cierre gana al enganche EN EL MISMO PUNTO, que es donde compiten', () => {
+    // La primera versión de este test clicaba en el centro de la pieza, a 40 px
+    // del vértice más cercano: `resolveSnap` devolvía `null` en los cuatro
+    // clics, así que no había competencia y el test habría seguido verde con la
+    // precedencia invertida. Lo midió la revisión adversarial del 06-09.
+    //
+    // Aquí el primer nodo NACE sobre un vértice de A (enganchado), y el cierre
+    // se intenta sobre ese mismo punto: los dos resolutores quieren el clic. Si
+    // el enganche fuera primero, se añadiría un cuarto nodo encima del primero
+    // en vez de completar la pieza.
     const { tool, click, onComplete } = setup([A]);
-    click(140, 140);
+    click(104, 103);                       // engancha al vértice (100,100)
+    expect(tool().nodes[0].anchor).toEqual({ x: 100, y: 100 });
     click(180, 140);
     click(180, 180);
-    click(142, 141);
-    expect(onComplete, 'no cerró estando encima de una pieza').toHaveBeenCalledTimes(1);
+    click(102, 101);                       // dentro del radio del primero Y del vértice
+    expect(onComplete, 'el enganche le ganó al cierre: se añadió un nodo en vez de cerrar').toHaveBeenCalledTimes(1);
     expect(tool().nodes).toEqual([]);
+    const cmds = onComplete.mock.calls[0][0].outline as PathCommand[];
+    expect(cmds[cmds.length - 1].type).toBe('Z');
   });
 });

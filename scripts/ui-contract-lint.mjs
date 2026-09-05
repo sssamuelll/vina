@@ -18,6 +18,13 @@
  *   node scripts/ui-contract-lint.mjs            # verifica contra el baseline
  *   node scripts/ui-contract-lint.mjs --update   # baja el techo a lo medido hoy
  *   node scripts/ui-contract-lint.mjs --list R3  # lista los sitios de una regla
+ *   node scripts/ui-contract-lint.mjs --root DIR # mide OTRO repo (para probarlo)
+ *
+ * `--root` existe porque un detector sin test es una opinión, y este tuvo las
+ * dos formas del defecto el mismo día: contar prosa (un `#1129` de comentario
+ * leído como color) y dejar de contar código al arreglarlo. Ahora se le puede
+ * dar un árbol de mentira con las líneas difíciles: ver
+ * `tests/repo/el-trinquete-de-ui-no-esta-ciego.test.ts`.
  *
  * Informe que lo originó: docs/reports/2026-08-14-auditoria-ui-deriva-de-diseno.md
  */
@@ -26,8 +33,10 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const BASELINE_PATH = join(ROOT, 'scripts', 'ui-contract-baseline.json');
+const RAIZ_PROPIA = join(dirname(fileURLToPath(import.meta.url)), '..');
+const iRoot = process.argv.indexOf('--root');
+const ROOT = iRoot !== -1 && process.argv[iRoot + 1] ? process.argv[iRoot + 1] : RAIZ_PROPIA;
+const BASELINE_PATH = join(RAIZ_PROPIA, 'scripts', 'ui-contract-baseline.json');
 
 /** El archivo donde SÍ es legal escribir un color literal. */
 const TOKEN_FILES = ['src/styles/tokens.css'];
@@ -64,11 +73,23 @@ function* lines(file) {
     // citar el número de un issue en un comentario de JSX rompía el trinquete.
     // El defecto ya estaba —`PatternEditor.tsx` traía un `#210` fantasma— y se
     // vio al escribir otro. Un detector que cuenta prosa mide otra cosa.
+    //
+    // Pero descartar la LÍNEA entera abre el agujero contrario, y la revisión
+    // adversarial del 06-09 lo sondeó: `{/* c */ activo && <Chip color="#f00"/>}`
+    // es JSX corriente y el color quedaba invisible. Se corta el comentario y
+    // se sigue escaneando lo que venga detrás.
     if (t.startsWith('/*') || t.startsWith('{/*')) {
-      if (!t.includes('*/')) inBlock = true;
+      const cierre = t.indexOf('*/');
+      if (cierre === -1) { inBlock = true; return; }
+      const resto = t.slice(cierre + 2).trim();
+      if (!resto) return;
+      _emit.push({ file, n: i + 1, line: resto });
       return;
     }
-    if (t.startsWith('//') || t.startsWith('*')) return;
+    if (t.startsWith('//')) return;
+    // `* ` de un bloque JSDoc — pero `* { … }` es un selector CSS universal, y
+    // descartarlo ciega la hoja entera. Se distingue por la llave.
+    if (t.startsWith('*') && !t.includes('{')) return;
     _emit.push({ file, n: i + 1, line });
   });
 }

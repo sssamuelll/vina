@@ -205,7 +205,6 @@ function mockState(overrides?: Partial<RootState>): RootState {
       toolOptions: {},
       recentTools: [],
 
-
     },
     parametric: {
       activePattern: null,

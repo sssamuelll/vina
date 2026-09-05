@@ -706,9 +706,14 @@ export function useEditorInteractions(
       // (empty canvas, or a node glyph, which lives in the overlay and hangs
       // off no [data-piece-id]) still goes to the tool, so marquee and point
       // dragging are untouched.
+      // Con el botón derecho no se cambia de pieza en edición, por la misma
+      // razón que no se reentra en la que ya está: `enterEdit` resetea el
+      // estado y BORRA la selección de puntos, así que el clic derecho sobre
+      // otra pieza dejaba el menú sin sujeto. La guarda de abajo cubría solo la
+      // mitad del recorrido — lo señaló la revisión adversarial del 06-09.
       const clicked = (e.target as SVGElement)
         .closest('[data-piece-id]')?.getAttribute('data-piece-id');
-      if (clicked && clicked !== editPattern.editingPieceId) {
+      if (e.button === 0 && clicked && clicked !== editPattern.editingPieceId) {
         editPattern.enterEdit(clicked);
         return;
       }

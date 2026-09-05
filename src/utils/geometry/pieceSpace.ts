@@ -74,6 +74,33 @@ export function pieceLocalToPatternDirection(
   return rotatePoint(dir, { x: 0, y: 0 }, rotation * Math.PI / 180);
 }
 
+/**
+ * Proyecta MUCHOS puntos de una pieza de una vez.
+ *
+ * `pieceLocalToPattern` recalcula `outlineBBoxCenter` —O(n) sobre el contorno—
+ * en cada llamada cuando la pieza está girada. Con un punto da igual; con todos
+ * los nodos de todas las piezas visibles, no: medido el 2026-09-06 sobre 20
+ * piezas de 300 comandos, 2,2 ms sin giro y **31,9 ms con giro**. Catorce veces.
+ *
+ * El centro es el mismo para todos los puntos de la pieza, así que se saca del
+ * bucle. Misma matemática, misma función de rotación: no es una segunda
+ * conversión, es la de siempre con el invariante izado.
+ */
+export function pieceLocalToPatternMany(
+  localPts: readonly Point2D[],
+  piece: TransformablePiece,
+): Point2D[] {
+  const rotation = piece.rotation ?? 0;
+  const { x: px, y: py } = piece.position;
+  if (!rotation) return localPts.map((p) => ({ x: p.x + px, y: p.y + py }));
+  const centro = outlineBBoxCenter(piece.outline);
+  const rad = rotation * Math.PI / 180;
+  return localPts.map((p) => {
+    const r = rotatePoint(p, centro, rad);
+    return { x: r.x + px, y: r.y + py };
+  });
+}
+
 /** Project an unrotated piece-local point through the piece's render transform. */
 export function pieceLocalToPattern(
   localPt: Point2D,

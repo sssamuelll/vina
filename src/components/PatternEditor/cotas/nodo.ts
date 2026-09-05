@@ -1,6 +1,6 @@
 import type { PathCommand, PatternPiece, Point2D } from '../../../types/types';
 import { anchorGroupOf, getAnchor } from '../nodeEditorUtils';
-import { pieceLocalToPattern } from '../../../utils/geometry/pieceSpace';
+import { pieceLocalToPattern, pieceLocalToPatternDirection } from '../../../utils/geometry/pieceSpace';
 import type { Cota } from './cotas';
 
 /** Un vecino: qué comando es y dónde está, en coordenadas LOCALES de la pieza. */
@@ -137,10 +137,12 @@ export function cotasDelNodo(piece: PatternPiece, commandIndex: number): Cota[] 
       // el trinquete de `pieceSpace`, que existe justo por esto.
       a: pieceLocalToPattern(v.punto, piece),
       b: pieceLocalToPattern(propio, piece),
-      // La normal se queda en LOCAL a propósito: es una dirección, y la capa la
-      // usa para separar el chip en píxeles de pantalla. Girarla la desalinearía
-      // del segmento que sí va girado.
-      outward: haciaFuera,
+      // La normal TAMBIÉN pasa por el giro. Escribí lo contrario y estaba al
+      // revés: `a` y `b` van girados, así que una normal sin girar queda
+      // PARALELA al segmento que dibuja. Medido sobre una pieza a 90°: los dos
+      // chips aterrizaban encima de su propia línea en vez de al lado.
+      // `cotasDeLineaInterna` ya lo hacía bien; el helper existe desde #1068.
+      outward: pieceLocalToPatternDirection(haciaFuera, piece),
       // No construye el contorno aquí: devuelve A DÓNDE va el nodo y deja que
       // lo escriba `useEditPattern`, que es quien ya lo hace en el arrastre —
       // con su compensación de pivote, su re-anclado de piquetes y su lote de
@@ -159,4 +161,27 @@ export function cotasDelNodo(piece: PatternPiece, commandIndex: number): Cota[] 
   if (anterior) { const c = cota(anterior, 'anterior'); if (c) cotas.push(c); }
   if (siguiente) { const c = cota(siguiente, 'siguiente'); if (c) cotas.push(c); }
   return cotas;
+}
+
+/**
+ * El punto único elegido en «Editar patrón», si lo hay.
+ *
+ * «Un punto» NO es «un índice de comando». Un clic sobre un nodo selecciona el
+ * grupo de anclas coincidentes entero (`useEditPattern`), porque CLO duplica el
+ * vértice en cada esquina y moverlas por separado rompería el contorno en una
+ * púa. En el DXF de María eso son DOS índices para un solo punto.
+ *
+ * Vive aquí y no en `PatternEditor` porque lo consultan dos sitios —las cotas y
+ * el gate del menú contextual— y tenerlo dos veces era exactamente la forma de
+ * que uno de los dos se quedara con la condición ingenua.
+ */
+export function puntoUnicoSeleccionado(
+  piece: PatternPiece | undefined,
+  seleccionados: ReadonlySet<number>,
+): { pieceId: string; commandIndex: number } | null {
+  if (!piece || seleccionados.size === 0) return null;
+  const nodos = [...seleccionados];
+  const grupo = anchorGroupOf(piece.outline, nodos[0]);
+  if (nodos.length !== grupo.length || !nodos.every((n) => grupo.includes(n))) return null;
+  return { pieceId: piece.id, commandIndex: nodos[0] };
 }

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Point2D, UnitSystem } from '../../../../types/types';
 import { HANDLE_RADIUS, ANCHOR_RADIUS } from '../../utils';
 import { formatDimension } from '../../../../utils/units';
@@ -29,31 +30,46 @@ interface PenToolOverlayProps {
   snapHover?: SnapTarget | null;
 }
 
+/**
+ * Los puntos de las piezas, ANTES del primer clic. Van fuera del grupo
+ * `pen-wip` a propósito: la queja de María es sobre el momento en que todavía
+ * no ha empezado a dibujar («si yo ahora quiero crear una línea nueva que
+ * empiece desde aquí»), y ese grupo solo existe con un nodo puesto. Salen del
+ * mismo índice que engancha, así que lo que se dibuja y lo que atrae son el
+ * mismo conjunto.
+ *
+ * Memoizado y aparte porque NO dependen del cursor. Dentro del overlay, cada
+ * `mousemove` de la pluma cambia `snapHover` y `previewPath`, y React
+ * reconciliaba de nuevo un círculo por nodo de todas las piezas visibles —
+ * miles con un DXF importado, medido el 06-09. Aquí solo se rehacen cuando
+ * cambian las piezas o el zoom.
+ */
+const VerticesDePiezas = memo(function VerticesDePiezas(
+  { puntos, zoom2D }: { puntos: Point2D[]; zoom2D: number },
+) {
+  if (puntos.length === 0) return null;
+  return (
+    <g className="pen-piece-vertices" pointerEvents="none">
+      {puntos.map((p, i) => (
+        <circle
+          key={i}
+          cx={p.x} cy={p.y} r={ANCHOR_RADIUS * 0.8 / zoom2D}
+          fill="var(--piece-fill-2d)"
+          stroke="var(--accent-2d)"
+          strokeWidth={1 / zoom2D}
+        />
+      ))}
+    </g>
+  );
+});
+
 export default function PenToolOverlay({
   zoom2D, units, penNodes, previewPath, guidePath, penDistance, penWillClose,
   verticesDePiezas = [], snapHover = null,
 }: PenToolOverlayProps) {
   return (
     <>
-      {/* Los puntos de las piezas, ANTES del primer clic. Van fuera del grupo
-          `pen-wip` a propósito: la queja de María es sobre el momento en que
-          todavía no ha empezado a dibujar («si yo ahora quiero crear una línea
-          nueva que empiece desde aquí»), y ese grupo solo existe con un nodo
-          puesto. Salen del mismo índice que engancha, así que lo que se dibuja
-          y lo que atrae son el mismo conjunto. */}
-      {verticesDePiezas.length > 0 && (
-        <g className="pen-piece-vertices" pointerEvents="none">
-          {verticesDePiezas.map((p, i) => (
-            <circle
-              key={i}
-              cx={p.x} cy={p.y} r={ANCHOR_RADIUS * 0.8 / zoom2D}
-              fill="var(--piece-fill-2d)"
-              stroke="var(--accent-2d)"
-              strokeWidth={1 / zoom2D}
-            />
-          ))}
-        </g>
-      )}
+      <VerticesDePiezas puntos={verticesDePiezas} zoom2D={zoom2D} />
 
       {/* El anillo de enganche: la misma palabra que la línea interna ya usa
           para «el próximo clic cae AQUÍ». El del CIERRE es otro y está abajo:

@@ -160,15 +160,20 @@ describe('ley de idioma — lo que se alcanza se lee, y lo cerrado dice por qué
     // lo que las vigila ya no es una lista de cadenas: son dos tests de
     // comportamiento. Si alguien revive `editor.selectedElasticId` o vuelve a
     // rebanar el rango del borde en los pliegues, fallan ellos.
-    const guardianes = [
-      'src/hooks/__tests__/el-elastico-se-selecciona-y-se-borra.test.tsx',
-      'src/utils/__tests__/el-pliegue-se-dibuja.test.ts',
+    // Que el archivo EXISTA no basta: uno vaciado, con sus `it` comentados o
+    // reducido a `expect(true).toBe(true)`, pasaría igual. Se exige la frase que
+    // nombra el comportamiento, que es lo que no sobrevive a un vaciado.
+    const guardianes: Array<[string, string]> = [
+      ['src/hooks/__tests__/el-elastico-se-selecciona-y-se-borra.test.tsx', 'Supr borra el elástico seleccionado'],
+      ['src/utils/__tests__/el-pliegue-se-dibuja.test.ts', 'ARRANCA sobre ese borde'],
     ];
-    for (const g of guardianes) {
+    for (const [ruta, frase] of guardianes) {
+      let src = '';
       expect(
-        () => readFileSync(join(process.cwd(), g), 'utf8'),
-        `${g} era el guardián de una deuda pagada: si se borra, la deuda vuelve muda`,
+        () => { src = readFileSync(join(process.cwd(), ruta), 'utf8'); },
+        `${ruta} era el guardián de una deuda pagada: si se borra, la deuda vuelve muda`,
       ).not.toThrow();
+      expect(src, `${ruta} ya no comprueba «${frase}»: el guardián se vació`).toContain(frase);
     }
   });
 });
