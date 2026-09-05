@@ -7,7 +7,7 @@
  * @module semanticEdges
  */
 
-import type { PatternPiece, SemanticEdge, SemanticEdgeType } from '../types/types';
+import type { PathCommand, PatternPiece, SemanticEdge, SemanticEdgeType } from '../types/types';
 import { analyzeOutline, type OutlineTram } from './outlineAnalysis';
 
 // ─── Tram facts (geometry via outlineAnalysis, M1 camisa de María) ───────────
@@ -242,6 +242,49 @@ export function edgeRangeForCommand(
     e => cmdIndex >= e.segmentRange[0] && cmdIndex < e.segmentRange[1],
   );
   return semantic ? semantic.segmentRange : [cmdIndex, cmdIndex + 1];
+}
+
+/**
+ * El rango de comandos que de verdad se puede MEDIR de un borde semántico.
+ *
+ * Hay un tramo de contorno que no tiene comando propio: el de CIERRE, el que
+ * la `Z` dibuja de vuelta al punto de la `M`. `flattenPathWithSource` etiqueta
+ * su punto con el índice de la `M` (lore de Fase 3, y de ese etiquetado
+ * dependen las esquinas de costura, `outlineRing.ts` y el hit-test de bordes),
+ * así que un borde hecho SOLO de ese tramo acaba con `segmentRange [0,1]` — un
+ * rango que apunta a la `M`, que no dibuja nada, y por tanto mide CERO.
+ *
+ * En un rectángulo eso es un lado entero. Medido el 2026-09-05: «Medir el
+ * borde» sobre el lado izquierdo devolvía «0.0 mm».
+ *
+ * Se traduce AL LEER, no al escribir. Cambiar lo que emite el productor movería
+ * el rango de ese borde para los 159 sitios que lo consumen, y ya se midió lo
+ * que cuesta: sobre el DXF real de María, 42 clics que enganchaban un borde
+ * pasaban a caer en «pieza» porque el hit-test del margen busca por la
+ * etiqueta vieja. Aquí solo lo ven los tres consumidores que necesitan medir.
+ *
+ * La traducción es inequívoca porque solo se aplica a un rango de UN comando
+ * que además es la `M`: la `M` no dibuja, así que ese rango no puede significar
+ * otra cosa. Un rango ancho que empieza en la `M` (p. ej. el contorno entero,
+ * `[0, outline.length]`) se deja como está.
+ *
+ * LO QUE NO ARREGLA, dicho: si el tramo de cierre comparte borde con otros
+ * comandos, el productor lo excluye del rango y ese borde sigue midiendo de
+ * menos — un segmento de polilínea sobre ~50 en el patrón de María. El caso
+ * visible, el del rectángulo, es este.
+ */
+export function rangoMedibleDeBorde(
+  outline: PathCommand[] | undefined,
+  rango: readonly [number, number],
+): [number, number] {
+  const [desde, hasta] = rango;
+  if (!outline || hasta !== desde + 1 || outline[desde]?.type !== 'M') {
+    return [desde, hasta];
+  }
+  for (let i = outline.length - 1; i > desde; i--) {
+    if (outline[i].type === 'Z') return [i, i + 1];
+  }
+  return [desde, hasta];
 }
 
 /**

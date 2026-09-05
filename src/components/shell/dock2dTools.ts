@@ -2,9 +2,12 @@ import type { ComponentType } from 'react';
 import {
   MousePointer2, PenTool, Square, Circle, Scissors, Ruler,
   PenLine, MoveVertical,
-  SquareDashed, GitCommitHorizontal, Waypoints,
+  SquareDashed, GitCommitHorizontal, Waypoints, Hand,
 } from 'lucide-react';
-import { InternalLineIcon, SeamIcon, NotchIcon } from './dockIcons';
+import {
+  InternalLineIcon, SeamIcon, NotchIcon,
+  MedirBordeIcon, CompararLargosIcon, AbrirPiezaIcon, PonerAvioIcon,
+} from './dockIcons';
 
 /** Un icono del dock: un glifo de Lucide, o uno propio de `dockIcons.tsx`
  *  cuando el vocabulario de patronaje no existe en ningún set genérico
@@ -58,6 +61,26 @@ export const DOCK_2D_CATALOG: DockToolDef[] = [
   // personalizador ya tiene puerta.
   { id: 'circle', icon: Circle, label: 'Elipse (círculo)', shortcut: 'E' },
   { id: 'grainline', icon: MoveVertical, label: 'Hilo', shortcut: '⇧G' },
+  // Las cinco del censo del 2026-09-05: tenían el gesto entero y ninguna
+  // puerta, así que solo se alcanzaban si el copiloto las activaba por su
+  // cuenta. Se ejercitaron una a una en Chrome antes de abrirles esta; las
+  // otras dos del censo (elastic, pleat) siguen cerradas y su razón está
+  // escrita —ejecutable— en las-cinco-puertas-que-se-abren.test.ts.
+  //
+  // Al catálogo y NO al default, mismo criterio que el círculo: a 1366×643 el
+  // dock con doce mide 596 px de 643 y cada herramienta cuesta 43 px, o sea que
+  // el techo real son trece. Meterlas de fábrica sería sacarle a María una de
+  // las doce que ya tiene medidas contra su trabajo diario.
+  //
+  // Y sin `shortcut`, igual que `point` unas líneas más arriba: de las 26
+  // letras del contexto 2d solo queda libre la `y`, y repartir mnemónicos
+  // inventados entre cinco enseñaría un hábito que CLO rompe. La puerta es el
+  // botón del catálogo más el personalizador ＋, que sí escala porque scrollea.
+  { id: 'hand', icon: Hand, label: 'Mano' },
+  { id: 'measureCurve', icon: MedirBordeIcon, label: 'Medir el borde' },
+  { id: 'compareCurves', icon: CompararLargosIcon, label: 'Comparar largos' },
+  { id: 'slashAndSpread', icon: AbrirPiezaIcon, label: 'Abrir la pieza' },
+  { id: 'trimPlace', icon: PonerAvioIcon, label: 'Poner avío' },
 ];
 
 export function getDockToolById(id: string): DockToolDef | undefined {

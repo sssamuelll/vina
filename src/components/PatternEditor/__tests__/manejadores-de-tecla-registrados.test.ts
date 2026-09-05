@@ -9,7 +9,9 @@ import { join } from 'node:path';
  * en curso, y si no hay, resetea la herramienta), y `useEditorInteractions`
  * lo lista en el array de dependencias del efecto que registra los manejadores
  * de tecla (`:445`)… pero **ningún `handlers.push` lo monta**. O sea: se
- * escribió, se cableó a medias, y Escape en Slash & Spread no hace nada.
+ * escribió, se cableó a medias, y Escape en Abrir la pieza no hace nada.
+ * (Se llamaba «Slash & Spread» hasta el 2026-09-05: se tradujo al abrirle la
+ * puerta en el dock, en el mismo lote.)
  *
  * El array de dependencias es la huella del olvido: alguien lo añadió ahí
  * pensando que había terminado. Este test convierte esa huella en la regla:
@@ -79,7 +81,7 @@ describe('F8 — ningún manejador de tecla se queda a medio cablear', () => {
     ).toEqual([]);
   });
 
-  it('el de Slash & Spread está montado (el que faltaba)', () => {
+  it('el de Abrir la pieza está montado (el que faltaba)', () => {
     expect(MONTADOS.has('slashAndSpreadTool')).toBe(true);
   });
 });

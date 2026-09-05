@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { toolRegistry } from '../index';
+import { TRIM_LIBRARY } from '../../utils/trim/trimLibrary';
 
 /**
  * Idioma de las opciones de herramienta (#1049).
@@ -9,10 +10,13 @@ import { toolRegistry } from '../index';
  * el único consumidor de `tool.options` era el schema del copiloto. Encender
  * la barra las pone en pantalla.
  *
- * Esta instantánea congelada cubre las 19 herramientas 2D que María puede
- * activar hoy — 7 por el dock, 12 por atajo (`polyPen` murió con la
- * unificación de líneas internas, spec 2026-08-29; `pen` sigue activable pero
- * sin opciones, cubierta aparte). Una etiqueta nueva en inglés
+ * Esta instantánea congelada cubre las 23 herramientas 2D CON OPCIONES que
+ * María puede activar hoy (`polyPen` murió con la unificación de líneas
+ * internas, spec 2026-08-29; `pen` sigue activable pero sin opciones, cubierta
+ * aparte; `hand` tampoco declara ninguna). Eran 19 hasta el 2026-09-05, cuando
+ * cinco herramientas que tenían gesto y ninguna puerta entraron al catálogo del
+ * dock — cuatro de ellas con opciones, y las cuatro rotuladas en inglés, que es
+ * la mitad de idioma del mismo defecto. Una etiqueta nueva en inglés
  * rompe el test, y el último caso rompe también si alguien AÑADE una opción a
  * una herramienta cubierta sin traducirla. Es lo único que impide que la
  * próxima herramienta reintroduzca la deriva que esta rama arregla.
@@ -30,7 +34,7 @@ import { toolRegistry } from '../index';
 
 /** toolId → optionId → [label, ...etiquetas de los choices] */
 const ESPERADO: Record<string, Record<string, string[]>> = {
-  // ── Las 7 del dock ──────────────────────────────────────────────────────
+  // ── Las del dock de fábrica ─────────────────────────────────────────────
   point: {
     mode: ['Tipo de punto', 'Punto', 'Curva por puntos', 'Curva bezier'],
   },
@@ -72,7 +76,7 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
     count: ['Cantidad', 'Uno', 'Dos', 'Tres'],
   },
 
-  // ── Las 13 de solo atajo ────────────────────────────────────────────────
+  // ── Las que se alcanzan por atajo ───────────────────────────────────────
   transform: {
     mode: ['Transformación', 'Escalar', 'Girar', 'Inclinar'],
     uniform: ['Escalar proporcional'],
@@ -136,6 +140,35 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
     offset: ['Separación (mm)'],
     threadColor: ['Color del hilo'],
   },
+
+  // ── Las cuatro que estrenaron puerta el 2026-09-05 ──────────────────────
+  // Estaban en inglés por la misma razón por la que no tenían botón: nadie
+  // traduce lo que nadie puede ver. Entran aquí el mismo día que al catálogo.
+  measureCurve: {
+    // Mismo rótulo que compareCurves: es la misma opción del mismo motor, y un
+    // término por concepto (§ 5 del contrato).
+    markerInterval: ['Marcas cada', '25 mm', '50 mm', '100 mm'],
+  },
+  compareCurves: {
+    markerInterval: ['Marcas cada', '25 mm', '50 mm', '100 mm'],
+  },
+  slashAndSpread: {
+    mode: ['Cómo se abre', 'Girando (ángulo)', 'En paralelo (distancia)'],
+    gapFill: ['El hueco se cierra', 'Con una recta', 'Con una curva'],
+  },
+  trimPlace: {
+    // Los 21 avíos NO se copian a mano aquí: el desplegable los saca de
+    // `nameEs`, que la biblioteca ya traía escrito. Escribirlos literalmente
+    // convertiría este trinquete en una copia de la biblioteca —cada avío nuevo
+    // rompería el test aunque llegara bien traducido— y no comprobaría lo
+    // único que hay que fijar, que es de qué campo salen. Que ese campo esté
+    // de verdad en español lo mide el caso de más abajo.
+    trimPreset: ['Avío', ...TRIM_LIBRARY.map((p) => p.nameEs)],
+    placementMode: ['Cómo se ponen', 'Uno', 'Repartidos por el borde'],
+    distributeCount: ['Cuántos'],
+    startOffset: ['Desde el principio (mm)'],
+    endOffset: ['Hasta el final (mm)'],
+  },
 };
 
 describe('idioma de las opciones de herramienta', () => {
@@ -171,6 +204,19 @@ describe('idioma de las opciones de herramienta', () => {
       const declaradas = toolRegistry.getTool(toolId)!.options?.map((o) => o.id) ?? [];
       expect(declaradas.slice().sort(), toolId).toEqual(Object.keys(opciones).sort());
     }
+  });
+
+  it('el desplegable de avíos lee la columna española, no la inglesa', () => {
+    // El defecto que esto caza: `label: p.name` en vez de `p.nameEs`. Los dos
+    // campos existen, los dos son string, y TypeScript no ve la diferencia —
+    // `nameEs` fue uno de los ocho contratos que la auditoría del 2026-08-14
+    // encontró escritos y rodeados. Comparar contra `name` es lo único que
+    // distingue "lee el campo bueno" de "lee un campo".
+    const etiquetas = toolRegistry.getTool('trimPlace')!.options!
+      .find((o) => o.id === 'trimPreset')!.choices!.map((c) => c.label);
+    const enIngles = TRIM_LIBRARY.filter((p) => etiquetas.includes(p.name)).map((p) => p.name);
+    expect(enIngles, 'hay avíos rotulados con su nombre inglés').toEqual([]);
+    expect(etiquetas).toHaveLength(TRIM_LIBRARY.length);
   });
 
   it('los identificadores de los choices siguen en inglés', () => {

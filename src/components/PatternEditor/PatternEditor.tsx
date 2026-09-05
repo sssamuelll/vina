@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch, shallowEqual } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
+import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage } from '../../store/projectSlice';
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
 import { setToolOption } from '../../store/toolSlice';
 import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
-import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, selectInternalLine, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
+import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, selectInternalLine, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
 import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand } from '../../types/types';
@@ -73,19 +73,14 @@ import NotchPrecisionModal from './NotchPrecisionModal';
 import { notchPlacedMessage } from './notchPrecisionCopy';
 import NextPointPanel from './NextPointPanel';
 import { DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
-import ReferenceImageSettings from './ReferenceImageSettings';
 import { computePixelsPerMm } from '../../utils/geometry/calibration';
-import { importReferenceImage } from '../../utils/import/imageImporter';
-import { storeImageBlob, loadImageBlob } from '../../utils/import/referenceImageStore';
+import { useReferenceImages } from './useReferenceImages';
 import ContextMenu, { type ContextMenuState } from './ContextMenu';
 import { pushJournal } from '../../utils/telemetry/journal';
 import FloatingActionBar from './FloatingActionBar';
 import { resolveTargetKind, type CurationCtx } from './actionCuration';
 import { selectWorkflowStage } from '../../store/selectors';
 import './PatternEditor.css';
-
-// Module-level map: imageId → blob URL (outside Redux for non-serializable data)
-const objectUrlMap = new Map<string, string>();
 
 /** Faja del dock 2D izquierdo, medida en navegador (no calculada): `.dock--left`
  *  da `x=14, ancho=54` — el borde derecho cae en 68. Los 54 salen de
@@ -121,18 +116,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const stage = useSelector(selectWorkflowStage);
   const clipboard = useSelector((s: RootState) => s.editor.clipboard);
 
-  // Hydrate objectUrlMap from IndexedDB for images loaded from autosave / project file
-  useEffect(() => {
-    for (const img of referenceImages) {
-      if (!objectUrlMap.has(img.id)) {
-        loadImageBlob(img.id).then(blob => {
-          if (blob && !objectUrlMap.has(img.id)) {
-            objectUrlMap.set(img.id, URL.createObjectURL(blob));
-          }
-        }).catch(() => {});
-      }
-    }
-  }, [referenceImages]);
+  // El mapa de blob URLs y los seis gestos del panel viven en el hook desde que
+  // el panel se mudó a `ContextPanel` (2026-09-05): aquí solo se lee el mapa
+  // para pintar. Ver useReferenceImages.ts.
+  const { objectUrlMap } = useReferenceImages();
 
   // Compute piece ID -> group color mapping for 2D visual indicators
   const groupColors = useMemo(() => {
@@ -994,55 +981,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     handleZoomToFit();
   }, [fitViewToken, pieces.length, svgSize.width, svgSize.height, handleZoomToFit]);
 
-  // ─── Reference image import ───────────────────────────────────────────────
-  const handleImageImport = useCallback(async (file: File) => {
-    const result = await importReferenceImage(file);
-    const id = newId();
-    // Store blob URL in module-level map for rendering
-    objectUrlMap.set(id, result.objectUrl);
-    // Persist blob to IndexedDB
-    await storeImageBlob(id, result.imageBlob);
-    // Add to Redux state
-    dispatch(addReferenceImage({
-      id,
-      filename: result.filename,
-      width: result.width,
-      height: result.height,
-      position: { x: 0, y: 0 },
-      scale: 1,
-      rotation: 0,
-      opacity: 0.5,
-      locked: false,
-      visible: true,
-      pixelsPerMm: null,
-    }));
-  }, [dispatch]);
-
-  // ─── Reference image action callbacks ────────────────────────────────────
-  const handleCalibrate = useCallback((imageId: string) => {
-    dispatch(startCalibration({ imageId }));
-  }, [dispatch]);
-
-  const handleToggleVisible = useCallback((imageId: string) => {
-    const img = referenceImages.find(i => i.id === imageId);
-    if (img) dispatch(updateReferenceImage({ id: imageId, visible: !img.visible }));
-  }, [referenceImages, dispatch]);
-
-  const handleToggleLocked = useCallback((imageId: string) => {
-    const img = referenceImages.find(i => i.id === imageId);
-    if (img) dispatch(updateReferenceImage({ id: imageId, locked: !img.locked }));
-  }, [referenceImages, dispatch]);
-
-  const handleOpacityChange = useCallback((imageId: string, opacity: number) => {
-    dispatch(updateReferenceImage({ id: imageId, opacity }));
-  }, [dispatch]);
-
-  const handleRemoveImage = useCallback((imageId: string) => {
-    // Do NOT revoke objectUrl or delete from map here — undo may restore the image.
-    // Cleanup is deferred to garbageCollect() on NEW_PROJECT / loadProject.
-    dispatch(removeReferenceImage(imageId));
-  }, [dispatch]);
-
   // ─── Calibration modal confirm ────────────────────────────────────────────
   const handleCalibrationConfirm = useCallback((realWorldMm: number) => {
     if (!calibrationMode || !calibrationMode.point1 || !calibrationSecondPoint) return;
@@ -1331,6 +1269,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           seamPhase={seamTool.phase}
           topstitchMode={topstitchTool.mode}
           walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
+          slashPhase={slashAndSpreadTool.phase}
           saDefaultWidthMm={seamAllowanceTool.widthMm}
           internalShapeNodesLength={internalShapeTool.nodes.length}
           cotasVisibles={sujeto.cotas.length > 0}
@@ -1447,15 +1386,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           onCancel={notchTool.cancelRefine}
         />
       )}
-      <ReferenceImageSettings
-        referenceImages={referenceImages}
-        onImport={handleImageImport}
-        onCalibrate={handleCalibrate}
-        onToggleVisible={handleToggleVisible}
-        onToggleLocked={handleToggleLocked}
-        onOpacityChange={handleOpacityChange}
-        onRemove={handleRemoveImage}
-      />
     </div>
   );
 }

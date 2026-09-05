@@ -22,8 +22,10 @@ const CompareCurvesIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const compareCurvesTool: ToolDefinition = {
   id: 'compareCurves',
-  name: 'Compare Curves',
-  description: 'Compare arc lengths of two pattern edges',
+  // «Comparar largos» y no «Comparar curvas»: compara LARGOS, no formas, y
+  // «curva» es palabra de geometría. María lee bordes.
+  name: 'Comparar largos',
+  description: 'Compara el largo de dos bordes y dice la diferencia',
   context: '2d',
   icon: CompareCurvesIcon,
   cursor: 'crosshair',
@@ -31,13 +33,15 @@ export const compareCurvesTool: ToolDefinition = {
   options: [
     {
       id: 'markerInterval',
-      label: 'Marker Interval',
+      // Mismo rótulo que en Medir el borde: es la misma opción del mismo motor,
+      // y dos nombres para lo mismo se leen como dos cosas distintas.
+      label: 'Marcas cada',
       type: 'select',
       value: '50',
       choices: [
-        { label: '25mm', value: '25' },
-        { label: '50mm', value: '50' },
-        { label: '100mm', value: '100' },
+        { label: '25 mm', value: '25' },
+        { label: '50 mm', value: '50' },
+        { label: '100 mm', value: '100' },
       ],
     },
   ],

@@ -74,7 +74,10 @@ export const HERRAMIENTAS_QUE_PIDEN_PIEZA = ['offsetOutline', 'slashAndSpread', 
 const PIDEN: Record<string, { pista: string; maximo: number }> = {
   offsetOutline: { pista: 'Selecciona una sola pieza para usar Desplazar contorno', maximo: 1 },
   extendTrim: { pista: 'Selecciona una sola pieza para usar Extender / recortar', maximo: 1 },
-  slashAndSpread: { pista: 'Selecciona la pieza que vas a abrir con Slash & Spread', maximo: Infinity },
+  // Sin nombrar la herramienta: ahora se llama «Abrir la pieza», y la frase
+  // ya dice «abrir». Repetirlo no enseña nada — las otras tres lo nombran
+  // porque su verbo solo no distingue cuál de las cuatro es.
+  slashAndSpread: { pista: 'Selecciona la pieza que vas a abrir', maximo: Infinity },
   transform: { pista: 'Selecciona la pieza o piezas para usar Transformar patrón', maximo: Infinity },
 };
 

@@ -32,6 +32,7 @@ export const offsetOutlineTool: ToolDefinition = {
     {
       id: 'distance',
       label: 'Distancia (mm)',
+      control: 'input',
       type: 'number',
       value: 10,
       min: 1,

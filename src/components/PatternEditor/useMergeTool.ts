@@ -5,6 +5,7 @@ import { addPiece, removePiece, removeSeam } from '../../store/projectSlice';
 import type { Point2D, PatternPiece } from '../../types/types';
 import { mergePieces } from '../../utils/patternOps';
 import { findSharedEdge } from '../../utils/geometry/mergeOutline';
+import { hitTestPieceBBox } from '../../utils/geometry/hitTest';
 import { screenToPattern } from '../../utils/geometry';
 import { useGuardedAction } from '../../hooks/useGuardedAction';
 import { noPasoNada } from './noPasoNada';
@@ -41,28 +42,18 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
     [zoom2D, pan2D],
   );
 
-  /** Hit-test: find which piece contains the point */
+  /**
+   * El mismo hit-test que el resto del lienzo, no una copia.
+   *
+   * Aquí vivía el bucle otra vez, sumando `piece.position` en lugar de traer el
+   * punto a coordenadas de la pieza: con la pieza girada medía contra el
+   * fantasma sin girar y el clic no enganchaba. Es exactamente #1064, que
+   * `PatternEditor.tsx:500` ya arregló dejando escrita la razón — esta copia se
+   * quedó atrás. Llevaba además un segundo defecto: con un comando de número
+   * impar de valores usaba `0` como `y`, lo que estiraba la caja hasta el origen.
+   */
   const hitTestPiece = useCallback(
-    (pt: Point2D): PatternPiece | null => {
-      // Simple bounding box hit test
-      for (const piece of pieces) {
-        const ox = piece.position.x;
-        const oy = piece.position.y;
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (const cmd of piece.outline) {
-          for (let i = 0; i < cmd.values.length; i += 2) {
-            const x = cmd.values[i] + ox;
-            const y = (i + 1 < cmd.values.length) ? cmd.values[i + 1] + oy : 0;
-            if (x < minX) minX = x; if (x > maxX) maxX = x;
-            if (y < minY) minY = y; if (y > maxY) maxY = y;
-          }
-        }
-        if (pt.x >= minX && pt.x <= maxX && pt.y >= minY && pt.y <= maxY) {
-          return piece;
-        }
-      }
-      return null;
-    },
+    (pt: Point2D): PatternPiece | null => hitTestPieceBBox(pt, pieces),
     [pieces],
   );
 

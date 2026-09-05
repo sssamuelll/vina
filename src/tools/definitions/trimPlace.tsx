@@ -23,16 +23,21 @@ const TrimPlaceIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
   </svg>
 );
 
-// Build preset choices grouped by type
+// El desplegable lee `nameEs`, que la biblioteca ya traía escrito y nadie
+// consultaba: era uno de los ocho contratos que la auditoría del 2026-08-14
+// encontró rodeados. La medida deja de repetirse —«Botón Plano 15mm (15mm)»—
+// porque cada `nameEs` ya la lleva dentro cuando importa.
 const presetChoices = TRIM_LIBRARY.map(p => ({
-  label: `${p.name} (${p.size}mm)`,
+  label: p.nameEs,
   value: p.id,
 }));
 
 export const trimPlaceTool: ToolDefinition = {
   id: 'trimPlace',
-  name: 'Place Trim',
-  description: 'Click on pattern edges to place trims (buttons, zippers, snaps)',
+  // «Poner avío» y no «Colocar avío»: «Colocar» ya es `Arrange`, la colocación
+  // 3D, y el glosario manda un término por concepto.
+  name: 'Poner avío',
+  description: 'Haz clic en un borde para poner botones, cierres o broches',
   context: '2d',
   icon: TrimPlaceIcon,
   cursor: 'crosshair',
@@ -40,24 +45,24 @@ export const trimPlaceTool: ToolDefinition = {
   options: [
     {
       id: 'trimPreset',
-      label: 'Preset',
+      label: 'Avío',
       type: 'select',
       value: TRIM_LIBRARY[0].id,
       choices: presetChoices,
     },
     {
       id: 'placementMode',
-      label: 'Mode',
+      label: 'Cómo se ponen',
       type: 'select',
       value: 'single',
       choices: [
-        { label: 'Single', value: 'single' },
-        { label: 'Distribute', value: 'distribute' },
+        { label: 'Uno', value: 'single' },
+        { label: 'Repartidos por el borde', value: 'distribute' },
       ],
     },
     {
       id: 'distributeCount',
-      label: 'Count',
+      label: 'Cuántos',
       type: 'number',
       value: 5,
       min: 2,
@@ -66,7 +71,15 @@ export const trimPlaceTool: ToolDefinition = {
     },
     {
       id: 'startOffset',
-      label: 'Start Offset (mm)',
+      // El principio y el final son los del borde, que es lo único que esta
+      // herramienta recorre. «Margen» está tomado por el de costura.
+      label: 'Desde el principio (mm)',
+      // `control: 'input'` llega en ESTE lote y no en el del censo de
+      // milímetros: allí se encendieron las once opciones que María podía
+      // alcanzar, y estas dos no eran alcanzables — la herramienta no tenía
+      // puerta. Abrirle la puerta las pone en pantalla, así que el deslizador
+      // de paso 1 sobre 0-50 mm pasa a ser un problema suyo hoy.
+      control: 'input',
       type: 'number',
       value: 10,
       min: 0,
@@ -75,7 +88,8 @@ export const trimPlaceTool: ToolDefinition = {
     },
     {
       id: 'endOffset',
-      label: 'End Offset (mm)',
+      label: 'Hasta el final (mm)',
+      control: 'input',
       type: 'number',
       value: 10,
       min: 0,

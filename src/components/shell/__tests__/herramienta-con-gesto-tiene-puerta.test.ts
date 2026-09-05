@@ -17,25 +17,25 @@ import { DOCK_2D_CATALOG } from '../dock2dTools';
  *
  * El censo del 2026-09-05 encontró la otra mitad, y es exactamente simétrica:
  * **siete herramientas con el gesto completo y ninguna puerta**. El despachador
- * las conduce en sus cinco enganches, tienen overlay, tienen hooks — y no hay
- * botón en el dock ni atajo registrado. Solo se alcanzan si el copiloto las
- * activa por su cuenta (`copilot/action/tools/definitions/patternOpsTools.ts`).
+ * las conduce en sus cinco enganches, tienen overlay, tienen hooks — y no había
+ * botón en el dock ni atajo registrado. Solo se alcanzaban si el copiloto las
+ * activaba por su cuenta (`copilot/action/tools/definitions/patternOpsTools.ts`).
  *
- * Las siete, con el nombre que la tira les pintaría:
+ * **Cinco de las siete ya tienen puerta** (catálogo del dock, 2026-09-05). Se
+ * ejercitaron una a una en Chrome y las cinco funcionan, así que entraron con
+ * nombre en español —Mano, Medir el borde, Comparar largos, Abrir la pieza,
+ * Poner avío—, con icono propio y con su pista de gesto. Cuáles merecían botón
+ * era decisión de producto: está tomada, y con sus razones medidas, en
+ * `las-cinco-puertas-que-se-abren.test.ts`.
  *
- *   compareCurves   Compare Curves        measureCurve   Measure Along Curve
- *   elastic         Elastic / Gathering   pleat          Pleat
- *   hand            Hand/Pan              slashAndSpread Slash & Spread
- *   trimPlace       Place Trim
+ * Quedan DOS, y no por olvido: `elastic` se crea y después no se puede
+ * seleccionar ni borrar, y `pleat` guarda el pliegue y nadie lo pinta. Darles
+ * botón habría sido reponer el defecto F7 —una puerta a una habitación vacía—
+ * cambiando la tecla por un icono.
  *
- * Y ahí está la correlación que explica el nombre en inglés que el informe
- * señaló: **las siete sin puerta son siete de las que nadie tradujo**. No es
- * casualidad. Nadie tradujo lo que nadie podía ver.
- *
- * Este test NO abre las puertas: cuáles de las siete merecen botón, en qué
- * orden y con qué icono es decisión de producto, igual que en F7 lo era cuáles
- * herramientas nacen. Lo que hace es **fijar el techo en siete** para que la
- * octava no pase en silencio, que es justo lo que dejó llegar a estas.
+ * Este test sigue haciendo lo mismo que el primer día: **fijar el techo** para
+ * que una nueva sin puerta no pase en silencio, que es justo lo que dejó llegar
+ * a estas. Hoy el techo son dos.
  */
 
 const DESPACHADOR = readFileSync(
@@ -61,17 +61,12 @@ const CON_ATAJO = new Set(
 const EN_EL_DOCK = new Set(DOCK_2D_CATALOG.map((t) => t.id));
 
 /**
- * Las siete de hoy, con su deuda declarada. Bajar esta lista es progreso; que
- * crezca es una puerta que se olvidó.
+ * Las dos de hoy, con su deuda declarada. Eran siete el 2026-09-05 por la
+ * mañana. Bajar esta lista es progreso; que crezca es una puerta que se olvidó.
  */
 const SIN_PUERTA_HOY = [
-  'compareCurves',
   'elastic',
-  'hand',
-  'measureCurve',
   'pleat',
-  'slashAndSpread',
-  'trimPlace',
 ] as const;
 
 describe('ley de puertas — una herramienta con gesto se alcanza sin adivinar', () => {
@@ -103,7 +98,7 @@ describe('ley de puertas — una herramienta con gesto se alcanza sin adivinar',
     ).toEqual([]);
   });
 
-  it('las siete siguen conducidas: la lista es de deuda, no de herramientas muertas', () => {
+  it('las dos siguen conducidas: la lista es de deuda, no de herramientas muertas', () => {
     // La red contra el arreglo perezoso: borrar el gesto también vaciaría la
     // lista de arriba. Estas SÍ funcionan; lo que les falta es por dónde entrar.
     for (const id of SIN_PUERTA_HOY) {
@@ -112,7 +107,18 @@ describe('ley de puertas — una herramienta con gesto se alcanza sin adivinar',
   });
 });
 
-describe('ley de idioma — y por qué estas siete son las que quedaron en inglés', () => {
+/**
+ * La correlación que este bloque fijaba —«las siete sin puerta son las siete
+ * que nadie tradujo»— fue el hallazgo, y con dos elementos ya no se sostiene:
+ * cualquier par correlaciona con cualquier cosa. Fue cierta, explicó por qué el
+ * inglés se concentraba justo ahí, y hoy es historia — cinco de las siete se
+ * tradujeron al abrirles la puerta, en el mismo lote, que es exactamente lo que
+ * la correlación decía que había que hacer.
+ *
+ * Queda vivo lo que sí se sostiene con dos, que además es lo que importa: lo
+ * que María alcanza lo lee en español, y lo que sigue cerrado dice por qué.
+ */
+describe('ley de idioma — lo que se alcanza se lee, y lo cerrado dice por qué', () => {
   const defs = (id: string) => {
     const dir = join(process.cwd(), 'src/tools/definitions');
     for (const f of readFileSync(join(dir, '..', 'index.ts'), 'utf8').matchAll(/from '\.\/definitions\/([\w]+)'/g)) {
@@ -142,16 +148,25 @@ describe('ley de idioma — y por qué estas siete son las que quedaron en ingl�
     expect(enIngles, 'herramientas alcanzables con nombre en inglés').toEqual([]);
   });
 
-  it('la deuda de idioma y la de puertas son la misma deuda', () => {
-    // El dato que explica el hallazgo: las siete sin puerta son también las que
-    // nadie tradujo. Si algún día una de ellas se traduce sin abrirle la
-    // puerta, este test deja de tener razón y hay que reescribir el comentario,
-    // no borrarlo.
-    const sinPuertaEnIngles = SIN_PUERTA_HOY.filter((id) => {
-      const src = defs(id);
-      const nombre = src ? (src.match(/name:\s*'([^']+)'/) ?? [])[1] : null;
-      return nombre != null && /^[\x20-\x7E]+$/.test(nombre) && !/[áéíóúñ]/i.test(nombre);
-    });
-    expect(sinPuertaEnIngles.length).toBeGreaterThanOrEqual(5);
+  /** Por qué cada una sigue sin puerta, medido en el navegador el 2026-09-05. */
+  const RAZONES: Record<typeof SIN_PUERTA_HOY[number], string> = {
+    elastic: 'ni un escritor de `selectedElasticId` en todo src/: se dibuja y después no se puede seleccionar ni borrar',
+    pleat: 'cero renderizadores leen `project.pleats`: el store guarda el pliegue y el SVG no cambia (301 → 301 nodos)',
+  };
+
+  it('cada una de las dos cerradas lleva su razón, y la razón se comprueba sola', () => {
+    // Una lista sin razones vuelve a ser lo que era antes de F7: una deuda que
+    // nadie sabe si sigue siendo cierta. Y una razón en prosa se queda escrita
+    // para siempre aunque se pague — por eso lo que la sostiene no es este mapa
+    // sino el guardián ejecutable, que falla el día que la deuda caduque.
+    expect(Object.keys(RAZONES).sort()).toEqual([...SIN_PUERTA_HOY].sort());
+
+    const guardian = readFileSync(
+      join(process.cwd(), 'src/components/shell/__tests__/las-cinco-puertas-que-se-abren.test.ts'),
+      'utf8',
+    );
+    for (const id of SIN_PUERTA_HOY) {
+      expect(guardian, `${id} no tiene guardián ejecutable de su razón`).toContain(id);
+    }
   });
 });

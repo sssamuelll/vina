@@ -74,6 +74,8 @@ npx playwright test --workers=2 \
   tests/e2e/emplazamiento-modales.spec.ts \
   tests/e2e/emplazamiento-paneles.spec.ts \
   tests/e2e/emplazamiento-tira.spec.ts \
+  tests/e2e/emplazamiento-imagenes-de-referencia.spec.ts \
+  tests/e2e/las-cinco-puertas.spec.ts \
   tests/e2e/cotas-no-tapan-el-transform-box.spec.ts \
   > /tmp/vina-deploy-e2e.log 2>&1 || { tail -30 /tmp/vina-deploy-e2e.log >&2; exit 1; }
 grep -E "passed|failed" /tmp/vina-deploy-e2e.log | tail -1 | sed 's/^ */✓ emplazamiento: /'

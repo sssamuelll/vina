@@ -36,9 +36,11 @@ export default function ReferenceImageSettings({
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) {
-      onImport(file).catch(() => {
-        // import errors are handled by the parent
-      });
+      // El hook avisa con un toast y limpia lo que haya quedado a medias; aquí
+      // solo hay que no dejar la promesa colgando. (Hasta el 2026-09-05 este
+      // catch decía «handled by the parent» y el padre no manejaba nada: cuatro
+      // caminos de error cerraban el selector sin decir ni pío.)
+      onImport(file).catch(() => {});
     }
     e.target.value = '';
   }

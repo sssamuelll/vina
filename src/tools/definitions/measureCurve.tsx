@@ -26,8 +26,10 @@ const MeasureCurveIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const measureCurveTool: ToolDefinition = {
   id: 'measureCurve',
-  name: 'Measure Along Curve',
-  description: 'Measure arc length along a pattern edge',
+  // «Medir el borde» y no «Medir curva»: también sirve para bordes rectos, y
+  // el objeto —el borde— es lo que la distingue de «Medir», que toma dos puntos.
+  name: 'Medir el borde',
+  description: 'Mide el largo de un borde siguiendo su curva',
   context: '2d',
   icon: MeasureCurveIcon,
   cursor: 'crosshair',
@@ -35,13 +37,15 @@ export const measureCurveTool: ToolDefinition = {
   options: [
     {
       id: 'markerInterval',
-      label: 'Marker Interval',
+      // Mismo rótulo que en Comparar largos: un término por concepto. Los
+      // `value` son identificadores y no se traducen.
+      label: 'Marcas cada',
       type: 'select',
       value: '50',
       choices: [
-        { label: '25mm', value: '25' },
-        { label: '50mm', value: '50' },
-        { label: '100mm', value: '100' },
+        { label: '25 mm', value: '25' },
+        { label: '50 mm', value: '50' },
+        { label: '100 mm', value: '100' },
       ],
     },
   ],

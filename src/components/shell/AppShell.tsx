@@ -15,6 +15,8 @@ import UnifiedBar from './UnifiedBar';
 import LeftDock from './LeftDock';
 import RightDock from './RightDock';
 import PatternEditor from '../PatternEditor/PatternEditor';
+import ReferenceImageSettings from '../PatternEditor/ReferenceImageSettings';
+import { useReferenceImages } from '../PatternEditor/useReferenceImages';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import ContextPanel from './ContextPanel';
 import ToastContainer from './ToastContainer';
@@ -33,6 +35,38 @@ const NestingTab = lazy(() => import('../BottomPanel/NestingTab'));
 const LayerPanel = lazy(() => import('../LayerPanel/LayerPanel'));
 const PropertiesPanel = lazy(() => import('../PropertiesPanel/PropertiesPanel'));
 
+/**
+ * Las imágenes de referencia, como contenido de panel.
+ *
+ * De dónde viene: colgaba de `.pattern-editor` como último hijo en flujo
+ * normal, detrás de un `<svg>` de alto completo y sin `position`, así que se
+ * pintaba en `top: 643` y `overflow: hidden` se lo comía. Era la ÚNICA puerta
+ * del repo para meter una imagen de fondo, o sea la ley de puertas (§ 6)
+ * incumplida desde el commit que lo creó. Aquí es el 8.º panel de contenido:
+ * hereda el material `overlay` entero de `.context-panel`, no estrena rincón ni
+ * escribe un z-index.
+ *
+ * Sin `lazy()` a propósito, y esa es la diferencia con los otros siete: el
+ * componente ya viajaba en el bundle principal cuando colgaba de
+ * `PatternEditor`, así que diferirlo no ahorra nada y mete el parpadeo de
+ * Suspense justo en la única puerta que hay para importar una imagen.
+ */
+function ReferenceImagesPanel() {
+  const referenceImages = useSelector((s: RootState) => s.project.referenceImages);
+  const { onImport, onCalibrate, onToggleVisible, onToggleLocked, onOpacityChange, onRemove } = useReferenceImages();
+  return (
+    <ReferenceImageSettings
+      referenceImages={referenceImages}
+      onImport={onImport}
+      onCalibrate={onCalibrate}
+      onToggleVisible={onToggleVisible}
+      onToggleLocked={onToggleLocked}
+      onOpacityChange={onOpacityChange}
+      onRemove={onRemove}
+    />
+  );
+}
+
 const PanelLoading = () => (
   <div style={{ padding: 'var(--sp-4)', color: 'var(--text-ghost)', fontSize: '13px', textAlign: 'center' }}>
     Cargando...
@@ -49,6 +83,7 @@ const PANEL_LABELS: Record<string, string> = {
   Nesting: 'Marcada',
   Layers: 'Capas',
   Properties: 'Propiedades',
+  ReferenceImages: 'Imágenes de referencia',
 };
 
 function renderPanelContent(name: string) {
@@ -68,6 +103,8 @@ function renderPanelContent(name: string) {
       return <Suspense fallback={fallback}><LayerPanel /></Suspense>;
     case 'Properties':
       return <Suspense fallback={fallback}><PropertiesPanel /></Suspense>;
+    case 'ReferenceImages':
+      return <ReferenceImagesPanel />;
     default:
       // Fase1-S2: murió el placeholder circular ("X — available via ⌘K").
       // Ya ningún opener vivo pasa nombres fuera del switch; si uno llega,

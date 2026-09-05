@@ -9,6 +9,7 @@ import type { ArcLengthSample } from '../../utils/geometry/arcLength';
 import { screenToPattern } from './sewingUtils';
 import { screenToPatternLength } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
+import { rangoMedibleDeBorde } from '../../utils/semanticEdges';
 import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 
 // ─── Types ───
@@ -125,10 +126,14 @@ export function findEdgeForSegment(piece: PatternPiece, segmentIndex: number): S
 }
 
 export function buildEdgeInfo(piece: PatternPiece, edge: SemanticEdge, markerInterval: number): SelectedEdgeInfo {
-  const arcLength = computePathArcLength(piece.outline, edge.segmentRange[0], edge.segmentRange[1]);
-  const markers = samplePathAtIntervals(piece.outline, markerInterval, edge.segmentRange[0], edge.segmentRange[1]);
+  // El borde de cierre no tiene comando propio y su rango apunta a la `M`, que
+  // mide cero: sin traducir, clicar el lado izquierdo de un rectangulo decia
+  // «0.0 mm». Ver `rangoMedibleDeBorde`.
+  const [desde, hasta] = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
+  const arcLength = computePathArcLength(piece.outline, desde, hasta);
+  const markers = samplePathAtIntervals(piece.outline, markerInterval, desde, hasta);
   const pathPoints = markers.map(m => pieceLocalToPattern(m.point, piece));
-  const rawWalk = samplePathDense(piece.outline, 3, edge.segmentRange[0], edge.segmentRange[1]);
+  const rawWalk = samplePathDense(piece.outline, 3, desde, hasta);
   const walkPoints = rawWalk.map(p => pieceLocalToPattern(p, piece));
   return { pieceId: piece.id, piece, edge, arcLength, markers, pathPoints, walkPoints };
 }

@@ -22,7 +22,7 @@ const HandIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const handTool: ToolDefinition = {
   id: 'hand',
-  name: 'Hand/Pan',
+  name: 'Mano',
   context: '2d',
   icon: HandIcon,
   cursor: 'grab',

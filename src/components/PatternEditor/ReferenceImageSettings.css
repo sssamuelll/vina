@@ -1,8 +1,38 @@
+/* Imágenes de referencia — contenido del 8.º panel de `ContextPanel`.
+ *
+ * Hasta el 2026-09-05 este archivo era CSS muerto: el panel se montaba como
+ * último hijo en flujo de `.pattern-editor` y se pintaba fuera de la ventana,
+ * así que sus trece colores literales y sus cuatro `:hover` sin foco eran
+ * deriva dormida. Emplazarlo sin esta pasada la habría estrenado en vivo, y el
+ * trinquete no se habría quejado: los sitios ya estaban contados en el techo.
+ *
+ * Los tokens salen del panel hermano `CollisionBodyPanel.css`, que tiene la
+ * misma forma —botón de importar, lista de filas, iconos, deslizadores— y se
+ * midió en la revisión adversarial del 2026-09-04. Un solo vocabulario para
+ * dos paneles gemelos.
+ *
+ * Contrastes MEDIDOS contra el sustrato de CADA sitio, que no es el mismo en
+ * todos — y la frase que había aquí decía lo contrario:
+ *
+ *   - Las seis medidas «sobre la fila» van contra `--bg-elevated`, que es
+ *     opaco y ES lo que hay debajo (`.ref-img-item`, más abajo). El comentario
+ *     viejo afirmaba que ese token «nunca fue lo que había debajo»: falso, y
+ *     los números que acompañaba estaban bien. Se corrige la frase, no los
+ *     colores.
+ *   - El botón de importar y los estados con realce sí van contra la superficie
+ *     COMPUESTA: `--surface-overlay-bg` (.92) sobre `--bg-base`, y encima el
+ *     tinte propio del chip.
+ *
+ * Lo que sí se hereda mal es medir contra el sustrato de OTRO estado: los
+ * colores de calibrar y eliminar solo se pintan en hover, así que van contra el
+ * chip del hover, no contra la fila desnuda. */
+
 .ref-img-settings {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 6px 4px;
+  /* Sin padding propio: el inset lo pone `.context-panel__body`. El 6px/4px de
+   * antes venía de cuando esto flotaba solo. */
   min-width: 200px;
 }
 
@@ -12,35 +42,26 @@
   gap: 5px;
   width: 100%;
   padding: 5px 8px;
-  background: rgba(74, 158, 255, 0.12);
-  border: 1px solid rgba(74, 158, 255, 0.3);
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-border);
   border-radius: 5px;
-  /* OJO: este panel NO SE VE. Medido el 2026-09-05 a 1366x768, se pinta en
-   * y=768 con la ventana en 768 — es el último hijo en flujo normal de
-   * `.pattern-editor` (width/height 100%, overflow hidden) y el hermano que va
-   * antes es el <svg> a 100%x100%, así que empieza justo donde el padre acaba
-   * y el overflow se lo come. Es una violación de la ley de puertas del
-   * contrato (§ 6) anterior a este cambio, y emplazarlo es una decisión de
-   * dónde va, no un arreglo de CSS: va con el spec del dueño del emplazamiento
-   * (docs/superpowers/specs/2026-09-05-dueno-del-emplazamiento-2d-design.md).
-   *
-   * El respaldo que había aquí (#4a9eff) estaba muerto: tokens.css entra global
-   * y --accent resolvía siempre. Sobre el tinte propio del chip
-   * —rgba(74,158,255,.12) compuesto sobre la superficie— los valores REALES son
-   * --accent 2,74-3,51:1 y --accent-ink 4,10-5,26:1 según lo que haya detrás.
-   * O sea que --accent-ink cumple AA sobre --bg-primary y --panel-bg pero NO
-   * sobre --bg-elevated (4,10:1). Se deja --accent-ink porque es el mejor de
-   * los tres y el panel hoy no se pinta; cuando se emplace hay que fijar la
-   * superficie de debajo y volver a medir, no heredar este número. */
+  /* El chip compuesto da rgb(20,20,45); `--accent-ink` encima mide 6,01:1
+   * (5,05:1 con el realce del hover). AA pide 4,5:1 a 11 px: pasa en los dos
+   * estados. `--accent` daría 4,01:1 y no pasa — por eso la tinta del acento
+   * tiene token propio. */
   color: var(--accent-ink);
   font-size: 11px;
   cursor: pointer;
   transition: background 0.12s;
 }
 
-.ref-img-import-btn:hover:not(:disabled) {
-  background: rgba(74, 158, 255, 0.22);
-}
+/* Ley de estado (§ 4): todo lo que tiene `:hover` tiene `:focus-visible`, y el
+ * par va en UNA línea. R5 empareja línea a línea —lee el selector solo cuando
+ * la llave está en la misma línea—, así que partirlo en dos esconde el hover
+ * del censo en vez de cubrirlo: pasaría en verde por invisible. Convención de
+ * `cotas.css` y `ToolStrip2D.css`. */
+.ref-img-import-btn:hover:not(:disabled), .ref-img-import-btn:focus-visible:not(:disabled) { background: var(--accent-border); }
+.ref-img-import-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .ref-img-import-btn:disabled {
   opacity: 0.4;
@@ -57,8 +78,8 @@
 }
 
 .ref-img-item {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
   border-radius: 5px;
   padding: 5px 6px;
   display: flex;
@@ -78,7 +99,9 @@
 
 .ref-img-name {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.75);
+  /* 13,84:1 sobre la fila. Es el nombre del archivo: la identidad de la fila,
+   * no un dato secundario. */
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -103,27 +126,57 @@
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.4);
+  /* 4,98:1 sobre la fila en reposo. */
+  color: var(--text-muted);
   transition: background 0.1s, color 0.1s;
   padding: 0;
 }
 
-.ref-img-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.85);
-}
+/* El realce NO puede ser `--bg-elevated`: la fila YA es ese token y el botón
+ * quedaría invisible. Un tinte del acento sí se ve (mismo hallazgo que
+ * `.cb-icon-btn`). 12,03:1 con `--text-primary` encima. */
+.ref-img-btn:hover, .ref-img-btn:focus-visible { background: var(--accent-subtle); color: var(--text-primary); }
+.ref-img-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+/* Ley de estado (§ 4): seleccionado > hover > reposo, EN PESO VISUAL.
+ *
+ * Corregido: el comentario decía eso y el código hacía lo contrario. El activo
+ * solo cambiaba de tono sobre la fila (5,72:1) mientras el hover se llevaba
+ * relleno Y tinta más clara (12,03:1), o sea que el botón apenas rozado se veía
+ * más encendido que el que está puesto — el mismo defecto que la auditoría
+ * encontró en el dock. Y la § 4 lo dice literal: «el estado seleccionado no
+ * puede depender solo del tono; cambia también el relleno».
+ *
+ * Ahora el activo lleva el relleno FUERTE del acento —.27 contra el .13 del
+ * hover— y ahí es donde vive el acento; la tinta se queda en `--text-primary`.
+ *
+ * Y esto es una corrección de una corrección, medida: la primera versión puso
+ * `--accent-ink` sobre ese relleno y da **4,16:1**, que NO pasa AA. Arreglar el
+ * peso rompió el contraste, que es el error de siempre por el otro lado. Con
+ * `--text-primary` sobre el chip compuesto rgb(46,47,99) son **10,06:1**.
+ *
+ * Que el hover mida 12,03 y el activo 10,06 no lo hace más flojo: el peso lo da
+ * el RELLENO, y el del activo es el doble. Los dos pasan AA de sobra.
+ *
+ * El activo va DESPUÉS del hover a propósito: misma especificidad, gana la
+ * última, así que pasar el ratón sobre un botón ya activo no lo apaga. */
 .ref-img-btn.active {
-  color: var(--accent-ink);
+  background: var(--accent-border);
+  color: var(--text-primary);
 }
 
-.ref-img-btn-calibrate:hover {
-  color: #f0c040;
-}
-
-.ref-img-btn-remove:hover {
-  color: #ff5a5a;
-}
+/* Van después del bloque de arriba a propósito: misma especificidad, gana la
+ * última, y así el color del rol pisa al realce genérico sin subir el peso.
+ *
+ * Contrastes MEDIDOS contra el sustrato de ESE estado, que es el chip del hover
+ * —`--accent-subtle` compuesto sobre la fila, rgb(24,24,50)— y no la fila
+ * desnuda: en reposo estos dos colores no se pintan nunca, así que medirlos
+ * contra la fila era medir contra un fondo que en ese estado no existe.
+ * `--warning` da **6,91:1** y `--destructive-hover` **5,36:1**. Los dos pasan
+ * AA. (Contra la fila desnuda darían 7,94 y 6,17, que es lo que decía la
+ * versión anterior: números correctos para un fondo que en ese estado no está.) */
+.ref-img-btn-calibrate:hover, .ref-img-btn-calibrate:focus-visible { color: var(--warning); }
+.ref-img-btn-remove:hover, .ref-img-btn-remove:focus-visible { color: var(--destructive-hover); }
 
 .ref-img-row-opacity {
   gap: 6px;
@@ -131,7 +184,7 @@
 
 .ref-img-label {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -145,7 +198,8 @@
 
 .ref-img-value {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  /* 6,73:1: el número se lee más que su etiqueta, que es lo que se consulta. */
+  color: var(--text-secondary);
   width: 26px;
   text-align: right;
   flex-shrink: 0;
