@@ -1,11 +1,10 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
 import type { Point2D, PathCommand, PatternPiece } from '../../types/types';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
-import { patternToPieceLocal, pieceLocalToPattern } from '../../utils/geometry/pieceSpace';
+import { patternToPieceLocal } from '../../utils/geometry/pieceSpace';
 import { pointInPolygon } from '../../utils/geometry/slashAndSpread';
-import { buildRing, projectToRing, type OutlineRing } from '../../utils/geometry/outlineRing';
-import { extractNodes, type EditableNode } from './nodeEditorUtils';
-import { getInternalLineEndpoints } from './internalShapePath';
+import { buildSnapIndex, resolveSnap as resolverEnganche } from './snapIndex';
+import type { SnapTarget } from './snapIndex';
 import { EDGE_HIT_PX, isDrag } from './gestureConstants';
 import { nodesToCommands, polarOf, polarPoint, type PolyPenNode } from './polyPenGeometry';
 import { pushJournal } from '../../utils/telemetry/journal';
@@ -34,14 +33,10 @@ export interface NextPointState {
  * devuelve si consumió, y solo entonces el router detiene la propagación.
  */
 
-export type SnapKind = 'firstNode' | 'vertex' | 'internalEnd' | 'outline';
-
-export interface SnapTarget {
-  kind: SnapKind;
-  pieceId: string | null;
-  /** Mundo (patrón). */
-  point: Point2D;
-}
+// El enganche vive en `snapIndex.ts` desde el 2026-09-06: lo estrenó esta
+// herramienta y ahora lo lee también la pluma (#1102). Se re-exportan los tipos
+// para no tocar a `PolyPenToolOverlay`, que los importa de aquí.
+export type { SnapKind, SnapTarget } from './snapIndex';
 
 export interface InternalLineToolOptions {
   nodeType: 'straight' | 'curvePoints';
@@ -98,38 +93,9 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
 
   const { pieces } = opts;
 
-  // Memos por identidad de `pieces`, no por evento de mouse (como usePointTool).
-  const nodesByPiece = useMemo(() => {
-    const m = new Map<string, EditableNode[]>();
-    for (const p of pieces) m.set(p.id, extractNodes(p));
-    return m;
-  }, [pieces]);
-
-  const endsByPiece = useMemo(() => {
-    const m = new Map<string, Point2D[]>();
-    for (const p of pieces) {
-      const ends: Point2D[] = [];
-      for (const line of p.internals ?? []) {
-        const ep = getInternalLineEndpoints(line);
-        if (ep) ends.push(ep[0], ep[1]);
-      }
-      m.set(p.id, ends);
-    }
-    return m;
-  }, [pieces]);
-
-  // Anillo pre-aplanado por pieza: proyectar contra él es O(n) por evento.
-  // `snapToEdge` re-aplana el contorno entero por comando y no cabe en un
-  // frame con veinte piezas DXF (revisión Halberg, 2026-08-29).
-  const ringsByPiece = useMemo(() => {
-    const m = new Map<string, OutlineRing>();
-    for (const p of pieces) {
-      if (!p.outline?.length) continue;
-      const built = buildRing(p.outline, 2);
-      if (built.ok) m.set(p.id, built.value);
-    }
-    return m;
-  }, [pieces]);
+  // Un solo memo por identidad de `pieces`: aplanar nodos, extremos de internas
+  // y anillos cuesta, y no puede rehacerse por evento de ratón.
+  const indice = useMemo(() => buildSnapIndex(pieces), [pieces]);
 
   const toWorld = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D =>
@@ -139,44 +105,14 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
 
   const radius = useCallback(() => screenToPatternLength(EDGE_HIT_PX, zoom), [zoom]);
 
-  /** Prioridad de la spec § 4.6; dentro de cada clase, la pieza de arriba primero. */
+  /** El de `snapIndex.ts`, con el primer nodo del trazo vivo como candidato. */
   const resolveSnap = useCallback((world: Point2D, allowFirstNode: boolean): SnapTarget | null => {
-    const r = radius();
     const nodes = nodesRef.current;
-    if (allowFirstNode && nodes.length >= 3 && dist(world, nodes[0].point) <= r) {
-      return { kind: 'firstNode', pieceId: hostRef.current, point: nodes[0].point };
-    }
-    const ps = optsRef.current.pieces;
-    for (let i = ps.length - 1; i >= 0; i--) {
-      const p = ps[i];
-      const local = patternToPieceLocal(world, p);
-      for (const nd of nodesByPiece.get(p.id) ?? []) {
-        if (dist(local, nd.position) <= r) {
-          return { kind: 'vertex', pieceId: p.id, point: pieceLocalToPattern(nd.position, p) };
-        }
-      }
-    }
-    for (let i = ps.length - 1; i >= 0; i--) {
-      const p = ps[i];
-      const local = patternToPieceLocal(world, p);
-      for (const end of endsByPiece.get(p.id) ?? []) {
-        if (dist(local, end) <= r) {
-          return { kind: 'internalEnd', pieceId: p.id, point: pieceLocalToPattern(end, p) };
-        }
-      }
-    }
-    for (let i = ps.length - 1; i >= 0; i--) {
-      const p = ps[i];
-      const ring = ringsByPiece.get(p.id);
-      if (!ring) continue;
-      const local = patternToPieceLocal(world, p);
-      const { point } = projectToRing(ring, local);
-      if (dist(local, point) <= r) {
-        return { kind: 'outline', pieceId: p.id, point: pieceLocalToPattern(point, p) };
-      }
-    }
-    return null;
-  }, [nodesByPiece, endsByPiece, ringsByPiece, radius]);
+    const primero = allowFirstNode && nodes.length >= 3
+      ? { point: nodes[0].point, pieceId: hostRef.current }
+      : null;
+    return resolverEnganche(indice, world, radius(), primero);
+  }, [indice, radius]);
 
   const topmostContaining = useCallback((world: Point2D): string | null => {
     const ps = optsRef.current.pieces;

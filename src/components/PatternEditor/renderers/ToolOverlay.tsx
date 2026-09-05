@@ -2,6 +2,7 @@ import { PatternPiece, PathCommand, Point2D, Tool2D } from '../../../types/types
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../../store';
 import { NodeRef } from '../nodeEditorUtils';
+import type { SnapTarget } from '../snapIndex';
 import type { EditableNode } from '../nodeEditorUtils';
 import POMOverlay from './overlays/POMOverlay';
 import EdgePairOverlay from './overlays/EdgePairOverlay';
@@ -59,6 +60,9 @@ interface ToolOverlayProps {
   guidePath: string | null;
   penDistance: { distance: number; position: Point2D } | null;
   penWillClose: boolean;
+  /** #1102: los puntos de las piezas y lo que el próximo clic enganchará. */
+  penVertices?: Point2D[];
+  penSnapHover?: SnapTarget | null;
   rectPreview: { x: number; y: number; width: number; height: number } | null;
   rectDimensions: { width: number; height: number; center: Point2D } | null;
   /** Círculo (#1111): la caja de la elipse en curso, no la del arrastre. */
@@ -243,7 +247,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
       )}
 
       {activeTool === 'pen' && (
-        <PenToolOverlay zoom2D={zoom2D} units={units} penNodes={props.penNodes} previewPath={props.previewPath} guidePath={props.guidePath} penDistance={props.penDistance} penWillClose={props.penWillClose} />
+        <PenToolOverlay zoom2D={zoom2D} units={units} penNodes={props.penNodes} previewPath={props.previewPath} guidePath={props.guidePath} penDistance={props.penDistance} penWillClose={props.penWillClose} verticesDePiezas={props.penVertices} snapHover={props.penSnapHover} />
       )}
 
       {activeTool === 'rectangle' && (

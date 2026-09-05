@@ -1,8 +1,12 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { Point2D, PathCommand, PatternPiece } from '../../types/types';
 import { screenToPattern } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
 import { polarOf, polarPoint } from './polyPenGeometry';
+import { buildSnapIndex, resolveSnap, verticesVisibles } from './snapIndex';
+import type { SnapTarget } from './snapIndex';
+import { EDGE_HIT_PX } from './gestureConstants';
+import { screenToPatternLength } from '../../utils/geometry';
 import { pushJournal } from '../../utils/telemetry/journal';
 import { isDrag } from './gestureConstants';
 
@@ -40,16 +44,31 @@ interface PenState {
   nextPoint: NextPointState | null;
 }
 
-const CLOSE_THRESHOLD = 12; // px — snap to first node to close
+// El radio de cierre es el MISMO que el del enganche. El spec de la línea
+// interna (2026-08-29 § 7) ya lo había decidido — «cierre | 12 px | 12 px,
+// ahora EDGE_HIT_PX (sin cambio de valor)»— y se quedó sin hacer: había un 12
+// literal aquí. Un solo radio para todo el enganche era el punto entero de esa
+// decisión, y con la pluma enganchando de verdad (#1102) ya no es cosmético:
+// dos radios distintos en la misma herramienta se notan.
 
 const EMPTY: PenState = { nodes: [], isDragging: false, cursorPos: null, isClosed: false, nextPoint: null };
+
+/** Identidad estable: un `[]` nuevo por render reharía el índice en cada frame. */
+const VACIO: PatternPiece[] = [];
 
 export function usePenTool(
   zoom: number,
   pan: Point2D,
   onComplete: (piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => void,
+  /**
+   * Piezas VISIBLES en orden de dibujo, para enganchar (#1102). Opcional para
+   * que los tests viejos de la pluma —que la prueban como creadora de piezas
+   * desde la nada— sigan valiendo tal cual.
+   */
+  pieces: PatternPiece[] = VACIO,
 ) {
   const [state, setState] = useState<PenState>(EMPTY);
+  const [hover, setHover] = useState<SnapTarget | null>(null);
   const nodesRef = useRef<PenNode[]>([]);
   nodesRef.current = state.nodes;
   const cursorRef = useRef<Point2D | null>(null);
@@ -62,6 +81,13 @@ export function usePenTool(
       screenToPattern(screenX, screenY, svgRect, zoom, pan),
     [zoom, pan],
   );
+
+  // Caro: se rehace solo cuando cambian las piezas, no por evento de ratón.
+  const indice = useMemo(() => buildSnapIndex(pieces), [pieces]);
+  const radio = useCallback(() => screenToPatternLength(EDGE_HIT_PX, zoom), [zoom]);
+  // Lo que se pinta sale del MISMO índice que engancha: si divergieran, el
+  // dibujo estaría prometiendo puntos que no atraen.
+  const verticesDePiezas = useMemo(() => verticesVisibles(indice), [indice]);
 
   /** Distance between two points */
   const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -144,26 +170,32 @@ export function usePenTool(
     const pt = toPattern(e.clientX, e.clientY, rect);
     const nodes = nodesRef.current;
 
-    // Check if closing the path (clicking near first node)
+    // Cerrar gana al enganche: si no, no se podría cerrar un trazo encima de
+    // una pieza, que es donde más se dibuja.
     if (nodes.length > 2) {
       const first = nodes[0].anchor;
-      if (dist(pt, first) * zoom < CLOSE_THRESHOLD) {
+      if (dist(pt, first) * zoom < EDGE_HIT_PX) {
         pushJournal('gesture', 'pen:press', { closes: true, nodes: nodes.length });
         complete(nodes, true);
         return;
       }
     }
 
-    // Add new node
-    pushJournal('gesture', 'pen:press', { closes: false, nodes: nodes.length + 1 });
-    const newNode: PenNode = { anchor: pt, handleIn: null, handleOut: null };
+    // El nodo cae donde hay algo que enganchar, y si no, donde ella clicó
+    // (#1102 [11:23]: «si yo ahora quiero crear una línea nueva que empiece
+    // desde aquí»). La pluma sigue creando piezas desde la nada: sin objetivo
+    // no hay imán.
+    const enganche = resolveSnap(indice, pt, radio());
+    const anchor = enganche?.point ?? pt;
+    pushJournal('gesture', 'pen:press', { closes: false, nodes: nodes.length + 1, snap: enganche?.kind ?? null });
+    const newNode: PenNode = { anchor, handleIn: null, handleOut: null };
     pressRef.current = { screen: { x: e.clientX, y: e.clientY }, moved: false };
     setState(prev => ({
       ...prev,
       nodes: [...prev.nodes, newNode],
       isDragging: false,
     }));
-  }, [toPattern, zoom, complete]);
+  }, [toPattern, zoom, complete, indice, radio]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;
@@ -173,6 +205,11 @@ export function usePenTool(
     if (press && !press.moved && isDrag(e.clientX - press.screen.x, e.clientY - press.screen.y)) {
       press.moved = true;
     }
+
+    // El aviso de enganche. Sin esto el imán existe y es invisible, que es la
+    // mitad literal de #1102 («no se está iluminando»). Durante un arrastre no:
+    // ahí se están dibujando manijas, no eligiendo dónde cae el nodo.
+    setHover(press?.moved ? null : resolveSnap(indice, pt, radio()));
 
     setState(prev => {
       if (press?.moved && prev.nodes.length > 0) {
@@ -193,7 +230,7 @@ export function usePenTool(
       }
       return { ...prev, cursorPos: pt };
     });
-  }, [toPattern]);
+  }, [toPattern, indice, radio]);
 
   const handleMouseUp = useCallback(() => {
     pressRef.current = null;
@@ -213,7 +250,7 @@ export function usePenTool(
     if (nodes.length >= 2) {
       const a = nodes[nodes.length - 1].anchor;
       const b = nodes[nodes.length - 2].anchor;
-      if (dist(a, b) * zoom < CLOSE_THRESHOLD) nodes = nodes.slice(0, -1);
+      if (dist(a, b) * zoom < EDGE_HIT_PX) nodes = nodes.slice(0, -1);
     }
     if (nodes.length < 2) return;
     complete(nodes, false);
@@ -292,7 +329,7 @@ export function usePenTool(
     state.nodes.length > 2 &&
     !!state.cursorPos &&
     !state.isClosed &&
-    dist(state.cursorPos, state.nodes[0].anchor) * zoom < CLOSE_THRESHOLD;
+    dist(state.cursorPos, state.nodes[0].anchor) * zoom < EDGE_HIT_PX;
 
   // Distance from last node to cursor for dimension label. Se apaga cuando
   // el cierre está armado: en ese momento la medida es ruido y era
@@ -312,6 +349,10 @@ export function usePenTool(
     previewPath: buildPreviewPath(),
     guidePath: buildGuidePath(),
     lastPointDistance,
+    /** Lo que el próximo clic va a enganchar, para que el overlay lo anuncie. */
+    hover,
+    /** Los vértices de las piezas visibles — #1102 [11:38]. */
+    verticesDePiezas,
     nextPoint: state.nextPoint,
     handleMouseDown,
     handleMouseMove,

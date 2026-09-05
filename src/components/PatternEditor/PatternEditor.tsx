@@ -190,7 +190,17 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     return fullPiece.id;
   }, [dispatch]);
 
-  const pen = usePenTool(zoom2D, pan2D, handlePieceComplete);
+  // Solo lo que se dibuja puede prometer una lectura o recibir el clic. El
+  // orden ascendente es el de PieceRenderer; el hook lo invierte una sola vez.
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
+  const drawablePieces = useMemo(
+    () => [...pieces]
+      .filter(p => !hiddenLayerIds.includes(p.layer ?? 1))
+      .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
+    [pieces, hiddenLayerIds],
+  );
+
+  const pen = usePenTool(zoom2D, pan2D, handlePieceComplete, drawablePieces);
   const rectTool = useRectangleTool(zoom2D, pan2D, handlePieceComplete);
   // El círculo nace de la misma puerta que la pluma y el rectángulo (#1111).
   const circleTool = useCircleTool(zoom2D, pan2D, handlePieceComplete);
@@ -240,16 +250,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       options: notchMirror.notch.notchOptions,
     };
   }, [notchMirror, pieces]);
-
-  // Solo lo que se dibuja puede prometer una lectura o recibir el clic. El
-  // orden ascendente es el de PieceRenderer; el hook lo invierte una sola vez.
-  const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
-  const drawablePieces = useMemo(
-    () => [...pieces]
-      .filter(p => !hiddenLayerIds.includes(p.layer ?? 1))
-      .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
-    [pieces, hiddenLayerIds],
-  );
 
   // Explicit apply-SA command (pieces are born net; this puts allowance back
   // on purpose). Width comes from editor.defaultSeamAllowanceWidth inside the
@@ -1143,6 +1143,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             guidePath={pen.guidePath}
             penDistance={pen.lastPointDistance}
             penWillClose={pen.willClose}
+            penVertices={pen.verticesDePiezas}
+            penSnapHover={pen.hover}
             rectPreview={rectTool.previewRect}
             rectDimensions={rectTool.rectDimensions}
             circlePreview={circleTool.previewRect}
