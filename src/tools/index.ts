@@ -46,6 +46,7 @@ import { slashAndSpreadTool } from './definitions/slashAndSpread';
 import { mergeTool } from './definitions/merge';
 import { dartTool } from './definitions/dart';
 import { circleTool } from './definitions/circle';
+import { triangleTool } from './definitions/triangle';
 import { mirrorTool } from './definitions/mirror';
 import { traceTool } from './definitions/trace';
 import { autoTraceTool } from './definitions/autoTrace';
@@ -81,6 +82,7 @@ const allTools = [
   traceTool,
   autoTraceTool,
   circleTool,
+  triangleTool,
 
   // 2D Tools — Pattern Editing
   scissorsTool,

@@ -30,6 +30,7 @@ export const RAZONES = [
   'unir:misma-pieza',
   'rectangulo:medida-en-cero',
   'circulo:medida-en-cero',
+  'triangulo:medida-en-cero',
   'pom:nombre-abierto',
   'abrir:linea-invalida',
 ] as const;
@@ -62,6 +63,7 @@ const MENSAJES: Record<RazonMuda, string> = {
   'unir:misma-pieza': 'Esa ya es la primera pieza; elige la segunda para unirlas',
   'rectangulo:medida-en-cero': 'El rectángulo mide cero; escribe un ancho y un alto mayores que cero',
   'circulo:medida-en-cero': 'El círculo mide cero; escribe un radio mayor que cero',
+  'triangulo:medida-en-cero': 'El triángulo mide cero; escribe una base y una altura mayores que cero',
   'pom:nombre-abierto': 'Primero ponle nombre a la medida; escribe y pulsa Enter, o Escape para dejarlo',
   'abrir:linea-invalida': 'Esa línea no corta la pieza en dos; arrastra de un borde al otro',
 };

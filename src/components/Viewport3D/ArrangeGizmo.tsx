@@ -114,6 +114,14 @@ export default function ArrangeGizmo({
   }, [camera]);
 
   const handleDown = useCallback((handle: Handle) => (e: ThreeEvent<PointerEvent>) => {
+    // Solo el botón primario arrastra. En este visor la ÓRBITA es el botón
+    // DERECHO (`Viewport3D.tsx` fija `{LEFT:-1, MIDDLE:-1, RIGHT: ROTATE}`) y
+    // R3F despacha `onPointerDown` para cualquier botón, así que sin este
+    // filtro un arrastre con el derecho apaga el orbit, mueve la pieza y al
+    // soltar escribe la colocación nueva. El gizmo nunca lo filtró; con la
+    // esfera de 1,8 cm casi no se notaba, pero desde #1108 la superficie es la
+    // pieza entera.
+    if (e.button !== 0) return;
     e.stopPropagation();
     const start = grabPoint(handle, e.ray, origin);
     if (!start) return;

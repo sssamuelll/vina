@@ -2,7 +2,9 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import type { PatternPiece } from '../../../../types/types';
-import PuntosDelContorno from '../PuntosDelContorno';
+import PuntosDelContorno, { EXTREMOS } from '../PuntosDelContorno';
+import { classifyEditableAnchors } from '../../anchorRoles';
+import { extractNodes } from '../../nodeEditorUtils';
 
 afterEach(cleanup);
 
@@ -137,5 +139,35 @@ describe('#1103 — los de curva solo con el menú de curva', () => {
 
     for (const rol of sin) expect(con).toContain(rol);
     expect(con.length).toBeGreaterThanOrEqual(sin.length);
+  });
+});
+
+/**
+ * Lo que se PINTA y lo que se puede AGARRAR tienen que ser el mismo conjunto.
+ *
+ * El bloque que este componente sustituyó no era decoración: era el mapa de
+ * impactos de un gesto real. `findClickedAnchorPoint` recorre los nodos con un
+ * umbral de 8 px y, si acierta, entra en editar el vértice en vez de arrastrar
+ * la pieza. Pintar un subconjunto y seguir agarrando la lista entera deja el
+ * borde limpio y el clic secuestrado — medido sobre el DXF de María: 887
+ * agarrables contra 40 pintados, con el espaciado entre nodos POR DEBAJO del
+ * umbral, o sea el contorno entero era zona de nodo invisible.
+ */
+describe('#1103 — lo que se agarra es lo que se ve', () => {
+  it('los roles que se pintan son exactamente los que el hit-test acepta', () => {
+    // Si alguien añade un rol a uno de los dos lados y no al otro, esto cae.
+    // `findClickedAnchorPoint` importa `EXTREMOS` de este módulo justamente
+    // para que no puedan divergir.
+    expect([...EXTREMOS].sort()).toEqual(['corner', 'lineEnd', 'openEndpoint']);
+  });
+
+  it('sobre una pieza con muestras de curva, lo pintado es un subconjunto propio', () => {
+    // El caso que hace daño: hay nodos que NO son extremos. Si el hit-test
+    // los aceptara, serían agarrables e invisibles.
+    const todos = classifyEditableAnchors(CON_CURVA, extractNodes(CON_CURVA));
+    const noExtremos = todos.filter(({ role }) => !EXTREMOS.has(role));
+
+    expect(noExtremos.length).toBeGreaterThan(0);
+    expect(pintar(CON_CURVA, { curva: false })).toHaveLength(todos.length - noExtremos.length);
   });
 });

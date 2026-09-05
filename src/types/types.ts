@@ -745,6 +745,9 @@ export type Tool2D =
   // propia linea: R3 del contrato lee un `#1111` en cola de una linea de
   // CODIGO como color hexadecimal, y el trinquete se pone rojo. Issue 1111.
   | 'circle'
+  // Triangulo, el otro hermano que pidio el mismo issue (isosceles y
+  // rectangulo, tanda 8). Numero en su propia linea por la misma razon.
+  | 'triangle'
   | 'seam'         // connect edges between pieces
   | 'seamEdit'     // inspect existing seams — the CLO3D "Edit Sewing" half (#219)
   | 'topstitchSeamline'  // topstitch along seam edge

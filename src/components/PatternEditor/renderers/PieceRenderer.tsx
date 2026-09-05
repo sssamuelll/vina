@@ -39,8 +39,8 @@ interface SinglePieceProps {
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
   showLineLengths: boolean;
-  /** Hay una herramienta de curva activa: solo entonces salen los puntos de curva (#1103). */
-  mostrarPuntosDeCurva: boolean;
+  /** La pieza que se está editando con una herramienta de curva: solo esa enseña sus puntos de curva. Por PIEZA, no global — encenderlo para todas suelta cientos de puntos sobre piezas que nadie toca (#1103). */
+  piezaConPuntosDeCurva: string | null;
   units: UnitSystem;
   isInternalLineSelected: boolean;
   selectedLineId?: string;
@@ -72,7 +72,7 @@ const SinglePiece = memo(function SinglePiece({
   showPieceNames,
   renderMode2D,
   showLineLengths,
-  mostrarPuntosDeCurva,
+  piezaConPuntosDeCurva,
   units,
   isInternalLineSelected,
   selectedLineId,
@@ -502,7 +502,7 @@ const SinglePiece = memo(function SinglePiece({
         piece={piece}
         zoom2D={zoom2D}
         isSelected={isSelected}
-        mostrarPuntosDeCurva={mostrarPuntosDeCurva}
+        mostrarPuntosDeCurva={piezaConPuntosDeCurva === piece.id}
       />
     </g>
   );
@@ -518,8 +518,8 @@ interface PieceRendererProps {
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
   showLineLengths: boolean;
-  /** Hay una herramienta de curva activa: solo entonces salen los puntos de curva (#1103). */
-  mostrarPuntosDeCurva: boolean;
+  /** La pieza que se está editando con una herramienta de curva: solo esa enseña sus puntos de curva. Por PIEZA, no global — encenderlo para todas suelta cientos de puntos sobre piezas que nadie toca (#1103). */
+  piezaConPuntosDeCurva: string | null;
   units: UnitSystem;
   /** Map of piece ID to group color for visual indicators */
   groupColors?: Record<string, string>;
@@ -540,7 +540,7 @@ export default function PieceRenderer({
   showPieceNames,
   renderMode2D,
   showLineLengths,
-  mostrarPuntosDeCurva,
+  piezaConPuntosDeCurva,
   units,
   groupColors,
   selectedInternalLine,
@@ -628,7 +628,7 @@ export default function PieceRenderer({
           showPieceNames={showPieceNames}
           renderMode2D={renderMode2D}
           showLineLengths={showLineLengths}
-          mostrarPuntosDeCurva={mostrarPuntosDeCurva}
+          piezaConPuntosDeCurva={piezaConPuntosDeCurva}
           units={units}
           groupColor={groupColors?.[piece.id]}
           isLayerLocked={!!layerLocked[piece.layer ?? 1]}

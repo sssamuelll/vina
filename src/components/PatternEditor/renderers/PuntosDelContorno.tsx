@@ -33,8 +33,18 @@ import AnchorGlyph from './AnchorGlyph';
  * forma solo hace falta donde se manipula.
  */
 
-/** Los que María llama «los extremos»: se ven siempre. */
-const EXTREMOS: ReadonlySet<AnchorRole> = new Set<AnchorRole>([
+/**
+ * Los que María llama «los extremos»: se ven siempre.
+ *
+ * **Exportado a propósito, y no por comodidad.** `findClickedAnchorPoint`
+ * (`useEditorInteractions.ts`) decide con esta MISMA lista qué punto se puede
+ * agarrar con Seleccionar. Lo pintado y lo agarrable tienen que ser el mismo
+ * conjunto: si divergen, el borde se ve limpio y el clic entra en edición de
+ * nodos igual — medido sobre el DXF de María, 887 nodos agarrables contra 40
+ * pintados, con el espaciado por debajo del umbral de captura, o sea el
+ * contorno ENTERO era zona de nodo invisible.
+ */
+export const EXTREMOS: ReadonlySet<AnchorRole> = new Set<AnchorRole>([
   'corner',
   'openEndpoint',
   'lineEnd',
@@ -45,7 +55,12 @@ interface PuntosDelContornoProps {
   zoom2D: number;
   /** La pieza está elegida: los puntos pasan de referencia a manipulables. */
   isSelected: boolean;
-  /** Hay una herramienta de curva activa: entonces sí salen los de curva. */
+  /**
+   * Esta pieza es la que se está editando con una herramienta de curva:
+   * entonces sí salen sus puntos de curva. Es POR PIEZA, no global — con el
+   * DXF de María, encenderlo para todas suelta cientos de puntos sobre piezas
+   * que nadie está tocando.
+   */
   mostrarPuntosDeCurva: boolean;
 }
 

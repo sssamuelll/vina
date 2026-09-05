@@ -34,7 +34,7 @@ function uid(_prefix: string): string { return newId(); }
 // no encuentra nada y no hace NADA, mientras el tool responde success. Así
 // estuvieron mudos `addFullness` y `transferDart` hasta #1009.
 function clonePiece(piece: PatternPiece, overrides?: Partial<PatternPiece>): PatternPiece {
-  return {
+  const clon: PatternPiece = {
     ...piece,
     id: uid('piece'),
     outline: piece.outline.map(c => ({ type: c.type, values: [...c.values] })),
@@ -44,6 +44,25 @@ function clonePiece(piece: PatternPiece, overrides?: Partial<PatternPiece>): Pat
     updatedAt: Date.now(),
     ...overrides,
   };
+
+  // Identidad nueva, pieza nueva: hereda la geometría y nada de la identidad.
+  // Con `{ id: piece.id }` —las ops en sitio de arriba— no se toca nada, porque
+  // ahí sigue siendo la MISMA pieza y borrarle el vínculo la desvincularía cada
+  // vez que se le estira un borde.
+  //
+  // Sin esto, cortar con Tijeras una pieza vinculada da dos mitades apuntando
+  // a la compañera; el `updatePiece` del auto-cosido —mismo gesto— despierta
+  // `linkedEditingMiddleware`, que le escribe a la compañera el contorno de una
+  // mitad y su pieza entera desaparece, dentro del mismo lote de deshacer
+  // (#1126, quinto sitio: el censo por `JSON.parse(JSON.stringify)` no ve este
+  // `...piece`).
+  if (clon.id !== piece.id) {
+    if (!overrides || !('linkedPieceId' in overrides)) clon.linkedPieceId = undefined;
+    if (!overrides || !('linkMode' in overrides)) clon.linkMode = undefined;
+    if (!overrides || !('createdAt' in overrides)) clon.createdAt = Date.now();
+  }
+
+  return clon;
 }
 
 function outlineBBox(outline: PathCommand[]): { minX: number; maxX: number; minY: number; maxY: number } {

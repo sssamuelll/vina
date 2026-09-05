@@ -10,16 +10,18 @@ import { TRIM_LIBRARY } from '../../utils/trim/trimLibrary';
  * el único consumidor de `tool.options` era el schema del copiloto. Encender
  * la barra las pone en pantalla.
  *
- * Esta instantánea congelada cubre las 23 herramientas 2D CON OPCIONES que
+ * Esta instantánea congelada cubre las 24 herramientas 2D CON OPCIONES que
  * María puede activar hoy (`polyPen` murió con la unificación de líneas
  * internas, spec 2026-08-29; `pen` sigue activable pero sin opciones, cubierta
  * aparte; `hand` tampoco declara ninguna). Eran 19 hasta el 2026-09-05, cuando
  * cinco herramientas que tenían gesto y ninguna puerta entraron al catálogo del
  * dock — cuatro de ellas con opciones, y las cuatro rotuladas en inglés, que es
- * la mitad de idioma del mismo defecto. Una etiqueta nueva en inglés
- * rompe el test, y el último caso rompe también si alguien AÑADE una opción a
- * una herramienta cubierta sin traducirla. Es lo único que impide que la
- * próxima herramienta reintroduzca la deriva que esta rama arregla.
+ * la mitad de idioma del mismo defecto. Y 24 desde la tanda 8, cuando el
+ * triángulo nació con las dos figuras del mismo issue que el círculo (#1111).
+ * Una etiqueta nueva en inglés rompe el test, y el último caso rompe también
+ * si alguien AÑADE una opción a una herramienta cubierta sin traducirla. Es lo
+ * único que impide que la próxima herramienta reintroduzca la deriva que esta
+ * rama arregla.
  *
  * Los `value` de los `choices` NO se traducen: son identificadores
  * ('curvePoints', 'flat-felled', 'outward'), no texto.
@@ -88,6 +90,15 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
     // interna ya existe `internalShape`.
     shapeType: ['Figura', 'Círculo', 'Elipse'],
     radius: ['Radio'],
+  },
+  // El triángulo (#1111, tanda 8): mismo issue que el círculo, mismas dos
+  // figuras en la barra. «Base» y «Altura» son las palabras del propio issue
+  // y el vocabulario del triángulo — no «Ancho»/«Alto», que son las cotas
+  // vivas genéricas del lienzo (`cotasDePieza()`), no la barra de opciones.
+  triangle: {
+    shapeType: ['Figura', 'Isósceles', 'Rectángulo'],
+    base: ['Base'],
+    altura: ['Altura'],
   },
   trace: {
     offset: ['Separación (mm)'],

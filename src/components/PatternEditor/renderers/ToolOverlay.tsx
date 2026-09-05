@@ -68,6 +68,9 @@ interface ToolOverlayProps {
   /** Círculo (#1111): la caja de la elipse en curso, no la del arrastre. */
   circlePreview: { x: number; y: number; width: number; height: number } | null;
   circleDimensions: { width: number; height: number; center: Point2D } | null;
+  /** Triángulo (#1111, tanda 8): los tres vértices en curso, no una caja. */
+  trianglePoints: [Point2D, Point2D, Point2D] | null;
+  triangleDimensions: { width: number; height: number; center: Point2D } | null;
   seamSegmentA: SegmentSelection | null;
   seamHoveredTarget: EdgeTarget | null;
   /** El borde del press mientras el gesto de coser sigue vivo, y el tramo que
@@ -256,6 +259,10 @@ export default function ToolOverlay(props: ToolOverlayProps) {
 
       {activeTool === 'circle' && (
         <ShapeToolOverlay figura="elipse" zoom2D={zoom2D} units={units} preview={props.circlePreview} dimensions={props.circleDimensions} />
+      )}
+
+      {activeTool === 'triangle' && (
+        <ShapeToolOverlay figura="triangulo" zoom2D={zoom2D} units={units} preview={null} puntos={props.trianglePoints} dimensions={props.triangleDimensions} />
       )}
 
       {(activeTool === 'measure' || activeTool === 'measureCurve' || activeTool === 'compareCurves') && (

@@ -47,7 +47,7 @@ export const TECHOS = {
   'src/components/PatternEditor/usePOMMeasureTool.ts': 2,
   'src/components/PatternEditor/useTopstitchTool.ts': 6,
   'src/components/PatternEditor/useTransformTool.ts': 2,
-  'src/copilot/action/tools/definitions/patternOpsTools.ts': 5,
+  'src/copilot/action/tools/definitions/patternOpsTools.ts': 1,
   'src/hooks/useElasticTool.ts': 4,
   'src/store/editorSlice.ts': 4,
   'src/store/projectSlice.ts': 5,

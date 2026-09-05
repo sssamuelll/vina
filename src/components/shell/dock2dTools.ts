@@ -7,7 +7,7 @@ import {
 import {
   InternalLineIcon, SeamIcon, NotchIcon,
   MedirBordeIcon, CompararLargosIcon, AbrirPiezaIcon, PonerAvioIcon,
-  ElasticoIcon, PliegueIcon,
+  ElasticoIcon, PliegueIcon, TrianguloIcon,
 } from './dockIcons';
 
 /** Un icono del dock: un glifo de Lucide, o uno propio de `dockIcons.tsx`
@@ -61,6 +61,11 @@ export const DOCK_2D_CATALOG: DockToolDef[] = [
   // sería cambiarle el dock sin haberlo pedido. Con su tecla E y el
   // personalizador ya tiene puerta.
   { id: 'circle', icon: Circle, label: 'Elipse (círculo)', shortcut: 'E' },
+  // El triángulo (#1111, tanda 8) entra al catálogo por la misma razón que el
+  // círculo: al default no, sin cambiarle el dock a María sin que lo pidiera.
+  // Sin shortcut a propósito, igual que las cinco de la tanda 6: repartir
+  // mnemónicos inventados enseñaría un hábito que CLO rompe.
+  { id: 'triangle', icon: TrianguloIcon, label: 'Triángulo' },
   { id: 'grainline', icon: MoveVertical, label: 'Hilo', shortcut: '⇧G' },
   // Las cinco del censo del 2026-09-05: tenían el gesto entero y ninguna
   // puerta, así que solo se alcanzaban si el copiloto las activaba por su
