@@ -36,7 +36,15 @@ function NumberInput({
         const texto = e.target.value;
         setBorrador(texto);
         if (texto === '' || Number.isNaN(Number(texto))) return;
-        alCambiar(Number(texto));
+        // Acotar al rango declarado. Con deslizador esto se cumplía por
+        // construcción y no hacía falta; en cuanto la opción pasa a campo
+        // escrito, teclear 999 en uno de máximo 200 mandaba 999 al store. Es el
+        // mismo acotado que `confirmarMargen` ya hace en la tira. El borrador
+        // local NO se toca: ella sigue viendo lo que escribió mientras escribe,
+        // y al salir del campo se suelta y vuelve a leerse el valor guardado.
+        const n = Number(texto);
+        const conMinimo = opcion.min != null ? Math.max(opcion.min, n) : n;
+        alCambiar(opcion.max != null ? Math.min(opcion.max, conMinimo) : conMinimo);
       }}
       onBlur={() => setBorrador(null)}
     />

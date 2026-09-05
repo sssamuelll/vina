@@ -32,6 +32,7 @@ export const dartTool: ToolDefinition = {
     {
       id: 'dartWidth',
       label: 'Ancho (mm)',
+      control: 'input',
       type: 'number',
       value: 20,
       min: 5,
@@ -41,6 +42,7 @@ export const dartTool: ToolDefinition = {
     {
       id: 'dartDepth',
       label: 'Largo (mm)',
+      control: 'input',
       type: 'number',
       value: 100,
       min: 20,

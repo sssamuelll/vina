@@ -45,6 +45,7 @@ export const notchTool: ToolDefinition = {
     {
       id: 'length',
       label: 'Profundidad (mm)',
+      control: 'input',
       type: 'number',
       value: 8,
       min: 3,
