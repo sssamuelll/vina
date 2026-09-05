@@ -162,6 +162,10 @@ describe('las guardas que el censo marcó (a) ya no son mudas', () => {
     ['src/components/PatternEditor/useWalkSeamTool.ts', 'walkseam'],
     ['src/components/PatternEditor/useTrimTool.ts', 'trim'],
     ['src/components/PatternEditor/useGrainlineTool.ts', 'grainline'],
+    // Tijeras entró tarde: su `state.error` vivía igual de muerto que el de
+    // Slash & Spread, pero la lista de abajo solo miraba a los dos hermanos
+    // que alguien censo ese día. Un censo parcial delata al detector (#1116).
+    ['src/components/PatternEditor/useScissorsTool.ts', 'tijeras'],
   ];
 
   it.each(OBLIGADOS)('%s habla cuando el gesto muere', (ruta, prefijo) => {
@@ -180,6 +184,7 @@ describe('las guardas que el censo marcó (a) ya no son mudas', () => {
     const sospechosos = [
       'src/components/PatternEditor/useSlashAndSpreadTool.ts',
       'src/components/PatternEditor/useMergeTool.ts',
+      'src/components/PatternEditor/useScissorsTool.ts',
     ];
     const ingles = /'(?:[A-Z][a-z]+ )+(?:[a-z]+ )*[a-z]+'/g;
     const malos: string[] = [];

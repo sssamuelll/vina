@@ -7,7 +7,7 @@ import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import { extendEdge, trimEdgeAtPoint } from '../../utils/patternOps';
 import { flattenPath } from '../../utils/seam/index';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
-import { patternToPieceLocal } from './pieceTransform';
+import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 
 export interface ExtendTrimState {
   /** Currently hovered snap point (endpoint for extend, point-on-edge for trim) */
@@ -87,7 +87,10 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
           if (dStart < threshold && dStart < bestDist) {
             bestDist = dStart;
             best = {
-              point: { x: prevX + piece.position.x, y: prevY + piece.position.y },
+              // Subir a patrón sumando solo la posición deshace media vuelta
+              // con la pieza girada: el punto no cae sobre el contorno que se
+              // ve (#1116, mismo bug copiado de Tijeras).
+              point: pieceLocalToPattern({ x: prevX, y: prevY }, piece),
               segmentIndex: i,
               endpoint: 'start',
             };
@@ -98,7 +101,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
           if (dEnd < threshold && dEnd < bestDist) {
             bestDist = dEnd;
             best = {
-              point: { x: endX + piece.position.x, y: endY + piece.position.y },
+              point: pieceLocalToPattern({ x: endX, y: endY }, piece),
               segmentIndex: i,
               endpoint: 'end',
             };
@@ -159,7 +162,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
           if (dist < threshold && dist < bestDist) {
             bestDist = dist;
             best = {
-              point: { x: projX + piece.position.x, y: projY + piece.position.y },
+              point: pieceLocalToPattern({ x: projX, y: projY }, piece),
               segmentIndex: i,
               endpoint: t < 0.5 ? 'start' : 'end',
             };

@@ -15,7 +15,7 @@ import { setToolOption } from '../../store/toolSlice';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import { flattenPath } from '../../utils/seam/index';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
-import { patternToPieceLocal } from './pieceTransform';
+import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 import {
   findSlashIntersections,
   splitOutlineAtSlash,
@@ -119,7 +119,9 @@ function snapToOutline(
     const dist = Math.hypot(localPt.x - proj.x, localPt.y - proj.y);
     if (dist < bestDist) {
       bestDist = dist;
-      bestPt = { x: proj.x + piece.position.x, y: proj.y + piece.position.y };
+      // Mismo bug que Tijeras, copiado tal cual: `localPt` sí se des-giró, y
+      // subir el resultado sumando la posición deshace media vuelta (#1116).
+      bestPt = pieceLocalToPattern(proj, piece);
     }
   }
 

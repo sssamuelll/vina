@@ -44,10 +44,7 @@ export const TECHOS = {
   'src/components/PatternEditor/renderers/overlays/SlashAndSpreadOverlay.tsx': 2,
   'src/components/PatternEditor/renderers/overlays/TopstitchOverlay.tsx': 2,
   'src/components/PatternEditor/useEditorInteractions.ts': 6,
-  'src/components/PatternEditor/useExtendTrimTool.ts': 6,
   'src/components/PatternEditor/usePOMMeasureTool.ts': 2,
-  'src/components/PatternEditor/useScissorsTool.ts': 2,
-  'src/components/PatternEditor/useSlashAndSpreadTool.ts': 2,
   'src/components/PatternEditor/useTopstitchTool.ts': 6,
   'src/components/PatternEditor/useTransformTool.ts': 2,
   'src/copilot/action/tools/definitions/patternOpsTools.ts': 5,
@@ -55,7 +52,7 @@ export const TECHOS = {
   'src/store/editorSlice.ts': 4,
   'src/store/projectSlice.ts': 5,
   'src/utils/grading/gradeAllSizes.ts': 1,
-  'src/utils/patternOps.ts': 9,
+  'src/utils/patternOps.ts': 5,
   'src/utils/pom/pomCompute.ts': 2,
 };
 

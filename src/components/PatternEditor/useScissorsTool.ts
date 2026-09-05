@@ -10,7 +10,8 @@ import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { splitPieceAtLine, findCutEdgePair } from '../../utils/patternOps';
 import { useGuardedAction } from '../../hooks/useGuardedAction';
 import { newId } from '../../utils/ids';
-import { patternToPieceLocal } from './pieceTransform';
+import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
+import { noPasoNada } from './noPasoNada';
 
 export interface ScissorsState {
   targetPieceId: string | null;
@@ -18,7 +19,6 @@ export interface ScissorsState {
   endPoint: Point2D | null;
   hoveredEdgePoint: Point2D | null;
   previewValid: boolean;
-  error: string | null;
 }
 
 const INITIAL_STATE: ScissorsState = {
@@ -27,7 +27,6 @@ const INITIAL_STATE: ScissorsState = {
   endPoint: null,
   hoveredEdgePoint: null,
   previewValid: false,
-  error: null,
 };
 
 const SNAP_THRESHOLD = 8; // screen pixels
@@ -77,7 +76,10 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
         const dist = Math.hypot(localPt.x - proj.x, localPt.y - proj.y);
         if (dist < bestDist) {
           bestDist = dist;
-          bestPt = { x: proj.x + piece.position.x, y: proj.y + piece.position.y };
+          // `localPt` sí se des-giró arriba; subir el resultado sumando solo
+          // la posición deshace la mitad de la vuelta y devuelve un punto que
+          // no está sobre el contorno que se ve (#1116).
+          bestPt = pieceLocalToPattern(proj, piece);
         }
       }
 
@@ -194,10 +196,14 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
 
           reset();
         } catch (err) {
-          setState(prev => ({
-            ...prev,
-            error: err instanceof Error ? err.message : 'Split failed',
-          }));
+          // `state.error` vivía aquí sin un solo consumidor: PatternEditor pasa
+          // los otros cinco campos del estado y este no, así que el mensaje
+          // —en inglés, además— no llegaba a nadie. El corte que no cruza es
+          // un gesto que murió después de armarse: ese es el canal (#1116).
+          noPasoNada('tijeras:corte-no-cruza', {
+            pieceId: s.targetPieceId,
+            motivo: err instanceof Error ? err.message : 'split-failed',
+          });
         }
       });
     },

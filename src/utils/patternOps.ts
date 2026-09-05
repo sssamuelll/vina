@@ -19,6 +19,7 @@ import { fitCubicBezier, rdpSimplify } from './geometry/bezier';
 import { linePolylineIntersections } from './geometry/lineIntersect';
 import { findSlashIntersections, buildSpreadPiece } from './geometry/slashAndSpread';
 import { newId } from './ids';
+import { patternToPieceLocal } from './geometry/pieceSpace';
 export { buildSpreadPiece } from './geometry/slashAndSpread';
 
 // B11-state: thin wrapper. Prefix retained in signature for backward
@@ -132,8 +133,12 @@ export function splitPieceAtLine(
   startPoint: Point2D,
   endPoint: Point2D,
 ): [PatternPiece, PatternPiece] {
-  const localStart = { x: startPoint.x - piece.position.x, y: startPoint.y - piece.position.y };
-  const localEnd = { x: endPoint.x - piece.position.x, y: endPoint.y - piece.position.y };
+  // Restar la posición NO es bajar a local: con la pieza girada da el punto
+  // girado sin trasladar, que cae en otro sitio. La línea deja de tocar el
+  // contorno donde la usuaria la dibujó — y lo peor no es que reviente, es
+  // que corta igual, por donde nadie pidió (#1116, hermano de #1064).
+  const localStart = patternToPieceLocal(startPoint, piece);
+  const localEnd = patternToPieceLocal(endPoint, piece);
 
   const hits = findOutlineIntersections(piece.outline, localStart, localEnd);
   if (hits.length < 2) {
