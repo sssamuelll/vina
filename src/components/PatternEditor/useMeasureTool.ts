@@ -263,14 +263,13 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
               const frac = si / NUM_SAMPLES;
               const dA = frac * edgeA.arcLength;
               const dB = frac * info.arcLength;
-              const ptA = pointAtPathDistance(
-                edgeA.piece.outline, dA,
-                edgeA.edge.segmentRange[0], edgeA.edge.segmentRange[1],
-              );
-              const ptB = pointAtPathDistance(
-                info.piece.outline, dB,
-                info.edge.segmentRange[0], info.edge.segmentRange[1],
-              );
+              // Igual que en la línea 132: el rango viene en la convención del
+              // productor y hay que traducirlo, o comparar contra el tramo de
+              // cierre muestrea el comando `M`, que no dibuja nada (#1120).
+              const [aDesde, aHasta] = rangoMedibleDeBorde(edgeA.piece.outline, edgeA.edge.segmentRange);
+              const [bDesde, bHasta] = rangoMedibleDeBorde(info.piece.outline, info.edge.segmentRange);
+              const ptA = pointAtPathDistance(edgeA.piece.outline, dA, aDesde, aHasta);
+              const ptB = pointAtPathDistance(info.piece.outline, dB, bDesde, bHasta);
               if (ptA && ptB) {
                 const worldA = pieceLocalToPattern(ptA, edgeA.piece);
                 const worldB = pieceLocalToPattern(ptB, info.piece);
@@ -320,12 +319,11 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
     if (measureMode === 'along-curve' && selectedEdge) {
       // Compute hover distance along the selected edge
       const localPt = patternToPieceLocal(rawPt, selectedEdge.piece);
-      const d = distanceAlongPath(
-        selectedEdge.piece.outline,
-        localPt,
-        selectedEdge.edge.segmentRange[0],
-        selectedEdge.edge.segmentRange[1],
-      );
+      // El panel ya medía bien el cierre desde #1120, pero la etiqueta que
+      // sigue al cursor no: decía 0,0 mm en todo el recorrido del lado
+      // izquierdo. Mismo rango traducido para las dos.
+      const [hDesde, hHasta] = rangoMedibleDeBorde(selectedEdge.piece.outline, selectedEdge.edge.segmentRange);
+      const d = distanceAlongPath(selectedEdge.piece.outline, localPt, hDesde, hHasta);
       setHoverDistance(d);
       setCursorPos(rawPt);
     } else {

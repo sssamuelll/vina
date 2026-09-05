@@ -99,7 +99,7 @@ export default function HintText({
           definido para qué es cada comando». La respuesta es corta y no estaba
           escrita en ninguna parte (#1103). */}
       {activeTool === 'select' && !cotasVisibles && !nodeEditorIsEditing && (
-        <Pie>Seleccionar mueve la pieza entera · para mover un punto suelto, Editar patrón</Pie>
+        <Pie>Seleccionar mueve la pieza, y un punto si pinchas encima · Editar patrón además añade, borra y curva</Pie>
       )}
 
       {/* Y [34:24]: «por qué este punto es redondo y este cuadrado, yo pensaría

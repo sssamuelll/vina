@@ -388,7 +388,14 @@ export function useNotchTool(
     if (!piece || liveLine?.type !== 'notch' || !liveLine.notchAnchor) return;
 
     const resolved = resolveNotchAnchor(piece.outline, liveLine.notchAnchor);
-    if (!resolved) return;
+    if (!resolved) {
+      // El mismo molde que `confirmRefine`, veinte líneas más abajo: su puerta
+      // (`actionCuration`) solo comprueba que el ancla EXISTA, no que resuelva,
+      // así que «Ajustar distancia…» aparece y al pulsarlo no pasa nada — ni
+      // panel, ni tira, ni bitácora. Arreglar una mitad parte el dibujo.
+      noPasoNada('notch:ancla-perdida', { pieceId, notchId: liveLine.id });
+      return;
+    }
 
     // Se reconstruye desde la versión viva de Redux para que un menú abierto
     // antes de otra edición no reviva geometría ni distancia obsoletas.

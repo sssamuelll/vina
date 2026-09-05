@@ -70,6 +70,12 @@ export default function DraggablePiece({
   }, [actualPos]);
 
   const handleGizmoDragEnd = useCallback((delta: [number, number, number]) => {
+    // Un clic sin desplazamiento no es una colocación. Sin esto, pinchar la
+    // pieza para comprobar que sigue elegida escribe `setArrangement3D` con
+    // coordenadas de mundo, marca el proyecto como sucio y desactiva la
+    // recolocación automática: al cambiar la estatura del maniquí, todas las
+    // piezas siguen al cuerpo nuevo menos esa.
+    if (delta[0] === 0 && delta[1] === 0 && delta[2] === 0) return;
     onDragEnd(piece.id, [
       actualPos[0] + delta[0],
       actualPos[1] + delta[1],
@@ -100,6 +106,12 @@ export default function DraggablePiece({
   // elige, los siguientes mueven.
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (!showGizmo || !arrastreLibre.current) return;
+    // Solo si esta pieza es lo que de verdad hay bajo el cursor. El rayo de
+    // R3F atraviesa todo y despacha a cada objeto que corta, así que con el
+    // delantero y la espalda superpuestos sobre el torso, arrastrar encima
+    // del delantero movía la ESPALDA si era la elegida — invisible, detrás
+    // del cuerpo, y con su colocación escrita al soltar.
+    if (e.intersections[0] && e.intersections[0].object !== e.object) return;
     arrastreLibre.current(e);
   }, [showGizmo]);
 

@@ -7,6 +7,7 @@
  */
 
 import type { PointOfMeasure, POMPoint, PatternPiece, Point2D } from '../../types/types';
+import { rangoMedibleDeBorde } from '../semanticEdges';
 import { computePathArcLength } from '../geometry/arcLength';
 
 // ─── World-position resolution ──────────────────────────────────────────────
@@ -70,7 +71,12 @@ export function computeAlongEdgeDistance(
   if (!edge) return null;
 
   // Always compute from geometry for correctness (edge.length may be stale after edits)
-  const [start, end] = edge.segmentRange;
+  // El rango viene en la convención del productor: el tramo de cierre se
+  // rotula con el índice de su `M`, que no dibuja nada. Sin traducir, un POM
+  // sobre el lado izquierdo de cualquier pieza exporta 0 mm en la ficha de
+  // especificación — hermano de #1120, que arregló las etiquetas del lienzo y
+  // dejó este vivo.
+  const [start, end] = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
   return computePathArcLength(piece.outline, start, end);
 }
 
