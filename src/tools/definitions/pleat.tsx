@@ -12,7 +12,7 @@ const PleatIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const pleatTool: ToolDefinition = {
   id: 'pleat',
-  name: 'Pleat',
+  name: 'Pliegue',
   context: '2d',
   icon: PleatIcon,
   cursor: 'crosshair',

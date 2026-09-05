@@ -1117,7 +1117,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
                 : undefined}
             />
           )}
-          <ElasticRenderer zoom2D={zoom2D} />
+          <ElasticRenderer zoom2D={zoom2D} selectedElasticId={elasticTool.selectedElasticId} />
           <TrimRenderer zoom2D={zoom2D} />
           {activeTool === 'seamAllowance' && (
             <SeamAllowanceSelectionOverlay

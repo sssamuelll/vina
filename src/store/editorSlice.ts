@@ -12,7 +12,6 @@ const initialState: EditorState = {
   selectedPieceIds: [],
   selectedSeamId: null,
   selectedPOMId: null,
-  selectedElasticId: null,
   selectedInternalLine: null,
   saSelection: null,
   notchMirrorInvert: true,

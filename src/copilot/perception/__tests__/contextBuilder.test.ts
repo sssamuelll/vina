@@ -95,7 +95,6 @@ function mockState(overrides?: Partial<RootState>): RootState {
       selectedPieceIds: ['piece-1'],
       selectedSeamId: null,
       selectedPOMId: null,
-      selectedElasticId: null,
       selectedInternalLine: null,
       saSelection: null,
       zoom2D: 1,
@@ -204,7 +203,9 @@ function mockState(overrides?: Partial<RootState>): RootState {
       activeTool2D: 'select',
       activeTool3D: 'camera',
       toolOptions: {},
-      recentTools: [],
+      recentTools: [],
+
+
     },
     parametric: {
       activePattern: null,

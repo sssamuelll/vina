@@ -289,6 +289,40 @@ export function rangoMedibleDeBorde(
 }
 
 /**
+ * El índice de comando TAL COMO LO ETIQUETAN los bordes.
+ *
+ * Hermano de `rangoMedibleDeBorde`, y su inversa: aquel traduce un rango que
+ * apunta a la `M` para poder MEDIR el tramo de cierre; este traduce un índice
+ * que apunta a la `Z` para poder NOMBRARLO.
+ *
+ * Hace falta porque los hit-tests recorren `outline` y devuelven el índice del
+ * comando que dibuja —para el lado de cierre, el de la `Z`— mientras el
+ * productor etiqueta ese mismo tramo con el de la `M` (lore de Fase 3, del que
+ * dependen las esquinas de costura y `outlineRing.ts`). Los dos convenios son
+ * defendibles; lo que no lo es es que nadie los case.
+ *
+ * Lo que costaba, medido el 2026-09-06 sobre un rectángulo: clicar el lado
+ * IZQUIERDO con Elástico o con Pliegue no hacía absolutamente nada.
+ * `resolveEdgeName` caía a `edge-4`, ningún borde se llama así, y los reducers
+ * `addElastic`/`addPleat` se van en silencio si el nombre no existe. Un lado
+ * entero de cualquier pieza, mudo, en tres herramientas.
+ *
+ * Se traduce AL LEER, como el hermano: los consumidores de `resolveEdgeName`
+ * son tres, no los 56 archivos que leen `segmentRange`.
+ */
+export function indiceSegunLosBordes(
+  outline: PathCommand[] | undefined,
+  cmdIndex: number,
+): number {
+  if (!outline || outline[cmdIndex]?.type !== 'Z') return cmdIndex;
+  // La `M` que abre el subcamino de esta `Z`.
+  for (let i = cmdIndex - 1; i >= 0; i--) {
+    if (outline[i].type === 'M') return i;
+  }
+  return cmdIndex;
+}
+
+/**
  * Find an edge by name (case-insensitive, partial match).
  */
 export function findEdgeByName(edges: SemanticEdge[], query: string): SemanticEdge | undefined {

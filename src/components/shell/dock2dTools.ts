@@ -7,6 +7,7 @@ import {
 import {
   InternalLineIcon, SeamIcon, NotchIcon,
   MedirBordeIcon, CompararLargosIcon, AbrirPiezaIcon, PonerAvioIcon,
+  ElasticoIcon, PliegueIcon,
 } from './dockIcons';
 
 /** Un icono del dock: un glifo de Lucide, o uno propio de `dockIcons.tsx`
@@ -63,9 +64,7 @@ export const DOCK_2D_CATALOG: DockToolDef[] = [
   { id: 'grainline', icon: MoveVertical, label: 'Hilo', shortcut: '⇧G' },
   // Las cinco del censo del 2026-09-05: tenían el gesto entero y ninguna
   // puerta, así que solo se alcanzaban si el copiloto las activaba por su
-  // cuenta. Se ejercitaron una a una en Chrome antes de abrirles esta; las
-  // otras dos del censo (elastic, pleat) siguen cerradas y su razón está
-  // escrita —ejecutable— en las-cinco-puertas-que-se-abren.test.ts.
+  // cuenta. Se ejercitaron una a una en Chrome antes de abrirles esta.
   //
   // Al catálogo y NO al default, mismo criterio que el círculo: a 1366×643 el
   // dock con doce mide 596 px de 643 y cada herramienta cuesta 43 px, o sea que
@@ -81,6 +80,21 @@ export const DOCK_2D_CATALOG: DockToolDef[] = [
   { id: 'compareCurves', icon: CompararLargosIcon, label: 'Comparar largos' },
   { id: 'slashAndSpread', icon: AbrirPiezaIcon, label: 'Abrir la pieza' },
   { id: 'trimPlace', icon: PonerAvioIcon, label: 'Poner avío' },
+  // Las otras dos del censo, que el 05-09 se quedaron fuera con su razón
+  // escrita. Las dos razones eran ciertas y las dos se cerraron:
+  //
+  //   elastic  no se podía seleccionar ni borrar, porque el resalte leía
+  //            `editor.selectedElasticId`, un campo de Redux sin un solo
+  //            escritor. Ahora el resalte cuelga del local —que sí se escribe—
+  //            y Supr borra el seleccionado.
+  //   pleat    «nadie lo pinta» era falso: `PieceRenderer` dibuja las líneas
+  //            `fold` con sus marcas de monte y valle desde siempre. Lo que
+  //            fallaba estaba antes, en `generatePleatFoldLines`, que rebanaba
+  //            el rango del borde y perdía su punto de arranque: devolvía cero
+  //            pliegues en CUALQUIER borde de un comando, o sea los cuatro
+  //            lados de un rectángulo.
+  { id: 'elastic', icon: ElasticoIcon, label: 'Elástico' },
+  { id: 'pleat', icon: PliegueIcon, label: 'Pliegue' },
 ];
 
 export function getDockToolById(id: string): DockToolDef | undefined {

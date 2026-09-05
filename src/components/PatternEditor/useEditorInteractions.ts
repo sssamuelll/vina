@@ -274,6 +274,7 @@ interface ToolHooks {
   elasticTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleKeyDown: (e: KeyboardEvent) => boolean;
   };
 }
 
@@ -463,7 +464,7 @@ export function useEditorInteractions(
     // Quién consumió la tecla, si alguien lo dijo. Solo los tres ganchos cuyo
     // `handleKeyDown` devuelve boolean pueden decirlo; los demás se ven en la
     // bitácora por lo que despachan.
-    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | 'circle' | 'cotas' | null;
+    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | 'circle' | 'cotas' | 'elastic' | null;
     const routeKey = (e: KeyboardEvent): KeyConsumer => {
       // Línea interna: con trazo vivo, Escape / Enter / Retroceso / Supr son
       // del motor. `handleKeyDown` dice si consumió.
@@ -500,6 +501,18 @@ export function useEditorInteractions(
           e.preventDefault();
           e.stopPropagation();
           return 'circle';
+        }
+        return null;
+      }
+      // Elástico: con uno seleccionado, Supr lo borra y Escape lo suelta. Va
+      // aquí y no en la burbuja porque `edit.delete` es un atajo GLOBAL que
+      // corre antes, y desde la burbuja Supr habría borrado la pieza además
+      // del elástico. Sin selección devuelve `false` y el Supr sigue su camino.
+      if (activeTool === 'elastic') {
+        if (elasticTool.handleKeyDown(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return 'elastic';
         }
         return null;
       }
@@ -565,7 +578,7 @@ export function useEditorInteractions(
     };
     window.addEventListener('keydown', onKeyCapture, { capture: true });
     return () => window.removeEventListener('keydown', onKeyCapture, { capture: true });
-  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, cotas]);
+  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, elasticTool, cotas]);
 
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);

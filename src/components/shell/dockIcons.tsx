@@ -178,3 +178,49 @@ export function NotchIcon(props: GlifoProps) {
     </Glifo>
   );
 }
+
+/**
+ * Elástico: el borde recto arriba y el zigzag que la herramienta pinta debajo.
+ *
+ * Es literalmente lo que `ElasticRenderer` deja en el patrón — un zigzag
+ * desplazado del borde que mide—, no una goma ni una cinta. Van los dos trazos
+ * porque el zigzag solo se confunde con el piquete, que también es una línea
+ * quebrada; con el borde encima se lee «algo puesto SOBRE un borde».
+ *
+ * DOS zigs, no cuatro ni ocho. Rasterizado a 16 px contra cinco alternativas
+ * (§ 5.2 del spec de iconos): con cuatro tramos los picos se empastan en una
+ * banda gris —61 px de tinta repartidos en un borrón— y con ocho, peor. Con dos
+ * se leen las dos uves. Es la misma cuenta que dejó «Poner avío» con dos
+ * agujeros en vez de cuatro.
+ */
+export function ElasticoIcon(props: GlifoProps) {
+  return (
+    <Glifo {...props}>
+      <path d="M3 7h18" />
+      <path d="m4 18 5-7 5 7 5-7" />
+    </Glifo>
+  );
+}
+
+/**
+ * Pliegue: el borde arriba y las líneas de doblez cayendo hacia dentro.
+ *
+ * Otra vez el rastro: `generatePleatFoldLines` genera exactamente eso —
+ * perpendiculares al borde nombrado, hacia dentro de la pieza— y
+ * `PieceRenderer` las pinta como internas de tipo `fold`.
+ *
+ * Tres dobleces y no cuatro: rasterizado a 16 px, con cuatro la separación cae
+ * a 4 unidades (2,7 px a tamaño de dock) y el glifo pasa de 86 a 106 píxeles de
+ * tinta — se lee como un código de barras. Con tres quedan cuatro filas de aire
+ * y los tres trazos se distinguen.
+ */
+export function PliegueIcon(props: GlifoProps) {
+  return (
+    <Glifo {...props}>
+      <path d="M3 5h18" />
+      <path d="M7 5v15" />
+      <path d="M12 5v15" />
+      <path d="M17 5v15" />
+    </Glifo>
+  );
+}

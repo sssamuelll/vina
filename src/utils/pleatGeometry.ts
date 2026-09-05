@@ -9,34 +9,13 @@
 import type { Pleat, PatternPiece, InternalLine, PathCommand } from '../types/types';
 import { MAX_PLEAT_COUNT } from '../types/types';
 import { uid } from './pathHelpers';
+import { interpolateEdgePoint } from './geometry/edgeInterpolation';
 
 // ─── Internal geometry helpers ────────────────────────────────────────────────
 
 interface Point2D {
   x: number;
   y: number;
-}
-
-/**
- * Flatten a slice of PathCommands into a polyline of points.
- * For M and L, the endpoint is values[0], values[1].
- * For C/Q/S/T/A, the endpoint is the last two values (approximation).
- * Z is ignored.
- */
-function flattenCommands(commands: PathCommand[]): Point2D[] {
-  const pts: Point2D[] = [];
-
-  for (const cmd of commands) {
-    if (cmd.type === 'Z') continue;
-
-    if (cmd.values.length >= 2) {
-      const x = cmd.values[cmd.values.length - 2];
-      const y = cmd.values[cmd.values.length - 1];
-      pts.push({ x, y });
-    }
-  }
-
-  return pts;
 }
 
 /** Euclidean distance between two points */
@@ -137,20 +116,25 @@ export function generatePleatFoldLines(
   pleat: Pleat,
   piece: PatternPiece,
 ): InternalLine[] {
-  // 1. Find the named edge
-  const edge = (piece.edges ?? []).find(e => e.name === pleat.edgeName);
-  if (!edge) return [];
-
-  // 2. Clamp count
+  // 1. Clamp count
   const count = Math.min(pleat.count, MAX_PLEAT_COUNT);
   if (count <= 0) return [];
 
-  // 3. Flatten edge segment into points
-  const [rangeStart, rangeEnd] = edge.segmentRange;
-  const segmentCmds = piece.outline.slice(rangeStart, rangeEnd);
-  const pts = flattenCommands(segmentCmds);
-
-  if (pts.length < 2) return [];
+  // 2. Muestrear el borde nombrado.
+  //
+  // Antes esto rebanaba `outline.slice(segmentRange)` y aplanaba el trozo. Un
+  // comando `L` lleva su punto FINAL, no el inicial, así que un borde de UN
+  // comando —los cuatro lados de un rectángulo lo son— daba un solo punto y la
+  // función devolvía [] sin decir nada. El pliegue no se dibujaba en ningún
+  // borde de ninguna pieza, y el censo del 05-09 leyó ese silencio como
+  // «nadie pinta los pliegues». Sí los pinta: `PieceRenderer` dibuja
+  // `type:'fold'` con sus marcas de monte y valle desde siempre.
+  //
+  // `interpolateEdgePoint` trabaja en espacio de comandos, mide curvas de
+  // verdad y ya resuelve el tramo de cierre (`rangoMedibleDeBorde`), que era
+  // el otro borde roto. Ver `el-pliegue-se-dibuja.test.ts`.
+  const muestrear = (t: number) => interpolateEdgePoint(piece, pleat.edgeName, t);
+  if (!muestrear(0)) return [];
 
   // 4. Clamp depth to piece bounding box height
   const bboxHeight = outlineBBoxHeight(piece.outline);
@@ -176,11 +160,11 @@ export function generatePleatFoldLines(
 
     if (linesPerRepeat === 1) {
       // Knife: single line at slot midpoint
-      const lineT = slotMid;
-      const { point, tangent } = samplePolyline(pts, lineT);
-      const perp = perpendicular(tangent);
+      const muestra = muestrear(slotMid);
+      if (!muestra) continue;
+      const perp = perpendicular(muestra.tangent);
 
-      lines.push(buildFoldLine(point, perp, depth, pleat.id, 'mountain'));
+      lines.push(buildFoldLine(muestra.point, perp, depth, pleat.id, 'mountain'));
     } else {
       // Box / Accordion / InvertedBox: two lines per repeat
       // Offset lines symmetrically around slot center
@@ -188,8 +172,9 @@ export function generatePleatFoldLines(
       const tA = slotMid - halfOffset * slotFraction;
       const tB = slotMid + halfOffset * slotFraction;
 
-      const sampA = samplePolyline(pts, tA);
-      const sampB = samplePolyline(pts, tB);
+      const sampA = muestrear(tA);
+      const sampB = muestrear(tB);
+      if (!sampA || !sampB) continue;
 
       let dirA: 'mountain' | 'valley';
       let dirB: 'mountain' | 'valley';

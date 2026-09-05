@@ -6,16 +6,16 @@ import dockReducer, { DEFAULT_DOCK_2D_IDS, MAX_DOCK_2D_TOOLS, addDockTool } from
 import type { DockState } from '../../../store/dockSlice';
 
 /**
- * Cuáles de las siete sin puerta se abren, y por qué las otras dos no.
+ * Las siete que estaban sin puerta, y por qué ninguna se queda fuera ya.
  *
  * El censo del 2026-09-05 (informe § 12.4) encontró siete herramientas con el
  * gesto completo y ninguna puerta. La tentación era abrir las siete de golpe.
- * Se ejercitaron una a una en Chrome antes de decidir, y no eran siete casos
- * iguales — abrirle la puerta a dos de ellas habría sido reponer F7 con un
- * botón en vez de con una tecla.
+ * Se ejercitaron una a una en Chrome antes de decidir, y NO eran siete casos
+ * iguales: cinco funcionaban enteras y dos estaban rotas por dentro. Abrirle la
+ * puerta a esas dos ese día habría sido reponer F7 con un botón en vez de con
+ * una tecla.
  *
- * LO QUE SE MIDIÓ, herramienta por herramienta, sobre un rectángulo de 200×150
- * hecho con la herramienta Rectángulo:
+ * LO QUE SE MIDIÓ, herramienta por herramienta, sobre un rectángulo de 200×150:
  *
  *   hand            pan 0,0 → 360,0. Funciona.
  *   slashAndSpread  contorno 5 → 10 comandos. Funciona, con CINCO clics
@@ -28,35 +28,51 @@ import type { DockState } from '../../../store/dockSlice';
  *   trimPlace       coloca el avío. Guardaba el borde CORRIDO UNO (clic arriba
  *                   → `leftEdge`) — arreglado en `edgeInterpolation`.
  *
- *   elastic         dibuja el zigzag y llega al 3D, pero `selectedElasticId`
- *                   no tiene NI UN escritor en todo `src/`: el resalte nunca
- *                   se enciende, no se puede seleccionar y no hay forma de
- *                   borrarlo salvo Ctrl+Z o el copiloto. Es una herramienta de
- *                   solo-crear.
- *   pleat           guarda el pliegue en el store y NADIE lo pinta: cero
- *                   referencias a `project.pleats` en `src/components`.
- *                   Medido además en el navegador: 301 nodos SVG antes del
- *                   clic y 301 después.
+ * Las dos que se quedaron fuera el 05-09 entraron el 06-09, con su deuda pagada
+ * primero. Las dos razones eran ciertas y las dos eran DEFECTOS, no carencias:
  *
- * Las dos que se quedan fuera llevan su razón EJECUTABLE aquí abajo: el día
- * que alguien le dé escritor a `selectedElasticId` o escriba el renderizador
- * de pliegues, este archivo falla y pide que se les abra la puerta. Una deuda
- * escrita así caduca sola; una escrita en prosa se queda para siempre.
+ *   elastic         se creaba y después no se podía seleccionar ni borrar: el
+ *                   resalte leía `editor.selectedElasticId`, un campo de Redux
+ *                   sin UN SOLO escritor en todo `src/`. La selección de verdad
+ *                   vivía en el local de `useElasticTool`, que sí se escribe en
+ *                   cada clic. Ahora el resalte cuelga de ahí y Supr borra el
+ *                   seleccionado — en la CAPTURA, porque `edit.delete` es un
+ *                   atajo global y desde la burbuja Supr habría borrado también
+ *                   la pieza.
+ *   pleat           «nadie lo pinta» era falso, y el guardián que lo certificaba
+ *                   buscaba la palabra equivocada: greppeaba `pleats` en
+ *                   `src/components` cuando el pliegue se pinta INDIRECTAMENTE,
+ *                   como líneas internas de tipo `fold` que `PieceRenderer`
+ *                   dibuja con sus marcas de monte y valle desde siempre.
+ *                   Lo roto estaba antes: `generatePleatFoldLines` rebanaba
+ *                   `outline.slice(segmentRange)`, y un comando `L` lleva su
+ *                   punto FINAL, no el inicial. Un borde de UN comando —los
+ *                   cuatro lados de un rectángulo— daba un punto, y la función
+ *                   devolvía `[]` sin decir nada. La medición del navegador
+ *                   (301 nodos SVG antes del clic y 301 después) era correcta;
+ *                   la explicación que le pusimos, no.
+ *
+ * Lo que vigila que ninguna de las dos deudas vuelva ya no es una cadena de
+ * texto en este archivo: son dos tests de comportamiento,
+ * `el-elastico-se-selecciona-y-se-borra.test.tsx` y `el-pliegue-se-dibuja.test.ts`.
+ * Una razón en prosa se queda escrita aunque se pague; una en código, no.
  */
 
 const RAIZ = process.cwd();
 const ids = DOCK_2D_CATALOG.map((t) => t.id);
 
-/** Las cinco que se abren, con el nombre que María va a leer. */
+/** Las siete, con el nombre que María va a leer. */
 const SE_ABREN: Record<string, string> = {
   hand: 'Mano',
   measureCurve: 'Medir el borde',
   compareCurves: 'Comparar largos',
   slashAndSpread: 'Abrir la pieza',
   trimPlace: 'Poner avío',
+  elastic: 'Elástico',
+  pleat: 'Pliegue',
 };
 
-describe('las cinco puertas que se abren', () => {
+describe('las siete puertas que se abren', () => {
   it.each(Object.entries(SE_ABREN))('%s entra al catálogo del dock', (id) => {
     expect(ids, `${id} sigue sin puerta`).toContain(id);
   });
@@ -109,62 +125,29 @@ describe('las cinco puertas que se abren', () => {
   });
 });
 
-describe('las dos que se quedan cerradas, con la razón ejecutable', () => {
-  it('elastic sigue sin escritor de selección: es de solo-crear', () => {
-    // El día que alguien escriba `state.selectedElasticId =` en un reducer,
-    // el elástico se podrá seleccionar y borrar, y entonces MERECE puerta.
-    // Que este test falle ese día es el recordatorio.
-    const slice = readFileSync(join(RAIZ, 'src/store/editorSlice.ts'), 'utf8');
-    const escritores = slice.match(/state\.selectedElasticId\s*=/g) ?? [];
-    expect(
-      escritores.length,
-      'selectedElasticId ya se escribe: el elástico se puede seleccionar, ábrele la puerta',
-    ).toBe(0);
-    expect(ids, 'elastic tiene puerta pero todavía no se puede borrar').not.toContain('elastic');
-  });
-
-  it('pleat sigue sin quien lo pinte', () => {
-    // Cero renderizadores leen `project.pleats`. Medido también en el
-    // navegador: el store guarda el pliegue y el SVG no cambia (301 → 301).
-    const pintores: string[] = [];
-    const recorrer = (dir: string) => {
-      for (const entrada of readdirSync(dir, { withFileTypes: true })) {
-        const ruta = join(dir, entrada.name);
-        if (entrada.isDirectory()) {
-          if (entrada.name !== '__tests__') recorrer(ruta);
-        } else if (/\.tsx?$/.test(entrada.name) && /\bpleats\b/.test(readFileSync(ruta, 'utf8'))) {
-          pintores.push(ruta);
-        }
-      }
-    };
-    recorrer(join(RAIZ, 'src/components'));
-    expect(
-      pintores,
-      'alguien ya pinta los pliegues: la herramienta deja rastro y merece puerta',
-    ).toEqual([]);
-    expect(ids, 'pleat tiene puerta pero no dibuja nada').not.toContain('pleat');
-  });
-});
-
 describe('un catálogo más grande no puede borrarle el dock a María', () => {
   it('fijar más del tope no crece la lista en silencio', () => {
-    // El sobre persistido valida `max(MAX_PINNED)`; si se guarda uno más
+    // El sobre persistido valida `max(MAX_DOCK_2D_TOOLS)`; si se guarda uno más
     // grande, al recargar `safeParse` lo rechaza ENTERO y el dock vuelve a las
-    // doce de fábrica. O sea: quien fije 17 pierde TODA su configuración, sin
-    // aviso. Con catorce en el catálogo eso era inalcanzable; con diecinueve
-    // no. El tope es de este lote porque el riesgo lo trae este lote.
+    // doce de fábrica. O sea: quien fije de más pierde TODA su configuración,
+    // sin aviso. Con catorce en el catálogo eso era inalcanzable; con veintiuna
+    // no.
     let estado: DockState = {
       pinnedExtra: { left: [], right: [] },
       signaling: 'subtle',
       tools2d: [...DEFAULT_DOCK_2D_IDS],
     };
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 14; i++) {
       estado = dockReducer(estado, addDockTool(`extra-${i}`));
     }
     expect(estado.tools2d.length).toBeLessThanOrEqual(MAX_DOCK_2D_TOOLS);
   });
 
   it('y el catálogo entero cabe bajo el tope, para que "fijarlo todo" nunca lo rompa', () => {
+    // Si esto falla es que el catálogo creció: sube MAX_DOCK_2D_TOOLS. Un tope
+    // por debajo del catálogo cambia el desastre por un defecto más pequeño
+    // pero igual de mudo — el ＋ de las últimas del personalizador no haría
+    // nada.
     expect(DOCK_2D_CATALOG.length).toBeLessThanOrEqual(MAX_DOCK_2D_TOOLS);
   });
 });

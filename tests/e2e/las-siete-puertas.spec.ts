@@ -1,35 +1,39 @@
 /**
- * Las cinco puertas nuevas, abiertas de verdad en un navegador.
+ * Las siete puertas nuevas, abiertas de verdad en un navegador.
  *
  * El censo del 2026-09-05 encontró siete herramientas con gesto completo y
- * ninguna puerta. Cinco la estrenaron. Este archivo prueba lo que ninguna
- * unitaria puede probar: que María LLEGA — que el botón existe donde se dice,
- * que se puede tocar, y que al tocarlo la herramienta se activa de verdad.
+ * ninguna puerta. Cinco la estrenaron ese día; las otras dos el 06-09, después
+ * de arreglar lo que de verdad las tenía cerradas. Este archivo prueba lo que
+ * ninguna unitaria puede probar: que María LLEGA — que el botón existe donde se
+ * dice, que se puede tocar, y que al tocarlo la herramienta se activa de
+ * verdad.
  *
  * Es la ley de «verificar la puerta, no solo el cuarto»: una unitaria que mira
  * `DOCK_2D_CATALOG` demuestra que la entrada está escrita, no que se alcance.
  *
  * Y mide dos cosas que este mismo cambio pone en riesgo:
  *
- *  - El personalizador pasa de catorce filas a diecinueve. El submenú del logo
+ *  - El personalizador pasa de catorce filas a veintiuna. El submenú del logo
  *    se salió de la pantalla con menos (#1095) y nadie lo vio hasta medirlo.
  *  - La pista de «Abrir la pieza» tiene que caber. En su primera redacción
  *    ocupaba 883 px y arrancaba en x = −101 a 1366×643: el hallazgo F2 del
  *    informe, repuesto por nuestra propia mano. Ahora va por fases.
  */
 import { test, expect, Page } from '@playwright/test';
-import { dispatch, st, toScreen } from './helpers/lienzo';
+import { addPiece, clickAt, dispatch, st, toScreen } from './helpers/lienzo';
 
 /** El viewport real del Chrome de María, medido en #1095. */
 const MARIA = { width: 1366, height: 643 };
 
 /** id → la etiqueta que María lee. */
-const LAS_CINCO: Array<[string, string]> = [
+const LAS_SIETE: Array<[string, string]> = [
   ['hand', 'Mano'],
   ['measureCurve', 'Medir el borde'],
   ['compareCurves', 'Comparar largos'],
   ['slashAndSpread', 'Abrir la pieza'],
   ['trimPlace', 'Poner avío'],
+  ['elastic', 'Elástico'],
+  ['pleat', 'Pliegue'],
 ];
 
 async function abrirApp(page: Page) {
@@ -48,11 +52,11 @@ const abrirPersonalizador = async (page: Page) => {
   await page.waitForTimeout(300);
 };
 
-test.describe('las cinco puertas se alcanzan', () => {
+test.describe('las siete puertas se alcanzan', () => {
   test.use({ viewport: MARIA });
   test.setTimeout(120_000);
 
-  for (const [id, etiqueta] of LAS_CINCO) {
+  for (const [id, etiqueta] of LAS_SIETE) {
     test(`«${etiqueta}» se añade al dock y su botón activa ${id}`, async ({ page }) => {
       await abrirApp(page);
       await abrirPersonalizador(page);
@@ -97,7 +101,7 @@ test.describe('las cinco puertas se alcanzan', () => {
     });
   }
 
-  test('el personalizador entero cabe en la pantalla con sus diecinueve filas', async ({ page }) => {
+  test('el personalizador entero cabe en la pantalla con sus veintiuna filas', async ({ page }) => {
     await abrirApp(page);
     await abrirPersonalizador(page);
 
@@ -115,7 +119,7 @@ test.describe('las cinco puertas se alcanzan', () => {
     });
 
     expect(medida, 'no se abrió el personalizador').not.toBeNull();
-    expect(medida!.filas, 'el catálogo no llegó al personalizador').toBeGreaterThanOrEqual(19);
+    expect(medida!.filas, 'el catálogo no llegó al personalizador').toBeGreaterThanOrEqual(21);
     // O cabe entero, o scrollea. Lo que no vale es salirse en silencio, que es
     // exactamente lo que hizo el submenú del logo en #1095.
     const cabe = medida!.top >= 0 && medida!.bottom <= medida!.vh;
@@ -276,7 +280,7 @@ test.describe('el avío se guarda con el nombre que María eligió', () => {
   });
 });
 
-test.describe('un catálogo de diecinueve no puede empujar el dock fuera de la pantalla', () => {
+test.describe('un catálogo de veintiuna no puede empujar el dock fuera de la pantalla', () => {
   test.use({ viewport: MARIA });
   test.setTimeout(120_000);
 
@@ -289,7 +293,7 @@ test.describe('un catálogo de diecinueve no puede empujar el dock fuera de la p
     //
     // Medido: cada herramienta cuesta 43 px y el alto es 80 + 43n. A 1366×643
     // el techo son trece. Con catorce el dock ya mide 682. Este riesgo lo trae
-    // el catálogo de diecinueve, o sea este mismo lote: antes eran catorce y
+    // el catálogo de veintiuna, o sea este mismo lote: antes eran catorce y
     // pasarse era casi imposible.
     await abrirApp(page);
     await page.evaluate(() => {
@@ -336,11 +340,138 @@ test.describe('un catálogo de diecinueve no puede empujar el dock fuera de la p
       `el dock se sale (${medida!.top}→${medida!.bottom} de ${medida!.vh})`,
     ).toBe(true);
     // Y si no cabe todo dentro, que scrollee — la barra ES la señal.
-    expect(medida!.scrollea, 'con diecinueve fijadas el dock debería poder scrollear').toBe(true);
+    expect(medida!.scrollea, 'con veintiuna fijadas el dock debería poder scrollear').toBe(true);
     expect(
       medida!.fuera,
       `estos botones del dock quedan fuera de la pantalla (dock ${medida!.top}→${medida!.bottom} de ${medida!.vh})`,
     ).toEqual([]);
     expect(medida!.inalcanzables, 'estos botones están dentro pero tapados').toEqual([]);
+  });
+});
+
+test.describe('las dos que estaban rotas por dentro', () => {
+  test.use({ viewport: MARIA });
+  test.setTimeout(150_000);
+
+  /** Una pieza dibujada por María, con sus bordes detectados por `addPiece`. */
+  async function unRectangulo(page: Page) {
+    await abrirApp(page);
+    await addPiece(page, 'p1', { x: 120, y: 140 }, 200, 150);
+    await expect.poll(async () => (await st(page)).project.pieces.length, { timeout: 5000 }).toBe(1);
+  }
+
+  /** El borde de ARRIBA de esa pieza, en coordenadas de patrón. */
+  const bordeDeArriba = { x: 220, y: 140 };
+
+  test('Pliegue: el clic deja dobleces en el patrón, y antes no dejaba nada', async ({ page }) => {
+    // La medición del 05-09 dio 301 nodos SVG antes del clic y 301 después, y
+    // la leímos como «nadie pinta los pliegues». El renderizador estaba bien:
+    // `generatePleatFoldLines` devolvía cero líneas en CUALQUIER borde de un
+    // comando, o sea los cuatro lados de un rectángulo. Este test mide las dos
+    // cosas —el dato y el dibujo— porque el fallo viejo pasaba la primera.
+    await unRectangulo(page);
+    await dispatch(page, 'editor/setActiveTool', 'pleat');
+    await dispatch(page, 'tools/setActiveTool2D', 'pleat');
+    await page.waitForTimeout(300);
+
+    const nodosAntes = await page.evaluate(() => document.querySelectorAll('svg.pattern-svg *').length);
+
+    await clickAt(page, bordeDeArriba);
+    await page.waitForTimeout(400);
+
+    const despues = await page.evaluate(() => ({
+      nodos: document.querySelectorAll('svg.pattern-svg *').length,
+      // los triángulos de monte/valle que PieceRenderer pinta por doblez
+      marcas: document.querySelectorAll('svg.pattern-svg polygon').length,
+    }));
+    const estado = await page.evaluate(() => {
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => {
+        project: { pleats: unknown[]; pieces: Array<{ internals: Array<{ type: string }> }> } } } })
+        .__VINA_STORE__.getState();
+      return {
+        pliegues: s.project.pleats.length,
+        dobleces: s.project.pieces[0].internals.filter((l) => l.type === 'fold').length,
+      };
+    });
+
+    expect(estado.pliegues, 'el pliegue no llegó ni al store').toBe(1);
+    expect(estado.dobleces, 'el pliegue se guardó sin una sola línea de doblez').toBeGreaterThan(0);
+    expect(
+      despues.nodos,
+      `el SVG no cambió: ${nodosAntes} nodos antes y ${despues.nodos} después`,
+    ).toBeGreaterThan(nodosAntes);
+    expect(despues.marcas, 'las líneas están pero sin sus marcas de monte/valle').toBeGreaterThan(0);
+  });
+
+  test('Elástico: se pone, se resalta y Supr lo quita sin llevarse la pieza', async ({ page }) => {
+    // Las dos mitades de su deuda. La segunda importa tanto como la primera:
+    // el Supr del elástico vive en la CAPTURA, y si se quedara el evento sin
+    // tener sujeto —o si lo dejara pasar teniéndolo— borraría la pieza.
+    await unRectangulo(page);
+    await dispatch(page, 'editor/setActiveTool', 'elastic');
+    await dispatch(page, 'tools/setActiveTool2D', 'elastic');
+    await page.waitForTimeout(300);
+
+    await clickAt(page, bordeDeArriba);
+    await page.waitForTimeout(300);
+
+    const puesto = await page.evaluate(() => {
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => {
+        project: { elastics: unknown[]; pieces: unknown[] } } } }).__VINA_STORE__.getState();
+      return { elasticos: s.project.elastics.length, piezas: s.project.pieces.length };
+    });
+    expect(puesto.elasticos, 'el elástico no se creó').toBe(1);
+
+    // El resalte: antes leía un campo de Redux sin escritores y no se encendía
+    // nunca. Ahora cuelga del local, así que TIENE que estar pintado.
+    const resaltado = await page.evaluate(
+      () => document.querySelectorAll('svg.pattern-svg [data-elastic-selected="true"], svg.pattern-svg .elastic--selected').length,
+    );
+
+    await page.mouse.move(200, 300);
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(400);
+
+    const tras = await page.evaluate(() => {
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => {
+        project: { elastics: unknown[]; pieces: unknown[] } } } }).__VINA_STORE__.getState();
+      return { elasticos: s.project.elastics.length, piezas: s.project.pieces.length };
+    });
+
+    expect(tras.elasticos, 'Supr no borró el elástico').toBe(0);
+
+    expect(tras.piezas, 'Supr se llevó la pieza además del elástico').toBe(puesto.piezas);
+    // El resalte se mide después de comprobar el borrado para no bloquear lo
+    // importante si el marcador cambia de nombre; si es cero, se dice.
+    expect(resaltado, 'el elástico seleccionado no se resalta en el lienzo').toBeGreaterThan(0);
+  });
+
+  test('Elástico: también en el lado de cierre, que es el que no se dibujaba', async ({ page }) => {
+    // El hermano del defecto del pliegue, buscado a propósito. `extractSegments`
+    // compara la `Z` contra su propio índice y el productor etiqueta el tramo de
+    // cierre con el de la `M`: el elástico del lado IZQUIERDO se guardaba en el
+    // store y no pintaba ni un trazo.
+    await unRectangulo(page);
+    await dispatch(page, 'editor/setActiveTool', 'elastic');
+    await dispatch(page, 'tools/setActiveTool2D', 'elastic');
+    await page.waitForTimeout(300);
+
+    await clickAt(page, { x: 120, y: 215 });   // el lado izquierdo, a media altura
+    await page.waitForTimeout(400);
+
+    const puesto = await page.evaluate(() => {
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => {
+        project: { elastics: Array<{ edgeName: string }> } } } }).__VINA_STORE__.getState();
+      return s.project.elastics.map((e) => e.edgeName);
+    });
+    expect(puesto, 'no se puso elástico en el lado izquierdo').toHaveLength(1);
+
+    const trazos = await page.evaluate(
+      () => document.querySelectorAll('svg.pattern-svg [data-elastic-id] path').length,
+    );
+    expect(
+      trazos,
+      `el elástico de «${puesto[0]}» está en el store y no dibuja nada`,
+    ).toBeGreaterThan(0);
   });
 });
