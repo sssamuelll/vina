@@ -70,6 +70,7 @@ const NOMBRES: Record<string, string> = {
   topstitchSeamline: 'Pespunte sobre costura',
   topstitchSegment: 'Pespunte por tramo',
   trace: 'Trazar',
+  triangle: 'Triángulo',
   trimPlace: 'Poner avío',
   transform: 'Transformar patrón',
   walkSeam: 'Recorrer costura',

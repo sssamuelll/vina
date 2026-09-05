@@ -224,3 +224,20 @@ export function PliegueIcon(props: GlifoProps) {
     </Glifo>
   );
 }
+
+/**
+ * Triángulo: el contorno que la herramienta deja en el patrón (#1111,
+ * tanda 8). Aquí el glifo es literal, no una metáfora — es la misma regla que
+ * ya sigue el Círculo, cuyo icono de dock también dibuja círculo por círculo.
+ *
+ * Ápice arriba-centro y base abajo: la misma orientación fija del isósceles
+ * por defecto, para que el icono no prometa un ángulo que la herramienta no
+ * dibuja de entrada.
+ */
+export function TrianguloIcon(props: GlifoProps) {
+  return (
+    <Glifo {...props}>
+      <path d="M12 4 20 20 4 20Z" />
+    </Glifo>
+  );
+}

@@ -33,13 +33,14 @@ const MAX_PINNED = 16;
  * la lista: le borra a María TODA su configuración, sin avisar. Con catorce en
  * el catálogo el tope era inalcanzable; con veintiuna no.
  *
- * Por qué 21 y no 16: tiene que caber el catálogo COMPLETO. Un tope por debajo
+ * Por qué 22 y no 16: tiene que caber el catálogo COMPLETO. Un tope por debajo
  * cambia el desastre por un defecto más pequeño pero igual de mudo — el botón
  * «añadir» de las últimas del personalizador no haría nada. Si el catálogo
  * crece por encima de esto, hay que subirlo: lo pide un aserto de
- * `las-siete-puertas-que-se-abren.test.ts`.
+ * `las-siete-puertas-que-se-abren.test.ts`. Subido de 21 a 22 en la tanda 8
+ * (#1111): el triángulo, hermano del círculo, entró al catálogo con puerta.
  */
-export const MAX_DOCK_2D_TOOLS = 21;
+export const MAX_DOCK_2D_TOOLS = 22;
 const MAX_ID_LEN = 80;
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 

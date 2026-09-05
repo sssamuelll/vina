@@ -66,11 +66,12 @@ export interface Sujeto {
   lineaDeSujeto: string | null;
 }
 
-const CON_COTAS_DE_PIEZA: ReadonlySet<Tool2D> = new Set<Tool2D>(['select', 'transform', 'rectangle', 'circle']);
+const CON_COTAS_DE_PIEZA: ReadonlySet<Tool2D> = new Set<Tool2D>(['select', 'transform', 'rectangle', 'circle', 'triangle']);
 
 /** Las que crean una pieza arrastrando: la recién nacida sale caliente y sus
- *  cotas escriben el default de la próxima (#1111 le dio la del círculo). */
-const CREAN_EN_CALIENTE: ReadonlySet<Tool2D> = new Set<Tool2D>(['rectangle', 'circle']);
+ *  cotas escriben el default de la próxima (#1111 le dio la del círculo y la
+ *  del triángulo). */
+const CREAN_EN_CALIENTE: ReadonlySet<Tool2D> = new Set<Tool2D>(['rectangle', 'circle', 'triangle']);
 
 /**
  * Las cuatro herramientas 2D que toman el sujeto de la SELECCIÓN y no del
