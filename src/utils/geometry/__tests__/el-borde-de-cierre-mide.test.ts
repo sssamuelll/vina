@@ -217,3 +217,36 @@ describe('el borde que se nombra es el borde que se dibuja', () => {
     }
   });
 });
+
+describe('el tramo de cierre con DOS subcaminos', () => {
+  it('cada subcamino se cierra con SU `Z`, no con la última del contorno', () => {
+    // Una pieza con agujero son dos subcaminos. `rangoMedibleDeBorde` buscaba
+    // la última `Z` hacia atrás, así que el cierre del contorno exterior se
+    // resolvía contra la `Z` del interior: el elástico y el pliegue se
+    // dibujaban sobre un borde ajeno. Lo cazó la revisión adversarial del
+    // 06-09 con este mismo contorno.
+    const dos: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'Z', values: [] },
+      { type: 'M', values: [20, 20] },
+      { type: 'L', values: [40, 20] },
+      { type: 'L', values: [40, 40] },
+      { type: 'Z', values: [] },
+    ];
+    expect(rangoMedibleDeBorde(dos, [0, 1]), 'el exterior se cerró con la Z del interior').toEqual([3, 4]);
+    expect(rangoMedibleDeBorde(dos, [4, 5])).toEqual([7, 8]);
+  });
+
+  it('y un subcamino SIN `Z` se queda como estaba, sin inventarse un cierre', () => {
+    const abierto: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'M', values: [200, 0] },
+      { type: 'L', values: [300, 0] },
+      { type: 'Z', values: [] },
+    ];
+    expect(rangoMedibleDeBorde(abierto, [0, 1]), 'se robó la Z del otro subcamino').toEqual([0, 1]);
+  });
+});

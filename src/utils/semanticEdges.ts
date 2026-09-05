@@ -282,10 +282,51 @@ export function rangoMedibleDeBorde(
   if (!outline || hasta !== desde + 1 || outline[desde]?.type !== 'M') {
     return [desde, hasta];
   }
-  for (let i = outline.length - 1; i > desde; i--) {
+  // Hacia DELANTE hasta la primera `Z`, que es la de este subcamino. Buscar la
+  // última hacia atrás parecía equivalente y no lo es: con dos subcaminos
+  // —una pieza con agujero— devolvía el cierre del OTRO, y el elástico o el
+  // pliegue se dibujaban sobre un borde ajeno. Lo cazó la revisión adversarial
+  // del 06-09, midiéndolo: `M0 L1 L2 Z3 M4 L5 L6 Z7`, el cierre del primer
+  // subcamino daba `[7,8]`.
+  for (let i = desde + 1; i < outline.length; i++) {
+    if (outline[i].type === 'M') break;
     if (outline[i].type === 'Z') return [i, i + 1];
   }
   return [desde, hasta];
+}
+
+/**
+ * El índice de comando TAL COMO LO ETIQUETAN los bordes.
+ *
+ * Hermano de `rangoMedibleDeBorde`, y su inversa: aquel traduce un rango que
+ * apunta a la `M` para poder MEDIR el tramo de cierre; este traduce un índice
+ * que apunta a la `Z` para poder NOMBRARLO.
+ *
+ * Hace falta porque los hit-tests recorren `outline` y devuelven el índice del
+ * comando que dibuja —para el lado de cierre, el de la `Z`— mientras el
+ * productor etiqueta ese mismo tramo con el de la `M` (lore de Fase 3, del que
+ * dependen las esquinas de costura y `outlineRing.ts`). Los dos convenios son
+ * defendibles; lo que no lo es es que nadie los case.
+ *
+ * Lo que costaba, medido el 2026-09-06 sobre un rectángulo: clicar el lado
+ * IZQUIERDO con Elástico o con Pliegue no hacía absolutamente nada.
+ * `resolveEdgeName` caía a `edge-4`, ningún borde se llama así, y los reducers
+ * `addElastic`/`addPleat` se van en silencio si el nombre no existe. Un lado
+ * entero de cualquier pieza, mudo, en tres herramientas.
+ *
+ * Se traduce AL LEER, como el hermano: los consumidores de `resolveEdgeName`
+ * son tres, no los 56 archivos que leen `segmentRange`.
+ */
+export function indiceSegunLosBordes(
+  outline: PathCommand[] | undefined,
+  cmdIndex: number,
+): number {
+  if (!outline || outline[cmdIndex]?.type !== 'Z') return cmdIndex;
+  // La `M` que abre el subcamino de esta `Z`.
+  for (let i = cmdIndex - 1; i >= 0; i--) {
+    if (outline[i].type === 'M') return i;
+  }
+  return cmdIndex;
 }
 
 /**

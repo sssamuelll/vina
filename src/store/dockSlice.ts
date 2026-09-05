@@ -31,15 +31,15 @@ const MAX_PINNED = 16;
  * rechaza el sobre ENTERO cuando un campo no valida — `loadDocks` devuelve null
  * y el dock vuelve a las doce de fábrica. O sea que pasarse del tope no recorta
  * la lista: le borra a María TODA su configuración, sin avisar. Con catorce en
- * el catálogo el tope era inalcanzable; con diecinueve no.
+ * el catálogo el tope era inalcanzable; con veintiuna no.
  *
- * Por qué 20 y no 16: tiene que caber el catálogo COMPLETO. Un tope por debajo
+ * Por qué 21 y no 16: tiene que caber el catálogo COMPLETO. Un tope por debajo
  * cambia el desastre por un defecto más pequeño pero igual de mudo — el botón
  * «añadir» de las últimas del personalizador no haría nada. Si el catálogo
  * crece por encima de esto, hay que subirlo: lo pide un aserto de
- * `las-cinco-puertas-que-se-abren.test.ts`.
+ * `las-siete-puertas-que-se-abren.test.ts`.
  */
-export const MAX_DOCK_2D_TOOLS = 20;
+export const MAX_DOCK_2D_TOOLS = 21;
 const MAX_ID_LEN = 80;
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 

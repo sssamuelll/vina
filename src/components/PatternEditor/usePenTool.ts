@@ -1,8 +1,12 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { Point2D, PathCommand, PatternPiece } from '../../types/types';
 import { screenToPattern } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
 import { polarOf, polarPoint } from './polyPenGeometry';
+import { buildSnapIndex, resolveSnap, verticesVisibles } from './snapIndex';
+import type { SnapTarget } from './snapIndex';
+import { EDGE_HIT_PX } from './gestureConstants';
+import { screenToPatternLength } from '../../utils/geometry';
 import { pushJournal } from '../../utils/telemetry/journal';
 import { isDrag } from './gestureConstants';
 
@@ -22,7 +26,7 @@ export interface PenNode {
   handleOut: Point2D | null;
 }
 
-/** El panel "Siguiente punto" abierto: desde dónde y con qué prefijado. */
+/** El tramo congelado con Tab: desde dónde y con qué par prefijado (#1129). */
 export interface NextPointState {
   from: Point2D;
   lengthMm: number;
@@ -38,22 +42,49 @@ interface PenState {
   /** Is the path closed? */
   isClosed: boolean;
   nextPoint: NextPointState | null;
+  /**
+   * Sube en cada Tab. La abre-el-chip de `PatternEditor` se enganchaba a la
+   * posición del tramo, y `openNextPoint` conserva `from` mientras no se
+   * coloque un punto: pulsar Tab una segunda vez no reabría el chip y, como el
+   * router ya había hecho `preventDefault`, el Tab nativo tampoco navegaba.
+   * Tecla muerta.
+   */
+  nextPointSeq: number;
 }
 
-const CLOSE_THRESHOLD = 12; // px — snap to first node to close
+// El radio de cierre es el MISMO que el del enganche. El spec de la línea
+// interna (2026-08-29 § 7) ya lo había decidido — «cierre | 12 px | 12 px,
+// ahora EDGE_HIT_PX (sin cambio de valor)»— y se quedó sin hacer: había un 12
+// literal aquí. Un solo radio para todo el enganche era el punto entero de esa
+// decisión, y con la pluma enganchando de verdad (#1102) ya no es cosmético:
+// dos radios distintos en la misma herramienta se notan.
 
-const EMPTY: PenState = { nodes: [], isDragging: false, cursorPos: null, isClosed: false, nextPoint: null };
+const EMPTY: PenState = { nodes: [], isDragging: false, cursorPos: null, isClosed: false, nextPoint: null, nextPointSeq: 0 };
+
+/** Identidad estable: un `[]` nuevo por render reharía el índice en cada frame. */
+const VACIO: PatternPiece[] = [];
 
 export function usePenTool(
   zoom: number,
   pan: Point2D,
   onComplete: (piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => void,
+  /**
+   * Piezas VISIBLES en orden de dibujo, para enganchar (#1102). Opcional para
+   * que los tests viejos de la pluma —que la prueban como creadora de piezas
+   * desde la nada— sigan valiendo tal cual.
+   */
+  pieces: PatternPiece[] = VACIO,
 ) {
   const [state, setState] = useState<PenState>(EMPTY);
+  const [hover, setHover] = useState<SnapTarget | null>(null);
   const nodesRef = useRef<PenNode[]>([]);
   nodesRef.current = state.nodes;
   const cursorRef = useRef<Point2D | null>(null);
   cursorRef.current = state.cursorPos;
+  // Espejo del par congelado: `handleKeyDown` es un callback estable y no
+  // puede leer `state` sin recrearse en cada tecla.
+  const nextPointRef = useRef<NextPointState | null>(null);
+  nextPointRef.current = state.nextPoint;
   const pressRef = useRef<{ screen: Point2D; moved: boolean } | null>(null);
 
   /** Convert screen coords to pattern space */
@@ -62,6 +93,13 @@ export function usePenTool(
       screenToPattern(screenX, screenY, svgRect, zoom, pan),
     [zoom, pan],
   );
+
+  // Caro: se rehace solo cuando cambian las piezas, no por evento de ratón.
+  const indice = useMemo(() => buildSnapIndex(pieces), [pieces]);
+  const radio = useCallback(() => screenToPatternLength(EDGE_HIT_PX, zoom), [zoom]);
+  // Lo que se pinta sale del MISMO índice que engancha: si divergieran, el
+  // dibujo estaría prometiendo puntos que no atraen.
+  const verticesDePiezas = useMemo(() => verticesVisibles(indice), [indice]);
 
   /** Distance between two points */
   const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -134,6 +172,11 @@ export function usePenTool(
       ...draftedPieceDefaults(),
     });
     pressRef.current = null;
+    // El anillo de enganche también se apaga: si no, cerrar una pieza lo deja
+    // pintado sobre el último objetivo hasta el siguiente movimiento del ratón,
+    // y volver a la pluma lo enseña apuntando a donde estuvo el cursor hace
+    // tres gestos.
+    setHover(null);
     setState(EMPTY);
   }, [nodesToCommands, onComplete]);
 
@@ -144,26 +187,37 @@ export function usePenTool(
     const pt = toPattern(e.clientX, e.clientY, rect);
     const nodes = nodesRef.current;
 
-    // Check if closing the path (clicking near first node)
+    // Cerrar gana al enganche: si no, no se podría cerrar un trazo encima de
+    // una pieza, que es donde más se dibuja.
     if (nodes.length > 2) {
       const first = nodes[0].anchor;
-      if (dist(pt, first) * zoom < CLOSE_THRESHOLD) {
+      // `<=`, igual que el enganche (`snapIndex` compara `<= radius`). Con `<`,
+      // a EXACTAMENTE 12 px el enganche disparaba y el cierre no: el clic
+      // colocaba un nodo encima del primero en vez de cerrar la pieza. Un
+      // valor de ancho, pero es el caso que unificar la constante venía a
+      // quitar.
+      if (dist(pt, first) * zoom <= EDGE_HIT_PX) {
         pushJournal('gesture', 'pen:press', { closes: true, nodes: nodes.length });
         complete(nodes, true);
         return;
       }
     }
 
-    // Add new node
-    pushJournal('gesture', 'pen:press', { closes: false, nodes: nodes.length + 1 });
-    const newNode: PenNode = { anchor: pt, handleIn: null, handleOut: null };
+    // El nodo cae donde hay algo que enganchar, y si no, donde ella clicó
+    // (#1102 [11:23]: «si yo ahora quiero crear una línea nueva que empiece
+    // desde aquí»). La pluma sigue creando piezas desde la nada: sin objetivo
+    // no hay imán.
+    const enganche = resolveSnap(indice, pt, radio());
+    const anchor = enganche?.point ?? pt;
+    pushJournal('gesture', 'pen:press', { closes: false, nodes: nodes.length + 1, snap: enganche?.kind ?? null });
+    const newNode: PenNode = { anchor, handleIn: null, handleOut: null };
     pressRef.current = { screen: { x: e.clientX, y: e.clientY }, moved: false };
     setState(prev => ({
       ...prev,
       nodes: [...prev.nodes, newNode],
       isDragging: false,
     }));
-  }, [toPattern, zoom, complete]);
+  }, [toPattern, zoom, complete, indice, radio]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;
@@ -173,6 +227,11 @@ export function usePenTool(
     if (press && !press.moved && isDrag(e.clientX - press.screen.x, e.clientY - press.screen.y)) {
       press.moved = true;
     }
+
+    // El aviso de enganche. Sin esto el imán existe y es invisible, que es la
+    // mitad literal de #1102 («no se está iluminando»). Durante un arrastre no:
+    // ahí se están dibujando manijas, no eligiendo dónde cae el nodo.
+    setHover(press?.moved ? null : resolveSnap(indice, pt, radio()));
 
     setState(prev => {
       if (press?.moved && prev.nodes.length > 0) {
@@ -193,7 +252,7 @@ export function usePenTool(
       }
       return { ...prev, cursorPos: pt };
     });
-  }, [toPattern]);
+  }, [toPattern, indice, radio]);
 
   const handleMouseUp = useCallback(() => {
     pressRef.current = null;
@@ -202,6 +261,7 @@ export function usePenTool(
 
   /** Clear any in-progress stroke (used when switching away from the tool). */
   const reset = useCallback(() => {
+    setHover(null);
     pressRef.current = null;
     setState(EMPTY);
   }, []);
@@ -213,31 +273,40 @@ export function usePenTool(
     if (nodes.length >= 2) {
       const a = nodes[nodes.length - 1].anchor;
       const b = nodes[nodes.length - 2].anchor;
-      if (dist(a, b) * zoom < CLOSE_THRESHOLD) nodes = nodes.slice(0, -1);
+      if (dist(a, b) * zoom < EDGE_HIT_PX) nodes = nodes.slice(0, -1);
     }
     if (nodes.length < 2) return;
     complete(nodes, false);
   }, [zoom, complete]);
 
-  // ─── Siguiente punto (spec 2026-08-29 § 7.2) ─────────────────────────────
+  // ─── El tramo en curso, congelado (cotas vivas § 5.4, #1129) ─────────────
 
-  /** Tab: abre el panel prefijado con la goma (último nodo → cursor). */
+  /** Tab: congela el tramo, prefijado con la goma (último nodo → cursor). */
   const openNextPoint = useCallback(() => {
     const nodes = nodesRef.current;
     if (nodes.length === 0) return;
     const from = nodes[nodes.length - 1].anchor;
     const cursor = cursorRef.current ?? from;
     const { lengthMm, angleDeg } = polarOf(from, cursor);
-    setState(prev => ({ ...prev, nextPoint: { from, lengthMm, angleDeg } }));
+    setState(prev => ({ ...prev, nextPoint: { from, lengthMm, angleDeg }, nextPointSeq: prev.nextPointSeq + 1 }));
+  }, []);
+
+  /**
+   * Reescribe el par pendiente SIN colocar (#1129). Es lo que hace Tab dentro
+   * de un chip: pasa de Largo a Angulo conservando lo escrito. Enter, en
+   * cambio, va por `placePolar`.
+   */
+  const setNextPointValues = useCallback((lengthMm: number, angleDeg: number) => {
+    setState(prev => (prev.nextPoint ? { ...prev, nextPoint: { ...prev.nextPoint, lengthMm, angleDeg } } : prev));
   }, []);
 
   const closeNextPoint = useCallback(() => {
-    // Escape y "Cerrar" nacen dentro del panel: invisibles para el router.
+    // Soltar el congelado sin tocar el trazo: el primer peldaño del Escape.
     pushJournal('gesture', 'pen:nextPoint', { op: 'close' });
     setState(prev => (prev.nextPoint ? { ...prev, nextPoint: null } : prev));
   }, []);
 
-  /** Coloca un nodo esquina a largo y ángulo del último; el panel sigue abierto desde el nuevo. */
+  /** Coloca un nodo esquina a largo y ángulo del último; el par se re-ancla al nuevo. */
   const placePolar = useCallback((lengthMm: number, angleDeg: number) => {
     if (nodesRef.current.length === 0) return;
     pushJournal('gesture', 'pen:nextPoint', { op: 'place', length: lengthMm, angle: angleDeg, nodes: nodesRef.current.length + 1 });
@@ -249,7 +318,17 @@ export function usePenTool(
       return {
         ...prev,
         nodes: [...prev.nodes, node],
-        nextPoint: prev.nextPoint ? { ...prev.nextPoint, from: anchor } : prev.nextPoint,
+        // Re-ancla al nodo nuevo Y conserva el par que se acaba de colocar.
+        // Antes conservaba el par ANTERIOR: tras escribir 80/90 y Enter, el
+        // chip del ángulo volvía a 0 y repetir el mismo tramo con otro Enter
+        // colocaba un tramo distinto. Encadenar es el punto de esta gramática.
+        nextPoint: prev.nextPoint ? { from: anchor, lengthMm, angleDeg } : prev.nextPoint,
+        // La secuencia sube también al COLOCAR, no solo al congelar: colocar
+        // re-ancla el par al nodo nuevo y el chip de Largo tiene que reabrirse
+        // para que el encadenado siga («80/90, Enter, 50/0, Enter»). Engancharla
+        // solo al Tab arreglaba la tecla muerta y rompía esto — lo cazó el gate
+        // de e2e en el mismo empujón.
+        nextPointSeq: prev.nextPoint ? prev.nextPointSeq + 1 : prev.nextPointSeq,
       };
     });
   }, []);
@@ -263,6 +342,12 @@ export function usePenTool(
     const nodes = nodesRef.current;
     switch (e.key) {
       case 'Escape':
+        // Peldaño nuevo (#1129): con el tramo congelado, Escape lo SUELTA y el
+        // trazo sigue vivo — «vuelve a seguir al cursor», spec de cotas vivas
+        // § 5.4. Antes esto no existía porque el Escape del panel nacía DENTRO
+        // del panel y el router no lo veía; los chips sí están en el lienzo, y
+        // sin este peldaño Escape se llevaba el trazo entero por delante.
+        if (nextPointRef.current) { closeNextPoint(); return true; }
         if (nodes.length === 0) return false;
         setState(EMPTY);
         return true;
@@ -283,7 +368,7 @@ export function usePenTool(
       default:
         return false;
     }
-  }, [complete, openNextPoint]);
+  }, [complete, openNextPoint, closeNextPoint]);
 
   // ¿El próximo clic cierra el contorno? Mismo umbral que el snap real de
   // handleMouseDown — el aviso y el comportamiento no pueden discrepar
@@ -292,7 +377,7 @@ export function usePenTool(
     state.nodes.length > 2 &&
     !!state.cursorPos &&
     !state.isClosed &&
-    dist(state.cursorPos, state.nodes[0].anchor) * zoom < CLOSE_THRESHOLD;
+    dist(state.cursorPos, state.nodes[0].anchor) * zoom < EDGE_HIT_PX;
 
   // Distance from last node to cursor for dimension label. Se apaga cuando
   // el cierre está armado: en ese momento la medida es ruido y era
@@ -312,7 +397,12 @@ export function usePenTool(
     previewPath: buildPreviewPath(),
     guidePath: buildGuidePath(),
     lastPointDistance,
+    /** Lo que el próximo clic va a enganchar, para que el overlay lo anuncie. */
+    hover,
+    /** Los vértices de las piezas visibles — #1102 [11:38]. */
+    verticesDePiezas,
     nextPoint: state.nextPoint,
+    nextPointSeq: state.nextPointSeq,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
@@ -320,6 +410,7 @@ export function usePenTool(
     handleKeyDown,
     openNextPoint,
     closeNextPoint,
+    setNextPointValues,
     placePolar,
     reset,
   };

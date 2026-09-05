@@ -1,7 +1,7 @@
 import type { PatternPiece, Point2D } from '../../types/types';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { edgeRangePolyline, closestOnPolyline } from '../../utils/seam';
-import { edgeRangeForCommand } from '../../utils/semanticEdges';
+import { edgeRangeForCommand, indiceSegunLosBordes } from '../../utils/semanticEdges';
 import { pieceLocalToPattern } from './pieceTransform';
 
 // ─── Shared Types ─────────────────────────────────────────────────────────────
@@ -48,8 +48,13 @@ export { screenToPattern } from '../../utils/geometry';
  * Falls back to `edge-{edgeIndex}` if no semantic edge matches.
  */
 export function resolveEdgeName(piece: PatternPiece, edgeIndex: number): string {
+  // El hit-test devuelve el índice del comando que DIBUJA; los bordes etiquetan
+  // el tramo de cierre con el de la `M`. Sin casarlos, clicar el lado izquierdo
+  // de un rectángulo daba `edge-4` y las tres herramientas que llaman aquí
+  // —Elástico, Pliegue, Editar costuras— no hacían nada, sin decirlo.
+  const i = indiceSegunLosBordes(piece.outline, edgeIndex);
   return piece.edges?.find(
-    e => edgeIndex >= e.segmentRange[0] && edgeIndex < e.segmentRange[1],
+    e => i >= e.segmentRange[0] && i < e.segmentRange[1],
   )?.name ?? `edge-${edgeIndex}`;
 }
 

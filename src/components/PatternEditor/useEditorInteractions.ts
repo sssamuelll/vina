@@ -274,6 +274,7 @@ interface ToolHooks {
   elasticTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleKeyDown: (e: KeyboardEvent) => boolean;
   };
 }
 
@@ -463,7 +464,7 @@ export function useEditorInteractions(
     // Quién consumió la tecla, si alguien lo dijo. Solo los tres ganchos cuyo
     // `handleKeyDown` devuelve boolean pueden decirlo; los demás se ven en la
     // bitácora por lo que despachan.
-    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | 'circle' | 'cotas' | null;
+    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | 'circle' | 'cotas' | 'elastic' | null;
     const routeKey = (e: KeyboardEvent): KeyConsumer => {
       // Línea interna: con trazo vivo, Escape / Enter / Retroceso / Supr son
       // del motor. `handleKeyDown` dice si consumió.
@@ -500,6 +501,18 @@ export function useEditorInteractions(
           e.preventDefault();
           e.stopPropagation();
           return 'circle';
+        }
+        return null;
+      }
+      // Elástico: con uno seleccionado, Supr lo borra y Escape lo suelta. Va
+      // aquí y no en la burbuja porque `edit.delete` es un atajo GLOBAL que
+      // corre antes, y desde la burbuja Supr habría borrado la pieza además
+      // del elástico. Sin selección devuelve `false` y el Supr sigue su camino.
+      if (activeTool === 'elastic') {
+        if (elasticTool.handleKeyDown(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return 'elastic';
         }
         return null;
       }
@@ -565,7 +578,7 @@ export function useEditorInteractions(
     };
     window.addEventListener('keydown', onKeyCapture, { capture: true });
     return () => window.removeEventListener('keydown', onKeyCapture, { capture: true });
-  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, cotas]);
+  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, elasticTool, cotas]);
 
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);
@@ -693,9 +706,14 @@ export function useEditorInteractions(
       // (empty canvas, or a node glyph, which lives in the overlay and hangs
       // off no [data-piece-id]) still goes to the tool, so marquee and point
       // dragging are untouched.
+      // Con el botón derecho no se cambia de pieza en edición, por la misma
+      // razón que no se reentra en la que ya está: `enterEdit` resetea el
+      // estado y BORRA la selección de puntos, así que el clic derecho sobre
+      // otra pieza dejaba el menú sin sujeto. La guarda de abajo cubría solo la
+      // mitad del recorrido — lo señaló la revisión adversarial del 06-09.
       const clicked = (e.target as SVGElement)
         .closest('[data-piece-id]')?.getAttribute('data-piece-id');
-      if (clicked && clicked !== editPattern.editingPieceId) {
+      if (e.button === 0 && clicked && clicked !== editPattern.editingPieceId) {
         editPattern.enterEdit(clicked);
         return;
       }
@@ -703,6 +721,16 @@ export function useEditorInteractions(
       if (handled) return;
     }
     if (activeTool === 'editPattern') {
+      // El botón derecho NO cambia de sujeto: pregunta por el que hay. Sin esta
+      // guarda, clicar con el derecho sobre la pieza que ya se está editando
+      // caía aquí —`handleMouseDown` del hook devuelve `false` para cualquier
+      // botón que no sea el izquierdo— y volvía a llamar `enterEdit` sobre la
+      // MISMA pieza, que resetea el estado entero y BORRA la selección de
+      // puntos. Medido el 2026-09-06: los chips del punto pasaban de dos a cero
+      // en el propio clic que iba a abrir su menú, así que «Mover exacto…»
+      // nunca tenía sujeto. Es la puerta de la petición literal de María
+      // [02:34], cerrándose sola al tocarla.
+      if (e.button !== 0) return;
       // Not yet editing — click piece to enter
       const target = e.target as SVGElement;
       const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');

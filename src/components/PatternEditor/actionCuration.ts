@@ -46,7 +46,8 @@ export type ActionId =
   | 'order' | 'layer' | 'lockToggle' | 'activeToggle' | 'groupCreate' | 'addToGroup' | 'removeFromGroup'
   | 'unlinkPieces' | 'selectLinkedPartner' | 'linkSymmetry' | 'linkInstance' | 'cloneLinkedSymmetry' | 'cloneLinkedInstance'
   | 'duplicate' | 'duplicateGroup' | 'duplicateAll' | 'rename' | 'properties' | 'select' | 'inspect' | 'selectPieceOfLine' | 'selectSeamA' | 'selectSeamB' | 'zoomToFit' | 'notchExactDistance' | 'saExactWidth'
-  | 'deletePiece' | 'deleteSeam' | 'deleteInternalLine';
+  | 'deletePiece' | 'deleteSeam' | 'deleteInternalLine'
+  | 'moverPuntoExacto';
 
 /** Callbacks que Surface B pasa como props (verbos que no son dispatches puros). */
 export interface CurationCallbacks {
@@ -60,6 +61,8 @@ export interface CurationCallbacks {
   onOpenProperties?: (pieceId: string) => void;
   onOpenSeamAllowanceProperties?: () => void;
   onRefineNotch?: (pieceId: string, line: InternalLine) => void;
+  /** #1112: lleva el foco al primer chip del punto. No abre nada nuevo. */
+  onMoverPuntoExacto?: () => void;
 }
 
 /** Contexto resuelto que consumen gate/label/run/submenu. Lo arma cada superficie
@@ -81,6 +84,13 @@ export interface CurationCtx {
   internalLine: InternalLine | null;
   segmentIndex?: number;
   segmentIsCurve?: boolean;
+  /**
+   * El clic derecho cayó sobre el punto que ya está elegido en «Editar patrón»
+   * (#1112). Un booleano y no un conteo, porque las dos preguntas que había que
+   * hacer son «¿hay UN punto elegido?» —y un punto son varios índices de
+   * comando en el DXF de María— y «¿es ESE el que tengo debajo?».
+   */
+  derechoSobreElPuntoElegido?: boolean;
   clipboard: { pieces: PatternPiece[] } | null;
   groups: PieceGroup[];
   pieces: PatternPiece[];
@@ -289,6 +299,26 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     run: (ctx) => {
       if (ctx.pieceId && ctx.internalLine) ctx.cb.onRefineNotch?.(ctx.pieceId, ctx.internalLine);
     } },
+  /**
+   * #1112, [02:34]: «si yo vuelvo a editar y le doy al clic derecho, como en
+   * CLO me saldría un submenú que diría vale cuánto lo quieres mover en esa
+   * dirección».
+   *
+   * No abre ningún campo nuevo: lleva el foco al primer chip del punto, que ya
+   * está en pantalla con la distancia a su vecino. Es el mismo patrón que
+   * `saExactWidth`, que selecciona y abre donde el número ya vive — «una puerta
+   * más, cero superficie nueva». Un campo dentro del menú rompería el reparto
+   * (el menú es de verbos).
+   *
+   * Va también en `point.segment` y no solo en `point.node` porque el hit-test
+   * del menú marca `segmentIndex` siempre que el clic caiga a ≤8 px de un
+   * tramo, y sobre un vértice esa distancia es cero: clic derecho justo encima
+   * de un punto resuelve `point.segment`. Es el mismo punto fantasma que
+   * `findInsertTarget` ya documenta.
+   */
+  moverPuntoExacto: { id: 'moverPuntoExacto', group: 'transform', icon: '⌖', label: 'Mover exacto…',
+    gate: (ctx) => ctx.derechoSobreElPuntoElegido === true,
+    run: (ctx) => { ctx.cb.onMoverPuntoExacto?.(); } },
   saExactWidth: { id: 'saExactWidth', group: 'transform', icon: '↔', label: 'Ancho exacto…',
     gate: (ctx) => !!ctx.pieceId && !!ctx.saEdgeId,
     run: (ctx) => {
@@ -346,8 +376,8 @@ export const CURATION: CurationRow[] = [
   },
   { targetKind: 'il.dart', stage: '*', altitude: 'body', bar: [], menu: ['optimizeCurves', 'selectPieceOfLine', 'deleteInternalLine'] },
   { targetKind: 'il.other', stage: '*', altitude: 'body', bar: [], menu: ['offsetInternalLine', 'optimizeCurves', 'selectPieceOfLine', 'deleteInternalLine'] },
-  { targetKind: 'point.segment', stage: '*', altitude: 'point', bar: [], menu: ['convertSegment', 'convertSegmentToPoints'] },
-  { targetKind: 'point.node', stage: '*', altitude: 'point', bar: [], menu: [] },
+  { targetKind: 'point.segment', stage: '*', altitude: 'point', bar: [], menu: ['moverPuntoExacto', 'convertSegment', 'convertSegmentToPoints'] },
+  { targetKind: 'point.node', stage: '*', altitude: 'point', bar: [], menu: ['moverPuntoExacto'] },
   { targetKind: 'emptyCanvas', stage: '*', altitude: 'body', bar: [], menu: ['paste', 'pasteMirror', 'zoomToFit'] },
 ];
 

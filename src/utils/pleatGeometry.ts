@@ -9,6 +9,7 @@
 import type { Pleat, PatternPiece, InternalLine, PathCommand } from '../types/types';
 import { MAX_PLEAT_COUNT } from '../types/types';
 import { uid } from './pathHelpers';
+import { interpolateEdgePoint } from './geometry/edgeInterpolation';
 
 // ─── Internal geometry helpers ────────────────────────────────────────────────
 
@@ -18,25 +19,33 @@ interface Point2D {
 }
 
 /**
- * Flatten a slice of PathCommands into a polyline of points.
- * For M and L, the endpoint is values[0], values[1].
- * For C/Q/S/T/A, the endpoint is the last two values (approximation).
- * Z is ignored.
+ * +1 si el contorno gira en el sentido en que `perpendicular` apunta HACIA
+ * DENTRO; -1 si al revés. Fórmula del cordón de zapato sobre las anclas.
+ *
+ * Hace falta porque `perpendicular` rota 90° a un lado fijo y no sabe de
+ * contornos: con un contorno horario —que un DXF puede traer perfectamente,
+ * `polyVertexToPath` conserva el orden del archivo— los pliegues nacían FUERA
+ * de la pieza. El defecto es viejo, pero mientras la función devolvía `[]`
+ * nadie podía verlo; arreglar el silencio sin arreglar esto habría cambiado
+ * «no pasa nada» por «pasa al revés», que es peor de diagnosticar.
+ *
+ * `analyzeOutline` ya calcula esto (`orientation`) y nadie lo consultaba aquí.
+ * Se recalcula en vez de importarlo para no arrastrar el análisis entero por
+ * un signo.
  */
-function flattenCommands(commands: PathCommand[]): Point2D[] {
-  const pts: Point2D[] = [];
-
-  for (const cmd of commands) {
-    if (cmd.type === 'Z') continue;
-
-    if (cmd.values.length >= 2) {
-      const x = cmd.values[cmd.values.length - 2];
-      const y = cmd.values[cmd.values.length - 1];
-      pts.push({ x, y });
-    }
+function sentidoHaciaDentro(outline: PathCommand[]): 1 | -1 {
+  let doble = 0;
+  let prev: Point2D | null = null;
+  let primero: Point2D | null = null;
+  for (const cmd of outline) {
+    if (cmd.type === 'Z' || cmd.values.length < 2) continue;
+    const p = { x: cmd.values[cmd.values.length - 2], y: cmd.values[cmd.values.length - 1] };
+    if (!primero) primero = p;
+    if (prev) doble += prev.x * p.y - p.x * prev.y;
+    prev = p;
   }
-
-  return pts;
+  if (prev && primero) doble += prev.x * primero.y - primero.x * prev.y;
+  return doble >= 0 ? 1 : -1;
 }
 
 /** Euclidean distance between two points */
@@ -137,20 +146,32 @@ export function generatePleatFoldLines(
   pleat: Pleat,
   piece: PatternPiece,
 ): InternalLine[] {
-  // 1. Find the named edge
-  const edge = (piece.edges ?? []).find(e => e.name === pleat.edgeName);
-  if (!edge) return [];
-
-  // 2. Clamp count
+  // 1. Clamp count
   const count = Math.min(pleat.count, MAX_PLEAT_COUNT);
   if (count <= 0) return [];
 
-  // 3. Flatten edge segment into points
-  const [rangeStart, rangeEnd] = edge.segmentRange;
-  const segmentCmds = piece.outline.slice(rangeStart, rangeEnd);
-  const pts = flattenCommands(segmentCmds);
+  // 2. Muestrear el borde nombrado.
+  //
+  // Antes esto rebanaba `outline.slice(segmentRange)` y aplanaba el trozo. Un
+  // comando `L` lleva su punto FINAL, no el inicial, así que un borde de UN
+  // comando —los cuatro lados de un rectángulo lo son— daba un solo punto y la
+  // función devolvía [] sin decir nada. El pliegue no se dibujaba en ningún
+  // borde de ninguna pieza, y el censo del 05-09 leyó ese silencio como
+  // «nadie pinta los pliegues». Sí los pinta: `PieceRenderer` dibuja
+  // `type:'fold'` con sus marcas de monte y valle desde siempre.
+  //
+  // `interpolateEdgePoint` trabaja en espacio de comandos, mide curvas de
+  // verdad y ya resuelve el tramo de cierre (`rangoMedibleDeBorde`), que era
+  // el otro borde roto. Ver `el-pliegue-se-dibuja.test.ts`.
+  const muestrear = (t: number) => interpolateEdgePoint(piece, pleat.edgeName, t);
+  if (!muestrear(0)) return [];
 
-  if (pts.length < 2) return [];
+  // El pliegue entra en la pieza, con el contorno en cualquier sentido.
+  const dentro = sentidoHaciaDentro(piece.outline);
+  const haciaDentro = (v: Point2D): Point2D => {
+    const n = perpendicular(v);
+    return dentro === 1 ? n : { x: -n.x, y: -n.y };
+  };
 
   // 4. Clamp depth to piece bounding box height
   const bboxHeight = outlineBBoxHeight(piece.outline);
@@ -176,11 +197,11 @@ export function generatePleatFoldLines(
 
     if (linesPerRepeat === 1) {
       // Knife: single line at slot midpoint
-      const lineT = slotMid;
-      const { point, tangent } = samplePolyline(pts, lineT);
-      const perp = perpendicular(tangent);
+      const muestra = muestrear(slotMid);
+      if (!muestra) continue;
+      const perp = haciaDentro(muestra.tangent);
 
-      lines.push(buildFoldLine(point, perp, depth, pleat.id, 'mountain'));
+      lines.push(buildFoldLine(muestra.point, perp, depth, pleat.id, 'mountain'));
     } else {
       // Box / Accordion / InvertedBox: two lines per repeat
       // Offset lines symmetrically around slot center
@@ -188,8 +209,9 @@ export function generatePleatFoldLines(
       const tA = slotMid - halfOffset * slotFraction;
       const tB = slotMid + halfOffset * slotFraction;
 
-      const sampA = samplePolyline(pts, tA);
-      const sampB = samplePolyline(pts, tB);
+      const sampA = muestrear(tA);
+      const sampB = muestrear(tB);
+      if (!sampA || !sampB) continue;
 
       let dirA: 'mountain' | 'valley';
       let dirB: 'mountain' | 'valley';
@@ -214,10 +236,10 @@ export function generatePleatFoldLines(
       }
 
       lines.push(
-        buildFoldLine(sampA.point, perpendicular(sampA.tangent), depth, pleat.id, dirA),
+        buildFoldLine(sampA.point, haciaDentro(sampA.tangent), depth, pleat.id, dirA),
       );
       lines.push(
-        buildFoldLine(sampB.point, perpendicular(sampB.tangent), depth, pleat.id, dirB),
+        buildFoldLine(sampB.point, haciaDentro(sampB.tangent), depth, pleat.id, dirB),
       );
     }
   }

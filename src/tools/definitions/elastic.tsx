@@ -20,7 +20,7 @@ const ElasticIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const elasticTool: ToolDefinition = {
   id: 'elastic',
-  name: 'Elastic / Gathering',
+  name: 'Elástico',
   context: '2d',
   icon: ElasticIcon,
   cursor: 'default',

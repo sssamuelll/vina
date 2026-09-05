@@ -25,7 +25,23 @@ export type CotaUpdate =
       fuente: 'tramo' | 'borde' | 'pieza';
       spanIndex?: number;
       width: number;
-    };
+    }
+  /**
+   * El tramo que se está dibujando (#1129). NO es una mutación de proyecto:
+   * todavía no hay objeto que mutar. La resuelve `PatternEditor` contra el hook
+   * de la herramienta viva —`placePolar` si se confirmó con Enter, actualizar
+   * los valores pendientes si fue con Tab—, que es la única forma de que un
+   * chip escriba en un gesto en vez de en Redux.
+   */
+  | { kind: 'tramoEnCurso'; largoMm: number; anguloDeg: number }
+  /**
+   * Mover un nodo del contorno a un punto exacto (#1112). Tampoco escribe el
+   * store: lo aplica `useEditPattern`, que es quien ya lo hace en el arrastre,
+   * con su compensación de pivote, su re-anclado de piquetes y su lote de
+   * deshacer. Un segundo escritor del mismo hecho es el fallo con nombre propio
+   * del repo.
+   */
+  | { kind: 'nodo'; pieceId: string; commandIndex: number; destino: Point2D };
 
 /**
  * Una cota viva (spec 2026-08-30 § 3, § 5): la medida que el objeto enseña
@@ -46,6 +62,16 @@ export interface Cota {
   max: number;
   /** Relleno (mando principal) o hueco (verificación) — § 3.4. */
   primary: boolean;
+  /**
+   * Confirmar con Enter vale aunque el valor no haya cambiado (#1129).
+   *
+   * Para la cota de un objeto, «no cambió → no despacho» es correcto: evita
+   * escribir en el store por nada. Para el tramo en curso NO lo es, porque ahí
+   * confirmar no es una mutación: es la orden de COLOCAR el punto. Sin esto,
+   * María congela el tramo, ve `80 mm / −90°` —que es justo lo que quiere—,
+   * pulsa Enter y no pasa nada: el caso más simple del encadenado, muerto.
+   */
+  confirmaSinCambio?: boolean;
   /** Procedencia visible del número cuando hace falta decirla. */
   rotulo?: string;
   /** Ausente conserva el scrub; `false` deja el chip solo para teclado. */

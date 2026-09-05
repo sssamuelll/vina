@@ -5,6 +5,7 @@
 **Hereda:** `docs/superpowers/specs/2026-08-11-arrastre-unificado-2d-design.md` (la ley, § 3.5, § 7), `.claude/skills/contrato-de-interfaz/SKILL.md`, `docs/superpowers/specs/2026-08-16-barra-opciones-herramienta-design.md`
 **Enmienda:** los tres documentos de § 2.
 **Estado:** v2 tras revisión adversarial (§ 16); pendiente de aprobación de Samuel.
+**Enmendado:** 2026-09-06 — § 5, la fila del enganche de la pluma (#1102). Ver el recuadro.
 
 ---
 
@@ -222,7 +223,43 @@ Es la regla de relleno que `PolyPenToolOverlay.tsx:52` ya aplica, extendida al f
 | arrastre | bezier sin umbral | igual |
 | opciones `smoothing`, `snapGrid`, `constrainAngles` | pintadas, no leídas | **se borran** de la definición y de `tools/README.md:61`. `Shift` = restringir ángulo queda reservada (§ 11) |
 
-La pluma **no** gana enganche ni curva por puntos: crea piezas desde la nada, y el contorno ya tiene curva por puntos por la herramienta Punto.
+~~La pluma **no** gana enganche ni curva por puntos: crea piezas desde la nada, y el contorno ya tiene curva por puntos por la herramienta Punto.~~
+
+> **ENMENDADO el 2026-09-06 (#1102).** La mitad del enganche cae; la de la curva
+> por puntos se mantiene.
+>
+> María, con la herramienta en la mano, audio del 30-08 [11:23]: *«si yo ahora
+> quiero crear una línea nueva que empiece desde aquí, no se está iluminando…
+> para mí estas líneas ahora deberían tener como puntos.»*
+>
+> El razonamiento de arriba era bueno y estaba incompleto. «Crea piezas desde la
+> nada» describe el primer trazo de un proyecto vacío; describe mal el trabajo de
+> ella, que es dibujar una pieza nueva **partiendo de una que ya está en la
+> mesa**. Ahí la pluma no crea desde la nada: crea desde un punto existente, y
+> sin imán ese punto hay que acertarlo a ojo.
+>
+> Lo que se hizo:
+>
+> - El resolutor salió de `usePolyPenTool` a `snapIndex.ts` y la pluma lo lee.
+>   **Un lector más para el que ya estaba bien; los otros veintitrés hit-tests
+>   del lienzo no se tocan** — fundirlos es una L con su propio spec (gramática
+>   de la tanda 6, § 4).
+> - Con eso se salda de paso la deuda de la fila «cierre» de esta misma tabla:
+>   prometía `EDGE_HIT_PX` y en el archivo seguía un `CLOSE_THRESHOLD = 12`
+>   literal. Ahora hay **un solo radio** en la herramienta, que era el punto de
+>   aquella decisión.
+> - Los vértices de las piezas se pintan **solo con la pluma activa**, que es la
+>   segunda mitad literal de la queja [11:38]. Pintarlos siempre es otra cosa y
+>   tiene su issue: #1108.
+> - El cierre gana al enganche cuando compiten: si no, un trazo encima de una
+>   pieza —donde más se dibuja— no se podría cerrar.
+>
+> **La curva por puntos sigue sin ir a la pluma.** Ese medio argumento sigue en
+> pie y nadie lo ha refutado: el contorno ya la tiene por la herramienta Punto.
+>
+> Contrato ejecutable: `src/components/PatternEditor/__tests__/1102-la-pluma-engancha.test.tsx`,
+> escrito con los mismos clics y la misma pieza que el test de enganche de la
+> línea interna — si las dos divergen, es que hay dos resolutores y uno miente.
 
 ---
 

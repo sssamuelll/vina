@@ -1,6 +1,9 @@
+import { memo } from 'react';
 import { Point2D, UnitSystem } from '../../../../types/types';
 import { HANDLE_RADIUS, ANCHOR_RADIUS } from '../../utils';
 import { formatDimension } from '../../../../utils/units';
+import { EDGE_HIT_PX } from '../../gestureConstants';
+import type { SnapTarget } from '../../snapIndex';
 
 interface PenNode {
   anchor: Point2D;
@@ -17,11 +20,70 @@ interface PenToolOverlayProps {
   penDistance: { distance: number; position: Point2D } | null;
   /** El próximo clic cierra el contorno — enciende el anillo del origen (maria-196) */
   penWillClose: boolean;
+  /**
+   * Los vértices de las piezas visibles, en patrón (#1102 [11:38]: «siempre en
+   * los extremos los puntos deberían aparecer»). Solo con la pluma: el gate ya
+   * lo pone `ToolOverlay`, así que aquí no hace falta ningún `if` nuevo.
+   */
+  verticesDePiezas?: Point2D[];
+  /** Lo que el próximo clic va a enganchar (#1102 [11:23]: «no se está iluminando»). */
+  snapHover?: SnapTarget | null;
 }
 
-export default function PenToolOverlay({ zoom2D, units, penNodes, previewPath, guidePath, penDistance, penWillClose }: PenToolOverlayProps) {
+/**
+ * Los puntos de las piezas, ANTES del primer clic. Van fuera del grupo
+ * `pen-wip` a propósito: la queja de María es sobre el momento en que todavía
+ * no ha empezado a dibujar («si yo ahora quiero crear una línea nueva que
+ * empiece desde aquí»), y ese grupo solo existe con un nodo puesto. Salen del
+ * mismo índice que engancha, así que lo que se dibuja y lo que atrae son el
+ * mismo conjunto.
+ *
+ * Memoizado y aparte porque NO dependen del cursor. Dentro del overlay, cada
+ * `mousemove` de la pluma cambia `snapHover` y `previewPath`, y React
+ * reconciliaba de nuevo un círculo por nodo de todas las piezas visibles —
+ * miles con un DXF importado, medido el 06-09. Aquí solo se rehacen cuando
+ * cambian las piezas o el zoom.
+ */
+const VerticesDePiezas = memo(function VerticesDePiezas(
+  { puntos, zoom2D }: { puntos: Point2D[]; zoom2D: number },
+) {
+  if (puntos.length === 0) return null;
+  return (
+    <g className="pen-piece-vertices" pointerEvents="none">
+      {puntos.map((p, i) => (
+        <circle
+          key={i}
+          cx={p.x} cy={p.y} r={ANCHOR_RADIUS * 0.8 / zoom2D}
+          fill="var(--piece-fill-2d)"
+          stroke="var(--accent-2d)"
+          strokeWidth={1 / zoom2D}
+        />
+      ))}
+    </g>
+  );
+});
+
+export default function PenToolOverlay({
+  zoom2D, units, penNodes, previewPath, guidePath, penDistance, penWillClose,
+  verticesDePiezas = [], snapHover = null,
+}: PenToolOverlayProps) {
   return (
     <>
+      <VerticesDePiezas puntos={verticesDePiezas} zoom2D={zoom2D} />
+
+      {/* El anillo de enganche: la misma palabra que la línea interna ya usa
+          para «el próximo clic cae AQUÍ». El del CIERRE es otro y está abajo:
+          uno dice dónde caerá el punto, el otro que la pieza se termina. */}
+      {snapHover && (
+        <circle
+          className="snap-ring"
+          cx={snapHover.point.x} cy={snapHover.point.y}
+          r={(EDGE_HIT_PX / zoom2D) * 0.5}
+          fill="none" stroke="var(--snap-2d)" strokeWidth={2 / zoom2D}
+          pointerEvents="none"
+        />
+      )}
+
       {penNodes.length > 0 && (
         <g className="pen-wip">
           <path

@@ -32,14 +32,16 @@ function idsAlcanzables(): string[] {
  *  del catálogo del dock (lo que ella acaba de clicar) o de la etiqueta que
  *  `shortcuts/defaults.ts` ya traía aprobada. */
 const NOMBRES: Record<string, string> = {
-  // Las cinco de abajo entraron al catálogo el 2026-09-05 (censo de puertas):
-  // tenían gesto y ninguna forma de llegar, así que `idsAlcanzables()` no las
-  // veía y nadie le exigía nombre español a su definición. Al abrirles la
-  // puerta el nombre viene con ellas — es el mismo lote, no un seguimiento.
+  // Siete de las de abajo entraron al catálogo entre el 2026-09-05 y el 06-09
+  // (censo de puertas): tenían gesto y ninguna forma de llegar, así que
+  // `idsAlcanzables()` no las veía y nadie le exigía nombre español a su
+  // definición. Al abrirles la puerta el nombre viene con ellas — es el mismo
+  // lote, no un seguimiento.
   circle: 'Elipse (círculo)',
   compareCurves: 'Comparar largos',
   dart: 'Pinza',
   editConstrain: 'Editar curvatura',
+  elastic: 'Elástico',
   editCurve: 'Editar punto de curva',
   editPattern: 'Editar patrón',
   extendTrim: 'Extender / recortar',
@@ -53,6 +55,7 @@ const NOMBRES: Record<string, string> = {
   offsetOutline: 'Desplazar contorno',
   pen: 'Pluma',
   pin: 'Fijar',
+  pleat: 'Pliegue',
   point: 'Punto',
   pomMeasure: 'Medir POM',
   rectangle: 'Rectángulo',

@@ -15,6 +15,7 @@ import { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../../store';
 import type { Elastic, PathCommand, PatternPiece } from '../../../types/types';
+import { rangoMedibleDeBorde } from '../../../utils/semanticEdges';
 
 // ─── Color map ───────────────────────────────────────────────────────────────
 
@@ -210,7 +211,13 @@ function SingleElastic({ elastic, piece, zoom2D, isSelected }: SingleElasticProp
     const edge = piece.edges?.find(e => e.name === elastic.edgeName);
     if (!edge) return null;
 
-    const [rangeStart, rangeEnd] = edge.segmentRange;
+    // `extractSegments` filtra por índice de comando, que es lo correcto — pero
+    // su rama `Z` compara contra el índice del propio `Z`, y el productor
+    // etiqueta el tramo de cierre con el de la `M`. Sin traducir el rango, el
+    // elástico del lado de cierre —el izquierdo de cualquier rectángulo— no
+    // dibujaba nada. Es el hermano del defecto de los pliegues, encontrado
+    // buscándolo a propósito.
+    const [rangeStart, rangeEnd] = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
     const segments = extractSegments(piece.outline, rangeStart, rangeEnd);
     if (segments.length === 0) return null;
 
@@ -226,13 +233,19 @@ function SingleElastic({ elastic, piece, zoom2D, isSelected }: SingleElasticProp
   if (!pathData) return null;
 
   const color = ELASTIC_COLORS[elastic.type] ?? '#888';
-  const opacity = isSelected ? 0.9 : 0.4;
-  const strokeWidth = 1.5 / zoom2D;
+  // El seleccionado engorda además de subir de tono: la ley de estado del
+  // contrato (§ 4) prohíbe que la selección dependa SOLO del tono, porque a
+  // 16 px y para quien no distingue colores eso no dice nada. Antes la única
+  // diferencia era la opacidad — y como el campo que la decidía no tenía
+  // escritores, nunca llegó a verse ni eso.
+  const opacity = isSelected ? 0.95 : 0.4;
+  const strokeWidth = (isSelected ? 2.5 : 1.5) / zoom2D;
   const offset = piece.position;
 
   return (
     <g
       data-elastic-id={elastic.id}
+      data-elastic-selected={isSelected ? 'true' : 'false'}
       transform={`translate(${offset.x}, ${offset.y})`}
       pointerEvents="none"
     >
@@ -253,12 +266,17 @@ function SingleElastic({ elastic, piece, zoom2D, isSelected }: SingleElasticProp
 
 interface ElasticRendererProps {
   zoom2D: number;
+  /**
+   * Cuál está seleccionado. Llega por prop desde `useElasticTool`, que es quien
+   * lo escribe. Antes esto se leía de `editor.selectedElasticId`, un campo de
+   * Redux sin un solo escritor: el resalte no se encendía nunca.
+   */
+  selectedElasticId: string | null;
 }
 
-export default function ElasticRenderer({ zoom2D }: ElasticRendererProps) {
+export default function ElasticRenderer({ zoom2D, selectedElasticId }: ElasticRendererProps) {
   const elastics = useSelector((s: RootState) => s.project.elastics);
   const pieces = useSelector((s: RootState) => s.project.pieces);
-  const selectedElasticId = useSelector((s: RootState) => s.editor.selectedElasticId);
 
   return (
     <>

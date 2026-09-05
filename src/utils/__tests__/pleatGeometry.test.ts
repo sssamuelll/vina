@@ -34,11 +34,24 @@ function makeSquarePiece(edges: SemanticEdge[] = []): PatternPiece {
   };
 }
 
-/** The "top" edge: indices 0–1 in the outline (M→L along y=0) */
+/**
+ * El borde de arriba, TAL COMO LO EMITE el productor: `[1, 2]`, un solo
+ * comando.
+ *
+ * Decía `[0, 2]`, incluyendo la `M`. `detectSemanticEdges` nunca emite eso —
+ * medido: `topEdge [1,2] · rightEdge [2,3] · bottomEdge [3,4] · leftEdge [0,1]`—
+ * y ese medio comando de más era justo lo que hacía que la función pareciera
+ * funcionar: con dos comandos la rebanada daba dos puntos, y con el rango real
+ * daba uno y la función devolvía `[]` en silencio. Un fixture inventado
+ * certificando una función rota, dos días seguidos y en dos archivos.
+ *
+ * `el-pliegue-se-dibuja.test.ts` no declara bordes: se los pide al productor.
+ * Es el patrón bueno; esto es el archivo viejo con la mentira quitada.
+ */
 const topEdge: SemanticEdge = {
   id: 'edge-top',
   name: 'top',
-  segmentRange: [0, 2], // commands 0 (M 0,0) and 1 (L 100,0)
+  segmentRange: [1, 2], // el comando 1 (L 100,0); el borde arranca donde acaba el 0
   edgeType: 'seam',
 };
 

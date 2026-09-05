@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
-import { addElastic } from '../store/projectSlice';
+import { addElastic, removeElastic } from '../store/projectSlice';
 import type { PatternPiece, Point2D, Elastic } from '../types/types';
 import { ELASTIC_DEFAULTS } from '../types/types';
 import { uid } from '../utils/pathHelpers';
@@ -204,10 +204,58 @@ export function useElasticTool(
     [isActive, toPattern, pieces, zoom2D, elastics, dispatch],
   );
 
+  /**
+   * Supr borra el elástico seleccionado; Escape lo suelta.
+   *
+   * El sujeto vive en el estado LOCAL de este hook, no en Redux, así que el
+   * borrado no puede pasar por `resolverBorrado` (`store/borradoDeSeleccion.ts`),
+   * que solo sabe leer el store. Es la misma familia que el borrado de nodos de
+   * `useEditPattern`: quien tiene la selección es quien la borra.
+   *
+   * Sin sujeto NO se consume: si esta herramienta se quedara el Supr en vacío,
+   * María no podría borrar una pieza con el Elástico activo.
+   *
+   * Devuelve `boolean` —el protocolo de `routeKey`, `useEditorInteractions.ts:114`—
+   * en vez de parar el evento por dentro. Es la diferencia entre que la bitácora
+   * diga `consumedBy: 'elastic'` y que mienta con `null`. Y va en la CAPTURA, no
+   * en la burbuja: `edit.delete` (`shortcuts/defaults.ts:22`) es global y corre
+   * antes que el router de burbuja, así que desde ahí Supr habría borrado la
+   * pieza Y el elástico.
+   */
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent): boolean => {
+      if (!isActive || !selectedElasticId) return false;
+      // El sujeto vive en estado local y NADIE lo sincroniza con el store: tras
+      // un Ctrl+Z que deshaga la creación, el id sigue apuntando a un elástico
+      // que ya no existe. Sin esta comprobación, `handleKeyDown` devolvía
+      // `true`, el router paraba el evento, y Supr dejaba de borrar la PIEZA
+      // seleccionada — muerto y sin explicación hasta pulsar Escape.
+      if (!elastics.some(el => el.id === selectedElasticId)) {
+        setSelectedElasticId(null);
+        return false;
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        dispatch(removeElastic(selectedElasticId));
+        setSelectedElasticId(null);
+        return true;
+      }
+
+      if (e.key === 'Escape') {
+        setSelectedElasticId(null);
+        return true;
+      }
+
+      return false;
+    },
+    [isActive, selectedElasticId, elastics, dispatch],
+  );
+
   return {
     hoveredEdge,
     selectedElasticId,
     handleMouseMove,
     handleMouseDown,
+    handleKeyDown,
   };
 }

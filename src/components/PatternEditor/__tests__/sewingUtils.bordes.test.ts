@@ -118,3 +118,60 @@ describe('#1042 — el hit-test no cambia', () => {
     expect(resolveEdgeName(partida, der.edgeIndex)).toBe('derecha');
   });
 });
+
+/**
+ * El lado de CIERRE tiene nombre, y durante mucho tiempo no lo tuvo.
+ *
+ * Los hit-tests recorren `outline` y devuelven el índice del comando que
+ * DIBUJA el tramo — para el lado de cierre de un rectángulo, el de la `Z`
+ * (índice 4). El productor de bordes etiqueta ese mismo tramo con el índice de
+ * la `M` (0), porque de ese etiquetado dependen las esquinas de costura y
+ * `outlineRing.ts`. Los dos convenios son defendibles; lo que no lo era es que
+ * nadie los casara.
+ *
+ * Medido el 2026-09-06: clicar el lado izquierdo de un rectángulo con Elástico
+ * o con Pliegue no hacía NADA. `resolveEdgeName` devolvía `edge-4`, ningún
+ * borde se llama así, y `addElastic`/`addPleat` se van en silencio cuando el
+ * nombre no existe. Un lado entero de cualquier pieza, mudo, en las tres
+ * herramientas que llaman aquí.
+ */
+describe('resolveEdgeName y el tramo de cierre', () => {
+  const rect: PatternPiece = {
+    id: 'r1', name: 'Rect',
+    outline: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [200, 0] },
+      { type: 'L', values: [200, 150] },
+      { type: 'L', values: [0, 150] },
+      { type: 'Z', values: [] },
+    ],
+    internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+    seamAllowance: 0, layer: 1, sublayer: 0, active: true,
+    edges: [
+      { id: 'a', name: 'topEdge', segmentRange: [1, 2], edgeType: 'seam' },
+      { id: 'b', name: 'rightEdge', segmentRange: [2, 3], edgeType: 'seam' },
+      { id: 'c', name: 'bottomEdge', segmentRange: [3, 4], edgeType: 'seam' },
+      { id: 'd', name: 'leftEdge', segmentRange: [0, 1], edgeType: 'seam' },
+    ] as SemanticEdge[],
+    createdAt: 0, updatedAt: 0,
+  } as unknown as PatternPiece;
+
+  it('los cuatro índices que devuelve un hit-test dan los cuatro nombres', () => {
+    // 1, 2, 3 son los tres lados que dibuja un `L`; 4 es la `Z`.
+    expect(resolveEdgeName(rect, 1)).toBe('topEdge');
+    expect(resolveEdgeName(rect, 2)).toBe('rightEdge');
+    expect(resolveEdgeName(rect, 3)).toBe('bottomEdge');
+    expect(resolveEdgeName(rect, 4)).toBe('leftEdge');
+  });
+
+  it('y ninguno cae al nombre inventado `edge-N`, que es el que nadie encuentra', () => {
+    for (const i of [1, 2, 3, 4]) {
+      expect(resolveEdgeName(rect, i), `el comando ${i} no tiene borde`).not.toMatch(/^edge-\d+$/);
+    }
+  });
+
+  it('sin bordes detectados sigue cayendo al nombre por índice, como siempre', () => {
+    const pelada = { ...rect, edges: [] } as PatternPiece;
+    expect(resolveEdgeName(pelada, 2)).toBe('edge-2');
+  });
+});

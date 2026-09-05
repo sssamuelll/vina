@@ -75,7 +75,10 @@ describe('CotaChip - edición', () => {
     fireEvent.change(input, { target: { value: '300,5' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(p.onCommit).toHaveBeenCalledTimes(1);
-    expect(p.onCommit).toHaveBeenCalledWith(p.cota, 300.5);
+    // El tercer argumento es de #1129: Enter y Tab dejaron de ser lo mismo
+    // porque los chips del tramo en curso los necesitan distintos (Tab salta de
+    // Largo a Ángulo, Enter coloca el punto).
+    expect(p.onCommit).toHaveBeenCalledWith(p.cota, 300.5, 'enter');
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole('button'));
   });
@@ -103,7 +106,7 @@ describe('CotaChip - edición', () => {
     fireEvent.change(input, { target: { value: '150' } });
     const noPrevenido = fireEvent.keyDown(input, { key: 'Tab' });
     expect(noPrevenido).toBe(false);
-    expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ id: 'ancho' }), 150);
+    expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ id: 'ancho' }), 150, 'tab');
     // el vecino abre su edicion, listo para teclear
     const siguiente = screen.getByRole('textbox', { name: 'Alto de la pieza' }) as HTMLInputElement;
     expect(document.activeElement).toBe(siguiente);

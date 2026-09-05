@@ -1,18 +1,17 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
 import type { Point2D, PathCommand, PatternPiece } from '../../types/types';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
-import { patternToPieceLocal, pieceLocalToPattern } from '../../utils/geometry/pieceSpace';
+import { patternToPieceLocal } from '../../utils/geometry/pieceSpace';
 import { pointInPolygon } from '../../utils/geometry/slashAndSpread';
-import { buildRing, projectToRing, type OutlineRing } from '../../utils/geometry/outlineRing';
-import { extractNodes, type EditableNode } from './nodeEditorUtils';
-import { getInternalLineEndpoints } from './internalShapePath';
+import { buildSnapIndex, resolveSnap as resolverEnganche } from './snapIndex';
+import type { SnapTarget } from './snapIndex';
 import { EDGE_HIT_PX, isDrag } from './gestureConstants';
 import { nodesToCommands, polarOf, polarPoint, type PolyPenNode } from './polyPenGeometry';
 import { pushJournal } from '../../utils/telemetry/journal';
 
 export type { PolyPenNode, PolyPenNodeType } from './polyPenGeometry';
 
-/** El panel "Siguiente punto" abierto: desde dónde y con qué prefijado. */
+/** El tramo congelado con Tab: desde dónde y con qué par prefijado (#1129). */
 export interface NextPointState {
   from: Point2D;
   lengthMm: number;
@@ -34,14 +33,10 @@ export interface NextPointState {
  * devuelve si consumió, y solo entonces el router detiene la propagación.
  */
 
-export type SnapKind = 'firstNode' | 'vertex' | 'internalEnd' | 'outline';
-
-export interface SnapTarget {
-  kind: SnapKind;
-  pieceId: string | null;
-  /** Mundo (patrón). */
-  point: Point2D;
-}
+// El enganche vive en `snapIndex.ts` desde el 2026-09-06: lo estrenó esta
+// herramienta y ahora lo lee también la pluma (#1102). Se re-exportan los tipos
+// para no tocar a `PolyPenToolOverlay`, que los importa de aquí.
+export type { SnapKind, SnapTarget } from './snapIndex';
 
 export interface InternalLineToolOptions {
   nodeType: 'straight' | 'curvePoints';
@@ -72,10 +67,11 @@ interface ViewState {
   hostId: string | null;
   closeArmed: boolean;
   nextPoint: NextPointState | null;
+  nextPointSeq: number;
 }
 
 const EMPTY: ViewState = {
-  nodes: [], previewPoint: null, pressPoint: null, isDragging: false, dragHandle: null, hover: null, hostId: null, closeArmed: false, nextPoint: null,
+  nodes: [], previewPoint: null, pressPoint: null, isDragging: false, dragHandle: null, hover: null, hostId: null, closeArmed: false, nextPoint: null, nextPointSeq: 0,
 };
 
 const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -94,42 +90,16 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
   const lastWorldRef = useRef<Point2D | null>(null);
   const hoverRef = useRef<SnapTarget | null>(null);
   const nextPointRef = useRef<NextPointState | null>(null);
+  /** Sube en cada Tab, para que reabrir el chip no dependa de que el tramo se
+   *  haya movido. Hermano del de la pluma (#1129). */
+  const nextPointSeqRef = useRef(0);
   const [view, setView] = useState<ViewState>(EMPTY);
 
   const { pieces } = opts;
 
-  // Memos por identidad de `pieces`, no por evento de mouse (como usePointTool).
-  const nodesByPiece = useMemo(() => {
-    const m = new Map<string, EditableNode[]>();
-    for (const p of pieces) m.set(p.id, extractNodes(p));
-    return m;
-  }, [pieces]);
-
-  const endsByPiece = useMemo(() => {
-    const m = new Map<string, Point2D[]>();
-    for (const p of pieces) {
-      const ends: Point2D[] = [];
-      for (const line of p.internals ?? []) {
-        const ep = getInternalLineEndpoints(line);
-        if (ep) ends.push(ep[0], ep[1]);
-      }
-      m.set(p.id, ends);
-    }
-    return m;
-  }, [pieces]);
-
-  // Anillo pre-aplanado por pieza: proyectar contra él es O(n) por evento.
-  // `snapToEdge` re-aplana el contorno entero por comando y no cabe en un
-  // frame con veinte piezas DXF (revisión Halberg, 2026-08-29).
-  const ringsByPiece = useMemo(() => {
-    const m = new Map<string, OutlineRing>();
-    for (const p of pieces) {
-      if (!p.outline?.length) continue;
-      const built = buildRing(p.outline, 2);
-      if (built.ok) m.set(p.id, built.value);
-    }
-    return m;
-  }, [pieces]);
+  // Un solo memo por identidad de `pieces`: aplanar nodos, extremos de internas
+  // y anillos cuesta, y no puede rehacerse por evento de ratón.
+  const indice = useMemo(() => buildSnapIndex(pieces), [pieces]);
 
   const toWorld = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D =>
@@ -139,44 +109,14 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
 
   const radius = useCallback(() => screenToPatternLength(EDGE_HIT_PX, zoom), [zoom]);
 
-  /** Prioridad de la spec § 4.6; dentro de cada clase, la pieza de arriba primero. */
+  /** El de `snapIndex.ts`, con el primer nodo del trazo vivo como candidato. */
   const resolveSnap = useCallback((world: Point2D, allowFirstNode: boolean): SnapTarget | null => {
-    const r = radius();
     const nodes = nodesRef.current;
-    if (allowFirstNode && nodes.length >= 3 && dist(world, nodes[0].point) <= r) {
-      return { kind: 'firstNode', pieceId: hostRef.current, point: nodes[0].point };
-    }
-    const ps = optsRef.current.pieces;
-    for (let i = ps.length - 1; i >= 0; i--) {
-      const p = ps[i];
-      const local = patternToPieceLocal(world, p);
-      for (const nd of nodesByPiece.get(p.id) ?? []) {
-        if (dist(local, nd.position) <= r) {
-          return { kind: 'vertex', pieceId: p.id, point: pieceLocalToPattern(nd.position, p) };
-        }
-      }
-    }
-    for (let i = ps.length - 1; i >= 0; i--) {
-      const p = ps[i];
-      const local = patternToPieceLocal(world, p);
-      for (const end of endsByPiece.get(p.id) ?? []) {
-        if (dist(local, end) <= r) {
-          return { kind: 'internalEnd', pieceId: p.id, point: pieceLocalToPattern(end, p) };
-        }
-      }
-    }
-    for (let i = ps.length - 1; i >= 0; i--) {
-      const p = ps[i];
-      const ring = ringsByPiece.get(p.id);
-      if (!ring) continue;
-      const local = patternToPieceLocal(world, p);
-      const { point } = projectToRing(ring, local);
-      if (dist(local, point) <= r) {
-        return { kind: 'outline', pieceId: p.id, point: pieceLocalToPattern(point, p) };
-      }
-    }
-    return null;
-  }, [nodesByPiece, endsByPiece, ringsByPiece, radius]);
+    const primero = allowFirstNode && nodes.length >= 3
+      ? { point: nodes[0].point, pieceId: hostRef.current }
+      : null;
+    return resolverEnganche(indice, world, radius(), primero);
+  }, [indice, radius]);
 
   const topmostContaining = useCallback((world: Point2D): string | null => {
     const ps = optsRef.current.pieces;
@@ -201,6 +141,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       hostId: hostRef.current,
       closeArmed: !!press?.closes || hover?.kind === 'firstNode',
       nextPoint: nextPointRef.current,
+      nextPointSeq: nextPointSeqRef.current,
     });
   }, []);
 
@@ -334,7 +275,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     if (nodesRef.current.length >= 2) finish(false);
   }, [finish]);
 
-  // ─── Siguiente punto (spec 2026-08-29 § 7.2) ─────────────────────────────
+  // ─── El tramo en curso, congelado (cotas vivas § 5.4, #1129) ─────────────
 
   /** Tab: abre el panel prefijado con la goma (último nodo → cursor). */
   const openNextPoint = useCallback(() => {
@@ -343,6 +284,19 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const from = nodes[nodes.length - 1].point;
     const { lengthMm, angleDeg } = polarOf(from, lastWorldRef.current ?? from);
     nextPointRef.current = { from, lengthMm, angleDeg };
+    nextPointSeqRef.current += 1;
+    publish();
+  }, [publish]);
+
+  /**
+   * Reescribe el par pendiente SIN colocar (#1129). Es lo que hace Tab dentro
+   * de un chip: pasa de Largo a Angulo conservando lo escrito. Enter, en
+   * cambio, va por `placePolar`.
+   */
+  const setNextPointValues = useCallback((lengthMm: number, angleDeg: number) => {
+    const np = nextPointRef.current;
+    if (!np) return;
+    nextPointRef.current = { ...np, lengthMm, angleDeg };
     publish();
   }, [publish]);
 
@@ -361,7 +315,13 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const from = nodes[nodes.length - 1].point;
     const point = polarPoint(from, lengthMm, angleDeg);
     nodesRef.current = [...nodes, { point, type: optsRef.current.nodeType }];
-    if (nextPointRef.current) nextPointRef.current = { ...nextPointRef.current, from: point };
+    // Re-ancla al nodo nuevo Y conserva el par que se acaba de colocar, para
+    // que encadenar repita el mismo tramo (#1129). Hermano del de la pluma.
+    if (nextPointRef.current) {
+      nextPointRef.current = { from: point, lengthMm, angleDeg };
+      // Colocar también reabre el chip: es lo que sostiene el encadenado.
+      nextPointSeqRef.current += 1;
+    }
     pushJournal('gesture', 'internalShape:nextPoint', { op: 'place', length: lengthMm, angle: angleDeg, nodes: nodes.length + 1 });
     publish();
   }, [publish]);
@@ -371,6 +331,12 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const nodes = nodesRef.current;
     switch (e.key) {
       case 'Escape':
+        // Peldaño nuevo (#1129): con el tramo congelado, Escape lo SUELTA y el
+        // trazo sigue vivo — «vuelve a seguir al cursor», spec de cotas vivas
+        // § 5.4. Antes esto no existía porque el Escape del panel nacía DENTRO
+        // del panel y el router no lo veía; los chips sí están en el lienzo, y
+        // sin este peldaño Escape se llevaba el trazo entero por delante.
+        if (nextPointRef.current) { closeNextPoint(); return true; }
         if (pressRef.current) { cancelPress(); return true; }
         if (nodes.length > 0) { reset(); return true; }
         return false;
@@ -391,7 +357,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       default:
         return false;
     }
-  }, [cancelPress, reset, finish, publish, openNextPoint]);
+  }, [cancelPress, reset, finish, publish, openNextPoint, closeNextPoint]);
 
   const isTracing = useCallback(() => nodesRef.current.length > 0 || pressRef.current !== null, []);
   const isArmed = useCallback(() => pressRef.current !== null, []);
@@ -406,6 +372,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     hostId: view.hostId,
     closeArmed: view.closeArmed,
     nextPoint: view.nextPoint,
+    nextPointSeq: view.nextPointSeq,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
@@ -413,6 +380,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     handleKeyDown,
     openNextPoint,
     closeNextPoint,
+    setNextPointValues,
     placePolar,
     cancelPress,
     reset,

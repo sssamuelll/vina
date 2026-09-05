@@ -107,7 +107,7 @@ describe('ContextMenu curado (Surface B)', () => {
     for (const b of buttons) expect((b.textContent ?? '').trim().length).toBeGreaterThan(0);
   });
 
-  it('point.node (edición de nodos, sin segmento) no monta menú', () => {
+  it('point.node sin punto bajo el cursor no monta menú', () => {
     const { container } = renderMenu(
       { ...base, pieceId: 'p1', isEditingNodes: true, activeTool: 'editPattern' },
       [piece('p1')],
@@ -152,11 +152,54 @@ describe('samuel-214 — el clic derecho con el puntero no se queda mudo', () =>
     expect(screen.getByText('Ajustar zoom al patrón')).toBeTruthy();
   });
 
-  it('dentro de Editar patrón el menú de nodo sigue mudo, como estaba', () => {
+  it('dentro de Editar patrón, el clic derecho LEJOS de un punto sigue mudo', () => {
+    // Que siga mudo importa más desde que `point.node` tiene un verbo: sin la
+    // pregunta «¿el clic cayó sobre el punto elegido?», «Mover exacto…» salía
+    // con cualquier clic derecho —lona vacía incluida— y abría el chip de un
+    // punto que podía estar al otro lado de la pieza.
     const { container } = renderMenu(
       { ...base, pieceId: 'p1', isEditingNodes: true, activeTool: 'editPattern' },
       [piece('p1')],
     );
     expect(container.querySelector('.context-menu')).toBeNull();
+  });
+});
+
+/**
+ * #1112 — «Mover exacto…», y las dos preguntas que hay que hacerse antes de
+ * ofrecerlo.
+ *
+ * La entrada no abre ningún campo nuevo: lleva el foco al chip del punto, que
+ * ya está en pantalla. Por eso solo tiene sentido cuando hay UN punto elegido y
+ * el clic derecho cayó sobre ÉL. Las dos condiciones se resuelven en la
+ * superficie —`PatternEditor` sabe qué nodo hay bajo el cursor— y llegan aquí
+ * como un solo booleano.
+ */
+describe('#1112 — «Mover exacto…» solo sobre el punto que va a mover', () => {
+  it('con el clic derecho sobre el punto elegido, la entrada aparece', () => {
+    renderMenu(
+      { ...base, pieceId: 'p1', isEditingNodes: true, activeTool: 'editPattern', derechoSobreElPuntoElegido: true },
+      [piece('p1')],
+    );
+    expect(screen.getByText('Mover exacto…')).toBeTruthy();
+  });
+
+  it('y también con un tramo bajo el cursor, porque sobre un vértice la distancia al tramo es cero', () => {
+    // El hit-test del menú marca `segmentIndex` siempre que el clic caiga a
+    // ≤8 px de un tramo, y sobre un vértice esa distancia es 0: clic derecho
+    // justo encima de un punto resuelve `point.segment`, no `point.node`.
+    renderMenu(
+      { ...base, pieceId: 'p1', isEditingNodes: true, activeTool: 'editPattern', segmentIndex: 1, derechoSobreElPuntoElegido: true },
+      [piece('p1')],
+    );
+    expect(screen.getByText('Mover exacto…')).toBeTruthy();
+  });
+
+  it('sin el clic sobre el punto, NO aparece — aunque haya uno elegido', () => {
+    const { container } = renderMenu(
+      { ...base, pieceId: 'p1', isEditingNodes: true, activeTool: 'editPattern', derechoSobreElPuntoElegido: false },
+      [piece('p1')],
+    );
+    expect(container.textContent ?? '').not.toContain('Mover exacto');
   });
 });

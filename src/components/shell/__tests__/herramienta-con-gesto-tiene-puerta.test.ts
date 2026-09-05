@@ -21,21 +21,25 @@ import { DOCK_2D_CATALOG } from '../dock2dTools';
  * botón en el dock ni atajo registrado. Solo se alcanzaban si el copiloto las
  * activaba por su cuenta (`copilot/action/tools/definitions/patternOpsTools.ts`).
  *
- * **Cinco de las siete ya tienen puerta** (catálogo del dock, 2026-09-05). Se
- * ejercitaron una a una en Chrome y las cinco funcionan, así que entraron con
- * nombre en español —Mano, Medir el borde, Comparar largos, Abrir la pieza,
- * Poner avío—, con icono propio y con su pista de gesto. Cuáles merecían botón
- * era decisión de producto: está tomada, y con sus razones medidas, en
- * `las-cinco-puertas-que-se-abren.test.ts`.
+ * **Las siete tienen puerta.** Cinco el 2026-09-05 —Mano, Medir el borde,
+ * Comparar largos, Abrir la pieza, Poner avío— y las otras dos el 06-09, con
+ * sus dos deudas pagadas primero. Las razones por las que estuvieron cerradas
+ * eran ciertas, y las dos resultaron ser DEFECTOS, no carencias:
  *
- * Quedan DOS, y no por olvido: `elastic` se crea y después no se puede
- * seleccionar ni borrar, y `pleat` guarda el pliegue y nadie lo pinta. Darles
- * botón habría sido reponer el defecto F7 —una puerta a una habitación vacía—
- * cambiando la tecla por un icono.
+ *   elastic  el resalte leía `editor.selectedElasticId`, un campo de Redux sin
+ *            un solo escritor. Ahora cuelga del local, que sí se escribe, y
+ *            Supr borra el seleccionado.
+ *   pleat    "nadie lo pinta" era falso: `PieceRenderer` dibuja las líneas
+ *            `fold` con sus marcas de monte y valle desde siempre. Lo roto
+ *            estaba antes, en `generatePleatFoldLines`, que rebanaba el rango
+ *            del borde y perdía su punto de arranque: devolvía cero pliegues en
+ *            cualquier borde de UN comando, o sea en los cuatro lados de un
+ *            rectángulo.
  *
  * Este test sigue haciendo lo mismo que el primer día: **fijar el techo** para
  * que una nueva sin puerta no pase en silencio, que es justo lo que dejó llegar
- * a estas. Hoy el techo son dos.
+ * a aquellas siete. Hoy el techo es CERO, que es el techo más ruidoso posible:
+ * cualquier herramienta nueva con gesto y sin puerta rompe la suite.
  */
 
 const DESPACHADOR = readFileSync(
@@ -61,13 +65,13 @@ const CON_ATAJO = new Set(
 const EN_EL_DOCK = new Set(DOCK_2D_CATALOG.map((t) => t.id));
 
 /**
- * Las dos de hoy, con su deuda declarada. Eran siete el 2026-09-05 por la
- * mañana. Bajar esta lista es progreso; que crezca es una puerta que se olvidó.
+ * Vacía. Eran siete el 2026-09-05 por la mañana y dos por la noche.
+ *
+ * Bajar esta lista es progreso; que crezca es una puerta que se olvidó. Si
+ * alguna vez hay que volver a meter una, va con su razón MEDIDA (no supuesta) y
+ * con un guardián ejecutable que falle el día que la deuda caduque.
  */
-const SIN_PUERTA_HOY = [
-  'elastic',
-  'pleat',
-] as const;
+const SIN_PUERTA_HOY: readonly string[] = [];
 
 describe('ley de puertas — una herramienta con gesto se alcanza sin adivinar', () => {
   it('el detector no está ciego: el despachador conduce al menos 25 ids', () => {
@@ -81,7 +85,7 @@ describe('ley de puertas — una herramienta con gesto se alcanza sin adivinar',
     const sinPuerta = [...CONDUCIDOS]
       .filter((id) => !CON_ATAJO.has(id) && !EN_EL_DOCK.has(id))
       .sort();
-    const nuevas = sinPuerta.filter((id) => !SIN_PUERTA_HOY.includes(id as typeof SIN_PUERTA_HOY[number]));
+    const nuevas = sinPuerta.filter((id) => !SIN_PUERTA_HOY.includes(id));
     expect(
       nuevas,
       'estas herramientas tienen gesto y ninguna puerta: dales botón o atajo, o decláralas aquí con su razón',
@@ -98,11 +102,14 @@ describe('ley de puertas — una herramienta con gesto se alcanza sin adivinar',
     ).toEqual([]);
   });
 
-  it('las dos siguen conducidas: la lista es de deuda, no de herramientas muertas', () => {
-    // La red contra el arreglo perezoso: borrar el gesto también vaciaría la
-    // lista de arriba. Estas SÍ funcionan; lo que les falta es por dónde entrar.
-    for (const id of SIN_PUERTA_HOY) {
+  it('la deuda declarada está en cero, y las siete de ayer siguen conducidas', () => {
+    // La red contra el arreglo perezoso: vaciar la lista borrando el gesto
+    // también la habría vaciado. Estas siete SÍ funcionan y ahora además se
+    // alcanzan.
+    expect(SIN_PUERTA_HOY, 'hay deuda de puertas declarada otra vez').toEqual([]);
+    for (const id of ['hand', 'measureCurve', 'compareCurves', 'slashAndSpread', 'trimPlace', 'elastic', 'pleat']) {
       expect(CONDUCIDOS.has(id), `${id} ya no tiene gesto: si murió, bórrala del todo`).toBe(true);
+      expect(EN_EL_DOCK.has(id), `${id} perdió su puerta`).toBe(true);
     }
   });
 });
@@ -148,25 +155,25 @@ describe('ley de idioma — lo que se alcanza se lee, y lo cerrado dice por qué
     expect(enIngles, 'herramientas alcanzables con nombre en inglés').toEqual([]);
   });
 
-  /** Por qué cada una sigue sin puerta, medido en el navegador el 2026-09-05. */
-  const RAZONES: Record<typeof SIN_PUERTA_HOY[number], string> = {
-    elastic: 'ni un escritor de `selectedElasticId` en todo src/: se dibuja y después no se puede seleccionar ni borrar',
-    pleat: 'cero renderizadores leen `project.pleats`: el store guarda el pliegue y el SVG no cambia (301 → 301 nodos)',
-  };
-
-  it('cada una de las dos cerradas lleva su razón, y la razón se comprueba sola', () => {
-    // Una lista sin razones vuelve a ser lo que era antes de F7: una deuda que
-    // nadie sabe si sigue siendo cierta. Y una razón en prosa se queda escrita
-    // para siempre aunque se pague — por eso lo que la sostiene no es este mapa
-    // sino el guardián ejecutable, que falla el día que la deuda caduque.
-    expect(Object.keys(RAZONES).sort()).toEqual([...SIN_PUERTA_HOY].sort());
-
-    const guardian = readFileSync(
-      join(process.cwd(), 'src/components/shell/__tests__/las-cinco-puertas-que-se-abren.test.ts'),
-      'utf8',
-    );
-    for (const id of SIN_PUERTA_HOY) {
-      expect(guardian, `${id} no tiene guardián ejecutable de su razón`).toContain(id);
+  it('y la razón de las que estuvieron cerradas se comprueba sola, no en prosa', () => {
+    // Las dos deudas de ayer se pagaron arreglando lo que las causaba, así que
+    // lo que las vigila ya no es una lista de cadenas: son dos tests de
+    // comportamiento. Si alguien revive `editor.selectedElasticId` o vuelve a
+    // rebanar el rango del borde en los pliegues, fallan ellos.
+    // Que el archivo EXISTA no basta: uno vaciado, con sus `it` comentados o
+    // reducido a `expect(true).toBe(true)`, pasaría igual. Se exige la frase que
+    // nombra el comportamiento, que es lo que no sobrevive a un vaciado.
+    const guardianes: Array<[string, string]> = [
+      ['src/hooks/__tests__/el-elastico-se-selecciona-y-se-borra.test.tsx', 'Supr borra el elástico seleccionado'],
+      ['src/utils/__tests__/el-pliegue-se-dibuja.test.ts', 'ARRANCA sobre ese borde'],
+    ];
+    for (const [ruta, frase] of guardianes) {
+      let src = '';
+      expect(
+        () => { src = readFileSync(join(process.cwd(), ruta), 'utf8'); },
+        `${ruta} era el guardián de una deuda pagada: si se borra, la deuda vuelve muda`,
+      ).not.toThrow();
+      expect(src, `${ruta} ya no comprueba «${frase}»: el guardián se vació`).toContain(frase);
     }
   });
 });

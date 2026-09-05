@@ -793,7 +793,6 @@ export interface EditorState {
   selectedPieceIds: string[];
   selectedSeamId: string | null;
   selectedPOMId: string | null;
-  selectedElasticId: string | null;
   selectedInternalLine: { pieceId: string; lineId: string } | null;
   /** Seam-allowance tool selection: a typed, mutually-exclusive set — N edges OR
    *  N vertices, never mixed. Replaces the old single selectedEdge/selectedVertex

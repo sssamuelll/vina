@@ -820,3 +820,278 @@ veces la compuerta hizo su trabajo: parar antes de publicar.
 
 `main` en `bc3b00b0`. `https://vina.sdar.dev/` responde 200 y sirve
 `assets/index-BB76HY8v.js`, el bundle recién compilado — no uno viejo.
+
+---
+
+## 14. La segunda noche — 2026-09-06
+
+El encargo fue «todo lo que queda»: la lista del § 13.7. Se cerró casi entera, y
+lo interesante no es eso — es que **cuatro de los cinco defectos que salieron no
+estaban en la lista**. Salieron de ir a hacer lo que la lista decía y encontrar
+que el cuarto no estaba vacío: estaba roto, y de una forma que ninguna prueba
+miraba.
+
+### 14.1 Las dos puertas que faltaban, y por qué una de sus razones era mía y falsa
+
+El § 13.1 dejó `elastic` y `pleat` fuera con una razón escrita para cada una, y
+un guardián ejecutable vigilándolas. **Las dos razones eran ciertas. Ninguna de
+las dos era una carencia: las dos eran defectos**, y la del pliegue la había
+explicado yo mal.
+
+**Pliegue.** Escribí «guarda el pliegue en el store y NADIE lo pinta», y el
+guardián que lo certificaba buscaba la palabra `pleats` en `src/components`.
+Buscaba lo que no era: el pliegue se pinta **indirectamente**, como líneas
+internas de tipo `fold`, y `PieceRenderer.tsx:230-268` las dibuja con sus
+triángulos de monte y valle desde siempre. Renderizador completo, con tokens
+propios.
+
+Lo roto estaba un paso antes. `generatePleatFoldLines` rebanaba
+`outline.slice(segmentRange)` y aplanaba el trozo — pero un comando `L` lleva su
+punto **final**, no el inicial. El borde de arriba de un rectángulo es el rango
+`[1,2]`, o sea un solo `L`, así que la rebanada daba UN punto, `pts.length < 2`,
+y la función devolvía `[]` sin decir nada. Un borde de un comando es el caso
+NORMAL: los cuatro lados de cualquier rectángulo lo son.
+
+La medición del navegador —301 nodos SVG antes del clic y 301 después— era
+correcta. La explicación que le puse, no. Es la misma familia que el § 12.6: el
+detector mide lo que sabe medir y uno lee su silencio como si fuera una
+respuesta.
+
+Y el test que lo cubría pasaba en verde porque su fixture declaraba el borde de
+arriba como `[0, 2]`, incluyendo la `M`. **El productor real nunca emite eso**:
+`detectSemanticEdges` da `[1,2]`. Un fixture inventado certificando una función
+rota — el mismo defecto que `edgeInterpolation` tenía el 04-09, dos días
+seguidos, en dos archivos distintos. El archivo nuevo no declara bordes a mano:
+se los pide al productor.
+
+**Elástico.** El resalte leía `editor.selectedElasticId`, un campo de Redux sin
+UN SOLO escritor en todo `src/`. La selección de verdad vivía en el local de
+`useElasticTool`, que sí se escribe en cada clic. El campo muere, el resalte
+cuelga del local, y Supr borra el seleccionado — en la **captura**, no en la
+burbuja, porque `edit.delete` es un atajo global que corre antes y desde la
+burbuja Supr habría borrado también la pieza.
+
+Y el resalte engorda además de subir de tono: la ley de estado del contrato
+(§ 4) prohíbe que la selección dependa solo del tono, y hasta hoy la única
+diferencia entre elástico elegido y no elegido era la opacidad — que además
+nunca llegó a verse, porque el campo que la decidía no tenía escritores.
+
+### 14.2 El hermano que salió porque se fue a buscarlo
+
+Arreglado el pliegue, la pregunta obligada era si el elástico tenía el mismo
+fallo, porque comparten `resolveEdgeName`. Lo tenía, y peor.
+
+`ElasticRenderer.extractSegments` filtra por índice de comando —lo correcto—
+pero su rama `Z` compara contra el índice del propio `Z`, y el productor etiqueta
+el tramo de cierre con el de la `M`. Eso era la mitad. La otra mitad estaba más
+arriba: **el hit-test devuelve el índice del comando que DIBUJA**, así que para
+el lado izquierdo de un rectángulo devuelve 4; ningún borde declara el 4;
+`resolveEdgeName` caía a `edge-4`; y `addElastic`/`addPleat` se van en silencio
+cuando el nombre no existe.
+
+O sea: **clicar el lado izquierdo de cualquier pieza con Elástico o con Pliegue
+no hacía absolutamente nada**, y con Editar costuras tampoco. Un lado entero,
+mudo, en tres herramientas, desde siempre.
+
+`indiceSegunLosBordes` lo traduce AL LEER, como su hermano `rangoMedibleDeBorde`
+del 05-09: los consumidores de `resolveEdgeName` son tres, no los 56 archivos
+que leen `segmentRange`. La misma regla, aplicada dos veces en dos días.
+
+### 14.3 La pluma engancha, y eso enmienda un contrato aprobado
+
+#1102 es la queja literal de María: «si yo ahora quiero crear una línea nueva que
+empiece desde aquí, no se está iluminando». La línea interna engancha desde el
+29-08. La pluma no miraba las piezas — ni siquiera las recibía.
+
+**El spec de la línea interna había decidido lo contrario**, en su § 5: «La
+pluma **no** gana enganche ni curva por puntos: crea piezas desde la nada». El
+razonamiento era bueno y estaba incompleto: describe el primer trazo de un
+proyecto vacío, no el trabajo de María, que es dibujar una pieza nueva partiendo
+de una que ya está en la mesa. Ahí la pluma no crea desde la nada.
+
+Se enmendó **en ese spec**, no aquí, y con la mitad que NO cae dicha: la curva
+por puntos sigue sin ir a la pluma, porque ese medio argumento nadie lo ha
+refutado.
+
+`resolveSnap` y sus tres memos salieron a `snapIndex.ts`. **Un lector más para
+el que ya estaba bien; los otros veintitrés hit-tests del lienzo no se tocan** —
+fundirlos tiene su propio spec ahora (§ 14.6). El oráculo de que la mudanza no
+movió nada son los 42 tests de la línea interna, que pasan sin tocar una línea.
+
+De paso se saldó una deuda que ese mismo spec dejó escrita y sin hacer: la fila
+«cierre» prometía `EDGE_HIT_PX` y en el archivo seguía un `CLOSE_THRESHOLD = 12`
+literal. Un solo radio en la herramienta era el punto entero de aquella decisión.
+
+### 14.4 El panel murió, y al morir destapó dos cosas
+
+`NextPointPanel` era un diálogo en la esquina para escribir el largo y el ángulo
+del próximo punto. Le robaba el sitio a la tira de herramienta —había una
+condición explícita para esconderla— y contradecía la gramática del número que
+el repo ya tenía escrita: el número vive donde vive su sujeto, y un tramo en
+curso es un gesto vivo.
+
+Lo que el issue dejaba abierto era **cómo un chip escribe en un hook en vez de
+en Redux**. Se resolvió con una variante de `CotaUpdate` que no toca el store, y
+con que `CotaChip` diga ahora con qué confirmó: para una cota de un objeto Enter
+y Tab son lo mismo, pero aquí no —Tab salta de Largo a Ángulo y Enter COLOCA—, y
+sin ese dato el encadenado «80, Tab, 90, Enter» es imposible.
+
+Las dos cosas que salieron al probarlo **en el navegador**, no de leer el código:
+
+- **Colocar reseteaba el ángulo.** `placePolar` re-anclaba el par al nodo nuevo
+  pero conservaba los valores viejos: tras escribir 80/90 y Enter, el chip del
+  ángulo volvía a 0 y repetir con otro Enter colocaba un tramo distinto.
+  Encadenar es el punto de esta gramática.
+- **A Escape le faltaba un peldaño.** Con el tramo congelado, Escape se llevaba
+  el trazo ENTERO por delante. El Escape del panel nacía dentro del panel y el
+  router nunca lo veía; los chips sí están en el lienzo.
+
+Ninguna de las dos la habría visto una unitaria.
+
+### 14.5 «Cuánto lo quieres mover», y la puerta que se cerraba sola al tocarla
+
+#1112 era la petición más fuerte del audio. Con «Editar patrón» activo **no
+había un solo número en pantalla**: la herramienta no estaba en
+`CON_COTAS_DE_PIEZA`, y la fila `point.node` del menú contextual estaba vacía.
+
+«Respecto a este punto, respecto a este punto» son los dos vecinos, y **no había
+función que los diera**. El censo encontró cinco copias del bucle «busca el ancla
+anterior» repartidas por dos archivos: todas hacia atrás, ninguna con siguiente,
+ninguna que envuelva por la `Z`, ninguna que sepa de subcaminos. Los tres casos
+que rompen las versiones ingenuas están todos en el test, y el segundo es el que
+importa: **el DXF de María trae el vértice duplicado en cada esquina**, y el
+vecino ingenuo es el gemelo a distancia cero. Una cota de «0,0 mm» que no se
+puede mover es peor que ninguna.
+
+Y el defecto que solo se ve en el navegador. Su [02:34] pedía el clic derecho, y
+la entrada no aparecía nunca. La razón no era el menú: **el clic derecho sobre
+la pieza en edición volvía a llamar `enterEdit` sobre la MISMA pieza y reseteaba
+el estado entero, borrando la selección de puntos**. Medido: los chips pasaban
+de dos a cero en el propio clic que iba a abrir su menú. La puerta de su
+petición literal se cerraba sola al tocarla, y llevaba así desde que existe la
+herramienta.
+
+Dos apuntes de método que se pagaron solos:
+
+- El chip **no** reconstruye el contorno: devuelve a dónde va el nodo y lo
+  escribe `useEditPattern.moveNodeTo`, que es quien ya lo hace en el arrastre.
+  Dos escritores del mismo hecho es el fallo con nombre propio de este repo.
+- El trinquete de `pieceSpace` cazó que yo sumaba `position` a mano para colocar
+  los chips, lo que **ignora el giro**: sobre una pieza girada habrían salido en
+  otro sitio del lienzo. Mi test no lo veía porque solo probaba con rotación 0.
+
+### 14.6 Tres specs, y una decisión que se cayó al medirla
+
+Los tres frentes que la gramática de la tanda 6 dejó abiertos con nombre tienen
+ahora documento, con sus decisiones cerradas y su corte medido. Ninguno se
+implementa.
+
+**Escape.** El blocker daba dos opciones: implementar la escalera o «documentar
+el orden vigente». El censo **elimina la segunda**: `ShortcutProvider` escucha en
+`document` y el router de herramientas en `window`, los dos en burbuja, así que
+el global corre primero y para **catorce herramientas un Escape hace dos cosas**.
+Con `editPattern` + `nodeEditor` a la vez, tres. Ningún test lo cubre. El orden
+vigente no es una convención que documentar: es un defecto que nadie decidió.
+
+Y corrige mi propio censo del 05-09, que estaba mal en dos sitios: son siete
+predicados y no ocho, con solo cuatro implementaciones reales, y catorce
+`handlers.push` y no trece. El hallazgo que cambia el tamaño es otro: **ocho
+ortografías distintas** de «¿hay gesto vivo?» y **tres protocolos de consumo
+incompatibles** en el mismo router, dos de los cuales hacen que la bitácora
+mienta con `consumedBy: null` en nueve casos donde sí se consumió.
+
+La decisión que abarata el tramo contradice a la propuesta: **el predicado no se
+unifica; se elimina la necesidad de tenerlo.** La escalera no necesita preguntar
+si hay gesto vivo — basta con llamar, y que el hook diga si consumió.
+
+**El resolutor de enganche.** Seis radios distintos en dieciocho archivos, ocho
+de ellos literales sin nombre. Y la misma pregunta con dos respuestas: 5 px en un
+archivo y 6 px en otro para «¿estoy sobre una línea interna?».
+
+La decisión importante es la que NO se toma: **no se reducen a dos**.
+`EDGE_HIT_PX = 12` es el único ratificado y el de las dos herramientas de dibujo
+principales; bajarlo para «unificar» es un cambio de producto disfrazado de
+refactor. Se unifica por clase de objeto y **ningún radio baja**.
+
+**Medir (#1104).** Cuatro de sus cinco peticiones son sobre **confianza**, no
+sobre capacidad. «Esto es patronaje» es la frase que las ordena. El spec cierra
+además la frontera con las cotas vivas: las cotas miden un objeto y lo escriben;
+Medir mide una relación y la lee. Y deja un hueco dicho y **sin decidir** —qué
+es una medición cuando la pieza se mueve—, porque ella no lo nombró.
+
+### 14.7 Qué queda
+
+- **La escalera de Escape**, con su spec y su corte. El primer tramo es escribir
+  los tests de qué debe pasar en las catorce, y no cabe con la mudanza.
+- **El resolutor único**, con su spec. El único tramo que cambia lo que María
+  siente lleva un e2e por herramienta, no uno global.
+- **#1104 Medir**, con su spec y sus cuatro tramos.
+- **6-4, el selector `sujetoActivo`.** Deliberadamente no hecho: es arquitectura
+  sin valor directo, y esta noche le nacieron dos clases nuevas (`tramoEnCurso`,
+  `nodo`) que ya viven en `cotasDelSujeto`. Formalizarlo se decide cuando tenga
+  un segundo consumidor que lo pida.
+- **#1105 Tijeras**, sus dos partes restantes: sacar `autoSew`/`seamType` de la
+  tira necesita un concepto de «opción avanzada» que el sistema de opciones no
+  tiene, y las cotas del corte a las esquinas son ahora baratas (`edgeDistances`
+  ya existe) pero son otra ronda.
+- **El aire de `chipScreenPosition`**, que sigue midiendo hasta el centro del
+  chip. Sigue siendo real y sigue sin síntoma: `separarChips` resuelve la
+  oclusión, y moverlo desplazaría todos los chips de una superficie que María
+  acaba de aprobar. Se deja dicho, otra vez, en vez de dejarlo colgando.
+- **`linea-interna-gramatica.spec.ts`**, un e2e en rojo que **ya lo estaba antes
+  de esta rama** (comprobado revirtiendo los commits). Su tercer trazo, el que
+  engancha al contorno, no se crea. No es regresión de esta noche y no se
+  investigó: queda anotado para que no se lea como daño colateral.
+- **El menú contextual del lienzo no tiene roles de menú**: pinta `<button>`
+  pelados sin `role="menuitem"`. Hueco de accesibilidad real, encontrado al
+  escribir el e2e de «Mover exacto…».
+
+### 14.8 Y después la revisión, que encontró trece — casi todos míos
+
+Tres revisiones adversariales en paralelo sobre la rama —geometría,
+interacción, tests—, midiendo y no opinando: corrieron sondas, cronometraron y
+volvieron con escenarios concretos. Trece hallazgos, y uno era un **blocker**.
+
+**#1112 estaba apagado sobre el DXF de María.** Un clic sobre un nodo no
+selecciona un nodo: selecciona el GRUPO de anclas coincidentes, porque CLO
+duplica el vértice en cada esquina. En su patrón real eso son dos índices para
+un punto, y mi condición era `size !== 1`: ni chips ni menú, en silencio, justo
+sobre los datos para los que se hizo. **Mis cuatro e2e estaban verdes porque
+`addPiece` construye un rectángulo sintético con anclas únicas.**
+
+Es la lección de la memoria, literal —«un test verde certifica nuestra promesa,
+no la de María»— con el fixture esquivándola. Y es la segunda vez en dos días
+que un fixture inventado certifica algo roto: la primera fue el `[0,2]` del
+pliegue.
+
+**Y mi propio arreglo del pliegue cambió «no pasa nada» por «pasa al revés»**,
+que es peor. La dirección salía de `perpendicular(tangente)`, que rota a un lado
+fijo sin mirar el sentido del contorno; con un contorno horario los pliegues
+nacían fuera de la pieza. El defecto era viejo y estaba escondido debajo del que
+arreglé: mientras la función devolvía `[]`, nadie podía verlo. Lo primero se
+reporta; lo segundo se aprende como maña.
+
+De los once restantes, los que cuentan una historia:
+
+- **Enter con el número que ya se ve no colocaba el punto.** `CotaChip` no
+  despacha si el valor no cambió — correcto para la cota de un objeto, falso
+  para el tramo en curso, donde confirmar no escribe: coloca.
+- **Tab por segunda vez era una tecla muerta.** El efecto se enganchaba a la
+  posición del tramo, que no cambia si no se coloca nada; y el `preventDefault`
+  del router ya había matado el Tab nativo.
+- **Un elástico colgante se tragaba el Supr global.** Tras un Ctrl+Z, el id
+  local seguía apuntando a algo que ya no existe, y la pieza seleccionada dejaba
+  de poder borrarse.
+- **`verticesVisibles` era O(n²) con la pieza girada**: 31,9 ms contra 2,2,
+  medido. Y 6000 círculos reconciliados en cada movimiento del ratón.
+- **El trinquete de UI, que por la mañana aprendió a saltar comentarios de JSX,
+  descartaba la línea entera** — así que un color escrito detrás de un
+  comentario cerrado quedaba invisible. Tuvo las dos formas del defecto el mismo
+  día: contar prosa y dejar de contar código. Ahora tiene test propio, que corre
+  el linter de verdad sobre un árbol de mentira con las cinco líneas difíciles.
+
+Y cinco oráculos flojos, cada uno con su razón medida. El más instructivo: el
+test llamado «el cierre gana al enganche» clicaba a 40 px del vértice más
+cercano, con un radio de 12. **No había ninguna competencia que resolver**, así
+que habría seguido verde con la precedencia invertida — que es exactamente lo
+que decía comprobar.

@@ -21,7 +21,12 @@ describe('usePenTool — bitácora de salidas mudas', () => {
     act(() => result.current.placePolar(50, 0));
     const gestures = getJournal().events.filter((e) => e.kind === 'gesture').map((e) => [e.name, e.data]);
     expect(gestures).toEqual([
-      ['pen:press', { closes: false, nodes: 1 }],
+      // `snap` desde #1102: qué enganchó el clic, o `null` si cayó en el vacío.
+      // Sin ese dato, un nodo que aterriza cuatro píxeles más allá de donde
+      // María clicó es indistinguible en la bitácora de uno que aterriza donde
+      // debía — y esa es exactamente la clase de fallo que la caja negra existe
+      // para ver.
+      ['pen:press', { closes: false, nodes: 1, snap: null }],
       ['pen:nextPoint', { op: 'place', length: 50, angle: 0, nodes: 2 }],
     ]);
   });
