@@ -18,6 +18,7 @@ import { pushJournal } from '../../utils/telemetry/journal';
 export const RAZONES = [
   'notch:sin-sitio',
   'notch:sin-emplazamiento',
+  'notch:ancla-perdida',
   'point:sin-comando',
   'walkseam:borde-sin-resolver',
   'trim:borde-sin-largo',
@@ -48,6 +49,7 @@ export interface AvisoMudo {
 const MENSAJES: Record<RazonMuda, string> = {
   'notch:sin-sitio': 'No cabe un piquete ahí; prueba un poco más adentro del borde',
   'notch:sin-emplazamiento': 'El piquete no encontró dónde pararse; suelta más cerca del borde',
+  'notch:ancla-perdida': 'El contorno cambió y el piquete perdió su esquina de referencia; colócalo otra vez con un clic',
   'point:sin-comando': 'Ese tramo no acepta un punto; prueba sobre otro lado de la pieza',
   'walkseam:borde-sin-resolver': 'Ese borde ya no está en el lienzo; prueba con otro lado de la pieza',
   'trim:borde-sin-largo': 'Ese borde no tiene largo; elige uno de los lados de la pieza',
