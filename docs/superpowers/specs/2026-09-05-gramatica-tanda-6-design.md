@@ -166,9 +166,14 @@ La propuesta proponía una escalera de tres peldaños («¿hay gesto vivo? → �
 sujeto? → vuelve a la flecha») con precio «ninguno». **Es el blocker más caro y
 queda abierto**, con la pregunta nombrada:
 
-- El peldaño 1 no tiene predicado universal: solo **seis** ganchos exponen
-  `isArmed()`/`isTracing()`, mientras **catorce** registran su `handleKeyDown`
-  en la burbuja de `window`.
+- El peldaño 1 no tiene predicado universal. Contado a mano el 2026-09-05
+  —porque el número que traía la crítica era otro—: **ocho** hooks exponen
+  `isArmed()`/`isTracing()` (`useCircleTool`, `useEdgeGesture`,
+  `useFreeSewingTool`, `useNotchTool`, `usePointTool`, `usePolyPenTool`,
+  `useRectangleTool`, `useSeamAllowanceTool`), mientras hay **trece** sitios de
+  `handlers.push` en `useEditorInteractions.ts:434-448` registrando
+  `handleKeyDown` en la burbuja de `window` — trece sitios que cubren quince
+  ids, porque uno agrupa los tres pespuntes. Los dos conjuntos apenas se tocan.
 - `editPattern.handleKeyDown` hace `exitEdit()` con Escape
   (`useEditPattern.ts:628-631`), un estado que la escalera ni nombra.
 - El spec de cotas vivas ya gasta un Escape: «un segundo `Escape` es el de
@@ -227,8 +232,8 @@ tramos M/L; llamarlos mudanza no baja el número.
 **Se decide la segunda, y con el precio de la primera medido.** Hacer que el
 productor emita el índice de la `Z` se implementó y se revirtió: sobre el DXF
 real de María, 42 clics que enganchaban un borde pasaron a caer en «pieza»,
-porque `pickEdgeForSeamAllowance` busca por la etiqueta vieja. Con 159
-consumidores de `segmentRange`, el productor ES la interfaz pública.
+porque `pickEdgeForSeamAllowance` busca por la etiqueta vieja. Con 56 archivos
+leyendo `segmentRange` (158 usos), el productor ES la interfaz pública.
 
 Lo que se hizo el 2026-09-05 cubre solo a los que MIDEN
 (`interpolateEdgePoint`, `computeEdgeLengthMM`, `buildEdgeInfo`), vía

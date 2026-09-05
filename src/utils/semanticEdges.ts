@@ -258,7 +258,8 @@ export function edgeRangeForCommand(
  * borde» sobre el lado izquierdo devolvía «0.0 mm».
  *
  * Se traduce AL LEER, no al escribir. Cambiar lo que emite el productor movería
- * el rango de ese borde para los 159 sitios que lo consumen, y ya se midió lo
+ * el rango de ese borde para los 56 archivos que lo leen (158 usos), y ya se
+ * midió lo
  * que cuesta: sobre el DXF real de María, 42 clics que enganchaban un borde
  * pasaban a caer en «pieza» porque el hit-test del margen busca por la
  * etiqueta vieja. Aquí solo lo ven los tres consumidores que necesitan medir.

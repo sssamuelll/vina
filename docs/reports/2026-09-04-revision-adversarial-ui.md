@@ -589,9 +589,18 @@ verde de punta a punta, incluido el smoke del WASM y los 24 e2e de emplazamiento
 ## 13. Los cuatro frentes que quedaban — 2026-09-05
 
 La § 12.5 dejó cuatro cosas escritas: las tres unificaciones L, la gramática de
-la tanda 6, abrir las siete puertas, y emplazar `ReferenceImageSettings`. Se
-hicieron las cuatro. Lo que sigue es lo que había detrás de cada una, que en
-tres de los cuatro casos no era lo que el informe decía.
+la tanda 6, abrir las siete puertas, y emplazar `ReferenceImageSettings`.
+
+Se cerraron las cuatro, y conviene decir con qué forma cada una, porque no es la
+misma: las puertas y el emplazamiento están **implementados y desplegados**; la
+gramática es un **spec** con sus diecinueve decisiones cerradas, que es
+exactamente lo que la tanda 6 estaba esperando; y de las tres unificaciones se
+implementó **una** —la de las superficies de número, la única con queja literal
+de María— mientras las otras dos quedan medidas y con su spec escrito, que es lo que
+el propio informe pedía («no como proyecto»).
+
+Lo que sigue es lo que había detrás de cada una, que en tres de los cuatro casos
+no era lo que el informe decía.
 
 ### 13.1 Antes de poner un botón, había que saber si el cuarto estaba vacío
 
@@ -755,8 +764,9 @@ Lo que el estrés cambió de verdad:
   dónde leerse, y la regla de «Supr con un borde no hace nada» reintroducía
   #1117 por la puerta de al lado.
 - **Un blocker queda abierto, con la pregunta nombrada**: la escalera de Escape
-  no tiene predicado universal — seis ganchos exponen su estado y **catorce**
-  registran su tecla.
+  no tiene predicado universal — ocho hooks exponen su estado y trece sitios
+  registran una tecla, y los dos conjuntos apenas se tocan. (El crítico decía
+  «seis y catorce»; los números se recontaron a mano antes de escribirlos.)
 
 ### 13.7 Qué queda
 
