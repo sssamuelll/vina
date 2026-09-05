@@ -147,16 +147,22 @@
  * encontró en el dock. Y la § 4 lo dice literal: «el estado seleccionado no
  * puede depender solo del tono; cambia también el relleno».
  *
- * Ahora el activo lleva el relleno FUERTE del acento (.27 contra el .13 del
- * hover) y su tinta. Sobre el chip compuesto —rgb(30,30,58)— `--accent-ink` da
- * 5,26:1, que pasa AA a 11 px. El hover se queda como está: es el estado
- * transitorio y tiene que pesar menos.
+ * Ahora el activo lleva el relleno FUERTE del acento —.27 contra el .13 del
+ * hover— y ahí es donde vive el acento; la tinta se queda en `--text-primary`.
+ *
+ * Y esto es una corrección de una corrección, medida: la primera versión puso
+ * `--accent-ink` sobre ese relleno y da **4,16:1**, que NO pasa AA. Arreglar el
+ * peso rompió el contraste, que es el error de siempre por el otro lado. Con
+ * `--text-primary` sobre el chip compuesto rgb(46,47,99) son **10,06:1**.
+ *
+ * Que el hover mida 12,03 y el activo 10,06 no lo hace más flojo: el peso lo da
+ * el RELLENO, y el del activo es el doble. Los dos pasan AA de sobra.
  *
  * El activo va DESPUÉS del hover a propósito: misma especificidad, gana la
  * última, así que pasar el ratón sobre un botón ya activo no lo apaga. */
 .ref-img-btn.active {
   background: var(--accent-border);
-  color: var(--accent-ink);
+  color: var(--text-primary);
 }
 
 /* Van después del bloque de arriba a propósito: misma especificidad, gana la
@@ -166,7 +172,9 @@
  * —`--accent-subtle` compuesto sobre la fila, rgb(24,24,50)— y no la fila
  * desnuda: en reposo estos dos colores no se pintan nunca, así que medirlos
  * contra la fila era medir contra un fondo que en ese estado no existe.
- * `--warning` da 7,52:1 y `--destructive-hover` 5,81:1. Los dos pasan AA. */
+ * `--warning` da **6,91:1** y `--destructive-hover` **5,36:1**. Los dos pasan
+ * AA. (Contra la fila desnuda darían 7,94 y 6,17, que es lo que decía la
+ * versión anterior: números correctos para un fondo que en ese estado no está.) */
 .ref-img-btn-calibrate:hover, .ref-img-btn-calibrate:focus-visible { color: var(--warning); }
 .ref-img-btn-remove:hover, .ref-img-btn-remove:focus-visible { color: var(--destructive-hover); }
 
