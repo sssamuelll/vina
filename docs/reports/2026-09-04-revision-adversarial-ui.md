@@ -780,3 +780,43 @@ Lo que el estrés cambió de verdad:
   deslizador que convertir, hay una opción que no existe. Es feature con gesto
   nuevo (#1105, #1107, #1112).
 - El aire de `chipScreenPosition`, que sigue midiendo hasta el centro del chip.
+
+### 13.8 Gates y despliegue
+
+`npx tsc -b --noEmit` limpio · **7862 unitarios en verde**, 13 skipped ·
+**39 e2e en Chromium** a 1366×643, con dos suites nuevas dentro del gate de
+deploy · `eslint --max-warnings=0` sin errores · trinquete con **R3 −13 y
+R5 −4**, ninguna regla arriba.
+
+Todo lo que toca al navegador se verificó en el navegador, no solo en jsdom:
+las cinco puertas se alcanzan con `elementFromPoint` y activan las **dos**
+llaves del motor; la imagen de referencia se importa **y se pinta** (un PNG de
+verdad, mirando el `href` del `<image>`); la pieza se abre con sus cinco clics;
+el dock con el catálogo entero fijado sigue dentro de la ventana; y el icono
+nuevo se rasterizó a 16 px contra tres alternativas antes de elegirlo.
+
+### 13.9 El gate volvió a fallar, y esta vez por dos caracteres
+
+El deploy se paró en su primera compuerta —«hay cambios tracked sin
+commitear»— y eso destapó algo peor que un árbol sucio: **el blob mergeado de
+`deploy-prod.sh` llevaba dos retornos de carro**, en los dos renglones que este
+mismo trabajo le añadió al gate.
+
+La barra de continuación escapa el CR, **no el salto de línea**. El comando se
+acaba ahí y los renglones siguientes se intentan ejecutar como programas. Y
+`bash -n` pasa en verde, porque es sintácticamente válido: solo es
+semánticamente falso. **Un gate cortado a la mitad no falla — corre con menos y
+reporta «passed»**, que es la peor forma de romperse y la misma familia del
+censo que la § 12.6 ya había señalado.
+
+`.gitattributes` YA pedía `scripts/*.sh text eol=lf`, con esa razón escrita
+desde antes. No bastó. Así que el guardián nuevo mira los **bytes**, no la
+sintaxis — y al encenderlo cazó un segundo archivo entero en CRLF que nadie
+estaba mirando.
+
+Es la segunda vez seguida que el gate de deploy falla en su primer uso tras
+tocarlo. Las dos veces por algo que no era el código que iba dentro, y las dos
+veces la compuerta hizo su trabajo: parar antes de publicar.
+
+`main` en `bc3b00b0`. `https://vina.sdar.dev/` responde 200 y sirve
+`assets/index-BB76HY8v.js`, el bundle recién compilado — no uno viejo.
