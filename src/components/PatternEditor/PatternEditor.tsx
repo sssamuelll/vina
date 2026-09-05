@@ -613,8 +613,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       internalLineId: hitInternalLineId,
       internalLineType: hitInternalLineType,
       isEditingNodes: editPatternTool.isEditing,
+      nodosSeleccionados: editPatternTool.selectedNodes.size,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, pen.nodes.length]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.selectedNodes, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, pen.nodes.length]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
@@ -685,6 +686,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   penRef.current = pen;
   const internalShapeRef = useRef(internalShapeTool);
   internalShapeRef.current = internalShapeTool;
+  const editPatternRef = useRef(editPatternTool);
+  editPatternRef.current = editPatternTool;
 
   // El tramo congelado con Tab, venga de la pluma o de la línea interna: las
   // dos son la misma gramática y solo una puede estar viva a la vez (#1129).
@@ -694,14 +697,23 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       ? internalShapeTool.nextPoint
       : null;
 
+  // El nodo en edición, solo cuando hay UNO: con dos o más, lo único que
+  // comparten es el desplazamiento del grupo, que es otra cota y no está hecha.
+  const nodoSeleccionado = useMemo(() => {
+    if (activeTool !== 'editPattern' || !editPatternTool.editingPieceId) return null;
+    const nodos = [...editPatternTool.selectedNodes];
+    if (nodos.length !== 1) return null;
+    return { pieceId: editPatternTool.editingPieceId, commandIndex: nodos[0] };
+  }, [activeTool, editPatternTool.editingPieceId, editPatternTool.selectedNodes]);
+
   const sujeto = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
     hotId, isDragging: isDraggingPiece || transformTool.isDragging || isDraggingEndpoint,
     contextMenuOpen: ctxMenu.visible, calibrationActive: calibrationMode !== null,
     hiddenLayerIds, layerLocked, saSelection: editor.saSelection,
     saAncla: seamAllowanceTool.ancla, saHover: seamAllowanceTool.hover,
-    tramoEnCurso,
-  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso]);
+    tramoEnCurso, nodoSeleccionado,
+  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso, nodoSeleccionado]);
   // Las cuatro herramientas que toman el sujeto de la selección lo dicen en la
   // tira antes del clic, en vez de morirse mudas (#1117).
   const falta = faltaSujeto(activeTool, selectedPieceIds);
@@ -820,6 +832,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       if (!herramienta) return;
       if (motivo === 'tab') herramienta.setNextPointValues(update.largoMm, update.anguloDeg);
       else herramienta.placePolar(update.largoMm, update.anguloDeg);
+    } else if (update.kind === 'nodo') {
+      // Lo escribe `useEditPattern`, no este archivo: es quien ya mueve nodos
+      // en el arrastre, con compensación de pivote, re-anclado de piquetes y
+      // lote de deshacer. Dos escritores del mismo hecho se desincronizan.
+      editPatternRef.current.moveNodeTo(update.pieceId, update.commandIndex, update.destino);
     } else {
       const piece = pieces.find(p => p.id === update.pieceId);
       if (!piece) return;
@@ -1385,6 +1402,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onOffsetInternalLine={handleOffsetInternalLine}
         onOptimizeCurves={handleOptimizeCurves}
         onRefineNotch={notchTool.refineExisting}
+        onMoverPuntoExacto={() => {
+          // No abre nada nuevo: lleva el foco al chip que ya está en pantalla.
+          if (cotasRef.current?.abrirPrimero()) {
+            pushJournal('gesture', 'nodo:moverExacto', { via: 'menu' });
+          }
+        }}
         onOpenSeamAllowanceProperties={() => onOpenPanel?.('Properties')}
         onOpenProperties={(pieceId) => {
           dispatch(selectPiece(pieceId));

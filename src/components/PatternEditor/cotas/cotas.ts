@@ -33,7 +33,15 @@ export type CotaUpdate =
    * los valores pendientes si fue con Tab—, que es la única forma de que un
    * chip escriba en un gesto en vez de en Redux.
    */
-  | { kind: 'tramoEnCurso'; largoMm: number; anguloDeg: number };
+  | { kind: 'tramoEnCurso'; largoMm: number; anguloDeg: number }
+  /**
+   * Mover un nodo del contorno a un punto exacto (#1112). Tampoco escribe el
+   * store: lo aplica `useEditPattern`, que es quien ya lo hace en el arrastre,
+   * con su compensación de pivote, su re-anclado de piquetes y su lote de
+   * deshacer. Un segundo escritor del mismo hecho es el fallo con nombre propio
+   * del repo.
+   */
+  | { kind: 'nodo'; pieceId: string; commandIndex: number; destino: Point2D };
 
 /**
  * Una cota viva (spec 2026-08-30 § 3, § 5): la medida que el objeto enseña

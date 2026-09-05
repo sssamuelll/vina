@@ -48,6 +48,8 @@ export interface ContextMenuState {
   internalLineType?: string | null;
   /** True cuando el hit-test ocurrió en altitud POINT (edición de nodos). */
   isEditingNodes?: boolean;
+  /** Cuántos puntos hay seleccionados en «Editar patrón» (#1112). */
+  nodosSeleccionados?: number;
 }
 
 interface ContextMenuProps extends CurationCallbacks {
@@ -168,11 +170,12 @@ export default function ContextMenu(props: ContextMenuProps) {
     internalLineType: (menu.internalLineType as InternalLineType | null) ?? null,
     internalLine,
     segmentIndex: menu.segmentIndex, segmentIsCurve: menu.segmentIsCurve,
+    nodosSeleccionados: menu.nodosSeleccionados,
     clipboard, groups, pieces, cb, onClose,
   };
 
   const defs = resolveMenuActions(ctx);
-  if (defs.length === 0) return null; // p.ej. point.node en v1: sin verbo → sin caja fantasma
+  if (defs.length === 0) return null; // sin verbo aplicable → sin caja fantasma
 
   // Agrupa por GROUP_ORDER; separador SOLO entre grupos presentes (N−1, cero vacíos).
   const present = GROUP_ORDER

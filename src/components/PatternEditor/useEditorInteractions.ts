@@ -716,6 +716,16 @@ export function useEditorInteractions(
       if (handled) return;
     }
     if (activeTool === 'editPattern') {
+      // El botón derecho NO cambia de sujeto: pregunta por el que hay. Sin esta
+      // guarda, clicar con el derecho sobre la pieza que ya se está editando
+      // caía aquí —`handleMouseDown` del hook devuelve `false` para cualquier
+      // botón que no sea el izquierdo— y volvía a llamar `enterEdit` sobre la
+      // MISMA pieza, que resetea el estado entero y BORRA la selección de
+      // puntos. Medido el 2026-09-06: los chips del punto pasaban de dos a cero
+      // en el propio clic que iba a abrir su menú, así que «Mover exacto…»
+      // nunca tenía sujeto. Es la puerta de la petición literal de María
+      // [02:34], cerrándose sola al tocarla.
+      if (e.button !== 0) return;
       // Not yet editing — click piece to enter
       const target = e.target as SVGElement;
       const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');

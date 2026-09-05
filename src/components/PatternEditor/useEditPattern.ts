@@ -721,6 +721,30 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     [state.editingPieceId, getPiece, dispatchAndRefresh, guardLocked],
   );
 
+  // ─── moveNodeTo (#1112: escribir la distancia a un vecino) ───
+
+  /**
+   * Mueve un nodo a un punto exacto, en coordenadas LOCALES de la pieza.
+   *
+   * Es la puerta de los chips del nodo. Existe para que el chip NO reconstruya
+   * el contorno por su cuenta: aquí está la compensación de pivote, el
+   * re-anclado de piquetes y el refresco del overlay, y tener eso duplicado en
+   * la capa de cotas es exactamente el fallo que este repo tiene escrito con
+   * nombre propio («dos listas se desincronizan»).
+   *
+   * `applyNodeMove` mueve el GRUPO de anclas coincidentes, no un comando: en el
+   * DXF de María cada esquina son dos o tres comandos en la misma coordenada, y
+   * mover uno solo rompería el contorno en una púa.
+   */
+  const moveNodeTo = useCallback(
+    (pieceId: string, commandIndex: number, destino: Point2D) => {
+      const piece = getPiece(pieceId);
+      if (!piece || guardLocked(piece)) return;
+      dispatchAndRefresh(piece, applyNodeMove(piece.outline, commandIndex, 'anchor', destino));
+    },
+    [getPiece, dispatchAndRefresh, guardLocked],
+  );
+
   // ─── convertSegmentToPoints ───
 
   /** Curva por puntos: la que pidió María, con los puntos SOBRE la línea (#197). */
@@ -776,6 +800,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     convertSegment,
     convertSegmentToPoints,
     addPointOnSegment,
+    moveNodeTo,
     getCursor,
   };
 }

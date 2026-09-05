@@ -3,6 +3,7 @@ import { margenEnPunto } from '../../../utils/seam/margenEnPunto';
 import { cotaDeMargen } from './cotaDeMargen';
 import { cotasDeLineaInterna, cotasDePieza, type Cota } from './cotas';
 import { cotasDelTramoEnCurso, type TramoEnCurso } from './tramoEnCurso';
+import { cotasDelNodo } from './nodo';
 import { formatMedida } from './parseMedida';
 
 export interface SeamAllowanceAnchor {
@@ -35,6 +36,17 @@ export interface SujetoInput {
    * llega como argumento — igual que le pasará a la selección de nodos.
    */
   tramoEnCurso?: TramoEnCurso | null;
+  /**
+   * El nodo que se está editando en «Editar patrón» (#1112). Como el tramo en
+   * curso, vive en el estado LOCAL de su hook y por eso llega como argumento —
+   * es una de las dos clases de sujeto que un `createSelector` puro no podría
+   * alcanzar, y de ahí que la escalera del sujeto activo tenga que recibirlas.
+   *
+   * Solo con UNO seleccionado: lo único que comparten dos o más nodos es su
+   * desplazamiento, y eso es otra cota (decisión 5 de la gramática de la
+   * tanda 6, todavía sin implementar).
+   */
+  nodoSeleccionado?: { pieceId: string; commandIndex: number } | null;
 }
 
 export interface Sujeto {
@@ -134,6 +146,29 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
       disabled: false,
       lineaDeSujeto: 'Editando: el tramo en curso',
     };
+  }
+
+  // Un nodo en edición gana a la pieza que lo contiene, por la misma regla de
+  // especificidad que hace ganar a una línea interna seleccionada: una
+  // sub-selección siempre manda sobre su contenedor.
+  if (input.nodoSeleccionado) {
+    const piezaDelNodo = input.pieces.find(p => p.id === input.nodoSeleccionado!.pieceId);
+    const capaDelNodo = piezaDelNodo?.layer ?? 1;
+    if (piezaDelNodo && !input.hiddenLayerIds.includes(capaDelNodo)) {
+      const cotas = cotasDelNodo(piezaDelNodo, input.nodoSeleccionado.commandIndex);
+      if (cotas.length > 0) {
+        return {
+          piece: piezaDelNodo,
+          caliente: false,
+          cotas,
+          lectura: null,
+          lecturaApagada: false,
+          bordeLeido: null,
+          disabled: Boolean(piezaDelNodo.locked) || Boolean(input.layerLocked[capaDelNodo]),
+          lineaDeSujeto: 'Editando: el punto seleccionado',
+        };
+      }
+    }
   }
 
   const lineaRect = input.activeTool === 'rectangle'
