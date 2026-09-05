@@ -26,7 +26,9 @@ const SlashAndSpreadIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const slashAndSpreadTool: ToolDefinition = {
   id: 'slashAndSpread',
-  name: 'Slash & Spread',
+  // «Abrir la pieza» conserva el verbo que la pista ya enseñaba, y cubre
+  // también la equivalencia de pinza, que «Dar vuelo» dejaría fuera.
+  name: 'Abrir la pieza',
   context: '2d',
   icon: SlashAndSpreadIcon,
   cursor: 'crosshair',
@@ -34,22 +36,24 @@ export const slashAndSpreadTool: ToolDefinition = {
   options: [
     {
       id: 'mode',
-      label: 'Spread Mode',
+      // El paréntesis dice en qué se mide cada modo: girando se arrastra un
+      // ángulo, en paralelo se arrastra una distancia.
+      label: 'Cómo se abre',
       type: 'select',
       value: 'pivot',
       choices: [
-        { label: 'Pivot (Angle)', value: 'pivot' },
-        { label: 'Parallel (Distance)', value: 'parallel' },
+        { label: 'Girando (ángulo)', value: 'pivot' },
+        { label: 'En paralelo (distancia)', value: 'parallel' },
       ],
     },
     {
       id: 'gapFill',
-      label: 'Gap Fill',
+      label: 'El hueco se cierra',
       type: 'select',
       value: 'straight',
       choices: [
-        { label: 'Straight', value: 'straight' },
-        { label: 'Smooth Curve', value: 'smooth' },
+        { label: 'Con una recta', value: 'straight' },
+        { label: 'Con una curva', value: 'smooth' },
       ],
     },
   ],

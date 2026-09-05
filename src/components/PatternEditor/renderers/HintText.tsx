@@ -12,6 +12,9 @@ interface HintTextProps {
   seamPhase?: 'idle' | 'holdingA';
   topstitchMode?: string;
   walkSeamPhase?: string;
+  /** Fase de «Abrir la pieza»: son cinco clics y ninguno se adivina, así que
+   *  la pista va una a una en vez de en una línea que no cabe. */
+  slashPhase?: string;
   /** Width the seamAllowance tool will apply on click (editor.defaultSeamAllowanceWidth) */
   saDefaultWidthMm?: number;
   /** Nodos del trazo de línea interna en curso: 0 = sin trazo. */
@@ -48,7 +51,7 @@ function Pie({ children }: { children: React.ReactNode }) {
 
 export default function HintText({
   activeTool, pieces, penNodesLength,
-  nodeEditorIsEditing, seamPhase, topstitchMode, walkSeamPhase,
+  nodeEditorIsEditing, seamPhase, topstitchMode, walkSeamPhase, slashPhase,
   saDefaultWidthMm, internalShapeNodesLength = 0, cotasVisibles = false, hasSeams,
 }: HintTextProps) {
   const hasPieces = pieces.length > 0;
@@ -122,6 +125,47 @@ export default function HintText({
         <Pie>
           {`Pasa por un borde para leer su margen · clic para escribirlo · pieza entera: ${formatMedida(saDefaultWidthMm ?? DEFAULT_SEAM_ALLOWANCE, 'mm')} · esquina: su tipo`}
         </Pie>
+      )}
+
+      {/* Las cinco que estrenaron puerta el 2026-09-05. Hasta ese día no tenían
+          botón ni atajo, así que tampoco tenían pista: nadie escribe la
+          instrucción de una herramienta a la que no se puede llegar. */}
+
+      {activeTool === 'hand' && (
+        <Pie>Arrastra para mover la vista · el botón del medio del ratón hace lo mismo sin salir de la herramienta que estés usando</Pie>
+      )}
+
+      {activeTool === 'measureCurve' && (
+        <Pie>Clic en un borde para leer su largo siguiendo la curva · clic en otro cambia de borde</Pie>
+      )}
+
+      {activeTool === 'compareCurves' && (
+        <Pie>Clic en un borde y después en otro para ver la diferencia de largo</Pie>
+      )}
+
+      {/* Cinco clics antes de poder arrastrar, y ninguno se adivina: es el
+          gesto más largo del lienzo 2D y hasta hoy no lo decía nadie.
+          Contarlos todos en una línea NO cabe — medido a 1366×643, la frase
+          entera ocupaba 883 px y arrancaba en x = −101, o sea el hallazgo F2
+          del informe repuesto por nuestra propia mano. Va por fases, como
+          `walkSeam` unas líneas más abajo: cada una dice solo el clic que toca.
+          Las fases son las de `useSlashAndSpreadTool`. */}
+      {activeTool === 'slashAndSpread' && (() => {
+        const msgs: Record<string, string> = {
+          idle: 'Clic en el contorno de la pieza para empezar el corte',
+          drawingSlash: 'Clic en el contorno otra vez para cerrar el corte · Esc cancela',
+          slashComplete: 'Clic en la mitad que quieres mover',
+          selectingHalf: 'Clic otra vez en esa mitad para confirmarla',
+          halfConfirmed: 'Clic en una punta del corte: por ahí va a girar',
+          awaitingDrag: 'Mueve el ratón para abrir la pieza · Esc vuelve atrás',
+          spreading: 'Suelta cuando esté como la quieres',
+          spreadPreview: 'Enter la abre de verdad · Esc descarta y deja volver a probar',
+        };
+        return <Pie>{msgs[slashPhase ?? 'idle'] ?? msgs.idle}</Pie>;
+      })()}
+
+      {activeTool === 'trimPlace' && (
+        <Pie>Clic en un borde pone el avío elegido · con «Repartidos por el borde» llena el borde entero de una vez</Pie>
       )}
 
       {activeTool === 'walkSeam' && (() => {

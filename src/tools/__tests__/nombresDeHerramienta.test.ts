@@ -32,15 +32,22 @@ function idsAlcanzables(): string[] {
  *  del catálogo del dock (lo que ella acaba de clicar) o de la etiqueta que
  *  `shortcuts/defaults.ts` ya traía aprobada. */
 const NOMBRES: Record<string, string> = {
+  // Las cinco de abajo entraron al catálogo el 2026-09-05 (censo de puertas):
+  // tenían gesto y ninguna forma de llegar, así que `idsAlcanzables()` no las
+  // veía y nadie le exigía nombre español a su definición. Al abrirles la
+  // puerta el nombre viene con ellas — es el mismo lote, no un seguimiento.
   circle: 'Elipse (círculo)',
+  compareCurves: 'Comparar largos',
   dart: 'Pinza',
   editConstrain: 'Editar curvatura',
   editCurve: 'Editar punto de curva',
   editPattern: 'Editar patrón',
   extendTrim: 'Extender / recortar',
   grainline: 'Hilo',
+  hand: 'Mano',
   internalShape: 'Línea interna',
   measure: 'Medir',
+  measureCurve: 'Medir el borde',
   merge: 'Unir patrones',
   notch: 'Piquete',
   offsetOutline: 'Desplazar contorno',
@@ -54,11 +61,13 @@ const NOMBRES: Record<string, string> = {
   seamAllowance: 'Margen de costura',
   seamEdit: 'Editar costuras',
   select: 'Seleccionar',
+  slashAndSpread: 'Abrir la pieza',
   topstitchEdit: 'Editar pespunte',
   topstitchFree: 'Pespunte libre',
   topstitchSeamline: 'Pespunte sobre costura',
   topstitchSegment: 'Pespunte por tramo',
   trace: 'Trazar',
+  trimPlace: 'Poner avío',
   transform: 'Transformar patrón',
   walkSeam: 'Recorrer costura',
 };

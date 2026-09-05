@@ -19,6 +19,27 @@ export interface DockState {
 const STORAGE_KEY = 'vina-docks';
 const STORAGE_VERSION = 1;
 const MAX_PINNED = 16;
+
+/**
+ * Tope de herramientas del dock 2D.
+ *
+ * NO es el mismo botón que `MAX_PINNED`, aunque los dos sean números parecidos:
+ * `MAX_PINNED` acota las sugerencias que la usuaria se queda (`pinnedExtra`), y
+ * esto acota `tools2d`, cuyos ids salen todos de `DOCK_2D_CATALOG`.
+ *
+ * Por qué existe: el sobre persistido valida `.max()` sobre esta lista, y zod
+ * rechaza el sobre ENTERO cuando un campo no valida — `loadDocks` devuelve null
+ * y el dock vuelve a las doce de fábrica. O sea que pasarse del tope no recorta
+ * la lista: le borra a María TODA su configuración, sin avisar. Con catorce en
+ * el catálogo el tope era inalcanzable; con diecinueve no.
+ *
+ * Por qué 20 y no 16: tiene que caber el catálogo COMPLETO. Un tope por debajo
+ * cambia el desastre por un defecto más pequeño pero igual de mudo — el botón
+ * «añadir» de las últimas del personalizador no haría nada. Si el catálogo
+ * crece por encima de esto, hay que subirlo: lo pide un aserto de
+ * `las-cinco-puertas-que-se-abren.test.ts`.
+ */
+export const MAX_DOCK_2D_TOOLS = 20;
 const MAX_ID_LEN = 80;
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -108,7 +129,7 @@ const sideArray = z.array(idString).max(MAX_PINNED);
 
 const signalingSchema = z.enum(['subtle', 'off']).default('subtle');
 
-const tools2dSchema = z.array(idString).max(MAX_PINNED).default([...DEFAULT_DOCK_2D_IDS]);
+const tools2dSchema = z.array(idString).max(MAX_DOCK_2D_TOOLS).default([...DEFAULT_DOCK_2D_IDS]);
 
 const DockStateSchema = z
   .object({
@@ -174,6 +195,11 @@ const dockSlice = createSlice({
       state.tools2d = action.payload.tools2d;
     },
     addDockTool(state, action: PayloadAction<string>) {
+      // El tope se comprueba AQUÍ y no solo en el schema: pasarse no recorta la
+      // lista al recargar, la tira entera (ver MAX_DOCK_2D_TOOLS). Callarse una
+      // herramienta de más es mucho más barato que devolverle el dock de
+      // fábrica a quien lleva meses acomodándolo.
+      if (state.tools2d.length >= MAX_DOCK_2D_TOOLS) return;
       if (!state.tools2d.includes(action.payload)) state.tools2d.push(action.payload);
     },
     removeDockTool(state, action: PayloadAction<string>) {

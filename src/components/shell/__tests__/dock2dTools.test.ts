@@ -3,8 +3,22 @@ import { DOCK_2D_CATALOG, getDockToolById } from '../dock2dTools';
 import { DEFAULT_DOCK_2D_IDS } from '../../../store/dockSlice';
 
 describe('dock2dTools catalog', () => {
-  it('has 14 entries (3 unwired phantom tools removed #529; point y seamEdit añadidos; line retirado en internalShape; circle nace en #1111)', () => {
-    expect(DOCK_2D_CATALOG).toHaveLength(14);
+  // 19 desde el 2026-09-05: entraron las cinco del censo de puertas —hand,
+  // measureCurve, compareCurves, slashAndSpread, trimPlace—, que tenían el
+  // gesto entero y ninguna forma de llegar salvo que el copiloto las activara.
+  // Van al final y sin atajo; el default sigue en doce.
+  it('has 19 entries (3 unwired phantom tools removed #529; point y seamEdit añadidos; line retirado en internalShape; circle nace en #1111; las cinco sin puerta se abren)', () => {
+    expect(DOCK_2D_CATALOG).toHaveLength(19);
+  });
+
+  it('las cinco que estrenaron puerta van al final, después de hilo', () => {
+    // El orden importa: el catálogo abre con el default en orden y cierra con
+    // lo que está fuera de fábrica. Si una se cuela antes de `grainline`, el
+    // aserto de "los primeros 12 son el default" seguiría verde y el
+    // personalizador mostraría el grupo partido.
+    expect(DOCK_2D_CATALOG.slice(-5).map((t) => t.id)).toEqual([
+      'hand', 'measureCurve', 'compareCurves', 'slashAndSpread', 'trimPlace',
+    ]);
   });
 
   it('drops the unwired phantom tools and the retired line tool', () => {

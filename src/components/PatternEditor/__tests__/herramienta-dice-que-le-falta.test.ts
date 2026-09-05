@@ -47,20 +47,18 @@ describe('G — la tira dice qué falta antes de que María haga clic', () => {
       // Que nombre la herramienta: "selecciona una pieza" a secas no enseña
       // en cuál de las cuatro está parada.
       expect(msg!.length).toBeGreaterThan(24);
-      // El guardián de idioma tiene que ver el inglés GENÉRICO, pero no puede
-      // cazar el nombre propio con el que la herramienta ya está rotulada en
-      // todo el producto: `slashAndSpread.tsx:29` la llama "Slash & Spread" en
-      // el dock, en la tira y en la paleta, y escribir otro nombre aquí
-      // rompería la ley de un-término-por-concepto, que es peor.
-      // Que ese nombre esté en inglés es una deuda REAL y ANTERIOR, de toda la
-      // herramienta, y se arregla renombrándola en su registro — no en esta
-      // frase. Queda anotada en el informe del 2026-09-04.
-      // La primera versión de este guardián (`/\b(select|piece|first|tool)\b/i`)
-      // no veía "Slash" ni "Spread" y habría dejado pasar cualquier otro nombre
-      // inglés inventado aquí; este sí, salvo los ya registrados.
-      const NOMBRES_REGISTRADOS = /Slash & Spread/g;
-      const sinNombresPropios = msg!.replace(NOMBRES_REGISTRADOS, '');
-      expect(sinNombresPropios, 'inglés colado en la pista')
+      // El guardián de idioma caza el inglés genérico. Hasta el 2026-09-05
+      // tenía que abrirle un hueco a un nombre propio: la herramienta se
+      // llamaba "Slash & Spread" en el dock, en la tira y en la paleta, y
+      // escribir otro nombre solo aquí habría roto la ley de
+      // un-término-por-concepto, que es peor. Esa deuda se pagó donde tocaba,
+      // en el registro y no en esta frase: hoy se llama "Abrir la pieza", y la
+      // pista ni la nombra, porque el nombre YA es el verbo. Con la deuda se va
+      // la excepción: el guardián vuelve a mirar la pista entera.
+      // La primera versión (`/\b(select|piece|first|tool)\b/i`) no veía "Slash"
+      // ni "Spread" y habría dejado pasar cualquier nombre inglés inventado
+      // aquí; esta sí.
+      expect(msg!, 'inglés colado en la pista')
         .not.toMatch(/\b(select|piece|first|tool|slash|spread|offset|extend|trim|transform|outline)\b/i);
     },
   );

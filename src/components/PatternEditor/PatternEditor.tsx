@@ -1331,6 +1331,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           seamPhase={seamTool.phase}
           topstitchMode={topstitchTool.mode}
           walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
+          slashPhase={slashAndSpreadTool.phase}
           saDefaultWidthMm={seamAllowanceTool.widthMm}
           internalShapeNodesLength={internalShapeTool.nodes.length}
           cotasVisibles={sujeto.cotas.length > 0}
