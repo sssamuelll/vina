@@ -250,7 +250,22 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       // punto en B dejaba las anclas de B flotando sobre la lona.
       if (piece.id === editingPieceIdRef.current) {
         expectedOutlineRef.current = newOutline;
-        setState(s => ({ ...s, nodes: newNodes }));
+        // Si el verbo insertó o borró comandos, todo índice guardado corrió de
+        // sitio y pasa a denotar OTRA geometría — exactamente lo que el JSDoc
+        // de `resyncStateToPiece` explica para el undo externo. Es el mismo
+        // caso, así que es la misma limpieza (#1122).
+        //
+        // Con guarda de longitud y no siempre: arrastrar y `moveNodeTo` mutan
+        // valores en el sitio, y hay un contrato verde que EXIGE que la
+        // selección sobreviva a un arrastre.
+        //
+        // ponytail: la longitud basta hoy porque ningún verbo inserta y borra
+        // a la vez; si alguno llega con saldo neto cero, esto pasa a ser un
+        // parámetro explícito del verbo.
+        const estructural = newOutline.length !== piece.outline.length;
+        setState(s => (estructural
+          ? resyncStateToPiece(s, updated)
+          : { ...s, nodes: newNodes }));
       }
       return newNodes;
     },
@@ -667,12 +682,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         };
         expectedOutlineRef.current = outline;
         dispatch(updatePiece(updated));
-        setState(s => ({
-          ...s,
-          nodes: extractNodes(updated),
-          selectedNodes: new Set<number>(),
-          selectedSegments: new Set<number>(),
-        }));
+        // Este camino no pasa por `dispatchAndRefresh`. Ya limpiaba la
+        // selección, pero dejaba vivos el hover y la previsualización con
+        // índices de un contorno que acaba de encoger (#1122).
+        setState(s => resyncStateToPiece(s, updated));
 
         e.preventDefault();
       }
