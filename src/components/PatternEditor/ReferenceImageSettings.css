@@ -11,10 +11,21 @@
  * midió en la revisión adversarial del 2026-09-04. Un solo vocabulario para
  * dos paneles gemelos.
  *
- * Contrastes MEDIDOS contra la superficie real (compuesto el alfa de cada
- * capa: `--surface-overlay-bg` .92 sobre `--bg-base`, y encima el tinte propio
- * de cada chip). No se heredan de la versión anterior de este archivo: aquéllos
- * se midieron contra `--bg-elevated`, que nunca fue lo que había debajo. */
+ * Contrastes MEDIDOS contra el sustrato de CADA sitio, que no es el mismo en
+ * todos — y la frase que había aquí decía lo contrario:
+ *
+ *   - Las seis medidas «sobre la fila» van contra `--bg-elevated`, que es
+ *     opaco y ES lo que hay debajo (`.ref-img-item`, más abajo). El comentario
+ *     viejo afirmaba que ese token «nunca fue lo que había debajo»: falso, y
+ *     los números que acompañaba estaban bien. Se corrige la frase, no los
+ *     colores.
+ *   - El botón de importar y los estados con realce sí van contra la superficie
+ *     COMPUESTA: `--surface-overlay-bg` (.92) sobre `--bg-base`, y encima el
+ *     tinte propio del chip.
+ *
+ * Lo que sí se hereda mal es medir contra el sustrato de OTRO estado: los
+ * colores de calibrar y eliminar solo se pintan en hover, así que van contra el
+ * chip del hover, no contra la fila desnuda. */
 
 .ref-img-settings {
   display: flex;
@@ -127,14 +138,35 @@
 .ref-img-btn:hover, .ref-img-btn:focus-visible { background: var(--accent-subtle); color: var(--text-primary); }
 .ref-img-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-/* Ley de estado: seleccionado pesa más que hover. 5,72:1 sobre la fila. */
+/* Ley de estado (§ 4): seleccionado > hover > reposo, EN PESO VISUAL.
+ *
+ * Corregido: el comentario decía eso y el código hacía lo contrario. El activo
+ * solo cambiaba de tono sobre la fila (5,72:1) mientras el hover se llevaba
+ * relleno Y tinta más clara (12,03:1), o sea que el botón apenas rozado se veía
+ * más encendido que el que está puesto — el mismo defecto que la auditoría
+ * encontró en el dock. Y la § 4 lo dice literal: «el estado seleccionado no
+ * puede depender solo del tono; cambia también el relleno».
+ *
+ * Ahora el activo lleva el relleno FUERTE del acento (.27 contra el .13 del
+ * hover) y su tinta. Sobre el chip compuesto —rgb(30,30,58)— `--accent-ink` da
+ * 5,26:1, que pasa AA a 11 px. El hover se queda como está: es el estado
+ * transitorio y tiene que pesar menos.
+ *
+ * El activo va DESPUÉS del hover a propósito: misma especificidad, gana la
+ * última, así que pasar el ratón sobre un botón ya activo no lo apaga. */
 .ref-img-btn.active {
+  background: var(--accent-border);
   color: var(--accent-ink);
 }
 
 /* Van después del bloque de arriba a propósito: misma especificidad, gana la
  * última, y así el color del rol pisa al realce genérico sin subir el peso.
- * 7,94:1 y 6,17:1 sobre la fila, respectivamente. */
+ *
+ * Contrastes MEDIDOS contra el sustrato de ESE estado, que es el chip del hover
+ * —`--accent-subtle` compuesto sobre la fila, rgb(24,24,50)— y no la fila
+ * desnuda: en reposo estos dos colores no se pintan nunca, así que medirlos
+ * contra la fila era medir contra un fondo que en ese estado no existe.
+ * `--warning` da 7,52:1 y `--destructive-hover` 5,81:1. Los dos pasan AA. */
 .ref-img-btn-calibrate:hover, .ref-img-btn-calibrate:focus-visible { color: var(--warning); }
 .ref-img-btn-remove:hover, .ref-img-btn-remove:focus-visible { color: var(--destructive-hover); }
 

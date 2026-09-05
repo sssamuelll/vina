@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
+import { showErrorToast } from '../../store/copilotUISlice';
 import { startCalibration } from '../../store/editorSlice';
 import { newId } from '../../utils/ids';
 import { importReferenceImage } from '../../utils/import/imageImporter';
@@ -64,26 +65,58 @@ export function useReferenceImages(): ReferenceImagesApi {
     }
   }, [referenceImages]);
 
+  /**
+   * Importar, y DECIRLO cuando no se pudo.
+   *
+   * Aquí había un `catch` vacío en el componente con el comentario «import
+   * errors are handled by the parent» — y el padre no tenía try/catch ni
+   * despachaba nada. Mientras el panel era inalcanzable eso era código muerto;
+   * emplazarlo lo convierte en el PRIMER modo de fallo que María va a ver, y
+   * los cuatro caminos que caen aquí son reales: MIME no aceptado (el diálogo
+   * del sistema deja elegir «Todos los archivos»), archivo de más de 20 MB (un
+   * TIFF escaneado de patronaje pasa de eso sin esfuerzo), archivo corrupto que
+   * el navegador no decodifica, e IndexedDB rechazando. En los cuatro se
+   * cerraba el selector y no pasaba nada.
+   *
+   * Es la misma deriva dormida que se atacó en el CSS de este panel, por el
+   * otro lado. Variante F de D2 (`showErrorToast`), como el panel gemelo
+   * `CollisionBodyMesh.tsx:56`.
+   */
   const onImport = useCallback(async (file: File) => {
-    const result = await importReferenceImage(file);
     const id = newId();
-    // La URL entra al mapa ANTES del dispatch: el dispatch es lo que re-renderiza
-    // al lienzo, y para entonces la URL ya tiene que estar puesta.
-    objectUrlMap.set(id, result.objectUrl);
-    await storeImageBlob(id, result.imageBlob);
-    dispatch(addReferenceImage({
-      id,
-      filename: result.filename,
-      width: result.width,
-      height: result.height,
-      position: { x: 0, y: 0 },
-      scale: 1,
-      rotation: 0,
-      opacity: 0.5,
-      locked: false,
-      visible: true,
-      pixelsPerMm: null,
-    }));
+    try {
+      const result = await importReferenceImage(file);
+      // El blob va a IndexedDB ANTES de tocar el mapa: si la escritura falla,
+      // no queda una URL huérfana que nadie pinta, nadie despacha y nadie
+      // revoca. El orden inverso dejaba justo eso.
+      await storeImageBlob(id, result.imageBlob);
+      // Y la URL entra al mapa antes del dispatch: el dispatch es lo que
+      // re-renderiza al lienzo, y para entonces la URL ya tiene que estar.
+      objectUrlMap.set(id, result.objectUrl);
+      dispatch(addReferenceImage({
+        id,
+        filename: result.filename,
+        width: result.width,
+        height: result.height,
+        position: { x: 0, y: 0 },
+        scale: 1,
+        rotation: 0,
+        opacity: 0.5,
+        locked: false,
+        visible: true,
+        pixelsPerMm: null,
+      }));
+    } catch (e) {
+      const url = objectUrlMap.get(id);
+      if (url) { URL.revokeObjectURL(url); objectUrlMap.delete(id); }
+      // Qué pasó, por qué y qué hacer, en ese orden. El mensaje del importador
+      // ya viene en español y dice el límite y los formatos.
+      dispatch(showErrorToast(
+        e instanceof Error && e.message
+          ? `No se pudo traer la imagen: ${e.message}`
+          : 'No se pudo traer la imagen. Prueba con un PNG, JPG o WEBP de menos de 20 MB.',
+      ));
+    }
   }, [dispatch]);
 
   const onCalibrate = useCallback((imageId: string) => {
@@ -105,8 +138,16 @@ export function useReferenceImages(): ReferenceImagesApi {
   }, [dispatch]);
 
   const onRemove = useCallback((imageId: string) => {
-    // No se revoca la URL ni se borra del mapa: deshacer puede devolver la
-    // imagen. La limpieza va en `garbageCollect()` al abrir otro proyecto.
+    // No se revoca la URL ni se borra del mapa, y eso es a propósito: deshacer
+    // puede devolver la imagen y sin su URL volvería en blanco.
+    //
+    // Lo que NO es cierto —y el comentario que había aquí lo afirmaba, y viajó
+    // verbatim desde `PatternEditor.tsx`— es que la limpieza «va en
+    // `garbageCollect()` al abrir otro proyecto»: esa función no tiene un solo
+    // llamador en producción, solo su propio test. Así que hoy cada imagen
+    // borrada deja una blob URL viva toda la sesión y un blob en IndexedDB para
+    // siempre. Es preexistente y no se arregla aquí, pero deja de estar escrito
+    // como si estuviera resuelto.
     dispatch(removeReferenceImage(imageId));
   }, [dispatch]);
 

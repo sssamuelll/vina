@@ -56,12 +56,23 @@ const FILE_MENU: MenuItem[] = [
   } },
   { separator: true, label: '' },
   { label: 'Importar DXF...', action: () => {} }, // wired via callback (opens file picker)
-  // La puerta de las imágenes de fondo (§ 6). Su panel existía desde el
+  // La puerta de las imágenes de referencia (§ 6). Su panel existía desde el
   // 2026-03-24 y no había forma de llegar a él: se montaba fuera de la ventana
-  // y nadie lo abría. Va junto a Importar DXF porque es el mismo gesto —meter
-  // algo de afuera al lienzo—, y NO choca con Vista ▸ «Imágenes de referencia»,
-  // que muestra u oculta las que ya están: son dos conceptos con dos etiquetas.
-  { label: 'Importar imagen de referencia...', action: () => {} }, // wired via onOpenPanel('ReferenceImages')
+  // y nadie lo abría.
+  //
+  // NOMBRA EL PANEL, NO LA ACCIÓN, y eso es una corrección: se llamaba
+  // «Importar imagen de referencia...» y `onOpenPanel` es `togglePanel`
+  // (AppShell.tsx:272, ratificado en AppShell.canaletas.test.tsx). O sea que el
+  // segundo clic CERRABA el panel en vez de importar, y el ítem hermano de
+  // arriba —«Importar DXF...»— abre el selector siempre. Dos etiquetas
+  // paralelas con dos comportamientos. Un ítem que nombra un sitio sí puede
+  // alternar, y ese es el patrón de «Avatar y medidas...».
+  //
+  // Los puntos suspensivos y el menú lo distinguen de Vista ▸ «Imágenes de
+  // referencia», que es la casilla de mostrar u ocultar. Es UN término para UN
+  // concepto asomado dos veces —gestionar y ver—, no dos términos: eso sí
+  // rompería la § 5.
+  { label: 'Imágenes de referencia...', action: () => {} }, // wired via onOpenPanel('ReferenceImages')
   { separator: true, label: '' },
   // Fase1-S2: solo exports que EXISTEN. Tech Pack / 3D / Reference Image /
   // Project Settings eran noops o abrían el placeholder circular — un item
@@ -314,7 +325,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
       onImportDXF();
     } else if (item.label === 'Avatar y medidas...') {
       onOpenPanel('Avatar');
-    } else if (item.label === 'Importar imagen de referencia...') {
+    } else if (item.label === 'Imágenes de referencia...') {
       onOpenPanel('ReferenceImages');
     } else if (item.action) {
       item.action(dispatch);

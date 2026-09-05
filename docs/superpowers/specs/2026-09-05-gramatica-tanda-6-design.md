@@ -217,6 +217,25 @@ tramos M/L; llamarlos mudanza no baja el número.
 | 4 | `borde → nada` convierte Supr en no-op tras usar Margen | **resuelto** — § 3.2 (b) |
 | 5 | La escalera omite dos sujetos que la propia propuesta hace visibles | **resuelto** — están en la lista de § 3 |
 
+## 9.5 El borde de cierre: la decisión que #1119 pedía, tomada
+
+`#1119` describe exactamente este defecto y deja abierta la decisión:
+
+> «Decidir junto con #1047: o el tramo de cierre entra en un `segmentRange`, o
+> `edgeRangeForCommand` lo resuelve explícitamente»
+
+**Se decide la segunda, y con el precio de la primera medido.** Hacer que el
+productor emita el índice de la `Z` se implementó y se revirtió: sobre el DXF
+real de María, 42 clics que enganchaban un borde pasaron a caer en «pieza»,
+porque `pickEdgeForSeamAllowance` busca por la etiqueta vieja. Con 159
+consumidores de `segmentRange`, el productor ES la interfaz pública.
+
+Lo que se hizo el 2026-09-05 cubre solo a los que MIDEN
+(`interpolateEdgePoint`, `computeEdgeLengthMM`, `buildEdgeInfo`), vía
+`rangoMedibleDeBorde`. Lo que #1119 llama «coser, margen, pespunte, autoSew»
+—los que van por `edgeRangeForCommand`— sigue abierto, y es la misma familia
+que el resolutor único: se decide con #1047, no aquí.
+
 ## 10. Lo que este documento no cierra
 
 - **La gramática de la curva.** Los chips de distancia del nodo no dicen qué

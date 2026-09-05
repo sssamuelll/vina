@@ -233,13 +233,36 @@ test.describe('el avío se guarda con el nombre que María eligió', () => {
     await page.mouse.move(b.x, b.y, { steps: 12 }); await page.mouse.up();
     await page.waitForTimeout(600);
 
+    // Que la pieza EXISTA antes de seguir: sin esto, un arranque lento deja el
+    // clic sobre el lienzo vacío y el fallo se lee como «el avío se guarda en
+    // inglés» cuando en realidad no se guardó nada. Un gate que da falsos rojos
+    // se acaba desactivando.
+    const pieza = await expect.poll(
+      async () => (await st(page)).project.pieces[0],
+      { timeout: 10_000, message: 'no se creó la pieza con Rectángulo' },
+    ).toBeTruthy().then(() => (st(page)).then((e) => e.project.pieces[0]));
+    expect(pieza.outline.length).toBeGreaterThan(3);
+
     await dispatch(page, 'editor/setActiveTool', 'trimPlace');
     await dispatch(page, 'tools/setActiveTool2D', 'trimPlace');
     await page.waitForTimeout(400);
-    const borde = await toScreen(page, { x: 220, y: 140 });
-    await page.mouse.move(borde.x, borde.y); await page.waitForTimeout(150);
+
+    // El medio del borde de arriba, sacado del contorno REAL y no de las
+    // coordenadas que se pidieron: si el rectángulo salió con otro tamaño, el
+    // clic sigue cayendo donde toca.
+    const xs = pieza.outline.flatMap((c) => c.values.filter((_, i) => i % 2 === 0));
+    const ys = pieza.outline.flatMap((c) => c.values.filter((_, i) => i % 2 === 1));
+    const medio = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: Math.min(...ys) };
+
+    const borde = await toScreen(page, medio);
+    await page.mouse.move(borde.x, borde.y); await page.waitForTimeout(200);
     await page.mouse.click(borde.x, borde.y);
-    await page.waitForTimeout(500);
+    await expect
+      .poll(async () => await page.evaluate(() => {
+        const w = window as unknown as { __VINA_STORE__: { getState: () => { project: { trims?: unknown[] } } } };
+        return (w.__VINA_STORE__.getState().project.trims ?? []).length;
+      }), { timeout: 8000, message: 'el clic sobre el borde no colocó ningún avío' })
+      .toBeGreaterThan(0);
 
     const guardado = await page.evaluate(() => {
       const w = window as unknown as { __VINA_STORE__: { getState: () => { project: { trims?: Array<{ name: string }> } } } };

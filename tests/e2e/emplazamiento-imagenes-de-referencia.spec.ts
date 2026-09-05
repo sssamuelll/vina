@@ -115,7 +115,7 @@ test.describe('la puerta de las imágenes de referencia', () => {
     // no burbujea y React no lo escucha): hay que despachar mouseover.
     await page.getByText('Archivo', { exact: true }).dispatchEvent('mouseover');
 
-    const item = page.getByText('Importar imagen de referencia...', { exact: true });
+    const item = page.getByText('Imágenes de referencia...', { exact: true });
     await expect(item, 'el menú Archivo no ofrece la puerta').toBeVisible({ timeout: 10_000 });
     await item.dispatchEvent('click');
     await page.waitForTimeout(700);
@@ -156,7 +156,7 @@ test.describe('la puerta de las imágenes de referencia', () => {
     await abrirApp(page);
     await page.getByRole('button', { name: /vina/i }).first().dispatchEvent('click');
     await page.getByText('Archivo', { exact: true }).dispatchEvent('mouseover');
-    await page.getByText('Importar imagen de referencia...', { exact: true }).dispatchEvent('click');
+    await page.getByText('Imágenes de referencia...', { exact: true }).dispatchEvent('click');
     await page.waitForTimeout(700);
 
     await page.locator('.ref-img-settings input[type="file"]')
@@ -180,8 +180,9 @@ test.describe('la puerta de las imágenes de referencia', () => {
   });
 
   test('y el toggle del menú Vista sigue siendo otra cosa, sin chocar de nombre', async ({ page }) => {
-    // Vista ▸ «Imágenes de referencia» muestra u oculta; Archivo ▸ «Importar
-    // imagen de referencia...» abre el panel. Un término por concepto (§ 5):
+    // Vista ▸ «Imágenes de referencia» muestra u oculta; Archivo ▸ «Imágenes de
+    // referencia...» abre el panel. Los tres puntos los distinguen, y `exact`
+    // impide que este aserto enganche al de Archivo por error. Un término por concepto (§ 5):
     // dos ítems con la MISMA etiqueta haciendo cosas distintas sí sería el fallo.
     await abrirApp(page);
     await page.getByRole('button', { name: /vina/i }).first().dispatchEvent('click');

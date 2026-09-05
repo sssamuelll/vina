@@ -5,7 +5,7 @@ import type { Trim, TrimPlacement } from '../../types/trim';
 import type { RootState, AppDispatch } from '../../store';
 import { addTrim } from '../../store/projectSlice';
 import { batchUndo } from '../../store/undoMiddleware';
-import { getTrimPreset } from '../../utils/trim/trimLibrary';
+import { getTrimPreset, TRIM_LIBRARY } from '../../utils/trim/trimLibrary';
 import { TRIM_DEFAULTS } from '../../types/trim';
 import { interpolateEdgePoint, computeEdgeLengthMM } from '../../utils/geometry/edgeInterpolation';
 import { screenToPattern } from '../../utils/geometry';
@@ -99,9 +99,20 @@ export function useTrimTool(
     const hit = findClosestEdgePoint(pt, pieces, zoom);
     if (!hit) return;
 
-    // Resolve preset
-    const presetId = toolOptions.trimPreset as string | undefined;
-    const preset = presetId ? getTrimPreset(presetId) : undefined;
+    // El desplegable de la tira enseña el primer avío ya seleccionado —es el
+    // `value` declarado en la definición— pero `toolOptions` está VACÍO hasta
+    // que ella toca el desplegable: el `value` de la definición es lo que se
+    // pinta, no lo que se guarda. Sin este respaldo, colocar un avío sin abrir
+    // el desplegable guardaba `TRIM_DEFAULTS` — nombre «Trim», en inglés, y
+    // propiedades genéricas que no son las del avío que la tira decía tener
+    // puesto. Medido con un e2e que coloca uno sin tocar nada.
+    //
+    // El respaldo se duplica aquí a propósito, que es la convención del propio
+    // archivo (`placementMode ?? 'single'` tres líneas abajo) y de los demás
+    // hooks: el hueco es general —ninguna herramienta siembra sus opciones en el
+    // store al activarse— y taparlo de raíz es otro trabajo.
+    const presetId = (toolOptions.trimPreset as string | undefined) ?? TRIM_LIBRARY[0].id;
+    const preset = getTrimPreset(presetId);
 
     const type = preset?.type ?? TRIM_DEFAULTS.type;
     // `nameEs`, no `name`: lo que se guarda aquí es lo que la lista de
