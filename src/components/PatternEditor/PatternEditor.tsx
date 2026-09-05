@@ -12,6 +12,7 @@ import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand } from 
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
 import { useCircleTool } from './useCircleTool';
+import { useTriangleTool } from './useTriangleTool';
 import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import CotaLines from './cotas/CotaLines';
 import { cotasDelSujeto, faltaSujeto } from './cotas/sujeto';
@@ -204,6 +205,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const rectTool = useRectangleTool(zoom2D, pan2D, handlePieceComplete);
   // El círculo nace de la misma puerta que la pluma y el rectángulo (#1111).
   const circleTool = useCircleTool(zoom2D, pan2D, handlePieceComplete);
+  // El triángulo, el otro hermano que pidió el mismo issue (#1111, tanda 8).
+  const triangleTool = useTriangleTool(zoom2D, pan2D, handlePieceComplete);
 
   const handleSeamComplete = useCallback((seam: Omit<Seam, 'id'>) => {
     const fullSeam: Seam = { ...seam, id: newId() };
@@ -456,6 +459,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       circleTool.cancel();
       return;
     }
+    // Triángulo: la misma ley que sus hermanos (#1111, tanda 8).
+    if (activeTool === 'triangle' && triangleTool.isArmed()) {
+      suppressed();
+      triangleTool.cancel();
+      return;
+    }
     // Pluma con trazo vivo: el botón derecho no hace nada y el menú no se
     // abre (spec § 5), igual que en la línea interna.
     if (activeTool === 'pen' && pen.nodes.length > 0) {
@@ -632,7 +641,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       isEditingNodes: editPatternTool.isEditing,
       derechoSobreElPuntoElegido,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.selectedNodes, editPatternTool.editingPieceId, editPatternTool.nodes, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, pen.nodes.length]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.selectedNodes, editPatternTool.editingPieceId, editPatternTool.nodes, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, triangleTool, pen.nodes.length]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
@@ -677,7 +686,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const cotasRef = useRef<CotasLayerHandle>(null);
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, circleTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas: cotasRef,
+      pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas: cotasRef,
     });
 
   // ── Cotas vivas (spec 2026-08-30 § 3, § 5): la pieza nueva o seleccionada
@@ -693,9 +702,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   }), shallowEqual);
   const { hotId: rectHotId, enfriar: enfriarRect } = rectTool;
   const { hotId: circleHotId, enfriar: enfriarCircle } = circleTool;
+  const { hotId: triangleHotId, enfriar: enfriarTriangle } = triangleTool;
   // Solo una herramienta está activa a la vez, y cada una enfría la suya en
   // cuanto deja de serlo: el sujeto caliente es el de la herramienta en curso.
-  const hotId = activeTool === 'circle' ? circleHotId : rectHotId;
+  const hotId = activeTool === 'circle' ? circleHotId : activeTool === 'triangle' ? triangleHotId : rectHotId;
   const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
   // Refs para que `aplicarCota` no se recree en cada render de la pluma: la
   // rama del tramo en curso necesita la herramienta viva, no una copia vieja.
@@ -814,6 +824,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     const viva = pieces.some(p => p.id === circleHotId);
     if (activeTool !== 'circle' || selectedPieceIds.length !== 1 || selectedPieceIds[0] !== circleHotId || !viva) enfriarCircle();
   }, [activeTool, selectedPieceIds, pieces, circleHotId, enfriarCircle]);
+  useEffect(() => {
+    if (!triangleHotId) return;
+    const viva = pieces.some(p => p.id === triangleHotId);
+    if (activeTool !== 'triangle' || selectedPieceIds.length !== 1 || selectedPieceIds[0] !== triangleHotId || !viva) enfriarTriangle();
+  }, [activeTool, selectedPieceIds, pieces, triangleHotId, enfriarTriangle]);
 
   const aplicarCota = useCallback((cota: Cota, valueMm: number, token?: UndoBatchToken, motivo: 'enter' | 'tab' = 'enter') => {
     // Un círculo escrito por UNA sola cota dejaba de ser círculo. La cota de una
@@ -894,6 +909,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       // La barra del círculo tiene un solo número, el Radio, y la cota es la
       // caja de la elipse (2rx × 2ry): la mitad de lo que se escribió.
       dispatch(setToolOption({ toolId: 'circle', optionId: 'radius', value: Math.round(valueMm / 2 * 10) / 10 }));
+      return;
+    }
+    if (activeTool === 'triangle') {
+      // La cota es la caja del triángulo (spec #1111): Ancho → Base, Alto → Altura.
+      dispatch(setToolOption({ toolId: 'triangle', optionId: cota.kind === 'ancho' ? 'base' : 'altura', value: Math.round(valueMm * 10) / 10 }));
       return;
     }
     dispatch(setToolOption({ toolId: 'rectangle', optionId: cota.kind === 'ancho' ? 'width' : 'height', value: Math.round(valueMm * 10) / 10 }));
@@ -1185,6 +1205,18 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             showPieceNames={showPieceNames}
             renderMode2D={renderMode2D}
             showLineLengths={showLineLengths}
+            piezaConPuntosDeCurva={
+              // María [11:38]: «los de curva igual no, porque son muchos
+              // puntos… solo deberían verse cuando uno clica como el menú
+              // curva». Los dos modos de editar nodos cuentan como ese menú:
+              // en los dos los puntos de curva son manipulables (#1103).
+              //
+              // Va el ID, no un booleano: encenderlo global suelta cientos de
+              // puntos sobre piezas que nadie está tocando.
+              nodeEditor.isEditing
+                ? nodeEditor.editingPieceId
+                : (activeTool === 'editPattern' ? editPatternTool.editingPieceId : null)
+            }
             units={units}
             groupColors={groupColors}
             selectedInternalLine={editor.selectedInternalLine}
@@ -1245,6 +1277,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             rectDimensions={rectTool.rectDimensions}
             circlePreview={circleTool.previewRect}
             circleDimensions={circleTool.circleDimensions}
+            trianglePoints={triangleTool.trianglePoints}
+            triangleDimensions={triangleTool.triangleDimensions}
             seamSegmentA={seamTool.segmentA}
             seamHoveredTarget={seamTool.hoveredTarget}
             seamActiveTarget={seamTool.activeTarget}

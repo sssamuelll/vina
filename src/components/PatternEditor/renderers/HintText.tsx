@@ -82,12 +82,31 @@ export default function HintText({
         <Pie>Arrastra para dibujar · un clic crea con el último radio · escribe en sus cotas para cambiarlo · Esc cancela</Pie>
       )}
 
+      {activeTool === 'triangle' && (
+        <Pie>Arrastra para dibujar · un clic crea con el último tamaño · escribe en sus cotas para cambiarlo · Esc cancela</Pie>
+      )}
+
       {activeTool === 'grainline' && (
         <Pie>Arrastra dentro de la pieza para el hilo · Shift ajusta a 0°/45°/90°</Pie>
       )}
 
       {cotasVisibles && (activeTool === 'select' || activeTool === 'transform') && (
         <Pie>Clic en una cota para escribirla · arrástrala para ajustar · Tab pasa a la siguiente · Esc suelta</Pie>
+      )}
+
+      {/* María [12:48]: «estos puntos los puedo mover con el comando
+          seleccionar o con el de editar… cuál es la diferencia… no está bien
+          definido para qué es cada comando». La respuesta es corta y no estaba
+          escrita en ninguna parte (#1103). */}
+      {activeTool === 'select' && !cotasVisibles && !nodeEditorIsEditing && (
+        <Pie>Seleccionar mueve la pieza, y un punto si pinchas encima · Editar patrón además añade, borra y curva</Pie>
+      )}
+
+      {/* Y [34:24]: «por qué este punto es redondo y este cuadrado, yo pensaría
+          que estos son de curva… no entiendo por qué». La forma SÍ dice el tipo
+          — lo que faltaba era decirle cuál es cuál. */}
+      {activeTool === 'editPattern' && !nodeEditorIsEditing && (
+        <Pie>Cuadrado es esquina · redondo es punto de curva · rombo es extremo abierto · arrastra para mover</Pie>
       )}
 
       {!hasPieces && activeTool === 'pen' && penNodesLength === 0 && (

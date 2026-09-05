@@ -7,6 +7,10 @@ export { getEdgeEndpoints, getEdgeLength, getEdgeArcLength, computeOffsetPath, c
 export { hitTestPieceBBox } from './hitTest';
 export { ellipseToPath } from './ellipse';
 export {
+  isoscelesTrianglePath, rightTrianglePath,
+  isoscelesTriangleVertices, rightTriangleVertices,
+} from './triangle';
+export {
   computeBoundingBox, computeHandlePositions, scaleOutline, rotateOutline,
   hitTestHandle, computeScaleFromDrag, computeRotationFromDrag,
 } from './transform';

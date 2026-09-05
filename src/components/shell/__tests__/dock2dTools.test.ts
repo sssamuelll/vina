@@ -3,13 +3,14 @@ import { DOCK_2D_CATALOG, getDockToolById } from '../dock2dTools';
 import { DEFAULT_DOCK_2D_IDS } from '../../../store/dockSlice';
 
 describe('dock2dTools catalog', () => {
-  // 21 desde el 2026-09-06: entraron las SIETE del censo de puertas. Cinco el
-  // 05-09 —hand, measureCurve, compareCurves, slashAndSpread, trimPlace— y las
-  // dos que ese día estaban rotas por dentro (elastic, pleat) el 06-09, con su
-  // defecto arreglado primero. Van al final y sin atajo; el default sigue en
-  // doce.
-  it('has 21 entries (3 unwired phantom tools removed #529; point y seamEdit añadidos; line retirado en internalShape; circle nace en #1111; las siete sin puerta se abren)', () => {
-    expect(DOCK_2D_CATALOG).toHaveLength(21);
+  // 22 desde la tanda 8: el triángulo (#1111) se suma al círculo, hermano
+  // suyo del mismo issue. 21 venían del 2026-09-06 con las SIETE del censo de
+  // puertas. Cinco el 05-09 —hand, measureCurve, compareCurves,
+  // slashAndSpread, trimPlace— y las dos que ese día estaban rotas por dentro
+  // (elastic, pleat) el 06-09, con su defecto arreglado primero. El triángulo
+  // va justo después del círculo, sin atajo; el default sigue en doce.
+  it('has 22 entries (3 unwired phantom tools removed #529; point y seamEdit añadidos; line retirado en internalShape; circle y triangle nacen en #1111; las siete sin puerta se abren)', () => {
+    expect(DOCK_2D_CATALOG).toHaveLength(22);
   });
 
   it('las siete que estrenaron puerta van al final, después de hilo', () => {

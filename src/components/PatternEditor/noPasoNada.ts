@@ -18,6 +18,8 @@ import { pushJournal } from '../../utils/telemetry/journal';
 export const RAZONES = [
   'notch:sin-sitio',
   'notch:sin-emplazamiento',
+  'notch:ancla-perdida',
+  'tijeras:corte-no-cruza',
   'point:sin-comando',
   'walkseam:borde-sin-resolver',
   'trim:borde-sin-largo',
@@ -28,6 +30,7 @@ export const RAZONES = [
   'unir:misma-pieza',
   'rectangulo:medida-en-cero',
   'circulo:medida-en-cero',
+  'triangulo:medida-en-cero',
   'pom:nombre-abierto',
   'abrir:linea-invalida',
 ] as const;
@@ -48,6 +51,8 @@ export interface AvisoMudo {
 const MENSAJES: Record<RazonMuda, string> = {
   'notch:sin-sitio': 'No cabe un piquete ahí; prueba un poco más adentro del borde',
   'notch:sin-emplazamiento': 'El piquete no encontró dónde pararse; suelta más cerca del borde',
+  'notch:ancla-perdida': 'El contorno cambió y el piquete perdió su esquina de referencia; colócalo otra vez con un clic',
+  'tijeras:corte-no-cruza': 'La línea de corte tiene que entrar por un lado y salir por otro; arrastra de borde a borde',
   'point:sin-comando': 'Ese tramo no acepta un punto; prueba sobre otro lado de la pieza',
   'walkseam:borde-sin-resolver': 'Ese borde ya no está en el lienzo; prueba con otro lado de la pieza',
   'trim:borde-sin-largo': 'Ese borde no tiene largo; elige uno de los lados de la pieza',
@@ -58,6 +63,7 @@ const MENSAJES: Record<RazonMuda, string> = {
   'unir:misma-pieza': 'Esa ya es la primera pieza; elige la segunda para unirlas',
   'rectangulo:medida-en-cero': 'El rectángulo mide cero; escribe un ancho y un alto mayores que cero',
   'circulo:medida-en-cero': 'El círculo mide cero; escribe un radio mayor que cero',
+  'triangulo:medida-en-cero': 'El triángulo mide cero; escribe una base y una altura mayores que cero',
   'pom:nombre-abierto': 'Primero ponle nombre a la medida; escribe y pulsa Enter, o Escape para dejarlo',
   'abrir:linea-invalida': 'Esa línea no corta la pieza en dos; arrastra de un borde al otro',
 };

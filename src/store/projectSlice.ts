@@ -613,6 +613,14 @@ const projectSlice = createSlice({
         clone.id = newId();
         clone.name = `${piece.name} (copy)`;
         clone.position = { x: (piece.position?.x ?? 0) + 30, y: (piece.position?.y ?? 0) + 30 };
+        // Un clon es una pieza NUEVA, no la continuación de la vieja: hereda la
+        // geometría y nada de la identidad. Sin esto, duplicar una pieza
+        // vinculada deja el clon atado a la simetría de la original, y la fecha
+        // heredada le miente a quien ordena por `createdAt` (#1126).
+        clone.linkedPieceId = undefined;
+        clone.linkMode = undefined;
+        clone.createdAt = Date.now();
+        clone.updatedAt = Date.now();
         state.pieces.push(clone);
         state.isDirty = true;
       }
@@ -1253,6 +1261,10 @@ const projectSlice = createSlice({
           : Math.max(0, (piece.layer ?? 1) - 1),
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        // Mismo motivo que en `duplicatePiece`: clonar a otra capa tampoco es
+        // pedir un vínculo (#1126).
+        linkedPieceId: undefined,
+        linkMode: undefined,
       };
       state.pieces.push(clone);
       const arrangement = state.arrangementOverrides[piece.id];

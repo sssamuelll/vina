@@ -233,6 +233,10 @@ describe('nearestSegment', () => {
 
     expect(hit).not.toBeNull();
     expect(hit!.distance).toBeLessThan(5);
+    // La distancia sola no prueba nada: acertar el lado y devolver el índice
+    // equivocado da exactamente este verde. El valor en juego es el índice, y
+    // por no mirarlo el bug del cierre vivió meses (#1120).
+    expect(hit!.commandIndex).toBe(4);
   });
 });
 
@@ -346,6 +350,22 @@ describe('deletePoint', () => {
 // ─── convertToCurve ───
 
 describe('convertToCurve', () => {
+  it('sobre el CIERRE inserta la curva antes de la Z, que sigue siendo la última', () => {
+    const outline = makeSquarePiece().outline;
+
+    // Índice 4 = la Z. Es la única rama de `convertToCurve` que inserta en vez
+    // de reemplazar en el sitio, y el describe entero llamaba tres veces al 1.
+    const result = convertToCurve(outline, 4);
+
+    expect(result).toHaveLength(outline.length + 1);
+    expect(result[4].type).toBe('C');
+    expect(result[5].type).toBe('Z');
+    // Y la curva va del último vértice de vuelta al origen: es el lado izquierdo.
+    const v = result[4].values;
+    expect(v[4]).toBeCloseTo(0, 1);
+    expect(v[5]).toBeCloseTo(0, 1);
+  });
+
   it('converts L to C with control points at 1/3 and 2/3', () => {
     const outline = makeSquarePiece().outline;
     // Convert first L (index 1: line from (0,0) to (100,0))

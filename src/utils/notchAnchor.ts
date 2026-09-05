@@ -220,7 +220,7 @@ export function resolveNotchAnchorV2(
   outline: PathCommand[],
   anchor: NotchAnchor,
   ring: OutlineRing,
-): { point: Point2D; normal: Point2D } | null {
+): { point: Point2D; normal: Point2D; distanceMm: number } | null {
   const flatRing = ringOf(outline);
   const n = flatRing.length;
   if (n < 3 || !(anchor.distanceMm >= 0) || !Number.isFinite(anchor.distanceMm)) return null;
@@ -258,7 +258,7 @@ export function resolveNotchAnchorV2(
   const normal = area2 > 0
     ? { x: -ty, y: tx }
     : { x: ty, y: -tx };
-  return { point, normal };
+  return { point, normal, distanceMm: d };
 }
 
 /** Index of the entry in `pts` closest to `pt`, or -1 for an empty list. */
@@ -315,7 +315,7 @@ export function trackMovedCorner(
 export function resolveNotchAnchor(
   outline: PathCommand[],
   anchor: NotchAnchor,
-): { point: Point2D; normal: Point2D } | null {
+): { point: Point2D; normal: Point2D; distanceMm: number } | null {
   if (anchor.metric === 2) {
     const built = buildRing(outline, 2);
     if (built.ok) return resolveNotchAnchorV2(outline, anchor, built.value);
@@ -359,7 +359,7 @@ export function resolveNotchAnchor(
       const inward = area2 > 0
         ? { x: -ty, y: tx }
         : { x: ty, y: -tx };
-      return { point: { x: a.x + t * dx, y: a.y + t * dy }, normal: inward };
+      return { point: { x: a.x + t * dx, y: a.y + t * dy }, normal: inward, distanceMm: offset };
     }
     acc += segLen;
   }

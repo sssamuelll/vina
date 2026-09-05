@@ -3,6 +3,7 @@
  */
 
 import type { ToolDefinition, ToolResult } from '../registry';
+import { pieceLocalToPattern } from '../../../../utils/geometry/pieceSpace';
 import type { AppDispatch, RootState } from '../../../../store';
 import type { PatternPiece, InternalLineType, PathCommand, SemanticEdge, Point2D } from '../../../../types/types';
 import { newId } from '../../../../utils/ids';
@@ -407,9 +408,14 @@ export const tools: ToolDefinition[] = [
       const endX = params.endX as number;
       const endY = params.endY as number;
 
-      // Convert piece-local coords to pattern space
-      const startPoint = { x: startX + piece.position.x, y: startY + piece.position.y };
-      const endPoint = { x: endX + piece.position.x, y: endY + piece.position.y };
+      // De local a patrón. Sumar la posición a secas era la identidad exacta
+      // mientras `splitPieceAtLine` la restaba a secas: local → +pos → −pos.
+      // Al arreglar el otro lado (#1116) esta mitad se quedó vieja, y con la
+      // pieza girada el agente pide una horizontal y sale la anti-diagonal —
+      // en silencio, porque una diagonal también corta el contorno en dos
+      // puntos y el tool responde `success`.
+      const startPoint = pieceLocalToPattern({ x: startX, y: startY }, piece);
+      const endPoint = pieceLocalToPattern({ x: endX, y: endY }, piece);
 
       let a, b;
       try {

@@ -55,7 +55,11 @@ export async function addRectanglePiece(page: Page, name = 'Rect'): Promise<stri
           { type: 'L', values: [200, 0] },
           { type: 'L', values: [200, 300] },
           { type: 'L', values: [0, 300] },
-          { type: 'L', values: [0, 0] },
+          // `Z`, no un `L` de vuelta al origen: es la forma que emite
+          // `useRectangleTool`, y el cuarto lado no tiene comando propio.
+          // El fixture viejo repetía el punto y con eso el cierre no existía
+          // como tal — por ahí se coló #1092 en verde (#1120).
+          { type: 'Z', values: [] },
         ],
         position: { x: 0, y: 0 },
         rotation: 0,

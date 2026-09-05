@@ -70,6 +70,12 @@ export default function DraggablePiece({
   }, [actualPos]);
 
   const handleGizmoDragEnd = useCallback((delta: [number, number, number]) => {
+    // Un clic sin desplazamiento no es una colocación. Sin esto, pinchar la
+    // pieza para comprobar que sigue elegida escribe `setArrangement3D` con
+    // coordenadas de mundo, marca el proyecto como sucio y desactiva la
+    // recolocación automática: al cambiar la estatura del maniquí, todas las
+    // piezas siguen al cuerpo nuevo menos esa.
+    if (delta[0] === 0 && delta[1] === 0 && delta[2] === 0) return;
     onDragEnd(piece.id, [
       actualPos[0] + delta[0],
       actualPos[1] + delta[1],
@@ -83,7 +89,31 @@ export default function DraggablePiece({
     groupRef.current?.position.set(...actualPos);
   }, [actualPos]);
 
+  // El arrastre libre que presta el gizmo, para poder empezarlo agarrando la
+  // PIEZA y no su esfera central — que mide `size * 0.11`, o sea un radio de
+  // ~1,8 cm de mundo: una cabeza de alfiler. María [20:08]: «para mover en 3D
+  // era con las flechas, es un poco incómodo… me gustaría que se pudiera
+  // mover con el ratón» — las flechas son las del gizmo (#1108).
+  const arrastreLibre = useRef<((e: ThreeEvent<PointerEvent>) => void) | null>(null);
+  const prestarArrastreLibre = useCallback((iniciar: (e: ThreeEvent<PointerEvent>) => void) => {
+    arrastreLibre.current = iniciar;
+  }, []);
+
   const showGizmo = canDrag && isSelected;
+
+  // Solo arrastra el cuerpo de una pieza YA seleccionada. Con eso no hace
+  // falta umbral de arrastre ni desambiguar clic-vs-arrastre: el primer clic
+  // elige, los siguientes mueven.
+  const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
+    if (!showGizmo || !arrastreLibre.current) return;
+    // Solo si esta pieza es lo que de verdad hay bajo el cursor. El rayo de
+    // R3F atraviesa todo y despacha a cada objeto que corta, así que con el
+    // delantero y la espalda superpuestos sobre el torso, arrastrar encima
+    // del delantero movía la ESPALDA si era la elegida — invisible, detrás
+    // del cuerpo, y con su colocación escrita al soltar.
+    if (e.intersections[0] && e.intersections[0].object !== e.object) return;
+    arrastreLibre.current(e);
+  }, [showGizmo]);
 
   // Si el gizmo desaparece sin escritura al store (deselección/Escape a mitad de
   // drag), `actualPos` no cambia y el efecto de arriba no corre — revierte el
@@ -97,6 +127,7 @@ export default function DraggablePiece({
       <group
         ref={groupRef}
         onClick={handleClick}
+        onPointerDown={handlePointerDown}
         position={actualPos}
         scale={[1, 1, isFlipped ? -1 : 1]}
       >
@@ -116,6 +147,7 @@ export default function DraggablePiece({
           onDrag={handleGizmoDrag}
           onDragEnd={handleGizmoDragEnd}
           setOrbitEnabled={setOrbitEnabled}
+          prestarArrastreLibre={prestarArrastreLibre}
         />
       )}
     </>

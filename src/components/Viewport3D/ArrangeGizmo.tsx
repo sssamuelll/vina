@@ -35,6 +35,16 @@ interface ArrangeGizmoProps {
   /** Fin del drag con el delta final. */
   onDragEnd: (delta: [number, number, number]) => void;
   setOrbitEnabled: (enabled: boolean) => void;
+  /**
+   * Presta el arrastre libre (el de la esfera central) a quien quiera
+   * empezarlo desde fuera — hoy, el propio cuerpo de la pieza (#1108).
+   *
+   * Se presta la función en vez de copiar la matemática: el plano ⊥ cámara,
+   * la captura global del puntero, el corte del orbit y la cancelación
+   * al desmontar a mitad de arrastre (#935) son un solo camino o no son
+   * ninguno.
+   */
+  prestarArrastreLibre?: (iniciar: (e: ThreeEvent<PointerEvent>) => void) => void;
   size?: number;
 }
 
@@ -71,6 +81,7 @@ export default function ArrangeGizmo({
   onDrag,
   onDragEnd,
   setOrbitEnabled,
+  prestarArrastreLibre,
   size = 0.16,
 }: ArrangeGizmoProps) {
   const { camera, gl } = useThree();
@@ -103,6 +114,14 @@ export default function ArrangeGizmo({
   }, [camera]);
 
   const handleDown = useCallback((handle: Handle) => (e: ThreeEvent<PointerEvent>) => {
+    // Solo el botón primario arrastra. En este visor la ÓRBITA es el botón
+    // DERECHO (`Viewport3D.tsx` fija `{LEFT:-1, MIDDLE:-1, RIGHT: ROTATE}`) y
+    // R3F despacha `onPointerDown` para cualquier botón, así que sin este
+    // filtro un arrastre con el derecho apaga el orbit, mueve la pieza y al
+    // soltar escribe la colocación nueva. El gizmo nunca lo filtró; con la
+    // esfera de 1,8 cm casi no se notaba, pero desde #1108 la superficie es la
+    // pieza entera.
+    if (e.button !== 0) return;
     e.stopPropagation();
     const start = grabPoint(handle, e.ray, origin);
     if (!start) return;
@@ -159,6 +178,11 @@ export default function ArrangeGizmo({
       setOrbitEnabled(true);
     };
   }, [grabPoint, origin, camera, gl, onDrag, onDragEnd, setOrbitEnabled]);
+
+  const iniciarLibre = useMemo(() => handleDown('center'), [handleDown]);
+  useEffect(() => {
+    prestarArrastreLibre?.(iniciarLibre);
+  }, [prestarArrastreLibre, iniciarLibre]);
 
   const over = useCallback((h: Handle) => (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
