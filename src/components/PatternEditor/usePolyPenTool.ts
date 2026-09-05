@@ -317,7 +317,11 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     nodesRef.current = [...nodes, { point, type: optsRef.current.nodeType }];
     // Re-ancla al nodo nuevo Y conserva el par que se acaba de colocar, para
     // que encadenar repita el mismo tramo (#1129). Hermano del de la pluma.
-    if (nextPointRef.current) nextPointRef.current = { from: point, lengthMm, angleDeg };
+    if (nextPointRef.current) {
+      nextPointRef.current = { from: point, lengthMm, angleDeg };
+      // Colocar también reabre el chip: es lo que sostiene el encadenado.
+      nextPointSeqRef.current += 1;
+    }
     pushJournal('gesture', 'internalShape:nextPoint', { op: 'place', length: lengthMm, angle: angleDeg, nodes: nodes.length + 1 });
     publish();
   }, [publish]);

@@ -140,4 +140,39 @@ test.describe('maria-195 — siguiente punto por largo y ángulo', () => {
       'la tira se escondió con el tramo congelado: eso era del panel viejo',
     ).toBeVisible();
   });
+
+  test('Tab dos veces reabre el chip: no es una tecla muerta', async ({ page }) => {
+    // El defecto que la revisión adversarial encontró leyendo: la abre-el-chip
+    // se enganchaba a la POSICIÓN del tramo, y congelar no la mueve. Segundo
+    // Tab → misma marca → efecto que sale temprano → chip que no se abre. Y
+    // como el router ya hizo `preventDefault`, el Tab nativo tampoco navega:
+    // tecla muerta, sin señal.
+    //
+    // Su arreglo (una secuencia) rompió el encadenado hasta que la secuencia
+    // subió también al COLOCAR — el otro caso, que sí tenía e2e. Los dos van
+    // juntos aquí para que no se puedan volver a separar.
+    await waitForApp(page);
+    await page.keyboard.press('h');
+    await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('pen');
+
+    const s0 = await toScreen(page, { x: 300, y: 400 });
+    await page.mouse.click(s0.x, s0.y);
+    await page.waitForTimeout(150);
+
+    await page.keyboard.press('Tab');
+    await expect(campo(page, 'Largo')).toBeVisible({ timeout: 5000 });
+
+    // Escape dentro del chip: cierra el borrador, el tramo sigue congelado.
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    await expect(chip(page, 'Largo'), 'el primer Escape soltó el tramo entero').toHaveCount(1);
+    await expect(campo(page, 'Largo')).toHaveCount(0);
+
+    // Y Tab otra vez vuelve a abrirlo.
+    await page.keyboard.press('Tab');
+    await expect(
+      campo(page, 'Largo'),
+      'el segundo Tab no reabrió el chip: tecla muerta',
+    ).toBeVisible({ timeout: 3000 });
+  });
 });

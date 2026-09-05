@@ -323,6 +323,12 @@ export function usePenTool(
         // chip del ángulo volvía a 0 y repetir el mismo tramo con otro Enter
         // colocaba un tramo distinto. Encadenar es el punto de esta gramática.
         nextPoint: prev.nextPoint ? { from: anchor, lengthMm, angleDeg } : prev.nextPoint,
+        // La secuencia sube también al COLOCAR, no solo al congelar: colocar
+        // re-ancla el par al nodo nuevo y el chip de Largo tiene que reabrirse
+        // para que el encadenado siga («80/90, Enter, 50/0, Enter»). Engancharla
+        // solo al Tab arreglaba la tecla muerta y rompía esto — lo cazó el gate
+        // de e2e en el mismo empujón.
+        nextPointSeq: prev.nextPoint ? prev.nextPointSeq + 1 : prev.nextPointSeq,
       };
     });
   }, []);
