@@ -78,6 +78,8 @@ npx playwright test --workers=2 \
   tests/e2e/las-siete-puertas.spec.ts \
   tests/e2e/1102-la-pluma-engancha.spec.ts \
   tests/e2e/1112-mover-el-punto-con-numero.spec.ts \
+  tests/e2e/maria-195-siguiente-punto.spec.ts \
+  tests/e2e/medidas-escritas-gramatica.spec.ts \
   tests/e2e/cotas-no-tapan-el-transform-box.spec.ts \
   > /tmp/vina-deploy-e2e.log 2>&1 || { tail -30 /tmp/vina-deploy-e2e.log >&2; exit 1; }
 grep -E "passed|failed" /tmp/vina-deploy-e2e.log | tail -1 | sed 's/^ */✓ emplazamiento: /'
