@@ -56,6 +56,12 @@ const FILE_MENU: MenuItem[] = [
   } },
   { separator: true, label: '' },
   { label: 'Importar DXF...', action: () => {} }, // wired via callback (opens file picker)
+  // La puerta de las imágenes de fondo (§ 6). Su panel existía desde el
+  // 2026-03-24 y no había forma de llegar a él: se montaba fuera de la ventana
+  // y nadie lo abría. Va junto a Importar DXF porque es el mismo gesto —meter
+  // algo de afuera al lienzo—, y NO choca con Vista ▸ «Imágenes de referencia»,
+  // que muestra u oculta las que ya están: son dos conceptos con dos etiquetas.
+  { label: 'Importar imagen de referencia...', action: () => {} }, // wired via onOpenPanel('ReferenceImages')
   { separator: true, label: '' },
   // Fase1-S2: solo exports que EXISTEN. Tech Pack / 3D / Reference Image /
   // Project Settings eran noops o abrían el placeholder circular — un item
@@ -308,6 +314,8 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
       onImportDXF();
     } else if (item.label === 'Avatar y medidas...') {
       onOpenPanel('Avatar');
+    } else if (item.label === 'Importar imagen de referencia...') {
+      onOpenPanel('ReferenceImages');
     } else if (item.action) {
       item.action(dispatch);
     }

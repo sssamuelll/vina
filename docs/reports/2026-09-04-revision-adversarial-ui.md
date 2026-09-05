@@ -583,3 +583,190 @@ deploy y estaba bloqueando el despliegue. Queda dicho, no como norma.
 `main` en `ed94d993`. `https://vina.sdar.dev/` responde 200 y sirve
 `assets/index-C7xdqEqO.js`, el bundle recién compilado. Gates del deploy en
 verde de punta a punta, incluido el smoke del WASM y los 24 e2e de emplazamiento.
+
+---
+
+## 13. Los cuatro frentes que quedaban — 2026-09-05
+
+La § 12.5 dejó cuatro cosas escritas: las tres unificaciones L, la gramática de
+la tanda 6, abrir las siete puertas, y emplazar `ReferenceImageSettings`. Se
+hicieron las cuatro. Lo que sigue es lo que había detrás de cada una, que en
+tres de los cuatro casos no era lo que el informe decía.
+
+### 13.1 Antes de poner un botón, había que saber si el cuarto estaba vacío
+
+El informe daba las siete herramientas sin puerta como un caso único con una
+decisión de producto encima. Se ejercitaron **una a una en Chrome**, y no eran
+siete casos iguales:
+
+| | qué se midió | puerta |
+|---|---|---|
+| `hand` | pan 0,0 → 360,0 | **sí** — Mano |
+| `slashAndSpread` | contorno 5 → 10 comandos | **sí** — Abrir la pieza |
+| `measureCurve` | marcas y total | **sí** — Medir el borde |
+| `compareCurves` | marcas cada 50 mm, «Total: 200.0 mm» | **sí** — Comparar largos |
+| `trimPlace` | coloca el avío | **sí** — Poner avío |
+| `elastic` | dibuja, pero `selectedElasticId` no tiene ni un escritor: no se selecciona ni se borra salvo con Ctrl+Z | **no** |
+| `pleat` | guarda el pliegue y **nadie lo pinta** (301 nodos SVG antes del clic y 301 después) | **no** |
+
+Abrirle la puerta a esas dos habría sido reponer F7 cambiando la tecla por un
+icono. Las dos razones quedan como asertos que fallan el día que la deuda
+caduque, no como prosa.
+
+Entran al **catálogo**, no al dock de fábrica: a 1366×643 el dock con doce mide
+596 px de 643 y cada herramienta cuesta 43, o sea que el techo son trece. Y sin
+tecla nueva: de las 26 letras del contexto 2d solo queda libre la `y`.
+
+**Y me equivoqué en el camino.** Mi primera sonda dio tres «muertas». Dos eran
+mías: activé la mitad de la herramienta (`editor.activeTool` sin
+`tools.activeTool2D`, que es la compuerta de Medir) y le di tres clics a una
+gramática de cinco — `slashAndSpread` pide clic-clic en el contorno, clic en una
+mitad, clic otra vez para confirmarla y clic en una punta del corte, y entonces
+arrastra y Enter. El reconocimiento decía «terminada» y tenía razón él.
+
+### 13.2 Dos defectos de geometría que el frente destapó
+
+Ninguno estaba en el informe, y los dos bloqueaban abrir esas puertas
+honestamente.
+
+**El borde de cierre de toda pieza medía cero.** `parseSegments` hacía
+`case 'Z': break`, así que el tramo que la `Z` dibuja no existía para nadie que
+pidiera un rango. En un rectángulo eso es un lado entero: «Medir el borde» sobre
+el lado izquierdo devolvía «0.0 mm», y «Medir el contorno» daba el perímetro
+menos un lado. El propio productor lo tenía escrito como limitación conocida
+—«A Z-closure segment carries cmd 0 (the M tag) — unaddressable as a draw
+command»— y la consecuencia estaba parcheada sin nombrarla en
+`LineLengthLabels.tsx:36`: `edge.length ?? computePathArcLength(...)`. Alguien
+chocó y tapó.
+
+**El avío se guardaba en el borde de al lado.** Clic ARRIBA guardaba `leftEdge`;
+DERECHA, `topEdge`; ABAJO, `rightEdge`; IZQUIERDA, `bottomEdge`. Corrido uno, las
+cuatro veces. `interpolateEdgePoint` leía `segmentRange` como índices sobre
+`flattenPath` —espacio de PUNTOS— cuando el contrato del productor es espacio de
+COMANDOS. Invisible en el lienzo, porque el renderizador usa la misma función y
+se equivoca igual; visible en cuanto el dato sale a un tech pack, al 3D o al
+copiloto. Y en una pieza importada, donde un borde son 14-20 comandos y
+`flattenPath` además densifica las curvas, no es un corrimiento de uno:
+descuadra del todo.
+
+El oráculo que los cazó a los dos no hubo que inventarlo: **cada borde ya
+declara su propio `length`**, y si el rango que guarda no lo reproduce, el
+objeto se contradice a sí mismo.
+
+**Lo que se probó y se descartó, con el precio medido.** El arreglo bonito era
+que el productor emitiera el índice de la `Z`. Se implementó, y la suite cobró
+en un minuto: sobre el DXF real de María, **42 clics que enganchaban un borde
+pasaron a caer en «pieza»**, porque el hit-test del margen busca por la etiqueta
+vieja. Romper el margen —recién entregado— para arreglar una medición en dos
+herramientas sin puerta es mal negocio. Se traduce al leer, y solo lo ven los
+tres consumidores que miden.
+
+### 13.3 Las tres unificaciones no eran lo que el informe midió
+
+El censo las encontró **más grandes**, y el dolor en otro sitio:
+
+- Los **once** hit-tests son **diecinueve** dentro de `PatternEditor/`, y
+  veinticuatro contando los de `utils/` que solo llama el lienzo 2D. Siete
+  radios distintos en veinte sitios, no ocho.
+- Las **cuatro** superficies de número son cinco. Y el dolor no está en
+  unificarlas: está en la que no existe. De las trece opciones en milímetros que
+  el repo declara, **doce eran deslizadores de paso fijo** y el mecanismo para
+  teclear lo usaba una sola herramienta. El Largo de la pinza no podía valer
+  102 mm; la Separación del pespunte, 7,3.
+- Los **seis** campos de selección son los que dice, pero uno está muerto
+  (`selectedElasticId`, sin un solo escritor) y la pérdida de datos ya la cerró
+  `resolverBorrado` anoche. Lo que queda es deuda de forma, no síntoma.
+
+Se hizo lo tercero, que era lo único con queja literal de María: las trece
+opciones rotuladas «(mm)» son campo escrito, con su trinquete y con el acotado
+de rango que ese cambio abría —teclear 999 en un campo de máximo 200 mandaba 999
+al store, porque con deslizador el rango se cumplía por construcción—. Unificar
+cuatro gramáticas no le da un número más; darle dónde teclear, sí.
+
+De paso cayó uno de los veinticuatro hit-tests: `useMergeTool` llevaba su propia
+copia de la caja con el bug de rotación de #1064 dentro. Y ojo con la dirección
+del defecto, porque la intuición la pone al revés: no era que Unir no
+enganchara una pieza girada — era que la enganchaba **desde donde la pieza no
+está**. María hacía clic en espacio vacío y Unir empezaba a unir.
+
+### 13.4 Lo que los revisores cazaron encima, y era todo mío
+
+Seis defectos, los seis introducidos anoche, ninguno visto por mí:
+
+1. **El icono de «Abrir la pieza» se leía como una H.** Rasterizado a 16 px
+   reales, la flecha salía maciza y soldada a las dos mitades. El comentario
+   razonaba el hueco contra el asta y se olvidó de la tinta de las puntas. La
+   cabecera de ese archivo YA tenía la lección escrita, del lote de iconos
+   anterior — y el lote la repitió por no medir.
+2. **El dock no tenía tope físico.** Va centrado con `translateY(-50%)`, así que
+   lo que sobra se sale por arriba **y** por abajo: de −109 a 788 en una ventana
+   de 643, con siete botones fuera. El tope que sí puse protege el sobre
+   persistido, no la pantalla: son dos fallos distintos con el mismo nombre.
+3. **El avío se guardaba con su nombre en inglés.** Se tradujo el desplegable y
+   no lo que el desplegable escribe: María elegía «Botón Plano 15mm» y la lista
+   de materiales le decía «Botón — Flat Button 15mm».
+4. **Tres pistas que mentían**, incluida la peor: «Esc vuelve atrás» en la fase
+   donde Escape es un reinicio entero — después de los cinco clics.
+
+### 13.5 El panel que llevaba 165 días fuera de pantalla
+
+`ReferenceImageSettings` no estaba mal emplazado: **nunca estuvo emplazado**.
+Nació el 2026-03-24 montado como último hijo en flujo normal de
+`.pattern-editor`, detrás de un `<svg>` de alto completo, y su CSS jamás declaró
+`position`. Se pintaba en `top: 643` y `overflow: hidden` se lo comía. Y su
+botón «Importar imagen» es la **única** puerta del repo para meter una imagen de
+fondo: no hay soltar-imagen, no hay comando en la paleta, y el copiloto solo
+sabe cambiar opacidad, ocultar y borrar las que ya existen.
+
+No era la trampa del `backdrop-filter` de la § 2 del contrato: los siete
+ancestros son `z-index: auto` y ninguno tiene `transform`, `filter`,
+`isolation` ni `contain`. Era geometría de flujo.
+
+Ahora es el 8.º panel de contenido: hereda el material `overlay` entero de
+`.context-panel`, no estrena rincón, no escribe un z-index, y su puerta está en
+Archivo ▸ «Importar imagen de referencia…», junto a Importar DXF.
+
+El riesgo real de esa mudanza era silencioso: `objectUrlMap` es un `Map` a nivel
+de módulo, y si se quedaba donde estaba, el lienzo se habría quedado sin URLs y
+la imagen se importaría y se pintaría **en blanco** — sin excepción, sin error, y
+sin que jsdom lo note. El e2e importa un PNG de verdad y mira el `href`.
+
+Y el e2e que lo fija **no nombra ni un selector**: afirma que ningún hijo de
+`.pattern-editor` se pinta fuera de la ventana. Falla hoy con el panel viejo y
+seguirá cazando al siguiente hijo que alguien añada al final de ese JSX, que es
+exactamente cómo llegó este.
+
+### 13.6 La gramática: diecinueve decisiones cerradas, un blocker abierto
+
+`docs/superpowers/specs/2026-09-05-gramatica-tanda-6-design.md`. Petra Haft
+cerró las diecinueve; Vex Rune cortó trece cosas que no hacían falta, Plumb
+Lindgren midió los ocho tramos y Adrian Serrano encontró cinco blockers. Las
+correcciones están incorporadas, no anexadas.
+
+Lo que el estrés cambió de verdad:
+
+- **Cuatro decisiones no había que tomarlas.** Tres las cerró el trabajo del 4 y
+  el 5 de septiembre; una se apoyaba en un hecho que caducó en un día.
+- **El resolutor único sale de la tanda 6.** La propuesta lo llamaba «mudanza»
+  con precio «ninguno». Son veinticuatro hit-tests, siete radios y cuatro
+  semánticas distintas; y reducirlos a dos **encogería el enganche de la pluma**,
+  contra una ratificación escrita.
+- **Dos correcciones de contenido**: dos clases del sujeto activo no tenían de
+  dónde leerse, y la regla de «Supr con un borde no hace nada» reintroducía
+  #1117 por la puerta de al lado.
+- **Un blocker queda abierto, con la pregunta nombrada**: la escalera de Escape
+  no tiene predicado universal — seis ganchos exponen su estado y **catorce**
+  registran su tecla.
+
+### 13.7 Qué queda
+
+- **La escalera de Escape** (§ 6 del spec). M con dos decisiones, y no cabe con
+  nada más.
+- **El resolutor único de enganche.** L, con su propio spec.
+- **Los tramos 6-0 a 6-6**, con sus tamaños medidos en la tabla del § 7.
+- **`elastic` y `pleat`**: una necesita escritor de selección, la otra un
+  renderizador. Las dos con su aserto vigilándolas, así que la deuda caduca sola.
+- **Tijeras, Hilo y Editar patrón** siguen sin superficie de número: no hay
+  deslizador que convertir, hay una opción que no existe. Es feature con gesto
+  nuevo (#1105, #1107, #1112).
+- El aire de `chipScreenPosition`, que sigue midiendo hasta el centro del chip.
