@@ -12,7 +12,10 @@ import LineLengthLabels from '../LineLengthLabels';
 
 afterEach(cleanup);
 
-// 100×100mm square: M + 4 line segments (outline indices 1-4).
+// Cuadrado de 100×100 mm, con la MISMA forma que emite `useRectangleTool`:
+// `M L L L Z`. El cuarto lado —el izquierdo— lo dibuja la `Z`, y no tiene
+// comando propio. El fixture viejo repetía el origen con un quinto `L`, y con
+// eso el cierre no existía como tal: el fallo no podía aparecer (#1120).
 function squarePiece(edges?: SemanticEdge[]): PatternPiece {
   return {
     id: 'p1',
@@ -26,7 +29,7 @@ function squarePiece(edges?: SemanticEdge[]): PatternPiece {
       { type: 'L', values: [100, 0] },
       { type: 'L', values: [100, 100] },
       { type: 'L', values: [0, 100] },
-      { type: 'L', values: [0, 0] },
+      { type: 'Z', values: [] },
     ],
     internals: [],
     createdAt: 0,
@@ -80,6 +83,18 @@ describe('LineLengthLabels', () => {
     const texts = container.querySelectorAll('text');
     expect(texts.length).toBe(4);
     for (const t of texts) expect(t.textContent).toBe('10.0 cm');
+  });
+
+  it('el lado de cierre también enseña su medida, y en su sitio', () => {
+    // Contar cuatro no basta: cuatro etiquetas pueden ser cuatro del lado
+    // equivocado. El oráculo es DÓNDE cae la del cierre — el lado izquierdo
+    // de un cuadrado de 100 va de (0,100) a (0,0), o sea su medio es (0,50).
+    const { container } = renderLabels(squarePiece(undefined));
+    const puntos = [...container.querySelectorAll('text')].map(t => ({
+      x: Number(t.getAttribute('x')),
+      y: Number(t.getAttribute('y')),
+    }));
+    expect(puntos).toContainEqual({ x: 0, y: 50 });
   });
 
   it('computes length from the outline when edge.length is missing', () => {

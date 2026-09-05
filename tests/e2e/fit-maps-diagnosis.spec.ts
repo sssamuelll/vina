@@ -68,7 +68,10 @@ async function addPiece(page: Page) {
         { type: 'L', values: [200, 0] },
         { type: 'L', values: [200, 300] },
         { type: 'L', values: [0, 300] },
-        { type: 'L', values: [0, 0] },
+        // `Z`, como emite `useRectangleTool`: el cuarto lado no tiene
+        // comando propio. El `L` de vuelta al origen hacía que el cierre no
+        // existiera como tal — por ahí pasó #1092 en verde (#1120).
+        { type: 'Z', values: [] },
       ],
       internals: [],
       position: { x: 60, y: 40 },

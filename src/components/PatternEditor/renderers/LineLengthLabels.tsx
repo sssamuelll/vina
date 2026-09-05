@@ -11,7 +11,7 @@
 import { useMemo } from 'react';
 import type { PatternPiece, SemanticEdge, UnitSystem } from '../../../types/types';
 import { computePathArcLength, pointAtPathDistance } from '../../../utils/geometry/arcLength';
-import { detectSemanticEdges } from '../../../utils/semanticEdges';
+import { detectSemanticEdges, rangoMedibleDeBorde } from '../../../utils/semanticEdges';
 import { formatDimension } from '../../../utils/units';
 
 interface LineLengthLabelsProps {
@@ -32,7 +32,14 @@ export default function LineLengthLabels({ piece, zoom2D, units }: LineLengthLab
     const edges: SemanticEdge[] = piece.edges?.length ? piece.edges : detectSemanticEdges(piece);
     const out: Label[] = [];
     for (const edge of edges) {
-      const [start, end] = edge.segmentRange;
+      // El `segmentRange` de un borde viene en la convención del PRODUCTOR: el
+      // tramo de cierre se rotula con el índice de su `M`. Sin traducir, un
+      // rectángulo real (`M L L L Z`) le pide el largo al comando 0 — que no
+      // dibuja nada— y `pointAtPathDistance` devuelve null, así que el lado
+      // izquierdo se queda SIN etiqueta. Era el cuarto consumidor y el único
+      // que no traducía (#1120; los otros tres: ElasticRenderer, useMeasureTool
+      // y edgeInterpolation).
+      const [start, end] = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
       const len = edge.length ?? computePathArcLength(piece.outline, start, end);
       if (len < 1) continue; // degenerate edge
       const mid = pointAtPathDistance(piece.outline, len / 2, start, end);
