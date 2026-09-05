@@ -95,7 +95,9 @@ const addTrimTool: ToolDefinition = {
     }
 
     const type = (params.type as TrimType | undefined) ?? preset?.type ?? TRIM_DEFAULTS.type;
-    const name = (params.name as string | undefined) ?? preset?.name ?? TRIM_DEFAULTS.name;
+    // `nameEs` primero, igual que el gesto del ratón: lo que se guarda es lo
+    // que la lista de materiales pinta. Ver `useTrimTool.ts`.
+    const name = (params.name as string | undefined) ?? preset?.nameEs ?? preset?.name ?? TRIM_DEFAULTS.name;
     const description = (params.description as string | undefined) ?? TRIM_DEFAULTS.description;
     const material = (params.material as string | undefined) ?? preset?.material ?? TRIM_DEFAULTS.material;
     const color = (params.color as string | undefined) ?? preset?.color ?? TRIM_DEFAULTS.color;
@@ -408,7 +410,7 @@ const distributeTrimAlongEdgeTool: ToolDefinition = {
       pieceId: params.pieceId as string,
       type: preset?.type ?? TRIM_DEFAULTS.type,
       presetId: params.presetId as string | undefined,
-      name: preset?.name ?? TRIM_DEFAULTS.name,
+      name: preset?.nameEs ?? preset?.name ?? TRIM_DEFAULTS.name,
       description: '',
       placement: { mode: 'edge-points', edgeName, positions },
       material: preset?.material ?? TRIM_DEFAULTS.material,

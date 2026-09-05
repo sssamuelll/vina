@@ -156,16 +156,21 @@ export default function HintText({
           drawingSlash: 'Clic en el contorno otra vez para cerrar el corte · Esc cancela',
           slashComplete: 'Clic en la mitad que quieres mover',
           selectingHalf: 'Clic otra vez en esa mitad para confirmarla',
-          halfConfirmed: 'Clic en una punta del corte: por ahí va a girar',
-          awaitingDrag: 'Mueve el ratón para abrir la pieza · Esc vuelve atrás',
+          halfConfirmed: 'Clic en una punta del corte: esa se queda quieta',
+          awaitingDrag: 'Mueve el ratón para abrir · Tab cambia entre girar y separar',
           spreading: 'Suelta cuando esté como la quieres',
           spreadPreview: 'Enter la abre de verdad · Esc descarta y deja volver a probar',
+          // OJO con Escape: solo en `spreadPreview` vuelve UN paso
+          // (`useSlashAndSpreadTool.ts:414-423`). En cualquier otra fase es un
+          // reinicio entero — bota el corte, la mitad y el pivote, y María
+          // vuelve al clic 1. Por eso ninguna otra pista lo nombra: prometer
+          // «vuelve atrás» donde hay reinicio es peor que no decir nada.
         };
         return <Pie>{msgs[slashPhase ?? 'idle'] ?? msgs.idle}</Pie>;
       })()}
 
       {activeTool === 'trimPlace' && (
-        <Pie>Clic en un borde pone el avío elegido · con «Repartidos por el borde» llena el borde entero de una vez</Pie>
+        <Pie>Clic en un borde pone el avío elegido · con «Repartidos por el borde» pone la cantidad que digas, repartida</Pie>
       )}
 
       {activeTool === 'walkSeam' && (() => {

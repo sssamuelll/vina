@@ -104,7 +104,13 @@ export function useTrimTool(
     const preset = presetId ? getTrimPreset(presetId) : undefined;
 
     const type = preset?.type ?? TRIM_DEFAULTS.type;
-    const name = preset?.name ?? TRIM_DEFAULTS.name;
+    // `nameEs`, no `name`: lo que se guarda aquí es lo que la lista de
+    // materiales le pinta después (`trimExtractor.ts` lo copia tal cual). Con
+    // `name`, María elegía «Botón Plano 15mm» en la tira y la pestaña Avíos le
+    // decía «Botón — Flat Button 15mm»: dos nombres para el mismo objeto en la
+    // misma sesión. La columna española ya existía en `trimLibrary.ts` y era
+    // uno de los ocho contratos que la auditoría encontró rodeados.
+    const name = preset?.nameEs ?? preset?.name ?? TRIM_DEFAULTS.name;
     const material = preset?.material ?? TRIM_DEFAULTS.material;
     const color = preset?.color ?? TRIM_DEFAULTS.color;
     const size = preset?.size ?? TRIM_DEFAULTS.size;

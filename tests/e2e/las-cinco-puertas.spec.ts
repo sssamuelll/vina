@@ -213,3 +213,111 @@ test.describe('«Abrir la pieza» — el gesto más largo del lienzo, dicho y he
     expect(fuera, 'la pista se sale de la pantalla en alguna fase').toEqual([]);
   });
 });
+
+test.describe('el avío se guarda con el nombre que María eligió', () => {
+  test.use({ viewport: MARIA });
+  test.setTimeout(120_000);
+
+  test('lo que dice la tira es lo que va al store, y de ahí a la lista de materiales', async ({ page }) => {
+    // El desplegable se tradujo y lo que ESCRIBE no. María elegía «Botón Plano
+    // 15mm» en la tira y la pestaña Avíos le decía «Botón — Flat Button 15mm»:
+    // dos nombres para el mismo objeto en la misma sesión. `trimExtractor.ts`
+    // copia este campo tal cual, así que el idioma se decide aquí.
+    await abrirApp(page);
+    await dispatch(page, 'editor/setActiveTool', 'rectangle');
+    await dispatch(page, 'tools/setActiveTool2D', 'rectangle');
+    await page.waitForTimeout(300);
+    const a = await toScreen(page, { x: 120, y: 140 });
+    const b = await toScreen(page, { x: 320, y: 290 });
+    await page.mouse.move(a.x, a.y); await page.mouse.down();
+    await page.mouse.move(b.x, b.y, { steps: 12 }); await page.mouse.up();
+    await page.waitForTimeout(600);
+
+    await dispatch(page, 'editor/setActiveTool', 'trimPlace');
+    await dispatch(page, 'tools/setActiveTool2D', 'trimPlace');
+    await page.waitForTimeout(400);
+    const borde = await toScreen(page, { x: 220, y: 140 });
+    await page.mouse.move(borde.x, borde.y); await page.waitForTimeout(150);
+    await page.mouse.click(borde.x, borde.y);
+    await page.waitForTimeout(500);
+
+    const guardado = await page.evaluate(() => {
+      const w = window as unknown as { __VINA_STORE__: { getState: () => { project: { trims?: Array<{ name: string }> } } } };
+      return (w.__VINA_STORE__.getState().project.trims ?? []).map((t) => t.name);
+    });
+
+    expect(guardado.length, 'no se colocó ningún avío').toBeGreaterThan(0);
+    for (const n of guardado) {
+      expect(n, `el avío se guardó como "${n}", en inglés`).not.toMatch(/\b(Button|Zipper|Snap|Flat|Shank|Horn|Molded|Metal|Nylon|Coil|Invisible|Trim)\b/);
+    }
+  });
+});
+
+test.describe('un catálogo de diecinueve no puede empujar el dock fuera de la pantalla', () => {
+  test.use({ viewport: MARIA });
+  test.setTimeout(120_000);
+
+  test('con el catálogo entero fijado, el dock sigue dentro y sus botones se alcanzan', async ({ page }) => {
+    // `MAX_DOCK_2D_TOOLS` protege el sobre persistido: impide que María pierda
+    // TODA su configuración al recargar. No protege el otro lado — `.dock` es
+    // `position:absolute; top:50%; translateY(-50%)` sin `max-height` ni
+    // `overflow`, así que lo que no cabe se sale por arriba Y por abajo, sin
+    // scroll y sin ninguna señal.
+    //
+    // Medido: cada herramienta cuesta 43 px y el alto es 80 + 43n. A 1366×643
+    // el techo son trece. Con catorce el dock ya mide 682. Este riesgo lo trae
+    // el catálogo de diecinueve, o sea este mismo lote: antes eran catorce y
+    // pasarse era casi imposible.
+    await abrirApp(page);
+    await page.evaluate(() => {
+      const w = window as unknown as { __VINA_STORE__: { dispatch: (a: unknown) => void } };
+      for (const id of ['hand', 'measureCurve', 'compareCurves', 'slashAndSpread', 'trimPlace', 'circle', 'grainline']) {
+        w.__VINA_STORE__.dispatch({ type: 'dock/addDockTool', payload: id });
+      }
+    });
+    await page.waitForTimeout(600);
+
+    const medida = await page.evaluate(() => {
+      const d = document.querySelector('.dock--left') as HTMLElement | null;
+      if (!d) return null;
+      const r = d.getBoundingClientRect();
+      const scrollea = d.scrollHeight > d.clientHeight + 1;
+      const botones = [...d.querySelectorAll('button')].map((b) => {
+        const br = b.getBoundingClientRect();
+        const visible = br.top >= r.top - 1 && br.bottom <= r.bottom + 1;
+        const hit = visible
+          ? document.elementFromPoint(br.left + br.width / 2, br.top + br.height / 2)
+          : null;
+        return {
+          nombre: b.getAttribute('aria-label') ?? '?',
+          visible,
+          alcanzable: !visible || (!!hit && (hit === b || b.contains(hit))),
+        };
+      });
+      return {
+        top: Math.round(r.top), bottom: Math.round(r.bottom), vh: window.innerHeight,
+        scrollea,
+        // Un botón que no se ve solo vale si se puede llegar a él haciendo
+        // scroll. Sin scroll, «fuera de la caja» es «perdido».
+        fuera: scrollea ? [] : botones.filter((b) => !b.visible).map((b) => b.nombre),
+        inalcanzables: botones.filter((b) => !b.alcanzable).map((b) => b.nombre),
+        cuantos: botones.length,
+      };
+    });
+
+    expect(medida, 'no hay dock izquierdo').not.toBeNull();
+    expect(medida!.cuantos, 'no se fijaron las herramientas').toBeGreaterThanOrEqual(17);
+    // Lo primero: la propia caja del dock cabe. Antes iba de -109 a 788.
+    expect(
+      medida!.top >= 0 && medida!.bottom <= medida!.vh,
+      `el dock se sale (${medida!.top}→${medida!.bottom} de ${medida!.vh})`,
+    ).toBe(true);
+    // Y si no cabe todo dentro, que scrollee — la barra ES la señal.
+    expect(medida!.scrollea, 'con diecinueve fijadas el dock debería poder scrollear').toBe(true);
+    expect(
+      medida!.fuera,
+      `estos botones del dock quedan fuera de la pantalla (dock ${medida!.top}→${medida!.bottom} de ${medida!.vh})`,
+    ).toEqual([]);
+    expect(medida!.inalcanzables, 'estos botones están dentro pero tapados').toEqual([]);
+  });
+});

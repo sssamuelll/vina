@@ -15,6 +15,21 @@
   border: var(--surface-chrome-border);
   border-radius: var(--surface-chrome-radius);
   box-shadow: var(--surface-chrome-shadow);
+  /* Acotado, porque va centrado: `top:50%` con `translateY(-50%)` reparte lo
+     que sobra por ARRIBA y por abajo a la vez, así que sin tope no se sale por
+     un lado sino por los dos. Medido a 1366×643 con el catálogo entero fijado:
+     el dock iba de -109 a 788 en una ventana de 643, y siete botones quedaban
+     fuera sin scroll y sin ninguna señal.
+
+     `MAX_DOCK_2D_TOOLS` protege el otro lado del mismo problema —que el sobre
+     persistido se pase y María pierda TODA su configuración al recargar—, pero
+     no este. Con catorce en el catálogo pasarse era casi imposible; con
+     diecinueve, no. Los 28 px son los 14 de `--left` arriba y abajo.
+
+     La barra de scroll es la señal, y por eso NO se esconde: salirse en
+     silencio es justo el defecto de #1095. Mismo remedio que `.dock-picker`. */
+  max-height: calc(100% - 28px);
+  overflow-y: auto;
 }
 
 .dock--left { left: 14px; }

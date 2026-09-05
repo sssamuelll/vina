@@ -115,22 +115,33 @@ export function CompararLargosIcon(props: GlifoProps) {
 }
 
 /**
- * Abrir la pieza: las dos mitades ya separadas, con la flecha del hueco entre
- * ellas. El rastro es el resultado —la pieza partida y abierta—, no la tijera
- * ni la línea de corte, que duran un instante.
+ * Abrir la pieza: las dos mitades ya separadas, con la cuña entre ellas.
+ * El rastro es el resultado —la pieza abierta—, no la tijera ni la línea de
+ * corte, que duran un instante.
  *
- * Las mitades son estrechas a propósito: la flecha necesita ocho unidades de
- * hueco para que sus puntas no se empasten con el asta a 16 px, y sin flecha
- * las dos mitades se leen como dos piezas cualesquiera, no como una abierta.
+ * SIN FLECHA, y esa es la corrección. La primera versión metía una flecha de
+ * dos puntas en el hueco y a 16 px reales el glifo se leía como una **H**:
+ *
+ *     ..+++######+++..     <- la flecha, maciza
+ *     ..+++######+++..
+ *
+ * Dos causas medidas sobre el `d`, las dos de aritmética: las mitades tenían
+ * 1 y 2 unidades de claro interior, o sea 0,67 y 1,33 px entre dos trazos de
+ * 1,33 px —cada mitad salía como una barra sólida—, y las puntas de la flecha
+ * (x=9 y x=15) se solapaban una unidad entera con los cantos interiores (x=8 y
+ * x=16), soldándose a ellos. El comentario razonaba el hueco contra el ASTA de
+ * la flecha y se olvidó de la tinta de las puntas.
+ *
+ * La cuña sola dice lo mismo y sobrevive: se abre hacia abajo, que es lo que
+ * hace el modo pivote. Rasterizado a 16 px contra tres alternativas antes de
+ * elegirlo, que es el método que el spec § 5.2 fijó y que la primera versión
+ * no corrió.
  */
 export function AbrirPiezaIcon(props: GlifoProps) {
   return (
     <Glifo {...props}>
-      <path d="M8 4H5L4 20h4z" />
-      <path d="M16 4h3l1 16h-4z" />
-      <path d="M9.5 12h5" />
-      <path d="m11 10-2 2 2 2" />
-      <path d="m13 10 2 2-2 2" />
+      <path d="M4 4h5l-1 16H5z" />
+      <path d="M20 4h-5l1 16h3z" />
     </Glifo>
   );
 }
