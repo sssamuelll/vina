@@ -125,21 +125,31 @@ export function useFreeSewingTool(
     setHoveredTarget(resolveTarget(e));
   }, [gesture, resolveTarget]);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key !== 'Escape') return;
+  /**
+   * Protocolo P1: devuelve si CONSUMIÓ la tecla (E-3 de la escalera de Escape).
+   *
+   * Antes devolvía `void` y el enrutador anotaba `consumedBy: null` sobre un
+   * Escape que sí se había consumido. Coser es la única de las cinco ramas que
+   * no está detrás de una guarda —puede entrar sin nada que cancelar—, así que
+   * devolver su nombre a ciegas habría cambiado una mentira por la contraria.
+   */
+  const handleKeyDown = useCallback((e: KeyboardEvent): boolean => {
+    if (e.key !== 'Escape') return false;
     // Un Esc = una acción (spec § 6, conflicto 7): si cancelamos algo, el evento
     // no sigue viajando hasta `selection.deselect`.
     if (gesture.isArmed()) {
       gesture.cancel();
       e.preventDefault();
       e.stopPropagation();
-      return;
+      return true;
     }
     if (segmentA) {
       setSegmentA(null);
       e.preventDefault();
       e.stopPropagation();
+      return true;
     }
+    return false;
   }, [gesture, segmentA]);
 
   /** El ratón salió del lienzo: el borde resaltado se va con él (#1132). */

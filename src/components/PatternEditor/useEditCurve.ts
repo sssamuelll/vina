@@ -295,9 +295,17 @@ export function useEditCurve(zoom: number, pan: Point2D) {
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && state.isEditing) {
+      // Peldaño 3 de la escalera (E-4): el nodo seleccionado se suelta antes
+      // de salir de la edición de curva. Mismo escalón que `useEditPattern`.
+      if (state.selectedNode) {
+        setState(s => ({ ...s, selectedNode: null }));
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       exitEdit();
     }
-  }, [state.isEditing, exitEdit]);
+  }, [state.isEditing, state.selectedNode, exitEdit]);
 
   return {
     ...state,
