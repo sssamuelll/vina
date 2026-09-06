@@ -117,6 +117,35 @@ describe('#1136 — el candado de la pieza para la escritura, no solo el dibujo'
     act(() => hook.result.current.handleMouseUp(clickAt(100, 100)));
     expect(onApply).toHaveBeenCalled();
   });
+
+  // Revisión adversarial 2026-09-06 [ALTO]: la guarda solo miraba el press.
+  // El arrastre de "margen a todas" acumula piezas en el mousemove sin volver
+  // a consultar el candado, así que rozar una pieza bloqueada con el cuerpo
+  // de una suelta se la colaba entera en el `onApplyAll`.
+  it('arrastrar el margen desde una pieza suelta no le escribe a la bloqueada que roza (revisión 2026-09-06)', () => {
+    const suelta = piece({ id: 'a', position: { x: 0, y: 0 } });
+    const bloqueada = piece({ id: 'b', locked: true, position: { x: 300, y: 0 } });
+    const { onApplyAll, hook } = setup([suelta, bloqueada]);
+    act(() => hook.result.current.handleMouseDown(clickAt(100, 100)));
+    act(() => hook.result.current.handleMouseMove(clickAt(150, 100)));
+    act(() => hook.result.current.handleMouseMove(clickAt(400, 100)));
+    act(() => hook.result.current.handleMouseUp(clickAt(400, 100)));
+    expect(onApplyAll).toHaveBeenCalledWith(['a'], expect.any(Number));
+  });
+
+  it('el arrastre que rozó una bloqueada también lo dice, no solo la omite', () => {
+    const avisos: string[] = [];
+    const cancelar = suscribirNoPasoNada(a => avisos.push(a.razon));
+    const suelta = piece({ id: 'a', position: { x: 0, y: 0 } });
+    const bloqueada = piece({ id: 'b', locked: true, position: { x: 300, y: 0 } });
+    const { hook } = setup([suelta, bloqueada]);
+    act(() => hook.result.current.handleMouseDown(clickAt(100, 100)));
+    act(() => hook.result.current.handleMouseMove(clickAt(150, 100)));
+    act(() => hook.result.current.handleMouseMove(clickAt(400, 100)));
+    act(() => hook.result.current.handleMouseUp(clickAt(400, 100)));
+    cancelar();
+    expect(avisos).toContain('margen:pieza-bloqueada');
+  });
 });
 
 describe('piezaBloqueada — el predicado que faltaba', () => {

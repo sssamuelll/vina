@@ -29,6 +29,8 @@ interface BodyDrag {
   startY: number;
   moved: boolean;
   touched: Set<string>;
+  /** Piezas bloqueadas que el arrastre rozó — no escriben, y el release avisa una vez. */
+  bloqueadas: Set<string>;
   singlePieceId: string;
   prevWidth: number;
 }
@@ -287,6 +289,7 @@ export function useSeamAllowanceTool(
       startY: e.clientY,
       moved: false,
       touched: new Set([target.pieceId]),
+      bloqueadas: new Set(),
       singlePieceId: target.pieceId,
       prevWidth,
     };
@@ -324,8 +327,17 @@ export function useSeamAllowanceTool(
       screenToPatternLength(EDGE_HIT_PX, zoom),
     );
     // El cuerpo que ganó el press no se convierte en tramo al rozar un borde.
-    if (target?.kind === 'piece') bodyDrag.touched.add(target.pieceId);
-  }, [edgeGesture, hitOrder, pan, resolveHover, zoom]);
+    if (target?.kind === 'piece') {
+      // El candado también aplica aquí (#1136 revisión 2026-09-06): el press
+      // solo mira su propia pieza, y el arrastre puede rozar una bloqueada.
+      const rozada = pieces.find(candidate => candidate.id === target.pieceId);
+      if (rozada && piezaBloqueada(rozada, layerLocked)) {
+        bodyDrag.bloqueadas.add(target.pieceId);
+      } else {
+        bodyDrag.touched.add(target.pieceId);
+      }
+    }
+  }, [edgeGesture, hitOrder, layerLocked, pan, pieces, resolveHover, zoom]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     presionado.current = false;
@@ -336,6 +348,9 @@ export function useSeamAllowanceTool(
     }
 
     bodyDragRef.current = null;
+    if (bodyDrag.bloqueadas.size > 0) {
+      noPasoNada('margen:pieza-bloqueada', { pieceIds: [...bodyDrag.bloqueadas], gesto: 'piece' });
+    }
     if (bodyDrag.moved && bodyDrag.touched.size > 0) {
       onApplyAll([...bodyDrag.touched], widthMm);
     } else {
