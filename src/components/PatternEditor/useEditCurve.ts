@@ -295,9 +295,22 @@ export function useEditCurve(zoom: number, pan: Point2D) {
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && state.isEditing) {
+      // Peldaño 3 de la escalera (E-4): el nodo seleccionado se suelta antes
+      // de salir de la edición de curva. Mismo escalón que `useEditPattern`.
+      //
+      // Pero el peldaño 2 —GESTO VIVO— manda sobre el 3 (revisión adversarial
+      // 2026-09-06): con `dragRef.current` puesto, Escape tiene que cancelar
+      // el arrastre y cerrar el lote "Editar nodo", no solo soltar la
+      // selección y dejar el nodo siguiendo al puntero.
+      if (!dragRef.current && state.selectedNode) {
+        setState(s => ({ ...s, selectedNode: null }));
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       exitEdit();
     }
-  }, [state.isEditing, exitEdit]);
+  }, [state.isEditing, state.selectedNode, exitEdit]);
 
   return {
     ...state,

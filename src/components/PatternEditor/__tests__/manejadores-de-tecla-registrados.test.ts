@@ -85,3 +85,64 @@ describe('F8 — ningún manejador de tecla se queda a medio cablear', () => {
     expect(MONTADOS.has('slashAndSpreadTool')).toBe(true);
   });
 });
+
+/**
+ * El rodeo por el otro lado (spec de la escalera de Escape, § 4.2).
+ *
+ * El trinquete de arriba comprueba que el `handleKeyDown` **exista y llegue**.
+ * No mira QUÉ TECLAS atiende — así que un hook con un `handleKeyDown` que solo
+ * escucha Enter pasa en verde, y Escape en esa herramienta cae al peldaño
+ * global sin que nadie lo note. `useOffsetTool` es ese caso.
+ *
+ * La spec lo listó como «falta añadirle Escape». El código dice otra cosa: su
+ * `reset` es `useCallback(() => {}, [])` —un no-op— porque la herramienta no
+ * guarda gesto en curso; su vista previa se deriva de la selección. Escape
+ * cayendo al global (`selection.deselect`) deselecciona, la vista previa
+ * desaparece, y eso ES el comportamiento correcto de la escalera.
+ *
+ * Así que lo que se arregla no es el hook: es el censo. Cada `handleKeyDown`
+ * montado declara aquí qué teclas atiende, y quien no atienda Escape tiene que
+ * decir por qué. Un hook nuevo que no aparezca en la lista rompe el test.
+ */
+describe('cada manejador declara qué teclas atiende, no solo que existe', () => {
+  /** Ganchos que NO atienden Escape, con la razón. Añadir aquí es una decisión. */
+  const SIN_ESCAPE: Record<string, string> = {
+    offsetTool: 'no guarda gesto: su reset es un no-op y la vista previa sale de '
+      + 'la selección, así que Escape cae al peldaño global y deselecciona — correcto',
+  };
+
+  const DIR = join(process.cwd(), 'src/components/PatternEditor');
+
+  /** `xTool` → `useXTool.ts`: la convención de nombres del router. */
+  function archivoDe(nombre: string): string {
+    const base = nombre.replace(/Tool$/, '');
+    return `use${base[0].toUpperCase()}${base.slice(1)}Tool.ts`;
+  }
+
+  it('los que dicen atender Escape lo atienden de verdad', () => {
+    const revisados: string[] = [];
+    for (const nombre of MONTADOS) {
+      if (nombre in SIN_ESCAPE) continue;
+      let src: string;
+      try {
+        src = readFileSync(join(DIR, archivoDe(nombre)), 'utf8');
+      } catch {
+        // El gancho no sigue la convención de nombres (`nodeEditor`,
+        // `editPattern`, `measureTool`…): fuera del alcance de este censo.
+        continue;
+      }
+      revisados.push(nombre);
+      expect(
+        /'Escape'/.test(src),
+        `${nombre} está montado en el router y su hook no menciona Escape. `
+        + 'O lo atiende, o entra en SIN_ESCAPE con su razón escrita.',
+      ).toBe(true);
+    }
+    // Control: si la convención de nombres cambia, esto deja de revisar nada.
+    expect(revisados.length, 'el censo no revisó ningún gancho').toBeGreaterThanOrEqual(4);
+  });
+
+  it('la lista de excepciones no crece sin que alguien lo decida', () => {
+    expect(Object.keys(SIN_ESCAPE)).toEqual(['offsetTool']);
+  });
+});

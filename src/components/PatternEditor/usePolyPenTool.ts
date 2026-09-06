@@ -360,7 +360,6 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
   }, [cancelPress, reset, finish, publish, openNextPoint, closeNextPoint]);
 
   const isTracing = useCallback(() => nodesRef.current.length > 0 || pressRef.current !== null, []);
-  const isArmed = useCallback(() => pressRef.current !== null, []);
 
   return {
     nodes: view.nodes,
@@ -385,6 +384,5 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     cancelPress,
     reset,
     isTracing,
-    isArmed,
   };
 }

@@ -41,9 +41,13 @@ describe('EdgePropertiesSection', () => {
     expect((screen.getByLabelText('Margen (mm)') as HTMLInputElement).value).toBe('10');
   });
 
-  it('shows the edge name and the effective width (inherited)', () => {
+  // Antes decía «shows the edge NAME»: certificaba que el panel enseñara `hem`,
+  // que es justo lo que #1106 punto 5 pide quitar. La promesa cambió, el test
+  // con ella — ahora el título nombra el borde por número y por su margen.
+  it('el título nombra el borde por número y enseña su margen efectivo', () => {
     mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
-    expect(screen.getByText(/hem/i)).toBeTruthy();
+    expect(screen.getByText('Borde 1 · margen 10 mm')).toBeTruthy();
+    expect(screen.queryByText(/hem/i)).toBeNull();
     expect((screen.getByLabelText(/margen/i) as HTMLInputElement).value).toBe('10');
   });
 

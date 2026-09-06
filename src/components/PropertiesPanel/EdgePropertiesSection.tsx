@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
 import {
   removeEdgeSeamAllowanceSpan,
   setEdgesSeamAllowance,
@@ -152,6 +153,7 @@ function SpanFields({ index, span, edgeLengthMm, onCommit, onRemove }: SpanField
 export default function EdgePropertiesSection({ items }: Props) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
 
   const resolved = items
     .map(({ pieceId, edgeId }) => {
@@ -173,6 +175,10 @@ export default function EdgePropertiesSection({ items }: Props) {
     .filter((value): value is NonNullable<typeof value> => value != null);
 
   const count = resolved.length;
+  // #1136: el panel es la segunda puerta de escritura del margen. Con varios
+  // bordes basta UNA pieza bloqueada para apagar: el commit es un solo dispatch
+  // sobre todos, y no hay forma de escribirle a la mitad de la selección.
+  const bloqueado = resolved.some(item => piezaBloqueada(item.piece, layerLocked));
   const allSame = count > 0 && resolved.every(item => item.effective === resolved[0].effective);
   const displayValue = allSame ? String(resolved[0].effective) : '';
   const anyOverridden = resolved.some(item => item.isOverridden);
@@ -199,6 +205,10 @@ export default function EdgePropertiesSection({ items }: Props) {
     : 0;
 
   const commitWidth = () => {
+    if (bloqueado) {
+      setValue(displayValue);
+      return;
+    }
     const width = parseFloat(value);
     if (!Number.isFinite(width) || width < 0) {
       setValue(displayValue);
@@ -207,7 +217,16 @@ export default function EdgePropertiesSection({ items }: Props) {
     dispatch(setEdgesSeamAllowance({ items: commitItems, width }));
   };
 
-  const subtitle = count === 1 ? `Borde · ${resolved[0].edgeName}` : `${count} bordes`;
+  // #1106 punto 5: «el panel de borde no enseña ids ni nombres de objeto;
+  // enseña "Borde 3 · margen 20 mm"». El número es el orden del borde en la
+  // pieza, no su id ni su nombre semántico en inglés (`armhole`, `hem`).
+  const numeroDeBorde = count === 1
+    ? (resolved[0].piece.edges ?? []).findIndex(e => e.id === resolved[0].edgeId) + 1
+    : 0;
+  const enMm = (n: number) => String(n).replace('.', ',');
+  const subtitle = count === 1
+    ? `Borde ${numeroDeBorde} · margen ${enMm(resolved[0].effective)} mm`
+    : `${count} bordes`;
   const widthLabel = spans.length > 0
     ? 'Margen fuera de los tramos (mm)'
     : 'Margen (mm)';
@@ -225,11 +244,19 @@ export default function EdgePropertiesSection({ items }: Props) {
           max={100}
           value={value}
           placeholder={allSame ? undefined : 'Varios'}
+          disabled={bloqueado}
           onChange={event => setValue(event.target.value)}
           onKeyDown={event => { if (event.key === 'Enter') commitWidth(); }}
           onBlur={commitWidth}
         />
       </div>
+      {bloqueado && (
+        <div className="panel-hint">
+          {count === 1
+            ? 'Esta pieza está bloqueada; quítale el candado para cambiarle el margen'
+            : 'Alguna de estas piezas está bloqueada; quítale el candado para cambiarles el margen'}
+        </div>
+      )}
       {!anyOverridden && displayValue !== '' && value === displayValue && (
         <div className="panel-hint">
           {count === 1 ? 'Este borde usa el margen de la pieza' : 'Estos bordes usan el margen de la pieza'}
@@ -238,7 +265,7 @@ export default function EdgePropertiesSection({ items }: Props) {
       <div className="panel-field panel-field--row">
         <button
           className="panel-chip-btn"
-          disabled={!anyOverridden}
+          disabled={bloqueado || !anyOverridden}
           onClick={() => dispatch(setEdgesSeamAllowance({ items: commitItems, width: null }))}
           title={count === 1
             ? `Usar el margen de la pieza (${String(resolved[0].pieceDefault).replace('.', ',')} mm)`
@@ -248,13 +275,14 @@ export default function EdgePropertiesSection({ items }: Props) {
         </button>
         <button
           className="panel-chip-btn"
+          disabled={bloqueado}
           onClick={() => dispatch(setEdgesSeamAllowance({ items: commitItems, width: 0 }))}
         >
           Sin margen
         </button>
       </div>
 
-      {spanTarget && spans.length > 0 && (
+      {spanTarget && spans.length > 0 && !bloqueado && (
         <div className="panel-subblock">
           <div className="panel-subtitle">Tramos del margen</div>
           {spans.map((span, index) => (

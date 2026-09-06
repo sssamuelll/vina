@@ -641,6 +641,21 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       if (!state.isEditing || !state.editingPieceId) return;
 
       if (e.key === 'Escape') {
+        // Peldaño 3 de la escalera (E-4): la sub-selección se suelta ANTES de
+        // salir. Un Escape = un peldaño. Salir de golpe con un nodo agarrado
+        // le quita el modo entero a María cuando solo quería soltar el punto.
+        //
+        // Pero el peldaño 2 —GESTO VIVO— manda sobre el 3. Con un arrastre
+        // abierto, Escape lo cancela y cierra su lote de deshacer; quedarse en
+        // el peldaño 3 dejaba el lote abierto y la siguiente acción entraba
+        // dentro de él (lo cazó `useEditPattern.undo.test.tsx`, no yo).
+        if (!dragRef.current
+            && (state.selectedNodes.size > 0 || state.selectedSegments.size > 0)) {
+          setState(s => ({ ...s, selectedNodes: new Set(), selectedSegments: new Set() }));
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
         exitEdit();
         return;
       }

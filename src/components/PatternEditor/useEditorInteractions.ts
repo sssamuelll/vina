@@ -145,7 +145,7 @@ interface ToolHooks {
     cancel: () => void;
     isArmed: () => boolean;
   };
-  seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
+  seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void; /** true = consumió la tecla (P1). */ handleKeyDown: (e: KeyboardEvent) => boolean; limpiarHover: () => void };
   notchTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -234,6 +234,7 @@ interface ToolHooks {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleKeyDown: (e: KeyboardEvent) => void;
+    limpiarHover: () => void;
   };
   topstitchTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -277,7 +278,6 @@ interface ToolHooks {
     cancelPress: () => void;
     reset: () => void;
     isTracing: () => boolean;
-    isArmed: () => boolean;
   };
   pleatTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -479,10 +479,16 @@ export function useEditorInteractions(
   // detiene la propagación; si no, la tecla fluye al global.
   // Spec: docs/superpowers/specs/2026-08-29-linea-interna-y-medidas-design.md § 8
   useEffect(() => {
-    // Quién consumió la tecla, si alguien lo dijo. Solo los tres ganchos cuyo
-    // `handleKeyDown` devuelve boolean pueden decirlo; los demás se ven en la
-    // bitácora por lo que despachan.
-    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | 'circle' | 'triangle' | 'cotas' | 'elastic' | null;
+    // Quién consumió la tecla. Antes solo lo decían los ganchos con protocolo
+    // P1 (los que devuelven boolean) y las otras cinco ramas devolvían `null`
+    // tras consumir: la caja negra anotaba «no fue nadie» sobre una tecla que
+    // sí se había comido alguien (E-3 de la escalera de Escape).
+    //
+    // Cuatro de esas cinco están detrás de una guarda —`armed`, `isArmed()`,
+    // `isDragging`—: si se entra, se consume, y nombrarlas es verdad. La
+    // quinta, coser, pasó a P1 porque podía entrar sin nada que cancelar.
+    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | 'circle' | 'triangle' | 'cotas' | 'elastic'
+      | 'point' | 'notch' | 'seamAllowance' | 'seam' | 'transform' | null;
     const routeKey = (e: KeyboardEvent): KeyConsumer => {
       // Línea interna: con trazo vivo, Escape / Enter / Retroceso / Supr son
       // del motor. `handleKeyDown` dice si consumió.
@@ -561,33 +567,34 @@ export function useEditorInteractions(
       // preventDefault + stopPropagation). Sin armar, el Esc fluye normal.
       if (activeTool === 'point' && pointTool.armed) {
         pointTool.handleKeyDown(e);
-        return null;
+        return 'point';
       }
       // El piquete comparte la misma ley que Coser: mientras el press siga
       // vivo, Escape pertenece al gesto y no a la selección.
       if (activeTool === 'notch' && notchTool.isArmed()) {
         notchTool.handleKeyDown(e);
-        return null;
+        return 'notch';
       }
       // El tramo de margen ya fijó su borde en el press; Escape pertenece a
       // ese gesto y no debe caer además en la deselección global.
       if (activeTool === 'seamAllowance' && seamAllowanceTool.isArmed()) {
         seamAllowanceTool.handleKeyDown(e);
-        return null;
+        return 'seamAllowance';
       }
       // Coser: con un gesto armado o una mitad sostenida, el Esc es del tool.
       // El hook hace preventDefault + stopPropagation cuando cancela algo; si
       // no hay nada que cancelar, el Esc fluye normal → deseleccionar.
+      // Sin guarda: coser puede entrar sin nada que cancelar, así que su P1
+      // es lo único que distingue «me la comí» de «que siga viajando».
       if (activeTool === 'seam') {
-        seamTool.handleKeyDown(e);
-        return null;
+        return seamTool.handleKeyDown(e) ? 'seam' : null;
       }
       if (activeTool !== 'select') return null;
       if (!transformTool.isDragging) return null;
       transformTool.handleKeyDown(e);
       e.preventDefault();
       e.stopPropagation();
-      return null;
+      return 'transform';
     };
     const onKeyCapture = (e: KeyboardEvent) => {
       // Las teclas que nacen dentro de un campo editable pertenecen al campo.
@@ -1226,9 +1233,22 @@ export function useEditorInteractions(
     setIsDraggingEndpoint(false);
   }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, triangleTool, grainlineTool]);
 
+  /**
+   * El ratón salió del lienzo. Todo resalte de hover se va con él (#1132).
+   *
+   * Cubría solo Margen. El censo del 06-09 encontró 14 hooks con estado de
+   * hover y uno cableado; estos tres son los que María nombró. Los que faltan
+   * están declarados en `1132-el-resalte-se-va-al-salir.test.ts`, que falla si
+   * el número sube — el mismo trinquete que ya guarda el espacio de pieza.
+   *
+   * No se filtra por `activeTool`: un resalte encendido por la herramienta
+   * anterior también se quedaba pegado, y limpiar de más no cuesta nada.
+   */
   const handleMouseLeave = useCallback(() => {
-    if (activeTool === 'seamAllowance') seamAllowanceTool.limpiarHover();
-  }, [activeTool, seamAllowanceTool]);
+    seamAllowanceTool.limpiarHover();
+    seamEditTool.limpiarHover();
+    seamTool.limpiarHover();
+  }, [seamAllowanceTool, seamEditTool, seamTool]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';

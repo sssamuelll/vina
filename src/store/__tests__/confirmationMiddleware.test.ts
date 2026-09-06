@@ -95,7 +95,8 @@ describe('confirmationMiddleware', () => {
     const confirmation = getPendingConfirmation(store);
     expect(confirmation).not.toBeNull();
     expect(confirmation!.source).toBe('middleware');
-    expect(confirmation!.title).toBe('Remove Pattern Piece');
+    // #1105: los diálogos de borrar hablan español desde la tanda 9.
+    expect(confirmation!.title).toBe('Borrar la pieza');
     expect(confirmation!.destructive).toBe(true);
     expect(confirmation!.reduxAction).toEqual({
       type: 'project/removePiece',
@@ -118,8 +119,8 @@ describe('confirmationMiddleware', () => {
 
     const confirmation = getPendingConfirmation(store);
     expect(confirmation).not.toBeNull();
-    expect(confirmation!.title).toBe('Remove 3 Pattern Pieces');
-    expect(confirmation!.consequences[0]).toBe('3 pattern pieces will be deleted.');
+    expect(confirmation!.title).toBe('Borrar 3 piezas');
+    expect(confirmation!.consequences[0]).toBe('Se borran 3 piezas');
   });
 
   it("override 'always' includes consequences", () => {

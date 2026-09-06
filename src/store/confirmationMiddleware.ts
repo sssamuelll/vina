@@ -22,37 +22,38 @@ const DESTRUCTIVE_ACTIONS: Record<string, string> = {
   'construction/removePoint': 'removePoint',
 };
 
-/** Human-readable dialog titles */
+/** Títulos del diálogo. Ley de idioma del contrato de interfaz: lo que María
+ *  lee justo antes de perder trabajo no puede estar en inglés (#1105). */
 function getTitle(type: string, payload: unknown): string {
   if (type === 'removePieces' && Array.isArray(payload) && payload.length > 1) {
-    return `Remove ${payload.length} Pattern Pieces`;
+    return `Borrar ${payload.length} piezas`;
   }
   const TITLES: Record<string, string> = {
-    removePiece: 'Remove Pattern Piece',
-    removePieces: 'Remove Pattern Piece',
-    removeSeam: 'Remove Seam',
-    removePoint: 'Remove Construction Point',
+    removePiece: 'Borrar la pieza',
+    removePieces: 'Borrar la pieza',
+    removeSeam: 'Borrar la costura',
+    removePoint: 'Borrar el punto de construcción',
   };
-  return TITLES[type] ?? 'Confirm Action';
+  return TITLES[type] ?? '¿Confirmas la acción?';
 }
 
-/** Consequence bullets shown in the confirmation dialog */
+/** Las viñetas de consecuencia del diálogo. Sin punto final: son etiquetas. */
 function getConsequences(type: string, payload: unknown): string[] {
   if (type === 'removePieces' && Array.isArray(payload) && payload.length > 1) {
     return [
-      `${payload.length} pattern pieces will be deleted.`,
-      'All seams and trims attached to these pieces will also be removed.',
+      `Se borran ${payload.length} piezas`,
+      'Las costuras y los avíos de esas piezas se borran con ellas',
     ];
   }
   const CONSEQUENCES: Record<string, string[]> = {
     removePiece: [
-      'Any seams and trims attached to this piece will also be removed.',
+      'Las costuras y los avíos de esta pieza se borran con ella',
     ],
     removeSeam: [
-      'The seam connection between pieces will be removed.',
+      'Las dos piezas dejan de estar cosidas',
     ],
     removePoint: [
-      'Any lines or curves that reference this point may break.',
+      'Las líneas y las curvas que se apoyan en ese punto pueden romperse',
     ],
   };
   return CONSEQUENCES[type] ?? [];
@@ -171,7 +172,7 @@ export const confirmationMiddleware: Middleware = (storeApi) => (next) => (rawAc
           showConfirmation({
             source: 'middleware',
             title: getTitle(opName, action.payload),
-            description: 'Please confirm you want to proceed.',
+            description: 'Confirma que quieres seguir',
             consequences: getConsequences(opName, action.payload),
             destructive: true,
             reduxAction: { type: action.type, payload: action.payload },
