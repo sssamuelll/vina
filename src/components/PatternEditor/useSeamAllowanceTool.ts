@@ -8,6 +8,7 @@ import {
   pieceLocalToPattern,
 } from '../../utils/geometry/pieceSpace';
 import { resolveSeamAllowanceClick } from '../../utils/seam/edgeHitTest';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
 import { margenEnPunto, type MargenEnPunto } from '../../utils/seam/margenEnPunto';
 import { pushJournal } from '../../utils/telemetry/journal';
 import type { SeamAllowanceAnchor } from './cotas/sujeto';
@@ -60,6 +61,12 @@ export function useSeamAllowanceTool(
     onSelectVertex: (pieceId: string, vertexIndex: number) => void;
   },
   active = true,
+  /**
+   * Capas bloqueadas (`project.layerLocked`). Va aquí y no por `useSelector`
+   * porque el candado es del proyecto y el hook ya recibe las piezas del
+   * llamador: pedirlo por separado abriría dos fuentes para la misma verdad.
+   */
+  layerLocked: Readonly<Record<number, boolean>> = {},
 ) {
   const widthMm = useSelector((s: RootState) => s.editor.defaultSeamAllowanceWidth);
   const { onApply, onApplyAll, onApplySpan, onSelectEdge, onSelectVertex } = callbacks;
@@ -229,6 +236,15 @@ export function useSeamAllowanceTool(
     );
     if (!target) return;
 
+    // El candado para la escritura, no solo el dibujo (#1136). Las tres ramas
+    // de abajo escriben —cuerpo y borde directamente, la esquina abriendo su
+    // panel—, así que la guarda va antes de las tres y no dentro de cada una.
+    const objetivo = pieces.find(candidate => candidate.id === target.pieceId);
+    if (objetivo && piezaBloqueada(objetivo, layerLocked)) {
+      noPasoNada('margen:pieza-bloqueada', { pieceId: target.pieceId, gesto: target.kind });
+      return;
+    }
+
     if (target.kind === 'vertex') {
       // La esquina tiene un verbo propio; arrastrarla aquí sería inventar otro.
       onSelectVertex(target.pieceId, target.vertexIndex);
@@ -274,7 +290,7 @@ export function useSeamAllowanceTool(
       singlePieceId: target.pieceId,
       prevWidth,
     };
-  }, [edgeGesture, hitOrder, limpiarHover, onSelectVertex, pan, pieces, zoom]);
+  }, [edgeGesture, hitOrder, layerLocked, limpiarHover, onSelectVertex, pan, pieces, zoom]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const bodyDrag = bodyDragRef.current;

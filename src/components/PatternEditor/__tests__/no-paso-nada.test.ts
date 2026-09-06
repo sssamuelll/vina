@@ -166,6 +166,13 @@ describe('las guardas que el censo marcó (a) ya no son mudas', () => {
     // Slash & Spread, pero la lista de abajo solo miraba a los dos hermanos
     // que alguien censo ese día. Un censo parcial delata al detector (#1116).
     ['src/components/PatternEditor/useScissorsTool.ts', 'tijeras'],
+    // Editar costuras entró el 06-09 con #1098: su clic sobre un borde SIN
+    // costura era un no-op declarado "a propósito" en un comentario, que para
+    // María es indistinguible de la herramienta rota. Un no-op a propósito
+    // sigue debiendo decirlo.
+    ['src/components/PatternEditor/useSeamEditTool.ts', 'costuras'],
+    // Margen ya hablaba ('margen:borde-sin-anillo'); #1136 le sumó el candado.
+    ['src/components/PatternEditor/useSeamAllowanceTool.ts', 'margen'],
   ];
 
   it.each(OBLIGADOS)('%s habla cuando el gesto muere', (ruta, prefijo) => {

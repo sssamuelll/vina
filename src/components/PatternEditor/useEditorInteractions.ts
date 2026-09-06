@@ -145,7 +145,7 @@ interface ToolHooks {
     cancel: () => void;
     isArmed: () => boolean;
   };
-  seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
+  seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void; limpiarHover: () => void };
   notchTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -234,6 +234,7 @@ interface ToolHooks {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleKeyDown: (e: KeyboardEvent) => void;
+    limpiarHover: () => void;
   };
   topstitchTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -277,7 +278,6 @@ interface ToolHooks {
     cancelPress: () => void;
     reset: () => void;
     isTracing: () => boolean;
-    isArmed: () => boolean;
   };
   pleatTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -1226,9 +1226,22 @@ export function useEditorInteractions(
     setIsDraggingEndpoint(false);
   }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, triangleTool, grainlineTool]);
 
+  /**
+   * El ratón salió del lienzo. Todo resalte de hover se va con él (#1132).
+   *
+   * Cubría solo Margen. El censo del 06-09 encontró 14 hooks con estado de
+   * hover y uno cableado; estos tres son los que María nombró. Los que faltan
+   * están declarados en `1132-el-resalte-se-va-al-salir.test.ts`, que falla si
+   * el número sube — el mismo trinquete que ya guarda el espacio de pieza.
+   *
+   * No se filtra por `activeTool`: un resalte encendido por la herramienta
+   * anterior también se quedaba pegado, y limpiar de más no cuesta nada.
+   */
   const handleMouseLeave = useCallback(() => {
-    if (activeTool === 'seamAllowance') seamAllowanceTool.limpiarHover();
-  }, [activeTool, seamAllowanceTool]);
+    seamAllowanceTool.limpiarHover();
+    seamEditTool.limpiarHover();
+    seamTool.limpiarHover();
+  }, [seamAllowanceTool, seamEditTool, seamTool]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';

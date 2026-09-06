@@ -96,12 +96,12 @@ const HOOK_CONSEQUENCES: Record<string, string[]> = {
   // el corte SIEMPRE la sustituye por 2 piezas nuevas — así que el copy
   // dice eso, no una elección que la herramienta no ofrece.
   splitPiece: ['La pieza original se sustituye por 2 piezas nuevas'],
-  mergePieces: ['Both pieces will be replaced by a single merged piece'],
+  mergePieces: ['Las dos piezas se sustituyen por una sola'],
 };
 
 const HOOK_TITLES: Record<string, string> = {
   splitPiece: '¿Dividir la pieza?',
-  mergePieces: 'Merge pieces?',
+  mergePieces: '¿Unir las piezas?',
 };
 
 const HOOK_DESCRIPTIONS: Record<string, string> = {
@@ -133,9 +133,12 @@ export function useGuardedAction() {
       dispatch(
         showConfirmation({
           source: 'hook',
-          title: HOOK_TITLES[operationName] ?? `Confirm ${operationName}?`,
-          description: HOOK_DESCRIPTIONS[operationName]
-            ?? `This will ${operationName.replace(/([A-Z])/g, ' $1').toLowerCase()}.`,
+          title: HOOK_TITLES[operationName] ?? '¿Confirmas la acción?',
+          // El respaldo no arma el texto con el identificador de la operación:
+          // «Confirm removeThing?» era inglés Y nombre de objeto, las dos
+          // mitades de la misma deriva. Lo que falta se ve en la bitácora, que
+          // ya registra la operación; a María se le habla en su idioma.
+          description: HOOK_DESCRIPTIONS[operationName] ?? 'Confirma que quieres seguir',
           consequences: HOOK_CONSEQUENCES[operationName] ?? [],
           destructive: true,
           confirmLabel: HOOK_CONFIRM_LABELS[operationName],

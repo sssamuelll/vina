@@ -44,7 +44,6 @@ export const TECHOS = {
   'src/components/PatternEditor/renderers/overlays/SlashAndSpreadOverlay.tsx': 2,
   'src/components/PatternEditor/renderers/overlays/TopstitchOverlay.tsx': 2,
   'src/components/PatternEditor/useEditorInteractions.ts': 6,
-  'src/components/PatternEditor/usePOMMeasureTool.ts': 2,
   'src/components/PatternEditor/useTopstitchTool.ts': 6,
   'src/components/PatternEditor/useTransformTool.ts': 2,
   'src/copilot/action/tools/definitions/patternOpsTools.ts': 1,

@@ -142,7 +142,13 @@ export function useFreeSewingTool(
     }
   }, [gesture, segmentA]);
 
+  /** El ratón salió del lienzo: el borde resaltado se va con él (#1132). */
+  const limpiarHover = useCallback(() => {
+    setHoveredTarget(current => (current === null ? current : null));
+  }, []);
+
   return {
+    limpiarHover,
     segmentA,
     phase: segmentA ? ('holdingA' as const) : ('idle' as const),
     hoveredTarget,

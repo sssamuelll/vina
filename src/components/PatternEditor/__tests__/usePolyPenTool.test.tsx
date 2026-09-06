@@ -121,7 +121,11 @@ describe('usePolyPenTool — anfitriona y nodos', () => {
     act(() => tool().handleMouseDown(ev(150, 150)));
     act(() => tool().handleMouseUp(ev(150, 150, 2)));
     expect(tool().nodes).toEqual([]);
-    expect(tool().isArmed()).toBe(true);
+    // Antes: `isArmed()`. Ese predicado estaba exportado y tipado en la
+    // interfaz del router, y su ÚNICO consumidor era esta línea — «predicado
+    // escrito, puerta sin abrir» (spec de la escalera de Escape § 4.3). Se
+    // quitó; el mismo hecho se lee en `pressPoint`, que sí consume el dibujo.
+    expect(tool().pressPoint).not.toBeNull();
   });
 });
 

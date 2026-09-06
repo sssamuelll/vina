@@ -110,6 +110,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const selectedPieceIds = editor.selectedPieceIds;
   const toolOptions = useSelector(selectToolOptions);
   const groups = useSelector((s: RootState) => s.project.groups);
+  // Sube aquí desde su sitio de más abajo: el hook de margen lo necesita para
+  // no escribirle a una pieza bloqueada (#1136), y se declara a 282.
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
   const referenceImages = useSelector((s: RootState) => s.project.referenceImages);
   const showReferenceImages = useSelector((s: RootState) => s.editor.showReferenceImages);
   const selectedReferenceImageId = useSelector((s: RootState) => s.editor.selectedReferenceImageId);
@@ -297,7 +300,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // La esquina sí lo abre: su tipo no tiene otra puerta.
     onSelectEdge: (pieceId, edgeId, additive) => { dispatch(selectSaEdges({ items: [{ pieceId, edgeId }], additive })); },
     onSelectVertex: (pieceId, vertexIndex) => { dispatch(selectSaVertices({ pieceId, vertexIndex })); onOpenPanel?.('Properties'); },
-  }, activeTool === 'seamAllowance');
+  }, activeTool === 'seamAllowance', layerLocked);
 
   const trimTool = useTrimTool(zoom2D, pan2D, pieces, dispatch);
 
@@ -706,7 +709,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // Solo una herramienta está activa a la vez, y cada una enfría la suya en
   // cuanto deja de serlo: el sujeto caliente es el de la herramienta en curso.
   const hotId = activeTool === 'circle' ? circleHotId : activeTool === 'triangle' ? triangleHotId : rectHotId;
-  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
   // Refs para que `aplicarCota` no se recree en cada render de la pluma: la
   // rama del tramo en curso necesita la herramienta viva, no una copia vieja.
   const penRef = useRef(pen);
