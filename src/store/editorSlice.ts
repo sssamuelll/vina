@@ -118,7 +118,7 @@ const editorSlice = createSlice({
       state.selectedInternalLine = null;
       state.saSelection = null;
     },
-    selectInternalLine(state, action: PayloadAction<{ pieceId: string; lineId: string }>) {
+    selectInternalLine(state, action: PayloadAction<NonNullable<EditorState['selectedInternalLine']>>) {
       state.selectedInternalLine = action.payload;
       state.selectedPieceIds = [action.payload.pieceId];
       state.selectedSeamId = null;

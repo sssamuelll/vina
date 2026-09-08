@@ -32,7 +32,7 @@ function getOutlineCenterForDrag(outline: PathCommand[]): { cx: number; cy: numb
   }
   return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
 }
-import { extractNodes, NodeRef } from './nodeEditorUtils';
+import { extractNodes, getAnchor, NodeRef } from './nodeEditorUtils';
 import { classifyEditableAnchors } from './anchorRoles';
 import { EXTREMOS } from './renderers/PuntosDelContorno';
 import { getInternalLineEndpoints } from './internalShapePath';
@@ -85,30 +85,28 @@ function distToSegment(px: number, py: number, x1: number, y1: number, x2: numbe
   return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
 }
 
-/** Minimum distance from a point to any segment of an internal line path */
-function distToInternalLine(px: number, py: number, path: PathCommand[]): number {
-  let minDist = Infinity;
+/**
+ * Conserva el comando que produjo la menor distancia: devolver solo la distancia
+ * obligaba al clic a seleccionar toda la interna. El índice pertenece al path
+ * existente y no convierte los tramos en entidades nuevas. En un empate conserva
+ * el tramo seleccionado; sin él, manda el orden del trazado (§ 2.2).
+ */
+function hitInternalLine(px: number, py: number, path: PathCommand[], preferredSegmentIndex?: number): { distance: number; segmentIndex: number } | null {
+  let nearest: { distance: number; segmentIndex: number } | null = null;
   let prevX = 0, prevY = 0;
-  for (const cmd of path) {
-    switch (cmd.type) {
-      case 'M':
-        prevX = cmd.values[0]; prevY = cmd.values[1];
-        break;
-      case 'L':
-        minDist = Math.min(minDist, distToSegment(px, py, prevX, prevY, cmd.values[0], cmd.values[1]));
-        prevX = cmd.values[0]; prevY = cmd.values[1];
-        break;
-      case 'C':
-        minDist = Math.min(minDist, distToSegment(px, py, prevX, prevY, cmd.values[4], cmd.values[5]));
-        prevX = cmd.values[4]; prevY = cmd.values[5];
-        break;
-      case 'Q':
-        minDist = Math.min(minDist, distToSegment(px, py, prevX, prevY, cmd.values[2], cmd.values[3]));
-        prevX = cmd.values[2]; prevY = cmd.values[3];
-        break;
+  for (const [segmentIndex, cmd] of path.entries()) {
+    const anchor = getAnchor(cmd);
+    if (!anchor) continue;
+    if (cmd.type !== 'M') {
+      const distance = distToSegment(px, py, prevX, prevY, anchor.x, anchor.y);
+      if (!nearest || distance < nearest.distance
+        || (distance === nearest.distance && segmentIndex === preferredSegmentIndex)) {
+        nearest = { distance, segmentIndex };
+      }
     }
+    prevX = anchor.x; prevY = anchor.y;
   }
-  return minDist;
+  return nearest;
 }
 
 interface ToolHooks {
@@ -907,16 +905,31 @@ export function useEditorInteractions(
           const { x: localX, y: localY } = patternToPieceLocal({ x: clickX, y: clickY }, piece);
           const LINE_THRESHOLD = screenToPatternLength(5, zoom2D);
           let nearestLine: InternalLine | null = null;
+          let nearestSegmentIndex: number | undefined;
           let nearestDist = Infinity;
           for (const line of piece.internals) {
-            const dist = distToInternalLine(localX, localY, line.path);
-            if (dist < LINE_THRESHOLD && dist < nearestDist) {
-              nearestDist = dist;
+            const isSelected = selectedInternalLine?.pieceId === piece.id
+              && selectedInternalLine.lineId === line.id;
+            const hit = hitInternalLine(localX, localY, line.path, isSelected ? selectedInternalLine.segmentIndex : undefined);
+            if (hit && hit.distance < LINE_THRESHOLD
+              && (hit.distance < nearestDist || (hit.distance === nearestDist && isSelected))) {
+              nearestDist = hit.distance;
               nearestLine = line;
+              nearestSegmentIndex = hit.segmentIndex;
             }
           }
           if (nearestLine) {
-            dispatch(selectInternalLine({ pieceId: piece.id, lineId: nearestLine.id }));
+            // Piquetes, pinzas, hilo y costuras conservan su sujeto de entidad:
+            // sus operaciones tienen semántica propia. Las internas de dibujo
+            // añaden el tramo al mismo par de IDs que siguen usando los demás
+            // consumidores, incluido el borrado de entidad de esta tanda.
+            const seleccionPorTramo = nearestLine.type === 'reference'
+              || nearestLine.type === 'fold' || nearestLine.type === 'pleat';
+            dispatch(selectInternalLine({
+              pieceId: piece.id,
+              lineId: nearestLine.id,
+              ...(seleccionPorTramo ? { segmentIndex: nearestSegmentIndex } : {}),
+            }));
             return;
           }
           

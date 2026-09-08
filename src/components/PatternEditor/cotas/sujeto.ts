@@ -1,4 +1,4 @@
-import type { PatternPiece, SaSelection, Tool2D } from '../../../types/types';
+import type { InternalLineSelection, PatternPiece, SaSelection, Tool2D } from '../../../types/types';
 import { margenEnPunto } from '../../../utils/seam/margenEnPunto';
 import { cotaDeMargen } from './cotaDeMargen';
 import { cotasDeLineaInterna, cotasDePieza, type Cota } from './cotas';
@@ -16,7 +16,7 @@ export interface SujetoInput {
   activeTool: Tool2D;
   pieces: PatternPiece[];
   selectedPieceIds: string[];
-  selectedInternalLine: { pieceId: string; lineId: string } | null;
+  selectedInternalLine: InternalLineSelection | null;
   /** La pieza que Rectángulo acaba de crear (enfriada a `null` por `PatternEditor`, spec § 3.1). */
   hotId: string | null;
   isDragging: boolean;
@@ -238,7 +238,8 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
     if (piece && line) {
       const capa = piece.layer ?? 1;
       if (input.hiddenLayerIds.includes(capa)) return nada(lineaRect);
-      const cotas = cotasDeLineaInterna(piece, line);
+      const { segmentIndex } = input.selectedInternalLine;
+      const cotas = cotasDeLineaInterna(piece, line, segmentIndex);
       return {
         piece,
         caliente: false,
@@ -247,7 +248,9 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
         lecturaApagada: false,
         bordeLeido: null,
         disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
-        lineaDeSujeto: `Editando: la línea seleccionada · ${cotas.length} cotas`,
+        lineaDeSujeto: segmentIndex === undefined
+          ? `Editando: la línea seleccionada · ${cotas.length} cotas`
+          : 'Editando: el tramo seleccionado',
       };
     }
   }

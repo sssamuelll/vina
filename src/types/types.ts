@@ -790,13 +790,25 @@ export type SaSelection =
   | { kind: 'edge'; items: { pieceId: string; edgeId: string }[] }
   | { kind: 'vertex'; items: { pieceId: string; vertexIndex: number }[] };
 
+/**
+ * El par de IDs sigue identificando la interna completa para sus consumidores
+ * actuales. El índice opcional identifica el comando de llegada del tramo en
+ * ese mismo path, sin partirlo ni crear entidades por cada gesto de selección.
+ * Sin índice se conserva la selección de entidad que producen otras herramientas.
+ */
+export interface InternalLineSelection {
+  pieceId: string;
+  lineId: string;
+  segmentIndex?: number;
+}
+
 export interface EditorState {
   viewMode: ViewMode;
   activeTool: Tool2D;
   selectedPieceIds: string[];
   selectedSeamId: string | null;
   selectedPOMId: string | null;
-  selectedInternalLine: { pieceId: string; lineId: string } | null;
+  selectedInternalLine: InternalLineSelection | null;
   /** Seam-allowance tool selection: a typed, mutually-exclusive set — N edges OR
    *  N vertices, never mixed. Replaces the old single selectedEdge/selectedVertex
    *  pair (multi-select Shift; spec 2026-06-09-selection-model-multiselect-design). */

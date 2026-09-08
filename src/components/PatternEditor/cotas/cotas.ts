@@ -254,7 +254,7 @@ function coincideConEsquinaProyectada(
 }
 
 /** Cotas de tramo y de borde de una sola línea interna seleccionada. */
-export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine): Cota[] {
+export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine, segmentIndex?: number): Cota[] {
   // Un piquete conserva una segunda verdad paramétrica (`notchAnchor`) y una
   // pinza tiene su propia entidad rica: mover solo el path desde este editor
   // genérico abriría dos dueños del mismo dato. Sus chips quedan para la tanda
@@ -269,6 +269,10 @@ export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine): Co
   const idBase = `${piece.id}-${line.id}`;
 
   for (const segment of segmentPolar(line.path)) {
+    // La selección precisa conserva el índice del comando de llegada: filtrar
+    // aquí reutiliza la escritura que ya deja fijo el origen y mueve solo ese
+    // nodo. Un índice desaparecido no debe mostrar las cotas de sus hermanos.
+    if (segmentIndex !== undefined && segment.toCommandIndex !== segmentIndex) continue;
     const from = pieceLocalToPattern(segment.from, piece);
     const to = pieceLocalToPattern(segment.to, piece);
     const outward = normalHaciaFuera(from, to, centro);
@@ -327,7 +331,10 @@ export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine): Co
     });
   }
 
-  if (line.path.length < 2 || line.path.filter(command => command.type === 'M').length > 1) {
+  // Las referencias al contorno pertenecen a la interna completa. Seleccionar
+  // un tramo ofrece únicamente su caja de largo y ángulo; los productores sin
+  // índice conservan también las cotas de borde que ya podían editar.
+  if (segmentIndex !== undefined || line.path.length < 2 || line.path.filter(command => command.type === 'M').length > 1) {
     return cotas;
   }
 
