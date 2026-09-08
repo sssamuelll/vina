@@ -85,15 +85,18 @@ describe('useTriangleTool — clic crea con la barra (isósceles por defecto)', 
 });
 
 describe('useTriangleTool — el arrastre dibuja el isósceles inscrito y escribe en la barra', () => {
-  it('crea lo dibujado (ápice arriba-centro) y deja Base/Altura en la barra', () => {
+  it('crea lo dibujado (ápice arriba-centro) y deja la barra como estaba', () => {
     const { store, press, move, release, onComplete } = setup();
+    const antes = store.getState().tools.toolOptions.triangle;
     press(100, 100); move(140, 130); move(180, 160); release(180, 160);
     expect(puntos(onComplete.mock.calls[0][0].outline)).toEqual([
       { x: 140, y: 100 },
       { x: 180, y: 160 },
       { x: 100, y: 160 },
     ]);
-    expect(store.getState().tools.toolOptions.triangle).toEqual({ base: 80, altura: 60 });
+    // Dibujar no reescribe la barra (reunión María 07-09): igual que su
+    // hermano el rectángulo, cada pieza es de un tamaño distinto.
+    expect(store.getState().tools.toolOptions.triangle).toEqual(antes);
   });
 
   it('el botón derecho no arma', () => {

@@ -238,7 +238,7 @@ TDD estricto: test primero, verlo fallar por la razón correcta, mínimo, verde.
 ### 8.3 E2E (Playwright, navegador de verdad — jsdom no ve layout ni foco)
 
 1. **La promesa de María, línea interna (#226):** activar `G`, dibujar una interna enganchada del lado izquierdo al inferior de una pieza; terminar → queda seleccionada y se ven cotas; clic en la cota `ccw` del extremo izquierdo → escribir `100` → `Enter` → en el store el extremo está a **100 mm** de esa esquina por el arco (medido con `buildRing` en el test) y sigue sobre el contorno; **una** entrada de deshacer; `Ctrl+Z` lo devuelve.
-2. **La promesa de María, rectángulo (#223):** `S`, clic → pieza 100×100 seleccionada con cotas; clic en `Ancho` → `300` → `Tab` → `150` → `Enter` → **la misma pieza** mide 300×150 (una pieza en total); segundo clic → otra de 300×150 (el default se escribió por ser creación caliente); seleccionar la primera con `Z` y escribir `200` en Ancho → cambia esa pieza y el default **sigue** en 300.
+2. **La promesa de María, rectángulo (#223):** `S`, clic → pieza 100×100 seleccionada con cotas; clic en `Ancho` → `300` → `Tab` → `150` → `Enter` → **la misma pieza** mide 300×150 (una pieza en total); segundo clic → otra de **100×100** (el default de fábrica: la creación caliente se retiró, ver § 15); seleccionar la primera con `Z` y escribir `200` en Ancho → cambia esa pieza y el default **sigue** en 100.
 3. **Scrub:** arrastrar el chip de Ancho 50 px a zoom 1 → la pieza mide 150 → **una** entrada de deshacer.
 4. **Teclas reales** (memoria: `listener-re-registrado-en-medio-del-dispatch`): con el foco en un chip en edición, `Backspace` no borra la pieza y `s` no cambia de herramienta; `Tab` desde el lienzo enfoca el primer chip; en trazo vivo `Tab` congela el chip y `Enter` coloca a `80 / 90`.
 5. **Emplazamiento a 1366×643:** `elementFromPoint` sobre la tira nunca devuelve el dock; el `<svg>` ocupa toda `.canvas-area__2d` (sin canal arriba); las cotas se ocultan mientras se arrastra la interna y vuelven al soltar.
@@ -285,6 +285,7 @@ La gramática que Atrium validó lado a lado (`Atrium/docs/superpowers/specs/202
 3. **Spec 29-ago § 7.2** ("Tab abre Siguiente punto"): **reemplazado** por "Tab congela el chip del tramo y lo abre en edición". El gesto sobrevive; el panel fijo no.
 4. **Contrato de interfaz § 2**: el material `overlay` gana la variante declarada `--surface-overlay-border-flush` (bordes → tono), y **una excepción dicha**: la tira es un `overlay` **persistente** mientras hay herramienta 2D activa (el contrato define overlay como lo que "flota y se va"). Se escribe en el SKILL.md junto a las variantes existentes (`-pill`, `-recessed`). Manda el usuario; queda dicho.
 5. **Contrato § 3** ("un panel nuevo no se abre encima de la regla ni del patrón"): la tira va **bajo** la regla (28 px) y las cotas van **sobre** el patrón por definición — son parte del objeto, como los handles del transform box, no un panel. Se anota como precisión, no como excepción.
+7. **§ 3.1 y § 8.3 caso 2 de esta misma spec** (la «creación caliente» escribe el default del próximo rectángulo): **retirada** por la reunión del 07-09. Ver § 15.
 6. **§ 9 de esta misma spec** ("`--readout-*` se reemplazan por `--cota-*`"): **invertido en su dirección, conservado en su intención** por la reunión del 07-09. Sigue habiendo *un solo lenguaje*, pero lo toma del readout, no de la píldora. Ver § 14.
 
 ---
@@ -424,3 +425,45 @@ jsdom no calcula layout ni apilamiento: esta enmienda **no se puede fijar con un
 2. Su caja cae **sobre** el trazo, no desplazada al lado (`elementFromPoint` sobre el punto medio del tramo).
 3. Texto renderizado **≥ 11 px CSS a zoom 1** — el número que cierra *"casi ni se lee"*.
 4. Contraste **≥ 4,5:1** de la tinta sobre el fondo del chip **compuesto sobre el papel del lienzo**: el fondo lleva alfa, y un medidor que ignora el alfa inventa el fallo.
+
+
+---
+
+## 15. Enmienda 2026-09-08 — el tamaño de una pieza no se contagia a la siguiente
+
+**Origen:** reunión del 2026-09-07, fallo 2 (`docs/reports/2026-09-07-reunion-maria.md` § 3.2 y § 4.1).
+
+### 15.1 Qué se retira
+
+Las **dos** escrituras implícitas del tamaño por defecto:
+
+1. **El arrastre.** `useRectangleTool` despachaba `setToolOption` con el ancho y el alto de lo recién dibujado. Igual sus hermanos `useCircleTool` (Radio) y `useTriangleTool` (Base/Altura).
+2. **La cota caliente.** `escribirDefault` en `PatternEditor.tsx`, que al editar la cota de una pieza recién nacida reescribía el default de las tres formas.
+
+María, [01:49]: *"en verdad no es una acción repetitiva, cada rectángulo va a ser de un tamaño distinto"*. Samuel, en la misma sesión: *"ok, bueno, entonces se quita, y ya está"* [01:57].
+
+**Por qué la premisa era razonable y aun así estaba equivocada:** el comentario del código citaba el *Adjust Last Operation* de Blender. Es un patrón correcto para un modelador —que repite operaciones sobre la misma forma— y equivocado para una patronista, que hace piezas distintas. La usuaria real lo desmintió antes que ningún argumento.
+
+### 15.2 Qué NO se retira
+
+**La barra de opciones de la herramienta sigue mandando sobre lo que crea un clic.** Si María escribe 250 × 180 ahí, el clic le da 250 × 180. Se va la ruta **implícita** (la app decidiendo sola), se queda la **deliberada** (ella escribiendo). Hay un caso e2e dedicado a vigilarlo, porque quitar el contagio sin este cuidado se llevaría por delante la única forma de crear un tamaño exacto sin arrastrar.
+
+`sujeto.caliente` **sobrevive**: no era solo para esto. Sostiene el rótulo *"Editando: la pieza nueva"* y va en la bitácora de cada commit de cota.
+
+### 15.3 El efecto secundario que ella ya había cazado
+
+Con el contagio puesto, el rótulo de la tira y el comportamiento se contradecían. María, [01:22]: *"pero ponía que de 100"* — el rótulo prometía 100 × 100 y el clic le creaba otra cosa. Al retirar las escrituras, rótulo y comportamiento vuelven a decir lo mismo.
+
+### 15.4 Los tests que encodaban el contrato viejo
+
+Cuatro, y encontrarlos fue la mitad del trabajo — cambiar solo el primero habría dejado el dibujo partido:
+
+| Test | Qué certificaba | Ahora |
+|---|---|---|
+| `cotas-de-pieza.spec.ts` (caso 1) | el segundo clic hereda 300×150 | crea 100×100 |
+| `useRectangleTool.test.tsx` (arrastre) | la barra queda en 80×60 | la barra queda como estaba |
+| `useRectangleTool.test.tsx` (bitácora) | `height: 60` heredado del arrastre anterior | `height: 100`, el de fábrica |
+| `useTriangleTool.test.tsx` (arrastre) | la barra queda en base 80 / altura 60 | la barra queda como estaba |
+| `maria-191-...spec.ts` | default 80×60 y rótulo *"Un clic crea 80 × 60 mm"* | default 100 y rótulo *"Un clic crea 100 × 100 mm"* |
+
+Más el spec nuevo `el-tamano-no-se-contagia.spec.ts`, que cubre el arrastre y los dos hermanos.

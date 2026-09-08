@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { setToolOption } from '../../store/toolSlice';
 import { Point2D, PathCommand, InternalLine } from '../../types/types';
 import { screenToPattern, isoscelesTriangleVertices, rightTriangleVertices } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
@@ -59,7 +58,7 @@ const toPath = (pts: [Point2D, Point2D, Point2D]): PathCommand[] => [
  * objeto y el release manda el valor. Soltar sin haberse movido crea con la
  * Base y la Altura de la barra, esquina superior izquierda en el press —el
  * mismo "clicas con el izquierdo y lo crea" de Rectángulo y Círculo—, y soltar
- * habiéndose movido crea lo dibujado y lo escribe en la barra.
+ * habiéndose movido crea lo dibujado sin tocar la barra (reunión María 07-09).
  *
  * Dos diferencias con su hermano:
  *
@@ -77,7 +76,6 @@ export function useTriangleTool(
   /** Devuelve el id de la pieza creada: la creación caliente (spec cotas vivas § 3.1) lo necesita. */
   onComplete: (piece: NewPieceData) => string,
 ) {
-  const dispatch = useDispatch();
   const barBase = useSelector((s: RootState) => Number(s.tools.toolOptions?.triangle?.base ?? DEFAULT_MM));
   const barAltura = useSelector((s: RootState) => Number(s.tools.toolOptions?.triangle?.altura ?? DEFAULT_MM));
   const barFigura = useSelector((s: RootState) => String(s.tools.toolOptions?.triangle?.shapeType ?? 'isosceles'));
@@ -167,15 +165,16 @@ export function useTriangleTool(
       if (w > 0 && h > 0) {
         const x = Math.min(p.start.x, end.x);
         const y = Math.min(p.start.y, end.y);
+        // Dibujar NO reescribe Base/Altura de la barra: mismo acuerdo que en
+        // el rectángulo (reunión María 07-09). Igual que el círculo, el
+        // triángulo no salió en la sesión pero comparte el mecanismo.
         create(verticesDe(barRef.current.figura, x, y, w, h, end.x >= p.start.x, end.y >= p.start.y));
-        dispatch(setToolOption({ toolId: 'triangle', optionId: 'base', value: round1(w) }));
-        dispatch(setToolOption({ toolId: 'triangle', optionId: 'altura', value: round1(h) }));
       } else {
         pushJournal('gesture', 'triangle:release', { outcome: 'tooSmall', base: round1(w), altura: round1(h), source: 'drag' });
       }
     }
     publish();
-  }, [toPattern, create, dispatch, publish]);
+  }, [toPattern, create, publish]);
 
   const cancel = useCallback(() => {
     pressRef.current = null;

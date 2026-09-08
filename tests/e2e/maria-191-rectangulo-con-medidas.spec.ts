@@ -9,10 +9,12 @@
  * puede editar") porque ella esperaba editar EL QUE TIENE DELANTE. Memoria:
  * `test-mide-nuestra-promesa-no-la-de-maria`.
  *
- * Ahora: un clic crea con el último tamaño, y las cotas sobre la pieza editan
- * esa pieza (cotas-de-pieza.spec.ts las mide a fondo); el arrastre sigue
- * dibujando a pulso y escribe el tamaño dibujado como default, que la tira
- * enseña en su línea de sujeto.
+ * Ahora: un clic crea con el tamaño que diga la barra —de fábrica 100 × 100—
+ * y las cotas sobre la pieza editan esa pieza (cotas-de-pieza.spec.ts las mide
+ * a fondo). El arrastre dibuja a pulso y NO toca la barra: tras la reunión del
+ * 2026-09-07 el tamaño de una pieza ya no se contagia a la siguiente, porque
+ * "cada rectángulo va a ser de un tamaño distinto" [01:49]. La tira sigue
+ * diciendo en su línea de sujeto qué crea el próximo clic.
  *
  * Spec: docs/superpowers/specs/2026-08-30-cotas-vivas-design.md § 3, § 6
  */
@@ -48,7 +50,7 @@ const bbox = (outline: Cmd[], pos: { x: number; y: number }) => {
 test.describe('maria-191 — rectángulo con medidas', () => {
   test.setTimeout(90_000);
 
-  test('un clic crea con el último tamaño y la cota edita ESA pieza; el arrastre dibuja a pulso y deja el tamaño escrito como default', async ({ page }) => {
+  test('un clic crea con el tamaño de la barra y la cota edita ESA pieza; el arrastre dibuja a pulso y no toca la barra', async ({ page }) => {
     await waitForApp(page);
     await page.keyboard.press('s');
     await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('rectangle');
@@ -71,7 +73,10 @@ test.describe('maria-191 — rectángulo con medidas', () => {
     expect(pieces).toHaveLength(1);
     expect(bbox(pieces[0].outline, pieces[0].position)).toEqual({ x: 250, y: 250, w: 300, h: 100 });
 
-    // El arrastre sigue dibujando a pulso y escribe lo dibujado como default.
+    // El arrastre sigue dibujando a pulso, pero YA NO escribe lo dibujado como
+    // default (reunión María 07-09, [01:49]). El rótulo tampoco cambia: era
+    // justo la contradicción que ella cazó en [01:22] — "pero ponía que de
+    // 100" y le creaba otra cosa.
     const a = await toScreen(page, { x: 100, y: 500 });
     const b = await toScreen(page, { x: 180, y: 560 });
     await page.mouse.move(a.x, a.y);
@@ -81,11 +86,12 @@ test.describe('maria-191 — rectángulo con medidas', () => {
     await expect.poll(async () => (await st(page)).project.pieces.length).toBe(2);
     pieces = (await st(page)).project.pieces;
     expect(bbox(pieces[1].outline, pieces[1].position)).toEqual({ x: 100, y: 500, w: 80, h: 60 });
-    await expect.poll(async () => (await st(page)).tools.toolOptions.rectangle?.width).toBe(80);
-    await expect.poll(async () => (await st(page)).tools.toolOptions.rectangle?.height).toBe(60);
+    await expect.poll(async () => (await st(page)).tools.toolOptions.rectangle?.width ?? 100).toBe(100);
+    await expect.poll(async () => (await st(page)).tools.toolOptions.rectangle?.height ?? 100).toBe(100);
 
-    // Deseleccionar: la tira vuelve a decir el tamaño del próximo clic.
+    // Deseleccionar: la tira dice el tamaño del próximo clic, que sigue
+    // siendo el de fábrica porque dibujar no lo cambió.
     await page.keyboard.press('Escape');
-    await expect(page.getByText('Un clic crea 80 × 60 mm · arrastra para dibujar')).toBeVisible();
+    await expect(page.getByText('Un clic crea 100 × 100 mm · arrastra para dibujar')).toBeVisible();
   });
 });

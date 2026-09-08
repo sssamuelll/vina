@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch, shallowEqual } from 'react-redux';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage } from '../../store/projectSlice';
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
-import { setToolOption } from '../../store/toolSlice';
 import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, selectInternalLine, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
@@ -919,27 +918,21 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const aplicarRef = useRef(aplicarCota);
   aplicarRef.current = aplicarCota;
 
-  // Solo en caliente se escribe el default del próximo rectángulo (Blender:
-  // Adjust Last Operation). Fuera del historial de deshacer, a propósito.
-  const escribirDefault = useCallback((cota: Cota, valueMm: number) => {
-    if (!sujeto.caliente) return;
-    if (activeTool === 'circle') {
-      // La barra del círculo tiene un solo número, el Radio, y la cota es la
-      // caja de la elipse (2rx × 2ry): la mitad de lo que se escribió.
-      dispatch(setToolOption({ toolId: 'circle', optionId: 'radius', value: Math.round(valueMm / 2 * 10) / 10 }));
-      return;
-    }
-    if (activeTool === 'triangle') {
-      // La cota es la caja del triángulo (spec #1111): Ancho → Base, Alto → Altura.
-      dispatch(setToolOption({ toolId: 'triangle', optionId: cota.kind === 'ancho' ? 'base' : 'altura', value: Math.round(valueMm * 10) / 10 }));
-      return;
-    }
-    dispatch(setToolOption({ toolId: 'rectangle', optionId: cota.kind === 'ancho' ? 'width' : 'height', value: Math.round(valueMm * 10) / 10 }));
-  }, [sujeto.caliente, activeTool, dispatch]);
+  // Aquí vivía `escribirDefault`: editar la cota de una pieza recién nacida
+  // reescribía el tamaño del próximo clic (el "Adjust Last Operation" de
+  // Blender). Se retira por la reunión del 07-09. Ese patrón es correcto para
+  // un modelador —que repite operaciones— y equivocado para una patronista:
+  // "en verdad no es una acción repetitiva, cada rectángulo va a ser de un
+  // tamaño distinto" [01:49].
+  //
+  // Lo que se va es la escritura IMPLÍCITA, no la barra: si ella escribe una
+  // medida ahí, el clic la sigue respetando.
+  //
+  // `sujeto.caliente` SOBREVIVE y no es código muerto: sostiene el rótulo
+  // "Editando: la pieza nueva" y va en la bitácora de cada commit de cota.
 
   const handleCotaCommit = useCallback((cota: Cota, valueMm: number, motivo: 'enter' | 'tab' = 'enter') => {
     aplicarCota(cota, valueMm, undefined, motivo);
-    escribirDefault(cota, valueMm);
     pushJournal('gesture', 'cota:commit', {
       id: cota.id,
       kind: cota.kind,
@@ -948,7 +941,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       caliente: sujeto.caliente,
       motivo,
     });
-  }, [aplicarCota, escribirDefault, sujeto.caliente]);
+  }, [aplicarCota, sujeto.caliente]);
 
   // Scrub: un batch de deshacer con token (una entrada), un despacho por frame
   // como máximo, cada valor derivado del snapshot de la cota de partida. Todos
@@ -986,9 +979,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     if (isUndoBatchTokenActive(s.token)) aplicarRef.current(s.cota, valueMm, s.token);
     const { cota } = s;
     cerrarScrub();
-    escribirDefault(cota, valueMm);
     pushJournal('gesture', 'cota:scrub', { id: cota.id, value: valueMm, caliente: sujeto.caliente });
-  }, [cerrarScrub, escribirDefault, sujeto.caliente]);
+  }, [cerrarScrub, sujeto.caliente]);
   // Cancelar (pointercancel, desmontaje del chip): la pieza vuelve al valor de
   // partida dentro del mismo batch y el batch se cierra. Sin clic fantasma.
   const handleCotaScrubCancel = useCallback((_cota: Cota) => {
