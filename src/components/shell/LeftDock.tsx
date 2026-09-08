@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Plus } from 'lucide-react';
 import { store, type RootState } from '../../store';
-import { activate2DTool } from '../../store/toolActivation';
+import { activate2DTool, selectHasInternalShapeHost } from '../../store/toolActivation';
 import { selectWorkflowStage } from '../../store/selectors';
 import { runUiExport } from '../../utils/export/uiExport';
 import { pinAuto, unpinAuto, addDockTool, removeDockTool, resetDockTools, reorderDockTool } from '../../store/dockSlice';
@@ -21,6 +21,7 @@ interface LeftDockProps {
 export default function LeftDock({ onOpenPanel }: LeftDockProps) {
   const dispatch = useDispatch();
   const activeTool = useSelector((s: RootState) => s.editor.activeTool);
+  const hasInternalShapeHost = useSelector(selectHasInternalShapeHost);
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
   const stage = useSelector(selectWorkflowStage);
   const pinnedExtra = useSelector((s: RootState) => s.dock.pinnedExtra);
@@ -61,6 +62,9 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
       tools={tools}
       activeToolId={activeTool}
       onSelectTool={(id) => activate2DTool(dispatch, id)}
+      disabledReasons={hasInternalShapeHost ? undefined : {
+        internalShape: 'Crea o muestra una pieza para dibujar líneas internas.',
+      }}
       onReorderTool={(fromId, toId) => dispatch(reorderDockTool({ fromId, toId }))}
       autoZone={
         <DockAutoZone

@@ -24,7 +24,10 @@ const initialState: EditorState = {
   showNotches: true,
   showAnchorPoints: false,
   showPieceNames: false,
-  showLineLengths: false,
+  // María necesita leer los largos mientras trabaja y no descubrió el chip
+  // durante la sesión; nacen visibles para acompañar el dibujo desde el inicio.
+  // El interruptor «Largos» conserva su control para apagarlos cuando estorben.
+  showLineLengths: true,
   showSewingLines: true,
   renderMode2D: 'textured' as const,
   snapToGrid: true,

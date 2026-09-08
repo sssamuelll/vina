@@ -12,6 +12,9 @@ interface DockProps {
   /** The currently active tool id (the engine truth). */
   activeToolId: string;
   onSelectTool: (id: string) => void;
+  /** El contenedor explica por qué una herramienta no se puede activar; así
+   *  el botón y su ayuda reflejan la misma condición que protege el comando. */
+  disabledReasons?: Readonly<Record<string, string | undefined>>;
   /** Optional auto-suggest (✦) zone rendered below the pinned tools. */
   autoZone?: ReactNode;
   /** Optional footer (e.g. the ＋ customize editor) rendered at the very bottom. */
@@ -26,7 +29,7 @@ interface DockProps {
  * tools + active id and handles activation. When onReorderTool is provided,
  * tools can be reordered by native HTML5 drag (coexists with click-to-activate).
  */
-export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, autoZone, footer, onReorderTool }: DockProps) {
+export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, disabledReasons, autoZone, footer, onReorderTool }: DockProps) {
   const reorderable = !!onReorderTool;
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -37,14 +40,17 @@ export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, a
       {tools.map(tool => {
         const Icon = tool.icon;
         const active = tool.id === activeToolId;
+        const disabledReason = disabledReasons?.[tool.id];
         const dragging = draggingId === tool.id;
         const isDropTarget = dropTargetId === tool.id && draggingId !== tool.id;
         return (
-          <ToolTooltip key={tool.id} name={tool.label} shortcut={tool.shortcut} position="right">
+          <ToolTooltip key={tool.id} name={tool.label} shortcut={tool.shortcut} description={disabledReason} position="right">
             <button
               type="button"
               className={`dock__tool ${active ? 'dock__tool--active' : ''} ${dragging ? 'dock__tool--dragging' : ''} ${isDropTarget ? 'dock__tool--drop-target' : ''}`}
               onClick={() => onSelectTool(tool.id)}
+              disabled={!!disabledReason}
+              title={disabledReason}
               aria-label={tool.shortcut ? `${tool.label} · ${displayShortcut(tool.shortcut)}` : tool.label}
               aria-pressed={active}
               draggable={reorderable}
