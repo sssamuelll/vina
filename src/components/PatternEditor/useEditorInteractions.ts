@@ -351,6 +351,20 @@ export function useEditorInteractions(
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
   const { pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas } = tools;
+  const isNodeEditing = nodeEditor.isEditing && (activeTool === 'select' || activeTool === 'editCurve');
+  const { exitEdit: exitNodeEdit } = nodeEditor;
+  const previousToolRef = useRef(activeTool);
+
+  // Seleccionar permite entrar a nodos con doble clic, pero volver a esa
+  // herramienta termina la sesión anterior. La entrada a Editar curvas se
+  // conserva porque convertir desde el menú abre sus nodos en el mismo
+  // evento que cambia la herramienta; limpiarlos aquí borraría esa entrada.
+  useEffect(() => {
+    if (previousToolRef.current !== activeTool) {
+      previousToolRef.current = activeTool;
+      if (activeTool !== 'editCurve') exitNodeEdit();
+    }
+  }, [activeTool, exitNodeEdit]);
 
   const selectionHasLocked = selectedPieceIds.some(
     id => pieces.find(p => p.id === id)?.locked,
@@ -365,7 +379,7 @@ export function useEditorInteractions(
   );
   const showTransformBox = shouldShowTransformBox({
     activeTool,
-    isNodeEditing: nodeEditor.isEditing,
+    isNodeEditing,
     selectedCount: selectedPieceIds.length,
     selectionHasLocked,
     hasSelectedInternalLine: selectedInternalLineIsLive,
@@ -453,7 +467,7 @@ export function useEditorInteractions(
     if (activeTool === 'seam') handlers.push(seamTool.handleKeyDown);
     if (MEASURE_TOOL_IDS.has(activeTool)) handlers.push(measureTool.handleKeyDown);
     if (activeTool === 'transform') handlers.push(transformTool.handleKeyDown);
-    if (nodeEditor.isEditing) handlers.push(nodeEditor.handleKeyDown);
+    if (isNodeEditing) handlers.push(nodeEditor.handleKeyDown);
     if (activeTool === 'editPattern') handlers.push(editPattern.handleKeyDown);
     if (activeTool === 'scissors') handlers.push(scissorsTool.handleKeyDown);
     // F8 (#1115): estaba en las dependencias pero nadie lo montaba, así que
@@ -469,7 +483,7 @@ export function useEditorInteractions(
     const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, seamEditTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown]);
+  }, [activeTool, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, isNodeEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, seamEditTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown]);
 
   // Coordinación de teclas (CF-1): un gesto vivo es dueño de sus teclas, EN
   // CAPTURA. `ShortcutProvider` escucha en `document` (burbuja) y corre antes
@@ -1193,7 +1207,7 @@ export function useEditorInteractions(
     }
     if (activeTool === 'grainline') grainlineTool.handleMouseUp(e);
     if (activeTool === 'transform' || (activeTool === 'select' && transformTool.isDragging)) transformTool.handleMouseUp();
-    if (nodeEditor.isEditing) nodeEditor.handleMouseUp();
+    if (nodeEditor.isEditing && (activeTool === 'select' || activeTool === 'editCurve')) nodeEditor.handleMouseUp();
     if (activeTool === 'editPattern') editPattern.handleMouseUp();
     if (activeTool === 'scissors') scissorsTool.handleMouseUp();
     if (activeTool === 'slashAndSpread') slashAndSpreadTool.handleMouseUp();
@@ -1251,15 +1265,16 @@ export function useEditorInteractions(
   }, [seamAllowanceTool, seamEditTool, seamTool]);
 
   const getCursor = () => {
-    if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
     switch (activeTool) {
       case 'pen': return 'crosshair';
       case 'hand': return panRef.current ? 'grabbing' : 'grab';
       case 'select':
+        if (isNodeEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
         if (dragRef.current) return 'grabbing';
         if (marqueeRef.current) return 'crosshair';
         return hoverCursor ?? 'default';
       case 'transform': return 'default';
+      case 'editCurve': return nodeEditor.hoveredNode ? 'move' : 'default';
       case 'editPattern': return editPattern.isEditing ? editPattern.getCursor() : 'default';
       case 'seam': return 'crosshair';
       case 'notch': return 'crosshair';

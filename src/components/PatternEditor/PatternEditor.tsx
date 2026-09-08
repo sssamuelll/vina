@@ -311,6 +311,22 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const grainlineTool = useGrainlineTool(zoom2D, pan2D, pieces, handleGrainlineSet);
   const nodeEditor = useEditCurve(zoom2D, pan2D);
   const editPatternTool = useEditPattern(zoom2D, pan2D);
+  const { isEditing: isPatternEditing, editingPieceId: patternEditingPieceId, exitEdit: exitPatternEdit } = editPatternTool;
+  const [anchorReferencePieceId, setAnchorReferencePieceId] = useState<string | null>(null);
+  const isNodeEditing = nodeEditor.isEditing && (activeTool === 'select' || activeTool === 'editCurve');
+
+  // Al volver a Seleccionar, las anclas siguen sirviendo de referencia
+  // (maria-194), pero la sesión de Q termina: ni su selección ni un arrastre
+  // pendiente pueden sobrevivir a la herramienta. Solo conservamos el ID
+  // visual; la referencia se dibuja desde el contorno actual de la pieza.
+  useEffect(() => {
+    if (activeTool !== 'editPattern' && isPatternEditing) {
+      setAnchorReferencePieceId(activeTool === 'select' ? patternEditingPieceId : null);
+      exitPatternEdit();
+    } else if (activeTool !== 'select') {
+      setAnchorReferencePieceId(null);
+    }
+  }, [activeTool, isPatternEditing, patternEditingPieceId, exitPatternEdit]);
   // Tool Punto (maria-203): despacha los tres verbos de useEditPattern — una
   // puerta común con el menú contextual, mismo candado, mismo re-anclaje.
   const pointToolHook = usePointTool(zoom2D, pan2D, pieces, {
@@ -323,15 +339,15 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
    * maria-203: tras convertir un lado desde el clic derecho, además de mutar
    * el outline hay que ENSEÑAR el resultado — editor de nodos abierto sobre la
    * pieza y el dock en "Edit Curve Points". Sin esto los puntos nuevos existían
-   * pero ningún overlay los pintaba y María veía "ningún cambio". Si la
-   * edición de patrón (Q) ya está abierta, esa superficie ya los enseña: no se
-   * le roba el modo.
+   * pero ningún overlay los pintaba y María veía "ningún cambio". También
+   * desde Q hay que pasar a editar curvas: su overlay muestra anclas, pero
+   * los manejadores Bézier y su arrastre pertenecen al editor de curvas.
    */
   const showConvertedPoints = useCallback((pieceId?: string) => {
-    if (!pieceId || editPatternTool.isEditing) return;
+    if (!pieceId) return;
     nodeEditor.enterEdit(pieceId);
     if (activeTool !== 'editCurve') activate2DTool(dispatch, 'editCurve');
-  }, [editPatternTool.isEditing, nodeEditor, activeTool, dispatch]);
+  }, [nodeEditor, activeTool, dispatch]);
   const scissorsTool = useScissorsTool(zoom2D, pan2D);
   const slashAndSpreadTool = useSlashAndSpreadTool(zoom2D, pan2D);
   const mergeTool = useMergeTool(zoom2D, pan2D);
@@ -1215,7 +1231,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
               //
               // Va el ID, no un booleano: encenderlo global suelta cientos de
               // puntos sobre piezas que nadie está tocando.
-              nodeEditor.isEditing
+              isNodeEditing
                 ? nodeEditor.editingPieceId
                 : (activeTool === 'editPattern' ? editPatternTool.editingPieceId : null)
             }
@@ -1307,7 +1323,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             measureHoverDistance={measureTool.hoverDistance}
             measureCompareEdgeA={measureTool.compareEdgeA}
             measureComparison={measureTool.comparison}
-            nodeEditorIsEditing={nodeEditor.isEditing}
+            nodeEditorIsEditing={isNodeEditing}
             nodeEditorEditingPieceId={nodeEditor.editingPieceId}
             nodeEditorNodes={nodeEditor.nodes}
             selectedNode={nodeEditor.selectedNode}
@@ -1317,6 +1333,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             transformHandles={transformTool.handles}
             transformPreview={transformTool.preview}
             editPatternIsEditing={editPatternTool.isEditing}
+            anchorReferencePieceId={anchorReferencePieceId}
             editPatternEditingPieceId={editPatternTool.editingPieceId}
             editPatternNodes={editPatternTool.nodes}
             editPatternSelectedNodes={editPatternTool.selectedNodes}
@@ -1399,7 +1416,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           activeTool={activeTool}
           pieces={pieces}
           penNodesLength={pen.nodes.length}
-          nodeEditorIsEditing={nodeEditor.isEditing}
+          nodeEditorIsEditing={isNodeEditing}
           seamPhase={seamTool.phase}
           topstitchMode={topstitchTool.mode}
           walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
