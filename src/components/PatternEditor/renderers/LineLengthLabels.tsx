@@ -40,7 +40,15 @@ export default function LineLengthLabels({ piece, zoom2D, units }: LineLengthLab
       // que no traducía (#1120; los otros tres: ElasticRenderer, useMeasureTool
       // y edgeInterpolation).
       const [start, end] = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
-      const len = edge.length ?? computePathArcLength(piece.outline, start, end);
+      // El largo se calcula SIEMPRE del contorno, nunca del `edge.length`
+      // guardado. Ese campo es un derivado que se escribe al detectar los
+      // bordes y no se refresca en la ruta que redimensiona por cota: tras
+      // editar una pieza a 300×150, las cuatro etiquetas seguían diciendo
+      // "100.0 mm" mientras la pieza ya medía 300×150 (encontrado por el
+      // replay de la sesión de María, 2026-09-08). El `??` que había aquí
+      // prefería el dato viejo, que es la forma clásica de que un derivado
+      // guardado le gane a su fuente. El contorno manda; el largo es suyo.
+      const len = computePathArcLength(piece.outline, start, end);
       if (len < 1) continue; // degenerate edge
       const mid = pointAtPathDistance(piece.outline, len / 2, start, end);
       if (!mid) continue;

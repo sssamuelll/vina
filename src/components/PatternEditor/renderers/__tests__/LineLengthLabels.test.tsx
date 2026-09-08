@@ -118,3 +118,42 @@ describe('LineLengthLabels', () => {
     expect(container.querySelectorAll('text').length).toBe(0);
   });
 });
+
+describe('el largo guardado no puede ganarle al contorno', () => {
+  // Encontrado por el replay de la sesión de María (2026-09-08): tras editar la
+  // cota de una pieza a 300×150, las cuatro etiquetas seguían diciendo "100.0
+  // mm". La pieza medía 300×150; las etiquetas mentían.
+  //
+  // La causa es un `??` que prefiere un derivado guardado:
+  //   const len = edge.length ?? computePathArcLength(piece.outline, ...)
+  // `piece.edges[].length` se calcula al detectar los bordes y NO se refresca
+  // en la ruta que redimensiona por cota, así que queda viejo. El contorno es
+  // la verdad —"path manda"—; el largo es un derivado suyo y se recalcula.
+  //
+  // El fixture es el oráculo: un registro que se contradice a sí mismo. El
+  // borde dice que mide 100 y su propio tramo, en el contorno, mide 300. No
+  // hace falta saber cuál es el bueno: basta con que no puedan discrepar.
+  it('recalcula el largo del contorno aunque el borde guarde otro', () => {
+    const piece = squarePiece();
+    piece.outline = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [300, 0] },
+      { type: 'L', values: [300, 150] },
+      { type: 'L', values: [0, 150] },
+      { type: 'Z', values: [] },
+    ];
+    // Bordes guardados con el largo de ANTES de redimensionar.
+    piece.edges = [
+      { id: 'e0', segmentRange: [0, 1], length: 100 },
+      { id: 'e1', segmentRange: [1, 2], length: 100 },
+      { id: 'e2', segmentRange: [2, 3], length: 100 },
+      { id: 'e3', segmentRange: [3, 0], length: 100 },
+    ] as unknown as SemanticEdge[];
+
+    const { container } = renderLabels(piece, 'mm');
+    const textos = Array.from(container.querySelectorAll('text')).map(t => t.textContent ?? '');
+
+    expect(textos.some(t => /300/.test(t)), `los lados de 300 mm tienen que decir 300: ${textos.join(' · ')}`).toBe(true);
+    expect(textos.every(t => !/^100([.,]0)?\s*mm$/.test(t.trim())), `ninguna etiqueta puede seguir en 100: ${textos.join(' · ')}`).toBe(true);
+  });
+});
