@@ -285,6 +285,7 @@ La gramática que Atrium validó lado a lado (`Atrium/docs/superpowers/specs/202
 3. **Spec 29-ago § 7.2** ("Tab abre Siguiente punto"): **reemplazado** por "Tab congela el chip del tramo y lo abre en edición". El gesto sobrevive; el panel fijo no.
 4. **Contrato de interfaz § 2**: el material `overlay` gana la variante declarada `--surface-overlay-border-flush` (bordes → tono), y **una excepción dicha**: la tira es un `overlay` **persistente** mientras hay herramienta 2D activa (el contrato define overlay como lo que "flota y se va"). Se escribe en el SKILL.md junto a las variantes existentes (`-pill`, `-recessed`). Manda el usuario; queda dicho.
 5. **Contrato § 3** ("un panel nuevo no se abre encima de la regla ni del patrón"): la tira va **bajo** la regla (28 px) y las cotas van **sobre** el patrón por definición — son parte del objeto, como los handles del transform box, no un panel. Se anota como precisión, no como excepción.
+6. **§ 9 de esta misma spec** ("`--readout-*` se reemplazan por `--cota-*`"): **invertido en su dirección, conservado en su intención** por la reunión del 07-09. Sigue habiendo *un solo lenguaje*, pero lo toma del readout, no de la píldora. Ver § 14.
 
 ---
 
@@ -378,3 +379,48 @@ Descartado por la propia revisión: teclear dígitos no mueve la cámara 3D (`Vi
 ### 13.3 Revisión del diff del PR A (`codex review --base main`, 2026-08-30, 21 min)
 
 Seis hallazgos, todos reales, todos corregidos en el mismo PR: (1) el sujeto ignoraba capas ocultas y bloqueadas — ahora una pieza en capa oculta no tiene cotas y en capa bloqueada las tiene apagadas; (2) contornos con `H`/`V`/`A` (válidos en el esquema) daban cotas falsas — ahora no dan cotas; (3) cancelar un scrub confirmaba el valor de partida y tragaba el clic siguiente — ahora `onScrubCancel` devuelve la pieza al valor de partida dentro del batch, sin clic fantasma; (4) `NextPointPanel` a 300 px fijos se recortaba en un panel angosto — `min(300px, calc(100% - 24px))`; (5) cambiar de herramienta entre rectángulo/seleccionar con la misma pieza no cerraba el batch — la limpieza va también por herramienta; (6) Tab desde el último chip se quedaba en el mismo botón — sale a la tira.
+
+
+---
+
+## 14. Enmienda 2026-09-08 — la cota que eligió María
+
+**Origen:** reunión del 2026-09-07 (`docs/reports/2026-09-07-reunion-maria.md` § 2.C y § 4.3). Decisión de Samuel el 08-09: **gana María**.
+
+### 14.1 Qué eligió, exactamente
+
+Eligió el readout oscuro tres veces [07:37], [21:21], [22:01]. Samuel prefería la píldora azul y cedió [22:15]. Pero **lo que ganó no fue el color**, y esto es lo que hay que implementar y no lo que parece:
+
+> *"me gusta bastante este, ¿sabes por qué? **más allá de los colores**, porque aparece encima de la línea"* [07:37]
+> *"los ángulos y la distancia están juntos, ocupa menos"* [21:21]
+> *"he creado dos cuadros para una misma información que en el otro estaba más acopladito"* [22:23]
+
+Tres propiedades, ninguna cromática:
+
+1. **Un chip por sujeto**, con las magnitudes agrupadas dentro (distancia y ángulo juntos) — no un chip por magnitud.
+2. **Sobre el trazo**, no al lado con línea de cota y ticks.
+3. **Compacto.**
+
+### 14.2 Lo que NO se hereda del readout
+
+El tamaño. De ese mismo readout dijo *"la letra casi ni se lee"* [07:31], y tenía razón: hoy es `fontSize={10 / z}` (`PolyPenToolOverlay.tsx:144`). **La enmienda toma la geometría de la negra y la legibilidad de la azul.** Copiarla tal cual arrastra el defecto que ella nombró.
+
+### 14.3 Una sola familia de tokens
+
+Contrato de interfaz § 1, *un nombre por concepto*: **no se resucita `--readout-*` ni nace una tercera familia.** Se redefinen los valores de `--cota-*` y se retiran `--readout-bg-2d` / `--readout-ink-2d` de `tokens.css` — hoy solo los consume `PolyPenToolOverlay`.
+
+| Token | Antes | Después | Por qué |
+|---|---|---|---|
+| `--cota-bg-2d` | `var(--accent-2d-fuerte)` | el oscuro translúcido del readout | es el cuadro del que ella habló |
+| `--cota-ink-2d` | `#ffffff` | sin cambio | — |
+| `--cota-line-2d` | `var(--accent-2d-fuerte)` | **sin cambio, a propósito** | no se quejó de las líneas de cota, se quejó del cuadro; y la línea de cota en acento es convención CAD. Dicho para que no se aplique en lote |
+| `--cota-edit-bg-2d` / `-ink-2d` | campo blanco | sin cambio | el campo en edición sigue siendo papel blanco |
+
+### 14.4 Cómo se verifica (e2e, no vitest)
+
+jsdom no calcula layout ni apilamiento: esta enmienda **no se puede fijar con un test unitario**. El e2e mide cuatro cosas sobre la app viva:
+
+1. Un **solo** chip por sujeto, con las dos magnitudes dentro de la misma caja.
+2. Su caja cae **sobre** el trazo, no desplazada al lado (`elementFromPoint` sobre el punto medio del tramo).
+3. Texto renderizado **≥ 11 px CSS a zoom 1** — el número que cierra *"casi ni se lee"*.
+4. Contraste **≥ 4,5:1** de la tinta sobre el fondo del chip **compuesto sobre el papel del lienzo**: el fondo lleva alfa, y un medidor que ignora el alfa inventa el fallo.
