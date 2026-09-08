@@ -53,6 +53,12 @@ export type CotaUpdate =
  */
 export interface Cota {
   id: string;
+  /**
+   * Las magnitudes de un mismo tramo conservan sus operaciones independientes,
+   * pero comparten esta identidad para presentarse en una sola caja (§ 14).
+   * No se agrupan por cercanía: dos tramos superpuestos siguen siendo distintos.
+   */
+  grupo?: string;
   kind: 'ancho' | 'alto' | 'tramo-largo' | 'tramo-angulo' | 'borde' | 'margen';
   /** Nombre accesible, en español: "Ancho de la pieza". */
   label: string;
@@ -272,6 +278,7 @@ export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine): Co
     const anguloPatron = polarOf(from, to).angleDeg;
     cotas.push({
       id: `${idBase}-tramo-${segment.toCommandIndex}-largo`,
+      grupo: `${idBase}-tramo-${segment.toCommandIndex}`,
       kind: 'tramo-largo',
       label: 'Largo',
       valueMm: segment.lengthMm,
@@ -295,6 +302,7 @@ export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine): Co
     });
     cotas.push({
       id: `${idBase}-tramo-${segment.toCommandIndex}-angulo`,
+      grupo: `${idBase}-tramo-${segment.toCommandIndex}`,
       kind: 'tramo-angulo',
       label: 'Ángulo',
       valueMm: anguloPatron,

@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Cota } from './cotas';
+import type { Point2D } from '../../../types/types';
 import { parseMedida, formatMedida } from './parseMedida';
+import { chipScreenPosition, separarChips, type Estorbo } from './cotasGeometry';
 import { DRAG_THRESHOLD_PX } from '../gestureConstants';
 import './cotas.css';
 
@@ -26,6 +28,66 @@ const aTexto = (v: number) => String(round1(v)).replace('.', ',');
 /** Una sola escala de modificadores para scrub y flechas: Shift grueso, Alt fino (Figma). */
 const ganancia = (e: { shiftKey: boolean; altKey: boolean }) => (e.shiftKey ? 10 : e.altKey ? 0.1 : 1);
 
+interface GrupoPuesto {
+  campos: Cota[];
+  left: number;
+  top: number;
+}
+
+const GruposDeCotas = createContext<Map<string, GrupoPuesto | null> | null>(null);
+
+/**
+ * La agrupación pertenece a la presentación: los dos descriptores siguen
+ * alimentando sus escritores y las líneas SVG. El contexto permite que la
+ * capa existente conserve su entrada y sus puertas de foco, mientras cada
+ * tramo ocupa una sola caja HTML. La separación se calcula con el texto de
+ * AMBAS magnitudes; medir solo el largo dejaría el ángulo encima de otro chip.
+ */
+export function AgruparCotas({ cotas, pan2D, zoom2D, estorbos, children }: {
+  cotas: Cota[];
+  pan2D: Point2D;
+  zoom2D: number;
+  estorbos?: readonly Estorbo[];
+  children: ReactNode;
+}) {
+  const puestos = useMemo(() => {
+    if (!cotas.some(cota => cota.grupo)) return null;
+    const grupos = new Map<string, Cota[]>();
+    for (const cota of cotas) {
+      const id = cota.grupo ?? cota.id;
+      const grupo = grupos.get(id);
+      if (grupo) grupo.push(cota);
+      else grupos.set(id, [cota]);
+    }
+    const items = Array.from(grupos.values()).map(campos => {
+      const cota = campos[0];
+      return {
+        cota,
+        campos,
+        ...(campos.length > 1 ? {
+          left: pan2D.x + (cota.a.x + cota.b.x) / 2 * zoom2D,
+          top: pan2D.y + (cota.a.y + cota.b.y) / 2 * zoom2D,
+        } : chipScreenPosition(cota, pan2D, zoom2D)),
+        texto: campos.map(campo => formatMedida(campo.valueMm, campo.unit)).join(' · '),
+      };
+    });
+    const posiciones = separarChips(items, estorbos);
+    const resultado = new Map<string, GrupoPuesto | null>();
+    items.forEach((item, i) => {
+      resultado.set(item.cota.id, { campos: item.campos, ...posiciones[i] });
+      for (const campo of item.campos.slice(1)) resultado.set(campo.id, null);
+    });
+    return resultado;
+  }, [cotas, pan2D, zoom2D, estorbos]);
+  return <GruposDeCotas.Provider value={puestos}>{children}</GruposDeCotas.Provider>;
+}
+
+export default function CotaChip(props: CotaChipProps) {
+  const grupo = useContext(GruposDeCotas)?.get(props.cota.id);
+  if (grupo === null) return null;
+  return <ChipEditable {...props} {...grupo} campos={grupo?.campos ?? [props.cota]} />;
+}
+
 /** Los chips de la capa, en orden del DOM: es el orden del Tab. */
 function chipsHermanos(el: HTMLElement | null): HTMLElement[] {
   const capa = el?.closest('.cotas');
@@ -35,24 +97,33 @@ function chipsHermanos(el: HTMLElement | null): HTMLElement[] {
 /**
  * Un chip de cota (spec 2026-08-30 § 5.3): en reposo es un botón — clic →
  * edición; arrastre ≥ 4 px → scrub con el puntero capturado —; en edición es
- * un campo de texto. Solo Enter y Tab confirman; Escape y el blur descartan
+ * uno o dos campos de texto. Solo Enter y Tab confirman; Escape y el blur descartan
  * (la selección cambia en mousedown, antes del blur: confirmar ahí sería una
- * carrera). Tab mueve el foco al chip vecino por su cuenta, porque el input
+ * carrera). En un tramo, Tab confirma Largo y pasa a Ángulo dentro de la misma
+ * caja; Shift+Tab recorre el camino inverso. Solo al salir de sus campos se
+ * pasa al chip vecino. Cambiar de campo con el ratón descarta el borrador del
+ * anterior, igual que salir por blur, para conservar una sola edición pendiente.
+ * Tab mueve el foco al chip vecino por su cuenta, porque el input
  * se desmonta en el mismo tick y la navegación nativa perdería el punto de
  * partida. Nada de `type="number"`: la rueda no cambia el valor y la coma
  * decimal entra. Las teclas del campo detienen la propagación — CF-1 ya
  * ignora targets editables; esto es el cinturón.
  */
-export default function CotaChip({
-  cota, left, top, zoom2D, disabled = false, onCommit, onScrubStart, onScrub, onScrubEnd, onScrubCancel,
-}: CotaChipProps) {
+function ChipEditable({
+  cota, campos, left, top, zoom2D, disabled = false, onCommit, onScrubStart, onScrub, onScrubEnd, onScrubCancel,
+}: CotaChipProps & { campos: Cota[] }) {
   const [editing, setEditing] = useState(false);
+  const [activo, setActivo] = useState(0);
+  const campoActivo = campos[activo];
+  const agrupado = campos.length > 1;
   const [draft, setDraft] = useState('');
   const [invalid, setInvalid] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const scrub = useRef<{ x0: number; v0: number; moved: boolean; last: number } | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const scrub = useRef<{ cota: Cota; x0: number; v0: number; moved: boolean; last: number } | null>(null);
   const skipClick = useRef(false);
+  const campoPulsado = useRef<number | null>(null);
   /** Qué enfocar al volver a reposo: el propio botón, o el chip vecino (Tab). */
   const focoAlCerrar = useRef<'boton' | 'siguiente' | 'anterior' | null>(null);
   /** Cerrado por tecla: el blur que pueda seguir no hace nada. */
@@ -81,24 +152,32 @@ export default function CotaChip({
       (fuera ?? boton).focus();
       return;
     }
-    // Tab aterriza listo para teclear: el vecino abre su edicion (300, Tab, 150, Enter).
+    // Al retroceder se entra por el último campo del chip anterior; abrir
+    // siempre el primero saltaría Ángulo en las líneas con varios tramos.
     vecino.focus();
-    vecino.click();
-  }, [editing]);
+    const entrada = destino === 'anterior'
+      ? vecino.querySelector<HTMLElement>('[data-campo]:last-child') ?? vecino
+      : vecino;
+    entrada.click();
+  }, [editing, activo]);
 
   // Un scrub que se queda sin puntero (cancel, captura perdida, desmontaje)
   // termina con el valor de partida: nunca queda un batch abierto.
   useEffect(() => () => {
     const s = scrub.current;
     scrub.current = null;
-    if (s?.moved) onScrubCancel(cota);
+    if (s?.moved) onScrubCancel(s.cota);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const abrir = () => {
-    if (disabled) return;
-    setDraft(aTexto(cota.valueMm));
+  const elegirCampo = (indice: number) => {
+    setActivo(indice);
+    setDraft(aTexto(campos[indice].valueMm));
     setInvalid(false);
+  };
+  const abrir = (indice: number) => {
+    if (disabled) return;
+    elegirCampo(indice);
     cerrado.current = false;
     setEditing(true);
   };
@@ -109,7 +188,7 @@ export default function CotaChip({
   };
   const parsea = (): number | null => {
     const v = parseMedida(draft);
-    return v !== null && v >= cota.min && v <= cota.max ? round1(v) : null;
+    return v !== null && v >= campoActivo.min && v <= campoActivo.max ? round1(v) : null;
   };
   /**
    * `motivo` existe por #1129. Para una cota de un objeto Enter y Tab son lo
@@ -124,7 +203,7 @@ export default function CotaChip({
       setInvalid(true);
       return false;
     }
-    if (v !== round1(cota.valueMm) || cota.confirmaSinCambio) onCommit(cota, v, motivo);
+    if (v !== round1(campoActivo.valueMm) || campoActivo.confirmaSinCambio) onCommit(campoActivo, v, motivo);
     return true;
   };
   const terminarScrub = (valor: (s: { v0: number; last: number }) => number) => {
@@ -132,29 +211,31 @@ export default function CotaChip({
     scrub.current = null;
     if (s?.moved) {
       skipClick.current = true;
-      onScrubEnd(cota, valor(s));
+      onScrubEnd(s.cota, valor(s));
     }
   };
   // Cancelar no es soltar: no hay clic después que tragar, y el valor vuelve al de partida.
   const cancelarScrub = () => {
+    campoPulsado.current = null;
     const s = scrub.current;
     scrub.current = null;
-    if (s?.moved) onScrubCancel(cota);
+    if (s?.moved) onScrubCancel(s.cota);
   };
 
   if (editing) {
-    return (
+    const input = (campo: Cota, indice: number) => (
       <input
-        ref={inputRef}
+        ref={indice === activo ? inputRef : undefined}
         type="text"
         inputMode="decimal"
-        className={`cota cota--editando${invalid ? ' cota--invalida' : ''}`}
-        style={{ left, top }}
-        aria-label={cota.label}
-        aria-invalid={invalid || undefined}
+        className={`${agrupado ? '' : 'cota '}cota--editando${invalid && indice === activo ? ' cota--invalida' : ''}`}
+        style={agrupado ? undefined : { left, top }}
+        aria-label={campo.label}
+        aria-invalid={(invalid && indice === activo) || undefined}
         data-rotulo={cota.rotulo}
         data-lado={cota.outward.y > 0 ? 'abajo' : undefined}
-        value={draft}
+        value={indice === activo ? draft : aTexto(campo.valueMm)}
+        onFocus={() => { if (indice !== activo) elegirCampo(indice); }}
         onChange={(e) => { setDraft(e.target.value); setInvalid(false); }}
         onKeyDown={(e) => {
           e.stopPropagation();
@@ -166,33 +247,60 @@ export default function CotaChip({
             cerrar('boton');
           } else if (e.key === 'Tab') {
             e.preventDefault();
-            if (confirmar('tab')) cerrar(e.shiftKey ? 'anterior' : 'siguiente');
+            if (confirmar('tab')) {
+              const siguiente = activo + (e.shiftKey ? -1 : 1);
+              if (siguiente >= 0 && siguiente < campos.length) elegirCampo(siguiente);
+              else cerrar(e.shiftKey ? 'anterior' : 'siguiente');
+            }
           } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
             e.preventDefault();
-            const base = parseMedida(draft) ?? cota.valueMm;
+            const base = parseMedida(draft) ?? campoActivo.valueMm;
             const paso = ganancia(e) * (e.key === 'ArrowUp' ? 1 : -1);
-            setDraft(aTexto(acota(base + paso, cota)));
+            setDraft(aTexto(acota(base + paso, campoActivo)));
             setInvalid(false);
           }
         }}
-        onBlur={() => { if (!cerrado.current) cerrar(null); }}
+        onBlur={(e) => {
+          if (!cerrado.current && !editorRef.current?.contains(e.relatedTarget)) cerrar(null);
+        }}
       />
+    );
+    if (!agrupado) return input(cota, 0);
+    return (
+      <div ref={editorRef} className="cota cota--grupo cota--grupo-editando" style={{ left, top }}>
+        {campos.map((campo, indice) => (
+          <label key={campo.id} className="cota-campo">
+            <span>{campo.label}</span>
+            {input(campo, indice)}
+            <span>{campo.unit === 'mm' ? 'mm' : '°'}</span>
+          </label>
+        ))}
+      </div>
     );
   }
 
+  const indiceEn = (target: EventTarget) => {
+    const indice = target instanceof Element ? target.closest<HTMLElement>('[data-campo]')?.dataset.campo : undefined;
+    return indice === undefined ? 0 : Number(indice);
+  };
   return (
     <button
       ref={buttonRef}
       type="button"
       className={`cota${cota.primary ? '' : ' cota--hueca'}${cota.scrub === false ? ' cota--sin-scrub' : ''}`}
       style={{ left, top }}
-      aria-label={`${cota.label}: ${formatMedida(cota.valueMm, cota.unit)}`}
+      aria-label={campos.map(campo => `${campo.label}: ${formatMedida(campo.valueMm, campo.unit)}`).join(' · ')}
       aria-disabled={disabled || undefined}
       data-rotulo={cota.rotulo}
       data-lado={cota.outward.y > 0 ? 'abajo' : undefined}
-      onClick={() => {
+      onClick={(e) => {
+        // La captura puede entregar el clic al botón aunque el puntero bajó
+        // sobre Ángulo. Conservamos ese campo desde pointerdown; los clics de
+        // teclado y de navegación usan su propio destino, sin heredar un gesto.
+        const indice = e.detail > 0 ? campoPulsado.current ?? indiceEn(e.target) : indiceEn(e.target);
+        campoPulsado.current = null;
         if (skipClick.current) { skipClick.current = false; return; }
-        abrir();
+        abrir(indice);
       }}
       onKeyDown={(e) => {
         // Espacio y Enter son del botón (abren la edición por el clic
@@ -201,8 +309,11 @@ export default function CotaChip({
       }}
       onContextMenu={(e) => e.preventDefault()}
       onPointerDown={(e) => {
-        if (disabled || e.button !== 0 || cota.scrub === false) return;
-        scrub.current = { x0: e.clientX, v0: cota.valueMm, moved: false, last: cota.valueMm };
+        if (disabled || e.button !== 0) return;
+        campoPulsado.current = indiceEn(e.target);
+        const campo = campos[campoPulsado.current];
+        if (campo.scrub === false) return;
+        scrub.current = { cota: campo, x0: e.clientX, v0: campo.valueMm, moved: false, last: campo.valueMm };
         e.currentTarget.setPointerCapture?.(e.pointerId);
       }}
       onPointerMove={(e) => {
@@ -212,14 +323,14 @@ export default function CotaChip({
         if (!s.moved) {
           if (Math.abs(dx) < DRAG_THRESHOLD_PX) return;
           s.moved = true;
-          onScrubStart(cota);
+          onScrubStart(s.cota);
         }
         // El ángulo no es una distancia sobre el patrón: dividirlo por zoom
         // haría que el mismo gesto cambiara según cuánto amplió María el lienzo.
-        const tasa = cota.unit === 'deg' ? 0.5 : 1 / zoom2D;
-        const v = acota(round1(s.v0 + dx * tasa * ganancia(e)), cota);
+        const tasa = s.cota.unit === 'deg' ? 0.5 : 1 / zoom2D;
+        const v = acota(round1(s.v0 + dx * tasa * ganancia(e)), s.cota);
         s.last = v;
-        onScrub(cota, v);
+        onScrub(s.cota, v);
       }}
       onPointerUp={(e) => {
         e.currentTarget.releasePointerCapture?.(e.pointerId);
@@ -228,7 +339,11 @@ export default function CotaChip({
       onPointerCancel={cancelarScrub}
       onLostPointerCapture={() => terminarScrub(s => s.last)}
     >
-      {formatMedida(cota.valueMm, cota.unit)}
+      {agrupado ? campos.map((campo, indice) => (
+        <span key={campo.id} data-campo={indice}>
+          {indice > 0 && ' · '}{formatMedida(campo.valueMm, campo.unit)}
+        </span>
+      )) : formatMedida(cota.valueMm, cota.unit)}
     </button>
   );
 }

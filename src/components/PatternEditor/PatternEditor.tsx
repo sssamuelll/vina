@@ -13,6 +13,7 @@ import { useRectangleTool } from './useRectangleTool';
 import { useCircleTool } from './useCircleTool';
 import { useTriangleTool } from './useTriangleTool';
 import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
+import { AgruparCotas } from './cotas/CotaChip';
 import CotaLines from './cotas/CotaLines';
 import { cotasDelSujeto, faltaSujeto } from './cotas/sujeto';
 import { puntoUnicoSeleccionado } from './cotas/nodo';
@@ -31,7 +32,7 @@ import { usePointTool } from './usePointTool';
 import { useSeamAllowanceTool } from './useSeamAllowanceTool';
 import { useNotchMirrorPreview } from './useNotchMirrorPreview';
 import SeamAllowanceSelectionOverlay from './renderers/overlays/SeamAllowanceSelectionOverlay';
-import { showUndoToast, showInfoToast } from '../../store/copilotUISlice';
+import { showUndoToast, showInfoToast, showWarningToast } from '../../store/copilotUISlice';
 import { useTrimTool } from './useTrimTool';
 import { newId } from '../../utils/ids';
 import { useGrainlineTool } from './useGrainlineTool';
@@ -191,6 +192,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     };
     dispatch(addPiece(fullPiece));
     dispatch(selectPiece(fullPiece.id));
+    // El aviso llega después de crear y seleccionar porque terminar abierta
+    // sigue siendo una salida válida de la pluma, tanto con Enter como con
+    // doble clic. Lo que faltaba era explicar que ese contorno necesita cierre
+    // para simular, sin perder la pieza que ella acaba de dibujar.
+    if (!piece.outline.some(command => command.type === 'Z')) {
+      dispatch(showWarningToast('La pieza quedó abierta y así no se puede simular.'));
+    }
     return fullPiece.id;
   }, [dispatch]);
 
@@ -1456,21 +1464,23 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         calibrationActive={calibrationMode !== null}
         ctx={barCtx}
       />
-      <CotasLayer
-        ref={cotasRef}
-        cotas={sujeto.cotas}
-        lectura={sujeto.lectura}
-        lecturaApagada={sujeto.lecturaApagada}
-        pan2D={pan2D}
-        zoom2D={zoom2D}
-        estorbos={estorbosDeLasAsas}
-        disabled={sujeto.disabled}
-        onCommit={handleCotaCommit}
-        onScrubStart={handleCotaScrubStart}
-        onScrub={handleCotaScrub}
-        onScrubEnd={handleCotaScrubEnd}
-        onScrubCancel={handleCotaScrubCancel}
-      />
+      <AgruparCotas cotas={sujeto.cotas} pan2D={pan2D} zoom2D={zoom2D} estorbos={estorbosDeLasAsas}>
+        <CotasLayer
+          ref={cotasRef}
+          cotas={sujeto.cotas}
+          lectura={sujeto.lectura}
+          lecturaApagada={sujeto.lecturaApagada}
+          pan2D={pan2D}
+          zoom2D={zoom2D}
+          estorbos={estorbosDeLasAsas}
+          disabled={sujeto.disabled}
+          onCommit={handleCotaCommit}
+          onScrubStart={handleCotaScrubStart}
+          onScrub={handleCotaScrub}
+          onScrubEnd={handleCotaScrubEnd}
+          onScrubCancel={handleCotaScrubCancel}
+        />
+      </AgruparCotas>
       {/* La tira ya no cede la esquina a nadie. La cedía porque `NextPointPanel`
           vivía en ella; los chips del tramo en curso viven sobre el trazo, que
           es donde está el gesto, así que no hay nada que esquivar (#1129). */}

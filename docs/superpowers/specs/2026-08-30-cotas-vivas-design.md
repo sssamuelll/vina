@@ -406,16 +406,14 @@ Tres propiedades, ninguna cromática:
 
 El tamaño. De ese mismo readout dijo *"la letra casi ni se lee"* [07:31], y tenía razón: hoy es `fontSize={10 / z}` (`PolyPenToolOverlay.tsx:144`). **La enmienda toma la geometría de la negra y la legibilidad de la azul.** Copiarla tal cual arrastra el defecto que ella nombró.
 
-### 14.3 Una sola familia de tokens
+### 14.3 Los tokens NO cambian — corregido 2026-09-08
 
-Contrato de interfaz § 1, *un nombre por concepto*: **no se resucita `--readout-*` ni nace una tercera familia.** Se redefinen los valores de `--cota-*` y se retiran `--readout-bg-2d` / `--readout-ink-2d` de `tokens.css` — hoy solo los consume `PolyPenToolOverlay`.
+La primera versión de esta enmienda decía que `--cota-bg-2d` pasaba al oscuro del readout y que `--readout-*` se retiraba. **Era una extralimitación mía y se corrige aquí**, por dos razones que aparecieron al implementarla:
 
-| Token | Antes | Después | Por qué |
-|---|---|---|---|
-| `--cota-bg-2d` | `var(--accent-2d-fuerte)` | el oscuro translúcido del readout | es el cuadro del que ella habló |
-| `--cota-ink-2d` | `#ffffff` | sin cambio | — |
-| `--cota-line-2d` | `var(--accent-2d-fuerte)` | **sin cambio, a propósito** | no se quejó de las líneas de cota, se quejó del cuadro; y la línea de cota en acento es convención CAD. Dicho para que no se aplique en lote |
-| `--cota-edit-bg-2d` / `-ink-2d` | campo blanco | sin cambio | el campo en edición sigue siendo papel blanco |
+1. **Ella dijo "más allá de los colores".** [07:37] La cita completa es *"me gusta bastante este, ¿sabes por qué? más allá de los colores, porque aparece encima de la línea"*. Lo que eligió es la **geometría** —un cuadro, magnitudes juntas, sobre el trazo, compacto—, y lo dijo excluyendo el color de forma explícita. Cambiar la paleta era leer su preferencia por donde ella misma dijo que no la leyera.
+2. **La familia azul es una decisión ratificada con mockups aprobados**, y hay un test que la sostiene: `cotas/__tests__/cotas-contraste.test.ts` exige que `--cota-bg-2d` sea del mismo tono que `--accent-2d`, con este comentario al lado: *"el arreglo perezoso sería oscurecer `--accent-2d` y ya. Pero ese token es el color de la selección y de las costuras"*. Además su lector solo admite `oklch(L C H)` sin alfa, así que un fondo translúcido lo rompería — y el alfa es, de hecho, parte de por qué el readout se lee mal.
+
+**Lo que queda de esta enmienda es solo geometría:** un chip por tramo con las dos magnitudes dentro, sobre el trazo, compacto, y las dos siguen siendo editables. `--cota-*` se queda como está. `--readout-*` desaparece por dejar de tener consumidor cuando el readout del trazo vivo hable el idioma de las cotas, no por cambiar de color.
 
 ### 14.4 Cómo se verifica (e2e, no vitest)
 

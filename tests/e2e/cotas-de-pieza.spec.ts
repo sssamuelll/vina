@@ -173,8 +173,13 @@ test.describe('cotas de pieza (María #223/#225)', () => {
     const alto = await cota(page, 'Alto').boundingBox();
     if (!ancho || !alto) throw new Error('sin chips');
     // girada 90°: el chip de Ancho queda a un lado (no arriba) y el de Alto arriba o abajo
-    const piezaBox = await page.locator('[data-piece-id]').first().boundingBox();
-    if (!piezaBox) throw new Error('sin pieza');
+    // El oráculo es el CONTORNO pintado, no el grupo `[data-piece-id]`: desde
+    // que "Largos" nace encendido (reunión 07-09, fallo 4) el grupo incluye las
+    // etiquetas de largo y su caja ya no es la geometría de la pieza. Lo que
+    // este caso afirma no cambia —el chip de Ancho cae a un costado y no por
+    // arriba—; cambia con qué se mide, porque la caja anterior medía de más.
+    const piezaBox = await page.locator('[data-piece-id] .piece-fill').first().boundingBox();
+    if (!piezaBox) throw new Error('sin contorno de pieza');
     // el chip se centra a 18 px del lado: su centro cae fuera de la caja por un costado, no por arriba
     const cx = ancho.x + ancho.width / 2;
     const cy = ancho.y + ancho.height / 2;

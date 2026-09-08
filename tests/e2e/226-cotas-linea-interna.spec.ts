@@ -38,8 +38,10 @@ test.describe('#226 — cotas de línea interna', () => {
 
     const capa = page.locator('[data-testid="cotas"]');
     await expect(capa).toBeVisible();
-    // Cota de tramo (largo) siempre visible; cotas de borde (huecas) por cada extremo enganchado.
-    await expect(page.locator('.cota:not(.cota--hueca)')).toHaveCount(2); // largo + ángulo
+    // Cota del tramo: UN chip con largo y ángulo dentro (reunión 07-09, § 14 de
+    // la spec: "he creado dos cuadros para una misma información"). Las cotas
+    // de borde (huecas) siguen siendo una por extremo enganchado.
+    await expect(page.locator('.cota:not(.cota--hueca)')).toHaveCount(1);
     const bordes = page.locator('.cota.cota--hueca');
     await expect(bordes.first()).toBeVisible();
     const nBordesAntes = await bordes.count();
@@ -106,12 +108,13 @@ test.describe('#226 — cotas de línea interna', () => {
     await page.waitForTimeout(300);
 
     const chips = page.locator('.cota:not(.cota--hueca)');
-    await expect(chips).toHaveCount(2); // largo + ángulo, gratis por ser InternalLine
+    await expect(chips).toHaveCount(1); // un solo chip: largo y ángulo juntos
 
-    // El chip de ángulo es el segundo del par (orden del Tab: largo → ángulo).
-    const angulo = chips.nth(1);
-    await angulo.click();
-    const input = page.locator('.cota--editando').first();
+    // El ángulo sigue siendo editable — que era el punto de las cotas vivas.
+    // Se le llega por su rótulo, no por su posición en un par que ya no existe.
+    await chips.first().click();
+    const input = page.getByRole('textbox', { name: /Ángulo/i });
+    await expect(input, 'el ángulo tiene que seguir teniendo su campo').toBeVisible();
     await input.fill('0');
     await input.press('Enter');
     await page.waitForTimeout(200);

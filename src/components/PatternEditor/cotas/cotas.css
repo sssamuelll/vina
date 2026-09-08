@@ -54,6 +54,35 @@
 .cota--editando:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cota--invalida { border-left-color: var(--destructive); }
 
+/* Las dos magnitudes comparten una sola superficie también al escribir.
+   Los rótulos quedan junto a sus campos para que Largo y Ángulo se puedan
+   reconocer sin adivinar por la unidad. El texto conserva los 11 px y la
+   paleta aprobada; el cambio de la reunión es de geometría y agrupación. */
+.cota--grupo-editando {
+  /* Al abrir los campos, la caja necesita más ancho que sus números en
+     reposo. La edición activa debe quedar encima de las lecturas vecinas
+     para que otro tramo no tape Ángulo mientras María está escribiendo. */
+  z-index: var(--z-canvas-chrome);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: auto;
+  padding: 4px 8px;
+  cursor: default;
+  background: var(--cota-edit-bg-2d);
+  color: var(--cota-edit-ink-2d);
+}
+.cota-campo { display: flex; align-items: center; gap: 4px; }
+.cota-campo .cota--editando {
+  width: 56px;
+  height: 22px;
+  padding: 0 4px;
+  border: 0;
+  border-left: var(--focus-rail);
+  font: inherit;
+}
+.cota-campo .cota--invalida { border-left-color: var(--destructive); }
+
 /* La lectura (spec 2026-09-02 § 4.2 R2, § 4.4): no es un blanco y pesa menos
    que el chip anclado — contrato § 4, seleccionado > hover — por opacidad y
    sin sombra, no solo por tono. */
