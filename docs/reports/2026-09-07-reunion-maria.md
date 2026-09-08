@@ -139,10 +139,26 @@ Medir no le da certeza y ella no sabe si clicó el punto o 0,2 mm al lado [08:45
 3. **Convertir en curva no convierte y arrastra la pieza** [11:01-12:04] — *"se ha arrastrado esto"*, *"convertir en línea y sin embargo no veo la curva"*, *"se ha quedado un link raro"*. Tres intentos, ninguno funcionó. El más grave de la sesión.
 4. **`Editar patrón` acota la caja envolvente, no los lados** [06:34, 10:12] — en una pieza no rectangular *"está sacando unas medidas que no son las medidas de la pieza sino como el rectángulo"*, y solo dos.
 5. **Las cotas desaparecen tras usar Medir** [08:20] — *"¿será que se fue después de darle a lo de medir?"*.
+   > **Reproducido el 2026-09-08, y no es lo que parece.** En la misma frase ella dice *"no me aparece **la medición**"* y *"no aparecen **las medidas** que teníamos"*: son dos cosas distintas. La reproducción mide las dos por separado y responde cuál se fue:
+   >
+   > | Paso | Cotas de la pieza | Mediciones pintadas |
+   > |---|---|---|
+   > | rectángulo nuevo por clic | **visibles** | — |
+   > | dos clics con Medir | — | **1** |
+   > | volver a Rectángulo | — | **0** ← se fue esto |
+   > | crear otro rectángulo | **visibles** | 0 |
+   >
+   > Las cotas nunca desaparecieron. Lo que desapareció fue **la medición**, al cambiar de herramienta. **No es un fallo aparte: es D3** de la spec de Medir (*"las mediciones PERSISTEN"*), que ya iba en la tanda 3. Perseguir "las cotas" habría sido arreglar algo que no estaba roto.
 6. **Medir por clic sobre una línea no mide** [07:19] — *"si yo clico, no aparece la medición de la línea"*. (Es lo que pide **#1104**: *medir una línea con un clic*.)
 7. **Punto amarillo se queda iluminado** al volver a Seleccionar [06:21].
 8. **Menú de "división" aparece sin causa aparente** [09:40] — *"¿qué pasó? ¿cuál fue la diferencia?" — "ni idea"*. Samuel: *"tenemos que revisar eso"*.
+   > **Resuelto por el fotograma `t_09-40.jpg` (2026-09-08).** "La división esa" es la **barrita de la pieza** — girar, duplicar, espejar, ajustes, candado — que aparece sobre la selección. No apareció de la nada: apareció bajo condiciones que ella no puede predecir. **No es un fallo suelto: es la causa D**, y se cierra con el contrato del contexto de pieza, no con un parche aquí.
 9. **La barra inferior se desplaza** [20:10, 20:44] — *"esa barra debe estar fija"*. Samuel lo llama overscroll.
+   > **Resuelto comparando `t_20-10.jpg` con `t_20-50.jpg` (2026-09-08).** No es la barra de abajo: es el **dock izquierdo de herramientas**. En `t_20-10` su contenido está desplazado y el rótulo "2D" de la cabecera se ha ido de vista, asomando un "+" abajo que en el otro fotograma no está.
+   >
+   > Y el scroll **es deliberado**: `Dock.css:31-33` pone `max-height: calc(100% - 28px); overflow-y: auto` por #1095, porque a 1366×643 con el catálogo entero *"siete botones quedaban fuera sin scroll y sin ninguna señal"*, y el comentario dice que la barra de scroll **es** la señal y por eso no se esconde.
+   >
+   > Así que no está roto: es una decisión chocando con su expectativa de que la columna de herramientas es mueble fijo. El arreglo no es `position: fixed` —con 19 herramientas en 643 px algo tiene que ceder— sino que **la cabecera no se vaya con el scroll** (`position: sticky` en `.dock__label`), que conserva la señal de #1095 y le quita la sensación de que la barra "se bajó".
 10. **`Línea interna` está activa sin patrón** [12:32] — *"si no hay patrón, ¿para qué activar esa opción?"*.
 11. **Pluma deja cerrar una pieza abierta sin avisar** [14:07] — pide un aviso *"¿me la cierras o qué?"* con opción de recordar la respuesta en ajustes.
 

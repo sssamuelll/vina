@@ -173,7 +173,7 @@ interface ToolHooks {
   };
   trimTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
   grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e?: React.MouseEvent<SVGSVGElement>) => void; cancel: () => void };
-  measureTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void; clear: () => void };
+  measureTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void; clear: () => void; limpiarHover?: () => void };
   nodeEditor: {
     isEditing: boolean;
     hoveredNode: unknown;
@@ -414,12 +414,6 @@ export function useEditorInteractions(
     }
     return null;
   }, [pan2D, zoom2D]);
-
-  // Clear measurements when switching away
-  useEffect(() => {
-    if (!MEASURE_TOOL_IDS.has(activeTool)) measureTool.clear();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- measureTool.clear is stable (useCallback with [])
-  }, [activeTool, measureTool.clear]);
 
   // Clear walk seam when switching away
   useEffect(() => {
@@ -1262,7 +1256,8 @@ export function useEditorInteractions(
     seamAllowanceTool.limpiarHover();
     seamEditTool.limpiarHover();
     seamTool.limpiarHover();
-  }, [seamAllowanceTool, seamEditTool, seamTool]);
+    measureTool.limpiarHover?.();
+  }, [seamAllowanceTool, seamEditTool, seamTool, measureTool]);
 
   const getCursor = () => {
     switch (activeTool) {

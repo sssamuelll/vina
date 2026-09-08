@@ -57,6 +57,7 @@ import { useEditorInteractions } from './useEditorInteractions';
 import { useElasticTool } from '../../hooks/useElasticTool';
 import { EDGE_HIT_PX } from './gestureConstants';
 import PolyPenToolOverlay from './renderers/overlays/PolyPenToolOverlay';
+import MeasureToolOverlay from './renderers/overlays/MeasureToolOverlay';
 import GridLayer from './renderers/GridLayer';
 import RulerLayer from './renderers/RulerLayer';
 import PieceRenderer from './renderers/PieceRenderer';
@@ -350,7 +351,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const scissorsTool = useScissorsTool(zoom2D, pan2D);
   const slashAndSpreadTool = useSlashAndSpreadTool(zoom2D, pan2D);
   const mergeTool = useMergeTool(zoom2D, pan2D);
-  const measureTool = useMeasureTool(zoom2D, pan2D);
+  const measureTool = useMeasureTool(zoom2D, pan2D, drawablePieces);
+  const measurementPieceIds = useMemo(() => new Set(pieces.map(p => p.id)), [pieces]);
   const seamEditTool = useSeamEditTool(
     zoom2D,
     pan2D,
@@ -1304,17 +1306,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             grainlineStartPoint={grainlineTool.startPoint}
             grainlineEndPoint={grainlineTool.endPoint}
             grainlinePieceId={grainlineTool.pieceId}
-            measurements={measureTool.measurements}
-            currentStart={measureTool.currentStart}
-            cursorPos={measureTool.cursorPos}
+            measurements={[]}
+            currentStart={null}
+            cursorPos={null}
             formatDistance={measureTool.formatDistance}
-            measureHoveredSnapPoint={measureTool.hoveredSnapPoint}
-            measureShowAngle={toolOptions?.[activeTool]?.showAngle ?? false}
-            measureMode={measureTool.measureMode}
-            measureSelectedEdge={measureTool.selectedEdge}
-            measureHoverDistance={measureTool.hoverDistance}
-            measureCompareEdgeA={measureTool.compareEdgeA}
-            measureComparison={measureTool.comparison}
             nodeEditorIsEditing={isNodeEditing}
             nodeEditorEditingPieceId={nodeEditor.editingPieceId}
             nodeEditorNodes={nodeEditor.nodes}
@@ -1381,6 +1376,29 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             selectMarquee={selectMarquee}
           />
           )}
+          {/* La anotación pertenece a la sesión del proyecto: ToolOverlay solo
+              monta Medir mientras la herramienta está activa. Este montaje
+              mantiene el resultado visible; el overlay recibe aparte si debe
+              pintar el gesto vivo. Sus coordenadas guardadas no siguen el
+              arrastre de piezas, como deja abierto el spec de Medir § 4. */}
+          <MeasureToolOverlay
+            zoom2D={zoom2D}
+            measurements={measureTool.measurements}
+            currentStart={measureTool.currentStart}
+            cursorPos={measureTool.cursorPos}
+            hoveredSnapPoint={measureTool.hoveredSnapPoint}
+            snapKind={measureTool.hoveredSnapKind}
+            proximity={measureTool.proximity}
+            formatDistance={measureTool.formatDistance}
+            showAngle={toolOptions?.measure?.showAngle ?? false}
+            measureMode={measureTool.measureMode}
+            selectedEdge={measureTool.selectedEdge}
+            hoverDistance={measureTool.hoverDistance}
+            compareEdgeA={measureTool.compareEdgeA}
+            comparison={measureTool.comparison}
+            existingPieceIds={measurementPieceIds}
+            active={activeTool === 'measure' || activeTool === 'measureCurve' || activeTool === 'compareCurves'}
+          />
           {activeTool === 'internalShape' && (
             <PolyPenToolOverlay
               nodes={internalShapeTool.nodes}
@@ -1458,6 +1476,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           es donde está el gesto, así que no hay nada que esquivar (#1129). */}
       <ToolStrip2D
         lineaDeSujeto={sujeto.lineaDeSujeto}
+        onClearMeasurements={measureTool.clear}
+        hasMeasurements={measureTool.measurements.length > 0 || !!measureTool.selectedEdge || !!measureTool.comparison}
         falta={falta}
         desenlace={desenlace}
         /* El modal de piquete no usa portal ni atrapa el foco, y la tira vive
