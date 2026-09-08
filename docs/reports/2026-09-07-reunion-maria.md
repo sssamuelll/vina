@@ -208,3 +208,40 @@ Tres veces elegida por la usuaria, con razón dada (§ 2.C). Samuel prefería la
 2. **Dónde va el control numérico** — María pide clic derecho (hábito de CLO, lo citó cuatro veces); Samuel dice explícitamente que no será un menú. No se acordó el gesto sustituto.
 3. **Si el enganche se propaga o se unifica** — *"copiar eso para el de medir"* puede ser copiar código a Medir o extraer el enganche a una capa que todas usen. La segunda es la que evita la tercera ronda de esta misma queja.
 4. **Qué es una línea interna**: ¿un trazo con N segmentos (hoy) o N líneas independientes (lo que ella espera)? De esto depende § 2.G y también qué se selecciona y qué cotas salen.
+
+
+---
+
+## 7. Cierre — qué se hizo, 2026-09-08
+
+Seis tandas, todas con tests escritos primero y verificados rojos por su razón, hashes sellados, e implementación delegada a `gpt-6-astra` (effort `ultra`, sandbox de solo escritura en el workspace) bajo contrato TDD.
+
+| Punto | Estado | Commit |
+|---|---|---|
+| Fallos 1, 3, 7 — el estado de edición sobrevivía a su herramienta | hecho | `09db0d5c` |
+| Fallo 2 — el tamaño se contagiaba (+ círculo y triángulo) | hecho | `408602d3` |
+| Fallos 5, 6 + causa F — Medir | hecho | `7244641e` |
+| Fallos 4, 9, 10 — puertas y defaults | hecho | `dbb78694` |
+| Causa C + fallo 11 — un cuadro, y el aviso | hecho | `b6dc3bfa` |
+| Causas A y G — el sujeto es el tramo | hecho | `21429ce2` |
+| Fallo 8 | no era un fallo propio: es la causa D |  |
+| Causas B, D, E | **decididas y sin implementar** — ver el contrato del 08-09 |  |
+
+### 7.1 Lo que cambió del diagnóstico al implementarlo
+
+Cinco de los dieciocho puntos no eran lo que el informe decía al escribirse. Vale la pena que quede junto:
+
+1. **"Medir no engancha" era falso.** Engancha al contorno; le faltaba prioridad de vértice. Arreglar "el enganche" habría intervenido el mecanismo equivocado.
+2. **Las dos cotas no convivían por indecisión.** La sustitución estaba escrita en la spec del 30-08 y sin ejecutar — y mandaba lo contrario que María.
+3. **El fallo 5 no era de las cotas.** Reproducido: nunca desaparecieron. Se iba la medición.
+4. **El fallo 9 no era la barra de abajo** sino el dock, y su scroll es una decisión deliberada de #1095.
+5. **El fallo 4 ya existía**: es el chip "Largos", que ella tuvo delante 25 minutos con la casilla vacía.
+
+Y dos correcciones a decisiones propias: la enmienda § 14 de la cota se pasó al tocar los tokens (ella dijo *"más allá de los colores"*), y el oráculo del caso de la pieza girada medía contra una caja que dejó de ser la geometría.
+
+### 7.2 Rojos preexistentes en `main`, ajenos a esta tanda
+
+Verificados con `git stash` antes de acusar a ningún cambio:
+
+- `edit-pattern-trust.spec.ts` — el arrastre lento de un nodo no mueve el comando.
+- `linea-interna-gramatica.spec.ts` — "línea interna y al borde del contorno": espera 3 internas y hay 2.
