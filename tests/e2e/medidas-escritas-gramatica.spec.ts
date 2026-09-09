@@ -133,7 +133,16 @@ test.describe('medidas escritas — gramática', () => {
     expect((await st(page)).project.pieces).toHaveLength(0);
   });
 
-  test('pluma: botón derecho mudo con trazo, Retroceso quita el último, doble clic termina abierta', async ({ page }) => {
+  test('pluma: botón derecho mudo con trazo, Retroceso quita el último, doble clic con 3 nodos cierra', async ({ page }) => {
+    // ENMENDADO el 2026-09-09 (contrato `2026-09-09-lo-que-se-ve-y-cuando`
+    // § 4). El título y el assert final decían "doble clic termina abierta":
+    // era el contrato viejo, donde doble clic terminaba el trazo TAL COMO
+    // ESTABA sin importar cuántos nodos tuviera. Ahora doble clic es Enter
+    // (usePenTool.ts: "Doble clic = terminar (= Enter): con tres nodos cierra;
+    // con dos queda abierta") — y este caso, tras el Backspace, sigue
+    // terminando con TRES nodos, así que ahora cierra. Lo demás que el caso
+    // prueba —botón derecho mudo a mitad de trazo, Backspace quita el
+    // último— no cambió y sigue verificándose igual.
     await waitForApp(page);
     await tool(page, 'h', 'pen');
     await clickAt(page, { x: 300, y: 300 });
@@ -151,6 +160,30 @@ test.describe('medidas escritas — gramática', () => {
     expect(pieces).toHaveLength(1);
     const pts = anchors(pieces[0].outline).map(([x, y]) => [x + pieces[0].position.x, y + pieces[0].position.y]);
     expect(pts).toEqual([[300, 300], [400, 300], [300, 400]]);
-    expect(pieces[0].outline.some(c => c.type === 'Z')).toBe(false);
+    expect(
+      pieces[0].outline.some(c => c.type === 'Z'),
+      'tres nodos: doble clic cierra el trazo solo (contrato de interfaz § 4, "actuar y ofrecer deshacer")',
+    ).toBe(true);
+  });
+
+  test('pluma: doble clic con exactamente 2 nodos no tiene área que cerrar, y queda abierta', async ({ page }) => {
+    // El hermano del caso de arriba: con SOLO dos nodos no hay polígono que
+    // cerrar, así que el trazo queda abierto — el aviso de "no se puede
+    // simular" sigue siendo cierto ahí (tanda5-un-cuadro-y-un-aviso.spec.ts lo
+    // cubre). Este caso es el control de que doble clic no inventa un cierre
+    // donde no hay geometría para cerrar.
+    await waitForApp(page);
+    await tool(page, 'h', 'pen');
+    await clickAt(page, { x: 300, y: 300 });
+    const s = await toScreen(page, { x: 400, y: 300 });
+    await page.mouse.move(s.x, s.y);
+    await page.mouse.dblclick(s.x, s.y);
+    await page.waitForTimeout(300);
+    const pieces = (await st(page)).project.pieces;
+    expect(pieces).toHaveLength(1);
+    expect(
+      pieces[0].outline.some(c => c.type === 'Z'),
+      'dos nodos no son un polígono: no hay nada que cerrar',
+    ).toBe(false);
   });
 });
