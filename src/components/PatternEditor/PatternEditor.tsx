@@ -192,10 +192,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     };
     dispatch(addPiece(fullPiece));
     dispatch(selectPiece(fullPiece.id));
-    // El aviso llega después de crear y seleccionar porque terminar abierta
-    // sigue siendo una salida válida de la pluma, tanto con Enter como con
-    // doble clic. Lo que faltaba era explicar que ese contorno necesita cierre
-    // para simular, sin perder la pieza que ella acaba de dibujar.
+    // Con dos nodos la pluma sigue abierta: no hay área que cerrar y el aviso
+    // sigue siendo cierto. Con tres o más, Enter y doble clic ya la cierran.
     if (!piece.outline.some(command => command.type === 'Z')) {
       dispatch(showWarningToast('La pieza quedó abierta y así no se puede simular.'));
     }
@@ -210,6 +208,19 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       .filter(p => !hiddenLayerIds.includes(p.layer ?? 1))
       .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
     [pieces, hiddenLayerIds],
+  );
+  // Los largos del contorno son del SUJETO pieza, no de «la pieza tocada»
+  // (contrato 09-09 § 1). `selectInternalLine` deja además
+  // `selectedPieceIds = [pieceId]` (editorSlice.ts:123), así que filtrar solo
+  // por selección encendía las cuatro lecturas del contorno encima de la cota
+  // del tramo que se estaba escribiendo: la sobresaturación de la causa G
+  // —[24:05] "y me sobresatura toda la información"— resucitada por la puerta
+  // de al lado. Si hay un sujeto más fino dentro de la pieza, el contorno calla.
+  const haySujetoDentroDeLaPieza = editor.selectedInternalLine !== null;
+  const piezasConLargos = useMemo(
+    () => drawablePieces.filter(piece =>
+      showLineLengths || (!haySujetoDentroDeLaPieza && selectedPieceIds.includes(piece.id))),
+    [drawablePieces, showLineLengths, selectedPieceIds, haySujetoDentroDeLaPieza],
   );
 
   const pen = usePenTool(zoom2D, pan2D, handlePieceComplete, drawablePieces);
@@ -1492,6 +1503,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         <CotasLayer
           ref={cotasRef}
           cotas={sujeto.cotas}
+          piezasConLargos={piezasConLargos}
+          piezaAcotadaId={sujeto.piece?.id}
+          units={units}
           lectura={sujeto.lectura}
           lecturaApagada={sujeto.lecturaApagada}
           pan2D={pan2D}

@@ -105,4 +105,4 @@
   white-space: nowrap;
 }
 .cota[data-rotulo][data-lado='abajo']::before { bottom: auto; top: calc(100% + 2px); }
-.cotas:has(.cota--editando) .cota--lectura { display: none; }
+.cotas:has(.cota--editando) .cota--lectura[data-lectura-hover] { display: none; }

@@ -1,16 +1,18 @@
 /**
- * @vitest-environment jsdom
+ * El largo de cada lado de una pieza (spec 2026-06-04 display-toggles-resurface
+ * § 4): uno por borde semántico, formateado en las unidades activas, con
+ * repliegue a `detectSemanticEdges` para las piezas sin bordes guardados (DXF).
  *
- * Guards the Line Lengths revival (spec 2026-06-04 display-toggles-resurface §4):
- * one label per semantic edge, formatDimension output, detection fallback for
- * pieces without stored edges (DXF imports).
+ * Estas pruebas vivían sobre el componente SVG `LineLengthLabels`, que el
+ * contrato del 2026-09-09 dejó sin montar: los largos pasaron a la capa de
+ * cotas como lecturas. Un test sobre un componente que nadie renderiza no
+ * certifica nada, así que se apuntan al módulo que sí se usa —el cálculo— y el
+ * renderizador muerto se borró. La cobertura es la misma; lo que cambia es que
+ * ahora mide código vivo.
  */
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
 import type { PatternPiece, SemanticEdge } from '../../../../types/types';
-import LineLengthLabels from '../LineLengthLabels';
-
-afterEach(cleanup);
+import { lineLengthLabels } from '../lineLengthLabelsData';
 
 // Cuadrado de 100×100 mm, con la MISMA forma que emite `useRectangleTool`:
 // `M L L L Z`. El cuarto lado —el izquierdo— lo dibuja la `Z`, y no tiene
@@ -39,73 +41,55 @@ function squarePiece(edges?: SemanticEdge[]): PatternPiece {
   } as unknown as PatternPiece;
 }
 
-function renderLabels(piece: PatternPiece, units: 'cm' | 'inches' | 'mm' = 'cm') {
-  return render(
-    <svg>
-      <LineLengthLabels piece={piece} zoom2D={1} units={units} />
-    </svg>,
-  );
-}
-
-describe('LineLengthLabels', () => {
-  it('renders one label per stored semantic edge, formatted in active units', () => {
-    const piece = squarePiece([
+describe('lineLengthLabels', () => {
+  it('da una etiqueta por borde guardado, en las unidades activas', () => {
+    const labels = lineLengthLabels(squarePiece([
       { id: 'e1', name: 'hemline', segmentRange: [1, 2], edgeType: 'hem', length: 100 },
-    ]);
-    const { container } = renderLabels(piece, 'cm');
-    const texts = container.querySelectorAll('text');
-    expect(texts.length).toBe(1);
-    expect(texts[0].textContent).toBe('10.0 cm');
+    ]), 'cm');
+    expect(labels).toHaveLength(1);
+    expect(labels[0].text).toBe('10.0 cm');
   });
 
-  it('formats in inches when units=inches', () => {
-    const piece = squarePiece([
+  it('formatea en pulgadas cuando las unidades son inches', () => {
+    const labels = lineLengthLabels(squarePiece([
       { id: 'e1', name: 'hemline', segmentRange: [1, 2], edgeType: 'hem', length: 100 },
-    ]);
-    const { container } = renderLabels(piece, 'inches');
-    expect(container.querySelector('text')!.textContent).toBe('3.9 in');
+    ]), 'inches');
+    expect(labels[0].text).toBe('3.9 in');
   });
 
-  it('positions the label at the edge midpoint', () => {
-    const piece = squarePiece([
-      // segment 1 runs (0,0)→(100,0): midpoint (50, 0)
+  it('coloca la etiqueta en el punto medio del lado', () => {
+    // El tramo 1 va de (0,0) a (100,0): su medio es (50, 0).
+    const labels = lineLengthLabels(squarePiece([
       { id: 'e1', name: 'hemline', segmentRange: [1, 2], edgeType: 'hem', length: 100 },
-    ]);
-    const { container } = renderLabels(piece);
-    const text = container.querySelector('text')!;
-    expect(Number(text.getAttribute('x'))).toBeCloseTo(50);
-    expect(Number(text.getAttribute('y'))).toBeCloseTo(0);
+    ]), 'cm');
+    expect(labels[0].x).toBeCloseTo(50);
+    expect(labels[0].y).toBeCloseTo(0);
   });
 
-  it('falls back to detectSemanticEdges for pieces without stored edges (DXF path)', () => {
-    // A 4-segment square groups into 4 zones (top/right/bottom/left) → 4 edges.
-    const { container } = renderLabels(squarePiece(undefined));
-    const texts = container.querySelectorAll('text');
-    expect(texts.length).toBe(4);
-    for (const t of texts) expect(t.textContent).toBe('10.0 cm');
+  it('sin bordes guardados los detecta (la ruta del DXF)', () => {
+    // Un cuadrado de cuatro tramos agrupa en cuatro zonas → cuatro bordes.
+    const labels = lineLengthLabels(squarePiece(undefined), 'cm');
+    expect(labels).toHaveLength(4);
+    for (const l of labels) expect(l.text).toBe('10.0 cm');
   });
 
   it('el lado de cierre también enseña su medida, y en su sitio', () => {
     // Contar cuatro no basta: cuatro etiquetas pueden ser cuatro del lado
     // equivocado. El oráculo es DÓNDE cae la del cierre — el lado izquierdo
     // de un cuadrado de 100 va de (0,100) a (0,0), o sea su medio es (0,50).
-    const { container } = renderLabels(squarePiece(undefined));
-    const puntos = [...container.querySelectorAll('text')].map(t => ({
-      x: Number(t.getAttribute('x')),
-      y: Number(t.getAttribute('y')),
-    }));
+    const puntos = lineLengthLabels(squarePiece(undefined), 'cm')
+      .map(l => ({ x: l.x, y: l.y }));
     expect(puntos).toContainEqual({ x: 0, y: 50 });
   });
 
-  it('computes length from the outline when edge.length is missing', () => {
-    const piece = squarePiece([
-      { id: 'e1', name: 'sideSeam', segmentRange: [2, 3], edgeType: 'seam' },
-    ]);
-    const { container } = renderLabels(piece);
-    expect(container.querySelector('text')!.textContent).toBe('10.0 cm');
+  it('calcula el largo del contorno cuando el borde no lo guarda', () => {
+    const labels = lineLengthLabels(squarePiece([
+      { id: 'e1', name: 'sideSeam', segmentRange: [2, 3], edgeType: 'seam' } as unknown as SemanticEdge,
+    ]), 'cm');
+    expect(labels[0].text).toBe('10.0 cm');
   });
 
-  it('skips degenerate edges (< 1mm)', () => {
+  it('se salta los lados degenerados (< 1 mm)', () => {
     const piece = {
       ...squarePiece(),
       outline: [
@@ -114,8 +98,7 @@ describe('LineLengthLabels', () => {
       ],
       edges: [{ id: 'e1', name: 'edge', segmentRange: [1, 2], edgeType: 'unknown', length: 0.5 }],
     } as unknown as PatternPiece;
-    const { container } = renderLabels(piece);
-    expect(container.querySelectorAll('text').length).toBe(0);
+    expect(lineLengthLabels(piece, 'cm')).toHaveLength(0);
   });
 });
 
@@ -150,8 +133,7 @@ describe('el largo guardado no puede ganarle al contorno', () => {
       { id: 'e3', segmentRange: [3, 0], length: 100 },
     ] as unknown as SemanticEdge[];
 
-    const { container } = renderLabels(piece, 'mm');
-    const textos = Array.from(container.querySelectorAll('text')).map(t => t.textContent ?? '');
+    const textos = lineLengthLabels(piece, 'mm').map(l => l.text);
 
     expect(textos.some(t => /300/.test(t)), `los lados de 300 mm tienen que decir 300: ${textos.join(' · ')}`).toBe(true);
     expect(textos.every(t => !/^100([.,]0)?\s*mm$/.test(t.trim())), `ninguna etiqueta puede seguir en 100: ${textos.join(' · ')}`).toBe(true);

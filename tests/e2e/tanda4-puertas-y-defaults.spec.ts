@@ -24,7 +24,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { waitForApp } from './helpers/sim';
-import { st, addPiece } from './helpers/lienzo';
+import { st, addPiece, toScreen } from './helpers/lienzo';
 
 const estado = (page: Page) => page.evaluate(() =>
   (window as unknown as { __VINA_STORE__: { getState: () => { editor: Record<string, unknown> } } })
@@ -95,18 +95,49 @@ test.describe('tanda 4 — puertas que no mienten y defaults que ella quiere', (
     ).toBeGreaterThanOrEqual(cajaDock!.y - 1);
   });
 
-  test('fallo 4 — los largos de cada lado vienen puestos', async ({ page }) => {
+  test('fallo 4 — los largos de cada lado se ven al trabajar la pieza', async ({ page }) => {
     await waitForApp(page);
+
+    // ENMENDADO el 2026-09-09 (contrato `2026-09-09-lo-que-se-ve-y-cuando`
+    // § 1). Esta prueba exigía `showLineLengths === true` de fábrica, y esa era
+    // la forma equivocada de cerrar el fallo 4.
+    //
+    // El fallo 4 nunca fue "el interruptor está apagado": fue que María tuvo
+    // los largos delante 25 minutos SIN VERLOS. Encenderlos para todas las
+    // piezas todo el tiempo los hacía visibles al precio de convertirlos en
+    // ruido permanente sobre el patrón — Samuel, probándolo el 09-09: "nunca
+    // desaparecen y es un poco anoying […] siempre allí contaminando la vista".
+    //
+    // Lo que ella pidió, textual [06:55], es más preciso que un interruptor:
+    // "CUANDO CLICO ESTO sí que me sería muy interesante que encima de cada
+    // línea me dijera cuánto mide cada línea". Cuando clico. Así que el fallo
+    // lo cierra la SELECCIÓN, y el interruptor vuelve a ser lo que dice —
+    // verlas todas, todo el tiempo— y vuelve a nacer apagado.
     expect(
       (await estado(page)).showLineLengths,
-      '"Largos" es exactamente lo que pidió en [06:55]: nace encendido',
-    ).toBe(true);
+      'el interruptor vuelve a nacer apagado: quien enseña los largos es la selección',
+    ).toBe(false);
 
-    // Y sigue siendo suyo: el chip de la fila de abajo lo apaga.
+    await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
+    await page.keyboard.press('z');
+    await expect.poll(async () => (await estado(page)).activeTool, { timeout: 5000 }).toBe('select');
+    await expect(page.locator('.cota--lectura'), 'sin tocar nada, ningún largo').toHaveCount(0);
+
+    const s = await toScreen(page, { x: 200, y: 150 });
+    await page.mouse.click(s.x, s.y);
+    await expect.poll(async () => (await estado(page)).selectedPieceIds.length).toBe(1);
+
+    // Y aquí es donde el fallo 4 queda cerrado de verdad: los ve al trabajar.
+    await expect(
+      page.locator('.cota--lectura'),
+      'clicar la pieza le enseña el largo de cada lado — [06:55], "cuando clico esto"',
+    ).not.toHaveCount(0);
+
+    // El interruptor sigue siendo suyo: el chip de la fila de abajo lo enciende.
     const chip = page.getByRole('button', { name: /Largos/ });
     await expect(chip).toBeVisible();
     await chip.click();
     await page.waitForTimeout(200);
-    expect((await estado(page)).showLineLengths, 'el chip lo apaga').toBe(false);
+    expect((await estado(page)).showLineLengths, 'el chip lo enciende').toBe(true);
   });
 });

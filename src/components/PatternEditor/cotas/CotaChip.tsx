@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Cota } from './cotas';
 import type { Point2D } from '../../../types/types';
 import { parseMedida, formatMedida } from './parseMedida';
 import { chipScreenPosition, separarChips, type Estorbo } from './cotasGeometry';
+import { GruposDeCotas, type GrupoPuesto } from './gruposDeCotas';
 import { DRAG_THRESHOLD_PX } from '../gestureConstants';
 import './cotas.css';
 
@@ -27,14 +28,6 @@ const acota = (v: number, c: Cota) => Math.min(c.max, Math.max(c.min, v));
 const aTexto = (v: number) => String(round1(v)).replace('.', ',');
 /** Una sola escala de modificadores para scrub y flechas: Shift grueso, Alt fino (Figma). */
 const ganancia = (e: { shiftKey: boolean; altKey: boolean }) => (e.shiftKey ? 10 : e.altKey ? 0.1 : 1);
-
-interface GrupoPuesto {
-  campos: Cota[];
-  left: number;
-  top: number;
-}
-
-const GruposDeCotas = createContext<Map<string, GrupoPuesto | null> | null>(null);
 
 /**
  * La agrupación pertenece a la presentación: los dos descriptores siguen

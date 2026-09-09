@@ -93,23 +93,62 @@ test.describe('tanda 5 — un cuadro para una información, y un aviso cuando no
     expect(px, 'el número que ella tiene que leer todo el día no baja de 11 px').toBeGreaterThanOrEqual(11);
   });
 
-  test('fallo 11 — terminar una pieza abierta lo dice, y no con un diálogo del navegador', async ({ page }) => {
+  test('fallo 11 — con tres puntos ya no hay nada que avisar: Enter cierra el trazo', async ({ page }) => {
     await waitForApp(page);
     await activar(page, 'h', 'pen');
 
-    // Tres puntos y Enter: termina abierta. Eso SIGUE PERMITIDO —está
-    // ratificado— pero deja de ser mudo.
+    // ENMENDADO el 2026-09-09 (contrato `2026-09-09-lo-que-se-ve-y-cuando`
+    // § 4). Antes esta prueba exigía el AVISO tras tres puntos y Enter. El
+    // aviso funcionaba —se verificó a mano en el navegador el 09-09 y aparece—
+    // pero avisar de algo que se puede resolver solo es peor que resolverlo, y
+    // el contrato de interfaz § 4 ya lo tenía escrito: "prefiere ACTUAR Y
+    // OFRECER DESHACER antes que preguntar".
     await clicEn(page, { x: 150, y: 150 });
     await clicEn(page, { x: 350, y: 150 });
     await clicEn(page, { x: 350, y: 300 });
     await page.keyboard.press('Enter');
     await page.waitForTimeout(600);
 
-    expect((await st(page)).project.pieces, 'la pieza se crea igual: terminar abierto está ratificado').toHaveLength(1);
+    const pieza = (await st(page)).project.pieces[0];
+    expect(pieza, 'la pieza se crea igual').toBeTruthy();
+    expect(
+      pieza.outline.map((c: { type: string }) => c.type),
+      'con tres nodos hay polígono: Enter lo cierra solo',
+    ).toContain('Z');
+
+    await expect(
+      page.locator('.toast__message').filter({ hasText: /no se puede simular/i }),
+      'y si cerró, no queda nada que advertir',
+    ).toHaveCount(0);
+
+    // La salida si no era eso: deshacer. No un modal, no una pregunta.
+    await page.keyboard.press('Control+z');
+    await expect.poll(async () => (await st(page)).project.pieces.length).toBe(0);
+  });
+
+  test('fallo 11 — donde el aviso sigue siendo cierto sigue saliendo, y no con un diálogo del navegador', async ({ page }) => {
+    await waitForApp(page);
+    await activar(page, 'h', 'pen');
+
+    // Dos puntos son una raya: no hay área que cerrar, así que la pieza SÍ
+    // queda abierta y el aviso sigue siendo verdad. Este es el caso que
+    // conserva el BLOCKER de Serrano — no se llega en silencio a una pieza que
+    // no simula— y el que prueba que no se hace con `alert()`.
+    await clicEn(page, { x: 150, y: 150 });
+    await clicEn(page, { x: 350, y: 150 });
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(600);
+
+    const pieza = (await st(page)).project.pieces[0];
+    expect(pieza, 'la pieza se crea igual: terminar abierto está ratificado').toBeTruthy();
+    expect(
+      pieza.outline.map((c: { type: string }) => c.type),
+      'dos nodos no cierran nada',
+    ).not.toContain('Z');
 
     await expect(
       page.getByText(/abiert|no se puede simular|no simula/i).first(),
-      'pero tiene que decirle que así no se puede rendir — es literalmente lo que pidió',
+      'y aquí sí tiene que decirle que así no se puede rendir — es literalmente lo que pidió',
     ).toBeVisible({ timeout: 5000 });
   });
 });

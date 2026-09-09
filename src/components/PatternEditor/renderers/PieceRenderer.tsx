@@ -3,7 +3,6 @@ import React, { memo, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { InternalLineSelection, PatternPiece, PathCommand, UnitSystem } from '../../../types/types';
-import LineLengthLabels from './LineLengthLabels';
 import PuntosDelContorno from './PuntosDelContorno';
 import { pathToSVG } from '../utils';
 import { getAnchor } from '../nodeEditorUtils';
@@ -39,10 +38,8 @@ interface SinglePieceProps {
   showNotches: boolean;
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
-  showLineLengths: boolean;
   /** La pieza que se está editando con una herramienta de curva: solo esa enseña sus puntos de curva. Por PIEZA, no global — encenderlo para todas suelta cientos de puntos sobre piezas que nadie toca (#1103). */
   piezaConPuntosDeCurva: string | null;
-  units: UnitSystem;
   isInternalLineSelected: boolean;
   selectedLineId?: string;
   selectedSegmentIndex?: number;
@@ -73,9 +70,7 @@ const SinglePiece = memo(function SinglePiece({
   showNotches,
   showPieceNames,
   renderMode2D,
-  showLineLengths,
   piezaConPuntosDeCurva,
-  units,
   isInternalLineSelected,
   selectedLineId,
   selectedSegmentIndex,
@@ -486,9 +481,6 @@ const SinglePiece = memo(function SinglePiece({
         }
       })()}
 
-      {showLineLengths && (
-        <LineLengthLabels piece={piece} zoom2D={zoom2D} units={units} />
-      )}
 
       {(piece.annotations || []).map((ann, i) => (
         <text
@@ -570,9 +562,7 @@ export default function PieceRenderer({
   showNotches,
   showPieceNames,
   renderMode2D,
-  showLineLengths,
   piezaConPuntosDeCurva,
-  units,
   groupColors,
   selectedInternalLine,
   editingPieceNameId,
@@ -658,9 +648,7 @@ export default function PieceRenderer({
           showNotches={showNotches}
           showPieceNames={showPieceNames}
           renderMode2D={renderMode2D}
-          showLineLengths={showLineLengths}
           piezaConPuntosDeCurva={piezaConPuntosDeCurva}
-          units={units}
           groupColor={groupColors?.[piece.id]}
           isLayerLocked={!!layerLocked[piece.layer ?? 1]}
           hasResolutionErrors={hasResolutionErrors.get(piece.id) ?? false}

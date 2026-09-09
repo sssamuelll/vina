@@ -335,25 +335,44 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
       } else {
         r.observaciones.puente = 'El paso 10 no vació el proyecto; se comprueban los largos sobre el estado que quedó';
       }
-      expect(largosDeFabrica, 'showLineLengths debe ser true desde el primer arranque limpio').toBe(true);
-      expect((await st(page)).editor.showLineLengths).toBe(true);
+      // ENMENDADO el 2026-09-09 (contrato `2026-09-09-lo-que-se-ve-y-cuando`
+      // § 1). Este paso exigía el interruptor encendido de fábrica y los
+      // rótulos SVG sobre TODAS las piezas. El fallo 4 nunca fue el
+      // interruptor: fue que ella no los veía. Ahora los enseña la SELECCIÓN,
+      // que es lo que pidió — [06:55] "CUANDO CLICO ESTO" — y sin dejarlos
+      // encima del patrón todo el rato.
+      expect(largosDeFabrica, 'el interruptor vuelve a nacer apagado; quien los enseña es la selección').toBe(false);
+      expect((await st(page)).editor.showLineLengths).toBe(false);
       await pieza(page, segunda);
-      const largos = page.locator(`[data-piece-id="${segunda}"] .line-length-labels text`);
-      await expect(largos).toHaveCount(4);
-      for (let i = 0; i < 4; i++) await expect(largos.nth(i)).toBeVisible();
+
+      await activar(page, 'z', 'select');
+      const b = caja(await pieza(page, segunda));
+      await clic(page, { x: b.x + b.w / 2, y: b.y + b.h / 2 });
+      await expect.poll(async () => (await st(page)).editor.selectedPieceIds).toEqual([segunda]);
+
+      const largos = page.locator('.cota--lectura');
+      await expect(largos, 'clicar la pieza enseña el largo de sus lados').not.toHaveCount(0);
       r.observaciones.largos = await largos.allTextContents();
-      expect((r.observaciones.largos as string[]).every(t => /100/.test(t))).toBe(true);
+      expect((r.observaciones.largos as string[]).every(t => /100/.test(t)),
+        'la pieza de 100×100 los enseña todos a 100').toBe(true);
       await expect(page.getByRole('button', { name: /Largos/ })).toBeVisible();
-      r.observaciones.largosVisiblesDeFabrica = true;
-      // En la sesión encadenada, los largos también deben seguir siendo los
-      // de cada lado DESPUÉS de editar. La presencia sola ocultaría un rótulo
-      // de 100 mm sobre el lado que acabamos de llevar a 300 mm.
-      const rotulosEditada = await page.locator(`[data-piece-id="${primera}"] .line-length-labels text`).allTextContents();
+
+      // Y sobre la pieza EDITADA en el paso 2, el largo tiene que ser el del
+      // contorno vivo (300×150), no el dato guardado que decía 100. Es el bug
+      // que este mismo recorrido cazó el 08-09; se comprueba que sigue muerto.
+      // Por el CENTRO: a esta pieza le convertimos el borde de arriba en curva
+      // en el paso 5, así que su esquina superior izquierda ya no está dentro
+      // del contorno y un clic ahí cae en el papel.
+      const bp = caja(await pieza(page, primera));
+      await clic(page, { x: bp.x + bp.w / 2, y: bp.y + bp.h / 2 });
+      await expect.poll(async () => (await st(page)).editor.selectedPieceIds).toEqual([primera]);
+      const rotulosEditada = await page.locator('.cota--lectura').allTextContents();
       r.observaciones.largosPiezaEditada = rotulosEditada;
-      r.observaciones.rectasEsperadas = [150, 300, 150];
-      expect(rotulosEditada.slice(1).map(t => Number.parseFloat(t.replace(',', '.'))),
-        'Los largos visibles deben corresponder a las rectas de la pieza editada en 2')
-        .toEqual([150, 300, 150]);
+      const numeros = rotulosEditada.map(t => Number.parseFloat(t.replace(/\s*mm/i, '').replace(',', '.')));
+      expect(numeros.some(n => Math.abs(n - 300) < 1) || numeros.some(n => Math.abs(n - 150) < 1),
+        'el contorno manda: la pieza llevada a 300×150 no puede rotular 100').toBe(true);
+      expect(numeros.every(n => Math.abs(n - 100) > 1),
+        'ningún rótulo puede seguir diciendo el largo viejo de 100').toBe(true);
     });
 
     await tramo(12, '[23:32] Una interna de tres tramos: solo uno y una cota', async r => {
@@ -380,16 +399,27 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
       requiere(12, ['gesture', 'internalShape:press'], ['gesture', 'key'], ['action', 'project/addInternalLine']);
     });
 
-    await tramo(13, '[14:07] Pluma, tres puntos, Enter: pieza abierta con aviso', async r => {
+    await tramo(13, '[14:07] Pluma, tres puntos, Enter: el trazo cierra solo', async r => {
+      // ENMENDADO el 2026-09-09 (contrato § 4). Antes este paso exigía el
+      // AVISO. El aviso funcionaba —verificado a mano en el navegador el
+      // 09-09— pero avisar de algo que se resuelve solo es peor que
+      // resolverlo, y el contrato de interfaz § 4 ya lo decía: "actuar y
+      // ofrecer deshacer antes que preguntar". Con tres nodos hay polígono, así
+      // que Enter cierra; el aviso queda para los dos nodos, donde sigue siendo
+      // cierto (lo cubre tanda5-un-cuadro-y-un-aviso.spec.ts).
       const ids = (await st(page)).project.pieces.map(p => p.id);
       await activar(page, 'h', 'pen');
       for (const punto of [{ x: 200, y: 780 }, { x: 380, y: 780 }, { x: 420, y: 880 }]) await clic(page, punto);
       await page.keyboard.press('Enter');
-      await expect(page.locator('.toast__message').filter({ hasText: 'La pieza quedó abierta y así no se puede simular.' })).toBeVisible();
+      await expect.poll(async () => (await st(page)).project.pieces.length).toBe(ids.length + 1);
       const nuevas = (await st(page)).project.pieces.filter(p => !ids.includes(p.id));
       expect(nuevas).toHaveLength(1);
-      expect(nuevas[0].outline.map(c => c.type)).toEqual(['M', 'L', 'L']);
-      r.observaciones = { pieza: nuevas[0], aviso: await page.locator('.toast__message').allTextContents() };
+      expect(nuevas[0].outline.map(c => c.type), 'con tres nodos, Enter cierra el trazo').toContain('Z');
+      await expect(
+        page.locator('.toast__message').filter({ hasText: 'no se puede simular' }),
+        'y si cerró, no queda nada que advertir',
+      ).toHaveCount(0);
+      r.observaciones = { pieza: nuevas[0], avisos: await page.locator('.toast__message').allTextContents() };
       requiere(13, ['gesture', 'key'], ['action', 'project/addPiece']);
     });
   } finally {
