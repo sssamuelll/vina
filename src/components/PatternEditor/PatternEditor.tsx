@@ -400,12 +400,23 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // anunciaba "6 cotas" apiladas encima del dibujo — [24:05] "y me
     // sobresatura toda la información" — y las cotas se comían el clic
     // siguiente, dejando el foco dentro de un campo y la aplicación sin
-    // atajos. Queda seleccionado el ÚLTIMO tramo: es el que se acaba de
-    // cerrar, y es el que ella querría corregir escribiendo.
+    // atajos. Queda seleccionado el último tramo: es el que se acaba de cerrar
+    // y el que ella querría corregir escribiendo.
+    //
+    // El ÚLTIMO COMANDO no sirve como índice: `segmentPolar` solo emite tramo
+    // para los `L`, y un trazo cerrado remata en `Z` (polyPenGeometry.ts:97)
+    // mientras uno curvo remata en `C`. Apuntar ahí deja la línea seleccionada
+    // con un índice que no casa con ningún tramo — sin cota y sin realce, una
+    // selección muerta y en silencio. Si no hay ningún `L` (todo curvas) se
+    // vuelve a la selección de entidad, que ahí no saca cotas de más porque
+    // esos tramos tampoco las tienen.
+    const ultimoTramo = localPath.reduce((acc, cmd, i) => (cmd.type === 'L' ? i : acc), -1);
     dispatch(selectInternalLine({
       pieceId: host.id,
       lineId,
-      ...(seSeleccionaPorTramo(internalLineType) ? { segmentIndex: localPath.length - 1 } : {}),
+      ...(seSeleccionaPorTramo(internalLineType) && ultimoTramo >= 0
+        ? { segmentIndex: ultimoTramo }
+        : {}),
     }));
   }, [pieces, dispatch, internalLineType]);
 

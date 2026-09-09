@@ -180,4 +180,35 @@ test.describe('dibujar una interna no crea un grupo de selección', () => {
       .poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 })
       .toBe('pen');
   });
+
+  test('un trazo CERRADO también cae en un tramo de verdad, no en la Z', async ({ page }) => {
+    await waitForApp(page);
+    await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
+
+    await page.keyboard.press('g');
+    await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('internalShape');
+
+    // Tres nodos y vuelta al primero: `usePolyPenTool` cierra al clicar sobre el
+    // nodo 0 con tres ya puestos, y `nodesToCommands` remata el path con `Z`.
+    const triangulo = [{ x: 120, y: 100 }, { x: 300, y: 100 }, { x: 300, y: 220 }];
+    for (const p of triangulo) await clicEn(page, p);
+    await clicEn(page, triangulo[0]);
+    await page.waitForTimeout(400);
+
+    const linea = await page.evaluate(() => {
+      const s = (window as unknown as { __VINA_STORE__: { getState: () => {
+        project: { pieces: Array<{ id: string; internals: Array<{ path: Array<{ type: string }> }> }> } } } })
+        .__VINA_STORE__.getState();
+      return s.project.pieces.find(p => p.id === 'p1')!.internals.at(-1)!;
+    });
+    expect(linea.path.at(-1)!.type, 'este caso solo vale si el trazo cerró de verdad').toBe('Z');
+
+    // `segmentPolar` solo emite tramo para los `L`: apuntar al último comando
+    // daba un índice que no casa con ninguno, y la línea quedaba seleccionada
+    // sin cota y sin realce — una selección muerta y en silencio.
+    await expect(
+      page.locator('.cota:not(.cota--hueca)'),
+      'el tramo elegido al cerrar tiene que ser uno que exista',
+    ).toHaveCount(1);
+  });
 });
