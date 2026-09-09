@@ -44,6 +44,22 @@
   padding: 2px 0 4px;
 }
 
+/* La cabecera debe seguir ubicando el dock aunque sus herramientas se
+   desplacen: el scroll conserva el acceso al catálogo completo en ventanas
+   cortas, como exige #1095. El fondo opaco impide que los iconos que pasan
+   por debajo se mezclen con el rótulo y parezca que la barra se movió. El rol
+   del dock la mantiene por encima de los wrappers de botones, que ya tienen
+   posición relativa y se pintarían después de la cabecera sin este orden. */
+.dock--left .dock__label {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-dock);
+  align-self: stretch;
+  flex-shrink: 0;
+  text-align: center;
+  background: var(--surface-chrome-bg);
+}
+
 .dock__tool {
   width: 38px;
   height: 38px;
@@ -81,6 +97,15 @@
 .dock__tool--active:hover {
   background: var(--accent);
   color: var(--on-accent);
+}
+
+/* Una herramienta sin anfitriona debe verse apagada incluso al pasar el
+   mouse; su título y su ayuda explican cómo volver a habilitarla. */
+.dock__tool:disabled {
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .dock__sep {

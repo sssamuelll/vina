@@ -24,6 +24,7 @@ const initialState: EditorState = {
   showNotches: true,
   showAnchorPoints: false,
   showPieceNames: false,
+  // La selección muestra sus largos; «Largos» los extiende a todas las piezas.
   showLineLengths: false,
   showSewingLines: true,
   renderMode2D: 'textured' as const,
@@ -115,7 +116,7 @@ const editorSlice = createSlice({
       state.selectedInternalLine = null;
       state.saSelection = null;
     },
-    selectInternalLine(state, action: PayloadAction<{ pieceId: string; lineId: string }>) {
+    selectInternalLine(state, action: PayloadAction<NonNullable<EditorState['selectedInternalLine']>>) {
       state.selectedInternalLine = action.payload;
       state.selectedPieceIds = [action.payload.pieceId];
       state.selectedSeamId = null;

@@ -54,7 +54,7 @@ test.describe('cotas de pieza (María #223/#225)', () => {
   test.setTimeout(90_000);
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
-  test('clic crea, las cotas editan ESA pieza, y el siguiente clic hereda el tamaño', async ({ page }) => {
+  test('clic crea, las cotas editan ESA pieza, y el siguiente clic NO hereda el tamaño', async ({ page }) => {
     await crearPorClic(page);
     let pieces = (await st(page)).project.pieces;
     expect(bbox(pieces[0])).toMatchObject({ w: 100, h: 100 });
@@ -73,13 +73,19 @@ test.describe('cotas de pieza (María #223/#225)', () => {
     await expect(cota(page, 'Ancho')).toHaveText('300 mm');
     await expect(cota(page, 'Alto')).toHaveText('150 mm');
 
-    // la creación caliente escribió el default: el siguiente clic hereda
-    // debajo de la primera (250..550 x 250..400), dentro del svg aunque la vista sea split
+    // Reunión 07-09 [01:49]: "en verdad no es una acción repetitiva, cada
+    // rectángulo va a ser de un tamaño distinto". La creación caliente se
+    // retira: editar la cota cambia ESA pieza y no contamina lo que el
+    // siguiente clic va a crear. El rótulo promete 100 × 100 y eso es lo que
+    // sale — ella ya había cazado la contradicción en [01:22]: "ponía que de
+    // 100" y le creó otra cosa.
+    // Debajo de la primera (250..550 x 250..400), dentro del svg aunque la vista sea split.
     const t = await toScreen(page, { x: 250, y: 500 });
     await page.mouse.click(t.x, t.y);
     await expect.poll(async () => (await st(page)).project.pieces.length).toBe(2);
     pieces = (await st(page)).project.pieces;
-    expect(bbox(pieces[1])).toMatchObject({ w: 300, h: 150 });
+    expect(bbox(pieces[1])).toMatchObject({ w: 100, h: 100 });
+    expect((await st(page)).tools.toolOptions.rectangle?.width ?? 100).toBe(100);
   });
 
   test('una pieza seleccionada con Z edita su cota sin tocar el default del rectángulo', async ({ page }) => {
@@ -167,8 +173,13 @@ test.describe('cotas de pieza (María #223/#225)', () => {
     const alto = await cota(page, 'Alto').boundingBox();
     if (!ancho || !alto) throw new Error('sin chips');
     // girada 90°: el chip de Ancho queda a un lado (no arriba) y el de Alto arriba o abajo
-    const piezaBox = await page.locator('[data-piece-id]').first().boundingBox();
-    if (!piezaBox) throw new Error('sin pieza');
+    // El oráculo es el CONTORNO pintado, no el grupo `[data-piece-id]`: desde
+    // que "Largos" nace encendido (reunión 07-09, fallo 4) el grupo incluye las
+    // etiquetas de largo y su caja ya no es la geometría de la pieza. Lo que
+    // este caso afirma no cambia —el chip de Ancho cae a un costado y no por
+    // arriba—; cambia con qué se mide, porque la caja anterior medía de más.
+    const piezaBox = await page.locator('[data-piece-id] .piece-fill').first().boundingBox();
+    if (!piezaBox) throw new Error('sin contorno de pieza');
     // el chip se centra a 18 px del lado: su centro cae fuera de la caja por un costado, no por arriba
     const cx = ancho.x + ancho.width / 2;
     const cy = ancho.y + ancho.height / 2;

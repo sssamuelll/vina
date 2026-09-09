@@ -20,7 +20,7 @@ export function anchoEstimadoDeChip(texto: string): number {
 
 /** Un chip ya colocado por `chipScreenPosition`, listo para desamontonar. */
 export interface ChipPuesto {
-  cota: Cota;
+  cota: Pick<Cota, 'id' | 'label' | 'a' | 'b' | 'outward'>;
   left: number;
   top: number;
   /** Texto que el chip pinta. Sin él se estima con `cota.label`. */
@@ -102,7 +102,7 @@ function areaSolapada(a: Caja, b: Caja): number {
  * ahí el chip se desliza *a lo largo del borde del que habla*.
  * (Lo levantó la revisión adversarial del lote de cotas, 2026-09-04.)
  */
-function tangenteDe(cota: Cota): Point2D {
+function tangenteDe(cota: Pick<Cota, 'a' | 'b' | 'outward'>): Point2D {
   const dx = cota.b.x - cota.a.x;
   const dy = cota.b.y - cota.a.y;
   const length = Math.hypot(dx, dy);

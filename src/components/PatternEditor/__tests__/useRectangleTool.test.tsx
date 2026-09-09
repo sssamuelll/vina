@@ -31,8 +31,10 @@ describe('useRectangleTool — bitácora de salidas mudas', () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(releases()).toEqual([
       { outcome: 'ignoredButton', button: 2 },
-      // el arrastre anterior dejó Alto 60 en la barra; Ancho 0 es lo que la anula
-      { outcome: 'tooSmall', width: 0, height: 60, source: 'bar' },
+      // El arrastre anterior YA NO deja nada en la barra (reunión 07-09): el
+      // Alto que se lee sigue siendo el de fábrica, 100. Ancho 0 es lo que
+      // anula la creación, y es lo único que este caso quiere demostrar.
+      { outcome: 'tooSmall', width: 0, height: 100, source: 'bar' },
     ]);
   });
 });
@@ -87,12 +89,19 @@ describe('useRectangleTool — clic crea con la barra', () => {
   });
 });
 
-describe('useRectangleTool — el arrastre dibuja y escribe en la barra', () => {
-  it('crea lo dibujado y deja Ancho/Alto en la barra', () => {
+describe('useRectangleTool — el arrastre dibuja y NO escribe en la barra', () => {
+  // Reunión María 07-09 [01:49]: "en verdad no es una acción repetitiva, cada
+  // rectángulo va a ser de un tamaño distinto". El "Adjust Last Operation" de
+  // Blender que justificaba esta escritura es correcto para un modelador y
+  // equivocado para una patronista: ella no repite piezas, las hace distintas.
+  // La barra sigue mandando sobre lo que crea un clic — pero solo si ELLA la
+  // escribe. Dibujar ya no la reescribe por su cuenta.
+  it('crea lo dibujado y deja la barra como estaba', () => {
     const { store, press, move, release, onComplete } = setup();
+    const antes = store.getState().tools.toolOptions.rectangle;
     press(100, 100); move(140, 130); move(180, 160); release(180, 160);
     expect(bbox(onComplete.mock.calls[0][0].outline)).toEqual({ x: 100, y: 100, w: 80, h: 60 });
-    expect(store.getState().tools.toolOptions.rectangle).toEqual({ width: 80, height: 60 });
+    expect(store.getState().tools.toolOptions.rectangle).toEqual(antes);
   });
 
   it('el botón derecho no arma', () => {

@@ -266,8 +266,8 @@ export function usePenTool(
     setState(EMPTY);
   }, []);
 
-  /** Doble clic = terminar abierta (= Enter). El nodo duplicado que deja el
-   *  segundo par down/up cae encima del último: se descarta. */
+  /** Doble clic = terminar (= Enter): con tres nodos cierra; con dos queda
+   *  abierta. El nodo duplicado del segundo par down/up se descarta. */
   const handleDoubleClick = useCallback(() => {
     let nodes = nodesRef.current;
     if (nodes.length >= 2) {
@@ -276,7 +276,7 @@ export function usePenTool(
       if (dist(a, b) * zoom < EDGE_HIT_PX) nodes = nodes.slice(0, -1);
     }
     if (nodes.length < 2) return;
-    complete(nodes, false);
+    complete(nodes, nodes.length >= 3);
   }, [zoom, complete]);
 
   // ─── El tramo en curso, congelado (cotas vivas § 5.4, #1129) ─────────────
@@ -334,7 +334,7 @@ export function usePenTool(
   }, []);
 
   /**
-   * Escape = cancel, Enter = finalize open path, Tab = siguiente punto,
+   * Escape = cancelar, Enter = terminar (cierra con ≥3 nodos), Tab = siguiente punto,
    * Retroceso/Supr = quitar el último. Devuelve si consumió la tecla: la
    * captura CF-1 detiene la propagación solo entonces (spec 2026-08-29 § 8).
    */
@@ -353,7 +353,7 @@ export function usePenTool(
         return true;
       case 'Enter':
         if (nodes.length < 2) return false;
-        complete(nodes, false);
+        complete(nodes, nodes.length >= 3);
         return true;
       case 'Tab':
         if (nodes.length === 0) return false;

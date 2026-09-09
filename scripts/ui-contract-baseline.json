@@ -3,12 +3,12 @@
   "rules": {
     "varFallback": 0,
     "phantomTokenRefs": 0,
-    "literalColor": 670,
+    "literalColor": 646,
     "tokenDefinitionFiles": 2,
     "hoverWithoutFocus": 35,
     "outlineNone": 8,
     "nativeDialog": 0,
     "zIndexLiteral": 24
   },
-  "_actualizado": "2026-09-05"
+  "_actualizado": "2026-09-09"
 }

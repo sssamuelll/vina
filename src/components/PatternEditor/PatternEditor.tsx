@@ -2,18 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch, shallowEqual } from 'react-redux';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage } from '../../store/projectSlice';
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
-import { setToolOption } from '../../store/toolSlice';
 import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, selectInternalLine, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, seSeleccionaPorTramo } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
 import { useCircleTool } from './useCircleTool';
 import { useTriangleTool } from './useTriangleTool';
 import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
+import { AgruparCotas } from './cotas/CotaChip';
 import CotaLines from './cotas/CotaLines';
 import { cotasDelSujeto, faltaSujeto } from './cotas/sujeto';
 import { puntoUnicoSeleccionado } from './cotas/nodo';
@@ -32,7 +32,7 @@ import { usePointTool } from './usePointTool';
 import { useSeamAllowanceTool } from './useSeamAllowanceTool';
 import { useNotchMirrorPreview } from './useNotchMirrorPreview';
 import SeamAllowanceSelectionOverlay from './renderers/overlays/SeamAllowanceSelectionOverlay';
-import { showUndoToast, showInfoToast } from '../../store/copilotUISlice';
+import { showUndoToast, showInfoToast, showWarningToast } from '../../store/copilotUISlice';
 import { useTrimTool } from './useTrimTool';
 import { newId } from '../../utils/ids';
 import { useGrainlineTool } from './useGrainlineTool';
@@ -58,6 +58,7 @@ import { useEditorInteractions } from './useEditorInteractions';
 import { useElasticTool } from '../../hooks/useElasticTool';
 import { EDGE_HIT_PX } from './gestureConstants';
 import PolyPenToolOverlay from './renderers/overlays/PolyPenToolOverlay';
+import MeasureToolOverlay from './renderers/overlays/MeasureToolOverlay';
 import GridLayer from './renderers/GridLayer';
 import RulerLayer from './renderers/RulerLayer';
 import PieceRenderer from './renderers/PieceRenderer';
@@ -191,6 +192,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     };
     dispatch(addPiece(fullPiece));
     dispatch(selectPiece(fullPiece.id));
+    // Con dos nodos la pluma sigue abierta: no hay área que cerrar y el aviso
+    // sigue siendo cierto. Con tres o más, Enter y doble clic ya la cierran.
+    if (!piece.outline.some(command => command.type === 'Z')) {
+      dispatch(showWarningToast('La pieza quedó abierta y así no se puede simular.'));
+    }
     return fullPiece.id;
   }, [dispatch]);
 
@@ -202,6 +208,19 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       .filter(p => !hiddenLayerIds.includes(p.layer ?? 1))
       .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
     [pieces, hiddenLayerIds],
+  );
+  // Los largos del contorno son del SUJETO pieza, no de «la pieza tocada»
+  // (contrato 09-09 § 1). `selectInternalLine` deja además
+  // `selectedPieceIds = [pieceId]` (editorSlice.ts:123), así que filtrar solo
+  // por selección encendía las cuatro lecturas del contorno encima de la cota
+  // del tramo que se estaba escribiendo: la sobresaturación de la causa G
+  // —[24:05] "y me sobresatura toda la información"— resucitada por la puerta
+  // de al lado. Si hay un sujeto más fino dentro de la pieza, el contorno calla.
+  const haySujetoDentroDeLaPieza = editor.selectedInternalLine !== null;
+  const piezasConLargos = useMemo(
+    () => drawablePieces.filter(piece =>
+      showLineLengths || (!haySujetoDentroDeLaPieza && selectedPieceIds.includes(piece.id))),
+    [drawablePieces, showLineLengths, selectedPieceIds, haySujetoDentroDeLaPieza],
   );
 
   const pen = usePenTool(zoom2D, pan2D, handlePieceComplete, drawablePieces);
@@ -311,6 +330,22 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const grainlineTool = useGrainlineTool(zoom2D, pan2D, pieces, handleGrainlineSet);
   const nodeEditor = useEditCurve(zoom2D, pan2D);
   const editPatternTool = useEditPattern(zoom2D, pan2D);
+  const { isEditing: isPatternEditing, editingPieceId: patternEditingPieceId, exitEdit: exitPatternEdit } = editPatternTool;
+  const [anchorReferencePieceId, setAnchorReferencePieceId] = useState<string | null>(null);
+  const isNodeEditing = nodeEditor.isEditing && (activeTool === 'select' || activeTool === 'editCurve');
+
+  // Al volver a Seleccionar, las anclas siguen sirviendo de referencia
+  // (maria-194), pero la sesión de Q termina: ni su selección ni un arrastre
+  // pendiente pueden sobrevivir a la herramienta. Solo conservamos el ID
+  // visual; la referencia se dibuja desde el contorno actual de la pieza.
+  useEffect(() => {
+    if (activeTool !== 'editPattern' && isPatternEditing) {
+      setAnchorReferencePieceId(activeTool === 'select' ? patternEditingPieceId : null);
+      exitPatternEdit();
+    } else if (activeTool !== 'select') {
+      setAnchorReferencePieceId(null);
+    }
+  }, [activeTool, isPatternEditing, patternEditingPieceId, exitPatternEdit]);
   // Tool Punto (maria-203): despacha los tres verbos de useEditPattern — una
   // puerta común con el menú contextual, mismo candado, mismo re-anclaje.
   const pointToolHook = usePointTool(zoom2D, pan2D, pieces, {
@@ -323,19 +358,20 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
    * maria-203: tras convertir un lado desde el clic derecho, además de mutar
    * el outline hay que ENSEÑAR el resultado — editor de nodos abierto sobre la
    * pieza y el dock en "Edit Curve Points". Sin esto los puntos nuevos existían
-   * pero ningún overlay los pintaba y María veía "ningún cambio". Si la
-   * edición de patrón (Q) ya está abierta, esa superficie ya los enseña: no se
-   * le roba el modo.
+   * pero ningún overlay los pintaba y María veía "ningún cambio". También
+   * desde Q hay que pasar a editar curvas: su overlay muestra anclas, pero
+   * los manejadores Bézier y su arrastre pertenecen al editor de curvas.
    */
   const showConvertedPoints = useCallback((pieceId?: string) => {
-    if (!pieceId || editPatternTool.isEditing) return;
+    if (!pieceId) return;
     nodeEditor.enterEdit(pieceId);
     if (activeTool !== 'editCurve') activate2DTool(dispatch, 'editCurve');
-  }, [editPatternTool.isEditing, nodeEditor, activeTool, dispatch]);
+  }, [nodeEditor, activeTool, dispatch]);
   const scissorsTool = useScissorsTool(zoom2D, pan2D);
   const slashAndSpreadTool = useSlashAndSpreadTool(zoom2D, pan2D);
   const mergeTool = useMergeTool(zoom2D, pan2D);
-  const measureTool = useMeasureTool(zoom2D, pan2D);
+  const measureTool = useMeasureTool(zoom2D, pan2D, drawablePieces);
+  const measurementPieceIds = useMemo(() => new Set(pieces.map(p => p.id)), [pieces]);
   const seamEditTool = useSeamEditTool(
     zoom2D,
     pan2D,
@@ -364,11 +400,35 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // El motor dibuja en espacio de PATRÓN; los internals se guardan locales
     // y `toPieceLocalPath` deshace posición y giro (#1068).
     const lineId = newId();
+    const localPath = toPieceLocalPath(path, host);
     dispatch(addInternalLine({
       pieceId: host.id,
-      line: { id: lineId, type: internalLineType, path: toPieceLocalPath(path, host) },
+      line: { id: lineId, type: internalLineType, path: localPath },
     }));
-    dispatch(selectInternalLine({ pieceId: host.id, lineId }));
+    // El gesto que dibujó varios tramos NO forma un grupo de selección
+    // (contrato 2026-09-08 § 5). Sin el tramo, cerrar el trazo devolvía la
+    // entidad entera y con ella TODAS sus cotas: una interna de tres tramos
+    // anunciaba "6 cotas" apiladas encima del dibujo — [24:05] "y me
+    // sobresatura toda la información" — y las cotas se comían el clic
+    // siguiente, dejando el foco dentro de un campo y la aplicación sin
+    // atajos. Queda seleccionado el último tramo: es el que se acaba de cerrar
+    // y el que ella querría corregir escribiendo.
+    //
+    // El ÚLTIMO COMANDO no sirve como índice: `segmentPolar` solo emite tramo
+    // para los `L`, y un trazo cerrado remata en `Z` (polyPenGeometry.ts:97)
+    // mientras uno curvo remata en `C`. Apuntar ahí deja la línea seleccionada
+    // con un índice que no casa con ningún tramo — sin cota y sin realce, una
+    // selección muerta y en silencio. Si no hay ningún `L` (todo curvas) se
+    // vuelve a la selección de entidad, que ahí no saca cotas de más porque
+    // esos tramos tampoco las tienen.
+    const ultimoTramo = localPath.reduce((acc, cmd, i) => (cmd.type === 'L' ? i : acc), -1);
+    dispatch(selectInternalLine({
+      pieceId: host.id,
+      lineId,
+      ...(seSeleccionaPorTramo(internalLineType) && ultimoTramo >= 0
+        ? { segmentIndex: ultimoTramo }
+        : {}),
+    }));
   }, [pieces, dispatch, internalLineType]);
 
   const handleInternalShapeLockedPress = useCallback(() => {
@@ -903,27 +963,21 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const aplicarRef = useRef(aplicarCota);
   aplicarRef.current = aplicarCota;
 
-  // Solo en caliente se escribe el default del próximo rectángulo (Blender:
-  // Adjust Last Operation). Fuera del historial de deshacer, a propósito.
-  const escribirDefault = useCallback((cota: Cota, valueMm: number) => {
-    if (!sujeto.caliente) return;
-    if (activeTool === 'circle') {
-      // La barra del círculo tiene un solo número, el Radio, y la cota es la
-      // caja de la elipse (2rx × 2ry): la mitad de lo que se escribió.
-      dispatch(setToolOption({ toolId: 'circle', optionId: 'radius', value: Math.round(valueMm / 2 * 10) / 10 }));
-      return;
-    }
-    if (activeTool === 'triangle') {
-      // La cota es la caja del triángulo (spec #1111): Ancho → Base, Alto → Altura.
-      dispatch(setToolOption({ toolId: 'triangle', optionId: cota.kind === 'ancho' ? 'base' : 'altura', value: Math.round(valueMm * 10) / 10 }));
-      return;
-    }
-    dispatch(setToolOption({ toolId: 'rectangle', optionId: cota.kind === 'ancho' ? 'width' : 'height', value: Math.round(valueMm * 10) / 10 }));
-  }, [sujeto.caliente, activeTool, dispatch]);
+  // Aquí vivía `escribirDefault`: editar la cota de una pieza recién nacida
+  // reescribía el tamaño del próximo clic (el "Adjust Last Operation" de
+  // Blender). Se retira por la reunión del 07-09. Ese patrón es correcto para
+  // un modelador —que repite operaciones— y equivocado para una patronista:
+  // "en verdad no es una acción repetitiva, cada rectángulo va a ser de un
+  // tamaño distinto" [01:49].
+  //
+  // Lo que se va es la escritura IMPLÍCITA, no la barra: si ella escribe una
+  // medida ahí, el clic la sigue respetando.
+  //
+  // `sujeto.caliente` SOBREVIVE y no es código muerto: sostiene el rótulo
+  // "Editando: la pieza nueva" y va en la bitácora de cada commit de cota.
 
   const handleCotaCommit = useCallback((cota: Cota, valueMm: number, motivo: 'enter' | 'tab' = 'enter') => {
     aplicarCota(cota, valueMm, undefined, motivo);
-    escribirDefault(cota, valueMm);
     pushJournal('gesture', 'cota:commit', {
       id: cota.id,
       kind: cota.kind,
@@ -932,7 +986,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       caliente: sujeto.caliente,
       motivo,
     });
-  }, [aplicarCota, escribirDefault, sujeto.caliente]);
+  }, [aplicarCota, sujeto.caliente]);
 
   // Scrub: un batch de deshacer con token (una entrada), un despacho por frame
   // como máximo, cada valor derivado del snapshot de la cota de partida. Todos
@@ -970,9 +1024,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     if (isUndoBatchTokenActive(s.token)) aplicarRef.current(s.cota, valueMm, s.token);
     const { cota } = s;
     cerrarScrub();
-    escribirDefault(cota, valueMm);
     pushJournal('gesture', 'cota:scrub', { id: cota.id, value: valueMm, caliente: sujeto.caliente });
-  }, [cerrarScrub, escribirDefault, sujeto.caliente]);
+  }, [cerrarScrub, sujeto.caliente]);
   // Cancelar (pointercancel, desmontaje del chip): la pieza vuelve al valor de
   // partida dentro del mismo batch y el batch se cierra. Sin clic fantasma.
   const handleCotaScrubCancel = useCallback((_cota: Cota) => {
@@ -1215,7 +1268,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
               //
               // Va el ID, no un booleano: encenderlo global suelta cientos de
               // puntos sobre piezas que nadie está tocando.
-              nodeEditor.isEditing
+              isNodeEditing
                 ? nodeEditor.editingPieceId
                 : (activeTool === 'editPattern' ? editPatternTool.editingPieceId : null)
             }
@@ -1296,18 +1349,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             grainlineStartPoint={grainlineTool.startPoint}
             grainlineEndPoint={grainlineTool.endPoint}
             grainlinePieceId={grainlineTool.pieceId}
-            measurements={measureTool.measurements}
-            currentStart={measureTool.currentStart}
-            cursorPos={measureTool.cursorPos}
+            measurements={[]}
+            currentStart={null}
+            cursorPos={null}
             formatDistance={measureTool.formatDistance}
-            measureHoveredSnapPoint={measureTool.hoveredSnapPoint}
-            measureShowAngle={toolOptions?.[activeTool]?.showAngle ?? false}
-            measureMode={measureTool.measureMode}
-            measureSelectedEdge={measureTool.selectedEdge}
-            measureHoverDistance={measureTool.hoverDistance}
-            measureCompareEdgeA={measureTool.compareEdgeA}
-            measureComparison={measureTool.comparison}
-            nodeEditorIsEditing={nodeEditor.isEditing}
+            nodeEditorIsEditing={isNodeEditing}
             nodeEditorEditingPieceId={nodeEditor.editingPieceId}
             nodeEditorNodes={nodeEditor.nodes}
             selectedNode={nodeEditor.selectedNode}
@@ -1317,6 +1363,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             transformHandles={transformTool.handles}
             transformPreview={transformTool.preview}
             editPatternIsEditing={editPatternTool.isEditing}
+            anchorReferencePieceId={anchorReferencePieceId}
             editPatternEditingPieceId={editPatternTool.editingPieceId}
             editPatternNodes={editPatternTool.nodes}
             editPatternSelectedNodes={editPatternTool.selectedNodes}
@@ -1372,6 +1419,29 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             selectMarquee={selectMarquee}
           />
           )}
+          {/* La anotación pertenece a la sesión del proyecto: ToolOverlay solo
+              monta Medir mientras la herramienta está activa. Este montaje
+              mantiene el resultado visible; el overlay recibe aparte si debe
+              pintar el gesto vivo. Sus coordenadas guardadas no siguen el
+              arrastre de piezas, como deja abierto el spec de Medir § 4. */}
+          <MeasureToolOverlay
+            zoom2D={zoom2D}
+            measurements={measureTool.measurements}
+            currentStart={measureTool.currentStart}
+            cursorPos={measureTool.cursorPos}
+            hoveredSnapPoint={measureTool.hoveredSnapPoint}
+            snapKind={measureTool.hoveredSnapKind}
+            proximity={measureTool.proximity}
+            formatDistance={measureTool.formatDistance}
+            showAngle={toolOptions?.measure?.showAngle ?? false}
+            measureMode={measureTool.measureMode}
+            selectedEdge={measureTool.selectedEdge}
+            hoverDistance={measureTool.hoverDistance}
+            compareEdgeA={measureTool.compareEdgeA}
+            comparison={measureTool.comparison}
+            existingPieceIds={measurementPieceIds}
+            active={activeTool === 'measure' || activeTool === 'measureCurve' || activeTool === 'compareCurves'}
+          />
           {activeTool === 'internalShape' && (
             <PolyPenToolOverlay
               nodes={internalShapeTool.nodes}
@@ -1399,7 +1469,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           activeTool={activeTool}
           pieces={pieces}
           penNodesLength={pen.nodes.length}
-          nodeEditorIsEditing={nodeEditor.isEditing}
+          nodeEditorIsEditing={isNodeEditing}
           seamPhase={seamTool.phase}
           topstitchMode={topstitchTool.mode}
           walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
@@ -1429,26 +1499,33 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         calibrationActive={calibrationMode !== null}
         ctx={barCtx}
       />
-      <CotasLayer
-        ref={cotasRef}
-        cotas={sujeto.cotas}
-        lectura={sujeto.lectura}
-        lecturaApagada={sujeto.lecturaApagada}
-        pan2D={pan2D}
-        zoom2D={zoom2D}
-        estorbos={estorbosDeLasAsas}
-        disabled={sujeto.disabled}
-        onCommit={handleCotaCommit}
-        onScrubStart={handleCotaScrubStart}
-        onScrub={handleCotaScrub}
-        onScrubEnd={handleCotaScrubEnd}
-        onScrubCancel={handleCotaScrubCancel}
-      />
+      <AgruparCotas cotas={sujeto.cotas} pan2D={pan2D} zoom2D={zoom2D} estorbos={estorbosDeLasAsas}>
+        <CotasLayer
+          ref={cotasRef}
+          cotas={sujeto.cotas}
+          piezasConLargos={piezasConLargos}
+          piezaAcotadaId={sujeto.piece?.id}
+          units={units}
+          lectura={sujeto.lectura}
+          lecturaApagada={sujeto.lecturaApagada}
+          pan2D={pan2D}
+          zoom2D={zoom2D}
+          estorbos={estorbosDeLasAsas}
+          disabled={sujeto.disabled}
+          onCommit={handleCotaCommit}
+          onScrubStart={handleCotaScrubStart}
+          onScrub={handleCotaScrub}
+          onScrubEnd={handleCotaScrubEnd}
+          onScrubCancel={handleCotaScrubCancel}
+        />
+      </AgruparCotas>
       {/* La tira ya no cede la esquina a nadie. La cedía porque `NextPointPanel`
           vivía en ella; los chips del tramo en curso viven sobre el trazo, que
           es donde está el gesto, así que no hay nada que esquivar (#1129). */}
       <ToolStrip2D
         lineaDeSujeto={sujeto.lineaDeSujeto}
+        onClearMeasurements={measureTool.clear}
+        hasMeasurements={measureTool.measurements.length > 0 || !!measureTool.selectedEdge || !!measureTool.comparison}
         falta={falta}
         desenlace={desenlace}
         /* El modal de piquete no usa portal ni atrapa el foco, y la tira vive

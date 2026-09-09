@@ -1,7 +1,9 @@
 import { PatternPiece, PathCommand, Point2D, Tool2D } from '../../../types/types';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../../store';
-import { NodeRef } from '../nodeEditorUtils';
+import { extractNodes, NodeRef } from '../nodeEditorUtils';
+import { classifyEditableAnchors } from '../anchorRoles';
+import { EXTREMOS } from './PuntosDelContorno';
 import type { SnapTarget } from '../snapIndex';
 import type { EditableNode } from '../nodeEditorUtils';
 import POMOverlay from './overlays/POMOverlay';
@@ -114,6 +116,7 @@ interface ToolOverlayProps {
   transformPreview: TransformPreview | null;
   // Edit Pattern
   editPatternIsEditing: boolean;
+  anchorReferencePieceId?: string | null;
   editPatternEditingPieceId: string | null;
   editPatternNodes: EditableNode[];
   editPatternSelectedNodes: Set<number>;
@@ -173,6 +176,9 @@ interface ToolOverlayProps {
 
 export default function ToolOverlay(props: ToolOverlayProps) {
   const { activeTool, zoom2D, pieces, units } = props;
+  const referencePiece = activeTool === 'select' && !props.nodeEditorIsEditing
+    ? pieces.find(p => p.id === props.anchorReferencePieceId)
+    : undefined;
 
   const poms = useSelector((s: RootState) => s.project.poms);
   const selectedPOMId = useSelector((s: RootState) => s.editor.selectedPOMId);
@@ -291,7 +297,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         />
       )}
 
-      {props.editPatternIsEditing && props.editPatternEditingPieceId && (
+      {activeTool === 'editPattern' && props.editPatternIsEditing && props.editPatternEditingPieceId && (
         <EditPatternOverlay
           zoom2D={zoom2D}
           pieces={pieces}
@@ -306,7 +312,29 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         />
       )}
 
-      {props.nodeEditorIsEditing && props.nodeEditorEditingPieceId && (
+      {/* Las anclas de referencia sobreviven al cambio Q → Seleccionar
+          (maria-194), sin conservar una sesión ni estados de interacción.
+          Leer el modelo aquí evita que undo o mover la pieza dejen puntos
+          pegados a una geometría anterior. Como en PuntosDelContorno, fuera
+          de edición solo se muestran extremos, nunca muestras de curva. */}
+      {referencePiece && (
+        <EditPatternOverlay
+          zoom2D={zoom2D}
+          pieces={pieces}
+          editingPieceId={referencePiece.id}
+          nodes={classifyEditableAnchors(referencePiece, extractNodes(referencePiece))
+            .filter(({ role }) => EXTREMOS.has(role))
+            .map(({ node }) => node)}
+          selectedNodes={new Set<number>()}
+          selectedSegments={new Set<number>()}
+          hoveredNode={null}
+          hoveredSegment={null}
+          addPointPreview={null}
+          marquee={null}
+        />
+      )}
+
+      {(activeTool === 'select' || activeTool === 'editCurve') && props.nodeEditorIsEditing && props.nodeEditorEditingPieceId && (
         <NodeEditorOverlay zoom2D={zoom2D} units={units} pieces={pieces} nodeEditorEditingPieceId={props.nodeEditorEditingPieceId} nodeEditorNodes={props.nodeEditorNodes} selectedNode={props.selectedNode} hoveredNode={props.hoveredNode} />
       )}
 

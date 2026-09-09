@@ -1,5 +1,6 @@
 import type { Point2D } from '../../../../types/types';
-import type { Measurement, SelectedEdgeInfo, CurveComparison } from '../../useMeasureTool';
+import type { Measurement, SelectedEdgeInfo, CurveComparison, MeasureProximity } from '../../useMeasureTool';
+import type { SnapKind } from '../../snapIndex';
 
 interface MeasureToolOverlayProps {
   zoom2D: number;
@@ -7,6 +8,10 @@ interface MeasureToolOverlayProps {
   currentStart: Point2D | null;
   cursorPos: Point2D | null;
   hoveredSnapPoint: Point2D | null;
+  snapKind?: SnapKind | null;
+  proximity?: MeasureProximity | null;
+  active?: boolean;
+  existingPieceIds?: ReadonlySet<string>;
   formatDistance: (d: number) => string;
   showAngle?: boolean;
   // Along-curve mode
@@ -32,11 +37,11 @@ function MeasurementLabel({ x, y, label, zoom2D, bold }: { x: number; y: number;
       <rect
         x={-totalW / 2} y={-7 / zoom2D}
         width={totalW} height={14 / zoom2D}
-        rx={7 / zoom2D} fill={bold ? 'rgba(123,31,162,0.85)' : 'rgba(0,0,0,0.75)'}
+        rx={7 / zoom2D} fill="var(--piece-fill-2d)"
       />
       <text
         textAnchor="middle" dominantBaseline="central"
-        fill="#fff" fontSize={fontSize} pointerEvents="none"
+        fill="var(--ink-on-light)" fontSize={fontSize} pointerEvents="none"
         fontWeight={bold ? 700 : 400}
       >
         {label}
@@ -71,15 +76,15 @@ function AngleArc({ start, end, zoom2D }: { start: Point2D; end: Point2D; zoom2D
   return (
     <g opacity={0.6}>
       <line x1={start.x} y1={start.y} x2={horizontal.x} y2={horizontal.y}
-        stroke="#9c27b0" strokeWidth={0.5 / zoom2D} strokeDasharray={`${2 / zoom2D}`} />
+        stroke="var(--ink-on-light-2)" strokeWidth={0.5 / zoom2D} strokeDasharray={`${2 / zoom2D}`} />
       <path
         d={`M ${horizontal.x} ${horizontal.y} A ${r} ${r} 0 ${largeArc} ${sweep} ${arcEnd.x} ${arcEnd.y}`}
-        fill="none" stroke="#9c27b0" strokeWidth={1 / zoom2D}
+        fill="none" stroke="var(--ink-on-light-2)" strokeWidth={1 / zoom2D}
       />
       <text
         x={labelPos.x} y={labelPos.y}
         textAnchor="middle" dominantBaseline="central"
-        fill="#9c27b0" fontSize={8 / zoom2D} pointerEvents="none"
+        fill="var(--ink-on-light)" fontSize={8 / zoom2D} pointerEvents="none"
       >
         {label}
       </text>
@@ -96,7 +101,7 @@ function EdgeHighlight({ edge, zoom2D, formatDistance }: {
 
   return (
     <g>
-      <polyline points={d} fill="none" stroke="#9c27b0" strokeWidth={3 / zoom2D} opacity={0.7} />
+      <polyline points={d} fill="none" stroke="var(--ink-on-light-2)" strokeWidth={3 / zoom2D} opacity={0.7} />
       {edge.markers.map((m, i) => {
         // `pathPoints[i]` es ESTE marcador ya en espacio de patrón —
         // `buildEdgeInfo` lo calcula con el helper y su comentario dice
@@ -108,7 +113,7 @@ function EdgeHighlight({ edge, zoom2D, formatDistance }: {
         if (!p) return null;
         return (
           <g key={i} transform={`translate(${p.x}, ${p.y})`}>
-            <circle r={2.5 / zoom2D} fill="#9c27b0" />
+            <circle r={2.5 / zoom2D} fill="var(--ink-on-light-2)" />
             {i > 0 && (
               <MeasurementLabel
                 x={0} y={-10 / zoom2D}
@@ -158,7 +163,7 @@ function WalkDot({ edge, zoom2D }: { edge: SelectedEdgeInfo; zoom2D: number }) {
   if (points.length < 2) return null;
 
   return (
-    <circle r={4 / zoom2D} fill="#9c27b0" opacity={0.9}>
+    <circle r={4 / zoom2D} fill="var(--ink-on-light-2)" opacity={0.9}>
       <animateMotion
         dur={`${Math.max(1, edge.arcLength / 100)}s`}
         repeatCount="indefinite"
@@ -173,7 +178,7 @@ function CompareVisualization({ comparison, zoom2D, formatDistance }: {
 }) {
   const { edgeA, edgeB, delta, easePercent, maxLocalDelta, samples } = comparison;
 
-  const dotColor = (ld: number) => ld < 2 ? '#4caf50' : ld < 5 ? '#ff9800' : '#f44336';
+  const dotColor = (ld: number) => ld < 2 ? 'var(--success)' : ld < 5 ? 'var(--warning)' : 'var(--destructive)';
 
   return (
     <g>
@@ -220,11 +225,11 @@ function HintLabel({ text, cursorPos, zoom2D }: { text: string; cursorPos: Point
       <rect
         x={-totalW / 2} y={-7 / zoom2D}
         width={totalW} height={14 / zoom2D}
-        rx={7 / zoom2D} fill="rgba(0,0,0,0.6)"
+        rx={7 / zoom2D} fill="var(--piece-fill-2d)"
       />
       <text
         textAnchor="middle" dominantBaseline="central"
-        fill="#fff" fontSize={9 / zoom2D} pointerEvents="none"
+        fill="var(--ink-on-light)" fontSize={9 / zoom2D} pointerEvents="none"
         fontStyle="italic"
       >
         {text}
@@ -237,15 +242,44 @@ export default function MeasureToolOverlay({
   zoom2D, measurements, currentStart, cursorPos,
   hoveredSnapPoint, formatDistance, showAngle,
   measureMode, selectedEdge, hoverDistance,
-  compareEdgeA, comparison,
+  compareEdgeA, comparison, proximity, snapKind,
+  active = true, existingPieceIds,
 }: MeasureToolOverlayProps) {
+  // La anotación conserva las coordenadas que María quiso recordar. Si falta
+  // una pieza, la apagamos sin borrarla: quitarla en silencio repetiría el
+  // mismo fallo que motivó la persistencia al cambiar de herramienta (D3).
+  const missingPiece = (pieceId: string) => existingPieceIds != null && !existingPieceIds.has(pieceId);
+  const selectedEdgeMissing = selectedEdge != null && missingPiece(selectedEdge.pieceId);
+  const comparisonMissing = comparison != null && (
+    missingPiece(comparison.edgeA.pieceId) || missingPiece(comparison.edgeB.pieceId)
+  );
+  const showPendingComparison = active && measureMode === 'compare' && !comparison && compareEdgeA;
+  if (!measurements.length && !selectedEdge && !comparison && !showPendingComparison
+    && !(active && (hoveredSnapPoint || proximity || (currentStart && cursorPos)))) return null;
+
   return (
-    <g className="measure-lines">
-      {hoveredSnapPoint && (
+    <g className="measure-lines" pointerEvents="none">
+      {active && hoveredSnapPoint && (
         <circle
           cx={hoveredSnapPoint.x} cy={hoveredSnapPoint.y}
-          r={4 / zoom2D} fill="#9c27b0" opacity={0.5}
+          r={(snapKind === 'vertex' ? 7 : 5) / zoom2D}
+          fill="none" stroke="var(--snap-2d)" strokeWidth={2 / zoom2D}
         />
+      )}
+
+      {/* La distancia parte del cursor sin enganchar: usar el punto resuelto
+          daría cero precisamente cuando María necesita saber cuánto se ha
+          desplazado el próximo clic. Es lectura junto al cursor, sin campo
+          ni fondo que sugiera que este número se puede escribir (D2). */}
+      {active && proximity && (
+        <text
+          x={proximity.cursor.x + 22 / zoom2D}
+          y={proximity.cursor.y - 18 / zoom2D}
+          fill="var(--ink-on-light)"
+          fontSize={11 / zoom2D}
+        >
+          {`a ${proximity.distance.toFixed(1)} mm de este punto`}
+        </text>
       )}
 
       {measurements.map(m => {
@@ -253,22 +287,22 @@ export default function MeasureToolOverlay({
         const my = (m.startPoint.y + m.endPoint.y) / 2;
         const label = formatDistance(m.distance);
         return (
-          <g key={m.id}>
+          <g key={m.id} opacity={m.pieceIds?.some(missingPiece) ? 0.45 : 1}>
             <line
               x1={m.startPoint.x} y1={m.startPoint.y}
               x2={m.endPoint.x} y2={m.endPoint.y}
-              stroke="#9c27b0" strokeWidth={1.5 / zoom2D}
+              stroke="var(--ink-on-light-2)" strokeWidth={1.5 / zoom2D}
               strokeDasharray={`${5 / zoom2D} ${3 / zoom2D}`}
             />
-            <circle cx={m.startPoint.x} cy={m.startPoint.y} r={3 / zoom2D} fill="#9c27b0" />
-            <circle cx={m.endPoint.x} cy={m.endPoint.y} r={3 / zoom2D} fill="#9c27b0" />
+            <circle cx={m.startPoint.x} cy={m.startPoint.y} r={3 / zoom2D} fill="var(--ink-on-light-2)" />
+            <circle cx={m.endPoint.x} cy={m.endPoint.y} r={3 / zoom2D} fill="var(--ink-on-light-2)" />
             <MeasurementLabel x={mx} y={my} label={label} zoom2D={zoom2D} />
             {showAngle && <AngleArc start={m.startPoint} end={m.endPoint} zoom2D={zoom2D} />}
           </g>
         );
       })}
 
-      {currentStart && cursorPos && (() => {
+      {active && currentStart && cursorPos && (() => {
         const s = currentStart;
         const c = cursorPos;
         const d = Math.hypot(c.x - s.x, c.y - s.y);
@@ -279,39 +313,41 @@ export default function MeasureToolOverlay({
           <>
             <line
               x1={s.x} y1={s.y} x2={c.x} y2={c.y}
-              stroke="#9c27b0" strokeWidth={1 / zoom2D}
+              stroke="var(--ink-on-light-2)" strokeWidth={1 / zoom2D}
               strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`} opacity={0.6}
             />
-            <circle cx={s.x} cy={s.y} r={3 / zoom2D} fill="#9c27b0" />
+            <circle cx={s.x} cy={s.y} r={3 / zoom2D} fill="var(--ink-on-light-2)" />
             <MeasurementLabel x={mx} y={my} label={label} zoom2D={zoom2D} />
             {showAngle && <AngleArc start={s} end={c} zoom2D={zoom2D} />}
           </>
         );
       })()}
 
-      {/* Along-curve mode */}
-      {measureMode === 'along-curve' && selectedEdge && (
-        <>
+      {/* La medida de un tramo ya tomada no depende de la herramienta activa;
+          solo el recorrido animado y la lectura viva pertenecen al gesto. */}
+      {selectedEdge && (
+        <g opacity={selectedEdgeMissing ? 0.45 : 1}>
           <EdgeHighlight edge={selectedEdge} zoom2D={zoom2D} formatDistance={formatDistance} />
-          <WalkDot edge={selectedEdge} zoom2D={zoom2D} />
-          {hoverDistance != null && cursorPos && (
+          {active && measureMode === 'along-curve' && !selectedEdgeMissing && <WalkDot edge={selectedEdge} zoom2D={zoom2D} />}
+          {active && measureMode === 'along-curve' && !selectedEdgeMissing && hoverDistance != null && cursorPos && (
             <MeasurementLabel
               x={cursorPos.x} y={cursorPos.y - 14 / zoom2D}
               label={formatDistance(hoverDistance)} zoom2D={zoom2D}
             />
           )}
-        </>
+        </g>
       )}
 
-      {/* Compare mode */}
-      {measureMode === 'compare' && comparison && (
-        <CompareVisualization comparison={comparison} zoom2D={zoom2D} formatDistance={formatDistance} />
+      {comparison && (
+        <g opacity={comparisonMissing ? 0.45 : 1}>
+          <CompareVisualization comparison={comparison} zoom2D={zoom2D} formatDistance={formatDistance} />
+        </g>
       )}
-      {measureMode === 'compare' && !comparison && compareEdgeA && (
-        <>
+      {showPendingComparison && compareEdgeA && (
+        <g opacity={missingPiece(compareEdgeA.pieceId) ? 0.45 : 1}>
           <EdgeHighlight edge={compareEdgeA} zoom2D={zoom2D} formatDistance={formatDistance} />
-          <HintLabel text="Haz clic en el segundo borde para comparar" cursorPos={cursorPos} zoom2D={zoom2D} />
-        </>
+          <HintLabel text="Haz clic en el segundo tramo para comparar" cursorPos={cursorPos} zoom2D={zoom2D} />
+        </g>
       )}
     </g>
   );

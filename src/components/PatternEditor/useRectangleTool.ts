@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { setToolOption } from '../../store/toolSlice';
 import { Point2D, PathCommand, InternalLine } from '../../types/types';
 import { screenToPattern } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
@@ -38,8 +37,9 @@ const round1 = (v: number) => Math.round(v * 10) / 10;
  * El press manda el objeto, el release manda el valor: soltar sin haberse
  * movido crea el rectángulo con el Ancho y el Alto de la barra, esquina
  * superior izquierda en el press — el "clicas con el izquierdo y lo crea" de
- * CLO. Soltar habiéndose movido crea lo dibujado y lo escribe en la barra,
- * así la barra enseña lo último que dibujó. Decide `isDrag` en píxeles de
+ * CLO. Soltar habiéndose movido crea lo dibujado y NO toca la barra
+ * (reunión María 07-09): la barra solo cambia si ella la escribe. Decide
+ * `isDrag` en píxeles de
  * pantalla; el gate viejo de 5 mm de patrón (que dejaba una banda muerta
  * entre 4 px y 5 mm) murió.
  */
@@ -49,7 +49,6 @@ export function useRectangleTool(
   /** Devuelve el id de la pieza creada: la creación caliente (spec cotas vivas § 3.1) lo necesita. */
   onComplete: (piece: NewPieceData) => string,
 ) {
-  const dispatch = useDispatch();
   const barWidth = useSelector((s: RootState) => Number(s.tools.toolOptions?.rectangle?.width ?? DEFAULT_MM));
   const barHeight = useSelector((s: RootState) => Number(s.tools.toolOptions?.rectangle?.height ?? DEFAULT_MM));
   const barRef = useRef({ w: barWidth, h: barHeight });
@@ -138,15 +137,19 @@ export function useRectangleTool(
       const w = Math.abs(end.x - p.start.x);
       const h = Math.abs(end.y - p.start.y);
       if (w > 0 && h > 0) {
+        // Dibujar NO reescribe la barra (reunión María 07-09, [01:49]: "en
+        // verdad no es una acción repetitiva, cada rectángulo va a ser de un
+        // tamaño distinto"). La barra sigue mandando sobre lo que crea un
+        // clic, pero solo si ELLA la escribe: se va la ruta implícita, se
+        // queda la deliberada. Ella misma cazó la contradicción que esto
+        // producía en [01:22]: el rótulo prometía 100 y le creaba otra cosa.
         create(Math.min(p.start.x, end.x), Math.min(p.start.y, end.y), w, h);
-        dispatch(setToolOption({ toolId: 'rectangle', optionId: 'width', value: round1(w) }));
-        dispatch(setToolOption({ toolId: 'rectangle', optionId: 'height', value: round1(h) }));
       } else {
         pushJournal('gesture', 'rectangle:release', { outcome: 'tooSmall', width: round1(w), height: round1(h), source: 'drag' });
       }
     }
     publish();
-  }, [toPattern, create, dispatch, publish]);
+  }, [toPattern, create, publish]);
 
   const cancel = useCallback(() => {
     pressRef.current = null;

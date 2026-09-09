@@ -56,10 +56,11 @@ export default function EditPatternOverlay({
         segmentHighlights.push(
           <path
             key={`seg-${i}`}
+            data-tramo-hover={isHovered ? i : undefined}
             d={d}
             fill="none"
-            stroke={isSelected ? '#FFD700' : '#6BB3FF'}
-            strokeWidth={2.5 / zoom2D}
+            stroke="var(--accent-2d)"
+            strokeWidth={(isSelected ? 2.5 : 2) / zoom2D}
             opacity={isSelected ? 1 : 0.6}
           />
         );
@@ -92,10 +93,11 @@ export default function EditPatternOverlay({
         segmentHighlights.push(
           <path
             key="seg-closing"
+            data-tramo-hover={isClosingHovered ? zIndex : undefined}
             d={d}
             fill="none"
-            stroke={isClosingSelected ? '#FFD700' : '#6BB3FF'}
-            strokeWidth={2.5 / zoom2D}
+            stroke="var(--accent-2d)"
+            strokeWidth={(isClosingSelected ? 2.5 : 2) / zoom2D}
             opacity={isClosingSelected ? 1 : 0.6}
           />
         );

@@ -34,8 +34,15 @@ const OCULTAS_EN_LA_TIRA: Record<string, ReadonlySet<string>> = {
  * un modal encima y la tira no debe recibir el foco (#1125).
  */
 export default function ToolStrip2D(
-  { lineaDeSujeto, falta = null, desenlace = null, inerte = false }:
-  { lineaDeSujeto: string | null; falta?: string | null; desenlace?: string | null; inerte?: boolean },
+  { lineaDeSujeto, falta = null, desenlace = null, inerte = false, onClearMeasurements, hasMeasurements = false }:
+  {
+    lineaDeSujeto: string | null;
+    falta?: string | null;
+    desenlace?: string | null;
+    inerte?: boolean;
+    onClearMeasurements?: () => void;
+    hasMeasurements?: boolean;
+  },
 ) {
   const dispatch = useDispatch();
   const raiz = useRef<HTMLDivElement>(null);
@@ -138,6 +145,21 @@ export default function ToolStrip2D(
               alCambiar={(v) => alCambiar(opcion.id, v)}
             />
           ))}
+        </div>
+      )}
+      {/* Las medidas sobreviven al cambio de herramienta: su borrado necesita
+          una puerta explícita en esta misma tira, donde viven los mandos de
+          las tres herramientas que las producen (Medir, D3). */}
+      {(activeTool === 'measure' || activeTool === 'measureCurve' || activeTool === 'compareCurves') && (
+        <div className="tool-strip__options">
+          <button
+            type="button"
+            className="tool-strip__toggle"
+            onClick={onClearMeasurements}
+            disabled={!hasMeasurements || !onClearMeasurements}
+          >
+            Borrar mediciones
+          </button>
         </div>
       )}
     </div>

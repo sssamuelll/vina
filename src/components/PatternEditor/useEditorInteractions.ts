@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectInternalLine, setZoom2D, setPan2D } from '../../store/editorSlice';
 import { movePiece, updateInternalLine } from '../../store/projectSlice';
-import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine } from '../../types/types';
+import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine, seSeleccionaPorTramo } from '../../types/types';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
 import { isPinnedAtZoomCeiling, zoomAtPoint } from '../../input/zoom2d';
 import { showInfoToast } from '../../store/copilotUISlice';
@@ -32,7 +32,7 @@ function getOutlineCenterForDrag(outline: PathCommand[]): { cx: number; cy: numb
   }
   return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
 }
-import { extractNodes, NodeRef } from './nodeEditorUtils';
+import { extractNodes, getAnchor, NodeRef } from './nodeEditorUtils';
 import { classifyEditableAnchors } from './anchorRoles';
 import { EXTREMOS } from './renderers/PuntosDelContorno';
 import { getInternalLineEndpoints } from './internalShapePath';
@@ -85,30 +85,28 @@ function distToSegment(px: number, py: number, x1: number, y1: number, x2: numbe
   return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
 }
 
-/** Minimum distance from a point to any segment of an internal line path */
-function distToInternalLine(px: number, py: number, path: PathCommand[]): number {
-  let minDist = Infinity;
+/**
+ * Conserva el comando que produjo la menor distancia: devolver solo la distancia
+ * obligaba al clic a seleccionar toda la interna. El índice pertenece al path
+ * existente y no convierte los tramos en entidades nuevas. En un empate conserva
+ * el tramo seleccionado; sin él, manda el orden del trazado (§ 2.2).
+ */
+function hitInternalLine(px: number, py: number, path: PathCommand[], preferredSegmentIndex?: number): { distance: number; segmentIndex: number } | null {
+  let nearest: { distance: number; segmentIndex: number } | null = null;
   let prevX = 0, prevY = 0;
-  for (const cmd of path) {
-    switch (cmd.type) {
-      case 'M':
-        prevX = cmd.values[0]; prevY = cmd.values[1];
-        break;
-      case 'L':
-        minDist = Math.min(minDist, distToSegment(px, py, prevX, prevY, cmd.values[0], cmd.values[1]));
-        prevX = cmd.values[0]; prevY = cmd.values[1];
-        break;
-      case 'C':
-        minDist = Math.min(minDist, distToSegment(px, py, prevX, prevY, cmd.values[4], cmd.values[5]));
-        prevX = cmd.values[4]; prevY = cmd.values[5];
-        break;
-      case 'Q':
-        minDist = Math.min(minDist, distToSegment(px, py, prevX, prevY, cmd.values[2], cmd.values[3]));
-        prevX = cmd.values[2]; prevY = cmd.values[3];
-        break;
+  for (const [segmentIndex, cmd] of path.entries()) {
+    const anchor = getAnchor(cmd);
+    if (!anchor) continue;
+    if (cmd.type !== 'M') {
+      const distance = distToSegment(px, py, prevX, prevY, anchor.x, anchor.y);
+      if (!nearest || distance < nearest.distance
+        || (distance === nearest.distance && segmentIndex === preferredSegmentIndex)) {
+        nearest = { distance, segmentIndex };
+      }
     }
+    prevX = anchor.x; prevY = anchor.y;
   }
-  return minDist;
+  return nearest;
 }
 
 interface ToolHooks {
@@ -173,7 +171,7 @@ interface ToolHooks {
   };
   trimTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
   grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e?: React.MouseEvent<SVGSVGElement>) => void; cancel: () => void };
-  measureTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void; clear: () => void };
+  measureTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void; clear: () => void; limpiarHover?: () => void };
   nodeEditor: {
     isEditing: boolean;
     hoveredNode: unknown;
@@ -351,6 +349,20 @@ export function useEditorInteractions(
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
   const { pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas } = tools;
+  const isNodeEditing = nodeEditor.isEditing && (activeTool === 'select' || activeTool === 'editCurve');
+  const { exitEdit: exitNodeEdit } = nodeEditor;
+  const previousToolRef = useRef(activeTool);
+
+  // Seleccionar permite entrar a nodos con doble clic, pero volver a esa
+  // herramienta termina la sesión anterior. La entrada a Editar curvas se
+  // conserva porque convertir desde el menú abre sus nodos en el mismo
+  // evento que cambia la herramienta; limpiarlos aquí borraría esa entrada.
+  useEffect(() => {
+    if (previousToolRef.current !== activeTool) {
+      previousToolRef.current = activeTool;
+      if (activeTool !== 'editCurve') exitNodeEdit();
+    }
+  }, [activeTool, exitNodeEdit]);
 
   const selectionHasLocked = selectedPieceIds.some(
     id => pieces.find(p => p.id === id)?.locked,
@@ -365,7 +377,7 @@ export function useEditorInteractions(
   );
   const showTransformBox = shouldShowTransformBox({
     activeTool,
-    isNodeEditing: nodeEditor.isEditing,
+    isNodeEditing,
     selectedCount: selectedPieceIds.length,
     selectionHasLocked,
     hasSelectedInternalLine: selectedInternalLineIsLive,
@@ -400,12 +412,6 @@ export function useEditorInteractions(
     }
     return null;
   }, [pan2D, zoom2D]);
-
-  // Clear measurements when switching away
-  useEffect(() => {
-    if (!MEASURE_TOOL_IDS.has(activeTool)) measureTool.clear();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- measureTool.clear is stable (useCallback with [])
-  }, [activeTool, measureTool.clear]);
 
   // Clear walk seam when switching away
   useEffect(() => {
@@ -453,7 +459,7 @@ export function useEditorInteractions(
     if (activeTool === 'seam') handlers.push(seamTool.handleKeyDown);
     if (MEASURE_TOOL_IDS.has(activeTool)) handlers.push(measureTool.handleKeyDown);
     if (activeTool === 'transform') handlers.push(transformTool.handleKeyDown);
-    if (nodeEditor.isEditing) handlers.push(nodeEditor.handleKeyDown);
+    if (isNodeEditing) handlers.push(nodeEditor.handleKeyDown);
     if (activeTool === 'editPattern') handlers.push(editPattern.handleKeyDown);
     if (activeTool === 'scissors') handlers.push(scissorsTool.handleKeyDown);
     // F8 (#1115): estaba en las dependencias pero nadie lo montaba, así que
@@ -469,7 +475,7 @@ export function useEditorInteractions(
     const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, seamEditTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown]);
+  }, [activeTool, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, isNodeEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, seamEditTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown]);
 
   // Coordinación de teclas (CF-1): un gesto vivo es dueño de sus teclas, EN
   // CAPTURA. `ShortcutProvider` escucha en `document` (burbuja) y corre antes
@@ -899,16 +905,30 @@ export function useEditorInteractions(
           const { x: localX, y: localY } = patternToPieceLocal({ x: clickX, y: clickY }, piece);
           const LINE_THRESHOLD = screenToPatternLength(5, zoom2D);
           let nearestLine: InternalLine | null = null;
+          let nearestSegmentIndex: number | undefined;
           let nearestDist = Infinity;
           for (const line of piece.internals) {
-            const dist = distToInternalLine(localX, localY, line.path);
-            if (dist < LINE_THRESHOLD && dist < nearestDist) {
-              nearestDist = dist;
+            const isSelected = selectedInternalLine?.pieceId === piece.id
+              && selectedInternalLine.lineId === line.id;
+            const hit = hitInternalLine(localX, localY, line.path, isSelected ? selectedInternalLine.segmentIndex : undefined);
+            if (hit && hit.distance < LINE_THRESHOLD
+              && (hit.distance < nearestDist || (hit.distance === nearestDist && isSelected))) {
+              nearestDist = hit.distance;
               nearestLine = line;
+              nearestSegmentIndex = hit.segmentIndex;
             }
           }
           if (nearestLine) {
-            dispatch(selectInternalLine({ pieceId: piece.id, lineId: nearestLine.id }));
+            // Piquetes, pinzas, hilo y costuras conservan su sujeto de entidad:
+            // sus operaciones tienen semántica propia. Las internas de dibujo
+            // añaden el tramo al mismo par de IDs que siguen usando los demás
+            // consumidores, incluido el borrado de entidad de esta tanda.
+            const seleccionPorTramo = seSeleccionaPorTramo(nearestLine.type);
+            dispatch(selectInternalLine({
+              pieceId: piece.id,
+              lineId: nearestLine.id,
+              ...(seleccionPorTramo ? { segmentIndex: nearestSegmentIndex } : {}),
+            }));
             return;
           }
           
@@ -1193,7 +1213,7 @@ export function useEditorInteractions(
     }
     if (activeTool === 'grainline') grainlineTool.handleMouseUp(e);
     if (activeTool === 'transform' || (activeTool === 'select' && transformTool.isDragging)) transformTool.handleMouseUp();
-    if (nodeEditor.isEditing) nodeEditor.handleMouseUp();
+    if (nodeEditor.isEditing && (activeTool === 'select' || activeTool === 'editCurve')) nodeEditor.handleMouseUp();
     if (activeTool === 'editPattern') editPattern.handleMouseUp();
     if (activeTool === 'scissors') scissorsTool.handleMouseUp();
     if (activeTool === 'slashAndSpread') slashAndSpreadTool.handleMouseUp();
@@ -1248,18 +1268,20 @@ export function useEditorInteractions(
     seamAllowanceTool.limpiarHover();
     seamEditTool.limpiarHover();
     seamTool.limpiarHover();
-  }, [seamAllowanceTool, seamEditTool, seamTool]);
+    measureTool.limpiarHover?.();
+  }, [seamAllowanceTool, seamEditTool, seamTool, measureTool]);
 
   const getCursor = () => {
-    if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
     switch (activeTool) {
       case 'pen': return 'crosshair';
       case 'hand': return panRef.current ? 'grabbing' : 'grab';
       case 'select':
+        if (isNodeEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
         if (dragRef.current) return 'grabbing';
         if (marqueeRef.current) return 'crosshair';
         return hoverCursor ?? 'default';
       case 'transform': return 'default';
+      case 'editCurve': return nodeEditor.hoveredNode ? 'move' : 'default';
       case 'editPattern': return editPattern.isEditing ? editPattern.getCursor() : 'default';
       case 'seam': return 'crosshair';
       case 'notch': return 'crosshair';

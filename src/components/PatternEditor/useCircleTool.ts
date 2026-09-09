@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { setToolOption } from '../../store/toolSlice';
 import { Point2D, PathCommand, InternalLine } from '../../types/types';
 import { screenToPattern, ellipseToPath } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
@@ -56,8 +55,8 @@ function inscrita(a: Point2D, b: Point2D, figura: string) {
  * dibujo hermanas con dos gramáticas distintas es la deriva que la revisión del
  * 04-09 midió. El press manda el objeto y el release manda el valor — soltar sin
  * haberse movido crea con el Radio de la barra (esquina de la caja en el press,
- * como el rectángulo), y soltar habiéndose movido crea lo dibujado y lo escribe
- * en la barra. La figura se INSCRIBE en la caja arrastrada; no se dibuja desde
+ * como el rectángulo), y soltar habiéndose movido crea lo dibujado sin tocar
+ * la barra (reunión María 07-09). La figura se INSCRIBE en la caja arrastrada; no se dibuja desde
  * el centro.
  *
  * Lo único que no es calco es `create()`: en vez del contorno de cuatro `L`,
@@ -70,7 +69,6 @@ export function useCircleTool(
   /** Devuelve el id de la pieza creada: la creación caliente (spec cotas vivas § 3.1) lo necesita. */
   onComplete: (piece: NewPieceData) => string,
 ) {
-  const dispatch = useDispatch();
   const barRadius = useSelector((s: RootState) => Number(s.tools.toolOptions?.circle?.radius ?? DEFAULT_RADIO_MM));
   const barShape = useSelector((s: RootState) => String(s.tools.toolOptions?.circle?.shapeType ?? 'circle'));
   const barRef = useRef({ r: barRadius, figura: barShape });
@@ -154,17 +152,17 @@ export function useCircleTool(
       const end = e ? toPattern(e) : p.current;
       const { cx, cy, rx, ry } = inscrita(p.start, end, barRef.current.figura);
       if (rx > 0 && ry > 0) {
+        // Dibujar NO reescribe el Radio de la barra: mismo acuerdo que en el
+        // rectángulo (reunión María 07-09). El círculo no salió en esa sesión,
+        // pero comparte el mecanismo, y arreglar solo el hermano que ella
+        // nombró dejaría los otros dos rotos igual.
         create(cx, cy, rx, ry);
-        // La barra tiene UN número. Se le escribe el semieje menor: en un
-        // círculo es el radio exacto de lo dibujado, y en una elipse es la
-        // medida que sí cabe en lo que se acaba de arrastrar.
-        dispatch(setToolOption({ toolId: 'circle', optionId: 'radius', value: round1(Math.min(rx, ry)) }));
       } else {
         pushJournal('gesture', 'circle:release', { outcome: 'tooSmall', rx: round1(rx), ry: round1(ry), source: 'drag' });
       }
     }
     publish();
-  }, [toPattern, create, dispatch, publish]);
+  }, [toPattern, create, publish]);
 
   const cancel = useCallback(() => {
     pressRef.current = null;

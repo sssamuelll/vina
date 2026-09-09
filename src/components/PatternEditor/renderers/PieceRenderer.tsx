@@ -2,10 +2,10 @@
 import React, { memo, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
-import { PatternPiece, PathCommand, UnitSystem } from '../../../types/types';
-import LineLengthLabels from './LineLengthLabels';
+import { InternalLineSelection, PatternPiece, PathCommand, UnitSystem } from '../../../types/types';
 import PuntosDelContorno from './PuntosDelContorno';
 import { pathToSVG } from '../utils';
+import { getAnchor } from '../nodeEditorUtils';
 import { effectiveSeamAllowanceWidth } from '../../../utils/seam';
 import {
   generateSeamAllowanceWithCorners,
@@ -38,12 +38,11 @@ interface SinglePieceProps {
   showNotches: boolean;
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
-  showLineLengths: boolean;
   /** La pieza que se está editando con una herramienta de curva: solo esa enseña sus puntos de curva. Por PIEZA, no global — encenderlo para todas suelta cientos de puntos sobre piezas que nadie toca (#1103). */
   piezaConPuntosDeCurva: string | null;
-  units: UnitSystem;
   isInternalLineSelected: boolean;
   selectedLineId?: string;
+  selectedSegmentIndex?: number;
   isEditingName: boolean;
   /** Stable 0-based piece index, used to derive the displayed number (`· 01`). */
   pieceNumber: number;
@@ -71,11 +70,10 @@ const SinglePiece = memo(function SinglePiece({
   showNotches,
   showPieceNames,
   renderMode2D,
-  showLineLengths,
   piezaConPuntosDeCurva,
-  units,
   isInternalLineSelected,
   selectedLineId,
+  selectedSegmentIndex,
   isEditingName,
   pieceNumber,
   groupColor,
@@ -218,9 +216,30 @@ const SinglePiece = memo(function SinglePiece({
         if (isNotch && !showNotches) return null;
         const hasFill = isNotch && line.notchOptions?.shape === 'diamond';
         const isLineSelected = isInternalLineSelected && selectedLineId === line.id;
+        const isWholeLineSelected = isLineSelected && selectedSegmentIndex === undefined;
+
+        // El path conserva todos sus comandos porque sigue siendo una sola interna;
+        // el acento se dibuja aparte para que seleccionar un tramo no resalte sus
+        // hermanos. Sin índice se conserva la selección anterior de la entidad.
+        const selectedCommand = isLineSelected && selectedSegmentIndex !== undefined
+          ? line.path[selectedSegmentIndex]
+          : undefined;
+        const previousCommand = isLineSelected && selectedSegmentIndex !== undefined
+          ? line.path[selectedSegmentIndex - 1]
+          : undefined;
+        const segmentStart = previousCommand ? getAnchor(previousCommand) : null;
+        const selectedSegmentD = selectedCommand && segmentStart &&
+          (selectedCommand.type === 'L' || selectedCommand.type === 'C' || selectedCommand.type === 'Q')
+          ? pathToSVG([{ type: 'M', values: [segmentStart.x, segmentStart.y] }, selectedCommand])
+          : null;
+        const lineDash =
+          line.type === 'fold' ? `${5 / zoom2D} ${3 / zoom2D} ${0.5 / zoom2D} ${3 / zoom2D}` :
+          line.type === 'topstitch' ? `${(line.topstitchOptions?.stitchLength ?? 3) / zoom2D} ${1.5 / zoom2D}` :
+          line.type === 'reference' ? `${4 / zoom2D} ${4 / zoom2D}` :
+          'none';
 
         // Tokenized internal-line colors (design surface 5, P0.3) — see internalLineColor.
-        const lineColor = internalLineColor(line, isLineSelected);
+        const lineColor = internalLineColor(line, isWholeLineSelected);
         const dartApex = line.type === 'dart' ? dartApexPoint(line.path) : null;
         // Grainline arrowhead (nota de María #169): one head, at the path's end
         // — same single arrow the draw preview shows, pointing the way the
@@ -279,22 +298,27 @@ const SinglePiece = memo(function SinglePiece({
               data-internal-line-type={line.type}
               d={pathToSVG(line.path)}
               style={{ stroke: lineColor, fill: hasFill ? lineColor : 'none' }}
-              strokeWidth={isLineSelected ? 2 / zoom2D : 0.8 / zoom2D}
-              strokeDasharray={
-                line.type === 'fold' ? `${5 / zoom2D} ${3 / zoom2D} ${0.5 / zoom2D} ${3 / zoom2D}` :
-                line.type === 'topstitch' ? `${(line.topstitchOptions?.stitchLength ?? 3) / zoom2D} ${1.5 / zoom2D}` :
-                line.type === 'reference' ? `${4 / zoom2D} ${4 / zoom2D}` :
-                'none'
-              }
-              opacity={line.type === 'grainline' && !showGrainlines ? 0 : line.type === 'reference' ? 0.6 : isLineSelected ? 1 : 0.8}
+              strokeWidth={isWholeLineSelected ? 2 / zoom2D : 0.8 / zoom2D}
+              strokeDasharray={lineDash}
+              opacity={line.type === 'grainline' && !showGrainlines ? 0 : line.type === 'reference' ? 0.6 : isWholeLineSelected ? 1 : 0.8}
             />
+            {selectedSegmentD && (
+              <path
+                data-internal-line-segment={selectedSegmentIndex}
+                d={selectedSegmentD}
+                style={{ stroke: internalLineColor(line, true), fill: 'none' }}
+                strokeWidth={2 / zoom2D}
+                strokeDasharray={lineDash}
+                pointerEvents="none"
+              />
+            )}
             {/* Grainline arrowhead (direction of cut) */}
             {grainlineHeads.map((tri, gi) => (
               <polygon
                 key={`gl-arrow-${gi}`}
                 points={tri.map(p => `${p.x},${p.y}`).join(' ')}
                 style={{ fill: lineColor }}
-                opacity={isLineSelected ? 1 : 0.8}
+                opacity={isWholeLineSelected ? 1 : 0.8}
                 pointerEvents="none"
               />
             ))}
@@ -306,7 +330,9 @@ const SinglePiece = memo(function SinglePiece({
               />
             )}
             {foldMarkers.length > 0 && <g className="fold-direction-markers">{foldMarkers}</g>}
-            {isLineSelected && (() => {
+            {/* Los extremos de la entidad siguen siendo sus controles de arrastre;
+                mostrarlos para un tramo anunciaría un alcance distinto al seleccionado. */}
+            {isWholeLineSelected && (() => {
               const first = line.path[0];
               const last = line.path[line.path.length - 1];
               const points: { x: number; y: number }[] = [];
@@ -455,9 +481,6 @@ const SinglePiece = memo(function SinglePiece({
         }
       })()}
 
-      {showLineLengths && (
-        <LineLengthLabels piece={piece} zoom2D={zoom2D} units={units} />
-      )}
 
       {(piece.annotations || []).map((ann, i) => (
         <text
@@ -523,7 +546,7 @@ interface PieceRendererProps {
   units: UnitSystem;
   /** Map of piece ID to group color for visual indicators */
   groupColors?: Record<string, string>;
-  selectedInternalLine?: { pieceId: string; lineId: string } | null;
+  selectedInternalLine?: InternalLineSelection | null;
   editingPieceNameId?: string | null;
   onPieceNameDoubleClick?: (pieceId: string) => void;
   onPieceNameSave?: (pieceId: string, newName: string) => void;
@@ -539,9 +562,7 @@ export default function PieceRenderer({
   showNotches,
   showPieceNames,
   renderMode2D,
-  showLineLengths,
   piezaConPuntosDeCurva,
-  units,
   groupColors,
   selectedInternalLine,
   editingPieceNameId,
@@ -627,9 +648,7 @@ export default function PieceRenderer({
           showNotches={showNotches}
           showPieceNames={showPieceNames}
           renderMode2D={renderMode2D}
-          showLineLengths={showLineLengths}
           piezaConPuntosDeCurva={piezaConPuntosDeCurva}
-          units={units}
           groupColor={groupColors?.[piece.id]}
           isLayerLocked={!!layerLocked[piece.layer ?? 1]}
           hasResolutionErrors={hasResolutionErrors.get(piece.id) ?? false}
@@ -640,6 +659,7 @@ export default function PieceRenderer({
           })()}
           isInternalLineSelected={selectedInternalLine?.pieceId === piece.id}
           selectedLineId={selectedInternalLine?.lineId}
+          selectedSegmentIndex={selectedInternalLine?.segmentIndex}
           isEditingName={editingPieceNameId === piece.id}
           pieceNumber={pieceNumberById[piece.id] ?? 0}
           matchLookup={matchLookupByPiece[piece.id]}
