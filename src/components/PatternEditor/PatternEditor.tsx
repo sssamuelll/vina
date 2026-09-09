@@ -7,7 +7,7 @@ import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../util
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, selectInternalLine, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, seSeleccionaPorTramo } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
 import { useCircleTool } from './useCircleTool';
@@ -389,11 +389,24 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // El motor dibuja en espacio de PATRÓN; los internals se guardan locales
     // y `toPieceLocalPath` deshace posición y giro (#1068).
     const lineId = newId();
+    const localPath = toPieceLocalPath(path, host);
     dispatch(addInternalLine({
       pieceId: host.id,
-      line: { id: lineId, type: internalLineType, path: toPieceLocalPath(path, host) },
+      line: { id: lineId, type: internalLineType, path: localPath },
     }));
-    dispatch(selectInternalLine({ pieceId: host.id, lineId }));
+    // El gesto que dibujó varios tramos NO forma un grupo de selección
+    // (contrato 2026-09-08 § 5). Sin el tramo, cerrar el trazo devolvía la
+    // entidad entera y con ella TODAS sus cotas: una interna de tres tramos
+    // anunciaba "6 cotas" apiladas encima del dibujo — [24:05] "y me
+    // sobresatura toda la información" — y las cotas se comían el clic
+    // siguiente, dejando el foco dentro de un campo y la aplicación sin
+    // atajos. Queda seleccionado el ÚLTIMO tramo: es el que se acaba de
+    // cerrar, y es el que ella querría corregir escribiendo.
+    dispatch(selectInternalLine({
+      pieceId: host.id,
+      lineId,
+      ...(seSeleccionaPorTramo(internalLineType) ? { segmentIndex: localPath.length - 1 } : {}),
+    }));
   }, [pieces, dispatch, internalLineType]);
 
   const handleInternalShapeLockedPress = useCallback(() => {

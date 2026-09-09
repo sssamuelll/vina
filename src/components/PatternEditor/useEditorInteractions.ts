@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectInternalLine, setZoom2D, setPan2D } from '../../store/editorSlice';
 import { movePiece, updateInternalLine } from '../../store/projectSlice';
-import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine } from '../../types/types';
+import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine, seSeleccionaPorTramo } from '../../types/types';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
 import { isPinnedAtZoomCeiling, zoomAtPoint } from '../../input/zoom2d';
 import { showInfoToast } from '../../store/copilotUISlice';
@@ -923,8 +923,7 @@ export function useEditorInteractions(
             // sus operaciones tienen semántica propia. Las internas de dibujo
             // añaden el tramo al mismo par de IDs que siguen usando los demás
             // consumidores, incluido el borrado de entidad de esta tanda.
-            const seleccionPorTramo = nearestLine.type === 'reference'
-              || nearestLine.type === 'fold' || nearestLine.type === 'pleat';
+            const seleccionPorTramo = seSeleccionaPorTramo(nearestLine.type);
             dispatch(selectInternalLine({
               pieceId: piece.id,
               lineId: nearestLine.id,

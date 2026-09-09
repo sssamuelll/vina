@@ -108,8 +108,20 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
         r.fallo = error instanceof Error ? error.message : String(error);
       } finally {
         r.hasta = await reloj(page);
-        writeFileSync(join(dir, `${String(paso).padStart(2, '0')}-estado.json`), JSON.stringify(await st(page), null, 2));
-        await page.screenshot({ path: join(dir, `${String(paso).padStart(2, '0')}.png`) });
+        // La evidencia no puede matar lo que viene a documentar. El
+        // `setDefaultTimeout(6000)` de arriba también gobierna al screenshot, y
+        // una captura de 1920×1080 con `trace:'on'` en una máquina cargada no
+        // cabe en 6 s. Como esto vive en un `finally`, al lanzar abortaba el
+        // recorrido entero: la corrida del 2026-09-09 dejó el paso 1 en verde y
+        // los doce siguientes sin ejecutar, con un informe de un solo resultado
+        // que parecía un fallo del producto. Plazo propio, y si aun así falla se
+        // anota en el paso y se sigue — un PNG que falta no invalida el veredicto.
+        try {
+          writeFileSync(join(dir, `${String(paso).padStart(2, '0')}-estado.json`), JSON.stringify(await st(page), null, 2));
+          await page.screenshot({ path: join(dir, `${String(paso).padStart(2, '0')}.png`), timeout: 30_000 });
+        } catch (error) {
+          r.observaciones.evidenciaIncompleta = error instanceof Error ? error.message : String(error);
+        }
         console.log(`MARIA ${paso}: ${r.estado} — ${nombre}${r.fallo ? `\n${r.fallo}` : ''}`);
       }
     });
@@ -233,9 +245,21 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
     });
 
     await tramo(7, '[12:11] Rectángulo conserva la cruz sobre nodos', async r => {
-      // Verifica que la secuencia dejó el editor vivo; no lo reenciende con un fixture.
-      if (await page.locator('.node-editor').count() !== 1)
-        throw new NoMontable('La secuencia anterior no dejó el editor de nodos encendido en Seleccionar');
+      // Este paso exigía antes que la secuencia hubiera DEJADO el editor de
+      // nodos encendido dentro de Seleccionar, y se declaraba NO MONTABLE si no
+      // lo encontraba. Estaba pidiendo la avería: la tanda 1 no maquilló el
+      // cursor, quitó el estado latente — cambiar de herramienta llama a
+      // `exitNodeEdit` (useEditorInteractions.ts:363) y el overlay se desmonta
+      // fuera de select/editCurve (ToolOverlay.tsx:337). Con el arreglo puesto
+      // la precondición es inalcanzable, así que el paso se declaraba no
+      // montable para siempre y no afirmaba nada.
+      //
+      // Ahora afirma las dos mitades, y juntas son más fuertes que la original:
+      // que tras el paso 6 no queda editor vivo, y que la cruz de Rectángulo no
+      // depende de que lo haya.
+      r.observaciones.editoresVivosTrasSeleccionar = await page.locator('.node-editor').count();
+      expect(r.observaciones.editoresVivosTrasSeleccionar,
+        'cambiar de herramienta no puede dejar un editor de nodos vivo detrás').toBe(0);
       const b = caja(await pieza(page, primera));
       await activar(page, 's', 'rectangle');
       const cursores: Array<{ svg: string; bajoElRaton: string }> = [];

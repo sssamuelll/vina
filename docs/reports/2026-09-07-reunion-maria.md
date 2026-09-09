@@ -225,6 +225,8 @@ Seis tandas, todas con tests escritos primero y verificados rojos por su razón,
 | Causa C + fallo 11 — un cuadro, y el aviso | hecho | `b6dc3bfa` |
 | Causas A y G — el sujeto es el tramo | hecho | `21429ce2` |
 | Fallo 8 | no era un fallo propio: es la causa D |  |
+| Causa G — la creación seguía formando grupo (visto por el recorrido, § 7.2) | hecho | esta tanda |
+| Etiquetas de largo con el dato viejo (visto por el recorrido, § 7.2) | hecho | `d0838c31` |
 | Causas B, D, E | **decididas y sin implementar** — ver el contrato del 08-09 |  |
 
 ### 7.1 Lo que cambió del diagnóstico al implementarlo
@@ -239,7 +241,31 @@ Cinco de los dieciocho puntos no eran lo que el informe decía al escribirse. Va
 
 Y dos correcciones a decisiones propias: la enmienda § 14 de la cota se pasó al tocar los tokens (ella dijo *"más allá de los colores"*), y el oráculo del caso de la pieza girada medía contra una caja que dejó de ser la geometría.
 
-### 7.2 Rojos preexistentes en `main`, ajenos a esta tanda
+### 7.2 Lo que encontró recorrer la sesión entera, 2026-09-09
+
+Las seis tandas se verificaron con casos aislados. María no encuentra las cosas aisladas: las encuentra encadenadas. Por eso el recorrido de los trece momentos en su orden, en una sola página y con la caja negra volcando la línea de tiempo (`tests/e2e/replay-maria-07-09.spec.ts`).
+
+Encontró **dos cosas que las seis tandas dieron por buenas**, y las dos eran una:
+
+**1. El largo guardado le ganaba al contorno** (`d0838c31`). El paso 2 pasaba su assert —la pieza medía 300×150— mientras la telemetría enseñaba las cuatro etiquetas diciendo `100.0 mm`. `edge.length ?? computePathArcLength(...)`: un derivado guardado que la ruta de redimensionar por cota no refresca, con un `??` que lo prefería. Estaba latente desde siempre y lo despertó la tanda 4 al encender "Largos" de fábrica.
+
+**2. Dibujar una interna creaba un grupo de selección** (esta tanda). `PatternEditor.tsx:396` autoseleccionaba la entidad entera al cerrar el trazo. Consecuencias en cascada, todas visibles en la captura del paso 12:
+
+- la cabecera anunciaba **«Editando: la línea seleccionada · 6 cotas»** sobre una interna de tres tramos — literalmente [24:05] *"y me sobresatura toda la información"*, la causa G intacta;
+- esas seis cotas tapaban el dibujo, así que el clic siguiente caía en una cota en vez de en el tramo y la abría a escribir;
+- el foco se quedaba dentro del campo y **la aplicación perdía todos los atajos de teclado** hasta clicar fuera. Un gesto de dibujo dejaba a Vina muda.
+
+La causa de fondo es que la regla vivía en un solo sitio de los dos que tienen que coincidir: el clic la aplicaba (`useEditorInteractions.ts`), el cierre del trazo no. Ahora es `seSeleccionaPorTramo()` en `types.ts`, junto a la selección que gobierna.
+
+**Por qué la tanda 6 no lo vio:** su test monta la interna con un `dispatch(project/addInternalLine)` directo. Verificó el cuarto y no la puerta. El caso nuevo la dibuja con la herramienta.
+
+**Y estaba escrito.** El contrato del 08-09 § 5 ya decía *"el gesto que creó varios tramos no forma un grupo de selección"*. Tercer caso en este repo de una decisión escrita que nadie ejecutó, después de la sustitución de la cota (§ 9 del 30-08) y el enganche de Medir (D1 del 06-09).
+
+**El paso 7 pedía la avería.** Exigía que la secuencia hubiera dejado el editor de nodos encendido dentro de Seleccionar, y se declaraba «NO MONTABLE» al no encontrarlo. Pero la tanda 1 no maquilló el cursor: quitó el estado latente, así que la precondición es inalcanzable a propósito. Reescrito para afirmar las dos mitades —que no queda editor vivo, y que la cruz de Rectángulo no depende de que lo haya—, que juntas son más fuertes que la original.
+
+Estado final del recorrido: **13 de 13**, 163 eventos, 0 perdidos, 0 anomalías, 0 errores de navegador.
+
+### 7.3 Rojos preexistentes en `main`, ajenos a esta tanda
 
 Verificados con `git stash` antes de acusar a ningún cambio:
 

@@ -802,6 +802,23 @@ export interface InternalLineSelection {
   segmentIndex?: number;
 }
 
+/**
+ * Qué internas se seleccionan POR TRAMO. Las de dibujo (referencia, doblez,
+ * pliegue) son un trazo continuo cuyos tramos la usuaria distingue a ojo; las
+ * demás —piquete, pinza, hilo, pespunte— tienen semántica de entidad y sus
+ * operaciones son sobre el objeto entero.
+ *
+ * Vive aquí, junto a la selección que gobierna, porque la regla la aplican dos
+ * sitios que TIENEN que coincidir: el clic que selecciona
+ * (`useEditorInteractions.ts`) y el cierre del trazo que acaba de dibujarse
+ * (`PatternEditor.tsx`). Estaban en desacuerdo —solo el primero la aplicaba— y
+ * el precio fue que dibujar una interna de tres tramos devolvía la entidad
+ * entera con sus seis cotas encima del dibujo (reunión 07-09, causa G).
+ */
+export function seSeleccionaPorTramo(type: InternalLineType): boolean {
+  return type === 'reference' || type === 'fold' || type === 'pleat';
+}
+
 export interface EditorState {
   viewMode: ViewMode;
   activeTool: Tool2D;

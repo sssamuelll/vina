@@ -122,3 +122,62 @@ test.describe('el sujeto es el tramo, no el bloque en que se dibujó', () => {
     expect(linea.path[3].values[0], 'D no lo arrastra este cambio').toBeCloseTo(350, 1);
   });
 });
+
+/**
+ * La puerta, no el cuarto.
+ *
+ * Los tres casos de arriba montan la interna con `project/addInternalLine`, y
+ * por ahí pasan en verde. El recorrido encadenado de la sesión de María la
+ * dibuja con la HERRAMIENTA — y ahí `PatternEditor.tsx:396` autoselecciona la
+ * entidad entera sin `segmentIndex` al cerrar el trazo. Con eso vuelve entero
+ * lo que esta tanda arregló: la cabecera anunció «Editando: la línea
+ * seleccionada · 6 cotas» sobre una interna de tres tramos, que es literalmente
+ * [24:05] "y me sobresatura toda la información".
+ *
+ * Y no se queda en ruido visual: las seis cotas tapan el propio dibujo, así que
+ * el clic siguiente cae en una cota en vez de en el tramo, la abre a escribir y
+ * el foco se queda dentro del campo. A partir de ahí los atajos globales callan
+ * —`h` deja de activar Pluma— porque el manejador cede el teclado a los campos.
+ * Un gesto de dibujo dejaba la aplicación sin atajos.
+ *
+ * El contrato ya lo decía y nadie lo ejecutó (§ 2 y § 5 de
+ * 2026-09-08-contexto-y-control-numerico-design.md): "el gesto que creó varios
+ * tramos NO forma un grupo de selección".
+ */
+test.describe('dibujar una interna no crea un grupo de selección', () => {
+  test.setTimeout(120_000);
+
+  test('al cerrar el trazo con Enter el sujeto es UN tramo, y el teclado sigue vivo', async ({ page }) => {
+    await waitForApp(page);
+    await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
+
+    await page.keyboard.press('g');
+    await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('internalShape');
+    // A partir de x=100: por debajo, el dock izquierdo tapa el lienzo y el clic
+    // cae en sus botones sin avisar (el primer intento activó «Punto»).
+    for (const p of [{ x: 100, y: 150 }, { x: 180, y: 150 }, { x: 260, y: 150 }, { x: 340, y: 150 }]) {
+      await clicEn(page, p);
+    }
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+
+    const sel = (await seleccion(page)) as { pieceId?: string; lineId?: string; segmentIndex?: number } | null;
+    expect(sel, 'el trazo recién cerrado tiene que quedar seleccionado por algo').not.toBeNull();
+    expect(
+      sel?.segmentIndex,
+      'la creación no puede devolver la entidad entera: el sujeto es un tramo',
+    ).not.toBeUndefined();
+
+    await expect(
+      page.locator('.cota:not(.cota--hueca)'),
+      'tres tramos recién dibujados no pueden sacar seis cotas encima del dibujo',
+    ).toHaveCount(1);
+
+    // El campo no puede quedarse el foco: si se lo queda, la aplicación pierde
+    // TODOS los atajos y solo se recupera clicando fuera.
+    await page.keyboard.press('h');
+    await expect
+      .poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 })
+      .toBe('pen');
+  });
+});
