@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
@@ -24,13 +24,50 @@ import {
   compensatePositionForPivotChange,
   patternToPieceLocal,
 } from './pieceTransform';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
+
+const NO_HIDDEN_LAYER_IDS: number[] = [];
 
 export interface EditCurveState {
   isEditing: boolean;
   editingPieceId: string | null;
+  hoveredPieceId: string | null;
   selectedNode: NodeRef | null;
   hoveredNode: NodeRef | null;
   nodes: EditableNode[];
+}
+
+interface EditableNodeHit {
+  ref: NodeRef;
+  position: Point2D;
+}
+
+function sameNodeRef(a: NodeRef, b: NodeRef): boolean {
+  return a.commandIndex === b.commandIndex && a.pointType === b.pointType;
+}
+
+/** Los manejadores mandan sobre las anclas, igual que en el mousedown vigente. */
+function hitTestEditableNode(
+  point: Point2D,
+  nodes: EditableNode[],
+  hitRadius: number,
+): EditableNodeHit | null {
+  for (const node of nodes) {
+    if (node.cp1 && node.cp1Ref
+        && Math.hypot(point.x - node.cp1.x, point.y - node.cp1.y) < hitRadius) {
+      return { ref: node.cp1Ref, position: node.cp1 };
+    }
+    if (node.cp2 && node.cp2Ref
+        && Math.hypot(point.x - node.cp2.x, point.y - node.cp2.y) < hitRadius) {
+      return { ref: node.cp2Ref, position: node.cp2 };
+    }
+  }
+  for (const node of nodes) {
+    if (Math.hypot(point.x - node.position.x, point.y - node.position.y) < hitRadius) {
+      return { ref: node.ref, position: node.position };
+    }
+  }
+  return null;
 }
 
 /**
@@ -47,6 +84,7 @@ function resyncCurveStateToPiece(
   return {
     ...state,
     nodes: extractNodes(piece),
+    hoveredPieceId: null,
     selectedNode: null,
     hoveredNode: null,
   };
@@ -55,14 +93,35 @@ function resyncCurveStateToPiece(
 export function useEditCurve(zoom: number, pan: Point2D) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation?.hiddenLayerIds ?? NO_HIDDEN_LAYER_IDS);
+  const hoverablePieces = useMemo(
+    () => pieces
+      .filter(p => !piezaBloqueada(p, layerLocked) && !hiddenLayerIds.includes(p.layer ?? 1))
+      .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0))
+      .reverse(),
+    [pieces, hiddenLayerIds, layerLocked],
+  );
 
   const [state, setState] = useState<EditCurveState>({
     isEditing: false,
     editingPieceId: null,
+    hoveredPieceId: null,
     selectedNode: null,
     hoveredNode: null,
     nodes: [],
   });
+
+  useEffect(() => {
+    if (state.isEditing || !state.hoveredPieceId) return;
+    if (hoverablePieces.some(piece => piece.id === state.hoveredPieceId)) return;
+    setState(current => ({
+      ...current,
+      hoveredPieceId: null,
+      hoveredNode: null,
+      nodes: [],
+    }));
+  }, [hoverablePieces, state.isEditing, state.hoveredPieceId]);
 
   const dragRef = useRef<{
     nodeRef: NodeRef;
@@ -119,6 +178,7 @@ export function useEditCurve(zoom: number, pan: Point2D) {
     setState({
       isEditing: true,
       editingPieceId: pieceId,
+      hoveredPieceId: null,
       selectedNode: selectedNode || null,
       hoveredNode: null,
       nodes: extractNodes(piece),
@@ -126,11 +186,49 @@ export function useEditCurve(zoom: number, pan: Point2D) {
     dragRef.current = null;
   }, [pieces, endDragBatch, dispatch]);
 
+  /**
+   * Hermano de la entrada actuante de Editar patrón. `enterEdit` conserva su
+   * semántica pura para todos sus callers; esta puerta añade exclusivamente el
+   * press que arma el arrastre del nodo sembrado.
+   */
+  const enterEditActuando = useCallback((
+    pieceId: string,
+    e: React.MouseEvent<SVGSVGElement>,
+  ): boolean => {
+    if (e.button !== 0) return false;
+    const piece = pieces.find(p => p.id === pieceId);
+    if (!piece) return false;
+    if (piezaBloqueada(piece, layerLocked)) {
+      // Mismo criterio que la entrada actuante de Editar patrón: el candado de
+      // capa no usa el texto del candado de pieza, pero tampoco se queda mudo.
+      if (piece.locked) enterEdit(pieceId);
+      else dispatch(showInfoToast('La capa de esta pieza está bloqueada: desbloquéala en Capas para editarla.'));
+      return true;
+    }
+    const nodes = extractNodes(piece);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const point = patternToPieceLocal(
+      toPattern(e.clientX, e.clientY, rect),
+      piece,
+    );
+    const nodeHit = hitTestEditableNode(point, nodes, screenToPatternLength(8, zoom));
+    if (!nodeHit) return false;
+
+    enterEdit(pieceId, nodeHit.ref);
+    dragRef.current = {
+      nodeRef: nodeHit.ref,
+      startMouse: { x: e.clientX, y: e.clientY },
+      startPos: { ...nodeHit.position },
+    };
+    return true;
+  }, [pieces, layerLocked, enterEdit, toPattern, zoom, dispatch]);
+
   const exitEdit = useCallback(() => {
     endDragBatch();
     setState({
       isEditing: false,
       editingPieceId: null,
+      hoveredPieceId: null,
       selectedNode: null,
       hoveredNode: null,
       nodes: [],
@@ -179,31 +277,15 @@ export function useEditCurve(zoom: number, pan: Point2D) {
 
     const HIT = screenToPatternLength(8, zoom);
 
-    // Check control points first (they should be clickable above anchors).
-    // Each handle carries its own drag ref (maria-203): cp1 = incoming
-    // (C:'cp2' / Q:'cp1' slot), cp2 = outgoing (next command's 'cp1' slot).
-    for (const node of state.nodes) {
-      const handles: Array<{ pos: Point2D; ref: NodeRef }> = [];
-      if (node.cp1 && node.cp1Ref) handles.push({ pos: node.cp1, ref: node.cp1Ref });
-      if (node.cp2 && node.cp2Ref) handles.push({ pos: node.cp2, ref: node.cp2Ref });
-      for (const h of handles) {
-        const d = Math.hypot(pt.x - h.pos.x, pt.y - h.pos.y);
-        if (d < HIT) {
-          setState(s => ({ ...s, selectedNode: h.ref }));
-          dragRef.current = { nodeRef: h.ref, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...h.pos } };
-          return true;
-        }
-      }
-    }
-
-    // Check anchors
-    for (const node of state.nodes) {
-      const d = Math.hypot(pt.x - node.position.x, pt.y - node.position.y);
-      if (d < HIT) {
-        setState(s => ({ ...s, selectedNode: node.ref }));
-        dragRef.current = { nodeRef: node.ref, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...node.position } };
-        return true;
-      }
+    const nodeHit = hitTestEditableNode(pt, state.nodes, HIT);
+    if (nodeHit) {
+      setState(s => ({ ...s, selectedNode: nodeHit.ref }));
+      dragRef.current = {
+        nodeRef: nodeHit.ref,
+        startMouse: { x: e.clientX, y: e.clientY },
+        startPos: { ...nodeHit.position },
+      };
+      return true;
     }
 
     // Clicked empty area — exit edit
@@ -212,7 +294,72 @@ export function useEditCurve(zoom: number, pan: Point2D) {
   }, [state, pieces, zoom, toPattern, exitEdit]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (!state.isEditing || !state.editingPieceId) return false;
+    if (!state.isEditing) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const HIT = screenToPatternLength(8, zoom);
+
+      // El DOM decide la pieza mientras el puntero cruza su relleno o la línea
+      // de un asa. El hit geométrico decide únicamente cuál nodo se resalta.
+      const target = e.target as Element | null;
+      const domPieceId = typeof target?.closest === 'function'
+        ? target.closest('[data-piece-id]')?.getAttribute('data-piece-id')
+        : null;
+      if (domPieceId) {
+        const domPiece = hoverablePieces.find(piece => piece.id === domPieceId);
+        if (!domPiece) {
+          // Una pieza visible pero bloqueada sigue ocluyendo las de abajo. El
+          // clic le pertenece al dueño DOM, así que el hover también.
+          setState(current => ({
+            ...current,
+            hoveredPieceId: null,
+            hoveredNode: null,
+            nodes: [],
+          }));
+          return false;
+        }
+        const nodes = extractNodes(domPiece);
+        const pt = patternToPieceLocal(
+          toPattern(e.clientX, e.clientY, rect),
+          domPiece,
+        );
+        const nodeHit = hitTestEditableNode(pt, nodes, HIT);
+        setState(current => ({
+          ...current,
+          hoveredPieceId: domPiece.id,
+          hoveredNode: nodeHit?.ref ?? null,
+          nodes,
+        }));
+        return false;
+      }
+
+      for (const piece of hoverablePieces) {
+        const nodes = extractNodes(piece);
+        const pt = patternToPieceLocal(
+          toPattern(e.clientX, e.clientY, rect),
+          piece,
+        );
+        const nodeHit = hitTestEditableNode(pt, nodes, HIT);
+        if (nodeHit) {
+          setState(s => ({
+            ...s,
+            hoveredPieceId: piece.id,
+            hoveredNode: nodeHit.ref,
+            nodes,
+          }));
+          return false;
+        }
+      }
+
+      setState(s => ({
+        ...s,
+        hoveredPieceId: null,
+        hoveredNode: null,
+        nodes: [],
+      }));
+      return false;
+    }
+
+    if (!state.editingPieceId) return false;
 
     if (dragRef.current) {
       const piece = pieces.find(p => p.id === state.editingPieceId);
@@ -268,30 +415,41 @@ export function useEditCurve(zoom: number, pan: Point2D) {
     );
     const HIT = screenToPatternLength(8, zoom);
 
-    let hovered: NodeRef | null = null;
-    for (const node of state.nodes) {
-      if (node.cp1 && node.cp1Ref) {
-        const d = Math.hypot(pt.x - node.cp1.x, pt.y - node.cp1.y);
-        if (d < HIT) { hovered = node.cp1Ref; break; }
-      }
-      if (node.cp2 && node.cp2Ref) {
-        const d = Math.hypot(pt.x - node.cp2.x, pt.y - node.cp2.y);
-        if (d < HIT) { hovered = node.cp2Ref; break; }
-      }
-      const d = Math.hypot(pt.x - node.position.x, pt.y - node.position.y);
-      if (d < HIT) { hovered = node.ref; break; }
-    }
+    const hovered = hitTestEditableNode(pt, state.nodes, HIT)?.ref ?? null;
 
-    if (hovered !== state.hoveredNode) {
+    if ((!hovered && state.hoveredNode)
+        || (hovered && (!state.hoveredNode || !sameNodeRef(hovered, state.hoveredNode)))) {
       setState(s => ({ ...s, hoveredNode: hovered }));
     }
     return false;
-  }, [state, pieces, zoom, toPattern, dispatch, beginDragBatch]);
+  }, [state, pieces, hoverablePieces, zoom, toPattern, dispatch, beginDragBatch]);
 
   const handleMouseUp = useCallback(() => {
+    const draggedNode = dragRef.current?.nodeRef ?? null;
     dragRef.current = null;
     endDragBatch();
+    if (draggedNode) {
+      // El nodo termina bajo el puntero. Guardarlo en estado fuerza el render
+      // que el cursor necesita y permite que el próximo move lo limpie al salir.
+      setState(current => ({ ...current, hoveredNode: draggedNode }));
+    }
   }, [endDragBatch]);
+
+  const getCursor = useCallback(
+    (): string => (dragRef.current || state.hoveredNode ? 'move' : 'default'),
+    [state.hoveredNode],
+  );
+
+  const limpiarHover = useCallback(() => {
+    setState(current => current.isEditing
+      ? current
+      : {
+          ...current,
+          hoveredPieceId: null,
+          hoveredNode: null,
+          nodes: [],
+        });
+  }, []);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && state.isEditing) {
@@ -315,10 +473,13 @@ export function useEditCurve(zoom: number, pan: Point2D) {
   return {
     ...state,
     enterEdit,
+    enterEditActuando,
     exitEdit,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
     handleKeyDown,
+    limpiarHover,
+    getCursor,
   };
 }

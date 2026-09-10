@@ -10,7 +10,7 @@ import React from 'react';
 import { renderHook, cleanup, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import projectReducer, { restoreState } from '../../../store/projectSlice';
+import projectReducer, { restoreState, setLayerLocked } from '../../../store/projectSlice';
 import { useEditPattern, findInsertTarget, resyncStateToPiece } from '../useEditPattern';
 import { patternToPieceLocal, pieceLocalToPattern } from '../pieceTransform';
 import { extractNodes, splitSegmentAt } from '../nodeEditorUtils';
@@ -191,18 +191,22 @@ describe('patternToPieceLocal / pieceLocalToPattern', () => {
 });
 
 describe('useEditPattern hit-testing on a rotated piece', () => {
-  function setup(p: PatternPiece) {
+  function setup(p: PatternPiece | PatternPiece[]) {
     const store = configureStore({ reducer: { project: projectReducer } });
-    store.dispatch(restoreState({ ...store.getState().project, pieces: [p] }));
+    const pieces = Array.isArray(p) ? p : [p];
+    store.dispatch(restoreState({ ...store.getState().project, pieces }));
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <Provider store={store}>{children}</Provider>
     );
     const hook = renderHook(() => useEditPattern(1, { x: 0, y: 0 }), { wrapper });
     return { store, hook };
   }
-  function clickAt(x: number, y: number) {
+  function clickAt(x: number, y: number, pieceId: string | null = null) {
     return {
       button: 0, shiftKey: false, clientX: x, clientY: y,
+      target: {
+        closest: () => (pieceId ? { getAttribute: () => pieceId } : null),
+      },
       currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
     } as unknown as React.MouseEvent<SVGSVGElement>;
   }
@@ -240,6 +244,88 @@ describe('useEditPattern hit-testing on a rotated piece', () => {
     const outline = (store.getState() as { project: { pieces: PatternPiece[] } }).project.pieces[0].outline;
     expect(outline[1].values[0]).toBeCloseTo(200);
     expect(outline[1].values[1]).toBeCloseTo(-10);
+  });
+
+  it('does not promise or start editing through a locked layer', () => {
+    const lockedLayerPiece = { ...piece(), layer: 3 } as PatternPiece;
+    const { hook, store } = setup(lockedLayerPiece);
+
+    act(() => { hook.result.current.handleMouseMove(clickAt(50, 0)); });
+    expect(hook.result.current.hoveredPieceId).toBe('p');
+
+    act(() => { store.dispatch(setLayerLocked({ layer: 3, locked: true })); });
+    expect(hook.result.current.hoveredPieceId).toBeNull();
+    expect(hook.result.current.hoveredSegment).toBeNull();
+
+    act(() => {
+      expect(hook.result.current.enterEditActuando('p', clickAt(0, 0))).toBe(true);
+    });
+    expect(hook.result.current.isEditing).toBe(false);
+  });
+
+  it('resolves equal zOrder in the same topmost order as the renderer', () => {
+    const below = piece();
+    const above = { ...piece(), id: 'p2', name: 'P2' } as PatternPiece;
+    const { hook } = setup([below, above]);
+
+    act(() => { hook.result.current.handleMouseMove(clickAt(50, 0)); });
+    expect(hook.result.current.hoveredPieceId).toBe('p2');
+  });
+
+  it('announces a first-gesture node drag with the move cursor', () => {
+    const { hook } = setup(piece());
+
+    act(() => { hook.result.current.handleMouseMove(clickAt(0, 0, 'p')); });
+
+    expect(hook.result.current.hoveredNode).toBe(0);
+    expect(hook.result.current.hoveredSegment).toBeNull();
+    expect(hook.result.current.getCursor()).toBe('move');
+  });
+
+  it('does not treat the synthetic closing edge of an open outline as a subject', () => {
+    const open = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [200, 0] },
+      { type: 'L', values: [200, 200] },
+    ] as PatternPiece['outline'];
+    const { hook } = setup(piece(open));
+
+    act(() => { hook.result.current.handleMouseMove(clickAt(100, 100, 'p')); });
+    expect(hook.result.current.hoveredPieceId).toBeNull();
+    expect(hook.result.current.hoveredSegment).toBeNull();
+
+    act(() => {
+      expect(hook.result.current.enterEditActuando('p', clickAt(100, 100, 'p'))).toBe(false);
+    });
+    expect(hook.result.current.isEditing).toBe(false);
+  });
+
+  it('does not promise a lower segment hidden behind the DOM-owned piece', () => {
+    const lower = piece([
+      { type: 'M', values: [0, 100] },
+      { type: 'L', values: [200, 100] },
+      { type: 'L', values: [200, 300] },
+      { type: 'L', values: [0, 300] },
+      { type: 'Z', values: [] },
+    ] as PatternPiece['outline']);
+    const upper = { ...piece(), id: 'p2', name: 'Upper' } as PatternPiece;
+    const { hook } = setup([lower, upper]);
+
+    act(() => { hook.result.current.handleMouseMove(clickAt(100, 100, 'p2')); });
+
+    expect(hook.result.current.hoveredPieceId).toBeNull();
+    expect(hook.result.current.getCursor()).toBe('default');
+  });
+
+  it('clears pre-entry hover when the pointer leaves the canvas', () => {
+    const { hook } = setup(piece());
+
+    act(() => { hook.result.current.handleMouseMove(clickAt(50, 0)); });
+    expect(hook.result.current.hoveredPieceId).toBe('p');
+
+    act(() => { hook.result.current.limpiarHover(); });
+    expect(hook.result.current.hoveredPieceId).toBeNull();
+    expect(hook.result.current.hoveredSegment).toBeNull();
   });
 });
 

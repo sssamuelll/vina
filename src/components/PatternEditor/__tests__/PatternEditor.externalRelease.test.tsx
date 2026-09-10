@@ -84,7 +84,7 @@ function setupHost() {
   fireEvent.mouseUp(window, { button: 0, buttons: 0, clientX: 50, clientY: 50 });
   expect(view.container.querySelector('[data-anchor-role]')).not.toBeNull();
 
-  return { store, svg, view, shortcutHost };
+  return { store, svg, view, shortcutHost, pieceFill };
 }
 
 function beginNodeDrag(svg: SVGSVGElement) {
@@ -170,4 +170,34 @@ describe('PatternEditor external drag release', () => {
       expect.soft(getUndoLength()).toBe(historyAfterGesture + 1);
     },
   );
+
+  it('closes a fused curve drag when a shortcut changes tools before release', () => {
+    const { store, svg, shortcutHost, pieceFill } = setupHost();
+    const outline = () => store.getState().project.pieces[0].outline;
+
+    fireEvent.keyDown(shortcutHost, { key: 'v' });
+    expect(store.getState().editor.activeTool).toBe('editCurve');
+
+    const historyBefore = getUndoLength();
+    fireEvent.mouseDown(pieceFill, { button: 0, buttons: 1, clientX: 100, clientY: 0 });
+    fireEvent.mouseMove(svg, { buttons: 1, clientX: 110, clientY: 0 });
+    expect(outline()[1].values).toEqual([110, 0]);
+
+    fireEvent.keyDown(shortcutHost, { key: 'q' });
+    expect(store.getState().editor.activeTool).toBe('editPattern');
+    fireEvent.mouseUp(window, { button: 0, buttons: 0, clientX: 500, clientY: 500 });
+
+    const afterRelease = structuredClone(outline());
+    const historyAfterGesture = getUndoLength();
+    fireEvent.keyDown(shortcutHost, { key: 'v' });
+    fireEvent.mouseMove(svg, { buttons: 1, clientX: 130, clientY: 0 });
+    store.dispatch(updatePiece({
+      ...store.getState().project.pieces[0],
+      name: 'Independent after curve tool switch',
+    }));
+
+    expect.soft(historyAfterGesture).toBe(historyBefore + 1);
+    expect.soft(outline()).toEqual(afterRelease);
+    expect.soft(getUndoLength()).toBe(historyAfterGesture + 1);
+  });
 });

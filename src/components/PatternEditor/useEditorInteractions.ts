@@ -174,13 +174,17 @@ interface ToolHooks {
   measureTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void; clear: () => void; limpiarHover?: () => void };
   nodeEditor: {
     isEditing: boolean;
+    hoveredPieceId: string | null;
     hoveredNode: unknown;
     enterEdit: (pieceId: string, selectedNode?: NodeRef) => void;
+    enterEditActuando: (pieceId: string, e: React.MouseEvent<SVGSVGElement>) => boolean;
     exitEdit: () => void;
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseUp: () => void;
     handleKeyDown: (e: KeyboardEvent) => void;
+    limpiarHover: () => void;
+    getCursor: () => string;
   };
   transformTool: {
     isDragging: boolean;
@@ -196,12 +200,14 @@ interface ToolHooks {
     hoveredNode: number | null;
     hoveredSegment: number | null;
     enterEdit: (pieceId: string) => void;
+    enterEditActuando: (pieceId: string, e: React.MouseEvent<SVGSVGElement>) => boolean;
     exitEdit: () => void;
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseUp: () => void;
     handleKeyDown: (e: KeyboardEvent) => void;
     handleDoubleClick: (e: React.MouseEvent<SVGSVGElement>) => boolean;
+    limpiarHover: () => void;
     getCursor: () => string;
   };
   scissorsTool: {
@@ -775,6 +781,7 @@ export function useEditorInteractions(
       const target = e.target as SVGElement;
       const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');
       if (pieceId) {
+        if (editPattern.enterEditActuando(pieceId, e)) return;
         editPattern.enterEdit(pieceId);
       } else {
         editPattern.exitEdit();
@@ -788,8 +795,14 @@ export function useEditorInteractions(
       // resto del ciclo, y un clic sobre OTRA pieza cae aquí y cambia el
       // objetivo de edición.
       const target = e.target as SVGElement;
-      const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');
+      // El overlay nuevo lleva `data-piece-id`; el hover fresco queda como
+      // respaldo para glifos con `pointer-events: none`.
+      const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id')
+        ?? nodeEditor.hoveredPieceId;
       if (pieceId) {
+        // Esta misma rama recibe el fallo del handler al cambiar A → B. Solo
+        // una sesión realmente inédita fusiona entrada y acción (§ 2).
+        if (!nodeEditor.isEditing && nodeEditor.enterEditActuando(pieceId, e)) return;
         nodeEditor.enterEdit(pieceId);
       } else {
         nodeEditor.exitEdit();
@@ -1049,7 +1062,7 @@ export function useEditorInteractions(
       }
       return;
     }
-    if (nodeEditor.isEditing && (activeTool === 'select' || activeTool === 'editCurve')) {
+    if (activeTool === 'editCurve' || (nodeEditor.isEditing && activeTool === 'select')) {
       const handled = nodeEditor.handleMouseMove(e);
       if (handled) return;
     }
@@ -1213,7 +1226,7 @@ export function useEditorInteractions(
     }
     if (activeTool === 'grainline') grainlineTool.handleMouseUp(e);
     if (activeTool === 'transform' || (activeTool === 'select' && transformTool.isDragging)) transformTool.handleMouseUp();
-    if (nodeEditor.isEditing && (activeTool === 'select' || activeTool === 'editCurve')) nodeEditor.handleMouseUp();
+    if (activeTool === 'editCurve' || (nodeEditor.isEditing && activeTool === 'select')) nodeEditor.handleMouseUp();
     if (activeTool === 'editPattern') editPattern.handleMouseUp();
     if (activeTool === 'scissors') scissorsTool.handleMouseUp();
     if (activeTool === 'slashAndSpread') slashAndSpreadTool.handleMouseUp();
@@ -1269,7 +1282,9 @@ export function useEditorInteractions(
     seamEditTool.limpiarHover();
     seamTool.limpiarHover();
     measureTool.limpiarHover?.();
-  }, [seamAllowanceTool, seamEditTool, seamTool, measureTool]);
+    editPattern.limpiarHover();
+    nodeEditor.limpiarHover();
+  }, [seamAllowanceTool, seamEditTool, seamTool, measureTool, editPattern, nodeEditor]);
 
   const getCursor = () => {
     switch (activeTool) {
@@ -1281,7 +1296,7 @@ export function useEditorInteractions(
         if (marqueeRef.current) return 'crosshair';
         return hoverCursor ?? 'default';
       case 'transform': return 'default';
-      case 'editCurve': return nodeEditor.hoveredNode ? 'move' : 'default';
+      case 'editCurve': return nodeEditor.getCursor();
       case 'editPattern': return editPattern.getCursor();
       case 'seam': return 'crosshair';
       case 'notch': return 'crosshair';

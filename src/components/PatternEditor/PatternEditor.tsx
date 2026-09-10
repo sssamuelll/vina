@@ -1350,6 +1350,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             formatDistance={measureTool.formatDistance}
             nodeEditorIsEditing={isNodeEditing}
             nodeEditorEditingPieceId={nodeEditor.editingPieceId}
+            nodeEditorHoveredPieceId={nodeEditor.hoveredPieceId}
             nodeEditorNodes={nodeEditor.nodes}
             selectedNode={nodeEditor.selectedNode}
             hoveredNode={nodeEditor.hoveredNode}

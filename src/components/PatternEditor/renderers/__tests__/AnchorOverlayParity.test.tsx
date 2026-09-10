@@ -1,9 +1,14 @@
 // @vitest-environment jsdom
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { configureStore } from '@reduxjs/toolkit';
+import { Provider } from 'react-redux';
 import type { PatternPiece } from '../../../../types/types';
 import { outlineBBoxCenter, rotatePoint } from '../../../../utils/geometry/transform';
+import projectReducer from '../../../../store/projectSlice';
+import editorReducer from '../../../../store/editorSlice';
 import { extractNodes } from '../../nodeEditorUtils';
+import ToolOverlay from '../ToolOverlay';
 import EditPatternOverlay from '../overlays/EditPatternOverlay';
 import NodeEditorOverlay from '../overlays/NodeEditorOverlay';
 
@@ -136,5 +141,74 @@ describe('anchor overlay parity', () => {
     expect(handle.getAttribute('stroke')).toBe('#ff6b6b');
     expect(handle.closest('[data-anchor-role]')).toBeNull();
     expect(container.querySelectorAll('[data-anchor-role]')).toHaveLength(nodes.length);
+  });
+
+  it('gives Bezier handles stronger geometry for hover and selection', () => {
+    const curved = {
+      ...piece,
+      rotation: 0,
+      outline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'C', values: [30, 0, 70, 100, 100, 100] },
+        { type: 'Z', values: [] },
+      ],
+    } as PatternPiece;
+    const nodes = extractNodes(curved);
+    const handleRef = nodes.find(node => node.cp2Ref)?.cp2Ref;
+    expect(handleRef).toBeDefined();
+
+    const renderHandle = (hovered: typeof handleRef, selected: typeof handleRef) => {
+      const view = render(
+        <svg>
+          <NodeEditorOverlay
+            zoom2D={1} units="mm" pieces={[curved]}
+            nodeEditorEditingPieceId="p" nodeEditorNodes={nodes}
+            selectedNode={selected ?? null} hoveredNode={hovered ?? null}
+          />
+        </svg>,
+      );
+      const handle = view.container.querySelector('.node-editor__control-handle')!;
+      const geometry = {
+        width: Number(handle.getAttribute('width')),
+        strokeWidth: Number(handle.getAttribute('stroke-width')),
+      };
+      view.unmount();
+      return geometry;
+    };
+
+    const idle = renderHandle(undefined, undefined);
+    const hovered = renderHandle(handleRef, undefined);
+    const selected = renderHandle(undefined, handleRef);
+
+    expect(hovered.width).toBeGreaterThan(idle.width);
+    expect(hovered.strokeWidth).toBeGreaterThan(idle.strokeWidth);
+    expect(selected.width).toBeGreaterThan(hovered.width);
+    expect(selected.strokeWidth).toBeGreaterThan(hovered.strokeWidth);
+  });
+
+  it('does not leak a curve pre-hover overlay into Select', () => {
+    const store = configureStore({ reducer: { project: projectReducer, editor: editorReducer } });
+    const nodes = extractNodes(piece);
+    const props = {
+      activeTool: 'select',
+      zoom2D: 1,
+      units: 'mm',
+      pieces: [piece],
+      anchorReferencePieceId: null,
+      nodeEditorIsEditing: false,
+      nodeEditorEditingPieceId: null,
+      nodeEditorHoveredPieceId: 'p',
+      nodeEditorNodes: nodes,
+      selectedNode: null,
+      hoveredNode: nodes[0].ref,
+    } as unknown as React.ComponentProps<typeof ToolOverlay>;
+
+    const { container } = render(
+      <Provider store={store}>
+        <svg><ToolOverlay {...props} /></svg>
+      </Provider>,
+    );
+
+    expect(container.querySelector('.node-editor')).toBeNull();
   });
 });
