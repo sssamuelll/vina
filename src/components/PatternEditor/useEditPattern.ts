@@ -847,7 +847,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   // ─── getCursor ───
 
   const getCursor = useCallback((): string => {
-    if (!state.isEditing) return 'default';
+    if (!state.isEditing) {
+      // Hover-sin-clic (2026-09-10): el resalte de tramo ya no espera la
+      // sesión entrada — el puntero tampoco puede, o la señal queda a
+      // medias (el tramo se resalta pero el cursor sigue en `default`).
+      return state.hoveredSegment !== null ? 'pointer' : 'default';
+    }
     if (dragRef.current) {
       if (dragRef.current.type === 'marquee') return 'crosshair';
       return 'move';
@@ -857,6 +862,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     if (state.hoveredSegment !== null) return 'pointer';
     return 'default';
   }, [state.isEditing, state.hoveredNode, state.hoveredSegment, state.addPointPreview]);
+
 
   return {
     ...state,

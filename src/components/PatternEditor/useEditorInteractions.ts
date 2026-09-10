@@ -1282,7 +1282,7 @@ export function useEditorInteractions(
         return hoverCursor ?? 'default';
       case 'transform': return 'default';
       case 'editCurve': return nodeEditor.hoveredNode ? 'move' : 'default';
-      case 'editPattern': return editPattern.isEditing ? editPattern.getCursor() : 'default';
+      case 'editPattern': return editPattern.getCursor();
       case 'seam': return 'crosshair';
       case 'notch': return 'crosshair';
       case 'point': return pointTool.getCursor();

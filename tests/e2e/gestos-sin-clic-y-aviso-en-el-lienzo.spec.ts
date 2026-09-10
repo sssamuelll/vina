@@ -39,6 +39,34 @@ test.describe('§ 1 — Editar patrón: el hover no espera un clic', () => {
     ).toHaveCount(1);
   });
 
+  test('el puntero también cambia sin clic previo — no solo el resalte', async ({ page }) => {
+    // Encontrado en vivo por Samuel el 2026-09-10: el resalte de tramo
+    // funcionaba sin clic, pero el cursor se quedaba en `default` — la señal
+    // quedaba a medias. `getCursor()` (useEditPattern.ts) y su llamador
+    // (useEditorInteractions.ts:1285) tenían la MISMA guarda de
+    // `state.isEditing` que ya se había quitado de `handleMouseMove`.
+    await waitForApp(page);
+    await addPiece(page, 'p1', { x: 100, y: 100 }, 200, 150);
+    await activarHerramienta(page, 'q', 'editPattern');
+
+    const svg = page.locator('svg.pattern-svg');
+    const lejos = await toScreen(page, { x: 500, y: 500 });
+    await page.mouse.move(lejos.x, lejos.y);
+    await page.waitForTimeout(150);
+    expect(
+      await svg.evaluate(el => getComputedStyle(el).cursor),
+      'lejos de cualquier tramo, el puntero es el de siempre',
+    ).toBe('default');
+
+    const s = await toScreen(page, { x: 200, y: 100 });
+    await page.mouse.move(s.x, s.y);
+    await page.waitForTimeout(200);
+    expect(
+      await svg.evaluate(el => getComputedStyle(el).cursor),
+      'sobre el tramo, sin haber clicado, el puntero tiene que avisar que es accionable',
+    ).toBe('pointer');
+  });
+
   test('al alejar el mouse de cualquier tramo, el resalte se va', async ({ page }) => {
     await waitForApp(page);
     await addPiece(page, 'p1', { x: 100, y: 100 }, 200, 150);
