@@ -5,6 +5,7 @@ import { classifyEditableAnchors } from '../../anchorRoles';
 import type { EditableNode, NodeRef } from '../../nodeEditorUtils';
 import { pieceLocalToPattern } from '../../pieceTransform';
 import AnchorGlyph, { type AnchorVisualState } from '../AnchorGlyph';
+import { READOUT_FONT_PX, pildoraDeMedida } from './pildoraDeMedida';
 
 interface NodeEditorOverlayProps {
   zoom2D: number;
@@ -102,21 +103,26 @@ export default function NodeEditorOverlay({ zoom2D, units, pieces, nodeEditorEdi
         })}
       </g>
 
-      {selectedNodeData && selectedNodePatternPosition && (
-        <g transform={`translate(${selectedNodePatternPosition.x}, ${selectedNodePatternPosition.y - 20 / zoom2D})`}>
-          <rect
-            x={-40 / zoom2D} y={-8 / zoom2D}
-            width={80 / zoom2D} height={16 / zoom2D}
-            rx={8 / zoom2D} fill="rgba(0,0,0,0.75)"
-          />
-          <text
-            textAnchor="middle" dominantBaseline="central"
-            fill="#fff" fontSize={9 / zoom2D} pointerEvents="none"
-          >
-            x: {formatDimension(selectedNodeData.position.x, units as UnitSystem)}, y: {formatDimension(selectedNodeData.position.y, units as UnitSystem)}
-          </text>
-        </g>
-      )}
+      {selectedNodeData && selectedNodePatternPosition && (() => {
+        // La píldora se dimensiona desde SU texto: con el ancho escrito a mano
+        // (80 px) "x: 489.1 mm, y: 411.0 mm" se salía por los dos lados y la
+        // mitad del número quedaba sobre la cuadrícula clara, ilegible.
+        const lectura = `x: ${formatDimension(selectedNodeData.position.x, units as UnitSystem)}, y: ${formatDimension(selectedNodeData.position.y, units as UnitSystem)}`;
+        const fontSize = READOUT_FONT_PX / zoom2D;
+        const pildora = pildoraDeMedida(lectura, fontSize);
+        return (
+          <g transform={`translate(${selectedNodePatternPosition.x}, ${selectedNodePatternPosition.y - 20 / zoom2D})`}>
+            <rect {...pildora} fill="var(--readout-bg-2d)" />
+            <text
+              textAnchor="middle" dominantBaseline="central"
+              fill="var(--readout-ink-2d)" fontSize={fontSize} pointerEvents="none"
+              style={{ fontFamily: 'var(--font-mono-2d)' }}
+            >
+              {lectura}
+            </text>
+          </g>
+        );
+      })()}
     </>
   );
 }

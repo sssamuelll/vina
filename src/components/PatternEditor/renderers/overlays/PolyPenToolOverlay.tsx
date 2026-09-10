@@ -3,6 +3,7 @@ import { formatDimension } from '../../../../utils/units';
 import { EDGE_HIT_PX } from '../../gestureConstants';
 import { nodesToCommands, commandsToPathD, type PolyPenNode, type PolyPenNodeType } from '../../polyPenGeometry';
 import type { SnapTarget } from '../../usePolyPenTool';
+import { READOUT_FONT_PX, pildoraDeMedida } from './pildoraDeMedida';
 
 /**
  * Overlay de "Línea interna" (spec 2026-08-29 § 4.7).
@@ -138,14 +139,25 @@ export default function PolyPenToolOverlay({
         />
       )}
 
-      {readout && (
-        <g className="il-readout" transform={`translate(${readout.at.x}, ${readout.at.y})`}>
-          <rect x={-48 / z} y={-8 / z} width={96 / z} height={16 / z} rx={8 / z} fill="var(--readout-bg-2d)" />
-          <text textAnchor="middle" dominantBaseline="central" fill="var(--readout-ink-2d)" fontSize={10 / z}>
-            {readout.text}
-          </text>
-        </g>
-      )}
+      {readout && (() => {
+        // Mismo arreglo que la píldora de la herramienta V: el ancho escrito a
+        // mano (96 px) ya andaba a un dígito de romperse — su lectura medía
+        // ~94 px. Se dimensiona desde el texto.
+        const fontSize = READOUT_FONT_PX / z;
+        const pildora = pildoraDeMedida(readout.text, fontSize);
+        return (
+          <g className="il-readout" transform={`translate(${readout.at.x}, ${readout.at.y})`}>
+            <rect {...pildora} fill="var(--readout-bg-2d)" />
+            <text
+              textAnchor="middle" dominantBaseline="central"
+              fill="var(--readout-ink-2d)" fontSize={fontSize}
+              style={{ fontFamily: 'var(--font-mono-2d)' }}
+            >
+              {readout.text}
+            </text>
+          </g>
+        );
+      })()}
     </g>
   );
 }
