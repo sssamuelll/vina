@@ -517,6 +517,23 @@ const SinglePiece = memo(function SinglePiece({
         );
       })()}
 
+      {!piece.outline.some(command => command.type === 'Z') && (() => {
+        const { cx, cy } = piece.outline.length ? getOutlineCenter(piece.outline) : { cx: 0, cy: 0 };
+        return (
+          <text
+            x={cx}
+            y={cy + 28 / zoom2D}
+            fontSize={10 / zoom2D}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            pointerEvents="none"
+            style={{ fontFamily: 'var(--font-mono-2d)', fill: 'var(--piece-error-2d)' }}
+          >
+            abierta: no se puede simular
+          </text>
+        );
+      })()}
+
       {/* Los extremos, SIEMPRE — no solo con la pieza elegida (#1103). El
           bloque de antes pintaba todos los nodos como el mismo círculo, sin
           decir cuál es esquina y cuál de curva, y sin deduplicar el vértice

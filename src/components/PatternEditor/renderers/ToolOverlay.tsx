@@ -107,6 +107,7 @@ interface ToolOverlayProps {
   measureComparison?: CurveComparison | null;
   nodeEditorIsEditing: boolean;
   nodeEditorEditingPieceId: string | null;
+  nodeEditorHoveredPieceId: string | null;
   nodeEditorNodes: EditorNode[];
   selectedNode: NodeRef | null;
   hoveredNode: NodeRef | null;
@@ -118,6 +119,7 @@ interface ToolOverlayProps {
   editPatternIsEditing: boolean;
   anchorReferencePieceId?: string | null;
   editPatternEditingPieceId: string | null;
+  editPatternHoveredPieceId: string | null;
   editPatternNodes: EditableNode[];
   editPatternSelectedNodes: Set<number>;
   editPatternSelectedSegments: Set<number>;
@@ -176,6 +178,11 @@ interface ToolOverlayProps {
 
 export default function ToolOverlay(props: ToolOverlayProps) {
   const { activeTool, zoom2D, pieces, units } = props;
+  const nodeEditorPieceId = props.nodeEditorIsEditing
+    ? props.nodeEditorEditingPieceId
+    : activeTool === 'editCurve'
+      ? props.nodeEditorHoveredPieceId
+      : null;
   const referencePiece = activeTool === 'select' && !props.nodeEditorIsEditing
     ? pieces.find(p => p.id === props.anchorReferencePieceId)
     : undefined;
@@ -297,11 +304,14 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         />
       )}
 
-      {activeTool === 'editPattern' && props.editPatternIsEditing && props.editPatternEditingPieceId && (
+      {activeTool === 'editPattern'
+        && ((props.editPatternIsEditing && props.editPatternEditingPieceId) || props.editPatternHoveredPieceId)
+        && (
         <EditPatternOverlay
           zoom2D={zoom2D}
           pieces={pieces}
           editingPieceId={props.editPatternEditingPieceId}
+          hoveredPieceId={props.editPatternHoveredPieceId}
           nodes={props.editPatternNodes}
           selectedNodes={props.editPatternSelectedNodes}
           selectedSegments={props.editPatternSelectedSegments}
@@ -322,6 +332,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           zoom2D={zoom2D}
           pieces={pieces}
           editingPieceId={referencePiece.id}
+          hoveredPieceId={null}
           nodes={classifyEditableAnchors(referencePiece, extractNodes(referencePiece))
             .filter(({ role }) => EXTREMOS.has(role))
             .map(({ node }) => node)}
@@ -334,8 +345,8 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         />
       )}
 
-      {(activeTool === 'select' || activeTool === 'editCurve') && props.nodeEditorIsEditing && props.nodeEditorEditingPieceId && (
-        <NodeEditorOverlay zoom2D={zoom2D} units={units} pieces={pieces} nodeEditorEditingPieceId={props.nodeEditorEditingPieceId} nodeEditorNodes={props.nodeEditorNodes} selectedNode={props.selectedNode} hoveredNode={props.hoveredNode} />
+      {(activeTool === 'select' || activeTool === 'editCurve') && nodeEditorPieceId && (
+        <NodeEditorOverlay zoom2D={zoom2D} units={units} pieces={pieces} nodeEditorEditingPieceId={nodeEditorPieceId} nodeEditorNodes={props.nodeEditorNodes} selectedNode={props.selectedNode} hoveredNode={props.hoveredNode} />
       )}
 
       {activeTool === 'scissors' && (

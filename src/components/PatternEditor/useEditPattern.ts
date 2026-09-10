@@ -8,7 +8,7 @@
  * Does NOT show bezier handles — that is for useEditCurve.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
@@ -36,6 +36,7 @@ import {
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { rotatePoint } from '../../utils/geometry/transform';
 import { reanchorNotches } from '../../utils/notchReanchor';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
 import { convertSegmentToSpline, resmoothAfterMove } from './splineSegment';
 import { showInfoToast } from '../../store/copilotUISlice';
 import {
@@ -48,12 +49,14 @@ export { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 // ─── Constants ───
 
 const HIT_RADIUS_PX = 8; // screen pixels
+const NO_HIDDEN_LAYER_IDS: number[] = [];
 
 // ─── State ───
 
 export interface EditPatternState {
   isEditing: boolean;
   editingPieceId: string | null;
+  hoveredPieceId: string | null;
   nodes: EditableNode[];
   selectedNodes: Set<number>;       // commandIndex set (multi-select)
   selectedSegments: Set<number>;    // commandIndex of segment destination
@@ -66,6 +69,7 @@ export interface EditPatternState {
 const INITIAL_STATE: EditPatternState = {
   isEditing: false,
   editingPieceId: null,
+  hoveredPieceId: null,
   nodes: [],
   selectedNodes: new Set<number>(),
   selectedSegments: new Set<number>(),
@@ -142,6 +146,7 @@ export function resyncStateToPiece(
     nodes: extractNodes(piece),
     selectedNodes: new Set<number>(),
     selectedSegments: new Set<number>(),
+    hoveredPieceId: null,
     hoveredNode: null,
     hoveredSegment: null,
     addPointPreview: null,
@@ -154,8 +159,37 @@ export function resyncStateToPiece(
 export function useEditPattern(zoom: number, pan: Point2D) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
+  // `?? []`: varios arneses de prueba de este hook montan una tienda mínima
+  // con solo el reducer `project` (útil desde antes de esta tanda). Con
+  // `simulation` ausente ahí, este selector no puede exigirlo.
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation?.hiddenLayerIds ?? NO_HIDDEN_LAYER_IDS);
+  // Mismo criterio que `drawablePieces`/`PieceRenderer` (PatternEditor.tsx:198-206):
+  // "solo lo que se dibuja puede prometer una lectura o recibir el clic", y
+  // de arriba hacia abajo — si dos piezas se solapan, el hover-sin-clic no
+  // puede señalar una que el clic real (hit-test del DOM, topmost por
+  // definición) ignoraría por estar tapada.
+  const hoverablePieces = useMemo(
+    () => pieces
+      .filter(p => !piezaBloqueada(p, layerLocked) && !hiddenLayerIds.includes(p.layer ?? 1))
+      .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0))
+      .reverse(),
+    [pieces, hiddenLayerIds, layerLocked],
+  );
 
   const [state, setState] = useState<EditPatternState>({ ...INITIAL_STATE });
+
+  useEffect(() => {
+    if (state.isEditing || !state.hoveredPieceId) return;
+    if (hoverablePieces.some(piece => piece.id === state.hoveredPieceId)) return;
+    setState(current => ({
+      ...current,
+      hoveredPieceId: null,
+      hoveredNode: null,
+      hoveredSegment: null,
+    }));
+  }, [hoverablePieces, state.isEditing, state.hoveredPieceId]);
+
   const dragRef = useRef<DragState | null>(null);
   const dragBatchTokenRef = useRef<UndoBatchToken | null>(null);
 
@@ -308,6 +342,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       setState({
         isEditing: true,
         editingPieceId: pieceId,
+        hoveredPieceId: null,
         nodes: extractNodes(piece),
         selectedNodes: new Set<number>(),
         selectedSegments: new Set<number>(),
@@ -319,6 +354,108 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       dragRef.current = null;
     },
     [pieces, endDragBatch, dispatch],
+  );
+
+  /**
+   * Entra a una pieza y, solo cuando el press tiene un sujeto concreto, deja
+   * armado ese mismo gesto. El hit-test usa nodos recién extraídos: antes de
+   * entrar, `state.nodes` todavía pertenece a la sesión vacía de React.
+   *
+   * `false` deja la entrada pura en manos del router. Así el relleno de la
+   * pieza conserva el contrato anterior y no nace un marquee por accidente.
+   */
+  const enterEditActuando = useCallback(
+    (pieceId: string, e: React.MouseEvent<SVGSVGElement>): boolean => {
+      if (e.button !== 0) return false;
+      const piece = pieces.find(p => p.id === pieceId);
+      if (!piece) return false;
+      if (piezaBloqueada(piece, layerLocked)) {
+        // El candado propio conserva el aviso de `enterEdit`. El de capa no
+        // puede usar ese texto —se desbloquea en Capas, no con clic derecho—
+        // pero tampoco puede quedarse callado: `enterEdit` ya lleva escrito
+        // por qué (maria-204), "sin aviso sería otro clicaba y nada pasaba".
+        if (piece.locked) enterEdit(pieceId);
+        else dispatch(showInfoToast('La capa de esta pieza está bloqueada: desbloquéala en Capas para editarla.'));
+        return true;
+      }
+
+      const nodes = extractNodes(piece);
+      const localPt = toLocal(e, piece);
+      const nodeHit = hitTestNode(localPt, nodes, hitRadius);
+
+      if (nodeHit) {
+        endDragBatch();
+        const selectedNodes = new Set(anchorGroupOf(piece.outline, nodeHit.commandIndex));
+        const startPositions = new Map<number, Point2D>();
+        for (const commandIndex of selectedNodes) {
+          const node = nodes.find(n => n.ref.commandIndex === commandIndex);
+          if (node) startPositions.set(commandIndex, { ...node.position });
+        }
+
+        seenOutlineRef.current = piece.outline;
+        expectedOutlineRef.current = null;
+        setState({
+          isEditing: true,
+          editingPieceId: pieceId,
+          hoveredPieceId: null,
+          nodes,
+          selectedNodes,
+          selectedSegments: new Set<number>(),
+          hoveredNode: null,
+          hoveredSegment: null,
+          addPointPreview: null,
+          marquee: null,
+        });
+        dragRef.current = {
+          type: 'node',
+          startMouse: { x: e.clientX, y: e.clientY },
+          startPositions,
+        };
+        return true;
+      }
+
+      const segmentHit = nearestSegment(localPt, piece.outline);
+      if (segmentHit
+          && segmentHit.distance < hitRadius
+          && piece.outline[segmentHit.commandIndex]?.type !== 'M') {
+        endDragBatch();
+        const selectedSegments = new Set([segmentHit.commandIndex]);
+        const startPositions = new Map<number, Point2D>();
+        const toIndex = piece.outline[segmentHit.commandIndex]?.type === 'Z'
+          ? 0
+          : segmentHit.commandIndex;
+        const toNode = nodes.find(n => n.ref.commandIndex === toIndex);
+        if (toNode) startPositions.set(toIndex, { ...toNode.position });
+        const fromNode = findFromNode(nodes, segmentHit.commandIndex);
+        if (fromNode && !startPositions.has(fromNode.ref.commandIndex)) {
+          startPositions.set(fromNode.ref.commandIndex, { ...fromNode.position });
+        }
+
+        seenOutlineRef.current = piece.outline;
+        expectedOutlineRef.current = null;
+        setState({
+          isEditing: true,
+          editingPieceId: pieceId,
+          hoveredPieceId: null,
+          nodes,
+          selectedNodes: new Set<number>(),
+          selectedSegments,
+          hoveredNode: null,
+          hoveredSegment: null,
+          addPointPreview: null,
+          marquee: null,
+        });
+        dragRef.current = {
+          type: 'segment',
+          startMouse: { x: e.clientX, y: e.clientY },
+          startPositions,
+        };
+        return true;
+      }
+
+      return false;
+    },
+    [pieces, layerLocked, toLocal, hitRadius, endDragBatch, enterEdit, dispatch],
   );
 
   // ─── exitEdit ───
@@ -496,7 +633,55 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): boolean => {
-      if (!state.isEditing || !state.editingPieceId) return false;
+      if (!state.isEditing) {
+        const hr = hitRadius;
+        const target = e.target as Element | null;
+        const domPieceId = typeof target?.closest === 'function'
+          ? target.closest('[data-piece-id]')?.getAttribute('data-piece-id')
+          : null;
+        // Cuando el DOM ya resolvió qué pieza está arriba, el hover no
+        // puede mirar a través de su relleno y prometer un gesto sobre otra.
+        const candidates = domPieceId
+          ? hoverablePieces.filter(piece => piece.id === domPieceId)
+          : hoverablePieces;
+
+        for (const piece of candidates) {
+          const localPt = toLocal(e, piece);
+          const nodeHit = hitTestNode(localPt, extractNodes(piece), hr);
+          if (nodeHit) {
+            setState(s => ({
+              ...s,
+              hoveredPieceId: piece.id,
+              hoveredNode: nodeHit.commandIndex,
+              hoveredSegment: null,
+            }));
+            return false;
+          }
+
+          const segHit = nearestSegment(localPt, piece.outline);
+          if (segHit
+              && segHit.distance < hr
+              && piece.outline[segHit.commandIndex]?.type !== 'M') {
+            setState(s => ({
+              ...s,
+              hoveredPieceId: piece.id,
+              hoveredNode: null,
+              hoveredSegment: segHit.commandIndex,
+            }));
+            return false;
+          }
+        }
+
+        setState(s => ({
+          ...s,
+          hoveredPieceId: null,
+          hoveredNode: null,
+          hoveredSegment: null,
+        }));
+        return false;
+      }
+
+      if (!state.editingPieceId) return false;
 
       const piece = getPiece(state.editingPieceId);
       if (!piece) return false;
@@ -588,7 +773,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       }));
       return false;
     },
-    [state, getPiece, toLocal, toPattern, zoom, hitRadius, dispatchAndRefresh, beginDragBatch],
+    [state, hoverablePieces, getPiece, toLocal, toPattern, zoom, hitRadius, dispatchAndRefresh, beginDragBatch],
   );
 
   // ─── handleMouseUp ───
@@ -804,8 +989,26 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   // ─── getCursor ───
 
+  const limpiarHover = useCallback(() => {
+    setState(current => current.isEditing
+      ? current
+      : {
+          ...current,
+          hoveredPieceId: null,
+          hoveredNode: null,
+          hoveredSegment: null,
+          addPointPreview: null,
+        });
+  }, []);
+
   const getCursor = useCallback((): string => {
-    if (!state.isEditing) return 'default';
+    if (!state.isEditing) {
+      // Hover-sin-clic (2026-09-10): el sujeto ya no espera la sesión
+      // entrada. El cursor distingue el nodo que se moverá del tramo que se
+      // seleccionará, para anunciar exactamente lo que hará el primer press.
+      if (state.hoveredNode !== null) return 'move';
+      return state.hoveredSegment !== null ? 'pointer' : 'default';
+    }
     if (dragRef.current) {
       if (dragRef.current.type === 'marquee') return 'crosshair';
       return 'move';
@@ -816,9 +1019,11 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     return 'default';
   }, [state.isEditing, state.hoveredNode, state.hoveredSegment, state.addPointPreview]);
 
+
   return {
     ...state,
     enterEdit,
+    enterEditActuando,
     exitEdit,
     handleMouseDown,
     handleMouseMove,
@@ -829,6 +1034,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     convertSegmentToPoints,
     addPointOnSegment,
     moveNodeTo,
+    limpiarHover,
     getCursor,
   };
 }

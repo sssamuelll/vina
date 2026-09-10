@@ -272,6 +272,23 @@ describe('cambiar de pieza sin salir de "Editar patrón" (nota de María #170)',
   });
 });
 
+describe('salida del lienzo en los modos de edición', () => {
+  it('rutea la limpieza del hover previo de patrón y curva', () => {
+    const editPattern = { ...editingP1(), limpiarHover: vi.fn() };
+    const nodeEditor = { ...idleNodeEditor(), limpiarHover: vi.fn() };
+    const { hook } = setup(
+      'editPattern',
+      [pieceP1()],
+      makeTools({ editPattern, nodeEditor }),
+    );
+
+    act(() => { hook.result.current.handleMouseLeave(); });
+
+    expect(editPattern.limpiarHover).toHaveBeenCalledOnce();
+    expect(nodeEditor.limpiarHover).toHaveBeenCalledOnce();
+  });
+});
+
 describe('cursor honesto sobre los handles (F15)', () => {
   it('muestra el cursor del handle al hacer hover en select con selección', () => {
     const tj = { ...idleTransform(), getCursor: vi.fn(() => 'nwse-resize') };

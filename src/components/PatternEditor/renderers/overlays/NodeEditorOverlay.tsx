@@ -5,6 +5,7 @@ import { classifyEditableAnchors } from '../../anchorRoles';
 import type { EditableNode, NodeRef } from '../../nodeEditorUtils';
 import { pieceLocalToPattern } from '../../pieceTransform';
 import AnchorGlyph, { type AnchorVisualState } from '../AnchorGlyph';
+import { READOUT_FONT_PX, pildoraDeMedida } from './pildoraDeMedida';
 
 interface NodeEditorOverlayProps {
   zoom2D: number;
@@ -43,7 +44,7 @@ export default function NodeEditorOverlay({ zoom2D, units, pieces, nodeEditorEdi
 
   return (
     <>
-      <g className="node-editor" transform={anchorTransform}>
+      <g className="node-editor" data-piece-id={piece.id} transform={anchorTransform}>
         {classifiedAnchors.map(({ node, role }) => {
           const state: AnchorVisualState = isNodeSelected(node.ref)
             ? 'selected'
@@ -57,28 +58,40 @@ export default function NodeEditorOverlay({ zoom2D, units, pieces, nodeEditorEdi
           if (node.cp2 && node.cp2Ref) handles.push({ key: 'out', pos: node.cp2, ref: node.cp2Ref });
           return (
             <g key={node.ref.commandIndex} data-command-index={node.ref.commandIndex}>
-              {handles.map(h => (
-                <g key={h.key}>
-                  <line
-                    x1={node.position.x} y1={node.position.y}
-                    x2={h.pos.x} y2={h.pos.y}
-                    stroke="rgba(255, 107, 107, 0.5)"
-                    strokeWidth={0.8 / zoom2D}
-                  />
-                  <rect
-                    className="node-editor__control-handle"
-                    x={h.pos.x - 3.5 / zoom2D}
-                    y={h.pos.y - 3.5 / zoom2D}
-                    width={7 / zoom2D}
-                    height={7 / zoom2D}
-                    fill={isNodeSelected(h.ref) ? '#ff6b6b' : '#fff'}
-                    stroke="#ff6b6b"
-                    strokeWidth={1 / zoom2D}
-                    style={{ cursor: 'move' }}
-                    rx={1 / zoom2D}
-                  />
-                </g>
-              ))}
+              {handles.map(h => {
+                const selected = Boolean(isNodeSelected(h.ref));
+                const hovered = !selected && Boolean(isNodeHovered(h.ref));
+                const halfSize = (selected ? 5 : hovered ? 4.25 : 3.5) / zoom2D;
+                const handleStrokeWidth = (selected ? 2 : hovered ? 1.5 : 1) / zoom2D;
+                return (
+                  <g key={h.key}>
+                    {/* El rojo del asa NO se migra a token en esta tanda: era
+                        una decisión visual fijada a propósito (el test de
+                        paridad se llamaba "keeps a Bezier control handle
+                        red"), y distingue el asa del azul de las anclas en un
+                        overlay denso. Migrarla exige elegir un tono nuevo
+                        viéndolo en pantalla, no de memoria. Pendiente aparte. */}
+                    <line
+                      x1={node.position.x} y1={node.position.y}
+                      x2={h.pos.x} y2={h.pos.y}
+                      stroke="rgba(255, 107, 107, 0.5)"
+                      strokeWidth={0.8 / zoom2D}
+                    />
+                    <rect
+                      className="node-editor__control-handle"
+                      x={h.pos.x - halfSize}
+                      y={h.pos.y - halfSize}
+                      width={halfSize * 2}
+                      height={halfSize * 2}
+                      fill={selected ? '#ff6b6b' : '#fff'}
+                      stroke="#ff6b6b"
+                      strokeWidth={handleStrokeWidth}
+                      style={{ cursor: 'move' }}
+                      rx={1 / zoom2D}
+                    />
+                  </g>
+                );
+              })}
               <AnchorGlyph
                 role={role}
                 position={node.position}
@@ -90,21 +103,26 @@ export default function NodeEditorOverlay({ zoom2D, units, pieces, nodeEditorEdi
         })}
       </g>
 
-      {selectedNodeData && selectedNodePatternPosition && (
-        <g transform={`translate(${selectedNodePatternPosition.x}, ${selectedNodePatternPosition.y - 20 / zoom2D})`}>
-          <rect
-            x={-40 / zoom2D} y={-8 / zoom2D}
-            width={80 / zoom2D} height={16 / zoom2D}
-            rx={8 / zoom2D} fill="rgba(0,0,0,0.75)"
-          />
-          <text
-            textAnchor="middle" dominantBaseline="central"
-            fill="#fff" fontSize={9 / zoom2D} pointerEvents="none"
-          >
-            x: {formatDimension(selectedNodeData.position.x, units as UnitSystem)}, y: {formatDimension(selectedNodeData.position.y, units as UnitSystem)}
-          </text>
-        </g>
-      )}
+      {selectedNodeData && selectedNodePatternPosition && (() => {
+        // La píldora se dimensiona desde SU texto: con el ancho escrito a mano
+        // (80 px) "x: 489.1 mm, y: 411.0 mm" se salía por los dos lados y la
+        // mitad del número quedaba sobre la cuadrícula clara, ilegible.
+        const lectura = `x: ${formatDimension(selectedNodeData.position.x, units as UnitSystem)}, y: ${formatDimension(selectedNodeData.position.y, units as UnitSystem)}`;
+        const fontSize = READOUT_FONT_PX / zoom2D;
+        const pildora = pildoraDeMedida(lectura, fontSize);
+        return (
+          <g transform={`translate(${selectedNodePatternPosition.x}, ${selectedNodePatternPosition.y - 20 / zoom2D})`}>
+            <rect {...pildora} fill="var(--readout-bg-2d)" />
+            <text
+              textAnchor="middle" dominantBaseline="central"
+              fill="var(--readout-ink-2d)" fontSize={fontSize} pointerEvents="none"
+              style={{ fontFamily: 'var(--font-mono-2d)' }}
+            >
+              {lectura}
+            </text>
+          </g>
+        );
+      })()}
     </>
   );
 }

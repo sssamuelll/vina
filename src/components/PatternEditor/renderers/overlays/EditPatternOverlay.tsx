@@ -7,7 +7,8 @@ import AnchorGlyph, { type AnchorVisualState } from '../AnchorGlyph';
 interface EditPatternOverlayProps {
   zoom2D: number;
   pieces: PatternPiece[];
-  editingPieceId: string;
+  editingPieceId: string | null;
+  hoveredPieceId: string | null;
   nodes: EditableNode[];
   selectedNodes: Set<number>;
   selectedSegments: Set<number>;
@@ -21,6 +22,7 @@ export default function EditPatternOverlay({
   zoom2D,
   pieces,
   editingPieceId,
+  hoveredPieceId,
   nodes,
   selectedNodes,
   selectedSegments,
@@ -29,10 +31,12 @@ export default function EditPatternOverlay({
   addPointPreview,
   marquee,
 }: EditPatternOverlayProps) {
-  const piece = pieces.find(p => p.id === editingPieceId);
+  const piece = pieces.find(p => p.id === (editingPieceId ?? hoveredPieceId));
   if (!piece) return null;
 
-  const classifiedAnchors = classifyEditableAnchors(piece, nodes);
+  const classifiedAnchors = editingPieceId
+    ? classifyEditableAnchors(piece, nodes)
+    : [];
 
   // Build segment paths for highlight
   const segmentHighlights: JSX.Element[] = [];
@@ -62,6 +66,7 @@ export default function EditPatternOverlay({
             stroke="var(--accent-2d)"
             strokeWidth={(isSelected ? 2.5 : 2) / zoom2D}
             opacity={isSelected ? 1 : 0.6}
+            pointerEvents="none"
           />
         );
       }
@@ -99,6 +104,7 @@ export default function EditPatternOverlay({
             stroke="var(--accent-2d)"
             strokeWidth={(isClosingSelected ? 2.5 : 2) / zoom2D}
             opacity={isClosingSelected ? 1 : 0.6}
+            pointerEvents="none"
           />
         );
       }
