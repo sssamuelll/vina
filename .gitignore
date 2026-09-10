@@ -105,3 +105,11 @@ design-handoff/ui-screenshots/walk-*.png
 # Los 3 .md curados ya trackeados aquí siguen versionados (git ignora la regla
 # para archivos ya trackeados) — son los que enlaza CLAUDE.md.
 docs/research/
+
+# graphify knowledge graph (local, regenerable con: graphify extract . --code-only)
+/graphify-out/
+AGENTS.md.pre-graphify.bak
+
+# Scratch de recon (prompts, issues en borrador, salidas de codex, capturas de
+# replay-maria) — evidencia de trabajo, no documentación curada.
+/.recon/
