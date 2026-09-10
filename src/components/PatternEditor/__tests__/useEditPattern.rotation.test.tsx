@@ -51,6 +51,7 @@ function InteractiveEditor() {
             zoom2D={1}
             pieces={pieces}
             editingPieceId={editor.editingPieceId}
+            hoveredPieceId={editor.hoveredPieceId}
             nodes={editor.nodes}
             selectedNodes={editor.selectedNodes}
             selectedSegments={editor.selectedSegments}

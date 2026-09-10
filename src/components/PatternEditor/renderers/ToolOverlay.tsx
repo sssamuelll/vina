@@ -118,6 +118,7 @@ interface ToolOverlayProps {
   editPatternIsEditing: boolean;
   anchorReferencePieceId?: string | null;
   editPatternEditingPieceId: string | null;
+  editPatternHoveredPieceId: string | null;
   editPatternNodes: EditableNode[];
   editPatternSelectedNodes: Set<number>;
   editPatternSelectedSegments: Set<number>;
@@ -297,11 +298,14 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         />
       )}
 
-      {activeTool === 'editPattern' && props.editPatternIsEditing && props.editPatternEditingPieceId && (
+      {activeTool === 'editPattern'
+        && ((props.editPatternIsEditing && props.editPatternEditingPieceId) || props.editPatternHoveredPieceId)
+        && (
         <EditPatternOverlay
           zoom2D={zoom2D}
           pieces={pieces}
           editingPieceId={props.editPatternEditingPieceId}
+          hoveredPieceId={props.editPatternHoveredPieceId}
           nodes={props.editPatternNodes}
           selectedNodes={props.editPatternSelectedNodes}
           selectedSegments={props.editPatternSelectedSegments}
@@ -322,6 +326,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           zoom2D={zoom2D}
           pieces={pieces}
           editingPieceId={referencePiece.id}
+          hoveredPieceId={null}
           nodes={classifyEditableAnchors(referencePiece, extractNodes(referencePiece))
             .filter(({ role }) => EXTREMOS.has(role))
             .map(({ node }) => node)}

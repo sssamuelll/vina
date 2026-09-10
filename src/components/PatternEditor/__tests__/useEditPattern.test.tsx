@@ -135,6 +135,7 @@ describe('resyncStateToPiece', () => {
     return {
       isEditing: true,
       editingPieceId: p.id,
+      hoveredPieceId: p.id,
       nodes: extractNodes(piece()), // stale: extracted from the square
       selectedNodes: new Set([1, 3]),
       selectedSegments: new Set([2]),
@@ -157,6 +158,7 @@ describe('resyncStateToPiece', () => {
     const next = resyncStateToPiece(stateFor(p), p);
     expect(next.selectedNodes.size).toBe(0);
     expect(next.selectedSegments.size).toBe(0);
+    expect(next.hoveredPieceId).toBeNull();
     expect(next.hoveredNode).toBeNull();
     expect(next.addPointPreview).toBeNull();
   });

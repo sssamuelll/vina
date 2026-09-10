@@ -975,7 +975,7 @@ export function useEditorInteractions(
       transformTool.handleMouseMove(e);
       return;
     }
-    if (editPattern.isEditing && activeTool === 'editPattern') {
+    if (activeTool === 'editPattern') {
       editPattern.handleMouseMove(e);
       return;
     }

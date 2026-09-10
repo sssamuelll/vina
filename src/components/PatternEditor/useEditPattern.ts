@@ -8,7 +8,7 @@
  * Does NOT show bezier handles — that is for useEditCurve.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
@@ -54,6 +54,7 @@ const HIT_RADIUS_PX = 8; // screen pixels
 export interface EditPatternState {
   isEditing: boolean;
   editingPieceId: string | null;
+  hoveredPieceId: string | null;
   nodes: EditableNode[];
   selectedNodes: Set<number>;       // commandIndex set (multi-select)
   selectedSegments: Set<number>;    // commandIndex of segment destination
@@ -66,6 +67,7 @@ export interface EditPatternState {
 const INITIAL_STATE: EditPatternState = {
   isEditing: false,
   editingPieceId: null,
+  hoveredPieceId: null,
   nodes: [],
   selectedNodes: new Set<number>(),
   selectedSegments: new Set<number>(),
@@ -142,6 +144,7 @@ export function resyncStateToPiece(
     nodes: extractNodes(piece),
     selectedNodes: new Set<number>(),
     selectedSegments: new Set<number>(),
+    hoveredPieceId: null,
     hoveredNode: null,
     hoveredSegment: null,
     addPointPreview: null,
@@ -154,6 +157,21 @@ export function resyncStateToPiece(
 export function useEditPattern(zoom: number, pan: Point2D) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
+  // `?? []`: varios arneses de prueba de este hook montan una tienda mínima
+  // con solo el reducer `project` (útil desde antes de esta tanda). Con
+  // `simulation` ausente ahí, este selector no puede exigirlo.
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation?.hiddenLayerIds ?? []);
+  // Mismo criterio que `drawablePieces`/`PieceRenderer` (PatternEditor.tsx:198-206):
+  // "solo lo que se dibuja puede prometer una lectura o recibir el clic", y
+  // de arriba hacia abajo — si dos piezas se solapan, el hover-sin-clic no
+  // puede señalar una que el clic real (hit-test del DOM, topmost por
+  // definición) ignoraría por estar tapada.
+  const hoverablePieces = useMemo(
+    () => pieces
+      .filter(p => !p.locked && !hiddenLayerIds.includes(p.layer ?? 1))
+      .sort((a, b) => (b.zOrder ?? 0) - (a.zOrder ?? 0)),
+    [pieces, hiddenLayerIds],
+  );
 
   const [state, setState] = useState<EditPatternState>({ ...INITIAL_STATE });
   const dragRef = useRef<DragState | null>(null);
@@ -308,6 +326,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       setState({
         isEditing: true,
         editingPieceId: pieceId,
+        hoveredPieceId: null,
         nodes: extractNodes(piece),
         selectedNodes: new Set<number>(),
         selectedSegments: new Set<number>(),
@@ -496,7 +515,30 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): boolean => {
-      if (!state.isEditing || !state.editingPieceId) return false;
+      if (!state.isEditing) {
+        const hr = hitRadius;
+        for (const piece of hoverablePieces) {
+          const localPt = toLocal(e, piece);
+          const segHit = nearestSegment(localPt, piece.outline);
+          if (segHit && segHit.distance < hr) {
+            setState(s => ({
+              ...s,
+              hoveredPieceId: piece.id,
+              hoveredSegment: segHit.commandIndex,
+            }));
+            return false;
+          }
+        }
+
+        setState(s => ({
+          ...s,
+          hoveredPieceId: null,
+          hoveredSegment: null,
+        }));
+        return false;
+      }
+
+      if (!state.editingPieceId) return false;
 
       const piece = getPiece(state.editingPieceId);
       if (!piece) return false;
@@ -588,7 +630,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       }));
       return false;
     },
-    [state, getPiece, toLocal, toPattern, zoom, hitRadius, dispatchAndRefresh, beginDragBatch],
+    [state, hoverablePieces, getPiece, toLocal, toPattern, zoom, hitRadius, dispatchAndRefresh, beginDragBatch],
   );
 
   // ─── handleMouseUp ───

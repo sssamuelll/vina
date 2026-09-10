@@ -30,6 +30,7 @@ function renderOverlay() {
         zoom2D={1}
         pieces={[piece]}
         editingPieceId="p"
+        hoveredPieceId={null}
         nodes={extractNodes(piece)}
         selectedNodes={new Set()}
         selectedSegments={new Set()}
@@ -51,6 +52,7 @@ describe('EditPatternOverlay rotation (nota de María #170)', () => {
           zoom2D={1}
           pieces={[rotated]}
           editingPieceId="p"
+          hoveredPieceId={null}
           nodes={extractNodes(rotated)}
           selectedNodes={new Set()}
           selectedSegments={new Set()}
@@ -92,7 +94,7 @@ describe('EditPatternOverlay anchor marks', () => {
     const { container } = render(
       <svg>
         <EditPatternOverlay
-          zoom2D={1} pieces={[densePiece]} editingPieceId="p"
+          zoom2D={1} pieces={[densePiece]} editingPieceId="p" hoveredPieceId={null}
           nodes={extractNodes(densePiece)} selectedNodes={new Set()}
           selectedSegments={new Set()} hoveredNode={null}
           hoveredSegment={null} addPointPreview={null} marquee={null}

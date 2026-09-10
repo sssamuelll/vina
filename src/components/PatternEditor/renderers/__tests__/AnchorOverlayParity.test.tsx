@@ -48,7 +48,7 @@ describe('anchor overlay parity', () => {
       <svg>
         <g data-testid="edit-overlay">
           <EditPatternOverlay
-            zoom2D={1} pieces={[piece]} editingPieceId={'p'} nodes={nodes}
+            zoom2D={1} pieces={[piece]} editingPieceId={'p'} hoveredPieceId={null} nodes={nodes}
             selectedNodes={new Set()} selectedSegments={new Set()}
             hoveredNode={null} hoveredSegment={null}
             addPointPreview={null} marquee={null}

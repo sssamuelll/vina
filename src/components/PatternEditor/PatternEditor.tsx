@@ -32,7 +32,7 @@ import { usePointTool } from './usePointTool';
 import { useSeamAllowanceTool } from './useSeamAllowanceTool';
 import { useNotchMirrorPreview } from './useNotchMirrorPreview';
 import SeamAllowanceSelectionOverlay from './renderers/overlays/SeamAllowanceSelectionOverlay';
-import { showUndoToast, showInfoToast, showWarningToast } from '../../store/copilotUISlice';
+import { showUndoToast, showInfoToast } from '../../store/copilotUISlice';
 import { useTrimTool } from './useTrimTool';
 import { newId } from '../../utils/ids';
 import { useGrainlineTool } from './useGrainlineTool';
@@ -192,11 +192,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     };
     dispatch(addPiece(fullPiece));
     dispatch(selectPiece(fullPiece.id));
-    // Con dos nodos la pluma sigue abierta: no hay área que cerrar y el aviso
-    // sigue siendo cierto. Con tres o más, Enter y doble clic ya la cierran.
-    if (!piece.outline.some(command => command.type === 'Z')) {
-      dispatch(showWarningToast('La pieza quedó abierta y así no se puede simular.'));
-    }
     return fullPiece.id;
   }, [dispatch]);
 
@@ -1365,6 +1360,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             editPatternIsEditing={editPatternTool.isEditing}
             anchorReferencePieceId={anchorReferencePieceId}
             editPatternEditingPieceId={editPatternTool.editingPieceId}
+            editPatternHoveredPieceId={editPatternTool.hoveredPieceId}
             editPatternNodes={editPatternTool.nodes}
             editPatternSelectedNodes={editPatternTool.selectedNodes}
             editPatternSelectedSegments={editPatternTool.selectedSegments}
