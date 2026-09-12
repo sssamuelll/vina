@@ -1,8 +1,9 @@
-import type { PatternPiece, Point2D } from '../../types/types';
+import type { PatternPiece, Point2D, Trazo } from '../../types/types';
 import { patternToPieceLocal, pieceLocalToPattern, pieceLocalToPatternMany } from '../../utils/geometry/pieceSpace';
 import { buildRing, projectToRing, type OutlineRing } from '../../utils/geometry/outlineRing';
 import { extractNodes, type EditableNode } from './nodeEditorUtils';
 import { getInternalLineEndpoints } from './internalShapePath';
+import { anclasDeTrazo, puntasDeTrazo, tramoMasCercano, crucesDeTrazos } from './trazos/trazoPath';
 
 /**
  * El resolutor de enganche del lienzo 2D, fuera del hook que lo estrenó.
@@ -27,11 +28,13 @@ import { getInternalLineEndpoints } from './internalShapePath';
  * `mousemove`.
  */
 
-export type SnapKind = 'firstNode' | 'vertex' | 'internalEnd' | 'outline';
+export type SnapKind = 'firstNode' | 'vertex' | 'trazoCross' | 'internalEnd' | 'trazoEnd' | 'outline';
 
 export interface SnapTarget {
   kind: SnapKind;
   pieceId: string | null;
+  /** El trazo que enganchó, cuando es uno (spec 2026-09-12 § 5.1). */
+  trazoId?: string;
   /** Mundo (patrón). */
   point: Point2D;
 }
@@ -42,6 +45,14 @@ export interface SnapIndex {
   nodesByPiece: Map<string, EditableNode[]>;
   endsByPiece: Map<string, Point2D[]>;
   ringsByPiece: Map<string, OutlineRing>;
+  /** Trazos VISIBLES (ya filtrados por `showTrazos`). */
+  trazos: Trazo[];
+  /** Anclas interiores (sin las puntas) por trazo, en mundo. */
+  interioresByTrazo: Map<string, Point2D[]>;
+  /** Las dos puntas por trazo. */
+  puntasByTrazo: Map<string, [Point2D, Point2D]>;
+  /** Cruces entre tramos rectos de trazos. */
+  cruces: Point2D[];
 }
 
 /** El primer nodo de un trazo vivo, cuando cerrar sobre él es una opción. */
@@ -53,13 +64,22 @@ export interface FirstNodeTarget {
 const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /**
+ * Identidad estable para el default: los tres llamadores de hoy siguen pasando
+ * un solo argumento, y un `[]` nuevo por llamada rompería el memo del índice.
+ */
+const SIN_TRAZOS: Trazo[] = [];
+
+/**
  * Aplana lo enganchable de las piezas visibles. Caro: memoízalo por `pieces`.
  *
  * El anillo se pre-aplana con métrica 2 porque proyectar contra él es O(n) por
  * evento; `snapToEdge` re-aplana el contorno entero por comando y no cabe en un
  * frame con veinte piezas DXF (revisión Halberg, 2026-08-29).
+ *
+ * Los trazos van en coordenadas de PATRÓN y no tienen pieza: no pasan por
+ * `patternToPieceLocal` ni por `buildRing` (spec 2026-09-12 § 5.1).
  */
-export function buildSnapIndex(pieces: PatternPiece[]): SnapIndex {
+export function buildSnapIndex(pieces: PatternPiece[], trazos: Trazo[] = SIN_TRAZOS): SnapIndex {
   const nodesByPiece = new Map<string, EditableNode[]>();
   const endsByPiece = new Map<string, Point2D[]>();
   const ringsByPiece = new Map<string, OutlineRing>();
@@ -80,16 +100,38 @@ export function buildSnapIndex(pieces: PatternPiece[]): SnapIndex {
     }
   }
 
-  return { pieces, nodesByPiece, endsByPiece, ringsByPiece };
+  const interioresByTrazo = new Map<string, Point2D[]>();
+  const puntasByTrazo = new Map<string, [Point2D, Point2D]>();
+  for (const t of trazos) {
+    const anclas = anclasDeTrazo(t.path);
+    if (anclas.length >= 2) interioresByTrazo.set(t.id, anclas.slice(1, -1));
+    const puntas = puntasDeTrazo(t.path);
+    if (puntas) puntasByTrazo.set(t.id, puntas);
+  }
+
+  return {
+    pieces,
+    nodesByPiece,
+    endsByPiece,
+    ringsByPiece,
+    trazos,
+    interioresByTrazo,
+    puntasByTrazo,
+    cruces: crucesDeTrazos(trazos),
+  };
 }
 
 /**
  * Qué hay bajo `world` dentro de `radius` (en unidades de PATRÓN, ya divididas
  * por el zoom por el llamador).
  *
- * Prioridad de la spec § 4.6, y dentro de cada clase la pieza de arriba
- * primero. En una esquina gana el vértice por PRECEDENCIA, no por radio: por
- * eso hay un solo radio y no siete.
+ * Prioridad de la spec § 4.6, ampliada con los trazos por la spec 2026-09-12
+ * § 5.1: vértice (de pieza o de trazo) → cruce de trazos → extremo (de interna
+ * o de trazo) → recorrido (contorno o trazo). Dentro de cada clase, primero las
+ * piezas y de ellas la de arriba — de ahí sale el empate del § 5.2, el vértice
+ * de la pieza le gana a la punta del trazo que está en el mismo sitio. En una
+ * esquina gana el vértice por PRECEDENCIA, no por radio: por eso hay un solo
+ * radio y no siete.
  *
  * `firstNode` es opcional porque las dos herramientas que lo usan cierran
  * distinto: la línea interna cierra colocando un nodo sobre el primero, y la
@@ -118,12 +160,36 @@ export function resolveSnap(
     }
   }
 
+  for (let i = index.trazos.length - 1; i >= 0; i--) {
+    const t = index.trazos[i];
+    for (const a of index.interioresByTrazo.get(t.id) ?? []) {
+      if (dist(world, a) <= radius) {
+        return { kind: 'vertex', pieceId: null, trazoId: t.id, point: a };
+      }
+    }
+  }
+
+  for (const c of index.cruces) {
+    if (dist(world, c) <= radius) {
+      return { kind: 'trazoCross', pieceId: null, point: c };
+    }
+  }
+
   for (let i = ps.length - 1; i >= 0; i--) {
     const p = ps[i];
     const local = patternToPieceLocal(world, p);
     for (const end of index.endsByPiece.get(p.id) ?? []) {
       if (dist(local, end) <= radius) {
         return { kind: 'internalEnd', pieceId: p.id, point: pieceLocalToPattern(end, p) };
+      }
+    }
+  }
+
+  for (let i = index.trazos.length - 1; i >= 0; i--) {
+    const t = index.trazos[i];
+    for (const punta of index.puntasByTrazo.get(t.id) ?? []) {
+      if (dist(world, punta) <= radius) {
+        return { kind: 'trazoEnd', pieceId: null, trazoId: t.id, point: punta };
       }
     }
   }
@@ -136,6 +202,17 @@ export function resolveSnap(
     const { point } = projectToRing(ring, local);
     if (dist(local, point) <= radius) {
       return { kind: 'outline', pieceId: p.id, point: pieceLocalToPattern(point, p) };
+    }
+  }
+
+  // Por la cuerda entre anclas, no con `buildRing`: ese cierra todo subpath
+  // aunque no traiga `Z` (`outlineRing.ts:361`) e inventaría un tramo entre las
+  // dos puntas de un trazo abierto.
+  for (let i = index.trazos.length - 1; i >= 0; i--) {
+    const t = index.trazos[i];
+    const hit = tramoMasCercano(t.path, world);
+    if (hit && hit.distance <= radius) {
+      return { kind: 'outline', pieceId: null, trazoId: t.id, point: hit.point };
     }
   }
 
@@ -163,6 +240,17 @@ export function verticesVisibles(index: SnapIndex): Point2D[] {
       // Sin duplicados. `extractNodes` emite un nodo por COMANDO, y el DXF de
       // María trae el vértice repetido en cada esquina: dos círculos idénticos
       // uno encima de otro, que no se ven pero se reconcilian igual.
+      const k = `${Math.round(q.x * 1e4)}|${Math.round(q.y * 1e4)}`;
+      if (vistos.has(k)) continue;
+      vistos.add(k);
+      puntos.push(q);
+    }
+  }
+  // Los trazos ya vienen en mundo. Entran aquí porque lo que engancha se ve
+  // (D3 firmada, #1157): si el imán los encuentra y el dibujo no los pinta, la
+  // promesa del punto es falsa.
+  for (const t of index.trazos) {
+    for (const q of anclasDeTrazo(t.path)) {
       const k = `${Math.round(q.x * 1e4)}|${Math.round(q.y * 1e4)}`;
       if (vistos.has(k)) continue;
       vistos.add(k);
