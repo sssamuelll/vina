@@ -126,29 +126,35 @@ test.describe('tanda 5 — un cuadro para una información, y un aviso cuando no
     await expect.poll(async () => (await st(page)).project.pieces.length).toBe(0);
   });
 
-  test('fallo 11 — donde el aviso sigue siendo cierto sigue saliendo, y no con un diálogo del navegador', async ({ page }) => {
+  test('fallo 11 — dos puntos ya no son una pieza que no simula: son un trazo, y no hay nada que rendir', async ({ page }) => {
+    // ENMENDADO el 2026-09-12 (spec `2026-09-12-trazos-lineas-de-construccion`
+    // § 3.1-3.2, #1158). Este caso exigía que dos puntos + Enter dejaran una
+    // PIEZA abierta con el aviso "no se puede simular" — la letra del BLOCKER
+    // de Serrano era "no se llega en silencio a una pieza que no simula".
+    // La Pluma ya no puede crear una pieza abierta en absoluto: con dos nodos
+    // el resultado es un TRAZO (línea de construcción), y un trazo no es una
+    // pieza — no hay nada que "no simule" de lo que avisar. El BLOCKER sigue
+    // cerrado, por construcción en vez de por aviso (spec § 3.2, "Por qué no
+    // rompe el BLOCKER de Serrano").
     await waitForApp(page);
     await activar(page, 'h', 'pen');
 
-    // Dos puntos son una raya: no hay área que cerrar, así que la pieza SÍ
-    // queda abierta y el aviso sigue siendo verdad. Este es el caso que
-    // conserva el BLOCKER de Serrano — no se llega en silencio a una pieza que
-    // no simula— y el que prueba que no se hace con `alert()`.
     await clicEn(page, { x: 150, y: 150 });
     await clicEn(page, { x: 350, y: 150 });
     await page.keyboard.press('Enter');
     await page.waitForTimeout(600);
 
-    const pieza = (await st(page)).project.pieces[0];
-    expect(pieza, 'la pieza se crea igual: terminar abierto está ratificado').toBeTruthy();
+    const { pieces, trazos } = (await st(page)).project;
+    expect(pieces, 'dos nodos no son un polígono: no debe nacer ninguna pieza').toHaveLength(0);
+    expect(trazos).toHaveLength(1);
     expect(
-      pieza.outline.map((c: { type: string }) => c.type),
+      trazos[0].path.map((c: { type: string }) => c.type),
       'dos nodos no cierran nada',
     ).not.toContain('Z');
 
     await expect(
       page.getByText(/abiert|no se puede simular|no simula/i).first(),
-      'y aquí sí tiene que decirle que así no se puede rendir — es literalmente lo que pidió',
-    ).toBeVisible({ timeout: 5000 });
+      'un trazo no es una pieza: no hay nada que avisar',
+    ).toHaveCount(0);
   });
 });

@@ -139,7 +139,13 @@ test.describe('§ 2 — la pieza abierta avisa junto a ella, no en una esquina',
     await page.waitForTimeout(150);
   }
 
-  test('con dos nodos la pieza queda abierta y el aviso vive sobre ella, no en un toast', async ({ page }) => {
+  test('con dos nodos ya no hay pieza que avisar: es un trazo, sin toast y sin aviso en el lienzo', async ({ page }) => {
+    // ENMENDADO el 2026-09-12 (spec `2026-09-12-trazos-lineas-de-construccion`
+    // § 3.1-3.2, #1158). Este caso medía el aviso "abierta: no se puede
+    // simular" dibujado sobre una pieza de dos nodos. La Pluma ya no crea
+    // piezas abiertas: con dos nodos el resultado es un trazo (línea de
+    // construcción), que no es una pieza y no lleva margen, capa ni aviso de
+    // simulación — no hay qué "no se puede simular" del qué avisar.
     await waitForApp(page);
     await activarHerramienta(page, 'h', 'pen');
     await clicEn(page, { x: 150, y: 150 });
@@ -147,18 +153,20 @@ test.describe('§ 2 — la pieza abierta avisa junto a ella, no en una esquina',
     await page.keyboard.press('Enter');
     await page.waitForTimeout(400);
 
-    const pieza = (await st(page)).project.pieces[0];
-    expect(pieza.outline.map(c => c.type), 'dos nodos: sigue abierta').not.toContain('Z');
+    const { pieces, trazos } = (await st(page)).project;
+    expect(pieces, 'dos nodos no son un polígono: no debe nacer ninguna pieza').toHaveLength(0);
+    expect(trazos).toHaveLength(1);
+    expect(trazos[0].path.map(c => c.type), 'dos nodos: el trazo queda abierto').not.toContain('Z');
 
     await expect(
       page.locator('.toast__message'),
-      'el toast se reemplazó por el aviso sobre la propia pieza',
+      'un trazo no es una pieza: sigue sin haber toast',
     ).toHaveCount(0);
 
     await expect(
       page.getByText('abierta: no se puede simular'),
-      'el aviso tiene que estar dibujado sobre la pieza misma',
-    ).toBeVisible();
+      'un trazo no es una pieza: no hay aviso de simulación que dibujar',
+    ).toHaveCount(0);
   });
 
   test('una pieza cerrada no lleva ningún aviso', async ({ page }) => {
@@ -169,10 +177,12 @@ test.describe('§ 2 — la pieza abierta avisa junto a ella, no en una esquina',
     await expect(page.getByText('abierta: no se puede simular')).toHaveCount(0);
   });
 
-  test('el aviso es una propiedad de la geometría: sigue ahí después, no solo al crear la pieza', async ({ page }) => {
-    // El toast viejo solo disparaba UNA VEZ, al completar el trazo. El aviso
-    // nuevo tiene que seguir visible más tarde — es derivado del `outline`,
-    // no un evento que se dispara y se olvida.
+  test('un trazo de dos nodos tampoco lleva el aviso más tarde, ni cambiando de herramienta', async ({ page }) => {
+    // ENMENDADO el 2026-09-12 (#1158): este caso medía que el aviso, al ser
+    // derivado del `outline` y no un evento, siguiera visible tras cambiar de
+    // herramienta. Con dos nodos ya no hay pieza —es un trazo— así que la
+    // propiedad que se mide ahora es la contraria: sigue sin haber nada que
+    // avisar, ni al crear ni después.
     await waitForApp(page);
     await activarHerramienta(page, 'h', 'pen');
     await clicEn(page, { x: 150, y: 150 });
@@ -180,10 +190,10 @@ test.describe('§ 2 — la pieza abierta avisa junto a ella, no en una esquina',
     await page.keyboard.press('Enter');
     await page.waitForTimeout(400);
 
-    // Cambia de herramienta y espera — un toast se habría ido hace rato.
     await activarHerramienta(page, 'z', 'select');
     await page.waitForTimeout(1000);
 
-    await expect(page.getByText('abierta: no se puede simular')).toBeVisible();
+    expect((await st(page)).project.pieces, 'sigue sin haber ninguna pieza').toHaveLength(0);
+    await expect(page.getByText('abierta: no se puede simular')).toHaveCount(0);
   });
 });

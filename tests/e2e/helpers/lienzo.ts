@@ -17,6 +17,8 @@ export interface EstadoLienzo {
   project: {
     pieces: Array<{ id: string; name: string; outline: Cmd[]; position: { x: number; y: number }; internals: unknown[] }>;
     seams: Array<{ id: string }>;
+    /** Líneas de construcción sueltas en el lienzo (spec 2026-09-12, #1158). */
+    trazos: Array<{ id: string; path: Cmd[] }>;
   };
 }
 type StoreWindow = { __VINA_STORE__: { dispatch: (a: unknown) => void; getState: () => EstadoLienzo } };

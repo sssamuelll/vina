@@ -113,9 +113,12 @@ export default function HintText({
       )}
 
       {!hasPieces && activeTool === 'pen' && penNodesLength === 0 && (
+        // `hasPieces` no cambia con un trazo (spec de trazos § 3.1: abierto no
+        // es pieza), así que esta pista de bienvenida reaparece después de
+        // cada trazo — es el flujo que #1158 habilita, no un caso raro.
         <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
           fill="var(--ink-hint)" fontSize="13">
-          Clic para añadir puntos · arrastra para curvar · clic en el primer punto para cerrar · Enter termina abierto · Esc cancela
+          Clic para añadir puntos · arrastra para curvar · clic en el primer punto para cerrar · Enter termina: pieza con tres puntos, trazo con dos · Esc cancela
         </text>
       )}
 

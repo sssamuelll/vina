@@ -189,27 +189,31 @@ test.describe('D4 — Pluma cierra sola, y deshacer es la salida', () => {
     await expect.poll(async () => (await st(page)).project.pieces.length).toBe(0);
   });
 
-  test('dos clics y Enter: no hay área que cerrar, y el aviso SIGUE saliendo', async ({ page }) => {
+  test('dos clics y Enter: no hay área que cerrar, y ya no es una pieza de la que avisar', async ({ page }) => {
+    // ENMENDADO el 2026-09-12 (spec `2026-09-12-trazos-lineas-de-construccion`
+    // § 3.1-3.2, #1158): este caso pedía que el aviso "SIGUE saliendo" con dos
+    // nodos, precisamente porque en ese momento era el único caso donde la
+    // Pluma dejaba una pieza abierta. Esa puerta se cerró: con dos nodos nace
+    // un trazo, no una pieza, y un trazo no lleva aviso de simulación.
     await waitForApp(page);
     await page.keyboard.press('h');
     await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('pen');
 
     for (const p of [{ x: 150, y: 500 }, { x: 350, y: 500 }]) await clicEn(page, p);
     await page.keyboard.press('Enter');
-    await expect.poll(async () => (await st(page)).project.pieces.length, { timeout: 5000 }).toBe(1);
+    await expect.poll(async () => (await st(page)).project.trazos.length, { timeout: 5000 }).toBe(1);
 
-    const pieza = (await st(page)).project.pieces[0];
+    const { pieces, trazos } = (await st(page)).project;
+    expect(pieces, 'dos nodos no son un polígono: no debe nacer ninguna pieza').toHaveLength(0);
     expect(
-      pieza.outline.map((c: { type: string }) => c.type),
+      trazos[0].path.map((c: { type: string }) => c.type),
       'dos nodos son una raya: no hay polígono que cerrar',
     ).not.toContain('Z');
 
-    // El aviso no se borra del código: se le retira el caso que ya no ocurre.
-    // Este todavía ocurre, así que el aviso tiene que seguir ahí.
     await expect(
-      page.locator('.toast__message').filter({ hasText: 'La pieza quedó abierta y así no se puede simular.' }),
-      'donde el aviso sigue siendo cierto, sigue saliendo',
-    ).toBeVisible();
+      page.locator('.toast__message').filter({ hasText: 'no se puede simular' }),
+      'un trazo no es una pieza: no hay nada que avisar',
+    ).toHaveCount(0);
   });
 });
 

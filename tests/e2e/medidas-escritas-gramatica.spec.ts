@@ -11,12 +11,13 @@ import { waitForApp } from './helpers/sim';
 
 type Cmd = { type: string; values: number[] };
 type Piece = { id: string; outline: Cmd[]; position: { x: number; y: number }; internals: Array<{ path: Cmd[] }> };
+type Trazo = { id: string; path: Cmd[] };
 type StoreWindow = {
   __VINA_STORE__: {
     dispatch: (a: unknown) => void;
     getState: () => {
       editor: { activeTool: string; zoom2D: number; pan2D: { x: number; y: number } };
-      project: { pieces: Piece[] };
+      project: { pieces: Piece[]; trazos: Trazo[] };
     };
   };
 };
@@ -166,12 +167,16 @@ test.describe('medidas escritas — gramática', () => {
     ).toBe(true);
   });
 
-  test('pluma: doble clic con exactamente 2 nodos no tiene área que cerrar, y queda abierta', async ({ page }) => {
-    // El hermano del caso de arriba: con SOLO dos nodos no hay polígono que
-    // cerrar, así que el trazo queda abierto — el aviso de "no se puede
-    // simular" sigue siendo cierto ahí (tanda5-un-cuadro-y-un-aviso.spec.ts lo
-    // cubre). Este caso es el control de que doble clic no inventa un cierre
-    // donde no hay geometría para cerrar.
+  test('pluma: doble clic con exactamente 2 nodos no tiene área que cerrar, y queda como trazo', async ({ page }) => {
+    // ENMENDADO el 2026-09-12 (spec `2026-09-12-trazos-lineas-de-construccion`
+    // § 3.1-3.2, #1158). El título y el assert decían "queda abierta" —era el
+    // contrato de antes de los trazos, donde dos nodos + doble clic producían
+    // una PIEZA abierta con su aviso de "no se puede simular". La Pluma ya no
+    // puede crear una pieza abierta: con solo dos nodos no hay polígono que
+    // cerrar, así que el trazo queda como línea de construcción — ninguna
+    // pieza, ningún aviso. Este caso sigue siendo el control de que doble
+    // clic no inventa un cierre donde no hay geometría para cerrar; lo que
+    // cambió es adónde va lo que queda abierto.
     await waitForApp(page);
     await tool(page, 'h', 'pen');
     await clickAt(page, { x: 300, y: 300 });
@@ -179,10 +184,11 @@ test.describe('medidas escritas — gramática', () => {
     await page.mouse.move(s.x, s.y);
     await page.mouse.dblclick(s.x, s.y);
     await page.waitForTimeout(300);
-    const pieces = (await st(page)).project.pieces;
-    expect(pieces).toHaveLength(1);
+    const { pieces, trazos } = (await st(page)).project;
+    expect(pieces, 'dos nodos no son un polígono: no debe nacer ninguna pieza').toHaveLength(0);
+    expect(trazos).toHaveLength(1);
     expect(
-      pieces[0].outline.some(c => c.type === 'Z'),
+      trazos[0].path.some(c => c.type === 'Z'),
       'dos nodos no son un polígono: no hay nada que cerrar',
     ).toBe(false);
   });
