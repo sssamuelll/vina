@@ -183,16 +183,12 @@ test.describe('trazos — líneas de construcción', () => {
   });
 
   test('recargar conserva los trazos', async ({ page }) => {
-    // BUG REAL, medido aquí el 2026-09-12 y sin arreglar a propósito (la
-    // tarea 9 escribe el e2e, no toca producción). El autoguardado SÍ escribe
-    // el trazo en IDB —la espera de abajo lo comprueba en disco—; lo que lo
-    // pierde es la hidratación: `projectAutosave.ts:52` decide si vale la pena
-    // restaurar con `pieces.length > 0 || seams.length > 0`, y un proyecto de
-    // solo trazos no cuenta como contenido, así que el `restoreProject` ni se
-    // despacha. Es exactamente el caso de María: raya de construcción primero,
-    // pieza calcada después. Un tercer término (`trazos.length > 0`) lo cierra.
-    // Al arreglarlo, este `test.fail` pasa a rojo: quítalo entonces.
-    test.fail(true, 'projectAutosave.ts:52 — hasContent no cuenta los trazos');
+    // Este recorrido cazó el bug de hidratación de #1158: el autoguardado SÍ
+    // escribía el trazo en IDB, pero la compuerta de contenido de
+    // `projectAutosave.ts` solo miraba piezas y costuras, así que un proyecto
+    // de solo trazos —el estado normal a mitad del trabajo de María— nunca se
+    // restauraba. Por eso las dos esperas están separadas: la de IDB prueba
+    // que se guardó, la de después prueba que volvió.
     await waitForApp(page);
     await activarHerramienta(page, 'h', 'pen');
     await clic(page, { x: 100, y: 100 }); await clic(page, { x: 300, y: 100 }); await page.keyboard.press('Enter');

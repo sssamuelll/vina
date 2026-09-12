@@ -162,8 +162,52 @@ describe('initProjectPersistence — boot hydration', () => {
     expect((toastCall![0] as unknown as { payload: { type: string } }).payload.type).toBe('error');
   });
 
-  it('empty saved project (0 pieces, 0 seams) → skipped silently', async () => {
-    mockedLoad.mockResolvedValue({ ok: true, project: { id: 'x', pieces: [], seams: [] }, warnings: [] } as never);
+  it('empty saved project (0 pieces, 0 seams, 0 trazos) → skipped silently', async () => {
+    mockedLoad.mockResolvedValue({ ok: true, project: { id: 'x', pieces: [], seams: [], trazos: [] }, warnings: [] } as never);
+    const store = makeFakeStore(emptyProject());
+
+    await initProjectPersistence(store);
+
+    expect(dispatchedTypes(store)).toEqual([]);
+  });
+
+  /**
+   * El orden de María (spec de trazos 2026-09-12 § 2.3): raya de construcción
+   * primero, pieza calcada después. Si cierra el navegador entre las dos cosas,
+   * la compuerta de contenido no puede tirarle el trabajo — el trazo SÍ estaba
+   * guardado en IDB, era la hidratación la que no lo restauraba. Lo midió el
+   * e2e `tests/e2e/trazos.spec.ts` («recargar conserva los trazos»).
+   */
+  it('proyecto de solo trazos (0 piezas, 0 costuras, 1 trazo) → se restaura igual', async () => {
+    const saved = { id: 'solo-trazos', pieces: [], seams: [], trazos: [{ id: 't1', path: [] }] };
+    mockedLoad.mockResolvedValue({ ok: true, project: saved, warnings: [] } as never);
+    const store = makeFakeStore(emptyProject());
+
+    await initProjectPersistence(store);
+
+    const types = dispatchedTypes(store);
+    expect(types).toContain('project/restoreProject');
+    expect(types).toContain('editor/requestFitView');
+    const toastCall = store.dispatch.mock.calls.find(c => (c[0] as UnknownAction).type === 'copilotUI/showToast')!;
+    const toast = (toastCall[0] as unknown as { payload: { message: string } }).payload;
+    // Sin piezas, el aviso no puede decir «0 piezas»: cuenta lo que sí volvió.
+    expect(toast.message).toBe('Restauré tu proyecto: 1 trazo');
+  });
+
+  it('piezas Y trazos → el aviso cuenta las dos cosas', async () => {
+    const saved = { id: 'mixto', pieces: [{}, {}], seams: [], trazos: [{ id: 't1' }, { id: 't2' }, { id: 't3' }] };
+    mockedLoad.mockResolvedValue({ ok: true, project: saved, warnings: [] } as never);
+    const store = makeFakeStore(emptyProject());
+
+    await initProjectPersistence(store);
+
+    const toastCall = store.dispatch.mock.calls.find(c => (c[0] as UnknownAction).type === 'copilotUI/showToast')!;
+    const toast = (toastCall[0] as unknown as { payload: { message: string } }).payload;
+    expect(toast.message).toBe('Restauré tu proyecto: 2 piezas y 3 trazos');
+  });
+
+  it('un guardado viejo sin el campo `trazos` no rompe la compuerta', async () => {
+    mockedLoad.mockResolvedValue({ ok: true, project: { id: 'viejo', pieces: [], seams: [] }, warnings: [] } as never);
     const store = makeFakeStore(emptyProject());
 
     await initProjectPersistence(store);
