@@ -11,12 +11,19 @@ const t = (id: string): Trazo => ({ id, createdAt: 1, path: [
 ] });
 
 describe('TrazosLayer (spec 2026-09-12 § 4)', () => {
-  it('pinta cada trazo con la tinta de referencia y sus dos puntas, sin color literal', () => {
+  it('pinta cada trazo con la tinta de referencia, sin color literal', () => {
     const { container } = render(<svg><TrazosLayer trazos={[t('a')]} seleccion={null} zoom2D={1} /></svg>);
     const path = container.querySelector('[data-trazo-id="a"] path')!;
     expect(path.getAttribute('stroke')).toBe('var(--ink-on-light-3)');
     expect(path.getAttribute('fill')).toBe('none');
-    expect(container.querySelectorAll('[data-trazo-id="a"] [data-anchor-role]')).toHaveLength(2);
+  });
+
+  // Lo que engancha se ve (D3, #1157): `resolveSnap` engancha a las anclas
+  // INTERIORES de cualquier trazo visible, no solo a las puntas. Pintar dos de
+  // tres era prometer un punto que no está dibujado.
+  it('pinta TODAS las anclas de un trazo aunque no esté seleccionado, no solo sus puntas', () => {
+    const { container } = render(<svg><TrazosLayer trazos={[t('a')]} seleccion={null} zoom2D={1} /></svg>);
+    expect(container.querySelectorAll('[data-trazo-id="a"] [data-anchor-role]')).toHaveLength(3);
   });
 
   it('con un tramo seleccionado resalta solo ese tramo en acento y enseña todas las anclas', () => {

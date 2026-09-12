@@ -48,4 +48,11 @@ describe('snapIndex — trazos (spec 2026-09-12 § 5.1)', () => {
     expect(v).toContainEqual({ x: 200, y: 0 });
     expect(v.filter(q => q.x === 100 && q.y === 0)).toHaveLength(1);
   });
+
+  it('verticesVisibles incluye el cruce de dos trazos: si engancha, se ve', () => {
+    const i = buildSnapIndex([], [trazo('a', [M(0, 5), L(10, 5)]), trazo('b', [M(5, 0), L(5, 10)])]);
+    const v = verticesVisibles(i);
+    expect(v).toContainEqual({ x: 5, y: 5 });
+    expect(v.filter(q => q.x === 5 && q.y === 5)).toHaveLength(1);
+  });
 });

@@ -2,15 +2,16 @@ import { memo } from 'react';
 import type { Trazo, TrazoSelection } from '../../../types/types';
 import { pathToSVG } from '../utils';
 import { getAnchor } from '../nodeEditorUtils';
-import { anclasDeTrazo, puntasDeTrazo } from '../trazos/trazoPath';
+import { anclasDeTrazo } from '../trazos/trazoPath';
 import AnchorGlyph from './AnchorGlyph';
 
 /**
  * Las líneas de construcción (spec 2026-09-12 § 4): tinta de referencia —la
- * misma que `internalLineColor` da a una interna `'reference'`—, puntas
- * siempre a la vista (lo que el imán encuentra se ve, #1157), tramo
- * seleccionado en acento, y las anclas interiores solo con el trazo
- * seleccionado. Se monta encima de las piezas y debajo de las cotas.
+ * misma que `internalLineColor` da a una interna `'reference'`—, TODAS sus
+ * anclas siempre a la vista y el tramo seleccionado en acento. Todas, no solo
+ * las puntas: `resolveSnap` engancha también a las anclas interiores de
+ * cualquier trazo visible, y lo que engancha se ve (D3, #1157). Se monta
+ * encima de las piezas y debajo de las cotas.
  *
  * Sin hover a propósito: las internas tampoco lo tienen en Seleccionar.
  */
@@ -32,7 +33,7 @@ function TrazosLayer({ trazos, seleccion, zoom2D }: TrazosLayerProps) {
         const tramoD = cmd && inicio && (cmd.type === 'L' || cmd.type === 'C' || cmd.type === 'Q')
           ? pathToSVG([{ type: 'M', values: [inicio.x, inicio.y] }, cmd])
           : null;
-        const puntos = tramo !== null ? anclasDeTrazo(trazo.path) : (puntasDeTrazo(trazo.path) ?? []);
+        const puntos = anclasDeTrazo(trazo.path);
         return (
           <g key={trazo.id} className="trazo" data-trazo-id={trazo.id}>
             <path

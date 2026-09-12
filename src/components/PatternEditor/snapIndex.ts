@@ -122,6 +122,27 @@ export function buildSnapIndex(pieces: PatternPiece[], trazos: Trazo[] = SIN_TRA
 }
 
 /**
+ * El mismo índice, pero solo con lo que IDENTIFICA UN TRAMO DE CONTORNO.
+ *
+ * Lo piden los modos de Medir que eligen un borde (`along-curve`, `compare`):
+ * hacen `pieces.find(p => p.id === snap.pieceId)`, así que todo lo que
+ * engancha con `pieceId: null` —extremos de interna, anclas de trazo, cruces—
+ * no les devuelve una pieza y les deja el clic MUDO. Vaciar los campos aquí,
+ * al lado de `buildSnapIndex`, es lo que hace que un campo nuevo del índice
+ * tenga que pasar por esta decisión en vez de colarse por un spread.
+ */
+export function soloContorno(index: SnapIndex): SnapIndex {
+  return {
+    ...index,
+    endsByPiece: new Map(),
+    trazos: [],
+    interioresByTrazo: new Map(),
+    puntasByTrazo: new Map(),
+    cruces: [],
+  };
+}
+
+/**
  * Qué hay bajo `world` dentro de `radius` (en unidades de PATRÓN, ya divididas
  * por el zoom por el llamador).
  *
@@ -256,6 +277,15 @@ export function verticesVisibles(index: SnapIndex): Point2D[] {
       vistos.add(k);
       puntos.push(q);
     }
+  }
+  // El cruce no es un objeto —nadie lo creó, sale de dos trazos— pero el imán
+  // lo encuentra, así que tiene que verse. No se pinta como glifo permanente
+  // en `TrazosLayer`: se enseña aquí, como candidato, igual que un vértice.
+  for (const c of index.cruces) {
+    const k = `${Math.round(c.x * 1e4)}|${Math.round(c.y * 1e4)}`;
+    if (vistos.has(k)) continue;
+    vistos.add(k);
+    puntos.push(c);
   }
   return puntos;
 }

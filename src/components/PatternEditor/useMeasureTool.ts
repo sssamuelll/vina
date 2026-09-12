@@ -11,7 +11,7 @@ import { screenToPatternLength } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
 import { rangoMedibleDeBorde } from '../../utils/semanticEdges';
 import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
-import { buildSnapIndex, resolveSnap, verticesVisibles, type SnapKind } from './snapIndex';
+import { buildSnapIndex, resolveSnap, soloContorno, verticesVisibles, type SnapKind } from './snapIndex';
 import { EDGE_HIT_PX } from './gestureConstants';
 
 // ─── Types ───
@@ -178,9 +178,10 @@ export function useMeasureTool(
   const snapPieces = visiblePieces ?? pieces;
   const snapIndex = useMemo(() => buildSnapIndex(snapPieces, trazos), [snapPieces, trazos]);
   // Un extremo interno sirve para medir entre puntos, pero no identifica un
-  // tramo del contorno. Las herramientas de curvas comparten los vértices y
-  // anillos del índice sin dejar que una interna les tape el tramo buscado.
-  const outlineIndex = useMemo(() => ({ ...snapIndex, endsByPiece: new Map<string, Point2D[]>() }), [snapIndex]);
+  // tramo del contorno — y un ancla o un cruce de trazo tampoco. Las
+  // herramientas de curvas comparten los vértices y anillos del índice sin
+  // dejar que nada con `pieceId: null` les tape el tramo buscado.
+  const outlineIndex = useMemo(() => soloContorno(snapIndex), [snapIndex]);
   const vertices = useMemo(() => verticesVisibles(snapIndex), [snapIndex]);
 
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
