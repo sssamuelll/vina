@@ -1,5 +1,5 @@
 import type { PathCommand, Point2D } from '../../../types/types';
-import { getAnchor } from '../nodeEditorUtils';
+import { applyNodeMove, getAnchor } from '../nodeEditorUtils';
 import { distToSegmentWithT } from '../../../utils/geometry/distance';
 
 /**
@@ -48,37 +48,17 @@ export function quitarTramo(
 }
 
 /**
- * Mueve una punta (0 = primera, 1 = última). Una llegada en curva arrastra su
- * manejador de llegada con el ancla — lo mismo que hace Seleccionar con las
- * puntas de una interna (`useEditorInteractions.ts`).
+ * Mueve una punta (0 = primera, 1 = última) y devuelve un path nuevo; el
+ * original no se toca.
+ *
+ * Delega en `applyNodeMove`, la misma puerta por la que se mueve el nodo de una
+ * pieza o de una interna, así que la punta arrastra **sus dos manejadores**: el
+ * de llegada (en su propio `C`/`Q`) y el de salida (el `cp1` del `C` siguiente,
+ * maria-203). Mover la punta de salida sin el segundo deformaba el arranque de
+ * un trazo curvo.
  */
 export function moverPunta(path: PathCommand[], extremo: 0 | 1, a: Point2D): PathCommand[] {
-  const nuevo = path.map(copia);
-  if (extremo === 0) {
-    nuevo[0].values[0] = a.x;
-    nuevo[0].values[1] = a.y;
-    return nuevo;
-  }
-  const last = nuevo[nuevo.length - 1];
-  if (last.type === 'L' || last.type === 'M') {
-    last.values[0] = a.x;
-    last.values[1] = a.y;
-  } else if (last.type === 'C') {
-    const dx = a.x - last.values[4];
-    const dy = a.y - last.values[5];
-    last.values[4] = a.x;
-    last.values[5] = a.y;
-    last.values[2] += dx;
-    last.values[3] += dy;
-  } else if (last.type === 'Q') {
-    const dx = a.x - last.values[2];
-    const dy = a.y - last.values[3];
-    last.values[2] = a.x;
-    last.values[3] = a.y;
-    last.values[0] += dx;
-    last.values[1] += dy;
-  }
-  return nuevo;
+  return applyNodeMove(path, extremo === 0 ? 0 : path.length - 1, 'anchor', a);
 }
 
 /**

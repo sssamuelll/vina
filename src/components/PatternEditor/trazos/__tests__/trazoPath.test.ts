@@ -54,6 +54,14 @@ describe('trazoPath — moverPunta', () => {
     const movido = moverPunta(curva, 1, { x: 100, y: 50 });
     expect(movido[1].values).toEqual([10, 0, 90, 50, 100, 50]);
   });
+  it('la punta de salida arrastra el manejador de salida, que vive en el C siguiente', () => {
+    const curva: PathCommand[] = [M(0, 0), { type: 'C', values: [10, 0, 90, 0, 100, 0] }];
+    const movido = moverPunta(curva, 0, { x: 0, y: 50 });
+    expect(movido[0].values).toEqual([0, 50]);
+    // el cp1 del C es el manejador SALIENTE del ancla movida: sube con ella
+    expect(movido[1].values).toEqual([10, 50, 90, 0, 100, 0]);
+    expect(curva[1].values).toEqual([10, 0, 90, 0, 100, 0]); // no muta el original
+  });
 });
 
 describe('trazoPath — tramoMasCercano', () => {
