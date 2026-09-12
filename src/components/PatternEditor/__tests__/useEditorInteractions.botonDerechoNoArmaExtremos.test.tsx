@@ -177,3 +177,42 @@ describe('el extremo de una interna seleccionada, igual — el hermano preexiste
     expect(hook.result.current.isDraggingEndpoint).toBe(false);
   });
 });
+
+/**
+ * Tercer hermano, el peor de los tres: el arrastre de pieza. Con el derecho
+ * `dragRef` quedaba armado, el hover le iba poniendo `lastPos` y el mouseup del
+ * SIGUIENTE clic izquierdo comiteaba `movePiece` a una posición que la usuaria
+ * nunca arrastró. Aquí la guarda NO puede ir en toda la rama: el clic derecho
+ * tiene que seguir seleccionando la pieza, porque el menú contextual necesita
+ * sujeto — así que el caso afirma las dos mitades.
+ *
+ * El oráculo es `project.pieces[0].position` tras down/move/up, el mismo que usa
+ * el gate de phantom-move de `useEditorInteractions.grammar.test.tsx`. El
+ * `transform` del `<g>` no sirve aquí: sin montar `PatternEditor` entero,
+ * `svgRef.current` es `null` y no hay grupo que consultar.
+ */
+describe('el arrastre de pieza: el derecho selecciona pero no arrastra', () => {
+  const pos = (store: ReturnType<typeof setup>['store']) =>
+    store.getState().project.pieces[0].position;
+
+  it('control — con el izquierdo la pieza se mueve y se comitea', () => {
+    const { store, hook } = setup();
+    act(() => { hook.result.current.handleMouseDown(downAt(50, 50, 0, 'a')); });
+    act(() => { hook.result.current.handleMouseMove(moveTo(50, 90)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+
+    expect(pos(store)).toEqual({ x: 0, y: 40 });
+  });
+
+  it('con el derecho la pieza SÍ se selecciona (el menú necesita sujeto) pero NO se mueve', () => {
+    const { store, hook } = setup();
+    act(() => { hook.result.current.handleMouseDown(downAt(50, 50, 2, 'a')); });
+
+    expect(store.getState().editor.selectedPieceIds).toContain('a');
+
+    act(() => { hook.result.current.handleMouseMove(moveTo(50, 90)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+
+    expect(pos(store)).toEqual({ x: 0, y: 0 });
+  });
+});

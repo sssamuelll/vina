@@ -1011,7 +1011,14 @@ export function useEditorInteractions(
           // Bloqueada = geometría intocable, no el sitio (maria-204): mover
           // se permite; modificar sigue bloqueado en sus superficies (box de
           // transform oculto, editores de nodos con guard, curation gates).
-          dragRef.current = { pieceId, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...piece.position } };
+          // La selección de arriba SÍ la hace el botón derecho — el menú contextual
+          // necesita sujeto. El arrastre no: con el derecho no hay release que lo
+          // suelte (ver la guarda de las puntas, arriba), así que el ref quedaba
+          // armado, el hover movía el `<g>` por DOM y el mouseup del SIGUIENTE clic
+          // izquierdo comiteaba `movePiece` a una posición que nadie arrastró.
+          if (e.button === 0) {
+            dragRef.current = { pieceId, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...piece.position } };
+          }
         }
       } else {
         if (trazoHit) { seleccionarTrazo(); return; }
