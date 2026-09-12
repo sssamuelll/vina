@@ -95,7 +95,7 @@ La alternativa descartada: un gesto nuevo para «terminar abierto» (Shift+Enter
 
 ### 3.3 La escalera de Escape, enmendada
 
-Con el chip de Tab abierto (`nextPoint`, #1129), el **primer** Esc suelta el chip, como hoy (`usePenTool.ts:341-345`). El **segundo** termina el trazo — antes tiraba el dibujo entero (`setState(EMPTY)`). El peldaño «cancelar el trazo entero» **desaparece de la Pluma**: Retroceso quita nodos de uno en uno, y un trazo terminado se deshace con `Ctrl+Z`.
+Con el chip de Tab abierto (`nextPoint`, #1129), los peldaños del chip siguen igual que hoy: un Esc cierra la edición del chip, el siguiente suelta el tramo congelado (`usePenTool.ts:341-345`) y el trazo sigue vivo. **El Esc que hoy tira el dibujo entero (`setState(EMPTY)`) pasa a terminar el trazo.** El peldaño «cancelar el trazo entero» **desaparece de la Pluma**: Retroceso quita nodos de uno en uno, y un trazo terminado se deshace con `Ctrl+Z`.
 
 ### 3.4 Lo que se dice y se registra
 
