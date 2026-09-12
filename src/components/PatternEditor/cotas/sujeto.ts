@@ -1,7 +1,7 @@
-import type { InternalLineSelection, PatternPiece, SaSelection, Tool2D } from '../../../types/types';
+import type { InternalLineSelection, PatternPiece, SaSelection, Tool2D, Trazo, TrazoSelection } from '../../../types/types';
 import { margenEnPunto } from '../../../utils/seam/margenEnPunto';
 import { cotaDeMargen } from './cotaDeMargen';
-import { cotasDeLineaInterna, cotasDePieza, type Cota } from './cotas';
+import { cotasDeLineaInterna, cotasDePieza, cotasDeTrazo, type Cota } from './cotas';
 import { cotasDelTramoEnCurso, type TramoEnCurso } from './tramoEnCurso';
 import { cotasDelNodo } from './nodo';
 import { formatMedida } from './parseMedida';
@@ -47,6 +47,14 @@ export interface SujetoInput {
    * tanda 6, todavía sin implementar).
    */
   nodoSeleccionado?: { pieceId: string; commandIndex: number } | null;
+  /**
+   * Los trazos VISIBLES (spec 2026-09-12 § 5.3). `PatternEditor` los filtra por
+   * «Construcción» antes de pasarlos, así que aquí «no está en la lista» y
+   * «no se ve» son el mismo hecho.
+   */
+  trazos?: readonly Trazo[];
+  /** El tramo de trazo seleccionado (`editor.selectedTrazo`). */
+  selectedTrazo?: TrazoSelection | null;
 }
 
 export interface Sujeto {
@@ -224,6 +232,26 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
       disabled: anclada ? apagada(anclada) : false,
       lineaDeSujeto: anclada ? 'Editando: este borde' : null,
     };
+  }
+
+  // Un tramo de trazo seleccionado es sujeto por la misma regla de
+  // especificidad que la interna: manda sobre cualquier pieza seleccionada.
+  if (input.selectedTrazo) {
+    if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada(lineaRect);
+    const trazo = input.trazos?.find(t => t.id === input.selectedTrazo!.trazoId) ?? null;
+    // Oculto (`trazos` ya viene filtrado) o borrado por deshacer: sin sujeto.
+    if (trazo) {
+      return {
+        piece: null,
+        caliente: false,
+        cotas: cotasDeTrazo(trazo, input.selectedTrazo.segmentIndex),
+        lectura: null,
+        lecturaApagada: false,
+        bordeLeido: null,
+        disabled: false,
+        lineaDeSujeto: 'Editando: el tramo seleccionado',
+      };
+    }
   }
 
   if (input.selectedInternalLine) {

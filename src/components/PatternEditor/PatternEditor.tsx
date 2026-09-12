@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch, shallowEqual } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage, addTrazo } from '../../store/projectSlice';
+import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage, addTrazo, updateTrazo } from '../../store/projectSlice';
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
 import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
@@ -833,7 +833,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     hiddenLayerIds, layerLocked, saSelection: editor.saSelection,
     saAncla: seamAllowanceTool.ancla, saHover: seamAllowanceTool.hover,
     tramoEnCurso, nodoSeleccionado,
-  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso, nodoSeleccionado]);
+    trazos: trazosVisibles, selectedTrazo: editor.selectedTrazo,
+  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso, nodoSeleccionado, trazosVisibles, editor.selectedTrazo]);
   // Las cuatro herramientas que toman el sujeto de la selección lo dicen en la
   // tira antes del clic, en vez de morirse mudas (#1117).
   const falta = faltaSujeto(activeTool, selectedPieceIds);
@@ -966,6 +967,14 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       // en el arrastre, con compensación de pivote, re-anclado de piquetes y
       // lote de deshacer. Dos escritores del mismo hecho se desincronizan.
       editPatternRef.current.moveNodeTo(update.pieceId, update.commandIndex, update.destino);
+    } else if (update.kind === 'trazo') {
+      // Vivo se comprueba contra la lista ENTERA del store, no contra la
+      // filtrada: un trazo oculto no puede estar seleccionado (`toggleTrazos`
+      // suelta la selección), así que aquí lo único que queda por descartar es
+      // que deshacer lo haya borrado.
+      if (!trazos.some(t => t.id === update.trazoId)) return;
+      const accion = updateTrazo({ id: update.trazoId, path: update.path });
+      dispatch(token ? withUndoBatchToken(accion, token) : accion);
     } else {
       const piece = pieces.find(p => p.id === update.pieceId);
       if (!piece) return;
@@ -973,7 +982,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       const accion = updateInternalLine({ pieceId: update.pieceId, lineId: update.lineId, path: update.path });
       dispatch(token ? withUndoBatchToken(accion, token) : accion);
     }
-  }, [pieces, dispatch, activeTool, figuraDelCirculo, sujeto.piece?.id]);
+  }, [pieces, trazos, dispatch, activeTool, figuraDelCirculo, sujeto.piece?.id]);
   const aplicarRef = useRef(aplicarCota);
   aplicarRef.current = aplicarCota;
 
