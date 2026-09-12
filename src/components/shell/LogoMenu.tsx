@@ -4,7 +4,7 @@ import type { RootState, AppDispatch } from '../../store';
 import {
   setViewMode, undo, redo, toggleSnapToGrid, toggleSeamAllowance,
   toggleGrainlines, toggleNotches, togglePieceNames, toggleSewingLines,
-  toggleReferenceImages, toggleLineLengths, setRenderMode2D,
+  toggleReferenceImages, toggleLineLengths, toggleTrazos, setRenderMode2D,
   clearSelection, setZoom2D, setUnits,
 } from '../../store/editorSlice';
 import {
@@ -14,7 +14,7 @@ import {
 import { toggleDockSignaling } from '../../store/dockSlice';
 import { requestConfirmation } from '../../hooks/useGuardedAction';
 import { showErrorToast, showInfoToast } from '../../store/copilotUISlice';
-import { duplicatePiece, removePieces, removeSeam, removeInternalLine, removePOM } from '../../store/projectSlice';
+import { duplicatePiece, removePieces, removeSeam, removeInternalLine, removePOM, removeTramoDeTrazo } from '../../store/projectSlice';
 import { resolverBorrado } from '../../store/borradoDeSeleccion';
 import { runAutoSew } from '../../store/autoSewThunk';
 import { openRenderSettings } from '../../store/renderSettingsThunk';
@@ -117,12 +117,17 @@ const EDIT_MENU: MenuItem[] = [
       selectedSeamId: editor.selectedSeamId,
       selectedPOMId: editor.selectedPOMId,
       selectedInternalLine: editor.selectedInternalLine,
+      selectedTrazo: editor.selectedTrazo,
       piezasBloqueadas: new Set(project.pieces.filter(p => p.locked === true).map(p => p.id)),
     });
     switch (sujeto.kind) {
       case 'seam': d(removeSeam(sujeto.id)); break;
       case 'internalLine':
         d(removeInternalLine({ pieceId: sujeto.pieceId, lineId: sujeto.lineId }));
+        d(clearSelection());
+        break;
+      case 'trazo':
+        d(removeTramoDeTrazo({ trazoId: sujeto.trazoId, segmentIndex: sujeto.segmentIndex }));
         d(clearSelection());
         break;
       case 'pom': d(removePOM(sujeto.id)); break;
@@ -155,6 +160,7 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Líneas de costura', action: (d) => d(toggleSewingLines()), checked: (s) => s.editor.showSewingLines },
   { label: 'Imágenes de referencia', action: (d) => d(toggleReferenceImages()), checked: (s) => s.editor.showReferenceImages },
   { label: 'Largos de línea', action: (d) => d(toggleLineLengths()), checked: (s) => s.editor.showLineLengths },
+  { label: 'Construcción', action: (d) => d(toggleTrazos()), checked: (s) => s.editor.showTrazos },
   { separator: true, label: '' },
   { label: 'Renderizado: texturizado', action: (d) => d(setRenderMode2D('textured')), checked: (s) => s.editor.renderMode2D === 'textured' },
   { label: 'Renderizado: translúcido', action: (d) => d(setRenderMode2D('translucent')), checked: (s) => s.editor.renderMode2D === 'translucent' },

@@ -23,6 +23,7 @@
  */
 
 import { SEWING_TOOL_IDS } from './toolActivation';
+import type { TrazoSelection } from '../types/types';
 
 export interface EstadoParaBorrado {
   activeTool: string;
@@ -30,6 +31,8 @@ export interface EstadoParaBorrado {
   selectedSeamId: string | null;
   selectedPOMId: string | null;
   selectedInternalLine: { pieceId: string; lineId: string } | null;
+  /** Tramo de trazo seleccionado (spec 2026-09-12 § 5.4). */
+  selectedTrazo?: TrazoSelection | null;
   /** Ids de piezas con el candado puesto (`locked === true`). */
   piezasBloqueadas: Set<string>;
 }
@@ -37,6 +40,7 @@ export interface EstadoParaBorrado {
 export type SujetoBorrable =
   | { kind: 'seam'; id: string }
   | { kind: 'internalLine'; pieceId: string; lineId: string }
+  | { kind: 'trazo'; trazoId: string; segmentIndex: number }
   | { kind: 'pom'; id: string }
   | { kind: 'pieces'; ids: string[] }
   | { kind: 'nada'; motivo?: 'bloqueada' };
@@ -45,6 +49,12 @@ export function resolverBorrado(e: EstadoParaBorrado): SujetoBorrable {
   // Menú de costuras: el sujeto es la costura o no hay sujeto (#1094).
   if (SEWING_TOOL_IDS.has(e.activeTool)) {
     return e.selectedSeamId ? { kind: 'seam', id: e.selectedSeamId } : { kind: 'nada' };
+  }
+
+  // El trazo es papel suelto: un tramo elegido es lo más fino que hay en el
+  // lienzo, y su selección es excluyente con todo lo demás (spec § 5.2).
+  if (e.selectedTrazo) {
+    return { kind: 'trazo', ...e.selectedTrazo };
   }
 
   if (e.selectedInternalLine) {

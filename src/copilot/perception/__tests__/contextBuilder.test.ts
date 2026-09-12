@@ -97,6 +97,8 @@ function mockState(overrides?: Partial<RootState>): RootState {
       selectedSeamId: null,
       selectedPOMId: null,
       selectedInternalLine: null,
+      selectedTrazo: null,
+      showTrazos: true,
       saSelection: null,
       zoom2D: 1,
       pan2D: { x: 0, y: 0 },

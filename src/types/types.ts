@@ -845,6 +845,10 @@ export interface EditorState {
   selectedSeamId: string | null;
   selectedPOMId: string | null;
   selectedInternalLine: InternalLineSelection | null;
+  /** Tramo de trazo seleccionado (spec 2026-09-12 § 5.2). Excluyente con piezas e internas. */
+  selectedTrazo: TrazoSelection | null;
+  /** Interruptor «Construcción»: apagado, los trazos ni se pintan ni enganchan ni se seleccionan. */
+  showTrazos: boolean;
   /** Seam-allowance tool selection: a typed, mutually-exclusive set — N edges OR
    *  N vertices, never mixed. Replaces the old single selectedEdge/selectedVertex
    *  pair (multi-select Shift; spec 2026-06-09-selection-model-multiselect-design). */

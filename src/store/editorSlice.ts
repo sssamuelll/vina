@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { EditorState, ViewMode, Tool2D, Point2D, UnitSystem, PatternPiece } from '../types/types';
+import { EditorState, ViewMode, Tool2D, Point2D, UnitSystem, PatternPiece, TrazoSelection } from '../types/types';
 import { NEW_PROJECT } from './actions';
 import { removeReferenceImage } from './projectSlice';
 import { newId } from '../utils/ids';
@@ -13,6 +13,7 @@ const initialState: EditorState = {
   selectedSeamId: null,
   selectedPOMId: null,
   selectedInternalLine: null,
+  selectedTrazo: null,
   saSelection: null,
   notchMirrorInvert: true,
   zoom2D: 1,
@@ -26,6 +27,7 @@ const initialState: EditorState = {
   showPieceNames: false,
   // La selección muestra sus largos; «Largos» los extiende a todas las piezas.
   showLineLengths: false,
+  showTrazos: true,
   showSewingLines: true,
   renderMode2D: 'textured' as const,
   snapToGrid: true,
@@ -53,10 +55,12 @@ const editorSlice = createSlice({
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
+      state.selectedTrazo = null;
       state.saSelection = null;
     },
     togglePieceSelection(state, action: PayloadAction<string>) {
       state.selectedPOMId = null;
+      state.selectedTrazo = null;
       state.saSelection = null;
       const idx = state.selectedPieceIds.indexOf(action.payload);
       if (idx === -1) {
@@ -83,6 +87,7 @@ const editorSlice = createSlice({
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
+      state.selectedTrazo = null;
       state.saSelection = null;
     },
     selectAllPieces(state, action: PayloadAction<string[]>) {
@@ -90,6 +95,7 @@ const editorSlice = createSlice({
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
+      state.selectedTrazo = null;
       state.saSelection = null;
     },
     selectAllVisiblePieces(state, action: PayloadAction<{ pieces: PatternPiece[]; layerLocked: Record<number, boolean> }>) {
@@ -100,6 +106,7 @@ const editorSlice = createSlice({
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
+      state.selectedTrazo = null;
       state.saSelection = null;
     },
     selectSeam(state, action: PayloadAction<string>) {
@@ -107,6 +114,7 @@ const editorSlice = createSlice({
       state.selectedPOMId = null;
       state.selectedPieceIds = [];
       state.selectedInternalLine = null;
+      state.selectedTrazo = null;
       state.saSelection = null;
     },
     selectPOM(state, action: PayloadAction<string | null>) {
@@ -114,6 +122,7 @@ const editorSlice = createSlice({
       state.selectedPieceIds = [];
       state.selectedSeamId = null;
       state.selectedInternalLine = null;
+      state.selectedTrazo = null;
       state.saSelection = null;
     },
     selectInternalLine(state, action: PayloadAction<NonNullable<EditorState['selectedInternalLine']>>) {
@@ -121,6 +130,16 @@ const editorSlice = createSlice({
       state.selectedPieceIds = [action.payload.pieceId];
       state.selectedSeamId = null;
       state.selectedPOMId = null;
+      state.selectedTrazo = null;
+      state.saSelection = null;
+    },
+    /** Un trazo se selecciona por tramo y desplaza a todo lo demás (spec 2026-09-12 § 5.2). */
+    selectTrazo(state, action: PayloadAction<TrazoSelection>) {
+      state.selectedTrazo = action.payload;
+      state.selectedPieceIds = [];
+      state.selectedSeamId = null;
+      state.selectedPOMId = null;
+      state.selectedInternalLine = null;
       state.saSelection = null;
     },
     // Seam-allowance tool selection — a typed, mutually-exclusive SET (N edges OR
@@ -146,6 +165,7 @@ const editorSlice = createSlice({
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
+      state.selectedTrazo = null;
     },
     selectSaVertices(state, action: PayloadAction<{ pieceId: string; vertexIndex: number }>) {
       // Single vertex (multi-vertex deferred): replace the set.
@@ -154,6 +174,7 @@ const editorSlice = createSlice({
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
+      state.selectedTrazo = null;
     },
     clearSaSelection(state) {
       state.saSelection = null;
@@ -195,6 +216,11 @@ const editorSlice = createSlice({
     },
     toggleLineLengths(state) {
       state.showLineLengths = !state.showLineLengths;
+    },
+    toggleTrazos(state) {
+      state.showTrazos = !state.showTrazos;
+      // Lo oculto no se edita: apagar la construcción suelta el tramo vivo.
+      if (!state.showTrazos) state.selectedTrazo = null;
     },
     toggleSewingLines(state) {
       state.showSewingLines = !state.showSewingLines;
@@ -278,10 +304,10 @@ const editorSlice = createSlice({
 
 export const {
   setViewMode, setActiveTool,
-  selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectAllVisiblePieces, selectSeam, selectPOM, selectInternalLine, selectSaEdges, selectSaVertices, clearSaSelection,
+  selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectAllVisiblePieces, selectSeam, selectPOM, selectInternalLine, selectTrazo, selectSaEdges, selectSaVertices, clearSaSelection,
   setZoom2D, setPan2D, requestFitView,
   toggleSeamAllowance, setDefaultSAWidth, setNotchMirrorInvert, toggleGrainlines, toggleNotches, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
-  togglePieceNames, toggleLineLengths, toggleSewingLines, setRenderMode2D,
+  togglePieceNames, toggleLineLengths, toggleTrazos, toggleSewingLines, setRenderMode2D,
   toggleReferenceImages, setShowReferenceImages, setSelectedReferenceImage,
   startCalibration, setCalibrationPoint1, cancelCalibration,
   setUnits,
