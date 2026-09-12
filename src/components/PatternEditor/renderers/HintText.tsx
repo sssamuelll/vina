@@ -71,7 +71,7 @@ export default function HintText({
       )}
 
       {activeTool === 'pen' && penNodesLength > 0 && (
-        <Pie>Clic añade · arrastra para curvar · Tab escribe largo y ángulo · clic en el primer punto cierra · Enter o doble clic termina · Retroceso quita el último · Esc cancela</Pie>
+        <Pie>Clic añade · arrastra para curvar · Tab escribe largo y ángulo · clic en el primer punto cierra · Enter o doble clic cierra la pieza · Esc deja el trazo · Retroceso quita el último</Pie>
       )}
 
       {activeTool === 'rectangle' && (

@@ -143,7 +143,9 @@ describe('el cierre de la pluma, con la deuda del spec saldada', () => {
     click(400, 400);
     click(303, 302);                       // dentro del radio del primero
     expect(onComplete).toHaveBeenCalledTimes(1);
-    const cmds = onComplete.mock.calls[0][0].outline as PathCommand[];
+    // Cerrado es pieza (spec 2026-09-12 § 3.1).
+    expect(onComplete.mock.calls[0][0].kind).toBe('pieza');
+    const cmds = onComplete.mock.calls[0][0].piece.outline as PathCommand[];
     expect(cmds[cmds.length - 1].type).toBe('Z');
   });
 
@@ -179,7 +181,9 @@ describe('el cierre de la pluma, con la deuda del spec saldada', () => {
     click(102, 101);                       // dentro del radio del primero Y del vértice
     expect(onComplete, 'el enganche le ganó al cierre: se añadió un nodo en vez de cerrar').toHaveBeenCalledTimes(1);
     expect(tool().nodes).toEqual([]);
-    const cmds = onComplete.mock.calls[0][0].outline as PathCommand[];
+    // Cerrado es pieza (spec 2026-09-12 § 3.1).
+    expect(onComplete.mock.calls[0][0].kind).toBe('pieza');
+    const cmds = onComplete.mock.calls[0][0].piece.outline as PathCommand[];
     expect(cmds[cmds.length - 1].type).toBe('Z');
   });
 });

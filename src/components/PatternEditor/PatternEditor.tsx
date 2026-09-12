@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch, shallowEqual } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage } from '../../store/projectSlice';
+import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage, addTrazo } from '../../store/projectSlice';
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
 import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
@@ -9,6 +9,7 @@ import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../.
 import type { RootState } from '../../store';
 import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, seSeleccionaPorTramo } from '../../types/types';
 import { usePenTool } from './usePenTool';
+import type { PenResult } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
 import { useCircleTool } from './useCircleTool';
 import { useTriangleTool } from './useTriangleTool';
@@ -195,6 +196,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     return fullPiece.id;
   }, [dispatch]);
 
+  /** La Pluma reparte (spec 2026-09-12 § 3.1). Un trazo terminado NO queda seleccionado (#1154). */
+  const handlePenComplete = useCallback((r: PenResult) => {
+    if (r.kind === 'pieza') { handlePieceComplete(r.piece); return; }
+    dispatch(addTrazo({ id: newId(), path: r.path, createdAt: Date.now() }));
+  }, [dispatch, handlePieceComplete]);
+
   // Solo lo que se dibuja puede prometer una lectura o recibir el clic. El
   // orden ascendente es el de PieceRenderer; el hook lo invierte una sola vez.
   const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
@@ -218,7 +225,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     [drawablePieces, showLineLengths, selectedPieceIds, haySujetoDentroDeLaPieza],
   );
 
-  const pen = usePenTool(zoom2D, pan2D, handlePieceComplete, drawablePieces);
+  const pen = usePenTool(zoom2D, pan2D, handlePenComplete, drawablePieces);
   const rectTool = useRectangleTool(zoom2D, pan2D, handlePieceComplete);
   // El círculo nace de la misma puerta que la pluma y el rectángulo (#1111).
   const circleTool = useCircleTool(zoom2D, pan2D, handlePieceComplete);

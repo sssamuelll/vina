@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
-import { Point2D, PathCommand, PatternPiece } from '../../types/types';
+import { Point2D, PathCommand, PatternPiece, Trazo } from '../../types/types';
 import { screenToPattern } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
 import { polarOf, polarPoint } from './polyPenGeometry';
@@ -64,16 +64,29 @@ const EMPTY: PenState = { nodes: [], isDragging: false, cursorPos: null, isClose
 /** Identidad estable: un `[]` nuevo por render reharía el índice en cada frame. */
 const VACIO: PatternPiece[] = [];
 
+/** Por dónde terminó el trazo, para la bitácora (spec 2026-09-12 § 3.4). */
+export type PenVia = 'close' | 'enter' | 'dblclick' | 'esc' | 'toolChange';
+
+/** Lo que la Pluma entrega al terminar: cerrado es pieza, abierto es trazo (spec 2026-09-12 § 3.1). */
+export type PenResult =
+  | { kind: 'pieza'; piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'> }
+  | { kind: 'trazo'; path: PathCommand[] };
+
+/** Misma razón que `VACIO`: identidad estable para el índice de enganche. */
+const SIN_TRAZOS: Trazo[] = [];
+
 export function usePenTool(
   zoom: number,
   pan: Point2D,
-  onComplete: (piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => void,
+  onComplete: (resultado: PenResult) => void,
   /**
    * Piezas VISIBLES en orden de dibujo, para enganchar (#1102). Opcional para
    * que los tests viejos de la pluma —que la prueban como creadora de piezas
    * desde la nada— sigan valiendo tal cual.
    */
   pieces: PatternPiece[] = VACIO,
+  /** Trazos VISIBLES: enganchan igual que las piezas (spec 2026-09-12 § 5.1). */
+  trazos: Trazo[] = SIN_TRAZOS,
 ) {
   const [state, setState] = useState<PenState>(EMPTY);
   const [hover, setHover] = useState<SnapTarget | null>(null);
@@ -94,8 +107,9 @@ export function usePenTool(
     [zoom, pan],
   );
 
-  // Caro: se rehace solo cuando cambian las piezas, no por evento de ratón.
-  const indice = useMemo(() => buildSnapIndex(pieces), [pieces]);
+  // Caro: se rehace solo cuando cambian las piezas o los trazos, no por evento
+  // de ratón.
+  const indice = useMemo(() => buildSnapIndex(pieces, trazos), [pieces, trazos]);
   const radio = useCallback(() => screenToPatternLength(EDGE_HIT_PX, zoom), [zoom]);
   // Lo que se pinta sale del MISMO índice que engancha: si divergieran, el
   // dibujo estaría prometiendo puntos que no atraen.
@@ -164,13 +178,22 @@ export function usePenTool(
     return `M${last.anchor.x},${last.anchor.y} C${cp1.x},${cp1.y} ${state.cursorPos.x},${state.cursorPos.y} ${state.cursorPos.x},${state.cursorPos.y}`;
   }, [state.nodes, state.cursorPos, state.isClosed]);
 
-  const complete = useCallback((nodes: PenNode[], closed: boolean) => {
+  const complete = useCallback((nodes: PenNode[], closed: boolean, via: PenVia) => {
     const commands = nodesToCommands(nodes, closed);
-    onComplete({
-      name: `Piece ${Date.now().toString(36)}`,
-      outline: commands,
-      ...draftedPieceDefaults(),
-    });
+    pushJournal('gesture', 'pen:complete', { kind: closed ? 'pieza' : 'trazo', nodes: nodes.length, via });
+    if (closed) {
+      onComplete({
+        kind: 'pieza',
+        piece: {
+          name: `Piece ${Date.now().toString(36)}`,
+          outline: commands,
+          ...draftedPieceDefaults(),
+        },
+      });
+    } else {
+      // Abierto nunca es pieza: es una raya de construcción (spec § 3.1).
+      onComplete({ kind: 'trazo', path: commands });
+    }
     pressRef.current = null;
     // El anillo de enganche también se apaga: si no, cerrar una pieza lo deja
     // pintado sobre el último objetivo hasta el siguiente movimiento del ratón,
@@ -198,7 +221,7 @@ export function usePenTool(
       // quitar.
       if (dist(pt, first) * zoom <= EDGE_HIT_PX) {
         pushJournal('gesture', 'pen:press', { closes: true, nodes: nodes.length });
-        complete(nodes, true);
+        complete(nodes, true, 'close');
         return;
       }
     }
@@ -259,15 +282,22 @@ export function usePenTool(
     setState(prev => ({ ...prev, isDragging: false }));
   }, []);
 
-  /** Clear any in-progress stroke (used when switching away from the tool). */
+  /**
+   * Salir de la Pluma no tira lo dibujado: con dos o más nodos queda un trazo
+   * (spec 2026-09-12 § 3.2). Lo llaman el cambio de herramienta y
+   * `pointercancel` — en los dos casos perder la raya era el fallo.
+   */
   const reset = useCallback(() => {
+    const nodes = nodesRef.current;
+    if (nodes.length >= 2) { complete(nodes, false, 'toolChange'); return; }
     setHover(null);
     pressRef.current = null;
     setState(EMPTY);
-  }, []);
+  }, [complete]);
 
-  /** Doble clic = terminar (= Enter): con tres nodos cierra; con dos queda
-   *  abierta. El nodo duplicado del segundo par down/up se descarta. */
+  /** Doble clic = terminar (= Enter): con tres nodos cierra la pieza; con dos
+   *  queda el trazo abierto. El nodo duplicado del segundo par down/up se
+   *  descarta. */
   const handleDoubleClick = useCallback(() => {
     let nodes = nodesRef.current;
     if (nodes.length >= 2) {
@@ -276,7 +306,7 @@ export function usePenTool(
       if (dist(a, b) * zoom < EDGE_HIT_PX) nodes = nodes.slice(0, -1);
     }
     if (nodes.length < 2) return;
-    complete(nodes, nodes.length >= 3);
+    complete(nodes, nodes.length >= 3, 'dblclick');
   }, [zoom, complete]);
 
   // ─── El tramo en curso, congelado (cotas vivas § 5.4, #1129) ─────────────
@@ -334,7 +364,7 @@ export function usePenTool(
   }, []);
 
   /**
-   * Escape = cancelar, Enter = terminar (cierra con ≥3 nodos), Tab = siguiente punto,
+   * Escape = terminar dejando el trazo, Enter = terminar (cierra con ≥3 nodos), Tab = siguiente punto,
    * Retroceso/Supr = quitar el último. Devuelve si consumió la tecla: la
    * captura CF-1 detiene la propagación solo entonces (spec 2026-08-29 § 8).
    */
@@ -342,18 +372,21 @@ export function usePenTool(
     const nodes = nodesRef.current;
     switch (e.key) {
       case 'Escape':
-        // Peldaño nuevo (#1129): con el tramo congelado, Escape lo SUELTA y el
-        // trazo sigue vivo — «vuelve a seguir al cursor», spec de cotas vivas
-        // § 5.4. Antes esto no existía porque el Escape del panel nacía DENTRO
-        // del panel y el router no lo veía; los chips sí están en el lienzo, y
-        // sin este peldaño Escape se llevaba el trazo entero por delante.
+        // Escalera (#1129, enmendada por la spec 2026-09-12 § 3.3): con el
+        // tramo congelado, Escape lo SUELTA y el trazo sigue vivo — «vuelve a
+        // seguir al cursor», spec de cotas vivas § 5.4. El chip en edición
+        // gestiona sus propios Esc antes de que la tecla llegue aquí.
         if (nextPointRef.current) { closeNextPoint(); return true; }
         if (nodes.length === 0) return false;
+        // Spec 2026-09-12 § 3.2: Esc TERMINA el trazo (Illustrator/Figma), no
+        // lo tira. Con un solo nodo no hay trazo que dejar. Lo que no se
+        // quería, Ctrl+Z.
+        if (nodes.length >= 2) { complete(nodes, false, 'esc'); return true; }
         setState(EMPTY);
         return true;
       case 'Enter':
         if (nodes.length < 2) return false;
-        complete(nodes, nodes.length >= 3);
+        complete(nodes, nodes.length >= 3, 'enter');
         return true;
       case 'Tab':
         if (nodes.length === 0) return false;
