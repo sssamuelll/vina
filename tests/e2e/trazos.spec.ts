@@ -119,6 +119,10 @@ test.describe('trazos — líneas de construcción', () => {
     await expect(page.locator('.cotas button.cota[aria-label^="Largo:"]')).toHaveCount(1);
     await page.keyboard.press('Escape'); // 2.º: suelta el tramo congelado
     await expect(page.locator('.cotas button.cota[aria-label^="Largo:"]')).toHaveCount(0);
+    // Que el 3.er peldaño sea EL que termina el trazo: si los dos primeros ya lo
+    // hubieran terminado, el conteo final daría 1 igual y el test pasaría por la
+    // razón equivocada.
+    await expect.poll(() => cuantosTrazos(page), { timeout: 5000 }).toBe(0);
     await page.keyboard.press('Escape'); // 3.º: termina el trazo
     await expect.poll(() => cuantosTrazos(page), { timeout: 5000 }).toBe(1);
 
@@ -276,11 +280,62 @@ test.describe('trazos — líneas de construcción', () => {
     expect((await estado(page)).project.trazos[0].path[0].values).toEqual([100, 100]);
 
     await activarHerramienta(page, 'z', 'select');
+
+    // Control positivo: el mismo trazo, clicado en su tramo LEJOS de la esquina,
+    // SÍ se coge. Sin esto, un «no cogió el trazo» pasa en verde aunque el clic
+    // no llegue al lienzo.
+    await clic(page, { x: 100, y: 40 });
+    await expect.poll(async () => (await estado(page)).editor.selectedTrazo !== null, { timeout: 5000 }).toBe(true);
+
+    // Y se suelta antes de la esquina: sin esto, el «no es null» de abajo lo
+    // podría estar dando este mismo clic, no el que se quiere medir.
+    await clic(page, { x: 600, y: 350 });
+    await expect.poll(async () => (await estado(page)).editor.selectedTrazo, { timeout: 5000 }).toBeNull();
+
+    // Con la pieza SIN seleccionar, la esquina elige el trazo: es lo que está
+    // encima, y el primer clic sobre una pieza es el que la elige, no el que le
+    // edita un nodo (gramática de Z, contrato 08-09 § 4; § 5.2 enmendada).
+    await clic(page, { x: 101, y: 101 });
+    expect((await estado(page)).editor.selectedTrazo, 'sin la pieza seleccionada la esquina tiene que coger el trazo').not.toBeNull();
+
     await clic(page, { x: 150, y: 150 }); // selecciona la pieza
     await expect.poll(async () => (await estado(page)).editor.selectedPieceIds, { timeout: 5000 }).toHaveLength(1);
 
-    // Sobre el vértice: entra a editar el nodo de la pieza, no coge el trazo.
+    // Sobre el vértice, con la pieza ya seleccionada: entra a editar su nodo, no
+    // coge el trazo.
     await clic(page, { x: 101, y: 101 });
     expect((await estado(page)).editor.selectedTrazo, 'la punta del trazo le ganó al vértice de la pieza').toBeNull();
+  });
+
+  /**
+   * Orden de pintado (§ 4 y § 9): los trazos van ENCIMA de las piezas —la raya
+   * tiene que seguir viéndose sobre la pieza que se calcó encima— y DEBAJO de
+   * las cotas. Los `path` de los trazos llevan `pointerEvents="none"`, así que
+   * el orden en el DOM ES el orden de pintado y no hay nada más que medir.
+   */
+  test('la capa de trazos se pinta encima de las piezas y debajo de las cotas', async ({ page }) => {
+    await waitForApp(page);
+    await addPiece(page, 'p', { x: 100, y: 100 });
+    await activarHerramienta(page, 'h', 'pen');
+    await clic(page, { x: 400, y: 100 }); await clic(page, { x: 500, y: 100 });
+    await page.keyboard.press('Enter');
+    await expect.poll(() => cuantosTrazos(page), { timeout: 5000 }).toBe(1);
+    await expect(page.locator('svg.pattern-svg g.trazos')).toHaveCount(1);
+
+    const orden = await page.evaluate(() => {
+      const svg = document.querySelector('svg.pattern-svg');
+      const pieza = svg?.querySelector('g.pattern-piece');
+      const trazos = svg?.querySelector('g.trazos');
+      const cotas = svg?.querySelector('g.cota-lineas');
+      if (!pieza || !trazos || !cotas) return { falta: true };
+      const antes = (a: Element, b: Element) =>
+        !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+      return {
+        falta: false,
+        piezaAntesDeTrazos: antes(pieza, trazos),
+        trazosAntesDeCotas: antes(trazos, cotas),
+      };
+    });
+    expect(orden).toEqual({ falta: false, piezaAntesDeTrazos: true, trazosAntesDeCotas: true });
   });
 });

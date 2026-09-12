@@ -1026,11 +1026,20 @@ export function useEditorInteractions(
         if (!e.shiftKey) {
           dispatch(clearSelection());
         }
-        marqueeRef.current = {
-          startPattern: { x: clickX, y: clickY },
-          currentPattern: { x: clickX, y: clickY },
-          shiftKey: e.shiftKey,
-        };
+        // Solo el izquierdo arma la goma, por la misma razón que las puntas y
+        // el arrastre de pieza (ver las guardas de arriba): con el derecho no
+        // hay release que la suelte, así que quedaba armada, el hover la pintaba
+        // siguiendo al cursor y el siguiente release IZQUIERDO despachaba
+        // `selectAllPieces` sobre un rectángulo que nadie arrastró. El
+        // `clearSelection()` de arriba sí se queda: el derecho en el vacío
+        // sigue soltando lo que hubiera.
+        if (e.button === 0) {
+          marqueeRef.current = {
+            startPattern: { x: clickX, y: clickY },
+            currentPattern: { x: clickX, y: clickY },
+            shiftKey: e.shiftKey,
+          };
+        }
       }
     }
   }, [activeTool, pan2D, zoom2D, pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox, selectedTrazo, trazos, showTrazos]);

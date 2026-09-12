@@ -113,7 +113,7 @@ Con el chip de Tab abierto (`nextPoint`, #1129), los peldaños del chip siguen i
 - **Orden de pintado:** un `TrazosLayer` propio (memoizado, como `PuntosDelContorno`) montado **después de `PieceRenderer` y antes de `ToolOverlay`** — encima de las piezas, debajo de cotas, tiradores y píldoras. Encima porque la raya tiene que seguir viéndose sobre la pieza que se calcó encima (*"para poder seguir dibujando"*); debajo de lo que flota, por la ley de emplazamiento. `ReferenceImageLayer` queda debajo de todo, como hoy (`PatternEditor.tsx:1242`).
 - **Anclas:** se pintan **todas las anclas de todos los trazos visibles, siempre** —puntas y vértices interiores— con `AnchorGlyph` en rol `lineEnd`; con el trazo seleccionado, las suyas pasan a estado `selected`. Un punto que ella puso es un punto que se ve: `resolveSnap` engancha a las anclas interiores de cualquier trazo visible, no solo a las puntas, y lo que el imán encuentra se ve (D3 firmada, #1157). Los **cruces** entre tramos rectos no son glifo permanente en `TrazosLayer` —nadie los creó, salen de dos trazos— pero sí entran en `verticesVisibles` del índice, así que la Pluma los pinta como candidatos y Línea interna les da su anillo al acercarse (§ 5.1).
 - **Estados:** tramo seleccionado en acento y sus anclas en estado seleccionado; **sin hover** — las internas tampoco lo tienen en Seleccionar (paridad, no omisión).
-- **Interruptor:** la fila de capas pasa a **Margen · Hilo · Piquetes · Costuras · Largos · Construcción** (`FilaDeCapas.tsx:12-18`, flag `showTrazos` en `editorSlice`, encendido de fábrica; el mismo asiento en `LogoMenu.tsx`, como «Largos de línea»). Apagado: los trazos **ni se pintan ni enganchan ni se seleccionan** — lo oculto no engancha, como las capas de piezas ocultas. Si había un tramo de trazo seleccionado, se suelta.
+- **Interruptor:** la fila de capas pasa a **Margen · Hilo · Piquetes · Costuras · Largos · Construcción** (`FilaDeCapas.tsx:19`, flag `showTrazos` en `editorSlice`, encendido de fábrica; el mismo asiento en `LogoMenu.tsx`, como «Largos de línea»). Apagado: los trazos **ni se pintan ni enganchan ni se seleccionan** — lo oculto no engancha, como las capas de piezas ocultas. Si había un tramo de trazo seleccionado, se suelta.
 - **Copy:** «Construcción», «trazo», «Editando: el tramo seleccionado». `aria-label` en español. Ley 5.
 
 ---
@@ -132,7 +132,7 @@ Con eso, **Pluma, Línea interna, Punto y Medir enganchan a trazos sin cambiar n
 
 En Seleccionar (`Z`), clic sobre un trazo selecciona **el tramo** — contrato 08-09 § 5: la unidad es el tramo, un trazo es línea de dibujo (`seSeleccionaPorTramo` = siempre). Estado propio en `editorSlice`: `selectedTrazo: { trazoId, segmentIndex } | null`, excluyente con la selección de piezas y con `selectedInternalLine` (seleccionar uno limpia los otros, como hace `selectInternalLine`). No se sobrecarga `InternalLineSelection.pieceId` con `null`: tiene demasiados lectores que asumen pieza.
 
-**Empates:** un trazo se pinta encima de las piezas, así que su tramo gana al cuerpo de una pieza. Pero **el vértice de una pieza gana a la punta de un trazo** que esté en el mismo sitio — es el caso normal después de calcar. La pieza es el objeto terminado; el trazo, la guía. Para coger esa punta, se mueve o esconde la pieza.
+**Empates:** un trazo se pinta encima de las piezas, así que su tramo gana al cuerpo de una pieza. Sobre una punta de trazo que cae en el mismo sitio que un vértice de pieza —el caso normal después de calcar— **gana la pieza si ya está seleccionada**; sin seleccionar, la esquina elige el trazo, que es lo que está encima. No es un descuido: es la gramática de `Z` (contrato 08-09 § 4, *Z selecciona, Q edita*) — el vértice de una pieza solo se toca cuando esa pieza es el sujeto, y el primer clic sobre una pieza sin seleccionar es el que la elige, no el que le edita un nodo. La pieza es el objeto terminado; el trazo, la guía. Para coger esa punta con la pieza seleccionada, se mueve o esconde la pieza.
 
 La tira dice **«Editando: el tramo seleccionado»**, como con una interna.
 
@@ -184,7 +184,7 @@ Supr con un tramo seleccionado → `removeTramoDeTrazo`: borra **ese tramo** (§
 | Cambiar de herramienta con 2+ nodos | queda el trazo (§ 3.2) |
 | Apagar «Construcción» con un tramo seleccionado | se suelta la selección; lo oculto no se edita |
 | Trazo debajo de una pieza bloqueada | el candado es de la pieza, no del papel: el trazo se edita igual |
-| Punta de trazo en el mismo sitio que un vértice de pieza | gana la pieza (§ 5.2) |
+| Punta de trazo en el mismo sitio que un vértice de pieza | gana la pieza **si ya está seleccionada**; sin seleccionar, la esquina elige el trazo, que es lo que está encima (§ 5.2) |
 | Proyecto viejo sin `trazos` | lista vacía, sin migración |
 | Cientos de trazos | índice por identidad de la lista; `TrazosLayer` memoizado y sin hover, con una sola pasada por trazo (las anclas salen de `anclasDeTrazo`, no de un recorrido aparte). El tope del dato lo pone `MAX_TRAZOS = 2000` en el esquema |
 | Deshacer tras borrar un tramo del medio | vuelve el trazo entero, con su id |

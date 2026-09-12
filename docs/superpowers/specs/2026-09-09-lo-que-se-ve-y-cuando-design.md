@@ -123,7 +123,7 @@ lecturas — que es exactamente lo que ella pedía en [06:34]:
 ## 4. D4 — Pluma: Enter cierra, y deshacer es la salida
 
 **Hoy** Enter termina el trazo tal como esté; si quedó abierto, se crea la pieza
-y sale un aviso (`PatternEditor.tsx:199`). El aviso funciona — se verificó a
+y sale un aviso (`PieceRenderer.tsx:532`). El aviso funciona — se verificó a
 mano el 09-09 y aparece. El problema no es que falle: es que **avisar de algo
 que se puede resolver solo es peor que resolverlo**.
 
@@ -141,8 +141,10 @@ El aviso no se borra del código: se le retira el caso que ya no ocurre.
 
 **Por qué no rompe el BLOCKER de Serrano.** Aquel exigía que no se pudiera
 llegar en silencio a una pieza que no simula. Con esto no se llega: con tres o
-más nodos ya no se produce, y con dos sigue avisando. La superficie que él
-protegía queda cubierta por construcción en vez de por advertencia.
+más nodos ya no se produce, y con dos nodos queda un trazo, no una pieza
+abierta de la que advertir (spec `2026-09-12-trazos-lineas-de-construccion`). La
+superficie que él protegía queda cubierta por construcción en vez de por
+advertencia.
 
 > **Enmendado el 2026-09-12.** Con dos nodos ya no se avisa **porque ya no se
 > crea la pieza**: queda un trazo. El BLOCKER sigue cubierto, y por el lado

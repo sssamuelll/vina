@@ -34,6 +34,25 @@ describe('TrazosLayer (spec 2026-09-12 § 4)', () => {
     expect(container.querySelectorAll('[data-trazo-id="a"] [data-anchor-role]')).toHaveLength(3);
   });
 
+  /**
+   * Un `segmentIndex` que no es tramo tumbaba el lienzo entero: el tramo `k` es
+   * el que LLEGA al comando `k`, así que con 0 la línea de arriba pedía
+   * `trazo.path[-1]` —`undefined`— y `getAnchor` le lee `.values` sin mirar. Lo
+   * mismo con un índice obsoleto (≥ `path.length`), que es lo que queda tras un
+   * Supr o un deshacer que acorta el trazo con la selección puesta.
+   */
+  it('con segmentIndex 0 no revienta y no resalta ningún tramo', () => {
+    const { container } = render(<svg><TrazosLayer trazos={[t('a')]} seleccion={{ trazoId: 'a', segmentIndex: 0 }} zoom2D={1} /></svg>);
+    expect(container.querySelector('[data-trazo-id="a"]')).not.toBeNull();
+    expect(container.querySelector('.trazo__tramo--seleccionado')).toBeNull();
+  });
+
+  it('con un segmentIndex obsoleto (más allá del path) tampoco revienta ni resalta', () => {
+    const { container } = render(<svg><TrazosLayer trazos={[t('a')]} seleccion={{ trazoId: 'a', segmentIndex: 7 }} zoom2D={1} /></svg>);
+    expect(container.querySelector('[data-trazo-id="a"]')).not.toBeNull();
+    expect(container.querySelector('.trazo__tramo--seleccionado')).toBeNull();
+  });
+
   it('sin trazos no pinta nada', () => {
     const { container } = render(<svg><TrazosLayer trazos={[]} seleccion={null} zoom2D={1} /></svg>);
     expect(container.querySelector('.trazos')).toBeNull();

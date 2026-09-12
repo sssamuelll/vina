@@ -58,6 +58,21 @@ describe('projectSlice — trazos (spec 2026-09-12 § 2)', () => {
     expect(s.trazos).toHaveLength(0);
   });
 
+  /**
+   * Un índice que no es tramo (0, o uno obsoleto) hacía trabajo igual:
+   * `quitarTramo` devuelve el path ORIGINAL, el reducer lo reescribía en otro
+   * objeto y ponía `isDirty` — un proyecto sucio sin cambio y un paso de
+   * deshacer vacío que a María le gasta un Ctrl+Z sin que se mueva nada.
+   */
+  it('removeTramoDeTrazo con un índice que no es tramo no toca nada', () => {
+    const antes = baseState({ trazos: [trazo('t1', [M(0, 0), L(100, 0)])] }) as any;
+    const s = reducer(antes, removeTramoDeTrazo({ trazoId: 't1', segmentIndex: 0 }));
+    expect(s.trazos).toEqual(antes.trazos);
+    // Identidad, no solo forma: reescribir el mismo path en otro objeto ya es el bug.
+    expect(s.trazos[0]).toBe(antes.trazos[0]);
+    expect(s.isDirty).toBe(false);
+  });
+
   it('un proyecto viejo sin trazos carga con la lista vacía', () => {
     const viejo = { ...baseState() } as any;
     delete viejo.trazos;

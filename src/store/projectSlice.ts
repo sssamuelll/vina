@@ -1056,6 +1056,11 @@ const projectSlice = createSlice({
       if (idx < 0) return;
       const trazo = state.trazos[idx];
       const [izquierda, derecha] = quitarTramo(trazo.path, action.payload.segmentIndex);
+      // Un índice que no es tramo (0, o uno obsoleto) devuelve el path ORIGINAL
+      // por referencia: seguir adelante reescribía el mismo trazo en otro objeto
+      // y ponía `isDirty`, o sea un proyecto sucio sin cambio y un paso de
+      // deshacer vacío.
+      if (izquierda === trazo.path) return;
       const nuevos: Trazo[] = [];
       if (izquierda) nuevos.push({ ...trazo, path: izquierda });
       if (derecha) nuevos.push({ id: newId(), path: derecha, createdAt: Date.now() });

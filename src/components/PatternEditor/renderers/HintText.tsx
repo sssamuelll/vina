@@ -71,7 +71,10 @@ export default function HintText({
       )}
 
       {activeTool === 'pen' && penNodesLength > 0 && (
-        <Pie>Clic añade · arrastra para curvar · Tab escribe largo y ángulo · clic en el primer punto cierra · Enter o doble clic cierra la pieza · Esc deja el trazo · Retroceso quita el último</Pie>
+        // Con dos nodos Enter NO cierra ninguna pieza: deja un trazo (spec de
+        // trazos § 3.1). Decir «cierra la pieza» prometía lo que no pasa, que es
+        // justo la mitad del gesto que María todavía está aprendiendo.
+        <Pie>Clic añade · arrastra para curvar · Tab escribe largo y ángulo · clic en el primer punto cierra · Enter o doble clic termina: pieza con tres puntos, trazo con dos · Esc deja el trazo · Retroceso quita el último</Pie>
       )}
 
       {activeTool === 'rectangle' && (

@@ -375,6 +375,10 @@ const referenceImageSchema = z
   .loose();
 
 // ─── Trazo (línea de construcción, spec 2026-09-12 § 2) ─────────────────────
+// A propósito sin `.min(2)` ni filtro de `Z`: `parseVinaProject` rechaza el
+// proyecto ENTERO cuando algo no pasa y no hay cuarentena de trazos; un `path`
+// vacío o con `Z` no rompe nada aguas abajo (`anclasDeTrazo` lo salta,
+// `tramoMasCercano` devuelve null).
 const trazoSchema = z
   .object({
     id: idString,

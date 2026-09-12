@@ -104,6 +104,14 @@ function downAt(x: number, y: number, button: number, pieceId: string | null = n
     currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
   } as unknown as React.MouseEvent<SVGSVGElement>;
 }
+/** Lienzo de mentira para el `svgRef`: la goma de la marquesina mide contra el
+ *  rect del SVG, y sin montar `PatternEditor` entero el ref es `null`. */
+function conLienzo(hook: ReturnType<typeof setup>['hook']) {
+  (hook.result.current.svgRef as React.MutableRefObject<SVGSVGElement | null>).current = {
+    getBoundingClientRect: () => ({ left: 0, top: 0 }),
+  } as unknown as SVGSVGElement;
+}
+
 function moveTo(x: number, y: number) {
   return {
     clientX: x, clientY: y,
@@ -214,5 +222,46 @@ describe('el arrastre de pieza: el derecho selecciona pero no arrastra', () => {
     act(() => { hook.result.current.handleMouseUp(); });
 
     expect(pos(store)).toEqual({ x: 0, y: 0 });
+  });
+});
+
+/**
+ * Cuarto hermano, preexistente: la marquesina del vacío. Tras un clic derecho en
+ * el lienzo vacío `handleMouseUp` nunca corre, así que la goma quedaba armada,
+ * el `mousemove` de hover la pintaba siguiendo al cursor, y el siguiente release
+ * IZQUIERDO despachaba `selectAllPieces(hitIds)` sobre un rectángulo que nadie
+ * arrastró — selección fantasma.
+ *
+ * El `clearSelection()` de esa rama se queda: el clic derecho en el vacío sigue
+ * soltando lo que hubiera. Lo que no se arma es la goma.
+ */
+describe('la marquesina del vacío solo se arma con el botón izquierdo', () => {
+  const seleccion = (store: ReturnType<typeof setup>['store']) =>
+    store.getState().editor.selectedPieceIds;
+
+  it('control — con el izquierdo la goma se pinta y el release selecciona lo que cubre', () => {
+    const { store, hook } = setup();
+    conLienzo(hook);
+    act(() => { hook.result.current.handleMouseDown(downAt(200, 200, 0)); });
+    act(() => { hook.result.current.handleMouseMove(moveTo(10, 10)); });
+
+    expect(hook.result.current.selectMarquee).not.toBeNull();
+
+    act(() => { hook.result.current.handleMouseUp(); });
+
+    expect(seleccion(store)).toContain('a');
+  });
+
+  it('con el derecho no se arma: ni goma en pantalla ni selección en el release siguiente', () => {
+    const { store, hook } = setup();
+    conLienzo(hook);
+    act(() => { hook.result.current.handleMouseDown(downAt(200, 200, 2)); });
+    act(() => { hook.result.current.handleMouseMove(moveTo(10, 10)); });
+
+    expect(hook.result.current.selectMarquee, 'la goma se pintó sola siguiendo al cursor').toBeNull();
+
+    act(() => { hook.result.current.handleMouseUp(); });
+
+    expect(seleccion(store), 'selección fantasma: nadie arrastró ese rectángulo').toEqual([]);
   });
 });

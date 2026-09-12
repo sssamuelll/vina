@@ -27,7 +27,13 @@ function TrazosLayer({ trazos, seleccion, zoom2D }: TrazosLayerProps) {
   return (
     <g className="trazos" data-trazos={trazos.length}>
       {trazos.map((trazo) => {
-        const tramo = seleccion?.trazoId === trazo.id ? seleccion.segmentIndex : null;
+        const elegido = seleccion?.trazoId === trazo.id ? seleccion.segmentIndex : null;
+        // El tramo `k` es el que LLEGA al comando `k`, así que 0 no es tramo y
+        // un índice obsoleto —lo que queda tras un Supr o un deshacer que
+        // acorta el trazo con la selección puesta— tampoco. Sin esta guarda,
+        // `trazo.path[tramo - 1]` era `undefined` y `getAnchor` le lee
+        // `.values` sin mirar: se caía el lienzo entero.
+        const tramo = elegido !== null && elegido > 0 && elegido < trazo.path.length ? elegido : null;
         const cmd = tramo !== null ? trazo.path[tramo] : undefined;
         const inicio = tramo !== null ? getAnchor(trazo.path[tramo - 1]) : null;
         const tramoD = cmd && inicio && (cmd.type === 'L' || cmd.type === 'C' || cmd.type === 'Q')
