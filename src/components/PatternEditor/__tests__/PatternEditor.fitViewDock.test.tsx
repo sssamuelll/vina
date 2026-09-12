@@ -20,7 +20,7 @@ import projectReducer, { restoreState } from '../../../store/projectSlice';
 import simulationReducer from '../../../store/simulationSlice';
 import toolReducer from '../../../store/toolSlice';
 import workflowReducer from '../../../store/workflowSlice';
-import type { PatternPiece } from '../../../types/types';
+import type { PatternPiece, Trazo } from '../../../types/types';
 import PatternEditor, { DOCK_WIDTH_PX } from '../PatternEditor';
 
 afterEach(() => {
@@ -53,11 +53,41 @@ const piece: PatternPiece = {
   updatedAt: 0,
 };
 
+/** Trazo con el MISMO bbox que la pieza: el ancho sigue mandando, así que el
+ *  encuadre esperado se calcula con la misma fórmula y el test discrimina. */
+const trazo: Trazo = {
+  id: 't',
+  path: [
+    { type: 'M', values: [0, 0] },
+    { type: 'L', values: [800, 0] },
+    { type: 'L', values: [800, 100] },
+  ],
+  createdAt: 0,
+};
+
 const VIEWPORT_WIDTH = 1000;
 const VIEWPORT_HEIGHT = 800;
 // DOCK_WIDTH_PX viene de PatternEditor.tsx — no se repite el literal acá.
 
-function setup() {
+/** El doble de ResizeObserver: jsdom no lo tiene y sin él `svgSize` queda en 0,
+ *  que es la otra compuerta del efecto de encuadre. */
+function stubResizeObserver() {
+  class ResizeObserverDouble {
+    cb: ResizeObserverCallback;
+    constructor(cb: ResizeObserverCallback) { this.cb = cb; }
+    observe() {
+      this.cb(
+        [{ contentRect: { width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT } } as ResizeObserverEntry],
+        this as unknown as ResizeObserver,
+      );
+    }
+    unobserve() {}
+    disconnect() {}
+  }
+  vi.stubGlobal('ResizeObserver', ResizeObserverDouble);
+}
+
+function setup(contenido: { pieces?: PatternPiece[]; trazos?: Trazo[] } = {}) {
   const store = configureStore({
     reducer: {
       project: projectReducer,
@@ -70,7 +100,11 @@ function setup() {
     },
     middleware: getDefault => getDefault({ serializableCheck: false }),
   });
-  store.dispatch(restoreState({ ...store.getState().project, pieces: [piece] }));
+  store.dispatch(restoreState({
+    ...store.getState().project,
+    pieces: contenido.pieces ?? [piece],
+    trazos: contenido.trazos ?? [],
+  }));
   const onOpenPanel = vi.fn();
   const view = render(
     <Provider store={store}>
@@ -94,19 +128,7 @@ function setup() {
 
 describe('PatternEditor — ajustar a la vista respeta la faja del dock', () => {
   it('descuenta el dock del ancho Y desplaza el paneo por lo mismo', () => {
-    class ResizeObserverDouble {
-      cb: ResizeObserverCallback;
-      constructor(cb: ResizeObserverCallback) { this.cb = cb; }
-      observe() {
-        this.cb(
-          [{ contentRect: { width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT } } as ResizeObserverEntry],
-          this as unknown as ResizeObserver,
-        );
-      }
-      unobserve() {}
-      disconnect() {}
-    }
-    vi.stubGlobal('ResizeObserver', ResizeObserverDouble);
+    stubResizeObserver();
 
     const { store } = setup();
 
@@ -115,6 +137,36 @@ describe('PatternEditor — ajustar a la vista respeta la faja del dock', () => 
     });
 
     const esperado = computeFitView([piece], VIEWPORT_WIDTH - DOCK_WIDTH_PX, VIEWPORT_HEIGHT)!;
+    expect(esperado).not.toBeNull();
+
+    expect(store.getState().editor.zoom2D).toBeCloseTo(esperado.zoom, 5);
+    expect(store.getState().editor.pan2D.x).toBeCloseTo(esperado.pan.x + DOCK_WIDTH_PX, 5);
+    expect(store.getState().editor.pan2D.y).toBeCloseTo(esperado.pan.y, 5);
+  });
+
+  /**
+   * Un proyecto de SOLO trazos también se encuadra (#1158, I1). La tarea 9
+   * arregló la compuerta de hidratación y `initProjectPersistence` despacha
+   * `requestFitView()` justo después; con cero piezas ese encuadre era un no-op
+   * silencioso —el aviso decía «Restauré tu proyecto: 3 trazos» y el lienzo se
+   * quedaba en `zoom 1, pan 0,0`— y el mismo no-op apagaba Ver ▸ Ajustar zoom
+   * al patrón. El oráculo es el store, igual que arriba.
+   */
+  it('con cero piezas y un trazo también encuadra (no se queda en zoom 1, pan 0,0)', () => {
+    stubResizeObserver();
+
+    const { store } = setup({ pieces: [], trazos: [trazo] });
+
+    act(() => {
+      store.dispatch(requestFitView());
+    });
+
+    // El trazo va en coordenadas de patrón: su `path` ES el contorno, sin posición.
+    const esperado = computeFitView(
+      [{ position: { x: 0, y: 0 }, outline: trazo.path }],
+      VIEWPORT_WIDTH - DOCK_WIDTH_PX,
+      VIEWPORT_HEIGHT,
+    )!;
     expect(esperado).not.toBeNull();
 
     expect(store.getState().editor.zoom2D).toBeCloseTo(esperado.zoom, 5);

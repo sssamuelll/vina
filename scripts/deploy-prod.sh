@@ -81,6 +81,7 @@ npx playwright test --workers=2 \
   tests/e2e/maria-195-siguiente-punto.spec.ts \
   tests/e2e/medidas-escritas-gramatica.spec.ts \
   tests/e2e/cotas-no-tapan-el-transform-box.spec.ts \
+  tests/e2e/trazos.spec.ts \
   > /tmp/vina-deploy-e2e.log 2>&1 || { tail -30 /tmp/vina-deploy-e2e.log >&2; exit 1; }
 grep -E "passed|failed" /tmp/vina-deploy-e2e.log | tail -1 | sed 's/^ */✓ emplazamiento: /'
 

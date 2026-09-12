@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, VinaProject, InternalLine, NotchAnchor, NotchOptions, NotchPair, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage, SeamAllowanceSpan } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, VinaProject, InternalLine, NotchAnchor, NotchOptions, NotchPair, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage, SeamAllowanceSpan, Trazo } from '../types/types';
 import type { ArrangementBinding, ArrangementOverride } from '../utils/cloth/arrangement/arrangementBinding';
 import type { Trim } from '../types/trim';
 import type { PieceArtwork } from '../types/artwork';
@@ -10,6 +10,7 @@ import { generatePleatFoldLines } from '../utils/pleatGeometry';
 import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator';
 import { uid } from '../utils/pathHelpers';
 import { newId } from '../utils/ids';
+import { quitarTramo } from '../components/PatternEditor/trazos/trazoPath';
 import { detectSemanticEdges, preserveEdgeWidthsByName } from '../utils/semanticEdges';
 import { reindexEdges, sameSegmentRanges } from '../utils/edgeReindex';
 import { mirrorPctRange } from '../utils/seam/seamRange';
@@ -216,6 +217,8 @@ interface ProjectState {
   notchPairs?: NotchPair[];
   /** Reference images for tracing in the 2D pattern editor */
   referenceImages: ReferenceImage[];
+  /** Líneas de construcción sueltas en el lienzo (spec 2026-09-12). */
+  trazos: Trazo[];
   /** Custom layer names (layer number → display name) */
   layerNames: Record<number, string>;
   /** Layer lock state (layer number → locked) */
@@ -249,6 +252,7 @@ const initialState: ProjectState = {
   poms: [],
   notchPairs: [],
   referenceImages: [],
+  trazos: [],
   layerNames: {},
   layerLocked: {},
   garmentInfo: {},
@@ -349,6 +353,8 @@ function applyProjectPayload(state: ProjectState, payload: VinaProject, generati
   state.layerLocked = (p as any).layerLocked ?? {};
   // Load reference image metadata (without objectUrl — blob restoration is async, done outside this reducer)
   state.referenceImages = (p as any).referenceImages ?? [];
+  // Trazos (spec 2026-09-12 § 2.3): un proyecto anterior no los tiene.
+  state.trazos = (p as any).trazos ?? [];
   state.trims = (p as any).trims ?? [];
 }
 
@@ -1025,6 +1031,43 @@ const projectSlice = createSlice({
       }
     },
 
+    // ─── Trazos: líneas de construcción (spec 2026-09-12) ───
+    addTrazo(state, action: PayloadAction<Trazo>) {
+      state.trazos.push(action.payload);
+      state.isDirty = true;
+    },
+    updateTrazo(state, action: PayloadAction<{ id: string; path: PathCommand[] }>) {
+      const trazo = state.trazos.find(t => t.id === action.payload.id);
+      if (!trazo) return;
+      trazo.path = action.payload.path;
+      state.isDirty = true;
+    },
+    removeTrazo(state, action: PayloadAction<string>) {
+      state.trazos = state.trazos.filter(t => t.id !== action.payload);
+      state.isDirty = true;
+    },
+    /**
+     * Supr sobre un tramo borra SOLO ese tramo (contrato 08-09 § 5). Del
+     * medio quedan dos trazos: el original conserva su id a la izquierda y
+     * la derecha nace con id nuevo. Con un solo nodo restante, se va.
+     */
+    removeTramoDeTrazo(state, action: PayloadAction<{ trazoId: string; segmentIndex: number }>) {
+      const idx = state.trazos.findIndex(t => t.id === action.payload.trazoId);
+      if (idx < 0) return;
+      const trazo = state.trazos[idx];
+      const [izquierda, derecha] = quitarTramo(trazo.path, action.payload.segmentIndex);
+      // Un índice que no es tramo (0, o uno obsoleto) devuelve el path ORIGINAL
+      // por referencia: seguir adelante reescribía el mismo trazo en otro objeto
+      // y ponía `isDirty`, o sea un proyecto sucio sin cambio y un paso de
+      // deshacer vacío.
+      if (izquierda === trazo.path) return;
+      const nuevos: Trazo[] = [];
+      if (izquierda) nuevos.push({ ...trazo, path: izquierda });
+      if (derecha) nuevos.push({ id: newId(), path: derecha, createdAt: Date.now() });
+      state.trazos.splice(idx, 1, ...nuevos);
+      state.isDirty = true;
+    },
+
     // ─── Seam Groups (M:N sewing) ───
     addSeamGroup(state, action: PayloadAction<SeamGroup>) {
       state.seamGroups.push(action.payload);
@@ -1656,6 +1699,7 @@ export const {
   restoreState, loadProject, restoreProject, clearLoadDiagnostics, setProjectName, setGarmentInfo, setGarmentInfoBulk,
   addPiece, updatePiece, removePiece, removePieces, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, setArrangementBinding, clearArrangementOverride, clearArrangementOverrides,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
+  addTrazo, updateTrazo, removeTrazo, removeTramoDeTrazo,
   addAnnotation, removeAnnotation, updateAnnotation,
   // Reactive solver (parametric updates)
   upsertPieceOutline, upsertMultiplePieceOutlines,

@@ -122,9 +122,116 @@ describe('usePenTool — siguiente punto, Retroceso y doble clic', () => {
     expect(tool().nextPoint).not.toBeNull();
     act(() => tool().handleDoubleClick());
     expect(onComplete).toHaveBeenCalledTimes(1);
-    const outline = onComplete.mock.calls[0][0].outline;
-    expect(outline.map((c: { type: string }) => c.type)).toEqual(['M', 'L']);
+    // Dos nodos no tienen área: desde la spec 2026-09-12 § 3.2 esto sale como
+    // trazo, no como pieza abierta.
+    const r = onComplete.mock.calls[0][0];
+    expect(r.kind).toBe('trazo');
+    expect(r.path.map((c: { type: string }) => c.type)).toEqual(['M', 'L']);
     expect(tool().nextPoint).toBeNull();
     expect(tool().nodes).toHaveLength(0);
+  });
+});
+
+/**
+ * Spec 2026-09-12 § 3: cerrado → pieza; abierto → trazo. Esc y el cambio de
+ * herramienta TERMINAN el trazo (Illustrator/Figma), nunca lo tiran.
+ */
+describe('usePenTool — cerrado es pieza, abierto es trazo', () => {
+  const key = (k: string) => new KeyboardEvent('keydown', { key: k });
+  function setup() {
+    const onComplete = vi.fn();
+    const hook = renderHook(() => usePenTool(1, { x: 0, y: 0 }, onComplete));
+    const click = (x: number, y: number) => {
+      act(() => hook.result.current.handleMouseDown(clickAt(x, y)));
+      act(() => hook.result.current.handleMouseUp());
+    };
+    return { onComplete, hook, click };
+  }
+
+  it('Enter con dos nodos → trazo abierto, sin Z', () => {
+    const { onComplete, hook, click } = setup();
+    click(0, 0); click(100, 0);
+    act(() => { hook.result.current.handleKeyDown(key('Enter')); });
+    expect(onComplete).toHaveBeenCalledWith({ kind: 'trazo', path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [100, 0] }] });
+    expect(hook.result.current.nodes).toHaveLength(0);
+  });
+
+  it('Enter con tres nodos → pieza cerrada (D4 del 09-09 se conserva)', () => {
+    const { onComplete, click, hook } = setup();
+    click(0, 0); click(100, 0); click(100, 100);
+    act(() => { hook.result.current.handleKeyDown(key('Enter')); });
+    const r = onComplete.mock.calls[0][0];
+    expect(r.kind).toBe('pieza');
+    expect(r.piece.outline.at(-1)).toEqual({ type: 'Z', values: [] });
+  });
+
+  it('el clic sobre el primer punto cierra: sale pieza, y la bitácora dice close', () => {
+    clearJournal();
+    const { onComplete, click, hook } = setup();
+    click(0, 0); click(100, 0); click(100, 100);
+    click(0, 0); // encima del primero: cierra
+    const r = onComplete.mock.calls[0][0];
+    expect(r.kind).toBe('pieza');
+    expect(getJournal().events.find((e) => e.name === 'pen:complete')?.data)
+      .toEqual({ kind: 'pieza', nodes: 3, via: 'close' });
+    expect(hook.result.current.nodes).toHaveLength(0);
+  });
+
+  it('Esc con tres nodos → trazo; con uno → nada; con el chip abierto solo cierra el chip', () => {
+    const { onComplete, click, hook } = setup();
+    click(0, 0); click(100, 0); click(100, 100);
+    act(() => { hook.result.current.openNextPoint(); });
+    expect(hook.result.current.nextPoint).not.toBeNull();
+    act(() => { hook.result.current.handleKeyDown(key('Escape')); });
+    expect(hook.result.current.nextPoint).toBeNull();
+    expect(onComplete).not.toHaveBeenCalled();        // el primer Esc solo soltó el chip
+    act(() => { hook.result.current.handleKeyDown(key('Escape')); });
+    expect(onComplete).toHaveBeenCalledWith({ kind: 'trazo', path: [
+      { type: 'M', values: [0, 0] }, { type: 'L', values: [100, 0] }, { type: 'L', values: [100, 100] },
+    ] });
+
+    const solo = setup();
+    solo.click(5, 5);
+    act(() => { solo.hook.result.current.handleKeyDown(key('Escape')); });
+    expect(solo.onComplete).not.toHaveBeenCalled();
+    expect(solo.hook.result.current.nodes).toHaveLength(0);
+  });
+
+  it('Esc sin nodos no consume la tecla', () => {
+    const { hook, onComplete } = setup();
+    let consumed = true;
+    act(() => { consumed = hook.result.current.handleKeyDown(key('Escape')); });
+    expect(consumed).toBe(false);
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it('reset (cambio de herramienta) con dos nodos termina el trazo; con uno lo suelta', () => {
+    clearJournal();
+    const { onComplete, click, hook } = setup();
+    click(0, 0); click(50, 0);
+    act(() => hook.result.current.reset());
+    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ kind: 'trazo' }));
+    expect(getJournal().events.find((e) => e.name === 'pen:complete')?.data)
+      .toEqual({ kind: 'trazo', nodes: 2, via: 'toolChange' });
+  });
+
+  it('la bitácora dice qué terminó y por dónde', () => {
+    clearJournal();
+    const { click, hook } = setup();
+    click(0, 0); click(100, 0);
+    act(() => { hook.result.current.handleKeyDown(key('Escape')); });
+    const fin = getJournal().events.find((e) => e.name === 'pen:complete');
+    expect(fin?.data).toEqual({ kind: 'trazo', nodes: 2, via: 'esc' });
+  });
+
+  it('el doble clic con tres nodos cierra la pieza y lo registra', () => {
+    clearJournal();
+    const { onComplete, click, hook } = setup();
+    click(0, 0); click(100, 0); click(100, 100);
+    act(() => hook.result.current.handleDoubleClick());
+    expect(onComplete.mock.calls[0][0].kind).toBe('pieza');
+    expect(getJournal().events.find((e) => e.name === 'pen:complete')?.data)
+      .toEqual({ kind: 'pieza', nodes: 3, via: 'dblclick' });
+    expect(hook.result.current.nodes).toHaveLength(0);
   });
 });

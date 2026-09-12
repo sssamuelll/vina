@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
-import type { Point2D, PathCommand, PatternPiece } from '../../types/types';
+import type { Point2D, PathCommand, PatternPiece, Trazo } from '../../types/types';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { patternToPieceLocal } from '../../utils/geometry/pieceSpace';
 import { pointInPolygon } from '../../utils/geometry/slashAndSpread';
@@ -42,6 +42,8 @@ export interface InternalLineToolOptions {
   nodeType: 'straight' | 'curvePoints';
   /** Piezas VISIBLES en orden de dibujo: la última está arriba. */
   pieces: PatternPiece[];
+  /** Trazos VISIBLES: enganchan como las piezas (spec 2026-09-12 § 5.1). */
+  trazos?: Trazo[];
   /** `commands` en coordenadas de mundo; el llamador las baja al marco local de la anfitriona. */
   onComplete: (hostId: string, commands: PathCommand[], closed: boolean) => void;
   onLockedPress?: (pieceId: string) => void;
@@ -76,6 +78,9 @@ const EMPTY: ViewState = {
 
 const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
 
+/** Identidad estable: sin trazos el índice de enganche no se rehace por render. */
+const SIN_TRAZOS: Trazo[] = [];
+
 export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToolOptions) {
   // El commit lee las opciones vigentes, no las de la render en que empezó el
   // trazo: `onComplete` cierra sobre `pieces`, y la anfitriona se resuelve por
@@ -95,11 +100,11 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
   const nextPointSeqRef = useRef(0);
   const [view, setView] = useState<ViewState>(EMPTY);
 
-  const { pieces } = opts;
+  const { pieces, trazos = SIN_TRAZOS } = opts;
 
   // Un solo memo por identidad de `pieces`: aplanar nodos, extremos de internas
   // y anillos cuesta, y no puede rehacerse por evento de ratón.
-  const indice = useMemo(() => buildSnapIndex(pieces), [pieces]);
+  const indice = useMemo(() => buildSnapIndex(pieces, trazos), [pieces, trazos]);
 
   const toWorld = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D =>

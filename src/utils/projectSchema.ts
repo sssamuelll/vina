@@ -32,6 +32,11 @@ const MAX_SEAM_GROUPS = 10_000;
 const MAX_NOTCH_PAIRS = 50_000;
 const MAX_REFERENCE_IMAGES = 200;
 const MAX_TRIMS = 5_000;
+// ponytail: tope generoso a propósito. La spec § 7 cuenta con cientos de trazos
+// por proyecto, y quien se cansa primero no es el archivo sino el índice de
+// enganche (§ 5.1). Esto es una cota anti-DoS, no un límite de producto: si
+// hace falta frenar antes, se frena donde se mide, no aquí.
+const MAX_TRAZOS = 2_000;
 
 const MAX_NAME_LEN = 1024;
 const MAX_ID_LEN = 1024;
@@ -369,6 +374,19 @@ const referenceImageSchema = z
   })
   .loose();
 
+// ─── Trazo (línea de construcción, spec 2026-09-12 § 2) ─────────────────────
+// A propósito sin `.min(2)` ni filtro de `Z`: `parseVinaProject` rechaza el
+// proyecto ENTERO cuando algo no pasa y no hay cuarentena de trazos; un `path`
+// vacío o con `Z` no rompe nada aguas abajo (`anclasDeTrazo` lo salta,
+// `tramoMasCercano` devuelve null).
+const trazoSchema = z
+  .object({
+    id: idString,
+    path: z.array(pathCommandSchema).max(MAX_OUTLINE_CMDS),
+    createdAt: finiteNumber,
+  })
+  .loose();
+
 // ─── Trim ───────────────────────────────────────────────────────────────────
 const trimPlacementSchema = z.discriminatedUnion('mode', [
   z.object({
@@ -440,6 +458,7 @@ const vinaProjectSchema = z
     notchPairs: z.array(notchPairSchema).max(MAX_NOTCH_PAIRS).optional(),
     garmentInfo: garmentInfoSchema.optional(),
     referenceImages: z.array(referenceImageSchema).max(MAX_REFERENCE_IMAGES).optional(),
+    trazos: z.array(trazoSchema).max(MAX_TRAZOS).optional(),
     trims: z.array(trimSchema).max(MAX_TRIMS).optional(),
     referenceImageData: z.record(safeKey, z.string().max(MAX_DATA_URI_LEN)).optional(),
     createdAt: finiteNumber,
@@ -586,6 +605,7 @@ export const __testing = {
   MAX_SEAMS,
   MAX_OUTLINE_CMDS,
   MAX_REFERENCE_IMAGES,
+  MAX_TRAZOS,
   MAX_DATA_URI_LEN,
   MAX_ID_LEN,
   MAX_NAME_LEN,

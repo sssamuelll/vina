@@ -123,7 +123,7 @@ lecturas — que es exactamente lo que ella pedía en [06:34]:
 ## 4. D4 — Pluma: Enter cierra, y deshacer es la salida
 
 **Hoy** Enter termina el trazo tal como esté; si quedó abierto, se crea la pieza
-y sale un aviso (`PatternEditor.tsx:199`). El aviso funciona — se verificó a
+y sale un aviso (`PieceRenderer.tsx:532`). El aviso funciona — se verificó a
 mano el 09-09 y aparece. El problema no es que falle: es que **avisar de algo
 que se puede resolver solo es peor que resolverlo**.
 
@@ -135,19 +135,29 @@ que se puede resolver solo es peor que resolverlo**.
 | Nodos al pulsar Enter (o doble clic) | Qué pasa |
 |---|---|
 | **≥ 3** | el trazo **se cierra solo**, como si el último clic hubiera caído sobre el punto 1. Sin aviso. `Ctrl+Z` deshace la pieza entera si no era eso |
-| **2** | no hay área que cerrar: se crea abierta y **el aviso se queda**, porque ahí sigue siendo cierto |
+| **2**, o Esc con ≥ 2 | no hay pieza: queda un **trazo** (línea de construcción). La Pluma no crea piezas abiertas — `2026-09-12-trazos-lineas-de-construccion-design.md` § 3 |
 
 El aviso no se borra del código: se le retira el caso que ya no ocurre.
 
 **Por qué no rompe el BLOCKER de Serrano.** Aquel exigía que no se pudiera
 llegar en silencio a una pieza que no simula. Con esto no se llega: con tres o
-más nodos ya no se produce, y con dos sigue avisando. La superficie que él
-protegía queda cubierta por construcción en vez de por advertencia.
+más nodos ya no se produce, y con dos nodos queda un trazo, no una pieza
+abierta de la que advertir (spec `2026-09-12-trazos-lineas-de-construccion`). La
+superficie que él protegía queda cubierta por construcción en vez de por
+advertencia.
+
+> **Enmendado el 2026-09-12.** Con dos nodos ya no se avisa **porque ya no se
+> crea la pieza**: queda un trazo. El BLOCKER sigue cubierto, y por el lado
+> fuerte — de la Pluma no sale ninguna pieza abierta, así que no hay nada de qué
+> advertir. El aviso (`PieceRenderer.tsx`) se queda para las piezas abiertas que
+> vengan de un DXF o de otra puerta. Spec de trazos § 3.1.
 
 **Por qué Pluma sí y las internas no.** Pluma crea **piezas**, y una pieza
 abierta no es un panel de prenda. Los trazos de construcción y las líneas de
 referencia son de la herramienta de **línea interna** (`g`), que vive dentro de
 una pieza y no tiene por qué cerrar. No se toca.
+
+> **Enmendado el 2026-09-12.** Los trazos de construcción ya no van por Línea interna: son `Trazo`, sueltos en el lienzo, y nacen de la Pluma al terminar abierta. María [13:31]: *"son las líneas que uno traza para poder seguir dibujando"*. Spec de trazos § 1.
 
 ## 5. D5 — Un tramo convertible se ve convertible
 
@@ -183,7 +193,9 @@ Si el resalte se escribe en CSS con `:hover`, la misma regla lleva su
 4. Interruptor «Largos» encendido sin selección: salen en todas las piezas.
 5. Pluma, tres clics, Enter: la pieza **cierra** (su contorno tiene `Z`) y **no**
    sale el aviso.
-6. Pluma, dos clics, Enter: la pieza queda abierta y **sí** sale el aviso.
+6. Pluma, dos clics, Enter: ~~la pieza queda abierta y **sí** sale el aviso~~ →
+   **enmendado el 2026-09-12**: queda un **trazo**, ninguna pieza y ningún
+   aviso (`tests/e2e/trazos.spec.ts`, recorrido 1).
 7. Editar patrón, puntero sobre un tramo del contorno: el tramo se resalta; al
    salir, vuelve a reposo.
 8. El trinquete de UI no sube ningún contador.
@@ -195,3 +207,11 @@ Si el resalte se escribe en CSS con `:hover`, la misma regla lleva su
 | `2026-08-30-cotas-vivas-design.md` § 89 | «Largos de línea… sigue igual, sin interacción» deja de valer: pasan a material de cota en variante de lectura (§ 2) y a mostrarse por selección (§ 1) |
 | Tanda 4 de la PR #1149 (`dbb78694`) | `showLineLengths` vuelve a nacer apagado; el fallo 4 lo cierra la selección, no el interruptor (§ 1) |
 | `2026-09-08-contexto-y-control-numerico-design.md` | § 5.1 gana la fila del contorno: un lado con chip no lleva lectura (§ 3) |
+
+**Enmendado el 2026-09-12** (#1158) por
+`2026-09-12-trazos-lineas-de-construccion-design.md`: la fila de **2 nodos** de
+D4 y el párrafo *"Por qué Pluma sí y las internas no"* de § 4 (ver las dos notas
+de enmienda ahí) y el recorrido 6 del plan de pruebas de § 7. El motivo es el de
+María [13:31] — *"son las líneas que uno traza para poder seguir dibujando"*—:
+una raya suelta no es una pieza abierta, es un **trazo**, y la Pluma dejó de
+poder crear piezas abiertas.

@@ -2,8 +2,8 @@ import type { CotasLayerHandle } from './cotas/CotasLayer';
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectInternalLine, setZoom2D, setPan2D } from '../../store/editorSlice';
-import { movePiece, updateInternalLine } from '../../store/projectSlice';
+import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectInternalLine, selectTrazo, setZoom2D, setPan2D } from '../../store/editorSlice';
+import { movePiece, updateInternalLine, updateTrazo } from '../../store/projectSlice';
 import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine, seSeleccionaPorTramo } from '../../types/types';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
 import { isPinnedAtZoomCeiling, zoomAtPoint } from '../../input/zoom2d';
@@ -36,6 +36,8 @@ import { extractNodes, getAnchor, NodeRef } from './nodeEditorUtils';
 import { classifyEditableAnchors } from './anchorRoles';
 import { EXTREMOS } from './renderers/PuntosDelContorno';
 import { getInternalLineEndpoints } from './internalShapePath';
+import { tramoMasCercano, puntasDeTrazo, moverPunta } from './trazos/trazoPath';
+import { beginUndoBatch, endUndoBatch, withUndoBatchToken, type UndoBatchToken } from '../../store/undoMiddleware';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { patternToPieceLocal } from './pieceTransform';
 import { DRAG_THRESHOLD_PX, isDrag } from './gestureConstants';
@@ -329,6 +331,9 @@ export function useEditorInteractions(
 ) {
   const dispatch = useDispatch();
   const selectedInternalLine = useSelector((s: RootState) => s.editor.selectedInternalLine);
+  const selectedTrazo = useSelector((s: RootState) => s.editor.selectedTrazo);
+  const trazos = useSelector((s: RootState) => s.project.trazos);
+  const showTrazos = useSelector((s: RootState) => s.editor.showTrazos);
   const svgRef = useRef<SVGSVGElement>(null);
   /** Posición de pantalla del último press, para que la bitácora mida `drag` en el release. */
   const pressRef = useRef<{ x: number; y: number } | null>(null);
@@ -337,6 +342,9 @@ export function useEditorInteractions(
   const internalLineDragRef = useRef<{
     pieceId: string; lineId: string; endpointIndex: 0 | 1;
     startMouse: Point2D; startPos: Point2D;
+  } | null>(null);
+  const trazoDragRef = useRef<{
+    trazoId: string; extremo: 0 | 1; startMouse: Point2D; startPos: Point2D; token: UndoBatchToken;
   } | null>(null);
   const marqueeRef = useRef<{ startPattern: Point2D; currentPattern: Point2D; shiftKey: boolean } | null>(null);
   const [selectMarquee, setSelectMarquee] = useState<{ start: Point2D; current: Point2D } | null>(null);
@@ -863,8 +871,35 @@ export function useEditorInteractions(
       const rect = e.currentTarget.getBoundingClientRect();
       const { x: clickX, y: clickY } = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
 
+      // Arrastrar una punta del trazo seleccionado (spec 2026-09-12 § 5.3), como con las internas.
+      // Solo el botón izquierdo arma el gesto: con el derecho no hay release que lo
+      // suelte —`PatternEditor.handleMouseDown` solo marca `mouseInteractionActiveRef`
+      // para los botones 0 y 1, y `finishMouseInteraction` sale en seco sin ese ref—
+      // así que el trazo se quedaba pegado al cursor y el lote de deshacer, abierto.
+      if (e.button === 0 && selectedTrazo && showTrazos) {
+        const trazo = trazos.find(t => t.id === selectedTrazo.trazoId);
+        const puntas = trazo && puntasDeTrazo(trazo.path);
+        if (puntas) {
+          const EP_THRESHOLD = screenToPatternLength(8, zoom2D);
+          for (let i = 0; i < 2; i++) {
+            if (Math.hypot(clickX - puntas[i].x, clickY - puntas[i].y) <= EP_THRESHOLD) {
+              trazoDragRef.current = {
+                trazoId: selectedTrazo.trazoId, extremo: i as 0 | 1,
+                startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...puntas[i] },
+                token: beginUndoBatch(dispatch, 'Mover trazo'),
+              };
+              setIsDraggingEndpoint(true);
+              pushJournal('gesture', 'trazo:drag', { trazoId: selectedTrazo.trazoId, extremo: i });
+              return;
+            }
+          }
+        }
+      }
+
       // Check if dragging an endpoint of the currently selected internal line
-      if (selectedInternalLine) {
+      // Mismo agujero que el de arriba, y preexistente: con el botón derecho el
+      // extremo quedaba armado sin release posible.
+      if (e.button === 0 && selectedInternalLine) {
         const ilPiece = pieces.find(p => p.id === selectedInternalLine.pieceId);
         if (ilPiece) {
           const ilLine = ilPiece.internals.find(l => l.id === selectedInternalLine.lineId);
@@ -891,9 +926,29 @@ export function useEditorInteractions(
         }
       }
 
+      // Un tramo de trazo se pinta encima de las piezas, así que gana al cuerpo
+      // de una pieza; pierde contra un vértice de pieza (spec § 5.2), que se
+      // comprueba más abajo con `findClickedAnchorPoint` antes de usar esto.
+      const trazoHit = (() => {
+        if (!showTrazos) return null;
+        const umbral = screenToPatternLength(5, zoom2D);
+        let mejor: { trazoId: string; segmentIndex: number; distance: number } | null = null;
+        for (const t of trazos) {
+          const h = tramoMasCercano(t.path, { x: clickX, y: clickY });
+          if (h && h.distance <= umbral && (!mejor || h.distance < mejor.distance)) {
+            mejor = { trazoId: t.id, segmentIndex: h.segmentIndex, distance: h.distance };
+          }
+        }
+        return mejor;
+      })();
+      const seleccionarTrazo = () => {
+        pushJournal('gesture', 'trazo:select', { trazoId: trazoHit!.trazoId, segmentIndex: trazoHit!.segmentIndex });
+        dispatch(selectTrazo({ trazoId: trazoHit!.trazoId, segmentIndex: trazoHit!.segmentIndex }));
+      };
+
       const target = e.target as SVGElement;
       const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');
-      
+
       if (pieceId) {
         const piece = pieces.find(p => p.id === pieceId);
         if (piece) {
@@ -913,6 +968,8 @@ export function useEditorInteractions(
               return;
             }
           }
+
+          if (trazoHit) { seleccionarTrazo(); return; }
 
           // Check if clicking on an internal line
           const { x: localX, y: localY } = patternToPieceLocal({ x: clickX, y: clickY }, piece);
@@ -954,21 +1011,38 @@ export function useEditorInteractions(
           // Bloqueada = geometría intocable, no el sitio (maria-204): mover
           // se permite; modificar sigue bloqueado en sus superficies (box de
           // transform oculto, editores de nodos con guard, curation gates).
-          dragRef.current = { pieceId, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...piece.position } };
+          // La selección de arriba SÍ la hace el botón derecho — el menú contextual
+          // necesita sujeto. El arrastre no: con el derecho no hay release que lo
+          // suelte (ver la guarda de las puntas, arriba), así que el ref quedaba
+          // armado, el hover movía el `<g>` por DOM y el mouseup del SIGUIENTE clic
+          // izquierdo comiteaba `movePiece` a una posición que nadie arrastró.
+          if (e.button === 0) {
+            dragRef.current = { pieceId, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...piece.position } };
+          }
         }
       } else {
+        if (trazoHit) { seleccionarTrazo(); return; }
         // Empty area: start marquee selection
         if (!e.shiftKey) {
           dispatch(clearSelection());
         }
-        marqueeRef.current = {
-          startPattern: { x: clickX, y: clickY },
-          currentPattern: { x: clickX, y: clickY },
-          shiftKey: e.shiftKey,
-        };
+        // Solo el izquierdo arma la goma, por la misma razón que las puntas y
+        // el arrastre de pieza (ver las guardas de arriba): con el derecho no
+        // hay release que la suelte, así que quedaba armada, el hover la pintaba
+        // siguiendo al cursor y el siguiente release IZQUIERDO despachaba
+        // `selectAllPieces` sobre un rectángulo que nadie arrastró. El
+        // `clearSelection()` de arriba sí se queda: el derecho en el vacío
+        // sigue soltando lo que hubiera.
+        if (e.button === 0) {
+          marqueeRef.current = {
+            startPattern: { x: clickX, y: clickY },
+            currentPattern: { x: clickX, y: clickY },
+            shiftKey: e.shiftKey,
+          };
+        }
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox, selectedTrazo, trazos, showTrazos]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -990,6 +1064,17 @@ export function useEditorInteractions(
     }
     if (activeTool === 'editPattern') {
       editPattern.handleMouseMove(e);
+      return;
+    }
+    if (trazoDragRef.current && activeTool === 'select') {
+      const d = trazoDragRef.current;
+      const dx = screenToPatternLength(e.clientX - d.startMouse.x, zoom2D);
+      const dy = screenToPatternLength(e.clientY - d.startMouse.y, zoom2D);
+      const trazo = trazos.find(t => t.id === d.trazoId);
+      if (trazo) {
+        const path = moverPunta(trazo.path, d.extremo, { x: d.startPos.x + dx, y: d.startPos.y + dy });
+        dispatch(withUndoBatchToken(updateTrazo({ id: d.trazoId, path }), d.token));
+      }
       return;
     }
     if (internalLineDragRef.current && activeTool === 'select') {
@@ -1108,7 +1193,7 @@ export function useEditorInteractions(
     if (activeTool === 'internalShape') internalShapeTool.handleMouseMove(e);
     if (activeTool === 'pleat') pleatTool.handleMouseMove(e);
     if (activeTool === 'elastic') elasticTool.handleMouseMove(e);
-  }, [activeTool, zoom2D, pan2D, pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox]);
+  }, [activeTool, zoom2D, pan2D, pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, trimTool, seamAllowanceTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox, trazos]);
 
   const handleMouseUp = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
     const press = pressRef.current;
@@ -1199,6 +1284,10 @@ export function useEditorInteractions(
     setIsDraggingPiece(false);
     panRef.current = null;
     dragRef.current = null;
+    if (trazoDragRef.current) {
+      endUndoBatch(dispatch, trazoDragRef.current.token);
+      trazoDragRef.current = null;
+    }
     internalLineDragRef.current = null;
     setIsDraggingEndpoint(false);
     if (activeTool === 'pen') pen.handleMouseUp();
@@ -1255,16 +1344,20 @@ export function useEditorInteractions(
     // navegador se queda el puntero, solo `cancel()` lo suelta (5b-3).
     if (activeTool === 'seamAllowance') seamAllowanceTool.cancel();
     // La línea interna descarta solo el press vivo (los nodos quedan); la
-    // pluma no separa press de trazo y suelta el trazo entero.
+    // pluma termina el trazo si tiene dos o más nodos (spec 2026-09-12 § 3.2).
     if (activeTool === 'internalShape') internalShapeTool.cancelPress();
     if (activeTool === 'pen') pen.reset();
     if (activeTool === 'rectangle') rectTool.cancel();
     if (activeTool === 'circle') circleTool.cancel();
     if (activeTool === 'triangle') triangleTool.cancel();
     if (activeTool === 'grainline') grainlineTool.cancel();
+    if (trazoDragRef.current) {
+      endUndoBatch(dispatch, trazoDragRef.current.token);
+      trazoDragRef.current = null;
+    }
     internalLineDragRef.current = null;
     setIsDraggingEndpoint(false);
-  }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, triangleTool, grainlineTool]);
+  }, [activeTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, triangleTool, grainlineTool, dispatch]);
 
   /**
    * El ratón salió del lienzo. Todo resalte de hover se va con él (#1132).

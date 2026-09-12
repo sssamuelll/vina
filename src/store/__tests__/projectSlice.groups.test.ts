@@ -15,6 +15,7 @@ function stateWith(pieces: { id: string }[], groups: { id: string; name: string;
     arrangementOverrides: {}, seamGroups: [], groups: groups.map(g => ({ ...g, createdAt: 0, updatedAt: 0 })),
     poms: [],
     referenceImages: [],
+    trazos: [],
     layerNames: {},
     layerLocked: {},
     loadDiagnostics: [],

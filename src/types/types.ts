@@ -146,6 +146,23 @@ export interface ReferenceImage {
   pixelsPerMm: number | null; // set by calibration, null = uncalibrated
 }
 
+/**
+ * Línea de construcción suelta en el lienzo (spec 2026-09-12 § 2). El `path`
+ * va en coordenadas de patrón y nunca lleva `Z`; no tiene anfitriona,
+ * posición ni rotación: está donde se dibujó, como una raya en el papel.
+ */
+export interface Trazo {
+  id: string;
+  path: PathCommand[];
+  createdAt: number;
+}
+
+/** Selección de un trazo: siempre por tramo (contrato 08-09 § 5). `segmentIndex` es el comando de llegada. */
+export interface TrazoSelection {
+  trazoId: string;
+  segmentIndex: number;
+}
+
 // ─── Rich Dart Entity ───
 
 /** Dart cap shape at the apex */
@@ -703,6 +720,8 @@ export interface VinaProject {
   garmentInfo?: GarmentInfo;
   /** Reference images for 2D tracing (optional for backward compat) */
   referenceImages?: ReferenceImage[];
+  /** Líneas de construcción sueltas (ausente en proyectos anteriores al 2026-09-12) */
+  trazos?: Trazo[];
   /** Trim placements (optional for backward compat) */
   trims?: import('./trim').Trim[];
   /** Base64-encoded image blobs keyed by imageId (present in .openclo.json files only) */
@@ -826,6 +845,10 @@ export interface EditorState {
   selectedSeamId: string | null;
   selectedPOMId: string | null;
   selectedInternalLine: InternalLineSelection | null;
+  /** Tramo de trazo seleccionado (spec 2026-09-12 § 5.2). Excluyente con piezas e internas. */
+  selectedTrazo: TrazoSelection | null;
+  /** Interruptor «Construcción»: apagado, los trazos ni se pintan ni enganchan ni se seleccionan. */
+  showTrazos: boolean;
   /** Seam-allowance tool selection: a typed, mutually-exclusive set — N edges OR
    *  N vertices, never mixed. Replaces the old single selectedEdge/selectedVertex
    *  pair (multi-select Shift; spec 2026-06-09-selection-model-multiselect-design). */

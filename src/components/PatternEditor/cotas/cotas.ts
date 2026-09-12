@@ -3,6 +3,7 @@ import type {
   PathCommand,
   PatternPiece,
   Point2D,
+  Trazo,
 } from '../../../types/types';
 import { buildRing, projectToRing } from '../../../utils/geometry/outlineRing';
 import { patternToPieceLocal, pieceLocalToPattern } from '../../../utils/geometry/pieceSpace';
@@ -41,7 +42,13 @@ export type CotaUpdate =
    * deshacer. Un segundo escritor del mismo hecho es el fallo con nombre propio
    * del repo.
    */
-  | { kind: 'nodo'; pieceId: string; commandIndex: number; destino: Point2D };
+  | { kind: 'nodo'; pieceId: string; commandIndex: number; destino: Point2D }
+  /**
+   * Un tramo de trazo (spec 2026-09-12 § 5.3). Un trazo no tiene anfitriona:
+   * su `path` ya está en patrón, así que el update lleva el trazo entero y no
+   * un par pieza/línea.
+   */
+  | { kind: 'trazo'; trazoId: string; path: PathCommand[] };
 
 /**
  * Una cota viva (spec 2026-08-30 § 3, § 5): la medida que el objeto enseña
@@ -253,6 +260,99 @@ function coincideConEsquinaProyectada(
   });
 }
 
+/**
+ * Las dos cotas (largo · ángulo) de cada tramo `L` de un path. `aPatron` y
+ * `aLocal` convierten entre el marco del path y el de pantalla: para una
+ * interna son las de la pieza; para un trazo, la identidad (ya está en mundo).
+ */
+function cotasDeTramos(opts: {
+  path: PathCommand[];
+  idBase: string;
+  centro: Point2D;
+  aPatron: (p: Point2D) => Point2D;
+  aLocal: (p: Point2D) => Point2D;
+  escribir: (path: PathCommand[]) => CotaUpdate | null;
+  segmentIndex?: number;
+}): Cota[] {
+  const { path, idBase, centro, aPatron, aLocal, escribir, segmentIndex } = opts;
+  const cotas: Cota[] = [];
+  for (const segment of segmentPolar(path)) {
+    // La selección precisa conserva el índice del comando de llegada: filtrar
+    // aquí reutiliza la escritura que ya deja fijo el origen y mueve solo ese
+    // nodo. Un índice desaparecido no debe mostrar las cotas de sus hermanos.
+    if (segmentIndex !== undefined && segment.toCommandIndex !== segmentIndex) continue;
+    const from = aPatron(segment.from);
+    const to = aPatron(segment.to);
+    const outward = normalHaciaFuera(from, to, centro);
+    // El ángulo que ve María es el de PATRÓN (pantalla), no el local: en una
+    // pieza girada ambos difieren por la rotación. El largo sí es invariante
+    // (girar no estira nada), así que ese sigue viniendo de segmentPolar.
+    const anguloPatron = polarOf(from, to).angleDeg;
+    const grupo = `${idBase}-tramo-${segment.toCommandIndex}`;
+    cotas.push({
+      id: `${grupo}-largo`,
+      grupo,
+      kind: 'tramo-largo',
+      label: 'Largo',
+      valueMm: segment.lengthMm,
+      unit: 'mm',
+      min: 0.1,
+      max: 99999,
+      primary: true,
+      a: from,
+      b: to,
+      outward,
+      apply: (mm) => {
+        const nuevo = copiaConNodoFinal(path, segment.toCommandIndex, segment.writeLength(mm));
+        return nuevo ? escribir(nuevo) : null;
+      },
+    });
+    cotas.push({
+      id: `${grupo}-angulo`,
+      grupo,
+      kind: 'tramo-angulo',
+      label: 'Ángulo',
+      valueMm: anguloPatron,
+      unit: 'deg',
+      min: -180,
+      max: 180,
+      primary: true,
+      a: from,
+      b: to,
+      outward,
+      apply: (deg) => {
+        const nuevo = copiaConNodoFinal(
+          path,
+          segment.toCommandIndex,
+          aLocal(polarPoint(from, segment.lengthMm, deg)),
+        );
+        return nuevo ? escribir(nuevo) : null;
+      },
+    });
+  }
+  return cotas;
+}
+
+/** Las cotas de un tramo de trazo (spec 2026-09-12 § 5.3): el path ya está en patrón. */
+export function cotasDeTrazo(trazo: Trazo, segmentIndex: number): Cota[] {
+  const anclas = trazo.path.map(getAnchor).filter((a): a is Point2D => a !== null);
+  if (anclas.length < 2) return [];
+  const centro = {
+    x: anclas.reduce((s, a) => s + a.x, 0) / anclas.length,
+    y: anclas.reduce((s, a) => s + a.y, 0) / anclas.length,
+  };
+  const identidad = (p: Point2D) => p;
+  return cotasDeTramos({
+    path: trazo.path,
+    idBase: `trazo-${trazo.id}`,
+    centro,
+    aPatron: identidad,
+    aLocal: identidad,
+    escribir: (path) => ({ kind: 'trazo', trazoId: trazo.id, path }),
+    segmentIndex,
+  });
+}
+
 /** Cotas de tramo y de borde de una sola línea interna seleccionada. */
 export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine, segmentIndex?: number): Cota[] {
   // Un piquete conserva una segunda verdad paramétrica (`notchAnchor`) y una
@@ -265,71 +365,16 @@ export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine, seg
   const centro = bbox
     ? bboxPivot(bbox)
     : pieceLocalToPattern({ x: 0, y: 0 }, piece);
-  const cotas: Cota[] = [];
   const idBase = `${piece.id}-${line.id}`;
-
-  for (const segment of segmentPolar(line.path)) {
-    // La selección precisa conserva el índice del comando de llegada: filtrar
-    // aquí reutiliza la escritura que ya deja fijo el origen y mueve solo ese
-    // nodo. Un índice desaparecido no debe mostrar las cotas de sus hermanos.
-    if (segmentIndex !== undefined && segment.toCommandIndex !== segmentIndex) continue;
-    const from = pieceLocalToPattern(segment.from, piece);
-    const to = pieceLocalToPattern(segment.to, piece);
-    const outward = normalHaciaFuera(from, to, centro);
-    // El ángulo que ve María es el de PATRÓN (pantalla), no el local: en una
-    // pieza girada ambos difieren por la rotación. El largo sí es invariante
-    // (girar no estira nada), así que ese sigue viniendo de segmentPolar.
-    const anguloPatron = polarOf(from, to).angleDeg;
-    cotas.push({
-      id: `${idBase}-tramo-${segment.toCommandIndex}-largo`,
-      grupo: `${idBase}-tramo-${segment.toCommandIndex}`,
-      kind: 'tramo-largo',
-      label: 'Largo',
-      valueMm: segment.lengthMm,
-      unit: 'mm',
-      min: 0.1,
-      max: 99999,
-      primary: true,
-      a: from,
-      b: to,
-      outward,
-      apply: (mm) => {
-        const path = copiaConNodoFinal(
-          line.path,
-          segment.toCommandIndex,
-          segment.writeLength(mm),
-        );
-        return path
-          ? { kind: 'internal', pieceId: piece.id, lineId: line.id, path }
-          : null;
-      },
-    });
-    cotas.push({
-      id: `${idBase}-tramo-${segment.toCommandIndex}-angulo`,
-      grupo: `${idBase}-tramo-${segment.toCommandIndex}`,
-      kind: 'tramo-angulo',
-      label: 'Ángulo',
-      valueMm: anguloPatron,
-      unit: 'deg',
-      min: -180,
-      max: 180,
-      primary: true,
-      a: from,
-      b: to,
-      outward,
-      apply: (deg) => {
-        const nuevoPatron = polarPoint(from, segment.lengthMm, deg);
-        const path = copiaConNodoFinal(
-          line.path,
-          segment.toCommandIndex,
-          patternToPieceLocal(nuevoPatron, piece),
-        );
-        return path
-          ? { kind: 'internal', pieceId: piece.id, lineId: line.id, path }
-          : null;
-      },
-    });
-  }
+  const cotas = cotasDeTramos({
+    path: line.path,
+    idBase,
+    centro,
+    aPatron: (p) => pieceLocalToPattern(p, piece),
+    aLocal: (p) => patternToPieceLocal(p, piece),
+    escribir: (path) => ({ kind: 'internal', pieceId: piece.id, lineId: line.id, path }),
+    segmentIndex,
+  });
 
   // Las referencias al contorno pertenecen a la interna completa. Seleccionar
   // un tramo ofrece únicamente su caja de largo y ángulo; los productores sin

@@ -97,6 +97,14 @@ describe('B — el candado también protege del borrado', () => {
   });
 });
 
+describe('resolverBorrado — trazo', () => {
+  it('con un tramo de trazo seleccionado, el sujeto es ese tramo', () => {
+    expect(resolverBorrado(con({
+      selectedTrazo: { trazoId: 't1', segmentIndex: 2 },
+    }))).toEqual({ kind: 'trazo', trazoId: 't1', segmentIndex: 2 });
+  });
+});
+
 describe('#1094 sigue arreglado — la regla de costuras no se pierde en el camino', () => {
   // El fix original: en el menú de costuras, Supr borra la costura o nada,
   // JAMÁS la pieza que quedó seleccionada tres gestos antes.

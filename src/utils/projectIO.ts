@@ -7,7 +7,7 @@
  * @module projectIO
  */
 
-import type { PieceGroup, ReferenceImage } from '../types/types';
+import type { PieceGroup, ReferenceImage, Trazo } from '../types/types';
 import type { Trim } from '../types/trim';
 import { saveProject, loadProject as loadProjectFromIDB, clearProject } from './storage';
 import { parseVinaProject } from './projectSchema';
@@ -28,6 +28,7 @@ interface ProjectState {
   groups?: PieceGroup[];
   garmentInfo?: import('../types/types').GarmentInfo;
   referenceImages?: ReferenceImage[];
+  trazos?: Trazo[];
   trims?: Trim[];
 }
 
@@ -75,6 +76,7 @@ function stateToProject(state: ProjectState): Record<string, unknown> {
     groups: state.groups ?? [],
     garmentInfo: state.garmentInfo || {},
     referenceImages: state.referenceImages ?? [],
+    trazos: state.trazos ?? [],
     trims: state.trims ?? [],
     createdAt: Date.now(),
     updatedAt: Date.now(),

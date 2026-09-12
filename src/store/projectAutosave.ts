@@ -42,6 +42,17 @@ export interface PersistenceStore {
 }
 
 const piecesLabel = (n: number) => (n === 1 ? '1 pieza' : `${n} piezas`);
+const trazosLabel = (n: number) => (n === 1 ? '1 trazo' : `${n} trazos`);
+
+/**
+ * Lo que de verdad volvió, dicho entero. Un proyecto puede ser solo trazos
+ * —el orden de María: raya de construcción primero, pieza calcada después— y
+ * entonces «0 piezas» sería mentira por omisión.
+ */
+const loQueVolvio = (piezas: number, trazos: number) =>
+  [piezas > 0 ? piecesLabel(piezas) : null, trazos > 0 ? trazosLabel(trazos) : null]
+    .filter(Boolean)
+    .join(' y ') || piecesLabel(0);
 
 export async function initProjectPersistence(store: PersistenceStore): Promise<void> {
   // ── 1. Hydrate first ──
@@ -49,7 +60,12 @@ export async function initProjectPersistence(store: PersistenceStore): Promise<v
     const result = await loadFromStorage();
     if (result && result.ok) {
       const project = result.project;
-      const hasContent = project.pieces.length > 0 || project.seams.length > 0;
+      // Los trazos cuentan como contenido (spec 2026-09-12 § 2.3): un proyecto
+      // de solo rayas de construcción es el estado normal a mitad del trabajo
+      // de María, y sin este término se guardaba bien y no se restauraba nunca.
+      // `?.` porque un guardado anterior a la feature no trae el campo.
+      const trazos = project.trazos?.length ?? 0;
+      const hasContent = project.pieces.length > 0 || project.seams.length > 0 || trazos > 0;
       if (hasContent) {
         // restoreProject, NOT loadProject: the import pipeline's generative
         // enrichment (auto-rename/auto-sew) must not run on a faithful restore.
@@ -59,7 +75,7 @@ export async function initProjectPersistence(store: PersistenceStore): Promise<v
         store.dispatch(requestFitView()); // frame the restored work (no blank canvas)
         store.dispatch(showToast({
           type: 'info',
-          message: `Restauré tu proyecto: ${piecesLabel(project.pieces.length)}`,
+          message: `Restauré tu proyecto: ${loQueVolvio(project.pieces.length, trazos)}`,
           actionLabel: 'Empezar de cero',
           actionPayload: NEW_PROJECT(),
           duration: 8000,

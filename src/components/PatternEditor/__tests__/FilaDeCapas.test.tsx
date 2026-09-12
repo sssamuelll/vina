@@ -14,6 +14,7 @@ const interruptores = [
   ['Piquetes', 'showNotches'],
   ['Costuras', 'showSewingLines'],
   ['Largos', 'showLineLengths'],
+  ['Construcción', 'showTrazos'],
 ] as const;
 
 describe('FilaDeCapas', () => {
@@ -41,5 +42,21 @@ describe('FilaDeCapas', () => {
       expect(store.getState().editor[field]).toBe(!before);
       expect(button.getAttribute('aria-pressed')).toBe(String(!before));
     }
+  });
+
+  it('el sexto interruptor es «Construcción», nace encendido y apaga showTrazos', () => {
+    const store = configureStore({ reducer: { editor: editorReducer } });
+    render(
+      <Provider store={store}>
+        <FilaDeCapas />
+      </Provider>,
+    );
+
+    const boton = screen.getByRole('button', { name: 'Construcción' });
+    expect(boton.getAttribute('aria-pressed')).toBe('true');
+
+    fireEvent.click(boton);
+
+    expect(store.getState().editor.showTrazos).toBe(false);
   });
 });

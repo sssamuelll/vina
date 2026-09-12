@@ -259,10 +259,14 @@ export default function MeasureToolOverlay({
 
   return (
     <g className="measure-lines" pointerEvents="none">
+      {/* Anillo de ancla (7 px) para todo lo que ES un punto —vértice de pieza,
+          punta de trazo, cruce de trazos—; el de arista (5 px) es para
+          engancharse EN una línea. La punta de un trazo con el anillo fino se
+          leía como «caí en el borde», que es otra promesa. */}
       {active && hoveredSnapPoint && (
         <circle
           cx={hoveredSnapPoint.x} cy={hoveredSnapPoint.y}
-          r={(snapKind === 'vertex' ? 7 : 5) / zoom2D}
+          r={(snapKind === 'vertex' || snapKind === 'trazoEnd' || snapKind === 'trazoCross' ? 7 : 5) / zoom2D}
           fill="none" stroke="var(--snap-2d)" strokeWidth={2 / zoom2D}
         />
       )}

@@ -6,6 +6,7 @@ import {
   toggleNotches,
   toggleSeamAllowance,
   toggleSewingLines,
+  toggleTrazos,
 } from '../../store/editorSlice';
 import './FilaDeCapas.css';
 
@@ -15,6 +16,7 @@ const CAPAS = [
   { label: 'Piquetes', flag: 'showNotches', action: toggleNotches },
   { label: 'Costuras', flag: 'showSewingLines', action: toggleSewingLines },
   { label: 'Largos', flag: 'showLineLengths', action: toggleLineLengths },
+  { label: 'Construcción', flag: 'showTrazos', action: toggleTrazos },
 ] as const;
 
 const selectCapasVisibles = (state: RootState) => ({
@@ -23,6 +25,7 @@ const selectCapasVisibles = (state: RootState) => ({
   showNotches: state.editor.showNotches,
   showSewingLines: state.editor.showSewingLines,
   showLineLengths: state.editor.showLineLengths,
+  showTrazos: state.editor.showTrazos,
 });
 
 export default function FilaDeCapas() {

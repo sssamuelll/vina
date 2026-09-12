@@ -35,8 +35,10 @@ function trazar(dx: number): string[] {
   act(() => { tool().handleMouseDown(ev(100, 10)); tool().handleMouseUp(); });
   act(() => { tool().handleKeyDown(new KeyboardEvent('keydown', { key: 'Enter' })); });
   expect(onComplete).toHaveBeenCalledTimes(1);
-  const outline = onComplete.mock.calls[0][0].outline as Array<{ type: string }>;
-  return outline.map((c) => c.type);
+  // Dos nodos: desde la spec 2026-09-12 § 3.2 esto sale como trazo abierto.
+  const r = onComplete.mock.calls[0][0];
+  expect(r.kind).toBe('trazo');
+  return (r.path as Array<{ type: string }>).map((c) => c.type);
 }
 
 describe('#1096 — la pluma respeta el umbral de arrastre', () => {
