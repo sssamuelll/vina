@@ -1148,19 +1148,29 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
 
   const handleZoomToFit = useCallback(() => {
     const svgEl = svgRef.current;
-    if (!svgEl || pieces.length === 0) return;
+    // Los trazos cuentan: un proyecto de SOLO trazos se restaura (tarea 9 de
+    // #1158) y `initProjectPersistence` pide encuadre justo después. Mirar solo
+    // las piezas dejaba ese encuadre —y Ver ▸ Ajustar zoom al patrón— en un
+    // no-op silencioso: el aviso decía «Restauré tu proyecto: 3 trazos» y el
+    // lienzo se quedaba en zoom 1, pan 0,0.
+    if (!svgEl || (pieces.length === 0 && trazos.length === 0)) return;
     const rect = svgEl.getBoundingClientRect();
     // El dock 2D flota (no reserva espacio real, § 2.1), así que el encuadre
     // tiene que descontar su faja a mano (ver DOCK_WIDTH_PX arriba). Se resta
     // del ancho Y se desplaza el paneo por lo mismo — encuadrar en
     // [DOCK, ancho], no en [0, ancho-DOCK]. Restar sin desplazar corre el
     // patrón HACIA el dock, que es lo contrario.
-    const fit = computeFitView(pieces, Math.max(0, rect.width - DOCK_WIDTH_PX), rect.height);
+    const fit = computeFitView(
+      // El `path` de un trazo va en coordenadas de patrón: sin posición propia.
+      [...pieces, ...trazos.map(t => ({ position: { x: 0, y: 0 }, outline: t.path }))],
+      Math.max(0, rect.width - DOCK_WIDTH_PX),
+      rect.height,
+    );
     if (fit) {
       dispatch(setZoom2D(fit.zoom));
       dispatch(setPan2D({ x: fit.pan.x + DOCK_WIDTH_PX, y: fit.pan.y }));
     }
-  }, [pieces, dispatch, svgRef]);
+  }, [pieces, trazos, dispatch, svgRef]);
 
   // Auto fit-to-content: an import bumps fitViewToken; frame the pattern once
   // the viewport size and pieces are both available. The early return leaves
@@ -1170,10 +1180,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const lastFitTokenRef = useRef(0);
   useEffect(() => {
     if (fitViewToken === lastFitTokenRef.current) return;
-    if (pieces.length === 0 || svgSize.width === 0) return; // not ready — retry on next render
+    // Ninguna de las dos listas tiene nada que encuadrar → todavía no.
+    if ((pieces.length === 0 && trazos.length === 0) || svgSize.width === 0) return; // not ready — retry on next render
     lastFitTokenRef.current = fitViewToken;
     handleZoomToFit();
-  }, [fitViewToken, pieces.length, svgSize.width, svgSize.height, handleZoomToFit]);
+  }, [fitViewToken, pieces.length, trazos.length, svgSize.width, svgSize.height, handleZoomToFit]);
 
   // ─── Calibration modal confirm ────────────────────────────────────────────
   const handleCalibrationConfirm = useCallback((realWorldMm: number) => {

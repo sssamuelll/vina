@@ -346,7 +346,14 @@ export function createPastedPieces(clipboard: { pieces: PatternPiece[] }, mirror
 
 /**
  * Compute zoom and pan to fit all pieces in the viewport with padding.
- * Returns null if no pieces or all pieces have no outline data.
+ * Returns null if nothing in the list has points, or the viewport has no size.
+ *
+ * La lista no es solo de piezas: un trazo (línea de construcción, spec
+ * 2026-09-12) entra adaptado a esta misma forma —`{ position: 0,0, outline:
+ * path }`, su `path` ya va en coordenadas de patrón—, así que un proyecto de
+ * solo trazos también se encuadra (#1158). De ahí que la compuerta sea
+ * «ninguna entrada tiene puntos» (`hasPoints`) y no «la lista está vacía»:
+ * contar la longitud dejaba el encuadre en un no-op silencioso.
  */
 export function computeFitView(
   pieces: { position: Point2D; rotation?: number; outline: { values: number[] }[] }[],
@@ -354,7 +361,7 @@ export function computeFitView(
   viewportHeight: number,
   padding = 1.2,
 ): { zoom: number; pan: Point2D } | null {
-  if (pieces.length === 0 || viewportWidth <= 0 || viewportHeight <= 0) return null;
+  if (viewportWidth <= 0 || viewportHeight <= 0) return null;
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   let hasPoints = false;
