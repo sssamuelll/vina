@@ -23,6 +23,10 @@ import toolsReducer from '../../../store/toolSlice';
 import constructionReducer from '../../../store/constructionSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
 import { store as appStore } from '../../../store';
+import { selectTrazo } from '../../../store/editorSlice';
+import { addTrazo } from '../../../store/projectSlice';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
+import type { Trazo } from '../../../types/types';
 import LogoMenu from '../LogoMenu';
 
 const { downloadDiagnosticBundleMock } = vi.hoisted(() => ({
@@ -185,6 +189,55 @@ describe('LogoMenu ▸ Archivo — diagnóstico', () => {
         message: 'No pude exportar el diagnóstico: el navegador no creó el archivo. Inténtalo de nuevo.',
       }),
     );
+  });
+});
+
+describe('LogoMenu ▸ Ver — Construcción (#1158)', () => {
+  it('la fila enciende y apaga editor.showTrazos y se marca sola', () => {
+    const store = renderMenu();
+    openViewMenu();
+    expect(isChecked('Construcción')).toBe(true);
+    fireEvent.click(screen.getByText('Construcción'));
+    expect(store.getState().editor.showTrazos).toBe(false);
+  });
+});
+
+/**
+ * La segunda puerta de borrado. Edición ▸ Eliminar lee el sujeto del store
+ * canónico (`store.getState()`), no del Provider, así que aquí se monta el
+ * menú CONTRA ese store: es la única forma de probar la puerta como la usa
+ * María, y es justo la puerta que en #1115 se había quedado tres semanas
+ * atrás respecto del atajo.
+ */
+describe('LogoMenu ▸ Edición ▸ Eliminar — tramo de trazo (#1158)', () => {
+  const TRAZO: Trazo = {
+    id: 'menu-t1',
+    path: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [200, 0] },
+      { type: 'L', values: [300, 0] },
+    ],
+    createdAt: 1,
+  };
+
+  it('borra ESE tramo, parte el trazo y lo escribe en la bitácora', () => {
+    clearJournal();
+    appStore.dispatch(addTrazo(TRAZO));
+    appStore.dispatch(selectTrazo({ trazoId: 'menu-t1', segmentIndex: 2 }));
+    render(<Provider store={appStore}><LogoMenu onOpenPanel={() => {}} onImportDXF={() => {}} /></Provider>);
+
+    fireEvent.click(screen.getByRole('button', { name: /vina/i }));
+    fireEvent.mouseEnter(screen.getByText('Edición'));
+    fireEvent.click(screen.getByText('Eliminar'));
+
+    // El trazo de cuatro anclas quedó partido en dos, y el original conserva su id.
+    const trazos = appStore.getState().project.trazos;
+    expect(trazos.filter((t) => t.id === 'menu-t1')).toHaveLength(1);
+    expect(trazos.filter((t) => t.path.length === 2)).toHaveLength(2);
+    expect(appStore.getState().editor.selectedTrazo).toBeNull();
+    expect(getJournal().events.find((e) => e.name === 'trazo:delete')?.data)
+      .toEqual({ trazoId: 'menu-t1', segmentIndex: 2, parte: true });
   });
 });
 

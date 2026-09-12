@@ -16,6 +16,8 @@ import { requestConfirmation } from '../../hooks/useGuardedAction';
 import { showErrorToast, showInfoToast } from '../../store/copilotUISlice';
 import { duplicatePiece, removePieces, removeSeam, removeInternalLine, removePOM, removeTramoDeTrazo } from '../../store/projectSlice';
 import { resolverBorrado } from '../../store/borradoDeSeleccion';
+import { parteElTrazo } from '../PatternEditor/trazos/trazoPath';
+import { pushJournal } from '../../utils/telemetry/journal';
 import { runAutoSew } from '../../store/autoSewThunk';
 import { openRenderSettings } from '../../store/renderSettingsThunk';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
@@ -126,10 +128,19 @@ const EDIT_MENU: MenuItem[] = [
         d(removeInternalLine({ pieceId: sujeto.pieceId, lineId: sujeto.lineId }));
         d(clearSelection());
         break;
-      case 'trazo':
+      case 'trazo': {
+        // La misma sonda que el atajo, con la misma regla de `parte`
+        // (spec 2026-09-12 § 5.6). Dos puertas, un solo registro.
+        const trazo = project.trazos.find(t => t.id === sujeto.trazoId);
+        pushJournal('gesture', 'trazo:delete', {
+          trazoId: sujeto.trazoId,
+          segmentIndex: sujeto.segmentIndex,
+          parte: trazo ? parteElTrazo(trazo.path, sujeto.segmentIndex) : false,
+        });
         d(removeTramoDeTrazo({ trazoId: sujeto.trazoId, segmentIndex: sujeto.segmentIndex }));
         d(clearSelection());
         break;
+      }
       case 'pom': d(removePOM(sujeto.id)); break;
       case 'pieces': d(removePieces(sujeto.ids)); break;
       case 'nada':

@@ -23,6 +23,8 @@ import {
 import { setActiveTool3D } from '../store/toolSlice';
 import { activate2DTool } from '../store/toolActivation';
 import { resolverBorrado } from '../store/borradoDeSeleccion';
+import { parteElTrazo } from '../components/PatternEditor/trazos/trazoPath';
+import { pushJournal } from '../utils/telemetry/journal';
 import { removePieces, removeSeam, removeInternalLine, removePOM, removeTramoDeTrazo, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
 import {
   startSimulation,
@@ -106,10 +108,19 @@ export function useKeyboardShortcuts() {
           dispatch(removeInternalLine({ pieceId: sujeto.pieceId, lineId: sujeto.lineId }));
           dispatch(clearSelection());
           break;
-        case 'trazo':
+        case 'trazo': {
+          // Toda superficie nueva nace instrumentada (spec 2026-09-12 § 5.6).
+          // `parte` es lo que ella ve: si este Supr rompe el trazo en dos.
+          const trazo = projectState.trazos.find(t => t.id === sujeto.trazoId);
+          pushJournal('gesture', 'trazo:delete', {
+            trazoId: sujeto.trazoId,
+            segmentIndex: sujeto.segmentIndex,
+            parte: trazo ? parteElTrazo(trazo.path, sujeto.segmentIndex) : false,
+          });
           dispatch(removeTramoDeTrazo({ trazoId: sujeto.trazoId, segmentIndex: sujeto.segmentIndex }));
           dispatch(clearSelection());
           break;
+        }
         case 'pom':
           dispatch(removePOM(sujeto.id));
           break;

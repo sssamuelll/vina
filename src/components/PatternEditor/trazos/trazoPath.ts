@@ -48,6 +48,18 @@ export function quitarTramo(
 }
 
 /**
+ * ¿Ese Supr PARTE el trazo en dos? Es lo que la bitácora registra como
+ * `parte` (spec § 5.6) y lo que la usuaria ve pasar. Vive aquí, al lado de
+ * `quitarTramo`, porque es su misma condición leída al revés — los dos lados
+ * sobreviven — y porque lo preguntan las DOS puertas de borrado: tenerlo
+ * escrito dos veces es cómo #1115 acabó con una puerta tres semanas atrás.
+ */
+export function parteElTrazo(path: PathCommand[], segmentIndex: number): boolean {
+  const [izquierda, derecha] = quitarTramo(path, segmentIndex);
+  return izquierda !== null && derecha !== null;
+}
+
+/**
  * Mueve una punta (0 = primera, 1 = última) y devuelve un path nuevo; el
  * original no se toca.
  *
