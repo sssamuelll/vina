@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import type { Point2D, PatternPiece, SemanticEdge } from '../../types/types';
+import type { Point2D, PatternPiece, SemanticEdge, Trazo } from '../../types/types';
 import { formatDimension } from '../../utils/units';
 import { flattenPath } from '../../utils/seam/index';
 import { computePathArcLength, samplePathAtIntervals, samplePathDense, distanceAlongPath, pointAtPathDistance } from '../../utils/geometry/arcLength';
@@ -160,14 +160,23 @@ export function buildOutlineInfo(piece: PatternPiece, markerInterval: number): S
   return buildEdgeInfo(piece, syntheticEdge, markerInterval);
 }
 
+/** Identidad estable: sin trazos el índice de enganche no se rehace por render. */
+const SIN_TRAZOS: Trazo[] = [];
+
 // ─── Hook ───
 
-export function useMeasureTool(zoom: number, pan: Point2D, visiblePieces?: PatternPiece[]) {
+export function useMeasureTool(
+  zoom: number,
+  pan: Point2D,
+  visiblePieces?: PatternPiece[],
+  /** Trazos VISIBLES: enganchan como las piezas (spec 2026-09-12 § 5.1). */
+  trazos: Trazo[] = SIN_TRAZOS,
+) {
   const units = useSelector((s: RootState) => s.editor.units);
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const projectId = useSelector((s: RootState) => s.project.id);
   const snapPieces = visiblePieces ?? pieces;
-  const snapIndex = useMemo(() => buildSnapIndex(snapPieces), [snapPieces]);
+  const snapIndex = useMemo(() => buildSnapIndex(snapPieces, trazos), [snapPieces, trazos]);
   // Un extremo interno sirve para medir entre puntos, pero no identifica un
   // tramo del contorno. Las herramientas de curvas comparten los vértices y
   // anillos del índice sin dejar que una interna les tape el tramo buscado.

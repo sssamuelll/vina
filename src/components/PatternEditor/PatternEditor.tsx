@@ -7,7 +7,7 @@ import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../util
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, selectInternalLine, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, seSeleccionaPorTramo } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, seSeleccionaPorTramo } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import type { PenResult } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
@@ -63,6 +63,7 @@ import MeasureToolOverlay from './renderers/overlays/MeasureToolOverlay';
 import GridLayer from './renderers/GridLayer';
 import RulerLayer from './renderers/RulerLayer';
 import PieceRenderer from './renderers/PieceRenderer';
+import TrazosLayer from './renderers/TrazosLayer';
 import SeamRenderer from './renderers/SeamRenderer';
 import ElasticRenderer from './renderers/ElasticRenderer';
 import TrimRenderer from './renderers/TrimRenderer';
@@ -95,6 +96,10 @@ export const DOCK_WIDTH_PX = 68;
 /** Lo que dura en la tira el desenlace de un gesto que no pasó nada (#1117):
  *  suficiente para leerlo, corto para no quedarse contestando el gesto de antes. */
 const DESENLACE_MS = 4000;
+
+/** Identidad estable para la capa apagada: sin ella el índice de enganche se
+ *  reharía en cada render con «Construcción» en off. */
+const SIN_TRAZOS: Trazo[] = [];
 
 interface PatternEditorProps {
   /** Opens the DXF file picker; wired by AppShell to its hidden <input>. */
@@ -196,6 +201,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     return fullPiece.id;
   }, [dispatch]);
 
+  const trazos = useSelector((s: RootState) => s.project.trazos);
+  const showTrazos = useSelector((s: RootState) => s.editor.showTrazos);
+  // Lo oculto no engancha ni se pinta: la lista vacía tiene identidad estable
+  // para que el índice de enganche no se rehaga por render.
+  const trazosVisibles = useMemo(() => (showTrazos ? trazos : SIN_TRAZOS), [showTrazos, trazos]);
+
   /** La Pluma reparte (spec 2026-09-12 § 3.1). Un trazo terminado NO queda seleccionado (#1154). */
   const handlePenComplete = useCallback((r: PenResult) => {
     if (r.kind === 'pieza') { handlePieceComplete(r.piece); return; }
@@ -225,7 +236,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     [drawablePieces, showLineLengths, selectedPieceIds, haySujetoDentroDeLaPieza],
   );
 
-  const pen = usePenTool(zoom2D, pan2D, handlePenComplete, drawablePieces);
+  const pen = usePenTool(zoom2D, pan2D, handlePenComplete, drawablePieces, trazosVisibles);
   const rectTool = useRectangleTool(zoom2D, pan2D, handlePieceComplete);
   // El círculo nace de la misma puerta que la pluma y el rectángulo (#1111).
   const circleTool = useCircleTool(zoom2D, pan2D, handlePieceComplete);
@@ -372,7 +383,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const scissorsTool = useScissorsTool(zoom2D, pan2D);
   const slashAndSpreadTool = useSlashAndSpreadTool(zoom2D, pan2D);
   const mergeTool = useMergeTool(zoom2D, pan2D);
-  const measureTool = useMeasureTool(zoom2D, pan2D, drawablePieces);
+  const measureTool = useMeasureTool(zoom2D, pan2D, drawablePieces, trazosVisibles);
   const measurementPieceIds = useMemo(() => new Set(pieces.map(p => p.id)), [pieces]);
   const seamEditTool = useSeamEditTool(
     zoom2D,
@@ -440,6 +451,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const internalShapeTool = usePolyPenTool(zoom2D, pan2D, {
     nodeType: internalNodeType,
     pieces: drawablePieces,
+    trazos: trazosVisibles,
     onComplete: handleInternalShapeComplete,
     onLockedPress: handleInternalShapeLockedPress,
   });
@@ -1282,6 +1294,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             onPieceNameSave={handlePieceNameSave}
             onPieceNameCancel={handlePieceNameCancel}
           />
+          <TrazosLayer trazos={trazosVisibles} seleccion={editor.selectedTrazo} zoom2D={zoom2D} />
           <CotaLines cotas={sujeto.cotas} zoom2D={zoom2D} />
           <ConstructionOverlay zoom2D={zoom2D} pieces={pieces} />
           {/* `showSewingLines` sigue siendo el interruptor maestro del usuario
