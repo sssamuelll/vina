@@ -146,6 +146,23 @@ export interface ReferenceImage {
   pixelsPerMm: number | null; // set by calibration, null = uncalibrated
 }
 
+/**
+ * Línea de construcción suelta en el lienzo (spec 2026-09-12 § 2). El `path`
+ * va en coordenadas de patrón y nunca lleva `Z`; no tiene anfitriona,
+ * posición ni rotación: está donde se dibujó, como una raya en el papel.
+ */
+export interface Trazo {
+  id: string;
+  path: PathCommand[];
+  createdAt: number;
+}
+
+/** Selección de un trazo: siempre por tramo (contrato 08-09 § 5). `segmentIndex` es el comando de llegada. */
+export interface TrazoSelection {
+  trazoId: string;
+  segmentIndex: number;
+}
+
 // ─── Rich Dart Entity ───
 
 /** Dart cap shape at the apex */
@@ -703,6 +720,8 @@ export interface VinaProject {
   garmentInfo?: GarmentInfo;
   /** Reference images for 2D tracing (optional for backward compat) */
   referenceImages?: ReferenceImage[];
+  /** Líneas de construcción sueltas (ausente en proyectos anteriores al 2026-09-12) */
+  trazos?: Trazo[];
   /** Trim placements (optional for backward compat) */
   trims?: import('./trim').Trim[];
   /** Base64-encoded image blobs keyed by imageId (present in .openclo.json files only) */

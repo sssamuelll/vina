@@ -40,6 +40,7 @@ function emptyState() {
     arrangementOverrides: {},
     poms: [],
     referenceImages: [],
+    trazos: [],
     layerNames: {},
     layerLocked: {},
     loadDiagnostics: [],
