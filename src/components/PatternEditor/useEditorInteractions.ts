@@ -872,7 +872,11 @@ export function useEditorInteractions(
       const { x: clickX, y: clickY } = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
 
       // Arrastrar una punta del trazo seleccionado (spec 2026-09-12 § 5.3), como con las internas.
-      if (selectedTrazo && showTrazos) {
+      // Solo el botón izquierdo arma el gesto: con el derecho no hay release que lo
+      // suelte —`PatternEditor.handleMouseDown` solo marca `mouseInteractionActiveRef`
+      // para los botones 0 y 1, y `finishMouseInteraction` sale en seco sin ese ref—
+      // así que el trazo se quedaba pegado al cursor y el lote de deshacer, abierto.
+      if (e.button === 0 && selectedTrazo && showTrazos) {
         const trazo = trazos.find(t => t.id === selectedTrazo.trazoId);
         const puntas = trazo && puntasDeTrazo(trazo.path);
         if (puntas) {
@@ -893,7 +897,9 @@ export function useEditorInteractions(
       }
 
       // Check if dragging an endpoint of the currently selected internal line
-      if (selectedInternalLine) {
+      // Mismo agujero que el de arriba, y preexistente: con el botón derecho el
+      // extremo quedaba armado sin release posible.
+      if (e.button === 0 && selectedInternalLine) {
         const ilPiece = pieces.find(p => p.id === selectedInternalLine.pieceId);
         if (ilPiece) {
           const ilLine = ilPiece.internals.find(l => l.id === selectedInternalLine.lineId);
