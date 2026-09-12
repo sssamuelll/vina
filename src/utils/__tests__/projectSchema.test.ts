@@ -538,6 +538,44 @@ describe('parseVinaProject — referenceImageData filtering', () => {
   });
 });
 
+describe('parseVinaProject — trazos (spec 2026-09-12 § 2.3)', () => {
+  const trazoBueno = {
+    id: 'trazo-1',
+    path: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+    ],
+    createdAt: 1000,
+  };
+
+  it('un trazo bien formado sobrevive el parse', () => {
+    const r = parseVinaProject(makeProject({ trazos: [trazoBueno] } as Partial<VinaProject>));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.project.trazos).toEqual([trazoBueno]);
+  });
+
+  it('un trazo sin path se rechaza y el error señala dónde', () => {
+    const r = parseVinaProject(
+      makeProject({ trazos: [{ id: 'trazo-1', createdAt: 1000 }] } as unknown as Partial<VinaProject>),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.code).toBe('invalid_shape');
+      expect(r.error.path).toContain('trazos');
+    }
+  });
+
+  it('rechaza más de MAX_TRAZOS trazos', () => {
+    const muchos = Array.from({ length: __testing.MAX_TRAZOS + 1 }, (_, i) => ({
+      ...trazoBueno,
+      id: `trazo-${i}`,
+    }));
+    const r = parseVinaProject(makeProject({ trazos: muchos } as Partial<VinaProject>));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe('too_large');
+  });
+});
+
 describe('parseVinaProject — trim placement discriminated union', () => {
   it('accepts each valid placement mode', () => {
     const placements: NonNullable<VinaProject['trims']>[number]['placement'][] = [
