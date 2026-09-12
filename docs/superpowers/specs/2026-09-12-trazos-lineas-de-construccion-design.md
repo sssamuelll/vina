@@ -4,7 +4,7 @@
 
 **Qué cierra:** que María pueda trazar primero y sacar la pieza después. Hoy cada raya suelta que dibuja con la Pluma es una «pieza abierta» con aviso (`t_11-20.jpg`: tres rayas, tres avisos), y Línea interna no arranca fuera de una pieza.
 
-> **Estado: decidido, sin implementar.** Enmienda D4 de `2026-09-09-lo-que-se-ve-y-cuando-design.md` y la escalera de Escape (§ 8). No reabre AXIS-2 (§ 1).
+> **Estado: implementado el 2026-09-12** en la rama `feat/trazos` (#1158), con las tres enmiendas de § 10. Enmienda D4 de `2026-09-09-lo-que-se-ve-y-cuando-design.md` y la escalera de Escape (§ 8). No reabre AXIS-2 (§ 1).
 
 ---
 
@@ -57,6 +57,9 @@ export interface Trazo {
 ### 2.3 Persistencia y deshacer
 
 - `VinaProject` gana `trazos?: Trazo[]`. Al cargar, backfill a `[]` junto a `referenceImages` (`projectSlice.ts:351`). Sin sobre de versión: la ausencia del campo es el caso viejo y se resuelve en el backfill (B6-state, variante sin envelope). Si el guardado del proyecto tiene comentario de shape en su `storageSet`, se actualiza el `<Type>`; no cambia la versión.
+- **La puerta de escritura también los lleva.** `stateToProject` (`src/utils/projectIO.ts`), que es por donde el autoguardado serializa el estado, emite `trazos: state.trazos ?? []`. Un campo que el reducer tiene y el serializador no escribe es un dato que se pierde al recargar y nadie ve fallar.
+- **El esquema los declara.** `vinaProjectSchema` (`src/utils/projectSchema.ts`) gana `trazoSchema` y el campo `trazos` opcional, con tope `MAX_TRAZOS = 2000` — el mismo tipo de cota que ya llevan las demás listas del proyecto.
+- **La compuerta de hidratación los cuenta.** `projectAutosave.ts` decidía si había algo que restaurar por `pieces` y `seams`; ahora suma los trazos, así que **un proyecto de solo trazos se restaura** en vez de descartarse en silencio, y el aviso dice lo que de verdad volvió: «Restauré tu proyecto: N piezas y M trazos» (solo la mitad que existe, si una es cero).
 - Reducers: `addTrazo`, `updateTrazo({ id, path })`, `removeTrazo(id)`, `removeTramoDeTrazo({ trazoId, segmentIndex })` (§ 5.4). Los cuatro entran al mapa de `undoMiddleware.ts:306+` con sus nombres («Trazo», «Editar trazo», «Borrar trazo», «Borrar tramo»). **Un trazo terminado = una entrada de deshacer.** Arrastrar una punta va en lote (`beginDragBatch`), como las internas.
 
 ### 2.4 Lo que un trazo no es
@@ -108,7 +111,7 @@ Con el chip de Tab abierto (`nextPoint`, #1129), los peldaños del chip siguen i
 
 - **Estilo:** el de la línea interna de **referencia** (`internalLineStyle.ts:17`, tinta `--ink-*`). Ni color nuevo ni token nuevo: para una patronista una raya de construcción y una línea de referencia son la misma cosa; solo cambia dónde viven. Ley de tokens: ningún literal.
 - **Orden de pintado:** un `TrazosLayer` propio (memoizado, como `PuntosDelContorno`) montado **después de `PieceRenderer` y antes de `ToolOverlay`** — encima de las piezas, debajo de cotas, tiradores y píldoras. Encima porque la raya tiene que seguir viéndose sobre la pieza que se calcó encima (*"para poder seguir dibujando"*); debajo de lo que flota, por la ley de emplazamiento. `ReferenceImageLayer` queda debajo de todo, como hoy (`PatternEditor.tsx:1242`).
-- **Extremos:** se pintan **siempre**, con `AnchorGlyph` en rol `lineEnd`. Lo que el imán encuentra se ve (D3 firmada, #1157). Los vértices interiores, solo con el trazo seleccionado — mismo reparto que las internas.
+- **Anclas:** se pintan **todas las anclas de todos los trazos visibles, siempre** —puntas y vértices interiores— con `AnchorGlyph` en rol `lineEnd`; con el trazo seleccionado, las suyas pasan a estado `selected`. Un punto que ella puso es un punto que se ve: `resolveSnap` engancha a las anclas interiores de cualquier trazo visible, no solo a las puntas, y lo que el imán encuentra se ve (D3 firmada, #1157). Los **cruces** entre tramos rectos no son glifo permanente en `TrazosLayer` —nadie los creó, salen de dos trazos— pero sí entran en `verticesVisibles` del índice, así que la Pluma los pinta como candidatos y Línea interna les da su anillo al acercarse (§ 5.1).
 - **Estados:** tramo seleccionado y hover como los de una interna (ley de estado: seleccionado > hover > reposo; hover sin clic per #1150). Sin `:hover` sin `:focus-visible`.
 - **Interruptor:** la fila de capas pasa a **Margen · Hilo · Piquetes · Costuras · Largos · Construcción** (`FilaDeCapas.tsx:12-18`, flag `showTrazos` en `editorSlice`, encendido de fábrica; el mismo asiento en `LogoMenu.tsx`, como «Largos de línea»). Apagado: los trazos **ni se pintan ni enganchan ni se seleccionan** — lo oculto no engancha, como las capas de piezas ocultas. Si había un tramo de trazo seleccionado, se suelta.
 - **Copy:** «Construcción», «trazo», «Editando: el tramo seleccionado». `aria-label` en español. Ley 5.
@@ -123,7 +126,7 @@ Con el chip de Tab abierto (`nextPoint`, #1129), los peldaños del chip siguen i
 
 Prioridad, de mayor a menor: `firstNode` → vértice (de pieza o de trazo) → cruce de trazos → extremo (de interna o de trazo) → recorrido (contorno o trazo). Mismo radio (`EDGE_HIT_PX`), mismo resolutor.
 
-Con eso, **Pluma, Línea interna, Punto y Medir enganchan a trazos sin cambiar nada**: todos leen del mismo índice. Los cruces con curvas no entran (§ 6). El índice se recalcula por identidad de `trazos`, nunca por evento de ratón (mismo motivo que con `pieces`: un patrón de ella tiene cientos).
+Con eso, **Pluma, Línea interna, Punto y Medir enganchan a trazos sin cambiar nada**: todos leen del mismo índice. Los cruces con curvas no entran (§ 6). El cruce, además, **se pinta como candidato de la Pluma**: entra en `verticesVisibles(index)` junto a las anclas de los trazos, y Línea interna lo enseña con su anillo de enganche al acercarse (§ 4). El índice se recalcula por identidad de `trazos`, nunca por evento de ratón (mismo motivo que con `pieces`: un patrón de ella tiene cientos).
 
 ### 5.2 Seleccionar
 
@@ -151,6 +154,8 @@ Supr con un tramo seleccionado → `removeTramoDeTrazo`: borra **ese tramo** (§
 ### 5.6 Caja negra
 
 `trazo:select { trazoId, segmentIndex }`, `trazo:delete { trazoId, segmentIndex, parte: boolean }`, `trazo:drag { trazoId, extremo }`, y los `snap` con `kind: 'trazoEnd' | 'trazoCross'`. Toda superficie nueva nace instrumentada.
+
+`trazo:delete` lo emiten **las dos puertas de borrado** —Supr (`useKeyboardShortcuts.ts`) y Edición ▸ Eliminar (`LogoMenu.tsx`)—, con la misma sonda; y `parte` no se razona en cada puerta: se deriva de `quitarTramo` con `parteElTrazo(path, segmentIndex)` (`trazos/trazoPath.ts`), que es su misma condición leída al revés. Una puerta sin sonda es cómo #1115 se escapó.
 
 ---
 
@@ -181,7 +186,7 @@ Supr con un tramo seleccionado → `removeTramoDeTrazo`: borra **ese tramo** (§
 | Trazo debajo de una pieza bloqueada | el candado es de la pieza, no del papel: el trazo se edita igual |
 | Punta de trazo en el mismo sitio que un vértice de pieza | gana la pieza (§ 5.2) |
 | Proyecto viejo sin `trazos` | lista vacía, sin migración |
-| Cientos de trazos | índice por identidad de la lista; `TrazosLayer` memoizado; los vértices interiores solo se pintan con el trazo seleccionado |
+| Cientos de trazos | índice por identidad de la lista; `TrazosLayer` memoizado y sin hover, con una sola pasada por trazo (las anclas salen de `anclasDeTrazo`, no de un recorrido aparte). El tope del dato lo pone `MAX_TRAZOS = 2000` en el esquema |
 | Deshacer tras borrar un tramo del medio | vuelve el trazo entero, con su id |
 
 ---
@@ -229,4 +234,5 @@ Supr con un tramo seleccionado → `removeTramoDeTrazo`: borra **ese tramo** (§
 
 ## 10. Registro
 
+- **2026-09-12 — implementado** en `feat/trazos` (#1158), en diez tareas. **Enmendado el mismo día con tres rulings que salieron de implementarlo:** (1) § 4 — las anclas ya no se reparten «puntas siempre, interiores solo con el trazo seleccionado»: se pintan **todas las de todos los trazos visibles, siempre**, porque `resolveSnap` engancha a las interiores y lo que engancha se ve (D3, #1157); y los cruces, que no son glifo permanente, entran en `verticesVisibles` y por eso la Pluma los pinta como candidatos (tarea 6, con § 5.1 y la fila de «cientos de trazos» de § 7 puestas de acuerdo). (2) § 5.6 — `trazo:delete` lo emiten las **dos** puertas de borrado y `parte` se deriva de `quitarTramo` vía `parteElTrazo`, no se razona dos veces (tarea 3). (3) § 2.3 — el plan no vio tres huecos de persistencia que las tareas 2 y 9 cerraron: `stateToProject` escribe `trazos`, `vinaProjectSchema` los declara con `MAX_TRAZOS = 2000`, y la compuerta de hidratación de `projectAutosave.ts` los cuenta, así que un proyecto de solo trazos se restaura.
 - **2026-09-12** — escrito tras el brainstorm con Samuel. Tres respuestas suyas (§ 1) y ocho secciones aprobadas una a una en la conversación. Decisión de más peso: reutilizar la gramática de la interna entera (tramo, chip, Supr, arrastre de puntas, índice de enganche) en vez de darle al trazo una propia. Decisión de gesto: Esc termina el trazo (Illustrator/Figma), lo que además cierra #1161 fallo 3.

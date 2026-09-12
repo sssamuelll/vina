@@ -36,6 +36,7 @@ exclamaciones, verbos que nombran el resultado (protocolo de microcopy solace-wr
 | turntable | vuelta 360° | |
 | avatar | avatar | |
 | mismatch (largo de costura) | diferencia | "⚠ 12.3mm de diferencia" |
+| construction line / trazo | trazo · construcción | «trazo» para la línea; «Construcción» para el interruptor de la fila de capas. Spec 2026-09-12. |
 
 ## Vocabulario UI
 

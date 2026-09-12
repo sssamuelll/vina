@@ -182,7 +182,7 @@ Y después de confirmar un tramo, **el siguiente vuelve a seguir al ratón**: no
 
 *Causa G.*
 
-**La unidad seleccionable es el tramo entre dos nodos consecutivos.** El gesto que creó varios tramos **no forma un grupo de selección**.
+**La unidad seleccionable es el tramo entre dos nodos consecutivos.** Vale igual para los trazos (líneas de construcción, spec 2026-09-12 § 5.2). El gesto que creó varios tramos **no forma un grupo de selección**.
 
 ```
 A ───────── B ───────── C ───────── D
@@ -272,4 +272,5 @@ Cada una admite **Esc antes de confirmar** y **un solo deshacer** después.
 
 ## 10. Registro
 
+- **Enmendado el 2026-09-12** (#1158) — § 5: la granularidad del tramo vale también para los **trazos** (líneas de construcción). Un trazo se selecciona por tramo siempre, con el mismo chip de largo · ángulo y el mismo Supr que una interna. Spec `2026-09-12-trazos-lineas-de-construccion-design.md` § 5.2-5.4.
 - **2026-09-08** — escrito tras la junta. Cierra los BLOCKER H1 y H2 de Serrano con las decisiones de § 2.3 (transiciones y edición pendiente) y § 3.1 (contrato geométrico por operación). La gramática de § 2 a § 5 viene de la propuesta de Petra Haft, con dos cosas añadidas aquí: la ley de Voronov en § 1, que explica por qué la herramienta y no la pieza declara la intención, y el precio del hábito de CLO dicho en voz alta en § 3.2.

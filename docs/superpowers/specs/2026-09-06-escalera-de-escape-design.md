@@ -130,6 +130,7 @@ existir es la obligación de que la escalera las conozca.
 |---|---|---|---|
 | 1 | Borrador de un chip en edición | `CotaChip` (`:157`) | **sí**, con su test y su e2e |
 | 2 | Gesto vivo de la herramienta (press, trazo, tramo congelado, marquee) | `handleKeyDown` de cada hook | parcial: pluma, línea interna, rectángulo, círculo, punto, piquete, margen, coser, elástico |
+| 2 · **pluma** | ~~Esc cancela el trazo entero~~ → Esc **termina** el trazo como línea de construcción (spec `2026-09-12-trazos-lineas-de-construccion-design.md` § 3.3); con un solo nodo, lo suelta | `usePenTool.handleKeyDown` | **sí** (#1158) |
 | 3 | Sub-selección (nodo, tramo, borde de margen) | `handleKeyDown` de su hook | **no** |
 | 4 | Selección de pieza | `ShortcutProvider` → `clearSelection` | sí, y es el último a propósito |
 
@@ -138,6 +139,15 @@ Un Escape, un peldaño. La escalera de dos que ya funciona de punta a punta
 `tests/e2e/1100-margen-en-el-borde.spec.ts:123-146`— es el precedente exacto, y
 el 06-09 se le añadió un tercer sitio: con el tramo congelado, Escape lo suelta
 y el trazo sigue (`usePenTool`, `usePolyPenTool`).
+
+> **Enmendado el 2026-09-12** (#1158). En la **pluma**, el peldaño 2 dejó de ser
+> «cancelar el dibujo entero»: Escape **termina** el trazo y lo deja en el
+> lienzo como línea de construcción; con un solo nodo no queda nada. El peldaño
+> de cancelar desaparece de la pluma —los nodos se quitan de uno en uno con
+> Retroceso, y un trazo terminado se deshace con `Ctrl+Z`— porque así **nunca se
+> pierde nada dibujado**, que es el fallo 3 de #1161, y porque es la convención
+> de Illustrator y Figma. Contrato de interfaz § 4: actuar y ofrecer deshacer
+> antes que preguntar. Spec de trazos § 3.2-3.3.
 
 ### D6 — «Volver a la flecha» NO es un peldaño
 
