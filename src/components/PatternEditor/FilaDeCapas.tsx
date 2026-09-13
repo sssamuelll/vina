@@ -2,21 +2,22 @@ import { shallowEqual, useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../../store';
 import {
   toggleGrainlines,
-  toggleLineLengths,
   toggleNotches,
   toggleSeamAllowance,
   toggleSewingLines,
   toggleTrazos,
+  setLineLengthMode,
 } from '../../store/editorSlice';
+import type { LineLengthMode } from '../../store/lineLengthPreference';
 import './FilaDeCapas.css';
 
 const CAPAS = [
-  { label: 'Margen', flag: 'showSeamAllowance', action: toggleSeamAllowance },
-  { label: 'Hilo', flag: 'showGrainlines', action: toggleGrainlines },
-  { label: 'Piquetes', flag: 'showNotches', action: toggleNotches },
-  { label: 'Costuras', flag: 'showSewingLines', action: toggleSewingLines },
-  { label: 'Largos', flag: 'showLineLengths', action: toggleLineLengths },
-  { label: 'Construcción', flag: 'showTrazos', action: toggleTrazos },
+  { kind: 'toggle', label: 'Margen', flag: 'showSeamAllowance', action: toggleSeamAllowance },
+  { kind: 'toggle', label: 'Hilo', flag: 'showGrainlines', action: toggleGrainlines },
+  { kind: 'toggle', label: 'Piquetes', flag: 'showNotches', action: toggleNotches },
+  { kind: 'toggle', label: 'Costuras', flag: 'showSewingLines', action: toggleSewingLines },
+  { kind: 'lengths' },
+  { kind: 'toggle', label: 'Construcción', flag: 'showTrazos', action: toggleTrazos },
 ] as const;
 
 const selectCapasVisibles = (state: RootState) => ({
@@ -24,7 +25,7 @@ const selectCapasVisibles = (state: RootState) => ({
   showGrainlines: state.editor.showGrainlines,
   showNotches: state.editor.showNotches,
   showSewingLines: state.editor.showSewingLines,
-  showLineLengths: state.editor.showLineLengths,
+  lineLengthMode: state.editor.lineLengthMode,
   showTrazos: state.editor.showTrazos,
 });
 
@@ -34,7 +35,24 @@ export default function FilaDeCapas() {
 
   return (
     <div className="fila-de-capas" role="group" aria-label="Capas visibles">
-      {CAPAS.map(({ label, flag, action }) => {
+      {CAPAS.map((capa) => {
+        if (capa.kind === 'lengths') {
+          return (
+            <label key={'lengths'} className={'fila-de-capas__largos'}>
+              <span>Largos</span>
+              <select
+                aria-label={'Largos'}
+                value={visibles.lineLengthMode}
+                onChange={(event) => dispatch(setLineLengthMode(event.currentTarget.value as LineLengthMode))}
+              >
+                <option value={'creation'}>Al crear</option>
+                <option value={'all'}>Todas</option>
+                <option value={'none'}>Ninguna</option>
+              </select>
+            </label>
+          );
+        }
+        const { label, flag, action } = capa;
         const activo = visibles[flag];
         return (
           <button

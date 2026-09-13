@@ -89,6 +89,8 @@ const pathCommandTypes = ['M', 'L', 'H', 'V', 'C', 'S', 'Q', 'T', 'A', 'Z'] as c
 const pathCommandSchema = z.object({
   type: z.enum(pathCommandTypes),
   values: z.array(finiteNumber).max(MAX_PATH_VALUES),
+  authoredAnchor: z.literal(true).optional(),
+  manualBezier: z.literal(true).optional(),
 });
 
 // ─── Internal lines ──────────────────────────────────────────────────────────

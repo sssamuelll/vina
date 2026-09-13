@@ -24,6 +24,7 @@ import nestingReducer from './nestingSlice';
 import gradingReducer from './gradingSlice';
 import inputSchemeReducer, { hydrateInputScheme, rehydrateInputScheme, persistInputScheme } from './inputSchemeSlice';
 import { initProjectPersistence } from './projectAutosave';
+import { initLineLengthPreference } from './lineLengthPreference';
 import { confirmationMiddleware } from './confirmationMiddleware';
 import { journalMiddleware } from './journalMiddleware';
 import { undoMiddleware } from './undoMiddleware';
@@ -110,6 +111,7 @@ store.subscribe(() => {
 void hydrateInputScheme().then((saved) => {
   if (saved) store.dispatch(rehydrateInputScheme(saved));
 });
+initLineLengthPreference(store);
 let prevInputScheme = store.getState().inputScheme;
 store.subscribe(() => {
   const inputScheme = store.getState().inputScheme;

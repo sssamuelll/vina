@@ -17,4 +17,9 @@ describe('formatMedida', () => {
     expect(formatMedida(213.54, 'mm')).toBe('213,5 mm');
   });
   it('grados', () => expect(formatMedida(37, 'deg')).toBe('37°'));
+  it('incluye la referencia en el mismo texto que se mide y se pinta', () => {
+    expect(formatMedida(90, 'deg', 'al borde')).toBe('90° al borde');
+    expect(formatMedida(30, 'deg', 'al tramo')).toBe('30° al tramo');
+    expect(formatMedida(100, 'mm', 'al borde')).toBe('100 mm');
+  });
 });

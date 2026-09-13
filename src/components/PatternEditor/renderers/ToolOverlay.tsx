@@ -31,6 +31,7 @@ import type { EdgeTarget } from '../edgeGesture';
 import type { BBox, HandlePosition } from '../../../utils/geometry/transform';
 import type { TransformPreview } from '../useTransformTool';
 import type { SlashAndSpreadPhase } from '../useSlashAndSpreadTool';
+import type { AngleReference } from '../angleReference';
 
 interface PenNode {
   anchor: Point2D;
@@ -60,7 +61,13 @@ interface ToolOverlayProps {
   penNodes: PenNode[];
   previewPath: string;
   guidePath: string | null;
-  penDistance: { distance: number; position: Point2D } | null;
+  penDistance: {
+    distance: number;
+    position: Point2D;
+    angleDeg?: number;
+    reference?: AngleReference;
+  } | null;
+  precisionHint?: boolean;
   penWillClose: boolean;
   /** #1102: los puntos de las piezas y lo que el próximo clic enganchará. */
   penVertices?: Point2D[];
@@ -263,7 +270,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
       )}
 
       {activeTool === 'pen' && (
-        <PenToolOverlay zoom2D={zoom2D} units={units} penNodes={props.penNodes} previewPath={props.previewPath} guidePath={props.guidePath} penDistance={props.penDistance} penWillClose={props.penWillClose} verticesDePiezas={props.penVertices} snapHover={props.penSnapHover} />
+        <PenToolOverlay zoom2D={zoom2D} units={units} penNodes={props.penNodes} previewPath={props.previewPath} guidePath={props.guidePath} penDistance={props.penDistance} penWillClose={props.penWillClose} verticesDePiezas={props.penVertices} snapHover={props.penSnapHover} precisionHint={props.precisionHint} />
       )}
 
       {activeTool === 'rectangle' && (

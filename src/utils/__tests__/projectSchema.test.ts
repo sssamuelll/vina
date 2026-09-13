@@ -696,3 +696,25 @@ describe('seam pieceB.reversed survives parse (Fase 5)', () => {
     if (r.ok) expect(r.project.seams[0].pieceB.reversed).toBeUndefined();
   });
 });
+
+describe('D3/D5 — intención de edición en el comando canónico', () => {
+  it('guardar JSON y cargar conserva anclas insertadas y la elección de Bézier libre', () => {
+    const project = makeProject();
+    project.pieces[0].outline[1].authoredAnchor = true;
+    project.pieces[0].outline.splice(2, 0, { type: 'C', values: [11, 0, 12, 5, 10, 10], manualBezier: true });
+    const result = parseVinaProjectJson(JSON.stringify(project));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.project.pieces[0].outline).toEqual(project.pieces[0].outline);
+  });
+
+  it('los proyectos previos no adquieren metadatos y una marca inválida se rechaza', () => {
+    const project = makeProject();
+    const legacy = parseVinaProject(project);
+    expect(legacy.ok).toBe(true);
+    if (legacy.ok) expect(legacy.project.pieces[0].outline).toEqual(project.pieces[0].outline);
+    const malformed = JSON.parse(JSON.stringify(project));
+    malformed.pieces[0].outline[1].authoredAnchor = 'yes';
+    expect(parseVinaProject(malformed).ok).toBe(false);
+  });
+});

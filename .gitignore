@@ -113,3 +113,8 @@ AGENTS.md.pre-graphify.bak
 # Scratch de recon (prompts, issues en borrador, salidas de codex, capturas de
 # replay-maria) — evidencia de trabajo, no documentación curada.
 /.recon/
+
+# Evidencia de verificación de las tandas (bitácoras, trazas de Playwright,
+# capturas, logs de gates) — misma regla que screenshots/: se cita desde los
+# informes en docs/reports/, no se versiona.
+/artifacts/

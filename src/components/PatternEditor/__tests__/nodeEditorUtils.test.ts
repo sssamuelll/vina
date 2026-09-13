@@ -243,6 +243,11 @@ describe('nearestSegment', () => {
 // ─── splitSegmentAt ───
 
 describe('splitSegmentAt', () => {
+  it('marks a user-inserted straight anchor', () => {
+    const result = splitSegmentAt(makeSquarePiece().outline, 1, 0.5);
+    expect(result[1].authoredAnchor).toBe(true);
+  });
+
   it('splits L segment into two L commands', () => {
     const outline = makeSquarePiece().outline;
     // Split the first L segment (index 1: from (0,0) to (100,0)) at midpoint

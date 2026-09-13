@@ -430,6 +430,44 @@ describe('unfoldPiece', () => {
     expect(full.id).toBe(half.id);
   });
 
+  it('preserves segment and arrival-anchor intent on the reflected reverse without moving geometry', () => {
+    const marked = makeHalfRect('Marked');
+    marked.outline = [
+      { type: 'M', values: [0, 0], authoredAnchor: true },
+      {
+        type: 'C',
+        values: [200 / 3, 0, 400 / 3, 0, 200, 0],
+        manualBezier: true,
+      },
+      { type: 'L', values: [200, 600], authoredAnchor: true },
+      { type: 'L', values: [0, 600] },
+      { type: 'Z', values: [] },
+    ];
+    const plain: PatternPiece = {
+      ...marked,
+      outline: marked.outline.map(({ type, values }) => ({ type, values: [...values] })),
+    };
+
+    const expectedGeometry = unfoldPiece(plain, 'fold-1').outline;
+    const actual = unfoldPiece(marked, 'fold-1').outline;
+    expect(actual.map(({ type, values }) => ({ type, values }))).toEqual(expectedGeometry);
+
+    expect(actual[0].authoredAnchor).toBe(true);
+    expect(actual.filter(command => command.type === 'C'))
+      .toHaveLength(2);
+    expect(actual.filter(command => command.type === 'C')
+      .every(command => command.manualBezier === true)).toBe(true);
+    const reversed = actual.filter(command => command.type === 'C')[1];
+    expect(reversed.values).toEqual([-400 / 3, 0, -200 / 3, 0, 0, 0]);
+    expect(reversed.authoredAnchor).toBe(true);
+
+    const reflectedAuthored = actual.find(command => {
+      const end = command.values.slice(-2);
+      return end[0] === -200 && end[1] === 600;
+    });
+    expect(reflectedAuthored?.authoredAnchor).toBe(true);
+  });
+
   it('removes fold line from internals', () => {
     const half = makeHalfRect('Front');
     const full = unfoldPiece(half, 'fold-1');

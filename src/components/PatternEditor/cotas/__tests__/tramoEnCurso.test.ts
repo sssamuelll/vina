@@ -39,6 +39,8 @@ describe('las dos cotas del tramo en curso', () => {
     expect(cotas[1].valueMm).toBe(90);
     expect(cotas[0].unit).toBe('mm');
     expect(cotas[1].unit).toBe('deg');
+    expect(cotas[0].grupo).toBe('tramo-en-curso');
+    expect(cotas[1].grupo).toBe(cotas[0].grupo);
   });
 
   it('el segmento que dibujan va del último nodo al punto polar, no a otro sitio', () => {
@@ -54,6 +56,17 @@ describe('las dos cotas del tramo en curso', () => {
     const [largo, angulo] = cotasDelTramoEnCurso({ from, lengthMm: 80, angleDeg: 90 });
     expect(largo.apply(50)).toEqual({ kind: 'tramoEnCurso', largoMm: 50, anguloDeg: 90 });
     expect(angulo.apply(0)).toEqual({ kind: 'tramoEnCurso', largoMm: 80, anguloDeg: 0 });
+  });
+
+  it('el marco relativo conserva el otro valor y vuelve al mismo ángulo absoluto', () => {
+    const lengthMm = 83.123456789;
+    const angleDeg = 127.123456789;
+    const [largo, angulo] = cotasDelTramoEnCurso({ from, lengthMm, angleDeg,
+      reference: { kind: 'border', baseDeg: 37.123456789 } });
+    expect(angulo.valueMm).toBeCloseTo(90, 12);
+    expect(angulo.referenceLabel).toBe('al borde');
+    expect(largo.apply(50.123456789)).toEqual({ kind: 'tramoEnCurso', largoMm: 50.123456789, anguloDeg: angleDeg });
+    expect(angulo.apply(angulo.valueMm)).toEqual({ kind: 'tramoEnCurso', largoMm: lengthMm, anguloDeg: angleDeg });
   });
 
   it('confirmar con Enter vale aunque el número no haya cambiado: aquí confirmar COLOCA', () => {

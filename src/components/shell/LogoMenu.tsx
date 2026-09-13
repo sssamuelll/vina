@@ -4,7 +4,7 @@ import type { RootState, AppDispatch } from '../../store';
 import {
   setViewMode, undo, redo, toggleSnapToGrid, toggleSeamAllowance,
   toggleGrainlines, toggleNotches, togglePieceNames, toggleSewingLines,
-  toggleReferenceImages, toggleLineLengths, toggleTrazos, setRenderMode2D,
+  toggleReferenceImages, setLineLengthMode, toggleTrazos, setRenderMode2D,
   clearSelection, setZoom2D, setUnits,
 } from '../../store/editorSlice';
 import {
@@ -170,7 +170,14 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Nombres de pieza', action: (d) => d(togglePieceNames()), checked: (s) => s.editor.showPieceNames },
   { label: 'Líneas de costura', action: (d) => d(toggleSewingLines()), checked: (s) => s.editor.showSewingLines },
   { label: 'Imágenes de referencia', action: (d) => d(toggleReferenceImages()), checked: (s) => s.editor.showReferenceImages },
-  { label: 'Largos de línea', action: (d) => d(toggleLineLengths()), checked: (s) => s.editor.showLineLengths },
+  {
+    label: 'Largos',
+    submenu: [
+      { label: 'Al crear', action: (d) => d(setLineLengthMode('creation')), checked: (s) => s.editor.lineLengthMode === 'creation' },
+      { label: 'Todas', action: (d) => d(setLineLengthMode('all')), checked: (s) => s.editor.lineLengthMode === 'all' },
+      { label: 'Ninguna', action: (d) => d(setLineLengthMode('none')), checked: (s) => s.editor.lineLengthMode === 'none' },
+    ],
+  },
   { label: 'Construcción', action: (d) => d(toggleTrazos()), checked: (s) => s.editor.showTrazos },
   { separator: true, label: '' },
   { label: 'Renderizado: texturizado', action: (d) => d(setRenderMode2D('textured')), checked: (s) => s.editor.renderMode2D === 'textured' },

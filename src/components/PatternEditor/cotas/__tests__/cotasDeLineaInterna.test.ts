@@ -132,10 +132,10 @@ describe('cotasDeLineaInterna — línea interna enganchada de un lado al otro',
       ...piezaBase(internals), rotation,
     } as PatternPiece);
 
-    it('un tramo horizontal en local, en una pieza girada 90°, se lee -90° (vertical hacia abajo en pantalla), no 0°', () => {
+    it('un tramo interior sin borde, en una pieza girada 90°, se lee -90° en el eje de pantalla', () => {
       const linea: InternalLine = {
         id: 'l1', type: 'reference',
-        path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [100, 0] }],
+        path: [{ type: 'M', values: [10, 10] }, { type: 'L', values: [90, 10] }],
       };
       const cotas = cotasDeLineaInterna(piezaGirada(90, [linea]), linea);
       const angulo = cotas.find(c => c.kind === 'tramo-angulo')!;
@@ -177,5 +177,38 @@ describe('cotasDeLineaInterna — línea interna enganchada de un lado al otro',
     // torcida hacia el punto viejo.
     expect(update.path[1].values[0]).toBeCloseTo(20 + dx, 3);
     expect(update.path[1].values[1]).toBeCloseTo(20 + dy, 3);
+  });
+});
+
+describe('D2 — el chip del tramo lee y escribe con su referencia', () => {
+  it('primer tramo desde borde derecho: 90 relativo entra en la pieza sin cambiar largo', () => {
+    const line: InternalLine = { id: 'relative', type: 'reference', path: [
+      { type: 'M', values: [100, 30] }, { type: 'L', values: [40, 30] },
+    ] };
+    const angle = cotasDeLineaInterna(piezaBase([line]), line).find(c => c.kind === 'tramo-angulo')!;
+    expect(angle.valueMm).toBeCloseTo(90, 9);
+    expect(angle.referenceLabel).toBe('al borde');
+    expect(angle.max).toBeGreaterThanOrEqual(270);
+    const equivalent = angle.apply(270);
+    const negative = angle.apply(-90);
+    expect(equivalent).toEqual(negative);
+    const update = angle.apply(90);
+    if (!update || update.kind !== 'internal') throw new Error('missing update');
+    expect(update.path[1].values[0]).toBeCloseTo(40, 9);
+    expect(update.path[1].values[1]).toBeCloseTo(30, 9);
+  });
+
+  it('un tramo intermedio de una pieza girada se refiere al anterior, sin depender de la rotación', () => {
+    const line: InternalLine = { id: 'relative', type: 'reference', path: [
+      { type: 'M', values: [20, 30] }, { type: 'L', values: [40, 10] }, { type: 'L', values: [20, -10] },
+    ] };
+    const piece = { ...piezaBase([line]), rotation: 37 };
+    const angle = cotasDeLineaInterna(piece, line, 2).find(c => c.kind === 'tramo-angulo')!;
+    expect(angle.valueMm).toBeCloseTo(90, 8);
+    expect(angle.referenceLabel).toBe('al tramo');
+    const update = angle.apply(angle.valueMm);
+    if (!update || update.kind !== 'internal') throw new Error('missing update');
+    expect(update.path[2].values[0]).toBeCloseTo(20, 8);
+    expect(update.path[2].values[1]).toBeCloseTo(-10, 8);
   });
 });

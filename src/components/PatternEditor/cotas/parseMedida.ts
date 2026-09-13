@@ -12,8 +12,8 @@ export function parseMedida(texto: string): number | null {
 }
 
 /** Un decimal como máximo, coma decimal, sin ceros de relleno: "213,5 mm", "300 mm", "37°". */
-export function formatMedida(valor: number, unit: 'mm' | 'deg'): string {
+export function formatMedida(valor: number, unit: 'mm' | 'deg', referenceLabel?: string): string {
   const redondeado = Math.round(valor * 10) / 10;
   const texto = String(redondeado).replace('.', ',');
-  return unit === 'deg' ? `${texto}°` : `${texto} mm`;
+  return unit === 'deg' ? `${texto}°${referenceLabel ? ` ${referenceLabel}` : ''}` : `${texto} mm`;
 }

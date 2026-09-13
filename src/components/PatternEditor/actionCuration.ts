@@ -25,6 +25,7 @@ import {
 import { reverseGrainline } from '../../utils/grainLine';
 import { selectPiece, selectSaEdges, clearSelection, copyPieces, createPastedPieces, enterSuperimposePickMode } from '../../store/editorSlice';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
+import { isSplineManaged, splineRunAt } from './splineSegment';
 
 // ── Vocabulario ──────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ export const GROUP_ORDER: GroupId[] = ['clipboard', 'transform', 'order', 'organ
 export type ActionId =
   | 'copy' | 'paste' | 'pasteMirror'
   | 'rotate90' | 'flipH' | 'flipV'
-  | 'reverseSeam' | 'reverseGrainline' | 'unfold' | 'unfoldOutlineOnly' | 'offsetInternalLine' | 'optimizeCurves' | 'optimizeAllCurves' | 'convertSegment' | 'convertSegmentToPoints'
+  | 'reverseSeam' | 'reverseGrainline' | 'unfold' | 'unfoldOutlineOnly' | 'offsetInternalLine' | 'optimizeCurves' | 'optimizeAllCurves' | 'convertSegment' | 'convertSegmentToPoints' | 'convertSegmentToBezier'
   | 'order' | 'layer' | 'lockToggle' | 'activeToggle' | 'groupCreate' | 'addToGroup' | 'removeFromGroup'
   | 'unlinkPieces' | 'selectLinkedPartner' | 'linkSymmetry' | 'linkInstance' | 'cloneLinkedSymmetry' | 'cloneLinkedInstance'
   | 'duplicate' | 'duplicateGroup' | 'duplicateAll' | 'rename' | 'properties' | 'select' | 'inspect' | 'selectPieceOfLine' | 'selectSeamA' | 'selectSeamB' | 'zoomToFit' | 'notchExactDistance' | 'saExactWidth'
@@ -54,6 +55,7 @@ export interface CurationCallbacks {
   onRename?: (pieceId: string) => void;
   onConvertSegment?: (commandIndex: number, toCurve: boolean, pieceId?: string) => void;
   onConvertSegmentToPoints?: (commandIndex: number, pieceId?: string) => void;
+  onConvertSegmentToBezier?: (commandIndex: number, pieceId?: string) => void;
   onZoomToFit?: () => void;
   onUnfold?: (pieceId: string, foldLineId: string, outlineOnly?: boolean) => void;
   onOffsetInternalLine?: (pieceId: string, lineId: string) => void;
@@ -137,6 +139,11 @@ const canAddToGroup = (ctx: CurationCtx) => !!ctx.pieceId && ctx.groups.some(g =
 const canRemoveFromGroup = (ctx: CurationCtx) => !!ctx.pieceId && ctx.groups.some(g => g.pieceIds.includes(ctx.pieceId!));
 const seamBothConnected = (ctx: CurationCtx) => !!(ctx.seam?.pieceA.pieceId && ctx.seam?.pieceB.pieceId);
 const hasCurveCmds = (ctx: CurationCtx) => !!ctx.internalLine?.path.some(c => c.type === 'C' || c.type === 'Q');
+const isManagedSplineSegment = (ctx: CurationCtx) => {
+  if (!ctx.piece || ctx.segmentIndex === undefined || !notLocked(ctx)) return false;
+  const run = splineRunAt(ctx.piece.outline, ctx.segmentIndex);
+  return !!run && isSplineManaged(ctx.piece.outline, run);
+};
 
 const pasteRun = (mirror: boolean) => (ctx: CurationCtx) => {
   if (!ctx.clipboard) return;
@@ -203,6 +210,10 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     // rehacer una ya curvada tirando sus manejadores sería destruir trabajo.
     gate: (ctx) => ctx.segmentIndex !== undefined && !ctx.segmentIsCurve && notLocked(ctx),
     run: (ctx) => ctx.cb.onConvertSegmentToPoints?.(ctx.segmentIndex!, ctx.pieceId ?? undefined) },
+  convertSegmentToBezier: { id: 'convertSegmentToBezier', group: 'transform', icon: '⌁',
+    label: 'Convertir a Bézier libre',
+    gate: isManagedSplineSegment,
+    run: (ctx) => ctx.cb.onConvertSegmentToBezier?.(ctx.segmentIndex!, ctx.pieceId ?? undefined) },
 
   // order (submenú z-order — colapsa 4 ítems planos en uno)
   order: { id: 'order', group: 'order', icon: '⇅', label: 'Orden', run: () => {},
@@ -346,7 +357,7 @@ export const CURATION: CurationRow[] = [
     bar: ['rotate90', 'duplicate', 'flipH', 'properties', 'lockToggle'],
     menu: [
       'copy', 'paste', 'pasteMirror',
-      'rotate90', 'flipH', 'flipV', 'optimizeAllCurves', 'convertSegment', 'convertSegmentToPoints', 'saExactWidth',
+      'rotate90', 'flipH', 'flipV', 'optimizeAllCurves', 'convertSegment', 'convertSegmentToPoints', 'convertSegmentToBezier', 'saExactWidth',
       'order',
       'layer', 'lockToggle', 'activeToggle', 'groupCreate', 'addToGroup', 'removeFromGroup',
       'unlinkPieces', 'selectLinkedPartner', 'linkSymmetry', 'linkInstance',
@@ -376,7 +387,7 @@ export const CURATION: CurationRow[] = [
   },
   { targetKind: 'il.dart', stage: '*', altitude: 'body', bar: [], menu: ['optimizeCurves', 'selectPieceOfLine', 'deleteInternalLine'] },
   { targetKind: 'il.other', stage: '*', altitude: 'body', bar: [], menu: ['offsetInternalLine', 'optimizeCurves', 'selectPieceOfLine', 'deleteInternalLine'] },
-  { targetKind: 'point.segment', stage: '*', altitude: 'point', bar: [], menu: ['moverPuntoExacto', 'convertSegment', 'convertSegmentToPoints'] },
+  { targetKind: 'point.segment', stage: '*', altitude: 'point', bar: [], menu: ['moverPuntoExacto', 'convertSegment', 'convertSegmentToPoints', 'convertSegmentToBezier'] },
   { targetKind: 'point.node', stage: '*', altitude: 'point', bar: [], menu: ['moverPuntoExacto'] },
   { targetKind: 'emptyCanvas', stage: '*', altitude: 'body', bar: [], menu: ['paste', 'pasteMirror', 'zoomToFit'] },
 ];

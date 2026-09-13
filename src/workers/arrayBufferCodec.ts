@@ -178,6 +178,7 @@ export function serializeCurve(curve: CCurve): CCurveSerialized {
  */
 export function serializePathCommand(cmd: PathCommand): PathCommandSerialized {
   return {
+    ...cmd,
     type: cmd.type as PathCommandSerialized['type'],
     values: [...cmd.values],
   };
@@ -188,7 +189,7 @@ export function serializePathCommand(cmd: PathCommand): PathCommandSerialized {
  */
 export function deserializeOutline(commands: PathCommandSerialized[]): PathCommand[] {
   return commands.map(cmd => ({
-    type: cmd.type,
+    ...cmd,
     values: [...cmd.values],
   }));
 }

@@ -28,7 +28,7 @@ export function mirrorOutlineX(outline: PathCommand[]): PathCommand[] {
  */
 function mirrorPathX(path: PathCommand[], cx: number): PathCommand[] {
   return path.map(cmd => {
-    if (cmd.type === 'Z') return { type: 'Z' as const, values: [] };
+    if (cmd.type === 'Z') return { ...cmd, type: 'Z' as const, values: [] };
     const values = [...cmd.values];
     if (cmd.type === 'M' || cmd.type === 'L') {
       values[0] = 2 * cx - values[0];
@@ -42,7 +42,7 @@ function mirrorPathX(path: PathCommand[], cx: number): PathCommand[] {
       values[0] = 2 * cx - values[0];
       values[2] = 2 * cx - values[2];
     }
-    return { type: cmd.type, values };
+    return { ...cmd, values };
   });
 }
 

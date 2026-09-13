@@ -557,7 +557,6 @@ interface PieceRendererProps {
   showNotches: boolean;
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
-  showLineLengths: boolean;
   /** La pieza que se está editando con una herramienta de curva: solo esa enseña sus puntos de curva. Por PIEZA, no global — encenderlo para todas suelta cientos de puntos sobre piezas que nadie toca (#1103). */
   piezaConPuntosDeCurva: string | null;
   units: UnitSystem;

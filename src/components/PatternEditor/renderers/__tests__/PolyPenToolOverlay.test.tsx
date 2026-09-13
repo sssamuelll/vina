@@ -20,6 +20,7 @@ function draw(props: Partial<React.ComponentProps<typeof PolyPenToolOverlay>> = 
   const all = {
     nodes: [], previewPoint: null, pressPoint: null, isDragging: false, dragHandle: null,
     hover: null, nodeType: 'straight' as const, closeArmed: false, zoom2D: 1, units: 'mm',
+    angleReference: { kind: 'absolute' as const, baseDeg: 0 }, frozen: false,
     ...props,
   };
   return render(<svg><PolyPenToolOverlay {...all} /></svg>);
@@ -44,6 +45,26 @@ describe('PolyPenToolOverlay', () => {
     expect(readout).toContain(formatDimension(Math.hypot(10, 10), 'mm'));
     // 0° a la derecha, 90° hacia arriba tal como se ve en pantalla
     expect(readout).toContain('45.0°');
+    expect(readout).toContain('al eje');
+  });
+
+  it('expresa el angulo contra la referencia del tramo y muestra la pista de precision', () => {
+    const { container, getByText } = draw({
+      nodes,
+      previewPoint: P(110, -10),
+      angleReference: { kind: 'segment', baseDeg: 30 },
+      precisionHint: true,
+    });
+    expect(container.querySelector('.il-readout text')?.textContent).toContain('15.0° al tramo');
+    expect(getByText('Tab · escribe la medida')).toBeTruthy();
+  });
+
+  it('apaga la lectura live cuando la medida esta congelada', () => {
+    const { container, queryByText } = draw({
+      nodes, previewPoint: P(110, -10), frozen: true, precisionHint: true,
+    });
+    expect(container.querySelector('.il-readout')).toBeNull();
+    expect(queryByText('Tab · escribe la medida')).toBeNull();
   });
 
   it('con un objetivo de enganche la goma salta al objetivo y aparece el anillo', () => {

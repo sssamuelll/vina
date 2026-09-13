@@ -479,7 +479,7 @@ function rotateCommands(cmds: PathCommand[], pivot: Point2D, angleDeg: number): 
       newValues[i + 1] = pivot.y + dx * sin + dy * cos;
     }
 
-    return { type: cmd.type, values: newValues };
+    return { ...cmd, values: newValues };
   });
 }
 
@@ -501,7 +501,7 @@ function translateCommands(cmds: PathCommand[], dx: number, dy: number): PathCom
       newValues[i + 1] += dy;
     }
 
-    return { type: cmd.type, values: newValues };
+    return { ...cmd, values: newValues };
   });
 }
 

@@ -26,6 +26,10 @@ const round1 = (v: number) => Math.round(v * 10) / 10;
 const acota = (v: number, c: Cota) => Math.min(c.max, Math.max(c.min, v));
 /** El valor como lo escribiría ella: coma decimal, sin unidad. */
 const aTexto = (v: number) => String(round1(v)).replace('.', ',');
+const referenciaVisible = (cota: Cota) =>
+  cota.unit === 'deg' && cota.referenceLabel ? ' ' + cota.referenceLabel : '';
+const textoVisible = (cota: Cota) =>
+  formatMedida(cota.valueMm, cota.unit, cota.referenceLabel);
 /** Una sola escala de modificadores para scrub y flechas: Shift grueso, Alt fino (Figma). */
 const ganancia = (e: { shiftKey: boolean; altKey: boolean }) => (e.shiftKey ? 10 : e.altKey ? 0.1 : 1);
 
@@ -61,7 +65,7 @@ export function AgruparCotas({ cotas, pan2D, zoom2D, estorbos, children }: {
           left: pan2D.x + (cota.a.x + cota.b.x) / 2 * zoom2D,
           top: pan2D.y + (cota.a.y + cota.b.y) / 2 * zoom2D,
         } : chipScreenPosition(cota, pan2D, zoom2D)),
-        texto: campos.map(campo => formatMedida(campo.valueMm, campo.unit)).join(' · '),
+        texto: campos.map(textoVisible).join(' · '),
       };
     });
     const posiciones = separarChips(items, estorbos);
@@ -94,8 +98,8 @@ function chipsHermanos(el: HTMLElement | null): HTMLElement[] {
  * (la selección cambia en mousedown, antes del blur: confirmar ahí sería una
  * carrera). En un tramo, Tab confirma Largo y pasa a Ángulo dentro de la misma
  * caja; Shift+Tab recorre el camino inverso. Solo al salir de sus campos se
- * pasa al chip vecino. Cambiar de campo con el ratón descarta el borrador del
- * anterior, igual que salir por blur, para conservar una sola edición pendiente.
+ * pasa al chip vecino. Cambiar de campo con el ratón confirma primero el
+ * borrador anterior; si es inválido, el foco no sale.
  * Tab mueve el foco al chip vecino por su cuenta, porque el input
  * se desmonta en el mismo tick y la navegación nativa perdería el punto de
  * partida. Nada de `type="number"`: la rueda no cambia el valor y la coma
@@ -110,6 +114,7 @@ function ChipEditable({
   const campoActivo = campos[activo];
   const agrupado = campos.length > 1;
   const [draft, setDraft] = useState('');
+  const [dirty, setDirty] = useState(false);
   const [invalid, setInvalid] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -166,6 +171,7 @@ function ChipEditable({
   const elegirCampo = (indice: number) => {
     setActivo(indice);
     setDraft(aTexto(campos[indice].valueMm));
+    setDirty(false);
     setInvalid(false);
   };
   const abrir = (indice: number) => {
@@ -180,15 +186,13 @@ function ChipEditable({
     setEditing(false);
   };
   const parsea = (): number | null => {
-    const v = parseMedida(draft);
-    return v !== null && v >= campoActivo.min && v <= campoActivo.max ? round1(v) : null;
+    const v = dirty ? parseMedida(draft) : campoActivo.valueMm;
+    return v !== null && v >= campoActivo.min && v <= campoActivo.max ? v : null;
   };
   /**
    * `motivo` existe por #1129. Para una cota de un objeto Enter y Tab son lo
-   * mismo —los dos escriben en Redux—, pero los chips del tramo en curso los
-   * necesitan distintos: Tab salta de Largo a Ángulo y Enter COLOCA el punto.
-   * Sin el dato, Tab colocaría, y el encadenado «80, Tab, −90, Enter» que pide
-   * la § 5.4 del spec de cotas vivas sería imposible.
+   * mismo —los dos confirman—, pero los chips agrupados necesitan distinguir
+   * recorrer otro campo con Tab de terminar esta edición con Enter.
    */
   const confirmar = (motivo: 'enter' | 'tab'): boolean => {
     const v = parsea();
@@ -196,7 +200,16 @@ function ChipEditable({
       setInvalid(true);
       return false;
     }
-    if (v !== round1(campoActivo.valueMm) || campoActivo.confirmaSinCambio) onCommit(campoActivo, v, motivo);
+    if (v !== campoActivo.valueMm || campoActivo.confirmaSinCambio) onCommit(campoActivo, v, motivo);
+    return true;
+  };
+  const cambiarCampo = (indice: number): boolean => {
+    if (indice === activo) return true;
+    if (!confirmar('tab')) {
+      inputRef.current?.focus();
+      return false;
+    }
+    elegirCampo(indice);
     return true;
   };
   const terminarScrub = (valor: (s: { v0: number; last: number }) => number) => {
@@ -221,15 +234,20 @@ function ChipEditable({
         ref={indice === activo ? inputRef : undefined}
         type="text"
         inputMode="decimal"
-        className={`${agrupado ? '' : 'cota '}cota--editando${invalid && indice === activo ? ' cota--invalida' : ''}`}
-        style={agrupado ? undefined : { left, top }}
+        className={`${agrupado || referenciaVisible(campo) ? '' : 'cota '}cota--editando${invalid && indice === activo ? ' cota--invalida' : ''}`}
+        style={agrupado || referenciaVisible(campo) ? undefined : { left, top }}
         aria-label={campo.label}
         aria-invalid={(invalid && indice === activo) || undefined}
         data-rotulo={cota.rotulo}
         data-lado={cota.outward.y > 0 ? 'abajo' : undefined}
         value={indice === activo ? draft : aTexto(campo.valueMm)}
-        onFocus={() => { if (indice !== activo) elegirCampo(indice); }}
-        onChange={(e) => { setDraft(e.target.value); setInvalid(false); }}
+        onMouseDown={(e) => {
+          if (indice === activo) return;
+          e.preventDefault();
+          cambiarCampo(indice);
+        }}
+        onFocus={() => { if (indice !== activo) cambiarCampo(indice); }}
+        onChange={(e) => { setDraft(e.target.value); setDirty(true); setInvalid(false); }}
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key === 'Enter') {
@@ -250,6 +268,7 @@ function ChipEditable({
             const base = parseMedida(draft) ?? campoActivo.valueMm;
             const paso = ganancia(e) * (e.key === 'ArrowUp' ? 1 : -1);
             setDraft(aTexto(acota(base + paso, campoActivo)));
+            setDirty(true);
             setInvalid(false);
           }
         }}
@@ -258,14 +277,25 @@ function ChipEditable({
         }}
       />
     );
-    if (!agrupado) return input(cota, 0);
+    if (!agrupado) {
+      const unico = input(cota, 0);
+      if (!referenciaVisible(cota)) return unico;
+      return (
+        <div ref={editorRef} className="cota cota--grupo cota--grupo-editando" style={{ left, top }}>
+          <label className="cota-campo">
+            {unico}
+            <span>{'°' + referenciaVisible(cota)}</span>
+          </label>
+        </div>
+      );
+    }
     return (
       <div ref={editorRef} className="cota cota--grupo cota--grupo-editando" style={{ left, top }}>
         {campos.map((campo, indice) => (
           <label key={campo.id} className="cota-campo">
             <span>{campo.label}</span>
             {input(campo, indice)}
-            <span>{campo.unit === 'mm' ? 'mm' : '°'}</span>
+            <span>{campo.unit === 'mm' ? 'mm' : '°' + referenciaVisible(campo)}</span>
           </label>
         ))}
       </div>
@@ -282,7 +312,7 @@ function ChipEditable({
       type="button"
       className={`cota${cota.primary ? '' : ' cota--hueca'}${cota.scrub === false ? ' cota--sin-scrub' : ''}`}
       style={{ left, top }}
-      aria-label={campos.map(campo => `${campo.label}: ${formatMedida(campo.valueMm, campo.unit)}`).join(' · ')}
+      aria-label={campos.map(campo => campo.label + ': ' + textoVisible(campo)).join(' · ')}
       aria-disabled={disabled || undefined}
       data-rotulo={cota.rotulo}
       data-lado={cota.outward.y > 0 ? 'abajo' : undefined}
@@ -334,9 +364,9 @@ function ChipEditable({
     >
       {agrupado ? campos.map((campo, indice) => (
         <span key={campo.id} data-campo={indice}>
-          {indice > 0 && ' · '}{formatMedida(campo.valueMm, campo.unit)}
+          {indice > 0 && ' · '}{textoVisible(campo)}
         </span>
-      )) : formatMedida(cota.valueMm, cota.unit)}
+      )) : textoVisible(cota)}
     </button>
   );
 }

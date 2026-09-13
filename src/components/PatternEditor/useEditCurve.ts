@@ -11,11 +11,12 @@ import {
 } from '../../store/undoMiddleware';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import {
-  extractNodes,
   applyNodeMove,
   type EditableNode,
   type NodeRef,
 } from './nodeEditorUtils';
+import { editableCurveNodes } from './editableCurveNodes';
+import { resmoothAfterMove } from './splineSegment';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { rotatePoint } from '../../utils/geometry/transform';
 import { showInfoToast } from '../../store/copilotUISlice';
@@ -83,7 +84,7 @@ function resyncCurveStateToPiece(
 ): EditCurveState {
   return {
     ...state,
-    nodes: extractNodes(piece),
+    nodes: editableCurveNodes(piece),
     hoveredPieceId: null,
     selectedNode: null,
     hoveredNode: null,
@@ -181,7 +182,7 @@ export function useEditCurve(zoom: number, pan: Point2D) {
       hoveredPieceId: null,
       selectedNode: selectedNode || null,
       hoveredNode: null,
-      nodes: extractNodes(piece),
+      nodes: editableCurveNodes(piece),
     });
     dragRef.current = null;
   }, [pieces, endDragBatch, dispatch]);
@@ -205,7 +206,7 @@ export function useEditCurve(zoom: number, pan: Point2D) {
       else dispatch(showInfoToast('La capa de esta pieza está bloqueada: desbloquéala en Capas para editarla.'));
       return true;
     }
-    const nodes = extractNodes(piece);
+    const nodes = editableCurveNodes(piece);
     const rect = e.currentTarget.getBoundingClientRect();
     const point = patternToPieceLocal(
       toPattern(e.clientX, e.clientY, rect),
@@ -317,7 +318,7 @@ export function useEditCurve(zoom: number, pan: Point2D) {
           }));
           return false;
         }
-        const nodes = extractNodes(domPiece);
+        const nodes = editableCurveNodes(domPiece);
         const pt = patternToPieceLocal(
           toPattern(e.clientX, e.clientY, rect),
           domPiece,
@@ -333,7 +334,7 @@ export function useEditCurve(zoom: number, pan: Point2D) {
       }
 
       for (const piece of hoverablePieces) {
-        const nodes = extractNodes(piece);
+        const nodes = editableCurveNodes(piece);
         const pt = patternToPieceLocal(
           toPattern(e.clientX, e.clientY, rect),
           piece,
@@ -380,12 +381,19 @@ export function useEditCurve(zoom: number, pan: Point2D) {
           x: dragRef.current.startPos.x + dx,
           y: dragRef.current.startPos.y + dy,
         };
-        const newOutline = applyNodeMove(
+        const movedOutline = applyNodeMove(
           piece.outline,
           dragRef.current.nodeRef.commandIndex,
           dragRef.current.nodeRef.pointType,
           newPos,
         );
+        const newOutline = dragRef.current.nodeRef.pointType === 'anchor'
+          ? resmoothAfterMove(
+              piece.outline,
+              movedOutline,
+              dragRef.current.nodeRef.commandIndex,
+            )
+          : movedOutline;
         const updatedPiece = {
           ...piece,
           position: compensatePositionForPivotChange(piece, newOutline),
@@ -399,7 +407,7 @@ export function useEditCurve(zoom: number, pan: Point2D) {
         };
         expectedOutlineRef.current = newOutline;
         dispatch(withUndoBatchToken(updatePiece(updatedPiece), undoBatchToken));
-        setState(s => ({ ...s, nodes: extractNodes(updatedPiece) }));
+        setState(s => ({ ...s, nodes: editableCurveNodes(updatedPiece) }));
       }
       return true;
     }

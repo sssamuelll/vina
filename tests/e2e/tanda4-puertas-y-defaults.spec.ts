@@ -95,7 +95,7 @@ test.describe('tanda 4 — puertas que no mienten y defaults que ella quiere', (
     ).toBeGreaterThanOrEqual(cajaDock!.y - 1);
   });
 
-  test('fallo 4 — los largos de cada lado se ven al trabajar la pieza', async ({ page }) => {
+  test('fallo 4 — Largos ofrece los tres modos y una pieza fría no contamina Al crear', async ({ page }) => {
     await waitForApp(page);
 
     // ENMENDADO el 2026-09-09 (contrato `2026-09-09-lo-que-se-ve-y-cuando`
@@ -113,10 +113,7 @@ test.describe('tanda 4 — puertas que no mienten y defaults que ella quiere', (
     // línea me dijera cuánto mide cada línea". Cuando clico. Así que el fallo
     // lo cierra la SELECCIÓN, y el interruptor vuelve a ser lo que dice —
     // verlas todas, todo el tiempo— y vuelve a nacer apagado.
-    expect(
-      (await estado(page)).showLineLengths,
-      'el interruptor vuelve a nacer apagado: quien enseña los largos es la selección',
-    ).toBe(false);
+    expect((await estado(page)).lineLengthMode).toBe('creation');
 
     await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
     await page.keyboard.press('z');
@@ -127,17 +124,15 @@ test.describe('tanda 4 — puertas que no mienten y defaults que ella quiere', (
     await page.mouse.click(s.x, s.y);
     await expect.poll(async () => (await estado(page)).selectedPieceIds.length).toBe(1);
 
-    // Y aquí es donde el fallo 4 queda cerrado de verdad: los ve al trabajar.
-    await expect(
-      page.locator('.cota--lectura'),
-      'clicar la pieza le enseña el largo de cada lado — [06:55], "cuando clico esto"',
-    ).not.toHaveCount(0);
+    await expect(page.locator('.cota--lectura'), 'seleccionarla no convierte una pieza fría en recién creada').toHaveCount(0);
 
-    // El interruptor sigue siendo suyo: el chip de la fila de abajo lo enciende.
-    const chip = page.getByRole('button', { name: /Largos/ });
-    await expect(chip).toBeVisible();
-    await chip.click();
-    await page.waitForTimeout(200);
-    expect((await estado(page)).showLineLengths, 'el chip lo enciende').toBe(true);
+    const modos = page.getByRole('combobox', { name: 'Largos' });
+    await expect(modos).toBeVisible();
+    await expect(modos.locator('option')).toHaveText(['Al crear', 'Todas', 'Ninguna']);
+    await modos.selectOption('all');
+    await expect(page.locator('.cota--lectura')).not.toHaveCount(0);
+    await modos.selectOption('none');
+    await expect(page.locator('.cota--lectura')).toHaveCount(0);
+    expect((await estado(page)).lineLengthMode).toBe('none');
   });
 });

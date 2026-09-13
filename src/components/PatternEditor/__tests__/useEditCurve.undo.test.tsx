@@ -4,11 +4,17 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import projectReducer, { loadProject, setLayerLocked } from '../../../store/projectSlice';
+import projectReducer, { loadProject, setLayerLocked, updatePiece } from '../../../store/projectSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
 import { undoMiddleware, getUndoLength } from '../../../store/undoMiddleware';
 import type { PatternPiece } from '../../../types/types';
-import type { NodeRef } from '../nodeEditorUtils';
+import { applyNodeMove, type NodeRef } from '../nodeEditorUtils';
+import {
+  convertSegmentToSpline,
+  isSplineManaged,
+  resmoothAfterMove,
+  toManualBezier,
+} from '../splineSegment';
 import { useEditCurve } from '../useEditCurve';
 
 afterEach(() => {
@@ -28,6 +34,13 @@ function squarePiece(): PatternPiece {
       { type: 'Z', values: [] },
     ],
   } as PatternPiece;
+}
+
+function splinePiece(): PatternPiece {
+  const base = squarePiece();
+  const straight = convertSegmentToSpline(base.outline, 1, 4);
+  const moved = applyNodeMove(straight, 2, 'anchor', { x: 50, y: 60 });
+  return { ...base, outline: resmoothAfterMove(straight, moved, 2) };
 }
 
 function setup(piece: PatternPiece | PatternPiece[]) {
@@ -195,5 +208,47 @@ describe('useEditCurve resync y undo por gesto', () => {
     expect(hook.result.current.hoveredPieceId).toBeNull();
     expect(hook.result.current.hoveredNode).toBeNull();
     expect(hook.result.current.nodes).toHaveLength(0);
+  });
+
+  it('una curva por puntos no deja hit-testear sus handles derivados', () => {
+    const piece = splinePiece();
+    const hiddenHandle = piece.outline[2].values.slice(0, 2);
+    const { hook } = setup(piece);
+    act(() => { hook.result.current.enterEdit('p'); });
+    expect(hook.result.current.nodes.some(node => node.cp1 || node.cp2)).toBe(false);
+
+    let handled = true;
+    act(() => {
+      handled = hook.result.current.handleMouseDown(pointer(hiddenHandle[0], hiddenHandle[1]));
+    });
+    expect(handled).toBe(false);
+    expect(hook.result.current.selectedNode).toBeNull();
+  });
+
+  it('arrastrar un ancla re-suaviza la cadena gestionada', () => {
+    const { store, hook } = setup(splinePiece());
+    const anchor = store.getState().project.pieces[0].outline[2].values.slice(4, 6);
+    act(() => { hook.result.current.enterEdit('p'); });
+    act(() => { hook.result.current.handleMouseDown(pointer(anchor[0], anchor[1])); });
+    act(() => { hook.result.current.handleMouseMove(pointer(anchor[0], anchor[1] + 30)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+
+    const outline = store.getState().project.pieces[0].outline;
+    expect(isSplineManaged(outline, { start: 1, end: 4 })).toBe(true);
+  });
+
+  it('al convertir y deshacer, el refresh vuelve a ocultar los handles', () => {
+    const { store, hook } = setup(splinePiece());
+    act(() => { hook.result.current.enterEdit('p'); });
+    expect(hook.result.current.nodes.some(node => node.cp1 || node.cp2)).toBe(false);
+
+    const current = store.getState().project.pieces[0];
+    act(() => {
+      store.dispatch(updatePiece({ ...current, outline: toManualBezier(current.outline, 2)! }));
+    });
+    expect(hook.result.current.nodes.some(node => node.cp1 || node.cp2)).toBe(true);
+
+    act(() => { store.dispatch({ type: 'editor/undo' }); });
+    expect(hook.result.current.nodes.some(node => node.cp1 || node.cp2)).toBe(false);
   });
 });

@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { ComponentProps } from 'react';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-import CotaChip from '../CotaChip';
+import CotaChip, { AgruparCotas } from '../CotaChip';
 import type { Cota } from '../cotas';
 
 /**
@@ -27,6 +27,41 @@ function monta(over: Partial<ComponentProps<typeof CotaChip>> = {}) {
   };
   render(<CotaChip {...props} />);
   return props;
+}
+
+function montaGrupo(overLargo: Partial<Cota> = {}, overAngulo: Partial<Cota> = {}) {
+  const onCommit = vi.fn();
+  const noop = {
+    onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn(), onScrubCancel: vi.fn(),
+  };
+  const largo = cota({
+    id: 'tramo-largo', grupo: 'tramo', kind: 'tramo-largo', label: 'Largo',
+    valueMm: 50, confirmaSinCambio: true, scrub: false, ...overLargo,
+  });
+  const angulo = cota({
+    id: 'tramo-angulo', grupo: 'tramo', kind: 'tramo-angulo', label: 'Ángulo',
+    valueMm: 0, unit: 'deg', min: -360, max: 360,
+    confirmaSinCambio: true, scrub: false, ...overAngulo,
+  });
+  const cotas = [largo, angulo];
+  render(
+    <AgruparCotas cotas={cotas} pan2D={{ x: 0, y: 0 }} zoom2D={1}>
+      <div className="cotas">
+        {cotas.map(item => (
+          <CotaChip
+            key={item.id}
+            cota={item}
+            left={0}
+            top={0}
+            zoom2D={1}
+            onCommit={onCommit}
+            {...noop}
+          />
+        ))}
+      </div>
+    </AgruparCotas>,
+  );
+  return { onCommit, largo, angulo };
 }
 
 describe('CotaChip - reposo', () => {
@@ -153,6 +188,91 @@ describe('CotaChip - edición', () => {
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Backspace' });
     expect(espia).not.toHaveBeenCalled();
     window.removeEventListener('keydown', espia);
+  });
+});
+
+describe('CotaChip - campos agrupados', () => {
+  it('clicar Ángulo confirma antes el borrador de Largo y mueve el foco', () => {
+    const { onCommit, largo } = montaGrupo();
+    fireEvent.click(screen.getByRole('button'));
+    const inputLargo = screen.getByRole('textbox', { name: 'Largo' });
+    fireEvent.change(inputLargo, { target: { value: '100' } });
+
+    fireEvent.mouseDown(screen.getByRole('textbox', { name: 'Ángulo' }));
+
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(largo, 100, 'tab');
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Ángulo' }));
+  });
+
+  it('un borrador inválido bloquea clic y Tab hacia el otro campo', () => {
+    const { onCommit } = montaGrupo();
+    fireEvent.click(screen.getByRole('button'));
+    const inputLargo = screen.getByRole('textbox', { name: 'Largo' });
+    fireEvent.change(inputLargo, { target: { value: 'gardenia' } });
+
+    fireEvent.mouseDown(screen.getByRole('textbox', { name: 'Ángulo' }));
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(inputLargo);
+    expect(inputLargo.getAttribute('aria-invalid')).toBe('true');
+
+    fireEvent.keyDown(inputLargo, { key: 'Tab' });
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(inputLargo);
+  });
+
+  it('Tab y Shift+Tab confirman cada borrador antes de recorrer Largo y Ángulo', () => {
+    const { onCommit, largo, angulo } = montaGrupo();
+    fireEvent.click(screen.getByRole('button'));
+    const inputLargo = screen.getByRole('textbox', { name: 'Largo' });
+    fireEvent.change(inputLargo, { target: { value: '100' } });
+    fireEvent.keyDown(inputLargo, { key: 'Tab' });
+
+    const inputAngulo = screen.getByRole('textbox', { name: 'Ángulo' });
+    expect(onCommit).toHaveBeenNthCalledWith(1, largo, 100, 'tab');
+    expect(document.activeElement).toBe(inputAngulo);
+    fireEvent.change(inputAngulo, { target: { value: '90' } });
+    fireEvent.keyDown(inputAngulo, { key: 'Tab', shiftKey: true });
+
+    expect(onCommit).toHaveBeenNthCalledWith(2, angulo, 90, 'tab');
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Largo' }));
+  });
+
+  it('Enter sin editar conserva la precisión interna aunque el texto esté redondeado', () => {
+    const exacta = cota({ valueMm: 12.345678, confirmaSinCambio: true });
+    const p = monta({ cota: exacta });
+    fireEvent.click(screen.getByRole('button'));
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    expect(input.value).toBe('12,3');
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(p.onCommit).toHaveBeenCalledWith(exacta, 12.345678, 'enter');
+  });
+
+  it('Enter conserva la precisión que se escribió explícitamente', () => {
+    const p = monta();
+    fireEvent.click(screen.getByRole('button'));
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '123,456' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(p.onCommit).toHaveBeenCalledWith(p.cota, 123.456, 'enter');
+  });
+
+  it('muestra la referencia del ángulo en reposo y edición sin cambiar su aria-label', () => {
+    monta({
+      cota: cota({
+        id: 'angulo', kind: 'tramo-angulo', label: 'Ángulo', valueMm: 90,
+        unit: 'deg', min: -360, max: 360, referenceLabel: 'al borde',
+      }),
+    });
+    const boton = screen.getByRole('button');
+    expect(boton.textContent).toBe('90° al borde');
+    fireEvent.click(boton);
+
+    expect(screen.getByRole('textbox', { name: 'Ángulo' })).toBeTruthy();
+    expect(screen.getByText('° al borde')).toBeTruthy();
   });
 });
 

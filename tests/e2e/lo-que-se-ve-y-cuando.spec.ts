@@ -42,7 +42,7 @@ async function medidasVisibles(page: Page): Promise<string[]> {
 test.describe('D1 — los largos se ven cuando se trabaja la pieza, no siempre', () => {
   test.setTimeout(120_000);
 
-  test('proyecto recién abierto: ningún largo a la vista y el interruptor apagado', async ({ page }) => {
+  test('proyecto recién abierto: ningún largo a la vista y modo Al crear', async ({ page }) => {
     await waitForApp(page);
     await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
     await page.waitForTimeout(300);
@@ -51,9 +51,9 @@ test.describe('D1 — los largos se ven cuando se trabaja la pieza, no siempre',
     // era que ella NUNCA los veía, y la selección lo cierra mejor que un
     // interruptor que no encontró — sin el ruido permanente.
     expect(
-      (await st(page)).editor.showLineLengths,
-      'el interruptor «Largos» vuelve a nacer apagado (§ 1 del contrato 09-09)',
-    ).toBe(false);
+      (await st(page)).editor.lineLengthMode,
+      'Largos nace en Al crear',
+    ).toBe('creation');
 
     await expect(
       lecturas(page),
@@ -61,7 +61,7 @@ test.describe('D1 — los largos se ven cuando se trabaja la pieza, no siempre',
     ).toHaveCount(0);
   });
 
-  test('clicar la pieza saca los largos de SUS lados, y no se pueden clicar', async ({ page }) => {
+  test('una pieza fría seleccionada no saca largos; Todas los muestra como lectura', async ({ page }) => {
     await waitForApp(page);
     await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
     await page.keyboard.press('z');
@@ -70,12 +70,9 @@ test.describe('D1 — los largos se ven cuando se trabaja la pieza, no siempre',
     await clicEn(page, { x: 200, y: 150 });
     await expect.poll(async () => (await st(page)).editor.selectedPieceIds.length).toBe(1);
 
-    // [06:55] "cuando clico esto sí que me sería muy interesante que encima de
-    // cada línea me dijera cuánto mide cada línea". Cuando clico.
-    await expect(
-      lecturas(page),
-      'la pieza seleccionada enseña los largos de sus lados',
-    ).not.toHaveCount(0);
+    await expect(lecturas(page), 'seleccionarla no la vuelve recién creada').toHaveCount(0);
+    await page.getByRole('combobox', { name: 'Largos' }).selectOption('all');
+    await expect(lecturas(page)).not.toHaveCount(0);
 
     // § 2: son LECTURA, no mando. Un chip que parece accionable y no lo es
     // miente peor que un texto gris.
@@ -95,6 +92,8 @@ test.describe('D1 — los largos se ven cuando se trabaja la pieza, no siempre',
     });
     await page.keyboard.press('z');
     await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('select');
+    await page.getByRole('combobox', { name: 'Largos' }).selectOption('all');
+    await expect(lecturas(page), 'control: Todas sí enseña el contorno antes de elegir la interna').not.toHaveCount(0);
     await clicEn(page, { x: 140, y: 150 });
 
     await expect
@@ -112,13 +111,10 @@ test.describe('D1 — los largos se ven cuando se trabaja la pieza, no siempre',
     ).toHaveCount(0);
   });
 
-  test('el interruptor «Largos» encendido las saca sin selección', async ({ page }) => {
+  test('el modo «Todas» las saca sin selección', async ({ page }) => {
     await waitForApp(page);
     await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
-    await page.evaluate(() => {
-      const store = (window as unknown as { __VINA_STORE__: { dispatch: (a: unknown) => void } }).__VINA_STORE__;
-      store.dispatch({ type: 'editor/toggleLineLengths' });
-    });
+    await page.getByRole('combobox', { name: 'Largos' }).selectOption('all');
     await page.waitForTimeout(300);
 
     await expect(
@@ -136,6 +132,7 @@ test.describe('D3 — un lado que ya lleva chip no lleva además su lectura', ()
     await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
     await page.keyboard.press('z');
     await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('select');
+    await page.getByRole('combobox', { name: 'Largos' }).selectOption('all');
     await clicEn(page, { x: 200, y: 150 });
 
     await expect(chipPieza(page, 'Ancho')).toBeVisible();

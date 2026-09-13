@@ -57,7 +57,7 @@ async function escribir(page: Page, valor: string) {
 test.describe('maria-195 — siguiente punto por largo y ángulo', () => {
   test.setTimeout(120_000);
 
-  test('pluma: Tab, 80/90, Enter, 50/0, Enter, Escape, Enter → tres puntos exactos', async ({ page }) => {
+  test('pluma: cada Enter coloca una vez; un Tab nuevo continúa y tres nodos cierran', async ({ page }) => {
     await waitForApp(page);
     await page.keyboard.press('h');
     await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('pen');
@@ -65,12 +65,15 @@ test.describe('maria-195 — siguiente punto por largo y ángulo', () => {
     const s = await toScreen(page, { x: 300, y: 400 });
     await page.mouse.move(s.x, s.y);
     await page.mouse.click(s.x, s.y);
+    const rumboInicial = await toScreen(page, { x: 300, y: 320 });
+    await page.mouse.move(rumboInicial.x, rumboInicial.y);
     await page.waitForTimeout(150);
 
     // Tab congela el tramo y abre el chip de Largo, ya en edición.
     await page.keyboard.press('Tab');
     await expect(campo(page, 'Largo'), 'Tab no congeló el tramo en dos chips').toBeVisible({ timeout: 5000 });
-    await expect(chip(page, 'Ángulo')).toHaveCount(1);
+    await expect(campo(page, 'Ángulo'), 'el editor agrupado no montó el Ángulo').toBeVisible();
+    await expect(page.getByText('° al eje', { exact: true })).toBeVisible();
 
     // 80, Tab al Ángulo, −90… ojo: 90 en la convención de pantalla es ARRIBA.
     await escribir(page, '80');
@@ -80,14 +83,17 @@ test.describe('maria-195 — siguiente punto por largo y ángulo', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(250);
 
-    // Enter coloca Y deja el par re-anclado al nodo nuevo, con Largo otra vez
-    // en edición: es el encadenado literal del spec («80/−90, Enter, 50/0,
-    // Enter»), y es lo que permite escribir un contorno entero sin soltar el
-    // teclado.
-    await expect(
-      campo(page, 'Largo'),
-      'tras colocar, el foco no volvió a Largo: el encadenado se rompe',
-    ).toBeVisible({ timeout: 3000 });
+    // Enter coloca exactamente una vez y desmonta el borrador numérico. El
+    // siguiente tramo vuelve a seguir el ratón hasta que ella pulse otro Tab.
+    await expect(campo(page, 'Largo'), 'Enter dejó montado el borrador numérico').toHaveCount(0);
+    await expect(campo(page, 'Ángulo')).toHaveCount(0);
+    await expect(chip(page, 'Largo')).toHaveCount(0);
+    await expect(chip(page, 'Ángulo')).toHaveCount(0);
+
+    const rumboSiguiente = await toScreen(page, { x: 300, y: 270 });
+    await page.mouse.move(rumboSiguiente.x, rumboSiguiente.y);
+    await page.keyboard.press('Tab');
+    await expect(campo(page, 'Largo'), 'el Tab nuevo no congeló el siguiente tramo').toBeVisible({ timeout: 3000 });
 
     await escribir(page, '50');
     await page.keyboard.press('Tab');
@@ -95,22 +101,13 @@ test.describe('maria-195 — siguiente punto por largo y ángulo', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(250);
 
-    // Escape en escalera, la del spec de cotas vivas: el PRIMERO descarta el
-    // borrador y devuelve el foco al botón del chip; el SEGUNDO suelta el
-    // tramo congelado y el trazo sigue vivo. Un Esc, una acción.
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
-    await expect(chip(page, 'Largo'), 'el primer Escape ya soltó el tramo: eso son dos acciones').toHaveCount(1);
-
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(250);
-    await expect(chip(page, 'Largo'), 'el segundo Escape no soltó el tramo congelado').toHaveCount(0);
-
-    // Y fuera del congelado, Enter termina la pieza abierta.
+    await expect(campo(page, 'Largo')).toHaveCount(0);
+    // Con tres nodos, Enter termina una pieza cerrada (firma D4).
     await page.keyboard.press('Enter');
     await page.waitForTimeout(400);
     const pieces = (await st(page)).project.pieces;
     expect(pieces, 'la pluma no terminó la pieza').toHaveLength(1);
+    expect(pieces[0].outline.at(-1)?.type, 'tres nodos no cerraron la pieza').toBe('Z');
     const pts = pieces[0].outline.filter(c => c.type !== 'Z').map(c => {
       const v = c.values;
       return [v[v.length - 2] + pieces[0].position.x, v[v.length - 1] + pieces[0].position.y];
@@ -118,7 +115,7 @@ test.describe('maria-195 — siguiente punto por largo y ángulo', () => {
     expect(pts).toHaveLength(3);
     expect(pts[0][0]).toBeCloseTo(300, 4); expect(pts[0][1]).toBeCloseTo(400, 4);
     expect(pts[1][0]).toBeCloseTo(300, 4); expect(pts[1][1]).toBeCloseTo(320, 4);
-    expect(pts[2][0]).toBeCloseTo(350, 4); expect(pts[2][1]).toBeCloseTo(320, 4);
+    expect(pts[2][0]).toBeCloseTo(300, 4); expect(pts[2][1]).toBeCloseTo(270, 4);
   });
 
   test('los chips del tramo NO le roban la esquina a la tira, que es por lo que murió el panel', async ({ page }) => {

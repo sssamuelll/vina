@@ -20,6 +20,10 @@ export type PathCommandType = 'M' | 'L' | 'H' | 'V' | 'C' | 'S' | 'Q' | 'T' | 'A
 export interface PathCommand {
   type: PathCommandType;
   values: number[];
+  /** A point deliberately inserted by the user; travels with its command. */
+  authoredAnchor?: true;
+  /** Explicit free-Bezier ownership, even when handles match a spline. */
+  manualBezier?: true;
 }
 
 /** A single pattern piece — front bodice, back panel, sleeve, etc. */
@@ -869,7 +873,9 @@ export interface EditorState {
   showNotches: boolean;
   showAnchorPoints: boolean;
   showPieceNames: boolean;
-  showLineLengths: boolean;
+  lineLengthMode: 'creation' | 'all' | 'none';
+  /** A late preference read must never overwrite a choice in this session. */
+  lineLengthModeSetByUser: boolean;
   showSewingLines: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
   snapToGrid: boolean;

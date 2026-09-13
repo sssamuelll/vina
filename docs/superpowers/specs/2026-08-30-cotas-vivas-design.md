@@ -1,5 +1,7 @@
 # Cotas vivas — las cotas son el formulario (diseño)
 
+> **Enmienda 2026-09-13:** el [contrato integrado de las seis firmas](../../reports/2026-09-13-seis-firmas-maria.md) rige §5.4: pareja Largo–Ángulo agrupada; Tab/Shift+Tab/clic interno conservan borrador; Enter coloca una vez y no rearma. El ángulo declara su referencia y la conserva al escribir. Largos generales usan Al crear/Todas/Ninguna.
+
 **Fecha:** 2026-08-30
 **Tarjetas de María:** #223, #225 (la barra), #226 (línea interna: distancia a los puntos), y el rastro de #191, #193, #195, #205, #209
 **Hereda y enmienda:** `docs/superpowers/specs/2026-08-16-barra-opciones-herramienta-design.md` (§ 3 canal permanente — **revertido**), `docs/superpowers/specs/2026-08-29-linea-interna-y-medidas-design.md` (§ 6 "sin panel para el rectángulo" y § 7.2 "Tab abre Siguiente punto" — **reemplazados**), `.claude/skills/contrato-de-interfaz/SKILL.md` (§ 2 materiales — **enmienda declarada**, ver § 10)

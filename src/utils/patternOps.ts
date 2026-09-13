@@ -37,8 +37,8 @@ function clonePiece(piece: PatternPiece, overrides?: Partial<PatternPiece>): Pat
   const clon: PatternPiece = {
     ...piece,
     id: uid('piece'),
-    outline: piece.outline.map(c => ({ type: c.type, values: [...c.values] })),
-    internals: piece.internals.map(i => ({ ...i, path: i.path.map(c => ({ type: c.type, values: [...c.values] })) })),
+    outline: piece.outline.map(c => ({ ...c, values: [...c.values] })),
+    internals: piece.internals.map(i => ({ ...i, path: i.path.map(c => ({ ...c, values: [...c.values] })) })),
     edges: piece.edges ? [...piece.edges] : undefined,
     darts: piece.darts ? [...piece.darts] : undefined,
     updatedAt: Date.now(),
@@ -326,9 +326,10 @@ export function addFacing(
 
     // Create facing: edge contour + offset contour
     facingOutline = [
-      ...edgeCmds.map(c => ({ type: c.type, values: [...c.values] })),
+      ...edgeCmds.map(c => ({ ...c, values: [...c.values] })),
       // Offset path (simplified: shift by width in Y)
       ...edgeCmds.map(c => ({
+        ...c,
         type: c.type as PathCommand['type'],
         values: c.values.map((v, i) => i % 2 === 1 ? v + width : v),
       })).reverse(),
@@ -616,7 +617,7 @@ export function extendEdge(
   distance: number,
 ): PatternPiece {
   const newPiece = clonePiece(piece, { id: piece.id });
-  const cmds = [...newPiece.outline.map(c => ({ type: c.type, values: [...c.values] }))];
+  const cmds = [...newPiece.outline.map(c => ({ ...c, values: [...c.values] }))];
 
   const ep = getEdgeEndpoints(cmds, segmentIndex);
   if (!ep) return newPiece;
@@ -633,7 +634,7 @@ export function extendEdge(
     // Extend the endpoint further along the tangent
     const cmd = cmds[segmentIndex];
     if (cmd.type === 'L') {
-      cmds[segmentIndex] = { type: 'L', values: [ep.end.x + ux * distance, ep.end.y + uy * distance] };
+      cmds[segmentIndex] = { ...cmd, type: 'L', values: [ep.end.x + ux * distance, ep.end.y + uy * distance] };
     } else if (cmd.type === 'C') {
       // For cubic bezier, extend the final point along the tangent formed by cp2 → end
       const cp2x = cmd.values[2], cp2y = cmd.values[3];
@@ -643,6 +644,7 @@ export function extendEdge(
       if (tlen > 0.001) {
         const tux = tdx / tlen, tuy = tdy / tlen;
         cmds[segmentIndex] = {
+          ...cmd,
           type: 'C',
           values: [cmd.values[0], cmd.values[1], cp2x, cp2y, ex + tux * distance, ey + tuy * distance],
         };
@@ -666,21 +668,21 @@ export function extendEdge(
     }
 
     if (segmentIndex === 1) {
-      cmds[0] = { type: 'M', values: [ep.start.x + startTx * distance, ep.start.y + startTy * distance] };
+      cmds[0] = { ...cmds[0], type: 'M', values: [ep.start.x + startTx * distance, ep.start.y + startTy * distance] };
     } else {
       const prev = cmds[segmentIndex - 1];
       if (prev.type === 'L') {
-        cmds[segmentIndex - 1] = { type: 'L', values: [ep.start.x + startTx * distance, ep.start.y + startTy * distance] };
+        cmds[segmentIndex - 1] = { ...prev, type: 'L', values: [ep.start.x + startTx * distance, ep.start.y + startTy * distance] };
       } else if (prev.type === 'C') {
         const v = [...prev.values];
         v[4] = ep.start.x + startTx * distance;
         v[5] = ep.start.y + startTy * distance;
-        cmds[segmentIndex - 1] = { type: 'C', values: v };
+        cmds[segmentIndex - 1] = { ...prev, type: 'C', values: v };
       } else if (prev.type === 'Q') {
         const v = [...prev.values];
         v[2] = ep.start.x + startTx * distance;
         v[3] = ep.start.y + startTy * distance;
-        cmds[segmentIndex - 1] = { type: 'Q', values: v };
+        cmds[segmentIndex - 1] = { ...prev, type: 'Q', values: v };
       }
     }
   }
@@ -705,43 +707,43 @@ export function trimEdgeAtPoint(
   keepSide: 'before' | 'after',
 ): PatternPiece {
   const newPiece = clonePiece(piece, { id: piece.id });
-  const cmds = [...newPiece.outline.map(c => ({ type: c.type, values: [...c.values] }))];
+  const cmds = [...newPiece.outline.map(c => ({ ...c, values: [...c.values] }))];
   const cmd = cmds[segmentIndex];
 
   if (cmd.type === 'L') {
     if (keepSide === 'before') {
-      cmds[segmentIndex] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
+      cmds[segmentIndex] = { ...cmd, type: 'L', values: [trimPoint.x, trimPoint.y] };
     } else {
       // Move the previous endpoint to trimPoint
       if (segmentIndex === 1) {
-        cmds[0] = { type: 'M', values: [trimPoint.x, trimPoint.y] };
+        cmds[0] = { ...cmds[0], type: 'M', values: [trimPoint.x, trimPoint.y] };
       } else {
         const prev = cmds[segmentIndex - 1];
         if (prev.type === 'L') {
-          cmds[segmentIndex - 1] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
+          cmds[segmentIndex - 1] = { ...prev, type: 'L', values: [trimPoint.x, trimPoint.y] };
         }
       }
     }
   } else if (cmd.type === 'C') {
     // Simplified: for cubic bezier, replace with a line to/from the trim point
     if (keepSide === 'before') {
-      cmds[segmentIndex] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
+      cmds[segmentIndex] = { ...cmd, type: 'L', values: [trimPoint.x, trimPoint.y] };
     } else {
       if (segmentIndex === 1) {
-        cmds[0] = { type: 'M', values: [trimPoint.x, trimPoint.y] };
+        cmds[0] = { ...cmds[0], type: 'M', values: [trimPoint.x, trimPoint.y] };
       } else {
         // Adjust previous segment endpoint to trim point
         const prev = cmds[segmentIndex - 1];
         if (prev.type === 'L') {
-          cmds[segmentIndex - 1] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
+          cmds[segmentIndex - 1] = { ...prev, type: 'L', values: [trimPoint.x, trimPoint.y] };
         } else if (prev.type === 'C') {
           const v = [...prev.values];
           v[4] = trimPoint.x; v[5] = trimPoint.y;
-          cmds[segmentIndex - 1] = { type: 'C', values: v };
+          cmds[segmentIndex - 1] = { ...prev, type: 'C', values: v };
         }
       }
       // Replace curve with line from trim point to original end
-      cmds[segmentIndex] = { type: 'L', values: [cmd.values[4], cmd.values[5]] };
+      cmds[segmentIndex] = { ...cmd, type: 'L', values: [cmd.values[4], cmd.values[5]] };
     }
   }
 
@@ -772,7 +774,7 @@ function reflectCommands(commands: PathCommand[], p1: Point2D, p2: Point2D): Pat
         vals[i + 1] = reflected.y;
       }
     }
-    return { type: cmd.type, values: vals };
+    return { ...cmd, values: vals };
   });
 }
 
@@ -827,38 +829,51 @@ export function unfoldPiece(
 
   const keptCmds: PathCommand[] = [];
   for (let i = splitA + 1; i <= splitB; i++) {
-    keptCmds.push({ type: piece.outline[i].type, values: [...piece.outline[i].values] });
+    keptCmds.push({ ...piece.outline[i], values: [...piece.outline[i].values] });
   }
 
   const mirroredCmds = reflectCommands(keptCmds, foldStart, foldEnd);
 
   const startPt = outlinePoints.find(p => p.idx === splitA)!.pt;
-  const merged: PathCommand[] = [{ type: 'M', values: [startPt.x, startPt.y] }];
+  const startAuthored = piece.outline[splitA].authoredAnchor;
+  const merged: PathCommand[] = [{
+    ...(startAuthored ? { authoredAnchor: true } : {}),
+    type: 'M', values: [startPt.x, startPt.y],
+  }];
 
   for (const cmd of keptCmds) {
-    merged.push({ type: cmd.type === 'M' ? 'L' : cmd.type, values: [...cmd.values] });
+    merged.push({ ...cmd, type: cmd.type === 'M' ? 'L' : cmd.type, values: [...cmd.values] });
   }
 
   // Reverse mirrored half — collect (start, cmd) segments, walk in reverse
-  const mirrorSegs: { start: Point2D; cmd: PathCommand }[] = [];
-  let mirrorCursor = { x: mirroredCmds[0]?.values[0] ?? 0, y: mirroredCmds[0]?.values[1] ?? 0 };
+  const mirrorSegs: { start: Point2D; cmd: PathCommand; authoredAnchor?: true }[] = [];
+  // keptCmds begins with a segment, not M. Its first values may be a control
+  // point; the reverse must arrive at the actual reflected starting anchor.
+  let mirrorCursor = reflectPoint(startPt, foldStart, foldEnd);
+  let arrivalIntent = startAuthored;
   for (const cmd of mirroredCmds) {
     if (cmd.type === 'M') {
       mirrorCursor = { x: cmd.values[0], y: cmd.values[1] };
+      arrivalIntent = cmd.authoredAnchor;
       continue;
     }
     if (cmd.type === 'Z') continue;
-    mirrorSegs.push({ start: { ...mirrorCursor }, cmd });
+    mirrorSegs.push({ start: { ...mirrorCursor }, cmd, authoredAnchor: arrivalIntent });
     const ep = cmdEndpoint(cmd);
     if (ep) mirrorCursor = ep;
+    arrivalIntent = cmd.authoredAnchor;
   }
   for (let i = mirrorSegs.length - 1; i >= 0; i--) {
-    const { start, cmd } = mirrorSegs[i];
+    const { start, cmd, authoredAnchor } = mirrorSegs[i];
+    const intent = {
+      ...(authoredAnchor ? { authoredAnchor: true as const } : {}),
+      ...(cmd.manualBezier ? { manualBezier: true as const } : {}),
+    };
     if (cmd.type === 'L' || cmd.type === 'H' || cmd.type === 'V') {
-      merged.push({ type: 'L', values: [start.x, start.y] });
+      merged.push({ ...intent, type: 'L', values: [start.x, start.y] });
     } else if (cmd.type === 'C') {
       const [cx1, cy1, cx2, cy2] = cmd.values;
-      merged.push({ type: 'C', values: [cx2, cy2, cx1, cy1, start.x, start.y] });
+      merged.push({ ...intent, type: 'C', values: [cx2, cy2, cx1, cy1, start.x, start.y] });
     }
   }
 
@@ -866,7 +881,7 @@ export function unfoldPiece(
 
   const newInternals = piece.internals
     .filter(l => l.id !== foldLineId)
-    .map(l => ({ ...l, path: l.path.map(c => ({ type: c.type, values: [...c.values] })) }));
+    .map(l => ({ ...l, path: l.path.map(c => ({ ...c, values: [...c.values] })) }));
 
   if (!options?.outlineOnly) {
     const mirrored = piece.internals
@@ -912,8 +927,8 @@ function areCollinear(a: Point2D, b: Point2D, c: Point2D, eps = 0.1): boolean {
 }
 
 export function optimizeCurvePoints(commands: PathCommand[], ratio: number): PathCommand[] {
-  if (ratio >= 1.0) return commands.map(c => ({ type: c.type, values: [...c.values] }));
-  if (commands.length <= 2) return commands.map(c => ({ type: c.type, values: [...c.values] }));
+  if (ratio >= 1.0) return commands.map(c => ({ ...c, values: [...c.values] }));
+  if (commands.length <= 2) return commands.map(c => ({ ...c, values: [...c.values] }));
 
   const mCmd = commands[0];
   const hasZ = commands[commands.length - 1].type === 'Z';
@@ -922,19 +937,19 @@ export function optimizeCurvePoints(commands: PathCommand[], ratio: number): Pat
 
   if (hasCurves) {
     const samples = samplePathAtIntervals(commands, 0.5);
-    if (samples.length < 2) return commands.map(c => ({ type: c.type, values: [...c.values] }));
+    if (samples.length < 2) return commands.map(c => ({ ...c, values: [...c.values] }));
     const points = samples.map(s => s.point);
     const bbox = outlineBBox(commands);
     const diag = Math.hypot(bbox.maxX - bbox.minX, bbox.maxY - bbox.minY);
     const tolerance = (1 - ratio) * diag * 0.005;
     const simplified = rdpSimplify(points, tolerance);
-    if (simplified.length < 2) return commands.map(c => ({ type: c.type, values: [...c.values] }));
+    if (simplified.length < 2) return commands.map(c => ({ ...c, values: [...c.values] }));
     const fitted = fitCubicBezier(simplified, tolerance);
     if (hasZ) fitted.push({ type: 'Z', values: [] });
     return fitted;
   }
 
-  const result: PathCommand[] = [{ type: mCmd.type, values: [...mCmd.values] }];
+  const result: PathCommand[] = [{ ...mCmd, values: [...mCmd.values] }];
   let prevPt: Point2D = { x: mCmd.values[0], y: mCmd.values[1] };
   for (let i = 0; i < geoCmds.length; i++) {
     const cmd = geoCmds[i];
@@ -949,7 +964,7 @@ export function optimizeCurvePoints(commands: PathCommand[], ratio: number): Pat
         continue;
       }
     }
-    result.push({ type: cmd.type, values: [...cmd.values] });
+    result.push({ ...cmd, values: [...cmd.values] });
     prevPt = endPt;
   }
   if (hasZ) result.push({ type: 'Z', values: [] });
@@ -964,13 +979,13 @@ export function optimizePieceCurves(
   const target = options?.target ?? 'all';
   const newOutline = (target === 'all' || target === 'outline')
     ? optimizeCurvePoints(piece.outline, ratio)
-    : piece.outline.map(c => ({ type: c.type, values: [...c.values] }));
+    : piece.outline.map(c => ({ ...c, values: [...c.values] }));
   const newInternals = piece.internals.map(l => {
     const shouldOptimize = target === 'all' ||
       (typeof target === 'object' && 'internalLineId' in target && target.internalLineId === l.id);
     return {
       ...l,
-      path: shouldOptimize ? optimizeCurvePoints(l.path, ratio) : l.path.map(c => ({ type: c.type, values: [...c.values] })),
+      path: shouldOptimize ? optimizeCurvePoints(l.path, ratio) : l.path.map(c => ({ ...c, values: [...c.values] })),
     };
   });
   return { ...piece, id: piece.id, outline: newOutline, internals: newInternals, edges: undefined, updatedAt: Date.now() };
@@ -1023,7 +1038,7 @@ export function offsetInternalLine(
   const sign = options.reverse ? -1 : 1;
   const newInternals = piece.internals.map(l => ({
     ...l,
-    path: l.path.map(c => ({ type: c.type, values: [...c.values] })),
+    path: l.path.map(c => ({ ...c, values: [...c.values] })),
   }));
 
   const samples = samplePathAtIntervals(sourceLine.path, 0.5);
@@ -1118,12 +1133,13 @@ export function replaceAsPatternOutline(
   }
 
   const insertCmds = lineCmds.map(c => ({
+    ...c,
     type: c.type === 'M' ? 'L' : c.type,
     values: [...c.values],
   }));
 
-  const before = piece.outline.slice(0, rangeStart + 1).map(c => ({ type: c.type, values: [...c.values] }));
-  const after = piece.outline.slice(rangeEnd + 1).map(c => ({ type: c.type, values: [...c.values] }));
+  const before = piece.outline.slice(0, rangeStart + 1).map(c => ({ ...c, values: [...c.values] }));
+  const after = piece.outline.slice(rangeEnd + 1).map(c => ({ ...c, values: [...c.values] }));
 
   const newOutline = [...before, ...insertCmds, ...after];
   if (newOutline[newOutline.length - 1].type !== 'Z') {
@@ -1132,7 +1148,7 @@ export function replaceAsPatternOutline(
 
   const oldSegment: PathCommand[] = [
     { type: 'M', values: [outlineStartPt.x, outlineStartPt.y] },
-    ...piece.outline.slice(rangeStart + 1, rangeEnd + 1).map(c => ({ type: c.type, values: [...c.values] })),
+    ...piece.outline.slice(rangeStart + 1, rangeEnd + 1).map(c => ({ ...c, values: [...c.values] })),
   ];
 
   const refLine = {
@@ -1143,7 +1159,7 @@ export function replaceAsPatternOutline(
 
   const newInternals = piece.internals
     .filter(l => l.id !== internalLineId)
-    .map(l => ({ ...l, path: l.path.map(c => ({ type: c.type, values: [...c.values] })) }));
+    .map(l => ({ ...l, path: l.path.map(c => ({ ...c, values: [...c.values] })) }));
   newInternals.push(refLine);
 
   const result = {

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * Guards the View menu display toggles (spec 2026-06-04 display-toggles-resurface):
- * 2D — Reference Images / Line Lengths checkboxes + Render mode radio trio.
+ * 2D — Reference Images checkbox + Line Lengths and Render mode radio trios.
  * 3D — Garment / Seamlines / Internal Lines checkboxes (Task 2).
  *
  * Also guards submenu hover persistence: the flyout sits at
@@ -87,13 +87,26 @@ describe('LogoMenu ▸ View — 2D display toggles', () => {
     expect(store.getState().editor.showReferenceImages).toBe(!before);
   });
 
-  it('toggles Line Lengths', () => {
+  it('expone los tres modos de Largos como opciones excluyentes', () => {
     const store = renderMenu();
-    const before = store.getState().editor.showLineLengths;
     openViewMenu();
-    expect(isChecked('Largos de línea')).toBe(before);
-    fireEvent.click(screen.getByText('Largos de línea'));
-    expect(store.getState().editor.showLineLengths).toBe(!before);
+    fireEvent.mouseEnter(screen.getByText('Largos'));
+    expect(isChecked('Al crear')).toBe(true);
+    expect(isChecked('Todas')).toBe(false);
+    expect(isChecked('Ninguna')).toBe(false);
+
+    fireEvent.click(screen.getByText('Todas'));
+    expect(store.getState().editor.lineLengthMode).toBe('all');
+    expect(store.getState().editor.lineLengthModeSetByUser).toBe(true);
+
+    openViewMenu();
+    fireEvent.mouseEnter(screen.getByText('Largos'));
+    expect(isChecked('Al crear')).toBe(false);
+    expect(isChecked('Todas')).toBe(true);
+    expect(isChecked('Ninguna')).toBe(false);
+
+    fireEvent.click(screen.getByText('Ninguna'));
+    expect(store.getState().editor.lineLengthMode).toBe('none');
   });
 
   it('toggles Piquetes and reflects checked state', () => {

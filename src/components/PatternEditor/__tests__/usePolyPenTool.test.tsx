@@ -293,7 +293,23 @@ describe('usePolyPenTool — siguiente punto (Tab, placePolar)', () => {
     move(200, 150);
     act(() => { consumed = tool().handleKeyDown(key('Tab')); });
     expect(consumed).toBe(true);
-    expect(tool().nextPoint).toEqual({ from: { x: 150, y: 150 }, lengthMm: 50, angleDeg: 0 });
+    expect(tool().nextPoint).toEqual({ from: { x: 150, y: 150 }, lengthMm: 50, angleDeg: 0, reference: { kind: 'absolute', baseDeg: 0 } });
+  });
+
+  it('borde → congelado → colocación → tramo previo conservan un solo marco', () => {
+    const { tool, click, move } = setup();
+    click(300, 150);
+    move(250, 150);
+    act(() => tool().openNextPoint());
+    expect(tool().nextPoint?.reference).toEqual({ kind: 'border', baseDeg: 90 });
+    move(500, 500);
+    expect(tool().previewPoint).toEqual({ x: 250, y: 150 });
+    act(() => tool().placePolar(70, 180));
+    expect(tool().nextPoint).toBeNull();
+    move(230, 110);
+    act(() => tool().openNextPoint());
+    expect(tool().nextPoint?.reference?.kind).toBe('segment');
+    expect(Math.abs(tool().nextPoint!.reference!.baseDeg)).toBeCloseTo(180);
   });
 
   it('placePolar coloca un nodo del tipo latcheado: −90° es hacia abajo', () => {

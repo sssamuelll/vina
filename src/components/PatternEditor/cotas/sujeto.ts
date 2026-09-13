@@ -244,7 +244,8 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
       return {
         piece: null,
         caliente: false,
-        cotas: cotasDeTrazo(trazo, input.selectedTrazo.segmentIndex),
+        cotas: cotasDeTrazo(trazo, input.selectedTrazo.segmentIndex,
+          input.pieces.filter(p => !input.hiddenLayerIds.includes(p.layer ?? 1))),
         lectura: null,
         lecturaApagada: false,
         bordeLeido: null,

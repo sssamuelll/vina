@@ -1337,7 +1337,7 @@ export function offsetOutline(
   join: OffsetJoin = 'round',
 ): PathCommand[] | null {
   if (distance === 0) {
-    return outline.map((c) => ({ type: c.type, values: [...c.values] }));
+    return outline.map((c) => ({ ...c, values: [...c.values] }));
   }
 
   // buildOffsetEdges normalises the winding, so a positive distance is outward

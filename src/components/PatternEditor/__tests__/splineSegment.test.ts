@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { PathCommand, Point2D } from '../../../types/types';
 import {
   convertSegmentToSpline, isSplineManaged, resmoothAfterMove, splineRunAt, runAnchors,
+  toManualBezier,
 } from '../splineSegment';
 import { convertToCurve } from '../nodeEditorUtils';
 
@@ -131,6 +132,23 @@ describe('los datos son su propia marca', () => {
     expect(points[0]).toEqual({ x: 0, y: 200 });
     expect(points[4]).toEqual({ x: 300, y: 200 });
   });
+
+  it('la salida explícita marca cada C sin alterar una sola coordenada', () => {
+    const managed = convertSegmentToSpline(rect(), 1, 4);
+    const coordinates = managed.map(command => [...command.values]);
+    const manual = toManualBezier(managed, 2)!;
+
+    expect(manual.map(command => command.values)).toEqual(coordinates);
+    expect(manual.slice(1, 5).every(command => command.manualBezier === true)).toBe(true);
+    expect(isSplineManaged(manual, { start: 1, end: 4 })).toBe(false);
+  });
+
+  it('no convierte una recta ni una cadena que ya es Bézier libre', () => {
+    expect(toManualBezier(rect(), 1)).toBeNull();
+    const managed = convertSegmentToSpline(rect(), 1, 4);
+    const manual = toManualBezier(managed, 2)!;
+    expect(toManualBezier(manual, 2)).toBeNull();
+  });
 });
 
 describe('resmoothAfterMove', () => {
@@ -181,5 +199,13 @@ describe('resmoothAfterMove', () => {
     const out = resmoothAfterMove(before, after, 0);
     expect(out[1].values.slice(0, 4)).not.toEqual(after[1].values.slice(0, 4));
     expect(isSplineManaged(out, { start: 1, end: 4 })).toBe(true);
+  });
+
+  it('al reescribir handles conserva los metadatos del comando', () => {
+    const spline = convertSegmentToSpline(rect(), 1, 4);
+    spline[2] = { ...spline[2], authoredAnchor: true };
+    const [before, after] = moveAnchor(spline, 2, 0, 40);
+    const out = resmoothAfterMove(before, after, 2);
+    expect(out[2].authoredAnchor).toBe(true);
   });
 });

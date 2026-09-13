@@ -82,7 +82,7 @@ function translateCommands(
       if (i % 2 === 0) newValues[i] += dx;
       else newValues[i] += dy;
     }
-    return { type: cmd.type, values: newValues };
+    return { ...cmd, values: newValues };
   });
 }
 

@@ -37,7 +37,7 @@ import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { rotatePoint } from '../../utils/geometry/transform';
 import { reanchorNotches } from '../../utils/notchReanchor';
 import { piezaBloqueada } from '../../utils/piezaBloqueada';
-import { convertSegmentToSpline, resmoothAfterMove } from './splineSegment';
+import { convertSegmentToSpline, resmoothAfterMove, toManualBezier } from './splineSegment';
 import { showInfoToast } from '../../store/copilotUISlice';
 import {
   compensatePositionForPivotChange,
@@ -971,6 +971,15 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   );
 
   // ─── addPointOnSegment ───
+  const convertSegmentToBezier = useCallback(
+    (commandIndex: number, pieceId?: string) => {
+      const piece = getPiece(pieceId ?? state.editingPieceId);
+      if (!piece || guardLocked(piece)) return;
+      const outline = toManualBezier(piece.outline, commandIndex);
+      if (outline) dispatchAndRefresh(piece, outline);
+    },
+    [state.editingPieceId, getPiece, dispatchAndRefresh, guardLocked],
+  );
 
   /**
    * Punto sobre un lado, por la misma puerta que el doble clic (maria-203 /
@@ -1032,6 +1041,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     handleDoubleClick,
     convertSegment,
     convertSegmentToPoints,
+    convertSegmentToBezier,
     addPointOnSegment,
     moveNodeTo,
     limpiarHover,

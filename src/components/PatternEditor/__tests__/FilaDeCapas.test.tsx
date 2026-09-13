@@ -13,7 +13,6 @@ const interruptores = [
   ['Hilo', 'showGrainlines'],
   ['Piquetes', 'showNotches'],
   ['Costuras', 'showSewingLines'],
-  ['Largos', 'showLineLengths'],
   ['Construcción', 'showTrazos'],
 ] as const;
 
@@ -42,6 +41,24 @@ describe('FilaDeCapas', () => {
       expect(store.getState().editor[field]).toBe(!before);
       expect(button.getAttribute('aria-pressed')).toBe(String(!before));
     }
+  });
+
+  it('expone los tres modos de Largos y guarda una selección explícita', () => {
+    const store = configureStore({ reducer: { editor: editorReducer } });
+    render(<Provider store={store}><FilaDeCapas /></Provider>);
+
+    const select = screen.getByRole('combobox', { name: 'Largos' });
+    expect((select as HTMLSelectElement).value).toBe('creation');
+    expect(within(select).getAllByRole('option').map(option => option.textContent)).toEqual([
+      'Al crear', 'Todas', 'Ninguna',
+    ]);
+
+    fireEvent.change(select, { target: { value: 'all' } });
+    expect(store.getState().editor.lineLengthMode).toBe('all');
+    expect(store.getState().editor.lineLengthModeSetByUser).toBe(true);
+
+    fireEvent.change(select, { target: { value: 'none' } });
+    expect(store.getState().editor.lineLengthMode).toBe('none');
   });
 
   it('el sexto interruptor es «Construcción», nace encendido y apaga showTrazos', () => {

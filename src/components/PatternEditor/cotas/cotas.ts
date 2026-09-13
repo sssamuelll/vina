@@ -15,6 +15,8 @@ import type { TransformUpdate } from '../pieceResize';
 import { polarOf, polarPoint } from '../polyPenGeometry';
 import { edgeDistances, type EdgeDistance } from './edgeDistances';
 import { segmentPolar } from './segmentPolar';
+import { ABSOLUTE_REFERENCE, absoluteAngle, angleReferenceLabel, borderReference, referenceBefore, relativeAngle, type AngleReference } from '../angleReference';
+import { buildSnapIndex } from '../snapIndex';
 
 export type CotaUpdate =
   | ({ kind: 'piece' } & TransformUpdate)
@@ -69,6 +71,8 @@ export interface Cota {
   kind: 'ancho' | 'alto' | 'tramo-largo' | 'tramo-angulo' | 'borde' | 'margen';
   /** Nombre accesible, en español: "Ancho de la pieza". */
   label: string;
+  /** Visible beside the angle, including while editing the numeric field. */
+  referenceLabel?: string;
   valueMm: number;
   unit: 'mm' | 'deg';
   min: number;
@@ -273,8 +277,9 @@ function cotasDeTramos(opts: {
   aLocal: (p: Point2D) => Point2D;
   escribir: (path: PathCommand[]) => CotaUpdate | null;
   segmentIndex?: number;
+  firstReferenceAt?: (world: Point2D) => AngleReference;
 }): Cota[] {
-  const { path, idBase, centro, aPatron, aLocal, escribir, segmentIndex } = opts;
+  const { path, idBase, centro, aPatron, aLocal, escribir, segmentIndex, firstReferenceAt } = opts;
   const cotas: Cota[] = [];
   for (const segment of segmentPolar(path)) {
     // La selección precisa conserva el índice del comando de llegada: filtrar
@@ -284,9 +289,12 @@ function cotasDeTramos(opts: {
     const from = aPatron(segment.from);
     const to = aPatron(segment.to);
     const outward = normalHaciaFuera(from, to, centro);
-    // El ángulo que ve María es el de PATRÓN (pantalla), no el local: en una
-    // pieza girada ambos difieren por la rotación. El largo sí es invariante
-    // (girar no estira nada), así que ese sigue viniendo de segmentPolar.
+    // Dirección y referencia se llevan juntas a patrón antes de restarlas.
+    // Así el ángulo relativo y su escritura conservan el marco al girar la pieza.
+    const previous = referenceBefore(path, segment.toCommandIndex);
+    const reference = previous.kind === 'segment'
+      ? { ...previous, baseDeg: polarOf(from, aPatron(polarPoint(segment.from, 1, previous.baseDeg))).angleDeg }
+      : firstReferenceAt?.(from) ?? ABSOLUTE_REFERENCE;
     const anguloPatron = polarOf(from, to).angleDeg;
     const grupo = `${idBase}-tramo-${segment.toCommandIndex}`;
     cotas.push({
@@ -312,10 +320,11 @@ function cotasDeTramos(opts: {
       grupo,
       kind: 'tramo-angulo',
       label: 'Ángulo',
-      valueMm: anguloPatron,
+      referenceLabel: angleReferenceLabel(reference),
+      valueMm: relativeAngle(anguloPatron, reference),
       unit: 'deg',
-      min: -180,
-      max: 180,
+      min: -360,
+      max: 360,
       primary: true,
       a: from,
       b: to,
@@ -324,7 +333,7 @@ function cotasDeTramos(opts: {
         const nuevo = copiaConNodoFinal(
           path,
           segment.toCommandIndex,
-          aLocal(polarPoint(from, segment.lengthMm, deg)),
+          aLocal(polarPoint(from, segment.lengthMm, absoluteAngle(deg, reference))),
         );
         return nuevo ? escribir(nuevo) : null;
       },
@@ -334,7 +343,7 @@ function cotasDeTramos(opts: {
 }
 
 /** Las cotas de un tramo de trazo (spec 2026-09-12 § 5.3): el path ya está en patrón. */
-export function cotasDeTrazo(trazo: Trazo, segmentIndex: number): Cota[] {
+export function cotasDeTrazo(trazo: Trazo, segmentIndex: number, pieces: PatternPiece[] = []): Cota[] {
   const anclas = trazo.path.map(getAnchor).filter((a): a is Point2D => a !== null);
   if (anclas.length < 2) return [];
   const centro = {
@@ -342,12 +351,14 @@ export function cotasDeTrazo(trazo: Trazo, segmentIndex: number): Cota[] {
     y: anclas.reduce((s, a) => s + a.y, 0) / anclas.length,
   };
   const identidad = (p: Point2D) => p;
+  const index = buildSnapIndex(pieces);
   return cotasDeTramos({
     path: trazo.path,
     idBase: `trazo-${trazo.id}`,
     centro,
     aPatron: identidad,
     aLocal: identidad,
+    firstReferenceAt: (world) => borderReference(index, world),
     escribir: (path) => ({ kind: 'trazo', trazoId: trazo.id, path }),
     segmentIndex,
   });
@@ -366,12 +377,14 @@ export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine, seg
     ? bboxPivot(bbox)
     : pieceLocalToPattern({ x: 0, y: 0 }, piece);
   const idBase = `${piece.id}-${line.id}`;
+  const index = buildSnapIndex([piece]);
   const cotas = cotasDeTramos({
     path: line.path,
     idBase,
     centro,
     aPatron: (p) => pieceLocalToPattern(p, piece),
     aLocal: (p) => patternToPieceLocal(p, piece),
+    firstReferenceAt: (world) => borderReference(index, world, piece.id),
     escribir: (path) => ({ kind: 'internal', pieceId: piece.id, lineId: line.id, path }),
     segmentIndex,
   });

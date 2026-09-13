@@ -92,7 +92,34 @@ describe('usePenTool — siguiente punto, Retroceso y doble clic', () => {
     let consumed = false;
     act(() => { consumed = tool().handleKeyDown(key('Tab')); });
     expect(consumed).toBe(true);
-    expect(tool().nextPoint).toEqual({ from: { x: 100, y: 100 }, lengthMm: 50, angleDeg: 0 });
+    expect(tool().nextPoint).toEqual({ from: { x: 100, y: 100 }, lengthMm: 50, angleDeg: 0, reference: { kind: 'absolute', baseDeg: 0 } });
+  });
+
+  it('colocar el punto suelta el par; el siguiente Tab toma el tramo nuevo', () => {
+    const { tool, click, onComplete } = setup();
+    click(100, 100);
+    act(() => tool().handleMouseMove(clickAt(150, 100)));
+    act(() => tool().openNextPoint());
+    act(() => tool().placePolar(80, 90));
+    expect(tool().nextPoint).toBeNull();
+    act(() => tool().handleMouseMove(clickAt(150, 20)));
+    act(() => tool().openNextPoint());
+    expect(tool().nextPoint?.lengthMm).toBeCloseTo(50);
+    expect(tool().nextPoint?.reference).toEqual({ kind: 'segment', baseDeg: 90 });
+    act(() => tool().closeNextPoint());
+    act(() => tool().handleKeyDown(key('Escape')));
+    expect(onComplete.mock.calls[0][0].path[1].values[1]).toBeCloseTo(20);
+  });
+
+  it('el ratón no mueve la goma congelada ni el par que se está escribiendo', () => {
+    const { tool, click } = setup();
+    click(100, 100);
+    act(() => tool().handleMouseMove(clickAt(150, 100)));
+    act(() => tool().openNextPoint());
+    const guide = tool().guidePath;
+    act(() => tool().handleMouseMove(clickAt(800, 500)));
+    expect(tool().guidePath).toBe(guide);
+    expect(tool().nextPoint?.lengthMm).toBe(50);
   });
 
   it('placePolar coloca el nodo: 90° hacia arriba, 0° a la derecha, encadenados', () => {
