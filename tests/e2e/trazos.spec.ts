@@ -111,19 +111,13 @@ test.describe('trazos — líneas de construcción', () => {
     await expect(page.locator('input.cota--editando[aria-label="Largo"]')).toBeVisible({ timeout: 5000 });
     await page.keyboard.press('Control+a'); await page.keyboard.type('100');
     await page.keyboard.press('Enter');
-    // Colocar re-ancla el par al nodo nuevo y REABRE el chip de Largo para
-    // encadenar (cotas vivas § 5.4): de ahí los tres peldaños de Escape.
-    await expect(page.locator('input.cota--editando[aria-label="Largo"]')).toBeVisible({ timeout: 5000 });
-
-    await page.keyboard.press('Escape'); // 1.º: cierra la edición del chip
-    await expect(page.locator('.cotas button.cota[aria-label^="Largo:"]')).toHaveCount(1);
-    await page.keyboard.press('Escape'); // 2.º: suelta el tramo congelado
+    // Enter coloca una sola vez y desmonta el borrador. El trazo sigue activo,
+    // pero ya no queda ningún peldaño numérico antes de terminarlo.
+    await expect(page.locator('input.cota--editando[aria-label="Largo"]')).toHaveCount(0);
+    await expect(page.locator('input.cota--editando[aria-label="Ángulo"]')).toHaveCount(0);
     await expect(page.locator('.cotas button.cota[aria-label^="Largo:"]')).toHaveCount(0);
-    // Que el 3.er peldaño sea EL que termina el trazo: si los dos primeros ya lo
-    // hubieran terminado, el conteo final daría 1 igual y el test pasaría por la
-    // razón equivocada.
     await expect.poll(() => cuantosTrazos(page), { timeout: 5000 }).toBe(0);
-    await page.keyboard.press('Escape'); // 3.º: termina el trazo
+    await page.keyboard.press('Escape'); // un solo Esc termina el trazo
     await expect.poll(() => cuantosTrazos(page), { timeout: 5000 }).toBe(1);
 
     const e = await estado(page);

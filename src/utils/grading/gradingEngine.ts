@@ -102,7 +102,7 @@ export function scaleOutline(
         newValues[i] = scalePoint(newValues[i], c, scaleFactor);
       }
     }
-    return { type: cmd.type, values: newValues };
+    return { ...cmd, values: newValues };
   });
 }
 
@@ -267,7 +267,7 @@ export function gradePieceByRules(
   });
 
   // Write each shift back onto the nearest outline vertex.
-  const outline: PathCommand[] = piece.outline.map((cmd) => ({ type: cmd.type, values: [...cmd.values] }));
+  const outline: PathCommand[] = piece.outline.map((cmd) => ({ ...cmd, values: [...cmd.values] }));
   for (let i = 0; i < resolved.length; i++) {
     const from = resolved[i].point;
     const dx = shifted[i].x - from.x;

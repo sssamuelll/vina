@@ -1,5 +1,7 @@
 # Contexto de pieza y control numérico — el contrato que faltaba
 
+> **Enmienda 2026-09-13:** [implementación integrada de las seis firmas](../../reports/2026-09-13-seis-firmas-maria.md). Se ejecuta la salida al ratón de §3.3; la pareja acepta navegación por clic y Tab sin perder medidas. El ángulo relativo usa un único helper. Los estados históricos de implementación del cuerpo se conservan como antecedente.
+
 **Origen:** reunión María + Samuel del 2026-09-07 ([informe](../../reports/2026-09-07-reunion-maria.md)), causas A, B, D, E y G. Y la junta del 2026-09-08 ([acta](../../reports/2026-09-07-junta-consejo.md)), donde Serrano marcó dos BLOCKER de especificación y Haft entregó la gramática.
 
 **Qué cierra este documento:** los dos huecos que impedían implementar lo que Samuel prometió de palabra en la reunión. No es un rediseño: es escribir el contrato que ya se debía.

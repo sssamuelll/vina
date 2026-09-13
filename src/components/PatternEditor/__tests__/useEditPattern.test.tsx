@@ -116,7 +116,7 @@ describe('splitSegmentAt on the closing (Z) edge', () => {
   it('inserts an L before the Z at the interpolated point', () => {
     const out = splitSegmentAt(square, 4, 0.5);
     expect(out).toHaveLength(6);
-    expect(out[4]).toEqual({ type: 'L', values: [0, 100] });
+    expect(out[4]).toEqual({ type: 'L', values: [0, 100], authoredAnchor: true });
     expect(out[5].type).toBe('Z');
   });
 });

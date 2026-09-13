@@ -86,10 +86,22 @@ const point2DSchema = z.object({ x: finiteNumber, y: finiteNumber });
 
 const pathCommandTypes = ['M', 'L', 'H', 'V', 'C', 'S', 'Q', 'T', 'A', 'Z'] as const;
 
-const pathCommandSchema = z.object({
-  type: z.enum(pathCommandTypes),
-  values: z.array(finiteNumber).max(MAX_PATH_VALUES),
-});
+// Cualquier valor que no sea exactamente `true` se LIMPIA a `undefined` en
+// vez de tumbar el proyecto entero — un `authoredAnchor: false` escrito por
+// un plugin viejo no puede volver `parseVinaProject` inservible al arranque.
+const cleanTrueFlag = z.preprocess(
+  (v) => (v === true ? true : undefined),
+  z.literal(true).optional(),
+);
+
+const pathCommandSchema = z
+  .object({
+    type: z.enum(pathCommandTypes),
+    values: z.array(finiteNumber).max(MAX_PATH_VALUES),
+    authoredAnchor: cleanTrueFlag,
+    manualBezier: cleanTrueFlag,
+  })
+  .loose();
 
 // ─── Internal lines ──────────────────────────────────────────────────────────
 // Record<InternalLineType, true> keeps this enum in COMPILE-TIME lockstep with

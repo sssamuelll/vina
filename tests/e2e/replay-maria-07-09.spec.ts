@@ -43,6 +43,31 @@ const caja = (p: PatternPiece) => {
   return { x: p.position.x + Math.min(...xs), y: p.position.y + Math.min(...ys),
     w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
 };
+function interiorDeTramoLineal(p: PatternPiece): Punto {
+  let desde: Punto | null = null;
+  for (const comando of p.outline) {
+    if (comando.type === 'M') {
+      desde = { x: comando.values[0], y: comando.values[1] };
+      continue;
+    }
+    if (comando.type === 'L' && desde) {
+      const hasta = { x: comando.values[0], y: comando.values[1] };
+      // Lejos tanto de las anclas como del manejador central del segmento.
+      const t = 0.37;
+      return {
+        x: p.position.x + desde.x + (hasta.x - desde.x) * t,
+        y: p.position.y + desde.y + (hasta.y - desde.y) * t,
+      };
+    }
+    if ('values' in comando && comando.values.length >= 2) {
+      desde = {
+        x: comando.values[comando.values.length - 2],
+        y: comando.values[comando.values.length - 1],
+      };
+    }
+  }
+  throw new NoMontable('La pieza no tiene un tramo lineal editable');
+}
 async function pieza(page: Page, id: string | undefined) {
   const p = (await st(page)).project.pieces.find(p => p.id === id);
   if (!p) throw new NoMontable(`No existe la pieza previa ${id ?? '(no creada)'}`);
@@ -60,7 +85,48 @@ async function pantalla(page: Page, p: Punto) {
   expect(s.y).toBeLessThan(box.y + box.height);
   return s;
 }
+async function encuadrar(page: Page, puntos: Punto[]) {
+  const box = await page.locator('svg.pattern-svg').boundingBox();
+  if (!box) throw new NoMontable('No hay lienzo 2D');
+  const { editor } = await st(page);
+  const xs = puntos.map(p => box.x + editor.pan2D.x + p.x * editor.zoom2D);
+  const ys = puntos.map(p => box.y + editor.pan2D.y + p.y * editor.zoom2D);
+  const margen = 70;
+  if (
+    Math.min(...xs) >= box.x + margen && Math.max(...xs) <= box.x + box.width - margen
+    && Math.min(...ys) >= box.y + margen && Math.max(...ys) <= box.y + box.height - margen
+  ) return;
+
+  expect(Math.max(...xs) - Math.min(...xs), 'los puntos deben caber juntos en el lienzo 2D')
+    .toBeLessThan(box.width - margen * 2);
+  expect(Math.max(...ys) - Math.min(...ys), 'los puntos deben caber juntos en el lienzo 2D')
+    .toBeLessThan(box.height - margen * 2);
+
+  let faltaX = box.x + box.width / 2 - (Math.min(...xs) + Math.max(...xs)) / 2;
+  let faltaY = box.y + box.height / 2 - (Math.min(...ys) + Math.max(...ys)) / 2;
+  const objetivo = { x: editor.pan2D.x + faltaX, y: editor.pan2D.y + faltaY };
+  const maxX = box.width - margen * 2;
+  const maxY = box.height - margen * 2;
+  while (Math.abs(faltaX) > 0.5 || Math.abs(faltaY) > 0.5) {
+    const dx = Math.max(-maxX, Math.min(maxX, faltaX));
+    const dy = Math.max(-maxY, Math.min(maxY, faltaY));
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx - dx / 2, cy - dy / 2);
+    await page.mouse.down({ button: 'middle' });
+    await page.mouse.move(cx + dx / 2, cy + dy / 2, { steps: 8 });
+    await page.mouse.up({ button: 'middle' });
+    faltaX -= dx;
+    faltaY -= dy;
+  }
+  await expect.poll(async () => {
+    const actual = (await st(page)).editor.pan2D;
+    return Math.hypot(actual.x - objetivo.x, actual.y - objetivo.y);
+  }).toBeLessThan(2);
+  for (const punto of puntos) await pantalla(page, punto);
+}
 async function clic(page: Page, p: Punto, button: 'left' | 'right' = 'left', offset: Punto = { x: 0, y: 0 }) {
+  await encuadrar(page, [p]);
   const s = await pantalla(page, p);
   await page.mouse.move(s.x + offset.x, s.y + offset.y);
   await page.mouse.click(s.x + offset.x, s.y + offset.y, { button });
@@ -91,7 +157,7 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
   let segunda: string | undefined;
   let grande: string | undefined;
   let piezasAntesDeVaciar: PatternPiece[] = [];
-  let largosDeFabrica = false;
+  let modoLargosDeFabrica: RootState['editor']['lineLengthMode'] = 'none';
   const requisitos = new Map<number, Array<[string, string]>>();
   const requiere = (paso: number, ...pares: Array<[string, string]>) => requisitos.set(paso, pares);
 
@@ -133,7 +199,7 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
     await page.waitForFunction(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__));
     await expect(page.getByRole('button', { name: 'Split', exact: true })).toBeVisible();
     expect((await st(page)).project.pieces).toHaveLength(0);
-    largosDeFabrica = (await st(page)).editor.showLineLengths;
+    modoLargosDeFabrica = (await st(page)).editor.lineLengthMode;
 
     await tramo(1, '[00:34] Un clic crea 100×100', async r => {
       await activar(page, 's', 'rectangle');
@@ -177,8 +243,11 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
 
     await tramo(4, '[01:49] Arrastre grande, clic 100×100 y barra intacta', async r => {
       const opciones = (await st(page)).tools.toolOptions.rectangle;
-      const a = await pantalla(page, { x: 180, y: 420 });
-      const b = await pantalla(page, { x: 500, y: 640 });
+      const inicio = { x: 180, y: 420 };
+      const fin = { x: 500, y: 640 };
+      await encuadrar(page, [inicio, fin, { x: 600, y: 440 }]);
+      const a = await pantalla(page, inicio);
+      const b = await pantalla(page, fin);
       await page.mouse.move(a.x, a.y);
       await page.mouse.down();
       await page.mouse.move(b.x, b.y, { steps: 12 });
@@ -202,10 +271,18 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
     await tramo(5, '[06:30] Editar, convertir por clic derecho y moldear', async r => {
       const p = await pieza(page, primera);
       const b = caja(p);
+      const tramoLineal = interiorDeTramoLineal(p);
       await activar(page, 'q', 'editPattern');
       await clic(page, { x: b.x + b.w / 2, y: b.y + b.h / 2 });
-      await clic(page, { x: b.x + b.w / 2, y: b.y }, 'right');
+      await clic(page, tramoLineal, 'right');
       await page.getByText('Convertir en curva', { exact: true }).click();
+      const convertida = await pieza(page, primera);
+      const curva = convertida.outline.find(comando => comando.type === 'C');
+      if (!curva) throw new NoMontable('La conversión no dejó un segmento C');
+      await clic(page, {
+        x: convertida.position.x + curva.values[curva.values.length - 2],
+        y: convertida.position.y + curva.values[curva.values.length - 1],
+      });
       await expect(page.locator('.node-editor__control-handle')).toHaveCount(2);
       const antes = await pieza(page, primera);
       expect(antes.outline.some(c => c.type === 'C')).toBe(true);
@@ -262,6 +339,10 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
         'cambiar de herramienta no puede dejar un editor de nodos vivo detrás').toBe(0);
       const b = caja(await pieza(page, primera));
       await activar(page, 's', 'rectangle');
+      await encuadrar(page, [
+        { x: b.x - 45, y: b.y + b.h },
+        { x: b.x + 45, y: b.y + b.h },
+      ]);
       const cursores: Array<{ svg: string; bajoElRaton: string }> = [];
       for (const dx of [45, 20, 5, 0, -5, 0, 5, 20, 45]) {
         const s = await pantalla(page, { x: b.x + dx, y: b.y + b.h });
@@ -335,14 +416,11 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
       } else {
         r.observaciones.puente = 'El paso 10 no vació el proyecto; se comprueban los largos sobre el estado que quedó';
       }
-      // ENMENDADO el 2026-09-09 (contrato `2026-09-09-lo-que-se-ve-y-cuando`
-      // § 1). Este paso exigía el interruptor encendido de fábrica y los
-      // rótulos SVG sobre TODAS las piezas. El fallo 4 nunca fue el
-      // interruptor: fue que ella no los veía. Ahora los enseña la SELECCIÓN,
-      // que es lo que pidió — [06:55] "CUANDO CLICO ESTO" — y sin dejarlos
-      // encima del patrón todo el rato.
-      expect(largosDeFabrica, 'el interruptor vuelve a nacer apagado; quien los enseña es la selección').toBe(false);
-      expect((await st(page)).editor.showLineLengths).toBe(false);
+      // ENMENDADO por la firma de María del 13-09: «Largos» es un interruptor
+      // apagado de fábrica, sin vínculo con crear ni con seleccionar. Encendido
+      // enseña los rótulos de cada pieza del proyecto.
+      expect(modoLargosDeFabrica, 'Largos nace apagado').toBe('none');
+      expect((await st(page)).editor.lineLengthMode).toBe('none');
       await pieza(page, segunda);
 
       await activar(page, 'z', 'select');
@@ -351,11 +429,28 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
       await expect.poll(async () => (await st(page)).editor.selectedPieceIds).toEqual([segunda]);
 
       const largos = page.locator('.cota--lectura');
-      await expect(largos, 'clicar la pieza enseña el largo de sus lados').not.toHaveCount(0);
+      await expect(largos, 'seleccionar una pieza no enciende sus largos').toHaveCount(0);
+      const interruptorLargos = page.getByRole('button', { name: 'Largos', exact: true });
+      await expect(interruptorLargos).toHaveAttribute('aria-pressed', 'false');
+      await interruptorLargos.click();
+      await expect(largos, 'encendido enseña el largo de los lados').not.toHaveCount(0);
       r.observaciones.largos = await largos.allTextContents();
-      expect((r.observaciones.largos as string[]).every(t => /100/.test(t)),
-        'la pieza de 100×100 los enseña todos a 100').toBe(true);
-      await expect(page.getByRole('button', { name: /Largos/ })).toBeVisible();
+      const numerosTodos = (r.observaciones.largos as string[])
+        .map(t => Number.parseFloat(t.replace(/\s*mm/i, '').replace(',', '.')));
+      const estadoConTodas = await st(page);
+      const otraCuadrada = estadoConTodas.project.pieces.find(p =>
+        p.id !== primera && p.id !== segunda && p.id !== grande);
+      expect(caja(await pieza(page, segunda)), 'la segunda pieza conserva su geometría exacta')
+        .toMatchObject({ w: 100, h: 100 });
+      expect(otraCuadrada && caja(otraCuadrada), 'la cuarta pieza conserva su geometría exacta')
+        .toMatchObject({ w: 100, h: 100 });
+      expect(numerosTodos.some(n => Math.abs(n - 100) < 1),
+        'Todas muestra visualmente los lados de 100 mm').toBe(true);
+      expect(numerosTodos.some(n => Math.abs(n - 300) < 1) && numerosTodos.some(n => Math.abs(n - 150) < 1),
+        'Todas muestra visualmente los lados vivos 300 y 150 de la pieza editada').toBe(true);
+      expect(numerosTodos.some(n => Math.abs(n - 320) < 1) && numerosTodos.some(n => Math.abs(n - 220) < 1),
+        'Todas incluye también la pieza grande de 320×220').toBe(true);
+      await expect(interruptorLargos).toHaveAttribute('aria-pressed', 'true');
 
       // Y sobre la pieza EDITADA en el paso 2, el largo tiene que ser el del
       // contorno vivo (300×150), no el dato guardado que decía 100. Es el bug
@@ -368,11 +463,36 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
       await expect.poll(async () => (await st(page)).editor.selectedPieceIds).toEqual([primera]);
       const rotulosEditada = await page.locator('.cota--lectura').allTextContents();
       r.observaciones.largosPiezaEditada = rotulosEditada;
-      const numeros = rotulosEditada.map(t => Number.parseFloat(t.replace(/\s*mm/i, '').replace(',', '.')));
-      expect(numeros.some(n => Math.abs(n - 300) < 1) || numeros.some(n => Math.abs(n - 150) < 1),
-        'el contorno manda: la pieza llevada a 300×150 no puede rotular 100').toBe(true);
-      expect(numeros.every(n => Math.abs(n - 100) > 1),
-        'ningún rótulo puede seguir diciendo el largo viejo de 100').toBe(true);
+      // El oráculo negativo del dato guardado, por pieza y no por pantalla
+      // (revisión 13-09, M15): con el interruptor encendido hay otras piezas de
+      // 100×100 a la vista, así que se filtran los rótulos por la caja de la
+      // pieza editada y ninguno de ESOS puede seguir diciendo 100.
+      const cajaEditada = await page.locator(`[data-piece-id="${primera}"].pattern-piece`).boundingBox();
+      expect(cajaEditada, 'la pieza editada tiene caja en pantalla').not.toBeNull();
+      const rotulosDentro: string[] = [];
+      for (const rotulo of await page.locator('.cota--lectura').all()) {
+        const c = await rotulo.boundingBox();
+        if (!c || !cajaEditada) continue;
+        const cx = c.x + c.width / 2;
+        const cy = c.y + c.height / 2;
+        if (cx >= cajaEditada.x - 40 && cx <= cajaEditada.x + cajaEditada.width + 40
+          && cy >= cajaEditada.y - 40 && cy <= cajaEditada.y + cajaEditada.height + 40) {
+          rotulosDentro.push(await rotulo.innerText());
+        }
+      }
+      r.observaciones.largosDentroDeLaEditada = rotulosDentro;
+      const numerosDentro = rotulosDentro.map(t => Number.parseFloat(t.replace(/\s*mm/i, '').replace(',', '.')));
+      expect(numerosDentro.length, 'la pieza editada tiene rótulos propios').toBeGreaterThan(0);
+      expect(numerosDentro.every(n => Math.abs(n - 100) > 1),
+        'ningún rótulo de la pieza editada puede seguir diciendo el largo viejo de 100').toBe(true);
+      await expect(page.getByRole('button', { name: /^Ancho de la pieza:/ }),
+        'el chip editable toma el ancho vivo, no el dato viejo').toHaveText('300 mm');
+      // El paso 5 subió un asa 45 mm: los extremos siguen delimitando 300×150,
+      // pero el bbox vivo (y por tanto su chip Alto) crece de 150 a 195.
+      await expect(page.getByRole('button', { name: /^Alto de la pieza:/ }),
+        'el chip editable toma el alto vivo tras moldear, no el dato viejo').toHaveText('195 mm');
+      expect(caja(await pieza(page, primera)), 'el bbox real incorpora los 45 mm del asa')
+        .toMatchObject({ w: 300, h: 195 });
     });
 
     await tramo(12, '[23:32] Una interna de tres tramos: solo uno y una cota', async r => {

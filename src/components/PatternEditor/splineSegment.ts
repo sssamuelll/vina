@@ -11,19 +11,14 @@ import { getAnchor, getClosingAnchor } from './nodeEditorUtils';
  * comandos `C` — Catmull-Rom → bezier es conversión exacta — así que el render,
  * los exportadores y el motor de margen de costura no cambian nada.
  *
- * ── Por qué no hay bandera en el esquema ──────────────────────────────────
+ * La pertenencia gestionada se reconoce por coincidencia de los manejadores
+ * con la predicción de Catmull-Rom desde las anclas. Al moverlas se recalculan
+ * para conservar esa relación; los proyectos anteriores usan el mismo criterio.
  *
- * Para re-suavizar al arrastrar hay que saber qué `C` pertenece a una curva
- * por puntos y cuál es un bezier que alguien afinó a mano. Guardar esa marca
- * sería un cambio de esquema, y los índices se desplazan al insertar o borrar
- * puntos — el mismo problema que `notchAnchor` tuvo que resolver de forma
- * paramétrica.
- *
- * No hace falta: **los datos son su propia marca**. Un tramo está gestionado
- * si sus manejadores COINCIDEN con lo que Catmull-Rom predice desde sus
- * vecinos. Recién creado coinciden por construcción; al arrastrar recalculamos
- * y vuelven a coincidir; un bezier movido a mano deja de coincidir y no se
- * toca nunca más. Sin migración, sin versión, sin estado que se desincronice.
+ * D5 añade `manualBezier` en cada C cuando el usuario elige Bézier libre,
+ * incluyendo «Convertir en curva». Esa intención prevalece sobre la coincidencia:
+ * un Bézier recto de dos anclas tiene los mismos controles que Catmull-Rom.
+ * La marca viaja con el comando, sin depender de índices persistidos.
  */
 
 /**
@@ -85,13 +80,20 @@ function withHandles(outline: PathCommand[], run: SplineRun, points: Point2D[]):
   for (let k = 0; k < handles.length; k++) {
     const [cp1, cp2] = handles[k];
     const anchor = points[k + 1];
-    cmds[run.start + k] = { type: 'C', values: [cp1.x, cp1.y, cp2.x, cp2.y, anchor.x, anchor.y] };
+    cmds[run.start + k] = {
+      ...cmds[run.start + k],
+      type: 'C',
+      values: [cp1.x, cp1.y, cp2.x, cp2.y, anchor.x, anchor.y],
+    };
   }
   return cmds;
 }
 
 /** ¿Los manejadores de este tramo son los que Catmull-Rom predice? */
 export function isSplineManaged(outline: PathCommand[], run: SplineRun): boolean {
+  for (let index = run.start; index <= run.end; index++) {
+    if (outline[index]?.manualBezier === true) return false;
+  }
   const points = runAnchors(outline, run);
   if (!points) return false;
   const handles = chainHandles(points, false);
@@ -106,6 +108,24 @@ export function isSplineManaged(outline: PathCommand[], run: SplineRun): boolean
     ) return false;
   }
   return true;
+}
+
+/**
+ * Cede una cadena gestionada al editor Bézier sin mover su geometría.
+ * La marca vive en cada C para sobrevivir inserciones y cambios de índices.
+ */
+export function toManualBezier(
+  outline: PathCommand[],
+  commandIndex: number,
+): PathCommand[] | null {
+  const run = splineRunAt(outline, commandIndex);
+  if (!run || !isSplineManaged(outline, run)) return null;
+
+  return outline.map((command, index) => ({
+    ...command,
+    values: [...command.values],
+    ...(index >= run.start && index <= run.end ? { manualBezier: true as const } : {}),
+  }));
 }
 
 /**

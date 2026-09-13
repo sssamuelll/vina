@@ -68,6 +68,18 @@ describe('CotasLayer — lectura', () => {
     expect((container.querySelector('.cota--lectura') as HTMLElement).hasAttribute('data-lado')).toBe(false);
   });
 
+  it('pinta la referencia del ángulo: se mide con ella (separarChips) y hay que pintarla con ella también', () => {
+    const { container } = render(
+      <CotasLayer
+        cotas={[]}
+        lectura={margen({ unit: 'deg', valueMm: 90, referenceLabel: 'al borde' })}
+        pan2D={{ x: 0, y: 0 }} zoom2D={1} {...noop}
+      />,
+    );
+    const lectura = container.querySelector('.cota--lectura') as HTMLElement;
+    expect(lectura.textContent).toBe('90° al borde');
+  });
+
   it('sin lectura no pinta nada extra', () => {
     const { container } = render(<CotasLayer cotas={[]} lectura={null} pan2D={{ x: 0, y: 0 }} zoom2D={1} {...noop} />);
     expect(container.querySelector('.cota--lectura')).toBeNull();

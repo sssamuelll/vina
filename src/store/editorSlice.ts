@@ -25,8 +25,8 @@ const initialState: EditorState = {
   showNotches: true,
   showAnchorPoints: false,
   showPieceNames: false,
-  // La selección muestra sus largos; «Largos» los extiende a todas las piezas.
-  showLineLengths: false,
+  lineLengthMode: 'none',
+  lineLengthModeSetByUser: false,
   showTrazos: true,
   showSewingLines: true,
   renderMode2D: 'textured' as const,
@@ -214,8 +214,12 @@ const editorSlice = createSlice({
     togglePieceNames(state) {
       state.showPieceNames = !state.showPieceNames;
     },
-    toggleLineLengths(state) {
-      state.showLineLengths = !state.showLineLengths;
+    setLineLengthMode(state, action: PayloadAction<EditorState['lineLengthMode']>) {
+      state.lineLengthMode = action.payload;
+      state.lineLengthModeSetByUser = true;
+    },
+    hydrateLineLengthMode(state, action: PayloadAction<EditorState['lineLengthMode']>) {
+      if (!state.lineLengthModeSetByUser) state.lineLengthMode = action.payload;
     },
     toggleTrazos(state) {
       state.showTrazos = !state.showTrazos;
@@ -282,7 +286,12 @@ const editorSlice = createSlice({
   extraReducers: (builder) => {
     // Reset the editor on a new project, but keep fitViewToken monotonic so a
     // DXF imported right after File ▸ New still triggers a fresh fit-to-content.
-    builder.addCase(NEW_PROJECT, (state) => ({ ...initialState, fitViewToken: state.fitViewToken }));
+    builder.addCase(NEW_PROJECT, (state) => ({
+      ...initialState,
+      fitViewToken: state.fitViewToken,
+      lineLengthMode: state.lineLengthMode,
+      lineLengthModeSetByUser: state.lineLengthModeSetByUser,
+    }));
     builder.addCase(removeReferenceImage, (state, action) => {
       if (state.selectedReferenceImageId === action.payload) {
         state.selectedReferenceImageId = null;
@@ -307,7 +316,7 @@ export const {
   selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectAllVisiblePieces, selectSeam, selectPOM, selectInternalLine, selectTrazo, selectSaEdges, selectSaVertices, clearSaSelection,
   setZoom2D, setPan2D, requestFitView,
   toggleSeamAllowance, setDefaultSAWidth, setNotchMirrorInvert, toggleGrainlines, toggleNotches, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
-  togglePieceNames, toggleLineLengths, toggleTrazos, toggleSewingLines, setRenderMode2D,
+  togglePieceNames, setLineLengthMode, hydrateLineLengthMode, toggleTrazos, toggleSewingLines, setRenderMode2D,
   toggleReferenceImages, setShowReferenceImages, setSelectedReferenceImage,
   startCalibration, setCalibrationPoint1, cancelCalibration,
   setUnits,

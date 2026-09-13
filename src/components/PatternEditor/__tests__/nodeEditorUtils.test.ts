@@ -243,6 +243,11 @@ describe('nearestSegment', () => {
 // ─── splitSegmentAt ───
 
 describe('splitSegmentAt', () => {
+  it('marks a user-inserted straight anchor', () => {
+    const result = splitSegmentAt(makeSquarePiece().outline, 1, 0.5);
+    expect(result[1].authoredAnchor).toBe(true);
+  });
+
   it('splits L segment into two L commands', () => {
     const outline = makeSquarePiece().outline;
     // Split the first L segment (index 1: from (0,0) to (100,0)) at midpoint
@@ -345,6 +350,15 @@ describe('deletePoint', () => {
     const result = deletePoint(outline, 2);
     expect(result[result.length - 1].type).toBe('Z');
   });
+
+  // M6 (revisión adversarial #1166): promover a M era un literal sin
+  // spread — la marca del comando promovido se perdía en silencio.
+  it('conserva authoredAnchor del comando promovido a M', () => {
+    const outline = makeSquarePiece().outline;
+    outline[1] = { ...outline[1], authoredAnchor: true };
+    const result = deletePoint(outline, 0);
+    expect(result[0]).toEqual({ type: 'M', values: [100, 0], authoredAnchor: true });
+  });
 });
 
 // ─── convertToCurve ───
@@ -403,6 +417,21 @@ describe('convertToCurve', () => {
     const result = convertToCurve(outline, 1);
     expect(result[1]).toEqual(outline[1]);
   });
+
+  // M4 (revisión adversarial #1166): el ancla no se mueve (mismo x,y) —
+  // conserva authoredAnchor del comando que sustituye.
+  it('conserva authoredAnchor del ancla que no se mueve', () => {
+    const outline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0], authoredAnchor: true },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ];
+    const result = convertToCurve(outline, 1);
+    expect(result[1].type).toBe('C');
+    expect(result[1].authoredAnchor).toBe(true);
+  });
 });
 
 // ─── convertToLine ───
@@ -432,6 +461,19 @@ describe('convertToLine', () => {
     // Index 1 is already an L — should be unchanged
     const result = convertToLine(outline, 1);
     expect(result[1]).toEqual(outline[1]);
+  });
+
+  // M4 companion: la vuelta a recta también conserva el ancla que no se
+  // mueve (mismo contrato que convertToCurve, dirección inversa).
+  it('conserva authoredAnchor del ancla que no se mueve', () => {
+    const outline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [33, -20, 66, -20, 100, 0], authoredAnchor: true },
+      { type: 'L', values: [100, 100] },
+      { type: 'Z', values: [] },
+    ];
+    const result = convertToLine(outline, 1);
+    expect(result[1]).toEqual({ type: 'L', values: [100, 0], authoredAnchor: true });
   });
 });
 

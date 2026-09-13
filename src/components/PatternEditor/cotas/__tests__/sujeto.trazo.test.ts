@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { cotasDelSujeto } from '../sujeto';
 import type { PathCommand, PatternPiece, Trazo } from '../../../../types/types';
+import * as snapIndexModule from '../../snapIndex';
 
 /**
  * El tramo de trazo seleccionado es un sujeto más (spec 2026-09-12 § 5.3):
@@ -27,6 +28,8 @@ const base = {
 const defaultRect = { width: 300, height: 150 };
 
 describe('cotasDelSujeto con un trazo seleccionado', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it('con un tramo de trazo seleccionado, el sujeto son sus dos cotas y la tira lo dice', () => {
     const s = cotasDelSujeto({ ...base, activeTool: 'select', trazos: [trazo], selectedTrazo: { trazoId: 't', segmentIndex: 2 } }, defaultRect);
     expect(s.piece).toBeNull();
@@ -37,5 +40,24 @@ describe('cotasDelSujeto con un trazo seleccionado', () => {
   it('arrastrando, o con la construcción oculta, no hay sujeto de trazo', () => {
     expect(cotasDelSujeto({ ...base, trazos: [trazo], selectedTrazo: { trazoId: 't', segmentIndex: 2 }, isDragging: true }, defaultRect).cotas).toEqual([]);
     expect(cotasDelSujeto({ ...base, trazos: [], selectedTrazo: { trazoId: 't', segmentIndex: 2 } }, defaultRect).cotas).toEqual([]);
+  });
+
+  // `cotasDeTrazo` cachea su índice de enganche por identidad del array de
+  // piezas que recibe; sin memoizar el filtro aquí, `sujeto.ts` le pasaba un
+  // `Array.prototype.filter` nuevo en cada llamada y la caché de abajo
+  // fallaba siempre — un cache-buster invisible desde `cotas.ts`.
+  it('dos llamadas seguidas con las MISMAS input.pieces + hiddenLayerIds no reconstruyen el índice de enganche', () => {
+    const spy = vi.spyOn(snapIndexModule, 'buildSnapIndex');
+    // Array propio, nunca visto por la caché de otra prueba de este archivo
+    // (`base.pieces`/`base.hiddenLayerIds` son fijos y varias pruebas ya los
+    // usaron — reusarlos aquí daría un acierto de caché heredado, no el que
+    // esta prueba dice medir).
+    const input = {
+      ...base, pieces: [pieza('z')], hiddenLayerIds: [] as number[],
+      trazos: [trazo], selectedTrazo: { trazoId: 't', segmentIndex: 2 },
+    };
+    cotasDelSujeto(input, defaultRect);
+    cotasDelSujeto(input, defaultRect);
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });

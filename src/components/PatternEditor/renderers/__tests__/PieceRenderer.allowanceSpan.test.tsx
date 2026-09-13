@@ -60,7 +60,6 @@ describe('PieceRenderer — tramo de margen en pieza neta', () => {
             showNotches
             showPieceNames={false}
             renderMode2D="wireframe"
-            showLineLengths={false}
       piezaConPuntosDeCurva={null}
             units="mm"
           />

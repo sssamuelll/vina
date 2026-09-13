@@ -1,5 +1,7 @@
 # Trazos — líneas de construcción fuera de una pieza
 
+> **Enmienda 2026-09-13:** se conserva D4. Al confirmar una medida con Enter ya no se rearma el par numérico; por eso un Esc posterior termina el trazo. Mientras se edita un borrador siguen los peldaños input → descongelar → terminar. Referencia angular, clic entre campos y evidencia de #1161 en el [contrato integrado](../../reports/2026-09-13-seis-firmas-maria.md).
+
 **Origen:** reunión María + Samuel del 2026-09-10 ([informe](../../reports/2026-09-10-reunion-maria.md), § 0, § 3 N4, § 5.4), decisión D4 firmada por Samuel el 2026-09-12 (§ 8) → issue #1158. Brainstorm del 2026-09-12 con tres respuestas suyas que fijan el tamaño de todo lo demás (§ 1).
 
 **Qué cierra:** que María pueda trazar primero y sacar la pieza después. Hoy cada raya suelta que dibuja con la Pluma es una «pieza abierta» con aviso (`t_11-20.jpg`: tres rayas, tres avisos), y Línea interna no arranca fuera de una pieza.

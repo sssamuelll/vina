@@ -3,6 +3,8 @@ import { Point2D, PathCommand, PatternPiece, Trazo } from '../../types/types';
 import { screenToPattern } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
 import { polarOf, polarPoint } from './polyPenGeometry';
+import { referenceForNext } from './angleReference';
+import type { TramoEnCurso } from './cotas/tramoEnCurso';
 import { buildSnapIndex, resolveSnap, verticesVisibles } from './snapIndex';
 import type { SnapTarget } from './snapIndex';
 import { EDGE_HIT_PX } from './gestureConstants';
@@ -27,11 +29,7 @@ export interface PenNode {
 }
 
 /** El tramo congelado con Tab: desde dónde y con qué par prefijado (#1129). */
-export interface NextPointState {
-  from: Point2D;
-  lengthMm: number;
-  angleDeg: number;
-}
+export type NextPointState = TramoEnCurso;
 
 interface PenState {
   nodes: PenNode[];
@@ -169,14 +167,17 @@ export function usePenTool(
 
   /** Build preview line from last node to cursor */
   const buildGuidePath = useCallback((): string => {
-    if (state.nodes.length === 0 || !state.cursorPos || state.isClosed) return '';
+    const target = state.nextPoint
+      ? polarPoint(state.nextPoint.from, state.nextPoint.lengthMm, state.nextPoint.angleDeg)
+      : hover?.point ?? state.cursorPos;
+    if (state.nodes.length === 0 || !target || state.isClosed) return '';
     const last = state.nodes[state.nodes.length - 1];
     const cp1 = last.handleOut || last.anchor;
     if (cp1 === last.anchor) {
-      return `M${last.anchor.x},${last.anchor.y} L${state.cursorPos.x},${state.cursorPos.y}`;
+      return `M${last.anchor.x},${last.anchor.y} L${target.x},${target.y}`;
     }
-    return `M${last.anchor.x},${last.anchor.y} C${cp1.x},${cp1.y} ${state.cursorPos.x},${state.cursorPos.y} ${state.cursorPos.x},${state.cursorPos.y}`;
-  }, [state.nodes, state.cursorPos, state.isClosed]);
+    return `M${last.anchor.x},${last.anchor.y} C${cp1.x},${cp1.y} ${target.x},${target.y} ${target.x},${target.y}`;
+  }, [state.nodes, state.cursorPos, state.isClosed, state.nextPoint, hover]);
 
   const complete = useCallback((nodes: PenNode[], closed: boolean, via: PenVia) => {
     const commands = nodesToCommands(nodes, closed);
@@ -235,10 +236,14 @@ export function usePenTool(
     pushJournal('gesture', 'pen:press', { closes: false, nodes: nodes.length + 1, snap: enganche?.kind ?? null });
     const newNode: PenNode = { anchor, handleIn: null, handleOut: null };
     pressRef.current = { screen: { x: e.clientX, y: e.clientY }, moved: false };
+    // Un clic con la pareja congelada la suelta: volver al ratón es volver del
+    // todo (revisión 13-09, H1). Si no, la goma se quedaba clavada al destino
+    // congelado y el chip sobre el tramo anterior hasta dos Escape.
     setState(prev => ({
       ...prev,
       nodes: [...prev.nodes, newNode],
       isDragging: false,
+      nextPoint: null,
     }));
   }, [toPattern, zoom, complete, indice, radio]);
 
@@ -316,10 +321,11 @@ export function usePenTool(
     const nodes = nodesRef.current;
     if (nodes.length === 0) return;
     const from = nodes[nodes.length - 1].anchor;
-    const cursor = cursorRef.current ?? from;
+    const cursor = resolveSnap(indice, cursorRef.current ?? from, radio())?.point ?? cursorRef.current ?? from;
     const { lengthMm, angleDeg } = polarOf(from, cursor);
-    setState(prev => ({ ...prev, nextPoint: { from, lengthMm, angleDeg }, nextPointSeq: prev.nextPointSeq + 1 }));
-  }, []);
+    const reference = referenceForNext(nodesToCommands(nodes, false), indice);
+    setState(prev => ({ ...prev, nextPoint: { from, lengthMm, angleDeg, reference }, nextPointSeq: prev.nextPointSeq + 1 }));
+  }, [indice, radio, nodesToCommands]);
 
   /**
    * Reescribe el par pendiente SIN colocar (#1129). Es lo que hace Tab dentro
@@ -336,7 +342,7 @@ export function usePenTool(
     setState(prev => (prev.nextPoint ? { ...prev, nextPoint: null } : prev));
   }, []);
 
-  /** Coloca un nodo esquina a largo y ángulo del último; el par se re-ancla al nuevo. */
+  /** Coloca una esquina exacta y devuelve el siguiente tramo al ratón. */
   const placePolar = useCallback((lengthMm: number, angleDeg: number) => {
     if (nodesRef.current.length === 0) return;
     pushJournal('gesture', 'pen:nextPoint', { op: 'place', length: lengthMm, angle: angleDeg, nodes: nodesRef.current.length + 1 });
@@ -348,17 +354,7 @@ export function usePenTool(
       return {
         ...prev,
         nodes: [...prev.nodes, node],
-        // Re-ancla al nodo nuevo Y conserva el par que se acaba de colocar.
-        // Antes conservaba el par ANTERIOR: tras escribir 80/90 y Enter, el
-        // chip del ángulo volvía a 0 y repetir el mismo tramo con otro Enter
-        // colocaba un tramo distinto. Encadenar es el punto de esta gramática.
-        nextPoint: prev.nextPoint ? { from: anchor, lengthMm, angleDeg } : prev.nextPoint,
-        // La secuencia sube también al COLOCAR, no solo al congelar: colocar
-        // re-ancla el par al nodo nuevo y el chip de Largo tiene que reabrirse
-        // para que el encadenado siga («80/90, Enter, 50/0, Enter»). Engancharla
-        // solo al Tab arreglaba la tecla muerta y rompía esto — lo cazó el gate
-        // de e2e en el mismo empujón.
-        nextPointSeq: prev.nextPoint ? prev.nextPointSeq + 1 : prev.nextPointSeq,
+        nextPoint: null,
       };
     });
   }, []);
@@ -406,6 +402,9 @@ export function usePenTool(
   // ¿El próximo clic cierra el contorno? Mismo umbral que el snap real de
   // handleMouseDown — el aviso y el comportamiento no pueden discrepar
   // (maria-196: el cierre existía pero era invisible).
+  // Con la pareja congelada el clic sigue cerrando (handleMouseDown no mira
+  // `nextPoint`), así que el aviso tampoco se apaga: aviso y comportamiento
+  // no pueden discrepar (maria-196, y la revisión del 13-09 por el otro lado).
   const willClose =
     state.nodes.length > 2 &&
     !!state.cursorPos &&
@@ -415,10 +414,15 @@ export function usePenTool(
   // Distance from last node to cursor for dimension label. Se apaga cuando
   // el cierre está armado: en ese momento la medida es ruido y era
   // exactamente lo que tapaba el punto de origen (maria-196).
-  const lastPointDistance = state.nodes.length > 0 && state.cursorPos && !state.isClosed && !willClose
+  const angleReference = useMemo(() => referenceForNext(nodesToCommands(state.nodes, false), indice),
+    [state.nodes, nodesToCommands, indice]);
+  const target = hover?.point ?? state.cursorPos;
+  const lastPointDistance = state.nodes.length > 0 && target && !state.isClosed && !willClose && !state.nextPoint
     ? {
-        distance: dist(state.nodes[state.nodes.length - 1].anchor, state.cursorPos),
-        position: state.cursorPos,
+        distance: polarOf(state.nodes[state.nodes.length - 1].anchor, target).lengthMm,
+        angleDeg: polarOf(state.nodes[state.nodes.length - 1].anchor, target).angleDeg,
+        reference: angleReference,
+        position: target,
       }
     : null;
 
@@ -430,7 +434,8 @@ export function usePenTool(
     previewPath: buildPreviewPath(),
     guidePath: buildGuidePath(),
     lastPointDistance,
-    /** Lo que el próximo clic va a enganchar, para que el overlay lo anuncie. */
+    /** Lo que el próximo clic va a enganchar, para que el overlay lo anuncie —
+     *  también con la pareja congelada, porque ese clic engancha igual. */
     hover,
     /** Los vértices de las piezas visibles — #1102 [11:38]. */
     verticesDePiezas,

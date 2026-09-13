@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * Guards the View menu display toggles (spec 2026-06-04 display-toggles-resurface):
- * 2D — Reference Images / Line Lengths checkboxes + Render mode radio trio.
+ * 2D — Reference Images checkbox + Line Lengths and Render mode radio trios.
  * 3D — Garment / Seamlines / Internal Lines checkboxes (Task 2).
  *
  * Also guards submenu hover persistence: the flyout sits at
@@ -23,7 +23,7 @@ import toolsReducer from '../../../store/toolSlice';
 import constructionReducer from '../../../store/constructionSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
 import { store as appStore } from '../../../store';
-import { selectTrazo } from '../../../store/editorSlice';
+import { selectTrazo, setLineLengthMode } from '../../../store/editorSlice';
 import { addTrazo } from '../../../store/projectSlice';
 import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 import type { Trazo } from '../../../types/types';
@@ -87,13 +87,30 @@ describe('LogoMenu ▸ View — 2D display toggles', () => {
     expect(store.getState().editor.showReferenceImages).toBe(!before);
   });
 
-  it('toggles Line Lengths', () => {
-    const store = renderMenu();
-    const before = store.getState().editor.showLineLengths;
+  it('el ítem «Largos» se marca con el modo Todas y el clic despacha setLineLengthMode', () => {
+    // La acción de «Largos» lee `store.getState()` (el store canónico), igual
+    // que «Eliminar» y «Seleccionar todo» de más abajo — así que el menú se
+    // monta CONTRA ese store, no contra uno local desechable, y se fija un
+    // punto de partida conocido con un despacho directo.
+    appStore.dispatch(setLineLengthMode('none'));
+    render(<Provider store={appStore}><LogoMenu onOpenPanel={() => {}} onImportDXF={() => {}} /></Provider>);
     openViewMenu();
-    expect(isChecked('Largos de línea')).toBe(before);
-    fireEvent.click(screen.getByText('Largos de línea'));
-    expect(store.getState().editor.showLineLengths).toBe(!before);
+    // El bug que se encontró en el viejo submenú de Largos era que el hover lo
+    // desmontaba; pasar el puntero por el ítem antes de clicar reproduce cómo
+    // interactúa María y deja fijado que ya no ocurre.
+    fireEvent.mouseEnter(screen.getByText('Largos'));
+    expect(isChecked('Largos')).toBe(false);
+
+    fireEvent.click(screen.getByText('Largos'));
+    expect(appStore.getState().editor.lineLengthMode).toBe('all');
+    expect(appStore.getState().editor.lineLengthModeSetByUser).toBe(true);
+
+    openViewMenu();
+    fireEvent.mouseEnter(screen.getByText('Largos'));
+    expect(isChecked('Largos')).toBe(true);
+
+    fireEvent.click(screen.getByText('Largos'));
+    expect(appStore.getState().editor.lineLengthMode).toBe('none');
   });
 
   it('toggles Piquetes and reflects checked state', () => {

@@ -74,6 +74,22 @@ export interface Sujeto {
   lineaDeSujeto: string | null;
 }
 
+/**
+ * El array de piezas VISIBLES que se le pasa a `cotasDeTrazo`, estable por
+ * identidad de `pieces` + `hiddenLayerIds`. `cotasDeTrazo` cachea su índice de
+ * enganche por identidad del array que recibe (`cotas.ts`); sin esto,
+ * `.filter(...)` construía un array NUEVO en cada llamada y esa caché de
+ * abajo nunca acertaba — un cache-buster invisible desde `cotas.ts`.
+ */
+const piezasVisiblesCache = new WeakMap<PatternPiece[], { hiddenLayerIds: readonly number[]; piezas: PatternPiece[] }>();
+function piezasVisibles(pieces: PatternPiece[], hiddenLayerIds: readonly number[]): PatternPiece[] {
+  const cached = piezasVisiblesCache.get(pieces);
+  if (cached && cached.hiddenLayerIds === hiddenLayerIds) return cached.piezas;
+  const piezas = pieces.filter(p => !hiddenLayerIds.includes(p.layer ?? 1));
+  piezasVisiblesCache.set(pieces, { hiddenLayerIds, piezas });
+  return piezas;
+}
+
 const CON_COTAS_DE_PIEZA: ReadonlySet<Tool2D> = new Set<Tool2D>(['select', 'transform', 'rectangle', 'circle', 'triangle']);
 
 /** Las que crean una pieza arrastrando: la recién nacida sale caliente y sus
@@ -244,7 +260,8 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
       return {
         piece: null,
         caliente: false,
-        cotas: cotasDeTrazo(trazo, input.selectedTrazo.segmentIndex),
+        cotas: cotasDeTrazo(trazo, input.selectedTrazo.segmentIndex,
+          piezasVisibles(input.pieces, input.hiddenLayerIds)),
         lectura: null,
         lecturaApagada: false,
         bordeLeido: null,

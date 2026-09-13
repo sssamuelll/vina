@@ -293,7 +293,23 @@ describe('usePolyPenTool — siguiente punto (Tab, placePolar)', () => {
     move(200, 150);
     act(() => { consumed = tool().handleKeyDown(key('Tab')); });
     expect(consumed).toBe(true);
-    expect(tool().nextPoint).toEqual({ from: { x: 150, y: 150 }, lengthMm: 50, angleDeg: 0 });
+    expect(tool().nextPoint).toEqual({ from: { x: 150, y: 150 }, lengthMm: 50, angleDeg: 0, reference: { kind: 'absolute', baseDeg: 0 } });
+  });
+
+  it('borde → congelado → colocación → tramo previo conservan un solo marco', () => {
+    const { tool, click, move } = setup();
+    click(300, 150);
+    move(250, 150);
+    act(() => tool().openNextPoint());
+    expect(tool().nextPoint?.reference).toEqual({ kind: 'border', baseDeg: 90 });
+    move(500, 500);
+    expect(tool().previewPoint).toEqual({ x: 250, y: 150 });
+    act(() => tool().placePolar(70, 180));
+    expect(tool().nextPoint).toBeNull();
+    move(230, 110);
+    act(() => tool().openNextPoint());
+    expect(tool().nextPoint?.reference?.kind).toBe('segment');
+    expect(Math.abs(tool().nextPoint!.reference!.baseDeg)).toBeCloseTo(180);
   });
 
   it('placePolar coloca un nodo del tipo latcheado: −90° es hacia abajo', () => {
@@ -312,6 +328,23 @@ describe('usePolyPenTool — siguiente punto (Tab, placePolar)', () => {
     expect(tool().nextPoint).not.toBeNull();
     act(() => { tool().handleKeyDown(key('Enter')); });
     expect(tool().nextPoint).toBeNull();
+  });
+
+  it('un clic con la pareja congelada la suelta y el nodo cae donde se clicó', () => {
+    // Revisión 13-09 (H1): volver al ratón es volver del todo; antes el nodo
+    // nacía pero la pareja seguía viva apuntando al origen anterior.
+    const { tool, click, move } = setup();
+    click(150, 150);
+    move(200, 150);
+    act(() => tool().openNextPoint());
+    expect(tool().nextPoint).not.toBeNull();
+    expect(tool().previewPoint).toEqual({ x: 200, y: 150 });
+    click(180, 200);
+    expect(tool().nextPoint).toBeNull();
+    expect(tool().nodes).toHaveLength(2);
+    expect(tool().nodes[1].point).toEqual({ x: 180, y: 200 });
+    move(230, 230);
+    expect(tool().previewPoint, 'la goma vuelve a seguir al ratón').toEqual({ x: 230, y: 230 });
   });
 });
 

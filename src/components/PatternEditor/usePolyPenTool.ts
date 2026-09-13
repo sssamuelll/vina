@@ -8,15 +8,13 @@ import type { SnapTarget } from './snapIndex';
 import { EDGE_HIT_PX, isDrag } from './gestureConstants';
 import { nodesToCommands, polarOf, polarPoint, type PolyPenNode } from './polyPenGeometry';
 import { pushJournal } from '../../utils/telemetry/journal';
+import { borderReference, referenceForNext } from './angleReference';
+import type { TramoEnCurso } from './cotas/tramoEnCurso';
 
 export type { PolyPenNode, PolyPenNodeType } from './polyPenGeometry';
 
 /** El tramo congelado con Tab: desde dónde y con qué par prefijado (#1129). */
-export interface NextPointState {
-  from: Point2D;
-  lengthMm: number;
-  angleDeg: number;
-}
+export type NextPointState = TramoEnCurso;
 
 /**
  * El motor de "Línea interna" (spec 2026-08-29 § 4.3–§ 4.6).
@@ -105,6 +103,9 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
   // Un solo memo por identidad de `pieces`: aplanar nodos, extremos de internas
   // y anillos cuesta, y no puede rehacerse por evento de ratón.
   const indice = useMemo(() => buildSnapIndex(pieces, trazos), [pieces, trazos]);
+  const referenceForNodes = useCallback((nodes: PolyPenNode[]) => nodes.length === 1
+    ? borderReference(indice, nodes[0].point, hostRef.current ?? undefined)
+    : referenceForNext(nodesToCommands(nodes, false), indice, hostRef.current ?? undefined), [indice]);
 
   const toWorld = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D =>
@@ -213,6 +214,9 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       hostRef.current = hostId;
     }
     pressRef.current = { world, screen: { x: e.clientX, y: e.clientY }, snap, closes, moved: false, drag: null };
+    // Un press con la pareja congelada la suelta: volver al ratón es volver
+    // del todo (revisión 13-09, H1). Hermano del de la Pluma.
+    nextPointRef.current = null;
     journalPress({ armed: true, snap: snap?.kind ?? null, hostId: hostRef.current, closes });
     publish();
   }, [toWorld, radius, resolveSnap, topmostContaining, publish]);
@@ -287,11 +291,12 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const nodes = nodesRef.current;
     if (nodes.length === 0) return;
     const from = nodes[nodes.length - 1].point;
-    const { lengthMm, angleDeg } = polarOf(from, lastWorldRef.current ?? from);
-    nextPointRef.current = { from, lengthMm, angleDeg };
+    const { lengthMm, angleDeg } = polarOf(from, hoverRef.current?.point ?? lastWorldRef.current ?? from);
+    const reference = referenceForNodes(nodes);
+    nextPointRef.current = { from, lengthMm, angleDeg, reference };
     nextPointSeqRef.current += 1;
     publish();
-  }, [publish]);
+  }, [publish, referenceForNodes]);
 
   /**
    * Reescribe el par pendiente SIN colocar (#1129). Es lo que hace Tab dentro
@@ -320,13 +325,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const from = nodes[nodes.length - 1].point;
     const point = polarPoint(from, lengthMm, angleDeg);
     nodesRef.current = [...nodes, { point, type: optsRef.current.nodeType }];
-    // Re-ancla al nodo nuevo Y conserva el par que se acaba de colocar, para
-    // que encadenar repita el mismo tramo (#1129). Hermano del de la pluma.
-    if (nextPointRef.current) {
-      nextPointRef.current = { from: point, lengthMm, angleDeg };
-      // Colocar también reabre el chip: es lo que sostiene el encadenado.
-      nextPointSeqRef.current += 1;
-    }
+    nextPointRef.current = null;
     pushJournal('gesture', 'internalShape:nextPoint', { op: 'place', length: lengthMm, angle: angleDeg, nodes: nodes.length + 1 });
     publish();
   }, [publish]);
@@ -366,12 +365,19 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
 
   const isTracing = useCallback(() => nodesRef.current.length > 0 || pressRef.current !== null, []);
 
+  const angleReference = useMemo(() => referenceForNodes(view.nodes), [view.nodes, referenceForNodes]);
+  const frozenTarget = view.nextPoint
+    ? polarPoint(view.nextPoint.from, view.nextPoint.lengthMm, view.nextPoint.angleDeg) : null;
+
   return {
     nodes: view.nodes,
-    previewPoint: view.previewPoint,
+    previewPoint: frozenTarget ?? view.previewPoint,
+    angleReference,
     pressPoint: view.pressPoint,
     isDragging: view.isDragging,
     dragHandle: view.dragHandle,
+    // Con la pareja congelada el press engancha y cierra igual, así que el
+    // aviso de enganche y el de cierre siguen encendidos (revisión 13-09, H2).
     hover: view.hover,
     hostId: view.hostId,
     closeArmed: view.closeArmed,

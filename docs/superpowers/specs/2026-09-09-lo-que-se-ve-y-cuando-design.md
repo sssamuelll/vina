@@ -1,5 +1,7 @@
 # Lo que se ve, y cuándo — enmienda de la revisión asistida del 2026-09-09
 
+> **Enmienda 2026-09-13:** la firma D1 del 12-09 reemplazó los largos automáticos de cualquier pieza seleccionada por Al crear/Todas/Ninguna, y la firma de María del 13-09 lo redujo a lo que ella pidió: un interruptor «Largos» apagado de fábrica, sin vínculo con crear ni con seleccionar («no quiero opciones»), con supresión por sujeto interno. Editar los largos de una pieza existente (Tab sobre la seleccionada, arrastrar un lado) es #1167. D3 conserva las inserciones humanas sin aumentar los glifos del DXF y D5 separa spline gestionada de Bézier libre. Mecanismos y pruebas en el [contrato integrado](../../reports/2026-09-13-seis-firmas-maria.md).
+
 > **Estado: decidido, para implementar en la PR #1149.**
 > Sale de una revisión asistida en vivo (Samuel probando, Claude guiando) sobre
 > la propia rama de la reunión del 07-09. Tres de los nueve pasos dejaron una

@@ -230,13 +230,14 @@ function offsetCommand(cmd: PathCommand, pos: Point2D): PathCommand {
   switch (cmd.type) {
     case 'M':
     case 'L':
-      return { type: cmd.type, values: [cmd.values[0] + pos.x, cmd.values[1] + pos.y] };
+      return { ...cmd, values: [cmd.values[0] + pos.x, cmd.values[1] + pos.y] };
     case 'H':
-      return { type: 'H', values: [cmd.values[0] + pos.x] };
+      return { ...cmd, type: 'H', values: [cmd.values[0] + pos.x] };
     case 'V':
-      return { type: 'V', values: [cmd.values[0] + pos.y] };
+      return { ...cmd, type: 'V', values: [cmd.values[0] + pos.y] };
     case 'C':
       return {
+        ...cmd,
         type: 'C',
         values: [
           cmd.values[0] + pos.x, cmd.values[1] + pos.y,
@@ -246,6 +247,7 @@ function offsetCommand(cmd: PathCommand, pos: Point2D): PathCommand {
       };
     case 'Q':
       return {
+        ...cmd,
         type: 'Q',
         values: [
           cmd.values[0] + pos.x, cmd.values[1] + pos.y,
@@ -253,7 +255,7 @@ function offsetCommand(cmd: PathCommand, pos: Point2D): PathCommand {
         ],
       };
     case 'Z':
-      return { type: 'Z', values: [] };
+      return { ...cmd, type: 'Z', values: [] };
     default:
       // For unknown types, offset all value pairs
       if (cmd.values.length >= 2) {
@@ -262,7 +264,7 @@ function offsetCommand(cmd: PathCommand, pos: Point2D): PathCommand {
           newValues[i] += pos.x;
           newValues[i + 1] += pos.y;
         }
-        return { type: cmd.type, values: newValues };
+        return { ...cmd, values: newValues };
       }
       return { ...cmd, values: [...cmd.values] };
   }

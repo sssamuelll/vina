@@ -2,7 +2,9 @@ import type { Point2D, UnitSystem } from '../../../../types/types';
 import { formatDimension } from '../../../../utils/units';
 import { EDGE_HIT_PX } from '../../gestureConstants';
 import { nodesToCommands, commandsToPathD, type PolyPenNode, type PolyPenNodeType } from '../../polyPenGeometry';
+import { polarOf } from '../../polyPenGeometry';
 import type { SnapTarget } from '../../usePolyPenTool';
+import { ABSOLUTE_REFERENCE, angleReferenceLabel, relativeAngle, type AngleReference } from '../../angleReference';
 import { READOUT_FONT_PX, pildoraDeMedida } from './pildoraDeMedida';
 
 /**
@@ -30,6 +32,9 @@ interface PolyPenToolOverlayProps {
   closeArmed: boolean;
   zoom2D: number;
   units: string;
+  angleReference?: AngleReference;
+  frozen?: boolean;
+  precisionHint?: boolean;
 }
 
 const fillFor = (type: PolyPenNodeType): string =>
@@ -37,6 +42,7 @@ const fillFor = (type: PolyPenNodeType): string =>
 
 export default function PolyPenToolOverlay({
   nodes, previewPoint, pressPoint, isDragging, dragHandle, hover, nodeType, closeArmed, zoom2D, units,
+  angleReference = ABSOLUTE_REFERENCE, frozen = false, precisionHint = false,
 }: PolyPenToolOverlayProps) {
   const z = zoom2D;
   const r = 4 / z;
@@ -55,14 +61,12 @@ export default function PolyPenToolOverlay({
   // Píldora: largo y ángulo del tramo en curso. 0° a la derecha, 90° hacia
   // arriba tal como se ve en pantalla (y crece hacia abajo en el patrón).
   let readout: { at: Point2D; text: string } | null = null;
-  if (lastNode && target && !isDragging && !pressPoint && !closeArmed) {
-    const dx = target.x - lastNode.point.x;
-    const dy = target.y - lastNode.point.y;
-    const len = Math.hypot(dx, dy);
-    const ang = (Math.atan2(-dy, dx) * 180) / Math.PI;
+  if (lastNode && target && !isDragging && !pressPoint && !closeArmed && !frozen) {
+    const polar = polarOf(lastNode.point, target);
+    const angle = relativeAngle(polar.angleDeg, angleReference);
     readout = {
       at: { x: (previewPoint ?? target).x + 22 / z, y: (previewPoint ?? target).y - 18 / z },
-      text: `${formatDimension(len, units as UnitSystem)} · ${ang.toFixed(1)}°`,
+      text: `${formatDimension(polar.lengthMm, units as UnitSystem)} · ${angle.toFixed(1)}° ${angleReferenceLabel(angleReference)}`,
     };
   }
 
@@ -155,6 +159,23 @@ export default function PolyPenToolOverlay({
             >
               {readout.text}
             </text>
+            {precisionHint && (
+              // Misma corrección que PenToolOverlay (#1166): ENCIMA de la
+              // píldora y alineada a su borde izquierdo, nunca cruzando el
+              // cursor ni el vértice que engancha.
+              <text
+                className="precision-hint"
+                x={pildora.x}
+                y={pildora.y - fontSize * 0.6}
+                textAnchor="start"
+                dominantBaseline="auto"
+                fill="var(--ink-hint)"
+                fontSize={fontSize}
+                style={{ fontFamily: 'var(--font-mono-2d)' }}
+              >
+                Tab · escribe la medida
+              </text>
+            )}
           </g>
         );
       })()}

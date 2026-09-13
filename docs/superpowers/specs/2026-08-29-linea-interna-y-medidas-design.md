@@ -1,5 +1,7 @@
 # Línea interna única, enganche y medidas escritas — diseño (v2)
 
+> **Enmienda 2026-09-13:** el [contrato integrado de las seis firmas](../../reports/2026-09-13-seis-firmas-maria.md) sustituye la referencia angular absoluta de presentación y el rearme automático del panel: Tab/derecho abre Largo–Ángulo, Enter coloca una vez y vuelve al ratón. G conserva su cancelación de §4; la conservación de construcción de #1158 corresponde a Pluma.
+
 **Fecha:** 2026-08-29
 **Tarjetas de María:** #209 (unificar), #205 (cancelar / reempezar / conectar), #206 (curvas internas), #193 (medidas en líneas internas, 2.ª vez), #191 (rectángulo con medidas, 2.ª vez), #195 (pluma con largo y ángulo, 2.ª vez)
 **Hereda:** `docs/superpowers/specs/2026-08-11-arrastre-unificado-2d-design.md` (la ley, § 3.5, § 7), `.claude/skills/contrato-de-interfaz/SKILL.md`, `docs/superpowers/specs/2026-08-16-barra-opciones-herramienta-design.md`

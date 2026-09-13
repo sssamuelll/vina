@@ -6,12 +6,26 @@ import {
 } from '../actionCuration';
 import type { AppDispatch } from '../../../store';
 import type { PatternPiece } from '../../../types/types';
+import { convertSegmentToSpline, toManualBezier } from '../splineSegment';
 
 function pieceFix(locked = false): PatternPiece {
   return {
     id: 'p1', name: 'P1', position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
     active: true, locked, seamAllowance: 0, outline: [], internals: [], edges: [],
   } as unknown as PatternPiece;
+}
+
+function managedPiece(locked = false): PatternPiece {
+  const piece = pieceFix(locked);
+  return {
+    ...piece,
+    outline: convertSegmentToSpline([
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'Z', values: [] },
+    ], 1, 4),
+  };
 }
 
 function makeCtx(over: Partial<CurationCtx> = {}): CurationCtx {
@@ -259,5 +273,38 @@ describe('convertir en curva por puntos (nota de María #197)', () => {
     const ctx = makeCtx({ pieceId: 'p7', segmentIndex: 3, cb: { onConvertSegmentToPoints } });
     ACTIONS.convertSegmentToPoints.run(ctx);
     expect(onConvertSegmentToPoints).toHaveBeenCalledWith(3, 'p7');
+  });
+});
+
+describe('#1159 — salida explícita de curva por puntos', () => {
+  const onConvertSegmentToBezier = vi.fn();
+
+  it('solo aparece sobre una cadena gestionada y desbloqueada', () => {
+    const managed = managedPiece();
+    const ids = resolveMenuActions(makeCtx({
+      piece: managed, pieces: [managed], segmentIndex: 2, segmentIsCurve: true,
+    })).map(def => def.id);
+    expect(ids).toContain('convertSegmentToBezier');
+
+    const manual = { ...managed, outline: toManualBezier(managed.outline, 2)! };
+    expect(resolveMenuActions(makeCtx({
+      piece: manual, pieces: [manual], segmentIndex: 2, segmentIsCurve: true,
+    })).map(def => def.id)).not.toContain('convertSegmentToBezier');
+
+    const locked = { ...managed, locked: true };
+    expect(resolveMenuActions(makeCtx({
+      piece: locked, pieces: [locked], segmentIndex: 2, segmentIsCurve: true,
+    })).map(def => def.id)).not.toContain('convertSegmentToBezier');
+  });
+
+  it('nombra la salida y entrega índice y pieza al callback', () => {
+    const managed = managedPiece();
+    const ctx = makeCtx({
+      pieceId: 'p1', piece: managed, pieces: [managed], segmentIndex: 3,
+      segmentIsCurve: true, cb: { onConvertSegmentToBezier },
+    });
+    expect(ACTIONS.convertSegmentToBezier.label).toBe('Convertir a Bézier libre');
+    ACTIONS.convertSegmentToBezier.run(ctx);
+    expect(onConvertSegmentToBezier).toHaveBeenCalledWith(3, 'p1');
   });
 });

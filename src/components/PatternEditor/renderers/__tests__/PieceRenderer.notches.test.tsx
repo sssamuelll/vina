@@ -68,7 +68,6 @@ function renderPiece(showNotches: boolean) {
           showNotches={showNotches}
           showPieceNames={false}
           renderMode2D="wireframe"
-          showLineLengths={false}
       piezaConPuntosDeCurva={null}
           units="mm"
         />

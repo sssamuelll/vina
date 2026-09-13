@@ -183,7 +183,7 @@ export function scaleOutline(
         newValues[i + 1] = center.y + (newValues[i + 1] - center.y) * scaleY;
       }
     }
-    return { type: cmd.type, values: newValues };
+    return { ...cmd, values: newValues };
   });
 }
 
@@ -209,7 +209,7 @@ export function rotateOutline(
         newValues[i + 1] = center.y + dx * sin + dy * cos;
       }
     }
-    return { type: cmd.type, values: newValues };
+    return { ...cmd, values: newValues };
   });
 }
 

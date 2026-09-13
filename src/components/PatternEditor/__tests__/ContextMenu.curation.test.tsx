@@ -8,6 +8,7 @@ import editorReducer from '../../../store/editorSlice';
 import projectReducer, { restoreState } from '../../../store/projectSlice';
 import ContextMenu, { type ContextMenuState } from '../ContextMenu';
 import type { PatternPiece } from '../../../types/types';
+import { convertSegmentToSpline } from '../splineSegment';
 
 afterEach(cleanup);
 
@@ -20,7 +21,11 @@ function piece(id: string, over: Partial<PatternPiece> = {}): PatternPiece {
   } as unknown as PatternPiece;
 }
 
-function renderMenu(menu: ContextMenuState, pieces: PatternPiece[]) {
+function renderMenu(
+  menu: ContextMenuState,
+  pieces: PatternPiece[],
+  onConvertSegmentToBezier?: (commandIndex: number, pieceId?: string) => void,
+) {
   const store = configureStore({
     reducer: {
       project: projectReducer,
@@ -32,7 +37,11 @@ function renderMenu(menu: ContextMenuState, pieces: PatternPiece[]) {
   store.dispatch(restoreState({ ...store.getState().project, pieces }));
   return render(
     <Provider store={store}>
-      <ContextMenu menu={menu} onClose={vi.fn()} />
+      <ContextMenu
+        menu={menu}
+        onClose={vi.fn()}
+        onConvertSegmentToBezier={onConvertSegmentToBezier}
+      />
     </Provider>,
   );
 }
@@ -113,6 +122,20 @@ describe('ContextMenu curado (Surface B)', () => {
       [piece('p1')],
     );
     expect(container.querySelector('.context-menu')).toBeNull();
+  });
+
+  it('ofrece y ejecuta la salida a Bézier libre sobre una curva por puntos', () => {
+    const onConvert = vi.fn();
+    const managed = piece('p1', {
+      outline: convertSegmentToSpline(piece('p1').outline, 1, 4),
+    });
+    renderMenu(
+      { ...base, pieceId: 'p1', pieceName: 'P1', segmentIndex: 2, segmentIsCurve: true },
+      [managed],
+      onConvert,
+    );
+    fireEvent.click(screen.getByText('Convertir a Bézier libre'));
+    expect(onConvert).toHaveBeenCalledWith(2, 'p1');
   });
 });
 

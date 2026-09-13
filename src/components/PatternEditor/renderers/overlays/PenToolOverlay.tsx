@@ -4,6 +4,9 @@ import { HANDLE_RADIUS, ANCHOR_RADIUS } from '../../utils';
 import { formatDimension } from '../../../../utils/units';
 import { EDGE_HIT_PX } from '../../gestureConstants';
 import type { SnapTarget } from '../../snapIndex';
+import type { AngleReference } from '../../angleReference';
+import { angleReferenceLabel, relativeAngle } from '../../angleReference';
+import { READOUT_FONT_PX, pildoraDeMedida } from './pildoraDeMedida';
 
 interface PenNode {
   anchor: Point2D;
@@ -17,7 +20,13 @@ interface PenToolOverlayProps {
   penNodes: PenNode[];
   previewPath: string;
   guidePath: string | null;
-  penDistance: { distance: number; position: Point2D } | null;
+  penDistance: {
+    distance: number;
+    position: Point2D;
+    angleDeg?: number;
+    reference?: AngleReference;
+  } | null;
+  precisionHint?: boolean;
   /** El próximo clic cierra el contorno — enciende el anillo del origen (maria-196) */
   penWillClose: boolean;
   /**
@@ -65,8 +74,16 @@ const VerticesDePiezas = memo(function VerticesDePiezas(
 
 export default function PenToolOverlay({
   zoom2D, units, penNodes, previewPath, guidePath, penDistance, penWillClose,
-  verticesDePiezas = [], snapHover = null,
+  verticesDePiezas = [], snapHover = null, precisionHint = false,
 }: PenToolOverlayProps) {
+  const distanceText = penDistance
+    ? (() => {
+        const length = formatDimension(penDistance.distance, units as UnitSystem);
+        if (penDistance.angleDeg === undefined || !penDistance.reference) return length;
+        const angle = relativeAngle(penDistance.angleDeg, penDistance.reference);
+        return `${length} · ${angle.toFixed(1)}° ${angleReferenceLabel(penDistance.reference)}`;
+      })()
+    : null;
   return (
     <>
       <VerticesDePiezas puntos={verticesDePiezas} zoom2D={zoom2D} />
@@ -175,23 +192,43 @@ export default function PenToolOverlay({
         </g>
       )}
 
-      {penDistance && (
+      {penDistance && distanceText && (() => {
+        const fontSize = READOUT_FONT_PX / zoom2D;
+        const pill = pildoraDeMedida(distanceText, fontSize);
+        return (
         // Desplazado arriba-derecha del cursor (maria-196): centrado en él
         // tapaba justo lo que estás a punto de clicar.
-        <g className="pen-distance-label" transform={`translate(${penDistance.position.x + 22 / zoom2D}, ${penDistance.position.y - 18 / zoom2D})`}>
-          <rect
-            x={-25 / zoom2D} y={-8 / zoom2D}
-            width={50 / zoom2D} height={16 / zoom2D}
-            rx={8 / zoom2D} fill="rgba(0,0,0,0.75)"
-          />
+        <g className="pen-distance-label" pointerEvents="none" transform={`translate(${penDistance.position.x + 22 / zoom2D}, ${penDistance.position.y - 18 / zoom2D})`}>
+          <rect {...pill} fill="var(--readout-bg-2d)" />
           <text
             textAnchor="middle" dominantBaseline="central"
-            fill="#fff" fontSize={10 / zoom2D} pointerEvents="none"
+            fill="var(--readout-ink-2d)" fontSize={fontSize} pointerEvents="none"
+            style={{ fontFamily: 'var(--font-mono-2d)' }}
           >
-            {formatDimension(penDistance.distance, units as UnitSystem)}
+            {distanceText}
           </text>
+          {precisionHint && (
+            // ENCIMA de la píldora (no debajo): debajo cruzaba justo el punto
+            // del próximo clic y el vértice que engancha (revisión
+            // adversarial #1166). Alineada a su mismo borde izquierdo —no
+            // centrada sobre el cursor— con `textAnchor="start"` en `pill.x`.
+            <text
+              className="precision-hint"
+              x={pill.x}
+              y={pill.y - fontSize * 0.6}
+              textAnchor="start"
+              dominantBaseline="auto"
+              fill="var(--ink-hint)"
+              fontSize={fontSize}
+              pointerEvents="none"
+              style={{ fontFamily: 'var(--font-mono-2d)' }}
+            >
+              Tab · escribe la medida
+            </text>
+          )}
         </g>
-      )}
+        );
+      })()}
     </>
   );
 }

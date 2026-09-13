@@ -8,6 +8,8 @@ import {
   encodePoints,
   decodePoints,
   serializePoint,
+  serializePathCommand,
+  deserializeOutline,
   serializePiece,
   deserializePiece,
   encodeOutline,
@@ -172,6 +174,22 @@ describe('ArrayBuffer Codec', () => {
       expect(decoded[2].values).toEqual([100, 50, 100, 100, 50, 100]);
       expect(decoded[4].type).toBe('Z');
       expect(decoded[4].values).toEqual([]);
+    });
+  });
+
+  describe('PathCommand serialization', () => {
+    it('preserves authored and manual Bezier intent in both directions', () => {
+      const commands: PathCommand[] = [
+        { type: 'L', values: [50, 0], authoredAnchor: true },
+        { type: 'C', values: [60, 0, 90, 0, 100, 0], manualBezier: true },
+      ];
+
+      const serialized = commands.map(serializePathCommand);
+      const restored = deserializeOutline(serialized);
+
+      expect(restored).toEqual(commands);
+      expect(restored[0]).not.toBe(commands[0]);
+      expect(restored[0].values).not.toBe(commands[0].values);
     });
   });
 

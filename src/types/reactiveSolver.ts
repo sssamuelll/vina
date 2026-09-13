@@ -61,6 +61,8 @@ export interface CCurveSerialized {
 export interface PathCommandSerialized {
   type: 'M' | 'L' | 'C' | 'Q' | 'Z';
   values: number[];
+  authoredAnchor?: true;
+  manualBezier?: true;
 }
 
 /** Serialized CPiece - flattened structure without complex references */

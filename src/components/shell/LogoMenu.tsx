@@ -4,7 +4,7 @@ import type { RootState, AppDispatch } from '../../store';
 import {
   setViewMode, undo, redo, toggleSnapToGrid, toggleSeamAllowance,
   toggleGrainlines, toggleNotches, togglePieceNames, toggleSewingLines,
-  toggleReferenceImages, toggleLineLengths, toggleTrazos, setRenderMode2D,
+  toggleReferenceImages, setLineLengthMode, toggleTrazos, setRenderMode2D,
   clearSelection, setZoom2D, setUnits,
 } from '../../store/editorSlice';
 import {
@@ -170,7 +170,10 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Nombres de pieza', action: (d) => d(togglePieceNames()), checked: (s) => s.editor.showPieceNames },
   { label: 'Líneas de costura', action: (d) => d(toggleSewingLines()), checked: (s) => s.editor.showSewingLines },
   { label: 'Imágenes de referencia', action: (d) => d(toggleReferenceImages()), checked: (s) => s.editor.showReferenceImages },
-  { label: 'Largos de línea', action: (d) => d(toggleLineLengths()), checked: (s) => s.editor.showLineLengths },
+  // Firma de María 2026-09-12: casilla de dos estados, no un submenú de tres
+  // opciones. `store.getState()` de la misma forma que ya usan «Eliminar» y
+  // «Seleccionar todo» arriba — el toggle depende del valor actual.
+  { label: 'Largos', action: (d) => d(setLineLengthMode(store.getState().editor.lineLengthMode === 'all' ? 'none' : 'all')), checked: (s) => s.editor.lineLengthMode === 'all' },
   { label: 'Construcción', action: (d) => d(toggleTrazos()), checked: (s) => s.editor.showTrazos },
   { separator: true, label: '' },
   { label: 'Renderizado: texturizado', action: (d) => d(setRenderMode2D('textured')), checked: (s) => s.editor.renderMode2D === 'textured' },

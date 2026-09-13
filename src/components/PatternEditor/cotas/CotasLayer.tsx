@@ -105,8 +105,8 @@ export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function
         cota,
         ...(grupo ?? chipScreenPosition(cota, pan2D, zoom2D)),
         texto: grupo
-          ? grupo.campos.map(campo => formatMedida(campo.valueMm, campo.unit)).join(' · ')
-          : formatMedida(cota.valueMm, cota.unit),
+          ? grupo.campos.map(campo => formatMedida(campo.valueMm, campo.unit, campo.referenceLabel)).join(' · ')
+          : formatMedida(cota.valueMm, cota.unit, cota.referenceLabel),
       }];
     });
     const items: ChipPuesto[] = [...chips, ...largos];
@@ -114,7 +114,7 @@ export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function
       items.push({
         cota: lectura,
         ...chipScreenPosition(lectura, pan2D, zoom2D),
-        texto: formatMedida(lectura.valueMm, lectura.unit),
+        texto: formatMedida(lectura.valueMm, lectura.unit, lectura.referenceLabel),
         cede: true,
       });
     }
@@ -148,7 +148,7 @@ export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function
           data-lado={lectura.outward.y > 0 ? 'abajo' : undefined}
           style={{ left: lecturaPosition.left, top: lecturaPosition.top, pointerEvents: 'none' }}
         >
-          {formatMedida(lectura.valueMm, lectura.unit)}
+          {formatMedida(lectura.valueMm, lectura.unit, lectura.referenceLabel)}
         </div>
       )}
       {cotas.map(cota => {

@@ -20,6 +20,28 @@ function isBezierCommand(command: PathCommand | undefined): boolean {
   return command?.type === 'C' || command?.type === 'Q';
 }
 
+function hasStraightIncidentEdges(
+  outline: PathCommand[],
+  commandIndex: number,
+): boolean {
+  if (outline[commandIndex]?.type === 'L') {
+    return outline[commandIndex + 1]?.type === 'L' ||
+      outline[commandIndex + 1]?.type === 'Z';
+  }
+  // The piece's own M closes a cycle when the outline ends in Z: outline[1]
+  // is its leaving edge, and the real command right before that closing Z
+  // is its arriving edge (the Z segment itself is always straight — that's
+  // what makes it a closer, not a claim this still has to check).
+  if (commandIndex === 0 && outline[0]?.type === 'M') {
+    const last = outline[outline.length - 1];
+    const beforeLast = outline[outline.length - 2];
+    return last?.type === 'Z' &&
+      outline[1]?.type === 'L' &&
+      beforeLast?.type === 'L';
+  }
+  return false;
+}
+
 function distance(a: Point2D, b: Point2D): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
@@ -76,6 +98,29 @@ export function classifyEditableAnchors(
     }
   }
 
+  // authoredAnchor records the user's insertion, independently of the
+  // current angle. It only has corner semantics while the two incident edges
+  // remain straight. Apply every group signal to the whole coincident group so
+  // the renderer never stacks different glyphs at one coordinate.
+  const authoredCorners = new Set<number>();
+  const bezierAnchors = new Set<number>();
+  for (const members of coincidentAnchorGroups(piece.outline).values()) {
+    const touchesBezier = members.some((index) =>
+      isBezierCommand(piece.outline[index]) ||
+      isBezierCommand(piece.outline[index + 1]));
+    if (touchesBezier) {
+      for (const index of members) bezierAnchors.add(index);
+      continue;
+    }
+
+    const hasAuthoredStraightAnchor = members.some((index) =>
+      piece.outline[index]?.authoredAnchor === true &&
+      hasStraightIncidentEdges(piece.outline, index));
+    if (hasAuthoredStraightAnchor) {
+      for (const index of members) authoredCorners.add(index);
+    }
+  }
+
   return nodes.map((node) => {
     const index = node.ref.commandIndex;
     let role: AnchorRole = 'smoothSample';
@@ -83,11 +128,10 @@ export function classifyEditableAnchors(
       role = 'openEndpoint';
     } else if (corners.has(index)) {
       role = 'corner';
-    } else if (
-      isBezierCommand(piece.outline[index]) ||
-      isBezierCommand(piece.outline[index + 1])
-    ) {
+    } else if (bezierAnchors.has(index)) {
       role = 'bezierAnchor';
+    } else if (authoredCorners.has(index)) {
+      role = 'corner';
     } else if ((groupOf.get(index)?.length ?? 1) >= 2) {
       role = 'lineEnd';
     }

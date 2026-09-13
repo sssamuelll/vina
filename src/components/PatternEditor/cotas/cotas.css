@@ -64,6 +64,7 @@
      para que otro tramo no tape Ángulo mientras María está escribiendo. */
   z-index: var(--z-canvas-chrome);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   height: auto;
@@ -73,6 +74,18 @@
   color: var(--cota-edit-ink-2d);
 }
 .cota-campo { display: flex; align-items: center; gap: 4px; }
+/* Firma de María 2026-09-12: «cómo sabe la usuaria que debe pulsar TAB».
+   Solo el tramo en curso la pinta (CotaChip.tsx la condiciona a ese grupo).
+   `flex-basis: 100%` en un contenedor `wrap` es lo que la manda a su propia
+   línea sin tocar el layout de los campos de arriba. Secundaria: mismo tono
+   que ya usan las meta-etiquetas sobre fondo claro (--cota-edit-bg-2d es
+   blanco), no la tinta primaria del campo. */
+.cota-grupo-pista {
+  flex-basis: 100%;
+  font-family: var(--font-ui-2d);
+  font-size: 10px;
+  color: var(--ink-on-light-2);
+}
 .cota-campo .cota--editando {
   width: 56px;
   height: 22px;

@@ -408,7 +408,11 @@ export function splitSegmentAt(
       const midX = prevAnchor.x + t * (anchor.x - prevAnchor.x);
       const midY = prevAnchor.y + t * (anchor.y - prevAnchor.y);
 
-      const newL: PathCommand = { type: 'L', values: [midX, midY] };
+      const newL: PathCommand = {
+        type: 'L',
+        values: [midX, midY],
+        authoredAnchor: true,
+      };
       // Insert the new point before the current command
       cmds.splice(commandIndex, 0, newL);
       return cmds;
@@ -436,12 +440,14 @@ export function splitSegmentAt(
 
       // First half: from p0 through a, d to f
       const c1: PathCommand = {
+        ...(cmd.manualBezier ? { manualBezier: true } : {}),
         type: 'C',
         values: [a.x, a.y, d.x, d.y, f.x, f.y],
       };
 
       // Second half: from f through e, c to p3
       const c2: PathCommand = {
+        ...cmd,
         type: 'C',
         values: [e.x, e.y, c.x, c.y, p3.x, p3.y],
       };
@@ -462,8 +468,15 @@ export function splitSegmentAt(
       const b = lerp2D(q1, q2, t);
       const m = lerp2D(a, b, t);
 
-      const qa: PathCommand = { type: 'Q', values: [a.x, a.y, m.x, m.y] };
-      const qb: PathCommand = { type: 'Q', values: [b.x, b.y, q2.x, q2.y] };
+      const qa: PathCommand = {
+        ...(cmd.manualBezier ? { manualBezier: true } : {}),
+        type: 'Q', values: [a.x, a.y, m.x, m.y],
+      };
+      const qb: PathCommand = {
+        ...cmd,
+        type: 'Q',
+        values: [b.x, b.y, q2.x, q2.y],
+      };
 
       cmds.splice(commandIndex, 1, qa, qb);
       return cmds;
@@ -477,7 +490,11 @@ export function splitSegmentAt(
       if (!firstAnchor) return cmds;
       const midX = prevAnchor.x + t * (firstAnchor.x - prevAnchor.x);
       const midY = prevAnchor.y + t * (firstAnchor.y - prevAnchor.y);
-      cmds.splice(commandIndex, 0, { type: 'L', values: [midX, midY] });
+      cmds.splice(commandIndex, 0, {
+        type: 'L',
+        values: [midX, midY],
+        authoredAnchor: true,
+      });
       return cmds;
     }
 
@@ -509,10 +526,15 @@ export function deletePoint(
 
   // Ensure first command is M
   if (cmds.length > 0 && cmds[0].type !== 'M') {
-    // Promote the first non-Z command to M
+    // Promote the first non-Z command to M. Its anchor doesn't move —
+    // conserva authoredAnchor; manualBezier no aplica, un M no es una curva.
     const firstAnchor = getAnchor(cmds[0]);
     if (firstAnchor) {
-      cmds[0] = { type: 'M', values: [firstAnchor.x, firstAnchor.y] };
+      cmds[0] = {
+        ...(cmds[0].authoredAnchor ? { authoredAnchor: true as const } : {}),
+        type: 'M',
+        values: [firstAnchor.x, firstAnchor.y],
+      };
     }
   }
 
@@ -552,7 +574,13 @@ export function convertToCurve(
   const cp2y = prevAnchor.y + (2 * (anchor.y - prevAnchor.y)) / 3;
 
   const curve: PathCommand = {
+    // El ancla es la misma coordenada (no se mueve): conserva authoredAnchor
+    // del comando L que sustituye. Solo aplica cuando de verdad lo sustituye
+    // en sitio — no cuando se materializa antes del Z (geometría insertada).
+    ...(cmd.type === 'L' && cmd.authoredAnchor ? { authoredAnchor: true as const } : {}),
     type: 'C',
+    // La conversión Bézier explícita conserva sus asas aunque la curva sea recta.
+    manualBezier: true,
     values: [cp1x, cp1y, cp2x, cp2y, anchor.x, anchor.y],
   };
 
@@ -581,7 +609,13 @@ export function convertToLine(
 
   if (cmd.type === 'C' || cmd.type === 'Q') {
     const anchor = getAnchor(cmd)!;
-    cmds[commandIndex] = { type: 'L', values: [anchor.x, anchor.y] };
+    // El ancla no se mueve: conserva authoredAnchor. manualBezier no viaja
+    // — el comando resultante ya no es una curva.
+    cmds[commandIndex] = {
+      ...(cmd.authoredAnchor ? { authoredAnchor: true as const } : {}),
+      type: 'L',
+      values: [anchor.x, anchor.y],
+    };
   }
 
   return cmds;

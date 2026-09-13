@@ -20,6 +20,7 @@ function draw(props: Partial<React.ComponentProps<typeof PolyPenToolOverlay>> = 
   const all = {
     nodes: [], previewPoint: null, pressPoint: null, isDragging: false, dragHandle: null,
     hover: null, nodeType: 'straight' as const, closeArmed: false, zoom2D: 1, units: 'mm',
+    angleReference: { kind: 'absolute' as const, baseDeg: 0 }, frozen: false,
     ...props,
   };
   return render(<svg><PolyPenToolOverlay {...all} /></svg>);
@@ -44,6 +45,46 @@ describe('PolyPenToolOverlay', () => {
     expect(readout).toContain(formatDimension(Math.hypot(10, 10), 'mm'));
     // 0° a la derecha, 90° hacia arriba tal como se ve en pantalla
     expect(readout).toContain('45.0°');
+    expect(readout).toContain('al eje');
+  });
+
+  it('expresa el angulo contra la referencia del tramo y muestra la pista de precision', () => {
+    const { container, getByText } = draw({
+      nodes,
+      previewPoint: P(110, -10),
+      angleReference: { kind: 'segment', baseDeg: 30 },
+      precisionHint: true,
+    });
+    expect(container.querySelector('.il-readout text')?.textContent).toContain('15.0° al tramo');
+    expect(getByText('Tab · escribe la medida')).toBeTruthy();
+  });
+
+  // #1166 revisión adversarial: misma corrección que PenToolOverlay — la
+  // pista tiene que quedar ENCIMA de la píldora, alineada a su borde
+  // izquierdo, nunca cruzando el cursor ni el vértice que engancha.
+  it('la pista queda ENCIMA de la píldora, alineada a su borde izquierdo, nunca sobre ni debajo del cursor', () => {
+    const { container } = draw({ nodes, previewPoint: P(110, -10), precisionHint: true });
+    const pill = container.querySelector('.il-readout rect')!;
+    const hint = container.querySelector('text.precision-hint')!;
+    const pillTop = Number(pill.getAttribute('y'));
+    const pillLeft = Number(pill.getAttribute('x'));
+    const hintY = Number(hint.getAttribute('y'));
+    const hintX = Number(hint.getAttribute('x'));
+
+    expect(hintY).toBeLessThan(pillTop);
+    expect(hintX).toBeCloseTo(pillLeft, 6);
+    expect(hint.getAttribute('text-anchor')).toBe('start');
+    // Igual que en PenToolOverlay: el cursor real vive en local (−22, +18)
+    // dentro de este grupo.
+    expect(hintY).toBeLessThan(18);
+  });
+
+  it('apaga la lectura live cuando la medida esta congelada', () => {
+    const { container, queryByText } = draw({
+      nodes, previewPoint: P(110, -10), frozen: true, precisionHint: true,
+    });
+    expect(container.querySelector('.il-readout')).toBeNull();
+    expect(queryByText('Tab · escribe la medida')).toBeNull();
   });
 
   it('con un objetivo de enganche la goma salta al objetivo y aparece el anillo', () => {

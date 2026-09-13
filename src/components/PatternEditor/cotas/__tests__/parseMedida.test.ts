@@ -6,7 +6,16 @@ describe('parseMedida', () => {
   it.each([
     ['300', 300], ['300,5', 300.5], ['300.5', 300.5], [' 12 ', 12], ['-45', -45], ['0', 0],
   ])('acepta %s', (texto, esperado) => expect(parseMedida(texto)).toBe(esperado));
-  it.each([['', null], ['abc', null], ['1e3', null], ['3,0,0', null], ['30 mm', null]])('rechaza %s', (t, e) =>
+  it.each([['', null], ['abc', null], ['1e3', null], ['3,0,0', null]])('rechaza %s', (t, e) =>
+    expect(parseMedida(t)).toBe(e));
+
+  // El parser rechazaba lo que el propio chip pinta (formatMedida): "90°",
+  // "12,3 mm" — y el signo menos Unicode (−, U+2212) que el teclado numérico
+  // de algún sistema operativo escribe en vez del ASCII.
+  it.each([
+    ['90°', 90], ['90 °', 90], ['12,3 mm', 12.3], ['12,3mm', 12.3], ['−90', -90], ['−12,5°', -12.5],
+  ])('acepta el sufijo que el chip pinta: %s', (texto, esperado) => expect(parseMedida(texto)).toBe(esperado));
+  it.each([['90grados', null], ['1e2', null], [',', null], ['30 cm', null]])('sigue rechazando %s', (t, e) =>
     expect(parseMedida(t)).toBe(e));
 });
 
@@ -17,4 +26,9 @@ describe('formatMedida', () => {
     expect(formatMedida(213.54, 'mm')).toBe('213,5 mm');
   });
   it('grados', () => expect(formatMedida(37, 'deg')).toBe('37°'));
+  it('incluye la referencia en el mismo texto que se mide y se pinta', () => {
+    expect(formatMedida(90, 'deg', 'al borde')).toBe('90° al borde');
+    expect(formatMedida(30, 'deg', 'al tramo')).toBe('30° al tramo');
+    expect(formatMedida(100, 'mm', 'al borde')).toBe('100 mm');
+  });
 });

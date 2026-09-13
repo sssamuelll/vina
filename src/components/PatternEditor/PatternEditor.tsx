@@ -59,6 +59,8 @@ import { useEditorInteractions } from './useEditorInteractions';
 import { useElasticTool } from '../../hooks/useElasticTool';
 import { EDGE_HIT_PX } from './gestureConstants';
 import PolyPenToolOverlay from './renderers/overlays/PolyPenToolOverlay';
+import { piezasConLargos as seleccionarPiezasConLargos } from './cotas/piezasConLargos';
+import { usePrecisionHint } from './usePrecisionHint';
 import MeasureToolOverlay from './renderers/overlays/MeasureToolOverlay';
 import GridLayer from './renderers/GridLayer';
 import RulerLayer from './renderers/RulerLayer';
@@ -113,7 +115,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const pieces = useSelector(selectPieces);
   const seams = useSelector(selectSeams);
   const editor = useSelector(selectEditor);
-  const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, showNotches, showPieceNames, showSewingLines, showLineLengths, renderMode2D, gridSize, units, fitViewToken } = editor;
+  const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, showNotches, showPieceNames, showSewingLines, lineLengthMode, renderMode2D, gridSize, units, fitViewToken } = editor;
   const selectedPieceIds = editor.selectedPieceIds;
   const toolOptions = useSelector(selectToolOptions);
   const groups = useSelector((s: RootState) => s.project.groups);
@@ -189,6 +191,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     visible: false, x: 0, y: 0, pieceId: null,
   });
 
+  const { showPrecisionHint, markPrecisionUsed } = usePrecisionHint();
   const handlePieceComplete = useCallback((piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => {
     const fullPiece: PatternPiece = {
       ...piece,
@@ -222,20 +225,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
     [pieces, hiddenLayerIds],
   );
-  // Los largos del contorno son del SUJETO pieza, no de «la pieza tocada»
-  // (contrato 09-09 § 1). `selectInternalLine` deja además
-  // `selectedPieceIds = [pieceId]` (editorSlice.ts:123), así que filtrar solo
-  // por selección encendía las cuatro lecturas del contorno encima de la cota
-  // del tramo que se estaba escribiendo: la sobresaturación de la causa G
-  // —[24:05] "y me sobresatura toda la información"— resucitada por la puerta
-  // de al lado. Si hay un sujeto más fino dentro de la pieza, el contorno calla.
-  const haySujetoDentroDeLaPieza = editor.selectedInternalLine !== null;
-  const piezasConLargos = useMemo(
-    () => drawablePieces.filter(piece =>
-      showLineLengths || (!haySujetoDentroDeLaPieza && selectedPieceIds.includes(piece.id))),
-    [drawablePieces, showLineLengths, selectedPieceIds, haySujetoDentroDeLaPieza],
-  );
-
   const pen = usePenTool(zoom2D, pan2D, handlePenComplete, drawablePieces, trazosVisibles);
   const rectTool = useRectangleTool(zoom2D, pan2D, handlePieceComplete);
   // El círculo nace de la misma puerta que la pluma y el rectángulo (#1111).
@@ -518,10 +507,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       seamAllowanceTool.cancel();
       return;
     }
-    // Línea interna con trazo vivo: el botón derecho no hace nada y el menú
-    // no se abre (spec 2026-08-29 § 4.3). Sin trazo, el menú de siempre.
+    // El clic derecho abre las mismas medidas que Tab (firma D6). Con un press
+    // vivo y ningún nodo no hay tramo que congelar: el menú se calla igual
+    // (spec 2026-08-29 § 4.3) y no pasa nada más.
     if (activeTool === 'internalShape' && internalShapeTool.isTracing()) {
       suppressed();
+      if (internalShapeTool.nodes.length > 0) internalShapeTool.openNextPoint();
       return;
     }
     // Rectángulo a mitad de arrastre: cancela y suprime el menú (spec § 6).
@@ -542,10 +533,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       triangleTool.cancel();
       return;
     }
-    // Pluma con trazo vivo: el botón derecho no hace nada y el menú no se
-    // abre (spec § 5), igual que en la línea interna.
+    // La misma puerta numérica en la pluma.
     if (activeTool === 'pen' && pen.nodes.length > 0) {
       suppressed();
+      pen.openNextPoint();
       return;
     }
     pushJournal('ui', 'contextmenu', { tool: activeTool, opened: true });
@@ -718,7 +709,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       isEditingNodes: editPatternTool.isEditing,
       derechoSobreElPuntoElegido,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.selectedNodes, editPatternTool.editingPieceId, editPatternTool.nodes, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, triangleTool, pen.nodes.length]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.selectedNodes, editPatternTool.editingPieceId, editPatternTool.nodes, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, triangleTool, pen]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
@@ -782,7 +773,21 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const { hotId: triangleHotId, enfriar: enfriarTriangle } = triangleTool;
   // Solo una herramienta está activa a la vez, y cada una enfría la suya en
   // cuanto deja de serlo: el sujeto caliente es el de la herramienta en curso.
-  const hotId = activeTool === 'circle' ? circleHotId : activeTool === 'triangle' ? triangleHotId : rectHotId;
+  const hotId = activeTool === 'circle' ? circleHotId
+    : activeTool === 'triangle' ? triangleHotId
+      : activeTool === 'rectangle' ? rectHotId : null;
+  // Los largos de los lados son un interruptor y nada más (firma de María del
+  // 13-09: «no quiero opciones ni que estén vinculadas con la creación»). Lo
+  // único que los calla con el interruptor encendido es un sujeto más fino
+  // dentro de la pieza o un arrastre, para no sobresaturar (#1153, 10-09).
+  const suppressLengths = isDraggingPiece || transformTool.isDragging || isDraggingEndpoint
+    || editor.selectedInternalLine !== null
+    || (nodeEditor.isEditing && nodeEditor.selectedNode !== null)
+    || (activeTool === 'editPattern' && editPatternTool.selectedNodes.size > 0);
+  const piezasConLargos = useMemo(
+    () => seleccionarPiezasConLargos(drawablePieces, lineLengthMode, { suppress: suppressLengths }),
+    [drawablePieces, lineLengthMode, suppressLengths],
+  );
   // Refs para que `aplicarCota` no se recree en cada render de la pluma: la
   // rama del tramo en curso necesita la herramienta viva, no una copia vieja.
   const penRef = useRef(pen);
@@ -873,20 +878,24 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // chip no existe hasta el render siguiente, así que se espera a que el
   // `tramoEnCurso` esté puesto y entonces se enfoca — no se puede enfocar lo
   // que todavía no está en el DOM.
-  const tramoVisto = useRef<number>(-1);
+  const tramoVisto = useRef<string>('');
   useEffect(() => {
     // La marca es la SECUENCIA del Tab, no la posición del tramo. Con la
     // posición, pulsar Tab una segunda vez sin haber colocado nada dejaba la
     // marca igual, el efecto salía temprano y el chip no se reabría — y como el
     // router ya había hecho `preventDefault`, el Tab nativo tampoco navegaba.
     // Tecla muerta, encontrada por la revisión adversarial del 06-09.
-    if (tramoVisto.current === tramoSeq) return;
-    tramoVisto.current = tramoSeq;
+    const clave = `${activeTool}:${tramoSeq}`;
+    if (tramoVisto.current === clave) return;
+    tramoVisto.current = clave;
     if (!tramoEnCurso) return;
     if (cotasRef.current?.abrirPrimero()) {
+      // La pista se retira solo cuando la pareja de verdad se abrió: si no,
+      // se apagaría (y persistiría) sin que ella viera nunca lo que anuncia.
+      markPrecisionUsed();
       pushJournal('gesture', 'tramo:congelado', { largo: tramoEnCurso.lengthMm, angulo: tramoEnCurso.angleDeg });
     }
-  }, [tramoSeq, tramoEnCurso]);
+  }, [activeTool, tramoSeq, tramoEnCurso, markPrecisionUsed]);
 
   // Enfriamiento irreversible (spec § 3.1): en cuanto la selección deja de ser
   // la pieza nueva, cambia la herramienta o la pieza desaparece, se enfría y
@@ -1293,7 +1302,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             showNotches={showNotches}
             showPieceNames={showPieceNames}
             renderMode2D={renderMode2D}
-            showLineLengths={showLineLengths}
             piezaConPuntosDeCurva={
               // María [11:38]: «los de curva igual no, porque son muchos
               // puntos… solo deberían verse cuando uno clica como el menú
@@ -1360,6 +1368,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             previewPath={pen.previewPath}
             guidePath={pen.guidePath}
             penDistance={pen.lastPointDistance}
+            precisionHint={showPrecisionHint}
             penWillClose={pen.willClose}
             penVertices={pen.verticesDePiezas}
             penSnapHover={pen.hover}
@@ -1482,6 +1491,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           {activeTool === 'internalShape' && (
             <PolyPenToolOverlay
               nodes={internalShapeTool.nodes}
+              angleReference={internalShapeTool.angleReference}
+              frozen={!!internalShapeTool.nextPoint}
+              precisionHint={showPrecisionHint}
               previewPoint={internalShapeTool.previewPoint}
               pressPoint={internalShapeTool.pressPoint}
               isDragging={internalShapeTool.isDragging}
@@ -1583,6 +1595,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         }}
         onConvertSegmentToPoints={(idx, pieceId) => {
           editPatternTool.convertSegmentToPoints(idx, pieceId);
+          showConvertedPoints(pieceId);
+        }}
+        onConvertSegmentToBezier={(idx, pieceId) => {
+          editPatternTool.convertSegmentToBezier(idx, pieceId);
           showConvertedPoints(pieceId);
         }}
         onZoomToFit={handleZoomToFit}
