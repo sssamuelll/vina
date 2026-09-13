@@ -59,6 +59,26 @@ describe('PolyPenToolOverlay', () => {
     expect(getByText('Tab · escribe la medida')).toBeTruthy();
   });
 
+  // #1166 revisión adversarial: misma corrección que PenToolOverlay — la
+  // pista tiene que quedar ENCIMA de la píldora, alineada a su borde
+  // izquierdo, nunca cruzando el cursor ni el vértice que engancha.
+  it('la pista queda ENCIMA de la píldora, alineada a su borde izquierdo, nunca sobre ni debajo del cursor', () => {
+    const { container } = draw({ nodes, previewPoint: P(110, -10), precisionHint: true });
+    const pill = container.querySelector('.il-readout rect')!;
+    const hint = container.querySelector('text.precision-hint')!;
+    const pillTop = Number(pill.getAttribute('y'));
+    const pillLeft = Number(pill.getAttribute('x'));
+    const hintY = Number(hint.getAttribute('y'));
+    const hintX = Number(hint.getAttribute('x'));
+
+    expect(hintY).toBeLessThan(pillTop);
+    expect(hintX).toBeCloseTo(pillLeft, 6);
+    expect(hint.getAttribute('text-anchor')).toBe('start');
+    // Igual que en PenToolOverlay: el cursor real vive en local (−22, +18)
+    // dentro de este grupo.
+    expect(hintY).toBeLessThan(18);
+  });
+
   it('apaga la lectura live cuando la medida esta congelada', () => {
     const { container, queryByText } = draw({
       nodes, previewPoint: P(110, -10), frozen: true, precisionHint: true,

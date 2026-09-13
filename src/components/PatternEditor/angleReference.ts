@@ -5,7 +5,17 @@ import { ringOf } from '../../utils/notchAnchor';
 import { polarOf } from './polyPenGeometry';
 import type { SnapIndex } from './snapIndex';
 
-/** Presentation frame only. Paths and numerical tool operations stay absolute. */
+/**
+ * Presentation frame only. Paths and numerical tool operations stay absolute.
+ *
+ * Lo que la referencia promete (firma D2, #1156) y sus límites:
+ * - «Seguir el borde = 0» vale en el sentido corregido del borde: el que deja
+ *   el interior de la pieza a +90°. Recorrerlo al revés lee ±180. Es inherente
+ *   a una referencia con signo.
+ * - En una esquina hay dos bordes: la referencia es el que se puede seguir
+ *   DESDE la esquina en ese sentido; el otro queda a +90 (en un ángulo recto).
+ * - Una pieza con más de un subpath (agujeros) no tiene «el borde»: cae al eje.
+ */
 export interface AngleReference {
   kind: 'absolute' | 'border' | 'segment';
   baseDeg: number;
@@ -55,6 +65,8 @@ function tangentAt(segment: RingSegment, t: number): Point2D {
 export function referenceBefore(
   path: PathCommand[], commandIndex: number, firstReference: AngleReference = ABSOLUTE_REFERENCE,
 ): AngleReference {
+  // Sin `M` inicial el parser arrancaría en (0,0) e inventaría un tramo.
+  if (path[0]?.type !== 'M') return firstReference;
   let start = commandIndex - 1;
   while (start > 0 && path[start]?.type !== 'M') start--;
   const built = buildRing(path.slice(start, commandIndex), 2);
@@ -65,14 +77,55 @@ export function referenceBefore(
   if (!segment) return firstReference;
   const tangent = tangentAt(segment, 1);
   if (Math.hypot(tangent.x, tangent.y) < 1e-9) return firstReference;
-  return { kind: 'segment', baseDeg: polarOf({ x: 0, y: 0 }, tangent).angleDeg };
+  return { kind: 'segment', baseDeg: normalizeAngle(polarOf({ x: 0, y: 0 }, tangent).angleDeg) };
+}
+
+const SAME_POINT_MM = 1e-6;
+const samePoint = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y) <= SAME_POINT_MM;
+
+/**
+ * Screen y grows down, so a positive shoelace traversal is clockwise on
+ * screen and leaves the interior on its right — the math-positive quarter
+ * turn of `polarOf` (counter-clockwise on screen) would point out. Those
+ * rings get their tangent reversed so +90 goes into the piece, independent
+ * of the winding the outline was saved with.
+ */
+function needsReversal(outline: PathCommand[]): boolean {
+  if (!outline.some(c => c.type === 'Z')) return false;
+  const points = ringOf(outline);
+  const area2 = points.reduce((sum, p, j) => {
+    const next = points[(j + 1) % points.length];
+    return sum + p.x * next.y - next.x * p.y;
+  }, 0);
+  return area2 > 0;
+}
+
+/**
+ * The border's own direction at `point`, before the winding correction.
+ *
+ * At a corner two segments meet. The reference is the one the user can
+ * follow FROM the corner in the corrected sense: the segment that leaves it
+ * when the ring already runs the right way, the one that arrives (walked
+ * backwards) when the ring is going to be reversed. Any other choice reads
+ * 180 for following a real edge (revisión 13-09, H4). `pointAt` alone is
+ * not enough: it settles the tie by ring order, which differs between the
+ * ring origin and every other corner.
+ */
+function borderTangent(
+  segments: readonly RingSegment[], at: { commandIndex: number; tLocal: number }, point: Point2D, reversed: boolean,
+): Point2D | null {
+  const arriving = segments.find(s => samePoint(s.to, point));
+  const leaving = segments.find(s => samePoint(s.from, point));
+  if (arriving && leaving) return reversed ? tangentAt(arriving, 1) : tangentAt(leaving, 0);
+  const segment = segments.find(s => s.commandIndex === at.commandIndex);
+  return segment ? tangentAt(segment, at.tLocal) : null;
 }
 
 /**
  * Reconstruct the first segment's reference from its actual attachment.
  * The snap index supplies visibility, draw order and the canonical rings.
  * No pixel radius: moving an origin off its edge removes the attachment.
- * At corners the ring's command order decides; cursor direction never does.
+ * At corners the ring decides (see `borderTangent`); cursor direction never does.
  */
 export function borderReference(index: SnapIndex, world: Point2D, pieceId?: string): AngleReference {
   for (let i = index.pieces.length - 1; i >= 0; i--) {
@@ -83,21 +136,13 @@ export function borderReference(index: SnapIndex, world: Point2D, pieceId?: stri
     const local = patternToPieceLocal(world, piece);
     const projected = projectToRing(ring, local);
     if (Math.hypot(projected.point.x - local.x, projected.point.y - local.y) > 1e-5) continue;
+    // The synthetic closure of an open path is not a border.
+    const real = ring.segments.filter(s => s.commandIndex < piece.outline.length);
+    const reversed = needsReversal(piece.outline);
     const at = pointAt(ring, projected.distanceMm);
-    const segment = ring.segments.find(s => s.commandIndex === at.commandIndex);
-    if (!segment || segment.commandIndex >= piece.outline.length) continue;
-    let tangent = tangentAt(segment, at.tLocal);
-    if (Math.hypot(tangent.x, tangent.y) < 1e-9) continue;
-    if (piece.outline.some(c => c.type === 'Z')) {
-      const points = ringOf(piece.outline);
-      const area2 = points.reduce((sum, p, j) => {
-        const next = points[(j + 1) % points.length];
-        return sum + p.x * next.y - next.x * p.y;
-      }, 0);
-      // Screen y grows down. Reverse a positive shoelace traversal so the
-      // math-positive quarter-turn goes into the piece, independent of winding.
-      if (area2 > 0) tangent = { x: -tangent.x, y: -tangent.y };
-    }
+    let tangent = borderTangent(real, at, projected.point, reversed);
+    if (!tangent || Math.hypot(tangent.x, tangent.y) < 1e-9) continue;
+    if (reversed) tangent = { x: -tangent.x, y: -tangent.y };
     const from = pieceLocalToPattern(local, piece);
     const to = pieceLocalToPattern({ x: local.x + tangent.x, y: local.y + tangent.y }, piece);
     return { kind: 'border', baseDeg: normalizeAngle(polarOf(from, to).angleDeg) };

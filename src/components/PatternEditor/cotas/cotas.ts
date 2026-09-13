@@ -16,7 +16,7 @@ import { polarOf, polarPoint } from '../polyPenGeometry';
 import { edgeDistances, type EdgeDistance } from './edgeDistances';
 import { segmentPolar } from './segmentPolar';
 import { ABSOLUTE_REFERENCE, absoluteAngle, angleReferenceLabel, borderReference, referenceBefore, relativeAngle, type AngleReference } from '../angleReference';
-import { buildSnapIndex } from '../snapIndex';
+import { buildSnapIndex, type SnapIndex } from '../snapIndex';
 
 export type CotaUpdate =
   | ({ kind: 'piece' } & TransformUpdate)
@@ -342,6 +342,36 @@ function cotasDeTramos(opts: {
   return cotas;
 }
 
+/**
+ * `buildSnapIndex` aplana nodos, extremos y anillos de TODAS las piezas
+ * visibles — caro, y ya documentado como memoizable "por identidad de
+ * `pieces`" en `snapIndex.ts`. `cotasDeTrazo`/`cotasDeLineaInterna` lo
+ * reconstruían en cada llamada de todos modos: una caché por identidad evita
+ * rehacerlo cuando la pieza (o el array de piezas visibles) no cambió entre
+ * dos llamadas — el caso común en la ruta de render, donde `sujeto.ts` llama
+ * esto en cada tick con la misma selección.
+ */
+const snapIndexPorPieza = new WeakMap<PatternPiece, SnapIndex>();
+const snapIndexPorPiezas = new WeakMap<PatternPiece[], SnapIndex>();
+
+function snapIndexDePieza(piece: PatternPiece): SnapIndex {
+  let index = snapIndexPorPieza.get(piece);
+  if (!index) {
+    index = buildSnapIndex([piece]);
+    snapIndexPorPieza.set(piece, index);
+  }
+  return index;
+}
+
+function snapIndexDePiezas(pieces: PatternPiece[]): SnapIndex {
+  let index = snapIndexPorPiezas.get(pieces);
+  if (!index) {
+    index = buildSnapIndex(pieces);
+    snapIndexPorPiezas.set(pieces, index);
+  }
+  return index;
+}
+
 /** Las cotas de un tramo de trazo (spec 2026-09-12 § 5.3): el path ya está en patrón. */
 export function cotasDeTrazo(trazo: Trazo, segmentIndex: number, pieces: PatternPiece[] = []): Cota[] {
   const anclas = trazo.path.map(getAnchor).filter((a): a is Point2D => a !== null);
@@ -351,7 +381,7 @@ export function cotasDeTrazo(trazo: Trazo, segmentIndex: number, pieces: Pattern
     y: anclas.reduce((s, a) => s + a.y, 0) / anclas.length,
   };
   const identidad = (p: Point2D) => p;
-  const index = buildSnapIndex(pieces);
+  const index = snapIndexDePiezas(pieces);
   return cotasDeTramos({
     path: trazo.path,
     idBase: `trazo-${trazo.id}`,
@@ -377,7 +407,7 @@ export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine, seg
     ? bboxPivot(bbox)
     : pieceLocalToPattern({ x: 0, y: 0 }, piece);
   const idBase = `${piece.id}-${line.id}`;
-  const index = buildSnapIndex([piece]);
+  const index = snapIndexDePieza(piece);
   const cotas = cotasDeTramos({
     path: line.path,
     idBase,

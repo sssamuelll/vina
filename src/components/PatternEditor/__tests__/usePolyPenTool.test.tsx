@@ -329,6 +329,23 @@ describe('usePolyPenTool — siguiente punto (Tab, placePolar)', () => {
     act(() => { tool().handleKeyDown(key('Enter')); });
     expect(tool().nextPoint).toBeNull();
   });
+
+  it('un clic con la pareja congelada la suelta y el nodo cae donde se clicó', () => {
+    // Revisión 13-09 (H1): volver al ratón es volver del todo; antes el nodo
+    // nacía pero la pareja seguía viva apuntando al origen anterior.
+    const { tool, click, move } = setup();
+    click(150, 150);
+    move(200, 150);
+    act(() => tool().openNextPoint());
+    expect(tool().nextPoint).not.toBeNull();
+    expect(tool().previewPoint).toEqual({ x: 200, y: 150 });
+    click(180, 200);
+    expect(tool().nextPoint).toBeNull();
+    expect(tool().nodes).toHaveLength(2);
+    expect(tool().nodes[1].point).toEqual({ x: 180, y: 200 });
+    move(230, 230);
+    expect(tool().previewPoint, 'la goma vuelve a seguir al ratón').toEqual({ x: 230, y: 230 });
+  });
 });
 
 /** Lo que el motor decide en silencio queda en la bitácora (spec caja-negra § 3.3). */

@@ -186,7 +186,12 @@ function ChipEditable({
     setEditing(false);
   };
   const parsea = (): number | null => {
-    const v = dirty ? parseMedida(draft) : campoActivo.valueMm;
+    // Lo ESCRITO se redondea a un decimal, igual que el chip lo pinta
+    // (`aTexto`/flechas ya lo hacían) — si no, el número guardado y el que
+    // se lee quedan a un decimal de distancia. Sin editar (`dirty === false`)
+    // conserva el valor interno exacto: eso no cambia.
+    const crudo = dirty ? parseMedida(draft) : campoActivo.valueMm;
+    const v = dirty && crudo !== null ? round1(crudo) : crudo;
     return v !== null && v >= campoActivo.min && v <= campoActivo.max ? v : null;
   };
   /**
@@ -275,13 +280,17 @@ function ChipEditable({
         onBlur={(e) => {
           if (!cerrado.current && !editorRef.current?.contains(e.relatedTarget)) cerrar(null);
         }}
+        onContextMenu={(e) => e.preventDefault()}
       />
     );
     if (!agrupado) {
       const unico = input(cota, 0);
       if (!referenciaVisible(cota)) return unico;
       return (
-        <div ref={editorRef} className="cota cota--grupo cota--grupo-editando" style={{ left, top }}>
+        <div
+          ref={editorRef} className="cota cota--grupo cota--grupo-editando" style={{ left, top }}
+          onContextMenu={(e) => e.preventDefault()}
+        >
           <label className="cota-campo">
             {unico}
             <span>{'°' + referenciaVisible(cota)}</span>
@@ -290,7 +299,10 @@ function ChipEditable({
       );
     }
     return (
-      <div ref={editorRef} className="cota cota--grupo cota--grupo-editando" style={{ left, top }}>
+      <div
+        ref={editorRef} className="cota cota--grupo cota--grupo-editando" style={{ left, top }}
+        onContextMenu={(e) => e.preventDefault()}
+      >
         {campos.map((campo, indice) => (
           <label key={campo.id} className="cota-campo">
             <span>{campo.label}</span>
@@ -298,6 +310,9 @@ function ChipEditable({
             <span>{campo.unit === 'mm' ? 'mm' : '°' + referenciaVisible(campo)}</span>
           </label>
         ))}
+        {cota.grupo === 'tramo-en-curso' && (
+          <span className="cota-grupo-pista">Tab para continuar · Enter para trazar</span>
+        )}
       </div>
     );
   }

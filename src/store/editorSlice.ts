@@ -25,7 +25,7 @@ const initialState: EditorState = {
   showNotches: true,
   showAnchorPoints: false,
   showPieceNames: false,
-  lineLengthMode: 'creation',
+  lineLengthMode: 'none',
   lineLengthModeSetByUser: false,
   showTrazos: true,
   showSewingLines: true,

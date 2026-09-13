@@ -15,7 +15,7 @@ interface LineLengthPreferenceStore {
 const STORAGE_KEY = 'line-length-mode';
 
 function isLineLengthMode(value: unknown): value is LineLengthMode {
-  return value === 'creation' || value === 'all' || value === 'none';
+  return value === 'all' || value === 'none';
 }
 
 export function initLineLengthPreference(store: LineLengthPreferenceStore): () => void {
@@ -41,7 +41,13 @@ export function initLineLengthPreference(store: LineLengthPreferenceStore): () =
 
   void storageGet('settings', STORAGE_KEY)
     .then((value) => {
-      if (active && isLineLengthMode(value)) store.dispatch(hydrateLineLengthMode(value));
+      if (!active) return;
+      if (isLineLengthMode(value)) store.dispatch(hydrateLineLengthMode(value));
+      // 'creation' es el tercer estado retirado (firma de María 2026-09-12):
+      // quien lo probó en esa rama lo tiene guardado en IDB. Se migra a
+      // 'none' explícitamente en vez de solo rechazarlo — el default ya es
+      // 'none', pero esto no depende de que siga siéndolo.
+      else if (value === 'creation') store.dispatch(hydrateLineLengthMode('none'));
     })
     .catch(() => undefined);
 

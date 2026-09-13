@@ -708,13 +708,37 @@ describe('D3/D5 — intención de edición en el comando canónico', () => {
     expect(result.project.pieces[0].outline).toEqual(project.pieces[0].outline);
   });
 
-  it('los proyectos previos no adquieren metadatos y una marca inválida se rechaza', () => {
+  it('los proyectos previos no adquieren metadatos y una marca inválida se limpia y el proyecto carga', () => {
     const project = makeProject();
     const legacy = parseVinaProject(project);
     expect(legacy.ok).toBe(true);
     if (legacy.ok) expect(legacy.project.pieces[0].outline).toEqual(project.pieces[0].outline);
+
+    // M8 (revisión adversarial #1166): un authoredAnchor no-true escrito por
+    // un plugin (o legado) se LIMPIA en vez de tumbar el proyecto entero.
     const malformed = JSON.parse(JSON.stringify(project));
     malformed.pieces[0].outline[1].authoredAnchor = 'yes';
-    expect(parseVinaProject(malformed).ok).toBe(false);
+    const result = parseVinaProject(malformed);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.project.pieces[0].outline[1].authoredAnchor).toBeUndefined();
+    }
+  });
+
+  it('limpia también manualBezier y otros valores no-true (false, null, número)', () => {
+    const project = makeProject();
+    const malformed = JSON.parse(JSON.stringify(project)) as Record<string, unknown>;
+    const pieces = malformed.pieces as Array<{ outline: Array<Record<string, unknown>> }>;
+    pieces[0].outline[1].authoredAnchor = false;
+    pieces[0].outline[1].manualBezier = null;
+    pieces[0].outline[2].manualBezier = 1;
+
+    const result = parseVinaProject(malformed);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.project.pieces[0].outline[1].authoredAnchor).toBeUndefined();
+      expect(result.project.pieces[0].outline[1].manualBezier).toBeUndefined();
+      expect(result.project.pieces[0].outline[2].manualBezier).toBeUndefined();
+    }
   });
 });

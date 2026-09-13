@@ -236,10 +236,14 @@ export function usePenTool(
     pushJournal('gesture', 'pen:press', { closes: false, nodes: nodes.length + 1, snap: enganche?.kind ?? null });
     const newNode: PenNode = { anchor, handleIn: null, handleOut: null };
     pressRef.current = { screen: { x: e.clientX, y: e.clientY }, moved: false };
+    // Un clic con la pareja congelada la suelta: volver al ratón es volver del
+    // todo (revisión 13-09, H1). Si no, la goma se quedaba clavada al destino
+    // congelado y el chip sobre el tramo anterior hasta dos Escape.
     setState(prev => ({
       ...prev,
       nodes: [...prev.nodes, newNode],
       isDragging: false,
+      nextPoint: null,
     }));
   }, [toPattern, zoom, complete, indice, radio]);
 
@@ -398,8 +402,10 @@ export function usePenTool(
   // ¿El próximo clic cierra el contorno? Mismo umbral que el snap real de
   // handleMouseDown — el aviso y el comportamiento no pueden discrepar
   // (maria-196: el cierre existía pero era invisible).
+  // Con la pareja congelada el clic sigue cerrando (handleMouseDown no mira
+  // `nextPoint`), así que el aviso tampoco se apaga: aviso y comportamiento
+  // no pueden discrepar (maria-196, y la revisión del 13-09 por el otro lado).
   const willClose =
-    !state.nextPoint &&
     state.nodes.length > 2 &&
     !!state.cursorPos &&
     !state.isClosed &&
@@ -428,8 +434,9 @@ export function usePenTool(
     previewPath: buildPreviewPath(),
     guidePath: buildGuidePath(),
     lastPointDistance,
-    /** Lo que el próximo clic va a enganchar, para que el overlay lo anuncie. */
-    hover: state.nextPoint ? null : hover,
+    /** Lo que el próximo clic va a enganchar, para que el overlay lo anuncie —
+     *  también con la pareja congelada, porque ese clic engancha igual. */
+    hover,
     /** Los vértices de las piezas visibles — #1102 [11:38]. */
     verticesDePiezas,
     nextPoint: state.nextPoint,

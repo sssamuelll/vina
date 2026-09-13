@@ -336,43 +336,50 @@ function splitCommandAt(
     return { before: [cmd], after: [] };
   }
 
+  // Las marcas viajan con el comando de llegada (`authoredAnchor`) o con el
+  // tramo (`manualBezier`): la mitad que termina en el punto de corte es
+  // geometría nueva y solo hereda la del tramo; la que conserva el extremo
+  // original hereda las dos. Mismo reparto que `splitSegmentAt` en
+  // nodeEditorUtils.ts — las tijeras eran el hermano sin censar (revisión
+  // 13-09, H5): un lado en Bézier libre cortado volvía a ser spline gestionada.
+  const delTramo = cmd.manualBezier ? { manualBezier: true as const } : {};
   switch (cmd.type) {
     case 'L': {
       const mx = lerp(anchor.x, cmd.values[0], t);
       const my = lerp(anchor.y, cmd.values[1], t);
       return {
         before: [{ type: 'L', values: [mx, my] }],
-        after: [{ type: 'L', values: [cmd.values[0], cmd.values[1]] }],
+        after: [{ ...cmd, type: 'L', values: [cmd.values[0], cmd.values[1]] }],
       };
     }
     case 'H': {
       const mx = lerp(anchor.x, cmd.values[0], t);
       return {
         before: [{ type: 'L', values: [mx, anchor.y] }],
-        after: [{ type: 'L', values: [cmd.values[0], anchor.y] }],
+        after: [{ ...cmd, type: 'L', values: [cmd.values[0], anchor.y] }],
       };
     }
     case 'V': {
       const my = lerp(anchor.y, cmd.values[0], t);
       return {
         before: [{ type: 'L', values: [anchor.x, my] }],
-        after: [{ type: 'L', values: [anchor.x, cmd.values[0]] }],
+        after: [{ ...cmd, type: 'L', values: [anchor.x, cmd.values[0]] }],
       };
     }
     case 'C': {
       const [cp1x, cp1y, cp2x, cp2y, ex, ey] = cmd.values;
       const split = splitCubic(anchor.x, anchor.y, cp1x, cp1y, cp2x, cp2y, ex, ey, t);
       return {
-        before: [{ type: 'C', values: [...split.first] }],
-        after: [{ type: 'C', values: [...split.second] }],
+        before: [{ ...delTramo, type: 'C', values: [...split.first] }],
+        after: [{ ...cmd, type: 'C', values: [...split.second] }],
       };
     }
     case 'Q': {
       const [cpx, cpy, ex, ey] = cmd.values;
       const split = splitQuadratic(anchor.x, anchor.y, cpx, cpy, ex, ey, t);
       return {
-        before: [{ type: 'Q', values: [...split.first] }],
-        after: [{ type: 'Q', values: [...split.second] }],
+        before: [{ ...delTramo, type: 'Q', values: [...split.first] }],
+        after: [{ ...cmd, type: 'Q', values: [...split.second] }],
       };
     }
     default: {
@@ -384,7 +391,7 @@ function splitCommandAt(
         const my = lerp(anchor.y, ey, t);
         return {
           before: [{ type: 'L', values: [mx, my] }],
-          after: [{ type: 'L', values: [ex, ey] }],
+          after: [{ ...cmd, type: 'L', values: [ex, ey] }],
         };
       }
       return { before: [cmd], after: [] };

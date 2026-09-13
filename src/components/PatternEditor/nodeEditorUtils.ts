@@ -526,10 +526,15 @@ export function deletePoint(
 
   // Ensure first command is M
   if (cmds.length > 0 && cmds[0].type !== 'M') {
-    // Promote the first non-Z command to M
+    // Promote the first non-Z command to M. Its anchor doesn't move —
+    // conserva authoredAnchor; manualBezier no aplica, un M no es una curva.
     const firstAnchor = getAnchor(cmds[0]);
     if (firstAnchor) {
-      cmds[0] = { type: 'M', values: [firstAnchor.x, firstAnchor.y] };
+      cmds[0] = {
+        ...(cmds[0].authoredAnchor ? { authoredAnchor: true as const } : {}),
+        type: 'M',
+        values: [firstAnchor.x, firstAnchor.y],
+      };
     }
   }
 
@@ -569,6 +574,10 @@ export function convertToCurve(
   const cp2y = prevAnchor.y + (2 * (anchor.y - prevAnchor.y)) / 3;
 
   const curve: PathCommand = {
+    // El ancla es la misma coordenada (no se mueve): conserva authoredAnchor
+    // del comando L que sustituye. Solo aplica cuando de verdad lo sustituye
+    // en sitio — no cuando se materializa antes del Z (geometría insertada).
+    ...(cmd.type === 'L' && cmd.authoredAnchor ? { authoredAnchor: true as const } : {}),
     type: 'C',
     // La conversión Bézier explícita conserva sus asas aunque la curva sea recta.
     manualBezier: true,
@@ -600,7 +609,13 @@ export function convertToLine(
 
   if (cmd.type === 'C' || cmd.type === 'Q') {
     const anchor = getAnchor(cmd)!;
-    cmds[commandIndex] = { type: 'L', values: [anchor.x, anchor.y] };
+    // El ancla no se mueve: conserva authoredAnchor. manualBezier no viaja
+    // — el comando resultante ya no es una curva.
+    cmds[commandIndex] = {
+      ...(cmd.authoredAnchor ? { authoredAnchor: true as const } : {}),
+      type: 'L',
+      values: [anchor.x, anchor.y],
+    };
   }
 
   return cmds;

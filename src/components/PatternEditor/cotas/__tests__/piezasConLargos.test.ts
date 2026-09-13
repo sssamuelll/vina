@@ -11,19 +11,12 @@ const pieces = [pieza('a'), pieza('b')];
 
 describe('piezasConLargos', () => {
   it.each([
-    ['none', null, false, []],
-    ['none', 'a', false, []],
-    ['all', null, false, ['a', 'b']],
-    ['all', 'a', false, ['a', 'b']],
-    ['creation', null, false, []],
-    ['creation', 'a', false, ['a']],
-    ['creation', 'missing', false, []],
-    ['creation', 'b', false, ['b']],
-    ['none', 'a', true, []],
-    ['all', 'a', true, []],
-    ['creation', 'a', true, []],
-  ] as const)('%s, sujeto %s, suppress=%s → %j', (mode, hotPieceId, suppress, expected) => {
-    const result = piezasConLargos(pieces, mode, { hotPieceId, suppress });
+    ['all', false, ['a', 'b']],
+    ['all', true, []],
+    ['none', false, []],
+    ['none', true, []],
+  ] as const)('mode=%s, suppress=%s → %j', (mode, suppress, expected) => {
+    const result = piezasConLargos(pieces, mode, { suppress });
     expect(result.map(piece => piece.id)).toEqual(expected);
     for (const piece of result) expect(pieces).toContain(piece);
   });

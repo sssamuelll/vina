@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint, unfoldPiece, optimizeCurvePoints, optimizePieceCurves, offsetInternalLine, replaceAsPatternOutline } from '../patternOps';
 import { extractDarts } from '../dartEntity';
 import type { PatternPiece, SemanticEdge, PathCommand } from '../../types/types';
+import { extractNodes } from '../../components/PatternEditor/nodeEditorUtils';
+import { classifyEditableAnchors } from '../../components/PatternEditor/anchorRoles';
 
 function makeRect(name: string, w: number, h: number): PatternPiece {
   return {
@@ -87,6 +89,23 @@ describe('addFacing', () => {
     const piece = makeRect('Front', 400, 600);
     const facing = addFacing(piece, 'top');
     expect(facing).toBeDefined();
+  });
+
+  // "Bajos" (revisión adversarial #1166): el contorno de offset invertido
+  // copiaba `...c` y con él la marca — la segunda aparición no es una
+  // inserción humana. El copiado 1:1 (primera mitad) sí conserva las marcas.
+  it('el contorno desplazado nace sin marcas; el copiado 1:1 las conserva', () => {
+    const piece = makeRect('Front Bodice', 400, 600);
+    piece.outline[1] = { ...piece.outline[1], authoredAnchor: true, manualBezier: true };
+    piece.edges = [{ id: 'e1', name: 'neckline', segmentRange: [1, 2], edgeType: 'seam' }];
+
+    const facing = addFacing(piece, 'neckline', 40);
+
+    expect(facing.outline[0]).toEqual({
+      type: 'L', values: [400, 0], authoredAnchor: true, manualBezier: true,
+    });
+    expect(facing.outline[1].authoredAnchor).toBeUndefined();
+    expect(facing.outline[1].manualBezier).toBeUndefined();
   });
 });
 
@@ -323,6 +342,15 @@ describe('trimEdgeAtPoint', () => {
     const result = trimEdgeAtPoint(piece, 1, { x: 100, y: 0 }, 'before');
     expect(result.id).toBe(piece.id);
   });
+
+  // M3 (revisión adversarial #1166): el punto de recorte es geometría NUEVA
+  // — nadie lo insertó — así que no hereda la marca del extremo descartado.
+  it('el punto de recorte en una línea recta nace sin authoredAnchor', () => {
+    const piece = makeRect('Square', 200, 200);
+    piece.outline[1] = { ...piece.outline[1], authoredAnchor: true };
+    const result = trimEdgeAtPoint(piece, 1, { x: 100, y: 0 }, 'before');
+    expect(result.outline[1]).toEqual({ type: 'L', values: [100, 0] });
+  });
 });
 
 function makeBezierPiece(): PatternPiece {
@@ -383,6 +411,28 @@ describe('trimEdgeAtPoint — Bezier', () => {
     const piece = makeBezierPiece();
     const result = trimEdgeAtPoint(piece, 1, { x: 100, y: -30 }, 'before');
     expect(result.id).toBe(piece.id);
+  });
+
+  // M3 (revisión adversarial #1166): el trim point es geometría NUEVA —
+  // manualBezier queda inerte (ya no es C) y authoredAnchor decoraría un
+  // punto que nadie insertó. Ninguna marca sobrevive.
+  it('el punto de recorte de una curva nace sin manualBezier ni authoredAnchor', () => {
+    const piece = makeBezierPiece();
+    piece.outline[1] = { ...piece.outline[1], authoredAnchor: true, manualBezier: true };
+    const result = trimEdgeAtPoint(piece, 1, { x: 100, y: -30 }, 'before');
+    expect(result.outline[1].type).toBe('L');
+    expect(result.outline[1].authoredAnchor).toBeUndefined();
+    expect(result.outline[1].manualBezier).toBeUndefined();
+  });
+
+  // M3: keepSide 'after' conserva el extremo ORIGINAL de la curva (no es
+  // geometría nueva) — authoredAnchor sigue; manualBezier no, porque el
+  // comando resultante ya no es un C.
+  it('conserva authoredAnchor pero no manualBezier cuando el extremo original sobrevive', () => {
+    const piece = makeBezierPiece();
+    piece.outline[1] = { ...piece.outline[1], authoredAnchor: true, manualBezier: true };
+    const result = trimEdgeAtPoint(piece, 1, { x: 100, y: -30 }, 'after');
+    expect(result.outline[1]).toEqual({ type: 'L', values: [200, 0], authoredAnchor: true });
   });
 });
 
@@ -466,6 +516,30 @@ describe('unfoldPiece', () => {
       return end[0] === -200 && end[1] === 600;
     });
     expect(reflectedAuthored?.authoredAnchor).toBe(true);
+
+    // M5: la promesa no es la bandera, es el ROL que renderiza. Aquí el M
+    // linda con la curva manualBezier (outline[1] es C) — bezierAnchor
+    // gana legítimamente por contrato (§ "solo tiene semántica de esquina
+    // mientras los dos lados incidentes siguen rectos"); no es smoothSample.
+    const actualPiece = unfoldPiece(marked, 'fold-1');
+    const roleAtM = classifyEditableAnchors(actualPiece, extractNodes(actualPiece))
+      .find((item) => item.node.ref.commandIndex === 0)?.role;
+    expect(roleAtM).toBe('bezierAnchor');
+  });
+
+  // M5 (revisión adversarial #1166): cuando el M desplegado NO linda con
+  // ninguna curva, authoredAnchor sí debe dar el glifo de esquina —
+  // hasStraightIncidentEdges tiene que reconocer sus dos lados: outline[1]
+  // (sale) y el último comando real antes del Z de cierre (llega).
+  it('el M del contorno desplegado da rol corner cuando sus dos lados son rectos', () => {
+    const half = makeHalfRect('FoldCorner');
+    half.outline[0] = { ...half.outline[0], authoredAnchor: true };
+
+    const full = unfoldPiece(half, 'fold-1');
+    const roleAtM = classifyEditableAnchors(full, extractNodes(full))
+      .find((item) => item.node.ref.commandIndex === 0)?.role;
+
+    expect(roleAtM).toBe('corner');
   });
 
   it('removes fold line from internals', () => {

@@ -72,11 +72,53 @@ describe('D2 — un marco angular para leer y escribir', () => {
     expect(relativeAngle(90, ref)).toBeCloseTo(0, 9);
   });
 
-  it('el primer tramo usa el borde y una esquina tiene un desempate estable', () => {
+  it('en una esquina: seguir un borde lee 0, el otro lee +90, y da igual el sentido guardado', () => {
+    // Revisión 13-09 (H4): el desempate por orden del anillo daba 180 al
+    // seguir un borde real y variaba entre el origen del anillo y las demás
+    // esquinas. El test anterior era `expect(f(x)).toEqual(f(x))`.
+    const reversed: PathCommand[] = [
+      { type: 'M', values: [0, 0] }, { type: 'L', values: [0, 100] },
+      { type: 'L', values: [100, 100] }, { type: 'L', values: [100, 0] }, { type: 'Z', values: [] },
+    ];
+    const esquinas = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
+    for (const path of [outline, reversed]) {
+      const index = buildSnapIndex([piece(path)]);
+      for (const esquina of esquinas) {
+        const ref = borderReference(index, esquina);
+        expect(ref.kind).toBe('border');
+        // Los dos bordes que salen de la esquina, como direcciones.
+        const bordes = esquinas
+          .filter(o => o !== esquina && (o.x === esquina.x || o.y === esquina.y))
+          .map(o => relativeAngle(polarOf(esquina, o).angleDeg, ref));
+        expect(bordes.map(v => Math.round(v * 1e6) / 1e6).sort((a, b) => a - b), `esquina ${esquina.x},${esquina.y}`).toEqual([0, 90]);
+        // Y la bisectriz interior queda a 45: +90 nunca apunta fuera.
+        const centro = polarOf(esquina, { x: 50, y: 50 }).angleDeg;
+        expect(relativeAngle(centro, ref)).toBeCloseTo(45, 9);
+      }
+    }
+  });
+
+  it('el primer tramo hereda el marco del borde cuando no hay tramo anterior', () => {
     const index = buildSnapIndex([piece()]);
     const ref = borderReference(index, { x: 100, y: 0 });
-    expect(ref.kind).toBe('border');
-    expect(borderReference(index, { x: 100, y: 0 })).toEqual(ref);
     expect(referenceBefore([{ type: 'M', values: [100, 0] }], 1, ref)).toEqual(ref);
+  });
+
+  it('el marco del tramo anterior queda normalizado en (−180, 180], y sin M inicial no se inventa', () => {
+    // Revisión 13-09 (C10 y C9): `polarOf` puede devolver −180, y un path
+    // sin `M` haría que el parser arrancara en (0,0).
+    const haciaIzquierda: PathCommand[] = [{ type: 'M', values: [50, 0] }, { type: 'L', values: [0, 0] }];
+    expect(referenceBefore(haciaIzquierda, haciaIzquierda.length).baseDeg).toBe(180);
+    const sinM: PathCommand[] = [{ type: 'L', values: [100, 0] }, { type: 'L', values: [100, 50] }];
+    expect(referenceBefore(sinM, 1)).toEqual(ABSOLUTE_REFERENCE);
+  });
+
+  it('una pieza con agujero no tiene «el borde»: cae al eje, y queda dicho', () => {
+    const conAgujero: PathCommand[] = [
+      ...outline,
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [40, 20] },
+      { type: 'L', values: [40, 40] }, { type: 'L', values: [20, 40] }, { type: 'Z', values: [] },
+    ];
+    expect(borderReference(buildSnapIndex([piece(conAgujero)]), { x: 0, y: 40 })).toEqual(ABSOLUTE_REFERENCE);
   });
 });

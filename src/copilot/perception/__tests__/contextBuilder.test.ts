@@ -109,7 +109,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       showNotches: true,
       showAnchorPoints: true,
       showPieceNames: false,
-      lineLengthMode: 'creation',
+      lineLengthMode: 'none',
       lineLengthModeSetByUser: false,
       showSewingLines: true,
       renderMode2D: 'textured' as const,

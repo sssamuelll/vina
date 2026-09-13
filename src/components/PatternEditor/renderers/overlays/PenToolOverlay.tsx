@@ -208,11 +208,16 @@ export default function PenToolOverlay({
             {distanceText}
           </text>
           {precisionHint && (
+            // ENCIMA de la píldora (no debajo): debajo cruzaba justo el punto
+            // del próximo clic y el vértice que engancha (revisión
+            // adversarial #1166). Alineada a su mismo borde izquierdo —no
+            // centrada sobre el cursor— con `textAnchor="start"` en `pill.x`.
             <text
               className="precision-hint"
-              y={pill.height / 2 + fontSize * 1.35}
-              textAnchor="middle"
-              dominantBaseline="hanging"
+              x={pill.x}
+              y={pill.y - fontSize * 0.6}
+              textAnchor="start"
+              dominantBaseline="auto"
               fill="var(--ink-hint)"
               fontSize={fontSize}
               pointerEvents="none"

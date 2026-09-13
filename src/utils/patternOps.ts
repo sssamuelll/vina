@@ -327,9 +327,9 @@ export function addFacing(
     // Create facing: edge contour + offset contour
     facingOutline = [
       ...edgeCmds.map(c => ({ ...c, values: [...c.values] })),
-      // Offset path (simplified: shift by width in Y)
+      // Offset path (simplified: shift by width in Y). Displaced geometry,
+      // not a 1:1 clone of the edge — born without authoredAnchor/manualBezier.
       ...edgeCmds.map(c => ({
-        ...c,
         type: c.type as PathCommand['type'],
         values: c.values.map((v, i) => i % 2 === 1 ? v + width : v),
       })).reverse(),
@@ -712,38 +712,51 @@ export function trimEdgeAtPoint(
 
   if (cmd.type === 'L') {
     if (keepSide === 'before') {
-      cmds[segmentIndex] = { ...cmd, type: 'L', values: [trimPoint.x, trimPoint.y] };
+      // El punto de recorte es geometría NUEVA — nace sin marcas.
+      cmds[segmentIndex] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
     } else {
       // Move the previous endpoint to trimPoint
       if (segmentIndex === 1) {
         cmds[0] = { ...cmds[0], type: 'M', values: [trimPoint.x, trimPoint.y] };
       } else {
+        // El extremo de `prev` pasa a ser el punto de recorte: geometría
+        // nueva, sin la marca del punto que desaparece (revisión 13-09).
         const prev = cmds[segmentIndex - 1];
         if (prev.type === 'L') {
-          cmds[segmentIndex - 1] = { ...prev, type: 'L', values: [trimPoint.x, trimPoint.y] };
+          cmds[segmentIndex - 1] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
         }
       }
     }
   } else if (cmd.type === 'C') {
     // Simplified: for cubic bezier, replace with a line to/from the trim point
     if (keepSide === 'before') {
-      cmds[segmentIndex] = { ...cmd, type: 'L', values: [trimPoint.x, trimPoint.y] };
+      // El punto de recorte es geometría NUEVA — manualBezier queda inerte
+      // (ya no es C) y authoredAnchor decoraría un punto que nadie insertó.
+      cmds[segmentIndex] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
     } else {
       if (segmentIndex === 1) {
         cmds[0] = { ...cmds[0], type: 'M', values: [trimPoint.x, trimPoint.y] };
       } else {
         // Adjust previous segment endpoint to trim point
+        // Ídem: el extremo de `prev` se sustituye por el punto de recorte. Un
+        // Bézier libre sigue siéndolo; el punto que desaparece no deja marca.
         const prev = cmds[segmentIndex - 1];
         if (prev.type === 'L') {
-          cmds[segmentIndex - 1] = { ...prev, type: 'L', values: [trimPoint.x, trimPoint.y] };
+          cmds[segmentIndex - 1] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
         } else if (prev.type === 'C') {
           const v = [...prev.values];
           v[4] = trimPoint.x; v[5] = trimPoint.y;
-          cmds[segmentIndex - 1] = { ...prev, type: 'C', values: v };
+          cmds[segmentIndex - 1] = { ...(prev.manualBezier ? { manualBezier: true as const } : {}), type: 'C', values: v };
         }
       }
-      // Replace curve with line from trim point to original end
-      cmds[segmentIndex] = { ...cmd, type: 'L', values: [cmd.values[4], cmd.values[5]] };
+      // Replace curve with line from trim point to original end. The
+      // original endpoint survives untouched — authoredAnchor travels with
+      // it, but manualBezier does not: the command is no longer a C.
+      cmds[segmentIndex] = {
+        ...(cmd.authoredAnchor ? { authoredAnchor: true as const } : {}),
+        type: 'L',
+        values: [cmd.values[4], cmd.values[5]],
+      };
     }
   }
 

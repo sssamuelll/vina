@@ -25,6 +25,16 @@ async function clicEn(page: Page, p: { x: number; y: number }) {
 }
 
 /**
+ * «Largos» es un interruptor y nada más (firma de María del 13-09: «no quiero
+ * opciones ni que estén vinculadas con la creación»). Nace apagado.
+ */
+async function encenderLargos(page: Page) {
+  const largos = page.getByRole('button', { name: 'Largos', exact: true });
+  if ((await largos.getAttribute('aria-pressed')) !== 'true') await largos.click();
+  await expect(largos).toHaveAttribute('aria-pressed', 'true');
+}
+
+/**
  * TODA medida visible sobre el patrón, viva donde viva en el DOM: los chips
  * HTML de la capa de cotas y los rótulos SVG del contorno. Mirar solo una de
  * las dos familias es lo que hacía vacua la primera versión de este oráculo —
@@ -42,18 +52,19 @@ async function medidasVisibles(page: Page): Promise<string[]> {
 test.describe('D1 — los largos se ven cuando se trabaja la pieza, no siempre', () => {
   test.setTimeout(120_000);
 
-  test('proyecto recién abierto: ningún largo a la vista y modo Al crear', async ({ page }) => {
+  test('proyecto recién abierto: ningún largo a la vista y el interruptor apagado', async ({ page }) => {
     await waitForApp(page);
     await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
     await page.waitForTimeout(300);
 
-    // La tanda 4 lo encendió de fábrica y eso es lo que se enmienda: el fallo 4
-    // era que ella NUNCA los veía, y la selección lo cierra mejor que un
-    // interruptor que no encontró — sin el ruido permanente.
+    // La tanda 4 lo encendió de fábrica y el 09-09 lo cerraba la selección; el
+    // 12-09 Samuel firmó tres estados con «Al crear» de fábrica; y el 13-09
+    // María lo redujo a lo que es: un interruptor, apagado, sin vínculo con
+    // la creación de la pieza. Los largos «todo el tiempo» le agobian.
     expect(
       (await st(page)).editor.lineLengthMode,
-      'Largos nace en Al crear',
-    ).toBe('creation');
+      'Largos nace apagado',
+    ).toBe('none');
 
     await expect(
       lecturas(page),
@@ -71,7 +82,7 @@ test.describe('D1 — los largos se ven cuando se trabaja la pieza, no siempre',
     await expect.poll(async () => (await st(page)).editor.selectedPieceIds.length).toBe(1);
 
     await expect(lecturas(page), 'seleccionarla no la vuelve recién creada').toHaveCount(0);
-    await page.getByRole('combobox', { name: 'Largos' }).selectOption('all');
+    await encenderLargos(page);
     await expect(lecturas(page)).not.toHaveCount(0);
 
     // § 2: son LECTURA, no mando. Un chip que parece accionable y no lo es
@@ -92,7 +103,7 @@ test.describe('D1 — los largos se ven cuando se trabaja la pieza, no siempre',
     });
     await page.keyboard.press('z');
     await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('select');
-    await page.getByRole('combobox', { name: 'Largos' }).selectOption('all');
+    await encenderLargos(page);
     await expect(lecturas(page), 'control: Todas sí enseña el contorno antes de elegir la interna').not.toHaveCount(0);
     await clicEn(page, { x: 140, y: 150 });
 
@@ -114,7 +125,7 @@ test.describe('D1 — los largos se ven cuando se trabaja la pieza, no siempre',
   test('el modo «Todas» las saca sin selección', async ({ page }) => {
     await waitForApp(page);
     await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
-    await page.getByRole('combobox', { name: 'Largos' }).selectOption('all');
+    await encenderLargos(page);
     await page.waitForTimeout(300);
 
     await expect(
@@ -132,7 +143,7 @@ test.describe('D3 — un lado que ya lleva chip no lleva además su lectura', ()
     await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
     await page.keyboard.press('z');
     await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('select');
-    await page.getByRole('combobox', { name: 'Largos' }).selectOption('all');
+    await encenderLargos(page);
     await clicEn(page, { x: 200, y: 150 });
 
     await expect(chipPieza(page, 'Ancho')).toBeVisible();

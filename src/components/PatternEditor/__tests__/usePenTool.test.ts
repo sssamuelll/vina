@@ -122,6 +122,36 @@ describe('usePenTool — siguiente punto, Retroceso y doble clic', () => {
     expect(tool().nextPoint?.lengthMm).toBe(50);
   });
 
+  it('un clic con la pareja congelada la suelta y coloca el nodo donde se clicó', () => {
+    // Revisión 13-09 (H1): volver al ratón es volver del todo. Antes el nodo
+    // se colocaba pero `nextPoint` seguía vivo: goma tiesa a un origen muerto.
+    const { tool, click } = setup();
+    click(100, 100);
+    act(() => tool().handleMouseMove(clickAt(150, 100)));
+    act(() => tool().openNextPoint());
+    expect(tool().nextPoint).not.toBeNull();
+    click(400, 300);
+    expect(tool().nextPoint).toBeNull();
+    expect(tool().nodes).toHaveLength(2);
+    expect(tool().nodes[1].anchor).toEqual({ x: 400, y: 300 });
+    act(() => tool().handleMouseMove(clickAt(500, 300)));
+    expect(tool().guidePath).toContain('L500,300');
+  });
+
+  it('con la pareja congelada el aviso de cierre dice lo que el clic va a hacer', () => {
+    // Revisión 13-09 (H2): `willClose` se apagaba al congelar pero el clic
+    // sobre el origen cerraba igual — la divergencia que maria-196 prohíbe.
+    const { tool, click, onComplete } = setup();
+    click(100, 100); click(200, 100); click(200, 200);
+    act(() => tool().handleMouseMove(clickAt(101, 101)));
+    expect(tool().willClose).toBe(true);
+    act(() => tool().openNextPoint());
+    expect(tool().willClose, 'congelar no puede apagar el aviso de un cierre que sigue armado').toBe(true);
+    click(101, 101);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete.mock.calls[0][0].kind).toBe('pieza');
+  });
+
   it('placePolar coloca el nodo: 90° hacia arriba, 0° a la derecha, encadenados', () => {
     const { tool, click } = setup();
     click(100, 100);

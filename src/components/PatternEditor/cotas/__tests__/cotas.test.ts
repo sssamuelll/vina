@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { cotasDePieza } from '../cotas';
-import type { PatternPiece, PathCommand } from '../../../../types/types';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { cotasDePieza, cotasDeLineaInterna, cotasDeTrazo } from '../cotas';
+import type { InternalLine, PatternPiece, PathCommand, Trazo } from '../../../../types/types';
+import * as snapIndexModule from '../../snapIndex';
 
 /** Cotas vivas (spec 2026-08-30 § 3, pieza): Ancho sobre el lado superior, Alto sobre el derecho, en el marco girado de la caja. */
 const rect = (w: number, h: number): PathCommand[] => [
@@ -55,5 +56,52 @@ describe('cotasDePieza', () => {
 
   it('pieza sin área → sin cotas', () => {
     expect(cotasDePieza(pieza({ outline: [] }))).toEqual([]);
+  });
+});
+
+/**
+ * `cotasDeTrazo` y `cotasDeLineaInterna` llamaban `buildSnapIndex` en CADA
+ * invocación, pese a que ya se documentaba como caro y memoizable "por
+ * identidad de `pieces`" — la ruta de RENDER (varios chips de un mismo tramo,
+ * o `sujeto.ts` en cada tick) lo reconstruía sin necesidad. Una caché por
+ * identidad (`WeakMap`) evita reconstruirlo cuando la pieza (o el array de
+ * piezas visibles) no cambió.
+ */
+describe('cotasDeLineaInterna / cotasDeTrazo — el índice de enganche se cachea por identidad', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('cotasDeLineaInterna: dos llamadas con la MISMA pieza no reconstruyen el índice', () => {
+    const spy = vi.spyOn(snapIndexModule, 'buildSnapIndex');
+    const linea: InternalLine = {
+      id: 'l1', type: 'reference',
+      path: [{ type: 'M', values: [10, 10] }, { type: 'L', values: [50, 50] }],
+    };
+    const p = pieza();
+    cotasDeLineaInterna(p, linea);
+    cotasDeLineaInterna(p, linea);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('cotasDeLineaInterna: una pieza DISTINTA sí reconstruye (no es una caché ciega al cambio)', () => {
+    const spy = vi.spyOn(snapIndexModule, 'buildSnapIndex');
+    const linea: InternalLine = {
+      id: 'l1', type: 'reference',
+      path: [{ type: 'M', values: [10, 10] }, { type: 'L', values: [50, 50] }],
+    };
+    cotasDeLineaInterna(pieza(), linea);
+    cotasDeLineaInterna(pieza(), linea);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('cotasDeTrazo: dos llamadas con el MISMO array de piezas no reconstruyen el índice', () => {
+    const spy = vi.spyOn(snapIndexModule, 'buildSnapIndex');
+    const trazo: Trazo = {
+      id: 't', createdAt: 1,
+      path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [100, 0] }, { type: 'L', values: [100, 50] }],
+    };
+    const pieces: PatternPiece[] = [pieza()];
+    cotasDeTrazo(trazo, 2, pieces);
+    cotasDeTrazo(trazo, 2, pieces);
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });

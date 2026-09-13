@@ -23,15 +23,15 @@ async function flushPromises() {
 }
 
 describe('preferencia de largos en editorSlice', () => {
-  it('nace en Al crear sin atribuirle la decisión a la usuaria', () => {
+  it('nace apagada sin atribuirle la decisión a la usuaria', () => {
     const state = editorReducer(undefined, { type: '@@INIT' });
-    expect(state.lineLengthMode).toBe('creation');
+    expect(state.lineLengthMode).toBe('none');
     expect(state.lineLengthModeSetByUser).toBe(false);
   });
 
-  it('una selección explícita marca la preferencia incluso si elige Al crear', () => {
-    const state = editorReducer(undefined, setLineLengthMode('creation'));
-    expect(state.lineLengthMode).toBe('creation');
+  it('una selección explícita marca la preferencia incluso si elige Ninguna', () => {
+    const state = editorReducer(undefined, setLineLengthMode('none'));
+    expect(state.lineLengthMode).toBe('none');
     expect(state.lineLengthModeSetByUser).toBe(true);
   });
 
@@ -39,9 +39,9 @@ describe('preferencia de largos en editorSlice', () => {
     const hydrated = editorReducer(undefined, hydrateLineLengthMode('all'));
     expect(hydrated.lineLengthMode).toBe('all');
     expect(hydrated.lineLengthModeSetByUser).toBe(false);
-    const chosen = editorReducer(hydrated, setLineLengthMode('creation'));
-    const late = editorReducer(chosen, hydrateLineLengthMode('none'));
-    expect(late.lineLengthMode).toBe('creation');
+    const chosen = editorReducer(hydrated, setLineLengthMode('none'));
+    const late = editorReducer(chosen, hydrateLineLengthMode('all'));
+    expect(late.lineLengthMode).toBe('none');
     expect(late.lineLengthModeSetByUser).toBe(true);
   });
 
@@ -79,22 +79,33 @@ describe('initLineLengthPreference', () => {
     const store = configureStore({ reducer: { editor: editorReducer } });
     const stop = initLineLengthPreference(store);
     await flushPromises();
-    expect(store.getState().editor.lineLengthMode).toBe('creation');
+    expect(store.getState().editor.lineLengthMode).toBe('none');
     expect(storageSet).not.toHaveBeenCalled();
     stop();
   });
 
-  it('una lectura tardía no pisa Al crear elegido durante el arranque', async () => {
+  it('un "creation" guardado por quien probó la rama vieja se hidrata como Ninguna', async () => {
+    vi.mocked(storageGet).mockResolvedValue('creation');
+    const store = configureStore({ reducer: { editor: editorReducer } });
+    const stop = initLineLengthPreference(store);
+    await flushPromises();
+    expect(store.getState().editor.lineLengthMode).toBe('none');
+    expect(store.getState().editor.lineLengthModeSetByUser).toBe(false);
+    expect(storageSet).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it('una lectura tardía no pisa la elección hecha durante el arranque', async () => {
     const read = deferred<unknown>();
     vi.mocked(storageGet).mockReturnValue(read.promise);
     const store = configureStore({ reducer: { editor: editorReducer } });
     const stop = initLineLengthPreference(store);
-    store.dispatch(setLineLengthMode('creation'));
-    read.resolve('all');
+    store.dispatch(setLineLengthMode('all'));
+    read.resolve('none');
     await flushPromises();
-    expect(store.getState().editor.lineLengthMode).toBe('creation');
+    expect(store.getState().editor.lineLengthMode).toBe('all');
     expect(store.getState().editor.lineLengthModeSetByUser).toBe(true);
-    expect(storageSet).toHaveBeenCalledWith('settings', 'line-length-mode', 'creation');
+    expect(storageSet).toHaveBeenCalledWith('settings', 'line-length-mode', 'all');
     stop();
   });
 

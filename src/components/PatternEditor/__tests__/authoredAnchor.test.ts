@@ -6,7 +6,7 @@ import { mirrorOutlineX } from '../../../utils/linkedEditing';
 import { extendEdge, optimizeCurvePoints } from '../../../utils/patternOps';
 import { offsetOutline } from '../../../utils/seam/cornerTypes';
 import { classifyEditableAnchors } from '../anchorRoles';
-import { applyNodeMove, deletePoint, extractNodes, splitSegmentAt } from '../nodeEditorUtils';
+import { applyNodeMove, convertToCurve, convertToLine, deletePoint, extractNodes, splitSegmentAt } from '../nodeEditorUtils';
 import { isSplineManaged, splineRunAt } from '../splineSegment';
 
 function piece(outline: PathCommand[]): PatternPiece {
@@ -177,5 +177,42 @@ describe('authored anchor intent', () => {
     expect(offsetOutline(outline, 0)?.[2].manualBezier).toBe(true);
     expect(extendEdge(piece(outline), 1, 'end', 10).outline[1].authoredAnchor)
       .toBe(true);
+  });
+
+  // M4 (revisión adversarial #1166): el ancla no se mueve al convertir a
+  // curva ni al volver a recta — authoredAnchor tiene que sobrevivir el
+  // viaje de ida y vuelta completo, marca Y rol.
+  it('survives a round trip through convertToCurve and convertToLine', () => {
+    const outline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0], authoredAnchor: true },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ];
+
+    const curved = convertToCurve(outline, 1);
+    expect(curved[1].type).toBe('C');
+    expect(curved[1].authoredAnchor).toBe(true);
+
+    const backToLine = convertToLine(curved, 1);
+    expect(backToLine[1]).toEqual({ type: 'L', values: [100, 0], authoredAnchor: true });
+    expect(roleAt(backToLine, 1)).toBe('corner');
+  });
+
+  // M5 (revisión adversarial #1166): un M con authoredAnchor nunca daba
+  // glifo — hasStraightIncidentEdges exigía type === 'L'. Con los dos lados
+  // rectos (outline[1] y el último comando real antes del Z de cierre) el
+  // rol tiene que ser corner, no smoothSample.
+  it('gives an M with authoredAnchor a corner role when both incident edges are straight', () => {
+    const outline: PathCommand[] = [
+      { type: 'M', values: [50, 0], authoredAnchor: true },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'L', values: [0, 0] },
+      { type: 'Z', values: [] },
+    ];
+    expect(roleAt(outline, 0)).toBe('corner');
   });
 });

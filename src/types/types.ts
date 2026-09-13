@@ -873,7 +873,7 @@ export interface EditorState {
   showNotches: boolean;
   showAnchorPoints: boolean;
   showPieceNames: boolean;
-  lineLengthMode: 'creation' | 'all' | 'none';
+  lineLengthMode: 'all' | 'none';
   /** A late preference read must never overwrite a choice in this session. */
   lineLengthModeSetByUser: boolean;
   showSewingLines: boolean;

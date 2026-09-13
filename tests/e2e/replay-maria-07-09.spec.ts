@@ -157,7 +157,7 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
   let segunda: string | undefined;
   let grande: string | undefined;
   let piezasAntesDeVaciar: PatternPiece[] = [];
-  let modoLargosDeFabrica: RootState['editor']['lineLengthMode'] = 'creation';
+  let modoLargosDeFabrica: RootState['editor']['lineLengthMode'] = 'none';
   const requisitos = new Map<number, Array<[string, string]>>();
   const requiere = (paso: number, ...pares: Array<[string, string]>) => requisitos.set(paso, pares);
 
@@ -416,11 +416,11 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
       } else {
         r.observaciones.puente = 'El paso 10 no vació el proyecto; se comprueban los largos sobre el estado que quedó';
       }
-      // ENMENDADO por D1: Al crear no confunde una pieza restaurada/seleccionada
-      // con una pieza caliente. «Todas» sigue siendo la orden explícita que
+      // ENMENDADO por la firma de María del 13-09: «Largos» es un interruptor
+      // apagado de fábrica, sin vínculo con crear ni con seleccionar. Encendido
       // enseña los rótulos de cada pieza del proyecto.
-      expect(modoLargosDeFabrica, 'Largos vuelve a nacer en Al crear').toBe('creation');
-      expect((await st(page)).editor.lineLengthMode).toBe('creation');
+      expect(modoLargosDeFabrica, 'Largos nace apagado').toBe('none');
+      expect((await st(page)).editor.lineLengthMode).toBe('none');
       await pieza(page, segunda);
 
       await activar(page, 'z', 'select');
@@ -429,11 +429,11 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
       await expect.poll(async () => (await st(page)).editor.selectedPieceIds).toEqual([segunda]);
 
       const largos = page.locator('.cota--lectura');
-      await expect(largos, 'una pieza restaurada y seleccionada sigue fría').toHaveCount(0);
-      const selectorLargos = page.getByRole('combobox', { name: 'Largos' });
-      await expect(selectorLargos.locator('option')).toHaveText(['Al crear', 'Todas', 'Ninguna']);
-      await selectorLargos.selectOption('all');
-      await expect(largos, 'Todas enseña el largo de los lados').not.toHaveCount(0);
+      await expect(largos, 'seleccionar una pieza no enciende sus largos').toHaveCount(0);
+      const interruptorLargos = page.getByRole('button', { name: 'Largos', exact: true });
+      await expect(interruptorLargos).toHaveAttribute('aria-pressed', 'false');
+      await interruptorLargos.click();
+      await expect(largos, 'encendido enseña el largo de los lados').not.toHaveCount(0);
       r.observaciones.largos = await largos.allTextContents();
       const numerosTodos = (r.observaciones.largos as string[])
         .map(t => Number.parseFloat(t.replace(/\s*mm/i, '').replace(',', '.')));
@@ -450,7 +450,7 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
         'Todas muestra visualmente los lados vivos 300 y 150 de la pieza editada').toBe(true);
       expect(numerosTodos.some(n => Math.abs(n - 320) < 1) && numerosTodos.some(n => Math.abs(n - 220) < 1),
         'Todas incluye también la pieza grande de 320×220').toBe(true);
-      await expect(selectorLargos).toHaveValue('all');
+      await expect(interruptorLargos).toHaveAttribute('aria-pressed', 'true');
 
       // Y sobre la pieza EDITADA en el paso 2, el largo tiene que ser el del
       // contorno vivo (300×150), no el dato guardado que decía 100. Es el bug
@@ -463,6 +463,28 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
       await expect.poll(async () => (await st(page)).editor.selectedPieceIds).toEqual([primera]);
       const rotulosEditada = await page.locator('.cota--lectura').allTextContents();
       r.observaciones.largosPiezaEditada = rotulosEditada;
+      // El oráculo negativo del dato guardado, por pieza y no por pantalla
+      // (revisión 13-09, M15): con el interruptor encendido hay otras piezas de
+      // 100×100 a la vista, así que se filtran los rótulos por la caja de la
+      // pieza editada y ninguno de ESOS puede seguir diciendo 100.
+      const cajaEditada = await page.locator(`[data-piece-id="${primera}"].pattern-piece`).boundingBox();
+      expect(cajaEditada, 'la pieza editada tiene caja en pantalla').not.toBeNull();
+      const rotulosDentro: string[] = [];
+      for (const rotulo of await page.locator('.cota--lectura').all()) {
+        const c = await rotulo.boundingBox();
+        if (!c || !cajaEditada) continue;
+        const cx = c.x + c.width / 2;
+        const cy = c.y + c.height / 2;
+        if (cx >= cajaEditada.x - 40 && cx <= cajaEditada.x + cajaEditada.width + 40
+          && cy >= cajaEditada.y - 40 && cy <= cajaEditada.y + cajaEditada.height + 40) {
+          rotulosDentro.push(await rotulo.innerText());
+        }
+      }
+      r.observaciones.largosDentroDeLaEditada = rotulosDentro;
+      const numerosDentro = rotulosDentro.map(t => Number.parseFloat(t.replace(/\s*mm/i, '').replace(',', '.')));
+      expect(numerosDentro.length, 'la pieza editada tiene rótulos propios').toBeGreaterThan(0);
+      expect(numerosDentro.every(n => Math.abs(n - 100) > 1),
+        'ningún rótulo de la pieza editada puede seguir diciendo el largo viejo de 100').toBe(true);
       await expect(page.getByRole('button', { name: /^Ancho de la pieza:/ }),
         'el chip editable toma el ancho vivo, no el dato viejo').toHaveText('300 mm');
       // El paso 5 subió un asa 45 mm: los extremos siguen delimitando 300×150,

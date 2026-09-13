@@ -8,7 +8,6 @@ import {
   toggleTrazos,
   setLineLengthMode,
 } from '../../store/editorSlice';
-import type { LineLengthMode } from '../../store/lineLengthPreference';
 import './FilaDeCapas.css';
 
 const CAPAS = [
@@ -16,7 +15,10 @@ const CAPAS = [
   { kind: 'toggle', label: 'Hilo', flag: 'showGrainlines', action: toggleGrainlines },
   { kind: 'toggle', label: 'Piquetes', flag: 'showNotches', action: toggleNotches },
   { kind: 'toggle', label: 'Costuras', flag: 'showSewingLines', action: toggleSewingLines },
-  { kind: 'lengths' },
+  // Firma de María 2026-09-12: interruptor de dos estados, no un desplegable
+  // de tres. Casilla como sus hermanas, no un caso especial de verdad — solo
+  // lee/escribe un campo que no es booleano (lineLengthMode).
+  { kind: 'largos', label: 'Largos' },
   { kind: 'toggle', label: 'Construcción', flag: 'showTrazos', action: toggleTrazos },
 ] as const;
 
@@ -36,34 +38,21 @@ export default function FilaDeCapas() {
   return (
     <div className="fila-de-capas" role="group" aria-label="Capas visibles">
       {CAPAS.map((capa) => {
-        if (capa.kind === 'lengths') {
-          return (
-            <label key={'lengths'} className={'fila-de-capas__largos'}>
-              <span>Largos</span>
-              <select
-                aria-label={'Largos'}
-                value={visibles.lineLengthMode}
-                onChange={(event) => dispatch(setLineLengthMode(event.currentTarget.value as LineLengthMode))}
-              >
-                <option value={'creation'}>Al crear</option>
-                <option value={'all'}>Todas</option>
-                <option value={'none'}>Ninguna</option>
-              </select>
-            </label>
-          );
-        }
-        const { label, flag, action } = capa;
-        const activo = visibles[flag];
+        const activo = capa.kind === 'largos' ? visibles.lineLengthMode === 'all' : visibles[capa.flag];
+        const handleClick = () => {
+          if (capa.kind === 'largos') dispatch(setLineLengthMode(activo ? 'none' : 'all'));
+          else dispatch(capa.action());
+        };
         return (
           <button
-            key={flag}
+            key={capa.label}
             type="button"
             className={`fila-de-capas__toggle${activo ? ' fila-de-capas__toggle--activo' : ''}`}
             aria-pressed={activo}
-            onClick={() => dispatch(action())}
+            onClick={handleClick}
           >
             <span className="fila-de-capas__marca" aria-hidden="true" />
-            {label}
+            {capa.label}
           </button>
         );
       })}

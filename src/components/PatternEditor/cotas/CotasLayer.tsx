@@ -148,7 +148,7 @@ export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function
           data-lado={lectura.outward.y > 0 ? 'abajo' : undefined}
           style={{ left: lecturaPosition.left, top: lecturaPosition.top, pointerEvents: 'none' }}
         >
-          {formatMedida(lectura.valueMm, lectura.unit)}
+          {formatMedida(lectura.valueMm, lectura.unit, lectura.referenceLabel)}
         </div>
       )}
       {cotas.map(cota => {

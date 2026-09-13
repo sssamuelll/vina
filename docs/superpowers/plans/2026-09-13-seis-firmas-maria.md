@@ -30,6 +30,8 @@
 
 ### D1: modos de largos
 
+> **Superado el 13-09 por la firma de María:** «Largos» es un interruptor `'all' | 'none'`, apagado de fábrica, sin vínculo con la creación. Lo de abajo queda como registro de lo que se implementó primero; el contrato vigente está en el informe, § Firmas de María.
+
 `LineLengthMode = 'creation' | 'all' | 'none'`, defecto `creation`. Control visible con los tres nombres firmados: Al crear / Todas / Ninguna. La preferencia sobrevive recarga y cambio de proyecto. La hidratación tardía no pisa una elección del usuario; las escrituras se serializan.
 
 La lista se deriva una sola vez de piezas visibles, modo y contexto. Ninguna da vacío. Un gesto de arrastre o sujeto dentro (interna, V, punto Q) suprime las lecturas generales; luego Todas muestra las visibles; Al crear muestra solo la pieza nueva mientras sigue siendo el sujeto. La creación de Pluma también tiene esa identidad transitoria; no activa defaults numéricos de otras herramientas.

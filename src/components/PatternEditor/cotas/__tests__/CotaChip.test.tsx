@@ -189,6 +189,12 @@ describe('CotaChip - edición', () => {
     expect(espia).not.toHaveBeenCalled();
     window.removeEventListener('keydown', espia);
   });
+  it('clic derecho sobre el campo del editor NO agrupado tampoco abre el menú nativo (#1166)', () => {
+    monta();
+    fireEvent.click(screen.getByRole('button'));
+    const prevenido = !fireEvent.contextMenu(screen.getByRole('textbox'));
+    expect(prevenido).toBe(true);
+  });
 });
 
 describe('CotaChip - campos agrupados', () => {
@@ -250,14 +256,14 @@ describe('CotaChip - campos agrupados', () => {
     expect(p.onCommit).toHaveBeenCalledWith(exacta, 12.345678, 'enter');
   });
 
-  it('Enter conserva la precisión que se escribió explícitamente', () => {
+  it('Enter redondea lo ESCRITO a un decimal, igual que el chip lo pinta (perdió round1 en #1166)', () => {
     const p = monta();
     fireEvent.click(screen.getByRole('button'));
     const input = screen.getByRole('textbox');
-    fireEvent.change(input, { target: { value: '123,456' } });
+    fireEvent.change(input, { target: { value: '100,25' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    expect(p.onCommit).toHaveBeenCalledWith(p.cota, 123.456, 'enter');
+    expect(p.onCommit).toHaveBeenCalledWith(p.cota, 100.3, 'enter');
   });
 
   it('muestra la referencia del ángulo en reposo y edición sin cambiar su aria-label', () => {
@@ -273,6 +279,30 @@ describe('CotaChip - campos agrupados', () => {
 
     expect(screen.getByRole('textbox', { name: 'Ángulo' })).toBeTruthy();
     expect(screen.getByText('° al borde')).toBeTruthy();
+  });
+
+  // Firma de María 2026-09-12: «como TAB va a ser clave para pasar de una
+  // casilla a la otra debería salir escrito». Solo en el tramo en curso: en
+  // las cotas de un objeto ya trazado, Enter y Tab hacen lo mismo y la pista
+  // mentiría.
+  it('la pareja del tramo en curso muestra la pista de Tab/Enter', () => {
+    montaGrupo({ grupo: 'tramo-en-curso' }, { grupo: 'tramo-en-curso' });
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.getByText('Tab para continuar · Enter para trazar')).toBeTruthy();
+  });
+
+  it('otra pareja agrupada (una línea ya trazada) NO muestra la pista: ahí Enter no traza', () => {
+    montaGrupo();
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.queryByText('Tab para continuar · Enter para trazar')).toBeNull();
+  });
+
+  it('clic derecho sobre la pareja abierta no saca el menú del navegador (#1166)', () => {
+    montaGrupo();
+    fireEvent.click(screen.getByRole('button'));
+    const inputLargo = screen.getByRole('textbox', { name: 'Largo' });
+    const prevenido = !fireEvent.contextMenu(inputLargo);
+    expect(prevenido).toBe(true);
   });
 });
 

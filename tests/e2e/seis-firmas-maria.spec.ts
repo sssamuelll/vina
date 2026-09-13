@@ -19,7 +19,7 @@ type Cmd = {
 
 type Estado = Awaited<ReturnType<typeof st>> & {
   editor: Awaited<ReturnType<typeof st>>['editor'] & {
-    lineLengthMode: 'creation' | 'all' | 'none';
+    lineLengthMode: 'all' | 'none';
     selectedInternalLine: { pieceId: string; lineId: string; segmentIndex?: number } | null;
   };
   project: Awaited<ReturnType<typeof st>>['project'] & {
@@ -67,33 +67,36 @@ async function prepararPerpendicularAlBorde(page: Page) {
 test.describe('seis firmas de María', () => {
   test.setTimeout(120_000);
 
-  test('D1: Largos recorre los tres modos, persiste y una interna suprime el contorno', async ({ page }) => {
+  test('D1: Largos es un interruptor apagado de fábrica, persiste, y una interna suprime el contorno', async ({ page }) => {
+    // Firma de María del 13-09: «no quiero ese desplegable con 3 opciones, no
+    // quiero opciones … el botón de activar el visualizador de líneas o
+    // desactivar, como aparecen cuando uno va a medir, eso es TOP, pero solo
+    // eso, no quiero opciones ni que estén vinculadas con la creación».
     await waitForApp(page);
     await addPiece(page, 'fria', { x: 80, y: 100 }, 200, 150);
 
-    const largos = page.getByRole('combobox', { name: 'Largos' });
-    await expect(largos).toHaveValue('creation');
-    await expect(lecturasDeLado(page), 'una pieza cargada no está caliente').toHaveCount(0);
+    const largos = page.getByRole('button', { name: 'Largos', exact: true });
+    await expect(largos).toHaveAttribute('aria-pressed', 'false');
+    await expect(lecturasDeLado(page), 'apagado: una pieza cargada no enseña largos').toHaveCount(0);
 
-    // Solo la pieza recién creada por la herramienta aparece en "Al crear".
+    // Crear una pieza tampoco los enciende: los largos no van atados a la creación.
     await activarHerramienta(page, 's', 'rectangle');
     await arrastrar(page, { x: 380, y: 100 }, { x: 580, y: 250 });
     await expect.poll(async () => (await estado(page)).project.pieces.length).toBe(2);
     await expect(page.getByRole('button', { name: /^Ancho de la pieza:/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Alto de la pieza:/ })).toBeVisible();
-    await expect(lecturasDeLado(page), 'Al crear no completó los otros dos lados de la pieza caliente').toHaveCount(2);
+    await expect(lecturasDeLado(page), 'crear una pieza no enciende sus largos').toHaveCount(0);
 
-    // Salir de la herramienta enfría esa pieza: Al crear vuelve a quedar vacío.
     await activarHerramienta(page, 'z', 'select');
-    await expect(lecturasDeLado(page)).toHaveCount(0);
-
-    await largos.selectOption('all');
+    await largos.click();
+    await expect(largos).toHaveAttribute('aria-pressed', 'true');
     // La pieza seleccionada ya tiene Ancho/Alto como chips: esas dos lecturas
     // no se duplican. Seis lecturas + dos chips siguen cubriendo ocho lados.
     await expect(lecturasDeLado(page)).toHaveCount(6);
-    await largos.selectOption('none');
+    await largos.click();
+    await expect(largos).toHaveAttribute('aria-pressed', 'false');
     await expect(lecturasDeLado(page)).toHaveCount(0);
-    await largos.selectOption('all');
+    await largos.click();
     await expect(lecturasDeLado(page)).toHaveCount(6);
 
     await dispatch(page, 'project/addInternalLine', {
@@ -128,7 +131,43 @@ test.describe('seis firmas de María', () => {
     await page.reload();
     await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
     await expect.poll(async () => (await estado(page)).editor.lineLengthMode).toBe('all');
-    await expect(page.getByRole('combobox', { name: 'Largos' })).toHaveValue('all');
+    await expect(page.getByRole('button', { name: 'Largos', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('D6: la pista «Tab · escribe la medida» se ve la primera vez, se retira al usar Tab y no vuelve tras recargar', async ({ page }) => {
+    // Lo que #1160 pidió medir en navegador y la tanda dejó sin e2e.
+    await waitForApp(page);
+    await activarHerramienta(page, 'h', 'pen');
+    await clickAt(page, { x: 300, y: 300 });
+    const cursor = await toScreen(page, { x: 420, y: 330 });
+    await page.mouse.move(cursor.x, cursor.y);
+    const pista = page.locator('.precision-hint');
+    await expect(pista).toBeVisible();
+    await expect(pista).toHaveText('Tab · escribe la medida');
+    // `.pen-distance-label` es el grupo entero (píldora + pista): la caja de la
+    // píldora es su `rect`.
+    const pildora = page.locator('.pen-distance-label rect').first();
+    const cajaPista = await pista.boundingBox();
+    const cajaPildora = await pildora.boundingBox();
+    expect(cajaPista && cajaPildora && cajaPista.y + cajaPista.height <= cajaPildora.y + 1,
+      'la pista va encima de la píldora, no por debajo del cursor').toBe(true);
+    expect(cajaPista && (cursor.x < cajaPista.x || cursor.y < cajaPista.y || cursor.y > cajaPista.y + cajaPista.height),
+      'la pista no tapa el punto donde va el siguiente clic').toBe(true);
+
+    await page.keyboard.press('Tab');
+    await expect(campo(page, 'Largo')).toBeVisible();
+    await expect(pista, 'descubierta: se retira').toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+
+    await page.reload();
+    await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
+    await page.waitForFunction(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__));
+    await activarHerramienta(page, 'h', 'pen');
+    await clickAt(page, { x: 300, y: 300 });
+    await page.mouse.move(cursor.x, cursor.y);
+    await expect(pildora, 'control: la píldora sigue').toBeVisible();
+    await expect(pista, 'la pista no vuelve después de descubrirla').toHaveCount(0);
   });
 
   test('D2: el primer ángulo conserva los 90° al borde y coloca la coordenada exacta', async ({ page }) => {

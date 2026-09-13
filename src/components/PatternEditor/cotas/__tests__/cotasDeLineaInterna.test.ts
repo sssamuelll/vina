@@ -154,6 +154,40 @@ describe('cotasDeLineaInterna — línea interna enganchada de un lado al otro',
       expect(update.path[1].values[0]).toBeCloseTo(60, 3);
       expect(update.path[1].values[1]).toBeCloseTo(25, 3);
     });
+
+    // Cobertura esquivada: el fixture de arriba (10,10)→(90,10)) es interior a
+    // propósito para conservar el −90 histórico, así que "borde + pieza
+    // girada" nunca se ejercitó junta. Aquí el PRIMER tramo sale exactamente
+    // de un borde (x=0, el lado izquierdo) en una pieza girada 37°.
+    it('primer tramo pegado al borde EN UNA PIEZA GIRADA: referencia al borde, ida y vuelta exacta, y 90° entra en la pieza', () => {
+      const linea: InternalLine = {
+        id: 'l1', type: 'reference',
+        path: [{ type: 'M', values: [0, 10] }, { type: 'L', values: [20, 25] }],
+      };
+      const pieza = piezaGirada(37, [linea]);
+      const cotas = cotasDeLineaInterna(pieza, linea);
+      const angulo = cotas.find(c => c.kind === 'tramo-angulo')!;
+      expect(angulo.referenceLabel).toBe('al borde');
+
+      // Ida y vuelta con precisión estricta — no el toBeCloseTo(x, 3) (≈5e-4)
+      // de la prueba de arriba: aquí se pide < 1e-9 mm.
+      const roundTrip = angulo.apply(angulo.valueMm);
+      if (!roundTrip || roundTrip.kind !== 'internal') throw new Error('se esperaba una actualización interna');
+      const distanciaIdaYVuelta = Math.hypot(roundTrip.path[1].values[0] - 20, roundTrip.path[1].values[1] - 25);
+      expect(distanciaIdaYVuelta).toBeLessThan(1e-9);
+
+      // Escribir 90° (relativo al borde) mete el destino DENTRO del
+      // rectángulo local (0..100 × 0..60): es el signo que decide si el
+      // cuarto de vuelta entra a la pieza o sale de ella (borderReference),
+      // y con rotación de por medio es justo lo que el fixture viejo evitaba.
+      const update90 = angulo.apply(90);
+      if (!update90 || update90.kind !== 'internal') throw new Error('se esperaba una actualización interna');
+      const [x, y] = update90.path[1].values;
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(100);
+      expect(y).toBeGreaterThan(0);
+      expect(y).toBeLessThan(60);
+    });
   });
 
   it('revisión adversarial (hallazgo P2): mover un extremo enganchado que ABRE en curva también traslada su control de salida', () => {

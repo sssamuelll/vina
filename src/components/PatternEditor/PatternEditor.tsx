@@ -191,7 +191,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     visible: false, x: 0, y: 0, pieceId: null,
   });
 
-  const [penHotId, setPenHotId] = useState<string | null>(null);
   const { showPrecisionHint, markPrecisionUsed } = usePrecisionHint();
   const handlePieceComplete = useCallback((piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => {
     const fullPiece: PatternPiece = {
@@ -213,7 +212,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
 
   /** La Pluma reparte (spec 2026-09-12 § 3.1). Un trazo terminado NO queda seleccionado (#1154). */
   const handlePenComplete = useCallback((r: PenResult) => {
-    if (r.kind === 'pieza') { setPenHotId(handlePieceComplete(r.piece)); return; }
+    if (r.kind === 'pieza') { handlePieceComplete(r.piece); return; }
     dispatch(addTrazo({ id: newId(), path: r.path, createdAt: Date.now() }));
   }, [dispatch, handlePieceComplete]);
 
@@ -508,10 +507,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       seamAllowanceTool.cancel();
       return;
     }
-    // El clic derecho abre las mismas medidas que Tab (firma D6).
+    // El clic derecho abre las mismas medidas que Tab (firma D6). Con un press
+    // vivo y ningún nodo no hay tramo que congelar: el menú se calla igual
+    // (spec 2026-08-29 § 4.3) y no pasa nada más.
     if (activeTool === 'internalShape' && internalShapeTool.isTracing()) {
       suppressed();
-      internalShapeTool.openNextPoint();
+      if (internalShapeTool.nodes.length > 0) internalShapeTool.openNextPoint();
       return;
     }
     // Rectángulo a mitad de arrastre: cancela y suprime el menú (spec § 6).
@@ -775,14 +776,18 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const hotId = activeTool === 'circle' ? circleHotId
     : activeTool === 'triangle' ? triangleHotId
       : activeTool === 'rectangle' ? rectHotId : null;
-  const hotLengthId = activeTool === 'pen' && pen.nodes.length === 0 ? penHotId : hotId;
+  // Los largos de los lados son un interruptor y nada más (firma de María del
+  // 13-09: «no quiero opciones ni que estén vinculadas con la creación»). Lo
+  // único que los calla con el interruptor encendido es un sujeto más fino
+  // dentro de la pieza o un arrastre, para no sobresaturar (#1153, 10-09).
   const suppressLengths = isDraggingPiece || transformTool.isDragging || isDraggingEndpoint
     || editor.selectedInternalLine !== null
     || (nodeEditor.isEditing && nodeEditor.selectedNode !== null)
     || (activeTool === 'editPattern' && editPatternTool.selectedNodes.size > 0);
-  const piezasConLargos = useMemo(() => seleccionarPiezasConLargos(drawablePieces, lineLengthMode, {
-    hotPieceId: hotLengthId, suppress: suppressLengths,
-  }), [drawablePieces, lineLengthMode, hotLengthId, suppressLengths]);
+  const piezasConLargos = useMemo(
+    () => seleccionarPiezasConLargos(drawablePieces, lineLengthMode, { suppress: suppressLengths }),
+    [drawablePieces, lineLengthMode, suppressLengths],
+  );
   // Refs para que `aplicarCota` no se recree en cada render de la pluma: la
   // rama del tramo en curso necesita la herramienta viva, no una copia vieja.
   const penRef = useRef(pen);
@@ -884,8 +889,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     if (tramoVisto.current === clave) return;
     tramoVisto.current = clave;
     if (!tramoEnCurso) return;
-    markPrecisionUsed();
     if (cotasRef.current?.abrirPrimero()) {
+      // La pista se retira solo cuando la pareja de verdad se abrió: si no,
+      // se apagaría (y persistiría) sin que ella viera nunca lo que anuncia.
+      markPrecisionUsed();
       pushJournal('gesture', 'tramo:congelado', { largo: tramoEnCurso.lengthMm, angulo: tramoEnCurso.angleDeg });
     }
   }, [activeTool, tramoSeq, tramoEnCurso, markPrecisionUsed]);
@@ -893,11 +900,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // Enfriamiento irreversible (spec § 3.1): en cuanto la selección deja de ser
   // la pieza nueva, cambia la herramienta o la pieza desaparece, se enfría y
   // no vuelve a calentarse sola.
-  useEffect(() => {
-    if (!penHotId) return;
-    if (activeTool !== 'pen' || pen.nodes.length > 0 || selectedPieceIds.length !== 1
-      || selectedPieceIds[0] !== penHotId || !pieces.some(p => p.id === penHotId)) setPenHotId(null);
-  }, [activeTool, pen.nodes.length, selectedPieceIds, pieces, penHotId]);
   useEffect(() => {
     if (!rectHotId) return;
     const viva = pieces.some(p => p.id === rectHotId);

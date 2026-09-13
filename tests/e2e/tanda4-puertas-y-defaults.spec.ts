@@ -95,7 +95,7 @@ test.describe('tanda 4 — puertas que no mienten y defaults que ella quiere', (
     ).toBeGreaterThanOrEqual(cajaDock!.y - 1);
   });
 
-  test('fallo 4 — Largos ofrece los tres modos y una pieza fría no contamina Al crear', async ({ page }) => {
+  test('fallo 4 — Largos es un interruptor apagado de fábrica, y seleccionar una pieza no lo enciende', async ({ page }) => {
     await waitForApp(page);
 
     // ENMENDADO el 2026-09-09 (contrato `2026-09-09-lo-que-se-ve-y-cuando`
@@ -108,12 +108,13 @@ test.describe('tanda 4 — puertas que no mienten y defaults que ella quiere', (
     // ruido permanente sobre el patrón — Samuel, probándolo el 09-09: "nunca
     // desaparecen y es un poco anoying […] siempre allí contaminando la vista".
     //
-    // Lo que ella pidió, textual [06:55], es más preciso que un interruptor:
-    // "CUANDO CLICO ESTO sí que me sería muy interesante que encima de cada
-    // línea me dijera cuánto mide cada línea". Cuando clico. Así que el fallo
-    // lo cierra la SELECCIÓN, y el interruptor vuelve a ser lo que dice —
-    // verlas todas, todo el tiempo— y vuelve a nacer apagado.
-    expect((await estado(page)).lineLengthMode).toBe('creation');
+    // ENMENDADO otra vez el 2026-09-13 con la firma de María: ni «cuando
+    // clico» (09-09) ni tres estados con «Al crear» (12-09). Textual: «no
+    // quiero ese desplegable con 3 opciones, no quiero opciones … el botón de
+    // activar el visualizador de líneas o desactivar, como aparecen cuando
+    // uno va a medir, eso es TOP, pero solo eso». Un interruptor, apagado de
+    // fábrica, sin vínculo con la creación ni con la selección.
+    expect((await estado(page)).lineLengthMode).toBe('none');
 
     await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
     await page.keyboard.press('z');
@@ -124,14 +125,15 @@ test.describe('tanda 4 — puertas que no mienten y defaults que ella quiere', (
     await page.mouse.click(s.x, s.y);
     await expect.poll(async () => (await estado(page)).selectedPieceIds.length).toBe(1);
 
-    await expect(page.locator('.cota--lectura'), 'seleccionarla no convierte una pieza fría en recién creada').toHaveCount(0);
+    await expect(page.locator('.cota--lectura'), 'seleccionarla no enciende sus largos').toHaveCount(0);
 
-    const modos = page.getByRole('combobox', { name: 'Largos' });
-    await expect(modos).toBeVisible();
-    await expect(modos.locator('option')).toHaveText(['Al crear', 'Todas', 'Ninguna']);
-    await modos.selectOption('all');
+    const largos = page.getByRole('button', { name: 'Largos', exact: true });
+    await expect(largos).toBeVisible();
+    await expect(largos).toHaveAttribute('aria-pressed', 'false');
+    await largos.click();
     await expect(page.locator('.cota--lectura')).not.toHaveCount(0);
-    await modos.selectOption('none');
+    expect((await estado(page)).lineLengthMode).toBe('all');
+    await largos.click();
     await expect(page.locator('.cota--lectura')).toHaveCount(0);
     expect((await estado(page)).lineLengthMode).toBe('none');
   });

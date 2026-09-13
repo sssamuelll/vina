@@ -24,9 +24,22 @@ function hasStraightIncidentEdges(
   outline: PathCommand[],
   commandIndex: number,
 ): boolean {
-  return outline[commandIndex]?.type === 'L' &&
-    (outline[commandIndex + 1]?.type === 'L' ||
-      outline[commandIndex + 1]?.type === 'Z');
+  if (outline[commandIndex]?.type === 'L') {
+    return outline[commandIndex + 1]?.type === 'L' ||
+      outline[commandIndex + 1]?.type === 'Z';
+  }
+  // The piece's own M closes a cycle when the outline ends in Z: outline[1]
+  // is its leaving edge, and the real command right before that closing Z
+  // is its arriving edge (the Z segment itself is always straight — that's
+  // what makes it a closer, not a claim this still has to check).
+  if (commandIndex === 0 && outline[0]?.type === 'M') {
+    const last = outline[outline.length - 1];
+    const beforeLast = outline[outline.length - 2];
+    return last?.type === 'Z' &&
+      outline[1]?.type === 'L' &&
+      beforeLast?.type === 'L';
+  }
+  return false;
 }
 
 function distance(a: Point2D, b: Point2D): number {

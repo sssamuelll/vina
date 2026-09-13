@@ -214,6 +214,9 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       hostRef.current = hostId;
     }
     pressRef.current = { world, screen: { x: e.clientX, y: e.clientY }, snap, closes, moved: false, drag: null };
+    // Un press con la pareja congelada la suelta: volver al ratón es volver
+    // del todo (revisión 13-09, H1). Hermano del de la Pluma.
+    nextPointRef.current = null;
     journalPress({ armed: true, snap: snap?.kind ?? null, hostId: hostRef.current, closes });
     publish();
   }, [toWorld, radius, resolveSnap, topmostContaining, publish]);
@@ -373,9 +376,11 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     pressPoint: view.pressPoint,
     isDragging: view.isDragging,
     dragHandle: view.dragHandle,
-    hover: view.nextPoint ? null : view.hover,
+    // Con la pareja congelada el press engancha y cierra igual, así que el
+    // aviso de enganche y el de cierre siguen encendidos (revisión 13-09, H2).
+    hover: view.hover,
     hostId: view.hostId,
-    closeArmed: !view.nextPoint && view.closeArmed,
+    closeArmed: view.closeArmed,
     nextPoint: view.nextPoint,
     nextPointSeq: view.nextPointSeq,
     handleMouseDown,

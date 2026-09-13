@@ -17,7 +17,7 @@ const interruptores = [
 ] as const;
 
 describe('FilaDeCapas', () => {
-  it('mantiene el orden y cada botón cambia el store y aria-pressed', () => {
+  it('mantiene el orden de las seis casillas y cada booleana cambia el store y aria-pressed', () => {
     const store = configureStore({ reducer: { editor: editorReducer } });
     render(
       <Provider store={store}>
@@ -27,9 +27,9 @@ describe('FilaDeCapas', () => {
 
     const group = screen.getByRole('group', { name: 'Capas visibles' });
     const buttons = within(group).getAllByRole('button');
-    expect(buttons.map((button) => button.textContent?.trim())).toEqual(
-      interruptores.map(([label]) => label),
-    );
+    expect(buttons.map((button) => button.textContent?.trim())).toEqual([
+      'Margen', 'Hilo', 'Piquetes', 'Costuras', 'Largos', 'Construcción',
+    ]);
 
     for (const [label, field] of interruptores) {
       const button = within(group).getByRole('button', { name: label });
@@ -43,22 +43,22 @@ describe('FilaDeCapas', () => {
     }
   });
 
-  it('expone los tres modos de Largos y guarda una selección explícita', () => {
+  it('la casilla «Largos» se marca con el modo Todas y despacha setLineLengthMode al pulsar', () => {
     const store = configureStore({ reducer: { editor: editorReducer } });
     render(<Provider store={store}><FilaDeCapas /></Provider>);
 
-    const select = screen.getByRole('combobox', { name: 'Largos' });
-    expect((select as HTMLSelectElement).value).toBe('creation');
-    expect(within(select).getAllByRole('option').map(option => option.textContent)).toEqual([
-      'Al crear', 'Todas', 'Ninguna',
-    ]);
+    const boton = screen.getByRole('button', { name: 'Largos' });
+    expect(store.getState().editor.lineLengthMode).toBe('none');
+    expect(boton.getAttribute('aria-pressed')).toBe('false');
 
-    fireEvent.change(select, { target: { value: 'all' } });
+    fireEvent.click(boton);
     expect(store.getState().editor.lineLengthMode).toBe('all');
     expect(store.getState().editor.lineLengthModeSetByUser).toBe(true);
+    expect(boton.getAttribute('aria-pressed')).toBe('true');
 
-    fireEvent.change(select, { target: { value: 'none' } });
+    fireEvent.click(boton);
     expect(store.getState().editor.lineLengthMode).toBe('none');
+    expect(boton.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('el sexto interruptor es «Construcción», nace encendido y apaga showTrazos', () => {

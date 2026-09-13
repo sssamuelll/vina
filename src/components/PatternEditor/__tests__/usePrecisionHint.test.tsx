@@ -23,13 +23,27 @@ describe('usePrecisionHint', () => {
     vi.mocked(storageSet).mockResolvedValue(undefined);
   });
 
-  it('oculta la pista cuando ya fue usada y no reescribe al hidratar', async () => {
+  it('nace apagada (sin parpadeo en frío) y se queda apagada cuando ya fue usada', async () => {
     vi.mocked(storageGet).mockResolvedValue(true);
     const { result } = renderHook(() => usePrecisionHint());
-    expect(result.current.showPrecisionHint).toBe(true);
-    await waitFor(() => expect(result.current.showPrecisionHint).toBe(false));
-    expect(storageGet).toHaveBeenCalledWith('settings', 'precision-hint-used');
+    expect(result.current.showPrecisionHint).toBe(false);
+    await waitFor(() => expect(storageGet).toHaveBeenCalledWith('settings', 'precision-hint-used'));
+    expect(result.current.showPrecisionHint).toBe(false);
     expect(storageSet).not.toHaveBeenCalled();
+  });
+
+  it('sin marca previa: nace apagada y se enciende al confirmar que nunca se usó', async () => {
+    vi.mocked(storageGet).mockResolvedValue(undefined);
+    const { result } = renderHook(() => usePrecisionHint());
+    expect(result.current.showPrecisionHint).toBe(false);
+    await waitFor(() => expect(result.current.showPrecisionHint).toBe(true));
+  });
+
+  it('si IDB falla al hidratar, se enciende igual (ayuda degradable) sin parpadeo previo', async () => {
+    vi.mocked(storageGet).mockRejectedValue(new Error('idb no disponible'));
+    const { result } = renderHook(() => usePrecisionHint());
+    expect(result.current.showPrecisionHint).toBe(false);
+    await waitFor(() => expect(result.current.showPrecisionHint).toBe(true));
   });
 
   it('la apaga de inmediato y persiste una sola vez', () => {

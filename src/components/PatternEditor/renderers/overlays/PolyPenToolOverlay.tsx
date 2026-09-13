@@ -160,11 +160,15 @@ export default function PolyPenToolOverlay({
               {readout.text}
             </text>
             {precisionHint && (
+              // Misma corrección que PenToolOverlay (#1166): ENCIMA de la
+              // píldora y alineada a su borde izquierdo, nunca cruzando el
+              // cursor ni el vértice que engancha.
               <text
                 className="precision-hint"
-                y={pildora.height / 2 + fontSize * 1.35}
-                textAnchor="middle"
-                dominantBaseline="hanging"
+                x={pildora.x}
+                y={pildora.y - fontSize * 0.6}
+                textAnchor="start"
+                dominantBaseline="auto"
                 fill="var(--ink-hint)"
                 fontSize={fontSize}
                 style={{ fontFamily: 'var(--font-mono-2d)' }}
