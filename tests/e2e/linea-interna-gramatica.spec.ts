@@ -153,7 +153,10 @@ test.describe('línea interna — gramática', () => {
 
     // Con la pareja abierta, Enter TRAZA (firma de María del 13-09). Para que
     // el Enter de abajo cierre la línea hay que soltarla antes: es la escalera
-    // de Escape — el primero descarta el borrador, el segundo suelta la pareja.
+    // de Escape. El PRIMERO cierra el campo y se lo come el propio chip (no
+    // llega al router); el SEGUNDO suelta la pareja. Ninguno de los dos toca el
+    // borrador, y se ve en este mismo caso: si alguno lo descartara, el Enter
+    // de abajo no tendría trazo que cerrar y `ils` saldría 0, no 1.
     await page.keyboard.press('Escape');
     await page.waitForTimeout(150);
     await page.keyboard.press('Escape');

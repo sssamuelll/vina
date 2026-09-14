@@ -217,6 +217,83 @@ test.describe('cerrar una interna no selecciona nada', () => {
   });
 
   /**
+   * Lo que la revisión adversarial cazó al quitar la autoselección, y que este
+   * archivo no medía: el dispatch que se fue era el ÚNICO que reseteaba la
+   * selección en todo el gesto. Escribía seis campos, no uno.
+   *
+   * Sin él, `handleInternalShapeComplete` quedó transparente a la selección: lo
+   * que estuviera agarrado antes de pulsar `G` sigue agarrado al cerrar. Y toda
+   * pieza recién creada queda seleccionada (`PatternEditor.tsx`,
+   * `dispatch(selectPiece(fullPiece.id))`), así que el recorrido normal —hago
+   * una pieza, dibujo una interna dentro, me arrepiento, Supr— se llevaba LA
+   * PIEZA ENTERA, sin diálogo y sin más rastro que Ctrl+Z.
+   *
+   * Que es exactamente el bug (A) que `borradoDeSeleccion.ts` dice en su
+   * cabecera que vino a matar, reabierto por la otra puerta.
+   */
+  test('tras dibujar una interna, Supr no se lleva la pieza', async ({ page }) => {
+    await waitForApp(page);
+    await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
+    // Crear una pieza la deja seleccionada; el helper de arriba no pasa por ahí,
+    // así que se reproduce a mano el estado en el que ella llega a dibujar.
+    await dispatch(page, 'editor/selectPiece', 'p1');
+    await expect.poll(async () => (await st(page)).editor.selectedPieceIds).toEqual(['p1']);
+
+    await page.keyboard.press('g');
+    await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('internalShape');
+    for (const p of [{ x: 120, y: 120 }, { x: 240, y: 120 }, { x: 240, y: 200 }]) await clicEn(page, p);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+
+    const conInterna = (await st(page)).project.pieces.find(p => p.id === 'p1');
+    expect(conInterna?.internals, 'este caso solo vale si la interna llegó a existir').toHaveLength(1);
+
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(400);
+
+    const despues = (await st(page)).project.pieces.find(p => p.id === 'p1');
+    expect(despues, 'dibujar dentro de una pieza no puede dejar armado un Supr que se la lleve').toBeDefined();
+    // Y tampoco se lleva la interna: al cerrar no queda nada seleccionado, así
+    // que Supr no tiene sujeto y lo honesto es que no haga nada. Deshacer es
+    // Ctrl+Z, que para eso está.
+    expect(despues!.internals, 'sin sujeto, Supr no borra nada').toHaveLength(1);
+  });
+
+  /**
+   * El hermano, por la otra puerta del resolutor. `resolverBorrado` mira el
+   * trazo ANTES que nada (spec 2026-09-12 § 5.2: es lo más fino del lienzo),
+   * así que un tramo de trazo agarrado de antes se lleva el Supr por un camino
+   * distinto al de la pieza. Un solo `clearSelection` cierra los dos, pero son
+   * dos ramas y se prueban las dos.
+   */
+  test('un trazo agarrado de antes tampoco se lo lleva el Supr de después', async ({ page }) => {
+    await waitForApp(page);
+    await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
+    await dispatch(page, 'project/addTrazo', {
+      id: 'tz', createdAt: 1,
+      path: [{ type: 'M', values: [420, 40] }, { type: 'L', values: [560, 40] }],
+    });
+    await dispatch(page, 'editor/selectTrazo', { trazoId: 'tz', segmentIndex: 1 });
+    await expect.poll(async () => (await st(page)).editor.selectedTrazo?.trazoId).toBe('tz');
+
+    await page.keyboard.press('g');
+    await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('internalShape');
+    for (const p of [{ x: 120, y: 120 }, { x: 240, y: 120 }, { x: 240, y: 200 }]) await clicEn(page, p);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(400);
+
+    const { project } = await st(page);
+    expect(
+      project.trazos.map(t => t.id),
+      'dibujar una interna no puede armar un Supr contra un trazo de otro sitio',
+    ).toContain('tz');
+    expect(project.pieces.find(p => p.id === 'p1')?.internals, 'ni contra la interna recién hecha').toHaveLength(1);
+  });
+
+  /**
    * El oráculo de #1154, que es lo que ella vio: no «hay una cota de más» sino
    * «la cota me come el clic». Se mide donde duele — en el punto exacto donde
    * cae el gesto siguiente — y con la consecuencia detrás: que ese clic
@@ -239,7 +316,12 @@ test.describe('cerrar una interna no selecciona nada', () => {
     const s = await toScreen(page, ultimoNodo);
     const quienEstaAhi = await page.evaluate(([x, y]) => {
       const el = document.elementFromPoint(x, y);
-      return el ? (el.closest('button.cota') ? 'cota' : el.tagName.toLowerCase()) : 'nada';
+      // `.cota` y no `button.cota`: abierta a escribir, la cota deja de ser un
+      // <button> y pasa a ser un <input class="cota cota--editando"> (o el
+      // <div class="cota--grupo-editando"> de la pareja). Buscar solo el botón
+      // dejaba pasar en verde justo el peor modo de fallo: el que se traga el
+      // clic Y se queda el foco, dejando la aplicación sin atajos.
+      return el ? (el.closest('.cota') ? 'cota' : el.tagName.toLowerCase()) : 'nada';
     }, [s.x, s.y] as const);
     expect(
       quienEstaAhi,

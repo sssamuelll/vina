@@ -25,6 +25,19 @@ import { waitForApp } from './helpers/sim';
 import { st, addPiece, toScreen } from './helpers/lienzo';
 
 const lecturas = (page: Page) => page.locator('.cota--lectura');
+
+/** Esquina superior izquierda del CONJUNTO de lecturas. Comparar `.first()`
+ *  antes y despues no vale: al soltar, la pieza queda seleccionada y los dos
+ *  lados que llevan chip editable pierden su lectura, asi que `.first()` deja
+ *  de ser el mismo lado y la diferencia se llena con la altura de la pieza. */
+async function esquinaDeLasLecturas(page: Page) {
+  const cajas = await lecturas(page).evaluateAll(els => els.map(el => {
+    const r = el.getBoundingClientRect();
+    return { x: r.x, y: r.y };
+  }));
+  expect(cajas.length, 'no hay lecturas que medir').toBeGreaterThan(0);
+  return { x: Math.min(...cajas.map(c => c.x)), y: Math.min(...cajas.map(c => c.y)) };
+}
 const posDe = async (page: Page) =>
   (await st(page)).project.pieces.find(p => p.id === 'p1')!.position;
 
@@ -47,8 +60,7 @@ test.describe('#1152 — los largos no se quedan donde ya no está la pieza', ()
 
     await encenderLargos(page);
     await expect(lecturas(page), 'con el interruptor encendido la pieza enseña sus largos').toHaveCount(4);
-    const cajaAntes = await lecturas(page).first().boundingBox();
-    expect(cajaAntes).not.toBeNull();
+    const antesEsquina = await esquinaDeLasLecturas(page);
 
     const posAntes = await posDe(page);
     const centro = await toScreen(page, { x: 200, y: 150 });
@@ -68,28 +80,32 @@ test.describe('#1152 — los largos no se quedan donde ya no está la pieza', ()
     await page.mouse.up();
     await page.waitForTimeout(300);
 
-    // Vuelven DOS, no cuatro, y está bien: al soltar la pieza queda
-    // seleccionada, y sobre los dos lados que llevan chip editable (el Ancho y
-    // el Alto del transform box) la lectura la sustituye el chip
-    // (`CotasLayer.tsx`: "solo el chip que está presente sobre ESTE lado
-    // sustituye su lectura"). Lo que importa es que vuelva a haberlas.
+    // Al soltar, la pieza queda seleccionada y sobre los dos lados que llevan
+    // chip editable la lectura la sustituye el chip (`CotasLayer.tsx`: "solo el
+    // chip que está presente sobre ESTE lado sustituye su lectura"), así que
+    // salen dos. Se suelta la selección clicando fuera para volver a comparar
+    // los CUATRO contra los cuatro: si no, se compara un lado contra OTRO
+    // distinto y la altura de la pieza se cuela dentro del resultado — con lo
+    // que una pieza inmóvil pasaría el listón. Lo cazó la revisión adversarial.
     await expect(lecturas(page), 'al soltar las lecturas vuelven').not.toHaveCount(0);
+    const vacio = await toScreen(page, { x: 700, y: 520 });
+    await page.mouse.click(vacio.x, vacio.y);
+    await expect.poll(async () => (await st(page)).editor.selectedPieceIds.length, { timeout: 5000 }).toBe(0);
+    await expect(lecturas(page), 'sin selección vuelven los cuatro largos').toHaveCount(4);
 
     const posDespues = await posDe(page);
     const { zoom2D } = (await st(page)).editor;
-    const recorrido = Math.hypot(posDespues.x - posAntes.x, posDespues.y - posAntes.y) * zoom2D;
-    expect(recorrido, 'este caso solo vale si la pieza se movió de verdad').toBeGreaterThan(50);
+    const dx = (posDespues.x - posAntes.x) * zoom2D;
+    const dy = (posDespues.y - posAntes.y) * zoom2D;
+    expect(Math.hypot(dx, dy), 'este caso solo vale si la pieza se movió de verdad').toBeGreaterThan(50);
 
     // Y vuelven CON la pieza: si el arreglo fuera solo esconderlas,
     // reaparecerían en el mismo píxel y el caso pasaría en verde con el bug
     // dentro. El listón sale de lo que la pieza se movió en Redux, no de un
     // número escogido a ojo — así el enganche a la cuadrícula no lo falsea.
-    const cajaDespues = await lecturas(page).first().boundingBox();
-    expect(cajaDespues).not.toBeNull();
-    expect(
-      Math.hypot(cajaDespues!.x - cajaAntes!.x, cajaDespues!.y - cajaAntes!.y),
-      'la lectura tiene que haberse movido con su lado, no reaparecer donde estaba',
-    ).toBeGreaterThan(recorrido * 0.7);
+    const despuesEsquina = await esquinaDeLasLecturas(page);
+    expect(despuesEsquina.x - antesEsquina.x, 'los largos se mueven con la pieza en x').toBeCloseTo(dx, 0);
+    expect(despuesEsquina.y - antesEsquina.y, 'y en y').toBeCloseTo(dy, 0);
   });
 
   test('redimensionar con el transform box también las calla', async ({ page }) => {
@@ -123,5 +139,30 @@ test.describe('#1152 — los largos no se quedan donde ya no está la pieza', ()
     await page.mouse.up();
     await page.waitForTimeout(300);
     await expect(lecturas(page), 'al soltar vuelven').not.toHaveCount(0);
+
+    // Y ninguna dice ya el largo de ANTES. Sin esto, una lectura que reaparezca
+    // con el valor viejo pasa el caso — que es exactamente la queja que vino a
+    // cerrar. El oráculo va por la negativa a propósito: al soltar, la pieza
+    // sigue seleccionada y los dos lados que llevan chip editable no tienen
+    // lectura, así que exigir que ALGUNA diga el ancho nuevo depende de cuál de
+    // los cuatro sobrevive. Que ninguna diga el viejo no depende de nada.
+    const caja = (await st(page)).project.pieces.find(p => p.id === 'p1')!.outline
+      .reduce((m, c) => ({
+        x: Math.max(m.x, c.values[c.values.length - 2] ?? 0),
+        y: Math.max(m.y, c.values[c.values.length - 1] ?? 0),
+      }), { x: 0, y: 0 });
+    expect(caja.x, 'redimensionar tiene que haber cambiado el ancho').toBeGreaterThan(400);
+    expect(caja.y, 'y el alto').toBeGreaterThan(300);
+
+    const numeros = (await lecturas(page).allInnerTexts())
+      .map(t => Number.parseFloat(t.replace(/\s*mm/i, '').replace(',', '.')))
+      .filter(n => Number.isFinite(n));
+    expect(numeros.length, 'hay lecturas que leer').toBeGreaterThan(0);
+    for (const viejo of [400, 300]) {
+      expect(
+        numeros.some(n => Math.abs(n - viejo) < 1),
+        `ninguna lectura puede seguir diciendo el ${viejo === 400 ? 'ancho' : 'alto'} de antes (${numeros.join(', ')})`,
+      ).toBe(false);
+    }
   });
 });

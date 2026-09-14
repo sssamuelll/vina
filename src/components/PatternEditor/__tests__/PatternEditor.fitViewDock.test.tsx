@@ -14,7 +14,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import constructionReducer from '../../../store/constructionSlice';
-import editorReducer, { requestFitView, computeFitView } from '../../../store/editorSlice';
+import editorReducer, { requestFitView, computeFitView, toggleTrazos } from '../../../store/editorSlice';
 import inputSchemeReducer from '../../../store/inputSchemeSlice';
 import projectReducer, { restoreState } from '../../../store/projectSlice';
 import simulationReducer from '../../../store/simulationSlice';
@@ -172,5 +172,70 @@ describe('PatternEditor — ajustar a la vista respeta la faja del dock', () => 
     expect(store.getState().editor.zoom2D).toBeCloseTo(esperado.zoom, 5);
     expect(store.getState().editor.pan2D.x).toBeCloseTo(esperado.pan.x + DOCK_WIDTH_PX, 5);
     expect(store.getState().editor.pan2D.y).toBeCloseTo(esperado.pan.y, 5);
+  });
+
+  /**
+   * El testigo se CONSUME aunque no haya nada que encuadrar (#1163, hallazgo de
+   * la revisión adversarial del 14-09).
+   *
+   * El efecto tenía una sola compuerta para dos condiciones que no son la misma:
+   * «el svg todavía no está medido» (hay que reintentar) y «no hay nada que
+   * encuadrar» (no hay nada que reintentar). Salía por las dos sin tocar
+   * `lastFitTokenRef`, así que un encuadre pedido sobre el lienzo vacío quedaba
+   * ARMADO y saltaba solo minutos después, al aparecer la primera geometría.
+   *
+   * Con la entrada de menú muerta eso no se alcanzaba: los tres productores de
+   * `requestFitView` —importar, restaurar, el copiloto— llegan con contenido ya
+   * en el store. Arreglar #1163 le da a la usuaria dos productores nuevos (el
+   * menú y ⌘0), pulsables sobre un proyecto recién abierto, que es justo el
+   * estado vacío. Esta PR es la que lo vuelve alcanzable, así que es la que lo
+   * cierra.
+   */
+  it('pedir encuadre con el lienzo vacío no deja un encuadre armado que salte al dibujar', () => {
+    stubResizeObserver();
+
+    const { store } = setup({ pieces: [], trazos: [] });
+
+    act(() => {
+      store.dispatch(requestFitView());
+    });
+    expect(store.getState().editor.zoom2D, 'sin nada que encuadrar no pasa nada').toBe(1);
+
+    // Y ahora la usuaria dibuja. Esto NO es un encuadre que ella pidiera.
+    act(() => {
+      store.dispatch(restoreState({ ...store.getState().project, pieces: [piece], trazos: [] }));
+    });
+
+    expect(
+      store.getState().editor.zoom2D,
+      'el encuadre de un lienzo vacío se descarta ahí mismo; no se queda esperando geometría',
+    ).toBe(1);
+    expect(store.getState().editor.pan2D).toEqual({ x: 0, y: 0 });
+  });
+
+  /**
+   * Con «Construcción» apagada, el encuadre no puede ir a por geometría que no
+   * se pinta (#1164 § 0). Estaba aparcado con un ruling porque `showTrazos`
+   * nace encendido y los tres productores eran de una sola vez; con ⌘0 pasa a
+   * ser un teclazo repetible desde cualquier estado, así que se cierra aquí.
+   */
+  it('con «Construcción» apagada, un trazo suelto no se encuadra', () => {
+    stubResizeObserver();
+
+    const { store } = setup({ pieces: [], trazos: [trazo] });
+    act(() => {
+      store.dispatch(toggleTrazos());
+    });
+    expect(store.getState().editor.showTrazos, 'la capa tiene que quedar apagada').toBe(false);
+
+    act(() => {
+      store.dispatch(requestFitView());
+    });
+
+    expect(
+      store.getState().editor.zoom2D,
+      'encuadrar hacia algo invisible deja el lienzo mirando a la nada',
+    ).toBe(1);
+    expect(store.getState().editor.pan2D).toEqual({ x: 0, y: 0 });
   });
 });

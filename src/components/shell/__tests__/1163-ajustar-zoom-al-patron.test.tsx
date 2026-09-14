@@ -30,6 +30,7 @@ import toolsReducer from '../../../store/toolSlice';
 import dockReducer from '../../../store/dockSlice';
 import constructionReducer from '../../../store/constructionSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
+import { displayShortcutBinding } from '../shortcutDisplay';
 import LogoMenu from '../LogoMenu';
 
 // uiExport arrastra los escritores de pdf/dxf, que aquí no pintan nada.
@@ -73,28 +74,54 @@ describe('#1163 — Ver ▸ Ajustar zoom al patrón', () => {
     ).toBe(antes + 1);
   });
 
-  it('el ⌘0 que el menú anuncia está registrado y hace lo mismo', () => {
-    const def = DEFAULT_SHORTCUTS.find(s => s.id === 'view.fitPattern');
-    expect(def, 'el menú promete ⌘0: tiene que existir en el registro').toBeDefined();
-    expect(def).toMatchObject({ key: '0', ctrl: true });
-    expect(def?.shift ?? false, 'el rótulo dice ⌘0, no ⌘⇧0').toBe(false);
-    expect(def?.alt ?? false, 'el rótulo dice ⌘0, no ⌥⌘0').toBe(false);
-
-    // Registrado no basta: un atajo en el catálogo sin manejador es la misma
-    // puerta a una pared, solo que en el otro lado.
+  /**
+   * ENDURECIDO el 2026-09-14 tras la revisión adversarial. La primera versión
+   * buscaba el def por id y pulsaba el literal `'0'` a mano: dos cadenas que no
+   * salían del menú. Con eso, cambiar el rótulo a `⌘9` dejaba el test en VERDE
+   * — es decir, el menú podía volver a mentir exactamente igual que en #1163,
+   * que es lo que este archivo dice que vigila. Y como solo disparaba
+   * `ctrlKey`, tampoco tocaba el `e.metaKey ||` del registro, que es lo único
+   * que hace que ⌘ funcione en Mac.
+   *
+   * Ahora el combo sale del ROTULO que se pinta, y se pulsa por los dos lados.
+   */
+  it('el atajo que el menú anuncia existe en el registro, se escribe igual y hace lo mismo', () => {
     const store = makeStore();
-    const view = render(
-      <Provider store={store}><ShortcutProvider><Hooked /></ShortcutProvider></Provider>,
-    );
-    const foco = view.getByTestId('foco');
-    foco.focus();
-    const antes = store.getState().editor.fitViewToken;
-    act(() => {
-      foco.dispatchEvent(new KeyboardEvent('keydown', { key: '0', ctrlKey: true, bubbles: true }));
-    });
+    render(<Provider store={store}><LogoMenu onOpenPanel={() => {}} onImportDXF={() => {}} /></Provider>);
+    fireEvent.click(screen.getByRole('button', { name: /vina/i }));
+    fireEvent.mouseEnter(screen.getByText('Vista'));
+
+    // 1. Lo que María tiene delante.
+    const fila = screen.getByText('Ajustar zoom al patrón').closest('.logo-menu__item')!;
+    const rotulo = fila.querySelector('.logo-menu__shortcut')?.textContent?.trim() ?? '';
+    expect(rotulo, 'la entrada anuncia un atajo').not.toBe('');
+
+    // 2. El registro tiene que declarar ESE combo, no uno cualquiera.
+    const def = DEFAULT_SHORTCUTS.find(s => s.id === 'view.fitPattern');
+    expect(def, 'el menú promete un atajo: tiene que existir en el registro').toBeDefined();
     expect(
-      store.getState().editor.fitViewToken,
-      'pulsar ⌘0 tiene que encuadrar, igual que la entrada de menú',
-    ).toBe(antes + 1);
+      displayShortcutBinding({ key: def!.key, ctrl: def!.ctrl, shift: def!.shift, alt: def!.alt }),
+      'el rótulo del menú y el atajo registrado tienen que ser el MISMO combo',
+    ).toBe(rotulo);
+
+    // 3. Y ese combo tiene que encuadrar. Por los dos lados: el registro
+    //    resuelve con `e.metaKey || e.ctrlKey`, y el rótulo dice ⌘, así que la
+    //    tecla de Mac es parte de la promesa, no un detalle de implementación.
+    cleanup();
+    for (const [nombre, mod] of [['Ctrl', { ctrlKey: true }], ['⌘', { metaKey: true }]] as const) {
+      const s2 = makeStore();
+      const view = render(
+        <Provider store={s2}><ShortcutProvider><Hooked /></ShortcutProvider></Provider>,
+      );
+      const foco = view.getByTestId('foco');
+      foco.focus();
+      const antes = s2.getState().editor.fitViewToken;
+      act(() => {
+        foco.dispatchEvent(new KeyboardEvent('keydown', { key: def!.key, ...mod, bubbles: true }));
+      });
+      expect(s2.getState().editor.fitViewToken, `pulsar ${nombre}+${def!.key} tiene que encuadrar`).toBe(antes + 1);
+      cleanup();
+    }
   });
+
 });
