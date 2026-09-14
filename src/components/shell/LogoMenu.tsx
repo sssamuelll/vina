@@ -5,7 +5,7 @@ import {
   setViewMode, undo, redo, toggleSnapToGrid, toggleSeamAllowance,
   toggleGrainlines, toggleNotches, togglePieceNames, toggleSewingLines,
   toggleReferenceImages, setLineLengthMode, toggleTrazos, setRenderMode2D,
-  clearSelection, setZoom2D, setUnits,
+  clearSelection, setZoom2D, setUnits, requestFitView,
 } from '../../store/editorSlice';
 import {
   startSimulation, pauseSimulation, resetSimulation, setViewMode3D,
@@ -160,7 +160,10 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Vista dividida', shortcut: '2', action: (d) => d(setViewMode('split')) },
   { label: 'Solo 3D', shortcut: '3', action: (d) => d(setViewMode('3d')) },
   { separator: true, label: '' },
-  { label: 'Ajustar zoom al patrón', shortcut: '⌘0', action: (d) => d({ type: 'editor/computeFitView' }) },
+  // `computeFitView` es una función pura del slice, no una acción: despacharla
+  // por cadena no encuadraba nada y nadie lo oía (#1163). El reducer es
+  // `requestFitView`, que sube el testigo que el editor observa.
+  { label: 'Ajustar zoom al patrón', shortcut: '⌘0', action: (d) => d(requestFitView()) },
   { label: 'Zoom 100%', shortcut: '⌘1', action: (d) => d(setZoom2D(1)) },
   { separator: true, label: '' },
   { label: 'Cuadrícula', shortcut: 'G', action: (d) => d(toggleSnapToGrid()), checked: (s) => s.editor.snapToGrid },

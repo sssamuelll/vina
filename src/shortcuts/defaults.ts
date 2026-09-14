@@ -72,6 +72,10 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'view.helpOverlayAlt', key: '?', label: 'Ayuda de atajos (alternativa)', category: 'View', context: 'global' },
   { id: 'view.layersPanel', key: 'l', ctrl: true, shift: true, label: 'Mostrar u ocultar panel de capas', category: 'View', context: 'global' },
   { id: 'view.xrayMode', key: 'x', shift: true, label: 'Activar o desactivar modo rayos X', category: 'View', context: 'global' },
+  // Anunciado como ⌘0 por Ver ▸ «Ajustar zoom al patrón» desde siempre y sin
+  // registrar hasta el 2026-09-13 (#1163). El `0` pelado de más abajo es la
+  // vista inferior de la cámara 3D: no chocan, este lleva Ctrl.
+  { id: 'view.fitPattern', key: '0', ctrl: true, label: 'Ajustar zoom al patrón', category: 'View', context: 'global' },
 
   // ─── 3D Tools ───────────────────────────────────────────────────────────────
   { id: 'tool3d.camera', key: 'q', label: 'Seleccionar/mover (3D)', category: '3D Tools', context: '3d' },

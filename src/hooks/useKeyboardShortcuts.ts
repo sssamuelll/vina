@@ -15,6 +15,7 @@ import {
   clearSelection,
   selectAllVisiblePieces,
   toggleSeamAllowance,
+  requestFitView,
   undo,
   redo,
   copyPieces,
@@ -222,6 +223,7 @@ export function useKeyboardShortcuts() {
 
       // View
       ['view.toggleSeamAllowance', () => dispatch(toggleSeamAllowance())],
+      ['view.fitPattern', () => dispatch(requestFitView())],
       ['view.layersPanel', () => window.dispatchEvent(new CustomEvent('vina:toggleLayersPanel'))],
       ['view.xrayMode', () => dispatch(setXrayMode({ enabled: !xrayMode }))],
 

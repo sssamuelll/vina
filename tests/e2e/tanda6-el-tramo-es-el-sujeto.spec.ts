@@ -128,26 +128,35 @@ test.describe('el sujeto es el tramo, no el bloque en que se dibujó', () => {
  *
  * Los tres casos de arriba montan la interna con `project/addInternalLine`, y
  * por ahí pasan en verde. El recorrido encadenado de la sesión de María la
- * dibuja con la HERRAMIENTA — y ahí `PatternEditor.tsx:396` autoselecciona la
- * entidad entera sin `segmentIndex` al cerrar el trazo. Con eso vuelve entero
- * lo que esta tanda arregló: la cabecera anunció «Editando: la línea
- * seleccionada · 6 cotas» sobre una interna de tres tramos, que es literalmente
- * [24:05] "y me sobresatura toda la información".
+ * dibuja con la HERRAMIENTA, y ahí el cierre del trazo autoseleccionaba algo.
  *
- * Y no se queda en ruido visual: las seis cotas tapan el propio dibujo, así que
- * el clic siguiente cae en una cota en vez de en el tramo, la abre a escribir y
- * el foco se queda dentro del campo. A partir de ahí los atajos globales callan
- * —`h` deja de activar Pluma— porque el manejador cede el teclado a los campos.
- * Un gesto de dibujo dejaba la aplicación sin atajos.
+ * ENMENDADO el 2026-09-14 (#1154). Este bloque nació el 09-09 exigiendo que el
+ * cierre dejara seleccionado UN TRAMO, porque lo que había antes era peor: la
+ * entidad entera, «Editando: la línea seleccionada · 6 cotas» sobre una interna
+ * de tres tramos, que es literalmente [24:05] "y me sobresatura toda la
+ * información". Bajar de seis cotas a una arregló el ruido y dejó el resto.
  *
- * El contrato ya lo decía y nadie lo ejecutó (§ 2 y § 5 de
- * 2026-09-08-contexto-y-control-numerico-design.md): "el gesto que creó varios
- * tramos NO forma un grupo de selección".
+ * Lo que quedaba lo dijo ella misma el 10-09 [09:32], dibujando internas con
+ * `G`: *"el zoom este me está molestando mucho, porque se pone esto aquí"*. No
+ * era el zoom. Era esa cota — la única que quedaba — plantada BAJO EL CURSOR,
+ * justo donde iba el clic siguiente (fotogramas `t_09-30.jpg` y `t_09-40.jpg`:
+ * la píldora gris del tramo en curso y el chip azul del anterior, pegados).
+ *
+ * Una cota es una menos que seis, pero encima del punto donde va el siguiente
+ * gesto sigue siendo una de más. Y la autoselección nunca la firmó nadie: el
+ * contrato 2026-09-08 § 5 solo dice que el gesto NO forma grupo de selección;
+ * lo de «queda seleccionado el último tramo» lo decidió el código. María firmó
+ * lo contrario el 13-09 — Enter traza y la herramienta vuelve al ratón, nada se
+ * abre solo. Así que al cerrar un trazo no se selecciona nada.
+ *
+ * Lo que esos casos medían sigue medido, solo que sobre un sujeto que se elige
+ * clicándolo: la forma del chip y su tamaño de letra viven en
+ * `tanda5-un-cuadro-y-un-aviso.spec.ts`, que ahora lo selecciona con el ratón.
  */
-test.describe('dibujar una interna no crea un grupo de selección', () => {
+test.describe('cerrar una interna no selecciona nada', () => {
   test.setTimeout(120_000);
 
-  test('al cerrar el trazo con Enter el sujeto es UN tramo, y el teclado sigue vivo', async ({ page }) => {
+  test('al cerrar el trazo con Enter no queda sujeto ni cota, y el teclado sigue vivo', async ({ page }) => {
     await waitForApp(page);
     await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
 
@@ -161,17 +170,15 @@ test.describe('dibujar una interna no crea un grupo de selección', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(400);
 
-    const sel = (await seleccion(page)) as { pieceId?: string; lineId?: string; segmentIndex?: number } | null;
-    expect(sel, 'el trazo recién cerrado tiene que quedar seleccionado por algo').not.toBeNull();
     expect(
-      sel?.segmentIndex,
-      'la creación no puede devolver la entidad entera: el sujeto es un tramo',
-    ).not.toBeUndefined();
+      await seleccion(page),
+      'el trazo se guarda; lo que no puede es quedarse agarrado de un sujeto que ella no pidió',
+    ).toBeNull();
 
     await expect(
       page.locator('.cota:not(.cota--hueca)'),
-      'tres tramos recién dibujados no pueden sacar seis cotas encima del dibujo',
-    ).toHaveCount(1);
+      'ninguna cota: ni las seis de la entidad ni la una del último tramo',
+    ).toHaveCount(0);
 
     // El campo no puede quedarse el foco: si se lo queda, la aplicación pierde
     // TODOS los atajos y solo se recupera clicando fuera.
@@ -181,7 +188,7 @@ test.describe('dibujar una interna no crea un grupo de selección', () => {
       .toBe('pen');
   });
 
-  test('un trazo CERRADO también cae en un tramo de verdad, no en la Z', async ({ page }) => {
+  test('un trazo CERRADO tampoco deja sujeto', async ({ page }) => {
     await waitForApp(page);
     await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
 
@@ -203,12 +210,49 @@ test.describe('dibujar una interna no crea un grupo de selección', () => {
     });
     expect(linea.path.at(-1)!.type, 'este caso solo vale si el trazo cerró de verdad').toBe('Z');
 
-    // `segmentPolar` solo emite tramo para los `L`: apuntar al último comando
-    // daba un índice que no casa con ninguno, y la línea quedaba seleccionada
-    // sin cota y sin realce — una selección muerta y en silencio.
-    await expect(
-      page.locator('.cota:not(.cota--hueca)'),
-      'el tramo elegido al cerrar tiene que ser uno que exista',
-    ).toHaveCount(1);
+    // El cierre por clic entra por el mismo sitio que el cierre por Enter, así
+    // que si uno se dejara sujeto el otro también: este es el control.
+    expect(await seleccion(page), 'cerrar clicando el primer nodo tampoco selecciona').toBeNull();
+    await expect(page.locator('.cota:not(.cota--hueca)')).toHaveCount(0);
+  });
+
+  /**
+   * El oráculo de #1154, que es lo que ella vio: no «hay una cota de más» sino
+   * «la cota me come el clic». Se mide donde duele — en el punto exacto donde
+   * cae el gesto siguiente — y con la consecuencia detrás: que ese clic
+   * empiece de verdad la interna siguiente.
+   */
+  test('el punto donde cae el clic siguiente no lo ocupa una cota', async ({ page }) => {
+    await waitForApp(page);
+    await addPiece(page, 'p1', { x: 0, y: 0 }, 400, 300);
+
+    await page.keyboard.press('g');
+    await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('internalShape');
+
+    const ultimoNodo = { x: 260, y: 150 };
+    for (const p of [{ x: 100, y: 150 }, { x: 180, y: 150 }, ultimoNodo]) await clicEn(page, p);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+
+    // El ratón sigue donde terminó el trazo: exactamente la postura de María en
+    // `t_09-40.jpg`, y exactamente donde ella iba a clicar otra vez.
+    const s = await toScreen(page, ultimoNodo);
+    const quienEstaAhi = await page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y);
+      return el ? (el.closest('button.cota') ? 'cota' : el.tagName.toLowerCase()) : 'nada';
+    }, [s.x, s.y] as const);
+    expect(
+      quienEstaAhi,
+      'donde ella va a clicar no puede haber un chip de cota esperando a comerse el gesto',
+    ).not.toBe('cota');
+
+    // Y la consecuencia, que es lo que ella notó: el clic siguiente dibuja.
+    const antes = (await st(page)).project.pieces.find(p => p.id === 'p1')!.internals.length;
+    await clicEn(page, ultimoNodo);
+    await clicEn(page, { x: 260, y: 240 });
+    await page.keyboard.press('Enter');
+    await expect
+      .poll(async () => (await st(page)).project.pieces.find(p => p.id === 'p1')!.internals.length, { timeout: 5000 })
+      .toBe(antes + 1);
   });
 });

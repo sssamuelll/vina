@@ -4,10 +4,10 @@ import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
 import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
-import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, selectInternalLine, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
+import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, seSeleccionaPorTramo } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import type { PenResult } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
@@ -407,30 +407,25 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       pieceId: host.id,
       line: { id: lineId, type: internalLineType, path: localPath },
     }));
-    // El gesto que dibujó varios tramos NO forma un grupo de selección
-    // (contrato 2026-09-08 § 5). Sin el tramo, cerrar el trazo devolvía la
-    // entidad entera y con ella TODAS sus cotas: una interna de tres tramos
-    // anunciaba "6 cotas" apiladas encima del dibujo — [24:05] "y me
-    // sobresatura toda la información" — y las cotas se comían el clic
-    // siguiente, dejando el foco dentro de un campo y la aplicación sin
-    // atajos. Queda seleccionado el último tramo: es el que se acaba de cerrar
-    // y el que ella querría corregir escribiendo.
+    // Y nada más: cerrar un trazo NO selecciona (#1154).
     //
-    // El ÚLTIMO COMANDO no sirve como índice: `segmentPolar` solo emite tramo
-    // para los `L`, y un trazo cerrado remata en `Z` (polyPenGeometry.ts:97)
-    // mientras uno curvo remata en `C`. Apuntar ahí deja la línea seleccionada
-    // con un índice que no casa con ningún tramo — sin cota y sin realce, una
-    // selección muerta y en silencio. Si no hay ningún `L` (todo curvas) se
-    // vuelve a la selección de entidad, que ahí no saca cotas de más porque
-    // esos tramos tampoco las tienen.
-    const ultimoTramo = localPath.reduce((acc, cmd, i) => (cmd.type === 'L' ? i : acc), -1);
-    dispatch(selectInternalLine({
-      pieceId: host.id,
-      lineId,
-      ...(seSeleccionaPorTramo(internalLineType) && ultimoTramo >= 0
-        ? { segmentIndex: ultimoTramo }
-        : {}),
-    }));
+    // Aquí hubo dos versiones y las dos molestaban. La primera devolvía la
+    // entidad entera, y con ella TODAS sus cotas: una interna de tres tramos
+    // anunciaba "6 cotas" apiladas encima del dibujo — [24:05] "y me
+    // sobresatura toda la información". La segunda (09-09) bajó a UNA, la del
+    // último tramo, con el argumento de que es la que ella querría corregir
+    // escribiendo. Nadie firmó ese argumento: el contrato 2026-09-08 § 5 solo
+    // dice que el gesto NO forma grupo de selección, y de ahí no se sigue que
+    // tenga que dejar algo agarrado.
+    //
+    // Una cota es cinco menos que seis, pero se planta BAJO EL CURSOR, justo
+    // donde va el clic siguiente. María, 10-09 [09:32], dibujando internas:
+    // "el zoom este me está molestando mucho, porque se pone esto aquí". No era
+    // el zoom. Y el 13-09 firmó la regla que zanja esto para toda la aplicación
+    // —Enter traza y la herramienta vuelve al ratón, nada se abre solo—, así
+    // que el trazo se guarda y el sujeto se elige clicándolo, como todo lo demás
+    // (`useEditorInteractions.ts`, que es ahora el único que aplica
+    // `seSeleccionaPorTramo`).
   }, [pieces, dispatch, internalLineType]);
 
   const handleInternalShapeLockedPress = useCallback(() => {
