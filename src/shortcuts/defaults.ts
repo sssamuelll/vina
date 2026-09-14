@@ -68,8 +68,14 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
 
   // ─── View ───────────────────────────────────────────────────────────────────
   { id: 'view.toggleSeamAllowance', key: 's', shift: true, label: 'Mostrar u ocultar margen de costura', category: 'View', context: 'global' },
-  { id: 'view.helpOverlay', key: '/', shift: true, label: 'Ayuda de atajos', category: 'View', context: 'global' },
-  { id: 'view.helpOverlayAlt', key: '?', label: 'Ayuda de atajos (alternativa)', category: 'View', context: 'global' },
+  // Aquí vivían `view.helpOverlay` (⇧/) y `view.helpOverlayAlt` (?), retirados
+  // el 2026-09-14 (#1170): estaban registrados, **no tenían manejador en
+  // ninguna parte** y no existe pantalla de ayuda que abrir — ni siquiera un
+  // consumidor de `getShortcutMap()`, que se exportó para ella. Un atajo en el
+  // catálogo que no hace nada es la misma enfermedad que el rótulo de menú que
+  // miente, por el otro lado del registro; y encima había un test vigilando su
+  // ortografía. La pantalla de ayuda es una funcionalidad que hace falta, y por
+  // eso vive como issue y no como dos líneas muertas aquí.
   { id: 'view.layersPanel', key: 'l', ctrl: true, shift: true, label: 'Mostrar u ocultar panel de capas', category: 'View', context: 'global' },
   { id: 'view.xrayMode', key: 'x', shift: true, label: 'Activar o desactivar modo rayos X', category: 'View', context: 'global' },
   // Anunciado como ⌘0 por Ver ▸ «Ajustar zoom al patrón» desde siempre y sin

@@ -26,14 +26,37 @@ import { runUiExport } from '../../utils/export/uiExport';
 import { downloadDiagnosticBundle } from '../../utils/export/diagnosticExporter';
 import { clearStorageProject } from '../../utils/projectIO';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import { displayShortcut } from './shortcutDisplay';
+import { displayShortcutBinding } from './shortcutDisplay';
+import { DEFAULT_SHORTCUTS } from '../../shortcuts/defaults';
 import { computeScrollFade, encajarSubmenu, type Encaje, type ScrollFade } from '../PatternEditor/menuOverflow';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/** El rótulo del atajo sale del registro, nunca de una cadena a mano (#1170). */
+function rotuloDeAtajo(id: string | undefined): string | null {
+  if (!id) return null;
+  const def = DEFAULT_SHORTCUTS.find(d => d.id === id);
+  return def ? displayShortcutBinding(def) : null;
+}
+
 interface MenuItem {
   label: string;
-  shortcut?: string;
+  /**
+   * Id de la acción en `src/shortcuts/defaults.ts`, NO el rótulo.
+   *
+   * La ley § 5 del contrato de interfaz dice que lo que el catálogo muestra
+   * tiene que existir, y aquí se rompía escribiendo la cadena a mano: el censo
+   * del 2026-09-14 encontró ocho de quince anuncios mal (#1170). Cuatro no los
+   * respaldaba nada —`⌘N`, `⌘1`, y dos que el registro tenía en OTRA tecla— y
+   * cuatro anunciaban una tecla que hace otra cosa: `1`/`2`/`3` son presets de
+   * cámara 3D y `G` es la herramienta Línea interna, así que María leía
+   * «Cuadrícula · G», pulsaba G y entraba a dibujar.
+   *
+   * Nombrando la acción, el rótulo sale de `displayShortcutBinding` y las dos
+   * fuentes no pueden separarse. Una fila sin atajo de verdad simplemente no
+   * declara ninguno: se sigue clicando igual.
+   */
+  shortcutId?: string;
   action?: (dispatch: AppDispatch) => void;
   checked?: (state: RootState) => boolean;
   disabled?: (state: RootState) => boolean;
@@ -46,7 +69,7 @@ interface MenuItem {
 const FILE_MENU: MenuItem[] = [
   // New Project must clear the IDB autosave BEFORE reloading — otherwise boot
   // hydration (projectAutosave) restores the project the user just abandoned.
-  { label: 'Proyecto nuevo', shortcut: '⌘N', action: (d) => {
+  { label: 'Proyecto nuevo', action: (d) => {
     void requestConfirmation(d, {
       title: '¿Empezar un proyecto nuevo?',
       description: 'Se cierra el patrón que tienes abierto y la ventana se recarga.',
@@ -99,19 +122,19 @@ const FILE_MENU: MenuItem[] = [
 ];
 
 const EDIT_MENU: MenuItem[] = [
-  { label: 'Deshacer', shortcut: '⌘Z', action: (d) => d(undo()), disabled: () => !canUndo() },
-  { label: 'Rehacer', shortcut: '⌘⇧Z', action: (d) => d(redo()), disabled: () => !canRedo() },
+  { label: 'Deshacer', shortcutId: 'edit.undo', action: (d) => d(undo()), disabled: () => !canUndo() },
+  { label: 'Rehacer', shortcutId: 'edit.redo', action: (d) => d(redo()), disabled: () => !canRedo() },
   { separator: true, label: '' },
   // Mismos dispatches que edit.duplicate / edit.delete (useKeyboardShortcuts):
   // el menú pintaba el shortcut pero el item era un noop (Fase1-S2).
-  { label: 'Duplicar', shortcut: '⌘D', action: (d) => {
+  { label: 'Duplicar', shortcutId: 'edit.duplicate', action: (d) => {
     for (const id of store.getState().editor.selectedPieceIds) d(duplicatePiece(id));
   } },
   // El sujeto lo decide `resolverBorrado` (#1115) — la MISMA función que usa el
   // atajo Supr. Antes esta acción reimplementaba la decisión a mano y se había
   // quedado tres semanas atrás: sin la regla de costuras de #1094 (en Coser
   // borraba la pieza) y sin el candado.
-  { label: 'Eliminar', shortcut: '⌫', action: (d) => {
+  { label: 'Eliminar', shortcutId: 'edit.delete', action: (d) => {
     const { editor, project } = store.getState();
     const sujeto = resolverBorrado({
       activeTool: editor.activeTool,
@@ -151,23 +174,23 @@ const EDIT_MENU: MenuItem[] = [
     }
   } },
   { separator: true, label: '' },
-  { label: 'Seleccionar todo', shortcut: '⌘A', action: (d) => { const ids = store.getState().project.pieces.map(p => p.id); d({ type: 'editor/selectAllPieces', payload: ids }); } },
-  { label: 'Quitar selección', shortcut: '⌘⇧A', action: (d) => d(clearSelection()) },
+  { label: 'Seleccionar todo', shortcutId: 'selection.selectAll', action: (d) => { const ids = store.getState().project.pieces.map(p => p.id); d({ type: 'editor/selectAllPieces', payload: ids }); } },
+  { label: 'Quitar selección', shortcutId: 'selection.deselect', action: (d) => d(clearSelection()) },
 ];
 
 const VIEW_MENU: MenuItem[] = [
-  { label: 'Solo 2D', shortcut: '1', action: (d) => d(setViewMode('2d')) },
-  { label: 'Vista dividida', shortcut: '2', action: (d) => d(setViewMode('split')) },
-  { label: 'Solo 3D', shortcut: '3', action: (d) => d(setViewMode('3d')) },
+  { label: 'Solo 2D', action: (d) => d(setViewMode('2d')) },
+  { label: 'Vista dividida', action: (d) => d(setViewMode('split')) },
+  { label: 'Solo 3D', action: (d) => d(setViewMode('3d')) },
   { separator: true, label: '' },
   // `computeFitView` es una función pura del slice, no una acción: despacharla
   // por cadena no encuadraba nada y nadie lo oía (#1163). El reducer es
   // `requestFitView`, que sube el testigo que el editor observa.
-  { label: 'Ajustar zoom al patrón', shortcut: '⌘0', action: (d) => d(requestFitView()) },
-  { label: 'Zoom 100%', shortcut: '⌘1', action: (d) => d(setZoom2D(1)) },
+  { label: 'Ajustar zoom al patrón', shortcutId: 'view.fitPattern', action: (d) => d(requestFitView()) },
+  { label: 'Zoom 100%', action: (d) => d(setZoom2D(1)) },
   { separator: true, label: '' },
-  { label: 'Cuadrícula', shortcut: 'G', action: (d) => d(toggleSnapToGrid()), checked: (s) => s.editor.snapToGrid },
-  { label: 'Margen de costura', shortcut: '⇧S', action: (d) => d(toggleSeamAllowance()), checked: (s) => s.editor.showSeamAllowance },
+  { label: 'Cuadrícula', action: (d) => d(toggleSnapToGrid()), checked: (s) => s.editor.snapToGrid },
+  { label: 'Margen de costura', shortcutId: 'view.toggleSeamAllowance', action: (d) => d(toggleSeamAllowance()), checked: (s) => s.editor.showSeamAllowance },
   { label: 'Hilos', action: (d) => d(toggleGrainlines()), checked: (s) => s.editor.showGrainlines },
   { label: 'Piquetes', action: (d) => d(toggleNotches()), checked: (s) => s.editor.showNotches },
   { label: 'Nombres de pieza', action: (d) => d(togglePieceNames()), checked: (s) => s.editor.showPieceNames },
@@ -203,7 +226,7 @@ const PATTERN_MENU: MenuItem[] = [
 
 const SIMULATION_MENU: MenuItem[] = [
   { label: 'Vestir avatar', action: (d) => { d(setViewMode3D('simulate')); d(startSimulation()); } },
-  { label: 'Iniciar simulación', shortcut: 'Espacio', action: (d) => d(startSimulation()) },
+  { label: 'Iniciar simulación', shortcutId: 'sim.toggle', action: (d) => d(startSimulation()) },
   { label: 'Pausar', action: (d) => d(pauseSimulation()) },
   { label: 'Restablecer', action: (d) => d(resetSimulation()) },
 ];
@@ -376,7 +399,9 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
       >
         <span className="logo-menu__check">{isChecked ? '✓' : ''}</span>
         <span className="logo-menu__label">{item.label}</span>
-        {item.shortcut && <span className="logo-menu__shortcut">{displayShortcut(item.shortcut)}</span>}
+        {rotuloDeAtajo(item.shortcutId) && (
+          <span className="logo-menu__shortcut">{rotuloDeAtajo(item.shortcutId)}</span>
+        )}
         {hasSubmenu && <ChevronRight size={14} className="logo-menu__chevron" />}
         {hasSubmenu && hoveredSub === item.label && (
           <Submenu>{item.submenu!.map((sub, si) => renderMenuItem(sub, si))}</Submenu>

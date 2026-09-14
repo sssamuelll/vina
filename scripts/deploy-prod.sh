@@ -69,6 +69,35 @@ echo "✓ smoke del WASM commiteado"
 # Vite arrancando en frío con tantos workers como CPUs se queda sin aire y los
 # tests se caen esperando a que monte, no por lo que miden. Un gate que da
 # falsos rojos se acaba desactivando, que es peor que no tenerlo.
+#
+# LA SEGUNDA MITAD DE LA LISTA — los specs de CONTRATO (#1169, 2026-09-14).
+#
+# Los doce de arriba vigilan emplazamiento y gestos. Faltaba la otra clase: los
+# que fijan una FIRMA de María o una decisión de producto escrita. Esos son los
+# que se pudren, porque se pudren cuando la decisión cambia y alguien actualiza
+# unos archivos y no sus hermanos. Medido dos veces seguidas, con el mismo
+# cambio de fondo (la firma D6: el clic derecho abre la pareja Largo/Angulo):
+#
+#   · PR #1166 — `medidas-escritas-gramatica` se quedo afirmando el contrato
+#     viejo. Se cazo, y solo porque ese archivo SI estaba en esta lista.
+#   · PR #1168 — `linea-interna-gramatica`, su hermano de la Linea interna,
+#     llevaba rojo desde ese mismo merge y nadie lo vio. No estaba en la lista.
+#     Aparecio de casualidad, corriendo una barrida amplia por otra razon.
+#
+# El mecanismo que protegio en el primero es el que faltaba en el segundo. No
+# fue mala suerte, fue cobertura. De paso salio un tercero: `bundle-split`
+# esperaba el rotulo «IK Mode» que el repo ya habia traducido a «Modo IK».
+#
+# MEDIDO el 2026-09-14 con la maquina libre: los doce viejos son 69 casos en
+# 8,6 min; los veintidos son 114 casos en 21,1 min. Doce minutos y medio mas.
+# Se dice aqui, y no en el informe de la PR, porque el numero es lo que decide
+# si alguien bypasea el gate un viernes: si duele, la conversacion es recortar
+# esta lista a conciencia, no saltarsela.
+#
+# No entran los 97 specs enteros: esta lista es la CLASE que se pudre, no un
+# intento de correrlo todo. El resto sigue sin gate y eso esta dicho en #1169.
+# Y no entra `bundle-split`: tiene un rojo real del tier TSL (#1171), y meterlo
+# bloquearia despliegues por un bug ajeno a lo que se este tocando.
 npx playwright test --workers=2 \
   tests/e2e/emplazamiento-lienzo-2d.spec.ts \
   tests/e2e/emplazamiento-modales.spec.ts \
@@ -82,8 +111,18 @@ npx playwright test --workers=2 \
   tests/e2e/medidas-escritas-gramatica.spec.ts \
   tests/e2e/cotas-no-tapan-el-transform-box.spec.ts \
   tests/e2e/trazos.spec.ts \
+  tests/e2e/linea-interna-gramatica.spec.ts \
+  tests/e2e/seis-firmas-maria.spec.ts \
+  tests/e2e/lo-que-se-ve-y-cuando.spec.ts \
+  tests/e2e/tanda4-puertas-y-defaults.spec.ts \
+  tests/e2e/tanda5-un-cuadro-y-un-aviso.spec.ts \
+  tests/e2e/tanda6-el-tramo-es-el-sujeto.spec.ts \
+  tests/e2e/1161-reproduccion-tab.spec.ts \
+  tests/e2e/226-cotas-linea-interna.spec.ts \
+  tests/e2e/1152-los-largos-no-se-quedan-clavados.spec.ts \
+  tests/e2e/replay-maria-07-09.spec.ts \
   > /tmp/vina-deploy-e2e.log 2>&1 || { tail -30 /tmp/vina-deploy-e2e.log >&2; exit 1; }
-grep -E "passed|failed" /tmp/vina-deploy-e2e.log | tail -1 | sed 's/^ */✓ emplazamiento: /'
+grep -E "passed|failed" /tmp/vina-deploy-e2e.log | tail -1 | sed 's/^ */✓ emplazamiento y contratos: /'
 
 echo "── Build ──────────────────────────────────────────────"
 npm run build > /tmp/vina-deploy-build.log 2>&1 || { tail -20 /tmp/vina-deploy-build.log >&2; exit 1; }
