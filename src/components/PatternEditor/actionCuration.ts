@@ -104,7 +104,8 @@ export interface ActionDef {
   id: ActionId;
   label: string | ((ctx: CurationCtx) => string);
   icon: string;
-  shortcut?: string;
+  /** Id de la acción en `defaults.ts`; el rótulo se deriva (#1170). */
+  shortcutId?: string;
   group: GroupId;
   danger?: boolean;
   /** Precondición. Si devuelve false, el ítem se OCULTA (hide-not-disable, §4). */
@@ -166,21 +167,21 @@ const ilDeleteLabel = (ctx: CurationCtx) => {
 
 export const ACTIONS: Record<ActionId, ActionDef> = {
   // clipboard
-  copy: { id: 'copy', group: 'clipboard', icon: '📄', label: 'Copiar', shortcut: 'Ctrl+C',
+  copy: { id: 'copy', group: 'clipboard', icon: '📄', label: 'Copiar', shortcutId: 'edit.copy',
     run: (ctx) => { if (ctx.piece) ctx.dispatch(copyPieces({ pieces: [ctx.piece] })); } },              // editorSlice.copyPieces
-  paste: { id: 'paste', group: 'clipboard', icon: '📋', label: 'Pegar', shortcut: 'Ctrl+V',
+  paste: { id: 'paste', group: 'clipboard', icon: '📋', label: 'Pegar', shortcutId: 'edit.paste',
     gate: hasClipboard, run: pasteRun(false) },                                                          // editorSlice.createPastedPieces + projectSlice.addPiece
-  pasteMirror: { id: 'pasteMirror', group: 'clipboard', icon: '🪞', label: 'Pegar en espejo', shortcut: 'Ctrl+R',
+  pasteMirror: { id: 'pasteMirror', group: 'clipboard', icon: '🪞', label: 'Pegar en espejo', shortcutId: 'edit.mirrorPaste',
     gate: hasClipboard, run: pasteRun(true) },
 
   // transform (mutadores de geometría → gate !locked, F2)
-  rotate90: { id: 'rotate90', group: 'transform', icon: '↻', label: 'Rotar 90°', shortcut: 'R',
+  rotate90: { id: 'rotate90', group: 'transform', icon: '↻', label: 'Rotar 90°',
     gate: notLocked, run: (ctx) => ctx.dispatch(rotatePiece({ id: ctx.pieceId!, rotation: (ctx.piece?.rotation ?? 0) + 90 })) }, // projectSlice.rotatePiece
-  flipH: { id: 'flipH', group: 'transform', icon: '↔', label: 'Voltear horizontal', shortcut: 'H',
+  flipH: { id: 'flipH', group: 'transform', icon: '↔', label: 'Voltear horizontal',
     gate: notLocked, run: (ctx) => ctx.dispatch(flipPieceH(ctx.pieceId!)) },                             // projectSlice.flipPieceH
-  flipV: { id: 'flipV', group: 'transform', icon: '↕', label: 'Voltear vertical', shortcut: 'V',
+  flipV: { id: 'flipV', group: 'transform', icon: '↕', label: 'Voltear vertical',
     gate: notLocked, run: (ctx) => ctx.dispatch(flipPieceV(ctx.pieceId!)) },                             // projectSlice.flipPieceV
-  reverseSeam: { id: 'reverseSeam', group: 'transform', icon: '↔', label: 'Invertir dirección de costura', shortcut: 'Ctrl+B',
+  reverseSeam: { id: 'reverseSeam', group: 'transform', icon: '↔', label: 'Invertir dirección de costura', shortcutId: 'selection.reverseSeam',
     run: (ctx) => ctx.dispatch(reverseSeam(ctx.seamId!)) },                                              // projectSlice.reverseSeam
   reverseGrainline: { id: 'reverseGrainline', group: 'transform', icon: '⇅', label: 'Invertir sentido del hilo',
     run: (ctx) => ctx.dispatch(updateInternalLine({                                                     // projectSlice.updateInternalLine (:497)
@@ -273,7 +274,7 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     run: (ctx) => ctx.dispatch(cloneAsLinked({ pieceId: ctx.pieceId!, mode: 'instance' })) },
 
   // identity
-  duplicate: { id: 'duplicate', group: 'identity', icon: '⧉', label: 'Duplicar', shortcut: 'Ctrl+D',
+  duplicate: { id: 'duplicate', group: 'identity', icon: '⧉', label: 'Duplicar', shortcutId: 'edit.duplicate',
     run: (ctx) => ctx.dispatch(duplicatePiece(ctx.pieceId!)) },                                              // duplicatePiece
   duplicateGroup: { id: 'duplicateGroup', group: 'identity', icon: '⧉', label: 'Duplicar', run: () => {},
     submenu: (ctx): SubMenuItem[] => [
@@ -285,7 +286,7 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     ] },
   duplicateAll: { id: 'duplicateAll', group: 'identity', icon: '⧉', label: 'Duplicar',
     run: (ctx) => ctx.selectedPieceIds.forEach(id => ctx.dispatch(duplicatePiece(id))) },                    // loop pieza-a-pieza (verbo existente)
-  rename: { id: 'rename', group: 'identity', icon: '✏️', label: 'Renombrar…', shortcut: 'F2',
+  rename: { id: 'rename', group: 'identity', icon: '✏️', label: 'Renombrar…',
     run: (ctx) => ctx.cb.onRename?.(ctx.pieceId!) },                                                         // Surface B prop → inline rename
   properties: { id: 'properties', group: 'identity', icon: '🎛', label: 'Propiedades…',
     run: (ctx) => ctx.cb.onOpenProperties?.(ctx.pieceId!) },                                                 // Surface B prop → Properties panel
@@ -340,9 +341,9 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     } },
 
   // danger (destructivos → gate !locked donde aplica, F2)
-  deletePiece: { id: 'deletePiece', group: 'danger', icon: '🗑', label: 'Eliminar pieza', shortcut: 'Del', danger: true,
+  deletePiece: { id: 'deletePiece', group: 'danger', icon: '🗑', label: 'Eliminar pieza', shortcutId: 'edit.delete', danger: true,
     gate: notLocked, run: (ctx) => ctx.dispatch(removePiece(ctx.pieceId!)) },                                // projectSlice.removePiece (SIN cascade-clean — POST-SHIP)
-  deleteSeam: { id: 'deleteSeam', group: 'danger', icon: '🗑', label: 'Eliminar costura', shortcut: 'Del', danger: true,
+  deleteSeam: { id: 'deleteSeam', group: 'danger', icon: '🗑', label: 'Eliminar costura', shortcutId: 'edit.delete', danger: true,
     run: (ctx) => { ctx.dispatch(removeSeam(ctx.seamId!)); ctx.dispatch(clearSelection()); } },              // removeSeam + clearSelection
   deleteInternalLine: { id: 'deleteInternalLine', group: 'danger', icon: '🗑', label: ilDeleteLabel, danger: true,
     run: (ctx) => ctx.dispatch(removeInternalLine({ pieceId: ctx.pieceId!, lineId: ctx.internalLineId! })) }, // projectSlice.removeInternalLine (:518)

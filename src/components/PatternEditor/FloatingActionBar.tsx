@@ -8,6 +8,7 @@
  * el label vive en el tooltip.
  */
 import { useMemo } from 'react';
+import { shortcutLabelFor } from '../shell/shortcutDisplay';
 import type { BBox } from '../../utils/geometry/transform';
 import type { Point2D } from '../../types/types';
 import type { CurationCtx } from './actionCuration';
@@ -83,7 +84,7 @@ export default function FloatingActionBar({
         const Icon = BAR_ICONS[def.id];
         const label = typeof def.label === 'function' ? def.label(ctx) : def.label;
         return (
-          <ToolTooltip key={def.id} name={label} shortcut={def.shortcut}>
+          <ToolTooltip key={def.id} name={label} shortcut={shortcutLabelFor(def.shortcutId) ?? undefined}>
             <button
               type="button"
               className="floating-action-bar__btn"

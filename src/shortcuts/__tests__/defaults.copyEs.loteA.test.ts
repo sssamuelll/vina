@@ -28,7 +28,9 @@ describe('copy del registro de atajos', () => {
 
     expect(labels['tool.notch']).toBe('Piquete');
     expect(labels['tool.seamAllowance']).toBe('Margen de costura');
-    expect(labels['view.helpOverlay']).toBe('Ayuda de atajos');
+    // `view.helpOverlay` se retiró el 2026-09-14 (#1170): registrado, sin
+    // manejador y sin pantalla que abrir. Este assert vigilaba la ortografía de
+    // algo que no existía — señal verde sobre nada.
     expect(labels['tool.pomMeasure']).toBe('Medir POM');
   });
 

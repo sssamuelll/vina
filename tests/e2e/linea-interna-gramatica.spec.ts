@@ -123,7 +123,7 @@ test.describe('línea interna — gramática', () => {
     expect(ils[2].path[0].values[1]).toBeCloseTo(0, 6);
   });
 
-  test('Retroceso quita el último sin borrar la pieza seleccionada; botón derecho mudo; Escape descarta', async ({ page }) => {
+  test('Retroceso quita el último sin borrar la pieza seleccionada; botón derecho abre la pareja sin menú; Escape descarta', async ({ page }) => {
     await waitForApp(page);
     await addPiece(page, 'A', { x: 150, y: 150 });
     await dispatch(page, 'editor/selectPiece', 'A');
@@ -135,8 +135,33 @@ test.describe('línea interna — gramática', () => {
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(150);
     expect((await st(page)).project.pieces).toHaveLength(1);
+    // ENMENDADO el 2026-09-14. El título dice "botón derecho mudo" y eso dejó
+    // de ser cierto con la firma D6 de María (13-09, #1160): a mitad de trazo el
+    // botón derecho abre la misma pareja Largo/Ángulo que Tab. Mudo sigue
+    // estándolo el MENÚ —ni el del navegador ni el de Vina— que es lo que este
+    // caso vigilaba; lo que cambió es que ahora además hace algo.
+    //
+    // Este archivo llevaba rojo desde la PR #1166 sin que nadie lo notara: el
+    // hermano de la Pluma (`medidas-escritas-gramatica.spec.ts`) sí se
+    // actualizó, este no, y no está entre los doce specs del gate de deploy.
     await clickAt(page, { x: 280, y: 250 }, 'right');
     await expect(page.locator('.context-menu')).toHaveCount(0);
+    await expect(
+      page.locator('input.cota--editando[aria-label="Largo"]'),
+      'el derecho abre la pareja como Tab (firma D6)',
+    ).toBeVisible({ timeout: 5000 });
+
+    // Con la pareja abierta, Enter TRAZA (firma de María del 13-09). Para que
+    // el Enter de abajo cierre la línea hay que soltarla antes: es la escalera
+    // de Escape. El PRIMERO cierra el campo y se lo come el propio chip (no
+    // llega al router); el SEGUNDO suelta la pareja. Ninguno de los dos toca el
+    // borrador, y se ve en este mismo caso: si alguno lo descartara, el Enter
+    // de abajo no tendría trazo que cerrar y `ils` saldría 0, no 1.
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(150);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(150);
+
     await page.keyboard.press('Enter');
     await page.waitForTimeout(200);
     let ils = await internalsOf(page, 'A');

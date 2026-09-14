@@ -13,6 +13,7 @@ export interface EstadoLienzo {
     pan2D: { x: number; y: number };
     selectedPieceIds: string[];
     selectedSeamId: string | null;
+    selectedTrazo: { trazoId: string; segmentIndex: number } | null;
   };
   project: {
     pieces: Array<{ id: string; name: string; outline: Cmd[]; position: { x: number; y: number }; internals: unknown[] }>;

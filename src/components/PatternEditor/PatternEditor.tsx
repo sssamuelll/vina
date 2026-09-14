@@ -4,10 +4,10 @@ import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
 import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
-import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, selectInternalLine, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
+import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, clearSelection, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, seSeleccionaPorTramo } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import type { PenResult } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
@@ -407,30 +407,39 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       pieceId: host.id,
       line: { id: lineId, type: internalLineType, path: localPath },
     }));
-    // El gesto que dibujó varios tramos NO forma un grupo de selección
-    // (contrato 2026-09-08 § 5). Sin el tramo, cerrar el trazo devolvía la
-    // entidad entera y con ella TODAS sus cotas: una interna de tres tramos
-    // anunciaba "6 cotas" apiladas encima del dibujo — [24:05] "y me
-    // sobresatura toda la información" — y las cotas se comían el clic
-    // siguiente, dejando el foco dentro de un campo y la aplicación sin
-    // atajos. Queda seleccionado el último tramo: es el que se acaba de cerrar
-    // y el que ella querría corregir escribiendo.
+    // Cerrar un trazo NO selecciona nada, y suelta lo que hubiera agarrado
+    // (#1154). Las dos mitades hacen falta, y por razones distintas.
     //
-    // El ÚLTIMO COMANDO no sirve como índice: `segmentPolar` solo emite tramo
-    // para los `L`, y un trazo cerrado remata en `Z` (polyPenGeometry.ts:97)
-    // mientras uno curvo remata en `C`. Apuntar ahí deja la línea seleccionada
-    // con un índice que no casa con ningún tramo — sin cota y sin realce, una
-    // selección muerta y en silencio. Si no hay ningún `L` (todo curvas) se
-    // vuelve a la selección de entidad, que ahí no saca cotas de más porque
-    // esos tramos tampoco las tienen.
-    const ultimoTramo = localPath.reduce((acc, cmd, i) => (cmd.type === 'L' ? i : acc), -1);
-    dispatch(selectInternalLine({
-      pieceId: host.id,
-      lineId,
-      ...(seSeleccionaPorTramo(internalLineType) && ultimoTramo >= 0
-        ? { segmentIndex: ultimoTramo }
-        : {}),
-    }));
+    // NO SELECCIONAR. Aquí hubo dos versiones y las dos molestaban. La primera
+    // devolvía la entidad entera, y con ella TODAS sus cotas: una interna de
+    // tres tramos anunciaba «6 cotas» apiladas encima del dibujo — [24:05] "y
+    // me sobresatura toda la información". La segunda (09-09) bajó a UNA, la
+    // del último tramo, con el argumento de que es la que ella querría
+    // corregir escribiendo. Nadie firmó ese argumento: el contrato 2026-09-08
+    // § 5 solo dice que el gesto no forma grupo de selección, y de ahí no se
+    // sigue que dibujar tenga que dejar algo agarrado.
+    //
+    // Una cota es cinco menos que seis, pero se planta BAJO EL CURSOR, justo
+    // donde va el clic siguiente. María, 10-09 [09:32], dibujando internas:
+    // "el zoom este me está molestando mucho, porque se pone esto aquí". No era
+    // el zoom. Y el 13-09 firmó la regla que zanja esto para toda la
+    // aplicación: Enter traza y la herramienta vuelve al ratón, nada se abre
+    // solo. Así que el trazo se guarda y el sujeto se elige clicándolo, como
+    // todo lo demás (`useEditorInteractions.ts`, el único sitio que aplica ya
+    // `seSeleccionaPorTramo`).
+    //
+    // SOLTAR LO DE ANTES. «No seleccionar» no puede significar «dejar puesto lo
+    // que hubiera». El dispatch que vivía aquí escribía SEIS campos, no uno:
+    // además de la línea ponía la pieza anfitriona y anulaba costura, POM,
+    // trazo y selección de márgenes. Era el único punto de todo el gesto que
+    // normalizaba la selección. Quitarlo a secas dejó el cierre transparente
+    // —lo agarrado antes de pulsar `G` seguía agarrado después— y, como crear
+    // una pieza la deja seleccionada, el recorrido normal (hago una pieza,
+    // dibujo una interna dentro, me arrepiento, Supr) se llevaba LA PIEZA
+    // ENTERA, sin diálogo. Es el bug (A) que `borradoDeSeleccion.ts` dice en su
+    // cabecera que vino a matar, reabierto por la otra puerta. Lo cazó la
+    // revisión adversarial del 14-09, con los gates en verde.
+    dispatch(clearSelection());
   }, [pieces, dispatch, internalLineType]);
 
   const handleInternalShapeLockedPress = useCallback(() => {
@@ -1162,7 +1171,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // las piezas dejaba ese encuadre —y Ver ▸ Ajustar zoom al patrón— en un
     // no-op silencioso: el aviso decía «Restauré tu proyecto: 3 trazos» y el
     // lienzo se quedaba en zoom 1, pan 0,0.
-    if (!svgEl || (pieces.length === 0 && trazos.length === 0)) return;
+    // `trazosVisibles`, no `trazos`: con «Construcción» apagada el encuadre iba
+    // a por geometría que no se pinta y dejaba el lienzo mirando a la nada
+    // (#1164 § 0). Estaba aparcado con un ruling porque la capa nace encendida
+    // y los tres productores eran de una sola vez; con ⌘0 (#1163) pasa a ser un
+    // teclazo repetible desde cualquier estado, así que se cierra aquí.
+    if (!svgEl || (pieces.length === 0 && trazosVisibles.length === 0)) return;
     const rect = svgEl.getBoundingClientRect();
     // El dock 2D flota (no reserva espacio real, § 2.1), así que el encuadre
     // tiene que descontar su faja a mano (ver DOCK_WIDTH_PX arriba). Se resta
@@ -1171,7 +1185,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // patrón HACIA el dock, que es lo contrario.
     const fit = computeFitView(
       // El `path` de un trazo va en coordenadas de patrón: sin posición propia.
-      [...pieces, ...trazos.map(t => ({ position: { x: 0, y: 0 }, outline: t.path }))],
+      [...pieces, ...trazosVisibles.map(t => ({ position: { x: 0, y: 0 }, outline: t.path }))],
       Math.max(0, rect.width - DOCK_WIDTH_PX),
       rect.height,
     );
@@ -1179,21 +1193,34 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       dispatch(setZoom2D(fit.zoom));
       dispatch(setPan2D({ x: fit.pan.x + DOCK_WIDTH_PX, y: fit.pan.y }));
     }
-  }, [pieces, trazos, dispatch, svgRef]);
+  }, [pieces, trazosVisibles, dispatch, svgRef]);
 
-  // Auto fit-to-content: an import bumps fitViewToken; frame the pattern once
-  // the viewport size and pieces are both available. The early return leaves
-  // lastFitTokenRef untouched until a real fit happens, so a token that arrives
-  // before the SVG is measured still fits on the next dependency change. The
-  // token guard ensures we fit once per request — never on subsequent edits.
+  // Auto fit-to-content: un import sube `fitViewToken` y aquí se encuadra una
+  // sola vez por petición, nunca en las ediciones siguientes.
+  //
+  // Las dos salidas de abajo parecen la misma y NO lo son — estuvieron juntas y
+  // costó un bug (revisión adversarial del 14-09). «El svg todavía no está
+  // medido» es un todavía: hay que reintentar en el render siguiente, y por eso
+  // el testigo se deja sin tocar. «No hay nada que encuadrar» es un no: no hay
+  // nada que reintentar, y dejar el testigo sin consumir deja el encuadre
+  // ARMADO — pedirlo sobre el lienzo vacío y que salte solo al dibujar la
+  // primera pieza, minutos después y sin que nadie lo pidiera.
+  //
+  // No se alcanzaba mientras los únicos productores eran importar, restaurar y
+  // el copiloto: los tres llegan con contenido ya en el store. Arreglar #1163
+  // le da a la usuaria dos productores nuevos —Ver ▸ Ajustar zoom al patrón y
+  // ⌘0—, pulsables sobre un proyecto recién abierto.
   const lastFitTokenRef = useRef(0);
   useEffect(() => {
     if (fitViewToken === lastFitTokenRef.current) return;
-    // Ninguna de las dos listas tiene nada que encuadrar → todavía no.
-    if ((pieces.length === 0 && trazos.length === 0) || svgSize.width === 0) return; // not ready — retry on next render
+    if (svgSize.width === 0) return; // todavía sin medir → se reintenta
+    if (pieces.length === 0 && trazosVisibles.length === 0) {
+      lastFitTokenRef.current = fitViewToken; // nada que encuadrar → se consume
+      return;
+    }
     lastFitTokenRef.current = fitViewToken;
     handleZoomToFit();
-  }, [fitViewToken, pieces.length, trazos.length, svgSize.width, svgSize.height, handleZoomToFit]);
+  }, [fitViewToken, pieces.length, trazosVisibles.length, svgSize.width, svgSize.height, handleZoomToFit]);
 
   // ─── Calibration modal confirm ────────────────────────────────────────────
   const handleCalibrationConfirm = useCallback((realWorldMm: number) => {

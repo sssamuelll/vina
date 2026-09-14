@@ -51,12 +51,22 @@ test.describe('tanda 5 — un cuadro para una información, y un aviso cuando no
     await waitForApp(page);
     await addPiece(page, 'pieza', { x: 100, y: 100 }, 300, 200);
 
-    // Dibuja una interna de un tramo dentro de la pieza y la deja seleccionada.
+    // Dibuja una interna de un tramo dentro de la pieza y luego la selecciona.
     await activar(page, 'g', 'internalShape');
     await clicEn(page, { x: 150, y: 150 });
     await clicEn(page, { x: 300, y: 220 });
     await page.keyboard.press('Enter');
     await page.waitForTimeout(400);
+
+    // ENMENDADO el 2026-09-14 (#1154). Estos dos casos se apoyaban en que
+    // cerrar el trazo dejaba el tramo seleccionado, y esa autoselección murió:
+    // plantaba la cota bajo el cursor, justo donde iba el clic siguiente. Lo
+    // que miden —que el largo y el ángulo van en UN cuadro, y que ese número se
+    // lee— no cambia ni un ápice; solo que ahora el tramo se elige clicándolo,
+    // que es como se elige todo lo demás.
+    await activar(page, 'z', 'select');
+    await clicEn(page, { x: 225, y: 185 });
+    await expect(page.locator('[data-internal-line-segment]'), 'el clic tiene que caer en el tramo').toHaveCount(1);
 
     // Los chips del tramo son `button.cota` con aria "Largo: …" y "Ángulo: …".
     const chips = page.locator('button.cota').filter({ hasText: /mm|°/ });
@@ -82,6 +92,16 @@ test.describe('tanda 5 — un cuadro para una información, y un aviso cuando no
     await clicEn(page, { x: 300, y: 220 });
     await page.keyboard.press('Enter');
     await page.waitForTimeout(400);
+
+    // ENMENDADO el 2026-09-14 (#1154). Estos dos casos se apoyaban en que
+    // cerrar el trazo dejaba el tramo seleccionado, y esa autoselección murió:
+    // plantaba la cota bajo el cursor, justo donde iba el clic siguiente. Lo
+    // que miden —que el largo y el ángulo van en UN cuadro, y que ese número se
+    // lee— no cambia ni un ápice; solo que ahora el tramo se elige clicándolo,
+    // que es como se elige todo lo demás.
+    await activar(page, 'z', 'select');
+    await clicEn(page, { x: 225, y: 185 });
+    await expect(page.locator('[data-internal-line-segment]'), 'el clic tiene que caer en el tramo').toHaveCount(1);
 
     const chip = page.locator('button.cota').filter({ hasText: /mm|°/ }).first();
     await expect(chip).toBeVisible();

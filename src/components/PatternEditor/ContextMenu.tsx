@@ -15,7 +15,7 @@ import { pushJournal } from '../../utils/telemetry/journal';
 import { selectWorkflowStage } from '../../store/selectors';
 import type { InternalLineType } from '../../types/types';
 import SubMenu from '../../components/shared/SubMenu';
-import { displayShortcut } from '../shell/shortcutDisplay';
+import { shortcutLabelFor } from '../shell/shortcutDisplay';
 import { computeScrollFade, type ScrollFade } from './menuOverflow';
 import { instrumentSubmenuItems } from './menuInstrumentation';
 import {
@@ -206,7 +206,9 @@ export default function ContextMenu(props: ContextMenuProps) {
                 >
                   <span className="context-menu__icon">{def.icon}</span>
                   <span className="context-menu__label">{label}</span>
-                  {def.shortcut && <span className="context-menu__shortcut">{displayShortcut(def.shortcut)}</span>}
+                  {shortcutLabelFor(def.shortcutId) && (
+                    <span className="context-menu__shortcut">{shortcutLabelFor(def.shortcutId)}</span>
+                  )}
                 </button>
               );
             })}

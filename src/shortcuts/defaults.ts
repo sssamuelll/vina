@@ -68,10 +68,20 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
 
   // ─── View ───────────────────────────────────────────────────────────────────
   { id: 'view.toggleSeamAllowance', key: 's', shift: true, label: 'Mostrar u ocultar margen de costura', category: 'View', context: 'global' },
-  { id: 'view.helpOverlay', key: '/', shift: true, label: 'Ayuda de atajos', category: 'View', context: 'global' },
-  { id: 'view.helpOverlayAlt', key: '?', label: 'Ayuda de atajos (alternativa)', category: 'View', context: 'global' },
+  // Aquí vivían `view.helpOverlay` (⇧/) y `view.helpOverlayAlt` (?), retirados
+  // el 2026-09-14 (#1170): estaban registrados, **no tenían manejador en
+  // ninguna parte** y no existe pantalla de ayuda que abrir — ni siquiera un
+  // consumidor de `getShortcutMap()`, que se exportó para ella. Un atajo en el
+  // catálogo que no hace nada es la misma enfermedad que el rótulo de menú que
+  // miente, por el otro lado del registro; y encima había un test vigilando su
+  // ortografía. La pantalla de ayuda es una funcionalidad que hace falta, y por
+  // eso vive como issue y no como dos líneas muertas aquí.
   { id: 'view.layersPanel', key: 'l', ctrl: true, shift: true, label: 'Mostrar u ocultar panel de capas', category: 'View', context: 'global' },
   { id: 'view.xrayMode', key: 'x', shift: true, label: 'Activar o desactivar modo rayos X', category: 'View', context: 'global' },
+  // Anunciado como ⌘0 por Ver ▸ «Ajustar zoom al patrón» desde siempre y sin
+  // registrar hasta el 2026-09-13 (#1163). El `0` pelado de más abajo es la
+  // vista inferior de la cámara 3D: no chocan, este lleva Ctrl.
+  { id: 'view.fitPattern', key: '0', ctrl: true, label: 'Ajustar zoom al patrón', category: 'View', context: 'global' },
 
   // ─── 3D Tools ───────────────────────────────────────────────────────────────
   { id: 'tool3d.camera', key: 'q', label: 'Seleccionar/mover (3D)', category: '3D Tools', context: '3d' },

@@ -831,12 +831,14 @@ export interface InternalLineSelection {
  * demás —piquete, pinza, hilo, pespunte— tienen semántica de entidad y sus
  * operaciones son sobre el objeto entero.
  *
- * Vive aquí, junto a la selección que gobierna, porque la regla la aplican dos
- * sitios que TIENEN que coincidir: el clic que selecciona
- * (`useEditorInteractions.ts`) y el cierre del trazo que acaba de dibujarse
- * (`PatternEditor.tsx`). Estaban en desacuerdo —solo el primero la aplicaba— y
- * el precio fue que dibujar una interna de tres tramos devolvía la entidad
- * entera con sus seis cotas encima del dibujo (reunión 07-09, causa G).
+ * Vive aquí, junto a la selección que gobierna. La aplica UN solo sitio: el
+ * clic que selecciona (`useEditorInteractions.ts`).
+ *
+ * Llegó a aplicarla también el cierre del trazo recién dibujado
+ * (`PatternEditor.tsx`), porque ese cierre autoseleccionaba. Ya no: desde
+ * #1154 cerrar un trazo no selecciona nada, y el sujeto se elige clicándolo.
+ * Si algún día vuelve a haber un segundo sitio, esta función es el único
+ * lugar donde la regla puede vivir para que los dos coincidan.
  */
 export function seSeleccionaPorTramo(type: InternalLineType): boolean {
   return type === 'reference' || type === 'fold' || type === 'pleat';

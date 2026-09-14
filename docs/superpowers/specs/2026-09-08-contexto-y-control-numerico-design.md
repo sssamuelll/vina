@@ -186,6 +186,15 @@ Y después de confirmar un tramo, **el siguiente vuelve a seguir al ratón**: no
 
 **La unidad seleccionable es el tramo entre dos nodos consecutivos.** Vale igual para los trazos (líneas de construcción, spec 2026-09-12 § 5.2). El gesto que creó varios tramos **no forma un grupo de selección**.
 
+> **Enmienda 2026-09-14 (#1154).** De la frase de arriba se dedujo una vez, en
+> la tanda del 09-09, que al cerrar el trazo había que dejar seleccionado el
+> ÚLTIMO tramo. No se sigue, y nadie lo firmó. Cerrar un trazo **no selecciona
+> nada**: la cota de ese tramo se plantaba bajo el cursor, justo donde iba el
+> clic siguiente — María, 10-09 [09:32], *"el zoom este me está molestando
+> mucho, porque se pone esto aquí"*. Esta sección dice qué unidad se selecciona
+> CUANDO se selecciona; no dice que dibujar seleccione. Los trazos ya lo tenían
+> bien (spec 2026-09-12 § 4).
+
 ```
 A ───────── B ───────── C ───────── D
       AB          BC          CD

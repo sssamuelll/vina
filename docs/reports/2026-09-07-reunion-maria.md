@@ -249,7 +249,10 @@ Encontró **dos cosas que las seis tandas dieron por buenas**, y las dos eran un
 
 **1. El largo guardado le ganaba al contorno** (`d0838c31`). El paso 2 pasaba su assert —la pieza medía 300×150— mientras la telemetría enseñaba las cuatro etiquetas diciendo `100.0 mm`. `edge.length ?? computePathArcLength(...)`: un derivado guardado que la ruta de redimensionar por cota no refresca, con un `??` que lo prefería. Estaba latente desde siempre y lo despertó la tanda 4 al encender "Largos" de fábrica.
 
-**2. Dibujar una interna creaba un grupo de selección** (esta tanda). `PatternEditor.tsx:396` autoseleccionaba la entidad entera al cerrar el trazo. Consecuencias en cascada, todas visibles en la captura del paso 12:
+**2. Dibujar una interna creaba un grupo de selección** (esta tanda). `PatternEditor.tsx:396` autoseleccionaba la entidad entera al cerrar el trazo.
+
+> **Nota del 2026-09-14 (#1154):** lo que esta tanda puso en su lugar —seleccionar el último tramo— duró hasta la reunión siguiente. María lo vio el 10-09 [09:32]: la única cota que quedaba se plantaba bajo el cursor. Hoy cerrar un trazo no selecciona nada. Se conserva el texto original como registro.
+ Consecuencias en cascada, todas visibles en la captura del paso 12:
 
 - la cabecera anunciaba **«Editando: la línea seleccionada · 6 cotas»** sobre una interna de tres tramos — literalmente [24:05] *"y me sobresatura toda la información"*, la causa G intacta;
 - esas seis cotas tapaban el dibujo, así que el clic siguiente caía en una cota en vez de en el tramo y la abría a escribir;

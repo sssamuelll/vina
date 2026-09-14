@@ -64,6 +64,31 @@ async function prepararPerpendicularAlBorde(page: Page) {
   return haciaDentro;
 }
 
+/**
+ * Lee una clave del almacén `settings` de IDB desde la página.
+ *
+ * Hace falta porque las escrituras de ajustes son fire-and-forget (`void
+ * storageSet(...)`): recargar sin esperarlas es una carrera que el usuario no
+ * puede perder —nadie recarga en el milisegundo siguiente— pero un test sí,
+ * y bajo carga lo pierde. Medido el 2026-09-14: el caso D6 se ponía rojo con
+ * la máquina ocupada y pasaba 2 de 2 aislado.
+ */
+const ajusteGuardado = (page: Page, clave: string) => page.evaluate(async (k) => {
+  const req = indexedDB.open('vina');
+  const db = await new Promise<IDBDatabase | null>(resolve => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+  if (!db?.objectStoreNames.contains('settings')) return null;
+  const value = await new Promise<unknown>(resolve => {
+    const get = db.transaction('settings').objectStore('settings').get(k);
+    get.onsuccess = () => resolve(get.result);
+    get.onerror = () => resolve(null);
+  });
+  db.close();
+  return value;
+}, clave);
+
 test.describe('seis firmas de María', () => {
   test.setTimeout(120_000);
 
@@ -112,21 +137,7 @@ test.describe('seis firmas de María', () => {
     });
     await expect(lecturasDeLado(page), 'la selección interna dejó cotas del contorno en Todas').toHaveCount(0);
 
-    await expect.poll(() => page.evaluate(async () => {
-      const req = indexedDB.open('vina');
-      const db = await new Promise<IDBDatabase | null>(resolve => {
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => resolve(null);
-      });
-      if (!db?.objectStoreNames.contains('settings')) return null;
-      const value = await new Promise<unknown>(resolve => {
-        const get = db.transaction('settings').objectStore('settings').get('line-length-mode');
-        get.onsuccess = () => resolve(get.result);
-        get.onerror = () => resolve(null);
-      });
-      db.close();
-      return value;
-    }), { timeout: 5000 }).toBe('all');
+    await expect.poll(() => ajusteGuardado(page, 'line-length-mode'), { timeout: 5000 }).toBe('all');
 
     await page.reload();
     await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
@@ -159,6 +170,12 @@ test.describe('seis firmas de María', () => {
     await expect(pista, 'descubierta: se retira').toHaveCount(0);
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
+
+    // La marca se escribe sin esperar a nadie (`void storageSet`). Recargar
+    // antes de que aterrice es una carrera que solo pierde una máquina cargada,
+    // y la perdía: la pista volvía y el caso salía rojo por el motivo
+    // equivocado. Lo que este caso mide es que la MARCA GUARDADA la suprime.
+    await expect.poll(() => ajusteGuardado(page, 'precision-hint-used'), { timeout: 5000 }).toBe(true);
 
     await page.reload();
     await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });

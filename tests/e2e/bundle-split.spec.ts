@@ -57,7 +57,11 @@ test.describe('Bundle Split — Dynamic Imports', () => {
     await expect(ikToggle).toBeVisible({ timeout: 5000 });
     await ikToggle.click({ force: true });
     await page.waitForTimeout(2000);
-    await expect(ikToggle).toHaveText('IK Mode');
+    // El rótulo se tradujo al español (ley de idioma del contrato de interfaz)
+    // y este assert se quedó con el inglés: `AvatarPanel.tsx` dice «Modo IK».
+    // Llevaba rojo sin que nadie lo viera porque este spec no está en ningún
+    // gate — es el caso que abrió #1169.
+    await expect(ikToggle).toHaveText('Modo IK');
 
     const importErrors = errors.filter(e =>
       e.includes('Failed to fetch dynamically imported module') ||

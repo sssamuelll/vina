@@ -102,13 +102,29 @@ test.describe('Command Palette (UnifiedBar commands mode)', () => {
     expect(await getViewMode(page)).toBe('2d');
   });
 
-  test('shortcuts are displayed next to commands that have one', async ({ page }) => {
+  test('shortcuts are displayed next to commands that have one — and only those', async ({ page }) => {
+    // ENMENDADO el 2026-09-14 (#1170). Este caso usaba «cuadrícula · G» como
+    // ejemplo, y ese era justamente el anuncio FALSO: `G` es la herramienta
+    // Línea interna, no la cuadrícula. O sea que había un test verde
+    // defendiendo el bug — María lee «cuadrícula … G», pulsa G y entra a
+    // dibujar. El propósito del caso es bueno; el ejemplo era el roto.
+    //
+    // Ahora se mide con un comando cuyo atajo SÍ existe, y con su negativo:
+    // el de la cuadrícula no puede anunciar ninguno.
     await page.keyboard.press('Control+k');
-    // "Toggle Grid" defines shortcut 'G' in UnifiedBarCommands.
+    await page.locator(INPUT).fill('deshacer');
+    await page.waitForTimeout(200);
+    const conAtajo = page.locator(COMMAND_BTN).first();
+    await expect(conAtajo).toContainText('Deshacer');
+    await expect(conAtajo, 'el atajo se pinta junto al comando que lo tiene').toContainText('Ctrl+Z');
+
     await page.locator(INPUT).fill('cuadrícula');
     await page.waitForTimeout(200);
-    const item = page.locator(COMMAND_BTN).first();
-    await expect(item).toContainText('cuadrícula');
-    await expect(item).toContainText('G');
+    const sinAtajo = page.locator(COMMAND_BTN).first();
+    await expect(sinAtajo).toContainText('cuadrícula');
+    await expect(
+      sinAtajo,
+      'la cuadrícula no tiene atajo: anunciar `G` mandaba a la usuaria a otra herramienta',
+    ).not.toContainText('G');
   });
 });
