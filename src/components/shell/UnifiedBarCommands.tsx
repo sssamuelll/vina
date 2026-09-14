@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '../../store';
 import { COMMANDS, COMMAND_CATEGORIES } from './unifiedBarCommandDefs';
-import { displayShortcut } from './shortcutDisplay';
+import { shortcutLabelFor } from './shortcutDisplay';
 
 function fuzzyMatch(query: string, text: string): boolean {
   const q = query.toLowerCase();
@@ -64,11 +64,11 @@ export default function UnifiedBarCommands({ query, onExecute, onOpenPanel }: Pr
             <Icon size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{cmd.name}</span>
             <span style={{ fontSize: '12px', color: 'var(--text-ghost)', marginLeft: 'auto' }}>{cmd.description}</span>
-            {cmd.shortcut && (
+            {shortcutLabelFor(cmd.shortcutId) && (
               <span style={{
                 fontSize: '10px', color: 'var(--text-dim)', background: 'var(--border-subtle)',
                 padding: '2px 6px', borderRadius: '3px', border: '1px solid var(--border)', marginLeft: '8px',
-              }}>{displayShortcut(cmd.shortcut)}</span>
+              }}>{shortcutLabelFor(cmd.shortcutId)}</span>
             )}
           </button>
         );

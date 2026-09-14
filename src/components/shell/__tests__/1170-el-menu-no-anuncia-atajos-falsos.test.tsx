@@ -26,7 +26,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { DEFAULT_SHORTCUTS } from '../../../shortcuts/defaults';
-import { displayShortcutBinding } from '../shortcutDisplay';
+import { displayShortcutBinding, shortcutLabelFor } from '../shortcutDisplay';
+import { COMMANDS } from '../unifiedBarCommandDefs';
+import { ACTIONS } from '../../PatternEditor/actionCuration';
 import constructionReducer from '../../../store/constructionSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
 import dockReducer from '../../../store/dockSlice';
@@ -41,8 +43,19 @@ vi.mock('../../../utils/export/diagnosticExporter', () => ({ downloadDiagnosticB
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
-/** Los siete cajones de primer nivel; el submenú solo se monta al pasarles el ratón. */
-const CAJONES = ['Archivo', 'Edición', 'Vista', 'Patrón', 'Simulación', 'Preferencias', 'Ayuda'];
+/**
+ * Los cajones de primer nivel salen del DOM, no de una lista a mano: duplicarla
+ * aquí dejaba invisible un cajón nuevo con un rótulo falso, que es justo lo que
+ * este archivo existe para cazar.
+ */
+function cajonesPintados(): string[] {
+  const panel = document.querySelector('.logo-menu');
+  if (!panel) return [];
+  return Array.from(panel.children)
+    .filter(el => el.querySelector('.logo-menu__chevron'))
+    .map(el => el.querySelector('.logo-menu__label')?.textContent?.trim() ?? '')
+    .filter(Boolean);
+}
 
 function anunciosDelMenu(): Array<{ label: string; rotulo: string }> {
   const store = configureStore({
@@ -60,11 +73,14 @@ function anunciosDelMenu(): Array<{ label: string; rotulo: string }> {
   // Edición.
   fireEvent.click(screen.getByRole('button', { name: /vina/i }));
 
+  const cajones = cajonesPintados();
+  expect(cajones.length, 'el desplegable tiene que abrir y enseñar sus cajones').toBeGreaterThan(4);
+
   const vistos = new Map<string, string>();
-  for (const cajon of CAJONES) {
+  for (const cajon of cajones) {
     const entrada = screen.queryByText(cajon);
-    if (!entrada) continue;
-    fireEvent.mouseEnter(entrada);
+    expect(entrada, `el cajón «${cajon}» estaba pintado y no se pudo abrir`).not.toBeNull();
+    fireEvent.mouseEnter(entrada!);
     for (const el of Array.from(document.querySelectorAll('.logo-menu__shortcut'))) {
       const fila = el.closest('.logo-menu__item');
       const label = fila?.querySelector('.logo-menu__label')?.textContent?.trim();
@@ -110,7 +126,14 @@ describe('#1170 — el menú no anuncia atajos que no existen', () => {
       'Quitar selección': 'selection.deselect',
       'Ajustar zoom al patrón': 'view.fitPattern',
       'Margen de costura': 'view.toggleSeamAllowance',
-      'Iniciar simulación': 'sim.toggle',
+      // «Iniciar simulación» NO está, y es a propósito. `sim.toggle` es un
+      // interruptor: fuera del modo de colocación, Espacio RESTABLECE
+      // (`useKeyboardShortcuts.ts`, rama else), mientras la fila solo despacha
+      // `startSimulation()`. El rótulo y la tecla no hacían lo mismo — el
+      // trinquete de arriba no podía verlo porque solo compara notación, y lo
+      // cazó la revisión adversarial. Unificarlos (¿la fila pasa a ser el
+      // interruptor y se llama «Iniciar o pausar»?) es decisión de producto y
+      // vive en #1170.
     };
 
     const anuncios = anunciosDelMenu();
@@ -131,5 +154,54 @@ describe('#1170 — el menú no anuncia atajos que no existen', () => {
     }
 
     expect(desajustes, 'cada fila enseña el atajo de su propia acción, o no enseña ninguno').toEqual([]);
+  });
+
+  /**
+   * Las OTRAS tres superficies que anuncian atajos. El primer censo miró solo
+   * el menú Vina y se presentó como el censo del repo; la revisión adversarial
+   * lo cazó y el tipo destapó una cuarta. El total real fue quince, no ocho:
+   *
+   * - paleta de comandos (Ctrl+K): «cuadrícula · G» — y había un e2e VERDE
+   *   defendiéndolo, o sea un test protegiendo el bug.
+   * - clic derecho del lienzo: «Rotar 90° · R» (es Desplazar contorno),
+   *   «Voltear horizontal · H» (es la Pluma), «Voltear vertical · V» (es
+   *   Editar curva), «Renombrar… · F2» (no existe) y «Del» como tercera grafía
+   *   de la tecla que el registro escribe «Supr».
+   * - barra flotante: se la pasa a `ToolTooltip`, que la pinta.
+   *
+   * Ninguna de las cuatro puede ya escribir una cadena: el campo es un id. Lo
+   * que queda por vigilar es que el id exista, que es lo que mide esto.
+   */
+  it('la paleta y el clic derecho tampoco anuncian atajos que no existen', () => {
+    const ids = new Set(DEFAULT_SHORTCUTS.map(d => d.id));
+    const huerfanos: string[] = [];
+
+    for (const cmd of COMMANDS) {
+      if (cmd.shortcutId && !ids.has(cmd.shortcutId)) {
+        huerfanos.push(`paleta «${cmd.name}» apunta a ${cmd.shortcutId}, que no existe`);
+      }
+    }
+    for (const [id, def] of Object.entries(ACTIONS)) {
+      if (def.shortcutId && !ids.has(def.shortcutId)) {
+        huerfanos.push(`clic derecho «${id}» apunta a ${def.shortcutId}, que no existe`);
+      }
+    }
+
+    expect(huerfanos, 'un id que no resuelve pinta un hueco donde había un atajo').toEqual([]);
+    // Y que el barrido mida algo: si un refactor vacía estas listas, el caso de
+    // arriba pasaria en verde sin haber mirado nada.
+    expect(COMMANDS.filter(c => c.shortcutId).length, 'la paleta declara atajos').toBeGreaterThan(2);
+    expect(Object.values(ACTIONS).filter(a => a.shortcutId).length, 'el clic derecho declara atajos').toBeGreaterThan(4);
+  });
+
+  it('y el rótulo que pintan sale del registro, no de una cadena suelta', () => {
+    // `shortcutLabelFor` es la única frontera: si alguien vuelve a meter texto
+    // libre, este caso no lo ve — lo ve el compilador, porque el campo ya no
+    // existe en `CommandDef` ni en `ActionDef`.
+    expect(shortcutLabelFor('edit.undo'), 'resuelve un id vivo').toBe(displayShortcutBinding(
+      DEFAULT_SHORTCUTS.find(d => d.id === 'edit.undo')!,
+    ));
+    expect(shortcutLabelFor('no.existe'), 'un id muerto no pinta nada').toBeNull();
+    expect(shortcutLabelFor(undefined), 'sin atajo, sin rótulo').toBeNull();
   });
 });

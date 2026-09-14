@@ -28,7 +28,8 @@ export interface CommandDef {
   description: string;
   icon: LucideIcon;
   category: CommandCategory;
-  shortcut?: string;
+  /** Id de la acción en `defaults.ts`; el rótulo se deriva (#1170). */
+  shortcutId?: string;
   action: (dispatch: AppDispatch, callbacks: CommandCallbacks) => void;
 }
 
@@ -70,12 +71,13 @@ export const COMMANDS: CommandDef[] = [
   { id: 'input-mouse', category: 'Vista', name: 'Controles de ratón', description: 'Estilo CLO3D: orbitar con clic derecho, zoom con rueda', icon: MousePointer2, action: (d) => d(setUserScheme('mouse')) },
 
   // ─── Toggles ───
-  { id: 'toggle-grid', category: 'Vista', name: 'Mostrar u ocultar cuadrícula', description: 'La cuadrícula del lienzo', icon: Grid3x3, shortcut: 'G', action: (d) => d(toggleSnapToGrid()) },
-  { id: 'toggle-seam-allowance', category: 'Vista', name: 'Mostrar u ocultar margen de costura', description: 'El margen alrededor de cada pieza', icon: ScanLine, shortcut: '⇧S', action: (d) => d(toggleSeamAllowance()) },
+  // Sin atajo: `G` es la herramienta Línea interna, no la cuadrícula (#1170).
+  { id: 'toggle-grid', category: 'Vista', name: 'Mostrar u ocultar cuadrícula', description: 'La cuadrícula del lienzo', icon: Grid3x3, action: (d) => d(toggleSnapToGrid()) },
+  { id: 'toggle-seam-allowance', category: 'Vista', name: 'Mostrar u ocultar margen de costura', description: 'El margen alrededor de cada pieza', icon: ScanLine, shortcutId: 'view.toggleSeamAllowance', action: (d) => d(toggleSeamAllowance()) },
   { id: 'toggle-grainlines', category: 'Vista', name: 'Mostrar u ocultar hilos', description: 'Las flechas de dirección de hilo', icon: PenLine, action: (d) => d(toggleGrainlines()) },
   { id: 'toggle-piece-names', category: 'Vista', name: 'Mostrar u ocultar nombres de pieza', description: 'Las etiquetas de cada pieza', icon: Tag, action: (d) => d(togglePieceNames()) },
 
   // ─── Edit ───
-  { id: 'undo', category: 'Edición', name: 'Deshacer', description: 'Deshace la última acción', icon: Undo2, shortcut: '⌘Z', action: (d) => d(undo()) },
-  { id: 'redo', category: 'Edición', name: 'Rehacer', description: 'Rehace lo último deshecho', icon: Redo2, shortcut: '⌘⇧Z', action: (d) => d(redo()) },
+  { id: 'undo', category: 'Edición', name: 'Deshacer', description: 'Deshace la última acción', icon: Undo2, shortcutId: 'edit.undo', action: (d) => d(undo()) },
+  { id: 'redo', category: 'Edición', name: 'Rehacer', description: 'Rehace lo último deshecho', icon: Redo2, shortcutId: 'edit.redo', action: (d) => d(redo()) },
 ];

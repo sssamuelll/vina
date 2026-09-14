@@ -94,6 +94,12 @@ echo "✓ smoke del WASM commiteado"
 # si alguien bypasea el gate un viernes: si duele, la conversacion es recortar
 # esta lista a conciencia, no saltarsela.
 #
+# Los dos ultimos entraron tarde, por el mismo argumento con el que entraron los
+# otros: `cotas-de-pieza` es el PR A de cotas vivas y su hermano el PR B
+# (`226-cotas-linea-interna`) ya estaba — dejar uno y no el otro es exactamente
+# la pareja que se pudre. Y `supr-borra-lo-que-se-ve` ejercita el menu Edicion
+# del propio `LogoMenu`, que esta rama refactoriza entero.
+#
 # No entran los 97 specs enteros: esta lista es la CLASE que se pudre, no un
 # intento de correrlo todo. El resto sigue sin gate y eso esta dicho en #1169.
 # Y no entra `bundle-split`: tiene un rojo real del tier TSL (#1171), y meterlo
@@ -121,8 +127,19 @@ npx playwright test --workers=2 \
   tests/e2e/226-cotas-linea-interna.spec.ts \
   tests/e2e/1152-los-largos-no-se-quedan-clavados.spec.ts \
   tests/e2e/replay-maria-07-09.spec.ts \
-  > /tmp/vina-deploy-e2e.log 2>&1 || { tail -30 /tmp/vina-deploy-e2e.log >&2; exit 1; }
-grep -E "passed|failed" /tmp/vina-deploy-e2e.log | tail -1 | sed 's/^ */✓ emplazamiento y contratos: /'
+  tests/e2e/cotas-de-pieza.spec.ts \
+  tests/e2e/supr-borra-lo-que-se-ve.spec.ts \
+  > /tmp/vina-deploy-e2e.log 2>&1 || {
+    echo "  log completo: /tmp/vina-deploy-e2e.log" >&2
+    tail -60 /tmp/vina-deploy-e2e.log >&2
+    exit 1
+  }
+# Sin `tail -1`: Playwright imprime «X flaky» en su PROPIA linea, ANTES de
+# «N passed», asi que quedarse con la ultima se los tragaba en silencio. Un
+# flaky en el gate no lo tumba (paso al reintento) pero es justo lo que hay que
+# ver antes de desplegar: con 114 casos en vez de 69 salen mas a menudo, y uno
+# que nadie mira es un rojo esperando su turno.
+grep -E "passed|failed|flaky" /tmp/vina-deploy-e2e.log | sed 's/^ */✓ emplazamiento y contratos: /'
 
 echo "── Build ──────────────────────────────────────────────"
 npm run build > /tmp/vina-deploy-build.log 2>&1 || { tail -20 /tmp/vina-deploy-build.log >&2; exit 1; }

@@ -26,18 +26,10 @@ import { runUiExport } from '../../utils/export/uiExport';
 import { downloadDiagnosticBundle } from '../../utils/export/diagnosticExporter';
 import { clearStorageProject } from '../../utils/projectIO';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import { displayShortcutBinding } from './shortcutDisplay';
-import { DEFAULT_SHORTCUTS } from '../../shortcuts/defaults';
+import { shortcutLabelFor } from './shortcutDisplay';
 import { computeScrollFade, encajarSubmenu, type Encaje, type ScrollFade } from '../PatternEditor/menuOverflow';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-/** El rótulo del atajo sale del registro, nunca de una cadena a mano (#1170). */
-function rotuloDeAtajo(id: string | undefined): string | null {
-  if (!id) return null;
-  const def = DEFAULT_SHORTCUTS.find(d => d.id === id);
-  return def ? displayShortcutBinding(def) : null;
-}
 
 interface MenuItem {
   label: string;
@@ -226,7 +218,7 @@ const PATTERN_MENU: MenuItem[] = [
 
 const SIMULATION_MENU: MenuItem[] = [
   { label: 'Vestir avatar', action: (d) => { d(setViewMode3D('simulate')); d(startSimulation()); } },
-  { label: 'Iniciar simulación', shortcutId: 'sim.toggle', action: (d) => d(startSimulation()) },
+  { label: 'Iniciar simulación', action: (d) => d(startSimulation()) },
   { label: 'Pausar', action: (d) => d(pauseSimulation()) },
   { label: 'Restablecer', action: (d) => d(resetSimulation()) },
 ];
@@ -390,6 +382,8 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
     const isChecked = state ? item.checked?.(state) : false;
     const hasSubmenu = item.submenu && item.submenu.length > 0;
 
+    const rotulo = shortcutLabelFor(item.shortcutId);
+
     return (
       <div
         key={item.label}
@@ -399,9 +393,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
       >
         <span className="logo-menu__check">{isChecked ? '✓' : ''}</span>
         <span className="logo-menu__label">{item.label}</span>
-        {rotuloDeAtajo(item.shortcutId) && (
-          <span className="logo-menu__shortcut">{rotuloDeAtajo(item.shortcutId)}</span>
-        )}
+        {rotulo && <span className="logo-menu__shortcut">{rotulo}</span>}
         {hasSubmenu && <ChevronRight size={14} className="logo-menu__chevron" />}
         {hasSubmenu && hoveredSub === item.label && (
           <Submenu>{item.submenu!.map((sub, si) => renderMenuItem(sub, si))}</Submenu>
