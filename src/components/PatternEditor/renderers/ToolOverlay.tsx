@@ -181,6 +181,9 @@ interface ToolOverlayProps {
   // Offset Preview
   offsetPreviewOutline: PathCommand[] | null;
   offsetPreviewPiecePosition: Point2D | null;
+  // Extend/Trim Preview (#1178: se calculaba y no tenía consumidor)
+  extendTrimPreviewOutline: PathCommand[] | null;
+  extendTrimPreviewPiecePosition: Point2D | null;
 }
 
 export default function ToolOverlay(props: ToolOverlayProps) {
@@ -431,6 +434,17 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         <OffsetPreviewOverlay
           previewOutline={props.offsetPreviewOutline}
           piecePosition={props.offsetPreviewPiecePosition}
+          zoom2D={zoom2D}
+        />
+      )}
+
+      {/* Mismo componente que Offset: el preview es genérico —contorno +
+          posición + zoom—, sin nada específico de una herramienta. Extender y
+          Recortar no pintaban absolutamente nada en toda su vida (#1178). */}
+      {activeTool === 'extendTrim' && props.extendTrimPreviewOutline && props.extendTrimPreviewPiecePosition && (
+        <OffsetPreviewOverlay
+          previewOutline={props.extendTrimPreviewOutline}
+          piecePosition={props.extendTrimPreviewPiecePosition}
           zoom2D={zoom2D}
         />
       )}
