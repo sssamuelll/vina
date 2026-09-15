@@ -41,6 +41,25 @@ function piezaCerrada(): PatternPiece {
   } as PatternPiece;
 }
 
+/**
+ * Cuadrado 100×150 cuyo borde de arriba es un comando `H` en vez de `L` —
+ * la forma real que produce el import de SVG (Illustrator/Inkscape/Figma
+ * emiten H/V para líneas rectas; `svgImport.ts:354,363`). El DXF de María
+ * llega pre-aplanado y nunca tiene H/V, así que este caso no la toca a
+ * ella — pero sí a cualquiera que importe de esas tres apps.
+ */
+function piezaConH(): PatternPiece {
+  return {
+    id: 'p', name: 'p',
+    outline: [
+      { type: 'M', values: [0, 0] }, { type: 'H', values: [100] },
+      { type: 'L', values: [100, 150] }, { type: 'L', values: [0, 150] }, { type: 'Z', values: [] },
+    ],
+    internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+    seamAllowance: 0, createdAt: 1, updatedAt: 1, active: true, layer: 1,
+  } as PatternPiece;
+}
+
 function ev(x: number, y: number) {
   return {
     button: 0, clientX: x, clientY: y,
@@ -131,5 +150,28 @@ describe('#1177 — el clic de confirmación decide por el segmento, no por el c
     const segmento2 = contorno(store)[2];
     expect(segmento1.values, 'el vértice anterior se movió cuando no debía').toEqual([200, 0]);
     expect(segmento2.values[1], 'el segmento 2 no se acortó hasta el punto de recorte').toBeCloseTo(75, 0);
+  });
+
+  it('un comando H antes del segmento no corrompe la decisión (import SVG real)', () => {
+    // El heurístico camina el contorno a mano para encontrar los vértices del
+    // segmento, y si ese walk no sabe leer H/V, el vértice de INICIO de
+    // cualquier segmento que venga después de un H/V queda congelado en
+    // (0,0) en vez del punto real — el mismo mecanismo que #1177 arregló
+    // para contornos cerrados, ahora disparado por otro tipo de comando.
+    //
+    // Segmento 2 (borde derecho, de (100,0) a (100,150)) confirma en (100,60):
+    // más cerca del inicio real (dist 60) que del final (dist 90) → 'before'.
+    // Con el vértice de inicio corrompido a (0,0), la distancia calculada al
+    // "inicio" sale 116.6 (> 90), así que decide 'after' — el lado contrario.
+    const { store, hook } = montar(piezaConH());
+    act(() => hook.result.current.handleMouseDown(ev(100, 145))); // arma el borde derecho (segmento 2)
+    act(() => hook.result.current.handleMouseDown(ev(100, 60)));  // confirma cerca del inicio real
+
+    const segmentoH = contorno(store)[1];
+    const segmentoL = contorno(store)[2];
+    expect(segmentoH.type, 'el comando H no debería tocarse al conservar "antes"').toBe('H');
+    expect(segmentoH.values).toEqual([100]);
+    expect(segmentoL.values[0], 'el segmento no se acortó hasta el punto de recorte').toBeCloseTo(97.69, 1);
+    expect(segmentoL.values[1]).toBeCloseTo(146.54, 1);
   });
 });

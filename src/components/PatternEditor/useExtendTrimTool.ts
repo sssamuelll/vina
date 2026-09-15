@@ -5,7 +5,7 @@ import { updatePiece } from '../../store/projectSlice';
 import { showErrorToast } from '../../store/copilotUISlice';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import { extendEdge, trimEdgeAtPoint } from '../../utils/patternOps';
-import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
+import { getEdgeEndpoints, screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 
 export interface ExtendTrimState {
@@ -24,31 +24,6 @@ const INITIAL_STATE: ExtendTrimState = {
 };
 
 const SNAP_THRESHOLD = 10; // screen pixels
-
-/**
- * Los dos vértices que delimitan `segmentIndex`, en espacio LOCAL de pieza.
- *
- * Existe para el clic de confirmación de Recortar (#1177): la pregunta que
- * ese clic contesta es «¿más cerca del inicio o del final de ESTE
- * segmento?», y eso no se puede leer del primer/último punto del CONTORNO
- * completo — para cualquier pieza cerrada son el mismo punto.
- */
-function segmentEndpoints(outline: PatternPiece['outline'], segmentIndex: number): { start: Point2D; end: Point2D } {
-  let prevX = 0, prevY = 0;
-  for (let i = 0; i < outline.length; i++) {
-    const cmd = outline[i];
-    let endX = prevX, endY = prevY;
-    switch (cmd.type) {
-      case 'M': endX = cmd.values[0]; endY = cmd.values[1]; break;
-      case 'L': endX = cmd.values[0]; endY = cmd.values[1]; break;
-      case 'C': endX = cmd.values[4]; endY = cmd.values[5]; break;
-      case 'Q': endX = cmd.values[2]; endY = cmd.values[3]; break;
-    }
-    if (i === segmentIndex) return { start: { x: prevX, y: prevY }, end: { x: endX, y: endY } };
-    prevX = endX; prevY = endY;
-  }
-  return { start: { x: prevX, y: prevY }, end: { x: prevX, y: prevY } };
-}
 
 export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
   const dispatch = useDispatch();
@@ -244,12 +219,14 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
         }
       } else {
         // Trim mode: click on edge to set trim point
-        const pt = toPattern(e);
-        const snap = findNearestEdgePoint(pt, piece);
-        if (!snap) return;
-
         if (!s.selectedSnap) {
-          // First click: select the trim point and preview
+          // First click: select the trim point and preview. Solo ESTE clic
+          // necesita caer sobre un borde; el de confirmación se contesta con
+          // su posición cruda, y exigirle un borde cerca lo dejaba sin efecto
+          // (#1177: «el segundo clic no hace nada»).
+          const pt = toPattern(e);
+          const snap = findNearestEdgePoint(pt, piece);
+          if (!snap) return;
           const localTrimPt = patternToPieceLocal(snap.point, piece);
           const trimmed = trimEdgeAtPoint(piece, snap.segmentIndex, localTrimPt, 'before');
           setState({
@@ -267,8 +244,14 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
           // ESTE segmento, no contra los extremos del contorno entero (#1177):
           // para cualquier pieza cerrada, primer y último punto del contorno
           // aplanado son el MISMO punto, y esa comparación no distinguía nada.
+          // Los vértices los lee `getEdgeEndpoints`, que sí sabe de H/V — un
+          // walk propio que los ignore congela el vértice de inicio de TODO
+          // segmento posterior a un H/V (los emite el import de SVG).
           const trimIdx = s.selectedSnap.segmentIndex;
-          const { start, end } = segmentEndpoints(piece.outline, trimIdx);
+          // null solo con índice 0 o fuera de rango; los dos hit-testers de
+          // este archivo excluyen M y Z, así que aquí no pasa.
+          const edge = getEdgeEndpoints(piece.outline, trimIdx);
+          const { start, end } = edge ?? { start: { x: 0, y: 0 }, end: { x: 0, y: 0 } };
           const distToStart = Math.hypot(localClick.x - start.x, localClick.y - start.y);
           const distToEnd = Math.hypot(localClick.x - end.x, localClick.y - end.y);
           const keepSide: 'before' | 'after' = distToStart < distToEnd ? 'before' : 'after';
