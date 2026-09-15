@@ -145,30 +145,43 @@ test.describe('#1115 — Supr borra lo que se ve', () => {
 /**
  * La segunda mitad de #1115, la que la tanda del 09-04 no barrió (2026-09-15).
  *
- * El caso A se arregló metiendo la decisión en `resolverBorrado`, y eso cubre
- * a los sujetos que VIVEN EN EL STORE. Los sujetos que son estado LOCAL de una
- * herramienta siguen perdiendo el duelo, y por la misma razón de siempre:
+ * El caso A se arregló metiendo la decisión en `resolverBorrado`, y eso cubre a
+ * los sujetos que VIVEN EN EL STORE. Los sujetos que son estado LOCAL de una
+ * herramienta perdían el duelo igual, y por la misma razón de siempre:
  *
- *   · `ShortcutProvider` escucha en `document`, burbuja  (ShortcutProvider.tsx:84)
- *   · `routeKey` escucha en `window`, CAPTURA — gana     (useEditorInteractions.ts:633)
- *   · los dueños locales escuchan en `window`, burbuja   (useEditorInteractions.ts:490)
+ *   · `ShortcutProvider` escucha en `document`, burbuja
+ *   · `routeKey` (CF-1) escucha en `window`, CAPTURA — gana
+ *   · los dueños locales escuchaban en `window`, burbuja — llegaban tarde
  *
  * `document` en burbuja corre ANTES que `window` en burbuja. Y la captura, que
- * sí llegaría primero, tiene un portón en la línea 585:
+ * sí llega primero, tenía un portón (`if (e.key !== 'Escape') return null;`)
+ * que solo dejaba pasar Supr y Retroceso de la pluma, las formas armadas, la
+ * línea interna en trazo y el elástico.
  *
- *     if (e.key !== 'Escape') return null;
+ * Cuatro sujetos caían por ahí. Los cuatro se reprodujeron en navegador antes
+ * de tocar nada, y la mitad NO los encontró el censo sino la revisión
+ * adversarial — el censo grepsó `'Delete'`, o sea quién DECLARA la tecla, y
+ * `useEditCurve` no contiene esa cadena en ninguna línea:
  *
- * O sea: por la captura solo pasan Supr y Retroceso de la pluma, las formas
- * armadas, la línea interna EN TRAZO y el elástico. Todo lo demás llega tarde.
+ *   D, D2, D3, D4  Editar patrón, nodo agarrado    — borraba la pieza entera
+ *   F              Editar patrón, TRAMO agarrado   — ídem, y el tramo se pinta
+ *   G, G2          Editar curva, nodo de curva      — ídem
+ *   E, E2, H       Pespunte, punto o extremo vivo   — deshacer borraba la pieza
  *
- * Censo de quién queda fuera (grep de `'Delete'`/`'Backspace'` en
- * `src/components/PatternEditor/`, 2026-09-15): exactamente dos.
+ * Los casos con 2 (D2, E2, G2) son los CONTROLES: sin sujeto local la tecla
+ * tiene que seguir hasta el atajo global y borrar la pieza como siempre. Sin
+ * ellos, «consumir siempre» también pasaría — y apagaría el borrado normal por
+ * el hecho de estar dentro de una herramienta, en silencio. Dos de los tres
+ * nacieron flojos y se arreglaron mutando: E2 pulsaba Supr, que Pespunte ni
+ * mira, y G2 no llegaba a entrar en modo edición.
  *
- *   D) `useEditPattern.ts:848`   — Supr sobre un nodo seleccionado
- *   E) `useTopstitchTool.ts:294` — Retroceso quita el último punto del pespunte
+ * El caso I vigila lo contrario, y existe porque el primer intento de arreglo
+ * lo rompió: de estos ganchos la captura toma SOLO Supr y Retroceso. Subírlos
+ * enteros mataba la propagación con `stopPropagation` y el menú contextual
+ * dejaba de cerrarse con Escape.
  *
- * Medir NO está: su `handleKeyDown` solo mira Escape desde hace tiempo
- * (`useMeasureTool.ts:413`). El issue lo cita y el issue está viejo.
+ * Medir no aparece: su `handleKeyDown` solo mira Escape. Queda un hueco suyo,
+ * dicho en la enmienda del spec y abierto como issue propio.
  */
 test.describe('#1115 (2ª mitad) — el sujeto local también manda', () => {
   test.setTimeout(90_000);
@@ -395,6 +408,12 @@ test.describe('#1115 (2ª mitad) — el sujeto local también manda', () => {
     await page.waitForTimeout(300);
     await dispatch(page, 'editor/selectPiece', 'p1');
     await activarHerramienta(page, 'v', 'editCurve');
+
+    // ENTRAR a la pieza, sin agarrar nodo. La primera versión solo activaba la
+    // herramienta, con lo cual `isEditing` era falso, la guarda ni se ejecutaba
+    // y el control pasaba en verde con el arreglo perezoso puesto. El control
+    // tiene que llegar hasta la línea que dice vigilar.
+    await clickAt(page, { x: 200, y: 175 });
     await page.waitForTimeout(300);
     await pulsarSupr(page);
 
