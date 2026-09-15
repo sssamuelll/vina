@@ -821,9 +821,18 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   // ─── handleKeyDown ───
 
+  /**
+   * P1 (#1115): devuelve si consumio la tecla. Este gancho vive en la captura
+   * CF-1, no en la burbuja — el atajo global `edit.delete` escucha en
+   * `document` en burbuja y corria ANTES, asi que Supr sobre un nodo borraba
+   * la pieza entera y este manejador llegaba a una pieza que ya no existia.
+   *
+   * `false` deja la tecla seguir su camino a proposito: sin nodo seleccionado,
+   * Supr tiene que poder borrar la pieza como en cualquier otro sitio.
+   */
   const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (!state.isEditing || !state.editingPieceId) return;
+    (e: KeyboardEvent): boolean => {
+      if (!state.isEditing || !state.editingPieceId) return false;
 
       if (e.key === 'Escape') {
         // Peldaño 3 de la escalera (E-4): la sub-selección se suelta ANTES de
@@ -839,17 +848,17 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           setState(s => ({ ...s, selectedNodes: new Set(), selectedSegments: new Set() }));
           e.preventDefault();
           e.stopPropagation();
-          return;
+          return true;
         }
         exitEdit();
-        return;
+        return true;
       }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (state.selectedNodes.size === 0) return;
+        if (state.selectedNodes.size === 0) return false;
 
         const piece = getPiece(state.editingPieceId);
-        if (!piece) return;
+        if (!piece) return false;
 
         // Sort indices descending to preserve earlier indices when deleting
         const indices = [...state.selectedNodes].sort((a, b) => b - a);
@@ -861,11 +870,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         ).size;
         if (remainingAnchorCount < 3) {
           dispatch(showInfoToast('No se puede borrar: la pieza necesita al menos 3 puntos'));
-          // Early return skips preventDefault, which is safe: the global
-          // delete shortcut runs on a document listener (ShortcutProvider)
-          // that never checks defaultPrevented, and Delete/Backspace have
-          // no native browser default worth suppressing here.
-          return;
+          // CONSUME igual (#1115). El comentario viejo decia que soltar la
+          // tecla aqui «era seguro porque el atajo global no mira
+          // defaultPrevented» — y esa era justo la trampa: al soltarla, el
+          // global se llevaba LA PIEZA ENTERA. O sea, «no puedo borrar el
+          // nodo porque hacen falta tres puntos» terminaba borrandolo todo.
+          return true;
         }
 
         let outline = piece.outline;
@@ -888,7 +898,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         setState(s => resyncStateToPiece(s, updated));
 
         e.preventDefault();
+        return true;
       }
+
+      return false;
     },
     [state, exitEdit, getPiece, dispatch],
   );

@@ -328,6 +328,54 @@ Medido en el árbol: cuatro oyentes de `keydown`. (a) `window` burbuja, el route
 
 Precedentes vivos del patrón: `pointTool.armed` en `:417`, `seamTool.handleKeyDown` en `:436-439`.
 
+> **Enmienda 2026-09-15 (#1115) — la regla 2 dice «gesto vivo» y hacía falta «sujeto vivo».**
+>
+> La regla 2 se escribió mirando trazos a medias, y por eso solo mudó a CF-1 a
+> los ganchos con un gesto abierto (`isTracing()`, `isArmed()`). Pero el duelo
+> que describe el párrafo de arriba no lo pierde solo un gesto: lo pierde
+> **cualquier dueño local de Supr o Retroceso**, porque `document` en burbuja
+> corre antes que `window` en burbuja, sin importar qué haya al otro lado.
+>
+> Censo del 2026-09-15 (`grep` de `'Delete'`/`'Backspace'` en
+> `src/components/PatternEditor/`): quedaban dos en la burbuja, y los dos
+> reproducidos en navegador antes de tocar nada.
+>
+> | Dueño | Tecla | Lo que pasaba |
+> |---|---|---|
+> | `useEditPattern` | Supr sobre un nodo agarrado | borraba **la pieza entera** (2 piezas → 1) |
+> | `useTopstitchTool` | Retroceso en Pespunte libre | deshacer un punto borraba **la pieza** (1 → 0) |
+>
+> Los dos pasan a CF-1 con el mismo protocolo P1. **La regla 2 se lee ahora
+> así: un sujeto local vivo —un gesto a medias O una sub-selección dentro de
+> una herramienta— es dueño de sus teclas, en captura.**
+>
+> Dos cosas que la enmienda deja dichas, porque no son obvias:
+>
+> - **`false` es parte del contrato, no el caso por defecto.** Sin nodo
+>   agarrado y sin puntos puestos, los dos ganchos devuelven `false` y la tecla
+>   sigue hasta el atajo global. Si no, entrar a una herramienta apagaría el
+>   borrado normal sin decirlo — y eso es un fallo peor, porque es silencioso.
+>   Los controles D2/E2 de `supr-borra-lo-que-se-ve.spec.ts` existen para eso,
+>   y **el control tiene que pulsar la misma tecla que el gancho se pelea**:
+>   la primera versión de E2 pulsaba Supr, que Pespunte ni mira, y pasaba en
+>   verde con el arreglo perezoso puesto.
+> - **Rendirse también es consumir.** Cuando `useEditPattern` avisa «la pieza
+>   necesita al menos 3 puntos», tiene que quedarse la tecla igual. Soltarla
+>   se la entregaba al global, así que «no puedo borrar el nodo» terminaba
+>   borrando la pieza entera. El comentario que había en el código llamaba
+>   «seguro» a soltarla: era cierto sobre los defaults del navegador y falso
+>   sobre todo lo demás.
+>
+> Diferencia con los precedentes, dicha para que nadie la descubra a golpes:
+> `pen` y las formas se guardan detrás de un gesto transitorio, mientras que
+> `editPattern` se guarda detrás de un **modo** (`state.isEditing`), que dura
+> mucho más. Por eso su `handleKeyDown` solo mira dos teclas y devuelve `false`
+> en todo lo demás: la ventana es ancha y la puerta tiene que ser estrecha.
+>
+> Medir NO entra. El issue #1115 lo nombra citando `useMeasureTool.ts:354`, y
+> ahí ya no hay nada: su `handleKeyDown` solo mira Escape (`:413`). El issue
+> estaba viejo.
+
 ---
 
 ## 9. Exportación
