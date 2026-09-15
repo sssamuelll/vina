@@ -459,7 +459,18 @@ export function useEditCurve(zoom: number, pan: Point2D) {
         });
   }, []);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+  /**
+   * P1 para Supr/Retroceso (#1115). Escape sigue llegando por la burbuja, donde
+   * su valor de retorno no lo mira nadie.
+   */
+  const handleKeyDown = useCallback((e: KeyboardEvent): boolean => {
+    // Con un nodo de curva agarrado, Supr es del nodo. No existe «borrar nodo
+    // de curva», así que no se borra nada — pero hay que quedarse la tecla: el
+    // atajo global escucha antes y se llevaba LA PIEZA con el nodo pintado
+    // encima. Sin nodo, la tecla sigue y la pieza se borra como siempre.
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.isEditing) {
+      return state.selectedNode !== null;
+    }
     if (e.key === 'Escape' && state.isEditing) {
       // Peldaño 3 de la escalera (E-4): el nodo seleccionado se suelta antes
       // de salir de la edición de curva. Mismo escalón que `useEditPattern`.
@@ -472,10 +483,12 @@ export function useEditCurve(zoom: number, pan: Point2D) {
         setState(s => ({ ...s, selectedNode: null }));
         e.preventDefault();
         e.stopPropagation();
-        return;
+        return true;
       }
       exitEdit();
+      return true;
     }
+    return false;
   }, [state.isEditing, state.selectedNode, exitEdit]);
 
   return {

@@ -821,9 +821,29 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   // ─── handleKeyDown ───
 
+  /**
+   * P1 (#1115): devuelve si consumió la tecla.
+   *
+   * Este gancho se llama desde DOS sitios, y la diferencia importa:
+   *
+   * - **Supr y Retroceso, desde la captura CF-1.** El atajo global
+   *   `edit.delete` escucha en `document` en burbuja y corría ANTES, así que
+   *   Supr sobre un nodo borraba la pieza entera y este manejador llegaba a
+   *   una pieza que ya no existía.
+   * - **Escape, desde la burbuja, como siempre.** Consumirlo en captura
+   *   parecía más limpio y resultó ser una regresión: `stopPropagation` en
+   *   captura sobre `window` mata TODA la propagación posterior, y con eso el
+   *   menú contextual (`ContextMenu.tsx`, que escucha en `document` en
+   *   burbuja) se quedaba abierto. Es el menú que lleva las firmas de María
+   *   del #1166. La ventana de `isEditing` es un MODO largo, no un gesto: una
+   *   puerta estrecha en teclas no basta si la condición es ancha.
+   *
+   * `false` deja la tecla seguir su camino a propósito: sin sujeto local,
+   * Supr tiene que poder borrar la pieza como en cualquier otro sitio.
+   */
   const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (!state.isEditing || !state.editingPieceId) return;
+    (e: KeyboardEvent): boolean => {
+      if (!state.isEditing || !state.editingPieceId) return false;
 
       if (e.key === 'Escape') {
         // Peldaño 3 de la escalera (E-4): la sub-selección se suelta ANTES de
@@ -839,17 +859,25 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           setState(s => ({ ...s, selectedNodes: new Set(), selectedSegments: new Set() }));
           e.preventDefault();
           e.stopPropagation();
-          return;
+          return true;
         }
         exitEdit();
-        return;
+        return true;
       }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (state.selectedNodes.size === 0) return;
+        if (state.selectedNodes.size === 0) {
+          // Un TRAMO elegido también es sujeto local: se pinta
+          // (`EditPatternOverlay`) y el Escape de arriba ya lo trata como tal.
+          // No existe «borrar tramo», así que aquí no se borra nada — pero se
+          // consume igual, porque soltar la tecla se la entrega al global y
+          // entonces desaparece la pieza con el tramo resaltado en pantalla.
+          // Mismo argumento que el aviso de los tres puntos, más abajo.
+          return state.selectedSegments.size > 0;
+        }
 
         const piece = getPiece(state.editingPieceId);
-        if (!piece) return;
+        if (!piece) return false;
 
         // Sort indices descending to preserve earlier indices when deleting
         const indices = [...state.selectedNodes].sort((a, b) => b - a);
@@ -861,11 +889,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         ).size;
         if (remainingAnchorCount < 3) {
           dispatch(showInfoToast('No se puede borrar: la pieza necesita al menos 3 puntos'));
-          // Early return skips preventDefault, which is safe: the global
-          // delete shortcut runs on a document listener (ShortcutProvider)
-          // that never checks defaultPrevented, and Delete/Backspace have
-          // no native browser default worth suppressing here.
-          return;
+          // CONSUME igual (#1115). El comentario viejo decia que soltar la
+          // tecla aqui «era seguro porque el atajo global no mira
+          // defaultPrevented» — y esa era justo la trampa: al soltarla, el
+          // global se llevaba LA PIEZA ENTERA. O sea, «no puedo borrar el
+          // nodo porque hacen falta tres puntos» terminaba borrandolo todo.
+          return true;
         }
 
         let outline = piece.outline;
@@ -888,7 +917,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         setState(s => resyncStateToPiece(s, updated));
 
         e.preventDefault();
+        return true;
       }
+
+      return false;
     },
     [state, exitEdit, getPiece, dispatch],
   );

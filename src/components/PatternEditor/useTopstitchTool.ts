@@ -281,23 +281,37 @@ export function useTopstitchTool(
     }
   }, [toPattern, getMode, findEdge, pieces, zoom2D]);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+  /**
+   * P1 (#1115): devuelve si consumio la tecla, porque este gancho paso a la
+   * captura CF-1. En Pespunte libre, Retroceso deshace el ultimo punto — pero
+   * `edit.deleteAlt` tambien esta en Retroceso y escucha en `document` en
+   * burbuja, o sea antes: deshacer un punto BORRABA LA PIEZA.
+   *
+   * Solo se reclama la tecla cuando hay algo vivo que atender. Sin gesto a
+   * medias, Supr y Escape siguen su camino al atajo global; si no, entrar a
+   * Pespunte apagaria el borrado normal sin decirlo.
+   */
+  const handleKeyDown = useCallback((e: KeyboardEvent): boolean => {
+    const mode = getMode();
+    const hayGestoVivo = state.segSnapA !== null || state.segSnapB !== null || state.freePoints.length > 0;
+
     if (e.key === 'Escape') {
       reset();
-      return;
+      return hayGestoVivo;
     }
-    const mode = getMode();
     if (e.key === 'Backspace' && mode === 'segment') {
+      if (state.segSnapA === null && state.segSnapB === null) return false;
       setState(prev => ({ ...prev, segSnapA: null, segSnapB: null }));
-      return;
+      return true;
     }
     if (e.key === 'Backspace' && mode === 'free') {
+      if (state.freePoints.length === 0) return false;
       setState(prev => ({
         ...prev,
         freePoints: prev.freePoints.slice(0, -1),
         freePieceId: prev.freePoints.length <= 1 ? null : prev.freePieceId,
       }));
-      return;
+      return true;
     }
     if (e.key === 'Enter' && mode === 'free' && state.freePieceId && state.freePoints.length >= 2) {
       const path: PathCommand[] = state.freePoints.map((p, i) => ({
@@ -306,9 +320,10 @@ export function useTopstitchTool(
       }));
       addTopstitch(state.freePieceId, path);
       reset();
-      return;
+      return true;
     }
-  }, [getMode, state.freePieceId, state.freePoints, addTopstitch, reset]);
+    return false;
+  }, [getMode, state.segSnapA, state.segSnapB, state.freePieceId, state.freePoints, addTopstitch, reset]);
 
   const getCursor = useCallback((): string => {
     const mode = getMode();
