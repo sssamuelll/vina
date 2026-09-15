@@ -5,8 +5,7 @@ import { updatePiece } from '../../store/projectSlice';
 import { showErrorToast } from '../../store/copilotUISlice';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import { extendEdge, trimEdgeAtPoint } from '../../utils/patternOps';
-import { flattenPath } from '../../utils/seam/index';
-import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
+import { getEdgeEndpoints, screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 import { piezaBloqueada } from '../../utils/piezaBloqueada';
 import { noPasoNada } from './noPasoNada';
@@ -233,12 +232,14 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
         }
       } else {
         // Trim mode: click on edge to set trim point
-        const pt = toPattern(e);
-        const snap = findNearestEdgePoint(pt, piece);
-        if (!snap) return;
-
         if (!s.selectedSnap) {
-          // First click: select the trim point and preview
+          // First click: select the trim point and preview. Solo ESTE clic
+          // necesita caer sobre un borde; el de confirmación se contesta con
+          // su posición cruda, y exigirle un borde cerca lo dejaba sin efecto
+          // (#1177: «el segundo clic no hace nada»).
+          const pt = toPattern(e);
+          const snap = findNearestEdgePoint(pt, piece);
+          if (!snap) return;
           const localTrimPt = patternToPieceLocal(snap.point, piece);
           const trimmed = trimEdgeAtPoint(piece, snap.segmentIndex, localTrimPt, 'before');
           setState({
@@ -252,16 +253,21 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
           const clickPt = toPattern(e);
           const localClick = patternToPieceLocal(clickPt, piece);
 
-          // Determine which side to keep based on where the confirmation click is
-          const flatPoints = flattenPath(piece.outline);
+          // Qué mitad conservar la decide el clic contra los dos vértices de
+          // ESTE segmento, no contra los extremos del contorno entero (#1177):
+          // para cualquier pieza cerrada, primer y último punto del contorno
+          // aplanado son el MISMO punto, y esa comparación no distinguía nada.
+          // Los vértices los lee `getEdgeEndpoints`, que sí sabe de H/V — un
+          // walk propio que los ignore congela el vértice de inicio de TODO
+          // segmento posterior a un H/V (los emite el import de SVG).
           const trimIdx = s.selectedSnap.segmentIndex;
-
-          // Simple heuristic: measure distance from click to first vs last point
-          const firstPt = flatPoints[0] ?? { x: 0, y: 0 };
-          const lastPt = flatPoints[flatPoints.length - 1] ?? { x: 0, y: 0 };
-          const distToFirst = Math.hypot(localClick.x - firstPt.x, localClick.y - firstPt.y);
-          const distToLast = Math.hypot(localClick.x - lastPt.x, localClick.y - lastPt.y);
-          const keepSide: 'before' | 'after' = distToFirst < distToLast ? 'before' : 'after';
+          // null solo con índice 0 o fuera de rango; los dos hit-testers de
+          // este archivo excluyen M y Z, así que aquí no pasa.
+          const edge = getEdgeEndpoints(piece.outline, trimIdx);
+          const { start, end } = edge ?? { start: { x: 0, y: 0 }, end: { x: 0, y: 0 } };
+          const distToStart = Math.hypot(localClick.x - start.x, localClick.y - start.y);
+          const distToEnd = Math.hypot(localClick.x - end.x, localClick.y - end.y);
+          const keepSide: 'before' | 'after' = distToStart < distToEnd ? 'before' : 'after';
 
           try {
             const trimmed = trimEdgeAtPoint(piece, trimIdx, localTrimPt, keepSide);
