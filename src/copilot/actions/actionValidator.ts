@@ -188,6 +188,8 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
+      const lockResult = pieceNotLocked(state, action.pieceId);
+      if (!lockResult.valid) return lockResult;
       // Warn about connected seams
       const connectedSeams = state.project.seams.filter(
         s => s.pieceA.pieceId === action.pieceId || s.pieceB.pieceId === action.pieceId
@@ -202,6 +204,8 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
+      const lockResult = pieceNotLocked(state, action.pieceId);
+      if (!lockResult.valid) return lockResult;
       if (!action.name) {
         return fail('Name cannot be empty');
       }
@@ -217,19 +221,22 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       if (action.axis !== 'x' && action.axis !== 'y') {
         return fail('Axis must be "x" or "y"');
       }
-      return ok();
+      // `createCopy` no lo lee el executor (mirror_piece siempre voltea
+      // in-place vía flipPieceH/flipPieceV) — el candado aplica siempre,
+      // no solo cuando createCopy es false.
+      return pieceNotLocked(state, action.pieceId);
 
     case 'move_piece':
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
-      return ok();
+      return pieceNotLocked(state, action.pieceId);
 
     case 'rotate_piece':
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
-      return ok();
+      return pieceNotLocked(state, action.pieceId);
 
     case 'scale_piece':
       if (!pieceExists(state, action.pieceId)) {
@@ -238,7 +245,7 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       if (action.factor <= 0) {
         return fail('Scale factor must be positive');
       }
-      return ok();
+      return pieceNotLocked(state, action.pieceId);
 
     case 'link_pieces': {
       const la = action as unknown as { pieceIdA?: string; pieceIdB?: string; mode?: string };
@@ -246,12 +253,16 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       if (!la.pieceIdB || !pieceExists(state, la.pieceIdB)) return fail(`Piece "${la.pieceIdB}" not found`);
       if (la.pieceIdA === la.pieceIdB) return fail('Cannot link a piece to itself');
       if (la.mode !== 'symmetry' && la.mode !== 'instance') return fail('Mode must be "symmetry" or "instance"');
+      const lockA = pieceNotLocked(state, la.pieceIdA);
+      if (!lockA.valid) return lockA;
+      const lockB = pieceNotLocked(state, la.pieceIdB);
+      if (!lockB.valid) return lockB;
       return ok();
     }
     case 'unlink_pieces': {
       const ua = action as unknown as { pieceId?: string };
       if (!ua.pieceId || !pieceExists(state, ua.pieceId)) return fail(`Piece "${ua.pieceId}" not found`);
-      return ok();
+      return pieceNotLocked(state, ua.pieceId);
     }
 
     default:
