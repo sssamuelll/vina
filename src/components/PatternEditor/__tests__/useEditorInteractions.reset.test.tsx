@@ -72,4 +72,18 @@ describe('reset-on-tool-switch wiring', () => {
     hook.rerender({ tool: 'select' });
     expect(tools.internalShapeTool.reset).toHaveBeenCalled();
   });
+
+  it('resets extendTrim when switching away from it (#1178: armar, cambiar de herramienta, volver deja pista y preview fantasma)', () => {
+    const { hook, tools } = setup('extendTrim');
+    (tools.extendTrimTool.reset as ReturnType<typeof vi.fn>).mockClear();
+    hook.rerender({ tool: 'select' });
+    expect(tools.extendTrimTool.reset).toHaveBeenCalled();
+  });
+
+  it('does not reset extendTrim while it stays active', () => {
+    const { hook, tools } = setup('extendTrim');
+    (tools.extendTrimTool.reset as ReturnType<typeof vi.fn>).mockClear();
+    hook.rerender({ tool: 'extendTrim' });
+    expect(tools.extendTrimTool.reset).not.toHaveBeenCalled();
+  });
 });

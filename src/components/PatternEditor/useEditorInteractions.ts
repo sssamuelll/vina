@@ -463,6 +463,14 @@ export function useEditorInteractions(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTool, pen.reset]);
 
+  // Clear an abandoned extend/trim gesture when switching away — mismo
+  // mecanismo que pen arriba (#1178): sin esto, la pista y el preview de la
+  // sesión anterior reaparecen "ya armados" al reactivar la herramienta.
+  useEffect(() => {
+    if (activeTool !== 'extendTrim') extendTrimTool.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool, extendTrimTool.reset]);
+
   // El borrado de la línea interna seleccionada YA NO vive aquí (#1115). Tenía
   // un duelo perdido de antemano: el atajo global escucha en `document` en
   // burbuja y corre antes que este router en `window`, así que la pieza se

@@ -1488,6 +1488,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
                 ? pieces.find(p => p.id === editor.selectedPieceIds[0])?.position ?? null
                 : null
             }
+            extendTrimPreviewOutline={extendTrimTool.previewOutline}
+            extendTrimPreviewPiecePosition={
+              editor.selectedPieceIds.length === 1
+                ? pieces.find(p => p.id === editor.selectedPieceIds[0])?.position ?? null
+                : null
+            }
             trimHoveredEdge={trimTool.hoveredEdge}
             selectMarquee={selectMarquee}
           />
@@ -1554,6 +1560,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           internalShapeNodesLength={internalShapeTool.nodes.length}
           cotasVisibles={sujeto.cotas.length > 0}
           hasSeams={seams.length > 0}
+          extendTrimMode={(toolOptions?.extendTrim?.mode as 'extend' | 'trim') ?? 'extend'}
+          extendTrimArmed={extendTrimTool.selectedSnap !== null}
         />
 
         <RulerLayer

@@ -24,6 +24,12 @@ interface HintTextProps {
   /** Hay al menos una costura en el proyecto. Sin ninguna, el clic de
    *  `seamEdit` es un no-op silencioso (#1098) — el hint cambia. */
   hasSeams?: boolean;
+  /** Modo de Extender/Recortar (#1178): la pista de "extender" no sirve
+   *  mientras María está recortando, y viceversa. */
+  extendTrimMode?: 'extend' | 'trim';
+  /** Hay un extremo (extender) o un punto de recorte (recortar) ya elegido,
+   *  esperando el clic o el Enter de confirmación (#1178). */
+  extendTrimArmed?: boolean;
 }
 
 /**
@@ -53,6 +59,7 @@ export default function HintText({
   activeTool, pieces, penNodesLength,
   nodeEditorIsEditing, seamPhase, topstitchMode, walkSeamPhase, slashPhase,
   saDefaultWidthMm, internalShapeNodesLength = 0, cotasVisibles = false, hasSeams,
+  extendTrimMode = 'extend', extendTrimArmed = false,
 }: HintTextProps) {
   const hasPieces = pieces.length > 0;
 
@@ -167,6 +174,28 @@ export default function HintText({
       {activeTool === 'compareCurves' && (
         <Pie>Clic en un borde y después en otro para ver la diferencia de largo</Pie>
       )}
+
+      {/* `canExecute` de Offset tenía un solo consumidor en todo el repo: el
+          propio atajo de Enter. Sin esta pista, nada en pantalla enseñaba que
+          esa tecla existe (#1178). */}
+      {activeTool === 'offsetOutline' && (
+        <Pie>Elige distancia y dirección en la tira · Enter aplica el desplazamiento</Pie>
+      )}
+
+      {/* Extender/Recortar no pintaba nada en toda su vida y tampoco tenía
+          pista (#1178). El modo importa: "extender" no sirve mientras María
+          recorta, y al revés — mismo criterio que topstitch unas líneas
+          arriba. */}
+      {activeTool === 'extendTrim' && (() => {
+        if (extendTrimMode === 'trim') {
+          return extendTrimArmed
+            ? <Pie>Clic del lado que quieres conservar, o Enter conserva el lado más cercano · Esc cancela</Pie>
+            : <Pie>Clic sobre un borde para marcar dónde recortar</Pie>;
+        }
+        return extendTrimArmed
+          ? <Pie>Clic otra vez, o Enter, confirma el extremo · Esc cancela</Pie>
+          : <Pie>Clic en el extremo de un borde para extenderlo</Pie>;
+      })()}
 
       {/* Cinco clics antes de poder arrastrar, y ninguno se adivina: es el
           gesto más largo del lienzo 2D y hasta hoy no lo decía nadie.
