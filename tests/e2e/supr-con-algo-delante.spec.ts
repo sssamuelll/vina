@@ -86,6 +86,12 @@ test.describe('#1173 — un diálogo abierto no deja que Supr borre lo de atrás
 
   test('M3 · el diálogo sigue cerrándose con Escape', async ({ page }) => {
     // La lección de #1115: retirar una tecla puede llevarse otra por delante.
+    //
+    // Honestidad sobre su alcance: este caso NO se pone rojo mutando la guarda
+    // de arriba, porque `ConfirmDialog` escucha su propio Escape en `window` y
+    // no depende del atajo global. Vigila la otra forma de romperlo —la que ya
+    // ocurrió una vez— que es que alguien añada `stopPropagation` y mate la
+    // propagación entera. Se queda por eso, sabiendo que no muerde hoy.
     await conPiezaSeleccionada(page);
     await abrirDialogo(page);
     await page.keyboard.press('Escape');
@@ -161,13 +167,22 @@ test.describe('#1172 — Medir y Recorrer costura no escriben: tampoco borran', 
   });
 
   test('M8 · el hermano: recorriendo una costura, Supr tampoco se la lleva', async ({ page }) => {
-    // Recorrer costura no aparecía en el issue. Se encontró censando por la
-    // REGLA (¿qué herramientas no escriben sobre la pieza?) y no por el grep
-    // de la tecla, que es la corrección que dejó #1115.
+    // Recorrer costura no aparecía en el issue: salió de censar por la REGLA
+    // (¿qué herramientas no escriben sobre la pieza?) y no por el grep de la
+    // tecla, que es la corrección que dejó #1115.
+    //
+    // Y el censo devolvió algo mejor que un bug: **ya estaba cubierta**, por
+    // estar en SEWING_TOOL_IDS desde antes. O sea que este caso pasaba ANTES
+    // del arreglo y no prueba nada de él — es un candado, no una medición.
+    // Vale igual, y de hecho es la mejor evidencia de que la decisión de
+    // #1172 va donde va: la regla ya existía a nivel de herramienta, a Medir
+    // solo le faltaba entrar en la lista.
     await conPiezaSeleccionada(page);
     await activarHerramienta(page, 'Shift+M', 'walkSeam');
     await clickAt(page, { x: 200, y: 100 });
     await page.waitForTimeout(300);
+    expect((await st(page)).editor.selectedPieceIds, 'el caso no se ejerce: no hay pieza que perder')
+      .toEqual(['p1']);
 
     const antes = await nPiezas(page);
     await pulsar(page, 'Delete');
