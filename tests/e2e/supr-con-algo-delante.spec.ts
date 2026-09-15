@@ -39,6 +39,10 @@ async function abrirApp(page: Page) {
 
 const nPiezas = async (p: Page) => (await st(p)).project.pieces.length;
 
+/** Vive `disabled` mientras no haya mediciones (`ToolStrip2D.tsx`). Sale gratis
+ *  y es el único oráculo que distingue «no midió» de «midió y se borró». */
+const botonBorrarMediciones = (p: Page) => p.getByRole('button', { name: 'Borrar mediciones' });
+
 /** Supr con el ratón fuera de todo campo, como lo pulsa María. */
 async function pulsar(page: Page, tecla: string) {
   await page.mouse.move(700, 620);
@@ -109,6 +113,49 @@ test.describe('#1173 — un diálogo abierto no deja que Supr borre lo de atrás
     await page.waitForTimeout(300);
     expect((await st(page)).editor.activeTool, 'un atajo se coló detrás del diálogo').toBe(antes);
   });
+
+  test('M10 · el nodo agarrado detrás del diálogo tampoco se va', async ({ page }) => {
+    // El agujero que la guarda de `ShortcutProvider` NO tapaba, y por el que
+    // #1173 estuvo medio arreglado: el router de #1115 escucha en `window` en
+    // CAPTURA, o sea ANTES que el atajo global en `document` en burbuja. Con
+    // el diálogo delante seguía borrando el nodo de la pieza de detrás.
+    await conPiezaSeleccionada(page);
+    await activarHerramienta(page, 'q', 'editPattern');
+    await clickAt(page, { x: 200, y: 175 });   // entrar a la pieza
+    await clickAt(page, { x: 100, y: 100 });   // agarrar la esquina
+    await page.waitForTimeout(300);
+
+    const antes = (await st(page)).project.pieces.find(p => p.id === 'p1')!.outline.length;
+    await abrirDialogo(page);
+    await pulsar(page, 'Delete');
+
+    const despues = (await st(page)).project.pieces.find(p => p.id === 'p1')!.outline.length;
+    expect(despues, 'se borró un nodo detrás del diálogo').toBe(antes);
+    await expect(page.locator('.confirm-dialog'), 'el diálogo se cerró solo').toBeVisible();
+  });
+
+  test('M11 · con el diálogo abierto, Espacio confirma en vez de arrancar la simulación', async ({ page }) => {
+    // Esto NO es una regresión que se arregla: es un fallo que había en main y
+    // que el arreglo de #1173 tapó de gratis. Lo encontró la revisión, no yo.
+    // `sim.toggle` está en Espacio con contexto `global` y hacía
+    // `preventDefault`, o sea que mataba la activación del botón enfocado: con
+    // un diálogo destructivo delante, Espacio arrancaba la simulación 3D y
+    // dejaba la pregunta en pantalla. Sin este caso nada lo protege.
+    await conPiezaSeleccionada(page);
+    await abrirDialogo(page);
+    const modoAntes = await page.evaluate(() => (window as unknown as {
+      __VINA_STORE__: { getState: () => { simulation: { viewMode3D: string } } };
+    }).__VINA_STORE__.getState().simulation.viewMode3D);
+
+    await page.keyboard.press(' ');
+    await page.waitForTimeout(500);
+
+    await expect(page.locator('.confirm-dialog'), 'Espacio no activó el botón enfocado').toHaveCount(0);
+    const modoDespues = await page.evaluate(() => (window as unknown as {
+      __VINA_STORE__: { getState: () => { simulation: { viewMode3D: string } } };
+    }).__VINA_STORE__.getState().simulation.viewMode3D);
+    expect(modoDespues, 'Espacio arrancó la simulación detrás del diálogo').toBe(modoAntes);
+  });
 });
 
 test.describe('#1172 — Medir y Recorrer costura no escriben: tampoco borran', () => {
@@ -132,10 +179,16 @@ test.describe('#1172 — Medir y Recorrer costura no escriben: tampoco borran', 
     await clickAt(page, { x: 100, y: 100 });
     await clickAt(page, { x: 300, y: 100 });
     await page.waitForTimeout(300);
+    await expect(botonBorrarMediciones(page), 'el caso no se ejerce: los clics no midieron nada')
+      .toBeEnabled();
 
     const antes = await nPiezas(page);
     await pulsar(page, 'Delete');
     expect(await nPiezas(page), 'midiendo, Supr se llevó la pieza').toBe(antes);
+    // La otra mitad, que estaba escrita en prosa tres veces y sin un solo
+    // assert: Supr tampoco se lleva las mediciones. Si alguien le engancha
+    // `clear()` a la tecla, contar piezas no lo vería.
+    await expect(botonBorrarMediciones(page), 'Supr se llevó las mediciones').toBeEnabled();
   });
 
   test('M7 · Retroceso hace lo mismo que Supr midiendo', async ({ page }) => {
@@ -145,9 +198,13 @@ test.describe('#1172 — Medir y Recorrer costura no escriben: tampoco borran', 
     await clickAt(page, { x: 300, y: 100 });
     await page.waitForTimeout(300);
 
+    await expect(botonBorrarMediciones(page), 'el caso no se ejerce: los clics no midieron nada')
+      .toBeEnabled();
+
     const antes = await nPiezas(page);
     await pulsar(page, 'Backspace');
     expect(await nPiezas(page), 'Retroceso no quedó igualado con Supr').toBe(antes);
+    await expect(botonBorrarMediciones(page), 'Retroceso se llevó las mediciones').toBeEnabled();
   });
 
   test('M9 · CONTROL: al salir de Medir, Supr vuelve a borrar', async ({ page }) => {
@@ -187,5 +244,27 @@ test.describe('#1172 — Medir y Recorrer costura no escriben: tampoco borran', 
     const antes = await nPiezas(page);
     await pulsar(page, 'Delete');
     expect(await nPiezas(page), 'recorriendo, Supr se llevó la pieza').toBe(antes);
+  });
+  test('M12 · el menú Edición ▸ Eliminar tampoco borra midiendo, y LO DICE', async ({ page }) => {
+    // Es la mitad que se olvidó en la primera versión y que la revisión midió:
+    // la regla vive en `resolverBorrado`, que lo leen DOS puertas. El atajo
+    // tiene la excusa de «la tecla no era tuya»; un renglón de menú con rótulo
+    // que la usuaria abrió y pulsó a propósito no la tiene.
+    await conPiezaSeleccionada(page);
+    await activarHerramienta(page, 'm', 'measure');
+
+    const menu = page.locator('.logo-menu__trigger, .top-bar .logo-menu, [aria-label="Menú de la aplicación"]').first();
+    await menu.click();
+    await page.locator('.logo-menu').waitFor({ timeout: 8000 });
+    await page.getByText('Edición', { exact: true }).first().hover();
+    await page.waitForTimeout(400);
+    await page.locator('.logo-menu__submenu').getByText(/^Eliminar$/).first().click();
+    await page.waitForTimeout(600);
+
+    expect(await nPiezas(page), 'el menú borró la pieza estando en Medir').toBe(1);
+    await expect(
+      page.locator('.toast', { hasText: /no se borran piezas/i }),
+      'la puerta se quedó muda: se pulsó y no pasó nada ni se dijo nada',
+    ).toBeVisible();
   });
 });

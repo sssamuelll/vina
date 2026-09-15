@@ -100,6 +100,10 @@ echo "✓ smoke del WASM commiteado"
 # la pareja que se pudre. Y `supr-borra-lo-que-se-ve` ejercita el menu Edicion
 # del propio `LogoMenu`, que esta rama refactoriza entero.
 #
+# Y `supr-con-algo-delante` va pegado a el: misma familia (#1172/#1173), la
+# misma `resolverBorrado` y el mismo item de menu. Separarlos es la pareja
+# que se pudre otra vez.
+#
 # No entran los 97 specs enteros: esta lista es la CLASE que se pudre, no un
 # intento de correrlo todo. El resto sigue sin gate y eso esta dicho en #1169.
 # Y no entra `bundle-split`: tiene un rojo real del tier TSL (#1171), y meterlo
@@ -129,6 +133,7 @@ npx playwright test --workers=2 \
   tests/e2e/replay-maria-07-09.spec.ts \
   tests/e2e/cotas-de-pieza.spec.ts \
   tests/e2e/supr-borra-lo-que-se-ve.spec.ts \
+  tests/e2e/supr-con-algo-delante.spec.ts \
   > /tmp/vina-deploy-e2e.log 2>&1 || {
     echo "  log completo: /tmp/vina-deploy-e2e.log" >&2
     tail -60 /tmp/vina-deploy-e2e.log >&2

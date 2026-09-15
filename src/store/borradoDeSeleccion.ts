@@ -43,29 +43,12 @@ export type SujetoBorrable =
   | { kind: 'trazo'; trazoId: string; segmentIndex: number }
   | { kind: 'pom'; id: string }
   | { kind: 'pieces'; ids: string[] }
-  | { kind: 'nada'; motivo?: 'bloqueada' };
+  | { kind: 'nada'; motivo?: 'bloqueada' | 'sin-sujeto' };
 
 export function resolverBorrado(e: EstadoParaBorrado): SujetoBorrable {
   // Menú de costuras: el sujeto es la costura o no hay sujeto (#1094).
   if (SEWING_TOOL_IDS.has(e.activeTool)) {
     return e.selectedSeamId ? { kind: 'seam', id: e.selectedSeamId } : { kind: 'nada' };
-  }
-
-  // Medir y comparar no escriben sobre el patron (#1172). Estando dentro,
-  // Supr no tiene sujeto: no hay nada seleccionable que sea suyo, y la pieza
-  // no puede serlo porque la herramienta ni la toca. Recorrer costura ya se
-  // comportaba asi desde que entro en SEWING_TOOL_IDS; esto solo iguala a sus
-  // hermanas, que se quedaron fuera por venir de otra familia.
-  //
-  // Lo que se ve en pantalla --las mediciones-- tiene su propia puerta
-  // visible, el boton «Borrar mediciones» de la tira. Eso lo decidio la v1 por
-  // escrito (`useMeasureTool.ts`, junto a su `handleKeyDown`) y ahi nombra a
-  // Supr: lo que no previo es que al soltar la tecla se la queda el atajo
-  // global y se lleva la PIEZA. Esto completa esa decision, no la cambia --y
-  // por eso tampoco borra las mediciones, que ademas viven en estado local y
-  // no tienen deshacer.
-  if (MEASURE_TOOL_IDS.has(e.activeTool)) {
-    return { kind: 'nada' };
   }
 
   // El trazo es papel suelto: un tramo elegido es lo más fino que hay en el
@@ -83,6 +66,23 @@ export function resolverBorrado(e: EstadoParaBorrado): SujetoBorrable {
   }
 
   if (e.selectedPieceIds.length > 0) {
+    // Medir y comparar no escriben sobre el patrón: ahí la PIEZA no es
+    // sujeto de Supr (#1172). Todo lo más fino —trazo, línea interna, POM—
+    // sigue borrándose, porque sigue pintado y manda la ley de la cabecera:
+    // lo que se ve es lo que se borra. Por eso la regla vive AQUÍ DENTRO y
+    // no arriba: arriba apagaba también lo que sí es sujeto.
+    //
+    // DECISIÓN NUEVA Y PROVISIONAL, tomada sin María. Lo que la v1 de Medir
+    // dejó escrito (`useMeasureTool.ts`, junto a su `handleKeyDown`) habla
+    // de las MEDICIONES —que se borran por el botón de la tira y no por
+    // Supr—, no de la pieza. Esto decide sobre un sujeto del que aquel
+    // comentario no dice nada, así que no es «completar» aquella decisión:
+    // es una propia. La alternativa viva —que Medir pueda seleccionar una
+    // medición y Supr la borre— sigue escrita en el #1172 y es de producto.
+    if (MEASURE_TOOL_IDS.has(e.activeTool)) {
+      return { kind: 'nada', motivo: 'sin-sujeto' };
+    }
+
     // El candado protege de borrar, igual que de editar. De una selección
     // mixta se van las libres: "no borres nunca" también dejaría pasar el
     // caso B y rompería el trabajo normal.

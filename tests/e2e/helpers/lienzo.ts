@@ -60,7 +60,11 @@ export async function clickAt(page: Page, p: { x: number; y: number }, button: '
 
 export async function activarHerramienta(page: Page, tecla: string, id: string) {
   await page.keyboard.press(tecla);
-  await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe(id);
+  // 15 s y no 5: era el presupuesto mas apretado de todos los helpers y es lo
+  // primero que revienta con el arranque en frio y muchos workers. Medido en
+  // la revision de #1172: 1 rojo de 31 corridas, y el `retries: 1` del config
+  // lo enterraba como «flaky» donde nadie lo lee.
+  await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 15000 }).toBe(id);
   await page.waitForTimeout(100);
 }
 

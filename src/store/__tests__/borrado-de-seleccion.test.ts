@@ -183,26 +183,19 @@ describe('#1172 — en las herramientas que solo MIRAN, Supr no tiene sujeto', (
   // solo iguala a sus hermanas, que se quedaron fuera por venir de otra
   // familia.
   it.each(['measure', 'measureCurve', 'compareCurves'])(
-    'con %s y una pieza seleccionada, no se borra nada',
+    'con %s y una pieza seleccionada, la pieza no se borra',
     (activeTool) => {
       expect(resolverBorrado(con({ activeTool, selectedPieceIds: ['p1'] })))
-        .toEqual({ kind: 'nada' });
+        .toEqual({ kind: 'nada', motivo: 'sin-sujeto' });
     },
   );
 
-  it('midiendo tampoco se cuelan la línea interna ni la costura', () => {
-    expect(resolverBorrado(con({
-      activeTool: 'measure',
-      selectedInternalLine: { pieceId: 'p1', lineId: 'L1' },
-      selectedSeamId: 's1',
-      selectedPieceIds: ['p1'],
-    }))).toEqual({ kind: 'nada' });
-  });
-
-  it('CONTROL: Medir POM NO entra — su medida sí es un objeto del store', () => {
-    // La herramienta que más se parece por el nombre y la que tiene que
-    // quedar fuera: una medida POM tiene selección propia (`selectedPOMId`),
-    // o sea sujeto propio, y Supr sí debe borrarla.
+  it('CONTROL: Medir POM NO entra en el conjunto por parecerse de nombre', () => {
+    // Ojo con lo que este caso prueba y lo que no. Prueba que `pomMeasure` no
+    // cayó dentro por parecido de nombre. NO prueba que un POM sea un sujeto
+    // alcanzable: `selectPOM` es un reducer que no despacha NADIE en el repo,
+    // así que este estado no lo produce ningún camino de usuaria hoy. La
+    // primera versión de este control decía lo contrario y era falso.
     expect(resolverBorrado(con({ activeTool: 'pomMeasure', selectedPOMId: 'pom1' })))
       .toEqual({ kind: 'pom', id: 'pom1' });
   });
@@ -212,5 +205,34 @@ describe('#1172 — en las herramientas que solo MIRAN, Supr no tiene sujeto', (
     // toda la app en silencio.
     expect(resolverBorrado(con({ activeTool: 'select', selectedPieceIds: ['p1'] })))
       .toEqual({ kind: 'pieces', ids: ['p1'] });
+  });
+});
+
+describe('#1172 — pero la sub-selección que SE VE se sigue borrando', () => {
+  // La primera versión puso la regla ARRIBA del todo y apagó de paso el
+  // trazo, la línea interna y el POM. Eso contradice la ley de la cabecera:
+  // esas selecciones siguen PINTADAS mientras se mide, y `setActiveTool` no
+  // las limpia al cambiar de herramienta. La regla es sobre la PIEZA.
+  it('midiendo, una línea interna seleccionada se borra ella', () => {
+    expect(resolverBorrado(con({
+      activeTool: 'measure',
+      selectedInternalLine: { pieceId: 'p1', lineId: 'L1' },
+      selectedPieceIds: ['p1'],
+    }))).toEqual({ kind: 'internalLine', pieceId: 'p1', lineId: 'L1' });
+  });
+
+  it('midiendo, un tramo de trazo seleccionado se borra él', () => {
+    expect(resolverBorrado(con({
+      activeTool: 'measure',
+      selectedTrazo: { trazoId: 't1', segmentIndex: 2 },
+      selectedPieceIds: ['p1'],
+    }))).toEqual({ kind: 'trazo', trazoId: 't1', segmentIndex: 2 });
+  });
+
+  it('cuando no se borra la pieza, se dice por qué y no en silencio', () => {
+    // El motivo no es adorno: de él cuelga que el menú Edición ▸ Eliminar
+    // conteste. Sin él, un renglón con rótulo se pulsa y no pasa nada.
+    expect(resolverBorrado(con({ activeTool: 'measure', selectedPieceIds: ['p1'] })))
+      .toEqual({ kind: 'nada', motivo: 'sin-sujeto' });
   });
 });

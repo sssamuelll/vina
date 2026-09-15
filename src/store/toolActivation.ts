@@ -12,15 +12,25 @@ import { getInternalLineEndpoints } from '../components/PatternEditor/internalSh
  *  render de costuras (PatternEditor) y la regla de Supr (useKeyboardShortcuts,
  *  #1094) — dos listas se desincronizan, como pasó con walkSeam. */
 export const SEWING_TOOL_IDS = new Set(['seam', 'seamEdit', 'walkSeam']);
-
-/** Las herramientas que solo MIRAN el patron. Entre las tres no hay un solo
- *  dispatch al store: no crean, no mueven y no borran nada. Vive aqui y no en
- *  el editor por la misma razon que el conjunto de arriba --lo leen el router
- *  de teclas del lienzo y la regla de Supr (`borradoDeSeleccion`, #1172), y
- *  dos listas se desincronizan.
+/** Las tres herramientas de medida. Comparten un solo gancho
+ *  (`useMeasureTool`) y no escriben nada: cero `dispatch` entre las tres.
  *
- *  `pomMeasure` NO entra: una medida POM si es un objeto del store, con su
- *  propia seleccion (`selectedPOMId`), y por eso tiene sujeto propio. */
+ *  Vive aquí y no en el editor por la misma razón que el conjunto de arriba:
+ *  lo leen el router de teclas del lienzo y la regla de Supr
+ *  (`borradoDeSeleccion`, #1172), y dos listas se desincronizan.
+ *
+ *  **Lo que significa allá es más estrecho que su nombre**: «aquí la PIEZA no
+ *  es sujeto de Supr». NO es «no escribe» — ese criterio no separa bien:
+ *  `walkSeam` tiene cero dispatches y su regla es otra (la costura o nada), y
+ *  `hand` tampoco escribe sobre el patrón y queda fuera a propósito. Navegar
+ *  es lo que se hace ENTRE operaciones, así que borrar la pieza seleccionada
+ *  mientras se desplaza el lienzo es intención plausible. Midiendo no: ahí se
+ *  están clicando puntos sobre la pieza.
+ *
+ *  `pomMeasure` queda fuera porque **no es alcanzable**: no tiene atajo ni
+ *  entrada de dock, solo la activa el copiloto. La razón NO es que tenga
+ *  sujeto propio: `selectPOM` es un reducer sin un solo despachador en el
+ *  repo, o sea que hoy nadie escribe `selectedPOMId`. */
 export const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
 
 /** La puerta necesita una pieza visible con geometría donde iniciar el trazo;

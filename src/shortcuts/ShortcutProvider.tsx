@@ -12,6 +12,7 @@ import { ShortcutRegistry, type ShortcutContext as ShortcutCtx } from './Shortcu
 import { DEFAULT_SHORTCUTS } from './defaults';
 import { ShortcutContext } from './ShortcutContext';
 import { pushJournal } from '../utils/telemetry/journal';
+import { hayModalDelante } from '../utils/superficieModal';
 
 /** Determine which panel has focus based on the active element */
 function getActiveContext(): ShortcutCtx[] {
@@ -76,7 +77,19 @@ export function ShortcutProvider({ children }: ShortcutProviderProps) {
         // dejar fuera: `NotchPrecisionModal` es `role="dialog"` SIN velo, se
         // abre junto a la pieza y el lienzo sigue vivo detras. Un detector
         // por `role` lo habria apagado con los demas.
-        if (document.querySelector('[aria-modal="true"]')) {
+        if (hayModalDelante()) {
+          // Retirarse no es soltarle la tecla al NAVEGADOR: sin esto, Ctrl+R
+          // detrás de un diálogo destructivo recarga la app entera y Ctrl+A
+          // selecciona el texto de la página. Si era un atajo nuestro CON
+          // ctrl/meta, se suprime: no es de Vina, pero tampoco del navegador.
+          //
+          // Y solo con ctrl/meta. Suprimir además las teclas sueltas rompe el
+          // control que tiene el foco dentro del diálogo: Espacio sobre el
+          // botón es su activación, y `sim.toggle` vive en Espacio. Eso fue
+          // un rojo medido al generalizarlo.
+          if ((e.ctrlKey || e.metaKey) && registryRef.current.matchEvent(e, getActiveContext())) {
+            e.preventDefault();
+          }
           return;
         }
       }
