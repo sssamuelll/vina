@@ -69,6 +69,10 @@ function createMockState(overrides: Partial<RootState['project']> = {}): () => R
           tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
         },
       ],
+      // El RootState real siempre trae este campo (`projectSlice.ts`, default
+      // `{}`); el mock se había quedado atrás y `pieceNotLocked` (#1176) lo
+      // lee incondicionalmente, como hace el resto del store.
+      layerLocked: {},
       fabrics: [],
       avatar: {
         id: 'default',
