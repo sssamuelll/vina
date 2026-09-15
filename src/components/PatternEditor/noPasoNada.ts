@@ -35,6 +35,10 @@ export const RAZONES = [
   'triangulo:medida-en-cero',
   'pom:nombre-abierto',
   'abrir:linea-invalida',
+  'desplazar:pieza-bloqueada',
+  'extender:pieza-bloqueada',
+  'abrir:pieza-bloqueada',
+  'unir:pieza-bloqueada',
 ] as const;
 
 export type RazonMuda = (typeof RAZONES)[number];
@@ -70,6 +74,10 @@ const MENSAJES: Record<RazonMuda, string> = {
   'triangulo:medida-en-cero': 'El triángulo mide cero; escribe una base y una altura mayores que cero',
   'pom:nombre-abierto': 'Primero ponle nombre a la medida; escribe y pulsa Enter, o Escape para dejarlo',
   'abrir:linea-invalida': 'Esa línea no corta la pieza en dos; arrastra de un borde al otro',
+  'desplazar:pieza-bloqueada': 'Esa pieza está bloqueada; quítale el candado y prueba otra vez',
+  'extender:pieza-bloqueada': 'Esa pieza está bloqueada; quítale el candado y prueba otra vez',
+  'abrir:pieza-bloqueada': 'Esa pieza está bloqueada; quítale el candado y prueba otra vez',
+  'unir:pieza-bloqueada': 'Esa pieza está bloqueada; quítale el candado y prueba otra vez',
 };
 
 export function mensajeDe(razon: RazonMuda): string {

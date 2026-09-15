@@ -6,6 +6,8 @@ import { showErrorToast } from '../../store/copilotUISlice';
 import type { Point2D, PathCommand, PatternPiece } from '../../types/types';
 import { offsetPieceOutline } from '../../utils/patternOps';
 import { uid } from '../../utils/pathHelpers';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
+import { noPasoNada } from './noPasoNada';
 
 export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
   void zoom2D; void pan2D; // reserved for future distance-from-cursor preview
@@ -13,6 +15,7 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const toolOptions = useSelector((s: RootState) => s.tools.toolOptions);
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
 
   /** Read current tool options */
   const getOptions = useCallback(() => {
@@ -48,6 +51,15 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
 
     const piece = pieces.find(p => p.id === selectedPieceIds[0]);
     if (!piece) return;
+
+    // El candado se leía para pintar (el chip, la fila de capas) y no para
+    // escribir: en modo `replace` esto SUSTITUYE el contorno en el sitio, sin
+    // dejar rastro de la geometría que el candado prometía proteger (#1145,
+    // mismo mecanismo que #1136 encontró en Margen).
+    if (piezaBloqueada(piece, layerLocked)) {
+      noPasoNada('desplazar:pieza-bloqueada', { pieceId: piece.id });
+      return;
+    }
 
     const { distance, direction, joinType, replace } = getOptions();
 
@@ -122,7 +134,7 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
       }
     }
 
-  }, [selectedPieceIds, pieces, getOptions, dispatch]);
+  }, [selectedPieceIds, pieces, getOptions, dispatch, layerLocked]);
 
   const handleMouseDown = useCallback(
     (_e: React.MouseEvent<SVGSVGElement>) => {

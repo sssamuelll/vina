@@ -9,6 +9,7 @@ import { hitTestPieceBBox } from '../../utils/geometry/hitTest';
 import { screenToPattern } from '../../utils/geometry';
 import { useGuardedAction } from '../../hooks/useGuardedAction';
 import { noPasoNada } from './noPasoNada';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
 
 export interface MergeState {
   pieceIdA: string | null;
@@ -28,6 +29,7 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const seams = useSelector((s: RootState) => s.project.seams);
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
   const guardAction = useGuardedAction();
 
   const [state, setState] = useState<MergeState>(INITIAL_STATE);
@@ -69,6 +71,16 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
 
       if (!clickedPiece) {
         reset();
+        return;
+      }
+
+      // El candado no se lee: ni para armar el primer sujeto, ni para el
+      // segundo, que es el clic que de verdad borra las dos piezas (#1145).
+      // `guardAction` no es una defensa — en modo experto ejecuta sin
+      // preguntar (`useGuardedAction.ts:120-124`) — así que este es el único
+      // filtro real, igual que ya lo es para Tijeras.
+      if (piezaBloqueada(clickedPiece, layerLocked)) {
+        noPasoNada('unir:pieza-bloqueada', { pieceId: clickedPiece.id });
         return;
       }
 
@@ -144,7 +156,7 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
         }
       });
     },
-    [toPattern, hitTestPiece, pieces, seams, dispatch, reset, guardAction],
+    [toPattern, hitTestPiece, pieces, seams, dispatch, reset, guardAction, layerLocked],
   );
 
   const handleMouseMove = useCallback(

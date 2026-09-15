@@ -115,6 +115,7 @@ describe('#1116 hermano — Slash & Spread engancha sobre la pieza que se ve', (
     toolOptions: {},
     zoom2D: 1,
     pan2D: { x: 0, y: 0 },
+    layerLocked: {},
   });
 
   it.each([0, 45, 137])('girada %i°, el enganche cae sobre el borde', (rot) => {

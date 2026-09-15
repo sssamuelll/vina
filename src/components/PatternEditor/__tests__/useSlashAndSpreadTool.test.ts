@@ -10,6 +10,7 @@ import {
   type SlashAndSpreadState,
   type SlashAndSpreadPhase,
 } from '../useSlashAndSpreadTool';
+import { suscribirNoPasoNada } from '../noPasoNada';
 
 // ─── Test Fixtures ─────────────────────────────────────────────────────────
 
@@ -101,6 +102,7 @@ function makeCtx(overrides: {
   pieces?: PatternPiece[];
   selectedPieceIds?: string[];
   toolOptions?: Record<string, unknown>;
+  layerLocked?: Record<number, boolean>;
 } = {}) {
   return {
     pieces: overrides.pieces ?? [squarePiece],
@@ -108,6 +110,7 @@ function makeCtx(overrides: {
     toolOptions: overrides.toolOptions ?? { mode: 'pivot', gapFill: 'straight' },
     zoom2D: 1,
     pan2D: { x: 0, y: 0 } as Point2D,
+    layerLocked: overrides.layerLocked ?? {},
   };
 }
 
@@ -166,6 +169,52 @@ describe('useSlashAndSpreadTool state machine', () => {
     expect(result.targetPieceId).toBe('piece-1');
     expect(result.startPoint).toBeNull();
     expect(result.phase).toBe('idle');
+  });
+
+  // ── 2b. #1145 (mitad ALTA) — el candado no deja targetear la pieza ──
+  //
+  // Abrir (Corte y apertura) reemplaza el contorno entero con las dos mitades
+  // recompuestas: es la escritura más destructiva de las cuatro. El candado
+  // se leía para pintar y no para escribir (mismo mecanismo que #1136).
+  //
+  // El guardia vive en `idle`, el único punto donde una pieza se vuelve
+  // `targetPieceId`: si no entra ahí, ninguna fase posterior puede escribir.
+
+  it('con el candado de la pieza, el clic no la vuelve objetivo', () => {
+    const ctx = makeCtx({ pieces: [{ ...squarePiece, locked: true }] });
+    const pt = snapPt(50, 0); // sobre el borde de arriba
+    const result = transitionMouseDown(INITIAL_STATE, pt, ctx);
+
+    expect(result.phase).toBe('idle');
+    expect(result.targetPieceId).toBeNull();
+  });
+
+  it('con el candado de la capa, tampoco', () => {
+    const ctx = makeCtx({
+      pieces: [{ ...squarePiece, layer: 3 }],
+      layerLocked: { 3: true },
+    });
+    const pt = snapPt(50, 0);
+    const result = transitionMouseDown(INITIAL_STATE, pt, ctx);
+
+    expect(result.phase).toBe('idle');
+    expect(result.targetPieceId).toBeNull();
+  });
+
+  it('el rechazo se dice, no muere en silencio', () => {
+    const avisos: string[] = [];
+    const cancelar = suscribirNoPasoNada(a => avisos.push(a.razon));
+    const ctx = makeCtx({ pieces: [{ ...squarePiece, locked: true }] });
+    transitionMouseDown(INITIAL_STATE, snapPt(50, 0), ctx);
+    cancelar();
+    expect(avisos).toContain('abrir:pieza-bloqueada');
+  });
+
+  it('CONTROL: sin candado, el mismo clic sí la vuelve objetivo', () => {
+    const ctx = makeCtx();
+    const result = transitionMouseDown(INITIAL_STATE, snapPt(50, 0), ctx);
+    expect(result.targetPieceId).toBe('piece-1');
+    expect(result.phase).toBe('drawingSlash');
   });
 
   // ── 3. drawingSlash → slashComplete (or error) ────────────────────
