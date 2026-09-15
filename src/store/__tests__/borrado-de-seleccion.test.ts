@@ -172,3 +172,45 @@ describe('el orden es el de la tira: lo fino antes que lo grueso', () => {
     expect(conTodo.kind).not.toBe('pieces');
   });
 });
+
+describe('#1172 — en las herramientas que solo MIRAN, Supr no tiene sujeto', () => {
+  // Medir y comparar no escriben sobre el patrón: entre las tres no hay un
+  // solo dispatch al store. Con una pieza seleccionada detrás de seis
+  // mediciones, Supr se llevaba la pieza. Medido en navegador: 1 → 0.
+  //
+  // No es que Medir «se trague» la tecla: es que ahí no hay nada que borrar.
+  // Recorrer costura ya se comportaba así por estar en SEWING_TOOL_IDS; esto
+  // solo iguala a sus hermanas, que se quedaron fuera por venir de otra
+  // familia.
+  it.each(['measure', 'measureCurve', 'compareCurves'])(
+    'con %s y una pieza seleccionada, no se borra nada',
+    (activeTool) => {
+      expect(resolverBorrado(con({ activeTool, selectedPieceIds: ['p1'] })))
+        .toEqual({ kind: 'nada' });
+    },
+  );
+
+  it('midiendo tampoco se cuelan la línea interna ni la costura', () => {
+    expect(resolverBorrado(con({
+      activeTool: 'measure',
+      selectedInternalLine: { pieceId: 'p1', lineId: 'L1' },
+      selectedSeamId: 's1',
+      selectedPieceIds: ['p1'],
+    }))).toEqual({ kind: 'nada' });
+  });
+
+  it('CONTROL: Medir POM NO entra — su medida sí es un objeto del store', () => {
+    // La herramienta que más se parece por el nombre y la que tiene que
+    // quedar fuera: una medida POM tiene selección propia (`selectedPOMId`),
+    // o sea sujeto propio, y Supr sí debe borrarla.
+    expect(resolverBorrado(con({ activeTool: 'pomMeasure', selectedPOMId: 'pom1' })))
+      .toEqual({ kind: 'pom', id: 'pom1' });
+  });
+
+  it('CONTROL: fuera de esas herramientas la pieza se sigue borrando', () => {
+    // Sin esto, «no borrar nunca» también pasaría y apagaría el borrado de
+    // toda la app en silencio.
+    expect(resolverBorrado(con({ activeTool: 'select', selectedPieceIds: ['p1'] })))
+      .toEqual({ kind: 'pieces', ids: ['p1'] });
+  });
+});
