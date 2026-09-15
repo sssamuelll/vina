@@ -5,7 +5,6 @@ import { updatePiece } from '../../store/projectSlice';
 import { showErrorToast } from '../../store/copilotUISlice';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import { extendEdge, trimEdgeAtPoint } from '../../utils/patternOps';
-import { flattenPath } from '../../utils/seam/index';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 
@@ -25,6 +24,31 @@ const INITIAL_STATE: ExtendTrimState = {
 };
 
 const SNAP_THRESHOLD = 10; // screen pixels
+
+/**
+ * Los dos vértices que delimitan `segmentIndex`, en espacio LOCAL de pieza.
+ *
+ * Existe para el clic de confirmación de Recortar (#1177): la pregunta que
+ * ese clic contesta es «¿más cerca del inicio o del final de ESTE
+ * segmento?», y eso no se puede leer del primer/último punto del CONTORNO
+ * completo — para cualquier pieza cerrada son el mismo punto.
+ */
+function segmentEndpoints(outline: PatternPiece['outline'], segmentIndex: number): { start: Point2D; end: Point2D } {
+  let prevX = 0, prevY = 0;
+  for (let i = 0; i < outline.length; i++) {
+    const cmd = outline[i];
+    let endX = prevX, endY = prevY;
+    switch (cmd.type) {
+      case 'M': endX = cmd.values[0]; endY = cmd.values[1]; break;
+      case 'L': endX = cmd.values[0]; endY = cmd.values[1]; break;
+      case 'C': endX = cmd.values[4]; endY = cmd.values[5]; break;
+      case 'Q': endX = cmd.values[2]; endY = cmd.values[3]; break;
+    }
+    if (i === segmentIndex) return { start: { x: prevX, y: prevY }, end: { x: endX, y: endY } };
+    prevX = endX; prevY = endY;
+  }
+  return { start: { x: prevX, y: prevY }, end: { x: prevX, y: prevY } };
+}
 
 export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
   const dispatch = useDispatch();
@@ -239,16 +263,15 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
           const clickPt = toPattern(e);
           const localClick = patternToPieceLocal(clickPt, piece);
 
-          // Determine which side to keep based on where the confirmation click is
-          const flatPoints = flattenPath(piece.outline);
+          // Qué mitad conservar la decide el clic contra los dos vértices de
+          // ESTE segmento, no contra los extremos del contorno entero (#1177):
+          // para cualquier pieza cerrada, primer y último punto del contorno
+          // aplanado son el MISMO punto, y esa comparación no distinguía nada.
           const trimIdx = s.selectedSnap.segmentIndex;
-
-          // Simple heuristic: measure distance from click to first vs last point
-          const firstPt = flatPoints[0] ?? { x: 0, y: 0 };
-          const lastPt = flatPoints[flatPoints.length - 1] ?? { x: 0, y: 0 };
-          const distToFirst = Math.hypot(localClick.x - firstPt.x, localClick.y - firstPt.y);
-          const distToLast = Math.hypot(localClick.x - lastPt.x, localClick.y - lastPt.y);
-          const keepSide: 'before' | 'after' = distToFirst < distToLast ? 'before' : 'after';
+          const { start, end } = segmentEndpoints(piece.outline, trimIdx);
+          const distToStart = Math.hypot(localClick.x - start.x, localClick.y - start.y);
+          const distToEnd = Math.hypot(localClick.x - end.x, localClick.y - end.y);
+          const keepSide: 'before' | 'after' = distToStart < distToEnd ? 'before' : 'after';
 
           try {
             const trimmed = trimEdgeAtPoint(piece, trimIdx, localTrimPt, keepSide);
