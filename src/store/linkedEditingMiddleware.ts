@@ -3,6 +3,7 @@ import { updatePiece, addInternalLine, updateInternalLine } from './projectSlice
 import { mirrorOutlineX, mirrorInternalsX, outlineCenterX } from '../utils/linkedEditing';
 import type { PatternPiece, InternalLine, PathCommand } from '../types/types';
 import { batchUndo } from './undoMiddleware';
+import { piezaBloqueada } from '../utils/piezaBloqueada';
 
 let isSyncing = false;
 
@@ -26,7 +27,7 @@ interface StoreLike {
 }
 
 interface ProjectStateShape {
-  project?: { pieces: PatternPiece[] };
+  project?: { pieces: PatternPiece[]; layerLocked?: Record<number, boolean> };
 }
 
 const BATCH_LABELS: Record<string, string> = {
@@ -130,6 +131,13 @@ function runCascade(action: ActionLike, store: StoreLike) {
   if (!editedPiece?.linkedPieceId || !editedPiece.linkMode) return;
   const partner = pieces.find(p => p.id === editedPiece!.linkedPieceId);
   if (!partner) return;
+
+  // #1176 (H1): la pieza editada ya pasó su propio candado (o no tiene) —
+  // eso lo decide quien despachó la acción original. Lo que este middleware
+  // decide es si puede escribir sobre la PAREJA, y si está bloqueada
+  // (directo o por capa) la respuesta es no: se omite solo la cascada, la
+  // edición de la pieza fuente ya se aplicó vía `next(action)` y se queda.
+  if (piezaBloqueada(partner, state.project?.layerLocked ?? {})) return;
 
   if (action.type === 'project/updatePiece') {
     syncUpdatePiece(store.dispatch, editedPiece, partner);
