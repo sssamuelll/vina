@@ -13,6 +13,7 @@ import projectReducer, { addPiece, setLayerLocked, lockPiece } from '../../../st
 import toolReducer, { setToolOption } from '../../../store/toolSlice';
 import { useExtendTrimTool } from '../useExtendTrimTool';
 import { suscribirNoPasoNada } from '../noPasoNada';
+import { getJournal, clearJournal } from '../../../utils/telemetry/journal';
 import type { PatternPiece } from '../../../types/types';
 
 afterEach(cleanup);
@@ -101,6 +102,22 @@ describe('#1145 — Extender/Recortar no reescribe el contorno de una pieza bloq
     act(() => hook.result.current.handleMouseDown(ev(0, 0)));
     cancelar();
     expect(avisos).toContain('extender:pieza-bloqueada');
+  });
+
+  it('la bitácora distingue recortar de extender: la razón es una sola, el modo va en los datos', () => {
+    // Revisión adversarial: `extender:pieza-bloqueada` cubre las dos modos.
+    // Sin `modo` en los datos, la bitácora leería «extender» cuando María
+    // estaba recortando — mismo archivo que YA distingue los dos modos para
+    // el toast de "no se pudo" (`mode === 'extend' ? … : …`).
+    clearJournal();
+    const { hook } = montar(pieza('p', { locked: true }), 'trim');
+    act(() => hook.result.current.handleMouseDown(ev(100, 0)));
+    const evento = getJournal().events.find(
+      e => e.kind === 'gesture' && e.name === 'no-paso-nada'
+        && (e.data as { razon?: string })?.razon === 'extender:pieza-bloqueada',
+    );
+    expect(evento?.data, 'el caso no se ejerce: no quedó el evento').toBeTruthy();
+    expect((evento!.data as { modo?: string }).modo).toBe('trim');
   });
 
   it('CONTROL: sin candado, el gesto de extender sí escribe', () => {

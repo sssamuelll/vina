@@ -77,11 +77,53 @@ describe('#1145 — Desplazar contorno no sustituye la geometría de una pieza b
     expect(avisos).toContain('desplazar:pieza-bloqueada');
   });
 
+  it('con el candado (en modo reemplazar), ni el preview se pinta', () => {
+    // Mismo criterio que ya se aplicó en Extender/Recortar: armar un preview
+    // que luego se rechaza en silencio al pulsar Enter es peor que no
+    // mostrarlo — María vería el fantasma del contorno desplazado y el gesto
+    // moriría con un mensaje. `montar()` deja `replace: true` por defecto.
+    const { hook } = montar(pieza('p', { locked: true }));
+    expect(hook.result.current.previewOutline).toBeNull();
+    expect(hook.result.current.canExecute).toBe(false);
+  });
+
   it('CONTROL: sin candado, execute() sí sustituye el contorno', () => {
     const { store, hook } = montar(pieza('p'));
     const antes = contorno(store, 'p');
     act(() => hook.result.current.execute());
     expect(contorno(store, 'p')).not.toBe(antes);
+  });
+
+  it('en modo NO reemplazar, la pieza derivada NACE SIN el candado de la original', () => {
+    // Revisión adversarial: el spread de `{...piece}` copia `locked` a la
+    // pieza nueva. La única ruta que #1145 le deja a María sobre una pieza
+    // bloqueada le entregaba algo tan atascado como lo que ya tenía.
+    const { store, hook } = montar(pieza('p', { locked: true }));
+    act(() => { store.dispatch(setToolOption({ toolId: 'offsetOutline', optionId: 'replace', value: false })); });
+
+    act(() => hook.result.current.execute());
+
+    const derivada = store.getState().project.pieces.find((p: PatternPiece) => p.id !== 'p')!;
+    expect(derivada.locked, 'la pieza derivada nació bloqueada').toBeFalsy();
+  });
+
+  it('con direction:both y replace, el candado corta también la derivada inward', () => {
+    // Decisión explícita, no un descuido: en `direction:'both'`, la mitad
+    // `inward` SIEMPRE hace `addPiece` (nunca lee `replace`) y nunca toca la
+    // original — es el mismo caso legítimo que el control de arriba. Pero el
+    // guardián está antes del `if (direction === 'both')` y corta
+    // `execute()` entero. Congelado aquí en vez de complicar el guardián con
+    // una excepción para una combinación de tres condiciones a la vez
+    // (`both` + `replace` + candado): revisión adversarial lo señaló como
+    // "fail-closed defendible", y esta prueba es la que falta para que
+    // decidirlo distinto no sea un cambio silencioso.
+    const { store, hook } = montar(pieza('p', { locked: true }));
+    act(() => { store.dispatch(setToolOption({ toolId: 'offsetOutline', optionId: 'direction', value: 'both' })); });
+    const n = store.getState().project.pieces.length;
+
+    act(() => hook.result.current.execute());
+
+    expect(store.getState().project.pieces.length, 'la derivada inward se creó igual').toBe(n);
   });
 
   it('CONTROL: en modo NO reemplazar, una pieza bloqueada sí puede derivar una nueva', () => {

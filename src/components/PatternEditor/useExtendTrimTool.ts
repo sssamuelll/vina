@@ -193,16 +193,18 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
       const piece = pieces.find(p => p.id === selectedPieceIds[0]);
       if (!piece) return;
 
+      const s = stateRef.current;
+      const { mode, distance } = getOptions();
+
       // El candado ni siquiera arma el gesto (#1145): armarlo y morir en el
       // segundo clic dejaría un preview que luego se rechaza en silencio, que
       // es peor que no empezar.
       if (piezaBloqueada(piece, layerLocked)) {
-        noPasoNada('extender:pieza-bloqueada', { pieceId: piece.id });
+        // `modo` en los datos y no en la razón: la herramienta es una sola y
+        // la bitácora no debe leer «extender» cuando María recortaba.
+        noPasoNada('extender:pieza-bloqueada', { pieceId: piece.id, modo: mode });
         return;
       }
-
-      const s = stateRef.current;
-      const { mode, distance } = getOptions();
 
       if (mode === 'extend') {
         if (!s.selectedSnap) {
@@ -316,16 +318,16 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
           const piece = pieces.find(p => p.id === selectedPieceIds[0]);
           if (!piece) return;
 
+          const { mode, distance } = getOptions();
+
           // Defensa en profundidad: si la pieza se bloqueó A MITAD del gesto
           // (el mismo hallazgo que la revisión de #1136 hizo el 09-06 para el
           // arrastre de margen), Enter es la otra puerta de escritura y tiene
           // que negarse igual que el clic.
           if (piezaBloqueada(piece, layerLocked)) {
-            noPasoNada('extender:pieza-bloqueada', { pieceId: piece.id });
+            noPasoNada('extender:pieza-bloqueada', { pieceId: piece.id, modo: mode });
             return;
           }
-
-          const { mode, distance } = getOptions();
           const snap = s.selectedSnap;
 
           try {

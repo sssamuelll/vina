@@ -34,11 +34,18 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
     const piece = pieces.find(p => p.id === selectedPieceIds[0]);
     if (!piece) return null;
 
-    const { distance, direction, joinType } = getOptions();
+    const { distance, direction, joinType, replace } = getOptions();
+
+    // Mismo criterio que Extender/Recortar: armar un preview que luego se
+    // rechaza en silencio al pulsar Enter es peor que no mostrarlo. Solo en
+    // modo `replace` — en modo "crear pieza nueva" el preview es honesto,
+    // porque `execute()` sí va a poder hacerlo (#1145).
+    if (replace && piezaBloqueada(piece, layerLocked)) return null;
+
     const effectiveDistance = direction === 'inward' ? -distance : distance;
 
     return offsetPieceOutline(piece, effectiveDistance, joinType);
-  }, [selectedPieceIds, pieces, getOptions]);
+  }, [selectedPieceIds, pieces, getOptions, layerLocked]);
 
   /** Whether the tool can execute (piece selected + valid preview) */
   const canExecute = selectedPieceIds.length === 1 && previewOutline !== null;
@@ -89,6 +96,10 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
           const newPiece: PatternPiece = {
             ...piece,
             id: uid(),
+            // La pieza derivada es geometría nueva: hereda `locked` por el
+            // spread pero no hay ninguna razón de producto para que nazca
+            // atascada como la original (#1145, revisión adversarial).
+            locked: false,
             name: `${piece.name} Offset (out)`,
             outline: outward,
             edges: undefined,
@@ -104,6 +115,8 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
         const newPiece: PatternPiece = {
           ...piece,
           id: uid(),
+          // pieza derivada: no hereda el candado de la original (#1145)
+          locked: false,
           name: `${piece.name} Offset (in)`,
           outline: inward,
           edges: undefined,
@@ -128,6 +141,8 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
         const newPiece: PatternPiece = {
           ...piece,
           id: uid(),
+          // pieza derivada: no hereda el candado de la original (#1145)
+          locked: false,
           name: `${piece.name} Offset`,
           outline: result,
           edges: undefined,
