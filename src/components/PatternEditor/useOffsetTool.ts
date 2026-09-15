@@ -6,6 +6,8 @@ import { showErrorToast } from '../../store/copilotUISlice';
 import type { Point2D, PathCommand, PatternPiece } from '../../types/types';
 import { offsetPieceOutline } from '../../utils/patternOps';
 import { uid } from '../../utils/pathHelpers';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
+import { noPasoNada } from './noPasoNada';
 
 export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
   void zoom2D; void pan2D; // reserved for future distance-from-cursor preview
@@ -13,6 +15,7 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const toolOptions = useSelector((s: RootState) => s.tools.toolOptions);
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
 
   /** Read current tool options */
   const getOptions = useCallback(() => {
@@ -31,11 +34,18 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
     const piece = pieces.find(p => p.id === selectedPieceIds[0]);
     if (!piece) return null;
 
-    const { distance, direction, joinType } = getOptions();
+    const { distance, direction, joinType, replace } = getOptions();
+
+    // Mismo criterio que Extender/Recortar: armar un preview que luego se
+    // rechaza en silencio al pulsar Enter es peor que no mostrarlo. Solo en
+    // modo `replace` — en modo "crear pieza nueva" el preview es honesto,
+    // porque `execute()` sí va a poder hacerlo (#1145).
+    if (replace && piezaBloqueada(piece, layerLocked)) return null;
+
     const effectiveDistance = direction === 'inward' ? -distance : distance;
 
     return offsetPieceOutline(piece, effectiveDistance, joinType);
-  }, [selectedPieceIds, pieces, getOptions]);
+  }, [selectedPieceIds, pieces, getOptions, layerLocked]);
 
   /** Whether the tool can execute (piece selected + valid preview) */
   const canExecute = selectedPieceIds.length === 1 && previewOutline !== null;
@@ -50,6 +60,20 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
     if (!piece) return;
 
     const { distance, direction, joinType, replace } = getOptions();
+
+    // El candado se leía para pintar (el chip, la fila de capas) y no para
+    // escribir: en modo `replace` esto SUSTITUYE el contorno en el sitio, sin
+    // dejar rastro de la geometría que el candado prometía proteger (#1145,
+    // mismo mecanismo que #1136 encontró en Margen).
+    //
+    // Solo `replace`: en modo "crear pieza nueva" la original ni se toca —se
+    // usa de referencia geométrica—, igual que mover ya se permite a
+    // propósito sobre una pieza bloqueada. Bloquearlo también restringiría
+    // algo que el candado nunca prometió proteger.
+    if (replace && piezaBloqueada(piece, layerLocked)) {
+      noPasoNada('desplazar:pieza-bloqueada', { pieceId: piece.id });
+      return;
+    }
 
     const createOffset = (effectiveDistance: number): PathCommand[] | null => {
       return offsetPieceOutline(piece, effectiveDistance, joinType);
@@ -72,6 +96,10 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
           const newPiece: PatternPiece = {
             ...piece,
             id: uid(),
+            // La pieza derivada es geometría nueva: hereda `locked` por el
+            // spread pero no hay ninguna razón de producto para que nazca
+            // atascada como la original (#1145, revisión adversarial).
+            locked: false,
             name: `${piece.name} Offset (out)`,
             outline: outward,
             edges: undefined,
@@ -87,6 +115,8 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
         const newPiece: PatternPiece = {
           ...piece,
           id: uid(),
+          // pieza derivada: no hereda el candado de la original (#1145)
+          locked: false,
           name: `${piece.name} Offset (in)`,
           outline: inward,
           edges: undefined,
@@ -111,6 +141,8 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
         const newPiece: PatternPiece = {
           ...piece,
           id: uid(),
+          // pieza derivada: no hereda el candado de la original (#1145)
+          locked: false,
           name: `${piece.name} Offset`,
           outline: result,
           edges: undefined,
@@ -122,7 +154,7 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
       }
     }
 
-  }, [selectedPieceIds, pieces, getOptions, dispatch]);
+  }, [selectedPieceIds, pieces, getOptions, dispatch, layerLocked]);
 
   const handleMouseDown = useCallback(
     (_e: React.MouseEvent<SVGSVGElement>) => {

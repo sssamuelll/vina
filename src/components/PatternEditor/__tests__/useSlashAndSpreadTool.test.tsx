@@ -1,4 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import React from 'react';
+import { renderHook, cleanup, act } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
 import type { PatternPiece, PathCommand, Point2D } from '../../../types/types';
 import type { OutlineHit } from '../../../utils/geometry/slashAndSpread';
 import {
@@ -7,9 +12,14 @@ import {
   transitionMouseMove,
   transitionMouseUp,
   transitionKeyDown,
+  useSlashAndSpreadTool,
   type SlashAndSpreadState,
   type SlashAndSpreadPhase,
 } from '../useSlashAndSpreadTool';
+import { suscribirNoPasoNada } from '../noPasoNada';
+import editorReducer, { selectPiece } from '../../../store/editorSlice';
+import projectReducer, { addPiece, lockPiece } from '../../../store/projectSlice';
+import toolReducer from '../../../store/toolSlice';
 
 // ─── Test Fixtures ─────────────────────────────────────────────────────────
 
@@ -101,6 +111,7 @@ function makeCtx(overrides: {
   pieces?: PatternPiece[];
   selectedPieceIds?: string[];
   toolOptions?: Record<string, unknown>;
+  layerLocked?: Record<number, boolean>;
 } = {}) {
   return {
     pieces: overrides.pieces ?? [squarePiece],
@@ -108,6 +119,7 @@ function makeCtx(overrides: {
     toolOptions: overrides.toolOptions ?? { mode: 'pivot', gapFill: 'straight' },
     zoom2D: 1,
     pan2D: { x: 0, y: 0 } as Point2D,
+    layerLocked: overrides.layerLocked ?? {},
   };
 }
 
@@ -166,6 +178,52 @@ describe('useSlashAndSpreadTool state machine', () => {
     expect(result.targetPieceId).toBe('piece-1');
     expect(result.startPoint).toBeNull();
     expect(result.phase).toBe('idle');
+  });
+
+  // ── 2b. #1145 (mitad ALTA) — el candado no deja targetear la pieza ──
+  //
+  // Abrir (Corte y apertura) reemplaza el contorno entero con las dos mitades
+  // recompuestas: es la escritura más destructiva de las cuatro. El candado
+  // se leía para pintar y no para escribir (mismo mecanismo que #1136).
+  //
+  // El guardia vive en `idle`, el único punto donde una pieza se vuelve
+  // `targetPieceId`: si no entra ahí, ninguna fase posterior puede escribir.
+
+  it('con el candado de la pieza, el clic no la vuelve objetivo', () => {
+    const ctx = makeCtx({ pieces: [{ ...squarePiece, locked: true }] });
+    const pt = snapPt(50, 0); // sobre el borde de arriba
+    const result = transitionMouseDown(INITIAL_STATE, pt, ctx);
+
+    expect(result.phase).toBe('idle');
+    expect(result.targetPieceId).toBeNull();
+  });
+
+  it('con el candado de la capa, tampoco', () => {
+    const ctx = makeCtx({
+      pieces: [{ ...squarePiece, layer: 3 }],
+      layerLocked: { 3: true },
+    });
+    const pt = snapPt(50, 0);
+    const result = transitionMouseDown(INITIAL_STATE, pt, ctx);
+
+    expect(result.phase).toBe('idle');
+    expect(result.targetPieceId).toBeNull();
+  });
+
+  it('el rechazo se dice, no muere en silencio', () => {
+    const avisos: string[] = [];
+    const cancelar = suscribirNoPasoNada(a => avisos.push(a.razon));
+    const ctx = makeCtx({ pieces: [{ ...squarePiece, locked: true }] });
+    transitionMouseDown(INITIAL_STATE, snapPt(50, 0), ctx);
+    cancelar();
+    expect(avisos).toContain('abrir:pieza-bloqueada');
+  });
+
+  it('CONTROL: sin candado, el mismo clic sí la vuelve objetivo', () => {
+    const ctx = makeCtx();
+    const result = transitionMouseDown(INITIAL_STATE, snapPt(50, 0), ctx);
+    expect(result.targetPieceId).toBe('piece-1');
+    expect(result.phase).toBe('drawingSlash');
   });
 
   // ── 3. drawingSlash → slashComplete (or error) ────────────────────
@@ -525,5 +583,103 @@ describe('useSlashAndSpreadTool state machine', () => {
     const result = transitionMouseUp(state);
 
     expect(result.phase).toBe('awaitingDrag');
+  });
+});
+
+// ─── #1145 — el candado a mitad de gesto, a nivel de HOOK ───────────────────
+//
+// Las pruebas de arriba llaman a `transitionMouseDown`/`transitionKeyDown`
+// directo: prueban la máquina de estados PURA, nunca el envoltorio de React
+// que la conecta al store. El guardián de #1145 vive en la fase `idle` de
+// `transitionMouseDown` — el único punto donde una pieza se vuelve
+// `targetPieceId` — pero `transitionKeyDown` NO recibe `ctx` y no puede
+// mirar el candado. Si la pieza se bloquea DESPUÉS de entrar en el gesto (la
+// fila de Capas y el menú contextual están fuera del lienzo y no resetean
+// este estado), Enter podía escribir igual — y como `updatePiece` sustituye
+// la pieza ENTERA, de paso le borraba el candado (revisión adversarial,
+// hallazgo triangulado por las tres lentes).
+//
+// Solo un test así, que monta el HOOK completo con un store real, puede
+// verlo: los de arriba, con la función pura, no llegan a `applyResult`.
+afterEach(cleanup);
+
+describe('#1145 — el candado a mitad de gesto sobrevive a Enter', () => {
+  function montar(piece: PatternPiece) {
+    const store = configureStore({
+      reducer: { editor: editorReducer, project: projectReducer, tools: toolReducer },
+    });
+    store.dispatch(addPiece(piece));
+    store.dispatch(selectPiece(piece.id));
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <Provider store={store}>{children}</Provider>
+    );
+    const hook = renderHook(() => useSlashAndSpreadTool(1, { x: 0, y: 0 }), { wrapper });
+    return { store, hook };
+  }
+
+  function ev(x: number, y: number) {
+    return {
+      clientX: x, clientY: y,
+      currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
+    } as unknown as React.MouseEvent<SVGSVGElement>;
+  }
+
+  /** Lleva el gesto real hasta `spreadPreview`, con la geometría mockeada de
+   *  arriba (`hit1`/`hit2`/`halfA`/`halfB`/`pointInPolygon`). */
+  function llegarAPreview(hook: ReturnType<typeof montar>['hook']) {
+    act(() => hook.result.current.handleMouseDown(ev(50, 0)));  // idle → drawingSlash
+    act(() => hook.result.current.handleMouseDown(ev(50, 100))); // → slashComplete
+    act(() => hook.result.current.handleMouseDown(ev(75, 50)));  // dentro de halfA → selectingHalf
+    act(() => hook.result.current.handleMouseDown(ev(75, 50)));  // confirma → halfConfirmed
+    act(() => hook.result.current.handleMouseDown(ev(50, 0)));   // cerca de hit1 → awaitingDrag
+    act(() => hook.result.current.handleMouseMove(ev(60, 20)));  // → spreading (calcula preview)
+    act(() => hook.result.current.handleMouseUp());              // → spreadPreview
+    expect(hook.result.current.phase, 'el gesto no llegó a spreadPreview: el caso no se ejerce')
+      .toBe('spreadPreview');
+  }
+
+  it('bloqueada DESPUÉS de armar el gesto, Enter no la reescribe', () => {
+    const { store, hook } = montar({ ...squarePiece, id: 'piece-1' });
+    llegarAPreview(hook);
+    act(() => { store.dispatch(lockPiece('piece-1')); });
+
+    const antes = store.getState().project.pieces[0];
+    act(() => hook.result.current.handleKeyDown(new KeyboardEvent('keydown', { key: 'Enter' })));
+    const despues = store.getState().project.pieces[0];
+
+    expect(despues.updatedAt, 'se aplicó el spread pese al candado').toBe(antes.updatedAt);
+  });
+
+  it('y no le borra el candado de paso', () => {
+    // `updatePiece` sustituye la pieza ENTERA. Si el guardián solo mirara el
+    // `previewPiece` viejo (armado antes de bloquear) en vez de la pieza
+    // FRESCA del store, esto pasaría igual aunque el test de arriba pasara.
+    const { store, hook } = montar({ ...squarePiece, id: 'piece-1' });
+    llegarAPreview(hook);
+    act(() => { store.dispatch(lockPiece('piece-1')); });
+
+    act(() => hook.result.current.handleKeyDown(new KeyboardEvent('keydown', { key: 'Enter' })));
+
+    expect(store.getState().project.pieces[0].locked, 'Enter le quitó el candado a la pieza').toBe(true);
+  });
+
+  it('el rechazo se dice, no muere en silencio', () => {
+    const avisos: string[] = [];
+    const cancelar = suscribirNoPasoNada(a => avisos.push(a.razon));
+    const { store, hook } = montar({ ...squarePiece, id: 'piece-1' });
+    llegarAPreview(hook);
+    act(() => { store.dispatch(lockPiece('piece-1')); });
+    act(() => hook.result.current.handleKeyDown(new KeyboardEvent('keydown', { key: 'Enter' })));
+    cancelar();
+    expect(avisos).toContain('abrir:pieza-bloqueada');
+  });
+
+  it('CONTROL: sin candado, Enter sí aplica el spread', () => {
+    const { store, hook } = montar({ ...squarePiece, id: 'piece-1' });
+    llegarAPreview(hook);
+    const antes = store.getState().project.pieces[0];
+    act(() => hook.result.current.handleKeyDown(new KeyboardEvent('keydown', { key: 'Enter' })));
+    const despues = store.getState().project.pieces[0];
+    expect(despues.updatedAt, 'sin candado, Enter no aplicó nada').not.toBe(antes.updatedAt);
   });
 });

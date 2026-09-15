@@ -8,6 +8,8 @@ import { extendEdge, trimEdgeAtPoint } from '../../utils/patternOps';
 import { flattenPath } from '../../utils/seam/index';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
+import { noPasoNada } from './noPasoNada';
 
 export interface ExtendTrimState {
   /** Currently hovered snap point (endpoint for extend, point-on-edge for trim) */
@@ -31,6 +33,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const toolOptions = useSelector((s: RootState) => s.tools.toolOptions);
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
 
   const [state, setState] = useState<ExtendTrimState>(INITIAL_STATE);
   const stateRef = useRef(state);
@@ -193,6 +196,16 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
       const s = stateRef.current;
       const { mode, distance } = getOptions();
 
+      // El candado ni siquiera arma el gesto (#1145): armarlo y morir en el
+      // segundo clic dejaría un preview que luego se rechaza en silencio, que
+      // es peor que no empezar.
+      if (piezaBloqueada(piece, layerLocked)) {
+        // `modo` en los datos y no en la razón: la herramienta es una sola y
+        // la bitácora no debe leer «extender» cuando María recortaba.
+        noPasoNada('extender:pieza-bloqueada', { pieceId: piece.id, modo: mode });
+        return;
+      }
+
       if (mode === 'extend') {
         if (!s.selectedSnap) {
           // First click: select an endpoint
@@ -260,7 +273,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
         }
       }
     },
-    [selectedPieceIds, pieces, getOptions, toPattern, findNearestEndpoint, findNearestEdgePoint, dispatch, reset],
+    [selectedPieceIds, pieces, getOptions, toPattern, findNearestEndpoint, findNearestEdgePoint, dispatch, reset, layerLocked],
   );
 
   const handleMouseMove = useCallback(
@@ -306,6 +319,15 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
           if (!piece) return;
 
           const { mode, distance } = getOptions();
+
+          // Defensa en profundidad: si la pieza se bloqueó A MITAD del gesto
+          // (el mismo hallazgo que la revisión de #1136 hizo el 09-06 para el
+          // arrastre de margen), Enter es la otra puerta de escritura y tiene
+          // que negarse igual que el clic.
+          if (piezaBloqueada(piece, layerLocked)) {
+            noPasoNada('extender:pieza-bloqueada', { pieceId: piece.id, modo: mode });
+            return;
+          }
           const snap = s.selectedSnap;
 
           try {
@@ -324,7 +346,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
         }
       }
     },
-    [selectedPieceIds, pieces, getOptions, dispatch, reset],
+    [selectedPieceIds, pieces, getOptions, dispatch, reset, layerLocked],
   );
 
   const getCursor = useCallback((): string => {

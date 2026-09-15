@@ -9,6 +9,7 @@ import { hitTestPieceBBox } from '../../utils/geometry/hitTest';
 import { screenToPattern } from '../../utils/geometry';
 import { useGuardedAction } from '../../hooks/useGuardedAction';
 import { noPasoNada } from './noPasoNada';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
 
 export interface MergeState {
   pieceIdA: string | null;
@@ -28,6 +29,8 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const seams = useSelector((s: RootState) => s.project.seams);
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
   const guardAction = useGuardedAction();
 
   const [state, setState] = useState<MergeState>(INITIAL_STATE);
@@ -53,8 +56,19 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
    * impar de valores usaba `0` como `y`, lo que estiraba la caja hasta el origen.
    */
   const hitTestPiece = useCallback(
-    (pt: Point2D): PatternPiece | null => hitTestPieceBBox(pt, pieces),
-    [pieces],
+    (pt: Point2D): PatternPiece | null => {
+      // `hitTestPieceBBox` devuelve la PRIMERA caja del array que contiene el
+      // punto: sin filtrar ocultas ni ordenar, una pieza invisible por capa
+      // que pisa a una visible ganaba el hit-test (revisión adversarial de
+      // #1145). Mismo filtro y orden que ya usa Tijeras — de arriba hacia
+      // abajo, y el candado no filtra aquí a propósito: la pieza bloqueada SÍ
+      // tiene que resolverse, para poder decir por qué se rechaza.
+      const visibles = pieces
+        .filter(p => !hiddenLayerIds.includes(p.layer ?? 1))
+        .sort((a, b) => (b.zOrder ?? 0) - (a.zOrder ?? 0));
+      return hitTestPieceBBox(pt, visibles);
+    },
+    [pieces, hiddenLayerIds],
   );
 
   const reset = useCallback(() => {
@@ -69,6 +83,16 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
 
       if (!clickedPiece) {
         reset();
+        return;
+      }
+
+      // El candado no se lee: ni para armar el primer sujeto, ni para el
+      // segundo, que es el clic que de verdad borra las dos piezas (#1145).
+      // `guardAction` no es una defensa — en modo experto ejecuta sin
+      // preguntar (`useGuardedAction.ts:120-124`) — así que este es el único
+      // filtro real, igual que ya lo es para Tijeras.
+      if (piezaBloqueada(clickedPiece, layerLocked)) {
+        noPasoNada('unir:pieza-bloqueada', { pieceId: clickedPiece.id });
         return;
       }
 
@@ -92,6 +116,17 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
       // Select second piece and try to merge
       const pieceA = pieces.find(p => p.id === s.pieceIdA);
       if (!pieceA) { reset(); return; }
+
+      // A se armó con un clic ANTERIOR: el candado pudo llegar después, desde
+      // la fila de Capas o el menú contextual, que están fuera del lienzo y
+      // no resetean este estado. El guardián de arriba solo pesa la pieza del
+      // clic ACTUAL — sin esto, A bloqueada a mitad de gesto se destruye
+      // igual (#1145, hallazgo de la revisión adversarial).
+      if (piezaBloqueada(pieceA, layerLocked)) {
+        noPasoNada('unir:pieza-bloqueada', { pieceId: pieceA.id });
+        reset();
+        return;
+      }
 
       const shared = findSharedEdge(
         pieceA.outline, pieceA.position,
@@ -144,7 +179,7 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
         }
       });
     },
-    [toPattern, hitTestPiece, pieces, seams, dispatch, reset, guardAction],
+    [toPattern, hitTestPiece, pieces, seams, dispatch, reset, guardAction, layerLocked],
   );
 
   const handleMouseMove = useCallback(

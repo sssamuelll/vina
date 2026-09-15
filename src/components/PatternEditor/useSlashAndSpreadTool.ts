@@ -24,6 +24,7 @@ import {
   type OutlineHit,
 } from '../../utils/geometry/slashAndSpread';
 import { noPasoNada } from './noPasoNada';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -92,6 +93,7 @@ export interface TransitionContext {
   toolOptions: Record<string, unknown>;
   zoom2D: number;
   pan2D: Point2D;
+  layerLocked: Readonly<Record<number, boolean>>;
 }
 
 // ─── Pure helpers ──────────────────────────────────────────────────────────
@@ -179,7 +181,7 @@ export function transitionMouseDown(
   pt: Point2D,
   ctx: TransitionContext,
 ): TransitionResult {
-  const { pieces, selectedPieceIds, zoom2D } = ctx;
+  const { pieces, selectedPieceIds, zoom2D, layerLocked } = ctx;
 
   // ── idle: target a piece and snap to outline ───────────────────────
   if (state.phase === 'idle') {
@@ -188,6 +190,16 @@ export function transitionMouseDown(
 
     const piece = pieces.find(p => p.id === targetId);
     if (!piece) return { ...state };
+
+    // El candado ni siquiera la vuelve objetivo (#1145): esta es la
+    // herramienta más destructiva de las cuatro — reemplaza el contorno
+    // entero con las dos mitades recompuestas. Bloquear aquí, el único punto
+    // donde una pieza se vuelve `targetPieceId`, cierra TODAS las fases
+    // posteriores de una vez.
+    if (piezaBloqueada(piece, layerLocked)) {
+      noPasoNada('abrir:pieza-bloqueada', { pieceId: piece.id });
+      return { ...state };
+    }
 
     const snap = snapToOutline(pt, piece, zoom2D);
     if (snap) {
@@ -459,6 +471,7 @@ export function useSlashAndSpreadTool(
   const toolOptions = useSelector(
     (s: RootState) => (s.tools.toolOptions?.slashAndSpread ?? { mode: 'pivot', gapFill: 'straight' }) as Record<string, unknown>,
   );
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
 
   const [state, setState] = useState<SlashAndSpreadState>(INITIAL_STATE);
   const stateRef = useRef(state);
@@ -478,12 +491,27 @@ export function useSlashAndSpreadTool(
     toolOptions,
     zoom2D,
     pan2D,
-  }), [pieces, selectedPieceIds, toolOptions, zoom2D, pan2D]);
+    layerLocked,
+  }), [pieces, selectedPieceIds, toolOptions, zoom2D, pan2D, layerLocked]);
 
   const applyResult = useCallback((result: TransitionResult) => {
     // Handle side effects
     if (result._applyPiece) {
-      dispatch(updatePiece(result._applyPiece));
+      // El guardián de `transitionMouseDown` solo cierra la puerta de ENTRAR
+      // al gesto. `transitionKeyDown` es pura y no recibe `ctx`, así que no
+      // puede volver a mirar el candado — y si la pieza se bloqueó DESPUÉS
+      // (la fila de Capas y el menú contextual están fuera del lienzo y no
+      // resetean este estado), Enter escribía igual. Se mira aquí, con la
+      // pieza FRESCA del store —no con `result._applyPiece`, que es un
+      // retrato tomado antes de bloquear— porque `updatePiece` sustituye el
+      // objeto ENTERO: aplicar el retrato viejo también le habría borrado el
+      // candado de paso (#1145, revisión adversarial).
+      const piezaActual = pieces.find(p => p.id === result._applyPiece!.id);
+      if (piezaActual && piezaBloqueada(piezaActual, layerLocked)) {
+        noPasoNada('abrir:pieza-bloqueada', { pieceId: piezaActual.id });
+      } else {
+        dispatch(updatePiece(result._applyPiece));
+      }
     }
     if (result._toggleMode) {
       const currentMode = (toolOptions.mode as string) ?? 'pivot';
@@ -494,7 +522,7 @@ export function useSlashAndSpreadTool(
     // Strip signals before storing state
     const { _applyPiece, _toggleMode, ...cleanState } = result;
     setState(cleanState);
-  }, [dispatch, toolOptions.mode]);
+  }, [dispatch, toolOptions.mode, pieces, layerLocked]);
 
   const reset = useCallback(() => {
     setState(INITIAL_STATE);
