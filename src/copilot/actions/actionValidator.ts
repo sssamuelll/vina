@@ -21,6 +21,7 @@ import type {
   ProjectAction,
 } from './actionTypes';
 import { validateName } from '../../utils/sanitizeName';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
 
 // ============================================================================
 // Validation Result
@@ -60,6 +61,27 @@ function seamExists(state: RootState, seamId: string): boolean {
 
 function getPiece(state: RootState, pieceId: string) {
   return state.project.pieces.find(p => p.id === pieceId);
+}
+
+/**
+ * El candado se leía para pintar (el chip, la fila de capas) y nunca para el
+ * copiloto (#1176, mismo mecanismo que #1136/#1145 encontraron en la UI).
+ *
+ * Vive junto a `pieceExists`, en el mismo sitio central que ya protege a las
+ * diez acciones geométricas de un `pieceId` inexistente — un llamador por
+ * `case`, no siete guardianes repartidos: eso es lo que #1176 señaló como el
+ * límite de "un gancho por llamador" al llegar a un despachador con más de
+ * una función registrada.
+ *
+ * Asume que `pieceExists` ya se comprobó antes (todos los llamadores lo
+ * hacen): una pieza inexistente no está "bloqueada", simplemente no está.
+ */
+function pieceNotLocked(state: RootState, pieceId: string): ValidationResult {
+  const piece = getPiece(state, pieceId);
+  if (piece && piezaBloqueada(piece, state.project.layerLocked)) {
+    return fail(`Piece "${pieceId}" is locked (directly or via its layer); ask the user to unlock it first`);
+  }
+  return ok();
 }
 
 function validateEdgeIndex(state: RootState, pieceId: string, edgeIndex: number): ValidationResult {
@@ -166,6 +188,8 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
+      const lockResult = pieceNotLocked(state, action.pieceId);
+      if (!lockResult.valid) return lockResult;
       // Warn about connected seams
       const connectedSeams = state.project.seams.filter(
         s => s.pieceA.pieceId === action.pieceId || s.pieceB.pieceId === action.pieceId
@@ -180,6 +204,8 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
+      const lockResult = pieceNotLocked(state, action.pieceId);
+      if (!lockResult.valid) return lockResult;
       if (!action.name) {
         return fail('Name cannot be empty');
       }
@@ -195,19 +221,22 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       if (action.axis !== 'x' && action.axis !== 'y') {
         return fail('Axis must be "x" or "y"');
       }
-      return ok();
+      // `createCopy` no lo lee el executor (mirror_piece siempre voltea
+      // in-place vía flipPieceH/flipPieceV) — el candado aplica siempre,
+      // no solo cuando createCopy es false.
+      return pieceNotLocked(state, action.pieceId);
 
     case 'move_piece':
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
-      return ok();
+      return pieceNotLocked(state, action.pieceId);
 
     case 'rotate_piece':
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
-      return ok();
+      return pieceNotLocked(state, action.pieceId);
 
     case 'scale_piece':
       if (!pieceExists(state, action.pieceId)) {
@@ -216,7 +245,7 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       if (action.factor <= 0) {
         return fail('Scale factor must be positive');
       }
-      return ok();
+      return pieceNotLocked(state, action.pieceId);
 
     case 'link_pieces': {
       const la = action as unknown as { pieceIdA?: string; pieceIdB?: string; mode?: string };
@@ -224,12 +253,16 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       if (!la.pieceIdB || !pieceExists(state, la.pieceIdB)) return fail(`Piece "${la.pieceIdB}" not found`);
       if (la.pieceIdA === la.pieceIdB) return fail('Cannot link a piece to itself');
       if (la.mode !== 'symmetry' && la.mode !== 'instance') return fail('Mode must be "symmetry" or "instance"');
+      const lockA = pieceNotLocked(state, la.pieceIdA);
+      if (!lockA.valid) return lockA;
+      const lockB = pieceNotLocked(state, la.pieceIdB);
+      if (!lockB.valid) return lockB;
       return ok();
     }
     case 'unlink_pieces': {
       const ua = action as unknown as { pieceId?: string };
       if (!ua.pieceId || !pieceExists(state, ua.pieceId)) return fail(`Piece "${ua.pieceId}" not found`);
-      return ok();
+      return pieceNotLocked(state, ua.pieceId);
     }
 
     default:
@@ -243,8 +276,11 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
 
 function validateGeometryAction(action: GeometryAction, state: RootState): ValidationResult {
   switch (action.action) {
-    case 'move_point':
-      return validatePointIndex(state, action.pieceId, action.pointIndex);
+    case 'move_point': {
+      const pointResult = validatePointIndex(state, action.pieceId, action.pointIndex);
+      if (!pointResult.valid) return pointResult;
+      return pieceNotLocked(state, action.pieceId);
+    }
 
     case 'add_point': {
       const edgeResult = validateEdgeIndex(state, action.pieceId, action.edgeIndex);
@@ -252,12 +288,14 @@ function validateGeometryAction(action: GeometryAction, state: RootState): Valid
       if (action.position < 0 || action.position > 1) {
         return fail('Position must be between 0 and 1');
       }
-      return ok();
+      return pieceNotLocked(state, action.pieceId);
     }
 
     case 'delete_point': {
       const pointResult = validatePointIndex(state, action.pieceId, action.pointIndex);
       if (!pointResult.valid) return pointResult;
+      const lockResult = pieceNotLocked(state, action.pieceId);
+      if (!lockResult.valid) return lockResult;
       // Warn if piece would have too few points
       const piece = getPiece(state, action.pieceId);
       const pointCount = piece?.outline.filter(c => c.type !== 'Z').length || 0;
@@ -267,10 +305,12 @@ function validateGeometryAction(action: GeometryAction, state: RootState): Valid
       return ok();
     }
 
-    case 'add_ease':
+    case 'add_ease': {
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
+      const lockResult = pieceNotLocked(state, action.pieceId);
+      if (!lockResult.valid) return lockResult;
       if (action.edge !== 'all' && typeof action.edge === 'number') {
         return validateEdgeIndex(state, action.pieceId, action.edge);
       }
@@ -278,15 +318,19 @@ function validateGeometryAction(action: GeometryAction, state: RootState): Valid
         return warn(['Ease amount is 0, no change will occur']);
       }
       return ok();
+    }
 
-    case 'add_dart':
+    case 'add_dart': {
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
+      const lockResult = pieceNotLocked(state, action.pieceId);
+      if (!lockResult.valid) return lockResult;
       if (action.depth <= 0) {
         return fail('Dart depth must be positive');
       }
       return ok();
+    }
 
     case 'curve_edge': {
       const curveResult = validateEdgeIndex(state, action.pieceId, action.edgeIndex);
@@ -294,13 +338,13 @@ function validateGeometryAction(action: GeometryAction, state: RootState): Valid
       if (action.curvature < -1 || action.curvature > 1) {
         return fail('Curvature must be between -1 and 1');
       }
-      return ok();
+      return pieceNotLocked(state, action.pieceId);
     }
 
     case 'straighten_edge': {
       const straightenResult = validateEdgeIndex(state, action.pieceId, action.edgeIndex);
       if (!straightenResult.valid) return straightenResult;
-      return ok();
+      return pieceNotLocked(state, action.pieceId);
     }
 
     case 'split_edge': {
@@ -309,13 +353,15 @@ function validateGeometryAction(action: GeometryAction, state: RootState): Valid
       if (action.at <= 0 || action.at >= 1) {
         return fail('Split position must be between 0 and 1 (exclusive)');
       }
-      return ok();
+      return pieceNotLocked(state, action.pieceId);
     }
 
     case 'split_piece': {
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
+      const lockResult = pieceNotLocked(state, action.pieceId);
+      if (!lockResult.valid) return lockResult;
       if (!Array.isArray(action.startPoint) || action.startPoint.length !== 2) {
         return fail('startPoint must be [x, y]');
       }
@@ -332,6 +378,13 @@ function validateGeometryAction(action: GeometryAction, state: RootState): Valid
       if (!pieceExists(state, action.pieceIdB)) {
         return fail(`Piece "${action.pieceIdB}" not found`);
       }
+      // Cualquiera de las dos basta: unir borra las DOS, así que ambas son
+      // sujeto de escritura (#1176 — mismo hallazgo que la revisión de #1145
+      // hizo en `useMergeTool`, donde la pieza A tampoco se revisaba).
+      const lockA = pieceNotLocked(state, action.pieceIdA);
+      if (!lockA.valid) return lockA;
+      const lockB = pieceNotLocked(state, action.pieceIdB);
+      if (!lockB.valid) return lockB;
       if (action.pieceIdA === action.pieceIdB) {
         return fail('Cannot merge a piece with itself');
       }

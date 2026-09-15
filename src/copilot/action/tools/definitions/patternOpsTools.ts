@@ -7,10 +7,24 @@ import { pieceLocalToPattern } from '../../../../utils/geometry/pieceSpace';
 import type { AppDispatch, RootState } from '../../../../store';
 import type { PatternPiece, InternalLineType, PathCommand, SemanticEdge, Point2D } from '../../../../types/types';
 import { newId } from '../../../../utils/ids';
+import { piezaBloqueada } from '../../../../utils/piezaBloqueada';
 
 function requireFiniteNumber(value: unknown, name: string): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return `${name} must be a valid number`;
   return null;
+}
+
+/**
+ * El candado se leía para pintar (el chip, la fila de capas) y nunca para el
+ * copiloto (#1176, mismo mecanismo que #1136/#1145 encontraron en la UI).
+ *
+ * Cada `execute` la llama justo después de resolver la pieza, antes de
+ * cualquier otra validación — igual que `requireFiniteNumber` unas líneas
+ * arriba, mismo estilo de guardia corta del archivo.
+ */
+export function lockedPieceError(piece: Pick<PatternPiece, 'locked' | 'layer'>, state: RootState): ToolResult | null {
+  if (!piezaBloqueada(piece, state.project.layerLocked)) return null;
+  return { success: false, error: 'Piece is locked (directly or via its layer); ask the user to unlock it first' };
 }
 
 // B11-state: thin wrapper. Prefix ignored.
@@ -118,6 +132,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
 
       const posErr = requireFiniteNumber(params.position, 'position');
       if (posErr) return { success: false, error: posErr };
@@ -193,6 +208,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
       const method = (params.method as string) || 'gather';
       const result = addFullness(piece, params.edge as string, params.amount as number, method as 'gather' | 'pleat' | 'flare');
       dispatch(updatePiece(result));
@@ -246,6 +262,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: 'Piece not found' };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
 
       // 2. Resolve edge names to SemanticEdge objects
       const edges = piece.edges ?? [];
@@ -318,6 +335,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
 
       // `piece.darts` es cache de dominio: en una pieza dibujada o importada
       // viene undefined y la op pura no encontraría nada que mover. Derivar
@@ -395,6 +413,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
 
       for (const [name, val] of [['startX', params.startX], ['startY', params.startY], ['endX', params.endX], ['endY', params.endY]] as const) {
         const err = requireFiniteNumber(val, name);
@@ -484,6 +503,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
       const distErr = requireFiniteNumber(params.distance, 'distance');
       if (distErr) return { success: false, error: distErr };
       const joinType = (params.joinType as string) || 'miter';
@@ -541,6 +561,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
       if (!piece.edges) return { success: false, error: `Piece has no semantic edges` };
       const edge = findEdgeByName(piece.edges, params.edgeName as string);
       if (!edge) return { success: false, error: `Edge "${params.edgeName}" not found` };
@@ -580,6 +601,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
       if (!piece.edges) return { success: false, error: `Piece has no semantic edges` };
       const edge = findEdgeByName(piece.edges, params.edgeName as string);
       if (!edge) return { success: false, error: `Edge "${params.edgeName}" not found` };
@@ -640,6 +662,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: 'Piece not found' };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
       const snapshot: PatternPiece = JSON.parse(JSON.stringify(piece));
       try {
         const result = unfoldPiece(piece, params.foldLineId as string, { outlineOnly: params.outlineOnly as boolean | undefined });
@@ -668,6 +691,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: 'Piece not found' };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
       const ratioErr = params.ratio !== undefined ? requireFiniteNumber(params.ratio, 'ratio') : null;
       if (ratioErr) return { success: false, error: ratioErr };
       const snapshot: PatternPiece = JSON.parse(JSON.stringify(piece));
@@ -704,6 +728,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: 'Piece not found' };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
       const distErr = requireFiniteNumber(params.distance, 'distance');
       if (distErr) return { success: false, error: distErr };
       const rawCount = (params.count as number) ?? 1;
@@ -774,6 +799,7 @@ export const tools: ToolDefinition[] = [
         if (!targetId) return { success: false, error: 'targetPieceId required for internalLine mode' };
         const piece = state.project.pieces.find(p => p.id === targetId);
         if (!piece) return { success: false, error: 'Target piece not found' };
+        const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
         const snapshot: PatternPiece = JSON.parse(JSON.stringify(piece));
         const lt = (params.lineType as string) || 'fold';
         const lineId = uid('line');
@@ -802,6 +828,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: 'Piece not found' };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
       const snapshot: PatternPiece = JSON.parse(JSON.stringify(piece));
 
       let range = params.outlineSegmentRange as [number, number] | undefined;
@@ -853,6 +880,7 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: 'Piece not found' };
+      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
 
       const posErr = requireFiniteNumber(params.position, 'position');
       if (posErr) return { success: false, error: posErr };

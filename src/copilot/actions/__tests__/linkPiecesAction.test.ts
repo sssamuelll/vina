@@ -10,7 +10,11 @@ const mockPiece = (id: string) => ({
 });
 
 const mockState = {
-  project: { pieces: [mockPiece('a'), mockPiece('b')], seams: [], fabrics: [], avatar: { measurements: {} }, name: '', id: '' },
+  // El RootState real siempre trae `layerLocked` (`projectSlice.ts`, default
+  // `{}`); este mock se había quedado atrás y `pieceNotLocked` (#1176
+  // seguimiento, guardia nueva en link_pieces/unlink_pieces) lo lee
+  // incondicionalmente, como hace el resto del store.
+  project: { pieces: [mockPiece('a'), mockPiece('b')], seams: [], fabrics: [], avatar: { measurements: {} }, name: '', id: '', layerLocked: {} },
   editor: { selectedPieceIds: [] },
   simulation: { simulationState: 'idle' },
 } as unknown as RootState;

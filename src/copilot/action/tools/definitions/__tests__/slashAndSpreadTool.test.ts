@@ -52,7 +52,10 @@ function makePiece(id = 'piece-1'): PatternPiece {
 
 function mockState(pieces: PatternPiece[]): () => RootState {
   return () => ({
-    project: { pieces },
+    // El RootState real siempre trae `layerLocked` (`projectSlice.ts`,
+    // default `{}`); el mock se había quedado atrás y `lockedPieceError`
+    // (#1176) lo lee incondicionalmente, como hace el resto del store.
+    project: { pieces, layerLocked: {} },
   }) as unknown as RootState;
 }
 

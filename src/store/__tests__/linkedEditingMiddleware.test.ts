@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
-import projectReducer, { addPiece, linkPieces, updatePiece, movePiece, loadProject, addInternalLine } from '../projectSlice';
+import projectReducer, { addPiece, linkPieces, updatePiece, movePiece, loadProject, addInternalLine, setLayerLocked } from '../projectSlice';
 import { linkedEditingMiddleware } from '../linkedEditingMiddleware';
 import { undoMiddleware, getUndoLength } from '../undoMiddleware';
 import type { PatternPiece, InternalLine } from '../../types/types';
@@ -109,6 +109,62 @@ describe('linkedEditingMiddleware', () => {
 
     const pieces = store.getState().project.pieces;
     expect(pieces.find(p => p.id === 'a')!.name).toBe('Edited');
+  });
+
+  // #1176 (H1) — editar la pieza SIN candado, cuando su pareja vinculada SÍ
+  // lo tiene, cascadeaba la escritura a la pareja bloqueada sin mirarlo. La
+  // pieza editada directamente es legítima (no está bloqueada); lo que debe
+  // omitirse es solo la cascada hacia la pareja.
+  it('omite la cascada si la pareja vinculada tiene el candado de PIEZA puesto — la fuente sí se actualiza', () => {
+    const store = createStore();
+    store.dispatch(addPiece(makePiece('a', 'Left')));
+    store.dispatch(addPiece({ ...makePiece('b', 'Right'), locked: true }));
+    store.dispatch(linkPieces({ pieceIdA: 'a', pieceIdB: 'b', mode: 'symmetry' }));
+
+    const a = store.getState().project.pieces.find(p => p.id === 'a')!;
+    const bAntes = store.getState().project.pieces.find(p => p.id === 'b')!;
+    const edited = {
+      ...a,
+      outline: [
+        { type: 'M' as const, values: [10, 0] },
+        { type: 'L' as const, values: [100, 0] },
+        { type: 'L' as const, values: [100, 200] },
+        { type: 'L' as const, values: [10, 200] },
+        { type: 'Z' as const, values: [] },
+      ],
+      updatedAt: Date.now(),
+    };
+    store.dispatch(updatePiece(edited));
+
+    const aDespues = store.getState().project.pieces.find(p => p.id === 'a')!;
+    const bDespues = store.getState().project.pieces.find(p => p.id === 'b')!;
+    expect(aDespues.outline[0].values[0], 'la pieza editada directamente (sin candado) sí debe cambiar').toBe(10);
+    expect(bDespues.outline, 'la pareja BLOQUEADA no debe tocarse').toEqual(bAntes.outline);
+  });
+
+  it('omite la cascada si la pareja vinculada tiene el candado de CAPA puesto', () => {
+    const store = createStore();
+    store.dispatch(addPiece(makePiece('a', 'Left')));
+    store.dispatch(addPiece({ ...makePiece('b', 'Right'), layer: 3 }));
+    store.dispatch(setLayerLocked({ layer: 3, locked: true }));
+    store.dispatch(linkPieces({ pieceIdA: 'a', pieceIdB: 'b', mode: 'symmetry' }));
+
+    const a = store.getState().project.pieces.find(p => p.id === 'a')!;
+    const bAntes = store.getState().project.pieces.find(p => p.id === 'b')!;
+    store.dispatch(updatePiece({
+      ...a,
+      outline: [
+        { type: 'M' as const, values: [10, 0] },
+        { type: 'L' as const, values: [100, 0] },
+        { type: 'L' as const, values: [100, 200] },
+        { type: 'L' as const, values: [10, 200] },
+        { type: 'Z' as const, values: [] },
+      ],
+      updatedAt: Date.now(),
+    }));
+
+    const bDespues = store.getState().project.pieces.find(p => p.id === 'b')!;
+    expect(bDespues.outline, 'la pareja con la CAPA bloqueada no debe tocarse').toEqual(bAntes.outline);
   });
 });
 
