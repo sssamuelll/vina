@@ -11,6 +11,7 @@ import { addPiece, updatePiece, removePiece, movePiece, rotatePiece } from '../.
 import { selectPiece } from '../../../../store/editorSlice';
 import type { PatternPiece, PathCommand } from '../../../../types/types';
 import { uid } from '../../../../utils/pathHelpers';
+import { lockedPieceError } from './patternOpsTools';
 
 /** Compute bounding box from outline */
 function computeBounds(outline: PathCommand[]): { width: number; height: number } {
@@ -133,6 +134,8 @@ const modifyOutlineTool: ToolDefinition = {
     const state = getState();
     const piece = state.project.pieces.find(p => p.id === params.pieceId);
     if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+    const lockErr = lockedPieceError(piece, state);
+    if (lockErr) return lockErr;
 
     const newOutline = params.outline as PathCommand[];
     dispatch(updatePiece({ ...piece, outline: newOutline, updatedAt: Date.now() }));
@@ -165,6 +168,8 @@ const modifyPointTool: ToolDefinition = {
     const state = getState();
     const piece = state.project.pieces.find(p => p.id === params.pieceId);
     if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+    const lockErr = lockedPieceError(piece, state);
+    if (lockErr) return lockErr;
 
     const pointIndex = params.pointIndex as number;
     if (pointIndex < 0 || pointIndex >= piece.outline.length) {
@@ -208,6 +213,8 @@ const deletePieceTool: ToolDefinition = {
     const state = getState();
     const piece = state.project.pieces.find(p => p.id === params.pieceId);
     if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+    const lockErr = lockedPieceError(piece, state);
+    if (lockErr) return lockErr;
 
     dispatch(removePiece(params.pieceId as string));
     return { success: true };
@@ -232,6 +239,8 @@ const renamePieceTool: ToolDefinition = {
     const state = getState();
     const piece = state.project.pieces.find(p => p.id === params.pieceId);
     if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+    const lockErr = lockedPieceError(piece, state);
+    if (lockErr) return lockErr;
 
     dispatch(updatePiece({ ...piece, name: params.name as string, updatedAt: Date.now() }));
     return { success: true };
@@ -256,6 +265,8 @@ const scalePieceTool: ToolDefinition = {
     const state = getState();
     const piece = state.project.pieces.find(p => p.id === params.pieceId);
     if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+    const lockErr = lockedPieceError(piece, state);
+    if (lockErr) return lockErr;
 
     const factor = params.factor as number;
     const scaled: PathCommand[] = piece.outline.map(c => ({
@@ -290,6 +301,8 @@ const movePieceTool: ToolDefinition = {
     const state = getState();
     const piece = state.project.pieces.find(p => p.id === params.pieceId);
     if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+    const lockErr = lockedPieceError(piece, state);
+    if (lockErr) return lockErr;
 
     dispatch(movePiece({ id: params.pieceId as string, x: params.x as number, y: params.y as number }));
     return { success: true };
@@ -314,6 +327,8 @@ const rotatePieceTool: ToolDefinition = {
     const state = getState();
     const piece = state.project.pieces.find(p => p.id === params.pieceId);
     if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+    const lockErr = lockedPieceError(piece, state);
+    if (lockErr) return lockErr;
 
     dispatch(rotatePiece({ id: params.pieceId as string, rotation: params.degrees as number }));
     return { success: true };
@@ -338,6 +353,8 @@ const mirrorPieceTool: ToolDefinition = {
     const state = getState();
     const piece = state.project.pieces.find(p => p.id === params.pieceId);
     if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+    const lockErr = lockedPieceError(piece, state);
+    if (lockErr) return lockErr;
 
     dispatch(updatePiece({ ...piece, mirrored: params.mirrored as boolean, updatedAt: Date.now() }));
     return { success: true };

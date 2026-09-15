@@ -22,7 +22,7 @@ function requireFiniteNumber(value: unknown, name: string): string | null {
  * cualquier otra validación — igual que `requireFiniteNumber` unas líneas
  * arriba, mismo estilo de guardia corta del archivo.
  */
-function lockedPieceError(piece: Pick<PatternPiece, 'locked' | 'layer'>, state: RootState): ToolResult | null {
+export function lockedPieceError(piece: Pick<PatternPiece, 'locked' | 'layer'>, state: RootState): ToolResult | null {
   if (!piezaBloqueada(piece, state.project.layerLocked)) return null;
   return { success: false, error: 'Piece is locked (directly or via its layer); ask the user to unlock it first' };
 }
