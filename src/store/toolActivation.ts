@@ -13,6 +13,16 @@ import { getInternalLineEndpoints } from '../components/PatternEditor/internalSh
  *  #1094) — dos listas se desincronizan, como pasó con walkSeam. */
 export const SEWING_TOOL_IDS = new Set(['seam', 'seamEdit', 'walkSeam']);
 
+/** Las herramientas que solo MIRAN el patron. Entre las tres no hay un solo
+ *  dispatch al store: no crean, no mueven y no borran nada. Vive aqui y no en
+ *  el editor por la misma razon que el conjunto de arriba --lo leen el router
+ *  de teclas del lienzo y la regla de Supr (`borradoDeSeleccion`, #1172), y
+ *  dos listas se desincronizan.
+ *
+ *  `pomMeasure` NO entra: una medida POM si es un objeto del store, con su
+ *  propia seleccion (`selectedPOMId`), y por eso tiene sujeto propio. */
+export const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
+
 /** La puerta necesita una pieza visible con geometría donde iniciar el trazo;
  *  una capa oculta no recibe clics en PatternEditor. El contorno y las internas
  *  sirven porque el primer punto también puede enganchar sus nodos o extremos.

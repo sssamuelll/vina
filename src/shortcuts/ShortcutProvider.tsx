@@ -51,16 +51,34 @@ export function ShortcutProvider({ children }: ShortcutProviderProps) {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't intercept when typing in form controls (unless Escape).
-      // Selects included: letters typed while a dropdown has focus are
-      // option-search keystrokes, not tool shortcuts.
-      if (
-        (e.target instanceof HTMLInputElement ||
+      // Escape es la excepcion de todo lo de abajo: sin el, una superficie
+      // que se queda las teclas encierra a la usuaria dentro de ella.
+      if (e.key !== 'Escape') {
+        // Las teclas nacidas en un campo son del campo. Los desplegables
+        // incluidos: una letra con el foco dentro busca opcion, no
+        // herramienta.
+        if (
+          e.target instanceof HTMLInputElement ||
           e.target instanceof HTMLTextAreaElement ||
-          e.target instanceof HTMLSelectElement) &&
-        e.key !== 'Escape'
-      ) {
-        return;
+          e.target instanceof HTMLSelectElement
+        ) {
+          return;
+        }
+
+        // Y un modal tapa MAS que un campo, no menos (#1173). `edit.delete`
+        // es de contexto `global`, asi que sin esto Supr se llevaba la pieza
+        // de detras mientras Maria leia la pregunta --y el dialogo se quedaba
+        // abierto preguntando por algo que ya no existia.
+        //
+        // El detector es el del estandar y no una marca nuestra: `aria-modal`
+        // dice exactamente «esto bloquea lo de atras». Y deja fuera, a
+        // proposito, a los dialogos NO modales, que es justo lo que hay que
+        // dejar fuera: `NotchPrecisionModal` es `role="dialog"` SIN velo, se
+        // abre junto a la pieza y el lienzo sigue vivo detras. Un detector
+        // por `role` lo habria apagado con los demas.
+        if (document.querySelector('[aria-modal="true"]')) {
+          return;
+        }
       }
 
       const activeContexts = getActiveContext();

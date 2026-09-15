@@ -39,10 +39,26 @@ const DESPACHADOR = readFileSync(
 );
 
 /**
+ * Un conjunto puede declararse FUERA del despachador y entrar por import: el
+ * #1172 mudó `MEASURE_TOOL_IDS` a `store/toolActivation.ts` para que la regla
+ * de Supr y el router de teclas leyeran la misma lista en vez de dos. El censo
+ * lo sigue hasta allá, porque si no se queda ciego justo donde la mudanza lo
+ * dejó — y este detector ya tiene antecedentes de quedarse ciego así.
+ *
+ * Lo que NO se afloja: la declaración cuenta solo si el DESPACHADOR la
+ * consulta con el id activo. Una lista suelta en el store sigue sin valer.
+ */
+const DECLARAN_CONJUNTOS = [
+  DESPACHADOR,
+  readFileSync(join(process.cwd(), 'src/store/toolActivation.ts'), 'utf8'),
+];
+
+/**
  * Los ids que el despachador conduce de verdad. Dos formas conviven en el
  * archivo y las dos cuentan:
  *   1. `activeTool === 'x'` — la mayoría.
  *   2. `X_TOOL_IDS = new Set([...])` + `.has(activeTool)` — medir y compañía.
+ *      El conjunto puede vivir aquí o en `store/toolActivation.ts`.
  *
  * NO cuenta el `switch` de cursor (`case 'x': return 'default'`): pintar un
  * cursor no es conducir un gesto. Ese fue justamente el ciego que dejó pasar a
@@ -51,10 +67,12 @@ const DESPACHADOR = readFileSync(
 function idsQueElDespachadorConduce(): Set<string> {
   const ids = new Set<string>();
   for (const m of DESPACHADOR.matchAll(/activeTool\s*===\s*'([A-Za-z0-9]+)'/g)) ids.add(m[1]);
-  for (const decl of DESPACHADOR.matchAll(/const\s+([A-Z0-9_]*TOOL_IDS)\s*=\s*new Set\(\[([^\]]*)\]/g)) {
-    // Solo si ese Set se consulta con el id activo; si no, es una lista muerta.
-    if (!new RegExp(`${decl[1]}\\.has\\(activeTool`).test(DESPACHADOR)) continue;
-    for (const lit of decl[2].matchAll(/'([A-Za-z0-9]+)'/g)) ids.add(lit[1]);
+  for (const fuente of DECLARAN_CONJUNTOS) {
+    for (const decl of fuente.matchAll(/const\s+([A-Z0-9_]*TOOL_IDS)\s*=\s*new Set\(\[([^\]]*)\]/g)) {
+      // Solo si ese Set se consulta con el id activo; si no, es lista muerta.
+      if (!new RegExp(`${decl[1]}\\.has\\(activeTool`).test(DESPACHADOR)) continue;
+      for (const lit of decl[2].matchAll(/'([A-Za-z0-9]+)'/g)) ids.add(lit[1]);
+    }
   }
   return ids;
 }

@@ -42,8 +42,8 @@ import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { patternToPieceLocal } from './pieceTransform';
 import { DRAG_THRESHOLD_PX, isDrag } from './gestureConstants';
 import { pushJournal } from '../../utils/telemetry/journal';
+import { MEASURE_TOOL_IDS } from '../../store/toolActivation';
 
-const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
 /** Los tres modos de Pespunte que DIBUJAN. `topstitchEdit` queda fuera a
  *  propósito: no tiene gesto a medias que cancelar, así que sus teclas no son
  *  suyas y deben seguir su camino al atajo global (#1115). */

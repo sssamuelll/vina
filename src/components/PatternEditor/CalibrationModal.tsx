@@ -28,7 +28,13 @@ export default function CalibrationModal({
 
   return (
     <div className="calibration-overlay" onClick={onCancel}>
-      <div className="calibration-modal" onClick={e => e.stopPropagation()}>
+      <div
+        className="calibration-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Calibración de escala"
+        onClick={e => e.stopPropagation()}
+      >
         <h3>Calibración de escala</h3>
         <p>Distancia medida: {pixelDistance.toFixed(1)} píxeles</p>
         <div className="calibration-input-row">

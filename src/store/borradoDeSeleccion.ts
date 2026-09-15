@@ -22,7 +22,7 @@
  * Ver docs/reports/2026-09-04-revision-adversarial-ui.md § 4.
  */
 
-import { SEWING_TOOL_IDS } from './toolActivation';
+import { SEWING_TOOL_IDS, MEASURE_TOOL_IDS } from './toolActivation';
 import type { TrazoSelection } from '../types/types';
 
 export interface EstadoParaBorrado {
@@ -49,6 +49,23 @@ export function resolverBorrado(e: EstadoParaBorrado): SujetoBorrable {
   // Menú de costuras: el sujeto es la costura o no hay sujeto (#1094).
   if (SEWING_TOOL_IDS.has(e.activeTool)) {
     return e.selectedSeamId ? { kind: 'seam', id: e.selectedSeamId } : { kind: 'nada' };
+  }
+
+  // Medir y comparar no escriben sobre el patron (#1172). Estando dentro,
+  // Supr no tiene sujeto: no hay nada seleccionable que sea suyo, y la pieza
+  // no puede serlo porque la herramienta ni la toca. Recorrer costura ya se
+  // comportaba asi desde que entro en SEWING_TOOL_IDS; esto solo iguala a sus
+  // hermanas, que se quedaron fuera por venir de otra familia.
+  //
+  // Lo que se ve en pantalla --las mediciones-- tiene su propia puerta
+  // visible, el boton «Borrar mediciones» de la tira. Eso lo decidio la v1 por
+  // escrito (`useMeasureTool.ts`, junto a su `handleKeyDown`) y ahi nombra a
+  // Supr: lo que no previo es que al soltar la tecla se la queda el atajo
+  // global y se lleva la PIEZA. Esto completa esa decision, no la cambia --y
+  // por eso tampoco borra las mediciones, que ademas viven en estado local y
+  // no tienen deshacer.
+  if (MEASURE_TOOL_IDS.has(e.activeTool)) {
+    return { kind: 'nada' };
   }
 
   // El trazo es papel suelto: un tramo elegido es lo más fino que hay en el
