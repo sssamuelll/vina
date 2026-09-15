@@ -188,7 +188,7 @@ interface ToolHooks {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseUp: () => void;
-    handleKeyDown: (e: KeyboardEvent) => void;
+    handleKeyDown: (e: KeyboardEvent) => boolean;
     limpiarHover: () => void;
     getCursor: () => string;
   };
@@ -470,21 +470,30 @@ export function useEditorInteractions(
   // global — un solo dueño, sin doble despacho. Un manejador local aquí solo
   // volvería a borrar lo mismo un tick después.
 
-  // Keyboard events (burbuja). NO están aquí, y viven en la captura CF-1 de
-  // abajo: la pluma, la línea interna, las formas armadas, el elástico y —desde
-  // #1115— Editar patrón y Pespunte. Una tecla, un sitio.
+  // Keyboard events (burbuja). La pluma, la línea interna, las formas armadas
+  // y el elástico NO están aquí: sus teclas viven ENTERAS en la captura CF-1 de
+  // abajo — una tecla, un sitio.
+  //
+  // Editar patrón, Editar curva y Pespunte sí están, y a propósito: de ellos la
+  // captura toma SOLO Supr y Retroceso (#1115), que son las que el atajo global
+  // les robaba. Escape y Enter siguen llegando aquí. Se intentó subirlos
+  // enteros y fue una regresión medida: `stopPropagation` en captura mata toda
+  // la propagación posterior, y el menú contextual de Editar patrón —el que
+  // lleva las firmas de María del #1166— dejaba de cerrarse con Escape.
   useEffect(() => {
     const handlers: ((e: KeyboardEvent) => void)[] = [];
     if (activeTool === 'seam') handlers.push(seamTool.handleKeyDown);
     if (MEASURE_TOOL_IDS.has(activeTool)) handlers.push(measureTool.handleKeyDown);
     if (activeTool === 'transform') handlers.push(transformTool.handleKeyDown);
     if (isNodeEditing) handlers.push(nodeEditor.handleKeyDown);
+    if (activeTool === 'editPattern') handlers.push(editPattern.handleKeyDown);
     if (activeTool === 'scissors') handlers.push(scissorsTool.handleKeyDown);
     // F8 (#1115): estaba en las dependencias pero nadie lo montaba, así que
     // Escape en Corte y apertura no hacía nada.
     if (activeTool === 'slashAndSpread') handlers.push(slashAndSpreadTool.handleKeyDown);
     if (activeTool === 'merge') handlers.push(mergeTool.handleKeyDown);
     if (activeTool === 'seamEdit') handlers.push(seamEditTool.handleKeyDown);
+    if (TOPSTITCH_TOOL_IDS.has(activeTool)) handlers.push(topstitchTool.handleKeyDown);
     if (activeTool === 'walkSeam') handlers.push(walkSeamTool.handleKeyDown);
     if (activeTool === 'offsetOutline') handlers.push(offsetTool.handleKeyDown);
     if (activeTool === 'extendTrim') handlers.push(extendTrimTool.handleKeyDown);
@@ -492,7 +501,15 @@ export function useEditorInteractions(
     const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, isNodeEditing, nodeEditor.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, seamEditTool.handleKeyDown, walkSeamTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown]);
+  }, [activeTool, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, isNodeEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, seamEditTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown]);
+
+  // Los dueños locales de Supr/Retroceso, leídos por ref desde la captura
+  // (#1115). Se asigna en el render, no en un efecto: el listener de captura se
+  // re-suscribe en cada render y el hueco entre el commit y el flush bastaba
+  // para que, bajo carga, la tecla viera una sub-selección vacía y cayera al
+  // atajo global — o sea, para que el fallo volviera de forma intermitente.
+  const localesRef = useRef({ activeTool, editPattern, topstitchTool, nodeEditor, isNodeEditing });
+  localesRef.current = { activeTool, editPattern, topstitchTool, nodeEditor, isNodeEditing };
 
   // Coordinación de teclas (CF-1): un gesto vivo es dueño de sus teclas, EN
   // CAPTURA. `ShortcutProvider` escucha en `document` (burbuja) y corre antes
@@ -511,7 +528,7 @@ export function useEditorInteractions(
     // `isDragging`—: si se entra, se consume, y nombrarlas es verdad. La
     // quinta, coser, pasó a P1 porque podía entrar sin nada que cancelar.
     type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | 'circle' | 'triangle' | 'cotas' | 'elastic'
-      | 'editPattern' | 'topstitch' | 'point' | 'notch' | 'seamAllowance' | 'seam' | 'transform' | null;
+      | 'editPattern' | 'editCurve' | 'topstitch' | 'point' | 'notch' | 'seamAllowance' | 'seam' | 'transform' | null;
     const routeKey = (e: KeyboardEvent): KeyConsumer => {
       // Línea interna: con trazo vivo, Escape / Enter / Retroceso / Supr son
       // del motor. `handleKeyDown` dice si consumió.
@@ -585,26 +602,39 @@ export function useEditorInteractions(
           return 'cotas';
         }
       }
-      // Editar patrón: con un nodo agarrado, Supr es del nodo (#1115). Estaba
-      // en la burbuja, o sea DESPUÉS del atajo global, así que Supr sobre un
-      // nodo se llevaba la pieza entera y este gancho llegaba a una pieza
-      // muerta. Sin nodo seleccionado devuelve `false` y el Supr sigue.
-      if (activeTool === 'editPattern') {
-        if (editPattern.handleKeyDown(e)) {
+      // #1115 — los sujetos LOCALES de Supr y Retroceso.
+      //
+      // Tres herramientas tienen una sub-selección propia que se PINTA y que
+      // Escape ya trataba como sujeto vivo. Sus manejadores estaban en la
+      // burbuja, o sea DESPUÉS del atajo global `edit.delete`/`edit.deleteAlt`
+      // (`ShortcutProvider`, `document` en burbuja), así que la tecla borraba
+      // la pieza y el gancho llegaba a una pieza muerta:
+      //
+      //   · Editar patrón — nodo o tramo agarrado
+      //   · Editar curva   — nodo de curva agarrado
+      //   · Pespunte       — punto o extremo a medias
+      //
+      // De ellos la captura toma SOLO estas dos teclas. Escape y Enter siguen
+      // llegando por la burbuja: subirlos también fue una regresión medida
+      // —`stopPropagation` en captura mata toda la propagación posterior y el
+      // menú contextual dejaba de cerrarse con Escape— porque la ventana de
+      // estos ganchos es un MODO largo, no un gesto.
+      //
+      // Se leen del ref, no del cierre: el efecto se re-suscribe en cada render
+      // y entre el commit y el flush el `window` seguía con el gancho anterior,
+      // cuya sub-selección estaba vacía. Bajo carga eso devolvía `false` y la
+      // pieza se borraba igual, de forma intermitente.
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const local = localesRef.current;
+        const dueño: [KeyConsumer, (e: KeyboardEvent) => boolean] | null =
+          local.activeTool === 'editPattern' ? ['editPattern', local.editPattern.handleKeyDown]
+          : TOPSTITCH_TOOL_IDS.has(local.activeTool) ? ['topstitch', local.topstitchTool.handleKeyDown]
+          : local.isNodeEditing ? ['editCurve', local.nodeEditor.handleKeyDown]
+          : null;
+        if (dueño && dueño[1](e)) {
           e.preventDefault();
           e.stopPropagation();
-          return 'editPattern';
-        }
-        return null;
-      }
-      // Pespunte: en el modo libre, Retroceso deshace el último punto — y
-      // `edit.deleteAlt` también está en Retroceso. Deshacer un punto borraba
-      // la pieza (#1115). Sin gesto a medias devuelve `false`.
-      if (TOPSTITCH_TOOL_IDS.has(activeTool)) {
-        if (topstitchTool.handleKeyDown(e)) {
-          e.preventDefault();
-          e.stopPropagation();
-          return 'topstitch';
+          return dueño[0];
         }
         return null;
       }
@@ -658,7 +688,7 @@ export function useEditorInteractions(
     };
     window.addEventListener('keydown', onKeyCapture, { capture: true });
     return () => window.removeEventListener('keydown', onKeyCapture, { capture: true });
-  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, triangleTool, elasticTool, cotas, editPattern, topstitchTool]);
+  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, triangleTool, elasticTool, cotas]);
 
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);

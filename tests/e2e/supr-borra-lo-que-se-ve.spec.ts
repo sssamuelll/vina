@@ -200,7 +200,7 @@ test.describe('#1115 (2ª mitad) — el sujeto local también manda', () => {
     expect(s.project.pieces.length, 'Supr se llevó la pieza entera estando en Editar patrón').toBe(2);
     const p1 = s.project.pieces.find(p => p.id === 'p1');
     expect(p1, 'la pieza que se estaba editando desapareció').toBeDefined();
-    expect(p1!.outline.length, 'el nodo seleccionado no se borró').toBeLessThan(antes);
+    expect(p1!.outline.length, 'el nodo seleccionado no se borró, o se llevó más de uno').toBe(antes - 1);
   });
 
   test('E · Retroceso en Pespunte libre quita el último punto, no la pieza', async ({ page }) => {
@@ -309,8 +309,141 @@ test.describe('#1115 (2ª mitad) — el sujeto local también manda', () => {
     await page.waitForTimeout(300);
     await pulsarSupr(page);
 
+    await expect(
+      page.locator('.toast', { hasText: /al menos 3 puntos/i }),
+      'no se puede borrar el nodo y no se lo dice: silencio donde hay una regla',
+    ).toBeVisible({ timeout: 4000 });
+
     const s = await st(page);
     expect(s.project.pieces.length, '«hacen falta 3 puntos» terminó borrando la pieza entera').toBe(1);
     expect(s.project.pieces[0].outline.length, 'el contorno se tocó pese al aviso').toBe(4);
+  });
+
+  test('D4 · y Retroceso hace lo mismo que Supr, que es la otra tecla del atajo', async ({ page }) => {
+    // `edit.deleteAlt` está en Retroceso y llama al MISMO `deleteSelection`.
+    // Sin este caso, estrechar el gancho a solo 'Delete' dejaba todo en verde.
+    await abrirApp(page);
+    await dispatch(page, 'project/addPiece', RECT('p1', 100, 100));
+    await dispatch(page, 'project/addPiece', RECT('p2', 500, 100));
+    await page.waitForTimeout(300);
+    await dispatch(page, 'editor/selectPiece', 'p1');
+    await activarHerramienta(page, 'q', 'editPattern');
+
+    await clickAt(page, { x: 200, y: 175 });
+    await clickAt(page, { x: 100, y: 100 });
+    await page.waitForTimeout(300);
+
+    const antes = (await st(page)).project.pieces.find(p => p.id === 'p1')!.outline.length;
+    await page.mouse.move(700, 620);
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(500);
+
+    const s = await st(page);
+    expect(s.project.pieces.length, 'Retroceso se llevó la pieza entera').toBe(2);
+    expect(s.project.pieces.find(p => p.id === 'p1')!.outline.length, 'el nodo no se borró').toBe(antes - 1);
+  });
+
+  test('F · un TRAMO agarrado tampoco deja que Supr se lleve la pieza', async ({ page }) => {
+    // El hermano que el censo por `grep 'Delete'` no veía: `selectedSegments`
+    // vive en el MISMO gancho, se pinta igual, y el Escape de arriba ya lo
+    // trataba como sujeto vivo. No existe «borrar tramo» — el contrato es que
+    // no pase nada, no que desaparezca la pieza.
+    await abrirApp(page);
+    await dispatch(page, 'project/addPiece', RECT('p1', 100, 100));
+    await dispatch(page, 'project/addPiece', RECT('p2', 500, 100));
+    await page.waitForTimeout(300);
+    await dispatch(page, 'editor/selectPiece', 'p1');
+    await activarHerramienta(page, 'q', 'editPattern');
+
+    await clickAt(page, { x: 200, y: 175 });   // entra
+    await clickAt(page, { x: 200, y: 100 });   // mitad del lado de arriba: un TRAMO, no un nodo
+    await page.waitForTimeout(300);
+    await pulsarSupr(page);
+
+    const s = await st(page);
+    expect(s.project.pieces.map(p => p.id), 'Supr con un tramo resaltado se llevó la pieza').toEqual(['p1', 'p2']);
+    expect(s.project.pieces.find(p => p.id === 'p1')!.outline.length, 'el contorno cambió').toBe(5);
+  });
+
+  test('G · un nodo de Editar curva tampoco deja que Supr se lleve la pieza', async ({ page }) => {
+    // El tercer hermano, y el que prueba que el censo estaba mal medido:
+    // `useEditCurve` no contiene la cadena 'Delete' en ninguna línea, así que
+    // un grep del síntoma no podía encontrarlo. Su propio comentario dice
+    // «mismo escalón que useEditPattern».
+    await abrirApp(page);
+    await dispatch(page, 'project/addPiece', RECT('p1', 100, 100));
+    await dispatch(page, 'project/addPiece', RECT('p2', 500, 100));
+    await page.waitForTimeout(300);
+    await dispatch(page, 'editor/selectPiece', 'p1');
+    await activarHerramienta(page, 'v', 'editCurve');
+
+    await clickAt(page, { x: 200, y: 175 });
+    await clickAt(page, { x: 100, y: 100 });
+    await page.waitForTimeout(300);
+    await pulsarSupr(page);
+
+    expect(
+      (await st(page)).project.pieces.map(p => p.id),
+      'Supr con un nodo de curva agarrado se llevó la pieza',
+    ).toEqual(['p1', 'p2']);
+  });
+
+  test('G2 · en Editar curva sin nodo agarrado, Supr sí borra la pieza', async ({ page }) => {
+    await abrirApp(page);
+    await dispatch(page, 'project/addPiece', RECT('p1', 100, 100));
+    await dispatch(page, 'project/addPiece', RECT('p2', 500, 100));
+    await page.waitForTimeout(300);
+    await dispatch(page, 'editor/selectPiece', 'p1');
+    await activarHerramienta(page, 'v', 'editCurve');
+    await page.waitForTimeout(300);
+    await pulsarSupr(page);
+
+    expect(
+      (await st(page)).project.pieces.map(p => p.id),
+      'entrar a Editar curva apagó el borrado normal',
+    ).toEqual(['p2']);
+  });
+
+  test('H · Pespunte por tramo con un extremo puesto no pierde la pieza', async ({ page }) => {
+    // El tercer modo que dibuja. La guarda de `segSnapA`/`segSnapB` nació en
+    // este arreglo sin un solo test que la mirara.
+    await abrirApp(page);
+    await dispatch(page, 'project/addPiece', RECT('p1', 100, 100));
+    await dispatch(page, 'project/addPiece', RECT('p2', 500, 100));
+    await page.waitForTimeout(300);
+    await dispatch(page, 'editor/selectPiece', 'p1');
+    await activarHerramienta(page, 'k', 'topstitchSegment');
+
+    await clickAt(page, { x: 160, y: 100 });   // un extremo sobre el lado de arriba
+    await page.waitForTimeout(300);
+    await page.mouse.move(700, 620);
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(500);
+
+    expect(
+      (await st(page)).project.pieces.map(p => p.id),
+      'Retroceso, que en Pespunte por tramo suelta el extremo, borró la pieza',
+    ).toEqual(['p1', 'p2']);
+  });
+
+  test('I · y Escape sigue cerrando el menú contextual en Editar patrón', async ({ page }) => {
+    // Regresión medida: la primera versión de este arreglo subía TODAS las
+    // teclas del gancho a la captura, y `stopPropagation` ahí mata la
+    // propagación entera. `ContextMenu` escucha en `document` en burbuja, o sea
+    // después, y el menú se quedaba abierto. Es el menú que lleva las firmas
+    // de María del #1166.
+    await abrirApp(page);
+    await dispatch(page, 'project/addPiece', RECT('p1', 100, 100));
+    await page.waitForTimeout(300);
+    await activarHerramienta(page, 'q', 'editPattern');
+    await clickAt(page, { x: 200, y: 175 });
+    await page.waitForTimeout(300);
+
+    await clickAt(page, { x: 200, y: 100 }, 'right');
+    const menu = page.locator('.context-menu');
+    await expect(menu, 'el clic derecho no abrió el menú: el caso no se ejerce').toBeVisible({ timeout: 5000 });
+
+    await page.keyboard.press('Escape');
+    await expect(menu, 'Escape dejó el menú abierto').toHaveCount(0, { timeout: 4000 });
   });
 });

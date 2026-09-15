@@ -822,12 +822,23 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   // ─── handleKeyDown ───
 
   /**
-   * P1 (#1115): devuelve si consumio la tecla. Este gancho vive en la captura
-   * CF-1, no en la burbuja — el atajo global `edit.delete` escucha en
-   * `document` en burbuja y corria ANTES, asi que Supr sobre un nodo borraba
-   * la pieza entera y este manejador llegaba a una pieza que ya no existia.
+   * P1 (#1115): devuelve si consumió la tecla.
    *
-   * `false` deja la tecla seguir su camino a proposito: sin nodo seleccionado,
+   * Este gancho se llama desde DOS sitios, y la diferencia importa:
+   *
+   * - **Supr y Retroceso, desde la captura CF-1.** El atajo global
+   *   `edit.delete` escucha en `document` en burbuja y corría ANTES, así que
+   *   Supr sobre un nodo borraba la pieza entera y este manejador llegaba a
+   *   una pieza que ya no existía.
+   * - **Escape, desde la burbuja, como siempre.** Consumirlo en captura
+   *   parecía más limpio y resultó ser una regresión: `stopPropagation` en
+   *   captura sobre `window` mata TODA la propagación posterior, y con eso el
+   *   menú contextual (`ContextMenu.tsx`, que escucha en `document` en
+   *   burbuja) se quedaba abierto. Es el menú que lleva las firmas de María
+   *   del #1166. La ventana de `isEditing` es un MODO largo, no un gesto: una
+   *   puerta estrecha en teclas no basta si la condición es ancha.
+   *
+   * `false` deja la tecla seguir su camino a propósito: sin sujeto local,
    * Supr tiene que poder borrar la pieza como en cualquier otro sitio.
    */
   const handleKeyDown = useCallback(
@@ -855,7 +866,15 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (state.selectedNodes.size === 0) return false;
+        if (state.selectedNodes.size === 0) {
+          // Un TRAMO elegido también es sujeto local: se pinta
+          // (`EditPatternOverlay`) y el Escape de arriba ya lo trata como tal.
+          // No existe «borrar tramo», así que aquí no se borra nada — pero se
+          // consume igual, porque soltar la tecla se la entrega al global y
+          // entonces desaparece la pieza con el tramo resaltado en pantalla.
+          // Mismo argumento que el aviso de los tres puntos, más abajo.
+          return state.selectedSegments.size > 0;
+        }
 
         const piece = getPiece(state.editingPieceId);
         if (!piece) return false;
