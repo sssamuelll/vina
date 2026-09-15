@@ -83,4 +83,21 @@ describe('#1145 — Desplazar contorno no sustituye la geometría de una pieza b
     act(() => hook.result.current.execute());
     expect(contorno(store, 'p')).not.toBe(antes);
   });
+
+  it('CONTROL: en modo NO reemplazar, una pieza bloqueada sí puede derivar una nueva', () => {
+    // El censo de #1145 solo marcó ALTA las líneas de `replace` (70, 109):
+    // en modo "crear pieza nueva" la original ni se lee para escribir, se usa
+    // de referencia — igual que mover ya se permite a propósito sobre una
+    // pieza bloqueada. Bloquear esto también sería restringir algo que el
+    // candado nunca prometió proteger.
+    const { store, hook } = montar(pieza('p', { locked: true }));
+    act(() => { store.dispatch(setToolOption({ toolId: 'offsetOutline', optionId: 'replace', value: false })); });
+    const antesOriginal = contorno(store, 'p');
+    const piezasAntes = store.getState().project.pieces.length;
+
+    act(() => hook.result.current.execute());
+
+    expect(contorno(store, 'p'), 'la pieza bloqueada se tocó igual').toBe(antesOriginal);
+    expect(store.getState().project.pieces.length, 'no se creó la pieza derivada').toBe(piezasAntes + 1);
+  });
 });

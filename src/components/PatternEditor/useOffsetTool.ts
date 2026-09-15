@@ -52,16 +52,21 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
     const piece = pieces.find(p => p.id === selectedPieceIds[0]);
     if (!piece) return;
 
+    const { distance, direction, joinType, replace } = getOptions();
+
     // El candado se leía para pintar (el chip, la fila de capas) y no para
     // escribir: en modo `replace` esto SUSTITUYE el contorno en el sitio, sin
     // dejar rastro de la geometría que el candado prometía proteger (#1145,
     // mismo mecanismo que #1136 encontró en Margen).
-    if (piezaBloqueada(piece, layerLocked)) {
+    //
+    // Solo `replace`: en modo "crear pieza nueva" la original ni se toca —se
+    // usa de referencia geométrica—, igual que mover ya se permite a
+    // propósito sobre una pieza bloqueada. Bloquearlo también restringiría
+    // algo que el candado nunca prometió proteger.
+    if (replace && piezaBloqueada(piece, layerLocked)) {
       noPasoNada('desplazar:pieza-bloqueada', { pieceId: piece.id });
       return;
     }
-
-    const { distance, direction, joinType, replace } = getOptions();
 
     const createOffset = (effectiveDistance: number): PathCommand[] | null => {
       return offsetPieceOutline(piece, effectiveDistance, joinType);
