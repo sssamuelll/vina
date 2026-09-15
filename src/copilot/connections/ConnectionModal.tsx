@@ -183,7 +183,13 @@ export default function ConnectionModal(props: Props) {
         if (e.target === e.currentTarget) props.onClose();
       }}
     >
-      <div style={dialogStyle} onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        style={dialogStyle}
+        role="dialog"
+        aria-modal="true"
+        aria-label={isEdit ? 'Editar conexión' : 'Agregar conexión'}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div style={headerStyle}>
           <h4 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>
             {isEdit ? 'Editar conexión' : 'Agregar conexión'}

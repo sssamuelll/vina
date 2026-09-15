@@ -1,6 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { DEFAULT_SHORTCUTS, ATAJOS_2D_SIN_GESTO } from '../defaults';
 
 /**
@@ -33,31 +31,12 @@ import { DEFAULT_SHORTCUTS, ATAJOS_2D_SIN_GESTO } from '../defaults';
  * Ver docs/reports/2026-09-04-revision-adversarial-ui.md § 2 F7.
  */
 
-const DESPACHADOR = readFileSync(
-  join(process.cwd(), 'src/components/PatternEditor/useEditorInteractions.ts'),
-  'utf8',
-);
-
 /**
- * Los ids que el despachador conduce de verdad. Dos formas conviven en el
- * archivo y las dos cuentan:
- *   1. `activeTool === 'x'` — la mayoría.
- *   2. `X_TOOL_IDS = new Set([...])` + `.has(activeTool)` — medir y compañía.
- *
- * NO cuenta el `switch` de cursor (`case 'x': return 'default'`): pintar un
- * cursor no es conducir un gesto. Ese fue justamente el ciego que dejó pasar a
- * `topstitchEdit` en la primera lectura de esta revisión.
+ * El censo vive en un solo sitio (`censoDeHerramientasConducidas.ts`) porque
+ * estaba copiado aquí y en el test de puertas, y se desincronizó: el #1172
+ * mudó `MEASURE_TOOL_IDS` fuera del despachador, aquí se arregló y allá no.
  */
-function idsQueElDespachadorConduce(): Set<string> {
-  const ids = new Set<string>();
-  for (const m of DESPACHADOR.matchAll(/activeTool\s*===\s*'([A-Za-z0-9]+)'/g)) ids.add(m[1]);
-  for (const decl of DESPACHADOR.matchAll(/const\s+([A-Z0-9_]*TOOL_IDS)\s*=\s*new Set\(\[([^\]]*)\]/g)) {
-    // Solo si ese Set se consulta con el id activo; si no, es una lista muerta.
-    if (!new RegExp(`${decl[1]}\\.has\\(activeTool`).test(DESPACHADOR)) continue;
-    for (const lit of decl[2].matchAll(/'([A-Za-z0-9]+)'/g)) ids.add(lit[1]);
-  }
-  return ids;
-}
+import { idsQueElDespachadorConduce } from './censoDeHerramientasConducidas';
 
 const CONDUCIDOS = idsQueElDespachadorConduce();
 

@@ -42,23 +42,15 @@ import { DOCK_2D_CATALOG } from '../dock2dTools';
  * cualquier herramienta nueva con gesto y sin puerta rompe la suite.
  */
 
-const DESPACHADOR = readFileSync(
-  join(process.cwd(), 'src/components/PatternEditor/useEditorInteractions.ts'),
-  'utf8',
-);
+/**
+ * El censo del despachador es el MISMO que usa el test hermano de atajos, y
+ * por eso vive en un sitio: cuando estaba copiado en los dos, el #1172 mudó
+ * un conjunto de archivo y este detector se quedó ciego mientras el otro ya
+ * lo seguía. Un censo duplicado no es una red, son dos redes distintas.
+ */
+import { idsQueElDespachadorConduce } from '../../../shortcuts/__tests__/censoDeHerramientasConducidas';
 
-/** Ids que el despachador conduce de verdad — mismo censo que el test de F7. */
-function idsConducidos(): Set<string> {
-  const ids = new Set<string>();
-  for (const m of DESPACHADOR.matchAll(/activeTool\s*===\s*'([A-Za-z0-9]+)'/g)) ids.add(m[1]);
-  for (const decl of DESPACHADOR.matchAll(/const\s+([A-Z0-9_]*TOOL_IDS)\s*=\s*new Set\(\[([^\]]*)\]/g)) {
-    if (!new RegExp(`${decl[1]}\\.has\\(activeTool`).test(DESPACHADOR)) continue;
-    for (const lit of decl[2].matchAll(/'([A-Za-z0-9]+)'/g)) ids.add(lit[1]);
-  }
-  return ids;
-}
-
-const CONDUCIDOS = idsConducidos();
+const CONDUCIDOS = idsQueElDespachadorConduce();
 const CON_ATAJO = new Set(
   DEFAULT_SHORTCUTS.filter((s) => s.id.startsWith('tool.')).map((s) => s.id.slice('tool.'.length)),
 );

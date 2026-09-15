@@ -161,6 +161,11 @@ const EDIT_MENU: MenuItem[] = [
       case 'nada':
         if (sujeto.motivo === 'bloqueada') {
           d(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+        } else if (sujeto.motivo === 'sin-sujeto') {
+          // Una puerta que la usuaria abrió y pulsó a propósito tiene que
+          // contestar. El atajo tiene la excusa de «la tecla no era tuya»;
+          // un renglón de menú con rótulo no la tiene (#1172).
+          d(showInfoToast('Midiendo no se borran piezas. Cambia a Seleccionar para borrarla.'));
         }
         break;
     }

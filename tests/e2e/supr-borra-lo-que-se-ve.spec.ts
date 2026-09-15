@@ -180,8 +180,10 @@ test.describe('#1115 — Supr borra lo que se ve', () => {
  * enteros mataba la propagación con `stopPropagation` y el menú contextual
  * dejaba de cerrarse con Escape.
  *
- * Medir no aparece: su `handleKeyDown` solo mira Escape. Queda un hueco suyo,
- * dicho en la enmienda del spec y abierto como issue propio.
+ * Medir no aparece aqui: su `handleKeyDown` solo mira Escape, asi que su hueco
+ * era de otra familia y se abrio como issue propio (#1172). Ya esta cerrado, y
+ * no por este mecanismo sino por `resolverBorrado`: ver
+ * `tests/e2e/supr-con-algo-delante.spec.ts`.
  */
 test.describe('#1115 (2ª mitad) — el sujeto local también manda', () => {
   test.setTimeout(90_000);

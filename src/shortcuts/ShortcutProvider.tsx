@@ -12,6 +12,7 @@ import { ShortcutRegistry, type ShortcutContext as ShortcutCtx } from './Shortcu
 import { DEFAULT_SHORTCUTS } from './defaults';
 import { ShortcutContext } from './ShortcutContext';
 import { pushJournal } from '../utils/telemetry/journal';
+import { hayModalDelante } from '../utils/superficieModal';
 
 /** Determine which panel has focus based on the active element */
 function getActiveContext(): ShortcutCtx[] {
@@ -51,16 +52,46 @@ export function ShortcutProvider({ children }: ShortcutProviderProps) {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't intercept when typing in form controls (unless Escape).
-      // Selects included: letters typed while a dropdown has focus are
-      // option-search keystrokes, not tool shortcuts.
-      if (
-        (e.target instanceof HTMLInputElement ||
+      // Escape es la excepcion de todo lo de abajo: sin el, una superficie
+      // que se queda las teclas encierra a la usuaria dentro de ella.
+      if (e.key !== 'Escape') {
+        // Las teclas nacidas en un campo son del campo. Los desplegables
+        // incluidos: una letra con el foco dentro busca opcion, no
+        // herramienta.
+        if (
+          e.target instanceof HTMLInputElement ||
           e.target instanceof HTMLTextAreaElement ||
-          e.target instanceof HTMLSelectElement) &&
-        e.key !== 'Escape'
-      ) {
-        return;
+          e.target instanceof HTMLSelectElement
+        ) {
+          return;
+        }
+
+        // Y un modal tapa MAS que un campo, no menos (#1173). `edit.delete`
+        // es de contexto `global`, asi que sin esto Supr se llevaba la pieza
+        // de detras mientras Maria leia la pregunta --y el dialogo se quedaba
+        // abierto preguntando por algo que ya no existia.
+        //
+        // El detector es el del estandar y no una marca nuestra: `aria-modal`
+        // dice exactamente «esto bloquea lo de atras». Y deja fuera, a
+        // proposito, a los dialogos NO modales, que es justo lo que hay que
+        // dejar fuera: `NotchPrecisionModal` es `role="dialog"` SIN velo, se
+        // abre junto a la pieza y el lienzo sigue vivo detras. Un detector
+        // por `role` lo habria apagado con los demas.
+        if (hayModalDelante()) {
+          // Retirarse no es soltarle la tecla al NAVEGADOR: sin esto, Ctrl+R
+          // detrás de un diálogo destructivo recarga la app entera y Ctrl+A
+          // selecciona el texto de la página. Si era un atajo nuestro CON
+          // ctrl/meta, se suprime: no es de Vina, pero tampoco del navegador.
+          //
+          // Y solo con ctrl/meta. Suprimir además las teclas sueltas rompe el
+          // control que tiene el foco dentro del diálogo: Espacio sobre el
+          // botón es su activación, y `sim.toggle` vive en Espacio. Eso fue
+          // un rojo medido al generalizarlo.
+          if ((e.ctrlKey || e.metaKey) && registryRef.current.matchEvent(e, getActiveContext())) {
+            e.preventDefault();
+          }
+          return;
+        }
       }
 
       const activeContexts = getActiveContext();

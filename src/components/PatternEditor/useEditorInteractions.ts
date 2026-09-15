@@ -42,8 +42,9 @@ import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { patternToPieceLocal } from './pieceTransform';
 import { DRAG_THRESHOLD_PX, isDrag } from './gestureConstants';
 import { pushJournal } from '../../utils/telemetry/journal';
+import { MEASURE_TOOL_IDS } from '../../store/toolActivation';
+import { hayModalDelante } from '../../utils/superficieModal';
 
-const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
 /** Los tres modos de Pespunte que DIBUJAN. `topstitchEdit` queda fuera a
  *  propósito: no tiene gesto a medias que cancelar, así que sus teclas no son
  *  suyas y deben seguir su camino al atajo global (#1115). */
@@ -498,7 +499,16 @@ export function useEditorInteractions(
     if (activeTool === 'offsetOutline') handlers.push(offsetTool.handleKeyDown);
     if (activeTool === 'extendTrim') handlers.push(extendTrimTool.handleKeyDown);
     if (handlers.length === 0) return;
-    const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
+    const handler = (e: KeyboardEvent) => {
+      // Con un modal delante el lienzo no tiene teclas. Va aquí ADEMÁS de en
+      // la captura porque la captura, al retirarse, no llama a
+      // `stopPropagation` —hacerlo mataría el Escape del propio diálogo, que
+      // es la regresión de #1115— así que la tecla sigue viajando y llega
+      // hasta aquí. Medido sin esto: el nodo agarrado se borraba igual
+      // detrás del diálogo, 5 nodos a 4.
+      if (hayModalDelante()) return;
+      handlers.forEach(h => h(e));
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [activeTool, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, isNodeEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, seamEditTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown]);
@@ -675,6 +685,12 @@ export function useEditorInteractions(
     const onKeyCapture = (e: KeyboardEvent) => {
       // Las teclas que nacen dentro de un campo editable pertenecen al campo.
       if (isEditableTarget(e.target)) return;
+      // Con un modal delante el lienzo no tiene teclas, ni siquiera Escape:
+      // esa es del diálogo. Y la guarda va AQUÍ además de en
+      // `ShortcutProvider` porque este oyente está en CAPTURA, o sea que
+      // corre antes que aquel: sin ella, Supr borraba el nodo agarrado
+      // detrás del diálogo —contorno de 5 nodos a 4, medido (#1173).
+      if (hayModalDelante()) return;
       // La tecla entra a la bitácora ANTES de sus consecuencias (la acción que
       // despache el gancho); quién la consumió se completa al volver. La
       // repetición automática de una tecla sostenida no es un gesto nuevo.
