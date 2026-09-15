@@ -86,13 +86,17 @@ describe('#1173 — la tecla es de quien tiene la atención', () => {
 
   it('Escape es la excepción: sigue pasando con el modal abierto', () => {
     // Misma excepción que la guarda de campos que ya estaba arriba. Sin ella
-    // un modal sin Escape propio dejaría a María encerrada.
-    const { lienzo } = montar(MODAL);
-    let visto = false;
-    const espia = () => { visto = true; };
-    document.addEventListener('keydown', espia);
+    // un modal sin Escape propio dejaría a María encerrada dentro de él.
+    //
+    // Se mide por su EFECTO (`selection.deselect` vacía la selección) y no
+    // espiando el evento en `document`: ahí la tecla llega igual haga lo que
+    // haga la guarda, así que ese espía pasaba en verde siempre.
+    const { store, lienzo } = montar(MODAL);
+    store.dispatch({ type: 'editor/selectPiece', payload: 'p1' });
+    expect(store.getState().editor.selectedPieceIds, 'el caso no se ejerce').toEqual(['p1']);
+
     pulsar(lienzo, 'Escape');
-    document.removeEventListener('keydown', espia);
-    expect(visto, 'Escape dejó de llegar').toBe(true);
+
+    expect(store.getState().editor.selectedPieceIds, 'Escape dejó de llegar').toEqual([]);
   });
 });
