@@ -763,10 +763,19 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   }, []);
 
   const cotasRef = useRef<CotasLayerHandle>(null);
+  const { hotId: rectHotId, enfriar: enfriarRect } = rectTool;
+  const { hotId: circleHotId, enfriar: enfriarCircle } = circleTool;
+  const { hotId: triangleHotId, enfriar: enfriarTriangle } = triangleTool;
+  // Solo una herramienta está activa a la vez, y cada una enfría la suya en
+  // cuanto deja de serlo: el sujeto caliente es el de la herramienta en curso.
+  const hotId = activeTool === 'circle' ? circleHotId
+    : activeTool === 'triangle' ? triangleHotId
+      : activeTool === 'rectangle' ? rectHotId : null;
   // La puerta de Tab al largo de un lado (#1167). Va antes del router de teclas
   // porque es él quien la abre.
   const puertaDeLado = usePuertaDeLado({
     pieces, selectedPieceIds, cursorPattern: cursorPositionRef, hiddenLayerIds, layerLocked,
+    caliente: hotId !== null && selectedPieceIds.length === 1 && selectedPieceIds[0] === hotId,
   });
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
@@ -784,14 +793,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     width: Number(s.tools.toolOptions?.rectangle?.width ?? 100),
     height: Number(s.tools.toolOptions?.rectangle?.height ?? 100),
   }), shallowEqual);
-  const { hotId: rectHotId, enfriar: enfriarRect } = rectTool;
-  const { hotId: circleHotId, enfriar: enfriarCircle } = circleTool;
-  const { hotId: triangleHotId, enfriar: enfriarTriangle } = triangleTool;
-  // Solo una herramienta está activa a la vez, y cada una enfría la suya en
-  // cuanto deja de serlo: el sujeto caliente es el de la herramienta en curso.
-  const hotId = activeTool === 'circle' ? circleHotId
-    : activeTool === 'triangle' ? triangleHotId
-      : activeTool === 'rectangle' ? rectHotId : null;
   // El lado elegido, venga del ratón o de Tab (#1167, spec 2026-09-18 § 3.1).
   //
   // El ratón ya lo elegía: en «Editar patrón» un clic sobre un lado lo

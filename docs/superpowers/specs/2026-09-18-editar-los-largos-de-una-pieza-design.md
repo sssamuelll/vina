@@ -78,12 +78,23 @@ Por qué el puntero y no «el primero» ni «el último tocado»:
   Si además recorriera lados, la misma tecla haría dos cosas distintas según
   dónde estuviera el foco.
 
-**Tab deja de abrir el Ancho.** Hoy Tab con una pieza seleccionada enfoca el
-primer chip del DOM, que es «Ancho» de la caja envolvente. Ancho y Alto siguen
-en pantalla y se siguen clicando; lo que cambia es que dejan de ser lo primero
-del camino de teclado. Es lo que ella pidió con todas sus letras —«el editable
-de **largos**»— y es coherente con su aviso: el rectángulo es transitorio, y
-Ancho × Alto es precisamente la caja del rectángulo.
+**Tab deja de abrir el Ancho —salvo con la pieza recién creada.** Hoy Tab con
+una pieza seleccionada enfoca el primer chip del DOM, que es «Ancho» de la caja
+envolvente. Ancho y Alto siguen en pantalla y se siguen clicando; lo que cambia
+es que dejan de ser lo primero del camino de teclado. Es lo que ella pidió con
+todas sus letras —«el editable de **largos**»— y es coherente con su aviso: el
+rectángulo es transitorio, y Ancho × Alto es precisamente la caja del
+rectángulo.
+
+La excepción la marcó ella, no el código: **«al SALIR de crear y volver a clicar
+la pieza»**. Mientras el rectángulo, el círculo o el triángulo siguen
+**calientes** —la pieza que la herramienta acaba de crear y sigue seleccionada,
+la misma ventana que ya gobierna `sujeto.caliente` desde #223/#225— Tab conserva
+el Ancho: es la medida que se acaba de dibujar, y ahí la caja envolvente **es**
+la pieza. En cuanto sale de crear, Tab abre el lado.
+
+No es un estado escondido: la tira lo dice en voz alta, «Editando: la pieza
+nueva» frente a «Editando: la pieza seleccionada».
 
 ### 3.2 Los lados curvos no tienen caja
 
@@ -161,6 +172,12 @@ pruebas de aceptación, dichas como las diría ella:
    lado de cierre, Tab → la caja sale con el largo de ESE lado.
 
 Cada una admite Esc antes de confirmar y un solo deshacer después.
+
+Las tres están en `tests/e2e/1167-editar-los-largos-de-la-pieza.spec.ts`, más
+otras cuatro que fija el mismo archivo: que Esc suelte **un** nivel y no
+deseleccione la pieza; que con la pieza bloqueada Tab **no se trague la tecla**;
+que la pieza recién creada conserve su Ancho; y que al salir de crear y volver a
+clicarla, Tab ya abra el lado.
 
 ---
 

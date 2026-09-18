@@ -31,7 +31,7 @@ const SOLO_CURVAS: PathCommand[] = [
 
 function montar(over: {
   pieces?: PatternPiece[]; selectedPieceIds?: string[]; cursor?: Point2D | null;
-  hiddenLayerIds?: number[]; layerLocked?: Record<number, boolean>;
+  hiddenLayerIds?: number[]; layerLocked?: Record<number, boolean>; caliente?: boolean;
 } = {}) {
   const cursor = { current: over.cursor ?? null };
   const props = {
@@ -40,6 +40,7 @@ function montar(over: {
     cursorPattern: cursor,
     hiddenLayerIds: over.hiddenLayerIds ?? [],
     layerLocked: over.layerLocked ?? {},
+    caliente: over.caliente ?? false,
   };
   const hook = renderHook(
     (p: typeof props) => usePuertaDeLado(p),
@@ -117,14 +118,14 @@ describe('usePuertaDeLado — Tab abre el largo de un lado', () => {
     const { hook } = montar({ pieces: [pieza('a'), pieza('b')], cursor: { x: 100, y: 105 } });
     act(() => { hook.result.current.enfocar(); });
     expect(hook.result.current.lado).not.toBe(null);
-    hook.rerender({ pieces: [pieza('a'), pieza('b')], selectedPieceIds: ['b'], cursorPattern: { current: null }, hiddenLayerIds: [], layerLocked: {} });
+    hook.rerender({ pieces: [pieza('a'), pieza('b')], selectedPieceIds: ['b'], cursorPattern: { current: null }, hiddenLayerIds: [], layerLocked: {}, caliente: false });
     expect(hook.result.current.lado).toBe(null);
   });
 
   it('borrar la pieza suelta el lado', () => {
     const { hook } = montar({ cursor: { x: 100, y: 105 } });
     act(() => { hook.result.current.enfocar(); });
-    hook.rerender({ pieces: [], selectedPieceIds: ['a'], cursorPattern: { current: null }, hiddenLayerIds: [], layerLocked: {} });
+    hook.rerender({ pieces: [], selectedPieceIds: ['a'], cursorPattern: { current: null }, hiddenLayerIds: [], layerLocked: {}, caliente: false });
     expect(hook.result.current.lado).toBe(null);
   });
 
@@ -174,8 +175,19 @@ describe('usePuertaDeLado — Tab abre el largo de un lado', () => {
       expect(hook.result.current.lado).not.toBe(null);
       hook.rerender({
         pieces: [pieza('a', { layer: 2 })], selectedPieceIds: ['a'],
-        cursorPattern: { current: null }, hiddenLayerIds: [2], layerLocked: {},
+        cursorPattern: { current: null }, hiddenLayerIds: [2], layerLocked: {}, caliente: false,
       });
+      expect(hook.result.current.lado).toBe(null);
+    });
+
+    it('la pieza RECIÉN creada conserva Ancho y Alto: es la medida que acaba de dibujar', () => {
+      // La distinción la hizo ella: «al SALIR de crear y volver a clicar la
+      // pieza». Mientras el rectángulo sigue caliente, Tab abre su Ancho — que
+      // es la promesa de #223/#225 y el mando correcto para lo recién dibujado.
+      const { hook } = montar({ caliente: true, cursor: { x: 100, y: 105 } });
+      let abrio = true;
+      act(() => { abrio = hook.result.current.enfocar(); });
+      expect(abrio).toBe(false);
       expect(hook.result.current.lado).toBe(null);
     });
   });

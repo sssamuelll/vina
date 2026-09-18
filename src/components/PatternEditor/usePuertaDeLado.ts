@@ -63,8 +63,16 @@ export function usePuertaDeLado(opts: {
   hiddenLayerIds: readonly number[];
   /** Capas bloqueadas (`project.layerLocked`). */
   layerLocked: Readonly<Record<number, boolean>>;
+  /**
+   * La pieza seleccionada es la que Rectángulo, Círculo o Triángulo acaba de
+   * crear y sigue caliente. Ahí Tab conserva Ancho y Alto (#223/#225): es la
+   * medida que se acaba de dibujar, y es la distinción que hizo ELLA —«al
+   * SALIR de crear y volver a clicar la pieza». Y no es un estado escondido:
+   * la tira dice «la pieza nueva» en vez de «la pieza seleccionada».
+   */
+  caliente: boolean;
 }): PuertaDeLado {
-  const { pieces, selectedPieceIds, cursorPattern, hiddenLayerIds, layerLocked } = opts;
+  const { pieces, selectedPieceIds, cursorPattern, hiddenLayerIds, layerLocked, caliente } = opts;
   const [lado, setLado] = useState<LadoElegido | null>(null);
   const [seq, setSeq] = useState(0);
   // El Escape tiene que saber AHORA si consumió algo, y un updater de `setState`
@@ -80,6 +88,7 @@ export function usePuertaDeLado(opts: {
   }, []);
 
   const enfocar = useCallback(() => {
+    if (caliente) return false;
     if (selectedPieceIds.length !== 1) return false;
     const piece = pieces.find(p => p.id === selectedPieceIds[0]);
     if (!piece || !editable(piece, hiddenLayerIds, layerLocked)) return false;
@@ -95,7 +104,7 @@ export function usePuertaDeLado(opts: {
     setLado(ladoRef.current);
     setSeq(n => n + 1);
     return true;
-  }, [pieces, selectedPieceIds, cursorPattern, hiddenLayerIds, layerLocked]);
+  }, [pieces, selectedPieceIds, cursorPattern, hiddenLayerIds, layerLocked, caliente]);
 
   // El sujeto no sobrevive a su dueño: si la pieza deja de estar seleccionada,
   // desaparece, o cambia la selección, el lado se suelta. Es la misma ley que
