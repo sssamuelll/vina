@@ -16,6 +16,7 @@
 import type { ProviderConfig } from './providers/types';
 import { SecureStorage } from './providers/secureStorage';
 import { safeGetItem, safeSetItem, safeRemoveItem } from '../utils/safeStorage';
+import { mensajeDeErrorEs } from './action/tools/mensajeDeErrorEs';
 
 // ─── Error Classification ───────────────────────────────────────────────────
 
@@ -217,6 +218,15 @@ export async function retryWithBackoff<T>(
 /**
  * Get a human-readable error message with actionable instructions.
  *
+ * El texto sale en español (#1199): esto no es una nota al pie en gris, es lo
+ * que `UnifiedBarChat` mete en el hilo como mensaje del asistente, con avatar y
+ * burbuja. Los emoji se quedan — son otra conversación (139 sitios más).
+ *
+ * Se traduce al LEER, igual que `mensajeDeErrorEs` (#1194): `classifyError` ya
+ * corrió sobre el error crudo antes de llegar aquí, así que traducir el cuerpo
+ * no reclasifica nada. El crudo del proveedor que el traductor no reconoce pasa
+ * intacto — es el único dato del fallo y perderlo sería peor que el inglés.
+ *
  * @param errorType - Classified error type
  * @param error - Original error
  * @returns User-facing error message
@@ -230,27 +240,32 @@ export function getErrorMessage(errorType: ErrorType, error: unknown): string {
 
   switch (errorType) {
     case 'auth':
-      return '🔑 API key is invalid or expired. Go to Chat → Settings (⚙️) to update your API key. ' +
-        'Get one at: Anthropic → console.anthropic.com/settings/keys | OpenAI → platform.openai.com/api-keys';
+      return '🔑 La clave de la API no sirve o se venció. Cámbiala en ajustes (⚙️). ' +
+        'Consigue una en: Anthropic → console.anthropic.com/settings/keys | OpenAI → platform.openai.com/api-keys';
 
     case 'rate_limit':
-      return '⏳ Rate limit reached. Wait a moment and try again, or switch to a different model/provider in Settings.';
+      return '⏳ El proveedor está frenando las respuestas por venir muy seguidas. ' +
+        'Espera un momento y vuelve a intentar, o cambia de modelo o de proveedor en ajustes.';
 
     case 'network':
-      return '🌐 Network error — could not reach the AI provider. Check your internet connection and try again.';
+      return '🌐 No se pudo llegar al proveedor de IA. Revisa tu conexión a internet y vuelve a intentar.';
 
     case 'provider_unavailable':
-      return '🔧 AI provider is temporarily unavailable. Try again in a moment, or switch providers in Settings.';
+      return '🔧 El proveedor de IA está caído por ahora. Vuelve a intentar en un momento, o cambia de proveedor en ajustes.';
 
+    // Sin rótulo delante: `mensajeDeErrorEs` ya devuelve una frase entera
+    // («Falta el dato pieceId»), y «Datos inválidos: falta el dato…» lo dice
+    // dos veces. Cuando el traductor no reconoce el crudo, ese crudo es el
+    // único dato que hay — igual que lo era en la versión inglesa.
     case 'invalid_params':
-      return `⚠️ Invalid parameters: ${rawMsg}. The agent will attempt with simplified values.`;
+      return `⚠️ ${mensajeDeErrorEs(rawMsg)}. La IA va a intentar con valores más simples.`;
 
     case 'tool_execution':
-      return `🔧 Tool error: ${rawMsg}`;
+      return `🔧 Falló una herramienta. ${mensajeDeErrorEs(rawMsg)}`;
 
     case 'unknown':
     default:
-      return `❌ Unexpected error: ${rawMsg}`;
+      return `❌ Error inesperado: ${rawMsg}`;
   }
 }
 

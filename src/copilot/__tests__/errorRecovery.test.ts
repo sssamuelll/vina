@@ -272,7 +272,7 @@ describe('retryWithBackoff', () => {
     const result = await retryWithBackoff(fn, { maxAttempts: 3, baseDelayMs: 10 });
     expect(result.recovered).toBe(false);
     expect(result.attempts).toBe(1);
-    expect(result.message).toContain('API key');
+    expect(result.message).toContain('clave');
   });
 
   it('should not retry on unknown errors', async () => {
@@ -353,54 +353,105 @@ describe('retryWithBackoff', () => {
 
 // ─── getErrorMessage ────────────────────────────────────────────────────────
 
-describe('getErrorMessage', () => {
-  it('should return setup instructions for auth errors', () => {
+/**
+ * #1199 — estas siete cadenas no son una nota al pie en gris: `UnifiedBarChat`
+ * las mete en el hilo como mensaje del asistente, con su avatar y su burbuja.
+ * O sea, la IA hablándole a María en inglés en medio de una conversación en
+ * español (dos líneas más abajo, ese mismo archivo ya escribe «Agrega un
+ * proveedor de IA en ajustes»).
+ *
+ * Las aserciones piden el SIGNIFICADO —qué pasó, qué hacer— y además niegan el
+ * inglés viejo. Solo pedir español dejaría pasar una traducción que se coma la
+ * instrucción; solo negar el inglés lo dejaría pasar borrando la cadena entera.
+ *
+ * Los emoji se conservan a propósito: viven en 139 sitios más del repo
+ * (severidades del inspector, menú contextual, ErrorBoundary). Son otra
+ * conversación, no esta.
+ */
+describe('getErrorMessage — la IA le habla a María en español (#1199)', () => {
+  it('auth: dice que la clave no sirve, adónde ir, y dónde conseguir otra', () => {
     const msg = getErrorMessage('auth', new Error('401'));
-    expect(msg).toContain('API key');
+    expect(msg).toContain('clave');
+    // La instrucción es la mitad del mensaje: el menú se llama «ajustes» en su
+    // barra, no «Settings» (glosario 2026-07-16).
+    expect(msg).toContain('ajustes');
+    expect(msg).not.toContain('Settings');
     expect(msg).toContain('console.anthropic.com');
     expect(msg).toContain('platform.openai.com');
     expect(msg).toContain('🔑');
   });
 
-  it('should return rate limit message', () => {
+  it('rate_limit: dice que el proveedor frenó y las dos salidas', () => {
     const msg = getErrorMessage('rate_limit', new Error('429'));
-    expect(msg).toContain('Rate limit');
+    expect(msg).toContain('proveedor');
+    expect(msg).toContain('Espera');
+    expect(msg).toContain('ajustes');
     expect(msg).toContain('⏳');
   });
 
-  it('should return network error message', () => {
+  it('network: culpa a la conexión, no a la usuaria', () => {
     const msg = getErrorMessage('network', new Error('failed'));
-    expect(msg).toContain('Network error');
+    expect(msg).toContain('conexión');
+    expect(msg).toContain('proveedor');
     expect(msg).toContain('🌐');
   });
 
-  it('should return provider unavailable message', () => {
+  it('provider_unavailable: dice que es temporal y ofrece cambiar', () => {
     const msg = getErrorMessage('provider_unavailable', new Error('500'));
-    expect(msg).toContain('temporarily unavailable');
+    expect(msg).toContain('proveedor');
+    expect(msg).toContain('ajustes');
     expect(msg).toContain('🔧');
   });
 
-  it('should return invalid params message with raw error', () => {
+  it('invalid_params: traduce lo que puede y no se come el crudo', () => {
     const msg = getErrorMessage('invalid_params', new Error('bust must be positive'));
+    // Techo conocido de #1194: lo que el traductor no reconoce pasa intacto.
+    // Perderlo sería peor que dejarlo en inglés — es el único dato del fallo.
     expect(msg).toContain('bust must be positive');
     expect(msg).toContain('⚠️');
   });
 
-  it('should include raw message for tool errors', () => {
+  it('invalid_params: la forma canónica de la validación sí llega traducida', () => {
+    const msg = getErrorMessage('invalid_params', new Error('Missing required parameter: "pieceId"'));
+    expect(msg).toContain('alta el dato pieceId');
+    expect(msg).not.toContain('Missing required parameter');
+  });
+
+  it('tool_execution: dice que falló una herramienta y traduce el crudo canónico', () => {
     const msg = getErrorMessage('tool_execution', new Error('Piece XYZ not found'));
     expect(msg).toContain('Piece XYZ not found');
+    expect(msg).toContain('herramienta');
     expect(msg).toContain('🔧');
   });
 
-  it('should return unknown error message with raw error', () => {
+  it('unknown: error inesperado, con el crudo detrás', () => {
     const msg = getErrorMessage('unknown', new Error('Cosmic ray'));
     expect(msg).toContain('Cosmic ray');
+    expect(msg).toContain('inesperado');
     expect(msg).toContain('❌');
   });
 
   it('should handle non-Error values', () => {
     const msg = getErrorMessage('unknown', 'string error');
     expect(msg).toContain('string error');
+  });
+
+  /**
+   * El trinquete. Sin esto, un caso nuevo del `switch` nace en inglés y nadie
+   * se entera: las aserciones de arriba solo miran los siete de hoy.
+   */
+  it('ninguno de los siete tipos deja inglés del proveedor en la burbuja', () => {
+    const TIPOS = ['auth', 'rate_limit', 'network', 'provider_unavailable',
+      'invalid_params', 'tool_execution', 'unknown'] as const;
+    const INGLES = /\b(Settings|Rate limit|Network error|Tool error|Invalid parameters|Unexpected error|API key|try again|Wait a moment|unavailable|switch|Check your)\b/i;
+    for (const tipo of TIPOS) {
+      // Error sin texto reconocible: lo que salga es cuerpo nuestro, no crudo.
+      // Y fuera las URL antes de mirar: `console.anthropic.com/settings/keys`
+      // lleva «settings» dentro y no es copy — es la dirección donde ella
+      // consigue la clave. (Se me coló en el primer intento de este trinquete.)
+      const sinUrls = getErrorMessage(tipo, new Error('42')).replace(/\S+\.(com|ai|org)\S*/g, '');
+      expect(sinUrls, `${tipo} sigue hablando inglés: ${sinUrls}`).not.toMatch(INGLES);
+    }
   });
 });
 
@@ -797,7 +848,7 @@ describe('RecoveryStrategy', () => {
 
     const result = await strategy.recover(new Error('401 Unauthorized'), fn);
     expect(result.recovered).toBe(false);
-    expect(result.message).toContain('API key');
+    expect(result.message).toContain('clave');
     expect(result.attempts).toBe(1);
   });
 
@@ -846,7 +897,7 @@ describe('RecoveryStrategy', () => {
 
     const result = await strategy.recover(new Error('Tool execution error'), fn);
     expect(result.recovered).toBe(false);
-    expect(result.message).toContain('Tool error');
+    expect(result.message).toContain('Falló una herramienta');
     expect(result.attempts).toBe(1);
   });
 
@@ -881,7 +932,7 @@ describe('RecoveryStrategy', () => {
       strategy.withRecovery(async () => {
         throw new Error('401 Unauthorized');
       })
-    ).rejects.toThrow('API key');
+    ).rejects.toThrow('clave');
   });
 
   it('should succeed on first attempt in withRecovery without recovery', async () => {
