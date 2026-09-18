@@ -255,7 +255,10 @@ export const tools: ToolDefinition[] = [
         mode: { type: 'string', enum: ['pivot', 'parallel'], description: 'Spread mode. Default: pivot' },
         gapFill: { type: 'string', enum: ['straight', 'smooth'], description: 'Gap fill method. Default: straight' },
       },
-      required: ['pieceId', 'fromEdge', 'toEdge', 'selectedHalf', 'spreadAmount'],
+      // `selectedHalf` fuera de required (#1189): el cuerpo lo rellena con 'B'
+      // unas líneas abajo, así que declararlo obligatorio apaga una llamada
+      // que hoy funciona en cuanto la guardia hace cumplir el schema.
+      required: ['pieceId', 'fromEdge', 'toEdge', 'spreadAmount'],
     },
     execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
       // 1. Find piece

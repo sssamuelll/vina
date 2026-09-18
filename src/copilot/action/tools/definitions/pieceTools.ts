@@ -62,7 +62,10 @@ const createPieceTool: ToolDefinition = {
       seamAllowance: { type: 'number', description: 'Seam allowance in mm. Pieces are born NET (0) — only set when the user explicitly asks for an allowance / Margen de costura en mm. Las piezas nacen en NETO (0) — solo asignar si el usuario lo pide explícitamente' },
       mirrored: { type: 'boolean', description: 'Whether piece is mirrored / Si la pieza está espejada' },
     },
-    required: ['name'],
+    // `name` NO va en required: el cuerpo lo rellena con 'New Piece' si falta
+    // (línea ~76). Mientras nadie validaba daba igual; con la guardia de #1189
+    // encendida, declararlo required apagaría una llamada que hoy funciona.
+    required: [],
   },
   execute: async (
     params: Record<string, unknown>,

@@ -139,8 +139,13 @@ export interface OpenAITool {
  *
  * `"false"` es truthy en JS: ese es exactamente el fallo de #1189 — entraba
  * en la rama destructiva de `offsetPattern` y reportaba `replaced: true`.
- * Por eso solo `"true"` y `"false"` se convierten: cualquier otra cadena se
- * deja pasar tal cual para que el validador la rechace en vez de adivinar.
+ *
+ * El booleano se compara normalizado (`trim().toLowerCase()`) porque `"True"`,
+ * `"TRUE"` y `"true "` NO son adivinanza: son el mismo token, y antes de esta
+ * guardia los cuatro daban ya el resultado correcto por ser truthy. Rechazarlos
+ * sería empeorar la superficie que este cambio viene a arreglar. `"1"`, `"0"` y
+ * `"yes"` sí son adivinanza y se dejan pasar tal cual para que el validador los
+ * rechace: ahí la intención no se deduce del token.
  */
 function coerceToSchema(
   schema: ToolParametersSchema,
@@ -151,8 +156,9 @@ function coerceToSchema(
     if (typeof value !== 'string') continue;
     const expected = schema.properties[key]?.type;
     if (expected === 'boolean') {
-      if (value === 'true') out[key] = true;
-      else if (value === 'false') out[key] = false;
+      const t = value.trim().toLowerCase();
+      if (t === 'true') out[key] = true;
+      else if (t === 'false') out[key] = false;
     } else if (expected === 'number' || expected === 'integer') {
       const n = Number(value);
       if (value.trim() !== '' && Number.isFinite(n)) out[key] = n;
@@ -333,31 +339,37 @@ export class ToolRegistry {
       return { success: false, error: 'Registry context not set. Call setContext() first.' };
     }
 
-    // Validate with Zod if schema exists
-    let validatedParams = params as Record<string, unknown>;
+    // #1189 — el camino vivo entraba sin validar NADA. De las 232 tools
+    // registradas solo 2 traen `schema` zod (`createSeam` en seamTools.ts y
+    // `setSeamRange` en sewingEnhancementTools.ts), así que la rama de abajo
+    // cubría 2 y las otras 230 pasaban derecho. `validate()` —el validador
+    // contra el JSON schema que TODAS declaran— estaba escrito y solo lo
+    // llamaba `toolExecutor.ts`, que no importa nadie fuera de tests.
+    //
+    // La guardia va aquí y no en `AgenticLoop` porque `execute` es el único
+    // paso por el que entra toda `ToolDefinition`: cubre de una vez los ~400
+    // casts `params.x as T` repartidos en 38 archivos que los leen sin mirar.
+    // NO cubre las 10 meta-tools, que `AgenticLoop.ts:512` resuelve antes de
+    // consultar el registro (son de solo lectura, sin dispatch).
+    //
+    // La coerción va ANTES de bifurcar a propósito: si solo la hiciera la rama
+    // JSON, esas 2 tools con zod tendrían la política contraria —un `"5"` que
+    // 230 tools aceptan, ellas lo rechazarían— y esa división no la decidió
+    // nadie. Techo conocido: la guardia es de primer nivel, no mira dentro de
+    // los arrays ni de los objetos anidados.
+    const coerced = coerceToSchema(tool.parameters, params as Record<string, unknown>);
+    let validatedParams = coerced;
     if (tool.schema) {
-      const validated = validateToolParams(tool.schema, params);
+      const validated = validateToolParams(tool.schema, coerced);
       if (!validated.success) {
         return { success: false, error: validated.error };
       }
       validatedParams = validated.data as Record<string, unknown>;
     } else {
-      // #1189 — hoy NINGUNA de las 46 definiciones trae `schema` zod, así que
-      // la rama de arriba no corre nunca y el camino vivo entraba sin validar
-      // nada. `validate()` (el validador contra el JSON schema que las tools
-      // sí declaran) estaba escrito y solo lo llamaba `toolExecutor.ts`, que
-      // no importa nadie fuera de tests.
-      //
-      // La guardia va aquí y no en `AgenticLoop` porque `execute` es el único
-      // paso por el que entran todas las tools y todos sus llamadores: cubre
-      // de una vez los 415 casts `params.x as T` de los 28 archivos que los
-      // leen sin mirar.
-      const coerced = coerceToSchema(tool.parameters, (params ?? {}) as Record<string, unknown>);
       const check = this.validate(name, coerced);
       if (!check.valid) {
         return { success: false, error: check.errors.join(', ') };
       }
-      validatedParams = coerced;
     }
 
     const dispatchAsAgent = ((action: Parameters<AppDispatch>[0]) =>

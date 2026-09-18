@@ -282,7 +282,9 @@ export const tools: ToolDefinition[] = [
           description: 'Tolerance in mm before flagging a change (default: 2mm)',
         },
       },
-      required: ['skillId', 'pieceId', 'formulas'],
+      // Solo `formulas` (#1189): el cuerpo nunca lee `skillId` ni `pieceId`,
+      // así que exigirlos rechaza una llamada que hacía exactamente su trabajo.
+      required: ['formulas'],
     },
     execute: async (params, _dispatch, _getState) => {
       const formulas = params.formulas as Array<{
