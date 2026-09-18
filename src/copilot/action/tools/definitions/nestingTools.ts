@@ -26,7 +26,10 @@ const runNestingTool: ToolDefinition = {
       fabricWidth: { type: 'number', description: 'Fabric width in mm (default 1500 = 150cm) / Ancho de tela en mm' },
       fabricLength: { type: 'number', description: 'Max fabric length in mm (default 3000) / Largo máximo de tela en mm' },
       gap: { type: 'number', description: 'Minimum gap between pieces in mm (default 5) / Espacio mínimo entre piezas en mm' },
-      rotationStep: { type: 'integer', description: 'Rotation granularity in degrees (default 90) / Granularidad de rotación en grados' },
+      // 'number', no 'integer' (#1189): el cuerpo lo lee `as number` y el motor
+      // solo exige > 0, así que 22,5° es una granularidad legítima que la
+      // guardia rechazaría por un 'integer' que nunca fue verdad.
+      rotationStep: { type: 'number', description: 'Rotation granularity in degrees (default 90) / Granularidad de rotación en grados' },
       allowMirror: { type: 'boolean', description: 'Allow mirroring pieces / Permitir espejar piezas' },
       sortStrategy: {
         type: 'string',

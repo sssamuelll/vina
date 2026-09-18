@@ -1297,7 +1297,14 @@ const projectSlice = createSlice({
         ...JSON.parse(JSON.stringify(piece)),
         // state-encoded ID — see B10-state. The parent piece's id is
         // intentionally referenced in the clone id for cross-reference.
-        id: `${piece.id}-clone-${Date.now()}`,
+        // La cola es `newId()` y no `Date.now()`: es el hermano de #1190 y
+        // falla igual. Dos clones de la misma pieza en el mismo milisegundo
+        // daban el MISMO id —`direction` no entra en el id, así que 'over' y
+        // 'under' colisionaban—, este reducer hace push sin deduplicar y
+        // `removePiece` filtra por id, de modo que el rollback de
+        // `layerTools.ts` borraba los dos clones y las costuras de ambos.
+        // `duplicatePiece` ya usaba `newId()`; este era el último sin migrar.
+        id: `${piece.id}-clone-${newId()}`,
         name: `${piece.name} (clone)`,
         layer: action.payload.direction === 'over'
           ? (piece.layer ?? 1) + 1
