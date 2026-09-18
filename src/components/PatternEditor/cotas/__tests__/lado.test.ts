@@ -56,6 +56,28 @@ describe('ladoDelHit — traducir la convención de nearestSegment', () => {
   it('un índice fuera del contorno no inventa un lado', () => {
     expect(ladoDelHit(RECTANGULO, 99)).toBe(null);
   });
+
+  /**
+   * Dos anillos: el hueco que la sesión de #1143 señaló y que no tenía oráculo.
+   * `indiceSegunLosBordes` retrocede hasta la `M` de SU subtrazo, y esto lo
+   * fija. Hoy `nearestSegment` no alcanza el segundo anillo —solo mide una
+   * cuerda de cierre y rotula con la PRIMERA `Z`—, así que el caso llega por
+   * código, no por ratón; el día que lo alcance, esta prueba ya está puesta.
+   */
+  it('con dos subtrazos, la Z del segundo apunta a la M del segundo', () => {
+    const dosAnillos: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [200, 0] },
+      { type: 'L', values: [200, 100] },
+      { type: 'Z', values: [] },
+      { type: 'M', values: [50, 30] },
+      { type: 'L', values: [150, 30] },
+      { type: 'L', values: [150, 70] },
+      { type: 'Z', values: [] },
+    ];
+    expect(ladoDelHit(dosAnillos, 3), 'la Z del primer anillo').toBe(0);
+    expect(ladoDelHit(dosAnillos, 7), 'la Z del segundo anillo').toBe(4);
+  });
 });
 
 describe('ladoMasCercano — qué lado abre Tab', () => {

@@ -284,9 +284,15 @@ Así que aquí va el censo de cada mecanismo, entero, no solo las ramas con test
 | | `copiaConExtremo` | ya lo hacía |
 | | `applyNodeMove` / `moveOneCommand` | ya lo hacía |
 | **Traducir la `Z` a su `M`** | `nearestSegment` | la produce (índice de la `Z`), y solo la de la PRIMERA |
-| | `useEditPattern.ts:424` | la clava a `0` |
-| | `lado.ts` `ladoDelHit` | retrocede hasta la `M` del subtrazo |
-| | — | las tres coinciden con un solo anillo; con dos, no. § 5 |
+| | `semanticEdges.ts` `indiceSegunLosBordes` | retrocede hasta la `M` del subtrazo. **Correcta, y ya existía** |
+| | `lado.ts` `ladoDelHit` | ya no la reimplementa: llama a la de arriba |
+| | `useEditPattern.ts:424` | la clava a `0`. **Mal con dos anillos**, y sigue así: no es de esta tanda |
+
+**El censo ya pagó**: la traducción `Z`→`M` tenía CUATRO copias y yo iba a dejar
+una quinta. `indiceSegunLosBordes` estaba escrita desde el 2026-09-06 con lo que
+costó su ausencia —«clicar el lado IZQUIERDO con Elástico o con Pliegue no hacía
+absolutamente nada»— y no tenía test propio. Ahora `ladoDelHit` la llama en vez de
+repetirla, y el caso de dos anillos que nadie fijaba está en `lado.test.ts`.
 
 Lo que este censo NO cubre, dicho: un archivo que traduzca bien en un sitio y mida
 crudo en otro con el rango desestructurado en variables. Es el mismo hueco que

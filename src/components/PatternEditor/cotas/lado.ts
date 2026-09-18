@@ -1,5 +1,6 @@
 import type { PathCommand, Point2D } from '../../../types/types';
 import { distToSegment } from '../../../utils/geometry/distance';
+import { indiceSegunLosBordes } from '../../../utils/semanticEdges';
 import { segmentPolar } from './segmentPolar';
 
 /**
@@ -14,26 +15,24 @@ import { segmentPolar } from './segmentPolar';
  */
 
 /**
- * De la convención de `nearestSegment` a la de `segmentPolar`.
+ * De la convención de `nearestSegment` a la de `segmentPolar`, y con validación.
  *
- * `nearestSegment` rotula el lado de cierre con el índice de la `Z` (o con 0 si
- * no hay); `segmentPolar` lo rotula con el de la `M`, porque el par final de esa
- * `M` ES el nodo que se mueve. Traducir al LEER y no al escribir: `nearestSegment`
- * tiene muchos consumidores y su convención es su interfaz pública.
+ * `nearestSegment` rotula el lado de cierre con el índice de la `Z`;
+ * `segmentPolar` lo rotula con el de la `M`, porque el par final de esa `M` ES
+ * el nodo que se mueve. La traducción NO se reimplementa aquí: la hace
+ * `indiceSegunLosBordes`, que ya existía para el mismo convenio y trae escrito
+ * lo que costó («clicar el lado IZQUIERDO con Elástico o con Pliegue no hacía
+ * absolutamente nada»). Era la cuarta copia de la misma idea en este repo; con
+ * esto quedan tres, y la que sobra es la de `useEditPattern.ts`, que la clava a
+ * `0` y por eso falla con dos subtrazos.
  *
- * `null` si ese hit no cae sobre ningún lado recto — un lado curvo incluido.
+ * Lo que sí es de aquí: validar. `null` si ese hit no cae sobre ningún lado
+ * RECTO —un lado curvo incluido—, porque el largo de una curva es de solo
+ * lectura (spec 08-09 § 3.1).
  */
 export function ladoDelHit(outline: PathCommand[], hitIndex: number): number | null {
-  const comando = outline[hitIndex];
-  if (!comando) return null;
-  let indice = hitIndex;
-  if (comando.type === 'Z') {
-    // La `M` que abre el subtrazo de esta `Z`.
-    indice = 0;
-    for (let i = hitIndex - 1; i >= 0; i--) {
-      if (outline[i].type === 'M') { indice = i; break; }
-    }
-  }
+  if (!outline[hitIndex]) return null;
+  const indice = indiceSegunLosBordes(outline, hitIndex);
   return segmentPolar(outline).some(t => t.toCommandIndex === indice) ? indice : null;
 }
 
