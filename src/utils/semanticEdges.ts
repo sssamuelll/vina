@@ -296,6 +296,33 @@ export function rangoMedibleDeBorde(
 }
 
 /**
+ * ESTE LADO SE QUEDA MUDO POR TRES VÍAS, y esta función solo cierra una.
+ *
+ * Medido entre el 2026-09-06 y el 2026-09-18, con tres sesiones tirando del
+ * hilo por puertas distintas:
+ *
+ *   1. el RANGO sin traducir — `segmentRange` apunta a la `M`, que no dibuja,
+ *      y quien mida ahí obtiene cero. Lo cierra `rangoMedibleDeBorde`, aquí
+ *      arriba, y lo vigila `scripts/medir-bordes-lint.mjs` (#1143).
+ *   2. el ÍNDICE sin traducir — un hit-test devuelve el índice de la `Z` y
+ *      quien lo recibe lo compara contra rangos rotulados con la `M`. Lo cierra
+ *      esta función. `useEditPattern.ts:424` hace la misma traducción clavada a
+ *      `0`, que es **incorrecto con dos anillos**, y sigue así.
+ *   3. el PRODUCTOR, que solo emitía lados dibujados con `L` y dejaba ese tramo
+ *      sin entidad propia: sin largo, sin ángulo y sin poder editarse (#1167,
+ *      `cotas/segmentPolar.ts`).
+ *
+ * Ninguna de las tres se ve desde las otras dos: el grep del mecanismo 1 no
+ * toca el 2. Lo único que las une es el OBJETO. Si el lado de cierre vuelve a
+ * fallar, el censo va por el objeto —quién lo mide, quién lo nombra, quién lo
+ * produce, quién lo dibuja— y no por la causa.
+ *
+ * (La nota va en la cabecera y no en un issue a propósito: las cuatro rondas
+ * anteriores tuvieron su issue y el defecto volvió igual. Esto es lo que se lee
+ * cuando alguien tropieza.)
+ */
+
+/**
  * El índice de comando TAL COMO LO ETIQUETAN los bordes.
  *
  * Hermano de `rangoMedibleDeBorde`, y su inversa: aquel traduce un rango que
