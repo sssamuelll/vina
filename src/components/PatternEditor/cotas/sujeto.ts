@@ -1,7 +1,7 @@
 import type { InternalLineSelection, PatternPiece, SaSelection, Tool2D, Trazo, TrazoSelection } from '../../../types/types';
 import { margenEnPunto } from '../../../utils/seam/margenEnPunto';
 import { cotaDeMargen } from './cotaDeMargen';
-import { cotasDeLineaInterna, cotasDePieza, cotasDeTrazo, type Cota } from './cotas';
+import { cotasDeLineaInterna, cotasDelLado, cotasDePieza, cotasDeTrazo, type Cota } from './cotas';
 import { cotasDelTramoEnCurso, type TramoEnCurso } from './tramoEnCurso';
 import { cotasDelNodo } from './nodo';
 import { formatMedida } from './parseMedida';
@@ -47,6 +47,16 @@ export interface SujetoInput {
    * tanda 6, todavía sin implementar).
    */
   nodoSeleccionado?: { pieceId: string; commandIndex: number } | null;
+  /**
+   * El lado del contorno elegido (#1167). Como el punto y el tramo en curso,
+   * vive en el estado LOCAL de su hook —o en el de la puerta de Tab— y por eso
+   * llega como argumento.
+   *
+   * `commandIndex` en la convención de `segmentPolar`: el comando cuyo par
+   * final es el nodo que se mueve (la `M` para el lado de cierre). Quien viene
+   * del ratón lo traduce antes con `ladoDelHit`.
+   */
+  ladoSeleccionado?: { pieceId: string; commandIndex: number } | null;
   /**
    * Los trazos VISIBLES (spec 2026-09-12 § 5.3). `PatternEditor` los filtra por
    * «Construcción» antes de pasarlos, así que aquí «no está en la lista» y
@@ -191,6 +201,34 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
           bordeLeido: null,
           disabled: Boolean(piezaDelNodo.locked) || Boolean(input.layerLocked[capaDelNodo]),
           lineaDeSujeto: 'Editando: el punto seleccionado',
+        };
+      }
+    }
+  }
+
+  // Un lado elegido gana a la pieza que lo contiene, por la misma regla de
+  // especificidad que el punto — y pierde contra el punto, que es más fino.
+  // Va después del nodo y antes de todo lo demás por eso (#1167 § 3.1).
+  if (input.ladoSeleccionado) {
+    const piezaDelLado = input.pieces.find(p => p.id === input.ladoSeleccionado!.pieceId);
+    const capaDelLado = piezaDelLado?.layer ?? 1;
+    if (piezaDelLado && !input.hiddenLayerIds.includes(capaDelLado)) {
+      // Durante el arrastre las cotas se callan: § 2.1 del 08-09 solo deja viva
+      // la magnitud que cambia, y trasladar un lado no cambia la suya.
+      if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada(null);
+      const cotas = cotasDelLado(piezaDelLado, input.ladoSeleccionado.commandIndex);
+      // Un lado que ya no existe (deshacer, curva por puntos) cae a la pieza en
+      // vez de dejar una caja vacía anunciada en la tira.
+      if (cotas.length > 0) {
+        return {
+          piece: piezaDelLado,
+          caliente: false,
+          cotas,
+          lectura: null,
+          lecturaApagada: false,
+          bordeLeido: null,
+          disabled: Boolean(piezaDelLado.locked) || Boolean(input.layerLocked[capaDelLado]),
+          lineaDeSujeto: 'Editando: el lado seleccionado',
         };
       }
     }

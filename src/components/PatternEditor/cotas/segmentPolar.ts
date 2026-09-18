@@ -40,29 +40,55 @@ function anchorAfter(
   }
 }
 
-/** Largo y ángulo editables de cada comando `L` del trazo. */
+/** Un tramo recto de `from` a `to`, escribible moviendo el nodo de `toCommandIndex`. */
+function tramo(from: Point2D, to: Point2D, toCommandIndex: number): PolarSegment {
+  const polar = polarOf(from, to);
+  return {
+    from,
+    to,
+    lengthMm: polar.lengthMm,
+    angleDeg: polar.angleDeg,
+    writeLength: mm => polarPoint(from, mm, polar.angleDeg),
+    writeAngle: deg => polarPoint(from, polar.lengthMm, deg),
+    toCommandIndex,
+  };
+}
+
+/** Más corto que esto, el lado de cierre no existe: la `Z` ya está sobre la `M`. */
+const CIERRE_MIN_MM = 1e-6;
+
+/**
+ * Largo y ángulo editables de cada tramo RECTO del trazo — incluido el de
+ * **cierre** (#1167 § 4).
+ *
+ * El de cierre no es un comando `L`: es la `Z`, que vuelve al ancla de su `M`.
+ * Sin él, un rectángulo real (`M L L L Z`) —el contorno más común que existe—
+ * enseñaba tres lados de cuatro. Es el mismo hueco que #1120 pagó en las
+ * etiquetas de «Largos»: un consumidor que no traduce la convención del
+ * productor.
+ *
+ * Su `toCommandIndex` es el de la **`M`**, no el de la `Z`, porque el par final
+ * de esa `M` ES el nodo que se mueve — que es lo que ese campo significa y lo
+ * que `copiaConNodoFinal` y `applyNodeMove` esperan recibir. La convención de
+ * `nearestSegment` (el índice de la `Z`) se traduce al leer.
+ */
 export function segmentPolar(path: PathCommand[]): PolarSegment[] {
   const segments: PolarSegment[] = [];
   let current: Point2D | null = null;
   let subpathStart: Point2D | null = null;
+  let subpathStartIndex = -1;
 
   path.forEach((command, commandIndex) => {
     const to = anchorAfter(command, current, subpathStart);
     if (command.type === 'L' && current && to) {
-      const from = current;
-      const polar = polarOf(from, to);
-      segments.push({
-        from,
-        to,
-        lengthMm: polar.lengthMm,
-        angleDeg: polar.angleDeg,
-        writeLength: mm => polarPoint(from, mm, polar.angleDeg),
-        writeAngle: deg => polarPoint(from, polar.lengthMm, deg),
-        toCommandIndex: commandIndex,
-      });
+      segments.push(tramo(current, to, commandIndex));
+    }
+    if (command.type === 'Z' && current && subpathStart && subpathStartIndex >= 0
+      && polarOf(current, subpathStart).lengthMm > CIERRE_MIN_MM) {
+      segments.push(tramo(current, subpathStart, subpathStartIndex));
     }
 
-    if (command.type === 'M') subpathStart = to;
+    if (command.type === 'M') { subpathStart = to; subpathStartIndex = commandIndex; }
     current = to;
   });
 
