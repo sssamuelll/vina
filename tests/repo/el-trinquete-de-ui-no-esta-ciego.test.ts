@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,12 +21,26 @@ import { join } from 'node:path';
  *     cuando empieza por la apertura de un comentario JSX ciega también lo que
  *     venga DETRÁS de su cierre en la misma línea — y un comentario corto
  *     seguido de una expresión con color es JSX corriente. Lo sondeó la
- *     revisión adversarial del mismo día; el caso vive abajo, en el segundo
- *     test, que es donde se puede escribir sin romper este bloque.
+ *     revisión adversarial del mismo día.
  *
  * Este archivo corre el linter de verdad sobre un árbol de mentira, con las dos
  * clases de línea. No mira contadores: mira que vea lo que hay y no vea lo que
  * no hay.
+ *
+ * LOS CINCO CASOS VAN EN UN SOLO ÁRBOL Y UNA SOLA CORRIDA. Antes cada uno
+ * armaba su repo temporal y arrancaba su `node`: cinco `git init`, cinco `git
+ * add`, cinco procesos. Bajo carga eso son 3-6 s por arranque y el caso se come
+ * su tope de 5 s sin haber medido nada — medido el 2026-09-18, este archivo se
+ * cayó dos veces por «Test timed out» dentro del hook de `pre-push` mientras la
+ * máquina tenía seis Chromium encima, y una tercera aquí mismo con la máquina
+ * quieta (16,07 s de reloj, un caso en 2,7 s y otro pasándose). Con una sola
+ * corrida son ~2 s y ninguno depende del reloj.
+ *
+ * Al compartir la salida, cada `it` afirma lo suyo POR ARCHIVO —«no aparece
+ * `src/A.tsx`», no «el total es 0»—, que además es mejor oráculo: fija el
+ * comportamiento del archivo en vez del contador global. Y el primero exige que
+ * el censo no haya salido vacío, porque un detector ciego devuelve cero
+ * hallazgos y eso se lee igual que «todo bien».
  */
 
 const RAIZ = process.cwd();
@@ -44,15 +58,54 @@ const ENV_SIN_GIT = Object.fromEntries(
   Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')),
 ) as NodeJS.ProcessEnv;
 
-/** Corre el linter con `--list R3` sobre un repo de mentira y devuelve su salida. */
-function censoR3(archivos: Record<string, string>): string {
+const CASOS: Record<string, string> = {
+  // El linter exige un archivo de tokens para no contarlo a él: su `#123456`
+  // es el control de la exención y no puede aparecer en el censo.
+  'src/styles/tokens.css': ':root { --accent: #123456; }\n',
+
+  // El falso positivo que rompía el build al citar #1129.
+  'src/A.tsx': [
+    'export const A = () => (',
+    '  <div>',
+    '    {/* el arreglo de #1129, medido el 06-09 */}',
+    '    <span />',
+    '  </div>',
+    ');',
+  ].join('\n'),
+
+  // El falso negativo que abría el arreglo del anterior. `{/* c */ expr}` es
+  // JSX válido y corriente.
+  'src/B.tsx': [
+    'export const B = ({ activo }) => (',
+    '  <div>',
+    '    {/* nota */ activo && <span style={{ color: \'#ff0000\' }} />}',
+    '  </div>',
+    ');',
+  ].join('\n'),
+
+  // El control positivo: si esto fallara, los negativos pasarían por ceguera
+  // total y no por acierto.
+  'src/C.tsx': "export const c = '#abcdef';\n",
+
+  // Un color citado dentro de un bloque de comentario de varias líneas.
+  'src/D.tsx': [
+    '/**',
+    ' * antes era #ff0000 y se cambió por un token',
+    ' */',
+    'export const d = 1;',
+  ].join('\n'),
+
+  // `t.startsWith('*')` descartaba la línea por parecer JSDoc. `* { … }` es un
+  // selector, no prosa.
+  'src/E.css': '* { color: #beef00; }\n',
+};
+
+/** Corre el linter con `--list R3` sobre el árbol de mentira, una sola vez. */
+function censoR3(): string {
   const dir = mkdtempSync(join(tmpdir(), 'vina-trinquete-'));
   try {
     execFileSync('git', ['init', '-q'], { cwd: dir, env: ENV_SIN_GIT });
-    mkdirSync(join(dir, 'src', 'styles'), { recursive: true });
-    // El linter exige un archivo de tokens para no contarlo a él.
-    writeFileSync(join(dir, 'src', 'styles', 'tokens.css'), ':root { --accent: #123456; }\n');
-    for (const [ruta, contenido] of Object.entries(archivos)) {
+    for (const [ruta, contenido] of Object.entries(CASOS)) {
       const destino = join(dir, ruta);
       mkdirSync(join(destino, '..'), { recursive: true });
       writeFileSync(destino, contenido);
@@ -70,60 +123,41 @@ function censoR3(archivos: Record<string, string>): string {
   }
 }
 
+/** El sitio que el censo imprime para un archivo: `  ruta:línea  color`. */
+const sitio = (archivo: string, color: string) =>
+  new RegExp(`${archivo.replace('.', '\\.')}:\\d+\\s+${color}`);
+
 describe('el trinquete de UI no está ciego', () => {
+  let salida = '';
+  beforeAll(() => { salida = censoR3(); });
+
+  it('el censo no sale vacío, ni cuenta el archivo de tokens', () => {
+    // Sin esto, los tres «no aparece» de abajo pasarían por ceguera total.
+    expect(salida, 'el censo no encontró nada: el detector está ciego').toMatch(/R3 .* 3 sitios/);
+    expect(salida, 'contó el archivo de tokens, que es donde SÍ es legal un literal')
+      .not.toContain('tokens.css');
+  });
+
   it('NO cuenta el número de un issue escrito en un comentario de JSX', () => {
-    // El falso positivo que rompía el build al citar #1129.
-    const salida = censoR3({
-      'src/A.tsx': [
-        'export const A = () => (',
-        '  <div>',
-        '    {/* el arreglo de #1129, medido el 06-09 */}',
-        '    <span />',
-        '  </div>',
-        ');',
-      ].join('\n'),
-    });
-    expect(salida, 'cuenta prosa: un número de issue no es un color').toContain('0 sitios');
+    expect(salida, 'cuenta prosa: un número de issue no es un color').not.toContain('src/A.tsx');
   });
 
   it('pero SÍ cuenta un color escrito detrás de un comentario de JSX cerrado', () => {
-    // El falso negativo que abría el arreglo del anterior. `{/* c */ expr}` es
-    // JSX válido y corriente.
-    const salida = censoR3({
-      'src/B.tsx': [
-        'export const B = ({ activo }) => (',
-        '  <div>',
-        '    {/* nota */ activo && <span style={{ color: \'#ff0000\' }} />}',
-        '  </div>',
-        ');',
-      ].join('\n'),
-    });
-    expect(salida, 'un color detrás de un comentario cerrado queda invisible').toContain('#ff0000');
+    expect(salida, 'un color detrás de un comentario cerrado queda invisible')
+      .toMatch(sitio('src/B.tsx', '#ff0000'));
   });
 
   it('y sigue viendo un color en una línea normal', () => {
-    // El control positivo: si esto fallara, los dos de arriba pasarían por
-    // ceguera total y no por acierto.
-    const salida = censoR3({ 'src/C.tsx': "export const c = '#abcdef';\n" });
-    expect(salida).toContain('#abcdef');
+    expect(salida).toMatch(sitio('src/C.tsx', '#abcdef'));
   });
 
   it('y NO ve un color dentro de un bloque de comentario de varias líneas', () => {
-    const salida = censoR3({
-      'src/D.tsx': [
-        '/**',
-        ' * antes era #ff0000 y se cambió por un token',
-        ' */',
-        'export const d = 1;',
-      ].join('\n'),
-    });
-    expect(salida).toContain('0 sitios');
+    expect(salida, 'un color citado en prosa de JSDoc no es una decisión de color')
+      .not.toContain('src/D.tsx');
   });
 
   it('pero un selector universal de CSS con color SÍ se cuenta, aunque empiece por `*`', () => {
-    // `t.startsWith('*')` descartaba la línea por parecer JSDoc. `* { … }` es un
-    // selector, no prosa.
-    const salida = censoR3({ 'src/E.css': '* { color: #beef00; }\n' });
-    expect(salida, 'el selector universal ciega la línea entera').toContain('#beef00');
+    expect(salida, 'el selector universal ciega la línea entera')
+      .toMatch(sitio('src/E.css', '#beef00'));
   });
 });

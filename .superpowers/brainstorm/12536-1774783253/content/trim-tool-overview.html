@@ -1,0 +1,151 @@
+<h2>Trim Placement Tool — UX Overview</h2>
+<p class="subtitle">Phase 2: Edge-bound placement following the notch tool pattern</p>
+
+<div class="section">
+  <h3>Tool Flow</h3>
+  <div class="mockup">
+    <div class="mockup-header">Toolbar & Options Bar</div>
+    <div class="mockup-body" style="padding: 20px; background: #1a1a2e;">
+      <!-- Toolbar strip -->
+      <div style="display: flex; gap: 8px; margin-bottom: 16px; align-items: center;">
+        <div style="background: #16213e; border: 1px solid #334; padding: 6px 10px; border-radius: 4px; color: #667; font-size: 12px;">Notch</div>
+        <div style="background: #0f3460; border: 2px solid #e94560; padding: 6px 10px; border-radius: 4px; color: #fff; font-size: 12px; font-weight: 600;">Trim</div>
+        <div style="background: #16213e; border: 1px solid #334; padding: 6px 10px; border-radius: 4px; color: #667; font-size: 12px;">Grainline</div>
+        <span style="color: #556; font-size: 11px; margin-left: 8px;">← New tool in toolbar</span>
+      </div>
+
+      <!-- Options bar -->
+      <div style="background: #16213e; border: 1px solid #334; border-radius: 6px; padding: 12px 16px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+        <div>
+          <div style="color: #889; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">Preset</div>
+          <div style="background: #0a0a1a; border: 1px solid #334; border-radius: 4px; padding: 6px 12px; color: #fff; font-size: 12px; min-width: 160px; display: flex; justify-content: space-between; align-items: center;">
+            <span>20mm 4-hole Button</span>
+            <span style="color: #556;">&#9662;</span>
+          </div>
+        </div>
+        <div>
+          <div style="color: #889; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">Mode</div>
+          <div style="display: flex; gap: 2px;">
+            <div style="background: #e94560; padding: 5px 12px; border-radius: 3px 0 0 3px; color: #fff; font-size: 11px; font-weight: 600;">Single</div>
+            <div style="background: #0a0a1a; border: 1px solid #334; padding: 5px 12px; border-radius: 0 3px 3px 0; color: #889; font-size: 11px;">Distribute</div>
+          </div>
+        </div>
+        <div>
+          <div style="color: #889; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">Size</div>
+          <div style="background: #0a0a1a; border: 1px solid #334; border-radius: 4px; padding: 6px 12px; color: #fff; font-size: 12px; width: 60px; text-align: center;">20 mm</div>
+        </div>
+        <div>
+          <div style="color: #889; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">Color</div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 20px; height: 20px; border-radius: 50%; background: #1a1a1a; border: 2px solid #556;"></div>
+            <span style="color: #aaa; font-size: 12px;">Black</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Placement Interaction</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Single Mode — Click to Place</div>
+      <div class="mockup-body" style="padding: 30px; background: #f8f9fa; position: relative;">
+        <svg viewBox="0 0 300 400" style="width: 100%; height: 300px;">
+          <!-- Piece outline -->
+          <path d="M 50 50 L 250 50 L 250 350 L 50 350 Z" fill="#fff" stroke="#333" stroke-width="2"/>
+          <!-- Edge labels -->
+          <text x="150" y="40" text-anchor="middle" fill="#999" font-size="10">shoulder</text>
+          <text x="265" y="200" text-anchor="start" fill="#999" font-size="10" transform="rotate(90, 265, 200)">side-seam</text>
+          <text x="35" y="200" text-anchor="end" fill="#e94560" font-size="10" font-weight="bold" transform="rotate(-90, 35, 200)">center-front</text>
+          <text x="150" y="370" text-anchor="middle" fill="#999" font-size="10">hemline</text>
+
+          <!-- Hover highlight on center-front edge -->
+          <line x1="50" y1="50" x2="50" y2="350" stroke="#e94560" stroke-width="3" opacity="0.3"/>
+
+          <!-- Cursor with snap indicator -->
+          <circle cx="50" cy="120" r="5" fill="#e94560" opacity="0.8"/>
+          <circle cx="50" cy="120" r="12" fill="none" stroke="#e94560" stroke-width="1" stroke-dasharray="3,3"/>
+
+          <!-- Preview trim (ghost) -->
+          <circle cx="50" cy="120" r="8" fill="none" stroke="#e94560" stroke-width="1.5" stroke-dasharray="2,2"/>
+          <circle cx="50" cy="120" r="2" fill="#e94560" opacity="0.5"/>
+
+          <!-- Already placed trim -->
+          <circle cx="50" cy="200" r="8" fill="#1a1a1a" stroke="#666" stroke-width="1.5"/>
+          <circle cx="47" cy="197" r="1.5" fill="#444"/>
+          <circle cx="53" cy="197" r="1.5" fill="#444"/>
+          <circle cx="47" cy="203" r="1.5" fill="#444"/>
+          <circle cx="53" cy="203" r="1.5" fill="#444"/>
+
+          <!-- Label -->
+          <text x="70" y="205" fill="#666" font-size="9">Button 1</text>
+        </svg>
+        <div style="text-align: center; color: #666; font-size: 12px; margin-top: 8px;">
+          Hover edge -> orange highlight -> click to place
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-header">Distribute Mode — N Trims Along Edge</div>
+      <div class="mockup-body" style="padding: 30px; background: #f8f9fa; position: relative;">
+        <svg viewBox="0 0 300 400" style="width: 100%; height: 300px;">
+          <!-- Piece outline -->
+          <path d="M 50 50 L 250 50 L 250 350 L 50 350 Z" fill="#fff" stroke="#333" stroke-width="2"/>
+          <!-- Edge labels -->
+          <text x="35" y="200" text-anchor="end" fill="#e94560" font-size="10" font-weight="bold" transform="rotate(-90, 35, 200)">center-front</text>
+
+          <!-- Selected edge highlight -->
+          <line x1="50" y1="80" x2="50" y2="320" stroke="#e94560" stroke-width="3" opacity="0.4"/>
+
+          <!-- Distributed buttons (4 evenly spaced) -->
+          <g>
+            <circle cx="50" cy="100" r="8" fill="#1a1a1a" stroke="#e94560" stroke-width="1.5"/>
+            <circle cx="50" cy="160" r="8" fill="#1a1a1a" stroke="#e94560" stroke-width="1.5"/>
+            <circle cx="50" cy="220" r="8" fill="#1a1a1a" stroke="#e94560" stroke-width="1.5"/>
+            <circle cx="50" cy="280" r="8" fill="#1a1a1a" stroke="#e94560" stroke-width="1.5"/>
+          </g>
+
+          <!-- Spacing indicators -->
+          <line x1="30" y1="100" x2="30" y2="160" stroke="#e94560" stroke-width="1" stroke-dasharray="2,2"/>
+          <text x="22" y="133" fill="#e94560" font-size="8" text-anchor="end">60</text>
+          <line x1="30" y1="160" x2="30" y2="220" stroke="#e94560" stroke-width="1" stroke-dasharray="2,2"/>
+          <text x="22" y="193" fill="#e94560" font-size="8" text-anchor="end">60</text>
+
+          <!-- Start/end offset markers -->
+          <line x1="42" y1="80" x2="58" y2="80" stroke="#e94560" stroke-width="1"/>
+          <text x="65" y="84" fill="#e94560" font-size="8">start offset: 20mm</text>
+          <line x1="42" y1="320" x2="58" y2="320" stroke="#e94560" stroke-width="1"/>
+          <text x="65" y="324" fill="#e94560" font-size="8">end offset: 30mm</text>
+        </svg>
+        <div style="text-align: center; color: #666; font-size: 12px; margin-top: 8px;">
+          Click edge -> set count (4) + offsets -> auto-distribute
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Key Behaviors</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+    <div style="background: #f0f4f8; border-radius: 8px; padding: 16px;">
+      <h4 style="margin: 0 0 8px; color: #333;">Snap-to-Edge</h4>
+      <p style="margin: 0; color: #666; font-size: 13px;">Mouse within 20px of any edge -> edge highlights. Click places trim at closest parametric t position. Same algorithm as notch tool.</p>
+    </div>
+    <div style="background: #f0f4f8; border-radius: 8px; padding: 16px;">
+      <h4 style="margin: 0 0 8px; color: #333;">Snap-to-Point</h4>
+      <p style="margin: 0; color: #666; font-size: 13px;">Existing construction points and edge endpoints attract the cursor. Holding Shift snaps to nearest point within 15px.</p>
+    </div>
+    <div style="background: #f0f4f8; border-radius: 8px; padding: 16px;">
+      <h4 style="margin: 0 0 8px; color: #333;">Mirror to Symmetric</h4>
+      <p style="margin: 0; color: #666; font-size: 13px;">Right-click placed trim -> "Mirror to Linked Piece". Auto-finds piece with matching linkedPieceId + linkMode='symmetry'. Creates mirrored trims.</p>
+    </div>
+    <div style="background: #f0f4f8; border-radius: 8px; padding: 16px;">
+      <h4 style="margin: 0 0 8px; color: #333;">Trim Library Dropdown</h4>
+      <p style="margin: 0; color: #666; font-size: 13px;">23 presets grouped by type (Buttons, Zippers, Snaps...). Search/filter. Shows icon, name, size, material. Select to set active trim for placement.</p>
+    </div>
+  </div>
+</div>
