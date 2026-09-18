@@ -79,8 +79,22 @@ const PROPIETARIOS = ['src/utils/semanticEdges.ts', 'src/utils/seam/index.ts'];
 
 const esTest = (f) => /__tests__|\.test\.|\.spec\./.test(f);
 
+/**
+ * El entorno SIN las variables que git exporta dentro de un hook.
+ *
+ * Dentro de `pre-push`, git pone `GIT_DIR`, `GIT_INDEX_FILE` y compañía en el
+ * entorno, y un `git ls-files` que las herede consulta ESE índice en vez del
+ * árbol que se le pide por `cwd`. El trinquete medía otra cosa y tumbaba el
+ * push sin que el repo tuviera nada malo. Medido el 2026-09-18.
+ */
+const ENV_SIN_GIT = Object.fromEntries(
+  Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')),
+);
+
 function archivos() {
-  const out = execFileSync('git', ['ls-files', '*.ts', '*.tsx'], { cwd: ROOT, encoding: 'utf8' });
+  const out = execFileSync('git', ['ls-files', '*.ts', '*.tsx'], {
+    cwd: ROOT, encoding: 'utf8', env: ENV_SIN_GIT,
+  });
   return out.split('\n')
     .filter(Boolean)
     .map((f) => f.replace(/\\/g, '/'))

@@ -28,6 +28,20 @@ import { join } from 'node:path';
 
 const RAIZ = process.cwd();
 
+/**
+ * El entorno SIN las variables que git exporta dentro de un hook.
+ *
+ * `git push` corre este test desde `pre-push`, y ahí git pone `GIT_DIR`,
+ * `GIT_INDEX_FILE` y compañía en el entorno. Un `git init` / `git add` que las
+ * herede trabaja sobre el repo de AFUERA en vez de sobre el temporal que se
+ * acaba de crear, así que el detector medía otra cosa y tumbaba el push sin que
+ * el repo tuviera nada malo. Medido el 2026-09-18.
+ */
+const ENV_SIN_GIT = Object.fromEntries(
+  Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')),
+) as NodeJS.ProcessEnv;
+
+
 const CASOS: Record<string, string> = {
   // R1, forma directa: el rango metido en los argumentos de la llamada.
   'src/malo.ts': `
@@ -98,18 +112,18 @@ const CASOS: Record<string, string> = {
 function censoDeLosCasos(): string {
   const dir = mkdtempSync(join(tmpdir(), 'vina-medir-'));
   try {
-    execFileSync('git', ['init', '-q'], { cwd: dir });
+    execFileSync('git', ['init', '-q'], { cwd: dir, env: ENV_SIN_GIT });
     for (const [ruta, contenido] of Object.entries(CASOS)) {
       const destino = join(dir, ruta);
       mkdirSync(join(destino, '..'), { recursive: true });
       writeFileSync(destino, contenido);
     }
-    execFileSync('git', ['add', '-A'], { cwd: dir });
+    execFileSync('git', ['add', '-A'], { cwd: dir, env: ENV_SIN_GIT });
     try {
       return execFileSync(
         'node',
         [join(RAIZ, 'scripts', 'medir-bordes-lint.mjs'), '--root', dir, '--list'],
-        { cwd: dir, encoding: 'utf8' },
+        { cwd: dir, encoding: 'utf8', env: ENV_SIN_GIT },
       );
     } catch (e) {
       // Sale con 1 cuando encuentra algo: la lista viene en stdout igual.
@@ -160,7 +174,7 @@ describe('el trinquete de medir bordes no está ciego', () => {
     let codigo = 0;
     try {
       listado = execFileSync('node', [join(RAIZ, 'scripts', 'medir-bordes-lint.mjs')], {
-        cwd: RAIZ, encoding: 'utf8',
+        cwd: RAIZ, encoding: 'utf8', env: ENV_SIN_GIT,
       });
     } catch (e) {
       const err = e as { stdout?: string; status?: number };

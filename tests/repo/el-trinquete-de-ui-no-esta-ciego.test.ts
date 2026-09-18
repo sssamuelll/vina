@@ -31,11 +31,24 @@ import { join } from 'node:path';
 
 const RAIZ = process.cwd();
 
+/**
+ * El entorno SIN las variables que git exporta dentro de un hook.
+ *
+ * `git push` corre esta suite desde `pre-push`, y ahí git pone `GIT_DIR`,
+ * `GIT_INDEX_FILE` y compañía en el entorno: el `git init` / `git add` de abajo
+ * las heredaba y trabajaba sobre el repo de AFUERA en vez del temporal, así que
+ * el linter recibía el árbol equivocado y este test se caía dentro del hook —
+ * solo dentro del hook. Medido el 2026-09-18 (#1143).
+ */
+const ENV_SIN_GIT = Object.fromEntries(
+  Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')),
+) as NodeJS.ProcessEnv;
+
 /** Corre el linter con `--list R3` sobre un repo de mentira y devuelve su salida. */
 function censoR3(archivos: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), 'vina-trinquete-'));
   try {
-    execFileSync('git', ['init', '-q'], { cwd: dir });
+    execFileSync('git', ['init', '-q'], { cwd: dir, env: ENV_SIN_GIT });
     mkdirSync(join(dir, 'src', 'styles'), { recursive: true });
     // El linter exige un archivo de tokens para no contarlo a él.
     writeFileSync(join(dir, 'src', 'styles', 'tokens.css'), ':root { --accent: #123456; }\n');
@@ -44,11 +57,13 @@ function censoR3(archivos: Record<string, string>): string {
       mkdirSync(join(destino, '..'), { recursive: true });
       writeFileSync(destino, contenido);
     }
-    execFileSync('git', ['add', '-A'], { cwd: dir });
+    execFileSync('git', ['add', '-A'], { cwd: dir, env: ENV_SIN_GIT });
     return execFileSync(
       'node',
       [join(RAIZ, 'scripts', 'ui-contract-lint.mjs'), '--root', dir, '--list', 'R3'],
-      { cwd: dir, encoding: 'utf8' },
+      // Sin las GIT_* el `git ls-files` del linter lee el árbol de mentira y no
+      // el de afuera; con ellas puestas —dentro del hook— leía el repo entero.
+      { cwd: dir, encoding: 'utf8', env: ENV_SIN_GIT },
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
