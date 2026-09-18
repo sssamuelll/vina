@@ -158,16 +158,111 @@ test.describe('editar los largos de una pieza que ya existe', () => {
     expect(editor.selectedPieceIds, 'un Esc se comió DOS niveles: también la pieza').toEqual(['p1']);
   });
 
+  /**
+   * «Tab se tragó la tecla y no abrió nada» y «Tab siguió su camino y no abrió
+   * nada» dan el mismo cero de cajas. Lo único que los distingue es si el
+   * router hizo `preventDefault`, así que eso es lo que se mide: un oráculo que
+   * no puede ver el fallo pasa en verde con el bug dentro.
+   */
+  async function tabSeTragoLaTecla(page: Page): Promise<boolean> {
+    await page.evaluate(() => {
+      (window as unknown as { __tab?: boolean }).__tab = undefined;
+      const oyente = (e: KeyboardEvent) => {
+        if (e.key === 'Tab') (window as unknown as { __tab?: boolean }).__tab = e.defaultPrevented;
+      };
+      window.addEventListener('keydown', oyente, { once: true });
+    });
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(400);
+    return page.evaluate(() => (window as unknown as { __tab?: boolean }).__tab === true);
+  }
+
   test('con la pieza bloqueada, Tab no se traga la tecla', async ({ page }) => {
-    // Tragarse Tab sin abrir nada es peor que no hacer nada: el
-    // `preventDefault` del router deja además muerto el Tab nativo.
     await unRectanguloSeleccionado(page);
     await dispatch(page, 'project/lockPiece', 'p1');
     await page.waitForTimeout(300);
     await elRatonSobre(page, { x: 300, y: 350 });
+    expect(await tabSeTragoLaTecla(page), 'Tab se consumió sin abrir nada: tecla muerta').toBe(false);
+    expect(await caja(page).count(), 'abrió la caja de una pieza bloqueada').toBe(0);
+  });
+
+  test('en Medir, Tab ni abre ni se traga la tecla', async ({ page }) => {
+    // § 4 del contrato del 08-09, en negrita suya: «Medir `M` | obtener
+    // medidas; ningún gesto modifica geometría». La primera versión de esta
+    // puerta no miraba la herramienta EN NINGUNA LÍNEA, así que abría una caja
+    // editable aquí y en las otras ~18.
+    await unRectanguloSeleccionado(page);
+    await dispatch(page, 'editor/setActiveTool', 'measure');
+    await dispatch(page, 'tools/setActiveTool2D', 'measure');
+    await page.waitForTimeout(400);
+    await elRatonSobre(page, { x: 300, y: 350 });
+    expect(await tabSeTragoLaTecla(page), 'Medir se comió el Tab').toBe(false);
+    expect(await caja(page).count(), 'Medir abrió una caja que escribe geometría').toBe(0);
+  });
+
+  test('el lado no sobrevive al cambio de herramienta', async ({ page }) => {
+    // Medido en navegador antes de arreglarlo: la tira decía «Pluma · Editando:
+    // el lado seleccionado» y la caja seguía plantada sobre el lienzo. § 2.2:
+    // «Herramienta de creación vs. pieza ya seleccionada → gana la herramienta,
+    // y desaparecen las cotas externas mientras dibuja».
+    await unRectanguloSeleccionado(page);
+    await elRatonSobre(page, { x: 300, y: 350 });
     await page.keyboard.press('Tab');
     await page.waitForTimeout(400);
-    expect(await caja(page).count(), 'abrió la caja de una pieza bloqueada').toBe(0);
+    await page.keyboard.press('Escape');            // cerrar el campo, chip en reposo
+    await page.waitForTimeout(250);
+    await expect(caja(page)).toHaveCount(1);
+
+    await dispatch(page, 'editor/setActiveTool', 'pen');
+    await dispatch(page, 'tools/setActiveTool2D', 'pen');
+    await page.waitForTimeout(500);
+    expect(await caja(page).count(), 'la caja del lado sobrevivió a la Pluma').toBe(0);
+  });
+
+  test('con el menú contextual abierto, Escape cierra EL MENÚ y no el lado', async ({ page }) => {
+    // La puerta engancha su Escape en CAPTURA y con `stopPropagation`: un «sí»
+    // de más mata la tecla para todo lo que venga después, y el Escape del menú
+    // está en burbuja. Es la regresión que `useEditorInteractions` documenta
+    // haber pagado una vez (#1115) y que la primera versión reintrodujo.
+    await unRectanguloSeleccionado(page);
+    await elRatonSobre(page, { x: 300, y: 350 });
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(250);
+
+    await clickAt(page, { x: 300, y: 275 }, 'right');
+    await page.waitForTimeout(400);
+    await expect(page.locator('.context-menu'), 'no se abrió el menú contextual').toHaveCount(1);
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    await expect(
+      page.locator('.context-menu'),
+      'el Escape se lo comió el lado y el menú se quedó abierto',
+    ).toHaveCount(0);
+  });
+
+  test('el camino de verdad: clicar la pieza y pulsar Tab sin mover el ratón', async ({ page }) => {
+    // Los otros casos mueven el ratón sobre el lado justo antes del Tab. Este
+    // es el que ella va a hacer de verdad —clic en la pieza, Tab— y ahí el
+    // ratón se quedó DENTRO, en el punto del clic. Tiene que abrir igual, y
+    // abrir el lado que ese punto tiene más cerca.
+    await page.goto('/');
+    await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
+    await page.waitForTimeout(600);
+    await addPiece(page, 'p1', { x: 200, y: 200 }, 200, 150);
+    await page.waitForTimeout(200);
+    // Clic dentro, cerca del borde de abajo: (300, 340) está a 10 mm de él.
+    await clickAt(page, { x: 300, y: 340 });
+    await page.waitForTimeout(300);
+    expect((await st(page)).editor.selectedPieceIds, 'el clic no seleccionó la pieza').toEqual(['p1']);
+
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(400);
+    await expect(campo(page, 'Largo'), 'Tab tras clicar la pieza no abrió nada').toBeVisible();
+    const valor = await campo(page, 'Largo').inputValue();
+    expect(valor, `abrió un lado que no es el de abajo (200 mm): ${valor}`).toContain('200');
   });
 
   test('al SALIR de crear y volver a clicar la pieza, Tab ya abre el lado', async ({ page }) => {

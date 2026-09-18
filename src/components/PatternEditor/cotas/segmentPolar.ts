@@ -11,6 +11,16 @@ export interface PolarSegment {
   writeAngle(deg: number): Point2D;
   /** Índice del comando cuyo par final representa el nodo que se mueve. */
   toCommandIndex: number;
+  /**
+   * El comando que DIBUJA este tramo. Coincide con `toCommandIndex` salvo en el
+   * de cierre, donde dibuja la `Z` y se mueve el ancla de la `M`.
+   *
+   * Los dos hacen falta y no son el mismo número: la referencia angular se
+   * busca «lo que hay ANTES de este comando», y preguntarlo por la `M` (índice
+   * 0) devuelve la nada — el lado de cierre decía «al eje» mientras sus
+   * hermanos decían «al tramo», dos de cuatro en un mismo rectángulo.
+   */
+  drawCommandIndex: number;
 }
 
 function anchorAfter(
@@ -40,9 +50,26 @@ function anchorAfter(
   }
 }
 
-/** Un tramo recto de `from` a `to`, escribible moviendo el nodo de `toCommandIndex`. */
-function tramo(from: Point2D, to: Point2D, toCommandIndex: number): PolarSegment {
+/**
+ * Más corto que esto, el tramo no existe: sus dos extremos son el mismo punto.
+ *
+ * No es una precaución teórica. El DXF de María llega de CLO con el vértice
+ * REPETIDO en cada esquina, así que un rectángulo suyo trae un tramo de 0 mm
+ * por esquina. Sin este filtro: un chip que dice «0,0 mm» por debajo de su
+ * propio mínimo (0,1), un ángulo de 0° que `atan2(0,0)` se inventa, y escribir
+ * 250 en él arrastra la esquina 250 mm a la derecha por un rumbo que nadie
+ * trazó. La lección está escrita en los dos vecinos: `nodo.ts` («una cota de
+ * 0,0 mm que no se puede mover es peor que ninguna») y `angleReference.ts`
+ * («never let atan2(0,0) invent a reference»).
+ */
+const TRAMO_MIN_MM = 1e-6;
+
+/** Un tramo recto de `from` a `to`, o `null` si sus extremos coinciden. */
+function tramo(
+  from: Point2D, to: Point2D, toCommandIndex: number, drawCommandIndex: number,
+): PolarSegment | null {
   const polar = polarOf(from, to);
+  if (polar.lengthMm <= TRAMO_MIN_MM) return null;
   return {
     from,
     to,
@@ -51,11 +78,9 @@ function tramo(from: Point2D, to: Point2D, toCommandIndex: number): PolarSegment
     writeLength: mm => polarPoint(from, mm, polar.angleDeg),
     writeAngle: deg => polarPoint(from, polar.lengthMm, deg),
     toCommandIndex,
+    drawCommandIndex,
   };
 }
-
-/** Más corto que esto, el lado de cierre no existe: la `Z` ya está sobre la `M`. */
-const CIERRE_MIN_MM = 1e-6;
 
 /**
  * Largo y ángulo editables de cada tramo RECTO del trazo — incluido el de
@@ -81,11 +106,12 @@ export function segmentPolar(path: PathCommand[]): PolarSegment[] {
   path.forEach((command, commandIndex) => {
     const to = anchorAfter(command, current, subpathStart);
     if (command.type === 'L' && current && to) {
-      segments.push(tramo(current, to, commandIndex));
+      const t = tramo(current, to, commandIndex, commandIndex);
+      if (t) segments.push(t);
     }
-    if (command.type === 'Z' && current && subpathStart && subpathStartIndex >= 0
-      && polarOf(current, subpathStart).lengthMm > CIERRE_MIN_MM) {
-      segments.push(tramo(current, subpathStart, subpathStartIndex));
+    if (command.type === 'Z' && current && subpathStart && subpathStartIndex >= 0) {
+      const t = tramo(current, subpathStart, subpathStartIndex, commandIndex);
+      if (t) segments.push(t);
     }
 
     if (command.type === 'M') { subpathStart = to; subpathStartIndex = commandIndex; }

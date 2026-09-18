@@ -174,8 +174,24 @@ function copiaConNodoFinal(
   const command = copy[commandIndex];
   if (!command || command.values.length < 2) return null;
   const offset = command.values.length - 2;
+  const dx = point.x - command.values[offset];
+  const dy = point.y - command.values[offset + 1];
   command.values[offset] = point.x;
   command.values[offset + 1] = point.y;
+  // El control de SALIDA viaja con el ancla, o la tangente se tuerce sola.
+  //
+  // Es la misma ley que `copiaConExtremo` ya aplicaba a los extremos de una
+  // interna («si lo que sale de M es una curva, su control de salida viaja con
+  // el mismo delta para no torcer la tangente») y que `applyNodeMove` aplica al
+  // contorno. Aquí faltaba, y por eso escribir el largo de un tramo recto
+  // seguido de una curva dejaba su `cp1` plantado donde estaba el nodo viejo.
+  // Lo destapó el lado de CIERRE (#1167): su ancla es la `M`, y el primer
+  // comando de una interna cerrada suele ser justo una `C`.
+  const siguiente = copy[commandIndex + 1];
+  if (siguiente && (siguiente.type === 'C' || siguiente.type === 'Q') && siguiente.values.length >= 2) {
+    siguiente.values[0] += dx;
+    siguiente.values[1] += dy;
+  }
   return copy;
 }
 
@@ -297,7 +313,12 @@ function cotasDeTramos(opts: {
     const outward = normalHaciaFuera(from, to, centro);
     // Dirección y referencia se llevan juntas a patrón antes de restarlas.
     // Así el ángulo relativo y su escritura conservan el marco al girar la pieza.
-    const previous = referenceBefore(path, segment.toCommandIndex);
+    // Por el comando que DIBUJA. Preguntarlo por el que se MUEVE devuelve la
+    // nada en el lado de cierre (la `M` es el índice 0: no hay nada antes), y
+    // entonces dos lados de un mismo rectángulo decían «al eje» y los otros
+    // dos «al tramo» — y no es cosmético: `absoluteAngle` usa esa referencia,
+    // así que el mismo número escrito daba geometría distinta según el lado.
+    const previous = referenceBefore(path, segment.drawCommandIndex);
     const reference = previous.kind === 'segment'
       ? { ...previous, baseDeg: polarOf(from, aPatron(polarPoint(segment.from, 1, previous.baseDeg))).angleDeg }
       : firstReferenceAt?.(from) ?? ABSOLUTE_REFERENCE;
@@ -419,6 +440,11 @@ export function cotasDeTrazo(trazo: Trazo, segmentIndex: number, pieces: Pattern
  * dice en voz alta («al eje» frente a «al tramo»).
  */
 export function cotasDelLado(piece: PatternPiece, toCommandIndex: number): Cota[] {
+  // La misma compuerta que `cotasDePieza`: `H`, `V` y `A` son válidos en el
+  // esquema y `computeBoundingBox` no los recorre, así que el centro —y con él
+  // la normal y la colocación del chip— saldría de una caja mal medida. La
+  // regla estaba escrita a tres funciones de aquí y no se aplicaba.
+  if (piece.outline.some(c => !COMANDOS_SOPORTADOS.has(c.type))) return [];
   const bbox = computeBoundingBox([piece], [piece.id]);
   const centro = bbox ? bboxPivot(bbox) : pieceLocalToPattern({ x: 0, y: 0 }, piece);
   return cotasDeTramos({

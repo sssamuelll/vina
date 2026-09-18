@@ -16,7 +16,7 @@ import { useTriangleTool } from './useTriangleTool';
 import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import { AgruparCotas } from './cotas/CotaChip';
 import CotaLines from './cotas/CotaLines';
-import { cotasDelSujeto, faltaSujeto } from './cotas/sujeto';
+import { admiteLado, cotasDelSujeto, faltaSujeto, refinarAlLado } from './cotas/sujeto';
 import { puntoUnicoSeleccionado } from './cotas/nodo';
 import { ladoDelHit } from './cotas/lado';
 import { usePuertaDeLado } from './usePuertaDeLado';
@@ -772,14 +772,18 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     : activeTool === 'triangle' ? triangleHotId
       : activeTool === 'rectangle' ? rectHotId : null;
   // La puerta de Tab al largo de un lado (#1167). Va antes del router de teclas
-  // porque es él quien la abre.
+  // porque es él quien la abre, y no decide por su cuenta: consulta el sujeto
+  // que hay en pantalla por estos dos refs, que se escriben más abajo en cuanto
+  // el sujeto está calculado. Una sola lista de compuertas, no dos.
+  const puedeAbrirLado = useRef(false);
+  const ladoEsElSujetoRef = useRef(false);
   const puertaDeLado = usePuertaDeLado({
-    pieces, selectedPieceIds, cursorPattern: cursorPositionRef, hiddenLayerIds, layerLocked,
-    caliente: hotId !== null && selectedPieceIds.length === 1 && selectedPieceIds[0] === hotId,
+    pieces, selectedPieceIds, cursorPattern: cursorPositionRef,
+    puedeAbrir: puedeAbrirLado, esElSujeto: ladoEsElSujetoRef,
   });
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas: cotasRef, lados: puertaDeLado,
+      pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas: cotasRef, lados: puertaDeLado.teclas,
     });
 
   // ── Cotas vivas (spec 2026-08-30 § 3, § 5): la pieza nueva o seleccionada
@@ -812,19 +816,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     return commandIndex === null ? null : { pieceId: piece.id, commandIndex };
   }, [activeTool, editPatternTool.editingPieceId, editPatternTool.selectedSegments, pieces]);
   const ladoSeleccionado = ladoDeQ ?? puertaDeLado.lado;
-  // Los largos de los lados son un interruptor y nada más (firma de María del
-  // 13-09: «no quiero opciones ni que estén vinculadas con la creación»). Lo
-  // único que los calla con el interruptor encendido es un sujeto más fino
-  // dentro de la pieza o un arrastre, para no sobresaturar (#1153, 10-09).
-  const suppressLengths = isDraggingPiece || transformTool.isDragging || isDraggingEndpoint
-    || editor.selectedInternalLine !== null
-    || (nodeEditor.isEditing && nodeEditor.selectedNode !== null)
-    || ladoSeleccionado !== null
-    || (activeTool === 'editPattern' && editPatternTool.selectedNodes.size > 0);
-  const piezasConLargos = useMemo(
-    () => seleccionarPiezasConLargos(drawablePieces, lineLengthMode, { suppress: suppressLengths }),
-    [drawablePieces, lineLengthMode, suppressLengths],
-  );
   // Refs para que `aplicarCota` no se recree en cada render de la pluma: la
   // rama del tramo en curso necesita la herramienta viva, no una copia vieja.
   const penRef = useRef(pen);
@@ -868,15 +859,49 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     [activeTool, editPatternTool.editingPieceId, editPatternTool.selectedNodes, pieces],
   );
 
-  const sujeto = useMemo(() => cotasDelSujeto({
+  const sujetoSinLado = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
     hotId, isDragging: isDraggingPiece || transformTool.isDragging || isDraggingEndpoint,
     contextMenuOpen: ctxMenu.visible, calibrationActive: calibrationMode !== null,
     hiddenLayerIds, layerLocked, saSelection: editor.saSelection,
     saAncla: seamAllowanceTool.ancla, saHover: seamAllowanceTool.hover,
-    tramoEnCurso, nodoSeleccionado, ladoSeleccionado,
+    tramoEnCurso, nodoSeleccionado,
     trazos: trazosVisibles, selectedTrazo: editor.selectedTrazo,
-  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso, nodoSeleccionado, ladoSeleccionado, trazosVisibles, editor.selectedTrazo]);
+  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso, nodoSeleccionado, trazosVisibles, editor.selectedTrazo]);
+  const sujeto = useMemo(
+    () => refinarAlLado(sujetoSinLado, ladoSeleccionado, { activeTool, pieces, hiddenLayerIds, layerLocked }),
+    [sujetoSinLado, ladoSeleccionado, activeTool, pieces, hiddenLayerIds, layerLocked],
+  );
+  // Los dos refs que la puerta de Tab consulta. Se escriben del sujeto REAL, no
+  // de una lista paralela: «¿cabría un lado?» y «¿el lado está a la vista?»
+  // tienen una sola respuesta cada una, y sale de `admiteLado`.
+  //
+  // El `activeTool === 'select'` no sobra: `admiteLado` deja sitio al lado
+  // también en `Q`, porque ahí el RATÓN lo elige. La puerta de TECLADO es solo
+  // de `Z` —es la que ella pidió, «volver a clicar la pieza»— y en `Q` el Tab
+  // sigue yendo al primer chip, como siempre.
+  puedeAbrirLado.current = activeTool === 'select'
+    && admiteLado(sujetoSinLado, activeTool) && !sujetoSinLado.disabled;
+  const ladoEsElSujeto = sujeto !== sujetoSinLado;
+  ladoEsElSujetoRef.current = ladoEsElSujeto;
+  // Los largos de los lados son un interruptor y nada más (firma de María del
+  // 13-09: «no quiero opciones ni que estén vinculadas con la creación»). Lo
+  // único que los calla con el interruptor encendido es un sujeto más fino
+  // dentro de la pieza o un arrastre, para no sobresaturar (#1153, 10-09).
+  //
+  // Del sujeto REAL y no de `ladoSeleccionado`: un lado ELEGIDO que la escalera
+  // rechaza —porque el contorno cambió bajo él— caía a la pieza y dejaba Ancho
+  // en pantalla con los largos apagados. Tab decía «largos», abría Ancho, y
+  // apagaba los largos sin que nadie tocara el interruptor.
+  const suppressLengths = isDraggingPiece || transformTool.isDragging || isDraggingEndpoint
+    || editor.selectedInternalLine !== null
+    || (nodeEditor.isEditing && nodeEditor.selectedNode !== null)
+    || ladoEsElSujeto
+    || (activeTool === 'editPattern' && editPatternTool.selectedNodes.size > 0);
+  const piezasConLargos = useMemo(
+    () => seleccionarPiezasConLargos(drawablePieces, lineLengthMode, { suppress: suppressLengths }),
+    [drawablePieces, lineLengthMode, suppressLengths],
+  );
   // Las cuatro herramientas que toman el sujeto de la selección lo dicen en la
   // tira antes del clic, en vez de morirse mudas (#1117).
   const falta = faltaSujeto(activeTool, selectedPieceIds);

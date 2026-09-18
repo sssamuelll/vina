@@ -700,6 +700,15 @@ export function useEditorInteractions(
       }
       // Un Esc consume UN nivel (escalera de escape, 06-09): soltar el lado
       // devuelve el sujeto a la pieza, no deselecciona la pieza entera.
+      //
+      // Va DESPUÉS de todos los gestos armados, y `soltar()` solo dice que sí
+      // cuando el lado está A LA VISTA. Las dos cosas por lo mismo: esto corre
+      // en CAPTURA y hace `stopPropagation`, así que un «sí» de más mata la
+      // tecla para todo lo que venga en burbuja — el menú contextual y los
+      // `handleKeyDown` de `editPattern`, `editCurve` y compañía. Es la
+      // regresión que este archivo documenta cuarenta líneas más arriba y que
+      // la primera versión de esta puerta reintrodujo: Z → Tab → clic derecho
+      // → Escape, y el menú se quedaba abierto.
       if (lados?.soltar()) {
         e.preventDefault();
         e.stopPropagation();

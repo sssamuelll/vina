@@ -62,13 +62,44 @@ Se llega a él de dos maneras, y son las dos que ella nombró:
 
 | Puerta | Gesto | Dónde |
 |---|---|---|
-| **Tab** | pieza seleccionada, Tab desde el lienzo | `Z`, `A`, y las tres de crear figura |
-| **Ratón** | clic o arrastre sobre el lado | `Q` (ya existía; lo que faltaba era la caja) |
+| **Tab** | pieza seleccionada, Tab desde el lienzo | **solo `Z`** |
+| **Ratón** | clic o arrastre sobre el lado | **solo `Q`** (ya existía; lo que faltaba era la caja) |
 
-**Qué lado abre Tab: el lado recto más cercano al puntero.** Y si el puntero
-nunca entró al lienzo, el primero del contorno.
+**Y en ninguna otra herramienta**, ni al abrirse ni una vez abierto. El sujeto es
+el par `(herramienta, objeto)` —§ 2.1 del 08-09— y § 2.2 lo remata: «Herramienta
+de creación vs. pieza ya seleccionada → gana **la herramienta**».
 
-Por qué el puntero y no «el primero» ni «el último tocado»:
+Esa fila no estaba en la primera versión de este documento y su ausencia costó
+caro: `enfocar` no consultaba `activeTool` **en ninguna línea**, así que la
+puerta abría en las ~19 herramientas cuya rama del router no devuelve antes del
+Tab. Medido en navegador: con la Pluma activa, la tira decía «Pluma · Editando:
+el lado seleccionado» y la caja seguía plantada sobre el lienzo. Y en Medir
+—donde § 4 dice, en negrita suya, «ningún gesto modifica geometría»— Tab abría
+un campo que escribe geometría.
+
+**Una sola lista de compuertas**, y vive en `admiteLado` (`cotas/sujeto.ts`). La
+consultan los dos caminos que la necesitan: el que **dibuja** (`refinarAlLado`) y
+el que decide si **Tab abre** (`usePuertaDeLado`). Tenerla dos veces fue el error
+de fondo de la primera versión, y las dos copias ya se contradecían en el commit
+que las escribió.
+
+**El lado no es un peldaño de la escalera: es un refinamiento.** En `Z` solo
+entra donde la pieza ya ganó, así que no puede eclipsar a un punto, a una
+interna, a un trazo ni a un margen. En `Q` es hermano del punto: entra cuando no
+hay nada más fino elegido. Escrito como peldaño —delante de todos, que es como
+nació— un lado enganchado se comía el sujeto de Margen y apagaba el interruptor
+«Largos» de María en toda herramienta, sin que ella tocara nada.
+
+**Qué lado abre Tab: el lado recto más cercano a la última posición del ratón
+sobre el lienzo.** Y si el ratón nunca entró, el primero del contorno.
+
+«La última posición sobre el lienzo» y no «el puntero»: el ref solo se escribe al
+mover el ratón DENTRO del `<svg>`, y no se limpia al salir. En el camino que ella
+va a hacer de verdad —clic en la pieza, Tab— eso es el punto del clic, que está
+dentro de la pieza y elige el lado que tenga más cerca. Es lo que hay que
+prometer, porque es lo que hace.
+
+Por qué el ratón y no «el primero» ni «el último tocado»:
 
 - Es determinista, que es lo que § 2.2 del 08-09 exige («menor distancia;
   determinista, sin azar»). El mismo criterio que ya usa `nearestSegment`.
@@ -78,23 +109,31 @@ Por qué el puntero y no «el primero» ni «el último tocado»:
   Si además recorriera lados, la misma tecla haría dos cosas distintas según
   dónde estuviera el foco.
 
-**Tab deja de abrir el Ancho —salvo con la pieza recién creada.** Hoy Tab con
-una pieza seleccionada enfoca el primer chip del DOM, que es «Ancho» de la caja
-envolvente. Ancho y Alto siguen en pantalla y se siguen clicando; lo que cambia
-es que dejan de ser lo primero del camino de teclado. Es lo que ella pidió con
-todas sus letras —«el editable de **largos**»— y es coherente con su aviso: el
-rectángulo es transitorio, y Ancho × Alto es precisamente la caja del
-rectángulo.
+**Tab deja de abrir el Ancho en `Z`.** Hoy Tab con una pieza seleccionada enfoca
+el primer chip del DOM, que es «Ancho» de la caja envolvente. Es lo que ella pidió
+con todas sus letras —«el editable de **largos**»— y es coherente con su aviso: el
+rectángulo es transitorio, y Ancho × Alto es precisamente la caja del rectángulo.
 
-La excepción la marcó ella, no el código: **«al SALIR de crear y volver a clicar
-la pieza»**. Mientras el rectángulo, el círculo o el triángulo siguen
-**calientes** —la pieza que la herramienta acaba de crear y sigue seleccionada,
-la misma ventana que ya gobierna `sujeto.caliente` desde #223/#225— Tab conserva
-el Ancho: es la medida que se acaba de dibujar, y ahí la caja envolvente **es**
-la pieza. En cuanto sale de crear, Tab abre el lado.
+Y la distinción que hizo ELLA —«al **salir** de crear y volver a clicar la
+pieza»— sale gratis de la compuerta de herramienta, sin caso especial: mientras
+Rectángulo, Círculo o Triángulo estén activas **se está creando**, y ahí Tab sigue
+abriendo el Ancho, que es la promesa de #223/#225 y el mando correcto para lo
+recién dibujado.
 
-No es un estado escondido: la tira lo dice en voz alta, «Editando: la pieza
-nueva» frente a «Editando: la pieza seleccionada».
+**El precio, dicho, porque no lo cubre ningún precedente.** La primera versión de
+este documento defendió la puerta diciendo que los chips de Ancho y Alto ya
+escriben geometría desde `Z`. Es cierto y no sirve: `resizePieceTo` **transforma
+el objeto entero**, que es justo lo que § 4 le concede a `Z` («arrastrar el cuerpo
+recoloca la pieza entera»); mover un nodo del contorno es literalmente lo que § 4
+le asigna a `Q`. Así que esto **ensancha `Z`**, de «transformar el objeto» a
+«editar la geometría que lo define».
+
+Se hace porque lo pidió ella, en esas palabras, y queda dicho aquí para que sea
+una excepción firmada y no la próxima regla tácita. Lo que la hace tolerable es
+que no toca la gramática del RATÓN: ningún arrastre desde `Z` deforma nada, y la
+diferencia observable entre seleccionar y editar —su queja reincidente— sigue en
+pie. Si al verlo dice que `Z` volvió a ser «multifunción», la puerta se muda a `Q`
+y esta sección se reescribe.
 
 ### 3.2 Los lados curvos no tienen caja
 
@@ -120,27 +159,106 @@ seleccionado entra en esa lista, junto al punto y a la interna.
 
 ---
 
-## 4. Un hueco que este trabajo destapa: el lado de cierre
+### 3.4 Qué suelta el lado
 
-`segmentPolar` recorre los comandos y solo emite tramo cuando el comando es una
-`L`. El lado de **cierre** de un contorno cerrado no es una `L`: es la `Z`, que
-vuelve al ancla de la `M`. O sea que en un rectángulo `M L L L Z` —el caso más
-común que existe— el cuarto lado no tendría caja.
+*La pregunta que el documento evitaba: ¿el lado es una «edición pendiente» a
+efectos de § 2.3 del 08-09, o una selección?*
 
-Es el mismo hueco que ya costó una vez: #1120, el lado izquierdo de un
-rectángulo sin etiqueta de largo, porque su consumidor no traducía la convención
-del productor. Se arregla en `segmentPolar`, que es donde está la causa, y no en
-el consumidor nuevo.
+**Es una sub-selección**, como el punto elegido en `Q` o el tramo de una interna.
+No es una edición pendiente: no hay valor a medio escribir hasta que se abre el
+campo, y de ese campo ya se ocupa `CotaChip` (Enter aplica, Escape y el blur
+descartan). Así que § 2.3 gobierna el **campo**, y el lado se rige por § 2.4: «se
+recupera volviendo a seleccionar el sujeto; no hay estado escondido».
 
-**Convención:** el tramo de cierre lleva como `toCommandIndex` el índice de la
-`M` que abre su subtrazo — porque el par final de esa `M` **es** el nodo que se
-mueve, que es lo que ese campo significa. La convención de `nearestSegment` (el
-índice de la `Z`) se traduce al leer, no al escribir.
+De ahí, lo que lo suelta:
 
-Efecto colateral, dicho: una línea interna cerrada gana la caja de su lado de
-cierre. Es la misma corrección, no una función nueva.
+| Pasa esto | El lado |
+|---|---|
+| Escape con la caja a la vista | se suelta, y consume **un** Esc |
+| Escape con la caja tapada (menú contextual abierto) | **no** se suelta ni consume: el Esc es del menú |
+| Cambia la herramienta | se suelta (`admiteLado` deja de admitirlo) |
+| Se deselecciona la pieza, o se selecciona otra | se suelta |
+| Se borra la pieza, se oculta o se bloquea su capa | se suelta |
+| Se elige una interna, un trazo, un punto o un margen | se suelta: lo más fino manda |
+| **Cambia la estructura del contorno** (un punto insertado, un deshacer) | se suelta |
+| **Ese lado se vuelve curvo** (curva por puntos) | se suelta |
+| Se mueve un nodo — escribir su propio largo, sin ir más lejos | **se queda** |
 
----
+Las dos filas en negrita son la lección que este repo ya tenía escrita y que esta
+puerta no heredó: un `commandIndex` es un nombre **prestado**, y `resyncStateToPiece`
+lo dice sin rodeos — «a surviving index would silently denote different geometry».
+Validar la PIEZA no basta; hay que validar el LADO. Sin esas dos filas, Tab abría
+el lado 3, un punto insertado corría los índices, y Enter escribía sobre otro lado
+sin que nada en pantalla cambiara de aspecto.
+
+Y una consecuencia que conviene decir en voz alta: **con el lado a la vista, Ancho
+y Alto no están en pantalla.** Se recuperan con Escape. La primera versión de este
+documento decía que «siguen en pantalla y se siguen clicando», y era falso.
+
+## 4. Cuatro huecos que este trabajo destapó
+
+Ninguno lo pedía el issue. Los cuatro salieron de mirar el productor compartido
+—`segmentPolar` y su escritor— que este cambio estrenaba como tercer consumidor.
+
+### 4.1 El lado de cierre no existía
+
+`segmentPolar` solo emitía tramo cuando el comando era una `L`. El lado de
+**cierre** de un contorno cerrado no es una `L`: es la `Z`, que vuelve al ancla de
+la `M`. O sea que en un rectángulo `M L L L Z` —el contorno más común que existe—
+el cuarto lado no tenía ni largo ni ángulo.
+
+Es el mismo hueco que ya costó una vez: #1120, el lado izquierdo de un rectángulo
+sin etiqueta de largo, porque su consumidor no traducía la convención del
+productor. Se arregla en `segmentPolar`, que es donde está la causa.
+
+**Convención:** el tramo de cierre lleva como `toCommandIndex` el índice de la `M`
+que abre su subtrazo —el par final de esa `M` **es** el nodo que se mueve— y como
+`drawCommandIndex` el de la `Z`. Los dos hacen falta y no son el mismo número; ver
+4.3. La convención de `nearestSegment` (el índice de la `Z`) se traduce al leer,
+con `ladoDelHit`.
+
+### 4.2 Los tramos de largo cero del DXF de María
+
+El DXF que ella exporta de CLO trae el vértice **repetido en cada esquina**. Cada
+duplicado es un tramo de 0 mm, y `segmentPolar` los emitía como lados de pleno
+derecho: una caja que dice «0,0 mm» —por debajo de su propio mínimo de 0,1— con un
+ángulo de 0° que `atan2(0,0)` se inventa, y que al escribirle 250 arrastraría la
+esquina 250 mm a la derecha por un rumbo que nadie trazó. Y `applyNodeMove` mueve
+el grupo de anclas coincidentes, así que se llevaría la esquina entera.
+
+La lección estaba escrita en los dos archivos vecinos —`nodo.ts` («una cota de
+“0,0 mm” que no se puede mover es peor que ninguna») y `angleReference.ts` («never
+let `atan2(0,0)` invent a reference»)— y la delató la asimetría del propio código:
+la guarda estaba puesta en la rama de la `Z`, la única que un test obligó a mirar,
+y no en la de la `L`, que ningún test tocaba. Ahora es una sola guarda para las
+dos, en `tramo()`.
+
+Ninguna de las suites nuevas lo veía, y no por casualidad: `addPiece` y los
+rectángulos sintéticos traen anclas ÚNICAS. Es el mismo hueco de fixture que
+`1112-mover-el-punto-con-numero.spec.ts` ya dejó escrito. Ahora hay un contorno con
+esquinas duplicadas en `sujeto.lado.test.ts`.
+
+### 4.3 El ángulo del lado de cierre mentía la mitad de las veces
+
+La referencia angular se busca preguntando «qué hay ANTES de este comando».
+Preguntándolo por el comando que se MUEVE, el lado de cierre pregunta por la `M`
+—índice 0— y no hay nada antes: caía a la referencia absoluta. Resultado en un
+rectángulo: dos lados decían «al tramo» y dos «al eje». Y no es cosmético, porque
+`absoluteAngle` usa esa referencia: **el mismo número escrito daba geometría
+distinta según el lado**. Por eso `PolarSegment` lleva ahora los dos índices.
+
+### 4.4 Y un cuarto, de propina: el manejador que se quedaba varado
+
+`copiaConNodoFinal` movía el ancla y dejaba quieto el control de salida del
+comando siguiente. Para una interna con una curva detrás de un tramo recto, eso
+tuerce la tangente en silencio — y el lado de cierre lo volvía alcanzable de una
+forma nueva, porque el primer comando de una interna cerrada suele ser una `C`.
+
+La ley ya estaba escrita dos veces: `copiaConExtremo` («si lo que sale de M es una
+curva, su control de salida viaja con el mismo delta para no torcer la tangente») y
+`applyNodeMove`, que lo hace para el contorno. Ahora `copiaConNodoFinal` también.
+La primera versión de este documento despachaba todo esto en una línea —«es la
+misma corrección, no una función nueva»— y no lo era.
 
 ## 5. Lo que NO se hace
 
@@ -154,14 +272,21 @@ cierre. Es la misma corrección, no una función nueva.
 - **No se recorre el contorno con Tab.** § 3.1.
 - **No se resuelve el largo de una curva.** § 3.2.
 - **No se migra la selección de tramo a Redux.** Vive en el hook, como el punto y
-  el tramo en curso, y llega a la escalera del sujeto como argumento.
+  el tramo en curso, y llega al sujeto como argumento.
+- **No se arreglan los contornos de varios subtrazos.** `nearestSegment` rotula
+  el cierre con la PRIMERA `Z` y solo mide una cuerda de cierre, así que un
+  contorno de dos anillos ya era inalcanzable para el ratón antes de esto.
+  `ladoDelHit` traduce bien igualmente; lo que no se hace es arreglar la fuente.
+- **No se unifica la traducción `Z`→`M`.** `useEditPattern` la hace en línea con
+  un `0` fijo. Sobre un contorno de un subtrazo las dos coinciden; separarlas en
+  una función compartida es la tanda que arregle lo de arriba, no esta.
 
 ---
 
 ## 6. La red
 
-jsdom no ve layout ni apilamiento; lo de aquí se prueba en navegador. Tres
-pruebas de aceptación, dichas como las diría ella:
+jsdom no ve layout, ni apilamiento, ni propagación real de teclas; lo de aquí se
+prueba en navegador. Las tres pruebas de aceptación, dichas como las diría ella:
 
 1. **darle 250 mm a un lado sin calcular nada** — `Z`, clic en la pieza, el ratón
    sobre el lado de abajo, Tab, escribir `250`, Enter → ese lado mide 250 mm, el
@@ -173,17 +298,40 @@ pruebas de aceptación, dichas como las diría ella:
 
 Cada una admite Esc antes de confirmar y un solo deshacer después.
 
-Las tres están en `tests/e2e/1167-editar-los-largos-de-la-pieza.spec.ts`, más
-otras cuatro que fija el mismo archivo: que Esc suelte **un** nivel y no
-deseleccione la pieza; que con la pieza bloqueada Tab **no se trague la tecla**;
-que la pieza recién creada conserve su Ancho; y que al salir de crear y volver a
-clicarla, Tab ya abra el lado.
+Y las que la revisión adversarial obligó a añadir, todas en
+`tests/e2e/1167-editar-los-largos-de-la-pieza.spec.ts`:
 
----
+- **el camino de verdad**: clicar la pieza y pulsar Tab **sin mover el ratón**.
+  Los otros casos lo colocan sobre el lado justo antes; este es el que ella hará.
+- **en Medir, Tab ni abre ni se traga la tecla.**
+- **el lado no sobrevive al cambio de herramienta.**
+- **con el menú contextual abierto, Escape cierra el menú** y no el lado.
+- **con la pieza bloqueada, Tab no se traga la tecla** — medido con
+  `defaultPrevented`, no contando cajas: «se tragó la tecla y no abrió» y «siguió
+  su camino y no abrió» dan el mismo cero, y un oráculo que no distingue los dos
+  pasa en verde con el fallo dentro.
+- **al salir de crear y volver a clicar la pieza**, Tab ya abre el lado.
 
 ## 7. Registro
 
 - **2026-09-18** — escrito para #1167. Tres de las cuatro decisiones abiertas del
   issue ya estaban en la spec del 08-09 (§ 2); la única nueva es qué lado abre
-  Tab (§ 3.1). El hueco del lado de cierre (§ 4) lo destapó la implementación, no
-  el issue.
+  Tab (§ 3.1). Los cuatro huecos de `segmentPolar` (§ 4) los destapó la
+  implementación, no el issue.
+- **2026-09-18, revisión adversarial** (Voronov + Serrano) sobre la primera
+  versión, ya implementada. Seis hallazgos entraron en el documento y cambiaron
+  el diseño, no solo el código:
+  1. La puerta no consultaba la herramienta en ninguna línea (§ 3.1). Era un
+     BLOCKER: Medir escribía geometría.
+  2. El lado nació como peldaño de la escalera y eclipsaba a Margen, a la interna
+     y al trazo; pasa a ser un **refinamiento** (§ 3.1).
+  3. Las compuertas estaban escritas dos veces y ya se contradecían; ahora hay una
+     sola, `admiteLado` (§ 3.1).
+  4. El Escape corría en captura con `stopPropagation` y se comía el del menú
+     contextual — la regresión que `useEditorInteractions` documenta haber pagado
+     en #1115 (§ 3.4).
+  5. Un `commandIndex` sobrevivía a los cambios de contorno y denotaba otro lado
+     en silencio (§ 3.4).
+  6. La defensa de «esto ya se hacía desde `Z`» era falsa: `resizePieceTo`
+     transforma el objeto entero, y mover un nodo no. La excepción pasa a estar
+     firmada por María, no justificada por un precedente (§ 3.1).
