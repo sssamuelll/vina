@@ -110,6 +110,18 @@ describe('#1194 — rama JSON: la guardia de #1189 habla español', () => {
     expect(msg).toBe('El dato joinType tiene que ser uno de: miter, round, square');
   });
 
+  // El caso que de verdad puede romper el traductor: la lista de opciones tiene
+  // que parar donde empieza el error siguiente, ni antes ni después.
+  it('un enum seguido de otro error no se come la lista ni el vecino', async () => {
+    const msg = await loQuePinta('sondaJson', { pieceId: 'p1', joinType: 'chaflán', distance: 'abc' });
+
+    expect(msg).toBe(
+      'El dato joinType tiene que ser uno de: miter, round, square, '
+      + 'el dato distance tiene que ser un número y llegó un texto',
+    );
+    sinJerga(msg);
+  });
+
   it('dos errores a la vez salen los dos, en español', async () => {
     const msg = await loQuePinta('sondaJson', { distance: 'abc' });
 
