@@ -119,6 +119,8 @@ function hitInternalLine(px: number, py: number, path: PathCommand[], preferredS
 interface ToolHooks {
   /** Capa de cotas vivas: Tab desde el lienzo enfoca el primer chip (spec 2026-08-30 § 5.3). */
   cotas?: React.RefObject<CotasLayerHandle>;
+  /** La puerta de Tab al largo de un lado (#1167, spec 2026-09-18 § 3.1). */
+  lados?: { enfocar: () => boolean; soltar: () => boolean };
   /** `handleKeyDown` devuelve si consumió la tecla (la captura CF-1 detiene la propagación solo entonces). */
   pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => boolean; handleDoubleClick: () => void; reset: () => void };
   rectTool: {
@@ -367,7 +369,7 @@ export function useEditorInteractions(
   const [isDraggingEndpoint, setIsDraggingEndpoint] = useState(false);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
-  const { pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas } = tools;
+  const { pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas, lados } = tools;
   const isNodeEditing = nodeEditor.isEditing && (activeTool === 'select' || activeTool === 'editCurve');
   const { exitEdit: exitNodeEdit } = nodeEditor;
   const previousToolRef = useRef(activeTool);
@@ -545,7 +547,7 @@ export function useEditorInteractions(
     // Cuatro de esas cinco están detrás de una guarda —`armed`, `isArmed()`,
     // `isDragging`—: si se entra, se consume, y nombrarlas es verdad. La
     // quinta, coser, pasó a P1 porque podía entrar sin nada que cancelar.
-    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | 'circle' | 'triangle' | 'cotas' | 'elastic'
+    type KeyConsumer = 'internalShape' | 'pen' | 'rectangle' | 'circle' | 'triangle' | 'cotas' | 'lado' | 'elastic'
       | 'editPattern' | 'editCurve' | 'topstitch' | 'point' | 'notch' | 'seamAllowance' | 'seam' | 'transform' | null;
     const routeKey = (e: KeyboardEvent): KeyConsumer => {
       // Línea interna: con trazo vivo, Escape / Enter / Retroceso / Supr son
@@ -614,6 +616,19 @@ export function useEditorInteractions(
       if (e.key === 'Tab' && !e.shiftKey) {
         const t = e.target as HTMLElement | null;
         const desdeElLienzo = t === document.body || (t?.tagName ?? '').toLowerCase() === 'svg';
+        // El LARGO DE UN LADO va antes que el primer chip (#1167). Es lo que
+        // ella pidió con todas sus letras —«el editable de largos»—, y Ancho y
+        // Alto son la caja envolvente: justo el rectángulo que su propio aviso
+        // llama fase transitoria. Siguen en pantalla y se siguen clicando; lo
+        // que cambia es que dejan de ser lo primero del camino de teclado.
+        // `enfocar` solo abre la caja: quien la ENFOCA es el efecto de
+        // `PatternEditor`, porque el chip no está en el DOM hasta el render
+        // siguiente.
+        if (desdeElLienzo && lados?.enfocar()) {
+          e.preventDefault();
+          e.stopPropagation();
+          return 'lado';
+        }
         if (desdeElLienzo && cotas?.current?.focusFirst()) {
           e.preventDefault();
           e.stopPropagation();
@@ -683,6 +698,22 @@ export function useEditorInteractions(
       if (activeTool === 'seam') {
         return seamTool.handleKeyDown(e) ? 'seam' : null;
       }
+      // Un Esc consume UN nivel (escalera de escape, 06-09): soltar el lado
+      // devuelve el sujeto a la pieza, no deselecciona la pieza entera.
+      //
+      // Va DESPUÉS de todos los gestos armados, y `soltar()` solo dice que sí
+      // cuando el lado está A LA VISTA. Las dos cosas por lo mismo: esto corre
+      // en CAPTURA y hace `stopPropagation`, así que un «sí» de más mata la
+      // tecla para todo lo que venga en burbuja — el menú contextual y los
+      // `handleKeyDown` de `editPattern`, `editCurve` y compañía. Es la
+      // regresión que este archivo documenta cuarenta líneas más arriba y que
+      // la primera versión de esta puerta reintrodujo: Z → Tab → clic derecho
+      // → Escape, y el menú se quedaba abierto.
+      if (lados?.soltar()) {
+        e.preventDefault();
+        e.stopPropagation();
+        return 'lado';
+      }
       if (activeTool !== 'select') return null;
       if (!transformTool.isDragging) return null;
       transformTool.handleKeyDown(e);
@@ -712,7 +743,7 @@ export function useEditorInteractions(
     };
     window.addEventListener('keydown', onKeyCapture, { capture: true });
     return () => window.removeEventListener('keydown', onKeyCapture, { capture: true });
-  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, triangleTool, elasticTool, cotas]);
+  }, [activeTool, transformTool, pointTool, seamTool, notchTool, seamAllowanceTool, internalShapeTool, pen, rectTool, circleTool, triangleTool, elasticTool, cotas, lados]);
 
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);

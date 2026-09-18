@@ -1,7 +1,7 @@
 import type { InternalLineSelection, PatternPiece, SaSelection, Tool2D, Trazo, TrazoSelection } from '../../../types/types';
 import { margenEnPunto } from '../../../utils/seam/margenEnPunto';
 import { cotaDeMargen } from './cotaDeMargen';
-import { cotasDeLineaInterna, cotasDePieza, cotasDeTrazo, type Cota } from './cotas';
+import { cotasDeLineaInterna, cotasDelLado, cotasDePieza, cotasDeTrazo, type Cota } from './cotas';
 import { cotasDelTramoEnCurso, type TramoEnCurso } from './tramoEnCurso';
 import { cotasDelNodo } from './nodo';
 import { formatMedida } from './parseMedida';
@@ -70,6 +70,16 @@ export interface Sujeto {
   bordeLeido: { pieceId: string; edgeId: string } | null;
   /** Pieza bloqueada: las cotas se ven apagadas y no se editan. */
   disabled: boolean;
+  /**
+   * El sujeto es la PIEZA entera, no algo más fino dentro de ella (#1167).
+   *
+   * Existe para que «¿cabe aquí un lado?» tenga UNA sola respuesta, en un solo
+   * sitio, y la consulten los dos caminos que la necesitan: el que dibuja
+   * (`refinarAlLado`) y el que decide si Tab abre (`usePuertaDeLado`). La
+   * primera versión tenía esa lista escrita dos veces, y las dos listas ya
+   * estaban separadas en el commit que las escribió.
+   */
+  esPieza: boolean;
   /** La línea de la tira que nombra qué se edita; `null` si no hay nada que decir. */
   lineaDeSujeto: string | null;
 }
@@ -155,6 +165,7 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
     lecturaApagada: false,
     bordeLeido: null,
     disabled: false,
+    esPieza: false,
     lineaDeSujeto: linea,
   });
   // Un trazo vivo gana a cualquier selección: la regla del sujeto es «el más
@@ -169,6 +180,7 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
       lecturaApagada: false,
       bordeLeido: null,
       disabled: false,
+      esPieza: false,
       lineaDeSujeto: 'Editando: el tramo en curso',
     };
   }
@@ -190,6 +202,7 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
           lecturaApagada: false,
           bordeLeido: null,
           disabled: Boolean(piezaDelNodo.locked) || Boolean(input.layerLocked[capaDelNodo]),
+          esPieza: false,
           lineaDeSujeto: 'Editando: el punto seleccionado',
         };
       }
@@ -246,6 +259,7 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
       lecturaApagada: leida ? apagada(leida) : false,
       bordeLeido: leida ? { pieceId: leida.piece.id, edgeId: leida.edge.id } : null,
       disabled: anclada ? apagada(anclada) : false,
+      esPieza: false,
       lineaDeSujeto: anclada ? 'Editando: este borde' : null,
     };
   }
@@ -266,6 +280,7 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
         lecturaApagada: false,
         bordeLeido: null,
         disabled: false,
+        esPieza: false,
         lineaDeSujeto: 'Editando: el tramo seleccionado',
       };
     }
@@ -293,6 +308,7 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
         lecturaApagada: false,
         bordeLeido: null,
         disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
+        esPieza: false,
         lineaDeSujeto: segmentIndex === undefined
           ? `Editando: la línea seleccionada · ${cotas.length} cotas`
           : 'Editando: el tramo seleccionado',
@@ -316,6 +332,66 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
     lecturaApagada: false,
     bordeLeido: null,
     disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
+    esPieza: true,
     lineaDeSujeto: caliente ? 'Editando: la pieza nueva' : 'Editando: la pieza seleccionada',
+  };
+}
+
+/**
+ * ¿Este sujeto deja sitio a un lado? (#1167, spec 2026-09-18 § 3.1.)
+ *
+ * **Una sola lista**, consultada por los dos caminos: el que DIBUJA
+ * (`refinarAlLado`) y el que decide si Tab abre (`usePuertaDeLado`). Tenerla
+ * dos veces fue el fallo de fondo de la primera versión — y las dos copias ya
+ * se contradecían en el commit que las escribió.
+ *
+ * En `Z` el lado **afina** el sujeto pieza: solo entra donde la pieza ya ganó,
+ * así que no puede eclipsar a un punto, a una interna, a un trazo ni a un
+ * margen — ni sobrevivir a la herramienta que los produjo. En `Q` es hermano
+ * del punto: entra cuando no hay nada más fino elegido.
+ *
+ * Y en las demás no entra, que es lo que faltaba: sin esta compuerta, un lado
+ * enganchado en `Z` producía una caja EDITABLE en las ~19 herramientas
+ * restantes, Medir incluida — donde § 4 del contrato del 08-09 dice, en negrita
+ * suya, «ningún gesto modifica geometría».
+ */
+export function admiteLado(sujeto: Sujeto, activeTool: Tool2D): boolean {
+  if (activeTool === 'select') return sujeto.esPieza;
+  if (activeTool === 'editPattern') return sujeto.cotas.length === 0;
+  return false;
+}
+
+/**
+ * El lado, cuando el sujeto le deja sitio. Si el lado ya no existe —deshacer,
+ * curva por puntos, un punto insertado que corrió los índices— devuelve el
+ * sujeto tal cual: la pieza manda, y no queda una caja anunciada sobre nada.
+ */
+export function refinarAlLado(
+  sujeto: Sujeto,
+  lado: { pieceId: string; commandIndex: number } | null,
+  input: Pick<SujetoInput, 'activeTool' | 'pieces' | 'hiddenLayerIds' | 'layerLocked'>,
+): Sujeto {
+  if (!lado || !admiteLado(sujeto, input.activeTool)) return sujeto;
+  const piece = input.pieces.find(p => p.id === lado.pieceId);
+  if (!piece) return sujeto;
+  const capa = piece.layer ?? 1;
+  if (input.hiddenLayerIds.includes(capa)) return sujeto;
+  const cotas = cotasDelLado(piece, lado.commandIndex);
+  if (cotas.length === 0) return sujeto;
+  return {
+    piece,
+    caliente: false,
+    cotas,
+    lectura: null,
+    lecturaApagada: false,
+    bordeLeido: null,
+    disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
+    esPieza: false,
+    // «Tramo», no «lado»: es la palabra que la app ya usa para ESTA unidad —la
+    // de una interna y la de un trazo dicen lo mismo— y el contrato de interfaz
+    // § 5 pide un término por concepto. En el código se llama `lado` porque es
+    // la palabra de María y la del issue; lo que la usuaria LEE sale del
+    // glosario, que aquí manda.
+    lineaDeSujeto: 'Editando: el tramo seleccionado',
   };
 }

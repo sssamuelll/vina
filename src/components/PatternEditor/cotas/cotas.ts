@@ -174,8 +174,24 @@ function copiaConNodoFinal(
   const command = copy[commandIndex];
   if (!command || command.values.length < 2) return null;
   const offset = command.values.length - 2;
+  const dx = point.x - command.values[offset];
+  const dy = point.y - command.values[offset + 1];
   command.values[offset] = point.x;
   command.values[offset + 1] = point.y;
+  // El control de SALIDA viaja con el ancla, o la tangente se tuerce sola.
+  //
+  // Es la misma ley que `copiaConExtremo` ya aplicaba a los extremos de una
+  // interna («si lo que sale de M es una curva, su control de salida viaja con
+  // el mismo delta para no torcer la tangente») y que `applyNodeMove` aplica al
+  // contorno. Aquí faltaba, y por eso escribir el largo de un tramo recto
+  // seguido de una curva dejaba su `cp1` plantado donde estaba el nodo viejo.
+  // Lo destapó el lado de CIERRE (#1167): su ancla es la `M`, y el primer
+  // comando de una interna cerrada suele ser justo una `C`.
+  const siguiente = copy[commandIndex + 1];
+  if (siguiente && (siguiente.type === 'C' || siguiente.type === 'Q') && siguiente.values.length >= 2) {
+    siguiente.values[0] += dx;
+    siguiente.values[1] += dy;
+  }
   return copy;
 }
 
@@ -275,7 +291,13 @@ function cotasDeTramos(opts: {
   centro: Point2D;
   aPatron: (p: Point2D) => Point2D;
   aLocal: (p: Point2D) => Point2D;
-  escribir: (path: PathCommand[]) => CotaUpdate | null;
+  /**
+   * El path ya reescrito, y además el nodo que se movió — índice y destino en
+   * local. Los dueños de un `path` propio (interna, trazo) usan el primero; el
+   * contorno usa los otros dos, porque su escritor único es `moveNodeTo` y ese
+   * recibe un nodo, no un path (#1167).
+   */
+  escribir: (path: PathCommand[], toCommandIndex: number, destinoLocal: Point2D) => CotaUpdate | null;
   segmentIndex?: number;
   firstReferenceAt?: (world: Point2D) => AngleReference;
 }): Cota[] {
@@ -291,7 +313,12 @@ function cotasDeTramos(opts: {
     const outward = normalHaciaFuera(from, to, centro);
     // Dirección y referencia se llevan juntas a patrón antes de restarlas.
     // Así el ángulo relativo y su escritura conservan el marco al girar la pieza.
-    const previous = referenceBefore(path, segment.toCommandIndex);
+    // Por el comando que DIBUJA. Preguntarlo por el que se MUEVE devuelve la
+    // nada en el lado de cierre (la `M` es el índice 0: no hay nada antes), y
+    // entonces dos lados de un mismo rectángulo decían «al eje» y los otros
+    // dos «al tramo» — y no es cosmético: `absoluteAngle` usa esa referencia,
+    // así que el mismo número escrito daba geometría distinta según el lado.
+    const previous = referenceBefore(path, segment.drawCommandIndex);
     const reference = previous.kind === 'segment'
       ? { ...previous, baseDeg: polarOf(from, aPatron(polarPoint(segment.from, 1, previous.baseDeg))).angleDeg }
       : firstReferenceAt?.(from) ?? ABSOLUTE_REFERENCE;
@@ -311,8 +338,9 @@ function cotasDeTramos(opts: {
       b: to,
       outward,
       apply: (mm) => {
-        const nuevo = copiaConNodoFinal(path, segment.toCommandIndex, segment.writeLength(mm));
-        return nuevo ? escribir(nuevo) : null;
+        const destino = segment.writeLength(mm);
+        const nuevo = copiaConNodoFinal(path, segment.toCommandIndex, destino);
+        return nuevo ? escribir(nuevo, segment.toCommandIndex, destino) : null;
       },
     });
     cotas.push({
@@ -330,12 +358,9 @@ function cotasDeTramos(opts: {
       b: to,
       outward,
       apply: (deg) => {
-        const nuevo = copiaConNodoFinal(
-          path,
-          segment.toCommandIndex,
-          aLocal(polarPoint(from, segment.lengthMm, absoluteAngle(deg, reference))),
-        );
-        return nuevo ? escribir(nuevo) : null;
+        const destino = aLocal(polarPoint(from, segment.lengthMm, absoluteAngle(deg, reference)));
+        const nuevo = copiaConNodoFinal(path, segment.toCommandIndex, destino);
+        return nuevo ? escribir(nuevo, segment.toCommandIndex, destino) : null;
       },
     });
   }
@@ -395,6 +420,46 @@ export function cotasDeTrazo(trazo: Trazo, segmentIndex: number, pieces: Pattern
 }
 
 /** Cotas de tramo y de borde de una sola línea interna seleccionada. */
+/**
+ * La caja de UN lado del contorno (#1167, spec 2026-09-18 § 3.1): Largo y
+ * Ángulo, la misma pareja y la misma gramática de Tab que ya tienen la interna,
+ * el trazo y el tramo en curso de la Pluma.
+ *
+ * `toCommandIndex` viene en la convención de `segmentPolar` — el comando cuyo
+ * par final es el nodo que se mueve. Desde el ratón se traduce con `ladoDelHit`.
+ *
+ * Escribir NO construye el contorno aquí: devuelve a dónde va el nodo y deja que
+ * lo aplique `useEditPattern.moveNodeTo`, que es quien ya lo hace en el
+ * arrastre, con compensación de pivote, re-anclado de piquetes y lote de
+ * deshacer. Un segundo escritor del mismo hecho es el fallo con nombre propio
+ * del repo — la misma razón por la que `cotasDelNodo` devuelve un destino.
+ *
+ * Sin `firstReferenceAt`: la referencia del primer lado es el eje, no el borde.
+ * Para una interna «el borde» es otra línea; para un lado del contorno el borde
+ * ES él mismo, y medir su ángulo contra sí mismo daría 0° siempre. La tira lo
+ * dice en voz alta («al eje» frente a «al tramo»).
+ */
+export function cotasDelLado(piece: PatternPiece, toCommandIndex: number): Cota[] {
+  // La misma compuerta que `cotasDePieza`: `H`, `V` y `A` son válidos en el
+  // esquema y `computeBoundingBox` no los recorre, así que el centro —y con él
+  // la normal y la colocación del chip— saldría de una caja mal medida. La
+  // regla estaba escrita a tres funciones de aquí y no se aplicaba.
+  if (piece.outline.some(c => !COMANDOS_SOPORTADOS.has(c.type))) return [];
+  const bbox = computeBoundingBox([piece], [piece.id]);
+  const centro = bbox ? bboxPivot(bbox) : pieceLocalToPattern({ x: 0, y: 0 }, piece);
+  return cotasDeTramos({
+    path: piece.outline,
+    idBase: `${piece.id}-lado`,
+    centro,
+    aPatron: (p) => pieceLocalToPattern(p, piece),
+    aLocal: (p) => patternToPieceLocal(p, piece),
+    escribir: (_path, commandIndex, destino) => ({
+      kind: 'nodo', pieceId: piece.id, commandIndex, destino,
+    }),
+    segmentIndex: toCommandIndex,
+  });
+}
+
 export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine, segmentIndex?: number): Cota[] {
   // Un piquete conserva una segunda verdad paramétrica (`notchAnchor`) y una
   // pinza tiene su propia entidad rica: mover solo el path desde este editor
