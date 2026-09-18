@@ -503,13 +503,17 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
-      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
+      const replace = params.replace as boolean;
+      // Solo el modo reemplazo escribe sobre la pieza; el default construye
+      // una pieza NUEVA y no le toca el candado (#1184).
+      if (replace) {
+        const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
+      }
       const distErr = requireFiniteNumber(params.distance, 'distance');
       if (distErr) return { success: false, error: distErr };
       const joinType = (params.joinType as string) || 'miter';
       const newOutline = offsetPieceOutline(piece, params.distance as number, joinType as 'miter' | 'round' | 'square');
       if (!newOutline) return { success: false, error: `Offset collapsed the shape (distance too large)` };
-      const replace = params.replace as boolean;
       if (replace) {
         const snapshot = JSON.parse(JSON.stringify(piece)) as PatternPiece;
         const updated: PatternPiece = { ...piece, outline: newOutline, edges: undefined, updatedAt: Date.now() };
@@ -525,6 +529,10 @@ export const tools: ToolDefinition[] = [
           // state-encoded ID — see B10-state. The parent piece's id is
           // intentionally referenced in the offset id for cross-reference.
           id: `offset-${piece.id}-${Date.now()}`,
+          // Geometría nueva: hereda `locked` por el spread y no hay razón de
+          // producto para que nazca atascada como la original — misma
+          // limpieza que la ruta de la UI (`useOffsetTool.ts`, #1145).
+          locked: false,
           name: `${piece.name} Offset`,
           outline: newOutline,
           edges: undefined,
