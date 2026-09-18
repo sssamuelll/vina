@@ -11,6 +11,7 @@
 import type { MetaToolDefinition, MetaToolResult } from './types';
 import type { PathCommand } from '../../../../types/types';
 import { computePathArcLength, pointAtPathDistance } from '../../../../utils/geometry/arcLength';
+import { rangoMedibleDeBorde } from '../../../../utils/semanticEdges';
 
 export const compareCurvesMetaTool: MetaToolDefinition = {
   name: 'compareCurves',
@@ -40,8 +41,12 @@ export const compareCurvesMetaTool: MetaToolDefinition = {
       if (!piece) return { error: `Piece "${pieceId}" not found.` };
       const edge = (piece.edges ?? []).find(e => e.name.toLowerCase() === edgeName.toLowerCase());
       if (!edge) return { error: `Edge "${edgeName}" not found on "${pieceId}". Available: ${(piece.edges ?? []).map(e => e.name).join(', ') || 'none'}` };
-      const length = computePathArcLength(piece.outline, edge.segmentRange[0], edge.segmentRange[1]);
-      return { piece, edge, length };
+      // Traducido: el tramo de cierre se rotula con el índice de la `M`, que
+      // no dibuja y mide cero (#1143). Sin esto, comparar un borde de cierre
+      // con su pareja daba una holgura del 100% que no existe.
+      const rango = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
+      const length = computePathArcLength(piece.outline, rango[0], rango[1]);
+      return { piece, edge, length, rango };
     }
 
     const a = findEdge(params.pieceIdA as string, params.edgeNameA as string);
@@ -56,8 +61,8 @@ export const compareCurvesMetaTool: MetaToolDefinition = {
     let maxLocalDelta = 0;
     for (let i = 0; i <= NUM_SAMPLES; i++) {
       const frac = i / NUM_SAMPLES;
-      const ptA = pointAtPathDistance(a.piece.outline, frac * a.length, a.edge.segmentRange[0], a.edge.segmentRange[1]);
-      const ptB = pointAtPathDistance(b.piece.outline, frac * b.length, b.edge.segmentRange[0], b.edge.segmentRange[1]);
+      const ptA = pointAtPathDistance(a.piece.outline, frac * a.length, a.rango[0], a.rango[1]);
+      const ptB = pointAtPathDistance(b.piece.outline, frac * b.length, b.rango[0], b.rango[1]);
       if (ptA && ptB) {
         const ld = Math.hypot(ptA.x - ptB.x, ptA.y - ptB.y);
         if (ld > maxLocalDelta) maxLocalDelta = ld;

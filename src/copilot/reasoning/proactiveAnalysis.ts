@@ -13,6 +13,7 @@
 import type { PatternPiece, Seam, PathCommand, InternalLine, Point2D } from '../../types/types';
 import { findEdgeByName, findEdgeForPoint } from '../../utils/seam/notchMirror';
 import { computePathArcLength, distanceAlongPath } from '../../utils/geometry/arcLength';
+import { rangoMedibleDeBorde } from '../../utils/semanticEdges';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -349,8 +350,15 @@ export function auditNotches(
     const notchesA = onEdge(pieceA, edgeA, allNotchesA);
     const notchesB = onEdge(pieceB, edgeB, allNotchesB);
 
-    const lenA = edgeA ? computePathArcLength(pieceA.outline, edgeA.segmentRange[0], edgeA.segmentRange[1]) : 0;
-    const lenB = edgeB ? computePathArcLength(pieceB.outline, edgeB.segmentRange[0], edgeB.segmentRange[1]) : 0;
+    // Traducido: el tramo de cierre se rotula con el indice de la `M`, que no
+    // dibuja y mide cero (#1143). Sin esto `lenA` daba 0 sobre el lado de
+    // cierre, el chequeo caia a la rama de respaldo —que solo CUENTA
+    // piquetes— y dos piquetes en puntas opuestas del mismo lado pasaban por
+    // alineados. El chequeo no fallaba: desaparecia.
+    const rangoA = edgeA ? rangoMedibleDeBorde(pieceA.outline, edgeA.segmentRange) : null;
+    const rangoB = edgeB ? rangoMedibleDeBorde(pieceB.outline, edgeB.segmentRange) : null;
+    const lenA = rangoA ? computePathArcLength(pieceA.outline, rangoA[0], rangoA[1]) : 0;
+    const lenB = rangoB ? computePathArcLength(pieceB.outline, rangoB[0], rangoB[1]) : 0;
 
     // Fall back to the count check when edges/geometry can't be resolved.
     if (!edgeA || !edgeB || lenA < 1e-9 || lenB < 1e-9) {
@@ -367,11 +375,11 @@ export function auditNotches(
     const tB0 = seam.pieceB.tStart ?? 0, tB1 = seam.pieceB.tEnd ?? 1;
     const fracsA = notchesA.map(n => {
       const pt = notchPoint(n)!;
-      return sewnFrac(distanceAlongPath(pieceA.outline, pt, edgeA.segmentRange[0], edgeA.segmentRange[1]) / lenA, tA0, tA1);
+      return sewnFrac(distanceAlongPath(pieceA.outline, pt, rangoA![0], rangoA![1]) / lenA, tA0, tA1);
     });
     const fracsB = notchesB.map(n => {
       const pt = notchPoint(n)!;
-      return sewnFrac(distanceAlongPath(pieceB.outline, pt, edgeB.segmentRange[0], edgeB.segmentRange[1]) / lenB, tB0, tB1);
+      return sewnFrac(distanceAlongPath(pieceB.outline, pt, rangoB![0], rangoB![1]) / lenB, tB0, tB1);
     });
 
     // Tolerance: ~2% of the shorter sewn span, floored at ~5mm (aligned with the

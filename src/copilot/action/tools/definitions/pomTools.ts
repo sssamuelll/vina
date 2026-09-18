@@ -13,6 +13,7 @@ import type { PointOfMeasure, POMCategory, POMMethod, POMPoint, Point2D } from '
 import { addPOM, updatePOM, removePOM } from '../../../../store/projectSlice';
 import { computePOMValue, recomputeAllPOMs } from '../../../../utils/pom/pomCompute';
 import { uid } from '../../../../utils/pathHelpers';
+import { interpolateEdgePoint } from '../../../../utils/geometry/edgeInterpolation';
 
 /** Validate that a param is a finite number. Returns error string or null. */
 function requireFiniteNumber(value: unknown, name: string): string | null {
@@ -119,12 +120,13 @@ const createPOMTool: ToolDefinition = {
     if (params.edgeAName) {
       const edge = pieceA.edges?.find(e => e.name === params.edgeAName);
       if (!edge) return { success: false, error: `Edge "${params.edgeAName}" not found on piece "${pieceA.name}"` };
-      // Resolve edge midpoint
-      const [start, end] = edge.segmentRange;
-      const midIdx = Math.floor((start + end) / 2);
-      const cmd = pieceA.outline[midIdx];
-      const lx = cmd && cmd.values.length >= 2 ? cmd.values[cmd.values.length - 2] : 0;
-      const ly = cmd && cmd.values.length >= 2 ? cmd.values[cmd.values.length - 1] : 0;
+      // El medio del borde, medido por largo de arco. Antes se cogía el VÉRTICE
+      // del comando de en medio del `segmentRange`, que no es el medio de nada:
+      // sobre el tramo de cierre —cuyo rango apunta a la `M`— anclaba el POM en
+      // la esquina de arranque de la pieza (#1143).
+      const medio = interpolateEdgePoint(pieceA, edge.name, 0.5)?.point;
+      const lx = medio?.x ?? 0;
+      const ly = medio?.y ?? 0;
       pointA = {
         pieceId: params.pieceAId as string,
         edgeName: params.edgeAName as string,
@@ -158,11 +160,9 @@ const createPOMTool: ToolDefinition = {
     } else if (params.edgeBName) {
       const edge = pieceB.edges?.find(e => e.name === params.edgeBName);
       if (!edge) return { success: false, error: `Edge "${params.edgeBName}" not found on piece "${pieceB.name}"` };
-      const [start, end] = edge.segmentRange;
-      const midIdx = Math.floor((start + end) / 2);
-      const cmd = pieceB.outline[midIdx];
-      const lx = cmd && cmd.values.length >= 2 ? cmd.values[cmd.values.length - 2] : 0;
-      const ly = cmd && cmd.values.length >= 2 ? cmd.values[cmd.values.length - 1] : 0;
+      const medio = interpolateEdgePoint(pieceB, edge.name, 0.5)?.point;
+      const lx = medio?.x ?? 0;
+      const ly = medio?.y ?? 0;
       pointB = {
         pieceId: pieceBId,
         edgeName: params.edgeBName as string,

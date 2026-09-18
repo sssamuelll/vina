@@ -16,6 +16,7 @@ import {
   pointAtPathDistance,
   distanceAlongPath,
 } from '../../utils/geometry/arcLength';
+import { rangoMedibleDeBorde } from '../../utils/semanticEdges';
 import {
   patternToPieceLocal,
   pieceLocalToPattern,
@@ -164,12 +165,12 @@ export function computeGhostTransform(
   // sintáctico. Pedir la pieza entera hace imposible olvidar su giro.
   const stationaryOutline = stationaryPiece.outline;
   const mobileOutline = mobilePiece.outline;
-  const stationaryArcLen = computePathArcLength(
-    stationaryOutline, stationaryRange[0], stationaryRange[1],
-  );
-  const mobileArcLen = computePathArcLength(
-    mobileOutline, mobileRange[0], mobileRange[1],
-  );
+  // Traducidos por lo mismo que en `sampleMismatch` (#1143): con el lado de
+  // cierre el fantasma se quedaba clavado en la esquina.
+  const [s0, s1] = rangoMedibleDeBorde(stationaryOutline, stationaryRange);
+  const [m0, m1] = rangoMedibleDeBorde(mobileOutline, mobileRange);
+  const stationaryArcLen = computePathArcLength(stationaryOutline, s0, s1);
+  const mobileArcLen = computePathArcLength(mobileOutline, m0, m1);
 
   // Clamp walk distance
   const dS = Math.max(0, Math.min(walkDistance, stationaryArcLen));
@@ -179,22 +180,18 @@ export function computeGhostTransform(
   const dM = frac * mobileArcLen;
 
   // Get local-space points on each edge
-  const localStatPt = pointAtPathDistance(
-    stationaryOutline, dS, stationaryRange[0], stationaryRange[1],
-  ) ?? { x: 0, y: 0 };
-  const localMobPt = pointAtPathDistance(
-    mobileOutline, dM, mobileRange[0], mobileRange[1],
-  ) ?? { x: 0, y: 0 };
+  const localStatPt = pointAtPathDistance(stationaryOutline, dS, s0, s1) ?? { x: 0, y: 0 };
+  const localMobPt = pointAtPathDistance(mobileOutline, dM, m0, m1) ?? { x: 0, y: 0 };
 
   // Las tangentes se comparan en espacio de PATRÓN. Medidas sobre el contorno
   // crudo el ángulo ignora los dos giros, y con una pieza girada el fantasma
   // se acuesta sobre una dirección que no existe en pantalla.
   const tS = pieceLocalToPatternDirection(
-    computeEdgeTangent(stationaryOutline, dS, stationaryRange[0], stationaryRange[1]),
+    computeEdgeTangent(stationaryOutline, dS, s0, s1),
     stationaryPiece,
   );
   const tM = pieceLocalToPatternDirection(
-    computeEdgeTangent(mobileOutline, dM, mobileRange[0], mobileRange[1]),
+    computeEdgeTangent(mobileOutline, dM, m0, m1),
     mobilePiece,
   );
 
@@ -235,8 +232,16 @@ export function sampleMismatch(
   rangeB: [number, number],
   tolerance: number,
 ): MismatchSample[] {
-  const lenA = computePathArcLength(outlineA, rangeA[0], rangeA[1]);
-  const lenB = computePathArcLength(outlineB, rangeB[0], rangeB[1]);
+  // Los rangos vienen en la convención del productor y el tramo de cierre se
+  // rotula con el índice de la `M`, que no dibuja: sin traducir, `lenA` da 0,
+  // la función se va por el early-return y caminar el lado de cierre no
+  // pintaba una sola muestra (#1143). Se traduce AQUÍ y no en los llamadores
+  // por el mismo motivo por el que esta familia recibe la pieza entera: que
+  // no se pueda olvidar.
+  const [a0, a1] = rangoMedibleDeBorde(outlineA, rangeA);
+  const [b0, b1] = rangoMedibleDeBorde(outlineB, rangeB);
+  const lenA = computePathArcLength(outlineA, a0, a1);
+  const lenB = computePathArcLength(outlineB, b0, b1);
 
   if (lenA <= 0) return [];
 
@@ -250,8 +255,8 @@ export function sampleMismatch(
     const dB = frac * lenB;
     const delta = Math.abs(dA - dB);
 
-    const ptA = pointAtPathDistance(outlineA, dA, rangeA[0], rangeA[1]);
-    const ptB = pointAtPathDistance(outlineB, dB, rangeB[0], rangeB[1]);
+    const ptA = pointAtPathDistance(outlineA, dA, a0, a1);
+    const ptB = pointAtPathDistance(outlineB, dB, b0, b1);
 
     if (!ptA || !ptB) continue;
 
@@ -279,8 +284,8 @@ export function sampleMismatch(
     const frac = 1;
     const dB = frac * lenB;
     const delta = Math.abs(lenA - dB);
-    const ptA = pointAtPathDistance(outlineA, lenA, rangeA[0], rangeA[1]);
-    const ptB = pointAtPathDistance(outlineB, dB, rangeB[0], rangeB[1]);
+    const ptA = pointAtPathDistance(outlineA, lenA, a0, a1);
+    const ptB = pointAtPathDistance(outlineB, dB, b0, b1);
 
     if (ptA && ptB) {
       let color: 'green' | 'yellow' | 'red';
@@ -321,11 +326,12 @@ export function walkDistanceAt(
   piece: PatternPiece,
   edge: SemanticEdge,
 ): number {
+  const [desde, hasta] = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
   return distanceAlongPath(
     piece.outline,
     patternToPieceLocal(patternPt, piece),
-    edge.segmentRange[0],
-    edge.segmentRange[1],
+    desde,
+    hasta,
   );
 }
 

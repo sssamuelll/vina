@@ -24,10 +24,14 @@ function makeRectPiece(id: string): PatternPiece {
     seamAllowance: 0,
     active: true,
     edges: [
-      // "side" edge: point 0 (0,0) -> point 1 (100,0) = 100mm top edge
-      { id: 'e1', name: 'side', segmentRange: [0, 1] as [number, number], edgeType: 'seam' as const },
-      // "bottom" edge: point 1 (100,0) -> point 2 (100,200) = 200mm right edge
-      { id: 'e2', name: 'bottom', segmentRange: [1, 2] as [number, number], edgeType: 'seam' as const },
+      // `segmentRange` va en espacio de COMANDOS, no de puntos (contrato del
+      // productor, `outlineAnalysis.ts:15`). Este fixture los escribía como
+      // índices sobre `flattenPath` y por eso cuadraba con el recorrido a mano
+      // que hacía `edgeLengthMM` — los dos equivocados a la vez (#1143).
+      // Comando 1: `L (100,0)` = el lado de ARRIBA, 100mm.
+      { id: 'e1', name: 'side', segmentRange: [1, 2] as [number, number], edgeType: 'seam' as const },
+      // Comando 2: `L (100,200)` = el lado DERECHO, 200mm.
+      { id: 'e2', name: 'bottom', segmentRange: [2, 3] as [number, number], edgeType: 'seam' as const },
     ],
   } as unknown as PatternPiece;
 }
@@ -82,7 +86,7 @@ describe('extractTrims', () => {
   it('groups edge-mode trims by type+name and sums lengths', () => {
     const pieces = [makeRectPiece('p1'), makeRectPiece('p2')];
     const trims: Trim[] = [
-      // "side" edge on p1: points[0]->(0,0) to points[1]->(100,0) = 100mm, full range
+      // borde "side" de p1: comando 1, el lado de arriba = 100mm, rango entero
       makeTrim({ id: 't1', pieceId: 'p1', type: 'zipper', name: 'Invisible', unitCost: 1.0, placement: { mode: 'edge', edgeName: 'side', tStart: 0, tEnd: 1 } }),
       // same edge on p2
       makeTrim({ id: 't2', pieceId: 'p2', type: 'zipper', name: 'Invisible', unitCost: 1.0, placement: { mode: 'edge', edgeName: 'side', tStart: 0, tEnd: 1 } }),
@@ -140,7 +144,7 @@ describe('extractTrims', () => {
     expect(countEntry.name).toBe(`${TRIM_TYPE_LABELS.button} — Flat`);
 
     const edgeEntry = result.find(e => e.unit === 'meters')!;
-    // "bottom" edge: points[1]->(100,0) to points[2]->(100,200) = 200mm = 0.2m
+    // borde "bottom": comando 2, el lado derecho = 200mm = 0.2m
     expect(edgeEntry.quantity).toBe(0.2);
     expect(edgeEntry.name).toBe(`${TRIM_TYPE_LABELS.zipper} — Metal`);
     expect(edgeEntry.unitCost).toBe(2.50);

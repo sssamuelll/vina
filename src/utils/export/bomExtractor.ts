@@ -17,6 +17,7 @@ import type {
 import type { Trim } from '../../types/trim';
 import type { BOMEntry } from '../../types/bom';
 import { flattenPath } from '../seam/index';
+import { computeEdgeLengthMM } from '../geometry/edgeInterpolation';
 import { extractTrims as extractTrimsFn } from '../trim/trimExtractor';
 
 // ─── Geometry Helpers ───
@@ -83,6 +84,14 @@ function pieceAreaM2(piece: PatternPiece): number {
 /**
  * Compute the length of an edge segment on a piece, in mm.
  * Falls back to 1/4 of perimeter if the edge is not found.
+ *
+ * Delega en `computeEdgeLengthMM` (#1143). Lo de antes era un recorrido a mano
+ * que indexaba el array de PUNTOS aplanados con los índices de COMANDO del
+ * `segmentRange`, dos espacios distintos: el comando `i` dibuja del punto
+ * `i-1` al `i`, así que cada borde se cobraba con el largo del lado de al
+ * lado —los cuatro lados de un rectángulo, no solo el de cierre— y en una
+ * pieza con curvas, donde un comando son muchos puntos, ni eso. Medido el
+ * 2026-09-18: `shoulder` declara 200 mm y el hilo salía por 150.
  */
 function edgeLengthMM(
   piece: PatternPiece,
@@ -90,28 +99,17 @@ function edgeLengthMM(
   tStart?: number,
   tEnd?: number,
 ): number {
-  const pts = dedup(flattenPath(piece.outline));
   const edge = piece.edges?.find((e) => e.name === edgeName);
 
   if (edge) {
-    const [start, end] = edge.segmentRange;
-    // Walk the flattened outline from start to end index, summing segment lengths
-    let length = 0;
-    for (let i = start; i < end && i < pts.length; i++) {
-      const j = (i + 1) % pts.length;
-      const dx = pts[j].x - pts[i].x;
-      const dy = pts[j].y - pts[i].y;
-      length += Math.sqrt(dx * dx + dy * dy);
-    }
-
     // Apply tStart/tEnd as fraction of the full edge length
     const t0 = tStart ?? 0;
     const t1 = tEnd ?? 1;
-    return length * (t1 - t0);
+    return computeEdgeLengthMM(piece, edgeName) * (t1 - t0);
   }
 
   // Fallback: 1/4 of perimeter
-  return computePerimeter(pts) / 4;
+  return computePerimeter(dedup(flattenPath(piece.outline))) / 4;
 }
 
 /**

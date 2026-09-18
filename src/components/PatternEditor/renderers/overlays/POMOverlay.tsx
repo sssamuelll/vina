@@ -10,6 +10,7 @@
 import type { PointOfMeasure, PatternPiece, Point2D } from '../../../../types/types';
 import { getEdgeEndpoints } from '../../../../utils/geometry/path';
 import { pieceLocalToPattern } from '../../pieceTransform';
+import { rangoMedibleDeBorde } from '../../../../utils/semanticEdges';
 
 // ─── Colours ────────────────────────────────────────────────────────────────
 
@@ -175,8 +176,10 @@ function AlongEdgePOM({
   const color = isSelected ? COLOR_ALONG_EDGE_SELECTED : COLOR_ALONG_EDGE;
   const strokeW = isSelected ? 2.5 / zoom2D : 1.5 / zoom2D;
 
-  // Render each segment in the edge's range
-  const [start, end] = edge.segmentRange;
+  // Render each segment in the edge's range. Traducido: el tramo de cierre se
+  // rotula con el índice de la `M`, que no dibuja, así que el bucle no metía
+  // ni un segmento y la cota entera —línea y número— no se pintaba (#1143).
+  const [start, end] = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
   const segments: React.ReactNode[] = [];
   let midX = 0;
   let midY = 0;

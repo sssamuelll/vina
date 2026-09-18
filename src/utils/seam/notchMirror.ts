@@ -19,6 +19,7 @@ import type {
   NotchAnchor,
 } from '../../types/types';
 import { computePathArcLength, pointAtPathDistance, distanceAlongPath } from '../geometry/arcLength';
+import { rangoMedibleDeBorde } from '../semanticEdges';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../notches';
 // `ringOf` es EL aplanado del contorno, y vive en notchAnchor: este módulo
 // tenía su propia copia literal, y dos copias del mismo aplanado derivan —
@@ -89,7 +90,7 @@ export function findEdgeForPoint(piece: PatternPiece, point: Point2D): SemanticE
   if (!piece.edges?.length) return null;
   let best: SemanticEdge | null = null, bestPerp = Infinity;
   for (const edge of piece.edges) {
-    const [s0, s1] = edge.segmentRange;
+    const [s0, s1] = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
     const d = distanceAlongPath(piece.outline, point, s0, s1);
     const pt = pointAtPathDistance(piece.outline, d, s0, s1);
     if (!pt) continue;
@@ -130,7 +131,11 @@ export function mapNotchAcrossSeam(args: {
   const pairedEdge = pairedPiece ? findEdgeByName(pairedPiece, partner.pairedEdgeName) : null;
   if (!pairedPiece || !pairedEdge) return { ok: false, reason: 'no-paired-edge', message: 'Paired edge not found.' };
 
-  const [sa0, sa1] = sourceEdge.segmentRange;
+  // Traducido: el tramo de cierre se rotula con el índice de la `M`, que no
+  // dibuja y mide cero (#1143). Sin esto, un piquete puesto en el lado de
+  // cierre no cruzaba la costura: salía por `degenerate`, «Source edge has
+  // zero length».
+  const [sa0, sa1] = rangoMedibleDeBorde(sourcePiece.outline, sourceEdge.segmentRange);
   const lenA = computePathArcLength(sourcePiece.outline, sa0, sa1);
   if (lenA < 1e-9) return { ok: false, reason: 'degenerate', message: 'Source edge has zero length.' };
   const dA = distanceAlongPath(sourcePiece.outline, point, sa0, sa1);
@@ -150,7 +155,7 @@ export function mapNotchAcrossSeam(args: {
   const fracSewnB = invert ? 1 - fracSewn : fracSewn;
   const fracEdgeB = tB0 + fracSewnB * (tB1 - tB0);
 
-  const [sb0, sb1] = pairedEdge.segmentRange;
+  const [sb0, sb1] = rangoMedibleDeBorde(pairedPiece.outline, pairedEdge.segmentRange);
   const lenB = computePathArcLength(pairedPiece.outline, sb0, sb1);
   const ptB = pointAtPathDistance(pairedPiece.outline, fracEdgeB * lenB, sb0, sb1);
   if (!ptB) return { ok: false, reason: 'degenerate', message: 'Paired edge has zero length.' };
