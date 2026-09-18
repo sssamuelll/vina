@@ -260,6 +260,39 @@ curva, su control de salida viaja con el mismo delta para no torcer la tangente�
 La primera versión de este documento despachaba todo esto en una línea —«es la
 misma corrección, no una función nueva»— y no lo era.
 
+### 4.5 El censo, que vale más que los cuatro arreglos
+
+Los tres primeros huecos tienen la misma forma y no es casualidad: **el arreglo
+llega hasta donde llega la mirada, y la mirada la dirige el test que ya existe.**
+La guarda de largo cero estaba puesta en la rama de la `Z` —la única que un test
+me obligó a mirar— y no en la de la `L`, que ningún test tocaba.
+
+El mismo día, el trinquete `scripts/medir-bordes-lint.mjs` (#1143) nació con esta
+cabecera sobre otro archivo y otro autor: «el defecto se arregló **cuatro veces**
+entre 2026-09-06 y 2026-09-18, y las tres primeras solo tocaron los sitios que
+alguien miraba ese día».
+
+Así que aquí va el censo de cada mecanismo, entero, no solo las ramas con test:
+
+| Mecanismo | Sitios | Estado |
+|---|---|---|
+| **Emitir tramo por comando** | `segmentPolar` (`L`, `Z`) | las dos ramas, una sola guarda en `tramo()` |
+| | `M`, `C`, `Q` | sin tramo a propósito: § 3.2, el largo de una curva es de solo lectura |
+| | `H`, `V`, `A`, `S`, `T` | sin tramo; y `COMANDOS_SOPORTADOS` ya rechaza esos contornos enteros (§ 4.4) |
+| | `trazos/trazoPath.ts` `rectasDe` | **mismo patrón, no tocado.** Es de CRUCES entre trazos, no de cotas, y su spec ya excluye las curvas. Un trazo cerrado no cruzaría por su lado de cierre; queda dicho, sin arreglar |
+| **Mover un ancla y arrastrar su control** | `copiaConNodoFinal` | arreglado aquí |
+| | `copiaConExtremo` | ya lo hacía |
+| | `applyNodeMove` / `moveOneCommand` | ya lo hacía |
+| **Traducir la `Z` a su `M`** | `nearestSegment` | la produce (índice de la `Z`), y solo la de la PRIMERA |
+| | `useEditPattern.ts:424` | la clava a `0` |
+| | `lado.ts` `ladoDelHit` | retrocede hasta la `M` del subtrazo |
+| | — | las tres coinciden con un solo anillo; con dos, no. § 5 |
+
+Lo que este censo NO cubre, dicho: un archivo que traduzca bien en un sitio y mida
+crudo en otro con el rango desestructurado en variables. Es el mismo hueco que
+`medir-bordes-lint.mjs` declara aceptar, y por la misma razón: la forma que se
+copia y se pega es la primera.
+
 ## 5. Lo que NO se hace
 
 - **No se toca la gramática del ratón de `Z`.** Ningún arrastre nuevo, ninguna

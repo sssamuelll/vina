@@ -306,4 +306,28 @@ test.describe('editar los largos de una pieza que ya existe', () => {
     const valor = await campo(page, 'Largo').inputValue();
     expect(valor, `no es el lado de 100 mm: ${valor}`).toContain('100');
   });
+
+  test('el lado elegido con Tab en Z no se cuela en Editar patrón', async ({ page }) => {
+    // Las dos puertas son excluyentes por herramienta. Con un `??` entre ellas,
+    // el lado de `Z` seguía siendo el sujeto en `Q` sin nada seleccionado, y
+    // además se quedaba el Escape que le tocaba a `editPattern`.
+    await unRectanguloSeleccionado(page);
+    await elRatonSobre(page, { x: 300, y: 350 });
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(250);
+    await expect(caja(page)).toHaveCount(1);
+
+    await dispatch(page, 'editor/setActiveTool', 'editPattern');
+    await dispatch(page, 'tools/setActiveTool2D', 'editPattern');
+    await page.waitForTimeout(500);
+    expect(await caja(page).count(), 'el lado de Z se coló en Editar patrón').toBe(0);
+
+    // Y al volver a Z sigue ahí: es una selección, no una edición pendiente.
+    await dispatch(page, 'editor/setActiveTool', 'select');
+    await dispatch(page, 'tools/setActiveTool2D', 'select');
+    await page.waitForTimeout(500);
+    await expect(caja(page), 'volver a Z no recuperó el lado seleccionado').toHaveCount(1);
+  });
 });

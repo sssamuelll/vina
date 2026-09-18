@@ -815,7 +815,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     const commandIndex = ladoDelHit(piece.outline, [...editPatternTool.selectedSegments][0]);
     return commandIndex === null ? null : { pieceId: piece.id, commandIndex };
   }, [activeTool, editPatternTool.editingPieceId, editPatternTool.selectedSegments, pieces]);
-  const ladoSeleccionado = ladoDeQ ?? puertaDeLado.lado;
+  // Las dos puertas son EXCLUYENTES por herramienta, no un `??`. Con el `??`,
+  // un lado elegido con Tab en `Z` seguía siendo el sujeto al pasar a `Q` sin
+  // nada seleccionado —`admiteLado` deja sitio ahí— y además se quedaba el
+  // Escape que le tocaba a `editPattern`. Cada herramienta, su puerta.
+  const ladoSeleccionado = activeTool === 'editPattern' ? ladoDeQ : puertaDeLado.lado;
   // Refs para que `aplicarCota` no se recree en cada render de la pluma: la
   // rama del tramo en curso necesita la herramienta viva, no una copia vieja.
   const penRef = useRef(pen);
