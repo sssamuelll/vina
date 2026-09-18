@@ -174,6 +174,6 @@ describe('#1176 — polyPenDraw: solo la rama que dibuja DENTRO de una pieza exi
     const tool = tools.find(t => t.name === 'polyPenDraw')!;
     const state = mockState([mockPiece('p', { locked: true })]); // bloqueada, pero irrelevante: no es el objetivo
     const result = await tool.execute({ points: puntos, mode: 'piece' }, dispatch, () => state);
-    expect(result.error ?? '').not.toMatch(/lock/i);
+    expect(result.success, `el modo pieza nueva se rechazó: ${result.error ?? ''}`).toBe(true);
   });
 });
