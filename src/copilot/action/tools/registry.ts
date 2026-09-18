@@ -127,6 +127,40 @@ export interface OpenAITool {
   };
 }
 
+// ─── Coerción ───────────────────────────────────────────────────────────────
+
+/**
+ * Lleva a su tipo los escalares que el function-calling manda como string.
+ *
+ * Un LLM manda `"5"` donde el schema dice `number` y `"false"` donde dice
+ * `boolean` con toda naturalidad. Rechazarlos a secas apagaría llamadas que
+ * hoy funcionan, así que primero se coercionan y solo lo que no se puede
+ * coercionar cae en `validate()` y se rechaza allí.
+ *
+ * `"false"` es truthy en JS: ese es exactamente el fallo de #1189 — entraba
+ * en la rama destructiva de `offsetPattern` y reportaba `replaced: true`.
+ * Por eso solo `"true"` y `"false"` se convierten: cualquier otra cadena se
+ * deja pasar tal cual para que el validador la rechace en vez de adivinar.
+ */
+function coerceToSchema(
+  schema: ToolParametersSchema,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...params };
+  for (const [key, value] of Object.entries(out)) {
+    if (typeof value !== 'string') continue;
+    const expected = schema.properties[key]?.type;
+    if (expected === 'boolean') {
+      if (value === 'true') out[key] = true;
+      else if (value === 'false') out[key] = false;
+    } else if (expected === 'number' || expected === 'integer') {
+      const n = Number(value);
+      if (value.trim() !== '' && Number.isFinite(n)) out[key] = n;
+    }
+  }
+  return out;
+}
+
 // ─── Registry ───────────────────────────────────────────────────────────────
 
 /**
@@ -307,6 +341,23 @@ export class ToolRegistry {
         return { success: false, error: validated.error };
       }
       validatedParams = validated.data as Record<string, unknown>;
+    } else {
+      // #1189 — hoy NINGUNA de las 46 definiciones trae `schema` zod, así que
+      // la rama de arriba no corre nunca y el camino vivo entraba sin validar
+      // nada. `validate()` (el validador contra el JSON schema que las tools
+      // sí declaran) estaba escrito y solo lo llamaba `toolExecutor.ts`, que
+      // no importa nadie fuera de tests.
+      //
+      // La guardia va aquí y no en `AgenticLoop` porque `execute` es el único
+      // paso por el que entran todas las tools y todos sus llamadores: cubre
+      // de una vez los 415 casts `params.x as T` de los 28 archivos que los
+      // leen sin mirar.
+      const coerced = coerceToSchema(tool.parameters, (params ?? {}) as Record<string, unknown>);
+      const check = this.validate(name, coerced);
+      if (!check.valid) {
+        return { success: false, error: check.errors.join(', ') };
+      }
+      validatedParams = coerced;
     }
 
     const dispatchAsAgent = ((action: Parameters<AppDispatch>[0]) =>
