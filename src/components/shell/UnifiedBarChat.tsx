@@ -11,6 +11,7 @@ import { showSuccessToast } from '../../store/copilotUISlice';
 import { piecesLabel, promptSafeName, type PendingDXFAttachment } from './dxfImport';
 import { useAgenticLoop, type ToolCallProgress } from '../../copilot/hooks/useAgenticLoop';
 import { getDefaultRegistry } from '../../copilot/action/tools/registry';
+import { mensajeDeErrorEs } from '../../copilot/action/tools/mensajeDeErrorEs';
 import { anthropicProvider } from '../../copilot/providers/anthropic';
 import { openaiProvider } from '../../copilot/providers/openai';
 import { deepseekProvider } from '../../copilot/providers/deepseek';
@@ -307,7 +308,9 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
                       {tc.status === 'done' ? '✓' : tc.status === 'error' ? '✗' : '·'}
                     </span>
                     <span style={{ fontFamily: "'SF Mono', 'Fira Code', monospace" }}>{tc.name}</span>
-                    {tc.error && <span style={{ opacity: 0.85 }}>— {tc.error}</span>}
+                    {/* #1194 — el error se traduce al pintarlo, no al producirlo:
+                        `classifyError` y el reintento del LLM leen el original. */}
+                    {tc.error && <span style={{ opacity: 0.85 }}>— {mensajeDeErrorEs(tc.error)}</span>}
                   </div>
                 </Fragment>
               ))}
