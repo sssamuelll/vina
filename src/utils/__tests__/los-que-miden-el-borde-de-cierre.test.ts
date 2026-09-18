@@ -8,7 +8,10 @@ import { measureAlongCurveTool } from '../../copilot/reasoning/bridge/meta-tools
 import { compareCurvesMetaTool } from '../../copilot/reasoning/bridge/meta-tools/compareCurves';
 import { pieceLocalToPattern } from '../geometry/pieceSpace';
 import { interpolateEdgePoint } from '../geometry/edgeInterpolation';
-import type { PathCommand, PatternPiece, Seam, SemanticEdge } from '../../types/types';
+import { auditNotches } from '../../copilot/reasoning/proactiveAnalysis';
+import { getPointOnEdge } from '../../copilot/action/tools/definitions/patternOpsTools';
+import { tools as pomTools } from '../../copilot/action/tools/definitions/pomTools';
+import type { InternalLine, PathCommand, PatternPiece, Seam, SemanticEdge } from '../../types/types';
 import type { Trim } from '../../types/trim';
 
 /**
@@ -72,6 +75,14 @@ function costura(p: PatternPiece, ea: SemanticEdge, q: PatternPiece, eb: Semanti
 }
 
 const estado = (pieces: PatternPiece[]) => () => ({ project: { pieces } }) as never;
+
+/** Un piquete mínimo: lo que se lee de él es el primer comando de su `path`. */
+function piquete(id: string, at: { x: number; y: number }): InternalLine {
+  return {
+    id, type: 'notch',
+    path: cmds(['M', [at.x, at.y]], ['L', [at.x, at.y + 5]]),
+  } as unknown as InternalLine;
+}
 
 describe('el hilo del BOM se calcula sobre el largo que el borde declara', () => {
   it('borde por borde, incluido el de cierre', () => {
@@ -190,5 +201,78 @@ describe('caminar la costura sobre el borde de cierre', () => {
       walkDistanceAt(pieceLocalToPattern(fin!.point, p), p, cierre),
       'caminar el borde de cierre se queda en 0: la costura no avanza',
     ).toBeCloseTo(cierre.length ?? 0, 0);
+  });
+});
+
+describe('el aviso de piquetes desalineados mira el borde de cierre', () => {
+  it('dos piquetes que no se corresponden en el lado de cierre se avisan', () => {
+    // Hoy no: con `lenA` a cero la función se va por la rama de respaldo, que
+    // solo CUENTA piquetes. Uno y uno, cuentas iguales, ningún aviso. El
+    // chequeo no falla: desaparece.
+    //
+    // 0,2 y 0,55 a propósito: la función acepta también el sentido CONTRARIO
+    // de recorrido —que es como se cosen dos piezas cara con cara—, así que
+    // 0,2 contra 0,8 SÍ están alineados y con ellos el test pasaba en vacío.
+    const p = rect('p1', 'Delantero', 0, 0, 200, 150);
+    const q = rect('p2', 'Espalda', 400, 0, 200, 150);
+    const ea = bordeDeCierre(p);
+    const eb = bordeDeCierre(q);
+    const conPiquetes = (pieza: PatternPiece, e: SemanticEdge, t: number, id: string) =>
+      ({ ...pieza, internals: [piquete(id, interpolateEdgePoint(pieza, e.name, t)!.point)] }) as PatternPiece;
+
+    const avisos = auditNotches(
+      [conPiquetes(p, ea, 0.2, 'n1'), conPiquetes(q, eb, 0.55, 'n2')],
+      [costura(p, ea, q, eb)],
+    );
+    expect(
+      avisos.filter((w) => w.severity === 'warning' && w.category === 'notch'),
+      'los dos piquetes caen en sitios distintos del lado y nadie avisa',
+    ).toHaveLength(1);
+  });
+});
+
+describe('el punto a t sobre un borde, para el copiloto', () => {
+  it('getPointOnEdge cae en el medio del lado de cierre con t=0,5', () => {
+    const p = rect('p1', 'Delantero', 0, 0, 200, 150);
+    const cierre = bordeDeCierre(p);
+    const esperado = interpolateEdgePoint(p, cierre.name, 0.5)!.point;
+    const dado = getPointOnEdge(p, cierre, 0.5);
+    expect(dado.x, 'el corte de slash&spread arranca en la esquina, no en el medio').toBeCloseTo(esperado.x, 0);
+    expect(dado.y).toBeCloseTo(esperado.y, 0);
+  });
+
+  it('y en el medio de cualquier lado, que hoy da el vértice del comando de en medio', () => {
+    const p = rect('p1', 'Delantero', 0, 0, 200, 150);
+    for (const e of p.edges ?? []) {
+      const esperado = interpolateEdgePoint(p, e.name, 0.5)!.point;
+      const dado = getPointOnEdge(p, e, 0.5);
+      expect(Math.hypot(dado.x - esperado.x, dado.y - esperado.y), `${e.name} a t=0,5`).toBeLessThan(0.5);
+    }
+  });
+});
+
+describe('el POM que crea el copiloto se ancla donde dice su t', () => {
+  it('sobre el borde de cierre, en el medio y no en la esquina', async () => {
+    const p = rect('p1', 'Delantero', 0, 0, 200, 150);
+    const q = rect('p2', 'Espalda', 400, 0, 200, 150);
+    const cierreP = bordeDeCierre(p);
+    const cierreQ = bordeDeCierre(q);
+    const crear = pomTools.find((t) => t.name === 'createPOM')!;
+
+    const acciones: Array<{ payload: { pointA: { localPosition: { x: number; y: number } } } }> = [];
+    const r = await crear.execute(
+      {
+        name: 'Ancho de pecho', pieceAId: p.id, edgeAName: cierreP.name,
+        pieceBId: q.id, edgeBName: cierreQ.name, method: 'straight',
+      },
+      ((a: unknown) => { acciones.push(a as never); return a; }) as never,
+      (() => ({ project: { pieces: [p, q], poms: [] } })) as never,
+    );
+
+    expect(r.success, `createPOM falló: ${r.error ?? ''}`).toBe(true);
+    const esperado = interpolateEdgePoint(p, cierreP.name, 0.5)!.point;
+    const puesto = acciones[0].payload.pointA.localPosition;
+    expect(puesto.x, 'el POM se ancló en la esquina de la pieza, no sobre el borde').toBeCloseTo(esperado.x, 0);
+    expect(puesto.y).toBeCloseTo(esperado.y, 0);
   });
 });

@@ -8,6 +8,7 @@ import type { AppDispatch, RootState } from '../../../../store';
 import type { PatternPiece, InternalLineType, PathCommand, SemanticEdge, Point2D } from '../../../../types/types';
 import { newId } from '../../../../utils/ids';
 import { piezaBloqueada } from '../../../../utils/piezaBloqueada';
+import { interpolateEdgePoint } from '../../../../utils/geometry/edgeInterpolation';
 
 function requireFiniteNumber(value: unknown, name: string): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return `${name} must be a valid number`;
@@ -33,74 +34,20 @@ function uid(_prefix: string): string {
 }
 
 /**
- * Interpolate a point at parametric position `t` along a SemanticEdge's
- * segment range within a piece outline.
+ * Un punto a `t` (0..1) a lo largo de un borde semántico de la pieza.
  *
- * Flattens the commands in the segment range to a sequence of endpoint
- * coordinates, then linearly interpolates at t ∈ [0, 1].
+ * Delega en `interpolateEdgePoint` (#1143). Lo de antes recorría los comandos
+ * del `segmentRange` quedándose con el VÉRTICE de cada uno e interpolaba entre
+ * esos vértices: sobre el tramo de cierre —cuyo rango apunta a la `M`, que no
+ * dibuja— devolvía la esquina de arranque de la pieza, y sobre cualquier lado
+ * de un solo comando devolvía su vértice final dijera lo que dijera `t`. La
+ * familia de `arcLength` interpola por LARGO DE ARCO, que es lo que `t`
+ * promete, y mide las curvas de verdad en vez de saltar de vértice en vértice.
+ *
+ * Exportada para poder probarla: es geometría pura, igual que `walkDistanceAt`.
  */
-function getPointOnEdge(outline: PathCommand[], edge: SemanticEdge, t: number): Point2D {
-  const [start, end] = edge.segmentRange;
-  const pts: Point2D[] = [];
-
-  let cx = 0;
-  let cy = 0;
-
-  for (let i = start; i < end && i < outline.length; i++) {
-    const cmd = outline[i];
-    switch (cmd.type) {
-      case 'M':
-        cx = cmd.values[0]; cy = cmd.values[1];
-        pts.push({ x: cx, y: cy });
-        break;
-      case 'L':
-        cx = cmd.values[0]; cy = cmd.values[1];
-        pts.push({ x: cx, y: cy });
-        break;
-      case 'H':
-        cx = cmd.values[0];
-        pts.push({ x: cx, y: cy });
-        break;
-      case 'V':
-        cy = cmd.values[0];
-        pts.push({ x: cx, y: cy });
-        break;
-      case 'C':
-        cx = cmd.values[4]; cy = cmd.values[5];
-        pts.push({ x: cx, y: cy });
-        break;
-      case 'S':
-        cx = cmd.values[2]; cy = cmd.values[3];
-        pts.push({ x: cx, y: cy });
-        break;
-      case 'Q':
-        cx = cmd.values[2]; cy = cmd.values[3];
-        pts.push({ x: cx, y: cy });
-        break;
-      case 'T':
-        cx = cmd.values[0]; cy = cmd.values[1];
-        pts.push({ x: cx, y: cy });
-        break;
-      case 'A':
-        cx = cmd.values[5]; cy = cmd.values[6];
-        pts.push({ x: cx, y: cy });
-        break;
-      default:
-        break;
-    }
-  }
-
-  if (pts.length === 0) return { x: 0, y: 0 };
-  if (pts.length === 1) return pts[0];
-
-  const idx = t * (pts.length - 1);
-  const lo = Math.floor(idx);
-  const hi = Math.min(lo + 1, pts.length - 1);
-  const frac = idx - lo;
-  return {
-    x: pts[lo].x + (pts[hi].x - pts[lo].x) * frac,
-    y: pts[lo].y + (pts[hi].y - pts[lo].y) * frac,
-  };
+export function getPointOnEdge(piece: PatternPiece, edge: SemanticEdge, t: number): Point2D {
+  return interpolateEdgePoint(piece, edge.name, t)?.point ?? { x: 0, y: 0 };
 }
 
 export const tools: ToolDefinition[] = [
@@ -277,8 +224,8 @@ export const tools: ToolDefinition[] = [
       // 3. Compute points at parametric t along each edge's segment range
       const fromT = typeof params.fromT === 'number' ? params.fromT : 0.5;
       const toT = typeof params.toT === 'number' ? params.toT : 0.5;
-      const fromPt = getPointOnEdge(piece.outline, fromEdge, fromT);
-      const toPt = getPointOnEdge(piece.outline, toEdge, toT);
+      const fromPt = getPointOnEdge(piece, fromEdge, fromT);
+      const toPt = getPointOnEdge(piece, toEdge, toT);
 
       // 4. Find intersections and build spread piece
       const { findSlashIntersections, buildSpreadPiece } = await import('../../../../utils/geometry/slashAndSpread');
