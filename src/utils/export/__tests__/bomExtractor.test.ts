@@ -178,23 +178,27 @@ describe('extractInterfacing', () => {
 describe('extractThread', () => {
   it('calculates thread with standard multiplier (2.5x)', () => {
     const pieces = [
-      makePiece({ id: 'p1', edges: [{ id: 'e1', name: 'sideSeam', segmentRange: [0, 2], edgeType: 'seam' }] }),
-      makePiece({ id: 'p2', edges: [{ id: 'e2', name: 'sideSeam', segmentRange: [0, 2], edgeType: 'seam' }] }),
+      makePiece({ id: 'p1', edges: [{ id: 'e1', name: 'sideSeam', segmentRange: [1, 3], edgeType: 'seam' }] }),
+      makePiece({ id: 'p2', edges: [{ id: 'e2', name: 'sideSeam', segmentRange: [1, 3], edgeType: 'seam' }] }),
     ];
     const seams = [makeSeam({ type: 'standard' })];
     const entries = extractThread(seams, pieces);
 
     expect(entries).toHaveLength(1);
     expect(entries[0].category).toBe('thread');
-    // Edge from index 0 to 2 on rect: (0,0)->(100,0)->(100,200) = 100+200=300mm
+    // `segmentRange` va en espacio de COMANDOS (`outlineAnalysis.ts:15`), no de
+    // puntos: los comandos 1 y 2 son `L (100,0)` y `L (100,200)`, o sea el lado
+    // de arriba más el derecho = 100+200 = 300mm. Escrito como [0,2] —índices
+    // de punto— daba el mismo número con el recorrido a mano que hacía
+    // `edgeLengthMM`, y los dos estaban mal (#1143).
     // Thread = 300mm * 2.5 = 750mm = 0.75m
     expect(entries[0].quantity).toBeCloseTo(0.75, 2);
   });
 
   it('applies french seam multiplier (5x)', () => {
     const pieces = [
-      makePiece({ id: 'p1', edges: [{ id: 'e1', name: 'sideSeam', segmentRange: [0, 2], edgeType: 'seam' }] }),
-      makePiece({ id: 'p2', edges: [{ id: 'e2', name: 'sideSeam', segmentRange: [0, 2], edgeType: 'seam' }] }),
+      makePiece({ id: 'p1', edges: [{ id: 'e1', name: 'sideSeam', segmentRange: [1, 3], edgeType: 'seam' }] }),
+      makePiece({ id: 'p2', edges: [{ id: 'e2', name: 'sideSeam', segmentRange: [1, 3], edgeType: 'seam' }] }),
     ];
     const seams = [makeSeam({ type: 'french' })];
     const entries = extractThread(seams, pieces);
@@ -205,8 +209,8 @@ describe('extractThread', () => {
 
   it('applies overlock multiplier (4x)', () => {
     const pieces = [
-      makePiece({ id: 'p1', edges: [{ id: 'e1', name: 'sideSeam', segmentRange: [0, 2], edgeType: 'seam' }] }),
-      makePiece({ id: 'p2', edges: [{ id: 'e2', name: 'sideSeam', segmentRange: [0, 2], edgeType: 'seam' }] }),
+      makePiece({ id: 'p1', edges: [{ id: 'e1', name: 'sideSeam', segmentRange: [1, 3], edgeType: 'seam' }] }),
+      makePiece({ id: 'p2', edges: [{ id: 'e2', name: 'sideSeam', segmentRange: [1, 3], edgeType: 'seam' }] }),
     ];
     const seams = [makeSeam({ type: 'overlock' })];
     const entries = extractThread(seams, pieces);
@@ -241,8 +245,8 @@ describe('extractThread', () => {
 describe('extractSeamTape', () => {
   it('filters taped seams and groups by tapeWidth', () => {
     const pieces = [
-      makePiece({ id: 'p1', edges: [{ id: 'e1', name: 'sideSeam', segmentRange: [0, 2], edgeType: 'seam' }] }),
-      makePiece({ id: 'p2', edges: [{ id: 'e2', name: 'sideSeam', segmentRange: [0, 2], edgeType: 'seam' }] }),
+      makePiece({ id: 'p1', edges: [{ id: 'e1', name: 'sideSeam', segmentRange: [1, 3], edgeType: 'seam' }] }),
+      makePiece({ id: 'p2', edges: [{ id: 'e2', name: 'sideSeam', segmentRange: [1, 3], edgeType: 'seam' }] }),
     ];
     const seams = [makeSeam({ taped: true, tapeWidth: 10 })];
     const entries = extractSeamTape(seams, pieces);
@@ -262,8 +266,8 @@ describe('extractSeamTape', () => {
 
   it('groups by different tape widths', () => {
     const pieces = [
-      makePiece({ id: 'p1', edges: [{ id: 'e1', name: 'sideSeam', segmentRange: [0, 2], edgeType: 'seam' }] }),
-      makePiece({ id: 'p2', edges: [{ id: 'e2', name: 'sideSeam', segmentRange: [0, 2], edgeType: 'seam' }] }),
+      makePiece({ id: 'p1', edges: [{ id: 'e1', name: 'sideSeam', segmentRange: [1, 3], edgeType: 'seam' }] }),
+      makePiece({ id: 'p2', edges: [{ id: 'e2', name: 'sideSeam', segmentRange: [1, 3], edgeType: 'seam' }] }),
     ];
     const seams = [
       makeSeam({ id: 's1', taped: true, tapeWidth: 10 }),
@@ -330,12 +334,12 @@ describe('extractAll', () => {
         id: 'p1',
         fabricCode: 'SELF',
         interfacingType: 'fusible-light',
-        edges: [{ id: 'e1', name: 'sideSeam', segmentRange: [0, 2], edgeType: 'seam' }],
+        edges: [{ id: 'e1', name: 'sideSeam', segmentRange: [1, 3], edgeType: 'seam' }],
       }),
       makePiece({
         id: 'p2',
         fabricCode: 'SELF',
-        edges: [{ id: 'e2', name: 'sideSeam', segmentRange: [0, 2], edgeType: 'seam' }],
+        edges: [{ id: 'e2', name: 'sideSeam', segmentRange: [1, 3], edgeType: 'seam' }],
       }),
     ];
     const fabrics = [makeFabric()];
