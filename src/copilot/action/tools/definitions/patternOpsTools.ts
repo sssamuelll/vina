@@ -8,7 +8,7 @@ import type { AppDispatch, RootState } from '../../../../store';
 import type { PatternPiece, InternalLineType, PathCommand, SemanticEdge, Point2D } from '../../../../types/types';
 import { newId } from '../../../../utils/ids';
 import { piezaBloqueada } from '../../../../utils/piezaBloqueada';
-import { interpolateEdgePoint } from '../../../../utils/geometry/edgeInterpolation';
+import { interpolateRangePoint } from '../../../../utils/geometry/edgeInterpolation';
 
 function requireFiniteNumber(value: unknown, name: string): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return `${name} must be a valid number`;
@@ -47,7 +47,7 @@ function uid(_prefix: string): string {
  * Exportada para poder probarla: es geometría pura, igual que `walkDistanceAt`.
  */
 export function getPointOnEdge(piece: PatternPiece, edge: SemanticEdge, t: number): Point2D {
-  return interpolateEdgePoint(piece, edge.name, t)?.point ?? { x: 0, y: 0 };
+  return interpolateRangePoint(piece.outline, edge.segmentRange, t)?.point ?? { x: 0, y: 0 };
 }
 
 export const tools: ToolDefinition[] = [

@@ -4,6 +4,8 @@ import { extractThread } from '../export/bomExtractor';
 import { extractTrims } from '../trim/trimExtractor';
 import { mapNotchAcrossSeam } from '../seam/notchMirror';
 import { walkDistanceAt } from '../../components/PatternEditor/useWalkSeamTool';
+import { snapToOutline, findEdgeForSegment } from '../../components/PatternEditor/useMeasureTool';
+import { measureEdgeLength } from '../patternOps';
 import { measureAlongCurveTool } from '../../copilot/reasoning/bridge/meta-tools/measureAlongCurve';
 import { compareCurvesMetaTool } from '../../copilot/reasoning/bridge/meta-tools/compareCurves';
 import { pieceLocalToPattern } from '../geometry/pieceSpace';
@@ -201,6 +203,44 @@ describe('caminar la costura sobre el borde de cierre', () => {
       walkDistanceAt(pieceLocalToPattern(fin!.point, p), p, cierre),
       'caminar el borde de cierre se queda en 0: la costura no avanza',
     ).toBeCloseTo(cierre.length ?? 0, 0);
+  });
+});
+
+describe('los dos sitios que destapó el trinquete', () => {
+  it('measureEdgeLength devuelve el largo que el borde declara, borde por borde', () => {
+    // La TERCERA función de «largo de un borde» escrita a mano en el repo, y
+    // rota igual: recorre los comandos del rango saltándose la `M` —que es el
+    // único comando del tramo de cierre— y toma las curvas por su cuerda.
+    const p = rect('p1', 'Delantero', 0, 0, 200, 150);
+    const rotos = (p.edges ?? [])
+      .map((e) => ({ borde: e.name, declara: e.length ?? 0, mide: measureEdgeLength(p, e) }))
+      .filter((m) => Math.abs(m.mide - m.declara) > 0.5);
+    expect(rotos, 'el copiloto mide estos bordes con otro número del que declaran').toEqual([]);
+  });
+
+  it('clicar el medio de una cara engancha el borde de ESA cara, en Medir', () => {
+    // `snapToOutline` devuelve el índice del segmento APLANADO y
+    // `findEdgeForSegment` lo compara contra rangos de COMANDO. El comando `i`
+    // dibuja del punto `i-1` al `i`, así que está corrido un borde: clicar
+    // arriba engancha el lado de cierre, clicar el de cierre engancha abajo.
+    // Es el mismo defecto que ya se arregló en «Poner avío» (#1143).
+    const p = rect('p1', 'Delantero', 0, 0, 200, 150);
+    const caras: Array<[{ x: number; y: number }, number]> = [
+      [{ x: 100, y: 0 }, 200],   // arriba
+      [{ x: 200, y: 75 }, 150],  // derecha
+      [{ x: 100, y: 150 }, 200], // abajo
+      [{ x: 0, y: 75 }, 150],    // izquierda: el tramo de cierre
+    ];
+    const fallos = caras.flatMap(([punto, largo]) => {
+      const snap = snapToOutline(punto, p, 1, 40);
+      if (!snap) return [{ punto, problema: 'no enganchó' }];
+      const borde = findEdgeForSegment(p, snap.segmentIndex);
+      if (!borde) return [{ punto, problema: 'ningún borde cubre ese índice' }];
+      return Math.abs((borde.length ?? 0) - largo) > 0.5
+        ? [{ punto, problema: `enganchó "${borde.name}", que mide ${borde.length} y no ${largo}` }]
+        : [];
+    });
+    expect(fallos, 'Medir engancha un borde que no es el que se clicó').toEqual([]);
   });
 });
 

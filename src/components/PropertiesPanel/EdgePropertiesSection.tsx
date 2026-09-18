@@ -8,7 +8,7 @@ import {
   updateEdgeSeamAllowanceSpan,
 } from '../../store/projectSlice';
 import type { SeamAllowanceSpan } from '../../types/types';
-import { computePathArcLength } from '../../utils/geometry/arcLength';
+import { computeRangeLengthMM } from '../../utils/geometry/edgeInterpolation';
 
 interface Props {
   /** La selección del margen admite uno o varios bordes con Shift. */
@@ -196,11 +196,11 @@ export default function EdgePropertiesSection({ items }: Props) {
     ? (
         Number.isFinite(spanTarget.edge.length)
           ? Math.max(0, spanTarget.edge.length ?? 0)
-          : computePathArcLength(
-              spanTarget.piece.outline,
-              spanTarget.edge.segmentRange[0],
-              spanTarget.edge.segmentRange[1],
-            )
+          // Medir es el camino de respaldo —el esquema declara `length`
+          // opcional, así que un proyecto guardado sin él es legal— y medía el
+          // `segmentRange` crudo: sobre el tramo de cierre daba 0, y con 0 las
+          // casillas del tramo nacen deshabilitadas (#1143).
+          : computeRangeLengthMM(spanTarget.piece.outline, spanTarget.edge.segmentRange)
       )
     : 0;
 

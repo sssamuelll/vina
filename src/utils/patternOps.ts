@@ -15,6 +15,7 @@ import { applyDartsToInternals } from './dartEntity';
 import { getEdgeEndpoints } from './geometry/path';
 import { offsetOutline, type OffsetJoin } from './seam/cornerTypes';
 import { samplePathAtIntervals } from './geometry/arcLength';
+import { computeRangeLengthMM, interpolateRangePoint } from './geometry/edgeInterpolation';
 import { fitCubicBezier, rdpSimplify } from './geometry/bezier';
 import { linePolylineIntersections } from './geometry/lineIntersect';
 import { findSlashIntersections, buildSpreadPiece } from './geometry/slashAndSpread';
@@ -445,77 +446,36 @@ export function transferDart(
 
 /**
  * Compute seam length for an edge (walk the outline segments).
+ *
+ * Delega en `computeRangeLengthMM` (#1143). Era la TERCERA función de «largo de
+ * un borde» escrita a mano en el repo, y fallaba por dos sitios: se saltaba la
+ * `M` —que es el único comando del tramo de cierre, así que ese lado medía
+ * cero— y tomaba cada curva por su cuerda. La familia de `arcLength` traduce
+ * el rango y mide las curvas de verdad.
  */
 export function measureEdgeLength(piece: PatternPiece, edge: SemanticEdge): number {
-  let length = 0;
-  let cx = 0, cy = 0;
-
-  for (let i = 0; i < piece.outline.length; i++) {
-    const cmd = piece.outline[i];
-    let ex = cx, ey = cy;
-
-    switch (cmd.type) {
-      case 'M': ex = cmd.values[0]; ey = cmd.values[1]; break;
-      case 'L': ex = cmd.values[0]; ey = cmd.values[1]; break;
-      case 'C': ex = cmd.values[4]; ey = cmd.values[5]; break;
-      default: break;
-    }
-
-    if (i >= edge.segmentRange[0] && i < edge.segmentRange[1] && cmd.type !== 'M') {
-      const dx = ex - cx, dy = ey - cy;
-      length += Math.sqrt(dx * dx + dy * dy);
-    }
-
-    cx = ex; cy = ey;
-  }
-
-  return Math.round(length * 100) / 100;
+  return Math.round(computeRangeLengthMM(piece.outline, edge.segmentRange) * 100) / 100;
 }
 
 // ─── findCutEdgePair ──────────────────────────────────────────────────────────
 
 /**
  * Compute the midpoint of an edge's segments on a piece outline.
- * Uses the average of all segment midpoints weighted by segment length.
+ *
+ * Delega en la familia de `arcLength` (#1143): el medio por LARGO DE ARCO, que
+ * es lo que el nombre promete, y con el rango traducido. El recorrido a mano
+ * de antes se saltaba la `M` —único comando del tramo de cierre— y devolvía
+ * `{0, 0, arcLength: 0}`, así que al partir una pieza por ese lado el par de
+ * bordes cortados se emparejaba contra el origen del patrón.
  */
 function computeEdgeMidpoint(
   piece: PatternPiece,
   edge: SemanticEdge,
 ): { x: number; y: number; arcLength: number } {
-  let cx = 0, cy = 0;
-  let totalLength = 0;
-  let midX = 0, midY = 0;
-
-  for (let i = 0; i < piece.outline.length; i++) {
-    const cmd = piece.outline[i];
-    let ex = cx, ey = cy;
-
-    switch (cmd.type) {
-      case 'M': ex = cmd.values[0]; ey = cmd.values[1]; break;
-      case 'L': ex = cmd.values[0]; ey = cmd.values[1]; break;
-      case 'C': ex = cmd.values[4]; ey = cmd.values[5]; break;
-      default: break;
-    }
-
-    if (i >= edge.segmentRange[0] && i < edge.segmentRange[1] && cmd.type !== 'M') {
-      const dx = ex - cx, dy = ey - cy;
-      const segLen = Math.sqrt(dx * dx + dy * dy);
-      const segMidX = (cx + ex) / 2;
-      const segMidY = (cy + ey) / 2;
-      midX += segMidX * segLen;
-      midY += segMidY * segLen;
-      totalLength += segLen;
-    }
-
-    cx = ex; cy = ey;
-  }
-
-  if (totalLength === 0) return { x: 0, y: 0, arcLength: 0 };
-  return {
-    x: midX / totalLength,
-    y: midY / totalLength,
-    arcLength: totalLength,
-  };
+  const arcLength = computeRangeLengthMM(piece.outline, edge.segmentRange);
+  const medio = arcLength > 0 ? interpolateRangePoint(piece.outline, edge.segmentRange, 0.5) : null;
+  if (!medio) return { x: 0, y: 0, arcLength: 0 };
+  return { x: medio.point.x, y: medio.point.y, arcLength };
 }
 
 /**

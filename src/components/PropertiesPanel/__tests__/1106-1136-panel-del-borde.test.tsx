@@ -109,3 +109,34 @@ describe('#1136 — el panel tampoco escribe en una pieza bloqueada', () => {
     expect(edge?.seamAllowanceWidth).toBe(33);
   });
 });
+
+/**
+ * #1143 — los tramos de margen del LADO DE CIERRE.
+ *
+ * El panel prefiere el `length` que el borde trae guardado y solo mide cuando
+ * no lo hay — y el esquema lo declara opcional, así que un proyecto guardado
+ * sin él es legal. Cuando toca medir, medía el `segmentRange` crudo: el tramo
+ * de cierre se rotula con el índice de la `M`, que no dibuja, así que salía 0,
+ * y con 0 las casillas «Desde/Hasta» nacen DESHABILITADAS. La usuaria ve un
+ * tramo de margen que no puede tocar, sin una palabra que lo explique.
+ */
+describe('#1143 — el tramo de margen del lado de cierre se puede editar', () => {
+  // Sin `length`, como los demás bordes de este archivo, y con el rango que
+  // apunta a la `M`: es el lado izquierdo del cuadrado, 100 mm.
+  const cierre: SemanticEdge = {
+    id: 'p:cierre', name: 'cierre', segmentRange: [0, 1], edgeType: 'seam',
+    seamAllowanceSpans: [{ tStart: 0, tEnd: 0.5, width: 12 }],
+  };
+
+  it('las casillas del tramo no nacen apagadas', () => {
+    mount(piece({ edges: [top, armhole, hem, cierre] }), [{ pieceId: 'p', edgeId: 'p:cierre' }]);
+    const desde = screen.getByLabelText(/Desde \(mm\)/i) as HTMLInputElement;
+    expect(desde.disabled, 'el tramo del lado de cierre sale muerto y sin explicación').toBe(false);
+  });
+
+  it('y enseñan los milímetros del lado, no cero', () => {
+    mount(piece({ edges: [top, armhole, hem, cierre] }), [{ pieceId: 'p', edgeId: 'p:cierre' }]);
+    const hasta = screen.getByLabelText(/Hasta \(mm\)/i) as HTMLInputElement;
+    expect(Number(hasta.value), 'medio lado de 100 mm son 50').toBeCloseTo(50, 1);
+  });
+});

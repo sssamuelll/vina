@@ -2,6 +2,7 @@ import type { Point2D, PatternPiece } from '../../../../types/types';
 import type { WalkSeamEdge, GhostTransform, MismatchSample, WalkSeamMetrics } from '../../useWalkSeamTool';
 import { pathToSVG } from '../../utils';
 import { pointAtPathDistance, computePathArcLength } from '../../../../utils/geometry/arcLength';
+import { rangoMedibleDeBorde } from '../../../../utils/semanticEdges';
 import { pieceLocalToPattern } from '../../../../utils/geometry/pieceSpace';
 import { outlineBBoxCenter } from '../../../../utils/geometry/transform';
 
@@ -49,8 +50,7 @@ function MetricsPanel({
   const midPt = pointAtPathDistance(
     stationaryEdge.piece.outline,
     midDist,
-    stationaryEdge.edge.segmentRange[0],
-    stationaryEdge.edge.segmentRange[1],
+    ...rangoMedibleDeBorde(stationaryEdge.piece.outline, stationaryEdge.edge.segmentRange),
   );
   if (!midPt) return null;
 
@@ -103,7 +103,9 @@ function EdgeHighlight({
   color: string;
   zoom2D: number;
 }) {
-  const [segStart, segEnd] = edge.edge.segmentRange;
+  // Traducido: sobre el lado de cierre `arcLen` daba 0 y el resalte no se
+  // pintaba, así que elegirlo parecía un clic que no cogió (#1143).
+  const [segStart, segEnd] = rangoMedibleDeBorde(edge.piece.outline, edge.edge.segmentRange);
   const arcLen = computePathArcLength(edge.piece.outline, segStart, segEnd);
   if (arcLen <= 0) return null;
 
@@ -215,7 +217,9 @@ function WalkIndicator({
   walkDistance: number;
   zoom2D: number;
 }) {
-  const [segStart, segEnd] = stationaryEdge.edge.segmentRange;
+  const [segStart, segEnd] = rangoMedibleDeBorde(
+    stationaryEdge.piece.outline, stationaryEdge.edge.segmentRange,
+  );
   const pt = pointAtPathDistance(
     stationaryEdge.piece.outline, walkDistance, segStart, segEnd,
   );
