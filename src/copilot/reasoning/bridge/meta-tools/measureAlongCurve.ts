@@ -10,6 +10,7 @@
 import type { MetaToolDefinition, MetaToolResult } from './types';
 import type { PathCommand } from '../../../../types/types';
 import { computePathArcLength, samplePathAtIntervals } from '../../../../utils/geometry/arcLength';
+import { rangoMedibleDeBorde } from '../../../../utils/semanticEdges';
 
 export const measureAlongCurveTool: MetaToolDefinition = {
   name: 'measureAlongCurve',
@@ -65,8 +66,13 @@ export const measureAlongCurveTool: MetaToolDefinition = {
       };
     }
 
-    const length = computePathArcLength(piece.outline, edge.segmentRange[0], edge.segmentRange[1]);
-    const samples = samplePathAtIntervals(piece.outline, markerInterval, edge.segmentRange[0], edge.segmentRange[1]);
+    // El rango viene en la convención del productor: el tramo de cierre se
+    // rotula con el índice de la `M`, que no dibuja y por tanto mide cero
+    // (#1143). Sin traducir, el copiloto le contestaba «0 mm» a María sobre un
+    // lado entero de la pieza.
+    const [desde, hasta] = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
+    const length = computePathArcLength(piece.outline, desde, hasta);
+    const samples = samplePathAtIntervals(piece.outline, markerInterval, desde, hasta);
 
     return {
       success: true,

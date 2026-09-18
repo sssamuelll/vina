@@ -1,9 +1,0 @@
-[drape-m4] simSeconds=2.5 belowHipPct=0.01 minY=0.552 maxY=1.575 nan=0
-[wrap-diag] minYvert=(-0.53,0.00,0.02)
-[wrap-diag] sleeveL: c=1 minY=0.000 maxY=0.000 below0.8=100.0%
-[wrap-diag] sleeveR: c=1 minY=0.000 maxY=0.000 below0.8=100.0%
-[wrap-diag] front: c=11156 minY=0.760 maxY=1.521 below0.8=3.0%
-[wrap-diag] back: c=10637 minY=0.810 maxY=1.575 below0.8=0.0%
-[wrap-diag] mid: c=7543 minY=0.791 maxY=1.560 below0.8=0.2%
-[creep-watch] simSeconds=10 belowHipPct=1.20 minY=0.000 maxY=1.575 nan=0 (issue #902 — non-deterministic, log-only)
-  1 passed (1.0m)

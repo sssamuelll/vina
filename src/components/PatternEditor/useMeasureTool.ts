@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { Point2D, PatternPiece, SemanticEdge, Trazo } from '../../types/types';
 import { formatDimension } from '../../utils/units';
-import { flattenPath } from '../../utils/seam/index';
+import { flattenPathWithSource } from '../../utils/seam/index';
 import { computePathArcLength, samplePathAtIntervals, samplePathDense, distanceAlongPath, pointAtPathDistance } from '../../utils/geometry/arcLength';
 import type { ArcLengthSample } from '../../utils/geometry/arcLength';
 import { screenToPattern } from './sewingUtils';
@@ -84,7 +84,14 @@ export function snapToOutline(
   radiusPx = SNAP_THRESHOLD,
 ): SnapResult | null {
   const localPt = patternToPieceLocal(pt, piece);
-  const flatPoints = flattenPath(piece.outline);
+  // Con PROCEDENCIA: cada punto sabe qué comando lo dibujó. Sin ella esta
+  // función devolvía el índice del segmento APLANADO y `findEdgeForSegment` lo
+  // comparaba contra rangos de COMANDO, que es otra unidad: el comando `i`
+  // dibuja del punto `i-1` al `i`, así que el enganche salía corrido un borde
+  // —clicar arriba enganchaba el lado de cierre— y con curvas, donde un
+  // comando son muchos puntos, se descuadraba del todo. Es el mismo defecto
+  // que ya se había arreglado en «Poner avío» (#1143).
+  const flatPoints = flattenPathWithSource(piece.outline);
   let bestDist = Infinity;
   let bestPt: Point2D | null = null;
   let bestSegment = -1;
@@ -106,7 +113,7 @@ export function snapToOutline(
       // sobre una pieza girada el snap devolvia un punto que no esta donde se
       // ve (#1068). Si una direccion necesita el helper, la otra tambien.
       bestPt = pieceLocalToPattern(proj, piece);
-      bestSegment = i;
+      bestSegment = flatPoints[i + 1].cmd;
     }
   }
 

@@ -2,6 +2,7 @@
 import type { PatternPiece } from '../../types/types';
 import type { Trim, TrimType } from '../../types/trim';
 import { flattenPath } from '../seam/index';
+import { computeEdgeLengthMM } from '../geometry/edgeInterpolation';
 
 function computePerimeter(points: { x: number; y: number }[]): number {
   let perimeter = 0;
@@ -14,26 +15,22 @@ function computePerimeter(points: { x: number; y: number }[]): number {
   return perimeter;
 }
 
+/**
+ * Largo (mm) del borde al que va cosido un avío.
+ *
+ * Delega en `computeEdgeLengthMM` (#1143), igual que el BOM. Lo de antes
+ * recorría el array de PUNTOS aplanados con los índices de COMANDO del
+ * `segmentRange` —dos espacios distintos— y encima los recortaba a `n-1`, así
+ * que cada avío se cobraba por el largo del lado de al lado y el borde de
+ * cierre, cuyo rango apunta a la `M`, por cero.
+ */
 function edgeLengthMM(piece: PatternPiece, edgeName: string, tStart: number, tEnd: number): number {
-  const pts = flattenPath(piece.outline);
   const edge = piece.edges?.find(e => e.name === edgeName);
   if (!edge) {
     // Fallback: fraction of perimeter
-    return computePerimeter(pts) / 4 * (tEnd - tStart);
+    return computePerimeter(flattenPath(piece.outline)) / 4 * (tEnd - tStart);
   }
-  const n = pts.length;
-  const start = Math.max(0, Math.min(edge.segmentRange[0], n - 1));
-  const end = Math.max(0, Math.min(edge.segmentRange[1], n - 1));
-  let len = 0;
-  let i = start;
-  while (i !== end && len < 100000) {
-    const next = (i + 1) % n;
-    const dx = pts[next].x - pts[i].x;
-    const dy = pts[next].y - pts[i].y;
-    len += Math.sqrt(dx * dx + dy * dy);
-    i = next;
-  }
-  return len * (tEnd - tStart);
+  return computeEdgeLengthMM(piece, edgeName) * (tEnd - tStart);
 }
 
 export interface TrimBOMEntry {
