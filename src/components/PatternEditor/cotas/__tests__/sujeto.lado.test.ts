@@ -112,7 +112,9 @@ describe('refinarAlLado — la caja del lado', () => {
     const s = conLado({}, { pieceId: 'a', commandIndex: 1 });
     expect(s.cotas.map(c => c.kind)).toEqual(['tramo-largo', 'tramo-angulo']);
     expect(s.cotas[0].valueMm).toBeCloseTo(200, 6);
-    expect(s.lineaDeSujeto).toBe('Editando: el lado seleccionado');
+    // Un término por concepto (contrato de interfaz § 5): la app ya llama
+    // «tramo» a esta unidad en la interna y en el trazo.
+    expect(s.lineaDeSujeto).toBe('Editando: el tramo seleccionado');
     expect(s.esPieza).toBe(false);
   });
 

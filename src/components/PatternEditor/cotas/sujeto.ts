@@ -387,6 +387,11 @@ export function refinarAlLado(
     bordeLeido: null,
     disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
     esPieza: false,
-    lineaDeSujeto: 'Editando: el lado seleccionado',
+    // «Tramo», no «lado»: es la palabra que la app ya usa para ESTA unidad —la
+    // de una interna y la de un trazo dicen lo mismo— y el contrato de interfaz
+    // § 5 pide un término por concepto. En el código se llama `lado` porque es
+    // la palabra de María y la del issue; lo que la usuaria LEE sale del
+    // glosario, que aquí manda.
+    lineaDeSujeto: 'Editando: el tramo seleccionado',
   };
 }

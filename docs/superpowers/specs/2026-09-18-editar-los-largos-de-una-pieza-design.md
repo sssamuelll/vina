@@ -52,11 +52,14 @@ ratón en `Q`.
 
 ### 3.1 El lado es un sujeto, y tiene dos puertas
 
-Un lado del contorno pasa a la escalera del sujeto (`cotas/sujeto.ts`), debajo
-del punto y por encima de la pieza: más específico que la pieza que lo contiene,
-menos que un punto. Enseña **una sola caja** con Largo · Ángulo — la misma
-pareja, el mismo componente y la misma gramática de Tab que ya tienen la
+Un lado del contorno pasa a ser sujeto de cotas: más específico que la pieza que
+lo contiene, menos que un punto. Enseña **una sola caja** con Largo · Ángulo — la
+misma pareja, el mismo componente y la misma gramática de Tab que ya tienen la
 interna, el trazo y el tramo en curso de la Pluma (§ 14 de cotas vivas).
+
+No entra en la escalera de `cotasDelSujeto` como un peldaño más: la **afina**
+desde fuera, con `refinarAlLado`. La diferencia no es de estilo y se explica más
+abajo — como peldaño se colaba delante de todos.
 
 Se llega a él de dos maneras, y son las dos que ella nombró:
 
@@ -147,7 +150,18 @@ dichas en voz alta:
   mide el recorrido y no la cuerda (`lineLengthLabelsData`). Ver no exige
   editar, ni al revés: es la separación que ella pidió.
 
-### 3.3 Editar no enciende ni apaga el interruptor
+### 3.3 En pantalla se llama «tramo», aunque en el código se llame «lado»
+
+El contrato de interfaz § 5 pide **un término por concepto**, y la app ya llama
+«tramo» a esta misma unidad: la tira dice «Editando: el tramo seleccionado» para
+una interna y para un trazo desde antes de esto. § 5 del contrato del 08-09 usa
+la misma palabra para el contorno. Así que la tira dice **tramo**, y no estrena
+una segunda palabra para lo mismo.
+
+En el código se llama `lado` a propósito: es la palabra de María y la del issue,
+y quien lea `ladoDelHit` dentro de seis meses la va a buscar por ahí.
+
+### 3.4 Editar no enciende ni apaga el interruptor
 
 «Esas casillas para editar largos son una cosa, y que se visualicen los largos
 de las líneas es otra cosa distinta.» El sujeto no consulta `lineLengthMode`.
@@ -159,7 +173,7 @@ seleccionado entra en esa lista, junto al punto y a la interna.
 
 ---
 
-### 3.4 Qué suelta el lado
+### 3.5 Qué suelta el lado
 
 *La pregunta que el documento evitaba: ¿el lado es una «edición pendiente» a
 efectos de § 2.3 del 08-09, o una selección?*
@@ -368,9 +382,9 @@ Y las que la revisión adversarial obligó a añadir, todas en
      sola, `admiteLado` (§ 3.1).
   4. El Escape corría en captura con `stopPropagation` y se comía el del menú
      contextual — la regresión que `useEditorInteractions` documenta haber pagado
-     en #1115 (§ 3.4).
+     en #1115 (§ 3.5).
   5. Un `commandIndex` sobrevivía a los cambios de contorno y denotaba otro lado
-     en silencio (§ 3.4).
+     en silencio (§ 3.5).
   6. La defensa de «esto ya se hacía desde `Z`» era falsa: `resizePieceTo`
      transforma el objeto entero, y mover un nodo no. La excepción pasa a estar
      firmada por María, no justificada por un precedente (§ 3.1).

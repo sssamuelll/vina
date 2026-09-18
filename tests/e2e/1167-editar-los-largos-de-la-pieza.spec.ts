@@ -170,12 +170,33 @@ test.describe('editar los largos de una pieza que ya existe', () => {
       const oyente = (e: KeyboardEvent) => {
         if (e.key === 'Tab') (window as unknown as { __tab?: boolean }).__tab = e.defaultPrevented;
       };
-      window.addEventListener('keydown', oyente, { once: true });
+      // En CAPTURA y sobre `window`, igual que el router. `stopPropagation` NO
+      // detiene a los oyentes del MISMO nodo en la MISMA fase, así que este
+      // corre después del suyo y ve su `preventDefault`.
+      //
+      // La primera versión de este helper escuchaba en burbuja, y ahí el
+      // `stopPropagation` del router lo dejaba sin correr: devolvía `false`
+      // SIEMPRE, incluso cuando la tecla se la tragaban. Un oráculo que solo
+      // sabe decir una cosa pasa en verde con el fallo dentro — que es justo lo
+      // que este helper vino a arreglar.
+      window.addEventListener('keydown', oyente, { capture: true, once: true });
     });
     await page.keyboard.press('Tab');
     await page.waitForTimeout(400);
     return page.evaluate(() => (window as unknown as { __tab?: boolean }).__tab === true);
   }
+
+  test('el detector de «tecla tragada» sabe decir que SÍ (control)', async ({ page }) => {
+    // Un detector sin su caso positivo es una opinión: si solo sabe decir «no»,
+    // los tres tests que lo usan pasan en verde con el fallo dentro.
+    await unRectanguloSeleccionado(page);
+    await elRatonSobre(page, { x: 300, y: 350 });
+    expect(
+      await tabSeTragoLaTecla(page),
+      'abriendo el lado, el router SÍ consume el Tab — si aquí sale false, el detector está ciego',
+    ).toBe(true);
+    await expect(campo(page, 'Largo')).toBeVisible();
+  });
 
   test('con la pieza bloqueada, Tab no se traga la tecla', async ({ page }) => {
     await unRectanguloSeleccionado(page);
