@@ -503,13 +503,17 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
-      const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
+      const replace = params.replace as boolean;
+      // Solo el modo reemplazo escribe sobre la pieza; el default construye
+      // una pieza NUEVA y no le toca el candado (#1184).
+      if (replace) {
+        const lockErr = lockedPieceError(piece, state); if (lockErr) return lockErr;
+      }
       const distErr = requireFiniteNumber(params.distance, 'distance');
       if (distErr) return { success: false, error: distErr };
       const joinType = (params.joinType as string) || 'miter';
       const newOutline = offsetPieceOutline(piece, params.distance as number, joinType as 'miter' | 'round' | 'square');
       if (!newOutline) return { success: false, error: `Offset collapsed the shape (distance too large)` };
-      const replace = params.replace as boolean;
       if (replace) {
         const snapshot = JSON.parse(JSON.stringify(piece)) as PatternPiece;
         const updated: PatternPiece = { ...piece, outline: newOutline, edges: undefined, updatedAt: Date.now() };
