@@ -300,7 +300,8 @@ Así que aquí va el censo de cada mecanismo, entero, no solo las ramas con test
 | **Traducir la `Z` a su `M`** | `nearestSegment` | la produce (índice de la `Z`), y solo la de la PRIMERA |
 | | `semanticEdges.ts` `indiceSegunLosBordes` | retrocede hasta la `M` del subtrazo. **Correcta, y ya existía** |
 | | `lado.ts` `ladoDelHit` | ya no la reimplementa: llama a la de arriba |
-| | `useEditPattern.ts:424` | la clava a `0`. **Mal con dos anillos**, y sigue así: no es de esta tanda |
+| | `useEditPattern.ts:424` | la clava a `0` — **consistente** con lo que el productor emite hoy, así que arreglarlo solo no arregla nada |
+| | — | la causa real está arriba: `nearestSegment` trata dos subcaminos como uno. **Reproducido y abierto en #1205** |
 
 **El censo ya pagó**: la traducción `Z`→`M` tenía CUATRO copias y yo iba a dejar
 una quinta. `indiceSegunLosBordes` estaba escrita desde el 2026-09-06 con lo que
