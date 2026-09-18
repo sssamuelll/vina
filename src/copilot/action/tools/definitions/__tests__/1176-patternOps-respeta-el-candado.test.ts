@@ -125,6 +125,12 @@ describe('#1176 — las siete herramientas de patronaje del copiloto respetan el
     // la aserción negativa, mutar `lockedPieceError` para que rechace TODO
     // con un mensaje en español dejaba los 14 CONTROL en verde con las 14
     // herramientas inutilizables. Es lo que dejó pasar #1184.
+    //
+    // Hasta dónde llega: esto prueba que la guardia no sobre-rechaza, no que
+    // la herramienta haga un buen trabajo. Sobre este rectángulo sin curvas
+    // `optimizeCurvePoints` despacha un `updatePiece` idéntico al original y
+    // aun así reporta éxito — el CONTROL lo bendice. Lo demás (que cada
+    // operación produzca la geometría correcta) es de sus propios tests.
     expect(result.success, `${nombre} no llegó a hacer nada: ${result.error ?? ''}`).toBe(true);
   });
 });
@@ -147,10 +153,16 @@ describe('#1184 — offsetPattern en modo previsualización no mira el candado d
     expect(result.success, 'el modo previsualización se rechazó por un candado que no le toca').toBe(true);
     expect(result.data).toMatchObject({ replaced: false });
     // Lo que prueba la exención: nació una pieza, no se pisó la bloqueada.
-    const tipos = (dispatchLocal as unknown as ReturnType<typeof vi.fn>).mock.calls
-      .map(([accion]) => (accion as { type: string }).type);
-    expect(tipos.some(t => t.endsWith('addPiece'))).toBe(true);
-    expect(tipos.some(t => t.endsWith('updatePiece'))).toBe(false);
+    const acciones = (dispatchLocal as unknown as ReturnType<typeof vi.fn>).mock.calls
+      .map(([accion]) => accion as { type: string; payload?: PatternPiece });
+    const nacida = acciones.find(a => a.type.endsWith('addPiece'))?.payload;
+    expect(nacida, 'no nació ninguna pieza derivada').toBeDefined();
+    expect(acciones.some(a => a.type.endsWith('updatePiece')), 'se escribió sobre la original').toBe(false);
+    // La derivada es geometría nueva y no tiene por qué nacer atascada: el
+    // spread le heredaba el `locked` de la original. La ruta de la UI ya
+    // limpia esto (`useOffsetTool.ts`, #1145) — abrir este modo sin copiar
+    // la limpieza deja una previsualización que no se puede ni mover.
+    expect(nacida?.locked ?? false, 'la previsualización nació bloqueada').toBe(false);
   });
 });
 

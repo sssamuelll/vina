@@ -529,6 +529,10 @@ export const tools: ToolDefinition[] = [
           // state-encoded ID — see B10-state. The parent piece's id is
           // intentionally referenced in the offset id for cross-reference.
           id: `offset-${piece.id}-${Date.now()}`,
+          // Geometría nueva: hereda `locked` por el spread y no hay razón de
+          // producto para que nazca atascada como la original — misma
+          // limpieza que la ruta de la UI (`useOffsetTool.ts`, #1145).
+          locked: false,
           name: `${piece.name} Offset`,
           outline: newOutline,
           edges: undefined,
