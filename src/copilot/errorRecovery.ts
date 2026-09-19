@@ -1,14 +1,19 @@
 /**
- * Error Recovery — intelligent retry, fallback, and graceful degradation strategies.
+ * Error Recovery — clasifica el fallo y lo dice en palabras que la usuaria puede
+ * usar.
  *
- * When a tool call or API request fails, the recovery system attempts to recover
- * automatically before surfacing the error to the user:
+ * Lo que de verdad corre hoy son dos funciones, y las dos las llama
+ * `UnifiedBarChat`: `classifyError` mira la cadena cruda del proveedor y decide
+ * de qué tipo es el fallo; `getErrorMessage` lo convierte en el mensaje que la
+ * IA pinta en la burbuja (#1199).
  *
- * - **Tool failures**: simplify parameters and retry (e.g. simpler outline)
- * - **Network errors**: exponential backoff with 3 attempts
- * - **Auth errors**: clear message with setup instructions
- * - **Provider unavailable**: fall back to alternate provider if configured
- * - **No API key**: offline mode — tools available without LLM
+ * Esta cabecera anunciaba cinco estrategias de recuperación automática
+ * —backoff exponencial, reintento con parámetros simplificados, cascada a otro
+ * proveedor, modo sin conexión— y **ninguna tenía consumidor**. El backoff y la
+ * clase `RecoveryStrategy` se borraron aquí; lo que queda de esa familia
+ * (`simplifyOutline`, el trío de `*FallbackProvider`, `isOfflineMode` y
+ * `getOfflineActions`) está inventariado en el PR que borró el resto. Si algún
+ * día se cablea de verdad, que el texto lo diga entonces y no antes.
  *
  * @module errorRecovery
  */
@@ -110,109 +115,6 @@ export function classifyError(error: unknown): ErrorType {
   }
 
   return 'unknown';
-}
-
-// ─── Recovery Strategies ────────────────────────────────────────────────────
-
-/**
- * Result of a recovery attempt.
- */
-export interface RecoveryResult {
-  /** Whether recovery was successful */
-  recovered: boolean;
-  /** If recovered, the result value */
-  result?: unknown;
-  /** Human-readable message about what happened */
-  message: string;
-  /** How many retry attempts were used */
-  attempts: number;
-}
-
-/** Options for retry with exponential backoff */
-export interface RetryOptions {
-  /** Maximum number of attempts (default 3) */
-  maxAttempts?: number;
-  /** Base delay in ms (default 1000) */
-  baseDelayMs?: number;
-  /** Maximum delay in ms (default 10000) */
-  maxDelayMs?: number;
-}
-
-/**
- * Sleep for a given duration.
- * @param ms - Milliseconds to wait
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * Calculate exponential backoff delay with jitter.
- *
- * @param attempt - Current attempt number (0-based)
- * @param baseMs - Base delay in milliseconds
- * @param maxMs - Maximum delay cap in milliseconds
- * @returns Delay in milliseconds
- */
-export function calculateBackoff(attempt: number, baseMs: number = 1000, maxMs: number = 10000): number {
-  const exponential = baseMs * Math.pow(2, attempt);
-  const jitter = Math.random() * baseMs * 0.5;
-  return Math.min(exponential + jitter, maxMs);
-}
-
-/**
- * Retry a function with exponential backoff.
- *
- * Attempts the function up to `maxAttempts` times, with increasing delays
- * between failures. Only retries on network and rate_limit errors.
- *
- * @param fn - Async function to retry
- * @param options - Retry configuration
- * @returns Recovery result
- */
-export async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {},
-): Promise<RecoveryResult> {
-  const { maxAttempts = 3, baseDelayMs = 1000, maxDelayMs = 10000 } = options;
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      const result = await fn();
-      return {
-        recovered: attempt > 0,
-        result,
-        message: attempt > 0 ? `Succeeded after ${attempt + 1} attempts` : 'Succeeded on first attempt',
-        attempts: attempt + 1,
-      };
-    } catch (e) {
-      lastError = e;
-      const errorType = classifyError(e);
-
-      // Only retry on retryable errors
-      if (errorType !== 'network' && errorType !== 'rate_limit' && errorType !== 'provider_unavailable') {
-        return {
-          recovered: false,
-          message: getErrorMessage(errorType, e),
-          attempts: attempt + 1,
-        };
-      }
-
-      // Don't sleep after the last attempt
-      if (attempt < maxAttempts - 1) {
-        const delay = calculateBackoff(attempt, baseDelayMs, maxDelayMs);
-        await sleep(delay);
-      }
-    }
-  }
-
-  const errorType = classifyError(lastError);
-  return {
-    recovered: false,
-    message: `Failed after ${maxAttempts} attempts: ${getErrorMessage(errorType, lastError)}`,
-    attempts: maxAttempts,
-  };
 }
 
 /**
@@ -501,117 +403,4 @@ export function getOfflineActions(): OfflineAction[] {
     { label: 'Ver medidas / Get measurements', toolName: 'getMeasurements', defaultParams: {}, icon: '📏' },
     { label: 'Listar telas / List fabrics', toolName: 'listFabrics', defaultParams: {}, icon: '🧶' },
   ];
-}
-
-// ─── Recovery Strategy Class ────────────────────────────────────────────────
-
-/**
- * Orchestrates error recovery across the agent system.
- *
- * Provides a unified interface for handling errors from tool execution,
- * API calls, and provider communication with appropriate strategies
- * per error type.
- */
-export class RecoveryStrategy {
-  private readonly maxRetries: number;
-  private readonly baseDelayMs: number;
-
-  /**
-   * Create a new RecoveryStrategy.
-   *
-   * @param maxRetries - Maximum retry attempts for retryable errors (default 3)
-   * @param baseDelayMs - Base delay for exponential backoff (default 1000)
-   */
-  constructor(maxRetries: number = 3, baseDelayMs: number = 1000) {
-    this.maxRetries = maxRetries;
-    this.baseDelayMs = baseDelayMs;
-  }
-
-  /**
-   * Attempt to recover from a tool execution error.
-   *
-   * Strategy depends on error type:
-   * - invalid_params: simplify outline and retry
-   * - network/rate_limit: exponential backoff
-   * - auth: return setup instructions
-   * - provider_unavailable: suggest fallback
-   *
-   * @param error - The error that occurred
-   * @param retryFn - Function to retry the operation
-   * @returns Recovery result
-   */
-  async recover<T>(
-    error: unknown,
-    retryFn: () => Promise<T>,
-  ): Promise<RecoveryResult> {
-    const errorType = classifyError(error);
-
-    switch (errorType) {
-      case 'network':
-      case 'rate_limit':
-        return retryWithBackoff(retryFn, {
-          maxAttempts: this.maxRetries,
-          baseDelayMs: this.baseDelayMs,
-        });
-
-      case 'auth':
-        return {
-          recovered: false,
-          message: getErrorMessage('auth', error),
-          attempts: 1,
-        };
-
-      case 'provider_unavailable':
-        // Try once more then fail with message
-        return retryWithBackoff(retryFn, {
-          maxAttempts: 2,
-          baseDelayMs: this.baseDelayMs,
-        });
-
-      case 'invalid_params':
-        return {
-          recovered: false,
-          message: getErrorMessage('invalid_params', error),
-          attempts: 1,
-        };
-
-      case 'tool_execution':
-        return {
-          recovered: false,
-          message: getErrorMessage('tool_execution', error),
-          attempts: 1,
-        };
-
-      default:
-        return {
-          recovered: false,
-          message: getErrorMessage('unknown', error),
-          attempts: 1,
-        };
-    }
-  }
-
-  /**
-   * Wrap an async operation with automatic recovery.
-   *
-   * @param operation - The async operation to execute
-   * @returns The result value, or throws after all recovery attempts fail
-   */
-  async withRecovery<T>(operation: () => Promise<T>): Promise<T> {
-    try {
-      return await operation();
-    } catch (error) {
-      // Log full error for debugging
-      console.error('[RecoveryStrategy] Operation failed:', error);
-
-      const recovery = await this.recover(error, operation);
-      if (recovery.result !== undefined) {
-        return recovery.result as T;
-      }
-      // Throw with the formatted message directly; mark it to avoid double-wrapping
-      const wrapped = new Error(recovery.message);
-      (wrapped as Error & { _formatted: boolean })._formatted = true;
-      throw wrapped;
-    }
-  }
 }
