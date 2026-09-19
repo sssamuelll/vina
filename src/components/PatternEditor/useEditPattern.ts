@@ -37,6 +37,7 @@ import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { rotatePoint } from '../../utils/geometry/transform';
 import { reanchorNotches } from '../../utils/notchReanchor';
 import { piezaBloqueada } from '../../utils/piezaBloqueada';
+import { indiceSegunLosBordes } from '../../utils/semanticEdges';
 import { convertSegmentToSpline, resmoothAfterMove, toManualBezier } from './splineSegment';
 import { showInfoToast } from '../../store/copilotUISlice';
 import {
@@ -421,9 +422,13 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         endDragBatch();
         const selectedSegments = new Set([segmentHit.commandIndex]);
         const startPositions = new Map<number, Point2D>();
-        const toIndex = piece.outline[segmentHit.commandIndex]?.type === 'Z'
-          ? 0
-          : segmentHit.commandIndex;
+        // La `Z` nombra el tramo; el nodo que mueve es el de la `M` que abre
+        // SU subcamino. Clavarlo a `0` era consistente mientras
+        // `nearestSegment` solo emitía la primera `Z`; desde #1205 emite la de
+        // cada anillo, y con un agujero arrastrar el cierre interior movía la
+        // esquina del marco. La traducción no se reimplementa: es la misma que
+        // usan `ladoDelHit` y `sewingUtils`.
+        const toIndex = indiceSegunLosBordes(piece.outline, segmentHit.commandIndex);
         const toNode = nodes.find(n => n.ref.commandIndex === toIndex);
         if (toNode) startPositions.set(toIndex, { ...toNode.position });
         const fromNode = findFromNode(nodes, segmentHit.commandIndex);
@@ -559,7 +564,14 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
       // 2. Check segment hit
       const segHit = nearestSegment(localPt, piece.outline);
-      if (segHit && segHit.distance < hr) {
+      // Una `M` es el cierre FANTASMA de un subcamino abierto: ahí no se
+      // dibuja nada. Los otros tres sitios que reciben un hit ya lo rechazaban
+      // (`findInsertTarget`, el mouseDown de fuera del modo edición y el
+      // hover); este no, y desde #1205 hay una `M` fantasma por subcamino
+      // abierto, no una por contorno. Sin la guarda, `findFromNode` cruzaba al
+      // anillo anterior y el arrastre movía un nodo de cada uno.
+      if (segHit && segHit.distance < hr
+          && piece.outline[segHit.commandIndex]?.type !== 'M') {
         const idx = segHit.commandIndex;
         const shift = e.shiftKey;
 
@@ -588,7 +600,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         const startPositions = new Map<number, Point2D>();
         for (const segIdx of selectedAfterClick) {
           // "to" node — the destination of this segment
-          const toIndex = piece.outline[segIdx]?.type === 'Z' ? 0 : segIdx;
+          const toIndex = indiceSegunLosBordes(piece.outline, segIdx);
           const toNode = state.nodes.find(n => n.ref.commandIndex === toIndex);
           if (toNode) {
             startPositions.set(toIndex, { ...toNode.position });
@@ -753,7 +765,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
       // Check segment hover
       const segHit = nearestSegment(localPt, piece.outline);
-      if (segHit && segHit.distance < hr) {
+      // Misma guarda: no se resalta ni se ofrece añadir un punto sobre un
+      // cierre fantasma.
+      if (segHit && segHit.distance < hr
+          && piece.outline[segHit.commandIndex]?.type !== 'M') {
         // addPointPreview is in piece-local space
         setState(s => ({
           ...s,

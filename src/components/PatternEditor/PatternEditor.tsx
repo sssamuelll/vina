@@ -681,7 +681,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     if (hitPiece) {
       const localPt = patternToPieceLocal({ x: canvasX, y: canvasY }, hitPiece);
       const segHit = nearestSegment(localPt, hitPiece.outline);
-      if (segHit && segHit.distance <= screenToPatternLength(8, zoom2D)) {
+      // Nunca una `M`: es el cierre fantasma de un subcamino abierto y no
+      // dibuja nada, así que «Convertir en curva» sobre él no tiene objeto
+      // (#1205). Misma guarda que los cuatro sitios hermanos.
+      if (segHit && segHit.distance <= screenToPatternLength(8, zoom2D)
+          && hitPiece.outline[segHit.commandIndex]?.type !== 'M') {
         segmentIndex = segHit.commandIndex;
         const cmd = hitPiece.outline[segHit.commandIndex];
         segmentIsCurve = cmd?.type === 'C' || cmd?.type === 'Q';

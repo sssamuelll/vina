@@ -42,6 +42,10 @@ export default function EditPatternOverlay({
   const segmentHighlights: JSX.Element[] = [];
   const outline = piece.outline;
   let prevX = 0, prevY = 0;
+  // Arranque del subcamino en curso: a él vuelve su propia `Z`. Con una pieza
+  // con agujero hay varios, y tomar siempre `outline[0]` dibujaba el realce
+  // del cierre sobre una cuerda que cruza la pieza y no existe (#1205).
+  let subX = 0, subY = 0;
   for (let i = 0; i < outline.length; i++) {
     const cmd = outline[i];
     const isSelected = selectedSegments.has(i);
@@ -55,6 +59,9 @@ export default function EditPatternOverlay({
         d = `M ${prevX} ${prevY} C ${cmd.values.join(' ')}`;
       } else if (cmd.type === 'Q') {
         d = `M ${prevX} ${prevY} Q ${cmd.values.join(' ')}`;
+      } else if (cmd.type === 'Z') {
+        // El cierre de ESTE subcamino: su última ancla de vuelta a su `M`.
+        d = `M ${prevX} ${prevY} L ${subX} ${subY}`;
       }
       if (d) {
         segmentHighlights.push(
@@ -75,39 +82,17 @@ export default function EditPatternOverlay({
     // Track previous anchor for segment path construction
     switch (cmd.type) {
       case 'M':
+        prevX = cmd.values[0]; prevY = cmd.values[1];
+        subX = prevX; subY = prevY; break;
       case 'L':
         prevX = cmd.values[0]; prevY = cmd.values[1]; break;
       case 'C':
         prevX = cmd.values[4]; prevY = cmd.values[5]; break;
       case 'Q':
         prevX = cmd.values[2]; prevY = cmd.values[3]; break;
-    }
-  }
-
-  // Closing segment: last anchor → first anchor (Z command)
-  const zIndex = outline.findIndex(c => c.type === 'Z');
-  if (zIndex >= 0) {
-    const isClosingSelected = selectedSegments.has(zIndex);
-    const isClosingHovered = hoveredSegment === zIndex && !isClosingSelected;
-
-    if (isClosingSelected || isClosingHovered) {
-      const firstCmd = outline[0];
-      if (firstCmd.type === 'M') {
-        // prevX/prevY from the loop already hold the last anchor position
-        const d = `M ${prevX} ${prevY} L ${firstCmd.values[0]} ${firstCmd.values[1]}`;
-        segmentHighlights.push(
-          <path
-            key="seg-closing"
-            data-tramo-hover={isClosingHovered ? zIndex : undefined}
-            d={d}
-            fill="none"
-            stroke="var(--accent-2d)"
-            strokeWidth={(isClosingSelected ? 2.5 : 2) / zoom2D}
-            opacity={isClosingSelected ? 1 : 0.6}
-            pointerEvents="none"
-          />
-        );
-      }
+      case 'Z':
+        // La `Z` devuelve el punto actual al arranque de su subcamino.
+        prevX = subX; prevY = subY; break;
     }
   }
 
