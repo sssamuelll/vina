@@ -73,12 +73,42 @@ async function drawRectAt(page: Page, x1: number, y1: number, x2: number, y2: nu
   await page.waitForTimeout(500);
 }
 
-/** Centros en pantalla de cada ancla dibujada por los overlays de edición. */
+/**
+ * Censo de anclas con su DUEÑO.
+ *
+ * Desde #1144 (06-09) hay DOS capas que pintan `[data-anchor-role]`:
+ * `PuntosDelContorno`, ambiente, que cuelga de un `[data-piece-id]` y dibuja
+ * los puntos de TODAS las piezas en su sitio; y el overlay de edición, que no
+ * cuelga de ninguna pieza y coloca las anclas con la transformada de la pieza
+ * que se está editando. El eco de María vive en la segunda: es la lista de
+ * nodos de una pieza pintada con la transformada de otra.
+ *
+ * Por eso cada ancla se anota con su dueño y con la caja de ese dueño: la del
+ * overlay se compara contra la pieza en edición, y la ambiente contra su
+ * propia pieza.
+ */
 const anchorCentres = (page: Page) => page.evaluate(() =>
   Array.from(document.querySelectorAll('[data-anchor-role]')).map(el => {
     const r = (el as SVGGElement).getBoundingClientRect();
-    return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+    const dueño = el.closest('[data-piece-id]');
+    // La caja se toma del TRAZO de la pieza (`.piece-fill`), no del grupo. El
+    // grupo contiene a las propias anclas, así que un ancla descolocada
+    // agrandaría la caja hasta contenerse a sí misma y el oráculo pasaría en
+    // verde con el eco dentro. El trazo es geometría pura y no puede crecer.
+    const c = dueño?.querySelector('.piece-fill')?.getBoundingClientRect();
+    return {
+      x: Math.round(r.x + r.width / 2),
+      y: Math.round(r.y + r.height / 2),
+      pieza: dueño?.getAttribute('data-piece-id') ?? null,
+      caja: c ? { left: c.left, top: c.top, right: c.right, bottom: c.bottom } : null,
+    };
   }));
+
+type Caja = { left: number; top: number; right: number; bottom: number };
+/** El glifo mide unos 10px y la caja es la del trazo, así que el margen es 30. */
+const M = 30;
+const fueraDe = (a: { x: number; y: number }, c: Caja) =>
+  a.x < c.left - M || a.x > c.right + M || a.y < c.top - M || a.y > c.bottom + M;
 
 /**
  * Censo de todo trazo discontinuo del lienzo, con su caja en pantalla.
@@ -130,8 +160,10 @@ test.describe('maria-218 — el eco de la pieza al crear un punto', () => {
     await setTool(page, 'editPattern');
     await page.mouse.click((A.left + A.right) / 2, (A.top + A.bottom) / 2);
     await page.waitForTimeout(400);
-    const enA = await anchorCentres(page);
-    expect(enA.length).toBeGreaterThan(0);
+    // Las del overlay son las que prueban que la edición de A entró de verdad;
+    // las ambiente están desde que existe la pieza y no prueban nada de eso.
+    const enA = (await anchorCentres(page)).filter(a => a.pieza === null);
+    expect(enA.length, 'el overlay de edición no pintó ninguna ancla: A no entró en edición').toBeGreaterThan(0);
 
     // Sin salir de la edición, herramienta punto y clic sobre el borde de B.
     await setTool(page, 'point');
@@ -150,12 +182,42 @@ test.describe('maria-218 — el eco de la pieza al crear un punto', () => {
       `ninguna pieza ganó un vértice: antes ${vérticesAntes}, después ${vérticesDespués}`,
     ).toBe(true);
 
-    // Ni una sola ancla puede caer fuera de la caja de A. Antes del fix, las de
-    // B aparecían con la posición de A: sobre lona vacía.
-    const M = 30; // margen: el glifo mide unos 10px y la caja es la del trazo
-    const fuera = (await anchorCentres(page)).filter(a =>
-      a.x < A.left - M || a.x > A.right + M || a.y < A.top - M || a.y > A.bottom + M);
-    expect(fuera).toHaveLength(0);
+    // Ni una sola ancla puede caer lejos de la pieza a la que pertenece.
+    //
+    // El oráculo viejo decía «ninguna ancla fuera de la caja de A» y valía
+    // cuando A era la única pieza con anclas pintadas. Desde #1144 las
+    // ambiente salen para TODAS las piezas, así que las cuatro de B en su
+    // propio sitio —correctas— lo tumbaban. Este mide la propiedad de verdad,
+    // que es la que María describió: una pieza no puede aparecer dibujada
+    // donde no está.
+    const censo = await anchorCentres(page);
+    expect(censo.length, 'no quedó ni un ancla que mirar: el test no ejerce nada').toBeGreaterThan(0);
+    const overlay = censo.filter(a => a.pieza === null);
+    const ambiente = censo.filter(a => a.caja !== null);
+
+    // Aquí NO se exige que el overlay exista. Medido el 2026-09-19: está
+    // gateado por `activeTool === 'editPattern'`, así que al pasar a la
+    // herramienta punto se desmonta y esta lista viene vacía. Exigirlo era el
+    // error del primer intento de arreglo. El peso lo lleva `ambiente`, que
+    // es la capa que hoy SÍ dibuja durante todo el recorrido de María.
+    //
+    // Consecuencia honesta: por la vía del overlay este recorrido ya no puede
+    // reproducir el eco, porque el overlay no llega vivo hasta el final. La
+    // propiedad se sigue vigilando en la capa que sí llega.
+    const ecoDelOverlay = overlay.filter(a => fueraDe(a, A));
+    expect(
+      ecoDelOverlay,
+      `anclas del overlay de edición fuera de la pieza que se edita: ${JSON.stringify(ecoDelOverlay)}`,
+    ).toHaveLength(0);
+
+    // Ambiente: cada una sobre su propia pieza. Si `dispatchAndRefresh`
+    // volviera a pisar los nodos de una pieza con los de otra, el grupo de A
+    // pintaría las anclas de B con la transformada de A y caerían aquí.
+    const ecoAmbiente = ambiente.filter(a => fueraDe(a, a.caja!));
+    expect(
+      ecoAmbiente,
+      `anclas pintadas lejos de su propia pieza: ${JSON.stringify(ecoAmbiente)}`,
+    ).toHaveLength(0);
   });
 
   /**

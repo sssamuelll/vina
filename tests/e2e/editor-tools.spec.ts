@@ -159,6 +159,10 @@ test.describe('Tool keyboard shortcuts', () => {
     ['z', 'select'],
     ['h', 'pen'],
     ['s', 'rectangle'],
+    // La 'e' vive AQUÍ desde #1140: el círculo recuperó su gesto (#1111) y con
+    // él el atajo, así que salió de ATAJOS_2D_SIN_GESTO. Estaba abajo, entre
+    // las reservadas, y ese test llevaba rojo desde el 05-09.
+    ['e', 'circle'],
     ['n', 'seam'],
     ['m', 'measure'],
     ['x', 'scissors'],
@@ -171,17 +175,30 @@ test.describe('Tool keyboard shortcuts', () => {
     });
   }
 
-  // Antes este bloque afirmaba que 'e' activaba circle y 'd' activaba dart, y
-  // pasaba: la activación ocurría de verdad. Lo que no ocurría era nada más.
   // Hallazgo F7 de la revisión adversarial del 2026-09-04: siete teclas del
   // lienzo metían a María en un modo inerte —la tira le dibujaba la cabina, el
   // cursor se ponía en cruz, y ningún clic hacía nada— porque el despachador
   // (src/components/PatternEditor/useEditorInteractions.ts) no conduce esos
-  // ids. El test certificaba el bug como si fuera la promesa. Ahora afirma lo
-  // contrario. Las teclas quedan reservadas en ATAJOS_2D_SIN_GESTO
-  // (src/shortcuts/defaults.ts) y vuelven cuando la herramienta exista.
-  for (const [key, toolId] of [['e', 'circle'], ['d', 'dart']] as const) {
-    test(`pressing '${key}' no activa ${toolId}: la herramienta no existe (F7)`, async ({ page }) => {
+  // ids. Quedaron reservadas en ATAJOS_2D_SIN_GESTO (src/shortcuts/defaults.ts)
+  // y vuelven a la lista de arriba cuando la herramienta exista, como ya hizo
+  // la 'e' del círculo en #1140.
+  //
+  // Antes esto vigilaba DOS teclas y una de ellas ('e') dejó de ser cierta sin
+  // que nadie lo notara. Ahora van las SEIS de la lista, y en una sola corrida:
+  // un test por tecla son seis arranques de app, y bajo carga los arranques son
+  // lo primero que se cae.
+  const teclasReservadas: [string, string][] = [
+    ['d', 'dart'],
+    ['c', 'editConstrain'],
+    ['w', 'pin'],
+    ['p', 'pomMeasure'],
+    ['t', 'topstitchEdit'],
+    ['i', 'trace'],
+  ];
+
+  test('las teclas de ATAJOS_2D_SIN_GESTO no meten a la usuaria en un modo inerte (F7)', async ({ page }) => {
+    const colados: string[] = [];
+    for (const [key, toolId] of teclasReservadas) {
       // Se ancla a una herramienta CONCRETA antes de pulsar. Comparar el
       // después con el antes a secas pasaba en vacío si `__VINA_STORE__` no
       // estaba: las dos lecturas daban null y el test se felicitaba solo.
@@ -190,9 +207,11 @@ test.describe('Tool keyboard shortcuts', () => {
 
       await page.keyboard.press(key);
       await page.waitForTimeout(200);
-      expect(await getActiveTool2D(page), `'${key}' metió a la usuaria en ${toolId}, que no tiene gesto`).toBe('select');
-    });
-  }
+      const tras = await getActiveTool2D(page);
+      if (tras !== 'select') colados.push(`'${key}' → ${tras} (reservada para ${toolId})`);
+    }
+    expect(colados, `teclas sin gesto que sí cambian de herramienta: ${colados.join(', ')}`).toEqual([]);
+  });
 });
 
 // ─── Undo / Redo ────────────────────────────────────────────────────────────

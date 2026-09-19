@@ -57,11 +57,22 @@ test('María DXF: editPattern visible → slow drag → undo/redo keeps marker o
 
   await expect.poll(async () => page.locator('[data-anchor-role]').count())
     .toBeGreaterThan(0);
-  const glyph = page.locator('[data-anchor-role="corner"]').first();
+  // Scope the glyph to the EDIT OVERLAY, which is the only layer that wraps
+  // each anchor in a `[data-command-index]`. Since #1144 the ambient
+  // `PuntosDelContorno` layer also renders `[data-anchor-role]`, for every
+  // piece and without that wrapper — and it comes first in DOM order, so a
+  // bare `.first()` resolved into it.
+  const glyph = page.locator('[data-command-index] [data-anchor-role="corner"]').first();
   await expect(glyph).toBeVisible();
-  const commandIndex = Number(
-    await glyph.evaluate((node) => node.parentElement?.getAttribute('data-command-index')),
+  // Read the attribute BEFORE coercing, and fail on its absence. The old guard
+  // was `Number.isInteger(Number(attr))`, and `Number(null)` is 0: with the
+  // wrapper gone the test silently switched to watching command 0 — the `M`,
+  // which no drag ever moves — and reported a working drag as a dead one.
+  const rawIndex = await glyph.evaluate(
+    (node) => node.closest('[data-command-index]')?.getAttribute('data-command-index') ?? null,
   );
+  expect(rawIndex, 'the anchor glyph is not inside a [data-command-index] wrapper').not.toBeNull();
+  const commandIndex = Number(rawIndex);
   expect(Number.isInteger(commandIndex)).toBe(true);
   const originalValues = await commandValues(page, pieceId, commandIndex);
   const originalGlyphBox = await glyph.boundingBox();
