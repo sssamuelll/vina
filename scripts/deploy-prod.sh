@@ -31,7 +31,22 @@ cd "$(dirname "$0")/.."
 echo "── Árbol ──────────────────────────────────────────────"
 # Cambios tracked sin commitear = desplegarías algo que el repo no registra.
 # Untracked se tolera (docs/research vive así).
-if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+#
+# El estado de SALIDA se mira aparte, y no es paranoia — medido el 2026-09-18.
+# Escrito como `[ -n "$(git status ...)" ]`, este gate daba VERDE con git roto:
+# el `$(...)` se come el error, devuelve vacío, y vacío se lee «limpio». Ese día
+# otra sesión dejó el repo con `core.bare = true` y toda operación de árbol
+# moría con `fatal: this operation must be run in a work tree` — pero
+# `git rev-parse` sigue funcionando en un repo bare, así que la línea de abajo
+# habría impreso «✓ limpio (fe66add8 en main)» y el deploy habría seguido sin
+# saber qué estaba publicando. Un gate que no puede medir tiene que PARAR, no
+# asumir lo mejor.
+if ! ESTADO=$(git status --porcelain --untracked-files=no); then
+  echo "✗ git no pudo leer el árbol de trabajo. No se despliega a ciegas." >&2
+  git status --porcelain --untracked-files=no >&2 || true
+  exit 1
+fi
+if [ -n "$ESTADO" ]; then
   echo "✗ Hay cambios tracked sin commitear. Commitea o stashea antes de desplegar." >&2
   git status --short --untracked-files=no >&2
   exit 1
@@ -50,6 +65,55 @@ npx vitest run > /tmp/vina-deploy-vitest.log 2>&1 || { tail -20 /tmp/vina-deploy
 grep -E "Test Files|Tests " /tmp/vina-deploy-vitest.log | sed 's/^ */✓ /'
 node scripts/verify-wasm-smoke.mjs
 echo "✓ smoke del WASM commiteado"
+
+# EL SERVIDOR VA CALIENTE, Y NO ES COSMÉTICO — medido el 2026-09-18.
+#
+# Playwright monta Vite él solo (`webServer` del config, con
+# `reuseExistingServer: true`), y arrancarlo EN FRÍO dentro del gate se paga por
+# los dos lados. Mismos 25 specs, mismo commit, mismos 2 workers, misma máquina:
+#
+#   · en frío    24,3 min y 2 flaky  (`newPage` y `waitForSelector` agotados)
+#   · caliente   19,2 min y 0 flaky
+#
+# Un 21% menos y los flaky desaparecen, porque el primer caso deja de esperar el
+# arranque de Vite con su propio reloj corriendo.
+#
+# Y NO, subir workers no era la salida — se midió el mismo día. A 6 workers el
+# RELOJ-TEST se duplica (33,8 → 70,2 min sumando casos): los Chromium con
+# SwiftShader se comen la máquina entre ellos. El paralelismo sube a 4,36× y el
+# neto son 3 minutos, con 2 caídos duros. Con GPU real (sin los args de
+# SwiftShader) es peor todavía: 78,3 min de reloj y 10 caídos. Esta caja se
+# satura entre 2 y 3 workers, dé igual el backend de GL, así que `--workers=2`
+# se queda — ahora por una razón medida aquí y no heredada de los runners.
+#
+# Lo que queda por bajar es el reloj-test: 33,8 min en 150 casos son 13,5 s por
+# caso, y casi todo es arrancar la app 150 veces contra el dev server. Eso se
+# ataca sirviendo el `dist` en vez de Vite, y es otra conversación.
+if curl -sf -o /tmp/vina-deploy-port.html http://localhost:5174/ 2>/dev/null; then
+  # Un servidor ajeno en 5174 lo reutilizaría Playwright EN SILENCIO y el gate
+  # mediría otra app. Ya pasó en esta máquina con otro proyecto del portafolio.
+  grep -q "Patronaje" /tmp/vina-deploy-port.html \
+    || { echo "✗ el puerto 5174 lo tiene otra app — el gate mediría lo que no es" >&2; exit 1; }
+  echo "✓ Vite ya estaba arriba en 5174"
+else
+  # El servidor se queda vivo a propósito cuando el script termina. Aquí había
+  # un `trap ... EXIT` con `kill` y NO funcionaba: en Git Bash el `kill` se lleva
+  # el envoltorio de `npx` y el node de Vite sobrevive — medido, el puerto seguía
+  # escuchando después de que el bloque saliera. Antes que un trap que miente,
+  # la verdad escrita: queda UN Vite escuchando, y la rama de arriba hace que el
+  # siguiente deploy lo reutilice en vez de levantar otro, así que la fuga está
+  # acotada a uno y no a uno por deploy. De paso, el segundo deploy del día
+  # arranca caliente gratis. Para matarlo a mano:
+  #   taskkill //F //PID $(netstat -ano | grep :5174 | grep LISTENING | head -1 | awk '{print $NF}')
+  npx vite --port 5174 > /tmp/vina-deploy-vite.log 2>&1 &
+  for _ in $(seq 60); do
+    if curl -sf -o /dev/null http://localhost:5174/; then break; fi
+    sleep 1
+  done
+  curl -sf -o /dev/null http://localhost:5174/ \
+    || { echo "✗ Vite no respondió en 60 s — ver /tmp/vina-deploy-vite.log" >&2; exit 1; }
+  echo "✓ Vite caliente en 5174"
+fi
 
 # Emplazamiento: el trinquete estático cuenta literales, no ve QUIÉN TAPA A
 # QUIÉN. La revisión adversarial del 2026-09-04 encontró tres colisiones vivas
