@@ -118,8 +118,15 @@ test.describe('Seam curved edge highlights', () => {
         type: 'project/addSeam',
         payload: {
           id: 'seam-q-edge-fallback',
-          pieceA: { pieceId: 'piece-q-a', edgeName: 'edge-0' },
-          pieceB: { pieceId: 'piece-q-b', edgeName: 'edge-0' },
+          // edge-N nombra un índice de COMANDO del contorno desde la
+          // unificación renderer↔solver (1ce78b20, 07-08), y el 0 es la `M`,
+          // que no aporta tramo: `edgeNToCommandIndex` devuelve null y la
+          // polilínea sale vacía. El borde curvo que este caso quiere
+          // ejercer —el mismo que la costura semántica resuelve por
+          // 'neckline'— es el comando 1, la `Q`. Con edge-0 esta costura caía
+          // al trazo del punto medio y pintaba UNA línea en vez de dos.
+          pieceA: { pieceId: 'piece-q-a', edgeName: 'edge-1' },
+          pieceB: { pieceId: 'piece-q-b', edgeName: 'edge-1' },
           type: 'standard',
           tension: 100,
           strength: 1,
@@ -147,7 +154,7 @@ test.describe('Seam curved edge highlights', () => {
     expect(pathDs.some((d) => d.includes('Q250,70,300,100'))).toBe(true);
     expect(pathDs.some((d) => d.includes('Q480,95,530,130'))).toBe(true);
 
-    // The semantic seam and edge-0 fallback both resolve the same curved edge on piece A
+    // The semantic seam and edge-N fallback both resolve the same curved edge on piece A
     const pieceAQuadratics = pathDs.filter((d) => d === 'M200,100 Q250,70,300,100');
     expect(pieceAQuadratics).toHaveLength(2);
 

@@ -70,21 +70,36 @@ test.describe('maria-199 — coser un tramo arrastrando, y verlo en Editar costu
 
     // Dos piezas separadas: A de x=100..250, B de x=400..550. 150px de lona
     // vacía entre ellas, para que ningún hit-test de borde sea ambiguo.
-    await drawRectAt(page, 100, 100, 250, 300);
-    await drawRectAt(page, 400, 100, 550, 300);
+    //
+    // Empezaban en y=100 y la segunda no nacía: `.tool-strip` flota sobre el
+    // lienzo en x 326..626, y 64..134, así que el `mousedown` de B en (400,100)
+    // caía en la tira y no en la lona. El de A, a x=100, sí entraba — por eso
+    // el fallo se leía como «no se crea la costura» y no como «falta una
+    // pieza». Medido con `elementFromPoint`. Bajar la banda a y=180..380 deja
+    // ambas por debajo de la tira y muy por encima de `.fila-de-capas` (y≥584).
+    await drawRectAt(page, 100, 180, 250, 380);
+    await drawRectAt(page, 400, 180, 550, 380);
+
+    // Las dos piezas TIENEN que existir antes de coser. Sin esto, el gesto de
+    // coser cae en lona vacía y el fallo se presenta como «no hay costura»,
+    // que es el síntoma equivocado: costó una reproducción entera averiguar
+    // que lo que faltaba era la pieza.
+    const cuantas = await page.evaluate(() =>
+      (window as unknown as StoreWindow).__VINA_STORE__.getState().project.pieces.length);
+    expect(cuantas, 'no se dibujaron las dos piezas: el gesto cayó fuera de la lona').toBe(2);
 
     // Coser: arrastrar del 25% al 75% del borde derecho de la primera pieza
-    // (x=250, de y=100 a y=300 → el 25%/75% cae en y=150/y=250).
+    // (x=250, de y=180 a y=380 → el 25%/75% cae en y=230/y=330).
     await setTool(page, 'seam');
-    await page.mouse.move(250, 150);
+    await page.mouse.move(250, 230);
     await page.mouse.down();
-    await page.mouse.move(250, 250, { steps: 10 });
+    await page.mouse.move(250, 330, { steps: 10 });
     await page.mouse.up();
     await page.waitForTimeout(300);
 
     // Clic entero en el borde izquierdo de la segunda pieza (x=400, punto medio
-    // y=200) — cierra la costura.
-    await page.mouse.click(400, 200);
+    // y=280) — cierra la costura.
+    await page.mouse.click(400, 280);
     await page.waitForTimeout(300);
 
     // La costura existe y la mitad arrastrada (pieceA) lleva rango parcial: la
@@ -103,7 +118,7 @@ test.describe('maria-199 — coser un tramo arrastrando, y verlo en Editar costu
 
     // Editar costuras: clicar el borde enseña la costura seleccionada.
     await setTool(page, 'seamEdit');
-    await page.mouse.click(400, 200);
+    await page.mouse.click(400, 280);
     await page.waitForTimeout(300);
     const selected = await page.evaluate(() =>
       (window as unknown as StoreWindow).__VINA_STORE__.getState().editor.selectedSeamId);

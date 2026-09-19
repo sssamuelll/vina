@@ -77,15 +77,22 @@ test.describe('maria-191 — rectángulo con medidas', () => {
     // default (reunión María 07-09, [01:49]). El rótulo tampoco cambia: era
     // justo la contradicción que ella cazó en [01:22] — "pero ponía que de
     // 100" y le creaba otra cosa.
-    const a = await toScreen(page, { x: 100, y: 500 });
-    const b = await toScreen(page, { x: 180, y: 560 });
+    // Estaba en y=500..560 de patrón, o sea y=536..596 de pantalla, y a
+    // 1280×720 el `mouseup` caía DENTRO de `.fila-de-capas` (x 165..626,
+    // y 584..626): el gesto terminaba sobre una superficie flotante en vez de
+    // sobre el lienzo y la segunda pieza no llegaba a nacer. Roto desde que
+    // existe esa fila (#1109/#1131), medido con `elementFromPoint`. Subirlo
+    // 100 mm lo deja en y=436..496 de pantalla, con ~90 px de aire por debajo,
+    // y sigue sin tocar la primera pieza (x 250..550, y 250..350).
+    const a = await toScreen(page, { x: 100, y: 400 });
+    const b = await toScreen(page, { x: 180, y: 460 });
     await page.mouse.move(a.x, a.y);
     await page.mouse.down();
     await page.mouse.move(b.x, b.y, { steps: 8 });
     await page.mouse.up();
     await expect.poll(async () => (await st(page)).project.pieces.length).toBe(2);
     pieces = (await st(page)).project.pieces;
-    expect(bbox(pieces[1].outline, pieces[1].position)).toEqual({ x: 100, y: 500, w: 80, h: 60 });
+    expect(bbox(pieces[1].outline, pieces[1].position)).toEqual({ x: 100, y: 400, w: 80, h: 60 });
     await expect.poll(async () => (await st(page)).tools.toolOptions.rectangle?.width ?? 100).toBe(100);
     await expect.poll(async () => (await st(page)).tools.toolOptions.rectangle?.height ?? 100).toBe(100);
 

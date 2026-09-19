@@ -60,7 +60,7 @@ async function getState<T = unknown>(page: Page, path: string): Promise<T> {
 /**
  * El SimulationStatusOverlay arranca COLAPSADO (Fase1-H2, plan 2026-07-16):
  * el header deja el tier y el badge ⚠, y el detalle de telemetría — entre él
- * el recuento de constraints de costura — vive tras un click. Los asserts de
+ * el recuento de restricciones de costura — vive tras un click. Los asserts de
  * observabilidad de seams miran ese detalle, así que hay que abrirlo.
  */
 async function expandSimOverlay(page: Page) {
@@ -254,13 +254,16 @@ test.describe('Seam parity replay — lote 1', () => {
 
     // Y el overlay lo enseña al usuario.
     await expandSimOverlay(page);
-    // Copia del overlay (SimulationStatusOverlay): "🧵 N constraints de costura".
-    await expect(page.locator('text=/constraints de costura/')).toBeVisible({ timeout: 10_000 });
+    // Copia del overlay (SimulationStatusOverlay): "🧵 N restricciones de
+    // costura". Decía "constraints" y el i18n del 14-08 lo tradujo; el spec se
+    // quedó con el inglés y llevaba cinco semanas rojo sin que nadie lo viera,
+    // porque no está en ningún gate.
+    await expect(page.locator('text=/restricciones de costura/')).toBeVisible({ timeout: 10_000 });
   });
 
   // Fase 4: un seam irresoluble NO falla en silencio — toast de error +
   // warning en el overlay; la sim arranca igual (degradación, no aborto).
-  test('seam irresoluble → toast "will not sew" + warning en overlay', async ({ page }) => {
+  test('seam irresoluble → toast "no va a coser" + warning en overlay', async ({ page }) => {
     test.setTimeout(90_000);
     await waitFor2D(page);
     await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pa', 'Front', 40, 40) });
@@ -273,7 +276,11 @@ test.describe('Seam parity replay — lote 1', () => {
     await switchView(page, '3D');
     await startSimulation(page);
 
-    await expect(page.locator('.toast--error .toast__message')).toContainText('will not sew', {
+    // El toast lo escribe useSimulationLifecycle y está en español desde el
+    // i18n: "1 costura no se pudo resolver y no va a coser — revisa el
+    // emparejado de bordes". Se ancla al verbo, no a la frase entera, para que
+    // un retoque de redacción no vuelva a dejar esto rojo en silencio.
+    await expect(page.locator('.toast--error .toast__message')).toContainText('no va a coser', {
       timeout: 30_000,
     });
 
@@ -283,8 +290,11 @@ test.describe('Seam parity replay — lote 1', () => {
     );
     expect(summary!.zeroConstraintSeams.map((z) => z.seamId)).toEqual(['s-bad']);
     await expandSimOverlay(page);
-    // "⚠️ N costura(s) sin constraints — no va a coser".
-    await expect(page.locator('text=/sin constraints/')).toBeVisible({
+    // "⚠️ N costura(s) sin restricciones — no va a coser". El mismo i18n del
+    // 14-08 que tradujo el toast tradujo también este aviso; el spec se quedó
+    // con las dos cadenas en inglés y solo se veía la primera, porque el
+    // assert que fallaba cortaba el test antes de llegar aquí.
+    await expect(page.locator('text=/sin restricciones/')).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -538,8 +548,11 @@ test.describe('Seam parity replay — patrón real de María', () => {
     expect(summary!.totalConstraints).toBeGreaterThan(40);
     expect(summary!.zeroConstraintSeams).toHaveLength(0);
     await expandSimOverlay(page);
-    // Copia del overlay (SimulationStatusOverlay): "🧵 N constraints de costura".
-    await expect(page.locator('text=/constraints de costura/')).toBeVisible({ timeout: 10_000 });
+    // Copia del overlay (SimulationStatusOverlay): "🧵 N restricciones de
+    // costura". Decía "constraints" y el i18n del 14-08 lo tradujo; el spec se
+    // quedó con el inglés y llevaba cinco semanas rojo sin que nadie lo viera,
+    // porque no está en ningún gate.
+    await expect(page.locator('text=/restricciones de costura/')).toBeVisible({ timeout: 10_000 });
   });
 });
 
