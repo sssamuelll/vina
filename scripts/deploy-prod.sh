@@ -187,6 +187,7 @@ npx playwright test --workers=2 \
   tests/e2e/trazos.spec.ts \
   tests/e2e/linea-interna-gramatica.spec.ts \
   tests/e2e/seis-firmas-maria.spec.ts \
+  tests/e2e/shift-endereza-a-la-hoja.spec.ts \
   tests/e2e/lo-que-se-ve-y-cuando.spec.ts \
   tests/e2e/tanda4-puertas-y-defaults.spec.ts \
   tests/e2e/tanda5-un-cuadro-y-un-aviso.spec.ts \

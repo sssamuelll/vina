@@ -197,6 +197,24 @@ export function applyNodeMove(
   return cmds;
 }
 
+/**
+ * Mueve cada ancla a su destino, una por una, SIN reagrupar por coincidencia.
+ *
+ * Para arrastres que decidieron su grupo al empezar el gesto. `applyNodeMove`
+ * reagrupa sobre el contorno que recibe; llamado frame a frame sobre el
+ * contorno ya movido, capturaba cualquier ancla por la que el arrastre pasara
+ * exactamente encima y se la llevaba (con Shift, que fija un eje, eso deja de
+ * ser raro).
+ */
+export function applyAnchorMoves(
+  outline: PathCommand[],
+  moves: ReadonlyMap<number, Point2D>,
+): PathCommand[] {
+  const cmds = outline.map(c => ({ ...c, values: [...c.values] }));
+  for (const [index, newPos] of moves) moveOneCommand(cmds, index, 'anchor', newPos);
+  return cmds;
+}
+
 /** Write a single command in place. Extracted so a group can reuse it. */
 function moveOneCommand(
   cmds: PathCommand[],

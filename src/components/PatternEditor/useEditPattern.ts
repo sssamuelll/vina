@@ -25,6 +25,7 @@ import {
   hitTestNode,
   nearestSegment,
   applyNodeMove,
+  applyAnchorMoves,
   splitSegmentAt,
   deletePoint,
   convertToCurve,
@@ -34,14 +35,17 @@ import {
   type EditableNode,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
-import { rotatePoint } from '../../utils/geometry/transform';
 import { reanchorNotches } from '../../utils/notchReanchor';
 import { piezaBloqueada } from '../../utils/piezaBloqueada';
 import { convertSegmentToSpline, resmoothAfterMove, toManualBezier } from './splineSegment';
+import { enderezarDesplazamiento } from './restriccionShift';
+import { useShiftSostenido } from './useShiftSostenido';
+import { isDrag } from './gestureConstants';
 import { showInfoToast } from '../../store/copilotUISlice';
 import {
   compensatePositionForPivotChange,
   patternToPieceLocal,
+  patternToPieceLocalDirection,
   pieceLocalToPattern,
 } from './pieceTransform';
 export { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
@@ -81,16 +85,31 @@ const INITIAL_STATE: EditPatternState = {
 
 // ─── Drag ref types ───
 
-interface NodeDrag {
-  type: 'node';
+/** Lo que comparten el arrastre de puntos y el de tramos. */
+interface OutlineDrag {
   startMouse: Point2D;
+  /** El contorno al empezar el gesto: cada frame se calcula desde aquí. */
+  startOutline: PathCommand[];
+  /** Grupo de anclas coincidentes de cada punto arrastrado, en `startOutline`. */
+  groups?: Map<number, number[]>;
+  /** Último ratón del arrastre: pulsar Shift con la mano quieta lo re-aplica. */
+  lastMouse?: Point2D;
+  /** El último desplazamiento escrito (marco local). */
+  lastDelta?: Point2D;
+  /** Ya escribió al menos un frame en el contorno. */
+  wrote?: boolean;
+  /** Shift+press sobre algo ya seleccionado: se quita al soltar si no hubo arrastre. */
+  quitarAlSoltar?: readonly number[];
+}
+
+interface NodeDrag extends OutlineDrag {
+  type: 'node';
   /** Map from commandIndex → original position */
   startPositions: Map<number, Point2D>;
 }
 
-interface SegmentDrag {
+interface SegmentDrag extends OutlineDrag {
   type: 'segment';
-  startMouse: Point2D;
   /** Map from commandIndex → original position (both endpoints of each segment) */
   startPositions: Map<number, Point2D>;
 }
@@ -409,6 +428,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         dragRef.current = {
           type: 'node',
           startMouse: { x: e.clientX, y: e.clientY },
+          startOutline: piece.outline,
           startPositions,
         };
         return true;
@@ -448,6 +468,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         dragRef.current = {
           type: 'segment',
           startMouse: { x: e.clientX, y: e.clientY },
+          startOutline: piece.outline,
           startPositions,
         };
         return true;
@@ -496,12 +517,24 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   useEffect(() => () => endDragBatch(), [endDragBatch]);
 
+  // Pulsar o soltar Shift a mitad del arrastre, con la mano quieta, re-aplica
+  // el último ratón: el punto se endereza (o se suelta) en ese instante. Los
+  // handlers de ratón escriben `shiftRef` con `e.shiftKey`, así que teclado y
+  // ratón no pueden discrepar sobre si Shift está pulsado.
+  const shiftRef = useShiftSostenido((shift) => {
+    const drag = dragRef.current;
+    if (!drag || drag.type === 'marquee' || !drag.lastMouse || !state.editingPieceId) return;
+    const piece = getPiece(state.editingPieceId);
+    if (piece) aplicarArrastre(piece, drag, drag.lastMouse, shift);
+  });
+
   // ─── handleMouseDown ───
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): boolean => {
       if (!state.isEditing || !state.editingPieceId) return false;
       if (e.button !== 0) return false;
+      shiftRef.current = e.shiftKey;
 
       const piece = getPiece(state.editingPieceId);
       if (!piece) return false;
@@ -517,14 +550,15 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         // A coincident group is one point: selecting a member selects them all,
         // so Delete removes the corner instead of leaving its twin behind.
         const group = anchorGroupOf(piece.outline, idx);
+        // Shift+press sobre un punto YA seleccionado: quitarlo se decide al
+        // soltar, y solo si no hubo arrastre. Pulsar Shift y después agarrar es
+        // como se endereza un arrastre (firma del 23-09); quitarlo en el press
+        // dejaba el arrastre sin sujeto y el punto no se movía.
+        const quitarAlSoltar = shift && state.selectedNodes.has(idx);
 
         setState(s => {
           const newSelected = new Set(shift ? s.selectedNodes : []);
-          if (shift && s.selectedNodes.has(idx)) {
-            for (const ci of group) newSelected.delete(ci);
-          } else {
-            for (const ci of group) newSelected.add(ci);
-          }
+          for (const ci of group) newSelected.add(ci);
           return {
             ...s,
             selectedNodes: newSelected,
@@ -533,12 +567,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         });
 
         // Build startPositions for all selected nodes (including the new group)
-        const selectedAfterClick = new Set(e.shiftKey ? state.selectedNodes : []);
-        if (e.shiftKey && state.selectedNodes.has(idx)) {
-          for (const ci of group) selectedAfterClick.delete(ci);
-        } else {
-          for (const ci of group) selectedAfterClick.add(ci);
-        }
+        const selectedAfterClick = new Set(shift ? state.selectedNodes : []);
+        for (const ci of group) selectedAfterClick.add(ci);
 
         const startPositions = new Map<number, Point2D>();
         for (const ci of selectedAfterClick) {
@@ -551,7 +581,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         dragRef.current = {
           type: 'node',
           startMouse: { x: e.clientX, y: e.clientY },
+          startOutline: piece.outline,
           startPositions,
+          ...(quitarAlSoltar ? { quitarAlSoltar: group } : {}),
         };
 
         return true;
@@ -562,14 +594,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       if (segHit && segHit.distance < hr) {
         const idx = segHit.commandIndex;
         const shift = e.shiftKey;
+        // El mismo aplazamiento que el de los puntos.
+        const quitarAlSoltar = shift && state.selectedSegments.has(idx);
 
         setState(s => {
           const newSelected = new Set(shift ? s.selectedSegments : []);
-          if (shift && s.selectedSegments.has(idx)) {
-            newSelected.delete(idx);
-          } else {
-            newSelected.add(idx);
-          }
+          newSelected.add(idx);
           return {
             ...s,
             selectedSegments: newSelected,
@@ -578,12 +608,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         });
 
         // Build startPositions for both endpoints of selected segments
-        const selectedAfterClick = new Set(e.shiftKey ? state.selectedSegments : []);
-        if (e.shiftKey && state.selectedSegments.has(idx)) {
-          selectedAfterClick.delete(idx);
-        } else {
-          selectedAfterClick.add(idx);
-        }
+        const selectedAfterClick = new Set(shift ? state.selectedSegments : []);
+        selectedAfterClick.add(idx);
 
         const startPositions = new Map<number, Point2D>();
         for (const segIdx of selectedAfterClick) {
@@ -603,7 +629,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         dragRef.current = {
           type: 'segment',
           startMouse: { x: e.clientX, y: e.clientY },
+          startOutline: piece.outline,
           startPositions,
+          ...(quitarAlSoltar ? { quitarAlSoltar: [idx] } : {}),
         };
 
         return true;
@@ -626,7 +654,72 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
       return true;
     },
-    [state, getPiece, toLocal, toPattern, hitRadius],
+    [state, getPiece, toLocal, toPattern, hitRadius, shiftRef],
+  );
+
+  // ─── El arrastre de nodos y tramos ───
+
+  /**
+   * Mueve lo arrastrado según el ratón. Con Shift, el desplazamiento se
+   * endereza respecto a la HOJA —horizontal, vertical o diagonal— desde donde
+   * estaba el punto (firma de María del 23-09, opción B; «cuánto lo quieres
+   * mover en esa dirección», #1112).
+   */
+  const aplicarArrastre = useCallback(
+    (piece: PatternPiece, drag: NodeDrag | SegmentDrag, mouse: Point2D, shift: boolean) => {
+      drag.lastMouse = mouse;
+      if (drag.startPositions.size === 0) return;
+      const pantalla = { x: mouse.x - drag.startMouse.x, y: mouse.y - drag.startMouse.y };
+      // Shift+press sobre algo ya seleccionado es un clic —que lo quita al
+      // soltar— hasta que la mano cruza el umbral de arrastre: un temblor no
+      // puede mover la selección ni anular la deselección.
+      if (drag.quitarAlSoltar && !drag.wrote && !isDrag(pantalla.x, pantalla.y)) return;
+      const enHoja = {
+        x: screenToPatternLength(pantalla.x, zoom),
+        y: screenToPatternLength(pantalla.y, zoom),
+      };
+      // Se endereza en la hoja ANTES de pasar el delta al marco de la pieza: en
+      // una pieza girada la hoja no gira con ella. Y el delta se gira porque
+      // las posiciones se guardan sin girar: así una pieza girada se arrastra
+      // hacia donde va el puntero, no en diagonal (nota de María #170).
+      const { x: dx, y: dy } = patternToPieceLocalDirection(
+        shift ? enderezarDesplazamiento(enHoja) : enHoja,
+        piece,
+      );
+      // Un desplazamiento igual al último escrito no reescribe nada: con Shift,
+      // mover la mano en perpendicular a la guía no cambia el punto; y antes
+      // del primer frame, el delta cero tampoco.
+      const ultimo = drag.lastDelta ?? { x: 0, y: 0 };
+      if (dx === ultimo.x && dy === ultimo.y) return;
+      const undoBatchToken = beginDragBatch();
+
+      // Desde el contorno del INICIO del gesto, ancla por ancla y con los
+      // grupos de anclas coincidentes de ESE contorno. Reagrupar frame a frame
+      // sobre el contorno ya movido capturaba cualquier ancla por la que el
+      // arrastre pasara exactamente encima, y se la llevaba.
+      drag.groups ??= new Map([...drag.startPositions.keys()].map((cmdIdx): [number, number[]] => {
+        const grupo = anchorGroupOf(drag.startOutline, cmdIdx);
+        return [cmdIdx, grupo.length > 0 ? grupo : [cmdIdx]];
+      }));
+      const moves = new Map<number, Point2D>();
+      for (const [cmdIdx, startPos] of drag.startPositions) {
+        const destino = { x: startPos.x + dx, y: startPos.y + dy };
+        for (const miembro of drag.groups.get(cmdIdx) ?? [cmdIdx]) moves.set(miembro, destino);
+      }
+      let outline = applyAnchorMoves(drag.startOutline, moves);
+
+      // Curva por puntos (#197): en un tramo gestionado los manejadores se
+      // rehacen desde las anclas, así que la curva sigue pasando por el
+      // punto y sin picos. La marca vive en el contorno previo al gesto.
+      for (const cmdIdx of drag.startPositions.keys()) {
+        outline = resmoothAfterMove(drag.startOutline, outline, cmdIdx);
+      }
+
+      dispatchAndRefresh(piece, outline, undoBatchToken);
+      drag.lastDelta = { x: dx, y: dy };
+      drag.wrote = true;
+    },
+    [zoom, beginDragBatch, dispatchAndRefresh],
   );
 
   // ─── handleMouseMove ───
@@ -691,37 +784,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       // Active drag
       if (drag) {
         if (drag.type === 'node' || drag.type === 'segment') {
-          const dxS = screenToPatternLength(e.clientX - drag.startMouse.x, zoom);
-          const dyS = screenToPatternLength(e.clientY - drag.startMouse.y, zoom);
-          // Positions are stored un-rotated; rotate the screen delta into the
-          // piece's local frame so a rotated piece drags in the pointer's
-          // direction, not skewed (nota de María #170).
-          const rot = piece.rotation ?? 0;
-          const { x: dx, y: dy } = rot
-            ? rotatePoint({ x: dxS, y: dyS }, { x: 0, y: 0 }, -rot * Math.PI / 180)
-            : { x: dxS, y: dyS };
-
-          if (drag.startPositions.size === 0 || (dx === 0 && dy === 0)) return true;
-          const undoBatchToken = beginDragBatch();
-
-          let outline = piece.outline;
-          for (const [cmdIdx, startPos] of drag.startPositions) {
-            const newPos: Point2D = {
-              x: startPos.x + dx,
-              y: startPos.y + dy,
-            };
-            outline = applyNodeMove(outline, cmdIdx, 'anchor', newPos);
-          }
-
-          // Curva por puntos (#197): en un tramo gestionado los manejadores se
-          // rehacen desde las anclas, así que la curva sigue pasando por el
-          // punto y sin picos. `piece.outline` es el contorno previo al frame,
-          // que es donde vive la marca — después del movimiento ya no coincide.
-          for (const cmdIdx of drag.startPositions.keys()) {
-            outline = resmoothAfterMove(piece.outline, outline, cmdIdx);
-          }
-
-          dispatchAndRefresh(piece, outline, undoBatchToken);
+          shiftRef.current = e.shiftKey;
+          aplicarArrastre(piece, drag, { x: e.clientX, y: e.clientY }, e.shiftKey);
           return true;
         }
 
@@ -773,7 +837,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       }));
       return false;
     },
-    [state, hoverablePieces, getPiece, toLocal, toPattern, zoom, hitRadius, dispatchAndRefresh, beginDragBatch],
+    [state, hoverablePieces, getPiece, toLocal, toPattern, hitRadius, aplicarArrastre, shiftRef],
   );
 
   // ─── handleMouseUp ───
@@ -816,7 +880,23 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       return;
     }
 
-    // For node/segment drags, just clear — the mutations already happened during mousemove
+    // Node/segment drags already wrote during mousemove. What is left is the
+    // Shift+click that never became a drag: now it does deselect.
+    const quitar = drag.quitarAlSoltar;
+    if (!quitar || drag.wrote) return;
+    if (drag.type === 'node') {
+      setState(s => {
+        const selectedNodes = new Set(s.selectedNodes);
+        for (const ci of quitar) selectedNodes.delete(ci);
+        return { ...s, selectedNodes };
+      });
+    } else {
+      setState(s => {
+        const selectedSegments = new Set(s.selectedSegments);
+        for (const ci of quitar) selectedSegments.delete(ci);
+        return { ...s, selectedSegments };
+      });
+    }
   }, [pieces, endDragBatch]);
 
   // ─── handleKeyDown ───

@@ -1,6 +1,11 @@
 import { PatternPiece, Tool2D } from '../../../types/types';
 import { DEFAULT_SEAM_ALLOWANCE } from '../../../utils/defaults';
 import { formatMedida } from '../cotas/parseMedida';
+import { displayShortcut } from '../../shell/shortcutDisplay';
+
+/** Arrastrar con Shift endereza a la hoja (Hilo y Editar patrón). La notación
+ *  del modificador sale de `shortcutDisplay`: ⇧ en macOS, Shift+ fuera. */
+const SHIFT_ENDEREZA = `${displayShortcut('⇧')}arrastrar: 0°/45°/90°`;
 
 interface HintTextProps {
   activeTool: Tool2D;
@@ -97,7 +102,7 @@ export default function HintText({
       )}
 
       {activeTool === 'grainline' && (
-        <Pie>Arrastra dentro de la pieza para el hilo · Shift ajusta a 0°/45°/90°</Pie>
+        <Pie>{`Arrastra dentro de la pieza para el hilo · ${SHIFT_ENDEREZA}`}</Pie>
       )}
 
       {cotasVisibles && (activeTool === 'select' || activeTool === 'transform') && (
@@ -116,7 +121,7 @@ export default function HintText({
           que estos son de curva… no entiendo por qué». La forma SÍ dice el tipo
           — lo que faltaba era decirle cuál es cuál. */}
       {activeTool === 'editPattern' && !nodeEditorIsEditing && (
-        <Pie>Cuadrado es esquina · redondo es punto de curva · rombo es extremo abierto · arrastra para mover</Pie>
+        <Pie>{`Cuadrado es esquina · redondo es punto de curva · rombo es extremo abierto · arrastra para mover · ${SHIFT_ENDEREZA}`}</Pie>
       )}
 
       {!hasPieces && activeTool === 'pen' && penNodesLength === 0 && (
