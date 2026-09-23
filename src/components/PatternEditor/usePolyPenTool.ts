@@ -10,6 +10,8 @@ import { nodesToCommands, polarOf, polarPoint, type PolyPenNode } from './polyPe
 import { pushJournal } from '../../utils/telemetry/journal';
 import { borderReference, referenceForNext } from './angleReference';
 import type { TramoEnCurso } from './cotas/tramoEnCurso';
+import { restringirAHoja45 } from './restriccionShift';
+import { useShiftSostenido } from './useShiftSostenido';
 
 export type { PolyPenNode, PolyPenNodeType } from './polyPenGeometry';
 
@@ -134,12 +136,56 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     return null;
   }, []);
 
+  // Pulsar o soltar Shift con el ratón quieto también endereza (o suelta) la
+  // goma. Los handlers de ratón escriben `shiftRef` con `e.shiftKey`, así que
+  // teclado y ratón no pueden discrepar sobre si Shift está pulsado.
+  const shiftRef = useShiftSostenido(() => {
+    if (pressRef.current || nodesRef.current.length === 0 || !lastWorldRef.current) return;
+    hoverRef.current = hoverPara(lastWorldRef.current);
+    publish();
+  });
+
+  /**
+   * Con Shift y un nodo del que partir, el punto sobre la guía de la hoja (firma
+   * de María del 23-09, opción B). Shift va por encima del enganche (contrato
+   * 2026-09-08 § 3.4); el cierre sobre el primer nodo, no: cerrar es otro gesto.
+   */
+  const enderezar = useCallback((world: Point2D | null): Point2D | null => {
+    const nodes = nodesRef.current;
+    if (!shiftRef.current || !world || nodes.length === 0) return null;
+    return restringirAHoja45(nodes[nodes.length - 1].point, world);
+  }, [shiftRef]);
+
+  /**
+   * ¿Cierra el trazo un press aquí? Si el ratón cae sobre el primer nodo, o si
+   * cae ahí la guía de Shift: cerrar una forma dibujada con Shift es enderezar
+   * el último lado justo hasta el primer punto.
+   */
+  const cierraEn = useCallback((raton: Point2D, guia: Point2D | null): boolean => {
+    const nodes = nodesRef.current;
+    const r = radius();
+    return nodes.length >= 3 && [raton, guia].some(p => p !== null && dist(p, nodes[0].point) <= r);
+  }, [radius]);
+
+  /**
+   * Lo que va a enganchar el próximo press. Con Shift no engancha nada salvo el
+   * cierre, así que basta mirar el primer nodo: sin el resolutor entero en cada
+   * movimiento, para tirar lo que devuelve.
+   */
+  const hoverPara = useCallback((world: Point2D): SnapTarget | null => {
+    const nodes = nodesRef.current;
+    if (!shiftRef.current || nodes.length === 0) return resolveSnap(world, true);
+    return cierraEn(world, enderezar(world))
+      ? { kind: 'firstNode', pieceId: hostRef.current, point: nodes[0].point }
+      : null;
+  }, [resolveSnap, cierraEn, enderezar, shiftRef]);
+
   const publish = useCallback(() => {
     const press = pressRef.current;
     const hover = press ? press.snap : hoverRef.current;
     setView({
       nodes: [...nodesRef.current],
-      previewPoint: lastWorldRef.current,
+      previewPoint: enderezar(lastWorldRef.current) ?? lastWorldRef.current,
       pressPoint: press ? (press.snap?.point ?? press.world) : null,
       isDragging: !!press?.moved,
       dragHandle: press?.moved ? press.drag : null,
@@ -149,7 +195,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       nextPoint: nextPointRef.current,
       nextPointSeq: nextPointSeqRef.current,
     });
-  }, []);
+  }, [enderezar]);
 
   const reset = useCallback(() => {
     nodesRef.current = [];
@@ -175,28 +221,35 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
-    const world = toWorld(e);
-    lastWorldRef.current = world;
+    shiftRef.current = e.shiftKey;
+    const raton = toWorld(e);
+    lastWorldRef.current = raton;
     const r = radius();
     const nodes = nodesRef.current;
     // Bitácora: cada press deja su desenlace (spec caja-negra § 3.3). Un press
     // que no arma es mudo para Redux; sin esto no queda rastro.
     const journalPress = (fields: Record<string, unknown>) =>
       pushJournal('gesture', 'internalShape:press', { hostId: hostRef.current, nodes: nodes.length, ...fields });
-    if (deadZoneRef.current && dist(world, deadZoneRef.current) <= r) {
+    // La zona muerta es del puntero (el segundo par de un doble clic), no de la guía.
+    if (deadZoneRef.current && dist(raton, deadZoneRef.current) <= r) {
       journalPress({ armed: false, why: 'deadZone' });
       return;
     }
 
-    const closes = nodes.length >= 3 && dist(world, nodes[0].point) <= r;
+    const guia = enderezar(raton);
+    const closes = cierraEn(raton, guia);
+    const world = closes ? raton : guia ?? raton;
     // Encima del último nodo: un tramo de largo cero es basura, y es lo que
-    // el segundo clic de un doble clic pondría.
-    if (!closes && nodes.length >= 1 && dist(world, nodes[nodes.length - 1].point) <= r) {
+    // el segundo clic de un doble clic pondría. Con Shift ese segundo press se
+    // endereza desde el nodo que acaba de poner el primero y cae lejos de él,
+    // así que se reconoce por lo que es: el segundo clic (`detail`).
+    const segundoClicConShift = e.shiftKey && e.detail >= 2;
+    if (!closes && nodes.length >= 1 && (segundoClicConShift || dist(world, nodes[nodes.length - 1].point) <= r)) {
       journalPress({ armed: false, why: 'lastNode' });
       return;
     }
 
-    const snap = closes ? null : resolveSnap(world, false);
+    const snap = closes || guia ? null : resolveSnap(world, false);
     if (nodes.length === 0) {
       // La anfitriona la fija el primer press: la pieza del objetivo si
       // engancha, si no la de arriba cuyo CONTORNO contiene el press.
@@ -217,13 +270,14 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     // Un press con la pareja congelada la suelta: volver al ratón es volver
     // del todo (revisión 13-09, H1). Hermano del de la Pluma.
     nextPointRef.current = null;
-    journalPress({ armed: true, snap: snap?.kind ?? null, hostId: hostRef.current, closes });
+    journalPress({ armed: true, snap: snap?.kind ?? null, hostId: hostRef.current, closes, ...(guia ? { shift: true } : {}) });
     publish();
-  }, [toWorld, radius, resolveSnap, topmostContaining, publish]);
+  }, [toWorld, radius, resolveSnap, topmostContaining, publish, enderezar, cierraEn, shiftRef]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const world = toWorld(e);
     lastWorldRef.current = world;
+    shiftRef.current = e.shiftKey;
     if (deadZoneRef.current && dist(world, deadZoneRef.current) > radius()) deadZoneRef.current = null;
 
     const press = pressRef.current;
@@ -233,9 +287,9 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       publish();
       return;
     }
-    hoverRef.current = resolveSnap(world, true);
+    hoverRef.current = hoverPara(world);
     publish();
-  }, [toWorld, radius, resolveSnap, publish]);
+  }, [toWorld, radius, hoverPara, publish, shiftRef]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const press = pressRef.current;
@@ -291,12 +345,14 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const nodes = nodesRef.current;
     if (nodes.length === 0) return;
     const from = nodes[nodes.length - 1].point;
-    const { lengthMm, angleDeg } = polarOf(from, hoverRef.current?.point ?? lastWorldRef.current ?? from);
+    // El mismo destino que la goma: con Shift `hoverRef` solo guarda el cierre,
+    // y el cierre va por delante de la guía.
+    const { lengthMm, angleDeg } = polarOf(from, hoverRef.current?.point ?? enderezar(lastWorldRef.current) ?? lastWorldRef.current ?? from);
     const reference = referenceForNodes(nodes);
     nextPointRef.current = { from, lengthMm, angleDeg, reference };
     nextPointSeqRef.current += 1;
     publish();
-  }, [publish, referenceForNodes]);
+  }, [publish, referenceForNodes, enderezar]);
 
   /**
    * Reescribe el par pendiente SIN colocar (#1129). Es lo que hace Tab dentro

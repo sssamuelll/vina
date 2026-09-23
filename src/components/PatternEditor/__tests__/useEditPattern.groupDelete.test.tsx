@@ -105,23 +105,18 @@ describe('useEditPattern — borrado de un grupo coincidente', () => {
   });
 
   it('shift-clicking a member of an already-selected group removes the whole group', () => {
+    // Clics completos: quitar con Shift se decide al SOLTAR, si no hubo
+    // arrastre, para que Shift+arrastrar un punto ya seleccionado lo mueva
+    // enderezado en vez de soltarlo (firma de María del 23-09).
     const piece = pieceWithDoubledCorner();
     const { ref } = setup(piece);
-    act(() => {
-      ref.current!.handleMouseDown(
-        mouseAt(pieceLocalToPattern({ x: 0, y: 100 }, piece)),
-      );
-    });
-    act(() => {
-      ref.current!.handleMouseDown(
-        mouseAt(pieceLocalToPattern({ x: 100, y: 0 }, piece), true),
-      );
-    });
-    act(() => {
-      ref.current!.handleMouseDown(
-        mouseAt(pieceLocalToPattern({ x: 100, y: 0 }, piece), true),
-      );
-    });
+    const clic = (p: { x: number; y: number }, shift = false) => {
+      act(() => { ref.current!.handleMouseDown(mouseAt(pieceLocalToPattern(p, piece), shift)); });
+      act(() => { ref.current!.handleMouseUp(); });
+    };
+    clic({ x: 0, y: 100 });
+    clic({ x: 100, y: 0 }, true);
+    clic({ x: 100, y: 0 }, true);
     expect([...ref.current!.selectedNodes].sort((a, b) => a - b)).toEqual([4]);
   });
 });
