@@ -3,7 +3,7 @@ import { margenEnPunto } from '../../../utils/seam/margenEnPunto';
 import { cotaDeMargen } from './cotaDeMargen';
 import { cotasDeLineaInterna, cotasDelLado, cotasDePieza, cotasDeTrazo, type Cota } from './cotas';
 import { cotasDelTramoEnCurso, type TramoEnCurso } from './tramoEnCurso';
-import { cotasDelNodo } from './nodo';
+import { cotasDelNodoEnPath } from './nodo';
 import { formatMedida } from './parseMedida';
 
 export interface SeamAllowanceAnchor {
@@ -46,7 +46,7 @@ export interface SujetoInput {
    * desplazamiento, y eso es otra cota (decisión 5 de la gramática de la
    * tanda 6, todavía sin implementar).
    */
-  nodoSeleccionado?: { pieceId: string; commandIndex: number } | null;
+  nodoSeleccionado?: { pieceId: string; commandIndex: number; lineId?: string } | null;
   /**
    * Los trazos VISIBLES (spec 2026-09-12 § 5.3). `PatternEditor` los filtra por
    * «Construcción» antes de pasarlos, así que aquí «no está en la lista» y
@@ -192,7 +192,13 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
     const piezaDelNodo = input.pieces.find(p => p.id === input.nodoSeleccionado!.pieceId);
     const capaDelNodo = piezaDelNodo?.layer ?? 1;
     if (piezaDelNodo && !input.hiddenLayerIds.includes(capaDelNodo)) {
-      const cotas = cotasDelNodo(piezaDelNodo, input.nodoSeleccionado.commandIndex);
+      // El punto puede ser de una interna (spec 2026-09-24 § 4.5): sus largos
+      // son los de SU línea.
+      const { commandIndex, lineId } = input.nodoSeleccionado;
+      const path = lineId
+        ? piezaDelNodo.internals.find(l => l.id === lineId)?.path
+        : piezaDelNodo.outline;
+      const cotas = path ? cotasDelNodoEnPath(piezaDelNodo, path, commandIndex, lineId) : [];
       if (cotas.length > 0) {
         return {
           piece: piezaDelNodo,

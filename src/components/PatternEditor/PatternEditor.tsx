@@ -17,7 +17,6 @@ import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import { AgruparCotas } from './cotas/CotaChip';
 import CotaLines from './cotas/CotaLines';
 import { admiteLado, cotasDelSujeto, faltaSujeto, refinarAlLado } from './cotas/sujeto';
-import { puntoUnicoSeleccionado } from './cotas/nodo';
 import { ladoDelHit } from './cotas/lado';
 import { usePuertaDeLado } from './usePuertaDeLado';
 import { cajasDeAsas } from './cotas/cotasGeometry';
@@ -43,7 +42,8 @@ import { useEditCurve } from './useEditCurve';
 import { useEditPattern } from './useEditPattern';
 import { patternToPieceLocal } from './pieceTransform';
 import { hitTestPieceBBox } from '../../utils/geometry/hitTest';
-import { hitTestNode, nearestSegment } from './nodeEditorUtils';
+import { anchorGroupOf, nearestSegment } from './nodeEditorUtils';
+import { CLAVE_CONTORNO, lineIdDeClave } from './lineaEditable';
 import { useMeasureTool } from './useMeasureTool';
 import { useTransformTool, type TransformUpdate } from './useTransformTool';
 import { useScissorsTool } from './useScissorsTool';
@@ -689,21 +689,35 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       }
     }
 
+    // En Q, lo que agarraría ese mismo press decide sobre qué habla el menú
+    // (spec 2026-09-24 § 4.4): un tramo de interna, o el punto ya elegido.
+    // (Por referencia, no `editPatternTool.agarreEn(e)` directo: llamar un
+    // método por su acceso de miembro le pide a `exhaustive-deps` el objeto
+    // ENTERO como dependencia, no la función — y `editPatternTool` es nuevo en
+    // cada render.)
+    const agarreEnQ = editPatternTool.agarreEn;
+    const agarreQ = activeTool === 'editPattern'
+      ? agarreEnQ(e as React.MouseEvent<SVGSVGElement>)
+      : null;
+    let segmentLineId: string | undefined;
+    if (agarreQ?.tipo === 'tramo' && agarreQ.clave !== CLAVE_CONTORNO && hitPiece?.id === editPatternTool.editingPieceId) {
+      segmentLineId = lineIdDeClave(agarreQ.clave) ?? undefined;
+      const cmd = hitPiece.internals.find(l => l.id === segmentLineId)?.path[agarreQ.commandIndex];
+      segmentIndex = agarreQ.commandIndex;
+      segmentIsCurve = cmd?.type === 'C' || cmd?.type === 'Q';
+    }
     // ¿El clic derecho cayó sobre el punto que está elegido? Sin esta
     // pregunta, «Mover exacto…» salía con CUALQUIER clic derecho estando en
     // modo nodo —lienzo vacío incluido, porque `resolveTargetKind` decide la
     // altitud antes de mirar nada— y abría el chip del punto elegido, que
     // podía estar al otro lado de la pieza. Ella pediría mover B y se movería A.
-    const elegido = puntoUnicoSeleccionado(
-      pieces.find(p => p.id === editPatternTool.editingPieceId),
-      editPatternTool.selectedNodes,
-    );
-    let derechoSobreElPuntoElegido = false;
-    if (elegido && hitPiece?.id === editPatternTool.editingPieceId) {
-      const localPt = patternToPieceLocal({ x: canvasX, y: canvasY }, hitPiece);
-      const golpe = hitTestNode(localPt, editPatternTool.nodes, screenToPatternLength(8, zoom2D));
-      derechoSobreElPuntoElegido = !!golpe && editPatternTool.selectedNodes.has(golpe.commandIndex);
-    }
+    const elegido = editPatternTool.puntoElegido;
+    const derechoSobreElPuntoElegido = !!elegido && agarreQ?.tipo === 'punto'
+      && (lineIdDeClave(agarreQ.clave) ?? undefined) === elegido.lineId
+      && anchorGroupOf(
+        (elegido.lineId ? hitPiece?.internals.find(l => l.id === elegido.lineId)?.path : hitPiece?.outline) ?? [],
+        elegido.commandIndex,
+      ).includes(agarreQ.commandIndex);
 
     setCtxMenu({
       visible: true,
@@ -715,13 +729,14 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       saEdgeId: hitSaEdgeId,
       segmentIndex,
       segmentIsCurve,
+      segmentLineId,
       activeTool,
       internalLineId: hitInternalLineId,
       internalLineType: hitInternalLineType,
       isEditingNodes: editPatternTool.isEditing,
       derechoSobreElPuntoElegido,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.selectedNodes, editPatternTool.editingPieceId, editPatternTool.nodes, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, triangleTool, pen]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.editingPieceId, editPatternTool.agarreEn, editPatternTool.puntoElegido, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, triangleTool, pen]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
@@ -844,25 +859,20 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       : -1;
 
   // El punto en edición, solo cuando hay UNO — que no es lo mismo que un
-  // índice de comando.
+  // índice de comando —, de cualquier línea (spec 2026-09-24 § 4.5).
   //
-  // Un clic sobre un nodo selecciona el GRUPO de anclas coincidentes
-  // (`useEditPattern.ts:367`), porque CLO duplica el vértice en cada esquina y
-  // moverlas por separado rompería el contorno en una púa. En el DXF de María
-  // eso significa `selectedNodes.size === 2` para UN SOLO punto: con la
-  // condición ingenua (`length !== 1`), los chips y el menú de #1112 se
-  // apagaban en silencio **justo sobre los datos para los que se hicieron**.
-  // El e2e no lo veía porque su rectángulo sintético tiene anclas únicas.
+  // Un clic sobre un nodo selecciona el GRUPO de anclas coincidentes (el
+  // agarre del hook, vía `anchorGroupOf`), porque CLO duplica el vértice en
+  // cada esquina y moverlas por separado rompería el contorno en una púa. En
+  // el DXF de María eso significa `selectedNodes.size === 2` para UN SOLO
+  // punto: con la condición ingenua (`length !== 1`), los chips y el menú de
+  // #1112 se apagaban en silencio **justo sobre los datos para los que se
+  // hicieron**. El e2e no lo veía porque su rectángulo sintético tiene
+  // anclas únicas. `puntoElegido` ya resuelve el grupo entero a un solo punto.
   //
   // Con dos o más PUNTOS distintos sigue sin haber cotas: lo único que
   // comparten es su desplazamiento, y esa es otra cota que no está hecha.
-  const nodoSeleccionado = useMemo(
-    () => puntoUnicoSeleccionado(
-      activeTool === 'editPattern' ? pieces.find(p => p.id === editPatternTool.editingPieceId) : undefined,
-      editPatternTool.selectedNodes,
-    ),
-    [activeTool, editPatternTool.editingPieceId, editPatternTool.selectedNodes, pieces],
-  );
+  const nodoSeleccionado = activeTool === 'editPattern' ? editPatternTool.puntoElegido : null;
 
   const sujetoSinLado = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
@@ -902,7 +912,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     || editor.selectedInternalLine !== null
     || (nodeEditor.isEditing && nodeEditor.selectedNode !== null)
     || ladoEsElSujeto
-    || (activeTool === 'editPattern' && editPatternTool.selectedNodes.size > 0);
+    || (activeTool === 'editPattern' && editPatternTool.hayPuntosElegidos);
   const piezasConLargos = useMemo(
     () => seleccionarPiezasConLargos(drawablePieces, lineLengthMode, { suppress: suppressLengths }),
     [drawablePieces, lineLengthMode, suppressLengths],
@@ -1056,7 +1066,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       // Lo escribe `useEditPattern`, no este archivo: es quien ya mueve nodos
       // en el arrastre, con compensación de pivote, re-anclado de piquetes y
       // lote de deshacer. Dos escritores del mismo hecho se desincronizan.
-      editPatternRef.current.moveNodeTo(update.pieceId, update.commandIndex, update.destino);
+      editPatternRef.current.moveNodeTo(update.pieceId, update.commandIndex, update.destino, update.lineId);
     } else if (update.kind === 'trazo') {
       // Vivo se comprueba contra la lista ENTERA del store, no contra la
       // filtrada: un trazo oculto no puede estar seleccionado (`toggleTrazos`
@@ -1720,17 +1730,17 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         menu={ctxMenu}
         onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
         onRename={(id) => setEditingPieceNameId(id)}
-        onConvertSegment={(idx, toCurve, pieceId) => {
-          editPatternTool.convertSegment(idx, toCurve, pieceId);
-          showConvertedPoints(pieceId);
+        onConvertSegment={(idx, toCurve, pieceId, lineId) => {
+          editPatternTool.convertSegment(idx, toCurve, pieceId, lineId);
+          if (!lineId) showConvertedPoints(pieceId);
         }}
-        onConvertSegmentToPoints={(idx, pieceId) => {
-          editPatternTool.convertSegmentToPoints(idx, pieceId);
-          showConvertedPoints(pieceId);
+        onConvertSegmentToPoints={(idx, pieceId, lineId) => {
+          editPatternTool.convertSegmentToPoints(idx, pieceId, lineId);
+          if (!lineId) showConvertedPoints(pieceId);
         }}
-        onConvertSegmentToBezier={(idx, pieceId) => {
-          editPatternTool.convertSegmentToBezier(idx, pieceId);
-          showConvertedPoints(pieceId);
+        onConvertSegmentToBezier={(idx, pieceId, lineId) => {
+          editPatternTool.convertSegmentToBezier(idx, pieceId, lineId);
+          if (!lineId) showConvertedPoints(pieceId);
         }}
         onZoomToFit={handleZoomToFit}
         onUnfold={handleUnfold}

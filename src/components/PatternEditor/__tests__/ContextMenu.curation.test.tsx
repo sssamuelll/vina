@@ -135,7 +135,7 @@ describe('ContextMenu curado (Surface B)', () => {
       onConvert,
     );
     fireEvent.click(screen.getByText('Convertir a Bézier libre'));
-    expect(onConvert).toHaveBeenCalledWith(2, 'p1');
+    expect(onConvert).toHaveBeenCalledWith(2, 'p1', undefined);
   });
 });
 
