@@ -23,10 +23,10 @@ import toolsReducer from '../../../store/toolSlice';
 import constructionReducer from '../../../store/constructionSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
 import { store as appStore } from '../../../store';
-import { selectTrazo, setLineLengthMode } from '../../../store/editorSlice';
-import { addTrazo } from '../../../store/projectSlice';
+import { selectTrazo, setLineLengthMode, selectInternalLine } from '../../../store/editorSlice';
+import { addTrazo, restoreState } from '../../../store/projectSlice';
 import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
-import type { Trazo } from '../../../types/types';
+import type { Trazo, InternalLine, PatternPiece } from '../../../types/types';
 import LogoMenu from '../LogoMenu';
 
 const { downloadDiagnosticBundleMock } = vi.hoisted(() => ({
@@ -255,6 +255,88 @@ describe('LogoMenu ▸ Edición ▸ Eliminar — tramo de trazo (#1158)', () => 
     expect(appStore.getState().editor.selectedTrazo).toBeNull();
     expect(getJournal().events.find((e) => e.name === 'trazo:delete')?.data)
       .toEqual({ trazoId: 'menu-t1', segmentIndex: 2, parte: true });
+  });
+});
+
+/**
+ * La misma puerta, ahora con una interna (Task 7 fix round 1, spec
+ * 2026-09-24 § 4.6). Igual razón que el tramo de trazo de arriba: Edición ▸
+ * Eliminar lee el sujeto del store canónico, así que se monta CONTRA
+ * `appStore`. Cada caso añade su propia pieza (`restoreState` aditivo, sin
+ * pisar lo que ya haya en `appStore`) para no interferir entre sí.
+ */
+describe('LogoMenu ▸ Edición ▸ Eliminar — tramo de interna (frontera, fase 2)', () => {
+  const REFERENCIA: InternalLine = {
+    id: 'menu-r1', type: 'reference',
+    path: [
+      { type: 'M', values: [20, 20] },
+      { type: 'L', values: [120, 20] },
+      { type: 'L', values: [120, 120] },
+      { type: 'L', values: [20, 120] },
+    ],
+  };
+  const PINZA: InternalLine = {
+    id: 'menu-d1', type: 'dart', dartOptions: { capShape: 'pointed' },
+    path: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [10, 50] },
+      { type: 'L', values: [20, 0] },
+    ],
+  };
+
+  function montarPieza(pieceId: string, internal: InternalLine) {
+    const piece = {
+      id: pieceId, name: 'P', position: { x: 0, y: 0 }, rotation: 0, mirrored: false, active: true, seamAllowance: 0,
+      outline: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [200, 0] }, { type: 'L', values: [200, 200] }, { type: 'Z', values: [] }],
+      internals: [internal], edges: [],
+    } as unknown as PatternPiece;
+    appStore.dispatch(restoreState({
+      ...appStore.getState().project,
+      pieces: [...appStore.getState().project.pieces, piece],
+    }));
+  }
+
+  function eliminarPorMenu() {
+    render(<Provider store={appStore}><LogoMenu onOpenPanel={() => {}} onImportDXF={() => {}} /></Provider>);
+    fireEvent.click(screen.getByRole('button', { name: /vina/i }));
+    fireEvent.mouseEnter(screen.getByText('Edición'));
+    fireEvent.click(screen.getByText('Eliminar'));
+  }
+
+  it('borra ESE tramo, parte la referencia en dos y lo escribe en la bitácora', () => {
+    clearJournal();
+    montarPieza('menu-p1', REFERENCIA);
+    appStore.dispatch(selectInternalLine({ pieceId: 'menu-p1', lineId: 'menu-r1', segmentIndex: 2 }));
+    eliminarPorMenu();
+
+    const internals = appStore.getState().project.pieces.find((p) => p.id === 'menu-p1')!.internals;
+    expect(internals).toHaveLength(2);
+    expect(internals.filter((l) => l.id === 'menu-r1')).toHaveLength(1);
+    expect(appStore.getState().editor.selectedInternalLine).toBeNull();
+    expect(getJournal().events.find((e) => e.name === 'interna:delete')?.data)
+      .toEqual({ pieceId: 'menu-p1', lineId: 'menu-r1', segmentIndex: 2 });
+  });
+
+  it('una pinza con un tramo elegido se va ENTERA: seBorraEntera no la deja partirse', () => {
+    clearJournal();
+    montarPieza('menu-p2', PINZA);
+    appStore.dispatch(selectInternalLine({ pieceId: 'menu-p2', lineId: 'menu-d1', segmentIndex: 1 }));
+    eliminarPorMenu();
+
+    const internals = appStore.getState().project.pieces.find((p) => p.id === 'menu-p2')!.internals;
+    expect(internals).toHaveLength(0);
+    expect(getJournal().events.find((e) => e.name === 'interna:delete')).toBeUndefined();
+  });
+
+  it('sin tramo elegido, la interna se borra entera (comportamiento de hoy)', () => {
+    clearJournal();
+    montarPieza('menu-p3', REFERENCIA);
+    appStore.dispatch(selectInternalLine({ pieceId: 'menu-p3', lineId: 'menu-r1' }));
+    eliminarPorMenu();
+
+    const internals = appStore.getState().project.pieces.find((p) => p.id === 'menu-p3')!.internals;
+    expect(internals).toHaveLength(0);
+    expect(getJournal().events.find((e) => e.name === 'interna:delete')).toBeUndefined();
   });
 });
 
