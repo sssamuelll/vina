@@ -11,6 +11,7 @@ import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator
 import { uid } from '../utils/pathHelpers';
 import { newId } from '../utils/ids';
 import { quitarTramo } from '../components/PatternEditor/trazos/trazoPath';
+import { quitarTramos } from '../components/PatternEditor/lineaEditable';
 import { detectSemanticEdges, preserveEdgeWidthsByName } from '../utils/semanticEdges';
 import { reindexEdges, sameSegmentRanges } from '../utils/edgeReindex';
 import { mirrorPctRange } from '../utils/seam/seamRange';
@@ -556,7 +557,17 @@ const projectSlice = createSlice({
     removeInternalLine(state, action: PayloadAction<{ pieceId: string; lineId: string }>) {
       const piece = state.pieces.find(p => p.id === action.payload.pieceId);
       if (piece) {
+        const quitada = piece.internals.find(l => l.id === action.payload.lineId);
         piece.internals = piece.internals.filter(l => l.id !== action.payload.lineId);
+        // Una pinza son dos datos enlazados por el id (#1016: el del Dart ES
+        // el de su línea): su línea y su copia `piece.darts`. Quitar solo la
+        // línea dejaba viva la copia, y la siguiente operación de pinza
+        // (`applyDartsToInternals`) volvía a dibujar la que se borró (spec
+        // 2026-09-24 § 7). Aquí y no en cada puerta: Supr desde Q, las dos de
+        // Z y el menú contextual llegan todos a este reductor.
+        if (quitada?.type === 'dart' && piece.darts) {
+          piece.darts = piece.darts.filter(d => d.id !== quitada.id);
+        }
         piece.updatedAt = Date.now();
         state.isDirty = true;
       }
@@ -565,6 +576,25 @@ const projectSlice = createSlice({
       if (state.notchPairs) state.notchPairs = state.notchPairs.filter(
         np => !((np.a.pieceId === pieceId && np.a.lineId === lineId) || (np.b.pieceId === pieceId && np.b.lineId === lineId))
       );
+    },
+    /**
+     * Supr sobre tramos de una interna (spec 2026-09-24 § 4.6): se quitan SOLO
+     * esos tramos. El primer trozo conserva el id; los demás nacen con id nuevo
+     * y el mismo tipo y opciones. Sin trozos, la interna se va. Un índice que
+     * no es tramo no escribe nada (sin `isDirty`, sin paso de deshacer vacío).
+     */
+    removeTramosDeInterna(state, action: PayloadAction<{ pieceId: string; lineId: string; segmentIndices: number[] }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (!piece) return;
+      const idx = piece.internals.findIndex(l => l.id === action.payload.lineId);
+      if (idx < 0) return;
+      const line = piece.internals[idx];
+      const trozos = quitarTramos(line.path, new Set(action.payload.segmentIndices));
+      if (trozos.length === 1 && trozos[0] === line.path) return;
+      const nuevas = trozos.map((path, i) => (i === 0 ? { ...line, path } : { ...line, id: newId(), path }));
+      piece.internals.splice(idx, 1, ...nuevas);
+      piece.updatedAt = Date.now();
+      state.isDirty = true;
     },
     /** Replace all internals of a given type (e.g. grainline — only one per piece) */
     setInternalLine(state, action: PayloadAction<{ pieceId: string; line: InternalLine }>) {
@@ -1705,7 +1735,7 @@ const projectSlice = createSlice({
 export const {
   restoreState, loadProject, restoreProject, clearLoadDiagnostics, setProjectName, setGarmentInfo, setGarmentInfoBulk,
   addPiece, updatePiece, removePiece, removePieces, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, setArrangementBinding, clearArrangementOverride, clearArrangementOverrides,
-  addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
+  addInternalLine, updateInternalLine, removeInternalLine, setInternalLine, removeTramosDeInterna,
   addTrazo, updateTrazo, removeTrazo, removeTramoDeTrazo,
   addAnnotation, removeAnnotation, updateAnnotation,
   // Reactive solver (parametric updates)

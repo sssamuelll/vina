@@ -348,3 +348,4 @@ No cierra un eje de auditoría: `CLAUDE.md` no cambia.
 ## 14. Registro
 
 - **2026-09-24.** Escrito tras la sesión con Samuel. Las ocho decisiones de § 2 se tomaron una a una con el código delante, y las tres partes del diseño (Q; Z y V; datos, fases y pruebas) se aprobaron antes de escribir. Sale del informe del 10-09 (queja 16, causa E) y del contrato del 08-09 § 4.
+- **Fases 1 y 2 hechas** (PR 1, #1212: núcleo sin cambios; PR 2, #1213: Q edita las internas). Q agarra, arrastra, endereza con Shift, engancha, inserta, borra y convierte puntos y tramos de las internas de forma propia; Supr sobre un tramo de interna quita solo ese tramo, también en Z. Quedan la fase 3 (trazos en Q), la 4 (Z deja de deformar) y la 5 (V), cada una con su plan.

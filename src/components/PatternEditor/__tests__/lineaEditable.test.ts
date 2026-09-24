@@ -7,12 +7,15 @@
 import { describe, it, expect } from 'vitest';
 import type { InternalLine, PathCommand, PatternPiece } from '../../../types/types';
 import {
-  CLAVE_CONTORNO, claveDeInterna, conPaths, lineIdDeClave, pathDeLinea,
+  CLAVE_CONTORNO, claveDeInterna, conPaths, lineIdDeClave, pathDeLinea, internasEditables,
+  quitarPuntos, quitarTramos,
 } from '../lineaEditable';
+import { esInternaEditable, esRectaDeDosPuntos, seBorraEntera } from '../../../types/types';
 import { compensatePositionForPivotChange } from '../pieceTransform';
 import { reanchorNotches } from '../../../utils/notchReanchor';
 import { computeNotchAnchor } from '../../../utils/notchAnchor';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../../utils/notches';
+import { applyDartsToInternals, extractDarts } from '../../../utils/dartEntity';
 
 const cuadrado: PathCommand[] = [
   { type: 'M', values: [0, 0] }, { type: 'L', values: [200, 0] },
@@ -89,5 +92,133 @@ describe('conPaths', () => {
     ]));
     expect(r.internals[0].path).toBe(nuevo);
     expect(r.internals[1]).toEqual(reanchorNotches([piquete], nuevoContorno, p.outline)[0]);
+  });
+});
+
+describe('qué internas edita Q (spec § 3.2)', () => {
+  const linea = (type: InternalLine['type'], extra: Partial<InternalLine> = {}): InternalLine => ({
+    id: type, type, path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [10, 0] }], ...extra,
+  });
+
+  it('las de forma propia sí; el piquete y el doblez de un pliegue no', () => {
+    for (const t of ['reference', 'fold', 'topstitch', 'seam', 'grainline', 'dart', 'pleat'] as const) {
+      expect(esInternaEditable(linea(t)), t).toBe(true);
+    }
+    expect(esInternaEditable(linea('notch'))).toBe(false);
+    expect(esInternaEditable(linea('fold', { foldOptions: { direction: 'mountain', creaseAngleDeg: 180, pleatId: 'pl' } }))).toBe(false);
+  });
+
+  it('Supr sobre un tramo se lleva entera solo la línea de hilo y la pinza', () => {
+    expect(seBorraEntera('grainline')).toBe(true);
+    expect(seBorraEntera('dart')).toBe(true);
+    for (const t of ['reference', 'fold', 'topstitch', 'seam', 'pleat'] as const) expect(seBorraEntera(t), t).toBe(false);
+  });
+
+  it('solo el hilo es una recta de dos puntos: en Q no se le insertan puntos ni se curva (§ 3.2); la pinza, sí', () => {
+    expect(esRectaDeDosPuntos('grainline')).toBe(true);
+    for (const t of ['reference', 'fold', 'topstitch', 'seam', 'pleat', 'dart'] as const) expect(esRectaDeDosPuntos(t), t).toBe(false);
+  });
+
+  it('internasEditables filtra en orden de pintado', () => {
+    const p = { ...pieza(), internals: [linea('reference'), linea('notch'), linea('grainline')] } as PatternPiece;
+    expect(internasEditables(p).map(l => l.id)).toEqual(['reference', 'grainline']);
+  });
+});
+
+describe('conPaths y la copia de las pinzas (spec § 7)', () => {
+  const pinza: InternalLine = {
+    id: 'd', type: 'dart', dartOptions: { capShape: 'pointed' },
+    path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [10, 50] }, { type: 'L', values: [20, 0] }],
+  };
+  function conPinza(): PatternPiece {
+    const base = { ...pieza(), internals: [pinza] } as PatternPiece;
+    const darts = extractDarts(base).map(d => ({ ...d, foldDirection: 'toward-center' as const }));
+    return { ...base, darts };
+  }
+  const apexMasHondo: PathCommand[] = [
+    { type: 'M', values: [0, 0] }, { type: 'L', values: [10, 60] }, { type: 'L', values: [20, 0] },
+  ];
+
+  it('mover la punta en Q relee la pinza y conserva lo que no es dibujo', () => {
+    const r = conPaths(conPinza(), new Map([[claveDeInterna('d'), apexMasHondo]]));
+    expect(r.darts![0].apex).toEqual({ x: 10, y: 60 });
+    expect(r.darts![0].foldDirection).toBe('toward-center');
+    expect(r.darts![0].capShape).toBe('pointed');
+  });
+
+  it('una operación de pinza después no revierte la edición (Review Focus 5)', () => {
+    const r = conPaths(conPinza(), new Map([[claveDeInterna('d'), apexMasHondo]]));
+    const internals = applyDartsToInternals(r, r.darts!);
+    const puntos = internals[0].path.map(c => c.values.slice(-2));
+    expect(puntos).toContainEqual([10, 60]);
+  });
+
+  it('quitar la línea de una pinza la quita de la copia; una pinza sin línea se queda', () => {
+    const sinLinea = { id: 'suelta', intake: 5, apex: { x: 0, y: 0 }, legs: [[], []] as [[], []], foldDirection: 'left' as const };
+    const base = conPinza();
+    const r = conPaths({ ...base, darts: [...base.darts!, sinLinea] }, new Map([[claveDeInterna('d'), null]]));
+    expect(r.darts!.map(d => d.id)).toEqual(['suelta']);
+  });
+});
+
+const P = (x: number, y: number): PathCommand => ({ type: 'L', values: [x, y] });
+const M = (x: number, y: number): PathCommand => ({ type: 'M', values: [x, y] });
+const anclas = (path: PathCommand[]) => path.filter(c => c.type !== 'Z').map(c => c.values.slice(-2));
+
+describe('quitarPuntos (spec § 4.6)', () => {
+  const abierta = [M(0, 0), P(100, 0), P(100, 100)];
+  const cerrada = [M(0, 0), P(100, 0), P(100, 100), { type: 'Z', values: [] } as PathCommand];
+
+  it('una abierta pierde el punto y sus vecinos se unen', () => {
+    expect(anclas(quitarPuntos(abierta, new Set([1]), false) as PathCommand[])).toEqual([[0, 0], [100, 100]]);
+  });
+  it('quitar la M promueve el siguiente a M', () => {
+    const r = quitarPuntos(abierta, new Set([0]), false) as PathCommand[];
+    expect(r[0].type).toBe('M');
+    expect(anclas(r)).toEqual([[100, 0], [100, 100]]);
+  });
+  it('una abierta que se queda con un punto deja de existir', () => {
+    expect(quitarPuntos([M(0, 0), P(100, 0)], new Set([1]), false)).toBeNull();
+  });
+  it('una cerrada o el contorno necesitan tres: si no llegan, insuficiente', () => {
+    expect(quitarPuntos(cerrada, new Set([1]), false)).toBe('insuficiente');
+    expect(quitarPuntos(cerrada, new Set([1]), true)).toBe('insuficiente');
+  });
+  it('gemelas: quitar el grupo entero no deja un gemelo (Review Focus 1)', () => {
+    const gemelas = [M(0, 0), P(100, 0), P(100, 0), P(100, 100)];
+    expect(anclas(quitarPuntos(gemelas, new Set([1, 2]), false) as PathCommand[])).toEqual([[0, 0], [100, 100]]);
+  });
+});
+
+describe('quitarTramos (spec § 4.6)', () => {
+  const tres = [M(0, 0), P(100, 0), P(100, 100), P(0, 100)];
+  const cuadradoCerrado = [M(0, 0), P(100, 0), P(100, 100), P(0, 100), { type: 'Z', values: [] } as PathCommand];
+
+  it('el tramo del medio parte la línea en dos', () => {
+    expect(quitarTramos(tres, new Set([2])).map(anclas)).toEqual([[[0, 0], [100, 0]], [[100, 100], [0, 100]]]);
+  });
+  it('el primero o el último la acortan', () => {
+    expect(quitarTramos(tres, new Set([1])).map(anclas)).toEqual([[[100, 0], [100, 100], [0, 100]]]);
+    expect(quitarTramos(tres, new Set([3])).map(anclas)).toEqual([[[0, 0], [100, 0], [100, 100]]]);
+  });
+  it('el único tramo de una línea de dos puntos: no queda nada', () => {
+    expect(quitarTramos([M(0, 0), P(100, 0)], new Set([1]))).toEqual([]);
+  });
+  it('en una cerrada, el primer tramo quitado la abre en una sola línea (Review Focus 3)', () => {
+    const r = quitarTramos(cuadradoCerrado, new Set([2]));
+    expect(r.map(anclas)).toEqual([[[100, 100], [0, 100], [0, 0], [100, 0]]]);
+    expect(r[0].some(c => c.type === 'Z')).toBe(false);
+  });
+  it('el cierre es un tramo más: quitarlo abre la forma por ahí', () => {
+    expect(quitarTramos(cuadradoCerrado, new Set([4])).map(anclas)).toEqual([[[0, 0], [100, 0], [100, 100], [0, 100]]]);
+  });
+  it('un índice que no es tramo no cambia nada: la misma referencia', () => {
+    const r = quitarTramos(tres, new Set([0]));
+    expect(r).toHaveLength(1);
+    expect(r[0]).toBe(tres);
+  });
+  it('conserva las curvas', () => {
+    const curva = [M(0, 0), { type: 'C', values: [30, -20, 70, -20, 100, 0] } as PathCommand, P(200, 0)];
+    expect(quitarTramos(curva, new Set([2]))[0][1]).toEqual(curva[1]);
   });
 });

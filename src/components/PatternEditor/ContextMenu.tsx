@@ -40,6 +40,8 @@ export interface ContextMenuState {
   segmentIndex?: number;
   /** Whether the segment is currently a curve */
   segmentIsCurve?: boolean;
+  /** La interna del tramo, en Q (spec 2026-09-24 § 4.4); sin ella, el contorno. */
+  segmentLineId?: string;
   /** Active tool when context menu was opened */
   activeTool?: string;
   /** ID of internal line under cursor, or null */
@@ -169,7 +171,7 @@ export default function ContextMenu(props: ContextMenuProps) {
     internalLineId: menu.internalLineId ?? null,
     internalLineType: (menu.internalLineType as InternalLineType | null) ?? null,
     internalLine,
-    segmentIndex: menu.segmentIndex, segmentIsCurve: menu.segmentIsCurve,
+    segmentIndex: menu.segmentIndex, segmentIsCurve: menu.segmentIsCurve, segmentLineId: menu.segmentLineId,
     derechoSobreElPuntoElegido: menu.derechoSobreElPuntoElegido,
     clipboard, groups, pieces, cb, onClose,
   };

@@ -28,6 +28,7 @@ const EditPatternTestHarness = forwardRef<EditorApi>(function EditPatternTestHar
           selectedSegments={editor.selectedSegments} hoveredNode={editor.hoveredNode}
           hoveredSegment={editor.hoveredSegment} addPointPreview={editor.addPointPreview}
           marquee={editor.marquee}
+          internas={editor.internas} enganche={editor.enganche}
         />
       )}
     </svg>

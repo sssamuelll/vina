@@ -53,9 +53,9 @@ export type ActionId =
 /** Callbacks que Surface B pasa como props (verbos que no son dispatches puros). */
 export interface CurationCallbacks {
   onRename?: (pieceId: string) => void;
-  onConvertSegment?: (commandIndex: number, toCurve: boolean, pieceId?: string) => void;
-  onConvertSegmentToPoints?: (commandIndex: number, pieceId?: string) => void;
-  onConvertSegmentToBezier?: (commandIndex: number, pieceId?: string) => void;
+  onConvertSegment?: (commandIndex: number, toCurve: boolean, pieceId?: string, lineId?: string) => void;
+  onConvertSegmentToPoints?: (commandIndex: number, pieceId?: string, lineId?: string) => void;
+  onConvertSegmentToBezier?: (commandIndex: number, pieceId?: string, lineId?: string) => void;
   onZoomToFit?: () => void;
   onUnfold?: (pieceId: string, foldLineId: string, outlineOnly?: boolean) => void;
   onOffsetInternalLine?: (pieceId: string, lineId: string) => void;
@@ -86,6 +86,8 @@ export interface CurationCtx {
   internalLine: InternalLine | null;
   segmentIndex?: number;
   segmentIsCurve?: boolean;
+  /** La interna del tramo, en Q (spec 2026-09-24 § 4.4); sin ella, el contorno. */
+  segmentLineId?: string;
   /**
    * El clic derecho cayó sobre el punto que ya está elegido en «Editar patrón»
    * (#1112). Un booleano y no un conteo, porque las dos preguntas que había que
@@ -140,10 +142,14 @@ const canAddToGroup = (ctx: CurationCtx) => !!ctx.pieceId && ctx.groups.some(g =
 const canRemoveFromGroup = (ctx: CurationCtx) => !!ctx.pieceId && ctx.groups.some(g => g.pieceIds.includes(ctx.pieceId!));
 const seamBothConnected = (ctx: CurationCtx) => !!(ctx.seam?.pieceA.pieceId && ctx.seam?.pieceB.pieceId);
 const hasCurveCmds = (ctx: CurationCtx) => !!ctx.internalLine?.path.some(c => c.type === 'C' || c.type === 'Q');
+const pathDelTramo = (ctx: CurationCtx) => (ctx.segmentLineId
+  ? ctx.piece?.internals.find(l => l.id === ctx.segmentLineId)?.path
+  : ctx.piece?.outline);
 const isManagedSplineSegment = (ctx: CurationCtx) => {
-  if (!ctx.piece || ctx.segmentIndex === undefined || !notLocked(ctx)) return false;
-  const run = splineRunAt(ctx.piece.outline, ctx.segmentIndex);
-  return !!run && isSplineManaged(ctx.piece.outline, run);
+  const path = pathDelTramo(ctx);
+  if (!path || ctx.segmentIndex === undefined || !notLocked(ctx)) return false;
+  const run = splineRunAt(path, ctx.segmentIndex);
+  return !!run && isSplineManaged(path, run);
 };
 
 const pasteRun = (mirror: boolean) => (ctx: CurationCtx) => {
@@ -204,17 +210,17 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     // fila). Trabaja en la fila `piece`, donde el clic derecho puede caer lejos del
     // contorno: sin segmento bajo el cursor el ítem se OCULTA (§4 hide-not-disable).
     gate: (ctx) => ctx.segmentIndex !== undefined && notLocked(ctx),
-    run: (ctx) => ctx.cb.onConvertSegment?.(ctx.segmentIndex!, !ctx.segmentIsCurve, ctx.pieceId ?? undefined) },
+    run: (ctx) => ctx.cb.onConvertSegment?.(ctx.segmentIndex!, !ctx.segmentIsCurve, ctx.pieceId ?? undefined, ctx.segmentLineId) },
   convertSegmentToPoints: { id: 'convertSegmentToPoints', group: 'transform', icon: '⌣',
     label: 'Convertir en curva por puntos',
     // Sólo sobre un lado RECTO: sobre una curva no hay nada que convertir, y
     // rehacer una ya curvada tirando sus manejadores sería destruir trabajo.
     gate: (ctx) => ctx.segmentIndex !== undefined && !ctx.segmentIsCurve && notLocked(ctx),
-    run: (ctx) => ctx.cb.onConvertSegmentToPoints?.(ctx.segmentIndex!, ctx.pieceId ?? undefined) },
+    run: (ctx) => ctx.cb.onConvertSegmentToPoints?.(ctx.segmentIndex!, ctx.pieceId ?? undefined, ctx.segmentLineId) },
   convertSegmentToBezier: { id: 'convertSegmentToBezier', group: 'transform', icon: '⌁',
     label: 'Convertir a Bézier libre',
     gate: isManagedSplineSegment,
-    run: (ctx) => ctx.cb.onConvertSegmentToBezier?.(ctx.segmentIndex!, ctx.pieceId ?? undefined) },
+    run: (ctx) => ctx.cb.onConvertSegmentToBezier?.(ctx.segmentIndex!, ctx.pieceId ?? undefined, ctx.segmentLineId) },
 
   // order (submenú z-order — colapsa 4 ítems planos en uno)
   order: { id: 'order', group: 'order', icon: '⇅', label: 'Orden', run: () => {},

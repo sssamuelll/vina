@@ -84,7 +84,8 @@ describe('#1115 — el gancho dice la verdad sobre si se quedó la tecla', () =>
   });
 
   it('con un TRAMO agarrado se queda la tecla aunque no haya nada que borrar', () => {
-    // No existe «borrar tramo». El contrato es que no pase nada — no que la
+    // No existe «borrar lado» en el CONTORNO (spec 2026-09-24 § 4.6 — una
+    // interna sí tiene su tramo). El contrato es que no pase nada — no que la
     // pieza desaparezca, que es lo que ocurría al soltar la tecla al global.
     const piece = rect();
     const { ref, store } = setup(piece);
@@ -97,7 +98,7 @@ describe('#1115 — el gancho dice la verdad sobre si se quedó la tecla', () =>
     act(() => { consumio = ref.current!.handleKeyDown(tecla('Delete')); });
 
     expect(consumio, 'con el tramo resaltado, la tecla se fue al global').toBe(true);
-    expect(contorno(store).length, 'un tramo no se borra').toBe(antes);
+    expect(contorno(store).length, 'un tramo del contorno no se borra').toBe(antes);
   });
 
   it('y cuando el nodo no se puede borrar, rendirse también es consumir', () => {

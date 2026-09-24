@@ -32,6 +32,7 @@ import type { BBox, HandlePosition } from '../../../utils/geometry/transform';
 import type { TransformPreview } from '../useTransformTool';
 import type { SlashAndSpreadPhase } from '../useSlashAndSpreadTool';
 import type { AngleReference } from '../angleReference';
+import type { EdicionDeInterna } from '../estadoDeQ';
 
 interface PenNode {
   anchor: Point2D;
@@ -134,6 +135,10 @@ interface ToolOverlayProps {
   editPatternHoveredSegment: number | null;
   editPatternAddPointPreview: Point2D | null;
   editPatternMarquee: { start: Point2D; current: Point2D } | null;
+  /** Las internas editables de la pieza en Q (spec 2026-09-24 § 3.3). */
+  editPatternInternas: EdicionDeInterna[];
+  /** El anillo de enganche del arrastre de una interna (§ 4.3). */
+  editPatternEnganche: Point2D | null;
   // Select marquee (piece box-select)
   selectMarquee: { start: Point2D; current: Point2D } | null;
   // Scissors
@@ -329,6 +334,8 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           hoveredSegment={props.editPatternHoveredSegment}
           addPointPreview={props.editPatternAddPointPreview}
           marquee={props.editPatternMarquee}
+          internas={props.editPatternInternas}
+          enganche={props.editPatternEnganche}
         />
       )}
 

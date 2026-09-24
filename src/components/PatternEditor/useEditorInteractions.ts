@@ -212,6 +212,8 @@ interface ToolHooks {
     handleDoubleClick: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     limpiarHover: () => void;
     getCursor: () => string;
+    /** Qué agarraría el press en la pieza en edición (spec 2026-09-24 § 3.4). */
+    agarreEn?: (e: React.MouseEvent<SVGSVGElement>) => unknown;
   };
   scissorsTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -870,9 +872,12 @@ export function useEditorInteractions(
       // estado y BORRA la selección de puntos, así que el clic derecho sobre
       // otra pieza dejaba el menú sin sujeto. La guarda de abajo cubría solo la
       // mitad del recorrido — lo señaló la revisión adversarial del 06-09.
+      // Salvo que el press agarre algo de la pieza en edición: entonces gana
+      // ella aunque otra pieza la tape (spec 2026-09-24 § 3.4, «en Q, la que se
+      // está editando»).
       const clicked = (e.target as SVGElement)
         .closest('[data-piece-id]')?.getAttribute('data-piece-id');
-      if (e.button === 0 && clicked && clicked !== editPattern.editingPieceId) {
+      if (e.button === 0 && clicked && clicked !== editPattern.editingPieceId && !editPattern.agarreEn?.(e)) {
         editPattern.enterEdit(clicked);
         return;
       }
