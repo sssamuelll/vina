@@ -1463,6 +1463,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
                 ? nodeEditor.editingPieceId
                 : (activeTool === 'editPattern' ? editPatternTool.editingPieceId : null)
             }
+            piezaEditadaEnQ={
+              // Solo Q: su overlay pinta los puntos de las internas; el de V
+              // todavía no (fase 5), así que ahí los extremos se quedan.
+              activeTool === 'editPattern' ? editPatternTool.editingPieceId : null
+            }
             units={units}
             groupColors={groupColors}
             selectedInternalLine={editor.selectedInternalLine}

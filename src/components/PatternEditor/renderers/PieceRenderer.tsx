@@ -40,6 +40,8 @@ interface SinglePieceProps {
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
   /** La pieza que se está editando con una herramienta de curva: solo esa enseña sus puntos de curva. Por PIEZA, no global — encenderlo para todas suelta cientos de puntos sobre piezas que nadie toca (#1103). */
   piezaConPuntosDeCurva: string | null;
+  /** La pieza en edición en Editar patrón (Q): su overlay ya pinta los puntos de sus internas (spec 2026-09-24 § 3.3). */
+  piezaEditadaEnQ: string | null;
   isInternalLineSelected: boolean;
   selectedLineId?: string;
   selectedSegmentIndex?: number;
@@ -71,6 +73,7 @@ const SinglePiece = memo(function SinglePiece({
   showPieceNames,
   renderMode2D,
   piezaConPuntosDeCurva,
+  piezaEditadaEnQ,
   isInternalLineSelected,
   selectedLineId,
   selectedSegmentIndex,
@@ -228,10 +231,19 @@ const SinglePiece = memo(function SinglePiece({
           ? line.path[selectedSegmentIndex - 1]
           : undefined;
         const segmentStart = previousCommand ? getAnchor(previousCommand) : null;
+        // El de cierre, con su índice en la `Z` (la convención de
+        // `nearestSegment` y del resalte de Q, `resaltesDeTramos`): del último
+        // ancla al primero. Supr en Z lo borra, así que tiene que verse
+        // (revisión final de la frontera, M-7).
+        const cierre = selectedCommand?.type === 'Z' && line.path[0]?.type === 'M'
+          ? getAnchor(line.path[0])
+          : null;
         const selectedSegmentD = selectedCommand && segmentStart &&
           (selectedCommand.type === 'L' || selectedCommand.type === 'C' || selectedCommand.type === 'Q')
           ? pathToSVG([{ type: 'M', values: [segmentStart.x, segmentStart.y] }, selectedCommand])
-          : null;
+          : segmentStart && cierre
+            ? pathToSVG([{ type: 'M', values: [segmentStart.x, segmentStart.y] }, { type: 'L', values: [cierre.x, cierre.y] }])
+            : null;
         const lineDash =
           line.type === 'fold' ? `${5 / zoom2D} ${3 / zoom2D} ${0.5 / zoom2D} ${3 / zoom2D}` :
           line.type === 'topstitch' ? `${(line.topstitchOptions?.stitchLength ?? 3) / zoom2D} ${1.5 / zoom2D}` :
@@ -332,9 +344,11 @@ const SinglePiece = memo(function SinglePiece({
             {foldMarkers.length > 0 && <g className="fold-direction-markers">{foldMarkers}</g>}
             {/* Los extremos de la entidad siguen siendo sus controles de arrastre;
                 mostrarlos para un tramo anunciaría un alcance distinto al seleccionado.
-                En Q y V, la pieza en edición ya pinta sus puntos en el overlay: dos
-                glifos en la misma coordenada son ruido (spec 2026-09-24 § 3.3). */}
-            {isWholeLineSelected && piezaConPuntosDeCurva !== piece.id && (() => {
+                En Q, la pieza en edición ya pinta sus puntos en el overlay: dos
+                glifos en la misma coordenada son ruido (spec 2026-09-24 § 3.3). En V
+                su overlay todavía no pinta los de las internas (fase 5), así que
+                ahí se quedan. */}
+            {isWholeLineSelected && piezaEditadaEnQ !== piece.id && (() => {
               const first = line.path[0];
               const last = line.path[line.path.length - 1];
               const points: { x: number; y: number }[] = [];
@@ -561,6 +575,8 @@ interface PieceRendererProps {
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
   /** La pieza que se está editando con una herramienta de curva: solo esa enseña sus puntos de curva. Por PIEZA, no global — encenderlo para todas suelta cientos de puntos sobre piezas que nadie toca (#1103). */
   piezaConPuntosDeCurva: string | null;
+  /** La pieza en edición en Editar patrón (Q), o ninguna (por omisión). Ver `SinglePieceProps`. */
+  piezaEditadaEnQ?: string | null;
   units: UnitSystem;
   /** Map of piece ID to group color for visual indicators */
   groupColors?: Record<string, string>;
@@ -581,6 +597,7 @@ export default function PieceRenderer({
   showPieceNames,
   renderMode2D,
   piezaConPuntosDeCurva,
+  piezaEditadaEnQ = null,
   groupColors,
   selectedInternalLine,
   editingPieceNameId,
@@ -667,6 +684,7 @@ export default function PieceRenderer({
           showPieceNames={showPieceNames}
           renderMode2D={renderMode2D}
           piezaConPuntosDeCurva={piezaConPuntosDeCurva}
+          piezaEditadaEnQ={piezaEditadaEnQ}
           groupColor={groupColors?.[piece.id]}
           isLayerLocked={!!layerLocked[piece.layer ?? 1]}
           hasResolutionErrors={hasResolutionErrors.get(piece.id) ?? false}

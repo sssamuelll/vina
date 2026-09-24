@@ -18,6 +18,9 @@ const PIECE_MODIFYING_ACTIONS = new Set([
   'project/addInternalLine',
   'project/updateInternalLine',
   'project/removeInternalLine',
+  // Supr sobre un tramo de interna (spec 2026-09-24 § 4.6): antes pasaba por
+  // `removeInternalLine` y marcaba el escalado como viejo; tiene que seguir.
+  'project/removeTramosDeInterna',
 ]);
 
 /**
@@ -26,7 +29,7 @@ const PIECE_MODIFYING_ACTIONS = new Set([
  * triggers: project/updatePiece, project/movePiece, project/rotatePiece,
  *           project/removePiece, project/removePieces,
  *           project/addInternalLine, project/updateInternalLine,
- *           project/removeInternalLine
+ *           project/removeInternalLine, project/removeTramosDeInterna
  * dispatches: grading/setStale (true) when modified piece is base, not generated
  * guard: none (setStale is idempotent + early-return if already stale or empty)
  * undo: does not group (metadata observation, not part of user undo step)

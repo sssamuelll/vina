@@ -240,9 +240,18 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     setGuias(prev => (mismasGuias(prev, g) ? prev : g));
   }, []);
 
+  /** La pieza —el objeto, no su id— de la que el hover antes de entrar leyó sus líneas. */
+  const piezaDelHoverRef = useRef<PatternPiece | null>(null);
+
   useEffect(() => {
     if (state.isEditing || !state.hoveredPieceId) return;
-    if (hoverablePieces.some(piece => piece.id === state.hoveredPieceId)) return;
+    // Tiene que seguir siendo la MISMA pieza, no solo el mismo id: el reductor
+    // nunca muta una pieza, así que otro objeto (un deshacer de teclado con el
+    // ratón quieto) trae otra geometría, y las internas del hover —las de
+    // antes— se quedarían pintadas como un fantasma (revisión final de la
+    // frontera, M-6).
+    const viva = hoverablePieces.find(piece => piece.id === state.hoveredPieceId);
+    if (viva && viva === piezaDelHoverRef.current) return;
     setState(hoverPerdido);
   }, [hoverablePieces, state.isEditing, state.hoveredPieceId]);
 
@@ -790,6 +799,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           const base: EditPatternState = { ...INITIAL_STATE, nodes, internas };
           const hit = agarrar(vistas(base, piece.outline), toLocal(e, piece), hitRadius, claveElegida(piece.id));
           if (hit) {
+            piezaDelHoverRef.current = piece;
             setState(s => (s.isEditing ? s : conLinea(
               { ...sinHover({ ...s, internas }), hoveredPieceId: piece.id },
               hit.clave,

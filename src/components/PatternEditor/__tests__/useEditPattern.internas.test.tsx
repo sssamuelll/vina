@@ -454,6 +454,29 @@ describe('el hover antes de entrar, precalculado por identidad de la pieza (§ 1
     act(() => { hook.result.current.limpiarHover(); });
     expect(hook.result.current.internas).toHaveLength(0);
   });
+
+  it('un deshacer de teclado con el ratón quieto suelta el hover: no queda pintada la interna de antes (revisión final M-6)', () => {
+    const { store, hook } = montarQ([pieza()]);
+    const bajada: PathCommand[] = [{ type: 'M', values: [20, 60] }, { type: 'L', values: [120, 60] }, { type: 'L', values: [120, 140] }];
+    act(() => { store.dispatch(updateInternalLine({ pieceId: 'p', lineId: 'L', path: bajada })); });
+    act(() => { hook.result.current.handleMouseMove(ev(70, 61)); });
+    expect(hook.result.current.hoveredPieceId).toBe('p');
+    expect(hook.result.current.internas[0].path).toEqual(bajada);
+    act(() => { store.dispatch({ type: 'editor/undo' }); });
+    expect(hook.result.current.hoveredPieceId).toBeNull();
+    expect(hook.result.current.internas).toHaveLength(0);
+  });
+
+  it('… pero un cambio en OTRA pieza no lo suelta', () => {
+    const otra = { ...pieza(), id: 'q', position: { x: 400, y: 0 } } as PatternPiece;
+    const { store, hook } = montarQ([pieza(), otra]);
+    act(() => { hook.result.current.handleMouseMove(ev(70, 21)); });
+    expect(hook.result.current.hoveredPieceId).toBe('p');
+    const bajada: PathCommand[] = [{ type: 'M', values: [20, 60] }, { type: 'L', values: [120, 60] }];
+    act(() => { store.dispatch(updateInternalLine({ pieceId: 'q', lineId: 'L', path: bajada })); });
+    expect(hook.result.current.hoveredPieceId).toBe('p');
+    expect(hook.result.current.internas[0].hoveredSegment).toBe(1);
+  });
 });
 
 describe('§ 10.2: lo que faltaba de los hooks', () => {
