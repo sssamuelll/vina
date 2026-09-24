@@ -7,7 +7,7 @@ import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../util
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, clearSelection, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, esRectaDeDosPuntos } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import type { PenResult } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
@@ -713,10 +713,20 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // verbos de convertir hablan de él.
     let segmentLineId: string | undefined;
     if (agarreQ?.tipo === 'tramo' && agarreQ.clave !== CLAVE_CONTORNO && hitPiece?.id === editPatternTool.editingPieceId) {
-      segmentLineId = lineIdDeClave(agarreQ.clave) ?? undefined;
-      const cmd = hitPiece.internals.find(l => l.id === segmentLineId)?.path[agarreQ.commandIndex];
-      segmentIndex = agarreQ.commandIndex;
-      segmentIsCurve = cmd?.type === 'C' || cmd?.type === 'Q';
+      const lineId = lineIdDeClave(agarreQ.clave) ?? undefined;
+      const linea = hitPiece.internals.find(l => l.id === lineId);
+      if (linea && esRectaDeDosPuntos(linea.type)) {
+        // El hilo no se curva (spec § 3.2): sin tramo, ningún verbo de
+        // convertir —ni para él, que sería una puerta muerta, ni para un lado
+        // del contorno que caiga cerca, que no es lo que ella clicó—.
+        segmentIndex = undefined;
+        segmentIsCurve = undefined;
+      } else {
+        segmentLineId = lineId;
+        const cmd = linea?.path[agarreQ.commandIndex];
+        segmentIndex = agarreQ.commandIndex;
+        segmentIsCurve = cmd?.type === 'C' || cmd?.type === 'Q';
+      }
     }
     // ¿El clic derecho cayó sobre el punto que está elegido? Sin esta
     // pregunta, «Mover exacto…» salía con CUALQUIER clic derecho estando en

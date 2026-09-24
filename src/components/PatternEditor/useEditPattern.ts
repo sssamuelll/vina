@@ -21,7 +21,7 @@ import {
   type UndoBatchToken,
 } from '../../store/undoMiddleware';
 import type { Point2D, PatternPiece, PathCommand, Trazo } from '../../types/types';
-import { esInternaEditable, seBorraEntera } from '../../types/types';
+import { esInternaEditable, esRectaDeDosPuntos, seBorraEntera } from '../../types/types';
 import {
   extractNodes,
   applyNodeMove,
@@ -171,6 +171,17 @@ export function lineasDeHover(piece: PatternPiece): LineasDeHover {
  */
 function hoverPerdido(s: EditPatternState): EditPatternState {
   return s.isEditing ? s : { ...sinHover(s), hoveredPieceId: null, internas: SIN_INTERNAS };
+}
+
+/**
+ * La línea de esta clave es el hilo, una recta de dos puntos (spec § 3.2): Q
+ * no le inserta puntos ni la curva, y no lo promete —ni el cursor de
+ * insertar, ni la muestra del punto nuevo—.
+ */
+function esRectaDeDosPuntosEn(piece: PatternPiece, clave: ClaveLinea): boolean {
+  const lineId = lineIdDeClave(clave);
+  const linea = lineId === null ? undefined : piece.internals.find(l => l.id === lineId);
+  return !!linea && esRectaDeDosPuntos(linea.type);
 }
 
 // ─── Hook ───
@@ -820,13 +831,15 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
       // Hover detection, en todas las líneas.
       const hit = agarrar(vistas(state, piece.outline), toLocal(e, piece), hitRadius, claveElegida(piece.id));
+      // Sobre el tramo del hilo, sin muestra: el doble clic no insertará ahí.
+      const conMuestra = hit?.tipo === 'tramo' && !esRectaDeDosPuntosEn(piece, hit.clave);
       setState(s => {
         const limpio = sinHover(s);
         // Nothing hovered
         if (!hit) return limpio;
         if (hit.tipo === 'punto') return conLinea(limpio, hit.clave, { hoveredNode: hit.commandIndex });
         // addPointPreview is in piece-local space
-        return conLinea(limpio, hit.clave, { hoveredSegment: hit.commandIndex, addPointPreview: hit.point });
+        return conLinea(limpio, hit.clave, { hoveredSegment: hit.commandIndex, addPointPreview: conMuestra ? hit.point : null });
       });
       return false;
     },
@@ -1034,6 +1047,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       if (!hit || hit.tipo !== 'tramo') return false;
       const linea = lineas.find(l => l.clave === hit.clave);
       if (!linea) return false;
+      // El hilo son dos puntos (spec § 3.2): su tramo no admite uno nuevo.
+      if (esRectaDeDosPuntosEn(piece, hit.clave)) return false;
       escribirLineas(piece, new Map([[hit.clave, splitSegmentAt(linea.path, hit.commandIndex, hit.t)]]));
       return true;
     },
@@ -1044,13 +1059,16 @@ export function useEditPattern(zoom: number, pan: Point2D) {
    * La clave y el path que edita uno de los cuatro verbos de abajo: el
    * contorno sin `lineId`, o la interna que nombra — si Q puede editarla
    * (spec § 3.2: `esInternaEditable` descarta un piquete o un doblez de
-   * pliegue). `null` si no hay nada que editar; los cuatro verbos no hacen
-   * nada entonces, en vez de repetir cada uno su propio candado.
+   * pliegue) y, para los tres que curvan (`curva`), si admite curvarse
+   * (`esRectaDeDosPuntos` descarta el hilo). `null` si no hay nada que
+   * editar; los cuatro verbos no hacen nada entonces, en vez de repetir cada
+   * uno su propio candado.
    */
-  const lineaDelVerbo = useCallback((piece: PatternPiece, lineId?: string): { clave: ClaveLinea; path: PathCommand[] } | null => {
+  const lineaDelVerbo = useCallback((piece: PatternPiece, lineId?: string, curva = false): { clave: ClaveLinea; path: PathCommand[] } | null => {
     if (!lineId) return { clave: CLAVE_CONTORNO, path: piece.outline };
     const linea = piece.internals.find(l => l.id === lineId);
     if (!linea || !esInternaEditable(linea)) return null;
+    if (curva && esRectaDeDosPuntos(linea.type)) return null;
     const clave = claveDeInterna(lineId);
     const path = pathDeLinea(piece, clave);
     return path ? { clave, path } : null;
@@ -1065,7 +1083,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (commandIndex: number, toCurve: boolean, pieceId?: string, lineId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece || guardLocked(piece)) return;
-      const l = lineaDelVerbo(piece, lineId);
+      const l = lineaDelVerbo(piece, lineId, true);
       if (!l) return;
       escribirLineas(piece, new Map([[l.clave, toCurve ? convertToCurve(l.path, commandIndex) : convertToLine(l.path, commandIndex)]]));
     },
@@ -1111,7 +1129,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (commandIndex: number, pieceId?: string, lineId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece || guardLocked(piece)) return;
-      const l = lineaDelVerbo(piece, lineId);
+      const l = lineaDelVerbo(piece, lineId, true);
       if (!l) return;
       escribirLineas(piece, new Map([[l.clave, convertSegmentToSpline(l.path, commandIndex)]]));
     },
@@ -1125,7 +1143,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (commandIndex: number, pieceId?: string, lineId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece || guardLocked(piece)) return;
-      const l = lineaDelVerbo(piece, lineId);
+      const l = lineaDelVerbo(piece, lineId, true);
       if (!l) return;
       const out = toManualBezier(l.path, commandIndex);
       if (out) escribirLineas(piece, new Map([[l.clave, out]]));

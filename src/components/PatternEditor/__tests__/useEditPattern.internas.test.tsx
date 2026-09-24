@@ -17,6 +17,7 @@ import { getUndoLength, undoMiddleware } from '../../../store/undoMiddleware';
 import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 import { applyDartsToInternals, extractDarts } from '../../../utils/dartEntity';
 import { lineasDeHover, useEditPattern } from '../useEditPattern';
+import { convertSegmentToSpline, toManualBezier } from '../splineSegment';
 import type { InternalLine, PathCommand, PatternPiece } from '../../../types/types';
 
 afterEach(cleanup);
@@ -764,5 +765,60 @@ describe('los verbos de Q sobre una interna', () => {
     act(() => hook.result.current.enterEdit('p'));
     act(() => hook.result.current.convertSegment(1, true, 'p', 'N'));
     expect(store.getState().project.pieces[0].internals.find(l => l.id === 'N')).toEqual(PIQUETE);
+  });
+});
+
+/**
+ * El hilo son dos puntos (spec § 3.2): en Q se mueven —con Shift y con
+ * enganche— y Supr lo borra, pero no se le inserta un punto ni se curva. Un
+ * hilo de más vértices deja el asta del DXF y su flecha en desacuerdo
+ * (`reverseGrainline`). Revisión final de la frontera, M-1.
+ */
+describe('el hilo en Q: se mueve y se borra, pero no se inserta ni se curva (§ 3.2)', () => {
+  const HILO: InternalLine = { id: 'H', type: 'grainline', path: [{ type: 'M', values: [20, 100] }, { type: 'L', values: [180, 100] }] };
+  const hiloDe = (hook: ReturnType<typeof montarQ>['hook']) => hook.result.current.internas.find(i => i.lineId === 'H')!;
+
+  it('su punto se arrastra', () => {
+    const { hook, internaDe } = montarQ([pieza([HILO])]);
+    act(() => hook.result.current.enterEdit('p'));
+    arrastrar(hook, [180, 100], [180, 120]);
+    expect(anclasDe(internaDe('H'))).toEqual([[20, 100], [180, 120]]);
+  });
+
+  it('el doble clic sobre su tramo no inserta un punto', () => {
+    const { hook, internaDe } = montarQ([pieza([HILO])]);
+    act(() => hook.result.current.enterEdit('p'));
+    let inserto = true;
+    act(() => { inserto = hook.result.current.handleDoubleClick(ev(100, 100)); });
+    expect(inserto).toBe(false);
+    expect(internaDe('H').path).toEqual(HILO.path);
+  });
+
+  it('los verbos de curvar no lo tocan', () => {
+    const { hook, internaDe } = montarQ([pieza([HILO])]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => hook.result.current.convertSegment(1, true, 'p', 'H'));
+    act(() => hook.result.current.convertSegmentToPoints(1, 'p', 'H'));
+    expect(internaDe('H').path).toEqual(HILO.path);
+  });
+
+  it('… ni pasa a Bézier libre un hilo que ya venía en curva por puntos', () => {
+    const enPuntos: InternalLine = { ...HILO, path: convertSegmentToSpline(HILO.path, 1) };
+    expect(toManualBezier(enPuntos.path, 1)).not.toBeNull();
+    const { hook, internaDe } = montarQ([pieza([enPuntos])]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => hook.result.current.convertSegmentToBezier(1, 'p', 'H'));
+    expect(internaDe('H').path).toEqual(enPuntos.path);
+  });
+
+  it('el cursor sobre su tramo no promete insertar; sobre el de una referencia, sí', () => {
+    const { hook } = montarQ([pieza([ELE, HILO])]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseMove(ev(100, 101)); });
+    expect(hiloDe(hook).hoveredSegment).toBe(1);
+    expect(hiloDe(hook).addPointPreview).toBeNull();
+    expect(hook.result.current.getCursor()).toBe('pointer');
+    act(() => { hook.result.current.handleMouseMove(ev(70, 21)); });
+    expect(hook.result.current.getCursor()).toBe('cell');
   });
 });

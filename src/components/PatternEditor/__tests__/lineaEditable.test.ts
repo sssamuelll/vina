@@ -10,7 +10,7 @@ import {
   CLAVE_CONTORNO, claveDeInterna, conPaths, lineIdDeClave, pathDeLinea, internasEditables,
   quitarPuntos, quitarTramos,
 } from '../lineaEditable';
-import { esInternaEditable, seBorraEntera } from '../../../types/types';
+import { esInternaEditable, esRectaDeDosPuntos, seBorraEntera } from '../../../types/types';
 import { compensatePositionForPivotChange } from '../pieceTransform';
 import { reanchorNotches } from '../../../utils/notchReanchor';
 import { computeNotchAnchor } from '../../../utils/notchAnchor';
@@ -112,6 +112,11 @@ describe('qué internas edita Q (spec § 3.2)', () => {
     expect(seBorraEntera('grainline')).toBe(true);
     expect(seBorraEntera('dart')).toBe(true);
     for (const t of ['reference', 'fold', 'topstitch', 'seam', 'pleat'] as const) expect(seBorraEntera(t), t).toBe(false);
+  });
+
+  it('solo el hilo es una recta de dos puntos: en Q no se le insertan puntos ni se curva (§ 3.2); la pinza, sí', () => {
+    expect(esRectaDeDosPuntos('grainline')).toBe(true);
+    for (const t of ['reference', 'fold', 'topstitch', 'seam', 'pleat', 'dart'] as const) expect(esRectaDeDosPuntos(t), t).toBe(false);
   });
 
   it('internasEditables filtra en orden de pintado', () => {

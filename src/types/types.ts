@@ -866,6 +866,22 @@ export function seBorraEntera(type: InternalLineType): boolean {
   return type === 'grainline' || type === 'dart';
 }
 
+/**
+ * El hilo es una recta de dos puntos (spec 2026-09-24 § 3.2: «dos puntos;
+ * Shift lo endereza a la hoja»). En Q se mueven sus puntos —con Shift y con
+ * enganche— y Supr lo borra, pero no se le inserta un punto ni se curva: un
+ * hilo de más vértices deja el asta del DXF y su flecha en desacuerdo
+ * (`reverseGrainline`, `utils/grainLine.ts`). Lo consultan el doble clic, los
+ * verbos de convertir, el menú contextual y el cursor: una sola lista, como
+ * `esInternaEditable`.
+ *
+ * La pinza no está aquí: si sus piernas admiten puntos nuevos es una pregunta
+ * de producto, abierta.
+ */
+export function esRectaDeDosPuntos(type: InternalLineType): boolean {
+  return type === 'grainline';
+}
+
 export interface EditorState {
   viewMode: ViewMode;
   activeTool: Tool2D;
