@@ -15,6 +15,7 @@ import editorReducer, { selectInternalLine } from '../../../store/editorSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
 import { getUndoLength, undoMiddleware } from '../../../store/undoMiddleware';
 import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
+import { extractDarts } from '../../../utils/dartEntity';
 import { lineasDeHover, useEditPattern } from '../useEditPattern';
 import type { InternalLine, PathCommand, PatternPiece } from '../../../types/types';
 
@@ -375,6 +376,37 @@ describe('la interna elegida se va con lo elegido en Q (§ 3.5)', () => {
     clic(70, 20, true);
     expect(store.getState().editor.selectedInternalLine).toBeNull();
   });
+
+  it('doble clic sobre un tramo elegido suelta la interna elegida global (fix round 1, § 3.5)', () => {
+    const { store, hook } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(ev(70, 20)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L', segmentIndex: 1 });
+    act(() => { hook.result.current.handleDoubleClick(ev(70, 20)); });
+    expect(store.getState().editor.selectedInternalLine).toBeNull();
+  });
+
+  it('convertSegmentToPoints sobre un tramo elegido también la suelta (fix round 1, § 3.5)', () => {
+    const { store, hook } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(ev(70, 20)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L', segmentIndex: 1 });
+    act(() => hook.result.current.convertSegmentToPoints(1, 'p', 'L'));
+    expect(store.getState().editor.selectedInternalLine).toBeNull();
+  });
+
+  it('un verbo no estructural (convertir a curva, mismo número de comandos) conserva la interna elegida (fix round 1)', () => {
+    const { store, hook } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(ev(70, 20)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L', segmentIndex: 1 });
+    act(() => hook.result.current.convertSegment(1, true, 'p', 'L'));
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L', segmentIndex: 1 });
+    expect(hook.result.current.internas[0].selectedSegments.has(1)).toBe(true);
+  });
 });
 
 describe('el hover antes de entrar, precalculado por identidad de la pieza (§ 13)', () => {
@@ -518,10 +550,14 @@ describe('los verbos de Q sobre una interna', () => {
     const { store, hook, internaDe } = montarQ([pieza([cerrada])]);
     act(() => hook.result.current.enterEdit('p'));
     clic(hook, 80, 20);
+    const antes = getUndoLength();
     supr(hook);
     expect(internaDe('C').path).toEqual(cerrada.path);
     const toasts = (store.getState() as unknown as { copilotUI: { toasts: { message: string }[] } }).copilotUI.toasts;
     expect(toasts.at(-1)?.message).toBe('No se puede borrar: la forma necesita al menos 3 puntos');
+    // Un borrado rechazado no abre lote ni dispatch: cero entradas nuevas
+    // (fix round 1, minor 4).
+    expect(getUndoLength()).toBe(antes);
   });
 
   it('el punto de cierre de una cerrada mueve juntos la M y el último (Review Focus 3)', () => {
@@ -561,10 +597,14 @@ describe('los verbos de Q sobre una interna', () => {
     const { store, hook } = montarQ([pieza([tres])]);
     act(() => hook.result.current.enterEdit('p'));
     clic(hook, 120, 70);
+    const antes = getUndoLength();
     supr(hook);
     const internas = store.getState().project.pieces[0].internals;
     expect(internas.map(l => l.path.length)).toEqual([2, 2]);
     expect(internas[0].id).toBe('L');
+    // Un gesto, una entrada, aunque el reductor devuelva dos piezas (fix
+    // round 1, minor 4).
+    expect(getUndoLength()).toBe(antes + 1);
   });
 
   it('Supr sobre un tramo de pinza se la lleva entera: no se parte', () => {
@@ -607,5 +647,105 @@ describe('los verbos de Q sobre una interna', () => {
     clic(hook, 120, 20);
     expect(hook.result.current.puntoElegido).toEqual({ pieceId: 'p', commandIndex: 1, lineId: 'L' });
     expect(hook.result.current.hayPuntosElegidos).toBe(true);
+  });
+
+  it('puntoElegido es null con puntos en dos líneas, y con un tramo elegido (fix round 1)', () => {
+    const { hook } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    clic(hook, 200, 0);
+    clic(hook, 120, 20, true);
+    expect(hook.result.current.puntoElegido).toBeNull();
+    clic(hook, 70, 20);
+    expect(hook.result.current.puntoElegido).toBeNull();
+  });
+
+  it('Supr de un tramo de una cerrada la abre en una sola línea, en una entrada de deshacer (Review Focus 3, fix round 1)', () => {
+    const cerrada: InternalLine = { id: 'C', type: 'reference', path: [
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [80, 20] }, { type: 'L', values: [50, 70] }, { type: 'Z', values: [] },
+    ] };
+    const { store, hook } = montarQ([pieza([cerrada])]);
+    act(() => hook.result.current.enterEdit('p'));
+    clic(hook, 50, 20); // el tramo entre (20,20) y (80,20)
+    const antes = getUndoLength();
+    supr(hook);
+    const internals = store.getState().project.pieces[0].internals;
+    expect(internals).toHaveLength(1);
+    expect(internals[0].path.some(c => c.type === 'Z')).toBe(false);
+    expect(anclasDe(internals[0])[0]).toEqual([80, 20]);
+    expect(getUndoLength()).toBe(antes + 1);
+  });
+
+  it('Supr en el ápice de una pinza de tres puntos se la lleva entera, con su Dart, y un deshacer restaura ambos (fix round 1)', () => {
+    const pinza: InternalLine = { id: 'P', type: 'dart', path: [
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [40, 90] }, { type: 'L', values: [60, 20] },
+    ] };
+    const base = pieza([pinza]);
+    const conDarts = { ...base, darts: extractDarts(base) };
+    expect(conDarts.darts).toHaveLength(1);
+    const { store, hook } = montarQ([conDarts]);
+    act(() => hook.result.current.enterEdit('p'));
+    clic(hook, 40, 90); // el ápice
+    supr(hook);
+    expect(store.getState().project.pieces[0].internals).toHaveLength(0);
+    expect(store.getState().project.pieces[0].darts).toHaveLength(0);
+    act(() => { store.dispatch({ type: 'editor/undo' }); });
+    expect(store.getState().project.pieces[0].internals).toHaveLength(1);
+    expect(store.getState().project.pieces[0].darts).toHaveLength(1);
+  });
+
+  it('una mezcla donde el contorno podría borrar pero una cerrada se niega: todo o nada, con el aviso de "forma" (fix round 1, minor 4)', () => {
+    const cerrada: InternalLine = { id: 'C', type: 'reference', path: [
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [80, 20] }, { type: 'L', values: [50, 70] }, { type: 'Z', values: [] },
+    ] };
+    const { store, hook, internaDe } = montarQ([pieza([cerrada])]);
+    act(() => hook.result.current.enterEdit('p'));
+    // Un punto del contorno (dejaría tres, válido solo) y uno de la cerrada
+    // (la dejaría con dos).
+    clic(hook, 200, 0); clic(hook, 80, 20, true);
+    supr(hook);
+    expect(store.getState().project.pieces[0].outline).toEqual(RECT);
+    expect(internaDe('C').path).toEqual(cerrada.path);
+    const toasts = (store.getState() as unknown as { copilotUI: { toasts: { message: string }[] } }).copilotUI.toasts;
+    expect(toasts.at(-1)?.message).toBe('No se puede borrar: la forma necesita al menos 3 puntos');
+  });
+
+  it('convertSegmentToBezier marca manualBezier en una interna (fix round 1, minor 4)', () => {
+    const { hook, internaDe } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => hook.result.current.convertSegmentToPoints(1, 'p', 'L'));
+    act(() => hook.result.current.convertSegmentToBezier(1, 'p', 'L'));
+    expect(internaDe('L').path[1]).toMatchObject({ type: 'C', manualBezier: true });
+  });
+
+  it('Supr sobre un tramo de hilo se lo lleva entero, sin evento de journal (spec § 4.6, fix round 1)', () => {
+    const hilo: InternalLine = { id: 'H', type: 'grainline', path: [
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [120, 120] },
+    ] };
+    clearJournal();
+    const { store, hook } = montarQ([pieza([hilo])]);
+    act(() => hook.result.current.enterEdit('p'));
+    clic(hook, 70, 70);
+    supr(hook);
+    expect(store.getState().project.pieces[0].internals).toHaveLength(0);
+    const eventos = getJournal().events.filter(e => e.kind === 'gesture').map(e => e.name);
+    expect(eventos).not.toContain('interna:delete');
+  });
+
+  it('doble clic sobre el extremo de una interna que cae en un lado del contorno no inserta en ninguna línea (§ 3.4, fix round 1)', () => {
+    const tocaLado: InternalLine = { id: 'V', type: 'reference', path: [
+      { type: 'M', values: [100, 0] }, { type: 'L', values: [100, 50] },
+    ] };
+    const { store, hook, internaDe } = montarQ([pieza([tocaLado])]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleDoubleClick(ev(100, 0)); });
+    expect(store.getState().project.pieces[0].outline).toEqual(RECT);
+    expect(internaDe('V').path).toEqual(tocaLado.path);
+  });
+
+  it('un verbo con el lineId de un piquete no cambia nada: Q no edita lo que no es suyo (§ 3.2, fix round 1, minor 8)', () => {
+    const { store, hook } = montarQ([pieza([ELE, PIQUETE])]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => hook.result.current.convertSegment(1, true, 'p', 'N'));
+    expect(store.getState().project.pieces[0].internals.find(l => l.id === 'N')).toEqual(PIQUETE);
   });
 });

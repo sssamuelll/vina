@@ -21,7 +21,7 @@ import {
   type UndoBatchToken,
 } from '../../store/undoMiddleware';
 import type { Point2D, PatternPiece, PathCommand, Trazo } from '../../types/types';
-import { seBorraEntera } from '../../types/types';
+import { esInternaEditable, seBorraEntera } from '../../types/types';
 import {
   extractNodes,
   applyNodeMove,
@@ -30,6 +30,7 @@ import {
   convertToCurve,
   convertToLine,
   anchorGroupOf,
+  coincidentAnchorGroups,
   type EditableNode,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
@@ -338,6 +339,14 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         setState(s => (estructural
           ? resyncStateToPiece(s, updated)
           : refrescarLineas(s, updated, cambios.keys())));
+        // Un cambio estructural corre los índices de CUALQUIER línea: el
+        // `segmentIndex` global de Z (spec § 3.5) podría señalar otra
+        // geometría. Sin soltarla aquí, un doble clic o un convertir-a-puntos
+        // sobre el tramo elegido dejaba el resaltado mintiendo, Supr borraba
+        // la mitad equivocada y Esc sacaba de Q con la interna todavía
+        // elegida fuera — la misma regresión que cerró la tanda de arreglos
+        // de la Tarea 8.
+        if (estructural && selectedInternalLineRef.current) dispatch(selectPiece(piece.id));
       }
     },
     [dispatch],
@@ -927,6 +936,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           // de los tres puntos, más abajo.
           if (conTramos.length === 0) return state.selectedSegments.size > 0;
 
+          // Este camino no pasa por `escribirLineas`: el efecto de arriba lo
+          // trata como cambio EXTERNO a propósito (`removeTramosDeInterna`
+          // puede nacer con un id nuevo para la segunda mitad, y solo
+          // `resyncStateToPiece` relee todo de cero).
           const token = beginUndoBatch(dispatch, 'Borrar tramo');
           for (const l of conTramos) {
             const lineId = lineIdDeClave(l.clave)!;
@@ -937,7 +950,11 @@ export function useEditPattern(zoom: number, pan: Point2D) {
               dispatch(withUndoBatchToken(removeInternalLine({ pieceId: piece.id, lineId }), token));
               continue;
             }
-            pushJournal('gesture', 'interna:delete', { pieceId: piece.id, lineId, segmentIndices: [...l.selectedSegments] });
+            // Un evento por tramo, como las puertas de Z (`useKeyboardShortcuts.ts`,
+            // `LogoMenu.tsx`): `segmentIndex` singular, con los índices ORIGINALES.
+            for (const segmentIndex of l.selectedSegments) {
+              pushJournal('gesture', 'interna:delete', { pieceId: piece.id, lineId, segmentIndex });
+            }
             dispatch(withUndoBatchToken(
               removeTramosDeInterna({ pieceId: piece.id, lineId, segmentIndices: [...l.selectedSegments] }),
               token,
@@ -954,6 +971,16 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         // nada también entre líneas: si una línea no puede, no se toca ninguna.
         const cambios = new Map<ClaveLinea, PathCommand[] | null>();
         for (const l of conPuntos) {
+          // Una pinza necesita sus tres anclas —base, ápice, base— para que
+          // `extractDartFromInternal` la vuelva a leer (#1020): dos anclas son
+          // una línea abierta válida para cualquier OTRA interna, pero no para
+          // una pinza. Se borra entera, como el hilo (spec § 4.6).
+          const lineId = lineIdDeClave(l.clave);
+          const linea = lineId ? piece.internals.find(x => x.id === lineId) : undefined;
+          if (linea?.type === 'dart') {
+            const restantes = coincidentAnchorGroups(l.path.filter((_, i) => !l.selectedNodes.has(i))).size;
+            if (restantes < 3) { cambios.set(l.clave, null); continue; }
+          }
           const r = quitarPuntos(l.path, l.selectedNodes, l.clave === CLAVE_CONTORNO);
           if (r === 'insuficiente') {
             dispatch(showInfoToast(l.clave === CLAVE_CONTORNO
@@ -1007,6 +1034,22 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     [state, getPiece, toLocal, hitRadius, claveElegida, escribirLineas],
   );
 
+  /**
+   * La clave y el path que edita uno de los cuatro verbos de abajo: el
+   * contorno sin `lineId`, o la interna que nombra — si Q puede editarla
+   * (spec § 3.2: `esInternaEditable` descarta un piquete o un doblez de
+   * pliegue). `null` si no hay nada que editar; los cuatro verbos no hacen
+   * nada entonces, en vez de repetir cada uno su propio candado.
+   */
+  const lineaDelVerbo = useCallback((piece: PatternPiece, lineId?: string): { clave: ClaveLinea; path: PathCommand[] } | null => {
+    if (!lineId) return { clave: CLAVE_CONTORNO, path: piece.outline };
+    const linea = piece.internals.find(l => l.id === lineId);
+    if (!linea || !esInternaEditable(linea)) return null;
+    const clave = claveDeInterna(lineId);
+    const path = pathDeLinea(piece, clave);
+    return path ? { clave, path } : null;
+  }, []);
+
   // ─── convertSegment ───
 
   /** `lineId`: una interna de la pieza (spec 2026-09-24 § 4.4); sin él, el contorno. */
@@ -1016,12 +1059,11 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (commandIndex: number, toCurve: boolean, pieceId?: string, lineId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece || guardLocked(piece)) return;
-      const clave = lineId ? claveDeInterna(lineId) : CLAVE_CONTORNO;
-      const path = pathDeLinea(piece, clave);
-      if (!path) return;
-      escribirLineas(piece, new Map([[clave, toCurve ? convertToCurve(path, commandIndex) : convertToLine(path, commandIndex)]]));
+      const l = lineaDelVerbo(piece, lineId);
+      if (!l) return;
+      escribirLineas(piece, new Map([[l.clave, toCurve ? convertToCurve(l.path, commandIndex) : convertToLine(l.path, commandIndex)]]));
     },
-    [state.editingPieceId, getPiece, escribirLineas, guardLocked],
+    [state.editingPieceId, getPiece, escribirLineas, guardLocked, lineaDelVerbo],
   );
 
   // ─── moveNodeTo (#1112: escribir la distancia a un vecino) ───
@@ -1045,12 +1087,11 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (pieceId: string, commandIndex: number, destino: Point2D, lineId?: string) => {
       const piece = getPiece(pieceId);
       if (!piece || guardLocked(piece)) return;
-      const clave = lineId ? claveDeInterna(lineId) : CLAVE_CONTORNO;
-      const path = pathDeLinea(piece, clave);
-      if (!path) return;
-      escribirLineas(piece, new Map([[clave, applyNodeMove(path, commandIndex, 'anchor', destino)]]));
+      const l = lineaDelVerbo(piece, lineId);
+      if (!l) return;
+      escribirLineas(piece, new Map([[l.clave, applyNodeMove(l.path, commandIndex, 'anchor', destino)]]));
     },
-    [getPiece, escribirLineas, guardLocked],
+    [getPiece, escribirLineas, guardLocked, lineaDelVerbo],
   );
 
   // ─── convertSegmentToPoints ───
@@ -1064,28 +1105,29 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (commandIndex: number, pieceId?: string, lineId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece || guardLocked(piece)) return;
-      const clave = lineId ? claveDeInterna(lineId) : CLAVE_CONTORNO;
-      const path = pathDeLinea(piece, clave);
-      if (!path) return;
-      escribirLineas(piece, new Map([[clave, convertSegmentToSpline(path, commandIndex)]]));
+      const l = lineaDelVerbo(piece, lineId);
+      if (!l) return;
+      escribirLineas(piece, new Map([[l.clave, convertSegmentToSpline(l.path, commandIndex)]]));
     },
-    [state.editingPieceId, getPiece, escribirLineas, guardLocked],
+    [state.editingPieceId, getPiece, escribirLineas, guardLocked, lineaDelVerbo],
   );
 
-  // ─── addPointOnSegment ───
+  // ─── convertSegmentToBezier ───
+
   /** `lineId`: una interna de la pieza (spec 2026-09-24 § 4.4); sin él, el contorno. */
   const convertSegmentToBezier = useCallback(
     (commandIndex: number, pieceId?: string, lineId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece || guardLocked(piece)) return;
-      const clave = lineId ? claveDeInterna(lineId) : CLAVE_CONTORNO;
-      const path = pathDeLinea(piece, clave);
-      if (!path) return;
-      const out = toManualBezier(path, commandIndex);
-      if (out) escribirLineas(piece, new Map([[clave, out]]));
+      const l = lineaDelVerbo(piece, lineId);
+      if (!l) return;
+      const out = toManualBezier(l.path, commandIndex);
+      if (out) escribirLineas(piece, new Map([[l.clave, out]]));
     },
-    [state.editingPieceId, getPiece, escribirLineas, guardLocked],
+    [state.editingPieceId, getPiece, escribirLineas, guardLocked, lineaDelVerbo],
   );
+
+  // ─── addPointOnSegment ───
 
   /**
    * Punto sobre un lado, por la misma puerta que el doble clic (maria-203 /
