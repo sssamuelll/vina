@@ -35,7 +35,6 @@ import {
   type EditableNode,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
-import { reanchorNotches } from '../../utils/notchReanchor';
 import { piezaBloqueada } from '../../utils/piezaBloqueada';
 import { convertSegmentToSpline, resmoothAfterMove, toManualBezier } from './splineSegment';
 import { guiasShift, type GuiaShift, type GuiasShift } from './restriccionShift';
@@ -44,12 +43,12 @@ import { ABSOLUTE_REFERENCE, arrivingReference, chordReference, type AngleRefere
 import { isDrag } from './gestureConstants';
 import { showInfoToast } from '../../store/copilotUISlice';
 import {
-  compensatePositionForPivotChange,
   patternToPieceLocal,
   patternToPieceLocalDirection,
   pieceLocalToPattern,
 } from './pieceTransform';
 export { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
+import { conPaths, CLAVE_CONTORNO, type ClaveLinea } from './lineaEditable';
 
 // ─── Constants ───
 
@@ -86,21 +85,32 @@ const INITIAL_STATE: EditPatternState = {
 
 // ─── Drag ref types ───
 
+/** Lo que un gesto arrastra de UNA línea. */
+interface ArrastreDeLinea {
+  /** El path de la línea al empezar el gesto: cada frame se calcula desde aquí. */
+  startPath: PathCommand[];
+  /** commandIndex → posición original. */
+  startPositions: Map<number, Point2D>;
+  /** Grupo de anclas coincidentes de cada punto arrastrado, en `startPath`. */
+  groups?: Map<number, number[]>;
+}
+
 /** Lo que comparten el arrastre de puntos y el de tramos. */
 interface OutlineDrag {
   startMouse: Point2D;
-  /** El contorno al empezar el gesto: cada frame se calcula desde aquí. */
-  startOutline: PathCommand[];
-  /** Grupo de anclas coincidentes de cada punto arrastrado, en `startOutline`. */
-  groups?: Map<number, number[]>;
+  /**
+   * Las líneas que mueve el gesto, cada una con su punto de partida. Todas con
+   * el mismo vector (spec 2026-09-24 § 4.1). En la fase 1, solo el contorno.
+   */
+  porLinea: Map<ClaveLinea, ArrastreDeLinea>;
   /** Último ratón del arrastre: pulsar Shift con la mano quieta lo re-aplica. */
   lastMouse?: Point2D;
   /** El último desplazamiento escrito (marco local). */
   lastDelta?: Point2D;
-  /** Ya escribió al menos un frame en el contorno. */
+  /** Ya escribió al menos un frame. */
   wrote?: boolean;
   /** Shift+press sobre algo ya seleccionado: se quita al soltar si no hubo arrastre. */
-  quitarAlSoltar?: readonly number[];
+  quitarAlSoltar?: { clave: ClaveLinea; indices: readonly number[] };
   /**
    * El marco de Shift dos veces, congelado al empezar (spec 2026-09-23 § 3.4):
    * desde dónde salen las guías —la posición inicial del punto agarrado, o el
@@ -112,14 +122,10 @@ interface OutlineDrag {
 
 interface NodeDrag extends OutlineDrag {
   type: 'node';
-  /** Map from commandIndex → original position */
-  startPositions: Map<number, Point2D>;
 }
 
 interface SegmentDrag extends OutlineDrag {
   type: 'segment';
-  /** Map from commandIndex → original position (both endpoints of each segment) */
-  startPositions: Map<number, Point2D>;
 }
 
 interface MarqueeDrag {
@@ -252,7 +258,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   /** Last outline (by identity) of the edited piece this hook has seen. */
   const seenOutlineRef = useRef<PathCommand[] | null>(null);
   /**
-   * Espejo de `state.editingPieceId` para `dispatchAndRefresh`, que necesita
+   * Espejo de `state.editingPieceId` para `escribirLineas`, que necesita
    * saber a quién pertenece el overlay sin re-crearse en cada cambio de estado
    * (su identidad alimenta media docena de useCallback aguas abajo).
    */
@@ -290,24 +296,15 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     [pieces],
   );
 
-  // ─── Helper: dispatch piece update and refresh nodes ───
+  // ─── Helper: la única puerta de escritura (spec 2026-09-24 § 8) ───
 
-  const dispatchAndRefresh = useCallback(
+  const escribirLineas = useCallback(
     (
       piece: PatternPiece,
-      newOutline: PatternPiece['outline'],
+      cambios: ReadonlyMap<ClaveLinea, PathCommand[] | null>,
       undoBatchToken?: UndoBatchToken,
     ) => {
-      const updated: PatternPiece = {
-        ...piece,
-        position: compensatePositionForPivotChange(piece, newOutline),
-        outline: newOutline,
-        // Notches with a parametric anchor follow the reshaped edge (#171).
-        // piece.outline is the pre-edit shape, which lets a dragged reference
-        // corner be re-identified instead of stranding its notch.
-        internals: reanchorNotches(piece.internals, newOutline, piece.outline),
-        updatedAt: Date.now(),
-      };
+      const updated = conPaths(piece, cambios);
       const action = updatePiece(updated);
       dispatch(undoBatchToken ? withUndoBatchToken(action, undoBatchToken) : action);
       const newNodes = extractNodes(updated);
@@ -318,7 +315,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       // fuera del modo edición") y con Editar patrón abierto sobre A, poner un
       // punto en B dejaba las anclas de B flotando sobre la lona.
       if (piece.id === editingPieceIdRef.current) {
-        expectedOutlineRef.current = newOutline;
+        expectedOutlineRef.current = updated.outline;
         // Si el verbo insertó o borró comandos, todo índice guardado corrió de
         // sitio y pasa a denotar OTRA geometría — exactamente lo que el JSDoc
         // de `resyncStateToPiece` explica para el undo externo. Es el mismo
@@ -331,14 +328,20 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         // ponytail: la longitud basta hoy porque ningún verbo inserta y borra
         // a la vez; si alguno llega con saldo neto cero, esto pasa a ser un
         // parámetro explícito del verbo.
-        const estructural = newOutline.length !== piece.outline.length;
+        const estructural = updated.outline.length !== piece.outline.length;
         setState(s => (estructural
           ? resyncStateToPiece(s, updated)
           : { ...s, nodes: newNodes }));
       }
-      return newNodes;
     },
     [dispatch],
+  );
+
+  /** Solo el contorno: lo que escribían los verbos de siempre. */
+  const escribirContorno = useCallback(
+    (piece: PatternPiece, outline: PathCommand[], undoBatchToken?: UndoBatchToken) =>
+      escribirLineas(piece, new Map([[CLAVE_CONTORNO, outline]]), undoBatchToken),
+    [escribirLineas],
   );
 
   // ─── Helper: candado en los verbos ───
@@ -445,8 +448,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         dragRef.current = {
           type: 'node',
           startMouse: { x: e.clientX, y: e.clientY },
-          startOutline: piece.outline,
-          startPositions,
+          porLinea: new Map([[CLAVE_CONTORNO, { startPath: piece.outline, startPositions }]]),
           marco: marcoDelPunto(piece, startPositions.get(nodeHit.commandIndex) ?? localPt, nodeHit.commandIndex),
         };
         return true;
@@ -486,8 +488,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         dragRef.current = {
           type: 'segment',
           startMouse: { x: e.clientX, y: e.clientY },
-          startOutline: piece.outline,
-          startPositions,
+          porLinea: new Map([[CLAVE_CONTORNO, { startPath: piece.outline, startPositions }]]),
           marco: marcoDelTramo(piece, nodes, segmentHit.commandIndex, pieceLocalToPattern(segmentHit.point, piece)),
         };
         return true;
@@ -607,10 +608,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         dragRef.current = {
           type: 'node',
           startMouse: { x: e.clientX, y: e.clientY },
-          startOutline: piece.outline,
-          startPositions,
+          porLinea: new Map([[CLAVE_CONTORNO, { startPath: piece.outline, startPositions }]]),
           marco: marcoDelPunto(piece, startPositions.get(idx) ?? localPt, idx),
-          ...(quitarAlSoltar ? { quitarAlSoltar: group } : {}),
+          ...(quitarAlSoltar ? { quitarAlSoltar: { clave: CLAVE_CONTORNO, indices: group } } : {}),
         };
 
         return true;
@@ -656,10 +656,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         dragRef.current = {
           type: 'segment',
           startMouse: { x: e.clientX, y: e.clientY },
-          startOutline: piece.outline,
-          startPositions,
+          porLinea: new Map([[CLAVE_CONTORNO, { startPath: piece.outline, startPositions }]]),
           marco: marcoDelTramo(piece, state.nodes, idx, pieceLocalToPattern(segHit.point, piece)),
-          ...(quitarAlSoltar ? { quitarAlSoltar: [idx] } : {}),
+          ...(quitarAlSoltar ? { quitarAlSoltar: { clave: CLAVE_CONTORNO, indices: [idx] } } : {}),
         };
 
         return true;
@@ -697,7 +696,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   const aplicarArrastre = useCallback(
     (piece: PatternPiece, drag: NodeDrag | SegmentDrag, mouse: Point2D, modo: ModoShift) => {
       drag.lastMouse = mouse;
-      if (drag.startPositions.size === 0) return;
+      if (![...drag.porLinea.values()].some(l => l.startPositions.size > 0)) return;
       const pantalla = { x: mouse.x - drag.startMouse.x, y: mouse.y - drag.startMouse.y };
       // Shift+press sobre algo ya seleccionado es un clic —que lo quita al
       // soltar— hasta que la mano cruza el umbral de arrastre: un temblor no
@@ -723,40 +722,41 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         publicarGuias(null);
       }
       const { x: dx, y: dy } = patternToPieceLocalDirection(enPatron, piece);
-      // Un desplazamiento igual al último escrito no reescribe nada: con Shift,
-      // mover la mano en perpendicular a la guía no cambia el punto; y antes
-      // del primer frame, el delta cero tampoco.
+      // Un desplazamiento igual al último escrito no reescribe nada.
       const ultimo = drag.lastDelta ?? { x: 0, y: 0 };
       if (dx === ultimo.x && dy === ultimo.y) return;
       const undoBatchToken = beginDragBatch();
 
-      // Desde el contorno del INICIO del gesto, ancla por ancla y con los
-      // grupos de anclas coincidentes de ESE contorno. Reagrupar frame a frame
-      // sobre el contorno ya movido capturaba cualquier ancla por la que el
+      // Cada línea desde su path del INICIO del gesto, ancla por ancla y con
+      // los grupos de anclas coincidentes de ESE path. Reagrupar frame a frame
+      // sobre el path ya movido capturaba cualquier ancla por la que el
       // arrastre pasara exactamente encima, y se la llevaba.
-      drag.groups ??= new Map([...drag.startPositions.keys()].map((cmdIdx): [number, number[]] => {
-        const grupo = anchorGroupOf(drag.startOutline, cmdIdx);
-        return [cmdIdx, grupo.length > 0 ? grupo : [cmdIdx]];
-      }));
-      const moves = new Map<number, Point2D>();
-      for (const [cmdIdx, startPos] of drag.startPositions) {
-        const destino = { x: startPos.x + dx, y: startPos.y + dy };
-        for (const miembro of drag.groups.get(cmdIdx) ?? [cmdIdx]) moves.set(miembro, destino);
+      const cambios = new Map<ClaveLinea, PathCommand[]>();
+      for (const [clave, linea] of drag.porLinea) {
+        if (linea.startPositions.size === 0) continue;
+        linea.groups ??= new Map([...linea.startPositions.keys()].map((cmdIdx): [number, number[]] => {
+          const grupo = anchorGroupOf(linea.startPath, cmdIdx);
+          return [cmdIdx, grupo.length > 0 ? grupo : [cmdIdx]];
+        }));
+        const moves = new Map<number, Point2D>();
+        for (const [cmdIdx, startPos] of linea.startPositions) {
+          const destino = { x: startPos.x + dx, y: startPos.y + dy };
+          for (const miembro of linea.groups.get(cmdIdx) ?? [cmdIdx]) moves.set(miembro, destino);
+        }
+        let path = applyAnchorMoves(linea.startPath, moves);
+        // Curva por puntos (#197): en un tramo gestionado los manejadores se
+        // rehacen desde las anclas. La marca vive en el path previo al gesto.
+        for (const cmdIdx of linea.startPositions.keys()) {
+          path = resmoothAfterMove(linea.startPath, path, cmdIdx);
+        }
+        cambios.set(clave, path);
       }
-      let outline = applyAnchorMoves(drag.startOutline, moves);
 
-      // Curva por puntos (#197): en un tramo gestionado los manejadores se
-      // rehacen desde las anclas, así que la curva sigue pasando por el
-      // punto y sin picos. La marca vive en el contorno previo al gesto.
-      for (const cmdIdx of drag.startPositions.keys()) {
-        outline = resmoothAfterMove(drag.startOutline, outline, cmdIdx);
-      }
-
-      dispatchAndRefresh(piece, outline, undoBatchToken);
+      escribirLineas(piece, cambios, undoBatchToken);
       drag.lastDelta = { x: dx, y: dy };
       drag.wrote = true;
     },
-    [zoom, beginDragBatch, dispatchAndRefresh, publicarGuias],
+    [zoom, beginDragBatch, escribirLineas, publicarGuias],
   );
 
   // ─── handleMouseMove ───
@@ -920,19 +920,20 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     }
 
     // Node/segment drags already wrote during mousemove. What is left is the
-    // Shift+click that never became a drag: now it does deselect.
+    // Shift+click that never became a drag: now it does deselect. En la fase 1
+    // la única línea es el contorno.
     const quitar = drag.quitarAlSoltar;
     if (!quitar || drag.wrote) return;
     if (drag.type === 'node') {
       setState(s => {
         const selectedNodes = new Set(s.selectedNodes);
-        for (const ci of quitar) selectedNodes.delete(ci);
+        for (const ci of quitar.indices) selectedNodes.delete(ci);
         return { ...s, selectedNodes };
       });
     } else {
       setState(s => {
         const selectedSegments = new Set(s.selectedSegments);
-        for (const ci of quitar) selectedSegments.delete(ci);
+        for (const ci of quitar.indices) selectedSegments.delete(ci);
         return { ...s, selectedSegments };
       });
     }
@@ -1021,16 +1022,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           outline = deletePoint(outline, idx);
         }
 
-        const updated: PatternPiece = {
-          ...piece,
-          position: compensatePositionForPivotChange(piece, outline),
-          outline,
-          internals: reanchorNotches(piece.internals, outline, piece.outline),
-          updatedAt: Date.now(),
-        };
+        const updated = conPaths(piece, new Map([[CLAVE_CONTORNO, outline]]));
         expectedOutlineRef.current = outline;
         dispatch(updatePiece(updated));
-        // Este camino no pasa por `dispatchAndRefresh`. Ya limpiaba la
+        // Este camino no pasa por `escribirLineas`. Ya limpiaba la
         // selección, pero dejaba vivos el hover y la previsualización con
         // índices de un contorno que acaba de encoger (#1122).
         setState(s => resyncStateToPiece(s, updated));
@@ -1058,13 +1053,13 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       const target = findInsertTarget(localPt, state.nodes, piece.outline, hitRadius);
       if (target) {
         const newOutline = splitSegmentAt(piece.outline, target.commandIndex, target.t);
-        dispatchAndRefresh(piece, newOutline);
+        escribirContorno(piece, newOutline);
         return true;
       }
 
       return false;
     },
-    [state, getPiece, toLocal, hitRadius, dispatchAndRefresh],
+    [state, getPiece, toLocal, hitRadius, escribirContorno],
   );
 
   // ─── convertSegment ───
@@ -1080,9 +1075,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         ? convertToCurve(piece.outline, commandIndex)
         : convertToLine(piece.outline, commandIndex);
 
-      dispatchAndRefresh(piece, newOutline);
+      escribirContorno(piece, newOutline);
     },
-    [state.editingPieceId, getPiece, dispatchAndRefresh, guardLocked],
+    [state.editingPieceId, getPiece, escribirContorno, guardLocked],
   );
 
   // ─── moveNodeTo (#1112: escribir la distancia a un vecino) ───
@@ -1104,9 +1099,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (pieceId: string, commandIndex: number, destino: Point2D) => {
       const piece = getPiece(pieceId);
       if (!piece || guardLocked(piece)) return;
-      dispatchAndRefresh(piece, applyNodeMove(piece.outline, commandIndex, 'anchor', destino));
+      escribirContorno(piece, applyNodeMove(piece.outline, commandIndex, 'anchor', destino));
     },
-    [getPiece, dispatchAndRefresh, guardLocked],
+    [getPiece, escribirContorno, guardLocked],
   );
 
   // ─── convertSegmentToPoints ───
@@ -1116,9 +1111,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (commandIndex: number, pieceId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece || guardLocked(piece)) return;
-      dispatchAndRefresh(piece, convertSegmentToSpline(piece.outline, commandIndex));
+      escribirContorno(piece, convertSegmentToSpline(piece.outline, commandIndex));
     },
-    [state.editingPieceId, getPiece, dispatchAndRefresh, guardLocked],
+    [state.editingPieceId, getPiece, escribirContorno, guardLocked],
   );
 
   // ─── addPointOnSegment ───
@@ -1127,14 +1122,14 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece || guardLocked(piece)) return;
       const outline = toManualBezier(piece.outline, commandIndex);
-      if (outline) dispatchAndRefresh(piece, outline);
+      if (outline) escribirContorno(piece, outline);
     },
-    [state.editingPieceId, getPiece, dispatchAndRefresh, guardLocked],
+    [state.editingPieceId, getPiece, escribirContorno, guardLocked],
   );
 
   /**
    * Punto sobre un lado, por la misma puerta que el doble clic (maria-203 /
-   * tool Punto): pasa por dispatchAndRefresh, que compensa el pivote y
+   * tool Punto): pasa por escribirLineas, que compensa el pivote y
    * re-ancla piquetes — un splitSegmentAt + updatePiece crudo los dejaría
    * varados. `pieceId` explícito para callers fuera del modo edición.
    */
@@ -1142,9 +1137,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (commandIndex: number, t: number, pieceId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece || guardLocked(piece)) return;
-      dispatchAndRefresh(piece, splitSegmentAt(piece.outline, commandIndex, t));
+      escribirContorno(piece, splitSegmentAt(piece.outline, commandIndex, t));
     },
-    [state.editingPieceId, getPiece, dispatchAndRefresh, guardLocked],
+    [state.editingPieceId, getPiece, escribirContorno, guardLocked],
   );
 
   // ─── getCursor ───
