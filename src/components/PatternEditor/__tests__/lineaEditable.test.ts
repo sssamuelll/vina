@@ -7,12 +7,14 @@
 import { describe, it, expect } from 'vitest';
 import type { InternalLine, PathCommand, PatternPiece } from '../../../types/types';
 import {
-  CLAVE_CONTORNO, claveDeInterna, conPaths, lineIdDeClave, pathDeLinea,
+  CLAVE_CONTORNO, claveDeInterna, conPaths, lineIdDeClave, pathDeLinea, internasEditables,
 } from '../lineaEditable';
+import { esInternaEditable, seBorraEntera } from '../../../types/types';
 import { compensatePositionForPivotChange } from '../pieceTransform';
 import { reanchorNotches } from '../../../utils/notchReanchor';
 import { computeNotchAnchor } from '../../../utils/notchAnchor';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../../utils/notches';
+import { applyDartsToInternals, extractDarts } from '../../../utils/dartEntity';
 
 const cuadrado: PathCommand[] = [
   { type: 'M', values: [0, 0] }, { type: 'L', values: [200, 0] },
@@ -89,5 +91,66 @@ describe('conPaths', () => {
     ]));
     expect(r.internals[0].path).toBe(nuevo);
     expect(r.internals[1]).toEqual(reanchorNotches([piquete], nuevoContorno, p.outline)[0]);
+  });
+});
+
+describe('qué internas edita Q (spec § 3.2)', () => {
+  const linea = (type: InternalLine['type'], extra: Partial<InternalLine> = {}): InternalLine => ({
+    id: type, type, path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [10, 0] }], ...extra,
+  });
+
+  it('las de forma propia sí; el piquete y el doblez de un pliegue no', () => {
+    for (const t of ['reference', 'fold', 'topstitch', 'seam', 'grainline', 'dart', 'pleat'] as const) {
+      expect(esInternaEditable(linea(t)), t).toBe(true);
+    }
+    expect(esInternaEditable(linea('notch'))).toBe(false);
+    expect(esInternaEditable(linea('fold', { foldOptions: { direction: 'mountain', creaseAngleDeg: 180, pleatId: 'pl' } }))).toBe(false);
+  });
+
+  it('Supr sobre un tramo se lleva entera solo la línea de hilo y la pinza', () => {
+    expect(seBorraEntera('grainline')).toBe(true);
+    expect(seBorraEntera('dart')).toBe(true);
+    for (const t of ['reference', 'fold', 'topstitch', 'seam', 'pleat'] as const) expect(seBorraEntera(t), t).toBe(false);
+  });
+
+  it('internasEditables filtra en orden de pintado', () => {
+    const p = { ...pieza(), internals: [linea('reference'), linea('notch'), linea('grainline')] } as PatternPiece;
+    expect(internasEditables(p).map(l => l.id)).toEqual(['reference', 'grainline']);
+  });
+});
+
+describe('conPaths y la copia de las pinzas (spec § 7)', () => {
+  const pinza: InternalLine = {
+    id: 'd', type: 'dart', dartOptions: { capShape: 'pointed' },
+    path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [10, 50] }, { type: 'L', values: [20, 0] }],
+  };
+  function conPinza(): PatternPiece {
+    const base = { ...pieza(), internals: [pinza] } as PatternPiece;
+    const darts = extractDarts(base).map(d => ({ ...d, foldDirection: 'toward-center' as const }));
+    return { ...base, darts };
+  }
+  const apexMasHondo: PathCommand[] = [
+    { type: 'M', values: [0, 0] }, { type: 'L', values: [10, 60] }, { type: 'L', values: [20, 0] },
+  ];
+
+  it('mover la punta en Q relee la pinza y conserva lo que no es dibujo', () => {
+    const r = conPaths(conPinza(), new Map([[claveDeInterna('d'), apexMasHondo]]));
+    expect(r.darts![0].apex).toEqual({ x: 10, y: 60 });
+    expect(r.darts![0].foldDirection).toBe('toward-center');
+    expect(r.darts![0].capShape).toBe('pointed');
+  });
+
+  it('una operación de pinza después no revierte la edición (Review Focus 5)', () => {
+    const r = conPaths(conPinza(), new Map([[claveDeInterna('d'), apexMasHondo]]));
+    const internals = applyDartsToInternals(r, r.darts!);
+    const puntos = internals[0].path.map(c => c.values.slice(-2));
+    expect(puntos).toContainEqual([10, 60]);
+  });
+
+  it('quitar la línea de una pinza la quita de la copia; una pinza sin línea se queda', () => {
+    const sinLinea = { id: 'suelta', intake: 5, apex: { x: 0, y: 0 }, legs: [[], []] as [[], []], foldDirection: 'left' as const };
+    const base = conPinza();
+    const r = conPaths({ ...base, darts: [...base.darts!, sinLinea] }, new Map([[claveDeInterna('d'), null]]));
+    expect(r.darts!.map(d => d.id)).toEqual(['suelta']);
   });
 });

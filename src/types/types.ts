@@ -844,6 +844,28 @@ export function seSeleccionaPorTramo(type: InternalLineType): boolean {
   return type === 'reference' || type === 'fold' || type === 'pleat';
 }
 
+/**
+ * Las internas que Editar patrón edita punto a punto (spec 2026-09-24 § 3.2):
+ * las de forma propia. Fuera, las que se calculan desde otra cosa y cuya
+ * edición se perdería sola: el piquete, que se re-ancla al borde
+ * (`notchAnchor`), y el doblez que genera un pliegue, que `updatePleat`
+ * regenera.
+ *
+ * Una sola lista para lo que se pinta, lo que se agarra y lo que engancha: si
+ * divergen, pasa lo de #1103 (887 agarrables contra 40 pintados).
+ */
+export function esInternaEditable(line: InternalLine): boolean {
+  return line.type !== 'notch' && !line.foldOptions?.pleatId;
+}
+
+/**
+ * Supr sobre un tramo de estas se lleva la línea entera (spec § 4.6): la línea
+ * de hilo y la pinza son entidades y no se parten.
+ */
+export function seBorraEntera(type: InternalLineType): boolean {
+  return type === 'grainline' || type === 'dart';
+}
+
 export interface EditorState {
   viewMode: ViewMode;
   activeTool: Tool2D;

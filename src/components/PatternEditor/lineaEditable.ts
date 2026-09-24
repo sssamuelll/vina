@@ -8,9 +8,11 @@
  * ningún otro sitio (dos escritores del mismo hecho se desincronizan: es el
  * fallo con nombre propio de este repo).
  */
-import type { PathCommand, PatternPiece } from '../../types/types';
+import type { InternalLine, PathCommand, PatternPiece } from '../../types/types';
+import { esInternaEditable } from '../../types/types';
 import { reanchorNotches } from '../../utils/notchReanchor';
 import { compensatePositionForPivotChange } from './pieceTransform';
+import { refrescarPinzas } from '../../utils/dartEntity';
 
 /** La clave de una línea dentro de su pieza: estable mientras la línea exista. */
 export type ClaveLinea = 'contorno' | `interna:${string}`;
@@ -33,6 +35,11 @@ export function pathDeLinea(piece: PatternPiece, clave: ClaveLinea): PathCommand
   return piece.internals.find(l => l.id === lineId)?.path ?? null;
 }
 
+/** Las internas que Q edita en esta pieza, en orden de pintado (la última, encima). */
+export function internasEditables(piece: PatternPiece): InternalLine[] {
+  return piece.internals.filter(esInternaEditable);
+}
+
 /**
  * La pieza con los paths nuevos de sus líneas.
  *
@@ -41,6 +48,7 @@ export function pathDeLinea(piece: PatternPiece, clave: ClaveLinea): PathCommand
  *   construía a mano `dispatchAndRefresh`.
  * - Una interna cambia su path, y `null` la quita. No mueve el pivote: el
  *   giro se hace sobre la caja del contorno, que no cambió.
+ * - Si la pieza guarda la copia `darts`, se refresca con `refrescarPinzas` (§ 7).
  */
 export function conPaths(
   piece: PatternPiece,
@@ -48,23 +56,31 @@ export function conPaths(
 ): PatternPiece {
   const contorno = cambios.get(CLAVE_CONTORNO) ?? null;
   let internals = piece.internals;
+  const quitadas = new Set<string>();
   const tocaInternas = [...cambios.keys()].some(k => k !== CLAVE_CONTORNO);
   if (tocaInternas) {
     internals = internals.flatMap(line => {
       const clave = claveDeInterna(line.id);
       if (!cambios.has(clave)) return [line];
       const path = cambios.get(clave);
-      return path ? [{ ...line, path }] : [];
+      if (!path) {
+        quitadas.add(line.id);
+        return [];
+      }
+      return [{ ...line, path }];
     });
   }
-  if (!contorno) return { ...piece, internals, updatedAt: Date.now() };
-  return {
-    ...piece,
-    position: compensatePositionForPivotChange(piece, contorno),
-    outline: contorno,
-    // piece.outline is the pre-edit shape, which lets a dragged reference
-    // corner be re-identified instead of stranding its notch.
-    internals: reanchorNotches(internals, contorno, piece.outline),
-    updatedAt: Date.now(),
-  };
+  const r: PatternPiece = contorno
+    ? {
+        ...piece,
+        position: compensatePositionForPivotChange(piece, contorno),
+        outline: contorno,
+        // piece.outline is the pre-edit shape, which lets a dragged reference
+        // corner be re-identified instead of stranding its notch.
+        internals: reanchorNotches(internals, contorno, piece.outline),
+        updatedAt: Date.now(),
+      }
+    : { ...piece, internals, updatedAt: Date.now() };
+  if (tocaInternas && piece.darts) r.darts = refrescarPinzas(piece.darts, r.internals, piece.edges, quitadas);
+  return r;
 }
