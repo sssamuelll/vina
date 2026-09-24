@@ -89,7 +89,7 @@ const INITIAL_STATE: EditPatternState = {
 interface ArrastreDeLinea {
   /** El path de la línea al empezar el gesto: cada frame se calcula desde aquí. */
   startPath: PathCommand[];
-  /** commandIndex → posición original. */
+  /** commandIndex → posición original (un tramo agarrado guarda sus dos extremos). */
   startPositions: Map<number, Point2D>;
   /** Grupo de anclas coincidentes de cada punto arrastrado, en `startPath`. */
   groups?: Map<number, number[]>;
@@ -722,7 +722,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         publicarGuias(null);
       }
       const { x: dx, y: dy } = patternToPieceLocalDirection(enPatron, piece);
-      // Un desplazamiento igual al último escrito no reescribe nada.
+      // Un desplazamiento igual al último escrito no reescribe nada: con Shift,
+      // mover la mano en perpendicular a la guía no cambia el punto; y antes
+      // del primer frame, el delta cero tampoco.
       const ultimo = drag.lastDelta ?? { x: 0, y: 0 };
       if (dx === ultimo.x && dy === ultimo.y) return;
       const undoBatchToken = beginDragBatch();
@@ -745,7 +747,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         }
         let path = applyAnchorMoves(linea.startPath, moves);
         // Curva por puntos (#197): en un tramo gestionado los manejadores se
-        // rehacen desde las anclas. La marca vive en el path previo al gesto.
+        // rehacen desde las anclas, así que la curva sigue pasando por el
+        // punto y sin picos. La marca vive en el path previo al gesto.
         for (const cmdIdx of linea.startPositions.keys()) {
           path = resmoothAfterMove(linea.startPath, path, cmdIdx);
         }

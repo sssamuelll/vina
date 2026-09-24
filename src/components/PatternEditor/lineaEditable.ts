@@ -62,6 +62,8 @@ export function conPaths(
     ...piece,
     position: compensatePositionForPivotChange(piece, contorno),
     outline: contorno,
+    // piece.outline is the pre-edit shape, which lets a dragged reference
+    // corner be re-identified instead of stranding its notch.
     internals: reanchorNotches(internals, contorno, piece.outline),
     updatedAt: Date.now(),
   };
