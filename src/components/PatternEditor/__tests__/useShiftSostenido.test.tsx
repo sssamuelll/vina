@@ -150,3 +150,42 @@ describe('useShiftSostenido — el modo', () => {
     expect(modo()).toBe('hoja');
   });
 });
+
+describe('useShiftSostenido — soltar se atiende siempre (revisión final)', () => {
+  it('soltar Shift dentro de un campo lo suelta: la pulsación siguiente es la hoja, no el borde pegado', () => {
+    // El flujo de la spec § 3.3: con el borde activo, Tab lleva el foco al chip
+    // y ella suelta Shift para escribir; el keyup nace en el campo.
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const { modo } = montar();
+    tecla('keydown'); tecla('keyup'); tecla('keydown');
+    expect(modo()).toBe('borde');
+    tecla('keyup', { target: input });
+    expect(modo()).toBe('suelto');
+    esperar(2000);
+    tecla('keydown');
+    expect(modo()).toBe('hoja');
+  });
+
+  it('soltar dentro de un campo no cuenta como toque', () => {
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const { modo } = montar();
+    tecla('keydown'); esperar(50);
+    tecla('keyup', { target: input }); esperar(50);
+    tecla('keydown');
+    expect(modo()).toBe('hoja');
+  });
+
+  it('un atajo con Shift (Ctrl+Shift+Z, Shift+Tab…) no es un toque', () => {
+    const { modo } = montar();
+    tecla('keydown');
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', shiftKey: true, ctrlKey: true }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'z', shiftKey: true, ctrlKey: true }));
+    });
+    esperar(60); tecla('keyup'); esperar(100);
+    tecla('keydown');
+    expect(modo()).toBe('hoja');
+  });
+});

@@ -150,6 +150,23 @@ describe('Pluma — Shift dos veces endereza al borde', () => {
     expect(tool().guias).toBeNull();
   });
 
+  it('tras Tab con el borde y soltar Shift en el chip, Shift una vez vuelve a ser el eje', () => {
+    // Revisión final (sonda G): el keyup nace en el campo del chip; si se
+    // ignoraba, el modo se quedaba pegado en el borde.
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const { tool, click, move } = setup();
+    click(COSTADO);
+    move(RUMBO);
+    dosVeces();
+    act(() => tool().openNextPoint());
+    act(() => { input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift', shiftKey: false, bubbles: true })); });
+    act(() => tool().placePolar(100, tool().nextPoint!.angleDeg));
+    tecla('keydown');
+    expect(tool().modoShift).toBe('hoja');
+    input.remove();
+  });
+
   it('Tab con el borde congela la dirección enderezada', () => {
     const { tool, click, move } = setup();
     click(COSTADO);

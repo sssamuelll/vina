@@ -43,27 +43,41 @@ export function useShiftSostenido(alCambiar: (modo: ModoShift) => void) {
   const alCambiarRef = useRef(alCambiar);
   alCambiarRef.current = alCambiar;
   // El doble toque: cuándo empezó la pulsación viva (null si no la vio el
-  // teclado), si el ratón la usó, y cuándo se soltó el último toque.
+  // teclado), si se gastó (un clic u otra tecla mientras estaba pulsada), y
+  // cuándo se soltó el último toque.
   const pulsadoEnRef = useRef<number | null>(null);
-  const conRatonRef = useRef(false);
+  const gastadaRef = useRef(false);
   const toqueEnRef = useRef<number | null>(null);
 
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
-      if (e.key !== 'Shift' || isEditableTarget(e.target) || hayModalDelante()) return;
+      if (e.key !== 'Shift') {
+        // Otra tecla con Shift pulsado (Ctrl+Shift+Z, Shift+Tab…) lo gasta: un
+        // atajo no es un toque.
+        if (e.type === 'keydown' && modoRef.current !== 'suelto') gastadaRef.current = true;
+        return;
+      }
       const ahora = Date.now();
+      const deCampo = isEditableTarget(e.target) || hayModalDelante();
       if (e.shiftKey) {
+        // Pulsar: las teclas de un campo son del campo, y con un modal delante
+        // el lienzo no escucha.
+        if (deCampo) return;
         // Autorrepetición, o la otra Shift con una ya pulsada: es la misma pulsación.
         if (modoRef.current !== 'suelto') return;
         const doble = toqueEnRef.current !== null && ahora - toqueEnRef.current <= SHIFT_DOBLE_MS;
         toqueEnRef.current = null;
         pulsadoEnRef.current = ahora;
-        conRatonRef.current = false;
+        gastadaRef.current = false;
         modoRef.current = doble ? 'borde' : 'hoja';
       } else {
+        // Soltar se atiende SIEMPRE. Tab lleva el foco al chip con Shift aún
+        // pulsado, y ella lo suelta para escribir: ignorar ese keyup dejaba el
+        // modo pegado —con el borde— y la pulsación siguiente parecía
+        // autorrepetición. Soltar dentro de un campo, eso sí, no es un toque.
         if (modoRef.current === 'suelto') return;
         const inicio = pulsadoEnRef.current;
-        toqueEnRef.current = inicio !== null && !conRatonRef.current && ahora - inicio <= SHIFT_TOQUE_MS
+        toqueEnRef.current = !deCampo && inicio !== null && !gastadaRef.current && ahora - inicio <= SHIFT_TOQUE_MS
           ? ahora
           : null;
         pulsadoEnRef.current = null;
@@ -73,13 +87,13 @@ export function useShiftSostenido(alCambiar: (modo: ModoShift) => void) {
     };
     // Un clic con Shift pulsado lo gasta: soltar después ya no es un toque.
     const raton = () => {
-      if (modoRef.current !== 'suelto') conRatonRef.current = true;
+      if (modoRef.current !== 'suelto') gastadaRef.current = true;
     };
     const olvidar = () => {
       modoRef.current = 'suelto';
       pulsadoEnRef.current = null;
       toqueEnRef.current = null;
-      conRatonRef.current = false;
+      gastadaRef.current = false;
     };
     window.addEventListener('keydown', tecla, true);
     window.addEventListener('keyup', tecla, true);
