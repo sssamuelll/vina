@@ -532,6 +532,8 @@ export function usePenTool(
     guias,
     /** Shift ahora mismo, para la pista del pie. */
     modoShift: state.modoShift,
+    /** El marco del siguiente tramo (el de la píldora), también cuando la píldora se apaga. */
+    angleReference,
     nextPoint: state.nextPoint,
     nextPointSeq: state.nextPointSeq,
     handleMouseDown,

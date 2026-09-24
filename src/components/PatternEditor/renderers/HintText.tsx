@@ -1,11 +1,31 @@
 import { PatternPiece, Tool2D } from '../../../types/types';
 import { DEFAULT_SEAM_ALLOWANCE } from '../../../utils/defaults';
 import { formatMedida } from '../cotas/parseMedida';
-import { displayShortcut } from '../../shell/shortcutDisplay';
+import { displayModifierKey, displayShortcut } from '../../shell/shortcutDisplay';
+import type { ModoShift } from '../useShiftSostenido';
+import { ABSOLUTE_REFERENCE, angleReferenceLabel, type AngleReference } from '../angleReference';
 
 /** Arrastrar con Shift endereza a la hoja (Hilo y Editar patrón). La notación
  *  del modificador sale de `shortcutDisplay`: ⇧ en macOS, Shift+ fuera. */
 const SHIFT_ENDEREZA = `${displayShortcut('⇧')}arrastrar: 0°/45°/90°`;
+
+/** Las herramientas con las dos guías de Shift (spec 2026-09-23). */
+const CON_DOS_GUIAS = new Set<Tool2D>(['pen', 'internalShape', 'editPattern']);
+
+/**
+ * Con Shift pulsado, la pista de la Pluma, la Línea interna y `Q` la sustituye
+ * una corta que dice cómo llegar a la otra guía (spec 2026-09-23 § 4.2): las de
+ * la Pluma y la Línea interna ya no caben en su laptop, y lo añadido caería en
+ * lo que no se ve. Los marcos se nombran como en la píldora.
+ */
+function pistaShift(modo: ModoShift, segundo: AngleReference['kind']): string {
+  const shift = displayModifierKey('⇧');
+  const eje = angleReferenceLabel(ABSOLUTE_REFERENCE);
+  const otro = angleReferenceLabel({ kind: segundo, baseDeg: 0 });
+  return modo === 'borde'
+    ? `${shift} dos veces: ${otro} · una vez: ${eje}`
+    : `${shift}: ${eje} · ${shift} dos veces: ${otro}`;
+}
 
 interface HintTextProps {
   activeTool: Tool2D;
@@ -35,6 +55,10 @@ interface HintTextProps {
   /** Hay un extremo (extender) o un punto de recorte (recortar) ya elegido,
    *  esperando el clic o el Enter de confirmación (#1178). */
   extendTrimArmed?: boolean;
+  /** Shift en la herramienta activa: suelto, una vez (el eje) o dos (el borde). */
+  modoShift?: ModoShift;
+  /** El marco de Shift dos veces, si hay uno distinto del eje que elegir. */
+  segundoMarco?: AngleReference['kind'] | null;
 }
 
 /**
@@ -65,8 +89,14 @@ export default function HintText({
   nodeEditorIsEditing, seamPhase, topstitchMode, walkSeamPhase, slashPhase,
   saDefaultWidthMm, internalShapeNodesLength = 0, cotasVisibles = false, hasSeams,
   extendTrimMode = 'extend', extendTrimArmed = false,
+  modoShift = 'suelto', segundoMarco = null,
 }: HintTextProps) {
   const hasPieces = pieces.length > 0;
+  // El editor de nodos tiene su propia pista: dos a la vez se pisarían.
+  const conShift = modoShift !== 'suelto' && segundoMarco !== null && CON_DOS_GUIAS.has(activeTool)
+    && !nodeEditorIsEditing
+    ? pistaShift(modoShift, segundoMarco)
+    : null;
 
   return (
     <>
@@ -74,7 +104,7 @@ export default function HintText({
         <Pie>Editando nodos · arrastra para mover · Esc para salir</Pie>
       )}
 
-      {activeTool === 'internalShape' && (
+      {activeTool === 'internalShape' && !conShift && (
         <Pie>
           {internalShapeNodesLength === 0
             ? 'Clic dentro de una pieza para empezar · las esquinas y los bordes enganchan'
@@ -82,7 +112,7 @@ export default function HintText({
         </Pie>
       )}
 
-      {activeTool === 'pen' && penNodesLength > 0 && (
+      {activeTool === 'pen' && penNodesLength > 0 && !conShift && (
         // Con dos nodos Enter NO cierra ninguna pieza: deja un trazo (spec de
         // trazos § 3.1). Decir «cierra la pieza» prometía lo que no pasa, que es
         // justo la mitad del gesto que María todavía está aprendiendo.
@@ -120,9 +150,11 @@ export default function HintText({
       {/* Y [34:24]: «por qué este punto es redondo y este cuadrado, yo pensaría
           que estos son de curva… no entiendo por qué». La forma SÍ dice el tipo
           — lo que faltaba era decirle cuál es cuál. */}
-      {activeTool === 'editPattern' && !nodeEditorIsEditing && (
+      {activeTool === 'editPattern' && !nodeEditorIsEditing && !conShift && (
         <Pie>{`Cuadrado es esquina · redondo es punto de curva · rombo es extremo abierto · arrastra para mover · ${SHIFT_ENDEREZA}`}</Pie>
       )}
+
+      {conShift && <Pie>{conShift}</Pie>}
 
       {!hasPieces && activeTool === 'pen' && penNodesLength === 0 && (
         // `hasPieces` no cambia con un trazo (spec de trazos § 3.1: abierto no

@@ -73,6 +73,8 @@ describe('Pluma — Shift dos veces endereza al borde', () => {
     expect(l.reference.kind).toBe('border');
     expect(relativeAngle(l.angleDeg, l.reference)).toBeCloseTo(90, 9);
     expect(tool().modoShift).toBe('borde');
+    // El marco también sale suelto, para la pista del pie (la píldora se apaga al cerrar).
+    expect(tool().angleReference).toEqual(l.reference);
   });
 
   it('las dos guías: con una vez manda la hoja; con dos, el borde', () => {
