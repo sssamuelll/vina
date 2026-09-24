@@ -574,12 +574,30 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // Properties panel (Direction A), so right-click is always the general piece
     // menu — one gesture, one meaning, no proximity guessing.
 
+    // En Q, lo que agarraría ese mismo press decide sobre qué habla el menú
+    // (spec 2026-09-24 § 4.4): un tramo de interna, o el punto ya elegido.
+    // Y de qué pieza: si agarra algo de la pieza en edición, el menú es de
+    // ella aunque la caja de otra la tape (§ 3.4, fila 5: «en Q, la que se
+    // está editando»), la misma regla que ya sigue el clic izquierdo
+    // (`useEditorInteractions`, revisión final de la frontera, I-3).
+    // (Por referencia, no `editPatternTool.agarreEn(e)` directo: llamar un
+    // método por su acceso de miembro le pide a `exhaustive-deps` el objeto
+    // ENTERO como dependencia, no la función — y `editPatternTool` es nuevo en
+    // cada render.)
+    const agarreEnQ = editPatternTool.agarreEn;
+    const agarreQ = activeTool === 'editPattern'
+      ? agarreEnQ(e as React.MouseEvent<SVGSVGElement>)
+      : null;
+    const piezaEnEdicion = agarreQ
+      ? pieces.find(p => p.id === editPatternTool.editingPieceId) ?? null
+      : null;
+
     // Hit-test: find piece whose bounding box contains the point.
     // Vía `hitTestPieceBBox` y no con una copia local del bucle: era la misma
     // caja calculada dos veces, y la de aquí se quedó midiendo contra el
     // fantasma sin girar cuando #1033 volvió el giro declarativo (#1064).
-    let hitPiece: typeof pieces[0] | null =
-      hitTestPieceBBox({ x: canvasX, y: canvasY }, pieces.filter(p => p.outline?.length))
+    let hitPiece: typeof pieces[0] | null = piezaEnEdicion
+      ?? hitTestPieceBBox({ x: canvasX, y: canvasY }, pieces.filter(p => p.outline?.length))
       ?? null;
     // Un borde se puede alcanzar unos píxeles por fuera del bbox. En ese caso
     // el hit preciso sigue siendo dueño del menú, no la ausencia del body-hit.
@@ -588,9 +606,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     }
 
     // Hit-test seams: check proximity to seam connection lines and edge highlights
+    // (No con la pieza en edición ya agarrada: una costura también es «otro
+    // objeto» para § 3.4, y el menú sería el suyo, sin pieza.)
     let hitSeamId: string | null = null;
     const SEAM_THRESHOLD = screenToPatternLength(8, zoom2D);
-    for (const seam of hitSaEdgeId ? [] : seams) {
+    for (const seam of hitSaEdgeId || piezaEnEdicion ? [] : seams) {
       const pieceA = pieces.find(p => p.id === seam.pieceA.pieceId);
       const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
       if (!pieceA || !pieceB) continue;
@@ -689,16 +709,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       }
     }
 
-    // En Q, lo que agarraría ese mismo press decide sobre qué habla el menú
-    // (spec 2026-09-24 § 4.4): un tramo de interna, o el punto ya elegido.
-    // (Por referencia, no `editPatternTool.agarreEn(e)` directo: llamar un
-    // método por su acceso de miembro le pide a `exhaustive-deps` el objeto
-    // ENTERO como dependencia, no la función — y `editPatternTool` es nuevo en
-    // cada render.)
-    const agarreEnQ = editPatternTool.agarreEn;
-    const agarreQ = activeTool === 'editPattern'
-      ? agarreEnQ(e as React.MouseEvent<SVGSVGElement>)
-      : null;
+    // El tramo de interna que agarraría el press en Q (`agarreQ`, arriba): los
+    // verbos de convertir hablan de él.
     let segmentLineId: string | undefined;
     if (agarreQ?.tipo === 'tramo' && agarreQ.clave !== CLAVE_CONTORNO && hitPiece?.id === editPatternTool.editingPieceId) {
       segmentLineId = lineIdDeClave(agarreQ.clave) ?? undefined;

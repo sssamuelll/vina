@@ -4,13 +4,20 @@
  * con otra pieza debajo del clic derecho (frontera, fase 2, ronda 1 de
  * revisión sobre la tarea 11).
  *
- * `hitPiece` (el menú) sale de `hitTestPieceBBox` sobre TODAS las piezas;
  * `agarreQ` (lo que decide `derechoSobreElPuntoElegido`) sale de
- * `editPatternTool.agarreEn`, escopeado a `editingPieceId` — nunca mira
- * `hitPiece`. Sin el guardián `hitPiece?.id === editingPieceId`, un clic
- * derecho cuya CAJA resuelve a otra pieza B, pero que cae —en el marco local
- * de la pieza A que Q edita— sobre el punto ya elegido de A, hacía pasar la
- * pregunta igual: el menú de B ofrecía «Mover exacto…» sobre el punto de A.
+ * `editPatternTool.agarreEn`, escopeado a `editingPieceId`. `hitPiece` (el
+ * menú) sale de `hitTestPieceBBox` sobre TODAS las piezas —salvo cuando ese
+ * press agarraría algo de la pieza en edición: entonces es ella—. Sin el
+ * guardián `hitPiece?.id === editingPieceId`, un clic derecho cuya CAJA
+ * resolvía a otra pieza B, pero que caía —en el marco local de la pieza A que
+ * Q edita— sobre el punto ya elegido de A, hacía pasar la pregunta igual: el
+ * menú de B ofrecía «Mover exacto…» sobre el punto de A.
+ *
+ * La revisión final de la frontera (I-3) cambió lo que ese clic abre: en Q
+ * gana la pieza en edición también con el botón derecho (spec 2026-09-24
+ * § 3.4, fila 5, la misma regla que ya sigue el izquierdo). El menú es el de
+ * A y ofrece «Mover exacto…» sobre su punto; si el press no agarra nada de A,
+ * el menú es el de B y no lo ofrece.
  *
  * El andamio de activar Q, entrar en una pieza con un clic sobre su relleno y
  * elegir un punto con un clic sin arrastre sigue
@@ -131,6 +138,9 @@ function setup(withB: boolean) {
   return svg;
 }
 
+/** La cabecera del menú abierto: el nombre de la pieza de la que habla. */
+const cabecera = () => document.querySelector('.context-menu .context-menu__header')?.textContent ?? null;
+
 describe('«Mover exacto…» y la pieza en edición, con otra pieza debajo del clic', () => {
   it('control: clic derecho sobre el punto elegido, pieza única, sí lo ofrece', () => {
     const svg = setup(false);
@@ -140,14 +150,81 @@ describe('«Mover exacto…» y la pieza en edición, con otra pieza debajo del 
     expect(screen.getByText('Mover exacto…')).toBeTruthy();
   });
 
-  it('el mismo clic, pero cuya caja resuelve a OTRA pieza, no lo ofrece', () => {
+  it('el mismo clic, con la caja de OTRA pieza encima: gana la pieza en edición, y el menú lo ofrece (§ 3.4, fila 5)', () => {
     const svg = setup(true);
 
     // (100,0) es a la vez el punto elegido de A y un punto interior de la
-    // caja de B. `hitPiece` es B (primera en el array); `agarreQ` sigue
-    // viendo el vértice de A, porque está escopeado a `editingPieceId`.
+    // caja de B, que va primera en el array. `agarreQ` ve el vértice de A,
+    // así que el menú es el de A, no el de la caja.
     fireEvent.contextMenu(svg, { clientX: 100, clientY: 0 });
 
+    expect(cabecera()).toBe('A');
+    expect(screen.getByText('Mover exacto…')).toBeTruthy();
+  });
+
+  it('un clic derecho que no agarra nada de A, dentro de la caja de B: el menú es de B y no lo ofrece', () => {
+    const svg = setup(true);
+
+    // (145,-20): a 5 mm del lado derecho de B y a más de 40 de todo lo de A.
+    fireEvent.contextMenu(svg, { clientX: 145, clientY: -20 });
+
+    expect(cabecera()).toBe('B');
     expect(screen.queryByText('Mover exacto…')).toBeNull();
+  });
+});
+
+/**
+ * Lo mismo con un TRAMO de interna de A bajo la caja de B: los verbos de
+ * convertir aparecen, y convierten la línea de A (spec § 4.4). Antes, con la
+ * caja de B, no aparecía ninguno —y el menú, sin verbos, ni se abría—.
+ */
+describe('clic derecho sobre un tramo de interna de la pieza en edición, con la caja de otra encima', () => {
+  it('ofrece convertir, y convierte la línea de la pieza en edición', () => {
+    const conInterna: PatternPiece = {
+      ...pieceA(),
+      internals: [{ id: 'L', type: 'reference', path: [{ type: 'M', values: [20, 50] }, { type: 'L', values: [80, 50] }] }],
+    };
+    // Su caja [40,160]×[30,70] cubre el tramo de A en (50,50), lejos de sus lados (más de 8 mm).
+    const encima: PatternPiece = {
+      ...pieceB(),
+      outline: [
+        { type: 'M', values: [40, 30] }, { type: 'L', values: [160, 30] },
+        { type: 'L', values: [160, 70] }, { type: 'L', values: [40, 70] }, { type: 'Z', values: [] },
+      ],
+    };
+    const store = configureStore({
+      reducer: {
+        project: projectReducer, editor: editorReducer, tools: toolReducer, simulation: simulationReducer,
+        construction: constructionReducer, inputScheme: inputSchemeReducer, workflow: workflowReducer,
+      },
+      middleware: getDefault => getDefault({ serializableCheck: false }),
+    });
+    store.dispatch(loadProject({
+      ...store.getState().project,
+      id: 'test', name: 'Test', pieces: [encima, conInterna],
+      seams: [], fabrics: [], createdAt: 0, updatedAt: 0,
+    }));
+    const view = render(
+      <Provider store={store}>
+        <ShortcutProvider><ShortcutEnabledPatternEditor /></ShortcutProvider>
+      </Provider>,
+    );
+    const shortcutHost = view.getByTestId('shortcut-host');
+    shortcutHost.focus();
+    fireEvent.keyDown(shortcutHost, { key: 'q' });
+    const svg = view.container.querySelector<SVGSVGElement>('svg.pattern-svg')!;
+    // Entra en A por un punto de su relleno sin nada que agarrar, fuera de la caja de B.
+    const relleno = view.container.querySelector<SVGPathElement>('[data-piece-id="a"] .piece-fill')!;
+    fireEvent.mouseDown(relleno, { button: 0, buttons: 1, clientX: 10, clientY: 90 });
+    fireEvent.mouseUp(window, { button: 0, buttons: 0, clientX: 10, clientY: 90 });
+
+    fireEvent.contextMenu(svg, { clientX: 50, clientY: 50 });
+
+    expect(cabecera()).toBe('A');
+    expect(screen.getByText('Convertir en curva por puntos')).toBeTruthy();
+    fireEvent.click(screen.getByText('Convertir en curva'));
+    const piezas = store.getState().project.pieces;
+    expect(piezas.find(p => p.id === 'a')!.internals[0].path[1].type).toBe('C');
+    expect(piezas.find(p => p.id === 'b')!.outline).toEqual(encima.outline);
   });
 });
