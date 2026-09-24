@@ -1,6 +1,6 @@
 # Shift: la hoja y el borde — dos guías, un toque más
 
-**Fecha:** 2026-09-23, revisada el 2026-09-24 · **Estado:** decisión 2 reabierta el 24-09 por la regla de teclados (§ 3.5) y cerrada esa noche por Claude, por delegación de Samuel; pendiente de su revisión a posteriori
+**Fecha:** 2026-09-23, revisada el 2026-09-24 · **Estado:** implementada el 24-09 (rama `feat/shift-dos-guias`). La decisión 2 se reabrió ese día por la regla de teclados (§ 3.5) y la cerró Claude esa noche, por delegación de Samuel; pendiente de su revisión a posteriori
 **Construye sobre:** `main` con #1209 (Shift endereza respecto a la hoja, firma B del 23-09)
 **Contratos que toca:** `2026-09-08-contexto-y-control-numerico-design.md` § 3.4 (precedencia y Shift), firma D2 del 12-09 (ángulo relativo al borde), contrato de interfaz (`.claude/skills/contrato-de-interfaz/`)
 
@@ -112,13 +112,13 @@ La píldora no cambia de forma. La **pista del pie** lleva la cuenta, con una re
 | Estado | Pista |
 |---|---|
 | en reposo, las tres | sin cambios (la de `Q` ya acaba en «· Shift+arrastrar: 0°/45°/90°», 643 px de 681) |
-| Shift mantenido, con segundo marco | **sustituye**: «Shift: a la hoja · Shift dos veces: al borde» |
-| borde activo | **sustituye**: «Shift dos veces: al borde · una vez: a la hoja» |
+| Shift mantenido, con segundo marco | **sustituye**: «Shift: al eje · Shift dos veces: al borde» (191 px de 681) |
+| borde activo | **sustituye**: «Shift dos veces: al borde · una vez: al eje» (207 px de 681) |
 | Shift mantenido, sin segundo marco | sin cambios: no hay nada que elegir |
 
 En `Q` antes de agarrar, «con segundo marco» se da por cierto: el lado que llega aún no se conoce, y la pista anuncia la opción. En mitad de un arrastre manda el marco congelado del punto agarrado.
 
-Los nombres de las teclas salen de `shortcutDisplay`: «⇧» en macOS y «Shift» fuera. Hace falta un helper nuevo allí para la tecla **sola** (`displayShortcut('⇧')` da «Shift+», pensado para combinar). Los anchos se miden en el e2e con la notación de Windows, que es la larga.
+Los marcos se nombran **como en la píldora** (`angleReferenceLabel`): «al eje» para la hoja, y «al borde» o «al tramo» para el otro —desde el segundo tramo de la Pluma el marco es el tramo anterior, no un borde—. Un término por concepto (contrato de interfaz § 5). Los nombres de las teclas salen de `shortcutDisplay`: «⇧» en macOS y «Shift» fuera, con un helper para la tecla **sola** (`displayModifierKey`; `displayShortcut('⇧')` da «Shift+», pensado para combinar). Los anchos de la tabla están medidos en el e2e con la notación de Windows, que es la larga, en Split a 1366×643. Con el editor de nodos abierto la pista de Shift no sale: tiene la suya.
 
 La pista del Hilo (`Shift+arrastrar: 0°/45°/90°`) no cambia: el Hilo no tiene borde de partida.
 
@@ -130,7 +130,7 @@ Ningún botón, interruptor, ajuste ni entrada de menú.
 
 ### 5.1 `restriccionShift.ts` — geometría pura
 
-- `restringirA45(desde, cursor, baseDeg = 0): Point2D` — generaliza `restringirAHoja45`, que desaparece: sus usos (Pluma, Línea interna, Hilo) pasan a `restringirA45(…)` con la base por defecto. `enderezarDesplazamiento(delta)`, el de `Q`, gana el mismo `baseDeg`. Con `baseDeg = 0` conserva los vectores escritos: la `y` de una horizontal idéntica a la del origen. Con otra base gira las ocho direcciones.
+- `restringirA45(desde, cursor, baseDeg = 0): Point2D` — generaliza la regla de la hoja; `restringirAHoja45` se queda como su caso de base 0 (en cada llamada dice qué quiere), y el Hilo la sigue usando. `enderezarDesplazamiento(delta)`, el de `Q`, gana el mismo `baseDeg`. Con `baseDeg = 0` conserva los vectores escritos: la `y` de una horizontal idéntica a la del origen. Con otra base gira las ocho direcciones.
 - `guiasShift(desde, cursor, referencia: AngleReference, borde: boolean): { punto: Point2D; activa: Guia; tenue: Guia | null }` con `Guia = { desde: Point2D; angleDeg: number }` en la convención de `polarPoint`. **Única fuente** del punto y de lo que se dibuja: la usan el hook para colocar y el overlay para pintar (la lección de maria-196).
 - `tenue` es `null` cuando `referencia.baseDeg` es múltiplo de 45° (tolerancia 1e-9): los dos marcos dan las mismas direcciones.
 
@@ -148,13 +148,13 @@ Ningún botón, interruptor, ajuste ni entrada de menú.
 - **`usePolyPenTool`**: igual, con `referenceForNodes`. Expone `guias`.
 - **`useEditPattern`**: al armar el arrastre (nodo o lado; también el primer press de `Q` que entra en la pieza y agarra el punto, `enterEditActuando`, que arma el mismo `dragRef`) guarda en el `drag` el `AngleReference` del lado de llegada —o del propio lado— en espacio de patrón. `aplicarArrastre` usa `guiasShift` con ese marco congelado. Expone `guias` mientras el arrastre dura.
 
-### 5.4 `renderers/overlays/GuiasShift.tsx`
+### 5.4 `renderers/overlays/GuiasShiftOverlay.tsx`
 
-Componente pequeño: `{ guias, zoom }` → uno o dos `<line>`. Tokens del § 4.1; sin colores literales (R3 del trinquete de UI, `node scripts/ui-contract-lint.mjs`, no puede subir). Lo montan los overlays de la Pluma, la Línea interna y Editar patrón. `pointerEvents="none"`.
+Componente pequeño: `{ guias, zoom }` → uno o dos `<line>`. Tokens del § 4.1; sin colores literales (R3 del trinquete de UI, `node scripts/ui-contract-lint.mjs`, no puede subir). Se monta **una vez** en `PatternEditor.tsx`, por debajo del `ToolOverlay` (los nodos y el anillo de enganche se leen encima), con las guías de la herramienta activa: un solo punto de montaje en vez de enhebrar props por los tres overlays. `pointerEvents="none"`. Cada `<line>` lleva `data-guia-shift="activa" | "tenue"`.
 
 ### 5.5 Cableado
 
-- `HintText.tsx` recibe el modo y si hay segundo marco, y aplica la tabla del § 4.2.
+- `HintText.tsx` recibe `modoShift` y `segundoMarco` (el `kind` de la referencia del otro marco, o `null` si coincide con el eje) y aplica la tabla del § 4.2.
 - `PatternEditor.tsx` solo cablea `guias` y el modo hacia overlays y pista; no calcula nada.
 
 ## 6. Pruebas
