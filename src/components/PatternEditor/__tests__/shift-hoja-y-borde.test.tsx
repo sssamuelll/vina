@@ -348,6 +348,18 @@ describe('Editar patrón — Shift dos veces endereza respecto al lado', () => {
     expect(cruzConCostado(a, ancla(2))).toBeCloseTo(0, 6);
   });
 
+  it('al agarrar un lado, la guía sale de un punto SOBRE el lado, no del pulso', () => {
+    // Revisión final (6): el press cae hasta 8 px fuera del lado; la guía a 0°
+    // tiene que ir por su propia recta. En patrón el costado va de (400,150) a
+    // (460,330); se pulsa 5 px fuera, en perpendicular.
+    const { tool, down, move } = setupQ(DELANTERO);
+    down({ x: 430 + 5 * 0.9487, y: 240 - 5 * 0.3162 });
+    dosVeces();
+    move({ x: 480, y: 230 }, true);
+    const desde = tool().guias!.activa!.desde;
+    expect((desde.x - 400) * 180 - (desde.y - 150) * 60).toBeCloseTo(0, 6);
+  });
+
   it('cambiar a dos veces a mitad del arrastre, con la mano quieta, cambia de marco', () => {
     const { down, move, ancla } = setupQ(DELANTERO);
     down({ x: 460, y: 330 });

@@ -488,14 +488,14 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           startMouse: { x: e.clientX, y: e.clientY },
           startOutline: piece.outline,
           startPositions,
-          marco: marcoDelTramo(piece, nodes, segmentHit.commandIndex, toPattern(e)),
+          marco: marcoDelTramo(piece, nodes, segmentHit.commandIndex, pieceLocalToPattern(segmentHit.point, piece)),
         };
         return true;
       }
 
       return false;
     },
-    [pieces, layerLocked, toLocal, toPattern, hitRadius, endDragBatch, enterEdit, dispatch],
+    [pieces, layerLocked, toLocal, hitRadius, endDragBatch, enterEdit, dispatch],
   );
 
   // ─── exitEdit ───
@@ -658,7 +658,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           startMouse: { x: e.clientX, y: e.clientY },
           startOutline: piece.outline,
           startPositions,
-          marco: marcoDelTramo(piece, state.nodes, idx, toPattern(e)),
+          marco: marcoDelTramo(piece, state.nodes, idx, pieceLocalToPattern(segHit.point, piece)),
           ...(quitarAlSoltar ? { quitarAlSoltar: [idx] } : {}),
         };
 
@@ -1228,7 +1228,7 @@ function marcoDelPunto(piece: PatternPiece, position: Point2D, commandIndex: num
   return { desde: pieceLocalToPattern(position, piece), referencia: arrivingReference(piece, commandIndex) };
 }
 
-/** El marco de un lado agarrado: su propia recta, desde donde se pulsó. */
+/** El marco de un lado agarrado: su propia recta, desde el punto del lado bajo el press (no el pulso, que cae hasta 8 px fuera). */
 function marcoDelTramo(
   piece: PatternPiece, nodes: EditableNode[], commandIndex: number, pulsado: Point2D,
 ): OutlineDrag['marco'] {
