@@ -15,6 +15,9 @@ type Linea = { id: string; type: string; path: Cmd[] };
 const internas = async (page: Page, pieceId = 'A') =>
   ((await st(page)).project.pieces.find(p => p.id === pieceId)!.internals as Linea[]);
 const anclas = (path: Cmd[]) => path.filter(c => c.type !== 'Z').map(c => c.values.slice(-2));
+/** La interna elegida, la de Z y la de Q (spec § 3.5). */
+const elegida = async (page: Page) =>
+  ((await st(page)).editor as unknown as { selectedInternalLine: unknown }).selectedInternalLine;
 
 async function arrastrar(page: Page, desde: { x: number; y: number }, hasta: { x: number; y: number }) {
   const a = await toScreen(page, desde);
@@ -140,5 +143,38 @@ test.describe('Q edita las internas', () => {
     await expect.poll(async () => anclas((await internas(page))[0].path)).toEqual([[20, 20], [120, 20]]);
     await expect.poll(async () => anclas((await internas(page))[1].path)).toEqual([[120, 120], [20, 120]]);
     expect((await st(page)).project.pieces).toHaveLength(1);
+  });
+
+  test('la cota de un tramo en Q: el largo con Tab llega a Ángulo, y el tramo sigue elegido (§ 4.5)', async ({ page }) => {
+    // «con números como en el contorno» (§ 1). Tab confirma el Largo antes de
+    // pasar al Ángulo: si esa escritura soltaba el tramo, la caja se iba bajo
+    // el Tab y el foco con ella. jsdom no ve el foco; esto sí.
+    await waitForApp(page);
+    await addPiece(page, 'A', { x: 100, y: 100 }, 300, 200);
+    await dispatch(page, 'project/addInternalLine', { pieceId: 'A', line: { id: 'L', type: 'reference', path: [
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [120, 20] }, { type: 'L', values: [120, 120] },
+    ] } });
+    await activarHerramienta(page, 'q', 'editPattern');
+    // El tramo (20,20)→(120,20), en local; en el patrón, por (170,120).
+    await clickAt(page, { x: 170, y: 120 });
+    await expect.poll(() => elegida(page)).toEqual({ pieceId: 'A', lineId: 'L', segmentIndex: 1 });
+
+    const caja = page.locator('.cotas button.cota[aria-label^="Largo"]');
+    await expect(caja, 'el tramo elegido en Q no enseña su caja').toHaveCount(1);
+    // Sobre su mitad de Largo: el clic abre el campo que cae bajo el puntero.
+    await caja.locator('[data-campo="0"]').click();
+    const largo = page.locator('input.cota--editando[aria-label="Largo"]');
+    await expect(largo).toBeFocused();
+    await largo.fill('150');
+    await page.keyboard.press('Tab');
+
+    await expect(
+      page.locator('input.cota--editando[aria-label="Ángulo"]'),
+      'el Tab no llegó a Ángulo: escribir el largo soltó el tramo',
+    ).toBeFocused();
+    await expect.poll(async () => anclas((await internas(page))[0].path)[1]).toEqual([170, 20]);
+    expect(await elegida(page)).toEqual({ pieceId: 'A', lineId: 'L', segmentIndex: 1 });
+    // Y en Q: su resalte de tramo elegido, a opacidad plena, en el overlay.
+    await expect(page.locator('[data-interna="L"] path[opacity="1"]')).toHaveCount(1);
   });
 });

@@ -1,4 +1,5 @@
 import type { InternalLineSelection, PatternPiece, SaSelection, Tool2D, Trazo, TrazoSelection } from '../../../types/types';
+import { esInternaEditable } from '../../../types/types';
 import { margenEnPunto } from '../../../utils/seam/margenEnPunto';
 import { cotaDeMargen } from './cotaDeMargen';
 import { cotasDeLineaInterna, cotasDelLado, cotasDePieza, cotasDeTrazo, type Cota } from './cotas';
@@ -305,7 +306,16 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
       const capa = piece.layer ?? 1;
       if (input.hiddenLayerIds.includes(capa)) return nada(lineaRect);
       const { segmentIndex } = input.selectedInternalLine;
-      const cotas = cotasDeLineaInterna(piece, line, segmentIndex);
+      // En Q (spec 2026-09-24 § 4.5) la global sin tramo son puntos de la
+      // interna: uno solo ya ganó arriba, por `nodoSeleccionado`; varios no
+      // tienen cotas, como en el contorno. Y el tramo escribe por el punto
+      // (`EscrituraDeInterna`) si la interna es de las que Q edita; la que no
+      // lo es (un doblez de pliegue elegido en Z) sigue escribiendo por su
+      // línea, como en Z: por el punto, `moveNodeTo` la rechazaría y el chip
+      // quedaría mudo.
+      const enQ = input.activeTool === 'editPattern';
+      if (enQ && segmentIndex === undefined) return nada(lineaRect);
+      const cotas = cotasDeLineaInterna(piece, line, segmentIndex, enQ && esInternaEditable(line) ? 'nodo' : 'linea');
       return {
         piece,
         caliente: false,
