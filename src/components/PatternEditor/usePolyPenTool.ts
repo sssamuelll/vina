@@ -204,6 +204,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     const press = pressRef.current;
     const hover = press ? press.snap : hoverRef.current;
     const guias = guiasPara(lastWorldRef.current);
+    const closeArmed = !!press?.closes || hover?.kind === 'firstNode';
     setView({
       nodes: [...nodesRef.current],
       previewPoint: guias?.punto ?? lastWorldRef.current,
@@ -212,12 +213,12 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       dragHandle: press?.moved ? press.drag : null,
       hover,
       hostId: hostRef.current,
-      closeArmed: !!press?.closes || hover?.kind === 'firstNode',
+      closeArmed,
       nextPoint: nextPointRef.current,
       nextPointSeq: nextPointSeqRef.current,
-      // Arrastrando un manejador, o con la pareja congelada, la goma no va por
-      // ninguna guía: no se pintan.
-      guias: press?.moved || nextPointRef.current ? null : guias,
+      // Arrastrando un manejador, con la pareja congelada o con el cierre
+      // armado, la goma no va por ninguna guía: no se pintan (maria-196).
+      guias: press?.moved || nextPointRef.current || closeArmed ? null : guias,
       modoShift: modoRef.current,
     });
   }, [guiasPara, modoRef]);

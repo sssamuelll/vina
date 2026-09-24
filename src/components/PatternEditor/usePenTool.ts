@@ -245,8 +245,10 @@ export function usePenTool(
   // manejador tal cual, que es lo que se va a guardar.
   const destino = state.isDragging ? state.cursorPos : siguiente?.punto ?? state.cursorPos;
   // Las guías se pintan mientras hay algo que enderezar: con la pareja
-  // congelada o arrastrando manejadores la goma no va por ninguna.
-  const guias = state.cursorPos && !state.isClosed && !state.isDragging && !state.nextPoint
+  // congelada o arrastrando manejadores la goma no va por ninguna. Con el
+  // cierre armado tampoco: el clic cierra, y una guía apuntando a otro lado
+  // prometería otra cosa (la píldora también se apaga ahí; maria-196).
+  const guias = state.cursorPos && !state.isClosed && !state.isDragging && !state.nextPoint && !willClose
     ? guiasPara(state.nodes, state.cursorPos, state.modoShift, angleReference)
     : null;
 

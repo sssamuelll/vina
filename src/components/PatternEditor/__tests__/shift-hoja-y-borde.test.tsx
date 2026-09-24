@@ -142,6 +142,18 @@ describe('Pluma — Shift dos veces endereza al borde', () => {
     expect(tool().guias!.tenue).toBeNull();
   });
 
+  it('con el cierre armado no hay guías: el clic cierra, como dice el aviso de cierre', () => {
+    // Revisión final (sonda F): la guía activa apuntaba a un lado y la goma al primer nodo.
+    const { tool, click, move } = setup([]);
+    click({ x: 100, y: 100 });
+    click({ x: 300, y: 100 });
+    click({ x: 300, y: 300 });
+    tecla('keydown');
+    move({ x: 104, y: 106 }, true);
+    expect(tool().willClose).toBe(true);
+    expect(tool().guias).toBeNull();
+  });
+
   it('arrastrando un manejador no hay guías', () => {
     const { tool, move } = setup();
     act(() => tool().handleMouseDown(ev(COSTADO.x, COSTADO.y)));
@@ -220,6 +232,17 @@ describe('Línea interna — Shift dos veces endereza al borde', () => {
     const a = { x: m.values[0], y: m.values[1] };
     const b = { x: l.values[0], y: l.values[1] };
     expect(relativeAngle(polarOf(a, b).angleDeg, BORDE)).toBeCloseTo(90, 9);
+  });
+
+  it('con el cierre armado no hay guías', () => {
+    const { tool, click, move } = setup();
+    click({ x: 250, y: 200 });
+    click({ x: 350, y: 200 });
+    click({ x: 350, y: 300 });
+    tecla('keydown');
+    move({ x: 253, y: 204 }, true);
+    expect(tool().closeArmed).toBe(true);
+    expect(tool().guias).toBeNull();
   });
 
   it('una vez es la hoja, como hoy', () => {
