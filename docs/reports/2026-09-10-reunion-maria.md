@@ -258,3 +258,11 @@ Las quejas 3, 12 y 23 (*"le estaba dando al shift, pero no me hace nada"*) tení
 **Lo que queda pendiente:** su ideal de las **dos guías a la vez** (hoja y borde) al pulsar Shift. Lo dijo como «idealmente», no como condición de la firma. Diseño en `docs/superpowers/specs/2026-09-23-shift-hoja-y-borde-design.md`.
 
 **24-09 — hecho:** las dos guías, con **Shift dos veces** para el borde (la tecla no es Alt: Vina tiene que funcionar con cualquier teclado, y Alt+Shift o Ctrl+Shift cambian el idioma del teclado en Windows; spec § 3.5). Shift una vez sigue siendo la hoja que firmó. Queda enseñárselo en su máquina y comprobar allí que alternar de guía no dispara las teclas especiales de Windows (cinco Shift seguidos).
+
+---
+
+## 10. La queja 16, en marcha — 2026-09-24
+
+*"el patrón lo puedo mover? no puedes editar las internas, ok, así hay que arreglarlo"* [10:05].
+
+Decidido por Samuel el 24-09 como la frontera entera del contrato del 08-09 § 4 (spec `docs/superpowers/specs/2026-09-24-frontera-seleccionar-editar-design.md`). Hechas las fases 1 y 2: en `Q` ya se editan las internas de forma propia —mover puntos y tramos, Shift, enganche, insertar, borrar y pasar un tramo a curva por puntos, lo que pidió en [10:16]—, y Supr sobre un tramo quita solo ese tramo. Falta que `Z` deje de editar (fase 4): hasta entonces, su pregunta del 30-08 y del 07-09 —*"¿cuál es la diferencia?"*— sigue con respuesta a medias.
