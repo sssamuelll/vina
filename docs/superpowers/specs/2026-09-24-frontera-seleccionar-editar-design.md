@@ -81,7 +81,8 @@ Una sola función decide esta lista, `esInternaEditable(line)`, junto a `seSelec
 
 ### 3.3 Lo que se ve
 
-- Con una pieza en edición, o bajo el ratón antes de entrar, se pintan a la vez los puntos del contorno y los de sus internas editables, con los glifos de `AnchorGlyph` que ya usa el contorno: cuadrado es esquina, redondo es punto de curva, rombo es extremo abierto. La pista del pie de Q ya lo explica.
+- Con una pieza en edición se pintan a la vez los puntos del contorno y los de sus internas editables, con los glifos de `AnchorGlyph` que ya usa el contorno: cuadrado es esquina, redondo es punto de curva, rombo es extremo abierto. La pista del pie de Q ya lo explica.
+- Antes de entrar, con la pieza bajo el ratón, las internas reciben el mismo trato que el contorno: el contorno enseña ahí sus extremos (`PuntosDelContorno`, #1103: *"siempre en los extremos los puntos deberían aparecer"*) y el tramo bajo el ratón se resalta; las internas enseñan sus extremos (los roles de `EXTREMOS`) y su tramo bajo el ratón. Las muestras de curva de las dos aparecen al entrar. *(Precisión del 24-09, al escribir el plan: la frase aprobada decía «o al pasar el ratón por encima antes de entrar» para todos los puntos, y hoy el contorno no los pinta todos en ese momento; se mantiene su regla y se aplica igual a las internas.)*
 - Los roles de una línea abierta:
   - sus dos puntas son **extremo abierto**;
   - un punto interior es **esquina** si el recorrido quiebra (el criterio de `detectCorners`) o si lo insertó ella sobre una recta (`authoredAnchor`, firma D3 del 12-09);
