@@ -11,9 +11,10 @@ import { renderHook, cleanup, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, { restoreState, updateInternalLine } from '../../../store/projectSlice';
-import editorReducer from '../../../store/editorSlice';
+import editorReducer, { selectInternalLine } from '../../../store/editorSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
 import { undoMiddleware } from '../../../store/undoMiddleware';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 import { useEditPattern } from '../useEditPattern';
 import type { InternalLine, PathCommand, PatternPiece } from '../../../types/types';
 
@@ -72,5 +73,200 @@ describe('el estado de Q conoce las internas', () => {
     expect([...hook.result.current.selectedNodes]).toEqual([1]);
     act(() => { store.dispatch(updateInternalLine({ pieceId: 'p', lineId: 'N', path: [{ type: 'M', values: [101, 0] }, { type: 'L', values: [101, 8] }] })); });
     expect([...hook.result.current.selectedNodes]).toEqual([1]);
+  });
+});
+
+const ev = (x: number, y: number, shift = false) => ({
+  button: 0, shiftKey: shift, clientX: x, clientY: y,
+  currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
+} as unknown as React.MouseEvent<SVGSVGElement>);
+
+const tecla = (type: 'keydown' | 'keyup') =>
+  act(() => { window.dispatchEvent(new KeyboardEvent(type, { key: 'Shift', shiftKey: type === 'keydown' })); });
+const dosVeces = () => { tecla('keydown'); tecla('keyup'); tecla('keydown'); };
+
+const DIAG: InternalLine = { id: 'D', type: 'reference', path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [200, 150] }] };
+const anclasDe = (l: InternalLine) => l.path.filter(c => c.type !== 'Z').map(c => c.values.slice(-2));
+
+function arrastrar(hook: ReturnType<typeof montarQ>['hook'], desde: [number, number], hasta: [number, number], shift = false) {
+  act(() => { hook.result.current.handleMouseDown(ev(desde[0], desde[1], shift)); });
+  act(() => { hook.result.current.handleMouseMove(ev(hasta[0], hasta[1], shift)); });
+  act(() => { hook.result.current.handleMouseUp(); });
+}
+
+describe('agarrar y arrastrar una interna en Q', () => {
+  it('un punto de una interna: se elige, se publica y se mueve solo él', () => {
+    const { store, hook, internaDe } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(ev(120, 20)); });
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L' });
+    act(() => { hook.result.current.handleMouseMove(ev(120, 40)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(anclasDe(internaDe('L'))).toEqual([[20, 20], [120, 40], [120, 120]]);
+    expect(store.getState().project.pieces[0].outline).toEqual(RECT);
+  });
+
+  it('un tramo: se elige con su tramo y se trasladan sus dos extremos', () => {
+    const { store, hook, internaDe } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    arrastrar(hook, [70, 20], [70, 30]);
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L', segmentIndex: 1 });
+    expect(anclasDe(internaDe('L'))).toEqual([[20, 30], [120, 30], [120, 120]]);
+  });
+
+  it('esquina compartida sin la interna elegida: se mueve la esquina, la interna no', () => {
+    const { store, hook, internaDe } = montarQ([pieza([DIAG])]);
+    act(() => hook.result.current.enterEdit('p'));
+    arrastrar(hook, [0, 0], [10, 5]);
+    expect(store.getState().project.pieces[0].outline[0].values).toEqual([10, 5]);
+    expect(anclasDe(internaDe('D'))[0]).toEqual([0, 0]);
+  });
+
+  it('… con la interna elegida, el mismo clic mueve su extremo', () => {
+    const { store, hook, internaDe } = montarQ([pieza([DIAG])]);
+    act(() => { store.dispatch(selectInternalLine({ pieceId: 'p', lineId: 'D' })); });
+    act(() => hook.result.current.enterEdit('p'));
+    arrastrar(hook, [0, 0], [40, 30]);
+    expect(anclasDe(internaDe('D'))[0]).toEqual([40, 30]);
+    expect(store.getState().project.pieces[0].outline[0].values).toEqual([0, 0]);
+  });
+
+  it('el extremo engancha exacto a la esquina al acercarlo, y se ve el anillo', () => {
+    const lejos: InternalLine = { ...DIAG, path: [{ type: 'M', values: [40, 30] }, { type: 'L', values: [200, 150] }] };
+    const { hook, internaDe } = montarQ([pieza([lejos])]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(ev(40, 30)); });
+    act(() => { hook.result.current.handleMouseMove(ev(3, 2)); });
+    expect(hook.result.current.enganche).toEqual({ x: 0, y: 0 });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(anclasDe(internaDe('D'))[0]).toEqual([0, 0]);
+    expect(hook.result.current.enganche).toBeNull();
+  });
+
+  it('con Shift manda Shift: no engancha', () => {
+    const lejos: InternalLine = { ...DIAG, path: [{ type: 'M', values: [40, 30] }, { type: 'L', values: [200, 150] }] };
+    const { hook, internaDe } = montarQ([pieza([lejos])]);
+    act(() => hook.result.current.enterEdit('p'));
+    tecla('keydown');
+    arrastrar(hook, [40, 30], [3, 2], true);
+    tecla('keyup');
+    expect(anclasDe(internaDe('D'))[0]).not.toEqual([0, 0]);
+    expect(hook.result.current.enganche).toBeNull();
+  });
+
+  it('pieza girada con enganche: engancha a la esquina girada y guarda el local correcto (Review Focus 2)', () => {
+    // Girada 180° sobre el centro de su caja (100,75): local (x,y) → patrón (200−x, 150−y).
+    const lejos: InternalLine = { ...DIAG, path: [{ type: 'M', values: [40, 30] }, { type: 'L', values: [100, 100] }] };
+    const { hook, internaDe } = montarQ([pieza([lejos], { rotation: 180 })]);
+    act(() => hook.result.current.enterEdit('p'));
+    // Su extremo local (40,30) se ve en (160,120); la esquina local (0,0) se ve en (200,150).
+    act(() => { hook.result.current.handleMouseDown(ev(160, 120)); });
+    act(() => { hook.result.current.handleMouseMove(ev(197, 148)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    const [x, y] = anclasDe(internaDe('D'))[0];
+    expect(x).toBeCloseTo(0, 9);
+    expect(y).toBeCloseTo(0, 9);
+  });
+
+  it('pieza girada: el punto va adonde va el puntero', () => {
+    const { hook, internaDe } = montarQ([pieza([ELE], { rotation: 180 })]);
+    act(() => hook.result.current.enterEdit('p'));
+    // ELE (120,20) local se ve en (80,130). +10 en pantalla hacia la derecha → local (110,20).
+    arrastrar(hook, [80, 130], [90, 130]);
+    const [x, y] = anclasDe(internaDe('L'))[1];
+    expect(x).toBeCloseTo(110, 9);
+    expect(y).toBeCloseTo(20, 9);
+  });
+
+  it('gemelas del DXF: agarrar una mueve el grupo entero (Review Focus 1)', () => {
+    const gemelas: InternalLine = { ...ELE, path: [
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [120, 20] }, { type: 'L', values: [120, 20] }, { type: 'L', values: [120, 120] },
+    ] };
+    const { hook, internaDe } = montarQ([pieza([gemelas])]);
+    act(() => hook.result.current.enterEdit('p'));
+    arrastrar(hook, [120, 20], [120, 30]);
+    expect(anclasDe(internaDe('L'))).toEqual([[20, 20], [120, 30], [120, 30], [120, 120]]);
+  });
+
+  it('Shift+clic junta un punto del contorno y uno de la interna; un arrastre los mueve igual', () => {
+    const { store, hook, internaDe } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(ev(200, 0)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    arrastrar(hook, [120, 20], [125, 25], true);
+    expect(store.getState().project.pieces[0].outline[1].values).toEqual([205, 5]);
+    expect(anclasDe(internaDe('L'))[1]).toEqual([125, 25]);
+  });
+
+  it('el marco coge puntos del contorno y de la interna', () => {
+    const { hook } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(ev(-20, -20)); });
+    act(() => { hook.result.current.handleMouseMove(ev(130, 30)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect([...hook.result.current.selectedNodes]).toEqual([0]);
+    expect([...hook.result.current.internas[0].selectedNodes]).toEqual([0, 1]);
+  });
+
+  it('Shift dos veces endereza respecto al tramo de la interna que llega al punto', () => {
+    // El tramo que llega a (60,20) viene de (20,100): pendiente 2:1.
+    const inclinada: InternalLine = { id: 'I', type: 'reference', path: [{ type: 'M', values: [20, 100] }, { type: 'L', values: [60, 20] }, { type: 'L', values: [140, 20] }] };
+    const { hook, internaDe } = montarQ([pieza([inclinada])]);
+    act(() => hook.result.current.enterEdit('p'));
+    dosVeces();
+    arrastrar(hook, [60, 20], [90, 20], true);
+    tecla('keyup');
+    const [x, y] = anclasDe(internaDe('I'))[1];
+    const ang = Math.atan2(-(y - 20), x - 60) * 180 / Math.PI;
+    const base = Math.atan2(80, 40) * 180 / Math.PI;
+    const rel = (((ang - base) % 45) + 45) % 45;
+    expect(Math.min(rel, 45 - rel)).toBeLessThan(1e-6);
+    const relHoja = ((ang % 45) + 45) % 45;
+    expect(Math.min(relHoja, 45 - relHoja)).toBeGreaterThan(1);
+  });
+
+  it('deshacer a mitad del arrastre cancela el gesto y relee los puntos (Review Focus 4)', () => {
+    const { store, hook, internaDe } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(ev(120, 20)); });
+    act(() => { hook.result.current.handleMouseMove(ev(120, 40)); });
+    act(() => { store.dispatch({ type: 'editor/undo' }); });
+    expect(anclasDe(internaDe('L'))[1]).toEqual([120, 20]);
+    act(() => { hook.result.current.handleMouseMove(ev(120, 60)); });
+    expect(anclasDe(internaDe('L'))[1]).toEqual([120, 20]);
+    expect(hook.result.current.internas[0].nodes[1].position).toEqual({ x: 120, y: 20 });
+  });
+
+  it('la caja negra registra qué agarró el press y si movió', () => {
+    clearJournal();
+    const { hook } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    arrastrar(hook, [120, 20], [120, 30]);
+    const eventos = getJournal().events.filter(e => e.kind === 'gesture').map(e => [e.name, e.data]);
+    expect(eventos).toContainEqual(['edicion:agarre', { objeto: 'pieza', linea: 'interna', que: 'punto', lineId: 'L' }]);
+    expect(eventos).toContainEqual(['edicion:suelta', { movio: true }]);
+  });
+
+  it('Esc suelta lo elegido, también la interna elegida', () => {
+    const { store, hook } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(ev(70, 20)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(store.getState().editor.selectedInternalLine).not.toBeNull();
+    act(() => { hook.result.current.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' })); });
+    expect(store.getState().editor.selectedInternalLine).toBeNull();
+    expect(hook.result.current.internas[0].selectedSegments.size).toBe(0);
+  });
+
+  it('el hover sobre un tramo de interna lo anuncia, antes y después de entrar', () => {
+    const { hook } = montarQ([pieza()]);
+    act(() => { hook.result.current.handleMouseMove(ev(70, 21)); });
+    expect(hook.result.current.hoveredPieceId).toBe('p');
+    expect(hook.result.current.internas[0].hoveredSegment).toBe(1);
+    expect(hook.result.current.getCursor()).toBe('pointer');
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseMove(ev(70, 21)); });
+    expect(hook.result.current.internas[0].hoveredSegment).toBe(1);
+    expect(hook.result.current.getCursor()).toBe('cell');
   });
 });

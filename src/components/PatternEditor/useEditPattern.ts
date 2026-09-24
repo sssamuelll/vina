@@ -12,6 +12,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
+import { selectInternalLine, selectPiece } from '../../store/editorSlice';
 import {
   beginUndoBatch,
   endUndoBatch,
@@ -19,11 +20,9 @@ import {
   withUndoBatchToken,
   type UndoBatchToken,
 } from '../../store/undoMiddleware';
-import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
+import type { Point2D, PatternPiece, PathCommand, Trazo } from '../../types/types';
 import {
   extractNodes,
-  hitTestNode,
-  nearestSegment,
   applyNodeMove,
   applyAnchorMoves,
   splitSegmentAt,
@@ -39,19 +38,25 @@ import { piezaBloqueada } from '../../utils/piezaBloqueada';
 import { convertSegmentToSpline, resmoothAfterMove, toManualBezier } from './splineSegment';
 import { guiasShift, type GuiaShift, type GuiasShift } from './restriccionShift';
 import { useShiftSostenido, type ModoShift } from './useShiftSostenido';
-import { ABSOLUTE_REFERENCE, arrivingReference, chordReference, type AngleReference } from './angleReference';
-import { isDrag } from './gestureConstants';
+import { ABSOLUTE_REFERENCE, arrivingReferenceOnPath, chordReference, type AngleReference } from './angleReference';
+import { EDGE_HIT_PX, isDrag } from './gestureConstants';
+import { buildSnapIndex, resolveSnap, type SnapIndex } from './snapIndex';
+import { agarrar, type Agarre } from './agarreDeQ';
 import { showInfoToast } from '../../store/copilotUISlice';
+import { pushJournal } from '../../utils/telemetry/journal';
 import {
   patternToPieceLocal,
   patternToPieceLocalDirection,
   pieceLocalToPattern,
 } from './pieceTransform';
 export { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
-import { conPaths, CLAVE_CONTORNO, pathDeLinea, type ClaveLinea } from './lineaEditable';
 import {
-  INITIAL_STATE, SIN_INTERNAS, estadoDeEntrada, extraerInternas, findFromNode,
-  mismosPaths, pathsEditables, refrescarLineas, resyncStateToPiece,
+  conPaths, CLAVE_CONTORNO, claveDeInterna, lineIdDeClave, pathDeLinea, type ClaveLinea,
+} from './lineaEditable';
+import {
+  INITIAL_STATE, SIN_INTERNAS, algoElegido, arrastreDe, conLinea, estadoDeEntrada, extraerInternas,
+  findFromNode, hoverDe, internaElegidaDe, marcoSelecciona, mismosPaths, pathsEditables,
+  refrescarLineas, resyncStateToPiece, sinHover, sinPuntos, sinSeleccion, sinTramos, vistas,
   type ArrastreDeLinea, type EditPatternState,
 } from './estadoDeQ';
 
@@ -62,6 +67,7 @@ export type { EditPatternState } from './estadoDeQ';
 
 const HIT_RADIUS_PX = 8; // screen pixels
 const NO_HIDDEN_LAYER_IDS: number[] = [];
+const SIN_TRAZOS: Trazo[] = [];
 
 // ─── Drag ref types ───
 
@@ -70,7 +76,7 @@ interface OutlineDrag {
   startMouse: Point2D;
   /**
    * Las líneas que mueve el gesto, cada una con su punto de partida. Todas con
-   * el mismo vector (spec 2026-09-24 § 4.1). En la fase 1, solo el contorno.
+   * el mismo vector (spec 2026-09-24 § 4.1).
    */
   porLinea: Map<ClaveLinea, ArrastreDeLinea>;
   /** Último ratón del arrastre: pulsar Shift con la mano quieta lo re-aplica. */
@@ -88,6 +94,12 @@ interface OutlineDrag {
    * Un marco vivo giraría la guía bajo la mano mientras el lado se inclina.
    */
   marco: { desde: Point2D; referencia: AngleReference };
+  /**
+   * Arrastrando UN punto de una interna: engancha (spec § 4.3). El índice se
+   * construye al empezar, sin la propia línea; `desde` es la posición local
+   * del punto agarrado al empezar.
+   */
+  enganche?: { indice: SnapIndex; desde: Point2D };
 }
 
 interface NodeDrag extends OutlineDrag {
@@ -120,16 +132,11 @@ export function findInsertTarget(
   outline: PathCommand[],
   hitRadius: number,
 ): { commandIndex: number; t: number } | null {
-  if (hitTestNode(localPt, nodes, hitRadius)) return null;
-  const segHit = nearestSegment(localPt, outline);
-  if (segHit && segHit.distance < hitRadius) {
-    // An M target is nearestSegment's phantom closing edge of an OPEN
-    // outline — there is no real edge there, so inserting is meaningless
-    // (and would push a junk no-op entry onto the undo stack).
-    if (outline[segHit.commandIndex]?.type === 'M') return null;
-    return { commandIndex: segHit.commandIndex, t: segHit.t };
-  }
-  return null;
+  // `agarrar` never returns nearestSegment's phantom closing edge of an OPEN
+  // outline — there is no real edge there, so inserting is meaningless
+  // (and would push a junk no-op entry onto the undo stack).
+  const hit = agarrar([{ clave: CLAVE_CONTORNO, path: outline, nodes }], localPt, hitRadius, null);
+  return hit?.tipo === 'tramo' ? { commandIndex: hit.commandIndex, t: hit.t } : null;
 }
 
 // ─── Hook ───
@@ -154,6 +161,23 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       .reverse(),
     [pieces, hiddenLayerIds, layerLocked],
   );
+  // La interna elegida tiene una sola fuente, la de Z (spec 2026-09-24 § 3.5).
+  // `?.`/`??`: los arneses de prueba de antes no montan `editor`.
+  const selectedInternalLine = useSelector((s: RootState) => s.editor?.selectedInternalLine ?? null);
+  const trazos = useSelector((s: RootState) => s.project.trazos ?? SIN_TRAZOS);
+  const showTrazos = useSelector((s: RootState) => s.editor?.showTrazos ?? true);
+  /** Lo visible en orden de dibujo, para el enganche (la última pieza, encima). */
+  const visiblesEnOrden = useMemo(
+    () => pieces
+      .filter(p => !hiddenLayerIds.includes(p.layer ?? 1))
+      .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
+    [pieces, hiddenLayerIds],
+  );
+  /** El punto al que engancha el arrastre de una interna, en patrón (spec § 4.3). */
+  const [enganche, setEnganche] = useState<Point2D | null>(null);
+  const publicarEnganche = useCallback((p: Point2D | null) => {
+    setEnganche(prev => (prev === p || (prev && p && prev.x === p.x && prev.y === p.y) ? prev : p));
+  }, []);
 
   const [state, setState] = useState<EditPatternState>({ ...INITIAL_STATE });
   /** Shift ahora mismo: la pista del pie lo lee antes de agarrar nada. */
@@ -168,12 +192,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   useEffect(() => {
     if (state.isEditing || !state.hoveredPieceId) return;
     if (hoverablePieces.some(piece => piece.id === state.hoveredPieceId)) return;
-    setState(current => ({
-      ...current,
-      hoveredPieceId: null,
-      hoveredNode: null,
-      hoveredSegment: null,
-    }));
+    setState(current => ({ ...sinHover(current), hoveredPieceId: null }));
   }, [hoverablePieces, state.isEditing, state.hoveredPieceId]);
 
   const dragRef = useRef<DragState | null>(null);
@@ -310,6 +329,30 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     [dispatch],
   );
 
+  /** La clave de la interna elegida en ESTA pieza, o null (spec § 3.5). */
+  const claveElegida = useCallback((pieceId: string) => (
+    selectedInternalLine?.pieceId === pieceId ? claveDeInterna(selectedInternalLine.lineId) : null
+  ), [selectedInternalLine]);
+
+  /**
+   * Q escribe la interna elegida cuando lo elegido es de una interna, y la
+   * vacía —dejando la pieza— cuando deja de serlo. Nunca guarda una interna
+   * elegida que Z no conozca: dos fuentes se desincronizan.
+   */
+  const publicarElegida = useCallback((pieceId: string, next: EditPatternState) => {
+    const elegida = internaElegidaDe(next);
+    if (elegida) dispatch(selectInternalLine({ pieceId, ...elegida }));
+    else if (selectedInternalLine?.pieceId === pieceId) dispatch(selectPiece(pieceId));
+  }, [dispatch, selectedInternalLine]);
+
+  /** El índice de enganche de lo visible, sin la interna que se arrastra (spec § 4.3). */
+  const indiceSin = useCallback((piece: PatternPiece, lineId: string): SnapIndex => buildSnapIndex(
+    visiblesEnOrden.map(p => (p.id === piece.id
+      ? { ...p, internals: p.internals.filter(l => l.id !== lineId) }
+      : p)),
+    showTrazos ? trazos : SIN_TRAZOS,
+  ), [visiblesEnOrden, showTrazos, trazos]);
+
   // ─── enterEdit ───
 
   const enterEdit = useCallback(
@@ -328,9 +371,79 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       setState(estadoDeEntrada(piece));
       dragRef.current = null;
       setGuias(null);
+      publicarEnganche(null);
     },
-    [pieces, endDragBatch, dispatch],
+    [pieces, endDragBatch, dispatch, publicarEnganche],
   );
+
+  /**
+   * Elige lo agarrado y arma el gesto (spec 2026-09-24 §§ 3.4-4.3). Lo comparten
+   * el press dentro de la pieza en edición y el primer press que entra en ella:
+   * un solo sitio decide qué queda elegido, qué se mueve, el marco de Shift y
+   * si engancha.
+   */
+  const armarGesto = useCallback(
+    (piece: PatternPiece, base: EditPatternState, hit: Agarre, e: React.MouseEvent<SVGSVGElement>): EditPatternState => {
+      const linea = vistas(base, piece.outline).find(l => l.clave === hit.clave);
+      if (!linea) return base;
+      const aditivo = e.shiftKey;
+      const lineId = lineIdDeClave(hit.clave);
+      let next: EditPatternState;
+      let quitarAlSoltar: OutlineDrag['quitarAlSoltar'];
+      let marco: OutlineDrag['marco'];
+      let grupo: number[] = [];
+      if (hit.tipo === 'punto') {
+        // A coincident group is one point: selecting a member selects them all,
+        // so Delete removes the corner instead of leaving its twin behind.
+        const miembros = anchorGroupOf(linea.path, hit.commandIndex);
+        grupo = miembros.length > 0 ? miembros : [hit.commandIndex];
+        // Shift+press sobre un punto YA seleccionado: quitarlo se decide al
+        // soltar, y solo si no hubo arrastre. Pulsar Shift y después agarrar es
+        // como se endereza un arrastre (firma del 23-09); quitarlo en el press
+        // dejaba el arrastre sin sujeto y el punto no se movía.
+        if (aditivo && linea.selectedNodes.has(hit.commandIndex)) quitarAlSoltar = { clave: hit.clave, indices: grupo };
+        // Un gesto mueve puntos o tramos, nunca las dos cosas.
+        const limpio = sinTramos(aditivo ? base : sinSeleccion(base));
+        const nodos = new Set(aditivo ? linea.selectedNodes : []);
+        for (const ci of grupo) nodos.add(ci);
+        next = conLinea(limpio, hit.clave, { selectedNodes: nodos });
+        const pos = linea.nodes.find(n => n.ref.commandIndex === hit.commandIndex)?.position ?? { x: 0, y: 0 };
+        marco = marcoDelPunto(piece, linea.path, pos, hit.commandIndex);
+      } else {
+        // El mismo aplazamiento que el de los puntos.
+        if (aditivo && linea.selectedSegments.has(hit.commandIndex)) quitarAlSoltar = { clave: hit.clave, indices: [hit.commandIndex] };
+        const limpio = sinPuntos(aditivo ? base : sinSeleccion(base));
+        const tramos = new Set(aditivo ? linea.selectedSegments : []);
+        tramos.add(hit.commandIndex);
+        next = conLinea(limpio, hit.clave, { selectedSegments: tramos });
+        marco = marcoDelTramo(piece, linea.path, linea.nodes, hit.commandIndex, pieceLocalToPattern(hit.point, piece));
+      }
+      const porLinea = arrastreDe(next, piece.outline, hit.tipo === 'punto' ? 'node' : 'segment');
+      const soloEse = porLinea.size === 1 && porLinea.get(hit.clave)?.startPositions.size === grupo.length;
+      const desde = hit.tipo === 'punto' ? porLinea.get(hit.clave)?.startPositions.get(hit.commandIndex) : undefined;
+      dragRef.current = {
+        type: hit.tipo === 'punto' ? 'node' : 'segment',
+        startMouse: { x: e.clientX, y: e.clientY },
+        porLinea,
+        marco,
+        ...(quitarAlSoltar ? { quitarAlSoltar } : {}),
+        ...(lineId && soloEse && desde ? { enganche: { indice: indiceSin(piece, lineId), desde } } : {}),
+      };
+      pushJournal('gesture', 'edicion:agarre', {
+        objeto: 'pieza', linea: lineId ? 'interna' : 'contorno', que: hit.tipo, ...(lineId ? { lineId } : {}),
+      });
+      return next;
+    },
+    [indiceSin],
+  );
+
+  /** Lo que agarraría un press en la pieza en edición (menú contextual y enrutador). */
+  const agarreEn = useCallback((e: React.MouseEvent<SVGSVGElement>): Agarre | null => {
+    if (!state.isEditing || !state.editingPieceId) return null;
+    const piece = getPiece(state.editingPieceId);
+    if (!piece) return null;
+    return agarrar(vistas(state, piece.outline), toLocal(e, piece), hitRadius, claveElegida(piece.id));
+  }, [state, getPiece, toLocal, hitRadius, claveElegida]);
 
   /**
    * Entra a una pieza y, solo cuando el press tiene un sujeto concreto, deja
@@ -354,88 +467,18 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         else dispatch(showInfoToast('La capa de esta pieza está bloqueada: desbloquéala en Capas para editarla.'));
         return true;
       }
-
-      const nodes = extractNodes(piece);
-      const localPt = toLocal(e, piece);
-      const nodeHit = hitTestNode(localPt, nodes, hitRadius);
-
-      if (nodeHit) {
-        endDragBatch();
-        const selectedNodes = new Set(anchorGroupOf(piece.outline, nodeHit.commandIndex));
-        const startPositions = new Map<number, Point2D>();
-        for (const commandIndex of selectedNodes) {
-          const node = nodes.find(n => n.ref.commandIndex === commandIndex);
-          if (node) startPositions.set(commandIndex, { ...node.position });
-        }
-
-        seenPathsRef.current = pathsEditables(piece);
-        expectedPathsRef.current = null;
-        setState({
-          isEditing: true,
-          editingPieceId: pieceId,
-          hoveredPieceId: null,
-          nodes,
-          selectedNodes,
-          selectedSegments: new Set<number>(),
-          hoveredNode: null,
-          hoveredSegment: null,
-          addPointPreview: null,
-          marquee: null,
-          internas: extraerInternas(piece),
-        });
-        dragRef.current = {
-          type: 'node',
-          startMouse: { x: e.clientX, y: e.clientY },
-          porLinea: new Map([[CLAVE_CONTORNO, { startPath: piece.outline, startPositions }]]),
-          marco: marcoDelPunto(piece, startPositions.get(nodeHit.commandIndex) ?? localPt, nodeHit.commandIndex),
-        };
-        return true;
-      }
-
-      const segmentHit = nearestSegment(localPt, piece.outline);
-      if (segmentHit
-          && segmentHit.distance < hitRadius
-          && piece.outline[segmentHit.commandIndex]?.type !== 'M') {
-        endDragBatch();
-        const selectedSegments = new Set([segmentHit.commandIndex]);
-        const startPositions = new Map<number, Point2D>();
-        const toIndex = piece.outline[segmentHit.commandIndex]?.type === 'Z'
-          ? 0
-          : segmentHit.commandIndex;
-        const toNode = nodes.find(n => n.ref.commandIndex === toIndex);
-        if (toNode) startPositions.set(toIndex, { ...toNode.position });
-        const fromNode = findFromNode(nodes, segmentHit.commandIndex);
-        if (fromNode && !startPositions.has(fromNode.ref.commandIndex)) {
-          startPositions.set(fromNode.ref.commandIndex, { ...fromNode.position });
-        }
-
-        seenPathsRef.current = pathsEditables(piece);
-        expectedPathsRef.current = null;
-        setState({
-          isEditing: true,
-          editingPieceId: pieceId,
-          hoveredPieceId: null,
-          nodes,
-          selectedNodes: new Set<number>(),
-          selectedSegments,
-          hoveredNode: null,
-          hoveredSegment: null,
-          addPointPreview: null,
-          marquee: null,
-          internas: extraerInternas(piece),
-        });
-        dragRef.current = {
-          type: 'segment',
-          startMouse: { x: e.clientX, y: e.clientY },
-          porLinea: new Map([[CLAVE_CONTORNO, { startPath: piece.outline, startPositions }]]),
-          marco: marcoDelTramo(piece, nodes, segmentHit.commandIndex, pieceLocalToPattern(segmentHit.point, piece)),
-        };
-        return true;
-      }
-
-      return false;
+      const base = estadoDeEntrada(piece);
+      const hit = agarrar(vistas(base, piece.outline), toLocal(e, piece), hitRadius, claveElegida(pieceId));
+      if (!hit) return false;
+      endDragBatch();
+      seenPathsRef.current = pathsEditables(piece);
+      expectedPathsRef.current = null;
+      const next = armarGesto(piece, base, hit, e);
+      setState(next);
+      publicarElegida(pieceId, next);
+      return true;
     },
-    [pieces, layerLocked, toLocal, hitRadius, endDragBatch, enterEdit, dispatch],
+    [pieces, layerLocked, toLocal, hitRadius, endDragBatch, enterEdit, dispatch, claveElegida, armarGesto, publicarElegida],
   );
 
   // ─── exitEdit ───
@@ -445,15 +488,17 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     setState({ ...INITIAL_STATE });
     dragRef.current = null;
     setGuias(null);
+    publicarEnganche(null);
     expectedPathsRef.current = null;
     seenPathsRef.current = null;
-  }, [endDragBatch]);
+  }, [endDragBatch, publicarEnganche]);
 
-  // Resync when the edited piece's outline changes OUTSIDE this hook
-  // (undo/redo via restoreState, copilot edits). Without this the dots detach
-  // from the reverted path and points appear to vanish. The hook's own
-  // dispatches are skipped by outline identity — they already refreshed
-  // nodes, and clearing selection/drag on them would kill an active drag.
+  // Resync when the edited piece's editable paths (its outline and its
+  // editable internals) change OUTSIDE this hook (undo/redo via restoreState,
+  // copilot edits). Without this the dots detach from the reverted path and
+  // points appear to vanish. The hook's own dispatches are skipped by the
+  // identity of those paths — they already refreshed nodes, and clearing
+  // selection/drag on them would kill an active drag.
   useEffect(() => {
     if (!state.isEditing || !state.editingPieceId) return;
     const piece = pieces.find(p => p.id === state.editingPieceId);
@@ -474,8 +519,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     endDragBatch();
     dragRef.current = null;
     setGuias(null);
+    publicarEnganche(null);
     setState(s => resyncStateToPiece(s, piece));
-  }, [pieces, state.isEditing, state.editingPieceId, exitEdit, endDragBatch]);
+  }, [pieces, state.isEditing, state.editingPieceId, exitEdit, endDragBatch, publicarEnganche]);
 
   useEffect(() => () => endDragBatch(), [endDragBatch]);
 
@@ -506,110 +552,19 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       const piece = getPiece(state.editingPieceId);
       if (!piece) return false;
 
-      const localPt = toLocal(e, piece);
-      const hr = hitRadius;
-
-      // 1. Check anchor hit
-      const nodeHit = hitTestNode(localPt, state.nodes, hr);
-      if (nodeHit) {
-        const idx = nodeHit.commandIndex;
-        const shift = e.shiftKey;
-        // A coincident group is one point: selecting a member selects them all,
-        // so Delete removes the corner instead of leaving its twin behind.
-        const group = anchorGroupOf(piece.outline, idx);
-        // Shift+press sobre un punto YA seleccionado: quitarlo se decide al
-        // soltar, y solo si no hubo arrastre. Pulsar Shift y después agarrar es
-        // como se endereza un arrastre (firma del 23-09); quitarlo en el press
-        // dejaba el arrastre sin sujeto y el punto no se movía.
-        const quitarAlSoltar = shift && state.selectedNodes.has(idx);
-
-        setState(s => {
-          const newSelected = new Set(shift ? s.selectedNodes : []);
-          for (const ci of group) newSelected.add(ci);
-          return {
-            ...s,
-            selectedNodes: newSelected,
-            selectedSegments: new Set<number>(),
-          };
-        });
-
-        // Build startPositions for all selected nodes (including the new group)
-        const selectedAfterClick = new Set(shift ? state.selectedNodes : []);
-        for (const ci of group) selectedAfterClick.add(ci);
-
-        const startPositions = new Map<number, Point2D>();
-        for (const ci of selectedAfterClick) {
-          const node = state.nodes.find(n => n.ref.commandIndex === ci);
-          if (node) {
-            startPositions.set(ci, { ...node.position });
-          }
-        }
-
-        dragRef.current = {
-          type: 'node',
-          startMouse: { x: e.clientX, y: e.clientY },
-          porLinea: new Map([[CLAVE_CONTORNO, { startPath: piece.outline, startPositions }]]),
-          marco: marcoDelPunto(piece, startPositions.get(idx) ?? localPt, idx),
-          ...(quitarAlSoltar ? { quitarAlSoltar: { clave: CLAVE_CONTORNO, indices: group } } : {}),
-        };
-
+      const hit = agarrar(vistas(state, piece.outline), toLocal(e, piece), hitRadius, claveElegida(piece.id));
+      if (hit) {
+        const next = armarGesto(piece, state, hit, e);
+        setState(next);
+        publicarElegida(piece.id, next);
         return true;
       }
 
-      // 2. Check segment hit
-      const segHit = nearestSegment(localPt, piece.outline);
-      if (segHit && segHit.distance < hr) {
-        const idx = segHit.commandIndex;
-        const shift = e.shiftKey;
-        // El mismo aplazamiento que el de los puntos.
-        const quitarAlSoltar = shift && state.selectedSegments.has(idx);
-
-        setState(s => {
-          const newSelected = new Set(shift ? s.selectedSegments : []);
-          newSelected.add(idx);
-          return {
-            ...s,
-            selectedSegments: newSelected,
-            selectedNodes: new Set<number>(),
-          };
-        });
-
-        // Build startPositions for both endpoints of selected segments
-        const selectedAfterClick = new Set(shift ? state.selectedSegments : []);
-        selectedAfterClick.add(idx);
-
-        const startPositions = new Map<number, Point2D>();
-        for (const segIdx of selectedAfterClick) {
-          // "to" node — the destination of this segment
-          const toIndex = piece.outline[segIdx]?.type === 'Z' ? 0 : segIdx;
-          const toNode = state.nodes.find(n => n.ref.commandIndex === toIndex);
-          if (toNode) {
-            startPositions.set(toIndex, { ...toNode.position });
-          }
-          // "from" node — the previous command's anchor
-          const fromNode = findFromNode(state.nodes, segIdx);
-          if (fromNode && !startPositions.has(fromNode.ref.commandIndex)) {
-            startPositions.set(fromNode.ref.commandIndex, { ...fromNode.position });
-          }
-        }
-
-        dragRef.current = {
-          type: 'segment',
-          startMouse: { x: e.clientX, y: e.clientY },
-          porLinea: new Map([[CLAVE_CONTORNO, { startPath: piece.outline, startPositions }]]),
-          marco: marcoDelTramo(piece, state.nodes, idx, pieceLocalToPattern(segHit.point, piece)),
-          ...(quitarAlSoltar ? { quitarAlSoltar: { clave: CLAVE_CONTORNO, indices: [idx] } } : {}),
-        };
-
-        return true;
-      }
-
-      // 3. Empty area → start marquee
+      // Empty area → start marquee. Sin Shift suelta todo; con Shift conserva
+      // los puntos.
       const patPt = toPattern(e);
       setState(s => ({
-        ...s,
-        selectedNodes: e.shiftKey ? s.selectedNodes : new Set<number>(),
-        selectedSegments: new Set<number>(),
+        ...(e.shiftKey ? sinTramos(s) : sinSeleccion(s)),
         marquee: { start: patPt, current: patPt },
       }));
 
@@ -621,7 +576,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
       return true;
     },
-    [state, getPiece, toLocal, toPattern, hitRadius, modoRef, sincronizar],
+    [state, getPiece, toLocal, toPattern, hitRadius, modoRef, sincronizar, claveElegida, armarGesto, publicarElegida],
   );
 
   // ─── El arrastre de nodos y tramos ───
@@ -661,7 +616,22 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       } else {
         publicarGuias(null);
       }
-      const { x: dx, y: dy } = patternToPieceLocalDirection(enPatron, piece);
+      let { x: dx, y: dy } = patternToPieceLocalDirection(enPatron, piece);
+      // Precedencia del § 3.4: Shift > enganche > ratón. Una interna no mueve el
+      // pivote de la pieza, así que su marco es el mismo en todo el gesto.
+      if (drag.enganche && modo === 'suelto') {
+        const { indice, desde } = drag.enganche;
+        const mundo = pieceLocalToPattern({ x: desde.x + dx, y: desde.y + dy }, piece);
+        const snap = resolveSnap(indice, mundo, screenToPatternLength(EDGE_HIT_PX, zoom));
+        if (snap) {
+          const local = patternToPieceLocal(snap.point, piece);
+          dx = local.x - desde.x;
+          dy = local.y - desde.y;
+        }
+        publicarEnganche(snap ? snap.point : null);
+      } else if (drag.enganche) {
+        publicarEnganche(null);
+      }
       // Un desplazamiento igual al último escrito no reescribe nada: con Shift,
       // mover la mano en perpendicular a la guía no cambia el punto; y antes
       // del primer frame, el delta cero tampoco.
@@ -699,7 +669,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       drag.lastDelta = { x: dx, y: dy };
       drag.wrote = true;
     },
-    [zoom, beginDragBatch, escribirLineas, publicarGuias],
+    [zoom, beginDragBatch, escribirLineas, publicarGuias, publicarEnganche],
   );
 
   // ─── handleMouseMove ───
@@ -707,7 +677,6 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): boolean => {
       if (!state.isEditing) {
-        const hr = hitRadius;
         const target = e.target as Element | null;
         const domPieceId = typeof target?.closest === 'function'
           ? target.closest('[data-piece-id]')?.getAttribute('data-piece-id')
@@ -719,38 +688,22 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           : hoverablePieces;
 
         for (const piece of candidates) {
-          const localPt = toLocal(e, piece);
-          const nodeHit = hitTestNode(localPt, extractNodes(piece), hr);
-          if (nodeHit) {
-            setState(s => ({
-              ...s,
-              hoveredPieceId: piece.id,
-              hoveredNode: nodeHit.commandIndex,
-              hoveredSegment: null,
-            }));
-            return false;
-          }
-
-          const segHit = nearestSegment(localPt, piece.outline);
-          if (segHit
-              && segHit.distance < hr
-              && piece.outline[segHit.commandIndex]?.type !== 'M') {
-            setState(s => ({
-              ...s,
-              hoveredPieceId: piece.id,
-              hoveredNode: null,
-              hoveredSegment: segHit.commandIndex,
-            }));
+          const internas = state.hoveredPieceId === piece.id && state.internas
+            ? state.internas
+            : extraerInternas(piece);
+          const base: EditPatternState = { ...INITIAL_STATE, nodes: extractNodes(piece), internas };
+          const hit = agarrar(vistas(base, piece.outline), toLocal(e, piece), hitRadius, claveElegida(piece.id));
+          if (hit) {
+            setState(s => conLinea(
+              { ...sinHover({ ...s, internas: s.hoveredPieceId === piece.id && s.internas ? s.internas : internas }), hoveredPieceId: piece.id },
+              hit.clave,
+              hit.tipo === 'punto' ? { hoveredNode: hit.commandIndex } : { hoveredSegment: hit.commandIndex },
+            ));
             return false;
           }
         }
 
-        setState(s => ({
-          ...s,
-          hoveredPieceId: null,
-          hoveredNode: null,
-          hoveredSegment: null,
-        }));
+        setState(s => ({ ...sinHover(s), hoveredPieceId: null }));
         return false;
       }
 
@@ -780,45 +733,19 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         }
       }
 
-      // Hover detection
-      const localPt = toLocal(e, piece);
-      const hr = hitRadius;
-
-      // Check node hover
-      const nodeHit = hitTestNode(localPt, state.nodes, hr);
-      if (nodeHit) {
-        setState(s => ({
-          ...s,
-          hoveredNode: nodeHit.commandIndex,
-          hoveredSegment: null,
-          addPointPreview: null,
-        }));
-        return false;
-      }
-
-      // Check segment hover
-      const segHit = nearestSegment(localPt, piece.outline);
-      if (segHit && segHit.distance < hr) {
+      // Hover detection, en todas las líneas.
+      const hit = agarrar(vistas(state, piece.outline), toLocal(e, piece), hitRadius, claveElegida(piece.id));
+      setState(s => {
+        const limpio = sinHover(s);
+        // Nothing hovered
+        if (!hit) return limpio;
+        if (hit.tipo === 'punto') return conLinea(limpio, hit.clave, { hoveredNode: hit.commandIndex });
         // addPointPreview is in piece-local space
-        setState(s => ({
-          ...s,
-          hoveredNode: null,
-          hoveredSegment: segHit.commandIndex,
-          addPointPreview: segHit.point,
-        }));
-        return false;
-      }
-
-      // Nothing hovered
-      setState(s => ({
-        ...s,
-        hoveredNode: null,
-        hoveredSegment: null,
-        addPointPreview: null,
-      }));
+        return conLinea(limpio, hit.clave, { hoveredSegment: hit.commandIndex, addPointPreview: hit.point });
+      });
       return false;
     },
-    [state, hoverablePieces, getPiece, toLocal, toPattern, hitRadius, aplicarArrastre, modoRef, sincronizar],
+    [state, hoverablePieces, getPiece, toLocal, toPattern, hitRadius, aplicarArrastre, modoRef, sincronizar, claveElegida],
   );
 
   // ─── handleMouseUp ───
@@ -827,60 +754,38 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     const drag = dragRef.current;
     dragRef.current = null;
     setGuias(null);
+    publicarEnganche(null);
     endDragBatch();
 
     if (!drag) return;
 
     if (drag.type === 'marquee') {
       // Resolve marquee selection
-      setState(s => {
-        if (!s.marquee || !s.editingPieceId) {
-          return { ...s, marquee: null };
-        }
-
-        const piece = pieces.find(p => p.id === s.editingPieceId);
-        if (!piece) return { ...s, marquee: null };
-
-        const { start, current } = s.marquee;
-        // Marquee is a screen-aligned box in pattern space; project each
-        // (un-rotated) node to its rotated pattern position before the test.
-        const minX = Math.min(start.x, current.x);
-        const maxX = Math.max(start.x, current.x);
-        const minY = Math.min(start.y, current.y);
-        const maxY = Math.max(start.y, current.y);
-
-        const insideNodes = new Set(s.selectedNodes); // keep existing if shift was held
-        for (const node of s.nodes) {
-          const { x, y } = pieceLocalToPattern(node.position, piece);
-          if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
-            insideNodes.add(node.ref.commandIndex);
-          }
-        }
-
-        return { ...s, marquee: null, selectedNodes: insideNodes };
-      });
+      const piece = state.editingPieceId ? pieces.find(p => p.id === state.editingPieceId) : undefined;
+      if (!state.marquee || !piece) {
+        setState(s => ({ ...s, marquee: null }));
+        return;
+      }
+      const next = marcoSelecciona(state, piece);
+      setState(next);
+      publicarElegida(piece.id, next);
       return;
     }
 
+    pushJournal('gesture', 'edicion:suelta', { movio: !!drag.wrote });
+
     // Node/segment drags already wrote during mousemove. What is left is the
-    // Shift+click that never became a drag: now it does deselect. En la fase 1
-    // la única línea es el contorno.
+    // Shift+click that never became a drag: now it does deselect.
     const quitar = drag.quitarAlSoltar;
-    if (!quitar || drag.wrote) return;
-    if (drag.type === 'node') {
-      setState(s => {
-        const selectedNodes = new Set(s.selectedNodes);
-        for (const ci of quitar.indices) selectedNodes.delete(ci);
-        return { ...s, selectedNodes };
-      });
-    } else {
-      setState(s => {
-        const selectedSegments = new Set(s.selectedSegments);
-        for (const ci of quitar.indices) selectedSegments.delete(ci);
-        return { ...s, selectedSegments };
-      });
-    }
-  }, [pieces, endDragBatch]);
+    if (!quitar || drag.wrote || !state.editingPieceId) return;
+    const v = vistas(state).find(l => l.clave === quitar.clave);
+    if (!v) return;
+    const conjunto = new Set(drag.type === 'node' ? v.selectedNodes : v.selectedSegments);
+    for (const ci of quitar.indices) conjunto.delete(ci);
+    const next = conLinea(state, quitar.clave, drag.type === 'node' ? { selectedNodes: conjunto } : { selectedSegments: conjunto });
+    setState(next);
+    publicarElegida(state.editingPieceId, next);
+  }, [state, pieces, endDragBatch, publicarEnganche, publicarElegida]);
 
   // ─── handleKeyDown ───
 
@@ -917,9 +822,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         // abierto, Escape lo cancela y cierra su lote de deshacer; quedarse en
         // el peldaño 3 dejaba el lote abierto y la siguiente acción entraba
         // dentro de él (lo cazó `useEditPattern.undo.test.tsx`, no yo).
-        if (!dragRef.current
-            && (state.selectedNodes.size > 0 || state.selectedSegments.size > 0)) {
-          setState(s => ({ ...s, selectedNodes: new Set(), selectedSegments: new Set() }));
+        if (!dragRef.current && algoElegido(state)) {
+          const next = sinSeleccion(state);
+          setState(next);
+          publicarElegida(state.editingPieceId, next);
           e.preventDefault();
           e.stopPropagation();
           return true;
@@ -979,7 +885,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
       return false;
     },
-    [state, exitEdit, getPiece, dispatch],
+    [state, exitEdit, getPiece, dispatch, publicarElegida],
   );
 
   // ─── handleDoubleClick ───
@@ -1088,34 +994,24 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   // ─── getCursor ───
 
   const limpiarHover = useCallback(() => {
-    setState(current => current.isEditing
-      ? current
-      : {
-          ...current,
-          hoveredPieceId: null,
-          hoveredNode: null,
-          hoveredSegment: null,
-          addPointPreview: null,
-        });
+    setState(current => (current.isEditing ? current : { ...sinHover(current), hoveredPieceId: null }));
   }, []);
 
   const getCursor = useCallback((): string => {
+    const hover = hoverDe(state);
     if (!state.isEditing) {
       // Hover-sin-clic (2026-09-10): el sujeto ya no espera la sesión
       // entrada. El cursor distingue el nodo que se moverá del tramo que se
       // seleccionará, para anunciar exactamente lo que hará el primer press.
-      if (state.hoveredNode !== null) return 'move';
-      return state.hoveredSegment !== null ? 'pointer' : 'default';
+      // Vale en cualquier línea: el contorno o una interna.
+      if (hover?.tipo === 'punto') return 'move';
+      return hover?.tipo === 'tramo' ? 'pointer' : 'default';
     }
-    if (dragRef.current) {
-      if (dragRef.current.type === 'marquee') return 'crosshair';
-      return 'move';
-    }
-    if (state.hoveredNode !== null) return 'move';
-    if (state.addPointPreview !== null) return 'cell';
-    if (state.hoveredSegment !== null) return 'pointer';
+    if (dragRef.current) return dragRef.current.type === 'marquee' ? 'crosshair' : 'move';
+    if (hover?.tipo === 'punto') return 'move';
+    if (hover?.tipo === 'tramo') return hover.conPreview ? 'cell' : 'pointer';
     return 'default';
-  }, [state.isEditing, state.hoveredNode, state.hoveredSegment, state.addPointPreview]);
+  }, [state]);
 
 
   return {
@@ -1141,21 +1037,27 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     guias,
     /** Shift ahora mismo, para la pista del pie. */
     modoShift,
+    /** El punto al que engancha el arrastre de una interna, en patrón (spec § 4.3). */
+    enganche,
+    /** Qué agarraría un press en la pieza en edición (menú contextual y enrutador). */
+    agarreEn,
   };
 }
 
 // ─── Internal helpers ───
 
-/** El marco de un punto agarrado: el lado que le llega, desde su posición inicial. */
-function marcoDelPunto(piece: PatternPiece, position: Point2D, commandIndex: number): OutlineDrag['marco'] {
-  return { desde: pieceLocalToPattern(position, piece), referencia: arrivingReference(piece, commandIndex) };
+/** El marco de un punto agarrado: el tramo de SU línea que le llega, desde su posición inicial (spec § 4.2). */
+function marcoDelPunto(
+  piece: PatternPiece, path: PathCommand[], position: Point2D, commandIndex: number,
+): OutlineDrag['marco'] {
+  return { desde: pieceLocalToPattern(position, piece), referencia: arrivingReferenceOnPath(piece, path, commandIndex) };
 }
 
-/** El marco de un lado agarrado: su propia recta, desde el punto del lado bajo el press (no el pulso, que cae hasta 8 px fuera). */
+/** El marco de un tramo agarrado: su propia recta, desde el punto del tramo bajo el press (no el pulso, que cae hasta 8 px fuera). */
 function marcoDelTramo(
-  piece: PatternPiece, nodes: EditableNode[], commandIndex: number, pulsado: Point2D,
+  piece: PatternPiece, path: PathCommand[], nodes: EditableNode[], commandIndex: number, pulsado: Point2D,
 ): OutlineDrag['marco'] {
-  const toIndex = piece.outline[commandIndex]?.type === 'Z' ? 0 : commandIndex;
+  const toIndex = path[commandIndex]?.type === 'Z' ? 0 : commandIndex;
   const to = nodes.find(n => n.ref.commandIndex === toIndex)?.position;
   const from = findFromNode(nodes, commandIndex)?.position;
   return { desde: pulsado, referencia: to && from ? chordReference(piece, from, to) : ABSOLUTE_REFERENCE };
