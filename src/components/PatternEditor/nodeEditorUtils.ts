@@ -111,8 +111,16 @@ export function anchorGroupOf(outline: PathCommand[], commandIndex: number): num
 
 /** Extract editable nodes from a piece's outline */
 export function extractNodes(piece: PatternPiece): EditableNode[] {
+  return extractNodesFromPath(piece.outline, piece.id);
+}
+
+/**
+ * Los nodos editables de cualquier línea de una pieza —su contorno o una de sus
+ * internas— (spec 2026-09-24 § 3.1). `ownerId` es la pieza dueña y va en cada
+ * `NodeRef.pieceId`, igual que con el contorno.
+ */
+export function extractNodesFromPath(cmds: PathCommand[], ownerId: string): EditableNode[] {
   const nodes: EditableNode[] = [];
-  const cmds = piece.outline;
 
   for (let i = 0; i < cmds.length; i++) {
     const cmd = cmds[i];
@@ -123,17 +131,17 @@ export function extractNodes(piece: PatternPiece): EditableNode[] {
       case 'M':
       case 'L':
         node = {
-          ref: { pieceId: piece.id, commandIndex: i, pointType: 'anchor' },
+          ref: { pieceId: ownerId, commandIndex: i, pointType: 'anchor' },
           position: { x: v[0], y: v[1] },
         };
         break;
       case 'C': {
         // Cubic bezier: cp1(v[0],v[1]), cp2(v[2],v[3]), anchor(v[4],v[5])
         node = {
-          ref: { pieceId: piece.id, commandIndex: i, pointType: 'anchor' },
+          ref: { pieceId: ownerId, commandIndex: i, pointType: 'anchor' },
           position: { x: v[4], y: v[5] },
           cp1: { x: v[2], y: v[3] }, // incoming handle of this anchor
-          cp1Ref: { pieceId: piece.id, commandIndex: i, pointType: 'cp2' },
+          cp1Ref: { pieceId: ownerId, commandIndex: i, pointType: 'cp2' },
         };
         break;
       }
@@ -142,10 +150,10 @@ export function extractNodes(piece: PatternPiece): EditableNode[] {
         // handle writes the 'cp1' slot — the hardcoded 'cp2' mapping made a
         // Q handle drag a silent no-op (maria-203).
         node = {
-          ref: { pieceId: piece.id, commandIndex: i, pointType: 'anchor' },
+          ref: { pieceId: ownerId, commandIndex: i, pointType: 'anchor' },
           position: { x: v[2], y: v[3] },
           cp1: { x: v[0], y: v[1] },
-          cp1Ref: { pieceId: piece.id, commandIndex: i, pointType: 'cp1' },
+          cp1Ref: { pieceId: ownerId, commandIndex: i, pointType: 'cp1' },
         };
         break;
       }
@@ -158,7 +166,7 @@ export function extractNodes(piece: PatternPiece): EditableNode[] {
       const next = cmds[i + 1];
       if (next?.type === 'C') {
         node.cp2 = { x: next.values[0], y: next.values[1] };
-        node.cp2Ref = { pieceId: piece.id, commandIndex: i + 1, pointType: 'cp1' };
+        node.cp2Ref = { pieceId: ownerId, commandIndex: i + 1, pointType: 'cp1' };
       }
       nodes.push(node);
     }

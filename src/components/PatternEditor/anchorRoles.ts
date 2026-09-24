@@ -65,10 +65,22 @@ export function classifyEditableAnchors(
   piece: PatternPiece,
   nodes: EditableNode[],
 ): ClassifiedAnchor[] {
-  const closed = piece.outline.some((command) => command.type === 'Z');
+  return classifyAnchorsOfPath(piece.outline, nodes);
+}
+
+/**
+ * Los roles de las anclas de cualquier línea (spec 2026-09-24 § 3.3): una
+ * interna abierta tiene extremos como un contorno abierto, y una cerrada se
+ * clasifica como el contorno.
+ */
+export function classifyAnchorsOfPath(
+  path: PathCommand[],
+  nodes: EditableNode[],
+): ClassifiedAnchor[] {
+  const closed = path.some((command) => command.type === 'Z');
 
   const groupOf = new Map<number, number[]>();
-  for (const members of coincidentAnchorGroups(piece.outline).values()) {
+  for (const members of coincidentAnchorGroups(path).values()) {
     for (const index of members) groupOf.set(index, members);
   }
 
@@ -86,7 +98,7 @@ export function classifyEditableAnchors(
 
   // A detected corner colours every member of its group. Claiming one node per
   // corner is what stacked a 6px curve dot on top of every 10px corner square.
-  const detected = detectCorners(piece.outline);
+  const detected = detectCorners(path);
   const corners = new Set<number>();
   for (const node of nodes) {
     const hit = detected.some(
@@ -104,18 +116,18 @@ export function classifyEditableAnchors(
   // the renderer never stacks different glyphs at one coordinate.
   const authoredCorners = new Set<number>();
   const bezierAnchors = new Set<number>();
-  for (const members of coincidentAnchorGroups(piece.outline).values()) {
+  for (const members of coincidentAnchorGroups(path).values()) {
     const touchesBezier = members.some((index) =>
-      isBezierCommand(piece.outline[index]) ||
-      isBezierCommand(piece.outline[index + 1]));
+      isBezierCommand(path[index]) ||
+      isBezierCommand(path[index + 1]));
     if (touchesBezier) {
       for (const index of members) bezierAnchors.add(index);
       continue;
     }
 
     const hasAuthoredStraightAnchor = members.some((index) =>
-      piece.outline[index]?.authoredAnchor === true &&
-      hasStraightIncidentEdges(piece.outline, index));
+      path[index]?.authoredAnchor === true &&
+      hasStraightIncidentEdges(path, index));
     if (hasAuthoredStraightAnchor) {
       for (const index of members) authoredCorners.add(index);
     }

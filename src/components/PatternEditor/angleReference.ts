@@ -173,12 +173,23 @@ function referenceAlong(piece: PatternPiece, atLocal: Point2D, dirLocal: Point2D
  * índice que no es ancla), el eje: Shift dos veces endereza como Shift una vez.
  */
 export function arrivingReference(piece: PatternPiece, commandIndex: number): AngleReference {
-  const command = piece.outline[commandIndex];
+  return arrivingReferenceOnPath(piece, piece.outline, commandIndex);
+}
+
+/**
+ * El tramo que llega a un ancla de CUALQUIER línea de la pieza —su contorno o
+ * una interna—, en el marco de la pieza (spec 2026-09-24 § 4.2). Al primer
+ * punto de una línea abierta no le llega nada: hace de marco el tramo que sale.
+ */
+export function arrivingReferenceOnPath(
+  piece: PatternPiece, path: PathCommand[], commandIndex: number,
+): AngleReference {
+  const command = path[commandIndex];
   if (!command || command.values.length < 2) return ABSOLUTE_REFERENCE;
   const anchor = { x: command.values[command.values.length - 2], y: command.values[command.values.length - 1] };
-  const built = buildRing(piece.outline, 2);
+  const built = buildRing(path, 2);
   if (!built.ok) return ABSOLUTE_REFERENCE;
-  const real = built.value.segments.filter(s => s.commandIndex < piece.outline.length);
+  const real = built.value.segments.filter(s => s.commandIndex < path.length);
   const arriving = real.find(s => samePoint(s.to, anchor) && !samePoint(s.from, anchor));
   if (arriving) return referenceAlong(piece, anchor, tangentAt(arriving, 1));
   const leaving = real.find(s => samePoint(s.from, anchor) && !samePoint(s.to, anchor));
