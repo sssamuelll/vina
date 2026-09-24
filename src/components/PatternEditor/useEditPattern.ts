@@ -48,52 +48,22 @@ import {
   pieceLocalToPattern,
 } from './pieceTransform';
 export { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
-import { conPaths, CLAVE_CONTORNO, type ClaveLinea } from './lineaEditable';
+import { conPaths, CLAVE_CONTORNO, pathDeLinea, type ClaveLinea } from './lineaEditable';
+import {
+  INITIAL_STATE, SIN_INTERNAS, estadoDeEntrada, extraerInternas, findFromNode,
+  mismosPaths, pathsEditables, refrescarLineas, resyncStateToPiece,
+  type ArrastreDeLinea, type EditPatternState,
+} from './estadoDeQ';
+
+export { resyncStateToPiece } from './estadoDeQ';
+export type { EditPatternState } from './estadoDeQ';
 
 // ─── Constants ───
 
 const HIT_RADIUS_PX = 8; // screen pixels
 const NO_HIDDEN_LAYER_IDS: number[] = [];
 
-// ─── State ───
-
-export interface EditPatternState {
-  isEditing: boolean;
-  editingPieceId: string | null;
-  hoveredPieceId: string | null;
-  nodes: EditableNode[];
-  selectedNodes: Set<number>;       // commandIndex set (multi-select)
-  selectedSegments: Set<number>;    // commandIndex of segment destination
-  hoveredNode: number | null;       // commandIndex
-  hoveredSegment: number | null;    // commandIndex
-  addPointPreview: Point2D | null;  // preview dot on edge hover
-  marquee: { start: Point2D; current: Point2D } | null;
-}
-
-const INITIAL_STATE: EditPatternState = {
-  isEditing: false,
-  editingPieceId: null,
-  hoveredPieceId: null,
-  nodes: [],
-  selectedNodes: new Set<number>(),
-  selectedSegments: new Set<number>(),
-  hoveredNode: null,
-  hoveredSegment: null,
-  addPointPreview: null,
-  marquee: null,
-};
-
 // ─── Drag ref types ───
-
-/** Lo que un gesto arrastra de UNA línea. */
-interface ArrastreDeLinea {
-  /** El path de la línea al empezar el gesto: cada frame se calcula desde aquí. */
-  startPath: PathCommand[];
-  /** commandIndex → posición original (un tramo agarrado guarda sus dos extremos). */
-  startPositions: Map<number, Point2D>;
-  /** Grupo de anclas coincidentes de cada punto arrastrado, en `startPath`. */
-  groups?: Map<number, number[]>;
-}
 
 /** Lo que comparten el arrastre de puntos y el de tramos. */
 interface OutlineDrag {
@@ -162,31 +132,6 @@ export function findInsertTarget(
   return null;
 }
 
-/**
- * Rebuild overlay nodes from the piece's current outline after an EXTERNAL
- * change (undo/redo restoring project state), so the anchor dots never detach
- * from the path. Selections and transient hover state are cleared, not
- * remapped: command indices shift when an insert is undone, so a surviving
- * index would silently denote different geometry (and a Delete on it would
- * destroy a legitimate corner).
- */
-export function resyncStateToPiece(
-  state: EditPatternState,
-  piece: PatternPiece,
-): EditPatternState {
-  return {
-    ...state,
-    nodes: extractNodes(piece),
-    selectedNodes: new Set<number>(),
-    selectedSegments: new Set<number>(),
-    hoveredPieceId: null,
-    hoveredNode: null,
-    hoveredSegment: null,
-    addPointPreview: null,
-    marquee: null,
-  };
-}
-
 // ─── Hook ───
 
 export function useEditPattern(zoom: number, pan: Point2D) {
@@ -249,14 +194,14 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     endUndoBatch(dispatch, token);
   }, [dispatch]);
   /**
-   * Outline object (by identity) this hook itself dispatched. The resync
-   * effect treats a pieces change as internal only when the store's outline
-   * IS that object — a boolean flag would mis-consume an external restore
-   * that lands in the same React batch as an internal edit.
+   * Los paths editables (contorno e internas, por identidad) que este hook
+   * acaba de escribir. El resync trata un cambio de `pieces` como propio solo
+   * si los paths del store SON estos: un booleano consumiría mal una
+   * restauración externa que caiga en el mismo lote de React.
    */
-  const expectedOutlineRef = useRef<PathCommand[] | null>(null);
-  /** Last outline (by identity) of the edited piece this hook has seen. */
-  const seenOutlineRef = useRef<PathCommand[] | null>(null);
+  const expectedPathsRef = useRef<PathCommand[][] | null>(null);
+  /** Los últimos paths editables (por identidad) de la pieza en edición. */
+  const seenPathsRef = useRef<PathCommand[][] | null>(null);
   /**
    * Espejo de `state.editingPieceId` para `escribirLineas`, que necesita
    * saber a quién pertenece el overlay sin re-crearse en cada cambio de estado
@@ -307,7 +252,6 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       const updated = conPaths(piece, cambios);
       const action = updatePiece(updated);
       dispatch(undoBatchToken ? withUndoBatchToken(action, undoBatchToken) : action);
-      const newNodes = extractNodes(updated);
       // El overlay pinta `nodes` con la transformada de `editingPieceId`, así
       // que un verbo sobre OTRA pieza no puede reescribirlos: serían las
       // coordenadas LOCALES de una pieza dibujadas en el sitio de otra. Ese es
@@ -315,11 +259,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       // fuera del modo edición") y con Editar patrón abierto sobre A, poner un
       // punto en B dejaba las anclas de B flotando sobre la lona.
       if (piece.id === editingPieceIdRef.current) {
-        expectedOutlineRef.current = updated.outline;
+        expectedPathsRef.current = pathsEditables(updated);
         // Si el verbo insertó o borró comandos, todo índice guardado corrió de
         // sitio y pasa a denotar OTRA geometría — exactamente lo que el JSDoc
         // de `resyncStateToPiece` explica para el undo externo. Es el mismo
-        // caso, así que es la misma limpieza (#1122).
+        // caso, así que es la misma limpieza (#1122). Lo mismo si quitó una
+        // línea entera: sus índices tampoco denotan ya nada.
         //
         // Con guarda de longitud y no siempre: arrastrar y `moveNodeTo` mutan
         // valores en el sitio, y hay un contrato verde que EXIGE que la
@@ -328,10 +273,13 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         // ponytail: la longitud basta hoy porque ningún verbo inserta y borra
         // a la vez; si alguno llega con saldo neto cero, esto pasa a ser un
         // parámetro explícito del verbo.
-        const estructural = updated.outline.length !== piece.outline.length;
+        const estructural = [...cambios].some(([clave, path]) => {
+          const antes = pathDeLinea(piece, clave);
+          return !path || !antes || path.length !== antes.length;
+        });
         setState(s => (estructural
           ? resyncStateToPiece(s, updated)
-          : { ...s, nodes: newNodes }));
+          : refrescarLineas(s, updated, cambios.keys())));
       }
     },
     [dispatch],
@@ -375,20 +323,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
         return;
       }
-      seenOutlineRef.current = piece.outline;
-      expectedOutlineRef.current = null;
-      setState({
-        isEditing: true,
-        editingPieceId: pieceId,
-        hoveredPieceId: null,
-        nodes: extractNodes(piece),
-        selectedNodes: new Set<number>(),
-        selectedSegments: new Set<number>(),
-        hoveredNode: null,
-        hoveredSegment: null,
-        addPointPreview: null,
-        marquee: null,
-      });
+      seenPathsRef.current = pathsEditables(piece);
+      expectedPathsRef.current = null;
+      setState(estadoDeEntrada(piece));
       dragRef.current = null;
       setGuias(null);
     },
@@ -431,8 +368,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           if (node) startPositions.set(commandIndex, { ...node.position });
         }
 
-        seenOutlineRef.current = piece.outline;
-        expectedOutlineRef.current = null;
+        seenPathsRef.current = pathsEditables(piece);
+        expectedPathsRef.current = null;
         setState({
           isEditing: true,
           editingPieceId: pieceId,
@@ -444,6 +381,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           hoveredSegment: null,
           addPointPreview: null,
           marquee: null,
+          internas: extraerInternas(piece),
         });
         dragRef.current = {
           type: 'node',
@@ -471,8 +409,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           startPositions.set(fromNode.ref.commandIndex, { ...fromNode.position });
         }
 
-        seenOutlineRef.current = piece.outline;
-        expectedOutlineRef.current = null;
+        seenPathsRef.current = pathsEditables(piece);
+        expectedPathsRef.current = null;
         setState({
           isEditing: true,
           editingPieceId: pieceId,
@@ -484,6 +422,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           hoveredSegment: null,
           addPointPreview: null,
           marquee: null,
+          internas: extraerInternas(piece),
         });
         dragRef.current = {
           type: 'segment',
@@ -506,8 +445,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     setState({ ...INITIAL_STATE });
     dragRef.current = null;
     setGuias(null);
-    expectedOutlineRef.current = null;
-    seenOutlineRef.current = null;
+    expectedPathsRef.current = null;
+    seenPathsRef.current = null;
   }, [endDragBatch]);
 
   // Resync when the edited piece's outline changes OUTSIDE this hook
@@ -522,10 +461,11 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       exitEdit();
       return;
     }
-    if (seenOutlineRef.current === piece.outline) return;
-    seenOutlineRef.current = piece.outline;
-    if (expectedOutlineRef.current === piece.outline) {
-      expectedOutlineRef.current = null;
+    const paths = pathsEditables(piece);
+    if (mismosPaths(seenPathsRef.current, paths)) return;
+    seenPathsRef.current = paths;
+    if (mismosPaths(expectedPathsRef.current, paths)) {
+      expectedPathsRef.current = null;
       return;
     }
     // External change: refresh nodes, drop selections (indices may denote
@@ -1026,7 +966,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         }
 
         const updated = conPaths(piece, new Map([[CLAVE_CONTORNO, outline]]));
-        expectedOutlineRef.current = outline;
+        expectedPathsRef.current = pathsEditables(updated);
         dispatch(updatePiece(updated));
         // Este camino no pasa por `escribirLineas`. Ya limpiaba la
         // selección, pero dejaba vivos el hover y la previsualización con
@@ -1180,6 +1120,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   return {
     ...state,
+    /** Las internas editables de la pieza en edición o bajo el ratón (spec § 3.2). */
+    internas: state.internas ?? SIN_INTERNAS,
     enterEdit,
     enterEditActuando,
     exitEdit,
@@ -1203,23 +1145,6 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 }
 
 // ─── Internal helpers ───
-
-/**
- * Find the "from" node of a segment. The segment ends at `commandIndex`;
- * the "from" node is the previous node whose commandIndex < commandIndex.
- */
-function findFromNode(nodes: EditableNode[], commandIndex: number): EditableNode | null {
-  let best: EditableNode | null = null;
-  let bestIdx = -1;
-  for (const node of nodes) {
-    const ci = node.ref.commandIndex;
-    if (ci < commandIndex && ci > bestIdx) {
-      bestIdx = ci;
-      best = node;
-    }
-  }
-  return best;
-}
 
 /** El marco de un punto agarrado: el lado que le llega, desde su posición inicial. */
 function marcoDelPunto(piece: PatternPiece, position: Point2D, commandIndex: number): OutlineDrag['marco'] {
