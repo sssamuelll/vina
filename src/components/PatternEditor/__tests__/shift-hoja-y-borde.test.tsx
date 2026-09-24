@@ -12,10 +12,14 @@
  * paneo 0: pantalla = patrón.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { renderHook, act, cleanup } from '@testing-library/react';
+import { renderHook, act, cleanup, render, fireEvent } from '@testing-library/react';
+import { configureStore } from '@reduxjs/toolkit';
+import { Provider } from 'react-redux';
+import projectReducer, { restoreState } from '../../../store/projectSlice';
 import type { PatternPiece, PathCommand } from '../../../types/types';
 import { usePenTool } from '../usePenTool';
 import { usePolyPenTool } from '../usePolyPenTool';
+import { useEditPattern } from '../useEditPattern';
 import { polarOf } from '../polyPenGeometry';
 import { relativeAngle, type AngleReference } from '../angleReference';
 
@@ -214,5 +218,135 @@ describe('Línea interna — Shift dos veces endereza al borde', () => {
     move(RUMBO);
     expect(tool().guias).toBeNull();
     expect(tool().previewPoint).toEqual(RUMBO);
+  });
+});
+
+// ─── Editar patrón (Q) ────────────────────────────────────────────────────────
+//
+// El marco del borde es el lado que LLEGA al punto agarrado (o el propio lado,
+// si se agarra un lado), congelado al empezar el arrastre (spec § 3.4).
+
+type Pt = { x: number; y: number };
+let editorQ: ReturnType<typeof useEditPattern> | null = null;
+
+function EditorQ() {
+  const editor = useEditPattern(1, { x: 0, y: 0 });
+  editorQ = editor;
+  return (
+    <svg data-testid="q" onMouseDown={editor.handleMouseDown} onMouseMove={editor.handleMouseMove} onMouseUp={editor.handleMouseUp}>
+      <rect data-testid="entrar" onClick={() => editor.enterEdit('delantero')} />
+    </svg>
+  );
+}
+
+function setupQ(pieza: PatternPiece) {
+  const store = configureStore({ reducer: { project: projectReducer } });
+  store.dispatch(restoreState({ ...store.getState().project, pieces: [pieza] }));
+  const vista = render(<Provider store={store}><EditorQ /></Provider>);
+  fireEvent.click(vista.getByTestId('entrar'));
+  const svg = vista.getByTestId('q');
+  return {
+    store,
+    tool: () => editorQ!,
+    down: (p: Pt, shiftKey = false) => fireEvent.mouseDown(svg, { button: 0, clientX: p.x, clientY: p.y, shiftKey }),
+    move: (p: Pt, shiftKey = false) => fireEvent.mouseMove(svg, { clientX: p.x, clientY: p.y, shiftKey }),
+    up: () => fireEvent.mouseUp(svg, { button: 0 }),
+    /** El ancla `i` del contorno, en coordenadas locales de la pieza. */
+    ancla: (i: number): Pt => {
+      const v = store.getState().project.pieces[0].outline[i].values;
+      return { x: v[v.length - 2], y: v[v.length - 1] };
+    },
+  };
+}
+
+/** El costado en local: de (200,0) a (260,180), dirección (60,180). */
+const cruzConCostado = (desde: Pt, p: Pt) => (p.x - desde.x) * 180 - (p.y - desde.y) * 60;
+
+describe('Editar patrón — Shift dos veces endereza respecto al lado', () => {
+  it('arrastrar el final del costado lo alarga sin cambiar su inclinación', () => {
+    const { down, move, up, ancla } = setupQ(DELANTERO);
+    down({ x: 460, y: 330 });
+    dosVeces();
+    move({ x: 480, y: 380 }, true);
+    up();
+    const p = ancla(2);
+    expect(cruzConCostado({ x: 200, y: 0 }, p)).toBeCloseTo(0, 6);
+    expect(p.y).toBeGreaterThan(180);
+  });
+
+  it('el marco se congela: dos pasos en perpendicular quedan sobre la misma recta', () => {
+    const { down, move, ancla } = setupQ(DELANTERO);
+    down({ x: 460, y: 330 });
+    dosVeces();
+    // Perpendicular a la dirección ORIGINAL (60,180): el producto escalar con
+    // ella, desde donde estaba el punto, se queda en cero. Un marco vivo
+    // giraría con el lado en el segundo paso.
+    const escalar = (p: Pt) => (p.x - 260) * 60 + (p.y - 180) * 180;
+    move({ x: 520, y: 312 }, true);
+    const p1 = ancla(2);
+    move({ x: 580, y: 294 }, true);
+    const p2 = ancla(2);
+    expect(escalar(p1)).toBeCloseTo(0, 6);
+    expect(escalar(p2)).toBeCloseTo(0, 6);
+    expect(p2.x).toBeGreaterThan(p1.x);
+  });
+
+  it('arrastrar el costado a 90° lo desplaza en perpendicular a sí mismo', () => {
+    const { down, move, up, ancla } = setupQ(DELANTERO);
+    down({ x: 430, y: 240 });
+    dosVeces();
+    move({ x: 480, y: 230 }, true);
+    up();
+    // Un lado arrastrado siempre queda paralelo; lo que da el borde es que se
+    // mueva en perpendicular a él, no en horizontal (la hoja).
+    const a = ancla(1);
+    expect((a.x - 200) * 60 + a.y * 180).toBeCloseTo(0, 6);
+    expect(a.x).toBeGreaterThan(200);
+    expect(cruzConCostado(a, ancla(2))).toBeCloseTo(0, 6);
+  });
+
+  it('cambiar a dos veces a mitad del arrastre, con la mano quieta, cambia de marco', () => {
+    const { down, move, ancla } = setupQ(DELANTERO);
+    down({ x: 460, y: 330 });
+    tecla('keydown');
+    move({ x: 480, y: 380 }, true);
+    expect(ancla(2).x).toBeCloseTo(260, 6); // la hoja: vertical
+    tecla('keyup');
+    tecla('keydown');
+    const p = ancla(2);
+    expect(cruzConCostado({ x: 200, y: 0 }, p)).toBeCloseTo(0, 6);
+    expect(p.y).toBeGreaterThan(180);
+  });
+
+  it('expone las guías mientras dura el arrastre, desde la posición inicial del punto', () => {
+    const { tool, down, move, up } = setupQ(DELANTERO);
+    down({ x: 460, y: 330 });
+    dosVeces();
+    move({ x: 480, y: 380 }, true);
+    expect(tool().guias!.activa!.desde).toEqual({ x: 460, y: 330 });
+    expect(tool().guias!.tenue).not.toBeNull();
+    expect(tool().modoShift).toBe('borde');
+    up();
+    expect(tool().guias).toBeNull();
+  });
+
+  it('en una pieza con arcos, dos veces endereza a la hoja sin romper', () => {
+    const conArco = {
+      ...DELANTERO,
+      outline: [
+        { type: 'M', values: [0, 0] }, { type: 'A', values: [120, 120, 0, 0, 1, 200, 0] },
+        { type: 'L', values: [260, 180] }, { type: 'L', values: [0, 180] }, { type: 'Z', values: [] },
+      ],
+    } as unknown as PatternPiece;
+    const { tool, down, move, ancla } = setupQ(conArco);
+    down({ x: 460, y: 330 });
+    dosVeces();
+    move({ x: 470, y: 400 }, true);
+    // Sin lado que medir, el marco del borde es el eje: una sola guía, y la
+    // vertical de la hoja.
+    expect(tool().modoShift).toBe('borde');
+    expect(tool().guias!.tenue).toBeNull();
+    expect(ancla(2).x).toBeCloseTo(260, 6);
+    expect(ancla(2).y).toBeGreaterThan(180);
   });
 });
