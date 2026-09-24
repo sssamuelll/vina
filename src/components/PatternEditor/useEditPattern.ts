@@ -11,7 +11,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { updatePiece } from '../../store/projectSlice';
+import { updatePiece, removeInternalLine, removeTramosDeInterna } from '../../store/projectSlice';
 import { selectInternalLine, selectPiece } from '../../store/editorSlice';
 import {
   beginUndoBatch,
@@ -21,16 +21,15 @@ import {
   type UndoBatchToken,
 } from '../../store/undoMiddleware';
 import type { Point2D, PatternPiece, PathCommand, Trazo } from '../../types/types';
+import { seBorraEntera } from '../../types/types';
 import {
   extractNodes,
   applyNodeMove,
   applyAnchorMoves,
   splitSegmentAt,
-  deletePoint,
   convertToCurve,
   convertToLine,
   anchorGroupOf,
-  coincidentAnchorGroups,
   type EditableNode,
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
@@ -51,8 +50,9 @@ import {
 } from './pieceTransform';
 export { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 import {
-  conPaths, CLAVE_CONTORNO, claveDeInterna, lineIdDeClave, pathDeLinea, type ClaveLinea,
+  conPaths, CLAVE_CONTORNO, claveDeInterna, lineIdDeClave, pathDeLinea, quitarPuntos, type ClaveLinea,
 } from './lineaEditable';
+import { puntoUnicoDeLinea } from './cotas/nodo';
 import {
   INITIAL_STATE, SIN_INTERNAS, algoElegido, arrastreDe, conLinea, estadoDeEntrada, extraerInternas,
   findFromNode, hoverDe, internaElegidaDe, marcoSelecciona, mismosPaths, pathsEditables,
@@ -495,6 +495,23 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   }, [state, getPiece, toLocal, hitRadius, claveElegida]);
 
   /**
+   * El punto único elegido, de cualquier línea (spec § 4.5): el sujeto de las
+   * cotas del punto y de «Mover exacto…». Con dos líneas con algo elegido, o
+   * con tramos, no hay punto único.
+   */
+  const puntoElegido = useMemo(() => {
+    if (!state.isEditing || !state.editingPieceId) return null;
+    const piece = pieces.find(p => p.id === state.editingPieceId);
+    if (!piece) return null;
+    const conAlgo = vistas(state, piece.outline).filter(v => v.selectedNodes.size > 0 || v.selectedSegments.size > 0);
+    if (conAlgo.length !== 1 || conAlgo[0].selectedSegments.size > 0) return null;
+    const commandIndex = puntoUnicoDeLinea(conAlgo[0].path, conAlgo[0].selectedNodes);
+    if (commandIndex === null) return null;
+    const lineId = lineIdDeClave(conAlgo[0].clave);
+    return { pieceId: piece.id, commandIndex, ...(lineId ? { lineId } : {}) };
+  }, [state, pieces]);
+
+  /**
    * Entra a una pieza y, solo cuando el press tiene un sujeto concreto, deja
    * armado ese mismo gesto. El hit-test usa nodos recién extraídos: antes de
    * entrar, `state.nodes` todavía pertenece a la sesión vacía de React.
@@ -892,49 +909,74 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (state.selectedNodes.size === 0) {
-          // Un TRAMO elegido también es sujeto local: se pinta
-          // (`EditPatternOverlay`) y el Escape de arriba ya lo trata como tal.
-          // No existe «borrar tramo», así que aquí no se borra nada — pero se
-          // consume igual, porque soltar la tecla se la entrega al global y
-          // entonces desaparece la pieza con el tramo resaltado en pantalla.
-          // Mismo argumento que el aviso de los tres puntos, más abajo.
-          return state.selectedSegments.size > 0;
-        }
-
         const piece = getPiece(state.editingPieceId);
         if (!piece) return false;
+        const lineas = vistas(state, piece.outline);
 
-        // Sort indices descending to preserve earlier indices when deleting
-        const indices = [...state.selectedNodes].sort((a, b) => b - a);
+        const conPuntos = lineas.filter(l => l.selectedNodes.size > 0);
+        if (conPuntos.length === 0) {
+          // Tramos de una interna: se quitan SOLO esos tramos (spec § 4.6),
+          // por el mismo reductor que usa Z.
+          const conTramos = lineas.filter(l => l.clave !== CLAVE_CONTORNO && l.selectedSegments.size > 0);
+          // Un TRAMO elegido también es sujeto local: se pinta
+          // (`EditPatternOverlay`) y el Escape de arriba ya lo trata como tal.
+          // Un tramo del CONTORNO no se borra —no existe «borrar lado»—, así
+          // que aquí no se borra nada — pero se consume igual, porque soltar
+          // la tecla se la entrega al global y entonces desaparece la pieza
+          // con el tramo resaltado en pantalla. Mismo argumento que el aviso
+          // de los tres puntos, más abajo.
+          if (conTramos.length === 0) return state.selectedSegments.size > 0;
 
-        // All-or-nothing: deleting part of a coincident group would leave a
-        // stranded twin, and a partial multi-delete is worse than none.
-        const remainingAnchorCount = coincidentAnchorGroups(
-          piece.outline.filter((_, index) => !state.selectedNodes.has(index)),
-        ).size;
-        if (remainingAnchorCount < 3) {
-          dispatch(showInfoToast('No se puede borrar: la pieza necesita al menos 3 puntos'));
-          // CONSUME igual (#1115). El comentario viejo decia que soltar la
-          // tecla aqui «era seguro porque el atajo global no mira
-          // defaultPrevented» — y esa era justo la trampa: al soltarla, el
-          // global se llevaba LA PIEZA ENTERA. O sea, «no puedo borrar el
-          // nodo porque hacen falta tres puntos» terminaba borrandolo todo.
+          const token = beginUndoBatch(dispatch, 'Borrar tramo');
+          for (const l of conTramos) {
+            const lineId = lineIdDeClave(l.clave)!;
+            // El hilo y la pinza son entidades: un tramo suyo se las lleva
+            // enteras, no las parte (spec § 4.6).
+            const linea = piece.internals.find(x => x.id === lineId);
+            if (linea && seBorraEntera(linea.type)) {
+              dispatch(withUndoBatchToken(removeInternalLine({ pieceId: piece.id, lineId }), token));
+              continue;
+            }
+            pushJournal('gesture', 'interna:delete', { pieceId: piece.id, lineId, segmentIndices: [...l.selectedSegments] });
+            dispatch(withUndoBatchToken(
+              removeTramosDeInterna({ pieceId: piece.id, lineId, segmentIndices: [...l.selectedSegments] }),
+              token,
+            ));
+          }
+          endUndoBatch(dispatch, token);
+          if (selectedInternalLineRef.current) dispatch(selectPiece(piece.id));
+          e.preventDefault();
           return true;
         }
 
-        let outline = piece.outline;
-        for (const idx of indices) {
-          outline = deletePoint(outline, idx);
+        // All-or-nothing: deleting part of a coincident group would leave a
+        // stranded twin, and a partial multi-delete is worse than none. Todo o
+        // nada también entre líneas: si una línea no puede, no se toca ninguna.
+        const cambios = new Map<ClaveLinea, PathCommand[] | null>();
+        for (const l of conPuntos) {
+          const r = quitarPuntos(l.path, l.selectedNodes, l.clave === CLAVE_CONTORNO);
+          if (r === 'insuficiente') {
+            dispatch(showInfoToast(l.clave === CLAVE_CONTORNO
+              ? 'No se puede borrar: la pieza necesita al menos 3 puntos'
+              : 'No se puede borrar: la forma necesita al menos 3 puntos'));
+            // CONSUME igual (#1115). El comentario viejo decia que soltar la
+            // tecla aqui «era seguro porque el atajo global no mira
+            // defaultPrevented» — y esa era justo la trampa: al soltarla, el
+            // global se llevaba LA PIEZA ENTERA. O sea, «no puedo borrar el
+            // nodo porque hacen falta tres puntos» terminaba borrandolo todo.
+            return true;
+          }
+          cambios.set(l.clave, r);
         }
 
-        const updated = conPaths(piece, new Map([[CLAVE_CONTORNO, outline]]));
+        const updated = conPaths(piece, cambios);
         expectedPathsRef.current = pathsEditables(updated);
         dispatch(updatePiece(updated));
         // Este camino no pasa por `escribirLineas`. Ya limpiaba la
         // selección, pero dejaba vivos el hover y la previsualización con
         // índices de un contorno que acaba de encoger (#1122).
         setState(s => resyncStateToPiece(s, updated));
+        if (selectedInternalLineRef.current) dispatch(selectPiece(piece.id));
 
         e.preventDefault();
         return true;
@@ -950,40 +992,36 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): boolean => {
       if (!state.isEditing || !state.editingPieceId) return false;
-
       const piece = getPiece(state.editingPieceId);
       if (!piece) return false;
-
-      const localPt = toLocal(e, piece);
-
-      const target = findInsertTarget(localPt, state.nodes, piece.outline, hitRadius);
-      if (target) {
-        const newOutline = splitSegmentAt(piece.outline, target.commandIndex, target.t);
-        escribirContorno(piece, newOutline);
-        return true;
-      }
-
-      return false;
+      // Sobre un punto no se inserta (el punto fantasma de #167): `agarrar` da
+      // el punto antes que el tramo, y el cierre fantasma no es un tramo.
+      const lineas = vistas(state, piece.outline);
+      const hit = agarrar(lineas, toLocal(e, piece), hitRadius, claveElegida(piece.id));
+      if (!hit || hit.tipo !== 'tramo') return false;
+      const linea = lineas.find(l => l.clave === hit.clave);
+      if (!linea) return false;
+      escribirLineas(piece, new Map([[hit.clave, splitSegmentAt(linea.path, hit.commandIndex, hit.t)]]));
+      return true;
     },
-    [state, getPiece, toLocal, hitRadius, escribirContorno],
+    [state, getPiece, toLocal, hitRadius, claveElegida, escribirLineas],
   );
 
   // ─── convertSegment ───
 
+  /** `lineId`: una interna de la pieza (spec 2026-09-24 § 4.4); sin él, el contorno. */
   const convertSegment = useCallback(
     // `pieceId` explícito para el clic derecho FUERA de "Editar patrón" (#197):
     // ahí no hay pieza en edición y el hit-test es quien sabe cuál se tocó.
-    (commandIndex: number, toCurve: boolean, pieceId?: string) => {
+    (commandIndex: number, toCurve: boolean, pieceId?: string, lineId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece || guardLocked(piece)) return;
-
-      const newOutline = toCurve
-        ? convertToCurve(piece.outline, commandIndex)
-        : convertToLine(piece.outline, commandIndex);
-
-      escribirContorno(piece, newOutline);
+      const clave = lineId ? claveDeInterna(lineId) : CLAVE_CONTORNO;
+      const path = pathDeLinea(piece, clave);
+      if (!path) return;
+      escribirLineas(piece, new Map([[clave, toCurve ? convertToCurve(path, commandIndex) : convertToLine(path, commandIndex)]]));
     },
-    [state.editingPieceId, getPiece, escribirContorno, guardLocked],
+    [state.editingPieceId, getPiece, escribirLineas, guardLocked],
   );
 
   // ─── moveNodeTo (#1112: escribir la distancia a un vecino) ───
@@ -1000,37 +1038,53 @@ export function useEditPattern(zoom: number, pan: Point2D) {
    * `applyNodeMove` mueve el GRUPO de anclas coincidentes, no un comando: en el
    * DXF de María cada esquina son dos o tres comandos en la misma coordenada, y
    * mover uno solo rompería el contorno en una púa.
+   *
+   * `lineId`: una interna de la pieza (spec 2026-09-24 § 4.4); sin él, el contorno.
    */
   const moveNodeTo = useCallback(
-    (pieceId: string, commandIndex: number, destino: Point2D) => {
+    (pieceId: string, commandIndex: number, destino: Point2D, lineId?: string) => {
       const piece = getPiece(pieceId);
       if (!piece || guardLocked(piece)) return;
-      escribirContorno(piece, applyNodeMove(piece.outline, commandIndex, 'anchor', destino));
+      const clave = lineId ? claveDeInterna(lineId) : CLAVE_CONTORNO;
+      const path = pathDeLinea(piece, clave);
+      if (!path) return;
+      escribirLineas(piece, new Map([[clave, applyNodeMove(path, commandIndex, 'anchor', destino)]]));
     },
-    [getPiece, escribirContorno, guardLocked],
+    [getPiece, escribirLineas, guardLocked],
   );
 
   // ─── convertSegmentToPoints ───
 
-  /** Curva por puntos: la que pidió María, con los puntos SOBRE la línea (#197). */
+  /**
+   * Curva por puntos: la que pidió María, con los puntos SOBRE la línea (#197).
+   *
+   * `lineId`: una interna de la pieza (spec 2026-09-24 § 4.4); sin él, el contorno.
+   */
   const convertSegmentToPoints = useCallback(
-    (commandIndex: number, pieceId?: string) => {
+    (commandIndex: number, pieceId?: string, lineId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece || guardLocked(piece)) return;
-      escribirContorno(piece, convertSegmentToSpline(piece.outline, commandIndex));
+      const clave = lineId ? claveDeInterna(lineId) : CLAVE_CONTORNO;
+      const path = pathDeLinea(piece, clave);
+      if (!path) return;
+      escribirLineas(piece, new Map([[clave, convertSegmentToSpline(path, commandIndex)]]));
     },
-    [state.editingPieceId, getPiece, escribirContorno, guardLocked],
+    [state.editingPieceId, getPiece, escribirLineas, guardLocked],
   );
 
   // ─── addPointOnSegment ───
+  /** `lineId`: una interna de la pieza (spec 2026-09-24 § 4.4); sin él, el contorno. */
   const convertSegmentToBezier = useCallback(
-    (commandIndex: number, pieceId?: string) => {
+    (commandIndex: number, pieceId?: string, lineId?: string) => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
       if (!piece || guardLocked(piece)) return;
-      const outline = toManualBezier(piece.outline, commandIndex);
-      if (outline) escribirContorno(piece, outline);
+      const clave = lineId ? claveDeInterna(lineId) : CLAVE_CONTORNO;
+      const path = pathDeLinea(piece, clave);
+      if (!path) return;
+      const out = toManualBezier(path, commandIndex);
+      if (out) escribirLineas(piece, new Map([[clave, out]]));
     },
-    [state.editingPieceId, getPiece, escribirContorno, guardLocked],
+    [state.editingPieceId, getPiece, escribirLineas, guardLocked],
   );
 
   /**
@@ -1098,6 +1152,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     enganche,
     /** Qué agarraría un press en la pieza en edición (menú contextual y enrutador). */
     agarreEn,
+    /** El punto único elegido, de cualquier línea (cotas y menú, spec § 4.5). */
+    puntoElegido,
+    /** Hay puntos elegidos en alguna línea: los largos callan (#1153). */
+    hayPuntosElegidos: vistas(state).some(v => v.selectedNodes.size > 0),
   };
 }
 

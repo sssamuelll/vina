@@ -485,3 +485,127 @@ describe('§ 10.2: lo que faltaba de los hooks', () => {
     expect(anclasDe(internaDe('L'))).toEqual([[20, 20], [120, 20], [120, 120]]);
   });
 });
+
+const supr = (hook: ReturnType<typeof montarQ>['hook']) =>
+  act(() => { hook.result.current.handleKeyDown(new KeyboardEvent('keydown', { key: 'Delete' })); });
+const clic = (hook: ReturnType<typeof montarQ>['hook'], x: number, y: number, shift = false) => {
+  act(() => { hook.result.current.handleMouseDown(ev(x, y, shift)); });
+  act(() => { hook.result.current.handleMouseUp(); });
+};
+
+describe('los verbos de Q sobre una interna', () => {
+  it('Supr sobre un punto lo quita y los vecinos se unen', () => {
+    const { hook, internaDe } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    clic(hook, 120, 20);
+    supr(hook);
+    expect(anclasDe(internaDe('L'))).toEqual([[20, 20], [120, 120]]);
+  });
+
+  it('una interna que se queda con un punto se va', () => {
+    const corta: InternalLine = { ...ELE, path: ELE.path.slice(0, 2) };
+    const { store, hook } = montarQ([pieza([corta])]);
+    act(() => hook.result.current.enterEdit('p'));
+    clic(hook, 120, 20);
+    supr(hook);
+    expect(store.getState().project.pieces[0].internals).toHaveLength(0);
+  });
+
+  it('una cerrada no baja de tres puntos: avisa y no toca nada (Review Focus 3)', () => {
+    const cerrada: InternalLine = { id: 'C', type: 'reference', path: [
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [80, 20] }, { type: 'L', values: [50, 70] }, { type: 'Z', values: [] },
+    ] };
+    const { store, hook, internaDe } = montarQ([pieza([cerrada])]);
+    act(() => hook.result.current.enterEdit('p'));
+    clic(hook, 80, 20);
+    supr(hook);
+    expect(internaDe('C').path).toEqual(cerrada.path);
+    const toasts = (store.getState() as unknown as { copilotUI: { toasts: { message: string }[] } }).copilotUI.toasts;
+    expect(toasts.at(-1)?.message).toBe('No se puede borrar: la forma necesita al menos 3 puntos');
+  });
+
+  it('el punto de cierre de una cerrada mueve juntos la M y el último (Review Focus 3)', () => {
+    const cerrada: InternalLine = { id: 'C', type: 'reference', path: [
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [80, 20] }, { type: 'L', values: [50, 70] }, { type: 'L', values: [20, 20] }, { type: 'Z', values: [] },
+    ] };
+    const { hook, internaDe } = montarQ([pieza([cerrada])]);
+    act(() => hook.result.current.enterEdit('p'));
+    arrastrar(hook, [20, 20], [25, 30]);
+    expect(anclasDe(internaDe('C'))[0]).toEqual([25, 30]);
+    expect(anclasDe(internaDe('C'))[3]).toEqual([25, 30]);
+  });
+
+  it('una mezcla con el contorno es todo o nada', () => {
+    const { store, hook, internaDe } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    // Tres puntos del contorno (dejarían uno) y uno de la interna.
+    clic(hook, 200, 0); clic(hook, 200, 150, true); clic(hook, 0, 150, true); clic(hook, 120, 20, true);
+    supr(hook);
+    expect(store.getState().project.pieces[0].outline).toEqual(RECT);
+    expect(internaDe('L').path).toEqual(ELE.path);
+  });
+
+  it('gemelas: Supr sobre una quita el grupo, no deja un gemelo (Review Focus 1)', () => {
+    const gemelas: InternalLine = { ...ELE, path: [
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [120, 20] }, { type: 'L', values: [120, 20] }, { type: 'L', values: [120, 120] },
+    ] };
+    const { hook, internaDe } = montarQ([pieza([gemelas])]);
+    act(() => hook.result.current.enterEdit('p'));
+    clic(hook, 120, 20);
+    supr(hook);
+    expect(anclasDe(internaDe('L'))).toEqual([[20, 20], [120, 120]]);
+  });
+
+  it('Supr sobre un tramo del medio parte la interna en dos', () => {
+    const tres: InternalLine = { ...ELE, path: [...ELE.path, { type: 'L', values: [20, 120] }] };
+    const { store, hook } = montarQ([pieza([tres])]);
+    act(() => hook.result.current.enterEdit('p'));
+    clic(hook, 120, 70);
+    supr(hook);
+    const internas = store.getState().project.pieces[0].internals;
+    expect(internas.map(l => l.path.length)).toEqual([2, 2]);
+    expect(internas[0].id).toBe('L');
+  });
+
+  it('Supr sobre un tramo de pinza se la lleva entera: no se parte', () => {
+    const pinza: InternalLine = { id: 'P', type: 'dart', path: [
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [40, 90] }, { type: 'L', values: [60, 20] },
+    ] };
+    const { store, hook } = montarQ([pieza([pinza])]);
+    act(() => hook.result.current.enterEdit('p'));
+    clic(hook, 30, 55);
+    supr(hook);
+    expect(store.getState().project.pieces[0].internals).toHaveLength(0);
+  });
+
+  it('doble clic en un tramo de interna inserta un punto marcado; sobre un punto, nada', () => {
+    const { hook, internaDe } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleDoubleClick(ev(70, 20)); });
+    expect(internaDe('L').path).toHaveLength(4);
+    expect(internaDe('L').path[1]).toMatchObject({ type: 'L', values: [70, 20], authoredAnchor: true });
+    act(() => { hook.result.current.handleDoubleClick(ev(120, 20)); });
+    expect(internaDe('L').path).toHaveLength(4);
+  });
+
+  it('convertir un tramo de interna: a curva, a curva por puntos, y mover un punto con número', () => {
+    const { hook, internaDe } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => hook.result.current.convertSegment(1, true, 'p', 'L'));
+    expect(internaDe('L').path[1]).toMatchObject({ type: 'C', manualBezier: true });
+    act(() => hook.result.current.convertSegment(1, false, 'p', 'L'));
+    expect(internaDe('L').path[1].type).toBe('L');
+    act(() => hook.result.current.convertSegmentToPoints(1, 'p', 'L'));
+    expect(internaDe('L').path.filter(c => c.type === 'C').length).toBeGreaterThan(1);
+    act(() => hook.result.current.moveNodeTo('p', 0, { x: 0, y: 0 }, 'L'));
+    expect(internaDe('L').path[0].values).toEqual([0, 0]);
+  });
+
+  it('el punto elegido de una interna es el sujeto de las cotas', () => {
+    const { hook } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    clic(hook, 120, 20);
+    expect(hook.result.current.puntoElegido).toEqual({ pieceId: 'p', commandIndex: 1, lineId: 'L' });
+    expect(hook.result.current.hayPuntosElegidos).toBe(true);
+  });
+});
