@@ -138,7 +138,7 @@ Ningún botón, interruptor, ajuste ni entrada de menú.
 
 - Sigue Shift como hoy: el estado sale del modificador (`e.shiftKey`), con los filtros de campo editable y modal, en `window` y en captura, sin consumir la tecla, y `blur` olvida sin avisar.
 - Pasa de un booleano a un **modo**: `'suelto' | 'hoja' | 'borde'`. Devuelve `modoRef` y avisa con `alCambiar(modo)` cuando cambia.
-- Para el doble toque guarda cuándo se pulsó Shift (sin contar la autorrepetición), si hubo ratón mientras estuvo pulsado (`pointerdown` en `window`, en captura) y cuándo se soltó el último toque.
+- Para el doble toque guarda cuándo se pulsó Shift (sin contar la autorrepetición), si se gastó mientras estuvo pulsado —un clic (`mousedown` en `window`, en captura: el lienzo solo usa eventos de ratón) u otra tecla (Ctrl+Shift+Z no es un toque)— y cuándo se soltó el último toque. Soltar se atiende siempre, también dentro de un campo (Tab lleva el foco al chip con Shift pulsado); pulsar, no.
 - Los handlers de ratón siguen sincronizando con `e.shiftKey` a través del hook: si el ratón dice que Shift no está, `suelto`; si dice que sí y el hook creía que no (Shift pulsado con la ventana sin foco), `hoja`.
 - `SHIFT_TOQUE_MS = 300` y `SHIFT_DOBLE_MS = 400` viven en `gestureConstants.ts`, junto a los umbrales de arrastre.
 

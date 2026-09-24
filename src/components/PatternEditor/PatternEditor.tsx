@@ -1469,14 +1469,14 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
               zoom={zoom2D}
             />
           )}
+          {/* Las guías de Shift van por debajo de los overlays de herramienta:
+              los nodos y el anillo de enganche se leen encima. */}
+          <GuiasShiftOverlay guias={shiftActivo?.guias ?? null} zoom2D={zoom2D} />
           {/* UN candado para todas las superficies que se colocan con Redux.
               Ver el comentario de `isDraggingPiece` arriba: dentro de este
               árbol viven los overlays que suman `piece.position`, y ninguno
               puede seguir a la pieza mientras el arrastre la mueve por DOM.
               Estaba puesto a mano en dos de ellos; el resto quedó fuera. */}
-          {/* Las guías de Shift van por debajo de los overlays de herramienta:
-              los nodos y el anillo de enganche se leen encima. */}
-          <GuiasShiftOverlay guias={shiftActivo?.guias ?? null} zoom2D={zoom2D} />
           {!isDraggingPiece && (
           <ToolOverlay
             activeTool={activeTool}
