@@ -31,3 +31,13 @@ export const EDGE_HIT_PX = 12;
 
 /** Radio de enganche de una ESQUINA; comparte la gramática del margen. */
 export const VERTEX_HIT_PX = 10;
+
+/**
+ * Shift dos veces (spec 2026-09-23 § 3.1): un TOQUE es pulsar y soltar Shift
+ * en menos de esto sin pulsar el ratón entre medias. Un Shift+clic no es un
+ * toque, ni lo es mantener Shift mientras se traza.
+ */
+export const SHIFT_TOQUE_MS = 300;
+
+/** Tras un toque, la siguiente pulsación antes de esto es «dos veces». */
+export const SHIFT_DOBLE_MS = 400;

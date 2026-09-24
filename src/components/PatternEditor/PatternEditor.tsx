@@ -61,6 +61,7 @@ import { useEditorInteractions } from './useEditorInteractions';
 import { useElasticTool } from '../../hooks/useElasticTool';
 import { EDGE_HIT_PX } from './gestureConstants';
 import PolyPenToolOverlay from './renderers/overlays/PolyPenToolOverlay';
+import GuiasShiftOverlay from './renderers/overlays/GuiasShiftOverlay';
 import { piezasConLargos as seleccionarPiezasConLargos } from './cotas/piezasConLargos';
 import { usePrecisionHint } from './usePrecisionHint';
 import MeasureToolOverlay from './renderers/overlays/MeasureToolOverlay';
@@ -1365,6 +1366,23 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     finishMouseInteraction(e);
   }, [finishMouseInteraction]);
 
+  // Shift de la herramienta activa (spec 2026-09-23): sus guías, para el
+  // lienzo, y su modo y su segundo marco, para la pista. Cada herramienta
+  // calcula las suyas con `guiasShift`; aquí solo se elige de cuál leer.
+  const shiftActivo = activeTool === 'pen'
+    ? { modo: pen.modoShift, guias: pen.guias, marco: pen.angleReference.kind }
+    : activeTool === 'internalShape'
+      ? { modo: internalShapeTool.modoShift, guias: internalShapeTool.guias, marco: internalShapeTool.angleReference.kind }
+      // En `Q` el marco es siempre un lado de la pieza.
+      : activeTool === 'editPattern'
+        ? { modo: editPatternTool.modoShift, guias: editPatternTool.guias, marco: 'border' as const }
+        : null;
+  // Hay algo que elegir si el segundo marco no coincide con el eje (hay guía
+  // tenue). En `Q` antes de agarrar, el lado aún no se conoce: se anuncia.
+  const segundoMarco = !shiftActivo ? null
+    : shiftActivo.guias ? (shiftActivo.guias.tenue ? shiftActivo.marco : null)
+    : activeTool === 'editPattern' ? shiftActivo.marco : null;
+
   return (
     <div className="pattern-editor">
       <svg
@@ -1451,6 +1469,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
               zoom={zoom2D}
             />
           )}
+          {/* Las guías de Shift van por debajo de los overlays de herramienta:
+              los nodos y el anillo de enganche se leen encima. */}
+          <GuiasShiftOverlay guias={shiftActivo?.guias ?? null} zoom2D={zoom2D} />
           {/* UN candado para todas las superficies que se colocan con Redux.
               Ver el comentario de `isDraggingPiece` arriba: dentro de este
               árbol viven los overlays que suman `piece.position`, y ninguno
@@ -1633,6 +1654,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           hasSeams={seams.length > 0}
           extendTrimMode={(toolOptions?.extendTrim?.mode as 'extend' | 'trim') ?? 'extend'}
           extendTrimArmed={extendTrimTool.selectedSnap !== null}
+          modoShift={shiftActivo?.modo}
+          segundoMarco={segundoMarco}
         />
 
         <RulerLayer

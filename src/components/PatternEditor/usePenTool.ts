@@ -3,7 +3,7 @@ import { Point2D, PathCommand, PatternPiece, Trazo } from '../../types/types';
 import { screenToPattern } from '../../utils/geometry';
 import { draftedPieceDefaults } from '../../utils/defaults';
 import { polarOf, polarPoint } from './polyPenGeometry';
-import { referenceForNext } from './angleReference';
+import { referenceForNext, type AngleReference } from './angleReference';
 import type { TramoEnCurso } from './cotas/tramoEnCurso';
 import { buildSnapIndex, resolveSnap, verticesVisibles } from './snapIndex';
 import type { SnapTarget } from './snapIndex';
@@ -11,8 +11,8 @@ import { EDGE_HIT_PX } from './gestureConstants';
 import { screenToPatternLength } from '../../utils/geometry';
 import { pushJournal } from '../../utils/telemetry/journal';
 import { isDrag } from './gestureConstants';
-import { restringirAHoja45 } from './restriccionShift';
-import { useShiftSostenido } from './useShiftSostenido';
+import { guiasShift, type GuiasShift } from './restriccionShift';
+import { useShiftSostenido, type ModoShift } from './useShiftSostenido';
 
 /**
  * A node in the pen path. Each node has an anchor point and optional
@@ -50,8 +50,11 @@ interface PenState {
    * Tecla muerta.
    */
   nextPointSeq: number;
-  /** Shift sostenido: la goma se endereza respecto a la hoja (firma 23-09, opción B). */
-  shift: boolean;
+  /**
+   * Shift: suelto, la hoja con una vez (firma 23-09, opción B) o el borde
+   * —la referencia de la píldora— con dos (spec 2026-09-23).
+   */
+  modoShift: ModoShift;
 }
 
 // El radio de cierre es el MISMO que el del enganche. El spec de la línea
@@ -61,7 +64,7 @@ interface PenState {
 // decisión, y con la pluma enganchando de verdad (#1102) ya no es cosmético:
 // dos radios distintos en la misma herramienta se notan.
 
-const EMPTY: PenState = { nodes: [], isDragging: false, cursorPos: null, isClosed: false, nextPoint: null, nextPointSeq: 0, shift: false };
+const EMPTY: PenState = { nodes: [], isDragging: false, cursorPos: null, isClosed: false, nextPoint: null, nextPointSeq: 0, modoShift: 'suelto' };
 
 /** Identidad estable: un `[]` nuevo por render reharía el índice en cada frame. */
 const VACIO: PatternPiece[] = [];
@@ -117,68 +120,6 @@ export function usePenTool(
   // dibujo estaría prometiendo puntos que no atraen.
   const verticesDePiezas = useMemo(() => verticesVisibles(indice), [indice]);
 
-  /**
-   * Con Shift y un nodo del que partir, el punto sobre la guía de la hoja; si
-   * no, `null` y manda lo de siempre. Shift va por encima del enganche
-   * (contrato 2026-09-08 § 3.4): con la guía puesta, un vértice cercano no se
-   * lleva el punto. El cierre sobre el primer nodo va por encima de Shift.
-   */
-  const enderezar = useCallback((nodes: PenNode[], cursor: Point2D, shift: boolean): Point2D | null =>
-    shift && nodes.length > 0 ? restringirAHoja45(nodes[nodes.length - 1].anchor, cursor) : null, []);
-
-  // Pulsar o soltar Shift con el ratón quieto también cuenta. Sin trazo en
-  // curso no hay nada que enderezar y el estado no se toca: escribir
-  // mayúsculas en el chat no puede re-renderizar el editor.
-  const shiftRef = useShiftSostenido((shift) => {
-    if (nodesRef.current.length === 0) return;
-    const cursor = cursorRef.current;
-    setHover(shift || pressRef.current?.moved || !cursor ? null : resolveSnap(indice, cursor, radio()));
-    setState(prev => (prev.shift === shift ? prev : { ...prev, shift }));
-  });
-
-  /** Distance between two points */
-  const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
-
-  /**
-   * ¿Cierra el contorno un clic aquí? Si el ratón cae sobre el primer nodo, o
-   * si cae ahí la guía de Shift: cerrar una forma dibujada con Shift es
-   * enderezar el último lado justo hasta el primer punto.
-   *
-   * `<=`, igual que el enganche (`snapIndex` compara `<= radius`). Con `<`, a
-   * EXACTAMENTE 12 px el enganche disparaba y el cierre no: el clic colocaba
-   * un nodo encima del primero en vez de cerrar la pieza.
-   */
-  const cierraEn = useCallback((nodes: PenNode[], raton: Point2D, guia: Point2D | null): boolean =>
-    nodes.length > 2
-      && [raton, guia].some(p => p !== null && dist(p, nodes[0].anchor) * zoom <= EDGE_HIT_PX),
-  [zoom]);
-
-  /**
-   * Adónde lleva un clic el siguiente punto, en el orden en que lo decide
-   * `handleMouseDown`: cerrar, después Shift, después el enganche, después el
-   * ratón. La goma, la píldora y Tab leen de aquí, así que el aviso y el clic
-   * no pueden discrepar (maria-196).
-   */
-  const destinoDe = useCallback(
-    (nodes: PenNode[], raton: Point2D, shift: boolean, enganche: Point2D | null) => {
-      const guia = enderezar(nodes, raton, shift);
-      if (cierraEn(nodes, raton, guia)) return { punto: nodes[0].anchor, cierra: true };
-      return { punto: guia ?? enganche ?? raton, cierra: false };
-    },
-    [enderezar, cierraEn],
-  );
-
-  // Con la pareja congelada el clic sigue cerrando (handleMouseDown no mira
-  // `nextPoint`), así que el aviso de cierre tampoco se apaga (maria-196, y la
-  // revisión del 13-09 por el otro lado).
-  const siguiente = state.cursorPos && !state.isClosed
-    ? destinoDe(state.nodes, state.cursorPos, state.shift, hover?.point ?? null)
-    : null;
-  const willClose = !!siguiente?.cierra;
-  // Arrastrando manejadores no hay punto que decidir: la goma enseña el
-  // manejador tal cual, que es lo que se va a guardar.
-  const destino = state.isDragging ? state.cursorPos : siguiente?.punto ?? state.cursorPos;
-
   /** Convert nodes array to PathCommand array */
   const nodesToCommands = useCallback((nodes: PenNode[], closed: boolean): PathCommand[] => {
     if (nodes.length === 0) return [];
@@ -221,6 +162,95 @@ export function usePenTool(
 
     return cmds;
   }, []);
+
+  // El marco en que la píldora lee el siguiente tramo, y en el que endereza
+  // Shift dos veces (spec 2026-09-23 § 3.1): el borde del que sale, o el tramo
+  // anterior.
+  const angleReference = useMemo(() => referenceForNext(nodesToCommands(state.nodes, false), indice),
+    [state.nodes, nodesToCommands, indice]);
+  // Los callbacks leen el marco de la render vigente, como leen `nodesRef`.
+  const angleReferenceRef = useRef<AngleReference>(angleReference);
+  angleReferenceRef.current = angleReference;
+
+  /**
+   * Con Shift y un nodo del que partir, las guías (spec 2026-09-23): la de la
+   * hoja con una vez, la del borde —la referencia de la píldora— con dos. Si
+   * no, `null` y manda lo de siempre. Shift va por encima del enganche
+   * (contrato 2026-09-08 § 3.4): con la guía puesta, un vértice cercano no se
+   * lleva el punto. El cierre sobre el primer nodo va por encima de Shift.
+   */
+  const guiasPara = useCallback(
+    (nodes: PenNode[], cursor: Point2D, modo: ModoShift, referencia: AngleReference): GuiasShift | null =>
+      modo !== 'suelto' && nodes.length > 0
+        ? guiasShift(nodes[nodes.length - 1].anchor, cursor, referencia, modo === 'borde')
+        : null,
+    [],
+  );
+  const enderezar = useCallback(
+    (nodes: PenNode[], cursor: Point2D, modo: ModoShift, referencia: AngleReference): Point2D | null =>
+      guiasPara(nodes, cursor, modo, referencia)?.punto ?? null,
+    [guiasPara],
+  );
+
+  // Pulsar o soltar Shift con el ratón quieto también cuenta. Sin trazo en
+  // curso no hay nada que enderezar y el estado no se toca: escribir
+  // mayúsculas en el chat no puede re-renderizar el editor.
+  const { modoRef, sincronizar } = useShiftSostenido((modo) => {
+    if (nodesRef.current.length === 0) return;
+    const cursor = cursorRef.current;
+    setHover(modo !== 'suelto' || pressRef.current?.moved || !cursor ? null : resolveSnap(indice, cursor, radio()));
+    setState(prev => (prev.modoShift === modo ? prev : { ...prev, modoShift: modo }));
+  });
+
+  /** Distance between two points */
+  const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  /**
+   * ¿Cierra el contorno un clic aquí? Si el ratón cae sobre el primer nodo, o
+   * si cae ahí la guía de Shift: cerrar una forma dibujada con Shift es
+   * enderezar el último lado justo hasta el primer punto.
+   *
+   * `<=`, igual que el enganche (`snapIndex` compara `<= radius`). Con `<`, a
+   * EXACTAMENTE 12 px el enganche disparaba y el cierre no: el clic colocaba
+   * un nodo encima del primero en vez de cerrar la pieza.
+   */
+  const cierraEn = useCallback((nodes: PenNode[], raton: Point2D, guia: Point2D | null): boolean =>
+    nodes.length > 2
+      && [raton, guia].some(p => p !== null && dist(p, nodes[0].anchor) * zoom <= EDGE_HIT_PX),
+  [zoom]);
+
+  /**
+   * Adónde lleva un clic el siguiente punto, en el orden en que lo decide
+   * `handleMouseDown`: cerrar, después Shift, después el enganche, después el
+   * ratón. La goma, la píldora y Tab leen de aquí, así que el aviso y el clic
+   * no pueden discrepar (maria-196).
+   */
+  const destinoDe = useCallback(
+    (nodes: PenNode[], raton: Point2D, modo: ModoShift, referencia: AngleReference, enganche: Point2D | null) => {
+      const guia = enderezar(nodes, raton, modo, referencia);
+      if (cierraEn(nodes, raton, guia)) return { punto: nodes[0].anchor, cierra: true };
+      return { punto: guia ?? enganche ?? raton, cierra: false };
+    },
+    [enderezar, cierraEn],
+  );
+
+  // Con la pareja congelada el clic sigue cerrando (handleMouseDown no mira
+  // `nextPoint`), así que el aviso de cierre tampoco se apaga (maria-196, y la
+  // revisión del 13-09 por el otro lado).
+  const siguiente = state.cursorPos && !state.isClosed
+    ? destinoDe(state.nodes, state.cursorPos, state.modoShift, angleReference, hover?.point ?? null)
+    : null;
+  const willClose = !!siguiente?.cierra;
+  // Arrastrando manejadores no hay punto que decidir: la goma enseña el
+  // manejador tal cual, que es lo que se va a guardar.
+  const destino = state.isDragging ? state.cursorPos : siguiente?.punto ?? state.cursorPos;
+  // Las guías se pintan mientras hay algo que enderezar: con la pareja
+  // congelada o arrastrando manejadores la goma no va por ninguna. Con el
+  // cierre armado tampoco: el clic cierra, y una guía apuntando a otro lado
+  // prometería otra cosa (la píldora también se apaga ahí; maria-196).
+  const guias = state.cursorPos && !state.isClosed && !state.isDragging && !state.nextPoint && !willClose
+    ? guiasPara(state.nodes, state.cursorPos, state.modoShift, angleReference)
+    : null;
 
   /** Build SVG path string for preview */
   const buildPreviewPath = useCallback((): string => {
@@ -273,16 +303,17 @@ export function usePenTool(
     const rect = svg.getBoundingClientRect();
     const pt = toPattern(e.clientX, e.clientY, rect);
     const nodes = nodesRef.current;
-    shiftRef.current = e.shiftKey;
+    sincronizar(e.shiftKey);
+    const modo = modoRef.current;
 
     // El segundo press de un doble clic con Shift repite el nodo que acaba de
     // poner el primero. Enderezarlo desde ESE nodo lo sacaba del sitio —30 mm
     // más allá en un doble clic a 30 mm de la guía— y `handleDoubleClick`, que
     // busca ese duplicado para quitarlo, lo conservaba: un trazo de dos nodos
-    // terminaba en pieza triangular.
-    const guia = e.shiftKey && e.detail >= 2 && nodes.length > 0
+    // terminaba en pieza triangular. Igual con la hoja que con el borde.
+    const guia = modo !== 'suelto' && e.detail >= 2 && nodes.length > 0
       ? nodes[nodes.length - 1].anchor
-      : enderezar(nodes, pt, e.shiftKey);
+      : enderezar(nodes, pt, modo, angleReferenceRef.current);
 
     // Cerrar gana al enganche y a Shift: si no, no se podría cerrar un trazo
     // encima de una pieza, que es donde más se dibuja.
@@ -299,7 +330,8 @@ export function usePenTool(
     const enganche = guia ? null : resolveSnap(indice, pt, radio());
     const anchor = guia ?? enganche?.point ?? pt;
     pushJournal('gesture', 'pen:press', {
-      closes: false, nodes: nodes.length + 1, snap: enganche?.kind ?? null, ...(guia ? { shift: true } : {}),
+      closes: false, nodes: nodes.length + 1, snap: enganche?.kind ?? null,
+      ...(guia ? { shift: true, ...(modo === 'borde' ? { borde: true } : {}) } : {}),
     });
     const newNode: PenNode = { anchor, handleIn: null, handleOut: null };
     pressRef.current = { screen: { x: e.clientX, y: e.clientY }, moved: false };
@@ -311,9 +343,9 @@ export function usePenTool(
       nodes: [...prev.nodes, newNode],
       isDragging: false,
       nextPoint: null,
-      shift: e.shiftKey,
+      modoShift: modo,
     }));
-  }, [toPattern, complete, indice, radio, enderezar, cierraEn, shiftRef]);
+  }, [toPattern, complete, indice, radio, enderezar, cierraEn, modoRef, sincronizar]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;
@@ -327,8 +359,9 @@ export function usePenTool(
     // El aviso de enganche. Sin esto el imán existe y es invisible, que es la
     // mitad literal de #1102 («no se está iluminando»). Durante un arrastre no:
     // ahí se están dibujando manijas, no eligiendo dónde cae el nodo.
-    shiftRef.current = e.shiftKey;
-    const conGuia = e.shiftKey && nodesRef.current.length > 0;
+    sincronizar(e.shiftKey);
+    const modoShift = modoRef.current;
+    const conGuia = modoShift !== 'suelto' && nodesRef.current.length > 0;
     setHover(press?.moved || conGuia ? null : resolveSnap(indice, pt, radio()));
 
     setState(prev => {
@@ -346,11 +379,11 @@ export function usePenTool(
           y: 2 * anchor.y - pt.y,
         };
         nodes[lastIdx] = last;
-        return { ...prev, nodes, cursorPos: pt, isDragging: true, shift: e.shiftKey };
+        return { ...prev, nodes, cursorPos: pt, isDragging: true, modoShift };
       }
-      return { ...prev, cursorPos: pt, shift: e.shiftKey };
+      return { ...prev, cursorPos: pt, modoShift };
     });
-  }, [toPattern, indice, radio, shiftRef]);
+  }, [toPattern, indice, radio, modoRef, sincronizar]);
 
   const handleMouseUp = useCallback(() => {
     pressRef.current = null;
@@ -392,11 +425,13 @@ export function usePenTool(
     if (nodes.length === 0) return;
     const from = nodes[nodes.length - 1].anchor;
     const raton = cursorRef.current ?? from;
-    const { punto } = destinoDe(nodes, raton, shiftRef.current, resolveSnap(indice, raton, radio())?.point ?? null);
+    const { punto } = destinoDe(
+      nodes, raton, modoRef.current, angleReferenceRef.current, resolveSnap(indice, raton, radio())?.point ?? null,
+    );
     const { lengthMm, angleDeg } = polarOf(from, punto);
     const reference = referenceForNext(nodesToCommands(nodes, false), indice);
     setState(prev => ({ ...prev, nextPoint: { from, lengthMm, angleDeg, reference }, nextPointSeq: prev.nextPointSeq + 1 }));
-  }, [indice, radio, nodesToCommands, destinoDe, shiftRef]);
+  }, [indice, radio, nodesToCommands, destinoDe, modoRef]);
 
   /**
    * Reescribe el par pendiente SIN colocar (#1129). Es lo que hace Tab dentro
@@ -473,8 +508,6 @@ export function usePenTool(
   // Distance from last node to cursor for dimension label. Se apaga cuando
   // el cierre está armado: en ese momento la medida es ruido y era
   // exactamente lo que tapaba el punto de origen (maria-196).
-  const angleReference = useMemo(() => referenceForNext(nodesToCommands(state.nodes, false), indice),
-    [state.nodes, nodesToCommands, indice]);
   const lastPointDistance = state.nodes.length > 0 && destino && !state.isClosed && !willClose && !state.nextPoint
     ? {
         distance: polarOf(state.nodes[state.nodes.length - 1].anchor, destino).lengthMm,
@@ -497,6 +530,12 @@ export function usePenTool(
     hover,
     /** Los vértices de las piezas visibles — #1102 [11:38]. */
     verticesDePiezas,
+    /** Las dos guías de Shift, para `GuiasShiftOverlay`; `null` sin Shift. */
+    guias,
+    /** Shift ahora mismo, para la pista del pie. */
+    modoShift: state.modoShift,
+    /** El marco del siguiente tramo (el de la píldora), también cuando la píldora se apaga. */
+    angleReference,
     nextPoint: state.nextPoint,
     nextPointSeq: state.nextPointSeq,
     handleMouseDown,

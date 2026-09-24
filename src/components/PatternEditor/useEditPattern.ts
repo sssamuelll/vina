@@ -38,8 +38,9 @@ import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { reanchorNotches } from '../../utils/notchReanchor';
 import { piezaBloqueada } from '../../utils/piezaBloqueada';
 import { convertSegmentToSpline, resmoothAfterMove, toManualBezier } from './splineSegment';
-import { enderezarDesplazamiento } from './restriccionShift';
-import { useShiftSostenido } from './useShiftSostenido';
+import { guiasShift, type GuiaShift, type GuiasShift } from './restriccionShift';
+import { useShiftSostenido, type ModoShift } from './useShiftSostenido';
+import { ABSOLUTE_REFERENCE, arrivingReference, chordReference, type AngleReference } from './angleReference';
 import { isDrag } from './gestureConstants';
 import { showInfoToast } from '../../store/copilotUISlice';
 import {
@@ -100,6 +101,13 @@ interface OutlineDrag {
   wrote?: boolean;
   /** Shift+press sobre algo ya seleccionado: se quita al soltar si no hubo arrastre. */
   quitarAlSoltar?: readonly number[];
+  /**
+   * El marco de Shift dos veces, congelado al empezar (spec 2026-09-23 § 3.4):
+   * desde dónde salen las guías —la posición inicial del punto agarrado, o el
+   * punto del lado donde se pulsó— y respecto a qué lado, en espacio de patrón.
+   * Un marco vivo giraría la guía bajo la mano mientras el lado se inclina.
+   */
+  marco: { desde: Point2D; referencia: AngleReference };
 }
 
 interface NodeDrag extends OutlineDrag {
@@ -197,6 +205,14 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   );
 
   const [state, setState] = useState<EditPatternState>({ ...INITIAL_STATE });
+  /** Shift ahora mismo: la pista del pie lo lee antes de agarrar nada. */
+  const [modoShift, setModoShift] = useState<ModoShift>('suelto');
+  /** Las guías del arrastre en curso, para `GuiasShiftOverlay`. */
+  const [guias, setGuias] = useState<GuiasShift | null>(null);
+  /** Solo reescribe el estado si lo que se pinta cambió. */
+  const publicarGuias = useCallback((g: GuiasShift | null) => {
+    setGuias(prev => (mismasGuias(prev, g) ? prev : g));
+  }, []);
 
   useEffect(() => {
     if (state.isEditing || !state.hoveredPieceId) return;
@@ -371,6 +387,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         marquee: null,
       });
       dragRef.current = null;
+      setGuias(null);
     },
     [pieces, endDragBatch, dispatch],
   );
@@ -430,6 +447,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           startMouse: { x: e.clientX, y: e.clientY },
           startOutline: piece.outline,
           startPositions,
+          marco: marcoDelPunto(piece, startPositions.get(nodeHit.commandIndex) ?? localPt, nodeHit.commandIndex),
         };
         return true;
       }
@@ -470,6 +488,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           startMouse: { x: e.clientX, y: e.clientY },
           startOutline: piece.outline,
           startPositions,
+          marco: marcoDelTramo(piece, nodes, segmentHit.commandIndex, pieceLocalToPattern(segmentHit.point, piece)),
         };
         return true;
       }
@@ -485,6 +504,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     endDragBatch();
     setState({ ...INITIAL_STATE });
     dragRef.current = null;
+    setGuias(null);
     expectedOutlineRef.current = null;
     seenOutlineRef.current = null;
   }, [endDragBatch]);
@@ -512,6 +532,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     // mousemove can't re-impose pre-undo positions.
     endDragBatch();
     dragRef.current = null;
+    setGuias(null);
     setState(s => resyncStateToPiece(s, piece));
   }, [pieces, state.isEditing, state.editingPieceId, exitEdit, endDragBatch]);
 
@@ -519,13 +540,17 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   // Pulsar o soltar Shift a mitad del arrastre, con la mano quieta, re-aplica
   // el último ratón: el punto se endereza (o se suelta) en ese instante. Los
-  // handlers de ratón escriben `shiftRef` con `e.shiftKey`, así que teclado y
+  // handlers de ratón pasan su `e.shiftKey` por `sincronizar`, así que teclado y
   // ratón no pueden discrepar sobre si Shift está pulsado.
-  const shiftRef = useShiftSostenido((shift) => {
+  //
+  // El modo vive también en el estado (arriba): la pista del pie lo lee antes
+  // de agarrar nada (spec 2026-09-23 § 4.2).
+  const { modoRef, sincronizar } = useShiftSostenido((modo) => {
+    setModoShift(modo);
     const drag = dragRef.current;
     if (!drag || drag.type === 'marquee' || !drag.lastMouse || !state.editingPieceId) return;
     const piece = getPiece(state.editingPieceId);
-    if (piece) aplicarArrastre(piece, drag, drag.lastMouse, shift);
+    if (piece) aplicarArrastre(piece, drag, drag.lastMouse, modo);
   });
 
   // ─── handleMouseDown ───
@@ -534,7 +559,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (e: React.MouseEvent<SVGSVGElement>): boolean => {
       if (!state.isEditing || !state.editingPieceId) return false;
       if (e.button !== 0) return false;
-      shiftRef.current = e.shiftKey;
+      sincronizar(e.shiftKey);
+      setModoShift(modoRef.current);
 
       const piece = getPiece(state.editingPieceId);
       if (!piece) return false;
@@ -583,6 +609,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           startMouse: { x: e.clientX, y: e.clientY },
           startOutline: piece.outline,
           startPositions,
+          marco: marcoDelPunto(piece, startPositions.get(idx) ?? localPt, idx),
           ...(quitarAlSoltar ? { quitarAlSoltar: group } : {}),
         };
 
@@ -631,6 +658,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           startMouse: { x: e.clientX, y: e.clientY },
           startOutline: piece.outline,
           startPositions,
+          marco: marcoDelTramo(piece, state.nodes, idx, pieceLocalToPattern(segHit.point, piece)),
           ...(quitarAlSoltar ? { quitarAlSoltar: [idx] } : {}),
         };
 
@@ -654,19 +682,20 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
       return true;
     },
-    [state, getPiece, toLocal, toPattern, hitRadius, shiftRef],
+    [state, getPiece, toLocal, toPattern, hitRadius, modoRef, sincronizar],
   );
 
   // ─── El arrastre de nodos y tramos ───
 
   /**
-   * Mueve lo arrastrado según el ratón. Con Shift, el desplazamiento se
-   * endereza respecto a la HOJA —horizontal, vertical o diagonal— desde donde
-   * estaba el punto (firma de María del 23-09, opción B; «cuánto lo quieres
-   * mover en esa dirección», #1112).
+   * Mueve lo arrastrado según el ratón. Con Shift una vez, el desplazamiento
+   * se endereza respecto a la HOJA —horizontal, vertical o diagonal— desde
+   * donde estaba el punto (firma de María del 23-09, opción B; «cuánto lo
+   * quieres mover en esa dirección», #1112). Con Shift dos veces, respecto al
+   * lado congelado en `drag.marco` (spec 2026-09-23 § 3.4).
    */
   const aplicarArrastre = useCallback(
-    (piece: PatternPiece, drag: NodeDrag | SegmentDrag, mouse: Point2D, shift: boolean) => {
+    (piece: PatternPiece, drag: NodeDrag | SegmentDrag, mouse: Point2D, modo: ModoShift) => {
       drag.lastMouse = mouse;
       if (drag.startPositions.size === 0) return;
       const pantalla = { x: mouse.x - drag.startMouse.x, y: mouse.y - drag.startMouse.y };
@@ -678,14 +707,22 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         x: screenToPatternLength(pantalla.x, zoom),
         y: screenToPatternLength(pantalla.y, zoom),
       };
-      // Se endereza en la hoja ANTES de pasar el delta al marco de la pieza: en
-      // una pieza girada la hoja no gira con ella. Y el delta se gira porque
-      // las posiciones se guardan sin girar: así una pieza girada se arrastra
-      // hacia donde va el puntero, no en diagonal (nota de María #170).
-      const { x: dx, y: dy } = patternToPieceLocalDirection(
-        shift ? enderezarDesplazamiento(enHoja) : enHoja,
-        piece,
-      );
+      // Se endereza en espacio de patrón —la hoja, o el lado, que ya va girado
+      // en su referencia— ANTES de pasar el delta al marco de la pieza: en una
+      // pieza girada la hoja no gira con ella. Y el delta se gira porque las
+      // posiciones se guardan sin girar: así una pieza girada se arrastra hacia
+      // donde va el puntero, no en diagonal (nota de María #170). Las guías
+      // salen del mismo cálculo que el punto.
+      let enPatron = enHoja;
+      if (modo !== 'suelto') {
+        const { desde, referencia } = drag.marco;
+        const g = guiasShift(desde, { x: desde.x + enHoja.x, y: desde.y + enHoja.y }, referencia, modo === 'borde');
+        enPatron = { x: g.punto.x - desde.x, y: g.punto.y - desde.y };
+        publicarGuias(g);
+      } else {
+        publicarGuias(null);
+      }
+      const { x: dx, y: dy } = patternToPieceLocalDirection(enPatron, piece);
       // Un desplazamiento igual al último escrito no reescribe nada: con Shift,
       // mover la mano en perpendicular a la guía no cambia el punto; y antes
       // del primer frame, el delta cero tampoco.
@@ -719,7 +756,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       drag.lastDelta = { x: dx, y: dy };
       drag.wrote = true;
     },
-    [zoom, beginDragBatch, dispatchAndRefresh],
+    [zoom, beginDragBatch, dispatchAndRefresh, publicarGuias],
   );
 
   // ─── handleMouseMove ───
@@ -784,8 +821,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       // Active drag
       if (drag) {
         if (drag.type === 'node' || drag.type === 'segment') {
-          shiftRef.current = e.shiftKey;
-          aplicarArrastre(piece, drag, { x: e.clientX, y: e.clientY }, e.shiftKey);
+          sincronizar(e.shiftKey);
+          setModoShift(modoRef.current);
+          aplicarArrastre(piece, drag, { x: e.clientX, y: e.clientY }, modoRef.current);
           return true;
         }
 
@@ -837,7 +875,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       }));
       return false;
     },
-    [state, hoverablePieces, getPiece, toLocal, toPattern, hitRadius, aplicarArrastre, shiftRef],
+    [state, hoverablePieces, getPiece, toLocal, toPattern, hitRadius, aplicarArrastre, modoRef, sincronizar],
   );
 
   // ─── handleMouseUp ───
@@ -845,6 +883,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   const handleMouseUp = useCallback(() => {
     const drag = dragRef.current;
     dragRef.current = null;
+    setGuias(null);
     endDragBatch();
 
     if (!drag) return;
@@ -1158,6 +1197,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     moveNodeTo,
     limpiarHover,
     getCursor,
+    /** Las dos guías de Shift del arrastre en curso; `null` sin Shift o sin arrastre. */
+    guias,
+    /** Shift ahora mismo, para la pista del pie. */
+    modoShift,
   };
 }
 
@@ -1178,4 +1221,29 @@ function findFromNode(nodes: EditableNode[], commandIndex: number): EditableNode
     }
   }
   return best;
+}
+
+/** El marco de un punto agarrado: el lado que le llega, desde su posición inicial. */
+function marcoDelPunto(piece: PatternPiece, position: Point2D, commandIndex: number): OutlineDrag['marco'] {
+  return { desde: pieceLocalToPattern(position, piece), referencia: arrivingReference(piece, commandIndex) };
+}
+
+/** El marco de un lado agarrado: su propia recta, desde el punto del lado bajo el press (no el pulso, que cae hasta 8 px fuera). */
+function marcoDelTramo(
+  piece: PatternPiece, nodes: EditableNode[], commandIndex: number, pulsado: Point2D,
+): OutlineDrag['marco'] {
+  const toIndex = piece.outline[commandIndex]?.type === 'Z' ? 0 : commandIndex;
+  const to = nodes.find(n => n.ref.commandIndex === toIndex)?.position;
+  const from = findFromNode(nodes, commandIndex)?.position;
+  return { desde: pulsado, referencia: to && from ? chordReference(piece, from, to) : ABSOLUTE_REFERENCE };
+}
+
+function mismaGuia(a: GuiaShift | null, b: GuiaShift | null): boolean {
+  return a === b
+    || (!!a && !!b && a.angleDeg === b.angleDeg && a.desde.x === b.desde.x && a.desde.y === b.desde.y);
+}
+
+/** Lo que se pinta no cambió: el estado no se reescribe y no re-renderiza. */
+function mismasGuias(a: GuiasShift | null, b: GuiasShift | null): boolean {
+  return a === b || (!!a && !!b && mismaGuia(a.activa, b.activa) && mismaGuia(a.tenue, b.tenue));
 }

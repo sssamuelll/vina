@@ -215,6 +215,35 @@ Y después de confirmar un tramo, **el siguiente vuelve a seguir al ratón**: no
 > `nodeEditorUtils.ts` (mover desde el contorno del inicio del gesto, sin
 > reagrupar). `Ctrl` suspendiendo el enganche sigue sin implementar.
 
+> **Enmienda del 24-09 — Shift dos veces, al borde.** Lo que María dejó
+> escrito como ideal en su firma (*«podrían salir guías para las dos
+> opciones»*). Shift una vez sigue siendo la hoja (la firma B, sin cambios).
+> **Shift dos veces** —un toque de menos de 300 ms sin ratón y, antes de
+> 400 ms, otra pulsación mantenida— endereza respecto a la referencia de la
+> píldora (firma D2): el borde del que sale el trazo, el tramo anterior, o en
+> `Q` el lado que llega al punto agarrado (congelado al empezar el arrastre).
+> Vale en la Pluma, la Línea interna y `Q`, con las dos guías a la vista: la
+> activa con el acento, la otra tenue. La píldora lee entonces un múltiplo de
+> 45° exacto («90,0° al borde»). La precedencia no cambia: cerrar > Shift (eje
+> o borde) > enganche > ratón.
+>
+> - La tecla es Shift y no Alt ni Ctrl porque **Vina funciona con cualquier
+>   teclado** (Samuel, 24-09): Alt izquierdo + Shift y Ctrl + Shift son
+>   atajos de Windows para cambiar de idioma o de teclado, el navegador no
+>   los puede interceptar, y a quien los tenga activos le cambiarían la
+>   distribución en mitad del trazo. Por la misma razón, cuando se implemente
+>   «`Ctrl` suspende el enganche» no puede pedirse con Shift pulsado a la vez.
+> - La pista del pie lo anuncia al pulsar Shift, sustituyendo a la de la
+>   herramienta: «Shift: al eje · Shift dos veces: al borde». Los marcos se
+>   nombran como en la píldora.
+> - Riesgo anotado sin medir: Windows ofrece las teclas especiales con cinco
+>   Shift seguidos; alternar de guía muy rápido podría llegar a cinco.
+>
+> Spec: `docs/superpowers/specs/2026-09-23-shift-hoja-y-borde-design.md`.
+> Implementación: `guiasShift` en `restriccionShift.ts`, el modo en
+> `useShiftSostenido.ts`, `arrivingReference`/`chordReference` en
+> `angleReference.ts` y `GuiasShiftOverlay.tsx`.
+
 - `Ctrl` suspende el enganche, sin desactivar una restricción angular explícita.
 - **Un imán a 499,8 mm no corrige una entrada de 500 mm.** El número escrito manda sobre la geometría cercana.
 - Se aceptan coma y punto decimal. Longitud nueva mínima **0,1 mm**; desplazamiento cero es operación sin cambio. Un valor inválido **se queda editable** y nunca se recorta en silencio.
