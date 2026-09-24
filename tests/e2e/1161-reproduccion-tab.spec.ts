@@ -18,7 +18,7 @@ const chip = (page: Page, nombre: 'Largo' | 'Ángulo') =>
   page.getByRole('button', { name: new RegExp(`^${nombre}:`) });
 
 async function escribir(page: Page, valor: string) {
-  await page.keyboard.press('Control+a');
+  await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.type(valor);
 }
 
