@@ -182,6 +182,30 @@ describe('agarrar y arrastrar una interna en Q', () => {
     expect(y).toBeCloseTo(0, 9);
   });
 
+  it('… y a 90°, donde un giro al revés no da lo mismo: va bajo el puntero y engancha a la esquina girada (Review Focus 2, revisión final M-8)', () => {
+    // Girada 90° sobre el centro de su caja (100,75): local (x,y) → patrón (175 − y, x − 25).
+    const lejos: InternalLine = { ...DIAG, path: [{ type: 'M', values: [40, 30] }, { type: 'L', values: [100, 100] }] };
+    const { hook, internaDe } = montarQ([pieza([lejos], { rotation: 90 })]);
+    act(() => hook.result.current.enterEdit('p'));
+    // Su extremo local (40,30) se ve en (145,15); la esquina local (0,0), en (175,−25).
+    act(() => { hook.result.current.handleMouseDown(ev(145, 15)); });
+    // (155,5), a más de 12 mm de todo lo que engancha: el punto va bajo el
+    // puntero, al local (30,20). Con el giro al revés iría al (50,40), que se
+    // ve en (135,25).
+    act(() => { hook.result.current.handleMouseMove(ev(155, 5)); });
+    const [xa, ya] = anclasDe(internaDe('D'))[0];
+    expect(xa).toBeCloseTo(30, 9);
+    expect(ya).toBeCloseTo(20, 9);
+    // Junto a la esquina girada: el anillo se ve en ella, y el local es el de la esquina.
+    act(() => { hook.result.current.handleMouseMove(ev(172, -23)); });
+    expect(hook.result.current.enganche!.x).toBeCloseTo(175, 9);
+    expect(hook.result.current.enganche!.y).toBeCloseTo(-25, 9);
+    act(() => { hook.result.current.handleMouseUp(); });
+    const [x, y] = anclasDe(internaDe('D'))[0];
+    expect(x).toBeCloseTo(0, 9);
+    expect(y).toBeCloseTo(0, 9);
+  });
+
   it('pieza girada: el punto va adonde va el puntero', () => {
     const { hook, internaDe } = montarQ([pieza([ELE], { rotation: 180 })]);
     act(() => hook.result.current.enterEdit('p'));

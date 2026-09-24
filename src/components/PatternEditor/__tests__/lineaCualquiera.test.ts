@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { PathCommand, PatternPiece } from '../../../types/types';
-import { extractNodes, extractNodesFromPath } from '../nodeEditorUtils';
+import { extractNodes, extractNodesFromPath, splitSegmentAt } from '../nodeEditorUtils';
 import { classifyAnchorsOfPath, classifyEditableAnchors } from '../anchorRoles';
 import { arrivingReference, arrivingReferenceOnPath } from '../angleReference';
 import { cotasDelNodo, cotasDelNodoEnPath, puntoUnicoDeLinea } from '../cotas/nodo';
@@ -58,6 +58,28 @@ describe('classifyAnchorsOfPath', () => {
   it('classifyEditableAnchors es el mismo cálculo sobre el contorno', () => {
     const p = pieza();
     expect(classifyEditableAnchors(p, extractNodes(p))).toEqual(classifyAnchorsOfPath(cuadrado, extractNodes(p)));
+  });
+
+  // § 10.1: «roles de una línea abierta, de una cerrada y de una con
+  // `authoredAnchor`» (revisión final de la frontera, M-8).
+  const roles = (path: PathCommand[]) => classifyAnchorsOfPath(path, extractNodesFromPath(path, 'p')).map(a => a.role);
+
+  it('una interna cerrada se clasifica como el contorno: su primer punto no es un extremo', () => {
+    const cerrada: PathCommand[] = [
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [50, 20] }, { type: 'L', values: [80, 20] },
+      { type: 'L', values: [80, 70] }, { type: 'L', values: [20, 70] }, { type: 'Z', values: [] },
+    ];
+    expect(roles(cerrada)).toEqual(['corner', 'smoothSample', 'corner', 'corner', 'corner']);
+    // La misma forma, abierta, sí tiene sus dos extremos.
+    expect(roles(cerrada.slice(0, -1))).toEqual(['openEndpoint', 'smoothSample', 'corner', 'corner', 'openEndpoint']);
+  });
+
+  it('en una interna abierta, el punto que ella insertó sobre una recta es esquina aunque no quiebre (firma D3 del 12-09)', () => {
+    const insertada = splitSegmentAt([{ type: 'M', values: [20, 20] }, { type: 'L', values: [120, 20] }], 1, 0.5);
+    expect(insertada[1]).toMatchObject({ type: 'L', values: [70, 20], authoredAnchor: true });
+    expect(roles(insertada)).toEqual(['openEndpoint', 'corner', 'openEndpoint']);
+    // Sin la marca, el mismo punto es una muestra.
+    expect(roles(insertada.map(c => ({ type: c.type, values: c.values })))).toEqual(['openEndpoint', 'smoothSample', 'openEndpoint']);
   });
 });
 
