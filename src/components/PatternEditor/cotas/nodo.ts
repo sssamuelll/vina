@@ -81,20 +81,25 @@ const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /**
  * Las cotas de un nodo en reposo: su distancia a cada vecino, escribibles.
- *
- * Escribir una mueve el nodo A LO LARGO de la recta que lo une con ese vecino,
- * conservando la dirección. Es la misma semántica que ya tiene el largo de un
- * tramo de línea interna («escribir el largo mueve el nodo final»), y es la
- * única lectura sin ambigüedad de «ponlo a 150 de este punto».
- *
- * Con dos o más nodos seleccionados no hay cotas de nodo: lo único que un grupo
- * comparte es su desplazamiento, y eso es otra cota (decisión 5 del spec de la
- * tanda 6). Aquí se devuelve vacío y quien llama decide.
  */
 export function cotasDelNodo(piece: PatternPiece, commandIndex: number): Cota[] {
-  const propio = getAnchor(piece.outline[commandIndex] ?? { type: 'Z', values: [] });
+  return cotasDelNodoEnPath(piece, piece.outline, commandIndex);
+}
+
+/**
+ * Las cotas de un nodo en reposo: su distancia a cada vecino, escribibles.
+ * (… el JSDoc de hoy …)
+ *
+ * Vale para cualquier línea de la pieza (spec 2026-09-24 § 4.5). `lineId` (una
+ * interna) viaja en el id de la cota y en su acción, para que `moveNodeTo`
+ * escriba en esa línea.
+ */
+export function cotasDelNodoEnPath(
+  piece: PatternPiece, path: PathCommand[], commandIndex: number, lineId?: string,
+): Cota[] {
+  const propio = getAnchor(path[commandIndex] ?? { type: 'Z', values: [] });
   if (!propio) return [];
-  const { anterior, siguiente } = vecinosDelNodo(piece.outline, commandIndex);
+  const { anterior, siguiente } = vecinosDelNodo(path, commandIndex);
 
   const centro = { x: 0, y: 0 };
   for (const cmd of piece.outline) {
@@ -115,15 +120,8 @@ export function cotasDelNodo(piece: PatternPiece, commandIndex: number): Cota[] 
       : normal;
 
     return {
-      id: `nodo-${commandIndex}-${lado}`,
-      // Las DOS son largos, así que las dos son `tramo-largo`. Tentaba poner
-      // `tramo-angulo` en una para heredar el desplazamiento ±36 px que
-      // `chipScreenPosition` da a ese par — pero ese desplazamiento existe
-      // porque Largo y Ángulo comparten punto medio, y estas dos cotas van
-      // sobre tramos DISTINTOS: sus puntos medios ya difieren. Mentir en el
-      // `kind` para heredar un layout es la clase de atajo que se cobra dos
-      // meses después, cuando alguien filtre por kind y encuentre un ángulo en
-      // milímetros.
+      id: lineId ? `nodo-${lineId}-${commandIndex}-${lado}` : `nodo-${commandIndex}-${lado}`,
+      // (… los comentarios de hoy sobre `kind`, `a`/`b`, `outward` y `apply` …)
       kind: 'tramo-largo',
       label: lado === 'anterior' ? 'Al punto anterior' : 'Al punto siguiente',
       valueMm: largo,
@@ -132,27 +130,15 @@ export function cotasDelNodo(piece: PatternPiece, commandIndex: number): Cota[] 
       max: 10000,
       primary: true,
       rotulo: 'del punto',
-      // Por el helper, no sumando `position`: sumarla ignora el GIRO, y sobre
-      // una pieza girada los chips saldrían en otro sitio del lienzo. Lo cazó
-      // el trinquete de `pieceSpace`, que existe justo por esto.
       a: pieceLocalToPattern(v.punto, piece),
       b: pieceLocalToPattern(propio, piece),
-      // La normal TAMBIÉN pasa por el giro. Escribí lo contrario y estaba al
-      // revés: `a` y `b` van girados, así que una normal sin girar queda
-      // PARALELA al segmento que dibuja. Medido sobre una pieza a 90°: los dos
-      // chips aterrizaban encima de su propia línea en vez de al lado.
-      // `cotasDeLineaInterna` ya lo hacía bien; el helper existe desde #1068.
       outward: pieceLocalToPatternDirection(haciaFuera, piece),
-      // No construye el contorno aquí: devuelve A DÓNDE va el nodo y deja que
-      // lo escriba `useEditPattern`, que es quien ya lo hace en el arrastre —
-      // con su compensación de pivote, su re-anclado de piquetes y su lote de
-      // deshacer. Reconstruirlo aquí sería un segundo escritor del mismo hecho,
-      // que es el fallo que este repo tiene escrito con nombre propio.
       apply: (v2) => ({
         kind: 'nodo' as const,
         pieceId: piece.id,
         commandIndex,
         destino: { x: v.punto.x + dir.x * v2, y: v.punto.y + dir.y * v2 },
+        ...(lineId ? { lineId } : {}),
       }),
     };
   };
@@ -179,9 +165,19 @@ export function puntoUnicoSeleccionado(
   piece: PatternPiece | undefined,
   seleccionados: ReadonlySet<number>,
 ): { pieceId: string; commandIndex: number } | null {
-  if (!piece || seleccionados.size === 0) return null;
+  if (!piece) return null;
+  const commandIndex = puntoUnicoDeLinea(piece.outline, seleccionados);
+  return commandIndex === null ? null : { pieceId: piece.id, commandIndex };
+}
+
+/** El mismo criterio sobre cualquier línea: el índice del punto, o null. */
+export function puntoUnicoDeLinea(
+  path: PathCommand[],
+  seleccionados: ReadonlySet<number>,
+): number | null {
+  if (seleccionados.size === 0) return null;
   const nodos = [...seleccionados];
-  const grupo = anchorGroupOf(piece.outline, nodos[0]);
+  const grupo = anchorGroupOf(path, nodos[0]);
   if (nodos.length !== grupo.length || !nodos.every((n) => grupo.includes(n))) return null;
-  return { pieceId: piece.id, commandIndex: nodos[0] };
+  return nodos[0];
 }

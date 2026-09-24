@@ -44,7 +44,7 @@ export type CotaUpdate =
    * deshacer. Un segundo escritor del mismo hecho es el fallo con nombre propio
    * del repo.
    */
-  | { kind: 'nodo'; pieceId: string; commandIndex: number; destino: Point2D }
+  | { kind: 'nodo'; pieceId: string; commandIndex: number; destino: Point2D; lineId?: string }
   /**
    * Un tramo de trazo (spec 2026-09-12 § 5.3). Un trazo no tiene anfitriona:
    * su `path` ya está en patrón, así que el update lleva el trazo entero y no
