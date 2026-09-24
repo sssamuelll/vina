@@ -5,7 +5,7 @@
  * María, 10-09 [10:05]: «el patrón lo puedo mover? no puedes editar las
  * internas, ok, así hay que arreglarlo».
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import React from 'react';
 import { renderHook, cleanup, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
@@ -13,12 +13,24 @@ import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, { restoreState, updateInternalLine } from '../../../store/projectSlice';
 import editorReducer, { selectInternalLine } from '../../../store/editorSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
-import { undoMiddleware } from '../../../store/undoMiddleware';
+import { getUndoLength, undoMiddleware } from '../../../store/undoMiddleware';
 import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
-import { useEditPattern } from '../useEditPattern';
+import { lineasDeHover, useEditPattern } from '../useEditPattern';
 import type { InternalLine, PathCommand, PatternPiece } from '../../../types/types';
 
 afterEach(cleanup);
+
+// El historial de deshacer vive a nivel de módulo (`undoMiddleware`): sin
+// vaciarlo, un `editor/undo` puede sacar la foto que dejó otro test, y lo que
+// prueba cada uno dependería del orden. Una base nueva lo vacía, como la
+// hidratación del autoguardado (`meta.resetUndoHistory`).
+beforeEach(() => {
+  const base = configureStore({
+    reducer: { project: projectReducer },
+    middleware: (gdm) => gdm({ serializableCheck: false }).concat(undoMiddleware),
+  });
+  base.dispatch({ ...restoreState(base.getState().project), meta: { resetUndoHistory: true } });
+});
 
 const RECT: PathCommand[] = [
   { type: 'M', values: [0, 0] }, { type: 'L', values: [200, 0] },
@@ -230,6 +242,7 @@ describe('agarrar y arrastrar una interna en Q', () => {
     act(() => hook.result.current.enterEdit('p'));
     act(() => { hook.result.current.handleMouseDown(ev(120, 20)); });
     act(() => { hook.result.current.handleMouseMove(ev(120, 40)); });
+    expect(anclasDe(internaDe('L'))[1]).toEqual([120, 40]);
     act(() => { store.dispatch({ type: 'editor/undo' }); });
     expect(anclasDe(internaDe('L'))[1]).toEqual([120, 20]);
     act(() => { hook.result.current.handleMouseMove(ev(120, 60)); });
@@ -268,5 +281,207 @@ describe('agarrar y arrastrar una interna en Q', () => {
     act(() => { hook.result.current.handleMouseMove(ev(70, 21)); });
     expect(hook.result.current.internas[0].hoveredSegment).toBe(1);
     expect(hook.result.current.getCursor()).toBe('cell');
+  });
+});
+
+const tecleo = (key: string) => new KeyboardEvent('keydown', { key });
+
+describe('la interna elegida se va con lo elegido en Q (§ 3.5)', () => {
+  it('elegir un punto de una interna y deshacer desde fuera la suelta (§ 4.7)', () => {
+    const { store, hook } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    // Un cambio cualquiera en el historial, antes de elegir: el deshacer lo revierte.
+    const otra: PathCommand[] = [{ type: 'M', values: [20, 20] }, { type: 'L', values: [120, 20] }, { type: 'L', values: [120, 110] }];
+    act(() => { store.dispatch(updateInternalLine({ pieceId: 'p', lineId: 'L', path: otra })); });
+    act(() => { hook.result.current.handleMouseDown(ev(120, 20)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L' });
+    act(() => { store.dispatch({ type: 'editor/undo' }); });
+    expect(hook.result.current.internas[0].selectedNodes.size).toBe(0);
+    expect(store.getState().editor.selectedInternalLine).toBeNull();
+    expect(store.getState().editor.selectedPieceIds).toEqual(['p']);
+  });
+
+  it('arrastrar un punto de interna, deshacer desde fuera y Supr: nada deja la línea entera en la puerta global', () => {
+    const { store, hook, internaDe } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    arrastrar(hook, [120, 20], [120, 40]);
+    act(() => { store.dispatch({ type: 'editor/undo' }); });
+    expect(anclasDe(internaDe('L'))[1]).toEqual([120, 20]);
+    let consumida = true;
+    act(() => { consumida = hook.result.current.handleKeyDown(tecleo('Delete')); });
+    expect(consumida).toBe(false);
+    expect(store.getState().editor.selectedInternalLine).toBeNull();
+  });
+
+  it('entrar en otra pieza suelta la interna elegida de la anterior; la de la pieza que entra se queda (§ 5.3)', () => {
+    const otra = { ...pieza(), id: 'q', position: { x: 400, y: 0 } } as PatternPiece;
+    const { store, hook } = montarQ([pieza(), otra]);
+    act(() => { store.dispatch(selectInternalLine({ pieceId: 'p', lineId: 'L' })); });
+    act(() => hook.result.current.enterEdit('q'));
+    expect(store.getState().editor.selectedInternalLine).toBeNull();
+    expect(store.getState().editor.selectedPieceIds).toEqual(['q']);
+
+    act(() => { store.dispatch(selectInternalLine({ pieceId: 'q', lineId: 'L' })); });
+    act(() => hook.result.current.enterEdit('q'));
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'q', lineId: 'L' });
+
+    // El primer press que entra y coge el contorno de la otra también la suelta.
+    act(() => hook.result.current.exitEdit());
+    act(() => { store.dispatch(selectInternalLine({ pieceId: 'p', lineId: 'L' })); });
+    act(() => { hook.result.current.enterEditActuando('q', ev(600, 0)); });
+    expect(hook.result.current.selectedNodes.has(1)).toBe(true);
+    expect(store.getState().editor.selectedInternalLine).toBeNull();
+  });
+
+  it('Esc con el arrastre de un punto de interna vivo la suelta', () => {
+    const { store, hook } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    act(() => { hook.result.current.handleMouseDown(ev(120, 20)); });
+    act(() => { hook.result.current.handleMouseMove(ev(120, 40)); });
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L' });
+    act(() => { hook.result.current.handleKeyDown(tecleo('Escape')); });
+    expect(hook.result.current.isEditing).toBe(false);
+    expect(store.getState().editor.selectedInternalLine).toBeNull();
+  });
+
+  it('el marco publica la interna si solo coge puntos de ella, y la suelta si coge de varias líneas', () => {
+    const { store, hook } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    // Solo L: (120,20) y (120,120).
+    act(() => { hook.result.current.handleMouseDown(ev(110, 10)); });
+    act(() => { hook.result.current.handleMouseMove(ev(130, 130)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L' });
+    // El contorno y L: ya no hay UNA interna que publicar.
+    act(() => { hook.result.current.handleMouseDown(ev(-20, -20)); });
+    act(() => { hook.result.current.handleMouseMove(ev(130, 30)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(store.getState().editor.selectedInternalLine).toBeNull();
+  });
+
+  it('un Shift+clic que quita un tramo vuelve a publicar lo que queda', () => {
+    const { store, hook } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    const clic = (x: number, y: number, shift = false) => {
+      act(() => { hook.result.current.handleMouseDown(ev(x, y, shift)); });
+      act(() => { hook.result.current.handleMouseUp(); });
+    };
+    clic(70, 20);
+    clic(121, 70, true);
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L' });
+    clic(121, 70, true);
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L', segmentIndex: 1 });
+    clic(70, 20, true);
+    expect(store.getState().editor.selectedInternalLine).toBeNull();
+  });
+});
+
+describe('el hover antes de entrar, precalculado por identidad de la pieza (§ 13)', () => {
+  it('tras un cambio de fuera que mueve la interna, el hover mira la geometría nueva', () => {
+    const { store, hook } = montarQ([pieza()]);
+    act(() => { hook.result.current.handleMouseMove(ev(70, 21)); });
+    expect(hook.result.current.internas[0].hoveredSegment).toBe(1);
+    const bajada: PathCommand[] = [{ type: 'M', values: [20, 60] }, { type: 'L', values: [120, 60] }, { type: 'L', values: [120, 140] }];
+    act(() => { store.dispatch(updateInternalLine({ pieceId: 'p', lineId: 'L', path: bajada })); });
+    act(() => { hook.result.current.handleMouseMove(ev(70, 21)); });
+    expect(hook.result.current.hoveredPieceId).toBeNull();
+    expect(hook.result.current.getCursor()).toBe('default');
+    act(() => { hook.result.current.handleMouseMove(ev(70, 61)); });
+    expect(hook.result.current.hoveredPieceId).toBe('p');
+    expect(hook.result.current.internas[0].hoveredSegment).toBe(1);
+  });
+
+  it('el hover no escribe en las líneas precalculadas de la pieza', () => {
+    const { store, hook } = montarQ([pieza()]);
+    const piece = store.getState().project.pieces[0];
+    const lineas = lineasDeHover(piece);
+    const conConjuntos = (_: string, v: unknown) => (v instanceof Set ? [...v] : v);
+    const foto = JSON.stringify(lineas, conConjuntos);
+    Object.freeze(lineas);
+    Object.freeze(lineas.nodes);
+    Object.freeze(lineas.internas);
+    lineas.internas.forEach(i => { Object.freeze(i); Object.freeze(i.nodes); });
+    act(() => { hook.result.current.handleMouseMove(ev(70, 21)); });
+    act(() => { hook.result.current.handleMouseMove(ev(120, 20)); });
+    act(() => { hook.result.current.handleMouseMove(ev(0, 0)); });
+    act(() => { hook.result.current.handleMouseMove(ev(500, 500)); });
+    act(() => { hook.result.current.limpiarHover(); });
+    expect(lineasDeHover(store.getState().project.pieces[0])).toBe(lineas);
+    expect(JSON.stringify(lineas, conConjuntos)).toBe(foto);
+  });
+
+  it('perdido el hover sin pieza en edición, el hook deja de devolver las internas de la pieza de debajo', () => {
+    const { hook } = montarQ([pieza()]);
+    act(() => { hook.result.current.handleMouseMove(ev(70, 21)); });
+    expect(hook.result.current.internas).toHaveLength(1);
+    act(() => { hook.result.current.handleMouseMove(ev(500, 500)); });
+    expect(hook.result.current.internas).toHaveLength(0);
+    act(() => { hook.result.current.handleMouseMove(ev(70, 21)); });
+    act(() => { hook.result.current.limpiarHover(); });
+    expect(hook.result.current.internas).toHaveLength(0);
+  });
+});
+
+describe('§ 10.2: lo que faltaba de los hooks', () => {
+  it('enganche sin la propia línea: sus puntas no enganchan, las de otra interna sí (§ 4.3)', () => {
+    const OTRA: InternalLine = { id: 'O', type: 'reference', path: [{ type: 'M', values: [60, 100] }, { type: 'L', values: [60, 140] }] };
+    // La punta (120,120) de L, junto a su propia punta (20,20): no engancha.
+    const a = montarQ([pieza([ELE, OTRA])]);
+    act(() => a.hook.result.current.enterEdit('p'));
+    act(() => { a.hook.result.current.handleMouseDown(ev(120, 120)); });
+    act(() => { a.hook.result.current.handleMouseMove(ev(23, 22)); });
+    expect(a.hook.result.current.enganche).toBeNull();
+    act(() => { a.hook.result.current.handleMouseUp(); });
+    expect(anclasDe(a.internaDe('L'))[2]).toEqual([23, 22]);
+    cleanup();
+    // La misma punta junto a la punta (60,100) de OTRA: engancha exacto.
+    const b = montarQ([pieza([ELE, OTRA])]);
+    act(() => b.hook.result.current.enterEdit('p'));
+    act(() => { b.hook.result.current.handleMouseDown(ev(120, 120)); });
+    act(() => { b.hook.result.current.handleMouseMove(ev(62, 103)); });
+    expect(b.hook.result.current.enganche).toEqual({ x: 60, y: 100 });
+    act(() => { b.hook.result.current.handleMouseUp(); });
+    expect(anclasDe(b.internaDe('L'))[2]).toEqual([60, 100]);
+  });
+
+  it('el primer press que entra en la pieza ya agarra y arrastra el punto de la interna (enterEditActuando)', () => {
+    clearJournal();
+    const { store, hook, internaDe } = montarQ([pieza()]);
+    let actuo = false;
+    act(() => { actuo = hook.result.current.enterEditActuando('p', ev(120, 20)); });
+    expect(actuo).toBe(true);
+    expect(hook.result.current.isEditing).toBe(true);
+    expect(hook.result.current.editingPieceId).toBe('p');
+    expect([...hook.result.current.internas[0].selectedNodes]).toEqual([1]);
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L' });
+    act(() => { hook.result.current.handleMouseMove(ev(120, 40)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(anclasDe(internaDe('L'))[1]).toEqual([120, 40]);
+    expect(store.getState().project.pieces[0].outline).toEqual(RECT);
+    const eventos = getJournal().events.filter(e => e.kind === 'gesture').map(e => [e.name, e.data]);
+    expect(eventos).toContainEqual(['edicion:agarre', { objeto: 'pieza', linea: 'interna', que: 'punto', lineId: 'L' }]);
+  });
+
+  it('… y sobre un tramo de interna entra con ese tramo elegido', () => {
+    const { store, hook } = montarQ([pieza()]);
+    act(() => { hook.result.current.enterEditActuando('p', ev(70, 20)); });
+    expect([...hook.result.current.internas[0].selectedSegments]).toEqual([1]);
+    expect(store.getState().editor.selectedInternalLine).toEqual({ pieceId: 'p', lineId: 'L', segmentIndex: 1 });
+  });
+
+  it('un gesto, una entrada de deshacer, aunque el ratón se mueva varias veces (§ 4.7)', () => {
+    const { store, hook, internaDe } = montarQ([pieza()]);
+    act(() => hook.result.current.enterEdit('p'));
+    const antes = getUndoLength();
+    act(() => { hook.result.current.handleMouseDown(ev(120, 20)); });
+    act(() => { hook.result.current.handleMouseMove(ev(120, 30)); });
+    act(() => { hook.result.current.handleMouseMove(ev(125, 40)); });
+    act(() => { hook.result.current.handleMouseMove(ev(130, 50)); });
+    act(() => { hook.result.current.handleMouseUp(); });
+    expect(anclasDe(internaDe('L'))[1]).toEqual([130, 50]);
+    expect(getUndoLength()).toBe(antes + 1);
+    act(() => { store.dispatch({ type: 'editor/undo' }); });
+    expect(anclasDe(internaDe('L'))).toEqual([[20, 20], [120, 20], [120, 120]]);
   });
 });

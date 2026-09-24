@@ -57,7 +57,7 @@ import {
   INITIAL_STATE, SIN_INTERNAS, algoElegido, arrastreDe, conLinea, estadoDeEntrada, extraerInternas,
   findFromNode, hoverDe, internaElegidaDe, marcoSelecciona, mismosPaths, pathsEditables,
   refrescarLineas, resyncStateToPiece, sinHover, sinPuntos, sinSeleccion, sinTramos, vistas,
-  type ArrastreDeLinea, type EditPatternState,
+  type ArrastreDeLinea, type EdicionDeInterna, type EditPatternState,
 } from './estadoDeQ';
 
 export { resyncStateToPiece } from './estadoDeQ';
@@ -139,6 +139,39 @@ export function findInsertTarget(
   return hit?.tipo === 'tramo' ? { commandIndex: hit.commandIndex, t: hit.t } : null;
 }
 
+/** Lo que el hover antes de entrar lee de una pieza: su contorno y sus internas editables. */
+export interface LineasDeHover {
+  nodes: EditableNode[];
+  internas: EdicionDeInterna[];
+}
+
+/**
+ * Las líneas de cada pieza para el hover antes de entrar, precalculadas por
+ * identidad y no por evento (spec 2026-09-24 § 13). El reductor nunca muta una
+ * pieza: un cambio en cualquiera de sus paths trae un objeto nuevo, así que
+ * una entrada no puede quedarse con la geometría de antes. Nadie escribe en
+ * ellas —`sinHover` y `conLinea` copian—, y el test del hover lo fija.
+ */
+const lineasPorPieza = new WeakMap<PatternPiece, LineasDeHover>();
+
+export function lineasDeHover(piece: PatternPiece): LineasDeHover {
+  let lineas = lineasPorPieza.get(piece);
+  if (!lineas) {
+    lineas = { nodes: extractNodes(piece), internas: extraerInternas(piece) };
+    lineasPorPieza.set(piece, lineas);
+  }
+  return lineas;
+}
+
+/**
+ * El hover antes de entrar, perdido: nada bajo el ratón y ninguna interna, que
+ * eran las de la pieza de debajo (spec § 3.2). Un estado que ya entró no es
+ * del hover y sigue como estaba.
+ */
+function hoverPerdido(s: EditPatternState): EditPatternState {
+  return s.isEditing ? s : { ...sinHover(s), hoveredPieceId: null, internas: SIN_INTERNAS };
+}
+
 // ─── Hook ───
 
 export function useEditPattern(zoom: number, pan: Point2D) {
@@ -164,6 +197,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   // La interna elegida tiene una sola fuente, la de Z (spec 2026-09-24 § 3.5).
   // `?.`/`??`: los arneses de prueba de antes no montan `editor`.
   const selectedInternalLine = useSelector((s: RootState) => s.editor?.selectedInternalLine ?? null);
+  /**
+   * La misma, leída al soltarla: quien la suelta (el resync, la entrada, Esc,
+   * `publicarElegida`) no se re-crea cada vez que cambia.
+   */
+  const selectedInternalLineRef = useRef(selectedInternalLine);
+  selectedInternalLineRef.current = selectedInternalLine;
   const trazos = useSelector((s: RootState) => s.project.trazos ?? SIN_TRAZOS);
   const showTrazos = useSelector((s: RootState) => s.editor?.showTrazos ?? true);
   /** Lo visible en orden de dibujo, para el enganche (la última pieza, encima). */
@@ -192,7 +231,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   useEffect(() => {
     if (state.isEditing || !state.hoveredPieceId) return;
     if (hoverablePieces.some(piece => piece.id === state.hoveredPieceId)) return;
-    setState(current => ({ ...sinHover(current), hoveredPieceId: null }));
+    setState(hoverPerdido);
   }, [hoverablePieces, state.isEditing, state.hoveredPieceId]);
 
   const dragRef = useRef<DragState | null>(null);
@@ -338,12 +377,16 @@ export function useEditPattern(zoom: number, pan: Point2D) {
    * Q escribe la interna elegida cuando lo elegido es de una interna, y la
    * vacía —dejando la pieza— cuando deja de serlo. Nunca guarda una interna
    * elegida que Z no conozca: dos fuentes se desincronizan.
+   *
+   * La vacía aunque sea de otra pieza, como elegir una ya la mueve aquí: sin
+   * nada de una interna elegido en Q, Supr sigue a la puerta global, y una
+   * línea elegida ahí se borraría entera.
    */
   const publicarElegida = useCallback((pieceId: string, next: EditPatternState) => {
     const elegida = internaElegidaDe(next);
     if (elegida) dispatch(selectInternalLine({ pieceId, ...elegida }));
-    else if (selectedInternalLine?.pieceId === pieceId) dispatch(selectPiece(pieceId));
-  }, [dispatch, selectedInternalLine]);
+    else if (selectedInternalLineRef.current) dispatch(selectPiece(pieceId));
+  }, [dispatch]);
 
   /** El índice de enganche de lo visible, sin la interna que se arrastra (spec § 4.3). */
   const indiceSin = useCallback((piece: PatternPiece, lineId: string): SnapIndex => buildSnapIndex(
@@ -366,6 +409,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
         return;
       }
+      // Q edita un objeto a la vez (spec 2026-09-24 § 3.1): la interna elegida
+      // de otra pieza se suelta al entrar, o Supr la borraría por la puerta
+      // global mientras se edita esta. La de esta misma pieza se queda: el
+      // doble clic desde Z (§ 5.3) entra con ella elegida.
+      const elegidaFuera = selectedInternalLineRef.current;
+      if (elegidaFuera && elegidaFuera.pieceId !== pieceId) dispatch(selectPiece(pieceId));
       seenPathsRef.current = pathsEditables(piece);
       expectedPathsRef.current = null;
       setState(estadoDeEntrada(piece));
@@ -407,7 +456,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         const nodos = new Set(aditivo ? linea.selectedNodes : []);
         for (const ci of grupo) nodos.add(ci);
         next = conLinea(limpio, hit.clave, { selectedNodes: nodos });
-        const pos = linea.nodes.find(n => n.ref.commandIndex === hit.commandIndex)?.position ?? { x: 0, y: 0 };
+        const pos = linea.nodes.find(n => n.ref.commandIndex === hit.commandIndex)?.position ?? toLocal(e, piece);
         marco = marcoDelPunto(piece, linea.path, pos, hit.commandIndex);
       } else {
         // El mismo aplazamiento que el de los puntos.
@@ -434,7 +483,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       });
       return next;
     },
-    [indiceSin],
+    [indiceSin, toLocal],
   );
 
   /** Lo que agarraría un press en la pieza en edición (menú contextual y enrutador). */
@@ -521,7 +570,12 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     setGuias(null);
     publicarEnganche(null);
     setState(s => resyncStateToPiece(s, piece));
-  }, [pieces, state.isEditing, state.editingPieceId, exitEdit, endDragBatch, publicarEnganche]);
+    // La interna elegida de esta pieza se va con la selección de Q (spec
+    // § 3.5 y § 4.7): su `segmentIndex` podría señalar otra geometría, y sin
+    // nada elegido en Q, Supr sigue a la puerta global, que con la línea
+    // elegida la borraría entera.
+    if (selectedInternalLineRef.current?.pieceId === piece.id) dispatch(selectPiece(piece.id));
+  }, [pieces, state.isEditing, state.editingPieceId, exitEdit, endDragBatch, publicarEnganche, dispatch]);
 
   useEffect(() => () => endDragBatch(), [endDragBatch]);
 
@@ -617,8 +671,9 @@ export function useEditPattern(zoom: number, pan: Point2D) {
         publicarGuias(null);
       }
       let { x: dx, y: dy } = patternToPieceLocalDirection(enPatron, piece);
-      // Precedencia del § 3.4: Shift > enganche > ratón. Una interna no mueve el
-      // pivote de la pieza, así que su marco es el mismo en todo el gesto.
+      // Precedencia de la spec 2026-09-24 § 4.3, que es la del contrato del
+      // 08-09 § 3.4: Shift > enganche > ratón. Una interna no mueve el pivote
+      // de la pieza, así que su marco es el mismo en todo el gesto.
       if (drag.enganche && modo === 'suelto') {
         const { indice, desde } = drag.enganche;
         const mundo = pieceLocalToPattern({ x: desde.x + dx, y: desde.y + dy }, piece);
@@ -688,22 +743,20 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           : hoverablePieces;
 
         for (const piece of candidates) {
-          const internas = state.hoveredPieceId === piece.id && state.internas
-            ? state.internas
-            : extraerInternas(piece);
-          const base: EditPatternState = { ...INITIAL_STATE, nodes: extractNodes(piece), internas };
+          const { nodes, internas } = lineasDeHover(piece);
+          const base: EditPatternState = { ...INITIAL_STATE, nodes, internas };
           const hit = agarrar(vistas(base, piece.outline), toLocal(e, piece), hitRadius, claveElegida(piece.id));
           if (hit) {
-            setState(s => conLinea(
-              { ...sinHover({ ...s, internas: s.hoveredPieceId === piece.id && s.internas ? s.internas : internas }), hoveredPieceId: piece.id },
+            setState(s => (s.isEditing ? s : conLinea(
+              { ...sinHover({ ...s, internas }), hoveredPieceId: piece.id },
               hit.clave,
               hit.tipo === 'punto' ? { hoveredNode: hit.commandIndex } : { hoveredSegment: hit.commandIndex },
-            ));
+            )));
             return false;
           }
         }
 
-        setState(s => ({ ...sinHover(s), hoveredPieceId: null }));
+        setState(hoverPerdido);
         return false;
       }
 
@@ -830,6 +883,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
           e.stopPropagation();
           return true;
         }
+        // Con un gesto vivo se sale sin pasar por el peldaño 3: la interna
+        // elegida se suelta aquí, o seguiría elegida fuera de Q y Supr la
+        // borraría entera (spec 2026-09-24 § 3.5).
+        if (dragRef.current && selectedInternalLineRef.current) dispatch(selectPiece(state.editingPieceId));
         exitEdit();
         return true;
       }
@@ -994,7 +1051,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   // ─── getCursor ───
 
   const limpiarHover = useCallback(() => {
-    setState(current => (current.isEditing ? current : { ...sinHover(current), hoveredPieceId: null }));
+    setState(hoverPerdido);
   }, []);
 
   const getCursor = useCallback((): string => {
