@@ -8,10 +8,10 @@ import type { SnapTarget } from './snapIndex';
 import { EDGE_HIT_PX, isDrag } from './gestureConstants';
 import { nodesToCommands, polarOf, polarPoint, type PolyPenNode } from './polyPenGeometry';
 import { pushJournal } from '../../utils/telemetry/journal';
-import { borderReference, referenceForNext } from './angleReference';
+import { borderReference, referenceForNext, type AngleReference } from './angleReference';
 import type { TramoEnCurso } from './cotas/tramoEnCurso';
-import { restringirAHoja45 } from './restriccionShift';
-import { useShiftSostenido } from './useShiftSostenido';
+import { guiasShift, type GuiasShift } from './restriccionShift';
+import { useShiftSostenido, type ModoShift } from './useShiftSostenido';
 
 export type { PolyPenNode, PolyPenNodeType } from './polyPenGeometry';
 
@@ -70,10 +70,15 @@ interface ViewState {
   closeArmed: boolean;
   nextPoint: NextPointState | null;
   nextPointSeq: number;
+  /** Las dos guías de Shift (spec 2026-09-23 § 4.1); `null` sin Shift. */
+  guias: GuiasShift | null;
+  /** Shift ahora mismo, para la pista del pie. */
+  modoShift: ModoShift;
 }
 
 const EMPTY: ViewState = {
   nodes: [], previewPoint: null, pressPoint: null, isDragging: false, dragHandle: null, hover: null, hostId: null, closeArmed: false, nextPoint: null, nextPointSeq: 0,
+  guias: null, modoShift: 'suelto',
 };
 
 const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -108,6 +113,17 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
   const referenceForNodes = useCallback((nodes: PolyPenNode[]) => nodes.length === 1
     ? borderReference(indice, nodes[0].point, hostRef.current ?? undefined)
     : referenceForNext(nodesToCommands(nodes, false), indice, hostRef.current ?? undefined), [indice]);
+  // El marco del borde de Shift dos veces proyecta sobre el anillo de la
+  // anfitriona: no se rehace por evento de ratón, solo cuando cambian los
+  // nodos (cambian de identidad con cada nodo nuevo) o el índice.
+  const marcoRef = useRef<{ nodes: PolyPenNode[]; indice: typeof indice; ref: AngleReference } | null>(null);
+  const marcoDe = useCallback((nodes: PolyPenNode[]): AngleReference => {
+    const cache = marcoRef.current;
+    if (cache && cache.nodes === nodes && cache.indice === indice) return cache.ref;
+    const ref = referenceForNodes(nodes);
+    marcoRef.current = { nodes, indice, ref };
+    return ref;
+  }, [indice, referenceForNodes]);
 
   const toWorld = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D =>
@@ -146,15 +162,19 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
   });
 
   /**
-   * Con Shift y un nodo del que partir, el punto sobre la guía de la hoja (firma
-   * de María del 23-09, opción B). Shift va por encima del enganche (contrato
-   * 2026-09-08 § 3.4); el cierre sobre el primer nodo, no: cerrar es otro gesto.
+   * Con Shift y un nodo del que partir, las guías (spec 2026-09-23): la de la
+   * hoja con una vez (firma de María del 23-09, opción B), la del borde —la
+   * referencia de la píldora— con dos. Shift va por encima del enganche
+   * (contrato 2026-09-08 § 3.4); el cierre sobre el primer nodo, no: cerrar es
+   * otro gesto.
    */
-  const enderezar = useCallback((world: Point2D | null): Point2D | null => {
+  const guiasPara = useCallback((world: Point2D | null): GuiasShift | null => {
     const nodes = nodesRef.current;
-    if (modoRef.current === 'suelto' || !world || nodes.length === 0) return null;
-    return restringirAHoja45(nodes[nodes.length - 1].point, world);
-  }, [modoRef]);
+    const modo = modoRef.current;
+    if (modo === 'suelto' || !world || nodes.length === 0) return null;
+    return guiasShift(nodes[nodes.length - 1].point, world, marcoDe(nodes), modo === 'borde');
+  }, [modoRef, marcoDe]);
+  const enderezar = useCallback((world: Point2D | null): Point2D | null => guiasPara(world)?.punto ?? null, [guiasPara]);
 
   /**
    * ¿Cierra el trazo un press aquí? Si el ratón cae sobre el primer nodo, o si
@@ -183,9 +203,10 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
   const publish = useCallback(() => {
     const press = pressRef.current;
     const hover = press ? press.snap : hoverRef.current;
+    const guias = guiasPara(lastWorldRef.current);
     setView({
       nodes: [...nodesRef.current],
-      previewPoint: enderezar(lastWorldRef.current) ?? lastWorldRef.current,
+      previewPoint: guias?.punto ?? lastWorldRef.current,
       pressPoint: press ? (press.snap?.point ?? press.world) : null,
       isDragging: !!press?.moved,
       dragHandle: press?.moved ? press.drag : null,
@@ -194,8 +215,12 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
       closeArmed: !!press?.closes || hover?.kind === 'firstNode',
       nextPoint: nextPointRef.current,
       nextPointSeq: nextPointSeqRef.current,
+      // Arrastrando un manejador, o con la pareja congelada, la goma no va por
+      // ninguna guía: no se pintan.
+      guias: press?.moved || nextPointRef.current ? null : guias,
+      modoShift: modoRef.current,
     });
-  }, [enderezar]);
+  }, [guiasPara, modoRef]);
 
   const reset = useCallback(() => {
     nodesRef.current = [];
@@ -270,9 +295,12 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     // Un press con la pareja congelada la suelta: volver al ratón es volver
     // del todo (revisión 13-09, H1). Hermano del de la Pluma.
     nextPointRef.current = null;
-    journalPress({ armed: true, snap: snap?.kind ?? null, hostId: hostRef.current, closes, ...(guia ? { shift: true } : {}) });
+    journalPress({
+      armed: true, snap: snap?.kind ?? null, hostId: hostRef.current, closes,
+      ...(guia ? { shift: true, ...(modoRef.current === 'borde' ? { borde: true } : {}) } : {}),
+    });
     publish();
-  }, [toWorld, radius, resolveSnap, topmostContaining, publish, enderezar, cierraEn, sincronizar]);
+  }, [toWorld, radius, resolveSnap, topmostContaining, publish, enderezar, cierraEn, modoRef, sincronizar]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const world = toWorld(e);
@@ -439,6 +467,10 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     closeArmed: view.closeArmed,
     nextPoint: view.nextPoint,
     nextPointSeq: view.nextPointSeq,
+    /** Las dos guías de Shift, para `GuiasShiftOverlay`. */
+    guias: view.guias,
+    /** Shift ahora mismo, para la pista del pie. */
+    modoShift: view.modoShift,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,

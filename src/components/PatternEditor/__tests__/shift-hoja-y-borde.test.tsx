@@ -15,6 +15,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import type { PatternPiece, PathCommand } from '../../../types/types';
 import { usePenTool } from '../usePenTool';
+import { usePolyPenTool } from '../usePolyPenTool';
 import { polarOf } from '../polyPenGeometry';
 import { relativeAngle, type AngleReference } from '../angleReference';
 
@@ -154,5 +155,64 @@ describe('Pluma — Shift dos veces endereza al borde', () => {
     expect(relativeAngle(np.angleDeg, np.reference!)).toBeCloseTo(90, 9);
     // Con la pareja congelada la goma no va por ninguna guía.
     expect(tool().guias).toBeNull();
+  });
+});
+
+describe('Línea interna — Shift dos veces endereza al borde', () => {
+  function setup() {
+    const onComplete = vi.fn();
+    const hook = renderHook(() => usePolyPenTool(1, { x: 0, y: 0 }, { nodeType: 'straight', pieces: [DELANTERO], onComplete }));
+    const tool = () => hook.result.current;
+    const click = (p: { x: number; y: number }, conShift = false) => act(() => {
+      tool().handleMouseDown(ev(p.x, p.y, conShift));
+      tool().handleMouseUp(ev(p.x, p.y, conShift));
+    });
+    const move = (p: { x: number; y: number }, conShift = false) =>
+      act(() => tool().handleMouseMove(ev(p.x, p.y, conShift)));
+    return { tool, click, move, onComplete };
+  }
+
+  it('la goma va por la perpendicular al costado, con la hoja como guía tenue', () => {
+    const { tool, click, move } = setup();
+    click(COSTADO);
+    move(RUMBO);
+    dosVeces();
+    expect(relativeAngle(polarOf(COSTADO, tool().previewPoint!).angleDeg, tool().angleReference)).toBeCloseTo(90, 9);
+    expect(tool().guias!.tenue!.angleDeg).toBe(180);
+    expect(tool().modoShift).toBe('borde');
+  });
+
+  it('el nodo cae sobre la perpendicular y la línea termina con dos nodos', () => {
+    const { tool, click, move, onComplete } = setup();
+    click(COSTADO);
+    move(RUMBO);
+    dosVeces();
+    click(RUMBO, true);
+    tecla('keyup');
+    act(() => { tool().handleKeyDown(new KeyboardEvent('keydown', { key: 'Enter' })); });
+    const [, comandos] = onComplete.mock.calls[0];
+    const [m, l] = comandos as PathCommand[];
+    expect(comandos).toHaveLength(2);
+    const a = { x: m.values[0], y: m.values[1] };
+    const b = { x: l.values[0], y: l.values[1] };
+    expect(relativeAngle(polarOf(a, b).angleDeg, BORDE)).toBeCloseTo(90, 9);
+  });
+
+  it('una vez es la hoja, como hoy', () => {
+    const { tool, click, move } = setup();
+    click(COSTADO);
+    move(RUMBO);
+    tecla('keydown');
+    expect(tool().previewPoint!.y).toBe(COSTADO.y);
+    expect(tool().guias!.activa!.angleDeg).toBe(180);
+    expect(tool().modoShift).toBe('hoja');
+  });
+
+  it('sin Shift no hay guías', () => {
+    const { tool, click, move } = setup();
+    click(COSTADO);
+    move(RUMBO);
+    expect(tool().guias).toBeNull();
+    expect(tool().previewPoint).toEqual(RUMBO);
   });
 });
