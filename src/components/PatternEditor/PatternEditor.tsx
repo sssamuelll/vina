@@ -1537,6 +1537,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             editPatternHoveredSegment={editPatternTool.hoveredSegment}
             editPatternAddPointPreview={editPatternTool.addPointPreview}
             editPatternMarquee={editPatternTool.marquee}
+            editPatternInternas={editPatternTool.internas}
+            editPatternEnganche={editPatternTool.enganche}
             scissorsTargetPieceId={scissorsTool.targetPieceId}
             scissorsStartPoint={scissorsTool.startPoint}
             scissorsEndPoint={scissorsTool.endPoint}

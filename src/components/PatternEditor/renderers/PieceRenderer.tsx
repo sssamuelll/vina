@@ -331,8 +331,10 @@ const SinglePiece = memo(function SinglePiece({
             )}
             {foldMarkers.length > 0 && <g className="fold-direction-markers">{foldMarkers}</g>}
             {/* Los extremos de la entidad siguen siendo sus controles de arrastre;
-                mostrarlos para un tramo anunciaría un alcance distinto al seleccionado. */}
-            {isWholeLineSelected && (() => {
+                mostrarlos para un tramo anunciaría un alcance distinto al seleccionado.
+                En Q y V, la pieza en edición ya pinta sus puntos en el overlay: dos
+                glifos en la misma coordenada son ruido (spec 2026-09-24 § 3.3). */}
+            {isWholeLineSelected && piezaConPuntosDeCurva !== piece.id && (() => {
               const first = line.path[0];
               const last = line.path[line.path.length - 1];
               const points: { x: number; y: number }[] = [];
