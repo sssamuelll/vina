@@ -323,6 +323,7 @@ export function hitTestNode(
 export function nearestSegment(
   point: Point2D,
   outline: PathCommand[],
+  opciones: { cierre?: boolean } = {},
 ): SegmentHit | null {
   let bestHit: SegmentHit | null = null;
 
@@ -376,28 +377,32 @@ export function nearestSegment(
     }
   }
 
-  // Check closing segment: last anchor back to first anchor
-  const first = anchors[0];
-  const last = anchors[anchors.length - 1];
-  const closingHit = distToSegmentWithT(
-    point.x, point.y,
-    last.pos.x, last.pos.y,
-    first.pos.x, first.pos.y,
-  );
+  // Una línea abierta no tiene cierre (spec 2026-09-24 § 3.4): pedirlo con
+  // `cierre: false` evita que el fantasma tape un tramo real.
+  if (opciones.cierre !== false) {
+    // Check closing segment: last anchor back to first anchor
+    const first = anchors[0];
+    const last = anchors[anchors.length - 1];
+    const closingHit = distToSegmentWithT(
+      point.x, point.y,
+      last.pos.x, last.pos.y,
+      first.pos.x, first.pos.y,
+    );
 
-  // The closing segment's commandIndex: use the Z command index if it exists,
-  // otherwise use 0 (the M command). Convention: we use the index of the Z command
-  // or fallback to the first anchor.
-  const zIndex = outline.findIndex(c => c.type === 'Z');
-  const closingIdx = zIndex >= 0 ? zIndex : 0;
+    // The closing segment's commandIndex: use the Z command index if it exists,
+    // otherwise use 0 (the M command). Convention: we use the index of the Z command
+    // or fallback to the first anchor.
+    const zIndex = outline.findIndex(c => c.type === 'Z');
+    const closingIdx = zIndex >= 0 ? zIndex : 0;
 
-  if (!bestHit || closingHit.distance < bestHit.distance) {
-    bestHit = {
-      commandIndex: closingIdx,
-      t: closingHit.t,
-      distance: closingHit.distance,
-      point: closingHit.point,
-    };
+    if (!bestHit || closingHit.distance < bestHit.distance) {
+      bestHit = {
+        commandIndex: closingIdx,
+        t: closingHit.t,
+        distance: closingHit.distance,
+        point: closingHit.point,
+      };
+    }
   }
 
   return bestHit;
