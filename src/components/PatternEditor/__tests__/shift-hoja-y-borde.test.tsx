@@ -22,6 +22,7 @@ import { usePolyPenTool } from '../usePolyPenTool';
 import { useEditPattern } from '../useEditPattern';
 import { polarOf } from '../polyPenGeometry';
 import { relativeAngle, type AngleReference } from '../angleReference';
+import { pieceLocalToPattern } from '../../../utils/geometry/pieceSpace';
 
 afterEach(cleanup);
 
@@ -347,6 +348,21 @@ describe('Editar patrón — Shift dos veces endereza respecto al lado', () => {
     expect(tool().modoShift).toBe('borde');
     up();
     expect(tool().guias).toBeNull();
+  });
+
+  it('en una pieza girada, el marco del lado gira con ella (spec § 6.2)', () => {
+    const girada = { ...DELANTERO, rotation: 30 } as unknown as PatternPiece;
+    const { down, move, up, ancla } = setupQ(girada);
+    const desde = pieceLocalToPattern({ x: 260, y: 180 }, girada);
+    // Hacia fuera por el costado, en el espacio del patrón, con algo de pulso.
+    const lejos = pieceLocalToPattern({ x: 260 + 18, y: 180 + 54 }, girada);
+    down(desde);
+    dosVeces();
+    move({ x: lejos.x + 3, y: lejos.y - 2 }, true);
+    up();
+    const p = ancla(2);
+    expect(cruzConCostado({ x: 200, y: 0 }, p)).toBeCloseTo(0, 6);
+    expect(p.y).toBeGreaterThan(180);
   });
 
   it('en una pieza con arcos, dos veces endereza a la hoja sin romper', () => {

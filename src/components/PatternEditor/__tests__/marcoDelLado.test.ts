@@ -33,12 +33,37 @@ describe('arrivingReference — el lado que llega al punto', () => {
     expect(arrivingReference(pieza(DELANTERO), 0).baseDeg).toBeCloseTo(90, 9);
   });
 
-  it('en una esquina con anclas gemelas salta el tramo de largo cero', () => {
+  it('en una esquina con anclas gemelas llega el lado de verdad, no el de largo cero', () => {
+    // Lado inclinado, para que el eje (0°) no pueda pasar por la respuesta.
     const gemelas: PathCommand[] = [
-      { type: 'M', values: [0, 0] }, { type: 'L', values: [100, 0] }, { type: 'L', values: [100, 0] },
-      { type: 'L', values: [100, 100] }, { type: 'L', values: [0, 100] }, { type: 'Z', values: [] },
+      { type: 'M', values: [0, 0] }, { type: 'L', values: [60, 180] }, { type: 'L', values: [60, 180] },
+      { type: 'L', values: [260, 180] }, { type: 'L', values: [260, 0] }, { type: 'Z', values: [] },
     ];
-    expect(arrivingReference(pieza(gemelas), 2).baseDeg).toBeCloseTo(0, 9);
+    const r = arrivingReference(pieza(gemelas), 2);
+    expect(r.kind).toBe('border');
+    expect(r.baseDeg).toBeCloseTo(polarOf({ x: 0, y: 0 }, { x: 60, y: 180 }).angleDeg, 9);
+  });
+
+  it('con gemelas en el M (un L de vuelta al origen antes del Z), al M le llega el último lado', () => {
+    const cierreDoble: PathCommand[] = [
+      { type: 'M', values: [0, 0] }, { type: 'L', values: [200, 0] }, { type: 'L', values: [260, 180] },
+      { type: 'L', values: [60, 180] }, { type: 'L', values: [0, 0] }, { type: 'Z', values: [] },
+    ];
+    const r = arrivingReference(pieza(cierreDoble), 0);
+    expect(r.kind).toBe('border');
+    expect(r.baseDeg).toBeCloseTo(polarOf({ x: 60, y: 180 }, { x: 0, y: 0 }).angleDeg, 9);
+  });
+
+  it('en un contorno abierto, al punto de inicio no le llega el cierre que no existe: manda el lado que sale', () => {
+    // Revisión final (sonda C): el cierre sintético de un contorno abierto no es un lado.
+    const abierto: PathCommand[] = [
+      { type: 'M', values: [0, 0] }, { type: 'L', values: [60, 180] }, { type: 'L', values: [260, 180] },
+    ];
+    const r = arrivingReference(pieza(abierto), 0);
+    expect(r.kind).toBe('border');
+    expect(r.baseDeg).toBeCloseTo(polarOf({ x: 0, y: 0 }, { x: 60, y: 180 }).angleDeg, 9);
+    // Al final del contorno abierto sí le llega su lado.
+    expect(arrivingReference(pieza(abierto), 2).baseDeg).toBeCloseTo(0, 9);
   });
 
   it('en una pieza girada el marco gira con ella', () => {
