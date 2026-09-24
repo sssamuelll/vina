@@ -61,6 +61,7 @@ import { useEditorInteractions } from './useEditorInteractions';
 import { useElasticTool } from '../../hooks/useElasticTool';
 import { EDGE_HIT_PX } from './gestureConstants';
 import PolyPenToolOverlay from './renderers/overlays/PolyPenToolOverlay';
+import GuiasShiftOverlay from './renderers/overlays/GuiasShiftOverlay';
 import { piezasConLargos as seleccionarPiezasConLargos } from './cotas/piezasConLargos';
 import { usePrecisionHint } from './usePrecisionHint';
 import MeasureToolOverlay from './renderers/overlays/MeasureToolOverlay';
@@ -1365,6 +1366,14 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     finishMouseInteraction(e);
   }, [finishMouseInteraction]);
 
+  // Shift de la herramienta activa (spec 2026-09-23): sus guías, para el
+  // lienzo, y su modo, para la pista. Cada herramienta calcula las suyas con
+  // `guiasShift`; aquí solo se elige de cuál leer.
+  const shiftActivo = activeTool === 'pen' ? { modo: pen.modoShift, guias: pen.guias }
+    : activeTool === 'internalShape' ? { modo: internalShapeTool.modoShift, guias: internalShapeTool.guias }
+    : activeTool === 'editPattern' ? { modo: editPatternTool.modoShift, guias: editPatternTool.guias }
+    : null;
+
   return (
     <div className="pattern-editor">
       <svg
@@ -1456,6 +1465,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
               árbol viven los overlays que suman `piece.position`, y ninguno
               puede seguir a la pieza mientras el arrastre la mueve por DOM.
               Estaba puesto a mano en dos de ellos; el resto quedó fuera. */}
+          {/* Las guías de Shift van por debajo de los overlays de herramienta:
+              los nodos y el anillo de enganche se leen encima. */}
+          <GuiasShiftOverlay guias={shiftActivo?.guias ?? null} zoom2D={zoom2D} />
           {!isDraggingPiece && (
           <ToolOverlay
             activeTool={activeTool}
