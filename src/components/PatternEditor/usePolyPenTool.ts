@@ -137,9 +137,9 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
   }, []);
 
   // Pulsar o soltar Shift con el ratón quieto también endereza (o suelta) la
-  // goma. Los handlers de ratón escriben `shiftRef` con `e.shiftKey`, así que
+  // goma. Los handlers de ratón pasan su `e.shiftKey` por `sincronizar`, así que
   // teclado y ratón no pueden discrepar sobre si Shift está pulsado.
-  const shiftRef = useShiftSostenido(() => {
+  const { modoRef, sincronizar } = useShiftSostenido(() => {
     if (pressRef.current || nodesRef.current.length === 0 || !lastWorldRef.current) return;
     hoverRef.current = hoverPara(lastWorldRef.current);
     publish();
@@ -152,9 +152,9 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
    */
   const enderezar = useCallback((world: Point2D | null): Point2D | null => {
     const nodes = nodesRef.current;
-    if (!shiftRef.current || !world || nodes.length === 0) return null;
+    if (modoRef.current === 'suelto' || !world || nodes.length === 0) return null;
     return restringirAHoja45(nodes[nodes.length - 1].point, world);
-  }, [shiftRef]);
+  }, [modoRef]);
 
   /**
    * ¿Cierra el trazo un press aquí? Si el ratón cae sobre el primer nodo, o si
@@ -174,11 +174,11 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
    */
   const hoverPara = useCallback((world: Point2D): SnapTarget | null => {
     const nodes = nodesRef.current;
-    if (!shiftRef.current || nodes.length === 0) return resolveSnap(world, true);
+    if (modoRef.current === 'suelto' || nodes.length === 0) return resolveSnap(world, true);
     return cierraEn(world, enderezar(world))
       ? { kind: 'firstNode', pieceId: hostRef.current, point: nodes[0].point }
       : null;
-  }, [resolveSnap, cierraEn, enderezar, shiftRef]);
+  }, [resolveSnap, cierraEn, enderezar, modoRef]);
 
   const publish = useCallback(() => {
     const press = pressRef.current;
@@ -221,7 +221,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
-    shiftRef.current = e.shiftKey;
+    sincronizar(e.shiftKey);
     const raton = toWorld(e);
     lastWorldRef.current = raton;
     const r = radius();
@@ -272,12 +272,12 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     nextPointRef.current = null;
     journalPress({ armed: true, snap: snap?.kind ?? null, hostId: hostRef.current, closes, ...(guia ? { shift: true } : {}) });
     publish();
-  }, [toWorld, radius, resolveSnap, topmostContaining, publish, enderezar, cierraEn, shiftRef]);
+  }, [toWorld, radius, resolveSnap, topmostContaining, publish, enderezar, cierraEn, sincronizar]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const world = toWorld(e);
     lastWorldRef.current = world;
-    shiftRef.current = e.shiftKey;
+    sincronizar(e.shiftKey);
     if (deadZoneRef.current && dist(world, deadZoneRef.current) > radius()) deadZoneRef.current = null;
 
     const press = pressRef.current;
@@ -289,7 +289,7 @@ export function usePolyPenTool(zoom: number, pan: Point2D, opts: InternalLineToo
     }
     hoverRef.current = hoverPara(world);
     publish();
-  }, [toWorld, radius, hoverPara, publish, shiftRef]);
+  }, [toWorld, radius, hoverPara, publish, sincronizar]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const press = pressRef.current;

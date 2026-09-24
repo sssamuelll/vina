@@ -129,7 +129,8 @@ export function usePenTool(
   // Pulsar o soltar Shift con el ratón quieto también cuenta. Sin trazo en
   // curso no hay nada que enderezar y el estado no se toca: escribir
   // mayúsculas en el chat no puede re-renderizar el editor.
-  const shiftRef = useShiftSostenido((shift) => {
+  const { modoRef, sincronizar } = useShiftSostenido((modo) => {
+    const shift = modo !== 'suelto';
     if (nodesRef.current.length === 0) return;
     const cursor = cursorRef.current;
     setHover(shift || pressRef.current?.moved || !cursor ? null : resolveSnap(indice, cursor, radio()));
@@ -273,7 +274,7 @@ export function usePenTool(
     const rect = svg.getBoundingClientRect();
     const pt = toPattern(e.clientX, e.clientY, rect);
     const nodes = nodesRef.current;
-    shiftRef.current = e.shiftKey;
+    sincronizar(e.shiftKey);
 
     // El segundo press de un doble clic con Shift repite el nodo que acaba de
     // poner el primero. Enderezarlo desde ESE nodo lo sacaba del sitio —30 mm
@@ -313,7 +314,7 @@ export function usePenTool(
       nextPoint: null,
       shift: e.shiftKey,
     }));
-  }, [toPattern, complete, indice, radio, enderezar, cierraEn, shiftRef]);
+  }, [toPattern, complete, indice, radio, enderezar, cierraEn, sincronizar]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;
@@ -327,7 +328,7 @@ export function usePenTool(
     // El aviso de enganche. Sin esto el imán existe y es invisible, que es la
     // mitad literal de #1102 («no se está iluminando»). Durante un arrastre no:
     // ahí se están dibujando manijas, no eligiendo dónde cae el nodo.
-    shiftRef.current = e.shiftKey;
+    sincronizar(e.shiftKey);
     const conGuia = e.shiftKey && nodesRef.current.length > 0;
     setHover(press?.moved || conGuia ? null : resolveSnap(indice, pt, radio()));
 
@@ -350,7 +351,7 @@ export function usePenTool(
       }
       return { ...prev, cursorPos: pt, shift: e.shiftKey };
     });
-  }, [toPattern, indice, radio, shiftRef]);
+  }, [toPattern, indice, radio, sincronizar]);
 
   const handleMouseUp = useCallback(() => {
     pressRef.current = null;
@@ -392,11 +393,11 @@ export function usePenTool(
     if (nodes.length === 0) return;
     const from = nodes[nodes.length - 1].anchor;
     const raton = cursorRef.current ?? from;
-    const { punto } = destinoDe(nodes, raton, shiftRef.current, resolveSnap(indice, raton, radio())?.point ?? null);
+    const { punto } = destinoDe(nodes, raton, modoRef.current !== 'suelto', resolveSnap(indice, raton, radio())?.point ?? null);
     const { lengthMm, angleDeg } = polarOf(from, punto);
     const reference = referenceForNext(nodesToCommands(nodes, false), indice);
     setState(prev => ({ ...prev, nextPoint: { from, lengthMm, angleDeg, reference }, nextPointSeq: prev.nextPointSeq + 1 }));
-  }, [indice, radio, nodesToCommands, destinoDe, shiftRef]);
+  }, [indice, radio, nodesToCommands, destinoDe, modoRef]);
 
   /**
    * Reescribe el par pendiente SIN colocar (#1129). Es lo que hace Tab dentro

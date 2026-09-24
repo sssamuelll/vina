@@ -519,13 +519,13 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
   // Pulsar o soltar Shift a mitad del arrastre, con la mano quieta, re-aplica
   // el último ratón: el punto se endereza (o se suelta) en ese instante. Los
-  // handlers de ratón escriben `shiftRef` con `e.shiftKey`, así que teclado y
+  // handlers de ratón pasan su `e.shiftKey` por `sincronizar`, así que teclado y
   // ratón no pueden discrepar sobre si Shift está pulsado.
-  const shiftRef = useShiftSostenido((shift) => {
+  const { sincronizar } = useShiftSostenido((modo) => {
     const drag = dragRef.current;
     if (!drag || drag.type === 'marquee' || !drag.lastMouse || !state.editingPieceId) return;
     const piece = getPiece(state.editingPieceId);
-    if (piece) aplicarArrastre(piece, drag, drag.lastMouse, shift);
+    if (piece) aplicarArrastre(piece, drag, drag.lastMouse, modo !== 'suelto');
   });
 
   // ─── handleMouseDown ───
@@ -534,7 +534,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     (e: React.MouseEvent<SVGSVGElement>): boolean => {
       if (!state.isEditing || !state.editingPieceId) return false;
       if (e.button !== 0) return false;
-      shiftRef.current = e.shiftKey;
+      sincronizar(e.shiftKey);
 
       const piece = getPiece(state.editingPieceId);
       if (!piece) return false;
@@ -654,7 +654,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
 
       return true;
     },
-    [state, getPiece, toLocal, toPattern, hitRadius, shiftRef],
+    [state, getPiece, toLocal, toPattern, hitRadius, sincronizar],
   );
 
   // ─── El arrastre de nodos y tramos ───
@@ -784,7 +784,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       // Active drag
       if (drag) {
         if (drag.type === 'node' || drag.type === 'segment') {
-          shiftRef.current = e.shiftKey;
+          sincronizar(e.shiftKey);
           aplicarArrastre(piece, drag, { x: e.clientX, y: e.clientY }, e.shiftKey);
           return true;
         }
@@ -837,7 +837,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       }));
       return false;
     },
-    [state, hoverablePieces, getPiece, toLocal, toPattern, hitRadius, aplicarArrastre, shiftRef],
+    [state, hoverablePieces, getPiece, toLocal, toPattern, hitRadius, aplicarArrastre, sincronizar],
   );
 
   // ─── handleMouseUp ───
