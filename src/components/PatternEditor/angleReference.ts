@@ -1,4 +1,4 @@
-import type { PathCommand, Point2D } from '../../types/types';
+import type { PathCommand, PatternPiece, Point2D } from '../../types/types';
 import { buildRing, pointAt, projectToRing, type OutlineRing } from '../../utils/geometry/outlineRing';
 import { pieceLocalToPattern, patternToPieceLocal } from '../../utils/geometry/pieceSpace';
 import { ringOf } from '../../utils/notchAnchor';
@@ -148,6 +148,38 @@ export function borderReference(index: SnapIndex, world: Point2D, pieceId?: stri
     return { kind: 'border', baseDeg: normalizeAngle(polarOf(from, to).angleDeg) };
   }
   return ABSOLUTE_REFERENCE;
+}
+
+/** Una dirección local como referencia en espacio de patrón: una pieza girada gira su marco. */
+function referenceAlong(piece: PatternPiece, atLocal: Point2D, dirLocal: Point2D): AngleReference {
+  if (Math.hypot(dirLocal.x, dirLocal.y) < 1e-9) return ABSOLUTE_REFERENCE;
+  const from = pieceLocalToPattern(atLocal, piece);
+  const to = pieceLocalToPattern({ x: atLocal.x + dirLocal.x, y: atLocal.y + dirLocal.y }, piece);
+  return { kind: 'border', baseDeg: normalizeAngle(polarOf(from, to).angleDeg) };
+}
+
+/**
+ * El lado que LLEGA a un ancla del contorno: el marco del borde al arrastrar
+ * ese punto en `Q` con Shift dos veces (spec 2026-09-23 § 3.4). A 0° el lado
+ * se alarga sin cambiar de inclinación; a 90° el punto sale en perpendicular a
+ * él. Al ancla del `M` le llega el lado de cierre. Un tramo de largo cero
+ * entre anclas gemelas no es un lado: se busca el que llega desde OTRO punto.
+ * Un lado curvo aporta su tangente de llegada. Sin lado (arcos, un índice que
+ * no es ancla), el eje: Shift dos veces endereza entonces como Shift una vez.
+ */
+export function arrivingReference(piece: PatternPiece, commandIndex: number): AngleReference {
+  const command = piece.outline[commandIndex];
+  if (!command || command.values.length < 2) return ABSOLUTE_REFERENCE;
+  const anchor = { x: command.values[command.values.length - 2], y: command.values[command.values.length - 1] };
+  const built = buildRing(piece.outline, 2);
+  if (!built.ok) return ABSOLUTE_REFERENCE;
+  const arriving = built.value.segments.find(s => samePoint(s.to, anchor) && !samePoint(s.from, anchor));
+  return arriving ? referenceAlong(piece, anchor, tangentAt(arriving, 1)) : ABSOLUTE_REFERENCE;
+}
+
+/** La recta de un lado, de su ancla de salida a la de llegada: el marco al arrastrar el lado en `Q`. */
+export function chordReference(piece: PatternPiece, fromLocal: Point2D, toLocal: Point2D): AngleReference {
+  return referenceAlong(piece, fromLocal, { x: toLocal.x - fromLocal.x, y: toLocal.y - fromLocal.y });
 }
 
 /** Live and frozen readings share the same frame, independent of the cursor. */
