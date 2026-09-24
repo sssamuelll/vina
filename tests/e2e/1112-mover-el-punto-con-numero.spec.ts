@@ -73,7 +73,7 @@ test.describe('mover el punto con número', () => {
 
     await chip(page, 'Al punto anterior').click();
     await expect(campo(page, 'Al punto anterior')).toBeVisible();
-    await page.keyboard.press('Control+a');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('150');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(500);
@@ -95,7 +95,7 @@ test.describe('mover el punto con número', () => {
     await clickAt(page, { x: 400, y: 200 });
     await page.waitForTimeout(400);
     await chip(page, 'Al punto anterior').click();
-    await page.keyboard.press('Control+a');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('150');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(400);

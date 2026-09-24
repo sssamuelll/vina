@@ -50,7 +50,7 @@ const chip = (page: Page, nombre: 'Largo' | 'Ángulo') =>
   page.locator(`.cotas button.cota[aria-label^="${nombre}:"]`);
 
 async function escribir(page: Page, valor: string) {
-  await page.keyboard.press('Control+a');
+  await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.type(valor);
 }
 

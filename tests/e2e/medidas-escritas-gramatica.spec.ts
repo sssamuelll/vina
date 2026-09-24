@@ -85,7 +85,7 @@ test.describe('medidas escritas — gramática', () => {
     // María, al firmar: «Sería TAB para continuar y ENTER para trazar» — y que
     // se lea junto a las casillas, no en la tira de abajo.
     await expect(page.getByText('Tab para continuar · Enter para trazar')).toBeVisible();
-    await page.keyboard.press('Control+a');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('80');
 
     // Retroceso dentro del campo es del campo: no quita nodos del trazo. Es la
@@ -98,7 +98,7 @@ test.describe('medidas escritas — gramática', () => {
     await page.keyboard.press('Tab');
     await expect(campo(page, 'Ángulo')).toBeVisible();
     await expect(campo(page, 'Largo'), 'Tab a Ángulo conserva el largo escrito (#1161)').toHaveValue('80');
-    await page.keyboard.press('Control+a');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('90');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(300);
