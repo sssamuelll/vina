@@ -14,7 +14,8 @@ import {
 import { toggleDockSignaling } from '../../store/dockSlice';
 import { requestConfirmation } from '../../hooks/useGuardedAction';
 import { showErrorToast, showInfoToast } from '../../store/copilotUISlice';
-import { duplicatePiece, removePieces, removeSeam, removeInternalLine, removePOM, removeTramoDeTrazo } from '../../store/projectSlice';
+import { duplicatePiece, removePieces, removeSeam, removeInternalLine, removeTramosDeInterna, removePOM, removeTramoDeTrazo } from '../../store/projectSlice';
+import { seBorraEntera } from '../../types/types';
 import { resolverBorrado } from '../../store/borradoDeSeleccion';
 import { parteElTrazo } from '../PatternEditor/trazos/trazoPath';
 import { pushJournal } from '../../utils/telemetry/journal';
@@ -139,10 +140,25 @@ const EDIT_MENU: MenuItem[] = [
     });
     switch (sujeto.kind) {
       case 'seam': d(removeSeam(sujeto.id)); break;
-      case 'internalLine':
-        d(removeInternalLine({ pieceId: sujeto.pieceId, lineId: sujeto.lineId }));
+      case 'internalLine': {
+        // La misma regla que el atajo (spec 2026-09-24 § 4.6): con un tramo
+        // elegido se va SOLO ese tramo; el hilo y la pinza no se parten. Dos
+        // puertas, un solo registro.
+        const line = project.pieces.find(p => p.id === sujeto.pieceId)
+          ?.internals.find(l => l.id === sujeto.lineId);
+        if (sujeto.segmentIndex !== undefined && line && !seBorraEntera(line.type)) {
+          pushJournal('gesture', 'interna:delete', {
+            pieceId: sujeto.pieceId, lineId: sujeto.lineId, segmentIndex: sujeto.segmentIndex,
+          });
+          d(removeTramosDeInterna({
+            pieceId: sujeto.pieceId, lineId: sujeto.lineId, segmentIndices: [sujeto.segmentIndex],
+          }));
+        } else {
+          d(removeInternalLine({ pieceId: sujeto.pieceId, lineId: sujeto.lineId }));
+        }
         d(clearSelection());
         break;
+      }
       case 'trazo': {
         // La misma sonda que el atajo, con la misma regla de `parte`
         // (spec 2026-09-12 § 5.6). Dos puertas, un solo registro.

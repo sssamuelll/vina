@@ -26,7 +26,8 @@ import { activate2DTool } from '../store/toolActivation';
 import { resolverBorrado } from '../store/borradoDeSeleccion';
 import { parteElTrazo } from '../components/PatternEditor/trazos/trazoPath';
 import { pushJournal } from '../utils/telemetry/journal';
-import { removePieces, removeSeam, removeInternalLine, removePOM, removeTramoDeTrazo, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
+import { removePieces, removeSeam, removeInternalLine, removeTramosDeInterna, removePOM, removeTramoDeTrazo, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
+import { seBorraEntera } from '../types/types';
 import {
   startSimulation,
   resetSimulation,
@@ -105,10 +106,24 @@ export function useKeyboardShortcuts() {
         case 'seam':
           dispatch(removeSeam(sujeto.id));
           break;
-        case 'internalLine':
-          dispatch(removeInternalLine({ pieceId: sujeto.pieceId, lineId: sujeto.lineId }));
+        case 'internalLine': {
+          // Con un tramo elegido se va SOLO ese tramo (spec 2026-09-24 § 4.6):
+          // lo que se ve es lo que se borra. El hilo y la pinza no se parten.
+          const line = projectState.pieces.find(p => p.id === sujeto.pieceId)
+            ?.internals.find(l => l.id === sujeto.lineId);
+          if (sujeto.segmentIndex !== undefined && line && !seBorraEntera(line.type)) {
+            pushJournal('gesture', 'interna:delete', {
+              pieceId: sujeto.pieceId, lineId: sujeto.lineId, segmentIndex: sujeto.segmentIndex,
+            });
+            dispatch(removeTramosDeInterna({
+              pieceId: sujeto.pieceId, lineId: sujeto.lineId, segmentIndices: [sujeto.segmentIndex],
+            }));
+          } else {
+            dispatch(removeInternalLine({ pieceId: sujeto.pieceId, lineId: sujeto.lineId }));
+          }
           dispatch(clearSelection());
           break;
+        }
         case 'trazo': {
           // Toda superficie nueva nace instrumentada (spec 2026-09-12 § 5.6).
           // `parte` es lo que ella ve: si este Supr rompe el trazo en dos.

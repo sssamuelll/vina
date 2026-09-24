@@ -322,6 +322,7 @@ const ACTION_LABELS: Record<string, string> = {
   'project/updateTrazo': 'Editar trazo',
   'project/removeTrazo': 'Borrar trazo',
   'project/removeTramoDeTrazo': 'Borrar tramo',
+  'project/removeTramosDeInterna': 'Borrar tramo',
   'project/setFabricCode': 'Change Fabric',
   'project/setPieceFabric': 'Change Fabric',
   'project/updateMeasurements': 'Edit Measurements',
