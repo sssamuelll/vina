@@ -714,6 +714,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     const elegido = editPatternTool.puntoElegido;
     const derechoSobreElPuntoElegido = !!elegido && agarreQ?.tipo === 'punto'
       && (lineIdDeClave(agarreQ.clave) ?? undefined) === elegido.lineId
+      && hitPiece?.id === editPatternTool.editingPieceId
       && anchorGroupOf(
         (elegido.lineId ? hitPiece?.internals.find(l => l.id === elegido.lineId)?.path : hitPiece?.outline) ?? [],
         elegido.commandIndex,
