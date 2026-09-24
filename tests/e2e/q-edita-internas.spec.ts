@@ -125,13 +125,20 @@ test.describe('Q edita las internas', () => {
     await activarHerramienta(page, 'q', 'editPattern');
     await clickAt(page, { x: 220, y: 220 });
     await page.keyboard.press('Delete');
-    expect(anclas((await internas(page))[0].path)).toEqual([[20, 20], [120, 20], [20, 120]]);
+    await expect.poll(async () => anclas((await internas(page))[0].path)).toEqual([[20, 20], [120, 20], [20, 120]]);
 
     await page.keyboard.press('ControlOrMeta+z');
     await activarHerramienta(page, 'z', 'select');
     await clickAt(page, { x: 220, y: 170 });
     await page.keyboard.press('Delete');
     await expect.poll(async () => (await internas(page)).length).toBe(2);
+    // `removeTramosDeInterna` (projectSlice.ts): el primer trozo conserva el id
+    // ('L'); el segundo nace con id nuevo. `quitarTramos` arma los trozos en el
+    // orden de recorrido desde el punto de partida: [20,20]→[120,20] (antes del
+    // tramo quitado) y [120,120]→[20,120] (después).
+    await expect.poll(async () => (await internas(page))[0].id).toBe('L');
+    await expect.poll(async () => anclas((await internas(page))[0].path)).toEqual([[20, 20], [120, 20]]);
+    await expect.poll(async () => anclas((await internas(page))[1].path)).toEqual([[120, 120], [20, 120]]);
     expect((await st(page)).project.pieces).toHaveLength(1);
   });
 });
