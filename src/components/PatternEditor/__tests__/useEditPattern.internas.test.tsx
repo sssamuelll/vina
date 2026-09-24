@@ -15,7 +15,7 @@ import editorReducer, { selectInternalLine } from '../../../store/editorSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
 import { getUndoLength, undoMiddleware } from '../../../store/undoMiddleware';
 import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
-import { extractDarts } from '../../../utils/dartEntity';
+import { applyDartsToInternals, extractDarts } from '../../../utils/dartEntity';
 import { lineasDeHover, useEditPattern } from '../useEditPattern';
 import type { InternalLine, PathCommand, PatternPiece } from '../../../types/types';
 
@@ -616,6 +616,23 @@ describe('los verbos de Q sobre una interna', () => {
     clic(hook, 30, 55);
     supr(hook);
     expect(store.getState().project.pieces[0].internals).toHaveLength(0);
+  });
+
+  it('… y con la copia `darts`, se va de las dos: una operación de pinza después no la resucita (spec § 7, revisión final I-1)', () => {
+    const pinza: InternalLine = { id: 'P', type: 'dart', path: [
+      { type: 'M', values: [20, 20] }, { type: 'L', values: [40, 90] }, { type: 'L', values: [60, 20] },
+    ] };
+    const base = pieza([pinza]);
+    const conDarts = { ...base, darts: extractDarts(base) };
+    expect(conDarts.darts).toHaveLength(1);
+    const { store, hook } = montarQ([conDarts]);
+    act(() => hook.result.current.enterEdit('p'));
+    clic(hook, 30, 55); // una pierna
+    supr(hook);
+    const piece = store.getState().project.pieces[0];
+    expect(piece.internals).toHaveLength(0);
+    expect(piece.darts).toHaveLength(0);
+    expect(applyDartsToInternals(piece, piece.darts!)).toEqual([]);
   });
 
   it('doble clic en un tramo de interna inserta un punto marcado; sobre un punto, nada', () => {

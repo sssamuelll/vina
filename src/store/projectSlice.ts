@@ -557,7 +557,17 @@ const projectSlice = createSlice({
     removeInternalLine(state, action: PayloadAction<{ pieceId: string; lineId: string }>) {
       const piece = state.pieces.find(p => p.id === action.payload.pieceId);
       if (piece) {
+        const quitada = piece.internals.find(l => l.id === action.payload.lineId);
         piece.internals = piece.internals.filter(l => l.id !== action.payload.lineId);
+        // Una pinza son dos datos enlazados por el id (#1016: el del Dart ES
+        // el de su línea): su línea y su copia `piece.darts`. Quitar solo la
+        // línea dejaba viva la copia, y la siguiente operación de pinza
+        // (`applyDartsToInternals`) volvía a dibujar la que se borró (spec
+        // 2026-09-24 § 7). Aquí y no en cada puerta: Supr desde Q, las dos de
+        // Z y el menú contextual llegan todos a este reductor.
+        if (quitada?.type === 'dart' && piece.darts) {
+          piece.darts = piece.darts.filter(d => d.id !== quitada.id);
+        }
         piece.updatedAt = Date.now();
         state.isDirty = true;
       }

@@ -26,6 +26,7 @@ import projectReducer, { restoreState } from '../../store/projectSlice';
 import simulationReducer from '../../store/simulationSlice';
 import toolReducer from '../../store/toolSlice';
 import { clearJournal, getJournal } from '../../utils/telemetry/journal';
+import { applyDartsToInternals, extractDarts } from '../../utils/dartEntity';
 import type { InternalLine, PatternPiece } from '../../types/types';
 
 /** Cuatro anclas, tres tramos: índices 1, 2 (medio) y 3 — como el trazo de #1158. */
@@ -52,14 +53,14 @@ const PINZA: InternalLine = {
 beforeEach(clearJournal);
 afterEach(cleanup);
 
-function montar(internal: InternalLine, segmentIndex?: number) {
+function montar(internal: InternalLine, segmentIndex?: number, extra: Partial<PatternPiece> = {}) {
   const store = configureStore({
     reducer: { editor: editorReducer, project: projectReducer, simulation: simulationReducer, tools: toolReducer },
   });
   const piece = {
     id: 'p', name: 'P', position: { x: 0, y: 0 }, rotation: 0, mirrored: false, active: true, seamAllowance: 0,
     outline: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [200, 0] }, { type: 'L', values: [200, 200] }, { type: 'Z', values: [] }],
-    internals: [internal], edges: [],
+    internals: [internal], edges: [], ...extra,
   } as unknown as PatternPiece;
   store.dispatch(restoreState({ ...store.getState().project, pieces: [piece], isDirty: false }));
   store.dispatch(selectInternalLine({
@@ -96,6 +97,16 @@ describe('Supr con un tramo de interna seleccionado (atajo de teclado, spec § 4
     const { store, evento } = montar(PINZA, 1);
     expect(store.getState().project.pieces[0].internals).toHaveLength(0);
     expect(evento).toBeUndefined();
+  });
+
+  it('… y con la copia `darts`, se va de las dos: una operación de pinza después no la resucita (spec § 7, revisión final I-1)', () => {
+    const darts = extractDarts({ internals: [PINZA], edges: [] } as unknown as PatternPiece);
+    expect(darts).toHaveLength(1);
+    const { store } = montar(PINZA, 1, { darts });
+    const piece = store.getState().project.pieces[0];
+    expect(piece.internals).toHaveLength(0);
+    expect(piece.darts).toEqual([]);
+    expect(applyDartsToInternals(piece, piece.darts!)).toEqual([]);
   });
 
   it('sin tramo elegido, la interna se borra entera (comportamiento de hoy)', () => {

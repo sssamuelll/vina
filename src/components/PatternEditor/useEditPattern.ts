@@ -300,7 +300,13 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     [pieces],
   );
 
-  // ─── Helper: la única puerta de escritura (spec 2026-09-24 § 8) ───
+  // ─── Helper: la puerta de escritura de los gestos y los verbos (spec 2026-09-24 § 8) ───
+  //
+  // No es la única: Supr (`handleKeyDown`) escribe por la suya. Sus puntos
+  // pasan por `conPaths` con un `updatePiece` propio, y sus tramos van a los
+  // reductores `removeTramosDeInterna` y `removeInternalLine`, que no pasan
+  // por `conPaths`: lo que esa puerta rehace al escribir —la copia `darts` de
+  // una pinza— lo rehace ahí el reductor (revisión final de la frontera, I-1).
 
   const escribirLineas = useCallback(
     (
