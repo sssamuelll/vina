@@ -155,11 +155,16 @@
   /* Escala fija de cinco pasos. La anterior era clamp() y a 1366 rendía
    * 10,51 / 11,20 / 16,29 px (fraccionarios en la laptop de María) contra 141
    * font-size literales. Cada paso sube 1 px a partir de 1600 (abajo). */
-  --text-1: 11px;  --leading-1: 16px;   /* atajos, meta, pista */
-  --text-2: 12px;  --leading-2: 16px;   /* etiquetas, menús, chips, rótulos de sección */
-  --text-3: 13px;  --leading-3: 18px;   /* valores, campos, cuerpo de panel, campo de la IA */
-  --text-4: 15px;  --leading-4: 20px;   /* título de panel, nombre de herramienta en la tira */
-  --text-5: 18px;  --leading-5: 24px;   /* título del estado vacío, nada más */
+  --text-1: 11px;
+  --leading-1: 16px;   /* atajos, meta, pista */
+  --text-2: 12px;
+  --leading-2: 16px;   /* etiquetas, menús, chips, rótulos de sección */
+  --text-3: 13px;
+  --leading-3: 18px;   /* valores, campos, cuerpo de panel, campo de la IA */
+  --text-4: 15px;
+  --leading-4: 20px;   /* título de panel, nombre de herramienta en la tira */
+  --text-5: 18px;
+  --leading-5: 24px;   /* título del estado vacío, nada más */
   /* Alias de la escala anterior, para sus 66 consumidores; migran en F6. */
   --text-xs: var(--text-1);
   --text-sm: var(--text-2);
