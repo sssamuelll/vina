@@ -64,7 +64,7 @@ export default function NotchPrecisionModal({
   }, [distance, depth, valid, onConfirm, onCancel]);
 
   return (
-    <div className="notch-precision-modal" role="dialog" aria-label="Colocación de piquete">
+    <div className="notch-precision-modal" role="dialog" aria-label="Colocación de piquete" data-superficie="modal">
       <h3>Colocación de piquete</h3>
       <p>La distancia se mide sobre el contorno desde la esquina marcada.</p>
       <div className="notch-precision-input-row">

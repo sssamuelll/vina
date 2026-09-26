@@ -65,7 +65,7 @@ export default function SurfaceModePill() {
   const CurrentIcon = current.icon;
 
   return (
-    <div ref={wrapperRef} className="surface-pill">
+    <div ref={wrapperRef} className="surface-pill" data-superficie="ambiente">
       <button
         className={`surface-pill__trigger ${open ? 'surface-pill__trigger--open' : ''}`}
         aria-label={`Modo de superficie: ${current.label}`}
@@ -75,7 +75,7 @@ export default function SurfaceModePill() {
         <span>{current.label}</span>
       </button>
       {open && (
-        <div className="surface-pill__flyout" role="group" aria-label="Modo de superficie">
+        <div className="surface-pill__flyout" role="group" aria-label="Modo de superficie" data-superficie="menu">
           {MODES.map(({ mode, label, icon: Icon }) => (
             <button
               key={mode}

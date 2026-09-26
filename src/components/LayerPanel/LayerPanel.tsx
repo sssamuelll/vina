@@ -395,6 +395,7 @@ export default function LayerPanel() {
         <div
           ref={contextMenuRef}
           className="layer-context-menu"
+          data-superficie="menu"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
           <button onClick={handleContextRename}>Renombrar capa</button>

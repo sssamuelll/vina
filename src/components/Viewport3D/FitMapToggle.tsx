@@ -263,7 +263,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
   return (
     <>
       {/* ── Toggle Bar ── */}
-      <div style={S.toggleBar}>
+      <div style={S.toggleBar} data-superficie="mapas">
         {MODES.map(({ mode, label, shortcut, icon }) => (
           <button
             key={mode}
@@ -328,7 +328,7 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
 
         {/* Config popover */}
         {showConfig && (
-          <div style={S.configPanel}>
+          <div style={S.configPanel} data-superficie="panel">
             <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>Ajustes del mapa de ajuste</div>
 
             {/* Stress Range */}

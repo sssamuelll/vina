@@ -53,13 +53,14 @@ export default function SolverMetrics() {
         className="solver-metrics-toggle"
         onClick={toggleExpanded}
         title="Métricas del solver"
+        data-superficie="dev"
       >
         <span className={`solver-metrics-dot ${isComputing ? 'solver-metrics-dot--active' : ''}`} />
         {isExpanded ? '▼' : '▲'} Solver
       </button>
 
       {isExpanded && (
-        <div className="solver-metrics-body">
+        <div className="solver-metrics-body" data-superficie="dev">
           <div className="solver-metrics-row">
             <span>Generación</span>
             <span>{state.generationId}</span>

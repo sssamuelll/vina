@@ -185,7 +185,7 @@ export default function ContextMenu(props: ContextMenuProps) {
     .filter(g => g.length > 0);
 
   return (
-    <div ref={ref} className="context-menu" style={{ left: pos.x, top: pos.y }}>
+    <div ref={ref} className="context-menu" data-superficie="menu" style={{ left: pos.x, top: pos.y }}>
       <div className="context-menu__scroll" ref={scrollRef}>
         {menu.seamId && (
           <div className="context-menu__header context-menu__header--seam">Costura</div>

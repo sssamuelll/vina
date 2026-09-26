@@ -18,7 +18,7 @@ interface DockToolPickerProps {
  */
 export default function DockToolPicker({ catalog, selectedIds, onAdd, onRemove, onReset }: DockToolPickerProps) {
   return (
-    <div className="dock-picker" role="group" aria-label="Personalizar herramientas del dock">
+    <div className="dock-picker" role="group" aria-label="Personalizar herramientas del dock" data-superficie="menu">
       <div className="dock-picker__title">Herramientas del dock</div>
       <ul className="dock-picker__list">
         {catalog.map((tool) => {

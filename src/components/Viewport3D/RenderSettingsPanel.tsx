@@ -31,7 +31,7 @@ export default function RenderSettingsPanel({
   if (!open) return null;
 
   return (
-    <div className="render-panel-wrapper">
+    <div className="render-panel-wrapper" data-superficie="panel">
       <div className="render-panel">
         <div className="render-panel-header">
           <h3>Renderizado y exportación 3D</h3>

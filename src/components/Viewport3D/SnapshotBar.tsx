@@ -56,7 +56,7 @@ export default function SnapshotBar({ onSaveSnapshot, onRestoreSnapshot, onDelet
   if (manualSnapshots.length === 0 && !canSave) return null;
 
   return (
-    <div className="snapshot-bar">
+    <div className="snapshot-bar" data-superficie="instantaneas">
       {manualSnapshots.map(snap => (
         <button
           key={snap.id}

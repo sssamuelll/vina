@@ -36,7 +36,7 @@ export default function FilaDeCapas() {
   const visibles = useSelector(selectCapasVisibles, shallowEqual);
 
   return (
-    <div className="fila-de-capas" role="group" aria-label="Capas visibles">
+    <div className="fila-de-capas" role="group" aria-label="Capas visibles" data-superficie="fila">
       {CAPAS.map((capa) => {
         const activo = capa.kind === 'largos' ? visibles.lineLengthMode === 'all' : visibles[capa.flag];
         const handleClick = () => {

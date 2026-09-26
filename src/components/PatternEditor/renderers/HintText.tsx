@@ -74,6 +74,7 @@ interface HintTextProps {
 function Pie({ children }: { children: React.ReactNode }) {
   return (
     <text
+      data-superficie="pista"
       x="50%" y="98%"
       textAnchor="middle" dominantBaseline="auto"
       fill="var(--ink-hint)"
@@ -160,7 +161,7 @@ export default function HintText({
         // `hasPieces` no cambia con un trazo (spec de trazos § 3.1: abierto no
         // es pieza), así que esta pista de bienvenida reaparece después de
         // cada trazo — es el flujo que #1158 habilita, no un caso raro.
-        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
+        <text data-superficie="pista" x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
           fill="var(--ink-hint)" fontSize="13">
           Clic para añadir puntos · arrastra para curvar · clic en el primer punto para cerrar · Enter termina: pieza con tres puntos, trazo con dos · Esc cancela
         </text>

@@ -289,6 +289,7 @@ export default function AppShell() {
       >
         {dxfDragActive && (
           <div
+            data-superficie="velo"
             style={{
               position: 'absolute',
               inset: 0,

@@ -14,7 +14,7 @@ interface DockShellProps {
  */
 export default function DockShell({ side, domainLabel, children }: DockShellProps) {
   return (
-    <div className={`dock dock--${side}`}>
+    <div className={`dock dock--${side}`} data-superficie="ambiente">
       <div className="dock__label">{domainLabel}</div>
       {children}
     </div>

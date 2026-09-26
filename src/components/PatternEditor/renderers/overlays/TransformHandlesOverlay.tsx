@@ -42,7 +42,7 @@ export default function TransformHandlesOverlay({
   const topCenter = handles.find(h => h.id === 'n');
 
   return (
-    <g className="transform-handles">
+    <g className="transform-handles" data-superficie="cabina">
       {/* Bounding box */}
       <rect
         x={bbox.x}

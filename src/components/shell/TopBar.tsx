@@ -36,7 +36,7 @@ export default function TopBar({ onOpenPanel, onImportDXF }: TopBarProps) {
   const handleRedo = () => { dispatch(redo()); forceUpdate(n => n + 1); };
 
   return (
-    <div className="top-bar">
+    <div className="top-bar" data-superficie="ambiente">
       {/* Logo → opens app menu */}
       <LogoMenu onOpenPanel={onOpenPanel} onImportDXF={onImportDXF} />
 
@@ -79,7 +79,7 @@ export default function TopBar({ onOpenPanel, onImportDXF }: TopBarProps) {
       <div className="top-bar__spacer" />
 
       {import.meta.env.DEV && (
-        <div className="top-bar__status" aria-label="Estado técnico de la simulación">
+        <div className="top-bar__status" aria-label="Estado técnico de la simulación" data-superficie="dev">
           <span className={dotClass} aria-hidden />
           <span>{SOLVER_TIER_INFO[solverTier].label}</span>
           {particleCount > 0 && <span>· {particleCountLabel(particleCount)}</span>}

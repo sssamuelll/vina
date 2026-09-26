@@ -178,6 +178,7 @@ export default function ConnectionModal(props: Props) {
   return createPortal(
     <div
       style={overlayStyle}
+      data-superficie="modal"
       onMouseDown={(e) => {
         // Click on backdrop closes; click inside dialog does not bubble.
         if (e.target === e.currentTarget) props.onClose();

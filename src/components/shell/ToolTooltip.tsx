@@ -61,6 +61,7 @@ export default function ToolTooltip({ name, shortcut, description, descriptionTo
       {visible && pos && createPortal(
         <div
           className={`tool-tooltip ${side}`}
+          data-superficie="tooltip"
           role="tooltip"
           style={{ top: pos.top, left: pos.left }}
         >
