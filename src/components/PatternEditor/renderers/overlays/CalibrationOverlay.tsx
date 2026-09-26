@@ -114,7 +114,7 @@ export default function CalibrationOverlay({
             dominantBaseline="auto"
             fill={color}
             fontSize={fontSize}
-            fontFamily="monospace"
+            fontFamily="var(--font-mono-2d)"
           >
             {pixelDist.toFixed(1)}px
           </text>

@@ -36,9 +36,9 @@
 .dock--right { right: 14px; }
 
 .dock__label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
+  font-family: var(--font-sans);
+  font-size: var(--text-1);
+  font-weight: var(--weight-medium);
   letter-spacing: 0.06em;
   color: var(--text-muted);
   padding: 2px 0 4px;
@@ -116,7 +116,7 @@
 }
 
 .dock__auto-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 8.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -190,7 +190,7 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 .dock-picker__title {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.1em;

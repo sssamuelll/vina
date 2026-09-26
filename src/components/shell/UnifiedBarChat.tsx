@@ -307,7 +307,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
                     <span style={{ flexShrink: 0 }}>
                       {tc.status === 'done' ? '✓' : tc.status === 'error' ? '✗' : '·'}
                     </span>
-                    <span style={{ fontFamily: "'SF Mono', 'Fira Code', monospace" }}>{tc.name}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{tc.name}</span>
                     {/* #1194 — el error se traduce al pintarlo, no al producirlo:
                         `classifyError` y el reintento del LLM leen el original. */}
                     {tc.error && <span style={{ opacity: 0.85 }}>— {mensajeDeErrorEs(tc.error)}</span>}

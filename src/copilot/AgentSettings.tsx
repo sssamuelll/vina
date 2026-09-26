@@ -133,7 +133,7 @@ const inputStyle: React.CSSProperties = {
   padding: '8px 10px',
   borderRadius: 5,
   fontSize: 14,
-  fontFamily: "'SF Mono', 'Fira Code', monospace",
+  fontFamily: 'var(--font-mono)',
 };
 
 const fieldStyle: React.CSSProperties = {

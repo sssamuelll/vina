@@ -24,7 +24,6 @@
   gap: var(--sp-2);
   font-size: var(--text-sm);
   color: var(--text-muted);
-  font-family: var(--font-mono);
 }
 
 .canvas-area {

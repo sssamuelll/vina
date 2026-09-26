@@ -65,7 +65,7 @@ const badgeStyle: React.CSSProperties = {
   background: 'var(--accent)',
   padding: '2px 8px',
   borderRadius: 999,
-  fontWeight: 700,
+  fontWeight: 600,
   letterSpacing: 0.4,
   textTransform: 'uppercase' as const,
   lineHeight: 1.4,
