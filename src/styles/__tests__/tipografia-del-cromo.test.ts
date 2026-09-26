@@ -42,12 +42,7 @@ describe('2. ningún 700 en el cromo', () => {
 describe('3. la mono solo viste datos', () => {
   /** Dónde es legal `var(--font-mono)` / `var(--font-mono-2d)` en CSS. `*` = todo el archivo. */
   const PERMITIDOS: Record<string, string[] | '*'> = {
-    /* '*' y no ['.mono']: el archivo abre con `@import` sin llaves (§ orden
-     * obligatorio de @import), y el parser de arriba no distingue at-rules de
-     * selectores — junta ese prefijo sin llaves con el primer selector real,
-     * así que `.mono` nunca llega solo a la comparación. Único uso de mono en
-     * el archivo; ver informe de la Tarea 8. */
-    'src/styles/base.css': '*',
+    'src/styles/base.css': ['.mono'],
     'src/styles/floating.css': ['.logo-menu__shortcut', '.context-menu__shortcut'],
     'src/styles/unified-bar.css': ['.chat-markdown code'],
     'src/components/shared/SubMenu.css': ['.submenu-shortcut'],
@@ -60,7 +55,10 @@ describe('3. la mono solo viste datos', () => {
   it.each(css)('%s: cada regla con mono está en la lista', (ruta) => {
     const permitido = PERMITIDOS[ruta];
     if (permitido === '*') return;
-    const sinComentarios = lee(ruta).replace(/\/\*[\s\S]*?\*\//g, '');
+    const sinComentarios = lee(ruta)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      // Las líneas `@import …;` no tienen llaves y se pegaban al primer selector real.
+      .replace(/^\s*@import[^;]*;\s*$/gm, '');
     const malos: string[] = [];
     for (const m of sinComentarios.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
       if (!/font-family:\s*var\(--font-mono(-2d)?\)/.test(m[2])) continue;
