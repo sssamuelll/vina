@@ -3,27 +3,3 @@
 @import './styles/layout.css';
 @import './styles/floating.css';
 @import './styles/unified-bar.css';
-
-
-/* ──────────────────────────────────────────────
-   Legacy CSS variables — SOLO las que el código vivo consume (verificado
-   var por var, Fase 2 2026-07-16; las otras 47 del shell VS-Code murieron
-   con sus componentes). No añadir aquí: lo nuevo va en styles/tokens.css.
-   ────────────────────────────────────────────── */
-:root {
-  --bg-primary: #1a1a1a;
-  --bg-secondary: #242424;
-  --panel-bg: #1e1e1e;
-
-  /* --text-secondary / --accent / --accent-hover: NO redefinir aquí — este
-     bloque carga después de tokens.css y lo pisaba (la app entera renderizaba
-     el azul VS-Code legacy en vez del indigo del design system). Los valores
-     canónicos viven en styles/tokens.css. */
-  --accent-dim: rgba(99, 102, 241, 0.15); /* legacy alias de --accent-subtle; consumidor vivo: InputSchemeSection */
-  --grainline-color: #6bff6b;
-
-  /* ─── Semantic Colors ─── */
-  --color-error: #ef4444;
-  --color-warning: #cca700;
-  --color-success: #10b981;
-}
