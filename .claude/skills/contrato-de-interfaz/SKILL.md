@@ -221,6 +221,8 @@ npx playwright test tests/e2e/contraste-del-cromo.spec.ts      # ningún texto d
 
 Una superficie nueva **declara** qué es con `data-superficie` (vocabulario en
 `tests/repo/superficies-declaradas.test.ts`); sin marca, el trinquete no la ve.
+Los dos trinquetes en navegador corren en local y antes de cada PR; en CI el trabajo de e2e sigue en
+`continue-on-error` (#506), así que hoy no bloquean el merge por sí solos.
 Para bajar un techo:
 
 ```bash

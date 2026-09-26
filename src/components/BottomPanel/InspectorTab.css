@@ -137,7 +137,7 @@
 }
 
 .inspector-suggestion-apply:hover {
-  background: #5558e6;
+  background: var(--accent);
 }
 
 .inspector-raw-data {

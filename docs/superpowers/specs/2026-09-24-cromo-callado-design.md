@@ -100,7 +100,9 @@ dibujar · coser, más «+»), dock 3D (4), reglas y rejilla (son documento), p�
 - **Superficie** = elemento con `data-superficie="<nombre>"`. Se marcan: cada superficie de material
   chrome u overlay, el texto de pista, y **una sola** `data-superficie="cabina"` que agrupa chips,
   caja de transformación y barra flotante. Ambiente (§ 3.1) y documento llevan
-  `data-superficie="ambiente"` / `"documento"` y no cuentan.
+  `data-superficie="ambiente"` / `"documento"` y no cuentan. "Visible" se decide por geometría (caja
+  dentro del viewport, sin `display:none`/`visibility:hidden`, opacidad acumulada > 0,05); la
+  oclusión la miden los specs de emplazamiento, no este trinquete.
 - Para cada una de las **diecisiete acciones** (las quince de § 3.3 más los dos reposos de § 3.2: 2D con patrón y Split) el spec
   ejecuta la secuencia de María con el DXF real, cuenta las superficies que aparecen o cambian
   respecto al paso anterior, y falla si la cuenta supera el techo efectivo — el mayor de la meta (**4**) y la línea base guardada en
@@ -126,7 +128,7 @@ el comentario del token, como hoy en `tokens.css:17-30`.
 | `--border` | `oklch(0.32 0.006 80)` ≈ `#34332f` | 1,46:1 sobre surface: se ve |
 | `--border-subtle` | `oklch(0.22 0.005 80)` ≈ `#1c1a18` | |
 | `--scrim` | `rgb(8 7 6 / 55%)` | |
-| `--scene-3d` | `oklch(0.26 0.004 80)` ≈ `#262421` | nuevo; fondo del escenario 3D, más claro que el cromo |
+| `--scene-3d` | `oklch(0.26 0.004 80)` ≈ `#252422` | nuevo; fondo del escenario 3D, más claro que el cromo |
 
 Hoy la rampa es tono 283-285 y el croma **sube** al apagar el texto (0,013 → 0,053): el gris más
 apagado es lo más violeta de la pantalla. Aquí el croma es constante.
@@ -156,6 +158,7 @@ verifica un e2e nuevo en F1.
 | `--accent-2d` | alias de `--accent` | un solo azul en cromo y papel |
 | `--ai` | `oklch(0.72 0.13 295)` ≈ `#ab93ed` | **nuevo**, único segundo tono: «esto lo hizo la IA». Nunca «activo». Sustituye `--dock-auto` y `--ai-2d` |
 | `--success` / `--warning` / `--destructive` | `oklch(0.68 0.14 150)` / `oklch(0.75 0.14 75)` / `oklch(0.62 0.18 25)` (4,65:1) | semánticos apagados a la croma de la familia; `--destructive-hover` un paso más claro |
+| `--destructive-fuerte` | `oklch(0.52 0.18 25)` ≈ `#ba2b2e` | relleno destructivo que lleva texto blanco (6,05:1); hermano de `--accent-fuerte` |
 
 Se retira `--accent-hover` (segundo nombre de `--accent-ink`). Migran a tokens los 17
 `rgba(99,102,241,x)` literales (floating.css ×6, SubMenu.css ×4, unified-bar.css ×2, layout.css,
@@ -172,10 +175,14 @@ el cromo 3D.
 | sombra | **ninguna** (hoy 0 8px 32px al 40 %: la mancha a la derecha del dock, captura 02) | `0 1px 2px rgba(0,0,0,0.28), 0 8px 20px rgba(0,0,0,0.22)` |
 | blur | — | **ninguno** (D8) |
 
+La línea de pelo tiene nombre propio, `--hairline: 1px solid rgba(255, 255, 255, 0.07)`, y
+`--surface-overlay-border` la referencia.
+
 Variantes: `--surface-overlay-shadow-recessed: 0 1px 2px rgba(0,0,0,0.2)`; `-sheet` y `-recessed`
 de fondo pasan a alias del material base (una sola opacidad, no tres). Radios concéntricos: el dock
 de 52 px conserva 10 exterior con padding 4 y botones 6 (interior = exterior − padding); el resto
-8/6. Se retiran `--radius-lg`, `--radius-xl` (0 consumidores directos) y `--blur` (único consumidor:
+8/6. Se retira `--radius-xl` (0 consumidores); `--radius-lg` (10 px) se conserva solo para el dock
+(10 = 6 del botón + 4 de padding) y `--blur` (único consumidor:
 `RenderSettingsPanel.css:19-20` → material overlay). El panel de contexto deja el overlay y toma
 `chrome` a ras: sin margen, sin radio, sin sombra, borde lateral hairline (recupera 24 px por panel).
 Hover: cambia solo la tinta (o `--bg-elevated` en botones de icono); ningún hover agrega sombra,

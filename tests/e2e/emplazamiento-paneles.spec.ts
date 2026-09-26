@@ -279,7 +279,7 @@ test.describe('Ola 2 — los paneles ocupan canaleta, no flotan', () => {
     expect(sonda.sondaEnOrigen).toBe(true);
   });
 
-  // H-3: el aserto de arriba fija QUE el panel es bloque contenedor; este
+  // H-3: el aserto de arriba fija que el panel YA NO es bloque contenedor; este
   // vigila la CONSECUENCIA — que nada renderizado dentro de un panel
   // dependa de resolverse contra el viewport. Hoy el único caso conocido
   // (.layer-context-menu) ya salió a un portal de document.body (ver el

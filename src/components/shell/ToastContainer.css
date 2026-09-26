@@ -15,6 +15,7 @@
 
 /* ─── Individual toast card ─── */
 
+/* Material overlay entero, por token (revisión final F1): era el único flotante del shell con blur y negro propio. */
 .toast {
   position: relative;
   display: flex;
@@ -22,12 +23,10 @@
   gap: 10px;
   max-width: 360px;
   padding: 10px 36px 10px 14px; /* right padding reserves space for dismiss btn */
-  background: rgba(30, 30, 30, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
   font-size: 13px;
   font-family: var(--font-sans);
   color: var(--text-primary);

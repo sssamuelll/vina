@@ -109,4 +109,13 @@ test('el navegador entiende la piel: oklch con alfa y color-mix (Review Focus 2)
     return c;
   });
   expect(sutil, '--accent-subtle (oklch con alfa) no compone').not.toMatch(/^$|rgba\(0, 0, 0, 0\)/);
+  const mezcla = await page.evaluate(() => {
+    const d = document.createElement('div');
+    d.style.background = 'color-mix(in oklab, var(--accent) 10%, transparent)';
+    document.body.appendChild(d);
+    const c = getComputedStyle(d).backgroundColor;
+    d.remove();
+    return c;
+  });
+  expect(mezcla, 'color-mix() (marquesina y previsualización de formas) no se parseó').not.toMatch(/^$|rgba\(0, 0, 0, 0\)/);
 });
