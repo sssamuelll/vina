@@ -56,7 +56,7 @@ export default function MergeOverlay({
 
   return (
     <g>
-      {renderHighlight(pieceIdA, '#4A9EFF')}
+      {renderHighlight(pieceIdA, 'var(--accent-2d)')}
       {pieceIdB && renderHighlight(pieceIdB, sharedEdgeFound ? '#4CAF50' : '#FF4444')}
 
       {/* Error message */}

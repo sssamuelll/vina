@@ -3,7 +3,7 @@
   "rules": {
     "varFallback": 0,
     "phantomTokenRefs": 0,
-    "literalColor": 589,
+    "literalColor": 570,
     "tokenDefinitionFiles": 1,
     "hoverWithoutFocus": 35,
     "outlineNone": 8,

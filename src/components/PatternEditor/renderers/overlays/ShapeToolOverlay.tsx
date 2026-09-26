@@ -24,8 +24,8 @@ interface ShapeToolOverlayProps {
  */
 export default function ShapeToolOverlay({ zoom2D, units, figura = 'rect', preview, puntos, dimensions }: ShapeToolOverlayProps) {
   const trazo = {
-    fill: 'rgba(74, 158, 255, 0.15)',
-    stroke: '#4a9eff',
+    style: { fill: 'color-mix(in oklab, var(--accent-2d) 15%, transparent)' },
+    stroke: 'var(--accent-2d)',
     strokeWidth: 1.5 / zoom2D,
     strokeDasharray: `${4 / zoom2D}`,
   };
