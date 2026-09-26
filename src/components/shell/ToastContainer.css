@@ -47,11 +47,11 @@
   border-radius: 10px 0 0 10px;
 }
 
-.toast--success::before { background: #4ade80; }
-.toast--error::before   { background: #f87171; }
-.toast--warning::before { background: #fbbf24; }
-.toast--info::before    { background: #60a5fa; }
-.toast--undo::before    { background: #a78bfa; }
+.toast--success::before { background: var(--success); }
+.toast--error::before   { background: var(--destructive); }
+.toast--warning::before { background: var(--warning); }
+.toast--info::before    { background: var(--accent); }
+.toast--undo::before    { background: var(--accent-ink); }
 
 /* ─── Message text ─── */
 

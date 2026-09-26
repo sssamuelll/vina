@@ -116,7 +116,7 @@
 }
 
 .empty-state-2d__ai-hint:hover {
-  color: var(--ai-2d);
+  color: var(--ai);
 }
 
 .empty-state-2d__ai-hint:focus-visible {
@@ -125,5 +125,5 @@
 }
 
 .empty-state-2d__ai-word {
-  color: var(--ai-2d);
+  color: var(--ai);
 }

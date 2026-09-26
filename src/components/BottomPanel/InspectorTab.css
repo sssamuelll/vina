@@ -126,8 +126,8 @@
 }
 
 .inspector-suggestion-apply {
-  background: #6366f1;
-  color: white;
+  background: var(--accent-fuerte);
+  color: var(--on-accent);
   border: none;
   padding: 3px 10px;
   border-radius: 4px;

@@ -242,7 +242,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
         <div style={{
           textAlign: 'center',
           padding: 'var(--sp-6)',
-          color: 'var(--text-ghost)',
+          color: 'var(--text-tertiary)',
           fontSize: 'var(--text-ui)',
         }}>
           {hasProvider ? 'Pregúntale a la IA sobre tu diseño...' : 'Agrega un proveedor de IA en ajustes para empezar a conversar.'}
@@ -301,7 +301,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
                       display: 'flex',
                       alignItems: 'baseline',
                       gap: 'var(--sp-1)',
-                      color: tc.status === 'error' ? 'var(--color-error)' : 'var(--text-ghost)',
+                      color: tc.status === 'error' ? 'var(--color-error)' : 'var(--text-tertiary)',
                     }}
                   >
                     <span style={{ flexShrink: 0 }}>
@@ -342,7 +342,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
           {agenticHook.toolCalls.map((tc, i) => (
             <div key={i} style={{
               fontSize: 'var(--text-xs)',
-              color: tc.status === 'error' ? 'var(--color-error)' : 'var(--text-ghost)',
+              color: tc.status === 'error' ? 'var(--color-error)' : 'var(--text-tertiary)',
               display: 'flex',
               alignItems: 'center',
               gap: 'var(--sp-1)',

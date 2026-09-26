@@ -61,7 +61,7 @@
 }
 
 .notch-precision-hint {
-  color: var(--text-ghost);
+  color: var(--text-tertiary);
   font-size: var(--text-xs);
   text-align: right;
   margin: 0 0 14px 0;
@@ -85,9 +85,9 @@
 }
 
 .notch-precision-actions button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--accent-fuerte);
+  border-color: var(--accent-fuerte);
+  color: var(--on-accent);
 }
 
 .notch-precision-actions button.primary:disabled {

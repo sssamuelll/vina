@@ -76,7 +76,7 @@ const footerStyle: React.CSSProperties = {
 };
 
 const btnStyle: React.CSSProperties = {
-  background: 'var(--accent)',
+  background: 'var(--accent-fuerte)',
   color: 'white',
   border: 'none',
   padding: '8px 18px',

@@ -65,7 +65,7 @@
 }
 
 .confirm-dialog__consequences li::marker {
-  color: var(--text-ghost);
+  color: var(--text-tertiary);
 }
 
 .confirm-dialog__actions {
@@ -99,27 +99,28 @@
 }
 
 .confirm-dialog__btn--primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-fuerte);
+  border-color: var(--accent-fuerte);
   color: var(--on-accent);
 }
 
+/* Aclara al pasar el mouse, como --destructive-hover. */
 .confirm-dialog__btn--primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 /* El botón destructivo no puede parecerse al primario: es la última pantalla
  * antes de perder algo. */
 .confirm-dialog__btn--destructive {
-  background: var(--destructive);
-  border-color: var(--destructive);
+  background: var(--destructive-fuerte);
+  border-color: var(--destructive-fuerte);
   color: var(--on-accent);
 }
 
 .confirm-dialog__btn--destructive:hover {
-  background: var(--destructive-hover);
-  border-color: var(--destructive-hover);
+  background: var(--destructive);
+  border-color: var(--destructive);
 }
 
 @keyframes confirm-fade {

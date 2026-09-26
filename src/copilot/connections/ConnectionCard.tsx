@@ -62,7 +62,7 @@ const subLabelStyle: React.CSSProperties = {
 const badgeStyle: React.CSSProperties = {
   fontSize: 10,
   color: 'white',
-  background: 'var(--accent)',
+  background: 'var(--accent-fuerte)',
   padding: '2px 8px',
   borderRadius: 999,
   fontWeight: 600,
