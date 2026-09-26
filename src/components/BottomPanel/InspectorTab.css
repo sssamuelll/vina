@@ -136,8 +136,11 @@
   white-space: nowrap;
 }
 
-.inspector-suggestion-apply:hover {
-  background: var(--accent);
+/* Aclara un paso sin perder AA con el texto blanco: a --accent el blanco cae
+ * a 3,95:1 (re-revisión final F1). Sin hover mientras esté deshabilitado
+ * («Próximamente»). */
+.inspector-suggestion-apply:hover:not(:disabled) {
+  background: var(--accent-fuerte-hover);
 }
 
 .inspector-raw-data {

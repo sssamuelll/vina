@@ -29,7 +29,7 @@ describe('ConfirmDialog — los botones con texto blanco llevan el paso fuerte',
     expect(prop(regla('.confirm-dialog__btn--destructive'), 'background')).toBe('var(--destructive-fuerte)');
   });
   it('el hover aclara un paso, no oscurece ni brilla', () => {
-    expect(prop(regla('.confirm-dialog__btn--primary:hover'), 'background')).toBe('var(--accent)');
-    expect(prop(regla('.confirm-dialog__btn--destructive:hover'), 'background')).toBe('var(--destructive)');
+    expect(prop(regla('.confirm-dialog__btn--primary:hover'), 'background')).toBe('var(--accent-fuerte-hover)');
+    expect(prop(regla('.confirm-dialog__btn--destructive:hover'), 'background')).toBe('var(--destructive-fuerte-hover)');
   });
 });

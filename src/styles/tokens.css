@@ -37,6 +37,7 @@
    *   --accent         bordes, tintes, tiradores, línea de selección
    *                    (3,43:1 sobre el crema; 4,67 sobre surface)
    *   --accent-fuerte  relleno sólido que lleva texto blanco (5,04:1)
+   *   --accent-fuerte-hover  ese relleno al pasar el mouse (4,65:1)
    *   --accent-ink     el acento ESCRITO sobre el cromo (8,65:1 surface)
    * Es el azul que ya tenían las cotas: el cromo lo adopta, y desaparecen el
    * índigo Tailwind (#6366f1, «indigo-500») y el violeta de AUTO. Los tres
@@ -47,6 +48,12 @@
    * igual que antes del 26-09 (era el paso fuerte del papel desde el 04-09). */
   --accent-2d-fuerte: oklch(0.54 0.15 248);
   --accent-fuerte: var(--accent-2d-fuerte);
+  /* El hover de un relleno que lleva texto: un paso más claro (+0,02 de L),
+   * el último en que el blanco sigue en AA. Subir a --accent lo deja en
+   * 3,95:1 — el hueco que la ola final del 26-09 abrió y la re-revisión cazó.
+   * Un relleno SIN texto (Enviar, el dock activo) sí puede ir a --accent: a un
+   * glifo le basta 3:1. Lo fija acento-legible.test.ts. */
+  --accent-fuerte-hover: oklch(0.56 0.15 248);  /* #0278c7 */
   --accent-ink: oklch(0.76 0.11 248);       /* #77b7f4 */
   --accent-subtle: oklch(0.60 0.16 248 / 14%);
   --accent-border: oklch(0.60 0.16 248 / 30%);
@@ -63,6 +70,8 @@
    * --destructive el blanco da 3,96:1; aquí 6,05:1. Mismo rol que
    * --accent-fuerte. */
   --destructive-fuerte: oklch(0.52 0.18 25); /* #ba2b2e */
+  /* Eliminar al pasar el mouse: el mismo paso que --accent-fuerte-hover. */
+  --destructive-fuerte-hover: oklch(0.54 0.18 25); /* #c13234 · 5,57:1 */
   /* Hermano de --accent-ink: lo destructivo también aclara al pasar el mouse. */
   --destructive-hover: oklch(0.70 0.16 25); /* #f2716a */
 

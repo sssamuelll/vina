@@ -94,8 +94,9 @@ dibujar · coser, más «+»), dock 3D (4), reglas y rejilla (son documento), p�
 
 ### 3.4 El trinquete de superficies
 
-`tests/e2e/superficies-por-accion.spec.ts`, con el patrón de `tests/e2e/emplazamiento-modales.spec.ts`
-(visibilidad real por `elementFromPoint`, no por CSS declarado):
+`tests/e2e/superficies-por-accion.spec.ts`, medido en navegador y no por CSS declarado (la
+visibilidad, por geometría; la oclusión —quién pinta encima de quién— queda en los specs de
+emplazamiento, que sí preguntan con `elementFromPoint`):
 
 - **Superficie** = elemento con `data-superficie="<nombre>"`. Se marcan: cada superficie de material
   chrome u overlay, el texto de pista, y **una sola** `data-superficie="cabina"` que agrupa chips,
@@ -153,12 +154,14 @@ verifica un e2e nuevo en F1.
 |---|---|---|
 | `--accent` | `oklch(0.60 0.16 248)` ≈ `#0584da` | bordes, tintes, tiradores, **línea de selección sobre el papel** (3,43:1 sobre crema; hoy `--accent-2d` a L 0,66 da 2,70:1, por debajo del 3:1 gráfico) |
 | `--accent-fuerte` | `:= var(--accent-2d-fuerte)` = `oklch(0.54 0.15 248)` | relleno con texto blanco (5,04:1). Ya verificado en `tokens.css:69`; `--cota-bg-2d` no se mueve |
+| `--accent-fuerte-hover` | `oklch(0.56 0.15 248)` ≈ `#0278c7` | el relleno con texto al pasar el mouse: un paso más claro (+0,02 de L), el último en que el blanco sigue en AA (4,65:1). A `--accent` el blanco cae a 3,95:1; a ese paso solo suben los rellenos sin texto (Enviar, el dock activo), donde a un glifo le basta 3:1 |
 | `--accent-ink` | `oklch(0.76 0.11 248)` | el acento escrito sobre el cromo (≈ 8,6:1) |
 | `--accent-subtle` / `--accent-border` | `oklch(0.60 0.16 248 / 14%)` / `/ 30%` | |
 | `--accent-2d` | alias de `--accent` | un solo azul en cromo y papel |
 | `--ai` | `oklch(0.72 0.13 295)` ≈ `#ab93ed` | **nuevo**, único segundo tono: «esto lo hizo la IA». Nunca «activo». Sustituye `--dock-auto` y `--ai-2d` |
 | `--success` / `--warning` / `--destructive` | `oklch(0.68 0.14 150)` / `oklch(0.75 0.14 75)` / `oklch(0.62 0.18 25)` (4,65:1) | semánticos apagados a la croma de la familia; `--destructive-hover` un paso más claro |
 | `--destructive-fuerte` | `oklch(0.52 0.18 25)` ≈ `#ba2b2e` | relleno destructivo que lleva texto blanco (6,05:1); hermano de `--accent-fuerte` |
+| `--destructive-fuerte-hover` | `oklch(0.54 0.18 25)` ≈ `#c13234` | Eliminar al pasar el mouse (5,57:1); el mismo paso que `--accent-fuerte-hover` |
 
 Se retira `--accent-hover` (segundo nombre de `--accent-ink`). Migran a tokens los 17
 `rgba(99,102,241,x)` literales (floating.css ×6, SubMenu.css ×4, unified-bar.css ×2, layout.css,
@@ -181,12 +184,12 @@ La línea de pelo tiene nombre propio, `--hairline: 1px solid rgba(255, 255, 255
 Variantes: `--surface-overlay-shadow-recessed: 0 1px 2px rgba(0,0,0,0.2)`; `-sheet` y `-recessed`
 de fondo pasan a alias del material base (una sola opacidad, no tres). Radios concéntricos: el dock
 de 52 px conserva 10 exterior con padding 4 y botones 6 (interior = exterior − padding); el resto
-8/6. Se retira `--radius-xl` (0 consumidores); `--radius-lg` (10 px) se conserva solo para el dock
-(10 = 6 del botón + 4 de padding) y `--blur` (único consumidor:
-`RenderSettingsPanel.css:19-20` → material overlay). El panel de contexto deja el overlay y toma
+8/6. Se retiran `--radius-xl` (0 consumidores) y `--blur` (único consumidor:
+`RenderSettingsPanel.css:19-20` → material overlay); `--radius-lg` (10 px) se conserva solo para el
+dock (10 = 6 del botón + 4 de padding). El panel de contexto deja el overlay y toma
 `chrome` a ras: sin margen, sin radio, sin sombra, borde lateral hairline (recupera 24 px por panel).
-Hover: cambia solo la tinta (o `--bg-elevated` en botones de icono); ningún hover agrega sombra,
-escala ni brillo. Transiciones 150/200 ms solo para cambios de estado.
+Hover: cambia solo la tinta (o `--bg-elevated` en botones de icono; en un relleno con texto, el
+paso `-fuerte-hover` de § 4.3); ningún hover agrega sombra, escala ni brillo. Transiciones 150/200 ms solo para cambios de estado.
 
 ### 4.5 Tipografía
 
@@ -311,7 +314,7 @@ muerto (`Viewport3D.tsx:1013-1045`) eliminado.
 | Firma de María #1109 (fila persistente) | Persistente y callada; plegado solo con firma | § 8. |
 | Firma de María #1103 (puntos siempre visibles) y `HintText.tsx:141-148` | Cambio de tinta, no de regla; pista por estado | § 8. |
 | `SKILL.md` § 6 ley de puertas | AUTO fuera → Escalado en LogoMenu › Patrón; «Ajustes de piquete» fuera → «Ancho» y rangos en la tira primero | D10, § 5. |
-| `SKILL.md` § 1 / trinquete R2 | Tokens nuevos (`--text-tertiary`, `--text-disabled`, `--ai`, `--scene-3d`, `--text-1..5`) y retirados (`--text-ghost`, `--text-dim`, `--dock-auto`, `--ai-2d`, `--accent-hover`, `--radius-lg/xl`, `--blur`, `--band-bar`, `--font-ui-2d` como familia) | Cada retiro con todos sus consumidores en el mismo PR. |
+| `SKILL.md` § 1 / trinquete R2 | Tokens nuevos (`--text-tertiary`, `--text-disabled`, `--ai`, `--scene-3d`, `--text-1..5`, `--hairline`, `--destructive-fuerte`, `--accent-fuerte-hover`, `--destructive-fuerte-hover`) y retirados (`--text-ghost`, `--text-dim`, `--dock-auto`, `--ai-2d`, `--accent-hover`, `--radius-xl`, `--blur`, `--band-bar`, `--font-ui-2d` como familia) | Cada retiro con todos sus consumidores en el mismo PR. |
 | `SKILL.md` § Verificación (nuevo) | El trinquete de superficies (§ 3.4) junto al de tokens | Sin él, el techo de 4 es prosa. |
 
 ## 7. Fases

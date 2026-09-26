@@ -149,6 +149,11 @@ la barra de IA.
 - **`seleccionado` > `hover` > `reposo`**, siempre, en peso visual. Ya estuvo al
   revés en el dock: la herramienta apenas rozada se veía más seleccionada que la
   activa.
+- **Un relleno que lleva texto no sube a `--accent` al hover.** El blanco encima
+  cae a 3,95:1; sube a `--accent-fuerte-hover` (4,65:1), y Eliminar a
+  `--destructive-fuerte-hover`. A `--accent` solo suben los rellenos sin texto
+  (Enviar, el dock activo): a un glifo le basta 3:1. Lo caza
+  `acento-legible.test.ts`.
 - El estado seleccionado **no puede depender solo del tono**. Un icono de 16px
   que solo cambia de color no comunica nada, y falla para quien no distingue
   colores. Cambia también el relleno.

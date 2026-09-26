@@ -104,9 +104,10 @@
   color: var(--on-accent);
 }
 
-/* Aclara al pasar el mouse, como --destructive-hover. */
+/* Aclara un paso al pasar el mouse — hasta donde el blanco sigue en AA
+ * (a --accent caería a 3,95:1); el borde sí sube al acento entero. */
 .confirm-dialog__btn--primary:hover {
-  background: var(--accent);
+  background: var(--accent-fuerte-hover);
   border-color: var(--accent);
 }
 
@@ -119,7 +120,7 @@
 }
 
 .confirm-dialog__btn--destructive:hover {
-  background: var(--destructive);
+  background: var(--destructive-fuerte-hover);
   border-color: var(--destructive);
 }
 

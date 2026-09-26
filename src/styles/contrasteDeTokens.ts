@@ -21,6 +21,8 @@ export const PARES: Par[] = [
   { tinta: '--accent-ink', fondo: '--bg-elevated', minimo: 4.5, por: 'el acento escrito sobre un botón' },
   { tinta: '--on-accent', fondo: '--accent-fuerte', minimo: 4.5, por: 'texto blanco sobre relleno de acento' },
   { tinta: '--on-accent', fondo: '--destructive-fuerte', minimo: 4.5, por: 'texto blanco sobre Eliminar' },
+  { tinta: '--on-accent', fondo: '--accent-fuerte-hover', minimo: 4.5, por: 'texto blanco sobre el relleno al pasar el mouse' },
+  { tinta: '--on-accent', fondo: '--destructive-fuerte-hover', minimo: 4.5, por: 'texto blanco sobre Eliminar al pasar el mouse' },
   { tinta: '--accent', fondo: '--bg-surface', minimo: 3, por: 'borde/relleno del dock activo' },
   { tinta: '--accent', fondo: '--canvas-2d', minimo: 3, por: 'línea de selección sobre el crema' },
   { tinta: '--accent', fondo: '--piece-fill-2d', minimo: 3, por: 'línea de selección sobre la pieza' },
