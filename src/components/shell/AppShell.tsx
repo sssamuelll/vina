@@ -68,7 +68,7 @@ function ReferenceImagesPanel() {
 }
 
 const PanelLoading = () => (
-  <div style={{ padding: 'var(--sp-4)', color: 'var(--text-ghost)', fontSize: '13px', textAlign: 'center' }}>
+  <div style={{ padding: 'var(--sp-4)', color: 'var(--text-tertiary)', fontSize: '13px', textAlign: 'center' }}>
     Cargando...
   </div>
 );
@@ -298,7 +298,7 @@ export default function AppShell() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: 'rgba(99, 102, 241, 0.12)',
+              background: 'var(--accent-subtle)',
               border: '2px dashed var(--accent)',
               borderRadius: 8,
             }}
@@ -311,7 +311,7 @@ export default function AppShell() {
                 borderRadius: 8,
                 fontSize: 15,
                 fontWeight: 600,
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                boxShadow: 'var(--surface-overlay-shadow)',
               }}
             >
               Suelta tu archivo .dxf para importarlo

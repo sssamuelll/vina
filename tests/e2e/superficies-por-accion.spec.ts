@@ -23,7 +23,7 @@ import {
  */
 const BASELINE = 'tests/e2e/superficies-baseline.json';
 /** Espejo de `DOCK_WIDTH_PX` (PatternEditor.tsx): borde derecho del dock izquierdo, en px. */
-const DOCK_ANCHO = 68;
+const DOCK_ANCHO = 62;
 
 const baseline = leerBaseline(BASELINE);
 const medidas: Record<string, number> = {};

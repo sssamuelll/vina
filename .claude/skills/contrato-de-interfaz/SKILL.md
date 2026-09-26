@@ -61,8 +61,16 @@ No se mezclan piezas de dos materiales. Se usa uno completo.
 
 | Material | Cuándo | Tokens |
 |---|---|---|
-| **`chrome`** | acoplado a una canaleta; opaco | `--surface-chrome-bg`, `-border`, `-radius`, `-shadow` |
-| **`overlay`** | flota de verdad sobre el documento y se va | `--surface-overlay-bg`, `-border`, `-radius`, `-shadow`, `-blur` |
+| **`chrome`** | acoplado a una canaleta; opaco; **sin sombra** | `--surface-chrome-bg`, `-border`, `-radius`, `-shadow` (= none) |
+| **`overlay`** | flota de verdad sobre el documento y se va; casi opaco (0,96), línea de pelo, sombra corta en dos capas; **sin blur** | `--surface-overlay-bg`, `-border` (= `--hairline`), `-radius`, `-shadow`, `-blur` (= none) |
+
+> **Enmienda 2026-09-26 (cromo callado, spec 2026-09-24 § 4.4):** los dos
+> roles siguen existiendo y se usan enteros, pero están hechos del MISMO
+> material y solo los distingue la sombra. El blur se retiró: con un fondo al
+> 92 % solo desenfocaba el 8 % que se transparentaba, y a cambio creaba los
+> contextos de apilamiento que recortaron `ConnectionModal` (párrafo de abajo).
+> `--surface-overlay-blur` sigue existiendo como token y vale `none`, para que
+> nadie lo reponga a mano. Se dice aquí para que no parezca fusión por descuido.
 
 Más una familia de **tinta**, que no es superficie: `--ink-*` es lo que se
 dibuja **sobre el papel** del lienzo 2D.
@@ -85,6 +93,11 @@ la barra de IA.
 > del transform box, no un panel. Lo pidió Samuel el 2026-08-30; queda escrito
 > para que no se vuelva regla tácita.
 
+> **Nota 2026-09-26:** ya no hay blur, así que un overlay ya NO establece
+> contexto de apilamiento por sí mismo; lo que sigue vale para cualquier
+> superficie que declare `transform`, `filter` u `opacity < 1`. El patrón del
+> portal sigue siendo el correcto para todo modal.
+>
 > **Estas dos leyes pelean, y hay que saberlo antes de escribir (medido el
 > 2026-08-15).** `--surface-overlay-blur` es un `backdrop-filter`, y un
 > `backdrop-filter` hace **dos cosas** que no tienen nada que ver con verse
@@ -136,6 +149,11 @@ la barra de IA.
 - **`seleccionado` > `hover` > `reposo`**, siempre, en peso visual. Ya estuvo al
   revés en el dock: la herramienta apenas rozada se veía más seleccionada que la
   activa.
+- **Un relleno que lleva texto no sube a `--accent` al hover.** El blanco encima
+  cae a 3,95:1; sube a `--accent-fuerte-hover` (4,65:1), y Eliminar a
+  `--destructive-fuerte-hover`. A `--accent` solo suben los rellenos sin texto
+  (Enviar, el dock activo): a un glifo le basta 3:1. Lo caza
+  `acento-legible.test.ts`.
 - El estado seleccionado **no puede depender solo del tono**. Un icono de 16px
   que solo cambia de color no comunica nada, y falla para quien no distingue
   colores. Cambia también el relleno.
@@ -157,6 +175,13 @@ la barra de IA.
   `src/shortcuts/defaults.ts`, el catálogo que lo muestra tiene que declararlo
   igual: `notch` tenía Shift+N registrado y el dock no lo mostraba, así que para
   la usuaria no existía.
+- **Mono = un dato cuya alineación carácter a carácter significa algo**
+  (regla, cotas, píldora de medida, `kbd`). Toda la prosa del cromo va en
+  `--font-sans`: el estado, los rótulos del dock, el estado vacío, el valor de
+  una opción. Una sola familia de cada: Inter y JetBrains Mono, nada más se
+  carga (`index.html`). Lo fija `tipografia-del-cromo.test.ts`, selector por
+  selector. (Enmienda 2026-09-26; la revisión del 04-09 § 8 decía «Schibsted +
+  mono», que no era lo que el código hacía.)
 
 ## 6. Ley de puertas
 
@@ -187,6 +212,30 @@ cuántos materiales hay de verdad en pantalla— existe el censo contra la app v
 ```bash
 npm run audit:ui        # requiere el server de dev corriendo
 ```
+
+Y dos trinquetes más, en navegador, con su línea base en JSON que **solo baja**
+(spec 2026-09-24 § 3.4 y § 7). El techo efectivo de un estado es el mayor de
+la meta y la línea base: por debajo de la meta el diseño puede mover
+superficies; por encima, solo se baja. Con reintentos, un fallo a mitad de un
+grupo serial escribe medidas parciales: por eso `--retries=0`.
+
+```bash
+npx playwright test tests/e2e/superficies-por-accion.spec.ts   # ≤ 4 componentes que aparecen o cambian por acción
+npx playwright test tests/e2e/contraste-del-cromo.spec.ts      # ningún texto del cromo bajo AA sobre su fondo real
+```
+
+Una superficie nueva **declara** qué es con `data-superficie` (vocabulario en
+`tests/repo/superficies-declaradas.test.ts`); sin marca, el trinquete no la ve.
+Los dos trinquetes en navegador corren en local y antes de cada PR; en CI el trabajo de e2e sigue en
+`continue-on-error` (#506), así que hoy no bloquean el merge por sí solos.
+Para bajar un techo:
+
+```bash
+SUPERFICIES_UPDATE=1 npx playwright test tests/e2e/superficies-por-accion.spec.ts --retries=0 --workers=1
+CONTRASTE_UPDATE=1 npx playwright test tests/e2e/contraste-del-cromo.spec.ts --retries=0 --workers=1
+```
+
+y se commitea el JSON. Nunca se editan a mano.
 
 > **La suite unitaria es CIEGA al apilamiento.** jsdom no calcula layout: no
 > tiene `elementFromPoint` y `getBoundingClientRect()` devuelve 0. Un modal

@@ -120,12 +120,13 @@ describe('F5 — el número que María lee cumple AA', () => {
   });
 });
 
-describe('F5 — arreglar la cota no puede cambiar la selección', () => {
-  // El arreglo perezoso sería oscurecer --accent-2d y ya. Pero ese token es el
-  // color de la selección y de las costuras, ratificado con mockups aprobados
-  // (spec 2026-08-30). Se toca la familia de cotas, no el acento del lienzo.
-  it('--accent-2d sigue siendo el azul aprobado para selección y costuras', () => {
-    expect(token('--accent-2d')).toBe('oklch(0.66 0.16 248)');
+describe('F5 — arreglar la cota no puede cambiar la selección por descuido', () => {
+  // La selección y las costuras cambiaron de valor UNA vez, a propósito, el
+  // 26-09 (cromo callado, spec § 4.3): --accent-2d es ahora alias del acento
+  // del cromo, a L 0,60 (3,43:1 sobre el crema; antes 2,70:1). Cualquier otro
+  // cambio pasa por aquí.
+  it('--accent-2d es el acento del cromo, tono 248 a L 0,60', () => {
+    expect(token('--accent-2d')).toBe('oklch(0.60 0.16 248)');
   });
 
   it('la familia de cotas es del mismo tono que la selección (no un azul nuevo)', () => {

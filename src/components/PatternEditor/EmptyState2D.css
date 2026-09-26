@@ -35,7 +35,7 @@
   align-items: center;
   gap: 8px;
   padding: 9px 16px;
-  font-family: var(--font-mono-2d);
+  font-family: var(--font-ui-2d);
   font-size: 13px;
   font-weight: 500;
   color: var(--ink-on-light);
@@ -60,11 +60,16 @@
   cursor: not-allowed;
 }
 
+/* Texto instructivo SOBRE el papel: --ink-hint (5,08:1 sobre --canvas-2d), el
+ * mismo rol que las pistas del lienzo. --ink-on-light-2 y -3 son tintas de
+ * LÍNEA (mínimo gráfico 3:1) y como texto dan 4,07:1 y 2,15:1 sobre el crema;
+ * --ai (7,1:1 sobre el cromo oscuro) da 2,25:1 aquí. Lo mide
+ * tests/e2e/contraste-del-cromo.spec.ts («estado vacío»). */
 .empty-state-2d__drop-hint {
   margin: 0;
-  font-family: var(--font-mono-2d);
+  font-family: var(--font-ui-2d);
   font-size: 11px;
-  color: var(--ink-on-light-3);
+  color: var(--ink-hint);
 }
 
 .empty-state-2d__secondary {
@@ -74,9 +79,9 @@
   gap: 6px;
   margin-top: 4px;
   padding: 4px 6px;
-  font-family: var(--font-mono-2d);
+  font-family: var(--font-ui-2d);
   font-size: 12px;
-  color: var(--ink-on-light-2);
+  color: var(--ink-hint);
   background: none;
   border: none;
   border-radius: 5px;
@@ -97,7 +102,7 @@
 }
 
 .empty-state-2d__kbd {
-  color: var(--ink-on-light-3);
+  color: var(--ink-hint);
 }
 
 .empty-state-2d__ai-hint {
@@ -107,16 +112,19 @@
   gap: 5px;
   margin: 6px 0 0;
   padding: 0;
-  font-family: var(--font-mono-2d);
+  font-family: var(--font-ui-2d);
   font-size: 11px;
-  color: var(--ink-on-light-3);
+  color: var(--ink-hint);
   background: none;
   border: none;
   cursor: pointer;
 }
 
+/* El hover sube de peso como su hermano __secondary (reposo --ink-hint → tinta
+ * plena); con --ai bajaría a 2,25:1 sobre el papel, el hover más tenue que el
+ * reposo. */
 .empty-state-2d__ai-hint:hover {
-  color: var(--ai-2d);
+  color: var(--ink-on-light);
 }
 
 .empty-state-2d__ai-hint:focus-visible {
@@ -124,6 +132,8 @@
   outline-offset: 2px;
 }
 
+/* La palabra-puerta lleva tinta plena (11,96:1), no --ai: --ai marca «esto lo
+ * hizo la IA» (spec § 4.3), no una puerta, y sobre el crema no se lee. */
 .empty-state-2d__ai-word {
-  color: var(--ai-2d);
+  color: var(--ink-on-light);
 }

@@ -72,7 +72,7 @@ export default function ResolutionSection({ open, onToggle }: SectionProps) {
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: aspectRatioLocked ? 'var(--accent)' : 'var(--text-dim)',
+                color: aspectRatioLocked ? 'var(--accent)' : 'var(--text-tertiary)',
                 padding: 2,
                 display: 'flex',
                 alignItems: 'center',

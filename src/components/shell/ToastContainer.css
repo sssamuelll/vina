@@ -15,6 +15,7 @@
 
 /* ─── Individual toast card ─── */
 
+/* Material overlay entero, por token (revisión final F1): era el único flotante del shell con blur y negro propio. */
 .toast {
   position: relative;
   display: flex;
@@ -22,12 +23,10 @@
   gap: 10px;
   max-width: 360px;
   padding: 10px 36px 10px 14px; /* right padding reserves space for dismiss btn */
-  background: rgba(30, 30, 30, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
   font-size: 13px;
   font-family: var(--font-sans);
   color: var(--text-primary);
@@ -47,11 +46,11 @@
   border-radius: 10px 0 0 10px;
 }
 
-.toast--success::before { background: #4ade80; }
-.toast--error::before   { background: #f87171; }
-.toast--warning::before { background: #fbbf24; }
-.toast--info::before    { background: #60a5fa; }
-.toast--undo::before    { background: #a78bfa; }
+.toast--success::before { background: var(--success); }
+.toast--error::before   { background: var(--destructive); }
+.toast--warning::before { background: var(--warning); }
+.toast--info::before    { background: var(--accent); }
+.toast--undo::before    { background: var(--accent-ink); }
 
 /* ─── Message text ─── */
 
@@ -99,7 +98,7 @@
   cursor: pointer;
   /* Esto NO es consecuencia de limpiar el respaldo: es un arreglo de contraste
    * aparte. El respaldo que había (blanco al 45%) estaba MUERTO —tokens.css
-   * entra global vía base.css:1, así que --text-dim resolvía siempre—, o sea
+   * entra global vía base.css:1, así que --text-dim (hoy --text-tertiary) resolvía siempre—, o sea
    * que la equis llevaba 1,96:1 desde el primer día y borrarlo no cambia un
    * píxel. --text-dim es la tinta de lo inerte (deshabilitado); un botón que se
    * pulsa lleva --text-muted, que da 4,87:1 y ya es el par reposo/hover con

@@ -94,7 +94,7 @@ function PuntosDelContorno({
           // Sin elegir la pieza, los puntos son una referencia y no un mando:
           // se pintan a la mitad de tamaño para que estén sin gritar.
           zoom2D={isSelected ? zoom2D : zoom2D * 2}
-          state="idle"
+          state={isSelected ? 'idle' : 'reposo'}
         />
       ))}
     </g>

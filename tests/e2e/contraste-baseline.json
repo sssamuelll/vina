@@ -1,0 +1,14 @@
+{
+  "_doc": "Techos del trinquete de contraste del cromo (spec 2026-09-24 «cromo callado» § 7 F1): textos por debajo de 4,5:1 (3:1 si son grandes) sobre su fondo compuesto, por estado. Solo bajan. Para fijar: CONTRASTE_UPDATE=1 npx playwright test tests/e2e/contraste-del-cromo.spec.ts --retries=0 --workers=1 (con reintentos, un fallo a mitad del grupo serial escribe medidas parciales). La meta es 0. Nunca se edita a mano.",
+  "meta": 0,
+  "estados": {
+    "estado vacío": 0,
+    "reposo con patrón": 0,
+    "pieza seleccionada": 0,
+    "menú del logo": 0,
+    "paleta abierta": 0,
+    "panel Propiedades": 0,
+    "panel Capas": 0,
+    "3D en reposo": 0
+  }
+}

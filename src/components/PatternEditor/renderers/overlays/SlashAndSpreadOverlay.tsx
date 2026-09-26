@@ -271,7 +271,7 @@ export default function SlashAndSpreadOverlay({
               textAnchor="middle"
               fill="#FF6600"
               fontSize={12 / zoom2D}
-              fontFamily="monospace"
+              fontFamily="var(--font-mono-2d)"
               pointerEvents="none"
             >
               {pivotPoint
