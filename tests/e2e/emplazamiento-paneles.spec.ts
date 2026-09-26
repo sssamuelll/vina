@@ -262,18 +262,21 @@ test.describe('Ola 2 — los paneles ocupan canaleta, no flotan', () => {
     expect(sonda.zIndex).toBe('auto');
     expect(sonda.flexBasis).toBe('300px');
 
-    // Y lo que hay que saber a ciencia cierta, no suponer: el panel conserva
-    // el material `overlay` por mandato de Samuel (decisión consciente, no
-    // un bug), y ese material lleva `backdrop-filter`. Si lo lleva, ES
-    // bloque contenedor, y cualquier superficie `position: fixed` que se
-    // renderice DESDE DENTRO de un panel necesita portal a `document.body`.
-    // Un if/else que afirma una cosa u otra según el propio valor medido
-    // DOCUMENTA la realidad, no la VIGILA — pasaría igual si alguien le
-    // quita el backdrop-filter al material sin querer. Aquí se fija la
-    // realidad vigente como aserto duro: si algún día backdropFilter deja
-    // de ser 'none', esto revienta y avisa que el mundo cambió.
-    expect(sonda.backdropFilter).not.toBe('none');
-    expect(sonda.sondaEnOrigen).toBe(false);
+    // Y lo que hay que saber a ciencia cierta, no suponer. Hasta el 26-09 el
+    // material `overlay` llevaba `backdrop-filter`, y eso hacía al panel
+    // BLOQUE CONTENEDOR de cualquier `position: fixed` que se renderizara
+    // desde dentro. La decisión D8 del spec «cromo callado» (2026-09-24
+    // § 4.4; contrato § 2 enmendado) retiró el blur: `--surface-overlay-blur`
+    // vale `none`, el panel ya no atrapa a sus descendientes fijos y la sonda
+    // SÍ resuelve contra el viewport. Se fija la realidad vigente como aserto
+    // duro, igual que antes: si algún día vuelve el blur (o un `transform`,
+    // `filter` o `perspective` en el panel), esto revienta y avisa que el
+    // mundo cambió otra vez. Lo que NO cambia es la regla de diseño: un modal
+    // o un menú que nazca dentro de un panel sigue yendo a `document.body`
+    // por portal, por z-index y no por bloque contenedor — lo vigila el test
+    // siguiente (H-3).
+    expect(sonda.backdropFilter).toBe('none');
+    expect(sonda.sondaEnOrigen).toBe(true);
   });
 
   // H-3: el aserto de arriba fija QUE el panel es bloque contenedor; este
