@@ -87,7 +87,7 @@
   --grid-2d: #e3dfd2;
   --grid-2d-major: #d8d3c2;
   --ink-on-light: #2b2d33;     /* cut line, primary labels */
-  --ink-on-light-2: #6f7480;   /* seam line, grainline, meta labels, puntos del contorno en reposo */
+  --ink-on-light-2: #6f7480;   /* línea de costura, hilo, rótulos meta, puntos del contorno en reposo */
   --ink-on-light-3: #a0a5b0;   /* construction / reference lines */
   /* Identidad de pares de costura sobre el papel. Misma luminosidad perceptual
      y saltos de 35–50° de tono: se distinguen sin convertir una costura en
@@ -128,8 +128,8 @@
   --annotation-2d: #808080;                 /* annotation fallback when its category has no color */
   /* Tinta de texto instructivo dibujado SOBRE el papel (pistas al pie del
    * lienzo). NO usar --text-* aquí: esos son la tinta del cromo OSCURO y sobre
-   * el crema quedan invisibles (1.05:1 medido el 2026-08-14). Éste da 5.08:1
-   * sobre --canvas-2d y 5.84:1 sobre --piece-fill-2d. Lo verifica
+   * el crema quedan invisibles (1.05:1 medido el 2026-08-14). Éste da 5,08:1
+   * sobre --canvas-2d y 5,85:1 sobre --piece-fill-2d. Lo verifica
    * HintText.legibilidad.test.tsx. */
   --ink-hint: #6b6459;
   /* Seam overlay (SeamRenderer) on the paper ground: tension labels are muted

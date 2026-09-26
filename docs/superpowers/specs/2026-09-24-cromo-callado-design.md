@@ -101,11 +101,11 @@ dibujar · coser, más «+»), dock 3D (4), reglas y rejilla (son documento), p�
   chrome u overlay, el texto de pista, y **una sola** `data-superficie="cabina"` que agrupa chips,
   caja de transformación y barra flotante. Ambiente (§ 3.1) y documento llevan
   `data-superficie="ambiente"` / `"documento"` y no cuentan.
-- Para cada una de las **dieciséis acciones** (las quince de § 3.3 más el reposo con patrón) el spec
+- Para cada una de las **diecisiete acciones** (las quince de § 3.3 más los dos reposos de § 3.2: 2D con patrón y Split) el spec
   ejecuta la secuencia de María con el DXF real, cuenta las superficies que aparecen o cambian
-  respecto al paso anterior, y falla si la cuenta supera **4** o supera la línea base guardada en
+  respecto al paso anterior, y falla si la cuenta supera el techo efectivo — el mayor de la meta (**4**) y la línea base guardada en
   `tests/e2e/superficies-baseline.json` (mismo trinquete que `ui-contract-baseline.json`: solo baja;
-  `--update` fija el techo nuevo; nunca se edita a mano).
+  `SUPERFICIES_UPDATE=1 … --retries=0 --workers=1` fija el techo nuevo; nunca se edita a mano. Por debajo de la meta el diseño puede mover superficies; por encima, solo se baja (enmienda 2026-09-26: leído literal, el «supera 4 o supera la línea base» congelaba el diseño de hoy)).
 - Se corre en F0 contra producción para escribir la línea base (hoy: entre 7 y 14 por acción) y al
   cierre de cada fase.
 
