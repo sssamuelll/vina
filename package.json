@@ -20,6 +20,7 @@
     "lint": "eslint .",
     "lint:ui": "node scripts/ui-contract-lint.mjs",
     "audit:ui": "node scripts/ui-surface-audit.mjs",
+    "audit:capturas": "node scripts/capturas-ui.mjs",
     "preview": "vite preview",
     "prepare": "husky",
     "test": "vitest run",
