@@ -13,8 +13,10 @@ import {
  *
  * Cuenta, para cada acción de María, las superficies que APARECEN o CAMBIAN
  * (la cabina del objeto cuenta 1; el ambiente no cuenta), y falla si la cuenta
- * supera el techo guardado en `superficies-baseline.json`. La meta es 4. Hoy
- * (F0) solo mide y fija la línea base; F2 y F4 la bajan.
+ * supera el techo efectivo: el mayor de la línea base guardada en
+ * `superficies-baseline.json` y la meta (4). Por debajo de la meta el diseño
+ * puede mover superficies; por encima, solo se baja. Hoy (F0) solo mide y fija
+ * la línea base; F2 y F4 la bajan.
  *
  * Serial a propósito: `medidas` se acumula en el proceso para escribir la línea
  * base al final con SUPERFICIES_UPDATE=1.
@@ -36,8 +38,10 @@ function registrar(accion: string, nombres: string[]): void {
 }
 
 // 90 s y no los 30 del config: cada test carga el DXF real en frío y algunos
-// (cota, Q, 3D) pasaron de 30 s en la primera corrida de esta máquina.
-test.describe.configure({ mode: 'serial', timeout: 90_000 });
+// (cota, Q, 3D) pasaron de 30 s en la primera corrida de esta máquina. En CI
+// (3-6× más lento, `playwright.config.ts:13`) 240 s, como `arrangement-flow`:
+// en serial, un solo timeout tumba los 18 y repite el grupo entero.
+test.describe.configure({ mode: 'serial', timeout: process.env.CI ? 240_000 : 90_000 });
 test.afterAll(() => {
   if (process.env.SUPERFICIES_UPDATE) fijarBaseline(BASELINE, medidas);
 });
