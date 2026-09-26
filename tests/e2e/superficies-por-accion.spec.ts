@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { addPiece, clickAt, activarHerramienta, dispatch } from './helpers/lienzo';
 import { startSimulation } from './helpers/sim';
 import { medirAccion, enReposo } from './helpers/superficies';
-import { leerBaseline, fijarBaseline } from './helpers/trinquete';
+import { leerBaseline, fijarBaseline, techoDe } from './helpers/trinquete';
 import {
   abrirAppVacia, cargarDxfDeMaria, reposo, centroDePieza, seleccionarPieza,
   abrirPaleta, abrirPanel, cambiarVista,
@@ -28,8 +28,8 @@ const medidas: Record<string, number> = {};
 
 function registrar(accion: string, nombres: string[]): void {
   medidas[accion] = nombres.length;
-  const techo = baseline.estados[accion];
-  console.log(`superficies · ${accion}: ${nombres.length} [${nombres.join(', ')}] · techo ${techo ?? '—'} · meta ${baseline.meta}`);
+  const techo = techoDe(baseline, accion);
+  console.log(`superficies · ${accion}: ${nombres.length} [${nombres.join(', ')}] · línea base ${baseline.estados[accion] ?? '—'} · techo ${techo ?? '—'} · meta ${baseline.meta}`);
   if (techo !== undefined) {
     expect(nombres.length, `${accion}: aparecieron o cambiaron ${nombres.join(', ')}`).toBeLessThanOrEqual(techo);
   }

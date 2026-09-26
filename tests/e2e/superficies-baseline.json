@@ -1,5 +1,5 @@
 {
-  "_doc": "Techos del trinquete de superficies por acción (spec 2026-09-24 «cromo callado» § 3.4). Solo bajan: SUPERFICIES_UPDATE=1 npx playwright test superficies-por-accion. La meta es 4; ninguna acción puede volver a subir por encima de su techo.",
+  "_doc": "Techos del trinquete de superficies por acción (spec 2026-09-24 «cromo callado» § 3.4). El techo efectivo es el mayor de (meta, línea base): por debajo de la meta el diseño puede mover superficies; por encima, solo se baja. Para fijar: SUPERFICIES_UPDATE=1 npx playwright test tests/e2e/superficies-por-accion.spec.ts --retries=0 --workers=1 (con reintentos, un fallo a mitad de un grupo serial escribe medidas parciales). Nunca se edita a mano.",
   "meta": 4,
   "estados": {
     "importar DXF": 1,

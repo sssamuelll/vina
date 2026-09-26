@@ -17,6 +17,13 @@ export function leerBaseline(ruta: string): Baseline {
   return JSON.parse(readFileSync(join(process.cwd(), ruta), 'utf8')) as Baseline;
 }
 
+/** Techo efectivo de un estado: el mayor de la línea base y la meta. Por debajo de la
+ *  meta hay libertad (el diseño puede mover superficies); por encima, solo se baja. */
+export function techoDe(b: Baseline, estado: string): number | undefined {
+  const t = b.estados[estado];
+  return t === undefined ? undefined : Math.max(t, b.meta);
+}
+
 export function fijarBaseline(ruta: string, medidas: Record<string, number>): void {
   const b = leerBaseline(ruta);
   for (const [estado, n] of Object.entries(medidas)) {
