@@ -92,11 +92,13 @@ import { selectWorkflowStage } from '../../store/selectors';
 import './PatternEditor.css';
 
 /** Faja del dock 2D izquierdo, medida en navegador (no calculada): `.dock--left`
- *  da `x=14, ancho=54` — el borde derecho cae en 68. Los 54 salen de
- *  `Dock.css`: 7px de padding + 38px de icono + 7px de padding + 1px de
- *  `--surface-chrome-border` a cada lado (2px). Exportada para que el test
- *  de `handleZoomToFit` use el mismo valor en vez de repetirlo. */
-export const DOCK_WIDTH_PX = 68;
+ *  da `x=14, ancho=48` — el borde derecho cae en 62. Los 48 salen de
+ *  `Dock.css`: 4px de padding + 38px de icono + 4px de padding + 1px de
+ *  `--surface-chrome-border` a cada lado (2px). Hasta el 26-09 el padding era
+ *  7 y la faja 68. Lo mide `superficies-por-accion.spec.ts` contra su espejo
+ *  `DOCK_ANCHO`. Exportada para que el test de `handleZoomToFit` use el mismo
+ *  valor en vez de repetirlo. */
+export const DOCK_WIDTH_PX = 62;
 
 /** Lo que dura en la tira el desenlace de un gesto que no pasó nada (#1117):
  *  suficiente para leerlo, corto para no quedarse contestando el gesto de antes. */
