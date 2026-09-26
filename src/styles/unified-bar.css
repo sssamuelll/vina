@@ -22,9 +22,7 @@
   padding: 0 10px 0 12px;
   gap: 10px;
   box-shadow: var(--surface-overlay-shadow-recessed);
-  opacity: 0.92;
-  transition: border-radius 0.15s ease, background 0.18s ease,
-    box-shadow 0.18s ease, opacity 0.18s ease;
+  transition: border-radius 0.15s ease, background 0.18s ease, box-shadow 0.18s ease;
   /* User-select none on non-input areas for drag */
   user-select: none;
 }
@@ -36,7 +34,6 @@
   /* Sube del reposo al material `overlay` pleno. */
   background: var(--surface-overlay-bg);
   box-shadow: var(--surface-overlay-shadow);
-  opacity: 1;
 }
 /* When panel is open, flatten the top edge for seamless connection */
 .unified-bar--panel-open {
@@ -71,8 +68,8 @@
 }
 .unified-bar__mode-btn--active {
   color: var(--text-primary);
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-border);
 }
 .unified-bar__mode-btn svg { width: 16px; height: 16px; }
 
@@ -98,13 +95,13 @@
   background: none;
   border: none;
   outline: none;
-  font-size: 15px;
+  font-size: var(--text-3);
   color: var(--text-primary);
   user-select: text;
   cursor: text;
 }
 .unified-bar__input::placeholder {
-  color: var(--text-ghost);
+  color: var(--text-tertiary);
 }
 
 /* ─── Send Button (circular) ─── */
@@ -112,7 +109,7 @@
 .unified-bar__send {
   width: 40px;
   height: 40px;
-  background: var(--accent);
+  background: var(--accent-fuerte);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -121,8 +118,8 @@
   transition: opacity var(--transition-fast);
   cursor: pointer;
 }
-.unified-bar__send svg { width: 18px; height: 18px; color: #fff; }
-.unified-bar__send:hover { opacity: 0.85; }
+.unified-bar__send svg { width: 18px; height: 18px; color: var(--on-accent); }
+.unified-bar__send:hover { background: var(--accent); }
 .unified-bar__send:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* ─── Model badge (hidden by default, shown in settings) ─── */
@@ -130,8 +127,8 @@
 /* ─── Shortcut hint ─── */
 
 .unified-bar__shortcut {
-  font-size: 11px;
-  color: var(--text-dim);
+  font-size: var(--text-1);
+  color: var(--text-tertiary);
   background: var(--border-subtle);
   padding: 3px 8px;
   border-radius: 4px;
@@ -159,7 +156,7 @@
   max-height: 50vh;
   overflow-y: auto;
   animation: slide-up var(--transition-normal) ease-out;
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--surface-overlay-shadow);
 }
 
 /* ─── Chat Messages ─── */
@@ -177,13 +174,13 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--accent-fuerte);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   font-size: 9px;
-  color: white;
+  color: var(--on-accent);
   font-weight: var(--weight-semibold);
 }
 .chat-message__text {
@@ -229,7 +226,7 @@
 .chat-markdown ol { margin: 0 0 var(--sp-2); padding-left: 1.2em; }
 .chat-markdown li { margin: 2px 0; }
 .chat-markdown strong { color: var(--text-primary); font-weight: var(--weight-semibold); }
-.chat-markdown a { color: var(--accent); text-decoration: underline; }
+.chat-markdown a { color: var(--accent-ink); text-decoration: underline; }
 .chat-markdown code {
   font-family: var(--font-mono);
   font-size: 0.88em;

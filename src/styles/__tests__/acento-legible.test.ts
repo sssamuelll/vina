@@ -65,6 +65,12 @@ describe('nadie escribe el acento como tinta sobre el cromo', () => {
     'src/components/Viewport3D/CollisionBodyPanel.css',
     'src/components/Viewport3D/SnapshotBar.css',
     'src/components/Viewport3D/SurfaceModePill.css',
+    // Cromo callado (26-09): el shell entero escribe el acento con --accent-ink.
+    'src/styles/base.css',
+    'src/styles/floating.css',
+    'src/styles/unified-bar.css',
+    'src/components/shell/Dock.css',
+    'src/components/shell/ToolTooltip.css',
   ];
 
   it.each(FUENTES)('%s usa --accent-ink para el texto, no --accent', (ruta) => {

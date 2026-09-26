@@ -35,7 +35,7 @@
 .canvas-area__2d {
   position: relative;
   overflow: hidden;
-  background: #f5f3f0; /* Warm paper — 2D canvas needs a light bg for pattern visibility */
+  background: var(--canvas-2d); /* un solo papel: el del lienzo */
 }
 
 .canvas-area__divider {
@@ -59,7 +59,7 @@
   transition: background 0.15s ease;
 }
 .canvas-area__divider:hover {
-  background: rgba(99, 102, 241, 0.08);
+  background: var(--accent-subtle);
 }
 .canvas-area__divider:hover::after {
   background: var(--accent);

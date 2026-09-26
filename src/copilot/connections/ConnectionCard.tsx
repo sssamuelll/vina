@@ -35,7 +35,7 @@ const cardStyle: React.CSSProperties = {
 
 const cardActiveStyle: React.CSSProperties = {
   borderColor: 'var(--accent)',
-  background: 'rgba(99, 102, 241, 0.08)',
+  background: 'var(--accent-subtle)',
 };
 
 const cardDisabledStyle: React.CSSProperties = {
