@@ -32,10 +32,6 @@
   --text-disabled: oklch(0.48 0.006 80);  /* #5f5d5a */
   /* Alias con 81 consumidores; significa «terciario». No sumar consumidores. */
   --text-muted: var(--text-tertiary);
-  /* TRANSITORIOS (se retiran en la Tarea 13 del plan F1, cuando ya no tengan
-   * consumidores): vestían atajos e instrucciones a 3,6:1 y 2,2:1. */
-  --text-ghost: var(--text-tertiary);
-  --text-dim: var(--text-tertiary);
 
   /* ── Acento — uno, tono 248, tres roles (spec § 4.3) ────────────────
    *   --accent         bordes, tintes, tiradores, línea de selección
@@ -54,12 +50,8 @@
   --accent-ink: oklch(0.76 0.11 248);       /* #77b7f4 */
   --accent-subtle: oklch(0.60 0.16 248 / 14%);
   --accent-border: oklch(0.60 0.16 248 / 30%);
-  /* TRANSITORIO: era el segundo nombre de --accent-ink. Tarea 13. */
-  --accent-hover: var(--accent-ink);
   /* El único segundo tono del sistema: «esto lo hizo la IA». Nunca «activo». */
   --ai: oklch(0.72 0.13 295);               /* #ab93ed · 7,13:1 sobre surface */
-  --dock-auto: var(--ai);                   /* TRANSITORIO → Tarea 13 */
-  --ai-2d: var(--ai);                       /* TRANSITORIO → Tarea 13 */
   /* Tinta sobre un relleno de acento o destructivo. */
   --on-accent: #ffffff;
 

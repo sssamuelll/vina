@@ -99,7 +99,7 @@
   cursor: pointer;
   /* Esto NO es consecuencia de limpiar el respaldo: es un arreglo de contraste
    * aparte. El respaldo que había (blanco al 45%) estaba MUERTO —tokens.css
-   * entra global vía base.css:1, así que --text-dim resolvía siempre—, o sea
+   * entra global vía base.css:1, así que --text-dim (hoy --text-tertiary) resolvía siempre—, o sea
    * que la equis llevaba 1,96:1 desde el primer día y borrarlo no cambia un
    * píxel. --text-dim es la tinta de lo inerte (deshabilitado); un botón que se
    * pulsa lleva --text-muted, que da 4,87:1 y ya es el par reposo/hover con
