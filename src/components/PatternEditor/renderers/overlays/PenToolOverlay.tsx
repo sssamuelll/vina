@@ -114,7 +114,7 @@ export default function PenToolOverlay({
             <path
               d={guidePath}
               fill="none"
-              stroke="rgba(74, 158, 255, 0.4)"
+              stroke="var(--accent-2d)" strokeOpacity={0.4}
               strokeWidth={1 / zoom2D}
               strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`}
             />
