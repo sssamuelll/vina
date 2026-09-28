@@ -60,9 +60,12 @@ describe('ladoDelHit — traducir la convención de nearestSegment', () => {
   /**
    * Dos anillos: el hueco que la sesión de #1143 señaló y que no tenía oráculo.
    * `indiceSegunLosBordes` retrocede hasta la `M` de SU subtrazo, y esto lo
-   * fija. Hoy `nearestSegment` no alcanza el segundo anillo —solo mide una
-   * cuerda de cierre y rotula con la PRIMERA `Z`—, así que el caso llega por
-   * código, no por ratón; el día que lo alcance, esta prueba ya está puesta.
+   * fija.
+   *
+   * Decía aquí que el caso llegaba por código y no por ratón, porque
+   * `nearestSegment` no alcanzaba el segundo anillo. Ese día llegó: #1205 lo
+   * arregló el 2026-09-19 y ahora el hit-test nombra la `Z` de cada anillo,
+   * así que esto se ejerce con el ratón.
    */
   it('con dos subtrazos, la Z del segundo apunta a la M del segundo', () => {
     const dosAnillos: PathCommand[] = [

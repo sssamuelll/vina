@@ -314,11 +314,30 @@ export function hitTestNode(
 /**
  * Find the nearest segment in an outline to a given point.
  * Returns the commandIndex, t parameter, distance, and the projected point.
- * Also checks the closing segment (last anchor back to first anchor).
+ * Each SUBPATH also contributes its own closing segment (its last anchor back
+ * to its `M`), labelled with that subpath's `Z`.
  *
  * For C/Q bezier segments, distance is computed by sampling the curve as a
  * polyline (cubic at 20 points, quadratic at 10) to ensure clicks on the
  * visible arc register accurately.
+ *
+ * SUBPATHS ARE NOT OPTIONAL HERE (#1205). Walking the anchors flat, as this
+ * did until 2026-09-19, breaks a piece with a hole in two visible ways:
+ * it invents a side between the last anchor of one ring and the `M` of the
+ * next, and it collapses both real closings into a single chord across the
+ * piece labelled with `findIndex(c => c.type === 'Z')` — always the FIRST `Z`.
+ * Measured on `M0 L1 L2 L3 Z4 M5 L6 L7 L8 Z9`: clicking either real closing
+ * side returned the other ring's `M`, and a phantom chord nobody draws was the
+ * nearest target at 0 mm across a wide band of fabric. Composite outlines are
+ * reachable: `svgImport.ts` accepts an `M` mid-path.
+ *
+ * Third door onto the same object. The other two are `rangoMedibleDeBorde`
+ * (the RANGE) and `indiceSegunLosBordes` (the INDEX), both in
+ * `src/utils/semanticEdges.ts`, whose headers carry what each one cost.
+ *
+ * An OPEN subpath still contributes a phantom closing segment, labelled with
+ * its own `M` — callers reject an `M` hit precisely because nothing is drawn
+ * there (`findInsertTarget`, `usePointTool`, `useEditPattern`).
  */
 export function nearestSegment(
   point: Point2D,
@@ -327,18 +346,61 @@ export function nearestSegment(
 ): SegmentHit | null {
   let bestHit: SegmentHit | null = null;
 
-  // Collect anchors with their command indices
-  const anchors: { index: number; pos: Point2D }[] = [];
+  // Split the outline into subpaths: every `M` opens one, and its `Z` (if any)
+  // is the command that draws its closing side.
+  // `closeIndex === null` means this subpath contributes NO closing segment.
+  // `heredado` is the point drawing RESUMES from when a subpath is not opened
+  // by an `M` — per SVG, that is the start of the previous subpath.
+  interface Subpath {
+    anchors: { index: number; pos: Point2D }[];
+    closeIndex: number | null;
+    heredado: Point2D | null;
+  }
+  const subpaths: Subpath[] = [];
+  let actual: Subpath | null = null;
+  let inicio: Point2D | null = null;
   for (let i = 0; i < outline.length; i++) {
-    const a = getAnchor(outline[i]);
-    if (a) {
-      anchors.push({ index: i, pos: a });
+    const cmd = outline[i];
+    if (cmd.type === 'Z') {
+      // A `Z` CLOSES the subpath — an `M` is not the only thing that ends one.
+      // `svgImport.ts` emits `Z` and resets the current point without a
+      // synthetic `M`, so `d="M… Z L… Z"` arrives exactly like this. Letting
+      // `actual` survive fused both rings back together: the invented side
+      // came back, and the second `Z` overwrote the first one's label, making
+      // the first ring's closing side unreachable for good.
+      if (actual) { actual.closeIndex = i; actual = null; }
+      continue;
     }
+    const a = getAnchor(cmd);
+    if (!a) continue;
+    if (cmd.type === 'M') {
+      inicio = a;
+      actual = { anchors: [], closeIndex: i, heredado: null };
+      subpaths.push(actual);
+    } else if (!actual) {
+      // Drawing resumed without an `M`: after a bare `Z`, or a malformed
+      // outline that never opened one. Per SVG the pen is back at the start
+      // of the previous subpath, so THAT segment is real and must be hit-
+      // testable; `heredado` carries it. With no previous start there is
+      // nothing to close against, so this subpath gets no phantom closing —
+      // the old fallback of `0` named whatever `outline[0]` happened to be,
+      // and on an outline that does not open with `M` that is a DRAWN
+      // command, which the `'M'` guards downstream do not reject.
+      actual = { anchors: [], closeIndex: null, heredado: inicio };
+      subpaths.push(actual);
+    }
+    actual.anchors.push({ index: i, pos: a });
   }
 
-  if (anchors.length < 2) return null;
+  for (const sub of subpaths) {
+  // The inherited start is a point, not a command, so it never labels a hit:
+  // the segment loop starts at index 1 and only ever names `curr`.
+  const anchors = sub.heredado
+    ? [{ index: -1, pos: sub.heredado }, ...sub.anchors]
+    : sub.anchors;
+  if (anchors.length < 2) continue;
 
-  // Check each segment between consecutive anchors
+  // Check each segment between consecutive anchors OF THIS SUBPATH
   for (let i = 1; i < anchors.length; i++) {
     const prev = anchors[i - 1];
     const curr = anchors[i];
@@ -377,32 +439,30 @@ export function nearestSegment(
     }
   }
 
+  // Closing segment OF THIS SUBPATH: its last anchor back to its own `M`,
+  // named by its own `Z` (or by that `M` when the subpath is open).
   // Una línea abierta no tiene cierre (spec 2026-09-24 § 3.4): pedirlo con
   // `cierre: false` evita que el fantasma tape un tramo real.
-  if (opciones.cierre !== false) {
-    // Check closing segment: last anchor back to first anchor
-    const first = anchors[0];
-    const last = anchors[anchors.length - 1];
-    const closingHit = distToSegmentWithT(
-      point.x, point.y,
-      last.pos.x, last.pos.y,
-      first.pos.x, first.pos.y,
-    );
+  const first = anchors[0];
+  const last = anchors[anchors.length - 1];
+  const closingHit = distToSegmentWithT(
+    point.x, point.y,
+    last.pos.x, last.pos.y,
+    first.pos.x, first.pos.y,
+  );
 
-    // The closing segment's commandIndex: use the Z command index if it exists,
-    // otherwise use 0 (the M command). Convention: we use the index of the Z command
-    // or fallback to the first anchor.
-    const zIndex = outline.findIndex(c => c.type === 'Z');
-    const closingIdx = zIndex >= 0 ? zIndex : 0;
-
-    if (!bestHit || closingHit.distance < bestHit.distance) {
-      bestHit = {
-        commandIndex: closingIdx,
-        t: closingHit.t,
-        distance: closingHit.distance,
-        point: closingHit.point,
-      };
-    }
+  if (
+    opciones.cierre !== false &&
+    sub.closeIndex !== null &&
+    (!bestHit || closingHit.distance < bestHit.distance)
+  ) {
+    bestHit = {
+      commandIndex: sub.closeIndex,
+      t: closingHit.t,
+      distance: closingHit.distance,
+      point: closingHit.point,
+    };
+  }
   }
 
   return bestHit;
@@ -517,7 +577,14 @@ export function splitSegmentAt(
       // Closing segment (last anchor → first anchor). Insert an L before the
       // Z so the closing edge of a closed piece is splittable like any other
       // — nearestSegment maps clicks on this edge to the Z command's index.
-      const firstAnchor = getAnchor(cmds[0]);
+      // `getClosingAnchor`, no `cmds[0]`: la `M` que hay que alcanzar es la
+      // que ABRE este subcamino, no la del primero. Con un solo anillo las dos
+      // coinciden y esto acertó por casualidad durante años; desde #1205 el
+      // hit-test nombra la `Z` de cada anillo, y partir el cierre de un
+      // agujero insertaba el punto en mitad de la tela. Las dos hermanas de
+      // esta rama —`convertToCurve` aquí abajo y `convertSegmentToSpline` en
+      // `splineSegment.ts`— ya lo hacían bien; esta era la única que no.
+      const firstAnchor = getClosingAnchor(cmds, commandIndex);
       if (!firstAnchor) return cmds;
       const midX = prevAnchor.x + t * (firstAnchor.x - prevAnchor.x);
       const midY = prevAnchor.y + t * (firstAnchor.y - prevAnchor.y);

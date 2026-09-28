@@ -2,7 +2,24 @@
 import type { PathCommand, Point2D } from '../../types/types';
 import { gaussLegendreCubicBezierLength } from './arcLength';
 
-/** Get the start and end points of an edge at edgeIndex in a PathCommand array. */
+/**
+ * Get the start and end points of an edge at edgeIndex in a PathCommand array.
+ *
+ * A `Z` closes against the `M` that OPENS ITS SUBPATH, not against
+ * `commands[0]` (#1205). With a single ring the two coincide and resolving to
+ * `commands[0]` was right by accident; on a piece with a hole it reported the
+ * hole's closing side as a chord running to the outer corner. Measured on
+ * `M0 L1 L2 L3 Z4 M5 L6 L7 L8 Z9`: edge 9 came back as (50,70)→(0,0), 86.02 mm
+ * long, instead of (50,70)→(50,30), 40 mm.
+ *
+ * It is the same convention `getClosingAnchor` already implements in
+ * `nodeEditorUtils.ts`; here the subpath start falls out of the walk for free.
+ *
+ * Who showed it: `usePointTool` builds `sideEnds` from this and `ToolOverlay`
+ * draws that guide on hover, so the tool promised a side that is not drawn.
+ * It also feeds `sewingUtils.buildEdgeSelection` — which decides what gets
+ * sewn — plus the elastic, topstitch and POM tools.
+ */
 export function getEdgeEndpoints(
   commands: PathCommand[],
   edgeIndex: number,
@@ -10,20 +27,19 @@ export function getEdgeEndpoints(
   if (edgeIndex < 1 || edgeIndex >= commands.length) return null;
 
   let cx = 0, cy = 0;
+  // Arranque del subcamino en curso: a él vuelve su propia `Z`.
+  let sx = 0, sy = 0;
   for (let i = 0; i < edgeIndex; i++) {
     const cmd = commands[i];
     const v = cmd.values;
     switch (cmd.type) {
-      case 'M': case 'L': cx = v[0]; cy = v[1]; break;
+      case 'M': cx = v[0]; cy = v[1]; sx = cx; sy = cy; break;
+      case 'L': cx = v[0]; cy = v[1]; break;
       case 'H': cx = v[0]; break;
       case 'V': cy = v[0]; break;
       case 'C': cx = v[4]; cy = v[5]; break;
       case 'Q': cx = v[2]; cy = v[3]; break;
-      case 'Z': {
-        const m = commands[0];
-        if (m.type === 'M') { cx = m.values[0]; cy = m.values[1]; }
-        break;
-      }
+      case 'Z': cx = sx; cy = sy; break;
     }
   }
   const start = { x: cx, y: cy };
@@ -37,11 +53,10 @@ export function getEdgeEndpoints(
     case 'V': end = { x: cx, y: v[0] }; break;
     case 'C': end = { x: v[4], y: v[5] }; break;
     case 'Q': end = { x: v[2], y: v[3] }; break;
-    case 'Z': {
-      const m = commands[0];
-      end = m.type === 'M' ? { x: m.values[0], y: m.values[1] } : start;
+    case 'Z':
+      // `sx`/`sy` es la `M` de ESTE subcamino: el bucle de arriba la dejó ahí.
+      end = { x: sx, y: sy };
       break;
-    }
     default: return null;
   }
 
@@ -77,11 +92,11 @@ export function getEdgePathD(
       return `M${sx},${sy} C${cmd.values[0] + offsetX},${cmd.values[1] + offsetY},${cmd.values[2] + offsetX},${cmd.values[3] + offsetY},${cmd.values[4] + offsetX},${cmd.values[5] + offsetY}`;
     case 'Q':
       return `M${sx},${sy} Q${cmd.values[0] + offsetX},${cmd.values[1] + offsetY},${cmd.values[2] + offsetX},${cmd.values[3] + offsetY}`;
-    case 'Z': {
-      const m = commands[0];
-      if (m.type === 'M') return `M${sx},${sy} L${m.values[0] + offsetX},${m.values[1] + offsetY}`;
-      return null;
-    }
+    case 'Z':
+      // El otro extremo ya lo resolvió `getEdgeEndpoints` contra la `M` de su
+      // subcamino; recalcularlo desde `commands[0]` era la tercera copia del
+      // mismo descuido.
+      return `M${sx},${sy} L${ep.end.x + offsetX},${ep.end.y + offsetY}`;
     default:
       return null;
   }
