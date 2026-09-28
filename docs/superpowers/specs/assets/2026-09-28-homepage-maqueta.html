@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vina — Patronaje y simulación 3D en el navegador</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--papel:#F4EFE6;--papel-hundido:#EBE7DE;--tinta:#1E1B18;--tinta-70:#5E5B56;--tinta-50:#89857F;--hairline:rgba(30,27,24,.12);--senal:#C0472B;--senal-texto:#B34228;--oro:#F0D08A;--ink:#2b2d33;--ink2:#6f7480;--chrome:#151411;--papel-60:#9E9A94}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--papel)}
+body{color:var(--tinta);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-feature-settings:"cv01","ss03";font-size:16px;line-height:1.5}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+a{color:inherit;text-decoration:none}
+.wrap{width:min(1280px,100% - 48px);margin-inline:auto}
+/* cabecera */
+header{height:56px;border-bottom:1px solid var(--hairline);background:rgba(244,239,230,.85)}
+header .wrap{height:100%;display:flex;align-items:center;justify-content:space-between}
+.logo{height:28px;width:auto;display:block}
+nav{display:flex;align-items:center;gap:28px;font-size:14px;color:var(--tinta-70)}
+.pill{display:inline-flex;align-items:center;height:36px;padding:0 18px;border-radius:999px;background:var(--tinta);color:var(--papel);font-size:14px;font-weight:500}
+/* hero */
+.hero{position:relative;overflow:hidden;background:
+  linear-gradient(rgba(30,27,24,.055) 1px,transparent 1px) 0 0/100px 100px,
+  linear-gradient(90deg,rgba(30,27,24,.055) 1px,transparent 1px) 0 0/100px 100px,
+  linear-gradient(rgba(30,27,24,.028) 1px,transparent 1px) 0 0/20px 20px,
+  linear-gradient(90deg,rgba(30,27,24,.028) 1px,transparent 1px) 0 0/20px 20px}
+.hero .wrap{display:grid;grid-template-columns:520px 1fr;grid-template-rows:auto auto;column-gap:56px;padding-top:28px;padding-bottom:0}
+.hero .texto{grid-column:1;grid-row:1}
+.hero .pattern{grid-column:2;grid-row:1/3}
+.hero .inset{grid-column:1;grid-row:2;align-self:end}
+h1{font-size:48px;line-height:1.05;font-weight:500;letter-spacing:-0.03em;text-wrap:balance}
+.lead{margin-top:18px;font-size:17px;color:var(--tinta-70);max-width:480px}
+.cta{margin-top:26px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;height:44px;padding:0 22px;border-radius:999px;font-size:15px;font-weight:500}
+.btn-primary{background:var(--tinta);color:var(--papel)}
+.btn-ghost{border:1px solid rgba(30,27,24,.28)}
+.meta{margin-top:16px;font-size:12px;color:var(--tinta-70)}
+.pattern{position:relative;height:540px}
+.pattern svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.cotachip{position:absolute;left:34%;top:82%;height:22px;padding:0 9px;border-radius:3px;background:var(--senal);color:#fff;font-size:12px;line-height:22px;white-space:nowrap}
+.inset{margin-top:32px;position:relative;height:300px;border:1px solid var(--hairline);border-bottom:0;border-radius:4px 4px 0 0;background:linear-gradient(180deg,#2a2825 0%,#1f1d1a 100%);overflow:hidden}
+.inset svg{position:absolute;inset:0;width:100%;height:100%}
+.ind{position:absolute;left:10px;top:8px;font-size:10px;color:#b7b4af;display:flex;align-items:center;gap:6px}
+.ind i{width:6px;height:6px;border-radius:50%;background:#4eb068;display:inline-block}
+.prov{position:absolute;right:10px;top:8px;font-size:9px;color:#8f8c87;letter-spacing:.04em}
+/* secciones */
+section{padding:96px 0}
+.eyebrow{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--tinta-70);font-weight:500}
+h2{margin-top:10px;font-size:32px;line-height:1.1;font-weight:500;letter-spacing:-0.02em;max-width:640px;text-wrap:balance}
+.intro{margin-top:14px;font-size:17px;color:var(--tinta-70);max-width:560px}
+.fig{margin-top:40px;border:1px solid var(--hairline);border-radius:4px;overflow:hidden;background:var(--chrome)}
+.fig img{display:block;width:100%;height:620px;object-fit:cover;object-position:top}
+.figcap{margin-top:12px;font-size:12px;color:var(--tinta-70);display:flex;justify-content:space-between;gap:16px}
+.cols{margin-top:56px;display:grid;grid-template-columns:repeat(3,1fr);column-gap:32px}
+.cols>div{padding-top:18px;border-top:1px solid var(--hairline)}
+.cols h3{font-size:20px;font-weight:500;letter-spacing:-0.01em}
+.cols p{margin-top:8px;font-size:15px;color:var(--tinta-70)}
+/* formatos */
+.formatos{background:var(--papel-hundido)}
+.fila{margin-top:36px;display:grid;grid-template-columns:120px 1fr;column-gap:24px;padding:18px 0;border-top:1px solid var(--hairline);font-size:14px}
+.fila:last-child{border-bottom:1px solid var(--hairline)}
+.fila b{font-weight:500;color:var(--tinta)}
+.fila span{color:var(--tinta-70)}
+/* cierre */
+.cierre{background:var(--tinta);color:var(--papel)}
+.cierre h2{color:var(--papel)}
+.cierre .intro{color:var(--papel-60)}
+.cierre .btn-primary{background:var(--papel);color:var(--tinta)}
+.cierre .btn-ghost{border-color:rgba(244,239,230,.35);color:var(--papel)}
+.repo{margin-top:40px;font-size:13px;color:var(--papel-60)}
+.repo em{font-style:normal;color:var(--papel);background:rgba(240,208,138,.18);padding:2px 6px}
+footer{border-top:1px solid var(--hairline);padding:28px 0;font-size:13px;color:var(--tinta-70)}
+footer .wrap{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}
+footer nav{gap:20px;font-size:13px}
+@media (max-width:720px){
+  .wrap{width:min(1280px,100% - 32px)}
+  nav a{display:none}
+  .hero .wrap{grid-template-columns:1fr;grid-template-rows:none;padding-top:32px}
+  .hero .texto,.hero .pattern,.hero .inset{grid-column:1;grid-row:auto}
+  .hero .texto{order:1}.hero .pattern{order:2}.hero .inset{order:3}
+  h1{font-size:36px}
+  .lead{font-size:17px}
+  .pattern{height:420px;margin-top:28px}
+  .cotachip{left:30%;top:80%}
+  .inset{height:240px;margin-top:0}
+  .prov{display:none}
+  .fig img{height:auto}
+  section{padding:64px 0}
+  h2{font-size:28px}
+  .fig img{height:260px}
+  .figcap{flex-direction:column;gap:4px}
+  .cols{grid-template-columns:1fr;row-gap:24px;margin-top:40px}
+  .fila{grid-template-columns:1fr;row-gap:6px}
+}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <img class="logo" src="logo.svg" alt="Vina">
+  <nav><a href="#taller">Producto</a><a href="#formatos">Formatos</a><a href="#copiloto">Copiloto</a><a href="#codigo">Código</a><a class="pill" href="/app/" style="display:inline-flex">Abrir Vina</a></nav>
+</div></header>
+
+<section class="hero" style="padding:0"><div class="wrap">
+  <div class="texto">
+    <h1>Traza el patrón, mira la caída.</h1>
+    <p class="lead">Vina es un CAD de patronaje que se abre en el navegador: patrón 2D editable, tela simulada en tiempo real y un copiloto que entiende de pinzas y costuras.</p>
+    <div class="cta"><a class="btn btn-primary" href="/app/">Abrir Vina</a><a class="btn btn-ghost" href="#codigo">Ver el código</a></div>
+    <p class="meta mono">Gratis y de código abierto · Sin cuenta · Tus proyectos se guardan en tu navegador</p>
+  </div>
+    <div class="inset">
+      <svg viewBox="0 0 540 300" preserveAspectRatio="xMidYMin slice" aria-hidden="true">
+        <defs><linearGradient id="tela" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E6C67C"/><stop offset=".55" stop-color="#F0D08A"/><stop offset="1" stop-color="#CBAA5F"/></linearGradient></defs>
+        <g fill="#3b3733"><circle cx="270" cy="60" r="24"/><path d="M256 84h28l6 18 24 10 38 80-13 6-32-60 4 200h-20l-8-115h-6l-8 115h-20l4-200-32 60-13-6 38-80 24-10z"/></g>
+        <path d="M238 114c10-6 54-6 64 0 6 14 10 32 12 54 3 30-2 76-4 118-3 58 2 92 6 110H224c4-18 9-52 6-110-2-42-7-88-4-118 2-22 6-40 12-54z" fill="url(#tela)"/>
+        <g fill="none" stroke="rgba(60,40,10,.22)" stroke-width="1.2"><path d="M254 176c-4 60-2 120 0 210"/><path d="M270 186c0 60 2 120 4 210"/><path d="M288 176c4 60 2 120-2 210"/></g>
+      </svg>
+      <div class="ind mono"><i></i>Simulando · WebGPU</div>
+      <div class="prov mono">GRABACIÓN REAL DEL PRODUCTO · PROVISIONAL</div>
+    </div>
+  <div class="pattern">
+    <svg viewBox="0 0 720 600" aria-hidden="true">
+      <rect x="60" y="20" width="176" height="14" fill="#F0D08A" opacity=".55"/>
+      <g fill="#ffffff" stroke="#2b2d33" stroke-width="1.25" stroke-linejoin="round">
+        <path d="M60 78 L150 40 C 165 30, 200 30, 215 40 L 232 60 C 250 40, 290 40, 308 60 L 325 40 L 415 78 C 412 120, 405 170, 405 230 C 405 300, 400 360, 398 420 C 397 470, 400 510, 402 540 L 74 540 C 76 510, 79 470, 78 420 C 76 360, 71 300, 71 230 C 71 170, 64 120, 60 78 Z"/>
+        <path d="M470 220 C 490 150, 540 100, 600 100 C 660 100, 700 150, 712 220 C 700 240, 690 300, 685 360 C 680 420, 676 470, 672 500 L 528 500 C 524 470, 520 420, 515 360 C 510 300, 500 240, 470 220 Z"/>
+      </g>
+      <g fill="none" stroke="#6f7480" stroke-width="1" stroke-dasharray="4 4">
+        <path d="M72 88 L152 54 C 166 45, 199 45, 213 54 L 232 76 C 250 58, 290 58, 308 76 L 327 54 L 403 88 C 400 130, 393 176, 393 232 C 393 300, 388 360, 386 420 C 385 468, 388 504, 390 528 L 86 528 C 88 504, 91 468, 90 420 C 88 360, 83 300, 83 232 C 83 176, 76 130, 72 88 Z"/>
+      </g>
+      <g stroke="#6f7480" stroke-width="1" fill="none">
+        <path d="M238 130 V 470"/><path d="M231 140 L238 128 L245 140"/><path d="M231 460 L238 472 L245 460"/>
+        <path d="M600 160 V 470"/><path d="M593 170 L600 158 L607 170"/><path d="M593 460 L600 472 L607 460"/>
+      </g>
+      <g stroke="#2b2d33" stroke-width="1.25" fill="none">
+        <path d="M71 300 l10 -3"/><path d="M405 300 l-10 -3"/><path d="M60 78 l8 8"/><path d="M415 78 l-8 8"/>
+        <path d="M528 300 l9 -2"/><path d="M685 300 l-9 -2"/><path d="M600 100 v10"/>
+      </g>
+      <path d="M150 540 L 185 400 L 220 540" fill="none" stroke="#2b2d33" stroke-width="1.25"/>
+      <g stroke="#C0472B" stroke-width="1" fill="none"><path d="M74 566 H 402"/><path d="M74 560 v12"/><path d="M402 560 v12"/></g>
+      <g font-family="JetBrains Mono, monospace" font-size="11" fill="#6f7480">
+        <text x="96" y="115">DELANTERO · ×1 · AL DOBLEZ</text>
+        <text x="540" y="140">MANGA · ×2</text>
+        <text x="60" y="30">CAMISA_BASE_v4 · T38 · mm</text>
+      </g>
+    </svg>
+    <div class="cotachip mono">328 mm · dobladillo</div>
+  </div>
+</div></section>
+
+<section id="taller"><div class="wrap">
+  <p class="eyebrow mono">Fig 0.1 · El taller</p>
+  <h2>Tal como se abre. Sin cuenta, sin instalar.</h2>
+  <p class="intro">Un lienzo de papel con tu patrón, un visor 3D con el avatar, y las herramientas de siempre en el orden de siempre.</p>
+  <div class="fig"><picture><source media="(max-width:720px)" srcset="canvas2d.png"><img src="taller-2d.png" alt="El lienzo 2D de Vina con el patrón de una camisa"></picture></div>
+  <p class="figcap mono"><span>Patrón real importado de un DXF · pieza seleccionada con su cota</span><span>Chromium · 1600 × 1000</span></p>
+  <div class="cols">
+    <div><h3>Trazado</h3><p>Pluma, rectángulo, pinzas, piquetes y márgenes de costura. Las cotas se escriben donde miden.</p></div>
+    <div><h3>Costura</h3><p>Coser piezas automáticamente o borde a borde. Las costuras se ven en el 2D y se cierran en el 3D.</p></div>
+    <div><h3>Caída</h3><p>Tela simulada en tiempo real sobre el avatar, con WebGPU dentro del navegador. Mapas de ajuste desde el primer fotograma.</p></div>
+  </div>
+</div></section>
+
+<section id="formatos" class="formatos"><div class="wrap">
+  <p class="eyebrow mono">Formatos</p>
+  <h2>Abre tu DXF y míralo caer.</h2>
+  <p class="intro">Lo que trazas en el lienzo es lo que lee la cortadora. Importa el patrón que ya tienes y expórtalo como salió.</p>
+  <div class="fila"><b>Lee</b><span class="mono">DXF-AAMA · DXF-ASTM · Gerber · SVG · ZPRJ (CLO)</span></div>
+  <div class="fila"><b>Escribe</b><span class="mono">DXF-AAMA · DXF por tallas · PDF de corte · BOM (CSV) · glTF · USDZ · OBJ · FBX</span></div>
+</div></section>
+
+<section id="copiloto"><div class="wrap">
+  <p class="eyebrow mono">Fig 0.2 · El copiloto</p>
+  <h2>Un copiloto que habla de costuras.</h2>
+  <p class="intro">Pídele que añada una pinza, que audite los márgenes o que cosa las piezas: usa las mismas herramientas que tú, y cada cambio se puede deshacer. Con tu propia clave de API.</p>
+  <div class="fig"><img src="taller-paleta.png" alt="La barra de comandos de Vina con las acciones del taller" style="object-position:center 30%;height:560px"></div>
+  <p class="figcap mono"><span>Cada verbo del taller está en la barra: coser, vestir, escalar, marcar, exportar</span><span>Fig 0.2</span></p>
+</div></section>
+
+<section id="codigo" class="cierre"><div class="wrap">
+  <p class="eyebrow mono" style="color:var(--papel-60)">Código</p>
+  <h2>Abierto, y se queda abierto.</h2>
+  <p class="intro">Vina es software libre bajo licencia MIT. El código, los tests y las decisiones de diseño están en el repositorio.</p>
+  <div class="cta"><a class="btn btn-primary" href="/app/">Abrir Vina</a><a class="btn btn-ghost" href="https://github.com/sssamuelll/vina">Ver el código</a></div>
+  <p class="repo mono">github.com/sssamuelll/vina · <em>MIT</em> · v0.11</p>
+</div></section>
+
+<footer><div class="wrap">
+  <span>© 2026 Vina · Patronaje y simulación 3D en el navegador</span>
+  <nav><a href="#taller">Producto</a><a href="#formatos">Formatos</a><a href="#copiloto">Copiloto</a><a href="#codigo">Código</a></nav>
+</div></footer>
+</body>
+</html>
