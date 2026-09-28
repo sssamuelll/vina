@@ -74,7 +74,9 @@ export function agarrar(
   let mejorTramo: { agarre: Agarre; rango: number } | null = null;
   lineas.forEach((linea, i) => {
     const hit = nearestSegment(punto, linea.path, { cierre: linea.path.some(c => c.type === 'Z') });
-    if (!hit || hit.distance >= radio) return;
+    // Un hit en una `M` es el cierre fantasma de un subcamino abierto: ahí no
+    // se dibuja nada (#1205).
+    if (!hit || hit.distance >= radio || linea.path[hit.commandIndex]?.type === 'M') return;
     const rango = rangoDeTramo(linea.clave, i, lineas.length, elegida);
     const gana = mejorTramo === null
       || hit.distance < mejorTramo.agarre.distancia

@@ -22,6 +22,16 @@ const ARRIBA = linea(claveDeInterna('A'), [{ type: 'M', values: [0, 0] }, { type
 const R = 8;
 
 describe('agarrar', () => {
+  it('el cierre fantasma de un subcamino abierto no se agarra (#1205)', () => {
+    // Un anillo cerrado da `cierre: true` a todo el path; el subcamino abierto
+    // de después aporta un cierre fantasma (400,100)→(300,0) rotulado con su `M`.
+    const MIXTO = linea(CLAVE_CONTORNO, [
+      ...RECT.path,
+      { type: 'M', values: [300, 0] }, { type: 'L', values: [400, 0] }, { type: 'L', values: [400, 100] },
+    ]);
+    expect(agarrar([MIXTO], { x: 350, y: 50 }, R, null)).toBeNull();
+  });
+
   it('un punto gana a un tramo dentro de 8 px', () => {
     expect(agarrar([RECT], { x: 3, y: 1 }, R, null)).toMatchObject({ tipo: 'punto', clave: CLAVE_CONTORNO, commandIndex: 0 });
   });
