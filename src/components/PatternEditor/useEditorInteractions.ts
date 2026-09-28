@@ -44,19 +44,13 @@ import { DRAG_THRESHOLD_PX, isDrag } from './gestureConstants';
 import { pushJournal } from '../../utils/telemetry/journal';
 import { MEASURE_TOOL_IDS } from '../../store/toolActivation';
 import { hayModalDelante } from '../../utils/superficieModal';
+import { isEditableTarget } from '../../utils/editableTarget';
 
 /** Los tres modos de Pespunte que DIBUJAN. `topstitchEdit` queda fuera a
  *  propósito: no tiene gesto a medias que cancelar, así que sus teclas no son
  *  suyas y deben seguir su camino al atajo global (#1115). */
 const TOPSTITCH_TOOL_IDS = new Set(['topstitchSeamline', 'topstitchSegment', 'topstitchFree']);
 const zoomCeilingToastLimiter = createTimeWindowLimiter(3000);
-
-/** Un campo editable es dueño de sus teclas: el router no las toca (spec 2026-08-29 § 8). */
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
-}
 
 // ─── Sondas de la bitácora (spec caja-negra-bitacora § 3.2) ─────────────────
 // El router es la puerta por la que pasan todos los mousedown/up/keydown de
@@ -218,6 +212,8 @@ interface ToolHooks {
     handleDoubleClick: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     limpiarHover: () => void;
     getCursor: () => string;
+    /** Qué agarraría el press en la pieza en edición (spec 2026-09-24 § 3.4). */
+    agarreEn?: (e: React.MouseEvent<SVGSVGElement>) => unknown;
   };
   scissorsTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -876,9 +872,12 @@ export function useEditorInteractions(
       // estado y BORRA la selección de puntos, así que el clic derecho sobre
       // otra pieza dejaba el menú sin sujeto. La guarda de abajo cubría solo la
       // mitad del recorrido — lo señaló la revisión adversarial del 06-09.
+      // Salvo que el press agarre algo de la pieza en edición: entonces gana
+      // ella aunque otra pieza la tape (spec 2026-09-24 § 3.4, «en Q, la que se
+      // está editando»).
       const clicked = (e.target as SVGElement)
         .closest('[data-piece-id]')?.getAttribute('data-piece-id');
-      if (e.button === 0 && clicked && clicked !== editPattern.editingPieceId) {
+      if (e.button === 0 && clicked && clicked !== editPattern.editingPieceId && !editPattern.agarreEn?.(e)) {
         editPattern.enterEdit(clicked);
         return;
       }

@@ -244,3 +244,25 @@ Las tres son de la gramática del tramo congelado (#1129, cotas vivas § 5.4) y 
 > *"tienen que ser o a mano alzada o editables 100%"*
 
 Vina no adivina números. Ningún imán a valores «bonitos» en ninguna herramienta: el ratón da lo que da, y el número exacto se escribe. Queda como regla de producto, no como opción descartada.
+
+---
+
+## 9. Firma del 23-09 — Shift, respecto a la hoja
+
+Las quejas 3, 12 y 23 (*"le estaba dando al shift, pero no me hace nada"*) tenían la regla escrita desde el 08-09 (§ 3.4: múltiplos de 45° mientras se mantiene), pero no decían **respecto a qué**. Con la firma D2 la píldora ya lee el ángulo desde el borde, y en un borde inclinado «perpendicular al borde» y «vertical de la hoja» son líneas distintas. La pregunta se le puso delante con capturas reales (artefacto «Shift y la perpendicular», `https://claude.ai/artifact/Qyea31bCA895AcJTftLXxE`). Firma leída de la base del artefacto (`firmas/shift`): **B, respecto a la hoja**, el 23-09 a las 10:38 (+0200). El campo «Quién firma» quedó vacío; la nota habla en primera persona como patronista. La nota, textual, con su ortografía:
+
+> *"A ver las dos opciones han sido difíciles para mi, en cuanto a decantarme por una u otra, porque es importante poder hacer ángulo desde borde de  la linea (el punto local) o desde el eje de la hoja. Idealmente cuando uno hace SHIFT podrían salir guías para las dos opciones contemplando que el usuario pueda elegir la que quiera pero si hay que elegir forzadamente por una como standard, creo que me decanto porque sean los ángulos respecto a la hoja o pantalla y te explico porque, es por la perspectiva del patronista, una pieza de patrón siempre lleva un dirección respecto a los bordes de la tela, piensa como se corta, entonces aunque haya lineas curvas e inclinadas todas siempre parten de unas perpendiculares que son las que envuelven el cuerpo y las que guían para la construcción del patrón. pienso yo que era mas frecuente tener las guías de ángulos respecto a la hoja que respecto a un citado [costado] que es inclinado pero respecto al ángulo recto del material y no de ese propio costado, no se si me explico. pero bueno dicho esto, probare esa opción B que he marcado, pero idealmente, se pudieran trazar los ángulos respecto a la hoja y respecto al punto de la linea desde donde se dibuja."*
+
+**Lo que queda hecho:** Shift endereza respecto a la hoja en la Pluma, la Línea interna, al arrastrar puntos y tramos en Editar patrón (`Q`) y en el Hilo, que ahora usa la misma regla. **Todavía no** al arrastrar un punto en Seleccionar o Editar curva, ni los extremos de trazos e internas desde Seleccionar. Los tres primeros reagrupan las anclas frame a frame (el defecto que se corrigió en `Q`): con Shift, pasar por encima de otra ancla y llevársela dejaría de ser raro. El de las internas no gira el delta en una pieza girada (#1068). Consecuencias y razones en la enmienda del contrato del 08-09 § 3.4.
+
+**Lo que queda pendiente:** su ideal de las **dos guías a la vez** (hoja y borde) al pulsar Shift. Lo dijo como «idealmente», no como condición de la firma. Diseño en `docs/superpowers/specs/2026-09-23-shift-hoja-y-borde-design.md`.
+
+**24-09 — hecho:** las dos guías, con **Shift dos veces** para el borde (la tecla no es Alt: Vina tiene que funcionar con cualquier teclado, y Alt+Shift o Ctrl+Shift cambian el idioma del teclado en Windows; spec § 3.5). Shift una vez sigue siendo la hoja que firmó. Queda enseñárselo en su máquina y comprobar allí que alternar de guía no dispara las teclas especiales de Windows (cinco Shift seguidos).
+
+---
+
+## 10. La queja 16, en marcha — 2026-09-24
+
+*"el patrón lo puedo mover? no puedes editar las internas, ok, así hay que arreglarlo"* [10:05].
+
+Decidido por Samuel el 24-09 como la frontera entera del contrato del 08-09 § 4 (spec `docs/superpowers/specs/2026-09-24-frontera-seleccionar-editar-design.md`). Hechas las fases 1 y 2: en `Q` ya se editan las internas de forma propia —mover puntos y tramos, Shift, enganche, insertar, borrar y pasar un tramo a curva por puntos, lo que pidió en [10:16]—, y Supr sobre un tramo quita solo ese tramo. Falta que `Z` deje de editar (fase 4): hasta entonces, su pregunta del 30-08 y del 07-09 —*"¿cuál es la diferencia?"*— sigue con respuesta a medias.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractDartFromInternal, extractDarts, adjustDartIntake, segmentDart, shapeDartCap, applyDartsToInternals } from '../dartEntity';
+import { extractDartFromInternal, extractDarts, adjustDartIntake, segmentDart, shapeDartCap, applyDartsToInternals, refrescarPinzas } from '../dartEntity';
 import type { InternalLine, PatternPiece } from '../../types/types';
 
 // V-shaped dart: base at (100,400)→(120,400), apex at (110,300)
@@ -317,5 +317,29 @@ describe('applyDartsToInternals', () => {
       const internals = applyDartsToInternals(piece, []);
       expect(internals.map(l => l.id)).toEqual(['legacy-straight']);
     });
+  });
+});
+
+// spec 2026-09-24 § 7: la copia `piece.darts` al día con sus líneas.
+describe('refrescarPinzas', () => {
+  it('una pinza cuya línea ya no se lee como pinza (se aplanó al moverla) sale de la copia, y su línea se queda', () => {
+    const darts = extractDarts(makePiece([dartLine]));
+    expect(darts.map(d => d.id)).toEqual(['dart-1']);
+    // El ápice llevado a la base: sin profundidad, ya no es una cuña (#1020).
+    const aplanada: InternalLine = {
+      ...dartLine,
+      path: [
+        { type: 'M', values: [100, 400] },
+        { type: 'L', values: [110, 400] },
+        { type: 'L', values: [120, 400] },
+      ],
+    };
+    expect(extractDartFromInternal(aplanada)).toBeNull();
+
+    const copia = refrescarPinzas(darts, [aplanada]);
+
+    expect(copia).toEqual([]);
+    // «`applyDartsToInternals` preserva su línea (#1020), así que no se pierde nada.»
+    expect(applyDartsToInternals(makePiece([aplanada]), copia)).toEqual([aplanada]);
   });
 });

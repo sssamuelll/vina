@@ -44,7 +44,7 @@ export type CotaUpdate =
    * deshacer. Un segundo escritor del mismo hecho es el fallo con nombre propio
    * del repo.
    */
-  | { kind: 'nodo'; pieceId: string; commandIndex: number; destino: Point2D }
+  | { kind: 'nodo'; pieceId: string; commandIndex: number; destino: Point2D; lineId?: string }
   /**
    * Un tramo de trazo (spec 2026-09-12 § 5.3). Un trazo no tiene anfitriona:
    * su `path` ya está en patrón, así que el update lleva el trazo entero y no
@@ -460,7 +460,23 @@ export function cotasDelLado(piece: PatternPiece, toCommandIndex: number): Cota[
   });
 }
 
-export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine, segmentIndex?: number): Cota[] {
+/**
+ * Por dónde escribe la cota de una interna.
+ *
+ * - `'linea'`: reescribe su path (`kind: 'internal'` → `updateInternalLine`).
+ *   Es la de Z.
+ * - `'nodo'`: devuelve a dónde va el punto y deja que lo escriba
+ *   `useEditPattern.moveNodeTo`, como `cotasDelLado` en el contorno. Es la de
+ *   Q (spec 2026-09-24 § 4.5): ahí la interna la edita el hook, y un segundo
+ *   escritor es para él un cambio de fuera, que soltaba el tramo elegido con
+ *   cada número —y con él el campo Ángulo al que iba el Tab— (revisión final
+ *   de la frontera, I-2).
+ */
+export type EscrituraDeInterna = 'linea' | 'nodo';
+
+export function cotasDeLineaInterna(
+  piece: PatternPiece, line: InternalLine, segmentIndex?: number, escritura: EscrituraDeInterna = 'linea',
+): Cota[] {
   // Un piquete conserva una segunda verdad paramétrica (`notchAnchor`) y una
   // pinza tiene su propia entidad rica: mover solo el path desde este editor
   // genérico abriría dos dueños del mismo dato. Sus chips quedan para la tanda
@@ -480,14 +496,21 @@ export function cotasDeLineaInterna(piece: PatternPiece, line: InternalLine, seg
     aPatron: (p) => pieceLocalToPattern(p, piece),
     aLocal: (p) => patternToPieceLocal(p, piece),
     firstReferenceAt: (world) => borderReference(index, world, piece.id),
-    escribir: (path) => ({ kind: 'internal', pieceId: piece.id, lineId: line.id, path }),
+    escribir: escritura === 'nodo'
+      ? (_path, commandIndex, destino) => ({ kind: 'nodo', pieceId: piece.id, commandIndex, destino, lineId: line.id })
+      : (path) => ({ kind: 'internal', pieceId: piece.id, lineId: line.id, path }),
     segmentIndex,
   });
 
   // Las referencias al contorno pertenecen a la interna completa. Seleccionar
   // un tramo ofrece únicamente su caja de largo y ángulo; los productores sin
   // índice conservan también las cotas de borde que ya podían editar.
-  if (segmentIndex !== undefined || line.path.length < 2 || line.path.filter(command => command.type === 'M').length > 1) {
+  //
+  // Las de borde reescriben la línea entera (`copiaConExtremo`), así que la
+  // escritura por el punto no las da: una cota de cada escritor en la misma
+  // tira es justo el fallo de arriba. En Q tampoco hacen falta, porque la
+  // línea entera no es sujeto de cotas ahí (§ 4.5, «varios puntos: ninguna»).
+  if (escritura === 'nodo' || segmentIndex !== undefined || line.path.length < 2 || line.path.filter(command => command.type === 'M').length > 1) {
     return cotas;
   }
 

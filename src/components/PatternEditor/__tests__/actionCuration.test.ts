@@ -228,7 +228,7 @@ describe('convertSegment alcanzable desde el clic derecho sobre la pieza (nota d
   it('pasa el pieceId del hit-test: fuera de edición no hay pieza en edición que deducir', () => {
     const ctx = makeCtx({ pieceId: 'p9', segmentIndex: 3, segmentIsCurve: false, cb: { onConvertSegment } });
     ACTIONS.convertSegment.run(ctx);
-    expect(onConvertSegment).toHaveBeenCalledWith(3, true, 'p9');
+    expect(onConvertSegment).toHaveBeenCalledWith(3, true, 'p9', undefined);
   });
 });
 
@@ -272,7 +272,7 @@ describe('convertir en curva por puntos (nota de María #197)', () => {
   it('pasa el índice del segmento y el pieceId del hit-test', () => {
     const ctx = makeCtx({ pieceId: 'p7', segmentIndex: 3, cb: { onConvertSegmentToPoints } });
     ACTIONS.convertSegmentToPoints.run(ctx);
-    expect(onConvertSegmentToPoints).toHaveBeenCalledWith(3, 'p7');
+    expect(onConvertSegmentToPoints).toHaveBeenCalledWith(3, 'p7', undefined);
   });
 });
 
@@ -305,6 +305,6 @@ describe('#1159 — salida explícita de curva por puntos', () => {
     });
     expect(ACTIONS.convertSegmentToBezier.label).toBe('Convertir a Bézier libre');
     ACTIONS.convertSegmentToBezier.run(ctx);
-    expect(onConvertSegmentToBezier).toHaveBeenCalledWith(3, 'p1');
+    expect(onConvertSegmentToBezier).toHaveBeenCalledWith(3, 'p1', undefined);
   });
 });

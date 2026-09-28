@@ -7,7 +7,7 @@ import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../util
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, clearSelection, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, esRectaDeDosPuntos } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import type { PenResult } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
@@ -17,7 +17,6 @@ import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import { AgruparCotas } from './cotas/CotaChip';
 import CotaLines from './cotas/CotaLines';
 import { admiteLado, cotasDelSujeto, faltaSujeto, refinarAlLado } from './cotas/sujeto';
-import { puntoUnicoSeleccionado } from './cotas/nodo';
 import { ladoDelHit } from './cotas/lado';
 import { usePuertaDeLado } from './usePuertaDeLado';
 import { cajasDeAsas } from './cotas/cotasGeometry';
@@ -43,7 +42,8 @@ import { useEditCurve } from './useEditCurve';
 import { useEditPattern } from './useEditPattern';
 import { patternToPieceLocal } from './pieceTransform';
 import { hitTestPieceBBox } from '../../utils/geometry/hitTest';
-import { hitTestNode, nearestSegment } from './nodeEditorUtils';
+import { anchorGroupOf, nearestSegment } from './nodeEditorUtils';
+import { CLAVE_CONTORNO, lineIdDeClave } from './lineaEditable';
 import { useMeasureTool } from './useMeasureTool';
 import { useTransformTool, type TransformUpdate } from './useTransformTool';
 import { useScissorsTool } from './useScissorsTool';
@@ -61,6 +61,7 @@ import { useEditorInteractions } from './useEditorInteractions';
 import { useElasticTool } from '../../hooks/useElasticTool';
 import { EDGE_HIT_PX } from './gestureConstants';
 import PolyPenToolOverlay from './renderers/overlays/PolyPenToolOverlay';
+import GuiasShiftOverlay from './renderers/overlays/GuiasShiftOverlay';
 import { piezasConLargos as seleccionarPiezasConLargos } from './cotas/piezasConLargos';
 import { usePrecisionHint } from './usePrecisionHint';
 import MeasureToolOverlay from './renderers/overlays/MeasureToolOverlay';
@@ -573,12 +574,30 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // Properties panel (Direction A), so right-click is always the general piece
     // menu — one gesture, one meaning, no proximity guessing.
 
+    // En Q, lo que agarraría ese mismo press decide sobre qué habla el menú
+    // (spec 2026-09-24 § 4.4): un tramo de interna, o el punto ya elegido.
+    // Y de qué pieza: si agarra algo de la pieza en edición, el menú es de
+    // ella aunque la caja de otra la tape (§ 3.4, fila 5: «en Q, la que se
+    // está editando»), la misma regla que ya sigue el clic izquierdo
+    // (`useEditorInteractions`, revisión final de la frontera, I-3).
+    // (Por referencia, no `editPatternTool.agarreEn(e)` directo: llamar un
+    // método por su acceso de miembro le pide a `exhaustive-deps` el objeto
+    // ENTERO como dependencia, no la función — y `editPatternTool` es nuevo en
+    // cada render.)
+    const agarreEnQ = editPatternTool.agarreEn;
+    const agarreQ = activeTool === 'editPattern'
+      ? agarreEnQ(e as React.MouseEvent<SVGSVGElement>)
+      : null;
+    const piezaEnEdicion = agarreQ
+      ? pieces.find(p => p.id === editPatternTool.editingPieceId) ?? null
+      : null;
+
     // Hit-test: find piece whose bounding box contains the point.
     // Vía `hitTestPieceBBox` y no con una copia local del bucle: era la misma
     // caja calculada dos veces, y la de aquí se quedó midiendo contra el
     // fantasma sin girar cuando #1033 volvió el giro declarativo (#1064).
-    let hitPiece: typeof pieces[0] | null =
-      hitTestPieceBBox({ x: canvasX, y: canvasY }, pieces.filter(p => p.outline?.length))
+    let hitPiece: typeof pieces[0] | null = piezaEnEdicion
+      ?? hitTestPieceBBox({ x: canvasX, y: canvasY }, pieces.filter(p => p.outline?.length))
       ?? null;
     // Un borde se puede alcanzar unos píxeles por fuera del bbox. En ese caso
     // el hit preciso sigue siendo dueño del menú, no la ausencia del body-hit.
@@ -587,9 +606,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     }
 
     // Hit-test seams: check proximity to seam connection lines and edge highlights
+    // (No con la pieza en edición ya agarrada: una costura también es «otro
+    // objeto» para § 3.4, y el menú sería el suyo, sin pieza.)
     let hitSeamId: string | null = null;
     const SEAM_THRESHOLD = screenToPatternLength(8, zoom2D);
-    for (const seam of hitSaEdgeId ? [] : seams) {
+    for (const seam of hitSaEdgeId || piezaEnEdicion ? [] : seams) {
       const pieceA = pieces.find(p => p.id === seam.pieceA.pieceId);
       const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
       if (!pieceA || !pieceB) continue;
@@ -692,21 +713,38 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       }
     }
 
+    // El tramo de interna que agarraría el press en Q (`agarreQ`, arriba): los
+    // verbos de convertir hablan de él.
+    let segmentLineId: string | undefined;
+    if (agarreQ?.tipo === 'tramo' && agarreQ.clave !== CLAVE_CONTORNO && hitPiece?.id === editPatternTool.editingPieceId) {
+      const lineId = lineIdDeClave(agarreQ.clave) ?? undefined;
+      const linea = hitPiece.internals.find(l => l.id === lineId);
+      if (linea && esRectaDeDosPuntos(linea.type)) {
+        // El hilo no se curva (spec § 3.2): sin tramo, ningún verbo de
+        // convertir —ni para él, que sería una puerta muerta, ni para un lado
+        // del contorno que caiga cerca, que no es lo que ella clicó—.
+        segmentIndex = undefined;
+        segmentIsCurve = undefined;
+      } else {
+        segmentLineId = lineId;
+        const cmd = linea?.path[agarreQ.commandIndex];
+        segmentIndex = agarreQ.commandIndex;
+        segmentIsCurve = cmd?.type === 'C' || cmd?.type === 'Q';
+      }
+    }
     // ¿El clic derecho cayó sobre el punto que está elegido? Sin esta
     // pregunta, «Mover exacto…» salía con CUALQUIER clic derecho estando en
     // modo nodo —lienzo vacío incluido, porque `resolveTargetKind` decide la
     // altitud antes de mirar nada— y abría el chip del punto elegido, que
     // podía estar al otro lado de la pieza. Ella pediría mover B y se movería A.
-    const elegido = puntoUnicoSeleccionado(
-      pieces.find(p => p.id === editPatternTool.editingPieceId),
-      editPatternTool.selectedNodes,
-    );
-    let derechoSobreElPuntoElegido = false;
-    if (elegido && hitPiece?.id === editPatternTool.editingPieceId) {
-      const localPt = patternToPieceLocal({ x: canvasX, y: canvasY }, hitPiece);
-      const golpe = hitTestNode(localPt, editPatternTool.nodes, screenToPatternLength(8, zoom2D));
-      derechoSobreElPuntoElegido = !!golpe && editPatternTool.selectedNodes.has(golpe.commandIndex);
-    }
+    const elegido = editPatternTool.puntoElegido;
+    const derechoSobreElPuntoElegido = !!elegido && agarreQ?.tipo === 'punto'
+      && (lineIdDeClave(agarreQ.clave) ?? undefined) === elegido.lineId
+      && hitPiece?.id === editPatternTool.editingPieceId
+      && anchorGroupOf(
+        (elegido.lineId ? hitPiece?.internals.find(l => l.id === elegido.lineId)?.path : hitPiece?.outline) ?? [],
+        elegido.commandIndex,
+      ).includes(agarreQ.commandIndex);
 
     setCtxMenu({
       visible: true,
@@ -718,13 +756,14 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       saEdgeId: hitSaEdgeId,
       segmentIndex,
       segmentIsCurve,
+      segmentLineId,
       activeTool,
       internalLineId: hitInternalLineId,
       internalLineType: hitInternalLineType,
       isEditingNodes: editPatternTool.isEditing,
       derechoSobreElPuntoElegido,
     });
-  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.selectedNodes, editPatternTool.editingPieceId, editPatternTool.nodes, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, triangleTool, pen]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.editingPieceId, editPatternTool.agarreEn, editPatternTool.puntoElegido, seamTool, notchTool, seamAllowanceTool, internalShapeTool, rectTool, circleTool, triangleTool, pen]);
 
   const handleTransform = useCallback((updates: TransformUpdate[]) => {
     for (const u of updates) {
@@ -847,25 +886,20 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       : -1;
 
   // El punto en edición, solo cuando hay UNO — que no es lo mismo que un
-  // índice de comando.
+  // índice de comando —, de cualquier línea (spec 2026-09-24 § 4.5).
   //
-  // Un clic sobre un nodo selecciona el GRUPO de anclas coincidentes
-  // (`useEditPattern.ts:367`), porque CLO duplica el vértice en cada esquina y
-  // moverlas por separado rompería el contorno en una púa. En el DXF de María
-  // eso significa `selectedNodes.size === 2` para UN SOLO punto: con la
-  // condición ingenua (`length !== 1`), los chips y el menú de #1112 se
-  // apagaban en silencio **justo sobre los datos para los que se hicieron**.
-  // El e2e no lo veía porque su rectángulo sintético tiene anclas únicas.
+  // Un clic sobre un nodo selecciona el GRUPO de anclas coincidentes (el
+  // agarre del hook, vía `anchorGroupOf`), porque CLO duplica el vértice en
+  // cada esquina y moverlas por separado rompería el contorno en una púa. En
+  // el DXF de María eso significa `selectedNodes.size === 2` para UN SOLO
+  // punto: con la condición ingenua (`length !== 1`), los chips y el menú de
+  // #1112 se apagaban en silencio **justo sobre los datos para los que se
+  // hicieron**. El e2e no lo veía porque su rectángulo sintético tiene
+  // anclas únicas. `puntoElegido` ya resuelve el grupo entero a un solo punto.
   //
   // Con dos o más PUNTOS distintos sigue sin haber cotas: lo único que
   // comparten es su desplazamiento, y esa es otra cota que no está hecha.
-  const nodoSeleccionado = useMemo(
-    () => puntoUnicoSeleccionado(
-      activeTool === 'editPattern' ? pieces.find(p => p.id === editPatternTool.editingPieceId) : undefined,
-      editPatternTool.selectedNodes,
-    ),
-    [activeTool, editPatternTool.editingPieceId, editPatternTool.selectedNodes, pieces],
-  );
+  const nodoSeleccionado = activeTool === 'editPattern' ? editPatternTool.puntoElegido : null;
 
   const sujetoSinLado = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
@@ -905,7 +939,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     || editor.selectedInternalLine !== null
     || (nodeEditor.isEditing && nodeEditor.selectedNode !== null)
     || ladoEsElSujeto
-    || (activeTool === 'editPattern' && editPatternTool.selectedNodes.size > 0);
+    || (activeTool === 'editPattern' && editPatternTool.hayPuntosElegidos);
   const piezasConLargos = useMemo(
     () => seleccionarPiezasConLargos(drawablePieces, lineLengthMode, { suppress: suppressLengths }),
     [drawablePieces, lineLengthMode, suppressLengths],
@@ -1059,7 +1093,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       // Lo escribe `useEditPattern`, no este archivo: es quien ya mueve nodos
       // en el arrastre, con compensación de pivote, re-anclado de piquetes y
       // lote de deshacer. Dos escritores del mismo hecho se desincronizan.
-      editPatternRef.current.moveNodeTo(update.pieceId, update.commandIndex, update.destino);
+      editPatternRef.current.moveNodeTo(update.pieceId, update.commandIndex, update.destino, update.lineId);
     } else if (update.kind === 'trazo') {
       // Vivo se comprueba contra la lista ENTERA del store, no contra la
       // filtrada: un trazo oculto no puede estar seleccionado (`toggleTrazos`
@@ -1369,6 +1403,23 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     finishMouseInteraction(e);
   }, [finishMouseInteraction]);
 
+  // Shift de la herramienta activa (spec 2026-09-23): sus guías, para el
+  // lienzo, y su modo y su segundo marco, para la pista. Cada herramienta
+  // calcula las suyas con `guiasShift`; aquí solo se elige de cuál leer.
+  const shiftActivo = activeTool === 'pen'
+    ? { modo: pen.modoShift, guias: pen.guias, marco: pen.angleReference.kind }
+    : activeTool === 'internalShape'
+      ? { modo: internalShapeTool.modoShift, guias: internalShapeTool.guias, marco: internalShapeTool.angleReference.kind }
+      // En `Q` el marco es siempre un lado de la pieza.
+      : activeTool === 'editPattern'
+        ? { modo: editPatternTool.modoShift, guias: editPatternTool.guias, marco: 'border' as const }
+        : null;
+  // Hay algo que elegir si el segundo marco no coincide con el eje (hay guía
+  // tenue). En `Q` antes de agarrar, el lado aún no se conoce: se anuncia.
+  const segundoMarco = !shiftActivo ? null
+    : shiftActivo.guias ? (shiftActivo.guias.tenue ? shiftActivo.marco : null)
+    : activeTool === 'editPattern' ? shiftActivo.marco : null;
+
   return (
     <div className="pattern-editor">
       <svg
@@ -1416,6 +1467,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
                 ? nodeEditor.editingPieceId
                 : (activeTool === 'editPattern' ? editPatternTool.editingPieceId : null)
             }
+            piezaEditadaEnQ={
+              // Solo Q: su overlay pinta los puntos de las internas; el de V
+              // todavía no (fase 5), así que ahí los extremos se quedan.
+              activeTool === 'editPattern' ? editPatternTool.editingPieceId : null
+            }
             units={units}
             groupColors={groupColors}
             selectedInternalLine={editor.selectedInternalLine}
@@ -1455,6 +1511,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
               zoom={zoom2D}
             />
           )}
+          {/* Las guías de Shift van por debajo de los overlays de herramienta:
+              los nodos y el anillo de enganche se leen encima. */}
+          <GuiasShiftOverlay guias={shiftActivo?.guias ?? null} zoom2D={zoom2D} />
           {/* UN candado para todas las superficies que se colocan con Redux.
               Ver el comentario de `isDraggingPiece` arriba: dentro de este
               árbol viven los overlays que suman `piece.position`, y ninguno
@@ -1520,6 +1579,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             editPatternHoveredSegment={editPatternTool.hoveredSegment}
             editPatternAddPointPreview={editPatternTool.addPointPreview}
             editPatternMarquee={editPatternTool.marquee}
+            editPatternInternas={editPatternTool.internas}
+            editPatternEnganche={editPatternTool.enganche}
             scissorsTargetPieceId={scissorsTool.targetPieceId}
             scissorsStartPoint={scissorsTool.startPoint}
             scissorsEndPoint={scissorsTool.endPoint}
@@ -1637,6 +1698,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           hasSeams={seams.length > 0}
           extendTrimMode={(toolOptions?.extendTrim?.mode as 'extend' | 'trim') ?? 'extend'}
           extendTrimArmed={extendTrimTool.selectedSnap !== null}
+          modoShift={shiftActivo?.modo}
+          segundoMarco={segundoMarco}
         />
 
         <RulerLayer
@@ -1699,17 +1762,17 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         menu={ctxMenu}
         onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
         onRename={(id) => setEditingPieceNameId(id)}
-        onConvertSegment={(idx, toCurve, pieceId) => {
-          editPatternTool.convertSegment(idx, toCurve, pieceId);
-          showConvertedPoints(pieceId);
+        onConvertSegment={(idx, toCurve, pieceId, lineId) => {
+          editPatternTool.convertSegment(idx, toCurve, pieceId, lineId);
+          if (!lineId) showConvertedPoints(pieceId);
         }}
-        onConvertSegmentToPoints={(idx, pieceId) => {
-          editPatternTool.convertSegmentToPoints(idx, pieceId);
-          showConvertedPoints(pieceId);
+        onConvertSegmentToPoints={(idx, pieceId, lineId) => {
+          editPatternTool.convertSegmentToPoints(idx, pieceId, lineId);
+          if (!lineId) showConvertedPoints(pieceId);
         }}
-        onConvertSegmentToBezier={(idx, pieceId) => {
-          editPatternTool.convertSegmentToBezier(idx, pieceId);
-          showConvertedPoints(pieceId);
+        onConvertSegmentToBezier={(idx, pieceId, lineId) => {
+          editPatternTool.convertSegmentToBezier(idx, pieceId, lineId);
+          if (!lineId) showConvertedPoints(pieceId);
         }}
         onZoomToFit={handleZoomToFit}
         onUnfold={handleUnfold}

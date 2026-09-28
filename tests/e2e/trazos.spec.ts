@@ -109,7 +109,7 @@ test.describe('trazos — líneas de construcción', () => {
     await clic(page, { x: 100, y: 100 });
     await page.keyboard.press('Tab');
     await expect(page.locator('input.cota--editando[aria-label="Largo"]')).toBeVisible({ timeout: 5000 });
-    await page.keyboard.press('Control+a'); await page.keyboard.type('100');
+    await page.keyboard.press('ControlOrMeta+a'); await page.keyboard.type('100');
     await page.keyboard.press('Enter');
     // Enter coloca una sola vez y desmonta el borrador. El trazo sigue activo,
     // pero ya no queda ningún peldaño numérico antes de terminarlo.

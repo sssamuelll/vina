@@ -1,9 +1,10 @@
 import type { InternalLineSelection, PatternPiece, SaSelection, Tool2D, Trazo, TrazoSelection } from '../../../types/types';
+import { esInternaEditable } from '../../../types/types';
 import { margenEnPunto } from '../../../utils/seam/margenEnPunto';
 import { cotaDeMargen } from './cotaDeMargen';
 import { cotasDeLineaInterna, cotasDelLado, cotasDePieza, cotasDeTrazo, type Cota } from './cotas';
 import { cotasDelTramoEnCurso, type TramoEnCurso } from './tramoEnCurso';
-import { cotasDelNodo } from './nodo';
+import { cotasDelNodoEnPath } from './nodo';
 import { formatMedida } from './parseMedida';
 
 export interface SeamAllowanceAnchor {
@@ -46,7 +47,7 @@ export interface SujetoInput {
    * desplazamiento, y eso es otra cota (decisión 5 de la gramática de la
    * tanda 6, todavía sin implementar).
    */
-  nodoSeleccionado?: { pieceId: string; commandIndex: number } | null;
+  nodoSeleccionado?: { pieceId: string; commandIndex: number; lineId?: string } | null;
   /**
    * Los trazos VISIBLES (spec 2026-09-12 § 5.3). `PatternEditor` los filtra por
    * «Construcción» antes de pasarlos, así que aquí «no está en la lista» y
@@ -192,7 +193,13 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
     const piezaDelNodo = input.pieces.find(p => p.id === input.nodoSeleccionado!.pieceId);
     const capaDelNodo = piezaDelNodo?.layer ?? 1;
     if (piezaDelNodo && !input.hiddenLayerIds.includes(capaDelNodo)) {
-      const cotas = cotasDelNodo(piezaDelNodo, input.nodoSeleccionado.commandIndex);
+      // El punto puede ser de una interna (spec 2026-09-24 § 4.5): sus largos
+      // son los de SU línea.
+      const { commandIndex, lineId } = input.nodoSeleccionado;
+      const path = lineId
+        ? piezaDelNodo.internals.find(l => l.id === lineId)?.path
+        : piezaDelNodo.outline;
+      const cotas = path ? cotasDelNodoEnPath(piezaDelNodo, path, commandIndex, lineId) : [];
       if (cotas.length > 0) {
         return {
           piece: piezaDelNodo,
@@ -299,7 +306,16 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
       const capa = piece.layer ?? 1;
       if (input.hiddenLayerIds.includes(capa)) return nada(lineaRect);
       const { segmentIndex } = input.selectedInternalLine;
-      const cotas = cotasDeLineaInterna(piece, line, segmentIndex);
+      // En Q (spec 2026-09-24 § 4.5) la global sin tramo son puntos de la
+      // interna: uno solo ya ganó arriba, por `nodoSeleccionado`; varios no
+      // tienen cotas, como en el contorno. Y el tramo escribe por el punto
+      // (`EscrituraDeInterna`) si la interna es de las que Q edita; la que no
+      // lo es (un doblez de pliegue elegido en Z) sigue escribiendo por su
+      // línea, como en Z: por el punto, `moveNodeTo` la rechazaría y el chip
+      // quedaría mudo.
+      const enQ = input.activeTool === 'editPattern';
+      if (enQ && segmentIndex === undefined) return nada(lineaRect);
+      const cotas = cotasDeLineaInterna(piece, line, segmentIndex, enQ && esInternaEditable(line) ? 'nodo' : 'linea');
       return {
         piece,
         caliente: false,

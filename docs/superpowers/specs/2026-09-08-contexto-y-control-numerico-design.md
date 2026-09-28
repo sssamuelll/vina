@@ -157,6 +157,93 @@ Y después de confirmar un tramo, **el siguiente vuelve a seguir al ratón**: no
 **valor numérico explícito → ángulo explícito → `Shift` mantenido → enganche → ratón libre.**
 
 - `Shift` restringe a múltiplos de **45°**, solo mientras se mantiene.
+
+> **Enmienda 2026-09-23 — firma de María: los 45° se cuentan desde la HOJA.**
+> Este punto no decía respecto a qué, y desde la firma D2 del 12-09 la píldora
+> lee el ángulo relativo al borde, así que había dos marcos posibles. Se le puso
+> la pregunta delante con capturas (artefacto «Shift y la perpendicular»,
+> `https://claude.ai/artifact/Qyea31bCA895AcJTftLXxE`) y firmó **B**: horizontal,
+> vertical y diagonales del espacio del patrón, sea cual sea el borde. Su razón,
+> textual: *"una pieza de patrón siempre lleva un dirección respecto a los
+> bordes de la tela, piensa como se corta, entonces aunque haya lineas curvas e
+> inclinadas todas siempre parten de unas perpendiculares que son las que
+> envuelven el cuerpo"*. Y su ideal, que queda como seguimiento: *"cuando uno
+> hace SHIFT podrían salir guías para las dos opciones"* (hoja y borde). Nota
+> entera en el informe del 10-09, § 9.
+>
+> Consecuencias escritas para que no se lean como fallo:
+> - Con Shift, la píldora **no** enseña un número redondo desde un borde
+>   inclinado (`71,6° al borde` para una horizontal). Shift endereza el ratón;
+>   no escribe ningún número, y la lectura sigue en el marco de D2.
+> - **Dónde actúa:** Pluma, Línea interna, arrastrar puntos y tramos en `Q`, e
+>   Hilo, que ahora usa la misma regla (tenía la suya: redondeaba el ángulo y
+>   conservaba la distancia). **Dónde no, todavía:** arrastrar un punto en
+>   Seleccionar o en Editar curva, y los extremos de trazos e internas desde
+>   `Z`. Los de Seleccionar, Editar curva y los extremos de trazos recalculan
+>   frame a frame sobre el contorno ya movido y reagrupan las anclas
+>   coincidentes: es el defecto que se corrigió en `Q`, y con un eje fijo,
+>   pasar exactamente por encima de otra ancla y llevársela deja de ser raro.
+>   Los extremos de internas no reagrupan, pero no giran el delta en una pieza
+>   girada (#1068). El § 4 retira de `Z` los arrastres que deforman.
+> - En `Q`, Shift endereza el **desplazamiento** desde donde estaba el punto
+>   (#1112: «cuánto lo quieres mover en esa dirección»), no el ángulo de un lado.
+>   En una pieza girada la hoja no gira con ella: se endereza en el espacio del
+>   patrón, antes de pasar el delta al marco de la pieza.
+> - En `Q`, Shift+press sigue siendo **selección aditiva**: Shift+arrastrar
+>   mueve todo lo seleccionado, como en Illustrator (y es la única forma de
+>   arrastrar varios puntos). Sobre algo **ya seleccionado**, la deselección se
+>   decide al soltar y solo si la mano no cruzó el umbral de arrastre (4 px):
+>   Shift+clic sigue quitando, y un temblor no mueve nada.
+> - Precedencia en el trazo: **cerrar** (el ratón o la guía de Shift sobre el
+>   primer nodo) > Shift > enganche > ratón. La goma, la píldora y Tab leen el
+>   mismo destino que el clic. Cerrar con la guía es el gesto natural de acabar
+>   una forma dibujada con Shift.
+> - El segundo press de un **Shift+doble clic** no es un nodo: termina el trazo
+>   igual que sin Shift.
+> - Arrastrando **manejadores** en la Pluma, Shift no los endereza: la goma
+>   enseña el manejador tal cual se va a guardar.
+> - La pista del pie lo dice en `Q` y en el Hilo, con la notación de
+>   `shortcutDisplay` (⇧ en macOS, «Shift+» fuera). En la Pluma y la Línea
+>   interna no: esa pista ya no cabe en su laptop (medido a 1366×643 en Split:
+>   se corta 167 px y 64 px por cada lado) y cualquier texto añadido caería en
+>   la parte que no se ve.
+> - El primer punto de un trazo no tiene de dónde enderezar: engancha como siempre.
+> - Perder el foco de la ventana no es soltar Shift: no reaplica nada.
+>
+> Implementación: `restriccionShift.ts` (la geometría), `useShiftSostenido.ts`
+> (la tecla, también con la mano quieta) y `applyAnchorMoves` en
+> `nodeEditorUtils.ts` (mover desde el contorno del inicio del gesto, sin
+> reagrupar). `Ctrl` suspendiendo el enganche sigue sin implementar.
+
+> **Enmienda del 24-09 — Shift dos veces, al borde.** Lo que María dejó
+> escrito como ideal en su firma (*«podrían salir guías para las dos
+> opciones»*). Shift una vez sigue siendo la hoja (la firma B, sin cambios).
+> **Shift dos veces** —un toque de menos de 300 ms sin ratón y, antes de
+> 400 ms, otra pulsación mantenida— endereza respecto a la referencia de la
+> píldora (firma D2): el borde del que sale el trazo, el tramo anterior, o en
+> `Q` el lado que llega al punto agarrado (congelado al empezar el arrastre).
+> Vale en la Pluma, la Línea interna y `Q`, con las dos guías a la vista: la
+> activa con el acento, la otra tenue. La píldora lee entonces un múltiplo de
+> 45° exacto («90,0° al borde»). La precedencia no cambia: cerrar > Shift (eje
+> o borde) > enganche > ratón.
+>
+> - La tecla es Shift y no Alt ni Ctrl porque **Vina funciona con cualquier
+>   teclado** (Samuel, 24-09): Alt izquierdo + Shift y Ctrl + Shift son
+>   atajos de Windows para cambiar de idioma o de teclado, el navegador no
+>   los puede interceptar, y a quien los tenga activos le cambiarían la
+>   distribución en mitad del trazo. Por la misma razón, cuando se implemente
+>   «`Ctrl` suspende el enganche» no puede pedirse con Shift pulsado a la vez.
+> - La pista del pie lo anuncia al pulsar Shift, sustituyendo a la de la
+>   herramienta: «Shift: al eje · Shift dos veces: al borde». Los marcos se
+>   nombran como en la píldora.
+> - Riesgo anotado sin medir: Windows ofrece las teclas especiales con cinco
+>   Shift seguidos; alternar de guía muy rápido podría llegar a cinco.
+>
+> Spec: `docs/superpowers/specs/2026-09-23-shift-hoja-y-borde-design.md`.
+> Implementación: `guiasShift` en `restriccionShift.ts`, el modo en
+> `useShiftSostenido.ts`, `arrivingReference`/`chordReference` en
+> `angleReference.ts` y `GuiasShiftOverlay.tsx`.
+
 - `Ctrl` suspende el enganche, sin desactivar una restricción angular explícita.
 - **Un imán a 499,8 mm no corrige una entrada de 500 mm.** El número escrito manda sobre la geometría cercana.
 - Se aceptan coma y punto decimal. Longitud nueva mínima **0,1 mm**; desplazamiento cero es operación sin cambio. Un valor inválido **se queda editable** y nunca se recorta en silencio.

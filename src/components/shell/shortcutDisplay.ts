@@ -24,6 +24,14 @@ export function displayShortcut(shortcut: string, isMac: boolean = IS_MAC): stri
     .replace(/⌥/g, 'Alt+');
 }
 
+/**
+ * El nombre de una tecla modificadora SOLA, para frases como «Shift dos
+ * veces»: `displayShortcut('⇧')` da «Shift+», que es para combinar.
+ */
+export function displayModifierKey(glyph: '⇧' | '⌘' | '⌥', isMac: boolean = IS_MAC): string {
+  return isMac ? glyph : displayShortcut(glyph, false).replace(/\+$/, '');
+}
+
 const KEY_LABELS: Readonly<Record<string, string>> = {
   ' ': 'Espacio',
   Backspace: 'Retroceso',

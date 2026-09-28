@@ -270,6 +270,17 @@ describe('cambiar de pieza sin salir de "Editar patrón" (nota de María #170)',
     expect(editPattern.handleMouseDown).toHaveBeenCalled();
     expect(editPattern.enterEdit).not.toHaveBeenCalled();
   });
+
+  it('con algo de la pieza en edición bajo el cursor, otra pieza encima no le quita el sujeto (spec 2026-09-24 § 3.4)', () => {
+    const editPattern = {
+      ...editingP1(),
+      agarreEn: vi.fn(() => ({ clave: 'interna:L', tipo: 'punto', commandIndex: 0, distancia: 0 })),
+    };
+    const { hook } = setup('editPattern', [pieceP1(), pieceP2()], makeTools({ editPattern }));
+    act(() => { hook.result.current.handleMouseDown(downOn('p2', 50, 50)); });
+    expect(editPattern.enterEdit).not.toHaveBeenCalled();
+    expect(editPattern.handleMouseDown).toHaveBeenCalled();
+  });
 });
 
 describe('salida del lienzo en los modos de edición', () => {

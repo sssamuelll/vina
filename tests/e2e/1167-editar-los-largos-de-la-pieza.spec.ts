@@ -68,7 +68,7 @@ test.describe('editar los largos de una pieza que ya existe', () => {
     const antes = await campo(page, 'Largo').inputValue();
     expect(antes, `el lado que abrió no es el de 200 mm: ${antes}`).toContain('200');
 
-    await page.keyboard.press('Control+a');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('250');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(500);
@@ -88,7 +88,7 @@ test.describe('editar los largos de una pieza que ya existe', () => {
     await elRatonSobre(page, { x: 300, y: 350 });
     await page.keyboard.press('Tab');
     await page.waitForTimeout(400);
-    await page.keyboard.press('Control+a');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('250');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(400);

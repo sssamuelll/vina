@@ -30,7 +30,7 @@ export interface EstadoParaBorrado {
   selectedPieceIds: string[];
   selectedSeamId: string | null;
   selectedPOMId: string | null;
-  selectedInternalLine: { pieceId: string; lineId: string } | null;
+  selectedInternalLine: { pieceId: string; lineId: string; segmentIndex?: number } | null;
   /** Tramo de trazo seleccionado (spec 2026-09-12 § 5.4). */
   selectedTrazo?: TrazoSelection | null;
   /** Ids de piezas con el candado puesto (`locked === true`). */
@@ -39,7 +39,7 @@ export interface EstadoParaBorrado {
 
 export type SujetoBorrable =
   | { kind: 'seam'; id: string }
-  | { kind: 'internalLine'; pieceId: string; lineId: string }
+  | { kind: 'internalLine'; pieceId: string; lineId: string; segmentIndex?: number }
   | { kind: 'trazo'; trazoId: string; segmentIndex: number }
   | { kind: 'pom'; id: string }
   | { kind: 'pieces'; ids: string[] }

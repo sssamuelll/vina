@@ -6,7 +6,7 @@ import { newId } from '../../utils/ids';
 import { patternToPieceLocal, pieceLocalToPattern } from './pieceTransform';
 import { isDrag } from './gestureConstants';
 import { noPasoNada } from './noPasoNada';
-import { polarOf, polarPoint } from './polyPenGeometry';
+import { restringirAHoja45 } from './restriccionShift';
 
 /**
  * Grainline tool: click+drag inside a piece to draw an arrow
@@ -97,9 +97,9 @@ export function useGrainlineTool(
     if (e.shiftKey && state.startPoint) {
       // El enganche se decide en patrón, no en el espacio local de una pieza
       // girada: 0° debe seguir siendo la horizontal que María ve en pantalla.
-      const startPattern = pieceLocalToPattern(state.startPoint, piece);
-      const { lengthMm, angleDeg } = polarOf(startPattern, endPattern);
-      endPattern = polarPoint(startPattern, lengthMm, Math.round(angleDeg / 45) * 45);
+      // Y con la misma regla que la Pluma, la Línea interna y Editar patrón:
+      // una sola tecla no puede enderezar de dos formas detrás de la misma pista.
+      endPattern = restringirAHoja45(pieceLocalToPattern(state.startPoint, piece), endPattern);
     }
     const local = patternToPieceLocal(endPattern, piece);
     setState(prev => ({ ...prev, endPoint: local, moveScreen: { x: e.clientX, y: e.clientY } }));

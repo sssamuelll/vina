@@ -391,7 +391,7 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
       piezasAntesDeVaciar = (await st(page)).project.pieces;
       await activar(page, 'z', 'select');
       await page.keyboard.press('Escape');
-      await page.keyboard.press('Control+a');
+      await page.keyboard.press('ControlOrMeta+a');
       await expect.poll(async () => (await st(page)).editor.selectedPieceIds.length).toBe(piezasAntesDeVaciar.length);
       await page.keyboard.press('Delete');
       await expect.poll(async () => (await st(page)).project.pieces.length).toBe(0);

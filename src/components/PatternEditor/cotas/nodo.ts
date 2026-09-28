@@ -92,9 +92,31 @@ const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
  * tanda 6). Aquí se devuelve vacío y quien llama decide.
  */
 export function cotasDelNodo(piece: PatternPiece, commandIndex: number): Cota[] {
-  const propio = getAnchor(piece.outline[commandIndex] ?? { type: 'Z', values: [] });
+  return cotasDelNodoEnPath(piece, piece.outline, commandIndex);
+}
+
+/**
+ * Las cotas de un nodo en reposo: su distancia a cada vecino, escribibles.
+ *
+ * Escribir una mueve el nodo A LO LARGO de la recta que lo une con ese vecino,
+ * conservando la dirección. Es la misma semántica que ya tiene el largo de un
+ * tramo de línea interna («escribir el largo mueve el nodo final»), y es la
+ * única lectura sin ambigüedad de «ponlo a 150 de este punto».
+ *
+ * Con dos o más nodos seleccionados no hay cotas de nodo: lo único que un grupo
+ * comparte es su desplazamiento, y eso es otra cota (decisión 5 del spec de la
+ * tanda 6). Aquí se devuelve vacío y quien llama decide.
+ *
+ * Vale para cualquier línea de la pieza (spec 2026-09-24 § 4.5). `lineId` (una
+ * interna) viaja en el id de la cota y en su acción, para que `moveNodeTo`
+ * escriba en esa línea.
+ */
+export function cotasDelNodoEnPath(
+  piece: PatternPiece, path: PathCommand[], commandIndex: number, lineId?: string,
+): Cota[] {
+  const propio = getAnchor(path[commandIndex] ?? { type: 'Z', values: [] });
   if (!propio) return [];
-  const { anterior, siguiente } = vecinosDelNodo(piece.outline, commandIndex);
+  const { anterior, siguiente } = vecinosDelNodo(path, commandIndex);
 
   const centro = { x: 0, y: 0 };
   for (const cmd of piece.outline) {
@@ -115,7 +137,7 @@ export function cotasDelNodo(piece: PatternPiece, commandIndex: number): Cota[] 
       : normal;
 
     return {
-      id: `nodo-${commandIndex}-${lado}`,
+      id: lineId ? `nodo-${lineId}-${commandIndex}-${lado}` : `nodo-${commandIndex}-${lado}`,
       // Las DOS son largos, así que las dos son `tramo-largo`. Tentaba poner
       // `tramo-angulo` en una para heredar el desplazamiento ±36 px que
       // `chipScreenPosition` da a ese par — pero ese desplazamiento existe
@@ -153,6 +175,7 @@ export function cotasDelNodo(piece: PatternPiece, commandIndex: number): Cota[] 
         pieceId: piece.id,
         commandIndex,
         destino: { x: v.punto.x + dir.x * v2, y: v.punto.y + dir.y * v2 },
+        ...(lineId ? { lineId } : {}),
       }),
     };
   };
@@ -179,9 +202,19 @@ export function puntoUnicoSeleccionado(
   piece: PatternPiece | undefined,
   seleccionados: ReadonlySet<number>,
 ): { pieceId: string; commandIndex: number } | null {
-  if (!piece || seleccionados.size === 0) return null;
+  if (!piece) return null;
+  const commandIndex = puntoUnicoDeLinea(piece.outline, seleccionados);
+  return commandIndex === null ? null : { pieceId: piece.id, commandIndex };
+}
+
+/** El mismo criterio sobre cualquier línea: el índice del punto, o null. */
+export function puntoUnicoDeLinea(
+  path: PathCommand[],
+  seleccionados: ReadonlySet<number>,
+): number | null {
+  if (seleccionados.size === 0) return null;
   const nodos = [...seleccionados];
-  const grupo = anchorGroupOf(piece.outline, nodos[0]);
+  const grupo = anchorGroupOf(path, nodos[0]);
   if (nodos.length !== grupo.length || !nodos.every((n) => grupo.includes(n))) return null;
-  return { pieceId: piece.id, commandIndex: nodos[0] };
+  return nodos[0];
 }

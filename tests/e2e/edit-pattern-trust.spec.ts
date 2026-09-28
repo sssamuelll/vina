@@ -62,7 +62,11 @@ test('María DXF: editPattern visible → slow drag → undo/redo keeps marker o
   // `PuntosDelContorno` layer also renders `[data-anchor-role]`, for every
   // piece and without that wrapper — and it comes first in DOM order, so a
   // bare `.first()` resolved into it.
-  const glyph = page.locator('[data-command-index] [data-anchor-role="corner"]').first();
+  // Since la frontera phase 2 (spec 2026-09-24 § 3.3), Q also paints the
+  // internal lines' points with the same `data-command-index`, wrapped in
+  // `[data-interna]` groups. This test is about the OUTLINE's point, so
+  // exclude anchors nested inside `[data-interna]`.
+  const glyph = page.locator('[data-command-index]:not([data-interna] *) [data-anchor-role="corner"]').first();
   await expect(glyph).toBeVisible();
   // Read the attribute BEFORE coercing, and fail on its absence. The old guard
   // was `Number.isInteger(Number(attr))`, and `Number(null)` is 0: with the
@@ -98,7 +102,7 @@ test('María DXF: editPattern visible → slow drag → undo/redo keeps marker o
   // the marker must be polled rather than sampled once. Address it by command
   // index too: the corner set changes while the undo lands, so `.first()` can
   // resolve to a different node and silently compare the wrong glyph.
-  const draggedGlyph = page.locator(`[data-command-index="${commandIndex}"] [data-anchor-role]`);
+  const draggedGlyph = page.locator(`[data-command-index="${commandIndex}"]:not([data-interna] *) [data-anchor-role]`);
   await expect.poll(async () => {
     const box = await draggedGlyph.boundingBox();
     if (!box) return null;

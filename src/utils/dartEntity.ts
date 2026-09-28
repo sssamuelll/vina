@@ -155,6 +155,41 @@ export function extractDarts(piece: PatternPiece): Dart[] {
 }
 
 /**
+ * La copia `piece.darts` al día con sus líneas (spec 2026-09-24 § 7).
+ *
+ * Una pinza cuya línea cambió se vuelve a leer de ella, conservando lo que no
+ * es dibujo: `foldDirection`, `capShape` y `edgeId`. Una que ya no se lee como
+ * pinza (se aplanó al moverla) sale de la copia; `applyDartsToInternals`
+ * preserva su línea (#1020), así que no se pierde nada. Una cuya línea se
+ * quitó (`quitadas`) sale también. Una pinza sin línea —nacida de una
+ * operación— se queda como estaba.
+ *
+ * Sin esto, la siguiente operación de pinza leería la copia vieja y la
+ * escribiría de vuelta: la edición de Q desaparecería sin aviso (#1016).
+ */
+export function refrescarPinzas(
+  darts: Dart[],
+  internals: InternalLine[],
+  edges?: SemanticEdge[],
+  quitadas: ReadonlySet<string> = new Set(),
+): Dart[] {
+  const lineas = new Map(internals.filter(l => l.type === 'dart').map(l => [l.id, l]));
+  return darts.flatMap(dart => {
+    if (quitadas.has(dart.id)) return [];
+    const line = lineas.get(dart.id);
+    if (!line) return [dart];
+    const leida = extractDartFromInternal(line, edges);
+    if (!leida) return [];
+    return [{
+      ...leida,
+      foldDirection: dart.foldDirection,
+      capShape: dart.capShape ?? leida.capShape,
+      edgeId: dart.edgeId ?? leida.edgeId,
+    }];
+  });
+}
+
+/**
  * Escribir un juego COMPLETO de darts de vuelta al almacenamiento (#1016).
  *
  * Es el inverso de `extractDarts` y el único camino por el que una op de
