@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 const H1 = 'Traza el patrón, mira la caída.';
 const ORIGEN = 'http://localhost:4179';
@@ -166,6 +166,22 @@ test.describe('móvil 390×844', () => {
   });
 });
 
+// Revisión final: entre 721 y 1000 px la rejilla de dos columnas dejaba el patrón en miniatura.
+test.describe('tableta 768×1024', () => {
+  test.use({ viewport: { width: 768, height: 1024 } });
+  test('el hero se apila: texto → patrón → visor, el patrón ≥ 300 px, sin scroll horizontal', async ({ page }) => {
+    await cargar(page);
+    const caja = async (sel: string) => (await page.locator(sel).boundingBox())!;
+    expect((await caja('.hero-patron')).width).toBeGreaterThanOrEqual(300);
+    expect((await caja('h1')).y).toBeLessThan((await caja('.hero-patron')).y);
+    expect((await caja('.hero-patron')).y).toBeLessThan((await caja('.hero-visor')).y);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(768);
+    // La figura sin recorte lateral: su caja guarda la proporción del fichero (1280×620).
+    const fig = await caja('img.fig-01');
+    expect(fig.width / fig.height).toBeCloseTo(1280 / 620, 1);
+  });
+});
+
 // Review Focus 5
 test.describe('pantalla de 320 px', () => {
   test.use({ viewport: { width: 320, height: 640 } });
@@ -192,10 +208,18 @@ test('trinquete de peso de la carga de / a 1366', async ({ page }) => {
       if (tipo === 'font') fuentes++;
     })());
   });
+  // Las imágenes de la carga dependen del umbral de distancia del lazy-load de Chromium: las
+  // figuras bajo el pliegue se piden ya en la carga inicial (por eso ~65 KB, no solo logo y póster).
   await page.goto('/', { waitUntil: 'networkidle' });
   await Promise.all(pendientes);
   const medido = { ...Object.fromEntries(Object.keys(TECHOS).map((k) => [k, bytes[k] ?? 0])), total: Object.values(bytes).reduce((a, b) => a + b, 0) };
-  if (process.env.HOME_PESO_UPDATE === '1') { writeFileSync(BASELINE, JSON.stringify(medido, null, 2) + '\n'); return; }
+  if (process.env.HOME_PESO_UPDATE === '1') {
+    // Solo baja (§ 8): subir un valor exige editarlo a mano en el JSON, a la vista del diff.
+    const previo = (existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {}) as Record<string, number>;
+    const nuevo = Object.fromEntries(Object.entries(medido).map(([k, v]) => [k, k in previo ? Math.min(v, previo[k]) : v]));
+    writeFileSync(BASELINE, JSON.stringify(nuevo, null, 2) + '\n');
+    return;
+  }
   const base = JSON.parse(readFileSync(BASELINE, 'utf8')) as Record<string, number>;
   expect(fuentes).toBeLessThanOrEqual(2);
   for (const [k, techo] of Object.entries(TECHOS)) {

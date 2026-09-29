@@ -48,7 +48,7 @@ React 18 · Redux Toolkit + Zustand · Three.js (WebGPU renderer) · Vite 6 · R
 git clone https://github.com/sssamuelll/vina.git
 cd vina
 npm install
-npm run dev        # workspace at http://localhost:5173
+npm run dev        # workspace at http://localhost:5173/app/
 npm test           # ~6,000 unit tests
 ```
 

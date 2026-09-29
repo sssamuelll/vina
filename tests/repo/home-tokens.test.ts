@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 
 const tokensCss = readFileSync('home/tokens.css', 'utf8');
-const homeCss = existsSync('home/home.css') ? readFileSync('home/home.css', 'utf8') : '';
-const html = existsSync('index.html') ? readFileSync('index.html', 'utf8') : '';
+const homeCss = readFileSync('home/home.css', 'utf8');
+const html = readFileSync('index.html', 'utf8');
 
 const tokens = Object.fromEntries(
   [...tokensCss.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]),

@@ -48,6 +48,9 @@ const MIME: Record<string, string> = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ico': 'image/x-icon',
+  '.webp': 'image/webp',
+  '.webmanifest': 'application/manifest+json',
+  '.wasm': 'application/wasm',
 };
 
 const copilotBridge = new CopilotBridge();
