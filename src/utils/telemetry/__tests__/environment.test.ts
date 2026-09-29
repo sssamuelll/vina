@@ -14,12 +14,12 @@ describe('getEnvironment', () => {
     expect(getEnvironment().build).toBeUndefined();
   });
 
-  it('con un <script src="/assets/index-abc.js"> presente, build es ese src', () => {
+  it('con un <script src="/assets/app-abc.js"> presente, build es ese src', () => {
     const script = document.createElement('script');
-    script.setAttribute('src', '/assets/index-abc.js');
+    script.setAttribute('src', '/assets/app-abc.js');
     document.head.appendChild(script);
 
-    expect(getEnvironment().build).toBe('/assets/index-abc.js');
+    expect(getEnvironment().build).toBe('/assets/app-abc.js');
   });
 
   it('flags incluye vina-use-webgpu y excluye blobs y claves ajenas', () => {
