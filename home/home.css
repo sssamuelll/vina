@@ -44,6 +44,8 @@ nav a:not(.pill):focus-visible { color: var(--tinta); }
 .marca { display: block; }
 .logo { height: 28px; width: auto; display: block; }
 nav { display: flex; align-items: center; gap: 28px; font-size: 14px; color: var(--tinta-70); }
+/* § 7: todo objetivo de puntero ≥ 24×24; el texto de 13–14 px solo da 19–21 de alto. */
+nav a:not(.pill) { display: inline-flex; align-items: center; min-height: 24px; }
 .pill { display: inline-flex; align-items: center; height: 36px; padding: 0 18px; border-radius: 999px; background: var(--tinta); color: var(--papel); font-size: 14px; font-weight: 500; }
 
 /* Hero */

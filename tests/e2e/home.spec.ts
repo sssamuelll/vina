@@ -88,6 +88,23 @@ test.describe('home a 1366×768', () => {
     for (const op of await page.locator('main section').evaluateAll((ss) => ss.map((s) => getComputedStyle(s).opacity))) expect(op).toBe('1');
   });
 
+  test('la descripción cabe en el snippet: 120–150 caracteres', async ({ page }) => {
+    await cargar(page);
+    const d = (await page.locator('meta[name="description"]').getAttribute('content'))!;
+    expect([...d].length).toBeGreaterThanOrEqual(120);
+    expect([...d].length).toBeLessThanOrEqual(150);
+  });
+
+  test('todo objetivo de puntero mide ≥ 24×24 (§ 7)', async ({ page }) => {
+    await cargar(page);
+    const chicos: string[] = [];
+    for (const el of await page.locator('a:visible, button:visible').all()) {
+      const b = (await el.boundingBox())!;
+      if (b.width < 24 || b.height < 24) chicos.push(`${(await el.innerText()).trim()} ${b.width.toFixed(1)}×${b.height.toFixed(1)}`);
+    }
+    expect(chicos).toEqual([]);
+  });
+
   test.describe('con reducción de movimiento', () => {
     // En Playwright 1.58 `reducedMotion` no es opción de test.use (se ignora en
     // silencio): va dentro de contextOptions.
