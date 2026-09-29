@@ -1,0 +1,17 @@
+/* Estilos de la home. Sin colores literales ni tokens con valor de reserva: todo
+ * sale de home/tokens.css (lo defiende tests/repo/home-tokens.test.ts). */
+
+@font-face {
+  font-family: 'Inter Variable';
+  src: url('./fonts/inter-latin-wght.woff2') format('woff2-variations');
+  font-weight: 100 900; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono Variable';
+  src: url('./fonts/jetbrains-mono-latin-wght.woff2') format('woff2-variations');
+  font-weight: 100 800; font-style: normal; font-display: swap;
+}
+/* Fallbacks métricos (Capsize 4 sobre los ficheros exactos, @fontsource-variable 5.3.0)
+ * → CLS 0 mientras cargan. Si se cambia un .woff2, se recalculan. */
+@font-face { font-family: 'Inter Fallback'; src: local('Arial'), local('ArialMT'); size-adjust: 107.1194%; ascent-override: 90.4365%; descent-override: 22.518%; line-gap-override: 0%; }
+@font-face { font-family: 'JetBrains Mono Fallback'; src: local('Arial'), local('ArialMT'); size-adjust: 134.5893%; ascent-override: 75.7861%; descent-override: 22.29%; line-gap-override: 0%; }

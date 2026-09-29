@@ -1,0 +1,32 @@
+/* Tokens de la home (vina.sdar.dev/). Otra superficie con otra paleta que el
+ * taller (src/styles/tokens.css): papel/tinta/señal frente a grafito/azul 248.
+ * Es el único fichero de la home con colores literales. Spec:
+ * docs/superpowers/specs/2026-09-28-homepage-design.md § 4.1. Contrastes WCAG 2
+ * recalculados por tests/repo/home-tokens.test.ts. */
+:root {
+  color-scheme: light;
+  --papel: #F4EFE6;          /* fondo; tinta encima 14,97:1 */
+  --papel-hundido: #EBE7DE;  /* banda de formatos */
+  --tinta: #1E1B18;          /* texto, botón primario, sección Código */
+  --tinta-70: #5E5B56;       /* entradillas, pies, navegación · 5,90:1 sobre papel */
+  --tinta-50: #89857F;       /* solo ≥ 24 px o decorativo · 3,20:1 */
+  --hairline: rgba(30, 27, 24, .12);   /* bordes de 1 px */
+  --hairline-fuerte: rgba(30, 27, 24, .28); /* contorno del botón secundario */
+  --rejilla-100: rgba(30, 27, 24, .055);
+  --rejilla-20: rgba(30, 27, 24, .028);
+  --senal: #C0472B;          /* cota del hero, foco · blanco encima 5,03:1 */
+  --senal-texto: #B34228;    /* enlaces y texto pequeño en color · 4,92:1 */
+  --oro: #F0D08A;            /* SOLO plano bajo tinta: marcador, MIT · 1,30:1 como texto: prohibido */
+  --gris: #9C958A;           /* reglas y adornos · 2,59:1 como texto: prohibido sobre papel */
+  --papel-60: #9E9A94;       /* texto secundario sobre --tinta · 6,12:1 */
+  --visor-arriba: #2a2825;   /* fondo del recuadro 3D, arriba */
+  --visor-abajo: #1f1d1a;    /* … y abajo: el único degradado de la página */
+  --visor-texto: #b7b4af;    /* indicador «Simulando» sobre el visor */
+  --visor-vivo: #4eb068;     /* el punto del indicador */
+  --ink: #2b2d33;            /* trazo del patrón del hero (la tinta del lienzo del taller) */
+  --ink-2: #6f7480;          /* hilo, piquetes y rótulos del patrón */
+  --blanco: #FFFFFF;         /* relleno de pieza y texto sobre --senal */
+  /* Los *Fallback son Arial con las métricas de cada fichero (home/home.css). */
+  --font-sans: 'Inter Variable', 'Inter Fallback', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono Fallback', ui-monospace, monospace;
+}
