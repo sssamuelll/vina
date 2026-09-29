@@ -3,7 +3,8 @@
  * Activos de la home desde el BUILD de producción (spec § 5.3–5.4 + enmienda 2026-09-29):
  * figuras del taller con el DXF de María, póster del visor, favicons, OG y manifest.
  *   npm run build && npx vite preview --port 4179 --strictPort     # terminal 1
- *   npm run home:activos -- --url=http://localhost:4179 [--espera=120000]
+ *   npm run home:activos -- --url=http://localhost:4179 [--espera=120000] [--sin-poster]
+ * --sin-poster salta el paso 7 (2,5 min de simulación); el resto sale byte a byte igual.
  * Los pasos del taller están copiados de scripts/capturas-ui.mjs (es un script, no un módulo).
  */
 import { chromium } from 'playwright';
@@ -17,6 +18,7 @@ const BASE = (arg('url') ?? 'http://localhost:4179').replace(/\/$/, '');
 // Headless no tiene WebGPU: simula en WASM a ~1 fps con las 29 000 partículas de la camiseta.
 // Medido el 2026-09-29: a los 8 s la tela ni ha empezado; a los 90–120 s ya está quieta.
 const ESPERA = Number(arg('espera') ?? 120_000);
+const SIN_POSTER = process.argv.includes('--sin-poster');
 const FIXTURE = path.join(REPO, 'tests/fixtures/garments/maria_patrones_samuel_2M.dxf');
 const PAPEL = '#F4EFE6';
 
@@ -176,16 +178,26 @@ await aWebp(page, png, 'home/img/fig-01-movil.webp', {
   ancho: 780,
 });
 
-// ── 6. fig-02: la paleta abierta (07-paleta), 1280×560 centrado al 30 % ──────
+// ── 6. fig-02: la paleta abierta (07-paleta), 1280×560 anclado a la paleta ───
+// La paleta se abre hacia arriba desde la barra de abajo (≈ 353–975 px): el recorte la
+// centra (con su campo de búsqueda) y se pega al borde si no cabe. El ratón, a un hueco del
+// lienzo, para que ninguna fila salga resaltada por un hover sobrante.
 await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+await page.mouse.move(W - 40, H / 2);
 await page.keyboard.press('Control+k'); await settle(800);
 png = await page.screenshot();
 const alto02 = Math.round(W * 560 / 1280);
-const y02 = Math.round((H - alto02) * 0.3);
+const paleta = await page.locator('.unified-bar__panel').boundingBox();
+const barra = await page.locator('.unified-bar').first().boundingBox();
+const [arriba, abajo] = [Math.min(paleta.y, barra.y), Math.max(paleta.y + paleta.height, barra.y + barra.height)];
+if (abajo - arriba + 24 > alto02) throw new Error(`fig-02: la paleta (${Math.round(abajo - arriba)} px) no cabe en ${alto02} con margen`);
+const y02 = Math.round(Math.min(Math.max((arriba + abajo) / 2 - alto02 / 2, 0), H - alto02));
 await aWebp(page, png, 'home/img/fig-02@2x.webp', { recorte: { x: 0, y: y02 * DPR, w: W * DPR, h: alto02 * DPR }, ancho: 2560 });
 await aWebp(page, png, 'home/img/fig-02@1x.webp', { recorte: { x: 0, y: y02 * DPR, w: W * DPR, h: alto02 * DPR }, ancho: 1280 });
 await page.keyboard.press('Escape');
 await context.close();
+
+if (SIN_POSTER) { await browser.close(); process.exit(0); }
 
 // ── 7. caida-poster: coser, vestir y simular, solo el lienzo 3D ─────────────
 // Navegador nuevo y 1600×1000 @1x: tras las capturas a @2x, o a más píxeles (3200×2000 a @2x,

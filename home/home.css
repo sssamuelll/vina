@@ -86,7 +86,7 @@ h2 { margin-top: 10px; font-size: 32px; line-height: 1.1; font-weight: 500; lett
 .intro { margin-top: 14px; font-size: 17px; color: var(--tinta-70); max-width: 560px; }
 .fig { margin-top: 40px; }
 .fig img { display: block; width: 100%; height: 620px; object-fit: cover; object-position: top; border: 1px solid var(--hairline); border-radius: 4px; }
-.fig img.fig-02 { height: 560px; object-position: center 30%; }
+.fig img.fig-02 { height: 560px; }
 .figcap { margin-top: 12px; font-size: 12px; color: var(--tinta-70); display: flex; justify-content: space-between; gap: 16px; }
 .cols { margin-top: 56px; display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 32px; }
 .cols > div { padding-top: 18px; border-top: 1px solid var(--hairline); }
