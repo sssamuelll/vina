@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * DXF de María → home/img/patron.svg (el patrón del hero de la home).
  * Determinista: mismo DXF, mismo SVG byte a byte (tests/repo/home-patron.test.ts
