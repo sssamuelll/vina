@@ -15,3 +15,14 @@
  * → CLS 0 mientras cargan. Si se cambia un .woff2, se recalculan. */
 @font-face { font-family: 'Inter Fallback'; src: local('Arial'), local('ArialMT'); size-adjust: 107.1194%; ascent-override: 90.4365%; descent-override: 22.518%; line-gap-override: 0%; }
 @font-face { font-family: 'JetBrains Mono Fallback'; src: local('Arial'), local('ArialMT'); size-adjust: 134.5893%; ascent-override: 75.7861%; descent-override: 22.29%; line-gap-override: 0%; }
+
+/* El patrón del hero (home/img/patron.svg, incrustado en el HTML). */
+.patron { display: block; width: 100%; height: 100%; }
+.patron .pieza { fill: var(--blanco); stroke: var(--ink); stroke-width: 1.25; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.patron .grainline { stroke: var(--ink-2); stroke-width: 1; marker-start: none; }
+.patron .notch { stroke: var(--ink); stroke-width: 1.25; }
+.patron .rotulo { font: 400 11px/1 var(--font-mono); fill: var(--ink-2); letter-spacing: .02em; }
+.patron .marcador { fill: var(--oro); opacity: .55; }
+.patron .cota path { stroke: var(--senal); stroke-width: 1; fill: none; }
+.patron .cota rect { fill: var(--senal); }
+.patron .cota text { font: 400 12px/1 var(--font-mono); fill: var(--blanco); font-variant-numeric: tabular-nums; }

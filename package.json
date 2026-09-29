@@ -35,7 +35,8 @@
     "determinism:diff": "tsx scripts/gpu-determinism-diff.ts",
     "bench": "tsx bench/run.ts",
     "bench:matchvertices": "tsx bench/matchVertices.bench.ts",
-    "bench:lra": "tsx bench/buildLRAConstraints.bench.ts"
+    "bench:lra": "tsx bench/buildLRAConstraints.bench.ts",
+    "home:patron": "tsx scripts/home/dxf-a-svg.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",

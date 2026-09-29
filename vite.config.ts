@@ -33,6 +33,19 @@ function serveWasmRaw(): import('vite').Plugin {
   };
 }
 
+/** La home incrusta ficheros en su HTML (`<!-- incluir: ruta -->`) para que el
+ *  SVG del hero herede los tokens y la fuente de la página: un <img> no puede. */
+function incluirEnHome(): import('vite').Plugin {
+  return {
+    name: 'incluir-en-home',
+    transformIndexHtml(html, ctx) {
+      // ctx.filename llega con barras normales también en Windows: no usar path.sep.
+      if (path.basename(ctx.filename) !== 'index.html' || /[\\/]app[\\/]index\.html$/.test(ctx.filename)) return html;
+      return html.replace(/<!-- incluir: ([\w/.-]+) -->/g, (_, rel) => fs.readFileSync(path.resolve(rel), 'utf8'));
+    },
+  };
+}
+
 export default defineConfig({
   base: '/',
   resolve: {
@@ -66,6 +79,7 @@ export default defineConfig({
   },
   plugins: [
     serveWasmRaw(),
+    incluirEnHome(),
     react(),
     nodePolyfills({
       // Only polyfill 'buffer' — needed by typedarray-pool (clean-pslg dep)
