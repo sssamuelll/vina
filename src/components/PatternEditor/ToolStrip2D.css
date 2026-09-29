@@ -5,10 +5,7 @@
   position: absolute;
   top: 28px; /* 20 px de regla + 8 de aire: nunca sobre la regla */
   right: 12px;
-  /* 328 = 300 × 12/11: la piel F1 subió el subtítulo de 11 a 12 px y a 300 px
-     partía en dos líneas (la tira pasó de 70 a 91 px y tapaba más lienzo).
-     El ancho crece con la letra para que tape lo mismo que antes. */
-  width: min(328px, calc(100% - 24px));
+  width: min(300px, calc(100% - 24px));
   /* Cromo acoplado al lienzo, no menú: la tira vive mientras haya herramienta
      2D activa. En --z-menu empataba con el modal de piquete, que declara esta
      misma esquina (enmienda 2026-09-05 del spec de emplazamiento). */
