@@ -119,7 +119,7 @@ test(`seam-gap: residual de cierre por costura (tether ${TETHER_OFF ? 'OFF' : 'O
     localStorage.setItem('vina-use-webgpu', 'true');
     if (tetherOff) localStorage.setItem('vina-tether-disabled', 'true');
   }, TETHER_OFF);
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
   await page.waitForFunction(
     () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),

@@ -31,7 +31,7 @@ import { test, expect, Page } from '@playwright/test';
 import { addPiece, activarHerramienta, clickAt, dispatch, st } from './helpers/lienzo';
 
 async function abrirApp(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
   await page.waitForTimeout(700);
   await page.locator('.toast__dismiss').evaluateAll((bs) => bs.forEach((b) => (b as HTMLElement).click())).catch(() => {});

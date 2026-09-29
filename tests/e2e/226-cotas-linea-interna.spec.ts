@@ -19,7 +19,7 @@ interface EstadoConInternals {
 }
 
 async function waitApp(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
   await page.waitForTimeout(500);
 }

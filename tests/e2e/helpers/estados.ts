@@ -17,7 +17,7 @@ export async function abrirAppVacia(page: Page): Promise<void> {
     localStorage.removeItem('vina-docks');
     localStorage.removeItem('vina-bar-position');
   });
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForFunction(() => Boolean((window as unknown as VentanaConStore).__VINA_STORE__), { timeout: 20_000 });
   await expect(page.locator('svg.pattern-svg')).toBeVisible({ timeout: 20_000 });
   // La app abre en Split (`editorSlice.ts:10`, `viewMode: 'split'`), y los

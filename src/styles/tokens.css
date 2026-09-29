@@ -148,7 +148,7 @@
 
   /* ── Tipografía (spec § 4.5) ────────────────────────────────────────── */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  /* Una sola mono, determinista: JetBrains Mono se carga en index.html; con
+  /* Una sola mono, determinista: JetBrains Mono se carga en app/index.html; con
    * 'SF Mono' primero, Mac y Windows rendían monos distintas. Mono = un dato
    * cuya alineación carácter a carácter significa algo (regla, cotas, píldora
    * de medida, kbd). La prosa va en --font-sans (contrato § 5). */

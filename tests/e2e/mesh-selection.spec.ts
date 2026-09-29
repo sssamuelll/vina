@@ -4,7 +4,7 @@
 import { test, expect, Page } from '@playwright/test';
 
 async function waitForApp(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
   await page.waitForTimeout(1000);
   const closeBtn = page.locator('button:has-text("✕")');

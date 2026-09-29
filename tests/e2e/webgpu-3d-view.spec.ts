@@ -21,7 +21,7 @@ test.describe('WebGPU 3D View Rendering', () => {
     await page.addInitScript(() => {
       localStorage.setItem('vina-use-webgpu', 'true');
     });
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
 
     // Switch to 3D view and wait for avatar to load + IK init
@@ -41,7 +41,7 @@ test.describe('WebGPU 3D View Rendering', () => {
     await page.addInitScript(() => {
       localStorage.setItem('vina-use-webgpu', 'true');
     });
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
     await page.click('button:has-text("3D")');
     await page.waitForTimeout(5000);
@@ -106,7 +106,7 @@ test.describe('WebGPU 3D View Rendering', () => {
     await page.addInitScript(() => {
       localStorage.setItem('vina-use-webgpu', 'false');
     });
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
     await page.click('button:has-text("3D")');
     await page.waitForTimeout(5000);

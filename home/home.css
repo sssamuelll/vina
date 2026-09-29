@@ -1,0 +1,170 @@
+/* Estilos de la home. Sin colores literales ni tokens con valor de reserva: todo
+ * sale de home/tokens.css (lo defiende tests/repo/home-tokens.test.ts). */
+
+@font-face {
+  font-family: 'Inter Variable';
+  src: url('./fonts/inter-latin-wght.woff2') format('woff2-variations');
+  font-weight: 100 900; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono Variable';
+  src: url('./fonts/jetbrains-mono-latin-wght.woff2') format('woff2-variations');
+  font-weight: 100 800; font-style: normal; font-display: swap;
+}
+/* Fallbacks métricos (Capsize 4 sobre los ficheros exactos, @fontsource-variable 5.3.0)
+ * → CLS 0 mientras cargan. Si se cambia un .woff2, se recalculan. */
+@font-face { font-family: 'Inter Fallback'; src: local('Arial'), local('ArialMT'); size-adjust: 107.1194%; ascent-override: 90.4365%; descent-override: 22.518%; line-gap-override: 0%; }
+@font-face { font-family: 'JetBrains Mono Fallback'; src: local('Arial'), local('ArialMT'); size-adjust: 134.5893%; ascent-override: 75.7861%; descent-override: 22.29%; line-gap-override: 0%; }
+
+/* Base */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: var(--papel); }
+body { background: var(--papel); color: var(--tinta); font: 400 16px/1.5 var(--font-sans); font-feature-settings: "cv01", "ss03"; -webkit-font-smoothing: antialiased; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+a { color: inherit; text-decoration: none; }
+.wrap { width: min(1280px, 100% - 48px); margin-inline: auto; }
+
+/* Estados (§ 4.4): todo :hover tiene su :focus-visible; ningún outline: none. */
+a, .btn { transition: color .18s cubic-bezier(.23, 1, .32, 1), opacity .18s cubic-bezier(.23, 1, .32, 1), transform .16s ease-out; }
+:focus-visible { outline: 2px solid var(--senal); outline-offset: 3px; border-radius: 4px; }
+.btn:active, .pill:active { transform: scale(.97); }
+nav a:not(.pill):focus-visible { color: var(--tinta); }
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover, .pill:hover { opacity: .82; }
+  nav a:not(.pill):hover { color: var(--tinta); }
+}
+
+/* Saltar al contenido: el primer foco de la página. */
+.saltar { position: absolute; left: 16px; top: -48px; z-index: 1; background: var(--tinta); color: var(--papel); padding: 8px 14px; border-radius: 999px; font-size: 14px; }
+.saltar:focus-visible { top: 12px; }
+
+/* Cabecera */
+.cabecera { height: 56px; border-bottom: 1px solid var(--hairline); background: var(--papel); }
+.cabecera .wrap { height: 100%; display: flex; align-items: center; justify-content: space-between; }
+.marca { display: block; }
+.logo { height: 28px; width: auto; display: block; }
+nav { display: flex; align-items: center; gap: 28px; font-size: 14px; color: var(--tinta-70); }
+/* § 7: todo objetivo de puntero ≥ 24×24; el texto de 13–14 px solo da 19–21 de alto. */
+nav a:not(.pill) { display: inline-flex; align-items: center; min-height: 24px; }
+.pill { display: inline-flex; align-items: center; height: 36px; padding: 0 18px; border-radius: 999px; background: var(--tinta); color: var(--papel); font-size: 14px; font-weight: 500; }
+
+/* Hero */
+.hero {
+  overflow: hidden;
+  background:
+    linear-gradient(var(--rejilla-100) 1px, transparent 1px) 0 0 / 100px 100px,
+    linear-gradient(90deg, var(--rejilla-100) 1px, transparent 1px) 0 0 / 100px 100px,
+    linear-gradient(var(--rejilla-20) 1px, transparent 1px) 0 0 / 20px 20px,
+    linear-gradient(90deg, var(--rejilla-20) 1px, transparent 1px) 0 0 / 20px 20px;
+}
+.hero .wrap { display: grid; grid-template-columns: 520px 1fr; column-gap: 56px; padding-top: 28px; }
+.hero .texto { grid-column: 1; grid-row: 1; }
+.hero-patron { grid-column: 2; grid-row: 1 / 3; height: 540px; }
+.hero-visor {
+  grid-column: 1; grid-row: 2; align-self: end; height: 300px; margin-top: 32px;
+  border: 1px solid var(--hairline); border-bottom: 0; border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, var(--visor-arriba), var(--visor-abajo));
+  overflow: hidden; position: relative;
+}
+/* El póster tapa el degradado; el indicador va detrás en el HTML y queda encima por orden. */
+.visor-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.indicador { position: absolute; left: 10px; top: 8px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--visor-texto); }
+.indicador i { width: 6px; height: 6px; border-radius: 50%; background: var(--visor-vivo); display: inline-block; }
+h1 { font-size: 48px; line-height: 1.05; font-weight: 500; letter-spacing: -0.03em; text-wrap: balance; }
+.lead { margin-top: 18px; font-size: 17px; color: var(--tinta-70); max-width: 480px; }
+.cta { margin-top: 26px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; height: 44px; padding: 0 22px; border-radius: 999px; font-size: 15px; font-weight: 500; }
+.btn-primario { background: var(--tinta); color: var(--papel); }
+.btn-contorno { border: 1px solid var(--hairline-fuerte); }
+.meta { margin-top: 16px; font-size: 12px; color: var(--tinta-70); }
+
+/* Secciones */
+section { padding: 96px 0; }
+.hero { padding: 0; }
+.eyebrow { font-size: 12px; line-height: 1.2; letter-spacing: .04em; text-transform: uppercase; color: var(--tinta-70); font-weight: 500; }
+h2 { margin-top: 10px; font-size: 32px; line-height: 1.1; font-weight: 500; letter-spacing: -0.02em; max-width: 640px; text-wrap: balance; }
+.intro { margin-top: 14px; font-size: 17px; color: var(--tinta-70); max-width: 560px; }
+.fig { margin-top: 40px; }
+.fig img { display: block; width: 100%; height: 620px; object-fit: cover; object-position: top; border: 1px solid var(--hairline); border-radius: 4px; }
+.fig img.fig-02 { height: 560px; }
+.figcap { margin-top: 12px; font-size: 12px; color: var(--tinta-70); display: flex; justify-content: space-between; gap: 16px; }
+.cols { margin-top: 56px; display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 32px; }
+.cols > div { padding-top: 18px; border-top: 1px solid var(--hairline); }
+h3 { font-size: 20px; line-height: 1.2; font-weight: 500; letter-spacing: -0.01em; }
+.cols p { margin-top: 8px; font-size: 15px; color: var(--tinta-70); }
+
+/* Formatos */
+.formatos { background: var(--papel-hundido); }
+.fila { margin-top: 36px; display: grid; grid-template-columns: 120px 1fr; column-gap: 24px; padding: 18px 0; border-top: 1px solid var(--hairline); font-size: 14px; }
+.fila:last-child { border-bottom: 1px solid var(--hairline); }
+.fila dt { font-weight: 500; color: var(--tinta); }
+.fila dd { margin: 0; color: var(--tinta-70); }
+
+/* Código (sección oscura) */
+.cierre { background: var(--tinta); color: var(--papel); }
+.cierre .eyebrow, .cierre .intro { color: var(--papel-60); }
+.cierre .btn-primario { background: var(--papel); color: var(--tinta); }
+.cierre .btn-contorno { border-color: color-mix(in srgb, var(--papel) 35%, transparent); color: var(--papel); }
+.repo { margin-top: 40px; font-size: 13px; color: var(--papel-60); }
+.repo em { font-style: normal; color: var(--papel); background: color-mix(in srgb, var(--oro) 18%, transparent); padding: 2px 6px; }
+
+/* Pie */
+.pie { border-top: 1px solid var(--hairline); padding: 28px 0; font-size: 13px; line-height: 1.45; color: var(--tinta-70); }
+.pie .wrap { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.pie nav { gap: 20px; font-size: 13px; }
+
+/* Sin entrada de secciones al hacer scroll (§ 4.4 la permitía con view()): un fundido
+ * ligado al scroll deja en reposo con opacidad parcial —y contraste bajo— toda sección
+ * que se quede a medio entrar. axe lo cazó a 1366×768 en #taller (opacidad 0,16). */
+
+/* Tipografía por pasos (§ 4.2): enteros, nada de escala fluida. */
+@media (min-width: 1440px) {
+  h1 { font-size: 56px; }
+  h2 { font-size: 36px; }
+  h3 { font-size: 22px; }
+  .lead, .intro { font-size: 18px; }
+}
+@media (min-width: 1600px) {
+  h1 { font-size: 64px; }
+  h2 { font-size: 40px; }
+  h3 { font-size: 24px; }
+}
+
+/* Tableta y ventanas estrechas: con 520 px de texto el patrón quedaba en miniatura
+ * (97 px a 721, 144 a 768). Una columna, texto → patrón → visor, y las figuras a su
+ * proporción en vez de recortarse de lado. */
+@media (max-width: 1000px) {
+  .hero .wrap { grid-template-columns: 1fr; }
+  .hero .texto, .hero-patron, .hero-visor { grid-column: 1; grid-row: auto; }
+  .hero-patron { margin-top: 28px; }
+  .hero-visor { order: 1; margin-top: 0; } /* en el HTML va antes que el patrón */
+  .fig img, .fig img.fig-02 { height: auto; }
+}
+
+/* Móvil: una columna (la de arriba), más baja. */
+@media (max-width: 720px) {
+  .wrap { width: min(1280px, 100% - 32px); }
+  nav a:not(.pill) { display: none; }
+  .hero .wrap { padding-top: 32px; }
+  .hero-patron { height: 420px; }
+  .hero-visor { height: 240px; }
+  h1 { font-size: 36px; }
+  h2 { font-size: 28px; }
+  .eyebrow { font-size: 11px; }
+  section { padding: 64px 0; }
+  .fig img, .fig img.fig-02 { height: 260px; }
+  .figcap { flex-direction: column; gap: 4px; }
+  .cols { grid-template-columns: 1fr; row-gap: 24px; margin-top: 40px; }
+  .fila { grid-template-columns: 1fr; row-gap: 6px; }
+}
+
+/* El patrón del hero (home/img/patron.svg, incrustado en el HTML). */
+.patron { display: block; width: 100%; height: 100%; }
+.patron .pieza { fill: var(--blanco); stroke: var(--ink); stroke-width: 1.25; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.patron .grainline { stroke: var(--ink-2); stroke-width: 1; marker-start: none; }
+.patron .notch { stroke: var(--ink); stroke-width: 1.25; }
+.patron .rotulo { font: 400 11px/1 var(--font-mono); fill: var(--ink-2); letter-spacing: .02em; }
+.patron .marcador { fill: var(--oro); opacity: .55; }
+.patron .cota path { stroke: var(--senal); stroke-width: 1; fill: none; }
+.patron .cota rect { fill: var(--senal); }
+.patron .cota text { font: 400 12px/1 var(--font-mono); fill: var(--blanco); font-variant-numeric: tabular-nums; }

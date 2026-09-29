@@ -23,7 +23,9 @@ export interface Environment {
 
 const MAX_FLAG_VALUE_CHARS = 32;
 const FLAG_PREFIX = 'vina-';
-const BUILD_SCRIPT_MARKER = 'assets/index-';
+// El chunk de entrada se llama como su clave en `build.rollupOptions.input`
+// de vite.config.ts: `app` → assets/app-<hash>.js. Si cambias la clave, cambia esto.
+const BUILD_SCRIPT_MARKER = 'assets/app-';
 
 /** `src` (atributo, no la URL resuelta) del primer `<script>` de build servido, o `undefined` en dev. */
 function findBuild(): string | undefined {

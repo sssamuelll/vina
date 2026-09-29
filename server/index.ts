@@ -20,6 +20,7 @@ import path from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { handleAPI } from './api.js';
 import { CopilotBridge } from './copilotBridge.js';
+import { resolverRuta } from './rutas.js';
 
 const HOME = process.env.HOME || process.env.USERPROFILE || '.';
 // Migración one-shot del dir de datos: ~/.openclo → ~/.vina (rename entero)
@@ -47,6 +48,9 @@ const MIME: Record<string, string> = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ico': 'image/x-icon',
+  '.webp': 'image/webp',
+  '.webmanifest': 'application/manifest+json',
+  '.wasm': 'application/wasm',
 };
 
 const copilotBridge = new CopilotBridge();
@@ -65,13 +69,10 @@ const server = http.createServer(async (req, res) => {
     return handleAPI(req, res, url, PROJECTS_DIR, copilotBridge);
   }
 
-  // Static file serving
-  let filePath = path.join(DIST_DIR, url.pathname === '/' ? 'index.html' : url.pathname);
-
-  // SPA fallback
-  if (!fs.existsSync(filePath)) {
-    filePath = path.join(DIST_DIR, 'index.html');
-  }
+  const destino = resolverRuta(url.pathname, (rel) => fs.existsSync(path.join(DIST_DIR, rel)) && fs.statSync(path.join(DIST_DIR, rel)).isFile());
+  if (destino.tipo === 'redirigir') { res.writeHead(301, { Location: destino.a }); res.end(); return; }
+  if (destino.tipo === 'no-encontrado') { res.writeHead(404); res.end('Not Found'); return; }
+  const filePath = path.join(DIST_DIR, destino.ruta);
 
   try {
     const content = fs.readFileSync(filePath);

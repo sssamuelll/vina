@@ -34,7 +34,7 @@ const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 
 try {
-  await page.goto(BASE);
+  await page.goto(`${BASE}/app/`);
   await page.waitForSelector('.canvas-area', { timeout: 20000 });
   await page.waitForFunction(() => Boolean(window.__VINA_STORE__), { timeout: 15000 });
   await page.waitForTimeout(1200);

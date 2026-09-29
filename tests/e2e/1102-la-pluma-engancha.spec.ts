@@ -22,7 +22,7 @@ test.describe('la pluma engancha, y se ve que engancha', () => {
   test.setTimeout(120_000);
 
   test('los puntos de la pieza aparecen con la pluma y NO con otra herramienta', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
     await page.waitForTimeout(600);
     await addPiece(page, 'p1', { x: 120, y: 140 }, 200, 150);
@@ -43,7 +43,7 @@ test.describe('la pluma engancha, y se ve que engancha', () => {
   });
 
   test('acercarse a un vértice enciende el anillo y el clic cae exacto', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
     await page.waitForTimeout(600);
     await addPiece(page, 'p1', { x: 120, y: 140 }, 200, 150);
@@ -80,7 +80,7 @@ test.describe('la pluma engancha, y se ve que engancha', () => {
   test('y el trazo que sale arranca en la esquina exacta de la pieza vecina', async ({ page }) => {
     // El resultado, no el intermedio: lo que se guarda tiene que empezar donde
     // ella quiso, porque de ahí sale el patrón.
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
     await page.waitForTimeout(600);
     await addPiece(page, 'p1', { x: 120, y: 140 }, 200, 150);

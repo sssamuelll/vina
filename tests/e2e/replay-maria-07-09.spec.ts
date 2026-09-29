@@ -194,7 +194,7 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
   }
 
   try {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.locator('svg.pattern-svg')).toBeVisible({ timeout: 20_000 });
     await page.waitForFunction(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__));
     await expect(page.getByRole('button', { name: 'Split', exact: true })).toBeVisible();

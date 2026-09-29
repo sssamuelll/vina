@@ -12,7 +12,7 @@ test.use({ viewport: { width: 1366, height: 643 } });
 
 test.describe('#1097 — zoom a 40× con aviso', () => {
   test('la rueda acerca más allá del viejo tope de 10, y avisa una sola vez al llegar al nuevo tope', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
     await page.waitForTimeout(500);
     await addPiece(page, 'p1', { x: 0, y: 0 }, 200, 200);
@@ -53,7 +53,7 @@ test.describe('#1097 — zoom a 40× con aviso', () => {
   });
 
   test('el trazo del contorno engorda visiblemente entre 1× y 40× (no se lee "pixelado" para siempre)', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
     await page.waitForTimeout(500);
     await addPiece(page, 'p1', { x: 0, y: 0 }, 200, 200);

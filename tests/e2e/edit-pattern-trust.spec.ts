@@ -30,7 +30,7 @@ async function commandValues(page: Page, pieceId: string, commandIndex: number):
 
 test('María DXF: editPattern visible → slow drag → undo/redo keeps marker on geometry', async ({ page }) => {
   await page.addInitScript(() => localStorage.removeItem('vina-docks'));
-  await page.goto('/');
+  await page.goto('/app/');
   const svg = page.locator('svg.pattern-svg');
   await expect(svg).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('button', { name: 'Editar patrón · Q' })).toBeVisible();

@@ -31,11 +31,14 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:gpu": "playwright test --config playwright.webgpu.config.ts",
+    "test:e2e:home": "playwright test --config playwright.home.config.ts",
     "test:e2e:gpu:determinism": "playwright test --config playwright.webgpu.config.ts -g determinism --repeat-each=5",
     "determinism:diff": "tsx scripts/gpu-determinism-diff.ts",
     "bench": "tsx bench/run.ts",
     "bench:matchvertices": "tsx bench/matchVertices.bench.ts",
-    "bench:lra": "tsx bench/buildLRAConstraints.bench.ts"
+    "bench:lra": "tsx bench/buildLRAConstraints.bench.ts",
+    "home:patron": "tsx scripts/home/dxf-a-svg.mjs",
+    "home:activos": "node scripts/home/activos.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
@@ -63,6 +66,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.17.0",
     "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",

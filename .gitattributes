@@ -16,3 +16,7 @@ scripts/*.sh text eol=lf
 
 # El gate de push corre la suite completa; mismas razones de LF que pre-commit.
 .husky/pre-push text eol=lf
+
+# El SVG del hero lo compara byte a byte tests/repo/home-patron.test.ts con la
+# salida del generador (LF). Un checkout CRLF lo rompería. Force LF.
+home/img/patron.svg text eol=lf

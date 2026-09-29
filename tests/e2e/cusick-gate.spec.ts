@@ -46,7 +46,7 @@ async function runCusick(page: Page, fabricId: string): Promise<CusickGpuResult>
     // pero el flag mantiene el contrato del gate explícito en el entorno.
     localStorage.setItem('vina-tether-disabled', 'true');
   });
-  await page.goto(`/?testScene=cusick&fabric=${fabricId}`);
+  await page.goto(`/app/?testScene=cusick&fabric=${fabricId}`);
   await page.waitForFunction(
     () =>
       (window as unknown as { __VINA_CUSICK__?: { done?: boolean } }).__VINA_CUSICK__

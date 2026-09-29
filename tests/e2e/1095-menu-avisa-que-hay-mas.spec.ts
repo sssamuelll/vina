@@ -15,7 +15,7 @@ test.use({ viewport: { width: 1366, height: 643 } });
 
 test.describe('#1095 — el menú avisa cuando hay más filas abajo', () => {
   test('degradado + flecha aparecen con overflow, y desaparecen al llegar al fondo', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
     await page.waitForTimeout(500);
 
@@ -96,7 +96,7 @@ test.describe('#1095 — el menú avisa cuando hay más filas abajo', () => {
   });
 
   test('ronda 2 (hallazgo del review): el submenú "Duplicar" es alcanzable con el mouse, no queda recortado', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
     await page.waitForTimeout(500);
     await addPiece(page, 'p1', { x: 100, y: 100 }, 200, 200);
@@ -130,7 +130,7 @@ test.describe('#1095 — el menú avisa cuando hay más filas abajo', () => {
   });
 
   test('ronda 2: el submenú "Duplicar" también se abre y se ejecuta por teclado', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
     await page.waitForTimeout(500);
     await addPiece(page, 'p1', { x: 100, y: 100 }, 200, 200);
@@ -154,7 +154,7 @@ test.describe('#1095 — el menú avisa cuando hay más filas abajo', () => {
   });
 
   test('un menú corto (sin overflow) no muestra ninguna señal', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
     await page.waitForTimeout(500);
 

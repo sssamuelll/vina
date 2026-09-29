@@ -135,7 +135,7 @@ function isViteGraphUrl(value) {
   const url = new URL(value, BASE_URL);
   if (url.origin !== ORIGIN) return false;
   const pathname = url.pathname;
-  return pathname === '/'
+  return pathname === '/app/'
     || pathname.startsWith('/src/')
     || pathname.startsWith('/@')
     || pathname.startsWith('/node_modules/.vite/')
@@ -173,8 +173,8 @@ function extractViteGraphUrls(source, baseUrl) {
 
 async function captureViteModuleGraph() {
   frozenResponses.clear();
-  const queued = new Set([`${BASE_URL}/`]);
-  let frontier = [`${BASE_URL}/`];
+  const queued = new Set([`${BASE_URL}/app/`]);
+  let frontier = [`${BASE_URL}/app/`];
   const maxEntries = 5_000;
   const maxBytes = 300 * 1024 * 1024;
   let totalBytes = 0;
@@ -191,7 +191,7 @@ async function captureViteModuleGraph() {
           headers: { accept: '*/*' },
         });
         if (!response.ok) {
-          if (url === `${BASE_URL}/`) throw new Error(`No se pudo congelar ${url}: HTTP ${response.status}`);
+          if (url === `${BASE_URL}/app/`) throw new Error(`No se pudo congelar ${url}: HTTP ${response.status}`);
           networkSnapshot.candidatos404Ignorados += 1;
           return null;
         }
@@ -426,7 +426,7 @@ async function prepareEmptyBase(viewport = DEFAULT_VIEWPORT) {
   // 90 s por la misma razón que la espera de `.app-shell` en waitForApp: con Vite
   // frío, el grafo transformado tarda más que los 30 s por defecto. Si cambias uno,
   // cambia el otro.
-  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 90_000 });
+  await page.goto(`${BASE_URL}/app/`, { waitUntil: 'domcontentloaded', timeout: 90_000 });
   await waitForApp(0);
   await dismissToasts();
   await settleUI();
@@ -436,7 +436,7 @@ async function prepareLoadedBase(viewport = DEFAULT_VIEWPORT) {
   await ensurePage();
   await page.setViewportSize(viewport);
   // Mismo 90 s que prepareEmptyBase y que waitForApp (ver el comentario de ambas).
-  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 90_000 });
+  await page.goto(`${BASE_URL}/app/`, { waitUntil: 'domcontentloaded', timeout: 90_000 });
   await waitForApp(EXPECTED_PIECES);
   await clickViewMode('Split');
   await dismissToasts();

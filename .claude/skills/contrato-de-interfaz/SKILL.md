@@ -179,7 +179,7 @@ la barra de IA.
   (regla, cotas, píldora de medida, `kbd`). Toda la prosa del cromo va en
   `--font-sans`: el estado, los rótulos del dock, el estado vacío, el valor de
   una opción. Una sola familia de cada: Inter y JetBrains Mono, nada más se
-  carga (`index.html`). Lo fija `tipografia-del-cromo.test.ts`, selector por
+  carga (`app/index.html`). Lo fija `tipografia-del-cromo.test.ts`, selector por
   selector. (Enmienda 2026-09-26; la revisión del 04-09 § 8 decía «Schibsted +
   mono», que no era lo que el código hacía.)
 

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
@@ -32,6 +33,22 @@ function serveWasmRaw(): import('vite').Plugin {
   };
 }
 
+/** La home incrusta ficheros en su HTML (`<!-- incluir: ruta -->`) para que el
+ *  SVG del hero herede los tokens y la fuente de la página: un <img> no puede. */
+function incluirEnHome(): import('vite').Plugin {
+  return {
+    name: 'incluir-en-home',
+    transformIndexHtml(html, ctx) {
+      // ctx.filename llega con barras normales también en Windows: no usar path.sep.
+      if (path.basename(ctx.filename) !== 'index.html' || /[\\/]app[\\/]index\.html$/.test(ctx.filename)) return html;
+      return html.replace(/<!-- incluir: ([\w/.-]+) -->/g, (_, rel) => fs.readFileSync(path.resolve(rel), 'utf8'));
+    },
+  };
+}
+
+// La home muestra «v0.11»: se lee de package.json en build (spec § 3.6).
+process.env.VITE_VINA_VERSION = JSON.parse(fs.readFileSync('package.json', 'utf8')).version.split('.').slice(0, 2).join('.');
+
 export default defineConfig({
   base: '/',
   resolve: {
@@ -50,6 +67,10 @@ export default defineConfig({
   build: {
     outDir: './dist',
     rollupOptions: {
+      input: {
+        inicio: fileURLToPath(new URL('./index.html', import.meta.url)),
+        app: fileURLToPath(new URL('./app/index.html', import.meta.url)),
+      },
       output: {
         manualChunks(id) {
           // All of Three.js in one chunk — splitting into separate chunks
@@ -61,6 +82,7 @@ export default defineConfig({
   },
   plugins: [
     serveWasmRaw(),
+    incluirEnHome(),
     react(),
     nodePolyfills({
       // Only polyfill 'buffer' — needed by typedarray-pool (clean-pslg dep)

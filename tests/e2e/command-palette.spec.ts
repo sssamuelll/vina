@@ -38,7 +38,7 @@ async function setViewMode(page: Page, mode: string) {
 
 test.describe('Command Palette (UnifiedBar commands mode)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 10000 });
   });
 
