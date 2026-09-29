@@ -1,6 +1,6 @@
 # Homepage de Vina — el patrón sobre la página
 
-> **Estado:** implementado el 2026-09-29 (PR #N); publicado: pendiente de nginx y repo público. Plan: `docs/superpowers/plans/2026-09-29-homepage.md`; lo que falta para publicar: `docs/superpowers/specs/2026-09-29-homepage-nginx.md`. **Enmendado el 2026-09-29 (§ 12): manda sobre el cuerpo.**
+> **Estado:** implementado el 2026-09-29 (PR #1218); publicado: pendiente de nginx y repo público. Plan: `docs/superpowers/plans/2026-09-29-homepage.md`; lo que falta para publicar: `docs/superpowers/specs/2026-09-29-homepage-nginx.md`. **Enmendado el 2026-09-29 (§ 12): manda sobre el cuerpo.**
 > Sale de `docs/reports/2026-09-27-homepage-competencia-y-referentes.md` (investigación del
 > 2026-09-27: 12 CAD de moda, 16 entrantes con IA, 24 homepages de software premium, 20 casas de
 > lujo, técnica; sus cinco notas están en `docs/reports/2026-09-27-homepage-investigacion/`) y del
