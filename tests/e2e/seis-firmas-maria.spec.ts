@@ -106,7 +106,10 @@ test.describe('seis firmas de María', () => {
 
     // Crear una pieza tampoco los enciende: los largos no van atados a la creación.
     await activarHerramienta(page, 's', 'rectangle');
-    await arrastrar(page, { x: 380, y: 100 }, { x: 580, y: 250 });
+    // Desde y 130 y no 100: en Split a 1280×720 el (380, 100) caía a 2 px del
+    // borde de abajo de la tira de herramienta, y con la piel F1 la tira lo
+    // tapaba (medido 2026-09-29). Este arrastre solo crea la segunda pieza.
+    await arrastrar(page, { x: 380, y: 130 }, { x: 580, y: 280 });
     await expect.poll(async () => (await estado(page)).project.pieces.length).toBe(2);
     await expect(page.getByRole('button', { name: /^Ancho de la pieza:/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Alto de la pieza:/ })).toBeVisible();
