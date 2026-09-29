@@ -9,7 +9,18 @@
  * jsdom no calcula layout: `elementFromPoint` y `getBoundingClientRect` solo
  * existen aquí.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+/** Líneas que ocupa el subtítulo de la tira, con las fuentes ya cargadas: con
+ *  el fallback el texto es más estrecho y cabe aunque con Inter no quepa. */
+async function subtituloEnLineas(page: Page) {
+  const sujeto = page.locator('.tool-strip__subject');
+  await expect(sujeto).toBeVisible();
+  return sujeto.evaluate(async (el) => {
+    await document.fonts.ready;
+    return Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight));
+  });
+}
 
 test.describe('emplazamiento de la tira y las cotas (laptop de María, 1366×643)', () => {
   test.use({ viewport: { width: 1366, height: 643 } });
@@ -37,6 +48,14 @@ test.describe('emplazamiento de la tira y las cotas (laptop de María, 1366×643
     expect(r.tiraTop - r.areaTop).toBeGreaterThanOrEqual(20);
   });
 
+  test('el subtítulo de la tira cabe en una línea', async ({ page }) => {
+    await page.goto('/app/');
+    await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
+    await page.getByRole('button', { name: 'Rectángulo' }).first().click();
+    const lineas = await subtituloEnLineas(page);
+    expect(lineas, 'el subtítulo de Rectángulo parte en dos y la tira tapa más lienzo').toBe(1);
+  });
+
   test('las cotas se ocultan mientras se arrastra la pieza y vuelven al soltar', async ({ page }) => {
     await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
@@ -54,5 +73,20 @@ test.describe('emplazamiento de la tira y las cotas (laptop de María, 1366×643
     await expect(ancho).toHaveCount(0);
     await page.mouse.up();
     await expect(ancho).toBeVisible();
+  });
+});
+
+// La vista por defecto es Split: el lienzo 2D es la mitad de la ventana, y ahí
+// la tira de 300 px partía el subtítulo desde la piel F1 (Inter 12 px, antes
+// 11): 91 px de alto en vez de 70, y el arrastre de seis-firmas D1 que empieza
+// justo bajo la tira caía encima de ella (medido 2026-09-29).
+test.describe('la tira en Split (1280×720)', () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+
+  test('el subtítulo de la tira cabe en una línea', async ({ page }) => {
+    await page.goto('/app/');
+    await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
+    await page.getByRole('button', { name: 'Rectángulo' }).first().click();
+    expect(await subtituloEnLineas(page)).toBe(1);
   });
 });
