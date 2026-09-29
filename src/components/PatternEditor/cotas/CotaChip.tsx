@@ -288,7 +288,7 @@ function ChipEditable({
       if (!referenciaVisible(cota)) return unico;
       return (
         <div
-          ref={editorRef} className="cota cota--grupo cota--grupo-editando" style={{ left, top }}
+          ref={editorRef} className="cota cota--grupo cota--grupo-editando" data-superficie="cabina" style={{ left, top }}
           onContextMenu={(e) => e.preventDefault()}
         >
           <label className="cota-campo">
@@ -300,7 +300,7 @@ function ChipEditable({
     }
     return (
       <div
-        ref={editorRef} className="cota cota--grupo cota--grupo-editando" style={{ left, top }}
+        ref={editorRef} className="cota cota--grupo cota--grupo-editando" data-superficie="cabina" style={{ left, top }}
         onContextMenu={(e) => e.preventDefault()}
       >
         {campos.map((campo, indice) => (
@@ -326,6 +326,7 @@ function ChipEditable({
       ref={buttonRef}
       type="button"
       className={`cota${cota.primary ? '' : ' cota--hueca'}${cota.scrub === false ? ' cota--sin-scrub' : ''}`}
+      data-superficie="cabina"
       style={{ left, top }}
       aria-label={campos.map(campo => campo.label + ': ' + textoVisible(campo)).join(' · ')}
       aria-disabled={disabled || undefined}

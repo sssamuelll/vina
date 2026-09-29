@@ -1,7 +1,7 @@
 import type { Point2D } from '../../../types/types';
 import type { AnchorRole } from '../anchorRoles';
 
-export type AnchorVisualState = 'idle' | 'hovered' | 'selected';
+export type AnchorVisualState = 'reposo' | 'idle' | 'hovered' | 'selected';
 
 export interface AnchorGlyphProps {
   role: AnchorRole;
@@ -11,9 +11,15 @@ export interface AnchorGlyphProps {
   className?: string;
 }
 
+/* Tinta sobre el papel (spec 2026-09-24 § 4.6): en reposo el punto es una
+ * referencia y va en tinta; elegida la pieza, en el acento del lienzo; bajo el
+ * cursor, en su paso fuerte (seleccionado > hover > reposo, contrato § 4). El
+ * nodo elegido conserva su dorado: es el color que los e2e de Q y el replay de
+ * María [07-09] buscan. */
 const STATE_COLOR: Record<AnchorVisualState, string> = {
-  idle: '#4A9EFF',
-  hovered: '#6BB3FF',
+  reposo: 'var(--ink-on-light-2)',
+  idle: 'var(--accent-2d)',
+  hovered: 'var(--accent-2d-fuerte)',
   selected: '#FFD700',
 };
 
@@ -36,20 +42,20 @@ export default function AnchorGlyph({
       {role === 'openEndpoint' && (
         <polygon
           points={`0,${-halfLarge} ${halfLarge},0 0,${halfLarge} ${-halfLarge},0`}
-          fill={color} stroke="#fff" strokeWidth={strokeWidth}
+          fill={color} stroke="var(--piece-fill-2d)" strokeWidth={strokeWidth}
         />
       )}
       {role === 'corner' && (
         <rect
           x={-halfLarge} y={-halfLarge}
           width={halfLarge * 2} height={halfLarge * 2}
-          fill={color} stroke="#fff" strokeWidth={strokeWidth}
+          fill={color} stroke="var(--piece-fill-2d)" strokeWidth={strokeWidth}
         />
       )}
       {role === 'bezierAnchor' && (
         <>
           <circle
-            r={4.5 / zoom2D} fill="none" stroke="#fff"
+            r={4.5 / zoom2D} fill="none" stroke="var(--piece-fill-2d)"
             strokeWidth={3 / zoom2D}
           />
           <circle
@@ -63,7 +69,7 @@ export default function AnchorGlyph({
           <rect
             x={-halfSmall} y={-halfSmall}
             width={halfSmall * 2} height={halfSmall * 2}
-            fill="none" stroke="#fff" strokeWidth={3 / zoom2D}
+            fill="none" stroke="var(--piece-fill-2d)" strokeWidth={3 / zoom2D}
           />
           <rect
             x={-halfSmall} y={-halfSmall}

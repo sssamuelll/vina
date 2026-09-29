@@ -441,6 +441,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
         // submenú se esfumaba a medio camino. Solo salir del panel cierra.
         <div
           className="logo-menu"
+          data-superficie="menu"
           onMouseLeave={() => { setHoveredTop(null); setHoveredSub(null); }}
         >
           {/* Top-level menu items with submenus */}

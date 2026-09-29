@@ -64,6 +64,7 @@ export default function FloatingActionBar({
   return (
     <div
       className="floating-action-bar"
+      data-superficie="cabina"
       style={{
         position: 'absolute',
         left,

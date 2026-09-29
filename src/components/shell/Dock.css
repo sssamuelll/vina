@@ -9,11 +9,13 @@
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  padding: 7px;
-  /* Material `chrome`: va acoplado a la canaleta, así que es opaco. */
+  padding: 4px;
+  /* Material `chrome`: va acoplado a la canaleta, así que es opaco y sin
+     sombra. Radio 10 = 6 del botón + 4 de padding (radios concéntricos,
+     spec 2026-09-24 § 4.4): es el único sitio con --radius-lg. */
   background: var(--surface-chrome-bg);
   border: var(--surface-chrome-border);
-  border-radius: var(--surface-chrome-radius);
+  border-radius: var(--radius-lg);
   box-shadow: var(--surface-chrome-shadow);
   /* Acotado, porque va centrado: `top:50%` con `translateY(-50%)` reparte lo
      que sobra por ARRIBA y por abajo a la vez, así que sin tope no se sale por
@@ -36,9 +38,9 @@
 .dock--right { right: 14px; }
 
 .dock__label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
+  font-family: var(--font-sans);
+  font-size: var(--text-1);
+  font-weight: var(--weight-medium);
   letter-spacing: 0.06em;
   color: var(--text-muted);
   padding: 2px 0 4px;
@@ -68,7 +70,7 @@
   justify-content: center;
   background: transparent;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
@@ -116,15 +118,15 @@
 }
 
 .dock__auto-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 8.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-ghost);
+  color: var(--text-tertiary);
 }
 
-.dock__tool--auto { color: var(--dock-auto); }
-.dock__tool--auto:hover { color: var(--dock-auto); background: var(--bg-elevated); }
+.dock__tool--auto { color: var(--ai); }
+.dock__tool--auto:hover { color: var(--ai); background: var(--bg-elevated); }
 
 .dock__tool-wrap {
   position: relative;
@@ -149,12 +151,14 @@
   border: 1px solid var(--border);
   background: var(--bg-surface);
   cursor: pointer;
-  transition: transform var(--transition-fast);
+  transition: border-color var(--transition-fast);
 }
 
-.dock__badge:hover { transform: scale(1.22); }
-.dock__badge--pin { color: var(--accent); }
-.dock__badge--auto { color: var(--dock-auto); }
+/* El hover cambia tinta o borde, nunca escala ni brillo (spec § 4.4). */
+.dock__badge:hover { border-color: var(--accent); }
+/* Un icono de 15 px escrito con el acento va en su rol de tinta. */
+.dock__badge--pin { color: var(--accent-ink); }
+.dock__badge--auto { color: var(--ai); }
 
 /* ── ＋ customize editor (slice 4) ── */
 .dock-editor { position: relative; display: flex; }
@@ -167,7 +171,7 @@
   justify-content: center;
   background: transparent;
   border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
   transition: border-color var(--transition-fast), color var(--transition-fast);
@@ -184,17 +188,18 @@
   max-height: 60vh;
   overflow-y: auto;
   padding: 6px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  /* Es un flyout: material overlay entero, por token. */
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
 }
 .dock-picker__title {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--text-ghost);
+  color: var(--text-tertiary);
   padding: 4px 6px;
 }
 .dock-picker__list { list-style: none; margin: 0; padding: 0; }
@@ -206,7 +211,7 @@
   padding: 6px 8px;
   background: transparent;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
   cursor: pointer;
   text-align: left;
@@ -216,7 +221,7 @@
 .dock-picker__item--on { color: var(--text-primary); }
 .dock-picker__label { flex: 1; font-size: 12px; }
 .dock-picker__kbd { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
-.dock-picker__check { width: 12px; color: var(--accent); }
+.dock-picker__check { width: 12px; color: var(--accent-ink); }
 .dock-picker__reset {
   width: 100%;
   margin-top: 4px;

@@ -132,6 +132,7 @@ export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function
         <div
           key={largo.cota.id}
           className="cota cota--lectura"
+          data-superficie="cabina"
           aria-hidden="true"
           style={{ left: largo.left, top: largo.top, pointerEvents: 'none' }}
         >
@@ -141,6 +142,7 @@ export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function
       {lectura && lecturaPosition && (
         <div
           className={`cota cota--lectura${lectura.primary ? '' : ' cota--hueca'}`}
+          data-superficie="cabina"
           aria-hidden="true"
           aria-disabled={lecturaApagada || undefined}
           data-lectura-hover=""

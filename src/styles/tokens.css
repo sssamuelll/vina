@@ -1,55 +1,103 @@
 :root {
-  /* Midnight Blue palette */
-  --bg-base: #0c0c14;
-  --bg-deeper: #08080f;
-  --bg-surface: #10101c;
-  --bg-elevated: #1a1a2e;
-  /* Must stay > --bg-elevated in luminance: a border equal to the surface it
-     outlines is invisible (Iris audit, properties re-home 2026-06-07). */
-  --border: #2a2a42;
-  --border-subtle: #12121f;
-  --text-primary: #e2e8f0;
-  --text-secondary: #a0a0c0;
-  --text-muted: #8888a8;
-  --text-ghost: #6a6a8a;
-  --text-dim: #4a4a6a;
-  --accent: #6366f1;
-  /* Relleno sólido de un control activo que lleva TEXTO encima: blanco da
-   * 6,29:1 contra este paso. --accent se queda para bordes, tintes y
-   * superficies sutiles — con blanco encima da 4,47:1, justo por debajo del
-   * 4,5:1 que pide AA (revisión adversarial 2026-09-04). */
-  --accent-fuerte: #4f46e5;
-  /* El acento cuando es TINTA sobre el cromo oscuro (texto de pestaña activa,
-   * icono activo, etiqueta destacada). --accent como texto se queda en 3,8-4,3:1
-   * contra los fondos del cromo, por debajo del 4,5:1 de AA; este paso claro da
-   * 5,7-6,4:1. Los tres roles del acento no son intercambiables:
-   *   --accent         → bordes, tintes y superficies
-   *   --accent-fuerte  → relleno sólido que lleva texto blanco encima
-   *   --accent-ink     → el acento escrito sobre el cromo
-   * (revisión adversarial 2026-09-04). */
-  --accent-ink: #818cf8;
-  --accent-hover: #818cf8;
-  --accent-subtle: rgba(99, 102, 241, 0.13);
-  --accent-border: rgba(99, 102, 241, 0.27);
-  --dock-auto: #a78bfa;   /* AI-suggested dock tools (violet), distinct from the indigo --accent */
-  --success: #22c55e;
-  --destructive: #ef4444;
-  /* Hermano de --accent-hover: el acento aclara al pasar el mouse, y lo
-   * destructivo tiene que seguir la misma regla o el botón de borrar se siente
-   * de otro sistema. */
-  --destructive-hover: #f87171;
-  --warning: #f59e0b;
+  /* ── Neutros del cromo — grafito cálido, tono 80 ──────────────────────
+   * Cromo callado (spec 2026-09-24 § 4.1). Hasta el 26-09 la rampa era
+   * «Midnight Blue» (tono OKLCH 283-285) y el croma SUBÍA al apagar el texto
+   * (0,013 en primary → 0,053 en dim): el gris más apagado era lo más violeta
+   * de la pantalla, peleando a 190° con el papel (--canvas-2d es tono 94).
+   * Ahora toda la rampa está en tono 80, la familia del papel, con croma
+   * constante 0,004-0,008. Los ratios los verifica contrasteDeTokens.ts;
+   * `npx tsx scripts/contraste-tokens.ts` imprime la tabla. */
+  --bg-deeper: oklch(0.13 0.004 80);    /* #080706 */
+  --bg-base: oklch(0.16 0.004 80);      /* #0e0d0b */
+  --bg-surface: oklch(0.19 0.005 80);   /* #151411 */
+  --bg-elevated: oklch(0.25 0.006 80);  /* #23211e */
+  /* Debe quedar por encima de --bg-elevated en luminosidad: un borde igual a
+   * la superficie que delimita es invisible (Iris, 2026-06-07). 1,46:1. */
+  --border: oklch(0.32 0.006 80);       /* #34332f */
+  --border-subtle: oklch(0.22 0.005 80);/* #1c1a18 */
+  /* La línea de pelo: única separación de lo que flota (spec § 4.4). Los
+   * separadores de menú NO la copian: usan --border como fondo de 1 px. */
+  --hairline: 1px solid rgba(255, 255, 255, 0.07);
+  /* Escenario del visor 3D, un paso más claro que el cromo para que la
+   * prenda no se lea sobre negro. Consumidor: F3 (renderSettingsSlice). */
+  --scene-3d: oklch(0.26 0.004 80);     /* #252422 */
 
-  /* ── 2D pattern canvas (design surface 5 — light "paper" CAD surface) ──
-     Namespaced so the dark app chrome (--accent above) is untouched; these are
-     consumed only by the 2D pattern editor renderers. Reference: design-team
-     handoff DESIGN-NOTES.md §3. The accent is reserved for selection + seams. */
+  /* ── Texto — cuatro pasos (spec § 4.2) ─────────────────────────────── */
+  --text-primary: oklch(0.93 0.006 80);   /* #eae7e3 · 14,95:1 sobre surface */
+  --text-secondary: oklch(0.77 0.008 80); /* #b7b4af · 8,91:1 · rótulos, meta */
+  /* Atajos, placeholder, pistas, kbd. 5,50:1 sobre surface, 4,79 sobre
+   * elevated, 5,03 sobre el overlay: el escalón bajo que TODAVÍA es texto. */
+  --text-tertiary: oklch(0.64 0.008 80);  /* #8f8c87 */
+  /* SOLO el estado deshabilitado. Nunca una instrucción ni un atajo: 2,81:1. */
+  --text-disabled: oklch(0.48 0.006 80);  /* #5f5d5a */
+  /* Alias con 81 consumidores; significa «terciario». No sumar consumidores. */
+  --text-muted: var(--text-tertiary);
+
+  /* ── Acento — uno, tono 248, tres roles (spec § 4.3) ────────────────
+   *   --accent         bordes, tintes, tiradores, línea de selección
+   *                    (3,43:1 sobre el crema; 4,67 sobre surface)
+   *   --accent-fuerte  relleno sólido que lleva texto blanco (5,04:1)
+   *   --accent-fuerte-hover  ese relleno al pasar el mouse (4,65:1)
+   *   --accent-ink     el acento ESCRITO sobre el cromo (8,65:1 surface)
+   * Es el azul que ya tenían las cotas: el cromo lo adopta, y desaparecen el
+   * índigo Tailwind (#6366f1, «indigo-500») y el violeta de AUTO. Los tres
+   * roles no son intercambiables (revisión 2026-09-04): lo fija
+   * acento-legible.test.ts. */
+  --accent: oklch(0.60 0.16 248);           /* #0584da */
+  /* Queda apenas fuera de la gama sRGB; el navegador lo recorta a #0072c0,
+   * igual que antes del 26-09 (era el paso fuerte del papel desde el 04-09). */
+  --accent-2d-fuerte: oklch(0.54 0.15 248);
+  --accent-fuerte: var(--accent-2d-fuerte);
+  /* El hover de un relleno que lleva texto: un paso más claro (+0,02 de L),
+   * el último en que el blanco sigue en AA. Subir a --accent lo deja en
+   * 3,95:1 — el hueco que la ola final del 26-09 abrió y la re-revisión cazó.
+   * Un relleno SIN texto (Enviar, el dock activo) sí puede ir a --accent: a un
+   * glifo le basta 3:1. Lo fija acento-legible.test.ts. */
+  --accent-fuerte-hover: oklch(0.56 0.15 248);  /* #0278c7 */
+  --accent-ink: oklch(0.76 0.11 248);       /* #77b7f4 */
+  --accent-subtle: oklch(0.60 0.16 248 / 14%);
+  --accent-border: oklch(0.60 0.16 248 / 30%);
+  /* El único segundo tono del sistema: «esto lo hizo la IA». Nunca «activo». */
+  --ai: oklch(0.72 0.13 295);               /* #ab93ed · 7,13:1 sobre surface */
+  /* Tinta sobre un relleno de acento o destructivo. */
+  --on-accent: #ffffff;
+
+  /* ── Semánticos, apagados a la croma de la familia (spec § 4.3) ────── */
+  --success: oklch(0.68 0.14 150);          /* #4eb068 · 6,78:1 */
+  --warning: oklch(0.75 0.14 75);           /* #e1a035 · 8,14:1 */
+  --destructive: oklch(0.62 0.18 25);       /* #de4e4b · 4,65:1 como texto */
+  /* Relleno destructivo que lleva texto blanco (el botón Eliminar): con
+   * --destructive el blanco da 3,96:1; aquí 6,05:1. Mismo rol que
+   * --accent-fuerte. */
+  --destructive-fuerte: oklch(0.52 0.18 25); /* #ba2b2e */
+  /* Eliminar al pasar el mouse: el mismo paso que --accent-fuerte-hover. */
+  --destructive-fuerte-hover: oklch(0.54 0.18 25); /* #c13234 · 5,57:1 */
+  /* Hermano de --accent-ink: lo destructivo también aclara al pasar el mouse. */
+  --destructive-hover: oklch(0.70 0.16 25); /* #f2716a */
+
+  /* ── Alias heredados de App.css (2026-07-16) ─────────────────────────
+   * Un solo archivo de tokens (R4 = 1). Consumidores: src/copilot/*
+   * (--bg-primary/--bg-secondary/--color-*), InputSchemeSection
+   * (--accent-dim), AvatarPanel.css (--color-success), Viewport3D.css
+   * (--grainline-color). No sumar consumidores: migran en F4 y F5. */
+  --bg-primary: var(--bg-surface);
+  --bg-secondary: var(--bg-elevated);
+  --panel-bg: var(--bg-surface);
+  --accent-dim: var(--accent-subtle);
+  --color-error: var(--destructive);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --grainline-color: #6bff6b; /* dato del visor 3D (el hilo), no cromo */
+
+  /* ── 2D pattern canvas — el papel NO se toca (spec § 4.6) ───────────
+     Namespaced so the dark app chrome is untouched; consumed only by the 2D
+     pattern editor renderers. The accent is reserved for selection + seams. */
   --canvas-2d: #f1efe8;
   --grid-2d: #e3dfd2;
   --grid-2d-major: #d8d3c2;
   --ink-on-light: #2b2d33;     /* cut line, primary labels */
-  --ink-on-light-2: #6f7480;   /* seam line, grainline, meta labels */
-  --ink-on-light-3: #a0a5b0;   /* construction / reference lines — lighter so they recede behind the seam line */
+  --ink-on-light-2: #6f7480;   /* línea de costura, hilo, rótulos meta, puntos del contorno en reposo */
+  --ink-on-light-3: #a0a5b0;   /* construction / reference lines */
   /* Identidad de pares de costura sobre el papel. Misma luminosidad perceptual
      y saltos de 35–50° de tono: se distinguen sin convertir una costura en
      protagonista por ser más clara que sus vecinas. */
@@ -61,67 +109,70 @@
   --seam-pair-6: oklch(0.55 0.11 295);
   --seam-pair-7: oklch(0.55 0.10 105);
   --seam-pair-8: oklch(0.55 0.11 20);
-  --accent-2d: oklch(0.66 0.16 248);   /* selection + seams only */
-  /* Paso oscuro del MISMO tono (248), para lo que lleva TEXTO encima o tiene
-   * que verse sobre el papel. --accent-2d se eligió para dibujar una LÍNEA
-   * sobre el crema: con blanco encima da 3,10:1 y AA pide 4,5:1 a 11 px. Este
-   * paso da blanco a 5,04:1 y 4,55:1 contra --canvas-2d. */
-  --accent-2d-fuerte: oklch(0.54 0.15 248);
-  --ai-2d: oklch(0.72 0.13 295);       /* AI-authored annotations */
-  --font-mono-2d: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace;
-  --font-ui-2d: 'Schibsted Grotesk', var(--font-sans);   /* UI support text on the paper canvas */
-  /* Piece-state colors — named so a working piece (folds, locks, errors,
-     topstitch, annotations) stays on-system instead of a parade of inline hex.
-     Hues preserved from the pre-token values; centralization is the point. */
+  /* Selección y costuras: el MISMO acento que el cromo. Hasta el 26-09 era
+   * oklch(0.66 0.16 248), que daba 2,70:1 sobre el crema (bajo el 3:1 de un
+   * objeto gráfico); a L 0,60 da 3,43:1 y 3,95:1 sobre el blanco de la pieza. */
+  --accent-2d: var(--accent);
+  --font-mono-2d: var(--font-mono);
+  --font-ui-2d: var(--font-sans);
   --piece-fill-2d: #ffffff;                 /* piece interior: paper white, sits above the canvas */
-  /* Status/marker hues muted for the cream paper ground (were vivid #ef4444 / #ff9800
-     / #9c27b0 / #3f51b5): chroma roughly halved, hue identity + mutual distinctness
-     kept, so a working piece reads as quiet technical markers, not a parade. */
-  --piece-error-2d: oklch(0.55 0.14 28);    /* unresolved / invalid geometry — muted brick red; catches the eye by hue uniqueness, not volume */
-  --piece-locked-2d: oklch(0.50 0.11 65);   /* locked-piece marker — amber, dark enough that 10px mono text reads on warm cream */
-  --fold-mountain-2d: oklch(0.50 0.13 335); /* mountain-fold direction — plum; extra chroma offsets the 0.8 marker opacity so it stays ≠ valley */
-  --fold-valley-2d: oklch(0.50 0.11 255);   /* valley-fold direction — blue, kept clear of the selection accent (248) */
+  /* Status/marker hues muted for the cream paper ground: chroma roughly halved,
+     hue identity + mutual distinctness kept, so a working piece reads as quiet
+     technical markers, not a parade. */
+  --piece-error-2d: oklch(0.55 0.14 28);    /* unresolved / invalid geometry — muted brick red */
+  --piece-locked-2d: oklch(0.50 0.11 65);   /* locked-piece marker — amber */
+  --fold-mountain-2d: oklch(0.50 0.13 335); /* mountain-fold direction — plum */
+  --fold-valley-2d: oklch(0.50 0.11 255);   /* valley-fold direction — blue */
   --topstitch-2d: #333333;                  /* topstitch default when the thread has no color set */
-  --notch-2d: oklch(0.52 0.115 165);        /* notch — montage registration mark; teal-green, the open hue between cool blue (255) and warm (50), so a frequent fine marker reads ≠ cut line and ≠ fold/seam at zoom */
+  --notch-2d: oklch(0.52 0.115 165);        /* notch — montage registration mark; teal-green */
   /* Enganche de la herramienta de línea interna (spec 2026-08-29 § 4.6): el
    * anillo que dice "el próximo clic cae AQUÍ". Ámbar, más claro que
    * --piece-locked-2d para que no se lea como candado. */
   --snap-2d: oklch(0.72 0.15 80);
   /* Píldora de medida dibujada sobre el papel (largo y ángulo del tramo en
-   * curso). Tinta clara sobre fondo oscuro translúcido: es cromo pequeño que
+   * curso). Tinta clara sobre fondo oscuro translúcido: cromo pequeño que
    * flota sobre el lienzo, no tinta del patrón. */
   --readout-bg-2d: rgba(43, 45, 51, 0.85);
   --readout-ink-2d: #ffffff;
   --annotation-2d: #808080;                 /* annotation fallback when its category has no color */
-  /* Tinta de texto instructivo dibujado SOBRE el papel (pistas de herramienta
-   * al pie del lienzo). NO usar --text-* aquí: esos son la tinta del cromo
-   * OSCURO y sobre el crema quedan invisibles — el defecto medido el
-   * 2026-08-14 daba 1.05:1. Éste da 5.08:1 sobre --canvas-2d y 5.84:1 sobre
-   * --piece-fill-2d: pasa AA en los dos suelos del 2D, y se queda en gris
-   * cálido para no competir con el trazo del patrón. Lo verifica
+  /* Tinta de texto instructivo dibujado SOBRE el papel (pistas al pie del
+   * lienzo). NO usar --text-* aquí: esos son la tinta del cromo OSCURO y sobre
+   * el crema quedan invisibles (1.05:1 medido el 2026-08-14). Éste da 5,08:1
+   * sobre --canvas-2d y 5,85:1 sobre --piece-fill-2d. Lo verifica
    * HintText.legibilidad.test.tsx. */
   --ink-hint: #6b6459;
-  /* Tinta sobre un relleno de --accent (herramienta activa del dock, botones
-   * primarios). Blanco puro da 4.47:1 contra #6366f1 — pasa el mínimo de 3:1
-   * de elemento gráfico con margen, y el de texto casi exacto. */
-  --on-accent: #ffffff;
-  /* Seam overlay (SeamRenderer) on the paper ground. State colors borrow the
-     piece selection/error language (--accent-2d / --piece-error-2d / --ink-on-light-3);
-     tension labels are muted warm (gather) / cool (ease). */
-  --seam-tension-gather-2d: oklch(0.58 0.11 50);  /* gather (<100%) — muted warm */
-  --seam-tension-ease-2d: oklch(0.56 0.10 235);   /* ease (>100%) — muted cool */
+  /* Seam overlay (SeamRenderer) on the paper ground: tension labels are muted
+     warm (gather) / cool (ease). */
+  --seam-tension-gather-2d: oklch(0.58 0.11 50);
+  --seam-tension-ease-2d: oklch(0.56 0.10 235);
 
-  /* Typography — scales with viewport for large screens.
-     clamp(min, preferred, max) ensures readability at any resolution.
-     Base: 13px on small screens, scales to ~16px at 2560px+. */
+  /* ── Tipografía (spec § 4.5) ────────────────────────────────────────── */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
-  --text-xs: clamp(10px, 0.55vw + 3px, 13px);
-  --text-sm: clamp(11px, 0.6vw + 3px, 14px);
-  --text-ui: clamp(12px, 0.65vw + 3px, 15px);
-  --text-input: clamp(13px, 0.7vw + 3px, 16px);
-  --text-heading: clamp(14px, 0.75vw + 3px, 17px);
-  --text-title: clamp(16px, 0.9vw + 4px, 20px);
+  /* Una sola mono, determinista: JetBrains Mono se carga en index.html; con
+   * 'SF Mono' primero, Mac y Windows rendían monos distintas. Mono = un dato
+   * cuya alineación carácter a carácter significa algo (regla, cotas, píldora
+   * de medida, kbd). La prosa va en --font-sans (contrato § 5). */
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* Escala fija de cinco pasos. La anterior era clamp() y a 1366 rendía
+   * 10,51 / 11,20 / 16,29 px (fraccionarios en la laptop de María) contra 141
+   * font-size literales. Cada paso sube 1 px a partir de 1600 (abajo). */
+  --text-1: 11px;
+  --leading-1: 16px;   /* atajos, meta, pista */
+  --text-2: 12px;
+  --leading-2: 16px;   /* etiquetas, menús, chips, rótulos de sección */
+  --text-3: 13px;
+  --leading-3: 18px;   /* valores, campos, cuerpo de panel, campo de la IA */
+  --text-4: 15px;
+  --leading-4: 20px;   /* título de panel, nombre de herramienta en la tira */
+  --text-5: 18px;
+  --leading-5: 24px;   /* título del estado vacío, nada más */
+  /* Alias de la escala anterior, para sus 66 consumidores; migran en F6. */
+  --text-xs: var(--text-1);
+  --text-sm: var(--text-2);
+  --text-ui: var(--text-3);
+  --text-input: var(--text-3);
+  --text-heading: var(--text-4);
+  --text-title: var(--text-5);
   --weight-normal: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
@@ -135,11 +186,12 @@
   --sp-6: clamp(24px, 1.4vw, 32px);
   --sp-8: clamp(32px, 1.8vw, 40px);
 
-  /* Radii */
+  /* Radios concéntricos (spec § 4.4): superficie 8, control 6; el dock lleva
+   * 10 porque interior (6) + padding (4) = exterior. El 12 de antes se retiró:
+   * un dock de 52 px, una tira de 300 y un panel de 310 llevaban el mismo. */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 10px;
-  --radius-xl: 12px;
 
   /* Sizes — scale with viewport for comfort on large displays */
   --top-bar-h: clamp(36px, 2.5vw, 48px);
@@ -148,86 +200,50 @@
   /* Franja inferior que ocupa la barra de IA en su posición por defecto, para
    * que nada acoplado abajo se le meta debajo. 94 = 24 de separación al borde
    * + 58 de alto (BAR_HEIGHT) + 12 de aire; las dos primeras salen de
-   * src/components/shell/barPosition.ts. */
+   * src/components/shell/barPosition.ts. Se retira en F4 (barra convocada). */
   --band-bar: 94px;
 
   /* Effects */
-  --blur: blur(12px);
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;
 
   /* ── Materiales de superficie ─────────────────────────────────────────
-   * Ley de materiales del contrato de interfaz
-   * (docs/reports/2026-08-14-auditoria-ui-deriva-de-diseno.md § 5.1).
-   *
-   * Vina es cromo oscuro sobre un documento claro. Cada vez que alguien
-   * agregaba una superficie tenía que re-resolver por su cuenta "¿cómo
-   * separo esta cosa oscura del papel crema de abajo?", y cada quien lo
-   * resolvió distinto: la auditoría midió SIETE materiales para una sola
-   * idea — cuatro negros, cinco radios (4/6/12/14/29), tres opacidades
-   * (.78/.92/.95), dos desenfoques (12/16), dos colores de borde, y uno de
-   * ellos —justo el que se para sobre el lienzo dibujado— sin sombra.
-   *
-   * Hay DOS materiales y se usan ENTEROS. No se mezclan piezas de dos.
-   *
-   *   chrome  → acoplado a una canaleta. Opaco: nada se ve a través.
-   *             dock 2D, dock 3D, controles del visor.
-   *   overlay → flota de verdad sobre el documento y se va. Translúcido
-   *             con desenfoque, para que se lea que está POR ENCIMA.
-   *             menús contextuales, paneles, barras de acción, tooltips.
-   *
-   * Más una tercera familia que no es una superficie sino tinta: `ink-*`,
-   * lo que se dibuja SOBRE el papel (ver --ink-hint arriba).
-   */
+   * Ley de materiales del contrato (enmendada el 26-09, spec § 4.4 y § 6).
+   * Dos ROLES, un solo material, distinguidos por la sombra:
+   *   chrome  → acoplado a una canaleta; opaco; SIN sombra (una sombra de
+   *             32 px bajo un dock acoplado era la mancha oscura a su derecha
+   *             sobre el crema).
+   *   overlay → flota de verdad y se va; casi opaco, línea de pelo, sombra
+   *             corta en dos capas, SIN blur: con un fondo al 92 % el blur solo
+   *             desenfocaba el 8 % restante y creaba los contextos de
+   *             apilamiento que recortaron ConnectionModal (contrato § 2).
+   * Más la familia de tinta: `ink-*`, lo que se dibuja SOBRE el papel. */
   --surface-chrome-bg: var(--bg-surface);
   --surface-chrome-border: 1px solid var(--border);
-  --surface-chrome-radius: var(--radius-xl);
-  --surface-chrome-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-
-  /* Variante A RAS de chrome, para el cromo acoplado que ocupa el ancho
-   * completo de su área: la barra de opciones de herramienta (#1049). El
-   * radio y la sombra de arriba describen algo que FLOTA —el dock, que es
-   * `position: absolute`—; una canaleta a ras muere contra los bordes de su
-   * contenedor, así que un radio xl le dejaría huecos y una sombra de 32px
-   * mentiría sobre su altura. Se declara aquí, y no se omite razonándolo en
-   * el CSS del componente, porque una pieza que falta razonada en prosa es
-   * justo cómo la auditoría del 2026-08-14 llegó a siete materiales para la
-   * misma idea. Mismo criterio que --surface-overlay-radius-pill. */
+  --surface-chrome-radius: var(--radius-md);
+  --surface-chrome-shadow: none;
+  /* Variante a RAS de chrome para el cromo que ocupa el ancho de su área (la
+   * barra de opciones de herramienta, #1049): sin radio ni sombra. */
   --surface-chrome-radius-flush: 0;
   --surface-chrome-shadow-flush: none;
 
-  --surface-overlay-bg: rgba(8, 8, 15, 0.92);
-  --surface-overlay-border: 1px solid rgba(99, 102, 241, 0.15);
-  --surface-overlay-radius: var(--radius-xl);
-  --surface-overlay-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  --surface-overlay-blur: blur(16px);
-
-  /* Única excepción de FORMA, y es de rol, no de capricho: una barra de
-   * comando con forma de cápsula (la barra de IA) no puede llevar el radio
-   * de panel sin leerse como un panel y competir con los paneles de verdad.
-   * Es un rol declarado, no un quinto radio suelto. */
+  --surface-overlay-bg: rgba(21, 20, 17, 0.96);
+  --surface-overlay-border: var(--hairline);
+  --surface-overlay-radius: var(--radius-md);
+  --surface-overlay-shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 8px 20px rgba(0, 0, 0, 0.22);
+  --surface-overlay-blur: none;
+  /* Única excepción de FORMA, y es de rol: la barra de IA es una cápsula. */
   --surface-overlay-radius-pill: 999px;
-
-  /* Variante REPOSO de overlay, solo para la barra de IA: en reposo se
-   * hunde para que el patrón gane la jerarquía sobre el papel claro, y sube
-   * a --surface-overlay-bg al enfocarla. La decisión es anterior a esta
-   * auditoría y está razonada en unified-bar.css; se tokeniza para que sea
-   * una variante declarada del material y no una tercera opacidad suelta. */
-  --surface-overlay-bg-recessed: rgba(8, 8, 15, 0.78);
-  --surface-overlay-shadow-recessed: 0 4px 18px rgba(0, 0, 0, 0.22);
-
-  /* Bordes → tono (cotas vivas, spec 2026-08-30 § 9): la tira de herramienta
-   * y los chips de cota se separan por sombra en capas, no por línea; el
-   * borde queda para los campos. Variante declarada del material overlay. */
+  /* Reposo de la barra de IA: un solo negro; en reposo solo cambia la sombra. */
+  --surface-overlay-bg-recessed: var(--surface-overlay-bg);
+  --surface-overlay-shadow-recessed: 0 1px 2px rgba(0, 0, 0, 0.2);
+  /* Bordes → tono (cotas vivas, spec 2026-08-30 § 9): la tira y la fila se
+   * separan por sombra, no por línea. Una sola sombra de flote. */
   --surface-overlay-border-flush: 1px solid transparent;
-  --surface-overlay-shadow-sheet: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.35);
+  --surface-overlay-shadow-sheet: var(--surface-overlay-shadow);
 
-  /* Cotas sobre el papel: el número que se escribe donde mide. Usa el paso
-   * FUERTE del acento 2D, no el de la selección: el chip lleva texto encima y
-   * la línea tiene que verse sobre el crema, y --accent-2d se eligió para
-   * dibujar una línea, no para escribir sobre él (daba 3,10:1 con blanco).
-   * La selección y las costuras siguen con --accent-2d. En edición el chip es
-   * un campo blanco sobre el papel. */
+  /* Cotas sobre el papel: el número que se escribe donde mide. Paso FUERTE
+   * del acento (lleva texto encima: blanco 5,04:1; 4,38:1 sobre el crema). */
   --cota-bg-2d: var(--accent-2d-fuerte);
   --cota-ink-2d: #ffffff;
   --cota-line-2d: var(--accent-2d-fuerte);
@@ -238,72 +254,42 @@
   --focus-rail: 3px solid var(--accent);
   --focus-rail-inset: inset 3px 0 0 0 var(--accent);
 
+  /* Velo detrás de un modal: de la familia del cromo, no negro puro. */
+  --scrim: rgb(8 7 6 / 55%);
+
   /* ── Escala de capas ──────────────────────────────────────────────────
    * Ley de emplazamiento (§ 5.2 del informe 2026-08-14): nada de z-index
-   * literal. La app llegó a tener 15 valores sueltos en un único contexto de
-   * apilamiento plano, con escaladas hasta 9999 y 10000.
-   *
-   * El orden es de URGENCIA, no de antigüedad. Lo que más urge va más arriba:
-   * una notificación tiene que verse incluso sobre un modal — hoy el modal
-   * (1000) entierra al toast (300), que es justo al revés.
-   *
-   * Los valores literales que quedan en el resto del CSS se migran en la fase
-   * de emplazamiento; esta escala es la que usa todo lo nuevo. */
-  /* Velo detrás de un modal. No es negro puro: sale de la familia azulada del
-   * cromo, si no se lee como un agujero recortado sobre el papel del lienzo. */
-  --scrim: rgb(8 8 15 / 55%);
-
+   * literal. El orden es de URGENCIA, no de antigüedad. Lo fija
+   * zIndexScale.test.ts, escalón por escalón. */
   --z-dock: 5;
-  /* H-5 (2026-08-16, Ola 2 de emplazamiento): sin consumidor real desde que
-   * `60643b35` le quitó el z-index a `.context-panel` — los paneles pasaron
-   * de tarjeta flotante a hijo flex de `.canvas-area`, así que ya no
-   * compiten por capa. Hoy solo lo referencian este comentario y
-   * `zIndexScale.test.ts`. Se queda de todos modos: la escala es un mapa de
-   * ROLES, no un inventario de usos — que hoy ningún panel necesite z-index
-   * no dice que el rol esté mal, dice que los paneles dejaron de flotar. La
-   * próxima superficie de rango panel que sí flote (un panel-tarjeta suelto,
-   * no acoplado a `.canvas-area`) lo va a necesitar, y el hueco entre
-   * --z-dock (5) y --z-hint (50) tiene que seguir existiendo para que la
-   * escalera se lea completa. */
+  /* Sin consumidor desde que los paneles son hijos flex de .canvas-area
+   * (60643b35); se queda porque la escala es un mapa de ROLES. */
   --z-panel: 25;
-  /* Cromo acoplado al lienzo: superficies PERSISTENTES que duran lo que dura
-   * su contexto —la tira de la herramienta activa, la fila de capas—, no lo
-   * que dura un gesto. Las dos estaban en --z-menu (200), que es el rol de lo
-   * TRANSITORIO: algo que aparece, se usa y se va. Con ese rol prestado, una
-   * superficie que nunca se cierra empataba con el modal de piquete —misma
-   * esquina, mismos cuatro números— y el desempate lo decidía el orden del
-   * DOM, no el diseño; y le ganaba al aviso de soltar el DXF, que cubre el
-   * lienzo entero.
-   *
-   * Va encima del dock (5) y de los paneles (25) porque es la cabina de la
-   * herramienta y no se puede enterrar; debajo del aviso del lienzo (50), de
-   * las barras (100) y de los menús (200) porque todo eso o urge más o dura
-   * menos. La CAPA dice dónde se pinta; el MATERIAL dice de qué está hecha:
-   * estas dos siguen usando el material `overlay`, y eso no cambia.
-   *
-   * Hallazgo F10 de docs/reports/2026-09-04-revision-adversarial-ui.md;
-   * decisión escrita en la enmienda 2026-09-05 del spec de emplazamiento. */
+  /* Cromo acoplado al lienzo: la tira y la fila. Persistentes, no menús
+   * (hallazgo F10 del 2026-09-04, enmienda 2026-09-05 del spec de
+   * emplazamiento). */
   --z-canvas-chrome: 40;
-  /* Aviso transitorio sobre el lienzo (el "suelta el DXF aquí"). Va encima del
-   * documento y de los paneles, pero DEBAJO del cromo de la app: el aviso
-   * pertenece al lienzo, no tapa la barra superior ni la de IA. Conserva el 50
-   * que ya tenía; que quede entre --z-panel y --z-bar no es casualidad, es el
-   * rol. */
+  /* Aviso transitorio sobre el lienzo («suelta el DXF aquí»). */
   --z-hint: 50;
   --z-bar: 100;
   --z-menu: 200;
   --z-context-menu: 1000;
   --z-modal: 1100;
-  /* Un tooltip explica un control; una notificación avisa de algo que pasó.
-   * Si empatan, gana la notificación — por eso este escalón está DEBAJO de
-   * --z-toast y no empatado con él. Empatados, el desempate lo decidía el
-   * orden de inserción del portal, que no es una decisión de diseño. */
+  /* Un tooltip explica un control; una notificación avisa. Empatados, gana la
+   * notificación: por eso este escalón está DEBAJO de --z-toast. */
   --z-tooltip: 1150;
   --z-toast: 1200;
-  /* Diagnóstico de desarrollo (SolverMetrics). Deliberadamente por encima de
-   * toda la escala: su trabajo es no ocultarse nunca, y solo existe con
-   * import.meta.env.DEV, así que no compite con nada en producción. Es el
-   * único rol que puede estar arriba del toast, y está nombrado justo para
-   * que se note que es la excepción. */
+  /* Diagnóstico de desarrollo (SolverMetrics): solo con import.meta.env.DEV. */
   --z-debug: 1300;
+}
+
+/* A partir de 1600 px cada paso de la escala sube 1 px (spec § 4.5). */
+@media (min-width: 1600px) {
+  :root {
+    --text-1: 12px;
+    --text-2: 13px;
+    --text-3: 14px;
+    --text-4: 16px;
+    --text-5: 19px;
+  }
 }

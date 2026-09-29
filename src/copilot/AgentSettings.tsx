@@ -133,7 +133,7 @@ const inputStyle: React.CSSProperties = {
   padding: '8px 10px',
   borderRadius: 5,
   fontSize: 14,
-  fontFamily: "'SF Mono', 'Fira Code', monospace",
+  fontFamily: 'var(--font-mono)',
 };
 
 const fieldStyle: React.CSSProperties = {
@@ -151,7 +151,7 @@ const rowStyle: React.CSSProperties = {
 };
 
 const btnStyle: React.CSSProperties = {
-  background: 'var(--accent)',
+  background: 'var(--accent-fuerte)',
   color: 'white',
   border: 'none',
   padding: '8px 18px',

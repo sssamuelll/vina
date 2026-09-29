@@ -43,7 +43,7 @@ export default function UnifiedBarCommands({ query, onExecute, onOpenPanel }: Pr
         <div key={cat}>
           <div style={{
             padding: '6px 12px 2px', fontSize: '10px', letterSpacing: '0.08em',
-            textTransform: 'uppercase', color: 'var(--text-ghost)', fontWeight: 600,
+            textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: 600,
           }}>
             {cat}
           </div>
@@ -63,10 +63,10 @@ export default function UnifiedBarCommands({ query, onExecute, onOpenPanel }: Pr
           >
             <Icon size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{cmd.name}</span>
-            <span style={{ fontSize: '12px', color: 'var(--text-ghost)', marginLeft: 'auto' }}>{cmd.description}</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>{cmd.description}</span>
             {shortcutLabelFor(cmd.shortcutId) && (
               <span style={{
-                fontSize: '10px', color: 'var(--text-dim)', background: 'var(--border-subtle)',
+                fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--border-subtle)',
                 padding: '2px 6px', borderRadius: '3px', border: '1px solid var(--border)', marginLeft: '8px',
               }}>{shortcutLabelFor(cmd.shortcutId)}</span>
             )}
@@ -76,7 +76,7 @@ export default function UnifiedBarCommands({ query, onExecute, onOpenPanel }: Pr
         </div>
       ))}
       {filtered.length === 0 && (
-        <div style={{ padding: 'var(--sp-4)', textAlign: 'center', color: 'var(--text-ghost)', fontSize: '14px' }}>
+        <div style={{ padding: 'var(--sp-4)', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '14px' }}>
           Ningún comando coincide con «{query}»
         </div>
       )}

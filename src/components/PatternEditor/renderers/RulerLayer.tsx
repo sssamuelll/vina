@@ -36,7 +36,7 @@ export default function RulerLayer({ zoom2D, pan2D, gridSize, units, width, heig
   const mono = 'var(--font-mono-2d)';
 
   return (
-    <g className="ruler-layer" pointerEvents="none">
+    <g className="ruler-layer" pointerEvents="none" data-superficie="documento">
       {/* Gutter backgrounds */}
       <rect x={0} y={0} width={width} height={GUTTER} style={{ fill: paper }} />
       <rect x={0} y={0} width={GUTTER} height={height} style={{ fill: paper }} />

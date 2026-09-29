@@ -62,7 +62,7 @@ export default function ReferenceImageLayer({
               <rect
                 x={img.position.x} y={img.position.y}
                 width={w} height={h}
-                fill="none" stroke="#4a9eff" strokeWidth={2}
+                fill="none" stroke="var(--accent-2d)" strokeWidth={2}
                 strokeDasharray="6 3"
                 transform={`rotate(${img.rotation}, ${cx}, ${cy})`}
                 style={{ pointerEvents: 'none' }}

@@ -242,7 +242,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
         <div style={{
           textAlign: 'center',
           padding: 'var(--sp-6)',
-          color: 'var(--text-ghost)',
+          color: 'var(--text-tertiary)',
           fontSize: 'var(--text-ui)',
         }}>
           {hasProvider ? 'Pregúntale a la IA sobre tu diseño...' : 'Agrega un proveedor de IA en ajustes para empezar a conversar.'}
@@ -301,13 +301,13 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
                       display: 'flex',
                       alignItems: 'baseline',
                       gap: 'var(--sp-1)',
-                      color: tc.status === 'error' ? 'var(--color-error)' : 'var(--text-ghost)',
+                      color: tc.status === 'error' ? 'var(--color-error)' : 'var(--text-tertiary)',
                     }}
                   >
                     <span style={{ flexShrink: 0 }}>
                       {tc.status === 'done' ? '✓' : tc.status === 'error' ? '✗' : '·'}
                     </span>
-                    <span style={{ fontFamily: "'SF Mono', 'Fira Code', monospace" }}>{tc.name}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{tc.name}</span>
                     {/* #1194 — el error se traduce al pintarlo, no al producirlo:
                         `classifyError` y el reintento del LLM leen el original. */}
                     {tc.error && <span style={{ opacity: 0.85 }}>— {mensajeDeErrorEs(tc.error)}</span>}
@@ -342,7 +342,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
           {agenticHook.toolCalls.map((tc, i) => (
             <div key={i} style={{
               fontSize: 'var(--text-xs)',
-              color: tc.status === 'error' ? 'var(--color-error)' : 'var(--text-ghost)',
+              color: tc.status === 'error' ? 'var(--color-error)' : 'var(--text-tertiary)',
               display: 'flex',
               alignItems: 'center',
               gap: 'var(--sp-1)',

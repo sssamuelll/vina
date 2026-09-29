@@ -81,7 +81,7 @@ export function SimulationStatusOverlay() {
       color: '#e0e0e0',
       backdropFilter: 'blur(4px)', lineHeight: 1.6,
       border: `1px solid ${tier.color}33`,
-    }}>
+    }} data-superficie="indicador-simulacion">
       <button
         type="button"
         aria-label="Estado de la simulación"

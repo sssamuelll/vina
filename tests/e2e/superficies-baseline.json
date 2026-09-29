@@ -1,0 +1,23 @@
+{
+  "_doc": "Techos del trinquete de superficies por acción (spec 2026-09-24 «cromo callado» § 3.4). El techo efectivo es el mayor de (meta, línea base): por debajo de la meta el diseño puede mover superficies; por encima, solo se baja. Para fijar: SUPERFICIES_UPDATE=1 npx playwright test tests/e2e/superficies-por-accion.spec.ts --retries=0 --workers=1 (con reintentos, un fallo a mitad de un grupo serial escribe medidas parciales). Nunca se edita a mano.",
+  "meta": 4,
+  "estados": {
+    "importar DXF": 1,
+    "reposo con patrón": 4,
+    "seleccionar y mover pieza": 3,
+    "escribir una cota": 0,
+    "editar un punto (Q)": 3,
+    "simular en 3D": 3,
+    "ajustar avatar": 1,
+    "cambiar de vista": 1,
+    "Split en reposo": 5,
+    "convocar la IA": 1,
+    "menú contextual": 2,
+    "dibujar con Pluma (H)": 2,
+    "Rectángulo (S)": 3,
+    "coser dos lados (N)": 2,
+    "poner piquete (⇧N)": 2,
+    "margen de costura (O)": 2,
+    "medir (M)": 1
+  }
+}

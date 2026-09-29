@@ -22,7 +22,7 @@ export default function EmptyState2D({ onImportDXF }: EmptyState2DProps) {
   const dispatch = useDispatch();
 
   return (
-    <div className="empty-state-2d" data-testid="empty-state-2d">
+    <div className="empty-state-2d" data-testid="empty-state-2d" data-superficie="estado-vacio">
       <div className="empty-state-2d__inner">
         <h2 className="empty-state-2d__heading">Trae tu patrón</h2>
 

@@ -16,8 +16,7 @@
 .render-panel {
   /* Superficie del design system (misma voz que ContextPanel) — el drawer
      traía el gris VS-Code de la era vieja (Fase 3, skin puerta-export). */
-  background: rgba(8, 8, 15, 0.95);
-  backdrop-filter: var(--blur);
+  background: var(--surface-overlay-bg);
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -85,7 +84,7 @@
 .render-hdri-item.active {
   border-color: var(--accent-border);
   background: var(--accent-subtle);
-  color: var(--accent-hover);
+  color: var(--accent-ink);
 }
 
 /* Color picker row */

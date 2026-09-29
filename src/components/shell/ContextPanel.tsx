@@ -23,7 +23,7 @@ export default function ContextPanel({ title, onClose, children }: Props) {
   }, []);
 
   return (
-    <div className="context-panel">
+    <div className="context-panel" data-superficie="panel">
       <div className="context-panel__header">
         <span>{title}</span>
         <button className="icon-btn" onClick={onClose} aria-label="Cerrar panel">

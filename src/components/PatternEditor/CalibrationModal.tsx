@@ -30,6 +30,7 @@ export default function CalibrationModal({
     <div className="calibration-overlay" onClick={onCancel}>
       <div
         className="calibration-modal"
+        data-superficie="modal"
         role="dialog"
         aria-modal="true"
         aria-label="Calibración de escala"

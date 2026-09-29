@@ -5,8 +5,8 @@
 /* Utility classes */
 .mono { font-family: var(--font-mono); }
 .muted { color: var(--text-muted); }
-.ghost { color: var(--text-ghost); }
-.accent { color: var(--accent); }
+.ghost { color: var(--text-tertiary); }
+.accent { color: var(--accent-ink); }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Status dots */
@@ -51,7 +51,7 @@
 /* Scale SVG icons inside buttons to 50% of button size */
 .icon-btn svg { width: 50%; height: 50%; }
 .icon-btn:hover { background: var(--bg-elevated); color: var(--text-primary); }
-.icon-btn--active { background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--accent-border); }
+.icon-btn--active { background: var(--accent-subtle); color: var(--accent-ink); border: 1px solid var(--accent-border); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

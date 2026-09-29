@@ -40,7 +40,7 @@ export default function ToastContainer() {
   return (
     <div className="toast-container" aria-live="polite" aria-label="Notificaciones">
       {toasts.map((toast) => (
-        <div key={toast.id} className={`toast toast--${toast.type}`} role="status">
+        <div key={toast.id} className={`toast toast--${toast.type}`} role="status" data-superficie="toast">
           <span className="toast__message">{toast.message}</span>
           {toast.actionLabel && toast.actionPayload != null && (
             <button

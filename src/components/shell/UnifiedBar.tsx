@@ -207,6 +207,7 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
     <div
       ref={barRef}
       className={barClasses}
+      data-superficie="barra"
       style={{ left: position.x, top: position.y }}
       onMouseDown={handleMouseDown}
       onDragEnter={handleDxfDragEnter}
@@ -217,6 +218,7 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
       {/* DXF drag overlay — appears while dragging a file over the bar/panel */}
       {dxfDragActive && (
         <div
+          data-superficie="velo"
           style={{
             position: 'absolute',
             inset: 0,
@@ -225,7 +227,7 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'rgba(99, 102, 241, 0.14)',
+            background: 'var(--accent-subtle)',
             border: '2px dashed var(--accent)',
             borderRadius: 12,
           }}
@@ -276,7 +278,7 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
 
       {/* Expanding panel */}
       {panelOpen && (
-        <div className="unified-bar__panel" onClick={e => e.stopPropagation()}>
+        <div className="unified-bar__panel" data-superficie="paleta" onClick={e => e.stopPropagation()}>
           {mode === 'chat' && (
             <UnifiedBarChat
               input={input}

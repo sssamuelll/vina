@@ -76,6 +76,7 @@ export default function ConfirmDialog() {
     <div className="confirm-scrim" onMouseDown={cerrar}>
       <div
         className="confirm-dialog"
+        data-superficie="modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"

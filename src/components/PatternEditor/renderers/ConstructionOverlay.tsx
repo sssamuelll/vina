@@ -77,7 +77,7 @@ export default function ConstructionOverlay({ zoom2D, pieces }: ConstructionOver
                     y={point.y - pointSize}
                     fontSize={fontSize}
                     fill={COLORS.label}
-                    fontFamily="monospace"
+                    fontFamily="var(--font-mono-2d)"
                   >
                     {point.label}
                   </text>
@@ -112,7 +112,7 @@ export default function ConstructionOverlay({ zoom2D, pieces }: ConstructionOver
             y={point.y - pointSize}
             fontSize={fontSize}
             fill={COLORS.label}
-            fontFamily="monospace"
+            fontFamily="var(--font-mono-2d)"
           >
             {point.label}
           </text>

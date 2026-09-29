@@ -13,7 +13,7 @@ export default function CalibrationOverlay({
 }: CalibrationOverlayProps) {
   if (!calibrationMode) return null;
 
-  const color = '#4a9eff';
+  const color = 'var(--accent-2d)';
   const sw = 1.5 / zoom2D;
   const r = 5 / zoom2D;
   const crosshairSize = 8 / zoom2D;
@@ -114,7 +114,7 @@ export default function CalibrationOverlay({
             dominantBaseline="auto"
             fill={color}
             fontSize={fontSize}
-            fontFamily="monospace"
+            fontFamily="var(--font-mono-2d)"
           >
             {pixelDist.toFixed(1)}px
           </text>

@@ -56,14 +56,14 @@ describe('AnchorGlyph', () => {
     expect(selected.container.querySelector('rect')?.getAttribute('fill')).toBe('#FFD700');
     cleanup();
     const hovered = draw('corner', 'hovered');
-    expect(hovered.container.querySelector('rect')?.getAttribute('fill')).toBe('#6BB3FF');
+    expect(hovered.container.querySelector('rect')?.getAttribute('fill')).toBe('var(--accent-2d-fuerte)');
   });
 
   it('uses diamond, square, ring, hollow square and dot as distinct glyphs', () => {
     expect(draw('openEndpoint').container.querySelector('polygon')).toBeTruthy();
     cleanup();
     expect(draw('corner').container.querySelector('rect')?.getAttribute('fill'))
-      .toBe('#4A9EFF');
+      .toBe('var(--accent-2d)');
     cleanup();
     expect(draw('bezierAnchor').container.querySelectorAll('circle')).toHaveLength(2);
     cleanup();

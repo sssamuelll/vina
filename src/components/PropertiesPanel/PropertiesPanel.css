@@ -12,7 +12,7 @@
 
 .panel-empty {
   padding: var(--sp-4);
-  color: var(--text-ghost);
+  color: var(--text-tertiary);
   font-size: var(--text-sm);
   text-align: center;
 }
@@ -313,7 +313,7 @@ select.panel-input {
   color: var(--text-secondary);
 }
 
-.panel-link-mode--symmetry { color: var(--accent-hover); }
+.panel-link-mode--symmetry { color: var(--accent-ink); }
 .panel-link-mode--instance { color: var(--success); }
 
 .panel-link {
@@ -384,7 +384,7 @@ select.panel-input {
 }
 
 .panel-tension-tag--gather { color: var(--warning); }
-.panel-tension-tag--ease { color: var(--accent-hover); }
+.panel-tension-tag--ease { color: var(--accent-ink); }
 
 /* ─── Material tab ─── */
 .material-tab {
@@ -420,7 +420,7 @@ select.panel-input {
 }
 
 .material-swatch:hover {
-  border-color: var(--accent-hover);
+  border-color: var(--accent);
 }
 
 .material-swatch--active {
@@ -474,7 +474,7 @@ select.panel-input {
   height: 28px;
   background: var(--bg-elevated);
   border-radius: var(--radius-sm);
-  border: 1px dashed var(--text-dim);
+  border: 1px dashed var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -490,7 +490,7 @@ select.panel-input {
 
 .material-texture-plus {
   font-size: var(--text-xs);
-  color: var(--text-dim);
+  color: var(--text-tertiary);
 }
 
 .material-texture-name {

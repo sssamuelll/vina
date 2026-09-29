@@ -318,7 +318,7 @@ Coincido con Plumb en el tamaño y con Petra en la dirección, y los junto así:
 
 ## 8. Lo que deliberadamente NO se propone
 
-- **Rediseñar la piel.** Los tokens, las dos fuentes (Schibsted Grotesk + monoespaciada), los iconos de Lucide y los cinco materiales declarados están bien. La deuda de piel es mecánica y está localizada (§ 3.2); se limpia, no se rediseña.
+- **Rediseñar la piel.** Los tokens, las dos fuentes (Schibsted Grotesk + monoespaciada) **[Enmienda 2026-09-26: la piel es Inter + JetBrains Mono para datos; Schibsted se cargaba en cuatro pesos para cuatro reglas y salió con la decisión D3 del spec «cromo callado». Y la piel sí se rediseñó: era la paleta, la mono y las sombras por defecto de un framework (brief 2026-09-24 § 1).]**, los iconos de Lucide y los cinco materiales declarados están bien. La deuda de piel es mecánica y está localizada (§ 3.2); se limpia, no se rediseña.
 - **Acoplar los docks y la barra a canaletas.** Samuel lo decidió el 14-08 (spec Fase 3+4 § 2.1): flotan a propósito. Esta revisión no lo re-litiga; lo que pide es que lo que flota tenga un dueño que reparta el borde, no que deje de flotar.
 - **Más espacio en blanco, otra tipografía, otro set de iconos.** El contrato lo prohíbe con razón: María trabaja horas viendo el patrón.
 - **Un "modo simple" y un "modo experto".** Dos gramáticas son peor que una mala. La divulgación progresiva de Petra va por defaults y por lo que se enseña al pasar, no por modos.

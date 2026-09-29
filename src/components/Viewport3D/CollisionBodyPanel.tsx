@@ -57,7 +57,7 @@ export default function CollisionBodyPanel({ open, onClose }: CollisionBodyPanel
   if (!open) return null;
 
   return (
-    <div className="cb-panel-wrapper">
+    <div className="cb-panel-wrapper" data-superficie="panel">
       <div className="cb-panel">
         <div className="cb-panel-header">
           <h3>Cuerpos de colisión</h3>

@@ -97,7 +97,7 @@ export default function ToolStrip2D(
   };
 
   return (
-    <div className="tool-strip" role="group" aria-label="Herramienta activa" ref={raiz}>
+    <div className="tool-strip" role="group" aria-label="Herramienta activa" ref={raiz} data-superficie="tira">
       <div className="tool-strip__head">
         <span className="tool-strip__tool">{definicion?.name ?? activeTool}</span>
         {atajo && <kbd className="tool-strip__shortcut">{atajo}</kbd>}

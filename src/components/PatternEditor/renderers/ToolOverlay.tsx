@@ -248,8 +248,8 @@ export default function ToolOverlay(props: ToolOverlayProps) {
               cx={props.pointToolHover.target.world.x}
               cy={props.pointToolHover.target.world.y}
               r={4 / zoom2D}
-              fill="#4a9eff"
-              stroke="#fff"
+              fill="var(--accent-2d)"
+              stroke="var(--piece-fill-2d)"
               strokeWidth={1.2 / zoom2D}
             />
           ) : (
@@ -259,7 +259,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
                 y1={props.pointToolHover.target.sideEnds[0].y}
                 x2={props.pointToolHover.target.sideEnds[1].x}
                 y2={props.pointToolHover.target.sideEnds[1].y}
-                stroke="#4a9eff"
+                stroke="var(--accent-2d)"
                 strokeWidth={3 / zoom2D}
                 strokeLinecap="round"
                 opacity={0.6}
@@ -463,8 +463,8 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           y={Math.min(props.selectMarquee.start.y, props.selectMarquee.current.y)}
           width={Math.abs(props.selectMarquee.current.x - props.selectMarquee.start.x)}
           height={Math.abs(props.selectMarquee.current.y - props.selectMarquee.start.y)}
-          fill="rgba(74, 158, 255, 0.1)"
-          stroke="#4A9EFF"
+          style={{ fill: 'color-mix(in oklab, var(--accent-2d) 10%, transparent)' }}
+          stroke="var(--accent-2d)"
           strokeWidth={1 / zoom2D}
           strokeDasharray={`${4 / zoom2D}`}
           pointerEvents="none"

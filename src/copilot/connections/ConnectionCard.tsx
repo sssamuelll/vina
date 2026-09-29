@@ -35,7 +35,7 @@ const cardStyle: React.CSSProperties = {
 
 const cardActiveStyle: React.CSSProperties = {
   borderColor: 'var(--accent)',
-  background: 'rgba(99, 102, 241, 0.08)',
+  background: 'var(--accent-subtle)',
 };
 
 const cardDisabledStyle: React.CSSProperties = {
@@ -62,10 +62,10 @@ const subLabelStyle: React.CSSProperties = {
 const badgeStyle: React.CSSProperties = {
   fontSize: 10,
   color: 'white',
-  background: 'var(--accent)',
+  background: 'var(--accent-fuerte)',
   padding: '2px 8px',
   borderRadius: 999,
-  fontWeight: 700,
+  fontWeight: 600,
   letterSpacing: 0.4,
   textTransform: 'uppercase' as const,
   lineHeight: 1.4,
