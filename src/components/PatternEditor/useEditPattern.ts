@@ -35,6 +35,7 @@ import {
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { piezaBloqueada } from '../../utils/piezaBloqueada';
+import { indiceSegunLosBordes } from '../../utils/semanticEdges';
 import { convertSegmentToSpline, resmoothAfterMove, toManualBezier } from './splineSegment';
 import { guiasShift, type GuiaShift, type GuiasShift } from './restriccionShift';
 import { useShiftSostenido, type ModoShift } from './useShiftSostenido';
@@ -1248,7 +1249,7 @@ function marcoDelPunto(
 function marcoDelTramo(
   piece: PatternPiece, path: PathCommand[], nodes: EditableNode[], commandIndex: number, pulsado: Point2D,
 ): OutlineDrag['marco'] {
-  const toIndex = path[commandIndex]?.type === 'Z' ? 0 : commandIndex;
+  const toIndex = indiceSegunLosBordes(path, commandIndex);
   const to = nodes.find(n => n.ref.commandIndex === toIndex)?.position;
   const from = findFromNode(nodes, commandIndex)?.position;
   return { desde: pulsado, referencia: to && from ? chordReference(piece, from, to) : ABSOLUTE_REFERENCE };

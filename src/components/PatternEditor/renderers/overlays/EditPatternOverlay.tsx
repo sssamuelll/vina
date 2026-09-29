@@ -32,6 +32,10 @@ function resaltesDeTramos(
   // Build segment paths for highlight
   const out: JSX.Element[] = [];
   let prevX = 0, prevY = 0;
+  // Arranque del subcamino en curso: a él vuelve su propia `Z`. Con una pieza
+  // con agujero hay varios, y tomar siempre `path[0]` dibujaba el realce
+  // del cierre sobre una cuerda que cruza la pieza y no existe (#1205).
+  let subX = 0, subY = 0;
   const trazo = (key: string, d: string, i: number, isSelected: boolean, isHovered: boolean) => (
     <path
       key={key}
@@ -53,24 +57,20 @@ function resaltesDeTramos(
       if (cmd.type === 'L') d = `M ${prevX} ${prevY} L ${cmd.values[0]} ${cmd.values[1]}`;
       else if (cmd.type === 'C') d = `M ${prevX} ${prevY} C ${cmd.values.join(' ')}`;
       else if (cmd.type === 'Q') d = `M ${prevX} ${prevY} Q ${cmd.values.join(' ')}`;
+      else if (cmd.type === 'Z') d = `M ${prevX} ${prevY} L ${subX} ${subY}`;
       if (d) out.push(trazo(`${prefijo}seg-${i}`, d, i, isSelected, isHovered));
     }
     // Track previous anchor for segment path construction
     switch (cmd.type) {
-      case 'M': case 'L': prevX = cmd.values[0]; prevY = cmd.values[1]; break;
+      case 'M':
+        prevX = cmd.values[0]; prevY = cmd.values[1];
+        subX = prevX; subY = prevY; break;
+      case 'L': prevX = cmd.values[0]; prevY = cmd.values[1]; break;
       case 'C': prevX = cmd.values[4]; prevY = cmd.values[5]; break;
       case 'Q': prevX = cmd.values[2]; prevY = cmd.values[3]; break;
-    }
-  }
-  // Closing segment: last anchor → first anchor (Z command)
-  const zIndex = path.findIndex(c => c.type === 'Z');
-  if (zIndex >= 0 && path[0]?.type === 'M') {
-    const isSelected = selected.has(zIndex);
-    const isHovered = hovered === zIndex && !isSelected;
-    if (isSelected || isHovered) {
-      // prevX/prevY from the loop already hold the last anchor position
-      const d = `M ${prevX} ${prevY} L ${path[0].values[0]} ${path[0].values[1]}`;
-      out.push(trazo(`${prefijo}seg-closing`, d, zIndex, isSelected, isHovered));
+      case 'Z':
+        // La `Z` devuelve el punto actual al arranque de su subcamino.
+        prevX = subX; prevY = subY; break;
     }
   }
   return out;

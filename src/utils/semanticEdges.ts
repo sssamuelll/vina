@@ -306,10 +306,11 @@ export function rangoMedibleDeBorde(
  *      arriba, y lo vigila `scripts/medir-bordes-lint.mjs` (#1143).
  *   2. el ÍNDICE sin traducir — un hit-test devuelve el índice de la `Z` y
  *      quien lo recibe lo compara contra rangos rotulados con la `M`. Lo cierra
- *      esta función. `useEditPattern.ts:424` hace la misma traducción clavada a
- *      `0`; parecía un bug y no lo es — es consistente con lo que el productor
- *      emite hoy. La causa real es que `nearestSegment` trata dos subcaminos
- *      como uno: reproducido en #1205.
+ *      esta función. `useEditPattern.ts` hacía la misma traducción clavada a
+ *      `0` en dos sitios; no era un bug mientras `nearestSegment` solo emitía
+ *      la PRIMERA `Z`, y pasó a serlo el día que dejó de hacerlo. Cerrado el
+ *      2026-09-19 con #1205: el productor ya respeta los subcaminos y los dos
+ *      sitios llaman aquí en vez de reimplementarlo.
  *   3. el PRODUCTOR, que solo emitía lados dibujados con `L` y dejaba ese tramo
  *      sin entidad propia: sin largo, sin ángulo y sin poder editarse (#1167,
  *      `cotas/segmentPolar.ts`).

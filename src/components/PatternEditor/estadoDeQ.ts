@@ -15,6 +15,7 @@
 import type { PathCommand, PatternPiece, Point2D } from '../../types/types';
 import { extractNodes, extractNodesFromPath, type EditableNode } from './nodeEditorUtils';
 import { pieceLocalToPattern } from './pieceTransform';
+import { indiceSegunLosBordes } from '../../utils/semanticEdges';
 import {
   CLAVE_CONTORNO, claveDeInterna, internasEditables, lineIdDeClave, type ClaveLinea,
 } from './lineaEditable';
@@ -329,7 +330,8 @@ export function arrastreDe(
       }
     } else {
       for (const segIdx of v.selectedSegments) {
-        const toIndex = v.path[segIdx]?.type === 'Z' ? 0 : segIdx;
+        // La `Z` mueve la `M` de SU subcamino, no la del primero (#1205).
+        const toIndex = indiceSegunLosBordes(v.path, segIdx);
         const toNode = v.nodes.find(n => n.ref.commandIndex === toIndex);
         if (toNode) startPositions.set(toIndex, { ...toNode.position });
         const fromNode = findFromNode(v.nodes, segIdx);
