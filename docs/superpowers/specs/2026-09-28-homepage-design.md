@@ -1,6 +1,6 @@
 # Homepage de Vina — el patrón sobre la página
 
-> **Estado:** decidido el 2026-09-28, pendiente de plan de implementación.
+> **Estado:** decidido el 2026-09-28; plan del 2026-09-29 en `docs/superpowers/plans/2026-09-29-homepage.md`. **Enmendado el 2026-09-29 (§ 12): manda sobre el cuerpo.**
 > Sale de `docs/reports/2026-09-27-homepage-competencia-y-referentes.md` (investigación del
 > 2026-09-27: 12 CAD de moda, 16 entrantes con IA, 24 homepages de software premium, 20 casas de
 > lujo, técnica; sus cinco notas están en `docs/reports/2026-09-27-homepage-investigacion/`) y del
@@ -393,3 +393,45 @@ en tiempo real y un copiloto que entiende de pinzas y costuras. Gratis y de cód
 - `docs/superpowers/specs/2026-09-24-cromo-callado-design.md` (la piel del taller, que la home no toca).
 - `.claude/skills/contrato-de-interfaz/SKILL.md` (leyes de tokens, estado, idioma; aplicadas aquí a otra superficie).
 - Maquetas aprobadas: `docs/superpowers/specs/assets/2026-09-28-homepage-{hero-c-1366,pagina-1366,pagina-390}.png` y `2026-09-28-homepage-maqueta.html`.
+
+## 12. Enmienda del 2026-09-29 — lo que dicen los datos
+
+Al planificar la implementación se midió el DXF de María y el repo, y tres cosas del cuerpo de
+este documento no eran ciertas. Esta sección manda sobre el cuerpo donde choquen. Decidido con
+Samuel el 2026-09-29.
+
+**El patrón es una camiseta, y el DXF no tiene pinza.** `maria_patrones_samuel_2M.dxf` trae cinco
+piezas sin nombre (`PATRONES PARA SAMUEL-1` a `-5`, formato AAMA): delantero y espalda de
+520 × 594 mm, dos mangas de 381 × 282 mm y una tira de cuello. Todas con `outlineIsCutLine: true`
+y margen 0. De ahí:
+
+- § 3.2 y § 5.1: los rótulos del hero son `DELANTERO · ×1`, `MANGA · ×2` y
+  `PATRONES PARA SAMUEL · AAMA · mm` (el nombre sale del DXF). Fuera `AL DOBLEZ` (el delantero
+  está entero), fuera `CAMISA_BASE_v4 · T38` (inventado en la maqueta).
+- Sin pinza (no existe) y sin línea de costura discontinua: el contorno ES la línea de corte, y
+  dibujar la de costura sería inventar un margen.
+- La cota es la medida real del dobladillo del delantero, **520 mm**, calculada por el script; no
+  los 328 mm de la maqueta.
+- El delantero es `SAMUEL-5` (escote central de 51 mm frente a 12 mm de la espalda, `SAMUEL-3`).
+- La caja del patrón es 720 × 540 (§ 3.2 y § 4.3); el 720 × 600 de § 5.1 era un resto.
+
+**El SVG del hero va incrustado en el HTML, no como `<img>`.** Un SVG en `<img>` no hereda la
+fuente ni los tokens de la página: sus rótulos saldrían en la mono del sistema. Un plugin de Vite
+de pocas líneas sustituye `<!-- incluir: home/img/patron.svg -->` por el fichero, y el SVG no lleva
+colores literales, solo clases. Los tokens de la home ganan `--ink` y `--ink-2` (la tinta del
+lienzo del taller, para el trazo), `--blanco` (relleno de pieza y texto sobre `--senal`) y los del
+visor y la rejilla, para que `home.css` no tenga ni un literal.
+
+**Imágenes en WebP, no AVIF.** En la máquina de trabajo no hay codificador AVIF (ni `sharp`, ni
+`ffmpeg`, ni `avifenc`), y Chromium codifica WebP de serie (`canvas.convertToBlob`). Se generan en
+WebP con el mismo script de Playwright, sin dependencias nativas nuevas. El presupuesto de peso de
+§ 8 no cambia.
+
+**El repo es privado.** `sssamuelll/vina` estaba en PRIVATE al planificar. El copy de «código
+abierto» y los enlaces al repo se implementan tal cual; Samuel lo hace público antes de publicar
+la home. Sin eso, la home no se despliega.
+
+**`scripts/home/og.mjs` se funde en `scripts/home/activos.mjs`**, que genera figuras, póster,
+favicons, manifest y OG en una sola pasada contra el build.
+
+Plan: `docs/superpowers/plans/2026-09-29-homepage.md`.
