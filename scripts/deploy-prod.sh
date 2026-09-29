@@ -212,6 +212,11 @@ npx playwright test --workers=2 \
 # que nadie mira es un rojo esperando su turno.
 grep -E "passed|failed|flaky" /tmp/vina-deploy-e2e.log | sed 's/^ */✓ emplazamiento y contratos: /'
 
+echo "── Home ───────────────────────────────────────────────"
+npx playwright test --config playwright.home.config.ts > /tmp/vina-deploy-home.log 2>&1 \
+  || { tail -30 /tmp/vina-deploy-home.log >&2; echo "✗ e2e de la home en rojo" >&2; exit 1; }
+grep -E "passed|failed|flaky" /tmp/vina-deploy-home.log | sed 's/^ */✓ home: /'
+
 echo "── Build ──────────────────────────────────────────────"
 npm run build > /tmp/vina-deploy-build.log 2>&1 || { tail -20 /tmp/vina-deploy-build.log >&2; exit 1; }
 # Del index.html del taller, no por glob: assets/ puede tener más de un *.js

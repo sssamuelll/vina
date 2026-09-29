@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const H1 = 'Traza el patrón, mira la caída.';
 const ORIGEN = 'http://localhost:4179';
@@ -172,4 +173,32 @@ test.describe('pantalla de 320 px', () => {
     await cargar(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   });
+});
+
+const TECHOS = { document: 25_000, stylesheet: 20_000, script: 0, font: 100_000, image: 300_000, media: 0, total: 500_000 };
+const BASELINE = 'tests/e2e/home-peso-baseline.json';
+
+test('trinquete de peso de la carga de / a 1366', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  const bytes: Record<string, number> = {}; let fuentes = 0;
+  const pendientes: Promise<void>[] = [];
+  page.on('response', (r) => {
+    // Se guardan las promesas y se esperan todas: un handler async suelto
+    // puede no haber sumado todavía cuando se compara.
+    pendientes.push((async () => {
+      const tipo = r.request().resourceType();
+      const n = (await r.body().catch(() => Buffer.alloc(0))).length;
+      bytes[tipo] = (bytes[tipo] ?? 0) + n;
+      if (tipo === 'font') fuentes++;
+    })());
+  });
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await Promise.all(pendientes);
+  const medido = { ...Object.fromEntries(Object.keys(TECHOS).map((k) => [k, bytes[k] ?? 0])), total: Object.values(bytes).reduce((a, b) => a + b, 0) };
+  if (process.env.HOME_PESO_UPDATE === '1') { writeFileSync(BASELINE, JSON.stringify(medido, null, 2) + '\n'); return; }
+  const base = JSON.parse(readFileSync(BASELINE, 'utf8')) as Record<string, number>;
+  expect(fuentes).toBeLessThanOrEqual(2);
+  for (const [k, techo] of Object.entries(TECHOS)) {
+    expect(medido[k], `${k}: ${medido[k]} B`).toBeLessThanOrEqual(Math.min(techo, base[k] ?? techo));
+  }
 });

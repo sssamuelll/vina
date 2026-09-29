@@ -1,6 +1,6 @@
 # Homepage de Vina — el patrón sobre la página
 
-> **Estado:** decidido el 2026-09-28; plan del 2026-09-29 en `docs/superpowers/plans/2026-09-29-homepage.md`. **Enmendado el 2026-09-29 (§ 12): manda sobre el cuerpo.**
+> **Estado:** implementado el 2026-09-29 (PR #N); publicado: pendiente de nginx y repo público. Plan: `docs/superpowers/plans/2026-09-29-homepage.md`; lo que falta para publicar: `docs/superpowers/specs/2026-09-29-homepage-nginx.md`. **Enmendado el 2026-09-29 (§ 12): manda sobre el cuerpo.**
 > Sale de `docs/reports/2026-09-27-homepage-competencia-y-referentes.md` (investigación del
 > 2026-09-27: 12 CAD de moda, 16 entrantes con IA, 24 homepages de software premium, 20 casas de
 > lujo, técnica; sus cinco notas están en `docs/reports/2026-09-27-homepage-investigacion/`) y del
@@ -433,5 +433,25 @@ la home. Sin eso, la home no se despliega.
 
 **`scripts/home/og.mjs` se funde en `scripts/home/activos.mjs`**, que genera figuras, póster,
 favicons, manifest y OG en una sola pasada contra el build.
+
+**Al implementar (2026-09-29).** Seis decisiones que salieron de medir la página ya construida:
+
+- **La meta description es otra.** Queda «CAD de patronaje en el navegador: patrón 2D editable,
+  tela simulada en tiempo real y un copiloto que entiende de costuras. Gratis y de código
+  abierto.» (150 caracteres). La frase de § 7 medía 174 contra su propio rango de 120–150, y el
+  e2e fija ese rango.
+- **Fuera la animación de entrada al hacer scroll de § 4.4.** Con `animation-timeline: view()` el
+  texto se queda desvaído donde el lector deje de bajar: axe midió 12 fallos de contraste en
+  `#taller` con opacidad 0,16. Gana que se lea sobre que se mueva.
+- **Los enlaces de la cabecera y del pie tienen `min-height: 24px`.** Medían 21 y 18,8 px contra
+  los 24 × 24 de § 7; un e2e mide cada enlace y cada botón visibles.
+- **El recorte de la Fig 0.2 se ancla a la paleta de comandos, no «centrado al 30 %».** La paleta
+  abre hacia arriba desde la barra de abajo, y el recorte al 30 % dejaba fuera su campo de
+  búsqueda y el grupo Exportar.
+- **Las `@font-face` viven en `home/home.css`, no en línea en el head (§ 5.5),** con un `preload`
+  de Inter en el head: el preload ya da el descubrimiento temprano.
+- **El póster del hero salió del tier WASM** (headless no tiene WebGPU) y trae una franja negra
+  dentada en la costura lateral derecha de la camiseta. Es salida real del solver y del render,
+  sin retocar; necesita su propio issue y una mirada antes de publicar.
 
 Plan: `docs/superpowers/plans/2026-09-29-homepage.md`.
