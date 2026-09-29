@@ -13,7 +13,7 @@ async function enterSewingSurface(page: Page) {
 
 test.describe('Seam curved edge highlights', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
     await page.waitForTimeout(1000);
   });

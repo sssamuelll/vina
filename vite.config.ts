@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
@@ -50,6 +51,10 @@ export default defineConfig({
   build: {
     outDir: './dist',
     rollupOptions: {
+      input: {
+        inicio: fileURLToPath(new URL('./index.html', import.meta.url)),
+        app: fileURLToPath(new URL('./app/index.html', import.meta.url)),
+      },
       output: {
         manualChunks(id) {
           // All of Three.js in one chunk — splitting into separate chunks

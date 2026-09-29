@@ -15,7 +15,7 @@ test.describe('emplazamiento de la tira y las cotas (laptop de María, 1366×643
   test.use({ viewport: { width: 1366, height: 643 } });
 
   test('el dock nunca pinta encima de la tira; el lienzo ocupa toda el área 2D', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
     await page.getByRole('button', { name: 'Rectángulo' }).first().click();
     const r = await page.evaluate(() => {
@@ -38,7 +38,7 @@ test.describe('emplazamiento de la tira y las cotas (laptop de María, 1366×643
   });
 
   test('las cotas se ocultan mientras se arrastra la pieza y vuelven al soltar', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
     await page.keyboard.press('s');
     const box = await page.locator('svg.pattern-svg').boundingBox();

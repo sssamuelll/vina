@@ -214,10 +214,11 @@ grep -E "passed|failed|flaky" /tmp/vina-deploy-e2e.log | sed 's/^ */✓ emplazam
 
 echo "── Build ──────────────────────────────────────────────"
 npm run build > /tmp/vina-deploy-build.log 2>&1 || { tail -20 /tmp/vina-deploy-build.log >&2; exit 1; }
-# Del index.html, no por glob: assets/ puede tener más de un index-*.js
-# (chunks) y el que importa es el que el index referencia de verdad.
-BUNDLE=$(grep -oE 'assets/index-[^"]+\.js' dist/index.html | head -1)
-[ -n "$BUNDLE" ] || { echo "✗ dist/index.html no referencia ningún assets/index-*.js" >&2; exit 1; }
+# Del index.html del taller, no por glob: assets/ puede tener más de un *.js
+# (chunks) y el que importa es el que el index referencia de verdad. La
+# entrada se llama como su clave en rollupOptions.input: `app` → app-*.js.
+BUNDLE=$(grep -oE 'assets/app-[^"]+\.js' dist/app/index.html | head -1)
+[ -n "$BUNDLE" ] || { echo "✗ dist/app/index.html no referencia ningún assets/app-*.js" >&2; exit 1; }
 echo "✓ dist listo ($(du -sh dist | cut -f1), bundle ${BUNDLE})"
 
 if [ "$ENSAYO" = "1" ]; then
@@ -232,10 +233,14 @@ echo "✓ publicado en $DOCROOT"
 
 echo "── Verificar ──────────────────────────────────────────"
 # Desde local, no desde la caja: el hairpin contra la Elastic IP da 404 falso.
-CODE=$(curl -s -o /tmp/vina-deploy-index.html -w "%{http_code}" "$URL")
-[ "$CODE" = "200" ] || { echo "✗ $URL devolvió $CODE" >&2; exit 1; }
-# El index publicado tiene que referenciar EXACTAMENTE el bundle que compilamos.
+# $URL ya termina en barra: "${URL}app/", no "$URL/app/", que pediría //app/.
+CODE=$(curl -s -o /tmp/vina-deploy-index.html -w "%{http_code}" "${URL}app/")
+[ "$CODE" = "200" ] || { echo "✗ ${URL}app/ devolvió $CODE" >&2; exit 1; }
+# El taller publicado tiene que referenciar EXACTAMENTE el bundle que compilamos.
 grep -q "$BUNDLE" /tmp/vina-deploy-index.html \
-  || { echo "✗ el index servido no referencia $BUNDLE — se publicó otra cosa" >&2; exit 1; }
-echo "✓ $URL → 200 y sirve $BUNDLE"
+  || { echo "✗ el taller servido no referencia $BUNDLE — se publicó otra cosa" >&2; exit 1; }
+CODE=$(curl -s -o /tmp/vina-deploy-home.html -w "%{http_code}" "$URL")
+[ "$CODE" = "200" ] && grep -q "Traza el patrón" /tmp/vina-deploy-home.html \
+  || { echo "✗ $URL no sirve la home" >&2; exit 1; }
+echo "✓ ${URL}app/ → 200 y sirve $BUNDLE; $URL sirve la home"
 echo "Deploy completo: $(git rev-parse --short HEAD)"

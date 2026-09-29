@@ -67,7 +67,7 @@ async function importSewAndSimulate(page: Page) {
   // switch es el opt-in de usuario, y debe existir ANTES de cargar la app.
   await page.addInitScript(() => localStorage.setItem('vina-use-webgpu', 'true'));
 
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
   await page.waitForFunction(
     () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),

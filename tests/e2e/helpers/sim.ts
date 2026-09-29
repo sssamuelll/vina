@@ -18,7 +18,7 @@ import { expect, type Page } from '@playwright/test';
 
 /** Wait for the app shell to hydrate: store exposed + RightDock Simulate button visible. */
 export async function waitForApp(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page
     .waitForFunction(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__), {
       timeout: 15_000,

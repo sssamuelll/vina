@@ -14,7 +14,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Canvas shell — view modes', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
   });
 
@@ -52,7 +52,7 @@ test.describe('Canvas shell — view modes', () => {
 
 test.describe('Canvas shell — split divider', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
   });
 

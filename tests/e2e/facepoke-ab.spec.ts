@@ -77,7 +77,7 @@ test('facepoke A/B metric @gpu-local', async ({ page }) => {
     const t = msg.text();
     if (/RenderBake|SimLifecycle|CollisionMesh|AvatarCollision/.test(t)) console.log(`[page] ${t}`);
   });
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
   await page.waitForFunction(
     () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),

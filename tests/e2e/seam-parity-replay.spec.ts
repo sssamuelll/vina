@@ -18,7 +18,7 @@ import { switchView, startSimulation } from './helpers/sim';
 // ─── Harness ─────────────────────────────────────────────────────────────────
 
 async function waitFor2D(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
   await page.waitForFunction(
     () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),

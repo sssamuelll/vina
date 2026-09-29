@@ -37,7 +37,7 @@ const LAS_SIETE: Array<[string, string]> = [
 ];
 
 async function abrirApp(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
   await page.waitForTimeout(800);
   await page.locator('.toast__dismiss')

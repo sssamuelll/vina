@@ -11,7 +11,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('3D Viewport', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForFunction(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__), { timeout: 15000 });
   });
 
@@ -63,7 +63,7 @@ test.describe('3D Viewport', () => {
 
 test.describe('Avatar Rendering', () => {
   test('avatar loads in 3D view', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForFunction(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__), { timeout: 15000 });
     await page.click('button:has-text("3D")');
     await page.waitForTimeout(3000);
@@ -72,7 +72,7 @@ test.describe('Avatar Rendering', () => {
 
   test.skip('A-pose visual regression', async ({ page }) => {
     // Run with --update-snapshots to create baseline.
-    await page.goto('/');
+    await page.goto('/app/');
     await page.click('button:has-text("3D")');
     await page.waitForTimeout(3000);
     await expect(page).toHaveScreenshot('avatar-a-pose.png');

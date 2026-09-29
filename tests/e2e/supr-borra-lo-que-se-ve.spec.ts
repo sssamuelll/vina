@@ -30,7 +30,7 @@ const RECT = (id: string, x: number, y: number, extra: Record<string, unknown> =
 });
 
 async function abrirApp(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
   await page.waitForTimeout(700);
   await page.locator('.toast__dismiss').evaluateAll((bs) => bs.forEach((b) => (b as HTMLElement).click())).catch(() => {});

@@ -34,7 +34,7 @@ const activeTool = (page: Page) =>
   page.evaluate(() => (window as unknown as StoreWindow).__VINA_STORE__.getState().tools.activeTool2D);
 
 async function waitForApp(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
   await page.waitForTimeout(600);
 }

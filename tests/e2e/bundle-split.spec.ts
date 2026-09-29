@@ -20,7 +20,7 @@ import { test, expect, Page } from '@playwright/test';
  */
 
 async function waitForApp(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForFunction(() => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__), { timeout: 15000 });
   await expect(page.locator('[aria-label="Simular"]').first()).toBeVisible({ timeout: 15000 });
 }

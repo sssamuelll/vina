@@ -103,7 +103,7 @@ async function abrirPanel(comando) {
   await settle(900);
 }
 
-await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 90_000 });
+await page.goto(`${BASE_URL}/app/`, { waitUntil: 'domcontentloaded', timeout: 90_000 });
 await waitForApp(0);
 await settle(1500);
 await dismissToasts();

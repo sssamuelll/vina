@@ -29,7 +29,7 @@ const contorno = async (page: Page) =>
   (await st(page)).project.pieces[0].outline.filter(c => c.type !== 'Z').map(c => c.values);
 
 async function unRectanguloSeleccionado(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
   await page.waitForTimeout(600);
   // 200 mm de ancho × 150 de alto, esquina superior izquierda en (200,200).
@@ -269,7 +269,7 @@ test.describe('editar los largos de una pieza que ya existe', () => {
     // es el que ella va a hacer de verdad —clic en la pieza, Tab— y ahí el
     // ratón se quedó DENTRO, en el punto del clic. Tiene que abrir igual, y
     // abrir el lado que ese punto tiene más cerca.
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
     await page.waitForTimeout(600);
     await addPiece(page, 'p1', { x: 200, y: 200 }, 200, 150);
@@ -291,7 +291,7 @@ test.describe('editar los largos de una pieza que ya existe', () => {
     // pudiera editar clicando TAB». Mientras el rectángulo sigue caliente, Tab
     // conserva Ancho —la medida que acaba de dibujar, #223/#225—; en cuanto
     // sale de crear, abre el largo del lado.
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
     await page.waitForTimeout(600);
     await page.keyboard.press('s');                       // Rectángulo

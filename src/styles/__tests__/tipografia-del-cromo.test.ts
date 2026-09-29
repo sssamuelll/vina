@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 /**
  * Spec 2026-09-24 «cromo callado» § 4.5 (decisión D3 de Samuel):
  *   1. una sola sans (Inter) en 400/500/600 y una sola mono (JetBrains Mono);
- *      Schibsted Grotesk y el 700 salen de index.html;
+ *      Schibsted Grotesk y el 700 salen de app/index.html (el taller);
  *   2. sin Inter 700 cargada, un `font-weight: 700` se sintetiza (negrita
  *      falsa): no puede quedar ninguno en el cromo;
  *   3. mono = un dato cuya alineación carácter a carácter significa algo
@@ -18,7 +18,7 @@ const rastreados = (patron: string) =>
   execFileSync('git', ['ls-files', patron], { encoding: 'utf8' }).split('\n').filter(Boolean);
 
 describe('1. las familias que se cargan', () => {
-  const html = lee('index.html');
+  const html = lee('app/index.html');
   it('Inter 400/500/600 y JetBrains Mono 400/500, nada más', () => {
     expect(html).toContain('family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
     expect(html).not.toContain('Schibsted');

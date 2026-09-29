@@ -55,7 +55,7 @@ test('workflow demo: capturas de toda la operación @gpu-local', async ({ page }
     localStorage.setItem('vina-use-webgpu', 'true');
     if (crossbendOff) localStorage.setItem('vina-crossbend', 'off');
   }, process.env.CROSSBEND === 'off');
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
   await page.waitForFunction(
     () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),

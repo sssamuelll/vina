@@ -15,6 +15,7 @@ export default defineConfig({
       'src/**/*.test.ts',
       'src/**/*.test.tsx',
       'tests/**/*.test.ts',
+      'server/**/*.test.ts',
       'eslint-rules/tests/**/*.test.js',
     ],
     exclude: ['node_modules/**'],

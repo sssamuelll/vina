@@ -27,7 +27,7 @@ import { dispatch, st } from './helpers/lienzo';
 const MARIA = { width: 1366, height: 643 };
 
 async function abrirApp(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
   await page.waitForTimeout(600);
   // Los toasts de arranque tapan la esquina y falsean elementFromPoint.

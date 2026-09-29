@@ -21,7 +21,7 @@ interface Estado {
 const estado = (page: Page) => page.evaluate(() => (window as unknown as { __VINA_STORE__: { getState: () => Estado } }).__VINA_STORE__.getState());
 
 async function waitApp(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
   await page.waitForTimeout(500);
 }

@@ -30,7 +30,7 @@ const campo = (page: Page, nombre: string) =>
   page.locator(`input.cota--editando[aria-label="${nombre}"]`);
 
 async function unRectanguloEnEdicion(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
   await page.waitForTimeout(600);
   await addPiece(page, 'p1', { x: 200, y: 200 }, 200, 150);
@@ -138,7 +138,7 @@ test.describe('mover el punto con número', () => {
     // #1112 se apagaban en silencio justo sobre los datos para los que se
     // hicieron. `addPiece` construye un rectángulo sintético con anclas únicas,
     // así que los otros tres tests de este archivo no podían verlo.
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 30000 });
     await page.waitForTimeout(600);
     await dispatch(page, 'project/addPiece', {

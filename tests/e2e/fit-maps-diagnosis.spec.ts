@@ -30,7 +30,7 @@ const MARIA_FIXTURE = path.resolve(
 // ─── Helpers (espejo de fit-maps.spec.ts) ───────────────────────────────────
 
 async function waitForApp(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
   await page.waitForTimeout(1000);
 }
@@ -298,7 +298,7 @@ test.describe('diagnóstico #1010 — fit map sobre el patrón real de María @g
 
     // Flujo probado del replay (F4 #897)
     await page.addInitScript(() => localStorage.setItem('vina-use-webgpu', 'true'));
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 15_000 });
     await page.waitForFunction(
       () => Boolean((window as unknown as { __VINA_STORE__?: unknown }).__VINA_STORE__),
