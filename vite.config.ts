@@ -46,6 +46,9 @@ function incluirEnHome(): import('vite').Plugin {
   };
 }
 
+// La home muestra «v0.11»: se lee de package.json en build (spec § 3.6).
+process.env.VITE_VINA_VERSION = JSON.parse(fs.readFileSync('package.json', 'utf8')).version.split('.').slice(0, 2).join('.');
+
 export default defineConfig({
   base: '/',
   resolve: {

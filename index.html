@@ -1,12 +1,99 @@
 <!doctype html>
 <html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Vina — Patronaje y simulación 3D en el navegador</title>
-    <link rel="stylesheet" href="/home/tokens.css"><link rel="stylesheet" href="/home/home.css">
-  </head>
-  <body>
-    <main><h1>Traza el patrón, mira la caída.</h1><a href="/app/">Abrir Vina</a><div style="width:720px;height:540px"><!-- incluir: home/img/patron.svg --></div></main>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vina — Patronaje y simulación 3D en el navegador</title>
+  <meta name="description" content="Un CAD de patronaje que se abre en el navegador: patrón 2D editable, tela simulada en tiempo real y un copiloto que entiende de pinzas y costuras. Gratis y de código abierto.">
+  <link rel="canonical" href="https://vina.sdar.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://vina.sdar.dev/">
+  <meta property="og:title" content="Vina — Patronaje y simulación 3D en el navegador">
+  <meta property="og:description" content="Traza el patrón, mira la caída. Un CAD de patronaje en el navegador, gratis y de código abierto.">
+  <meta property="og:image" content="https://vina.sdar.dev/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="preload" href="./home/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="./home/tokens.css">
+  <link rel="stylesheet" href="./home/home.css">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"WebApplication","name":"Vina","url":"https://vina.sdar.dev/",
+   "applicationCategory":"DesignApplication","operatingSystem":"Web","inLanguage":"es",
+   "offers":{"@type":"Offer","price":0,"priceCurrency":"USD"},"isAccessibleForFree":true,
+   "license":"https://opensource.org/licenses/MIT","sameAs":["https://github.com/sssamuelll/vina"]}
+  </script>
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<header class="cabecera"><div class="wrap">
+  <a href="/" class="marca"><img class="logo" src="./home/img/logo.svg" alt="Vina" width="48" height="28"></a>
+  <nav aria-label="Principal">
+    <a href="#taller">Producto</a><a href="#formatos">Formatos</a><a href="#copiloto">Copiloto</a><a href="#codigo">Código</a>
+    <a class="pill" href="/app/">Abrir Vina</a>
+  </nav>
+</div></header>
+
+<main id="contenido">
+<section class="hero"><div class="wrap">
+  <div class="texto">
+    <h1>Traza el patrón, mira la caída.</h1>
+    <p class="lead">Vina es un CAD de patronaje que se abre en el navegador: patrón 2D editable, tela simulada en tiempo real y un copiloto que entiende de pinzas y costuras.</p>
+    <div class="cta"><a class="btn btn-primario" href="/app/">Abrir Vina</a><a class="btn btn-contorno" href="#codigo">Ver el código</a></div>
+    <p class="meta mono">Gratis y de código abierto · Sin cuenta · Tus proyectos se guardan en tu navegador</p>
+  </div>
+  <div class="hero-visor">
+    <!-- Task 5: <img class="visor-poster" …> -->
+    <p class="indicador mono"><i aria-hidden="true"></i>Simulando · <span lang="en">WebGPU</span></p>
+  </div>
+  <div class="hero-patron"><!-- incluir: home/img/patron.svg --></div>
+</div></section>
+
+<section id="taller"><div class="wrap">
+  <p class="eyebrow mono">Fig 0.1 · El taller</p>
+  <h2>Tal como se abre. Sin cuenta, sin instalar.</h2>
+  <p class="intro">Un lienzo de papel con tu patrón, un visor 3D con el avatar, y las herramientas de siempre en el orden de siempre.</p>
+  <figure class="fig"><!-- Task 5: <picture> con fig-01 --><figcaption class="figcap mono"><span>Patrón real importado de un DXF · pieza seleccionada con su cota</span><span>Chromium · 1600 × 1000</span></figcaption></figure>
+  <div class="cols">
+    <div><h3>Trazado</h3><p>Pluma, rectángulo, pinzas, piquetes y márgenes de costura. Las cotas se escriben donde miden.</p></div>
+    <div><h3>Costura</h3><p>Coser piezas automáticamente o borde a borde. Las costuras se ven en el 2D y se cierran en el 3D.</p></div>
+    <div><h3>Caída</h3><p>Tela simulada en tiempo real sobre el avatar, con <span lang="en">WebGPU</span> dentro del navegador. Mapas de ajuste desde el primer fotograma.</p></div>
+  </div>
+</div></section>
+
+<section id="formatos" class="formatos"><div class="wrap">
+  <p class="eyebrow mono">Formatos</p>
+  <h2>Abre tu DXF y míralo caer.</h2>
+  <p class="intro">Lo que trazas en el lienzo es lo que lee la cortadora. Importa el patrón que ya tienes y expórtalo como salió.</p>
+  <dl class="filas">
+    <div class="fila"><dt>Lee</dt><dd class="mono">DXF-AAMA · DXF-ASTM · Gerber · SVG · ZPRJ (CLO)</dd></div>
+    <div class="fila"><dt>Escribe</dt><dd class="mono">DXF-AAMA · DXF por tallas · PDF de corte · BOM (CSV) · glTF · USDZ · OBJ · FBX</dd></div>
+  </dl>
+</div></section>
+
+<section id="copiloto"><div class="wrap">
+  <p class="eyebrow mono">Fig 0.2 · El copiloto</p>
+  <h2>Un copiloto que habla de costuras.</h2>
+  <p class="intro">Pídele que añada una pinza, que audite los márgenes o que cosa las piezas: usa las mismas herramientas que tú, y cada cambio se puede deshacer. Con tu propia clave de API.</p>
+  <figure class="fig"><!-- Task 5: fig-02 --><figcaption class="figcap mono"><span>Cada verbo del taller está en la barra: coser, vestir, escalar, marcar, exportar</span><span>Fig 0.2</span></figcaption></figure>
+</div></section>
+
+<section id="codigo" class="cierre"><div class="wrap">
+  <p class="eyebrow mono">Código</p>
+  <h2>Abierto, y se queda abierto.</h2>
+  <p class="intro">Vina es software libre bajo licencia MIT. El código, los tests y las decisiones de diseño están en el repositorio.</p>
+  <div class="cta"><a class="btn btn-primario" href="/app/">Abrir Vina</a><a class="btn btn-contorno" href="https://github.com/sssamuelll/vina">Ver el código</a></div>
+  <p class="repo mono">github.com/sssamuelll/vina · <em>MIT</em> · v%VITE_VINA_VERSION%</p>
+</div></section>
+</main>
+
+<footer class="pie"><div class="wrap">
+  <span>© 2026 Vina · Patronaje y simulación 3D en el navegador</span>
+  <nav aria-label="Pie"><a href="#taller">Producto</a><a href="#formatos">Formatos</a><a href="#copiloto">Copiloto</a><a href="#codigo">Código</a></nav>
+</div></footer>
+</body>
 </html>
