@@ -105,6 +105,22 @@ test.describe('home a 1366×768', () => {
     expect(chicos).toEqual([]);
   });
 
+  test('toda imagen carga y tiene alt', async ({ page }) => {
+    const fallidas: string[] = [];
+    page.on('response', (r) => { if (r.request().resourceType() === 'image' && r.status() >= 400) fallidas.push(r.url()); });
+    await cargar(page);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForLoadState('networkidle');
+    expect(fallidas).toEqual([]);
+    for (const img of await page.locator('main img').all()) {
+      await expect(img).toHaveAttribute('alt', /.+/);
+      expect(await img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
+    }
+    await expect(page.locator('img.fig-01')).toHaveCount(1);
+    await expect(page.locator('img.fig-02')).toHaveCount(1);
+    await expect(page.locator('img.visor-poster')).toHaveCount(1);
+  });
+
   test.describe('con reducción de movimiento', () => {
     // En Playwright 1.58 `reducedMotion` no es opción de test.use (se ignora en
     // silencio): va dentro de contextOptions.
@@ -139,7 +155,8 @@ test.describe('sin JavaScript', () => {
 test.describe('móvil 390×844', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   test('orden texto → patrón → visor, y sin scroll horizontal', async ({ page }) => {
-    await cargar(page);
+    const { errores } = await cargar(page);
+    expect(errores).toEqual([]);
     const y = async (sel: string) => (await page.locator(sel).boundingBox())!.y;
     expect(await y('h1')).toBeLessThan(await y('.hero-patron'));
     expect(await y('.hero-patron')).toBeLessThan(await y('.hero-visor'));

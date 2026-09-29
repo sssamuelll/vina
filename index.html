@@ -47,7 +47,7 @@
     <p class="meta mono">Gratis y de código abierto · Sin cuenta · Tus proyectos se guardan en tu navegador</p>
   </div>
   <div class="hero-visor">
-    <!-- Task 5: <img class="visor-poster" …> -->
+    <img class="visor-poster" src="./home/img/caida-poster.webp" alt="La tela de la camiseta cayendo sobre el avatar en el visor 3D" width="520" height="300" decoding="async">
     <p class="indicador mono"><i aria-hidden="true"></i>Simulando · <span lang="en">WebGPU</span></p>
   </div>
   <div class="hero-patron"><!-- incluir: home/img/patron.svg --></div>
@@ -57,7 +57,10 @@
   <p class="eyebrow mono">Fig 0.1 · El taller</p>
   <h2>Tal como se abre. Sin cuenta, sin instalar.</h2>
   <p class="intro">Un lienzo de papel con tu patrón, un visor 3D con el avatar, y las herramientas de siempre en el orden de siempre.</p>
-  <figure class="fig"><!-- Task 5: <picture> con fig-01 --><figcaption class="figcap mono"><span>Patrón real importado de un DXF · pieza seleccionada con su cota</span><span>Chromium · 1600 × 1000</span></figcaption></figure>
+  <figure class="fig"><picture>
+    <source media="(max-width: 720px)" srcset="./home/img/fig-01-movil.webp">
+    <img class="fig-01" src="./home/img/fig-01@1x.webp" srcset="./home/img/fig-01@1x.webp 1x, ./home/img/fig-01@2x.webp 2x" alt="El lienzo 2D de Vina con el patrón de María y una pieza seleccionada con su cota" width="1280" height="620" loading="lazy" decoding="async">
+  </picture><figcaption class="figcap mono"><span>Patrón real importado de un DXF · pieza seleccionada con su cota</span><span>Chromium · 1600 × 1000</span></figcaption></figure>
   <div class="cols">
     <div><h3>Trazado</h3><p>Pluma, rectángulo, pinzas, piquetes y márgenes de costura. Las cotas se escriben donde miden.</p></div>
     <div><h3>Costura</h3><p>Coser piezas automáticamente o borde a borde. Las costuras se ven en el 2D y se cierran en el 3D.</p></div>
@@ -79,7 +82,7 @@
   <p class="eyebrow mono">Fig 0.2 · El copiloto</p>
   <h2>Un copiloto que habla de costuras.</h2>
   <p class="intro">Pídele que añada una pinza, que audite los márgenes o que cosa las piezas: usa las mismas herramientas que tú, y cada cambio se puede deshacer. Con tu propia clave de API.</p>
-  <figure class="fig"><!-- Task 5: fig-02 --><figcaption class="figcap mono"><span>Cada verbo del taller está en la barra: coser, vestir, escalar, marcar, exportar</span><span>Fig 0.2</span></figcaption></figure>
+  <figure class="fig"><img class="fig-02" src="./home/img/fig-02@1x.webp" srcset="./home/img/fig-02@1x.webp 1x, ./home/img/fig-02@2x.webp 2x" alt="La barra de comandos de Vina abierta sobre el patrón, con las acciones del taller" width="1280" height="560" loading="lazy" decoding="async"><figcaption class="figcap mono"><span>Cada verbo del taller está en la barra: coser, vestir, escalar, marcar, exportar</span><span>Fig 0.2</span></figcaption></figure>
 </div></section>
 
 <section id="codigo" class="cierre"><div class="wrap">

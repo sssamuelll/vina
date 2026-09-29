@@ -37,7 +37,8 @@
     "bench": "tsx bench/run.ts",
     "bench:matchvertices": "tsx bench/matchVertices.bench.ts",
     "bench:lra": "tsx bench/buildLRAConstraints.bench.ts",
-    "home:patron": "tsx scripts/home/dxf-a-svg.mjs"
+    "home:patron": "tsx scripts/home/dxf-a-svg.mjs",
+    "home:activos": "node scripts/home/activos.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
