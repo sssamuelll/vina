@@ -4,6 +4,7 @@
  * y baja cada GLB de `public/avatares/` cuando hace falta.
  */
 import type { Avatar, BodyMeasurements } from '../types/types';
+import { DEFAULT_MEASUREMENTS, aMorph, type MorphConfig } from '../utils/avatar/morphTargets';
 import catalogo from './catalogo.json';
 
 export interface EntradaDeCatalogo {
@@ -69,3 +70,20 @@ export function avatarPorUrl(url: string | null | undefined): Avatar | undefined
 
 /** Un proyecto nuevo arranca con Mujer EU 38 (spec § 5). */
 export const AVATAR_POR_DEFECTO: Avatar = POR_URL.get('/avatares/mujer-eu38.glb')!;
+
+/**
+ * Las medidas del cuerpo que se ve en 3D. Uno de la biblioteca no se estira (spec § 5): son las de
+ * su talla aunque María edite las del proyecto, que van al patrón. Un modelo propio y el maniquí de
+ * costura siguen las del proyecto, como antes. Lo que dibuja, choca o se coloca sobre el cuerpo lee
+ * de aquí; el patrón lee `project.avatar.measurements`.
+ */
+export function medidasDelCuerpo(p: { avatarMode: string; avatarModelUrl: string | null; avatar: Avatar }): BodyMeasurements {
+  return (p.avatarMode === 'model' && avatarPorUrl(p.avatarModelUrl)?.measurements) || p.avatar.measurements;
+}
+
+/** Contra qué se estira el cuerpo cargado: uno de la biblioteca, contra sus propias medidas (todo da
+ *  1,0); un modelo propio, contra el hombre de 180 cm de siempre. */
+export function referenciaDeMorph(url: string | null): MorphConfig {
+  const cuerpo = avatarPorUrl(url);
+  return cuerpo ? aMorph(cuerpo.measurements) : DEFAULT_MEASUREMENTS;
+}

@@ -29,6 +29,7 @@ import {
 } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY } from '../../utils/cloth/physicalFabric';
 import { cmToM } from '../../utils/geometry';
+import { medidasDelCuerpo } from '../../avatares/catalogo';
 import { useDisposable } from './hooks/useDisposable';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -239,7 +240,7 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
     s.simulation.pieceFabrics[piece.id] ?? s.simulation.defaultFabricId
   );
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
-  const avatarHeight = cmToM(useSelector((s: RootState) => s.project.avatar.measurements.height));
+  const avatarHeight = cmToM(useSelector((s: RootState) => medidasDelCuerpo(s.project).height));
   const particleDistance = useSelector((s: RootState) =>
     s.simulation.pieceParticleDistance[piece.id] ?? s.simulation.particleDistance
   );

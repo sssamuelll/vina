@@ -4,7 +4,8 @@ import { useFrame, ThreeEvent } from "@react-three/fiber";
 import * as THREE from 'three';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../../utils/avatar/morphTargets';
+import { computeMorphWeights, MORPH_BONE_MAP, aMorph } from '../../utils/avatar/morphTargets';
+import { medidasDelCuerpo, referenciaDeMorph } from '../../avatares/catalogo';
 import { registerAvatarRenderRoot } from '../../utils/cloth/renderCollisionBake';
 import { IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS, setAvailableMorphTargets, clearMorphTargets } from '../../store/avatarSlice';
 import { setArmAxis } from '../../store/simulationSlice';
@@ -174,7 +175,8 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
 
   const dispatch = useDispatch();
   const joints = useSelector((s: RootState) => s.avatar.pose.joints);
-  const measurements = useSelector((s: RootState) => s.project.avatar.measurements);
+  // Las del cuerpo: uno de la biblioteca no se estira aunque María edite las del proyecto (spec § 5).
+  const measurements = useSelector((s: RootState) => medidasDelCuerpo(s.project));
   const morphTargets = useSelector((s: RootState) => s.avatar.morphTargets);
   const ikChains = useSelector((s: RootState) => s.avatar.pose.ikChains);
   const ikTargets = useSelector((s: RootState) => s.avatar.pose.ikTargets);
@@ -495,16 +497,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   // Helper to apply pose + morphs to all bones
   const applyPose = useRef(() => {});
   applyPose.current = () => {
-    const morphCfg: MorphConfig = {
-      chest: measurements.chest,
-      waist: measurements.waist,
-      hip: measurements.hips,
-      shoulderWidth: measurements.shoulder,
-      height: measurements.height,
-      armLength: measurements.armLength,
-      inseam: measurements.inseam,
-    };
-    const weights = computeMorphWeights(morphCfg);
+    const weights = computeMorphWeights(aMorph(measurements), referenciaDeMorph(url));
 
     boneMap.current.forEach((bone, name) => {
       const bindPose = bindPoses.current.get(name);

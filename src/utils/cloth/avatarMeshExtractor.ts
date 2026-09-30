@@ -9,7 +9,7 @@
 
 import * as THREE from 'three';
 import { POSE_PRESETS } from '../../store/avatarSlice';
-import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../avatar/morphTargets';
+import { computeMorphWeights, DEFAULT_MEASUREMENTS, MORPH_BONE_MAP, type MorphConfig } from '../avatar/morphTargets';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -283,8 +283,9 @@ export function applyMorph(
   scene: THREE.Object3D,
   measurements: MorphConfig,
   morphTargets: Record<string, number>,
+  referencia: MorphConfig = DEFAULT_MEASUREMENTS,
 ): void {
-  const w = computeMorphWeights(measurements);
+  const w = computeMorphWeights(measurements, referencia);
   scene.traverse((obj) => {
     if ((obj as THREE.Bone).isBone) {
       const bone = obj as THREE.Bone;

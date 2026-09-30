@@ -19,6 +19,7 @@ export async function extractAvatarCollisionMesh(
   joints?: Record<string, { x: number; y: number; z: number }>,
   measurements?: import('../avatar/morphTargets').MorphConfig,
   morphTargets?: Record<string, number>,
+  referencia?: import('../avatar/morphTargets').MorphConfig,
 ): Promise<CollisionMeshData | null> {
   const { extractMeshData, applyPose, applyMorph } = await import('./avatarMeshExtractor');
   const { importMesh } = await import('../import/meshImporter');
@@ -40,7 +41,7 @@ export async function extractAvatarCollisionMesh(
   // the render is morphed, so cloth collides with a differently-shaped invisible body.
   const posed = !!(joints && Object.keys(joints).length > 0);
   if (posed) applyPose(result.scene, joints!);
-  if (measurements) applyMorph(result.scene, measurements, morphTargets ?? {});
+  if (measurements) applyMorph(result.scene, measurements, morphTargets ?? {}, referencia);
   if (posed || measurements) result.scene.updateMatrixWorld(true);
 
   const { vertices, indices, normals } = extractMeshData(result.scene);

@@ -48,6 +48,7 @@ import { useShortcutRegistry } from '../shortcuts/useShortcut';
 export type { ShortcutDef as ShortcutEntry } from '../shortcuts/ShortcutRegistry';
 
 import { DEFAULT_SHORTCUTS } from '../shortcuts/defaults';
+import { medidasDelCuerpo } from '../avatares/catalogo';
 
 /** Exportable shortcut map for help overlay — now reads from registry */
 export function getShortcutMap() {
@@ -66,7 +67,8 @@ export function useKeyboardShortcuts() {
   const activeTool = useSelector((s: RootState) => s.editor.activeTool);
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
   const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
-  const avatar = useSelector((s: RootState) => s.project.avatar);
+  // Colocar piezas va sobre el cuerpo que se ve (spec § 5).
+  const cuerpo = useSelector((s: RootState) => medidasDelCuerpo(s.project));
   const projectState = useSelector((s: RootState) => s.project);
   const clipboard = useSelector((s: RootState) => s.editor.clipboard);
   const xrayMode = useSelector((s: RootState) => s.simulation.xrayMode);
@@ -203,7 +205,7 @@ export function useKeyboardShortcuts() {
         if (viewMode3D === 'arrange') {
           dispatch(setSimulationMode('complete'));
           dispatch(setParticleDistance(3));
-          const placements = placeGarmentPieces(pieces, avatar.measurements);
+          const placements = placeGarmentPieces(pieces, cuerpo);
           const snapshot: Record<string, [number, number, number]> = {};
           pieces.forEach((p, i) => {
             const pos = placements[i].position;
@@ -216,7 +218,7 @@ export function useKeyboardShortcuts() {
       }],
       ['sim.toggle', () => {
         if (viewMode3D === 'arrange') {
-          const placements = placeGarmentPieces(pieces, avatar.measurements);
+          const placements = placeGarmentPieces(pieces, cuerpo);
           const snapshot: Record<string, [number, number, number]> = {};
           pieces.forEach((p, i) => {
             const pos = placements[i].position;
@@ -300,5 +302,5 @@ export function useKeyboardShortcuts() {
         registry.unregisterHandler(id);
       }
     };
-  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, selectedPOMId, selectedInternalLine, selectedTrazo, activeTool, viewMode3D, fitMapMode, avatar, projectState, clipboard, xrayMode, layerLocked]);
+  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, selectedPOMId, selectedInternalLine, selectedTrazo, activeTool, viewMode3D, fitMapMode, cuerpo, projectState, clipboard, xrayMode, layerLocked]);
 }
