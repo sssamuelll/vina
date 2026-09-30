@@ -9,6 +9,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { VRM } from '@pixiv/three-vrm';
 import { loadVRM } from '../avatar/vrmLoader';
 
@@ -214,7 +215,7 @@ async function loadFBX(url: string): Promise<THREE.Group> {
 }
 
 async function loadGLTF(url: string): Promise<THREE.Group> {
-  const loader = new GLTFLoader();
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   return new Promise((resolve, reject) => {
     loader.load(
       url,
