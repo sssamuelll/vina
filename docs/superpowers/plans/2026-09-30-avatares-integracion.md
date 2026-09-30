@@ -63,7 +63,7 @@ Medidos el 2026-09-30 leyendo el código. Van en el cuerpo de la PR para Samuel.
 
 ---
 
-### Tarea 1: el catálogo dentro de la app
+### Task 1: el catálogo dentro de la app
 
 **Archivos:**
 - Modificar: `tsconfig.app.json` (agregar `resolveJsonModule`)
@@ -253,7 +253,7 @@ git commit -m "feat(avatares): el catálogo entra a la app, con sus medidas en l
 
 ---
 
-### Tarea 2: `MeshoptDecoder` en los dos `GLTFLoader`
+### Task 2: `MeshoptDecoder` en los dos `GLTFLoader`
 
 **Archivos:**
 - Modificar: `src/utils/import/meshImporter.ts:11` (import) y `:217` (`loadGLTF`)
@@ -373,7 +373,7 @@ git commit -m "feat(avatares): los dos GLTFLoader decodifican meshopt"
 
 ---
 
-### Tarea 3: el cuerpo de la biblioteca no se estira, y todo se coloca sobre él
+### Task 3: el cuerpo de la biblioteca no se estira, y todo se coloca sobre él
 
 **Archivos:**
 - Modificar: `src/utils/avatar/morphTargets.ts` (`aMorph`, referencia en `computeMorphWeights`)
@@ -751,7 +751,7 @@ git commit -m "feat(avatares): el cuerpo de la biblioteca no se estira y todo se
 
 ---
 
-### Tarea 4: guardar y reabrir conserva el cuerpo
+### Task 4: guardar y reabrir conserva el cuerpo
 
 **Archivos:**
 - Modificar: `src/store/projectSlice.ts:283` (`applyProjectPayload`)
@@ -835,7 +835,7 @@ git commit -m "feat(avatares): al abrir un proyecto, el cuerpo sale de avatar.mo
 
 ---
 
-### Tarea 5: Mujer EU 38 por defecto, el panel lo dice y se borra el escaneo
+### Task 5: Mujer EU 38 por defecto, el panel lo dice y se borra el escaneo
 
 **Archivos:**
 - Modificar: `src/store/projectSlice.ts:165-178` (`defaultAvatar`) y `:248` (`avatarModelUrl`)
@@ -1029,7 +1029,7 @@ git commit -m "feat(avatares): un proyecto nuevo arranca con Mujer EU 38 y se bo
 
 ---
 
-### Tarea 6: gates, e2e del deploy, trinquetes y PR
+### Task 6: gates, e2e del deploy, trinquetes y PR
 
 **Archivos:** ninguno nuevo. Si un contador del contrato de UI baja, se actualiza `scripts/ui-contract-baseline.json` con `--update`.
 
