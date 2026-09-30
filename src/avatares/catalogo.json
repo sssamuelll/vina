@@ -1,0 +1,868 @@
+[
+  {
+    "id": "mujer-eu32",
+    "grupo": "mujer",
+    "talla": {
+      "eu": "32",
+      "us": "2"
+    },
+    "archivo": "mujer-eu32.glb",
+    "miniatura": "mujer-eu32.webp",
+    "medidas": {
+      "estatura": 159.9,
+      "cuello": 30.2,
+      "hombros": 35.8,
+      "busto": 76,
+      "bajo_busto": 64.8,
+      "cintura": 64.9,
+      "cadera": 88.4,
+      "muslo": 50.1,
+      "rodilla": 32,
+      "biceps": 23.1,
+      "talle_trasero": 37.6,
+      "largo_brazo": 52.8,
+      "tiro": 56.3,
+      "entrepierna": 77.9,
+      "altura_cintura": 100.8
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "mujer-eu34",
+    "grupo": "mujer",
+    "talla": {
+      "eu": "34",
+      "us": "4"
+    },
+    "archivo": "mujer-eu34.glb",
+    "miniatura": "mujer-eu34.webp",
+    "medidas": {
+      "estatura": 158.7,
+      "cuello": 30.8,
+      "hombros": 35.5,
+      "busto": 80,
+      "bajo_busto": 67.6,
+      "cintura": 69.8,
+      "cadera": 91,
+      "muslo": 53.1,
+      "rodilla": 33.7,
+      "biceps": 24.3,
+      "talle_trasero": 37.6,
+      "largo_brazo": 53,
+      "tiro": 57.4,
+      "entrepierna": 76.7,
+      "altura_cintura": 99.8
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "mujer-eu36",
+    "grupo": "mujer",
+    "talla": {
+      "eu": "36",
+      "us": "6"
+    },
+    "archivo": "mujer-eu36.glb",
+    "miniatura": "mujer-eu36.webp",
+    "medidas": {
+      "estatura": 160.5,
+      "cuello": 31.2,
+      "hombros": 35.5,
+      "busto": 84,
+      "bajo_busto": 70.3,
+      "cintura": 73,
+      "cadera": 94.4,
+      "muslo": 55.4,
+      "rodilla": 34.4,
+      "biceps": 25.4,
+      "talle_trasero": 36.6,
+      "largo_brazo": 53.6,
+      "tiro": 60.7,
+      "entrepierna": 77.2,
+      "altura_cintura": 100.8
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "mujer-eu38",
+    "grupo": "mujer",
+    "talla": {
+      "eu": "38",
+      "us": "8"
+    },
+    "archivo": "mujer-eu38.glb",
+    "miniatura": "mujer-eu38.webp",
+    "medidas": {
+      "estatura": 161.4,
+      "cuello": 31.6,
+      "hombros": 36.1,
+      "busto": 88,
+      "bajo_busto": 73.2,
+      "cintura": 77.1,
+      "cadera": 97,
+      "muslo": 57.5,
+      "rodilla": 35.1,
+      "biceps": 26.5,
+      "talle_trasero": 38.2,
+      "largo_brazo": 53.7,
+      "tiro": 61.7,
+      "entrepierna": 77.7,
+      "altura_cintura": 101.5
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "mujer-eu40",
+    "grupo": "mujer",
+    "talla": {
+      "eu": "40",
+      "us": "10"
+    },
+    "archivo": "mujer-eu40.glb",
+    "miniatura": "mujer-eu40.webp",
+    "medidas": {
+      "estatura": 162.7,
+      "cuello": 32.5,
+      "hombros": 36.6,
+      "busto": 92,
+      "bajo_busto": 77.6,
+      "cintura": 80.6,
+      "cadera": 100.8,
+      "muslo": 59,
+      "rodilla": 35.2,
+      "biceps": 26.7,
+      "talle_trasero": 37.2,
+      "largo_brazo": 54.3,
+      "tiro": 62.8,
+      "entrepierna": 78.3,
+      "altura_cintura": 102.4
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "mujer-eu42",
+    "grupo": "mujer",
+    "talla": {
+      "eu": "42",
+      "us": "12"
+    },
+    "archivo": "mujer-eu42.glb",
+    "miniatura": "mujer-eu42.webp",
+    "medidas": {
+      "estatura": 163,
+      "cuello": 33,
+      "hombros": 36.7,
+      "busto": 96,
+      "bajo_busto": 82.3,
+      "cintura": 84.7,
+      "cadera": 103.4,
+      "muslo": 60.1,
+      "rodilla": 35.4,
+      "biceps": 26.8,
+      "talle_trasero": 37.7,
+      "largo_brazo": 54.3,
+      "tiro": 63.7,
+      "entrepierna": 78,
+      "altura_cintura": 102.3
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "mujer-eu44",
+    "grupo": "mujer",
+    "talla": {
+      "eu": "44",
+      "us": "14"
+    },
+    "archivo": "mujer-eu44.glb",
+    "miniatura": "mujer-eu44.webp",
+    "medidas": {
+      "estatura": 163.1,
+      "cuello": 33.8,
+      "hombros": 36.7,
+      "busto": 100,
+      "bajo_busto": 87.7,
+      "cintura": 89.8,
+      "cadera": 106,
+      "muslo": 61.1,
+      "rodilla": 35.4,
+      "biceps": 26.9,
+      "talle_trasero": 39.6,
+      "largo_brazo": 54.3,
+      "tiro": 64.5,
+      "entrepierna": 77.8,
+      "altura_cintura": 102.2
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "mujer-eu46",
+    "grupo": "mujer",
+    "talla": {
+      "eu": "46",
+      "us": "16"
+    },
+    "archivo": "mujer-eu46.glb",
+    "miniatura": "mujer-eu46.webp",
+    "medidas": {
+      "estatura": 164.9,
+      "cuello": 34.3,
+      "hombros": 37,
+      "busto": 104,
+      "bajo_busto": 92.1,
+      "cintura": 93.1,
+      "cadera": 106.9,
+      "muslo": 61.6,
+      "rodilla": 35.7,
+      "biceps": 27.1,
+      "talle_trasero": 40.4,
+      "largo_brazo": 55.1,
+      "tiro": 65.4,
+      "entrepierna": 78.7,
+      "altura_cintura": 103.4
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "mujer-eu48",
+    "grupo": "mujer",
+    "talla": {
+      "eu": "48",
+      "us": "18"
+    },
+    "archivo": "mujer-eu48.glb",
+    "miniatura": "mujer-eu48.webp",
+    "medidas": {
+      "estatura": 165.4,
+      "cuello": 35.2,
+      "hombros": 37.4,
+      "busto": 108,
+      "bajo_busto": 97.2,
+      "cintura": 98.1,
+      "cadera": 110.4,
+      "muslo": 63.1,
+      "rodilla": 36,
+      "biceps": 27.5,
+      "talle_trasero": 39.7,
+      "largo_brazo": 55.5,
+      "tiro": 66.9,
+      "entrepierna": 78,
+      "altura_cintura": 103
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "hombre-eu44",
+    "grupo": "hombre",
+    "talla": {
+      "eu": "44",
+      "us": "34"
+    },
+    "archivo": "hombre-eu44.glb",
+    "miniatura": "hombre-eu44.webp",
+    "medidas": {
+      "estatura": 170.5,
+      "cuello": 35.5,
+      "hombros": 39.9,
+      "busto": 88,
+      "cintura": 74.3,
+      "cadera": 88,
+      "muslo": 53.5,
+      "rodilla": 35.7,
+      "biceps": 28.5,
+      "talle_trasero": 40.9,
+      "largo_brazo": 57.6,
+      "tiro": 59.4,
+      "entrepierna": 82.6,
+      "altura_cintura": 105.9
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "hombre-eu46",
+    "grupo": "hombre",
+    "talla": {
+      "eu": "46",
+      "us": "36"
+    },
+    "archivo": "hombre-eu46.glb",
+    "miniatura": "hombre-eu46.webp",
+    "medidas": {
+      "estatura": 173.9,
+      "cuello": 36.7,
+      "hombros": 40.3,
+      "busto": 92,
+      "cintura": 78.5,
+      "cadera": 91.6,
+      "muslo": 55.3,
+      "rodilla": 36.9,
+      "biceps": 29.9,
+      "talle_trasero": 39.9,
+      "largo_brazo": 58.3,
+      "tiro": 61,
+      "entrepierna": 84.2,
+      "altura_cintura": 108.1
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "hombre-eu48",
+    "grupo": "hombre",
+    "talla": {
+      "eu": "48",
+      "us": "38"
+    },
+    "archivo": "hombre-eu48.glb",
+    "miniatura": "hombre-eu48.webp",
+    "medidas": {
+      "estatura": 173.3,
+      "cuello": 37.4,
+      "hombros": 40.5,
+      "busto": 96,
+      "cintura": 82.1,
+      "cadera": 94.2,
+      "muslo": 56,
+      "rodilla": 37.5,
+      "biceps": 30.9,
+      "talle_trasero": 41.8,
+      "largo_brazo": 58.6,
+      "tiro": 61.3,
+      "entrepierna": 83.8,
+      "altura_cintura": 107.8
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "hombre-eu50",
+    "grupo": "hombre",
+    "talla": {
+      "eu": "50",
+      "us": "40"
+    },
+    "archivo": "hombre-eu50.glb",
+    "miniatura": "hombre-eu50.webp",
+    "medidas": {
+      "estatura": 174.4,
+      "cuello": 38.4,
+      "hombros": 41,
+      "busto": 100,
+      "cintura": 86.8,
+      "cadera": 97.8,
+      "muslo": 57.1,
+      "rodilla": 38.3,
+      "biceps": 32.1,
+      "talle_trasero": 42.2,
+      "largo_brazo": 58.9,
+      "tiro": 62.1,
+      "entrepierna": 84.5,
+      "altura_cintura": 108.8
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "hombre-eu52",
+    "grupo": "hombre",
+    "talla": {
+      "eu": "52",
+      "us": "42"
+    },
+    "archivo": "hombre-eu52.glb",
+    "miniatura": "hombre-eu52.webp",
+    "medidas": {
+      "estatura": 175,
+      "cuello": 39.2,
+      "hombros": 41.3,
+      "busto": 104,
+      "cintura": 92,
+      "cadera": 100.9,
+      "muslo": 58.3,
+      "rodilla": 38.6,
+      "biceps": 32.3,
+      "talle_trasero": 41.1,
+      "largo_brazo": 59,
+      "tiro": 63.2,
+      "entrepierna": 84.1,
+      "altura_cintura": 108.7
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "hombre-eu54",
+    "grupo": "hombre",
+    "talla": {
+      "eu": "54",
+      "us": "44"
+    },
+    "archivo": "hombre-eu54.glb",
+    "miniatura": "hombre-eu54.webp",
+    "medidas": {
+      "estatura": 175.3,
+      "cuello": 40.2,
+      "hombros": 41.7,
+      "busto": 108,
+      "cintura": 97.1,
+      "cadera": 103.4,
+      "muslo": 59.1,
+      "rodilla": 38.7,
+      "biceps": 32.4,
+      "talle_trasero": 41.4,
+      "largo_brazo": 59.2,
+      "tiro": 63.9,
+      "entrepierna": 84.1,
+      "altura_cintura": 108.8
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "hombre-eu56",
+    "grupo": "hombre",
+    "talla": {
+      "eu": "56",
+      "us": "46"
+    },
+    "archivo": "hombre-eu56.glb",
+    "miniatura": "hombre-eu56.webp",
+    "medidas": {
+      "estatura": 176.7,
+      "cuello": 41.2,
+      "hombros": 42.1,
+      "busto": 112,
+      "cintura": 101.5,
+      "cadera": 105.9,
+      "muslo": 59.9,
+      "rodilla": 38.9,
+      "biceps": 32.6,
+      "talle_trasero": 43.7,
+      "largo_brazo": 59.7,
+      "tiro": 64.8,
+      "entrepierna": 84.9,
+      "altura_cintura": 109.8
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "hombre-eu58",
+    "grupo": "hombre",
+    "talla": {
+      "eu": "58",
+      "us": "48"
+    },
+    "archivo": "hombre-eu58.glb",
+    "miniatura": "hombre-eu58.webp",
+    "medidas": {
+      "estatura": 177.8,
+      "cuello": 41.9,
+      "hombros": 42.7,
+      "busto": 116,
+      "cintura": 105.8,
+      "cadera": 109.1,
+      "muslo": 61,
+      "rodilla": 39,
+      "biceps": 32.7,
+      "talle_trasero": 42.6,
+      "largo_brazo": 60,
+      "tiro": 65.9,
+      "entrepierna": 85.5,
+      "altura_cintura": 110.5
+    },
+    "fuente": "ANSUR II",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nina-2",
+    "grupo": "nina",
+    "talla": {
+      "edad": 2
+    },
+    "archivo": "nina-2.glb",
+    "miniatura": "nina-2.webp",
+    "medidas": {
+      "estatura": 90.3,
+      "cuello": 23.9,
+      "hombros": 18.8,
+      "busto": 46.7,
+      "cintura": 47.1,
+      "cadera": 50.2,
+      "muslo": 29.5,
+      "rodilla": 20.2,
+      "biceps": 17,
+      "talle_trasero": 21.7,
+      "largo_brazo": 29.4,
+      "tiro": 33.5,
+      "entrepierna": 40,
+      "altura_cintura": 53.7
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nina-4",
+    "grupo": "nina",
+    "talla": {
+      "edad": 4
+    },
+    "archivo": "nina-4.glb",
+    "miniatura": "nina-4.webp",
+    "medidas": {
+      "estatura": 105.8,
+      "cuello": 25,
+      "hombros": 21.5,
+      "busto": 52.2,
+      "cintura": 49.4,
+      "cadera": 58.4,
+      "muslo": 33.9,
+      "rodilla": 22.4,
+      "biceps": 17.9,
+      "talle_trasero": 24.4,
+      "largo_brazo": 33.8,
+      "tiro": 38.9,
+      "entrepierna": 48.3,
+      "altura_cintura": 64
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nina-6",
+    "grupo": "nina",
+    "talla": {
+      "edad": 6
+    },
+    "archivo": "nina-6.glb",
+    "miniatura": "nina-6.webp",
+    "medidas": {
+      "estatura": 119.1,
+      "cuello": 26,
+      "hombros": 24.6,
+      "busto": 59.1,
+      "cintura": 55.2,
+      "cadera": 67.6,
+      "muslo": 40.1,
+      "rodilla": 25.3,
+      "biceps": 20.2,
+      "talle_trasero": 28.8,
+      "largo_brazo": 37.4,
+      "tiro": 43.4,
+      "entrepierna": 55.3,
+      "altura_cintura": 72.8
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nina-8",
+    "grupo": "nina",
+    "talla": {
+      "edad": 8
+    },
+    "archivo": "nina-8.glb",
+    "miniatura": "nina-8.webp",
+    "medidas": {
+      "estatura": 131.8,
+      "cuello": 26.8,
+      "hombros": 27.2,
+      "busto": 64.7,
+      "cintura": 60.5,
+      "cadera": 75.7,
+      "muslo": 45.1,
+      "rodilla": 27.7,
+      "biceps": 21.6,
+      "talle_trasero": 30.7,
+      "largo_brazo": 40.9,
+      "tiro": 47,
+      "entrepierna": 62,
+      "altura_cintura": 81.2
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nina-10",
+    "grupo": "nina",
+    "talla": {
+      "edad": 10
+    },
+    "archivo": "nina-10.glb",
+    "miniatura": "nina-10.webp",
+    "medidas": {
+      "estatura": 145.8,
+      "cuello": 27.8,
+      "hombros": 29.9,
+      "busto": 70.9,
+      "bajo_busto": 63.8,
+      "cintura": 66.5,
+      "cadera": 84.3,
+      "muslo": 50.4,
+      "rodilla": 30.2,
+      "biceps": 23.2,
+      "talle_trasero": 35.5,
+      "largo_brazo": 44.8,
+      "tiro": 51.4,
+      "entrepierna": 69.6,
+      "altura_cintura": 90.5
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nina-12",
+    "grupo": "nina",
+    "talla": {
+      "edad": 12
+    },
+    "archivo": "nina-12.glb",
+    "miniatura": "nina-12.webp",
+    "medidas": {
+      "estatura": 155.1,
+      "cuello": 28.9,
+      "hombros": 31.6,
+      "busto": 75.4,
+      "bajo_busto": 67.6,
+      "cintura": 70.8,
+      "cadera": 88.8,
+      "muslo": 52.9,
+      "rodilla": 31.8,
+      "biceps": 24.5,
+      "talle_trasero": 36.1,
+      "largo_brazo": 47.7,
+      "tiro": 54.6,
+      "entrepierna": 74.5,
+      "altura_cintura": 96.8
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nina-14",
+    "grupo": "nina",
+    "talla": {
+      "edad": 14
+    },
+    "archivo": "nina-14.glb",
+    "miniatura": "nina-14.webp",
+    "medidas": {
+      "estatura": 160.4,
+      "cuello": 29.4,
+      "hombros": 32.8,
+      "busto": 78.8,
+      "bajo_busto": 70.9,
+      "cintura": 75.3,
+      "cadera": 95.4,
+      "muslo": 55.9,
+      "rodilla": 32.9,
+      "biceps": 25.3,
+      "talle_trasero": 39,
+      "largo_brazo": 49.3,
+      "tiro": 57.2,
+      "entrepierna": 77.1,
+      "altura_cintura": 100.3
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nino-2",
+    "grupo": "nino",
+    "talla": {
+      "edad": 2
+    },
+    "archivo": "nino-2.glb",
+    "miniatura": "nino-2.webp",
+    "medidas": {
+      "estatura": 90.5,
+      "cuello": 24.5,
+      "hombros": 19.1,
+      "busto": 47.8,
+      "cintura": 47.9,
+      "cadera": 49.4,
+      "muslo": 28.7,
+      "rodilla": 20.3,
+      "biceps": 17.3,
+      "talle_trasero": 21.5,
+      "largo_brazo": 29.6,
+      "tiro": 33.3,
+      "entrepierna": 39.9,
+      "altura_cintura": 53.5
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nino-4",
+    "grupo": "nino",
+    "talla": {
+      "edad": 4
+    },
+    "archivo": "nino-4.glb",
+    "miniatura": "nino-4.webp",
+    "medidas": {
+      "estatura": 107.4,
+      "cuello": 26.7,
+      "hombros": 22.6,
+      "busto": 56.1,
+      "cintura": 52,
+      "cadera": 57.7,
+      "muslo": 33.3,
+      "rodilla": 23.2,
+      "biceps": 19.5,
+      "talle_trasero": 25.4,
+      "largo_brazo": 34.7,
+      "tiro": 39.7,
+      "entrepierna": 48.7,
+      "altura_cintura": 64.4
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nino-6",
+    "grupo": "nino",
+    "talla": {
+      "edad": 6
+    },
+    "archivo": "nino-6.glb",
+    "miniatura": "nino-6.webp",
+    "medidas": {
+      "estatura": 120.5,
+      "cuello": 28.2,
+      "hombros": 25,
+      "busto": 62.6,
+      "cintura": 53.5,
+      "cadera": 62.6,
+      "muslo": 36.2,
+      "rodilla": 24.7,
+      "biceps": 18.8,
+      "talle_trasero": 27.2,
+      "largo_brazo": 38.3,
+      "tiro": 43.9,
+      "entrepierna": 55.3,
+      "altura_cintura": 72.7
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nino-8",
+    "grupo": "nino",
+    "talla": {
+      "edad": 8
+    },
+    "archivo": "nino-8.glb",
+    "miniatura": "nino-8.webp",
+    "medidas": {
+      "estatura": 131.2,
+      "cuello": 29.8,
+      "hombros": 28,
+      "busto": 69.3,
+      "cintura": 60.2,
+      "cadera": 70.2,
+      "muslo": 40.5,
+      "rodilla": 27.9,
+      "biceps": 22.3,
+      "talle_trasero": 30.9,
+      "largo_brazo": 41.5,
+      "tiro": 47,
+      "entrepierna": 60.5,
+      "altura_cintura": 79.3
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nino-10",
+    "grupo": "nino",
+    "talla": {
+      "edad": 10
+    },
+    "archivo": "nino-10.glb",
+    "miniatura": "nino-10.webp",
+    "medidas": {
+      "estatura": 143.4,
+      "cuello": 31.5,
+      "hombros": 30.8,
+      "busto": 76.3,
+      "cintura": 66.8,
+      "cadera": 77.1,
+      "muslo": 44.3,
+      "rodilla": 30.5,
+      "biceps": 24.5,
+      "talle_trasero": 35.4,
+      "largo_brazo": 45.1,
+      "tiro": 51.4,
+      "entrepierna": 66.6,
+      "altura_cintura": 87
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nino-12",
+    "grupo": "nino",
+    "talla": {
+      "edad": 12
+    },
+    "archivo": "nino-12.glb",
+    "miniatura": "nino-12.webp",
+    "medidas": {
+      "estatura": 158.4,
+      "cuello": 33.8,
+      "hombros": 33.5,
+      "busto": 82.9,
+      "cintura": 77.6,
+      "cadera": 89.5,
+      "muslo": 50,
+      "rodilla": 32.9,
+      "biceps": 26.7,
+      "talle_trasero": 38.4,
+      "largo_brazo": 50.5,
+      "tiro": 56.7,
+      "entrepierna": 75.3,
+      "altura_cintura": 97.5
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  },
+  {
+    "id": "nino-14",
+    "grupo": "nino",
+    "talla": {
+      "edad": 14
+    },
+    "archivo": "nino-14.glb",
+    "miniatura": "nino-14.webp",
+    "medidas": {
+      "estatura": 170.5,
+      "cuello": 35.7,
+      "hombros": 35.7,
+      "busto": 88.2,
+      "cintura": 80,
+      "cadera": 93.4,
+      "muslo": 52.9,
+      "rodilla": 34.9,
+      "biceps": 28.6,
+      "talle_trasero": 41,
+      "largo_brazo": 54.8,
+      "tiro": 60.1,
+      "entrepierna": 82.3,
+      "altura_cintura": 105.9
+    },
+    "fuente": "NHANES 2021-2023",
+    "generador": "1.0.0"
+  }
+]
