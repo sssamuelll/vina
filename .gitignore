@@ -118,3 +118,6 @@ AGENTS.md.pre-graphify.bak
 # capturas, logs de gates) — misma regla que screenshots/: se cita desde los
 # informes en docs/reports/, no se versiona.
 /artifacts/
+
+# Blender compila los módulos de scripts/avatares/ al importarlos
+__pycache__/
