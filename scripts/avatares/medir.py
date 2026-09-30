@@ -39,7 +39,14 @@ LAZOS = {
 HORIZONTALES = {'busto', 'bajo_busto', 'cintura_ombligo', 'cadera', 'muslo', 'rodilla'}
 ACROMION, ACROMION_DER = 8274, 1602  # izquierdo y su espejo (data/mesh_metadata/hm08.mirror)
 CODO, MUNECA = 10037, 10548          # MakeHuman: upperarm-length [8274, 10037], lowerarm-length [10040, 10548]
-PASO_CINTURA = 0.005                 # m: barrido de la cintura natural
+CERVICAL = (857, 858)  # la vértebra C7 cae entre estos dos de la línea media de la espalda: contra la
+                       # mediana de cervicaleheight de ANSUR, ≤ 1,1 cm en seis tallas adultas
+FRACCION_CINTURA = 0.12  # la cintura natural en el tramo del lazo del ombligo al bajo busto: a media altura
+                         # entre la cresta ilíaca y la costilla más baja (protocolo de la OMS; ISO 8559-1 la
+                         # ubica entre ambas). Calibrado con iliocristaleheight y tenthribheight de ANSUR en
+                         # seis tallas adultas (0,09–0,20). EU 38: 101,5 cm, contra 101,2 en ANSUR
+FRACCION_MUSLO = 0.012  # bajo la horcajadura, en fracción de la estatura (~2 cm): el pliegue glúteo. Con
+                        # ANSUR, EU 38 da 57,5 contra 58,0; el lazo de MakeHuman, 7 cm más abajo, daba 55,4
 
 
 def _cm(m):
@@ -142,12 +149,25 @@ def coordenadas(bm):
     return [v.co.copy() for v in bm.verts]
 
 
+def horcajadura(bm):
+    """El punto más bajo del corte sagital (x = 0): la entrepierna."""
+    return min((p for a in cortar(bm, (0, 0, 0), (1, 0, 0)) for p in a), key=lambda p: p.z)
+
+
+def muslo(bm, co, con_casco=False):
+    """El muslo izquierdo, horizontal, justo bajo el pliegue glúteo (ISO 8559-1). Falla si a esa altura
+    las piernas se tocan: la cinta abrazaría las dos."""
+    alto = max(c.z for c in co) - min(c.z for c in co)
+    cm, h = cinta(bm, co, 'muslo', horcajadura(bm).z - FRACCION_MUSLO * alto, con_casco=True)
+    if min(p.x for p in h) <= 0:
+        raise ValueError('a la altura del muslo las piernas se tocan: la cinta abrazaría las dos')
+    return (cm, h) if con_casco else cm
+
+
 def medidas_ajustables(bm):
     """Las que el generador ajusta a los datos (spec § 3.4); cintura_ombligo es la de ANSUR/NHANES."""
     co = coordenadas(bm)
     z0 = min(c.z for c in co)
-    sagital = cortar(bm, (0, 0, 0), (1, 0, 0))
-    horcajadura = min((p for a in sagital for p in a), key=lambda p: p.z)
     return {
         'estatura': _cm(max(c.z for c in co) - z0),
         'busto': cinta(bm, co, 'busto'),
@@ -156,16 +176,17 @@ def medidas_ajustables(bm):
         'cuello': cinta(bm, co, 'cuello'),
         'hombros': _cm((co[ACROMION] - co[ACROMION_DER]).length),
         'largo_brazo': _cm((co[ACROMION] - co[CODO]).length + (co[CODO] - co[MUNECA]).length),
-        'entrepierna': _cm(horcajadura.z - z0),
+        'entrepierna': _cm(horcajadura(bm).z - z0),
     }
 
 
 def cintura_natural(bm, co):
-    """La circunferencia horizontal mínima entre el lazo de la cintura (ombligo) y el bajo busto."""
+    """(circunferencia, altura) de la cintura natural: horizontal y a altura fija. No es la mínima: en la
+    malla de mujer la mínima cae por encima de la costilla más baja, y el torso de hombre es una meseta
+    que la haría saltar varios centímetros de una talla a la vecina."""
     z_ombligo = plano_de_lazo(co, LAZOS['cintura_ombligo'])[0].z
-    z_bajo = plano_de_lazo(co, LAZOS['bajo_busto'])[0].z
-    alturas = [z_ombligo + k * PASO_CINTURA for k in range(int((z_bajo - z_ombligo) / PASO_CINTURA) + 1)]
-    return min((cinta(bm, co, 'cintura_ombligo', z), z) for z in alturas)
+    z = z_ombligo + FRACCION_CINTURA * (plano_de_lazo(co, LAZOS['bajo_busto'])[0].z - z_ombligo)
+    return cinta(bm, co, 'cintura_ombligo', z), z
 
 
 def punto_sagital(sagital, z, signo):
@@ -182,13 +203,13 @@ def medidas(bm):
     cintura, z_cintura = cintura_natural(bm, co)
     sagital = cortar(bm, (0, 0, 0), (1, 0, 0))
     delante, detras = punto_sagital(sagital, z_cintura, -1), punto_sagital(sagital, z_cintura, 1)
-    nuca = max((co[i] for i in LAZOS['cuello']), key=lambda c: c.y)
+    nuca = sum((co[i] for i in CERVICAL), Vector()) / len(CERVICAL)
     return {
         'estatura': m['estatura'], 'cuello': m['cuello'], 'hombros': m['hombros'], 'busto': m['busto'],
         'bajo_busto': cinta(bm, co, 'bajo_busto'),
         'cintura': cintura,
         'cadera': m['cadera'],
-        'muslo': cinta(bm, co, 'muslo'),
+        'muslo': muslo(bm, co),
         'rodilla': cinta(bm, co, 'rodilla'),
         'biceps': cinta(bm, co, 'biceps'),
         'talle_trasero': recorrido(bm, (0, 0, 0), (1, 0, 0), nuca, detras),
@@ -203,6 +224,7 @@ def trazos(bm):
     """Los puntos de cada cinta, para dibujarlas sobre el cuerpo en la hoja de contactos."""
     co = coordenadas(bm)
     _, z = cintura_natural(bm, co)
-    t = {k: cinta(bm, co, k, con_casco=True)[1] for k in ('cuello', 'busto', 'bajo_busto', 'cintura_ombligo', 'cadera', 'muslo', 'rodilla', 'biceps')}
+    t = {k: cinta(bm, co, k, con_casco=True)[1] for k in ('cuello', 'busto', 'bajo_busto', 'cintura_ombligo', 'cadera', 'rodilla', 'biceps')}
+    t['muslo'] = muslo(bm, co, con_casco=True)[1]
     t['cintura'] = cinta(bm, co, 'cintura_ombligo', z, con_casco=True)[1]
     return t

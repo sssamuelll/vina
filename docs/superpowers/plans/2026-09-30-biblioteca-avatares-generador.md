@@ -38,7 +38,7 @@ Los valores que aparecen en los pasos "Esperado" salen de esas corridas.
 Medidos el 2026-09-30. Samuel los revisa junto con el plan.
 
 1. **Cuello.** Se ajusta a la columna `neckcircumference` de ANSUR: bajo la nuez y perpendicular al cuello, que es la medida de cuello de camisa. No se usa la base del cuello. Razón: el lazo de cuello de MakeHuman pasa por ahí, y con `neckcircumferencebase` (34–39 cm en mujeres) ninguna mujer llega, porque el target de cuello alcanza como máximo 33,8.
-2. **Cintura.** ANSUR mide la cintura a la altura del ombligo. NHANES la mide sobre la cresta ilíaca, que en adultos queda a 0,4–1,5 cm del ombligo (medido en ANSUR). El generador ajusta a esa altura; el campo se llama `cintura_ombligo` y solo aparece en `tallas.json` y en el informe. El catálogo publica la **cintura natural**: la circunferencia horizontal mínima entre el ombligo y el bajo busto. En EU 38 da 70,9 cm, y EN 13402 dice 69–72.
+2. **Cintura.** ANSUR mide la cintura a la altura del ombligo. NHANES la mide sobre la cresta ilíaca, que en adultos queda a 0,4–1,5 cm del ombligo (medido en ANSUR). El generador ajusta a esa altura; el campo se llama `cintura_ombligo` y solo aparece en `tallas.json` y en el informe. El catálogo publica la **cintura natural** (ver la enmienda de abajo).
 3. **Niños.** NHANES 2021–2023 tiene tres limitaciones:
    - la cadera solo existe desde los 12 años (es lo que dice la documentación de la variable);
    - no trae muslo;
@@ -55,6 +55,16 @@ Medidos el 2026-09-30. Samuel los revisa junto con el plan.
 6. **La palanca gruesa es el macro `weight`**, y los targets `measure-*` llegan hasta ±2. Con los targets limitados a ±1, las tallas grandes no llegan: a EU 48 le faltaban 10 cm de cintura.
 7. **meshopt va con las librerías de gltf-transform**, no con su CLI. Así se llama desde el mismo proceso y entran menos paquetes. Las dos rutas instalan `sharp`, porque lo pide `@gltf-transform/functions`.
 8. **`npm run avatares` tarda unos 2 min, no unos 6.** Corren 8 Blender a la vez y cada talla tarda de 5 a 15 s.
+
+### Enmienda de la revisión final (2026-09-30)
+
+La revisión de toda la rama encontró que tres medidas publicadas no se medían donde las pone ISO 8559-1 (§ 3.2 del spec). Se corrigieron con pruebas en `ajuste_test.py` (`donde_mide`), sobre cuerpos reales, calibrando contra ANSUR con 12 cuerpos ajustados:
+
+- **Muslo:** horizontal, en la pierna izquierda, a 0,012 de la estatura bajo la horcajadura (el pliegue glúteo). El lazo de MakeHuman quedaba 7 cm más abajo: EU 38 publicaba 55,4 y ahora 57,5 (ANSUR: 58,0). Si a esa altura las piernas se tocan, falla en vez de medir las dos.
+- **Talle trasero:** arranca en la cervical, el punto medio de los vértices 857 y 858, a ≤ 1,1 cm de la mediana de `cervicaleheight` de ANSUR en seis tallas adultas. Antes arrancaba a media altura del cuello, 4 cm más arriba.
+- **Cintura natural:** va horizontal y a altura fija, a media altura entre la cresta ilíaca y la costilla más baja (protocolo de la OMS; ISO 8559-1 la ubica entre ambas). Eso es 0,12 del tramo entre el lazo del ombligo y el bajo busto, calibrado con `iliocristaleheight` y `tenthribheight` de ANSUR. No es la mínima: en la malla de mujer la mínima caía por encima de la costilla más baja, y el torso de hombre es una meseta que la hacía saltar de talla a talla. EU 38: queda a 101,5 cm (ANSUR: 101,2) y mide 77,1. EN 13402 dice 69–72, porque las mujeres de ANSUR son más anchas de cintura que esa tabla: su cintura al ombligo mide 79,1.
+
+También `generar-todas.mjs` comprime y valida en `.tmp/` antes de copiar a `public/`. Así, una talla rechazada no pisa la GLB publicada, y un error posterior a Blender sale como FALLA de esa talla en vez de tumbar la corrida.
 
 ## Review Focus
 
@@ -1968,15 +1978,26 @@ Esta tarea no lleva código. Nadie sigue a la Tarea 8 sin la respuesta de Samuel
 
 - [ ] **Step 1: Mandar a Samuel `.tmp/avatares/hoja.png`** con estas preguntas:
   1. ¿Cada cuerpo se ve de su talla y su edad?
-  2. ¿Las cintas rojas pasan por donde pasaría la de una patronista? El cuello va bajo la nuez; el busto por el ápice; la cintura natural es la **más alta** de las dos de la cintura (la otra es la del ombligo, donde miden ANSUR y NHANES). En EU 38 la cintura natural queda a 108 cm del suelo (0,67 de la estatura), justo bajo las costillas. Si a la patronista le parece alta, esa altura es la que acorta el talle trasero (34,4) y alarga el tiro (73,2).
-  3. `weight` queda en 1,0 desde EU 38 en mujer y desde EU 50 en hombre, y en casi todos los niños. ¿Se ven gordos? (El muslo sale más fino que en ANSUR: 55,4 contra 58,0 en EU 38, medido.) Además, `mujer-eu48` usa 1,98 del tope de 2 en el target de cintura: está en el borde de lo alcanzable, y cualquier cambio en el acabado puede dejarla sin converger.
+  2. ¿Las cintas rojas pasan por donde pasaría la de una patronista? Así están puestas:
+     - el cuello va bajo la nuez;
+     - el busto, por el ápice;
+     - el muslo, justo bajo el pliegue glúteo;
+     - de las dos de la cintura, la natural es la **más alta**. Queda a media altura entre la cresta ilíaca y la costilla más baja: en EU 38, a 101,5 cm (ANSUR da 101,2). La otra es la del ombligo, donde miden ANSUR y NHANES.
+
+     El talle trasero de EU 38 (38,2) va de la cervical a esa cintura natural. ANSUR lo mide hasta el ombligo y da 41,5; la tabla de Vina (`gradingSkill.ts:167`) dice 40,5.
+  3. `weight` queda en 1,0 desde EU 38 en mujer y desde EU 50 en hombre, y en casi todos los niños. ¿Se ven gordos?
+     - La cintura natural de EU 38 mide 77,1, más que los 69–72 de EN 13402. Es la cintura de las mujeres de ANSUR, que son militares: al ombligo miden 79,1.
+     - `mujer-eu48` usa 1,98 del tope de 2 en el target de cintura. Está en el borde de lo alcanzable, y cualquier cambio en el acabado puede dejarla sin converger.
   4. ¿Pezones y entrepierna quedan suficientemente alisados?
+  5. Algunas medidas no crecen de talla en talla. EU 32 sale de solo 10 personas y queda más alta que EU 34 (159,9 contra 158,7). Lo mismo pasa con la entrepierna y la altura de cintura en varias tallas vecinas, porque así vienen las medianas de ANSUR. ¿Se acepta tal cual, o se suaviza cada medida con una regresión contra el busto?
 - [ ] **Step 2: Si algo no convence, cambiar solo su perilla:**
 
 | Qué | Perilla | Archivo |
 |---|---|---|
 | alisado de pezones y entrepierna | `REGIONES` (radio, iteraciones) | `acabado.py` |
-| altura de la cintura natural | el tramo de `cintura_natural()` y `PASO_CINTURA` | `medir.py` |
+| altura de la cintura natural | `FRACCION_CINTURA` | `medir.py` |
+| altura del muslo bajo la horcajadura | `FRACCION_MUSLO` | `medir.py` |
+| dónde arranca el talle trasero | `CERVICAL` | `medir.py` |
 | qué cintas van horizontales | `HORIZONTALES` | `medir.py` |
 | cuánto se estiran los targets | `LIMITE_CONTROL` | `ajuste.py` |
 | cuerpo sobre el que se calcula el acabado | `BASES` | `acabado.py` |

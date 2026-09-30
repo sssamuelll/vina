@@ -75,10 +75,10 @@ td{padding:1px 8px 1px 0}td+td{text-align:right}.falla{color:#a00}</style>
 <h1>Biblioteca de avatares — hoja de contactos</h1><main>${resultados.map(tarjeta).join('\n')}</main></html>\n`;
 }
 
-function correrBlender(args, log) {
+export function correr(cmd, args, log) {
   return new Promise((resolve) => {
     const salida = createWriteStream(log);
-    const p = spawn(BLENDER, args, { cwd: RAIZ, stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(cmd, args, { cwd: RAIZ, stdio: ['ignore', 'pipe', 'pipe'] });
     p.stdout.pipe(salida);
     p.stderr.pipe(salida);
     p.on('error', (e) => { salida.end(String(e)); resolve(1); });
@@ -114,22 +114,35 @@ async function comprimir(entrada, salida) {
 
 async function generarUna(id) {
   const base = path.join(TMP, id);
-  for (const ext of ['.json', '.glb', '.webp', '-hoja.png']) rmSync(base + ext, { force: true }); // un fallo no hereda archivos viejos
-  const code = await correrBlender(['-b', '--python-exit-code', '1', '--python', path.join(AQUI, 'generar.py'), '--', '--talla', id, '--salida', TMP], base + '.log');
+  for (const ext of ['.json', '.glb', '.meshopt.glb', '.webp', '-hoja.png']) rmSync(base + ext, { force: true }); // un fallo no hereda archivos viejos
+  const code = await correr(BLENDER, ['-b', '--python-exit-code', '1', '--python', path.join(AQUI, 'generar.py'), '--', '--talla', id, '--salida', TMP], base + '.log');
   const faltan = ['.json', '.glb', '.webp', '-hoja.png'].filter((ext) => !existsSync(base + ext));
   if (code !== 0 || faltan.length) {
     const cola = existsSync(base + '.log') ? readFileSync(base + '.log', 'utf8').split('\n').slice(-12).join('\n') : '';
     return { id, ok: false, error: `Blender salió con ${code}${faltan.length ? `; faltan ${faltan.join(', ')}` : ''}\n${cola}` };
   }
-  const glb = path.join(PUBLICO, `${id}.glb`);
-  await comprimir(base + '.glb', glb);
-  const peso = statSync(glb).size;
-  if (peso > MAX_GLB) return { id, ok: false, error: `${id}.glb pesa ${peso} bytes tras meshopt (máximo ${MAX_GLB})` };
-  const huesos = huesosDelGlb(readFileSync(glb));
-  const faltanHuesos = HUESOS.filter((h) => !huesos.includes(h));
-  if (huesos.length !== HUESOS.length || faltanHuesos.length) return { id, ok: false, error: `huesos: ${huesos.length}, faltan ${faltanHuesos.join(', ')}` };
-  copyFileSync(base + '.webp', path.join(PUBLICO, `${id}.webp`));
-  return { id, ok: true, peso, ...JSON.parse(readFileSync(base + '.json', 'utf8')) };
+  return publicar(id);
+}
+
+/** Del GLB de Blender al publicado: meshopt y las validaciones corren en tmp, y solo si todo pasa se
+ *  copian GLB y miniatura a public/. Así una talla rechazada no pisa la que ya estaba publicada, y un
+ *  error después de Blender vuelve como falla de esa talla en vez de tumbar la corrida. */
+export async function publicar(id, tmp = TMP, publico = PUBLICO) {
+  const base = path.join(tmp, id);
+  try {
+    await comprimir(base + '.glb', base + '.meshopt.glb');
+    const peso = statSync(base + '.meshopt.glb').size;
+    if (peso > MAX_GLB) return { id, ok: false, error: `${id}.glb pesa ${peso} bytes tras meshopt (máximo ${MAX_GLB})` };
+    const huesos = huesosDelGlb(readFileSync(base + '.meshopt.glb'));
+    const faltanHuesos = HUESOS.filter((h) => !huesos.includes(h));
+    if (huesos.length !== HUESOS.length || faltanHuesos.length) return { id, ok: false, error: `huesos: ${huesos.length}, faltan ${faltanHuesos.join(', ')}` };
+    const resultado = JSON.parse(readFileSync(base + '.json', 'utf8'));
+    copyFileSync(base + '.meshopt.glb', path.join(publico, `${id}.glb`));
+    copyFileSync(base + '.webp', path.join(publico, `${id}.webp`));
+    return { id, ok: true, peso, ...resultado };
+  } catch (e) {
+    return { id, ok: false, error: `después de Blender: ${e.message}` };
+  }
 }
 
 async function probar() {
@@ -138,7 +151,7 @@ async function probar() {
   let fallas = 0;
   for (const [archivo, extra] of pruebas) {
     const log = path.join(TMP, archivo.replace('.py', '.log'));
-    const code = await correrBlender(['-b', ...extra, '--python-exit-code', '1', '--python', path.join(AQUI, archivo)], log);
+    const code = await correr(BLENDER, ['-b', ...extra, '--python-exit-code', '1', '--python', path.join(AQUI, archivo)], log);
     console.log(`${code === 0 ? 'ok   ' : 'FALLA'} ${archivo}${code === 0 ? '' : ` (ver ${log})`}`);
     fallas += code === 0 ? 0 : 1;
   }
