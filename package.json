@@ -38,7 +38,9 @@
     "bench:matchvertices": "tsx bench/matchVertices.bench.ts",
     "bench:lra": "tsx bench/buildLRAConstraints.bench.ts",
     "home:patron": "tsx scripts/home/dxf-a-svg.mjs",
-    "home:activos": "node scripts/home/activos.mjs"
+    "home:activos": "node scripts/home/activos.mjs",
+    "avatares": "node scripts/avatares/generar-todas.mjs",
+    "avatares:tallas": "node scripts/avatares/tallas.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
@@ -68,6 +70,9 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.17.0",
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
     "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -87,6 +92,7 @@
     "husky": "^9.1.7",
     "jsdom": "^28.1.0",
     "lint-staged": "^16.2.7",
+    "meshoptimizer": "^1.3.0",
     "puppeteer": "^24.37.5",
     "tsx": "^4.21.0",
     "typescript": "~5.6.2",
