@@ -20,6 +20,7 @@ import { refineSeamsInWorld } from '../utils/autoSew/worldRefine';
 import { resolveArrangementWithFrames } from '../utils/cloth/arrangement/arrangementBinding';
 import { buildAxisHints } from '../utils/cloth/arrangement/buildAxisHints';
 import type { PatternPiece, Seam } from '../types/types';
+import { medidasDelCuerpo } from '../avatares/catalogo';
 
 /**
  * World-space refinement of the proposals (M4-C): partner reassignment by
@@ -44,7 +45,7 @@ export function refineProposalsAgainstState(
   const axisHints = buildAxisHints(pieces, armAxis);
   const placements = resolveArrangementWithFrames(
     pieces,
-    state.project.avatar.measurements,
+    medidasDelCuerpo(state.project),
     state.project.arrangementOverrides,
     { axisHints, skeletonReady: armAxis.ready },
   );

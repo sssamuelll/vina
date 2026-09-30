@@ -100,6 +100,8 @@ import { isWebGPUAvailable, WEBGPU_FEATURE_FLAG_KEY } from '../../utils/cloth/gp
 import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
 import { mapClothSimConfigToWasmSolverConfig } from '../../utils/cloth/configBridge';
 import { cmToM } from '../../utils/geometry';
+import { medidasDelCuerpo, referenciaDeMorph } from '../../avatares/catalogo';
+import { aMorph } from '../../utils/avatar/morphTargets';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
@@ -315,9 +317,10 @@ export function useSimulationLifecycle({
   const dispatch = useDispatch();
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
-  const avatarHeight = cmToM(useSelector((s: RootState) => s.project.avatar.measurements.height));
+  // Las del cuerpo: uno de la biblioteca no se estira aunque María edite las del proyecto (spec § 5).
+  const measurements = useSelector((s: RootState) => medidasDelCuerpo(s.project));
+  const avatarHeight = cmToM(measurements.height);
   const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
-  const measurements = useSelector((s: RootState) => s.project.avatar.measurements);
   const morphTargets = useSelector((s: RootState) => s.avatar.morphTargets);
   const windForce = useSelector((s: RootState) => s.simulation.windForce);
   const windEnabled = useSelector((s: RootState) => s.simulation.windEnabled);
@@ -893,18 +896,15 @@ export function useSimulationLifecycle({
 
     collisionRebuildTimer.current = setTimeout(async () => {
       try {
-        // #frente2 collision fix: pass measurements (mapped to MorphConfig — same
-        // rename as AvatarModel.tsx:497-505: hip←hips, shoulderWidth←shoulder) +
-        // native morphTargets so the collider matches the MORPHED render body.
-        const morphCfg = {
-          chest: measurements.chest, waist: measurements.waist, hip: measurements.hips,
-          shoulderWidth: measurements.shoulder, height: measurements.height,
-          armLength: measurements.armLength, inseam: measurements.inseam,
-        };
+        // #frente2 collision fix: the collider gets the same morph as the render
+        // (AvatarModel.tsx): the body's own measurements against its own reference,
+        // plus the native morphTargets.
         // Live bake first (reads the CURRENT morphed render — no arg plumbing);
         // URL pipeline with explicit morphs as fallback.
         const collisionMesh = (await bakeCollisionFromRender())
-          ?? await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, avatarJointsRef.current, morphCfg, morphTargets);
+          ?? await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, avatarJointsRef.current, {
+            medidas: aMorph(measurements), morphTargets, referencia: referenciaDeMorph(avatarModelUrl),
+          });
         if (!collisionMesh) return;
 
         // Check client is still alive (user may have stopped sim); skip a

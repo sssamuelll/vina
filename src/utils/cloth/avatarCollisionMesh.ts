@@ -6,6 +6,15 @@
 import type { CollisionMeshData } from './collisionMesh';
 import { extractCollisionMesh } from './collisionMesh';
 import { metresToImporter, importerToMetres } from '../geometry';
+import type { MorphConfig } from '../avatar/morphTargets';
+import { avatarPorUrl } from '../../avatares/catalogo';
+
+/** El mismo estiramiento que el render, con la referencia del cuerpo cargado (referenciaDeMorph). */
+export interface MorphDelCuerpo {
+  medidas: MorphConfig;
+  morphTargets: Record<string, number>;
+  referencia: MorphConfig;
+}
 
 /**
  * Load avatar model, extract mesh data, and convert to flat CollisionMeshData.
@@ -17,8 +26,7 @@ export async function extractAvatarCollisionMesh(
   avatarUrl: string,
   avatarHeight: number,
   joints?: Record<string, { x: number; y: number; z: number }>,
-  measurements?: import('../avatar/morphTargets').MorphConfig,
-  morphTargets?: Record<string, number>,
+  morph?: MorphDelCuerpo,
 ): Promise<CollisionMeshData | null> {
   const { extractMeshData, applyPose, applyMorph } = await import('./avatarMeshExtractor');
   const { importMesh } = await import('../import/meshImporter');
@@ -26,6 +34,7 @@ export async function extractAvatarCollisionMesh(
   const filename = avatarUrl.split('/').pop() || avatarUrl;
   const result = await importMesh(avatarUrl, filename, {
     targetHeightMm: metresToImporter(avatarHeight),
+    centrar: !avatarPorUrl(avatarUrl),
   });
 
   importerToMetres(result.scene);
@@ -40,8 +49,8 @@ export async function extractAvatarCollisionMesh(
   // the render is morphed, so cloth collides with a differently-shaped invisible body.
   const posed = !!(joints && Object.keys(joints).length > 0);
   if (posed) applyPose(result.scene, joints!);
-  if (measurements) applyMorph(result.scene, measurements, morphTargets ?? {});
-  if (posed || measurements) result.scene.updateMatrixWorld(true);
+  if (morph) applyMorph(result.scene, morph.medidas, morph.morphTargets, morph.referencia);
+  if (posed || morph) result.scene.updateMatrixWorld(true);
 
   const { vertices, indices, normals } = extractMeshData(result.scene);
   console.log(`[AvatarCollision] extractMeshData: ${vertices.length / 3} verts, ${indices.length / 3} tris, normals=${normals ? normals.length / 3 : 'NONE'}`);

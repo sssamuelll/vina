@@ -41,7 +41,7 @@ HUESOS = {
     'RightHandIndex1', 'RightHandIndex2', 'RightHandIndex3', 'RightHandMiddle1', 'RightHandMiddle2', 'RightHandMiddle3',
     'RightHandRing1', 'RightHandRing2', 'RightHandRing3', 'RightHandPinky1', 'RightHandPinky2', 'RightHandPinky3',
     'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'LeftToeBase', 'RightUpLeg', 'RightLeg', 'RightFoot', 'RightToeBase',
-}  # los 52 del avatar de hoy (public/default-avatar.glb), sin el prefijo mixamorig:
+}  # los 52 de Mixamo, sin el prefijo mixamorig:
 SEXO = {'mujer': 0.0, 'hombre': 1.0, 'nina': 0.0, 'nino': 1.0}
 
 

@@ -68,6 +68,11 @@ describe('import_dxf executor — loadType "open" is a faithful import (no auto-
     expect(
       project.loadDiagnostics.filter(d => d.code === 'AUTO_SEAMS_DETECTED'),
     ).toHaveLength(0);
+    // Un proyecto nuevo arranca con Mujer EU 38 y sus medidas (spec 2026-09-29 § 5), también
+    // cuando lo abre el copiloto: ni el hombre de 180 escrito a mano ni sliders que María no tocó.
+    const { AVATAR_POR_DEFECTO } = await import('../../../avatares/catalogo');
+    expect(project.avatar.measurements).toEqual(AVATAR_POR_DEFECTO.measurements);
+    expect(project.avatarModelUrl).toBe(AVATAR_POR_DEFECTO.modelUrl);
   });
 
   it('el import fiel del copiloto crea historia y deshacer restaura el proyecto anterior', async () => {

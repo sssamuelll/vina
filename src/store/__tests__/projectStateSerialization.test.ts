@@ -120,7 +120,7 @@ function buildRealisticProjectState() {
     fabrics: [makeFabric('default-cotton'), makeFabric('silk-charmeuse')],
     avatar: makeAvatar(),
     avatarMode: 'model' as const,
-    avatarModelUrl: '/default-avatar.glb',
+    avatarModelUrl: '/avatares/mujer-eu38.glb',
     isDirty: true,
     groups: [{ id: 'g1', name: 'Front panels', pieceIds: ['p1'] }],
     seamGroups: [],

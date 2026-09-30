@@ -40,6 +40,7 @@ import { buildAxisHints } from '../../../../utils/cloth/arrangement/buildAxisHin
 import { computeEffectiveRegions } from '../../../../utils/cloth/garmentPlacement';
 import { bakeCollisionFromRender } from '../../../../utils/cloth/renderCollisionBake';
 import { getRegisteredCollisionMesh } from '../../../../utils/cloth/penetrationMetric';
+import { medidasDelCuerpo } from '../../../../avatares/catalogo';
 
 // ─── listFabrics ────────────────────────────────────────────────────────────
 
@@ -552,7 +553,7 @@ async function resolveLiveAnchorMap(getState: () => RootState): Promise<AnchorMa
   if (!mesh) return null;
   const state = getState();
   const armAxis = state.simulation.armAxis;
-  const map = buildAnchorMap(mesh, state.project.avatar.measurements, { left: armAxis.left, right: armAxis.right });
+  const map = buildAnchorMap(mesh, medidasDelCuerpo(state.project), { left: armAxis.left, right: armAxis.right });
   registerAnchorMap(map);
   return map.rings.length > 0 ? map : null;
 }
@@ -641,7 +642,7 @@ const placePieceTool: ToolDefinition = {
     const map = await resolveLiveAnchorMap(getState);
     if (!map) return { success: false, error: AVATAR_NOT_READY_ERROR };
 
-    const measurements = state.project.avatar.measurements;
+    const measurements = medidasDelCuerpo(state.project);
     const opts = contractOpts(state, pieces);
     const binding = bindingForAnchor(pieces, index, measurements, map, anchorId, opts);
     const namespace = anchorNamespaceFor(computeEffectiveRegions(pieces)[index]);

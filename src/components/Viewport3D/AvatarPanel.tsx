@@ -5,7 +5,7 @@ import {
   setPreset, resetPose, selectJoint, setJointRotation, mirrorJoint,
   loadSavedPosesFromStorage, loadSavedPosesAsync, savePose, deleteSavedPose, overwriteSavedPose,
   togglePoseEditor, toggleIK,
-  POSE_PRESETS, JOINT_CONSTRAINTS,
+  JOINT_CONSTRAINTS,
   loadProfilesFromStorage, loadProfilesAsync, setActiveProfile, addProfile, updateProfile, deleteProfile,
   setMorphTarget,
 } from '../../store/avatarSlice';
@@ -13,6 +13,8 @@ import {
   setAvatarModelUrl, setAvatarMode, updateMeasurements,
 } from '../../store/projectSlice';
 import type { AvatarProfile } from '../../utils/avatar/avatarLibrary';
+import { AVATAR_POR_DEFECTO, avatarPorUrl, registrarModeloPropio } from '../../avatares/catalogo';
+import { PRESETS_DE_POSE } from '../../utils/avatar/posePorDireccion';
 import type { BodyMeasurements } from '../../types/types';
 import type { AvatarMode } from '../../store/projectSlice';
 import { requestConfirmation } from '../../hooks/useGuardedAction';
@@ -35,7 +37,7 @@ const SLIDERS: SliderDef[] = [
   { key: 'inseam', label: 'Entrepierna', min: 65, max: 90 },
 ];
 
-// Las keys de POSE_PRESETS son estado Redux (activePreset) — no se traducen; solo el label visible.
+// Las keys de PRESETS_DE_POSE son estado Redux (activePreset) — no se traducen; solo el label visible.
 const PRESET_LABELS: Record<string, string> = {
   'Relaxed': 'Relajada',
   'Arms Forward': 'Brazos al frente',
@@ -58,6 +60,9 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
   const activeProfileId = useSelector((s: RootState) => s.avatar.activeProfileId);
   const avatarMode = useSelector((s: RootState) => s.project.avatarMode);
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
+  const modeloDelProyecto = useSelector((s: RootState) => s.project.avatar.modelUrl);
+  // El cuerpo que se ve, si es de la biblioteca: no se estira (spec § 5).
+  const deLaBiblioteca = avatarPorUrl(avatarModelUrl);
   const poseEditorOpen = useSelector((s: RootState) => s.avatar.poseEditorOpen);
 
   // Pose state
@@ -107,7 +112,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
 
   // Derive model name
   useEffect(() => {
-    if (!avatarModelUrl || avatarModelUrl === '/default-avatar.glb') {
+    if (!avatarModelUrl || avatarPorUrl(avatarModelUrl)) {
       setModelName(null);
     }
   }, [avatarModelUrl]);
@@ -117,10 +122,13 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
     const ext = file.name.toLowerCase().split('.').pop() || '';
     const supported = ['obj', 'fbx', 'glb', 'gltf', 'vrm'];
     if (!supported.includes(ext)) return;
-    const url = URL.createObjectURL(file);
+    // El blob no trae extensión: sin el nombre en el fragmento, AvatarModel no sabe qué cargador
+    // usar y la subida fallaba en silencio. fetch ignora el fragmento de una URL blob.
+    const url = `${URL.createObjectURL(file)}#${encodeURIComponent(file.name)}`;
+    registrarModeloPropio(url, measurements);
     dispatch(setAvatarModelUrl(url));
     setModelName(file.name);
-  }, [dispatch]);
+  }, [dispatch, measurements]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -224,13 +232,13 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                   📁 Suelta un archivo .obj, .fbx, .glb, .gltf o .vrm
                 </div>
                 <div className="ap-model-info">
-                  <span>{modelName ?? 'Avatar por defecto'}</span>
-                  {modelName && (
+                  <span>{modelName ?? deLaBiblioteca?.name ?? 'Modelo propio'}</span>
+                  {!deLaBiblioteca && (
                     <button
                       className="ap-btn"
                       style={{ flex: 'none', padding: '2px 8px' }}
                       onClick={() => {
-                        dispatch(setAvatarModelUrl('/default-avatar.glb'));
+                        dispatch(setAvatarModelUrl(avatarPorUrl(modeloDelProyecto)?.modelUrl ?? AVATAR_POR_DEFECTO.modelUrl));
                         setModelName(null);
                       }}
                     >
@@ -298,6 +306,9 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                   )}
                 </div>
 
+                {avatarMode === 'model' && deLaBiblioteca && (
+                  <div className="ap-hint">El cuerpo es la talla {deLaBiblioteca.name}; tus cambios se usan en el patrón.</div>
+                )}
                 {/* Measurements */}
                 <div className="ap-slider-group">
                   {SLIDERS.map(({ key, label, min, max }) => {
@@ -375,7 +386,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
               <div className="ap-section-body">
                 {/* Presets */}
                 <div className="ap-preset-row">
-                  {Object.keys(POSE_PRESETS).map(name => (
+                  {Object.keys(PRESETS_DE_POSE).map(name => (
                     <button
                       key={name}
                       className={`ap-preset-btn ${activePreset === name ? 'active' : ''}`}

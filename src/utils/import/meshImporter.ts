@@ -9,6 +9,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { VRM } from '@pixiv/three-vrm';
 import { loadVRM } from '../avatar/vrmLoader';
 
@@ -91,6 +92,10 @@ export interface ImportOptions {
   forceUnit?: ScaleUnit;
   /** Auto-fix flipped normals */
   fixNormals?: boolean;
+  /** Centrar en X/Z por la caja en bind y apoyar en y=0 (default: true). Los cuerpos de la
+   *  biblioteca ya salen del generador en su sitio, y AvatarModel los dibuja sin mover: centrarlos
+   *  por la caja los corría 11 cm (brazos adelante en el reposo). */
+  centrar?: boolean;
   /**
    * Mesh size/complexity limits. Defaults to `DEFAULT_IMPORT_LIMITS`.
    * Pass `false` to programmatically disable all limit checks (e.g. internal pipeline).
@@ -214,7 +219,7 @@ async function loadFBX(url: string): Promise<THREE.Group> {
 }
 
 async function loadGLTF(url: string): Promise<THREE.Group> {
-  const loader = new GLTFLoader();
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   return new Promise((resolve, reject) => {
     loader.load(
       url,
@@ -342,6 +347,7 @@ export async function importMesh(
     targetHeightMm = 1800,
     forceUnit,
     fixNormals: doFixNormals = true,
+    centrar = true,
   } = options;
 
   const limits = resolveLimits(options);
@@ -433,9 +439,11 @@ export async function importMesh(
 
   // Center at origin (feet on ground)
   const finalBbox = new THREE.Box3().setFromObject(scene);
-  const center = new THREE.Vector3();
-  finalBbox.getCenter(center);
-  scene.position.set(-center.x, -finalBbox.min.y, -center.z);
+  if (centrar) {
+    const center = new THREE.Vector3();
+    finalBbox.getCenter(center);
+    scene.position.set(-center.x, -finalBbox.min.y, -center.z);
+  }
 
   // Fix normals
   if (doFixNormals) {

@@ -38,6 +38,7 @@ import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import PanCrosshair from './PanCrosshair';
 import SnapshotBar from './SnapshotBar';
 import AnchorPoints from './AnchorPoints';
+import { medidasDelCuerpo } from '../../avatares/catalogo';
 import AvatarTapes from './AvatarTapes';
 import CollisionBodyMesh from './CollisionBodyMesh';
 import CollisionBodyPanel from './CollisionBodyPanel';
@@ -193,6 +194,8 @@ const SAFARI_GESTURES = typeof window !== 'undefined' && 'ongesturestart' in win
 export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false }: Viewport3DProps) {
   const dispatch = useDispatch();
   const { pieces, seams, avatarMode, avatarModelUrl, avatar, arrangementOverrides } = useSelector((s: RootState) => s.project);
+  // Lo que se coloca sobre el cuerpo usa SUS medidas: uno de la biblioteca no se estira (spec § 5).
+  const cuerpo = medidasDelCuerpo({ avatarMode, avatarModelUrl, avatar });
   const { selectedPieceIds } = useSelector((s: RootState) => s.editor);
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const pieceFabrics = useSelector((s: RootState) => s.simulation.pieceFabrics);
@@ -241,11 +244,11 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   // manga se computaba contra el frame A-pose pero se previsualizaba contra
   // T-pose (split-brain que el acta prohíbe; hallazgo del agente de UI).
   const garmentPlacements = useMemo(
-    () => resolveArrangement(pieces, avatar.measurements, arrangementOverrides, {
+    () => resolveArrangement(pieces, cuerpo, arrangementOverrides, {
       skeletonReady: armAxis.ready,
       axisHints: buildAxisHints(activePieces, armAxis),
     }),
-    [pieces, activePieces, avatar.measurements, arrangementOverrides, armAxis],
+    [pieces, activePieces, cuerpo, arrangementOverrides, armAxis],
   );
   // activePieces (no el array FULL): el set del contrato es el del solver —
   // ver anchorClick.ts (review #934, split-brain L/R por-set).
@@ -257,7 +260,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     const result = resolveAnchorClick({
       activePieces,
       selectedPieceIds,
-      measurements: avatar.measurements,
+      measurements: cuerpo,
       map: getAnchorMap(),
       anchorId,
       armAxis,
@@ -275,7 +278,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       case 'no-map': // unreachable from a rendered point — nothing sane to do
         break;
     }
-  }, [activePieces, selectedPieceIds, avatar.measurements, armAxis, dispatch]);
+  }, [activePieces, selectedPieceIds, cuerpo, armAxis, dispatch]);
 
   const simRef = useRef<GarmentSimulationHandle>(null);
   const cameraMode = activeTool3D === 'camera';
@@ -869,7 +872,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
           <Suspense fallback={null}>
             <AvatarModel
             url={avatarModelUrl}
-            height={cmToM(avatar.measurements.height)}
+            height={cmToM(cuerpo.height)}
             onPointerDown={isTapeTool ? handleAvatarClick : undefined}
           />
           </Suspense>
@@ -881,7 +884,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         <AvatarTapes />
         {/* AnchorPoints: only when 'arrangement' tool is active — mutually exclusive with pose */}
         <AnchorPoints
-          measurements={avatar.measurements}
+          measurements={cuerpo}
           visible={activeTool3D === 'arrangement' && !poseEditorOpen}
           onAnchorClick={handleAnchorClick}
           activeNamespace={anchorNamespace}

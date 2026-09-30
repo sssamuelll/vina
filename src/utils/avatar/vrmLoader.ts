@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { VRMLoaderPlugin, VRM } from '@pixiv/three-vrm';
 
 export interface VRMLoadResult {
@@ -24,7 +25,7 @@ export function isVRMFile(filename: string): boolean {
  * Load a VRM file and return the scene + VRM instance.
  */
 export async function loadVRM(url: string): Promise<VRMLoadResult> {
-  const loader = new GLTFLoader();
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   loader.register((parser) => new VRMLoaderPlugin(parser));
 
   const gltf = await loader.loadAsync(url);

@@ -130,7 +130,7 @@ vi.mock('../../../utils/cloth/gpu/webgpuDetect', async (importOriginal) => {
     isWebGPUAvailable: webgpuMocks.isWebGPUAvailable,
   };
 });
-// Colisión de avatar: projectSlice arranca con '/default-avatar.glb' — null
+// Colisión de avatar: projectSlice arranca con '/avatares/mujer-eu38.glb' — null
 // evita red/three en el test sin tocar el flujo del cascade.
 vi.mock('../../../utils/cloth/avatarCollisionMesh', () => ({
   extractAvatarCollisionMesh: vi.fn().mockResolvedValue(null),

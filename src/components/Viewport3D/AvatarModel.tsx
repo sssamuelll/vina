@@ -4,9 +4,11 @@ import { useFrame, ThreeEvent } from "@react-three/fiber";
 import * as THREE from 'three';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../../utils/avatar/morphTargets';
+import { computeMorphWeights, MORPH_BONE_MAP, aMorph } from '../../utils/avatar/morphTargets';
+import { avatarPorUrl, medidasDelCuerpo, referenciaDeMorph } from '../../avatares/catalogo';
 import { registerAvatarRenderRoot } from '../../utils/cloth/renderCollisionBake';
-import { IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS, setAvailableMorphTargets, clearMorphTargets } from '../../store/avatarSlice';
+import { IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS, setAvailableMorphTargets, clearMorphTargets, presetResuelta } from '../../store/avatarSlice';
+import { PRESETS_DE_POSE, resolverPreset } from '../../utils/avatar/posePorDireccion';
 import { setArmAxis } from '../../store/simulationSlice';
 import { clampSwingTwist, ANATOMICAL_CONSTRAINTS } from '../../utils/avatar/swingTwistConstraint';
 import { isVRMFile, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
@@ -174,7 +176,10 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
 
   const dispatch = useDispatch();
   const joints = useSelector((s: RootState) => s.avatar.pose.joints);
-  const measurements = useSelector((s: RootState) => s.project.avatar.measurements);
+  const activePreset = useSelector((s: RootState) => s.avatar.pose.activePreset);
+  const porResolver = useSelector((s: RootState) => s.avatar.pose.porResolver);
+  // Las del cuerpo: uno de la biblioteca no se estira aunque María edite las del proyecto (spec § 5).
+  const measurements = useSelector((s: RootState) => medidasDelCuerpo(s.project));
   const morphTargets = useSelector((s: RootState) => s.avatar.morphTargets);
   const ikChains = useSelector((s: RootState) => s.avatar.pose.ikChains);
   const ikTargets = useSelector((s: RootState) => s.avatar.pose.ikTargets);
@@ -191,6 +196,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
 
     importMesh(url, filename, {
       targetHeightMm: metresToImporter(height),
+      centrar: !avatarPorUrl(url),
     }).then((result) => {
       if (cancelled) return;
 
@@ -286,8 +292,10 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       discoverBoneAxes(boneMap.current, bindPoses.current, scene);
     }
 
-    // Auto-scale: skip for OBJ/FBX (already scaled in their loader useEffect)
-    if (!isObjFbx) {
+    // Auto-scale: skip for OBJ/FBX (already scaled in their loader useEffect). Un cuerpo de la
+    // biblioteca tampoco: ya sale del generador a su estatura y en su sitio, y la colisión por URL
+    // lo lee igual (centrar: false). Recentrarlo por la caja posada lo corría con los brazos.
+    if (!isObjFbx && !avatarPorUrl(url)) {
       const box = new THREE.Box3().setFromObject(scene);
       const size = new THREE.Vector3();
       box.getSize(size);
@@ -356,6 +364,18 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
     requestAnimationFrame(() => applyPose.current());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [importedScene, autoScale, height, vrmInstance, isVrm, isObjFbx]);
+
+  // Presets por dirección (posePorDireccion.ts): la activa se traduce a rotaciones para ESTE
+  // esqueleto cuando se escoge y cada vez que carga un cuerpo nuevo. Va después del efecto de
+  // arriba, que llena boneMap y bindPoses en el mismo commit.
+  const presetResueltaPara = useRef<THREE.Object3D | null>(null);
+  useEffect(() => {
+    const preset = activePreset ? PRESETS_DE_POSE[activePreset] : undefined;
+    if (!importedScene || !preset || boneMap.current.size === 0) return;
+    if (!porResolver && presetResueltaPara.current === importedScene) return;
+    presetResueltaPara.current = importedScene;
+    dispatch(presetResuelta({ nombre: activePreset!, joints: resolverPreset(preset, boneMap.current, bindPoses.current) }));
+  }, [importedScene, activePreset, porResolver, dispatch]);
 
   // Initialize IK solver and chains
   const initializeIK = async (activeScene: THREE.Object3D) => {
@@ -495,16 +515,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   // Helper to apply pose + morphs to all bones
   const applyPose = useRef(() => {});
   applyPose.current = () => {
-    const morphCfg: MorphConfig = {
-      chest: measurements.chest,
-      waist: measurements.waist,
-      hip: measurements.hips,
-      shoulderWidth: measurements.shoulder,
-      height: measurements.height,
-      armLength: measurements.armLength,
-      inseam: measurements.inseam,
-    };
-    const weights = computeMorphWeights(morphCfg);
+    const weights = computeMorphWeights(aMorph(measurements), referenciaDeMorph(url));
 
     boneMap.current.forEach((bone, name) => {
       const bindPose = bindPoses.current.get(name);

@@ -60,6 +60,7 @@ import { computePenetrationMetric, getPenetrationBody, penetrationStrideFor } fr
 import { computeFacePokeMetric, getFacePokeMetricBody, facePokeStrideFor } from '../../utils/cloth/facePokeMetric';
 import { mapClothSimConfigToWasmSolverConfig, type SharedClothSimConfigKeys } from '../../utils/cloth/configBridge';
 import type { ClothSimConfig } from '../../utils/cloth/xpbdSolver';
+import { medidasDelCuerpo } from '../../avatares/catalogo';
 import {
   dispatchBrushStroke,
   dispatchBrushClear,
@@ -255,7 +256,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const surfaceMode3D = useSelector((s: RootState) => s.simulation.surfaceMode3D);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const pinStrength = useSelector((s: RootState) => s.tools.toolOptions?.['pin']?.pinStrength || 'strong') as 'weak' | 'medium' | 'strong';
-  const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
+  // Las del cuerpo: uno de la biblioteca no se estira aunque María edite las del proyecto (spec § 5).
+  const avatarMeasurements = useSelector((s: RootState) => medidasDelCuerpo(s.project));
   // M2 (camisa de María): the user's arrange-mode drags MUST reach the
   // solver — before this selector, placedMeshes ignored them and Simulate
   // silently discarded manual placement (hallazgo A).

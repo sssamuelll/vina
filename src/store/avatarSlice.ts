@@ -3,6 +3,7 @@ import { AvatarProfile, loadProfiles, loadProfilesAsync, saveProfile as upsertPr
 import { constrainJoint, HUMAN_JOINTS } from '../utils/avatar/jointConstraints';
 import { safeGetItem } from '../utils/safeStorage';
 import { NEW_PROJECT } from './actions';
+import { PRESETS_DE_POSE } from '../utils/avatar/posePorDireccion';
 
 export interface JointRotation {
   x: number;  // degrees
@@ -24,6 +25,9 @@ export interface IKChain {
 export interface PoseState {
   joints: Record<string, JointRotation>;
   activePreset: string | null;
+  /** La preset activa todavía no se tradujo a rotaciones para el esqueleto cargado
+   *  (lo hace AvatarModel con `resolverPreset`, y despacha `presetResuelta`). */
+  porResolver: boolean;
   ikChains: IKChain[];
   ikTargets: IKTarget[];
   ikEnabled: boolean;
@@ -91,33 +95,6 @@ export const JOINT_CONSTRAINTS: Record<string, {
   RightLeg: { minX: -140, maxX: 0, minY: -10, maxY: 10, minZ: -5, maxZ: 5 },
 };
 
-export const POSE_PRESETS: Record<string, Record<string, JointRotation>> = {
-  'A-pose': {
-    // +X = lower arm (adduction), verified via axis discovery
-    LeftArm: { x: 25, y: 0, z: 0 },
-    RightArm: { x: 25, y: 0, z: 0 },
-  },
-  'T-pose': {},
-  'Relaxed': {
-    // +X = lower arm significantly
-    LeftArm: { x: 60, y: 0, z: 0 },
-    RightArm: { x: 60, y: 0, z: 0 },
-    LeftUpLeg: { x: 5, y: 0, z: 0 },
-    RightUpLeg: { x: 5, y: 0, z: 0 },
-  },
-  'Arms Forward': {
-    // -Z = forward for Left, +Z = forward for Right (from discovery)
-    // Actually: LeftArm +Z = slight fwd, -Z = very backward. So +Z for forward.
-    LeftArm: { x: 0, y: 0, z: 45 },
-    RightArm: { x: 0, y: 0, z: -45 },
-  },
-  'Sitting': {
-    LeftUpLeg: { x: 90, y: 0, z: 0 },
-    RightUpLeg: { x: 90, y: 0, z: 0 },
-    LeftLeg: { x: -90, y: 0, z: 0 },
-    RightLeg: { x: -90, y: 0, z: 0 },
-  },
-};
 
 const MIRROR_MAP: Record<string, string> = {
   LeftShoulder: 'RightShoulder',
@@ -228,8 +205,9 @@ function persistPoses(poses: SavedPose[]): void {
 
 const initialState: AvatarState = {
   pose: {
-    joints: { ...POSE_PRESETS['A-pose'] },
+    joints: {},
     activePreset: 'A-pose',
+    porResolver: true,
     ikChains: [...IK_CHAINS],
     ikTargets: [],
     ikEnabled: false,
@@ -251,12 +229,15 @@ const avatarSlice = createSlice({
       const clamped = clampJointRotation(action.payload.joint, action.payload.rotation);
       state.pose.joints[action.payload.joint] = clamped;
       state.pose.activePreset = null;
+      state.pose.porResolver = false;
     },
+    /** Una preset de fábrica dice direcciones, no rotaciones: queda por resolver contra el
+     *  esqueleto que esté cargado (posePorDireccion.ts). Una pose guardada se aplica tal cual. */
     setPreset(state, action: PayloadAction<string>) {
-      const preset = POSE_PRESETS[action.payload];
-      if (preset !== undefined) {
-        state.pose.joints = { ...preset };
+      if (PRESETS_DE_POSE[action.payload]) {
+        state.pose.joints = {};
         state.pose.activePreset = action.payload;
+        state.pose.porResolver = true;
         return;
       }
       // Check saved custom poses
@@ -264,11 +245,20 @@ const avatarSlice = createSlice({
       if (custom) {
         state.pose.joints = { ...custom.joints };
         state.pose.activePreset = custom.id;
+        state.pose.porResolver = false;
       }
+    },
+    /** Las rotaciones de una preset para el esqueleto cargado. Si mientras tanto se escogió otra,
+     *  llega tarde y no pisa nada. */
+    presetResuelta(state, action: PayloadAction<{ nombre: string; joints: Record<string, JointRotation> }>) {
+      if (state.pose.activePreset !== action.payload.nombre) return;
+      state.pose.joints = action.payload.joints;
+      state.pose.porResolver = false;
     },
     resetPose(state) {
       state.pose.joints = {};
       state.pose.activePreset = null;
+      state.pose.porResolver = false;
     },
     togglePoseEditor(state) {
       state.poseEditorOpen = !state.poseEditorOpen;
@@ -313,6 +303,7 @@ const avatarSlice = createSlice({
         delete state.pose.joints[mirror];
       }
       state.pose.activePreset = null;
+      state.pose.porResolver = false;
     },
     
     // ─── Custom Pose Management ───
@@ -337,6 +328,7 @@ const avatarSlice = createSlice({
       persistPoses(poses);
       state.savedPoses = poses;
       state.pose.activePreset = pose.id;
+      state.pose.porResolver = false;
     },
     deleteSavedPose(state, action: PayloadAction<string>) {
       const poses = state.savedPoses.filter(p => p.id !== action.payload);
@@ -416,7 +408,7 @@ const avatarSlice = createSlice({
 });
 
 export const {
-  setJointRotation, setPreset, resetPose, togglePoseEditor, selectJoint, mirrorJoint,
+  setJointRotation, setPreset, presetResuelta, resetPose, togglePoseEditor, selectJoint, mirrorJoint,
   loadProfilesFromStorage, setActiveProfile, addProfile, updateProfile, deleteProfile,
   loadSavedPosesFromStorage, savePose, deleteSavedPose, overwriteSavedPose,
   toggleIK, setIKTarget, removeIKTarget, updateIKChainTarget,
