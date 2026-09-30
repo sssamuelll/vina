@@ -2,6 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import reducer, { loadProject, restoreProject, setAvatarModelUrl } from '../projectSlice';
 import type { VinaProject } from '../../types/types';
+import { NEW_PROJECT } from '../actions';
+import { AVATAR_POR_DEFECTO } from '../../avatares/catalogo';
 
 const medidas = { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 };
 const proyecto = (modelUrl: string): VinaProject => ({
@@ -29,4 +31,13 @@ describe('al cargar, el cuerpo sale de avatar.modelUrl (spec § 5)', () => {
       expect(s.avatar.measurements).toEqual(medidas);
     },
   );
+});
+
+describe('proyecto nuevo', () => {
+  it('arranca con Mujer EU 38 y sus medidas, al abrir la app y con Nuevo proyecto', () => {
+    for (const s of [reducer(undefined, { type: '@@INIT' }), reducer(conModeloPropio, NEW_PROJECT())]) {
+      expect(s.avatar).toBe(AVATAR_POR_DEFECTO);
+      expect(s.avatarModelUrl).toBe('/avatares/mujer-eu38.glb');
+    }
+  });
 });

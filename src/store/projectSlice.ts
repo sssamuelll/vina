@@ -163,21 +163,6 @@ function autoDetectLayer(category?: string): number {
 /** Lateral offset in metres when superimposing a piece in 'side' mode. */
 const SUPERIMPOSE_SIDE_OFFSET_M = 0.1;
 
-const defaultAvatar: Avatar = {
-  id: 'default',
-  name: 'Default Avatar',
-  modelUrl: '',
-  measurements: {
-    height: 180,
-    chest: 96,
-    waist: 82,
-    hips: 96,
-    shoulder: 44,
-    armLength: 64,
-    inseam: 82,
-  },
-};
-
 const defaultFabric: Fabric = {
   id: 'default-cotton',
   name: 'Cotton',
@@ -244,9 +229,9 @@ const initialState: ProjectState = {
   elastics: [],
   trims: [],
   fabrics: [defaultFabric],
-  avatar: defaultAvatar,
+  avatar: AVATAR_POR_DEFECTO,
   avatarMode: 'model',
-  avatarModelUrl: '/default-avatar.glb',
+  avatarModelUrl: AVATAR_POR_DEFECTO.modelUrl,
   isDirty: false,
   groups: [],
   seamGroups: [],

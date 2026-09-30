@@ -13,6 +13,7 @@ import {
   setAvatarModelUrl, setAvatarMode, updateMeasurements,
 } from '../../store/projectSlice';
 import type { AvatarProfile } from '../../utils/avatar/avatarLibrary';
+import { AVATAR_POR_DEFECTO, avatarPorUrl } from '../../avatares/catalogo';
 import type { BodyMeasurements } from '../../types/types';
 import type { AvatarMode } from '../../store/projectSlice';
 import { requestConfirmation } from '../../hooks/useGuardedAction';
@@ -58,6 +59,9 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
   const activeProfileId = useSelector((s: RootState) => s.avatar.activeProfileId);
   const avatarMode = useSelector((s: RootState) => s.project.avatarMode);
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
+  const modeloDelProyecto = useSelector((s: RootState) => s.project.avatar.modelUrl);
+  // El cuerpo que se ve, si es de la biblioteca: no se estira (spec § 5).
+  const deLaBiblioteca = avatarPorUrl(avatarModelUrl);
   const poseEditorOpen = useSelector((s: RootState) => s.avatar.poseEditorOpen);
 
   // Pose state
@@ -107,7 +111,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
 
   // Derive model name
   useEffect(() => {
-    if (!avatarModelUrl || avatarModelUrl === '/default-avatar.glb') {
+    if (!avatarModelUrl || avatarPorUrl(avatarModelUrl)) {
       setModelName(null);
     }
   }, [avatarModelUrl]);
@@ -224,13 +228,13 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                   📁 Suelta un archivo .obj, .fbx, .glb, .gltf o .vrm
                 </div>
                 <div className="ap-model-info">
-                  <span>{modelName ?? 'Avatar por defecto'}</span>
-                  {modelName && (
+                  <span>{modelName ?? deLaBiblioteca?.name ?? 'Modelo propio'}</span>
+                  {!deLaBiblioteca && (
                     <button
                       className="ap-btn"
                       style={{ flex: 'none', padding: '2px 8px' }}
                       onClick={() => {
-                        dispatch(setAvatarModelUrl('/default-avatar.glb'));
+                        dispatch(setAvatarModelUrl(avatarPorUrl(modeloDelProyecto)?.modelUrl ?? AVATAR_POR_DEFECTO.modelUrl));
                         setModelName(null);
                       }}
                     >
@@ -298,6 +302,9 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                   )}
                 </div>
 
+                {avatarMode === 'model' && deLaBiblioteca && (
+                  <div className="ap-hint">El cuerpo es la talla {deLaBiblioteca.name}; tus cambios se usan en el patrón.</div>
+                )}
                 {/* Measurements */}
                 <div className="ap-slider-group">
                   {SLIDERS.map(({ key, label, min, max }) => {

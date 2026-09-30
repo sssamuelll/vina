@@ -171,23 +171,23 @@ describe('projectSlice', () => {
 
   it('updates measurements', () => {
     const store = createStore();
+    const cinturaAntes = store.getState().project.avatar.measurements.waist;
     store.dispatch(updateMeasurements({ chest: 100 }));
     expect(store.getState().project.avatar.measurements.chest).toBe(100);
     // Other measurements unchanged
-    expect(store.getState().project.avatar.measurements.waist).toBe(82);
+    expect(store.getState().project.avatar.measurements.waist).toBe(cinturaAntes);
   });
 
   it('supports optional expanded measurements without breaking existing', () => {
     const store = createStore();
-    // New optional fields default to undefined
-    expect(store.getState().project.avatar.measurements.neckCirc).toBeUndefined();
-    expect(store.getState().project.avatar.measurements.thighCirc).toBeUndefined();
-    // Can set them
+    // El avatar por defecto (Mujer EU 38) ya trae las 15 del catálogo; lo que se
+    // promete aquí es que escribir las opcionales no toca las principales.
+    const estaturaAntes = store.getState().project.avatar.measurements.height;
     store.dispatch(updateMeasurements({ neckCirc: 38, upperArmCirc: 30 }));
     expect(store.getState().project.avatar.measurements.neckCirc).toBe(38);
     expect(store.getState().project.avatar.measurements.upperArmCirc).toBe(30);
     // Primary measurements still intact
-    expect(store.getState().project.avatar.measurements.height).toBe(180);
+    expect(store.getState().project.avatar.measurements.height).toBe(estaturaAntes);
   });
 
   it('sets avatar mode', () => {

@@ -34,7 +34,7 @@ export const HUESOS = [
   'RightHandIndex1', 'RightHandIndex2', 'RightHandIndex3', 'RightHandMiddle1', 'RightHandMiddle2', 'RightHandMiddle3',
   'RightHandRing1', 'RightHandRing2', 'RightHandRing3', 'RightHandPinky1', 'RightHandPinky2', 'RightHandPinky3',
   'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'LeftToeBase', 'RightUpLeg', 'RightLeg', 'RightFoot', 'RightToeBase',
-]; // los 52 del avatar de hoy (public/default-avatar.glb)
+]; // los 52 de Mixamo, sin el prefijo mixamorig:
 
 const GRUPOS = { mujer: 'Mujer', hombre: 'Hombre', nina: 'Niña', nino: 'Niño' };
 
