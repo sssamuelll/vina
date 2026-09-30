@@ -81,9 +81,20 @@ export function medidasDelCuerpo(p: { avatarMode: string; avatarModelUrl: string
   return (p.avatarMode === 'model' && avatarPorUrl(p.avatarModelUrl)?.measurements) || p.avatar.measurements;
 }
 
-/** Contra qué se estira el cuerpo cargado: uno de la biblioteca, contra sus propias medidas (todo da
- *  1,0); un modelo propio, contra el hombre de 180 cm de siempre. */
+/** Las medidas del proyecto cuando se subió cada modelo propio. Viven lo que vive su blob. */
+const referenciasDeModelosPropios = new Map<string, MorphConfig>();
+
+/** Un modelo propio se ve tal cual llega, y las ediciones de medidas lo estiran desde ahí. Antes
+ *  pasaba sin esto porque el proyecto por defecto medía lo mismo que el hombre de 180 cm. */
+export function registrarModeloPropio(url: string, medidas: BodyMeasurements): void {
+  referenciasDeModelosPropios.set(url, aMorph(medidas));
+}
+
+/** Contra qué se estira el cuerpo cargado. Uno de la biblioteca, contra sus propias medidas: todo
+ *  da 1,0. Un modelo propio, contra las medidas que tenía el proyecto al subirlo. Si no pasó por el
+ *  panel, contra el hombre de 180 cm de siempre. */
 export function referenciaDeMorph(url: string | null): MorphConfig {
   const cuerpo = avatarPorUrl(url);
-  return cuerpo ? aMorph(cuerpo.measurements) : DEFAULT_MEASUREMENTS;
+  if (cuerpo) return aMorph(cuerpo.measurements);
+  return (url && referenciasDeModelosPropios.get(url)) || DEFAULT_MEASUREMENTS;
 }

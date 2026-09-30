@@ -61,6 +61,7 @@ import { validateAction } from './actionValidator';
 import { resolvePieceQueryOrId } from './pieceQueryResolver';
 import { uid } from '../../utils/pathHelpers';
 import { splitPieceAtLine, mergePieces } from '../../utils/patternOps';
+import { AVATAR_POR_DEFECTO } from '../../avatares/catalogo';
 
 // ============================================================================
 // Helpers
@@ -937,20 +938,8 @@ export class CopilotActionExecutor {
             pieces: importedPieces,
             seams: [],
             fabrics: [],
-            avatar: {
-              id: 'default',
-              name: 'Default Avatar',
-              modelUrl: '',
-              measurements: {
-                height: 180,
-                chest: 96,
-                waist: 82,
-                hips: 96,
-                shoulder: 44,
-                armLength: 64,
-                inseam: 82,
-              },
-            },
+            // Un proyecto nuevo arranca con Mujer EU 38 (spec 2026-09-29 § 5), también aquí.
+            avatar: AVATAR_POR_DEFECTO,
             createdAt: Date.now(),
             updatedAt: Date.now(),
           }));

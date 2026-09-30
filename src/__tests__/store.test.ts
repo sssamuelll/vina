@@ -3,7 +3,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, {
   addPiece, updatePiece, removePiece, movePiece, rotatePiece,
   addSeam, addInternalLine, setInternalLine, updateInternalLine,
-  setProjectName, loadProject, updateMeasurements,
+  setProjectName, loadProject, restoreProject, updateMeasurements,
   setAvatarMode, setAvatarModelUrl,
   bringToFront, sendToBack, bringForward, sendBackward,
   lockPiece, unlockPiece, batchSetSeamAllowance,
@@ -18,7 +18,7 @@ import {
   undoMiddleware, canUndo, canRedo, batchUndo, beginUndoBatch,
   endUndoBatch, getHistory, getUndoLength, withUndoBatchToken,
 } from '../store/undoMiddleware';
-import { PatternPiece } from '../types/types';
+import { PatternPiece, type VinaProject } from '../types/types';
 
 afterEach(() => vi.useRealTimers());
 
@@ -180,14 +180,20 @@ describe('projectSlice', () => {
 
   it('supports optional expanded measurements without breaking existing', () => {
     const store = createStore();
-    // El avatar por defecto (Mujer EU 38) ya trae las 15 del catálogo; lo que se
-    // promete aquí es que escribir las opcionales no toca las principales.
-    const estaturaAntes = store.getState().project.avatar.measurements.height;
+    // Un proyecto de antes, con las 7 principales y ninguna opcional (el defecto de hoy, Mujer
+    // EU 38, ya trae las 15 del catálogo y no probaría que se AGREGAN).
+    store.dispatch(restoreProject({
+      id: 'viejo', name: 'Viejo', pieces: [], seams: [], fabrics: [], createdAt: 1000, updatedAt: 1000,
+      avatar: { id: 'default', name: 'Default Avatar', modelUrl: '', measurements: { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 } },
+    } as VinaProject));
+    expect(store.getState().project.avatar.measurements.neckCirc).toBeUndefined();
+    expect(store.getState().project.avatar.measurements.thighCirc).toBeUndefined();
+    // Can set them
     store.dispatch(updateMeasurements({ neckCirc: 38, upperArmCirc: 30 }));
     expect(store.getState().project.avatar.measurements.neckCirc).toBe(38);
     expect(store.getState().project.avatar.measurements.upperArmCirc).toBe(30);
     // Primary measurements still intact
-    expect(store.getState().project.avatar.measurements.height).toBe(estaturaAntes);
+    expect(store.getState().project.avatar.measurements.height).toBe(180);
   });
 
   it('sets avatar mode', () => {

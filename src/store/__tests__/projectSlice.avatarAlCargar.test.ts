@@ -16,10 +16,16 @@ const proyecto = (modelUrl: string): VinaProject => ({
 const conModeloPropio = reducer(reducer(undefined, { type: '@@INIT' }), setAvatarModelUrl('blob:http://localhost/propio'));
 
 describe('al cargar, el cuerpo sale de avatar.modelUrl (spec § 5)', () => {
-  it.each([['loadProject', loadProject], ['restoreProject', restoreProject]] as const)('%s restaura una talla de la biblioteca', (_, accion) => {
-    const s = reducer(conModeloPropio, accion(proyecto('/avatares/hombre-eu50.glb')));
-    expect(s.avatarModelUrl).toBe('/avatares/hombre-eu50.glb');
-    expect(s.avatar.modelUrl).toBe('/avatares/hombre-eu50.glb');
+  it.each([
+    ['loadProject', loadProject, '/avatares/hombre-eu50.glb'],
+    ['restoreProject', restoreProject, '/avatares/hombre-eu50.glb'],
+    ['restoreProject', restoreProject, '/avatares/mujer-eu38.glb'], // cada arranque con autoguardado
+  ] as const)('%s restaura %s y las medidas del patrón que se guardaron', (_, accion, url) => {
+    const s = reducer(conModeloPropio, accion(proyecto(url)));
+    expect(s.avatarModelUrl).toBe(url);
+    expect(s.avatar.modelUrl).toBe(url);
+    // las del patrón, no las de la talla: María las editó y el cuerpo no se estira por eso
+    expect(s.avatar.measurements).toEqual(medidas);
   });
 
   it.each(['', '/default-avatar.glb', 'blob:http://localhost/viejo'])(

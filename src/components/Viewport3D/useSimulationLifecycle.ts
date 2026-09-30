@@ -899,11 +899,12 @@ export function useSimulationLifecycle({
         // #frente2 collision fix: the collider gets the same morph as the render
         // (AvatarModel.tsx): the body's own measurements against its own reference,
         // plus the native morphTargets.
-        const morphCfg = aMorph(measurements);
         // Live bake first (reads the CURRENT morphed render — no arg plumbing);
         // URL pipeline with explicit morphs as fallback.
         const collisionMesh = (await bakeCollisionFromRender())
-          ?? await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, avatarJointsRef.current, morphCfg, morphTargets, referenciaDeMorph(avatarModelUrl));
+          ?? await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight, avatarJointsRef.current, {
+            medidas: aMorph(measurements), morphTargets, referencia: referenciaDeMorph(avatarModelUrl),
+          });
         if (!collisionMesh) return;
 
         // Check client is still alive (user may have stopped sim); skip a

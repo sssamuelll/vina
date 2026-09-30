@@ -5,7 +5,7 @@ import {
   setPreset, resetPose, selectJoint, setJointRotation, mirrorJoint,
   loadSavedPosesFromStorage, loadSavedPosesAsync, savePose, deleteSavedPose, overwriteSavedPose,
   togglePoseEditor, toggleIK,
-  POSE_PRESETS, JOINT_CONSTRAINTS,
+  JOINT_CONSTRAINTS,
   loadProfilesFromStorage, loadProfilesAsync, setActiveProfile, addProfile, updateProfile, deleteProfile,
   setMorphTarget,
 } from '../../store/avatarSlice';
@@ -13,7 +13,8 @@ import {
   setAvatarModelUrl, setAvatarMode, updateMeasurements,
 } from '../../store/projectSlice';
 import type { AvatarProfile } from '../../utils/avatar/avatarLibrary';
-import { AVATAR_POR_DEFECTO, avatarPorUrl } from '../../avatares/catalogo';
+import { AVATAR_POR_DEFECTO, avatarPorUrl, registrarModeloPropio } from '../../avatares/catalogo';
+import { PRESETS_DE_POSE } from '../../utils/avatar/posePorDireccion';
 import type { BodyMeasurements } from '../../types/types';
 import type { AvatarMode } from '../../store/projectSlice';
 import { requestConfirmation } from '../../hooks/useGuardedAction';
@@ -36,7 +37,7 @@ const SLIDERS: SliderDef[] = [
   { key: 'inseam', label: 'Entrepierna', min: 65, max: 90 },
 ];
 
-// Las keys de POSE_PRESETS son estado Redux (activePreset) — no se traducen; solo el label visible.
+// Las keys de PRESETS_DE_POSE son estado Redux (activePreset) — no se traducen; solo el label visible.
 const PRESET_LABELS: Record<string, string> = {
   'Relaxed': 'Relajada',
   'Arms Forward': 'Brazos al frente',
@@ -121,10 +122,13 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
     const ext = file.name.toLowerCase().split('.').pop() || '';
     const supported = ['obj', 'fbx', 'glb', 'gltf', 'vrm'];
     if (!supported.includes(ext)) return;
-    const url = URL.createObjectURL(file);
+    // El blob no trae extensión: sin el nombre en el fragmento, AvatarModel no sabe qué cargador
+    // usar y la subida fallaba en silencio. fetch ignora el fragmento de una URL blob.
+    const url = `${URL.createObjectURL(file)}#${encodeURIComponent(file.name)}`;
+    registrarModeloPropio(url, measurements);
     dispatch(setAvatarModelUrl(url));
     setModelName(file.name);
-  }, [dispatch]);
+  }, [dispatch, measurements]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -382,7 +386,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
               <div className="ap-section-body">
                 {/* Presets */}
                 <div className="ap-preset-row">
-                  {Object.keys(POSE_PRESETS).map(name => (
+                  {Object.keys(PRESETS_DE_POSE).map(name => (
                     <button
                       key={name}
                       className={`ap-preset-btn ${activePreset === name ? 'active' : ''}`}

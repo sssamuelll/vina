@@ -39,7 +39,7 @@ export const DEFAULT_MEASUREMENTS: MorphConfig = {
  * (a library body → all 1.0, spec 2026-09-29 § 5) or, for a user-uploaded model,
  * the default reference avatar.
  */
-export function computeMorphWeights(measurements: MorphConfig, referencia: MorphConfig = DEFAULT_MEASUREMENTS): MorphWeights {
+export function computeMorphWeights(measurements: MorphConfig, referencia: MorphConfig): MorphWeights {
   const d = referencia;
 
   return {

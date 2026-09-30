@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AVATAR_POR_DEFECTO, avatarPorUrl, medidasDelCuerpo, referenciaDeMorph } from '../catalogo';
+import { AVATAR_POR_DEFECTO, avatarPorUrl, medidasDelCuerpo, referenciaDeMorph, registrarModeloPropio } from '../catalogo';
 import { DEFAULT_MEASUREMENTS, aMorph, computeMorphWeights } from '../../utils/avatar/morphTargets';
 import type { BodyMeasurements } from '../../types/types';
 
@@ -26,5 +26,18 @@ describe('las medidas del cuerpo que se ve', () => {
     expect(referenciaDeMorph('blob:http://localhost/1')).toBe(DEFAULT_MEASUREMENTS);
     expect(referenciaDeMorph(null)).toBe(DEFAULT_MEASUREMENTS);
     expect(referenciaDeMorph(url)).toEqual(aMorph(avatarPorUrl(url)!.measurements));
+  });
+});
+
+describe('un modelo propio', () => {
+  it('se ve tal cual al subirlo y las ediciones lo estiran desde ahí', () => {
+    const url = 'blob:http://localhost/propio#mio.glb';
+    registrarModeloPropio(url, editadas);
+    expect(Object.values(computeMorphWeights(aMorph(editadas), referenciaDeMorph(url)))).toEqual([1, 1, 1, 1, 1, 1, 1]);
+    expect(computeMorphWeights(aMorph({ ...editadas, chest: 77 }), referenciaDeMorph(url)).chestScale).toBeCloseTo(77 / 70);
+  });
+
+  it('sin registrar (no pasó por el panel) sigue contra el de 180 cm', () => {
+    expect(referenciaDeMorph('blob:http://localhost/otro#x.glb')).toBe(DEFAULT_MEASUREMENTS);
   });
 });
