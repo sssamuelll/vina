@@ -44,11 +44,4 @@ assert d[next(iter(pez))].length == 0
 assert max(v.length for v in d.values()) > 1e-4
 print('ok alisado')
 
-# 4) una escultura con otra topología se rechaza
-try:
-    acabado.diferencia(co, co[:-1])
-except ValueError as e:
-    assert 'Dyntopo' in str(e)
-else:
-    raise AssertionError('debía rechazar una escultura con otros vértices')
-print('acabado_test: 4 pruebas OK')
+print('acabado_test: 3 pruebas OK')

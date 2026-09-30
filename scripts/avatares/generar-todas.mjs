@@ -146,7 +146,7 @@ export async function publicar(id, tmp = TMP, publico = PUBLICO) {
 }
 
 async function probar() {
-  const pruebas = [['medir_test.py', ['--factory-startup']], ['acabado_test.py', []], ['ajuste_test.py', []]];
+  const pruebas = [['medir_test.py', ['--factory-startup']], ['acabado_test.py', []], ['ajuste_test.py', []], ['cabeza_test.py', []]];
   mkdirSync(TMP, { recursive: true });
   let fallas = 0;
   for (const [archivo, extra] of pruebas) {
@@ -185,7 +185,11 @@ async function main() {
   const navegador = await chromium.launch();
   const pagina = await navegador.newPage({ viewport: { width: 1920, height: 1080 } });
   await pagina.goto(pathToFileURL(hoja).href);
-  await pagina.screenshot({ path: path.join(TMP, 'hoja.png'), fullPage: true });
+  try {
+    await pagina.screenshot({ path: path.join(TMP, 'hoja.png'), fullPage: true });
+  } catch (e) {
+    console.warn(`no pude escribir hoja.png (¿está abierta en un visor?): ${e.message.split('\n')[0]}. La hoja.html sí quedó.`);
+  }
   await navegador.close();
   const fallas = resultados.filter((r) => !r.ok);
   console.log(`catálogo: ${catalogo.length} entradas → ${path.relative(RAIZ, CATALOGO)}\nhoja de contactos: ${path.relative(RAIZ, hoja)} y hoja.png`);

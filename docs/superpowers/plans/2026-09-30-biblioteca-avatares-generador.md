@@ -46,12 +46,12 @@ Medidos el 2026-09-30. Samuel los revisa junto con el plan.
 
    Por eso los niños ajustan estatura y cintura, y cadera solo a los 12 y 14. El resto se mide y se publica.
 4. **Talla US de mujer = EU − 30**, así que EU 38 = US 8, como en el ejemplo de § 3.1. La tabla de § 2 dice "US 0–18", pero eso no cuadra ni con 9 tallas ni con el ejemplo; queda US 2–18. En hombre, US = EU − 10 (EU 50 = US 40).
-5. **La cabeza lisa se esculpe a mano**, con la manera 2 de § 4.2. Por script se probaron tres alisados y ninguno sirve:
+5. **La cabeza lisa no se esculpe: se reemplaza** (ver la Tarea 8, reescrita). Por script se probaron tres alisados de la cabeza original y ninguno sirve:
    - Taubin deja la cara casi igual;
    - el laplaciano encoge la cabeza hacia el cuello;
    - el alisado radial la vuelve una bola con rasgos fantasma.
 
-   Pezones y entrepierna sí salen por script (manera 1). `acabado.py --preparar/--guardar-cabeza` convierte la escultura en un `.target`.
+   Pezones y entrepierna sí salen por script (manera 1). La cabeza la teje `cabeza.py`, entera y nueva, en cada avatar.
 6. **La palanca gruesa es el macro `weight`**, y los targets `measure-*` llegan hasta ±2. Con los targets limitados a ±1, las tallas grandes no llegan: a EU 48 le faltaban 10 cm de cintura.
 7. **meshopt va con las librerías de gltf-transform**, no con su CLI. Así se llama desde el mismo proceso y entran menos paquetes. Las dos rutas instalan `sharp`, porque lo pide `@gltf-transform/functions`.
 8. **`npm run avatares` tarda unos 2 min, no unos 6.** Corren 8 Blender a la vez y cada talla tarda de 5 a 15 s.
@@ -82,7 +82,8 @@ También `generar-todas.mjs` comprime y valida en `.tmp/` antes de copiar a `pub
 | `scripts/avatares/tallas.json` | las 31 tallas con sus medidas objetivo y la columna y banda de donde sale cada una |
 | `scripts/avatares/medir.py` | las 15 medidas sobre la malla (la cinta es la envolvente convexa del corte) |
 | `scripts/avatares/ajuste.py` | lleva un cuerpo MPFB a sus medidas objetivo |
-| `scripts/avatares/acabado.py` | los `.target` del acabado de maniquí (por script y por escultura) |
+| `scripts/avatares/acabado.py` | los `.target` del acabado de maniquí (pezones y entrepierna) |
+| `scripts/avatares/cabeza.py` | la cabeza de maniquí: reemplaza la de MPFB por una tapa lisa, después de medir |
 | `scripts/avatares/generar.py` | una avatar por proceso de Blender: GLB, miniatura, hoja y entrada |
 | `scripts/avatares/generar-todas.mjs` | `npm run avatares`: paralelo, meshopt, catálogo, hoja de contactos y `--probar` |
 | `scripts/avatares/{medir,ajuste,acabado}_test.py` | las pruebas que corren dentro de Blender |
@@ -2007,32 +2008,26 @@ Un cambio de perilla lleva la prueba que corresponda, un commit propio y regener
 
 ---
 
-### Task 8: La cabeza lisa, a mano (manera 2 de § 4.2)
+### Task 8: La cabeza lisa (reescrita el 2026-09-30: `cabeza.py`, no escultura a mano)
 
-Tarea de persona: la hace Samuel, o quien él diga, con Blender 5.0 abierto con interfaz. Se hace una vez por grupo (`mujer`, `hombre`, `nina`, `nino`). La escultura se hace sobre el cuerpo base del grupo y vale para todas sus tallas.
+Samuel pidió que la cabeza la hiciera Claude y no una escultura a mano, así que se reescribió esta tarea. No se esculpe la cabeza original: `scripts/avatares/cabeza.py` la reemplaza en cada avatar.
 
-- [ ] **Step 1: Preparar el cuerpo base**
+1. Corta a 0,009 × la estatura sobre el plano del cuello de `medir.py`. Así el cuello y la cervical, donde se mide, no se tocan.
+2. Borra lo de arriba: ojos, boca, orejas y sus cavidades.
+3. Teje una tapa nueva en 40 anillos, desde el borde del corte hasta la coronilla.
+4. Cada punto de la tapa va a la piel más externa de la cabeza original en su dirección. Es un rayo lanzado desde afuera, así que las cavidades quedan fuera.
+5. Esa piel se filtra con una mediana por vecindad angular de 28°. Borra nariz, labios y orejas, que ocupan menos de la mitad de la ventana, y conserva mandíbula y mentón. Después se suaviza con una gaussiana de 8° y con Taubin, lo que también disuelve el zigzag del borde.
+6. La mediana baja la coronilla entre 5 y 8 mm. Se la devuelve a su altura porque la estatura es una medida ajustada.
+7. Los pesos del rig se copian del vértice original más cercano.
 
-Run: `"$BLENDER" -b --python-exit-code 1 --python scripts/avatares/acabado.py -- --grupo mujer --preparar`
-Esperado: `acabado: esculpe la cabeza en …\.tmp\avatares\escultura-mujer.blend (modo Sculpt, simetría X, sin Dyntopo) y guarda`.
+`generar.py` llama a `cabeza.py` **después de medir**, porque cambia los vértices, y vuelve a medir solo la estatura. Las 31 regeneradas dan un peor error de estatura de 0,20 cm. El camino de la escultura a mano (`acabado.py --preparar/--guardar-cabeza`) se quitó: la tapa reemplaza la cabeza igual, así que habría quedado como una trampa sin efecto.
 
-- [ ] **Step 2: Esculpir**
+Lo que se probó y no sirvió, todo medido el 2026-09-30:
+- alisar la malla original: Taubin deja la cara, el laplaciano la encoge y el radial la vuelve bola;
+- proyectarla sobre una superficie polinómica: deja pliegues y ondas;
+- alisar el radio con un bi-laplaciano: con cualquier intensidad deja a la vista las cavidades de ojos y boca.
 
-Abre ese `.blend` en Blender 5.0, selecciona `escultura` y entra en modo Sculpt con la simetría X activa (viene así por defecto). Con Smooth (Shift), Flatten y Scrape, borra nariz, labios, cuencas de los ojos y el relieve de las orejas, y deja la cabeza lisa de maniquí. No toques del cuello para abajo. **No uses Dyntopo ni Remesh, ni agregues o borres geometría**: la escultura tiene que conservar sus 13380 vértices. Guarda con Ctrl+S.
-
-- [ ] **Step 3: Convertirla en `.target`**
-
-Run: `"$BLENDER" -b --python-exit-code 1 --python scripts/avatares/acabado.py -- --grupo mujer --guardar-cabeza`
-Esperado: `acabado mujer/cabeza.target: N vértices`, sin el aviso `ojo: … están bajo el cuello`. Si aparece el aviso, la escultura tocó el cuerpo: corrige y guarda de nuevo. Si sale el error de `Dyntopo`, la topología cambió: prepara de nuevo y vuelve a esculpir.
-
-- [ ] **Step 4: Ver la cabeza en los extremos del grupo**
-
-Run: `npm run avatares -- --solo mujer-eu32,mujer-eu38,mujer-eu48` (para hombre: `hombre-eu44,hombre-eu50,hombre-eu58`; para niños: `nina-2,nina-8,nina-14` y `nino-2,nino-8,nino-14`).
-Revisa `.tmp/avatares/hoja.png`. En los niños importa ver la de 2 años y la de 14, porque la escultura hecha sobre el cuerpo de 8 se aplica a los dos extremos.
-
-- [ ] **Step 5: Repetir los pasos 1 a 4 con `hombre`, `nina` y `nino`.**
-
----
+La prueba es `cabeza_test.py`, sobre una mujer y un niño de 2 años horneados. Verifica que la malla quede cerrada; que sea lisa (ninguna arista dobla más de 50°, cuando la cabeza original dobla 128° y la esquina mandíbula-cuello, que se conserva, 37°); que el cuello siga intacto; que ningún vértice nuevo quede sin hueso y que la coronilla vaya sobre todo a `Head`; y que la estatura cambie menos de 1 mm. Corre en `npm run avatares -- --probar`.
 
 ### Task 9: Las 31, la revisión con María y el commit de lo generado
 
@@ -2049,7 +2044,7 @@ Esperado, en unos 2 min: 31 líneas `ok`, `catálogo: 31 entradas`, y ninguna FA
 git add public/avatares/*.glb public/avatares/*.webp src/avatares/catalogo.json scripts/avatares/acabado/
 git diff --cached --stat | tail -3
 ```
-Esperado: 31 `.glb`, 31 `.webp`, `catalogo.json` y 12 `.target` (4 grupos × pezones, entrepierna y cabeza), unos 8,3 MB en total. Nada más.
+Esperado: 31 `.glb`, 31 `.webp`, `catalogo.json` y 8 `.target` (4 grupos × pezones y entrepierna), unos 8 MB en total. Nada más.
 ```bash
 git commit -m "$(cat <<'EOF'
 feat(avatares): las 31 avatares de la biblioteca

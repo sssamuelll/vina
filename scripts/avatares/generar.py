@@ -22,6 +22,7 @@ from mathutils import Matrix, Vector
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
 import ajuste  # noqa: E402
+import cabeza  # noqa: E402
 import medir  # noqa: E402
 from bl_ext.blender_org import mpfb  # noqa: E402
 from bl_ext.blender_org.mpfb.services.humanservice import HumanService  # noqa: E402
@@ -218,6 +219,11 @@ def main():
     m = medir.medidas(bm)
     trazos = medir.trazos(bm)
     bm.free()
+    # después de medir: la cabeza de maniquí cambia los vértices y los índices de medir.py dejan de valer.
+    # Solo la estatura puede moverse (la coronilla nueva), así que se vuelve a medir.
+    tapa = cabeza.cabeza_de_maniqui(body)
+    zs = [(body.matrix_world @ v.co).z for v in body.data.vertices]
+    m['estatura'] = (max(zs) - min(zs)) * 100
     base = os.path.join(os.path.abspath(a.salida), a.talla)  # Blender resuelve las rutas relativas del render contra la raíz de la unidad
     bpy.ops.object.select_all(action='DESELECT')
     bpy.ops.export_scene.gltf(filepath=base + '.glb', export_format='GLB', export_skins=True,
@@ -226,7 +232,7 @@ def main():
     informe = {'objetivo': objetivo, 'ajustadas': {k: round(ajustadas[k], 2) for k in objetivo},
                'error': {k: round(ajustadas[k] - objetivo[k], 2) for k in objetivo},
                'variables': {k: round(v, 4) for k, v in variables.items()},
-               'acabado': [os.path.basename(t) for t in acabados], 'n': talla['n']}
+               'acabado': [os.path.basename(t) for t in acabados], 'cabeza': tapa, 'n': talla['n']}
     with open(base + '.json', 'w', encoding='utf-8') as f:
         json.dump({'entrada': entrada_de_catalogo(talla, m), 'informe': informe}, f, ensure_ascii=False, indent=1)
     print(f'[{a.talla}] listo: {json.dumps(informe["error"])}')
