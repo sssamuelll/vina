@@ -172,6 +172,15 @@ fi
 # intento de correrlo todo. El resto sigue sin gate y eso esta dicho en #1169.
 # Y no entra `bundle-split`: tiene un rojo real del tier TSL (#1171), y meterlo
 # bloquearia despliegues por un bug ajeno a lo que se este tocando.
+#
+# Y los tres trinquetes de la interfaz (spec 2026-10-02 «la interfaz en papel»
+# § 9): reposo, superficies por accion y contraste. Corrian «antes de cada PR»,
+# o sea cuando alguien se acordaba, y la ley «se mide» era prosa: nada impedia
+# desplegar con un contador subido. MEDIDO el 2026-10-02 con la maquina libre:
+# superficies y contraste son 27 casos en 14,3 min con dos workers; reposo es
+# 1 caso en 30 s. El gate pasa de unos 21 a unos 36 min. Si duele, lo primero
+# que sale es `superficies-por-accion` (18 casos): reposo y contraste cazan lo
+# que rompe un cambio de piel.
 npx playwright test --workers=2 \
   tests/e2e/emplazamiento-lienzo-2d.spec.ts \
   tests/e2e/emplazamiento-modales.spec.ts \
@@ -201,6 +210,9 @@ npx playwright test --workers=2 \
   tests/e2e/supr-borra-lo-que-se-ve.spec.ts \
   tests/e2e/supr-con-algo-delante.spec.ts \
   tests/e2e/avatar-por-defecto.spec.ts \
+  tests/e2e/reposo-solo-lo-que-perdura.spec.ts \
+  tests/e2e/superficies-por-accion.spec.ts \
+  tests/e2e/contraste-del-cromo.spec.ts \
   > /tmp/vina-deploy-e2e.log 2>&1 || {
     echo "  log completo: /tmp/vina-deploy-e2e.log" >&2
     tail -60 /tmp/vina-deploy-e2e.log >&2
