@@ -1439,7 +1439,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
       >
-        <GridLayer zoom2D={zoom2D} pan2D={pan2D} gridSize={gridSize} />
+        <GridLayer zoom2D={zoom2D} pan2D={pan2D} gridSize={gridSize} units={units} />
 
         <g data-pan-zoom-group transform={`translate(${pan2D.x}, ${pan2D.y}) scale(${zoom2D})`}>
           <ReferenceImageLayer
