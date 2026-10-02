@@ -24,6 +24,10 @@ async function waitApp(page: Page) {
   await page.waitForTimeout(500);
 }
 
+// 90 s y no los 30 del config, como el resto del gate del deploy: la medida
+// está en `emplazamiento-paneles.spec.ts` (atascos de 20 a 50 s, 2026-10-02).
+test.describe.configure({ timeout: process.env.CI ? 240_000 : 90_000 });
+
 test.describe('#226 — cotas de línea interna', () => {
   test('seleccionar una línea enganchada muestra sus cotas, y escribir una distancia de borde mueve SOLO ese extremo por el contorno', async ({ page }) => {
     await waitApp(page);

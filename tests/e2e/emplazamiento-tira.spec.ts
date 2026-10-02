@@ -11,6 +11,10 @@
  */
 import { test, expect } from '@playwright/test';
 
+// 90 s y no los 30 del config, como el resto del gate del deploy: la medida
+// está en `emplazamiento-paneles.spec.ts` (atascos de 20 a 50 s, 2026-10-02).
+test.describe.configure({ timeout: process.env.CI ? 240_000 : 90_000 });
+
 test.describe('emplazamiento de la tira y las cotas (laptop de María, 1366×643)', () => {
   test.use({ viewport: { width: 1366, height: 643 } });
 
