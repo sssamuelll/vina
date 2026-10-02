@@ -25,7 +25,7 @@
 - `git add` con rutas explícitas; nunca `git add -A` ni `git add .`. `.maria-avatar.mjs` no se commitea. Los mensajes de commit terminan con la línea de atribución que pida la sesión.
 - E2E: el servidor de `http://localhost:5174` tiene que ser el de ESTE árbol de trabajo. Antes de la primera corrida: si algo escucha en 5174, se para; se lanza `npx vite --port 5174 --strictPort` desde este directorio y se espera a que `curl -s http://localhost:5174/app/ | grep -o "<title>[^<]*</title>"` devuelva `<title>Vina — Patronaje y simulación 3D</title>`. Siempre `--workers=2` o menos.
 - Línea base de un trinquete: solo con su variable `*_UPDATE=1` y `--retries=0 --workers=1`. Nunca a mano.
-- No se hace push, ni PR, ni deploy sin que Samuel lo diga. El deploy es local: `bash scripts/deploy-prod.sh`. Ese script no tiene modo «solo gates»: siempre despliega.
+- No se hace push, ni PR, ni deploy sin que Samuel lo diga. El deploy es local: `bash scripts/deploy-prod.sh`. Para validar sin tocar producción existe `--ensayo`, y solo ese: cualquier otro argumento se ignora y el script despliega. (Corregido el 2026-10-02; aquí decía que no había modo de solo gates.)
 - Si se ejecuta con subagentes: no commitean, no despliegan y no corren `scripts/deploy-prod.sh`; el controlador corre los gates y commitea.
 
 ## Review Focus
@@ -1703,7 +1703,7 @@ Expected: todo en verde; `lint:ui` con «ningún contador subió». Si `lint:ui`
 
 - [ ] **Step 2: La lista e2e del deploy, sin desplegar**
 
-`scripts/deploy-prod.sh` no tiene modo «solo gates»: siempre despliega. La lista se saca del script y se corre a mano:
+`bash scripts/deploy-prod.sh --ensayo` corre todos los gates del deploy —typecheck, lint, contrato, unitarios, smoke del WASM, la lista e2e, el e2e de la home y el build— y sale antes de enviar. (Corregido el 2026-10-02: el plan decía que ese modo no existía. La revisión final lo encontró en las líneas 10 y 26-27 del script.) Para correr solo la lista e2e, se saca del script:
 
 ```bash
 npx playwright test --workers=2 $(grep -oE "tests/e2e/[a-zA-Z0-9-]+\.spec\.ts" scripts/deploy-prod.sh | sort -u)
@@ -1760,3 +1760,13 @@ Si algo de esto no se cumple, se arregla antes de seguir; no se da la tarea por 
 - [ ] **Step 5: Dejar la rama lista**
 
 `git status --short` solo enseña `.maria-avatar.mjs` sin seguimiento. `git log --oneline docs/interfaz-en-papel..HEAD` enseña los commits de las Tasks 1 a 7 (y el de techos, si lo hubo). No se hace push ni se abre PR: eso lo decide Samuel.
+
+---
+
+## Notas de la ejecución (2026-10-02)
+
+Lo que el código hace distinto de lo que este plan dice, y por qué:
+
+- **Tarea 4, test del desplazamiento.** El pan (100, 60) pasaba contra el código viejo por coincidencia (100 mod 48 = 100 mod 24). Se cambió a (130, 85), con los literales 10 y 13.
+- **Tarea 5, sitio de la marca de escala.** El plan la pone abajo a la izquierda, por encima de la frase de ayuda. La revisión final midió que, con un panel abierto a la izquierda, en 1366 px cae debajo de la barra de IA; por encima de la banda de la barra choca con la fila de capas en Split. Quedó arriba a la izquierda, en los 20 px que ocupaba la regla (`c8fdfa06`): sin la prop `height` y sin `PISTA_Y_PORCENTAJE`. Vuelve abajo, a donde dice la spec § 4.4, cuando P2 despeje el pie.
+- **Tarea 8, paso 2.** Existe `bash scripts/deploy-prod.sh --ensayo` (ver arriba).
