@@ -3,7 +3,7 @@
    * Cromo callado (spec 2026-09-24 § 4.1). Hasta el 26-09 la rampa era
    * «Midnight Blue» (tono OKLCH 283-285) y el croma SUBÍA al apagar el texto
    * (0,013 en primary → 0,053 en dim): el gris más apagado era lo más violeta
-   * de la pantalla, peleando a 190° con el papel (--canvas-2d es tono 94).
+   * de la pantalla, peleando a 190° con el papel (--canvas-2d era tono 94; desde el 02-10, 91).
    * Ahora toda la rampa está en tono 80, la familia del papel, con croma
    * constante 0,004-0,008. Los ratios los verifica contrasteDeTokens.ts;
    * `npx tsx scripts/contraste-tokens.ts` imprime la tabla. */
@@ -35,7 +35,7 @@
 
   /* ── Acento — uno, tono 248, tres roles (spec § 4.3) ────────────────
    *   --accent         bordes, tintes, tiradores, línea de selección
-   *                    (3,43:1 sobre el crema; 4,67 sobre surface)
+   *                    (3,59:1 sobre el papel; 4,67 sobre surface)
    *   --accent-fuerte  relleno sólido que lleva texto blanco (5,04:1)
    *   --accent-fuerte-hover  ese relleno al pasar el mouse (4,65:1)
    *   --accent-ink     el acento ESCRITO sobre el cromo (8,65:1 surface)
@@ -89,11 +89,14 @@
   --color-success: var(--success);
   --grainline-color: #6bff6b; /* dato del visor 3D (el hilo), no cromo */
 
-  /* ── 2D pattern canvas — el papel NO se toca (spec § 4.6) ───────────
-     Namespaced so the dark app chrome is untouched; consumed only by the 2D
-     pattern editor renderers. The accent is reserved for selection + seams. */
-  --canvas-2d: #f1efe8;
-  --grid-2d: #e3dfd2;
+  /* ── La hoja del lienzo 2D (spec 2026-10-02 «la interfaz en papel» § 7.3) ──
+     Papel más amarillo que el de cromo callado (era #f1efe8) y una cuadrícula
+     de un solo paso que se ve siempre: 1,52:1 sobre el papel (las dos de antes
+     daban 1,16 y 1,30). El blanco de la pieza se separa del papel 1,10:1; si
+     las piezas se pierden, la reserva es #f5efde, que devuelve el 1,15. Los
+     dos pisos los fija contrasteDeTokens.ts. */
+  --canvas-2d: #faf4e3;
+  --grid-2d: #cfc8b6;
   --ink-on-light: #2b2d33;     /* cut line, primary labels */
   --ink-on-light-2: #6f7480;   /* línea de costura, hilo, rótulos meta, puntos del contorno en reposo */
   --ink-on-light-3: #a0a5b0;   /* construction / reference lines */
@@ -110,7 +113,7 @@
   --seam-pair-8: oklch(0.55 0.11 20);
   /* Selección y costuras: el MISMO acento que el cromo. Hasta el 26-09 era
    * oklch(0.66 0.16 248), que daba 2,70:1 sobre el crema (bajo el 3:1 de un
-   * objeto gráfico); a L 0,60 da 3,43:1 y 3,95:1 sobre el blanco de la pieza. */
+   * objeto gráfico); a L 0,60 da 3,59:1 sobre el papel y 3,95:1 sobre la pieza. */
   --accent-2d: var(--accent);
   --font-mono-2d: var(--font-mono);
   --font-ui-2d: var(--font-sans);
@@ -136,7 +139,7 @@
   --annotation-2d: #808080;                 /* annotation fallback when its category has no color */
   /* Tinta de texto instructivo dibujado SOBRE el papel (pistas al pie del
    * lienzo). NO usar --text-* aquí: esos son la tinta del cromo OSCURO y sobre
-   * el crema quedan invisibles (1.05:1 medido el 2026-08-14). Éste da 5,08:1
+   * el crema quedan invisibles (1.05:1 medido el 2026-08-14). Éste da 5,32:1
    * sobre --canvas-2d y 5,85:1 sobre --piece-fill-2d. Lo verifica
    * HintText.legibilidad.test.tsx. */
   --ink-hint: #6b6459;
@@ -242,7 +245,7 @@
   --surface-overlay-shadow-sheet: var(--surface-overlay-shadow);
 
   /* Cotas sobre el papel: el número que se escribe donde mide. Paso FUERTE
-   * del acento (lleva texto encima: blanco 5,04:1; 4,38:1 sobre el crema). */
+   * del acento (lleva texto encima: blanco 5,04:1; 4,59:1 sobre el papel). */
   --cota-bg-2d: var(--accent-2d-fuerte);
   --cota-ink-2d: #ffffff;
   --cota-line-2d: var(--accent-2d-fuerte);

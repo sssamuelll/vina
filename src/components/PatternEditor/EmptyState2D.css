@@ -60,10 +60,10 @@
   cursor: not-allowed;
 }
 
-/* Texto instructivo SOBRE el papel: --ink-hint (5,08:1 sobre --canvas-2d), el
+/* Texto instructivo SOBRE el papel: --ink-hint (5,32:1 sobre --canvas-2d), el
  * mismo rol que las pistas del lienzo. --ink-on-light-2 y -3 son tintas de
- * LÍNEA (mínimo gráfico 3:1) y como texto dan 4,07:1 y 2,15:1 sobre el crema;
- * --ai (7,1:1 sobre el cromo oscuro) da 2,25:1 aquí. Lo mide
+ * LÍNEA (mínimo gráfico 3:1) y como texto dan 4,26:1 y 2,25:1 sobre el papel;
+ * --ai (7,1:1 sobre el cromo oscuro) da 2,35:1 aquí. Lo mide
  * tests/e2e/contraste-del-cromo.spec.ts («estado vacío»). */
 .empty-state-2d__drop-hint {
   margin: 0;
