@@ -3,13 +3,12 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import MarcaDeEscala from '../MarcaDeEscala';
-import { PISTA_Y_PORCENTAJE } from '../HintText';
 
 afterEach(cleanup);
 
 type Props = ComponentProps<typeof MarcaDeEscala>;
 const base: Props = {
-  zoom2D: 0.48, pan2D: { x: 100, y: 60 }, gridSize: 10, units: 'mm', height: 607, izquierda: 74,
+  zoom2D: 0.48, pan2D: { x: 100, y: 60 }, gridSize: 10, units: 'mm', izquierda: 74,
 };
 const pinta = (props: Partial<Props> = {}) =>
   render(<svg><MarcaDeEscala {...base} {...props} /></svg>).container;
@@ -40,12 +39,11 @@ describe('MarcaDeEscala (spec 2026-10-02 § 4.4)', () => {
     expect(Math.abs(pasos - Math.round(pasos))).toBeLessThan(1e-9);
   });
 
-  it('va por encima de la frase de ayuda, y dentro del lienzo', () => {
-    const y = corchete(pinta())[1].y;
-    const lineaDeLaPista = (607 * PISTA_Y_PORCENTAJE) / 100;
-    // 11 px es el cuerpo de la frase: la marca tiene que quedar por encima.
-    expect(y).toBeLessThan(lineaDeLaPista - 11);
-    expect(y).toBeGreaterThan(0);
+  it('va arriba, en la franja que dejó la regla: la base a 16 px y el corchete, 5 más arriba', () => {
+    const c = pinta();
+    const p = corchete(c);
+    expect(p.map((q) => q.y)).toEqual([11, 16, 16, 11]);
+    expect(c.querySelector('.marca-de-escala text')!.getAttribute('y')).toBe('16');
   });
 
   it('es documento y no recibe el ratón', () => {
@@ -68,10 +66,6 @@ describe('MarcaDeEscala (spec 2026-10-02 § 4.4)', () => {
 
   it('en pulgadas habla en pulgadas', () => {
     expect(pinta({ zoom2D: 1, units: 'inches' }).querySelector('.marca-de-escala text')!.textContent).toBe('1 in');
-  });
-
-  it('antes de medir el lienzo (alto 0) no se pinta', () => {
-    expect(pinta({ height: 0 }).querySelector('.marca-de-escala')).toBeNull();
   });
 
   it('con una cuadrícula imposible no se pinta', () => {

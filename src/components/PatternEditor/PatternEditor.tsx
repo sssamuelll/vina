@@ -188,7 +188,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // State for inline piece name editing
   const [editingPieceNameId, setEditingPieceNameId] = useState<string | null>(null);
 
-  // Viewport size (px) for the screen-space ruler layer.
+  // Viewport size (px): the fit-to-view needs it.
   const [svgSize, setSvgSize] = useState({ width: 0, height: 0 });
 
   // Context menu state
@@ -1263,7 +1263,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     };
   }, [finishMouseInteraction]);
 
-  // Track SVG viewport size: the fit-to-view and the scale mark need it.
+  // Track SVG viewport size: the fit-to-view needs it.
   useEffect(() => {
     const el = svgRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -1715,7 +1715,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             pan2D={pan2D}
             gridSize={gridSize}
             units={units}
-            height={svgSize.height}
             izquierda={DOCK_WIDTH_PX + 12}
           />
         )}

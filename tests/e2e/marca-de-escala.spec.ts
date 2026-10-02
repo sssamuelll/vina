@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { abrirAppVacia, cargarDxfDeMaria, reposo, cambiarVista } from './helpers/estados';
+import { abrirAppVacia, cargarDxfDeMaria, reposo, cambiarVista, abrirPanel } from './helpers/estados';
 import { activarHerramienta, dispatch, st } from './helpers/lienzo';
 
 /**
@@ -8,9 +8,12 @@ import { activarHerramienta, dispatch, st } from './helpers/lienzo';
  *
  *  1. que mide lo que dice: un cuadro exacto de la cuadrícula que se pinta;
  *  2. que nada la tapa ni se pisa con la frase de ayuda, en la pantalla de
- *     María y en Split, con la frase más larga que hay;
+ *     María y en Split, con la frase más larga que hay, y también con un panel
+ *     abierto a la izquierda: el lienzo se corre 324 px y su esquina de abajo
+ *     queda bajo la barra de IA, que va centrada en la ventana;
  *  3. que no desaparece —ni vuelve «Trae tu patrón»— cuando en la hoja solo
- *     hay un trazo.
+ *     hay un trazo o una foto para calcar, y que en la pantalla vacía no está;
+ *  4. que las unidades llegan a la cuadrícula y a la marca a la vez.
  */
 interface VentanaConStore {
   __VINA_STORE__: { getState: () => { editor: { zoom2D: number } } };
@@ -55,12 +58,21 @@ test.describe('la marca de escala (laptop de María, 1366×643)', () => {
     expect(Math.abs(despues!.anchoDelCorchete - despues!.cuadro)).toBeLessThan(1.5);
   });
 
-  for (const vista of ['2D', 'Split'] as const) {
-    test(`en ${vista} nada la tapa y no se pisa con la frase de ayuda`, async ({ page }) => {
+  const CASOS = [
+    { vista: '2D', panel: false }, { vista: 'Split', panel: false },
+    { vista: '2D', panel: true }, { vista: 'Split', panel: true },
+  ] as const;
+  for (const { vista, panel } of CASOS) {
+    test(`en ${vista}${panel ? ' con Propiedades abierto' : ''} nada la tapa y no se pisa con la frase de ayuda`, async ({ page }) => {
       await abrirAppVacia(page);
       await cargarDxfDeMaria(page);
       await cambiarVista(page, vista);
       await reposo(page);
+      if (panel) {
+        // Después del reposo y no antes: Escape cierra el panel.
+        await abrirPanel(page, 'Propiedades', 'Propiedades');
+        await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+      }
       // La Pluma con un punto puesto enseña la frase más larga de la app.
       await activarHerramienta(page, 'h', 'pen');
       const svg = await page.locator('svg.pattern-svg').boundingBox();
@@ -89,10 +101,12 @@ test.describe('la marca de escala (laptop de María, 1366×643)', () => {
           pistas: pistas.length,
           sePisan,
           tapan,
-          dentro: marca.left >= area.left && marca.right <= area.right && marca.bottom <= area.bottom,
+          dentro: marca.left >= area.left && marca.right <= area.right && marca.top >= area.top && marca.bottom <= area.bottom,
+          paneles: document.querySelectorAll('.context-panel').length,
         };
       });
       expect(r, 'no hay marca de escala').not.toBeNull();
+      expect(r!.paneles, 'el panel no está como dice el caso').toBe(panel ? 1 : 0);
       expect(r!.pistas, 'la Pluma con un punto puesto tiene que enseñar su frase').toBeGreaterThan(0);
       expect(r!.tapan, 'algo del cromo tapa la marca de escala').toEqual([]);
       expect(r!.sePisan, 'la marca de escala y la frase de ayuda se pisan').toBe(false);
@@ -114,5 +128,35 @@ test.describe('la marca de escala (laptop de María, 1366×643)', () => {
     await activarHerramienta(page, 'z', 'select');
     await expect(page.locator('[data-testid="empty-state-2d"]'), '«Trae tu patrón» tapa el trazo').toHaveCount(0);
     await expect(page.locator('.marca-de-escala'), 'sin piezas pero con un trazo, la marca tiene que estar').toHaveCount(1);
+  });
+
+  test('la pantalla vacía no lleva marca; con una foto para calcar, la marca está y «Trae tu patrón» se va', async ({ page }) => {
+    await abrirAppVacia(page);
+    await expect(page.locator('[data-testid="empty-state-2d"]')).toHaveCount(1);
+    await expect(page.locator('.marca-de-escala'), 'la pantalla vacía no lleva marca de escala').toHaveCount(0);
+
+    await dispatch(page, 'project/addReferenceImage', {
+      id: 'foto', filename: 'foto.png', width: 800, height: 600, position: { x: 0, y: 0 },
+      scale: 1, rotation: 0, opacity: 0.5, locked: false, visible: true, pixelsPerMm: null,
+    });
+    expect((await st(page)).editor.activeTool).toBe('select');
+    await expect(page.locator('[data-testid="empty-state-2d"]'), '«Trae tu patrón» tapa la foto que se va a calcar').toHaveCount(0);
+    await expect(page.locator('.marca-de-escala'), 'con una foto en la hoja, la marca tiene que estar').toHaveCount(1);
+  });
+
+  test('en pulgadas, la cuadrícula y la marca cambian juntas', async ({ page }) => {
+    await abrirAppVacia(page);
+    await cargarDxfDeMaria(page);
+    await reposo(page);
+    await dispatch(page, 'editor/setUnits', 'inches');
+    await page.waitForTimeout(300);
+
+    const r = await leer(page);
+    expect(r, 'no hay marca de escala o no hay cuadrícula').not.toBeNull();
+    expect(r!.rotulo, 'la marca no habla en pulgadas').toMatch(/^(1\/8|1\/4|1\/2|\d+) in$/);
+    // «1/2» → 0,5; «6» → 6.
+    const pulgadas = r!.rotulo.replace(' in', '').split('/').map(Number).reduce((a, b) => a / b);
+    expect(pulgadas * 25.4 * r!.zoom, 'la cuadrícula no se pinta en pulgadas').toBeCloseTo(r!.cuadro, 0);
+    expect(Math.abs(r!.anchoDelCorchete - r!.cuadro), 'el corchete no mide un cuadro').toBeLessThan(1.5);
   });
 });

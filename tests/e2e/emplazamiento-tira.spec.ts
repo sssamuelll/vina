@@ -33,7 +33,7 @@ test.describe('emplazamiento de la tira y las cotas (laptop de María, 1366×643
     expect(Math.abs(r.svgTop - r.areaTop)).toBeLessThan(1);
     expect(Math.abs(r.svgH - r.areaH)).toBeLessThan(1);
     expect(r.tiraRight).toBeLessThanOrEqual(r.areaRight);
-    // a 20 px o más del borde de arriba: el hueco de la regla, retirada el 2026-10-02
+    // a 20 px o más del borde de arriba: la franja que dejó la regla, donde va la marca de escala
     expect(r.tiraTop - r.areaTop).toBeGreaterThanOrEqual(20);
   });
 
