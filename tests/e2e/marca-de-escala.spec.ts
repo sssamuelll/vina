@@ -156,7 +156,10 @@ test.describe('la marca de escala (laptop de María, 1366×643)', () => {
     expect(r!.rotulo, 'la marca no habla en pulgadas').toMatch(/^(1\/8|1\/4|1\/2|\d+) in$/);
     // «1/2» → 0,5; «6» → 6.
     const pulgadas = r!.rotulo.replace(' in', '').split('/').map(Number).reduce((a, b) => a / b);
-    expect(pulgadas * 25.4 * r!.zoom, 'la cuadrícula no se pinta en pulgadas').toBeCloseTo(r!.cuadro, 0);
+    // Al ancho exacto y no al píxel: con el patrón de María encuadrado, 2 in
+    // (50,8 mm) y 50 mm se llevan 0,39 px, y una cuadrícula que se quedara en
+    // milímetros pasaba una tolerancia de medio píxel (medido el 2026-10-02).
+    expect(Math.abs(pulgadas * 25.4 * r!.zoom - r!.cuadro), 'la cuadrícula no se pinta en pulgadas').toBeLessThan(1e-6);
     expect(Math.abs(r!.anchoDelCorchete - r!.cuadro), 'el corchete no mide un cuadro').toBeLessThan(1.5);
   });
 });
