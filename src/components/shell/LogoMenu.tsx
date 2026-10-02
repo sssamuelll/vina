@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNo
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import {
-  setViewMode, undo, redo, toggleSnapToGrid, toggleSeamAllowance,
+  setViewMode, undo, redo, toggleSeamAllowance,
   toggleGrainlines, toggleNotches, togglePieceNames, toggleSewingLines,
   toggleReferenceImages, setLineLengthMode, toggleTrazos, setRenderMode2D,
   clearSelection, setZoom2D, setUnits, requestFitView,
@@ -202,7 +202,6 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Ajustar zoom al patrón', shortcutId: 'view.fitPattern', action: (d) => d(requestFitView()) },
   { label: 'Zoom 100%', action: (d) => d(setZoom2D(1)) },
   { separator: true, label: '' },
-  { label: 'Cuadrícula', action: (d) => d(toggleSnapToGrid()), checked: (s) => s.editor.snapToGrid },
   { label: 'Margen de costura', shortcutId: 'view.toggleSeamAllowance', action: (d) => d(toggleSeamAllowance()), checked: (s) => s.editor.showSeamAllowance },
   { label: 'Hilos', action: (d) => d(toggleGrainlines()), checked: (s) => s.editor.showGrainlines },
   { label: 'Piquetes', action: (d) => d(toggleNotches()), checked: (s) => s.editor.showNotches },
@@ -226,9 +225,9 @@ const VIEW_MENU: MenuItem[] = [
   { separator: true, label: '' },
   { label: 'Sugerencias del dock', action: (d) => d(toggleDockSignaling()), checked: (s) => s.dock.signaling === 'subtle' },
   { separator: true, label: '' },
-  { label: 'Regla: cm', action: (d) => d(setUnits('cm')), checked: (s) => s.editor.units === 'cm' },
-  { label: 'Regla: pulgadas', action: (d) => d(setUnits('inches')), checked: (s) => s.editor.units === 'inches' },
-  { label: 'Regla: mm', action: (d) => d(setUnits('mm')), checked: (s) => s.editor.units === 'mm' },
+  { label: 'Unidades: cm', action: (d) => d(setUnits('cm')), checked: (s) => s.editor.units === 'cm' },
+  { label: 'Unidades: pulgadas', action: (d) => d(setUnits('inches')), checked: (s) => s.editor.units === 'inches' },
+  { label: 'Unidades: mm', action: (d) => d(setUnits('mm')), checked: (s) => s.editor.units === 'mm' },
 ];
 
 // Fase1-S2: Detect All Edges / Validate Pattern / Grade All Sizes / Nesting

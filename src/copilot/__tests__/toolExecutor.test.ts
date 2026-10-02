@@ -62,7 +62,6 @@ const mockGetState: () => RootState = () => ({
     pan2D: { x: 0, y: 0 },
     showSeamAllowance: true,
     showGrainlines: true,
-    snapToGrid: true,
     gridSize: 10,
     units: 'mm',
   },

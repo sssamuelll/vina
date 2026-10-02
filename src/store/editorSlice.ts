@@ -30,7 +30,6 @@ const initialState: EditorState = {
   showTrazos: true,
   showSewingLines: true,
   renderMode2D: 'textured' as const,
-  snapToGrid: true,
   gridSize: 10,
   units: 'mm',
   clipboard: null,
@@ -252,9 +251,6 @@ const editorSlice = createSlice({
     setRenderMode2D(state, action: PayloadAction<'textured' | 'translucent' | 'wireframe'>) {
       state.renderMode2D = action.payload;
     },
-    toggleSnapToGrid(state) {
-      state.snapToGrid = !state.snapToGrid;
-    },
     setGridSize(state, action: PayloadAction<number>) {
       state.gridSize = action.payload;
     },
@@ -315,7 +311,7 @@ export const {
   setViewMode, setActiveTool,
   selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectAllVisiblePieces, selectSeam, selectPOM, selectInternalLine, selectTrazo, selectSaEdges, selectSaVertices, clearSaSelection,
   setZoom2D, setPan2D, requestFitView,
-  toggleSeamAllowance, setDefaultSAWidth, setNotchMirrorInvert, toggleGrainlines, toggleNotches, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
+  toggleSeamAllowance, setDefaultSAWidth, setNotchMirrorInvert, toggleGrainlines, toggleNotches, setGridSize, toggleAnchorPoints,
   togglePieceNames, setLineLengthMode, hydrateLineLengthMode, toggleTrazos, toggleSewingLines, setRenderMode2D,
   toggleReferenceImages, setShowReferenceImages, setSelectedReferenceImage,
   startCalibration, setCalibrationPoint1, cancelCalibration,
