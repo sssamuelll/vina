@@ -1,7 +1,8 @@
 # La interfaz en papel — una sola hoja, una sola piel
 
 > **Estado:** diseño aprobado por Samuel el 2026-10-02, sección por sección, sobre maquetas de la app
-> real. Pendiente de su revisión de este documento y del plan de implementación.
+> real. Lo revisó ese mismo día y lo aprobó con un añadido, el modo oscuro (D15, § 7.7). Pendiente
+> del plan de implementación.
 >
 > **Sustituye** las fases F2 a F6 de `2026-09-24-cromo-callado-design.md` y su piel (§ 4.1-4.4 y
 > § 4.6). **Conserva** lo que F0 y F1 dejaron construido (§ 2.2).
@@ -50,7 +51,7 @@ Todas las tomó Samuel mirando maquetas. Donde dice «recomendación», la propu
 | # | Decisión | Resultado |
 |---|---|---|
 | D1 | Dirección | **Nada oscuro flota sobre el papel.** Escogida entre tres: terminar cromo callado tal cual, esta, y «solo el papel» (todo se convoca). La tercera se descartó porque el problema medido de María es no encontrar lo que ya existe. |
-| D2 | Piel | **Todo claro, una sola piel:** papel y tinta, también la barra superior. Lo único con color es lo activo y lo que es del patrón. Reemplaza el grafito cálido de cromo callado (su D1). Recomendación. |
+| D2 | Piel | **Todo claro, una sola piel:** papel y tinta, también la barra superior. Lo único con color es lo activo y lo que es del patrón. Reemplaza el grafito cálido de cromo callado (su D1). Recomendación. Es la piel de fábrica; la otra es D15. |
 | D3 | Papel | **`#faf4e3`**, más amarillo que el de hoy (`#f1efe8`), y **siempre cuadriculado**. El relleno blanco de las piezas se conserva: condición expresa de Samuel. |
 | D4 | Reglas | **Fuera** las reglas numeradas de arriba y de la izquierda, y con ellas la cruz del origen. **Queda una marca de escala** que dice cuánto mide un cuadro. |
 | D5 | Herramientas | Las mismas, en el mismo orden y a un clic, como **tinta en el margen de la hoja**: las del patrón a la izquierda, las del 3D a la derecha. Sin tarjeta, sin sombra, sin rótulo. |
@@ -63,6 +64,7 @@ Todas las tomó Samuel mirando maquetas. Donde dice «recomendación», la propu
 | D12 | 3D | El escenario toma **el color del papel** y pierde el piso gris; queda una sombra suave. Los mapas de ajuste aparecen después de simular. «Capturar visor» pasa a Vina › Exportar. |
 | D13 | Pantalla vacía | **Tres caminos:** importar, arrastrar el archivo o pedírselo a la IA. |
 | D14 | María | Lo que mueve cosas que ella firmó (capas, piquete sin modal) se le enseña **antes de publicarlo**. Lo dije yo y Samuel no lo objetó; queda como decisión hasta que diga otra cosa. |
+| D15 | Modo oscuro | **Hay un segundo modo, «Oscuro».** La misma interfaz con otra columna de colores: hoja gris neutro `#333`, piezas blancas. El claro es el de fábrica. Se construye al final (P7). Lo pidió Samuel al revisar este documento; el primer oscuro que vio (`#1a1916`) le pareció demasiado oscuro y pidió «algo más tech» (§ 7.7). |
 
 ### 2.1 Por qué se descartó «solo el papel»
 
@@ -88,7 +90,8 @@ Por eso este documento distingue entre **callar** (bajar el volumen de lo que pe
 
 ## 3. Las siete leyes
 
-1. **Una sola hoja.** Toda la ventana es papel y tinta. Hay un solo material.
+1. **Una sola hoja.** Toda la ventana es papel y tinta. Hay un solo material a la vez: el claro de
+   fábrica, o el oscuro si la usuaria lo escoge (§ 7.7). Nunca dos pieles en la misma pantalla.
 2. **En reposo, solo lo que perdura.** Barra superior, márgenes de herramientas, frase de ayuda y
    marca de escala. Nada más está montado.
 3. **Las opciones nacen donde se actúa.** Sobre el objeto, o en la línea al pie si hacen falta antes
@@ -427,6 +430,68 @@ toma el valor que hoy tiene `--destructive-fuerte`, que pasa a ser su alias.
 y `-sheet` del material overlay. Cada token se va con todos sus consumidores en el mismo PR (R2 = 0
 siempre).
 
+### 7.7 El modo oscuro
+
+La misma interfaz, con otra columna de valores en el mismo archivo de tokens. Nada cambia de sitio
+ni de forma. Capturas: `10-oscuro-reposo-2d.png`, `11-oscuro-pieza-seleccionada.png`,
+`12-oscuro-split.png`.
+
+**Reglas.**
+
+- **El claro es el de fábrica.** El oscuro se escoge; no sigue al sistema operativo.
+- **Las piezas son blancas en los dos modos.** Es el volumen que Samuel pidió conservar, y hace que
+  todo lo que se dibuja dentro de una pieza (hilo, costuras, piquetes, anotaciones) valga igual en
+  los dos.
+- **Mecanismo:** un bloque `:root[data-tema="oscuro"]` en `src/styles/tokens.css`. Sigue habiendo un
+  solo archivo de tokens (R4 = 1). Ningún componente sabe en qué modo está.
+- **Puerta:** Vina › Vista › «Tema: claro / oscuro», y el panel Preferencias.
+- **Dónde se guarda:** en `localStorage`, no en el proyecto: es de la usuaria. Va en LS y no en IDB
+  porque hay que leerlo antes del primer pintado; lleva la justificación en línea que pide
+  `CLAUDE.md`.
+- **Nombre:** «Oscuro». En la app no aparece ningún otro.
+
+**De dónde salen los valores.** Samuel pidió que fuera «más tech» y que, sin decirlo, resultara
+familiar a quien puede ser el primer cliente. Los neutros y el azul son los que adidas publica en su
+sistema de diseño para herramientas internas, YARN (`github.com/adidas/adidas-yarn-design-system`,
+licencia MIT, `src/less/variables/colors.less`, último cambio 2020-03-27). Se toman solo colores:
+ni logotipo, ni rayas, ni sus tipografías. Que YARN siga siendo lo que usan hoy por dentro no está
+verificado.
+
+| Rol | Token | Valor | Contraste |
+|---|---|---|---|
+| La hoja, la barra superior, los márgenes, los paneles | `--canvas-2d` y los `--bg-*` que la siguen | `#333333` (YARN «nickel») | — |
+| Cuadrícula | `--grid-2d` | `#4a4a4a` (paso propio) | 1,43 sobre la hoja |
+| Papel hundido | `--bg-elevated` | `#424242` (paso propio) | 1,26 |
+| Lo que flota y los campos | `--surface-overlay-bg`, `--field-bg` | `#1a1a1a` (YARN «black») | — |
+| Línea de pelo | `--hairline` | `rgba(255, 255, 255, 0.10)` | — |
+| Borde de un campo | `--border` | `#858585` (paso propio) | 3,42 sobre la hoja |
+| Texto | `--text-primary` | `#ffffff` | 12,63 hoja · 17,40 lo que flota |
+| | `--text-secondary` | `#e1e1e1` (YARN «silver») | 9,66 · 13,31 |
+| | `--text-tertiary`, `--ink-hint` | `#bfbfbf` (YARN «gray») | 6,87 · 9,46 |
+| | `--text-disabled` | `#767676` (YARN «darkgray») | 2,78 · 3,83 |
+| Lo activo, bordes, selección | `--accent` | `#0d83ff` (YARN «blue-100») | 3,43 sobre la hoja; blanco encima 3,68 |
+| Relleno con texto blanco (las cotas) | `--accent-fuerte` | sin cambio, `#0072c0` | blanco encima 5,04 |
+| El acento escrito | `--accent-ink` | `#66b0ff` (YARN «blue-60») | 5,55 · 7,64 |
+| IA | `--ai` | sin cambio respecto a hoy, `#ab93ed` | 4,89 |
+| Éxito, aviso, peligro (como texto) | `--success`, `--warning`, `--destructive` | `#65cc3d`, `#f2b400`, `#ff7666` (YARN) | 6,17 · 6,80 · 4,83 |
+| Sombra de lo que flota | `--surface-overlay-shadow` | `0 1px 2px rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.28)` | — |
+| Velo | `--scrim` | `rgb(0 0 0 / 50%)` | — |
+
+`#0d83ff` marca lo activo, que no lleva texto: a un glifo le basta 3:1. Con texto blanco encima da
+3,68, bajo el mínimo; por eso las cotas conservan `--accent-fuerte`. El azul de Vina en claro es
+`#0584da`: están a un paso.
+
+**Lo que hay que resolver en P7, y no antes.**
+
+- **Dos tintas donde hoy hay una.** `--ink-on-light*` se usa tanto dentro de la pieza (siempre
+  blanca) como sobre la hoja (que en oscuro es `#333`; ahí `#2b2d33` da 1,09:1 y no se ve). Hay que
+  repartir sus 58 usos en 18 archivos: lo que se dibuja dentro de la pieza se queda, y lo que se
+  dibuja sobre la hoja (trazos, la goma de la Pluma, las medidas de Medir, las guías) pasa a una
+  tinta que cambia con el modo.
+- **Los ocho pares de costura** están a L 0,55 y sobre `#333` dan entre 2,45 y 2,77:1. En oscuro
+  suben a L 0,60: entre 3,02 y 3,36 sobre la hoja, y 3,76 o más sobre la pieza.
+- **El escenario 3D** sigue a `--canvas-2d` por CSS; no pide nada más.
+
 ## 8. Lo que se borra
 
 | Qué | Archivos | Su puerta pasa a |
@@ -454,7 +519,8 @@ Tres en navegador, con línea base en JSON que solo baja, como los de F0 y F1.
 2. **Superficies por acción** (existente). Línea base nueva al cierre de cada fase. La lista de
    acciones pasa a ser la de § 5.1.
 3. **Contraste** (existente, `contraste-del-cromo.spec.ts`). Ningún texto por debajo de 4,5:1 sobre
-   su fondo real. Se vuelve a medir entero en P1.
+   su fondo real. Se vuelve a medir entero en P1. Desde P7 corre en los dos modos, con una línea
+   base por modo.
 
 Y uno de emplazamiento: **los márgenes no se mueven.** La x del margen de herramientas es la misma
 con panel y sin panel, en 2D y en Split.
@@ -502,8 +568,13 @@ mezclar. Sin `--no-verify`.
 | **P4** Paneles | M | Una ranura, a la derecha y a ras. Propiedades en dos niveles y a petición, con la puerta del tipo de esquina primero. Avatar de siete campos. Capas con iconos. Preferencias como panel. | Los márgenes no se mueven. Abrir un panel: 1. | Enseñar Propiedades. |
 | **P5** 3D y Split | M | Escenario del color del papel y plano de solo sombra. Margen del 3D. Grupo de la prenda arriba. Mapas tras simular. Un solo indicador. Línea de pelo entre vistas. «Capturar visor» al menú. | Reposo en Split y en 3D: solo lo que perdura. | — |
 | **P6** Limpieza | L, en 3-4 PR | Tamaños de letra literales a la escala. Los colores literales que queden. Retiro de alias y de los tokens de § 7.6. | R3 y los literales de `font-size` bajan por archivo. | — |
+| **P7** Modo oscuro | M | § 7.7: el bloque de valores, la puerta en el menú y en Preferencias, el reparto de `--ink-on-light*` entre pieza y hoja, los pares de costura a L 0,60. | Contraste en los dos modos. Los trinquetes de reposo y de superficies dan lo mismo en claro y en oscuro. | Se le avisa. |
 
-Orden: P0, P1, P2. Después P3, P4 y P5 en cualquier orden. P6 al final.
+Orden: P0, P1, P2. Después P3, P4 y P5 en cualquier orden. P6 y, al final, P7.
+
+**Una regla que el modo oscuro adelanta a P1:** ningún color escrito a mano en lo que cada fase
+toque. Con dos modos, un color fijo queda mal en uno de los dos. P7 no arranca con R3 por encima de
+cero en las superficies de este documento.
 
 P1 sola deja la app con la piel nueva y la estructura de hoy: tarjetas blancas donde ahora son
 oscuras. Es un estado coherente y se puede publicar.
@@ -531,10 +602,19 @@ oscuras. Es un estado coherente y se puede publicar.
   una línea y una decisión de Samuel; no entra en este documento.
 - **Demasiadas herramientas en el margen.** Caben unas dieciséis a 768 px de alto. Si la usuaria
   agrega más, las que no entran quedan en «+».
+- **El modo oscuro dobla la revisión.** Cada pantalla y cada contraste se miran dos veces. Y exige
+  terminar de pasar a tokens los 565 colores literales, que con un solo modo se podía ir haciendo
+  sin prisa.
+- **Piezas blancas sobre hoja oscura** dan 12,63:1: destacan mucho, y encandilan más que un oscuro
+  en el que también la pieza se apague. Es el precio de conservar el volumen de la pieza y de no
+  duplicar las tintas del patrón. Si molesta, la salida es bajar el blanco de la pieza en oscuro
+  (un token), no oscurecerla.
+- **Los colores del modo oscuro vienen de un sistema de diseño ajeno y de 2020.** Son grises neutros
+  y un azul: sirven igual si el cliente es otro. No se toma nada que identifique a la marca.
 
 ## 13. Evidencia y cómo regenerarla
 
-Las once capturas de `2026-10-02-interfaz-en-papel/`:
+Las catorce capturas de `2026-10-02-interfaz-en-papel/` (`index.html` las enseña en orden):
 
 | Archivo | Qué muestra |
 |---|---|
@@ -547,6 +627,7 @@ Las once capturas de `2026-10-02-interfaz-en-papel/`:
 | `07-pantalla-vacia.png` | Sin patrón. |
 | `08-panel-a-peticion.png` | Propiedades, a la derecha y a ras. |
 | `09-ia-convocada.png` | La barra de IA. |
+| `10-oscuro-reposo-2d.png`, `11-oscuro-pieza-seleccionada.png`, `12-oscuro-split.png` | El modo oscuro (§ 7.7). |
 
 Se hicieron con Playwright contra producción: headless con la tarjeta gráfica real
 (`channel: 'chromium'`, `--enable-gpu`, `--use-angle=d3d11`), el DXF
