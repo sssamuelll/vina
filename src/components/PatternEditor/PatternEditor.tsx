@@ -66,7 +66,7 @@ import { piezasConLargos as seleccionarPiezasConLargos } from './cotas/piezasCon
 import { usePrecisionHint } from './usePrecisionHint';
 import MeasureToolOverlay from './renderers/overlays/MeasureToolOverlay';
 import GridLayer from './renderers/GridLayer';
-import RulerLayer from './renderers/RulerLayer';
+import MarcaDeEscala from './renderers/MarcaDeEscala';
 import PieceRenderer from './renderers/PieceRenderer';
 import TrazosLayer from './renderers/TrazosLayer';
 import SeamRenderer from './renderers/SeamRenderer';
@@ -1263,7 +1263,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     };
   }, [finishMouseInteraction]);
 
-  // Track SVG viewport size for the ruler layer (screen-space ticks/labels).
+  // Track SVG viewport size: the fit-to-view and the scale mark need it.
   useEffect(() => {
     const el = svgRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -1421,6 +1421,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   const segundoMarco = !shiftActivo ? null
     : shiftActivo.guias ? (shiftActivo.guias.tenue ? shiftActivo.marco : null)
     : activeTool === 'editPattern' ? shiftActivo.marco : null;
+
+  // Vacía es «no hay nada en la hoja», no «no hay piezas»: un trazo o una foto
+  // para calcar ya son trabajo (spec 2026-10-02 § 4.6). De esto cuelgan el
+  // estado vacío y la marca de escala.
+  const pantallaVacia = shouldShowEmptyState(pieces.length + trazos.length + referenceImages.length, activeTool);
 
   return (
     <div className="pattern-editor">
@@ -1704,14 +1709,16 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           segundoMarco={segundoMarco}
         />
 
-        <RulerLayer
-          zoom2D={zoom2D}
-          pan2D={pan2D}
-          gridSize={gridSize}
-          units={units}
-          width={svgSize.width}
-          height={svgSize.height}
-        />
+        {!pantallaVacia && (
+          <MarcaDeEscala
+            zoom2D={zoom2D}
+            pan2D={pan2D}
+            gridSize={gridSize}
+            units={units}
+            height={svgSize.height}
+            izquierda={DOCK_WIDTH_PX + 12}
+          />
+        )}
       </svg>
       <FloatingActionBar
         show={showTransformBox}
@@ -1757,7 +1764,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         inerte={Boolean(notchTool.refining?.notch.notchAnchor)}
       />
       <FilaDeCapas />
-      {shouldShowEmptyState(pieces.length, activeTool) && (
+      {pantallaVacia && (
         <EmptyState2D onImportDXF={onImportDXF} />
       )}
       <ContextMenu

@@ -88,7 +88,7 @@ la barra de IA.
 > usan la tira de herramienta del lienzo 2D y los chips de cota
 > (`docs/superpowers/specs/2026-08-30-cotas-vivas-design.md` § 9-10).
 > **Excepción dicha:** la tira es un `overlay` que NO se va — está mientras hay
-> herramienta 2D activa, bajo la regla (28 px) y nunca sobre ella. Y las cotas
+> herramienta 2D activa, a 28 px del borde de arriba. Y las cotas
 > van sobre el patrón por definición: son parte del objeto, como los tiradores
 > del transform box, no un panel. Lo pidió Samuel el 2026-08-30; queda escrito
 > para que no se vuelva regla tácita.
@@ -129,7 +129,7 @@ la barra de IA.
 
 - El cromo se **acopla en canaletas**; el documento tiene área segura.
 - Solo tres cosas pueden taparlo: menús transitorios, toasts y la paleta.
-- Un panel nuevo NO se abre encima de la regla ni del patrón.
+- Un panel nuevo NO se abre encima del patrón.
 - Nada de `z-index` literal. Si necesitas una capa, es que falta un rol.
 - **`isolation: isolate` no hace lo que parece.** Un elemento con `position` (no
   `static`) y `z-index` numérico **ya es** contexto de apilamiento; agregarle
@@ -176,7 +176,7 @@ la barra de IA.
   igual: `notch` tenía Shift+N registrado y el dock no lo mostraba, así que para
   la usuaria no existía.
 - **Mono = un dato cuya alineación carácter a carácter significa algo**
-  (regla, cotas, píldora de medida, `kbd`). Toda la prosa del cromo va en
+  (marca de escala, cotas, píldora de medida, `kbd`). Toda la prosa del cromo va en
   `--font-sans`: el estado, los rótulos del dock, el estado vacío, el valor de
   una opción. Una sola familia de cada: Inter y JetBrains Mono, nada más se
   carga (`app/index.html`). Lo fija `tipografia-del-cromo.test.ts`, selector por

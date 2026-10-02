@@ -94,7 +94,6 @@
      pattern editor renderers. The accent is reserved for selection + seams. */
   --canvas-2d: #f1efe8;
   --grid-2d: #e3dfd2;
-  --grid-2d-major: #d8d3c2;
   --ink-on-light: #2b2d33;     /* cut line, primary labels */
   --ink-on-light-2: #6f7480;   /* línea de costura, hilo, rótulos meta, puntos del contorno en reposo */
   --ink-on-light-3: #a0a5b0;   /* construction / reference lines */
@@ -150,7 +149,7 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   /* Una sola mono, determinista: JetBrains Mono se carga en app/index.html; con
    * 'SF Mono' primero, Mac y Windows rendían monos distintas. Mono = un dato
-   * cuya alineación carácter a carácter significa algo (regla, cotas, píldora
+   * cuya alineación carácter a carácter significa algo (marca de escala, cotas, píldora
    * de medida, kbd). La prosa va en --font-sans (contrato § 5). */
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   /* Escala fija de cinco pasos. La anterior era clamp() y a 1366 rendía

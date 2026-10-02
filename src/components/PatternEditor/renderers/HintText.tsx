@@ -61,6 +61,10 @@ interface HintTextProps {
   segundoMarco?: AngleReference['kind'] | null;
 }
 
+/** A qué altura del lienzo va la pista, en %. La marca de escala se coloca por
+ *  encima de esta línea (MarcaDeEscala.tsx): si esto cambia, ella lo sigue. */
+export const PISTA_Y_PORCENTAJE = 98;
+
 /**
  * Pista al pie del lienzo: la única cosa que le explica a María cómo se usa la
  * herramienta activa.
@@ -75,7 +79,7 @@ function Pie({ children }: { children: React.ReactNode }) {
   return (
     <text
       data-superficie="pista"
-      x="50%" y="98%"
+      x="50%" y={`${PISTA_Y_PORCENTAJE}%`}
       textAnchor="middle" dominantBaseline="auto"
       fill="var(--ink-hint)"
       fontSize="11"

@@ -3,7 +3,7 @@
    § 2. Material overlay entero en su variante sin borde: la sombra separa. */
 .tool-strip {
   position: absolute;
-  top: 28px; /* 20 px de regla + 8 de aire: nunca sobre la regla */
+  top: 28px; /* el hueco de la regla, retirada el 2026-10-02, + 8 de aire; la tira muere en P2 */
   right: 12px;
   width: min(300px, calc(100% - 24px));
   /* Cromo acoplado al lienzo, no menú: la tira vive mientras haya herramienta
