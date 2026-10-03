@@ -75,7 +75,7 @@ export default function SurfaceModePill() {
         <span>{current.label}</span>
       </button>
       {open && (
-        <div className="surface-pill__flyout" role="group" aria-label="Modo de superficie" data-superficie="menu">
+        <div className="surface-pill__flyout" role="group" aria-label="Modo de superficie" data-superficie="menu" data-material="papel">
           {MODES.map(({ mode, label, icon: Icon }) => (
             <button
               key={mode}

@@ -441,6 +441,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
         <div
           className="logo-menu"
           data-superficie="menu"
+          data-material="papel"
           onMouseLeave={() => { setHoveredTop(null); setHoveredSub(null); }}
         >
           {/* Top-level menu items with submenus */}

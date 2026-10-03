@@ -75,6 +75,7 @@ export default function SubMenu({ label, icon, items }: SubMenuProps) {
       {open && pos && createPortal(
         <div
           className="submenu-panel"
+          data-material="papel"
           style={{ position: 'fixed', top: pos.top, left: pos.left }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}

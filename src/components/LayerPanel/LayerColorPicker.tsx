@@ -34,7 +34,7 @@ export default function LayerColorPicker({ color, onChange }: LayerColorPickerPr
         title="Cambiar color de capa"
       />
       {open && (
-        <div className="layer-color-popover">
+        <div className="layer-color-popover" data-material="papel">
           {PRESET_COLORS.map(c => (
             <button
               key={c}

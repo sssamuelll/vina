@@ -36,4 +36,4 @@
   font-size: var(--text-xs); color: var(--text-tertiary); margin-left: 12px;
   font-family: var(--font-mono); white-space: nowrap;
 }
-.submenu-separator { height: 1px; background: var(--border); margin: 4px 10px; }
+.submenu-separator { height: 1px; background: var(--border-subtle); margin: 4px 10px; }
