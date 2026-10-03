@@ -44,7 +44,7 @@ const fieldStyle: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = {
-  background: 'var(--bg-primary)',
+  background: 'var(--field-bg)',
   border: '1px solid var(--border)',
   color: 'var(--text-primary)',
   padding: '8px 10px',
@@ -138,7 +138,7 @@ export default function DynamicProviderForm({ provider, values, onChange, provid
                 href={meta.helpUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: 'var(--accent)' }}
+                style={{ color: 'var(--accent-ink)' }}
               >
                 {meta.helpUrl.replace(/^https?:\/\//, '')}
               </a>

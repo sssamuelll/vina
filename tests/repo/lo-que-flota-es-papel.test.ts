@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 /**
  * Lo que flota es papel (spec 2026-10-02 «la interfaz en papel» § 6.3, § 7.1,
@@ -43,6 +44,11 @@ const RAICES: Array<[string, number]> = [
   ['src/components/shell/ToastContainer.tsx', 1],
   ['src/components/shell/ToolTooltip.tsx', 1],
   ['src/components/shell/AppShell.tsx', 1],
+  // Modales
+  ['src/components/shell/ConfirmDialog.tsx', 1],
+  ['src/components/PatternEditor/NotchPrecisionModal.tsx', 1],
+  ['src/components/PatternEditor/CalibrationModal.tsx', 1],
+  ['src/copilot/connections/ConnectionModal.tsx', 1],
 ];
 
 /**
@@ -62,6 +68,12 @@ const PINTA: Array<[string, string[] | '*']> = [
   // Avisos y tooltips
   ['src/components/shell/ToastContainer.css', '*'],
   ['src/components/shell/ToolTooltip.css', '*'],
+  // Modales
+  ['src/components/shell/ConfirmDialog.css', '*'],
+  ['src/components/PatternEditor/NotchPrecisionModal.css', '*'],
+  ['src/components/PatternEditor/CalibrationModal.css', '*'],
+  ['src/copilot/connections/ConnectionModal.tsx', '*'],
+  ['src/copilot/connections/DynamicProviderForm.tsx', '*'],
 ];
 
 const FONDO_DEL_MARCO = /var\(--(bg-surface|bg-base|bg-deeper|bg-primary|panel-bg|surface-chrome-bg)\)/;
@@ -122,5 +134,21 @@ describe('la tarjeta de «suelta tu archivo» es un aviso, y es papel', () => {
     "boxShadow: 'var(--surface-overlay-shadow)'",
   ])('lleva %s', (declaracion) => {
     expect(appShell).toContain(declaracion);
+  });
+});
+
+describe('todo portal es algo que flota, y nace papel', () => {
+  // Un portal cuelga de <body>, fuera del árbol del marco, y hereda la tinta
+  // clara que <body> ya calculó: sin la marca, un menú blanco con letra
+  // clara. Vale también para el portal que se escriba mañana.
+  const componentes = execFileSync('git', ['ls-files', 'src/**/*.tsx'], { encoding: 'utf8' })
+    .split('\n')
+    .filter((f) => f && !/__tests__|\.test\./.test(f));
+  it('cada archivo marca al menos tantas raíces de papel como portales abre', () => {
+    const sinMarca = componentes.filter((ruta) => {
+      const texto = sinComentarios(lee(ruta));
+      return veces(texto, 'createPortal(') > veces(texto, MARCA);
+    });
+    expect(sinMarca).toEqual([]);
   });
 });

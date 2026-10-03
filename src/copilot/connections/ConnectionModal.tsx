@@ -36,27 +36,28 @@ type Props = AddProps | EditProps;
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',
   inset: 0,
-  background: 'rgba(0, 0, 0, 0.6)',
+  background: 'var(--scrim)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   zIndex: 'var(--z-modal)',
 };
 
+// Lo que flota es papel (spec 2026-10-02 § 6.3): el material entero, por token.
 const dialogStyle: React.CSSProperties = {
-  background: 'var(--bg-secondary)',
-  border: '1px solid var(--border)',
-  borderRadius: 8,
+  background: 'var(--surface-overlay-bg)',
+  border: 'var(--surface-overlay-border)',
+  borderRadius: 'var(--surface-overlay-radius)',
   width: 'min(440px, 92vw)',
   maxHeight: '85vh',
   display: 'flex',
   flexDirection: 'column',
-  boxShadow: '0 16px 48px rgba(0, 0, 0, 0.5)',
+  boxShadow: 'var(--surface-overlay-shadow)',
 };
 
 const headerStyle: React.CSSProperties = {
   padding: '16px 18px',
-  borderBottom: '1px solid var(--border)',
+  borderBottom: 'var(--hairline)',
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
@@ -69,7 +70,7 @@ const bodyStyle: React.CSSProperties = {
 
 const footerStyle: React.CSSProperties = {
   padding: 14,
-  borderTop: '1px solid var(--border)',
+  borderTop: 'var(--hairline)',
   display: 'flex',
   justifyContent: 'flex-end',
   gap: 10,
@@ -77,7 +78,7 @@ const footerStyle: React.CSSProperties = {
 
 const btnStyle: React.CSSProperties = {
   background: 'var(--accent-fuerte)',
-  color: 'white',
+  color: 'var(--on-accent)',
   border: 'none',
   padding: '8px 18px',
   borderRadius: 5,
@@ -179,6 +180,7 @@ export default function ConnectionModal(props: Props) {
     <div
       style={overlayStyle}
       data-superficie="modal"
+      data-material="papel"
       onMouseDown={(e) => {
         // Click on backdrop closes; click inside dialog does not bubble.
         if (e.target === e.currentTarget) props.onClose();
@@ -213,7 +215,7 @@ export default function ConnectionModal(props: Props) {
               </label>
               <select
                 style={{
-                  background: 'var(--bg-primary)',
+                  background: 'var(--field-bg)',
                   border: '1px solid var(--border)',
                   color: 'var(--text-primary)',
                   padding: '8px 10px',
