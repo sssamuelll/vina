@@ -49,6 +49,8 @@ const RAICES: Array<[string, number]> = [
   ['src/components/PatternEditor/NotchPrecisionModal.tsx', 1],
   ['src/components/PatternEditor/CalibrationModal.tsx', 1],
   ['src/copilot/connections/ConnectionModal.tsx', 1],
+  // La barrita de la pieza
+  ['src/components/PatternEditor/FloatingActionBar.tsx', 1],
 ];
 
 /**
@@ -74,6 +76,8 @@ const PINTA: Array<[string, string[] | '*']> = [
   ['src/components/PatternEditor/CalibrationModal.css', '*'],
   ['src/copilot/connections/ConnectionModal.tsx', '*'],
   ['src/copilot/connections/DynamicProviderForm.tsx', '*'],
+  // La barrita de la pieza
+  ['src/components/PatternEditor/FloatingActionBar.tsx', '*'],
 ];
 
 const FONDO_DEL_MARCO = /var\(--(bg-surface|bg-base|bg-deeper|bg-primary|panel-bg|surface-chrome-bg)\)/;
