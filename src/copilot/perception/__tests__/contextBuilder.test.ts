@@ -113,7 +113,6 @@ function mockState(overrides?: Partial<RootState>): RootState {
       lineLengthModeSetByUser: false,
       showSewingLines: true,
       renderMode2D: 'textured' as const,
-      snapToGrid: true,
       gridSize: 10,
       units: 'mm',
       clipboard: null,

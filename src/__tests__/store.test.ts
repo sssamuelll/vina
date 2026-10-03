@@ -11,7 +11,7 @@ import projectReducer, {
 import editorReducer, {
   setViewMode, setActiveTool, selectPiece, clearSelection,
   togglePieceSelection, selectSeam, setZoom2D, setPan2D,
-  toggleSeamAllowance, toggleGrainlines, toggleNotches, toggleSnapToGrid,
+  toggleSeamAllowance, toggleGrainlines, toggleNotches,
   copyPieces, clearClipboard, createPastedPieces,
 } from '../store/editorSlice';
 import {
@@ -339,7 +339,6 @@ describe('editorSlice', () => {
     expect(store.getState().editor.showSeamAllowance).toBe(!initial);
 
     store.dispatch(toggleGrainlines());
-    store.dispatch(toggleSnapToGrid());
   });
 
   it('toggles notch visibility off and back on', () => {

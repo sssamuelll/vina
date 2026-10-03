@@ -36,6 +36,8 @@ export const PARES: Par[] = [
   { tinta: '--ink-hint', fondo: '--piece-fill-2d', minimo: 4.5, por: 'pista sobre la pieza' },
   { tinta: '--ink-on-light', fondo: '--canvas-2d', minimo: 4.5, por: 'línea de corte y rótulos' },
   { tinta: '--ink-on-light-2', fondo: '--canvas-2d', minimo: 3, por: 'puntos del contorno en reposo' },
+  { tinta: '--grid-2d', fondo: '--canvas-2d', minimo: 1.4, por: 'la cuadrícula se ve siempre sobre el papel' },
+  { tinta: '--piece-fill-2d', fondo: '--canvas-2d', minimo: 1.09, por: 'la pieza blanca se separa del papel' },
   { tinta: '--cota-ink-2d', fondo: '--cota-bg-2d', minimo: 4.5, por: 'el número de la cota' },
   { tinta: '--cota-line-2d', fondo: '--canvas-2d', minimo: 3, por: 'la línea de cota' },
   { tinta: '--cota-edit-ink-2d', fondo: '--cota-edit-bg-2d', minimo: 4.5, por: 'la cota en edición' },

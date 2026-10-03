@@ -6,10 +6,10 @@
 import type { AppDispatch } from '../../store';
 import { store } from '../../store';
 import { runUiExport } from '../../utils/export/uiExport';
-import { setViewMode, toggleSnapToGrid, toggleSeamAllowance, toggleGrainlines, togglePieceNames, undo, redo } from '../../store/editorSlice';
+import { setViewMode, toggleSeamAllowance, toggleGrainlines, togglePieceNames, undo, redo } from '../../store/editorSlice';
 import { startSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
 import {
-  FileText, Scissors, Ruler, Shirt, Download, Grid3x3, Eye,
+  FileText, Scissors, Ruler, Shirt, Download, Eye,
   Layers, ScanLine, Undo2, Redo2, User, Package,
   Search, PenLine, Tag, Hand, MousePointer2,
   SlidersHorizontal, type LucideIcon,
@@ -71,8 +71,6 @@ export const COMMANDS: CommandDef[] = [
   { id: 'input-mouse', category: 'Vista', name: 'Controles de ratón', description: 'Estilo CLO3D: orbitar con clic derecho, zoom con rueda', icon: MousePointer2, action: (d) => d(setUserScheme('mouse')) },
 
   // ─── Toggles ───
-  // Sin atajo: `G` es la herramienta Línea interna, no la cuadrícula (#1170).
-  { id: 'toggle-grid', category: 'Vista', name: 'Mostrar u ocultar cuadrícula', description: 'La cuadrícula del lienzo', icon: Grid3x3, action: (d) => d(toggleSnapToGrid()) },
   { id: 'toggle-seam-allowance', category: 'Vista', name: 'Mostrar u ocultar margen de costura', description: 'El margen alrededor de cada pieza', icon: ScanLine, shortcutId: 'view.toggleSeamAllowance', action: (d) => d(toggleSeamAllowance()) },
   { id: 'toggle-grainlines', category: 'Vista', name: 'Mostrar u ocultar hilos', description: 'Las flechas de dirección de hilo', icon: PenLine, action: (d) => d(toggleGrainlines()) },
   { id: 'toggle-piece-names', category: 'Vista', name: 'Mostrar u ocultar nombres de pieza', description: 'Las etiquetas de cada pieza', icon: Tag, action: (d) => d(togglePieceNames()) },

@@ -5,12 +5,15 @@ import './EmptyState2D.css';
 
 /**
  * Whether the 2D canvas should show the onboarding empty-state. Shown only on
- * the idle Select tool with no pieces — picking any drawing tool (pen / rect /
- * polyPen / …) clears the canvas for that tool instead of keeping the overlay.
+ * the idle Select tool with nothing on the sheet. `enLaHoja` counts pieces,
+ * construction strokes and reference images: a stroke or a photo to trace is
+ * already work, and «Trae tu patrón» must not cover it (spec 2026-10-02 § 4.6).
+ * Picking any drawing tool (pen / rect / polyPen / …) clears the canvas for
+ * that tool instead of keeping the overlay.
  */
 // eslint-disable-next-line react-refresh/only-export-components
-export function shouldShowEmptyState(pieceCount: number, activeTool: Tool2D): boolean {
-  return pieceCount === 0 && activeTool === 'select';
+export function shouldShowEmptyState(enLaHoja: number, activeTool: Tool2D): boolean {
+  return enLaHoja === 0 && activeTool === 'select';
 }
 
 interface EmptyState2DProps {

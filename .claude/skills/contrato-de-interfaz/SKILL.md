@@ -88,7 +88,7 @@ la barra de IA.
 > usan la tira de herramienta del lienzo 2D y los chips de cota
 > (`docs/superpowers/specs/2026-08-30-cotas-vivas-design.md` § 9-10).
 > **Excepción dicha:** la tira es un `overlay` que NO se va — está mientras hay
-> herramienta 2D activa, bajo la regla (28 px) y nunca sobre ella. Y las cotas
+> herramienta 2D activa, a 28 px del borde de arriba. Y las cotas
 > van sobre el patrón por definición: son parte del objeto, como los tiradores
 > del transform box, no un panel. Lo pidió Samuel el 2026-08-30; queda escrito
 > para que no se vuelva regla tácita.
@@ -129,7 +129,7 @@ la barra de IA.
 
 - El cromo se **acopla en canaletas**; el documento tiene área segura.
 - Solo tres cosas pueden taparlo: menús transitorios, toasts y la paleta.
-- Un panel nuevo NO se abre encima de la regla ni del patrón.
+- Un panel nuevo NO se abre encima del patrón.
 - Nada de `z-index` literal. Si necesitas una capa, es que falta un rol.
 - **`isolation: isolate` no hace lo que parece.** Un elemento con `position` (no
   `static`) y `z-index` numérico **ya es** contexto de apilamiento; agregarle
@@ -176,7 +176,7 @@ la barra de IA.
   igual: `notch` tenía Shift+N registrado y el dock no lo mostraba, así que para
   la usuaria no existía.
 - **Mono = un dato cuya alineación carácter a carácter significa algo**
-  (regla, cotas, píldora de medida, `kbd`). Toda la prosa del cromo va en
+  (marca de escala, cotas, píldora de medida, `kbd`). Toda la prosa del cromo va en
   `--font-sans`: el estado, los rótulos del dock, el estado vacío, el valor de
   una opción. Una sola familia de cada: Inter y JetBrains Mono, nada más se
   carga (`app/index.html`). Lo fija `tipografia-del-cromo.test.ts`, selector por
@@ -213,24 +213,27 @@ cuántos materiales hay de verdad en pantalla— existe el censo contra la app v
 npm run audit:ui        # requiere el server de dev corriendo
 ```
 
-Y dos trinquetes más, en navegador, con su línea base en JSON que **solo baja**
-(spec 2026-09-24 § 3.4 y § 7). El techo efectivo de un estado es el mayor de
-la meta y la línea base: por debajo de la meta el diseño puede mover
-superficies; por encima, solo se baja. Con reintentos, un fallo a mitad de un
-grupo serial escribe medidas parciales: por eso `--retries=0`.
+Y tres trinquetes más, en navegador, con su línea base en JSON que **solo baja**
+(spec 2026-09-24 § 3.4 y § 7; spec 2026-10-02 § 9). El techo efectivo de un
+estado es el mayor de la meta y la línea base: por debajo de la meta el diseño
+puede mover superficies; por encima, solo se baja. Con reintentos, un fallo a
+mitad de un grupo serial escribe medidas parciales: por eso `--retries=0`.
 
 ```bash
-npx playwright test tests/e2e/superficies-por-accion.spec.ts   # ≤ 4 componentes que aparecen o cambian por acción
-npx playwright test tests/e2e/contraste-del-cromo.spec.ts      # ningún texto del cromo bajo AA sobre su fondo real
+npx playwright test tests/e2e/reposo-solo-lo-que-perdura.spec.ts   # en reposo, solo lo que perdura (meta: 0 de sobra)
+npx playwright test tests/e2e/superficies-por-accion.spec.ts       # ≤ 4 componentes que aparecen o cambian por acción
+npx playwright test tests/e2e/contraste-del-cromo.spec.ts          # ningún texto del cromo bajo AA sobre su fondo real
 ```
 
 Una superficie nueva **declara** qué es con `data-superficie` (vocabulario en
 `tests/repo/superficies-declaradas.test.ts`); sin marca, el trinquete no la ve.
-Los dos trinquetes en navegador corren en local y antes de cada PR; en CI el trabajo de e2e sigue en
-`continue-on-error` (#506), así que hoy no bloquean el merge por sí solos.
+Los tres corren en local, antes de cada PR y, desde el 2026-10-02, en el gate
+del deploy (`scripts/deploy-prod.sh`); en CI el trabajo de e2e sigue en
+`continue-on-error` (#506), así que ahí no bloquean el merge por sí solos.
 Para bajar un techo:
 
 ```bash
+REPOSO_UPDATE=1 npx playwright test tests/e2e/reposo-solo-lo-que-perdura.spec.ts --retries=0 --workers=1
 SUPERFICIES_UPDATE=1 npx playwright test tests/e2e/superficies-por-accion.spec.ts --retries=0 --workers=1
 CONTRASTE_UPDATE=1 npx playwright test tests/e2e/contraste-del-cromo.spec.ts --retries=0 --workers=1
 ```

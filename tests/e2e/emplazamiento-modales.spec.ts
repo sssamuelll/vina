@@ -157,6 +157,10 @@ async function sondearApilamiento(page: Page, selector: string): Promise<Apilami
   }, selector);
 }
 
+// 90 s y no los 30 del config, como el resto del gate del deploy: la medida
+// está en `emplazamiento-paneles.spec.ts` (atascos de 20 a 50 s, 2026-10-02).
+test.describe.configure({ timeout: process.env.CI ? 240_000 : 90_000 });
+
 test.describe('Emplazamiento — las dos reclasificaciones que solo se ven en el navegador', () => {
   test('NotchPrecisionModal: reclasificado a --z-menu, le sigue ganando al cromo', async ({ page }) => {
     await esperarApp(page);

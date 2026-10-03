@@ -95,6 +95,17 @@ async function anchoDelDocumento(page: Page): Promise<number> {
   });
 }
 
+// 90 s y no los 30 del config, como el resto del gate del deploy (28 de sus 32
+// specs ya lo fijaban). Medido el 2026-10-02 en tres corridas enteras del gate:
+// el primer test que arranca en el worker que acaba de terminar un trinquete
+// pesado (contraste, superficies) tarda de 33 a 51 s más de lo suyo, y se le
+// van abriendo el contexto del navegador. Detrás del de contraste, por orden
+// alfabético, cae este spec: con 30 s salió «flaky» dos de dos veces, en un
+// test distinto cada vez; con 90 s es un test lento (60 s en vez de 12). Por
+// qué se atasca ese primer test no está averiguado. Aparte, el test de los
+// siete paneles tarda 29,5 s él solo.
+test.describe.configure({ timeout: process.env.CI ? 240_000 : 90_000 });
+
 test.describe('Ola 2 — los paneles ocupan canaleta, no flotan', () => {
   test.beforeEach(async ({ page }) => {
     await abrirApp(page);
