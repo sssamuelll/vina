@@ -1,13 +1,24 @@
-import { contrastRatio, tokenColor } from './colorMath';
+import { contrastRatio, cssDelAmbito, tokenColor } from './colorMath';
 
 /**
  * Los pares de la piel que tienen que cumplir un piso (spec 2026-09-24
  * «cromo callado» § 4). Texto normal: AA 4,5:1. Objeto gráfico (una línea,
  * un borde, un relleno sin texto): 3:1. Deshabilitado: 2,5:1 — WCAG lo exime,
  * pero por debajo de eso ni se ve que hay un control.
+ *
+ * Un par con `ambito` se lee desde dentro de `data-material="<ámbito>"`
+ * (spec 2026-10-02 § 7.2).
  */
-export interface Par { tinta: string; fondo: string; minimo: number; por: string }
+export interface Par { tinta: string; fondo: string; minimo: number; por: string; ambito?: 'papel' }
 export interface Resultado extends Par { ratio: number; ok: boolean }
+
+/** Los pares del ámbito de papel: sobre la hoja (que lo gana en P2), sobre el
+ *  blanco de lo que flota y, el texto, sobre el papel hundido del hover y las
+ *  teclas. Son los números de la tabla de § 7.2. */
+const papel = (tinta: string, fondos: string[], minimo: number, por: string): Par[] =>
+  fondos.map((fondo) => ({ tinta, fondo, minimo, por: `papel · ${por}`, ambito: 'papel' as const }));
+const HOJA_Y_BLANCO = ['--canvas-2d', '--surface-overlay-bg'];
+const Y_HUNDIDO = [...HOJA_Y_BLANCO, '--bg-elevated'];
 
 export const PARES: Par[] = [
   { tinta: '--text-primary', fondo: '--bg-surface', minimo: 4.5, por: 'texto principal' },
@@ -41,11 +52,23 @@ export const PARES: Par[] = [
   { tinta: '--cota-ink-2d', fondo: '--cota-bg-2d', minimo: 4.5, por: 'el número de la cota' },
   { tinta: '--cota-line-2d', fondo: '--canvas-2d', minimo: 3, por: 'la línea de cota' },
   { tinta: '--cota-edit-ink-2d', fondo: '--cota-edit-bg-2d', minimo: 4.5, por: 'la cota en edición' },
+  ...papel('--text-primary', Y_HUNDIDO, 4.5, 'texto principal'),
+  ...papel('--text-secondary', Y_HUNDIDO, 4.5, 'rótulos'),
+  ...papel('--text-tertiary', Y_HUNDIDO, 4.5, 'atajos, placeholder, lo inactivo'),
+  ...papel('--text-disabled', HOJA_Y_BLANCO, 2.5, 'solo deshabilitado'),
+  ...papel('--border', HOJA_Y_BLANCO, 3, 'el borde de un campo'),
+  ...papel('--accent-ink', HOJA_Y_BLANCO, 4.5, 'el acento escrito'),
+  ...papel('--ai', HOJA_Y_BLANCO, 4.5, '«lo hizo la IA»'),
+  ...papel('--success', HOJA_Y_BLANCO, 4.5, 'semántico'),
+  ...papel('--warning', HOJA_Y_BLANCO, 4.5, 'semántico'),
+  ...papel('--destructive', HOJA_Y_BLANCO, 4.5, 'texto destructivo'),
+  ...papel('--destructive-hover', HOJA_Y_BLANCO, 4.5, 'texto destructivo al pasar el mouse'),
 ];
 
 export function verificarContraste(css: string): Resultado[] {
   return PARES.map((p) => {
-    const ratio = contrastRatio(tokenColor(css, p.tinta).rgb, tokenColor(css, p.fondo).rgb);
+    const fuente = p.ambito ? cssDelAmbito(css, p.ambito) : css;
+    const ratio = contrastRatio(tokenColor(fuente, p.tinta).rgb, tokenColor(fuente, p.fondo).rgb);
     return { ...p, ratio, ok: ratio >= p.minimo };
   });
 }

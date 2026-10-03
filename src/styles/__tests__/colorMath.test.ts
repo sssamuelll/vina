@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  oklchToRgb, parseCssColor, toHex, contrastRatio, compositeOver, resolveToken, tokenColor,
+  oklchToRgb, parseCssColor, toHex, contrastRatio, compositeOver, resolveToken, tokenColor, cssDelAmbito,
 } from '../colorMath';
 
 describe('colorMath — OKLCH → sRGB', () => {
@@ -56,5 +56,21 @@ describe('colorMath — tokens', () => {
   it('avisa del token que no existe y del ciclo', () => {
     expect(() => resolveToken(CSS, '--nada')).toThrow(/no existe/);
     expect(() => resolveToken(CSS, '--ciclo')).toThrow(/ciclo/);
+  });
+});
+
+describe('colorMath — el CSS visto desde dentro de un ámbito', () => {
+  const CSS = [
+    ':root {', '  --fondo: #000000;', '  --solo-raiz: #123456;', '}',
+    '[data-material="papel"] {', '  --fondo: #ffffff;', '}',
+  ].join('\n');
+  it('lo que el ámbito declara gana a :root', () => {
+    expect(resolveToken(cssDelAmbito(CSS, 'papel'), '--fondo')).toBe('#ffffff');
+  });
+  it('lo que el ámbito no declara sale de :root', () => {
+    expect(resolveToken(cssDelAmbito(CSS, 'papel'), '--solo-raiz')).toBe('#123456');
+  });
+  it('un ámbito que no existe rompe en voz alta, no cae a :root en silencio', () => {
+    expect(() => cssDelAmbito(CSS, 'otro')).toThrow(/no hay ámbito "otro"/);
   });
 });

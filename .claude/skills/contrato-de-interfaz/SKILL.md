@@ -34,7 +34,7 @@ Estas cuatro preguntas cubren el 90% de la deriva medida:
    `src/styles/tokens.css`. Si no existe el token, **defínelo ahí**, no en tu
    componente.
 2. **¿Es una superficie que flota sobre el lienzo?** → usa un material entero
-   (§2). No inventes el tuyo.
+   (§2), y su raíz lleva `data-material="papel"`. No inventes el tuyo.
 3. **¿Es texto que ve la usuaria?** → español, y el término sale del glosario
    `docs/specs/2026-07-16-ui-copy-es-glosario.md`.
 4. **¿Es una función nueva?** → ¿por dónde entra? Si solo se llega por la
@@ -59,25 +59,54 @@ Estas cuatro preguntas cubren el 90% de la deriva medida:
 
 No se mezclan piezas de dos materiales. Se usa uno completo.
 
-| Material | Cuándo | Tokens |
+| Material | Qué es | Tokens |
 |---|---|---|
-| **`chrome`** | acoplado a una canaleta; opaco; **sin sombra** | `--surface-chrome-bg`, `-border`, `-radius`, `-shadow` (= none) |
-| **`overlay`** | flota de verdad sobre el documento y se va; casi opaco (0,96), línea de pelo, sombra corta en dos capas; **sin blur** | `--surface-overlay-bg`, `-border` (= `--hairline`), `-radius`, `-shadow`, `-blur` (= none) |
+| **`chrome`**, el marco | la barra superior y los paneles: atracado a un borde, opaco, **sin sombra** | `--surface-chrome-bg`, `-border`, `-radius`, `-shadow` (= none) |
+| **`overlay`**, lo que flota | menús, avisos, tooltips, modales y la barrita de la pieza: flota sobre la hoja y se va. **Es papel:** blanco, línea de pelo, sombra corta en dos capas, **sin blur** | `--surface-overlay-bg`, `-border` (= `--hairline`), `-radius`, `-shadow`, `-blur` (= none) |
 
-> **Enmienda 2026-09-26 (cromo callado, spec 2026-09-24 § 4.4):** los dos
-> roles siguen existiendo y se usan enteros, pero están hechos del MISMO
-> material y solo los distingue la sombra. El blur se retiró: con un fondo al
-> 92 % solo desenfocaba el 8 % que se transparentaba, y a cambio creaba los
-> contextos de apilamiento que recortaron `ConnectionModal` (párrafo de abajo).
-> `--surface-overlay-blur` sigue existiendo como token y vale `none`, para que
-> nadie lo reponga a mano. Se dice aquí para que no parezca fusión por descuido.
+> **Enmienda 2026-10-02 (spec «la interfaz en papel» § 7.1, § 7.2 y § 10):**
+> vuelven a ser dos materiales distintos, el marco oscuro y lo que flota en
+> claro. Deroga la del 26-09 («un solo material, solo los distingue la
+> sombra»). El blur sigue fuera: con un fondo al 92 % solo desenfocaba el 8 %
+> que se transparentaba, y creaba los contextos de apilamiento que recortaron
+> `ConnectionModal` (párrafo de abajo). `--surface-overlay-blur` vale `none`.
+
+**El ámbito de papel.** Lo que flota se vuelve papel con un atributo en su
+raíz: `data-material="papel"`. El bloque de `tokens.css` con ese selector
+redefine, para lo que está dentro, los mismos nombres que usa el marco: un
+componente escribe `--text-primary`, `--border` o `--surface-overlay-bg` y
+recibe tinta clara y fondo oscuro en el marco, tinta oscura y fondo blanco
+sobre el papel. No sabe dónde está. Cinco reglas:
+
+- **Todo portal nace papel.** Un portal cuelga de `<body>` y hereda la tinta
+  clara ya calculada ahí: su raíz lleva el atributo. Lo vigila
+  `tests/repo/lo-que-flota-es-papel.test.ts`, que además pide la marca,
+  archivo por archivo, en cada cosa que flota.
+- **Dentro del papel no hay `--bg-surface`, `--bg-base` ni `--bg-deeper`** (ni
+  sus alias `--bg-primary` y `--panel-bg`): el ámbito no los redefine, y un
+  campo pintado así queda negro con tinta negra encima. El trinquete de
+  contraste no lo ve, porque el valor de un campo no es un nodo de texto. Un
+  campo usa `--field-bg`; un botón secundario, `transparent` con
+  `1px solid var(--border)`; el hover y las teclas, `--bg-elevated` (papel
+  hundido).
+- **Lo que separa es línea de pelo** (`--border-subtle`, o `--hairline` si es
+  un borde). Dentro del papel, `--border` es el borde de un campo, a 3:1.
+- **Un alias de `:root` se resuelve en `:root`.** Si un token nuevo lee un
+  nombre que el ámbito redefine (`--text-muted: var(--text-tertiary)`), el
+  ámbito lo vuelve a declarar; si no, baja con el valor del marco. Lo vigila
+  `src/styles/__tests__/ambito-de-papel.test.ts`.
+- **Hasta su fase siguen con el overlay oscuro de `:root`:** la barra de IA, la
+  tira y la fila (P2), los paneles (P4, que los pasa a `chrome` a ras) y el
+  cromo del 3D (P5). La hoja gana el ámbito en P2 y el escenario en P5.
 
 Más una familia de **tinta**, que no es superficie: `--ink-*` es lo que se
 dibuja **sobre el papel** del lienzo 2D.
 
-> **La trampa que ya nos costó una vez:** los `--text-*` son la tinta del cromo
-> **oscuro**. Aplicados sobre el crema del lienzo dan 1.05:1 de contraste — o
-> sea, invisibles. Si tu texto va dentro del `<svg>` del lienzo, usa `--ink-*`.
+> **La trampa que ya nos costó una vez, a medio cerrar:** los `--text-*`
+> cambian con el material. Dentro de `data-material="papel"` son tinta
+> oscura; fuera, la del marco. La hoja del lienzo todavía no lleva el ámbito
+> (lo gana en P2): ahí un `--text-*` da 1,05:1, invisible. Lo que se dibuja
+> del patrón, dentro del `<svg>`, va con `--ink-*`.
 
 Variantes declaradas (no inventes más): `--surface-overlay-radius-pill` para
 barras con forma de cápsula, y `--surface-overlay-bg-recessed` para el reposo de

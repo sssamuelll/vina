@@ -15,8 +15,12 @@
    * la superficie que delimita es invisible (Iris, 2026-06-07). 1,46:1. */
   --border: oklch(0.32 0.006 80);       /* #34332f */
   --border-subtle: oklch(0.22 0.005 80);/* #1c1a18 */
-  /* La línea de pelo: única separación de lo que flota (spec § 4.4). Los
-   * separadores de menú NO la copian: usan --border como fondo de 1 px. */
+  /* El fondo de un campo (spec 2026-10-02 § 7.2): en el marco, el elevado de
+   * siempre; dentro del ámbito de papel, blanco. */
+  --field-bg: var(--bg-elevated);
+  /* La línea de pelo del marco. Dentro del ámbito de papel es del color de
+   * --border-subtle, y es también lo que separa dentro de lo que flota: ahí
+   * --border es el borde de un campo, a 3:1, y de separador pesa como uno. */
   --hairline: 1px solid rgba(255, 255, 255, 0.07);
   /* Escenario del visor 3D, un paso más claro que el cromo para que la
    * prenda no se lea sobre negro. Consumidor: F3 (renderSettingsSlice). */
@@ -138,8 +142,9 @@
   --readout-ink-2d: #ffffff;
   --annotation-2d: #808080;                 /* annotation fallback when its category has no color */
   /* Tinta de texto instructivo dibujado SOBRE el papel (pistas al pie del
-   * lienzo). NO usar --text-* aquí: esos son la tinta del cromo OSCURO y sobre
-   * el crema quedan invisibles (1.05:1 medido el 2026-08-14). Éste da 5,32:1
+   * lienzo). NO usar --text-* aquí todavía: la hoja no lleva el ámbito de
+   * papel hasta P2, y fuera de él --text-* es la tinta del marco, que sobre el
+   * papel queda invisible (1.05:1 medido el 2026-08-14). Éste da 5,32:1
    * sobre --canvas-2d y 5,85:1 sobre --piece-fill-2d. Lo verifica
    * HintText.legibilidad.test.tsx. */
   --ink-hint: #6b6459;
@@ -210,15 +215,19 @@
   --transition-normal: 200ms ease;
 
   /* ── Materiales de superficie ─────────────────────────────────────────
-   * Ley de materiales del contrato (enmendada el 26-09, spec § 4.4 y § 6).
-   * Dos ROLES, un solo material, distinguidos por la sombra:
-   *   chrome  → acoplado a una canaleta; opaco; SIN sombra (una sombra de
-   *             32 px bajo un dock acoplado era la mancha oscura a su derecha
-   *             sobre el crema).
-   *   overlay → flota de verdad y se va; casi opaco, línea de pelo, sombra
-   *             corta en dos capas, SIN blur: con un fondo al 92 % el blur solo
-   *             desenfocaba el 8 % restante y creaba los contextos de
-   *             apilamiento que recortaron ConnectionModal (contrato § 2).
+   * Ley de materiales del contrato, enmendada el 2026-10-02 (spec «la
+   * interfaz en papel» § 7.1): vuelven a ser DOS materiales.
+   *   chrome  → el marco. Acoplado a un borde; opaco; SIN sombra (una sombra
+   *             de 32 px bajo un dock acoplado era la mancha oscura a su
+   *             derecha sobre el papel).
+   *   overlay → lo que flota y se va: línea de pelo, sombra corta en dos
+   *             capas, SIN blur (con un fondo al 92 % el blur solo desenfocaba
+   *             el 8 % restante y creaba los contextos de apilamiento que
+   *             recortaron ConnectionModal, contrato § 2). Sobre la hoja es
+   *             PAPEL: blanco, y lo pone el ámbito de papel de más abajo.
+   * Los valores de overlay de :root son el oscuro de cromo callado. Desde P1b
+   * los leen solo la barra de IA, la tira y la fila (hasta P2), los paneles
+   * (hasta P4, que los pasa a chrome a ras) y el cromo del 3D (hasta P5).
    * Más la familia de tinta: `ink-*`, lo que se dibuja SOBRE el papel. */
   --surface-chrome-bg: var(--bg-surface);
   --surface-chrome-border: 1px solid var(--border);
@@ -283,6 +292,64 @@
   --z-toast: 1200;
   /* Diagnóstico de desarrollo (SolverMetrics): solo con import.meta.env.DEV. */
   --z-debug: 1300;
+}
+
+/* ── El ámbito de papel (spec 2026-10-02 «la interfaz en papel» § 7.2) ─────
+ * Lo lleva, con data-material="papel", la raíz de cada cosa que flota sobre la
+ * hoja: menús, avisos, tooltips, modales y la barrita de la pieza. Redefine,
+ * para lo que está dentro, los nombres que usa el marco: un componente
+ * escribe --text-primary y recibe tinta clara en el marco y tinta oscura
+ * sobre el papel. No sabe dónde está.
+ *
+ * Ratios, en este orden: sobre la hoja · sobre el blanco de lo que flota ·
+ * sobre el papel hundido. Los fija contrasteDeTokens.ts.
+ *
+ * Dos cosas que no se ven y muerden:
+ *  1. CSS resuelve var() donde se DECLARA. Un alias de :root
+ *     (--text-muted: var(--text-tertiary)) baja ya resuelto con el valor del
+ *     marco: 3,35:1 sobre blanco. Todo alias que lea un nombre de aquí se
+ *     vuelve a declarar aquí, al final del bloque. Lo vigila
+ *     ambito-de-papel.test.ts.
+ *  2. color se hereda ya calculado: sin la línea color de abajo, un portal
+ *     colgado de body heredaría la tinta clara del marco.
+ *
+ * La hoja y sus márgenes lo ganan en P2, el escenario 3D en P5: hasta entonces
+ * llevan encima el dock, la tira, la fila y el cromo del 3D, que siguen
+ * oscuros, y con el ámbito su tinta se volvería oscura sobre fondo oscuro. */
+[data-material="papel"] {
+  color: var(--text-primary);
+
+  --text-primary: oklch(0.27 0.010 80);     /* #292621 · 13,72 · 15,07 · 11,87 */
+  --text-secondary: oklch(0.45 0.012 80);   /* #59554e · 6,74 · 7,41 · 5,84 · rótulos */
+  --text-tertiary: oklch(0.50 0.012 80);    /* #67635c · 5,44 · 5,97 · 4,71 · atajos, placeholder */
+  --text-disabled: oklch(0.66 0.010 80);    /* #95928b · 2,83 · 3,11 · solo deshabilitado */
+  --bg-elevated: oklch(0.92 0.022 91);      /* #eae4d4 · papel hundido: hover, teclas */
+  --field-bg: #ffffff;
+  --border: oklch(0.62 0.012 80);           /* #8a857e · el borde de un campo: 3,33 · 3,66 */
+  --border-subtle: rgba(40, 36, 30, 0.14);  /* la línea de pelo y los separadores */
+  --hairline: 1px solid var(--border-subtle);
+  --accent-ink: oklch(0.50 0.15 248);       /* #0066b3 · 5,38 · 5,91 */
+  --ai: oklch(0.50 0.16 295);               /* #6c4ab3 · 5,85 · 6,43 */
+  --success: oklch(0.50 0.13 150);          /* #137738 · 5,13 · 5,64 */
+  --warning: oklch(0.52 0.12 70);           /* #945a00 · 5,14 · 5,64 */
+  --destructive: oklch(0.52 0.18 25);       /* #ba2b2e · 5,50 · 6,05 */
+  --destructive-hover: oklch(0.46 0.18 25); /* #a50d1c · 7,15 · 7,85 */
+
+  /* Lo que flota es papel que se despega de la hoja (§ 7.1). */
+  --surface-overlay-bg: #ffffff;
+  --surface-overlay-shadow: 0 1px 2px rgba(40, 36, 30, 0.10), 0 8px 24px rgba(40, 36, 30, 0.12);
+  --scrim: rgb(41 38 33 / 32%);
+
+  /* Los alias de :root que leen un nombre de arriba (punto 1). */
+  --text-muted: var(--text-tertiary);
+  --bg-secondary: var(--bg-elevated);
+  --color-error: var(--destructive);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --surface-chrome-border: 1px solid var(--border);
+  --surface-overlay-border: var(--hairline);
+  --surface-overlay-bg-recessed: var(--surface-overlay-bg);
+  --surface-overlay-shadow-sheet: var(--surface-overlay-shadow);
 }
 
 /* A partir de 1600 px cada paso de la escala sube 1 px (spec § 4.5). */
