@@ -2837,3 +2837,30 @@ Si algo no se cumple, se arregla antes de seguir.
 - [ ] **Step 6: Enseñárselo a Samuel, y nada más**
 
 `git status --short` solo enseña `.maria-avatar.mjs` sin seguimiento. `git log --oneline main..HEAD` enseña el commit del plan y los de las Tasks 1 a 7 (y el de techos, si lo hubo). Se le enseña a Samuel `p1b-en-la-app.html` y se espera: nunca había visto un menú, un aviso ni un modal en claro (spec § 13). No se hace push ni PR hasta que lo diga.
+
+---
+
+## Notas de la ejecución (2026-10-03)
+
+Ejecutado en línea, tarea por tarea. Cada rojo, cada verde y cada número de los «Expected» salió como está escrito. Ensayo del deploy sobre `6fd59607`: 9357 unitarios, 205 e2e sin flaky (36,3 min), la home y el build; reposo y superficies quedaron en su línea base.
+
+**Lo que el código hace y el plan no decía.** La revisión final (un subagente Opus, de solo lectura) encontró que el menú de «+», al pasar a `<body>`, quedó fuera del orden del teclado: Tab desde «+» ya no entraba en la lista, y Escape no devolvía el foco. Arreglado en `d0375de2`. Al abrir, el foco va al primer ítem habilitado. Escape lo devuelve al «+» si estaba dentro. El «+» declara `aria-controls`. El test está en `Dock.test.tsx`.
+
+**Lo que la revisión dejó y no se arregló aquí** (menores, para la fase que toque):
+
+- **Menú de «+».** Su posición se mide al abrir. No sigue al «+» cuando el dock crece (unos 21 px por cada herramienta añadida; «Restablecer valores» lo mueve mucho) ni cuando cambia el tamaño de la ventana. P2 rehace el dock como margen: ahí el ancla se recalcula.
+- **Huecos de `lo-que-flota-es-papel.test.ts`.**
+  - `'src/**/*.tsx'` no ve `src/App.tsx`, `main.tsx` ni `bootstrap.tsx`; con `'src/*.tsx'` salen todos.
+  - No caza colores con nombre (`'white'`), ni `hsl()` ni `oklch()` escritos a mano.
+  - `PINTA` no incluye los `.tsx` de las raíces que flotan.
+  - Ninguna unitaria prueba que un clic dentro del menú en portal no lo cierra.
+- **Lo deshabilitado por opacidad cae a ~2,1:1 sobre blanco**, bajo el piso de 2,5 del repo. Son «Deshacer» y «Rehacer» del menú Vina (opacidad 0,35) y el botón primario deshabilitado de los modales (0,5). En papel convendría `--text-disabled` en vez de opacidad.
+- **Tres muestras del selector de color de Capas** casi no tienen borde contra el blanco: amarillo 1,53:1, verde 1,74, turquesa 1,86. Una línea de pelo en reposo lo resuelve sin tocar el dato.
+- **Los dos menús de Capas** llevan `border-radius: 6px` y no `--surface-overlay-radius`.
+- **Sin ver en navegador en esta rama:** el clic derecho del 3D, el menú de Capas, el modal de calibración y la tarjeta de «suelta tu archivo». Todos van por token.
+- **Preexistente, para P5: el trinquete de contraste no ve el WebGL.** `fondoDe` compone los ancestros del DOM y llega al fondo oscuro de `<body>`; el canvas del 3D no es ancestro de nada. La píldora del modo de superficie, abierta, pinta `--accent-subtle` sobre el gris del escenario con la tinta clara del marco: unos 1,25:1 de verdad, y el trinquete dice 0.
+- **Comentarios viejos.**
+  - «Same glass language» en `floating.css` y `SubMenu.css`.
+  - `(e.g., "Undo")` en `copilotUISlice.ts`.
+  - «(DockToolPicker pattern)» en `SurfaceModePill.tsx`.
+  - El contrato no nombra `--surface-chrome-bg` entre los fondos prohibidos dentro del papel; el test sí lo prohíbe.
