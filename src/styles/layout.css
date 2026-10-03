@@ -46,7 +46,11 @@
 .grupo-del-patron {
   flex: 1 1 0;
   min-width: 0;
-  overflow: hidden;
+  /* Recorta la fila mientras no cabe y aún no se plegó, pero deja asomar el
+     anillo de foco: 2 px a 1 px del botón. Con `hidden` se comía 3 px arriba,
+     abajo y a la izquierda del primero (barra-superior.spec.ts). */
+  overflow: clip;
+  overflow-clip-margin: 3px;
   display: flex;
   align-items: center;
 }

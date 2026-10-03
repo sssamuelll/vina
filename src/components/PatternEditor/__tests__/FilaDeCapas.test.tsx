@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Provider } from 'react-redux';
 import editorReducer from '../../../store/editorSlice';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 import FilaDeCapas from '../FilaDeCapas';
 
 afterEach(() => {
@@ -113,6 +114,34 @@ describe('FilaDeCapas plegada: cuando los seis no caben (spec 2026-10-02 § 4.2)
 
     fireEvent.click(within(menu).getByRole('button', { name: 'Hilo' }));
     expect(store.getState().editor.showGrainlines, 'el interruptor de dentro no despacha').toBe(false);
+  });
+
+  it('al abrirse, el foco entra al menú: cuelga de <body>, y Tab desde «Mostrar» no llegaría a los seis', () => {
+    sinSitio();
+    const store = configureStore({ reducer: { editor: editorReducer } });
+    render(<Provider store={store}><FilaDeCapas /></Provider>);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar' }));
+
+    const menu = screen.getByRole('group', { name: 'Qué se ve del patrón' });
+    expect(document.activeElement).toBe(within(menu).getByRole('button', { name: 'Margen' }));
+  });
+
+  it('deja rastro en la bitácora: si se plegó y con qué anchos, y cuándo se abre y se cierra el menú', () => {
+    sinSitio();
+    clearJournal();
+    const store = configureStore({ reducer: { editor: editorReducer } });
+    render(<Provider store={store}><FilaDeCapas /></Provider>);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar' }));
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    const ui = getJournal().events.filter((e) => e.kind === 'ui').map((e) => [e.name, e.data]);
+    expect(ui).toEqual([
+      ['grupo-del-patron', { plegado: true, hueco: 300, natural: 402 }],
+      ['mostrar', { abierto: true }],
+      ['mostrar', { abierto: false }],
+    ]);
   });
 
   it('si con el menú abierto vuelven a caber, el menú se cierra y los seis vuelven a la barra', () => {

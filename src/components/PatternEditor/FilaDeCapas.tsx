@@ -11,6 +11,7 @@ import {
   toggleTrazos,
   setLineLengthMode,
 } from '../../store/editorSlice';
+import { pushJournal } from '../../utils/telemetry/journal';
 
 const CAPAS = [
   { kind: 'toggle', label: 'Margen', flag: 'showSeamAllowance', action: toggleSeamAllowance },
@@ -49,10 +50,18 @@ function useNoCabe(hueco: RefObject<HTMLDivElement>): boolean {
   useLayoutEffect(() => {
     const el = hueco.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
+    let anotado: boolean | undefined;
     const medir = () => {
       const fila = el.querySelector<HTMLElement>('.grupo-del-patron__fila');
       if (fila) anchoNatural.current = fila.scrollWidth;
-      setNoCabe(anchoNatural.current > el.clientWidth);
+      const plegado = anchoNatural.current > el.clientWidth;
+      // La caja negra ve si se plegó y con qué anchos: un «no encuentro Largos»
+      // en la máquina de María se lee ahí, no se adivina.
+      if (plegado !== anotado) {
+        anotado = plegado;
+        pushJournal('ui', 'grupo-del-patron', { plegado, hueco: el.clientWidth, natural: anchoNatural.current });
+      }
+      setNoCabe(plegado);
     };
     const ro = new ResizeObserver(medir);
     ro.observe(el);
@@ -86,6 +95,17 @@ export default function FilaDeCapas() {
 
   // Si la ventana crece con el menú abierto, el menú se va con el botón.
   useEffect(() => { if (!noCabe) setAbierto(false); }, [noCabe]);
+
+  // Abrir y cerrar quedan en la bitácora, venga de un clic, de Escape o de que
+  // vuelvan a caber. Abierto, el foco entra al menú: cuelga de <body>, y Tab
+  // desde «Mostrar» no llegaría a los seis (igual que el personalizador).
+  const abiertoAntes = useRef(abierto);
+  useEffect(() => {
+    if (abiertoAntes.current === abierto) return;
+    abiertoAntes.current = abierto;
+    pushJournal('ui', 'mostrar', { abierto });
+    if (abierto) menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+  }, [abierto]);
 
   useEffect(() => {
     if (!abierto) return;
