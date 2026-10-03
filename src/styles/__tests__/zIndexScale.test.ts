@@ -88,8 +88,8 @@ describe('la escala de z-index ordena por urgencia, no por antigüedad', () => {
 const SITIOS_GLOBALES: Array<{ archivo: string; patron: RegExp; nota: string }> = [
   { archivo: 'src/components/shell/Dock.css', patron: /z-index:\s*var\(--z-dock\)/, nota: 'dock' },
   { archivo: 'src/components/PatternEditor/ToolStrip2D.css', patron: /\.tool-strip\s*\{[^}]*z-index:\s*var\(--z-canvas-chrome\)/, nota: 'tira de herramienta 2D' },
-  { archivo: 'src/components/PatternEditor/FilaDeCapas.css', patron: /\.fila-de-capas\s*\{[^}]*z-index:\s*var\(--z-canvas-chrome\)/, nota: 'fila de capas' },
   { archivo: 'src/styles/layout.css', patron: /\.top-bar\s*\{[^}]*z-index:\s*var\(--z-bar\)/, nota: 'top-bar' },
+  { archivo: 'src/styles/layout.css', patron: /\.grupo-del-patron__menu\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú de «Mostrar», el grupo del patrón plegado: cuelga de <body>' },
   { archivo: 'src/styles/unified-bar.css', patron: /z-index:\s*var\(--z-bar\)/, nota: 'unified-bar' },
   { archivo: 'src/styles/floating.css', patron: /\.logo-menu\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú del logo' },
   { archivo: 'src/copilot/connections/ConnectionModal.tsx', patron: /zIndex:\s*['"]var\(--z-modal\)['"]/, nota: 'ConnectionModal reclasificado a modal (tiene velo)' },

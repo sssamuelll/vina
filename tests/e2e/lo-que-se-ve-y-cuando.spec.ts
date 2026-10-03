@@ -51,6 +51,10 @@ async function medidasVisibles(page: Page): Promise<string[]> {
 
 test.describe('D1 — los largos se ven cuando se trabaja la pieza, no siempre', () => {
   test.setTimeout(120_000);
+  // Pulsa «Largos», que desde P2 vive en la barra superior: a 1280 (el
+  // viewport de estos e2e) los seis interruptores no caben y se pliegan en
+  // «Mostrar» (spec 2026-10-02 § 4.2). Se mide en la pantalla de María.
+  test.use({ viewport: { width: 1366, height: 768 } });
 
   test('proyecto recién abierto: ningún largo a la vista y el interruptor apagado', async ({ page }) => {
     await waitForApp(page);
@@ -137,6 +141,10 @@ test.describe('D1 — los largos se ven cuando se trabaja la pieza, no siempre',
 
 test.describe('D3 — un lado que ya lleva chip no lleva además su lectura', () => {
   test.setTimeout(120_000);
+  // Pulsa «Largos», que desde P2 vive en la barra superior: a 1280 (el
+  // viewport de estos e2e) los seis interruptores no caben y se pliegan en
+  // «Mostrar» (spec 2026-10-02 § 4.2). Se mide en la pantalla de María.
+  test.use({ viewport: { width: 1366, height: 768 } });
 
   test('rectángulo seleccionado: ningún número repetido', async ({ page }) => {
     await waitForApp(page);

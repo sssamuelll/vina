@@ -85,14 +85,21 @@ async function solape(page: Page, a: string, b: string) {
   }, [a, b] as const);
 }
 
-test.describe('F1 — la barra de IA sigue siendo clicable con la fila de capas puesta', () => {
+/**
+ * F1 se cerró de raíz en P2 de «la interfaz en papel» (spec 2026-10-02 § 4.2):
+ * los interruptores dejaron el lienzo y viven en la barra superior, que la
+ * barra de IA no puede tapar (`barPosition.ts` la acota por debajo). Lo que
+ * sigue midiéndose es el resultado: ninguno de los dos tapa al otro.
+ */
+test.describe('F1 — la barra de IA y los interruptores del patrón no se pisan', () => {
   test.use({ viewport: MARIA });
   test.setTimeout(90_000);
 
   test('los tres botones de modo se pueden clicar en vista dividida', async ({ page }) => {
     await abrirApp(page);
     await vistaDividida(page);
-    await expect(page.locator('.fila-de-capas')).toBeVisible();
+    await unaPieza(page);
+    await expect(page.locator('.grupo-del-patron')).toBeVisible();
 
     const modos = await alcanzables(page, '.unified-bar__modes button');
     expect(modos.length, 'la barra de IA no expuso sus botones de modo').toBeGreaterThanOrEqual(3);
@@ -103,33 +110,37 @@ test.describe('F1 — la barra de IA sigue siendo clicable con la fila de capas 
     ).toEqual([]);
   });
 
-  test('y la fila de capas tampoco queda tapada por la barra', async ({ page }) => {
+  test('y los interruptores tampoco quedan tapados por la barra', async ({ page }) => {
     await abrirApp(page);
     await vistaDividida(page);
-    const toggles = await alcanzables(page, '.fila-de-capas button');
-    expect(toggles.length).toBeGreaterThanOrEqual(4);
+    await unaPieza(page);
+    const toggles = await alcanzables(page, '.grupo-del-patron button');
+    expect(toggles.length).toBeGreaterThanOrEqual(6);
     const tapados = toggles.filter((t) => !t.alcanzable);
     expect(
       tapados,
-      `toggles de la fila tapados: ${tapados.map((t) => `${t.nombre} ← ${t.culpable}`).join(', ')}`,
+      `interruptores tapados: ${tapados.map((t) => `${t.nombre} ← ${t.culpable}`).join(', ')}`,
     ).toEqual([]);
   });
 
   test('sus rectángulos no se solapan en absoluto', async ({ page }) => {
     await abrirApp(page);
     await vistaDividida(page);
-    expect(await solape(page, '.fila-de-capas', '.unified-bar')).toBe(0);
+    await unaPieza(page);
+    expect(await solape(page, '.grupo-del-patron', '.unified-bar')).toBe(0);
   });
 
   // Viewport ANTES de abrir: la posición por defecto de la barra se calcula al
   // montarla (barPosition.ts), así que redimensionar después no la recoloca y
-  // el test pasaría sin haber medido nada.
+  // el test pasaría sin haber medido nada. A 1280 el grupo se pliega en
+  // «Mostrar»: lo que se mide es ese botón.
   for (const vp of [{ width: 1280, height: 720 }, { width: 1366, height: 768 }]) {
     test(`tampoco a ${vp.width}×${vp.height}`, async ({ page }) => {
       await page.setViewportSize(vp);
       await abrirApp(page);
       await vistaDividida(page);
-      expect(await solape(page, '.fila-de-capas', '.unified-bar')).toBe(0);
+      await unaPieza(page);
+      expect(await solape(page, '.grupo-del-patron', '.unified-bar')).toBe(0);
       const tapados = (await alcanzables(page, '.unified-bar__modes button')).filter((m) => !m.alcanzable);
       expect(tapados, `tapados: ${tapados.map((t) => `${t.nombre} ← ${t.culpable}`).join(', ')}`).toEqual([]);
     });
@@ -140,7 +151,7 @@ test.describe('F2 — la pista de la herramienta se lee entera', () => {
   test.use({ viewport: MARIA });
   test.setTimeout(90_000);
 
-  test('la fila de capas no la tapa', async ({ page }) => {
+  test('nada la tapa y no se sale por la derecha', async ({ page }) => {
     await abrirApp(page);
     await vistaDividida(page);
     await unaPieza(page);
@@ -158,7 +169,9 @@ test.describe('F2 — la pista de la herramienta se lee entera', () => {
       }
       if (!pista) return null;
       const rp = pista.getBoundingClientRect();
-      const rf = document.querySelector('.fila-de-capas')?.getBoundingClientRect();
+      // Desde P2 el grupo vive en la barra superior y la pista al pie de la
+      // hoja: el solape tiene que seguir siendo 0.
+      const rf = document.querySelector('.grupo-del-patron')?.getBoundingClientRect();
       const solape = rf
         ? Math.max(0, Math.min(rp.right, rf.right) - Math.max(rp.left, rf.left)) *
           Math.max(0, Math.min(rp.bottom, rf.bottom) - Math.max(rp.top, rf.top))

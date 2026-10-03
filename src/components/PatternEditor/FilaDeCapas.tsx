@@ -1,4 +1,7 @@
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { shallowEqual, useDispatch, useSelector } from 'react-redux';
+import { ChevronDown } from 'lucide-react';
 import type { AppDispatch, RootState } from '../../store';
 import {
   toggleGrainlines,
@@ -8,7 +11,6 @@ import {
   toggleTrazos,
   setLineLengthMode,
 } from '../../store/editorSlice';
-import './FilaDeCapas.css';
 
 const CAPAS = [
   { kind: 'toggle', label: 'Margen', flag: 'showSeamAllowance', action: toggleSeamAllowance },
@@ -22,6 +24,9 @@ const CAPAS = [
   { kind: 'toggle', label: 'Construcción', flag: 'showTrazos', action: toggleTrazos },
 ] as const;
 
+/** El nombre del grupo, plegado o no: el lector de pantalla oye lo mismo. */
+const NOMBRE = 'Qué se ve del patrón';
+
 const selectCapasVisibles = (state: RootState) => ({
   showSeamAllowance: state.editor.showSeamAllowance,
   showGrainlines: state.editor.showGrainlines,
@@ -31,31 +36,134 @@ const selectCapasVisibles = (state: RootState) => ({
   showTrazos: state.editor.showTrazos,
 });
 
+/**
+ * ¿Caben los seis en su hueco? Se decide midiendo (spec 2026-10-02 § 4.2), no
+ * con un ancho escrito: en otro idioma los rótulos miden otra cosa. Desplegado,
+ * `scrollWidth` de la fila es su ancho natural y se guarda; plegado ya no se
+ * puede medir, así que se compara el hueco con el último ancho natural. Sin
+ * `ResizeObserver` (jsdom) nunca se pliega.
+ */
+function useNoCabe(hueco: RefObject<HTMLDivElement>): boolean {
+  const [noCabe, setNoCabe] = useState(false);
+  const anchoNatural = useRef(0);
+  useLayoutEffect(() => {
+    const el = hueco.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const medir = () => {
+      const fila = el.querySelector<HTMLElement>('.grupo-del-patron__fila');
+      if (fila) anchoNatural.current = fila.scrollWidth;
+      setNoCabe(anchoNatural.current > el.clientWidth);
+    };
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    medir();
+    // Con la fuente de verdad cargada los rótulos cambian de ancho, y el hueco
+    // no: el observador no se enteraría.
+    void document.fonts?.ready.then(medir);
+    return () => ro.disconnect();
+  }, [hueco]);
+  return noCabe;
+}
+
+/**
+ * El grupo del patrón (spec 2026-10-02 «la interfaz en papel» § 4.2): los seis
+ * interruptores de lo que se ve, en la barra superior, entre rehacer y el
+ * selector de vista. Hasta P2 eran una fila flotante sobre el lienzo (#1109).
+ *
+ * Cuando no caben (otro idioma, una ventana más estrecha) se pliegan en un solo
+ * botón, «Mostrar», con los seis dentro. En español a 1366 px no se pliega: lo
+ * fija `barra-superior.spec.ts`.
+ */
 export default function FilaDeCapas() {
   const dispatch = useDispatch<AppDispatch>();
   const visibles = useSelector(selectCapasVisibles, shallowEqual);
+  const hueco = useRef<HTMLDivElement>(null);
+  const noCabe = useNoCabe(hueco);
+  const [abierto, setAbierto] = useState(false);
+  const [ancla, setAncla] = useState({ left: 0, top: 0 });
+  const botonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Si la ventana crece con el menú abierto, el menú se va con el botón.
+  useEffect(() => { if (!noCabe) setAbierto(false); }, [noCabe]);
+
+  useEffect(() => {
+    if (!abierto) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (botonRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setAbierto(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (menuRef.current?.contains(document.activeElement)) botonRef.current?.focus();
+      setAbierto(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); };
+  }, [abierto]);
+
+  const interruptores = CAPAS.map((capa) => {
+    const activo = capa.kind === 'largos' ? visibles.lineLengthMode === 'all' : visibles[capa.flag];
+    const handleClick = () => {
+      if (capa.kind === 'largos') dispatch(setLineLengthMode(activo ? 'none' : 'all'));
+      else dispatch(capa.action());
+    };
+    return (
+      <button
+        key={capa.label}
+        type="button"
+        className={`grupo-del-patron__interruptor${activo ? ' grupo-del-patron__interruptor--activo' : ''}`}
+        aria-pressed={activo}
+        onClick={handleClick}
+      >
+        <span className="grupo-del-patron__marca" aria-hidden="true" />
+        {capa.label}
+      </button>
+    );
+  });
 
   return (
-    <div className="fila-de-capas" role="group" aria-label="Capas visibles" data-superficie="fila">
-      {CAPAS.map((capa) => {
-        const activo = capa.kind === 'largos' ? visibles.lineLengthMode === 'all' : visibles[capa.flag];
-        const handleClick = () => {
-          if (capa.kind === 'largos') dispatch(setLineLengthMode(activo ? 'none' : 'all'));
-          else dispatch(capa.action());
-        };
-        return (
+    <div ref={hueco} className="grupo-del-patron">
+      {noCabe ? (
+        <>
           <button
-            key={capa.label}
+            ref={botonRef}
             type="button"
-            className={`fila-de-capas__toggle${activo ? ' fila-de-capas__toggle--activo' : ''}`}
-            aria-pressed={activo}
-            onClick={handleClick}
+            className="grupo-del-patron__plegado"
+            aria-expanded={abierto}
+            aria-controls="grupo-del-patron-menu"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              setAncla({ left: r.left, top: r.bottom + 4 });
+              setAbierto((a) => !a);
+            }}
           >
-            <span className="fila-de-capas__marca" aria-hidden="true" />
-            {capa.label}
+            Mostrar
+            <ChevronDown size={12} aria-hidden="true" />
           </button>
-        );
-      })}
+          {abierto && createPortal(
+            <div
+              ref={menuRef}
+              id="grupo-del-patron-menu"
+              className="grupo-del-patron__menu"
+              role="group"
+              aria-label={NOMBRE}
+              data-superficie="menu"
+              data-material="papel"
+              style={{ left: ancla.left, top: ancla.top }}
+            >
+              {interruptores}
+            </div>,
+            document.body,
+          )}
+        </>
+      ) : (
+        <div className="grupo-del-patron__fila" role="group" aria-label={NOMBRE}>
+          {interruptores}
+        </div>
+      )}
     </div>
   );
 }

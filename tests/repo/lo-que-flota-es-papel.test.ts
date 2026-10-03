@@ -21,8 +21,10 @@ import { execFileSync } from 'node:child_process';
  *  4. no escribe con --accent: sobre blanco da 3,95:1; la tinta del acento es
  *     --accent-ink.
  *
- * Fuera a propósito: la barra de IA, la tira, la fila y el dock (pasan en P2),
- * el cromo del 3D (P5) y los paneles, que son marco.
+ * Fuera a propósito: la barra de IA y la tira (pasan en P2), la fila, que
+ * desde P2 vive en la barra superior y es marco (su menú plegado sí flota),
+ * el cromo del 3D (P5) y los paneles, que son marco. El margen de
+ * herramientas no flota, pero es papel: su raíz lleva la marca desde P2.
  */
 const lee = (ruta: string) => readFileSync(join(process.cwd(), ruta), 'utf8');
 const sinComentarios = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
@@ -40,6 +42,7 @@ const RAICES: Array<[string, number]> = [
   ['src/components/LayerPanel/LayerPanel.tsx', 1],
   ['src/components/LayerPanel/LayerColorPicker.tsx', 1],
   ['src/components/Viewport3D/SurfaceModePill.tsx', 1],
+  ['src/components/PatternEditor/FilaDeCapas.tsx', 1],
   // Avisos y tooltips
   ['src/components/shell/ToastContainer.tsx', 1],
   ['src/components/shell/ToolTooltip.tsx', 1],
@@ -51,6 +54,8 @@ const RAICES: Array<[string, number]> = [
   ['src/copilot/connections/ConnectionModal.tsx', 1],
   // La barrita de la pieza
   ['src/components/PatternEditor/FloatingActionBar.tsx', 1],
+  // El margen de herramientas: no flota, es la orilla de la hoja (P2)
+  ['src/components/shell/Dock.tsx', 1],
 ];
 
 /**
@@ -64,7 +69,8 @@ const PINTA: Array<[string, string[] | '*']> = [
   // Menús
   ['src/styles/floating.css', ['.logo-menu', '.context-menu']],
   ['src/components/shared/SubMenu.css', '*'],
-  ['src/components/shell/Dock.css', ['.dock-picker']],
+  ['src/components/shell/Dock.css', ['.dock-picker', '.margen']],
+  ['src/styles/layout.css', ['.grupo-del-patron__menu']],
   ['src/components/LayerPanel/LayerPanel.css', ['.layer-context-menu', '.layer-color-popover', '.layer-color-swatch']],
   ['src/components/Viewport3D/SurfaceModePill.css', ['.surface-pill__flyout', '.surface-pill__option']],
   // Avisos y tooltips

@@ -84,6 +84,10 @@ test.describe('tanda 4 — puertas que no mienten y defaults que ella quiere', (
   });
 
   test('fallo 4 — Largos es un interruptor apagado de fábrica, y seleccionar una pieza no lo enciende', async ({ page }) => {
+    // Pulsa «Largos», que desde P2 vive en la barra superior: a 1280 (el
+    // viewport de estos e2e) los seis interruptores no caben y se pliegan en
+    // «Mostrar» (spec 2026-10-02 § 4.2). Se mide en la pantalla de María.
+    await page.setViewportSize({ width: 1366, height: 768 });
     await waitForApp(page);
 
     // ENMENDADO el 2026-09-09 (contrato `2026-09-09-lo-que-se-ve-y-cuando`

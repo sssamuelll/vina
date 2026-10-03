@@ -97,6 +97,10 @@ test.describe('seis firmas de María', () => {
     // quiero opciones … el botón de activar el visualizador de líneas o
     // desactivar, como aparecen cuando uno va a medir, eso es TOP, pero solo
     // eso, no quiero opciones ni que estén vinculadas con la creación».
+    // Pulsa «Largos», que desde P2 vive en la barra superior: a 1280 (el
+    // viewport de estos e2e) los seis interruptores no caben y se pliegan en
+    // «Mostrar» (spec 2026-10-02 § 4.2). Se mide en la pantalla de María.
+    await page.setViewportSize({ width: 1366, height: 768 });
     await waitForApp(page);
     await addPiece(page, 'fria', { x: 80, y: 100 }, 200, 150);
 

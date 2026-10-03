@@ -51,6 +51,10 @@ async function encenderLargos(page: Page) {
 
 test.describe('#1152 — los largos no se quedan donde ya no está la pieza', () => {
   test.setTimeout(120_000);
+  // Pulsa «Largos», que desde P2 vive en la barra superior: a 1280 (el
+  // viewport de estos e2e) los seis interruptores no caben y se pliegan en
+  // «Mostrar» (spec 2026-10-02 § 4.2). Se mide en la pantalla de María.
+  test.use({ viewport: { width: 1366, height: 768 } });
 
   test('durante el arrastre no hay ninguna lectura, y al soltar vuelven en el sitio nuevo', async ({ page }) => {
     await waitForApp(page);

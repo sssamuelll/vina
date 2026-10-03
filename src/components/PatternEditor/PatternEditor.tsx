@@ -23,7 +23,6 @@ import { cajasDeAsas } from './cotas/cotasGeometry';
 import { resizePieceTo } from './pieceResize';
 import ToolStrip2D from './ToolStrip2D';
 import { suscribirNoPasoNada } from './noPasoNada';
-import FilaDeCapas from './FilaDeCapas';
 import type { Cota } from './cotas/cotas';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
@@ -1752,7 +1751,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
            en su misma esquina: se declara inerte mientras esté abierto (#1125). */
         inerte={Boolean(notchTool.refining?.notch.notchAnchor)}
       />
-      <FilaDeCapas />
       {pantallaVacia && (
         <EmptyState2D onImportDXF={onImportDXF} />
       )}
