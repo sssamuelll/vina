@@ -204,6 +204,20 @@ describe('LeftDock (container)', () => {
     expect(screen.queryByRole('group', { name: 'Personalizar herramientas del dock' })).toBeNull();
   });
 
+  it('el teclado entra al personalizador y vuelve al «+» con Escape', () => {
+    // El personalizador cuelga de <body> (P1b): en el DOM queda lejos del «+»,
+    // y Tab desde el botón ya no entraba en la lista (revisión final de P1b).
+    renderLeftDock();
+    const add = screen.getByRole('button', { name: 'Personalizar herramientas del dock' });
+    add.focus();
+    fireEvent.click(add);
+    const menu = screen.getByRole('group', { name: 'Personalizar herramientas del dock' });
+    expect(menu.contains(document.activeElement), 'el foco se quedó fuera del personalizador').toBe(true);
+    expect(add.getAttribute('aria-controls'), 'el «+» no dice qué abre').toBe(menu.id);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(document.activeElement, 'Escape no devolvió el foco al «+»').toBe(add);
+  });
+
   it('renders tools in tools2d order; reordering moves the tool in the DOM', () => {
     const { store } = renderLeftDock();
     const select1 = screen.getByRole('button', { name: /seleccionar · z/i });

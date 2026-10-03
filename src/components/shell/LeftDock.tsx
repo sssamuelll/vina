@@ -33,6 +33,13 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
   const [ancla, setAncla] = useState({ left: 0, bottom: 0 });
   const editorRef = useRef<HTMLDivElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+
+  // Abierto, el foco entra al personalizador: en el DOM queda lejos del «+», y
+  // Tab desde el botón ya no llegaría a la lista.
+  useEffect(() => {
+    if (pickerOpen) pickerRef.current?.querySelector<HTMLButtonElement>('.dock-picker__item:not(:disabled)')?.focus();
+  }, [pickerOpen]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -41,7 +48,12 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
       if (editorRef.current?.contains(t) || pickerRef.current?.contains(t)) return;
       setPickerOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPickerOpen(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      // Si el foco estaba en el personalizador, vuelve al «+» que lo abrió.
+      if (pickerRef.current?.contains(document.activeElement)) addRef.current?.focus();
+      setPickerOpen(false);
+    };
     window.addEventListener('mousedown', onDown);
     window.addEventListener('keydown', onKey);
     return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); };
@@ -86,6 +98,7 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
       footer={
         <div ref={editorRef} className="dock-editor">
           <button
+            ref={addRef}
             type="button"
             className="dock__add"
             onClick={(e) => {
@@ -97,6 +110,7 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
             }}
             aria-label="Personalizar herramientas del dock"
             aria-expanded={pickerOpen}
+            aria-controls="dock-picker"
           >
             <Plus size={16} />
           </button>

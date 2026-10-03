@@ -32,6 +32,7 @@ export default function DockToolPicker({ catalog, selectedIds, onAdd, onRemove, 
   return createPortal(
     <div
       ref={raizRef}
+      id="dock-picker"
       className="dock-picker"
       role="group"
       aria-label="Personalizar herramientas del dock"
