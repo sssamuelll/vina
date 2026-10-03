@@ -136,7 +136,9 @@ test('a 1280 «Mostrar» también se recorre con el teclado: Enter abre, el foco
   await cargarDxfDeMaria(page);
   const mostrar = page.getByRole('button', { name: 'Mostrar' });
   await expect(mostrar).toBeVisible();
-  await mostrar.focus();
+  // Con el foco de teclado en «Mostrar», su anillo se ve entero: la barra
+  // tampoco lo recorta a él.
+  expect(await ladosSinAnillo(page, mostrar), 'el anillo de «Mostrar» sale recortado').toEqual([]);
   await page.keyboard.press('Enter');
 
   const menu = page.getByRole('group', { name: 'Qué se ve del patrón' });
@@ -148,7 +150,10 @@ test('a 1280 «Mostrar» también se recorre con el teclado: Enter abre, el foco
   await expect(mostrar).toBeFocused();
 });
 
-test('el anillo de foco de los interruptores y de «Mostrar» se ve entero: la barra no lo recorta', async ({ page }) => {
+test('el anillo de foco de los interruptores se ve entero: la barra no lo recorta', async ({ page }) => {
+  // «Mostrar» se mide en el caso del teclado, que ya abre a 1280: encoger la
+  // ventana aquí, con el 3D de Split pintando por CPU, tardó más de 5 s en
+  // plegar el grupo bajo la carga del gate.
   await page.setViewportSize({ width: 1366, height: 643 });
   await abrirAppVacia(page);
   await cargarDxfDeMaria(page);
@@ -158,9 +163,4 @@ test('el anillo de foco de los interruptores y de «Mostrar» se ve entero: la b
   // el foco no le cambia el tono: el anillo es lo único que dice dónde está.
   expect(await ladosSinAnillo(page, grupo.getByRole('button', { name: 'Margen' })), 'Margen').toEqual([]);
   expect(await ladosSinAnillo(page, grupo.getByRole('button', { name: 'Hilo' })), 'Hilo').toEqual([]);
-
-  await page.setViewportSize({ width: 1280, height: 720 });
-  const mostrar = page.getByRole('button', { name: 'Mostrar' });
-  await expect(mostrar).toBeVisible();
-  expect(await ladosSinAnillo(page, mostrar), '«Mostrar»').toEqual([]);
 });
