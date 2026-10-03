@@ -11,7 +11,7 @@ import editorReducer, { setViewMode } from '../../../store/editorSlice';
 import toolsReducer from '../../../store/toolSlice';
 import projectReducer, { addPiece } from '../../../store/projectSlice';
 import simulationReducer from '../../../store/simulationSlice';
-import dockReducer, { toggleDockSignaling, pinAuto, addDockTool, removeDockTool, reorderDockTool } from '../../../store/dockSlice';
+import dockReducer, { addDockTool, removeDockTool, reorderDockTool } from '../../../store/dockSlice';
 import LeftDock from '../LeftDock';
 
 afterEach(cleanup);
@@ -98,12 +98,12 @@ describe('Dock (presentational)', () => {
   });
 });
 
-function renderLeftDock(onOpenPanel = vi.fn()) {
+function renderLeftDock() {
   const store = configureStore({
     reducer: { editor: editorReducer, tools: toolsReducer, project: projectReducer, simulation: simulationReducer, dock: dockReducer },
   });
-  render(<Provider store={store}><LeftDock onOpenPanel={onOpenPanel} /></Provider>);
-  return { store, onOpenPanel };
+  render(<Provider store={store}><LeftDock /></Provider>);
+  return { store };
 }
 
 describe('LeftDock (container)', () => {
@@ -117,54 +117,18 @@ describe('LeftDock (container)', () => {
   it('is hidden in 3D-only view', () => {
     const store = configureStore({ reducer: { editor: editorReducer, tools: toolsReducer, project: projectReducer, simulation: simulationReducer, dock: dockReducer } });
     store.dispatch(setViewMode('3d'));
-    render(<Provider store={store}><LeftDock onOpenPanel={vi.fn()} /></Provider>);
-    expect(screen.queryByText('2D')).toBeNull();
+    render(<Provider store={store}><LeftDock /></Provider>);
+    expect(screen.queryByRole('button', { name: /seleccionar · z/i })).toBeNull();
   });
 
-  it('shows a grade ✦ suggestion once pieces exist and runs it', () => {
-    const { store, onOpenPanel } = renderLeftDock();
-    act(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Escalar' }));
-    expect(onOpenPanel).toHaveBeenCalledWith('Grading');
-  });
-
-  it('keeps a grade suggestion (✦→📌) and records it in the dock slice', () => {
+  it('sin zona AUTO: con piezas no aparece ninguna sugerencia (spec 2026-10-02 § 8)', () => {
     const { store } = renderLeftDock();
     act(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Fijar Escalar' }));
-    expect(store.getState().dock.pinnedExtra.left).toEqual(['grade']);
-    expect(screen.getByRole('button', { name: 'Soltar Escalar' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Fijar Escalar' })).toBeNull();
-  });
-
-  it('signaling=off mutes the auto layer but shows no suggestion', () => {
-    const { store } = renderLeftDock();
-    act(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
-      store.dispatch(toggleDockSignaling()); // → 'off'
-    });
-    expect(screen.queryByText('auto')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Fijar Escalar' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Escalar' })).toBeNull();
-  });
-
-  it('off: a kept tool still renders (plain, no Unpin badge)', () => {
-    const { store } = renderLeftDock();
-    act(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
-      store.dispatch(pinAuto({ side: 'left', id: 'grade' }));
-      store.dispatch(toggleDockSignaling()); // → 'off'
-    });
-    expect(screen.getByRole('button', { name: 'Escalar' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Soltar Escalar' })).toBeNull();
+    expect(screen.queryByText('auto')).toBeNull();
   });
 
   // Usaba 'notch' (Piquete), que desde la auditoría de UI del 2026-08-14 viene

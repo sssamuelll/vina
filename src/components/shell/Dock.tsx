@@ -15,8 +15,6 @@ interface DockProps {
   /** El contenedor explica por qué una herramienta no se puede activar; así
    *  el botón y su ayuda reflejan la misma condición que protege el comando. */
   disabledReasons?: Readonly<Record<string, string | undefined>>;
-  /** Optional auto-suggest (✦) zone rendered below the pinned tools. */
-  autoZone?: ReactNode;
   /** Optional footer (e.g. the ＋ customize editor) rendered at the very bottom. */
   footer?: ReactNode;
   /** When set, tool buttons become native-drag reorder sources/targets. */
@@ -29,7 +27,7 @@ interface DockProps {
  * tools + active id and handles activation. When onReorderTool is provided,
  * tools can be reordered by native HTML5 drag (coexists with click-to-activate).
  */
-export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, disabledReasons, autoZone, footer, onReorderTool }: DockProps) {
+export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, disabledReasons, footer, onReorderTool }: DockProps) {
   const reorderable = !!onReorderTool;
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -65,7 +63,6 @@ export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, d
           </ToolTooltip>
         );
       })}
-      {autoZone}
       {footer}
     </DockShell>
   );

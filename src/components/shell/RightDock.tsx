@@ -1,14 +1,10 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { Shirt, Spline, Play, Pause, PersonStanding } from 'lucide-react';
 import type { RootState } from '../../store';
-import { startSimulation, pauseSimulation, setViewMode3D, resetSimulation, setFitMapMode } from '../../store/simulationSlice';
+import { startSimulation, pauseSimulation, setViewMode3D, resetSimulation } from '../../store/simulationSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
-import { selectWorkflowStage } from '../../store/selectors';
-import { pinAuto, unpinAuto } from '../../store/dockSlice';
 import DockShell from './DockShell';
-import DockAutoZone from './DockAutoZone';
 import ToolTooltip from './ToolTooltip';
-import { getDockSuggestions, getAutoItemById, type DockSuggestion } from './dockSuggestions';
 
 interface RightDockProps {
   onOpenPanel: (name: string) => void;
@@ -26,9 +22,6 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
   const simState = useSelector((s: RootState) => s.simulation.simulationState);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const frameTime = useSelector((s: RootState) => s.simulation.frameTimeMs);
-  const stage = useSelector(selectWorkflowStage);
-  const pinnedExtra = useSelector((s: RootState) => s.dock.pinnedExtra);
-  const signaling = useSelector((s: RootState) => s.dock.signaling);
 
   if (viewMode === '2d') return null;
 
@@ -47,11 +40,6 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
   };
 
   const SimIcon = simActive ? Pause : Play;
-
-  const runSuggestion = (id: string) => {
-    if (id === 'fitmap') dispatch(setFitMapMode('fit'));
-    else if (id === 'bom') onOpenPanel('BOM');
-  };
 
   return (
     <>
@@ -98,22 +86,6 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
             <PersonStanding size={16} />
           </button>
         </ToolTooltip>
-        {(() => {
-          const keptIds = pinnedExtra.right;
-          const kept = keptIds.map(getAutoItemById).filter((x): x is DockSuggestion => x !== undefined);
-          const suggested = getDockSuggestions(stage, 'right').filter((s) => !keptIds.includes(s.id));
-          return (
-            <DockAutoZone
-              kept={kept}
-              suggested={suggested}
-              signaling={signaling}
-              side="right"
-              onRun={runSuggestion}
-              onPin={(id) => dispatch(pinAuto({ side: 'right', id }))}
-              onUnpin={(id) => dispatch(unpinAuto({ side: 'right', id }))}
-            />
-          );
-        })()}
       </DockShell>
 
       {simActive && (

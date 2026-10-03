@@ -329,7 +329,7 @@ export default function AppShell() {
           className="canvas-area__2d"
           style={{ flex: `${get2dFlexGrow()} 1 0px`, display: viewMode === '3d' ? 'none' : undefined }}
         >
-          <LeftDock onOpenPanel={togglePanel} />
+          <LeftDock />
           <PatternEditor
             onImportDXF={() => dxfInputRef.current?.click()}
             onOpenPanel={openPanel}
