@@ -197,7 +197,9 @@ test.describe('cerrar una interna no selecciona nada', () => {
 
     // Tres nodos y vuelta al primero: `usePolyPenTool` cierra al clicar sobre el
     // nodo 0 con tres ya puestos, y `nodesToCommands` remata el path con `Z`.
-    const triangulo = [{ x: 120, y: 100 }, { x: 300, y: 100 }, { x: 300, y: 220 }];
+    // Lejos de la tarjeta de herramienta (en Split a 1280 empieza en x 326):
+    // con el margen, el (300, 100) de antes caía dentro de ella (P2a).
+    const triangulo = [{ x: 120, y: 100 }, { x: 260, y: 100 }, { x: 260, y: 220 }];
     for (const p of triangulo) await clicEn(page, p);
     await clicEn(page, triangulo[0]);
     await page.waitForTimeout(400);

@@ -4,13 +4,30 @@ import { Plus } from 'lucide-react';
 import type { RootState } from '../../store';
 import { activate2DTool, selectHasInternalShapeHost } from '../../store/toolActivation';
 import { addDockTool, removeDockTool, resetDockTools, reorderDockTool } from '../../store/dockSlice';
+import { toolRegistry } from '../../tools';
 import Dock from './Dock';
 import DockToolPicker from './DockToolPicker';
 import { DOCK_2D_CATALOG, getDockToolById, type DockToolDef } from './dock2dTools';
 
-/** The left (2D) dock: an editable tool set + a ＋ customize editor. Hidden in
- *  3D-only view. La zona AUTO se fue en P2 de «la interfaz en papel» (spec
- *  2026-10-02 § 8): Escalado y Lista de materiales están en Vina › Patrón. */
+/**
+ * La activa, cuando no está en el margen: del catálogo si es una de las suyas,
+ * y si no (Transformar, con A, o una que solo abre el menú o los comandos) del
+ * registro de herramientas, con su nombre en español. El grupo no se usa: va
+ * sola al final, detrás de aire.
+ */
+function herramientaDeFuera(id: string): DockToolDef | undefined {
+  const delCatalogo = getDockToolById(id);
+  if (delCatalogo) return delCatalogo;
+  const def = toolRegistry.getTool(id);
+  // El icono del registro solo acepta `size` numérico; el margen siempre le
+  // pasa 16, así que encaja en `DockIcon`.
+  return def ? { id, icon: def.icon as DockToolDef['icon'], label: def.name, grupo: 'editar' } : undefined;
+}
+
+/** El margen de herramientas del patrón (spec 2026-10-02 § 4.3): las del dock
+ *  de la usuaria + el ＋ que las agrega y las quita. Hidden in 3D-only view. La
+ *  zona AUTO se fue en P2 (§ 8): Escalado y Lista de materiales están en
+ *  Vina › Patrón. */
 export default function LeftDock() {
   const dispatch = useDispatch();
   const activeTool = useSelector((s: RootState) => s.editor.activeTool);
@@ -54,12 +71,15 @@ export default function LeftDock() {
   const tools = tools2d
     .map(getDockToolById)
     .filter((t): t is DockToolDef => t !== undefined);
+  // La activa siempre tiene marca (spec § 4.3): si no está en el margen, se
+  // pinta al final mientras siga activa.
+  const activaFuera = tools.some((t) => t.id === activeTool) ? undefined : herramientaDeFuera(activeTool);
 
   return (
     <Dock
-      domainLabel="2D"
       tools={tools}
       activeToolId={activeTool}
+      activaFuera={activaFuera}
       onSelectTool={(id) => activate2DTool(dispatch, id)}
       disabledReasons={hasInternalShapeHost ? undefined : {
         internalShape: 'Crea o muestra una pieza para dibujar líneas internas.',

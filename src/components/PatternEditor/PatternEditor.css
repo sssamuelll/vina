@@ -1,5 +1,7 @@
 .pattern-editor {
-  width: 100%;
+  /* La hoja ocupa lo que deja el margen de herramientas (layout.css). */
+  flex: 1;
+  min-width: 0;
   height: 100%;
   overflow: hidden;
   cursor: crosshair;

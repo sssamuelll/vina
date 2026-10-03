@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 /**
- * El dock 2D flota (`position: absolute`, § 2.1 de la spec) y no reserva
- * espacio real, así que "ajustar a la vista" tiene que descontar su faja a
- * mano — ver task-10-brief-corregido.md. jsdom no calcula layout
+ * Desde P2 de «la interfaz en papel» el margen de herramientas es una columna
+ * al lado de la hoja, no encima (spec 2026-10-02 § 4.3): "ajustar a la vista"
+ * encuadra en el svg entero, sin descontar ninguna faja. Hasta P2 el dock
+ * flotaba y había que descontarle 62 px a mano. jsdom no calcula layout
  * (`getBoundingClientRect` da 0 siempre y no existe `ResizeObserver`), así
  * que este test mockea las dos cosas que `handleZoomToFit` mide y afirma
  * el resultado EN EL STORE, no una llamada espiada (espiar el binding
@@ -21,7 +22,7 @@ import simulationReducer from '../../../store/simulationSlice';
 import toolReducer from '../../../store/toolSlice';
 import workflowReducer from '../../../store/workflowSlice';
 import type { PatternPiece, Trazo } from '../../../types/types';
-import PatternEditor, { DOCK_WIDTH_PX } from '../PatternEditor';
+import PatternEditor from '../PatternEditor';
 
 afterEach(() => {
   cleanup();
@@ -67,7 +68,6 @@ const trazo: Trazo = {
 
 const VIEWPORT_WIDTH = 1000;
 const VIEWPORT_HEIGHT = 800;
-// DOCK_WIDTH_PX viene de PatternEditor.tsx — no se repite el literal acá.
 
 /** El doble de ResizeObserver: jsdom no lo tiene y sin él `svgSize` queda en 0,
  *  que es la otra compuerta del efecto de encuadre. */
@@ -126,8 +126,8 @@ function setup(contenido: { pieces?: PatternPiece[]; trazos?: Trazo[] } = {}) {
   return { store, svg };
 }
 
-describe('PatternEditor — ajustar a la vista respeta la faja del dock', () => {
-  it('descuenta el dock del ancho Y desplaza el paneo por lo mismo', () => {
+describe('PatternEditor — ajustar a la vista encuadra en la hoja entera', () => {
+  it('usa el ancho del svg y no desplaza el paneo: el margen ya no tapa la hoja', () => {
     stubResizeObserver();
 
     const { store } = setup();
@@ -136,11 +136,11 @@ describe('PatternEditor — ajustar a la vista respeta la faja del dock', () => 
       store.dispatch(requestFitView());
     });
 
-    const esperado = computeFitView([piece], VIEWPORT_WIDTH - DOCK_WIDTH_PX, VIEWPORT_HEIGHT)!;
+    const esperado = computeFitView([piece], VIEWPORT_WIDTH, VIEWPORT_HEIGHT)!;
     expect(esperado).not.toBeNull();
 
     expect(store.getState().editor.zoom2D).toBeCloseTo(esperado.zoom, 5);
-    expect(store.getState().editor.pan2D.x).toBeCloseTo(esperado.pan.x + DOCK_WIDTH_PX, 5);
+    expect(store.getState().editor.pan2D.x).toBeCloseTo(esperado.pan.x, 5);
     expect(store.getState().editor.pan2D.y).toBeCloseTo(esperado.pan.y, 5);
   });
 
@@ -164,13 +164,13 @@ describe('PatternEditor — ajustar a la vista respeta la faja del dock', () => 
     // El trazo va en coordenadas de patrón: su `path` ES el contorno, sin posición.
     const esperado = computeFitView(
       [{ position: { x: 0, y: 0 }, outline: trazo.path }],
-      VIEWPORT_WIDTH - DOCK_WIDTH_PX,
+      VIEWPORT_WIDTH,
       VIEWPORT_HEIGHT,
     )!;
     expect(esperado).not.toBeNull();
 
     expect(store.getState().editor.zoom2D).toBeCloseTo(esperado.zoom, 5);
-    expect(store.getState().editor.pan2D.x).toBeCloseTo(esperado.pan.x + DOCK_WIDTH_PX, 5);
+    expect(store.getState().editor.pan2D.x).toBeCloseTo(esperado.pan.x, 5);
     expect(store.getState().editor.pan2D.y).toBeCloseTo(esperado.pan.y, 5);
   });
 

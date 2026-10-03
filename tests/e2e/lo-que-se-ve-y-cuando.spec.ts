@@ -176,7 +176,11 @@ test.describe('D4 — Pluma cierra sola, y deshacer es la salida', () => {
     await page.keyboard.press('h');
     await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('pen');
 
-    for (const p of [{ x: 150, y: 500 }, { x: 350, y: 500 }, { x: 350, y: 640 }]) await clicEn(page, p);
+    // Por encima de la barra de IA y de la fila de capas, que en reposo viven
+    // en el pie de la hoja: desde que el margen corre la hoja 44 px, el
+    // (350, 640) de antes caía dentro de la barra (P2a). P2c la saca del
+    // reposo; la fila sube a la barra superior en la tarea siguiente.
+    for (const p of [{ x: 150, y: 400 }, { x: 350, y: 400 }, { x: 350, y: 520 }]) await clicEn(page, p);
     await page.keyboard.press('Enter');
     await expect.poll(async () => (await st(page)).project.pieces.length, { timeout: 5000 }).toBe(1);
 

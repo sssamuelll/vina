@@ -176,8 +176,11 @@ test.describe('#1172 — Medir y Recorrer costura no escriben: tampoco borran', 
   test('M6 · con mediciones en pantalla, Supr no se lleva la pieza', async ({ page }) => {
     await conPiezaSeleccionada(page);
     await activarHerramienta(page, 'm', 'measure');
+    // A la izquierda de la tarjeta de herramienta, que en Split a 1280 empieza
+    // en x 326: desde que el margen corre la hoja 44 px, el (300, 100) de antes
+    // caía dentro de ella (P2a). P2b la borra.
     await clickAt(page, { x: 100, y: 100 });
-    await clickAt(page, { x: 300, y: 100 });
+    await clickAt(page, { x: 250, y: 100 });
     await page.waitForTimeout(300);
     await expect(botonBorrarMediciones(page), 'el caso no se ejerce: los clics no midieron nada')
       .toBeEnabled();
@@ -194,8 +197,11 @@ test.describe('#1172 — Medir y Recorrer costura no escriben: tampoco borran', 
   test('M7 · Retroceso hace lo mismo que Supr midiendo', async ({ page }) => {
     await conPiezaSeleccionada(page);
     await activarHerramienta(page, 'm', 'measure');
+    // A la izquierda de la tarjeta de herramienta, que en Split a 1280 empieza
+    // en x 326: desde que el margen corre la hoja 44 px, el (300, 100) de antes
+    // caía dentro de ella (P2a). P2b la borra.
     await clickAt(page, { x: 100, y: 100 });
-    await clickAt(page, { x: 300, y: 100 });
+    await clickAt(page, { x: 250, y: 100 });
     await page.waitForTimeout(300);
 
     await expect(botonBorrarMediciones(page), 'el caso no se ejerce: los clics no midieron nada')

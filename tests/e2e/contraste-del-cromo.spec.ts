@@ -162,7 +162,7 @@ test('lo que flota sobre la hoja: aviso, diálogo, tooltip y menús', async ({ p
   await page.keyboard.press('Escape');
   await expect(page.locator('.confirm-dialog')).toHaveCount(0);
 
-  await page.locator('.dock--left .dock__tool').first().hover();
+  await page.locator('nav.margen .dock__tool').first().hover();
   await expect(page.locator('.tool-tooltip')).toBeVisible({ timeout: 3_000 });
   await page.waitForTimeout(200);
   await registrar('tooltip', page);

@@ -36,6 +36,9 @@
   position: relative;
   overflow: hidden;
   background: var(--canvas-2d); /* un solo papel: el del lienzo */
+  /* El margen de herramientas y la hoja, uno al lado de la otra (spec
+     2026-10-02 § 4.3): el margen es una columna, no flota encima. */
+  display: flex;
 }
 
 .canvas-area__divider {

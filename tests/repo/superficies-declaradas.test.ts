@@ -22,6 +22,7 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/shell/TopBar.tsx', 'ambiente', 1],
   ['src/components/shell/TopBar.tsx', 'dev', 1],
   ['src/components/shell/DockShell.tsx', 'ambiente', 1],
+  ['src/components/shell/Dock.tsx', 'ambiente', 1],
   ['src/components/PatternEditor/renderers/MarcaDeEscala.tsx', 'documento', 1],
   ['src/components/Viewport3D/SurfaceModePill.tsx', 'ambiente', 1],
   ['src/components/Viewport3D/SurfaceModePill.tsx', 'menu', 1],
