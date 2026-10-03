@@ -39,6 +39,10 @@ const RAICES: Array<[string, number]> = [
   ['src/components/LayerPanel/LayerPanel.tsx', 1],
   ['src/components/LayerPanel/LayerColorPicker.tsx', 1],
   ['src/components/Viewport3D/SurfaceModePill.tsx', 1],
+  // Avisos y tooltips
+  ['src/components/shell/ToastContainer.tsx', 1],
+  ['src/components/shell/ToolTooltip.tsx', 1],
+  ['src/components/shell/AppShell.tsx', 1],
 ];
 
 /**
@@ -55,6 +59,9 @@ const PINTA: Array<[string, string[] | '*']> = [
   ['src/components/shell/Dock.css', ['.dock-picker']],
   ['src/components/LayerPanel/LayerPanel.css', ['.layer-context-menu', '.layer-color-popover', '.layer-color-swatch']],
   ['src/components/Viewport3D/SurfaceModePill.css', ['.surface-pill__flyout', '.surface-pill__option']],
+  // Avisos y tooltips
+  ['src/components/shell/ToastContainer.css', '*'],
+  ['src/components/shell/ToolTooltip.css', '*'],
 ];
 
 const FONDO_DEL_MARCO = /var\(--(bg-surface|bg-base|bg-deeper|bg-primary|panel-bg|surface-chrome-bg)\)/;
@@ -102,5 +109,18 @@ describe('dentro de lo que flota, lo que separa es línea de pelo', () => {
     ['src/components/shell/Dock.css', '.dock-picker__reset', 'border-top: var(--hairline)'],
   ])('%s: %s lleva %s', (ruta, selector, declaracion) => {
     expect(regla(ruta, selector)).toContain(declaracion);
+  });
+});
+
+describe('la tarjeta de «suelta tu archivo» es un aviso, y es papel', () => {
+  // El velo de arrastre (AppShell) es un tinte de acento sobre la hoja; la
+  // tarjeta que dice qué pasa al soltar flota encima: material entero.
+  const appShell = sinComentarios(lee('src/components/shell/AppShell.tsx'));
+  it.each([
+    "background: 'var(--surface-overlay-bg)'",
+    "border: 'var(--surface-overlay-border)'",
+    "boxShadow: 'var(--surface-overlay-shadow)'",
+  ])('lleva %s', (declaracion) => {
+    expect(appShell).toContain(declaracion);
   });
 });

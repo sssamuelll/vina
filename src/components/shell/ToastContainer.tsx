@@ -38,7 +38,7 @@ export default function ToastContainer() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="toast-container" aria-live="polite" aria-label="Notificaciones">
+    <div className="toast-container" data-material="papel" aria-live="polite" aria-label="Notificaciones">
       {toasts.map((toast) => (
         <div key={toast.id} className={`toast toast--${toast.type}`} role="status" data-superficie="toast">
           <span className="toast__message">{toast.message}</span>

@@ -290,6 +290,7 @@ export default function AppShell() {
         {dxfDragActive && (
           <div
             data-superficie="velo"
+            data-material="papel"
             style={{
               position: 'absolute',
               inset: 0,
@@ -305,7 +306,8 @@ export default function AppShell() {
           >
             <div
               style={{
-                background: 'var(--bg-elevated)',
+                background: 'var(--surface-overlay-bg)',
+                border: 'var(--surface-overlay-border)',
                 color: 'var(--text-primary)',
                 padding: '14px 22px',
                 borderRadius: 8,

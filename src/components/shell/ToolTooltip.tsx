@@ -62,6 +62,7 @@ export default function ToolTooltip({ name, shortcut, description, descriptionTo
         <div
           className={`tool-tooltip ${side}`}
           data-superficie="tooltip"
+          data-material="papel"
           role="tooltip"
           style={{ top: pos.top, left: pos.left }}
         >
