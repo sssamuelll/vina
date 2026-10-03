@@ -42,6 +42,13 @@ describe('el gate del deploy corre los trinquetes de la interfaz', () => {
     ]));
   });
 
+  it('y las dos redes de emplazamiento de P2a: el margen y la barra superior (§ 9)', () => {
+    expect(specsDelGate()).toEqual(expect.arrayContaining([
+      'tests/e2e/margen-de-herramientas.spec.ts',
+      'tests/e2e/barra-superior.spec.ts',
+    ]));
+  });
+
   it('cada spec de la lista existe en disco', () => {
     expect(specsDelGate().filter((s) => !existsSync(join(RAIZ, s)))).toEqual([]);
   });

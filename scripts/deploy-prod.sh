@@ -214,6 +214,8 @@ npx playwright test --workers=2 \
   tests/e2e/superficies-por-accion.spec.ts \
   tests/e2e/contraste-del-cromo.spec.ts \
   tests/e2e/marca-de-escala.spec.ts \
+  tests/e2e/margen-de-herramientas.spec.ts \
+  tests/e2e/barra-superior.spec.ts \
   > /tmp/vina-deploy-e2e.log 2>&1 || {
     echo "  log completo: /tmp/vina-deploy-e2e.log" >&2
     tail -60 /tmp/vina-deploy-e2e.log >&2

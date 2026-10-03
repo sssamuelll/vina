@@ -95,9 +95,12 @@ sobre el papel. No sabe dónde está. Cinco reglas:
   nombre que el ámbito redefine (`--text-muted: var(--text-tertiary)`), el
   ámbito lo vuelve a declarar; si no, baja con el valor del marco. Lo vigila
   `src/styles/__tests__/ambito-de-papel.test.ts`.
-- **Hasta su fase siguen con el overlay oscuro de `:root`:** la barra de IA, la
-  tira y la fila (P2), los paneles (P4, que los pasa a `chrome` a ras) y el
-  cromo del 3D (P5). La hoja gana el ámbito en P2 y el escenario en P5.
+- **Hasta su fase siguen con el overlay oscuro de `:root`:** la barra de IA y
+  la tira (P2), los paneles (P4, que los pasa a `chrome` a ras) y el cromo del
+  3D (P5). La fila dejó el lienzo en P2: sus seis interruptores viven en la
+  barra superior, que es marco, y solo su menú plegado («Mostrar») flota y es
+  papel. El margen de herramientas lleva el ámbito desde P2; la hoja lo gana
+  cuando se vaya la tira, y el escenario en P5.
 
 Más una familia de **tinta**, que no es superficie: `--ink-*` es lo que se
 dibuja **sobre el papel** del lienzo 2D.
@@ -157,6 +160,17 @@ la barra de IA.
 ## 3. Ley de emplazamiento
 
 - El cromo se **acopla en canaletas**; el documento tiene área segura.
+- **En reposo, solo lo que perdura** (spec 2026-10-02 «la interfaz en papel»
+  § 3, ley 2): la barra superior, los márgenes de herramientas, la línea al
+  pie y la marca de escala. Nada más está montado. Lo mide
+  `reposo-solo-lo-que-perdura.spec.ts`, con una línea base que solo baja.
+- **El selector de vista y los márgenes no se mueven.** El selector está en el
+  centro de la ventana en las tres vistas, porque la barra superior reparte
+  sus dos lados a partes iguales (lo mide `barra-superior.spec.ts`). Los
+  márgenes de herramientas son columnas pegadas al borde, no flotan: no tapan
+  la hoja ni se desplazan con lo que pasa encima (`margen-de-herramientas.spec.ts`).
+  Que tampoco se muevan al abrir un panel llega con la ranura a la derecha: en
+  2D con P4, en Split con P5.
 - Solo tres cosas pueden taparlo: menús transitorios, toasts y la paleta.
 - Un panel nuevo NO se abre encima del patrón.
 - Nada de `z-index` literal. Si necesitas una capa, es que falta un rol.

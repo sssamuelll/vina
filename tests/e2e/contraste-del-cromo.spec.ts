@@ -227,3 +227,15 @@ test('lo que flota en el 3D: el menú del modo de superficie', async ({ page }) 
   await page.waitForTimeout(200);
   await registrar('menú de superficie (3D)', page);
 });
+
+test('la barra superior plegada: el menú de «Mostrar»', async ({ page }) => {
+  // A 1366 los seis interruptores caben; a 1280 se pliegan (spec 2026-10-02
+  // § 4.2) y el menú que los lleva es papel, colgado de <body>.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await cargarDxfDeMaria(page);
+  await reposo(page);
+  await page.getByRole('button', { name: 'Mostrar' }).click();
+  await expect(page.getByRole('group', { name: 'Qué se ve del patrón' })).toBeVisible();
+  await page.waitForTimeout(200);
+  await registrar('menú «Mostrar» (barra plegada)', page);
+});
