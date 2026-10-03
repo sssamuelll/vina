@@ -4,12 +4,17 @@ import { leerBaseline, fijarBaseline, techoDe } from './helpers/trinquete';
 import {
   abrirAppVacia, cargarDxfDeMaria, reposo, seleccionarPieza, abrirPaleta, abrirPanel, cambiarVista,
 } from './helpers/estados';
+import { addPiece, dispatch, clickAt, activarHerramienta } from './helpers/lienzo';
 
 /**
  * Trinquete de contraste del cromo (spec 2026-09-24 «cromo callado» § 4.2 y
  * § 7 F1). Por estado, cuenta los textos que no llegan a AA sobre su fondo
  * real y falla si la cuenta supera el techo guardado. La meta es 0; lo que
  * hoy falla y no toca F1 (paneles de contenido) baja en F5 y F6.
+ *
+ * Desde P1b de «la interfaz en papel» (spec 2026-10-02 § 9) mide también lo
+ * que flota, que pasa a papel: el aviso, el diálogo, el tooltip, los menús
+ * con sus submenús (dos cuelgan de <body>) y los modales.
  */
 const BASELINE = 'tests/e2e/contraste-baseline.json';
 const baseline = leerBaseline(BASELINE);
@@ -21,8 +26,16 @@ async function registrar(estado: string, page: Parameters<typeof medirContraste>
   const techo = techoDe(baseline, estado);
   console.log(`contraste · ${estado}: ${fallos.length} texto(s) bajo AA · línea base ${baseline.estados[estado] ?? '—'} · techo ${techo ?? '—'} · meta ${baseline.meta}`);
   for (const f of fallos) console.log(`    ${f.ratio}:1 (mín ${f.minimo}) «${f.texto}» ${f.selector} — ${f.color} sobre ${f.fondo}`);
+  // Un estado que no está en la línea base no medía nada: `techoDe` daba
+  // undefined y la aserción se saltaba (revisión final de P0 + P1a). Ahora
+  // falla, salvo en la corrida que la escribe.
+  if (!process.env.CONTRASTE_UPDATE) {
+    expect.soft(techo, `«${estado}» no está en ${BASELINE}: fíjalo con CONTRASTE_UPDATE=1`).toBeDefined();
+  }
   if (techo !== undefined) {
-    expect(fallos.length, fallos.map((f) => `${f.ratio}:1 «${f.texto}» ${f.selector}`).join('\n')).toBeLessThanOrEqual(techo);
+    // Blando: en los tests que miden varias superficies seguidas, una que
+    // falla no esconde a las que vienen detrás.
+    expect.soft(fallos.length, fallos.map((f) => `${f.ratio}:1 «${f.texto}» ${f.selector}`).join('\n')).toBeLessThanOrEqual(techo);
   }
 }
 
@@ -118,4 +131,99 @@ test('el navegador entiende la piel: oklch con alfa y color-mix (Review Focus 2)
     return c;
   });
   expect(mezcla, 'color-mix() (marquesina y previsualización de formas) no se parseó').not.toMatch(/^$|rgba\(0, 0, 0, 0\)/);
+});
+
+// ── Lo que flota (spec 2026-10-02 § 9: en P1b se vuelve a medir entero) ──
+// Con una pieza sembrada y no con el DXF: ninguna de estas superficies
+// depende del patrón, y en un grupo serial del gate cada carga del DXF son
+// de 10 a 20 s. Las esperas cortas dejan terminar las animaciones de
+// entrada: a media opacidad el medidor no cuenta el texto.
+
+test('lo que flota sobre la hoja: aviso, diálogo, tooltip y menús', async ({ page }) => {
+  await addPiece(page, 'flota', { x: 120, y: 120 }, 300, 240);
+  await reposo(page);
+
+  await dispatch(page, 'copilotUI/showToast', {
+    type: 'undo', message: 'Margen de costura 8 mm → 10 mm', actionLabel: 'Deshacer',
+    actionPayload: { type: 'editor/noop' }, duration: 0,
+  });
+  await expect(page.locator('.toast')).toBeVisible();
+  await page.waitForTimeout(300);
+  await registrar('aviso', page);
+  await reposo(page);
+
+  await dispatch(page, 'copilotUI/showConfirmation', {
+    title: 'Eliminar la pieza', description: 'La pieza se borra con sus costuras.',
+    consequences: ['Se pierden 2 costuras'], destructive: true, confirmLabel: 'Eliminar la pieza',
+  });
+  await expect(page.locator('.confirm-dialog')).toBeVisible();
+  await page.waitForTimeout(300);
+  await registrar('diálogo de confirmación', page);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.confirm-dialog')).toHaveCount(0);
+
+  await page.locator('.dock--left .dock__tool').first().hover();
+  await expect(page.locator('.tool-tooltip')).toBeVisible({ timeout: 3_000 });
+  await page.waitForTimeout(200);
+  await registrar('tooltip', page);
+  await page.mouse.move(700, 600);
+
+  await page.getByRole('button', { name: 'Personalizar herramientas del dock' }).click();
+  await expect(page.locator('.dock-picker')).toBeVisible();
+  await page.waitForTimeout(200);
+  await registrar('menú del dock', page);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.dock-picker')).toHaveCount(0);
+
+  await clickAt(page, { x: 270, y: 240 }, 'right');
+  const menu = page.locator('.context-menu');
+  await expect(menu).toBeVisible();
+  await page.waitForTimeout(200);
+  await registrar('menú del clic derecho', page);
+  await menu.getByRole('button', { name: /Orden/ }).first().hover();
+  await expect(page.locator('.submenu-panel')).toBeVisible({ timeout: 2_000 });
+  await page.waitForTimeout(200);
+  await registrar('submenú del clic derecho', page);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+
+  await page.locator('.logo-menu__trigger').click();
+  await page.locator('.logo-menu > .logo-menu__item').first().hover();
+  await expect(page.locator('.logo-menu__submenu')).toBeVisible();
+  await page.waitForTimeout(200);
+  await registrar('submenú del logo', page);
+  await page.keyboard.press('Escape');
+});
+
+test('los modales: el del piquete y el de conexión', async ({ page }) => {
+  await addPiece(page, 'piquete', { x: 120, y: 120 }, 300, 400);
+  await reposo(page);
+  await activarHerramienta(page, 'Shift+N', 'notch');
+  // El piquete tiene que caer sobre el contorno y no en el relleno: se
+  // prueban varios puntos del lado izquierdo, como en emplazamiento-modales.
+  const modal = page.locator('.notch-precision-modal');
+  for (const y of [320, 260, 380, 220, 420]) {
+    await clickAt(page, { x: 120, y });
+    await page.waitForTimeout(250);
+    if (await modal.isVisible()) break;
+  }
+  await expect(modal, 'ningún clic sobre el borde abrió el modal del piquete').toBeVisible();
+  await registrar('modal del piquete', page);
+  await page.keyboard.press('Escape');
+  await expect(modal).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Modo ajustes' }).click();
+  await page.getByRole('button', { name: /Agregar (conexión|tu primera conexión)/ }).first().click();
+  await expect(page.getByRole('dialog', { name: 'Agregar conexión' })).toBeVisible();
+  await page.waitForTimeout(200);
+  await registrar('modal de conexión', page);
+});
+
+test('lo que flota en el 3D: el menú del modo de superficie', async ({ page }) => {
+  await cambiarVista(page, '3D');
+  await page.locator('.surface-pill__trigger').click();
+  await expect(page.locator('.surface-pill__flyout')).toBeVisible();
+  await page.waitForTimeout(200);
+  await registrar('menú de superficie (3D)', page);
 });
