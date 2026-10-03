@@ -167,10 +167,12 @@ la barra de IA.
 - **El selector de vista y los márgenes no se mueven.** El selector está en el
   centro de la ventana en las tres vistas, porque la barra superior reparte
   sus dos lados a partes iguales (lo mide `barra-superior.spec.ts`). Los
-  márgenes de herramientas son columnas pegadas al borde, no flotan: no tapan
-  la hoja ni se desplazan con lo que pasa encima (`margen-de-herramientas.spec.ts`).
-  Que tampoco se muevan al abrir un panel llega con la ranura a la derecha: en
-  2D con P4, en Split con P5.
+  márgenes de herramientas son columnas pegadas al borde que no tapan la hoja
+  (lo mide `margen-de-herramientas.spec.ts`). Van en el flujo, al lado de la
+  hoja: lo que flota encima no comparte caja con ellos y no los empuja. Con
+  barras clásicas el margen crece de 44 a 47 px mientras sus herramientas no
+  caben, y la hoja se corre esos 3 px. Que tampoco se muevan al abrir un panel
+  llega con la ranura a la derecha: en 2D con P4, en Split con P5.
 - Solo tres cosas pueden taparlo: menús transitorios, toasts y la paleta.
 - Un panel nuevo NO se abre encima del patrón.
 - Nada de `z-index` literal. Si necesitas una capa, es que falta un rol.
