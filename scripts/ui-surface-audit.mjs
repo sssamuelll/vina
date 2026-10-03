@@ -1066,7 +1066,7 @@ async function collectCensus() {
 async function enumerateLeftDockTools() {
   activeStateName = 'enumeración dinámica del dock izquierdo';
   await prepareLoadedBase();
-  return page.locator('.dock--left button.dock__tool').evaluateAll((buttons) => buttons
+  return page.locator('nav.margen button.dock__tool').evaluateAll((buttons) => buttons
     .filter((button) => {
       const rect = button.getBoundingClientRect();
       const style = getComputedStyle(button);
@@ -1081,11 +1081,11 @@ async function enumerateLeftDockTools() {
 }
 
 async function clickDockTool(tool) {
-  const button = page.locator('.dock--left').getByRole('button', { name: tool.nombre, exact: true }).first();
+  const button = page.locator('nav.margen').getByRole('button', { name: tool.nombre, exact: true }).first();
   await button.click();
   if (tool.tieneAriaPressed) {
     await page.waitForFunction((name) => {
-      const candidates = [...document.querySelectorAll('.dock--left button.dock__tool')];
+      const candidates = [...document.querySelectorAll('nav.margen button.dock__tool')];
       const target = candidates.find((item) => (
         (item.getAttribute('aria-label') || item.getAttribute('title') || item.textContent || '').replace(/\s+/g, ' ').trim() === name
       ));
@@ -1141,7 +1141,7 @@ async function findPieceInteriorPoint() {
 }
 
 async function selectFirstPiece() {
-  const selectButton = page.locator('.dock--left').getByRole('button', { name: 'Seleccionar · Z', exact: true });
+  const selectButton = page.locator('nav.margen').getByRole('button', { name: 'Seleccionar · Z', exact: true });
   await selectButton.click();
   const point = await findPieceInteriorPoint();
   await page.mouse.click(point.x, point.y);
@@ -1198,7 +1198,7 @@ async function openPieceContextMenu() {
 }
 
 async function openPieceLineContextMenu() {
-  const editButton = page.locator('.dock--left').getByRole('button', { name: 'Editar patrón · Q', exact: true });
+  const editButton = page.locator('nav.margen').getByRole('button', { name: 'Editar patrón · Q', exact: true });
   await editButton.click();
   const interior = await findPieceInteriorPoint();
   await page.mouse.click(interior.x, interior.y);
