@@ -38,6 +38,9 @@ const opcionesDelPiquete = (page: Page) =>
 const cuantasPiezas = (page: Page) =>
   page.evaluate(() => (window as unknown as VentanaConStore).__VINA_STORE__.getState().project.pieces.length);
 
+const seleccion = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __VINA_STORE__: { getState: () => { editor: { selectedPieceIds: string[] } } } }).__VINA_STORE__.getState().editor.selectedPieceIds);
+
 const piquetesDe = (page: Page, id: string) =>
   page.evaluate((pieza) => (window as unknown as VentanaConStore).__VINA_STORE__.getState().project.pieces
     .find((p) => p.id === pieza)?.internals
@@ -215,11 +218,11 @@ test('en una ventana estrecha, lo que no cabe pasa a «Más»: la frase conserva
   await expect(direccion.getByRole('button', { name: 'Las dos' })).toHaveAttribute('aria-pressed', 'true');
   expect(await cuantasPiezas(page)).toBe(piezas);
 
-  // Con el ratón, ningún botón del pie se queda con el foco, ni el que dejó
-  // el teclado: el Enter siguiente es de la herramienta y aplica. El Escape de
-  // arriba también soltó la pieza (decisión 10 del plan: la escalera de
-  // Escape es de P2c), así que se vuelve a seleccionar.
-  await dispatch(page, 'editor/selectPiece', 'desplazar-pie');
+  // Escape cerró «Más» y nada más: la pieza sigue seleccionada (spec
+  // 2026-10-02 § 6.2, la escalera de lo que se llama). Con el ratón, ningún
+  // botón del pie se queda con el foco, ni el que dejó el teclado: el Enter
+  // siguiente es de la herramienta y aplica.
+  expect(await seleccion(page), 'el Escape de «Más» soltó la pieza').toEqual(['desplazar-pie']);
   await direccion.getByRole('button', { name: 'Hacia afuera' }).click();
   expect(await page.evaluate(() => document.activeElement?.closest('.linea-al-pie') == null), 'el clic dejó el foco en la línea al pie').toBe(true);
   await page.keyboard.press('Enter');

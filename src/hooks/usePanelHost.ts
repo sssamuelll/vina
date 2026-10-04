@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { getPanelSide } from '../components/shell/panelSide';
+import { usePeldanoDeEscape } from '../shortcuts/escaleraDeLoLlamado';
 
 export interface PanelHost {
   leftPanel: string | null;
@@ -60,6 +61,10 @@ export function usePanelHost(): PanelHost {
   // Escape cierra los dos paneles, de forma determinista.
   const closeLeft = useCallback(() => setLeftPanel(null), []);
   const closeRight = useCallback(() => setRightPanel(null), []);
+
+  // Esc cierra los paneles antes que la selección, y los dos a la vez: un
+  // peldaño de la escalera de lo que se llama (spec 2026-10-02 § 6.1 y § 6.2).
+  usePeldanoDeEscape('paneles', 'panel', Boolean(leftPanel || rightPanel), () => { closeLeft(); closeRight(); });
 
   return { leftPanel, rightPanel, openPanel, togglePanel, closeLeft, closeRight };
 }

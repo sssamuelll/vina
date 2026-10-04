@@ -6,6 +6,7 @@ import { Provider } from 'react-redux';
 import editorReducer from '../../../store/editorSlice';
 import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 import FilaDeCapas from '../FilaDeCapas';
+import { ShortcutProvider } from '../../../shortcuts/ShortcutProvider';
 
 afterEach(() => {
   cleanup();
@@ -50,7 +51,7 @@ describe('FilaDeCapas', () => {
 
   it('la casilla «Largos» se marca con el modo Todas y despacha setLineLengthMode al pulsar', () => {
     const store = configureStore({ reducer: { editor: editorReducer } });
-    render(<Provider store={store}><FilaDeCapas /></Provider>);
+    render(<Provider store={store}><ShortcutProvider><FilaDeCapas /></ShortcutProvider></Provider>);
 
     const boton = screen.getByRole('button', { name: 'Largos' });
     expect(store.getState().editor.lineLengthMode).toBe('none');
@@ -100,7 +101,7 @@ describe('FilaDeCapas plegada: cuando los seis no caben (spec 2026-10-02 § 4.2)
   it('se pliegan en «Mostrar», que abre un menú de papel con los seis', () => {
     sinSitio();
     const store = configureStore({ reducer: { editor: editorReducer } });
-    render(<Provider store={store}><FilaDeCapas /></Provider>);
+    render(<Provider store={store}><ShortcutProvider><FilaDeCapas /></ShortcutProvider></Provider>);
 
     expect(screen.queryByRole('group', { name: 'Qué se ve del patrón' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar' }));
@@ -119,7 +120,7 @@ describe('FilaDeCapas plegada: cuando los seis no caben (spec 2026-10-02 § 4.2)
   it('al abrirse, el foco entra al menú: cuelga de <body>, y Tab desde «Mostrar» no llegaría a los seis', () => {
     sinSitio();
     const store = configureStore({ reducer: { editor: editorReducer } });
-    render(<Provider store={store}><FilaDeCapas /></Provider>);
+    render(<Provider store={store}><ShortcutProvider><FilaDeCapas /></ShortcutProvider></Provider>);
 
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar' }));
 
@@ -131,10 +132,10 @@ describe('FilaDeCapas plegada: cuando los seis no caben (spec 2026-10-02 § 4.2)
     sinSitio();
     clearJournal();
     const store = configureStore({ reducer: { editor: editorReducer } });
-    render(<Provider store={store}><FilaDeCapas /></Provider>);
+    render(<Provider store={store}><ShortcutProvider><FilaDeCapas /></ShortcutProvider></Provider>);
 
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar' }));
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
 
     const ui = getJournal().events.filter((e) => e.kind === 'ui').map((e) => [e.name, e.data]);
     expect(ui).toEqual([
@@ -156,7 +157,7 @@ describe('FilaDeCapas plegada: cuando los seis no caben (spec 2026-10-02 § 4.2)
     const hueco = vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(300);
     vi.spyOn(Element.prototype, 'scrollWidth', 'get').mockReturnValue(402);
     const store = configureStore({ reducer: { editor: editorReducer } });
-    render(<Provider store={store}><FilaDeCapas /></Provider>);
+    render(<Provider store={store}><ShortcutProvider><FilaDeCapas /></ShortcutProvider></Provider>);
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar' }));
     expect(document.querySelector('.grupo-del-patron__menu')).not.toBeNull();
 
@@ -178,13 +179,13 @@ describe('FilaDeCapas plegada: cuando los seis no caben (spec 2026-10-02 § 4.2)
   it('Escape lo cierra y devuelve el foco a «Mostrar»', () => {
     sinSitio();
     const store = configureStore({ reducer: { editor: editorReducer } });
-    render(<Provider store={store}><FilaDeCapas /></Provider>);
+    render(<Provider store={store}><ShortcutProvider><FilaDeCapas /></ShortcutProvider></Provider>);
     const mostrar = screen.getByRole('button', { name: 'Mostrar' });
     fireEvent.click(mostrar);
     const menu = screen.getByRole('group', { name: 'Qué se ve del patrón' });
     within(menu).getByRole('button', { name: 'Margen' }).focus();
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
 
     expect(screen.queryByRole('group', { name: 'Qué se ve del patrón' })).toBeNull();
     expect(document.activeElement).toBe(mostrar);

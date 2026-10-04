@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { usePanelHost } from '../usePanelHost';
+import { bajarLaEscalera } from '../../shortcuts/escaleraDeLoLlamado';
 
 describe('usePanelHost', () => {
   it('arranca con las dos ranuras vacías', () => {
@@ -102,5 +103,13 @@ describe('usePanelHost', () => {
     rerender();
     expect(result.current.closeLeft).toBe(closeLeftAntes);
     expect(result.current.closeRight).toBe(closeRightAntes);
+  });
+
+  it('Escape con dos paneles abiertos cierra los dos: un solo peldaño, el de los paneles', () => {
+    const { result } = renderHook(() => usePanelHost());
+    act(() => { result.current.openPanel('Properties'); result.current.openPanel('Layers'); });
+    expect([result.current.leftPanel, result.current.rightPanel]).toEqual(['Properties', 'Layers']);
+    act(() => { expect(bajarLaEscalera()).toBe('paneles'); });
+    expect([result.current.leftPanel, result.current.rightPanel]).toEqual([null, null]);
   });
 });

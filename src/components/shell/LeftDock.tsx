@@ -8,6 +8,7 @@ import Dock from './Dock';
 import DockToolPicker from './DockToolPicker';
 import { DOCK_2D_CATALOG, getDockToolById, type DockToolDef } from './dock2dTools';
 import { herramientaParaMostrar } from './herramientaParaMostrar';
+import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
 
 /** El margen de herramientas del patrón (spec 2026-10-02 § 4.3): las del dock
  *  de la usuaria + el ＋ que las agrega y las quita. Hidden in 3D-only view. La
@@ -40,16 +41,17 @@ export default function LeftDock() {
       if (editorRef.current?.contains(t) || pickerRef.current?.contains(t)) return;
       setPickerOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      // Si el foco estaba en el personalizador, vuelve al «+» que lo abrió.
-      if (pickerRef.current?.contains(document.activeElement)) addRef.current?.focus();
-      setPickerOpen(false);
-    };
     window.addEventListener('mousedown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); };
+    return () => window.removeEventListener('mousedown', onDown);
   }, [pickerOpen]);
+
+  // Esc lo cierra antes que la selección, y si el foco estaba en el
+  // personalizador vuelve al «+» que lo abrió: un peldaño de la escalera de lo
+  // que se llama (spec 2026-10-02 § 6.2).
+  usePeldanoDeEscape('personalizador', 'menu', pickerOpen, () => {
+    if (pickerRef.current?.contains(document.activeElement)) addRef.current?.focus();
+    setPickerOpen(false);
+  });
 
   if (viewMode === '3d') return null;
 

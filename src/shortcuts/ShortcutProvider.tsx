@@ -14,6 +14,7 @@ import { ShortcutContext } from './ShortcutContext';
 import { pushJournal } from '../utils/telemetry/journal';
 import { hayModalDelante } from '../utils/superficieModal';
 import { esTeclaDeBotonera } from './teclaDeBotonera';
+import { bajarLaEscalera } from './escaleraDeLoLlamado';
 
 /** Determine which panel has focus based on the active element */
 function getActiveContext(): ShortcutCtx[] {
@@ -96,6 +97,19 @@ export function ShortcutProvider({ children }: ShortcutProviderProps) {
           if ((e.ctrlKey || e.metaKey) && registryRef.current.matchEvent(e, getActiveContext())) {
             e.preventDefault();
           }
+          return;
+        }
+      }
+
+      // Lo que se llama se cierra antes que la selección (spec 2026-10-02
+      // § 6.2): un menú, la barra de IA, un panel. Un Escape, un peldaño. Un
+      // modal delante se queda su Escape.
+      if (e.key === 'Escape' && !hayModalDelante()) {
+        const peldano = bajarLaEscalera();
+        if (peldano) {
+          pushJournal('shortcut', 'escape', { peldano });
+          e.preventDefault();
+          e.stopPropagation();
           return;
         }
       }
