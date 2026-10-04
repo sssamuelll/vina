@@ -10,14 +10,26 @@
   height: var(--top-bar-h);
   background: var(--bg-deeper);
   border-bottom: 1px solid var(--border);
-  display: flex;
+  /* Tres columnas: los lados reparten a partes iguales lo que sobra y pueden
+     encogerse hasta cero, así que el selector de vista queda en el centro de
+     la ventana y no se mueve con lo que haya a cada lado (spec 2026-10-02
+     § 4.2). Hasta P2 eran dos espaciadores `flex: 1`, y su x dependía de los
+     vecinos. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   padding: 0 var(--sp-3);
-  gap: var(--sp-3);
+  column-gap: var(--sp-3);
   flex-shrink: 0;
   z-index: var(--z-bar);
 }
-.top-bar__spacer { flex: 1; }
+.top-bar__lado {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.top-bar__lado--derecho { justify-content: flex-end; }
 .top-bar__status {
   display: flex;
   align-items: center;
@@ -25,6 +37,70 @@
   font-size: var(--text-sm);
   color: var(--text-muted);
 }
+
+/* El grupo del patrón (FilaDeCapas.tsx): los seis interruptores de lo que se
+   ve, sobre el marco. El estado se lee en la marca, llena o hueca, y en el
+   tono del texto: no depende solo del color (ley de estado del contrato). 8 px
+   entre ellos y sin relleno lateral, porque así caben a 1366 px (spec § 4.2:
+   con 12 px no cabían por 7; con 2 px de relleno, medido, por 5). */
+.grupo-del-patron {
+  flex: 1 1 0;
+  min-width: 0;
+  /* Recorta la fila mientras no cabe y aún no se plegó, pero deja asomar el
+     anillo de foco: 2 px a 1 px del botón. Con `hidden` se comía 3 px arriba,
+     abajo y a la izquierda del primero (barra-superior.spec.ts). */
+  overflow: clip;
+  overflow-clip-margin: 3px;
+  display: flex;
+  align-items: center;
+}
+.grupo-del-patron__fila { display: flex; align-items: center; gap: 8px; }
+.grupo-del-patron__interruptor,
+.grupo-del-patron__plegado {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.grupo-del-patron__interruptor--activo { color: var(--text-primary); }
+.grupo-del-patron__marca {
+  width: 8px;
+  height: 8px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+}
+.grupo-del-patron__interruptor--activo .grupo-del-patron__marca { background: currentColor; }
+.grupo-del-patron__interruptor:hover, .grupo-del-patron__plegado:hover { color: var(--text-primary); }
+.grupo-del-patron__interruptor:focus-visible, .grupo-del-patron__plegado:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; color: var(--text-primary); }
+
+/* «Mostrar», plegado: el menú cuelga de <body> y es papel (contrato § 2,
+   «todo portal nace papel»). Los mismos interruptores, en columna. */
+.grupo-del-patron__menu {
+  position: fixed;
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
+}
+.grupo-del-patron__menu .grupo-del-patron__interruptor { padding: 4px 8px; }
+.grupo-del-patron__menu .grupo-del-patron__interruptor:hover { background: var(--bg-elevated); }
+.grupo-del-patron__menu .grupo-del-patron__interruptor:focus-visible { background: var(--bg-elevated); }
 
 .canvas-area {
   flex: 1;
@@ -36,6 +112,9 @@
   position: relative;
   overflow: hidden;
   background: var(--canvas-2d); /* un solo papel: el del lienzo */
+  /* El margen de herramientas y la hoja, uno al lado de la otra (spec
+     2026-10-02 § 4.3): el margen es una columna, no flota encima. */
+  display: flex;
 }
 
 .canvas-area__divider {

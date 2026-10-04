@@ -14,15 +14,13 @@ export interface ToolTooltipProps {
   name: string;
   shortcut?: string;
   description?: string;
-  /** Tints the description line to match a dock badge: 'pin' → blue, 'auto' → violet. */
-  descriptionTone?: 'pin' | 'auto';
   hasSubTools?: boolean;
   /** Which side the tooltip appears on. Default: 'left' */
   position?: 'left' | 'right';
   children: ReactNode;
 }
 
-export default function ToolTooltip({ name, shortcut, description, descriptionTone, hasSubTools, position = 'left', children }: ToolTooltipProps) {
+export default function ToolTooltip({ name, shortcut, description, hasSubTools, position = 'left', children }: ToolTooltipProps) {
   const [visible, setVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -73,7 +71,7 @@ export default function ToolTooltip({ name, shortcut, description, descriptionTo
             )}
           </div>
           {description && (
-            <div className={`tool-tooltip-desc${descriptionTone ? ` tool-tooltip-desc--${descriptionTone}` : ''}`}>{description}</div>
+            <div className="tool-tooltip-desc">{description}</div>
           )}
           {hasSubTools && (
             <div className="tool-tooltip-hint">Mantén pulsado para ver variantes</div>

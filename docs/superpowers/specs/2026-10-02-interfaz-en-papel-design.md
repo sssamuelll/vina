@@ -486,7 +486,9 @@ flota. La hoja y sus márgenes lo ganan en P2, y el escenario en P5: hasta enton
 dock, la tira, la fila y el cromo del 3D, que siguen oscuros, y con el ámbito su tinta se volvería
 oscura sobre fondo oscuro. Los valores de lo que flota (§ 7.1) viven en el bloque del ámbito;
 `:root` conserva el overlay oscuro para lo que todavía no ha pasado a papel. Así, una superficie
-que olvide el atributo se queda oscura y legible, no blanca con tinta clara.
+que olvide el atributo se queda oscura y legible, no blanca con tinta clara. Nota del plan de P2
+(2026-10-03): el margen de herramientas lleva el ámbito en su raíz desde que deja de flotar, y la
+hoja lo gana cuando se vaya la tira, que es la última superficie oscura que vive encima de ella.
 
 | Token | En el ámbito de papel | Sobre papel | Sobre blanco | Sobre papel hundido | Uso |
 |---|---|---|---|---|---|

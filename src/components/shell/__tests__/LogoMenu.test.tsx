@@ -354,3 +354,39 @@ describe('LogoMenu ▸ View — 3D display toggles', () => {
     expect(store.getState().simulation[field]).toBe(!before);
   });
 });
+
+describe('LogoMenu ▸ Patrón — las puertas de la zona AUTO (spec 2026-10-02 § 8)', () => {
+  function renderConPaneles() {
+    const onOpenPanel = vi.fn();
+    const store = configureStore({
+      reducer: {
+        editor: editorReducer,
+        simulation: simulationReducer,
+        dock: dockReducer,
+        project: projectReducer,
+        tools: toolsReducer,
+        construction: constructionReducer,
+        copilotUI: copilotUIReducer,
+      },
+    });
+    render(<Provider store={store}><LogoMenu onOpenPanel={onOpenPanel} onImportDXF={() => {}} /></Provider>);
+    fireEvent.click(screen.getByRole('button', { name: /vina/i }));
+    fireEvent.mouseEnter(screen.getByText('Patrón'));
+    return onOpenPanel;
+  }
+
+  it.each([
+    ['Escalado...', 'Grading'],
+    ['Lista de materiales...', 'BOM'],
+  ] as const)('«%s» abre el panel %s', (rotulo, panel) => {
+    const onOpenPanel = renderConPaneles();
+    fireEvent.click(screen.getByText(rotulo));
+    expect(onOpenPanel).toHaveBeenCalledWith(panel);
+  });
+
+  it('«Sugerencias del dock» ya no está en Vista: la zona AUTO se fue', () => {
+    renderMenu();
+    openViewMenu();
+    expect(screen.queryByText('Sugerencias del dock')).toBeNull();
+  });
+});

@@ -22,8 +22,6 @@ import {
  * base al final con SUPERFICIES_UPDATE=1.
  */
 const BASELINE = 'tests/e2e/superficies-baseline.json';
-/** Espejo de `DOCK_WIDTH_PX` (PatternEditor.tsx): borde derecho del dock izquierdo, en px. */
-const DOCK_ANCHO = 62;
 
 const baseline = leerBaseline(BASELINE);
 const medidas: Record<string, number> = {};
@@ -242,12 +240,4 @@ test.describe('con un rectángulo sembrado (lados rectos conocidos)', () => {
       () => clickAt(page, { x: 420, y: 120 }),
     ]));
   });
-});
-
-test('el dock mide lo que DOCK_WIDTH_PX dice', async ({ page }) => {
-  await page.setViewportSize({ width: 1366, height: 768 });
-  await abrirAppVacia(page);
-  const caja = await page.locator('.dock--left').boundingBox();
-  expect(caja).not.toBeNull();
-  expect(Math.round(caja!.x + caja!.width), 'el borde derecho del dock y DOCK_WIDTH_PX divergen').toBe(DOCK_ANCHO);
 });

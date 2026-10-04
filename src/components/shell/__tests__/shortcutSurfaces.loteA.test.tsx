@@ -18,13 +18,13 @@ const LINE_TOOL = {
   icon: Minus,
   label: 'Línea',
   shortcut: '⇧L',
+  grupo: 'dibujar' as const,
 };
 
 describe('notación de atajos en las superficies del dock', () => {
   it('normaliza el aria-label del dock', () => {
     render(
       <Dock
-        domainLabel="2D"
         tools={[LINE_TOOL]}
         activeToolId="line"
         onSelectTool={() => {}}

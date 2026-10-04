@@ -48,26 +48,10 @@ describe('ToolTooltip', () => {
     expect(document.querySelector('.tool-tooltip-shortcut')).toBeNull();
   });
 
-  it('applies the pin tone class to the description', () => {
-    const { container } = renderTip({ name: 'Grade', description: 'you pinned this', descriptionTone: 'pin' });
+  it('renders the description line', () => {
+    const { container } = renderTip({ name: 'X', description: 'Crea o muestra una pieza para dibujar líneas internas.' });
     hover(container);
-    const desc = document.querySelector('.tool-tooltip-desc')!;
-    expect(desc.textContent).toBe('you pinned this');
-    expect(desc.classList.contains('tool-tooltip-desc--pin')).toBe(true);
-  });
-
-  it('applies the auto tone class to the description', () => {
-    const { container } = renderTip({ name: 'Grade', description: 'suggested for this stage · click ✦ to keep', descriptionTone: 'auto' });
-    hover(container);
-    expect(document.querySelector('.tool-tooltip-desc')!.classList.contains('tool-tooltip-desc--auto')).toBe(true);
-  });
-
-  it('renders a plain description (no tone class) when descriptionTone is omitted', () => {
-    const { container } = renderTip({ name: 'X', description: 'plain' });
-    hover(container);
-    const desc = document.querySelector('.tool-tooltip-desc')!;
-    expect(desc.classList.contains('tool-tooltip-desc--pin')).toBe(false);
-    expect(desc.classList.contains('tool-tooltip-desc--auto')).toBe(false);
+    expect(document.querySelector('.tool-tooltip-desc')!.textContent).toBe('Crea o muestra una pieza para dibujar líneas internas.');
   });
 
   it('uses the position class (right vs left)', () => {

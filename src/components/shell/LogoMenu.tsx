@@ -11,7 +11,6 @@ import {
   startSimulation, pauseSimulation, resetSimulation, setViewMode3D,
   toggleGarment, toggleSeamlines3D, toggleSimSeamLines, toggleInternalLines3D,
 } from '../../store/simulationSlice';
-import { toggleDockSignaling } from '../../store/dockSlice';
 import { requestConfirmation } from '../../hooks/useGuardedAction';
 import { showErrorToast, showInfoToast } from '../../store/copilotUISlice';
 import { duplicatePiece, removePieces, removeSeam, removeInternalLine, removeTramosDeInterna, removePOM, removeTramoDeTrazo } from '../../store/projectSlice';
@@ -50,6 +49,9 @@ interface MenuItem {
    * declara ninguno: se sigue clicando igual.
    */
   shortcutId?: string;
+  /** El panel que abre (clave de `renderPanelContent`). Va por `onOpenPanel`,
+   *  que alterna: por eso estos rótulos nombran el panel, no una acción. */
+  panel?: string;
   action?: (dispatch: AppDispatch) => void;
   checked?: (state: RootState) => boolean;
   disabled?: (state: RootState) => boolean;
@@ -90,7 +92,7 @@ const FILE_MENU: MenuItem[] = [
   // referencia», que es la casilla de mostrar u ocultar. Es UN término para UN
   // concepto asomado dos veces —gestionar y ver—, no dos términos: eso sí
   // rompería la § 5.
-  { label: 'Imágenes de referencia...', action: () => {} }, // wired via onOpenPanel('ReferenceImages')
+  { label: 'Imágenes de referencia...', panel: 'ReferenceImages' },
   { separator: true, label: '' },
   // Fase1-S2: solo exports que EXISTEN. Tech Pack / 3D / Reference Image /
   // Project Settings eran noops o abrían el placeholder circular — un item
@@ -223,8 +225,6 @@ const VIEW_MENU: MenuItem[] = [
   { label: '3D: costuras en simulación', action: (d) => d(toggleSimSeamLines()), checked: (s) => s.simulation.showSimSeamLines },
   { label: '3D: líneas internas', action: (d) => d(toggleInternalLines3D()), checked: (s) => s.simulation.showInternalLines3D },
   { separator: true, label: '' },
-  { label: 'Sugerencias del dock', action: (d) => d(toggleDockSignaling()), checked: (s) => s.dock.signaling === 'subtle' },
-  { separator: true, label: '' },
   { label: 'Unidades: cm', action: (d) => d(setUnits('cm')), checked: (s) => s.editor.units === 'cm' },
   { label: 'Unidades: pulgadas', action: (d) => d(setUnits('inches')), checked: (s) => s.editor.units === 'inches' },
   { label: 'Unidades: mm', action: (d) => d(setUnits('mm')), checked: (s) => s.editor.units === 'mm' },
@@ -234,6 +234,12 @@ const VIEW_MENU: MenuItem[] = [
 // Layout eran noops; Auto-Sew es el único con implementación real.
 const PATTERN_MENU: MenuItem[] = [
   { label: 'Coser piezas automáticamente', action: (d) => d(runAutoSew()) },
+  { separator: true, label: '' },
+  // Las dos sugerencias de la zona AUTO que no tenían otra puerta en el menú
+  // (spec 2026-10-02 § 8). Exportar DXF ya estaba en Archivo; el mapa de
+  // ajuste conserva la suya en el visor 3D hasta P5.
+  { label: 'Escalado...', panel: 'Grading' },
+  { label: 'Lista de materiales...', panel: 'BOM' },
 ];
 
 const SIMULATION_MENU: MenuItem[] = [
@@ -246,7 +252,7 @@ const SIMULATION_MENU: MenuItem[] = [
 // Fase1-S2: AI Provider abría el placeholder circular (la superficie real es
 // el modo settings del UnifiedBar); Keyboard Shortcuts era un noop.
 const PREFERENCES_MENU: MenuItem[] = [
-  { label: 'Avatar y medidas...', action: () => {} }, // wired via onOpenPanel('Avatar')
+  { label: 'Avatar y medidas...', panel: 'Avatar' },
 ];
 
 const HELP_MENU: MenuItem[] = [
@@ -381,10 +387,8 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
 
     if (item.label === 'Importar DXF...') {
       onImportDXF();
-    } else if (item.label === 'Avatar y medidas...') {
-      onOpenPanel('Avatar');
-    } else if (item.label === 'Imágenes de referencia...') {
-      onOpenPanel('ReferenceImages');
+    } else if (item.panel) {
+      onOpenPanel(item.panel);
     } else if (item.action) {
       item.action(dispatch);
     }

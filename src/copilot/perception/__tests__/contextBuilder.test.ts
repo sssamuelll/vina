@@ -329,8 +329,6 @@ function mockState(overrides?: Partial<RootState>): RootState {
       lastGradedAt: null,
     },
     dock: {
-      pinnedExtra: { left: [], right: [] },
-      signaling: 'subtle' as const,
       tools2d: ['select', 'pen', 'line', 'rectangle', 'scissors', 'measure', 'seam'],
     },
     inputScheme: {

@@ -16,11 +16,25 @@
 import { expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
-export async function exportBundle(page: Page): Promise<Record<string, unknown>> {
+/**
+ * Abre el submenú `submenu` del menú Vina, con eventos sintéticos (ver arriba).
+ *
+ * Antes aparca el ratón real en la esquina de la barra, donde no se despliega
+ * nada: si el último gesto del spec lo dejó donde aparece otra fila, Chrome le
+ * da a esa fila su `mouseover` de verdad unos cientos de ms después de abrirse
+ * el menú, y su submenú le gana al pedido. 1102 cayó así en el gate de P2a; lo
+ * fija `emplazamiento-imagenes-de-referencia.spec.ts`.
+ */
+export async function abrirSubmenuDeVina(page: Page, submenu: string): Promise<void> {
+  await page.mouse.move(1, 1);
   await page.getByRole('button', { name: /vina/i }).first().dispatchEvent('click');
   // React implementa onMouseEnter sobre mouseover/mouseout (mouseenter nativo
   // no burbujea y React no lo escucha): hay que despachar mouseover.
-  await page.getByText('Archivo', { exact: true }).dispatchEvent('mouseover');
+  await page.getByText(submenu, { exact: true }).first().dispatchEvent('mouseover');
+}
+
+export async function exportBundle(page: Page): Promise<Record<string, unknown>> {
+  await abrirSubmenuDeVina(page, 'Archivo');
   await expect(page.getByText('Exportar diagnóstico', { exact: true })).toBeVisible({ timeout: 10_000 });
   const [download] = await Promise.all([
     page.waitForEvent('download'),

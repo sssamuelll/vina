@@ -320,7 +320,7 @@ test.describe('un catálogo de veintiuna no puede empujar el dock fuera de la pa
     await page.waitForTimeout(600);
 
     const medida = await page.evaluate(() => {
-      const d = document.querySelector('.dock--left') as HTMLElement | null;
+      const d = document.querySelector('nav.margen') as HTMLElement | null;
       if (!d) return null;
       const r = d.getBoundingClientRect();
       const scrollea = d.scrollHeight > d.clientHeight + 1;

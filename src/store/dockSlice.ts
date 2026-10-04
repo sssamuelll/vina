@@ -2,14 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { z } from 'zod';
 import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 
-type DockSide = 'left' | 'right';
-
 export interface DockState {
-  /** Auto-suggestion ids the user kept (shown always, with a 📌 badge). */
-  pinnedExtra: { left: string[]; right: string[] };
-  /** Auto-signaling preference. 'off' mutes ✦ suggestions + badges + the "auto"
-   *  label; kept items still render as plain buttons. Default 'subtle'. */
-  signaling: 'subtle' | 'off';
   /** The left (2D) dock's tool membership — ids drawn from DOCK_2D_CATALOG.
    *  Rendered in this array's order (user-reorderable via drag, slice 4b).
    *  Default DEFAULT_DOCK_2D_IDS. Min 1 (never empty). */
@@ -17,15 +10,16 @@ export interface DockState {
 }
 
 const STORAGE_KEY = 'vina-docks';
-const STORAGE_VERSION = 1;
-const MAX_PINNED = 16;
+/** v2 desde P2 de «la interfaz en papel» (spec 2026-10-02 § 8): la zona AUTO
+ *  se fue y con ella `pinnedExtra` y `signaling`. El sobre v1 se sigue leyendo
+ *  (`EnvelopeV1Schema`) para no devolverle a nadie el dock de fábrica. */
+const STORAGE_VERSION = 2;
+/** Tope de las sugerencias fijadas del sobre v1. Solo valida lo que se lee. */
+const MAX_PINNED_V1 = 16;
 
 /**
- * Tope de herramientas del dock 2D.
- *
- * NO es el mismo botón que `MAX_PINNED`, aunque los dos sean números parecidos:
- * `MAX_PINNED` acota las sugerencias que la usuaria se queda (`pinnedExtra`), y
- * esto acota `tools2d`, cuyos ids salen todos de `DOCK_2D_CATALOG`.
+ * Tope de herramientas del dock 2D: acota `tools2d`, cuyos ids salen todos de
+ * `DOCK_2D_CATALOG`.
  *
  * Por qué existe: el sobre persistido valida `.max()` sobre esta lista, y zod
  * rechaza el sobre ENTERO cuando un campo no valida — `loadDocks` devuelve null
@@ -126,30 +120,42 @@ const idString = z
   .min(1)
   .max(MAX_ID_LEN)
   .refine((s) => !s.includes('\0'), { message: 'contains null byte' });
-const sideArray = z.array(idString).max(MAX_PINNED);
-
-const signalingSchema = z.enum(['subtle', 'off']).default('subtle');
-
 const tools2dSchema = z.array(idString).max(MAX_DOCK_2D_TOOLS).default([...DEFAULT_DOCK_2D_IDS]);
 
-const DockStateSchema = z
+const PersistedEnvelopeSchema = z
+  .object({ version: z.literal(STORAGE_VERSION), data: z.object({ tools2d: tools2dSchema }).strict() })
+  .strict();
+
+/**
+ * El sobre v1, tal como lo escribía `persistDocks` hasta P2: con la zona AUTO
+ * dentro y `.strict()`. Si v2 no lo aceptara, `loadDocks` devolvería null y la
+ * usuaria recibiría el dock de fábrica en silencio, que es justo lo que la spec
+ * pide evitar (§ 8). Se lee, se descartan `pinnedExtra` y `signaling`, y se
+ * conserva `tools2d`; la siguiente escritura ya sale en v2.
+ */
+const sideArrayV1 = z.array(idString).max(MAX_PINNED_V1);
+const EnvelopeV1Schema = z
   .object({
-    pinnedExtra: z.object({ left: sideArray, right: sideArray }).strict(),
-    signaling: signalingSchema,
-    tools2d: tools2dSchema,
+    version: z.literal(1),
+    data: z
+      .object({
+        pinnedExtra: z.object({ left: sideArrayV1, right: sideArrayV1 }).strict(),
+        signaling: z.enum(['subtle', 'off']).default('subtle'),
+        tools2d: tools2dSchema,
+      })
+      .strict(),
   })
   .strict();
 
-const PersistedEnvelopeSchema = z
-  .object({ version: z.literal(STORAGE_VERSION), data: DockStateSchema })
-  .strict();
+const EnvelopeSchema = z.union([PersistedEnvelopeSchema, EnvelopeV1Schema]);
 
-const initialState: DockState = { pinnedExtra: { left: [], right: [] }, signaling: 'subtle', tools2d: [...DEFAULT_DOCK_2D_IDS] };
+const initialState: DockState = { tools2d: [...DEFAULT_DOCK_2D_IDS] };
 
-/** Persist the kept-dock set to its own LS key (small per-user UI preference;
+/** Persist the dock's tool set to its own LS key (small per-user UI preference;
  *  LS-only, co-located in spirit with workflowSlice prefs — not project data). */
 export function persistDocks(state: DockState): void {
-  safeSetItem(STORAGE_KEY, JSON.stringify({ version: STORAGE_VERSION, data: state }));
+  // shape: DockState v2 — opt-in envelope: yes
+  safeSetItem(STORAGE_KEY, JSON.stringify({ version: STORAGE_VERSION, data: { tools2d: state.tools2d } }));
 }
 
 export function loadDocks(): DockState | null {
@@ -164,35 +170,21 @@ export function loadDocks(): DockState | null {
   } catch {
     return null;
   }
-  const result = PersistedEnvelopeSchema.safeParse(parsed);
+  const result = EnvelopeSchema.safeParse(parsed);
   if (!result.success) {
     console.warn('[dockSlice] discarding corrupt envelope', {
       issues: result.error.issues.slice(0, 5).map((i) => ({ path: i.path.join('.'), code: i.code })),
     });
     return null;
   }
-  const data = result.data.data;
-  return { ...data, tools2d: migrateDefaultDockTools(data.tools2d) };
+  return { tools2d: migrateDefaultDockTools(result.data.data.tools2d) };
 }
 
 const dockSlice = createSlice({
   name: 'dock',
   initialState,
   reducers: {
-    pinAuto(state, action: PayloadAction<{ side: DockSide; id: string }>) {
-      const { side, id } = action.payload;
-      if (!state.pinnedExtra[side].includes(id)) state.pinnedExtra[side].push(id);
-    },
-    unpinAuto(state, action: PayloadAction<{ side: DockSide; id: string }>) {
-      const { side, id } = action.payload;
-      state.pinnedExtra[side] = state.pinnedExtra[side].filter((x) => x !== id);
-    },
-    toggleDockSignaling(state) {
-      state.signaling = state.signaling === 'subtle' ? 'off' : 'subtle';
-    },
     rehydrateDocks(state, action: PayloadAction<DockState>) {
-      state.pinnedExtra = action.payload.pinnedExtra;
-      state.signaling = action.payload.signaling;
       state.tools2d = action.payload.tools2d;
     },
     addDockTool(state, action: PayloadAction<string>) {
@@ -224,5 +216,5 @@ const dockSlice = createSlice({
   // No new-project handler: the kept set is a user preference and persists across projects.
 });
 
-export const { pinAuto, unpinAuto, rehydrateDocks, toggleDockSignaling, addDockTool, removeDockTool, resetDockTools, reorderDockTool } = dockSlice.actions;
+export const { rehydrateDocks, addDockTool, removeDockTool, resetDockTools, reorderDockTool } = dockSlice.actions;
 export default dockSlice.reducer;

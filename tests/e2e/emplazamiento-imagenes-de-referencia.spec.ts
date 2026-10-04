@@ -31,6 +31,7 @@
  *      «verificar la puerta, no solo el cuarto».
  */
 import { test, expect, Page } from '@playwright/test';
+import { abrirSubmenuDeVina } from './helpers/diagnostico';
 
 /** El viewport real del Chrome de María, medido en #1095. */
 const MARIA = { width: 1366, height: 643 };
@@ -109,11 +110,7 @@ test.describe('la puerta de las imágenes de referencia', () => {
 
   test('desde el menú Vina ▸ Archivo se llega al panel, y su botón se puede tocar', async ({ page }) => {
     await abrirApp(page);
-
-    await page.getByRole('button', { name: /vina/i }).first().dispatchEvent('click');
-    // React implementa onMouseEnter sobre mouseover/mouseout (mouseenter nativo
-    // no burbujea y React no lo escucha): hay que despachar mouseover.
-    await page.getByText('Archivo', { exact: true }).dispatchEvent('mouseover');
+    await abrirSubmenuDeVina(page, 'Archivo');
 
     const item = page.getByText('Imágenes de referencia...', { exact: true });
     await expect(item, 'el menú Archivo no ofrece la puerta').toBeVisible({ timeout: 10_000 });
@@ -154,8 +151,7 @@ test.describe('la puerta de las imágenes de referencia', () => {
     // sin URL y la imagen se importa y se pinta EN BLANCO. Todo verde, y la
     // funcionalidad muerta. Por eso se importa una de verdad y se mira el href.
     await abrirApp(page);
-    await page.getByRole('button', { name: /vina/i }).first().dispatchEvent('click');
-    await page.getByText('Archivo', { exact: true }).dispatchEvent('mouseover');
+    await abrirSubmenuDeVina(page, 'Archivo');
     await page.getByText('Imágenes de referencia...', { exact: true }).dispatchEvent('click');
     await page.waitForTimeout(700);
 
@@ -185,8 +181,29 @@ test.describe('la puerta de las imágenes de referencia', () => {
     // impide que este aserto enganche al de Archivo por error. Un término por concepto (§ 5):
     // dos ítems con la MISMA etiqueta haciendo cosas distintas sí sería el fallo.
     await abrirApp(page);
-    await page.getByRole('button', { name: /vina/i }).first().dispatchEvent('click');
-    await page.getByText('Vista', { exact: true }).first().dispatchEvent('mouseover');
+    await abrirSubmenuDeVina(page, 'Vista');
     await expect(page.getByText('Imágenes de referencia', { exact: true })).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('y se llega aunque el último gesto deje el ratón donde se despliega otra fila', async ({ page }) => {
+    // Así cayó 1102 en el gate de P2a (2026-10-04): su último clic deja el
+    // ratón quieto donde se despliega la fila «Patrón». Al abrirse el menú,
+    // Chrome le da a esa fila su `mouseover` de verdad unos cientos de ms
+    // después, y su submenú le gana al de Archivo, que aquí es sintético. A
+    // solas el helper casi siempre llega antes; con la carga del gate, no. Por
+    // eso se espera a propósito más que ese rato antes de mirar.
+    await abrirApp(page);
+    await page.getByRole('button', { name: /vina/i }).first().dispatchEvent('click');
+    const patron = await page.locator('.logo-menu__label').filter({ hasText: /^Patrón$/ }).boundingBox();
+    if (!patron) throw new Error('el menú Vina no enseñó la fila «Patrón»');
+    await page.keyboard.press('Escape');
+    await page.mouse.move(patron.x + patron.width / 2, patron.y + patron.height / 2);
+
+    await abrirSubmenuDeVina(page, 'Archivo');
+    await page.waitForTimeout(1_000);
+    await expect(
+      page.getByText('Imágenes de referencia...', { exact: true }),
+      'el submenú de la fila que quedó bajo el ratón le ganó al de Archivo',
+    ).toBeVisible();
   });
 });

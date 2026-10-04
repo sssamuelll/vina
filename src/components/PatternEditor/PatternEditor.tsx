@@ -23,7 +23,6 @@ import { cajasDeAsas } from './cotas/cotasGeometry';
 import { resizePieceTo } from './pieceResize';
 import ToolStrip2D from './ToolStrip2D';
 import { suscribirNoPasoNada } from './noPasoNada';
-import FilaDeCapas from './FilaDeCapas';
 import type { Cota } from './cotas/cotas';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
@@ -90,15 +89,6 @@ import FloatingActionBar from './FloatingActionBar';
 import { resolveTargetKind, type CurationCtx } from './actionCuration';
 import { selectWorkflowStage } from '../../store/selectors';
 import './PatternEditor.css';
-
-/** Faja del dock 2D izquierdo, medida en navegador (no calculada): `.dock--left`
- *  da `x=14, ancho=48` — el borde derecho cae en 62. Los 48 salen de
- *  `Dock.css`: 4px de padding + 38px de icono + 4px de padding + 1px de
- *  `--surface-chrome-border` a cada lado (2px). Hasta el 26-09 el padding era
- *  7 y la faja 68. Lo mide `superficies-por-accion.spec.ts` contra su espejo
- *  `DOCK_ANCHO`. Exportada para que el test de `handleZoomToFit` use el mismo
- *  valor en vez de repetirlo. */
-export const DOCK_WIDTH_PX = 62;
 
 /** Lo que dura en la tira el desenlace de un gesto que no pasó nada (#1117):
  *  suficiente para leerlo, corto para no quedarse contestando el gesto de antes. */
@@ -1289,20 +1279,19 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // teclazo repetible desde cualquier estado, así que se cierra aquí.
     if (!svgEl || (pieces.length === 0 && trazosVisibles.length === 0)) return;
     const rect = svgEl.getBoundingClientRect();
-    // El dock 2D flota (no reserva espacio real, § 2.1), así que el encuadre
-    // tiene que descontar su faja a mano (ver DOCK_WIDTH_PX arriba). Se resta
-    // del ancho Y se desplaza el paneo por lo mismo — encuadrar en
-    // [DOCK, ancho], no en [0, ancho-DOCK]. Restar sin desplazar corre el
-    // patrón HACIA el dock, que es lo contrario.
+    // El margen de herramientas es una columna al lado de la hoja, no encima
+    // (spec 2026-10-02 § 4.3): el svg ya empieza donde termina, así que se
+    // encuadra en el svg entero. Hasta P2 el dock flotaba y aquí se le
+    // descontaba su faja a mano.
     const fit = computeFitView(
       // El `path` de un trazo va en coordenadas de patrón: sin posición propia.
       [...pieces, ...trazosVisibles.map(t => ({ position: { x: 0, y: 0 }, outline: t.path }))],
-      Math.max(0, rect.width - DOCK_WIDTH_PX),
+      rect.width,
       rect.height,
     );
     if (fit) {
       dispatch(setZoom2D(fit.zoom));
-      dispatch(setPan2D({ x: fit.pan.x + DOCK_WIDTH_PX, y: fit.pan.y }));
+      dispatch(setPan2D(fit.pan));
     }
   }, [pieces, trazosVisibles, dispatch, svgRef]);
 
@@ -1715,7 +1704,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             pan2D={pan2D}
             gridSize={gridSize}
             units={units}
-            izquierda={DOCK_WIDTH_PX + 12}
+            izquierda={12}
           />
         )}
       </svg>
@@ -1762,7 +1751,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
            en su misma esquina: se declara inerte mientras esté abierto (#1125). */
         inerte={Boolean(notchTool.refining?.notch.notchAnchor)}
       />
-      <FilaDeCapas />
       {pantallaVacia && (
         <EmptyState2D onImportDXF={onImportDXF} />
       )}

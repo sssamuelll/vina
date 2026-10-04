@@ -13,7 +13,7 @@ import editorReducer, { setViewMode } from '../../../store/editorSlice';
 import simulationReducer, { startSimulation, pauseSimulation, setFrameTime } from '../../../store/simulationSlice';
 import toolsReducer from '../../../store/toolSlice';
 import projectReducer, { addPiece } from '../../../store/projectSlice';
-import dockReducer, { toggleDockSignaling } from '../../../store/dockSlice';
+import dockReducer from '../../../store/dockSlice';
 import RightDock from '../RightDock';
 
 afterEach(cleanup);
@@ -66,42 +66,16 @@ describe('RightDock (3D dock)', () => {
     expect(screen.queryByText('3D')).toBeNull();
   });
 
-  it('shows a BOM ✦ suggestion at the simulated stage and runs it', () => {
-    const { store, onOpenPanel } = renderRightDock();
-    act(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
-      store.dispatch(startSimulation());
-      store.dispatch(pauseSimulation()); // → simulationState 'paused' → stage 'simulated'
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'BOM' }));
-    expect(onOpenPanel).toHaveBeenCalledWith('BOM');
-  });
-
-  it('keeps a BOM suggestion at the simulated stage', () => {
-    const { store } = renderRightDock();
-    act(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
-      store.dispatch(startSimulation());
-      store.dispatch(pauseSimulation());
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Fijar BOM' }));
-    expect(store.getState().dock.pinnedExtra.right).toEqual(['bom']);
-    expect(screen.getByRole('button', { name: 'Soltar BOM' })).toBeTruthy();
-  });
-
-  it('signaling=off mutes the auto layer at the simulated stage', () => {
+  it('sin zona AUTO: simulada, no aparece la sugerencia de BOM (spec 2026-10-02 § 8)', () => {
     const { store } = renderRightDock();
     act(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
       store.dispatch(startSimulation());
       store.dispatch(pauseSimulation()); // → simulationState 'paused' → stage 'simulated'
-      store.dispatch(toggleDockSignaling()); // → 'off'
     });
-    expect(screen.queryByText('auto')).toBeNull();
     expect(screen.queryByRole('button', { name: 'BOM' })).toBeNull();
+    expect(screen.queryByText('auto')).toBeNull();
   });
 });
 

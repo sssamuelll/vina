@@ -31,15 +31,15 @@ describe('AppShell usa usePanelHost, no un estado de una sola ranura', () => {
   });
 });
 
-describe('los cinco sitios llaman la operación que les toca', () => {
+describe('los cuatro sitios llaman la operación que les toca', () => {
   const src = leer();
 
   it('TopBar recibe togglePanel', () => {
     expect(src).toMatch(/<TopBar[\s\S]{0,80}onOpenPanel=\{togglePanel\}/);
   });
 
-  it('LeftDock recibe togglePanel', () => {
-    expect(src).toMatch(/<LeftDock[\s\S]{0,80}onOpenPanel=\{togglePanel\}/);
+  it('LeftDock ya no abre paneles: su única puerta a uno era la zona AUTO (spec 2026-10-02 § 8)', () => {
+    expect(src).toMatch(/<LeftDock \/>/);
   });
 
   it('RightDock recibe togglePanel', () => {

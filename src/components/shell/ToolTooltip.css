@@ -75,8 +75,6 @@
   white-space: normal;
   font-family: var(--font-sans);
 }
-.tool-tooltip-desc--pin { color: var(--accent-ink); }
-.tool-tooltip-desc--auto { color: var(--ai); }
 
 .tool-tooltip-hint {
   font-size: var(--text-1);

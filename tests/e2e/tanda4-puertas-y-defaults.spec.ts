@@ -64,38 +64,30 @@ test.describe('tanda 4 — puertas que no mienten y defaults que ella quiere', (
     await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 3000 }).toBe('internalShape');
   });
 
-  test('fallo 9 — el dock se desplaza pero su cabecera no se va', async ({ page }) => {
-    // Ventana corta a propósito: es la condición que hace scrollear el dock, y
-    // es la que ella tenía. Sin esto el caso pasa sin probar nada.
+  test('fallo 9 — el margen se desplaza por dentro: la columna no se mueve', async ({ page }) => {
+    // Ventana corta a propósito: es la condición que hace desplazarse el
+    // margen, y es la que ella tenía. Lo que vio fue el dock «bajarse» cuando
+    // su rótulo «2D» se iba con el scroll. El margen ya no tiene rótulo (spec
+    // 2026-10-02 § 4.3): lo que queda por medir es que la columna se queda
+    // quieta y solo viajan las herramientas.
     await page.setViewportSize({ width: 1280, height: 520 });
     await waitForApp(page);
 
-    const dock = page.locator('.dock--left');
-    const rotulo = dock.locator('.dock__label').first();
-    await expect(rotulo, 'el rótulo "2D" está a la vista antes de tocar nada').toBeVisible();
+    const margen = page.locator('nav.margen');
+    const alcanzable = await margen.evaluate(el => el.scrollHeight - el.clientHeight);
+    expect(alcanzable, 'el margen tiene que desbordar para que este caso mida algo').toBeGreaterThan(0);
 
-    const alcanzable = await dock.evaluate(el => el.scrollHeight - el.clientHeight);
-    expect(alcanzable, 'el dock tiene que desbordar para que este caso mida algo').toBeGreaterThan(0);
-
-    await dock.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    const antes = await margen.boundingBox();
+    await margen.evaluate(el => { el.scrollTop = el.scrollHeight; });
     await page.waitForTimeout(200);
-
-    // Lo que ella vio: el rótulo se fue con el scroll y la barra "se bajó".
-    const cajaRotulo = await rotulo.boundingBox();
-    const cajaDock = await dock.boundingBox();
-    expect(cajaRotulo, 'el rótulo tiene que seguir teniendo caja').not.toBeNull();
-    expect(cajaDock).not.toBeNull();
-    // El assert tiene que ser "no se fue por ARRIBA", no "está cerca de
-    // arriba": un rótulo que se va con el scroll queda POR ENCIMA del dock, y
-    // un `y < dockY + 40` se cumpliría igual. Una comprobación floja da señal
-    // falsa y pasa en verde con el fallo dentro.
-    expect(
-      cajaRotulo!.y,
-      'con el dock desplazado hasta abajo, el rótulo no puede haberse ido por arriba',
-    ).toBeGreaterThanOrEqual(cajaDock!.y - 1);
+    expect(await margen.boundingBox(), 'con el margen desplazado hasta abajo, la columna se movió').toEqual(antes);
   });
 
   test('fallo 4 — Largos es un interruptor apagado de fábrica, y seleccionar una pieza no lo enciende', async ({ page }) => {
+    // Pulsa «Largos», que desde P2 vive en la barra superior: a 1280 (el
+    // viewport de estos e2e) los seis interruptores no caben y se pliegan en
+    // «Mostrar» (spec 2026-10-02 § 4.2). Se mide en la pantalla de María.
+    await page.setViewportSize({ width: 1366, height: 768 });
     await waitForApp(page);
 
     // ENMENDADO el 2026-09-09 (contrato `2026-09-09-lo-que-se-ve-y-cuando`

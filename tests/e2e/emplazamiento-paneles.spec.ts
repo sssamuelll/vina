@@ -406,7 +406,7 @@ test.describe('Ola 2 — los paneles ocupan canaleta, no flotan', () => {
       return g ? g.getBoundingClientRect().left : -1;
     });
     const bordeDerechoDelDock = await page.evaluate(() => {
-      const dock = document.querySelector('.dock--left');
+      const dock = document.querySelector('nav.margen');
       return dock ? dock.getBoundingClientRect().right : -1;
     });
 

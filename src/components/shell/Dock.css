@@ -1,5 +1,41 @@
+/* El margen de herramientas del patrón (spec 2026-10-02 «la interfaz en papel»
+   § 4.3). Es papel, no marco: el color de la hoja, y una línea de pelo la
+   separa de ella. Es una columna en el flujo de `.canvas-area__2d`, no flota:
+   no tapa la hoja ni se mueve con lo que pase encima. Lleva
+   data-material="papel", así que `--text-*`, `--bg-elevated` y `--border` de
+   `.dock__tool` y `.dock__add` son los del papel. */
+.margen {
+  flex: 0 0 auto;
+  /* 44 px, y más solo mientras se desplaza: el ancho sale del contenido, así
+     que la barra se SUMA en vez de comerse los botones (medido con barras
+     clásicas el 2026-10-03: con `width: 44px` fijo quedaban 33 px útiles para
+     botones de 36). Playwright esconde las barras por defecto
+     (`--hide-scrollbars`): el e2e del margen las enciende. */
+  width: auto;
+  min-width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0;
+  background: var(--canvas-2d);
+  border-right: var(--hairline);
+  /* Si no caben (hasta 22, `MAX_DOCK_2D_TOOLS`), se desplaza con la barra a la
+     vista: salirse en silencio es el defecto de #1095. Fina, para que no se
+     coma el ancho de los botones. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+/* Entre dos grupos (editar, dibujar, coser), aire; nunca una raya. */
+.margen__aire { flex: 0 0 10px; }
+.margen .tool-tooltip-wrapper { display: flex; }
+.margen .dock__tool,
+.margen .dock__add { width: 36px; height: 36px; flex-shrink: 0; }
+.margen .dock-editor { margin-top: 10px; }
+
 /* Side dock — vertical tool column framing the canvas (redesign surface #4).
-   Dark chrome over the light paper canvas; global tokens only. */
+   Desde P2 solo la usa el 3D (`RightDock`), hasta que P5 la vuelva margen. */
 .dock {
   position: absolute;
   top: 50%;
@@ -34,7 +70,6 @@
   overflow-y: auto;
 }
 
-.dock--left { left: 14px; }
 .dock--right { right: 14px; }
 
 .dock__label {
@@ -44,22 +79,6 @@
   letter-spacing: 0.06em;
   color: var(--text-muted);
   padding: 2px 0 4px;
-}
-
-/* La cabecera debe seguir ubicando el dock aunque sus herramientas se
-   desplacen: el scroll conserva el acceso al catálogo completo en ventanas
-   cortas, como exige #1095. El fondo opaco impide que los iconos que pasan
-   por debajo se mezclen con el rótulo y parezca que la barra se movió. El rol
-   del dock la mantiene por encima de los wrappers de botones, que ya tienen
-   posición relativa y se pintarían después de la cabecera sin este orden. */
-.dock--left .dock__label {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-dock);
-  align-self: stretch;
-  flex-shrink: 0;
-  text-align: center;
-  background: var(--surface-chrome-bg);
 }
 
 .dock__tool {
@@ -110,55 +129,9 @@
   cursor: not-allowed;
 }
 
-.dock__sep {
-  width: 24px;
-  height: 1px;
-  background: var(--border);
-  margin: 3px 0;
-}
-
-.dock__auto-label {
-  font-family: var(--font-sans);
-  font-size: 8.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-}
-
-.dock__tool--auto { color: var(--ai); }
-.dock__tool--auto:hover { color: var(--ai); background: var(--bg-elevated); }
-
-.dock__tool-wrap {
-  position: relative;
-  display: flex;
-}
-
 /* ToolTooltip wraps each item in a div; keep it transparent to the dock's
    flex column so gap/centering are unchanged. */
 .dock .tool-tooltip-wrapper { display: flex; }
-
-.dock__badge {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 15px;
-  height: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--bg-surface);
-  cursor: pointer;
-  transition: border-color var(--transition-fast);
-}
-
-/* El hover cambia tinta o borde, nunca escala ni brillo (spec § 4.4). */
-.dock__badge:hover { border-color: var(--accent); }
-/* Un icono de 15 px escrito con el acento va en su rol de tinta. */
-.dock__badge--pin { color: var(--accent-ink); }
-.dock__badge--auto { color: var(--ai); }
 
 /* ── ＋ customize editor (slice 4) ── */
 .dock-editor { position: relative; display: flex; }

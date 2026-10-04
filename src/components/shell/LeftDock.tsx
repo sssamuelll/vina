@@ -1,31 +1,38 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Plus } from 'lucide-react';
-import { store, type RootState } from '../../store';
+import type { RootState } from '../../store';
 import { activate2DTool, selectHasInternalShapeHost } from '../../store/toolActivation';
-import { selectWorkflowStage } from '../../store/selectors';
-import { runUiExport } from '../../utils/export/uiExport';
-import { pinAuto, unpinAuto, addDockTool, removeDockTool, resetDockTools, reorderDockTool } from '../../store/dockSlice';
+import { addDockTool, removeDockTool, resetDockTools, reorderDockTool } from '../../store/dockSlice';
+import { toolRegistry } from '../../tools';
 import Dock from './Dock';
-import DockAutoZone from './DockAutoZone';
 import DockToolPicker from './DockToolPicker';
 import { DOCK_2D_CATALOG, getDockToolById, type DockToolDef } from './dock2dTools';
-import { getDockSuggestions, getAutoItemById, type DockSuggestion } from './dockSuggestions';
 
-interface LeftDockProps {
-  onOpenPanel: (name: string) => void;
+/**
+ * La activa, cuando no está en el margen: del catálogo si es una de las suyas,
+ * y si no (Transformar, con A, o una que solo abre el menú o los comandos) del
+ * registro de herramientas, con su nombre en español. El grupo no se usa: va
+ * sola al final, detrás de aire.
+ */
+function herramientaDeFuera(id: string): DockToolDef | undefined {
+  const delCatalogo = getDockToolById(id);
+  if (delCatalogo) return delCatalogo;
+  const def = toolRegistry.getTool(id);
+  // El icono del registro solo acepta `size` numérico; el margen siempre le
+  // pasa 16, así que encaja en `DockIcon`.
+  return def ? { id, icon: def.icon as DockToolDef['icon'], label: def.name, grupo: 'editar' } : undefined;
 }
 
-/** The left (2D) dock: an editable tool set + the stage-driven auto zone + a ＋
- *  customize editor. Hidden in 3D-only view. */
-export default function LeftDock({ onOpenPanel }: LeftDockProps) {
+/** El margen de herramientas del patrón (spec 2026-10-02 § 4.3): las del dock
+ *  de la usuaria + el ＋ que las agrega y las quita. Hidden in 3D-only view. La
+ *  zona AUTO se fue en P2 (§ 8): Escalado y Lista de materiales están en
+ *  Vina › Patrón. */
+export default function LeftDock() {
   const dispatch = useDispatch();
   const activeTool = useSelector((s: RootState) => s.editor.activeTool);
   const hasInternalShapeHost = useSelector(selectHasInternalShapeHost);
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
-  const stage = useSelector(selectWorkflowStage);
-  const pinnedExtra = useSelector((s: RootState) => s.dock.pinnedExtra);
-  const signaling = useSelector((s: RootState) => s.dock.signaling);
   const tools2d = useSelector((s: RootState) => s.dock.tools2d);
   const [pickerOpen, setPickerOpen] = useState(false);
   // El personalizador cuelga de <body> (ver DockToolPicker): se abre donde
@@ -64,37 +71,20 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
   const tools = tools2d
     .map(getDockToolById)
     .filter((t): t is DockToolDef => t !== undefined);
-
-  const runSuggestion = (id: string) => {
-    if (id === 'grade') onOpenPanel('Grading');
-    else if (id === 'export') runUiExport('dxf', store.getState().project, dispatch);
-  };
-
-  const keptIds = pinnedExtra.left;
-  const kept = keptIds.map(getAutoItemById).filter((x): x is DockSuggestion => x !== undefined);
-  const suggested = getDockSuggestions(stage, 'left').filter((s) => !keptIds.includes(s.id));
+  // La activa siempre tiene marca (spec § 4.3): si no está en el margen, se
+  // pinta al final mientras siga activa.
+  const activaFuera = tools.some((t) => t.id === activeTool) ? undefined : herramientaDeFuera(activeTool);
 
   return (
     <Dock
-      domainLabel="2D"
       tools={tools}
       activeToolId={activeTool}
+      activaFuera={activaFuera}
       onSelectTool={(id) => activate2DTool(dispatch, id)}
       disabledReasons={hasInternalShapeHost ? undefined : {
         internalShape: 'Crea o muestra una pieza para dibujar líneas internas.',
       }}
       onReorderTool={(fromId, toId) => dispatch(reorderDockTool({ fromId, toId }))}
-      autoZone={
-        <DockAutoZone
-          kept={kept}
-          suggested={suggested}
-          signaling={signaling}
-          side="left"
-          onRun={runSuggestion}
-          onPin={(id) => dispatch(pinAuto({ side: 'left', id }))}
-          onUnpin={(id) => dispatch(unpinAuto({ side: 'left', id }))}
-        />
-      }
       footer={
         <div ref={editorRef} className="dock-editor">
           <button

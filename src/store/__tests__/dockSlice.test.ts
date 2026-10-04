@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import dockReducer, {
-  pinAuto, unpinAuto, persistDocks, loadDocks, toggleDockSignaling,
+  persistDocks, loadDocks,
   rehydrateDocks, addDockTool, removeDockTool, resetDockTools,
   reorderDockTool, LEGACY_DEFAULT_DOCK_2D_IDS, LEGACY_DEFAULT_DOCK_2D_IDS_V2,
   LEGACY_DEFAULT_DOCK_2D_IDS_V3, LEGACY_DEFAULT_DOCK_2D_IDS_V5,
@@ -12,75 +12,49 @@ import dockReducer, {
 
 const initial = () => dockReducer(undefined, { type: '@@INIT' });
 
-describe('dockSlice reducers', () => {
-  it('pinAuto adds an id once (idempotent)', () => {
-    let s = dockReducer(initial(), pinAuto({ side: 'left', id: 'grade' }));
-    s = dockReducer(s, pinAuto({ side: 'left', id: 'grade' }));
-    expect(s.pinnedExtra.left).toEqual(['grade']);
-    expect(s.pinnedExtra.right).toEqual([]);
-  });
-  it('unpinAuto removes the id', () => {
-    let s = dockReducer(initial(), pinAuto({ side: 'right', id: 'bom' }));
-    s = dockReducer(s, unpinAuto({ side: 'right', id: 'bom' }));
-    expect(s.pinnedExtra.right).toEqual([]);
-  });
-});
+/**
+ * Un sobre v1 tal como lo dejaba escrito en el navegador el `persistDocks` de
+ * antes de P2: la zona AUTO dentro, con algo fijado y las sugerencias apagadas,
+ * y un dock personalizado. Es la cadena de bytes, no un objeto armado en el
+ * test: el que lee es `JSON.parse` sobre lo que hay en localStorage.
+ */
+const SOBRE_V1_DE_VERDAD =
+  '{"version":1,"data":{"pinnedExtra":{"left":["grade"],"right":["bom"]},"signaling":"off","tools2d":["select","pen","notch","grainline"]}}';
 
 describe('dockSlice persistence', () => {
   beforeEach(() => localStorage.clear());
-  it('persistDocks → loadDocks round-trips (incl. signaling + tools2d)', () => {
-    const state = { pinnedExtra: { left: ['grade'], right: ['bom'] }, signaling: 'off' as const, tools2d: ['select', 'notch'] };
-    persistDocks(state);
-    expect(loadDocks()).toEqual(state);
+  it('persistDocks → loadDocks round-trips, en v2', () => {
+    persistDocks({ tools2d: ['select', 'notch'] });
+    expect(JSON.parse(localStorage.getItem('vina-docks')!)).toEqual({ version: 2, data: { tools2d: ['select', 'notch'] } });
+    expect(loadDocks()).toEqual({ tools2d: ['select', 'notch'] });
+  });
+  it('un sobre v1 de verdad conserva el dock de la usuaria y suelta la zona AUTO', () => {
+    localStorage.setItem('vina-docks', SOBRE_V1_DE_VERDAD);
+    const loaded = loadDocks();
+    expect(loaded).toEqual({ tools2d: ['select', 'pen', 'notch', 'grainline'] });
+    persistDocks(loaded!);
+    expect(JSON.parse(localStorage.getItem('vina-docks')!)).toEqual({
+      version: 2, data: { tools2d: ['select', 'pen', 'notch', 'grainline'] },
+    });
   });
   it('loadDocks returns null when nothing stored', () => {
     expect(loadDocks()).toBeNull();
   });
   it('loadDocks returns null for a corrupt envelope', () => {
-    localStorage.setItem('vina-docks', JSON.stringify({ version: 99, data: { pinnedExtra: { left: [], right: [] } } }));
+    localStorage.setItem('vina-docks', JSON.stringify({ version: 99, data: { tools2d: ['select'] } }));
     expect(loadDocks()).toBeNull();
   });
-  it('loadDocks returns null for wrong-typed data', () => {
+  it('loadDocks returns null for wrong-typed v1 data', () => {
     localStorage.setItem('vina-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: 'nope', right: [] } } }));
     expect(loadDocks()).toBeNull();
   });
-});
-
-describe('dockSlice signaling', () => {
-  beforeEach(() => localStorage.clear());
-
-  it('defaults signaling to subtle', () => {
-    expect(initial().signaling).toBe('subtle');
-  });
-
-  it('toggleDockSignaling flips subtle → off → subtle', () => {
-    let s = dockReducer(initial(), toggleDockSignaling());
-    expect(s.signaling).toBe('off');
-    s = dockReducer(s, toggleDockSignaling());
-    expect(s.signaling).toBe('subtle');
-  });
-
-  it('rehydrateDocks sets signaling', () => {
-    const s = dockReducer(initial(), rehydrateDocks({ pinnedExtra: { left: [], right: [] }, signaling: 'off', tools2d: [...DEFAULT_DOCK_2D_IDS] }));
-    expect(s.signaling).toBe('off');
-  });
-
-  it('loadDocks defaults signaling to subtle for a pre-3c envelope (no signaling key)', () => {
-    localStorage.setItem('vina-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: [], right: [] } } }));
-    const loaded = loadDocks();
-    expect(loaded).not.toBeNull();
-    expect(loaded!.signaling).toBe('subtle');
-  });
-
-  it('loadDocks discards an envelope with an invalid signaling value', () => {
-    localStorage.setItem('vina-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: [], right: [] }, signaling: 'loud' } }));
+  it('un v2 con la zona AUTO dentro no valida: v2 nació sin ella', () => {
+    localStorage.setItem('vina-docks', JSON.stringify({ version: 2, data: { tools2d: ['select'], signaling: 'off' } }));
     expect(loadDocks()).toBeNull();
   });
-
-  it('NEW_PROJECT does not reset signaling', () => {
-    const off = dockReducer(initial(), toggleDockSignaling());
-    const after = dockReducer(off, { type: 'global/newProject' });
-    expect(after.signaling).toBe('off');
+  it('un v1 de antes de `signaling` se sigue leyendo', () => {
+    localStorage.setItem('vina-docks', JSON.stringify({ version: 1, data: { pinnedExtra: { left: [], right: [] }, tools2d: ['select', 'seam'] } }));
+    expect(loadDocks()).toEqual({ tools2d: ['select', 'seam'] });
   });
 });
 
@@ -141,7 +115,7 @@ describe('dockSlice tools2d', () => {
       .filter((id) => id === 'editPattern')).toHaveLength(1);
   });
 
-  it('loadDocks migrates a persisted historical default and round-trips it as v1', () => {
+  it('loadDocks migrates a persisted historical default and round-trips it as v2', () => {
     localStorage.setItem('vina-docks', JSON.stringify({
       version: 1,
       data: {
@@ -184,7 +158,7 @@ describe('dockSlice tools2d', () => {
   });
 
   it('rehydrateDocks sets tools2d', () => {
-    const s = dockReducer(initial(), rehydrateDocks({ pinnedExtra: { left: [], right: [] }, signaling: 'subtle', tools2d: ['select', 'seam'] }));
+    const s = dockReducer(initial(), rehydrateDocks({ tools2d: ['select', 'seam'] }));
     expect(s.tools2d).toEqual(['select', 'seam']);
   });
 
@@ -208,7 +182,7 @@ describe('dockSlice tools2d', () => {
 });
 
 describe('dockSlice reorderDockTool', () => {
-  const seed = (ids: string[]) => dockReducer(initial(), rehydrateDocks({ pinnedExtra: { left: [], right: [] }, signaling: 'subtle', tools2d: ids }));
+  const seed = (ids: string[]) => dockReducer(initial(), rehydrateDocks({ tools2d: ids }));
 
   it('up-move: dragging a lower tool onto a higher one lands it before the target', () => {
     const s = dockReducer(seed(['select', 'pen', 'notch']), reorderDockTool({ fromId: 'notch', toId: 'select' }));
