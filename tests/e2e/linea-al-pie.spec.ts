@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { abrirAppVacia, cargarDxfDeMaria, cambiarVista, reposo, centroDePieza } from './helpers/estados';
-import { addPiece, activarHerramienta, clickAt } from './helpers/lienzo';
+import { addPiece, activarHerramienta, clickAt, dispatch } from './helpers/lienzo';
 
 /**
  * La línea al pie (spec 2026-10-02 «la interfaz en papel» § 5.3 y § 5.4),
@@ -134,6 +134,8 @@ test('las opciones del piquete son botones a un clic, y lo que se escoge es lo q
   await reposo(page);
   await page.locator('nav.margen .dock__tool[aria-label^="Piquete"]').first().click();
   await expect(page.locator('.seccion-del-patron__nombre')).toHaveText('Piquete');
+  // A 1366 en Split las cuatro caben enteras con su frase (spec § 5.3): sin «Más».
+  await expect(page.locator('.seccion-del-patron__mas')).toHaveCount(0);
 
   const pie = page.locator('.seccion-del-patron');
   await pie.getByRole('button', { name: 'En T' }).click();
@@ -156,6 +158,47 @@ test('las opciones del piquete son botones a un clic, y lo que se escoge es lo q
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await piquetesDe(page, 'piquete-pie')).at(-1))
     .toMatchObject({ shape: 't-notch', count: 2, length: 9 });
+});
+
+test('en una ventana estrecha, lo que no cabe pasa a «Más»: la frase conserva sus 200 px y todo sigue a un clic, también con el teclado', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 700 });
+  await abrirAppVacia(page);
+  await addPiece(page, 'desplazar-pie', { x: 120, y: 120 }, 300, 400);
+  await dispatch(page, 'editor/selectPiece', 'desplazar-pie');
+  await activarHerramienta(page, 'r', 'offsetOutline');
+
+  const mas = page.locator('.seccion-del-patron__mas');
+  await expect(mas, 'a 1100 px las cuatro opciones de Desplazar contorno no caben y no hay «Más»').toBeVisible();
+  const r = await page.evaluate(() => {
+    const frase = document.querySelector('.seccion-del-patron__frase')!.getBoundingClientRect();
+    const boton = document.querySelector('.seccion-del-patron__mas')!.getBoundingClientRect();
+    return { frase: frase.width, fraseLeft: frase.left, masRight: boton.right };
+  });
+  expect(r.frase, 'la frase se quedó con menos de 200 px').toBeGreaterThanOrEqual(199);
+  expect(r.masRight, '«Más» se mete en la frase').toBeLessThanOrEqual(r.fraseLeft);
+
+  await mas.focus();
+  await page.keyboard.press('Enter');
+  const menu = page.getByRole('group', { name: /^Más opciones de/ });
+  await expect(menu).toBeVisible();
+  await expect(menu).toHaveAttribute('data-material', 'papel');
+  expect(await menu.evaluate((m) => m.contains(document.activeElement)), 'abierto con el teclado, el foco se quedó fuera').toBe(true);
+  const caja = await menu.boundingBox();
+  const lineaTop = await page.locator('.linea-al-pie').evaluate((e) => e.getBoundingClientRect().top);
+  expect(caja!.y + caja!.height, 'el menú no se abre hacia arriba').toBeLessThanOrEqual(lineaTop);
+  // Lo plegado se toca: nada lo tapa.
+  const tapados = await menu.evaluate((m) => [...m.querySelectorAll<HTMLElement>('button:not([tabindex="-1"]), input, select')]
+    .filter((b) => {
+      const c = b.getBoundingClientRect();
+      const encima = document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2);
+      return !encima || !b.contains(encima);
+    })
+    .map((b) => b.textContent?.trim() || b.id));
+  expect(tapados).toEqual([]);
+
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(mas).toBeFocused();
 });
 
 test('las cotas se ocultan mientras se arrastra la pieza y vuelven al soltar', async ({ page }) => {

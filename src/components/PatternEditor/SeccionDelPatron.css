@@ -39,3 +39,27 @@
 .opcion-del-pie__accion:disabled { color: var(--text-disabled); cursor: default; }
 .opcion-del-pie__accion:hover { background: var(--bg-elevated); }
 .opcion-del-pie__accion:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* «Más» (spec § 5.3): las opciones que no caben, a un clic. Como «Mostrar» en
+   la barra superior. */
+.seccion-del-patron__mas { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; background: transparent; border: var(--hairline); border-radius: var(--radius-sm); color: var(--text-secondary); font: inherit; cursor: pointer; }
+.seccion-del-patron__mas:hover { color: var(--text-primary); }
+.seccion-del-patron__mas:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; color: var(--text-primary); }
+/* Su menú cuelga de <body> y es papel (contrato § 2: todo portal nace papel).
+   Se abre hacia arriba, sobre la hoja. */
+.seccion-del-patron__menu {
+  position: fixed;
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px;
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}

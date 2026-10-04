@@ -43,6 +43,7 @@ const RAICES: Array<[string, number]> = [
   ['src/components/LayerPanel/LayerColorPicker.tsx', 1],
   ['src/components/Viewport3D/SurfaceModePill.tsx', 1],
   ['src/components/PatternEditor/FilaDeCapas.tsx', 1],
+  ['src/components/PatternEditor/SeccionDelPatron.tsx', 1],
   // Avisos y tooltips
   ['src/components/shell/ToastContainer.tsx', 1],
   ['src/components/shell/ToolTooltip.tsx', 1],
@@ -72,7 +73,10 @@ const PINTA: Array<[string, string[] | '*']> = [
   ['src/styles/floating.css', ['.logo-menu', '.context-menu']],
   ['src/components/shared/SubMenu.css', '*'],
   ['src/components/shell/Dock.css', ['.dock-picker', '.margen']],
-  ['src/styles/layout.css', ['.grupo-del-patron__menu']],
+  ['src/styles/layout.css', ['.grupo-del-patron__menu', '.opcion-del-pie']],
+  // El menú «Más» de la línea al pie y los controles que lleva dentro
+  ['src/components/PatternEditor/SeccionDelPatron.css', ['.seccion-del-patron__menu', '.opcion-del-pie']],
+  ['src/components/PatternEditor/ToolOptionControls.css', '*'],
   ['src/components/LayerPanel/LayerPanel.css', ['.layer-context-menu', '.layer-color-popover', '.layer-color-swatch']],
   ['src/components/Viewport3D/SurfaceModePill.css', ['.surface-pill__flyout', '.surface-pill__option']],
   // Avisos y tooltips

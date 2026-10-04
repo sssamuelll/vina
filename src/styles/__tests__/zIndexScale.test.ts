@@ -89,6 +89,7 @@ const SITIOS_GLOBALES: Array<{ archivo: string; patron: RegExp; nota: string }> 
   { archivo: 'src/components/shell/Dock.css', patron: /z-index:\s*var\(--z-dock\)/, nota: 'dock' },
   { archivo: 'src/styles/layout.css', patron: /\.top-bar\s*\{[^}]*z-index:\s*var\(--z-bar\)/, nota: 'top-bar' },
   { archivo: 'src/styles/layout.css', patron: /\.grupo-del-patron__menu\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú de «Mostrar», el grupo del patrón plegado: cuelga de <body>' },
+  { archivo: 'src/components/PatternEditor/SeccionDelPatron.css', patron: /\.seccion-del-patron__menu\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú «Más» de la línea al pie: cuelga de <body>' },
   { archivo: 'src/styles/unified-bar.css', patron: /z-index:\s*var\(--z-bar\)/, nota: 'unified-bar' },
   { archivo: 'src/styles/floating.css', patron: /\.logo-menu\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú del logo' },
   { archivo: 'src/copilot/connections/ConnectionModal.tsx', patron: /zIndex:\s*['"]var\(--z-modal\)['"]/, nota: 'ConnectionModal reclasificado a modal (tiene velo)' },

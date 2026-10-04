@@ -29,6 +29,7 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/shell/AppShell.tsx', 'ambiente', 1],
   ['src/components/PatternEditor/SeccionDelPatron.tsx', 'pie', 1],
   ['src/components/PatternEditor/SeccionDelPatron.tsx', 'pista', 1],
+  ['src/components/PatternEditor/SeccionDelPatron.tsx', 'menu', 1],
   ['src/components/PatternEditor/renderers/MarcaDeEscala.tsx', 'documento', 1],
   ['src/components/Viewport3D/SurfaceModePill.tsx', 'ambiente', 1],
   ['src/components/Viewport3D/SurfaceModePill.tsx', 'menu', 1],

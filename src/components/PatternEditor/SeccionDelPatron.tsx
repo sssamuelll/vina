@@ -1,5 +1,7 @@
-import { Fragment, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { ChevronUp } from 'lucide-react';
 import type { RootState } from '../../store';
 import { setDefaultSAWidth } from '../../store/editorSlice';
 import { setToolOption } from '../../store/toolSlice';
@@ -8,7 +10,9 @@ import type { ToolOption } from '../../tools/types';
 import { useShortcutRegistry } from '../../shortcuts';
 import { displayShortcutBinding } from '../shell/shortcutDisplay';
 import { herramientaParaMostrar } from '../shell/herramientaParaMostrar';
+import { pushJournal } from '../../utils/telemetry/journal';
 import { Control } from './ToolOptionControls';
+import { cuantasCaben } from './cuantasCaben';
 import type { FraseDelPie } from './fraseDeLaFase';
 import './SeccionDelPatron.css';
 
@@ -40,6 +44,75 @@ const MARGEN_DEL_PROXIMO_CLIC: ToolOption = {
 
 /** Las tres que dejan mediciones: su borrado tiene puerta aquí, junto a sus mandos (Medir, D3). */
 const DEJAN_MEDICIONES = new Set(['measure', 'measureCurve', 'compareCurves']);
+
+/** Lo que la frase conserva antes de que las opciones se plieguen en «Más» (spec § 5.3). */
+const FRASE_MIN_PX = 200;
+/** Lo que se reserva para «Más» al decidir cuántas caben. */
+const ANCHO_MAS_PX = 64;
+
+/**
+ * ¿Cuántas opciones caben a la vista? Se decide midiendo, como el plegado de la
+ * barra superior: con todas a la vista se mide cada una y se guarda; plegadas
+ * ya no se pueden medir, así que se decide con lo guardado. Una herramienta
+ * nueva, o la fuente de verdad recién cargada, se vuelven a medir con todas a
+ * la vista: el efecto de diseño corre antes de pintar, así que ese paso no
+ * llega a verse. Sin `ResizeObserver` (jsdom) caben todas.
+ */
+function useCuantasCaben(raiz: RefObject<HTMLDivElement>, herramienta: string, total: number): number {
+  const [medida, setMedida] = useState({ herramienta, cuantas: total });
+  const anchos = useRef<{ herramienta: string; lista: number[] } | null>(null);
+  const anotado = useRef('');
+  const cuantas = medida.herramienta === herramienta ? Math.min(medida.cuantas, total) : total;
+
+  const medir = useCallback(() => {
+    const el = raiz.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const fila = el.querySelector<HTMLElement>('.seccion-del-patron__opciones');
+    const quien = el.querySelector<HTMLElement>('.seccion-del-patron__quien');
+    if (!fila || !quien) return;
+    const controles = Array.from(fila.children).filter(
+      (h): h is HTMLElement => h instanceof HTMLElement && h.classList.contains('opcion-del-pie'),
+    );
+    if (controles.length === total) anchos.current = { herramienta, lista: controles.map((c) => c.offsetWidth) };
+    if (!anchos.current || anchos.current.herramienta !== herramienta || anchos.current.lista.length !== total) return;
+    const css = getComputedStyle(el);
+    const hueco = el.clientWidth - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0)
+      - quien.offsetWidth - 2 * (parseFloat(css.columnGap) || 0) - FRASE_MIN_PX;
+    const k = cuantasCaben(anchos.current.lista, hueco, parseFloat(getComputedStyle(fila).columnGap) || 0, ANCHO_MAS_PX);
+    // La caja negra ve cuántas quedaron a la vista y con qué hueco: un «no
+    // encuentro el ancho» en la máquina de María se lee ahí.
+    const clave = `${herramienta}:${k}`;
+    if (anotado.current !== clave) {
+      anotado.current = clave;
+      pushJournal('ui', 'linea-al-pie', { herramienta, aLaVista: k, total, hueco: Math.round(hueco) });
+    }
+    setMedida((m) => (m.herramienta === herramienta && m.cuantas === k ? m : { herramienta, cuantas: k }));
+  }, [raiz, herramienta, total]);
+
+  useLayoutEffect(() => { medir(); }, [medir, cuantas]);
+
+  useLayoutEffect(() => {
+    const el = raiz.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => medir());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [raiz, medir]);
+
+  // Con la fuente de verdad cargada los rótulos cambian de ancho y la franja
+  // no: el observador no se enteraría. Se vuelve a medir con todas a la vista.
+  useEffect(() => {
+    let vivo = true;
+    void document.fonts?.ready.then(() => {
+      if (!vivo) return;
+      anchos.current = null;
+      setMedida((m) => ({ ...m, cuantas: Number.POSITIVE_INFINITY }));
+    });
+    return () => { vivo = false; };
+  }, []);
+
+  return cuantas;
+}
 
 /**
  * La sección del patrón de la línea al pie (spec 2026-10-02 «la interfaz en
@@ -126,6 +199,45 @@ export default function SeccionDelPatron({
     });
   }
 
+  const cuantas = useCuantasCaben(raiz, activeTool, controles.length);
+  const plegadas = controles.slice(cuantas);
+  const [abierto, setAbierto] = useState(false);
+  const [ancla, setAncla] = useState({ left: 0, bottom: 0 });
+  const masRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Otra herramienta, un modal encima, o que vuelvan a caber todas: el menú se
+  // cierra con su botón.
+  useEffect(() => { setAbierto(false); }, [activeTool, inerte]);
+  useEffect(() => { if (plegadas.length === 0) setAbierto(false); }, [plegadas.length]);
+
+  // Abrir y cerrar quedan en la bitácora. Abierto, el foco entra al menú:
+  // cuelga de <body>, y Tab desde «Más» no llegaría (como «Mostrar»).
+  const abiertoAntes = useRef(abierto);
+  useEffect(() => {
+    if (abiertoAntes.current === abierto) return;
+    abiertoAntes.current = abierto;
+    pushJournal('ui', 'mas', { abierto, herramienta: activeTool });
+    if (abierto) menuRef.current?.querySelector<HTMLElement>('button:not([tabindex="-1"]), input, select')?.focus();
+  }, [abierto, activeTool]);
+
+  useEffect(() => {
+    if (!abierto) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (masRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setAbierto(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (menuRef.current?.contains(document.activeElement)) masRef.current?.focus();
+      setAbierto(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); };
+  }, [abierto]);
+
   return (
     <div ref={raiz} className="seccion-del-patron" role="group" aria-label="Herramienta activa" data-shortcut-context="2d">
       <span className="seccion-del-patron__quien">
@@ -135,7 +247,27 @@ export default function SeccionDelPatron({
       </span>
       {controles.length > 0 && (
         <div className="seccion-del-patron__opciones" data-superficie="pie">
-          {controles.map((c) => <Fragment key={c.clave}>{c.nodo}</Fragment>)}
+          {controles.slice(0, cuantas).map((c) => <Fragment key={c.clave}>{c.nodo}</Fragment>)}
+          {plegadas.length > 0 && (
+            <button
+              ref={masRef}
+              type="button"
+              className="seccion-del-patron__mas"
+              aria-expanded={abierto}
+              aria-controls="seccion-del-patron-mas"
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                // Hacia arriba, sobre la hoja: se apoya en el borde de arriba de
+                // la línea al pie, no en el del botón, que la taparía.
+                const arriba = e.currentTarget.closest('.linea-al-pie')?.getBoundingClientRect().top ?? r.top;
+                setAncla({ left: r.left, bottom: window.innerHeight - arriba + 4 });
+                setAbierto((a) => !a);
+              }}
+            >
+              Más
+              <ChevronUp size={12} aria-hidden="true" />
+            </button>
+          )}
         </div>
       )}
       {/* La región viva va montada SIEMPRE y solo cambia su contenido: los
@@ -152,6 +284,22 @@ export default function SeccionDelPatron({
           </span>
         )}
       </div>
+      {abierto && plegadas.length > 0 && createPortal(
+        <div
+          ref={menuRef}
+          id="seccion-del-patron-mas"
+          className="seccion-del-patron__menu"
+          role="group"
+          aria-label={`Más opciones de ${nombre}`}
+          data-superficie="menu"
+          data-material="papel"
+          data-shortcut-context="2d"
+          style={{ left: ancla.left, bottom: ancla.bottom }}
+        >
+          {plegadas.map((c) => <Fragment key={c.clave}>{c.nodo}</Fragment>)}
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
