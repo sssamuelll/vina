@@ -122,6 +122,9 @@ export default function AppShell() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const [dxfDragActive, setDxfDragActive] = useState(false);
+  // La ranura de la línea al pie donde PatternEditor pinta la sección del
+  // patrón. Por estado y no por ref: el portal necesita el nodo ya montado.
+  const [ranuraDelPie, setRanuraDelPie] = useState<HTMLDivElement | null>(null);
   const dxfDragCounter = useRef(0);
   const dxfInputRef = useRef<HTMLInputElement>(null);
 
@@ -333,6 +336,7 @@ export default function AppShell() {
           <PatternEditor
             onImportDXF={() => dxfInputRef.current?.click()}
             onOpenPanel={openPanel}
+            ranuraDelPie={ranuraDelPie}
           />
         </div>
         {viewMode === 'split' && (
@@ -353,6 +357,13 @@ export default function AppShell() {
             {renderPanelContent(rightPanel)}
           </ContextPanel>
         )}
+      </div>
+      {/* La línea al pie (spec 2026-10-02 § 5.3): la tercera fila de la
+          ventana. Marco, de lado a lado y siempre; la sección del patrón la
+          llena PatternEditor por portal, porque su frase sale del estado de
+          sus herramientas. */}
+      <div className="linea-al-pie" data-superficie="ambiente">
+        <div ref={setRanuraDelPie} className="linea-al-pie__patron" />
       </div>
       <UnifiedBar
         onOpenPanel={togglePanel}

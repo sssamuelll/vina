@@ -4,25 +4,10 @@ import { Plus } from 'lucide-react';
 import type { RootState } from '../../store';
 import { activate2DTool, selectHasInternalShapeHost } from '../../store/toolActivation';
 import { addDockTool, removeDockTool, resetDockTools, reorderDockTool } from '../../store/dockSlice';
-import { toolRegistry } from '../../tools';
 import Dock from './Dock';
 import DockToolPicker from './DockToolPicker';
 import { DOCK_2D_CATALOG, getDockToolById, type DockToolDef } from './dock2dTools';
-
-/**
- * La activa, cuando no está en el margen: del catálogo si es una de las suyas,
- * y si no (Transformar, con A, o una que solo abre el menú o los comandos) del
- * registro de herramientas, con su nombre en español. El grupo no se usa: va
- * sola al final, detrás de aire.
- */
-function herramientaDeFuera(id: string): DockToolDef | undefined {
-  const delCatalogo = getDockToolById(id);
-  if (delCatalogo) return delCatalogo;
-  const def = toolRegistry.getTool(id);
-  // El icono del registro solo acepta `size` numérico; el margen siempre le
-  // pasa 16, así que encaja en `DockIcon`.
-  return def ? { id, icon: def.icon as DockToolDef['icon'], label: def.name, grupo: 'editar' } : undefined;
-}
+import { herramientaParaMostrar } from './herramientaParaMostrar';
 
 /** El margen de herramientas del patrón (spec 2026-10-02 § 4.3): las del dock
  *  de la usuaria + el ＋ que las agrega y las quita. Hidden in 3D-only view. La
@@ -72,8 +57,8 @@ export default function LeftDock() {
     .map(getDockToolById)
     .filter((t): t is DockToolDef => t !== undefined);
   // La activa siempre tiene marca (spec § 4.3): si no está en el margen, se
-  // pinta al final mientras siga activa.
-  const activaFuera = tools.some((t) => t.id === activeTool) ? undefined : herramientaDeFuera(activeTool);
+  // pinta al final, sola y detrás de aire, mientras siga activa.
+  const activaFuera = tools.some((t) => t.id === activeTool) ? undefined : herramientaParaMostrar(activeTool);
 
   return (
     <Dock

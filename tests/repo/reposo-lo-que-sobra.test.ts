@@ -6,8 +6,8 @@ describe('lo que sobra en reposo (spec 2026-10-02 § 9)', () => {
     expect(loQueSobra(['pista'], false)).toEqual([]);
   });
 
-  it('la tira, la fila y la barra de IA sobran, y salen ordenadas', () => {
-    expect(loQueSobra(['tira', 'pista', 'fila', 'barra'], false)).toEqual(['barra', 'fila', 'tira']);
+  it('las opciones al pie y la barra de IA sobran en reposo, y salen ordenadas', () => {
+    expect(loQueSobra(['pie', 'pista', 'barra'], false)).toEqual(['barra', 'pie']);
   });
 
   it('el estado vacío solo se permite en la pantalla vacía', () => {

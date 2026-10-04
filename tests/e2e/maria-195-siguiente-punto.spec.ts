@@ -118,10 +118,10 @@ test.describe('maria-195 — siguiente punto por largo y ángulo', () => {
     expect(pts[2][0]).toBeCloseTo(300, 4); expect(pts[2][1]).toBeCloseTo(270, 4);
   });
 
-  test('los chips del tramo NO le roban la esquina a la tira, que es por lo que murió el panel', async ({ page }) => {
-    // `NextPointPanel` obligaba a esconder `ToolStrip2D` mientras estaba
-    // abierto: los dos vivían en la misma esquina. Los chips viven sobre el
-    // trazo, así que la cabina de la herramienta se queda donde estaba.
+  test('los chips del tramo no le quitan la voz a la línea al pie, que es por lo que murió el panel', async ({ page }) => {
+    // `NextPointPanel` obligaba a esconder la tarjeta de la herramienta
+    // mientras estaba abierto: los dos vivían en la misma esquina. Los chips
+    // viven sobre el trazo, y la herramienta se nombra en la línea al pie.
     await waitForApp(page);
     await page.keyboard.press('h');
     await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('pen');
@@ -133,9 +133,10 @@ test.describe('maria-195 — siguiente punto por largo y ángulo', () => {
     await expect(campo(page, 'Largo')).toBeVisible({ timeout: 5000 });
 
     await expect(
-      page.locator('.tool-strip'),
-      'la tira se escondió con el tramo congelado: eso era del panel viejo',
+      page.locator('.seccion-del-patron'),
+      'la línea al pie perdió su sección con el tramo congelado: eso era del panel viejo',
     ).toBeVisible();
+    await expect(page.locator('.seccion-del-patron__nombre')).toHaveText('Pluma');
   });
 
   test('Tab dos veces reabre el chip: no es una tecla muerta', async ({ page }) => {

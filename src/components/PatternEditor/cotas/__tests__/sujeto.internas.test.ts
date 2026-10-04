@@ -15,9 +15,8 @@ describe('el punto elegido de una interna es sujeto de cotas', () => {
       activeTool: 'editPattern', pieces: [pieza], selectedPieceIds: ['p'], selectedInternalLine: { pieceId: 'p', lineId: 'L' },
       hotId: null, isDragging: false, contextMenuOpen: false, calibrationActive: false, hiddenLayerIds: [], layerLocked: {},
       nodoSeleccionado: { pieceId: 'p', commandIndex: 1, lineId: 'L' },
-    }, { width: 100, height: 100 });
+    });
     expect(s.cotas.map(c => c.id)).toEqual(['nodo-L-1-anterior', 'nodo-L-1-siguiente']);
-    expect(s.lineaDeSujeto).toBe('Editando: el punto seleccionado');
   });
 });
 
@@ -34,26 +33,23 @@ describe('en Q, las cotas de una interna son las de lo elegido (spec § 4.5)', (
     hotId: null, isDragging: false, contextMenuOpen: false, calibrationActive: false, hiddenLayerIds: [], layerLocked: {},
     ...over,
   });
-  const RECT = { width: 100, height: 100 };
 
   it('varios puntos de una interna —la elegida sin tramo y sin punto único—: ninguna cota', () => {
-    const s = cotasDelSujeto(entrada({ selectedInternalLine: { pieceId: 'p', lineId: 'L' } }), RECT);
+    const s = cotasDelSujeto(entrada({ selectedInternalLine: { pieceId: 'p', lineId: 'L' } }));
     expect(s.cotas).toEqual([]);
   });
 
   it('en Z, la misma línea entera conserva las suyas', () => {
-    const s = cotasDelSujeto(entrada({ activeTool: 'select', selectedInternalLine: { pieceId: 'p', lineId: 'L' } }), RECT);
+    const s = cotasDelSujeto(entrada({ activeTool: 'select', selectedInternalLine: { pieceId: 'p', lineId: 'L' } }));
     expect(s.cotas.length).toBeGreaterThan(0);
-    expect(s.lineaDeSujeto).toBe(`Editando: la línea seleccionada · ${s.cotas.length} cotas`);
   });
 
   it('un tramo: el mismo largo y ángulo que en Z, escritos por el punto con su lineId', () => {
     const tramo = { pieceId: 'p', lineId: 'L', segmentIndex: 1 };
-    const q = cotasDelSujeto(entrada({ selectedInternalLine: tramo }), RECT);
-    const z = cotasDelSujeto(entrada({ activeTool: 'select', selectedInternalLine: tramo }), RECT);
+    const q = cotasDelSujeto(entrada({ selectedInternalLine: tramo }));
+    const z = cotasDelSujeto(entrada({ activeTool: 'select', selectedInternalLine: tramo }));
     expect(q.cotas.map(c => c.kind)).toEqual(['tramo-largo', 'tramo-angulo']);
     expect(q.cotas.map(c => [c.id, c.valueMm, c.referenceLabel])).toEqual(z.cotas.map(c => [c.id, c.valueMm, c.referenceLabel]));
-    expect(q.lineaDeSujeto).toBe('Editando: el tramo seleccionado');
 
     const largo = q.cotas[0].apply(150);
     expect(largo).toMatchObject({ kind: 'nodo', pieceId: 'p', commandIndex: 1, lineId: 'L' });
@@ -71,7 +67,7 @@ describe('en Q, las cotas de una interna son las de lo elegido (spec § 4.5)', (
       path: [{ type: 'M', values: [20, 60] }, { type: 'L', values: [120, 60] }],
     };
     const conDoblez = { ...pieza, internals: [doblez] } as PatternPiece;
-    const s = cotasDelSujeto(entrada({ pieces: [conDoblez], selectedInternalLine: { pieceId: 'p', lineId: 'F', segmentIndex: 1 } }), RECT);
+    const s = cotasDelSujeto(entrada({ pieces: [conDoblez], selectedInternalLine: { pieceId: 'p', lineId: 'F', segmentIndex: 1 } }));
     expect(s.cotas[0].apply(150)).toMatchObject({ kind: 'internal', pieceId: 'p', lineId: 'F' });
   });
 });

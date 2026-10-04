@@ -404,12 +404,12 @@ describe('CotaChip - scrub', () => {
     pointer(b, 'pointerup', 4);
   });
 
-  it('Tab desde el último chip sale del grupo hacia la tira de herramienta', () => {
+  it('Tab desde el último chip sale del grupo hacia la línea al pie', () => {
     const noop = { onCommit: vi.fn(), onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn(), onScrubCancel: vi.fn() };
     render(
       <div>
         <div className="cotas"><CotaChip cota={cota()} left={0} top={0} zoom2D={1} {...noop} /></div>
-        <div className="tool-strip"><select aria-label="Tipo"><option>a</option></select></div>
+        <div className="seccion-del-patron"><select aria-label="Tipo"><option>a</option></select></div>
       </div>,
     );
     fireEvent.click(screen.getByRole('button'));

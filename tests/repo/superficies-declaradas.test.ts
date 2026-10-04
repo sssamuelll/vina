@@ -12,7 +12,7 @@ import { join } from 'node:path';
  */
 export const VOCABULARIO = new Set([
   'ambiente', 'documento', 'dev',
-  'tira', 'pista', 'barra', 'paleta', 'velo', 'cabina', 'menu', 'panel',
+  'pie', 'pista', 'barra', 'paleta', 'velo', 'cabina', 'menu', 'panel',
   'modal', 'toast', 'tooltip', 'estado-vacio', 'indicador-simulacion',
   'indicador-fps', 'mapas', 'instantaneas',
 ]);
@@ -23,15 +23,19 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/shell/TopBar.tsx', 'dev', 1],
   ['src/components/shell/DockShell.tsx', 'ambiente', 1],
   ['src/components/shell/Dock.tsx', 'ambiente', 1],
+  // La línea al pie (spec 2026-10-02 § 5.3): marco. Lo que aparece en ella
+  // son las opciones (`pie`) y la frase (`pista`), que pinta la sección del
+  // patrón por portal.
+  ['src/components/shell/AppShell.tsx', 'ambiente', 1],
+  ['src/components/PatternEditor/SeccionDelPatron.tsx', 'pie', 1],
+  ['src/components/PatternEditor/SeccionDelPatron.tsx', 'pista', 1],
   ['src/components/PatternEditor/renderers/MarcaDeEscala.tsx', 'documento', 1],
   ['src/components/Viewport3D/SurfaceModePill.tsx', 'ambiente', 1],
   ['src/components/Viewport3D/SurfaceModePill.tsx', 'menu', 1],
   ['src/components/Debug/SolverMetrics.tsx', 'dev', 2],
-  ['src/components/PatternEditor/ToolStrip2D.tsx', 'tira', 1],
   // La fila vive en la barra superior desde P2: es parte de su ambiente. Lo
   // único suyo que aparece es el menú de «Mostrar», cuando se pliega.
   ['src/components/PatternEditor/FilaDeCapas.tsx', 'menu', 1],
-  ['src/components/PatternEditor/renderers/HintText.tsx', 'pista', 2],
   ['src/components/shell/UnifiedBar.tsx', 'barra', 1],
   ['src/components/shell/UnifiedBar.tsx', 'velo', 1],
   ['src/components/shell/UnifiedBar.tsx', 'paleta', 1],

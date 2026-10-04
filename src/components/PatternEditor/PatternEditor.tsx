@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSelector, useDispatch, shallowEqual } from 'react-redux';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage, addTrazo, updateTrazo } from '../../store/projectSlice';
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
@@ -21,7 +22,8 @@ import { ladoDelHit } from './cotas/lado';
 import { usePuertaDeLado } from './usePuertaDeLado';
 import { cajasDeAsas } from './cotas/cotasGeometry';
 import { resizePieceTo } from './pieceResize';
-import ToolStrip2D from './ToolStrip2D';
+import SeccionDelPatron from './SeccionDelPatron';
+import { fraseDeLaFase, fraseDelPie } from './fraseDeLaFase';
 import { suscribirNoPasoNada } from './noPasoNada';
 import type { Cota } from './cotas/cotas';
 import { useFreeSewingTool } from './useFreeSewingTool';
@@ -29,7 +31,7 @@ import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { resolveSeamAllowanceClick } from '../../utils/seam/edgeHitTest';
 import { useNotchTool } from './useNotchTool';
-import { usePointTool } from './usePointTool';
+import { usePointTool, type PointToolMode } from './usePointTool';
 import { useSeamAllowanceTool } from './useSeamAllowanceTool';
 import { useNotchMirrorPreview } from './useNotchMirrorPreview';
 import SeamAllowanceSelectionOverlay from './renderers/overlays/SeamAllowanceSelectionOverlay';
@@ -72,7 +74,6 @@ import SeamRenderer from './renderers/SeamRenderer';
 import ElasticRenderer from './renderers/ElasticRenderer';
 import TrimRenderer from './renderers/TrimRenderer';
 import ToolOverlay from './renderers/ToolOverlay';
-import HintText from './renderers/HintText';
 import EmptyState2D, { shouldShowEmptyState } from './EmptyState2D';
 import ConstructionOverlay from './renderers/ConstructionOverlay';
 import ReferenceImageLayer from './renderers/ReferenceImageLayer';
@@ -103,9 +104,12 @@ interface PatternEditorProps {
   onImportDXF?: () => void;
   /** Opens a named ContextPanel (e.g. 'Properties'); wired by AppShell. */
   onOpenPanel?: (name: string) => void;
+  /** La ranura de la línea al pie donde se pinta la sección del patrón (spec
+   *  2026-10-02 § 5.3); la pone AppShell. Sin ella (tests) no se pinta. */
+  ranuraDelPie?: HTMLElement | null;
 }
 
-export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEditorProps) {
+export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }: PatternEditorProps) {
   const dispatch = useDispatch();
   const pieces = useSelector(selectPieces);
   const seams = useSelector(selectSeams);
@@ -901,7 +905,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     saAncla: seamAllowanceTool.ancla, saHover: seamAllowanceTool.hover,
     tramoEnCurso, nodoSeleccionado,
     trazos: trazosVisibles, selectedTrazo: editor.selectedTrazo,
-  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso, nodoSeleccionado, trazosVisibles, editor.selectedTrazo]);
+  }), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso, nodoSeleccionado, trazosVisibles, editor.selectedTrazo]);
   const sujeto = useMemo(
     () => refinarAlLado(sujetoSinLado, ladoSeleccionado, { activeTool, pieces, hiddenLayerIds, layerLocked }),
     [sujetoSinLado, ladoSeleccionado, activeTool, pieces, hiddenLayerIds, layerLocked],
@@ -937,12 +941,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     [drawablePieces, lineLengthMode, suppressLengths],
   );
   // Las cuatro herramientas que toman el sujeto de la selección lo dicen en la
-  // tira antes del clic, en vez de morirse mudas (#1117).
+  // línea al pie antes del clic, en vez de morirse mudas (#1117).
   const falta = faltaSujeto(activeTool, selectedPieceIds);
 
   // El desenlace de un gesto que se armó y no dejó nada (#1117, hallazgo G).
-  // Va a la tira y no a un toast: el mismo gesto se repite cinco veces en tres
-  // segundos y serían cinco toasts encima del lienzo.
+  // Va a la frase de la línea al pie y no a un toast: el mismo gesto se repite
+  // cinco veces en tres segundos y serían cinco toasts encima del lienzo.
   const [desenlace, setDesenlace] = useState<string | null>(null);
   useEffect(() => {
     let borrado: ReturnType<typeof setTimeout> | undefined;
@@ -953,10 +957,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     });
     return () => { cancelar(); clearTimeout(borrado); };
   }, []);
-  // La tira pinta el nombre de la herramienta activa en su cabecera. Sin esto,
-  // fallar un piquete y pasarse a Hilo dentro de los 4 s deja «Hilo» arriba y
-  // el mensaje del piquete debajo: el aviso queda atribuido a la herramienta
-  // equivocada. Es el mismo defecto que este canal vino a arreglar, al reves.
+  // La línea al pie nombra la herramienta activa junto a la frase. Sin esto,
+  // fallar un piquete y pasarse a Hilo dentro de los 4 s deja «Hilo» al lado
+  // del mensaje del piquete: el aviso queda atribuido a la herramienta
+  // equivocada. Es el mismo defecto que este canal vino a arreglar, al revés.
   useEffect(() => setDesenlace(null), [activeTool]);
 
   const abrirChipVisto = useRef(0);
@@ -1416,8 +1420,35 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // estado vacío y la marca de escala.
   const pantallaVacia = shouldShowEmptyState(pieces.length + trazos.length + referenceImages.length, activeTool);
 
+  // La frase de la línea al pie (spec 2026-10-02 § 5.4), de la fase de la
+  // herramienta activa. El desenlace y lo que falta le ganan (`fraseDelPie`).
+  const fase = fraseDeLaFase({
+    activeTool,
+    penNodesLength: pen.nodes.length,
+    nodeEditorIsEditing: isNodeEditing,
+    seamPhase: seamTool.phase,
+    topstitchMode: topstitchTool.mode,
+    walkSeamPhase: walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle',
+    slashPhase: slashAndSpreadTool.phase,
+    saDefaultWidthMm: seamAllowanceTool.widthMm,
+    internalShapeNodesLength: internalShapeTool.nodes.length,
+    cotasVisibles: sujeto.cotas.length > 0,
+    hasSeams: seams.length > 0,
+    extendTrimMode: (toolOptions?.extendTrim?.mode as 'extend' | 'trim') ?? 'extend',
+    extendTrimArmed: extendTrimTool.selectedSnap !== null,
+    modoShift: shiftActivo?.modo,
+    segundoMarco,
+    rectanguloPorDefecto: defaultRect,
+    tijerasEmpezadas: scissorsTool.startPoint !== null,
+    medidaEmpezada: measureTool.currentStart !== null,
+    modoDelPunto: (toolOptions?.point?.mode as PointToolMode | undefined) ?? 'point',
+  });
+
   return (
-    <div className="pattern-editor">
+    // La hoja es papel desde P2b (spec 2026-10-02 § 7.2): se fue la tira, la
+    // última superficie oscura que vivía encima. Lo que se dibuja del patrón,
+    // dentro del <svg>, sigue con --ink-*.
+    <div className="pattern-editor" data-material="papel">
       <svg
         ref={svgRef}
         className="pattern-svg"
@@ -1679,25 +1710,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           )}
         </g>
 
-        <HintText
-          activeTool={activeTool}
-          pieces={pieces}
-          penNodesLength={pen.nodes.length}
-          nodeEditorIsEditing={isNodeEditing}
-          seamPhase={seamTool.phase}
-          topstitchMode={topstitchTool.mode}
-          walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
-          slashPhase={slashAndSpreadTool.phase}
-          saDefaultWidthMm={seamAllowanceTool.widthMm}
-          internalShapeNodesLength={internalShapeTool.nodes.length}
-          cotasVisibles={sujeto.cotas.length > 0}
-          hasSeams={seams.length > 0}
-          extendTrimMode={(toolOptions?.extendTrim?.mode as 'extend' | 'trim') ?? 'extend'}
-          extendTrimArmed={extendTrimTool.selectedSnap !== null}
-          modoShift={shiftActivo?.modo}
-          segundoMarco={segundoMarco}
-        />
-
         {!pantallaVacia && (
           <MarcaDeEscala
             zoom2D={zoom2D}
@@ -1738,19 +1750,22 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           onScrubCancel={handleCotaScrubCancel}
         />
       </AgruparCotas>
-      {/* La tira ya no cede la esquina a nadie. La cedía porque `NextPointPanel`
-          vivía en ella; los chips del tramo en curso viven sobre el trazo, que
-          es donde está el gesto, así que no hay nada que esquivar (#1129). */}
-      <ToolStrip2D
-        lineaDeSujeto={sujeto.lineaDeSujeto}
-        onClearMeasurements={measureTool.clear}
-        hasMeasurements={measureTool.measurements.length > 0 || !!measureTool.selectedEdge || !!measureTool.comparison}
-        falta={falta}
-        desenlace={desenlace}
-        /* El modal de piquete no usa portal ni atrapa el foco, y la tira vive
-           en su misma esquina: se declara inerte mientras esté abierto (#1125). */
-        inerte={Boolean(notchTool.refining?.notch.notchAnchor)}
-      />
+      {/* La sección del patrón de la línea al pie (spec 2026-10-02 § 5.3):
+          vive en el marco, al pie de la ventana, pero su frase sale del estado
+          de las herramientas de aquí, así que se pinta por portal en la ranura
+          que deja AppShell. En 3D no hay hoja que explicar: la franja se queda
+          y su sección del 3D llega en P5. */}
+      {ranuraDelPie && editor.viewMode !== '3d' && createPortal(
+        <SeccionDelPatron
+          frase={fraseDelPie(desenlace, falta, fase)}
+          onClearMeasurements={measureTool.clear}
+          hasMeasurements={measureTool.measurements.length > 0 || !!measureTool.selectedEdge || !!measureTool.comparison}
+          // El modal del piquete no usa portal ni atrapa el foco: mientras está
+          // abierto, la sección se declara inerte (#1125). Se va en P3.
+          inerte={Boolean(notchTool.refining?.notch.notchAnchor)}
+        />,
+        ranuraDelPie,
+      )}
       {pantallaVacia && (
         <EmptyState2D onImportDXF={onImportDXF} />
       )}

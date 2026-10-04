@@ -20,33 +20,29 @@ const base = {
   isDragging: false, contextMenuOpen: false, calibrationActive: false,
   hiddenLayerIds: [] as number[], layerLocked: {} as Record<number, boolean>,
 };
-const def = { width: 300, height: 150 };
 
 describe('cotasDelSujeto', () => {
-  it('rectángulo sin selección: sin cotas y la línea dice el tamaño del próximo clic', () => {
-    const s = cotasDelSujeto({ ...base, activeTool: 'rectangle', selectedPieceIds: [] }, def);
+  it('rectángulo sin selección: sin cotas', () => {
+    const s = cotasDelSujeto({ ...base, activeTool: 'rectangle', selectedPieceIds: [] });
     expect(s.cotas).toEqual([]);
-    expect(s.lineaDeSujeto).toBe('Un clic crea 300 × 150 mm · arrastra para dibujar');
   });
   it('rectángulo con la pieza recién creada seleccionada: caliente, dos cotas, "la pieza nueva"', () => {
-    const s = cotasDelSujeto({ ...base, activeTool: 'rectangle', selectedPieceIds: ['a'], hotId: 'a' }, def);
+    const s = cotasDelSujeto({ ...base, activeTool: 'rectangle', selectedPieceIds: ['a'], hotId: 'a' });
     expect(s.caliente).toBe(true);
     expect(s.cotas.map(c => c.id)).toEqual(['ancho', 'alto']);
-    expect(s.lineaDeSujeto).toBe('Editando: la pieza nueva');
   });
   it('select con una pieza: no caliente aunque el hotId coincida, "la pieza seleccionada"', () => {
-    const s = cotasDelSujeto({ ...base, activeTool: 'select', selectedPieceIds: ['a'], hotId: 'a' }, def);
+    const s = cotasDelSujeto({ ...base, activeTool: 'select', selectedPieceIds: ['a'], hotId: 'a' });
     expect(s.caliente).toBe(false);
     expect(s.cotas).toHaveLength(2);
-    expect(s.lineaDeSujeto).toBe('Editando: la pieza seleccionada');
   });
   it('pieza bloqueada: cotas presentes pero deshabilitadas', () => {
-    const s = cotasDelSujeto({ ...base, activeTool: 'select', selectedPieceIds: ['b'] }, def);
+    const s = cotasDelSujeto({ ...base, activeTool: 'select', selectedPieceIds: ['b'] });
     expect(s.disabled).toBe(true);
     expect(s.cotas).toHaveLength(2);
   });
   it('capa bloqueada: cotas presentes pero deshabilitadas, como el candado de pieza', () => {
-    const s = cotasDelSujeto({ ...base, activeTool: 'select', selectedPieceIds: ['c'], layerLocked: { 2: true } }, def);
+    const s = cotasDelSujeto({ ...base, activeTool: 'select', selectedPieceIds: ['c'], layerLocked: { 2: true } });
     expect(s.disabled).toBe(true);
     expect(s.cotas).toHaveLength(2);
   });
@@ -59,7 +55,7 @@ describe('cotasDelSujeto', () => {
     ['otra herramienta', { selectedPieceIds: ['a'], activeTool: 'pen' as const }],
     ['pieza que ya no existe', { selectedPieceIds: ['zzz'] }],
   ])('sin cotas: %s', (_n, over) => {
-    const s = cotasDelSujeto({ ...base, activeTool: 'select', ...over } as Parameters<typeof cotasDelSujeto>[0], def);
+    const s = cotasDelSujeto({ ...base, activeTool: 'select', ...over } as Parameters<typeof cotasDelSujeto>[0]);
     expect(s.cotas).toEqual([]);
   });
 
@@ -78,26 +74,24 @@ describe('cotasDelSujeto', () => {
       const s = cotasDelSujeto({
         ...baseConLinea, activeTool: 'select', selectedPieceIds: ['a'],
         selectedInternalLine: { pieceId: 'a', lineId: 'l1' },
-      }, def);
+      });
       expect(s.cotas.length).toBeGreaterThan(0);
       expect(s.cotas.some(c => c.kind === 'tramo-largo')).toBe(true);
-      expect(s.lineaDeSujeto).toBe(`Editando: la línea seleccionada · ${s.cotas.length} cotas`);
     });
 
     it('hallazgo #11 — lineId colgante (la línea ya no existe, p.ej. tras un undo): cae a las cotas de la pieza, no deja la tira en blanco', () => {
       const s = cotasDelSujeto({
         ...baseConLinea, activeTool: 'select', selectedPieceIds: ['a'],
         selectedInternalLine: { pieceId: 'a', lineId: 'no-existe' },
-      }, def);
+      });
       expect(s.cotas.map(c => c.id)).toEqual(['ancho', 'alto']);
-      expect(s.lineaDeSujeto).toBe('Editando: la pieza seleccionada');
     });
 
     it('hallazgo #11 — pieceId colgante (la pieza ya no existe): sin cotas, sin crash', () => {
       const s = cotasDelSujeto({
         ...baseConLinea, activeTool: 'select', selectedPieceIds: [],
         selectedInternalLine: { pieceId: 'no-existe', lineId: 'l1' },
-      }, def);
+      });
       expect(s.cotas).toEqual([]);
     });
 
@@ -107,7 +101,7 @@ describe('cotasDelSujeto', () => {
         ...baseConLinea, pieces: [bloqueada, base.pieces[1], base.pieces[2]],
         activeTool: 'select', selectedPieceIds: ['a'],
         selectedInternalLine: { pieceId: 'a', lineId: 'l1' },
-      }, def);
+      });
       expect(s.disabled).toBe(true);
       expect(s.cotas.length).toBeGreaterThan(0);
     });

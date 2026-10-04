@@ -153,4 +153,19 @@
   overflow: hidden;
 }
 
+/* La línea al pie (spec 2026-10-02 «la interfaz en papel» § 5.3): marco, del
+   material y el alto de la barra superior, de lado a lado y siempre. Es una
+   fila de la ventana, no flota: la hoja termina encima y nada la empuja. La
+   sección del patrón la pinta PatternEditor por portal en su ranura
+   (SeccionDelPatron.css); la del 3D llega en P5. */
+.linea-al-pie {
+  height: var(--top-bar-h);
+  flex-shrink: 0;
+  display: flex;
+  background: var(--bg-deeper);
+  border-top: 1px solid var(--border);
+  color: var(--text-primary);
+}
+.linea-al-pie__patron { flex: 1 1 auto; min-width: 0; display: flex; }
+
 /* unified-bar-slot removed — bar is now position:fixed overlay */

@@ -161,27 +161,24 @@ test.describe('F2 — la pista de la herramienta se lee entera', () => {
     await page.waitForTimeout(400);
 
     const medida = await page.evaluate(() => {
-      const svg = document.querySelector('svg.pattern-svg')!;
-      let pista: Element | null = null;
-      for (const t of svg.querySelectorAll('text')) {
-        const s = (t.textContent ?? '').trim();
-        if (s.length > 20 && /^(Clic|Pasa|Arrastra|Haz)/.test(s)) pista = t;
-      }
+      const pista = document.querySelector<HTMLElement>('.seccion-del-patron__texto');
       if (!pista) return null;
       const rp = pista.getBoundingClientRect();
-      // Desde P2 el grupo vive en la barra superior y la pista al pie de la
-      // hoja: el solape tiene que seguir siendo 0.
-      const rf = document.querySelector('.grupo-del-patron')?.getBoundingClientRect();
-      const solape = rf
-        ? Math.max(0, Math.min(rp.right, rf.right) - Math.max(rp.left, rf.left)) *
-          Math.max(0, Math.min(rp.bottom, rf.bottom) - Math.max(rp.top, rf.top))
-        : 0;
-      return { texto: (pista.textContent ?? '').trim(), solape: Math.round(solape), fueraPorDerecha: Math.round(Math.max(0, rp.right - window.innerWidth)) };
+      // Desde P2b la frase vive en la línea al pie: lo que hay encima de ella,
+      // en su centro, tiene que ser ella misma.
+      const encima = document.elementFromPoint(rp.left + Math.min(rp.width / 2, 40), rp.top + rp.height / 2);
+      return {
+        texto: (pista.textContent ?? '').trim(),
+        tapada: encima && pista.contains(encima) ? null : (encima as HTMLElement | null)?.className?.toString() ?? 'nada',
+        recortada: pista.scrollWidth > pista.clientWidth + 1,
+        fueraPorDerecha: Math.round(Math.max(0, rp.right - window.innerWidth)),
+      };
     });
 
-    expect(medida, 'no encontré la pista de la herramienta al pie del lienzo').not.toBeNull();
-    expect(medida!.solape, `la fila tapa ${medida!.solape} px² de la pista "${medida!.texto}"`).toBe(0);
-    expect(medida!.fueraPorDerecha, 'la pista se sale del viewport por la derecha').toBe(0);
+    expect(medida, 'no encontré la frase de la herramienta en la línea al pie').not.toBeNull();
+    expect(medida!.tapada, `algo tapa la frase "${medida!.texto}"`).toBeNull();
+    expect(medida!.recortada, `la frase "${medida!.texto}" no cabe en una línea`).toBe(false);
+    expect(medida!.fueraPorDerecha, 'la frase se sale del viewport por la derecha').toBe(0);
   });
 });
 

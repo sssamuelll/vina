@@ -142,10 +142,12 @@ function ChipEditable({
     const i = hermanos.indexOf(boton);
     const vecino = hermanos[i + (destino === 'siguiente' ? 1 : -1)];
     if (!vecino) {
-      // Borde del grupo: hacia adelante sale a la tira (el siguiente control del
-      // lienzo); hacia atrás se queda en el botón. Sin esto Tab se comía un paso.
+      // Borde del grupo: hacia adelante sale a la línea al pie (el siguiente
+      // control de la herramienta); hacia atrás se queda en el botón. Sin esto
+      // Tab se comía un paso. Restar y Sumar no cuentan: no están en el orden
+      // del teclado.
       const fuera = destino === 'siguiente'
-        ? document.querySelector<HTMLElement>('.tool-strip input, .tool-strip select, .tool-strip button')
+        ? document.querySelector<HTMLElement>('.seccion-del-patron input, .seccion-del-patron select, .seccion-del-patron button:not([tabindex="-1"])')
         : null;
       (fuera ?? boton).focus();
       return;

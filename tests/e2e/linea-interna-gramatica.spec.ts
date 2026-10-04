@@ -68,7 +68,7 @@ test.describe('línea interna — gramática', () => {
     await waitForApp(page);
     await addPiece(page, 'A', { x: 150, y: 150 });
     await tool(page, 'g', 'internalShape');
-    await page.selectOption('#opcion-nodeType', 'curvePoints');
+    await page.locator('#opcion-nodeType').getByRole('button', { name: 'Curva por puntos' }).click();
     await expect.poll(async () => (await st(page)).tools.toolOptions.internalShape?.nodeType).toBe('curvePoints');
     await clickAt(page, { x: 200, y: 200 });
     await clickAt(page, { x: 240, y: 240 });
@@ -79,7 +79,7 @@ test.describe('línea interna — gramática', () => {
     expect(ils).toHaveLength(1);
     expect(types(ils[0].path)).toBe('MCC');
 
-    await page.selectOption('#opcion-nodeType', 'straight');
+    await page.locator('#opcion-nodeType').getByRole('button', { name: 'Recta' }).click();
     const a = await toScreen(page, { x: 200, y: 260 });
     const b = await toScreen(page, { x: 230, y: 280 });
     await page.mouse.move(a.x, a.y);
