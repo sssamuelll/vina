@@ -9,6 +9,16 @@
     "paleta abierta": 0,
     "panel Propiedades": 0,
     "panel Capas": 0,
-    "3D en reposo": 0
+    "3D en reposo": 0,
+    "aviso": 0,
+    "diálogo de confirmación": 0,
+    "tooltip": 0,
+    "menú del dock": 0,
+    "menú del clic derecho": 0,
+    "submenú del clic derecho": 0,
+    "submenú del logo": 0,
+    "modal del piquete": 0,
+    "modal de conexión": 2,
+    "menú de superficie (3D)": 0
   }
 }

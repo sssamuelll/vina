@@ -44,7 +44,7 @@
   padding: var(--sp-3) var(--sp-4);
 }
 
-/* ─── Logo Menu (Figma-style, same glassmorphic as floating capsule) ─── */
+/* ─── Logo Menu (Figma-style) ─── */
 
 .logo-menu__trigger {
   display: flex;
@@ -76,9 +76,9 @@
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  /* Same glassmorphic as the floating capsule bar */
-  /* Material `overlay`. El radio era 14px a mano — un quinto radio suelto
-   * que no correspondía a ningún rol. */
+  /* Material `overlay`, en papel: la raíz lleva data-material="papel" (spec
+   * 2026-10-02 § 6.3). El radio era 14px a mano — un quinto radio suelto que
+   * no correspondía a ningún rol. */
   background: var(--surface-overlay-bg);
   backdrop-filter: var(--surface-overlay-blur);
   -webkit-backdrop-filter: var(--surface-overlay-blur);
@@ -93,7 +93,7 @@
 
 .logo-menu__separator {
   height: 1px;
-  background: var(--border);
+  background: var(--border-subtle);
   margin: 4px 10px;
 }
 
@@ -208,7 +208,7 @@
   padding: 6px 12px 4px;
   font-size: var(--text-xs);
   color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline);
   margin-bottom: 2px;
 }
 .context-menu__header--seam {
@@ -253,7 +253,7 @@
 }
 .context-menu__separator {
   height: 1px;
-  background: var(--border);
+  background: var(--border-subtle);
   margin: 4px 10px;
 }
 .context-menu__fade,

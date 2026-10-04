@@ -81,13 +81,24 @@ describe('FloatingActionBar — anclaje (F4: contrato de transformTool.bbox)', (
   });
 });
 
-describe('FloatingActionBar — superficie neutral-dark (nunca azul de selección)', () => {
-  it('fondo #1a1a1a, z-index 90; NO el azul de selección #4A9EFF', () => {
+describe('FloatingActionBar — es papel que flota (spec 2026-10-02 § 5.5 y § 7.1)', () => {
+  it('blanca, con línea de pelo y sombra corta: el material de lo que flota, por token; z-index 90', () => {
     const { container } = renderBar();
     const bar = container.querySelector('.floating-action-bar') as HTMLElement;
-    expect(bar.style.backgroundColor).toBe('rgb(26, 26, 26)');       // #1a1a1a
-    expect(bar.style.backgroundColor).not.toBe('rgb(74, 158, 255)'); // #4A9EFF
+    expect(bar.getAttribute('data-material')).toBe('papel');
+    const estilo = bar.getAttribute('style') ?? '';
+    expect(estilo).toContain('background-color: var(--surface-overlay-bg)');
+    expect(estilo).toContain('border: var(--surface-overlay-border)');
+    expect(estilo).toContain('border-radius: var(--surface-overlay-radius)');
+    expect(estilo).toContain('box-shadow: var(--surface-overlay-shadow)');
     expect(bar.style.zIndex).toBe('90');
+  });
+
+  it('los iconos van en la tinta del ámbito, no en un gris escrito a mano', () => {
+    renderBar();
+    for (const b of screen.getAllByRole('button')) {
+      expect(b.getAttribute('style') ?? '').toContain('color: var(--text-primary)');
+    }
   });
 });
 

@@ -9,6 +9,7 @@ import reducer, {
   clearHighlights,
   cleanupExpiredHighlights,
   showToast,
+  showUndoToast,
   dismissToast,
   clearToasts,
   cleanupExpiredToasts,
@@ -153,6 +154,11 @@ describe('copilotUISlice', () => {
       expect(state.toasts[0].type).toBe('undo');
       expect(state.toasts[0].actionLabel).toBe('Undo');
       expect(state.toasts[0].actionPayload).toEqual({ pieceId: 'p1' });
+    });
+
+    it('el aviso con Deshacer lo dice en español (contrato § 5)', () => {
+      const state = reducer(initialState, showUndoToast('Margen de costura 8mm → 10mm', { type: 'x' }));
+      expect(state.toasts[0].actionLabel).toBe('Deshacer');
     });
 
     it('should dismiss a toast', () => {

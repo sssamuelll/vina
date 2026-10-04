@@ -1,7 +1,11 @@
+/* Calibración de una imagen de referencia: un modal, con el material de lo
+ * que flota y la tinta del ámbito de papel (spec 2026-10-02 § 6.3). Hasta P1b
+ * traía su gris, su borde y su azul escritos a mano: dieciocho colores que no
+ * salían del sistema. */
 .calibration-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -9,24 +13,25 @@
 }
 
 .calibration-modal {
-  background: #2a2a2a;
-  border: 1px solid #444;
-  border-radius: 8px;
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
   padding: 20px;
   width: 340px;
-  color: #e0e0e0;
+  color: var(--text-primary);
   font-size: 13px;
 }
 
 .calibration-modal h3 {
   margin: 0 0 12px 0;
   font-size: 15px;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .calibration-modal p {
   margin: 0 0 14px 0;
-  color: #aaa;
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -40,16 +45,16 @@
 
 .calibration-input-row label {
   flex-shrink: 0;
-  color: #e0e0e0;
+  color: var(--text-secondary);
 }
 
 .calibration-input-row input[type='number'] {
   flex: 1;
   padding: 4px 8px;
-  background: #1e1e1e;
-  border: 1px solid #555;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  color: #e0e0e0;
+  color: var(--text-primary);
   font-size: 13px;
   min-width: 0;
 }
@@ -64,21 +69,20 @@
 .calibration-actions button {
   padding: 6px 16px;
   border-radius: 4px;
-  border: 1px solid #555;
-  background: #333;
-  color: #e0e0e0;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 13px;
 }
 
 .calibration-actions button.primary {
-  background: #0078d4;
-  border-color: #0078d4;
-  color: #fff;
+  background: var(--accent-fuerte);
+  border-color: var(--accent-fuerte);
+  color: var(--on-accent);
 }
 
 .calibration-actions button.primary:disabled {
-  background: #0078d480;
-  border-color: #0078d480;
+  opacity: 0.5;
   cursor: not-allowed;
 }

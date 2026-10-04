@@ -128,6 +128,21 @@ test.describe('las siete puertas se alcanzan', () => {
       `el personalizador se sale (${medida!.top}→${medida!.bottom} de ${medida!.vh}) y no scrollea`,
     ).toBe(true);
   });
+
+  test('el personalizador se ve: lo que hay en su caja es él, no el lienzo', async ({ page }) => {
+    // #1149 le puso scroll al dock, y un scroll recorta todo lo que se sale de
+    // su caja: el personalizador existía, con su tamaño, a la derecha del dock
+    // y fuera de la vista. Los clics de este archivo lo alcanzaban porque
+    // Playwright desplaza el dock a lo ancho hasta encontrarlo; una persona no.
+    await abrirApp(page);
+    await abrirPersonalizador(page);
+    const tapados = await page.evaluate(() => {
+      const r = document.querySelector('.dock-picker')!.getBoundingClientRect();
+      return [[r.left + 20, r.top + 20], [r.left + r.width / 2, r.top + r.height / 2], [r.right - 20, r.bottom - 20]]
+        .filter(([x, y]) => !document.elementFromPoint(x, y)?.closest('.dock-picker')).length;
+    });
+    expect(tapados, 'el personalizador está recortado o tapado: de tres puntos de su caja, estos no son él').toBe(0);
+  });
 });
 
 test.describe('«Abrir la pieza» — el gesto más largo del lienzo, dicho y hecho', () => {

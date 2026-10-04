@@ -481,6 +481,13 @@ escenario) y la raíz de cada superficie que flota. Un componente no sabe sobre 
 usa `--text-primary` y recibe tinta clara en el marco y tinta oscura sobre el papel. Sigue habiendo
 un solo archivo de tokens (R4 = 1).
 
+**Cuándo lo lleva cada cosa** (nota del plan de P1b, 2026-10-03). En P1b, solo la raíz de lo que
+flota. La hoja y sus márgenes lo ganan en P2, y el escenario en P5: hasta entonces llevan encima el
+dock, la tira, la fila y el cromo del 3D, que siguen oscuros, y con el ámbito su tinta se volvería
+oscura sobre fondo oscuro. Los valores de lo que flota (§ 7.1) viven en el bloque del ámbito;
+`:root` conserva el overlay oscuro para lo que todavía no ha pasado a papel. Así, una superficie
+que olvide el atributo se queda oscura y legible, no blanca con tinta clara.
+
 | Token | En el ámbito de papel | Sobre papel | Sobre blanco | Sobre papel hundido | Uso |
 |---|---|---|---|---|---|
 | `--text-primary` | oklch(0.27 0.010 80) · `#292621` | 13,72 | 15,07 | 11,87 | |

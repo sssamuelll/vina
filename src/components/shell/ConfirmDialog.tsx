@@ -73,7 +73,7 @@ export default function ConfirmDialog() {
   const { title, description, consequences, destructive } = pending;
 
   return (
-    <div className="confirm-scrim" onMouseDown={cerrar}>
+    <div className="confirm-scrim" data-material="papel" onMouseDown={cerrar}>
       <div
         className="confirm-dialog"
         data-superficie="modal"

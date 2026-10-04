@@ -408,7 +408,7 @@ export function showUndoToast(message: string, undoPayload: unknown) {
   return showToast({
     type: 'undo',
     message,
-    actionLabel: 'Undo',
+    actionLabel: 'Deshacer',
     actionPayload: undoPayload,
     duration: 5000,
   });

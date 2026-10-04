@@ -110,3 +110,20 @@ export function resolveToken(css: string, name: string, vistos = new Set<string>
 export function tokenColor(css: string, name: string): RGBA {
   return parseCssColor(resolveToken(css, name));
 }
+
+/**
+ * El CSS visto desde dentro de `data-material="<ámbito>"` (spec 2026-10-02
+ * § 7.2): lo que el ámbito declara va delante, y `resolveToken`, que toma la
+ * primera declaración, encuentra la del ámbito o, si no la hay, la de :root.
+ *
+ * Una diferencia con el navegador, a sabiendas: aquí un alias de :root
+ * (`--text-muted: var(--text-tertiary)`) se sigue con los valores del ámbito, y
+ * el navegador lo resuelve en :root, con los del marco. Las dos lecturas
+ * coinciden porque ambito-de-papel.test.ts exige que el ámbito vuelva a
+ * declarar cada alias que lea uno de sus nombres.
+ */
+export function cssDelAmbito(css: string, ambito: string): string {
+  const bloque = css.match(new RegExp(`\\[data-material="${ambito}"\\]\\s*\\{([^}]*)\\}`));
+  if (!bloque) throw new Error(`no hay ámbito "${ambito}" en el CSS`);
+  return `${bloque[1]}\n${css}`;
+}

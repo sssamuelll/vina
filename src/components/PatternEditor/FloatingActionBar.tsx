@@ -65,6 +65,7 @@ export default function FloatingActionBar({
     <div
       className="floating-action-bar"
       data-superficie="cabina"
+      data-material="papel"
       style={{
         position: 'absolute',
         left,
@@ -75,10 +76,12 @@ export default function FloatingActionBar({
         alignItems: 'center',
         gap: 2,
         padding: 4,
-        backgroundColor: '#1a1a1a',
-        border: '1px solid #333',
-        borderRadius: 6,
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+        // Lo que flota es papel (spec 2026-10-02 § 5.5): blanca, con línea de
+        // pelo y sombra corta. Era un negro escrito a mano.
+        backgroundColor: 'var(--surface-overlay-bg)',
+        border: 'var(--surface-overlay-border)',
+        borderRadius: 'var(--surface-overlay-radius)',
+        boxShadow: 'var(--surface-overlay-shadow)',
       }}
     >
       {actions.map((def) => {
@@ -101,7 +104,7 @@ export default function FloatingActionBar({
                 background: 'transparent',
                 border: 'none',
                 borderRadius: 4,
-                color: '#e0e0e0',
+                color: 'var(--text-primary)',
                 cursor: 'pointer',
               }}
             >

@@ -266,6 +266,7 @@ export default function ContextMenu3D({
       ref={ref}
       className="context-menu context-menu--scroll"
       data-superficie="menu"
+      data-material="papel"
       style={{ left: menu.x, top: menu.y }}
     >
       {menu.target === 'piece' && menu.pieceName && (
