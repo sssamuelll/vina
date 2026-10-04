@@ -354,6 +354,15 @@ final. A 1366 px y en Split, las cuatro opciones del piquete caben enteras con s
 **No empuja ni se mueve.** Es una fila fija de la ventana: la hoja termina encima de ella, y la
 marca de escala y los márgenes están en el mismo sitio con cualquier herramienta.
 
+**Nota del plan de P2b (2026-10-04).** La sección del patrón la pinta `PatternEditor` por portal
+en una ranura de la línea al pie, porque la frase sale del estado de sus herramientas; en 3D no
+se pinta (la franja se queda y espera a la sección del 3D, P5). Todo número es un campo con
+«Restar» y «Sumar», que no entran en el orden del teclado: con el foco en el campo, las flechas
+hacen lo mismo. «Margen del próximo clic» se escribe al teclear, como las demás opciones. Las
+formas del piquete se dibujan con la geometría del lienzo (`generateNotchPath`). Las frases y
+los avisos que cambian están en el plan (`docs/superpowers/plans/2026-10-04-interfaz-en-papel-p2b.md`,
+Task 2).
+
 ### 5.4 La frase
 
 - Una línea en `--text-secondary`, después de las opciones.

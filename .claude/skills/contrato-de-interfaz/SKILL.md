@@ -95,35 +95,35 @@ sobre el papel. No sabe dónde está. Cinco reglas:
   nombre que el ámbito redefine (`--text-muted: var(--text-tertiary)`), el
   ámbito lo vuelve a declarar; si no, baja con el valor del marco. Lo vigila
   `src/styles/__tests__/ambito-de-papel.test.ts`.
-- **Hasta su fase siguen con el overlay oscuro de `:root`:** la barra de IA y
-  la tira (P2), los paneles (P4, que los pasa a `chrome` a ras) y el cromo del
-  3D (P5). La fila dejó el lienzo en P2: sus seis interruptores viven en la
+- **Hasta su fase siguen con el overlay oscuro de `:root`:** la barra de IA
+  (P2c), los paneles (P4, que los pasa a `chrome` a ras) y el cromo del 3D
+  (P5). La fila dejó el lienzo en P2a: sus seis interruptores viven en la
   barra superior, que es marco, y solo su menú plegado («Mostrar») flota y es
-  papel. El margen de herramientas lleva el ámbito desde P2; la hoja lo gana
-  cuando se vaya la tira, y el escenario en P5.
+  papel. La tira murió en P2b: sus opciones viven en la línea al pie, que es
+  marco, y solo su menú «Más» flota y es papel. El margen de herramientas
+  lleva el ámbito desde P2a y la hoja desde P2b; el escenario lo gana en P5.
 
 Más una familia de **tinta**, que no es superficie: `--ink-*` es lo que se
 dibuja **sobre el papel** del lienzo 2D.
 
-> **La trampa que ya nos costó una vez, a medio cerrar:** los `--text-*`
+> **La trampa que ya nos costó una vez, cerrada en P2b:** los `--text-*`
 > cambian con el material. Dentro de `data-material="papel"` son tinta
-> oscura; fuera, la del marco. La hoja del lienzo todavía no lleva el ámbito
-> (lo gana en P2): ahí un `--text-*` da 1,05:1, invisible. Lo que se dibuja
-> del patrón, dentro del `<svg>`, va con `--ink-*`.
+> oscura; fuera, la del marco. La hoja lleva el ámbito desde P2b, así que lo
+> que vive sobre ella puede usar `--text-*`; lo que está en el marco (la barra
+> superior, la línea al pie, los paneles) recibe la tinta clara. Lo que se
+> dibuja del patrón, dentro del `<svg>`, sigue con `--ink-*`, que no cambia
+> con el material.
 
 Variantes declaradas (no inventes más): `--surface-overlay-radius-pill` para
 barras con forma de cápsula, y `--surface-overlay-bg-recessed` para el reposo de
 la barra de IA.
 
-> **Y `--surface-overlay-border-flush`** (bordes → tono: la sombra en capas
-> `--surface-overlay-shadow-sheet` separa, el borde queda para los campos). La
-> usan la tira de herramienta del lienzo 2D y los chips de cota
-> (`docs/superpowers/specs/2026-08-30-cotas-vivas-design.md` § 9-10).
-> **Excepción dicha:** la tira es un `overlay` que NO se va — está mientras hay
-> herramienta 2D activa, a 28 px del borde de arriba. Y las cotas
-> van sobre el patrón por definición: son parte del objeto, como los tiradores
-> del transform box, no un panel. Lo pidió Samuel el 2026-08-30; queda escrito
-> para que no se vuelva regla tácita.
+> **Las cotas van sobre el patrón por definición:** son parte del objeto,
+> como los tiradores del transform box, no un panel
+> (`docs/superpowers/specs/2026-08-30-cotas-vivas-design.md` § 9-10). La
+> tira de herramienta, el otro `overlay` que no se iba, murió en P2b con su
+> borde `-flush` y su sombra `-sheet`: su sitio es la línea al pie, que es
+> marco y no una excepción (spec 2026-10-02 § 10).
 
 > **Nota 2026-09-26:** ya no hay blur, así que un overlay ya NO establece
 > contexto de apilamiento por sí mismo; lo que sigue vale para cualquier
@@ -173,6 +173,10 @@ la barra de IA.
   barras clásicas el margen crece de 44 a 47 px mientras sus herramientas no
   caben, y la hoja se corre esos 3 px. Que tampoco se muevan al abrir un panel
   llega con la ranura a la derecha: en 2D con P4, en Split con P5.
+- **La línea al pie es una fila de la ventana.** Marco, de lado a lado y
+  siempre, con el alto de la barra superior; la hoja termina encima y nada la
+  empuja. Las opciones de la herramienta viven ahí, como botones; lo que no
+  cabe pasa a «Más». Lo mide `linea-al-pie.spec.ts`.
 - Solo tres cosas pueden taparlo: menús transitorios, toasts y la paleta.
 - Un panel nuevo NO se abre encima del patrón.
 - Nada de `z-index` literal. Si necesitas una capa, es que falta un rol.

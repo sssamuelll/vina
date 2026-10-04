@@ -239,3 +239,22 @@ test('la barra superior plegada: el menú de «Mostrar»', async ({ page }) => {
   await page.waitForTimeout(200);
   await registrar('menú «Mostrar» (barra plegada)', page);
 });
+
+test('la línea al pie: las opciones del piquete y el menú «Más»', async ({ page }) => {
+  // Desde P2b las opciones de la herramienta viven en el marco, al pie, y lo
+  // que no cabe flota en un menú de papel.
+  await addPiece(page, 'piquete-pie', { x: 120, y: 120 }, 300, 400);
+  await reposo(page);
+  await activarHerramienta(page, 'Shift+N', 'notch');
+  await expect(page.locator('.seccion-del-patron [data-superficie="pie"]')).toBeVisible();
+  await page.waitForTimeout(200);
+  await registrar('línea al pie con el piquete', page);
+
+  await page.setViewportSize({ width: 1100, height: 700 });
+  await dispatch(page, 'editor/selectPiece', 'piquete-pie');
+  await activarHerramienta(page, 'r', 'offsetOutline');
+  await page.locator('.seccion-del-patron__mas').click();
+  await expect(page.getByRole('group', { name: /^Más opciones de/ })).toBeVisible();
+  await page.waitForTimeout(200);
+  await registrar('menú «Más» de la línea al pie', page);
+});
