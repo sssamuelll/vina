@@ -118,6 +118,23 @@ describe('un número es un campo con sus botones de menos y más', () => {
   });
 });
 
+describe('lo tecleado y los botones de paso', () => {
+  it('Sumar sin salir del campo enseña el valor nuevo: el borrador no se queda con lo tecleado', () => {
+    // Los botones de paso no toman el foco con el ratón (no le roban a la
+    // herramienta su Enter), así que el campo ya no se desenfoca al pulsarlos
+    // y su borrador tiene que soltarse al dar el valor.
+    function ConEstado() {
+      const [v, setV] = React.useState<unknown>(8);
+      return <Control opcion={profundidad} valor={v} alCambiar={setV} />;
+    }
+    render(<ConEstado />);
+    const campo = screen.getByLabelText('Profundidad (mm)') as HTMLInputElement;
+    fireEvent.change(campo, { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sumar' }));
+    expect(campo.value).toBe('13');
+  });
+});
+
 describe('interruptor y color', () => {
   it('el interruptor es un botón con su marca, sin texto encendido/apagado', () => {
     const alCambiar = pintar({ id: 'showAngle', label: 'Mostrar el ángulo', type: 'toggle', value: false });

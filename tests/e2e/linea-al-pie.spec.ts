@@ -35,6 +35,9 @@ interface VentanaConStore {
 const opcionesDelPiquete = (page: Page) =>
   page.evaluate(() => (window as unknown as VentanaConStore).__VINA_STORE__.getState().tools.toolOptions.notch ?? {});
 
+const cuantasPiezas = (page: Page) =>
+  page.evaluate(() => (window as unknown as VentanaConStore).__VINA_STORE__.getState().project.pieces.length);
+
 const piquetesDe = (page: Page, id: string) =>
   page.evaluate((pieza) => (window as unknown as VentanaConStore).__VINA_STORE__.getState().project.pieces
     .find((p) => p.id === pieza)?.internals
@@ -177,10 +180,14 @@ test('en una ventana estrecha, lo que no cabe pasa a «Más»: la frase conserva
   expect(r.frase, 'la frase se quedó con menos de 200 px').toBeGreaterThanOrEqual(199);
   expect(r.masRight, '«Más» se mete en la frase').toBeLessThanOrEqual(r.fraseLeft);
 
+  const piezas = await cuantasPiezas(page);
   await mas.focus();
   await page.keyboard.press('Enter');
   const menu = page.getByRole('group', { name: /^Más opciones de/ });
   await expect(menu).toBeVisible();
+  // Enter sobre un botón del pie es del botón: no llega a Desplazar contorno,
+  // que con una pieza seleccionada crearía «… Offset» (revisión final de P2b).
+  expect(await cuantasPiezas(page), 'Enter sobre «Más» desplazó la pieza').toBe(piezas);
   await expect(menu).toHaveAttribute('data-material', 'papel');
   expect(await menu.evaluate((m) => m.contains(document.activeElement)), 'abierto con el teclado, el foco se quedó fuera').toBe(true);
   const caja = await menu.boundingBox();
@@ -199,6 +206,39 @@ test('en una ventana estrecha, lo que no cabe pasa a «Más»: la frase conserva
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await expect(mas).toBeFocused();
+
+  // Espacio sobre una alternativa la pulsa: no arranca la simulación.
+  const direccion = page.locator('#opcion-direction');
+  await page.keyboard.press('Shift+Tab');
+  await expect(direccion.getByRole('button', { name: 'Las dos' })).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(direccion.getByRole('button', { name: 'Las dos' })).toHaveAttribute('aria-pressed', 'true');
+  expect(await cuantasPiezas(page)).toBe(piezas);
+
+  // Con el ratón, ningún botón del pie se queda con el foco, ni el que dejó
+  // el teclado: el Enter siguiente es de la herramienta y aplica. El Escape de
+  // arriba también soltó la pieza (decisión 10 del plan: la escalera de
+  // Escape es de P2c), así que se vuelve a seleccionar.
+  await dispatch(page, 'editor/selectPiece', 'desplazar-pie');
+  await direccion.getByRole('button', { name: 'Hacia afuera' }).click();
+  expect(await page.evaluate(() => document.activeElement?.closest('.linea-al-pie') == null), 'el clic dejó el foco en la línea al pie').toBe(true);
+  await page.keyboard.press('Enter');
+  await expect.poll(() => cuantasPiezas(page), { message: 'Enter no aplicó el desplazamiento' }).toBe(piezas + 1);
+});
+
+test('a 1000 px, el menú «Más» se corre a la izquierda para no salirse de la ventana', async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await abrirAppVacia(page);
+  await addPiece(page, 'desplazar-pie', { x: 120, y: 120 }, 300, 400);
+  await dispatch(page, 'editor/selectPiece', 'desplazar-pie');
+  await activarHerramienta(page, 'r', 'offsetOutline');
+
+  await page.locator('.seccion-del-patron__mas').click();
+  const menu = page.getByRole('group', { name: /^Más opciones de/ });
+  await expect(menu).toBeVisible();
+  const caja = (await menu.boundingBox())!;
+  expect(caja.x + caja.width, 'el menú se sale por la derecha').toBeLessThanOrEqual(1000 - 16 + 0.5);
+  expect(caja.x, 'el menú se sale por la izquierda').toBeGreaterThanOrEqual(16 - 0.5);
 });
 
 test('las cotas se ocultan mientras se arrastra la pieza y vuelven al soltar', async ({ page }) => {

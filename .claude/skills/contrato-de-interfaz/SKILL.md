@@ -209,6 +209,14 @@ la barra de IA.
 - **Todo lo que tenga `:hover` tiene `:focus-visible`.** El repo llegó a tener
   76 contra 6.
 - `outline: none` solo es legal si la misma regla pone otra señal en su lugar.
+- **Enter y Espacio son del botón que tiene el foco del teclado.** Una
+  botonera que convive con el lienzo (la línea al pie y su menú «Más») lo
+  declara con `data-botonera`: sus botones no se quedan con el foco por un
+  clic, un clic en cualquier sitio suelta el que dejó el teclado, y con el
+  foco de teclado su Enter y su Espacio no pasan a los atajos ni a la
+  herramienta (`src/shortcuts/teclaDeBotonera.ts`). Sin eso, Espacio sobre una
+  alternativa arrancaba la simulación y Enter sobre «Más» desplazaba la pieza
+  (revisión de P2b). La barra superior y «Mostrar» todavía no lo cumplen.
 - Nada de `confirm()` / `alert()` / `prompt()`. Existe el sistema de Toast
   (`showToast`, `showErrorToast`, `showUndoToast` en `copilotUISlice`). Para algo
   destructivo, prefiere **actuar y ofrecer deshacer** antes que preguntar.

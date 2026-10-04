@@ -211,15 +211,49 @@ export default function SeccionDelPatron({
   useEffect(() => { setAbierto(false); }, [activeTool, inerte]);
   useEffect(() => { if (plegadas.length === 0) setAbierto(false); }, [plegadas.length]);
 
-  // Abrir y cerrar quedan en la bitácora. Abierto, el foco entra al menú:
-  // cuelga de <body>, y Tab desde «Más» no llegaría (como «Mostrar»).
+  // Abrir y cerrar quedan en la bitácora. Abierto con el teclado, el foco
+  // entra al menú: cuelga de <body>, y Tab desde «Más» no llegaría (como
+  // «Mostrar»). Con el ratón se queda donde estaba: el Enter siguiente es de
+  // la herramienta, no de la primera alternativa del menú.
   const abiertoAntes = useRef(abierto);
+  const deTeclado = useRef(false);
   useEffect(() => {
     if (abiertoAntes.current === abierto) return;
     abiertoAntes.current = abierto;
     pushJournal('ui', 'mas', { abierto, herramienta: activeTool });
-    if (abierto) menuRef.current?.querySelector<HTMLElement>('button:not([tabindex="-1"]), input, select')?.focus();
+    if (abierto && deTeclado.current) menuRef.current?.querySelector<HTMLElement>('button:not([tabindex="-1"]), input, select')?.focus();
   }, [abierto, activeTool]);
+
+  // Abierto, se coloca sobre la línea al pie (apoyado en su borde de arriba,
+  // no en el del botón, que la taparía), alineado con «Más» y sin salirse de
+  // la ventana: con «Más» cerca del borde derecho, se corre a la izquierda.
+  useLayoutEffect(() => {
+    const boton = masRef.current;
+    const menu = menuRef.current;
+    if (!abierto || !boton || !menu) return;
+    const r = boton.getBoundingClientRect();
+    const arriba = boton.closest('.linea-al-pie')?.getBoundingClientRect().top ?? r.top;
+    setAncla({
+      left: Math.max(16, Math.min(r.left, window.innerWidth - menu.offsetWidth - 16)),
+      bottom: window.innerHeight - arriba + 4,
+    });
+  }, [abierto]);
+
+  // Con el ratón, ningún botón de la línea al pie se queda con el foco: un
+  // clic en cualquier sitio suelta el que dejó el teclado, y el botón pinchado
+  // no lo toma. Así Enter y Espacio solo son de un botón del pie cuando María
+  // llegó a él con el teclado (`esTeclaDeBotonera`).
+  useEffect(() => {
+    const soltar = () => {
+      const activo = document.activeElement;
+      if (activo instanceof HTMLElement && activo.matches('[data-botonera] button')) activo.blur();
+    };
+    window.addEventListener('mousedown', soltar, true);
+    return () => window.removeEventListener('mousedown', soltar, true);
+  }, []);
+  const noTomarElFoco = (e: { target: EventTarget; preventDefault: () => void }) => {
+    if ((e.target as Element).closest('button')) e.preventDefault();
+  };
 
   useEffect(() => {
     if (!abierto) return;
@@ -239,7 +273,15 @@ export default function SeccionDelPatron({
   }, [abierto]);
 
   return (
-    <div ref={raiz} className="seccion-del-patron" role="group" aria-label="Herramienta activa" data-shortcut-context="2d">
+    <div
+      ref={raiz}
+      className="seccion-del-patron"
+      role="group"
+      aria-label="Herramienta activa"
+      data-shortcut-context="2d"
+      data-botonera
+      onMouseDown={noTomarElFoco}
+    >
       <span className="seccion-del-patron__quien">
         {Icono && <Icono size={16} />}
         <span className="seccion-del-patron__nombre">{nombre}</span>
@@ -256,11 +298,8 @@ export default function SeccionDelPatron({
               aria-expanded={abierto}
               aria-controls="seccion-del-patron-mas"
               onClick={(e) => {
-                const r = e.currentTarget.getBoundingClientRect();
-                // Hacia arriba, sobre la hoja: se apoya en el borde de arriba de
-                // la línea al pie, no en el del botón, que la taparía.
-                const arriba = e.currentTarget.closest('.linea-al-pie')?.getBoundingClientRect().top ?? r.top;
-                setAncla({ left: r.left, bottom: window.innerHeight - arriba + 4 });
+                // Un clic que viene del teclado (Enter, Espacio) llega con `detail` 0.
+                deTeclado.current = e.detail === 0;
                 setAbierto((a) => !a);
               }}
             >
@@ -294,6 +333,8 @@ export default function SeccionDelPatron({
           data-superficie="menu"
           data-material="papel"
           data-shortcut-context="2d"
+          data-botonera
+          onMouseDown={noTomarElFoco}
           style={{ left: ancla.left, bottom: ancla.bottom }}
         >
           {plegadas.map((c) => <Fragment key={c.clave}>{c.nodo}</Fragment>)}

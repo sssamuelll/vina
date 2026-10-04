@@ -13,6 +13,7 @@ import { DEFAULT_SHORTCUTS } from './defaults';
 import { ShortcutContext } from './ShortcutContext';
 import { pushJournal } from '../utils/telemetry/journal';
 import { hayModalDelante } from '../utils/superficieModal';
+import { esTeclaDeBotonera } from './teclaDeBotonera';
 
 /** Determine which panel has focus based on the active element */
 function getActiveContext(): ShortcutCtx[] {
@@ -65,6 +66,11 @@ export function ShortcutProvider({ children }: ShortcutProviderProps) {
         ) {
           return;
         }
+
+        // Y Enter y Espacio sobre un botón de la línea al pie, que son su
+        // pulsación: Espacio no es la simulación con el foco en una
+        // alternativa.
+        if (esTeclaDeBotonera(e)) return;
 
         // Y un modal tapa MAS que un campo, no menos (#1173). `edit.delete`
         // es de contexto `global`, asi que sin esto Supr se llevaba la pieza

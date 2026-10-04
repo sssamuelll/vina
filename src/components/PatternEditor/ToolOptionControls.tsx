@@ -44,7 +44,12 @@ function Numero({ id, opcion, valor, alCambiar }: {
 }) {
   const [borrador, setBorrador] = useState<string | null>(null);
   const paso = opcion.step ?? 1;
-  const dar = (n: number) => alCambiar(acotar(opcion, redondearAlPaso(n, paso)));
+  // Los botones de paso no le quitan el foco al campo (la línea al pie no se
+  // queda con el foco por un clic), así que el borrador se suelta aquí.
+  const dar = (n: number) => {
+    setBorrador(null);
+    alCambiar(acotar(opcion, redondearAlPaso(n, paso)));
+  };
   return (
     <span className="opcion-del-pie__numero">
       <button

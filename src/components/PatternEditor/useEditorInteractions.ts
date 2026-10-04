@@ -44,6 +44,7 @@ import { DRAG_THRESHOLD_PX, isDrag } from './gestureConstants';
 import { pushJournal } from '../../utils/telemetry/journal';
 import { MEASURE_TOOL_IDS } from '../../store/toolActivation';
 import { hayModalDelante } from '../../utils/superficieModal';
+import { esTeclaDeBotonera } from '../../shortcuts/teclaDeBotonera';
 import { isEditableTarget } from '../../utils/editableTarget';
 
 /** Los tres modos de Pespunte que DIBUJAN. `topstitchEdit` queda fuera a
@@ -513,6 +514,9 @@ export function useEditorInteractions(
       // hasta aquí. Medido sin esto: el nodo agarrado se borraba igual
       // detrás del diálogo, 5 nodos a 4.
       if (hayModalDelante()) return;
+      // Enter y Espacio sobre un botón de la línea al pie son del botón: con el
+      // foco en «Más», Enter desplazaba además la pieza.
+      if (esTeclaDeBotonera(e)) return;
       handlers.forEach(h => h(e));
     };
     window.addEventListener('keydown', handler);
