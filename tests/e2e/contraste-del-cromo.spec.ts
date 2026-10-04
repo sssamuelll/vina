@@ -213,7 +213,8 @@ test('los modales: el del piquete y el de conexión', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(modal).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Modo ajustes' }).click();
+  // Preferencias (P2c) monta AgentSettings → ConnectionsList → ConnectionModal.
+  await abrirPanel(page, 'IA y ratón', 'IA y ratón');
   await page.getByRole('button', { name: /Agregar (conexión|tu primera conexión)/ }).first().click();
   await expect(page.getByRole('dialog', { name: 'Agregar conexión' })).toBeVisible();
   await page.waitForTimeout(200);

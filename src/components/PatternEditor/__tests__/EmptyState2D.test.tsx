@@ -12,11 +12,12 @@ import { configureStore } from '@reduxjs/toolkit';
 import editorReducer from '../../../store/editorSlice';
 import toolsReducer from '../../../store/toolSlice';
 import EmptyState2D, { shouldShowEmptyState } from '../EmptyState2D';
+import iaReducer from '../../../store/iaSlice';
 
 afterEach(cleanup);
 
 function renderWithStore(props: { onImportDXF?: () => void } = {}) {
-  const store = configureStore({ reducer: { editor: editorReducer, tools: toolsReducer } });
+  const store = configureStore({ reducer: { editor: editorReducer, tools: toolsReducer, ia: iaReducer } });
   render(
     <Provider store={store}>
       <EmptyState2D {...props} />
@@ -69,12 +70,9 @@ describe('EmptyState2D', () => {
     expect(btn.disabled).toBe(true);
   });
 
-  it('dispatches vina:focusChat when the AI hint is clicked', () => {
-    const spy = vi.fn();
-    window.addEventListener('vina:focusChat', spy);
-    renderWithStore({ onImportDXF: () => {} });
+  it('el aviso de la IA la convoca (spec 2026-10-02 § 6.2): la barra no existe en reposo', () => {
+    const store = renderWithStore({ onImportDXF: () => {} });
     fireEvent.click(screen.getByRole('button', { name: /describe tu patrón a la ia/i }));
-    expect(spy).toHaveBeenCalledTimes(1);
-    window.removeEventListener('vina:focusChat', spy);
+    expect(store.getState().ia.abierta).toBe(true);
   });
 });

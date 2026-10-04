@@ -7,7 +7,8 @@
 
 const STORAGE_KEY = 'vina-bar-position';
 export const BAR_WIDTH = 560;
-export const BAR_HEIGHT = 58;
+/** La cápsula de una línea (spec 2026-10-02 § 6.2). */
+export const BAR_HEIGHT = 48;
 
 // Token max of --top-bar-h: clamp(36px, 2.5vw, 48px) — used when no .top-bar
 // is mounted (e.g. hideChrome shells, tests).

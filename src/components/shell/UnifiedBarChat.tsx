@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, Fragment } from 'react';
+import { useEffect, useRef, Fragment } from 'react';
 import { useSelector } from 'react-redux';
 import { Paperclip, X } from 'lucide-react';
 import Markdown from 'react-markdown';
@@ -6,19 +6,9 @@ import remarkGfm from 'remark-gfm';
 import type { RootState } from '../../store';
 import { piecesLabel, type PendingDXFAttachment } from './dxfImport';
 import { mensajeDeErrorEs } from '../../copilot/action/tools/mensajeDeErrorEs';
-import { enviar, detener } from '../../copilot/conversacion';
+import { detener } from '../../copilot/conversacion';
 
 interface Props {
-  input: string;
-  setInput: (v: string) => void;
-  /**
-   * Counter incremented by `UnifiedBar` ONLY when the user actually submits
-   * (Enter key or Send button click). UnifiedBarChat watches this nonce
-   * (not the raw `input` prop) to decide when to fire a send — decoupling
-   * per-keystroke input updates from submit intent. Pre-2026-05-28 we
-   * watched `input` directly which sent one message per typed character.
-   */
-  submitNonce: number;
   /** DXF attached to the input but not yet sent. Imported into the project
    *  (atomically) when the message is sent; the agent then operates on the
    *  loaded pieces. Null when nothing is attached. */
@@ -29,10 +19,10 @@ interface Props {
 
 /**
  * La conversación con la IA. Solo pinta: la conversación y el turno del agente
- * viven en el slice `ia`, y el agente corre en `copilot/conversacion.ts`, así
- * que ocultar la barra no los pierde (spec 2026-10-02 § 6.2).
+ * viven en el slice `ia`, el agente corre en `copilot/conversacion.ts`, y
+ * envía la barra. Ocultarla no los pierde (spec 2026-10-02 § 6.2).
  */
-export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDXF, clearAttachment }: Props) {
+export default function UnifiedBarChat({ pendingDXF, clearAttachment }: Props) {
   const { mensajes, trabajando, enCurso } = useSelector((s: RootState) => s.ia);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -40,33 +30,6 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [mensajes, enCurso]);
-
-  // Send a chat message. Called from the nonce-watching effect below when
-  // the user actually submits (Enter / Send button in UnifiedBar).
-  const handleSend = useCallback((text: string) => {
-    if ((!text.trim() && !pendingDXF) || trabajando) return;
-    setInput('');
-    const adjunto = pendingDXF;
-    clearAttachment();
-    void enviar(text, adjunto);
-  }, [pendingDXF, trabajando, setInput, clearAttachment]);
-
-  // Watch the submit-nonce from UnifiedBar. It changes ONLY when the user
-  // intentionally submits (Enter key or Send button). Per-keystroke input
-  // updates do not move the nonce. Initial value is captured in the ref so
-  // mount does not auto-fire (`null` sentinel handles the very first run).
-  const lastNonceRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (lastNonceRef.current === null) {
-      lastNonceRef.current = submitNonce;
-      return;
-    }
-    if (submitNonce === lastNonceRef.current) return;
-    lastNonceRef.current = submitNonce;
-
-    if ((!input.trim() && !pendingDXF) || trabajando) return;
-    handleSend(input);
-  }, [submitNonce, input, pendingDXF, handleSend, trabajando]);
 
   // Running tool indicator
   const runningToolName = enCurso.find(tc => tc.status === 'running')?.name;

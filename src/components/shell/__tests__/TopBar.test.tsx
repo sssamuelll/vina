@@ -14,12 +14,13 @@ import editorReducer, { setViewMode } from '../../../store/editorSlice';
 import simulationReducer from '../../../store/simulationSlice';
 import projectReducer, { addPiece, addTrazo } from '../../../store/projectSlice';
 import TopBar from '../TopBar';
+import iaReducer from '../../../store/iaSlice';
 
 afterEach(cleanup);
 
 function renderBarra() {
   const store = configureStore({
-    reducer: { editor: editorReducer, simulation: simulationReducer, project: projectReducer },
+    reducer: { editor: editorReducer, simulation: simulationReducer, project: projectReducer, ia: iaReducer },
   });
   render(<Provider store={store}><TopBar onOpenPanel={() => {}} onImportDXF={() => {}} /></Provider>);
   return store;
@@ -63,7 +64,7 @@ describe('TopBar ▸ grupo del patrón', () => {
 
   it('el selector de vista ya no vive entre dos espaciadores', () => {
     const { container } = render(
-      <Provider store={configureStore({ reducer: { editor: editorReducer, simulation: simulationReducer, project: projectReducer } })}>
+      <Provider store={configureStore({ reducer: { editor: editorReducer, simulation: simulationReducer, project: projectReducer, ia: iaReducer } })}>
         <TopBar onOpenPanel={() => {}} onImportDXF={() => {}} />
       </Provider>,
     );

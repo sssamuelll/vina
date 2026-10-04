@@ -44,6 +44,8 @@ const RAICES: Array<[string, number]> = [
   ['src/components/Viewport3D/SurfaceModePill.tsx', 1],
   ['src/components/PatternEditor/FilaDeCapas.tsx', 1],
   ['src/components/PatternEditor/SeccionDelPatron.tsx', 1],
+  // La barra de IA convocada (P2c)
+  ['src/components/shell/UnifiedBar.tsx', 1],
   // Avisos y tooltips
   ['src/components/shell/ToastContainer.tsx', 1],
   ['src/components/shell/ToolTooltip.tsx', 1],

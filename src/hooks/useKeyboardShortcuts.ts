@@ -42,6 +42,7 @@ import {
 import { placeGarmentPieces } from '../utils/cloth/garmentPlacement';
 import { saveToStorage } from '../utils/projectIO';
 import { showSuccessToast, showInfoToast } from '../store/copilotUISlice';
+import { abrirIA } from '../store/iaSlice';
 import { useShortcutRegistry } from '../shortcuts/useShortcut';
 
 // Re-export ShortcutEntry type for backwards compatibility
@@ -241,6 +242,9 @@ export function useKeyboardShortcuts() {
       // View
       ['view.toggleSeamAllowance', () => dispatch(toggleSeamAllowance())],
       ['view.fitPattern', () => dispatch(requestFitView())],
+      // La IA se llama (spec 2026-10-02 § 6.2): Ctrl+/ para conversar, Ctrl+K para los comandos.
+      ['copilot.focusChat', () => dispatch(abrirIA('conversacion'))],
+      ['app.commandPalette', () => dispatch(abrirIA('comandos'))],
       ['view.layersPanel', () => window.dispatchEvent(new CustomEvent('vina:toggleLayersPanel'))],
       ['view.xrayMode', () => dispatch(setXrayMode({ enabled: !xrayMode }))],
 

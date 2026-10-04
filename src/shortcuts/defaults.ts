@@ -112,8 +112,7 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'fitmap.none', key: '0', alt: true, label: 'Desactivar mapa de ajuste', category: '3D Tools', context: '3d' },
 
   // ─── Copilot ────────────────────────────────────────────────────────────────
-  { id: 'copilot.focusChat', key: '/', ctrl: true, label: 'Enfocar campo del chat', category: 'View', context: 'copilot' },
-  { id: 'copilot.togglePanel', key: '/', ctrl: true, shift: true, label: 'Mostrar u ocultar panel del chat', category: 'View', context: 'copilot' },
+  { id: 'copilot.focusChat', key: '/', ctrl: true, label: 'Conversar con la IA', category: 'View', context: 'global' },
 
   // ─── Command Palette ────────────────────────────────────────────────────────
   { id: 'app.commandPalette', key: 'k', ctrl: true, label: 'Paleta de comandos', category: 'View', context: 'global' },

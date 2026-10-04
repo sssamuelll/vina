@@ -1,5 +1,6 @@
 import { useDispatch } from 'react-redux';
 import { activate2DTool } from '../../store/toolActivation';
+import { abrirIA } from '../../store/iaSlice';
 import type { Tool2D } from '../../types/types';
 import './EmptyState2D.css';
 
@@ -64,7 +65,7 @@ export default function EmptyState2D({ onImportDXF }: EmptyState2DProps) {
         <button
           type="button"
           className="empty-state-2d__ai-hint"
-          onClick={() => window.dispatchEvent(new CustomEvent('vina:focusChat'))}
+          onClick={() => dispatch(abrirIA())}
           aria-label="Describe tu patrón a la IA"
         >
           o descríbelo a la <span className="empty-state-2d__ai-word">IA</span>

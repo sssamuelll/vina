@@ -21,7 +21,7 @@ describe('loadPosition — restoring a persisted bar position', () => {
     setViewport(800, 500);
     const p = loadPosition();
     expect(p.x + 560).toBeLessThanOrEqual(800); // BAR_WIDTH inside
-    expect(p.y + 58).toBeLessThanOrEqual(500);  // BAR_HEIGHT inside
+    expect(p.y + 48).toBeLessThanOrEqual(500);  // BAR_HEIGHT inside
     expect(p.x).toBeGreaterThanOrEqual(0);
     expect(p.y).toBeGreaterThanOrEqual(0);
   });
@@ -31,14 +31,14 @@ describe('loadPosition — restoring a persisted bar position', () => {
     localStorage.setItem(KEY, '{not json');
     setViewport(1600, 900);
     const p = loadPosition();
-    expect(p).toEqual({ x: Math.round((1600 - 560) / 2), y: 900 - 40 - 58 - 24 });
+    expect(p).toEqual({ x: Math.round((1600 - 560) / 2), y: 900 - 40 - 48 - 24 });
   });
 
   it('falls back to bottom-center on non-finite coordinates', () => {
     localStorage.setItem(KEY, JSON.stringify({ x: 'wat', y: null }));
     setViewport(1600, 900);
     const p = loadPosition();
-    expect(p).toEqual({ x: Math.round((1600 - 560) / 2), y: 900 - 40 - 58 - 24 });
+    expect(p).toEqual({ x: Math.round((1600 - 560) / 2), y: 900 - 40 - 48 - 24 });
   });
 });
 
@@ -73,7 +73,7 @@ describe('clampPosition — bar movable everywhere except over the top-bar', () 
     setViewport(1600, 900);
     const p = clampPosition(5000, 5000);
     expect(p.x).toBe(1600 - 560 - 16);
-    expect(p.y).toBe(900 - 40 - 58 - 16);
+    expect(p.y).toBe(900 - 40 - 48 - 16);
   });
 });
 
@@ -86,8 +86,8 @@ describe('la barra no tapa la línea al pie (spec 2026-10-02 § 5.3)', () => {
     linea.getBoundingClientRect = () => ({ top: 607, bottom: 643, left: 0, right: 1366, width: 1366, height: 36, x: 0, y: 607, toJSON: () => ({}) });
     document.body.appendChild(linea);
     try {
-      expect(clampPosition(400, 9999).y).toBe(607 - 58 - 16);
-      expect(loadPosition().y).toBe(607 - 58 - 24);
+      expect(clampPosition(400, 9999).y).toBe(607 - 48 - 16);
+      expect(loadPosition().y).toBe(607 - 48 - 24);
     } finally {
       linea.remove();
     }
@@ -96,6 +96,6 @@ describe('la barra no tapa la línea al pie (spec 2026-10-02 § 5.3)', () => {
   it('sin la línea montada (el primer render) la calcula como --top-bar-h: una posición guardada antes de P2b no queda debajo', () => {
     setViewport(1366, 643);
     localStorage.setItem(KEY, JSON.stringify({ x: 400, y: 643 - 58 - 24 }));
-    expect(loadPosition().y).toBe(643 - 36 - 58 - 16);
+    expect(loadPosition().y).toBe(643 - 36 - 48 - 16);
   });
 });

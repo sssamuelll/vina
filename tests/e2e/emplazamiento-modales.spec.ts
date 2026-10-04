@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { abrirPanel } from './helpers/estados';
 
 /**
  * Ola 1 de la Fase 3+4 (§ 2.3 de la spec, Grupo 1): las cuatro
@@ -207,6 +208,13 @@ test.describe('Emplazamiento — las dos reclasificaciones que solo se ven en el
     }
     expect(abierto, 'ningún clic sobre el borde izquierdo abrió el modal de piquete').toBe(true);
 
+    // La barra de IA ya no está en reposo (P2c): se convoca para medir contra
+    // ella. Antes sale el foco del campo del modal, que se queda las teclas.
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press('Control+/');
+    await expect(page.locator('.unified-bar')).toBeVisible();
+    await expect(modal.first(), 'convocar la barra cerró el modal del piquete').toBeVisible();
+
     await page.screenshot({ path: 'test-results/emplazamiento-notch-modal.png', fullPage: false });
 
     const sondeo = await sondearApilamiento(page, '.notch-precision-modal');
@@ -223,9 +231,9 @@ test.describe('Emplazamiento — las dos reclasificaciones que solo se ven en el
   test('ConnectionModal: reclasificado a --z-modal, ¿le gana al cromo de verdad?', async ({ page }) => {
     await esperarApp(page);
 
-    // La barra de IA en modo ajustes es quien monta AgentSettings →
-    // ConnectionsList → ConnectionModal.
-    await page.getByRole('button', { name: 'Modo ajustes' }).click();
+    // El panel Preferencias (P2c) monta AgentSettings → ConnectionsList →
+    // ConnectionModal.
+    await abrirPanel(page, 'IA y ratón', 'IA y ratón');
     await page.waitForTimeout(700);
 
     const agregar = page.getByRole('button', { name: /Agregar (conexión|tu primera conexión)/ });

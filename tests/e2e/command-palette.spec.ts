@@ -118,13 +118,12 @@ test.describe('Command Palette (UnifiedBar commands mode)', () => {
     await expect(conAtajo).toContainText('Deshacer');
     await expect(conAtajo, 'el atajo se pinta junto al comando que lo tiene').toContainText('Ctrl+Z');
 
-    await page.locator(INPUT).fill('cuadrícula');
+    // El comando de la cuadrícula se fue en P1a (la cuadrícula está siempre):
+    // el negativo es ahora un comando que de verdad no tiene atajo.
+    await page.locator(INPUT).fill('IA y ratón');
     await page.waitForTimeout(200);
     const sinAtajo = page.locator(COMMAND_BTN).first();
-    await expect(sinAtajo).toContainText('cuadrícula');
-    await expect(
-      sinAtajo,
-      'la cuadrícula no tiene atajo: anunciar `G` mandaba a la usuaria a otra herramienta',
-    ).not.toContainText('G');
+    await expect(sinAtajo).toContainText('IA y ratón');
+    await expect(sinAtajo, 'un comando sin atajo no anuncia ninguno').not.toContainText('Ctrl');
   });
 });

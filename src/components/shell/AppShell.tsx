@@ -120,6 +120,8 @@ function renderPanelContent(name: string, cerrar: () => void) {
 export default function AppShell() {
   const dispatch = useDispatch();
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
+  // La IA no existe en reposo: la barra se monta cuando se la llama (spec 2026-10-02 § 6.2).
+  const iaAbierta = useSelector((s: RootState) => s.ia.abierta);
   const splitRatio = useSelector((s: RootState) => s.layout.splitRatio);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const { leftPanel, rightPanel, openPanel, togglePanel, closeLeft, closeRight } = usePanelHost();
@@ -369,9 +371,7 @@ export default function AppShell() {
       <div className="linea-al-pie" data-superficie="ambiente">
         <div ref={setRanuraDelPie} className="linea-al-pie__patron" />
       </div>
-      <UnifiedBar
-        onOpenPanel={togglePanel}
-      />
+      {iaAbierta && <UnifiedBar onOpenPanel={togglePanel} />}
       <ToastContainer />
       {/* Enciende `copilotUI.pendingConfirmation`, que estuvo siendo una
           superficie oscura: useGuardedAction lo despachaba (Tijeras, Fusionar)

@@ -2,6 +2,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Undo2, Redo2 } from 'lucide-react';
 import type { RootState } from '../../store';
 import { setViewMode, undo, redo } from '../../store/editorSlice';
+import { abrirIA, ocultarIA } from '../../store/iaSlice';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { useState } from 'react';
 import LogoMenu from './LogoMenu';
@@ -92,7 +93,32 @@ export default function TopBar({ onOpenPanel, onImportDXF }: TopBarProps) {
             {pieces.length > 0 && <span>· {pieceCountLabel(pieces.length)}</span>}
           </div>
         )}
+        <BotonIA />
       </div>
     </div>
+  );
+}
+
+/**
+ * «IA» (spec 2026-10-02 § 4.2 y § 6.2): marcado con la barra abierta, y con
+ * una señal mientras el agente trabaja con la barra oculta.
+ */
+function BotonIA() {
+  const dispatch = useDispatch();
+  const { abierta, trabajando } = useSelector((s: RootState) => s.ia);
+  const trabajandoOculta = trabajando && !abierta;
+  const nombre = trabajandoOculta ? 'La IA está trabajando' : 'Conversar con la IA';
+  return (
+    <button
+      type="button"
+      className={`boton-ia${abierta || trabajandoOculta ? ' boton-ia--activo' : ''}`}
+      aria-pressed={abierta || trabajandoOculta}
+      aria-label={nombre}
+      title={abierta ? 'Ocultar la IA' : trabajandoOculta ? nombre : `${nombre} (${displayShortcut('⌘/')})`}
+      onClick={() => dispatch(abierta ? ocultarIA() : abrirIA())}
+    >
+      IA
+      {trabajandoOculta && <span className="boton-ia__actividad" aria-hidden="true" />}
+    </button>
   );
 }

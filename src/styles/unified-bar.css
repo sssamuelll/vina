@@ -4,15 +4,11 @@
   position: fixed;
   z-index: var(--z-bar);
   width: 560px;
-  height: 58px;
-  /* Idle (resting): the agentic bar is the instrument, not the subject. On the
-     light paper canvas it must not be the loudest object, so at rest it recedes
-     — a softer, more translucent dark capsule that lets the pattern win the
-     hierarchy. It comes forward the moment you reach for it (see below). On the
-     dark 3D view this is benign: dark-on-dark either way. */
-  background: var(--surface-overlay-bg-recessed);
-  backdrop-filter: var(--surface-overlay-blur);
-  -webkit-backdrop-filter: var(--surface-overlay-blur);
+  height: 48px;
+  /* La IA convocada (spec 2026-10-02 § 6.2): una cápsula de papel de una
+     línea, blanca con línea de pelo y sombra corta. No tiene reposo: solo
+     existe abierta (el atributo data-material="papel" la vuelve papel). */
+  background: var(--surface-overlay-bg);
   border: var(--surface-overlay-border);
   /* Rol cápsula del material `overlay`: una barra de comando con forma de
    * píldora no puede llevar el radio de panel sin leerse como panel. */
@@ -21,57 +17,18 @@
   align-items: center;
   padding: 0 10px 0 12px;
   gap: 10px;
-  box-shadow: var(--surface-overlay-shadow-recessed);
-  transition: border-radius 0.15s ease, background 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: var(--surface-overlay-shadow);
+  transition: border-radius 0.15s ease;
   /* User-select none on non-input areas for drag */
   user-select: none;
 }
-/* Come forward when in use — hovered, focused, or with the panel open. Full
-   presence restored so typing/reading the agent is never dim. */
-.unified-bar:hover,
-.unified-bar:focus-within,
-.unified-bar--panel-open {
-  /* Sube del reposo al material `overlay` pleno. */
-  background: var(--surface-overlay-bg);
-  box-shadow: var(--surface-overlay-shadow);
-}
 /* When panel is open, flatten the top edge for seamless connection */
 .unified-bar--panel-open {
-  border-radius: 0 0 29px 29px;
+  border-radius: 0 0 24px 24px;
 }
 /* Drag cursor on the bar body */
 .unified-bar--draggable { cursor: grab; }
 .unified-bar--dragging { cursor: grabbing; }
-
-/* ─── Mode Toggle (circular buttons) ─── */
-
-.unified-bar__modes {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.unified-bar__mode-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  color: var(--text-muted);
-  transition: all var(--transition-fast);
-  cursor: pointer;
-}
-.unified-bar__mode-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-elevated);
-}
-.unified-bar__mode-btn--active {
-  color: var(--text-primary);
-  background: var(--accent-subtle);
-  border: 1px solid var(--accent-border);
-}
-.unified-bar__mode-btn svg { width: 16px; height: 16px; }
 
 /* ─── Input Field (capsule inside capsule) ─── */
 
@@ -107,8 +64,8 @@
 /* ─── Send Button (circular) ─── */
 
 .unified-bar__send {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   background: var(--accent-fuerte);
   border-radius: 50%;
   display: flex;
@@ -118,24 +75,19 @@
   transition: opacity var(--transition-fast);
   cursor: pointer;
 }
-.unified-bar__send svg { width: 18px; height: 18px; color: var(--on-accent); }
+.unified-bar__send svg { width: 16px; height: 16px; color: var(--on-accent); }
 .unified-bar__send:hover { background: var(--accent); }
+.unified-bar__send:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .unified-bar__send:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* ─── Model badge (hidden by default, shown in settings) ─── */
 
-/* ─── Shortcut hint ─── */
-
-.unified-bar__shortcut {
-  font-size: var(--text-1);
-  color: var(--text-tertiary);
-  background: var(--border-subtle);
-  padding: 3px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-}
-
 /* ─── Metadata (moved out of bar) ─── */
+
+/* ─── El icono y la tecla Esc de la cápsula ─── */
+
+.unified-bar__icono { flex-shrink: 0; color: var(--text-tertiary); }
+.unified-bar__esc { flex-shrink: 0; padding: 1px 6px; border: var(--hairline); border-radius: var(--radius-sm); color: var(--text-tertiary); font: var(--text-xs) / 1.4 var(--font-mono); }
 
 /* ─── Expanding Panel ─── */
 
