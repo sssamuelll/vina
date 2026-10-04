@@ -77,6 +77,9 @@ interface AgentSettingsProps {
   budget?: number;
   /** Called when budget changes. Gates the budget section's visibility. */
   onBudgetChange?: (budget: number) => void;
+  /** Dentro de un panel (Preferencias, spec 2026-10-02 § 6.1): el panel ya
+   *  tiene título y ✕, así que no se pintan la cabecera ni el «Cerrar». */
+  enPanel?: boolean;
 }
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
@@ -182,6 +185,7 @@ export default function AgentSettings({
   projectCost,
   budget,
   onBudgetChange,
+  enPanel = false,
 }: AgentSettingsProps) {
   const [teachingMode, setTeachingModeState] = useState(isTeachingModeEnabled);
   const [language, setLanguage] = useState<LanguagePreference>(loadLanguagePreference);
@@ -210,16 +214,18 @@ export default function AgentSettings({
   return (
     <div style={panelStyle}>
       <div style={contentStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h4 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Ajustes del agente</h4>
-          <button
-            onClick={onClose}
-            style={{ ...btnSecondaryStyle, padding: '4px 10px', fontSize: 13 }}
-            title="Cerrar ajustes"
-          >
-            ✕
-          </button>
-        </div>
+        {!enPanel && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h4 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Ajustes del agente</h4>
+            <button
+              onClick={onClose}
+              style={{ ...btnSecondaryStyle, padding: '4px 10px', fontSize: 13 }}
+              title="Cerrar ajustes"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* AI Connections — list of independently-configured providers.
             Persists immediately on every mutation. No race conditions
@@ -328,7 +334,7 @@ export default function AgentSettings({
 
       {/* Footer — Save preferences. Connections persist immediately, not on Save. */}
       <div style={footerStyle}>
-        <button style={btnSecondaryStyle} onClick={onClose}>Cerrar</button>
+        {!enPanel && <button style={btnSecondaryStyle} onClick={onClose}>Cerrar</button>}
         <button style={btnStyle} onClick={handleSavePrefs}>Guardar preferencias</button>
       </div>
     </div>

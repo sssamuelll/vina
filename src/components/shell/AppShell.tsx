@@ -19,6 +19,7 @@ import ReferenceImageSettings from '../PatternEditor/ReferenceImageSettings';
 import { useReferenceImages } from '../PatternEditor/useReferenceImages';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import ContextPanel from './ContextPanel';
+import PreferenciasPanel from './PreferenciasPanel';
 import ToastContainer from './ToastContainer';
 import ConfirmDialog from './ConfirmDialog';
 import { usePanelHost } from '../../hooks/usePanelHost';
@@ -83,10 +84,11 @@ const PANEL_LABELS: Record<string, string> = {
   Nesting: 'Marcada',
   Layers: 'Capas',
   Properties: 'Propiedades',
+  Preferences: 'IA y ratón',
   ReferenceImages: 'Imágenes de referencia',
 };
 
-function renderPanelContent(name: string) {
+function renderPanelContent(name: string, cerrar: () => void) {
   const fallback = <PanelLoading />;
   switch (name) {
     case 'Avatar':
@@ -103,6 +105,8 @@ function renderPanelContent(name: string) {
       return <Suspense fallback={fallback}><LayerPanel /></Suspense>;
     case 'Properties':
       return <Suspense fallback={fallback}><PropertiesPanel /></Suspense>;
+    case 'Preferences':
+      return <PreferenciasPanel alCerrar={cerrar} />;
     case 'ReferenceImages':
       return <ReferenceImagesPanel />;
     default:
@@ -325,7 +329,7 @@ export default function AppShell() {
         )}
         {leftPanel && (
           <ContextPanel title={PANEL_LABELS[leftPanel] ?? leftPanel} onClose={closeLeft}>
-            {renderPanelContent(leftPanel)}
+            {renderPanelContent(leftPanel, closeLeft)}
           </ContextPanel>
         )}
         <div
@@ -354,7 +358,7 @@ export default function AppShell() {
         </div>
         {rightPanel && (
           <ContextPanel title={PANEL_LABELS[rightPanel] ?? rightPanel} onClose={closeRight}>
-            {renderPanelContent(rightPanel)}
+            {renderPanelContent(rightPanel, closeRight)}
           </ContextPanel>
         )}
       </div>

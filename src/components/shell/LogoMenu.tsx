@@ -250,10 +250,12 @@ const SIMULATION_MENU: MenuItem[] = [
   { label: 'Restablecer', action: (d) => d(resetSimulation()) },
 ];
 
-// Fase1-S2: AI Provider abría el placeholder circular (la superficie real es
-// el modo settings del UnifiedBar); Keyboard Shortcuts era un noop.
-const PREFERENCES_MENU: MenuItem[] = [
+// Las conexiones de IA y el ratón son el panel Preferencias desde P2c (spec
+// 2026-10-02 § 6.1). Se exporta para que su test lea la lista que pinta el menú.
+// eslint-disable-next-line react-refresh/only-export-components
+export const PREFERENCES_MENU: MenuItem[] = [
   { label: 'Avatar y medidas...', panel: 'Avatar' },
+  { label: 'IA y ratón...', panel: 'Preferences' },
 ];
 
 const HELP_MENU: MenuItem[] = [
