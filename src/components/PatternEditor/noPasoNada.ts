@@ -9,9 +9,9 @@ import { pushJournal } from '../../utils/telemetry/journal';
  * gesto que muere DESPUÉS de armarse — María apretó sobre un borde real, el
  * hit-test acertó, soltó, y no apareció ni el piquete ni un aviso.
  *
- * Canal: bitácora siempre, tira para las accionables, toast nunca. Un gesto
- * que no pasó nada se repite cinco veces en tres segundos, y serían cinco
- * toasts encima del lienzo; la tira ya tiene sus ranuras de texto y no
+ * Canal: bitácora siempre, la frase de la línea al pie para las accionables,
+ * toast nunca. Un gesto que no pasó nada se repite cinco veces en tres
+ * segundos, y serían cinco toasts encima del lienzo; la frase ya está ahí y no
  * interrumpe.
  */
 
@@ -55,16 +55,16 @@ export interface AvisoMudo {
  * obliga a que una razón nueva nazca con su mensaje.
  */
 const MENSAJES: Record<RazonMuda, string> = {
-  'notch:sin-sitio': 'No cabe un piquete ahí; prueba un poco más adentro del borde',
+  'notch:sin-sitio': 'El piquete no cabe ahí; prueba más adentro del borde',
   'notch:sin-emplazamiento': 'El piquete no encontró dónde pararse; suelta más cerca del borde',
-  'notch:ancla-perdida': 'El contorno cambió y el piquete perdió su esquina de referencia; colócalo otra vez con un clic',
-  'tijeras:corte-no-cruza': 'La línea de corte tiene que entrar por un lado y salir por otro; arrastra de borde a borde',
+  'notch:ancla-perdida': 'El contorno cambió; marca el piquete otra vez con un clic',
+  'tijeras:corte-no-cruza': 'El corte tiene que cruzar la pieza; marca el final en otro borde',
   'point:sin-comando': 'Ese tramo no acepta un punto; prueba sobre otro lado de la pieza',
   'walkseam:borde-sin-resolver': 'Ese borde ya no está en el lienzo; prueba con otro lado de la pieza',
   'trim:borde-sin-largo': 'Ese borde no tiene largo; elige uno de los lados de la pieza',
   'grainline:fuera-de-pieza': 'El hilo se dibuja dentro de una pieza; arrastra desde adentro',
   'pespunte:tramo-invalido': 'Marca el segundo punto en el mismo borde y separado del primero',
-  'pespunte:desplazamiento-no-cabe': 'El desplazamiento no cabe en ese borde; reduce la distancia en la tira',
+  'pespunte:desplazamiento-no-cabe': 'El pespunte no cabe; reduce la separación',
   'margen:borde-sin-anillo': 'Ese borde no se pudo leer; toca otra vez sobre el contorno de la pieza',
   'margen:pieza-bloqueada': 'Esa pieza está bloqueada; quítale el candado y prueba otra vez',
   'costuras:borde-sin-costura': 'Ese borde todavía no tiene costura; usa Coser para hacerla y vuelve aquí',
@@ -105,7 +105,7 @@ export function noPasoNada(razon: RazonMuda, data?: Record<string, unknown>): vo
     try {
       fn(aviso);
     } catch {
-      // El gesto ya ocurrió; la tira es decoración del desenlace y no puede
+      // El gesto ya ocurrió; la frase es decoración del desenlace y no puede
       // tumbarlo por reventar al pintarse.
     }
   }
