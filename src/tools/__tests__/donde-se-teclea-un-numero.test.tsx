@@ -56,15 +56,17 @@ describe('donde ya dice «(mm)», María puede teclear', () => {
     expect(opcionesEnMilimetros().length).toBeGreaterThanOrEqual(10);
   });
 
-  it('todas son campo escrito, no deslizador', () => {
-    const deslizadores = opcionesEnMilimetros()
-      .filter(({ opcion }) => opcion.control !== 'input')
-      .map(({ tool, opcion }) => `${tool}.${opcion.id} «${opcion.label}» (paso ${opcion.step ?? 1})`);
+  it('todas se teclean: en la línea al pie un número es un campo (spec 2026-10-02 § 5.3)', () => {
+    const sinCampo = opcionesEnMilimetros()
+      .filter(({ opcion }) => {
+        const { container, unmount } = render(<Control opcion={opcion} valor={opcion.value} alCambiar={() => {}} />);
+        const hayCampo = container.querySelector('input[type="number"]') !== null;
+        unmount();
+        return !hayCampo;
+      })
+      .map(({ tool, opcion }) => `${tool}.${opcion.id} «${opcion.label}»`);
 
-    expect(
-      deslizadores,
-      'estas piden un número en milímetros y solo se pueden arrastrar',
-    ).toEqual([]);
+    expect(sinCampo, 'estas piden un número en milímetros y no se pueden teclear').toEqual([]);
   });
 
   it('y conservan su rango declarado: encender el campo no borra el min/max', () => {
@@ -83,7 +85,7 @@ describe('un campo escrito respeta su rango — el agujero que abre lo de arriba
 
   const opcion: ToolOption = {
     id: 'distance', label: 'Distancia (mm)', type: 'number',
-    value: 10, min: 1, max: 200, step: 1, control: 'input',
+    value: 10, min: 1, max: 200, step: 1,
   };
 
   const escribir = (texto: string) => {
@@ -118,7 +120,7 @@ describe('un campo escrito respeta su rango — el agujero que abre lo de arriba
 
   it('y no acota lo que no tiene rango declarado', () => {
     const sinRango: ToolOption = {
-      id: 'x', label: 'Cualquiera', type: 'number', value: 1, control: 'input',
+      id: 'x', label: 'Cualquiera', type: 'number', value: 1,
     };
     const alCambiar = vi.fn();
     render(<Control opcion={sinRango} valor={1} alCambiar={alCambiar} />);

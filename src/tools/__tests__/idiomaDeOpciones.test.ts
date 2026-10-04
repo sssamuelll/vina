@@ -63,19 +63,13 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
   seam: {
     seamType: ['Tipo de costura', 'Normal', 'Francesa', 'Flat-felled', 'Overlock'],
   },
+  // En la línea al pie el nombre de la herramienta está al lado: «Forma» basta.
+  // La cantidad se lee «1 2 3» (spec 2026-10-02 § 5.3), y el ancho gana su sitio.
   notch: {
-    shape: [
-      'Forma del piquete',
-      'Recta',
-      'En T',
-      'V hacia adentro',
-      'V hacia afuera',
-      'En U',
-      'Almena',
-      'Rombo',
-    ],
+    shape: ['Forma', 'Recta', 'En T', 'V hacia adentro', 'V hacia afuera', 'En U', 'Almena', 'Rombo'],
+    count: ['Cantidad', '1', '2', '3'],
     length: ['Profundidad (mm)'],
-    count: ['Cantidad', 'Uno', 'Dos', 'Tres'],
+    width: ['Ancho (mm)'],
   },
 
   // ── Las que se alcanzan por atajo ───────────────────────────────────────

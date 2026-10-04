@@ -43,7 +43,6 @@ export const extendTrimTool: ToolDefinition = {
     {
       id: 'distance',
       label: 'Distancia (mm)',
-      control: 'input',
       type: 'number',
       value: 20,
       min: 1,

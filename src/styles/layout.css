@@ -55,8 +55,11 @@
   align-items: center;
 }
 .grupo-del-patron__fila { display: flex; align-items: center; gap: 8px; }
+/* `.opcion-del-pie__interruptor` es el interruptor de una opción en la línea
+   al pie (ToolOptionControls.tsx): un solo estilo de interruptor en el marco. */
 .grupo-del-patron__interruptor,
-.grupo-del-patron__plegado {
+.grupo-del-patron__plegado,
+.opcion-del-pie__interruptor {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -72,16 +75,16 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.grupo-del-patron__interruptor--activo { color: var(--text-primary); }
-.grupo-del-patron__marca {
+.grupo-del-patron__interruptor--activo, .opcion-del-pie__interruptor--activo { color: var(--text-primary); }
+.grupo-del-patron__marca, .opcion-del-pie__marca {
   width: 8px;
   height: 8px;
   border: 1px solid currentColor;
   border-radius: 2px;
 }
-.grupo-del-patron__interruptor--activo .grupo-del-patron__marca { background: currentColor; }
-.grupo-del-patron__interruptor:hover, .grupo-del-patron__plegado:hover { color: var(--text-primary); }
-.grupo-del-patron__interruptor:focus-visible, .grupo-del-patron__plegado:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; color: var(--text-primary); }
+.grupo-del-patron__interruptor--activo .grupo-del-patron__marca, .opcion-del-pie__interruptor--activo .opcion-del-pie__marca { background: currentColor; }
+.grupo-del-patron__interruptor:hover, .grupo-del-patron__plegado:hover, .opcion-del-pie__interruptor:hover { color: var(--text-primary); }
+.grupo-del-patron__interruptor:focus-visible, .grupo-del-patron__plegado:focus-visible, .opcion-del-pie__interruptor:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; color: var(--text-primary); }
 
 /* «Mostrar», plegado: el menú cuelga de <body> y es papel (contrato § 2,
    «todo portal nace papel»). Los mismos interruptores, en columna. */

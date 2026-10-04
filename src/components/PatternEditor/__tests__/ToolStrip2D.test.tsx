@@ -29,7 +29,7 @@ const CON_OPCIONES: ToolDefinition = {
   icon: IconoVacio,
   options: [
     { id: 'numero', label: 'Un número', type: 'number', value: 5, min: 0, max: 10, step: 1 },
-    { id: 'medida', label: 'Una medida', type: 'number', value: 100, min: 1, max: 3000, step: 1, control: 'input' },
+    { id: 'medida', label: 'Una medida', type: 'number', value: 100, min: 1, max: 3000, step: 1 },
     { id: 'lista', label: 'Una lista', type: 'select', value: 'a', choices: [{ label: 'Opción A', value: 'a' }, { label: 'Opción B', value: 'b' }] },
     { id: 'interruptor', label: 'Un interruptor', type: 'toggle', value: false },
     { id: 'color', label: 'Un color', type: 'color', value: '#334455' },
@@ -60,16 +60,16 @@ function montar(activeTool: string, lineaDeSujeto: string | null = null) {
 describe('ToolStrip2D', () => {
   it('pinta un control por cada opción declarada, de cada tipo', () => {
     montar('__tira_con_opciones');
-    expect(screen.getByLabelText('Un número').getAttribute('type')).toBe('range');
+    expect(screen.getByLabelText('Un número').getAttribute('type')).toBe('number');
     expect(screen.getByLabelText('Una medida').getAttribute('type')).toBe('number');
-    expect(screen.getByLabelText('Una lista').tagName).toBe('SELECT');
+    expect(screen.getByRole('group', { name: 'Una lista' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Un interruptor' }).getAttribute('aria-pressed')).toBe('false');
     expect(screen.getByLabelText('Un color').getAttribute('type')).toBe('color');
   });
 
   it('despacha setToolOption al cambiar un desplegable, mover un deslizador (como número) y pulsar un interruptor', () => {
     const { store } = montar('__tira_con_opciones');
-    fireEvent.change(screen.getByLabelText('Una lista'), { target: { value: 'b' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Opción B' }));
     fireEvent.change(screen.getByLabelText('Un número'), { target: { value: '7' } });
     fireEvent.click(screen.getByRole('button', { name: 'Un interruptor' }));
     const v = store.getState().tools.toolOptions.__tira_con_opciones;
@@ -89,7 +89,7 @@ describe('ToolStrip2D', () => {
 
   it('conserva id="opcion-<id>" en los controles (los e2e de piquete y tijeras lo usan)', () => {
     montar('__tira_con_opciones');
-    expect(screen.getByLabelText('Una lista').id).toBe('opcion-lista');
+    expect(screen.getByRole('group', { name: 'Una lista' }).id).toBe('opcion-lista');
   });
 
   it('muestra el atajo efectivo cuando la herramienta tiene uno', () => {
