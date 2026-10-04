@@ -284,7 +284,7 @@ describe('matchVertices', () => {
     }
   });
 
-  it('pairs 20000×20000 vertices in under 100 ms (legacy O(n²) needs ≈ 700 ms)', () => {
+  it('pairs 20000×20000 vertices in under 300 ms (legacy O(n²) needs ≈ 550 ms)', () => {
     const N = 20000;
     const a: ParameterizedVertex[] = new Array(N);
     const b: ParameterizedVertex[] = new Array(N);
@@ -293,21 +293,18 @@ describe('matchVertices', () => {
       a[i] = { index: i, t };
       b[i] = { index: i + N, t };
     }
-    // Best of three: under the full parallel suite a single cold measurement
-    // reached 119-160 ms on a machine where it takes ~23 ms alone, and the
-    // deploy gate runs it without retries. The minimum measures the algorithm,
-    // not the load; the legacy O(n²) still needs ≈ 700 ms on every run.
-    let elapsed = Infinity;
-    let pairs: ReturnType<typeof matchVertices> = [];
-    for (let k = 0; k < 3; k++) {
-      const t0 = performance.now();
-      pairs = matchVertices(a, b);
-      elapsed = Math.min(elapsed, performance.now() - t0);
-    }
+    const t0 = performance.now();
+    const pairs = matchVertices(a, b);
+    const elapsed = performance.now() - t0;
     expect(pairs.length).toBe(N);
     expect(pairs[0]).toEqual([0, N]);
     expect(pairs[N - 1]).toEqual([N - 1, 2 * N - 1]);
-    expect(elapsed).toBeLessThan(100);
+    // Measured on the same machine (2026-10-04): alone this takes ~23 ms and
+    // the legacy O(n²) from before b0e914df takes 545-590 ms. Under the full
+    // parallel suite this call took 112-160 ms (the best of three runs too:
+    // the load is sustained, not a spike), and the deploy gate runs it
+    // without retries. 300 ms sits about halfway, in ratio, between the two.
+    expect(elapsed).toBeLessThan(300);
   });
 });
 
