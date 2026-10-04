@@ -293,9 +293,17 @@ describe('matchVertices', () => {
       a[i] = { index: i, t };
       b[i] = { index: i + N, t };
     }
-    const t0 = performance.now();
-    const pairs = matchVertices(a, b);
-    const elapsed = performance.now() - t0;
+    // Best of three: under the full parallel suite a single cold measurement
+    // reached 119-160 ms on a machine where it takes ~23 ms alone, and the
+    // deploy gate runs it without retries. The minimum measures the algorithm,
+    // not the load; the legacy O(n²) still needs ≈ 700 ms on every run.
+    let elapsed = Infinity;
+    let pairs: ReturnType<typeof matchVertices> = [];
+    for (let k = 0; k < 3; k++) {
+      const t0 = performance.now();
+      pairs = matchVertices(a, b);
+      elapsed = Math.min(elapsed, performance.now() - t0);
+    }
     expect(pairs.length).toBe(N);
     expect(pairs[0]).toEqual([0, N]);
     expect(pairs[N - 1]).toEqual([N - 1, 2 * N - 1]);
