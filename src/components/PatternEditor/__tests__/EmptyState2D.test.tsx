@@ -40,13 +40,13 @@ describe('shouldShowEmptyState', () => {
 });
 
 describe('EmptyState2D', () => {
-  it('renders the heading and all four affordances', () => {
+  it('lo que dice la spec § 4.6: «Trae tu patrón», «Importar DXF», arrastrar y la IA; sin «Dibujar desde cero»', () => {
     renderWithStore({ onImportDXF: () => {} });
     expect(screen.getByText('Trae tu patrón')).toBeTruthy();
     expect(screen.getByRole('button', { name: /importar dxf/i })).toBeTruthy();
-    expect(screen.getByText(/suelta tu \.dxf/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /dibujar desde cero/i })).toBeTruthy();
-    expect(screen.getByText(/descríbelo a la/i)).toBeTruthy();
+    expect(screen.getByText('o arrastra el archivo aquí')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'o descríbeselo a la IA' })).toBeTruthy();
+    expect(screen.queryByText(/Dibujar desde cero/)).toBeNull();
   });
 
   it('calls onImportDXF when the primary button is clicked', () => {
@@ -54,14 +54,6 @@ describe('EmptyState2D', () => {
     renderWithStore({ onImportDXF });
     fireEvent.click(screen.getByRole('button', { name: /importar dxf/i }));
     expect(onImportDXF).toHaveBeenCalledTimes(1);
-  });
-
-  it('activates the Pen tool in both slices when Draw from scratch is clicked', () => {
-    const store = renderWithStore({ onImportDXF: () => {} });
-    expect(store.getState().editor.activeTool).toBe('select');
-    fireEvent.click(screen.getByRole('button', { name: /dibujar desde cero/i }));
-    expect(store.getState().editor.activeTool).toBe('pen');
-    expect(store.getState().tools.activeTool2D).toBe('pen');
   });
 
   it('disables the Import DXF button when no handler is provided', () => {
@@ -72,7 +64,7 @@ describe('EmptyState2D', () => {
 
   it('el aviso de la IA la convoca (spec 2026-10-02 § 6.2): la barra no existe en reposo', () => {
     const store = renderWithStore({ onImportDXF: () => {} });
-    fireEvent.click(screen.getByRole('button', { name: /describe tu patrón a la ia/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'o descríbeselo a la IA' }));
     expect(store.getState().ia.abierta).toBe(true);
   });
 });

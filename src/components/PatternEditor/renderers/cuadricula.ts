@@ -83,3 +83,8 @@ export function cuadroDeLaCuadricula(gridSizeMm: number, zoom2D: number, units: 
 export function primeraLineaDesde(panPx: number, cuadroPx: number, desdePx: number): number {
   return panPx + Math.ceil((desdePx - panPx) / cuadroPx) * cuadroPx;
 }
+
+/** La última línea de la cuadrícula que no pasa de `hastaPx`: donde se apoya la marca de escala (spec § 4.4). */
+export function ultimaLineaHasta(panPx: number, cuadroPx: number, hastaPx: number): number {
+  return panPx + Math.floor((hastaPx - panPx) / cuadroPx) * cuadroPx;
+}

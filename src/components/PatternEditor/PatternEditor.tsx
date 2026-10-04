@@ -1710,13 +1710,14 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
           )}
         </g>
 
-        {!pantallaVacia && (
+        {!pantallaVacia && svgSize.height > 0 && (
           <MarcaDeEscala
             zoom2D={zoom2D}
             pan2D={pan2D}
             gridSize={gridSize}
             units={units}
             izquierda={12}
+            alto={svgSize.height}
           />
         )}
       </svg>
