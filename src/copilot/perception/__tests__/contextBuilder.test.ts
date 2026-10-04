@@ -241,6 +241,14 @@ function mockState(overrides?: Partial<RootState>): RootState {
       ghostPreview: null,
       actionLogVisible: false,
     },
+    ia: {
+      abierta: false,
+      modoDeApertura: 'conversacion',
+      aperturas: 0,
+      mensajes: [],
+      trabajando: false,
+      enCurso: [],
+    },
     camera: {
       pendingPreset: null,
       pendingFocusPieceId: null,

@@ -270,3 +270,8 @@
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* «Detener» (spec 2026-10-02 § 6.2): el agente no hace nada más. */
+.unified-bar__detener { margin-left: auto; height: 24px; padding: 0 10px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font: inherit; cursor: pointer; }
+.unified-bar__detener:hover { background: var(--bg-elevated); }
+.unified-bar__detener:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

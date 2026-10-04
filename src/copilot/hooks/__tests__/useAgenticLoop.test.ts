@@ -175,10 +175,10 @@ describe('useAgenticLoop integration', () => {
     };
   });
 
-  it('hook module exports useAgenticLoop and reduceToolCalls', async () => {
+  it('el módulo exporta reduceToolCalls (el hook se fue con P2c: el turno lo corre copilot/conversacion.ts)', async () => {
     const mod = await import('../useAgenticLoop');
-    expect(typeof mod.useAgenticLoop).toBe('function');
     expect(typeof mod.reduceToolCalls).toBe('function');
+    expect('useAgenticLoop' in mod).toBe(false);
   });
 
   it('createDebugAgenticLoop mock returns a working loop', async () => {
