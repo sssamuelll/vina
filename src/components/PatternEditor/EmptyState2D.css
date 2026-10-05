@@ -72,39 +72,6 @@
   color: var(--ink-hint);
 }
 
-.empty-state-2d__secondary {
-  pointer-events: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  padding: 4px 6px;
-  font-family: var(--font-ui-2d);
-  font-size: 12px;
-  color: var(--ink-hint);
-  background: none;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.empty-state-2d__secondary:hover,
-.empty-state-2d__secondary:focus-visible {
-  color: var(--ink-on-light);
-}
-
-/* El foco no se puede quedar en el mismo oscurecimiento de tinta que el hover:
- * sobre el papel es un gris que pasa a otro gris y no dice "estás aquí". Mismo
- * anillo que su hermano __ai-hint, abajo en este archivo. */
-.empty-state-2d__secondary:focus-visible {
-  outline: 2px solid var(--accent-2d);
-  outline-offset: 2px;
-}
-
-.empty-state-2d__kbd {
-  color: var(--ink-hint);
-}
-
 .empty-state-2d__ai-hint {
   pointer-events: auto;
   display: inline-flex;
@@ -120,9 +87,8 @@
   cursor: pointer;
 }
 
-/* El hover sube de peso como su hermano __secondary (reposo --ink-hint → tinta
- * plena); con --ai bajaría a 2,25:1 sobre el papel, el hover más tenue que el
- * reposo. */
+/* El hover sube de --ink-hint a tinta plena; con --ai bajaría a 2,25:1 sobre
+ * el papel, el hover más tenue que el reposo. */
 .empty-state-2d__ai-hint:hover {
   color: var(--ink-on-light);
 }
@@ -130,10 +96,4 @@
 .empty-state-2d__ai-hint:focus-visible {
   outline: 2px solid var(--accent-2d);
   outline-offset: 2px;
-}
-
-/* La palabra-puerta lleva tinta plena (11,96:1), no --ai: --ai marca «esto lo
- * hizo la IA» (spec § 4.3), no una puerta, y sobre el crema no se lee. */
-.empty-state-2d__ai-word {
-  color: var(--ink-on-light);
 }

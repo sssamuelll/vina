@@ -186,6 +186,7 @@ npx playwright test --workers=2 \
   tests/e2e/emplazamiento-modales.spec.ts \
   tests/e2e/emplazamiento-paneles.spec.ts \
   tests/e2e/linea-al-pie.spec.ts \
+  tests/e2e/ia-convocada.spec.ts \
   tests/e2e/emplazamiento-imagenes-de-referencia.spec.ts \
   tests/e2e/las-siete-puertas.spec.ts \
   tests/e2e/1102-la-pluma-engancha.spec.ts \

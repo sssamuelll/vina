@@ -202,7 +202,7 @@ describe('bundle de diagnóstico puro', () => {
 describe('bundle extendido: journal, environment, slices, storage', () => {
   // `state` (arriba) solo puebla project/avatar/simulation/inspector — a
   // propósito, para no interferir con el resto del archivo. Esta réplica
-  // añade los 20 slices de EXPORTED_SLICES con un marcador propio por clave,
+  // añade los 21 slices de EXPORTED_SLICES con un marcador propio por clave,
   // más un campo fuera del Pick viejo en `inspector`, para probar que viajan
   // completos.
   const richState = {
@@ -215,7 +215,7 @@ describe('bundle extendido: journal, environment, slices, storage', () => {
     return { ...sources(false), ...overrides };
   }
 
-  it('lleva journal, environment, storage, los 20 slices e inspector completo', () => {
+  it('lleva journal, environment, storage, los 21 slices e inspector completo', () => {
     const s = richSources({
       getJournal: vi.fn(() => ({ events: [{ t: 1, kind: 'action' as const, name: 'x' }], dropped: 2 })),
       getEnvironment: vi.fn(() => ({ webgpu: true, viewport: { w: 10, h: 20 } })),

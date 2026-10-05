@@ -36,6 +36,9 @@ const STORAGE_KEY = 'vina-shortcut-overrides';
 
 // ─── Registry ────────────────────────────────────────────────────────────────
 
+/** Un símbolo de una tecla: ni letra, ni cifra, ni Espacio. */
+const esSimbolo = (k: string): boolean => k.length === 1 && !/[\p{L}\p{N}\s]/u.test(k);
+
 export class ShortcutRegistry {
   private defaults = new Map<string, ShortcutDef>();
   private overrides = new Map<string, KeyCombo>();
@@ -85,7 +88,14 @@ export class ShortcutRegistry {
 
   // ─── Key event matching ─────────────────────────────────────────────
 
-  /** Find the action that matches a keyboard event in the given contexts */
+  /**
+   * Find the action that matches a keyboard event in the given contexts.
+   *
+   * Un símbolo ya trae la Mayús en `e.key`: en el teclado español «/» es
+   * Mayús+7 y «;» es Mayús+«,». Si su atajo no declara la Mayús, no exige que
+   * esté suelta. Las letras y el Espacio sí la distinguen (Espacio simula,
+   * Mayús+Espacio simula en alta resolución).
+   */
   matchEvent(e: KeyboardEvent, activeContexts: ShortcutContext[]): string | null {
     const key = e.key.toLowerCase();
     const ctrl = e.metaKey || e.ctrlKey;
@@ -98,10 +108,11 @@ export class ShortcutRegistry {
       const binding = this.getBinding(actionId);
       if (!binding) continue;
 
+      const mayusDaIgual = !binding.shift && esSimbolo(binding.key);
       if (
         binding.key.toLowerCase() === key &&
         !!binding.ctrl === ctrl &&
-        !!binding.shift === shift &&
+        (mayusDaIgual || !!binding.shift === shift) &&
         !!binding.alt === alt
       ) {
         return actionId;

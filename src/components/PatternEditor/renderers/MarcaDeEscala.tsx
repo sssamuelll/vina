@@ -1,5 +1,5 @@
 import { Point2D, UnitSystem } from '../../../types/types';
-import { cuadroDeLaCuadricula, primeraLineaDesde } from './cuadricula';
+import { cuadroDeLaCuadricula, primeraLineaDesde, ultimaLineaHasta } from './cuadricula';
 
 interface MarcaDeEscalaProps {
   zoom2D: number;
@@ -8,16 +8,16 @@ interface MarcaDeEscalaProps {
   units: UnitSystem;
   /** Primer px, desde la izquierda, que el cromo deja libre. */
   izquierda: number;
+  /** Alto de la hoja en px: la marca va al pie. */
+  alto: number;
 }
 
 /**
- * La base del corchete y del rótulo, desde arriba: dentro de los 20 px que
- * ocupaba la regla y por encima de la tira de herramienta, que empieza a 28.
- * Abajo, mientras la barra de IA y la fila de capas floten, no hay sitio que
- * no tapen con un panel abierto a la izquierda; cuando P2 las quite, la marca
- * baja a donde dice la spec § 4.4.
+ * Lo que la marca deja hasta el pie de la hoja, sobre la línea al pie (spec
+ * § 4.4). Arriba estuvo mientras la barra de IA y la fila de capas flotaban
+ * abajo; desde P2c ya no hay nada en reposo que la tape.
  */
-const LINEA_BASE_PX = 16;
+const AIRE_AL_PIE_PX = 24;
 const ALTO_DEL_CORCHETE_PX = 5;
 
 /**
@@ -29,12 +29,12 @@ const ALTO_DEL_CORCHETE_PX = 5;
  * cuadrícula, y su valor en la unidad activa. Espacio de pantalla, como
  * GridLayer. Es documento, no cromo: no recibe el ratón.
  */
-export default function MarcaDeEscala({ zoom2D, pan2D, gridSize, units, izquierda }: MarcaDeEscalaProps) {
+export default function MarcaDeEscala({ zoom2D, pan2D, gridSize, units, izquierda, alto }: MarcaDeEscalaProps) {
   const cuadro = cuadroDeLaCuadricula(gridSize, zoom2D, units);
   if (!cuadro) return null;
 
   const x = primeraLineaDesde(pan2D.x, cuadro.px, izquierda);
-  const y = LINEA_BASE_PX;
+  const y = ultimaLineaHasta(pan2D.y, cuadro.px, alto - AIRE_AL_PIE_PX);
 
   return (
     <g

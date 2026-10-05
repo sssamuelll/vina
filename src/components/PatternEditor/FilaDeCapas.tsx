@@ -12,6 +12,7 @@ import {
   setLineLengthMode,
 } from '../../store/editorSlice';
 import { pushJournal } from '../../utils/telemetry/journal';
+import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
 
 const CAPAS = [
   { kind: 'toggle', label: 'Margen', flag: 'showSeamAllowance', action: toggleSeamAllowance },
@@ -114,15 +115,16 @@ export default function FilaDeCapas() {
       if (botonRef.current?.contains(t) || menuRef.current?.contains(t)) return;
       setAbierto(false);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (menuRef.current?.contains(document.activeElement)) botonRef.current?.focus();
-      setAbierto(false);
-    };
     window.addEventListener('mousedown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); };
+    return () => window.removeEventListener('mousedown', onDown);
   }, [abierto]);
+
+  // Esc lo cierra antes que la selección, y el foco vuelve a «Mostrar»: un
+  // peldaño de la escalera de lo que se llama (spec 2026-10-02 § 6.2).
+  usePeldanoDeEscape('mostrar', 'menu', abierto, () => {
+    if (menuRef.current?.contains(document.activeElement)) botonRef.current?.focus();
+    setAbierto(false);
+  });
 
   const interruptores = CAPAS.map((capa) => {
     const activo = capa.kind === 'largos' ? visibles.lineLengthMode === 'all' : visibles[capa.flag];

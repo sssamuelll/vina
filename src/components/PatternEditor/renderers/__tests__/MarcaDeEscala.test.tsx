@@ -8,7 +8,7 @@ afterEach(cleanup);
 
 type Props = ComponentProps<typeof MarcaDeEscala>;
 const base: Props = {
-  zoom2D: 0.48, pan2D: { x: 100, y: 60 }, gridSize: 10, units: 'mm', izquierda: 74,
+  zoom2D: 0.48, pan2D: { x: 100, y: 60 }, gridSize: 10, units: 'mm', izquierda: 74, alto: 600,
 };
 const pinta = (props: Partial<Props> = {}) =>
   render(<svg><MarcaDeEscala {...base} {...props} /></svg>).container;
@@ -39,11 +39,17 @@ describe('MarcaDeEscala (spec 2026-10-02 § 4.4)', () => {
     expect(Math.abs(pasos - Math.round(pasos))).toBeLessThan(1e-9);
   });
 
-  it('va arriba, en la franja que dejó la regla: la base a 16 px y el corchete, 5 más arriba', () => {
+  it('va abajo a la izquierda: la base en la última línea de la cuadrícula que deja 24 px al pie de la hoja', () => {
     const c = pinta();
-    const p = corchete(c);
-    expect(p.map((q) => q.y)).toEqual([11, 16, 16, 11]);
-    expect(c.querySelector('.marca-de-escala text')!.getAttribute('y')).toBe('16');
+    // Un cuadro de 24 px desde y = 60: la última línea que no pasa de 600 − 24 es la 564.
+    expect(corchete(c).map((q) => q.y)).toEqual([559, 564, 564, 559]);
+    expect(c.querySelector('.marca-de-escala text')!.getAttribute('y')).toBe('564');
+    for (const y of [61, 70, 72]) {
+      const base = Math.max(...corchete(pinta({ pan2D: { x: 100, y } })).map((q) => q.y));
+      expect(600 - base, `con pan.y = ${y}`).toBeGreaterThanOrEqual(24);
+      expect(600 - base, `con pan.y = ${y}`).toBeLessThan(24 + 24);
+      expect((base - y) % 24, 'no se apoya en una línea de la cuadrícula').toBe(0);
+    }
   });
 
   it('es documento y no recibe el ratón', () => {

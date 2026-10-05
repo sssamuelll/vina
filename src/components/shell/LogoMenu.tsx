@@ -28,6 +28,7 @@ import { clearStorageProject } from '../../utils/projectIO';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { shortcutLabelFor } from './shortcutDisplay';
 import { computeScrollFade, encajarSubmenu, type Encaje, type ScrollFade } from '../PatternEditor/menuOverflow';
+import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -249,10 +250,12 @@ const SIMULATION_MENU: MenuItem[] = [
   { label: 'Restablecer', action: (d) => d(resetSimulation()) },
 ];
 
-// Fase1-S2: AI Provider abría el placeholder circular (la superficie real es
-// el modo settings del UnifiedBar); Keyboard Shortcuts era un noop.
-const PREFERENCES_MENU: MenuItem[] = [
+// Las conexiones de IA y el ratón son el panel Preferencias desde P2c (spec
+// 2026-10-02 § 6.1). Se exporta para que su test lea la lista que pinta el menú.
+// eslint-disable-next-line react-refresh/only-export-components
+export const PREFERENCES_MENU: MenuItem[] = [
   { label: 'Avatar y medidas...', panel: 'Avatar' },
+  { label: 'IA y ratón...', panel: 'Preferences' },
 ];
 
 const HELP_MENU: MenuItem[] = [
@@ -372,14 +375,9 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
     return () => window.removeEventListener('mousedown', handler);
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setOpen(false); setHoveredTop(null); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [open]);
+  // Esc lo cierra antes que la selección: un peldaño de la escalera de lo que
+  // se llama (spec 2026-10-02 § 6.2).
+  usePeldanoDeEscape('vina', 'menu', open, () => { setOpen(false); setHoveredTop(null); });
 
   const handleItemClick = useCallback((item: MenuItem) => {
     if (item.separator || item.submenu) return;

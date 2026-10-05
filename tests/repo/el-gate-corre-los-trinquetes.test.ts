@@ -55,6 +55,10 @@ describe('el gate del deploy corre los trinquetes de la interfaz', () => {
     expect(specs).not.toContain('tests/e2e/emplazamiento-tira.spec.ts');
   });
 
+  it('y la red de la IA convocada (P2c): no está en reposo y sus puertas abren', () => {
+    expect(specsDelGate()).toContain('tests/e2e/ia-convocada.spec.ts');
+  });
+
   it('cada spec de la lista existe en disco', () => {
     expect(specsDelGate().filter((s) => !existsSync(join(RAIZ, s)))).toEqual([]);
   });

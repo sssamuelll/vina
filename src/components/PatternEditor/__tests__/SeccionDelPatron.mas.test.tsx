@@ -13,6 +13,7 @@ import type { ToolDefinition } from '../../../tools/types';
 import type { Tool2D } from '../../../types/types';
 import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 import SeccionDelPatron from '../SeccionDelPatron';
+import { ShortcutProvider } from '../../../shortcuts/ShortcutProvider';
 
 /**
  * «Más» (spec 2026-10-02 § 5.3): con la frase en sus 200 px, las opciones que
@@ -67,7 +68,7 @@ afterEach(() => {
 function montar() {
   const store = configureStore({ reducer: { tools: toolReducer, editor: editorReducer } });
   store.dispatch(setActiveTool('__pie_tres' as Tool2D));
-  render(<Provider store={store}><SeccionDelPatron frase={null} /></Provider>);
+  render(<Provider store={store}><ShortcutProvider><SeccionDelPatron frase={null} /></ShortcutProvider></Provider>);
   return store;
 }
 
@@ -98,7 +99,7 @@ describe('lo que no cabe pasa a «Más»', () => {
     fireEvent.click(mas, { detail: 0 });
     const menu = screen.getByRole('group', { name: /^Más opciones de/ });
     expect(menu.contains(document.activeElement), 'el foco se quedó fuera del menú').toBe(true);
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
     expect(screen.queryByRole('group', { name: /^Más opciones de/ })).toBeNull();
     expect(document.activeElement).toBe(mas);
   });
@@ -174,10 +175,10 @@ describe('lo que no cabe pasa a «Más»', () => {
   it('con un modal encima, el menú se cierra (#1125)', () => {
     const store = configureStore({ reducer: { tools: toolReducer, editor: editorReducer } });
     store.dispatch(setActiveTool('__pie_tres' as Tool2D));
-    const { rerender } = render(<Provider store={store}><SeccionDelPatron frase={null} /></Provider>);
+    const { rerender } = render(<Provider store={store}><ShortcutProvider><SeccionDelPatron frase={null} /></ShortcutProvider></Provider>);
     fireEvent.click(screen.getByRole('button', { name: 'Más' }));
     expect(screen.getByRole('group', { name: /^Más opciones de/ })).toBeTruthy();
-    rerender(<Provider store={store}><SeccionDelPatron frase={null} inerte /></Provider>);
+    rerender(<Provider store={store}><ShortcutProvider><SeccionDelPatron frase={null} inerte /></ShortcutProvider></Provider>);
     expect(screen.queryByRole('group', { name: /^Más opciones de/ })).toBeNull();
   });
 });

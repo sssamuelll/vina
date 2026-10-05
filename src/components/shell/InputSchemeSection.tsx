@@ -30,7 +30,9 @@ export default function InputSchemeSection() {
               borderRadius: 6,
               border: scheme === opt.id ? '1px solid var(--accent)' : '1px solid var(--border)',
               background: scheme === opt.id ? 'var(--accent-dim)' : 'var(--bg-primary)',
-              color: scheme === opt.id ? 'var(--accent)' : 'var(--text-secondary)',
+              // Elegida: el borde y el relleno de acento dicen el estado; el texto va
+              // en tinta plena. En --accent sobre --accent-dim daba 4,04:1 (contraste-del-cromo).
+              color: scheme === opt.id ? 'var(--text-primary)' : 'var(--text-secondary)',
               fontSize: 12,
               cursor: 'pointer',
               textAlign: 'left',

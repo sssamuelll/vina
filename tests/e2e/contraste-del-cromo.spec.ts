@@ -213,7 +213,8 @@ test('los modales: el del piquete y el de conexión', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(modal).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Modo ajustes' }).click();
+  // Preferencias (P2c) monta AgentSettings → ConnectionsList → ConnectionModal.
+  await abrirPanel(page, 'IA y ratón', 'IA y ratón');
   await page.getByRole('button', { name: /Agregar (conexión|tu primera conexión)/ }).first().click();
   await expect(page.getByRole('dialog', { name: 'Agregar conexión' })).toBeVisible();
   await page.waitForTimeout(200);
@@ -257,4 +258,21 @@ test('la línea al pie: las opciones del piquete y el menú «Más»', async ({ 
   await expect(page.getByRole('group', { name: /^Más opciones de/ })).toBeVisible();
   await page.waitForTimeout(200);
   await registrar('menú «Más» de la línea al pie', page);
+});
+
+test('la IA convocada y su panel', async ({ page }) => {
+  // Desde P2c la barra de IA no está en reposo: se mide convocada, con una
+  // conversación en papel, y su panel de ajustes en el marco.
+  await addPiece(page, 'ia-pieza', { x: 120, y: 120 }, 300, 400);
+  await reposo(page);
+  await page.keyboard.press('Control+/');
+  await page.getByPlaceholder('Pide algo o pregunta').fill('hola');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.unified-bar__panel')).toContainText('hola');
+  await page.waitForTimeout(200);
+  await registrar('barra de IA con una conversación', page);
+  await page.keyboard.press('Escape');
+  await abrirPanel(page, 'IA y ratón', 'IA y ratón');
+  await page.waitForTimeout(200);
+  await registrar('panel IA y ratón', page);
 });

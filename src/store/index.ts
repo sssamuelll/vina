@@ -12,6 +12,7 @@ import parametricReducer from './parametricSlice';
 import constructionReducer from './constructionSlice';
 import blueprintReducer from './blueprintSlice';
 import copilotUIReducer from './copilotUISlice';
+import iaReducer from './iaSlice';
 import cameraReducer from './cameraSlice';
 import collisionBodyReducer from './collisionBodySlice';
 import renderSettingsReducer from './renderSettingsSlice';
@@ -49,6 +50,7 @@ export const store = configureStore({
     construction: constructionReducer,
     blueprints: blueprintReducer,
     copilotUI: copilotUIReducer,
+    ia: iaReducer,
     camera: cameraReducer,
     collisionBody: collisionBodyReducer,
     renderSettings: renderSettingsReducer,

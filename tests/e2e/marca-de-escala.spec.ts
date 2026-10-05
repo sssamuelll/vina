@@ -28,6 +28,11 @@ const leer = (page: Page) => page.evaluate(() => {
     anchoDelCorchete: marca.querySelector('path')!.getBoundingClientRect().width,
     cuadro: Number(patron.getAttribute('width')),
     zoom: (window as unknown as VentanaConStore).__VINA_STORE__.getState().editor.zoom2D,
+    abajo: (() => {
+      const svg = document.querySelector('svg.pattern-svg')!.getBoundingClientRect();
+      const r = marca.querySelector('path')!.getBoundingClientRect();
+      return { aIzquierda: r.left - svg.left, alPie: svg.bottom - r.bottom };
+    })(),
   };
 });
 
@@ -42,6 +47,10 @@ test.describe('la marca de escala (laptop de María, 1366×643)', () => {
 
     const antes = await leer(page);
     expect(antes, 'no hay marca de escala o no hay cuadrícula').not.toBeNull();
+    // Abajo a la izquierda de la hoja (spec § 4.4): entre 24 px y 24 más un cuadro del pie.
+    expect(antes!.abajo.alPie).toBeGreaterThanOrEqual(23);
+    expect(antes!.abajo.alPie).toBeLessThanOrEqual(24 + antes!.cuadro + 1);
+    expect(antes!.abajo.aIzquierda).toBeLessThan(80);
     // 1,5 px de holgura: el corchete lleva un trazo de 1 px, mitad a cada lado.
     expect(Math.abs(antes!.anchoDelCorchete - antes!.cuadro), 'el corchete no mide un cuadro').toBeLessThan(1.5);
     expect(antes!.cuadro).toBeGreaterThanOrEqual(18);

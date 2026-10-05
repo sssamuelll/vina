@@ -95,19 +95,15 @@ test.describe('F1 — la barra de IA y los interruptores del patrón no se pisan
   test.use({ viewport: MARIA });
   test.setTimeout(90_000);
 
-  test('los tres botones de modo se pueden clicar en vista dividida', async ({ page }) => {
+  test('convocada en Split, la cápsula se alcanza entera y no pisa el grupo del patrón', async ({ page }) => {
     await abrirApp(page);
     await vistaDividida(page);
     await unaPieza(page);
-    await expect(page.locator('.grupo-del-patron')).toBeVisible();
-
-    const modos = await alcanzables(page, '.unified-bar__modes button');
-    expect(modos.length, 'la barra de IA no expuso sus botones de modo').toBeGreaterThanOrEqual(3);
-    const tapados = modos.filter((m) => !m.alcanzable);
-    expect(
-      tapados,
-      `botones de la barra de IA tapados: ${tapados.map((t) => `${t.nombre} ← ${t.culpable}`).join(', ')}`,
-    ).toEqual([]);
+    await page.keyboard.press('Control+/');
+    await expect(page.locator('.unified-bar')).toBeVisible();
+    const tapados = (await alcanzables(page, '.unified-bar input')).filter((m) => !m.alcanzable);
+    expect(tapados, `tapados: ${tapados.map((t) => `${t.nombre} ← ${t.culpable}`).join(', ')}`).toEqual([]);
+    expect(await solape(page, '.grupo-del-patron', '.unified-bar')).toBe(0);
   });
 
   test('y los interruptores tampoco quedan tapados por la barra', async ({ page }) => {
@@ -123,26 +119,18 @@ test.describe('F1 — la barra de IA y los interruptores del patrón no se pisan
     ).toEqual([]);
   });
 
-  test('sus rectángulos no se solapan en absoluto', async ({ page }) => {
-    await abrirApp(page);
-    await vistaDividida(page);
-    await unaPieza(page);
-    expect(await solape(page, '.grupo-del-patron', '.unified-bar')).toBe(0);
-  });
-
   // Viewport ANTES de abrir: la posición por defecto de la barra se calcula al
-  // montarla (barPosition.ts), así que redimensionar después no la recoloca y
-  // el test pasaría sin haber medido nada. A 1280 el grupo se pliega en
-  // «Mostrar»: lo que se mide es ese botón.
+  // montarla (barPosition.ts). A 1280 el grupo se pliega en «Mostrar»: lo que
+  // se mide es ese botón.
   for (const vp of [{ width: 1280, height: 720 }, { width: 1366, height: 768 }]) {
     test(`tampoco a ${vp.width}×${vp.height}`, async ({ page }) => {
       await page.setViewportSize(vp);
       await abrirApp(page);
       await vistaDividida(page);
       await unaPieza(page);
+      await page.keyboard.press('Control+/');
+      await expect(page.locator('.unified-bar')).toBeVisible();
       expect(await solape(page, '.grupo-del-patron', '.unified-bar')).toBe(0);
-      const tapados = (await alcanzables(page, '.unified-bar__modes button')).filter((m) => !m.alcanzable);
-      expect(tapados, `tapados: ${tapados.map((t) => `${t.nombre} ← ${t.culpable}`).join(', ')}`).toEqual([]);
     });
   }
 });

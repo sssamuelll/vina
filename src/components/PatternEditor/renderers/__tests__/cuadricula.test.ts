@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cuadroDeLaCuadricula, primeraLineaDesde, CUADRO_MIN_PX } from '../cuadricula';
+import { cuadroDeLaCuadricula, primeraLineaDesde, ultimaLineaHasta, CUADRO_MIN_PX } from '../cuadricula';
 import { ZOOM_MAX, ZOOM_MIN } from '../../../../input/zoom2d';
 
 describe('cuadroDeLaCuadricula — un solo paso, siempre a la vista', () => {
@@ -95,5 +95,14 @@ describe('primeraLineaDesde — la primera línea de la cuadrícula a la derecha
         expect(Math.abs(pasos - Math.round(pasos))).toBeLessThan(1e-9);
       }
     }
+  });
+});
+
+describe('ultimaLineaHasta', () => {
+  it('la última línea de la cuadrícula que no pasa de un tope', () => {
+    expect(ultimaLineaHasta(0, 20, 95)).toBe(80);
+    expect(ultimaLineaHasta(7, 20, 95)).toBe(87);
+    expect(ultimaLineaHasta(-13, 20, 95)).toBe(87);
+    expect(ultimaLineaHasta(0, 20, 80)).toBe(80);
   });
 });

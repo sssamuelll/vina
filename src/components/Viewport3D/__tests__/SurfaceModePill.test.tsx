@@ -10,12 +10,13 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import simulationReducer, { setSurfaceMode3D } from '../../../store/simulationSlice';
 import SurfaceModePill from '../SurfaceModePill';
+import { ShortcutProvider } from '../../../shortcuts/ShortcutProvider';
 
 afterEach(cleanup);
 
 function renderPill() {
   const store = configureStore({ reducer: { simulation: simulationReducer } });
-  render(<Provider store={store}><SurfaceModePill /></Provider>);
+  render(<Provider store={store}><ShortcutProvider><SurfaceModePill /></ShortcutProvider></Provider>);
   return store;
 }
 
@@ -61,7 +62,7 @@ describe('SurfaceModePill', () => {
   it('Escape closes the flyout', () => {
     renderPill();
     fireEvent.click(screen.getByRole('button', { name: /^modo de superficie:/i }));
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(screen.queryByRole('group', { name: 'Modo de superficie' })).toBeNull();
   });
 

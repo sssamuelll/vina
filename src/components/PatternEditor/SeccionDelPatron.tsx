@@ -11,6 +11,7 @@ import { useShortcutRegistry } from '../../shortcuts';
 import { displayShortcutBinding } from '../shell/shortcutDisplay';
 import { herramientaParaMostrar } from '../shell/herramientaParaMostrar';
 import { pushJournal } from '../../utils/telemetry/journal';
+import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
 import { Control } from './ToolOptionControls';
 import { cuantasCaben } from './cuantasCaben';
 import type { FraseDelPie } from './fraseDeLaFase';
@@ -262,15 +263,16 @@ export default function SeccionDelPatron({
       if (masRef.current?.contains(t) || menuRef.current?.contains(t)) return;
       setAbierto(false);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (menuRef.current?.contains(document.activeElement)) masRef.current?.focus();
-      setAbierto(false);
-    };
     window.addEventListener('mousedown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); };
+    return () => window.removeEventListener('mousedown', onDown);
   }, [abierto]);
+
+  // Esc lo cierra antes que la selección, y el foco vuelve a «Más»: un peldaño
+  // de la escalera de lo que se llama (spec 2026-10-02 § 6.2).
+  usePeldanoDeEscape('mas', 'menu', abierto, () => {
+    if (menuRef.current?.contains(document.activeElement)) masRef.current?.focus();
+    setAbierto(false);
+  });
 
   return (
     <div

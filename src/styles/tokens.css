@@ -202,11 +202,6 @@
   --top-bar-h: clamp(36px, 2.5vw, 48px);
   --unified-bar-h: clamp(44px, 3vw, 56px);
   --toolbar-btn: clamp(28px, 2vw, 38px);
-  /* Franja inferior que ocupa la barra de IA en su posición por defecto, para
-   * que nada acoplado abajo se le meta debajo. 94 = 24 de separación al borde
-   * + 58 de alto (BAR_HEIGHT) + 12 de aire; las dos primeras salen de
-   * src/components/shell/barPosition.ts. Se retira en F4 (barra convocada). */
-  --band-bar: 94px;
 
   /* Effects */
   --transition-fast: 150ms ease;

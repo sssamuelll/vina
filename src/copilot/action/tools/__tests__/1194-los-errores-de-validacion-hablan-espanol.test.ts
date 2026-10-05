@@ -2,7 +2,7 @@
 // Schema en el chat de María.
 //
 // El camino: la guardia de #1189 (`registry.ts`) y la rama zod (`validation.ts`)
-// → `AgenticLoop` → `useAgenticLoop` → `UnifiedBarChat.tsx:310`, donde se pinta
+// → `AgenticLoop` → `copilot/conversacion.ts` → `UnifiedBarChat.tsx`, donde se pinta
 // LITERAL, en rojo, rodeada de copy en español.
 //
 // La traducción va al LEER, no al escribir: `classifyError` (errorRecovery.ts:92-99)

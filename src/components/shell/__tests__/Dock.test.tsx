@@ -14,6 +14,7 @@ import simulationReducer from '../../../store/simulationSlice';
 import dockReducer, { addDockTool, removeDockTool, reorderDockTool } from '../../../store/dockSlice';
 import { activate2DTool } from '../../../store/toolActivation';
 import LeftDock from '../LeftDock';
+import { ShortcutProvider } from '../../../shortcuts/ShortcutProvider';
 
 afterEach(cleanup);
 
@@ -128,7 +129,7 @@ function renderLeftDock() {
   const store = configureStore({
     reducer: { editor: editorReducer, tools: toolsReducer, project: projectReducer, simulation: simulationReducer, dock: dockReducer },
   });
-  render(<Provider store={store}><LeftDock /></Provider>);
+  render(<Provider store={store}><ShortcutProvider><LeftDock /></ShortcutProvider></Provider>);
   return { store };
 }
 
@@ -143,7 +144,7 @@ describe('LeftDock (container)', () => {
   it('is hidden in 3D-only view', () => {
     const store = configureStore({ reducer: { editor: editorReducer, tools: toolsReducer, project: projectReducer, simulation: simulationReducer, dock: dockReducer } });
     store.dispatch(setViewMode('3d'));
-    render(<Provider store={store}><LeftDock /></Provider>);
+    render(<Provider store={store}><ShortcutProvider><LeftDock /></ShortcutProvider></Provider>);
     expect(screen.queryByRole('button', { name: /seleccionar · z/i })).toBeNull();
   });
 
@@ -198,7 +199,7 @@ describe('LeftDock (container)', () => {
     expect(screen.queryByRole('group', { name: 'Personalizar herramientas del dock' })).toBeNull();
     fireEvent.click(add);
     expect(screen.getByRole('group', { name: 'Personalizar herramientas del dock' })).toBeTruthy();
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
     expect(screen.queryByRole('group', { name: 'Personalizar herramientas del dock' })).toBeNull();
   });
 
@@ -222,7 +223,7 @@ describe('LeftDock (container)', () => {
     const menu = screen.getByRole('group', { name: 'Personalizar herramientas del dock' });
     expect(menu.contains(document.activeElement), 'el foco se quedó fuera del personalizador').toBe(true);
     expect(add.getAttribute('aria-controls'), 'el «+» no dice qué abre').toBe(menu.id);
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
     expect(document.activeElement, 'Escape no devolvió el foco al «+»').toBe(add);
   });
 

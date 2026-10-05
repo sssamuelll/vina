@@ -12,7 +12,7 @@ import {
   FileText, Scissors, Ruler, Shirt, Download, Eye,
   Layers, ScanLine, Undo2, Redo2, User, Package,
   Search, PenLine, Tag, Hand, MousePointer2,
-  SlidersHorizontal, type LucideIcon,
+  SlidersHorizontal, Settings, type LucideIcon,
 } from 'lucide-react';
 import { setUserScheme } from '../../store/inputSchemeSlice';
 import { runAutoSew } from '../../store/autoSewThunk';
@@ -58,6 +58,7 @@ export const COMMANDS: CommandDef[] = [
   { id: 'show-nesting', category: 'Paneles', name: 'Marcada', description: 'Distribución de piezas en la tela (nesting)', icon: Layers, action: (_d, cb) => cb.onOpenPanel('Nesting') },
   { id: 'show-layers', category: 'Paneles', name: 'Capas', description: 'Capas de piezas', icon: Layers, action: (_d, cb) => cb.onOpenPanel('Layers') },
   { id: 'show-properties', category: 'Paneles', name: 'Propiedades', description: 'Pieza, costura y materiales', icon: SlidersHorizontal, action: (_d, cb) => cb.onOpenPanel('Properties') },
+  { id: 'show-preferences', category: 'Paneles', name: 'IA y ratón', description: 'Conexiones de IA, idioma y ratón', icon: Settings, action: (_d, cb) => cb.onOpenPanel('Preferences') },
 
   // ─── Export ───
   { id: 'export-3d', category: 'Exportar', name: 'Exportar 3D / Vuelta 360°', description: 'Capturas en alta, vuelta 360°, glTF/USDZ', icon: Download, action: (d) => d(openRenderSettings()) },

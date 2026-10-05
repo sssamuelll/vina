@@ -169,3 +169,14 @@
 .linea-al-pie__patron { flex: 1 1 auto; min-width: 0; display: flex; }
 
 /* unified-bar-slot removed — bar is now position:fixed overlay */
+
+/* «IA» (spec 2026-10-02 § 4.2): el botón de la barra superior que llama a la
+   IA. Marcado = relleno y tinta plena, no solo tono; trabajando con la barra
+   oculta, una señal que late (quieta con movimiento reducido). */
+.boton-ia { position: relative; height: 26px; padding: 0 10px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); font: inherit; font-weight: 600; cursor: pointer; }
+.boton-ia:hover { color: var(--text-primary); }
+.boton-ia:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.boton-ia--activo { background: var(--bg-elevated); color: var(--text-primary); }
+.boton-ia__actividad { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: boton-ia-latido 1.2s ease-in-out infinite; }
+@keyframes boton-ia-latido { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .boton-ia__actividad { animation: none; } }
