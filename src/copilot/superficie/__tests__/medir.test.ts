@@ -21,6 +21,30 @@ const medir = async <T>(nombre: string, args: unknown, ctx: ReturnType<typeof co
 };
 
 describe('measure', () => {
+  it('un punto sobre una curva está sobre el borde, y el largo hasta él es el del arco', async () => {
+    // La curva del revisor: (30, 135) es exactamente su punto en t = 0,5.
+    const curva = pieza('c', [100], {
+      outline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'C', values: [0, 120, 40, 180, 120, 180] },
+        { type: 'L', values: [300, 180] },
+        { type: 'L', values: [300, 0] },
+        { type: 'Z', values: [] },
+      ],
+      edges: [{ id: 'c:armhole', name: 'armhole', segmentRange: [1, 2], edgeType: 'seam' }],
+    });
+    const bezier = (t: number) => {
+      const u = 1 - t;
+      return { x: 3 * u * t * t * 40 + t ** 3 * 120, y: 3 * u * u * t * 120 + 3 * u * t * t * 180 + t ** 3 * 180 };
+    };
+    let arco = 0;
+    for (let i = 1; i <= 1000; i++) {
+      const a = bezier((i - 1) / 2000), b = bezier(i / 2000);
+      arco += Math.hypot(b.x - a.x, b.y - a.y);
+    }
+    const r = await medir<Medida>('measure', { piece_id: 'c', edge: 'armhole', from: 0, to: { x: 30, y: 135 } }, contexto([curva]));
+    expect(Math.abs(r.length - arco)).toBeLessThan(0.5);
+  });
   it('un borde entero, un tramo en fracciones y un tramo entre dos puntos', async () => {
     const ctx = contexto([pieza('a', [50, 80, 100], { position: { x: 10, y: 0 } })]);
     expect((await medir<Medida>('measure', { piece_id: 'a', edge: 'top' }, ctx)).length).toBe(100);

@@ -3,7 +3,7 @@ import type { PatternPiece } from '../../../types/types';
 import { definirVerbo, type ContextoDeVerbo, type Verbo } from '../tipos';
 import { computeRangeLengthMM } from '../../../utils/geometry/edgeInterpolation';
 import { rangoMedibleDeBorde } from '../../../utils/semanticEdges';
-import { distanceAlongPath, pointAtPathDistance } from '../../../utils/geometry/arcLength';
+import { projectOntoPath } from '../../../utils/geometry/arcLength';
 import { patternToPieceLocal } from '../../../utils/geometry/pieceSpace';
 import { metricasDeCaminar, TOLERANCIA_CAMINAR_MM } from '../../../utils/seam/caminarCostura';
 import { validatePiece } from '../../../utils/patternRules';
@@ -28,12 +28,11 @@ const FUERA_DEL_BORDE_MM = 1;
 /** Dónde cae un extremo, en mm a lo largo del borde desde su inicio. */
 function distanciaDesdeElInicio(e: Tramo['from'], piece: PatternPiece, rango: [number, number], largo: number, edge: string): number {
   if (typeof e === 'number') return e * largo;
-  const local = patternToPieceLocal(e, piece);
-  const d = distanceAlongPath(piece.outline, local, rango[0], rango[1]);
-  const sobre = pointAtPathDistance(piece.outline, d, rango[0], rango[1]);
-  const fuera = sobre ? Math.hypot(local.x - sobre.x, local.y - sobre.y) : Infinity;
-  if (fuera > FUERA_DEL_BORDE_MM) throw new Error(`point (${unDecimal(e.x)}, ${unDecimal(e.y)}) is ${unDecimal(fuera)} mm off edge ${edge}`);
-  return d;
+  // La distancia y el desvío salen de la MISMA proyección: medir el desvío con
+  // una ida y vuelta caía en otro punto de una curva (t paramétrico).
+  const { distance, offset } = projectOntoPath(piece.outline, patternToPieceLocal(e, piece), rango[0], rango[1]);
+  if (offset > FUERA_DEL_BORDE_MM) throw new Error(`point (${unDecimal(e.x)}, ${unDecimal(e.y)}) is ${unDecimal(offset)} mm off edge ${edge}`);
+  return distance;
 }
 
 /** El largo de un tramo de un borde, medido ahora. */
