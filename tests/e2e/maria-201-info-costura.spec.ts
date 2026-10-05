@@ -53,7 +53,10 @@ async function sewMismatchedPieces(page: Page) {
   const base = { internals: [], rotation: 0, mirrored: false, seamAllowance: 0, layer: 1, sublayer: 0, active: true, createdAt: 1, updatedAt: 1 };
   await dispatch(page, { type: 'project/addPiece', payload: { ...base, id: 'm201-a', name: 'A', outline: rect(100), position: { x: 60, y: 160 } } });
   await dispatch(page, { type: 'project/addPiece', payload: { ...base, id: 'm201-b', name: 'B', outline: rect(160), position: { x: 260, y: 160 } } });
-  await dispatch(page, { type: 'project/addSeam', payload: { id: 'm201-s', pieceA: { pieceId: 'm201-a', edgeName: 'edge-0' }, pieceB: { pieceId: 'm201-b', edgeName: 'edge-0' }, type: 'standard', tension: 80, strength: 1, active: true, taped: false, tapeWidth: 10 } });
+  // Cosido por el borde superior (`topEdge`, el nombre que le pone addPiece).
+  // Antes decía `edge-0`, que es la `M` y no resuelve: el lienzo medía por
+  // accidente el comando 1 (revisión de la entrega 1a de la superficie).
+  await dispatch(page, { type: 'project/addSeam', payload: { id: 'm201-s', pieceA: { pieceId: 'm201-a', edgeName: 'topEdge' }, pieceB: { pieceId: 'm201-b', edgeName: 'topEdge' }, type: 'standard', tension: 80, strength: 1, active: true, taped: false, tapeWidth: 10 } });
   // La info de costura vive en el menú de costuras (maria-210): fuera de él ya
   // no se pinta nada. Este spec mide ESA info, así que entra a su superficie.
   await dispatch(page, { type: 'editor/setActiveTool', payload: 'seam' });

@@ -18,7 +18,7 @@ import type {
   InternalLine,
   NotchAnchor,
 } from '../../types/types';
-import { computePathArcLength, pointAtPathDistance, distanceAlongPath } from '../geometry/arcLength';
+import { computePathArcLength, pointAtPathDistance, distanceAlongPath, projectOntoPath } from '../geometry/arcLength';
 import { rangoMedibleDeBorde } from '../semanticEdges';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../notches';
 // `ringOf` es EL aplanado del contorno, y vive en notchAnchor: este módulo
@@ -91,11 +91,10 @@ export function findEdgeForPoint(piece: PatternPiece, point: Point2D): SemanticE
   let best: SemanticEdge | null = null, bestPerp = Infinity;
   for (const edge of piece.edges) {
     const [s0, s1] = rangoMedibleDeBorde(piece.outline, edge.segmentRange);
-    const d = distanceAlongPath(piece.outline, point, s0, s1);
-    const pt = pointAtPathDistance(piece.outline, d, s0, s1);
-    if (!pt) continue;
-    const perp = Math.hypot(point.x - pt.x, point.y - pt.y);
-    if (perp < bestPerp) { bestPerp = perp; best = edge; }
+    // El desvío sale de la misma proyección que la distancia: la ida y vuelta
+    // por `pointAtPathDistance` caía en otro punto de una curva (t paramétrico).
+    const { offset } = projectOntoPath(piece.outline, point, s0, s1);
+    if (offset < bestPerp) { bestPerp = offset; best = edge; }
   }
   return best;
 }

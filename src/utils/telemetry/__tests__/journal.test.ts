@@ -153,3 +153,12 @@ describe('cola de rescate', () => {
     expect(localStorage.getItem(JOURNAL_TAIL_KEY)).toBeNull();
   });
 });
+
+describe("journal: lo que hacen los agentes", () => {
+  it("'agente' no se funde: dos llamadas seguidas al mismo verbo son dos entradas", () => {
+    clearJournal();
+    pushJournal('agente', 'measure', { args: { edge: 'a' } });
+    pushJournal('agente', 'measure', { args: { edge: 'b' } });
+    expect(getJournal().events.filter(e => e.kind === 'agente')).toHaveLength(2);
+  });
+});

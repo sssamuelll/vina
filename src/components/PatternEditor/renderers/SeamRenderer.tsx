@@ -9,10 +9,12 @@
  */
 
 import { PatternPiece, Point2D, Seam } from '../../../types/types';
-import { getEdgeEndpoints, getEdgeArcLength, getEdgePathD } from '../../../utils/geometry/path';
+import { getEdgeEndpoints, getEdgePathD, getRangePathD } from '../../../utils/geometry/path';
+import { rangoMedibleDeBorde } from '../../../utils/semanticEdges';
 import { resolveEdgePolyline, edgeNToCommandIndex, slicePolylineByT } from '../../../utils/seam/index';
 import { samplePolyline, perpendicular } from '../../../utils/pleatGeometry';
 import { seamPairColor, seamMismatchMm, layoutMismatchLabels, SEAM_MISMATCH_THRESHOLD_MM } from './seamVisuals';
+import { largosDeCostura } from '../../../utils/seam/largoCosido';
 
 interface SeamRendererProps {
   seams: Seam[];
@@ -53,11 +55,15 @@ export default function SeamRenderer({
         const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
         if (!pieceA || !pieceB) return [];
 
-        // Resolve semantic edge name to segment index (with edge-N fallback)
+        // Resolve semantic edge name to its command range (with edge-N
+        // fallback). Traducido: el tramo de cierre se rotula con la `M`, que no
+        // dibuja, y una costura sobre él no se pintaba (#1143).
         const semEdgeA = pieceA.edges?.find(e => e.name === seam.pieceA.edgeName);
         const semEdgeB = pieceB.edges?.find(e => e.name === seam.pieceB.edgeName);
-        let segIdxA = semEdgeA?.segmentRange[0] ?? -1;
-        let segIdxB = semEdgeB?.segmentRange[0] ?? -1;
+        const comandosA = semEdgeA ? rangoMedibleDeBorde(pieceA.outline, semEdgeA.segmentRange) : null;
+        const comandosB = semEdgeB ? rangoMedibleDeBorde(pieceB.outline, semEdgeB.segmentRange) : null;
+        let segIdxA = comandosA?.[0] ?? -1;
+        let segIdxB = comandosB?.[0] ?? -1;
         // Fallback: legacy "edge-N" IS a command index already (the
         // resolveEdgeName producer contract — edgeNToCommandIndex). The old
         // `N + 1` here read one edge past the one the user clicked, and
@@ -102,18 +108,24 @@ export default function SeamRenderer({
         // solver) en vez del path exacto del comando completo.
         const polyToPathD = (pts: Point2D[]): string =>
           'M' + pts.map(p => `${p.x},${p.y}`).join(' L');
+        // Una costura entera pinta su borde ENTERO: el primer comando solo era,
+        // en las curvas del DXF de María, un resalte de 2,4 mm. Un rango vacío
+        // ([i, i]) dibuja su primer comando, como lo cose el motor
+        // (`commandRangeToFlattened`).
         const pathDA = rangeA && polyA.length >= 2
           ? polyToPathD(polyA)
-          : getEdgePathD(pieceA.outline, segIdxA, offA.x, offA.y);
+          : (comandosA && getRangePathD(pieceA.outline, comandosA, offA.x, offA.y)) || getEdgePathD(pieceA.outline, segIdxA, offA.x, offA.y);
         const pathDB = rangeB && polyB.length >= 2
           ? polyToPathD(polyB)
-          : getEdgePathD(pieceB.outline, segIdxB, offB.x, offB.y);
+          : (comandosB && getRangePathD(pieceB.outline, comandosB, offB.x, offB.y)) || getEdgePathD(pieceB.outline, segIdxB, offB.x, offB.y);
 
-        const midA = {
+        // Los largos y la etiqueta de desajuste van en el medio del tramo
+        // cosido, no en el del primer comando del borde.
+        const midA = polyA.length >= 2 ? samplePolyline(polyA, 0.5).point : {
           x: (epA.start.x + epA.end.x) / 2 + offA.x,
           y: (epA.start.y + epA.end.y) / 2 + offA.y,
         };
-        const midB = {
+        const midB = polyB.length >= 2 ? samplePolyline(polyB, 0.5).point : {
           x: (epB.start.x + epB.end.x) / 2 + offB.x,
           y: (epB.start.y + epB.end.y) / 2 + offB.y,
         };
@@ -127,9 +139,11 @@ export default function SeamRenderer({
         // at 0.6mm on a 10mm notch seam. The craft works in mm.
         // Largo COSIDO (sewnLengthMm): un half parcial compara su sub-tramo,
         // no el borde entero — si no, todo seam parcial gritaba mismatch.
-        const lenA = getEdgeArcLength(pieceA.outline, segIdxA) * (rangeA ? rangeA[1] - rangeA[0] : 1);
-        const lenB = getEdgeArcLength(pieceB.outline, segIdxB) * (rangeB ? rangeB[1] - rangeB[0] : 1);
-        const mismatchMm = seamMismatchMm(lenA, lenB);
+        // Una sola medida (spec 2026-10-05): el borde ENTERO por la fracción
+        // cosida. `getEdgeArcLength(outline, segmentRange[0])` medía solo el
+        // primer comando, y el DXF de María trae bordes de 14-20.
+        const { a: lenA, b: lenB } = largosDeCostura(seam, pieces);
+        const mismatchMm = lenA != null && lenB != null ? seamMismatchMm(lenA, lenB) : 0;
         const hasMismatch = mismatchMm > SEAM_MISMATCH_THRESHOLD_MM;
 
         // El hover de coser/editar enciende igual que la selección. La lista
@@ -333,14 +347,14 @@ export default function SeamRenderer({
                   fontSize={8 / zoom2D} textAnchor="middle"
                   style={{ fill: 'var(--ink-on-light-2)', fontFamily: 'var(--font-mono-2d)' }}
                 >
-                  {lenA.toFixed(1)}mm
+                  {lenA != null ? `${lenA.toFixed(1)}mm` : '—'}
                 </text>
                 <text
                   x={midB.x} y={midB.y - 8 / zoom2D}
                   fontSize={8 / zoom2D} textAnchor="middle"
                   style={{ fill: 'var(--ink-on-light-2)', fontFamily: 'var(--font-mono-2d)' }}
                 >
-                  {lenB.toFixed(1)}mm
+                  {lenB != null ? `${lenB.toFixed(1)}mm` : '—'}
                 </text>
               </>
             )}
