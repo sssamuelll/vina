@@ -60,6 +60,10 @@ describe('pasarTurno', () => {
     expect(pasarTurno(sujetoPieza(), 'select', { seleccion, indice: 1 }, seleccion, 'anterior')).toEqual({ seleccion, indice: 0 });
     expect(pasarTurno(sujetoPieza(), 'select', TURNO_INICIAL, seleccion, 'anterior')).toBeNull();
   });
+  it('con la pieza bloqueada el Tab es el de siempre: no pasa el turno a una cota apagada, que no recibe el foco', () => {
+    const bloqueada = { ...sujetoPieza(), disabled: true };
+    expect(pasarTurno(bloqueada, 'select', TURNO_INICIAL, seleccion, 'siguiente')).toBeNull();
+  });
   it('en Rectángulo el Tab es el de siempre', () => {
     expect(pasarTurno(sujetoPieza(), 'rectangle', TURNO_INICIAL, seleccion, 'siguiente')).toBeNull();
   });

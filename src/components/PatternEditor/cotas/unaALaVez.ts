@@ -48,7 +48,9 @@ export function pasarTurno(
   seleccion: readonly string[],
   hacia: 'siguiente' | 'anterior',
 ): TurnoDeCota | null {
-  if (!aplica(sujeto, activeTool)) return null;
+  // Con la pieza bloqueada las cotas están apagadas y no reciben el foco: pasar
+  // el turno dejaría el foco en el aire. El Tab sigue su camino de siempre.
+  if (!aplica(sujeto, activeTool) || sujeto.disabled) return null;
   const indice = indiceVivo(turno, seleccion, sujeto.cotas.length) + (hacia === 'siguiente' ? 1 : -1);
   if (indice < 0 || indice >= sujeto.cotas.length) return null;
   return { seleccion, indice };

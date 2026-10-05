@@ -38,6 +38,7 @@ test.describe('la cabina de la pieza (P3a)', () => {
   test('con la pieza bloqueada no hay caja, pero la barrita trae «Desbloquear» primero', async ({ page }) => {
     await unaPiezaSeleccionada(page);
     await dispatch(page, 'project/lockPiece', 'p1');
+    await expect(page.locator('.transform-handles'), 'la pieza bloqueada no enseña la caja').toHaveCount(0);
     const primero = barrita(page).getByRole('button').first();
     await expect(primero).toHaveAttribute('aria-label', 'Desbloquear');
     await primero.click();
@@ -81,7 +82,23 @@ test.describe('la cabina de la pieza (P3a)', () => {
     await expect(campo('Ancho')).toBeFocused();
     await page.keyboard.press('Escape');
 
-    // Otra pieza empieza por Ancho.
+    // En reposo, Tab hacia delante sobre Ancho también pasa a Alto.
+    await chip('Ancho').focus();
+    await page.keyboard.press('Tab');
+    await expect(campo('Alto')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(chip('Alto')).toBeVisible();
+
+    // Volver a hacer clic en la pieza la selecciona de nuevo: empieza por Ancho.
+    await clickAt(page, { x: 250, y: 200 });
+    await expect(chip('Ancho')).toHaveText('300 mm');
+    await expect(chip('Alto')).toHaveCount(0);
+
+    // Otra pieza, con Alto a la vista en la de antes, empieza por Ancho.
+    await chip('Ancho').click();
+    await page.keyboard.press('Tab');
+    await expect(campo('Alto')).toBeFocused();
+    await page.keyboard.press('Escape');
     await addPiece(page, 'p2', { x: 500, y: 100 }, 120, 90);
     await clickAt(page, { x: 560, y: 145 });
     await expect(chip('Ancho')).toHaveText('120 mm');

@@ -448,6 +448,12 @@ describe('CotaChip - una cota a la vez (spec 2026-10-02 § 5.5)', () => {
     expect(fireEvent.keyDown(screen.getByRole('button'), { key: 'Tab', shiftKey: true })).toBe(false);
     expect(onSalir).toHaveBeenCalledWith('anterior');
   });
+  it('en reposo, Tab hacia delante sobre el chip pasa de turno, y el Tab nativo no se va', () => {
+    const onSalir = vi.fn(() => true);
+    monta({ onSalir });
+    expect(fireEvent.keyDown(screen.getByRole('button'), { key: 'Tab' })).toBe(false);
+    expect(onSalir).toHaveBeenCalledWith('siguiente');
+  });
   it('en reposo, si la capa dice que no, el Tab nativo sigue', () => {
     monta({ onSalir: () => false });
     expect(fireEvent.keyDown(screen.getByRole('button'), { key: 'Tab' })).toBe(true);
