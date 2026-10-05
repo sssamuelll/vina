@@ -10,7 +10,13 @@ interface Medida {
 interface Veredicto {
   verdict: string;
   issues: Array<{ kind: string; seam_id?: string; message: string }>;
-  seams: Array<{ id: string; walks: boolean | null; a: { edge: string; length: number }; b: { length: number } }>;
+  seams: Array<{
+    id: string;
+    walks: boolean | null;
+    delta: number | null;
+    a: { piece_id: string; edge: string; length: number };
+    b: { piece_id: string; edge: string; length: number };
+  }>;
 }
 
 /** Medir (spec 2026-10-05 § 5.1 y § 5.3): números de ahora, y un veredicto que no miente. */
@@ -46,10 +52,12 @@ describe('measure', () => {
     expect(Math.abs(r.length - arco)).toBeLessThan(0.5);
   });
   it('un borde entero, un tramo en fracciones y un tramo entre dos puntos', async () => {
-    const ctx = contexto([pieza('a', [50, 80, 100], { position: { x: 10, y: 0 } })]);
+    // La pieza se corre también en perpendicular al borde (y = 20): si los
+    // puntos no pasaran a espacio de pieza, caerían a 20 mm de él.
+    const ctx = contexto([pieza('a', [50, 80, 100], { position: { x: 10, y: 20 } })]);
     expect((await medir<Medida>('measure', { piece_id: 'a', edge: 'top' }, ctx)).length).toBe(100);
     expect((await medir<Medida>('measure', { piece_id: 'a', edge: 'top', from: 0.25, to: 0.75 }, ctx)).length).toBe(50);
-    expect((await medir<Medida>('measure', { piece_id: 'a', edge: 'top', from: { x: 20, y: 0 }, to: { x: 70, y: 0 } }, ctx)).length).toBe(50);
+    expect((await medir<Medida>('measure', { piece_id: 'a', edge: 'top', from: { x: 20, y: 20 }, to: { x: 70, y: 20 } }, ctx)).length).toBe(50);
   });
   it('un punto fuera del borde es un error dicho, no una proyección callada', async () => {
     const r = await ejecutarVerbo(VERBOS_DE_MEDIR, 'measure', { piece_id: 'a', edge: 'top', from: { x: 10, y: 30 } }, contexto([pieza('a', [100])]));
@@ -111,6 +119,11 @@ describe('verify', () => {
     const r = await medir('walk_seam', { seam_id: 's1' }, contexto([pieza('a', [100]), pieza('b', [100])], [costura({ tension: 80 })]));
     expect(r).toMatchObject({ tension: 80, active: true });
   });
+  it('una costura cuyo borde ya no existe no se mide, y verify lo dice', async () => {
+    const r = await medir<Veredicto>('verify', {}, contexto([pieza('a', [100]), pieza('b', [100])], [costura({ pieceA: { pieceId: 'a', edgeName: 'manga' } })]));
+    expect(r.verdict).toBe('has-issues');
+    expect(r.issues).toContainEqual(expect.objectContaining({ kind: 'seam-not-measurable', seam_id: 's1' }));
+  });
   it('un contorno que no cierra sale como problema', async () => {
     const abierta = pieza('a', [100]);
     abierta.outline = abierta.outline.filter(c => c.type !== 'Z');
@@ -129,6 +142,28 @@ describe('verify', () => {
     for (const s of noCaminan) {
       const problema = r.issues.find(i => i.seam_id === s.id);
       expect(problema?.message).toContain(`${s.a.length} mm against ${s.b.length} mm`);
+    }
+  });
+  it('con la camisa de María: el cuello mide 62 mm menos que el escote, y cada copa lleva 0,4 mm de embebido', async () => {
+    // Oráculos que no dependen de dónde parte autoSew cada borde: sumadas sus
+    // mitades, cada costura cubre los bordes enteros (518,1 contra 456 en el
+    // cuello; 450,9 de copa contra 230,6 + 219,9 de sisas).
+    const { piezas, seams } = camisaDeMaria();
+    const r = await medir<Veredicto>('verify', {}, contexto(piezas, seams));
+    const cuello = r.seams.filter(s => s.b.edge.startsWith('collarNeckEdge') || s.a.edge.startsWith('collarNeckEdge'));
+    expect(cuello).toHaveLength(4);
+    // Con el delta de cada costura, redondeado una vez: restar largos ya
+    // redondeados acumula hasta 0,4 mm en ocho números.
+    const faltaDeCuello = cuello.reduce((suma, s) => suma + Math.abs(s.delta ?? NaN), 0);
+    expect(Math.abs(faltaDeCuello - 62.1)).toBeLessThanOrEqual(0.25);
+    const mangas = piezas.filter(p => p.category === 'sleeve');
+    expect(mangas).toHaveLength(2);
+    for (const manga of mangas) {
+      const copa = r.seams.filter(s => (s.a.piece_id === manga.id && s.a.edge === 'sleeveCap') || (s.b.piece_id === manga.id && s.b.edge === 'sleeveCap'));
+      expect(copa).toHaveLength(2);
+      // delta es B − A: la copa menos la sisa es −delta si la copa es A.
+      const embebido = copa.reduce((suma, s) => suma + (s.a.edge === 'sleeveCap' ? -(s.delta ?? NaN) : (s.delta ?? NaN)), 0);
+      expect(Math.abs(embebido - 0.4)).toBeLessThanOrEqual(0.25);
     }
   });
 });

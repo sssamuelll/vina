@@ -6,7 +6,7 @@ import { camisaDeMaria, contexto, costura, pieza, piquete } from './fixtures';
 /** Lo que estos tests leen de las respuestas: el resto se compara con `toMatchObject`. */
 interface Patron {
   revision: number;
-  pieces: Array<{ locked: boolean; edges: Array<{ name: string; length: number }>; notches: unknown[] }>;
+  pieces: Array<{ category: string | null; side: string | null; locked: boolean; edges: Array<{ name: string; length: number }>; notches: unknown[] }>;
   seams: Array<{ a: { length: number }; b: { length: number } }>;
 }
 interface Pieza {
@@ -29,9 +29,12 @@ describe('read_pattern', () => {
     expect(r.pieces[0].edges.find(e => e.name === 'top')?.length).toBe(100);
   });
   it('trae ancho, alto, área y si está bloqueada, por la pieza o por su capa', async () => {
-    const r = await leer<Patron>('read_pattern', {}, contexto([pieza('a', [100]), pieza('b', [100], { layer: 2 })], [], { 2: true }));
+    const r = await leer<Patron>('read_pattern', {}, contexto(
+      [pieza('a', [100]), pieza('b', [100], { layer: 2 }), pieza('c', [100], { locked: true })], [], { 2: true },
+    ));
     expect(r.pieces[0]).toMatchObject({ width: 100, height: 50, area: 5000, locked: false });
     expect(r.pieces[1].locked).toBe(true);
+    expect(r.pieces[2].locked).toBe(true);
   });
   it('mide cada costura por sus dos lados y dice si camina', async () => {
     const r = await leer<Patron>('read_pattern', {}, contexto([pieza('a', [50, 80, 100]), pieza('b', [20, 50, 110])], [costura()]));
@@ -53,6 +56,16 @@ describe('read_pattern', () => {
       expect(s.a.length).toBeGreaterThan(0);
       expect(s.b.length).toBeGreaterThan(0);
     }
+  });
+  it('con la camisa de María, los largos son los de sus bordes curvos enteros (77-127 comandos), no los de su primer comando', async () => {
+    const { piezas, seams } = camisaDeMaria();
+    const r = await leer<Patron>('read_pattern', {}, contexto(piezas, seams));
+    const largo = (categoria: string, lado: string | null, borde: string) =>
+      r.pieces.find(p => p.category === categoria && (lado === null || p.side === lado))?.edges.find(e => e.name === borde)?.length;
+    expect(largo('bodice', 'front', 'armhole')).toBe(230.6);
+    expect(largo('bodice', 'front', 'neckline')).toBe(299.6);
+    expect(largo('sleeve', null, 'sleeveCap')).toBe(450.9);
+    expect(largo('collar', null, 'collarNeckEdge')).toBe(228);
   });
 });
 

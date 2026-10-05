@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { z } from 'zod';
+import { configureStore } from '@reduxjs/toolkit';
+import projectReducer, { addPiece } from '../../../store/projectSlice';
+import { seguirLaRevision } from '../../../store/revisionDelProyecto';
 import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 import { ejecutarVerbo } from '../ejecutar';
 import { definirVerbo, type ContextoDeVerbo } from '../tipos';
@@ -24,6 +27,19 @@ describe('ejecutarVerbo', () => {
     const r = await ejecutarVerbo([eco], 'echo', { n: 3 }, ctx);
     expect(r).toMatchObject({ ok: true, result: { n: 3 } });
     expect(typeof r.revision).toBe('number');
+  });
+  it('la revisión del sobre es la de ahora: sube si el proyecto cambió entre dos llamadas', async () => {
+    const store = configureStore({ reducer: { project: projectReducer }, middleware: g => g({ serializableCheck: false }) });
+    const soltar = seguirLaRevision(store);
+    const antes = await ejecutarVerbo([eco], 'echo', { n: 1 }, ctx);
+    store.dispatch(addPiece({
+      id: 'p1', name: 'p1', outline: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [10, 0] }, { type: 'Z', values: [] }],
+      internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 0,
+      layer: 1, sublayer: 0, active: true, createdAt: 0, updatedAt: 0,
+    }));
+    const despues = await ejecutarVerbo([eco], 'echo', { n: 2 }, ctx);
+    expect(despues.revision).toBe(antes.revision + 1);
+    soltar();
   });
   it('un verbo que no existe es un error dicho, no una excepción', async () => {
     expect(await ejecutarVerbo([eco], 'nope', {}, ctx)).toMatchObject({ ok: false, error: 'unknown verb: nope' });
