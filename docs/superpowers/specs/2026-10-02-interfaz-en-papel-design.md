@@ -456,6 +456,14 @@ voltear y propiedades. Captura 02.
   `2026-09-06-escalera-de-escape-design.md` por delante del panel y de la deselección.
 - `--band-bar` se retira con sus consumidores: ya nada reserva una franja para ella.
 
+**Nota del plan de P2c (2026-10-04).** «Cerrar» y «ocultar» son lo mismo para la vista; lo que
+cambia es si queda conversación. Esc borra primero el texto del campo, y con el campo vacío
+oculta la barra. «Detener» es cooperativo: el agente para al volver cada respuesta o antes de la
+herramienta siguiente, y lo que ya hizo se queda en el patrón. La escalera de lo que se llama
+(menú, barra de IA, panel, antes que la selección) no incluye las herramientas del lienzo
+(`2026-09-06-escalera-de-escape-design.md`, aparte). Preferencias se llama «IA y ratón», en el
+menú Vina, en la paleta y en el título del panel.
+
 ### 6.3 Lo que flota: menús, avisos, tooltips y modales
 
 Todo lo que aparece encima de la hoja usa el mismo material: fondo blanco, línea de pelo, radio 8,

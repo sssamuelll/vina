@@ -4,12 +4,9 @@
   z-index: 15;
 }
 .floating-3d--bottom-left {
-  /* Por encima del UnifiedBar en su posición default (58px alto + 24px de
-     offset, barPosition.ts) — a bottom:12 quedaba recortado DETRÁS del bar
-     (Fase1-S3). Si el usuario arrastra el bar, ese es su layout. El número
-     ahora sale del token `--band-bar`, compartido con la barra de instantáneas
-     y la fila de capas del lienzo 2D. */
-  bottom: var(--band-bar);
+  /* La barra de IA ya no está en reposo (spec 2026-10-02 § 6.2): nada
+     reserva su franja, y esto vuelve al suelo. */
+  bottom: var(--sp-3);
   left: var(--sp-3);
   display: flex;
   align-items: center;

@@ -95,13 +95,14 @@ sobre el papel. No sabe dónde está. Cinco reglas:
   nombre que el ámbito redefine (`--text-muted: var(--text-tertiary)`), el
   ámbito lo vuelve a declarar; si no, baja con el valor del marco. Lo vigila
   `src/styles/__tests__/ambito-de-papel.test.ts`.
-- **Hasta su fase siguen con el overlay oscuro de `:root`:** la barra de IA
-  (P2c), los paneles (P4, que los pasa a `chrome` a ras) y el cromo del 3D
-  (P5). La fila dejó el lienzo en P2a: sus seis interruptores viven en la
-  barra superior, que es marco, y solo su menú plegado («Mostrar») flota y es
-  papel. La tira murió en P2b: sus opciones viven en la línea al pie, que es
-  marco, y solo su menú «Más» flota y es papel. El margen de herramientas
-  lleva el ámbito desde P2a y la hoja desde P2b; el escenario lo gana en P5.
+- **Hasta su fase siguen con el overlay oscuro de `:root`:** los paneles (P4,
+  que los pasa a `chrome` a ras) y el cromo del 3D (P5). La fila dejó el
+  lienzo en P2a: sus seis interruptores viven en la barra superior, que es
+  marco, y solo su menú plegado («Mostrar») flota y es papel. La tira murió en
+  P2b: sus opciones viven en la línea al pie, que es marco, y solo su menú
+  «Más» flota y es papel. La barra de IA es papel desde P2c, y solo existe
+  convocada. El margen de herramientas lleva el ámbito desde P2a y la hoja
+  desde P2b; el escenario lo gana en P5.
 
 Más una familia de **tinta**, que no es superficie: `--ink-*` es lo que se
 dibuja **sobre el papel** del lienzo 2D.
@@ -115,8 +116,8 @@ dibuja **sobre el papel** del lienzo 2D.
 > con el material.
 
 Variantes declaradas (no inventes más): `--surface-overlay-radius-pill` para
-barras con forma de cápsula, y `--surface-overlay-bg-recessed` para el reposo de
-la barra de IA.
+barras con forma de cápsula. Las `-recessed` ya no las usa la barra de IA, que
+desde P2c no tiene reposo; siguen la cota y el avatar hasta P6 (spec § 7.5).
 
 > **Las cotas van sobre el patrón por definición:** son parte del objeto,
 > como los tiradores del transform box, no un panel
@@ -177,6 +178,11 @@ la barra de IA.
   siempre, con el alto de la barra superior; la hoja termina encima y nada la
   empuja. Las opciones de la herramienta viven ahí, como botones; lo que no
   cabe pasa a «Más». Lo mide `linea-al-pie.spec.ts`.
+- **La IA no existe en reposo.** Se llama con «IA», `Ctrl+/`, `Ctrl+K` o desde
+  la pantalla vacía, y aparece sobre la línea al pie, en papel. Ocultarla no
+  pierde la conversación ni corta al agente: viven en el store
+  (`store/iaSlice.ts`, `copilot/conversacion.ts`). Lo mide
+  `ia-convocada.spec.ts`.
 - Solo tres cosas pueden taparlo: menús transitorios, toasts y la paleta.
 - Un panel nuevo NO se abre encima del patrón.
 - Nada de `z-index` literal. Si necesitas una capa, es que falta un rol.
@@ -217,6 +223,12 @@ la barra de IA.
   herramienta (`src/shortcuts/teclaDeBotonera.ts`). Sin eso, Espacio sobre una
   alternativa arrancaba la simulación y Enter sobre «Más» desplazaba la pieza
   (revisión de P2b). La barra superior y «Mostrar» todavía no lo cumplen.
+- **Esc cierra lo que se llama antes que la selección:** menú, barra de IA,
+  panel, en ese orden y de uno en uno (spec 2026-10-02 § 6.2). Una superficie
+  nueva que se cierra con Esc sube su peldaño con `usePeldanoDeEscape`
+  (`src/shortcuts/escaleraDeLoLlamado.ts`) y no escucha Escape por su cuenta:
+  un oyente propio corre después del atajo de deseleccionar y suelta la pieza
+  al cerrar.
 - Nada de `confirm()` / `alert()` / `prompt()`. Existe el sistema de Toast
   (`showToast`, `showErrorToast`, `showUndoToast` en `copilotUISlice`). Para algo
   destructivo, prefiere **actuar y ofrecer deshacer** antes que preguntar.
