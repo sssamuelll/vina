@@ -258,19 +258,36 @@ Dentro de este subproyecto, para probar la superficie desde el primer día y cum
 - Un piquete da su distancia desde el inicio de su borde, y la de su ancla cuando la tiene.
 - `fit_map` pasa a la entrega 1b, con `simulate`.
 - La revisión del proyecto es por sesión.
-- El lienzo medía las costuras por el primer comando de cada borde: la etiqueta de desajuste y los
-  largos al pasar el ratón. Pasa a la misma medida que el agente.
-- Las costuras M:N (`seamGroups`) se anuncian en `warnings` y no se describen todavía.
+- El lienzo medía, pintaba y anclaba cada costura por el primer comando de su borde: la etiqueta de
+  desajuste, los largos al pasar el ratón y el resalte, que en la sisa de María era de 2,4 mm. Ahora
+  mide con lo mismo que el agente y pinta y ancla el borde entero. Una costura sobre el tramo de
+  cierre, que no se pintaba, se pinta.
+- Las costuras M:N (`seamGroups`) se anuncian en `warnings` y no se describen todavía. Si las hay,
+  `verify` no dice `ok`.
 - Un borde se nombra por su `name`.
 - `measure` acepta fracciones o puntos sobre el borde.
+- El desvío de un punto a un borde sale de la misma proyección que su distancia (`projectOntoPath`).
+  La ida y vuelta de antes mentía en las curvas: `pointAtPathDistance` es lineal en el parámetro, no
+  en el arco. Sigue así para quien coloca un punto a una distancia; eso queda pendiente.
+- `verify` recibe la holgura buscada por costura (`ease_mm`) y deja fuera las costuras apagadas. Cada
+  costura medida trae su `tension` y si está activa.
+- Los piquetes de una costura parcial son los de su tramo cosido (`auditNotches`). El aviso dice el
+  hecho y ya no aconseja copiar el piquete que falta.
 - Lo que `verify` dice de la camisa de María:
   - costados y hombros caminan;
   - las dos mitades de cada copa quedan a ±5 mm, porque autoSew parte la copa en t = 0,5 y las sisas
     miden 230,6 mm (delantera) y 219,9 mm (trasera);
-  - el cuello mide 62 mm menos que el escote (456 contra 518).
+  - el cuello mide 62 mm menos que el escote (456 contra 518);
+  - los piquetes:
+    - en la costura delantera de cada manga, los 2 de la sisa delantera no tienen pareja;
+    - en la trasera, los 2 de la manga tampoco.
+
+    Por las distancias (43,9 y 60,8 mm desde el inicio de la sisa delantera; 43,8 y 59,8 desde el
+    final de la copa), autoSew parece haber cosido las mitades de la copa a la sisa que no les toca.
+    Es una hipótesis.
 
   Son diferencias reales, no ruido.
-- Las definiciones de los cinco verbos miden 4.424 caracteres, contra unos 203.000 del registro de
+- Las definiciones de los cinco verbos miden 4.605 caracteres, contra unos 203.000 del registro de
   hoy por llamada (§ 3).
 
 ## 6. Riesgos
