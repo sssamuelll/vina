@@ -18,6 +18,7 @@ import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import { AgruparCotas } from './cotas/CotaChip';
 import CotaLines from './cotas/CotaLines';
 import { admiteLado, cotasDelSujeto, faltaSujeto, refinarAlLado } from './cotas/sujeto';
+import { cotasALaVista, pasarTurno, TURNO_INICIAL, type TurnoDeCota } from './cotas/unaALaVez';
 import { ladoDelHit } from './cotas/lado';
 import { usePuertaDeLado } from './usePuertaDeLado';
 import { cajasDeAsas } from './cotas/cotasGeometry';
@@ -820,7 +821,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     pieces, selectedPieceIds, cursorPattern: cursorPositionRef,
     puedeAbrir: puedeAbrirLado, esElSujeto: ladoEsElSujetoRef,
   });
-  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint } =
+  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, showActionBar, isDraggingPiece, isDraggingEndpoint } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
       pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas: cotasRef, lados: puertaDeLado.teclas,
     });
@@ -1010,6 +1011,31 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
       pushJournal('gesture', 'lado:abre', { via: 'tab', commandIndex: puertaDeLado.lado.commandIndex });
     }
   }, [puertaDeLado.seq, puertaDeLado.lado]);
+
+  // Una cota de la pieza a la vez (spec 2026-10-02 § 5.5). El turno vive
+  // aquí porque es de la vista: qué cota se ve no es un dato del proyecto.
+  // Como el tramo congelado y el lado, la cota siguiente no existe hasta el
+  // render que la monta: se cuenta la secuencia y entonces se abre.
+  const [turnoDeCota, setTurnoDeCota] = useState<TurnoDeCota>(TURNO_INICIAL);
+  const [abrirTurno, setAbrirTurno] = useState(0);
+  const cotasVisibles = useMemo(
+    () => cotasALaVista(sujeto, activeTool, turnoDeCota, selectedPieceIds),
+    [sujeto, activeTool, turnoDeCota, selectedPieceIds],
+  );
+  const salirDeLaCota = useCallback((hacia: 'siguiente' | 'anterior'): boolean => {
+    const siguiente = pasarTurno(sujeto, activeTool, turnoDeCota, selectedPieceIds, hacia);
+    if (!siguiente) return false;
+    setTurnoDeCota(siguiente);
+    setAbrirTurno(n => n + 1);
+    pushJournal('gesture', 'cota:turno', { hacia, indice: siguiente.indice });
+    return true;
+  }, [sujeto, activeTool, turnoDeCota, selectedPieceIds]);
+  const turnoVisto = useRef(0);
+  useEffect(() => {
+    if (turnoVisto.current === abrirTurno) return;
+    turnoVisto.current = abrirTurno;
+    cotasRef.current?.abrirPrimero();
+  }, [abrirTurno]);
 
   // Enfriamiento irreversible (spec § 3.1): en cuanto la selección deja de ser
   // la pieza nueva, cambia la herramienta o la pieza desaparece, se enfría y
@@ -1508,7 +1534,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
             onPieceNameCancel={handlePieceNameCancel}
           />
           <TrazosLayer trazos={trazosVisibles} seleccion={editor.selectedTrazo} zoom2D={zoom2D} />
-          <CotaLines cotas={sujeto.cotas} zoom2D={zoom2D} />
+          <CotaLines cotas={cotasVisibles} zoom2D={zoom2D} />
           <ConstructionOverlay zoom2D={zoom2D} pieces={pieces} />
           {/* `showSewingLines` sigue siendo el interruptor maestro del usuario
               (menú del logo → "Líneas de costura"); lo que se le suma es el
@@ -1722,7 +1748,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
         )}
       </svg>
       <FloatingActionBar
-        show={showTransformBox}
+        show={showActionBar}
         bbox={transformTool.bbox}
         pan2D={pan2D}
         zoom2D={zoom2D}
@@ -1731,10 +1757,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
         calibrationActive={calibrationMode !== null}
         ctx={barCtx}
       />
-      <AgruparCotas cotas={sujeto.cotas} pan2D={pan2D} zoom2D={zoom2D} estorbos={estorbosDeLasAsas}>
+      <AgruparCotas cotas={cotasVisibles} pan2D={pan2D} zoom2D={zoom2D} estorbos={estorbosDeLasAsas}>
         <CotasLayer
           ref={cotasRef}
-          cotas={sujeto.cotas}
+          cotas={cotasVisibles}
+          onSalir={salirDeLaCota}
           piezasConLargos={piezasConLargos}
           piezaAcotadaId={sujeto.piece?.id}
           units={units}

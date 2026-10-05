@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shouldShowTransformBox } from '../useEditorInteractions';
+import { shouldShowActionBar, shouldShowTransformBox } from '../useEditorInteractions';
 
 describe('shouldShowTransformBox', () => {
   it('siempre muestra para el tool transform standalone', () => {
@@ -39,7 +39,7 @@ describe('shouldShowTransformBox', () => {
   });
 
   // PR B, spec § 3.5: con una interna seleccionada, la pieza no compite —
-  // se suprimen el box Y la FloatingActionBar (comparten este mismo booleano).
+  // se suprimen el box y la FloatingActionBar, que lo sigue (`shouldShowActionBar`).
   it('oculta con una interna seleccionada, aunque la pieza esté seleccionada y desbloqueada', () => {
     expect(shouldShowTransformBox({
       activeTool: 'select', isNodeEditing: false, selectedCount: 1, selectionHasLocked: false,
@@ -51,5 +51,22 @@ describe('shouldShowTransformBox', () => {
     expect(shouldShowTransformBox({
       activeTool: 'select', isNodeEditing: false, selectedCount: 1, selectionHasLocked: false,
     })).toBe(true);
+  });
+});
+
+describe('shouldShowActionBar (spec 2026-10-02 § 5.5)', () => {
+  const base = { activeTool: 'select' as const, isNodeEditing: false, selectedCount: 1, selectionHasLocked: false };
+
+  it('con la pieza bloqueada no hay caja, pero sí barrita: «Desbloquear» no queda detrás de un menú', () => {
+    const bloqueada = { ...base, selectionHasLocked: true };
+    expect(shouldShowTransformBox(bloqueada)).toBe(false);
+    expect(shouldShowActionBar(bloqueada)).toBe(true);
+  });
+
+  it('en todo lo demás sigue a la caja: sin selección, editando nodos, con una interna o en otra herramienta, no está', () => {
+    expect(shouldShowActionBar({ ...base, selectedCount: 0 })).toBe(false);
+    expect(shouldShowActionBar({ ...base, isNodeEditing: true })).toBe(false);
+    expect(shouldShowActionBar({ ...base, hasSelectedInternalLine: true })).toBe(false);
+    expect(shouldShowActionBar({ ...base, activeTool: 'rectangle' })).toBe(false);
   });
 });

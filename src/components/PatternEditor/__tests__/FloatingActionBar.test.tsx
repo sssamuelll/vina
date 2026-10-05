@@ -106,11 +106,18 @@ describe('FloatingActionBar — icon-only + labels en tooltip', () => {
   it('renderiza icon-only: un botón por acción, con SVG y sin texto visible', () => {
     renderBar();
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(5); // rotate90, duplicate, flipH, properties, lockToggle
+    expect(buttons).toHaveLength(4); // rotate90, duplicate, flipH, properties
     for (const b of buttons) {
       expect(b.querySelector('svg')).toBeTruthy();
       expect((b.textContent ?? '').trim()).toBe('');
     }
+  });
+
+  it('con la pieza bloqueada, «Desbloquear» va primero, con su icono', () => {
+    renderBar({ ctx: makeCtx({ piece: pieceFix(true), pieces: [pieceFix(true)] }) });
+    const [primero] = screen.getAllByRole('button');
+    expect(primero.getAttribute('aria-label')).toBe('Desbloquear');
+    expect(primero.querySelector('svg')).toBeTruthy();
   });
 
   it('la acción corre el verbo existente al hacer clic (rotate90 → dispatch)', () => {

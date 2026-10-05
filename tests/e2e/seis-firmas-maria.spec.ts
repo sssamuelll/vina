@@ -122,14 +122,15 @@ test.describe('seis firmas de María', () => {
     await activarHerramienta(page, 'z', 'select');
     await largos.click();
     await expect(largos).toHaveAttribute('aria-pressed', 'true');
-    // La pieza seleccionada ya tiene Ancho/Alto como chips: esas dos lecturas
-    // no se duplican. Seis lecturas + dos chips siguen cubriendo ocho lados.
-    await expect(lecturasDeLado(page)).toHaveCount(6);
+    // La pieza seleccionada tiene su cota Ancho como chip: esa lectura no se
+    // duplica. Desde P3a se ve una cota a la vez (spec 2026-10-02 § 5.5), así
+    // que Alto vuelve a ser lectura: siete lecturas + un chip cubren ocho lados.
+    await expect(lecturasDeLado(page)).toHaveCount(7);
     await largos.click();
     await expect(largos).toHaveAttribute('aria-pressed', 'false');
     await expect(lecturasDeLado(page)).toHaveCount(0);
     await largos.click();
-    await expect(lecturasDeLado(page)).toHaveCount(6);
+    await expect(lecturasDeLado(page)).toHaveCount(7);
 
     await dispatch(page, 'project/addInternalLine', {
       pieceId: 'fria',

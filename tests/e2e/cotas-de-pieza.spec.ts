@@ -174,9 +174,10 @@ test.describe('cotas de pieza (María #223/#225)', () => {
     const s = await toScreen(page, { x: 300, y: 300 });
     await page.mouse.click(s.x, s.y);
     const ancho = await cota(page, 'Ancho').boundingBox();
-    const alto = await cota(page, 'Alto').boundingBox();
-    if (!ancho || !alto) throw new Error('sin chips');
-    // girada 90°: el chip de Ancho queda a un lado (no arriba) y el de Alto arriba o abajo
+    if (!ancho) throw new Error('sin chip de Ancho');
+    // Una cota a la vez (spec 2026-10-02 § 5.5): en Seleccionar solo se ve Ancho.
+    await expect(cota(page, 'Alto')).toHaveCount(0);
+    // girada 90°: el chip de Ancho queda a un lado (no arriba)
     // El oráculo es el CONTORNO pintado, no el grupo `[data-piece-id]`: desde
     // que "Largos" nace encendido (reunión 07-09, fallo 4) el grupo incluye las
     // etiquetas de largo y su caja ya no es la geometría de la pieza. Lo que

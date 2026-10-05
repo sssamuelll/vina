@@ -155,7 +155,7 @@ test.describe('D3 — un lado que ya lleva chip no lleva además su lectura', ()
     await clicEn(page, { x: 200, y: 150 });
 
     await expect(chipPieza(page, 'Ancho')).toBeVisible();
-    await expect(chipPieza(page, 'Alto')).toBeVisible();
+    await expect(chipPieza(page, 'Alto'), 'una cota a la vez (spec 2026-10-02 § 5.5)').toHaveCount(0);
 
     // Lo que Samuel fotografió: el lado de arriba con el chip «400 mm» y justo
     // debajo «400.0 mm» en gris. El mismo número, dos veces, en dos idiomas
@@ -165,8 +165,8 @@ test.describe('D3 — un lado que ya lleva chip no lleva además su lectura', ()
     // dos lados opuestos miden lo mismo de forma legítima, así que buscar
     // valores repetidos daría rojo incluso con el arreglo puesto. Un rectángulo
     // seleccionado tiene cuatro lados y debe enseñar CUATRO medidas — Ancho
-    // (arriba), Alto (derecha) y las lecturas de los dos lados que ningún chip
-    // cubre. Hoy salen seis: los dos chips más los cuatro rótulos, y dos de
+    // (arriba) y las lecturas de los tres lados que ningún chip cubre (desde
+    // P3a se ve una cota a la vez). Hoy salen seis: los dos chips más los cuatro rótulos, y dos de
     // esos rótulos caen encima de un chip que ya dice ese número.
     const medidas = await medidasVisibles(page);
     expect(

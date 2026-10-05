@@ -488,9 +488,13 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
       await expect(page.getByRole('button', { name: /^Ancho de la pieza:/ }),
         'el chip editable toma el ancho vivo, no el dato viejo').toHaveText('300 mm');
       // El paso 5 subió un asa 45 mm: los extremos siguen delimitando 300×150,
-      // pero el bbox vivo (y por tanto su chip Alto) crece de 150 a 195.
-      await expect(page.getByRole('button', { name: /^Alto de la pieza:/ }),
-        'el chip editable toma el alto vivo tras moldear, no el dato viejo').toHaveText('195 mm');
+      // pero el bbox vivo (y por tanto su cota Alto) crece de 150 a 195. Una
+      // cota a la vez (spec 2026-10-02 § 5.5): Alto se alcanza con Tab.
+      await page.getByRole('button', { name: /^Ancho de la pieza:/ }).click();
+      await page.keyboard.press('Tab');
+      await expect(page.locator('input.cota--editando[aria-label="Alto de la pieza"]'),
+        'la cota editable toma el alto vivo tras moldear, no el dato viejo').toHaveValue('195');
+      await page.keyboard.press('Escape');
       expect(caja(await pieza(page, primera)), 'el bbox real incorpora los 45 mm del asa')
         .toMatchObject({ w: 300, h: 195 });
     });
