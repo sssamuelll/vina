@@ -273,7 +273,7 @@ export function auditSeamLengths(
 }
 
 /** Base point (M command) of a notch internal line. */
-function notchPoint(n: InternalLine): Point2D | null {
+export function notchPoint(n: InternalLine): Point2D | null {
   const h = n.path[0];
   return h && h.values.length >= 2 ? { x: h.values[0], y: h.values[1] } : null;
 }

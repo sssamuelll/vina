@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import type { Verbo } from './tipos';
+import { VERBOS_DE_LEER } from './verbos/leer';
 
 /**
  * La superficie de herramientas de Vina (spec 2026-10-05): la única capa que
  * ven los agentes, el de la usuaria por MCP y el de Vina. Los verbos llegan
  * por entregas: 1a leer y medir, 1b actuar.
  */
-export const SUPERFICIE: readonly Verbo[] = [];
+export const SUPERFICIE: readonly Verbo[] = [...VERBOS_DE_LEER];
 
 export interface DefinicionDeVerbo {
   name: string;
