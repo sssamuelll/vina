@@ -25,6 +25,7 @@ import nestingReducer from './nestingSlice';
 import gradingReducer from './gradingSlice';
 import inputSchemeReducer, { hydrateInputScheme, rehydrateInputScheme, persistInputScheme } from './inputSchemeSlice';
 import { initProjectPersistence } from './projectAutosave';
+import { seguirLaRevision } from './revisionDelProyecto';
 import { initLineLengthPreference } from './lineLengthPreference';
 import { confirmationMiddleware } from './confirmationMiddleware';
 import { journalMiddleware } from './journalMiddleware';
@@ -128,6 +129,9 @@ store.subscribe(() => {
 // can never clobber the autosave with the boot-empty project. The user's
 // actual work must survive a reload (browsers are volatile).
 void initProjectPersistence(store);
+
+// La revisión del proyecto para los agentes (spec 2026-10-05 § 5.2).
+seguirLaRevision(store);
 
 // Expose store for debugging (remove in production)
 (window as unknown as Record<string, unknown>).__VINA_STORE__ = store;

@@ -22,7 +22,8 @@ export type JournalKind =
   | 'session'
   | 'storage'
   | 'error'
-  | 'solver';
+  | 'solver'
+  | 'agente';
 
 export interface JournalEvent {
   /** `Date.now()` — misma base que los rings existentes. */
@@ -43,8 +44,11 @@ export const JOURNAL_COALESCE_MS = 1000;
 export const JOURNAL_TAIL_KEY = 'vina-last-journal';
 export const RESUMIR_MAX_CHARS = 600;
 
-/** Un gesto, un atajo, una superficie o un evento de storage repetido es información, no ruido. */
-const UNFUSED: ReadonlySet<JournalKind> = new Set(['gesture', 'shortcut', 'ui', 'storage']);
+/**
+ * Un gesto, un atajo, una superficie, un evento de storage o una llamada de un
+ * agente repetidos son información, no ruido.
+ */
+const UNFUSED: ReadonlySet<JournalKind> = new Set(['gesture', 'shortcut', 'ui', 'storage', 'agente']);
 
 const events: JournalEvent[] = [];
 let dropped = 0;
