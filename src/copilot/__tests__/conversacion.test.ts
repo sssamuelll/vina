@@ -80,6 +80,35 @@ describe('la conversación', () => {
     expect(store.getState().ia.mensajes.at(-1)?.toolCalls ?? []).toEqual([]);
   });
 
+  it('detener llega al turno en curso aunque la conexión cambie a mitad', async () => {
+    let soltar!: (r: ProviderResponse) => void;
+    let vuelta = 0;
+    estado.responder = () => {
+      vuelta += 1;
+      return vuelta === 1
+        ? new Promise((r) => { soltar = r; })
+        : Promise.resolve({ content: 'Hecho.', toolCalls: [] });
+    };
+    const { store, enviar, detener } = await cargar();
+    const { RESPUESTA_DETENIDA } = await import('../reasoning/bridge/AgenticLoop');
+    const enviando = enviar('acorta el escote');
+    await vi.waitFor(() => expect(soltar).toBeTypeOf('function'));
+    // «Guardar preferencias» en el panel «IA y ratón» avisa aunque no toque la conexión.
+    window.dispatchEvent(new CustomEvent('vina:provider-config-changed'));
+    detener();
+    soltar({ content: '', toolCalls: [{ id: 't1', name: 'getGarmentState', arguments: '{}' }] });
+    await enviando;
+    expect(store.getState().ia.mensajes.at(-1)?.content, 'el agente siguió después de «Detener»').toBe(RESPUESTA_DETENIDA);
+  });
+
+  it('«Detener» queda en la bitácora: la caja negra ve el gesto, llegue o no al agente', async () => {
+    const { clearJournal, getJournal } = await import('../../utils/telemetry/journal');
+    clearJournal();
+    const { detener } = await cargar();
+    detener();
+    expect(getJournal().events.find((e) => e.name === 'ia:detener')).toMatchObject({ kind: 'ui', data: { enCurso: false } });
+  });
+
   it('sin conexión, la respuesta dice dónde se agrega', async () => {
     estado.conConexion = false;
     const { store, enviar, SIN_CONEXION } = await cargar();

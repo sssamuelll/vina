@@ -16,6 +16,9 @@ import { hayModalDelante } from '../utils/superficieModal';
 import { esTeclaDeBotonera } from './teclaDeBotonera';
 import { bajarLaEscalera } from './escaleraDeLoLlamado';
 
+/** Ctrl+/ y Ctrl+K no escriben: llaman a la IA también desde un campo (spec 2026-10-02 § 6.2). */
+const LLAMAN_A_LA_IA = new Set(['copilot.focusChat', 'app.commandPalette']);
+
 /** Determine which panel has focus based on the active element */
 function getActiveContext(): ShortcutCtx[] {
   const active = document.activeElement;
@@ -65,7 +68,12 @@ export function ShortcutProvider({ children }: ShortcutProviderProps) {
           e.target instanceof HTMLTextAreaElement ||
           e.target instanceof HTMLSelectElement
         ) {
-          return;
+          // Menos Ctrl+/ y Ctrl+K, que llaman a la IA: desde un campo de la
+          // línea al pie no abrían la barra, y Chrome se llevaba Ctrl+K a su
+          // barra de direcciones. Un campo que ya atendió la tecla (la propia
+          // barra) se la queda.
+          const id = e.defaultPrevented ? null : registryRef.current.matchEvent(e, ['global']);
+          if (!id || !LLAMAN_A_LA_IA.has(id)) return;
         }
 
         // Y Enter y Espacio sobre un botón de la línea al pie, que son su

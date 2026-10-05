@@ -29,6 +29,7 @@ import type { AgenticEvent, AgenticLoop } from './reasoning/bridge/AgenticLoop';
 import { createDebugAgenticLoop } from './debug/createDebugBridge';
 import { classifyError, getErrorMessage } from './errorRecovery';
 import { newId } from '../utils/ids';
+import { pushJournal } from '../utils/telemetry/journal';
 
 export const SIN_CONEXION = 'Falta una conexión de IA. Agrégala en Vina › Preferencias › IA y ratón.';
 
@@ -56,6 +57,8 @@ const aPasos = (tcs: ToolCallProgress[]): PasoDelAgente[] =>
 
 let conexion: Promise<ProviderConfig | null> | null = null;
 let loop: AgenticLoop | null = null;
+/** El loop del turno en curso. «Detener» va a él: un cambio de conexión a mitad deja `loop` en null, no al turno. */
+let loopDelTurno: AgenticLoop | null = null;
 let escuchando = false;
 
 /** La conexión activa. Un cambio en `ConnectionsList` la invalida, y el loop con ella. */
@@ -155,17 +158,26 @@ export async function enviar(texto: string, adjunto: PendingDXFAttachment | null
   };
 
   dispatch(empezarTurno());
+  let delTurno: AgenticLoop | null = null;
   try {
-    const respuesta = await elLoop(config).run(alAgente, alEvento);
+    delTurno = elLoop(config);
+    loopDelTurno = delTurno;
+    const respuesta = await delTurno.run(alAgente, alEvento);
     dispatch(agregarMensaje({ id: newId(), role: 'assistant', content: respuesta, toolCalls: aPasos(pasos) }));
   } catch (e: unknown) {
     dispatch(agregarMensaje({ id: newId(), role: 'assistant', content: getErrorMessage(classifyError(e), e) }));
   } finally {
+    if (loopDelTurno === delTurno) loopDelTurno = null;
     dispatch(terminarTurno());
   }
 }
 
-/** «Detener»: el turno en curso no hace nada más (spec 2026-10-02 § 6.2). */
+/**
+ * «Detener»: el turno en curso no hace nada más (spec 2026-10-02 § 6.2). El
+ * gesto queda en la bitácora aunque no haya turno al que llegar: si María dice
+ * «le di a Detener y siguió», la caja negra tiene que poder enseñarlo.
+ */
 export function detener(): void {
-  loop?.detener();
+  pushJournal('ui', 'ia:detener', { enCurso: loopDelTurno !== null });
+  loopDelTurno?.detener();
 }

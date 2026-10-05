@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { Provider } from 'react-redux';
@@ -84,6 +84,19 @@ describe('la cápsula', () => {
     expect(screen.getByPlaceholderText('Pide algo o pregunta')).toBe(campo);
   });
 
+  it('con la IA trabajando, Enter no se lleva lo escrito: se queda en el campo y no se envía', () => {
+    // jsdom no tiene scrollIntoView, y el panel de la conversación baja al último mensaje.
+    Element.prototype.scrollIntoView = vi.fn();
+    act(() => { store.dispatch(abrirIA()); store.dispatch(empezarTurno()); });
+    montar(<UnifiedBar onOpenPanel={() => {}} />);
+    const campo = screen.getByPlaceholderText('Pide algo o pregunta') as HTMLInputElement;
+    fireEvent.change(campo, { target: { value: 'y también la manga' } });
+    expect((screen.getByRole('button', { name: 'Enviar' }) as HTMLButtonElement).disabled, '«Enviar» se ofrece con la IA trabajando').toBe(true);
+    fireEvent.keyDown(campo, { key: 'Enter' });
+    expect(campo.value, 'Enter borró lo que María escribió').toBe('y también la manga');
+    expect(store.getState().ia.mensajes).toEqual([]);
+  });
+
   it('Ctrl+K abre con los comandos', () => {
     act(() => { store.dispatch(abrirIA('comandos')); });
     montar(<UnifiedBar onOpenPanel={() => {}} />);
@@ -121,5 +134,31 @@ describe('los atajos', () => {
     act(() => { store.dispatch(ocultarIA()); });
     fireEvent.keyDown(lienzo, { key: 'k', ctrlKey: true });
     expect(store.getState().ia).toMatchObject({ abierta: true, modoDeApertura: 'comandos' });
+  });
+
+  it('desde un campo, Ctrl+K y Ctrl+/ también abren la barra, y el navegador no se queda la tecla', () => {
+    montar(<input aria-label="Profundidad" />);
+    const campo = screen.getByLabelText('Profundidad');
+    campo.focus();
+    expect(fireEvent.keyDown(campo, { key: 'k', ctrlKey: true }), 'Chrome se lleva Ctrl+K a su barra de direcciones').toBe(false);
+    expect(store.getState().ia).toMatchObject({ abierta: true, modoDeApertura: 'comandos' });
+    act(() => { store.dispatch(ocultarIA()); });
+    expect(fireEvent.keyDown(campo, { key: '/', ctrlKey: true })).toBe(false);
+    expect(store.getState().ia).toMatchObject({ abierta: true, modoDeApertura: 'conversacion' });
+  });
+
+  it('en un campo, los demás atajos siguen siendo del campo: Ctrl+Z deshace el texto, no el patrón', () => {
+    montar(<input aria-label="Profundidad" />);
+    const campo = screen.getByLabelText('Profundidad');
+    campo.focus();
+    expect(fireEvent.keyDown(campo, { key: 'z', ctrlKey: true })).toBe(true);
+  });
+
+  it('Ctrl+/ con un teclado español, donde «/» es Mayús+7, también abre la conversación', () => {
+    montar(<div data-shortcut-context="2d" tabIndex={0} data-testid="lienzo" />);
+    const lienzo = screen.getByTestId('lienzo');
+    lienzo.focus();
+    fireEvent.keyDown(lienzo, { key: '/', ctrlKey: true, shiftKey: true });
+    expect(store.getState().ia).toMatchObject({ abierta: true, modoDeApertura: 'conversacion' });
   });
 });

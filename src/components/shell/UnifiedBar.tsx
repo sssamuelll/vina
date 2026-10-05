@@ -144,12 +144,14 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
   }, [isDragging]);
 
   const handleSubmit = useCallback(() => {
-    if (comandos || (!input.trim() && !pendingDXF)) return;
+    // Con la IA trabajando, lo escrito y el DXF se quedan donde están: se
+    // envían cuando termine el turno, no se pierden.
+    if (comandos || trabajando || (!input.trim() && !pendingDXF)) return;
     const adjunto = pendingDXF;
     setInput('');
     setPendingDXF(null);
     void enviar(input, adjunto);
-  }, [comandos, input, pendingDXF]);
+  }, [comandos, trabajando, input, pendingDXF]);
 
   const conPanel = comandos || mensajes.length > 0 || trabajando || pendingDXF !== null;
   const Icono = comandos ? Search : MessageSquare;
@@ -217,7 +219,7 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
       </div>
 
       {!comandos && (input.trim() || pendingDXF) ? (
-        <button className="unified-bar__send" aria-label="Enviar" onClick={handleSubmit}>
+        <button className="unified-bar__send" aria-label="Enviar" disabled={trabajando} onClick={handleSubmit}>
           <ArrowUp size={16} />
         </button>
       ) : (

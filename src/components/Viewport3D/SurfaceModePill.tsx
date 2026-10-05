@@ -16,6 +16,7 @@ import {
 import type { RootState } from '../../store';
 import { setSurfaceMode3D } from '../../store/simulationSlice';
 import type { SurfaceMode3D } from '../../store/simulationSlice';
+import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
 import './SurfaceModePill.css';
 
 interface ModeDef {
@@ -50,16 +51,13 @@ export default function SurfaceModePill() {
         setOpen(false);
       }
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
     window.addEventListener('mousedown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('mousedown', onDown);
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => window.removeEventListener('mousedown', onDown);
   }, [open]);
+
+  // Esc lo cierra antes que la barra de IA, un panel y la selección: un peldaño
+  // de la escalera de lo que se llama (spec 2026-10-02 § 6.2).
+  usePeldanoDeEscape('superficie', 'menu', open, () => setOpen(false));
 
   const current = MODES.find(m => m.mode === surfaceMode3D) ?? MODES[0];
   const CurrentIcon = current.icon;
