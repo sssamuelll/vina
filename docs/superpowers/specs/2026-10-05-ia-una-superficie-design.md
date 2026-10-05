@@ -81,7 +81,7 @@ tokens solo en definiciones.
 
 **Los ojos buenos ya existen, en la interfaz.**
 - «Caminar costura» calcula la diferencia, la holgura y un veredicto con tolerancia
-  (`useWalkSeamTool.ts:223-266`).
+  (`useWalkSeamTool.ts:228-305` y `:393-404`).
 - El escalado que aplica las reglas por punto es `gradePieceToSize` (`gradingEngine.ts:187`); las
   herramientas del agente llaman a `gradePiece` y se lo saltan.
 
@@ -135,7 +135,7 @@ real de María lo pide.
 | Verbo | Qué devuelve | Sobre qué |
 |---|---|---|
 | `measure` | El largo de un borde, de un tramo o de una curva entre dos puntos. | La medida a lo largo de la curva de hoy (`measureAlongCurve`). |
-| `walk_seam` | Dos tramos comparados: los dos largos, la diferencia, la holgura en % y el veredicto contra la tolerancia de la herramienta de la interfaz (la misma para los dos). | El motor de «Caminar costura» (`useWalkSeamTool.ts:223-266`), sacado a una función pura que usan la herramienta y la superficie. |
+| `walk_seam` | Dos tramos comparados: los dos largos, la diferencia, la holgura en % y el veredicto contra la tolerancia de la herramienta de la interfaz (la misma para los dos). | El motor de «Caminar costura» (`useWalkSeamTool.ts:228-305` y `:393-404`), sacado a `src/utils/seam/caminarCostura.ts`, que usan la herramienta y la superficie. |
 | `verify` | El veredicto de la prenda, con números: cada costura caminada de verdad, los contornos que no cierran, los piquetes sin pareja. El margen 0 es lo normal y no es un error. | Lo que `verifyGarment` debía ser: `walk_seam` sobre cada costura, en vez del perímetro. |
 | `fit_map` | Después de simular: las cifras del mapa de ajuste por pieza, de verdad. Si no hay simulación, `available: false` y el porqué. | Hoy el «por pieza» copia la cifra global. |
 
@@ -175,7 +175,7 @@ interface Recibo {
   changed: { created: string[]; modified: string[]; deleted: string[] };
   /** La medida del resultado, propia de cada verbo (§ 5.1), calculada después del cambio. */
   measure: Record<string, number | string | boolean | null>;
-  /** Lo que no cuadra, con números: «the seam does not walk: 4.2 mm apart (tolerance 2 mm)». */
+  /** Lo que no cuadra, con números: «the seam does not walk: 4.2 mm apart (tolerance 3 mm)». */
   warnings: string[];
   /** La revisión del proyecto antes y después: el agente ve si algo cambió, y si María tocó algo en medio. */
   revision: { before: number; after: number };
@@ -243,6 +243,35 @@ Dentro de este subproyecto, para probar la superficie desde el primer día y cum
 - Quitar las claves y los proveedores: subproyecto 4.
 - Organizar las conversaciones del agente de Vina, y la caché de definiciones por proveedor: cuando
   el agente de Vina hable con un solo proveedor.
+
+**Nota del plan de la entrega 1a (2026-10-05).** Lo que el código y la camisa de María afinaron (plan
+`docs/superpowers/plans/2026-10-05-ia-superficie-1a.md`, «Decisiones»):
+
+- La tolerancia es la de «Caminar costura», 3 mm.
+- **Vina no adivina la holgura.** Camina quien queda con |diferencia − holgura buscada| por debajo
+  de la tolerancia, y la holgura buscada es 0 salvo que el agente la pase (`ease_mm`).
+  - En la camisa de María la copa de la manga mide 450,9 mm y la sisa entera 450,5 mm: 0,4 mm de
+    embebido.
+  - Una regla de 30-50 mm por categoría, como `SLEEVE_CAP_EASE`, habría marcado rotas sus cuatro
+    costuras de manga.
+- Cada lado de una costura se mide por su tramo cosido (`sewnLengthMm`).
+- Un piquete da su distancia desde el inicio de su borde, y la de su ancla cuando la tiene.
+- `fit_map` pasa a la entrega 1b, con `simulate`.
+- La revisión del proyecto es por sesión.
+- El lienzo medía las costuras por el primer comando de cada borde: la etiqueta de desajuste y los
+  largos al pasar el ratón. Pasa a la misma medida que el agente.
+- Las costuras M:N (`seamGroups`) se anuncian en `warnings` y no se describen todavía.
+- Un borde se nombra por su `name`.
+- `measure` acepta fracciones o puntos sobre el borde.
+- Lo que `verify` dice de la camisa de María:
+  - costados y hombros caminan;
+  - las dos mitades de cada copa quedan a ±5 mm, porque autoSew parte la copa en t = 0,5 y las sisas
+    miden 230,6 mm (delantera) y 219,9 mm (trasera);
+  - el cuello mide 62 mm menos que el escote (456 contra 518).
+
+  Son diferencias reales, no ruido.
+- Las definiciones de los cinco verbos miden 4.424 caracteres, contra unos 203.000 del registro de
+  hoy por llamada (§ 3).
 
 ## 6. Riesgos
 
