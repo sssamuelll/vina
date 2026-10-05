@@ -371,16 +371,11 @@ export function auditNotches(
       continue;
     }
 
+    // El tramo cosido de cada lado, en el sentido del borde. El de B va en
+    // sentido de cosido (convención de seamRange.ts): invertido, se espeja.
     const tA0 = seam.pieceA.tStart ?? 0, tA1 = seam.pieceA.tEnd ?? 1;
     const tB0 = seam.pieceB.tStart ?? 0, tB1 = seam.pieceB.tEnd ?? 1;
-    const fracsA = notchesA.map(n => {
-      const pt = notchPoint(n)!;
-      return sewnFrac(distanceAlongPath(pieceA.outline, pt, rangoA![0], rangoA![1]) / lenA, tA0, tA1);
-    });
-    const fracsB = notchesB.map(n => {
-      const pt = notchPoint(n)!;
-      return sewnFrac(distanceAlongPath(pieceB.outline, pt, rangoB![0], rangoB![1]) / lenB, tB0, tB1);
-    });
+    const [wB0, wB1] = seam.pieceB.reversed ? [1 - tB1, 1 - tB0] : [tB0, tB1];
 
     // Tolerance: ~2% of the shorter sewn span, floored at ~5mm (aligned with the
     // walk-seam sampling interval). Expressed as a fraction of the sewn span.
@@ -388,19 +383,34 @@ export function auditNotches(
     const tolMm = Math.max(5, 0.02 * Math.min(sewnA, sewnB));
     const tolFrac = tolMm / Math.max(1e-9, Math.min(sewnA, sewnB));
 
+    // Un piquete fuera del tramo cosido no es de esta costura y se descarta.
+    // Antes se sujetaba al extremo y fingía casar con el de enfrente (revisión
+    // de la entrega 1a, 2026-10-05). Dentro de la tolerancia sí cuenta: es un
+    // piquete de extremo.
+    const cosidos = (piece: PatternPiece, notches: InternalLine[], rango: [number, number], len: number, w0: number, w1: number) =>
+      notches.flatMap(n => {
+        const f = distanceAlongPath(piece.outline, notchPoint(n)!, rango[0], rango[1]) / len;
+        const holgura = tolMm / len;
+        return f < w0 - holgura || f > w1 + holgura ? [] : [sewnFrac(f, w0, w1)];
+      });
+    const fracsA = cosidos(pieceA, notchesA, rangoA!, lenA, tA0, tA1);
+    const fracsB = cosidos(pieceB, notchesB, rangoB!, lenB, wB0, wB1);
+
     const matched = Math.max(
       countMatches(fracsA, fracsB, tolFrac),
       countMatches(fracsA, fracsB.map(x => 1 - x), tolFrac), // opposite sense
     );
-    const unmatchedA = notchesA.length - matched;
-    const unmatchedB = notchesB.length - matched;
+    const unmatchedA = fracsA.length - matched;
+    const unmatchedB = fracsB.length - matched;
 
+    // Solo el hecho: copiar el piquete que falta puede ser el arreglo
+    // equivocado (en la camisa de María, las mitades de la copa parecen
+    // cosidas a la sisa que no les toca).
     if (unmatchedA > 0 || unmatchedB > 0) {
       warnings.push({
         category: 'notch', severity: 'warning', pieceIds: [pieceA.id, pieceB.id],
         message: `Notches don't line up across the seam between ${pieceA.name} and ${pieceB.name} `
-          + `(${matched} aligned, ${unmatchedA} on ${pieceA.name} and ${unmatchedB} on ${pieceB.name} without a match). `
-          + `Mirror the missing notch to the paired edge.`,
+          + `(${matched} aligned, ${unmatchedA} on ${pieceA.name} and ${unmatchedB} on ${pieceB.name} without a match).`,
       });
     }
   }
