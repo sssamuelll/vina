@@ -9,10 +9,11 @@
  */
 
 import { PatternPiece, Point2D, Seam } from '../../../types/types';
-import { getEdgeEndpoints, getEdgeArcLength, getEdgePathD } from '../../../utils/geometry/path';
+import { getEdgeEndpoints, getEdgePathD } from '../../../utils/geometry/path';
 import { resolveEdgePolyline, edgeNToCommandIndex, slicePolylineByT } from '../../../utils/seam/index';
 import { samplePolyline, perpendicular } from '../../../utils/pleatGeometry';
 import { seamPairColor, seamMismatchMm, layoutMismatchLabels, SEAM_MISMATCH_THRESHOLD_MM } from './seamVisuals';
+import { largosDeCostura } from '../../../utils/seam/largoCosido';
 
 interface SeamRendererProps {
   seams: Seam[];
@@ -127,9 +128,11 @@ export default function SeamRenderer({
         // at 0.6mm on a 10mm notch seam. The craft works in mm.
         // Largo COSIDO (sewnLengthMm): un half parcial compara su sub-tramo,
         // no el borde entero — si no, todo seam parcial gritaba mismatch.
-        const lenA = getEdgeArcLength(pieceA.outline, segIdxA) * (rangeA ? rangeA[1] - rangeA[0] : 1);
-        const lenB = getEdgeArcLength(pieceB.outline, segIdxB) * (rangeB ? rangeB[1] - rangeB[0] : 1);
-        const mismatchMm = seamMismatchMm(lenA, lenB);
+        // Una sola medida (spec 2026-10-05): el borde ENTERO por la fracción
+        // cosida. `getEdgeArcLength(outline, segmentRange[0])` medía solo el
+        // primer comando, y el DXF de María trae bordes de 14-20.
+        const { a: lenA, b: lenB } = largosDeCostura(seam, pieces);
+        const mismatchMm = lenA != null && lenB != null ? seamMismatchMm(lenA, lenB) : 0;
         const hasMismatch = mismatchMm > SEAM_MISMATCH_THRESHOLD_MM;
 
         // El hover de coser/editar enciende igual que la selección. La lista
@@ -333,14 +336,14 @@ export default function SeamRenderer({
                   fontSize={8 / zoom2D} textAnchor="middle"
                   style={{ fill: 'var(--ink-on-light-2)', fontFamily: 'var(--font-mono-2d)' }}
                 >
-                  {lenA.toFixed(1)}mm
+                  {lenA != null ? `${lenA.toFixed(1)}mm` : '—'}
                 </text>
                 <text
                   x={midB.x} y={midB.y - 8 / zoom2D}
                   fontSize={8 / zoom2D} textAnchor="middle"
                   style={{ fill: 'var(--ink-on-light-2)', fontFamily: 'var(--font-mono-2d)' }}
                 >
-                  {lenB.toFixed(1)}mm
+                  {lenB != null ? `${lenB.toFixed(1)}mm` : '—'}
                 </text>
               </>
             )}
