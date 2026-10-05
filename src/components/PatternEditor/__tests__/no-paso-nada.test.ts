@@ -82,6 +82,19 @@ describe('mensajeDe — el catálogo de razones', () => {
       expect(RAZONES).toContain(r);
     }
   });
+
+  it('las Tijeras usan dos clics: su aviso no puede decir «arrastra»', () => {
+    expect(mensajeDe('tijeras:corte-no-cruza')).not.toMatch(/arrastr/i);
+  });
+
+  it('ningún aviso nombra la tira: su sitio es la línea al pie desde P2b', () => {
+    expect(RAZONES.filter((r) => /\btira\b/i.test(mensajeDe(r)))).toEqual([]);
+  });
+
+  it('los del piquete caben junto a sus cuatro opciones (spec 2026-10-02 § 5.3)', () => {
+    const largos = RAZONES.filter((r) => r.startsWith('notch:') && mensajeDe(r).length > 65);
+    expect(largos.map((r) => `${r}: ${mensajeDe(r).length}`)).toEqual([]);
+  });
 });
 
 describe('noPasoNada — escribe en la bitácora y avisa a la tira', () => {

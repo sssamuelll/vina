@@ -51,10 +51,9 @@ export interface ToolOption {
   min?: number;
   max?: number;
   step?: number;
+  /** Las alternativas de un `select`. Con `icon`, su botón en la línea al pie
+   *  enseña el dibujo y se llama como la alternativa (spec 2026-10-02 § 5.3:
+   *  «las siete formas del piquete como siete botones con su dibujo»). */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  choices?: { label: string; value: any }[];
-  /** Control a pintar cuando `type: 'number'`. Omisión `'slider'`: nada de lo
-   *  que hoy se pinta cambia. `'input'` pinta un `<input type="number">` —
-   *  milímetros no son opacidades. */
-  control?: 'slider' | 'input';
+  choices?: { label: string; value: any; icon?: React.FC<{ size?: number }> }[];
 }

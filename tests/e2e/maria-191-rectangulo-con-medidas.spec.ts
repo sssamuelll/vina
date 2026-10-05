@@ -55,8 +55,8 @@ test.describe('maria-191 — rectángulo con medidas', () => {
     await page.keyboard.press('s');
     await expect.poll(async () => (await st(page)).editor.activeTool, { timeout: 5000 }).toBe('rectangle');
 
-    // La tira dice qué crea el próximo clic (no hay barra que editar).
-    await expect(page.getByText('Un clic crea 100 × 100 mm · arrastra para dibujar')).toBeVisible();
+    // La línea al pie dice qué crea el próximo clic (no hay barra que editar).
+    await expect(page.locator('.seccion-del-patron__texto')).toContainText('un clic crea uno de 100 × 100 mm');
 
     const s = await toScreen(page, { x: 250, y: 250 });
     await page.mouse.move(s.x, s.y);
@@ -96,9 +96,9 @@ test.describe('maria-191 — rectángulo con medidas', () => {
     await expect.poll(async () => (await st(page)).tools.toolOptions.rectangle?.width ?? 100).toBe(100);
     await expect.poll(async () => (await st(page)).tools.toolOptions.rectangle?.height ?? 100).toBe(100);
 
-    // Deseleccionar: la tira dice el tamaño del próximo clic, que sigue
+    // Deseleccionar: la línea al pie dice el tamaño del próximo clic, que sigue
     // siendo el de fábrica porque dibujar no lo cambió.
     await page.keyboard.press('Escape');
-    await expect(page.getByText('Un clic crea 100 × 100 mm · arrastra para dibujar')).toBeVisible();
+    await expect(page.locator('.seccion-del-patron__texto')).toContainText('un clic crea uno de 100 × 100 mm');
   });
 });

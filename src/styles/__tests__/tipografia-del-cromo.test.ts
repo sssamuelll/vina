@@ -48,7 +48,7 @@ describe('3. la mono solo viste datos', () => {
     'src/components/shared/SubMenu.css': ['.submenu-shortcut'],
     'src/components/shell/ToolTooltip.css': ['.tool-tooltip-shortcut'],
     'src/components/shell/Dock.css': ['.dock-picker__kbd'],
-    'src/components/PatternEditor/ToolStrip2D.css': ['.tool-strip__shortcut'],
+    'src/components/PatternEditor/SeccionDelPatron.css': ['.seccion-del-patron__tecla'],
     'src/components/PatternEditor/cotas/cotas.css': '*',
   };
   const css = rastreados('src/**/*.css');

@@ -1,0 +1,65 @@
+/* La sección del patrón de la línea al pie (spec 2026-10-02 «la interfaz en
+   papel» § 5.3): quién, las opciones y la frase, en ese orden, el de la barra
+   de opciones de Illustrator. Vive en el marco: tinta clara de `:root` sobre
+   --bg-deeper. Los controles están en ToolOptionControls.css. */
+.seccion-del-patron {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  column-gap: 16px;
+  padding: 0 var(--sp-3);
+  font-size: var(--text-sm);
+}
+.seccion-del-patron__quien { flex: none; display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.seccion-del-patron__nombre { color: var(--text-primary); font-size: var(--text-ui); font-weight: var(--weight-semibold); white-space: nowrap; }
+.seccion-del-patron__tecla { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-tertiary); }
+.seccion-del-patron__opciones {
+  flex: none;
+  display: flex;
+  align-items: center;
+  column-gap: 12px;
+  /* Recorta lo que todavía no se midió, pero deja asomar el anillo de foco,
+     como el grupo del patrón en la barra superior (layout.css). */
+  overflow: clip;
+  overflow-clip-margin: 3px;
+}
+/* La frase cede primero (spec § 5.3): lo que no quepa se corta con puntos
+   suspensivos, y queda entero en el título y en la región viva. */
+.seccion-del-patron__frase { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.seccion-del-patron__texto { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-secondary); }
+/* Lo que falta (#1117) se distingue por RELLENO y el desenlace por su riel,
+   los dos a plena tinta: ley de estado, no solo el tono. */
+.seccion-del-patron__texto--falta { display: inline-block; vertical-align: middle; padding: 2px 8px; border-radius: var(--radius-sm); background: var(--accent-subtle); color: var(--text-primary); }
+.seccion-del-patron__texto--desenlace { padding-left: 8px; border-left: 2px solid var(--accent); color: var(--text-primary); }
+
+/* Borrar mediciones: una acción, no una opción. Se pinta también dentro del
+   menú «Más», que es papel: solo tokens que valen en los dos materiales. */
+.opcion-del-pie__accion { height: 24px; padding: 0 10px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font: inherit; cursor: pointer; }
+.opcion-del-pie__accion:disabled { color: var(--text-disabled); cursor: default; }
+.opcion-del-pie__accion:hover { background: var(--bg-elevated); }
+.opcion-del-pie__accion:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* «Más» (spec § 5.3): las opciones que no caben, a un clic. Como «Mostrar» en
+   la barra superior. */
+.seccion-del-patron__mas { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; background: transparent; border: var(--hairline); border-radius: var(--radius-sm); color: var(--text-secondary); font: inherit; cursor: pointer; }
+.seccion-del-patron__mas:hover { color: var(--text-primary); }
+.seccion-del-patron__mas:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; color: var(--text-primary); }
+/* Su menú cuelga de <body> y es papel (contrato § 2: todo portal nace papel).
+   Se abre hacia arriba, sobre la hoja. */
+.seccion-del-patron__menu {
+  position: fixed;
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px;
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}

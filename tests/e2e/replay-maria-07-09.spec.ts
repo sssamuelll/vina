@@ -203,7 +203,7 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
 
     await tramo(1, '[00:34] Un clic crea 100×100', async r => {
       await activar(page, 's', 'rectangle');
-      await expect(page.getByText('Un clic crea 100 × 100 mm · arrastra para dibujar')).toBeVisible();
+      await expect(page.locator('.seccion-del-patron__texto')).toContainText('un clic crea uno de 100 × 100 mm');
       await clic(page, { x: 180, y: 170 });
       await expect.poll(async () => (await st(page)).project.pieces.length).toBe(1);
       primera = (await st(page)).project.pieces[0].id;
@@ -264,7 +264,7 @@ test('María 07-09: las trece promesas de corrido, con caja negra', async ({ pag
       expect(r.observaciones.clic).toMatchObject({ w: 100, h: 100 });
       expect((await st(page)).tools.toolOptions.rectangle).toEqual(opciones);
       await page.keyboard.press('Escape');
-      await expect(page.getByText('Un clic crea 100 × 100 mm · arrastra para dibujar')).toBeVisible();
+      await expect(page.locator('.seccion-del-patron__texto')).toContainText('un clic crea uno de 100 × 100 mm');
       requiere(4, ['gesture', 'down'], ['action', 'project/addPiece']);
     });
 

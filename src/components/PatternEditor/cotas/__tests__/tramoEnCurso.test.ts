@@ -114,15 +114,14 @@ const BASE: SujetoInput = {
 
 describe('el tramo en curso como sujeto', () => {
   it('con la pluma trazando y Tab pulsado, el sujeto son sus dos chips', () => {
-    const s = cotasDelSujeto({ ...BASE, tramoEnCurso: { from, lengthMm: 80, angleDeg: 90 } }, { width: 100, height: 100 });
+    const s = cotasDelSujeto({ ...BASE, tramoEnCurso: { from, lengthMm: 80, angleDeg: 90 } });
     expect(s.cotas).toHaveLength(2);
-    expect(s.lineaDeSujeto).toBe('Editando: el tramo en curso');
   });
 
   it('sin Tab pulsado la pluma no tiene cotas: el readout sigue siendo el readout', () => {
     // Congelar es un acto deliberado. Si el tramo tuviera chips siempre, el
     // trazo se llenaría de campos mientras ella dibuja.
-    const s = cotasDelSujeto({ ...BASE, tramoEnCurso: null }, { width: 100, height: 100 });
+    const s = cotasDelSujeto({ ...BASE, tramoEnCurso: null });
     expect(s.cotas).toEqual([]);
   });
 
@@ -138,9 +137,7 @@ describe('el tramo en curso como sujeto', () => {
       seamAllowance: 0, layer: 1, sublayer: 0, active: true, createdAt: 0, updatedAt: 0,
     } as never;
     const s = cotasDelSujeto(
-      { ...BASE, activeTool: 'select', pieces: [pieza], selectedPieceIds: ['p1'], tramoEnCurso: { from, lengthMm: 80, angleDeg: 90 } },
-      { width: 100, height: 100 },
-    );
+      { ...BASE, activeTool: 'select', pieces: [pieza], selectedPieceIds: ['p1'], tramoEnCurso: { from, lengthMm: 80, angleDeg: 90 } });
     expect(s.cotas.map(c => c.label)).toEqual(['Largo', 'Ángulo']);
   });
 });

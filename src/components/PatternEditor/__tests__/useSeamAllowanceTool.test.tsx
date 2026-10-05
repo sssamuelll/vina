@@ -172,7 +172,7 @@ describe('useSeamAllowanceTool left-click', () => {
     expect(onSelectVertex).not.toHaveBeenCalled();
   });
 
-  it('exposes the effective width for the HintText', () => {
+  it('exposes the effective width for the foot-line phrase', () => {
     const { store, hook } = setup();
     expect(hook.result.current.widthMm).toBe(9.5);
     act(() => store.dispatch(setDefaultSAWidth(15)));

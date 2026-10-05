@@ -48,13 +48,12 @@ const base = {
   hiddenLayerIds: [] as number[], layerLocked: {} as Record<number, boolean>,
   activeTool: 'select' as Tool2D, selectedPieceIds: ['a'],
 } satisfies SujetoInput;
-const def = { width: 300, height: 150 };
 
 const entrada = (over: Partial<SujetoInput> = {}): SujetoInput => ({ ...base, ...over });
-const sujetoDe = (over: Partial<SujetoInput> = {}) => cotasDelSujeto(entrada(over), def);
+const sujetoDe = (over: Partial<SujetoInput> = {}) => cotasDelSujeto(entrada(over));
 const conLado = (over: Partial<SujetoInput>, lado: { pieceId: string; commandIndex: number } | null) => {
   const input = entrada(over);
-  return refinarAlLado(cotasDelSujeto(input, def), lado, input);
+  return refinarAlLado(cotasDelSujeto(input), lado, input);
 };
 
 describe('admiteLado — la única lista de compuertas', () => {
@@ -114,7 +113,6 @@ describe('refinarAlLado — la caja del lado', () => {
     expect(s.cotas[0].valueMm).toBeCloseTo(200, 6);
     // Un término por concepto (contrato de interfaz § 5): la app ya llama
     // «tramo» a esta unidad en la interna y en el trazo.
-    expect(s.lineaDeSujeto).toBe('Editando: el tramo seleccionado');
     expect(s.esPieza).toBe(false);
   });
 
@@ -144,19 +142,17 @@ describe('refinarAlLado — la caja del lado', () => {
     ['arrastrando', { isDragging: true }],
   ])('%s el lado NO se dibuja: devuelve el sujeto tal cual', (_caso, over) => {
     const input = entrada(over);
-    const antes = cotasDelSujeto(input, def);
+    const antes = cotasDelSujeto(input);
     expect(refinarAlLado(antes, { pieceId: 'a', commandIndex: 1 }, input)).toBe(antes);
   });
 
   it('un lado que ya no existe cae a la pieza, y lo dice: Ancho y Alto', () => {
     const s = conLado({}, { pieceId: 'a', commandIndex: 99 });
     expect(s.cotas.map(c => c.id)).toEqual(['ancho', 'alto']);
-    expect(s.lineaDeSujeto).toBe('Editando: la pieza seleccionada');
   });
 
   it('una pieza que ya no existe cae a la pieza seleccionada, sin inventar sujeto', () => {
     const s = conLado({}, { pieceId: 'zzz', commandIndex: 1 });
-    expect(s.lineaDeSujeto).toBe('Editando: la pieza seleccionada');
     expect(s.cotas.map(c => c.id)).toEqual(['ancho', 'alto']);
   });
 

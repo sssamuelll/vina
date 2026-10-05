@@ -141,12 +141,10 @@
   --readout-bg-2d: rgba(43, 45, 51, 0.85);
   --readout-ink-2d: #ffffff;
   --annotation-2d: #808080;                 /* annotation fallback when its category has no color */
-  /* Tinta de texto instructivo dibujado SOBRE el papel (pistas al pie del
-   * lienzo). NO usar --text-* aquí todavía: la hoja no lleva el ámbito de
-   * papel hasta P2, y fuera de él --text-* es la tinta del marco, que sobre el
-   * papel queda invisible (1.05:1 medido el 2026-08-14). Éste da 5,32:1
-   * sobre --canvas-2d y 5,85:1 sobre --piece-fill-2d. Lo verifica
-   * HintText.legibilidad.test.tsx. */
+  /* Tinta de texto instructivo dibujado SOBRE el papel: la marca de escala y
+   * la pantalla vacía. Da 5,32:1 sobre --canvas-2d y 5,85:1 sobre
+   * --piece-fill-2d; lo verifica contrasteDeTokens.ts. La frase de la
+   * herramienta vive desde P2b en la línea al pie, que es marco. */
   --ink-hint: #6b6459;
   /* Seam overlay (SeamRenderer) on the paper ground: tension labels are muted
      warm (gather) / cool (ease). */
@@ -248,10 +246,6 @@
   /* Reposo de la barra de IA: un solo negro; en reposo solo cambia la sombra. */
   --surface-overlay-bg-recessed: var(--surface-overlay-bg);
   --surface-overlay-shadow-recessed: 0 1px 2px rgba(0, 0, 0, 0.2);
-  /* Bordes → tono (cotas vivas, spec 2026-08-30 § 9): la tira y la fila se
-   * separan por sombra, no por línea. Una sola sombra de flote. */
-  --surface-overlay-border-flush: 1px solid transparent;
-  --surface-overlay-shadow-sheet: var(--surface-overlay-shadow);
 
   /* Cotas sobre el papel: el número que se escribe donde mide. Paso FUERTE
    * del acento (lleva texto encima: blanco 5,04:1; 4,59:1 sobre el papel). */
@@ -349,7 +343,6 @@
   --surface-chrome-border: 1px solid var(--border);
   --surface-overlay-border: var(--hairline);
   --surface-overlay-bg-recessed: var(--surface-overlay-bg);
-  --surface-overlay-shadow-sheet: var(--surface-overlay-shadow);
 }
 
 /* A partir de 1600 px cada paso de la escala sube 1 px (spec § 4.5). */

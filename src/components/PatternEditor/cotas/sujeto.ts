@@ -5,7 +5,6 @@ import { cotaDeMargen } from './cotaDeMargen';
 import { cotasDeLineaInterna, cotasDelLado, cotasDePieza, cotasDeTrazo, type Cota } from './cotas';
 import { cotasDelTramoEnCurso, type TramoEnCurso } from './tramoEnCurso';
 import { cotasDelNodoEnPath } from './nodo';
-import { formatMedida } from './parseMedida';
 
 export interface SeamAllowanceAnchor {
   pieceId: string;
@@ -81,8 +80,6 @@ export interface Sujeto {
    * estaban separadas en el commit que las escribió.
    */
   esPieza: boolean;
-  /** La línea de la tira que nombra qué se edita; `null` si no hay nada que decir. */
-  lineaDeSujeto: string | null;
 }
 
 /**
@@ -157,8 +154,8 @@ export function faltaSujeto(activeTool: string, selectedPieceIds: string[]): str
  * de `FloatingActionBar`), y no existen con dos piezas. Una interna
  * seleccionada gana sobre la pieza que la contiene y recibe sus propias cotas.
  */
-export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number; height: number }): Sujeto {
-  const nada = (linea: string | null): Sujeto => ({
+export function cotasDelSujeto(input: SujetoInput): Sujeto {
+  const nada = (): Sujeto => ({
     piece: null,
     caliente: false,
     cotas: [],
@@ -167,7 +164,6 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
     bordeLeido: null,
     disabled: false,
     esPieza: false,
-    lineaDeSujeto: linea,
   });
   // Un trazo vivo gana a cualquier selección: la regla del sujeto es «el más
   // reciente», y no hay nada más reciente que lo que se está dibujando ahora
@@ -182,7 +178,6 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
       bordeLeido: null,
       disabled: false,
       esPieza: false,
-      lineaDeSujeto: 'Editando: el tramo en curso',
     };
   }
 
@@ -210,18 +205,13 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
           bordeLeido: null,
           disabled: Boolean(piezaDelNodo.locked) || Boolean(input.layerLocked[capaDelNodo]),
           esPieza: false,
-          lineaDeSujeto: 'Editando: el punto seleccionado',
         };
       }
     }
   }
 
-  const lineaRect = input.activeTool === 'rectangle'
-    ? `Un clic crea ${formatMedida(defaultRect.width, 'mm').replace(' mm', '')} × ${formatMedida(defaultRect.height, 'mm')} · arrastra para dibujar`
-    : null;
-
   if (input.activeTool === 'seamAllowance') {
-    if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada(null);
+    if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada();
 
     const selection = input.saSelection;
     const selected = selection?.kind === 'edge' && selection.items.length === 1
@@ -267,14 +257,13 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
       bordeLeido: leida ? { pieceId: leida.piece.id, edgeId: leida.edge.id } : null,
       disabled: anclada ? apagada(anclada) : false,
       esPieza: false,
-      lineaDeSujeto: anclada ? 'Editando: este borde' : null,
     };
   }
 
   // Un tramo de trazo seleccionado es sujeto por la misma regla de
   // especificidad que la interna: manda sobre cualquier pieza seleccionada.
   if (input.selectedTrazo) {
-    if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada(lineaRect);
+    if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada();
     const trazo = input.trazos?.find(t => t.id === input.selectedTrazo!.trazoId) ?? null;
     // Oculto (`trazos` ya viene filtrado) o borrado por deshacer: sin sujeto.
     if (trazo) {
@@ -288,13 +277,12 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
         bordeLeido: null,
         disabled: false,
         esPieza: false,
-        lineaDeSujeto: 'Editando: el tramo seleccionado',
       };
     }
   }
 
   if (input.selectedInternalLine) {
-    if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada(lineaRect);
+    if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada();
     const piece = input.pieces.find(p => p.id === input.selectedInternalLine!.pieceId) ?? null;
     const line = piece?.internals.find(internal => (
       internal.id === input.selectedInternalLine!.lineId
@@ -304,7 +292,7 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
     // válido — cae al camino de abajo en vez de dejar la tira en blanco.
     if (piece && line) {
       const capa = piece.layer ?? 1;
-      if (input.hiddenLayerIds.includes(capa)) return nada(lineaRect);
+      if (input.hiddenLayerIds.includes(capa)) return nada();
       const { segmentIndex } = input.selectedInternalLine;
       // En Q (spec 2026-09-24 § 4.5) la global sin tramo son puntos de la
       // interna: uno solo ya ganó arriba, por `nodoSeleccionado`; varios no
@@ -314,7 +302,7 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
       // línea, como en Z: por el punto, `moveNodeTo` la rechazaría y el chip
       // quedaría mudo.
       const enQ = input.activeTool === 'editPattern';
-      if (enQ && segmentIndex === undefined) return nada(lineaRect);
+      if (enQ && segmentIndex === undefined) return nada();
       const cotas = cotasDeLineaInterna(piece, line, segmentIndex, enQ && esInternaEditable(line) ? 'nodo' : 'linea');
       return {
         piece,
@@ -325,20 +313,17 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
         bordeLeido: null,
         disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
         esPieza: false,
-        lineaDeSujeto: segmentIndex === undefined
-          ? `Editando: la línea seleccionada · ${cotas.length} cotas`
-          : 'Editando: el tramo seleccionado',
       };
     }
   }
 
-  if (!CON_COTAS_DE_PIEZA.has(input.activeTool)) return nada(null);
-  if (input.selectedPieceIds.length !== 1) return nada(lineaRect);
-  if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada(lineaRect);
+  if (!CON_COTAS_DE_PIEZA.has(input.activeTool)) return nada();
+  if (input.selectedPieceIds.length !== 1) return nada();
+  if (input.isDragging || input.contextMenuOpen || input.calibrationActive) return nada();
   const piece = input.pieces.find(p => p.id === input.selectedPieceIds[0]) ?? null;
-  if (!piece) return nada(lineaRect);
+  if (!piece) return nada();
   const capa = piece.layer ?? 1;
-  if (input.hiddenLayerIds.includes(capa)) return nada(lineaRect);
+  if (input.hiddenLayerIds.includes(capa)) return nada();
   const caliente = CREAN_EN_CALIENTE.has(input.activeTool) && input.hotId === piece.id;
   return {
     piece,
@@ -349,7 +334,6 @@ export function cotasDelSujeto(input: SujetoInput, defaultRect: { width: number;
     bordeLeido: null,
     disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
     esPieza: true,
-    lineaDeSujeto: caliente ? 'Editando: la pieza nueva' : 'Editando: la pieza seleccionada',
   };
 }
 
@@ -403,11 +387,5 @@ export function refinarAlLado(
     bordeLeido: null,
     disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
     esPieza: false,
-    // «Tramo», no «lado»: es la palabra que la app ya usa para ESTA unidad —la
-    // de una interna y la de un trazo dicen lo mismo— y el contrato de interfaz
-    // § 5 pide un término por concepto. En el código se llama `lado` porque es
-    // la palabra de María y la del issue; lo que la usuaria LEE sale del
-    // glosario, que aquí manda.
-    lineaDeSujeto: 'Editando: el tramo seleccionado',
   };
 }

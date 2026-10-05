@@ -78,12 +78,12 @@ test.describe('#1100 — el margen se lee al pasar y se escribe al clicar', () =
     await page.mouse.move(c.x, c.y, { steps: 6 });
     await expect(lectura).toHaveCount(0);
 
-    // Otra vez al borde, y de ahí a la tira (fuera del <svg>): la costura de #1132.
+    // Otra vez al borde, y de ahí a la línea al pie (fuera del <svg>): la costura de #1132.
     await page.mouse.move(s.x, s.y, { steps: 6 });
     await expect(lectura).toBeVisible();
-    const tira = await page.locator('.tool-strip').boundingBox();
-    expect(tira).not.toBeNull();
-    await page.mouse.move(tira!.x + 12, tira!.y + 12, { steps: 8 });
+    const pie = await page.locator('.linea-al-pie').boundingBox();
+    expect(pie).not.toBeNull();
+    await page.mouse.move(pie!.x + 300, pie!.y + 12, { steps: 8 });
     await expect(lectura).toHaveCount(0);
   });
 

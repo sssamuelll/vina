@@ -59,7 +59,8 @@ test.describe('cotas de pieza (María #223/#225)', () => {
     let pieces = (await st(page)).project.pieces;
     expect(bbox(pieces[0])).toMatchObject({ w: 100, h: 100 });
     await expect(cota(page, 'Ancho')).toHaveText('100 mm');
-    await expect(page.getByText('Editando: la pieza nueva')).toBeVisible();
+    // El rótulo «Editando: la pieza nueva» se fue con la tarjeta en P2b (spec
+    // 2026-10-02 § 8): de qué pieza son las cotas lo prueba la edición de abajo.
 
     await cota(page, 'Ancho').click();
     await page.keyboard.type('300');
@@ -93,7 +94,10 @@ test.describe('cotas de pieza (María #223/#225)', () => {
     await page.keyboard.press('z');
     await expect.poll(async () => (await st(page)).editor.activeTool).toBe('select');
     await page.mouse.click(s.x + 20, s.y + 20);
-    await expect(page.getByText('Editando: la pieza seleccionada')).toBeVisible();
+    // Desde P2b no hay rótulo «Editando: la pieza seleccionada»: lo dice la
+    // selección (spec 2026-10-02 § 8).
+    const id = (await st(page)).project.pieces[0].id;
+    await expect.poll(async () => (await st(page)).editor.selectedPieceIds).toEqual([id]);
 
     await cota(page, 'Ancho').click();
     await page.keyboard.type('200');

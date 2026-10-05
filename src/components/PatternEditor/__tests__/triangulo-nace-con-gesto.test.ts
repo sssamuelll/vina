@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DEFAULT_SHORTCUTS, ATAJOS_2D_SIN_GESTO } from '../../../shortcuts/defaults';
 import { toolRegistry } from '../../../tools';
 import { DOCK_2D_CATALOG } from '../../shell/dock2dTools';
+import { fraseDeLaFase } from '../fraseDeLaFase';
 
 /**
  * #1111 (tanda 8) — María pidió «círculo y triángulo». El círculo nació en el
@@ -105,15 +106,13 @@ describe('el triángulo se comporta como sus hermanos rectángulo y círculo', (
     expect(conjunto, 'el triángulo no entra en CON_COTAS_DE_PIEZA').toContain("'triangle'");
   });
 
-  it('tiene su línea de ayuda en la pista', () => {
-    const hint = lee('src/components/PatternEditor/renderers/HintText.tsx');
-    expect(hint, 'el triángulo no instruye a nadie').toMatch(/triangle/);
+  it('tiene su frase en la línea al pie', () => {
+    expect(fraseDeLaFase({ activeTool: 'triangle', penNodesLength: 0, nodeEditorIsEditing: false }), 'el triángulo no instruye a nadie').toBeTruthy();
   });
 
-  it('la pista está en español y no promete lo que no hace', () => {
-    const hint = lee('src/components/PatternEditor/renderers/HintText.tsx');
-    const bloque = hint.match(/triangle[^}]{0,400}/s)?.[0] ?? '';
-    expect(bloque).not.toMatch(/\b(drag|click|draw|shape)\b/i);
+  it('la frase está en español y no promete lo que no hace', () => {
+    const frase = fraseDeLaFase({ activeTool: 'triangle', penNodesLength: 0, nodeEditorIsEditing: false }) ?? '';
+    expect(frase).not.toMatch(/\b(drag|click|draw|shape)\b/i);
   });
 
   it("'triangle' es miembro de la unión Tool2D, no un cast suelto", () => {

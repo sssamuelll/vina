@@ -221,30 +221,25 @@ const BASE: SujetoInput = {
 
 describe('el punto como sujeto', () => {
   it('con UN punto seleccionado, la tira lo nombra y salen sus dos cotas', () => {
-    const s = cotasDelSujeto({ ...BASE, nodoSeleccionado: { pieceId: 'p1', commandIndex: 1 } }, { width: 100, height: 100 });
+    const s = cotasDelSujeto({ ...BASE, nodoSeleccionado: { pieceId: 'p1', commandIndex: 1 } });
     expect(s.cotas).toHaveLength(2);
-    expect(s.lineaDeSujeto).toBe('Editando: el punto seleccionado');
   });
 
   it('sin punto seleccionado, «Editar patrón» no tiene cotas', () => {
-    const s = cotasDelSujeto({ ...BASE, nodoSeleccionado: null }, { width: 100, height: 100 });
+    const s = cotasDelSujeto({ ...BASE, nodoSeleccionado: null });
     expect(s.cotas).toEqual([]);
   });
 
   it('en una capa oculta no hay cotas, como para cualquier otro sujeto', () => {
     const s = cotasDelSujeto(
-      { ...BASE, hiddenLayerIds: [1], nodoSeleccionado: { pieceId: 'p1', commandIndex: 1 } },
-      { width: 100, height: 100 },
-    );
+      { ...BASE, hiddenLayerIds: [1], nodoSeleccionado: { pieceId: 'p1', commandIndex: 1 } });
     expect(s.cotas).toEqual([]);
   });
 
   it('en una pieza bloqueada las cotas se ven, apagadas: leer no es editar', () => {
     const bloqueada = { ...PIEZA, locked: true } as PatternPiece;
     const s = cotasDelSujeto(
-      { ...BASE, pieces: [bloqueada], nodoSeleccionado: { pieceId: 'p1', commandIndex: 1 } },
-      { width: 100, height: 100 },
-    );
+      { ...BASE, pieces: [bloqueada], nodoSeleccionado: { pieceId: 'p1', commandIndex: 1 } });
     expect(s.cotas).toHaveLength(2);
     expect(s.disabled).toBe(true);
   });

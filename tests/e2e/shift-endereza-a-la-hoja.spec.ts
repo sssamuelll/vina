@@ -37,10 +37,10 @@ async function mover(page: Page, p: { x: number; y: number }) {
   await page.waitForTimeout(200);
 }
 
-// La pista del pie (`y="98%"`) nombra los marcos igual que la píldora desde
-// Shift dos veces («al eje», «al borde»): se excluye para no leerla por ella.
+// La frase de la línea al pie nombra los marcos igual que la píldora («al
+// eje», «al borde»), pero desde P2b vive fuera del <svg>: no se confunden.
 const pildora = (page: Page) =>
-  page.locator('svg.pattern-svg text:not([y="98%"])').filter({ hasText: /al (borde|tramo|eje)/ }).first();
+  page.locator('svg.pattern-svg text').filter({ hasText: /al (borde|tramo|eje)/ }).first();
 
 test.describe('Shift endereza respecto a la hoja', () => {
   test.setTimeout(120_000);
@@ -164,7 +164,8 @@ async function dosVecesShift(page: Page) {
   await page.keyboard.down('Shift');
 }
 
-const PISTA = 'svg.pattern-svg > text[y="98%"]';
+/** La frase de la línea al pie (spec 2026-10-02 § 5.4); hasta P2b, un `<text>` al pie del svg. */
+const PISTA = '.seccion-del-patron__texto';
 
 test.describe('Shift dos veces endereza al borde', () => {
   test.setTimeout(120_000);
@@ -232,11 +233,8 @@ test.describe('Shift dos veces endereza al borde', () => {
       const pista = page.locator(PISTA);
       const cabe = async (texto: string) => {
         await expect(pista).toHaveText(texto);
-        const { largo, ancho } = await pista.evaluate((t) => ({
-          largo: (t as SVGTextElement).getComputedTextLength(),
-          ancho: (t as SVGTextElement).ownerSVGElement!.getBoundingClientRect().width,
-        }));
-        expect(largo, `«${texto}» mide ${largo} px en un lienzo de ${ancho}`).toBeLessThan(ancho);
+        const { largo, ancho } = await pista.evaluate((t) => ({ largo: t.scrollWidth, ancho: t.clientWidth }));
+        expect(largo, `«${texto}» mide ${largo} px en una frase de ${ancho}`).toBeLessThanOrEqual(ancho + 1);
       };
 
       await page.keyboard.down('Shift');

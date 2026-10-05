@@ -39,7 +39,7 @@ async function abrirApp(page: Page) {
 
 const nPiezas = async (p: Page) => (await st(p)).project.pieces.length;
 
-/** Vive `disabled` mientras no haya mediciones (`ToolStrip2D.tsx`). Sale gratis
+/** Vive `disabled` mientras no haya mediciones (la línea al pie, `SeccionDelPatron.tsx`). Sale gratis
  *  y es el único oráculo que distingue «no midió» de «midió y se borró». */
 const botonBorrarMediciones = (p: Page) => p.getByRole('button', { name: 'Borrar mediciones' });
 

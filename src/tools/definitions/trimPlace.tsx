@@ -74,12 +74,9 @@ export const trimPlaceTool: ToolDefinition = {
       // El principio y el final son los del borde, que es lo único que esta
       // herramienta recorre. «Margen» está tomado por el de costura.
       label: 'Desde el principio (mm)',
-      // `control: 'input'` llega en ESTE lote y no en el del censo de
-      // milímetros: allí se encendieron las once opciones que María podía
-      // alcanzar, y estas dos no eran alcanzables — la herramienta no tenía
-      // puerta. Abrirle la puerta las pone en pantalla, así que el deslizador
-      // de paso 1 sobre 0-50 mm pasa a ser un problema suyo hoy.
-      control: 'input',
+      // Como todo número en la línea al pie, se teclea: un campo con Restar y
+      // Sumar (spec 2026-10-02 § 5.3). Hasta P2b era un deslizador de paso 1
+      // sobre 0-50 mm.
       type: 'number',
       value: 10,
       min: 0,
@@ -89,7 +86,6 @@ export const trimPlaceTool: ToolDefinition = {
     {
       id: 'endOffset',
       label: 'Hasta el final (mm)',
-      control: 'input',
       type: 'number',
       value: 10,
       min: 0,

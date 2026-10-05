@@ -203,7 +203,8 @@ test.describe('«Abrir la pieza» — el gesto más largo del lienzo, dicho y he
 
   test('y la pista cabe en la pantalla en TODAS sus fases', async ({ page }) => {
     // La primera redacción metía los cinco pasos en una línea: 883 px de ancho
-    // arrancando en x = −101. Con la pista por fases, cada una tiene que caber.
+    // arrancando en x = −101. Desde P2b la frase vive en la línea al pie: tiene
+    // que estar, y caber entera, en todas las fases.
     const pieza = await unaTira(page);
     await dispatch(page, 'editor/selectPiece', pieza.id);
     await dispatch(page, 'editor/setActiveTool', 'slashAndSpread');
@@ -211,20 +212,22 @@ test.describe('«Abrir la pieza» — el gesto más largo del lienzo, dicho y he
     await page.waitForTimeout(400);
 
     const medirPista = () => page.evaluate(() => {
-      const t = [...document.querySelectorAll('svg.pattern-svg text')]
-        .map((e) => ({ txt: e.textContent ?? '', r: (e as SVGGraphicsElement).getBoundingClientRect() }))
-        .filter((x) => x.txt.length > 25)
-        .sort((a, b) => b.txt.length - a.txt.length)[0];
+      const t = document.querySelector<HTMLElement>('.seccion-del-patron__texto');
       if (!t) return null;
-      return { txt: t.txt, left: Math.round(t.r.left), right: Math.round(t.r.right), vw: window.innerWidth };
+      const r = t.getBoundingClientRect();
+      return {
+        txt: t.textContent ?? '', left: Math.round(r.left), right: Math.round(r.right),
+        vw: window.innerWidth, recortada: t.scrollWidth > t.clientWidth + 1,
+      };
     });
 
     const fuera: string[] = [];
     const pasos: Array<[number, number]> = [[220, 140], [220, 290], [170, 215], [170, 215], [220, 290]];
     for (let i = 0; i <= pasos.length; i++) {
       const p = await medirPista();
-      if (p && (p.left < 0 || p.right > p.vw)) {
-        fuera.push(`paso ${i}: "${p.txt.slice(0, 45)}…" ${p.left}→${p.right} de ${p.vw}`);
+      if (!p) fuera.push(`paso ${i}: sin frase`);
+      else if (p.left < 0 || p.right > p.vw || p.recortada) {
+        fuera.push(`paso ${i}: "${p.txt.slice(0, 45)}…" ${p.left}→${p.right} de ${p.vw}${p.recortada ? ', recortada' : ''}`);
       }
       if (i < pasos.length) await clic(page, pasos[i][0], pasos[i][1]);
     }

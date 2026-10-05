@@ -253,7 +253,6 @@ test.describe('trazos — líneas de construcción', () => {
     await expect.poll(async () => (await estado(page)).editor.selectedTrazo, { timeout: 5000 })
       .toMatchObject({ segmentIndex: 2 });
     await expect(page.locator('.cotas button.cota[aria-label^="Largo:"]')).toHaveCount(1);
-    await expect(page.locator('.tool-strip')).toContainText('Editando: el tramo seleccionado');
 
     // Supr se lleva ESE tramo; como era del medio, el trazo queda partido en dos.
     await page.keyboard.press('Delete');

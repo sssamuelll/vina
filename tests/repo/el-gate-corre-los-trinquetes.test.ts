@@ -49,6 +49,12 @@ describe('el gate del deploy corre los trinquetes de la interfaz', () => {
     ]));
   });
 
+  it('y la red de la línea al pie (P2b), que sustituye a la de la tira', () => {
+    const specs = specsDelGate();
+    expect(specs).toContain('tests/e2e/linea-al-pie.spec.ts');
+    expect(specs).not.toContain('tests/e2e/emplazamiento-tira.spec.ts');
+  });
+
   it('cada spec de la lista existe en disco', () => {
     expect(specsDelGate().filter((s) => !existsSync(join(RAIZ, s)))).toEqual([]);
   });
