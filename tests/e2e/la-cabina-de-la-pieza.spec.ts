@@ -57,4 +57,34 @@ test.describe('la cabina de la pieza (P3a)', () => {
     await page.mouse.up();
     await expect(barrita(page)).toBeVisible();
   });
+
+  test('una cota a la vez: Ancho a la vista; Tab desde ella pasa a Alto, que ocupa su sitio', async ({ page }) => {
+    const chip = (nombre: 'Ancho' | 'Alto') => page.getByRole('button', { name: new RegExp(`^${nombre} de la pieza:`) });
+    const campo = (nombre: 'Ancho' | 'Alto') => page.locator(`input.cota--editando[aria-label="${nombre} de la pieza"]`);
+    await unaPiezaSeleccionada(page);
+    await expect(chip('Ancho')).toHaveText('300 mm');
+    await expect(chip('Alto')).toHaveCount(0);
+
+    // En edición: Tab pasa a Alto, abierto y listo para teclear.
+    await chip('Ancho').click();
+    await page.keyboard.press('Tab');
+    await expect(campo('Alto')).toBeFocused();
+    await expect(chip('Ancho')).toHaveCount(0);
+    await page.keyboard.type('150');
+    await page.keyboard.press('Enter');
+    await expect(chip('Alto')).toHaveText('150 mm');
+    await expect(chip('Ancho'), 'confirmar Alto no devuelve a Ancho').toHaveCount(0);
+
+    // En reposo: Shift+Tab sobre el chip vuelve a Ancho.
+    await chip('Alto').focus();
+    await page.keyboard.press('Shift+Tab');
+    await expect(campo('Ancho')).toBeFocused();
+    await page.keyboard.press('Escape');
+
+    // Otra pieza empieza por Ancho.
+    await addPiece(page, 'p2', { x: 500, y: 100 }, 120, 90);
+    await clickAt(page, { x: 560, y: 145 });
+    await expect(chip('Ancho')).toHaveText('120 mm');
+    await expect(chip('Alto')).toHaveCount(0);
+  });
 });

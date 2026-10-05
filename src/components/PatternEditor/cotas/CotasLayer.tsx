@@ -35,6 +35,8 @@ export interface CotasLayerProps {
   onScrub: CotaChipProps['onScrub'];
   onScrubEnd: CotaChipProps['onScrubEnd'];
   onScrubCancel: CotaChipProps['onScrubCancel'];
+  /** Una cota a la vez: lo que el chip consulta antes de soltar el foco con Tab. */
+  onSalir?: CotaChipProps['onSalir'];
 }
 
 /**
@@ -45,7 +47,7 @@ export interface CotasLayerProps {
  * de Redux en el mismo render: no hay nada que sincronizar.
  */
 export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function CotasLayer(
-  { cotas, piezasConLargos, piezaAcotadaId, units = 'mm', lectura, lecturaApagada, pan2D, zoom2D, estorbos, disabled, onCommit, onScrubStart, onScrub, onScrubEnd, onScrubCancel },
+  { cotas, piezasConLargos, piezaAcotadaId, units = 'mm', lectura, lecturaApagada, pan2D, zoom2D, estorbos, disabled, onCommit, onScrubStart, onScrub, onScrubEnd, onScrubCancel, onSalir },
   ref,
 ) {
   const root = useRef<HTMLDivElement>(null);
@@ -170,6 +172,7 @@ export const CotasLayer = forwardRef<CotasLayerHandle, CotasLayerProps>(function
             onScrub={onScrub}
             onScrubEnd={onScrubEnd}
             onScrubCancel={onScrubCancel}
+            onSalir={onSalir}
           />
         );
       })}
