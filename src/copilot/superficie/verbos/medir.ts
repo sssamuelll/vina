@@ -97,7 +97,7 @@ const walkSeam = definirVerbo({
 });
 
 interface Problema {
-  kind: 'seam-does-not-walk' | 'seam-not-measurable' | 'outline-open' | 'piece-without-outline' | 'notch';
+  kind: 'seam-does-not-walk' | 'seam-not-measurable' | 'seam-groups-not-verified' | 'outline-open' | 'piece-without-outline' | 'notch';
   piece_ids: string[];
   seam_id?: string;
   message: string;
@@ -106,14 +106,22 @@ interface Problema {
 const verify = definirVerbo({
   name: 'verify',
   description:
-    'Check the garment with numbers measured now: walks every seam over its sewn stretches, and finds open outlines and notches without a partner across their seam. A difference may be ease on purpose (a sleeve cap is often longer than its armhole): verify reports it with both lengths and does not guess intent. A seam allowance of 0 is normal, not a problem.',
-  args: z.object({}),
-  run: (_args, ctx) => {
-    const { pieces, seams } = ctx.getState().project;
-    const costuras = seams.map(s => medirCostura(s, pieces));
+    'Check the garment with numbers measured now: walks every active seam over its sewn stretches, and finds open outlines and notches without a partner across their seam. A difference may be ease on purpose (a sleeve cap is often longer than its armhole): verify does not guess it; pass it per seam in ease_mm. A seam allowance of 0 is normal, not a problem.',
+  args: z.object({
+    ease_mm: z.record(z.string(), z.number()).optional().describe('ease wanted on purpose per seam id, B minus A, in mm; default 0'),
+  }),
+  run: (args, ctx) => {
+    const { pieces, seams, seamGroups } = ctx.getState().project;
+    const costuras = seams.map(s => medirCostura(s, pieces, { easeMm: args.ease_mm?.[s.id] }));
     const issues: Problema[] = [];
+    // Las costuras M:N todavía no se miden: decir «ok» sin mirarlas mentiría.
+    if (seamGroups.length > 0) {
+      issues.push({ kind: 'seam-groups-not-verified', piece_ids: [], message: `${seamGroups.length} many-to-many seam groups are not verified yet` });
+    }
     for (const c of costuras) {
       const ids = [c.a.piece_id, c.b.piece_id];
+      // Apagada: fuera de la simulación y del veredicto; se lista igual.
+      if (!c.active) continue;
       if (c.walks === null) {
         issues.push({ kind: 'seam-not-measurable', piece_ids: ids, seam_id: c.id, message: `seam ${c.id}: a side has no measurable edge` });
       } else if (!c.walks) {
@@ -131,7 +139,7 @@ const verify = definirVerbo({
     }
     // Los avisos «info» de auditNotches son el «no notches on seam» de cada
     // costura sin piquetes: ruido, no un problema.
-    for (const w of auditNotches(pieces, seams)) {
+    for (const w of auditNotches(pieces, seams.filter(s => s.active !== false))) {
       if (w.severity !== 'info') issues.push({ kind: 'notch', piece_ids: w.pieceIds, message: w.message });
     }
     return { revision: revisionDelProyecto(), verdict: issues.length === 0 ? 'ok' : 'has-issues', seams: costuras, issues };

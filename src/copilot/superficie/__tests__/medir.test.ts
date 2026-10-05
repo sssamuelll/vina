@@ -92,6 +92,25 @@ describe('verify', () => {
     expect(r.issues[0]).toMatchObject({ kind: 'seam-does-not-walk', seam_id: 's1' });
     expect(r.issues[0].message).toContain('100 mm against 110 mm');
   });
+  it('la holgura buscada se le pasa por costura: con ella, una copa 40 mm más larga camina', async () => {
+    const ctx = contexto([pieza('a', [100]), pieza('b', [140])], [costura()]);
+    expect((await medir<Veredicto>('verify', {}, ctx)).verdict).toBe('has-issues');
+    expect((await medir<Veredicto>('verify', { ease_mm: { s1: 40 } }, ctx)).verdict).toBe('ok');
+  });
+  it('una costura apagada se lista con su largo pero no cuenta en el veredicto', async () => {
+    const r = await medir<Veredicto>('verify', {}, contexto([pieza('a', [100]), pieza('b', [110])], [costura({ active: false })]));
+    expect(r.verdict).toBe('ok');
+    expect(r.seams[0]).toMatchObject({ active: false, delta: 10 });
+  });
+  it('un grupo de costuras M:N no se verifica todavía, y verify no dice ok sin haberlo mirado', async () => {
+    const r = await medir<Veredicto>('verify', {}, contexto([], [], {}, [{ id: 'g1' }]));
+    expect(r.verdict).toBe('has-issues');
+    expect(r.issues.some(i => i.kind === 'seam-groups-not-verified')).toBe(true);
+  });
+  it('la tensión y si está activa viajan con cada costura: un frunce puede ser a propósito', async () => {
+    const r = await medir('walk_seam', { seam_id: 's1' }, contexto([pieza('a', [100]), pieza('b', [100])], [costura({ tension: 80 })]));
+    expect(r).toMatchObject({ tension: 80, active: true });
+  });
   it('un contorno que no cierra sale como problema', async () => {
     const abierta = pieza('a', [100]);
     abierta.outline = abierta.outline.filter(c => c.type !== 'Z');

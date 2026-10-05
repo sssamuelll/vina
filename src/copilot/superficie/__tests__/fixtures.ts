@@ -42,8 +42,13 @@ export function costura(over: Partial<Seam> = {}): Seam {
 }
 
 /** Un contexto de verbo sobre un proyecto hecho a mano: los verbos de leer y medir solo leen `getState().project`. */
-export function contexto(pieces: PatternPiece[], seams: Seam[] = [], layerLocked: Record<number, boolean> = {}): ContextoDeVerbo {
-  const estado = { project: { pieces, seams, layerLocked, seamGroups: [] } } as unknown as RootState;
+export function contexto(
+  pieces: PatternPiece[],
+  seams: Seam[] = [],
+  layerLocked: Record<number, boolean> = {},
+  seamGroups: unknown[] = [],
+): ContextoDeVerbo {
+  const estado = { project: { pieces, seams, layerLocked, seamGroups } } as unknown as RootState;
   return { getState: () => estado, dispatch: vi.fn() as unknown as ContextoDeVerbo['dispatch'], origen: 'vina' };
 }
 

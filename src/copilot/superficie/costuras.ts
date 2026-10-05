@@ -16,6 +16,10 @@ export interface CosturaMedida {
   tolerance: number;
   band: BandaDeDesajuste | null;
   walks: boolean | null;
+  /** El frunce o el embebido que María le puso, en % (100 = ninguno): una diferencia puede ser a propósito. */
+  tension: number;
+  /** Apagada, la costura queda fuera de la simulación. */
+  active: boolean;
 }
 
 /**
@@ -49,5 +53,7 @@ export function medirCostura(
     tolerance: tolerancia,
     band: m?.band ?? null,
     walks: m?.walks ?? null,
+    tension: seam.tension,
+    active: seam.active !== false,
   };
 }
