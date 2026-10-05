@@ -396,6 +396,14 @@ voltear y propiedades. Captura 02.
   «es más minimalista». `--readout-bg-2d` no cambia. Es parte del trazo, como las cotas, y es la
   única superficie oscura sobre el papel.
 
+**Nota del plan de P3a (2026-10-05).** P3 se parte en tres: P3a (la cabina), P3b (la cota de lo que
+se pone: piquete y punto) y P3c (la etiqueta de opción y la puerta de vuelta). El candado ya estaba
+en el menú del clic derecho; solo sale de la barrita. Con la pieza bloqueada la caja no está y la
+barrita sí: «Desbloquear», Duplicar, Propiedades…. Una cota a la vez vale en Seleccionar y en
+Transformar; Rectángulo, Círculo y Triángulo conservan las dos. Tab, en edición o en reposo, pasa a
+la siguiente, y una selección nueva empieza por Ancho. El `#1a1a1a` de la barrita ya se había ido
+en P1b.
+
 ## 6. Lo que se llama
 
 ### 6.1 Paneles

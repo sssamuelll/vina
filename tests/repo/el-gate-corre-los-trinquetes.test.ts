@@ -59,6 +59,10 @@ describe('el gate del deploy corre los trinquetes de la interfaz', () => {
     expect(specsDelGate()).toContain('tests/e2e/ia-convocada.spec.ts');
   });
 
+  it('y la red de la cabina de la pieza (P3a): la barrita de cuatro y una cota a la vez', () => {
+    expect(specsDelGate()).toContain('tests/e2e/la-cabina-de-la-pieza.spec.ts');
+  });
+
   it('cada spec de la lista existe en disco', () => {
     expect(specsDelGate().filter((s) => !existsSync(join(RAIZ, s)))).toEqual([]);
   });
