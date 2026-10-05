@@ -820,7 +820,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     pieces, selectedPieceIds, cursorPattern: cursorPositionRef,
     puedeAbrir: puedeAbrirLado, esElSujeto: ladoEsElSujetoRef,
   });
-  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint } =
+  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, showActionBar, isDraggingPiece, isDraggingEndpoint } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
       pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas: cotasRef, lados: puertaDeLado.teclas,
     });
@@ -1722,7 +1722,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
         )}
       </svg>
       <FloatingActionBar
-        show={showTransformBox}
+        show={showActionBar}
         bbox={transformTool.bbox}
         pan2D={pan2D}
         zoom2D={zoom2D}

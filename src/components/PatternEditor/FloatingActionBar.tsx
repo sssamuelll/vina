@@ -1,9 +1,10 @@
 /**
  * FloatingActionBar (Surface A) — barra flotante de acciones sobre el transform
- * box en el verbo `select`. Cabalga T2–T5: monta cuando `showTransformBox` es
- * true (⇒ suprimida en altitud POINT por construcción, invariante G7), se ancla
- * a `transformTool.bbox`, y NO lleva listener de teclado — la seguridad de Escape
- * la da la captura de T5. Lee `resolveBarActions` (T6, cap 5, sin danger,
+ * box en el verbo `select`. Monta con `showActionBar`: la caja de transformación,
+ * salvo con la pieza bloqueada, donde la caja no está y la barrita sí (spec
+ * 2026-10-02 § 5.5); suprimida en altitud POINT por construcción (invariante
+ * G7). Se ancla a `transformTool.bbox`, y NO lleva listener de teclado — la seguridad de Escape
+ * la da la captura de T5. Lee `resolveBarActions` (T6, cap 4, sin danger,
  * BAR_ENABLED_KINDS) y `BAR_ICONS` (T8, monocromo). icon-only + ToolTooltip:
  * el label vive en el tooltip.
  */
@@ -27,7 +28,7 @@ const BAR_GAP = 8;
 const APPROX_BAR_HEIGHT = 40;
 
 export interface FloatingActionBarProps {
-  /** showTransformBox (T2): monta SOLO si es true → POINT suprimido por construcción. */
+  /** showActionBar: monta SOLO si es true → POINT suprimido por construcción. */
   show: boolean;
   /** transformTool.bbox (T2/F4): anclaje en coords de patrón. */
   bbox: BBox | null;

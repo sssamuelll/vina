@@ -109,7 +109,8 @@ describe('integridad de CURATION', () => {
       }
     }
   });
-  it('bar autorada no excede el cap de 5', () => {
+  it('la barrita es de cuatro (spec 2026-10-02 § 5.5) y ninguna fila autora más', () => {
+    expect(BAR_MAX_VISIBLE).toBe(4);
     for (const row of CURATION) {
       expect(row.bar.length).toBeLessThanOrEqual(BAR_MAX_VISIBLE);
     }
@@ -171,11 +172,23 @@ describe('gate !locked en el menú de pieza (F2)', () => {
 });
 
 describe('resolveBarActions — cap, no-danger y BAR_ENABLED_KINDS', () => {
-  it('pieza desbloqueada: barra rankeada, ≤5, sin danger', () => {
+  it('pieza desbloqueada: la barrita de cuatro, sin el candado, que vive en el menú', () => {
     const bar = resolveBarActions(makeCtx()).map(d => d.id);
-    expect(bar).toEqual(['rotate90', 'duplicate', 'flipH', 'properties', 'lockToggle']);
+    expect(bar).toEqual(['rotate90', 'duplicate', 'flipH', 'properties']);
     expect(bar.length).toBeLessThanOrEqual(BAR_MAX_VISIBLE);
     for (const id of bar) expect(ACTIONS[id].danger).not.toBe(true);
+    expect(resolveMenuActions(makeCtx()).map(d => d.id)).toContain('lockToggle');
+  });
+  it('pieza bloqueada: «Desbloquear» va primero; rotar y voltear caen por su gate', () => {
+    const ctx = makeCtx({ piece: pieceFix(true), pieces: [pieceFix(true)] });
+    const bar = resolveBarActions(ctx);
+    expect(bar.map(d => d.id)).toEqual(['lockToggle', 'duplicate', 'properties']);
+    const label = bar[0].label;
+    expect(typeof label === 'function' ? label(ctx) : label).toBe('Desbloquear');
+  });
+  it('varias piezas con la primera bloqueada: la barrita de la selección no desbloquea solo esa', () => {
+    const ctx = makeCtx({ targetKind: 'multiPiece', piece: pieceFix(true), selectedPieceIds: ['p1', 'p2'] });
+    expect(resolveBarActions(ctx).map(d => d.id)).not.toContain('lockToggle');
   });
   it('targetKind fuera de BAR_ENABLED_KINDS (seam) → barra vacía', () => {
     expect(BAR_ENABLED_KINDS.has('seam')).toBe(false);

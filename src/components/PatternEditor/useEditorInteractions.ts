@@ -326,6 +326,15 @@ export function shouldShowTransformBox(opts: {
     && opts.selectedCount > 0;
 }
 
+/**
+ * La barrita de la pieza (spec 2026-10-02 § 5.5) sigue a la caja, con una
+ * excepción: con la selección bloqueada la caja no está y la barrita sí, para
+ * que «Desbloquear» nunca quede detrás de un menú.
+ */
+export function shouldShowActionBar(opts: Parameters<typeof shouldShowTransformBox>[0]): boolean {
+  return shouldShowTransformBox({ ...opts, selectionHasLocked: false });
+}
+
 export function useEditorInteractions(
   activeTool: Tool2D,
   zoom2D: number,
@@ -394,6 +403,13 @@ export function useEditorInteractions(
       && p.internals.some(l => l.id === selectedInternalLine.lineId),
   );
   const showTransformBox = shouldShowTransformBox({
+    activeTool,
+    isNodeEditing,
+    selectedCount: selectedPieceIds.length,
+    selectionHasLocked,
+    hasSelectedInternalLine: selectedInternalLineIsLive,
+  }) && !isDraggingPiece;
+  const showActionBar = shouldShowActionBar({
     activeTool,
     isNodeEditing,
     selectedCount: selectedPieceIds.length,
@@ -1527,5 +1543,5 @@ export function useEditorInteractions(
     }
   };
 
-  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint };
+  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, showActionBar, isDraggingPiece, isDraggingEndpoint };
 }
