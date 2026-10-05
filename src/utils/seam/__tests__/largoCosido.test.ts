@@ -36,6 +36,10 @@ describe('largoCosidoDeLado', () => {
     const sinBordes = { ...pieza('a', [50, 80, 100]), edges: undefined };
     expect(largoCosidoDeLado(sinBordes, { pieceId: 'a', edgeName: 'edge-1' })).toBeCloseTo(50, 6);
   });
+  it('un borde de rango vacío ([1, 1]) no tiene largo: undefined, no 0', () => {
+    const vacio = { ...pieza('a', [50, 80, 100]), edges: [{ id: 'a:v', name: 'vacio', segmentRange: [1, 1], edgeType: 'seam' }] as SemanticEdge[] };
+    expect(largoCosidoDeLado(vacio, { pieceId: 'a', edgeName: 'vacio' })).toBeUndefined();
+  });
   it('un borde que no existe no se inventa: undefined', () => {
     expect(largoCosidoDeLado(pieza('a', [100]), { pieceId: 'a', edgeName: 'manga' })).toBeUndefined();
   });

@@ -11,7 +11,11 @@ import { edgeNToCommandIndex } from './index';
  */
 export function largoCosidoDeLado(piece: PatternPiece, lado: Seam['pieceA'] | Seam['pieceB']): number | undefined {
   const borde = piece.edges?.find(e => e.name === lado.edgeName);
-  if (borde) return sewnLengthMm(computeRangeLengthMM(piece.outline, borde.segmentRange), lado);
+  if (borde) {
+    // `[desde, hasta)` vacío no es un borde: decir 0 sería inventar un número.
+    if (borde.segmentRange[1] <= borde.segmentRange[0]) return undefined;
+    return sewnLengthMm(computeRangeLengthMM(piece.outline, borde.segmentRange), lado);
+  }
   // «edge-N» heredado: N ES un índice de comando (el contrato de
   // resolveEdgeName), y ese borde es ese único comando.
   const indice = edgeNToCommandIndex(piece.outline, lado.edgeName);

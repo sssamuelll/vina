@@ -9,7 +9,8 @@
  */
 
 import { PatternPiece, Point2D, Seam } from '../../../types/types';
-import { getEdgeEndpoints, getEdgePathD } from '../../../utils/geometry/path';
+import { getEdgeEndpoints, getEdgePathD, getRangePathD } from '../../../utils/geometry/path';
+import { rangoMedibleDeBorde } from '../../../utils/semanticEdges';
 import { resolveEdgePolyline, edgeNToCommandIndex, slicePolylineByT } from '../../../utils/seam/index';
 import { samplePolyline, perpendicular } from '../../../utils/pleatGeometry';
 import { seamPairColor, seamMismatchMm, layoutMismatchLabels, SEAM_MISMATCH_THRESHOLD_MM } from './seamVisuals';
@@ -54,11 +55,15 @@ export default function SeamRenderer({
         const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
         if (!pieceA || !pieceB) return [];
 
-        // Resolve semantic edge name to segment index (with edge-N fallback)
+        // Resolve semantic edge name to its command range (with edge-N
+        // fallback). Traducido: el tramo de cierre se rotula con la `M`, que no
+        // dibuja, y una costura sobre él no se pintaba (#1143).
         const semEdgeA = pieceA.edges?.find(e => e.name === seam.pieceA.edgeName);
         const semEdgeB = pieceB.edges?.find(e => e.name === seam.pieceB.edgeName);
-        let segIdxA = semEdgeA?.segmentRange[0] ?? -1;
-        let segIdxB = semEdgeB?.segmentRange[0] ?? -1;
+        const comandosA = semEdgeA ? rangoMedibleDeBorde(pieceA.outline, semEdgeA.segmentRange) : null;
+        const comandosB = semEdgeB ? rangoMedibleDeBorde(pieceB.outline, semEdgeB.segmentRange) : null;
+        let segIdxA = comandosA?.[0] ?? -1;
+        let segIdxB = comandosB?.[0] ?? -1;
         // Fallback: legacy "edge-N" IS a command index already (the
         // resolveEdgeName producer contract — edgeNToCommandIndex). The old
         // `N + 1` here read one edge past the one the user clicked, and
@@ -103,18 +108,24 @@ export default function SeamRenderer({
         // solver) en vez del path exacto del comando completo.
         const polyToPathD = (pts: Point2D[]): string =>
           'M' + pts.map(p => `${p.x},${p.y}`).join(' L');
+        // Una costura entera pinta su borde ENTERO: el primer comando solo era,
+        // en las curvas del DXF de María, un resalte de 2,4 mm. Un rango vacío
+        // ([i, i]) dibuja su primer comando, como lo cose el motor
+        // (`commandRangeToFlattened`).
         const pathDA = rangeA && polyA.length >= 2
           ? polyToPathD(polyA)
-          : getEdgePathD(pieceA.outline, segIdxA, offA.x, offA.y);
+          : (comandosA && getRangePathD(pieceA.outline, comandosA, offA.x, offA.y)) || getEdgePathD(pieceA.outline, segIdxA, offA.x, offA.y);
         const pathDB = rangeB && polyB.length >= 2
           ? polyToPathD(polyB)
-          : getEdgePathD(pieceB.outline, segIdxB, offB.x, offB.y);
+          : (comandosB && getRangePathD(pieceB.outline, comandosB, offB.x, offB.y)) || getEdgePathD(pieceB.outline, segIdxB, offB.x, offB.y);
 
-        const midA = {
+        // Los largos y la etiqueta de desajuste van en el medio del tramo
+        // cosido, no en el del primer comando del borde.
+        const midA = polyA.length >= 2 ? samplePolyline(polyA, 0.5).point : {
           x: (epA.start.x + epA.end.x) / 2 + offA.x,
           y: (epA.start.y + epA.end.y) / 2 + offA.y,
         };
-        const midB = {
+        const midB = polyB.length >= 2 ? samplePolyline(polyB, 0.5).point : {
           x: (epB.start.x + epB.end.x) / 2 + offB.x,
           y: (epB.start.y + epB.end.y) / 2 + offB.y,
         };
