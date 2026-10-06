@@ -21,9 +21,12 @@
  * 2. DIRECTION — set `pieceB.reversed` so endpoints pair nearest-to-nearest
  *    (straight, not crossed). Ctrl+B in the seam tool remains the human
  *    override; this only seeds the AI proposal correctly.
+ * 3. CAP CUT — step 1 may hand a sleeve-cap half to the other armhole, so
+ *    each split cap is re-cut for its FINAL partners (`repartirCopas`).
  *
  * Seams whose edges can't be resolved by semantic name (manual `edge-N`
- * seams, missing pieces) pass through untouched.
+ * seams, missing pieces) pass through steps 1-2 untouched; step 3 only
+ * touches a cap split in two complementary halves.
  */
 
 import type { PatternPiece, Seam } from '../../types/types';
@@ -127,9 +130,10 @@ interface ResolvedSeam {
 
 /**
  * Refine a set of proposed seams against the CURRENT placements: reassign
- * symmetric partners by world proximity and seed `pieceB.reversed` from
- * endpoint geometry. Returns refined copies in the same order; unresolvable
- * seams pass through untouched.
+ * symmetric partners by world proximity, seed `pieceB.reversed` from
+ * endpoint geometry, and re-cut split sleeve caps for their final partners.
+ * Returns refined copies in the same order; unresolvable seams pass through
+ * untouched unless they are halves of a split cap.
  *
  * Endpoints are positioned with the WRAP (envelope-wrap PR), via the same
  * `wrapPlacedMesh(frame, flip)` the solver starts pieces with — NOT the old

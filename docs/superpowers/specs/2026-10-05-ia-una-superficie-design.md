@@ -294,14 +294,17 @@ Dentro de este subproyecto, para probar la superficie desde el primer día y cum
     cosen desde la app (el menú, «Re-coser» y las dos herramientas del agente), devuelve esa mitad a
     la sisa delantera, y los piquetes casan. Los tests de esta nota cosían sin worldRefine.
   - **Los ±5 mm sí eran de Vina.** La copa se partía en t = 0,5 aunque las sisas no miden lo mismo.
-    Ahora se parte donde cada mitad mide lo que su sisa (`src/utils/autoSew/repartoDeCopa.ts`,
-    `SEAM_ENGINE_VERSION` 2), y las cuatro medias costuras quedan a 0,2 mm.
-  - **El cuello es una tira de punto.** Es un rectángulo de 456 × 40,9 mm sobre un escote de 518 mm
-    sin abertura: el 88 %, que es lo que se corta una tira para que se estire y quede plana. Vina la
-    reparte pareja (88 % delante y detrás). Que el lienzo la marque con «⚠» es otra cosa: no hay cómo
-    decirle a Vina que esa diferencia es a propósito.
-  - Siguen cosiendo sin pose, y por tanto con el cruce, la carga generativa de `loadProject` y el
-    motor paramétrico.
+    Ahora se parte donde cada mitad mide lo que su sisa (`src/utils/autoSew/repartoDeCopa.ts`), y las
+    cuatro medias costuras quedan a 0,2 mm. Con `SEAM_ENGINE_VERSION` 2, «Re-coser» se ofrece solo
+    donde hay mitades de copa del motor anterior, y rehace solo esas.
+  - **El cuello parece una tira de punto** (provisional hasta que María lo confirme). Es un
+    rectángulo de 456 × 40,9 mm sobre un escote de 518 mm sin abertura: el 88 %, que es lo que se
+    corta una tira para que se estire y quede plana. Vina la reparte pareja (88 % delante y detrás).
+    Que el lienzo la marque con «⚠» es otra cosa: no hay cómo decirle a Vina que esa diferencia es a
+    propósito.
+  - Los dos caminos que cosen sin pose, la carga generativa de `loadProject` y el motor paramétrico
+    (`useParametricEngine`), no tienen llamador en la app: nadie despacha `project/loadProject` fuera
+    de los tests, y ningún componente usa el hook.
 - Las definiciones de los cinco verbos miden 4.605 caracteres, contra unos 203.000 del registro de
   hoy por llamada (§ 3).
 

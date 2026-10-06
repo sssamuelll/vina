@@ -12,6 +12,12 @@
  * 2026-10-05 § 5.3). El corte depende de QUÉ sisa recibe cada mitad, y eso lo
  * decide worldRefine después de autoSew; por eso corre al final de los dos,
  * sobre las costuras ya escritas.
+ *
+ * ponytail: el corte se calcula por par de mitades. Si alguien borra UNA
+ * mitad, cambia el largo de una sisa y vuelve a coser con el menú, la mitad
+ * nueva sale con el corte nuevo y no toca a la que quedó (samePair ignora
+ * los rangos; al cuello le pasa igual desde 2026-07). Si eso aparece, el
+ * arreglo es completar la mitad que falta con el rango que deja libre la otra.
  */
 import type { PatternPiece, Seam } from '../../types/types';
 import { largoCosidoDeLado } from '../seam/largoCosido';
@@ -43,6 +49,14 @@ function conRangoFisico(s: Seam, lado: Lado, r: [number, number]): Seam {
 }
 
 const EPS = 1e-6;
+
+/** Una media costura de copa: copa↔sisa con la copa cosida solo en parte. */
+export function esMitadDeCopa(s: Seam): boolean {
+  const lado = ladoDeLaCopa(s);
+  if (!lado) return false;
+  const [desde, hasta] = rangoFisico(s, lado);
+  return desde > EPS || hasta < 1 - EPS;
+}
 
 /**
  * Pone el corte de cada copa partida en dos donde cada mitad mide, en

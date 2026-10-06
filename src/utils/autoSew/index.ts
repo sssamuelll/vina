@@ -19,7 +19,7 @@ import { extractEdges, type Edge } from './edgeExtractor';
 import { scorePieceNames } from './namingHeuristics';
 import { matchEdgesByLength, lengthSimilarity } from './arcLengthMatcher';
 import { scoreEdgePair, rankAndDeduplicate, areDeclaredPartners, type ScoredSeamCandidate, type ScorerWeights } from './scorer';
-import { repartirCopas } from './repartoDeCopa';
+import { esMitadDeCopa, repartirCopas } from './repartoDeCopa';
 
 // ─── Seam engine versioning ──────────────────────────────────────────────────
 
@@ -31,7 +31,8 @@ import { repartirCopas } from './repartoDeCopa';
  * collarEnds + fix reversed×rango (2026-07-04). 2 = la copa se parte donde
  * cada mitad mide lo que su sisa, no en t = 0,5 (2026-10-06). Ausente en la
  * seam = 0 (pre-versionado). Disciplina manual — si cambias la propuesta,
- * súbela.
+ * súbela, y di en isStaleAiSeam qué costuras de los motores anteriores
+ * quedaron viejas.
  */
 export const SEAM_ENGINE_VERSION = 2;
 
@@ -40,10 +41,17 @@ export const SEAM_ENGINE_VERSION = 2;
  * provenance cubre las dos marcas que autoSew estampa (createdBy 'ai' +
  * prefijo state-encoded 'auto-seam-'); las seams humanas (newId, sin
  * createdBy) NUNCA son stale.
+ *
+ * El motor 2 solo cambió dónde se parte la copa: del motor 1 solo están
+ * viejas sus mitades de copa. Sin esto, «Re-coser» se ofrecía en cualquier
+ * prenda con costuras IA, aunque no tuviera mangas, y rehacía costuras que
+ * salían iguales perdiendo lo que la usuaria les hubiera cambiado.
  */
 export function isStaleAiSeam(s: Seam): boolean {
   const isAi = s.createdBy === 'ai' || s.id.startsWith('auto-seam-');
-  return isAi && (s.sewEngine ?? 0) < SEAM_ENGINE_VERSION;
+  if (!isAi) return false;
+  const motor = s.sewEngine ?? 0;
+  return motor < 1 || (motor < SEAM_ENGINE_VERSION && esMitadDeCopa(s));
 }
 
 // ─── Public types ───────────────────────────────────────────────────────────

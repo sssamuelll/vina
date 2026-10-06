@@ -75,7 +75,7 @@ function capPhysicalRange(s: Seam): [number, number] {
 }
 
 describe('sisaSplit — el cap de cada manga se cose a los DOS armholes (delantero + espalda)', () => {
-  it('María: 4 medias costuras de sisa (2 por manga), con rangos complementarios y armholes en piezas distintas', () => {
+  it('María: 4 medias costuras de sisa (2 por manga), complementarias, en piezas distintas y cada una del largo de su sisa', () => {
     const pieces = importMariaClassified();
     const result = autoSew(pieces, { minConfidence: 0.3 });
     const refined = refineSeamsInWorld(
@@ -124,12 +124,13 @@ describe('sisaSplit — el cap de cada manga se cose a los DOS armholes (delante
       }
     }
 
-    // Y los dos piquetes de la copa caen sobre los de la sisa delantera: la
-    // mitad que los lleva va a la sisa que también los lleva.
+    // Guarda de la asignación, no del corte: los dos piquetes de la copa caen
+    // sobre los de la sisa delantera porque worldRefine da la mitad que los
+    // lleva a la sisa que también los lleva (autoSew solo la da a la trasera).
     expect(auditNotches(pieces, sisas).filter(w => /line up/i.test(w.message))).toEqual([]);
   });
 
-  it('sin pose mundo (carga generativa, motor paramétrico), cada mitad de la copa mide lo que la sisa que eligió autoSew', () => {
+  it('autoSew solo, sin pose mundo, ya corta cada copa según las sisas que eligió', () => {
     const pieces = importMariaClassified();
     const sisas = autoSew(pieces, { minConfidence: 0.3 }).seams.map(s => s.seam).filter(isSisa);
     expect(sisas).toHaveLength(4);
