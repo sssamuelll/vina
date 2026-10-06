@@ -314,7 +314,8 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
   notchExactDistance: { id: 'notchExactDistance', group: 'transform', icon: '⌖', label: 'Ajustar distancia…',
     // Un path legado sin ancla conserva su dibujo, pero no sabe desde qué
     // referencia medir: ocultarlo evita ofrecer una precisión que no existe.
-    gate: (ctx) => ctx.internalLine?.type === 'notch' && !!ctx.internalLine.notchAnchor,
+    // Y con la pieza bloqueada tampoco: su cota escribiría en ella (maria-204).
+    gate: (ctx) => ctx.internalLine?.type === 'notch' && !!ctx.internalLine.notchAnchor && notLocked(ctx),
     run: (ctx) => {
       if (ctx.pieceId && ctx.internalLine) ctx.cb.onRefineNotch?.(ctx.pieceId, ctx.internalLine);
     } },

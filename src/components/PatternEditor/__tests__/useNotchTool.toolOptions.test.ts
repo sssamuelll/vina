@@ -108,9 +108,13 @@ describe('useNotchTool — notch options from toolOptions.notch (G6)', () => {
 
 describe('useNotchTool — click-then-refine (notch-precision F3, D-4)', () => {
   it('click commits the notch AND opens refine state pre-filled with the anchor', () => {
-    const { onAddNotch, result } = setup();
+    const h = setup();
+    const { onAddNotch, result } = h;
     expect(onAddNotch).toHaveBeenCalledTimes(1);
+    // La sesión se mide sobre la línea viva: llega a `pieces` en el render siguiente.
+    syncCommittedNotch(h);
     expect(result.current.refining).not.toBeNull();
+    expect(result.current.refining!.sesion).toBeGreaterThan(0);
     const { notch, refWorld, maxDistanceMm } = result.current.refining!;
     expect(notch.notchAnchor?.distanceMm).toBeCloseTo(30, 5);
     // Corner (0,0) piece-local + piece position (0,0) = world (0,0)
@@ -136,26 +140,19 @@ describe('useNotchTool — click-then-refine (notch-precision F3, D-4)', () => {
     expect(path[1].values[1]).toBeCloseTo(10, 5);
     expect(anchor.distanceMm).toBe(42);
     expect(opts.length).toBe(10);
-    expect(h.result.current.refining).toBeNull();
+    // La sesión sigue: Tab pasa a la profundidad, y la cierra el chip.
+    expect(h.result.current.refining).not.toBeNull();
+    expect(h.result.current.refining!.previewWorld ?? null).toBeNull();
   });
 
-  it('confirm after the committed line vanished (undo) RE-CREATES the notch instead of ghost no-op', () => {
-    // Review finding #1 (HIGH): Ctrl+Z while the modal is open deletes the
-    // committed line; confirming then dispatched an update against a dead
-    // lineId — silent no-op, modal closed as if success, no notch existed.
-    // Confirming still owes the user a notch at the refined position.
-    const h = setup(); // pieces never gain the notch — the "line vanished" shape
-    const original: InternalLine = h.onAddNotch.mock.calls[0][1];
+  it('la cota muere con su piquete: sin la línea, confirmar no escribe ni lo vuelve a poner', () => {
+    // El modal se quedaba abierto mientras un Ctrl+Z borraba la línea y por
+    // eso la volvía a poner. La cota no descansa abierta: dentro del campo,
+    // el Ctrl+Z es del campo, y una cota sin objeto no escribe (aplicarCota).
+    const h = setup(); // la pieza nunca recibe el piquete: la forma de «la línea se fue»
     act(() => { h.result.current.confirmRefine(42, 10); });
-
     expect(h.onUpdateNotch).not.toHaveBeenCalled();
-    expect(h.onAddNotch).toHaveBeenCalledTimes(2);
-    const [pieceId, recreated] = h.onAddNotch.mock.calls[1];
-    expect(pieceId).toBe('p1');
-    expect(recreated.id).not.toBe(original.id);
-    expect(recreated.notchAnchor?.distanceMm).toBe(42);
-    expect(recreated.path[0].values[0]).toBeCloseTo(42, 5);
-    expect(recreated.path[1].values[1]).toBeCloseTo(10, 5);
+    expect(h.onAddNotch).toHaveBeenCalledTimes(1);
     expect(h.result.current.refining).toBeNull();
   });
 
@@ -163,16 +160,21 @@ describe('useNotchTool — click-then-refine (notch-precision F3, D-4)', () => {
     // Review finding #10: while typing a distance the marker should show
     // where the notch WILL land, not only where the click put it.
     const h = setup();
+    syncCommittedNotch(h);
     act(() => { h.result.current.previewRefine(42); });
     expect(h.result.current.refining?.previewWorld).toBeDefined();
     expect(h.result.current.refining!.previewWorld!.x).toBeCloseTo(42, 5);
     expect(h.result.current.refining!.previewWorld!.y).toBeCloseTo(0, 5);
+    // Un borrador que no vale borra el fantasma.
+    act(() => { h.result.current.previewRefine(null); });
+    expect(h.result.current.refining!.previewWorld ?? null).toBeNull();
   });
 
   it('leaving the notch tool cancels the refine state (no orphaned modal)', () => {
     // Review finding #2: a tool-switch shortcut while the modal was open left
     // it mounted while its canvas marker (gated on activeTool) vanished.
     const h = setup(undefined, { withEditor: true });
+    syncCommittedNotch(h);
     expect(h.result.current.refining).not.toBeNull();
     act(() => { h.store.dispatch(setActiveTool('select')); });
     expect(h.result.current.refining).toBeNull();
@@ -210,5 +212,24 @@ describe('useNotchTool — click-then-refine (notch-precision F3, D-4)', () => {
     act(() => { result.current.handleMouseUp(fakeEvent(100, 50)); });
     expect(onAddNotch).toHaveBeenCalledTimes(1); // notch still created
     expect(result.current.refining).toBeNull();  // but nothing to refine numerically
+  });
+});
+
+describe('useNotchTool — la pieza bloqueada (maria-204)', () => {
+  it('no recibe piquetes, ni por clic ni por arrastre, y no abre cota', () => {
+    const store = configureStore({ reducer: { tools: toolReducer } });
+    const onAddNotch = vi.fn();
+    const wrapper = ({ children }: { children: React.ReactNode }) => createElement(Provider, { store, children });
+    const { result } = renderHook(
+      () => useNotchTool(1, { x: 0, y: 0 }, [{ ...makeSquare(), locked: true }], onAddNotch),
+      { wrapper },
+    );
+    act(() => { result.current.handleMouseDown(fakeEvent(30, 0)); });
+    act(() => { result.current.handleMouseUp(fakeEvent(30, 0)); });
+    act(() => { result.current.handleMouseDown(fakeEvent(30, 0)); });
+    act(() => { result.current.handleMouseMove(fakeEvent(70, 0)); });
+    act(() => { result.current.handleMouseUp(fakeEvent(70, 0)); });
+    expect(onAddNotch).not.toHaveBeenCalled();
+    expect(result.current.refining).toBeNull();
   });
 });

@@ -8,11 +8,11 @@
  * llevaba la pieza de detrás mientras María leía la pregunta.
  *
  * El detector es `[aria-modal="true"]`, que es justo la pregunta que ARIA
- * responde, y no una marca inventada. Eso deja fuera —a propósito— a los
- * diálogos NO modales: `NotchPrecisionModal` declara `role="dialog"` pero no
- * tiene velo, se abre junto a la pieza y el lienzo sigue vivo detrás. Un
- * detector por `role="dialog"` lo habría barrido con los demás; el caso de
- * abajo es lo que lo impide.
+ * responde, y no una marca inventada. Eso deja fuera —a propósito— lo que no
+ * es modal: un diálogo sin velo, y la cota del piquete (P3b), que vive sobre
+ * el borde con el lienzo vivo detrás. Un detector por `role="dialog"` o por
+ * «hay algo abierto» los habría barrido con los demás; los casos de abajo son
+ * lo que lo impide.
  *
  * El duelo de orden entre oyentes no se puede medir aquí (jsdom no lo
  * reproduce) y lo mide `tests/e2e/supr-con-algo-delante.spec.ts`. Lo de aquí
@@ -30,7 +30,8 @@ import simulationReducer from '../../store/simulationSlice';
 import toolReducer from '../../store/toolSlice';
 import CalibrationModal from '../../components/PatternEditor/CalibrationModal';
 import ConnectionModal from '../../copilot/connections/ConnectionModal';
-import NotchPrecisionModal from '../../components/PatternEditor/NotchPrecisionModal';
+import CotaChip, { AgruparCotas } from '../../components/PatternEditor/cotas/CotaChip';
+import type { Cota } from '../../components/PatternEditor/cotas/cotas';
 
 afterEach(cleanup);
 
@@ -64,7 +65,7 @@ const pulsar = (target: Element, key: string, ctrl = false) => {
 };
 
 const MODAL = <div role="dialog" aria-modal="true" aria-label="¿Unir las piezas?" />;
-/** Como `NotchPrecisionModal`: diálogo, pero sin velo — el lienzo sigue vivo. */
+/** Un diálogo sin velo: el lienzo sigue vivo detrás. */
 const NO_MODAL = <div role="dialog" aria-label="Colocación de piquete" />;
 
 describe('#1173 — la tecla es de quien tiene la atención', () => {
@@ -166,18 +167,30 @@ describe('#1173 — y los modales REALES de la app se declaran modales', () => {
     expect(store.getState().editor.activeTool, 'un atajo se coló detrás del modal').toBe(antes);
   });
 
-  it('CONTROL: el panel del piquete NO es modal, y el lienzo sigue vivo detrás', () => {
-    // Es el que decide si el detector está bien elegido. No tiene velo, se
-    // abre junto a la pieza y está ahí justo para seguir trabajando sobre
-    // ella. Un detector por `role="dialog"` lo habría apagado con los demás.
+  it('CONTROL: la cota del piquete NO es modal, y el lienzo sigue vivo detrás', () => {
+    // Es la que decide si el detector está bien elegido. Vive sobre el borde,
+    // junto al piquete, y está ahí justo para seguir trabajando sobre él.
+    const cota = (over: Partial<Cota>): Cota => ({
+      id: 'piquete-distancia', grupo: 'piquete', kind: 'borde', label: 'Distancia', valueMm: 10, unit: 'mm',
+      min: 0, max: 100, primary: true, scrub: false,
+      a: { x: 0, y: 0 }, b: { x: 10, y: 0 }, outward: { x: 0, y: -1 }, apply: () => null, ...over,
+    });
+    const cotas = [cota({}), cota({ id: 'piquete-profundidad', kind: 'profundidad', label: 'Profundidad', valueMm: 5, min: 1, max: 30 })];
+    const sin = () => undefined;
     const { store, lienzo } = montar(
-      <NotchPrecisionModal
-        initialDistanceMm={10} initialDepthMm={5} maxDistanceMm={100}
-        onConfirm={nada} onCancel={nada}
-      />,
+      <AgruparCotas cotas={cotas} pan2D={{ x: 0, y: 0 }} zoom2D={1}>
+        <div className="cotas">
+          {cotas.map(c => (
+            <CotaChip key={c.id} cota={c} left={0} top={0} zoom2D={1}
+              onCommit={sin} onScrubStart={sin} onScrub={sin} onScrubEnd={sin} onScrubCancel={sin} />
+          ))}
+        </div>
+      </AgruparCotas>,
     );
+    act(() => { document.querySelector<HTMLButtonElement>('button.cota')!.click(); });
+    expect(document.querySelector('[aria-modal]'), 'la cota se declara modal').toBeNull();
     pulsar(lienzo, 'q');
-    expect(store.getState().editor.activeTool, 'el panel del piquete apagó los atajos')
+    expect(store.getState().editor.activeTool, 'la cota del piquete apagó los atajos')
       .toBe('editPattern');
   });
 });

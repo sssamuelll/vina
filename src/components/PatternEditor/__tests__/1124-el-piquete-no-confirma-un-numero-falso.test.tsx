@@ -100,7 +100,7 @@ function montar(piezasIniciales: PatternPiece[], onUpdate = vi.fn()) {
 }
 
 describe('#1124 — el techo del piquete se mide, no se recuerda', () => {
-  it('recalcula el techo cuando el contorno encoge con el modal abierto', () => {
+  it('recalcula el techo cuando el contorno encoge con la cota abierta', () => {
     const { result, rerender } = montar([pieza]);
 
     act(() => { result.current.refineExisting(pieza.id, notch); });

@@ -97,7 +97,6 @@ const SITIOS_GLOBALES: Array<{ archivo: string; patron: RegExp; nota: string }> 
   { archivo: 'src/components/shared/SubMenu.css', patron: /z-index:\s*calc\(var\(--z-context-menu\)\s*\+\s*10\)/, nota: 'submenú DENTRO del menú contextual — solo ordena contra sus hermanos, ver nota abajo' },
   { archivo: 'src/styles/floating.css', patron: /\.logo-menu__submenu\s*\{[^}]*z-index:\s*calc\(var\(--z-menu\)\s*\+\s*10\)/, nota: 'submenú DENTRO del menú del logo — misma forma anidada' },
   { archivo: 'src/components/PatternEditor/CalibrationModal.css', patron: /z-index:\s*var\(--z-modal\)/, nota: 'CalibrationModal reclasificado a modal (tiene velo)' },
-  { archivo: 'src/components/PatternEditor/NotchPrecisionModal.css', patron: /z-index:\s*var\(--z-menu\)/, nota: 'NotchPrecisionModal reclasificado a la baja (el propio archivo dice sin velo)' },
   { archivo: 'src/components/shell/AppShell.tsx', patron: /zIndex:\s*'var\(--z-hint\)'/, nota: 'aviso de soltar-DXF: encima del lienzo, debajo de las barras' },
   { archivo: 'src/components/Debug/SolverMetrics.css', patron: /z-index:\s*var\(--z-debug\)/, nota: 'el 9999 era pánico, pero 25 lo enterraba bajo las barras: es diagnóstico de dev, tiene rol propio' },
   { archivo: 'src/components/shell/ToolTooltip.css', patron: /z-index:\s*var\(--z-tooltip\)/, nota: 'escalón propio: empatado con el toast, el desempate lo decidía el portal' },

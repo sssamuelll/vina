@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useSelector } from 'react-redux';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
+import { showInfoToast } from '../../store/copilotUISlice';
 import type { PatternPiece, Point2D, InternalLine, NotchOptions } from '../../types/types';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 import { computeNotchAnchor, resolveNotchAnchor, resolveNotchAnchorV2, outlinePerimeter } from '../../utils/notchAnchor';
@@ -40,33 +41,42 @@ interface NotchToolState {
 }
 
 /**
- * Click-then-refine state (notch-precision F3, D-4): the click already
- * committed the notch; the precision modal reads this to offer numeric
- * re-positioning. `refWorld` = the anchor's reference corner in world
- * coords, for the canvas marker.
+ * El piquete que se está terminando de poner (notch-precision F3, D-4; desde
+ * P3b, con su cota sobre el borde en vez del modal): el clic ya lo puso, y su
+ * cota ofrece la distancia exacta. `refWorld` es la esquina de referencia en
+ * coordenadas de mundo, para la marca del lienzo.
  */
 export interface NotchRefineState {
   pieceId: string;
+  /** La línea VIVA, leída de `pieces` en cada render: lo que se ve es lo que hay. */
   notch: InternalLine;
   source: 'placement' | 'existing';
-  refWorld: Point2D;   // reference corner, world coords (canvas marker)
-  notchWorld: Point2D; // notch entry point, world coords (canvas marker)
+  refWorld: Point2D;   // esquina de referencia, mundo (marca del lienzo)
+  notchWorld: Point2D; // el piquete, mundo
   /**
-   * Outline perimeter — the modal's distance ceiling (a longer distance
-   * would wrap). DERIVADO del contorno vivo en cada render, nunca guardado:
-   * un Ctrl+Z con el modal abierto encoge la pieza, y un techo fotografiado
-   * al abrir deja teclear un número que ya no existe (#1124).
+   * El perímetro: el techo de la distancia (una mayor envolvería). DERIVADO
+   * del contorno vivo en cada render, nunca guardado: un techo fotografiado al
+   * abrir deja teclear un número que ya no existe (#1124).
    */
   maxDistanceMm: number;
-  /** Live landing point while the user types a distance (canvas ghost marker). */
+  /** Dónde quedará con lo que se está tecleando (el fantasma del lienzo). */
   previewWorld?: Point2D | null;
+  /** Cuenta las sesiones: el chip se abre una vez por sesión, no por render. */
+  sesion: number;
 }
 
 /**
- * Lo que de verdad se guarda en estado. El techo no está aquí a propósito:
- * que el tipo no lo admita es lo que impide volver a fotografiarlo (#1124).
+ * Lo que de verdad se guarda: qué piquete y desde cuándo. Todo lo demás —el
+ * ancla, la esquina, el piquete, el techo— se mide del contorno vivo en cada
+ * render (#1124): que el tipo no lo admita es lo que impide fotografiarlo.
  */
-type RefineGuardado = Omit<NotchRefineState, 'maxDistanceMm'>;
+interface RefineGuardado {
+  pieceId: string;
+  lineId: string;
+  source: 'placement' | 'existing';
+  previewWorld?: Point2D | null;
+  sesion: number;
+}
 
 export interface NotchDragPreview {
   refWorld: Point2D;
@@ -126,7 +136,7 @@ function liveTFromRange(pressT: number, liveRange: [number, number]): number {
 /**
  * Create a notch InternalLine at a point with a normal direction.
  * Attaches the parametric anchor (notch-precision F2): arc distance from
- * the nearest outline corner, so the precision modal can read/edit the
+ * the nearest outline corner, so its cota (P3b) can read/edit the
  * placement numerically. Cornerless outlines yield an anchor-less notch.
  * Exported for unit tests.
  */
@@ -161,8 +171,10 @@ export function useNotchTool(
     options: NotchOptions,
   ) => void,
 ) {
+  const dispatch = useDispatch();
   const [state, setState] = useState<NotchToolState>({ hoveredPoint: null });
   const [refining, setRefining] = useState<RefineGuardado | null>(null);
+  const sesiones = useRef(0);
 
   // El refinamiento nacido del gesto pertenece a Piquete y muere al salir de
   // esa herramienta. El de una línea existente nace del menú contextual y no
@@ -177,7 +189,7 @@ export function useNotchTool(
 
   // toolOptions.notch (G6, mirrors the toolOptions.seam convention): canonical
   // keys = NotchOptions names (shape/length/width/angle/count). Defaults live
-  // here until a proper 2D Settings exists; the explicit param (modal, tests)
+  // here until a proper 2D Settings exists; the explicit param (tests)
   // overrides the store.
   const storeNotchOptions = useSelector(
     (s: RootState) => s.tools.toolOptions?.notch as Partial<NotchOptions> | undefined,
@@ -325,6 +337,12 @@ export function useNotchTool(
     const { target } = commit;
     const piece = ringData.pieces.find(candidate => candidate.id === target.pieceId);
     if (!piece) return;
+    if (piece.locked) {
+      // El candado (maria-204) vale para todo lo que edita la pieza: Punto ya
+      // lo respetaba y Piquete escribía. Mismo aviso que los demás verbos.
+      dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+      return;
+    }
 
     if (commit.kind === 'click') {
       const exact = resolveTargetOnRing(target);
@@ -336,16 +354,11 @@ export function useNotchTool(
       }
       const notch = createNotchLine(exact.worldPoint, exact.normal, piece, effectiveOptions);
       onAddNotch(piece.id, notch);
-      // Click-then-refine (D-4): el modal solo abre cuando la posición fue una
-      // adivinanza. Un piquete sin ancla conserva el clic, pero no puede refinarse.
+      // Click-then-refine (D-4): la cota solo se abre cuando la posición fue
+      // una adivinanza. Un piquete sin ancla conserva el clic, pero no tiene
+      // desde dónde contar.
       if (notch.notchAnchor) {
-        setRefining({
-          pieceId: piece.id,
-          notch,
-          source: 'placement',
-          refWorld: pieceLocalToPattern(notch.notchAnchor.refPoint, piece),
-          notchWorld: exact.worldPoint,
-        });
+        setRefining({ pieceId: piece.id, lineId: notch.id, source: 'placement', sesion: ++sesiones.current });
       }
       return;
     }
@@ -362,7 +375,7 @@ export function useNotchTool(
       notchOptions: effectiveOptions,
       notchAnchor: placement.anchor,
     });
-  }, [ringData, resolveTargetOnRing, resolveDraggedNotch, effectiveOptions, onAddNotch]);
+  }, [ringData, resolveTargetOnRing, resolveDraggedNotch, effectiveOptions, onAddNotch, dispatch]);
 
   const gesture = useEdgeGesture({ resolveTarget, resolveReleaseT, onCommit });
   const handleMouseDown = gesture.handleMouseDown;
@@ -397,75 +410,51 @@ export function useNotchTool(
       return;
     }
 
-    // Se reconstruye desde la versión viva de Redux para que un menú abierto
-    // antes de otra edición no reviva geometría ni distancia obsoletas.
-    setRefining({
-      pieceId,
-      notch: liveLine,
-      source: 'existing',
-      refWorld: pieceLocalToPattern(liveLine.notchAnchor.refPoint, piece),
-      notchWorld: pieceLocalToPattern(resolved.point, piece),
-    });
+    // Solo se guarda qué piquete: lo demás se lee de Redux en cada render, así
+    // que un menú abierto antes de otra edición no revive geometría obsoleta.
+    setRefining({ pieceId, lineId: liveLine.id, source: 'existing', sesion: ++sesiones.current });
   }, [pieces]);
 
-  /** Apply edited distance/depth: resolve the anchor and regenerate the path. */
+  /** Escribe la distancia y la profundidad. La sesión sigue: Tab pasa a la profundidad, y la cierra el chip. */
   const confirmRefine = useCallback((distanceMm: number, depthMm: number) => {
-    if (!refining?.notch.notchAnchor) { setRefining(null); return; }
+    if (!refining) return;
     const piece = pieces.find(p => p.id === refining.pieceId);
-    if (!piece) { setRefining(null); return; }
-
-    const resolved = resolveNotchAnchor(piece.outline, { ...refining.notch.notchAnchor, distanceMm });
-    if (resolved) {
-      // La distancia que se PERSISTE es la que el anillo usó de verdad, no la
-      // cruda: `resolveNotchAnchor` envuelve a propósito (ver su JSDoc), y un
-      // registro que dice 450 sobre un contorno de 400 le anuncia a María un
-      // número falso — el toast lee este mismo campo (#1124).
-      const editedAnchor = { ...refining.notch.notchAnchor, distanceMm: resolved.distanceMm };
-      const opts: NotchOptions = { ...(refining.notch.notchOptions ?? effectiveOptions), length: depthMm };
-      const path = generateNotchPath(resolved.point, resolved.normal, opts);
-      const liveLine = piece.internals.find(l => l.id === refining.notch.id);
-      if (liveLine) {
-        onUpdateNotch?.(refining.pieceId, refining.notch.id, path, editedAnchor, opts);
-      } else {
-        // The committed line vanished while the modal was open (undo while
-        // the modal's input was blurred). Dispatching an update against a
-        // dead lineId would silently no-op and close as if success —
-        // confirming still owes the user a notch at the refined position,
-        // so re-add it.
-        onAddNotch(refining.pieceId, {
-          id: newId(),
-          type: 'notch',
-          path,
-          notchOptions: opts,
-          notchAnchor: editedAnchor,
-        });
-      }
-    } else {
-      // Mismo molde que el `else` de arriba, y con el mismo desenlace mudo: si
-      // el contorno se editó bajo el modal, el `refPoint` deja de caer sobre él
-      // y `resolveNotchAnchor` devuelve null. Sin esto, «Colocar exacto» cierra
-      // el panel como si hubiera colocado algo (#1124, hermano).
-      noPasoNada('notch:ancla-perdida', { pieceId: refining.pieceId, notchId: refining.notch.id });
+    const liveLine = piece?.internals.find(l => l.id === refining.lineId);
+    // La cota muere con su piquete, como toda cota (`aplicarCota`): un deshacer
+    // que se lo llevó no se contesta volviéndolo a poner.
+    if (!piece || liveLine?.type !== 'notch' || !liveLine.notchAnchor) { setRefining(null); return; }
+    const resolved = resolveNotchAnchor(piece.outline, { ...liveLine.notchAnchor, distanceMm });
+    if (!resolved) {
+      // Si el contorno cambió bajo la cota, el refPoint ya no cae sobre él:
+      // confirmar que no coloca tiene que decirlo (#1124, hermano).
+      noPasoNada('notch:ancla-perdida', { pieceId: piece.id, notchId: liveLine.id });
+      setRefining(null);
+      return;
     }
-    setRefining(null);
-  }, [refining, pieces, effectiveOptions, onUpdateNotch, onAddNotch]);
+    // La distancia que se PERSISTE es la que el anillo usó de verdad, no la
+    // cruda: `resolveNotchAnchor` envuelve a propósito (ver su JSDoc), y un
+    // registro que dice 450 sobre un contorno de 400 le anuncia a María un
+    // número falso: el aviso lee este mismo campo (#1124).
+    const editedAnchor = { ...liveLine.notchAnchor, distanceMm: resolved.distanceMm };
+    const opts: NotchOptions = { ...(liveLine.notchOptions ?? effectiveOptions), length: depthMm };
+    onUpdateNotch?.(piece.id, liveLine.id, generateNotchPath(resolved.point, resolved.normal, opts), editedAnchor, opts);
+    setRefining(prev => (prev ? { ...prev, previewWorld: null } : prev));
+  }, [refining, pieces, effectiveOptions, onUpdateNotch]);
 
-  /** Live landing point while typing a distance — feeds the canvas ghost marker. */
-  const previewRefine = useCallback((distanceMm: number) => {
+  /** Dónde quedará con lo que se está tecleando; `null` borra el fantasma. */
+  const previewRefine = useCallback((distanceMm: number | null) => {
     setRefining(prev => {
-      if (!prev?.notch.notchAnchor) return prev;
+      if (!prev) return prev;
+      if (distanceMm === null) return { ...prev, previewWorld: null };
       const piece = pieces.find(p => p.id === prev.pieceId);
-      if (!piece) return prev;
-      const resolved = resolveNotchAnchor(piece.outline, { ...prev.notch.notchAnchor, distanceMm });
-      if (!resolved) return { ...prev, previewWorld: null };
-      return {
-        ...prev,
-        previewWorld: pieceLocalToPattern(resolved.point, piece),
-      };
+      const line = piece?.internals.find(l => l.id === prev.lineId);
+      if (!piece || !line?.notchAnchor) return prev;
+      const resolved = resolveNotchAnchor(piece.outline, { ...line.notchAnchor, distanceMm });
+      return { ...prev, previewWorld: resolved ? pieceLocalToPattern(resolved.point, piece) : null };
     });
   }, [pieces]);
 
-  /** Keep the clicked placement; just close the refine state. */
+  /** Esc, Enter o el siguiente clic: el piquete se queda como está y la sesión se cierra. */
   const cancelRefine = useCallback(() => setRefining(null), []);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -491,16 +480,25 @@ export function useNotchTool(
     });
   }, [gesture, resolveTarget, resolveTargetOnRing]);
 
-  // El techo se mide contra la pieza de AHORA. Si el contorno encogió con el
-  // modal abierto, `distanceValid` del modal se vuelve falso solo, el botón se
-  // apaga y la pista anuncia el perímetro real (#1124).
+  // Todo se mide contra la pieza de AHORA: la línea, su ancla, la esquina, el
+  // piquete y el techo. Si el contorno encoge con la cota abierta, el techo de
+  // la cota encoge con él (#1124).
   const refiningConTecho = useMemo<NotchRefineState | null>(() => {
     if (!refining) return null;
     const piece = pieces.find(p => p.id === refining.pieceId);
-    if (!piece) return null;
+    const notch = piece?.internals.find(l => l.id === refining.lineId);
+    if (!piece || notch?.type !== 'notch' || !notch.notchAnchor) return null;
+    const resolved = resolveNotchAnchor(piece.outline, notch.notchAnchor);
+    if (!resolved) return null;
     return {
-      ...refining,
-      maxDistanceMm: outlinePerimeter(piece.outline, refining.notch.notchAnchor?.metric ?? 1),
+      pieceId: piece.id,
+      notch,
+      source: refining.source,
+      sesion: refining.sesion,
+      previewWorld: refining.previewWorld,
+      refWorld: pieceLocalToPattern(notch.notchAnchor.refPoint, piece),
+      notchWorld: pieceLocalToPattern(resolved.point, piece),
+      maxDistanceMm: outlinePerimeter(piece.outline, notch.notchAnchor.metric ?? 1),
     };
   }, [refining, pieces]);
 

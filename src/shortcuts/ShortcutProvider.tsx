@@ -88,10 +88,10 @@ export function ShortcutProvider({ children }: ShortcutProviderProps) {
         //
         // El detector es el del estandar y no una marca nuestra: `aria-modal`
         // dice exactamente «esto bloquea lo de atras». Y deja fuera, a
-        // proposito, a los dialogos NO modales, que es justo lo que hay que
-        // dejar fuera: `NotchPrecisionModal` es `role="dialog"` SIN velo, se
-        // abre junto a la pieza y el lienzo sigue vivo detras. Un detector
-        // por `role` lo habria apagado con los demas.
+        // proposito, lo que no es modal, que es justo lo que hay que dejar
+        // fuera: la cota del piquete (P3b) vive sobre el borde, junto a la
+        // pieza, y el lienzo sigue vivo detras. Un detector por `role` o por
+        // «hay algo abierto» la habria apagado con los demas.
         if (hayModalDelante()) {
           // Retirarse no es soltarle la tecla al NAVEGADOR: sin esto, Ctrl+R
           // detrás de un diálogo destructivo recarga la app entera y Ctrl+A

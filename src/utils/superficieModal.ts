@@ -13,9 +13,9 @@
  * nodos mientras el diálogo seguía preguntando.
  *
  * El detector es el del estándar y no una marca nuestra: `aria-modal` dice
- * exactamente «esto bloquea lo de atrás». Deja fuera a propósito a los
- * diálogos NO modales — `NotchPrecisionModal` es `role="dialog"` SIN velo, se
- * abre junto a la pieza y el lienzo sigue vivo detrás.
+ * exactamente «esto bloquea lo de atrás». Deja fuera a propósito lo que no
+ * es modal: la cota del piquete (P3b) vive sobre el borde, junto a la pieza,
+ * y el lienzo sigue vivo detrás.
  *
  * Y comprueba que se VEA. `AppShell` deja el panel 2D montado con
  * `display:none` en modo Solo 3D, y `CalibrationModal` vive dentro: sin esta
