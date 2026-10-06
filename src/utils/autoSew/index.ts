@@ -19,6 +19,7 @@ import { extractEdges, type Edge } from './edgeExtractor';
 import { scorePieceNames } from './namingHeuristics';
 import { matchEdgesByLength, lengthSimilarity } from './arcLengthMatcher';
 import { scoreEdgePair, rankAndDeduplicate, areDeclaredPartners, type ScoredSeamCandidate, type ScorerWeights } from './scorer';
+import { repartirCopas } from './repartoDeCopa';
 
 // ─── Seam engine versioning ──────────────────────────────────────────────────
 
@@ -27,10 +28,12 @@ import { scoreEdgePair, rankAndDeduplicate, areDeclaredPartners, type ScoredSeam
  * cambie de forma (splits, rangos, partners): las seams IA persistidas en
  * proyectos viejos quedan marcadas stale y el toast "Re-coser" ofrece
  * regenerarlas. Historia: 1 = splits M:N de sisa+collar + cierre de
- * collarEnds + fix reversed×rango (2026-07-04). Ausente en la seam = 0
- * (pre-versionado). Disciplina manual — si cambias la propuesta, súbela.
+ * collarEnds + fix reversed×rango (2026-07-04). 2 = la copa se parte donde
+ * cada mitad mide lo que su sisa, no en t = 0,5 (2026-10-06). Ausente en la
+ * seam = 0 (pre-versionado). Disciplina manual — si cambias la propuesta,
+ * súbela.
  */
-export const SEAM_ENGINE_VERSION = 1;
+export const SEAM_ENGINE_VERSION = 2;
 
 /**
  * ¿Es una seam IA generada por un motor anterior? El predicado de
@@ -251,10 +254,12 @@ export function autoSew(
   // partner ("chaleco + brazaletes").
   //
   // Split: cada costura cap↔armhole se parte en DOS medias costuras con
-  // rango parcial en el lado del cap (t 0-0.5 / 0.5-1 — la maquinaria de
-  // rangos + renormalizeFilteredT es de Fase 5), la segunda apuntando al
-  // mejor armhole NO consumido de OTRA pieza (ya scoreado por el pipeline —
-  // armhole↔sleeveCap son declared partners, siempre llegan al scorer).
+  // rango parcial en el lado del cap (aquí t 0-0.5 / 0.5-1; el corte de
+  // verdad lo pone repartirCopas al final, donde cada mitad mide lo que su
+  // sisa — la maquinaria de rangos + renormalizeFilteredT es de Fase 5), la
+  // segunda apuntando al mejor armhole NO consumido de OTRA pieza (ya
+  // scoreado por el pipeline — armhole↔sleeveCap son declared partners,
+  // siempre llegan al scorer).
   // Qué mitad va a cuál armhole y la dirección los decide worldRefine en
   // pose MUNDO (permutación del grupo bodice:armhole↔sleeve:sleevecap,
   // ahora de 4 miembros — cabe en MAX_GROUP_PERMUTE).
@@ -429,6 +434,11 @@ export function autoSew(
     reason: candidate.breakdown.reason,
     breakdown: candidate.breakdown,
   }));
+
+  // El corte de cada copa partida va donde cada mitad mide lo que la sisa que
+  // le tocó aquí; worldRefine lo vuelve a poner si cambia las parejas.
+  const repartidas = repartirCopas(seams.map(p => p.seam), activePieces);
+  seams.forEach((p, i) => { p.seam = repartidas[i]; });
 
   // ── Self-close pass (sleeve tube closure) ─────────────────────────────────
   // The pipeline above pairs only DISTINCT pieces (the i<j loop + the

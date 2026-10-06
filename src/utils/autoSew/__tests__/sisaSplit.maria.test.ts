@@ -10,10 +10,15 @@
  * sin quién la sostuviera ("chaleco + brazaletes").
  *
  * El fix: pase de SPLIT — cada costura cap↔armhole se parte en DOS medias
- * costuras con rango parcial en el lado del cap (t 0-0.5 / 0.5-1; la
- * maquinaria de rangos + renormalizeFilteredT es de Fase 5), apuntando a los
- * armholes de las DOS piezas del torso. worldRefine decide en pose MUNDO qué
- * mitad va a cuál armhole (permutación de grupo) y la dirección.
+ * costuras con rango parcial en el lado del cap (la maquinaria de rangos +
+ * renormalizeFilteredT es de Fase 5), apuntando a los armholes de las DOS
+ * piezas del torso. worldRefine decide en pose MUNDO qué mitad va a cuál
+ * armhole (permutación de grupo) y la dirección.
+ *
+ * Dónde se corta la copa (2026-10-06): donde cada mitad mide, en proporción,
+ * lo que su sisa (`repartirCopas`). Partida en t = 0,5, las sisas de María
+ * (230,6 y 219,9 mm) dejaban sus cuatro medias costuras a 5,2 y 5,5 mm, y el
+ * lienzo las marcaba con «⚠» sobre un patrón con 0,4 mm de embebido.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -24,6 +29,9 @@ import { detectSemanticEdges } from '../../semanticEdges';
 import { autoSew } from '../index';
 import { refineSeamsInWorld } from '../worldRefine';
 import { resolveArrangementWithFrames } from '../../cloth/arrangement/arrangementBinding';
+import { largosDeCostura } from '../../seam/largoCosido';
+import { SEAM_MISMATCH_THRESHOLD_MM } from '../../../components/PatternEditor/renderers/seamVisuals';
+import { auditNotches } from '../../../copilot/reasoning/proactiveAnalysis';
 import type { BodyMeasurements, PatternPiece, Seam } from '../../../types/types';
 
 const FIXTURE = resolve(__dirname, '../../../../tests/fixtures/garments/maria_patrones_samuel_2M.dxf');
@@ -92,21 +100,43 @@ describe('sisaSplit — el cap de cada manga se cose a los DOS armholes (delante
     for (const [sleeveId, seams] of bySleeve) {
       expect(seams.length, `manga ${sleeveId}: dos medias costuras`).toBe(2);
 
-      // Rangos FÍSICOS complementarios en el lado del cap: [0,0.5] + [0.5,1]
-      // (la unión debe ser el anillo COMPLETO — con el bug reversed×rango
-      // ambas medias daban la misma mitad física y esto fallaba).
+      // Rangos FÍSICOS complementarios en el lado del cap: [0, corte] +
+      // [corte, 1] (la unión debe ser el anillo COMPLETO — con el bug
+      // reversed×rango ambas medias daban la misma mitad física y esto fallaba).
       const ranges = seams
         .map(capPhysicalRange)
         .sort((a, b) => a[0] - b[0]);
       expect(ranges[0][0]).toBeCloseTo(0, 5);
-      expect(ranges[0][1]).toBeCloseTo(0.5, 5);
-      expect(ranges[1][0]).toBeCloseTo(0.5, 5);
+      expect(ranges[0][1]).toBeCloseTo(ranges[1][0], 9);
       expect(ranges[1][1]).toBeCloseTo(1, 5);
 
       // Los dos armholes viven en piezas DISTINTAS del torso (delantero + espalda)
       const armPieces = new Set(seams.map(s => armholeHalf(s).pieceId));
       expect(armPieces.size, `manga ${sleeveId}: armholes en dos piezas del torso`).toBe(2);
       expect(armPieces.has(sleeveId)).toBe(false);
+
+      // Cada mitad de la copa mide lo que su sisa, con la medida del lienzo:
+      // ninguna media costura llega a su aviso «⚠ N mm de diferencia».
+      for (const s of seams) {
+        const { a, b } = largosDeCostura(s, pieces);
+        expect(Math.abs(a! - b!), `${s.pieceA.edgeName} ↔ ${s.pieceB.edgeName}: ${a} contra ${b} mm`)
+          .toBeLessThan(SEAM_MISMATCH_THRESHOLD_MM);
+      }
+    }
+
+    // Y los dos piquetes de la copa caen sobre los de la sisa delantera: la
+    // mitad que los lleva va a la sisa que también los lleva.
+    expect(auditNotches(pieces, sisas).filter(w => /line up/i.test(w.message))).toEqual([]);
+  });
+
+  it('sin pose mundo (carga generativa, motor paramétrico), cada mitad de la copa mide lo que la sisa que eligió autoSew', () => {
+    const pieces = importMariaClassified();
+    const sisas = autoSew(pieces, { minConfidence: 0.3 }).seams.map(s => s.seam).filter(isSisa);
+    expect(sisas).toHaveLength(4);
+    for (const s of sisas) {
+      const { a, b } = largosDeCostura(s, pieces);
+      expect(Math.abs(a! - b!), `${s.pieceA.edgeName} ↔ ${s.pieceB.edgeName}: ${a} contra ${b} mm`)
+        .toBeLessThan(SEAM_MISMATCH_THRESHOLD_MM);
     }
   });
 

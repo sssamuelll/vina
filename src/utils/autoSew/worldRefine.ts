@@ -32,6 +32,7 @@ import type { PlacementWithFrame } from '../cloth/arrangement/arrangementBinding
 import { wrapPlacedMesh } from '../cloth/arrangement/wrapPlacedMesh';
 import { flattenPath, commandRangeToFlattened } from '../seam/index';
 import { mirrorPctRange } from '../seam/seamRange';
+import { repartirCopas } from './repartoDeCopa';
 
 type V3 = [number, number, number];
 
@@ -229,7 +230,7 @@ export function refineSeamsInWorld(
   }
 
   // ── 2. Direction (reversed) from endpoint geometry ───────────────────────
-  return seams.map((seam, i) => {
+  const refined = seams.map((seam, i) => {
     const r = resolved[i];
     if (!r) return seam;
 
@@ -255,4 +256,9 @@ export function refineSeamsInWorld(
       pieceB: { ...yStored, reversed },
     };
   });
+
+  // ── 3. Where each sleeve cap is cut ──────────────────────────────────────
+  // Step 1 may hand a cap half to the other armhole; the cut follows the
+  // FINAL partners, so each half measures what its armhole measures.
+  return repartirCopas(refined, pieces);
 }
