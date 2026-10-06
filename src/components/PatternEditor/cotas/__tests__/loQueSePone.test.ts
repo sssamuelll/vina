@@ -49,8 +49,9 @@ describe('cotasDelPiquete', () => {
 
   it('dos campos en un grupo: Distancia, con el largo del lado, y Profundidad de 1 a 30', () => {
     const cotas = cotasDelPiquete(refinando(), pieza, enVivo());
+    // El techo es el lado, el mismo que se lee: «de 300 mm» (revisión final de P3b).
     expect(cotas.map(c => [c.label, c.valueMm, c.min, c.max, c.unit])).toEqual([
-      ['Distancia', 60, 0, 1000, 'mm'],
+      ['Distancia', 60, 0, 300, 'mm'],
       ['Profundidad', 8, 1, 30, 'mm'],
     ]);
     expect(cotas[0].referenceLabel).toBe('de 300 mm');
@@ -65,12 +66,31 @@ describe('cotasDelPiquete', () => {
     expect(p.apply(12)).toEqual({ kind: 'piquete', distanciaMm: 60, profundidadMm: 12 });
   });
 
-  it('el hilo va de la esquina al piquete, o al fantasma mientras se escribe, y por fuera de la pieza', () => {
+  it('el hilo va de la esquina al piquete puesto, por fuera de la pieza', () => {
     const [d] = cotasDelPiquete(refinando(), pieza, enVivo());
     expect([d.a, d.b]).toEqual([{ x: 10, y: 20 }, { x: 70, y: 20 }]);
     expect(d.outward.y).toBeLessThan(0);
-    const [conFantasma] = cotasDelPiquete(refinando({ previewWorld: { x: 110, y: 20 } }), pieza, enVivo());
-    expect(conFantasma.b).toEqual({ x: 110, y: 20 });
+  });
+
+  it('el campo no se mueve mientras se escribe: el fantasma lo pinta el lienzo, no la cota', () => {
+    // Anclado al fantasma, el campo saltaba con cada tecla —a 125 px con «250»,
+    // dentro de la pieza con un valor que envuelve— (revisión final de P3b).
+    const quieto = cotasDelPiquete(refinando(), pieza, enVivo());
+    const conFantasma = cotasDelPiquete(refinando({ previewWorld: { x: 110, y: 20 } }), pieza, enVivo());
+    expect(conFantasma.map(c => [c.a, c.b, c.outward])).toEqual(quieto.map(c => [c.a, c.b, c.outward]));
+  });
+
+  it('una distancia guardada mayor que el lado sigue siendo válida: el techo no la deja atrapada', () => {
+    const r = refinando();
+    const lejos = { ...r, notch: { ...r.notch, notchAnchor: { ...r.notch.notchAnchor!, distanceMm: 450 } } };
+    expect(cotasDelPiquete(lejos, pieza, enVivo())[0].max).toBe(450);
+  });
+
+  it('sin lado que medir, el techo vuelve a ser el perímetro', () => {
+    const conAgujero: PatternPiece = { ...pieza, outline: [...rect, { type: 'M', values: [50, 50] }, { type: 'L', values: [60, 50] }, { type: 'L', values: [60, 60] }, { type: 'Z', values: [] }] };
+    const [d] = cotasDelPiquete(refinando(), conAgujero, enVivo());
+    expect(d.max).toBe(1000);
+    expect(d.referenceLabel).toBeUndefined();
   });
 
   it('solo la distancia mueve el fantasma; el cierre lo lleva la primera, que es la que monta el chip', () => {

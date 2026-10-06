@@ -17,6 +17,7 @@ import toolReducer from '../../../store/toolSlice';
 import workflowReducer from '../../../store/workflowSlice';
 import type { InternalLine, PatternPiece } from '../../../types/types';
 import PatternEditor from '../PatternEditor';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 
 afterEach(cleanup);
 
@@ -107,5 +108,17 @@ describe('PatternEditor — distancia exacta de un piquete existente', () => {
     expect(linea.path[0].values[0]).toBeCloseTo(60, 6);
     expect(screen.queryByRole('textbox', { name: 'Distancia' })).toBeNull();
     expect(view.container.querySelector('.notch-refine-marker')).toBeNull();
+  });
+
+  it('cerrar la cota sin escribir deja rastro en la bitácora (la caja negra ve todo gesto)', () => {
+    clearJournal();
+    const { view } = montar();
+    const svg = view.container.querySelector<SVGSVGElement>('svg.pattern-svg')!;
+    fireEvent.contextMenu(svg, { clientX: 42, clientY: 4 });
+    fireEvent.click(screen.getByRole('button', { name: /Ajustar distancia/ }));
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Distancia' }), { key: 'Escape' });
+    const nombres = getJournal().events.filter(e => e.kind === 'gesture').map(e => e.name);
+    expect(nombres).toContain('cota:loQueSePone');
+    expect(nombres).toContain('cota:loQueSePone:cierra');
   });
 });

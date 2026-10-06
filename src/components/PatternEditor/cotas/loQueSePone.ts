@@ -68,7 +68,9 @@ export function cotasDelPiquete(
   if (!anchor) return [];
   const profundidad = r.notch.notchOptions?.length ?? DEFAULT_NOTCH_OPTIONS.length;
   const lado = largoDelLado(piece.outline, anchor);
-  const b = r.previewWorld ?? r.notchWorld;
+  // El hilo va al piquete PUESTO, no al fantasma: anclado al fantasma, el campo
+  // saltaba con cada tecla. El fantasma lo pinta la marca del lienzo.
+  const b = r.notchWorld;
   const comun = {
     grupo: 'piquete',
     primary: true,
@@ -86,8 +88,11 @@ export function cotasDelPiquete(
       valueMm: anchor.distanceMm,
       unit: 'mm',
       min: 0,
-      // El perímetro, medido del contorno vivo (#1124): más allá envolvería.
-      max: r.maxDistanceMm,
+      // El lado, el mismo que se lee («de 300 mm»), medido del contorno vivo
+      // (#1124). Una distancia ya guardada más allá —la dejaba el modal, que
+      // envolvía hasta el perímetro— no queda atrapada; sin lado que medir
+      // (una pieza con agujero), el perímetro.
+      max: lado !== null ? Math.max(lado, anchor.distanceMm) : r.maxDistanceMm,
       ...(lado !== null ? { referenceLabel: `de ${formatMedida(lado, 'mm')}` } : {}),
       alEscribir: enVivo.alEscribir,
       alCerrar: enVivo.alCerrar,

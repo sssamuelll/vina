@@ -22,6 +22,7 @@ import {
 } from '../../store/undoMiddleware';
 import type { PathCommand, PatternPiece, Point2D } from '../../types/types';
 import { computeNotchAnchor } from '../../utils/notchAnchor';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
 import { pushJournal } from '../../utils/telemetry/journal';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { arcToNativeT } from '../../utils/geometry/arcToNative';
@@ -44,6 +45,9 @@ import { noPasoNada } from './noPasoNada';
 import { useEdgeGesture } from './useEdgeGesture';
 
 export type PointToolMode = 'point' | 'curvePoints' | 'bezier';
+
+/** Estable: un `{}` nuevo en cada render rehacía los callbacks que lo usan. */
+const SIN_CAPAS_BLOQUEADAS: Readonly<Record<number, boolean>> = {};
 
 /** Objetivo resuelto bajo el cursor (coords de mundo para el preview). */
 export interface PointToolTarget {
@@ -140,6 +144,9 @@ export function usePointTool(
   const [puesto, setPuesto] = useState<PuntoPuesto | null>(null);
   const loteRef = useRef<UndoBatchToken | null>(null);
   const sesiones = useRef(0);
+  // El candado de capa pesa igual que el de la pieza (#1136). Encadenado para
+  // los stores mínimos de los tests, sin `project`.
+  const layerLocked = useSelector((s: RootState) => s.project?.layerLocked) ?? SIN_CAPAS_BLOQUEADAS;
 
   /** Cierra la cota y su lote de deshacer: poner y terminar de poner es una sola entrada. */
   const terminarPuesto = useCallback(() => {
@@ -284,7 +291,7 @@ export function usePointTool(
     // que se escriba en ella. La pieza bloqueada la avisa el verbo.
     const poner = (commandIndex: number, nativeT: number) => {
       terminarPuesto();
-      if (piece.locked || !verbs.reinsertarPunto) {
+      if (piezaBloqueada(piece, layerLocked) || !verbs.reinsertarPunto) {
         verbs.addPointOnSegment(commandIndex, nativeT, piece.id);
         return;
       }
@@ -331,7 +338,7 @@ export function usePointTool(
     // esos números no coinciden, de ahí la conversión explícita.
     const nativeT = arcToNativeT(command, endpoints.start, at.tLocal);
     poner(at.commandIndex, nativeT);
-  }, [pieces, ringsByPiece, mode, verbs, terminarPuesto, dispatch]);
+  }, [pieces, ringsByPiece, mode, verbs, terminarPuesto, dispatch, layerLocked]);
 
   /** Lo que escribe la cota del punto: volver a ponerlo a esa distancia de la esquina. */
   const moverPuesto = useCallback((distanciaMm: number) => {

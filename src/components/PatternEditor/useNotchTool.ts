@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { showInfoToast } from '../../store/copilotUISlice';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
 import type { PatternPiece, Point2D, InternalLine, NotchOptions } from '../../types/types';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 import { computeNotchAnchor, resolveNotchAnchor, resolveNotchAnchorV2, outlinePerimeter } from '../../utils/notchAnchor';
@@ -34,6 +35,8 @@ import { distanceAnchorFrom, spanLengthMm, unwrapOnSpan } from './distanceCommit
  */
 
 const NOTCH_SIZE = 8; // mm in pattern space
+/** Estable: un `{}` nuevo en cada render rehacía los callbacks que lo usan. */
+const SIN_CAPAS_BLOQUEADAS: Readonly<Record<number, boolean>> = {};
 void NOTCH_SIZE; // reserved for future use
 
 interface NotchToolState {
@@ -175,6 +178,9 @@ export function useNotchTool(
   const [state, setState] = useState<NotchToolState>({ hoveredPoint: null });
   const [refining, setRefining] = useState<RefineGuardado | null>(null);
   const sesiones = useRef(0);
+  // El candado de capa pesa igual que el de la pieza (#1136). Encadenado para
+  // los stores mínimos de los tests del hook, sin `project`.
+  const layerLocked = useSelector((s: RootState) => s.project?.layerLocked) ?? SIN_CAPAS_BLOQUEADAS;
 
   // El refinamiento nacido del gesto pertenece a Piquete y muere al salir de
   // esa herramienta. El de una línea existente nace del menú contextual y no
@@ -337,7 +343,7 @@ export function useNotchTool(
     const { target } = commit;
     const piece = ringData.pieces.find(candidate => candidate.id === target.pieceId);
     if (!piece) return;
-    if (piece.locked) {
+    if (piezaBloqueada(piece, layerLocked)) {
       // El candado (maria-204) vale para todo lo que edita la pieza: Punto ya
       // lo respetaba y Piquete escribía. Mismo aviso que los demás verbos.
       dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
@@ -375,7 +381,7 @@ export function useNotchTool(
       notchOptions: effectiveOptions,
       notchAnchor: placement.anchor,
     });
-  }, [ringData, resolveTargetOnRing, resolveDraggedNotch, effectiveOptions, onAddNotch, dispatch]);
+  }, [ringData, resolveTargetOnRing, resolveDraggedNotch, effectiveOptions, onAddNotch, dispatch, layerLocked]);
 
   const gesture = useEdgeGesture({ resolveTarget, resolveReleaseT, onCommit });
   const handleMouseDown = gesture.handleMouseDown;
@@ -399,6 +405,12 @@ export function useNotchTool(
     const piece = pieces.find(candidate => candidate.id === pieceId);
     const liveLine = piece?.internals.find(candidate => candidate.id === line.id);
     if (!piece || liveLine?.type !== 'notch' || !liveLine.notchAnchor) return;
+    if (piezaBloqueada(piece, layerLocked)) {
+      // La puerta común de «Ajustar distancia…»: el menú no conoce el candado
+      // de capa, y su cota escribiría en la pieza.
+      dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+      return;
+    }
 
     const resolved = resolveNotchAnchor(piece.outline, liveLine.notchAnchor);
     if (!resolved) {
@@ -413,7 +425,7 @@ export function useNotchTool(
     // Solo se guarda qué piquete: lo demás se lee de Redux en cada render, así
     // que un menú abierto antes de otra edición no revive geometría obsoleta.
     setRefining({ pieceId, lineId: liveLine.id, source: 'existing', sesion: ++sesiones.current });
-  }, [pieces]);
+  }, [pieces, layerLocked, dispatch]);
 
   /** Escribe la distancia y la profundidad. La sesión sigue: Tab pasa a la profundidad, y la cierra el chip. */
   const confirmRefine = useCallback((distanceMm: number, depthMm: number) => {

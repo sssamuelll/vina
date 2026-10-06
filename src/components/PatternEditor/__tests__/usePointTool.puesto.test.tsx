@@ -12,6 +12,7 @@ import { Provider } from 'react-redux';
 import { configureStore, type Middleware } from '@reduxjs/toolkit';
 import toolReducer, { setToolOption } from '../../../store/toolSlice';
 import editorReducer, { setActiveTool } from '../../../store/editorSlice';
+import projectReducer, { setLayerLocked } from '../../../store/projectSlice';
 import { undoMiddleware } from '../../../store/undoMiddleware';
 import { usePointTool } from '../usePointTool';
 import { splitSegmentAt } from '../nodeEditorUtils';
@@ -33,17 +34,18 @@ const cuadrado = (over: Partial<PatternPiece> = {}): PatternPiece => ({
   layer: 1, sublayer: 0, active: true, createdAt: 0, updatedAt: 0, ...over,
 } as PatternPiece);
 
-function montar(inicial: PatternPiece = cuadrado()) {
+function montar(inicial: PatternPiece = cuadrado(), opciones: { capaBloqueada?: boolean } = {}) {
   const acciones: Accion[] = [];
   const captura: Middleware = () => next => action => {
     acciones.push(action as Accion);
     return next(action);
   };
   const store = configureStore({
-    reducer: { tools: toolReducer, editor: editorReducer },
+    reducer: { tools: toolReducer, editor: editorReducer, project: projectReducer },
     middleware: gDM => gDM({ serializableCheck: false }).concat(captura, undoMiddleware),
   });
   store.dispatch(setActiveTool('point' as Tool2D));
+  if (opciones.capaBloqueada) store.dispatch(setLayerLocked({ layer: 1, locked: true }));
   // Como Redux: lo que escribe el verbo está en el render siguiente.
   let piezas = [inicial];
   const verbs = {
@@ -187,6 +189,14 @@ describe('el punto recién puesto trae su cota', () => {
     const h = montar(cuadrado({ locked: true }));
     click(h.ref, { x: 30, y: 0 });
     expect(h.verbs.addPointOnSegment).toHaveBeenCalledTimes(1);
+    expect(h.verbs.addPointOnSegment.mock.calls[0][3]).toBeUndefined();
+    expect(h.ref.current!.puesto).toBeNull();
+    expect(tipos(h.acciones)).not.toContain('undo/startBatch');
+  });
+
+  it('una pieza de capa bloqueada tampoco abre cota ni lote: el candado de capa pesa igual (#1136)', () => {
+    const h = montar(cuadrado(), { capaBloqueada: true });
+    click(h.ref, { x: 30, y: 0 });
     expect(h.verbs.addPointOnSegment.mock.calls[0][3]).toBeUndefined();
     expect(h.ref.current!.puesto).toBeNull();
     expect(tipos(h.acciones)).not.toContain('undo/startBatch');

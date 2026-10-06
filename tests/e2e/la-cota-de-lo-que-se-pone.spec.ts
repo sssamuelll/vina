@@ -127,6 +127,9 @@ test.describe('la cota de lo que se pone (P3b)', () => {
     await expect(campo(page, 'Distancia')).toBeFocused();
     expect(await numero(page, 'Distancia')).toBeCloseTo(60, 0);
 
+    // Más de 500 ms entre el clic y el número: dos escrituras iguales más
+    // seguidas se funden solas, y entonces el deshacer único no probaría el lote.
+    await page.waitForTimeout(700);
     await campo(page, 'Distancia').fill('120');
     await campo(page, 'Distancia').press('Enter');
     await expect(campo(page, 'Distancia')).toHaveCount(0);

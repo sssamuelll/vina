@@ -13,6 +13,7 @@ import type React from 'react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import toolReducer, { setToolOption } from '../../../store/toolSlice';
+import projectReducer, { setLayerLocked } from '../../../store/projectSlice';
 import editorReducer, { setActiveTool } from '../../../store/editorSlice';
 import { useNotchTool } from '../useNotchTool';
 import type { InternalLine, PatternPiece } from '../../../types/types';
@@ -230,6 +231,39 @@ describe('useNotchTool — la pieza bloqueada (maria-204)', () => {
     act(() => { result.current.handleMouseMove(fakeEvent(70, 0)); });
     act(() => { result.current.handleMouseUp(fakeEvent(70, 0)); });
     expect(onAddNotch).not.toHaveBeenCalled();
+    expect(result.current.refining).toBeNull();
+  });
+});
+
+describe('useNotchTool — la capa bloqueada pesa igual que la pieza (piezaBloqueada, #1136)', () => {
+  function conCapaBloqueada() {
+    const store = configureStore({ reducer: { tools: toolReducer, project: projectReducer } });
+    store.dispatch(setLayerLocked({ layer: 1, locked: true }));
+    const onAddNotch = vi.fn();
+    const wrapper = ({ children }: { children: React.ReactNode }) => createElement(Provider, { store, children });
+    return { store, onAddNotch, wrapper };
+  }
+
+  it('el clic no pone el piquete en una pieza de capa bloqueada', () => {
+    const { onAddNotch, wrapper } = conCapaBloqueada();
+    const { result } = renderHook(
+      () => useNotchTool(1, { x: 0, y: 0 }, [{ ...makeSquare(), layer: 1 }], onAddNotch),
+      { wrapper },
+    );
+    act(() => { result.current.handleMouseDown(fakeEvent(30, 0)); });
+    act(() => { result.current.handleMouseUp(fakeEvent(30, 0)); });
+    expect(onAddNotch).not.toHaveBeenCalled();
+  });
+
+  it('«Ajustar distancia…» no abre la cota sobre ella', () => {
+    const { onAddNotch, wrapper } = conCapaBloqueada();
+    const line: InternalLine = {
+      id: 'n', type: 'notch', path: [{ type: 'M', values: [30, 0] }, { type: 'L', values: [30, 8] }],
+      notchAnchor: { refPoint: { x: 0, y: 0 }, direction: 'cw', distanceMm: 30, metric: 2 },
+    };
+    const pieza = { ...makeSquare(), layer: 1, internals: [line] };
+    const { result } = renderHook(() => useNotchTool(1, { x: 0, y: 0 }, [pieza], onAddNotch), { wrapper });
+    act(() => { result.current.refineExisting(pieza.id, line); });
     expect(result.current.refining).toBeNull();
   });
 });

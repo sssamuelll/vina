@@ -913,11 +913,19 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     if (piquetePuesto && piezaDelPiquete) {
       return cotasDelPiquete(piquetePuesto, piezaDelPiquete, {
         alEscribir: (mm) => notchRef.current.previewRefine(mm),
-        alCerrar: () => notchRef.current.cancelRefine(),
+        alCerrar: () => {
+          // Enter, Esc, Tab o el siguiente clic: la caja negra ve también el
+          // cierre que no escribió (lo que sí escribe deja su `cota:commit`).
+          pushJournal('gesture', 'cota:loQueSePone:cierra', { que: 'piquete' });
+          notchRef.current.cancelRefine();
+        },
       });
     }
     if (puntoPuesto && piezaDelPunto) {
-      return [cotaDelPunto(puntoPuesto, piezaDelPunto, () => pointRef.current.terminarPuesto())];
+      return [cotaDelPunto(puntoPuesto, piezaDelPunto, () => {
+        pushJournal('gesture', 'cota:loQueSePone:cierra', { que: 'punto' });
+        pointRef.current.terminarPuesto();
+      })];
     }
     return null;
   }, [piquetePuesto, piezaDelPiquete, puntoPuesto, piezaDelPunto]);

@@ -398,11 +398,13 @@ export function useEditPattern(zoom: number, pan: Point2D) {
    */
   const guardLocked = useCallback(
     (piece: PatternPiece): boolean => {
-      if (!piece.locked) return false;
+      // El candado de capa pesa igual que el de la pieza (#1136): Q ya no
+      // deja entrar en una pieza de capa bloqueada, y sus verbos tampoco.
+      if (!piezaBloqueada(piece, layerLocked)) return false;
       dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
       return true;
     },
-    [dispatch],
+    [dispatch, layerLocked],
   );
 
   /** La clave de la interna elegida en ESTA pieza, o null (spec § 3.5). */
