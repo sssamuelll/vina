@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fraseDeLaFase, fraseDelPie, LO_QUE_SE_PONE, type FaseDeLaHerramienta } from '../fraseDeLaFase';
+import { fraseDeLaFase, fraseDelPie, LO_QUE_SE_PONE, LO_QUE_SE_PONE_EL_PUNTO, type FaseDeLaHerramienta } from '../fraseDeLaFase';
 import { displayModifierKey } from '../../shell/shortcutDisplay';
 
 /**
@@ -198,11 +198,17 @@ describe('las cuatro que estrenan frase (spec § 5.4)', () => {
 });
 
 describe('la cota de lo que se pone (spec 2026-10-02 § 5.2)', () => {
-  it('con la cota abierta, la frase dice cómo terminar de ponerlo, con cualquier herramienta', () => {
-    for (const activeTool of ['notch', 'point', 'select'] as const) {
-      expect(fraseDeLaFase({ ...base, activeTool, loQueSePone: true })).toBe(LO_QUE_SE_PONE);
+  it('con la cota del piquete abierta, la frase dice cómo terminar de ponerlo, con cualquier herramienta', () => {
+    for (const activeTool of ['notch', 'select'] as const) {
+      expect(fraseDeLaFase({ ...base, activeTool, loQueSePone: 'piquete' })).toBe(LO_QUE_SE_PONE);
     }
     expect(LO_QUE_SE_PONE).toBe('Escribe la distancia · Enter fija · Esc no lo mueve');
+  });
+
+  it('la del punto descansa en reposo: la frase dice que se abre con un clic, y cómo se cierra', () => {
+    expect(fraseDeLaFase({ ...base, activeTool: 'point', loQueSePone: 'punto' })).toBe(LO_QUE_SE_PONE_EL_PUNTO);
+    expect(LO_QUE_SE_PONE_EL_PUNTO).toMatch(/clic/i);
+    expect(LO_QUE_SE_PONE_EL_PUNTO).toMatch(/\bEsc\b/);
   });
 });
 
@@ -219,7 +225,7 @@ const TODAS: Array<Partial<FaseDeLaHerramienta>> = [
   { activeTool: 'measure' }, { activeTool: 'measure', medidaEmpezada: true },
   { activeTool: 'seam', seamPhase: 'idle' }, { activeTool: 'seam', seamPhase: 'holdingA' },
   { activeTool: 'seamEdit', hasSeams: false }, { activeTool: 'seamEdit', hasSeams: true },
-  { activeTool: 'seamAllowance', saDefaultWidthMm: 10 }, { activeTool: 'notch' }, { activeTool: 'notch', loQueSePone: true },
+  { activeTool: 'seamAllowance', saDefaultWidthMm: 10 }, { activeTool: 'notch' }, { activeTool: 'notch', loQueSePone: 'piquete' }, { activeTool: 'point', loQueSePone: 'punto' },
   { activeTool: 'topstitchSeamline', topstitchMode: 'seamline' }, { activeTool: 'topstitchSegment', topstitchMode: 'segment' },
   { activeTool: 'topstitchFree', topstitchMode: 'free' }, { activeTool: 'topstitchEdit', topstitchMode: 'edit' },
   { activeTool: 'hand' }, { activeTool: 'measureCurve' }, { activeTool: 'compareCurves' }, { activeTool: 'offsetOutline' },
@@ -250,7 +256,8 @@ describe('cada frase, en español y en una línea', () => {
     const PRESUPUESTO: Array<[Partial<FaseDeLaHerramienta>, number]> = [
       [{ activeTool: 'internalShape', internalShapeNodesLength: 2 }, 85],
       [{ activeTool: 'notch' }, 55],
-      [{ activeTool: 'notch', loQueSePone: true }, 55],
+      [{ activeTool: 'notch', loQueSePone: 'piquete' }, 55],
+      [{ activeTool: 'point', loQueSePone: 'punto' }, 85],
       [{ activeTool: 'scissors', tijerasEmpezadas: true }, 85],
       [{ activeTool: 'topstitchSeamline', topstitchMode: 'seamline' }, 40],
       [{ activeTool: 'topstitchSegment', topstitchMode: 'segment' }, 40],

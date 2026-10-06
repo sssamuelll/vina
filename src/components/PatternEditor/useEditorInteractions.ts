@@ -158,6 +158,8 @@ interface ToolHooks {
   };
   pointTool: {
     armed: boolean;
+    /** El punto recién puesto con su cota a la vista (P3b): Esc la cierra. */
+    puesto?: unknown;
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -689,8 +691,9 @@ export function useEditorInteractions(
       }
       if (e.key !== 'Escape') return null;
       // Tool Punto armado: cancelar SOLO la colocación pendiente (el hook hace
-      // preventDefault + stopPropagation). Sin armar, el Esc fluye normal.
-      if (activeTool === 'point' && pointTool.armed) {
+      // preventDefault + stopPropagation). Con la cota del punto recién puesto
+      // a la vista, Esc la cierra (P3b). Si no, el Esc fluye normal.
+      if (activeTool === 'point' && (pointTool.armed || pointTool.puesto)) {
         pointTool.handleKeyDown(e);
         return 'point';
       }

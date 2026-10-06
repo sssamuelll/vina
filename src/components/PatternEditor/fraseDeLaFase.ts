@@ -15,8 +15,13 @@ const CON_DOS_GUIAS = new Set<Tool2D>(['pen', 'internalShape', 'editPattern']);
 
 const COTAS = 'Clic en una cota para escribirla · arrástrala para ajustar · Tab pasa a la siguiente · Esc suelta';
 
-/** La cota de lo que se pone está abierta (spec 2026-10-02 § 5.2). Cabe en el hueco del piquete (55). */
+/** La cota del piquete recién puesto está abierta (spec 2026-10-02 § 5.2). Cabe en el hueco del piquete (55). */
 export const LO_QUE_SE_PONE = 'Escribe la distancia · Enter fija · Esc no lo mueve';
+/**
+ * La del punto descansa en reposo: no se lleva el foco, para que las teclas
+ * sigan siendo del lienzo (la firma D3 de María: pone un punto y pulsa Q).
+ */
+export const LO_QUE_SE_PONE_EL_PUNTO = 'Clic en la cota para ponerlo a una distancia exacta · Esc la cierra';
 
 /**
  * Con Shift pulsado, la frase de la Pluma, la Línea interna y `Q` la sustituye
@@ -61,8 +66,8 @@ export interface FaseDeLaHerramienta {
   segundoMarco?: AngleReference['kind'] | null;
   /** El tamaño con que un clic crea el rectángulo (spec 2026-08-30 § 3.1). */
   rectanguloPorDefecto?: { width: number; height: number };
-  /** El piquete o el punto que se está poniendo tiene su cota abierta: gana a cualquier herramienta. */
-  loQueSePone?: boolean;
+  /** El piquete o el punto que se está poniendo tiene su cota a la vista: gana a cualquier herramienta. */
+  loQueSePone?: 'piquete' | 'punto' | null;
   /** Tijeras: el primer punto del corte ya está puesto. */
   tijerasEmpezadas?: boolean;
   /** Medir: el primer punto ya está puesto. */
@@ -80,7 +85,8 @@ export interface FaseDeLaHerramienta {
  */
 export function fraseDeLaFase(f: FaseDeLaHerramienta): string | null {
   const tool = f.activeTool;
-  if (f.loQueSePone) return LO_QUE_SE_PONE;
+  if (f.loQueSePone === 'piquete') return LO_QUE_SE_PONE;
+  if (f.loQueSePone === 'punto') return LO_QUE_SE_PONE_EL_PUNTO;
   // El editor de nodos tiene su propia frase, y gana: dos a la vez se pisaban.
   if (f.nodeEditorIsEditing) return 'Editando nodos · arrastra para mover · Esc para salir';
   if (f.modoShift && f.modoShift !== 'suelto' && f.segundoMarco && CON_DOS_GUIAS.has(tool)) {

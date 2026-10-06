@@ -382,11 +382,28 @@ export function usePointTool(
     }
   }, [activeTool, cancelGesture, terminarPuesto]);
 
+  // La cota del punto descansa en reposo (no se lleva el foco), así que su vida
+  // la cierran los demás: el siguiente clic, Esc, otra herramienta, o que el
+  // punto ya no sea el nuestro —un deshacer se lo llevó—. En ese caso se va sola.
+  const vivaDelPuesto = puesto ? pieces.find(pc => pc.id === puesto.pieceId) : undefined;
+  useEffect(() => {
+    if (puesto && vivaDelPuesto?.outline !== puesto.esperado) {
+      pushJournal('gesture', 'punto:puesto-perdido', { pieceId: puesto.pieceId });
+      terminarPuesto();
+    }
+  }, [puesto, vivaDelPuesto, terminarPuesto]);
+
   // Desmontar con la cota abierta no deja el lote colgado.
   useEffect(() => () => {
     const lote = loteRef.current;
     if (lote && isUndoBatchTokenActive(lote)) endUndoBatch(dispatch, lote);
   }, [dispatch]);
+
+  /** El siguiente clic en el lienzo cierra la cota del punto anterior, ponga o no otro. */
+  const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    terminarPuesto();
+    gesture.handleMouseDown(e);
+  }, [gesture, terminarPuesto]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     gesture.handleMouseMove(e);
@@ -398,16 +415,26 @@ export function usePointTool(
     setHover(resolveHover(e));
   }, [gesture, resolveHover]);
 
-  /** Esc con colocación armada = cancelar SOLO eso (coordinación CF-1). */
+  /**
+   * Esc con colocación armada = cancelar SOLO eso (coordinación CF-1). Sin
+   * colocación, y con la cota del punto a la vista, Esc cierra la cota: el
+   * punto se queda donde se puso, y la tecla no sigue a la selección.
+   */
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && gesture.isArmed()) {
+      if (e.key !== 'Escape') return;
+      if (gesture.isArmed()) {
         gesture.cancel();
-        e.preventDefault();
-        e.stopPropagation();
+      } else if (puesto) {
+        pushJournal('gesture', 'cota:loQueSePone:cierra', { que: 'punto', via: 'esc' });
+        terminarPuesto();
+      } else {
+        return;
       }
+      e.preventDefault();
+      e.stopPropagation();
     },
-    [gesture],
+    [gesture, puesto, terminarPuesto],
   );
 
   const getCursor = useCallback((): string => {
@@ -420,7 +447,7 @@ export function usePointTool(
     hover,
     mode,
     armed: gesture.phase !== 'idle',
-    handleMouseDown: gesture.handleMouseDown,
+    handleMouseDown,
     handleMouseMove,
     handleMouseUp,
     handleKeyDown,

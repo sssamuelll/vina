@@ -116,7 +116,7 @@ test.describe('la cota de lo que se pone (P3b)', () => {
     expect((await piquetes(page))[0].path).toEqual(piquete.path);
   });
 
-  test('el punto trae su cota; Enter lo mueve, y un Ctrl+Z lo quita entero', async ({ page }) => {
+  test('el punto trae su cota en reposo; un clic la abre, Enter lo mueve, y un Ctrl+Z lo quita entero', async ({ page }) => {
     await unaPieza(page);
     await dispatch(page, 'editor/setActiveTool', 'point');
     await dispatch(page, 'tools/setActiveTool2D', 'point');
@@ -124,6 +124,11 @@ test.describe('la cota de lo que se pone (P3b)', () => {
     await clickAt(page, { x: 160, y: 100 });
 
     await expect.poll(async () => (await contorno(page)).length).toBe(6);
+    // En reposo: no se lleva el foco, las teclas siguen siendo del lienzo.
+    const chip = page.getByRole('button', { name: /^Distancia: / });
+    await expect(chip).toBeVisible();
+    await expect(campo(page, 'Distancia')).toHaveCount(0);
+    await chip.click();
     await expect(campo(page, 'Distancia')).toBeFocused();
     expect(await numero(page, 'Distancia')).toBeCloseTo(60, 0);
 
@@ -140,6 +145,26 @@ test.describe('la cota de lo que se pone (P3b)', () => {
 
     await page.keyboard.press('Control+z');
     await expect.poll(async () => (await contorno(page)).length).toBe(5);
+  });
+
+  test('Esc cierra la cota del punto y lo deja; con otra a la vista, la Q sigue cambiando de herramienta (firma D3)', async ({ page }) => {
+    await unaPieza(page);
+    await dispatch(page, 'editor/setActiveTool', 'point');
+    await dispatch(page, 'tools/setActiveTool2D', 'point');
+    await page.waitForTimeout(300);
+    const chip = page.getByRole('button', { name: /^Distancia: / });
+
+    await clickAt(page, { x: 160, y: 100 });
+    await expect(chip).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(chip).toHaveCount(0);
+    expect(await contorno(page), 'Esc se llevó el punto').toHaveLength(6);
+
+    await clickAt(page, { x: 220, y: 100 });
+    await expect(chip).toBeVisible();
+    await activarHerramienta(page, 'q', 'editPattern');
+    await expect(chip).toHaveCount(0);
+    expect(await contorno(page)).toHaveLength(7);
   });
 
   test('en Split, la cota cae dentro de la hoja y nada la tapa', async ({ page }) => {

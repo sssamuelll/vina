@@ -1031,10 +1031,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     }
   }, [activeTool, tramoSeq, tramoEnCurso, markPrecisionUsed]);
 
-  // La cota de lo que se pone se abre sola, una vez por sesión: el clic que
-  // puso el piquete deja el número listo para teclear, como lo dejaba el modal.
-  const claveDeLoQueSePone = piquetePuesto ? `piquete:${piquetePuesto.sesion}`
-    : puntoPuesto ? `punto:${puntoPuesto.sesion}` : '';
+  // La cota del piquete se abre sola, una vez por sesión: el clic que lo puso
+  // deja el número listo para teclear, como lo dejaba el modal. La del punto
+  // no: descansa en reposo y las teclas siguen siendo del lienzo (firma D3).
+  const claveDeLoQueSePone = piquetePuesto ? `piquete:${piquetePuesto.sesion}` : '';
   const loQueSePoneVisto = useRef('');
   useEffect(() => {
     if (loQueSePoneVisto.current === claveDeLoQueSePone) return;
@@ -1043,10 +1043,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     const abrio = cotasRef.current?.abrirPrimero() ?? false;
     pushJournal('gesture', 'cota:loQueSePone', { clave: claveDeLoQueSePone, abrio });
     // Sin chip, la sesión no tendría quien la cerrara.
-    if (!abrio) {
-      notchRef.current.cancelRefine();
-      pointRef.current.terminarPuesto();
-    }
+    if (!abrio) notchRef.current.cancelRefine();
   }, [claveDeLoQueSePone]);
 
   // Tab sobre la pieza abre la caja del lado (#1167). Igual que el tramo
@@ -1525,7 +1522,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     tijerasEmpezadas: scissorsTool.startPoint !== null,
     medidaEmpezada: measureTool.currentStart !== null,
     modoDelPunto: (toolOptions?.point?.mode as PointToolMode | undefined) ?? 'point',
-    loQueSePone: loQueSePone !== null,
+    loQueSePone: loQueSePone === null ? null : piquetePuesto ? 'piquete' : 'punto',
   });
 
   return (

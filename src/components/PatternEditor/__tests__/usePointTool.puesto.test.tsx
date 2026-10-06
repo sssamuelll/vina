@@ -202,6 +202,33 @@ describe('el punto recién puesto trae su cota', () => {
     expect(tipos(h.acciones)).not.toContain('undo/startBatch');
   });
 
+  it('Esc quita la cota sin mover el punto, y la tecla no sigue de largo', () => {
+    const h = montar();
+    click(h.ref, { x: 30, y: 0 });
+    const esc = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    act(() => h.ref.current!.handleKeyDown(esc));
+    expect(h.ref.current!.puesto).toBeNull();
+    expect(esc.defaultPrevented).toBe(true);
+    expect(h.verbs.reinsertarPunto).not.toHaveBeenCalled();
+    expect(tipos(h.acciones)).toContain('undo/endBatch');
+  });
+
+  it('el siguiente clic en el lienzo cierra la cota, aunque no ponga nada', () => {
+    const h = montar();
+    click(h.ref, { x: 30, y: 0 });
+    click(h.ref, { x: 300, y: 300 }); // lejos de todo borde
+    expect(h.verbs.addPointOnSegment).toHaveBeenCalledTimes(1);
+    expect(h.ref.current!.puesto).toBeNull();
+  });
+
+  it('si el punto deja de estar (un deshacer se lo llevó), la cota se va sola', () => {
+    const h = montar();
+    click(h.ref, { x: 30, y: 0 });
+    h.cambiaPiezas([cuadrado()]);
+    expect(h.ref.current!.puesto).toBeNull();
+    expect(tipos(h.acciones)).toContain('undo/endBatch');
+  });
+
   it('curva por puntos y bezier no abren cota', () => {
     const h = montar();
     act(() => { h.store.dispatch(setToolOption({ toolId: 'point', optionId: 'mode', value: 'curvePoints' })); });
