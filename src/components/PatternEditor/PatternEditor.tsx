@@ -18,7 +18,7 @@ import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import { AgruparCotas } from './cotas/CotaChip';
 import CotaLines from './cotas/CotaLines';
 import { admiteLado, cotasDelSujeto, faltaSujeto, refinarAlLado } from './cotas/sujeto';
-import { cotasDelPiquete } from './cotas/loQueSePone';
+import { cotaDelPunto, cotasDelPiquete } from './cotas/loQueSePone';
 import { cotasALaVista, pasarTurno, TURNO_INICIAL, type TurnoDeCota } from './cotas/unaALaVez';
 import { ladoDelHit } from './cotas/lado';
 import { usePuertaDeLado } from './usePuertaDeLado';
@@ -351,6 +351,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
   // puerta común con el menú contextual, mismo candado, mismo re-anclaje.
   const pointToolHook = usePointTool(zoom2D, pan2D, pieces, {
     addPointOnSegment: editPatternTool.addPointOnSegment,
+    reinsertarPunto: editPatternTool.reinsertarPunto,
     convertSegment: editPatternTool.convertSegment,
     convertSegmentToPoints: editPatternTool.convertSegmentToPoints,
   });
@@ -902,8 +903,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
   // en refs para que `aplicarCota` y las cotas no se rehagan en cada render.
   const notchRef = useRef(notchTool);
   notchRef.current = notchTool;
+  const pointRef = useRef(pointToolHook);
+  pointRef.current = pointToolHook;
   const piquetePuesto = notchTool.refining;
   const piezaDelPiquete = piquetePuesto ? pieces.find(p => p.id === piquetePuesto.pieceId) : undefined;
+  const puntoPuesto = pointToolHook.puesto;
+  const piezaDelPunto = puntoPuesto ? pieces.find(p => p.id === puntoPuesto.pieceId) : undefined;
   const loQueSePone = useMemo(() => {
     if (piquetePuesto && piezaDelPiquete) {
       return cotasDelPiquete(piquetePuesto, piezaDelPiquete, {
@@ -911,8 +916,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
         alCerrar: () => notchRef.current.cancelRefine(),
       });
     }
+    if (puntoPuesto && piezaDelPunto) {
+      return [cotaDelPunto(puntoPuesto, piezaDelPunto, () => pointRef.current.terminarPuesto())];
+    }
     return null;
-  }, [piquetePuesto, piezaDelPiquete]);
+  }, [piquetePuesto, piezaDelPiquete, puntoPuesto, piezaDelPunto]);
 
   const sujetoSinLado = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
@@ -1017,7 +1025,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
 
   // La cota de lo que se pone se abre sola, una vez por sesión: el clic que
   // puso el piquete deja el número listo para teclear, como lo dejaba el modal.
-  const claveDeLoQueSePone = piquetePuesto ? `piquete:${piquetePuesto.sesion}` : '';
+  const claveDeLoQueSePone = piquetePuesto ? `piquete:${piquetePuesto.sesion}`
+    : puntoPuesto ? `punto:${puntoPuesto.sesion}` : '';
   const loQueSePoneVisto = useRef('');
   useEffect(() => {
     if (loQueSePoneVisto.current === claveDeLoQueSePone) return;
@@ -1026,7 +1035,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     const abrio = cotasRef.current?.abrirPrimero() ?? false;
     pushJournal('gesture', 'cota:loQueSePone', { clave: claveDeLoQueSePone, abrio });
     // Sin chip, la sesión no tendría quien la cerrara.
-    if (!abrio) notchRef.current.cancelRefine();
+    if (!abrio) {
+      notchRef.current.cancelRefine();
+      pointRef.current.terminarPuesto();
+    }
   }, [claveDeLoQueSePone]);
 
   // Tab sobre la pieza abre la caja del lado (#1167). Igual que el tramo
@@ -1145,6 +1157,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     } else if (update.kind === 'piquete') {
       // Lo escribe la herramienta, que sabe regenerar el path desde el ancla.
       notchRef.current.confirmRefine(update.distanciaMm, update.profundidadMm);
+    } else if (update.kind === 'punto') {
+      // Moverlo es volver a ponerlo desde la pieza de antes del clic.
+      pointRef.current.moverPuesto(update.distanciaMm);
     } else if (update.kind === 'nodo') {
       // Lo escribe `useEditPattern`, no este archivo: es quien ya mueve nodos
       // en el arrastre, con compensación de pivote, re-anclado de piquetes y

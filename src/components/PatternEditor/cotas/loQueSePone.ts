@@ -1,10 +1,13 @@
 import type { PathCommand, PatternPiece, Point2D } from '../../../types/types';
-import { buildRing, projectToRing } from '../../../utils/geometry/outlineRing';
+import { buildRing, pointAt, projectToRing } from '../../../utils/geometry/outlineRing';
+import { getEdgeEndpoints } from '../../../utils/geometry/path';
+import { arcToNativeT } from '../../../utils/geometry/arcToNative';
 import { computeBoundingBox, bboxPivot } from '../../../utils/geometry/transform';
 import { pieceLocalToPattern } from '../../../utils/geometry/pieceSpace';
 import { detectCorners } from '../../../utils/notchAnchor';
 import { DEFAULT_NOTCH_OPTIONS } from '../../../utils/notches';
 import type { NotchRefineState } from '../useNotchTool';
+import type { PuntoPuesto } from '../usePointTool';
 import { normalHaciaFuera, type Cota } from './cotas';
 import { formatMedida } from './parseMedida';
 
@@ -103,4 +106,56 @@ export function cotasDelPiquete(
       apply: (mm) => ({ kind: 'piquete', distanciaMm: anchor.distanceMm, profundidadMm: mm }),
     },
   ];
+}
+
+/**
+ * Dónde cae el punto a `distanciaMm` de la esquina, contado por el arco
+ * (métrica 2), como lo pide `splitSegmentAt`: comando y parámetro NATIVO. En
+ * una sisa, la fracción de arco y la de De Casteljau no coinciden.
+ * `'sobre-un-punto'` si cae encima de un vértice (partir ahí lo duplicaría);
+ * `null` si no cae en ningún comando.
+ */
+export function dondeCaeElPunto(
+  outline: PathCommand[],
+  cuenta: Cuenta,
+  distanciaMm: number,
+): { commandIndex: number; nativeT: number } | 'sobre-un-punto' | null {
+  const built = buildRing(outline, 2);
+  if (!built.ok) return null;
+  const ring = built.value;
+  const desde = projectToRing(ring, cuenta.refPoint).distanceMm;
+  const at = pointAt(ring, cuenta.direction === 'cw' ? desde + distanciaMm : desde - distanciaMm);
+  const comando = outline[at.commandIndex];
+  const extremos = getEdgeEndpoints(outline, at.commandIndex);
+  if (!comando || !extremos || comando.type === 'M') return null;
+  if (at.tLocal < 1e-6 || at.tLocal > 1 - 1e-6) return 'sobre-un-punto';
+  return { commandIndex: at.commandIndex, nativeT: arcToNativeT(comando, extremos.start, at.tLocal) };
+}
+
+/**
+ * El punto recién puesto (spec 2026-10-02 § 5.2): «una cota con la distancia a
+ * la esquina, escribible, que vive hasta el siguiente clic o Esc». Es
+ * terminar de ponerlo, no editar un punto que ya existía. El techo es el
+ * lado: pasar de la esquina siguiente lo pondría en otro.
+ */
+export function cotaDelPunto(p: PuntoPuesto, viva: PatternPiece, alCerrar: () => void): Cota {
+  const a = pieceLocalToPattern(p.cuenta.refPoint, viva);
+  const b = pieceLocalToPattern(p.vertice, viva);
+  return {
+    id: 'punto-distancia',
+    kind: 'borde',
+    label: 'Distancia',
+    valueMm: p.distanciaMm,
+    unit: 'mm',
+    min: 0,
+    max: p.ladoMm,
+    referenceLabel: `de ${formatMedida(p.ladoMm, 'mm')}`,
+    primary: true,
+    scrub: false,
+    a,
+    b,
+    outward: normalHaciaFuera(a, b, centroDe(viva)),
+    alCerrar,
+    apply: (mm) => ({ kind: 'punto', distanciaMm: mm }),
+  };
 }

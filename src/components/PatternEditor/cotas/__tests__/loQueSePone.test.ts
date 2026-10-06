@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { largoDelLado, cotasDelPiquete } from '../loQueSePone';
+import { largoDelLado, cotasDelPiquete, dondeCaeElPunto, cotaDelPunto } from '../loQueSePone';
 import type { NotchRefineState } from '../../useNotchTool';
+import type { PuntoPuesto } from '../../usePointTool';
+import { splitSegmentAt, getAnchor } from '../../nodeEditorUtils';
+import { buildRing, projectToRing } from '../../../../utils/geometry/outlineRing';
 import type { PathCommand, PatternPiece } from '../../../../types/types';
 import { DEFAULT_NOTCH_OPTIONS } from '../../../../utils/notches';
 
@@ -82,5 +85,51 @@ describe('cotasDelPiquete', () => {
   it('sin ancla no hay cota', () => {
     const r = refinando();
     expect(cotasDelPiquete({ ...r, notch: { ...r.notch, notchAnchor: undefined } }, pieza, enVivo())).toEqual([]);
+  });
+});
+
+describe('dondeCaeElPunto', () => {
+  const esquina = { x: 0, y: 0 };
+  it('en un lado recto, la fracción nativa del comando', () => {
+    expect(dondeCaeElPunto(rect, { refPoint: esquina, direction: 'cw' }, 120)).toEqual({ commandIndex: 1, nativeT: expect.closeTo(0.4, 9) });
+  });
+  it('en sentido contrario cuenta hacia atrás, por el cierre', () => {
+    // Del (0,0) hacia atrás está el cierre Z, de (0,200) a (0,0): 50 mm antes del final.
+    expect(dondeCaeElPunto(rect, { refPoint: esquina, direction: 'ccw' }, 50)).toEqual({ commandIndex: 4, nativeT: expect.closeTo(0.75, 9) });
+  });
+  it('sobre un punto que ya existe no hay sitio nuevo', () => {
+    expect(dondeCaeElPunto(rect, { refPoint: esquina, direction: 'cw' }, 300)).toBe('sobre-un-punto');
+    expect(dondeCaeElPunto(rect, { refPoint: esquina, direction: 'cw' }, 0)).toBe('sobre-un-punto');
+  });
+  it('en una curva, el punto cae a esa distancia medida por el arco, no por el parámetro', () => {
+    const curva: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [40, -60, 160, -60, 200, 0] },
+      { type: 'L', values: [200, 100] }, { type: 'L', values: [0, 100] }, { type: 'Z', values: [] },
+    ];
+    const donde = dondeCaeElPunto(curva, { refPoint: esquina, direction: 'cw' }, 70);
+    if (donde === null || donde === 'sobre-un-punto') throw new Error('sin sitio');
+    const partida = splitSegmentAt(curva, donde.commandIndex, donde.nativeT);
+    const vertice = getAnchor(partida[donde.commandIndex])!;
+    const anillo = buildRing(partida, 2);
+    if (!anillo.ok) throw new Error('sin anillo');
+    expect(projectToRing(anillo.value, vertice).distanceMm).toBeCloseTo(70, 2);
+  });
+});
+
+describe('cotaDelPunto', () => {
+  const puesto: PuntoPuesto = {
+    pieceId: 'p', base: pieza, cuenta: { refPoint: { x: 0, y: 0 }, direction: 'cw' },
+    distanciaMm: 60, ladoMm: 300, vertice: { x: 60, y: 0 }, esperado: rect, sesion: 1,
+  };
+  it('la distancia a la esquina, con el lado de techo y el largo junto al número', () => {
+    const alCerrar = vi.fn();
+    const c = cotaDelPunto(puesto, pieza, alCerrar);
+    expect([c.label, c.valueMm, c.min, c.max, c.referenceLabel]).toEqual(['Distancia', 60, 0, 300, 'de 300 mm']);
+    expect([c.a, c.b]).toEqual([{ x: 10, y: 20 }, { x: 70, y: 20 }]);
+    expect(c.outward.y).toBeLessThan(0);
+    expect(c.alCerrar).toBe(alCerrar);
+    expect(c.alEscribir).toBeUndefined();
+    expect(c.apply(120)).toEqual({ kind: 'punto', distanciaMm: 120 });
   });
 });

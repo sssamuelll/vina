@@ -11,10 +11,18 @@
  *
  * Gramática completa: propuesta de Petra Haft, sesión maria dock-tool-puntos.
  */
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useSelector } from 'react-redux';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import type { PatternPiece, Point2D } from '../../types/types';
+import {
+  beginUndoBatch,
+  endUndoBatch,
+  isUndoBatchTokenActive,
+  type UndoBatchToken,
+} from '../../store/undoMiddleware';
+import type { PathCommand, PatternPiece, Point2D } from '../../types/types';
+import { computeNotchAnchor } from '../../utils/notchAnchor';
+import { pushJournal } from '../../utils/telemetry/journal';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { arcToNativeT } from '../../utils/geometry/arcToNative';
 import {
@@ -26,7 +34,8 @@ import {
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { edgeRangeForCommand } from '../../utils/semanticEdges';
 import { patternToPieceLocal, pieceLocalToPattern } from './useEditPattern';
-import { extractNodes, hitTestNode, nearestSegment, type EditableNode } from './nodeEditorUtils';
+import { extractNodes, getAnchor, hitTestNode, nearestSegment, type EditableNode } from './nodeEditorUtils';
+import { dondeCaeElPunto, largoDelLado, type Cuenta } from './cotas/loQueSePone';
 import { spanLengthMm, unwrapOnSpan } from './distanceCommit';
 import { edgeSpanMm } from './edgeArc';
 import type { EdgeCommit, EdgeTarget } from './edgeGesture';
@@ -56,6 +65,24 @@ export interface PointToolHover {
    * 'locked'   → pieza bloqueada: not-allowed; el verbo avisa al soltar.
    */
   reason: 'ok' | 'anchor' | 'curveMode' | 'locked';
+}
+
+/**
+ * El punto que se está terminando de poner (spec 2026-10-02 § 5.2). `base` es
+ * la pieza de antes del clic: mover el punto es volver a ponerlo desde ella.
+ */
+export interface PuntoPuesto {
+  pieceId: string;
+  base: PatternPiece;
+  cuenta: Cuenta;
+  distanciaMm: number;
+  /** El lado desde la esquina, en el sentido de la cuenta: el techo de la cota. */
+  ladoMm: number;
+  /** El vértice puesto, en coordenadas locales. */
+  vertice: Point2D;
+  /** El contorno que se escribió: si el vivo ya no es este, el punto ya no es el nuestro. */
+  esperado: PathCommand[];
+  sesion: number;
 }
 
 interface PointEdgeTarget extends EdgeTarget {
@@ -101,12 +128,26 @@ export function usePointTool(
   pan: Point2D,
   pieces: PatternPiece[],
   verbs: {
-    addPointOnSegment: (commandIndex: number, t: number, pieceId?: string) => void;
+    addPointOnSegment: (commandIndex: number, t: number, pieceId?: string, undoBatchToken?: UndoBatchToken) => PathCommand[] | null | void;
+    /** Opcional para los arneses viejos: sin él, el punto se pone y no trae cota. */
+    reinsertarPunto?: (base: PatternPiece, commandIndex: number, t: number, undoBatchToken?: UndoBatchToken) => PathCommand[] | null;
     convertSegment: (commandIndex: number, toCurve: boolean, pieceId?: string) => void;
     convertSegmentToPoints: (commandIndex: number, pieceId?: string) => void;
   },
 ) {
+  const dispatch = useDispatch();
   const [hover, setHover] = useState<PointToolHover | null>(null);
+  const [puesto, setPuesto] = useState<PuntoPuesto | null>(null);
+  const loteRef = useRef<UndoBatchToken | null>(null);
+  const sesiones = useRef(0);
+
+  /** Cierra la cota y su lote de deshacer: poner y terminar de poner es una sola entrada. */
+  const terminarPuesto = useCallback(() => {
+    const lote = loteRef.current;
+    loteRef.current = null;
+    if (lote && isUndoBatchTokenActive(lote)) endUndoBatch(dispatch, lote);
+    setPuesto(null);
+  }, [dispatch]);
 
   const mode: PointToolMode = useSelector((s: RootState) => {
     const opts = s.tools.toolOptions?.point as { mode?: PointToolMode } | undefined;
@@ -239,8 +280,38 @@ export function usePointTool(
       return;
     }
 
+    // Poner el punto abre su cota: un lote de deshacer para el punto y todo lo
+    // que se escriba en ella. La pieza bloqueada la avisa el verbo.
+    const poner = (commandIndex: number, nativeT: number) => {
+      terminarPuesto();
+      if (piece.locked || !verbs.reinsertarPunto) {
+        verbs.addPointOnSegment(commandIndex, nativeT, piece.id);
+        return;
+      }
+      const lote = beginUndoBatch(dispatch, 'Poner punto');
+      const escrito = verbs.addPointOnSegment(commandIndex, nativeT, piece.id, lote);
+      const vertice = escrito ? getAnchor(escrito[commandIndex]) : null;
+      const ancla = vertice ? computeNotchAnchor(piece.outline, vertice, 2) : null;
+      const ladoMm = ancla ? largoDelLado(piece.outline, ancla) : null;
+      if (!escrito || !vertice || !ancla || ladoMm === null) {
+        endUndoBatch(dispatch, lote);
+        return;
+      }
+      loteRef.current = lote;
+      setPuesto({
+        pieceId: piece.id,
+        base: piece,
+        cuenta: { refPoint: ancla.refPoint, direction: ancla.direction },
+        distanciaMm: ancla.distanceMm,
+        ladoMm,
+        vertice,
+        esperado: escrito,
+        sesion: ++sesiones.current,
+      });
+    };
+
     if (commit.kind === 'click') {
-      verbs.addPointOnSegment(target.edgeIndex, target.nativeT, target.pieceId);
+      poner(target.edgeIndex, target.nativeT);
       return;
     }
 
@@ -259,8 +330,37 @@ export function usePointTool(
     // final del verbo, habla en parámetro nativo de De Casteljau. En una sisa
     // esos números no coinciden, de ahí la conversión explícita.
     const nativeT = arcToNativeT(command, endpoints.start, at.tLocal);
-    verbs.addPointOnSegment(at.commandIndex, nativeT, target.pieceId);
-  }, [pieces, ringsByPiece, mode, verbs]);
+    poner(at.commandIndex, nativeT);
+  }, [pieces, ringsByPiece, mode, verbs, terminarPuesto, dispatch]);
+
+  /** Lo que escribe la cota del punto: volver a ponerlo a esa distancia de la esquina. */
+  const moverPuesto = useCallback((distanciaMm: number) => {
+    const p = puesto;
+    if (!p || !verbs.reinsertarPunto) return;
+    const viva = pieces.find(pc => pc.id === p.pieceId);
+    // ponytail: la vida del punto se mide por el contorno que escribimos. Un
+    // cambio de la pieza que no toque el contorno (moverla desde la IA con la
+    // cota abierta) se perdería al volver a ponerlo desde la pieza de antes.
+    if (!viva || viva.outline !== p.esperado) {
+      pushJournal('gesture', 'punto:puesto-perdido', { pieceId: p.pieceId });
+      terminarPuesto();
+      return;
+    }
+    const donde = dondeCaeElPunto(p.base.outline, p.cuenta, distanciaMm);
+    if (donde === null) {
+      noPasoNada('point:sin-comando', { pieceId: p.pieceId });
+      return;
+    }
+    if (donde === 'sobre-un-punto') {
+      noPasoNada('point:sobre-un-punto', { pieceId: p.pieceId, distanciaMm });
+      return;
+    }
+    const lote = loteRef.current && isUndoBatchTokenActive(loteRef.current) ? loteRef.current : undefined;
+    const escrito = verbs.reinsertarPunto(p.base, donde.commandIndex, donde.nativeT, lote);
+    const vertice = escrito ? getAnchor(escrito[donde.commandIndex]) : null;
+    if (!escrito || !vertice) return;
+    setPuesto({ ...p, distanciaMm, vertice, esperado: escrito });
+  }, [puesto, pieces, verbs, terminarPuesto]);
 
   const gesture = useEdgeGesture({ resolveTarget, resolveReleaseT, onCommit });
   const { cancel: cancelGesture } = gesture;
@@ -271,8 +371,15 @@ export function usePointTool(
     if (activeTool !== 'point') {
       setHover(null);
       cancelGesture();
+      terminarPuesto();
     }
-  }, [activeTool, cancelGesture]);
+  }, [activeTool, cancelGesture, terminarPuesto]);
+
+  // Desmontar con la cota abierta no deja el lote colgado.
+  useEffect(() => () => {
+    const lote = loteRef.current;
+    if (lote && isUndoBatchTokenActive(lote)) endUndoBatch(dispatch, lote);
+  }, [dispatch]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     gesture.handleMouseMove(e);
@@ -311,5 +418,9 @@ export function usePointTool(
     handleMouseUp,
     handleKeyDown,
     getCursor,
+    /** El punto recién puesto, con su cota abierta (spec 2026-10-02 § 5.2). */
+    puesto,
+    moverPuesto,
+    terminarPuesto,
   };
 }

@@ -582,3 +582,50 @@ describe('maria-218 — un verbo sobre otra pieza no reescribe las anclas del ov
     expect(hook.result.current.nodes).toHaveLength(5);
   });
 });
+
+describe('reinsertarPunto (P3b): volver a poner el punto recién puesto', () => {
+  const edges = [
+    { id: 'e-top', name: 'top', segmentRange: [1, 2], edgeType: 'seam' },
+    { id: 'e-right', name: 'right', segmentRange: [2, 3], edgeType: 'seam' },
+    { id: 'e-bottom', name: 'bottom', segmentRange: [3, 4], edgeType: 'seam' },
+    { id: 'e-left', name: 'left', segmentRange: [4, 5], edgeType: 'seam' },
+  ] as unknown as PatternPiece['edges'];
+
+  function montar(viva: PatternPiece) {
+    const store = configureStore({ reducer: { project: projectReducer } });
+    store.dispatch(restoreState({ ...store.getState().project, pieces: [viva] }));
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <Provider store={store}>{children}</Provider>
+    );
+    const hook = renderHook(() => useEditPattern(1, { x: 0, y: 0 }), { wrapper });
+    const viva0 = () => (store.getState() as { project: { pieces: PatternPiece[] } }).project.pieces[0];
+    return { hook, viva0 };
+  }
+
+  it('parte de la pieza de antes: un solo vértice de más, y los bordes como en una sola inserción', () => {
+    const base = { ...piece(), edges } as PatternPiece;
+    const { hook, viva0 } = montar(base);
+    act(() => { hook.result.current.addPointOnSegment(1, 0.3, 'p'); });
+    expect(viva0().outline).toHaveLength(6);
+
+    let escrito: ReturnType<typeof hook.result.current.reinsertarPunto> = null;
+    act(() => { escrito = hook.result.current.reinsertarPunto(base, 1, 0.7); });
+
+    const viva = viva0();
+    expect(viva.outline).toHaveLength(6);
+    expect(viva.outline).toBe(escrito);
+    expect(viva.outline[1].values).toEqual([140, 0]);
+    expect(viva.outline.some(c => c.values[0] === 60 && c.values[1] === 0)).toBe(false);
+    // El borde de arriba gana el comando nuevo; los demás se corren uno, una sola vez.
+    expect(viva.edges!.map(e => e.segmentRange)).toEqual([[1, 3], [3, 4], [4, 5], [5, 6]]);
+  });
+
+  it('el candado se mira en la pieza viva, no en la de antes', () => {
+    const base = { ...piece(), edges } as PatternPiece;
+    const { hook, viva0 } = montar({ ...base, locked: true });
+    let escrito: ReturnType<typeof hook.result.current.reinsertarPunto> = null;
+    act(() => { escrito = hook.result.current.reinsertarPunto(base, 1, 0.7); });
+    expect(escrito).toBeNull();
+    expect(viva0().outline).toHaveLength(5);
+  });
+});

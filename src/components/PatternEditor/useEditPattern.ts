@@ -35,6 +35,7 @@ import {
 } from './nodeEditorUtils';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { piezaBloqueada } from '../../utils/piezaBloqueada';
+import { reindexEdges } from '../../utils/edgeReindex';
 import { indiceSegunLosBordes } from '../../utils/semanticEdges';
 import { convertSegmentToSpline, resmoothAfterMove, toManualBezier } from './splineSegment';
 import { guiasShift, type GuiaShift, type GuiasShift } from './restriccionShift';
@@ -1171,12 +1172,34 @@ export function useEditPattern(zoom: number, pan: Point2D) {
    * varados. `pieceId` explícito para callers fuera del modo edición.
    */
   const addPointOnSegment = useCallback(
-    (commandIndex: number, t: number, pieceId?: string) => {
+    (commandIndex: number, t: number, pieceId?: string, undoBatchToken?: UndoBatchToken): PathCommand[] | null => {
       const piece = getPiece(pieceId ?? state.editingPieceId);
-      if (!piece || guardLocked(piece)) return;
-      escribirContorno(piece, splitSegmentAt(piece.outline, commandIndex, t));
+      if (!piece || guardLocked(piece)) return null;
+      const outline = splitSegmentAt(piece.outline, commandIndex, t);
+      escribirContorno(piece, outline, undoBatchToken);
+      return outline;
     },
     [state.editingPieceId, getPiece, escribirContorno, guardLocked],
+  );
+
+  /**
+   * Vuelve a poner el punto recién puesto en otro sitio del mismo contorno
+   * (spec 2026-10-02 § 5.2): parte de la pieza de ANTES del clic, así que es lo
+   * mismo que si el clic hubiera caído ahí. No deja un vértice de más, y los
+   * piquetes se re-anclan desde el contorno original. El candado se mira en la
+   * pieza viva.
+   */
+  const reinsertarPunto = useCallback(
+    (base: PatternPiece, commandIndex: number, t: number, undoBatchToken?: UndoBatchToken): PathCommand[] | null => {
+      const viva = getPiece(base.id);
+      if (!viva || guardLocked(viva)) return null;
+      const outline = splitSegmentAt(base.outline, commandIndex, t);
+      // El reductor reindexa los bordes solo cuando cambia el número de
+      // comandos, y aquí no cambia: el contorno vivo ya tiene el punto del clic.
+      escribirContorno({ ...base, edges: reindexEdges(base.edges, base.outline, outline) }, outline, undoBatchToken);
+      return outline;
+    },
+    [getPiece, escribirContorno, guardLocked],
   );
 
   // ─── getCursor ───
@@ -1218,6 +1241,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
     convertSegmentToPoints,
     convertSegmentToBezier,
     addPointOnSegment,
+    reinsertarPunto,
     moveNodeTo,
     limpiarHover,
     getCursor,
