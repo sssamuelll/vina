@@ -10,11 +10,10 @@ import { abrirPanel } from './helpers/estados';
  * un navegador para encontrarla.
  *
  * Dos de las cuatro se verificaron a mano en Chrome (SolverMetrics y
- * ToolTooltip). Las otras dos viven detrás de flujos que hay que conducir:
+ * ToolTooltip). Las otras dos vivían detrás de flujos que hay que conducir:
+ * `NotchPrecisionModal` se fue en P3b (el piquete se escribe en su cota,
+ * sobre el borde) y queda la otra:
  *
- *  - `NotchPrecisionModal`  1000 → --z-menu (200), reclasificado A LA BAJA
- *    porque su propio archivo dice "deliberately no scrim/backdrop": no
- *    bloquea, así que no es un modal.
  *  - `ConnectionModal`      200 → --z-modal (1100), reclasificado AL ALZA
  *    porque sí tiene velo y sí bloquea.
  *
@@ -25,13 +24,6 @@ import { abrirPanel } from './helpers/estados';
  * defecto que tumbó al Grupo 2, y hay que comprobar que el Grupo 1 no lo
  * repite.
  */
-
-interface VentanaConStore {
-  __VINA_STORE__: {
-    dispatch: (a: { type: string; payload?: unknown }) => void;
-    getState: () => { tools: { activeTool2D: string } };
-  };
-}
 
 /** Resultado del sondeo de apilamiento de una superficie. */
 interface Apilamiento {
@@ -48,36 +40,6 @@ interface Apilamiento {
 async function esperarApp(page: Page) {
   await page.goto('/app/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 20000 });
-  await page.waitForTimeout(600);
-}
-
-/**
- * Siembra un rectángulo. El e2e arranca con proyecto vacío, y el piquete
- * necesita un contorno donde caer. Un lado recto es el caso que SÍ produce
- * `notchAnchor`, que es la condición para que el modal abra (D-4,
- * click-then-refine).
- */
-async function sembrarRectangulo(page: Page) {
-  await page.evaluate(() => {
-    const w = 300, h = 400;
-    (window as unknown as VentanaConStore).__VINA_STORE__.dispatch({
-      type: 'project/addPiece',
-      payload: {
-        id: 'emplazamiento-rect',
-        name: 'Rectángulo de prueba',
-        outline: [
-          { type: 'M', values: [0, 0] },
-          { type: 'L', values: [w, 0] },
-          { type: 'L', values: [w, h] },
-          { type: 'L', values: [0, h] },
-          { type: 'Z', values: [] },
-        ],
-        position: { x: 120, y: 120 },
-        internals: [], rotation: 0, mirrored: false, seamAllowance: 0,
-        layer: 1, sublayer: 0, active: true, createdAt: 1, updatedAt: 1,
-      },
-    });
-  });
   await page.waitForTimeout(600);
 }
 
@@ -162,72 +124,7 @@ async function sondearApilamiento(page: Page, selector: string): Promise<Apilami
 // está en `emplazamiento-paneles.spec.ts` (atascos de 20 a 50 s, 2026-10-02).
 test.describe.configure({ timeout: process.env.CI ? 240_000 : 90_000 });
 
-test.describe('Emplazamiento — las dos reclasificaciones que solo se ven en el navegador', () => {
-  test('NotchPrecisionModal: reclasificado a --z-menu, le sigue ganando al cromo', async ({ page }) => {
-    await esperarApp(page);
-    await sembrarRectangulo(page);
-
-    // El piquete abre el modal solo al hacer clic (click-then-refine, D-4):
-    // el modal aparece cuando la posición fue una adivinanza y hay ancla.
-    // Activar una herramienta 2D son DOS hechos, no uno: `editor.activeTool`
-    // decide qué hace un clic en el lienzo y `tools.activeTool2D` es la clave
-    // de opciones. Ponerle solo el segundo la deja activada a medias — lo dice
-    // `toolActivation.ts`, y es exactamente lo que pasó al escribir este test.
-    await page.evaluate(() => {
-      const st = (window as unknown as VentanaConStore).__VINA_STORE__;
-      st.dispatch({ type: 'editor/setActiveTool', payload: 'notch' });
-      st.dispatch({ type: 'tools/setActiveTool2D', payload: 'notch' });
-    });
-    await expect
-      .poll(() => page.evaluate(
-        () => (window as unknown as VentanaConStore).__VINA_STORE__.getState().tools.activeTool2D,
-      ))
-      .toBe('notch');
-    await page.waitForTimeout(300);
-
-    // Clic sobre el borde de una pieza. Se prueban varios puntos del contorno
-    // porque el piquete necesita caer sobre el anillo, no sobre el relleno.
-    const svg = page.locator('svg.pattern-svg');
-    const caja = await svg.boundingBox();
-    expect(caja).not.toBeNull();
-
-    const pieza = page.locator('g.pattern-piece').first();
-    await expect(pieza).toBeVisible();
-    const cajaPieza = await pieza.boundingBox();
-    expect(cajaPieza).not.toBeNull();
-
-    // El piquete tiene que caer sobre el anillo del contorno, no sobre el
-    // relleno. Se barren varios puntos del borde izquierdo hasta que el modal
-    // abra; si ninguno acierta, el test falla en vez de dar un verde falso.
-    const modal = page.locator('.notch-precision-modal');
-    let abierto = false;
-    for (const frac of [0.5, 0.35, 0.65, 0.25, 0.75]) {
-      await page.mouse.click(cajaPieza!.x + 1, cajaPieza!.y + cajaPieza!.height * frac);
-      await page.waitForTimeout(400);
-      if (await modal.count() > 0 && await modal.first().isVisible()) { abierto = true; break; }
-    }
-    expect(abierto, 'ningún clic sobre el borde izquierdo abrió el modal de piquete').toBe(true);
-
-    // La barra de IA ya no está en reposo (P2c): se convoca para medir contra
-    // ella. Antes sale el foco del campo del modal, que se queda las teclas.
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-    await page.keyboard.press('Control+/');
-    await expect(page.locator('.unified-bar')).toBeVisible();
-    await expect(modal.first(), 'convocar la barra cerró el modal del piquete').toBeVisible();
-
-    await page.screenshot({ path: 'test-results/emplazamiento-notch-modal.png', fullPage: false });
-
-    const sondeo = await sondearApilamiento(page, '.notch-precision-modal');
-    expect(sondeo.existe).toBe(true);
-    // 200 (--z-menu): por encima de las dos barras (100), por debajo de un
-    // menú contextual (1000) y de un modal de verdad (1100).
-    expect(sondeo.zIndex).toBe('200');
-    expect(sondeo.encerradoPor).toEqual([]);
-    // El cromo no puede quedar por delante: eso sería el defecto de vuelta.
-    expect(sondeo.ganaSobreTopBar.join(' ')).not.toMatch(/top-bar|app-shell/);
-    expect(sondeo.ganaSobreBarraIA.join(' ')).not.toMatch(/unified-bar/);
-  });
-
+test.describe('Emplazamiento — la reclasificación que solo se ve en el navegador', () => {
   test('ConnectionModal: reclasificado a --z-modal, ¿le gana al cromo de verdad?', async ({ page }) => {
     await esperarApp(page);
 

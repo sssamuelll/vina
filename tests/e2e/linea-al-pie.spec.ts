@@ -152,15 +152,15 @@ test('las opciones del piquete son botones a un clic, y lo que se escoge es lo q
   expect((await medirPie(page)).frase!.recortada, 'la frase no cabe junto a las cuatro opciones').toBe(false);
 
   // Se pone uno: el clic tiene que caer sobre el contorno, así que se prueban
-  // varios puntos del lado izquierdo, como en emplazamiento-modales. Esc deja
-  // el piquete donde se hizo clic (el modal vive hasta P3).
-  const modal = page.locator('.notch-precision-modal');
+  // varios puntos del lado izquierdo. La sonda es la cota del piquete (P3b),
+  // que se abre con el clic; Esc deja el piquete donde se hizo clic.
+  const cota = page.locator('input.cota--editando[aria-label="Distancia"]');
   for (const y of [320, 260, 380, 220, 420]) {
     await clickAt(page, { x: 120, y });
     await page.waitForTimeout(250);
-    if (await modal.isVisible()) break;
+    if (await cota.isVisible()) break;
   }
-  await expect(modal, 'ningún clic sobre el borde puso el piquete').toBeVisible();
+  await expect(cota, 'ningún clic sobre el borde puso el piquete').toBeVisible();
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await piquetesDe(page, 'piquete-pie')).at(-1))
     .toMatchObject({ shape: 't-notch', count: 2, length: 9 });

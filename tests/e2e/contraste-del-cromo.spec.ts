@@ -196,22 +196,23 @@ test('lo que flota sobre la hoja: aviso, diálogo, tooltip y menús', async ({ p
   await page.keyboard.press('Escape');
 });
 
-test('los modales: el del piquete y el de conexión', async ({ page }) => {
+test('la cota del piquete y el modal de conexión', async ({ page }) => {
   await addPiece(page, 'piquete', { x: 120, y: 120 }, 300, 400);
   await reposo(page);
   await activarHerramienta(page, 'Shift+N', 'notch');
   // El piquete tiene que caer sobre el contorno y no en el relleno: se
-  // prueban varios puntos del lado izquierdo, como en emplazamiento-modales.
-  const modal = page.locator('.notch-precision-modal');
+  // prueban varios puntos del lado izquierdo. Desde P3b el clic abre su cota
+  // sobre el borde (el modal se fue).
+  const cota = page.locator('input.cota--editando[aria-label="Distancia"]');
   for (const y of [320, 260, 380, 220, 420]) {
     await clickAt(page, { x: 120, y });
     await page.waitForTimeout(250);
-    if (await modal.isVisible()) break;
+    if (await cota.isVisible()) break;
   }
-  await expect(modal, 'ningún clic sobre el borde abrió el modal del piquete').toBeVisible();
-  await registrar('modal del piquete', page);
+  await expect(cota, 'ningún clic sobre el borde abrió la cota del piquete').toBeVisible();
+  await registrar('cota del piquete', page);
   await page.keyboard.press('Escape');
-  await expect(modal).toHaveCount(0);
+  await expect(cota).toHaveCount(0);
 
   // Preferencias (P2c) monta AgentSettings → ConnectionsList → ConnectionModal.
   await abrirPanel(page, 'IA y ratón', 'IA y ratón');
