@@ -10,6 +10,9 @@
  *
  * Orden crítico bajo test: proponer PRIMERO (0 propuestas → no borrar nada),
  * borrar stale, añadir dedupando SOLO contra supervivientes humanas.
+ *
+ * Abajo, runAutoSew sobre la camisa de María: la puerta por la que la app
+ * cose (menú del logo / ⌘K), con su pose mundo de verdad (2026-10-06).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -17,8 +20,11 @@ import { resolve } from 'path';
 import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, { addSeam, restoreProject } from '../projectSlice';
 import { undoMiddleware } from '../undoMiddleware';
-import { resewAiSeams } from '../autoSewThunk';
+import { resewAiSeams, runAutoSew } from '../autoSewThunk';
 import { SEAM_ENGINE_VERSION, isStaleAiSeam } from '../../utils/autoSew';
+import { esMitadDeCopa } from '../../utils/autoSew/repartoDeCopa';
+import { largosDeCostura } from '../../utils/seam/largoCosido';
+import { SEAM_MISMATCH_THRESHOLD_MM } from '../../components/PatternEditor/renderers/seamVisuals';
 import { importDXFContent } from '../../utils/dxf';
 import { classifyPiecesGeometric } from '../../utils/geometricClassifier';
 import { detectSemanticEdges } from '../../utils/semanticEdges';
@@ -155,5 +161,84 @@ describe('resewAiSeams', () => {
     expect(result.removed).toBe(0);
     expect(result.added).toBe(0);
     expect(store.getState().project.seams.some(s => s.id === stale.id)).toBe(true);
+  });
+});
+
+/** Lo que dejaba el motor 1: cada copa partida en t = 0,5 (físico) y todo con sewEngine 1. */
+function comoElMotor1(seams: Seam[]): Seam[] {
+  return seams.map(s => {
+    const v1: Seam = { ...s, sewEngine: 1 };
+    if (!esMitadDeCopa(s)) return v1;
+    const lado = /^sleevecap/i.test(s.pieceA.edgeName) ? 'pieceA' : 'pieceB';
+    // Un B invertido guarda su rango en sentido de cosido (seamRange.ts).
+    const espejo = lado === 'pieceB' && s.pieceB.reversed === true;
+    const empiezaEnCero = espejo ? (s[lado].tEnd ?? 1) > 1 - 1e-9 : (s[lado].tStart ?? 0) < 1e-9;
+    const fisico: [number, number] = empiezaEnCero ? [0, 0.5] : [0.5, 1];
+    const [tStart, tEnd] = espejo ? [1 - fisico[1], 1 - fisico[0]] : fisico;
+    return { ...v1, [lado]: { ...s[lado], tStart, tEnd } };
+  });
+}
+
+const aMenosDeUnMm = (seams: Seam[], pieces: PatternPiece[]) => {
+  for (const s of seams) {
+    const { a, b } = largosDeCostura(s, pieces);
+    expect(Math.abs(a! - b!), `${s.pieceA.edgeName} ↔ ${s.pieceB.edgeName}: ${a} contra ${b} mm`)
+      .toBeLessThan(SEAM_MISMATCH_THRESHOLD_MM);
+  }
+};
+
+describe('runAutoSew — la camisa de María por la puerta de la app', () => {
+  it('las cuatro mitades de copa quedan a menos de 1 mm de su sisa: el lienzo no las marca con «⚠»', () => {
+    const store = makeStore(importMariaClassified(), []);
+    runAutoSew()(store.dispatch as never, store.getState as never);
+    const { seams, pieces } = store.getState().project;
+    const copas = seams.filter(esMitadDeCopa);
+    expect(copas).toHaveLength(4);
+    aMenosDeUnMm(copas, pieces);
+  });
+});
+
+describe('el motor 2 solo cambió dónde se parte la copa', () => {
+  const ia = (over: Partial<Seam> = {}): Seam => ({
+    id: 'auto-seam-1-0', type: 'standard', tension: 100, strength: 1, active: true, taped: false, tapeWidth: 10,
+    createdBy: 'ai',
+    pieceA: { pieceId: 'del', edgeName: 'sideSeam', tStart: 0, tEnd: 1 },
+    pieceB: { pieceId: 'esp', edgeName: 'sideSeam', tStart: 0, tEnd: 1 },
+    ...over,
+  });
+  const sisa = { pieceId: 'del', edgeName: 'armhole', tStart: 0, tEnd: 1 };
+
+  it('del motor 1, solo las mitades de copa están viejas: un costado o una copa entera siguen vigentes', () => {
+    expect(isStaleAiSeam(ia({ sewEngine: 1 }))).toBe(false);
+    expect(isStaleAiSeam(ia({ sewEngine: 1, pieceA: sisa, pieceB: { pieceId: 'manga', edgeName: 'sleeveCap', tStart: 0, tEnd: 1 } }))).toBe(false);
+    expect(isStaleAiSeam(ia({ sewEngine: 1, pieceA: sisa, pieceB: { pieceId: 'manga', edgeName: 'sleeveCap', tStart: 0, tEnd: 0.5, reversed: true } }))).toBe(true);
+  });
+
+  it('todo el motor 0 está viejo; lo del motor actual y lo humano, nunca', () => {
+    expect(isStaleAiSeam(ia())).toBe(true);
+    expect(isStaleAiSeam(ia({ sewEngine: SEAM_ENGINE_VERSION, pieceA: sisa, pieceB: { pieceId: 'manga', edgeName: 'sleeveCap', tStart: 0, tEnd: 0.5 } }))).toBe(false);
+    expect(isStaleAiSeam({ ...ia(), id: 'e2f1a3b4-humana', createdBy: undefined })).toBe(false);
+  });
+
+  it('en un proyecto del motor 1, «Re-coser» rehace solo las cuatro mitades de copa, cortadas por sus sisas', () => {
+    const pieces = importMariaClassified();
+    const cosida = makeStore(pieces, []);
+    runAutoSew()(cosida.dispatch as never, cosida.getState as never);
+    const delMotor1 = comoElMotor1(cosida.getState().project.seams);
+    const store = makeStore(pieces, delMotor1);
+    expect(store.getState().project.seams.filter(isStaleAiSeam)).toHaveLength(4);
+
+    const result = resewAiSeams()(store.dispatch as never, store.getState as never);
+
+    expect(result.removed).toBe(4);
+    const { seams, pieces: enStore } = store.getState().project;
+    // Lo demás del motor 1 se queda como estaba, con su id.
+    for (const s of delMotor1.filter(x => !esMitadDeCopa(x))) {
+      expect(seams.some(x => x.id === s.id), `se rehízo ${s.pieceA.edgeName} ↔ ${s.pieceB.edgeName}`).toBe(true);
+    }
+    const copas = seams.filter(esMitadDeCopa);
+    expect(copas).toHaveLength(4);
+    aMenosDeUnMm(copas, enStore);
+    expect(seams.some(isStaleAiSeam)).toBe(false);
   });
 });
