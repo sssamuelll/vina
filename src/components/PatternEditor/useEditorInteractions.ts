@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectInternalLine, selectTrazo, setZoom2D, setPan2D } from '../../store/editorSlice';
 import { movePiece, updateInternalLine, updateTrazo } from '../../store/projectSlice';
-import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine, seSeleccionaPorTramo } from '../../types/types';
+import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine, esInternaEditable, seSeleccionaPorTramo } from '../../types/types';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
 import { isPinnedAtZoomCeiling, zoomAtPoint } from '../../input/zoom2d';
 import { showInfoToast } from '../../store/copilotUISlice';
@@ -1033,7 +1033,10 @@ export function useEditorInteractions(
         const ilPiece = pieces.find(p => p.id === selectedInternalLine.pieceId);
         if (ilPiece) {
           const ilLine = ilPiece.internals.find(l => l.id === selectedInternalLine.lineId);
-          if (ilLine) {
+          // Un piquete o un doblez de pliegue no se agarra por sus puntas: su
+          // path sale de un ancla o de una entidad, y arrastrarlo dejaba el
+          // ancla desfasada (P3b). La misma lista que Q (`esInternaEditable`).
+          if (ilLine && esInternaEditable(ilLine)) {
             const endpoints = getInternalLineEndpoints(ilLine);
             if (endpoints) {
               const { x: localX, y: localY } = patternToPieceLocal({ x: clickX, y: clickY }, ilPiece);

@@ -529,7 +529,7 @@ const projectSlice = createSlice({
       pieceId: string;
       lineId: string;
       path: PathCommand[];
-      // Optional notch fields (notch-precision F3): the precision modal
+      // Optional notch fields (notch-precision F3): the notch's cota (P3b)
       // re-positions a notch, which moves path AND anchor/depth together.
       notchAnchor?: NotchAnchor;
       notchOptions?: NotchOptions;

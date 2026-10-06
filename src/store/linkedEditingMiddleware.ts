@@ -144,7 +144,7 @@ function runCascade(action: ActionLike, store: StoreLike) {
   } else if (action.type === 'project/addInternalLine') {
     syncAddInternalLine(store.dispatch, editedPiece, partner, (payload as { line: InternalLine }).line);
   } else if (action.type === 'project/updateInternalLine') {
-    syncUpdateInternalLine(store.dispatch, editedPiece, partner, payload as { pieceId: string; lineId: string; path: PathCommand[] });
+    syncUpdateInternalLine(store.dispatch, editedPiece, partner, payload as LineaActualizada);
   } else if (action.type === 'project/flipPieceH' || action.type === 'project/flipPieceV') {
     syncUpdatePiece(store.dispatch, editedPiece, partner);
   }
@@ -183,7 +183,19 @@ function syncAddInternalLine(dispatch: Dispatch, source: PatternPiece, partner: 
   }
 }
 
-function syncUpdateInternalLine(dispatch: Dispatch, source: PatternPiece, partner: PatternPiece, payload: { pieceId: string; lineId: string; path: PathCommand[] }) {
+interface LineaActualizada {
+  pieceId: string;
+  lineId: string;
+  path: PathCommand[];
+  notchAnchor?: InternalLine['notchAnchor'];
+  notchOptions?: InternalLine['notchOptions'];
+}
+
+function syncUpdateInternalLine(dispatch: Dispatch, source: PatternPiece, partner: PatternPiece, payload: LineaActualizada) {
+  // La forma del piquete viaja entera: sin sus opciones, la pareja guarda una
+  // profundidad que ya no dibuja (P3b). El ancla, solo a la instancia: el
+  // espejo la suelta a propósito, como `mirrorInternalsX`.
+  const opciones = payload.notchOptions ? { notchOptions: payload.notchOptions } : {};
   if (source.linkMode === 'instance') {
     const sourceIdx = source.internals.findIndex(l => l.id === payload.lineId);
     if (sourceIdx !== -1 && partner.internals[sourceIdx]) {
@@ -191,6 +203,8 @@ function syncUpdateInternalLine(dispatch: Dispatch, source: PatternPiece, partne
         pieceId: partner.id,
         lineId: partner.internals[sourceIdx].id,
         path: payload.path,
+        ...(payload.notchAnchor ? { notchAnchor: payload.notchAnchor } : {}),
+        ...opciones,
       }));
     }
   } else {
@@ -202,6 +216,7 @@ function syncUpdateInternalLine(dispatch: Dispatch, source: PatternPiece, partne
         pieceId: partner.id,
         lineId: partner.internals[sourceIdx].id,
         path: mirroredPath,
+        ...opciones,
       }));
     }
   }
