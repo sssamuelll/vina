@@ -1124,7 +1124,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
       if (!trazos.some(t => t.id === update.trazoId)) return;
       const accion = updateTrazo({ id: update.trazoId, path: update.path });
       dispatch(token ? withUndoBatchToken(accion, token) : accion);
-    } else {
+    } else if (update.kind === 'internal') {
       const piece = pieces.find(p => p.id === update.pieceId);
       if (!piece) return;
       if (!piece.internals.some(line => line.id === update.lineId)) return;

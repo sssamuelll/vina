@@ -55,6 +55,12 @@ export interface SujetoInput {
   trazos?: readonly Trazo[];
   /** El tramo de trazo seleccionado (`editor.selectedTrazo`). */
   selectedTrazo?: TrazoSelection | null;
+  /**
+   * La cota de lo que se pone (spec 2026-10-02 § 5.2): el piquete o el punto
+   * que se está terminando de poner. Vive en el estado local de su
+   * herramienta, como el tramo en curso, y llega ya armada.
+   */
+  loQueSePone?: readonly Cota[] | null;
 }
 
 export interface Sujeto {
@@ -165,6 +171,21 @@ export function cotasDelSujeto(input: SujetoInput): Sujeto {
     disabled: false,
     esPieza: false,
   });
+  // Lo que se está poniendo gana a todo: es lo más reciente, y sus cotas
+  // cierran el gesto que lo puso.
+  if (input.loQueSePone && input.loQueSePone.length > 0) {
+    return {
+      piece: null,
+      caliente: false,
+      cotas: [...input.loQueSePone],
+      lectura: null,
+      lecturaApagada: false,
+      bordeLeido: null,
+      disabled: false,
+      esPieza: false,
+    };
+  }
+
   // Un trazo vivo gana a cualquier selección: la regla del sujeto es «el más
   // reciente», y no hay nada más reciente que lo que se está dibujando ahora
   // mismo. Va antes que todo lo demás por eso.

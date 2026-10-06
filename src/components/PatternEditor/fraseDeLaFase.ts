@@ -15,6 +15,9 @@ const CON_DOS_GUIAS = new Set<Tool2D>(['pen', 'internalShape', 'editPattern']);
 
 const COTAS = 'Clic en una cota para escribirla · arrástrala para ajustar · Tab pasa a la siguiente · Esc suelta';
 
+/** La cota de lo que se pone está abierta (spec 2026-10-02 § 5.2). Cabe en el hueco del piquete (55). */
+export const LO_QUE_SE_PONE = 'Escribe la distancia · Enter fija · Esc no lo mueve';
+
 /**
  * Con Shift pulsado, la frase de la Pluma, la Línea interna y `Q` la sustituye
  * una corta que dice cómo llegar a la otra guía (spec 2026-09-23 § 4.2). Los
@@ -58,6 +61,8 @@ export interface FaseDeLaHerramienta {
   segundoMarco?: AngleReference['kind'] | null;
   /** El tamaño con que un clic crea el rectángulo (spec 2026-08-30 § 3.1). */
   rectanguloPorDefecto?: { width: number; height: number };
+  /** El piquete o el punto que se está poniendo tiene su cota abierta: gana a cualquier herramienta. */
+  loQueSePone?: boolean;
   /** Tijeras: el primer punto del corte ya está puesto. */
   tijerasEmpezadas?: boolean;
   /** Medir: el primer punto ya está puesto. */
@@ -75,6 +80,7 @@ export interface FaseDeLaHerramienta {
  */
 export function fraseDeLaFase(f: FaseDeLaHerramienta): string | null {
   const tool = f.activeTool;
+  if (f.loQueSePone) return LO_QUE_SE_PONE;
   // El editor de nodos tiene su propia frase, y gana: dos a la vez se pisaban.
   if (f.nodeEditorIsEditing) return 'Editando nodos · arrastra para mover · Esc para salir';
   if (f.modoShift && f.modoShift !== 'suelto' && f.segundoMarco && CON_DOS_GUIAS.has(tool)) {
