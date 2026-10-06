@@ -21,6 +21,7 @@ export const RAZONES = [
   'notch:ancla-perdida',
   'tijeras:corte-no-cruza',
   'point:sin-comando',
+  'point:sobre-un-punto',
   'walkseam:borde-sin-resolver',
   'trim:borde-sin-largo',
   'grainline:fuera-de-pieza',
@@ -60,6 +61,9 @@ const MENSAJES: Record<RazonMuda, string> = {
   'notch:ancla-perdida': 'El contorno cambió; marca el piquete otra vez con un clic',
   'tijeras:corte-no-cruza': 'El corte tiene que cruzar la pieza; marca el final en otro borde',
   'point:sin-comando': 'Ese tramo no acepta un punto; prueba sobre otro lado de la pieza',
+  // El punto que se pidió ya existe y el nuevo sobra: Deshacer se lleva justo
+  // el lote «Poner punto» (P3b), no el punto de antes.
+  'point:sobre-un-punto': 'Ya hay un punto ahí; usa Deshacer para quitar el nuevo',
   'walkseam:borde-sin-resolver': 'Ese borde ya no está en el lienzo; prueba con otro lado de la pieza',
   'trim:borde-sin-largo': 'Ese borde no tiene largo; elige uno de los lados de la pieza',
   'grainline:fuera-de-pieza': 'El hilo se dibuja dentro de una pieza; arrastra desde adentro',

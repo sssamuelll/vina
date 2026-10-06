@@ -226,6 +226,18 @@ test.describe('con un rectángulo sembrado (lados rectos conocidos)', () => {
     ]));
   });
 
+  // Punto no tiene tecla. Tras el clic trae su cota (spec 2026-10-02 § 5.1: 3).
+  test('poner punto', async ({ page }) => {
+    registrar('poner punto', await medirAccion(page, [
+      async () => {
+        await dispatch(page, 'editor/setActiveTool', 'point');
+        await dispatch(page, 'tools/setActiveTool2D', 'point');
+        await page.waitForTimeout(300);
+      },
+      () => clickAt(page, { x: 120, y: 320 }),
+    ]));
+  });
+
   test('margen de costura (O)', async ({ page }) => {
     registrar('margen de costura (O)', await medirAccion(page, [
       () => activarHerramienta(page, 'o', 'seamAllowance'),

@@ -18,6 +18,7 @@ import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import { AgruparCotas } from './cotas/CotaChip';
 import CotaLines from './cotas/CotaLines';
 import { admiteLado, cotasDelSujeto, faltaSujeto, refinarAlLado } from './cotas/sujeto';
+import { cotaDelPunto, cotasDelPiquete } from './cotas/loQueSePone';
 import { cotasALaVista, pasarTurno, TURNO_INICIAL, type TurnoDeCota } from './cotas/unaALaVez';
 import { ladoDelHit } from './cotas/lado';
 import { usePuertaDeLado } from './usePuertaDeLado';
@@ -80,9 +81,7 @@ import ConstructionOverlay from './renderers/ConstructionOverlay';
 import ReferenceImageLayer from './renderers/ReferenceImageLayer';
 import CalibrationOverlay from './renderers/overlays/CalibrationOverlay';
 import CalibrationModal from './CalibrationModal';
-import NotchPrecisionModal from './NotchPrecisionModal';
 import { notchPlacedMessage } from './notchPrecisionCopy';
-import { DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 import { computePixelsPerMm } from '../../utils/geometry/calibration';
 import { useReferenceImages } from './useReferenceImages';
 import ContextMenu, { type ContextMenuState } from './ContextMenu';
@@ -352,6 +351,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
   // puerta común con el menú contextual, mismo candado, mismo re-anclaje.
   const pointToolHook = usePointTool(zoom2D, pan2D, pieces, {
     addPointOnSegment: editPatternTool.addPointOnSegment,
+    reinsertarPunto: editPatternTool.reinsertarPunto,
     convertSegment: editPatternTool.convertSegment,
     convertSegmentToPoints: editPatternTool.convertSegmentToPoints,
   });
@@ -898,6 +898,38 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
   // comparten es su desplazamiento, y esa es otra cota que no está hecha.
   const nodoSeleccionado = activeTool === 'editPattern' ? editPatternTool.puntoElegido : null;
 
+  // La cota de lo que se pone (spec 2026-10-02 § 5.2): el piquete recién puesto,
+  // o el de «Ajustar distancia…», con su chip abierto. Las herramientas viven
+  // en refs para que `aplicarCota` y las cotas no se rehagan en cada render.
+  const notchRef = useRef(notchTool);
+  notchRef.current = notchTool;
+  const pointRef = useRef(pointToolHook);
+  pointRef.current = pointToolHook;
+  const piquetePuesto = notchTool.refining;
+  const piezaDelPiquete = piquetePuesto ? pieces.find(p => p.id === piquetePuesto.pieceId) : undefined;
+  const puntoPuesto = pointToolHook.puesto;
+  const piezaDelPunto = puntoPuesto ? pieces.find(p => p.id === puntoPuesto.pieceId) : undefined;
+  const loQueSePone = useMemo(() => {
+    if (piquetePuesto && piezaDelPiquete) {
+      return cotasDelPiquete(piquetePuesto, piezaDelPiquete, {
+        alEscribir: (mm) => notchRef.current.previewRefine(mm),
+        alCerrar: () => {
+          // Enter, Esc, Tab o el siguiente clic: la caja negra ve también el
+          // cierre que no escribió (lo que sí escribe deja su `cota:commit`).
+          pushJournal('gesture', 'cota:loQueSePone:cierra', { que: 'piquete' });
+          notchRef.current.cancelRefine();
+        },
+      });
+    }
+    if (puntoPuesto && piezaDelPunto) {
+      return [cotaDelPunto(puntoPuesto, piezaDelPunto, () => {
+        pushJournal('gesture', 'cota:loQueSePone:cierra', { que: 'punto' });
+        pointRef.current.terminarPuesto();
+      })];
+    }
+    return null;
+  }, [piquetePuesto, piezaDelPiquete, puntoPuesto, piezaDelPunto]);
+
   const sujetoSinLado = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
     hotId, isDragging: isDraggingPiece || transformTool.isDragging || isDraggingEndpoint,
@@ -906,7 +938,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     saAncla: seamAllowanceTool.ancla, saHover: seamAllowanceTool.hover,
     tramoEnCurso, nodoSeleccionado,
     trazos: trazosVisibles, selectedTrazo: editor.selectedTrazo,
-  }), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso, nodoSeleccionado, trazosVisibles, editor.selectedTrazo]);
+    loQueSePone,
+  }), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso, nodoSeleccionado, trazosVisibles, editor.selectedTrazo, loQueSePone]);
   const sujeto = useMemo(
     () => refinarAlLado(sujetoSinLado, ladoSeleccionado, { activeTool, pieces, hiddenLayerIds, layerLocked }),
     [sujetoSinLado, ladoSeleccionado, activeTool, pieces, hiddenLayerIds, layerLocked],
@@ -997,6 +1030,21 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
       pushJournal('gesture', 'tramo:congelado', { largo: tramoEnCurso.lengthMm, angulo: tramoEnCurso.angleDeg });
     }
   }, [activeTool, tramoSeq, tramoEnCurso, markPrecisionUsed]);
+
+  // La cota del piquete se abre sola, una vez por sesión: el clic que lo puso
+  // deja el número listo para teclear, como lo dejaba el modal. La del punto
+  // no: descansa en reposo y las teclas siguen siendo del lienzo (firma D3).
+  const claveDeLoQueSePone = piquetePuesto ? `piquete:${piquetePuesto.sesion}` : '';
+  const loQueSePoneVisto = useRef('');
+  useEffect(() => {
+    if (loQueSePoneVisto.current === claveDeLoQueSePone) return;
+    loQueSePoneVisto.current = claveDeLoQueSePone;
+    if (!claveDeLoQueSePone) return;
+    const abrio = cotasRef.current?.abrirPrimero() ?? false;
+    pushJournal('gesture', 'cota:loQueSePone', { clave: claveDeLoQueSePone, abrio });
+    // Sin chip, la sesión no tendría quien la cerrara.
+    if (!abrio) notchRef.current.cancelRefine();
+  }, [claveDeLoQueSePone]);
 
   // Tab sobre la pieza abre la caja del lado (#1167). Igual que el tramo
   // congelado de la Pluma: el chip no existe hasta el render siguiente, así que
@@ -1111,6 +1159,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
       if (!herramienta) return;
       if (motivo === 'tab') herramienta.setNextPointValues(update.largoMm, update.anguloDeg);
       else herramienta.placePolar(update.largoMm, update.anguloDeg);
+    } else if (update.kind === 'piquete') {
+      // Lo escribe la herramienta, que sabe regenerar el path desde el ancla.
+      notchRef.current.confirmRefine(update.distanciaMm, update.profundidadMm);
+    } else if (update.kind === 'punto') {
+      // Moverlo es volver a ponerlo desde la pieza de antes del clic.
+      pointRef.current.moverPuesto(update.distanciaMm);
     } else if (update.kind === 'nodo') {
       // Lo escribe `useEditPattern`, no este archivo: es quien ya mueve nodos
       // en el arrastre, con compensación de pivote, re-anclado de piquetes y
@@ -1124,7 +1178,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
       if (!trazos.some(t => t.id === update.trazoId)) return;
       const accion = updateTrazo({ id: update.trazoId, path: update.path });
       dispatch(token ? withUndoBatchToken(accion, token) : accion);
-    } else {
+    } else if (update.kind === 'internal') {
       const piece = pieces.find(p => p.id === update.pieceId);
       if (!piece) return;
       if (!piece.internals.some(line => line.id === update.lineId)) return;
@@ -1468,6 +1522,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     tijerasEmpezadas: scissorsTool.startPoint !== null,
     medidaEmpezada: measureTool.currentStart !== null,
     modoDelPunto: (toolOptions?.point?.mode as PointToolMode | undefined) ?? 'point',
+    loQueSePone: loQueSePone === null ? null : piquetePuesto ? 'piquete' : 'punto',
   });
 
   return (
@@ -1788,9 +1843,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
           frase={fraseDelPie(desenlace, falta, fase)}
           onClearMeasurements={measureTool.clear}
           hasMeasurements={measureTool.measurements.length > 0 || !!measureTool.selectedEdge || !!measureTool.comparison}
-          // El modal del piquete no usa portal ni atrapa el foco: mientras está
-          // abierto, la sección se declara inerte (#1125). Se va en P3.
-          inerte={Boolean(notchTool.refining?.notch.notchAnchor)}
         />,
         ranuraDelPie,
       )}
@@ -1836,16 +1888,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
           pixelDistance={calibrationPixelDist}
           onConfirm={handleCalibrationConfirm}
           onCancel={handleCalibrationCancel}
-        />
-      )}
-      {notchTool.refining?.notch.notchAnchor && (
-        <NotchPrecisionModal
-          initialDistanceMm={notchTool.refining.notch.notchAnchor.distanceMm}
-          initialDepthMm={notchTool.refining.notch.notchOptions?.length ?? DEFAULT_NOTCH_OPTIONS.length}
-          maxDistanceMm={notchTool.refining.maxDistanceMm}
-          onPreview={notchTool.previewRefine}
-          onConfirm={notchTool.confirmRefine}
-          onCancel={notchTool.cancelRefine}
         />
       )}
     </div>

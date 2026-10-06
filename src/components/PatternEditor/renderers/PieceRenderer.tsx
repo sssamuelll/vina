@@ -2,7 +2,7 @@
 import React, { memo, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
-import { InternalLineSelection, PatternPiece, PathCommand, UnitSystem } from '../../../types/types';
+import { InternalLineSelection, PatternPiece, PathCommand, UnitSystem, esInternaEditable } from '../../../types/types';
 import PuntosDelContorno from './PuntosDelContorno';
 import { pathToSVG } from '../utils';
 import { getAnchor } from '../nodeEditorUtils';
@@ -347,8 +347,9 @@ const SinglePiece = memo(function SinglePiece({
                 En Q, la pieza en edición ya pinta sus puntos en el overlay: dos
                 glifos en la misma coordenada son ruido (spec 2026-09-24 § 3.3). En V
                 su overlay todavía no pinta los de las internas (fase 5), así que
-                ahí se quedan. */}
-            {isWholeLineSelected && piezaEditadaEnQ !== piece.id && (() => {
+                ahí se quedan. Y lo que no se agarra no se pinta: las puntas de un
+                piquete o de un doblez de pliegue (P3b, `esInternaEditable`). */}
+            {isWholeLineSelected && piezaEditadaEnQ !== piece.id && esInternaEditable(line) && (() => {
               const first = line.path[0];
               const last = line.path[line.path.length - 1];
               const points: { x: number; y: number }[] = [];

@@ -316,6 +316,14 @@ porque ahí están a la vista.
 panel de hoy (`PieceProperties.tsx:278-283`), más amplios que el 3 a 20 de la herramienta
 (`notch.tsx:51-52`); así ningún valor guardado queda fuera.
 
+**Nota del plan de P3b (2026-10-06).** Lo que se pone trae su cota abierta: el piquete, con Distancia
+y Profundidad, y el punto, con su Distancia. Junto al número se lee el largo del lado («de 520 mm»).
+La profundidad se queda en el chip hasta que P3c le dé su etiqueta, porque hoy es la única puerta
+para la de un piquete ya puesto. El chip vive lo que dura su edición: Enter fija, Esc no lo mueve, y
+el siguiente clic lo cierra. Poner un punto y terminar de ponerlo es una sola entrada de deshacer.
+Las puntas de un piquete ya no se arrastran con Seleccionar, porque dejaban su ancla desfasada; para
+moverlo está «Ajustar distancia…». La pieza bloqueada no recibe piquetes. El modal desaparece.
+
 ### 5.3 La línea al pie
 
 Una franja al pie de la ventana, de lado a lado, del material y del alto de la barra superior

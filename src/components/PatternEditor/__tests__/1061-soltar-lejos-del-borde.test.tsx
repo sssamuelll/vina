@@ -31,7 +31,7 @@ import toolReducer from '../../../store/toolSlice';
 import { snapToEdge } from '../useSegmentSewingTool';
 import { useFreeSewingTool } from '../useFreeSewingTool';
 import { useNotchTool } from '../useNotchTool';
-import type { PatternPiece, SemanticEdge } from '../../../types/types';
+import type { InternalLine, PatternPiece, SemanticEdge } from '../../../types/types';
 
 /**
  * Borde de arriba en DOS comandos (largo 100), costado derecho CURVO, y el
@@ -178,9 +178,15 @@ describe('coser — soltar lejos marca el tramo, no el borde entero', () => {
 
 describe('piquete — soltar lejos marca la distancia, no cae a clic', () => {
   const setup = () => {
+    // Como Redux: lo que se añade está en el render siguiente. La cota del
+    // piquete se mide sobre la línea viva (P3b).
+    let piezas = [PIEZA];
     const onAddNotch = vi.fn();
+    onAddNotch.mockImplementation((_pieceId: string, line: InternalLine) => {
+      piezas = [{ ...PIEZA, internals: [...piezas[0].internals, line] }];
+    });
     const { result } = renderHook(
-      () => useNotchTool(1, { x: 0, y: 0 }, [PIEZA], onAddNotch),
+      () => useNotchTool(1, { x: 0, y: 0 }, piezas, onAddNotch),
       { wrapper },
     );
     return { result, onAddNotch };
@@ -309,7 +315,7 @@ describe('piquete — soltar lejos marca la distancia, no cae a clic', () => {
     expect(onAddNotch.mock.calls[0][1].notchAnchor.direction).toBe('cw');
   });
 
-  it('un clic pelado SIGUE poniendo el piquete y abriendo el modal', () => {
+  it('un clic pelado SIGUE poniendo el piquete y abriendo su cota', () => {
     const h = setup();
     act(() => { h.result.current.handleMouseDown(ev(30, 0)); });
     act(() => { h.result.current.handleMouseUp(ev(30, 0)); });

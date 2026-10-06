@@ -128,13 +128,10 @@ function useCuantasCaben(raiz: RefObject<HTMLDivElement>, herramienta: string, t
  */
 export default function SeccionDelPatron({
   frase,
-  inerte = false,
   onClearMeasurements,
   hasMeasurements = false,
 }: {
   frase: FraseDelPie | null;
-  /** Hay un modal encima (el del piquete, hasta P3): la sección no recibe el foco (#1125). */
-  inerte?: boolean;
   onClearMeasurements?: () => void;
   hasMeasurements?: boolean;
 }) {
@@ -144,12 +141,6 @@ export default function SeccionDelPatron({
   const activeTool = useSelector((s: RootState) => s.editor.activeTool);
   const margenDelProximoClic = useSelector((s: RootState) => s.editor.defaultSeamAllowanceWidth);
   const valores = useSelector((s: RootState) => s.tools.toolOptions[activeTool] ?? SIN_VALORES);
-
-  // `inert` no existe en los tipos de React 18: se pone en el DOM a mano, en el
-  // contenedor y no en cada control, para que no se olvide ninguno (#1125).
-  useEffect(() => {
-    raiz.current?.toggleAttribute('inert', inerte);
-  }, [inerte]);
 
   const alCambiar = useCallback(
     (optionId: string, value: unknown) => dispatch(setToolOption({ toolId: activeTool, optionId, value })),
@@ -207,9 +198,8 @@ export default function SeccionDelPatron({
   const masRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Otra herramienta, un modal encima, o que vuelvan a caber todas: el menú se
-  // cierra con su botón.
-  useEffect(() => { setAbierto(false); }, [activeTool, inerte]);
+  // Otra herramienta, o que vuelvan a caber todas: el menú se cierra con su botón.
+  useEffect(() => { setAbierto(false); }, [activeTool]);
   useEffect(() => { if (plegadas.length === 0) setAbierto(false); }, [plegadas.length]);
 
   // Abrir y cerrar quedan en la bitácora. Abierto con el teclado, el foco

@@ -33,7 +33,7 @@ const acota = (v: number, c: Cota) => Math.min(c.max, Math.max(c.min, v));
 /** El valor como lo escribiría ella: coma decimal, sin unidad. */
 const aTexto = (v: number) => String(round1(v)).replace('.', ',');
 const referenciaVisible = (cota: Cota) =>
-  cota.unit === 'deg' && cota.referenceLabel ? ' ' + cota.referenceLabel : '';
+  cota.referenceLabel ? ' ' + cota.referenceLabel : '';
 const textoVisible = (cota: Cota) =>
   formatMedida(cota.valueMm, cota.unit, cota.referenceLabel);
 /** Una sola escala de modificadores para scrub y flechas: Shift grueso, Alt fino (Figma). */
@@ -67,7 +67,9 @@ export function AgruparCotas({ cotas, pan2D, zoom2D, estorbos, children }: {
       return {
         cota,
         campos,
-        ...(campos.length > 1 ? {
+        // La distancia sobre un borde vive fuera de la pieza, como su chip
+        // suelto; el par del tramo se queda en su punto medio.
+        ...(campos.length > 1 && cota.kind !== 'borde' ? {
           left: pan2D.x + (cota.a.x + cota.b.x) / 2 * zoom2D,
           top: pan2D.y + (cota.a.y + cota.b.y) / 2 * zoom2D,
         } : chipScreenPosition(cota, pan2D, zoom2D)),
@@ -198,6 +200,7 @@ function ChipEditable({
     cerrado.current = true;
     focoAlCerrar.current = foco;
     setEditing(false);
+    cota.alCerrar?.();
   };
   const parsea = (): number | null => {
     // Lo ESCRITO se redondea a un decimal, igual que el chip lo pinta
@@ -266,7 +269,11 @@ function ChipEditable({
           cambiarCampo(indice);
         }}
         onFocus={() => { if (indice !== activo) cambiarCampo(indice); }}
-        onChange={(e) => { setDraft(e.target.value); setDirty(true); setInvalid(false); }}
+        onChange={(e) => {
+          setDraft(e.target.value); setDirty(true); setInvalid(false);
+          const v = parseMedida(e.target.value);
+          campo.alEscribir?.(v !== null && v >= campo.min && v <= campo.max ? v : null);
+        }}
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key === 'Enter') {
@@ -286,9 +293,11 @@ function ChipEditable({
             e.preventDefault();
             const base = parseMedida(draft) ?? campoActivo.valueMm;
             const paso = ganancia(e) * (e.key === 'ArrowUp' ? 1 : -1);
-            setDraft(aTexto(acota(base + paso, campoActivo)));
+            const nuevo = acota(base + paso, campoActivo);
+            setDraft(aTexto(nuevo));
             setDirty(true);
             setInvalid(false);
+            campoActivo.alEscribir?.(nuevo);
           }
         }}
         onBlur={(e) => {
@@ -307,7 +316,7 @@ function ChipEditable({
         >
           <label className="cota-campo">
             {unico}
-            <span>{'°' + referenciaVisible(cota)}</span>
+            <span>{(cota.unit === 'mm' ? ' mm' : '°') + referenciaVisible(cota)}</span>
           </label>
         </div>
       );
@@ -321,7 +330,7 @@ function ChipEditable({
           <label key={campo.id} className="cota-campo">
             <span>{campo.label}</span>
             {input(campo, indice)}
-            <span>{campo.unit === 'mm' ? 'mm' : '°' + referenciaVisible(campo)}</span>
+            <span>{(campo.unit === 'mm' ? 'mm' : '°') + referenciaVisible(campo)}</span>
           </label>
         ))}
         {cota.grupo === 'tramo-en-curso' && (

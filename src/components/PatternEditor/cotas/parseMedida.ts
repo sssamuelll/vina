@@ -20,5 +20,6 @@ export function parseMedida(texto: string): number | null {
 export function formatMedida(valor: number, unit: 'mm' | 'deg', referenceLabel?: string): string {
   const redondeado = Math.round(valor * 10) / 10;
   const texto = String(redondeado).replace('.', ',');
-  return unit === 'deg' ? `${texto}°${referenceLabel ? ` ${referenceLabel}` : ''}` : `${texto} mm`;
+  const referencia = referenceLabel ? ` ${referenceLabel}` : '';
+  return unit === 'deg' ? `${texto}°${referencia}` : `${texto} mm${referencia}`;
 }

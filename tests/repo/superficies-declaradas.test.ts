@@ -54,7 +54,6 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/Viewport3D/CollisionBodyPanel.tsx', 'panel', 1],
   ['src/components/Viewport3D/FitMapToggle.tsx', 'panel', 1],
   ['src/components/Viewport3D/FitMapToggle.tsx', 'mapas', 1],
-  ['src/components/PatternEditor/NotchPrecisionModal.tsx', 'modal', 1],
   ['src/components/shell/ConfirmDialog.tsx', 'modal', 1],
   ['src/components/PatternEditor/CalibrationModal.tsx', 'modal', 1],
   ['src/copilot/connections/ConnectionModal.tsx', 'modal', 1],

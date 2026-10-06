@@ -265,3 +265,40 @@ describe('la marquesina del vacío solo se arma con el botón izquierdo', () => 
     expect(seleccion(store), 'selección fantasma: nadie arrastró ese rectángulo').toEqual([]);
   });
 });
+
+/**
+ * Las puntas de un piquete seleccionado no se arman, ni con el izquierdo (P3b).
+ * El arrastre escribía el `path` sin el ancla: el siguiente cambio del contorno
+ * devolvía el piquete a su sitio. La misma lista que Q (`esInternaEditable`).
+ * El control es el de arriba: el extremo de una línea de referencia sí se arma.
+ */
+describe('las puntas de un piquete seleccionado no se arrastran', () => {
+  it('ni con el izquierdo: el path queda igual y no hay arrastre de extremo', () => {
+    const store = configureStore({
+      reducer: { editor: editorReducer, project: projectReducer, inputScheme: inputSchemeReducer },
+    });
+    const pieces = [{
+      ...pieza(),
+      internals: [{
+        id: 'n1', type: 'notch' as const,
+        path: [{ type: 'M' as const, values: [40, 0] }, { type: 'L' as const, values: [40, 8] }],
+        notchAnchor: { refPoint: { x: 0, y: 0 }, direction: 'cw' as const, distanceMm: 40, metric: 2 as const },
+      }],
+    }];
+    store.dispatch(restoreState({ ...store.getState().project, pieces }));
+    const tools = makeTools({ nodeEditor: idleNodeEditor(), transformTool: idleTransform() });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <Provider store={store}>{children}</Provider>
+    );
+    const hook = renderHook(
+      () => useEditorInteractions('select', 1, { x: 0, y: 0 }, pieces, tools),
+      { wrapper },
+    );
+    act(() => { store.dispatch(selectInternalLine({ pieceId: 'a', lineId: 'n1' })); });
+    act(() => { hook.result.current.handleMouseDown(downAt(40, 8, 0)); });
+    act(() => { hook.result.current.handleMouseMove(moveTo(60, 30)); });
+
+    expect(internaPath(store)).toEqual(pieces[0].internals[0].path);
+    expect(hook.result.current.isDraggingEndpoint).toBe(false);
+  });
+});

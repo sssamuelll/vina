@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { parseMedida, formatMedida } from '../parseMedida';
 
+describe('formatMedida con referencia en mm (P3b)', () => {
+  it('la referencia acompaña también a una distancia: «de 520 mm»', () => {
+    expect(formatMedida(156, 'mm', 'de 520 mm')).toBe('156 mm de 520 mm');
+    expect(formatMedida(156, 'mm')).toBe('156 mm');
+  });
+});
+
 /** Cotas vivas (spec 2026-08-30 § 4.4): lo que María escribe en un chip. */
 describe('parseMedida', () => {
   it.each([
@@ -29,6 +36,7 @@ describe('formatMedida', () => {
   it('incluye la referencia en el mismo texto que se mide y se pinta', () => {
     expect(formatMedida(90, 'deg', 'al borde')).toBe('90° al borde');
     expect(formatMedida(30, 'deg', 'al tramo')).toBe('30° al tramo');
-    expect(formatMedida(100, 'mm', 'al borde')).toBe('100 mm');
+    // Desde P3b una distancia también la lleva: «156 mm de 520 mm» (el largo del lado).
+    expect(formatMedida(100, 'mm', 'de 300 mm')).toBe('100 mm de 300 mm');
   });
 });

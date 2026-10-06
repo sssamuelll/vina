@@ -171,14 +171,4 @@ describe('lo que no cabe pasa a «Más»', () => {
     expect(ui).toContainEqual(['mas', { abierto: true, herramienta: '__pie_tres' }]);
     expect(ui).toContainEqual(['mas', { abierto: false, herramienta: '__pie_tres' }]);
   });
-
-  it('con un modal encima, el menú se cierra (#1125)', () => {
-    const store = configureStore({ reducer: { tools: toolReducer, editor: editorReducer } });
-    store.dispatch(setActiveTool('__pie_tres' as Tool2D));
-    const { rerender } = render(<Provider store={store}><ShortcutProvider><SeccionDelPatron frase={null} /></ShortcutProvider></Provider>);
-    fireEvent.click(screen.getByRole('button', { name: 'Más' }));
-    expect(screen.getByRole('group', { name: /^Más opciones de/ })).toBeTruthy();
-    rerender(<Provider store={store}><ShortcutProvider><SeccionDelPatron frase={null} inerte /></ShortcutProvider></Provider>);
-    expect(screen.queryByRole('group', { name: /^Más opciones de/ })).toBeNull();
-  });
 });

@@ -64,13 +64,12 @@ export default function NotchToolOverlay({
         </>
       )}
       {refineMarker && (() => {
-        // While a distance is being typed, the dashed hint tracks where the
-        // notch WILL land (preview ghost), not only where the click put it.
-        const target = refineMarker.previewWorld ?? refineMarker.notchWorld;
-        const isPreview = refineMarker.previewWorld != null;
+        // La línea de cota de la cota del piquete hace de hilo (P3b): aquí
+        // quedan la esquina desde la que cuenta y el fantasma.
+        const target = refineMarker.previewWorld;
         return (
           <g className="notch-refine-marker" pointerEvents="none">
-            {/* Reference corner: the point the modal's distance is measured FROM */}
+            {/* La esquina desde la que cuenta la cota del piquete */}
             <circle
               cx={refineMarker.refWorld.x}
               cy={refineMarker.refWorld.y}
@@ -85,18 +84,8 @@ export default function NotchToolOverlay({
               r={1.6 / zoom2D}
               style={{ fill: 'var(--notch-2d)' }}
             />
-            {/* Measurement hint: corner → (preview | current) notch position */}
-            <line
-              x1={refineMarker.refWorld.x}
-              y1={refineMarker.refWorld.y}
-              x2={target.x}
-              y2={target.y}
-              style={{ stroke: 'var(--notch-2d)' }}
-              strokeWidth={1 / zoom2D}
-              strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`}
-              opacity={0.7}
-            />
-            {isPreview && (
+            {/* Dónde quedará con lo que se está tecleando */}
+            {target && (
               <circle
                 cx={target.x}
                 cy={target.y}

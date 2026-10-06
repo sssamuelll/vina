@@ -52,7 +52,6 @@ const RAICES: Array<[string, number]> = [
   ['src/components/shell/AppShell.tsx', 1],
   // Modales
   ['src/components/shell/ConfirmDialog.tsx', 1],
-  ['src/components/PatternEditor/NotchPrecisionModal.tsx', 1],
   ['src/components/PatternEditor/CalibrationModal.tsx', 1],
   ['src/copilot/connections/ConnectionModal.tsx', 1],
   // La barrita de la pieza
@@ -86,7 +85,6 @@ const PINTA: Array<[string, string[] | '*']> = [
   ['src/components/shell/ToolTooltip.css', '*'],
   // Modales
   ['src/components/shell/ConfirmDialog.css', '*'],
-  ['src/components/PatternEditor/NotchPrecisionModal.css', '*'],
   ['src/components/PatternEditor/CalibrationModal.css', '*'],
   ['src/copilot/connections/ConnectionModal.tsx', '*'],
   ['src/copilot/connections/DynamicProviderForm.tsx', '*'],

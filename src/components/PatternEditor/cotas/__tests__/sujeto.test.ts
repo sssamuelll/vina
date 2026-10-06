@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { cotasDelSujeto } from '../sujeto';
+import type { Cota } from '../cotas';
 import type { PatternPiece, PathCommand, InternalLine } from '../../../../types/types';
 
 /**
@@ -22,6 +23,14 @@ const base = {
 };
 
 describe('cotasDelSujeto', () => {
+  it('lo que se pone gana a todo: es lo más reciente (spec 2026-10-02 § 5.2)', () => {
+    const puesta: Cota = { id: 'piquete-distancia', kind: 'borde', label: 'Distancia', valueMm: 60, unit: 'mm', min: 0, max: 400,
+      primary: true, a: { x: 0, y: 0 }, b: { x: 60, y: 0 }, outward: { x: 0, y: -1 }, apply: () => null };
+    const s = cotasDelSujeto({ ...base, activeTool: 'select', selectedPieceIds: ['a'], loQueSePone: [puesta] });
+    expect(s.cotas).toEqual([puesta]);
+    expect(s.esPieza).toBe(false);
+    expect(s.disabled).toBe(false);
+  });
   it('rectángulo sin selección: sin cotas', () => {
     const s = cotasDelSujeto({ ...base, activeTool: 'rectangle', selectedPieceIds: [] });
     expect(s.cotas).toEqual([]);
