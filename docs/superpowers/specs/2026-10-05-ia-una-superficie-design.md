@@ -308,6 +308,41 @@ Dentro de este subproyecto, para probar la superficie desde el primer día y cum
 - Las definiciones de los cinco verbos miden 4.605 caracteres, contra unos 203.000 del registro de
   hoy por llamada (§ 3).
 
+**Nota del plan de la entrega 1b, primera mitad (2026-10-09).** Plan
+`docs/superpowers/plans/2026-10-09-ia-superficie-1b.md`. Entran siete verbos de «Actuar»:
+`create_piece`, `edit_outline`, `sew`, `unsew`, `notch`, `remove` y `undo`. Lo que el código afinó:
+
+- `Recibo.measure` admite medidas anidadas (los bordes de una pieza, una costura medida).
+- Un id que no existe o unos argumentos inválidos son un error dicho. Lo que el patrón no permite
+  (una pieza bloqueada, una distancia más allá del borde, una medida que no confirma) es un recibo
+  con `done: false`. En los dos casos no cambia nada.
+- Cada verbo mide lo que va a escribir antes de despachar y vuelve a medir el estado de después. Si
+  esa segunda medida no confirma, el paso se deshace y queda en «Rehacer».
+- Los verbos usan los escritores de la interfaz. `edit_outline` tiene tres modos, y cada uno es una
+  cota de la interfaz: `move_point` (el arrastre de un nodo), `set_length` (la cota «Largo» de un
+  lado de un solo tramo recto) y `set_size` (las cotas «Ancho» y «Alto»).
+- `sew` cose en el mismo sentido salvo `reversed`, como la herramienta de coser. Los tramos se dan
+  en el sentido de su borde; el rango de un B invertido se guarda espejado y se lee sin espejar.
+- Las costuras del agente llevan `createdBy: 'ai'` y ya no salen viejas: `isStaleAiSeam` solo mira
+  las de autoSew (id `auto-seam-`). Antes «Re-coser» borraba lo que hubiera cosido el agente.
+- El piquete con pareja va por la costura que cose ese punto (una copa partida tiene dos), en el
+  sentido de la costura y a la distancia de arco que le toca. Si ninguna costura cose el punto, se
+  rehúsa. Mover un piquete no mueve su pareja; el recibo lo avisa.
+- `notchPoint` mide un piquete por el centro de su base. En una V, una U, un castillo o un piquete
+  doble, el primer punto del trazo está corrido medio ancho por el borde, y `read_pattern` lo medía
+  1,5 mm fuera de sitio.
+- Borrar avisa: «La IA borró Manga 2», con «Deshacer», que deshace ese paso solo si sigue siendo el
+  último. Si no, el aviso dice «No se deshizo nada porque después hubo otros cambios; usa Deshacer
+  hasta que vuelva lo borrado». Descoser no avisa. Los pasos del historial se llaman «IA: coser
+  Delantero con Espalda»: el «Agente:» de § 5.4 era un ejemplo. Textos aprobados por Samuel.
+- Coser y descoser una pieza bloqueada se permite, como en la interfaz; el candado protege su
+  contorno y sus internas.
+- Medido en la camisa de María: un piquete con pareja a un 20 % de la copa cae en la sisa que cose
+  esa mitad, dentro de ella, y no en un extremo como antes.
+- La superficie tiene 12 verbos y sus definiciones miden 11.060 caracteres.
+- Queda para la segunda mitad: `dart`, `seam_allowance`, `classify`, `assign_fabric`, `dress`,
+  `simulate` con `fit_map`, `grade` y `export`.
+
 ## 6. Riesgos
 
 - **Perder alcance.** La superficie corta deja fuera nesting, BOM, colorways, render y avíos. Si

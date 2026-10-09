@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ejecutarVerbo } from '../ejecutar';
+import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../../utils/notches';
+import type { InternalLine, NotchOptions } from '../../../types/types';
 import { VERBOS_DE_LEER } from '../verbos/leer';
 import { camisaDeMaria, contexto, costura, pieza, piquete } from './fixtures';
 
@@ -43,6 +45,19 @@ describe('read_pattern', () => {
   it('un piquete dice en qué borde está y a qué distancia de su inicio', async () => {
     const r = await leer<Patron>('read_pattern', {}, contexto([pieza('a', [100], { internals: [piquete('n1', 30)] })]));
     expect(r.pieces[0].notches[0]).toMatchObject({ id: 'n1', edge: 'top', distance_from_edge_start: 30, anchor: null });
+  });
+  it('un piquete en V, en U, en castillo o doble se mide por su centro, no por el primer punto de su trazo', async () => {
+    const forma = (id: string, o: Partial<NotchOptions>): InternalLine => ({
+      id, type: 'notch', path: generateNotchPath({ x: 30, y: 0 }, { x: 0, y: 1 }, { ...DEFAULT_NOTCH_OPTIONS, ...o }),
+    });
+    const internas = [
+      forma('v', { shape: 'v-internal' }), forma('u', { shape: 'u-notch' }), forma('castillo', { shape: 'castle' }),
+      forma('doble', { count: 2 }), forma('triple', { count: 3, width: 4 }),
+    ];
+    const r = await leer<Patron>('read_pattern', {}, contexto([pieza('a', [100], { internals: internas })]));
+    for (const n of r.pieces[0].notches as Array<{ id: string; edge: string; distance_from_edge_start: number }>) {
+      expect({ id: n.id, edge: n.edge, d: n.distance_from_edge_start }).toEqual({ id: n.id, edge: 'top', d: 30 });
+    }
   });
   it('trae la revisión del proyecto', async () => {
     expect(typeof (await leer<Patron>('read_pattern', {}, contexto([]))).revision).toBe('number');

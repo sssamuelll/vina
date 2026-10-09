@@ -1,6 +1,7 @@
 import type { PatternPiece, Seam } from '../../types/types';
 import { largosDeCostura } from '../../utils/seam/largoCosido';
 import { metricasDeCaminar, TOLERANCIA_CAMINAR_MM, type BandaDeDesajuste } from '../../utils/seam/caminarCostura';
+import { mirrorPctRange } from '../../utils/seam/seamRange';
 
 /** Los números de la superficie van en mm, con un decimal. */
 export const unDecimal = (v: number) => Math.round(v * 10) / 10;
@@ -36,6 +37,11 @@ export function medirCostura(
   const tolerancia = opciones.toleranceMm ?? TOLERANCIA_CAMINAR_MM;
   const holgura = opciones.easeMm ?? 0;
   const m = a != null && b != null ? metricasDeCaminar(a, b, tolerancia, holgura) : null;
+  // Un B invertido guarda su rango en el sentido de cosido (`seamRange.ts`);
+  // aquí se lee en el de su borde, como lo recibe `sew` y lo mide `measure`.
+  const [bDesde, bHasta] = seam.pieceB.reversed === true
+    ? mirrorPctRange([seam.pieceB.tStart ?? 0, seam.pieceB.tEnd ?? 1])
+    : [seam.pieceB.tStart ?? 0, seam.pieceB.tEnd ?? 1];
   return {
     id: seam.id,
     a: {
@@ -44,7 +50,7 @@ export function medirCostura(
     },
     b: {
       piece_id: seam.pieceB.pieceId, edge: seam.pieceB.edgeName,
-      t_start: seam.pieceB.tStart ?? 0, t_end: seam.pieceB.tEnd ?? 1,
+      t_start: bDesde, t_end: bHasta,
       reversed: seam.pieceB.reversed === true, length: b != null ? unDecimal(b) : null,
     },
     delta: m ? unDecimal(m.delta) : null,

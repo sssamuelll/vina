@@ -14,6 +14,7 @@ import type { PatternPiece, Seam, PathCommand, InternalLine, Point2D } from '../
 import { findEdgeByName, findEdgeForPoint } from '../../utils/seam/notchMirror';
 import { computePathArcLength, distanceAlongPath } from '../../utils/geometry/arcLength';
 import { rangoMedibleDeBorde } from '../../utils/semanticEdges';
+import { buildRing, projectToRing } from '../../utils/geometry/outlineRing';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -272,10 +273,35 @@ export function auditSeamLengths(
   return warnings;
 }
 
-/** Base point (M command) of a notch internal line. */
-export function notchPoint(n: InternalLine): Point2D | null {
-  const h = n.path[0];
-  return h && h.values.length >= 2 ? { x: h.values[0], y: h.values[1] } : null;
+/** Un punto del trazo está en la base del piquete si dista del contorno esto más que el más cercano. */
+const BASE_DEL_PIQUETE_MM = 0.25;
+
+/**
+ * Dónde está un piquete sobre el contorno: el centro de su base. Su base son
+ * los puntos del trazo que tocan el contorno; su centro, el pie del centroide
+ * de esos puntos. El primer punto del trazo solo es el centro en el corte
+ * simple: en una V, una U, un castillo o un piquete doble o triple está corrido
+ * medio ancho por el borde (1,5-3,75 mm), y un piquete de DXF puede empezar
+ * por su punta. Las formas de `generateNotchPath` son simétricas respecto a su
+ * normal, así que el centro de la base es el centro del piquete.
+ */
+export function notchPoint(n: InternalLine, outline: PathCommand[]): Point2D | null {
+  const puntos = n.path.flatMap(c => (c.values.length >= 2 ? [{ x: c.values[c.values.length - 2], y: c.values[c.values.length - 1] }] : []));
+  if (puntos.length === 0) return null;
+  const built = buildRing(outline, 2);
+  if (!built.ok) return puntos[0];
+  const ring = built.value;
+  const desvios = puntos.map(p => {
+    const pie = projectToRing(ring, p).point;
+    return Math.hypot(p.x - pie.x, p.y - pie.y);
+  });
+  const minimo = Math.min(...desvios);
+  const base = puntos.filter((_, i) => desvios[i] <= minimo + BASE_DEL_PIQUETE_MM);
+  const centro = {
+    x: base.reduce((s, p) => s + p.x, 0) / base.length,
+    y: base.reduce((s, p) => s + p.y, 0) / base.length,
+  };
+  return projectToRing(ring, centro).point;
 }
 
 /** Fraction (0-1) within the sewn sub-range [t0,t1] of an edge. */
@@ -345,7 +371,7 @@ export function auditNotches(
     // Notches that actually sit on the seamed edge of each piece.
     const onEdge = (piece: PatternPiece, edge: typeof edgeA, notches: InternalLine[]) =>
       edge
-        ? notches.filter(n => { const pt = notchPoint(n); return pt != null && findEdgeForPoint(piece, pt)?.id === edge.id; })
+        ? notches.filter(n => { const pt = notchPoint(n, piece.outline); return pt != null && findEdgeForPoint(piece, pt)?.id === edge.id; })
         : notches;
     const notchesA = onEdge(pieceA, edgeA, allNotchesA);
     const notchesB = onEdge(pieceB, edgeB, allNotchesB);
@@ -389,7 +415,7 @@ export function auditNotches(
     // piquete de extremo.
     const cosidos = (piece: PatternPiece, notches: InternalLine[], rango: [number, number], len: number, w0: number, w1: number) =>
       notches.flatMap(n => {
-        const f = distanceAlongPath(piece.outline, notchPoint(n)!, rango[0], rango[1]) / len;
+        const f = distanceAlongPath(piece.outline, notchPoint(n, piece.outline)!, rango[0], rango[1]) / len;
         const holgura = tolMm / len;
         return f < w0 - holgura || f > w1 + holgura ? [] : [sewnFrac(f, w0, w1)];
       });
