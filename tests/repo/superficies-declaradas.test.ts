@@ -44,6 +44,10 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/PatternEditor/cotas/CotaChip.tsx', 'cabina', 3],
   ['src/components/PatternEditor/cotas/CotasLayer.tsx', 'cabina', 2],
   ['src/components/PatternEditor/renderers/overlays/TransformHandlesOverlay.tsx', 'cabina', 1],
+  // La etiqueta de opción (spec 2026-10-02 § 5.2, P3c): la pastilla es parte
+  // de la cabina del objeto; su menú, como el de «Más», es un menú.
+  ['src/components/PatternEditor/etiquetas/EtiquetaDeOpcion.tsx', 'cabina', 1],
+  ['src/components/PatternEditor/etiquetas/EtiquetaDeOpcion.tsx', 'menu', 1],
   ['src/components/shell/LogoMenu.tsx', 'menu', 1],
   ['src/components/PatternEditor/ContextMenu.tsx', 'menu', 1],
   ['src/components/Viewport3D/ContextMenu3D.tsx', 'menu', 1],

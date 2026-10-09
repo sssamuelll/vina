@@ -56,6 +56,8 @@ const RAICES: Array<[string, number]> = [
   ['src/copilot/connections/ConnectionModal.tsx', 1],
   // La barrita de la pieza
   ['src/components/PatternEditor/FloatingActionBar.tsx', 1],
+  // La etiqueta de opción y su menú, que cuelga de <body> (P3c)
+  ['src/components/PatternEditor/etiquetas/EtiquetaDeOpcion.tsx', 2],
   // El margen de herramientas: no flota, es la orilla de la hoja (P2)
   ['src/components/shell/Dock.tsx', 1],
   // La hoja: tampoco flota, es el papel (P2b, cuando se fue la tira)
@@ -90,6 +92,8 @@ const PINTA: Array<[string, string[] | '*']> = [
   ['src/copilot/connections/DynamicProviderForm.tsx', '*'],
   // La barrita de la pieza
   ['src/components/PatternEditor/FloatingActionBar.tsx', '*'],
+  // La etiqueta de opción y su menú (P3c)
+  ['src/components/PatternEditor/etiquetas/EtiquetaDeOpcion.css', '*'],
 ];
 
 const FONDO_DEL_MARCO = /var\(--(bg-surface|bg-base|bg-deeper|bg-primary|panel-bg|surface-chrome-bg)\)/;
