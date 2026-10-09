@@ -37,8 +37,8 @@ const hoja = () => document.querySelector<HTMLElement>('.hoja-del-agente');
 
 beforeEach(() => {
   poner({ estado: 'apagado' });
-  vi.mocked(conectarTuAgente).mockClear();
-  vi.mocked(desconectarTuAgente).mockClear();
+  vi.mocked(conectarTuAgente).mockReset();
+  vi.mocked(desconectarTuAgente).mockReset();
 });
 afterEach(cleanup);
 
@@ -126,6 +126,32 @@ describe('la hoja', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tu agente' }));
     await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(2));
     expect(hoja()!.textContent).not.toContain('Permitir');
+  });
+
+  it('esperando con el permiso por dar, la nota sigue; y se va en cuanto el navegador lo da (revisión M7)', async () => {
+    const permiso = { state: 'prompt' as PermissionState, onchange: null as null | (() => void) };
+    Object.defineProperty(navigator, 'permissions', { value: { query: vi.fn().mockResolvedValue(permiso) }, configurable: true });
+    poner({ estado: 'buscando' });
+    montar();
+    fireEvent.click(screen.getByRole('button', { name: 'Tu agente' }));
+    await vi.waitFor(() => expect(hoja()!.textContent).toContain('Haz clic en «Permitir».'));
+    act(() => { permiso.state = 'granted'; permiso.onchange?.(); });
+    expect(hoja()!.textContent).not.toContain('Permitir');
+  });
+
+  it('al conectar, el foco pasa al botón nuevo; y Esc lo devuelve al enchufe (revisión M8)', async () => {
+    vi.mocked(conectarTuAgente).mockImplementation(() => { store.dispatch(cambiarPuente({ estado: 'buscando' })); });
+    montar();
+    const enchufe = screen.getByRole('button', { name: 'Tu agente' });
+    fireEvent.click(enchufe);
+    const conectar = within(hoja()!).getByRole('button', { name: 'Conectar' });
+    await vi.waitFor(() => expect(document.activeElement).toBe(conectar));
+    fireEvent.click(conectar);
+    const desconectar = within(hoja()!).getByRole('button', { name: 'Desconectar' });
+    await vi.waitFor(() => expect(document.activeElement).toBe(desconectar));
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    expect(hoja()).toBeNull();
+    expect(document.activeElement).toBe(enchufe);
   });
 
   it('Esc la cierra y el foco vuelve al enchufe; un clic fuera también la cierra', async () => {

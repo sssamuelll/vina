@@ -1,5 +1,6 @@
 import type { AppDispatch, RootState } from '../../store';
 import { cambiarPuente, type EstadoDelPuente } from '../../store/puenteSlice';
+import { revisionDelProyecto } from '../../store/revisionDelProyecto';
 import { pushJournal } from '../../utils/telemetry/journal';
 import { ejecutarVerbo } from '../superficie/ejecutar';
 import { SUPERFICIE, definicionesDeLaSuperficie } from '../superficie';
@@ -18,14 +19,21 @@ export const CIERRE_REEMPLAZADA = 4001;
 
 export type PermisoDelNavegador = 'prompt' | 'granted' | 'denied' | 'desconocido';
 
-/** El permiso de «acceso a la red local». Chrome 155 lo llama así (medido el 09-10); otros navegadores no lo conocen. */
-export async function permisoDelNavegador(): Promise<PermisoDelNavegador> {
+/**
+ * El permiso de «acceso a la red local», vivo: su `onchange` avisa cuando la
+ * usuaria responde al navegador. Chrome 155 lo llama así (medido el 09-10);
+ * otros navegadores no lo conocen y dan null.
+ */
+export async function estadoDelPermiso(): Promise<PermissionStatus | null> {
   try {
-    const { state } = await navigator.permissions.query({ name: 'local-network-access' as PermissionName });
-    return state;
+    return await navigator.permissions.query({ name: 'local-network-access' as PermissionName });
   } catch {
-    return 'desconocido';
+    return null;
   }
+}
+
+export async function permisoDelNavegador(): Promise<PermisoDelNavegador> {
+  return (await estadoDelPermiso())?.state ?? 'desconocido';
 }
 
 const NOMBRES: Record<string, string> = {
@@ -53,7 +61,7 @@ export interface DependenciasDelPuente {
 
 type MensajeDelPuente =
   | { t: 'agente'; nombre?: unknown }
-  | { t: 'llamada'; id: number; verbo: string; args: unknown };
+  | { t: 'llamada'; id: number; verbo: string; args: unknown; hasta?: number };
 
 export function crearConexion(dep: DependenciasDelPuente) {
   const verbos = dep.verbos ?? SUPERFICIE;
@@ -79,7 +87,16 @@ export function crearConexion(dep: DependenciasDelPuente) {
       return;
     }
     if (!encendido || ws) return;
-    const s = new dep.WebSocketImpl(`ws://127.0.0.1:${dep.puerto()}`);
+    let s: WebSocket;
+    try {
+      s = new dep.WebSocketImpl(`ws://127.0.0.1:${dep.puerto()}`);
+    } catch {
+      // Un navegador que no deja ni intentarlo (contenido mixto, por ejemplo):
+      // dicho, en vez de quedarse esperando para siempre.
+      encendido = false;
+      poner('bloqueado');
+      return;
+    }
     ws = s;
     s.onopen = () => {
       s.send(JSON.stringify({ t: 'hola', v: 1, instrucciones: INSTRUCCIONES, definiciones: definicionesDeLaSuperficie(verbos) }));
@@ -90,10 +107,14 @@ export function crearConexion(dep: DependenciasDelPuente) {
       try { m = JSON.parse(String(e.data)); } catch { return; }
       if (m.t === 'agente') poner('conectado', nombreDelAgente(m.nombre));
       if (m.t === 'llamada') {
-        const { id, verbo, args } = m;
+        const { id, verbo, args, hasta } = m;
         // Una a la vez: un agente que pide en paralelo no mezcla dos lotes de deshacer.
         cola = cola.then(async () => {
-          const respuesta = await ejecutarVerbo(verbos, verbo, args, { getState: dep.getState, dispatch: dep.dispatch, origen: 'mcp' });
+          // Vencida, el agente ya la dio por fallida: correrla ahora la
+          // aplicaría a sus espaldas, y la repetiría si reintenta.
+          const respuesta = typeof hasta === 'number' && Date.now() > hasta
+            ? { ok: false as const, error: `${verbo} expired before Vina could run it (Vina was busy); nothing was changed.`, revision: revisionDelProyecto() }
+            : await ejecutarVerbo(verbos, verbo, args, { getState: dep.getState, dispatch: dep.dispatch, origen: 'mcp' });
           if (s.readyState === dep.WebSocketImpl.OPEN) s.send(JSON.stringify({ t: 'respuesta', id, respuesta }));
         });
       }

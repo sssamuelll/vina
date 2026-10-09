@@ -27,7 +27,7 @@ class SocketFalso {
   caer(code = 1006) { this.readyState = 3; this.onclose?.({ code }); }
 }
 
-function montar(permiso: PermisoDelNavegador = 'granted', verbos?: readonly Verbo[]) {
+function montar(permiso: PermisoDelNavegador = 'granted', verbos?: readonly Verbo[], Impl: unknown = SocketFalso) {
   const { store, ctx } = tienda();
   const estados: Array<{ estado: EstadoDelPuente; agente: string | null }> = [];
   const dispatch = ((a: { type: string; payload?: { estado: EstadoDelPuente; agente?: string | null } }) => {
@@ -35,7 +35,7 @@ function montar(permiso: PermisoDelNavegador = 'granted', verbos?: readonly Verb
     return ctx.dispatch(a as never);
   }) as typeof ctx.dispatch;
   const conexion = crearConexion({
-    WebSocketImpl: SocketFalso as unknown as typeof WebSocket,
+    WebSocketImpl: Impl as typeof WebSocket,
     getState: ctx.getState,
     dispatch,
     puerto: () => 18462,
@@ -74,6 +74,17 @@ describe('conectar', () => {
     socket().abrir();
     socket().recibir({ t: 'agente', nombre: 'claude-code', version: '2.1' });
     expect(ultimo()).toEqual({ estado: 'conectado', agente: 'Claude Code' });
+  });
+
+  it('si el navegador no deja ni crear la conexión, queda bloqueado y no espera para siempre', async () => {
+    class SocketQueLanza {
+      static OPEN = 1;
+      constructor() { throw new DOMException('insecure', 'SecurityError'); }
+    }
+    const { conexion, ultimo } = montar('desconocido', undefined, SocketQueLanza);
+    conexion.conectar();
+    await tick();
+    expect(ultimo()).toEqual({ estado: 'bloqueado', agente: null });
   });
 
   it('con el permiso negado no abre nada: queda bloqueado', async () => {
@@ -149,6 +160,17 @@ describe('las llamadas', () => {
     soltar();
     await vi.waitFor(() => expect(socket().enviados.filter(m => m.t === 'respuesta').length).toBe(2));
     expect(orden).toEqual(['lento empieza', 'lento termina', 'rapido']);
+  });
+
+  it('una llamada que llega vencida no corre: responde que no se cambió nada (revisión I1)', async () => {
+    const { store, conexion, socket } = montar();
+    conexion.conectar();
+    await tick();
+    socket().abrir();
+    socket().recibir({ t: 'llamada', id: 4, verbo: 'create_piece', args: { rectangle: { width: 100, height: 50 } }, hasta: Date.now() - 1 });
+    await vi.waitFor(() => expect(socket().enviados.some(m => m.t === 'respuesta')).toBe(true));
+    expect(socket().enviados.find(m => m.t === 'respuesta')!.respuesta).toMatchObject({ ok: false, error: expect.stringMatching(/expired.*nothing was changed/) });
+    expect(store.getState().project.pieces).toEqual([]);
   });
 
   it('un verbo que no existe responde ok: false, sin romper la conexión', async () => {

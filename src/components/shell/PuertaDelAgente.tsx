@@ -6,7 +6,7 @@ import type { RootState } from '../../store';
 import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
 import { pushJournal } from '../../utils/telemetry/journal';
 import { conectarTuAgente, desconectarTuAgente } from '../../copilot/puente/puenteDeLaApp';
-import { permisoDelNavegador, type PermisoDelNavegador } from '../../copilot/puente/conexion';
+import { estadoDelPermiso, type PermisoDelNavegador } from '../../copilot/puente/conexion';
 
 export const COMANDO_CLAUDE_CODE = 'claude mcp add vina -- npx -y vina-mcp';
 export const CONFIG_JSON = '"vina": { "command": "npx", "args": ["-y", "vina-mcp"] }';
@@ -28,16 +28,39 @@ export default function PuertaDelAgente() {
   const conectado = estado === 'conectado';
   const nombre = conectado ? `${agente ?? 'Tu agente'} está conectado` : 'Tu agente';
 
-  // Abrir y cerrar quedan en la bitácora. Abierta, el foco entra a la hoja y
-  // se pregunta el permiso: la nota solo sale si el navegador va a preguntar.
+  // Abrir y cerrar quedan en la bitácora.
   const abiertaAntes = useRef(abierta);
   useEffect(() => {
     if (abiertaAntes.current === abierta) return;
     abiertaAntes.current = abierta;
     pushJournal('ui', 'tu-agente', { abierta });
+  }, [abierta]);
+
+  // Abierta, el foco vive en la hoja: al abrir, y cuando el estado cambia y
+  // se lleva el botón que lo tenía («Conectar» pasa a «Desconectar»).
+  useEffect(() => {
     if (!abierta) return;
+    const activo = document.activeElement;
+    if (activo && activo !== document.body && hojaRef.current?.contains(activo)) return;
     hojaRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
-    void permisoDelNavegador().then(setPermiso);
+  }, [abierta, estado]);
+
+  // El permiso, en vivo: la nota sale si el navegador va a preguntar, y se va
+  // en cuanto la usuaria le responde.
+  useEffect(() => {
+    if (!abierta) return;
+    let viva = true;
+    let estadoPermiso: PermissionStatus | null = null;
+    void estadoDelPermiso().then((p) => {
+      if (!viva || !p) return;
+      estadoPermiso = p;
+      setPermiso(p.state);
+      p.onchange = () => setPermiso(p.state);
+    });
+    return () => {
+      viva = false;
+      if (estadoPermiso) estadoPermiso.onchange = null;
+    };
   }, [abierta]);
 
   useEffect(() => {
@@ -52,7 +75,8 @@ export default function PuertaDelAgente() {
   }, [abierta]);
 
   usePeldanoDeEscape('tu-agente', 'menu', abierta, () => {
-    if (hojaRef.current?.contains(document.activeElement)) botonRef.current?.focus();
+    const activo = document.activeElement;
+    if (activo === document.body || hojaRef.current?.contains(activo)) botonRef.current?.focus();
     setAbierta(false);
   });
 
@@ -103,6 +127,12 @@ export default function PuertaDelAgente() {
     </div>
   );
 
+  // Sale antes y mientras se espera: al pulsar «Conectar» es cuando Chrome
+  // pregunta.
+  const notaDelPermiso = permiso === 'prompt' && (
+    <p className="hoja-del-agente__nota">La primera vez, tu navegador te pregunta si Vina puede acceder a otras aplicaciones de este dispositivo. Haz clic en «Permitir».</p>
+  );
+
   let contenido;
   if (estado === 'buscando') {
     contenido = (
@@ -110,6 +140,7 @@ export default function PuertaDelAgente() {
         {senal(false, 'Esperando a tu agente')}
         <p>Abre tu agente y Vina se conecta en cuanto arranque. Si lo acabas de configurar, ciérralo y ábrelo otra vez.</p>
         {accion('Desconectar', desconectarTuAgente, false)}
+        {notaDelPermiso}
         {configuracion}
       </>
     );
@@ -142,9 +173,7 @@ export default function PuertaDelAgente() {
       <>
         <p>Claude Code, Claude Desktop o Cursor pueden leer y cambiar este patrón. Lo que cambien se deshace con Ctrl+Z, como lo tuyo.</p>
         {accion('Conectar', conectarTuAgente, true)}
-        {permiso === 'prompt' && (
-          <p className="hoja-del-agente__nota">La primera vez, tu navegador te pregunta si Vina puede acceder a otras aplicaciones de este dispositivo. Haz clic en «Permitir».</p>
-        )}
+        {notaDelPermiso}
         {configuracion}
       </>
     );
