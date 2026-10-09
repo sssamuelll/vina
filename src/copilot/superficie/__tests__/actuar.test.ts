@@ -75,6 +75,22 @@ describe('cerrar', () => {
   });
 });
 
+describe('las guardas que cuidan el último paso de María', () => {
+  it('si escribir falla sin haber despachado nada, no se deshace el paso de María', () => {
+    const { store, ctx } = tienda([pieza('a', [100])]);
+    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'de María' }));
+    expect(() => actuar(ctx, 'prueba', 'romper', () => { throw new Error('antes de escribir'); })).toThrow('antes de escribir');
+    expect(store.getState().project.pieces[0].name).toBe('de María');
+  });
+  it('cerrar con done:false y nada escrito no deshace el paso de María', () => {
+    const { store, ctx } = tienda([pieza('a', [100])]);
+    store.dispatch(updatePiece({ ...store.getState().project.pieces[0], name: 'de María' }));
+    const e = actuar(ctx, 'prueba', 'nada', () => {});
+    expect(cerrar(ctx, 'prueba', e, { done: false, measure: {}, warnings: ['no cuadra'] }).done).toBe(false);
+    expect(store.getState().project.pieces[0].name).toBe('de María');
+  });
+});
+
 describe('rehusar y el candado', () => {
   it('rehusar no cambia nada y dice por qué', () => {
     expect(rehusar('piece is locked')).toMatchObject({

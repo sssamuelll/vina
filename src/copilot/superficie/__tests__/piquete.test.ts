@@ -62,6 +62,28 @@ describe('notch', () => {
     expect(store.getState().project.pieces.every(p => p.internals.length === 0)).toBe(true);
   });
 
+  it('con pareja en una pieza bloqueada: no pone ninguno de los dos', async () => {
+    const { store, ctx } = tienda([pieza('a', [100]), pieza('b', [100], { locked: true })], [costura()]);
+    const r = await actuarCon(ctx, { piece_id: 'a', edge: 'top', distance: 30, pair: true });
+    expect(r).toMatchObject({ done: false, warnings: ['the paired piece b is locked'] });
+    expect(store.getState().project.pieces.every(p => p.internals.length === 0)).toBe(true);
+  });
+
+  it('la profundidad pedida es la del piquete', async () => {
+    const { store, ctx } = tienda([pieza('a', [100])]);
+    await actuarCon(ctx, { piece_id: 'a', edge: 'top', distance: 30, depth_mm: 15 });
+    expect(store.getState().project.pieces[0].internals[0].notchOptions).toMatchObject({ length: 15 });
+  });
+
+  it('mover un piquete con pareja no mueve la pareja, y el recibo lo avisa', async () => {
+    const { store, ctx } = tienda([pieza('a', [100]), pieza('b', [100])], [costura()]);
+    const puesto = await actuarCon(ctx, { piece_id: 'a', edge: 'top', distance: 30, pair: true });
+    const pareja = (puesto.measure.pair as { notch_id: string }).notch_id;
+    const r = await actuarCon(ctx, { piece_id: 'a', edge: 'top', distance: 60, notch_id: puesto.measure.notch_id });
+    expect(r.warnings).toEqual([`notch ${puesto.measure.notch_id} has a pair on piece b; it was not moved`]);
+    expect(store.getState().project.pieces[1].internals.map(l => l.id)).toEqual([pareja]);
+  });
+
   it('mueve un piquete puesto: el mismo id, a la distancia nueva, con sus opciones', async () => {
     const opciones = { shape: 'slit' as const, subType: 'straightforward' as const, length: 12, width: 3, angle: 0, count: 2 };
     const { store, ctx } = tienda([pieza('a', [100], { internals: [{ ...piquete('n1', 30), notchOptions: opciones }] })]);
