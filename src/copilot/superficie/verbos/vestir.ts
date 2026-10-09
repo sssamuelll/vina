@@ -2,10 +2,16 @@ import { z } from 'zod';
 import type { PatternPiece } from '../../../types/types';
 import { definirVerbo, type ContextoDeVerbo, type Recibo, type Verbo } from '../tipos';
 import { setViewMode } from '../../../store/editorSlice';
-import { resetSimulation, setViewMode3D } from '../../../store/simulationSlice';
+import { pauseSimulation, resetSimulation, setViewMode3D, startSimulation } from '../../../store/simulationSlice';
 import { computeEffectiveRegions, rawRegions } from '../../../utils/cloth/garmentPlacement';
+import {
+  getActiveSolverTier, getClothGeometry, getSolverEvents, latidosDeLaSimulacion,
+} from '../../../utils/cloth/solverRuntimeTracker';
 import { revisionDelProyecto } from '../../../store/revisionDelProyecto';
 import { rehusar } from '../actuar';
+import { unDecimal } from '../costuras';
+import { CUADROS_POR_LECTURA, estaAsentada, movimientoP95, UMBRAL_MM_POR_CUADRO } from '../asentamiento';
+import { ajusteDeLaTela } from './ajuste';
 
 /** Un objeto nuevo cada vez: un recibo no comparte su `changed` con otro. */
 export const sinCambios = (): Recibo['changed'] => ({ created: [], modified: [], deleted: [] });
@@ -68,4 +74,119 @@ const dress = definirVerbo({
   },
 });
 
-export const VERBOS_DE_VESTIR: readonly Verbo[] = [dress];
+const PAUSA_MS = 250;
+/** La pestaña oculta tanto tiempo: el navegador no dibuja, y la tela no avanza. */
+const OCULTA_MS = 2_000;
+/** Sin un cuadro nuevo tanto tiempo, con la pestaña a la vista: el WASM da uno cada 1-2 s. */
+const SIN_CUADROS_MS = 10_000;
+/** El primer cuadro: la cascada de tiers tarda hasta 12-15 s por tier en arrancar. */
+const ARRANQUE_MS = 30_000;
+
+const dormir = (ms: number) => new Promise<void>(r => { setTimeout(r, ms); });
+const oculta = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+
+const OCULTA =
+  'Vina is hidden (its tab is in the background, or the window is minimized or covered), so the browser does not draw it and the simulation does not advance. Ask the user to bring Vina to the front, then call simulate again.';
+
+/** Lo último que dijo el solver al fallar, si dijo algo. */
+function loQueDijoElSolver(): string {
+  const e = [...getSolverEvents()].reverse().find(x => x.kind === 'start:failed' || x.kind === 'tier:failed');
+  return e ? `${e.kind}: ${JSON.stringify(e.data)}` : 'no solver reported an error';
+}
+
+interface Espera { settled: boolean; warnings: string[]; frames: number; seconds: number; speed: number | null }
+
+/**
+ * Espera a que la tela se quede quieta mirando el latido (`latidosDeLaSimulacion`)
+ * y la malla que la app dibuja. No espera de balde: si Vina no se ve, si la
+ * tela deja de llegar o si nunca arrancó, lo dice (decisión 2 del plan 1b-2).
+ */
+async function esperarQuieta(ctx: ContextoDeVerbo, plazoS: number): Promise<Espera> {
+  const t0 = Date.now();
+  const desde = latidosDeLaSimulacion();
+  const movimientos: number[] = [];
+  let previa: { latidos: number; pos: Float32Array } | null = null;
+  let ultimo = desde;
+  let ultimoCambio = t0;
+  let ocultaDesde: number | null = null;
+  for (;;) {
+    await dormir(PAUSA_MS);
+    const ahora = Date.now();
+    const latidos = latidosDeLaSimulacion();
+    const frames = latidos - desde;
+    const seconds = unDecimal((ahora - t0) / 1000);
+    const speed = movimientos.length ? Math.round(movimientos[movimientos.length - 1] * 1e4) / 1e4 : null;
+    const fin = (settled: boolean, warnings: string[] = []): Espera => ({ settled, warnings, frames, seconds, speed });
+
+    if (ctx.getState().simulation.simulationState !== 'running') return fin(false, ['the simulation was stopped while waiting']);
+    if (latidos !== ultimo) { ultimo = latidos; ultimoCambio = ahora; }
+    ocultaDesde = oculta() ? (ocultaDesde ?? ahora) : null;
+    if (ocultaDesde !== null && ahora - ocultaDesde >= OCULTA_MS) return fin(false, [OCULTA]);
+    if (frames === 0 && ahora - t0 >= ARRANQUE_MS) {
+      return fin(false, [`the simulation did not start within ${ARRANQUE_MS / 1000} s (${loQueDijoElSolver()})`]);
+    }
+    if (frames > 0 && ahora - ultimoCambio >= SIN_CUADROS_MS) {
+      return fin(false, [`the simulation stopped advancing: no new frame of cloth in ${SIN_CUADROS_MS / 1000} s. Vina may be hidden or covered by another window: ask the user to bring it to the front, then call simulate again.`]);
+    }
+
+    const malla = getClothGeometry()?.geometry.getAttribute('position');
+    if (malla && (!previa || latidos - previa.latidos >= CUADROS_POR_LECTURA)) {
+      const pos = (malla.array as Float32Array).slice();
+      if (previa && previa.pos.length === pos.length) movimientos.push(movimientoP95(previa.pos, pos, latidos - previa.latidos));
+      previa = { latidos, pos };
+    }
+    if (estaAsentada(movimientos, frames)) return fin(true);
+    if ((ahora - t0) / 1000 >= plazoS) {
+      const porSegundo = unDecimal(frames / Math.max((ahora - t0) / 1000, 0.001));
+      const ultima = movimientos.length ? Math.round(movimientos[movimientos.length - 1] * 1e4) / 1e4 : null;
+      const aun = ultima === null ? 'how much it still moves is not measured yet' : `the cloth still moves ${ultima} mm per frame`;
+      return fin(false, [
+        `did not settle within ${plazoS} s: ${frames} frames on the ${getActiveSolverTier()} tier (${porSegundo} frames per second); ${aun} (it counts as settled under ${UMBRAL_MM_POR_CUADRO})`,
+      ]);
+    }
+  }
+}
+
+const simulate = definirVerbo({
+  name: 'simulate',
+  description:
+    "Start or stop the cloth simulation on the avatar, in the 3D view (from 2D the view switches to Split). start drapes from the dressed pose; stop pauses it and the cloth stays where it is. With wait (default), it answers when the cloth settles, with the fit map, or after wait_seconds with done: false and why. The simulation runs in the user's browser and only advances while Vina is visible on screen.",
+  args: z.object({
+    action: z.enum(['start', 'stop']),
+    wait: z.boolean().default(true),
+    wait_seconds: z.number().int().min(1).max(110).default(60).describe('how long to wait for the cloth to settle; default 60'),
+  }),
+  run: async ({ action, wait, wait_seconds }, ctx) => {
+    const before = revisionDelProyecto();
+    const recibo = (done: boolean, measure: Recibo['measure'], warnings: string[] = []): Recibo => ({
+      done, changed: sinCambios(), measure, warnings, revision: { before, after: revisionDelProyecto() },
+    });
+    const { project, simulation } = ctx.getState();
+    if (action === 'stop') {
+      if (simulation.simulationState === 'running') ctx.dispatch(pauseSimulation());
+      const state = ctx.getState().simulation.simulationState;
+      return recibo(state !== 'running', { state });
+    }
+    if (!project.pieces.some(p => p.active)) return rehusar('there are no active pieces to simulate');
+    if (!simulation.showGarment) return rehusar('the garment is hidden in the 3D view; the user can show it again there');
+    const view_changed = verElTres(ctx);
+    ctx.dispatch(setViewMode3D('simulate'));
+    if (simulation.simulationState !== 'running') ctx.dispatch(startSimulation());
+    if (!wait) {
+      return recibo(ctx.getState().simulation.simulationState === 'running', { state: 'running', tier: getActiveSolverTier(), view_changed });
+    }
+    const e = await esperarQuieta(ctx, wait_seconds);
+    return recibo(e.settled, {
+      state: ctx.getState().simulation.simulationState,
+      tier: getActiveSolverTier(),
+      settled: e.settled,
+      seconds: e.seconds,
+      frames: e.frames,
+      speed_mm_per_frame: e.speed,
+      view_changed,
+      ...(e.settled ? { fit: ajusteDeLaTela(ctx) } : {}),
+    }, e.warnings);
+  },
+});
+
+export const VERBOS_DE_VESTIR: readonly Verbo[] = [dress, simulate];
