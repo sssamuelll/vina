@@ -347,6 +347,61 @@ Dentro de este subproyecto, para probar la superficie desde el primer día y cum
 - Queda para la segunda mitad: `dart`, `seam_allowance`, `classify`, `assign_fabric`, `dress`,
   `simulate` con `fit_map`, `grade` y `export`.
 
+**Nota del plan de la entrega 1b, segunda mitad, parte A (2026-10-09).** Plan
+`docs/superpowers/plans/2026-10-09-ia-superficie-1b2-ajuste.md`. Entra el ciclo del ajuste:
+`classify`, `assign_fabric`, `dress`, `simulate` y `fit_map`. La parte B (`dart`,
+`seam_allowance`, `grade`, `export`) tiene su propio plan. Lo que el código y dos sondas
+afinaron:
+
+- **La simulación solo avanza con Vina a la vista.**
+  - Con otra pestaña delante o la ventana minimizada, el navegador baja a 1 cuadro por segundo y
+    la tela no se mueve.
+  - `simulate` mira el latido: los cuadros de tela nueva que la app dibuja
+    (`latirLaSimulacion`, en el `useFrame` de `GarmentSimulation`).
+  - No espera de balde. Lo dice con la pestaña oculta 2 s, sin cuadro nuevo en 10 s, o sin
+    ningún cuadro en 30 s; en este último caso, con lo último que dijo el solver.
+- **Asentada.** Pasados 180 cuadros, la tela se mueve menos de 0,02 mm por cuadro (percentil 95
+  de sus vértices) en tres lecturas seguidas, separadas por al menos 30 cuadros.
+  - Medido con la camisa de María cosida, en WebGPU: el percentil 95 baja de 4,9 mm a ~0,01 mm
+    hacia el cuadro 500, y ahí se queda entre 0,006 y 0,015. El máximo nunca baja de 0,14: unos
+    pocos vértices tiemblan siempre.
+  - En WASM el worker da un cuadro cada 1-2 s: la camisa no se asienta en el plazo, y el recibo
+    lo dice con el tier, los cuadros por segundo y lo que se mueve todavía.
+- **`wait_seconds`** va de 1 a 110 y por defecto vale 60: los 60 s de esta spec, siempre por
+  debajo de los 120 s del puente.
+- **`stop` pausa:** la app libera el solver y la tela queda donde estaba. Un `start` después
+  vuelve a vestir desde la pose del vestido.
+- **`fit_map` mide cada pieza por sus vértices** (el manifiesto de la malla), con las fórmulas del
+  mapa en pantalla y la tela de la simulación.
+  - Sin el cuerpo, como la app (que pasa el avatar como `null`): «ajustada» y «no se puede poner»
+    cuentan la pieza entera.
+  - Las aristas del solver se piden mientras falten, con el mapa en pantalla o sin él.
+  - El «por pieza» que copiaba la cifra global (`getFitMapByPiece`) no lo usa la superficie.
+- **`dress` no escribe el patrón** ni borra lo que María movió a mano, cosa que la herramienta
+  vieja (`arrangeGarment`) sí hacía. Para la simulación si corre y deja el 3D en vestir.
+  - Por cada pieza dice si su región la decidió la categoría o el nombre. La que Vina no sabe
+    ubicar sale sin región, con el aviso de clasificarla: caería en el delantero del torso.
+- **Desde 2D, `dress` y `simulate` pasan la vista a Split**, como el panel de render.
+- **`classify` nombra de nuevo los bordes por la categoría solo si nada los usa** (costuras,
+  grupos, pliegues, elásticos, puntos de medida). Si algo los usa, los deja y lo avisa. Sin
+  `side`, el lado viejo se va.
+- **El candado protege el contorno y las internas:** `classify` y `assign_fabric` se permiten,
+  como coser.
+- **`assign_fabric`** usa la biblioteca que lee el simulador (`PHYSICAL_FABRIC_LIBRARY`).
+  - El simulador viste con una sola tela: la toma cuando todas las piezas activas comparten una.
+    Si difieren, sigue con la suya y el recibo lo dice.
+  - La tela de las piezas se deshace con Ctrl+Z; la de la simulación no, porque es estado de la
+    simulación, como la vista.
+- **Pasos del historial:** «IA: clasificar Manga», «IA: poner Denim 12oz a 5 piezas» (el
+  `nameEs` de la tela).
+- **Lo que dio la camisa de María al vestirla:** el clasificador geométrico ubica las cinco
+  piezas (cuello, dos mangas, delantero, espalda) con 15 costuras activas.
+  - Quitada la categoría del cuello, `dress` lo nombra sin región. `classify` como cuello deja
+    sus bordes, que están cosidos, y entonces la camisa se viste entera.
+- **Las instrucciones** dicen que la simulación solo avanza con Vina a la vista, y la línea del
+  candado dice lo que protege.
+- **La superficie tiene 17 verbos** y sus definiciones miden 14.646 caracteres.
+
 ## 6. Riesgos
 
 - **Perder alcance.** La superficie corta deja fuera nesting, BOM, colorways, render y avíos. Si

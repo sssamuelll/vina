@@ -6,15 +6,21 @@ import { VERBOS_DE_PIEZA } from './verbos/pieza';
 import { VERBOS_DE_COSTURA } from './verbos/costura';
 import { VERBOS_DE_PIQUETE } from './verbos/piquete';
 import { VERBOS_DE_BORRAR } from './verbos/borrar';
+import { VERBOS_DE_AJUSTE } from './verbos/ajuste';
+import { VERBOS_DE_PRENDA } from './verbos/prenda';
+import { VERBOS_DE_VESTIR } from './verbos/vestir';
 
 /**
  * La superficie de herramientas de Vina (spec 2026-10-05): la única capa que
  * ven los agentes, el de la usuaria por MCP y el de Vina. Los verbos llegan
- * por entregas: 1a leer y medir; 1b, primera mitad, las manos.
+ * por entregas: 1a leer y medir; 1b, primera mitad, las manos; segunda mitad,
+ * parte A, el ciclo del ajuste (clasificar, tela, vestir, simular y el mapa
+ * de ajuste).
  */
 export const SUPERFICIE: readonly Verbo[] = [
-  ...VERBOS_DE_LEER, ...VERBOS_DE_MEDIR,
+  ...VERBOS_DE_LEER, ...VERBOS_DE_MEDIR, ...VERBOS_DE_AJUSTE,
   ...VERBOS_DE_PIEZA, ...VERBOS_DE_COSTURA, ...VERBOS_DE_PIQUETE, ...VERBOS_DE_BORRAR,
+  ...VERBOS_DE_PRENDA, ...VERBOS_DE_VESTIR,
 ];
 
 export interface DefinicionDeVerbo {

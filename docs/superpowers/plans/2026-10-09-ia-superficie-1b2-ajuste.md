@@ -74,7 +74,7 @@ Afinan la spec sin cambiar su intención. La Task 6 las anota en ella.
 11. **`classify` nombra de nuevo los bordes solo si nada los usa** (costuras, grupos de costura, pliegues, elásticos, puntos de medida). Si algo los usa, los deja y lo avisa. Sin `side`, el lado viejo se va.
 12. **El candado protege el contorno y las internas.** `classify` y `assign_fabric` no los tocan, así que se permiten, como coser (decisión 13 de la primera mitad).
 13. **`assign_fabric` pone la tela en las piezas**, y Ctrl+Z la quita. Si todas las piezas activas comparten una, la simulación la usa (`setDefaultFabric`). Eso no se deshace: es estado de la simulación, como la vista. Si las telas difieren, la simulación sigue con la suya y el recibo lo dice.
-14. **Pasos del historial:** «IA: clasificar Manga» y «IA: poner Mezclilla a 5 piezas» (el `nameEs` de la tela).
+14. **Pasos del historial:** «IA: clasificar Manga» y «IA: poner Denim 12oz a 5 piezas» (el `nameEs` de la tela).
 15. **Las instrucciones** añaden que la simulación corre en el navegador y solo avanza con Vina a la vista. La línea del candado dice lo que protege.
 
 ## Archivos

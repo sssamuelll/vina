@@ -48,10 +48,32 @@ describe('el ciclo de María por la superficie', () => {
     expect(store.getState().project.seams.map(s => s.id)).toEqual(seams.map(s => s.id));
   });
 
-  it('la superficie tiene los doce verbos', () => {
+  it('vestir la camisa: la pieza que Vina no sabe ubicar se clasifica, y entonces se viste entera', async () => {
+    const { piezas, seams } = camisaDeMaria();
+    // El clasificador geométrico ubica las cinco (medido el 09-10). Al cuello se le
+    // quita la categoría: así llega una pieza de un DXF con nombres de bloque.
+    const cuello = piezas.find(p => p.category === 'collar')!;
+    delete cuello.category;
+    const { ctx } = tienda(piezas, seams);
+    type Pieza = { piece_id: string; region: string | null };
+    const r1 = await actuarCon(ctx, 'dress', {});
+    expect(r1.done).toBe(false);
+    expect((r1.measure.pieces as Pieza[]).filter(p => p.region === null).map(p => p.piece_id)).toEqual([cuello.id]);
+    const c = await actuarCon(ctx, 'classify', { piece_id: cuello.id, category: 'collar' });
+    // El cuello está cosido: sus bordes guardan sus nombres.
+    expect(c.measure).toMatchObject({ region: 'collar', edges_renamed: false });
+    const r2 = await actuarCon(ctx, 'dress', {});
+    expect(r2.done).toBe(true);
+    expect((r2.measure.pieces as Pieza[]).map(p => p.region).sort()).toEqual(
+      ['back-torso', 'collar', 'front-torso', 'left-sleeve', 'right-sleeve'],
+    );
+  });
+
+  it('la superficie tiene los diecisiete verbos', () => {
     expect(SUPERFICIE.map(v => v.name)).toEqual([
-      'read_pattern', 'read_piece', 'measure', 'walk_seam', 'verify',
+      'read_pattern', 'read_piece', 'measure', 'walk_seam', 'verify', 'fit_map',
       'create_piece', 'edit_outline', 'sew', 'unsew', 'notch', 'remove', 'undo',
+      'classify', 'assign_fabric', 'dress', 'simulate',
     ]);
   });
 });
