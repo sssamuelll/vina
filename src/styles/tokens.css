@@ -218,9 +218,9 @@
    *             el 8 % restante y creaba los contextos de apilamiento que
    *             recortaron ConnectionModal, contrato § 2). Sobre la hoja es
    *             PAPEL: blanco, y lo pone el ámbito de papel de más abajo.
-   * Los valores de overlay de :root son el oscuro de cromo callado. Desde P1b
-   * los leen solo la barra de IA, la tira y la fila (hasta P2), los paneles
-   * (hasta P4, que los pasa a chrome a ras) y el cromo del 3D (hasta P5).
+   * Los valores de overlay de :root son el oscuro de cromo callado. Desde P4
+   * los paneles son chrome a ras (`.context-panel`), y esos valores los lee
+   * solo el cromo del 3D, hasta P5.
    * Más la familia de tinta: `ink-*`, lo que se dibuja SOBRE el papel. */
   --surface-chrome-bg: var(--bg-surface);
   --surface-chrome-border: 1px solid var(--border);

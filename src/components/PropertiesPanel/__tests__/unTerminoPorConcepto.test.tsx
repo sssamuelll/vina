@@ -1,10 +1,10 @@
 /**
  * @vitest-environment jsdom
  *
- * Un término por concepto (contrato de interfaz § 5): Propiedades nombra las
- * formas del piquete, los tipos de costura y los de esquina igual que la línea
- * al pie y la etiqueta de opción (P3c). Antes decía «Recto», «V interna»,
- * «Castillo», «Estándar» y «Sobrecargada» donde el pie decía otra cosa.
+ * Un término por concepto (contrato de interfaz § 5): Propiedades nombra los
+ * tipos de costura igual que la línea al pie y la etiqueta de opción (P3c).
+ * Antes decía «Estándar» y «Sobrecargada» donde el pie decía otra cosa. Las
+ * formas del piquete y los preajustes de margen salieron de Propiedades en P4.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { act, render, cleanup } from '@testing-library/react';
@@ -17,7 +17,6 @@ import toolReducer from '../../../store/toolSlice';
 import PropertiesPanel from '../PropertiesPanel';
 import type { AppDispatch } from '../../../store';
 import type { PatternPiece, Seam } from '../../../types/types';
-import { FORMAS_DE_PIQUETE } from '../../../tools/definitions/notch';
 import { TIPOS_DE_COSTURA } from '../../../utils/seam/tiposDeCostura';
 
 afterEach(cleanup);
@@ -44,28 +43,7 @@ function panel() {
   return store;
 }
 
-const opciones = (id: string) => {
-  const select = document.getElementById(id) as HTMLSelectElement | null;
-  expect(select, `#${id}`).not.toBeNull();
-  return Array.from(select!.options).map((o) => [o.value, o.textContent]);
-};
-
 describe('Propiedades nombra como la línea al pie', () => {
-  it('las formas del piquete', () => {
-    panel();
-    expect(opciones('prop-notch-shape')).toEqual(FORMAS_DE_PIQUETE.map((c) => [c.value, c.label]));
-  });
-
-  it('los preajustes de margen llevan el nombre del tipo de costura con que se le llama en el pie', () => {
-    // Revisión final de P3c (lente A): «Estándar» y «Sobrecargada» seguían aquí.
-    panel();
-    const fila = Array.from(document.querySelectorAll('.panel-field'))
-      .find((f) => f.textContent?.includes('Preajustes de margen'))!;
-    const nombres = Array.from(fila.querySelectorAll('button')).map((b) => b.textContent);
-    const delPie = TIPOS_DE_COSTURA.map((t) => t.label);
-    expect(nombres.filter((n) => !delPie.includes(n ?? ''))).toEqual([]);
-  });
-
   it('los tipos de costura, en su desplegable y en la insignia de la lista', () => {
     const store = panel();
     const costura: Seam = {
@@ -73,9 +51,10 @@ describe('Propiedades nombra como la línea al pie', () => {
       pieceA: { pieceId: 'p1', edgeName: 'edge-1' }, pieceB: { pieceId: 'p1', edgeName: 'edge-3' },
     } as Seam;
     act(() => { (store.dispatch as AppDispatch)(addSeam(costura)); });
+    // Con la costura elegida: con una pieza, la lista del proyecto no sale (P4).
+    act(() => { (store.dispatch as AppDispatch)(selectSeam('s1')); });
     // La lista de costuras: la insignia ya no dice «sobrecargada».
     expect(document.querySelector('.seam-type')?.textContent).toBe('flat-felled');
-    act(() => { (store.dispatch as AppDispatch)(selectSeam('s1')); });
     const tipo = Array.from(document.querySelectorAll('select'))
       .find((s) => Array.from(s.options).some((o) => o.value === 'flat-felled'))!;
     expect(Array.from(tipo.options).map((o) => [o.value, o.textContent]))

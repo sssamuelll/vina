@@ -75,7 +75,7 @@ const PanelLoading = () => (
 );
 
 /** Nombre visible del panel. Las CLAVES (Properties, BOM...) no se tocan:
- * indexan renderPanelContent y getPanelSide; solo cambia el display. */
+ * indexan renderPanelContent; solo cambia el display. */
 const PANEL_LABELS: Record<string, string> = {
   Avatar: 'Avatar',
   BOM: 'Lista de materiales',
@@ -92,7 +92,7 @@ function renderPanelContent(name: string, cerrar: () => void) {
   const fallback = <PanelLoading />;
   switch (name) {
     case 'Avatar':
-      return <Suspense fallback={fallback}><AvatarPanel open /></Suspense>;
+      return <Suspense fallback={fallback}><AvatarPanel /></Suspense>;
     case 'BOM':
       return <Suspense fallback={fallback}><BOMTab /></Suspense>;
     case 'Grading':
@@ -124,7 +124,7 @@ export default function AppShell() {
   const iaAbierta = useSelector((s: RootState) => s.ia.abierta);
   const splitRatio = useSelector((s: RootState) => s.layout.splitRatio);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
-  const { leftPanel, rightPanel, openPanel, togglePanel, closeLeft, closeRight } = usePanelHost();
+  const { paneles, openPanel, togglePanel, closePanel } = usePanelHost();
   const canvasRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const [dxfDragActive, setDxfDragActive] = useState(false);
@@ -219,11 +219,11 @@ export default function AppShell() {
   }, [importDXFFile]);
 
   // ─── Divider drag ───────────────────────────────────────────────────
-  // H-1: `canvasRef` (.canvas-area) ya no es la región repartible — desde que
-  // los paneles pasaron a ser hijos flex reales, puede tener hasta dos
-  // paneles de 324px de cada lado ocupando ese mismo rect. La región real va
+  // H-1: `canvasRef` (.canvas-area) ya no es la región repartible — los
+  // paneles son hijos flex reales, y desde P4 puede haber hasta dos de 300 px
+  // a la derecha ocupando ese mismo rect. La región real va
   // del borde izquierdo de .canvas-area__2d al borde derecho de
-  // .canvas-area__3d, midiendo los elementos (nunca 300/324 a mano, eso es
+  // .canvas-area__3d, midiendo los elementos (nunca 300 a mano, eso es
   // lo que sobrevive a que cambie el ancho del panel), y hay que descontar
   // el ancho del propio divisor del espacio repartible. Se captura todo UNA
   // vez al empezar el arrastre, no en cada mousemove.
@@ -329,11 +329,6 @@ export default function AppShell() {
             </div>
           </div>
         )}
-        {leftPanel && (
-          <ContextPanel title={PANEL_LABELS[leftPanel] ?? leftPanel} onClose={closeLeft}>
-            {renderPanelContent(leftPanel, closeLeft)}
-          </ContextPanel>
-        )}
         <div
           className="canvas-area__2d"
           style={{ flex: `${get2dFlexGrow()} 1 0px`, display: viewMode === '3d' ? 'none' : undefined }}
@@ -358,11 +353,15 @@ export default function AppShell() {
             <Viewport3D activeTool3D={activeTool3D as Tool3D} hideChrome />
           </Viewport3DErrorBoundary>
         </div>
-        {rightPanel && (
-          <ContextPanel title={PANEL_LABELS[rightPanel] ?? rightPanel} onClose={closeRight}>
-            {renderPanelContent(rightPanel, closeRight)}
+        {/* Los paneles (spec 2026-10-02 § 6.1): a la derecha y a ras, detrás
+            del 3D, así que la hoja se estrecha por la derecha y las
+            herramientas no se mueven. El primero de la lista va pegado al
+            borde de la ventana: se pintan al revés. */}
+        {[...paneles].reverse().map((nombre) => (
+          <ContextPanel key={nombre} title={PANEL_LABELS[nombre] ?? nombre} onClose={() => closePanel(nombre)}>
+            {renderPanelContent(nombre, () => closePanel(nombre))}
           </ContextPanel>
-        )}
+        ))}
       </div>
       {/* La línea al pie (spec 2026-10-02 § 5.3): la tercera fila de la
           ventana. Marco, de lado a lado y siempre; la sección del patrón la

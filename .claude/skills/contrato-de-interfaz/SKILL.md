@@ -95,8 +95,9 @@ sobre el papel. No sabe dónde está. Cinco reglas:
   nombre que el ámbito redefine (`--text-muted: var(--text-tertiary)`), el
   ámbito lo vuelve a declarar; si no, baja con el valor del marco. Lo vigila
   `src/styles/__tests__/ambito-de-papel.test.ts`.
-- **Hasta su fase siguen con el overlay oscuro de `:root`:** los paneles (P4,
-  que los pasa a `chrome` a ras) y el cromo del 3D (P5). La fila dejó el
+- **Hasta su fase sigue con el overlay oscuro de `:root`** el cromo del 3D
+  (P5). Desde P4 los paneles son `chrome` a ras, entre la barra superior y la
+  línea al pie (`.context-panel`, `floating.css`). La fila dejó el
   lienzo en P2a: sus seis interruptores viven en la barra superior, que es
   marco, y solo su menú plegado («Mostrar») flota y es papel. La tira murió en
   P2b: sus opciones viven en la línea al pie, que es marco, y solo su menú
@@ -180,8 +181,9 @@ de una sola lista por concepto (`FORMAS_DE_PIQUETE`, `TIPOS_DE_COSTURA`,
   (lo mide `margen-de-herramientas.spec.ts`). Van en el flujo, al lado de la
   hoja: lo que flota encima no comparte caja con ellos y no los empuja. Con
   barras clásicas el margen crece de 44 a 47 px mientras sus herramientas no
-  caben, y la hoja se corre esos 3 px. Que tampoco se muevan al abrir un panel
-  llega con la ranura a la derecha: en 2D con P4, en Split con P5.
+  caben, y la hoja se corre esos 3 px. Al abrir un panel tampoco se mueven en
+  2D desde P4: va a la derecha, a ras, y la hoja se estrecha por ese lado
+  (`emplazamiento-paneles.spec.ts`). En Split llega con P5.
 - **La línea al pie es una fila de la ventana.** Marco, de lado a lado y
   siempre, con el alto de la barra superior; la hoja termina encima y nada la
   empuja. Las opciones de la herramienta viven ahí, como botones; lo que no

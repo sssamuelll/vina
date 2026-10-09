@@ -113,7 +113,7 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, edge
   ];
 
   return (
-    <PropertySection id="seam-props" title={`COSTURA: ${pieceAName} ↔ ${pieceBName}`} collapsed={collapsed} onToggle={onToggle}>
+    <PropertySection id="seam-props" title={`Costura: ${pieceAName} ↔ ${pieceBName}`} collapsed={collapsed} onToggle={onToggle}>
       {/* Type dropdown */}
       <div className="panel-field">
         <label>Tipo</label>

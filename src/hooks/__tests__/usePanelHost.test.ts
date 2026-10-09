@@ -1,115 +1,180 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import { usePanelHost } from '../usePanelHost';
-import { bajarLaEscalera } from '../../shortcuts/escaleraDeLoLlamado';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { renderHook, act, cleanup } from '@testing-library/react';
+import { usePanelHost, conElPanel, ranurasPara, ANCHO_PARA_DOS_RANURAS } from '../usePanelHost';
+import { bajarLaEscalera, subirPeldano } from '../../shortcuts/escaleraDeLoLlamado';
+import { clearJournal, getJournal } from '../../utils/telemetry/journal';
+
+const anchoOriginal = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+
+/** Cambia el ancho de la ventana y avisa, como lo haría el navegador. */
+function anchoDeVentana(px: number) {
+  Object.defineProperty(window, 'innerWidth', { value: px, writable: true, configurable: true });
+  window.dispatchEvent(new Event('resize'));
+}
+
+beforeEach(() => anchoDeVentana(1366));
+// Sin `cleanup`, cada hook quedaba montado, con su oyente de `resize` y su
+// peldaño en la escalera, y le hablaba al test siguiente (revisión final de
+// P4, lente B): los globales de vitest están apagados y Testing Library no
+// limpia sola.
+afterEach(() => {
+  cleanup();
+  if (anchoOriginal) Object.defineProperty(window, 'innerWidth', anchoOriginal);
+});
+
+describe('conElPanel', () => {
+  it('con una ranura, el panel que se pide reemplaza al que estaba', () => {
+    expect(conElPanel(['Layers'], 'Properties', 1)).toEqual(['Properties']);
+  });
+
+  it('con dos ranuras, el segundo se suma a la izquierda del primero', () => {
+    expect(conElPanel(['Layers'], 'Properties', 2)).toEqual(['Layers', 'Properties']);
+  });
+
+  it('con las dos llenas, el tercero reemplaza al último que se abrió y el primero no se mueve', () => {
+    expect(conElPanel(['Layers', 'Properties'], 'Grading', 2)).toEqual(['Layers', 'Grading']);
+  });
+
+  it('pedir uno que ya está abierto no cambia nada', () => {
+    expect(conElPanel(['Layers', 'Properties'], 'Layers', 2)).toEqual(['Layers', 'Properties']);
+  });
+});
+
+describe('ranurasPara', () => {
+  it('una por debajo de 1600 px y dos a partir de 1600', () => {
+    expect(ranurasPara(ANCHO_PARA_DOS_RANURAS - 1)).toBe(1);
+    expect(ranurasPara(ANCHO_PARA_DOS_RANURAS)).toBe(2);
+  });
+});
 
 describe('usePanelHost', () => {
-  it('arranca con las dos ranuras vacías', () => {
+  it('arranca sin paneles', () => {
     const { result } = renderHook(() => usePanelHost());
-    expect(result.current.leftPanel).toBeNull();
-    expect(result.current.rightPanel).toBeNull();
+    expect(result.current.paneles).toEqual([]);
   });
 
-  it('openPanel enruta un panel derecho a rightPanel', () => {
+  it('por debajo de 1600 px, Propiedades reemplaza a Capas: no hay lado izquierdo', () => {
     const { result } = renderHook(() => usePanelHost());
-    act(() => result.current.openPanel('BOM'));
-    expect(result.current.rightPanel).toBe('BOM');
-    expect(result.current.leftPanel).toBeNull();
+    act(() => result.current.togglePanel('Layers'));
+    act(() => result.current.openPanel('Properties'));
+    expect(result.current.paneles).toEqual(['Properties']);
   });
 
-  it('openPanel enruta un panel izquierdo a leftPanel', () => {
+  it('a partir de 1600 px caben dos, uno junto al otro', () => {
+    anchoDeVentana(1680);
+    const { result } = renderHook(() => usePanelHost());
+    act(() => result.current.togglePanel('Layers'));
+    act(() => result.current.openPanel('Properties'));
+    expect(result.current.paneles).toEqual(['Layers', 'Properties']);
+  });
+
+  it('al estrechar la ventana por debajo de 1600 se queda el último que se abrió, y al ensancharla no vuelve el otro', () => {
+    anchoDeVentana(1680);
+    const { result } = renderHook(() => usePanelHost());
+    act(() => result.current.togglePanel('Layers'));
+    act(() => result.current.togglePanel('Grading'));
+    act(() => anchoDeVentana(1366));
+    expect(result.current.paneles).toEqual(['Grading']);
+    act(() => anchoDeVentana(1680));
+    expect(result.current.paneles).toEqual(['Grading']);
+  });
+
+  it('openPanel nunca cierra: pedir dos veces el mismo lo deja abierto', () => {
     const { result } = renderHook(() => usePanelHost());
     act(() => result.current.openPanel('Properties'));
-    expect(result.current.leftPanel).toBe('Properties');
-    expect(result.current.rightPanel).toBeNull();
-  });
-
-  it('openPanel nunca cierra: abrir el mismo panel dos veces lo deja abierto', () => {
-    const { result } = renderHook(() => usePanelHost());
     act(() => result.current.openPanel('Properties'));
-    act(() => result.current.openPanel('Properties'));
-    expect(result.current.leftPanel).toBe('Properties');
+    expect(result.current.paneles).toEqual(['Properties']);
   });
 
-  it('openPanel de un panel izquierdo no toca el derecho ya abierto — la esencia del caso medido', () => {
-    const { result } = renderHook(() => usePanelHost());
-    act(() => result.current.openPanel('Layers')); // derecho
-    act(() => result.current.openPanel('Properties')); // izquierdo
-    expect(result.current.rightPanel).toBe('Layers');
-    expect(result.current.leftPanel).toBe('Properties');
-  });
-
-  it('togglePanel abre si estaba cerrado', () => {
-    const { result } = renderHook(() => usePanelHost());
-    act(() => result.current.togglePanel('Avatar'));
-    expect(result.current.rightPanel).toBe('Avatar');
-  });
-
-  it('togglePanel cierra si era el mismo panel ya abierto de ese lado', () => {
+  it('togglePanel cierra el que ya estaba abierto', () => {
     const { result } = renderHook(() => usePanelHost());
     act(() => result.current.togglePanel('Avatar'));
     act(() => result.current.togglePanel('Avatar'));
-    expect(result.current.rightPanel).toBeNull();
+    expect(result.current.paneles).toEqual([]);
   });
 
-  it('togglePanel de un panel distinto en el mismo lado reemplaza al que estaba', () => {
+  it('closePanel cierra solo ese, y el otro pasa al borde', () => {
+    anchoDeVentana(1680);
     const { result } = renderHook(() => usePanelHost());
-    act(() => result.current.togglePanel('Avatar'));
-    act(() => result.current.togglePanel('BOM'));
-    expect(result.current.rightPanel).toBe('BOM');
+    act(() => result.current.togglePanel('Layers'));
+    act(() => result.current.togglePanel('Properties'));
+    act(() => result.current.closePanel('Layers'));
+    expect(result.current.paneles).toEqual(['Properties']);
   });
 
-  // H-2: closeLeft/closeRight existen para que AppShell deje de pasarle a
-  // ContextPanel una flecha en línea (`() => closePanel(leftPanel)`), que
-  // cambia de identidad en cada render y re-suscribe el listener de Escape
-  // — el mecanismo detrás de "Escape cierra siempre el izquierdo" con dos
-  // paneles abiertos. Ver el comentario junto a su definición. (closePanel
-  // por nombre se borró del hook — sin llamador desde que AppShell pasó a
-  // closeLeft/closeRight; estos dos cubren lo que hoy se usa.)
-  it('closeLeft cierra el panel izquierdo sin importar cuál esté abierto', () => {
-    const { result } = renderHook(() => usePanelHost());
-    act(() => result.current.openPanel('Properties'));
-    act(() => result.current.closeLeft());
-    expect(result.current.leftPanel).toBeNull();
-  });
-
-  it('closeLeft no toca el panel derecho', () => {
-    const { result } = renderHook(() => usePanelHost());
-    act(() => result.current.openPanel('Layers')); // derecho
-    act(() => result.current.closeLeft());
-    expect(result.current.rightPanel).toBe('Layers');
-  });
-
-  it('closeRight cierra el panel derecho sin importar cuál esté abierto', () => {
-    const { result } = renderHook(() => usePanelHost());
-    act(() => result.current.openPanel('Layers'));
-    act(() => result.current.closeRight());
-    expect(result.current.rightPanel).toBeNull();
-  });
-
-  it('closeRight no toca el panel izquierdo', () => {
-    const { result } = renderHook(() => usePanelHost());
-    act(() => result.current.openPanel('Properties')); // izquierdo
-    act(() => result.current.closeRight());
-    expect(result.current.leftPanel).toBe('Properties');
-  });
-
-  it('closeLeft y closeRight mantienen la misma identidad entre renders — la esencia del arreglo', () => {
-    const { result, rerender } = renderHook(() => usePanelHost());
-    const closeLeftAntes = result.current.closeLeft;
-    const closeRightAntes = result.current.closeRight;
-    act(() => result.current.openPanel('Properties')); // fuerza un re-render
-    rerender();
-    expect(result.current.closeLeft).toBe(closeLeftAntes);
-    expect(result.current.closeRight).toBe(closeRightAntes);
-  });
-
-  it('Escape con dos paneles abiertos cierra los dos: un solo peldaño, el de los paneles', () => {
+  it('Escape cierra todos a la vez: un solo peldaño, el de los paneles', () => {
+    anchoDeVentana(1680);
     const { result } = renderHook(() => usePanelHost());
     act(() => { result.current.openPanel('Properties'); result.current.openPanel('Layers'); });
-    expect([result.current.leftPanel, result.current.rightPanel]).toEqual(['Properties', 'Layers']);
+    expect(result.current.paneles).toEqual(['Properties', 'Layers']);
     act(() => { expect(bajarLaEscalera()).toBe('paneles'); });
-    expect([result.current.leftPanel, result.current.rightPanel]).toEqual([null, null]);
+    expect(result.current.paneles).toEqual([]);
+  });
+
+  it('si la ventana se ensancha con la app abierta, caben dos: openPanel lee las ranuras de ahora', () => {
+    const { result } = renderHook(() => usePanelHost());
+    act(() => anchoDeVentana(1680));
+    act(() => result.current.togglePanel('Layers'));
+    act(() => result.current.openPanel('Properties'));
+    expect(result.current.paneles).toEqual(['Layers', 'Properties']);
+  });
+
+  it('togglePanel sobre uno de dos abiertos cierra solo ese', () => {
+    anchoDeVentana(1680);
+    const { result } = renderHook(() => usePanelHost());
+    act(() => result.current.togglePanel('Layers'));
+    act(() => result.current.togglePanel('Properties'));
+    act(() => result.current.togglePanel('Layers'));
+    expect(result.current.paneles).toEqual(['Properties']);
+  });
+
+  it('con los paneles cerrados el peldaño se retira: el siguiente Esc ya no es suyo', () => {
+    const { result } = renderHook(() => usePanelHost());
+    act(() => result.current.openPanel('Properties'));
+    act(() => { expect(bajarLaEscalera()).toBe('paneles'); });
+    expect(result.current.paneles).toEqual([]);
+    act(() => { expect(bajarLaEscalera()).toBeNull(); });
+  });
+
+  it('un menú abierto se cierra antes que los paneles: el peldaño de los paneles es «panel»', () => {
+    const bajar = subirPeldano('menu-de-prueba', 'menu', () => {});
+    try {
+      const { result } = renderHook(() => usePanelHost());
+      act(() => result.current.openPanel('Properties'));
+      act(() => { expect(bajarLaEscalera()).toBe('menu-de-prueba'); });
+      expect(result.current.paneles).toEqual(['Properties']);
+    } finally {
+      bajar();
+    }
+  });
+
+  it('la caja negra ve cerrarse los dos cuando Esc cierra dos', () => {
+    anchoDeVentana(1680);
+    const { result } = renderHook(() => usePanelHost());
+    act(() => { result.current.openPanel('Properties'); result.current.openPanel('Layers'); });
+    clearJournal();
+    act(() => { bajarLaEscalera(); });
+    const cerrados = getJournal().events
+      .filter((e) => e.kind === 'ui' && e.name === 'panel' && e.data?.abierto === false)
+      .map((e) => e.data?.panel);
+    expect(cerrados).toEqual(['Properties', 'Layers']);
+  });
+
+  it('la caja negra ve abrir, reemplazar y cerrar', () => {
+    clearJournal();
+    const { result } = renderHook(() => usePanelHost());
+    act(() => result.current.togglePanel('Layers'));
+    act(() => result.current.openPanel('Properties'));
+    act(() => result.current.closePanel('Properties'));
+    const eventos = getJournal().events
+      .filter((e) => e.kind === 'ui' && e.name === 'panel')
+      .map((e) => [e.data?.panel, e.data?.abierto]);
+    expect(eventos).toEqual([
+      ['Layers', true],
+      ['Properties', true],
+      ['Layers', false],
+      ['Properties', false],
+    ]);
   });
 });

@@ -1,70 +1,81 @@
-import { useCallback, useState } from 'react';
-import { getPanelSide } from '../components/shell/panelSide';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePeldanoDeEscape } from '../shortcuts/escaleraDeLoLlamado';
+import { pushJournal } from '../utils/telemetry/journal';
 
-export interface PanelHost {
-  leftPanel: string | null;
-  rightPanel: string | null;
-  openPanel: (name: string) => void;
-  togglePanel: (name: string) => void;
-  /** Cierre sin argumentos, identidad estable entre renders — ver H-2 abajo. */
-  closeLeft: () => void;
-  closeRight: () => void;
+/** Desde este ancho de ventana caben dos paneles, uno junto al otro (spec 2026-10-02 § 6.1). */
+export const ANCHO_PARA_DOS_RANURAS = 1600;
+
+export function ranurasPara(anchoDeVentana: number): number {
+  return anchoDeVentana >= ANCHO_PARA_DOS_RANURAS ? 2 : 1;
 }
 
 /**
- * Dos ranuras independientes (izquierda/derecha) en vez de una sola
- * mutuamente excluyente. Resuelve el caso medido en la auditoría del
- * 2026-08-14: Capas (derecha) y Propiedades (izquierda) pueden convivir.
- *
- * Dos operaciones, no una, porque tienen intención distinta:
- * - openPanel: GARANTIZA abierto. La usa la selección en el lienzo
- *   (PatternEditor) — seleccionar un borde y luego otro no debe cerrar
- *   Propiedades a mitad de una edición.
- * - togglePanel: abre si cerrado, cierra si abierto. La usan los botones
- *   (docks, LogoMenu, paleta de comandos) — el comportamiento de hoy.
+ * Los paneles después de pedir `nombre`. Si ya está, nada cambia. Si cabe, se
+ * suma a la izquierda de los que hay. Si no, reemplaza al último que se abrió:
+ * el primero, pegado al borde de la ventana, no se mueve.
+ */
+export function conElPanel(paneles: readonly string[], nombre: string, ranuras: number): string[] {
+  if (paneles.includes(nombre)) return [...paneles];
+  return [...paneles.slice(0, ranuras - 1), nombre];
+}
+
+export interface PanelHost {
+  /** Los paneles abiertos: el primero, pegado al borde derecho de la ventana; el segundo, a su izquierda. */
+  paneles: string[];
+  /** GARANTIZA abierto: la barrita de la pieza y el menú del clic derecho. */
+  openPanel: (name: string) => void;
+  /** Abre si está cerrado y cierra si está abierto: los docks, el menú Vina y los comandos. */
+  togglePanel: (name: string) => void;
+  closePanel: (name: string) => void;
+}
+
+/**
+ * Los paneles del marco (spec 2026-10-02 § 6.1): se piden y se abren a la
+ * derecha. Por debajo de 1600 px hay una ranura, y el panel que se pide
+ * reemplaza al que estaba; a partir de 1600, dos. Nada los abre solo:
+ * Propiedades dejó de abrirse al elegir una esquina del margen en P3c, así
+ * que el panel de calco ya no se cierra mientras María dibuja (el caso por el
+ * que hasta P4 había una ranura a cada lado).
  */
 export function usePanelHost(): PanelHost {
-  const [leftPanel, setLeftPanel] = useState<string | null>(null);
-  const [rightPanel, setRightPanel] = useState<string | null>(null);
+  const [paneles, setPaneles] = useState<string[]>([]);
+  const [ranuras, setRanuras] = useState(() => ranurasPara(window.innerWidth));
+
+  // Al estrechar la ventana por debajo de 1600 se queda el último que se abrió.
+  useEffect(() => {
+    const alCambiarDeAncho = () => {
+      const n = ranurasPara(window.innerWidth);
+      setRanuras(n);
+      setPaneles((p) => (p.length > n ? p.slice(-n) : p));
+    };
+    window.addEventListener('resize', alCambiarDeAncho);
+    return () => window.removeEventListener('resize', alCambiarDeAncho);
+  }, []);
 
   const openPanel = useCallback((name: string) => {
-    if (getPanelSide(name) === 'left') setLeftPanel(name);
-    else setRightPanel(name);
-  }, []);
+    setPaneles((p) => conElPanel(p, name, ranuras));
+  }, [ranuras]);
 
   const togglePanel = useCallback((name: string) => {
-    if (getPanelSide(name) === 'left') {
-      setLeftPanel((prev) => (prev === name ? null : name));
-    } else {
-      setRightPanel((prev) => (prev === name ? null : name));
-    }
+    setPaneles((p) => (p.includes(name) ? p.filter((n) => n !== name) : conElPanel(p, name, ranuras)));
+  }, [ranuras]);
+
+  const closePanel = useCallback((name: string) => {
+    setPaneles((p) => p.filter((n) => n !== name));
   }, []);
 
-  // H-2: Escape en ContextPanel.tsx registra un keydown propio por
-  // instancia; con dos paneles montados, AppShell antes pasaba
-  // `onClose={() => closePanel(leftPanel)}` — una flecha en línea que
-  // cambia de identidad EN CADA RENDER de AppShell. Eso re-suscribe el
-  // efecto de Escape de cada ContextPanel, y si algo vacía la actualización
-  // entre los dos listeners de `window` durante el propio despacho del
-  // evento (que es justo lo que un runtime puede hacer y un upgrade de
-  // React puede voltear en silencio — no es una decisión de diseño),
-  // el listener que se quitó a mitad del despacho ya no se invoca. Medido:
-  // Escape cerraba siempre el izquierdo, porque su efecto se registra
-  // primero.
-  //
-  // El arreglo es estructural: cierres SIN argumentos, memoizados con
-  // dependencias vacías, para que su identidad nunca cambie entre renders
-  // de AppShell. Con la identidad estable, ningún re-render (venga cuando
-  // venga) re-suscribe el efecto, así que los dos listeners de `window`
-  // siguen registrados durante todo el despacho y los dos se ejecutan —
-  // Escape cierra los dos paneles, de forma determinista.
-  const closeLeft = useCallback(() => setLeftPanel(null), []);
-  const closeRight = useCallback(() => setRightPanel(null), []);
+  // La caja negra ve cada panel que se abre y cada uno que se cierra, también
+  // el que se va porque otro ocupó su ranura: los dos llegan juntos.
+  const antes = useRef<string[]>([]);
+  useEffect(() => {
+    for (const n of paneles) if (!antes.current.includes(n)) pushJournal('ui', 'panel', { panel: n, abierto: true });
+    for (const n of antes.current) if (!paneles.includes(n)) pushJournal('ui', 'panel', { panel: n, abierto: false });
+    antes.current = paneles;
+  }, [paneles]);
 
-  // Esc cierra los paneles antes que la selección, y los dos a la vez: un
-  // peldaño de la escalera de lo que se llama (spec 2026-10-02 § 6.1 y § 6.2).
-  usePeldanoDeEscape('paneles', 'panel', Boolean(leftPanel || rightPanel), () => { closeLeft(); closeRight(); });
+  // Esc cierra los paneles antes que la selección, todos a la vez: un peldaño
+  // de la escalera de lo que se llama (spec 2026-10-02 § 6.2).
+  usePeldanoDeEscape('paneles', 'panel', paneles.length > 0, () => setPaneles([]));
 
-  return { leftPanel, rightPanel, openPanel, togglePanel, closeLeft, closeRight };
+  return { paneles, openPanel, togglePanel, closePanel };
 }

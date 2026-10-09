@@ -1,8 +1,7 @@
-/* PropertiesPanel — content styles for the ContextPanel host.
- * The glass chrome (background, border, blur, radius, body padding) belongs
- * to .context-panel in styles/floating.css; this file only styles content.
- * Tokenized 2026-06-07 on re-home (was old-shell era: hardcoded px + the
- * legacy App.css gray palette). */
+/* PropertiesPanel — el contenido del panel Propiedades. El marco del panel
+ * (fondo, borde, relleno) es de .context-panel, en styles/floating.css; aquí
+ * solo se pinta lo de dentro. Tokenizado el 2026-06-07 al mudarse (venía de
+ * la vieja carcasa: px a mano y la paleta gris de App.css). */
 
 .properties-panel {
   display: flex;
@@ -41,13 +40,40 @@
   color: var(--text-primary);
 }
 
+.panel-section-header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.panel-section-header:focus-visible .panel-title {
+  color: var(--text-primary);
+}
+
 /* Section title must outrank its field labels (Iris: the parent was reading
-   quieter than its children) — one size up + brighter than the labels. */
+   quieter than its children) — one size up + brighter than the labels.
+   En sentence case desde P4 (contrato § 5; captura 08 de la spec 2026-10-02). */
 .panel-title {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* El primer nivel de una pieza (spec 2026-10-02 § 6.1): sin cabecera, y la
+   misma línea que separa una sección de la siguiente. */
+.panel-nivel {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--sp-2);
+}
+
+/* La capa de una pieza: el número y, a su lado, su nombre de taller. */
+.panel-capa {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.panel-field .panel-capa__nombre {
+  min-width: 56px;
+  font-size: var(--text-xs);
+  font-weight: normal;
   color: var(--text-secondary);
 }
 
@@ -92,7 +118,6 @@
   gap: var(--sp-2);
 }
 
-.panel-field--wrap { flex-wrap: wrap; }
 .panel-field--between { justify-content: space-between; }
 .panel-field--row { justify-content: flex-start; }
 
@@ -122,7 +147,7 @@
   padding: var(--sp-1) 0;
 }
 
-/* Sub-blocks (Linked Editing, Notch Settings) */
+/* Sub-blocks (edición vinculada, capa y subcapa, tramos del margen) */
 .panel-subblock {
   margin-top: var(--sp-2);
   border-top: 1px solid var(--border-subtle);
@@ -133,8 +158,6 @@
   font-size: var(--text-xs);
   color: var(--text-muted);
   margin-bottom: var(--sp-1);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .panel-subtitle--spaced {

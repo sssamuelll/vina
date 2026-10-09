@@ -9,8 +9,8 @@ import { activarHerramienta, dispatch, st } from './helpers/lienzo';
  *  1. que mide lo que dice: un cuadro exacto de la cuadrícula que se pinta;
  *  2. que nada la tapa ni se pisa con la frase de ayuda, en la pantalla de
  *     María y en Split, con la frase más larga que hay, y también con un panel
- *     abierto a la izquierda: el lienzo se corre 324 px y su esquina de abajo
- *     queda bajo la barra de IA, que va centrada en la ventana;
+ *     abierto (hasta P4 se abría a la izquierda y corría el lienzo 324 px;
+ *     desde P4 va a la derecha y la marca no se mueve);
  *  3. que no desaparece —ni vuelve «Trae tu patrón»— cuando en la hoja solo
  *     hay un trazo o una foto para calcar, y que en la pantalla vacía no está;
  *  4. que las unidades llegan a la cuadrícula y a la marca a la vez.

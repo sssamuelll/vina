@@ -12,29 +12,31 @@ import {
 import {
   setAvatarModelUrl, setAvatarMode, updateMeasurements,
 } from '../../store/projectSlice';
-import type { AvatarProfile } from '../../utils/avatar/avatarLibrary';
+import { MIN_MEASUREMENT_CM, MAX_MEASUREMENT_CM, type AvatarProfile } from '../../utils/avatar/avatarLibrary';
 import { AVATAR_POR_DEFECTO, avatarPorUrl, registrarModeloPropio } from '../../avatares/catalogo';
 import { PRESETS_DE_POSE } from '../../utils/avatar/posePorDireccion';
 import type { BodyMeasurements } from '../../types/types';
 import type { AvatarMode } from '../../store/projectSlice';
 import { requestConfirmation } from '../../hooks/useGuardedAction';
+import CampoDeMedida from './CampoDeMedida';
 import './AvatarPanel.css';
 
-interface SliderDef {
+interface MedidaDef {
   key: keyof BodyMeasurements;
   label: string;
-  min: number;
-  max: number;
 }
 
-const SLIDERS: SliderDef[] = [
-  { key: 'height', label: 'Estatura', min: 140, max: 210 },
-  { key: 'chest', label: 'Pecho', min: 70, max: 130 },
-  { key: 'waist', label: 'Cintura', min: 55, max: 120 },
-  { key: 'hips', label: 'Cadera', min: 70, max: 130 },
-  { key: 'shoulder', label: 'Ancho de hombros', min: 35, max: 55 },
-  { key: 'armLength', label: 'Largo de brazo', min: 50, max: 75 },
-  { key: 'inseam', label: 'Entrepierna', min: 65, max: 90 },
+// Los rangos del deslizador viejo (140-210 de estatura, 35-55 de hombros…)
+// eran de adulto, y el catálogo trae cuerpos de niño: los campos aceptan lo
+// que aceptan los perfiles guardados (MIN/MAX_MEASUREMENT_CM).
+const MEDIDAS: MedidaDef[] = [
+  { key: 'height', label: 'Estatura' },
+  { key: 'chest', label: 'Pecho' },
+  { key: 'waist', label: 'Cintura' },
+  { key: 'hips', label: 'Cadera' },
+  { key: 'shoulder', label: 'Ancho de hombros' },
+  { key: 'armLength', label: 'Largo de brazo' },
+  { key: 'inseam', label: 'Entrepierna' },
 ];
 
 // Las keys de PRESETS_DE_POSE son estado Redux (activePreset) — no se traducen; solo el label visible.
@@ -47,11 +49,7 @@ const PRESET_LABELS: Record<string, string> = {
 const AXIS_LABELS = ['X', 'Y', 'Z'] as const;
 const AXIS_KEYS = ['x', 'y', 'z'] as const;
 
-interface AvatarPanelProps {
-  open: boolean;
-}
-
-export default function AvatarPanel({ open }: AvatarPanelProps) {
+export default function AvatarPanel() {
   const dispatch = useDispatch<AppDispatch>();
 
   // Avatar state
@@ -100,15 +98,19 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
     void loadSavedPosesAsync().then(poses => dispatch(loadSavedPosesFromStorage(poses)));
   }, [dispatch]);
 
-  // Sync gizmos with panel open state + pose section
+  // Con la sección «Pose» abierta, los mandos de las articulaciones se ven.
   useEffect(() => {
-    if (open && poseOpen && !poseEditorOpen) {
-      dispatch(togglePoseEditor());
-    }
-    if (!open && poseEditorOpen) {
-      dispatch(togglePoseEditor());
-    }
-  }, [open, poseOpen, poseEditorOpen, dispatch]);
+    if (poseOpen && !poseEditorOpen) dispatch(togglePoseEditor());
+  }, [poseOpen, poseEditorOpen, dispatch]);
+
+  // Al cerrarse el panel, o al reemplazarlo otro en su ranura, el modo pose se
+  // apaga: sin el panel no quedaba puerta para apagarlo, y los mandos y
+  // «● MODO POSE» se quedaban en el 3D.
+  const poseAlDesmontar = useRef(poseEditorOpen);
+  poseAlDesmontar.current = poseEditorOpen;
+  useEffect(() => () => {
+    if (poseAlDesmontar.current) dispatch(togglePoseEditor());
+  }, [dispatch]);
 
   // Derive model name
   useEffect(() => {
@@ -198,7 +200,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
   const canMirror = selectedJoint ? (selectedJoint.startsWith('Left') || selectedJoint.startsWith('Right')) : false;
 
   return (
-    <div className={`avatar-panel-wrapper ${open ? 'open' : 'closed'}`}>
+    <div className="avatar-panel-wrapper">
       <div className="avatar-panel">
         {/* Fase1-S6: sin header propio — el host (ContextPanel "Avatar") ya
             pone título y botón de cerrar; aquí había un segundo par. */}
@@ -309,29 +311,19 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                 {avatarMode === 'model' && deLaBiblioteca && (
                   <div className="ap-hint">El cuerpo es la talla {deLaBiblioteca.name}; tus cambios se usan en el patrón.</div>
                 )}
-                {/* Measurements */}
-                <div className="ap-slider-group">
-                  {SLIDERS.map(({ key, label, min, max }) => {
-                    const val = (measurements[key] as number) ?? min;
-                    return (
-                      <div key={key}>
-                        <div className="ap-slider-label">
-                          <span>{label}</span>
-                          <span>{val} cm</span>
-                        </div>
-                        <div className="ap-slider-control">
-                          <input
-                            type="range" min={min} max={max} step={1} value={val}
-                            onChange={e => handleMeasurement(key, Number(e.target.value))}
-                          />
-                          <input
-                            type="number" min={min} max={max} step={1} value={val}
-                            onChange={e => handleMeasurement(key, Number(e.target.value))}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                {/* Las siete medidas, un campo cada una (spec 2026-10-02 § 6.1). */}
+                <div className="ap-medidas">
+                  {MEDIDAS.map(({ key, label }) => (
+                    <CampoDeMedida
+                      key={key}
+                      id={`ap-medida-${key}`}
+                      label={label}
+                      min={MIN_MEASUREMENT_CM}
+                      max={MAX_MEASUREMENT_CM}
+                      valor={measurements[key] as number | undefined}
+                      alFijar={(v) => handleMeasurement(key, v)}
+                    />
+                  ))}
                 </div>
               </div>
             )}

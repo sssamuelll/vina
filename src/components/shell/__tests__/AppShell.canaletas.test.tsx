@@ -3,12 +3,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * AppShell reemplaza la ranura única (contextPanel/setContextPanel) por
- * usePanelHost() con dos ranuras. La corrección de la spec (§ 1 de la spec
- * de Fase 3+4): la selección en el lienzo usa openPanel (garantiza abierto),
- * los botones usan togglePanel (alternan) — antes eran cuatro sitios que
- * alternaban y uno (PatternEditor.tsx:271) que no, y esa asimetría era a
- * propósito, no un bug.
+ * AppShell guarda la lista de paneles abiertos en usePanelHost(), todos a la
+ * derecha (spec 2026-10-02 § 6.1, P4). La barrita de la pieza y el clic
+ * derecho usan openPanel (garantiza abierto); los botones, togglePanel
+ * (alternan). La asimetría es a propósito, no un bug.
  */
 function leer(): string {
   return readFileSync(join(process.cwd(), 'src/components/shell/AppShell.tsx'), 'utf8');
@@ -22,12 +20,7 @@ describe('AppShell usa usePanelHost, no un estado de una sola ranura', () => {
   });
 
   it('usa usePanelHost', () => {
-    // H-2: `closePanel` (por nombre) salió de la destructuración de AppShell.
-    // Los botones X de ContextPanel ahora usan `closeLeft`/`closeRight` —
-    // cierres sin argumentos, identidad estable — para que Escape con dos
-    // paneles abiertos no dependa de qué re-render caiga entre dos listeners
-    // de `window`. Ver usePanelHost.ts.
-    expect(src).toMatch(/const \{ leftPanel, rightPanel, openPanel, togglePanel, closeLeft, closeRight \} = usePanelHost\(\)/);
+    expect(src).toMatch(/const \{ paneles, openPanel, togglePanel, closePanel \} = usePanelHost\(\)/);
   });
 });
 
@@ -55,33 +48,20 @@ describe('los cuatro sitios llaman la operación que les toca', () => {
   });
 });
 
-describe('canvas-area tiene los cinco hijos en el orden de la spec § 2.1', () => {
+describe('los paneles van a la derecha (spec 2026-10-02 § 6.1)', () => {
   const src = leer();
-  // Comparación de posiciones sobre el ARCHIVO COMPLETO, no sobre un
-  // "bloque" recortado — JS no hace balanced-brace matching, y recortar con
-  // un regex hasta el primer </div> corta en el div del aviso de soltar-DXF
-  // (que cierra mucho antes que canvas-area), no en el cierre real.
-  //
-  // Marcador exacto `className="canvas-area__2d"` (no el bare 'canvas-area__2d'):
-  // desde H-1, handleDividerMouseDown mide la región repartible con
-  // `querySelector('.canvas-area__2d')` — esa llamada vive ANTES del JSX en
-  // el archivo y también contiene el substring, así que un indexOf sin
-  // comillas encuentra la llamada, no el elemento real.
+  // Marcador exacto `className="canvas-area__3d"`: `handleDividerMouseDown`
+  // también contiene el substring, en una llamada que vive antes del JSX.
 
-  it('el panel izquierdo aparece antes de canvas-area__2d', () => {
-    const idxLeft = src.indexOf('leftPanel &&');
-    const idx2d = src.indexOf('className="canvas-area__2d"');
-    expect(idxLeft).toBeGreaterThan(-1);
-    expect(idx2d).toBeGreaterThan(-1);
-    expect(idxLeft).toBeLessThan(idx2d);
+  it('no queda ranura a la izquierda', () => {
+    expect(src).not.toMatch(/leftPanel/);
   });
 
-  it('el panel derecho aparece después de canvas-area__3d', () => {
+  it('los paneles se pintan después de canvas-area__3d, el primero de la lista al final', () => {
     const idx3d = src.indexOf('className="canvas-area__3d"');
-    const idxRight = src.indexOf('rightPanel &&');
+    const idxPaneles = src.indexOf('[...paneles].reverse().map(');
     expect(idx3d).toBeGreaterThan(-1);
-    expect(idxRight).toBeGreaterThan(-1);
-    expect(idx3d).toBeLessThan(idxRight);
+    expect(idxPaneles).toBeGreaterThan(idx3d);
   });
 });
 

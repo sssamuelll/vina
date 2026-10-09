@@ -469,6 +469,21 @@ en P1b.
   conexiones, idioma, presupuesto, esquema de entrada) pasa a ser un panel, con puerta en Vina ›
   Preferencias. Entra en la misma fase en que la barra pierde ese modo.
 
+**Nota del plan de P4 (2026-10-09).** Lo que § 6.1 no decía y el plan decidió:
+
+- Con dos ranuras, el tercer panel reemplaza al último que se abrió; el primero, pegado al borde,
+  no se mueve. Al estrechar la ventana por debajo de 1600 px se queda el último que se abrió, y al
+  ensancharla no vuelve el otro.
+- Con una pieza elegida, Propiedades no enseña la lista de costuras del proyecto (captura 08). La
+  edición vinculada se queda en el primer nivel, y Propiedades entera va en sentence case.
+- Dentro de «Producción» no hay pliegues anidados: capa y subcapa van tras una línea, y
+  «Simulación» y «Material», con su subtítulo.
+- Un campo de medida del Avatar se fija con Enter o al salir; fuera del rango se queda en el borde,
+  y vacío vuelve al de antes. Al cerrarse el panel se apaga el modo pose.
+- Las capas sin nombre puesto se llaman «Forro», «Exterior», «Avíos» y, de la 3 en adelante,
+  «Capa N». También los glifos ▶ ▼ ☰ de Capas pasan a Lucide.
+- En Split y en 3D la ranura todavía empuja el dock del 3D: el margen del 3D llega con P5.
+
 ### 6.2 La IA
 
 - No existe en reposo. Puertas: el botón «IA», el de la pantalla vacía, `Ctrl+/` (conversación) y
