@@ -1,10 +1,10 @@
-import type { PathCommand, PatternPiece, Point2D } from '../../../types/types';
+import type { InternalLine, PathCommand, PatternPiece, Point2D } from '../../../types/types';
 import { buildRing, pointAt, projectToRing } from '../../../utils/geometry/outlineRing';
 import { getEdgeEndpoints } from '../../../utils/geometry/path';
 import { arcToNativeT } from '../../../utils/geometry/arcToNative';
 import { computeBoundingBox, bboxPivot } from '../../../utils/geometry/transform';
 import { pieceLocalToPattern } from '../../../utils/geometry/pieceSpace';
-import { detectCorners } from '../../../utils/notchAnchor';
+import { detectCorners, resolveNotchAnchor } from '../../../utils/notchAnchor';
 import { DEFAULT_NOTCH_OPTIONS } from '../../../utils/notches';
 import type { NotchRefineState } from '../useNotchTool';
 import type { PuntoPuesto } from '../usePointTool';
@@ -53,11 +53,9 @@ export function centroDe(piece: PatternPiece): Point2D {
 }
 
 /**
- * El piquete recién puesto, o el de «Ajustar distancia…»: Distancia y
- * Profundidad en un solo chip. La distancia mueve el fantasma con cada tecla;
- * la profundidad se queda aquí hasta que P3c le dé su etiqueta, porque hoy es
- * su única puerta para un piquete ya puesto. Cada campo escribe con el valor
- * de ahora del otro: el path sale de los dos.
+ * El piquete recién puesto, o el de «Ajustar distancia…»: su Distancia, que
+ * mueve el fantasma con cada tecla. La profundidad vive en la etiqueta del
+ * piquete desde P3c, como prometió P3b; aquí se escribe la que ya tiene.
  */
 export function cotasDelPiquete(
   r: NotchRefineState,
@@ -71,46 +69,65 @@ export function cotasDelPiquete(
   // El hilo va al piquete PUESTO, no al fantasma: anclado al fantasma, el campo
   // saltaba con cada tecla. El fantasma lo pinta la marca del lienzo.
   const b = r.notchWorld;
-  const comun = {
-    grupo: 'piquete',
+  return [{
+    id: 'piquete-distancia',
+    kind: 'borde',
+    label: 'Distancia',
+    valueMm: anchor.distanceMm,
+    unit: 'mm',
+    min: 0,
+    // El lado, el mismo que se lee («de 300 mm»), medido del contorno vivo
+    // (#1124). Una distancia ya guardada más allá —la dejaba el modal, que
+    // envolvía hasta el perímetro— no queda atrapada; sin lado que medir
+    // (una pieza con agujero), el perímetro.
+    max: lado !== null ? Math.max(lado, anchor.distanceMm) : r.maxDistanceMm,
+    ...(lado !== null ? { referenceLabel: `de ${formatMedida(lado, 'mm')}` } : {}),
     primary: true,
     scrub: false,
     a: r.refWorld,
     b,
     outward: normalHaciaFuera(r.refWorld, b, centroDe(piece)),
+    alEscribir: enVivo.alEscribir,
+    alCerrar: enVivo.alCerrar,
+    apply: (mm) => ({ kind: 'piquete', distanciaMm: mm, profundidadMm: profundidad }),
+  }];
+}
+
+/**
+ * El piquete elegido con Seleccionar (spec 2026-10-02 § 5.2, P3c, la puerta de
+ * vuelta): su distancia a la esquina, en reposo; clic o Tab la abren, como las
+ * cotas de la pieza. Escribe por el ancla, como la de lo que se pone. Lo demás
+ * —forma, cantidad, profundidad y ancho— está en su etiqueta.
+ */
+export function cotaDelPiqueteElegido(piece: PatternPiece, line: InternalLine): Cota | null {
+  const anchor = line.notchAnchor;
+  if (line.type !== 'notch' || !anchor) return null;
+  const resuelta = resolveNotchAnchor(piece.outline, anchor);
+  if (!resuelta) return null;
+  const a = pieceLocalToPattern(anchor.refPoint, piece);
+  const b = pieceLocalToPattern(resuelta.point, piece);
+  const lado = largoDelLado(piece.outline, anchor);
+  const anillo = buildRing(piece.outline, 2);
+  const perimetro = anillo.ok ? anillo.value.totalMm : anchor.distanceMm;
+  return {
+    // state-encoded ID: la distancia de esta línea.
+    id: `${piece.id}-${line.id}-distancia`,
+    kind: 'borde',
+    label: 'Distancia',
+    valueMm: anchor.distanceMm,
+    unit: 'mm',
+    min: 0,
+    // Los mismos techos que la de lo que se pone: el lado, sin atrapar una
+    // distancia ya guardada más allá; sin lado que medir, el perímetro.
+    max: lado !== null ? Math.max(lado, anchor.distanceMm) : Math.max(perimetro, anchor.distanceMm),
+    ...(lado !== null ? { referenceLabel: `de ${formatMedida(lado, 'mm')}` } : {}),
+    primary: true,
+    scrub: false,
+    a,
+    b,
+    outward: normalHaciaFuera(a, b, centroDe(piece)),
+    apply: (mm) => ({ kind: 'piqueteElegido', pieceId: piece.id, lineId: line.id, distanciaMm: mm }),
   };
-  return [
-    {
-      ...comun,
-      id: 'piquete-distancia',
-      kind: 'borde',
-      label: 'Distancia',
-      valueMm: anchor.distanceMm,
-      unit: 'mm',
-      min: 0,
-      // El lado, el mismo que se lee («de 300 mm»), medido del contorno vivo
-      // (#1124). Una distancia ya guardada más allá —la dejaba el modal, que
-      // envolvía hasta el perímetro— no queda atrapada; sin lado que medir
-      // (una pieza con agujero), el perímetro.
-      max: lado !== null ? Math.max(lado, anchor.distanceMm) : r.maxDistanceMm,
-      ...(lado !== null ? { referenceLabel: `de ${formatMedida(lado, 'mm')}` } : {}),
-      alEscribir: enVivo.alEscribir,
-      alCerrar: enVivo.alCerrar,
-      apply: (mm) => ({ kind: 'piquete', distanciaMm: mm, profundidadMm: profundidad }),
-    },
-    {
-      ...comun,
-      id: 'piquete-profundidad',
-      kind: 'profundidad',
-      label: 'Profundidad',
-      valueMm: profundidad,
-      unit: 'mm',
-      // Los de § 5.2: los del panel de hoy, para que ningún valor guardado quede fuera.
-      min: 1,
-      max: 30,
-      apply: (mm) => ({ kind: 'piquete', distanciaMm: anchor.distanceMm, profundidadMm: mm }),
-    },
-  ];
 }
 
 /**

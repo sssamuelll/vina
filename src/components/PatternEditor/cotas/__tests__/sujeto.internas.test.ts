@@ -71,3 +71,49 @@ describe('en Q, las cotas de una interna son las de lo elegido (spec § 4.5)', (
     expect(s.cotas[0].apply(150)).toMatchObject({ kind: 'internal', pieceId: 'p', lineId: 'F' });
   });
 });
+
+/**
+ * El piquete elegido con Seleccionar (spec 2026-10-02 § 5.2, P3c, la puerta de
+ * vuelta): su distancia a la esquina, en reposo, que escribe por el ancla. En
+ * las demás herramientas sigue sin cotas: la suya es la de lo que se pone.
+ */
+describe('el piquete elegido trae su distancia (P3c)', () => {
+  const conPiquete = {
+    ...pieza,
+    outline: [
+      { type: 'M', values: [0, 0] }, { type: 'L', values: [300, 0] }, { type: 'L', values: [300, 200] },
+      { type: 'L', values: [0, 200] }, { type: 'Z', values: [] },
+    ],
+    internals: [{
+      id: 'n', type: 'notch', path: [{ type: 'M', values: [60, 0] }, { type: 'L', values: [60, 8] }],
+      notchAnchor: { refPoint: { x: 0, y: 0 }, direction: 'cw', distanceMm: 60, metric: 2 },
+    }],
+  } as unknown as PatternPiece;
+  const entrada = (over: Partial<SujetoInput>): SujetoInput => ({
+    activeTool: 'select', pieces: [conPiquete], selectedPieceIds: ['p'], selectedInternalLine: { pieceId: 'p', lineId: 'n' },
+    hotId: null, isDragging: false, contextMenuOpen: false, calibrationActive: false, hiddenLayerIds: [], layerLocked: {},
+    ...over,
+  });
+
+  it('con Seleccionar: Distancia, que escribe por el ancla', () => {
+    const s = cotasDelSujeto(entrada({}));
+    expect(s.cotas.map(c => c.label)).toEqual(['Distancia']);
+    expect(s.cotas[0].apply(150)).toEqual({ kind: 'piqueteElegido', pieceId: 'p', lineId: 'n', distanciaMm: 150 });
+    expect(s.esPieza).toBe(false);
+  });
+
+  it('con la pieza bloqueada se ve apagada', () => {
+    const s = cotasDelSujeto(entrada({ pieces: [{ ...conPiquete, locked: true }] }));
+    expect(s.cotas).toHaveLength(1);
+    expect(s.disabled).toBe(true);
+  });
+
+  it('con otra herramienta, ninguna: la del piquete es la de lo que se pone', () => {
+    expect(cotasDelSujeto(entrada({ activeTool: 'notch' })).cotas).toEqual([]);
+  });
+
+  it('arrastrando o con el menú abierto, se calla como todas', () => {
+    expect(cotasDelSujeto(entrada({ isDragging: true })).cotas).toEqual([]);
+    expect(cotasDelSujeto(entrada({ contextMenuOpen: true })).cotas).toEqual([]);
+  });
+});

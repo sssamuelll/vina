@@ -5,6 +5,7 @@ import { cotaDeMargen } from './cotaDeMargen';
 import { cotasDeLineaInterna, cotasDelLado, cotasDePieza, cotasDeTrazo, type Cota } from './cotas';
 import { cotasDelTramoEnCurso, type TramoEnCurso } from './tramoEnCurso';
 import { cotasDelNodoEnPath } from './nodo';
+import { cotaDelPiqueteElegido } from './loQueSePone';
 
 export interface SeamAllowanceAnchor {
   pieceId: string;
@@ -324,6 +325,22 @@ export function cotasDelSujeto(input: SujetoInput): Sujeto {
       // quedaría mudo.
       const enQ = input.activeTool === 'editPattern';
       if (enQ && segmentIndex === undefined) return nada();
+      // El piquete elegido con Seleccionar enseña su distancia, que escribe por
+      // el ancla (spec 2026-10-02 § 5.2, P3c). En las demás herramientas, como
+      // antes, ninguna: su cota es la de lo que se pone.
+      if (line.type === 'notch') {
+        const distancia = input.activeTool === 'select' ? cotaDelPiqueteElegido(piece, line) : null;
+        return {
+          piece,
+          caliente: false,
+          cotas: distancia ? [distancia] : [],
+          lectura: null,
+          lecturaApagada: false,
+          bordeLeido: null,
+          disabled: Boolean(piece.locked) || Boolean(input.layerLocked[capa]),
+          esPieza: false,
+        };
+      }
       const cotas = cotasDeLineaInterna(piece, line, segmentIndex, enQ && esInternaEditable(line) ? 'nodo' : 'linea');
       return {
         piece,

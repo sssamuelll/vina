@@ -8,7 +8,7 @@ import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../util
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, clearSelection, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, esRectaDeDosPuntos } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, esRectaDeDosPuntos, type NotchOptions } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import type { PenResult } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
@@ -26,7 +26,10 @@ import { cajasDeAsas } from './cotas/cotasGeometry';
 import { resizePieceTo } from './pieceResize';
 import SeccionDelPatron from './SeccionDelPatron';
 import { fraseDeLaFase, fraseDelPie } from './fraseDeLaFase';
-import { suscribirNoPasoNada } from './noPasoNada';
+import { noPasoNada, suscribirNoPasoNada } from './noPasoNada';
+import EtiquetaDeOpcion from './etiquetas/EtiquetaDeOpcion';
+import { claveDeEtiqueta, etiquetaDeLaSeleccion, posicionDeEtiqueta, presentarEtiqueta } from './etiquetas/etiquetas';
+import { reescribirPiquete } from './etiquetas/piquete';
 import type { Cota } from './cotas/cotas';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
@@ -944,6 +947,35 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     () => refinarAlLado(sujetoSinLado, ladoSeleccionado, { activeTool, pieces, hiddenLayerIds, layerLocked }),
     [sujetoSinLado, ladoSeleccionado, activeTool, pieces, hiddenLayerIds, layerLocked],
   );
+
+  // La etiqueta de opción de lo elegido (spec 2026-10-02 § 5.2, P3c): el pie
+  // de lo que ya está puesto. Se calla cuando se callan las cotas.
+  const etiqueta = useMemo(() => etiquetaDeLaSeleccion({
+    activeTool, pieces, seams,
+    selectedInternalLine: editor.selectedInternalLine,
+    selectedSeamId: editor.selectedSeamId,
+    saSelection: editor.saSelection,
+    showNotches, showSewingLines, showSeamAllowance, hiddenLayerIds, layerLocked,
+    callada: isDraggingPiece || transformTool.isDragging || isDraggingEndpoint || ctxMenu.visible || calibrationMode !== null,
+  }), [activeTool, pieces, seams, editor.selectedInternalLine, editor.selectedSeamId, editor.saSelection, showNotches, showSewingLines, showSeamAllowance, hiddenLayerIds, layerLocked, isDraggingPiece, transformTool.isDragging, isDraggingEndpoint, ctxMenu.visible, calibrationMode]);
+  // Lo que se escribe en una etiqueta vale para ese objeto y nada más (§ 5.2,
+  // «Lo que no se recuerda»): ninguna opción de herramienta cambia.
+  const cambiarEtiqueta = useCallback((opcion: string, valor: unknown) => {
+    if (etiqueta?.que === 'piquete') {
+      const piece = pieces.find(p => p.id === etiqueta.pieceId);
+      const line = piece?.internals.find(l => l.id === etiqueta.lineId);
+      if (!piece || !line) return;
+      const nuevo = reescribirPiquete(piece, line, { opciones: { [opcion]: valor } as Partial<NotchOptions> });
+      if (!nuevo) {
+        noPasoNada('notch:ancla-perdida', { pieceId: piece.id, notchId: line.id });
+        return;
+      }
+      dispatch(updateInternalLine({ pieceId: piece.id, lineId: line.id, ...nuevo }));
+    }
+  }, [etiqueta, pieces, dispatch]);
+  const avisarBloqueada = useCallback(() => {
+    dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+  }, [dispatch]);
   // Los dos refs que la puerta de Tab consulta. Se escriben del sujeto REAL, no
   // de una lista paralela: «¿cabría un lado?» y «¿el lado está a la vista?»
   // tienen una sola respuesta cada una, y sale de `admiteLado`.
@@ -1162,6 +1194,19 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     } else if (update.kind === 'piquete') {
       // Lo escribe la herramienta, que sabe regenerar el path desde el ancla.
       notchRef.current.confirmRefine(update.distanciaMm, update.profundidadMm);
+    } else if (update.kind === 'piqueteElegido') {
+      // El piquete elegido con Seleccionar (P3c): por el ancla, como al ponerlo.
+      // El mismo escritor que su etiqueta.
+      const piece = pieces.find(p => p.id === update.pieceId);
+      const line = piece?.internals.find(l => l.id === update.lineId);
+      if (!piece || !line) return;
+      const nuevo = reescribirPiquete(piece, line, { distanciaMm: update.distanciaMm });
+      if (!nuevo) {
+        noPasoNada('notch:ancla-perdida', { pieceId: piece.id, notchId: line.id });
+        return;
+      }
+      const accion = updateInternalLine({ pieceId: piece.id, lineId: line.id, ...nuevo });
+      dispatch(token ? withUndoBatchToken(accion, token) : accion);
     } else if (update.kind === 'punto') {
       // Moverlo es volver a ponerlo desde la pieza de antes del clic.
       pointRef.current.moverPuesto(update.distanciaMm);
@@ -1523,6 +1568,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     medidaEmpezada: measureTool.currentStart !== null,
     modoDelPunto: (toolOptions?.point?.mode as PointToolMode | undefined) ?? 'point',
     loQueSePone: loQueSePone === null ? null : piquetePuesto ? 'piquete' : 'punto',
+    etiqueta: etiqueta?.que ?? null,
   });
 
   return (
@@ -1833,6 +1879,18 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
           onScrubCancel={handleCotaScrubCancel}
         />
       </AgruparCotas>
+      {etiqueta && (
+        <EtiquetaDeOpcion
+          // Otra selección es otra etiqueta: su menú se cierra.
+          key={claveDeEtiqueta(etiqueta)}
+          que={etiqueta.que}
+          {...presentarEtiqueta(etiqueta)}
+          {...posicionDeEtiqueta(etiqueta, pan2D, zoom2D)}
+          apagada={etiqueta.apagada}
+          alPulsarApagada={avisarBloqueada}
+          alCambiar={cambiarEtiqueta}
+        />
+      )}
       {/* La sección del patrón de la línea al pie (spec 2026-10-02 § 5.3):
           vive en el marco, al pie de la ventana, pero su frase sale del estado
           de las herramientas de aquí, así que se pinta por portal en la ranura

@@ -74,7 +74,14 @@ export interface FaseDeLaHerramienta {
   medidaEmpezada?: boolean;
   /** Punto: lo que hace el clic, la alternativa elegida de su opción. */
   modoDelPunto?: PointToolMode;
+  /** Lo elegido trae su etiqueta de opción (spec 2026-10-02 § 5.2, P3c). */
+  etiqueta?: 'piquete' | 'costura' | 'esquina' | null;
 }
+
+/** Con Seleccionar, lo elegido que trae etiqueta (solace-wren, 2026-10-09). */
+const DE_LA_ETIQUETA: Partial<Record<'piquete' | 'costura' | 'esquina', string>> = {
+  piquete: 'Clic en la distancia para escribirla · la etiqueta cambia forma, cantidad y medidas · Esc suelta',
+};
 
 /**
  * La frase de la fase (spec 2026-10-02 «la interfaz en papel» § 5.4): lo único
@@ -97,6 +104,9 @@ export function fraseDeLaFase(f: FaseDeLaHerramienta): string | null {
     // María [12:48]: «cuál es la diferencia… no está bien definido para qué es
     // cada comando». La respuesta es corta y no estaba escrita (#1103).
     case 'select':
+      // Lo elegido con etiqueta gana a la frase de las cotas: un piquete no se
+      // arrastra, y una costura o una esquina no tienen cota.
+      if (f.etiqueta && DE_LA_ETIQUETA[f.etiqueta]) return DE_LA_ETIQUETA[f.etiqueta]!;
       return f.cotasVisibles
         ? COTAS
         : 'Seleccionar mueve la pieza, y un punto si pinchas encima · Editar patrón además añade, borra y curva';

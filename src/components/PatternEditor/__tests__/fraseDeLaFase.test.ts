@@ -97,6 +97,18 @@ describe('las cotas', () => {
   });
 });
 
+describe('la etiqueta de lo elegido (P3c)', () => {
+  it('el piquete: su distancia se escribe con clic y la etiqueta cambia lo demás; gana a la de las cotas', () => {
+    const f = frase({ activeTool: 'select', cotasVisibles: true, etiqueta: 'piquete' });
+    expect(f).toMatch(/distancia/i);
+    expect(f).toMatch(/etiqueta/i);
+    expect(f).toMatch(/forma/i);
+    expect(f).toMatch(/\bEsc\b/);
+    // Un piquete no se arrastra (P3b): la frase de las cotas lo prometería.
+    expect(f).not.toMatch(/arrástrala/i);
+  });
+});
+
 describe('el hilo (#1107)', () => {
   it('se arrastra dentro de la pieza y Shift engancha 0°, 45° y 90°', () => {
     const f = frase({ activeTool: 'grainline' });
