@@ -34,6 +34,7 @@ import { linkedEditingMiddleware } from './linkedEditingMiddleware';
 import { reactiveSolverMiddleware } from './reactiveSolverMiddleware';
 import { gradingStalenessMiddleware } from './gradingStalenessMiddleware';
 import { resewBridgeMiddleware } from './resewBridgeMiddleware';
+import { deshacerDelAgenteMiddleware } from './deshacerDelAgenteMiddleware';
 import { initHistoryTimelinePersistence } from './historyTimeline';
 
 export const store = configureStore({
@@ -83,7 +84,7 @@ export const store = configureStore({
         ignoredPaths: ['project.pieces', 'project.avatar', 'collisionBody.bodies', 'copilotUI.pendingConfirmation'],
         ignoredActions: ['project/loadProject', 'project/restoreState', 'copilotUI/showConfirmation'],
       },
-    }).concat(journalMiddleware, confirmationMiddleware, linkedEditingMiddleware, undoMiddleware, reactiveSolverMiddleware, gradingStalenessMiddleware, resewBridgeMiddleware),
+    }).concat(journalMiddleware, confirmationMiddleware, linkedEditingMiddleware, undoMiddleware, reactiveSolverMiddleware, gradingStalenessMiddleware, resewBridgeMiddleware, deshacerDelAgenteMiddleware),
 });
 
 void initHistoryTimelinePersistence();

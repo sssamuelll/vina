@@ -37,10 +37,11 @@ import { esMitadDeCopa, repartirCopas } from './repartoDeCopa';
 export const SEAM_ENGINE_VERSION = 2;
 
 /**
- * ¿Es una seam IA generada por un motor anterior? El predicado de
- * provenance cubre las dos marcas que autoSew estampa (createdBy 'ai' +
- * prefijo state-encoded 'auto-seam-'); las seams humanas (newId, sin
- * createdBy) NUNCA son stale.
+ * ¿Es una seam IA generada por un motor anterior? Solo autoSew tiene motor:
+ * sus costuras llevan el id state-encoded `auto-seam-` desde su primera
+ * versión (2026-02-23). Lo que cose el agente a mano (`sew`, `createSeam`)
+ * lleva `createdBy: 'ai'` y un `newId`, y NUNCA está viejo: antes salía viejo
+ * por no tener `sewEngine`, y «Re-coser» lo borraba. Las humanas tampoco.
  *
  * El motor 2 solo cambió dónde se parte la copa: del motor 1 solo están
  * viejas sus mitades de copa. Sin esto, «Re-coser» se ofrecía en cualquier
@@ -48,8 +49,7 @@ export const SEAM_ENGINE_VERSION = 2;
  * salían iguales perdiendo lo que la usuaria les hubiera cambiado.
  */
 export function isStaleAiSeam(s: Seam): boolean {
-  const isAi = s.createdBy === 'ai' || s.id.startsWith('auto-seam-');
-  if (!isAi) return false;
+  if (!s.id.startsWith('auto-seam-')) return false;
   const motor = s.sewEngine ?? 0;
   return motor < 1 || (motor < SEAM_ENGINE_VERSION && esMitadDeCopa(s));
 }
