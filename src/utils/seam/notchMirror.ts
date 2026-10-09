@@ -18,33 +18,13 @@ import type {
   InternalLine,
   NotchAnchor,
 } from '../../types/types';
-import { computePathArcLength, pointAtPathDistance, distanceAlongPath, projectOntoPath } from '../geometry/arcLength';
+import { computePathArcLength, distanceAlongPath, projectOntoPath } from '../geometry/arcLength';
+import { computeRangeLengthMM, interpolateRangePoint } from '../geometry/edgeInterpolation';
+import { buildRing } from '../geometry/outlineRing';
 import { rangoMedibleDeBorde } from '../semanticEdges';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../notches';
-// `ringOf` es EL aplanado del contorno, y vive en notchAnchor: este módulo
-// tenía su propia copia literal, y dos copias del mismo aplanado derivan —
-// alguien arregla una y no la otra (#1029).
-import { computeNotchAnchor, ringOf } from '../notchAnchor';
+import { computeNotchAnchor, resolveNotchAnchorV2 } from '../notchAnchor';
 import { lineId } from '../pathHelpers';
-
-export interface SeamPartner {
-  seam: Seam;
-  pairedPieceId: string;
-  pairedEdgeName: string;
-}
-
-/** Find a seam connecting (pieceId, edgeName); return the paired side, bidirectional. */
-export function findSeamForEdge(pieceId: string, edgeName: string, seams: Seam[]): SeamPartner | null {
-  for (const seam of seams) {
-    if (seam.pieceA.pieceId === pieceId && seam.pieceA.edgeName === edgeName) {
-      return { seam, pairedPieceId: seam.pieceB.pieceId, pairedEdgeName: seam.pieceB.edgeName };
-    }
-    if (seam.pieceB.pieceId === pieceId && seam.pieceB.edgeName === edgeName) {
-      return { seam, pairedPieceId: seam.pieceA.pieceId, pairedEdgeName: seam.pieceA.edgeName };
-    }
-  }
-  return null;
-}
 
 /** Resolve a SemanticEdge by name (or id), with the positional `edge-N` fallback. */
 export function findEdgeByName(piece: PatternPiece, edgeName: string): SemanticEdge | null {
@@ -53,36 +33,6 @@ export function findEdgeByName(piece: PatternPiece, edgeName: string): SemanticE
   const m = /^edge-(\d+)$/.exec(edgeName);
   if (m && piece.edges) return piece.edges[Number(m[1])] ?? null;
   return null;
-}
-
-/**
- * Interior unit normal at a point on an outline. Shoelace winding decides which
- * side is inward (the resolveNotchAnchor convention, shared so a mirror notch
- * never points outward on a reversed-winding piece — D-M4).
- */
-export function interiorNormalAtPoint(outline: PathCommand[], point: Point2D): Point2D {
-  const ring = ringOf(outline);
-  const n = ring.length;
-  if (n < 3) return { x: 0, y: -1 };
-  let area2 = 0;
-  for (let i = 0; i < n; i++) {
-    const a = ring[i], b = ring[(i + 1) % n];
-    area2 += a.x * b.y - b.x * a.y;
-  }
-  let bestDist = Infinity, tx = 1, ty = 0;
-  for (let i = 0; i < n; i++) {
-    const a = ring[i], b = ring[(i + 1) % n];
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const segLen = Math.hypot(dx, dy);
-    if (segLen < 1e-9) continue;
-    let t = ((point.x - a.x) * dx + (point.y - a.y) * dy) / (segLen * segLen);
-    t = Math.max(0, Math.min(1, t));
-    const px = a.x + t * dx, py = a.y + t * dy;
-    const dist = Math.hypot(point.x - px, point.y - py);
-    if (dist < bestDist) { bestDist = dist; tx = dx / segLen; ty = dy / segLen; }
-  }
-  // Left normal of travel = (-ty, tx); inward depends on winding (shoelace sign).
-  return area2 > 0 ? { x: -ty, y: tx } : { x: ty, y: -tx };
 }
 
 /** Which semantic edge does a point fall on (nearest by perpendicular distance)? */
@@ -99,16 +49,56 @@ export function findEdgeForPoint(piece: PatternPiece, point: Point2D): SemanticE
   return best;
 }
 
+/**
+ * El punto a `distanciaMm` del inicio de un borde, contado por el arco y en el
+ * sentido del borde, con la normal hacia dentro: lo mismo que la cota de un
+ * piquete puesto a mano (P3b), por la métrica 2. Coordenadas locales.
+ */
+export function puntoEnElBorde(
+  piece: PatternPiece,
+  edge: SemanticEdge,
+  distanciaMm: number,
+): { point: Point2D; normal: Point2D } | null {
+  const inicio = interpolateRangePoint(piece.outline, edge.segmentRange, 0)?.point;
+  const built = buildRing(piece.outline, 2);
+  if (!inicio || !built.ok) return null;
+  const r = resolveNotchAnchorV2(piece.outline, { refPoint: inicio, direction: 'cw', distanceMm: distanciaMm, metric: 2 }, built.value);
+  return r ? { point: r.point, normal: r.normal } : null;
+}
+
 export type MirrorNotchResult =
-  | { ok: true; pairedPieceId: string; pairedEdgeName: string; point: Point2D; normal: Point2D; frac: number; seamId: string }
+  | {
+      ok: true; pairedPieceId: string; pairedEdgeName: string; point: Point2D; normal: Point2D;
+      frac: number; seamId: string;
+      /** Dónde cae la pareja: fracción de su borde, en el sentido de ese borde. */
+      pairedFrac: number;
+      /** El sentido usado, en los términos de `NotchPair.invert`: true si un borde corre al revés del otro. */
+      invert: boolean;
+      /** Si el punto está dentro del tramo cosido. Fuera, la pareja cae en el extremo más cercano. */
+      onSewnStretch: boolean;
+    }
   | { ok: false; reason: 'no-edge' | 'no-seam' | 'no-paired-edge' | 'degenerate'; message: string };
+
+/** El rango de un lado en el sentido de su borde: un B invertido lo guarda en el de cosido (`seamRange.ts`). */
+function rangoEnElBorde(lado: Seam['pieceA'] | Seam['pieceB']): [number, number] {
+  const r: [number, number] = [lado.tStart ?? 0, lado.tEnd ?? 1];
+  return 'reversed' in lado && lado.reversed === true ? [1 - r[1], 1 - r[0]] : r;
+}
 
 /**
  * Map a notch point on a source piece's edge to the corresponding point on the
- * paired piece's edge across their shared seam. `invert` flips the sense (the
- * normal real-garment case sews edges right-sides-together → opposite traversal;
- * the human picks the sense via preview+toggle — D-M2). Respects `tStart/tEnd`
- * partial seams: the fraction is measured within the SEWN sub-range.
+ * paired piece's edge across their shared seam (CLO3D's "corresponding notch").
+ *
+ * - **La costura del punto.** Un borde puede tener varias: una copa partida
+ *   cose cada mitad a una sisa. Va por la que cose el punto; si ninguna lo
+ *   cose, por la más cercana, y `onSewnStretch` lo dice. Antes tomaba la
+ *   primera y la pareja caía en un extremo de la otra sisa.
+ * - **El sentido.** Sin `invert`, el de la costura: un B `reversed` cose de su
+ *   final a su inicio. Con `invert` (el panel, D-M2), el de antes: los dos
+ *   rangos guardados como si fueran del borde, y `invert` da la vuelta.
+ * - **La distancia.** La pareja cae a la distancia de arco que le toca
+ *   (`puntoEnElBorde`); `pointAtPathDistance` es lineal en el parámetro de
+ *   una curva y la dejaba corrida.
  */
 export function mapNotchAcrossSeam(args: {
   sourcePiece: PatternPiece;
@@ -123,13 +113,6 @@ export function mapNotchAcrossSeam(args: {
   const sourceEdge = args.sourceEdge ?? findEdgeForPoint(sourcePiece, point);
   if (!sourceEdge) return { ok: false, reason: 'no-edge', message: 'Notch is not on a named edge of the piece.' };
 
-  const partner = findSeamForEdge(sourcePiece.id, sourceEdge.name, seams);
-  if (!partner) return { ok: false, reason: 'no-seam', message: `No seam on edge "${sourceEdge.name}". Create the seam first.` };
-
-  const pairedPiece = pieces.find(p => p.id === partner.pairedPieceId);
-  const pairedEdge = pairedPiece ? findEdgeByName(pairedPiece, partner.pairedEdgeName) : null;
-  if (!pairedPiece || !pairedEdge) return { ok: false, reason: 'no-paired-edge', message: 'Paired edge not found.' };
-
   // Traducido: el tramo de cierre se rotula con el índice de la `M`, que no
   // dibuja y mide cero (#1143). Sin esto, un piquete puesto en el lado de
   // cierre no cruzaba la costura: salía por `degenerate`, «Source edge has
@@ -137,36 +120,67 @@ export function mapNotchAcrossSeam(args: {
   const [sa0, sa1] = rangoMedibleDeBorde(sourcePiece.outline, sourceEdge.segmentRange);
   const lenA = computePathArcLength(sourcePiece.outline, sa0, sa1);
   if (lenA < 1e-9) return { ok: false, reason: 'degenerate', message: 'Source edge has zero length.' };
-  const dA = distanceAlongPath(sourcePiece.outline, point, sa0, sa1);
-  const fracEdgeA = dA / lenA;
+  const fracEdgeA = distanceAlongPath(sourcePiece.outline, point, sa0, sa1) / lenA;
 
-  // Which seam side is the source, to read the right tStart/tEnd sub-range.
-  const srcOnA = partner.seam.pieceA.pieceId === sourcePiece.id && partner.seam.pieceA.edgeName === sourceEdge.name;
-  const srcSide = srcOnA ? partner.seam.pieceA : partner.seam.pieceB;
-  const dstSide = srcOnA ? partner.seam.pieceB : partner.seam.pieceA;
-  const tA0 = srcSide.tStart ?? 0, tA1 = srcSide.tEnd ?? 1;
-  const tB0 = dstSide.tStart ?? 0, tB1 = dstSide.tEnd ?? 1;
+  // Las costuras de este borde, con el lado que es la fuente.
+  const candidatas = seams.flatMap(seam => {
+    const enA = seam.pieceA.pieceId === sourcePiece.id && seam.pieceA.edgeName === sourceEdge.name;
+    const enB = seam.pieceB.pieceId === sourcePiece.id && seam.pieceB.edgeName === sourceEdge.name;
+    return [...(enA ? [{ seam, srcOnA: true }] : []), ...(enB ? [{ seam, srcOnA: false }] : [])];
+  });
+  if (candidatas.length === 0) return { ok: false, reason: 'no-seam', message: `No seam on edge "${sourceEdge.name}". Create the seam first.` };
+  const fuera = (c: (typeof candidatas)[number]) => {
+    const [t0, t1] = rangoEnElBorde(c.srcOnA ? c.seam.pieceA : c.seam.pieceB);
+    return Math.max(0, t0 - fracEdgeA, fracEdgeA - t1);
+  };
+  const elegida = candidatas.reduce((mejor, c) => (fuera(c) < fuera(mejor) ? c : mejor));
+  const { seam, srcOnA } = elegida;
+  const srcSide = srcOnA ? seam.pieceA : seam.pieceB;
+  const dstSide = srcOnA ? seam.pieceB : seam.pieceA;
 
-  // Fraction within the SEWN sub-range of the source edge.
-  const spanA = tA1 - tA0;
-  let fracSewn = spanA > 1e-9 ? (fracEdgeA - tA0) / spanA : fracEdgeA;
-  fracSewn = Math.max(0, Math.min(1, fracSewn));
-  const fracSewnB = invert ? 1 - fracSewn : fracSewn;
-  const fracEdgeB = tB0 + fracSewnB * (tB1 - tB0);
+  const pairedPiece = pieces.find(p => p.id === dstSide.pieceId);
+  const pairedEdge = pairedPiece ? findEdgeByName(pairedPiece, dstSide.edgeName) : null;
+  if (!pairedPiece || !pairedEdge) return { ok: false, reason: 'no-paired-edge', message: 'Paired edge not found.' };
 
-  const [sb0, sb1] = rangoMedibleDeBorde(pairedPiece.outline, pairedEdge.segmentRange);
-  const lenB = computePathArcLength(pairedPiece.outline, sb0, sb1);
-  const ptB = pointAtPathDistance(pairedPiece.outline, fracEdgeB * lenB, sb0, sb1);
-  if (!ptB) return { ok: false, reason: 'degenerate', message: 'Paired edge has zero length.' };
+  let pairedFrac: number;
+  let sentido: boolean;
+  if (invert !== undefined) {
+    // El de antes: los rangos guardados como si fueran del borde.
+    const tA0 = srcSide.tStart ?? 0, tA1 = srcSide.tEnd ?? 1;
+    const tB0 = dstSide.tStart ?? 0, tB1 = dstSide.tEnd ?? 1;
+    const spanA = tA1 - tA0;
+    const u = Math.max(0, Math.min(1, spanA > 1e-9 ? (fracEdgeA - tA0) / spanA : fracEdgeA));
+    pairedFrac = tB0 + (invert ? 1 - u : u) * (tB1 - tB0);
+    sentido = invert;
+  } else {
+    // El de la costura: `u` es la posición a lo largo de lo cosido, en el
+    // sentido de cosido; un B invertido corre al revés de su borde.
+    const alReves = seam.pieceB.reversed === true;
+    const s0 = srcSide.tStart ?? 0, s1 = srcSide.tEnd ?? 1;
+    const tCosido = !srcOnA && alReves ? 1 - fracEdgeA : fracEdgeA;
+    const span = s1 - s0;
+    const u = Math.max(0, Math.min(1, span > 1e-9 ? (tCosido - s0) / span : tCosido));
+    const d0 = dstSide.tStart ?? 0, d1 = dstSide.tEnd ?? 1;
+    const tDestino = d0 + u * (d1 - d0);
+    pairedFrac = srcOnA && alReves ? 1 - tDestino : tDestino;
+    sentido = alReves;
+  }
+
+  const lenB = computeRangeLengthMM(pairedPiece.outline, pairedEdge.segmentRange);
+  const sitio = puntoEnElBorde(pairedPiece, pairedEdge, pairedFrac * lenB);
+  if (!sitio) return { ok: false, reason: 'degenerate', message: 'Paired edge has zero length.' };
 
   return {
     ok: true,
     pairedPieceId: pairedPiece.id,
     pairedEdgeName: pairedEdge.name,
-    point: ptB,
-    normal: interiorNormalAtPoint(pairedPiece.outline, ptB),
+    point: sitio.point,
+    normal: sitio.normal,
     frac: fracEdgeA,
-    seamId: partner.seam.id,
+    seamId: seam.id,
+    pairedFrac,
+    invert: sentido,
+    onSewnStretch: fuera(elegida) <= 0.5 / lenA,
   };
 }
 
