@@ -180,3 +180,31 @@
 .boton-ia__actividad { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: boton-ia-latido 1.2s ease-in-out infinite; }
 @keyframes boton-ia-latido { 50% { opacity: 0.3; } }
 @media (prefers-reduced-motion: reduce) { .boton-ia__actividad { animation: none; } }
+
+/* «Tu agente» (spec 2026-10-09, P1): el enchufe al lado de «IA», del mismo
+   alto, y su hoja de papel, que cuelga de <body> como el menú «Mostrar». */
+.puerta-del-agente { position: relative; height: 26px; width: 30px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; }
+.puerta-del-agente:hover { color: var(--text-primary); }
+.puerta-del-agente:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.puerta-del-agente--abierta { background: var(--bg-elevated); color: var(--text-primary); }
+.puerta-del-agente__punto { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+
+.hoja-del-agente { position: fixed; z-index: var(--z-menu); width: 330px; padding: 14px 16px; background: var(--surface-overlay-bg); border: var(--surface-overlay-border); border-radius: var(--surface-overlay-radius); box-shadow: var(--surface-overlay-shadow); color: var(--text-primary); font-size: var(--text-3); line-height: var(--line-height); }
+.hoja-del-agente__titulo { margin: 0 0 6px; font-size: var(--text-3); font-weight: 600; }
+.hoja-del-agente p { margin: 0 0 10px; color: var(--text-secondary); }
+.hoja-del-agente__estado { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-weight: 600; }
+.hoja-del-agente__senal { width: 8px; height: 8px; border-radius: 50%; background: var(--text-tertiary); }
+.hoja-del-agente__senal--ok { background: var(--success); }
+.hoja-del-agente__accion { height: 28px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--text-primary); font: inherit; cursor: pointer; }
+.hoja-del-agente__accion:hover { background: var(--bg-elevated); }
+.hoja-del-agente__accion:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hoja-del-agente__accion--principal { border-color: var(--accent-fuerte); background: var(--accent-fuerte); color: var(--on-accent); font-weight: 600; }
+.hoja-del-agente__accion--principal:hover { background: var(--accent-fuerte-hover); }
+.hoja-del-agente .hoja-del-agente__nota { margin: 10px 0 0; font-size: var(--text-2); }
+.hoja-del-agente__configuracion { margin: 12px -16px 0; padding: 12px 16px 0; border-top: var(--hairline); }
+.hoja-del-agente__subtitulo { font-size: var(--text-2); font-weight: 600; }
+.hoja-del-agente__fila { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 3px; font-size: var(--text-2); color: var(--text-secondary); }
+.hoja-del-agente__copiar { padding: 0; border: 0; background: transparent; color: var(--accent-fuerte); font: inherit; font-weight: 600; cursor: pointer; }
+.hoja-del-agente__copiar:hover { text-decoration: underline; }
+.hoja-del-agente__copiar:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hoja-del-agente__codigo { display: block; padding: 6px 8px; background: var(--bg-elevated); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: var(--text-1); color: var(--text-primary); white-space: pre-wrap; word-break: break-all; }

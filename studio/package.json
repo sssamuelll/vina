@@ -1,0 +1,14 @@
+{
+  "name": "vina-studio",
+  "version": "0.1.0",
+  "description": "MCP server for Vina: lets your AI agent (Claude Code, Claude Desktop, Cursor) work on the garment pattern you have open. Runs vina-mcp.",
+  "keywords": ["mcp", "model-context-protocol", "claude", "cursor", "garment", "pattern", "vina"],
+  "type": "module",
+  "bin": { "vina-studio": "bin/vina-studio.mjs" },
+  "files": ["bin", "README.md", "LICENSE"],
+  "engines": { "node": ">=18" },
+  "dependencies": { "vina-mcp": "0.1.0" },
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/sssamuelll/vina", "directory": "studio" },
+  "homepage": "https://vina.sdar.dev"
+}

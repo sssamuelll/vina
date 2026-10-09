@@ -31,3 +31,8 @@ home/*.html text eol=lf
 home/img/*.svg text eol=lf
 public/*.svg text eol=lf
 public/*.webmanifest text eol=lf
+
+# vina-mcp y vina-studio se publican en npm desde estas carpetas: un CRLF en el
+# shebang de bin/*.mjs rompe `npx vina-studio` en Mac y Linux. Force LF.
+mcp/** text eol=lf
+studio/** text eol=lf

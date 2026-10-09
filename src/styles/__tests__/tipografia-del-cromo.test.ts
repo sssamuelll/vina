@@ -43,6 +43,8 @@ describe('3. la mono solo viste datos', () => {
   /** Dónde es legal `var(--font-mono)` / `var(--font-mono-2d)` en CSS. `*` = todo el archivo. */
   const PERMITIDOS: Record<string, string[] | '*'> = {
     'src/styles/base.css': ['.mono'],
+    // El comando que se copia para configurar tu agente: texto exacto, como una tecla.
+    'src/styles/layout.css': ['.hoja-del-agente__codigo'],
     'src/styles/floating.css': ['.logo-menu__shortcut', '.context-menu__shortcut'],
     'src/styles/unified-bar.css': ['.chat-markdown code'],
     'src/components/shared/SubMenu.css': ['.submenu-shortcut'],

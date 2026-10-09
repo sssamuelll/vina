@@ -68,12 +68,12 @@ function snapshotOf(record: ClothGeometryRecord | null): ClothSnapshot | null {
   };
 }
 
-/** Los 21 slices del store fuera de `project`/`avatar`/`simulation`/`inspector` (exportados aparte). Trinquete: `exportedSlices.ratchet.test.ts`. */
+/** Los 22 slices del store fuera de `project`/`avatar`/`simulation`/`inspector` (exportados aparte). Trinquete: `exportedSlices.ratchet.test.ts`. */
 export const EXPORTED_SLICES = [
   'editor', 'tools', 'dock', 'inputScheme', 'layout', 'workflow',
   'renderSettings', 'camera', 'copilotUI', 'collisionBody', 'plugins',
   'blueprints', 'marker', 'nesting', 'grading', 'bom', 'parametric',
-  'construction', 'animation', 'avatarTape', 'ia',
+  'construction', 'animation', 'avatarTape', 'ia', 'puente',
 ] as const;
 
 export interface DiagnosticSources {

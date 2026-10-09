@@ -6,6 +6,7 @@ import { abrirIA, ocultarIA } from '../../store/iaSlice';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { useState } from 'react';
 import LogoMenu from './LogoMenu';
+import PuertaDelAgente from './PuertaDelAgente';
 import FilaDeCapas from '../PatternEditor/FilaDeCapas';
 import { displayShortcut } from './shortcutDisplay';
 import {
@@ -94,6 +95,7 @@ export default function TopBar({ onOpenPanel, onImportDXF }: TopBarProps) {
           </div>
         )}
         <BotonIA />
+        <PuertaDelAgente />
       </div>
     </div>
   );

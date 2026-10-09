@@ -12,8 +12,9 @@ import {
   FileText, Scissors, Ruler, Shirt, Download, Eye,
   Layers, ScanLine, Undo2, Redo2, User, Package,
   Search, PenLine, Tag, Hand, MousePointer2,
-  SlidersHorizontal, Settings, type LucideIcon,
+  SlidersHorizontal, Settings, Plug, type LucideIcon,
 } from 'lucide-react';
+import { conectarTuAgente, desconectarTuAgente } from '../../copilot/puente/puenteDeLaApp';
 import { setUserScheme } from '../../store/inputSchemeSlice';
 import { runAutoSew } from '../../store/autoSewThunk';
 import { openRenderSettings } from '../../store/renderSettingsThunk';
@@ -46,6 +47,10 @@ export const COMMANDS: CommandDef[] = [
   // ─── Simulation ───
   { id: 'dress-avatar', category: 'Acciones', name: 'Vestir avatar', description: 'Coloca las piezas y arranca la simulación', icon: Shirt, action: (d) => { d(setViewMode3D('simulate')); d(startSimulation()); } },
   { id: 'reset-sim', category: 'Acciones', name: 'Restablecer simulación', description: 'Detiene la simulación y vuelve al inicio', icon: Shirt, action: (d) => d(resetSimulation()) },
+
+  // ─── Tu agente (spec 2026-10-09) ───
+  { id: 'conectar-tu-agente', category: 'Acciones', name: 'Conectar tu agente', description: 'Deja que Claude Code, Claude Desktop o Cursor trabajen en este patrón', icon: Plug, action: () => conectarTuAgente() },
+  { id: 'desconectar-tu-agente', category: 'Acciones', name: 'Desconectar tu agente', description: 'Tu agente deja de ver y cambiar este patrón', icon: Plug, action: () => desconectarTuAgente() },
 
   // ─── Panels ───
   { id: 'show-avatar', category: 'Paneles', name: 'Avatar y medidas', description: 'Medidas corporales, pose y modelo del avatar', icon: User, action: (_d, cb) => cb.onOpenPanel('Avatar') },

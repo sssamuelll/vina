@@ -13,6 +13,7 @@ import constructionReducer from './constructionSlice';
 import blueprintReducer from './blueprintSlice';
 import copilotUIReducer from './copilotUISlice';
 import iaReducer from './iaSlice';
+import puenteReducer from './puenteSlice';
 import cameraReducer from './cameraSlice';
 import collisionBodyReducer from './collisionBodySlice';
 import renderSettingsReducer from './renderSettingsSlice';
@@ -53,6 +54,7 @@ export const store = configureStore({
     blueprints: blueprintReducer,
     copilotUI: copilotUIReducer,
     ia: iaReducer,
+    puente: puenteReducer,
     camera: cameraReducer,
     collisionBody: collisionBodyReducer,
     renderSettings: renderSettingsReducer,

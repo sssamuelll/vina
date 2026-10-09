@@ -115,6 +115,10 @@ Cada uno tiene su spec (esta es la del 1), su plan, su PR y su despliegue.
    borran las claves de «IA y ratón», los seis proveedores, `claudeBridge.ts` y
    `server/copilotBridge.ts`.
 
+**Nota del puente (2026-10-09).** El subproyecto 2 va antes de terminar el 1 y tiene su spec,
+`2026-10-09-puente-mcp-design.md`. La puerta no es el botón «IA» sino un enchufe a su lado, con un
+punto cuando hay un agente conectado: Samuel eligió esa variante viendo las maquetas.
+
 ## 5. Subproyecto 1: la superficie
 
 ### 5.1 La forma: unos 20 verbos
