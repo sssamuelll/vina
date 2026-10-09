@@ -32,7 +32,7 @@ import { resolveArrangementWithFrames } from '../../utils/cloth/arrangement/arra
 import { computeEffectiveRegions } from '../../utils/cloth/garmentPlacement';
 import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
 import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
-import { computeFitMapData, fabricToFitParams, shouldRequestEdgeData } from '../../utils/cloth/fitMaps';
+import { computeFitMapData, DEFAULT_FIT_PARAMS, fabricToFitParams, shouldRequestEdgeData } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { addPin, setCollisionDistance, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
 import { showErrorToast } from '../../store/copilotUISlice';
@@ -44,7 +44,7 @@ import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
-import { pushSolverEvent, registerClothGeometry, type MeshManifestEntry } from '../../utils/cloth/solverRuntimeTracker';
+import { latirLaSimulacion, pushSolverEvent, registerClothGeometry, type MeshManifestEntry } from '../../utils/cloth/solverRuntimeTracker';
 import { pushError } from '../../utils/errorTracker';
 import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { FACE_POKE_GENERATE_CADENCE } from '../../utils/cloth/gpu/tslFacePoke';
@@ -166,11 +166,9 @@ interface GarmentSimulationProps {
  * Merged multi-piece simulation component.
  * Renders all pieces as a single merged mesh with vertex colors.
  */
-// #1010: fallback de FabricFitParams cuando la tela activa no está en la
-// librería (compartido por el bloque TSL y el CPU readback path).
-const DEFAULT_FIT_PARAMS = {
-  maxStretchRatio: 0.08, weight: 150, thickness: 0.4, avgStretch: 0.025,
-};
+// #1010: el fallback de FabricFitParams (DEFAULT_FIT_PARAMS) vive en
+// fitMaps.ts desde la IA 1b-2: lo comparten el bloque TSL, el CPU readback
+// path y `fit_map` de la superficie.
 
 // #1010 diag — evidencia e2e de la ruta de datos del fit map por tier.
 // Mutado in-place en useFrame (cero alloc); mismo patrón window-global que
@@ -203,6 +201,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // `GrabState` ref + boolean `grabDragging` pair.
   const grabHandleRef = useRef<GrabHandle | null>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
+  // IA 1b-2: el último cuadro del worker que llegó a la malla (cuenta un latido por cuadro nuevo).
+  const ultimaTelaCopiadaRef = useRef<Float32Array | null>(null);
   const tslFrameCounter = useRef(0);
   const tslReadbackPending = useRef(false);
   // §A1: completed-readback counter — the penetration metric runs on every
@@ -577,7 +577,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // aterriza, edgeDataRef queda null para siempre y el fit map no pinta
     // nada, en silencio. Acá se re-pide mientras haga falta — antes del
     // branch de tier, porque los tres caminos sufren lo mismo.
-    if (shouldRequestEdgeData(fitMapMode, edgeDataRef.current, performance.now(), lastEdgeDataRequestRef.current)) {
+    if (shouldRequestEdgeData(edgeDataRef.current, performance.now(), lastEdgeDataRequestRef.current)) {
       lastEdgeDataRequestRef.current = performance.now();
       (clients.wasm ?? clients.cpu ?? clients.gpu)?.requestEdgeData();
     }
@@ -706,6 +706,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       for (let s = 0; s < substeps; s++) {
         renderer.compute(substepNodes);
       }
+      // IA 1b-2: un cuadro de tela nueva (en TSL, render y sim van al mismo paso).
+      latirLaSimulacion(edgeDataRef.current);
 
       // Steam brush (once per frame, after substeps settle; skip when inactive)
       if (solver.brushNodes.strength.value > 0) {
@@ -893,6 +895,12 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           posAttr.needsUpdate = true;
           staticGeometry.computeVertexNormals();
           staticGeometry.computeBoundingSphere();
+          // IA 1b-2: cada cuadro del worker llega en un array nuevo
+          // (transferido, o copiado en el neural): solo ese cuenta como latido.
+          if (positions !== ultimaTelaCopiadaRef.current) {
+            ultimaTelaCopiadaRef.current = positions;
+            latirLaSimulacion(edgeDataRef.current);
+          }
         }
       }
     }

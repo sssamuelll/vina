@@ -1,5 +1,6 @@
 import type { BufferGeometry } from 'three';
 import type { SolverTier } from '../../store/simulationSlice';
+import type { SolverEdgeData } from './fitMaps';
 import { pushJournal } from '../telemetry/journal';
 
 /**
@@ -77,6 +78,31 @@ export function registerClothGeometry(
 
 export function getClothGeometry(): ClothGeometryRecord | null {
   return clothGeometry;
+}
+
+// ─── El latido de la tela (IA 1b-2) ─────────────────────────────────────────
+
+let latidos = 0;
+let aristas: SolverEdgeData | null = null;
+
+/**
+ * Un cuadro en que la app dibujó tela nueva (el `useFrame` de
+ * GarmentSimulation, pasadas sus compuertas). Lo cuenta la superficie para
+ * saber si la simulación avanza: con Vina oculta el navegador no dibuja, y el
+ * latido se para aunque un worker siga calculando. Lleva las aristas del
+ * solver, que el mapa de ajuste por pieza necesita (`fit_map`).
+ */
+export function latirLaSimulacion(edges: SolverEdgeData | null): void {
+  latidos += 1;
+  aristas = edges;
+}
+
+export function latidosDeLaSimulacion(): number {
+  return latidos;
+}
+
+export function aristasDeLaTela(): SolverEdgeData | null {
+  return aristas;
 }
 
 // ─── Ring de eventos de la cascada ──────────────────────────────────────────
