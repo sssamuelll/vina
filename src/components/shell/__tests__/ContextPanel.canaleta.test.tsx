@@ -29,8 +29,15 @@ describe('.context-panel es un hijo flex, no un overlay', () => {
     expect(regla).toMatch(/flex:\s*0\s+0\s+300px/);
   });
 
-  it('conserva el material overlay (fondo, blur, borde, sombra)', () => {
-    expect(regla).toMatch(/background:\s*var\(--surface-overlay-bg\)/);
-    expect(regla).toMatch(/backdrop-filter:\s*var\(--surface-overlay-blur\)/);
+  it('es marco a ras: el material chrome entero, sin margen, sin radio y sin sombra (spec 2026-10-02 § 6.1)', () => {
+    expect(regla).toMatch(/background:\s*var\(--surface-chrome-bg\)/);
+    expect(regla).toMatch(/border-left:\s*var\(--surface-chrome-border\)/);
+    expect(regla).toMatch(/border-radius:\s*var\(--surface-chrome-radius-flush\)/);
+    expect(regla).toMatch(/box-shadow:\s*var\(--surface-chrome-shadow-flush\)/);
+    expect(regla).not.toMatch(/margin|max-height|--surface-overlay/);
+  });
+
+  it('no entra deslizándose: sin transform, no es bloque contenedor de lo que lleva dentro', () => {
+    expect(regla).not.toMatch(/animation/);
   });
 });

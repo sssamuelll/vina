@@ -75,7 +75,7 @@ const PanelLoading = () => (
 );
 
 /** Nombre visible del panel. Las CLAVES (Properties, BOM...) no se tocan:
- * indexan renderPanelContent y getPanelSide; solo cambia el display. */
+ * indexan renderPanelContent; solo cambia el display. */
 const PANEL_LABELS: Record<string, string> = {
   Avatar: 'Avatar',
   BOM: 'Lista de materiales',
@@ -124,7 +124,7 @@ export default function AppShell() {
   const iaAbierta = useSelector((s: RootState) => s.ia.abierta);
   const splitRatio = useSelector((s: RootState) => s.layout.splitRatio);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
-  const { leftPanel, rightPanel, openPanel, togglePanel, closeLeft, closeRight } = usePanelHost();
+  const { paneles, openPanel, togglePanel, closePanel } = usePanelHost();
   const canvasRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const [dxfDragActive, setDxfDragActive] = useState(false);
@@ -329,11 +329,6 @@ export default function AppShell() {
             </div>
           </div>
         )}
-        {leftPanel && (
-          <ContextPanel title={PANEL_LABELS[leftPanel] ?? leftPanel} onClose={closeLeft}>
-            {renderPanelContent(leftPanel, closeLeft)}
-          </ContextPanel>
-        )}
         <div
           className="canvas-area__2d"
           style={{ flex: `${get2dFlexGrow()} 1 0px`, display: viewMode === '3d' ? 'none' : undefined }}
@@ -358,11 +353,15 @@ export default function AppShell() {
             <Viewport3D activeTool3D={activeTool3D as Tool3D} hideChrome />
           </Viewport3DErrorBoundary>
         </div>
-        {rightPanel && (
-          <ContextPanel title={PANEL_LABELS[rightPanel] ?? rightPanel} onClose={closeRight}>
-            {renderPanelContent(rightPanel, closeRight)}
+        {/* Los paneles (spec 2026-10-02 § 6.1): a la derecha y a ras, detrás
+            del 3D, así que la hoja se estrecha por la derecha y las
+            herramientas no se mueven. El primero de la lista va pegado al
+            borde de la ventana: se pintan al revés. */}
+        {[...paneles].reverse().map((nombre) => (
+          <ContextPanel key={nombre} title={PANEL_LABELS[nombre] ?? nombre} onClose={() => closePanel(nombre)}>
+            {renderPanelContent(nombre, () => closePanel(nombre))}
           </ContextPanel>
-        )}
+        ))}
       </div>
       {/* La línea al pie (spec 2026-10-02 § 5.3): la tercera fila de la
           ventana. Marco, de lado a lado y siempre; la sección del patrón la

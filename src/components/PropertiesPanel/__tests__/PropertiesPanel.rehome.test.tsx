@@ -19,7 +19,6 @@ import editorReducer, { selectPiece, selectSeam, setActiveTool } from '../../../
 import simulationReducer from '../../../store/simulationSlice';
 import toolReducer from '../../../store/toolSlice';
 import PropertiesPanel from '../PropertiesPanel';
-import { getPanelSide } from '../../shell/panelSide';
 import { COMMANDS } from '../../shell/unifiedBarCommandDefs';
 import type { AppDispatch } from '../../../store';
 import type { PatternPiece, Seam } from '../../../types/types';
@@ -61,10 +60,7 @@ function renderPanel(store = makeStore()) {
 }
 
 describe('opener surfaces', () => {
-  it('Properties is a left-side (2D-domain) panel', () => {
-    expect(getPanelSide('Properties')).toBe('left');
-  });
-
+  // Dónde se abre (a la derecha, en la ranura) lo fija usePanelHost.test.ts.
   it('⌘K has a show-properties command that opens the Properties panel', () => {
     const cmd = COMMANDS.find(c => c.id === 'show-properties');
     expect(cmd).toBeTruthy();

@@ -14,19 +14,17 @@
   font-size: var(--text-xs);
   color: var(--text-muted);
 }
-/* Context panel */
+/* Un panel del marco (spec 2026-10-02 § 6.1): a la derecha, de la barra
+   superior a la línea al pie, con el material chrome entero en su variante
+   a ras. Sin margen, sin radio y sin sombra; la línea de su izquierda lo
+   separa de la hoja. */
 .context-panel {
   flex: 0 0 300px;
-  max-height: calc(100vh - var(--top-bar-h) - var(--unified-bar-h) - var(--sp-8));
-  background: var(--surface-overlay-bg);
-  backdrop-filter: var(--surface-overlay-blur);
-  -webkit-backdrop-filter: var(--surface-overlay-blur);
-  border: var(--surface-overlay-border);
-  border-radius: var(--surface-overlay-radius);
-  box-shadow: var(--surface-overlay-shadow);
+  background: var(--surface-chrome-bg);
+  border-left: var(--surface-chrome-border);
+  border-radius: var(--surface-chrome-radius-flush);
+  box-shadow: var(--surface-chrome-shadow-flush);
   overflow-y: auto;
-  margin: var(--sp-3);
-  animation: slide-down var(--transition-normal) ease-out;
 }
 .context-panel__header {
   display: flex;
