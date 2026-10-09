@@ -9,11 +9,12 @@
   overflow: hidden;
 }
 
+/* Sin borde propio: el marco del panel ya pone su línea (spec 2026-10-02
+   § 6.1); la de aquí era del panel lateral de febrero y se veía doble. */
 .avatar-panel {
   width: 260px;
   height: 100%;
   background: var(--bg-surface);
-  border-left: 1px solid var(--border);
   color: var(--text-primary);
   font-size: 12px;
   display: flex;
