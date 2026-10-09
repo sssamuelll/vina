@@ -58,10 +58,16 @@ function arrancar(puerto: number) {
 async function iniciar(a: ReturnType<typeof arrancar>) {
   const r = await a.pedir('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'prueba', version: '1' } });
   a.avisar('notifications/initialized');
+  // El puente atiende su entrada en orden: la respuesta al ping dice que ya
+  // procesó `initialized`. Sin esto, un saludo de la pestaña que llegue antes
+  // pierde, con razón, el aviso de lista cambiada.
+  await a.pedir('ping');
   return r;
 }
 
-describe('vina-mcp, como lo arranca un agente', () => {
+// Cada caso lanza procesos de Node: con la suite entera corriendo, arrancar
+// tarda más de los 5 s por defecto.
+describe('vina-mcp, como lo arranca un agente', { timeout: 20_000 }, () => {
   it('se presenta con las instrucciones y da la superficie horneada antes de que llegue la pestaña', async () => {
     const a = arrancar(await puertoLibre());
     const r = await iniciar(a);
