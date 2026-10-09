@@ -249,6 +249,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       trabajando: false,
       enCurso: [],
     },
+    puente: { estado: 'apagado', agente: null },
     camera: {
       pendingPreset: null,
       pendingFocusPieceId: null,
