@@ -81,8 +81,8 @@ export const notchTool: ToolDefinition = {
         { label: '3', value: 3 },
       ],
     },
-    // Los rangos del panel de Propiedades (spec § 5.2): un rango por opción, y
-    // así ningún valor guardado queda fuera.
+    // Los rangos que tenía el panel de Propiedades (spec § 5.2), que P4 borró:
+    // un rango por opción, y así ningún valor guardado queda fuera.
     {
       id: 'length',
       label: 'Profundidad (mm)',

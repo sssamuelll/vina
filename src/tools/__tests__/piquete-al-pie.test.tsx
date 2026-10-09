@@ -9,9 +9,9 @@ import { DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 /**
  * El piquete en la línea al pie (spec 2026-10-02 § 5.3 y § 5.2): forma,
  * cantidad, profundidad y ancho, ANTES del clic, como botones a un clic. El
- * ancho hoy solo estaba en Propiedades; los rangos son los del panel, más
- * amplios que los de la herramienta, para que ningún valor guardado quede
- * fuera.
+ * ancho solo estaba en Propiedades; los rangos son los que tenía Propiedades
+ * (que P4 borró), más amplios que los de la herramienta, para que ningún
+ * valor guardado quede fuera.
  */
 afterEach(cleanup);
 
@@ -23,11 +23,11 @@ describe('el piquete al pie', () => {
     expect(opciones.map((o) => o.id)).toEqual(['shape', 'count', 'length', 'width']);
   });
 
-  it('el ancho gana su sitio, con el rango del panel (1 a 20 mm)', () => {
+  it('el ancho gana su sitio, con el rango que tenía Propiedades (1 a 20 mm)', () => {
     expect(de('width')).toMatchObject({ type: 'number', label: 'Ancho (mm)', min: 1, max: 20, value: DEFAULT_NOTCH_OPTIONS.width });
   });
 
-  it('la profundidad toma el rango del panel (1 a 30 mm)', () => {
+  it('la profundidad toma el rango que tenía Propiedades (1 a 30 mm)', () => {
     expect(de('length')).toMatchObject({ type: 'number', label: 'Profundidad (mm)', min: 1, max: 30, value: DEFAULT_NOTCH_OPTIONS.length });
   });
 
