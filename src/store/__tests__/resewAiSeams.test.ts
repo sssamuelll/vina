@@ -220,6 +220,10 @@ describe('el motor 2 solo cambió dónde se parte la copa', () => {
     expect(isStaleAiSeam({ ...ia(), id: 'e2f1a3b4-humana', createdBy: undefined })).toBe(false);
   });
 
+  it('lo que cose el agente no es del motor: no está viejo y «Re-coser» no lo toca', () => {
+    expect(isStaleAiSeam({ ...ia(), id: '3f6c1d2e-agente', sewEngine: undefined })).toBe(false);
+  });
+
   it('en un proyecto del motor 1, «Re-coser» rehace solo las cuatro mitades de copa, cortadas por sus sisas', () => {
     const pieces = importMariaClassified();
     const cosida = makeStore(pieces, []);

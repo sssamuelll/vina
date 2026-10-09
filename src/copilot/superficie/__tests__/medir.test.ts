@@ -167,3 +167,11 @@ describe('verify', () => {
     }
   });
 });
+
+describe('medirCostura lee los rangos en el sentido de su borde', () => {
+  it('un B invertido guarda su rango en el sentido de cosido, y se lee espejado', async () => {
+    const seam = costura({ pieceB: { pieceId: 'b', edgeName: 'top', tStart: 0, tEnd: 0.4, reversed: true } });
+    const r = await ejecutarVerbo(VERBOS_DE_MEDIR, 'walk_seam', { seam_id: 's1' }, contexto([pieza('a', [100]), pieza('b', [100])], [seam]));
+    expect(r.ok && r.result).toMatchObject({ b: { t_start: 0.6, t_end: 1, reversed: true, length: 40 } });
+  });
+});
