@@ -52,6 +52,8 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/PatternEditor/ContextMenu.tsx', 'menu', 1],
   ['src/components/Viewport3D/ContextMenu3D.tsx', 'menu', 1],
   ['src/components/shell/DockToolPicker.tsx', 'menu', 1],
+  // «Tu agente» (spec 2026-10-09): el enchufe vive en la barra; su hoja flota.
+  ['src/components/shell/PuertaDelAgente.tsx', 'menu', 1],
   ['src/components/LayerPanel/LayerPanel.tsx', 'menu', 1],
   ['src/components/shell/ContextPanel.tsx', 'panel', 1],
   ['src/components/Viewport3D/RenderSettingsPanel.tsx', 'panel', 1],

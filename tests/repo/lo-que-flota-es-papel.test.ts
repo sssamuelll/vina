@@ -44,6 +44,8 @@ const RAICES: Array<[string, number]> = [
   ['src/components/Viewport3D/SurfaceModePill.tsx', 1],
   ['src/components/PatternEditor/FilaDeCapas.tsx', 1],
   ['src/components/PatternEditor/SeccionDelPatron.tsx', 1],
+  // La hoja de «Tu agente», que cuelga del enchufe (spec 2026-10-09)
+  ['src/components/shell/PuertaDelAgente.tsx', 1],
   // La barra de IA convocada (P2c)
   ['src/components/shell/UnifiedBar.tsx', 1],
   // Avisos y tooltips
@@ -76,7 +78,7 @@ const PINTA: Array<[string, string[] | '*']> = [
   ['src/styles/floating.css', ['.logo-menu', '.context-menu']],
   ['src/components/shared/SubMenu.css', '*'],
   ['src/components/shell/Dock.css', ['.dock-picker', '.margen']],
-  ['src/styles/layout.css', ['.grupo-del-patron__menu', '.opcion-del-pie']],
+  ['src/styles/layout.css', ['.grupo-del-patron__menu', '.opcion-del-pie', '.hoja-del-agente']],
   // El menú «Más» de la línea al pie y los controles que lleva dentro
   ['src/components/PatternEditor/SeccionDelPatron.css', ['.seccion-del-patron__menu', '.opcion-del-pie']],
   ['src/components/PatternEditor/ToolOptionControls.css', '*'],
