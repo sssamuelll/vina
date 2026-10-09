@@ -1,5 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// El puerto de los e2e se escoge con VINA_E2E_PORT (5174 por defecto). Con
+// `reuseExistingServer`, Playwright se queda con el primer servidor que
+// responda en su puerto: dos árboles de trabajo con el mismo puerto validan uno
+// el Vite del otro, en silencio. `--strictPort`: un puerto ocupado falla en vez
+// de mudarse a otro donde nadie lo espera.
+const PUERTO = Number(process.env.VINA_E2E_PORT ?? 5174);
+
 export default defineConfig({
   testDir: './tests/e2e',
   // Los specs @gpu-local (DoD #897, perf) requieren GPU/WebGPU real — corren
@@ -25,7 +32,7 @@ export default defineConfig({
   retries: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:5174',
+    baseURL: `http://localhost:${PUERTO}`,
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
     // WebGL needs actual GPU — use headed when available
@@ -40,8 +47,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npx vite --port 5174',
-    port: 5174,
+    command: `npx vite --port ${PUERTO} --strictPort`,
+    port: PUERTO,
     reuseExistingServer: true,
     timeout: 15000,
   },
