@@ -24,7 +24,7 @@ const puertoLibre = () =>
   });
 
 function arrancar(puerto: number) {
-  const proc = spawn(process.execPath, ['mcp/bin/vina-mcp.mjs'], { env: { ...process.env, VINA_MCP_PORT: String(puerto) } });
+  const proc = spawn(process.execPath, ['mcp/bin/vina-mcp.mjs'], { env: { ...process.env, VINA_MCP_PORT: String(puerto), VINA_MCP_ALLOW_LOCAL: '1' } });
   procesos.push(proc);
   let errores = '';
   proc.stderr.on('data', d => { errores += String(d); });
@@ -108,7 +108,7 @@ describe('vina-mcp, como lo arranca un agente', { timeout: 20_000 }, () => {
     await iniciar(b);
     const r = await b.pedir('tools/call', { name: 'read_pattern', arguments: {} });
     expect(r.result!.isError).toBe(true);
-    expect(JSON.stringify(r.result)).toContain('Another agent session is connected to Vina');
+    expect(JSON.stringify(r.result)).toMatch(/cannot take port \d+: another agent session/);
   });
 
   it('al cerrarse la entrada, sale con 0 y suelta el puerto (Review Focus 4)', async () => {

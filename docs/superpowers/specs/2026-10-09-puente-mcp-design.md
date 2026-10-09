@@ -46,10 +46,10 @@ Chrome con ventana. El código fue desechable y no entra al repo.
 | P3 | **El agente arranca el puente por stdio; el puente espera a la pestaña en `127.0.0.1:8462`.** `VINA_MCP_PORT` cambia el puerto (para las pruebas). | Un navegador no puede escuchar un socket: la pestaña tiene que llamar. 8462 es «VINA» en el teclado del teléfono. |
 | P4 | **Una pestaña a la vez:** gana la última, y la anterior se apaga diciendo por qué. | Dos pestañas que reintentan se robarían la conexión sin fin. |
 | P5 | **Un puerto, un puente.** Si el 8462 está ocupado (otra sesión del agente lo tiene), el segundo puente sigue vivo, reintenta cada 3 s y responde a cada llamada que otra sesión tiene la conexión. | En esta máquina corren a veces dos sesiones de Claude Code a la vez. Morir dejaría al agente con un servidor caído y sin explicación. |
-| P6 | **El puente solo acepta a Vina como pestaña:** `Origin` igual a `https://vina.sdar.dev`, o `http://localhost` / `http://127.0.0.1` con cualquier puerto. Lo demás, 403. | Que otra web abierta no se haga pasar por la pestaña. |
+| P6 | **El puente solo acepta a Vina como pestaña:** `Origin` igual a `https://vina.sdar.dev`. `http://localhost` y `http://127.0.0.1`, con cualquier puerto, solo con `VINA_MCP_ALLOW_LOCAL=1` (desarrollo, e2e). Lo demás, 403, y el puente registra el rechazo. | Que otra web abierta no se haga pasar por la pestaña. La revisión final mostró que «cualquier web local» era demasiado: un servidor de desarrollo ajeno, o un XSS en uno, podía cambiarle al agente las descripciones de las herramientas. |
 | P7 | **La lista de verbos viaja dos veces:** horneada en el paquete (`mcp/superficie.json`) y en el saludo de la pestaña. Si difieren, manda la de la pestaña, y el puente avisa con `notifications/tools/list_changed`. Un test exige que la horneada sea igual a la de la superficie. | El agente pide la lista al arrancar, casi siempre antes de que la pestaña conecte. La pestaña desplegada es la verdad: un paquete viejo no recorta verbos nuevos. |
 | P8 | **Las instrucciones para el agente viven en la superficie** (`instrucciones.ts`, en inglés) y viajan horneadas y en el saludo. El MCP las da en `initialize.instructions`. | D4: el agente de Vina recibirá las mismas. D8: la superficie va en inglés. |
-| P9 | **Una llamada espera a la pestaña hasta 120 s.** Si la pestaña se va a mitad, la llamada vuelve con error al momento. Sin pestaña, la llamada espera hasta 4 s a que llegue, y después vuelve con error y con lo que hay que hacer. | `simulate` con `wait` llegará a 60 s (segunda mitad de la 1b). La pestaña reintenta cada 3 s: el agente arranca el puente y llama enseguida, casi siempre antes de que la pestaña lo encuentre. |
+| P9 | **Una llamada espera a la pestaña hasta 120 s.** Si la pestaña se va a mitad, la llamada vuelve con error al momento. Sin pestaña, la llamada espera hasta 4 s a que llegue, y después vuelve con error y con lo que hay que hacer. Cada llamada lleva su plazo (`hasta`): la pestaña no corre una vencida, y los errores de plazo y de corte dicen que pudo haberse aplicado. | `simulate` con `wait` llegará a 60 s (segunda mitad de la 1b). La pestaña reintenta cada 3 s: el agente arranca el puente y llama enseguida, casi siempre antes de que la pestaña lo encuentre. Sin el plazo, una llamada dada por fallida podía correr después, y el agente, al reintentar, la duplicaba (revisión final). |
 | P10 | **«Conectar» no se recuerda entre recargas.** El permiso del navegador sí se recuerda. | Conectarse es un permiso por sesión. Si molesta, se guarda después. |
 | P11 | **El resultado viaja como texto JSON en `content`:** `{ result, revision }`. Con `ok: false` va `{ error, revision }` con `isError`; si el puente no pudo llamar, el porqué, en texto y con `isError`. Un `done: false` no es error: es la respuesta honesta (§ 5.3 de la spec madre). | Todo cliente MCP lee texto. Un `structuredContent` sin `outputSchema` no lo usa nadie todavía. La revisión viaja en toda respuesta, también en las de leer. |
 | P12 | **Publicar en npm es un paso aparte**, con la cuenta y la orden de Samuel, y va antes del deploy de la puerta. | La hoja enseña `npx -y vina-mcp`. El repo es público, así que conviene reservar el nombre pronto. |
@@ -77,10 +77,10 @@ Entre la pestaña y el puente viaja JSON por WebSocket, en la versión 1 del pro
 |---|---|---|
 | pestaña → puente | `{ t: 'hola', v: 1, instrucciones, definiciones }` | al abrir |
 | puente → pestaña | `{ t: 'agente', nombre, version }` | cuando el agente se presenta, o al llegar la pestaña si ya se presentó |
-| puente → pestaña | `{ t: 'llamada', id, verbo, args }` | por cada `tools/call` |
+| puente → pestaña | `{ t: 'llamada', id, verbo, args, hasta }` | por cada `tools/call`; `hasta` es el instante (ms, el reloj de la máquina) en que el agente la da por fallida |
 | pestaña → puente | `{ t: 'respuesta', id, respuesta }` | la `Respuesta` de `ejecutarVerbo` |
 
-El puente cierra con el código **4001** cuando llega otra pestaña.
+El puente cierra con el código **4001** cuando llega otra pestaña. Un saludo de otra versión (`v` distinto de 1) o sin lista no cambia nada: el puente sigue con su lista horneada y registra que hay que actualizar `vina-mcp`. Si el puente no puede escuchar por algo que no sea el puerto ocupado, sigue vivo y lo dice en cada llamada.
 
 ### 4.2 La pestaña
 
@@ -119,7 +119,8 @@ Los textos finales salen de solace-wren, en el plan.
 
 **Protege:**
 - El puente escucha solo en `127.0.0.1`.
-- Solo acepta como pestaña a Vina, por su origen (P6).
+- Solo acepta como pestaña a Vina en producción, por su origen (P6). Una Vina local entra solo si
+  se pide.
 - La pestaña solo corre verbos de la superficie, validados con zod: ningún archivo, ninguna red,
   ningún código del agente.
 - Cada llamada queda en la caja negra, y cada cambio se deshace con Ctrl+Z.

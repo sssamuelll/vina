@@ -40,7 +40,7 @@ function agente(proc: ChildProcessWithoutNullStreams) {
 }
 
 test('tu agente entra por el enchufe: crea una pieza que se ve, y la deshace', async ({ page }) => {
-  const proc = spawn(process.execPath, ['mcp/bin/vina-mcp.mjs'], { env: { ...process.env, VINA_MCP_PORT: String(PUERTO) } });
+  const proc = spawn(process.execPath, ['mcp/bin/vina-mcp.mjs'], { env: { ...process.env, VINA_MCP_PORT: String(PUERTO), VINA_MCP_ALLOW_LOCAL: '1' } });
   try {
     const yo = agente(proc);
     await yo.pedir('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'claude-code', version: 'e2e' } });

@@ -102,6 +102,35 @@ describe('lo demás', () => {
     expect(enviados.at(-1)).toEqual({ jsonrpc: '2.0', id: 9, result: {} });
   });
 
+  it('null, un número o un lote dan -32600 con id null, sin tumbar nada', async () => {
+    const { p, enviados } = montar();
+    await p.recibir('null');
+    await p.recibir('7');
+    await p.recibir('[{"jsonrpc":"2.0","id":1,"method":"ping"}]');
+    const invalido = { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } };
+    expect(enviados).toEqual([invalido, invalido, invalido]);
+  });
+
+  it('initialize con params null responde igual', async () => {
+    const { p, enviados } = montar();
+    await p.recibir(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: null }));
+    expect(enviados[0].result!.protocolVersion).toBe(VERSIONES[0]);
+  });
+
+  it('un fallo dentro de un pedido responde -32603 con su id', async () => {
+    const enviados: Msg[] = [];
+    const rota = () => { throw new Error('rota'); };
+    const p = crearProtocolo({ version: '0', superficie: rota, llamar: vi.fn(), enviar: (m: Msg) => enviados.push(m) });
+    await p.recibir(JSON.stringify({ jsonrpc: '2.0', id: 5, method: 'tools/list' }));
+    expect(enviados).toEqual([{ jsonrpc: '2.0', id: 5, error: { code: -32603, message: 'Internal error: rota' } }]);
+  });
+
+  it('un ping mandado como notificación no se contesta', async () => {
+    const { p, enviados } = montar();
+    await p.recibir(JSON.stringify({ jsonrpc: '2.0', method: 'ping' }));
+    expect(enviados).toEqual([]);
+  });
+
   it('avisa que la lista cambió solo después de notifications/initialized', async () => {
     const { p, enviados } = montar();
     p.avisarListaCambiada();

@@ -4,7 +4,7 @@
   "description": "Let your AI agent (Claude Code, Claude Desktop, Cursor) work on the pattern open in Vina.",
   "type": "module",
   "bin": { "vina-mcp": "bin/vina-mcp.mjs" },
-  "files": ["bin", "src", "superficie.json", "README.md"],
+  "files": ["bin", "src", "superficie.json", "README.md", "LICENSE"],
   "engines": { "node": ">=18" },
   "dependencies": { "ws": "^8.19.0" },
   "license": "MIT",

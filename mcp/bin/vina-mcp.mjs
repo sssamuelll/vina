@@ -22,6 +22,8 @@ const protocolo = crearProtocolo({
 });
 const puente = crearPuente({
   puerto,
+  // Una Vina servida en esta máquina (desarrollo, e2e) entra solo si se pide.
+  permitirLocal: process.env.VINA_MCP_ALLOW_LOCAL === '1',
   superficie,
   registrar,
   alCambiarSuperficie: (s) => {

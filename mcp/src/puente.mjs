@@ -13,16 +13,25 @@ export const CIERRE_REEMPLAZADA = 4001;
 const VINA = 'https://vina.sdar.dev';
 const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
-/** Solo Vina puede ser la pestaña (P6): producción, o la app en esta máquina. */
-export function origenPermitido(origen) {
-  return origen === VINA || (typeof origen === 'string' && LOCAL.test(origen));
+/**
+ * Solo Vina puede ser la pestaña (P6): la de producción. Una Vina servida en
+ * esta máquina (desarrollo, e2e) entra solo si se pide con
+ * VINA_MCP_ALLOW_LOCAL=1: cualquier web local podría si no hacerse pasar por
+ * ella y cambiarle al agente las descripciones de las herramientas.
+ */
+export function origenPermitido(origen, permitirLocal = false) {
+  return origen === VINA || (permitirLocal && typeof origen === 'string' && LOCAL.test(origen));
 }
 
 const NO_CONECTADA =
-  'Vina is not connected. Ask the user to open Vina in the browser, click the plug icon next to «IA» and press «Conectar».';
+  'Vina is not connected. If the user already pressed «Conectar», Vina retries every few seconds: try again in a moment. Otherwise ask them to open Vina in the browser, click the plug icon next to «IA» and press «Conectar».';
+// Lo que el puente da por fallido pudo haber corrido en la pestaña.
+const QUIZAS = 'It may have been applied: call read_pattern before retrying.';
 
 export function crearPuente({
   puerto,
+  host = '127.0.0.1',
+  permitirLocal = false,
   superficie = null,
   registrar = () => {},
   alCambiarSuperficie = () => {},
@@ -33,6 +42,7 @@ export function crearPuente({
   let servidor = null;
   let pestana = null;
   let ocupado = false;
+  let fallo = null;
   let cerrado = false;
   let reintento;
   let agente = null;
@@ -42,12 +52,12 @@ export function crearPuente({
   const aLaEspera = new Set();
 
   const enUso = () =>
-    `Another agent session is connected to Vina (port ${puerto} is in use). Close that session or use it.`;
+    `vina-mcp cannot take port ${puerto}: another agent session with vina-mcp, or another program, has it. Close that session, or use it.`;
 
   function soltar(motivo) {
     for (const p of pendientes.values()) {
       clearTimeout(p.timer);
-      p.reject(new Error(`Vina disconnected while running ${p.verbo}${motivo}.`));
+      p.reject(new Error(`Vina disconnected while running ${p.verbo}${motivo}. ${QUIZAS}`));
     }
     pendientes.clear();
   }
@@ -70,7 +80,12 @@ export function crearPuente({
     ws.on('message', (datos) => {
       let m;
       try { m = JSON.parse(String(datos)); } catch { return; }
+      if (!m || typeof m !== 'object') return;
       if (m.t === 'hola') {
+        // Un paquete viejo frente a una pestaña nueva (P7) sigue vivo: se queda
+        // con su lista horneada y dice qué hacer.
+        if (m.v !== 1) { registrar(`Vina speaks protocol v${m.v}; update vina-mcp (npx -y vina-mcp@latest)`); return; }
+        if (typeof m.instrucciones !== 'string' || !Array.isArray(m.definiciones)) { registrar('ignored a malformed greeting from Vina'); return; }
         // La pestaña desplegada es la verdad (P7): un paquete viejo no recorta verbos nuevos.
         const s = { instrucciones: m.instrucciones, definiciones: m.definiciones };
         const clave = JSON.stringify(s);
@@ -97,24 +112,48 @@ export function crearPuente({
 
   function escuchar() {
     return new Promise((listo) => {
+      // Sin poder escuchar por otra razón (un puerto reservado por Windows, uno
+      // inválido) el puente tampoco muere: lo dice en cada llamada.
+      const fallar = (e) => {
+        fallo = `vina-mcp cannot listen on ${host}:${puerto} (${e.code ?? 'error'}): ${e.message}`;
+        registrar(fallo);
+        listo('fallo');
+      };
       const intentar = () => {
         if (cerrado) return;
-        const s = new WebSocketServer({
-          host: '127.0.0.1',
-          port: puerto,
-          // Con callback para responder 403: devolver false da un 401, que
-          // pediría credenciales que no existen.
-          verifyClient: ({ origin }, responder) => responder(origenPermitido(origin), 403, 'Forbidden'),
-        });
+        let s;
+        try {
+          s = new WebSocketServer({
+            host,
+            port: puerto,
+            // Con callback para responder 403: devolver false da un 401, que
+            // pediría credenciales que no existen.
+            verifyClient: ({ origin }, responder) => {
+              const ok = origenPermitido(origin, permitirLocal);
+              if (!ok) {
+                const local = !permitirLocal && LOCAL.test(origin ?? '');
+                registrar(`rejected a tab from ${origin ?? 'no origin'}${local ? ' (a local Vina: start vina-mcp with VINA_MCP_ALLOW_LOCAL=1)' : ''}`);
+              }
+              responder(ok, 403, 'Forbidden');
+            },
+          });
+        } catch (e) {
+          fallar(e);
+          return;
+        }
         s.on('listening', () => {
           servidor = s;
           ocupado = false;
-          registrar(`waiting for Vina on 127.0.0.1:${s.address().port}`);
+          registrar(`waiting for Vina on ${host}:${s.address().port}`);
           s.on('connection', alConectar);
           listo('escuchando');
         });
         s.on('error', (e) => {
-          if (e.code !== 'EADDRINUSE') { registrar(e.message); return; }
+          if (e.code !== 'EADDRINUSE') {
+            s.close();
+            fallar(e);
+            return;
+          }
           // P5: otra sesión del agente tiene el puerto. Este puente sigue vivo
           // y reintenta; si muriera, el agente vería un servidor caído sin
           // explicación.
@@ -131,6 +170,7 @@ export function crearPuente({
 
   async function llamar(verbo, args) {
     if (cerrado) throw new Error('vina-mcp is shutting down.');
+    if (fallo) throw new Error(fallo);
     if (!pestana) {
       if (ocupado) throw new Error(enUso());
       // La pestaña reintenta cada 3 s: una llamada que llega antes la espera.
@@ -146,10 +186,12 @@ export function crearPuente({
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         pendientes.delete(id);
-        reject(new Error(`Vina did not answer ${verbo} within ${Math.round(plazoMs / 1000)} s.`));
+        reject(new Error(`Vina did not answer ${verbo} within ${Math.round(plazoMs / 1000)} s. ${QUIZAS}`));
       }, plazoMs);
       pendientes.set(id, { resolve, reject, timer, verbo });
-      ws.send(JSON.stringify({ t: 'llamada', id, verbo, args }));
+      // `hasta`: pasado ese instante el agente ya la dio por fallida, y la
+      // pestaña no la corre (comparten reloj: los dos en esta máquina).
+      ws.send(JSON.stringify({ t: 'llamada', id, verbo, args, hasta: Date.now() + plazoMs }));
     });
   }
 
@@ -175,7 +217,7 @@ export function crearPuente({
     llamar,
     presentarAgente,
     cerrar,
-    estado: () => (cerrado ? 'cerrado' : ocupado ? 'ocupado' : pestana ? 'conectado' : 'escuchando'),
+    estado: () => (cerrado ? 'cerrado' : fallo ? 'fallo' : ocupado ? 'ocupado' : pestana ? 'conectado' : 'escuchando'),
     puertoReal: () => servidor?.address()?.port ?? null,
   };
 }

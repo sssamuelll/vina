@@ -25,7 +25,9 @@ export function crearProtocolo({ version, superficie, llamar, presentarse = () =
   const fallar = (id, code, message) => enviar({ jsonrpc: '2.0', id, error: { code, message } });
   const texto = (t, isError) => ({ content: [{ type: 'text', text: t }], ...(isError ? { isError: true } : {}) });
 
-  async function atender({ id, method, params = {} }) {
+  async function atender(m) {
+    const { id, method } = m;
+    const params = m.params ?? {};
     const esPedido = id !== undefined && id !== null;
     switch (method) {
       case 'initialize': {
@@ -42,7 +44,8 @@ export function crearProtocolo({ version, superficie, llamar, presentarse = () =
         listo = true;
         return;
       case 'ping':
-        return responder(id, {});
+        if (esPedido) responder(id, {});
+        return;
       case 'tools/list':
         return responder(id, {
           tools: superficie().definiciones.map(d => ({ name: d.name, description: d.description, inputSchema: d.input_schema })),
@@ -70,7 +73,14 @@ export function crearProtocolo({ version, superficie, llamar, presentarse = () =
       if (!t) return;
       let m;
       try { m = JSON.parse(t); } catch { return fallar(null, -32700, 'Parse error'); }
-      await atender(m);
+      // Un objeto por línea: sin lotes (MCP los quitó en 2025-06-18), sin null
+      // ni escalares. Nada que llegue por aquí puede tumbar el proceso.
+      if (!m || typeof m !== 'object' || Array.isArray(m)) return fallar(null, -32600, 'Invalid Request');
+      try {
+        await atender(m);
+      } catch (e) {
+        if (m.id !== undefined && m.id !== null) fallar(m.id, -32603, `Internal error: ${e instanceof Error ? e.message : String(e)}`);
+      }
     },
     avisarListaCambiada() {
       if (listo) enviar({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' });
