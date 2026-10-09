@@ -6,8 +6,8 @@
 export const INSTRUCCIONES = [
   "Vina is a CAD for garment patterns, open in the user's browser. These tools read and change the pattern that is open right now.",
   'All lengths are in millimetres.',
-  'Read before you act: read_pattern lists the pieces, their edges, seams and notches, with the ids the other tools take.',
-  'Every answer carries the project revision. It goes up with every change: if it moved between two of your calls, someone else changed the pattern, so read it again.',
+  'Read before you act: read_pattern gives every piece with its edges and notches, and every seam; read_piece gives one piece in full (its points and internal lines). Use the ids they return.',
+  'Every answer carries the project revision, which goes up with every change. A receipt gives revision.before and revision.after: if before is not the revision you last saw, someone else changed the pattern in between, so read it again. The revision starts again from 0 when the user reloads Vina.',
   'Every tool that changes the pattern returns a receipt. done is true only when the measured result confirms the change. done: false is an honest answer, not a crash: read its warnings; nothing was half-changed.',
   'Each change is one undo step for the user (Ctrl+Z). The undo tool reverts only steps made by an agent.',
   'A locked piece is never edited or removed: the tools that would do it answer done: false.',

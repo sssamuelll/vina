@@ -27,6 +27,9 @@ describe('la superficie horneada en vina-mcp', () => {
   it('las instrucciones dicen lo que el agente necesita, en inglés', () => {
     const t = INSTRUCCIONES.toLowerCase();
     for (const clave of ['millimetres', 'receipt', 'done: false', 'undo', 'revision', 'locked']) expect(t).toContain(clave);
+    // Revisión final, M5: lo exacto. Los ids en detalle salen de read_piece; la
+    // comparación honesta es revision.before; y la revisión vuelve a 0 al recargar.
+    for (const clave of ['read_piece', 'revision.before', 'reloads']) expect(t).toContain(clave);
     // El glosario trae las palabras de María tal cual («patrón»); el resto va en inglés (D8).
     const prosa = INSTRUCCIONES.split('\n').filter(l => !l.startsWith('The user works in Spanish'));
     expect(prosa.join('\n')).not.toMatch(/[áéíóúñ¿¡]/);
