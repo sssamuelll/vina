@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { InternalLine } from '../../../types/types';
 import { definirVerbo, type Verbo } from '../tipos';
-import { removeInternalLine, removePiece } from '../../../store/projectSlice';
+import { removeInternalLine, removePieces } from '../../../store/projectSlice';
 import { getHistory, hayLoteAbierto, withAgentHistorySource } from '../../../store/undoMiddleware';
 import { undo } from '../../../store/editorSlice';
 import { showUndoToast } from '../../../store/copilotUISlice';
@@ -38,8 +38,10 @@ const remove = definirVerbo({
     const loQue = interna ? `${QUE_ES[interna.type]} de ${piece.name}` : piece.name;
     const e = actuar(ctx, 'remove', `borrar ${loQue}`, () => {
       if (interna) ctx.dispatch(removeInternalLine({ pieceId: piece.id, lineId: interna.id }));
-      // El diálogo de confirmación es para los borrados de María: borrar actúa y ofrece deshacer.
-      else ctx.dispatch({ ...removePiece(piece.id), meta: { skipConfirmation: true } });
+      // El escritor de Supr (`removePieces`): además limpia grupos de costura y
+      // pliegues. El diálogo de confirmación es para los borrados de María:
+      // borrar actúa y ofrece deshacer.
+      else ctx.dispatch({ ...removePieces([piece.id]), meta: { skipConfirmation: true } });
     });
     const sigue = interna
       ? e.despues.pieces.find(p => p.id === piece.id)?.internals.some(l => l.id === interna.id) === true

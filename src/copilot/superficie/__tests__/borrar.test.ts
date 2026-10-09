@@ -16,7 +16,7 @@ const ultimoAviso = (store: ReturnType<typeof tienda>['store']) => store.getStat
 
 describe('remove', () => {
   it('borra una pieza y sus costuras, sin pedir confirmación, y avisa con «Deshacer» que la devuelve', async () => {
-    const { store, ctx } = tienda([pieza('a', [100]), pieza('b', [100])], [costura()], {}, { confirmOverrides: { removePiece: 'always' } });
+    const { store, ctx } = tienda([pieza('a', [100]), pieza('b', [100])], [costura()], {}, { confirmOverrides: { removePieces: 'always' } });
     const r = await actuarCon(ctx, 'remove', { piece_id: 'a' });
     expect(r).toMatchObject({ done: true, measure: { removed: { kind: 'piece', id: 'a', name: 'a' }, seams_removed: ['s1'] } });
     expect(store.getState().project.pieces.map(p => p.id)).toEqual(['b']);
@@ -26,6 +26,21 @@ describe('remove', () => {
     store.dispatch(aviso!.actionPayload as never);
     expect(store.getState().project.pieces.map(p => p.id)).toEqual(['a', 'b']);
     expect(store.getState().project.seams).toHaveLength(1);
+  });
+
+  it('borrar una pieza no deja grupos de costura ni pliegues que la nombren, como Supr', async () => {
+    const grupo = {
+      id: 'g1', edgesA: [{ pieceId: 'a', edgeName: 'top' }], edgesB: [{ pieceId: 'b', edgeName: 'top' }],
+      type: 'standard', tension: 100, strength: 1, active: true, taped: false, tapeWidth: 10,
+    };
+    const pliegue = {
+      id: 'p1', pieceId: 'a', edgeName: 'top', type: 'knife', depth: 10, spacing: 20, count: 1,
+      direction: 'left', tStart: 0.2, tEnd: 0.4, generatedLineIds: [],
+    };
+    const { store, ctx } = tienda([pieza('a', [100]), pieza('b', [100])], [], { seamGroups: [grupo], pleats: [pliegue] });
+    expect(await actuarCon(ctx, 'remove', { piece_id: 'a' })).toMatchObject({ done: true });
+    expect(store.getState().project.seamGroups).toEqual([]);
+    expect(store.getState().project.pleats).toEqual([]);
   });
 
   it('borra algo de dentro de una pieza, y el aviso dice qué', async () => {
