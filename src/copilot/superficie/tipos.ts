@@ -30,6 +30,24 @@ export function definirVerbo<A extends z.ZodType>(verbo: Verbo<A>): Verbo<A> {
   return verbo;
 }
 
+/**
+ * Lo que devuelve todo verbo de «Actuar» (spec § 5.2). `measure` es propia de
+ * cada verbo y puede anidar —los bordes de una pieza, una costura medida—: el
+ * `Record` plano de la spec no cabía en el recibo de `create_piece`.
+ */
+export interface Recibo {
+  /** true solo si la medida confirma el resultado (§ 5.3). */
+  done: boolean;
+  /** Qué cambió, por id: piezas, costuras e internas. */
+  changed: { created: string[]; modified: string[]; deleted: string[] };
+  /** La medida del resultado, calculada después del cambio. */
+  measure: Record<string, unknown>;
+  /** Lo que no cuadra, con números. */
+  warnings: string[];
+  /** La revisión del proyecto antes y después: el agente ve si María tocó algo en medio. */
+  revision: { before: number; after: number };
+}
+
 export type Respuesta =
   | { ok: true; result: unknown; revision: number }
   | { ok: false; error: string; revision: number };

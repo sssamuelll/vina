@@ -7,6 +7,15 @@ import { importDXFContent } from '../../../utils/dxf';
 import { classifyPiecesGeometric } from '../../../utils/geometricClassifier';
 import { detectSemanticEdges } from '../../../utils/semanticEdges';
 import { autoSew } from '../../../utils/autoSew';
+import { combineReducers, configureStore } from '@reduxjs/toolkit';
+import projectReducer from '../../../store/projectSlice';
+import editorReducer from '../../../store/editorSlice';
+import copilotUIReducer from '../../../store/copilotUISlice';
+import workflowReducer from '../../../store/workflowSlice';
+import { confirmationMiddleware } from '../../../store/confirmationMiddleware';
+import { linkedEditingMiddleware } from '../../../store/linkedEditingMiddleware';
+import { undoMiddleware } from '../../../store/undoMiddleware';
+import { seguirLaRevision } from '../../../store/revisionDelProyecto';
 import type { ContextoDeVerbo } from '../tipos';
 
 /** Un rectángulo de 50 mm de alto cuyo lado de arriba son tantos comandos como `xs`. */
@@ -50,6 +59,40 @@ export function contexto(
 ): ContextoDeVerbo {
   const estado = { project: { pieces, seams, layerLocked, seamGroups } } as unknown as RootState;
   return { getState: () => estado, dispatch: vi.fn() as unknown as ContextoDeVerbo['dispatch'], origen: 'vina' };
+}
+
+/**
+ * Una tienda de verdad con lo que toca un verbo de «Actuar»: deshacer, la
+ * confirmación de borrados y los vínculos entre piezas. El historial de
+ * deshacer es del módulo, así que cada tienda empieza sin pasos.
+ */
+export function tienda(
+  pieces: PatternPiece[] = [],
+  seams: Seam[] = [],
+  proyecto: Record<string, unknown> = {},
+  workflow: Record<string, unknown> = {},
+) {
+  const inicio = { type: '@@prueba/inicio' };
+  const reducer = combineReducers({ project: projectReducer, editor: editorReducer, copilotUI: copilotUIReducer, workflow: workflowReducer });
+  type Estado = ReturnType<typeof reducer>;
+  const preloadedState: Partial<Estado> = {
+    project: { ...projectReducer(undefined, inicio), pieces, seams, ...proyecto } as Estado['project'],
+    workflow: { ...workflowReducer(undefined, inicio), ...workflow } as Estado['workflow'],
+  };
+  const store = configureStore({
+    reducer,
+    preloadedState,
+    middleware: g => g({ serializableCheck: false, immutableCheck: false })
+      .concat(confirmationMiddleware, linkedEditingMiddleware, undoMiddleware),
+  });
+  store.dispatch({ type: 'prueba/historiaNueva', meta: { resetUndoHistory: true } });
+  seguirLaRevision(store);
+  const ctx: ContextoDeVerbo = {
+    getState: () => store.getState() as unknown as RootState,
+    dispatch: store.dispatch as unknown as ContextoDeVerbo['dispatch'],
+    origen: 'vina',
+  };
+  return { store, ctx };
 }
 
 /** La camisa de María (5 piezas): clasificada, con sus bordes y cosida por autoSew, como en `resewAiSeams.test.ts`. */
