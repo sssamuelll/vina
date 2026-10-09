@@ -1,6 +1,6 @@
 import type { RootState } from '../../store';
 import type { PatternPiece } from '../../types/types';
-import { batchUndo, withAgentHistorySource } from '../../store/undoMiddleware';
+import { batchUndo, hayLoteAbierto, withAgentHistorySource } from '../../store/undoMiddleware';
 import { undo } from '../../store/editorSlice';
 import { revisionDelProyecto } from '../../store/revisionDelProyecto';
 import { piezaBloqueada } from '../../utils/piezaBloqueada';
@@ -12,6 +12,12 @@ type Proyecto = RootState['project'];
 export const MARGEN_MM = 0.5;
 
 const NADA: Recibo['changed'] = { created: [], modified: [], deleted: [] };
+
+/**
+ * Lo que dice un verbo que escribe mientras María está a mitad de un gesto. No
+ * es un «no» del patrón: en un momento se puede volver a probar.
+ */
+export const OCUPADA = 'the user is in the middle of an edit; try again in a moment';
 
 /**
  * Qué cambió entre dos estados del proyecto, por id: piezas, costuras e
@@ -49,9 +55,12 @@ export interface Escritura {
  * El paso único de todo verbo que escribe (spec § 5.4): un lote de deshacer
  * con su nombre («IA: coser Delantero con Espalda»), marcado como del agente
  * para que `undo` sepa de quién es. Nada cambia a medias (§ 5.3, regla 3): si
- * `escribir` falla después de despachar algo, se deshace y el error sale.
+ * `escribir` falla después de despachar algo, se deshace y el error sale. Con
+ * un gesto de María a medias no escribe: lo dice (`OCUPADA`).
  */
 export function actuar(ctx: ContextoDeVerbo, verbo: string, etiqueta: string, escribir: () => void): Escritura {
+  // Con un gesto de María abierto, lo escrito entraría en SU paso de deshacer.
+  if (hayLoteAbierto()) throw new Error(OCUPADA);
   const antes = ctx.getState().project;
   const before = revisionDelProyecto();
   const fallo: { hubo: boolean; error?: unknown } = { hubo: false };

@@ -2,12 +2,12 @@ import { z } from 'zod';
 import type { InternalLine } from '../../../types/types';
 import { definirVerbo, type Verbo } from '../tipos';
 import { removeInternalLine, removePiece } from '../../../store/projectSlice';
-import { getHistory, withAgentHistorySource } from '../../../store/undoMiddleware';
+import { getHistory, hayLoteAbierto, withAgentHistorySource } from '../../../store/undoMiddleware';
 import { undo } from '../../../store/editorSlice';
 import { showUndoToast } from '../../../store/copilotUISlice';
 import { DESHACER_DEL_AGENTE } from '../../../store/actions';
 import { revisionDelProyecto } from '../../../store/revisionDelProyecto';
-import { actuar, cambiosEntre, cerrar, estaBloqueada, piezaDe, rehusar } from '../actuar';
+import { actuar, cambiosEntre, cerrar, estaBloqueada, OCUPADA, piezaDe, rehusar } from '../actuar';
 
 /** Lo que hay dentro de una pieza, como lo lee María (glosario; aprobado el 2026-10-09). */
 const QUE_ES: Record<InternalLine['type'], string> = {
@@ -69,6 +69,8 @@ const undoVerb = definirVerbo({
     'Undo the last step of the history, only if an agent made it. If the last step was made by the user, nothing is undone: done is false and the warning says so. Returns which step was undone.',
   args: z.object({}),
   run: (_args, ctx) => {
+    // Con un gesto de María abierto, deshacer cerraría su lote y se lo llevaría.
+    if (hayLoteAbierto()) throw new Error(OCUPADA);
     const ultimo = getHistory().past.at(-1);
     if (!ultimo) return rehusar('nothing to undo');
     if (!ultimo.agent) return rehusar(`the last step was made by the user ("${ultimo.label}"); it is not undone`);

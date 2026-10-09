@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getHistory } from '../../../store/undoMiddleware';
+import { beginUndoBatch, endUndoBatch, getHistory } from '../../../store/undoMiddleware';
 import { undo } from '../../../store/editorSlice';
 import { addInternalLine, addPiece, updatePiece } from '../../../store/projectSlice';
 import { actuar, cambiosEntre, cerrar, estaBloqueada, rehusar } from '../actuar';
@@ -33,6 +33,18 @@ describe('actuar: el paso de escribir de todo verbo', () => {
       throw new Error('a medias');
     })).toThrow('a medias');
     expect(store.getState().project.pieces.map(p => p.id)).toEqual(['a']);
+  });
+});
+
+describe('María a mitad de un gesto', () => {
+  it('el verbo no escribe ni se mete en su paso: lo dice para que el agente vuelva a probar', () => {
+    const { store, ctx } = tienda([pieza('a', [100])]);
+    const gesto = beginUndoBatch(store.dispatch, 'Arrastrar un punto');
+    expect(() => actuar(ctx, 'prueba', 'crear', () => { ctx.dispatch(addPiece(pieza('b', [50]))); }))
+      .toThrow('the user is in the middle of an edit; try again in a moment');
+    expect(store.getState().project.pieces.map(p => p.id)).toEqual(['a']);
+    endUndoBatch(store.dispatch, gesto);
+    expect(getHistory().past).toHaveLength(0);
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getHistory } from '../../../store/undoMiddleware';
+import { beginUndoBatch, endUndoBatch, getHistory } from '../../../store/undoMiddleware';
 import { updatePiece } from '../../../store/projectSlice';
 import { undo } from '../../../store/editorSlice';
 import { ejecutarVerbo } from '../ejecutar';
@@ -73,6 +73,16 @@ describe('undo', () => {
     expect(r).toMatchObject({ done: false, warnings: ['the last step was made by the user ("Edit Piece"); it is not undone'] });
     expect(store.getState().project.pieces[0].name).toBe('suyo');
   });
+  it('si María está a mitad de un gesto, no deshace nada: ni lo del agente ni lo suyo', async () => {
+    const { store, ctx } = tienda([pieza('a', [100]), pieza('b', [100])]);
+    await actuarCon(ctx, 'remove', { piece_id: 'a' });
+    const gesto = beginUndoBatch(store.dispatch, 'Arrastrar un punto');
+    const r = await ejecutarVerbo(VERBOS_DE_BORRAR, 'undo', {}, ctx);
+    expect(r).toMatchObject({ ok: false, error: 'the user is in the middle of an edit; try again in a moment' });
+    endUndoBatch(store.dispatch, gesto);
+    expect(store.getState().project.pieces.map(p => p.id)).toEqual(['b']);
+  });
+
   it('sin pasos, nada que deshacer', async () => {
     const { ctx } = tienda();
     expect(await actuarCon(ctx, 'undo', {})).toMatchObject({ done: false, warnings: ['nothing to undo'] });
