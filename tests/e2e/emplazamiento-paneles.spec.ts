@@ -242,6 +242,17 @@ test.describe('los paneles: a la derecha, a ras y con reemplazo', () => {
     await expect(page.locator(PANEL)).toHaveCount(2);
   });
 
+  test('con dos paneles, la ✕ de uno cierra ese y no el otro', async ({ page }) => {
+    await page.setViewportSize({ width: 1680, height: 900 });
+    await abrirPanel(page, 'Capas');
+    await abrirPanel(page, 'Propiedades');
+    await expect(page.locator(PANEL)).toHaveCount(2);
+    await page.locator(PANEL, { has: page.locator('.context-panel__header span', { hasText: 'Propiedades' }) })
+      .getByRole('button', { name: 'Cerrar panel' }).click();
+    await expect(page.locator(PANEL)).toHaveCount(1);
+    await expect(page.locator('.context-panel__header span')).toHaveText('Capas');
+  });
+
   test('con dos paneles, el modo dividido no se desborda ni deja hueco, y ninguno va a la izquierda', async ({ page }) => {
     await page.setViewportSize({ width: 1680, height: 900 });
     await abrirPanel(page, 'Capas');

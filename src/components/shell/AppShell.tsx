@@ -219,11 +219,11 @@ export default function AppShell() {
   }, [importDXFFile]);
 
   // ─── Divider drag ───────────────────────────────────────────────────
-  // H-1: `canvasRef` (.canvas-area) ya no es la región repartible — desde que
-  // los paneles pasaron a ser hijos flex reales, puede tener hasta dos
-  // paneles de 324px de cada lado ocupando ese mismo rect. La región real va
+  // H-1: `canvasRef` (.canvas-area) ya no es la región repartible — los
+  // paneles son hijos flex reales, y desde P4 puede haber hasta dos de 300 px
+  // a la derecha ocupando ese mismo rect. La región real va
   // del borde izquierdo de .canvas-area__2d al borde derecho de
-  // .canvas-area__3d, midiendo los elementos (nunca 300/324 a mano, eso es
+  // .canvas-area__3d, midiendo los elementos (nunca 300 a mano, eso es
   // lo que sobrevive a que cambie el ancho del panel), y hay que descontar
   // el ancho del propio divisor del espacio repartible. Se captura todo UNA
   // vez al empezar el arrastre, no en cada mousemove.

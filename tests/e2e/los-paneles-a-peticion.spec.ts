@@ -23,6 +23,17 @@ async function aLaVista(page: Page, selector: string): Promise<boolean> {
   }, selector);
 }
 
+/** El alto del cuerpo de «Producción», que su botón nombra con `aria-controls`. */
+async function altoDeProduccion(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const boton = [...document.querySelectorAll('.panel-section-header')]
+      .find((b) => b.textContent?.includes('Producción'));
+    const cuerpo = boton && document.getElementById(boton.getAttribute('aria-controls') ?? '');
+    // NaN y no -1: «-1 < 1» pasaría sin haber encontrado el cuerpo.
+    return cuerpo ? cuerpo.getBoundingClientRect().height : Number.NaN;
+  });
+}
+
 async function propiedadesDesdeLaBarrita(page: Page) {
   await abrirAppVacia(page);
   await addPiece(page, 'p1', { x: 100, y: 100 }, 300, 200);
@@ -41,17 +52,24 @@ test('desde la barrita, Propiedades abre con sus cuatro campos a la vista y «Pr
     expect(await aLaVista(page, `#${id}`), id).toBe(true);
   }
   await expect(page.getByRole('button', { name: 'Producción' })).toHaveAttribute('aria-expanded', 'false');
-  expect(await aLaVista(page, '#prop-piece-layer'), 'la capa se ve con «Producción» plegada').toBe(false);
+  // Plegada, su cuerpo mide 0 de alto. `elementFromPoint` no sirve para esto:
+  // el cuerpo plegado es `inert`, y lo inerte no existe para el puntero aunque
+  // se viera (revisión final de P4, lentes A y B).
+  expect(await altoDeProduccion(page), '«Producción» plegada no mide 0 de alto').toBeLessThan(1);
 });
 
-test('«Producción» se despliega, y lo último del panel se alcanza desplazándolo', async ({ page }) => {
+test('«Producción» se despliega, y lo último del panel se alcanza con la rueda', async ({ page }) => {
   await propiedadesDesdeLaBarrita(page);
   await page.getByRole('button', { name: 'Producción' }).click();
   await expect(page.getByRole('button', { name: 'Producción' })).toHaveAttribute('aria-expanded', 'true');
-  await page.locator('#prop-piece-layer').scrollIntoViewIfNeeded();
-  expect(await aLaVista(page, '#prop-piece-layer')).toBe(true);
-  await page.locator('.panel-delete').scrollIntoViewIfNeeded();
-  expect(await aLaVista(page, '.panel-delete')).toBe(true);
+  expect(await altoDeProduccion(page)).toBeGreaterThan(100);
+  // Con la rueda sobre el panel, como ella: `scrollIntoViewIfNeeded` también
+  // movería la `.canvas-area`, que recorta.
+  const panel = (await page.locator('.context-panel').boundingBox())!;
+  await page.mouse.move(panel.x + panel.width / 2, panel.y + panel.height / 2);
+  await page.mouse.wheel(0, 3000);
+  await page.waitForTimeout(300);
+  expect(await aLaVista(page, '.panel-delete'), '«Eliminar pieza» no se alcanza con la rueda').toBe(true);
 });
 
 test('el Avatar, desde su botón del 3D: siete campos, y Enter escribe la medida', async ({ page }) => {

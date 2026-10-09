@@ -389,14 +389,13 @@ export default function LayerPanel() {
         );
       })}
 
-      {/* Context menu. Se monta en <body>, no donde vive el árbol: LayerPanel
-          se renderiza dentro de ContextPanel, que lleva
-          `backdrop-filter: var(--surface-overlay-blur)` por la ley de
-          materiales. Un backdrop-filter distinto de none es bloque contenedor
-          de sus descendientes `position: fixed` — sin portal, este menú se
-          posicionaba con coordenadas de viewport pero resolvía contra el
-          panel (medido: 969px de desvío en X). Mismo patrón que ToolTooltip y
-          ConnectionModal, por la misma razón. */}
+      {/* Context menu. Se monta en <body>, no donde vive el árbol: cuando
+          ContextPanel llevaba `backdrop-filter`, el panel era bloque
+          contenedor de sus descendientes `position: fixed`, y sin portal este
+          menú resolvía contra el panel (medido: 969px de desvío en X). Desde
+          P4 el panel es marco a ras, sin filtro ni transform, y el portal
+          sigue siendo lo correcto: es lo que flota, y todo portal nace papel.
+          Mismo patrón que ToolTooltip y ConnectionModal. */}
       {contextMenu && createPortal(
         <div
           ref={contextMenuRef}

@@ -40,7 +40,8 @@ function dibujoDeForma(shape: NotchShape): React.FC<{ size?: number }> {
 
 /**
  * Las siete formas, con el nombre que ve María: una lista por concepto (contrato
- * § 5). La usan la línea al pie, la etiqueta del piquete (P3c) y Propiedades.
+ * § 5). La usan la línea al pie y la etiqueta del piquete (P3c); Propiedades
+ * dejó de enseñarlas en P4.
  */
 export const FORMAS_DE_PIQUETE: NonNullable<ToolOption['choices']> = [
   { label: 'Recta', value: 'slit', icon: dibujoDeForma('slit') },
