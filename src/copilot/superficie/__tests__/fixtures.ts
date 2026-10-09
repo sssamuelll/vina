@@ -15,6 +15,7 @@ import workflowReducer from '../../../store/workflowSlice';
 import { confirmationMiddleware } from '../../../store/confirmationMiddleware';
 import { linkedEditingMiddleware } from '../../../store/linkedEditingMiddleware';
 import { undoMiddleware } from '../../../store/undoMiddleware';
+import { deshacerDelAgenteMiddleware } from '../../../store/deshacerDelAgenteMiddleware';
 import { seguirLaRevision } from '../../../store/revisionDelProyecto';
 import type { ContextoDeVerbo } from '../tipos';
 
@@ -83,7 +84,7 @@ export function tienda(
     reducer,
     preloadedState,
     middleware: g => g({ serializableCheck: false, immutableCheck: false })
-      .concat(confirmationMiddleware, linkedEditingMiddleware, undoMiddleware),
+      .concat(confirmationMiddleware, linkedEditingMiddleware, undoMiddleware, deshacerDelAgenteMiddleware),
   });
   store.dispatch({ type: 'prueba/historiaNueva', meta: { resetUndoHistory: true } });
   seguirLaRevision(store);

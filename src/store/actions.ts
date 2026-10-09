@@ -21,3 +21,11 @@ export const NEW_PROJECT = createAction('global/newProject');
  * puentea al thunk `resewAiSeams` (@cascade depth 1).
  */
 export const RESEW_AI_SEAMS = createAction('global/resewAiSeams');
+
+/**
+ * El «Deshacer» del aviso de un borrado del agente (spec IA § 5.4). Acción
+ * PLANA para que el botón de un toast la dispare; `deshacerDelAgenteMiddleware`
+ * deshace ese paso solo si sigue siendo el último. Lo identifican su etiqueta
+ * y su instante en el historial.
+ */
+export const DESHACER_DEL_AGENTE = createAction<{ etiqueta: string; instante: number }>('global/deshacerDelAgente');
