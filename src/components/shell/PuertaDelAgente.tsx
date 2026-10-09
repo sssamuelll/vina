@@ -8,8 +8,8 @@ import { pushJournal } from '../../utils/telemetry/journal';
 import { conectarTuAgente, desconectarTuAgente } from '../../copilot/puente/puenteDeLaApp';
 import { estadoDelPermiso, type PermisoDelNavegador } from '../../copilot/puente/conexion';
 
-export const COMANDO_CLAUDE_CODE = 'claude mcp add vina -- npx -y vina-mcp';
-export const CONFIG_JSON = '"vina": { "command": "npx", "args": ["-y", "vina-mcp"] }';
+export const COMANDO_CLAUDE_CODE = 'claude mcp add vina -- npx -y vina-studio';
+export const CONFIG_JSON = '"vina": { "command": "npx", "args": ["-y", "vina-studio"] }';
 
 /**
  * «Tu agente» (spec 2026-10-09, P1 y § 4.3): el enchufe al lado de «IA», con un

@@ -1,7 +1,8 @@
 {
   "name": "vina-mcp",
   "version": "0.1.0",
-  "description": "Let your AI agent (Claude Code, Claude Desktop, Cursor) work on the pattern open in Vina.",
+  "description": "The MCP bridge inside vina-studio: lets your AI agent (Claude Code, Claude Desktop, Cursor) work on the pattern open in Vina.",
+  "keywords": ["mcp", "model-context-protocol", "claude", "cursor", "garment", "pattern", "vina"],
   "type": "module",
   "bin": { "vina-mcp": "bin/vina-mcp.mjs" },
   "files": ["bin", "src", "superficie.json", "README.md", "LICENSE"],

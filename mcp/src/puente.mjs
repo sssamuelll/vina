@@ -84,7 +84,7 @@ export function crearPuente({
       if (m.t === 'hola') {
         // Un paquete viejo frente a una pestaña nueva (P7) sigue vivo: se queda
         // con su lista horneada y dice qué hacer.
-        if (m.v !== 1) { registrar(`Vina speaks protocol v${m.v}; update vina-mcp (npx -y vina-mcp@latest)`); return; }
+        if (m.v !== 1) { registrar(`Vina speaks protocol v${m.v}; update vina-studio (npx -y vina-studio@latest)`); return; }
         if (typeof m.instrucciones !== 'string' || !Array.isArray(m.definiciones)) { registrar('ignored a malformed greeting from Vina'); return; }
         // La pestaña desplegada es la verdad (P7): un paquete viejo no recorta verbos nuevos.
         const s = { instrucciones: m.instrucciones, definiciones: m.definiciones };

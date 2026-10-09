@@ -1,52 +1,20 @@
 # vina-mcp
 
-Let your AI agent work on the garment pattern you have open in [Vina](https://vina.sdar.dev):
-read it, measure it, create pieces, sew, notch, remove and undo. Every change is one Ctrl+Z step
-in Vina.
+The bridge inside [`vina-studio`](https://www.npmjs.com/package/vina-studio): it speaks MCP over
+stdio with your AI agent and waits for the [Vina](https://vina.sdar.dev) tab on
+`ws://127.0.0.1:8462`.
 
-It works like Blender's MCP: your agent starts `vina-mcp` on your computer, and the Vina tab
-connects to it when you press «Conectar».
-
-## Set up your agent once
-
-**Claude Code**
+To set up your agent, use `vina-studio`; its README has the steps:
 
 ```sh
-claude mcp add vina -- npx -y vina-mcp
+claude mcp add vina -- npx -y vina-studio
 ```
 
-**Claude Desktop** (`claude_desktop_config.json`) or **Cursor** (`~/.cursor/mcp.json`), inside
-`mcpServers`:
+Settings, as environment variables:
 
-```json
-"vina": { "command": "npx", "args": ["-y", "vina-mcp"] }
-```
-
-Restart the agent after adding it.
-
-## Connect Vina
-
-1. Open Vina in Chrome, Edge or Brave.
-2. Click the plug icon next to «IA» and press «Conectar».
-3. The first time, the browser asks whether Vina may access other apps and services on this
-   device. Choose «Permitir» (Allow).
-
-## How it works
-
-- `vina-mcp` speaks MCP over stdio with your agent and waits for the Vina tab on
-  `ws://127.0.0.1:8462` (set `VINA_MCP_PORT` to change it).
-- It only listens on your computer, and only accepts `https://vina.sdar.dev` as the tab. One tab
-  at a time: the last one to connect wins.
-- The tab only runs Vina's tool surface, the one Vina's own agent will also use: no files, no
-  network, no code from the agent.
-- If a call times out or the tab disconnects in the middle of one, the change may still have
-  been applied. The error says so; read the pattern again before retrying.
-- Requires Node 18 or newer.
-
-## Developing Vina
-
-To connect a Vina served from your own computer (`npm run dev`), start `vina-mcp` with
-`VINA_MCP_ALLOW_LOCAL=1`. Without it, a tab from `http://localhost` is refused: any local page
-could otherwise pretend to be Vina.
+- `VINA_MCP_PORT`: the port to listen on (8462 by default).
+- `VINA_MCP_ALLOW_LOCAL=1`: also accept a Vina served from your own computer (`npm run dev`).
+  Without it only `https://vina.sdar.dev` is accepted: any local page could otherwise pretend to
+  be Vina.
 
 License: MIT.

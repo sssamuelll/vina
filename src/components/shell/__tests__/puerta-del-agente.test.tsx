@@ -9,7 +9,8 @@ import { cambiarPuente } from '../../../store/puenteSlice';
 import { ShortcutProvider } from '../../../shortcuts/ShortcutProvider';
 import { useKeyboardShortcuts } from '../../../hooks/useKeyboardShortcuts';
 import TopBar from '../TopBar';
-import { COMANDO_CLAUDE_CODE } from '../PuertaDelAgente';
+import { readFileSync } from 'node:fs';
+import { COMANDO_CLAUDE_CODE, CONFIG_JSON } from '../PuertaDelAgente';
 import { conectarTuAgente, desconectarTuAgente } from '../../../copilot/puente/puenteDeLaApp';
 import { COMMANDS } from '../unifiedBarCommandDefs';
 
@@ -111,6 +112,13 @@ describe('la hoja', () => {
     fireEvent.click(copiar);
     expect(writeText).toHaveBeenCalledWith(COMANDO_CLAUDE_CODE);
     await vi.waitFor(() => expect(copiar.textContent).toBe('Copiado'));
+  });
+
+  it('lo que se copia nombra el paquete que se publica', () => {
+    // Es el texto que la usuaria pega en su agente: un nombre equivocado corre el código de otro.
+    const { name } = JSON.parse(readFileSync('studio/package.json', 'utf8'));
+    expect(COMANDO_CLAUDE_CODE).toBe(`claude mcp add vina -- npx -y ${name}`);
+    expect(CONFIG_JSON).toBe(`"vina": { "command": "npx", "args": ["-y", "${name}"] }`);
   });
 
   it('la nota del permiso sale solo si el navegador va a preguntar', async () => {

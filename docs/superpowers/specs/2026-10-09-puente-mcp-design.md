@@ -12,7 +12,7 @@
 
 Un agente de la usuaria (Claude Code, Claude Desktop, Cursor) trabaja sobre el patrón que tiene
 abierto en Vina, con los verbos de la superficie. Se hace como en Blender: el agente arranca un
-programa local, `npx -y vina-mcp`, y la pestaña de Vina se conecta a ese programa con un botón. Vina
+programa local, `npx -y vina-studio` (que corre `vina-mcp`), y la pestaña de Vina se conecta a ese programa con un botón. Vina
 no guarda claves ni habla con ningún modelo: el cerebro es el de la usuaria.
 
 ## 2. Lo medido el 09-10
@@ -35,7 +35,7 @@ Chrome con ventana. El código fue desechable y no entra al repo.
 - **Producción manda `Content-Security-Policy-Report-Only`** con un `connect-src` que no incluye
   `ws://127.0.0.1`. Hoy solo avisa en la consola; no bloquea.
 - **Firefox y Safari quedan sin medir:** no están instalados en la máquina.
-- **El nombre `vina-mcp` está libre en npm** (09-10).
+- **Los nombres `vina-mcp` y `vina-studio` están libres en npm** (09-10). `vina`, a secas, lo tiene otra persona.
 
 ## 3. Decisiones
 
@@ -52,11 +52,17 @@ Chrome con ventana. El código fue desechable y no entra al repo.
 | P9 | **Una llamada espera a la pestaña hasta 120 s.** Si la pestaña se va a mitad, la llamada vuelve con error al momento. Sin pestaña, la llamada espera hasta 4 s a que llegue, y después vuelve con error y con lo que hay que hacer. Cada llamada lleva su plazo (`hasta`): la pestaña no corre una vencida, y los errores de plazo y de corte dicen que pudo haberse aplicado. | `simulate` con `wait` llegará a 60 s (segunda mitad de la 1b). La pestaña reintenta cada 3 s: el agente arranca el puente y llama enseguida, casi siempre antes de que la pestaña lo encuentre. Sin el plazo, una llamada dada por fallida podía correr después, y el agente, al reintentar, la duplicaba (revisión final). |
 | P10 | **«Conectar» no se recuerda entre recargas.** El permiso del navegador sí se recuerda. | Conectarse es un permiso por sesión. Si molesta, se guarda después. |
 | P11 | **El resultado viaja como texto JSON en `content`:** `{ result, revision }`. Con `ok: false` va `{ error, revision }` con `isError`; si el puente no pudo llamar, el porqué, en texto y con `isError`. Un `done: false` no es error: es la respuesta honesta (§ 5.3 de la spec madre). | Todo cliente MCP lee texto. Un `structuredContent` sin `outputSchema` no lo usa nadie todavía. La revisión viaja en toda respuesta, también en las de leer. |
-| P12 | **Publicar en npm es un paso aparte**, con la cuenta y la orden de Samuel, y va antes del deploy de la puerta. | La hoja enseña `npx -y vina-mcp`. El repo es público, así que conviene reservar el nombre pronto. |
+| P12 | **Publicar en npm es un paso aparte**, con la cuenta y la orden de Samuel, y va antes del deploy de la puerta. Se publican los dos paquetes, `vina-mcp` primero. | La hoja enseña `npx -y vina-studio`, que depende de `vina-mcp`. El repo es público, así que conviene reservar los nombres pronto. |
+| P13 | **El paquete que se enseña es `vina-studio`, con `vina-mcp` dentro.** `vina-studio` (`studio/`) es una entrada de dos líneas que arranca el bin de `vina-mcp`, su única dependencia, con la versión exacta. `vina-mcp` sigue siendo el motor y también se publica. | Samuel: «vina-studio con vina-mcp dentro». La usuaria pega el nombre del producto; el descriptivo queda como motor y deja reservado ese nombre. Costo: dos paquetes y dos publicaciones por versión. Un test exige que la dependencia sea la versión de `mcp/`, y otro que la hoja enseñe el nombre que se publica. |
 
 ## 4. Las piezas
 
-### 4.1 `mcp/`, el paquete `vina-mcp`
+### 4.1 `mcp/`, el paquete `vina-mcp`, y `studio/`, el paquete `vina-studio` (P13)
+
+**`studio/`** tiene `package.json` (nombre `vina-studio`, un solo `bin` que se llama como el paquete,
+dependencia exacta de `vina-mcp`), `bin/vina-studio.mjs` (importa el bin de `vina-mcp`), el README
+completo para la usuaria y la licencia. El README de `mcp/` solo apunta a `vina-studio` y lista las
+variables de entorno.
 
 - **`mcp/package.json`:** nombre `vina-mcp`, `bin`, `type: module`, dependencia `ws`, Node ≥ 18.
 - **`mcp/bin/vina-mcp.mjs`:** une la entrada y la salida estándar con el puente. Lo que registra va a
@@ -80,7 +86,7 @@ Entre la pestaña y el puente viaja JSON por WebSocket, en la versión 1 del pro
 | puente → pestaña | `{ t: 'llamada', id, verbo, args, hasta }` | por cada `tools/call`; `hasta` es el instante (ms, el reloj de la máquina) en que el agente la da por fallida |
 | pestaña → puente | `{ t: 'respuesta', id, respuesta }` | la `Respuesta` de `ejecutarVerbo` |
 
-El puente cierra con el código **4001** cuando llega otra pestaña. Un saludo de otra versión (`v` distinto de 1) o sin lista no cambia nada: el puente sigue con su lista horneada y registra que hay que actualizar `vina-mcp`. Si el puente no puede escuchar por algo que no sea el puerto ocupado, sigue vivo y lo dice en cada llamada.
+El puente cierra con el código **4001** cuando llega otra pestaña. Un saludo de otra versión (`v` distinto de 1) o sin lista no cambia nada: el puente sigue con su lista horneada y registra que hay que actualizar `vina-studio`. Si el puente no puede escuchar por algo que no sea el puerto ocupado, sigue vivo y lo dice en cada llamada.
 
 ### 4.2 La pestaña
 

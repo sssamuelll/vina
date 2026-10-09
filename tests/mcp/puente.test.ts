@@ -169,7 +169,7 @@ describe('la pestaña', () => {
     t.decir(7);
     await expect(p.llamar('read_pattern', {})).resolves.toMatchObject({ ok: true });
     expect(alCambiar).not.toHaveBeenCalled();
-    expect(registrar).toHaveBeenCalledWith(expect.stringMatching(/protocol v2.*update vina-mcp/));
+    expect(registrar).toHaveBeenCalledWith(expect.stringMatching(/protocol v2.*update vina-studio/));
   });
 
   it('se entera de quién es el agente, aunque se haya presentado antes de que ella llegara', async () => {
