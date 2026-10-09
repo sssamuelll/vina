@@ -16,7 +16,7 @@ import { medirCostura, unDecimal } from '../costuras';
 const punto = (p: Point2D) => ({ x: unDecimal(p.x), y: unDecimal(p.y) });
 
 /** Los bordes de una pieza, medidos ahora: nunca `SemanticEdge.length`, que se congela al detectar. */
-function bordesDe(piece: PatternPiece) {
+export function bordesDe(piece: PatternPiece) {
   return (piece.edges ?? []).map(edge => {
     const largo = computeRangeLengthMM(piece.outline, edge.segmentRange);
     const desde = interpolateRangePoint(piece.outline, edge.segmentRange, 0)?.point;
@@ -67,7 +67,7 @@ function margenDe(piece: PatternPiece) {
 }
 
 /** Ancho y alto: la misma caja que las cotas «Ancho» y «Alto» que ve María. */
-function cajaDe(piece: PatternPiece) {
+export function cajaDe(piece: PatternPiece) {
   const caja = computeBoundingBox([piece], [piece.id]);
   return { width: unDecimal(caja?.width ?? 0), height: unDecimal(caja?.height ?? 0) };
 }
