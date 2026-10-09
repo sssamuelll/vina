@@ -5,7 +5,7 @@
  * chips y store: un chip aislado no demostraría que el borde bajo el ratón
  * llega al lienzo ni que Enter escribe en ESE borde.
  */
-import { act, cleanup, fireEvent, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -211,5 +211,27 @@ describe('PatternEditor — el margen se escribe al clicar (#1100)', () => {
     clic(svg, 50, 2);
     act(() => { store.dispatch(restoreState({ ...store.getState().project, pieces: [] })); });
     expect(boton()).toBeNull();
+  });
+});
+
+describe('PatternEditor — la esquina con Margen trae su etiqueta, y no abre Propiedades (P3c)', () => {
+  it('clic en la esquina: la elige, su etiqueta dice el tipo, y Propiedades no se abre', () => {
+    const { store, svg, onOpenPanel } = setup();
+    clic(svg, 0, 0);
+    expect(store.getState().editor.saSelection).toEqual({ kind: 'vertex', items: [{ pieceId: 'p', vertexIndex: 0 }] });
+    // Abría el panel por su cuenta: «su tipo no tiene otra puerta». Ahora la tiene.
+    expect(onOpenPanel).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Tipo de esquina: Inglete' })).toBeTruthy();
+  });
+
+  it('elegir «Cuadrada» en su menú escribe esa esquina y nada más', () => {
+    const { store, svg } = setup();
+    clic(svg, 0, 0);
+    fireEvent.click(screen.getByRole('button', { name: 'Tipo de esquina: Inglete' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cuadrada' }));
+    const p = store.getState().project.pieces[0];
+    expect(p.cornerTypes).toEqual({ 0: 'squared' });
+    expect(p.defaultCornerType).toBeUndefined();
+    expect(screen.getByRole('button', { name: 'Tipo de esquina: Cuadrada' })).toBeTruthy();
   });
 });

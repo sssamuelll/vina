@@ -6,6 +6,10 @@ import { resolveNotchAnchor } from '../../../utils/notchAnchor';
 import { DEFAULT_NOTCH_OPTIONS } from '../../../utils/notches';
 import { piezaBloqueada } from '../../../utils/piezaBloqueada';
 import { FORMAS_DE_PIQUETE, notchTool } from '../../../tools/definitions/notch';
+import type { ToolOption } from '../../../tools/types';
+import { margenMasAncho } from '../../../utils/seam/esquinaDelMargen';
+import { TIPOS_DE_ESQUINA, tipoDeEsquina } from '../../../utils/seam/tiposDeEsquina';
+import { centroDe } from '../cotas/loQueSePone';
 import type { EtiquetaDeOpcionProps } from './EtiquetaDeOpcion';
 import { textoDelPiquete } from './piquete';
 
@@ -77,9 +81,39 @@ function delPiquete(input: EtiquetaInput): Etiqueta | null {
   };
 }
 
+/**
+ * La esquina del margen elegida con Seleccionar o con Margen: la etiqueta va
+ * sobre el vértice, pasada la punta del margen.
+ */
+function deLaEsquina(input: EtiquetaInput): Etiqueta | null {
+  const sel = input.saSelection;
+  if (sel?.kind !== 'vertex' || sel.items.length !== 1 || !input.showSeamAllowance) return null;
+  if (input.activeTool !== 'select' && input.activeTool !== 'seamAllowance') return null;
+  const { pieceId, vertexIndex } = sel.items[0];
+  const piece = input.pieces.find((p) => p.id === pieceId);
+  if (!piece || !visible(piece, input)) return null;
+  const margen = margenMasAncho(piece);
+  const cmd = piece.outline[vertexIndex];
+  if (!(margen > 0) || !cmd || (cmd.type !== 'M' && cmd.type !== 'L')) return null;
+  const punto = pieceLocalToPattern({ x: cmd.values[0], y: cmd.values[1] }, piece);
+  const centro = centroDe(piece);
+  return {
+    que: 'esquina',
+    pieceId,
+    vertexIndex,
+    tipo: tipoDeEsquina(piece, vertexIndex),
+    apagada: piezaBloqueada(piece, input.layerLocked),
+    punto,
+    // ponytail: del centro de la pieza al vértice; en una esquina cóncava apunta
+    // hacia dentro. La bisectriz, si molesta.
+    hacia: unitario({ x: punto.x - centro.x, y: punto.y - centro.y }),
+    separacionMm: margen * Math.SQRT2,
+  };
+}
+
 export function etiquetaDeLaSeleccion(input: EtiquetaInput): Etiqueta | null {
   if (input.callada) return null;
-  return delPiquete(input);
+  return delPiquete(input) ?? deLaEsquina(input);
 }
 
 /** Lo que la pastilla enseña y lo que su menú ofrece (microcopy: solace-wren, 2026-10-09). */
@@ -98,9 +132,28 @@ export function presentarEtiqueta(
       valores: { shape: e.opciones.shape, count: e.opciones.count, length: e.opciones.length, width: e.opciones.width },
     };
   }
-  // ponytail: la costura y la esquina llegan en sus tareas (P3c, Tasks 4 y 5).
+  if (e.que === 'esquina') {
+    const texto = TIPOS_DE_ESQUINA.find((t) => t.value === e.tipo)?.label ?? e.tipo;
+    return {
+      texto,
+      nombre: `Tipo de esquina: ${texto}`,
+      nombreDelMenu: 'Opciones de la esquina',
+      opciones: [OPCION_TIPO_DE_ESQUINA],
+      valores: { cornerType: e.tipo },
+    };
+  }
+  // ponytail: la costura llega en su tarea (P3c, Task 5).
   return { texto: '', nombre: '', nombreDelMenu: '', opciones: [], valores: {} };
 }
+
+/** El tipo de esquina como una opción del pie: siete alternativas, que caben como botones. */
+const OPCION_TIPO_DE_ESQUINA: ToolOption = {
+  id: 'cornerType',
+  label: 'Tipo de esquina',
+  type: 'select',
+  value: 'mitered',
+  choices: TIPOS_DE_ESQUINA.map((t) => ({ label: t.label, value: t.value })),
+};
 
 /** Separación fija, en px, entre el objeto (más su separación a escala) y el centro de la pastilla. */
 const SEPARACION_PX = 16;

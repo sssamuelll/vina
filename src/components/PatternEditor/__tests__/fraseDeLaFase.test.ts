@@ -107,6 +107,13 @@ describe('la etiqueta de lo elegido (P3c)', () => {
     // Un piquete no se arrastra (P3b): la frase de las cotas lo prometería.
     expect(f).not.toMatch(/arrástrala/i);
   });
+
+  it('la esquina del margen: la etiqueta cambia su tipo', () => {
+    const f = frase({ activeTool: 'select', etiqueta: 'esquina' });
+    expect(f).toMatch(/etiqueta/i);
+    expect(f).toMatch(/tipo de esquina/i);
+    expect(f).toMatch(/\bEsc\b/);
+  });
 });
 
 describe('el hilo (#1107)', () => {

@@ -8,7 +8,7 @@ import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../util
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, clearSelection, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, esRectaDeDosPuntos, type NotchOptions } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, esRectaDeDosPuntos, type CornerType, type NotchOptions } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import type { PenResult } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
@@ -320,9 +320,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     // empujaba el lienzo y dejaba el chip recién abierto bajo la tira (medido
     // en las capturas de la entrega 33). Si el panel está abierto, se
     // actualiza igual; "Usar el de la pieza" y los tramos siguen viviendo ahí.
-    // La esquina sí lo abre: su tipo no tiene otra puerta.
+    // La esquina tampoco lo abre desde P3c: su tipo está en su etiqueta, sobre
+    // el vértice (spec 2026-10-02 § 5.2 y § 11, «el tipo de esquina ya tiene
+    // puerta fuera de Propiedades»).
     onSelectEdge: (pieceId, edgeId, additive) => { dispatch(selectSaEdges({ items: [{ pieceId, edgeId }], additive })); },
-    onSelectVertex: (pieceId, vertexIndex) => { dispatch(selectSaVertices({ pieceId, vertexIndex })); onOpenPanel?.('Properties'); },
+    onSelectVertex: (pieceId, vertexIndex) => { dispatch(selectSaVertices({ pieceId, vertexIndex })); },
   }, activeTool === 'seamAllowance', layerLocked);
 
   const trimTool = useTrimTool(zoom2D, pan2D, pieces, dispatch);
@@ -971,6 +973,15 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
         return;
       }
       dispatch(updateInternalLine({ pieceId: piece.id, lineId: line.id, ...nuevo }));
+    } else if (etiqueta?.que === 'esquina') {
+      // Esa esquina y nada más: «Aplicar a todas las esquinas» sigue en Propiedades.
+      const piece = pieces.find(p => p.id === etiqueta.pieceId);
+      if (!piece) return;
+      dispatch(updatePiece({
+        ...piece,
+        cornerTypes: { ...(piece.cornerTypes ?? {}), [etiqueta.vertexIndex]: valor as CornerType },
+        updatedAt: Date.now(),
+      }));
     }
   }, [etiqueta, pieces, dispatch]);
   const avisarBloqueada = useCallback(() => {
@@ -1657,7 +1668,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
           )}
           <ElasticRenderer zoom2D={zoom2D} selectedElasticId={elasticTool.selectedElasticId} />
           <TrimRenderer zoom2D={zoom2D} />
-          {activeTool === 'seamAllowance' && (
+          {/* Con Seleccionar, la esquina elegida también se marca (P3c): su
+              etiqueta dice el tipo y el anillo dice cuál es. */}
+          {(activeTool === 'seamAllowance' || (activeTool === 'select' && editor.saSelection?.kind === 'vertex')) && (
             <SeamAllowanceSelectionOverlay
               saSelection={editor.saSelection}
               hoverEdge={sujeto.bordeLeido}

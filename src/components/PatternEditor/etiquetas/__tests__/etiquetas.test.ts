@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { InternalLine, PathCommand, PatternPiece } from '../../../../types/types';
 import { DEFAULT_NOTCH_OPTIONS } from '../../../../utils/notches';
 import { FORMAS_DE_PIQUETE, notchTool } from '../../../../tools/definitions/notch';
+import { TIPOS_DE_ESQUINA } from '../../../../utils/seam/tiposDeEsquina';
 import {
   claveDeEtiqueta, etiquetaDeLaSeleccion, posicionDeEtiqueta, presentarEtiqueta, type EtiquetaInput,
 } from '../etiquetas';
@@ -85,6 +86,62 @@ describe('presentarEtiqueta — el piquete', () => {
     expect(p.opciones).toBe(notchTool.options);
     expect(p.valores).toEqual({ shape: 'slit', count: 1, length: 8, width: 3 });
     expect(p.Dibujo).toBe(FORMAS_DE_PIQUETE[0].icon);
+  });
+});
+
+describe('etiquetaDeLaSeleccion — la esquina del margen', () => {
+  const conMargen: PatternPiece = { ...pieza, seamAllowance: 10 };
+  const esquina = (over: Partial<EtiquetaInput> = {}) => base({
+    pieces: [conMargen], selectedInternalLine: null,
+    saSelection: { kind: 'vertex', items: [{ pieceId: 'p1', vertexIndex: 0 }] }, ...over,
+  });
+
+  it('con Seleccionar o con Margen: su etiqueta, fuera de la pieza, pasada la punta del margen', () => {
+    for (const activeTool of ['select', 'seamAllowance'] as const) {
+      const e = etiquetaDeLaSeleccion(esquina({ activeTool }))!;
+      expect(e).toMatchObject({ que: 'esquina', pieceId: 'p1', vertexIndex: 0, tipo: 'mitered', apagada: false });
+      expect(e.punto).toEqual({ x: 100, y: 100 });
+      // Del centro de la pieza hacia la esquina: arriba a la izquierda.
+      expect(e.hacia.x).toBeLessThan(0);
+      expect(e.hacia.y).toBeLessThan(0);
+      expect(e.separacionMm).toBeCloseTo(10 * Math.SQRT2, 6);
+    }
+  });
+
+  it('el tipo guardado de esa esquina, si no el de la pieza, si no Inglete', () => {
+    expect((etiquetaDeLaSeleccion(esquina({ pieces: [{ ...conMargen, cornerTypes: { 0: 'squared' } }] })) as { tipo: string }).tipo).toBe('squared');
+    expect((etiquetaDeLaSeleccion(esquina({ pieces: [{ ...conMargen, defaultCornerType: 'envelope' }] })) as { tipo: string }).tipo).toBe('envelope');
+  });
+
+  it('con otra herramienta, con el margen oculto, sin margen o callada, nada', () => {
+    expect(etiquetaDeLaSeleccion(esquina({ activeTool: 'pen' }))).toBeNull();
+    expect(etiquetaDeLaSeleccion(esquina({ showSeamAllowance: false }))).toBeNull();
+    expect(etiquetaDeLaSeleccion(esquina({ pieces: [pieza] }))).toBeNull();
+    expect(etiquetaDeLaSeleccion(esquina({ callada: true }))).toBeNull();
+  });
+
+  it('con la pieza bloqueada, apagada; con la capa oculta, nada', () => {
+    expect(etiquetaDeLaSeleccion(esquina({ pieces: [{ ...conMargen, locked: true }] }))!.apagada).toBe(true);
+    expect(etiquetaDeLaSeleccion(esquina({ hiddenLayerIds: [1] }))).toBeNull();
+  });
+
+  it('un índice que no es un vértice (el Z) no lleva etiqueta', () => {
+    expect(etiquetaDeLaSeleccion(esquina({ saSelection: { kind: 'vertex', items: [{ pieceId: 'p1', vertexIndex: 4 }] } }))).toBeNull();
+  });
+
+  it('presentarEtiqueta: «Tipo de esquina: Inglete», su menú y las siete alternativas', () => {
+    const p = presentarEtiqueta(etiquetaDeLaSeleccion(esquina())!);
+    expect(p.texto).toBe('Inglete');
+    expect(p.nombre).toBe('Tipo de esquina: Inglete');
+    expect(p.nombreDelMenu).toBe('Opciones de la esquina');
+    expect(p.opciones).toHaveLength(1);
+    expect(p.opciones[0].label).toBe('Tipo de esquina');
+    expect(p.opciones[0].choices!.map((c) => [c.value, c.label])).toEqual(TIPOS_DE_ESQUINA.map((t) => [t.value, t.label]));
+    expect(p.valores).toEqual({ cornerType: 'mitered' });
+  });
+
+  it('su clave', () => {
+    expect(claveDeEtiqueta(etiquetaDeLaSeleccion(esquina())!)).toBe('esquina:p1:0');
   });
 });
 
