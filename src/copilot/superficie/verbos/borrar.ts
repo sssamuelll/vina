@@ -55,7 +55,9 @@ const remove = definirVerbo({
     // Borrar actúa y ofrece deshacer (spec § 5.4): el aviso deshace solo este paso.
     const paso = getHistory().past.at(-1);
     if (r.done && paso) {
-      ctx.dispatch(showUndoToast(`La IA borró ${loQue}`, DESHACER_DEL_AGENTE({ etiqueta: paso.label, instante: paso.timestamp })));
+      ctx.dispatch(showUndoToast(`La IA borró ${loQue}`, DESHACER_DEL_AGENTE({
+        etiqueta: paso.label, instante: paso.timestamp, pieza: piece.id, ...(interna ? { interna: interna.id } : {}),
+      })));
     }
     return r;
   },

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { getHistory } from '../../../store/undoMiddleware';
 import { updatePiece } from '../../../store/projectSlice';
+import { undo } from '../../../store/editorSlice';
 import { ejecutarVerbo } from '../ejecutar';
 import type { Recibo } from '../tipos';
 import { VERBOS_DE_BORRAR } from '../verbos/borrar';
@@ -33,6 +34,21 @@ describe('remove', () => {
     expect(r).toMatchObject({ done: true, changed: { deleted: ['n1'] }, measure: { removed: { kind: 'notch', id: 'n1' } } });
     expect(ultimoAviso(store)).toMatchObject({ message: 'La IA borró un piquete de Delantero' });
     expect(getHistory().past.at(-1)).toMatchObject({ label: 'IA: borrar un piquete de Delantero', agent: { toolName: 'remove' } });
+  });
+
+  it('si lo borrado ya volvió (Ctrl+Z de María o undo del agente), «Deshacer» no hace nada ni manda a deshacer más', async () => {
+    for (const devolver of ['maria', 'agente'] as const) {
+      const { store, ctx } = tienda([pieza('a', [100]), pieza('b', [100])]);
+      await actuarCon(ctx, 'remove', { piece_id: 'a' });
+      const aviso = ultimoAviso(store)!;
+      if (devolver === 'maria') store.dispatch(undo());
+      else await actuarCon(ctx, 'undo', {});
+      store.dispatch(updatePiece({ ...store.getState().project.pieces.find(p => p.id === 'b')!, name: 'de María' }));
+      const avisos = store.getState().copilotUI.toasts.length;
+      store.dispatch(aviso.actionPayload as never);
+      expect(store.getState().project.pieces.map(p => p.name)).toEqual(['a', 'de María']);
+      expect(store.getState().copilotUI.toasts).toHaveLength(avisos);
+    }
   });
 
   it('una pieza bloqueada no se borra, y no hay aviso', async () => {
