@@ -1,4 +1,4 @@
-/* AvatarPanel — sidebar that pushes the 3D viewport horizontally instead of overlaying. */
+/* AvatarPanel — el contenido del panel «Avatar» (ContextPanel). */
 /* Deuda de tokens cerrada el 2026-09-04: este archivo llamaba a --border-color y
  * --bg-hover, dos nombres que no existen en ningun sitio, y pintaba el resto con
  * rgba(255,255,255,.) a ojo. Ahora consume el sistema: reposo --bg-surface,
@@ -7,14 +7,6 @@
 .avatar-panel-wrapper {
   flex-shrink: 0;
   overflow: hidden;
-}
-
-.avatar-panel-wrapper.open {
-  width: 260px;
-}
-
-.avatar-panel-wrapper.closed {
-  width: 0;
 }
 
 .avatar-panel {
@@ -26,46 +18,6 @@
   font-size: 12px;
   display: flex;
   flex-direction: column;
-}
-
-.avatar-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-.avatar-panel-header h3 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.avatar-panel-close {
-  width: 24px;
-  height: 24px;
-  border: none;
-  background: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  font-size: 16px;
-}
-
-.avatar-panel-close:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-}
-
-.avatar-panel-close:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 
 .avatar-panel-scroll {
@@ -273,6 +225,52 @@
   color: var(--text-primary);
   font-size: 10px;
   text-align: right;
+}
+
+/* Las siete medidas (spec 2026-10-02 § 6.1): un campo por medida, el rótulo a
+   la izquierda y la unidad detrás. Las cifras, en columna. */
+.ap-medidas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.ap-medida {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.ap-medida label {
+  flex: 1;
+}
+
+.ap-medida__campo {
+  width: 64px;
+  padding: 2px var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--field-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ap-medida__campo:hover {
+  border-color: var(--text-tertiary);
+}
+
+.ap-medida__campo:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ap-medida__unidad {
+  width: 20px;
+  color: var(--text-tertiary);
 }
 
 /* Pose presets */

@@ -92,7 +92,7 @@ function renderPanelContent(name: string, cerrar: () => void) {
   const fallback = <PanelLoading />;
   switch (name) {
     case 'Avatar':
-      return <Suspense fallback={fallback}><AvatarPanel open /></Suspense>;
+      return <Suspense fallback={fallback}><AvatarPanel /></Suspense>;
     case 'BOM':
       return <Suspense fallback={fallback}><BOMTab /></Suspense>;
     case 'Grading':
