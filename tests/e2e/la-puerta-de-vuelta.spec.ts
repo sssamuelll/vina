@@ -155,6 +155,28 @@ test.describe('la puerta de vuelta (P3c)', () => {
     await expect(etiqueta(page, /^Tipo de esquina/)).toHaveCount(0);
   });
 
+  test('una esquina pegada al borde de la hoja: la pastilla se queda dentro de la hoja', async ({ page }) => {
+    // Las capturas de P3c la enseñaron cortada («…lete»): fuera del vértice,
+    // hacia arriba y a la izquierda, se salía de la hoja.
+    await unaPieza(page);
+    await dispatch(page, 'project/batchSetSeamAllowance', { pieceIds: ['p1'], width: 10 });
+    await dispatch(page, 'editor/setZoom2D', 1);
+    // La esquina de (100, 100) queda a 20 px del borde de arriba a la izquierda de la hoja.
+    await dispatch(page, 'editor/setPan2D', { x: -80, y: -80 });
+    await page.waitForTimeout(300);
+    await activarHerramienta(page, 'z', 'select');
+    await clickAt(page, { x: 93, y: 93 });
+
+    const pastilla = etiqueta(page, /^Tipo de esquina/);
+    await expect(pastilla).toBeVisible();
+    const caja = (await pastilla.boundingBox())!;
+    const hoja = (await page.locator('.pattern-editor').boundingBox())!;
+    expect(caja.x, 'se sale por la izquierda').toBeGreaterThanOrEqual(hoja.x);
+    expect(caja.y, 'se sale por arriba').toBeGreaterThanOrEqual(hoja.y);
+    expect(caja.x + caja.width, 'se sale por la derecha').toBeLessThanOrEqual(hoja.x + hoja.width);
+    expect(caja.y + caja.height, 'se sale por abajo').toBeLessThanOrEqual(hoja.y + hoja.height);
+  });
+
   test('Margen: el clic en la esquina trae su etiqueta y no abre Propiedades', async ({ page }) => {
     await unaPieza(page);
     await dispatch(page, 'project/batchSetSeamAllowance', { pieceIds: ['p1'], width: 10 });

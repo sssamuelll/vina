@@ -48,6 +48,9 @@ export interface EtiquetaDeOpcionProps {
  * El menú cuelga de <body>, como «Más», y Esc lo cierra antes que la
  * selección (`usePeldanoDeEscape`).
  */
+/** Lo que la pastilla guarda del borde de la hoja cuando tiene que correrse (px). */
+const MARGEN_HOJA_PX = 8;
+
 /** El `translate` que apoya el borde cercano de la pastilla en su ancla. */
 function desplazamiento(hacia: Point2D | undefined): string {
   const eje = (v: number) => Math.round((-50 + v * 50) * 10) / 10;
@@ -59,6 +62,8 @@ export default function EtiquetaDeOpcion({
 }: EtiquetaDeOpcionProps) {
   const [abierto, setAbierto] = useState(false);
   const [ancla, setAncla] = useState({ left: 0, top: 0 });
+  const [empujon, setEmpujon] = useState({ x: 0, y: 0 });
+  const raizRef = useRef<HTMLSpanElement>(null);
   const botonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const deTeclado = useRef(false);
@@ -85,6 +90,27 @@ export default function EtiquetaDeOpcion({
       menuRef.current?.querySelector<HTMLElement>('button:not([tabindex="-1"]), input, select')?.focus();
     }
   }, [abierto, que]);
+
+  // Dentro de la hoja: con el objeto pegado a su borde, la pastilla se corre lo
+  // justo para no salirse (las capturas de P3c la enseñaron cortada). Se mide
+  // sin el corrimiento de antes; sin cambio, no vuelve a pintar. jsdom no mide.
+  useLayoutEffect(() => {
+    const el = raizRef.current;
+    const hoja = el?.offsetParent;
+    if (!el || !(hoja instanceof HTMLElement)) return;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0) return;
+    const h = hoja.getBoundingClientRect();
+    const izq = r.left - empujon.x;
+    const der = r.right - empujon.x;
+    const arr = r.top - empujon.y;
+    const aba = r.bottom - empujon.y;
+    const x = izq < h.left + MARGEN_HOJA_PX ? h.left + MARGEN_HOJA_PX - izq
+      : der > h.right - MARGEN_HOJA_PX ? h.right - MARGEN_HOJA_PX - der : 0;
+    const y = arr < h.top + MARGEN_HOJA_PX ? h.top + MARGEN_HOJA_PX - arr
+      : aba > h.bottom - MARGEN_HOJA_PX ? h.bottom - MARGEN_HOJA_PX - aba : 0;
+    if (Math.abs(x - empujon.x) > 0.5 || Math.abs(y - empujon.y) > 0.5) setEmpujon({ x, y });
+  }, [left, top, hacia?.x, hacia?.y, texto, empujon.x, empujon.y]);
 
   // Debajo de la pastilla; si no cabe, encima. Nunca fuera de la ventana.
   useLayoutEffect(() => {
@@ -129,11 +155,18 @@ export default function EtiquetaDeOpcion({
 
   return (
     <span
+      ref={raizRef}
       className="etiqueta-de-opcion"
       data-superficie="cabina"
       data-material="papel"
       data-botonera
-      style={{ left, top, transform: desplazamiento(hacia) }}
+      style={{
+        left,
+        top,
+        transform: empujon.x || empujon.y
+          ? `${desplazamiento(hacia)} translate(${empujon.x}px, ${empujon.y}px)`
+          : desplazamiento(hacia),
+      }}
       onMouseDown={noTomarElFoco}
     >
       <button
