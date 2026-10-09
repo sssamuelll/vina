@@ -43,4 +43,37 @@ describe('el Avatar: siete medidas, siete campos (spec 2026-10-02 § 6.1)', () =
     unmount();
     expect(store.getState().avatar.poseEditorOpen).toBe(false);
   });
+
+  it('con «Pose» plegada, cerrar el panel no enciende el modo pose', () => {
+    const { store, unmount } = panel();
+    fireEvent.click(screen.getByRole('button', { name: /Pose$/ }));
+    expect(store.getState().avatar.poseEditorOpen).toBe(false);
+    unmount();
+    expect(store.getState().avatar.poseEditorOpen).toBe(false);
+  });
+
+  it('una medida de niño se escribe tal cual: los límites son los de los perfiles, no los del deslizador de adulto', () => {
+    const { store } = panel();
+    const hombros = screen.getByLabelText('Ancho de hombros');
+    fireEvent.change(hombros, { target: { value: '30' } });
+    fireEvent.keyDown(hombros, { key: 'Enter' });
+    expect(store.getState().project.avatar.measurements.shoulder).toBe(30);
+  });
+
+  it('cada campo enseña y escribe su propia medida', () => {
+    const { store } = panel();
+    const CLAVES: Record<string, string> = {
+      Estatura: 'height', Pecho: 'chest', Cintura: 'waist', Cadera: 'hips',
+      'Ancho de hombros': 'shoulder', 'Largo de brazo': 'armLength', Entrepierna: 'inseam',
+    };
+    for (const [nombre, clave] of Object.entries(CLAVES)) {
+      const m = store.getState().project.avatar.measurements as unknown as Record<string, number>;
+      const campo = screen.getByLabelText(nombre) as HTMLInputElement;
+      expect(campo.value, nombre).toBe(String(m[clave]).replace('.', ','));
+      fireEvent.change(campo, { target: { value: '50,5' } });
+      fireEvent.keyDown(campo, { key: 'Enter' });
+      const despues = store.getState().project.avatar.measurements as unknown as Record<string, number>;
+      expect(despues[clave], nombre).toBe(50.5);
+    }
+  });
 });

@@ -5,11 +5,15 @@ import CampoDeMedida from '../CampoDeMedida';
 
 afterEach(cleanup);
 
-/** Sin argumento, 161,4; con `undefined` explícito, sin valor (un parámetro por defecto lo taparía). */
+/**
+ * Sin argumento, 161,4; con `undefined` explícito, sin valor (un parámetro por
+ * defecto lo taparía). Los límites son los del Avatar: los de los perfiles
+ * guardados, 5 a 500 cm.
+ */
 function campo(...arg: [number | undefined] | []) {
   const valor = arg.length ? arg[0] : 161.4;
   const alFijar = vi.fn();
-  render(<CampoDeMedida id="m" label="Estatura" valor={valor} min={140} max={210} alFijar={alFijar} />);
+  render(<CampoDeMedida id="m" label="Estatura" valor={valor} min={5} max={500} alFijar={alFijar} />);
   return { alFijar, input: screen.getByLabelText('Estatura') as HTMLInputElement };
 }
 
@@ -41,14 +45,28 @@ describe('CampoDeMedida: una medida del cuerpo, un campo', () => {
     expect(alFijar).toHaveBeenLastCalledWith(166.5);
   });
 
-  it('fuera del rango se queda en el borde', () => {
+  it('fuera del rango no escribe y vuelve al de antes: Vina no cambia el número que ella teclea', () => {
     const { alFijar, input } = campo();
-    fireEvent.change(input, { target: { value: '300' } });
+    for (const v of ['600', '0', '-5', '4,9']) {
+      fireEvent.change(input, { target: { value: v } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      expect(input.value, v).toBe('161,4');
+    }
+    expect(alFijar).not.toHaveBeenCalled();
+  });
+
+  it('una medida de niño se escribe tal cual', () => {
+    const { alFijar, input } = campo();
+    fireEvent.change(input, { target: { value: '90,3' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(alFijar).toHaveBeenLastCalledWith(210);
-    fireEvent.change(input, { target: { value: '10' } });
+    expect(alFijar).toHaveBeenCalledWith(90.3);
+  });
+
+  it('solo espacios no escribe', () => {
+    const { alFijar, input } = campo();
+    fireEvent.change(input, { target: { value: '   ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(alFijar).toHaveBeenLastCalledWith(140);
+    expect(alFijar).not.toHaveBeenCalled();
   });
 
   it('vacío o sin número vuelve al de antes y no escribe: borrar no es poner 0', () => {
@@ -62,8 +80,10 @@ describe('CampoDeMedida: una medida del cuerpo, un campo', () => {
   });
 
   it('el mismo valor no escribe: no deja un paso de deshacer vacío', () => {
+    // «170,0» y no «170»: un change con el mismo texto que ya enseña el campo
+    // React no lo entrega, y el caso pasaría sin mirar la guarda (lente B).
     const { alFijar, input } = campo(170);
-    fireEvent.change(input, { target: { value: '170' } });
+    fireEvent.change(input, { target: { value: '170,0' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(alFijar).not.toHaveBeenCalled();
   });

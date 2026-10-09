@@ -12,7 +12,7 @@ import {
 import {
   setAvatarModelUrl, setAvatarMode, updateMeasurements,
 } from '../../store/projectSlice';
-import type { AvatarProfile } from '../../utils/avatar/avatarLibrary';
+import { MIN_MEASUREMENT_CM, MAX_MEASUREMENT_CM, type AvatarProfile } from '../../utils/avatar/avatarLibrary';
 import { AVATAR_POR_DEFECTO, avatarPorUrl, registrarModeloPropio } from '../../avatares/catalogo';
 import { PRESETS_DE_POSE } from '../../utils/avatar/posePorDireccion';
 import type { BodyMeasurements } from '../../types/types';
@@ -24,18 +24,19 @@ import './AvatarPanel.css';
 interface MedidaDef {
   key: keyof BodyMeasurements;
   label: string;
-  min: number;
-  max: number;
 }
 
+// Los rangos del deslizador viejo (140-210 de estatura, 35-55 de hombros…)
+// eran de adulto, y el catálogo trae cuerpos de niño: los campos aceptan lo
+// que aceptan los perfiles guardados (MIN/MAX_MEASUREMENT_CM).
 const MEDIDAS: MedidaDef[] = [
-  { key: 'height', label: 'Estatura', min: 140, max: 210 },
-  { key: 'chest', label: 'Pecho', min: 70, max: 130 },
-  { key: 'waist', label: 'Cintura', min: 55, max: 120 },
-  { key: 'hips', label: 'Cadera', min: 70, max: 130 },
-  { key: 'shoulder', label: 'Ancho de hombros', min: 35, max: 55 },
-  { key: 'armLength', label: 'Largo de brazo', min: 50, max: 75 },
-  { key: 'inseam', label: 'Entrepierna', min: 65, max: 90 },
+  { key: 'height', label: 'Estatura' },
+  { key: 'chest', label: 'Pecho' },
+  { key: 'waist', label: 'Cintura' },
+  { key: 'hips', label: 'Cadera' },
+  { key: 'shoulder', label: 'Ancho de hombros' },
+  { key: 'armLength', label: 'Largo de brazo' },
+  { key: 'inseam', label: 'Entrepierna' },
 ];
 
 // Las keys de PRESETS_DE_POSE son estado Redux (activePreset) — no se traducen; solo el label visible.
@@ -312,13 +313,13 @@ export default function AvatarPanel() {
                 )}
                 {/* Las siete medidas, un campo cada una (spec 2026-10-02 § 6.1). */}
                 <div className="ap-medidas">
-                  {MEDIDAS.map(({ key, label, min, max }) => (
+                  {MEDIDAS.map(({ key, label }) => (
                     <CampoDeMedida
                       key={key}
                       id={`ap-medida-${key}`}
                       label={label}
-                      min={min}
-                      max={max}
+                      min={MIN_MEASUREMENT_CM}
+                      max={MAX_MEASUREMENT_CM}
                       valor={measurements[key] as number | undefined}
                       alFijar={(v) => handleMeasurement(key, v)}
                     />

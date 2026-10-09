@@ -25,8 +25,9 @@ const MAX_MODEL_URL_LEN = 4096;
 const MAX_PROFILES = 1024;
 // Centimeters. Smallest known adult height ~55cm; tallest ~272cm. Largest
 // recorded waist ~302cm. 5..500 covers the realistic envelope plus margin.
-const MIN_MEASUREMENT_CM = 5;
-const MAX_MEASUREMENT_CM = 500;
+// También son los límites de los campos de medida del panel Avatar (P4).
+export const MIN_MEASUREMENT_CM = 5;
+export const MAX_MEASUREMENT_CM = 500;
 // Reject timestamps before 2000-01-01 (predates the project) and beyond
 // 1 day in the future at parse time (clock skew tolerance).
 const MIN_TIMESTAMP_MS = Date.UTC(2000, 0, 1);

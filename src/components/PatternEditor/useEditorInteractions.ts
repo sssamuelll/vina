@@ -539,6 +539,11 @@ export function useEditorInteractions(
       // hasta aquí. Medido sin esto: el nodo agarrado se borraba igual
       // detrás del diálogo, 5 nodos a 4.
       if (hayModalDelante()) return;
+      // Las teclas que nacen en un campo son del campo, como en la captura:
+      // Retroceso en el nombre de una pieza borraba nodos con Editar patrón,
+      // y Enter en una medida del Avatar corría el desfase (revisión final de
+      // P4). La captura ya se retiraba; la tecla seguía viajando hasta aquí.
+      if (isEditableTarget(e.target)) return;
       // Enter y Espacio sobre un botón de la línea al pie son del botón: con el
       // foco en «Más», Enter desplazaba además la pieza.
       if (esTeclaDeBotonera(e)) return;

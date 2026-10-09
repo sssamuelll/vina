@@ -17,8 +17,10 @@ const mostrar = (v: number | undefined) => (v === undefined ? '' : String(v).rep
  * Una medida del cuerpo, un campo (spec 2026-10-02 § 6.1: «siete medidas como
  * siete campos; hoy son 21 controles»). Lo tecleado se fija con Enter o al
  * salir del campo, no con cada tecla: escribiendo 170, el cuerpo pasaba por 1
- * y por 17 cm. Fuera del rango se queda en el borde; vacío o sin número,
- * vuelve al de antes sin escribir nada. Esc deshace lo tecleado.
+ * y por 17 cm. Vacío, sin número o fuera de [min, max], vuelve al de antes
+ * sin escribir nada: Vina no cambia el número que ella teclea por otro (la
+ * revisión final de P4 vio que recortar al borde reescribía las medidas de
+ * niño). Esc deshace lo tecleado.
  */
 export default function CampoDeMedida({ id, label, valor, min, max, alFijar }: CampoDeMedidaProps) {
   const [borrador, setBorrador] = useState<string | null>(null);
@@ -28,9 +30,8 @@ export default function CampoDeMedida({ id, label, valor, min, max, alFijar }: C
     const texto = borrador.trim();
     setBorrador(null);
     const n = Number(texto.replace(',', '.'));
-    if (texto === '' || !Number.isFinite(n)) return;
-    const v = Math.min(max, Math.max(min, n));
-    if (v !== valor) alFijar(v);
+    if (texto === '' || !Number.isFinite(n) || n < min || n > max) return;
+    if (n !== valor) alFijar(n);
   };
 
   return (
