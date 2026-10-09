@@ -6,11 +6,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { render, screen, cleanup, act } from '@testing-library/react';
+import { render, screen, cleanup, act, fireEvent } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import projectReducer, { addPiece, renameLayer } from '../../../store/projectSlice';
-import simulationReducer from '../../../store/simulationSlice';
+import projectReducer, { addPiece, renameLayer, setLayerLocked } from '../../../store/projectSlice';
+import simulationReducer, { toggleLayerVisibility } from '../../../store/simulationSlice';
 import editorReducer from '../../../store/editorSlice';
 import LayerPanel from '../LayerPanel';
 import type { AppDispatch } from '../../../store';
@@ -62,6 +62,31 @@ describe('Capas', () => {
     }
     const texto = document.querySelector('.layer-panel')!.textContent ?? '';
     expect(texto).not.toMatch(/\p{Extended_Pictographic}|[▶▼☰]/u);
+  });
+
+  it('el icono dice el estado, y el nombre accesible es el mismo que el del título', () => {
+    const { d } = panel();
+    const icono = (nombre: string) =>
+      screen.getAllByRole('button', { name: nombre })[0].querySelector('svg')!.getAttribute('class') ?? '';
+    expect(icono('Ocultar capa')).toMatch(/lucide-eye(?!-off)/);
+    expect(icono('Bloquear capa')).toMatch(/lucide-lock-open|lucide-unlock/);
+    act(() => { d(toggleLayerVisibility(3)); d(setLayerLocked({ layer: 3, locked: true })); });
+    expect(icono('Mostrar capa')).toMatch(/lucide-eye-off/);
+    expect(icono('Desbloquear capa')).toMatch(/lucide-lock(?!-open)/);
+    const conIcono = Array.from(document.querySelectorAll('.layer-icon-btn'));
+    expect(conIcono.length).toBeGreaterThan(0);
+    for (const b of conIcono) {
+      expect(b.getAttribute('aria-label'), b.getAttribute('title') ?? '').toBe(b.getAttribute('title'));
+    }
+  });
+
+  it('el aviso de la capa base dice su nombre de taller, no su número', () => {
+    panel();
+    const exterior = Array.from(document.querySelectorAll('.layer-group-header'))
+      .find((h) => h.textContent?.includes('Exterior'))!;
+    fireEvent.contextMenu(exterior);
+    expect(screen.getByRole('button', { name: 'Eliminar capa' }).getAttribute('title'))
+      .toBe('La capa Exterior no se puede eliminar');
   });
 
   it('los títulos van en sentence case: el CSS no los pasa a mayúsculas', () => {

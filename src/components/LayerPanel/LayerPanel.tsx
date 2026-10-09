@@ -409,7 +409,9 @@ export default function LayerPanel() {
           <button
             onClick={handleContextDelete}
             disabled={contextMenu.layer === 1}
-            title={contextMenu.layer === 1 ? 'La capa 1 no se puede eliminar' : undefined}
+            title={contextMenu.layer === 1
+              ? `La capa ${getLayerDisplayName({ project: { layerNames } }, 1)} no se puede eliminar`
+              : undefined}
           >
             Eliminar capa
           </button>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { updatePiece, setLayer, setSublayer, addAnnotation, removeAnnotation, setFabricCode, addPlacementRule, removePlacementRule } from '../../store/projectSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState } from '../../store';
+import { updatePiece, setLayer, setSublayer, addAnnotation, removeAnnotation, setFabricCode, addPlacementRule, removePlacementRule, getLayerDisplayName } from '../../store/projectSlice';
 import { STANDARD_FABRIC_CODES } from '../../utils/fabricCodes';
 import type { InterfacingType, PatternPiece, PlacementRule, PlacementRuleType } from '../../types/types';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
@@ -17,6 +18,7 @@ import MaterialTab from './MaterialTab';
  */
 export default function ProduccionDeLaPieza({ piece }: { piece: PatternPiece }) {
   const dispatch = useDispatch();
+  const layerNames = useSelector((s: RootState) => s.project.layerNames);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [customText, setCustomText] = useState('');
 
@@ -153,15 +155,21 @@ export default function ProduccionDeLaPieza({ piece }: { piece: PatternPiece }) 
       <div className="panel-subblock">
         <div className="panel-field">
           <label htmlFor="prop-piece-layer">Capa</label>
-          <input
-            id="prop-piece-layer"
-            type="number"
-            className="panel-input narrow"
-            value={piece.layer ?? 1}
-            min={0}
-            max={9}
-            onChange={e => dispatch(setLayer({ pieceId: piece.id, layer: Number(e.target.value) }))}
-          />
+          {/* El número y su nombre de taller juntos: en Capas ya no va el
+              número delante («Exterior», no «1: Shell»), y sin el nombre aquí
+              no había cómo saber qué capa es la 2 (revisión final de P4). */}
+          <span className="panel-capa">
+            <input
+              id="prop-piece-layer"
+              type="number"
+              className="panel-input narrow"
+              value={piece.layer ?? 1}
+              min={0}
+              max={9}
+              onChange={e => dispatch(setLayer({ pieceId: piece.id, layer: Number(e.target.value) }))}
+            />
+            <span className="panel-capa__nombre">{getLayerDisplayName({ project: { layerNames } }, piece.layer ?? 1)}</span>
+          </span>
         </div>
         <div className="panel-field">
           <label htmlFor="prop-piece-sublayer">Subcapa</label>

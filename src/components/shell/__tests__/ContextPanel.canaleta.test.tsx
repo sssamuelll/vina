@@ -17,6 +17,10 @@ describe('.context-panel es un hijo flex, no un overlay', () => {
   const css = leer('src/styles/floating.css');
   const regla = css.match(/\.context-panel\s*\{[^}]*\}/)?.[0] ?? '';
 
+  it('la regla existe: sin ella, los demás casos pasarían sin mirar nada', () => {
+    expect(regla).not.toBe('');
+  });
+
   it('ya no declara position: absolute', () => {
     expect(regla).not.toMatch(/position:\s*absolute/);
   });
@@ -37,7 +41,11 @@ describe('.context-panel es un hijo flex, no un overlay', () => {
     expect(regla).not.toMatch(/margin|max-height|--surface-overlay/);
   });
 
-  it('no entra deslizándose: sin transform, no es bloque contenedor de lo que lleva dentro', () => {
-    expect(regla).not.toMatch(/animation/);
+  it('no entra deslizándose ni encierra lo de dentro: sin animación, transform, filter, will-change ni contain', () => {
+    expect(regla).not.toMatch(/animation|transform|filter|will-change|contain\s*:/);
+  });
+
+  it('se desplaza por dentro: con «Producción» abierta a 643 px de alto, lo de abajo se alcanza con la rueda', () => {
+    expect(regla).toMatch(/overflow-y:\s*auto/);
   });
 });

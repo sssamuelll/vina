@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, cleanup } from '@testing-library/react';
 import { usePanelHost, conElPanel, ranurasPara, ANCHO_PARA_DOS_RANURAS } from '../usePanelHost';
-import { bajarLaEscalera } from '../../shortcuts/escaleraDeLoLlamado';
+import { bajarLaEscalera, subirPeldano } from '../../shortcuts/escaleraDeLoLlamado';
 import { clearJournal, getJournal } from '../../utils/telemetry/journal';
 
 const anchoOriginal = Object.getOwnPropertyDescriptor(window, 'innerWidth');
@@ -14,7 +14,12 @@ function anchoDeVentana(px: number) {
 }
 
 beforeEach(() => anchoDeVentana(1366));
+// Sin `cleanup`, cada hook quedaba montado, con su oyente de `resize` y su
+// peldaño en la escalera, y le hablaba al test siguiente (revisión final de
+// P4, lente B): los globales de vitest están apagados y Testing Library no
+// limpia sola.
 afterEach(() => {
+  cleanup();
   if (anchoOriginal) Object.defineProperty(window, 'innerWidth', anchoOriginal);
 });
 
@@ -105,6 +110,55 @@ describe('usePanelHost', () => {
     expect(result.current.paneles).toEqual(['Properties', 'Layers']);
     act(() => { expect(bajarLaEscalera()).toBe('paneles'); });
     expect(result.current.paneles).toEqual([]);
+  });
+
+  it('si la ventana se ensancha con la app abierta, caben dos: openPanel lee las ranuras de ahora', () => {
+    const { result } = renderHook(() => usePanelHost());
+    act(() => anchoDeVentana(1680));
+    act(() => result.current.togglePanel('Layers'));
+    act(() => result.current.openPanel('Properties'));
+    expect(result.current.paneles).toEqual(['Layers', 'Properties']);
+  });
+
+  it('togglePanel sobre uno de dos abiertos cierra solo ese', () => {
+    anchoDeVentana(1680);
+    const { result } = renderHook(() => usePanelHost());
+    act(() => result.current.togglePanel('Layers'));
+    act(() => result.current.togglePanel('Properties'));
+    act(() => result.current.togglePanel('Layers'));
+    expect(result.current.paneles).toEqual(['Properties']);
+  });
+
+  it('con los paneles cerrados el peldaño se retira: el siguiente Esc ya no es suyo', () => {
+    const { result } = renderHook(() => usePanelHost());
+    act(() => result.current.openPanel('Properties'));
+    act(() => { expect(bajarLaEscalera()).toBe('paneles'); });
+    expect(result.current.paneles).toEqual([]);
+    act(() => { expect(bajarLaEscalera()).toBeNull(); });
+  });
+
+  it('un menú abierto se cierra antes que los paneles: el peldaño de los paneles es «panel»', () => {
+    const bajar = subirPeldano('menu-de-prueba', 'menu', () => {});
+    try {
+      const { result } = renderHook(() => usePanelHost());
+      act(() => result.current.openPanel('Properties'));
+      act(() => { expect(bajarLaEscalera()).toBe('menu-de-prueba'); });
+      expect(result.current.paneles).toEqual(['Properties']);
+    } finally {
+      bajar();
+    }
+  });
+
+  it('la caja negra ve cerrarse los dos cuando Esc cierra dos', () => {
+    anchoDeVentana(1680);
+    const { result } = renderHook(() => usePanelHost());
+    act(() => { result.current.openPanel('Properties'); result.current.openPanel('Layers'); });
+    clearJournal();
+    act(() => { bajarLaEscalera(); });
+    const cerrados = getJournal().events
+      .filter((e) => e.kind === 'ui' && e.name === 'panel' && e.data?.abierto === false)
+      .map((e) => e.data?.panel);
+    expect(cerrados).toEqual(['Properties', 'Layers']);
   });
 
   it('la caja negra ve abrir, reemplazar y cerrar', () => {

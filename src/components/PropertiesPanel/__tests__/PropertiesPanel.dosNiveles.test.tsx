@@ -113,6 +113,30 @@ describe('Propiedades de una pieza, en dos niveles', () => {
     expect(screen.getByText('Costuras (1)')).toBeTruthy();
   });
 
+  it('«Eliminar pieza» queda fuera de «Producción»: se ve con ella plegada', () => {
+    panel();
+    expect(seccionDeProduccion().contains(screen.getByRole('button', { name: 'Eliminar pieza' }))).toBe(false);
+  });
+
+  it('el primer nivel escribe en la pieza: Margen y Espejada', () => {
+    const { store } = panel();
+    const p1 = () => store.getState().project.pieces.find((p) => p.id === 'p1')!;
+    fireEvent.change(screen.getByLabelText('Margen (mm)'), { target: { value: '12' } });
+    expect(p1().seamAllowance).toBe(12);
+    fireEvent.click(screen.getByLabelText('Espejada'));
+    expect(p1().mirrored).toBe(true);
+  });
+
+  it('«Capa» escribe la capa, no la subcapa, y dice su nombre de taller: en Capas ya no va el número', () => {
+    const { store } = panel({ layer: 2 });
+    const fila = () => screen.getByLabelText('Capa').closest('.panel-field')!;
+    expect(fila().textContent).toContain('Avíos');
+    fireEvent.change(screen.getByLabelText('Capa'), { target: { value: '0' } });
+    const p1 = store.getState().project.pieces.find((p) => p.id === 'p1')!;
+    expect([p1.layer, p1.sublayer]).toEqual([0, 0]);
+    expect(fila().textContent).toContain('Forro');
+  });
+
   it('la edición vinculada se queda a la vista, en el primer nivel', () => {
     panel({ linkedPieceId: 'p2', linkMode: 'symmetry' });
     const vinculada = screen.getByText('Edición vinculada');
@@ -124,8 +148,9 @@ describe('Propiedades de una pieza, en dos niveles', () => {
     act(() => { d(addSeam(COSTURA)); d(selectSeam('s1')); });
     expect(screen.getByText('Costura: Delantero ↔ Espalda')).toBeTruthy();
     const css = readFileSync(join(process.cwd(), 'src/components/PropertiesPanel/PropertiesPanel.css'), 'utf8');
-    for (const sel of ['panel-title', 'panel-subtitle']) {
+    for (const sel of ['panel-title', 'panel-subtitle', 'panel-section-header']) {
       const regla = css.match(new RegExp(`\\.${sel}\\s*\\{[^}]*\\}`))?.[0] ?? '';
+      expect(regla, `${sel}: la regla no está`).not.toBe('');
       expect(regla, sel).not.toMatch(/text-transform:\s*uppercase/);
     }
   });
