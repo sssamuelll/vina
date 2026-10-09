@@ -104,6 +104,13 @@ describe('Seleccionar elige la esquina del margen en su punta (P3c)', () => {
     expect(editor(store).selectedPieceIds).toEqual([]);
   });
 
+  it('con Shift, la punta no elige la esquina: Shift suma, no suelta', () => {
+    const { store, hook } = setup();
+    act(() => { hook.result.current.handleMouseDown({ ...clicFuera(-6, -6, 0), shiftKey: true } as React.MouseEvent<SVGSVGElement>); });
+    expect(editor(store).saSelection).toBeNull();
+    expect(editor(store).selectedPieceIds).toEqual(['a']);
+  });
+
   it('con el margen oculto, deselecciona como siempre', () => {
     const { store, hook } = setup();
     act(() => { store.dispatch(toggleSeamAllowance()); });

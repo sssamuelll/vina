@@ -14,7 +14,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { abrirAppVacia, cambiarVista } from './helpers/estados';
-import { addPiece, activarHerramienta, clickAt, dispatch } from './helpers/lienzo';
+import { addPiece, activarHerramienta, clickAt, dispatch, toScreen } from './helpers/lienzo';
 
 interface Linea {
   id: string;
@@ -34,7 +34,9 @@ type Ventana = { __VINA_STORE__: { getState: () => Estado } };
 const estado = (page: Page) => page.evaluate(() => (window as unknown as Ventana).__VINA_STORE__.getState());
 const piquetes = async (page: Page) =>
   (await estado(page)).project.pieces[0].internals.filter((l) => l.type === 'notch');
-const etiqueta = (page: Page, nombre: string | RegExp) => page.getByRole('button', { name: nombre });
+// Exacto con un texto: «Tipo de esquina: Inglete» también encontraría «… Inglete doble».
+const etiqueta = (page: Page, nombre: string | RegExp) =>
+  page.getByRole('button', typeof nombre === 'string' ? { name: nombre, exact: true } : { name: nombre });
 const menu = (page: Page, nombre: string) => page.getByRole('group', { name: nombre });
 const campoDistancia = (page: Page) => page.locator('input.cota--editando[aria-label="Distancia"]');
 
@@ -93,6 +95,30 @@ test.describe('la puerta de vuelta (P3c)', () => {
     await expect(etiqueta(page, /^Piquete: /)).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(etiqueta(page, /^Piquete: /)).toHaveCount(0);
+  });
+
+  test('un piquete en un lado vertical: la pastilla crece hacia dentro y no lo tapa', async ({ page }) => {
+    // Revisión final de P3c (lente A): centrada, la pastilla tapaba el piquete y su borde.
+    await unaPieza(page);
+    await activarHerramienta(page, 'Shift+N', 'notch');
+    // El lado izquierdo, x = 100. Si un clic cae en el relleno y no en el borde, se prueba otra altura.
+    let yPuesto = 0;
+    for (const y of [160, 200, 240, 140]) {
+      await clickAt(page, { x: 100, y });
+      if (await campoDistancia(page).isVisible()) { yPuesto = y; break; }
+    }
+    expect(yPuesto, 'ningún clic sobre el lado izquierdo puso el piquete').toBeGreaterThan(0);
+    await campoDistancia(page).press('Escape');
+    await activarHerramienta(page, 'z', 'select');
+    await clickAt(page, { x: 104, y: yPuesto });
+    await expect(etiqueta(page, /^Piquete: /)).toBeVisible();
+
+    for (const punto of [{ x: 100, y: yPuesto }, { x: 104, y: yPuesto }]) {
+      const s = await toScreen(page, punto);
+      const tapado = await page.evaluate(([x, y]) =>
+        Boolean(document.elementFromPoint(x, y)?.closest('.etiqueta-de-opcion')), [s.x, s.y]);
+      expect(tapado, `la pastilla tapa (${punto.x}, ${punto.y})`).toBe(false);
+    }
   });
 
   test('la distancia del piquete elegido se escribe y lo mueve por su ancla', async ({ page }) => {

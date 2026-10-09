@@ -56,6 +56,16 @@ describe('Propiedades nombra como la línea al pie', () => {
     expect(opciones('prop-notch-shape')).toEqual(FORMAS_DE_PIQUETE.map((c) => [c.value, c.label]));
   });
 
+  it('los preajustes de margen llevan el nombre del tipo de costura con que se le llama en el pie', () => {
+    // Revisión final de P3c (lente A): «Estándar» y «Sobrecargada» seguían aquí.
+    panel();
+    const fila = Array.from(document.querySelectorAll('.panel-field'))
+      .find((f) => f.textContent?.includes('Preajustes de margen'))!;
+    const nombres = Array.from(fila.querySelectorAll('button')).map((b) => b.textContent);
+    const delPie = TIPOS_DE_COSTURA.map((t) => t.label);
+    expect(nombres.filter((n) => !delPie.includes(n ?? ''))).toEqual([]);
+  });
+
   it('los tipos de costura, en su desplegable y en la insignia de la lista', () => {
     const store = panel();
     const costura: Seam = {

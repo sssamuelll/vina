@@ -103,16 +103,11 @@ describe('la etiqueta de lo elegido (P3c)', () => {
     expect(f).toMatch(/distancia/i);
     expect(f).toMatch(/etiqueta/i);
     expect(f).toMatch(/forma/i);
+    expect(f).toMatch(/cantidad/i);
+    expect(f).toMatch(/medidas/i);
     expect(f).toMatch(/\bEsc\b/);
     // Un piquete no se arrastra (P3b): la frase de las cotas lo prometería.
     expect(f).not.toMatch(/arrástrala/i);
-  });
-
-  it('la costura: la etiqueta cambia su tipo', () => {
-    const f = frase({ activeTool: 'select', etiqueta: 'costura' });
-    expect(f).toMatch(/etiqueta/i);
-    expect(f).toMatch(/tipo de costura/i);
-    expect(f).toMatch(/\bEsc\b/);
   });
 
   it('Editar costuras dice que el clic enseña con qué está cosido y deja cambiar el tipo', () => {

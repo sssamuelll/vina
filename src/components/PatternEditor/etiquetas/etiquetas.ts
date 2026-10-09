@@ -11,6 +11,7 @@ import { piezaBloqueada } from '../../../utils/piezaBloqueada';
 import { FORMAS_DE_PIQUETE, notchTool } from '../../../tools/definitions/notch';
 import type { ToolOption } from '../../../tools/types';
 import { margenMasAncho } from '../../../utils/seam/esquinaDelMargen';
+import { detectCornerCommands } from '../../../utils/outlineAnalysis';
 import { TIPOS_DE_ESQUINA, tipoDeEsquina } from '../../../utils/seam/tiposDeEsquina';
 import { centroDe } from '../cotas/loQueSePone';
 import type { EtiquetaDeOpcionProps } from './EtiquetaDeOpcion';
@@ -98,6 +99,9 @@ function deLaEsquina(input: EtiquetaInput): Etiqueta | null {
   const margen = margenMasAncho(piece);
   const cmd = piece.outline[vertexIndex];
   if (!(margen > 0) || !cmd || (cmd.type !== 'M' && cmd.type !== 'L')) return null;
+  // Una elección vieja puede caer en un punto que ya no es esquina (Q insertó
+  // uno antes): elegir un tipo escribiría `cornerTypes` en medio de un lado.
+  if (!detectCornerCommands(piece.outline).has(vertexIndex)) return null;
   const punto = pieceLocalToPattern({ x: cmd.values[0], y: cmd.values[1] }, piece);
   const centro = centroDe(piece);
   return {
@@ -114,15 +118,20 @@ function deLaEsquina(input: EtiquetaInput): Etiqueta | null {
   };
 }
 
-/** Las herramientas donde la costura elegida enseña su etiqueta. */
-const CON_ETIQUETA_DE_COSTURA: ReadonlySet<Tool2D> = new Set<Tool2D>(['select', 'seam', 'seamEdit']);
+/**
+ * Las herramientas donde la costura elegida enseña su etiqueta: las de
+ * costura y ninguna más. Firma de María #210: «eso solo debería verse al
+ * activar el menú de costuras». Coser deja elegida la costura que termina y la
+ * elección sobrevive al cambio de herramienta: con Seleccionar no se le pega
+ * la etiqueta (revisión final de P3c).
+ */
+const CON_ETIQUETA_DE_COSTURA: ReadonlySet<Tool2D> = new Set<Tool2D>(['seam', 'seamEdit']);
 
 /**
  * La costura elegida: la deja elegida Coser al terminarla, y la elige Editar
- * costuras con un clic en su lado (su puerta de vuelta: con Seleccionar no se
- * pinta ninguna costura, firma de María #210). La etiqueta va en el medio de
- * su mitad A, hacia dentro de la pieza A. Nunca apagada: el tipo de costura
- * no es geometría de la pieza.
+ * costuras con un clic en su lado, que es su puerta de vuelta. La etiqueta va
+ * en el medio de su mitad A, hacia dentro de la pieza A. Nunca apagada: el
+ * tipo de costura no es geometría de la pieza.
  */
 function deLaCostura(input: EtiquetaInput): Etiqueta | null {
   if (!input.selectedSeamId || !input.showSewingLines || !CON_ETIQUETA_DE_COSTURA.has(input.activeTool)) return null;

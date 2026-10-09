@@ -108,6 +108,12 @@ describe('el piquete elegido trae su distancia (P3c)', () => {
     expect(s.disabled).toBe(true);
   });
 
+  it('con su capa bloqueada también se ve apagada', () => {
+    const s = cotasDelSujeto(entrada({ layerLocked: { 1: true } }));
+    expect(s.cotas).toHaveLength(1);
+    expect(s.disabled).toBe(true);
+  });
+
   it('con otra herramienta, ninguna: la del piquete es la de lo que se pone', () => {
     expect(cotasDelSujeto(entrada({ activeTool: 'notch' })).cotas).toEqual([]);
   });

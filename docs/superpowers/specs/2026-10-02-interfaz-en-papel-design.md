@@ -327,19 +327,26 @@ moverlo está «Ajustar distancia…». La pieza bloqueada no recibe piquetes. E
 **Nota del plan de P3c (2026-10-09).** La etiqueta de opción es una pastilla de papel. Al clicarla
 abre los mismos controles de la línea al pie, pero para ese objeto. La pastilla y el menú los fijó
 solace-wren.
+- **La pastilla crece hacia fuera del objeto:** su borde cercano se apoya junto a él. Así no tapa
+  lo que describe, aunque esté en un lado vertical.
 - **El piquete** elegido con Seleccionar enseña su distancia en reposo y una etiqueta con forma,
-  cantidad, profundidad y ancho: «Recta · 8 × 3 mm». La profundidad deja el chip de lo que se pone.
-- **La esquina del margen** se elige con un clic de Seleccionar en la punta del margen, o con
-  Margen, y su etiqueta da el tipo. Margen ya no abre Propiedades.
-- **La costura** enseña su tipo cuando está elegida. La deja elegida Coser al terminarla, y la
-  elige Editar costuras con un clic en su lado. **La costura no se elige con Seleccionar:** la
-  firma de María #210 pide que con Seleccionar no se pinte ninguna («eso solo debería verse al
-  activar el menu de costuras»), así que su puerta de vuelta es Editar costuras. Su queja del
-  30-08, «si le doy a editar costuras no pasa absolutamente nada», deja de ser cierta.
+  cantidad, profundidad y ancho: «Recta · 8 × 3 mm». El recién puesto conserva la profundidad en
+  su chip, porque no trae etiqueta.
+- **La esquina del margen** se elige con un clic de Seleccionar sobre la banda pintada del margen
+  junto a la esquina: dentro de la línea de corte, o a 6 px de ella. Fuera de eso el clic sigue
+  soltando la selección y tirando la goma. Con Margen también se elige, y su etiqueta da el tipo.
+  Margen ya no abre Propiedades.
+- **La costura** enseña su tipo cuando está elegida, solo con Coser y Editar costuras. La deja
+  elegida Coser al terminarla, y la elige Editar costuras con un clic en su lado. **La costura no
+  se elige con Seleccionar, ni su etiqueta sale ahí:** la firma de María #210 pide que con
+  Seleccionar no se pinte ninguna («eso solo debería verse al activar el menu de costuras»), así
+  que su puerta de vuelta es Editar costuras. Su queja del 30-08, «si le doy a editar costuras no
+  pasa absolutamente nada», deja de ser cierta.
 - **«Tipo de costura» sale de la línea al pie.** Una costura nueva nace Normal y se cambia en su
   etiqueta. Tijeras conserva el suyo.
-- **Un término por concepto:** Propiedades usa los mismos nombres que el pie. Se van
-  «Sobrecargada», «Estándar», «Recto», «V interna», «V externa» y «Castillo».
+- **Un término por concepto:** Propiedades usa los mismos nombres que el pie, también en los
+  preajustes de margen. Se van «Sobrecargada», «Estándar», «Recto», «V interna», «V externa» y
+  «Castillo».
 
 ### 5.3 La línea al pie
 

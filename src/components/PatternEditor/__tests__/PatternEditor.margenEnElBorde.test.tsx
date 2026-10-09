@@ -10,7 +10,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import constructionReducer from '../../../store/constructionSlice';
-import editorReducer, { clearSelection, setActiveTool } from '../../../store/editorSlice';
+import editorReducer, { clearSelection, selectSaVertices, setActiveTool } from '../../../store/editorSlice';
 import inputSchemeReducer from '../../../store/inputSchemeSlice';
 import projectReducer, { restoreState } from '../../../store/projectSlice';
 import simulationReducer from '../../../store/simulationSlice';
@@ -222,6 +222,26 @@ describe('PatternEditor — la esquina con Margen trae su etiqueta, y no abre Pr
     // Abría el panel por su cuenta: «su tipo no tiene otra puerta». Ahora la tiene.
     expect(onOpenPanel).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Tipo de esquina: Inglete' })).toBeTruthy();
+  });
+
+  it('cambiar una esquina conserva el tipo que las demás ya tenían', () => {
+    // Lo que la usuaria escribió en otra esquina no se pierde (lente B, M8).
+    const { store, svg } = setup(pieza({ cornerTypes: { 2: 'envelope' } }));
+    clic(svg, 0, 0);
+    fireEvent.click(screen.getByRole('button', { name: 'Tipo de esquina: Inglete' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cuadrada' }));
+    expect(store.getState().project.pieces[0].cornerTypes).toEqual({ 0: 'squared', 2: 'envelope' });
+  });
+
+  it('con Seleccionar, la esquina elegida lleva su anillo, como con Margen', () => {
+    const { store, view } = setup();
+    act(() => {
+      store.dispatch(setActiveTool('select'));
+      store.dispatch(selectSaVertices({ pieceId: 'p', vertexIndex: 0 }));
+    });
+    const anillo = view.container.querySelector('circle[stroke="var(--accent-2d)"][fill="none"]');
+    expect(anillo?.getAttribute('cx')).toBe('0');
+    expect(anillo?.getAttribute('cy')).toBe('0');
   });
 
   it('elegir «Cuadrada» en su menú escribe esa esquina y nada más', () => {

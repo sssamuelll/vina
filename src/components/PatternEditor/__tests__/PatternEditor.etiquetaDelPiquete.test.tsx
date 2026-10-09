@@ -16,6 +16,7 @@ import projectReducer, { loadProject } from '../../../store/projectSlice';
 import simulationReducer from '../../../store/simulationSlice';
 import toolReducer from '../../../store/toolSlice';
 import workflowReducer from '../../../store/workflowSlice';
+import copilotUIReducer from '../../../store/copilotUISlice';
 import type { InternalLine, PatternPiece } from '../../../types/types';
 import PatternEditor from '../PatternEditor';
 import { reescribirPiquete } from '../etiquetas/piquete';
@@ -46,7 +47,7 @@ const piece: PatternPiece = {
   updatedAt: 0,
 };
 
-function montar(pieza: PatternPiece = piece) {
+function montar(pieza: PatternPiece = piece, ranuraDelPie?: HTMLElement) {
   const store = configureStore({
     reducer: {
       project: projectReducer,
@@ -56,6 +57,7 @@ function montar(pieza: PatternPiece = piece) {
       construction: constructionReducer,
       inputScheme: inputSchemeReducer,
       workflow: workflowReducer,
+      copilotUI: copilotUIReducer,
     },
     middleware: getDefault => getDefault({ serializableCheck: false }),
   });
@@ -65,7 +67,7 @@ function montar(pieza: PatternPiece = piece) {
   }));
   const view = render(
     <Provider store={store}>
-      <PatternEditor />
+      <PatternEditor ranuraDelPie={ranuraDelPie} />
     </Provider>,
   );
   act(() => {
@@ -107,11 +109,32 @@ describe('PatternEditor — el piquete elegido trae su distancia y su etiqueta (
     expect(linea(store).path[0].values[0]).toBeCloseTo(60, 6);
   });
 
-  it('con la pieza bloqueada la etiqueta se ve apagada y no abre', () => {
-    montar({ ...piece, locked: true });
+  it('con la pieza bloqueada la etiqueta se ve apagada, no abre, y avisa', () => {
+    const { store } = montar({ ...piece, locked: true });
     const etiqueta = screen.getByRole('button', { name: 'Piquete: Recta · 8 × 3 mm' });
     expect(etiqueta.getAttribute('aria-disabled')).toBe('true');
     fireEvent.click(etiqueta);
     expect(screen.queryByRole('group', { name: 'Opciones del piquete' })).toBeNull();
+    expect(store.getState().copilotUI.toasts.at(-1)?.message)
+      .toBe('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.');
+  });
+
+  it('elegir otro piquete cierra el menú del anterior, aunque no haya clic (la IA, el store)', () => {
+    const otro: InternalLine = { ...notch, id: 'notch-70', notchAnchor: { ...notch.notchAnchor!, distanceMm: 70 } };
+    const { store } = montar({ ...piece, internals: [notch, otro] });
+    fireEvent.click(screen.getByRole('button', { name: /^Piquete: / }));
+    expect(screen.queryByRole('group', { name: 'Opciones del piquete' })).not.toBeNull();
+    act(() => { store.dispatch(selectInternalLine({ pieceId: 'piece-1', lineId: 'notch-70' })); });
+    expect(screen.queryByRole('group', { name: 'Opciones del piquete' })).toBeNull();
+  });
+
+  it('la línea al pie dice lo que hace su etiqueta', () => {
+    const ranura = document.createElement('div');
+    document.body.appendChild(ranura);
+    montar(piece, ranura);
+    expect(ranura.textContent).toContain(
+      'Clic en la distancia para escribirla · la etiqueta cambia forma, cantidad y medidas · Esc suelta',
+    );
+    ranura.remove();
   });
 });

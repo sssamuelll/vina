@@ -84,7 +84,8 @@ export default function PieceProperties({ piece, collapsed, simCollapsed, onTogg
       <div className="panel-field panel-field--wrap">
         <label>Preajustes de margen</label>
         <div className="panel-preset-row">
-          {([['Overlock', 8], ['Estándar', 10], ['Sobrecargada', 12], ['Francesa', 15]] as const).map(([label, width]) => (
+          {/* Cada preajuste se llama como su tipo de costura en el pie y en la etiqueta (P3c). */}
+          {([['Overlock', 8], ['Normal', 10], ['Flat-felled', 12], ['Francesa', 15]] as const).map(([label, width]) => (
             <button
               key={label}
               className="panel-chip-btn"

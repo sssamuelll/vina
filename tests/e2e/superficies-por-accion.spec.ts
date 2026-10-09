@@ -239,11 +239,14 @@ test.describe('con un rectángulo sembrado (lados rectos conocidos)', () => {
     }
   }
 
+  // Cada medida comprueba después que el gesto hizo lo que dice: el trinquete
+  // solo pone techo, y un clic que no eligiera nada pasaría con menos.
   test('elegir un piquete (Z)', async ({ page }) => {
     await unPiqueteElegido(page, false);
     registrar('elegir un piquete (Z)', await medirAccion(page, [
       () => clickAt(page, { x: 180, y: 124 }),
     ]));
+    await expect(page.getByRole('button', { name: /^Piquete: / })).toBeVisible();
   });
 
   test('abrir la etiqueta del piquete', async ({ page }) => {
@@ -251,6 +254,7 @@ test.describe('con un rectángulo sembrado (lados rectos conocidos)', () => {
     registrar('abrir la etiqueta del piquete', await medirAccion(page, [
       () => page.getByRole('button', { name: /^Piquete: / }).click(),
     ]));
+    await expect(page.getByRole('group', { name: 'Opciones del piquete' })).toBeVisible();
   });
 
   test('elegir una esquina del margen (Z)', async ({ page }) => {
@@ -260,6 +264,21 @@ test.describe('con un rectángulo sembrado (lados rectos conocidos)', () => {
     registrar('elegir una esquina del margen (Z)', await medirAccion(page, [
       () => clickAt(page, { x: 113, y: 113 }),
     ]));
+    await expect(page.getByRole('button', { name: /^Tipo de esquina/ })).toBeVisible();
+  });
+
+  // «coser dos lados (N)» no cose: sus dos clics caen en la misma pieza, y
+  // Coser pide otra para la segunda mitad. Este cose de verdad y mide la
+  // etiqueta de la costura recién hecha (revisión final de P3c).
+  test('coser dos piezas (N)', async ({ page }) => {
+    await addPiece(page, 'otra-superficies', { x: 500, y: 120 }, 300, 400);
+    await reposo(page);
+    registrar('coser dos piezas (N)', await medirAccion(page, [
+      () => activarHerramienta(page, 'n', 'seam'),
+      () => clickAt(page, { x: 420, y: 300 }),
+      () => clickAt(page, { x: 500, y: 300 }),
+    ]));
+    await expect(page.getByRole('button', { name: /^Tipo de costura/ })).toBeVisible();
   });
 
   // Punto no tiene tecla. Tras el clic trae su cota (spec 2026-10-02 § 5.1: 3).

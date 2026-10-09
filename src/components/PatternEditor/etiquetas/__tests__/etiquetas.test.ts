@@ -112,6 +112,10 @@ describe('etiquetaDeLaSeleccion — la esquina del margen', () => {
   it('el tipo guardado de esa esquina, si no el de la pieza, si no Inglete', () => {
     expect((etiquetaDeLaSeleccion(esquina({ pieces: [{ ...conMargen, cornerTypes: { 0: 'squared' } }] })) as { tipo: string }).tipo).toBe('squared');
     expect((etiquetaDeLaSeleccion(esquina({ pieces: [{ ...conMargen, defaultCornerType: 'envelope' }] })) as { tipo: string }).tipo).toBe('envelope');
+    // Con los dos guardados manda el de la esquina, como en Propiedades y en el dibujo.
+    expect((etiquetaDeLaSeleccion(esquina({
+      pieces: [{ ...conMargen, defaultCornerType: 'envelope', cornerTypes: { 0: 'squared' } }],
+    })) as { tipo: string }).tipo).toBe('squared');
   });
 
   it('con otra herramienta, con el margen oculto, sin margen o callada, nada', () => {
@@ -124,6 +128,25 @@ describe('etiquetaDeLaSeleccion — la esquina del margen', () => {
   it('con la pieza bloqueada, apagada; con la capa oculta, nada', () => {
     expect(etiquetaDeLaSeleccion(esquina({ pieces: [{ ...conMargen, locked: true }] }))!.apagada).toBe(true);
     expect(etiquetaDeLaSeleccion(esquina({ hiddenLayerIds: [1] }))).toBeNull();
+  });
+
+  it('una elección vieja que ya no cae en una esquina (Q insertó un punto antes) no lleva etiqueta', () => {
+    // Revisión final de P3c (lente A): si no, elegir un tipo escribiría
+    // `cornerTypes` en un punto del medio de un lado.
+    const conPuntoEnMedio: PatternPiece = {
+      ...conMargen,
+      outline: [
+        { type: 'M', values: [0, 0] }, { type: 'L', values: [150, 0] }, { type: 'L', values: [300, 0] },
+        { type: 'L', values: [300, 200] }, { type: 'L', values: [0, 200] }, { type: 'Z', values: [] },
+      ],
+    };
+    expect(etiquetaDeLaSeleccion(esquina({
+      pieces: [conPuntoEnMedio], saSelection: { kind: 'vertex', items: [{ pieceId: 'p1', vertexIndex: 1 }] },
+    }))).toBeNull();
+    // La esquina de verdad, el 2, sí.
+    expect(etiquetaDeLaSeleccion(esquina({
+      pieces: [conPuntoEnMedio], saSelection: { kind: 'vertex', items: [{ pieceId: 'p1', vertexIndex: 2 }] },
+    }))?.que).toBe('esquina');
   });
 
   it('un índice que no es un vértice (el Z) no lleva etiqueta', () => {
@@ -160,11 +183,18 @@ describe('etiquetaDeLaSeleccion — la costura', () => {
     pieceA: { pieceId: 'p1', edgeName: 'top' }, pieceB: { pieceId: 'p1', edgeName: 'bottom' },
   } as Seam;
   const conCostura = (over: Partial<EtiquetaInput> = {}) => base({
-    pieces: [conLados], seams: [costura], selectedInternalLine: null, selectedSeamId: 's1', ...over,
+    activeTool: 'seamEdit', pieces: [conLados], seams: [costura], selectedInternalLine: null, selectedSeamId: 's1', ...over,
   });
 
-  it('con Seleccionar, Coser o Editar costuras: en el medio de su mitad A, hacia dentro de la pieza A', () => {
-    for (const activeTool of ['select', 'seam', 'seamEdit'] as const) {
+  it('con Seleccionar, nada aunque esté elegida: la información de costura solo con las herramientas de costura (#210)', () => {
+    // María (#210): «eso solo debería verse al activar el menú de costuras».
+    // Coser deja elegida la costura que termina, y la elección sobrevive al
+    // cambiar de herramienta: con Z no se le pega la etiqueta.
+    expect(etiquetaDeLaSeleccion(conCostura({ activeTool: 'select' }))).toBeNull();
+  });
+
+  it('con Coser o Editar costuras: en el medio de su mitad A, hacia dentro de la pieza A', () => {
+    for (const activeTool of ['seam', 'seamEdit'] as const) {
       const e = etiquetaDeLaSeleccion(conCostura({ activeTool }))!;
       expect(e).toMatchObject({ que: 'costura', seamId: 's1', tipo: 'standard', apagada: false, separacionMm: 0 });
       // El lado de arriba va de (100, 100) a (400, 100).
@@ -180,6 +210,13 @@ describe('etiquetaDeLaSeleccion — la costura', () => {
     expect(etiquetaDeLaSeleccion(conCostura({ showSewingLines: false }))).toBeNull();
     expect(etiquetaDeLaSeleccion(conCostura({ hiddenLayerIds: [1] }))).toBeNull();
     expect(etiquetaDeLaSeleccion(conCostura({ callada: true }))).toBeNull();
+  });
+
+  it('una costura de un tramo: la etiqueta va en el medio del tramo cosido, no del lado', () => {
+    const deUnTramo = { ...costura, pieceA: { pieceId: 'p1', edgeName: 'top', tStart: 0.5, tEnd: 1 } } as Seam;
+    const e = etiquetaDeLaSeleccion(conCostura({ seams: [deUnTramo] }))!;
+    // El tramo va de 250 a 400: su medio es 325.
+    expect(e.punto.x).toBeCloseTo(325, 6);
   });
 
   it('una costura que ya no está (deshacer), nada', () => {

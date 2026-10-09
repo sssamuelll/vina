@@ -47,22 +47,26 @@ describe('largoDelLado', () => {
 describe('cotasDelPiquete', () => {
   const enVivo = () => ({ alEscribir: vi.fn(), alCerrar: vi.fn() });
 
-  it('un campo, Distancia, con el largo del lado: la profundidad vive en la etiqueta del piquete (P3c)', () => {
+  // La profundidad SIGUE en el chip de lo que se pone (revisión final de P3c,
+  // lente A): la etiqueta solo existe para el piquete ELEGIDO con Seleccionar,
+  // así que sacarla de aquí dejaba al recién puesto sin puerta a la suya.
+  it('dos campos en un grupo: Distancia, con el largo del lado, y Profundidad de 1 a 30', () => {
     const cotas = cotasDelPiquete(refinando(), pieza, enVivo());
     // El techo es el lado, el mismo que se lee: «de 300 mm» (revisión final de P3b).
     expect(cotas.map(c => [c.label, c.valueMm, c.min, c.max, c.unit])).toEqual([
       ['Distancia', 60, 0, 300, 'mm'],
+      ['Profundidad', 8, 1, 30, 'mm'],
     ]);
     expect(cotas[0].referenceLabel).toBe('de 300 mm');
-    // Un campo solo no es un grupo: el chip es el del punto.
-    expect(cotas[0].grupo).toBeUndefined();
-    expect(cotas[0].kind).toBe('borde');
-    expect(cotas[0].scrub).toBe(false);
+    expect(cotas.map(c => c.grupo)).toEqual(['piquete', 'piquete']);
+    expect(cotas.map(c => c.kind)).toEqual(['borde', 'profundidad']);
+    expect(cotas.every(c => c.scrub === false)).toBe(true);
   });
 
-  it('la distancia escribe con la profundidad que el piquete ya tiene', () => {
-    const [d] = cotasDelPiquete(refinando(), pieza, enVivo());
+  it('cada campo escribe con el valor de ahora del otro', () => {
+    const [d, p] = cotasDelPiquete(refinando(), pieza, enVivo());
     expect(d.apply(90)).toEqual({ kind: 'piquete', distanciaMm: 90, profundidadMm: 8 });
+    expect(p.apply(12)).toEqual({ kind: 'piquete', distanciaMm: 60, profundidadMm: 12 });
   });
 
   it('el hilo va de la esquina al piquete puesto, por fuera de la pieza', () => {
@@ -92,11 +96,13 @@ describe('cotasDelPiquete', () => {
     expect(d.referenceLabel).toBeUndefined();
   });
 
-  it('la distancia mueve el fantasma y cierra la sesión', () => {
+  it('solo la distancia mueve el fantasma; el cierre lo lleva la primera, que es la que monta el chip', () => {
     const v = enVivo();
-    const [d] = cotasDelPiquete(refinando(), pieza, v);
+    const [d, p] = cotasDelPiquete(refinando(), pieza, v);
     expect(d.alEscribir).toBe(v.alEscribir);
     expect(d.alCerrar).toBe(v.alCerrar);
+    expect(p.alEscribir).toBeUndefined();
+    expect(p.alCerrar).toBeUndefined();
   });
 
   it('sin ancla no hay cota', () => {

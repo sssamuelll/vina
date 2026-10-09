@@ -70,9 +70,9 @@ describe('PatternEditor — la costura elegida trae su etiqueta (P3c)', () => {
     expect(store.getState().tools.toolOptions.seam?.seamType).toBeUndefined();
   });
 
-  it('con Seleccionar y la costura elegida (desde la lista de Propiedades), también', () => {
+  it('con Seleccionar no, aunque la costura siga elegida: solo con las herramientas de costura (#210)', () => {
     montar('select');
-    expect(screen.getByRole('button', { name: 'Tipo de costura: Normal' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Tipo de costura/ })).toBeNull();
   });
 
   it('con la Pluma, no', () => {

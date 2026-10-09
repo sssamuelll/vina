@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { toolRegistry } from '../index';
 import { TRIM_LIBRARY } from '../../utils/trim/trimLibrary';
 
@@ -195,6 +197,17 @@ describe('idioma de las opciones de herramienta', () => {
     // «Tipo de costura» fuera del gesto de coser (María 30-08 [22:47]): la
     // costura nace Normal y su tipo se cambia con ella elegida.
     expect(toolRegistry.getTool('seam')!.options ?? []).toEqual([]);
+  });
+
+  it('nadie lee la opción que Coser ya no declara, ni en 2D ni en 3D', () => {
+    // `Sew3DTool` la leía y ningún test lo monta (lente B, M15): sin esto, un
+    // `toolOptions.seam.seamType` que vuelva pasaría en verde y leería un
+    // valor que nada escribe.
+    const raiz = join(process.cwd(), 'src');
+    const lectores = (readdirSync(raiz, { recursive: true }) as string[])
+      .filter((f) => /\.(ts|tsx)$/.test(f) && !/__tests__/.test(f))
+      .filter((f) => /toolOptions\??\.seam\??\./.test(readFileSync(join(raiz, f), 'utf8')));
+    expect(lectores).toEqual([]);
   });
 
   it('Tijeras conserva su tipo de costura, con los nombres de siempre (spec § 5.3)', () => {

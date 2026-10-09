@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import EtiquetaDeOpcion, { type EtiquetaDeOpcionProps } from '../EtiquetaDeOpcion';
 import { bajarLaEscalera } from '../../../../shortcuts/escaleraDeLoLlamado';
+import { clearJournal, getJournal } from '../../../../utils/telemetry/journal';
 import type { ToolOption } from '../../../../tools/types';
 
 /**
@@ -72,6 +73,17 @@ describe('EtiquetaDeOpcion (spec 2026-10-02 § 5.2)', () => {
     expect(alCambiar).toHaveBeenCalledWith('type', 'french');
   });
 
+  it('un mousedown dentro del menú no lo cierra, y el clic elige', () => {
+    // `fireEvent.click` solo no dispara el mousedown que vigila el cierre por fuera.
+    const { boton, alCambiar } = pintar();
+    fireEvent.click(boton);
+    const francesa = screen.getByRole('button', { name: 'Francesa' });
+    fireEvent.mouseDown(francesa);
+    fireEvent.click(francesa);
+    expect(alCambiar).toHaveBeenCalledWith('type', 'french');
+    expect(menu()).not.toBeNull();
+  });
+
   it('un número llega acotado a su rango', () => {
     const { boton, alCambiar } = pintar();
     fireEvent.click(boton);
@@ -102,6 +114,50 @@ describe('EtiquetaDeOpcion (spec 2026-10-02 § 5.2)', () => {
     fireEvent.click(boton);
     fireEvent.mouseDown(document.body);
     expect(menu()).toBeNull();
+  });
+
+  it('crece hacia fuera del objeto: su borde cercano se apoya en el ancla, no su centro', () => {
+    // Revisión final de P3c (lente A): centrada, una pastilla de 140 px junto a
+    // un piquete de un lado vertical lo tapaba, a él y a su borde.
+    const raiz = (hacia?: { x: number; y: number }) => {
+      cleanup();
+      pintar(hacia ? { hacia } : {});
+      return screen.getByRole('button', { name: 'Tipo de costura: Normal' }).closest('.etiqueta-de-opcion') as HTMLElement;
+    };
+    expect(raiz({ x: 1, y: 0 }).style.transform).toBe('translate(0%, -50%)');
+    expect(raiz({ x: -1, y: 0 }).style.transform).toBe('translate(-100%, -50%)');
+    expect(raiz({ x: 0, y: 1 }).style.transform).toBe('translate(-50%, 0%)');
+    expect(raiz().style.transform).toBe('translate(-50%, -50%)');
+  });
+
+  it('si la pieza se bloquea con el menú abierto (un Ctrl+Z del desbloqueo), el menú se cierra', () => {
+    const alCambiar = vi.fn();
+    const props: EtiquetaDeOpcionProps = {
+      que: 'piquete', texto: 'Recta · 8 × 3 mm', nombre: 'Piquete: Recta · 8 × 3 mm', nombreDelMenu: 'Opciones del piquete',
+      opciones: [TIPO], valores: { type: 'standard' }, alCambiar, left: 0, top: 0,
+    };
+    const { rerender } = render(<EtiquetaDeOpcion {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Piquete: Recta · 8 × 3 mm' }));
+    expect(screen.queryByRole('group', { name: 'Opciones del piquete' })).not.toBeNull();
+    rerender(<EtiquetaDeOpcion {...props} apagada />);
+    expect(screen.queryByRole('group', { name: 'Opciones del piquete' })).toBeNull();
+  });
+
+  it('la caja negra ve también el cierre por desmontaje: otra selección, un deshacer, otra herramienta', () => {
+    clearJournal();
+    const { boton } = pintar();
+    fireEvent.click(boton);
+    cleanup();
+    const eventos = getJournal().events.filter((e) => e.name === 'etiqueta').map((e) => e.data?.abierto);
+    expect(eventos).toEqual([true, false]);
+  });
+
+  it('se anuncia como «Más»: aria-expanded y aria-controls con el id de su menú', () => {
+    const { boton } = pintar();
+    expect(boton.hasAttribute('aria-haspopup')).toBe(false);
+    fireEvent.click(boton);
+    expect(boton.getAttribute('aria-controls')).toBe(menu()!.id);
+    expect(menu()!.id).not.toBe('');
   });
 
   it('apagada no abre: avisa', () => {

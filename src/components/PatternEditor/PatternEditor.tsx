@@ -28,6 +28,7 @@ import SeccionDelPatron from './SeccionDelPatron';
 import { fraseDeLaFase, fraseDelPie } from './fraseDeLaFase';
 import { noPasoNada, suscribirNoPasoNada } from './noPasoNada';
 import EtiquetaDeOpcion from './etiquetas/EtiquetaDeOpcion';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
 import { claveDeEtiqueta, etiquetaDeLaSeleccion, posicionDeEtiqueta, presentarEtiqueta } from './etiquetas/etiquetas';
 import { reescribirPiquete } from './etiquetas/piquete';
 import type { Cota } from './cotas/cotas';
@@ -963,6 +964,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
   // Lo que se escribe en una etiqueta vale para ese objeto y nada más (§ 5.2,
   // «Lo que no se recuerda»): ninguna opción de herramienta cambia.
   const cambiarEtiqueta = useCallback((opcion: string, valor: unknown) => {
+    // El escritor mira el candado, no solo la pastilla (#1136): con la pieza
+    // bloqueada, nada se escribe aunque un menú haya quedado abierto.
+    if (etiqueta?.apagada) {
+      dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+      return;
+    }
     if (etiqueta?.que === 'piquete') {
       const piece = pieces.find(p => p.id === etiqueta.pieceId);
       const line = piece?.internals.find(l => l.id === etiqueta.lineId);
@@ -1213,7 +1220,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
       // El mismo escritor que su etiqueta.
       const piece = pieces.find(p => p.id === update.pieceId);
       const line = piece?.internals.find(l => l.id === update.lineId);
-      if (!piece || !line) return;
+      // El candado, también aquí: la cota se apaga, pero el escritor no se fía.
+      if (!piece || !line || piezaBloqueada(piece, layerLocked)) return;
       const nuevo = reescribirPiquete(piece, line, { distanciaMm: update.distanciaMm });
       if (!nuevo) {
         noPasoNada('notch:ancla-perdida', { pieceId: piece.id, notchId: line.id });
@@ -1244,7 +1252,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
       const accion = updateInternalLine({ pieceId: update.pieceId, lineId: update.lineId, path: update.path });
       dispatch(token ? withUndoBatchToken(accion, token) : accion);
     }
-  }, [pieces, trazos, dispatch, activeTool, figuraDelCirculo, sujeto.piece?.id]);
+  }, [pieces, trazos, dispatch, activeTool, figuraDelCirculo, sujeto.piece?.id, layerLocked]);
   const aplicarRef = useRef(aplicarCota);
   aplicarRef.current = aplicarCota;
 
@@ -1902,6 +1910,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
           que={etiqueta.que}
           {...presentarEtiqueta(etiqueta)}
           {...posicionDeEtiqueta(etiqueta, pan2D, zoom2D)}
+          hacia={etiqueta.hacia}
           apagada={etiqueta.apagada}
           alPulsarApagada={avisarBloqueada}
           alCambiar={cambiarEtiqueta}

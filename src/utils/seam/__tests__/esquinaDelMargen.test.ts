@@ -38,11 +38,36 @@ describe('esquinaDelMargenEn', () => {
     expect(esquinaDelMargenEn([p1], { x: 160, y: 93 }, 1, true)).toBeNull();
   });
 
-  it('el radio es la punta más 10 px: a menos zoom, 10 px son más patrón', () => {
-    // (80, 80) está a 28,3 mm del vértice. Zoom 0,5: 14,1 + 20 = 34,1 → dentro.
-    expect(esquinaDelMargenEn([p1], { x: 80, y: 80 }, 0.5, true)).toEqual({ pieceId: 'p1', vertexIndex: 0 });
-    // Zoom 2: 14,1 + 5 = 19,1 → fuera.
-    expect(esquinaDelMargenEn([p1], { x: 80, y: 80 }, 2, true)).toBeNull();
+  it('fuera de la línea de corte, cerca del vértice, nada: ese clic sigue soltando la selección y tirando la goma', () => {
+    // Revisión final de P3c (lente A): el disco de 24 px alrededor del vértice
+    // robaba el clic al aire en una zona que no se ve. (80, 95) está a 10 mm
+    // de la línea de corte, fuera de la banda pintada.
+    expect(esquinaDelMargenEn([p1], { x: 80, y: 95 }, 1, true)).toBeNull();
+  });
+
+  it('dentro del contorno neto, junto al vértice, nada: el clic es de la pieza aunque su relleno no lo reciba («alambre»)', () => {
+    expect(esquinaDelMargenEn([p1], { x: 104, y: 104 }, 1, true)).toBeNull();
+  });
+
+  it('un dobladillo ancho en otro borde no agranda la zona de esta esquina', () => {
+    const conDobladillo = pieza('h', 100, 100, {
+      edges: [{ id: 'h:bottom', name: 'bottom', segmentRange: [3, 4], edgeType: 'seam', length: 300, seamAllowanceWidth: 40 }],
+    });
+    // La esquina de arriba a la izquierda tiene 10 mm a los dos lados: (75, 75) queda fuera de su banda.
+    expect(esquinaDelMargenEn([conDobladillo], { x: 75, y: 75 }, 1, true)).toBeNull();
+    expect(esquinaDelMargenEn([conDobladillo], { x: 93, y: 93 }, 1, true)).toEqual({ pieceId: 'h', vertexIndex: 0 });
+  });
+
+  it('a zoom alto, la punta exacta del margen sigue eligiendo su esquina', () => {
+    // La punta (90, 90) está a 14,1 mm del vértice (lente B, M4).
+    expect(esquinaDelMargenEn([p1], { x: 90, y: 90 }, 4, true)).toEqual({ pieceId: 'p1', vertexIndex: 0 });
+  });
+
+  it('la orilla de la línea de corte se mide en px: a menos zoom, abarca más patrón', () => {
+    // (84, 84) está fuera del corte, a 8,5 mm de la punta. Zoom 0,5: 6 px = 12 mm → elige.
+    expect(esquinaDelMargenEn([p1], { x: 84, y: 84 }, 0.5, true)).toEqual({ pieceId: 'p1', vertexIndex: 0 });
+    // Zoom 2: 6 px = 3 mm → no.
+    expect(esquinaDelMargenEn([p1], { x: 84, y: 84 }, 2, true)).toBeNull();
   });
 
   it('entre dos piezas, la esquina más cercana', () => {

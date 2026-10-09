@@ -81,7 +81,6 @@ export interface FaseDeLaHerramienta {
 /** Con Seleccionar, lo elegido que trae etiqueta (solace-wren, 2026-10-09). */
 const DE_LA_ETIQUETA: Partial<Record<'piquete' | 'costura' | 'esquina', string>> = {
   piquete: 'Clic en la distancia para escribirla · la etiqueta cambia forma, cantidad y medidas · Esc suelta',
-  costura: 'Clic en la etiqueta para cambiar el tipo de costura · Esc suelta',
   esquina: 'Clic en la etiqueta para cambiar el tipo de esquina · Esc suelta',
 };
 

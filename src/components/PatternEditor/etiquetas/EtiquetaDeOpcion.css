@@ -3,9 +3,10 @@
    encima del svg). Su menú es el de «Más»: los controles del pie, en filas.
    Todo sale de tokens (R3); cada :hover trae su :focus-visible en la misma
    línea (R5). */
+/* Su `transform` lo pone el componente: el borde cercano se apoya en el ancla
+   y la pastilla crece hacia fuera del objeto (`hacia`). */
 .etiqueta-de-opcion {
   position: absolute;
-  transform: translate(-50%, -50%);
   pointer-events: auto;
 }
 

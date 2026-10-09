@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FC } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FC } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import type { ToolOption } from '../../../tools/types';
+import type { Point2D } from '../../../types/types';
 import { usePeldanoDeEscape } from '../../../shortcuts/escaleraDeLoLlamado';
 import { pushJournal } from '../../../utils/telemetry/journal';
 import { Control } from '../ToolOptionControls';
@@ -25,9 +26,15 @@ export interface EtiquetaDeOpcionProps {
   valores: Readonly<Record<string, unknown>>;
   /** Llega con el id de la opción (`shape`), no con el del control (`etiqueta-shape`). */
   alCambiar(opcion: string, valor: unknown): void;
-  /** Centro de la pastilla, en px del contenedor `.pattern-editor`. */
+  /** El ancla de la pastilla, en px del contenedor `.pattern-editor`. */
   left: number;
   top: number;
+  /**
+   * Hacia dónde se aleja del objeto (unitario). La pastilla crece en esa
+   * dirección: su borde cercano se apoya en el ancla, así no tapa lo que
+   * describe aunque el objeto esté en un lado vertical. Sin él, centrada.
+   */
+  hacia?: Point2D;
   /** Pieza o capa bloqueada: se ve apagada, y el clic avisa en vez de abrir. */
   apagada?: boolean;
   alPulsarApagada?(): void;
@@ -41,14 +48,30 @@ export interface EtiquetaDeOpcionProps {
  * El menú cuelga de <body>, como «Más», y Esc lo cierra antes que la
  * selección (`usePeldanoDeEscape`).
  */
+/** El `translate` que apoya el borde cercano de la pastilla en su ancla. */
+function desplazamiento(hacia: Point2D | undefined): string {
+  const eje = (v: number) => Math.round((-50 + v * 50) * 10) / 10;
+  return hacia ? `translate(${eje(hacia.x)}%, ${eje(hacia.y)}%)` : 'translate(-50%, -50%)';
+}
+
 export default function EtiquetaDeOpcion({
-  que, texto, Dibujo, nombre, nombreDelMenu, opciones, valores, alCambiar, left, top, apagada = false, alPulsarApagada,
+  que, texto, Dibujo, nombre, nombreDelMenu, opciones, valores, alCambiar, left, top, hacia, apagada = false, alPulsarApagada,
 }: EtiquetaDeOpcionProps) {
   const [abierto, setAbierto] = useState(false);
   const [ancla, setAncla] = useState({ left: 0, top: 0 });
   const botonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const deTeclado = useRef(false);
+  const menuId = useId();
+
+  // La caja negra ve todo cierre, también el que no pasa por un gesto suyo:
+  // otra selección, un deshacer u otra herramienta desmontan la pastilla con
+  // el menú abierto (revisión final de P3c).
+  const abiertoAlDesmontar = useRef(abierto);
+  abiertoAlDesmontar.current = abierto;
+  useEffect(() => () => {
+    if (abiertoAlDesmontar.current) pushJournal('ui', 'etiqueta', { que, abierto: false, motivo: 'desmontada' });
+  }, [que]);
 
   // Abrir y cerrar quedan en la bitácora. Abierto con el teclado, el foco
   // entra al menú: cuelga de <body>, y Tab desde la pastilla no llegaría. Con
@@ -87,6 +110,12 @@ export default function EtiquetaDeOpcion({
     return () => window.removeEventListener('mousedown', onDown);
   }, [abierto]);
 
+  // Si la pieza se bloquea con el menú abierto (un Ctrl+Z del desbloqueo, el
+  // candado de la capa), el menú se va: un clic más escribiría sobre ella.
+  useEffect(() => {
+    if (apagada) setAbierto(false);
+  }, [apagada]);
+
   usePeldanoDeEscape('etiqueta', 'menu', abierto, () => {
     if (menuRef.current?.contains(document.activeElement)) botonRef.current?.focus();
     setAbierto(false);
@@ -104,7 +133,7 @@ export default function EtiquetaDeOpcion({
       data-superficie="cabina"
       data-material="papel"
       data-botonera
-      style={{ left, top }}
+      style={{ left, top, transform: desplazamiento(hacia) }}
       onMouseDown={noTomarElFoco}
     >
       <button
@@ -112,8 +141,8 @@ export default function EtiquetaDeOpcion({
         type="button"
         className="etiqueta-de-opcion__boton"
         aria-label={nombre}
-        aria-haspopup="true"
         aria-expanded={abierto}
+        aria-controls={abierto ? menuId : undefined}
         aria-disabled={apagada || undefined}
         onClick={(e) => {
           if (apagada) {
@@ -132,6 +161,7 @@ export default function EtiquetaDeOpcion({
       {abierto && createPortal(
         <div
           ref={menuRef}
+          id={menuId}
           className="etiqueta-de-opcion__menu"
           role="group"
           aria-label={nombreDelMenu}
