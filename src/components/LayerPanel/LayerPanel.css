@@ -15,7 +15,7 @@
 .layer-group.drop-rejected { outline: 2px solid var(--destructive); outline-offset: -2px; border-radius: 4px; }
 .layer-group-header { display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: var(--bg-surface); border-radius: 4px; cursor: pointer; user-select: none; }
 .layer-group-header:hover { background: var(--bg-elevated); }
-.layer-group-title { flex: 1; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-group-title { flex: 1; font-weight: 600; font-size: 11px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .layer-group-count { color: var(--text-muted); font-size: 10px; min-width: 16px; text-align: center; }
 .layer-collapse-chevron { color: var(--text-muted); font-size: 10px; width: 14px; text-align: center; }
 .layer-group-pieces { padding-left: 8px; }

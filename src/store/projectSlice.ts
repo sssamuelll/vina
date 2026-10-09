@@ -1766,10 +1766,12 @@ export const {
   addReferenceImage, removeReferenceImage, updateReferenceImage,
 } = projectSlice.actions;
 
-const DEFAULT_LAYER_NAMES: Record<number, string> = { 0: 'Lining', 1: 'Shell', 2: 'Trims' };
+// Los nombres de taller (spec 2026-10-02 § 6.1). Solo se ven: `layerNames`
+// no viaja en `stateToProject`, así que ningún proyecto guardado los lleva.
+const DEFAULT_LAYER_NAMES: Record<number, string> = { 0: 'Forro', 1: 'Exterior', 2: 'Avíos' };
 
 export function getLayerDisplayName(state: { project: { layerNames: Record<number, string> } }, layer: number): string {
-  return state.project.layerNames[layer] ?? DEFAULT_LAYER_NAMES[layer] ?? `Layer ${layer}`;
+  return state.project.layerNames[layer] ?? DEFAULT_LAYER_NAMES[layer] ?? `Capa ${layer}`;
 }
 
 export default projectSlice.reducer;

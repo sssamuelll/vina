@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { ChevronDown, ChevronRight, Eye, EyeOff, GripVertical, Lock, Unlock } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import {
@@ -244,8 +245,10 @@ export default function LayerPanel() {
         >
           Rayos X
         </button>
-        <button onClick={handleCollapseAll} title="Contraer/expandir todo">
-          {allLayers.every(l => collapsed[l]) ? '\u25B6' : '\u25BC'}
+        <button onClick={handleCollapseAll} title="Contraer/expandir todo" aria-label="Contraer/expandir todo">
+          {allLayers.every(l => collapsed[l])
+            ? <ChevronRight size={12} aria-hidden="true" />
+            : <ChevronDown size={12} aria-hidden="true" />}
         </button>
       </div>
 
@@ -302,7 +305,7 @@ export default function LayerPanel() {
                   className="layer-group-title"
                   onDoubleClick={e => { e.stopPropagation(); startRename(layerNum); }}
                 >
-                  {layerNum}: {displayName}
+                  {displayName}
                 </span>
               )}
 
@@ -312,8 +315,9 @@ export default function LayerPanel() {
                 className={`layer-icon-btn${isHidden ? '' : ' active'}`}
                 onClick={e => { e.stopPropagation(); dispatch(toggleLayerVisibility(layerNum)); }}
                 title={isHidden ? 'Mostrar capa' : 'Ocultar capa'}
+                aria-label={isHidden ? 'Mostrar capa' : 'Ocultar capa'}
               >
-                {isHidden ? '\uD83D\uDE48' : '\uD83D\uDC41'}
+                {isHidden ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
               </button>
 
               <button
@@ -323,12 +327,13 @@ export default function LayerPanel() {
                   dispatch(setLayerLocked({ layer: layerNum, locked: !isLocked }));
                 }}
                 title={isLocked ? 'Desbloquear capa' : 'Bloquear capa'}
+                aria-label={isLocked ? 'Desbloquear capa' : 'Bloquear capa'}
               >
-                {isLocked ? '\uD83D\uDD12' : '\uD83D\uDD13'}
+                {isLocked ? <Lock size={14} aria-hidden="true" /> : <Unlock size={14} aria-hidden="true" />}
               </button>
 
               <span className="layer-collapse-chevron">
-                {isCollapsed ? '\u25B6' : '\u25BC'}
+                {isCollapsed ? <ChevronRight size={12} aria-hidden="true" /> : <ChevronDown size={12} aria-hidden="true" />}
               </span>
             </div>
 
@@ -361,7 +366,7 @@ export default function LayerPanel() {
                       onClick={() => dispatch(selectPiece(piece.id))}
                     >
                       <span className="layer-piece-drag-handle" title="Arrastra para reordenar">
-                        &#x2630;
+                        <GripVertical size={12} aria-hidden="true" />
                       </span>
                       <span className="layer-piece-name">{piece.name}</span>
                       {(piece.sublayer ?? 0) > 0 && (
@@ -371,8 +376,9 @@ export default function LayerPanel() {
                         className={`layer-icon-btn${!isPieceHidden ? ' active' : ''}`}
                         onClick={e => { e.stopPropagation(); dispatch(toggleHide3D(piece.id)); }}
                         title={isPieceHidden ? 'Mostrar pieza' : 'Ocultar pieza'}
+                        aria-label={isPieceHidden ? 'Mostrar pieza' : 'Ocultar pieza'}
                       >
-                        {isPieceHidden ? '\uD83D\uDE48' : '\uD83D\uDC41'}
+                        {isPieceHidden ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
                       </button>
                     </div>
                   );
