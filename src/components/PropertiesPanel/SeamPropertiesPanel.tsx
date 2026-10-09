@@ -2,6 +2,7 @@ import { useDispatch } from 'react-redux';
 import { updateSeam, setSeamTension, deactivateSeam, removeSeam, reverseSeam } from '../../store/projectSlice';
 import type { Seam } from '../../types/types';
 import { applyPctRange, sewnLengthMm } from '../../utils/seam/seamRange';
+import { TIPOS_DE_COSTURA } from '../../utils/seam/tiposDeCostura';
 import PropertySection from './PropertySection';
 
 interface SeamPropertiesPanelProps {
@@ -121,10 +122,10 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, edge
           value={seam.type}
           onChange={e => dispatch(updateSeam({ ...seam, type: e.target.value as Seam['type'] }))}
         >
-          <option value="standard">Estándar</option>
-          <option value="french">Francesa</option>
-          <option value="flat-felled">Sobrecargada</option>
-          <option value="overlock">Overlock</option>
+          {/* Los nombres de la etiqueta de la costura: un término por concepto (P3c). */}
+          {TIPOS_DE_COSTURA.map(t => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
         </select>
       </div>
 

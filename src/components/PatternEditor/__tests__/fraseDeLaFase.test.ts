@@ -108,6 +108,19 @@ describe('la etiqueta de lo elegido (P3c)', () => {
     expect(f).not.toMatch(/arrástrala/i);
   });
 
+  it('la costura: la etiqueta cambia su tipo', () => {
+    const f = frase({ activeTool: 'select', etiqueta: 'costura' });
+    expect(f).toMatch(/etiqueta/i);
+    expect(f).toMatch(/tipo de costura/i);
+    expect(f).toMatch(/\bEsc\b/);
+  });
+
+  it('Editar costuras dice que el clic enseña con qué está cosido y deja cambiar el tipo', () => {
+    const f = frase({ activeTool: 'seamEdit', hasSeams: true });
+    expect(f).toMatch(/cosid/i);
+    expect(f).toMatch(/tipo de costura/i);
+  });
+
   it('la esquina del margen: la etiqueta cambia su tipo', () => {
     const f = frase({ activeTool: 'select', etiqueta: 'esquina' });
     expect(f).toMatch(/etiqueta/i);

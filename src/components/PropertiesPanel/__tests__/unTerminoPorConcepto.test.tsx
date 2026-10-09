@@ -7,17 +7,18 @@
  * «Castillo», «Estándar» y «Sobrecargada» donde el pie decía otra cosa.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { act, render, cleanup } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import projectReducer, { addPiece } from '../../../store/projectSlice';
-import editorReducer, { selectPiece } from '../../../store/editorSlice';
+import projectReducer, { addPiece, addSeam } from '../../../store/projectSlice';
+import editorReducer, { selectPiece, selectSeam } from '../../../store/editorSlice';
 import simulationReducer from '../../../store/simulationSlice';
 import toolReducer from '../../../store/toolSlice';
 import PropertiesPanel from '../PropertiesPanel';
 import type { AppDispatch } from '../../../store';
-import type { PatternPiece } from '../../../types/types';
+import type { PatternPiece, Seam } from '../../../types/types';
 import { FORMAS_DE_PIQUETE } from '../../../tools/definitions/notch';
+import { TIPOS_DE_COSTURA } from '../../../utils/seam/tiposDeCostura';
 
 afterEach(cleanup);
 
@@ -53,5 +54,21 @@ describe('Propiedades nombra como la línea al pie', () => {
   it('las formas del piquete', () => {
     panel();
     expect(opciones('prop-notch-shape')).toEqual(FORMAS_DE_PIQUETE.map((c) => [c.value, c.label]));
+  });
+
+  it('los tipos de costura, en su desplegable y en la insignia de la lista', () => {
+    const store = panel();
+    const costura: Seam = {
+      id: 's1', type: 'flat-felled', tension: 1, strength: 1, active: true, taped: false, tapeWidth: 0,
+      pieceA: { pieceId: 'p1', edgeName: 'edge-1' }, pieceB: { pieceId: 'p1', edgeName: 'edge-3' },
+    } as Seam;
+    act(() => { (store.dispatch as AppDispatch)(addSeam(costura)); });
+    // La lista de costuras: la insignia ya no dice «sobrecargada».
+    expect(document.querySelector('.seam-type')?.textContent).toBe('flat-felled');
+    act(() => { (store.dispatch as AppDispatch)(selectSeam('s1')); });
+    const tipo = Array.from(document.querySelectorAll('select'))
+      .find((s) => Array.from(s.options).some((o) => o.value === 'flat-felled'))!;
+    expect(Array.from(tipo.options).map((o) => [o.value, o.textContent]))
+      .toEqual(TIPOS_DE_COSTURA.map((t) => [t.value, t.label]));
   });
 });

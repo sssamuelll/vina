@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSelector, useDispatch, shallowEqual } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage, addTrazo, updateTrazo } from '../../store/projectSlice';
+import { addPiece, addSeam, updateSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage, addTrazo, updateTrazo } from '../../store/projectSlice';
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
 import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
@@ -982,8 +982,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
         cornerTypes: { ...(piece.cornerTypes ?? {}), [etiqueta.vertexIndex]: valor as CornerType },
         updatedAt: Date.now(),
       }));
+    } else if (etiqueta?.que === 'costura') {
+      const seam = seams.find(s => s.id === etiqueta.seamId);
+      if (seam) dispatch(updateSeam({ ...seam, type: valor as Seam['type'] }));
     }
-  }, [etiqueta, pieces, dispatch]);
+  }, [etiqueta, pieces, seams, dispatch]);
   const avisarBloqueada = useCallback(() => {
     dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
   }, [dispatch]);

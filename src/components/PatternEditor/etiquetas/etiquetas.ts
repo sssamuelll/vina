@@ -1,7 +1,10 @@
 import type {
   CornerType, InternalLineSelection, NotchOptions, PatternPiece, Point2D, SaSelection, Seam, Tool2D,
 } from '../../../types/types';
-import { pieceLocalToPattern, pieceLocalToPatternDirection } from '../../../utils/geometry/pieceSpace';
+import { pieceLocalToPattern, pieceLocalToPatternDirection, pieceLocalToPatternMany } from '../../../utils/geometry/pieceSpace';
+import { samplePolyline } from '../../../utils/pleatGeometry';
+import { resolveEdgePolyline, slicePolylineByT } from '../../../utils/seam/index';
+import { nombreDelTipoDeCostura, TIPOS_DE_COSTURA } from '../../../utils/seam/tiposDeCostura';
 import { resolveNotchAnchor } from '../../../utils/notchAnchor';
 import { DEFAULT_NOTCH_OPTIONS } from '../../../utils/notches';
 import { piezaBloqueada } from '../../../utils/piezaBloqueada';
@@ -111,9 +114,44 @@ function deLaEsquina(input: EtiquetaInput): Etiqueta | null {
   };
 }
 
+/** Las herramientas donde la costura elegida enseña su etiqueta. */
+const CON_ETIQUETA_DE_COSTURA: ReadonlySet<Tool2D> = new Set<Tool2D>(['select', 'seam', 'seamEdit']);
+
+/**
+ * La costura elegida: la deja elegida Coser al terminarla, y la elige Editar
+ * costuras con un clic en su lado (su puerta de vuelta: con Seleccionar no se
+ * pinta ninguna costura, firma de María #210). La etiqueta va en el medio de
+ * su mitad A, hacia dentro de la pieza A. Nunca apagada: el tipo de costura
+ * no es geometría de la pieza.
+ */
+function deLaCostura(input: EtiquetaInput): Etiqueta | null {
+  if (!input.selectedSeamId || !input.showSewingLines || !CON_ETIQUETA_DE_COSTURA.has(input.activeTool)) return null;
+  const seam = input.seams.find((s) => s.id === input.selectedSeamId);
+  const pieceA = seam && input.pieces.find((p) => p.id === seam.pieceA.pieceId);
+  if (!seam || !pieceA || !visible(pieceA, input)) return null;
+  const entera = resolveEdgePolyline(pieceA.outline, pieceA.edges, seam.pieceA.edgeName);
+  const { tStart, tEnd } = seam.pieceA;
+  const tramo = tStart != null && tEnd != null ? slicePolylineByT(entera, tStart, tEnd) : entera;
+  // ponytail: sin tramo resuelto no hay etiqueta; SeamRenderer cae al medio del primer comando.
+  if (tramo.length < 2) return null;
+  // Con el giro de la pieza, a diferencia de SeamRenderer (deuda #1068): donde
+  // el dibujo ya está mal, la etiqueta está en su sitio.
+  const punto = samplePolyline(pieceLocalToPatternMany(tramo, pieceA), 0.5).point;
+  const centro = centroDe(pieceA);
+  return {
+    que: 'costura',
+    seamId: seam.id,
+    tipo: seam.type,
+    apagada: false,
+    punto,
+    hacia: unitario({ x: centro.x - punto.x, y: centro.y - punto.y }),
+    separacionMm: 0,
+  };
+}
+
 export function etiquetaDeLaSeleccion(input: EtiquetaInput): Etiqueta | null {
   if (input.callada) return null;
-  return delPiquete(input) ?? deLaEsquina(input);
+  return delPiquete(input) ?? deLaEsquina(input) ?? deLaCostura(input);
 }
 
 /** Lo que la pastilla enseña y lo que su menú ofrece (microcopy: solace-wren, 2026-10-09). */
@@ -142,9 +180,24 @@ export function presentarEtiqueta(
       valores: { cornerType: e.tipo },
     };
   }
-  // ponytail: la costura llega en su tarea (P3c, Task 5).
-  return { texto: '', nombre: '', nombreDelMenu: '', opciones: [], valores: {} };
+  const texto = nombreDelTipoDeCostura(e.tipo);
+  return {
+    texto,
+    nombre: `Tipo de costura: ${texto}`,
+    nombreDelMenu: 'Opciones de la costura',
+    opciones: [OPCION_TIPO_DE_COSTURA],
+    valores: { type: e.tipo },
+  };
 }
+
+/** El tipo de costura como una opción del pie: las cuatro alternativas de siempre. */
+const OPCION_TIPO_DE_COSTURA: ToolOption = {
+  id: 'type',
+  label: 'Tipo de costura',
+  type: 'select',
+  value: 'standard',
+  choices: TIPOS_DE_COSTURA.map((t) => ({ label: t.label, value: t.value })),
+};
 
 /** El tipo de esquina como una opción del pie: siete alternativas, que caben como botones. */
 const OPCION_TIPO_DE_ESQUINA: ToolOption = {
@@ -155,12 +208,16 @@ const OPCION_TIPO_DE_ESQUINA: ToolOption = {
   choices: TIPOS_DE_ESQUINA.map((t) => ({ label: t.label, value: t.value })),
 };
 
-/** Separación fija, en px, entre el objeto (más su separación a escala) y el centro de la pastilla. */
+/**
+ * Separación fija, en px, entre el objeto (más su separación a escala) y el
+ * centro de la pastilla. La costura se aparta más: en su medio están sus largos.
+ */
 const SEPARACION_PX = 16;
+const SEPARACION_COSTURA_PX = 24;
 
 /** El centro de la pastilla en px del contenedor `.pattern-editor`. */
 export function posicionDeEtiqueta(e: Etiqueta, pan: Point2D, zoom: number): { left: number; top: number } {
-  const lejos = e.separacionMm * zoom + SEPARACION_PX;
+  const lejos = e.separacionMm * zoom + (e.que === 'costura' ? SEPARACION_COSTURA_PX : SEPARACION_PX);
   return {
     left: pan.x + e.punto.x * zoom + e.hacia.x * lejos,
     top: pan.y + e.punto.y * zoom + e.hacia.y * lejos,

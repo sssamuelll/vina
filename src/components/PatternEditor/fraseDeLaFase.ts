@@ -81,6 +81,7 @@ export interface FaseDeLaHerramienta {
 /** Con Seleccionar, lo elegido que trae etiqueta (solace-wren, 2026-10-09). */
 const DE_LA_ETIQUETA: Partial<Record<'piquete' | 'costura' | 'esquina', string>> = {
   piquete: 'Clic en la distancia para escribirla · la etiqueta cambia forma, cantidad y medidas · Esc suelta',
+  costura: 'Clic en la etiqueta para cambiar el tipo de costura · Esc suelta',
   esquina: 'Clic en la etiqueta para cambiar el tipo de esquina · Esc suelta',
 };
 
@@ -153,7 +154,10 @@ export function fraseDeLaFase(f: FaseDeLaHerramienta): string | null {
         ? 'Ahora marca en la otra pieza · clic en vacío o Esc suelta'
         : 'Clic cose el lado entero · arrastre cose solo un tramo';
     case 'seamEdit':
-      return f.hasSeams === false ? 'No hay costuras: cose primero con N' : 'Clic en un lado para ver con qué está cosido';
+      return f.hasSeams === false
+        ? 'No hay costuras: cose primero con N'
+        // Desde P3c el clic trae además la etiqueta de la costura con su tipo.
+        : 'Clic en un lado para ver con qué está cosido y cambiar el tipo de costura';
     case 'seamAllowance':
       return `Pasa por un borde para leer su margen · clic para escribirlo · pieza entera: ${formatMedida(f.saDefaultWidthMm ?? DEFAULT_SEAM_ALLOWANCE, 'mm')} · esquina: su tipo`;
     case 'notch':

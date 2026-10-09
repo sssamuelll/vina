@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { InternalLine, PathCommand, PatternPiece } from '../../../../types/types';
+import type { InternalLine, PathCommand, PatternPiece, Seam } from '../../../../types/types';
+import { TIPOS_DE_COSTURA } from '../../../../utils/seam/tiposDeCostura';
 import { DEFAULT_NOTCH_OPTIONS } from '../../../../utils/notches';
 import { FORMAS_DE_PIQUETE, notchTool } from '../../../../tools/definitions/notch';
 import { TIPOS_DE_ESQUINA } from '../../../../utils/seam/tiposDeEsquina';
@@ -142,6 +143,68 @@ describe('etiquetaDeLaSeleccion — la esquina del margen', () => {
 
   it('su clave', () => {
     expect(claveDeEtiqueta(etiquetaDeLaSeleccion(esquina())!)).toBe('esquina:p1:0');
+  });
+});
+
+describe('etiquetaDeLaSeleccion — la costura', () => {
+  const conLados: PatternPiece = {
+    ...pieza,
+    internals: [],
+    edges: [
+      { id: 'p1:top', name: 'top', segmentRange: [1, 2], edgeType: 'seam', length: 300 },
+      { id: 'p1:bottom', name: 'bottom', segmentRange: [3, 4], edgeType: 'seam', length: 300 },
+    ],
+  };
+  const costura = {
+    id: 's1', type: 'standard', tension: 1, strength: 1, active: true, taped: false, tapeWidth: 0,
+    pieceA: { pieceId: 'p1', edgeName: 'top' }, pieceB: { pieceId: 'p1', edgeName: 'bottom' },
+  } as Seam;
+  const conCostura = (over: Partial<EtiquetaInput> = {}) => base({
+    pieces: [conLados], seams: [costura], selectedInternalLine: null, selectedSeamId: 's1', ...over,
+  });
+
+  it('con Seleccionar, Coser o Editar costuras: en el medio de su mitad A, hacia dentro de la pieza A', () => {
+    for (const activeTool of ['select', 'seam', 'seamEdit'] as const) {
+      const e = etiquetaDeLaSeleccion(conCostura({ activeTool }))!;
+      expect(e).toMatchObject({ que: 'costura', seamId: 's1', tipo: 'standard', apagada: false, separacionMm: 0 });
+      // El lado de arriba va de (100, 100) a (400, 100).
+      expect(e.punto.x).toBeCloseTo(250, 6);
+      expect(e.punto.y).toBeCloseTo(100, 6);
+      expect(e.hacia.x).toBeCloseTo(0, 6);
+      expect(e.hacia.y).toBeCloseTo(1, 6);
+    }
+  });
+
+  it('con otra herramienta, con «Costuras» apagado, con la capa de A oculta o callada, nada', () => {
+    expect(etiquetaDeLaSeleccion(conCostura({ activeTool: 'pen' }))).toBeNull();
+    expect(etiquetaDeLaSeleccion(conCostura({ showSewingLines: false }))).toBeNull();
+    expect(etiquetaDeLaSeleccion(conCostura({ hiddenLayerIds: [1] }))).toBeNull();
+    expect(etiquetaDeLaSeleccion(conCostura({ callada: true }))).toBeNull();
+  });
+
+  it('una costura que ya no está (deshacer), nada', () => {
+    expect(etiquetaDeLaSeleccion(conCostura({ selectedSeamId: 'otra' }))).toBeNull();
+  });
+
+  it('nunca apagada: el tipo de costura no es geometría de la pieza', () => {
+    expect(etiquetaDeLaSeleccion(conCostura({ pieces: [{ ...conLados, locked: true }] }))!.apagada).toBe(false);
+  });
+
+  it('presentarEtiqueta: «Tipo de costura: Normal», su menú y las cuatro alternativas', () => {
+    const p = presentarEtiqueta(etiquetaDeLaSeleccion(conCostura())!);
+    expect(p.texto).toBe('Normal');
+    expect(p.nombre).toBe('Tipo de costura: Normal');
+    expect(p.nombreDelMenu).toBe('Opciones de la costura');
+    expect(p.opciones).toHaveLength(1);
+    expect(p.opciones[0].label).toBe('Tipo de costura');
+    expect(p.opciones[0].choices!.map((c) => [c.value, c.label])).toEqual(TIPOS_DE_COSTURA.map((t) => [t.value, t.label]));
+    expect(p.valores).toEqual({ type: 'standard' });
+  });
+
+  it('su clave, y 24 px de separación para no tapar sus largos', () => {
+    const e = etiquetaDeLaSeleccion(conCostura())!;
+    expect(claveDeEtiqueta(e)).toBe('costura:s1');
+    expect(posicionDeEtiqueta(e, { x: 0, y: 0 }, 1).top).toBeCloseTo(100 + 24, 6);
   });
 });
 

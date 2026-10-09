@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 /**
- * F3 edit — the seam/freesewing tool family must honor the seamType tool
- * option (toolOptions.seam.seamType), mirroring the convention already
- * canonical in useSegmentSewingTool. It used to hardcode 'standard', so
- * choosing a french/overlock/flat-felled construction was impossible.
+ * El tipo de una costura nueva. Hasta P3c, Coser lo leía de su opción en la
+ * línea al pie (toolOptions.seam.seamType). Desde P3c (spec 2026-10-02 § 5.2
+ * y § 5.3) «Tipo de costura» sale del pie: la costura nace Normal y su tipo se
+ * cambia en su etiqueta, con la costura elegida. Es el «“Tipo de costura”
+ * fuera del gesto de coser» que María pidió el 30-08 [22:47].
  */
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
@@ -76,16 +77,16 @@ function setup(seamType?: string) {
   return onComplete;
 }
 
-describe('useFreeSewingTool — seamType from toolOptions (F3)', () => {
-  it('defaults to standard when no option is set', () => {
+describe('useFreeSewingTool — la costura nueva nace Normal (P3c)', () => {
+  it('sin nada guardado, Normal', () => {
     const onComplete = setup();
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(onComplete.mock.calls[0][0].type).toBe('standard');
   });
 
-  it('honors toolOptions.seam.seamType', () => {
+  it('un tipo viejo que quede en toolOptions ya no manda: la opción salió del pie', () => {
     const onComplete = setup('french');
     expect(onComplete).toHaveBeenCalledTimes(1);
-    expect(onComplete.mock.calls[0][0].type).toBe('french');
+    expect(onComplete.mock.calls[0][0].type).toBe('standard');
   });
 });
