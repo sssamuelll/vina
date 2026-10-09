@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { addPiece, clickAt, activarHerramienta, dispatch } from './helpers/lienzo';
 import { startSimulation } from './helpers/sim';
 import { medirAccion, enReposo } from './helpers/superficies';
@@ -224,6 +224,61 @@ test.describe('con un rectángulo sembrado (lados rectos conocidos)', () => {
       },
       () => clickAt(page, { x: 120, y: 320 }),
     ]));
+  });
+
+  // La puerta de vuelta (P3c): elegir lo ya puesto trae su cabina —la cota y
+  // la etiqueta cuentan 1— y su frase. Abrir la etiqueta es un menú.
+  async function unPiqueteElegido(page: Page, elegir: boolean) {
+    await activarHerramienta(page, 'Shift+N', 'notch');
+    await clickAt(page, { x: 180, y: 120 });
+    await page.locator('input.cota--editando[aria-label="Distancia"]').press('Escape');
+    await activarHerramienta(page, 'z', 'select');
+    if (elegir) {
+      await clickAt(page, { x: 180, y: 124 });
+      await expect(page.getByRole('button', { name: /^Piquete: / })).toBeVisible();
+    }
+  }
+
+  // Cada medida comprueba después que el gesto hizo lo que dice: el trinquete
+  // solo pone techo, y un clic que no eligiera nada pasaría con menos.
+  test('elegir un piquete (Z)', async ({ page }) => {
+    await unPiqueteElegido(page, false);
+    registrar('elegir un piquete (Z)', await medirAccion(page, [
+      () => clickAt(page, { x: 180, y: 124 }),
+    ]));
+    await expect(page.getByRole('button', { name: /^Piquete: / })).toBeVisible();
+  });
+
+  test('abrir la etiqueta del piquete', async ({ page }) => {
+    await unPiqueteElegido(page, true);
+    registrar('abrir la etiqueta del piquete', await medirAccion(page, [
+      () => page.getByRole('button', { name: /^Piquete: / }).click(),
+    ]));
+    await expect(page.getByRole('group', { name: 'Opciones del piquete' })).toBeVisible();
+  });
+
+  test('elegir una esquina del margen (Z)', async ({ page }) => {
+    await dispatch(page, 'project/batchSetSeamAllowance', { pieceIds: ['rect-superficies'], width: 10 });
+    await activarHerramienta(page, 'z', 'select');
+    // La punta del margen de la esquina de (120, 120) cae en (110, 110).
+    registrar('elegir una esquina del margen (Z)', await medirAccion(page, [
+      () => clickAt(page, { x: 113, y: 113 }),
+    ]));
+    await expect(page.getByRole('button', { name: /^Tipo de esquina/ })).toBeVisible();
+  });
+
+  // «coser dos lados (N)» no cose: sus dos clics caen en la misma pieza, y
+  // Coser pide otra para la segunda mitad. Este cose de verdad y mide la
+  // etiqueta de la costura recién hecha (revisión final de P3c).
+  test('coser dos piezas (N)', async ({ page }) => {
+    await addPiece(page, 'otra-superficies', { x: 500, y: 120 }, 300, 400);
+    await reposo(page);
+    registrar('coser dos piezas (N)', await medirAccion(page, [
+      () => activarHerramienta(page, 'n', 'seam'),
+      () => clickAt(page, { x: 420, y: 300 }),
+      () => clickAt(page, { x: 500, y: 300 }),
+    ]));
+    await expect(page.getByRole('button', { name: /^Tipo de costura/ })).toBeVisible();
   });
 
   // Punto no tiene tecla. Tras el clic trae su cota (spec 2026-10-02 § 5.1: 3).

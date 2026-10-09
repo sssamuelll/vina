@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react';
-import { ToolDefinition } from '../types';
+import { ToolDefinition, type ToolOption } from '../types';
 import type { NotchShape } from '../../types/types';
 import { DEFAULT_NOTCH_OPTIONS, generateNotchPath } from '../../utils/notches';
 
@@ -38,6 +38,20 @@ function dibujoDeForma(shape: NotchShape): React.FC<{ size?: number }> {
   return Dibujo;
 }
 
+/**
+ * Las siete formas, con el nombre que ve María: una lista por concepto (contrato
+ * § 5). La usan la línea al pie, la etiqueta del piquete (P3c) y Propiedades.
+ */
+export const FORMAS_DE_PIQUETE: NonNullable<ToolOption['choices']> = [
+  { label: 'Recta', value: 'slit', icon: dibujoDeForma('slit') },
+  { label: 'En T', value: 't-notch', icon: dibujoDeForma('t-notch') },
+  { label: 'V hacia adentro', value: 'v-internal', icon: dibujoDeForma('v-internal') },
+  { label: 'V hacia afuera', value: 'v-external', icon: dibujoDeForma('v-external') },
+  { label: 'En U', value: 'u-notch', icon: dibujoDeForma('u-notch') },
+  { label: 'Almena', value: 'castle', icon: dibujoDeForma('castle') },
+  { label: 'Rombo', value: 'diamond', icon: dibujoDeForma('diamond') },
+];
+
 export const notchTool: ToolDefinition = {
   id: 'notch',
   name: 'Piquete',
@@ -54,15 +68,7 @@ export const notchTool: ToolDefinition = {
       label: 'Forma',
       type: 'select',
       value: DEFAULT_NOTCH_OPTIONS.shape,
-      choices: [
-        { label: 'Recta', value: 'slit', icon: dibujoDeForma('slit') },
-        { label: 'En T', value: 't-notch', icon: dibujoDeForma('t-notch') },
-        { label: 'V hacia adentro', value: 'v-internal', icon: dibujoDeForma('v-internal') },
-        { label: 'V hacia afuera', value: 'v-external', icon: dibujoDeForma('v-external') },
-        { label: 'En U', value: 'u-notch', icon: dibujoDeForma('u-notch') },
-        { label: 'Almena', value: 'castle', icon: dibujoDeForma('castle') },
-        { label: 'Rombo', value: 'diamond', icon: dibujoDeForma('diamond') },
-      ],
+      choices: FORMAS_DE_PIQUETE,
     },
     {
       id: 'count',

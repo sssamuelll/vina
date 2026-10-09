@@ -57,6 +57,13 @@ export type CotaUpdate =
    * distancia y la profundidad viajan juntas porque el path sale de las dos.
    */
   | { kind: 'piquete'; distanciaMm: number; profundidadMm: number }
+  /**
+   * El piquete elegido con Seleccionar (P3c, la puerta de vuelta): su
+   * distancia, escrita por el ancla. A diferencia de `'piquete'` no hay sesión
+   * de herramienta detrás: lo escribe `PatternEditor` con `reescribirPiquete`,
+   * el mismo escritor que usa su etiqueta.
+   */
+  | { kind: 'piqueteElegido'; pieceId: string; lineId: string; distanciaMm: number }
   /** El punto recién puesto: moverlo es volver a ponerlo, y eso lo hace `usePointTool`. */
   | { kind: 'punto'; distanciaMm: number };
 

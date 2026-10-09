@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { largoDelLado, cotasDelPiquete, dondeCaeElPunto, cotaDelPunto } from '../loQueSePone';
+import { largoDelLado, cotasDelPiquete, dondeCaeElPunto, cotaDelPunto, cotaDelPiqueteElegido } from '../loQueSePone';
 import type { NotchRefineState } from '../../useNotchTool';
 import type { PuntoPuesto } from '../../usePointTool';
 import { splitSegmentAt, getAnchor } from '../../nodeEditorUtils';
 import { buildRing, projectToRing } from '../../../../utils/geometry/outlineRing';
-import type { PathCommand, PatternPiece } from '../../../../types/types';
+import type { InternalLine, PathCommand, PatternPiece } from '../../../../types/types';
 import { DEFAULT_NOTCH_OPTIONS } from '../../../../utils/notches';
 
 /** La cota del piquete recién puesto (spec 2026-10-02 § 5.2): dos campos, un grupo, por fuera del borde. */
@@ -47,6 +47,9 @@ describe('largoDelLado', () => {
 describe('cotasDelPiquete', () => {
   const enVivo = () => ({ alEscribir: vi.fn(), alCerrar: vi.fn() });
 
+  // La profundidad SIGUE en el chip de lo que se pone (revisión final de P3c,
+  // lente A): la etiqueta solo existe para el piquete ELEGIDO con Seleccionar,
+  // así que sacarla de aquí dejaba al recién puesto sin puerta a la suya.
   it('dos campos en un grupo: Distancia, con el largo del lado, y Profundidad de 1 a 30', () => {
     const cotas = cotasDelPiquete(refinando(), pieza, enVivo());
     // El techo es el lado, el mismo que se lee: «de 300 mm» (revisión final de P3b).
@@ -105,6 +108,47 @@ describe('cotasDelPiquete', () => {
   it('sin ancla no hay cota', () => {
     const r = refinando();
     expect(cotasDelPiquete({ ...r, notch: { ...r.notch, notchAnchor: undefined } }, pieza, enVivo())).toEqual([]);
+  });
+});
+
+describe('cotaDelPiqueteElegido (P3c, la puerta de vuelta)', () => {
+  const elegido = (distanceMm = 60): InternalLine => ({
+    id: 'n', type: 'notch', path: [{ type: 'M', values: [distanceMm, 0] }, { type: 'L', values: [distanceMm, 8] }],
+    notchAnchor: { refPoint: { x: 0, y: 0 }, direction: 'cw', distanceMm, metric: 2 },
+    notchOptions: { ...DEFAULT_NOTCH_OPTIONS, length: 8 },
+  });
+
+  it('su distancia a la esquina, con el largo del lado; descansa: ni sesión que cerrar ni arrastre', () => {
+    const c = cotaDelPiqueteElegido(pieza, elegido())!;
+    expect([c.label, c.valueMm, c.min, c.max, c.unit, c.kind]).toEqual(['Distancia', 60, 0, 300, 'mm', 'borde']);
+    expect(c.referenceLabel).toBe('de 300 mm');
+    expect(c.scrub).toBe(false);
+    expect(c.alCerrar).toBeUndefined();
+    expect(c.alEscribir).toBeUndefined();
+    expect(c.grupo).toBeUndefined();
+  });
+
+  it('escribe por el ancla: la pieza, la línea y la distancia', () => {
+    expect(cotaDelPiqueteElegido(pieza, elegido())!.apply(150))
+      .toEqual({ kind: 'piqueteElegido', pieceId: 'p', lineId: 'n', distanciaMm: 150 });
+  });
+
+  it('el hilo va de la esquina al piquete, en patrón, por fuera de la pieza', () => {
+    const c = cotaDelPiqueteElegido(pieza, elegido())!;
+    expect([c.a, c.b]).toEqual([{ x: 10, y: 20 }, { x: 70, y: 20 }]);
+    expect(c.outward.y).toBeLessThan(0);
+  });
+
+  it('una distancia guardada mayor que el lado no queda atrapada', () => {
+    expect(cotaDelPiqueteElegido(pieza, elegido(450))!.max).toBe(450);
+  });
+
+  it('sin ancla, con un ancla que ya no cae en el contorno o si no es un piquete, no hay cota', () => {
+    expect(cotaDelPiqueteElegido(pieza, { ...elegido(), notchAnchor: undefined })).toBeNull();
+    expect(cotaDelPiqueteElegido(pieza, {
+      ...elegido(), notchAnchor: { refPoint: { x: 999, y: 999 }, direction: 'cw', distanceMm: 5, metric: 2 },
+    })).toBeNull();
+    expect(cotaDelPiqueteElegido(pieza, { ...elegido(), type: 'reference' })).toBeNull();
   });
 });
 

@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSelector, useDispatch, shallowEqual } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage, addTrazo, updateTrazo } from '../../store/projectSlice';
+import { addPiece, addSeam, updateSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage, addTrazo, updateTrazo } from '../../store/projectSlice';
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
 import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, clearSelection, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, esRectaDeDosPuntos } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, esRectaDeDosPuntos, type CornerType, type NotchOptions } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import type { PenResult } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
@@ -26,7 +26,11 @@ import { cajasDeAsas } from './cotas/cotasGeometry';
 import { resizePieceTo } from './pieceResize';
 import SeccionDelPatron from './SeccionDelPatron';
 import { fraseDeLaFase, fraseDelPie } from './fraseDeLaFase';
-import { suscribirNoPasoNada } from './noPasoNada';
+import { noPasoNada, suscribirNoPasoNada } from './noPasoNada';
+import EtiquetaDeOpcion from './etiquetas/EtiquetaDeOpcion';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
+import { claveDeEtiqueta, etiquetaDeLaSeleccion, posicionDeEtiqueta, presentarEtiqueta } from './etiquetas/etiquetas';
+import { reescribirPiquete } from './etiquetas/piquete';
 import type { Cota } from './cotas/cotas';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
@@ -317,9 +321,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     // empujaba el lienzo y dejaba el chip recién abierto bajo la tira (medido
     // en las capturas de la entrega 33). Si el panel está abierto, se
     // actualiza igual; "Usar el de la pieza" y los tramos siguen viviendo ahí.
-    // La esquina sí lo abre: su tipo no tiene otra puerta.
+    // La esquina tampoco lo abre desde P3c: su tipo está en su etiqueta, sobre
+    // el vértice (spec 2026-10-02 § 5.2 y § 11, «el tipo de esquina ya tiene
+    // puerta fuera de Propiedades»).
     onSelectEdge: (pieceId, edgeId, additive) => { dispatch(selectSaEdges({ items: [{ pieceId, edgeId }], additive })); },
-    onSelectVertex: (pieceId, vertexIndex) => { dispatch(selectSaVertices({ pieceId, vertexIndex })); onOpenPanel?.('Properties'); },
+    onSelectVertex: (pieceId, vertexIndex) => { dispatch(selectSaVertices({ pieceId, vertexIndex })); },
   }, activeTool === 'seamAllowance', layerLocked);
 
   const trimTool = useTrimTool(zoom2D, pan2D, pieces, dispatch);
@@ -944,6 +950,53 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     () => refinarAlLado(sujetoSinLado, ladoSeleccionado, { activeTool, pieces, hiddenLayerIds, layerLocked }),
     [sujetoSinLado, ladoSeleccionado, activeTool, pieces, hiddenLayerIds, layerLocked],
   );
+
+  // La etiqueta de opción de lo elegido (spec 2026-10-02 § 5.2, P3c): el pie
+  // de lo que ya está puesto. Se calla cuando se callan las cotas.
+  const etiqueta = useMemo(() => etiquetaDeLaSeleccion({
+    activeTool, pieces, seams,
+    selectedInternalLine: editor.selectedInternalLine,
+    selectedSeamId: editor.selectedSeamId,
+    saSelection: editor.saSelection,
+    showNotches, showSewingLines, showSeamAllowance, hiddenLayerIds, layerLocked,
+    callada: isDraggingPiece || transformTool.isDragging || isDraggingEndpoint || ctxMenu.visible || calibrationMode !== null,
+  }), [activeTool, pieces, seams, editor.selectedInternalLine, editor.selectedSeamId, editor.saSelection, showNotches, showSewingLines, showSeamAllowance, hiddenLayerIds, layerLocked, isDraggingPiece, transformTool.isDragging, isDraggingEndpoint, ctxMenu.visible, calibrationMode]);
+  // Lo que se escribe en una etiqueta vale para ese objeto y nada más (§ 5.2,
+  // «Lo que no se recuerda»): ninguna opción de herramienta cambia.
+  const cambiarEtiqueta = useCallback((opcion: string, valor: unknown) => {
+    // El escritor mira el candado, no solo la pastilla (#1136): con la pieza
+    // bloqueada, nada se escribe aunque un menú haya quedado abierto.
+    if (etiqueta?.apagada) {
+      dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+      return;
+    }
+    if (etiqueta?.que === 'piquete') {
+      const piece = pieces.find(p => p.id === etiqueta.pieceId);
+      const line = piece?.internals.find(l => l.id === etiqueta.lineId);
+      if (!piece || !line) return;
+      const nuevo = reescribirPiquete(piece, line, { opciones: { [opcion]: valor } as Partial<NotchOptions> });
+      if (!nuevo) {
+        noPasoNada('notch:ancla-perdida', { pieceId: piece.id, notchId: line.id });
+        return;
+      }
+      dispatch(updateInternalLine({ pieceId: piece.id, lineId: line.id, ...nuevo }));
+    } else if (etiqueta?.que === 'esquina') {
+      // Esa esquina y nada más: «Aplicar a todas las esquinas» sigue en Propiedades.
+      const piece = pieces.find(p => p.id === etiqueta.pieceId);
+      if (!piece) return;
+      dispatch(updatePiece({
+        ...piece,
+        cornerTypes: { ...(piece.cornerTypes ?? {}), [etiqueta.vertexIndex]: valor as CornerType },
+        updatedAt: Date.now(),
+      }));
+    } else if (etiqueta?.que === 'costura') {
+      const seam = seams.find(s => s.id === etiqueta.seamId);
+      if (seam) dispatch(updateSeam({ ...seam, type: valor as Seam['type'] }));
+    }
+  }, [etiqueta, pieces, seams, dispatch]);
+  const avisarBloqueada = useCallback(() => {
+    dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+  }, [dispatch]);
   // Los dos refs que la puerta de Tab consulta. Se escriben del sujeto REAL, no
   // de una lista paralela: «¿cabría un lado?» y «¿el lado está a la vista?»
   // tienen una sola respuesta cada una, y sale de `admiteLado`.
@@ -1162,6 +1215,20 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     } else if (update.kind === 'piquete') {
       // Lo escribe la herramienta, que sabe regenerar el path desde el ancla.
       notchRef.current.confirmRefine(update.distanciaMm, update.profundidadMm);
+    } else if (update.kind === 'piqueteElegido') {
+      // El piquete elegido con Seleccionar (P3c): por el ancla, como al ponerlo.
+      // El mismo escritor que su etiqueta.
+      const piece = pieces.find(p => p.id === update.pieceId);
+      const line = piece?.internals.find(l => l.id === update.lineId);
+      // El candado, también aquí: la cota se apaga, pero el escritor no se fía.
+      if (!piece || !line || piezaBloqueada(piece, layerLocked)) return;
+      const nuevo = reescribirPiquete(piece, line, { distanciaMm: update.distanciaMm });
+      if (!nuevo) {
+        noPasoNada('notch:ancla-perdida', { pieceId: piece.id, notchId: line.id });
+        return;
+      }
+      const accion = updateInternalLine({ pieceId: piece.id, lineId: line.id, ...nuevo });
+      dispatch(token ? withUndoBatchToken(accion, token) : accion);
     } else if (update.kind === 'punto') {
       // Moverlo es volver a ponerlo desde la pieza de antes del clic.
       pointRef.current.moverPuesto(update.distanciaMm);
@@ -1185,7 +1252,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
       const accion = updateInternalLine({ pieceId: update.pieceId, lineId: update.lineId, path: update.path });
       dispatch(token ? withUndoBatchToken(accion, token) : accion);
     }
-  }, [pieces, trazos, dispatch, activeTool, figuraDelCirculo, sujeto.piece?.id]);
+  }, [pieces, trazos, dispatch, activeTool, figuraDelCirculo, sujeto.piece?.id, layerLocked]);
   const aplicarRef = useRef(aplicarCota);
   aplicarRef.current = aplicarCota;
 
@@ -1523,6 +1590,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     medidaEmpezada: measureTool.currentStart !== null,
     modoDelPunto: (toolOptions?.point?.mode as PointToolMode | undefined) ?? 'point',
     loQueSePone: loQueSePone === null ? null : piquetePuesto ? 'piquete' : 'punto',
+    etiqueta: etiqueta?.que ?? null,
   });
 
   return (
@@ -1611,7 +1679,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
           )}
           <ElasticRenderer zoom2D={zoom2D} selectedElasticId={elasticTool.selectedElasticId} />
           <TrimRenderer zoom2D={zoom2D} />
-          {activeTool === 'seamAllowance' && (
+          {/* Con Seleccionar, la esquina elegida también se marca (P3c): su
+              etiqueta dice el tipo y el anillo dice cuál es. */}
+          {(activeTool === 'seamAllowance' || (activeTool === 'select' && editor.saSelection?.kind === 'vertex')) && (
             <SeamAllowanceSelectionOverlay
               saSelection={editor.saSelection}
               hoverEdge={sujeto.bordeLeido}
@@ -1833,6 +1903,19 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
           onScrubCancel={handleCotaScrubCancel}
         />
       </AgruparCotas>
+      {etiqueta && (
+        <EtiquetaDeOpcion
+          // Otra selección es otra etiqueta: su menú se cierra.
+          key={claveDeEtiqueta(etiqueta)}
+          que={etiqueta.que}
+          {...presentarEtiqueta(etiqueta)}
+          {...posicionDeEtiqueta(etiqueta, pan2D, zoom2D)}
+          hacia={etiqueta.hacia}
+          apagada={etiqueta.apagada}
+          alPulsarApagada={avisarBloqueada}
+          alCambiar={cambiarEtiqueta}
+        />
+      )}
       {/* La sección del patrón de la línea al pie (spec 2026-10-02 § 5.3):
           vive en el marco, al pie de la ventana, pero su frase sale del estado
           de las herramientas de aquí, así que se pinta por portal en la ranura

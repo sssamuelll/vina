@@ -23,15 +23,14 @@ import EdgePropertiesSection from './EdgePropertiesSection';
 import VertexPropertiesSection from './VertexPropertiesSection';
 import SeamAllowanceDefaultSection from './SeamAllowanceDefaultSection';
 import NotchPropertiesSection from './NotchPropertiesSection';
+import { TIPOS_DE_COSTURA } from '../../utils/seam/tiposDeCostura';
 import './PropertiesPanel.css';
 
-// Etiquetas ES para el badge de tipo de costura (los valores son keys de datos).
-const SEAM_TYPE_LABELS: Record<string, string> = {
-  standard: 'estándar',
-  french: 'francesa',
-  'flat-felled': 'sobrecargada',
-  overlock: 'overlock',
-};
+// La insignia del tipo de costura, con los nombres de la etiqueta de la
+// costura y de la línea al pie (un término por concepto, P3c), en minúscula.
+const SEAM_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  TIPOS_DE_COSTURA.map(t => [t.value, t.label.toLowerCase()]),
+);
 
 export default function PropertiesPanel() {
   const dispatch = useDispatch();

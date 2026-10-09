@@ -2,7 +2,8 @@ import type { CotasLayerHandle } from './cotas/CotasLayer';
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectInternalLine, selectTrazo, setZoom2D, setPan2D } from '../../store/editorSlice';
+import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectInternalLine, selectTrazo, selectSaVertices, setZoom2D, setPan2D } from '../../store/editorSlice';
+import { esquinaDelMargenEn } from '../../utils/seam/esquinaDelMargen';
 import { movePiece, updateInternalLine, updateTrazo } from '../../store/projectSlice';
 import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine, esInternaEditable, seSeleccionaPorTramo } from '../../types/types';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
@@ -51,6 +52,8 @@ import { isEditableTarget } from '../../utils/editableTarget';
  *  propósito: no tiene gesto a medias que cancelar, así que sus teclas no son
  *  suyas y deben seguir su camino al atajo global (#1115). */
 const TOPSTITCH_TOOL_IDS = new Set(['topstitchSeamline', 'topstitchSegment', 'topstitchFree']);
+/** Referencia estable: un `?? []` dentro del selector re-renderiza en bucle. */
+const NO_HIDDEN_LAYER_IDS: number[] = [];
 const zoomCeilingToastLimiter = createTimeWindowLimiter(3000);
 
 // ─── Sondas de la bitácora (spec caja-negra-bitacora § 3.2) ─────────────────
@@ -349,6 +352,10 @@ export function useEditorInteractions(
   const selectedTrazo = useSelector((s: RootState) => s.editor.selectedTrazo);
   const trazos = useSelector((s: RootState) => s.project.trazos);
   const showTrazos = useSelector((s: RootState) => s.editor.showTrazos);
+  // La esquina del margen se elige en su punta (P3c): solo donde el margen se
+  // ve, y solo en piezas cuya capa se ve.
+  const showSeamAllowance = useSelector((s: RootState) => s.editor.showSeamAllowance);
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation?.hiddenLayerIds ?? NO_HIDDEN_LAYER_IDS);
   const svgRef = useRef<SVGSVGElement>(null);
   /** Posición de pantalla del último press, para que la bitácora mida `drag` en el release. */
   const pressRef = useRef<{ x: number; y: number } | null>(null);
@@ -1158,6 +1165,19 @@ export function useEditorInteractions(
         }
       } else {
         if (trazoHit) { seleccionarTrazo(); return; }
+        // La esquina del margen se elige con un clic en su punta (spec
+        // 2026-10-02 § 5.2, P3c, la puerta de vuelta): ahí el clic caía en el
+        // vacío y deseleccionaba. Solo el izquierdo y sin Shift: con el
+        // derecho el vacío sigue soltando la selección, y Shift suma piezas.
+        if (e.button === 0 && !e.shiftKey) {
+          const visibles = pieces.filter(p => !hiddenLayerIds.includes(p.layer ?? 1));
+          const esquina = esquinaDelMargenEn(visibles, { x: clickX, y: clickY }, zoom2D, showSeamAllowance);
+          if (esquina) {
+            pushJournal('gesture', 'esquina:select', esquina);
+            dispatch(selectSaVertices(esquina));
+            return;
+          }
+        }
         // Empty area: start marquee selection
         if (!e.shiftKey) {
           dispatch(clearSelection());
@@ -1178,7 +1198,7 @@ export function useEditorInteractions(
         }
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox, selectedTrazo, trazos, showTrazos]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox, selectedTrazo, trazos, showTrazos, showSeamAllowance, hiddenLayerIds]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {

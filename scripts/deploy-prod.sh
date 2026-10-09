@@ -89,12 +89,18 @@ echo "✓ smoke del WASM commiteado"
 # Lo que queda por bajar es el reloj-test: 33,8 min en 150 casos son 13,5 s por
 # caso, y casi todo es arrancar la app 150 veces contra el dev server. Eso se
 # ataca sirviendo el `dist` en vez de Vite, y es otra conversación.
-if curl -sf -o /tmp/vina-deploy-port.html http://localhost:5174/ 2>/dev/null; then
-  # Un servidor ajeno en 5174 lo reutilizaría Playwright EN SILENCIO y el gate
-  # mediría otra app. Ya pasó en esta máquina con otro proyecto del portafolio.
+#
+# El puerto se escoge con VINA_E2E_PORT (5174 por defecto) y viaja a Playwright
+# por el entorno (playwright.config.ts): un worktree con su propio Vite mide su
+# árbol, y no el del checkout de al lado que escucha en el 5174.
+PUERTO="${VINA_E2E_PORT:-5174}"
+export VINA_E2E_PORT="$PUERTO"
+if curl -sf -o /tmp/vina-deploy-port.html "http://localhost:$PUERTO/" 2>/dev/null; then
+  # Un servidor ajeno en el puerto lo reutilizaría Playwright EN SILENCIO y el
+  # gate mediría otra app. Ya pasó en esta máquina con otro proyecto del portafolio.
   grep -q "Patronaje" /tmp/vina-deploy-port.html \
-    || { echo "✗ el puerto 5174 lo tiene otra app — el gate mediría lo que no es" >&2; exit 1; }
-  echo "✓ Vite ya estaba arriba en 5174"
+    || { echo "✗ el puerto $PUERTO lo tiene otra app — el gate mediría lo que no es" >&2; exit 1; }
+  echo "✓ Vite ya estaba arriba en $PUERTO"
 else
   # El servidor se queda vivo a propósito cuando el script termina. Aquí había
   # un `trap ... EXIT` con `kill` y NO funcionaba: en Git Bash el `kill` se lleva
@@ -104,15 +110,15 @@ else
   # siguiente deploy lo reutilice en vez de levantar otro, así que la fuga está
   # acotada a uno y no a uno por deploy. De paso, el segundo deploy del día
   # arranca caliente gratis. Para matarlo a mano:
-  #   taskkill //F //PID $(netstat -ano | grep :5174 | grep LISTENING | head -1 | awk '{print $NF}')
-  npx vite --port 5174 > /tmp/vina-deploy-vite.log 2>&1 &
+  #   taskkill //F //PID $(netstat -ano | grep ":$PUERTO" | grep LISTENING | head -1 | awk '{print $NF}')
+  npx vite --port "$PUERTO" --strictPort > /tmp/vina-deploy-vite.log 2>&1 &
   for _ in $(seq 60); do
-    if curl -sf -o /dev/null http://localhost:5174/; then break; fi
+    if curl -sf -o /dev/null "http://localhost:$PUERTO/"; then break; fi
     sleep 1
   done
-  curl -sf -o /dev/null http://localhost:5174/ \
+  curl -sf -o /dev/null "http://localhost:$PUERTO/" \
     || { echo "✗ Vite no respondió en 60 s — ver /tmp/vina-deploy-vite.log" >&2; exit 1; }
-  echo "✓ Vite caliente en 5174"
+  echo "✓ Vite caliente en $PUERTO"
 fi
 
 # Emplazamiento: el trinquete estático cuenta literales, no ve QUIÉN TAPA A
@@ -189,6 +195,7 @@ npx playwright test --workers=2 \
   tests/e2e/ia-convocada.spec.ts \
   tests/e2e/la-cabina-de-la-pieza.spec.ts \
   tests/e2e/la-cota-de-lo-que-se-pone.spec.ts \
+  tests/e2e/la-puerta-de-vuelta.spec.ts \
   tests/e2e/emplazamiento-imagenes-de-referencia.spec.ts \
   tests/e2e/las-siete-puertas.spec.ts \
   tests/e2e/1102-la-pluma-engancha.spec.ts \

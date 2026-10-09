@@ -7,6 +7,7 @@ import { STANDARD_FABRIC_CODES } from '../../utils/fabricCodes';
 import { selectPiece } from '../../store/editorSlice';
 import type { NotchShape, NotchOptions, InterfacingType, PatternPiece, PlacementRule, PlacementRuleType } from '../../types/types';
 import { DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
+import { FORMAS_DE_PIQUETE } from '../../tools/definitions/notch';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
 import { ANNOTATION_TEMPLATES, annotationId, sanitizeAnnotationText } from '../../utils/annotationTemplates';
 import PropertySection from './PropertySection';
@@ -83,7 +84,8 @@ export default function PieceProperties({ piece, collapsed, simCollapsed, onTogg
       <div className="panel-field panel-field--wrap">
         <label>Preajustes de margen</label>
         <div className="panel-preset-row">
-          {([['Overlock', 8], ['Estándar', 10], ['Sobrecargada', 12], ['Francesa', 15]] as const).map(([label, width]) => (
+          {/* Cada preajuste se llama como su tipo de costura en el pie y en la etiqueta (P3c). */}
+          {([['Overlock', 8], ['Normal', 10], ['Flat-felled', 12], ['Francesa', 15]] as const).map(([label, width]) => (
             <button
               key={label}
               className="panel-chip-btn"
@@ -264,13 +266,10 @@ export default function PieceProperties({ piece, collapsed, simCollapsed, onTogg
             value={notchSettings.shape}
             onChange={e => setNotchOption('shape', e.target.value as NotchShape)}
           >
-            <option value="slit">Recto</option>
-            <option value="t-notch">En T</option>
-            <option value="v-internal">V interna</option>
-            <option value="v-external">V externa</option>
-            <option value="u-notch">En U</option>
-            <option value="castle">Castillo</option>
-            <option value="diamond">Rombo</option>
+            {/* Los nombres de la línea al pie: un término por concepto (P3c). */}
+            {FORMAS_DE_PIQUETE.map(c => (
+              <option key={String(c.value)} value={String(c.value)}>{c.label}</option>
+            ))}
           </select>
         </div>
         <div className="panel-field">

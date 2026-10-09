@@ -23,7 +23,7 @@ import * as THREE from 'three';
 import type { RootState, AppDispatch } from '../../store';
 import { addSeam } from '../../store/projectSlice';
 import { pickEdge, pieceHighlightRotation } from '../../utils/3d/edgePicker';
-import type { PatternPiece, PathCommand, Seam } from '../../types/types';
+import type { PatternPiece, PathCommand } from '../../types/types';
 import EdgeHighlight from './EdgeHighlight';
 import { newId } from '../../utils/ids';
 
@@ -126,11 +126,6 @@ interface Sew3DToolProps {
 export default function Sew3DTool({ pieces, placements, flippedPieceIds }: Sew3DToolProps) {
   const dispatch = useDispatch<AppDispatch>();
   const seams = useSelector((s: RootState) => s.project.seams);
-  // Seam construction type — shared option surface for the seam tool family
-  // (toolOptions.seam.seamType), same as the 2D seam/freesewing tools.
-  const seamType = useSelector(
-    (s: RootState) => (s.tools.toolOptions?.seam?.seamType as Seam['type']) ?? 'standard',
-  );
 
   // State machine
   const [firstEdge, setFirstEdge] = useState<{ pieceId: string; edgeName: string } | null>(null);
@@ -221,7 +216,9 @@ export default function Sew3DTool({ pieces, placements, flippedPieceIds }: Sew3D
         id: newId(),
         pieceA: { pieceId: firstEdge.pieceId, edgeName: firstEdge.edgeName, tStart: 0, tEnd: 1 },
         pieceB: { pieceId: clicked.pieceId, edgeName: clicked.edgeName, tStart: 0, tEnd: 1 },
-        type: seamType,
+        // Nace Normal, como en 2D: el tipo se cambia en la etiqueta de la
+        // costura (P3c). Leía la opción de Coser, que salió del pie.
+        type: 'standard',
         tension: 100,
         strength: 1.0,
         active: true,
@@ -233,7 +230,7 @@ export default function Sew3DTool({ pieces, placements, flippedPieceIds }: Sew3D
       setFirstEdge(null);
       setHoveredEdge(null);
     }
-  }, [firstEdge, getCompatibility, dispatch, seamType]);
+  }, [firstEdge, getCompatibility, dispatch]);
 
   // Get piece + placement for a given pieceId
   const getPiecePlacement = useCallback((pieceId: string) => {

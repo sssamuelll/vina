@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
+import { TIPOS_DE_COSTURA } from '../../utils/seam/tiposDeCostura';
 
 const ScissorsIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
   <svg
@@ -40,12 +41,8 @@ export const scissorsTool: ToolDefinition = {
       label: 'Tipo de costura',
       type: 'select',
       value: 'standard',
-      choices: [
-        { label: 'Normal', value: 'standard' },
-        { label: 'Francesa', value: 'french' },
-        { label: 'Flat-felled', value: 'flat-felled' },
-        { label: 'Overlock', value: 'overlock' },
-      ],
+      // La misma lista que la etiqueta de la costura y Propiedades (P3c).
+      choices: TIPOS_DE_COSTURA.map(t => ({ label: t.label, value: t.value })),
     },
   ],
   copilot: {
