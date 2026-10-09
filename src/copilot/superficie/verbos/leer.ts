@@ -36,7 +36,7 @@ export function bordesDe(piece: PatternPiece) {
 /** Los piquetes: su borde, la distancia desde el inicio del borde y, si la tiene, su ancla (decisión 4). */
 function piquetesDe(piece: PatternPiece) {
   return piece.internals.filter(l => l.type === 'notch').map(line => {
-    const p = notchPoint(line);
+    const p = notchPoint(line, piece.outline);
     const borde = p ? findEdgeForPoint(piece, p) : null;
     const distancia = p && borde
       ? distanceAlongPath(piece.outline, p, ...rangoMedibleDeBorde(piece.outline, borde.segmentRange))
