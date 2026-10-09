@@ -62,6 +62,11 @@ const sew = definirVerbo({
     const b = fraccionesDeTramo(args.b, ctx);
     if ((a.hasta - a.desde) * a.edgeLength < SIN_LARGO) throw new Error('stretch a has no length');
     if ((b.hasta - b.desde) * b.edgeLength < SIN_LARGO) throw new Error('stretch b has no length');
+    // Un tramo al revés de su borde pedía otro sentido; coserlo derecho y decir
+    // `done` mentiría (revisión final de la 1b). El sentido se pide con `reversed`.
+    for (const [nombre, t] of [['a', a], ['b', b]] as const) {
+      if (t.alReves) throw new Error(`stretch ${nombre} runs against its edge: give from before to, and use reversed to sew B from its end`);
+    }
     // B invertido: su rango se guarda en el sentido de cosido (`seamRange.ts`).
     const rangoB: [number, number] = args.reversed ? mirrorPctRange([b.desde, b.hasta]) : [b.desde, b.hasta];
     const seam: Seam = {

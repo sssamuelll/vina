@@ -53,6 +53,20 @@ describe('sew', () => {
     expect(r.warnings).toContain('edge top of piece a is already sewn there by seam s1');
   });
 
+  it('un tramo dado al revés de su borde es un error dicho: el sentido se pide con reversed', async () => {
+    const { store, ctx } = tienda([pieza('a', [100]), pieza('b', [100])]);
+    for (const b of [
+      { piece_id: 'b', edge: 'top', from: { x: 100, y: 0 }, to: { x: 0, y: 0 } },
+      { piece_id: 'b', edge: 'top', from: 1, to: 0 },
+    ]) {
+      const r = await ejecutarVerbo(VERBOS_DE_COSTURA, 'sew', { a: { piece_id: 'a', edge: 'top' }, b }, ctx);
+      expect(r.ok === false && r.error).toMatch(/^stretch b runs against its edge/);
+    }
+    const r = await ejecutarVerbo(VERBOS_DE_COSTURA, 'sew', { a: { piece_id: 'a', edge: 'top', from: 0.6, to: 0.1 }, b: { piece_id: 'b', edge: 'top' } }, ctx);
+    expect(r.ok === false && r.error).toMatch(/^stretch a runs against its edge/);
+    expect(store.getState().project.seams).toHaveLength(0);
+  });
+
   it('un tramo sin largo es un error dicho, y no cose nada', async () => {
     const { store, ctx } = tienda([pieza('a', [100]), pieza('b', [100])]);
     const r = await ejecutarVerbo(VERBOS_DE_COSTURA, 'sew', { a: { piece_id: 'a', edge: 'top', from: 0.3, to: 0.3 }, b: { piece_id: 'b', edge: 'top' } }, ctx);

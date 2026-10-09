@@ -35,8 +35,12 @@ function distanciaDesdeElInicio(e: Tramo['from'], piece: PatternPiece, rango: [n
   return distance;
 }
 
-/** Un tramo en fracciones de su borde, ordenadas: dónde empieza y dónde acaba, medidos ahora. */
-export function fraccionesDeTramo(t: Tramo, ctx: ContextoDeVerbo): { piece: PatternPiece; edgeLength: number; desde: number; hasta: number } {
+/**
+ * Un tramo en fracciones de su borde, ordenadas: dónde empieza y dónde acaba,
+ * medidos ahora. `alReves` dice si `from` venía después de `to`: medir no lo
+ * necesita, coser sí.
+ */
+export function fraccionesDeTramo(t: Tramo, ctx: ContextoDeVerbo): { piece: PatternPiece; edgeLength: number; desde: number; hasta: number; alReves: boolean } {
   const piece = ctx.getState().project.pieces.find(p => p.id === t.piece_id);
   if (!piece) throw new Error(`no piece with id ${t.piece_id}`);
   const borde = piece.edges?.find(e => e.name === t.edge);
@@ -47,7 +51,7 @@ export function fraccionesDeTramo(t: Tramo, ctx: ContextoDeVerbo): { piece: Patt
   const d1 = distanciaDesdeElInicio(t.to, piece, rango, edgeLength, t.edge);
   // Un borde de largo cero mide 0, como antes; quien cosa lo verá sin largo.
   const largo = edgeLength > 1e-9 ? edgeLength : 1;
-  return { piece, edgeLength, desde: Math.min(d0, d1) / largo, hasta: Math.max(d0, d1) / largo };
+  return { piece, edgeLength, desde: Math.min(d0, d1) / largo, hasta: Math.max(d0, d1) / largo, alReves: d1 < d0 };
 }
 
 /** El largo de un tramo de un borde, medido ahora. */
