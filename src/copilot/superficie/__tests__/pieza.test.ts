@@ -3,7 +3,8 @@ import { getHistory } from '../../../store/undoMiddleware';
 import { ejecutarVerbo } from '../ejecutar';
 import type { Recibo } from '../tipos';
 import { VERBOS_DE_PIEZA } from '../verbos/pieza';
-import { pieza, tienda } from './fixtures';
+import { VERBOS_DE_LEER } from '../verbos/leer';
+import { costura, pieza, tienda } from './fixtures';
 
 const actuarCon = async (ctx: ReturnType<typeof tienda>['ctx'], nombre: string, args: unknown): Promise<Recibo> => {
   const r = await ejecutarVerbo(VERBOS_DE_PIEZA, nombre, args, ctx);
@@ -57,5 +58,69 @@ describe('create_piece', () => {
       const r = await ejecutarVerbo(VERBOS_DE_PIEZA, 'create_piece', args, ctx);
       expect(r.ok === false && r.error).toMatch(/give rectangle or points/);
     }
+  });
+});
+
+/** El punto `index` de una pieza, en espacio de patrón, como lo lee `read_piece`. */
+const puntoLeido = async (ctx: ReturnType<typeof tienda>['ctx'], id: string, index: number) => {
+  const r = await ejecutarVerbo(VERBOS_DE_LEER, 'read_piece', { piece_id: id }, ctx);
+  if (!r.ok) throw new Error(r.error);
+  return (r.result as { points: Array<{ index: number; x: number; y: number }> }).points.find(p => p.index === index);
+};
+
+describe('edit_outline', () => {
+  it('move_point lleva el punto donde se pide, y el recibo dice qué bordes cambiaron y cómo quedó su costura', async () => {
+    const { ctx } = tienda(
+      [pieza('a', [100]), pieza('b', [60])],
+      [costura({ pieceA: { pieceId: 'a', edgeName: 'right' }, pieceB: { pieceId: 'b', edgeName: 'right' } })],
+    );
+    const r = await actuarCon(ctx, 'edit_outline', { piece_id: 'a', mode: 'move_point', point_index: 2, to: { x: 100, y: 80 } });
+    expect(r.done).toBe(true);
+    expect(r.measure.edges_changed).toEqual([{ name: 'right', before: 50, after: 80 }]);
+    expect(r.measure.seams).toMatchObject([{ id: 's1', a: { length: 80 }, b: { length: 50 } }]);
+    expect(await puntoLeido(ctx, 'a', 2)).toMatchObject({ x: 100, y: 80 });
+  });
+
+  it('en una pieza girada, el punto queda donde se pidió, en espacio de patrón', async () => {
+    const { ctx } = tienda([pieza('a', [100], { rotation: 30, position: { x: 40, y: 10 } })]);
+    const r = await actuarCon(ctx, 'edit_outline', { piece_id: 'a', mode: 'move_point', point_index: 2, to: { x: 200, y: 150 } });
+    expect(r.done).toBe(true);
+    expect(await puntoLeido(ctx, 'a', 2)).toMatchObject({ x: 200, y: 150 });
+  });
+
+  it('set_length cambia el largo de un borde de un tramo recto, desde su inicio y en su dirección', async () => {
+    const { ctx } = tienda([pieza('a', [100])]);
+    const r = await actuarCon(ctx, 'edit_outline', { piece_id: 'a', mode: 'set_length', edge: 'top', length: 150 });
+    expect(r).toMatchObject({ done: true, measure: { length: 150 } });
+    expect(await puntoLeido(ctx, 'a', 1)).toMatchObject({ x: 150, y: 0 });
+  });
+
+  it('set_length no adivina en un borde de varios tramos: lo dice y propone move_point', async () => {
+    const { store, ctx } = tienda([pieza('a', [50, 80, 100])]);
+    const antes = store.getState().project;
+    const r = await actuarCon(ctx, 'edit_outline', { piece_id: 'a', mode: 'set_length', edge: 'top', length: 150 });
+    expect(r.done).toBe(false);
+    expect(r.warnings[0]).toMatch(/^edge top has 3 segments; .*move_point/);
+    expect(store.getState().project).toBe(antes);
+  });
+
+  it('set_size escala la pieza al ancho y al alto pedidos, como las cotas Ancho y Alto', async () => {
+    const { ctx } = tienda([pieza('a', [100])]);
+    const r = await actuarCon(ctx, 'edit_outline', { piece_id: 'a', mode: 'set_size', width: 200 });
+    expect(r).toMatchObject({ done: true, measure: { width: 200, height: 50 } });
+  });
+
+  it('una pieza bloqueada, por ella o por su capa, no se toca', async () => {
+    const { store, ctx } = tienda([pieza('a', [100], { layer: 3 })], [], { layerLocked: { 3: true } });
+    const antes = store.getState().project;
+    const r = await actuarCon(ctx, 'edit_outline', { piece_id: 'a', mode: 'set_size', width: 200 });
+    expect(r).toMatchObject({ done: false, warnings: ['piece is locked'] });
+    expect(store.getState().project).toBe(antes);
+  });
+
+  it('a cada modo le faltan sus argumentos: error dicho', async () => {
+    const { ctx } = tienda([pieza('a', [100])]);
+    const r = await ejecutarVerbo(VERBOS_DE_PIEZA, 'edit_outline', { piece_id: 'a', mode: 'move_point' }, ctx);
+    expect(r.ok === false && r.error).toMatch(/move_point needs point_index and to/);
   });
 });
