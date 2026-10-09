@@ -618,9 +618,12 @@ export function normalizeInPlaneOrientation(
  * Toggle-reset + single deterministic `detectBodyRegion` pass — the ONE place
  * the side-effecting L/R toggles are exercised for a batch. Returns the RAW
  * regions (with `'unknown'` preserved); callers layer the `allUnknown`
- * alternation on top. Private so the toggle reset is never duplicated.
+ * alternation on top. Exportada para que `dress` (IA 1b-2) distinga una pieza
+ * sin región de la alternancia delante/detrás que `computeEffectiveRegions` le
+ * pone a un patrón sin clasificar. Sigue siendo el único sitio que reinicia
+ * los toggles: nadie más la duplica.
  */
-function rawRegions(pieces: PatternPiece[]): BodyRegion[] {
+export function rawRegions(pieces: PatternPiece[]): BodyRegion[] {
   _sleeveToggle = false;
   _cuffToggle = false;
   // Compute regions ONCE to avoid double-calling detectBodyRegion
