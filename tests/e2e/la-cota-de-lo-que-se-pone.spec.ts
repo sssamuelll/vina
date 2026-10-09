@@ -76,7 +76,9 @@ test.describe('la cota de lo que se pone (P3b)', () => {
     expect(await numero(page, 'Distancia')).toBeCloseTo(100, 0);
   });
 
-  test('«Ajustar distancia…» abre la misma cota, con la profundidad a un Tab', async ({ page }) => {
+  // Desde P3c la profundidad de un piquete ya puesto vive en su etiqueta
+  // (la-puerta-de-vuelta.spec.ts); la cota es solo la distancia.
+  test('«Ajustar distancia…» abre la misma cota, solo con la distancia', async ({ page }) => {
     await unaPieza(page);
     await activarHerramienta(page, 'Shift+N', 'notch');
     await clickAt(page, { x: 160, y: 100 });
@@ -87,14 +89,12 @@ test.describe('la cota de lo que se pone (P3b)', () => {
     await page.getByText('Ajustar distancia…', { exact: true }).click();
 
     await expect(campo(page, 'Distancia')).toBeFocused();
+    await expect(campo(page, 'Profundidad'), 'la profundidad volvió al chip').toHaveCount(0);
     await campo(page, 'Distancia').fill('90');
-    await campo(page, 'Distancia').press('Tab');
-    await expect(campo(page, 'Profundidad')).toBeFocused();
-    await campo(page, 'Profundidad').fill('12');
-    await campo(page, 'Profundidad').press('Enter');
+    await campo(page, 'Distancia').press('Enter');
 
     await expect.poll(async () => (await piquetes(page))[0].notchAnchor?.distanceMm).toBeCloseTo(90, 1);
-    expect((await piquetes(page))[0].notchOptions?.length).toBe(12);
+    expect((await piquetes(page))[0].notchOptions?.length).toBe(8);
   });
 
   test('las puntas de un piquete seleccionado no se arrastran', async ({ page }) => {

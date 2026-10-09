@@ -324,6 +324,23 @@ el siguiente clic lo cierra. Poner un punto y terminar de ponerlo es una sola en
 Las puntas de un piquete ya no se arrastran con Seleccionar, porque dejaban su ancla desfasada; para
 moverlo está «Ajustar distancia…». La pieza bloqueada no recibe piquetes. El modal desaparece.
 
+**Nota del plan de P3c (2026-10-09).** La etiqueta de opción es una pastilla de papel. Al clicarla
+abre los mismos controles de la línea al pie, pero para ese objeto. La pastilla y el menú los fijó
+solace-wren.
+- **El piquete** elegido con Seleccionar enseña su distancia en reposo y una etiqueta con forma,
+  cantidad, profundidad y ancho: «Recta · 8 × 3 mm». La profundidad deja el chip de lo que se pone.
+- **La esquina del margen** se elige con un clic de Seleccionar en la punta del margen, o con
+  Margen, y su etiqueta da el tipo. Margen ya no abre Propiedades.
+- **La costura** enseña su tipo cuando está elegida. La deja elegida Coser al terminarla, y la
+  elige Editar costuras con un clic en su lado. **La costura no se elige con Seleccionar:** la
+  firma de María #210 pide que con Seleccionar no se pinte ninguna («eso solo debería verse al
+  activar el menu de costuras»), así que su puerta de vuelta es Editar costuras. Su queja del
+  30-08, «si le doy a editar costuras no pasa absolutamente nada», deja de ser cierta.
+- **«Tipo de costura» sale de la línea al pie.** Una costura nueva nace Normal y se cambia en su
+  etiqueta. Tijeras conserva el suyo.
+- **Un término por concepto:** Propiedades usa los mismos nombres que el pie. Se van
+  «Sobrecargada», «Estándar», «Recto», «V interna», «V externa» y «Castillo».
+
 ### 5.3 La línea al pie
 
 Una franja al pie de la ventana, de lado a lado, del material y del alto de la barra superior

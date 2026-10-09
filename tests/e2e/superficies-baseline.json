@@ -15,10 +15,13 @@
     "menú contextual": 2,
     "dibujar con Pluma (H)": 1,
     "Rectángulo (S)": 2,
-    "coser dos lados (N)": 2,
+    "coser dos lados (N)": 1,
     "poner piquete (⇧N)": 2,
     "margen de costura (O)": 2,
     "medir (M)": 1,
-    "poner punto": 3
+    "poner punto": 3,
+    "elegir un piquete (Z)": 2,
+    "abrir la etiqueta del piquete": 1,
+    "elegir una esquina del margen (Z)": 2
   }
 }

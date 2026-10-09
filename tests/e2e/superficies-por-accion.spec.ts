@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { addPiece, clickAt, activarHerramienta, dispatch } from './helpers/lienzo';
 import { startSimulation } from './helpers/sim';
 import { medirAccion, enReposo } from './helpers/superficies';
@@ -223,6 +223,42 @@ test.describe('con un rectángulo sembrado (lados rectos conocidos)', () => {
         await page.waitForTimeout(300);
       },
       () => clickAt(page, { x: 120, y: 320 }),
+    ]));
+  });
+
+  // La puerta de vuelta (P3c): elegir lo ya puesto trae su cabina —la cota y
+  // la etiqueta cuentan 1— y su frase. Abrir la etiqueta es un menú.
+  async function unPiqueteElegido(page: Page, elegir: boolean) {
+    await activarHerramienta(page, 'Shift+N', 'notch');
+    await clickAt(page, { x: 180, y: 120 });
+    await page.locator('input.cota--editando[aria-label="Distancia"]').press('Escape');
+    await activarHerramienta(page, 'z', 'select');
+    if (elegir) {
+      await clickAt(page, { x: 180, y: 124 });
+      await expect(page.getByRole('button', { name: /^Piquete: / })).toBeVisible();
+    }
+  }
+
+  test('elegir un piquete (Z)', async ({ page }) => {
+    await unPiqueteElegido(page, false);
+    registrar('elegir un piquete (Z)', await medirAccion(page, [
+      () => clickAt(page, { x: 180, y: 124 }),
+    ]));
+  });
+
+  test('abrir la etiqueta del piquete', async ({ page }) => {
+    await unPiqueteElegido(page, true);
+    registrar('abrir la etiqueta del piquete', await medirAccion(page, [
+      () => page.getByRole('button', { name: /^Piquete: / }).click(),
+    ]));
+  });
+
+  test('elegir una esquina del margen (Z)', async ({ page }) => {
+    await dispatch(page, 'project/batchSetSeamAllowance', { pieceIds: ['rect-superficies'], width: 10 });
+    await activarHerramienta(page, 'z', 'select');
+    // La punta del margen de la esquina de (120, 120) cae en (110, 110).
+    registrar('elegir una esquina del margen (Z)', await medirAccion(page, [
+      () => clickAt(page, { x: 113, y: 113 }),
     ]));
   });
 

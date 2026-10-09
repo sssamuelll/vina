@@ -222,6 +222,22 @@ test('la cota del piquete y el modal de conexión', async ({ page }) => {
   await registrar('modal de conexión', page);
 });
 
+test('la etiqueta del piquete, abierta', async ({ page }) => {
+  // La puerta de vuelta (P3c): la pastilla es papel sobre la hoja y su menú,
+  // papel colgado de <body>, con los controles de la línea al pie.
+  await addPiece(page, 'etiqueta', { x: 120, y: 120 }, 300, 400);
+  await reposo(page);
+  await activarHerramienta(page, 'Shift+N', 'notch');
+  await clickAt(page, { x: 180, y: 120 });
+  await page.locator('input.cota--editando[aria-label="Distancia"]').press('Escape');
+  await activarHerramienta(page, 'z', 'select');
+  await clickAt(page, { x: 180, y: 124 });
+  await page.getByRole('button', { name: /^Piquete: / }).click();
+  await expect(page.getByRole('group', { name: 'Opciones del piquete' })).toBeVisible();
+  await page.waitForTimeout(200);
+  await registrar('etiqueta del piquete abierta', page);
+});
+
 test('lo que flota en el 3D: el menú del modo de superficie', async ({ page }) => {
   await cambiarVista(page, '3D');
   await page.locator('.surface-pill__trigger').click();

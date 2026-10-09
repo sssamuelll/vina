@@ -195,6 +195,7 @@ npx playwright test --workers=2 \
   tests/e2e/ia-convocada.spec.ts \
   tests/e2e/la-cabina-de-la-pieza.spec.ts \
   tests/e2e/la-cota-de-lo-que-se-pone.spec.ts \
+  tests/e2e/la-puerta-de-vuelta.spec.ts \
   tests/e2e/emplazamiento-imagenes-de-referencia.spec.ts \
   tests/e2e/las-siete-puertas.spec.ts \
   tests/e2e/1102-la-pluma-engancha.spec.ts \

@@ -119,6 +119,14 @@ Variantes declaradas (no inventes más): `--surface-overlay-radius-pill` para
 barras con forma de cápsula. Las `-recessed` ya no las usa la barra de IA, que
 desde P2c no tiene reposo; siguen la cota y el avatar hasta P6 (spec § 7.5).
 
+**La etiqueta de opción** (`PatternEditor/etiquetas/EtiquetaDeOpcion.tsx`, P3c)
+es la única pastilla de opciones sobre la hoja: es `cabina`, es papel, y su
+menú lleva los controles de la línea al pie (`Control`), no una lista nueva.
+Lo elegido que tenga opciones las enseña ahí: un objeto nuevo suma su rama a
+`etiquetas.ts` y no inventa otra pastilla. Los nombres de las alternativas salen
+de una sola lista por concepto (`FORMAS_DE_PIQUETE`, `TIPOS_DE_COSTURA`,
+`TIPOS_DE_ESQUINA`), que comparten el pie, la etiqueta y Propiedades.
+
 > **Las cotas van sobre el patrón por definición:** son parte del objeto,
 > como los tiradores del transform box, no un panel
 > (`docs/superpowers/specs/2026-08-30-cotas-vivas-design.md` § 9-10). La
