@@ -456,9 +456,19 @@ afinaron:
     salía 70 % «no se puede poner»; por largo de tela y sin astillas, la prenda queda en mediana
     0,1 %, p95 7,1 % y 3,5 % «no se puede poner». El delantero 6,2 %, la espalda 2,7 %, las
     mangas 0,1-0,4 % y el cuello 4,7 % (la tira de punto, cosida como popelina).
-  - Sin medir: una prenda ajustada o de punto. El tope del 2 % es el mismo para todas las telas
-    (`maxStrain`), y los repasos lo hacen cumplir más; un tejido de punto o una prenda con
-    holgura negativa podría abrir costuras. Antes del deploy.
+  - Prenda ajustada (10-10): la camisa de María (≈100 cm de pecho) sobre las tallas 46 y 48 de
+    la biblioteca (busto 104 y 108). Ninguna costura se abre (la media de cada una queda bajo
+    1 cm) y la penetración es 0, con y sin repasos. Sin repasos la prenda da 19-20 % «no se
+    puede poner» en todas las tallas, holgada o no: era el residuo del solver, no el ajuste. Con
+    repasos: 3,5 % (talla 38), 3,8 % (46) y 6,0 % (48); el delantero, 6,2 / 7,1 / 11,1 %. Ahora
+    el ajuste se distingue, pero poco: la popelina no pasa del tope y la prenda chica se acomoda
+    sin estirarse; que no entre es contacto con el cuerpo, y `fit_map` no lo mide.
+  - El cuello: con repasos la costura del cuello al escote se abre en un punto, hasta 3,3 cm en
+    la talla 38 y 4,5 cm en la 48 (media 0,6-0,9 cm; sin repasos, 0,9 cm como máximo). El cuello
+    mide 62 mm menos que el escote: parece una tira de punto que en la realidad estira, pero la
+    simulación viste todo con una sola tela y en GPU el estiramiento es rígido con el mismo tope
+    del 2 % para todas, así que el punto se comporta como la popelina. El arreglo de fondo es un
+    tope por tela, con la tela de cada pieza llegando al simulador.
 
 ## 6. Riesgos
 
