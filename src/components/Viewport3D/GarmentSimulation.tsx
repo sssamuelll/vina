@@ -602,7 +602,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // Pass B (solve) va dentro del subpaso; la Pass A (generate), abajo.
       const facePokeOn = (GPU_CAPABILITIES.facePoke || facePokeForced.current) && solver.facePokeNodes;
       // Los kernels del subpaso, en orden, con los repasos del estiramiento
-      // tras la colisión (IA 1b-2): `nodosDelSubpaso.ts`, donde viven los
+      // antes de la colisión (IA 1b-2): `nodosDelSubpaso.ts`, donde viven los
       // porqués de cada posición. Un submit por substep (#897 F2).
       const substepNodes = nodosDelSubpaso(solver, {
         tether: tetherReady.current,

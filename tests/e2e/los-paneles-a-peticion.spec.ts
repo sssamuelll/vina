@@ -62,14 +62,26 @@ test('«Producción» se despliega, y lo último del panel se alcanza con la rue
   await propiedadesDesdeLaBarrita(page);
   await page.getByRole('button', { name: 'Producción' }).click();
   await expect(page.getByRole('button', { name: 'Producción' })).toHaveAttribute('aria-expanded', 'true');
-  expect(await altoDeProduccion(page)).toBeGreaterThan(100);
+  // El cuerpo crece con una transición de 200 ms. Leer el alto una sola vez,
+  // justo al cambiar `aria-expanded`, daba 0 si el navegador aún no había
+  // pintado un cuadro (10-10: 7 de 8 corridas en la rama de la IA 1b-2, que
+  // arranca la transición unos 15 ms más tarde); y girar la rueda a mitad de
+  // la transición deja el final del panel abajo, porque la sección sigue
+  // creciendo. Se espera a que termine: más de 100 px, y quieto entre lecturas.
+  let altoAntes = -1;
+  await expect.poll(async () => {
+    const alto = await altoDeProduccion(page);
+    const desplegada = alto > 100 && alto === altoAntes;
+    altoAntes = alto;
+    return desplegada;
+  }, { message: '«Producción» no termina de desplegarse' }).toBe(true);
   // Con la rueda sobre el panel, como ella: `scrollIntoViewIfNeeded` también
   // movería la `.canvas-area`, que recorta.
   const panel = (await page.locator('.context-panel').boundingBox())!;
   await page.mouse.move(panel.x + panel.width / 2, panel.y + panel.height / 2);
   await page.mouse.wheel(0, 3000);
-  await page.waitForTimeout(300);
-  expect(await aLaVista(page, '.panel-delete'), '«Eliminar pieza» no se alcanza con la rueda').toBe(true);
+  // El desplazamiento de la rueda es animado: se espera a que llegue, no 300 ms.
+  await expect.poll(() => aLaVista(page, '.panel-delete'), { message: '«Eliminar pieza» no se alcanza con la rueda' }).toBe(true);
 });
 
 test('el Avatar, desde su botón del 3D: siete campos, y Enter escribe la medida', async ({ page }) => {
