@@ -11,7 +11,13 @@
 // Por qué «el último intento» y no el resultado del test: un grupo serial que
 // cae se reintenta ENTERO, y un test que ya había pasado vuelve a correr. Y por
 // qué no `test.ok()`: cuenta como ok un test que no llegó a correr.
-import { mkdirSync, writeFileSync } from 'node:fs';
+//
+// Un error que Playwright no ata a ningún test (el cierre de un worker, una
+// promesa rechazada cuando su test ya terminó) llega por onError y deja la
+// corrida en rojo aunque cada spec pasara. Las marcas de esa corrida se borran
+// al final; si no, el intento siguiente las encontraría todas y daría verde sin
+// correr nada. Una corrida que matan no llega a onEnd, y sus marcas se quedan.
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 export default class MemoriaDelGate {
@@ -21,6 +27,9 @@ export default class MemoriaDelGate {
     mkdirSync(this.carpeta, { recursive: true });
     /** spec → (id del test → ¿su último intento salió como se esperaba?) */
     this.specs = new Map();
+    /** Las marcas que escribió esta corrida. */
+    this.escritas = new Set();
+    this.errorSinTest = false;
   }
 
   onBegin(_config, suite) {
@@ -35,7 +44,19 @@ export default class MemoriaDelGate {
     const spec = basename(test.location.file);
     const tests = this.specs.get(spec);
     tests.set(test.id, result.status === test.expectedStatus);
-    if ([...tests.values()].every(Boolean)) writeFileSync(join(this.carpeta, `${spec}.ok`), '');
+    if ([...tests.values()].every(Boolean)) {
+      const marca = join(this.carpeta, `${spec}.ok`);
+      writeFileSync(marca, '');
+      this.escritas.add(marca);
+    }
+  }
+
+  onError() {
+    this.errorSinTest = true;
+  }
+
+  onEnd() {
+    if (this.errorSinTest) for (const marca of this.escritas) rmSync(marca, { force: true });
   }
 
   printsToStdio() {
