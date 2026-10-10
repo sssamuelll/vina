@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { estaAsentada, MINIMO_DE_CUADROS, movimientoP95, UMBRAL_MM_POR_CUADRO } from '../asentamiento';
+import { estaAsentada, MINIMO_DE_CUADROS, mismaTela, movimientoP95, UMBRAL_MM_POR_CUADRO } from '../asentamiento';
+
+describe('mismaTela', () => {
+  it('dos lecturas idénticas son la misma tela; un vértice movido ya no', () => {
+    const a = new Float32Array([0, 1, 2, 3, 4, 5]);
+    expect(mismaTela(a, a.slice())).toBe(true);
+    const b = a.slice();
+    b[4] += 1e-6;
+    expect(mismaTela(a, b)).toBe(false);
+  });
+});
 
 /** 100 vértices en el origen, y los mismos movidos en x: los primeros `n` por `a` metros, el resto por `b`. */
 function lecturas(n: number, a: number, b: number) {

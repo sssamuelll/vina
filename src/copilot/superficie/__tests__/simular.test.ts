@@ -5,7 +5,7 @@ import { BufferGeometry, Float32BufferAttribute } from 'three';
 import { pauseSimulation } from '../../../store/simulationSlice';
 import { setViewMode } from '../../../store/editorSlice';
 import {
-  clearActiveSolverTier, clearSolverEvents, latirLaSimulacion, pushSolverEvent, registerClothGeometry, setActiveSolverTier,
+  beginCascade, clearActiveSolverTier, clearSolverEvents, latirLaSimulacion, pushSolverEvent, registerClothGeometry, setActiveSolverTier,
 } from '../../../utils/cloth/solverRuntimeTracker';
 import { ejecutarVerbo } from '../ejecutar';
 import { VERBOS_DE_VESTIR } from '../verbos/vestir';
@@ -88,14 +88,40 @@ describe('simulate', () => {
     expect(r.warnings.join(' ')).toMatch(/stopped advancing.*10 s/);
   });
 
-  it('si no llega ningún cuadro, dice que no arrancó y lo que dijo el solver', async () => {
+  it('si no llega ningún cuadro, dice que no arrancó y lo que dijo el solver en esta corrida, no en una vieja', async () => {
     const { ctx } = tienda([suelta('a')]);
-    pushSolverEvent('start:failed', { tier: 'webgpu', reason: 'adapter is null' });
+    pushSolverEvent('tier:failed', { tier: 'webgpu', reason: 'de una corrida vieja' });
     const p = simular(ctx, { action: 'start' });
+    // La cascada de esta corrida, como la abre el ciclo de vida al arrancar.
+    beginCascade();
+    pushSolverEvent('start:failed', { tier: 'webgpu', reason: 'adapter is null' });
     await vi.advanceTimersByTimeAsync(31_000);
     const r = await recibo(p);
     expect(r.done).toBe(false);
     expect(r.warnings.join(' ')).toMatch(/did not start within 30 s.*adapter is null/);
+    expect(r.warnings.join(' ')).not.toMatch(/corrida vieja/);
+  });
+
+  it('un fallo de una corrida vieja no se cita como el de esta (revisión final)', async () => {
+    const { ctx } = tienda([suelta('a')]);
+    pushSolverEvent('tier:failed', { tier: 'webgpu', reason: 'de una corrida vieja' });
+    const p = simular(ctx, { action: 'start' });
+    beginCascade();
+    await vi.advanceTimersByTimeAsync(31_000);
+    const r = await recibo(p);
+    expect(r.warnings.join(' ')).toMatch(/did not start within 30 s \(no solver reported an error\)/);
+  });
+
+  it('dos lecturas de la misma tela no cuentan como quietud (en TSL, sin readback entre ellas)', async () => {
+    const { ctx } = tienda([suelta('a')]);
+    const { mover } = tela();
+    setActiveSolverTier('webgpu');
+    const p = simular(ctx, { action: 'start', wait_seconds: 5 });
+    // Latidos sin que la malla cambie: la tela no llegó, no está quieta.
+    await correr(24, 30, () => 0, mover);
+    const r = await recibo(p);
+    expect(r.done).toBe(false);
+    expect(r.measure.settled).toBe(false);
   });
 
   it('pasado el plazo sin quietud, lo dice con el tier y el ritmo', async () => {
@@ -143,9 +169,15 @@ describe('simulate', () => {
     expect(store.getState().simulation.simulationState).toBe('paused');
   });
 
-  it('sin piezas activas no arranca', async () => {
+  it('sin piezas que simular no arranca, y dice por qué', async () => {
     const { ctx } = tienda([suelta('a', 'a', { active: false })]);
     const r = await recibo(simular(ctx, { action: 'start' }));
-    expect(r).toMatchObject({ done: false, warnings: ['there are no active pieces to simulate'] });
+    expect(r).toMatchObject({ done: false, warnings: ['there are no pieces to simulate: a (inactive)'] });
+  });
+
+  it('con todas las piezas ocultas en 3D tampoco: no espera 30 s para decirlo (revisión final)', async () => {
+    const { ctx } = tienda([suelta('a')], [], {}, {}, { hiddenPieceIds: ['a'] });
+    const r = await recibo(simular(ctx, { action: 'start' }));
+    expect(r).toMatchObject({ done: false, warnings: ['there are no pieces to simulate: a (hidden in 3D)'] });
   });
 });

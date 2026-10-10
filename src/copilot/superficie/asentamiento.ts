@@ -28,6 +28,13 @@ export function movimientoP95(antes: Float32Array, despues: Float32Array, cuadro
   return (d[Math.min(n - 1, Math.floor(0.95 * n))] * 1000) / cuadros;
 }
 
+/** Dos lecturas idénticas son la misma tela: no hubo dato nuevo entre ellas, no que la tela esté quieta. */
+export function mismaTela(a: Float32Array, b: Float32Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 /** Quieta: pasados los cuadros mínimos, las últimas lecturas se mueven menos que el umbral. */
 export function estaAsentada(movimientos: readonly number[], cuadros: number): boolean {
   if (cuadros < MINIMO_DE_CUADROS || movimientos.length < SEGUIDAS) return false;

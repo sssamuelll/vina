@@ -72,12 +72,35 @@ describe('dress', () => {
     expect(r.measure.pieces).toEqual([
       { piece_id: 'd', name: 'Delantero', region: 'front-torso', decided_by: 'category', moved_by_hand: true },
     ]);
-    expect(r.measure.inactive).toEqual([{ piece_id: 'z', name: 'Bolsillo' }]);
+    expect(r.measure.left_out).toEqual([{ piece_id: 'z', name: 'Bolsillo', reason: 'inactive' }]);
   });
 
-  it('sin piezas activas no viste nada', async () => {
+  it('lo que la app no coloca tampoco se viste: oculta en 3D o en una capa oculta, y dice por qué (revisión final)', async () => {
+    const { ctx } = tienda(
+      [
+        suelta('d', 'Delantero', { category: 'bodice' }),
+        suelta('m1', 'Manga A', { category: 'sleeve' }),
+        suelta('m2', 'Manga B', { category: 'sleeve' }),
+        suelta('f', 'Forro', { category: 'lining', layer: 0 }),
+      ],
+      [], {}, {},
+      { hiddenPieceIds: ['m1'], hiddenLayerIds: [0] },
+    );
+    const r = await actuarCon(ctx, 'dress', {});
+    // La app coloca solo la manga visible, y como la primera manga sin lado: la izquierda.
+    expect(r.measure.pieces).toEqual([
+      { piece_id: 'd', name: 'Delantero', region: 'front-torso', decided_by: 'category' },
+      { piece_id: 'm2', name: 'Manga B', region: 'left-sleeve', decided_by: 'category' },
+    ]);
+    expect(r.measure.left_out).toEqual([
+      { piece_id: 'm1', name: 'Manga A', reason: 'hidden in 3D' },
+      { piece_id: 'f', name: 'Forro', reason: 'layer 0 is hidden' },
+    ]);
+  });
+
+  it('sin piezas que vestir no viste nada, y dice por qué', async () => {
     const { ctx } = tienda([suelta('z', 'z', { active: false })]);
     const r = await actuarCon(ctx, 'dress', {});
-    expect(r).toMatchObject({ done: false, warnings: ['there are no active pieces to dress'] });
+    expect(r).toMatchObject({ done: false, warnings: ['there are no pieces to dress: z (inactive)'] });
   });
 });

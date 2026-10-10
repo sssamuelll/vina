@@ -401,6 +401,31 @@ afinaron:
 - **Las instrucciones** dicen que la simulación solo avanza con Vina a la vista, y la línea del
   candado dice lo que protege.
 - **La superficie tiene 17 verbos** y sus definiciones miden 14.646 caracteres.
+- **Lo que cambió la revisión final (Opus, 0 críticos, 3 importantes y 2 menores subidos de grado):**
+  - Las piezas que se visten y se simulan salen de un solo filtro, el de `GarmentSimulation`
+    (`piezasEnLaSimulacion.ts`): activas, sin ocultar en 3D y en una capa visible. `dress` dice
+    cuáles deja fuera y por qué; antes miraba solo `active` y vestía otra prenda que la simulada.
+  - `classify` tampoco nombra de nuevo los bordes si un avío está puesto sobre uno o si un borde
+    tiene margen propio: el margen se perdía en silencio.
+  - `fit_map` no mide una tela recién montada (0 cuadros desde que se montó): daba un ajuste
+    perfecto de la pose de partida.
+  - «No arrancó» cita lo que dijo el solver en esta corrida, no en una vieja.
+  - Dos lecturas iguales de la malla no cuentan como tela quieta: en TSL la malla se relee cada
+    15 cuadros.
+- **Hallazgo abierto: el simulador estira la tela (medido el 10-10).** Con la camisa de María
+  cosida y asentada en WebGPU, el 15-26 % del cuerpo pasa del 8 % de estiramiento con ~12 cm de
+  holgura de pecho sobre el avatar «mujer-eu38» (88 cm), así que `fit_map` y el mapa de ajuste de
+  la app dicen «no se puede poner» de una camisa holgada.
+  - No es la medida: el reposo de la malla es el patrón plano (UV × 0,1 exacto) y la tela
+    envuelta nace a 0 %.
+  - No es una costura: quitar el cuello, las mangas, los costados o los hombros deja el
+    estiramiento entre 14 y 20 %; solo sin ninguna costura baja al 2 %. Tampoco es el tirante del
+    cuerpo ni la velocidad del cierre.
+  - Es convergencia: con 15 subpasos por cuadro las restricciones «rígidas» no aguantan el peso
+    de la prenda cerrada, que cuelga de los hombros, y lo de arriba se estira. Con 30 subpasos
+    queda en 3,8 % (p95 6,9 %); con 45, en 1,6 % (p95 4,0 %), como sin coser.
+  - El precio en esta máquina, con la camisa de María: 25,3 cuadros/s con 15, 12,9 con 30 y
+    ~8,5 con 45.
 
 ## 6. Riesgos
 

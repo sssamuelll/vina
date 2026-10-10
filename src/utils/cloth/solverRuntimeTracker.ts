@@ -74,6 +74,10 @@ export function registerClothGeometry(
   manifest: MeshManifestEntry[],
 ): void {
   clothGeometry = geometry ? { geometry, manifest } : null;
+  // Una tela nueva todavía no se movió: las aristas y los cuadros de la vieja
+  // no valen para ella (revisión final IA 1b-2: `fit_map` medía la pose plana).
+  aristas = null;
+  latidosDeLaTela = 0;
 }
 
 export function getClothGeometry(): ClothGeometryRecord | null {
@@ -83,6 +87,7 @@ export function getClothGeometry(): ClothGeometryRecord | null {
 // ─── El latido de la tela (IA 1b-2) ─────────────────────────────────────────
 
 let latidos = 0;
+let latidosDeLaTela = 0;
 let aristas: SolverEdgeData | null = null;
 
 /**
@@ -94,11 +99,17 @@ let aristas: SolverEdgeData | null = null;
  */
 export function latirLaSimulacion(edges: SolverEdgeData | null): void {
   latidos += 1;
+  latidosDeLaTela += 1;
   aristas = edges;
 }
 
 export function latidosDeLaSimulacion(): number {
   return latidos;
+}
+
+/** Los cuadros que avanzó la tela registrada ahora (0 recién montada). */
+export function latidosDeEstaTela(): number {
+  return latidosDeLaTela;
 }
 
 export function aristasDeLaTela(): SolverEdgeData | null {

@@ -45,6 +45,7 @@ import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
 import { latirLaSimulacion, pushSolverEvent, registerClothGeometry, type MeshManifestEntry } from '../../utils/cloth/solverRuntimeTracker';
+import { seSimula } from '../../utils/cloth/piezasEnLaSimulacion';
 import { pushError } from '../../utils/errorTracker';
 import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { FACE_POKE_GENERATE_CADENCE } from '../../utils/cloth/gpu/tslFacePoke';
@@ -280,13 +281,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
 
   // Filter inactive pieces — only active pieces participate in simulation
-  // Also filter out hidden pieces (3D arrangement visibility) and hidden layers
+  // Also filter out hidden pieces (3D arrangement visibility) and hidden layers.
+  // El filtro es uno (`piezasEnLaSimulacion.ts`): lo leen Viewport3D y la superficie.
   const activePieces = useMemo(
-    () => pieces.filter(p =>
-      p.active !== false
-      && !hiddenPieceIds.includes(p.id)
-      && !hiddenLayerIds.includes(p.layer ?? 1)
-    ),
+    () => pieces.filter(p => seSimula(p, hiddenPieceIds, hiddenLayerIds)),
     [pieces, hiddenPieceIds, hiddenLayerIds],
   );
 

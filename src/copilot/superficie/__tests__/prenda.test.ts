@@ -47,6 +47,27 @@ describe('classify', () => {
     expect(r.warnings.join(' ')).toMatch(/keep their names/);
   });
 
+  it('un margen propio en un borde guarda los nombres de los bordes (revisión final)', async () => {
+    const p = suelta('p1', 'Pieza 1');
+    const conMargen = { ...p, edges: p.edges!.map((e, i) => (i === 0 ? { ...e, seamAllowanceWidth: 40 } : e)) };
+    const { store, ctx } = tienda([conMargen]);
+    const r = await actuarCon(ctx, 'classify', { piece_id: 'p1', category: 'bodice', side: 'back' });
+    expect(store.getState().project.pieces[0].edges).toEqual(conMargen.edges);
+    expect(r.warnings.join(' ')).toMatch(/seam allowances/);
+  });
+
+  it('un avío puesto sobre un borde también (revisión final)', async () => {
+    const p = suelta('p1', 'Pieza 1');
+    const avio = {
+      id: 't1', pieceId: 'p1', type: 'button', name: 'Botón', description: '', material: '', color: '', size: 10, unitCost: 0, active: true,
+      placement: { mode: 'edge', edgeName: p.edges![0].name, tStart: 0, tEnd: 1 },
+    };
+    const { store, ctx } = tienda([p], [], { trims: [avio] });
+    const r = await actuarCon(ctx, 'classify', { piece_id: 'p1', category: 'bodice', side: 'back' });
+    expect(store.getState().project.pieces[0].edges).toEqual(p.edges);
+    expect(r.warnings.join(' ')).toMatch(/trims/);
+  });
+
   it('un Ctrl+Z la deja como estaba', async () => {
     const p = suelta('p1', 'Pieza 1');
     const { store, ctx } = tienda([p]);

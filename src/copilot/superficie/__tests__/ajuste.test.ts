@@ -60,6 +60,16 @@ describe('fit_map', () => {
     expect(r.garment).toMatchObject({ strain_max_pct: 20, tight_pct: 33.3, cant_wear_pct: 33.3 });
   });
 
+  it('una tela recién puesta, que todavía no se movió, no tiene mapa (revisión final)', async () => {
+    tela([{ pieceId: 'a', factor: 1.2 }]);
+    // Otra simulación monta una tela nueva: las aristas y los cuadros de la vieja no valen.
+    const nueva = new BufferGeometry();
+    nueva.setAttribute('position', new Float32BufferAttribute([0, 0, 0, 0.1, 0, 0], 3));
+    registerClothGeometry(nueva, [{ pieceId: 'a', vertexOffset: 0, vertexCount: 2, triCount: 0 }]);
+    const { ctx } = tienda([suelta('a')], [], {}, {}, { simulationState: 'running' });
+    expect(await leer(ctx)).toMatchObject({ available: false, reason: expect.stringMatching(/has not moved yet/) });
+  });
+
   it('sin las aristas del solver, lo dice', async () => {
     tela([{ pieceId: 'a', factor: 1 }]);
     latirLaSimulacion(null);

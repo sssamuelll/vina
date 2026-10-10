@@ -6,6 +6,7 @@ import { setPieceFabric, updatePiece } from '../../../store/projectSlice';
 import { setDefaultFabric } from '../../../store/simulationSlice';
 import { detectSemanticEdges } from '../../../utils/semanticEdges';
 import { computeEffectiveRegions } from '../../../utils/cloth/garmentPlacement';
+import { seSimula } from '../../../utils/cloth/piezasEnLaSimulacion';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric } from '../../../utils/cloth/physicalFabric';
 import { actuar, cerrar, piezaDe, rehusar } from '../actuar';
 import { bordesDe } from './leer';
@@ -17,24 +18,32 @@ const LADOS = ['front', 'back', 'left', 'right', 'center', 'both'] as const sati
 // La biblioteca que lee el simulador; la otra (`FABRIC_LIBRARY`) tiene ids que él no conoce.
 const TELAS = PHYSICAL_FABRIC_LIBRARY.map(f => f.id) as [string, ...string[]];
 
-/** Lo que guarda por nombre un borde de la pieza: si algo lo hace, nombrarlos de nuevo lo dejaría colgando. */
-function quienNombraSusBordes(id: string, p: Proyecto): string[] {
-  const es = (x: { pieceId: string }) => x.pieceId === id;
+/**
+ * Lo que depende de los bordes de la pieza: si algo lo hace, nombrarlos de
+ * nuevo lo dejaría colgando. Unos los guardan por nombre (costuras, grupos,
+ * pliegues, elásticos, puntos de medida, avíos sobre un borde); el margen
+ * propio de un borde vive en el borde mismo (revisión final IA 1b-2: se perdía).
+ */
+function quienUsaSusBordes(piece: PatternPiece, p: Proyecto): string[] {
+  const es = (x: { pieceId: string }) => x.pieceId === piece.id;
   const quien: string[] = [];
   if (p.seams.some(s => es(s.pieceA) || es(s.pieceB))) quien.push('seams');
   if (p.seamGroups.some(g => g.edgesA.some(es) || g.edgesB.some(es))) quien.push('seam groups');
   if (p.pleats.some(es)) quien.push('pleats');
   if (p.elastics.some(es)) quien.push('elastics');
   if (p.poms.some(m => es(m.pointA) || es(m.pointB))) quien.push('points of measure');
+  if (p.trims.some(t => es(t) && (t.placement.mode === 'edge' || t.placement.mode === 'edge-points'))) quien.push('trims');
+  if ((piece.edges ?? []).some(e => e.seamAllowanceWidth != null || (e.seamAllowanceSpans?.length ?? 0) > 0)) quien.push('seam allowances');
   return quien;
 }
 
-/** La región del cuerpo que le toca a la pieza al vestir, entre las activas: la misma que usa la colocación. */
-export function regionAlVestir(pieces: readonly PatternPiece[], id: string): string | null {
-  const activas = pieces.filter(p => p.active);
-  const i = activas.findIndex(p => p.id === id);
+/** La región del cuerpo que le toca a la pieza al vestir, entre las que la app coloca (`piezasEnLaSimulacion.ts`). */
+export function regionAlVestir(state: RootState, id: string): string | null {
+  const { hiddenPieceIds, hiddenLayerIds } = state.simulation;
+  const vestibles = state.project.pieces.filter(p => seSimula(p, hiddenPieceIds, hiddenLayerIds));
+  const i = vestibles.findIndex(p => p.id === id);
   if (i < 0) return null;
-  const r = computeEffectiveRegions(activas)[i];
+  const r = computeEffectiveRegions(vestibles)[i];
   return r === 'unknown' ? null : r;
 }
 
@@ -49,7 +58,7 @@ const classify = definirVerbo({
   }),
   run: ({ piece_id, category, side }, ctx) => {
     const piece = piezaDe(ctx, piece_id);
-    const usan = quienNombraSusBordes(piece.id, ctx.getState().project);
+    const usan = quienUsaSusBordes(piece, ctx.getState().project);
     const nueva: PatternPiece = { ...piece, category, side };
     if (usan.length === 0) {
       const edges = detectSemanticEdges(nueva);
@@ -65,7 +74,7 @@ const classify = definirVerbo({
         piece_id,
         category: despues.category ?? null,
         side: despues.side ?? null,
-        region: regionAlVestir(e.despues.pieces, piece.id),
+        region: regionAlVestir(ctx.getState(), piece.id),
         edges: bordesDe(despues),
         edges_renamed: renombrados,
       },
@@ -85,16 +94,18 @@ const assignFabric = definirVerbo({
   run: ({ fabric, piece_ids }, ctx) => {
     const objetivo = piece_ids
       ? piece_ids.map(id => piezaDe(ctx, id))
-      : ctx.getState().project.pieces.filter(p => p.active);
+      : ctx.getState().project.pieces.filter(p => p.active !== false);
     if (objetivo.length === 0) return rehusar('there are no active pieces');
     const tela = getPhysicalFabric(fabric)!;
     const a = objetivo.length === 1 ? objetivo[0].name : `${objetivo.length} piezas`;
     const e = actuar(ctx, 'assign_fabric', `poner ${tela.nameEs} a ${a}`, () => {
       for (const p of objetivo) ctx.dispatch(setPieceFabric({ pieceId: p.id, fabricId: fabric }));
     });
-    // El simulador viste con una sola tela (`defaultFabricId`): la toma cuando todas las piezas activas comparten esta.
-    const activas = e.despues.pieces.filter(p => p.active);
-    if (activas.length > 0 && activas.every(p => p.fabricId === fabric)) ctx.dispatch(setDefaultFabric(fabric));
+    // El simulador viste con una sola tela (`defaultFabricId`): la toma cuando todas
+    // las piezas que viste comparten esta (el filtro de la app, `piezasEnLaSimulacion.ts`).
+    const { hiddenPieceIds, hiddenLayerIds } = ctx.getState().simulation;
+    const vestidas = e.despues.pieces.filter(p => seSimula(p, hiddenPieceIds, hiddenLayerIds));
+    if (vestidas.length > 0 && vestidas.every(p => p.fabricId === fabric)) ctx.dispatch(setDefaultFabric(fabric));
     const simulacion = ctx.getState().simulation.defaultFabricId;
     const telaDe = (id: string) => e.despues.pieces.find(p => p.id === id)?.fabricId ?? null;
     return cerrar(ctx, 'assign_fabric', e, {
@@ -106,7 +117,7 @@ const assignFabric = definirVerbo({
       },
       warnings: simulacion === fabric
         ? []
-        : [`the active pieces have different fabrics, and the simulation drapes the whole garment with one fabric: ${simulacion}`],
+        : [`the pieces the simulation dresses have different fabrics, and it drapes the whole garment with one fabric: ${simulacion}`],
     });
   },
 });

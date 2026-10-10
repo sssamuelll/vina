@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { definirVerbo, type ContextoDeVerbo, type Verbo } from '../tipos';
-import { aristasDeLaTela, getActiveSolverTier, getClothGeometry } from '../../../utils/cloth/solverRuntimeTracker';
+import { aristasDeLaTela, getActiveSolverTier, getClothGeometry, latidosDeEstaTela } from '../../../utils/cloth/solverRuntimeTracker';
 import {
   computePerVertexStrain, DEFAULT_FIT_MAP_CONFIG, DEFAULT_FIT_PARAMS, fabricToFitParams,
 } from '../../../utils/cloth/fitMaps';
@@ -15,6 +15,8 @@ export type Ajuste =
   | {
     available: true;
     tier: string;
+    /** Cuadros que avanzó esta tela desde que se montó. */
+    frames: number;
     fabric: { id: string; max_stretch_pct: number };
     garment: Medida;
     pieces: Array<{ piece_id: string; name: string } & Medida>;
@@ -32,6 +34,9 @@ export function ajusteDeLaTela(ctx: ContextoDeVerbo): Ajuste {
   const tela = getClothGeometry();
   const pos = tela?.geometry.getAttribute('position');
   if (!tela || !pos) return { available: false, reason: 'the cloth is not built yet; try again when the simulation has started' };
+  // Una tela recién montada está en su pose de partida: medirla daría un ajuste perfecto que no es.
+  const frames = latidosDeEstaTela();
+  if (frames === 0) return { available: false, reason: 'the cloth has not moved yet; simulate, or try again in a moment' };
   const aristas = aristasDeLaTela();
   if (!aristas || aristas.stretchingIds.length === 0) {
     return { available: false, reason: 'the solver has not sent its edge data yet; try again in a moment' };
@@ -64,6 +69,7 @@ export function ajusteDeLaTela(ctx: ContextoDeVerbo): Ajuste {
   return {
     available: true,
     tier: getActiveSolverTier(),
+    frames,
     fabric: { id: simulation.defaultFabricId, max_stretch_pct: unDecimal(aguanta * 100) },
     garment: medir(0, pos.count),
     pieces: tela.manifest.map(m => ({ piece_id: m.pieceId, name: nombre.get(m.pieceId) ?? m.pieceId, ...medir(m.vertexOffset, m.vertexCount) })),
