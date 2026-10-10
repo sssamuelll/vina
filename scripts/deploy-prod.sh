@@ -6,7 +6,7 @@
 # tiene 1.9 GB de RAM y un npm ci + vite build allá termina en OOM.
 #
 # Uso:
-#   bash scripts/deploy-prod.sh            # gates → build → enviar → verificar
+#   bash scripts/deploy-prod.sh            # gates → build → e2e del build → enviar → verificar
 #   bash scripts/deploy-prod.sh --ensayo   # todo menos enviar (valida sin tocar prod)
 #
 # Los gates de acá son el subconjunto rápido (typecheck + lint + unit + smoke
@@ -53,73 +53,131 @@ if [ -n "$ESTADO" ]; then
 fi
 echo "✓ limpio ($(git rev-parse --short HEAD) en $(git branch --show-current))"
 
-echo "── Gates ──────────────────────────────────────────────"
-npx tsc -b --noEmit
-echo "✓ typecheck"
-npm run lint > /dev/null
-echo "✓ lint"
-node scripts/ui-contract-lint.mjs > /tmp/vina-ui-contract.log 2>&1 \
-  || { cat /tmp/vina-ui-contract.log >&2; exit 1; }
-echo "✓ contrato de interfaz (trinquete)"
-npx vitest run > /tmp/vina-deploy-vitest.log 2>&1 || { tail -20 /tmp/vina-deploy-vitest.log >&2; exit 1; }
-grep -E "Test Files|Tests " /tmp/vina-deploy-vitest.log | sed 's/^ */✓ /'
-node scripts/verify-wasm-smoke.mjs
-echo "✓ smoke del WASM commiteado"
+# LA MEMORIA DEL GATE (2026-10-10): lo que ya pasó sobre un árbol no se vuelve
+# a correr sobre ese árbol.
+#
+# El árbol es el contenido commiteado (`HEAD^{tree}`), y el bloque de arriba
+# acaba de exigir que no haya nada tracked sin commitear: mismo árbol es mismo
+# código, mismos tests, mismas líneas base y mismo lockfile. Cada etapa que
+# pasa deja una marca en `<git-common-dir>/vina-gate/<árbol>/`, que comparten
+# todos los worktrees; el e2e la deja spec a spec, en cuanto cada uno pasa
+# entero (`scripts/memoria-del-gate.mjs`). El merge de una rama sobre una main
+# que no se movió tiene el mismo árbol que la rama, así que el ensayo de la
+# rama vale para el deploy de main.
+#
+# Lo que costaba no tenerla, medido. El 06-10, el deploy de la copa repitió
+# entero el e2e que el ensayo ya había pasado sobre el mismo árbol (`4fed9ef1`)
+# y murió a mitad, por memoria. El 10-10, un test de contraste se pasó de
+# tiempo con la máquina cargada, y el segundo intento volvió a correr los 40
+# specs, 1,2 h, para repetir uno. Ahora el ensayo deja el deploy en build y
+# envío, y un rojo se reintenta corriendo solo lo que faltó.
+#
+# El verde exige lo mismo que antes: todos los specs de la lista en verde
+# sobre ESTE árbol, en una corrida o en varias. Para correrlo todo otra vez:
+#   rm -rf "$(git rev-parse --git-common-dir)/vina-gate"
+#
+# La clave lleva también lo instalado. El lockfile está en el árbol, pero
+# node_modules puede no corresponderle: los worktrees comparten el del checkout
+# principal, y un `npm ci` después del ensayo cambiaría lo que se compila sin
+# cambiar el árbol. npm deja lo que instaló de verdad en
+# node_modules/.package-lock.json, y con él viaja la versión de Playwright y,
+# por tanto, la de su Chromium.
+ARBOL=$(git rev-parse 'HEAD^{tree}')
+INSTALADO=$(git hash-object node_modules/.package-lock.json) \
+  || { echo "✗ no hay node_modules/.package-lock.json: instala las dependencias (npm ci)" >&2; exit 1; }
+MARCAS="$(git rev-parse --git-common-dir)/vina-gate/$ARBOL-${INSTALADO:0:12}"
+mkdir -p "$MARCAS"
 
-# EL SERVIDOR VA CALIENTE, Y NO ES COSMÉTICO — medido el 2026-09-18.
+echo "── Gates ──────────────────────────────────────────────"
+if [ -f "$MARCAS/rapidos.ok" ]; then
+  echo "✓ typecheck, lint, trinquete, unitarios y WASM: ya pasaron sobre este árbol"
+else
+  npx tsc -b --noEmit
+  echo "✓ typecheck"
+  npm run lint > /dev/null
+  echo "✓ lint"
+  node scripts/ui-contract-lint.mjs > /tmp/vina-ui-contract.log 2>&1 \
+    || { cat /tmp/vina-ui-contract.log >&2; exit 1; }
+  echo "✓ contrato de interfaz (trinquete)"
+  npx vitest run > /tmp/vina-deploy-vitest.log 2>&1 || { tail -20 /tmp/vina-deploy-vitest.log >&2; exit 1; }
+  grep -E "Test Files|Tests " /tmp/vina-deploy-vitest.log | sed 's/^ */✓ /'
+  node scripts/verify-wasm-smoke.mjs
+  echo "✓ smoke del WASM commiteado"
+  touch "$MARCAS/rapidos.ok"
+fi
+
+echo "── Build ──────────────────────────────────────────────"
+npm run build > /tmp/vina-deploy-build.log 2>&1 || { tail -20 /tmp/vina-deploy-build.log >&2; exit 1; }
+# Del index.html del taller, no por glob: assets/ puede tener más de un *.js
+# (chunks) y el que importa es el que el index referencia de verdad. La
+# entrada se llama como su clave en rollupOptions.input: `app` → app-*.js.
+BUNDLE=$(grep -oE 'assets/app-[^"]+\.js' dist/app/index.html | head -1)
+[ -n "$BUNDLE" ] || { echo "✗ dist/app/index.html no referencia ningún assets/app-*.js" >&2; exit 1; }
+echo "✓ dist listo ($(du -sh dist | cut -f1), bundle ${BUNDLE})"
+
+# LOS E2E MIDEN EL BUILD, NO EL SERVIDOR DE DESARROLLO (2026-10-10).
 #
-# Playwright monta Vite él solo (`webServer` del config, con
-# `reuseExistingServer: true`), y arrancarlo EN FRÍO dentro del gate se paga por
-# los dos lados. Mismos 25 specs, mismo commit, mismos 2 workers, misma máquina:
+# Hasta ese día corrían contra Vite en modo desarrollo, que no es lo que se
+# publica: pinta en la barra superior un indicador técnico (`top-bar__status`,
+# solo con `import.meta.env.DEV`) que producción no tiene, y lleva el React de
+# desarrollo. Ahora se compila una vez, arriba, y los dos Playwright sirven ese
+# `dist` con `vite preview` (VINA_E2E_BUILD=1 en sus configs), en un puerto que
+# no reutilizan: si ya hay algo escuchando, paran y lo dicen. De paso el deploy
+# deja de compilar dos veces (la home compilaba la suya).
 #
-#   · en frío    24,3 min y 2 flaky  (`newPage` y `waitForSelector` agotados)
-#   · caliente   19,2 min y 0 flaky
+# Medido el mismo día, una pestaña con SwiftShader: arrancar /app/ cuesta 2,5 s
+# con el servidor de desarrollo caliente (733 peticiones), 83 s en frío, y
+# 0,7 s con el build (8 peticiones). El arranque NO era el grueso del gate,
+# contra lo que se escribió aquí el 09-18: son 2,5 s de unos 32 por caso. El
+# tiempo está en lo que hace cada spec: superficies-por-accion,
+# contraste-del-cromo y las-siete-puertas son el 29 % del reloj-test.
 #
-# Un 21% menos y los flaky desaparecen, porque el primer caso deja de esperar el
-# arranque de Vite con su propio reloj corriendo.
+# CI=1, también desde el 10-10: los topes de tiempo de CI (120 s por test,
+# 240 s por grupo serial, 15 s por expect) y las mismas aserciones. Con los
+# topes locales, un test del grupo serial de contraste pasó de 90 s con la
+# máquina cargada y tumbó el deploy entero; solo y con la máquina libre pasaba
+# en 30 s. Un gate que da falsos rojos se acaba desactivando.
 #
-# Y NO, subir workers no era la salida — se midió el mismo día. A 6 workers el
-# RELOJ-TEST se duplica (33,8 → 70,2 min sumando casos): los Chromium con
-# SwiftShader se comen la máquina entre ellos. El paralelismo sube a 4,36× y el
-# neto son 3 minutos, con 2 caídos duros. Con GPU real (sin los args de
-# SwiftShader) es peor todavía: 78,3 min de reloj y 10 caídos. Esta caja se
-# satura entre 2 y 3 workers, dé igual el backend de GL, así que `--workers=2`
-# se queda — ahora por una razón medida aquí y no heredada de los runners.
-#
-# Lo que queda por bajar es el reloj-test: 33,8 min en 150 casos son 13,5 s por
-# caso, y casi todo es arrancar la app 150 veces contra el dev server. Eso se
-# ataca sirviendo el `dist` en vez de Vite, y es otra conversación.
+# Y no, subir workers no es la salida: se midió el 2026-09-18. A 6 workers el
+# reloj-test se duplica (33,8 → 70,2 min sumando casos), porque los Chromium
+# con SwiftShader se comen la máquina entre ellos, y el neto son 3 minutos con
+# 2 caídos duros. Con GPU real (sin los args de SwiftShader) es peor todavía:
+# 78,3 min de reloj y 10 caídos. Esta caja se satura entre 2 y 3 workers, dé
+# igual el backend de GL, así que `--workers=2` se queda.
 #
 # El puerto se escoge con VINA_E2E_PORT (5174 por defecto) y viaja a Playwright
-# por el entorno (playwright.config.ts): un worktree con su propio Vite mide su
-# árbol, y no el del checkout de al lado que escucha en el 5174.
-PUERTO="${VINA_E2E_PORT:-5174}"
-export VINA_E2E_PORT="$PUERTO"
-if curl -sf -o /tmp/vina-deploy-port.html "http://localhost:$PUERTO/" 2>/dev/null; then
-  # Un servidor ajeno en el puerto lo reutilizaría Playwright EN SILENCIO y el
-  # gate mediría otra app. Ya pasó en esta máquina con otro proyecto del portafolio.
-  grep -q "Patronaje" /tmp/vina-deploy-port.html \
-    || { echo "✗ el puerto $PUERTO lo tiene otra app — el gate mediría lo que no es" >&2; exit 1; }
-  echo "✓ Vite ya estaba arriba en $PUERTO"
+# por el entorno (playwright.config.ts): un worktree sirve y mide su propio
+# build, y no el del checkout de al lado.
+export VINA_E2E_BUILD=1 CI=1
+export VINA_E2E_PORT="${VINA_E2E_PORT:-5174}"
+
+# Un puerto ocupado para antes de lanzar Playwright, y dice por quién. Lo más
+# probable es un `vite preview` que sobrevivió a un ensayo cortado: en Windows,
+# matar el envoltorio de npx no mata a node (medido el 2026-09-18 y otra vez el
+# 10-10, cuando parar el ensayo dejó vivo el Playwright entero con su
+# servidor). Playwright tampoco mide lo que ya escucha (reuseExistingServer:
+# false), pero su aviso se queda dentro del log, y el gate diría «faltan N
+# specs» como si el intento siguiente fuera a salir distinto.
+puerto_libre() {
+  local pid
+  pid=$(netstat -ano | grep -E "[:.]$1 +[^ ]+ +LISTENING" | awk '{print $NF}' | head -1 || true)
+  [ -z "$pid" ] && return 0
+  echo "✗ el puerto $1 lo tiene el proceso $pid, quizá un ensayo cortado. Ciérralo con: taskkill //F //T //PID $pid" >&2
+  exit 1
+}
+
+echo "── Home ───────────────────────────────────────────────"
+if [ -f "$MARCAS/home.ok" ]; then
+  echo "✓ home: ya pasó sobre este árbol"
 else
-  # El servidor se queda vivo a propósito cuando el script termina. Aquí había
-  # un `trap ... EXIT` con `kill` y NO funcionaba: en Git Bash el `kill` se lleva
-  # el envoltorio de `npx` y el node de Vite sobrevive — medido, el puerto seguía
-  # escuchando después de que el bloque saliera. Antes que un trap que miente,
-  # la verdad escrita: queda UN Vite escuchando, y la rama de arriba hace que el
-  # siguiente deploy lo reutilice en vez de levantar otro, así que la fuga está
-  # acotada a uno y no a uno por deploy. De paso, el segundo deploy del día
-  # arranca caliente gratis. Para matarlo a mano:
-  #   taskkill //F //PID $(netstat -ano | grep ":$PUERTO" | grep LISTENING | head -1 | awk '{print $NF}')
-  npx vite --port "$PUERTO" --strictPort > /tmp/vina-deploy-vite.log 2>&1 &
-  for _ in $(seq 60); do
-    if curl -sf -o /dev/null "http://localhost:$PUERTO/"; then break; fi
-    sleep 1
-  done
-  curl -sf -o /dev/null "http://localhost:$PUERTO/" \
-    || { echo "✗ Vite no respondió en 60 s — ver /tmp/vina-deploy-vite.log" >&2; exit 1; }
-  echo "✓ Vite caliente en $PUERTO"
+  puerto_libre 4179
+  npx playwright test --config playwright.home.config.ts > /tmp/vina-deploy-home.log 2>&1 \
+    || { tail -30 /tmp/vina-deploy-home.log >&2; echo "✗ e2e de la home en rojo" >&2; exit 1; }
+  grep -E "passed|failed|flaky" /tmp/vina-deploy-home.log | sed 's/^ */✓ home: /'
+  touch "$MARCAS/home.ok"
 fi
+
+echo "── Emplazamiento y contratos ──────────────────────────"
 
 # Emplazamiento: el trinquete estático cuenta literales, no ve QUIÉN TAPA A
 # QUIÉN. La revisión adversarial del 2026-09-04 encontró tres colisiones vivas
@@ -187,72 +245,86 @@ fi
 # 1 caso en 30 s. El gate pasa de unos 21 a unos 36 min. Si duele, lo primero
 # que sale es `superficies-por-accion` (18 casos): reposo y contraste cazan lo
 # que rompe un cambio de piel.
-npx playwright test --workers=2 \
-  tests/e2e/emplazamiento-lienzo-2d.spec.ts \
-  tests/e2e/emplazamiento-modales.spec.ts \
-  tests/e2e/emplazamiento-paneles.spec.ts \
-  tests/e2e/linea-al-pie.spec.ts \
-  tests/e2e/ia-convocada.spec.ts \
-  tests/e2e/puente-mcp.spec.ts \
-  tests/e2e/la-cabina-de-la-pieza.spec.ts \
-  tests/e2e/la-cota-de-lo-que-se-pone.spec.ts \
-  tests/e2e/la-puerta-de-vuelta.spec.ts \
-  tests/e2e/los-paneles-a-peticion.spec.ts \
-  tests/e2e/emplazamiento-imagenes-de-referencia.spec.ts \
-  tests/e2e/las-siete-puertas.spec.ts \
-  tests/e2e/1102-la-pluma-engancha.spec.ts \
-  tests/e2e/1112-mover-el-punto-con-numero.spec.ts \
-  tests/e2e/maria-195-siguiente-punto.spec.ts \
-  tests/e2e/medidas-escritas-gramatica.spec.ts \
-  tests/e2e/cotas-no-tapan-el-transform-box.spec.ts \
-  tests/e2e/trazos.spec.ts \
-  tests/e2e/linea-interna-gramatica.spec.ts \
-  tests/e2e/seis-firmas-maria.spec.ts \
-  tests/e2e/shift-endereza-a-la-hoja.spec.ts \
-  tests/e2e/q-edita-internas.spec.ts \
-  tests/e2e/lo-que-se-ve-y-cuando.spec.ts \
-  tests/e2e/tanda4-puertas-y-defaults.spec.ts \
-  tests/e2e/tanda5-un-cuadro-y-un-aviso.spec.ts \
-  tests/e2e/tanda6-el-tramo-es-el-sujeto.spec.ts \
-  tests/e2e/1161-reproduccion-tab.spec.ts \
-  tests/e2e/226-cotas-linea-interna.spec.ts \
-  tests/e2e/1152-los-largos-no-se-quedan-clavados.spec.ts \
-  tests/e2e/replay-maria-07-09.spec.ts \
-  tests/e2e/cotas-de-pieza.spec.ts \
-  tests/e2e/supr-borra-lo-que-se-ve.spec.ts \
-  tests/e2e/supr-con-algo-delante.spec.ts \
-  tests/e2e/avatar-por-defecto.spec.ts \
-  tests/e2e/reposo-solo-lo-que-perdura.spec.ts \
-  tests/e2e/superficies-por-accion.spec.ts \
-  tests/e2e/contraste-del-cromo.spec.ts \
-  tests/e2e/marca-de-escala.spec.ts \
-  tests/e2e/margen-de-herramientas.spec.ts \
-  tests/e2e/barra-superior.spec.ts \
-  > /tmp/vina-deploy-e2e.log 2>&1 || {
+#
+# La lista es un array y no un comando partido con barras: un CR colado al
+# final de un renglón ya no corta el comando en silencio
+# (tests/repo/los-scripts-de-shell-no-llevan-cr.test.ts). Ese spec se queda sin
+# marca, y el gate lo nombra al fallar.
+SPECS_DEL_GATE=(
+  tests/e2e/emplazamiento-lienzo-2d.spec.ts
+  tests/e2e/emplazamiento-modales.spec.ts
+  tests/e2e/emplazamiento-paneles.spec.ts
+  tests/e2e/linea-al-pie.spec.ts
+  tests/e2e/ia-convocada.spec.ts
+  tests/e2e/puente-mcp.spec.ts
+  tests/e2e/la-cabina-de-la-pieza.spec.ts
+  tests/e2e/la-cota-de-lo-que-se-pone.spec.ts
+  tests/e2e/la-puerta-de-vuelta.spec.ts
+  tests/e2e/los-paneles-a-peticion.spec.ts
+  tests/e2e/emplazamiento-imagenes-de-referencia.spec.ts
+  tests/e2e/las-siete-puertas.spec.ts
+  tests/e2e/1102-la-pluma-engancha.spec.ts
+  tests/e2e/1112-mover-el-punto-con-numero.spec.ts
+  tests/e2e/maria-195-siguiente-punto.spec.ts
+  tests/e2e/medidas-escritas-gramatica.spec.ts
+  tests/e2e/cotas-no-tapan-el-transform-box.spec.ts
+  tests/e2e/trazos.spec.ts
+  tests/e2e/linea-interna-gramatica.spec.ts
+  tests/e2e/seis-firmas-maria.spec.ts
+  tests/e2e/shift-endereza-a-la-hoja.spec.ts
+  tests/e2e/q-edita-internas.spec.ts
+  tests/e2e/lo-que-se-ve-y-cuando.spec.ts
+  tests/e2e/tanda4-puertas-y-defaults.spec.ts
+  tests/e2e/tanda5-un-cuadro-y-un-aviso.spec.ts
+  tests/e2e/tanda6-el-tramo-es-el-sujeto.spec.ts
+  tests/e2e/1161-reproduccion-tab.spec.ts
+  tests/e2e/226-cotas-linea-interna.spec.ts
+  tests/e2e/1152-los-largos-no-se-quedan-clavados.spec.ts
+  tests/e2e/replay-maria-07-09.spec.ts
+  tests/e2e/cotas-de-pieza.spec.ts
+  tests/e2e/supr-borra-lo-que-se-ve.spec.ts
+  tests/e2e/supr-con-algo-delante.spec.ts
+  tests/e2e/avatar-por-defecto.spec.ts
+  tests/e2e/reposo-solo-lo-que-perdura.spec.ts
+  tests/e2e/superficies-por-accion.spec.ts
+  tests/e2e/contraste-del-cromo.spec.ts
+  tests/e2e/marca-de-escala.spec.ts
+  tests/e2e/margen-de-herramientas.spec.ts
+  tests/e2e/barra-superior.spec.ts
+)
+# Los specs de la lista que todavía no pasaron sobre este árbol.
+sin_marca() { for s in "${SPECS_DEL_GATE[@]}"; do [ -f "$MARCAS/$(basename "$s").ok" ] || echo "$s"; done; }
+mapfile -t PENDIENTES < <(sin_marca)
+if [ ${#PENDIENTES[@]} -eq 0 ]; then
+  echo "✓ emplazamiento y contratos: los ${#SPECS_DEL_GATE[@]} specs ya pasaron sobre este árbol"
+else
+  if [ ${#PENDIENTES[@]} -lt ${#SPECS_DEL_GATE[@]} ]; then
+    echo "  corren ${#PENDIENTES[@]} de ${#SPECS_DEL_GATE[@]} specs: los demás ya pasaron sobre este árbol"
+  fi
+  puerto_libre "$VINA_E2E_PORT"
+  E2E=0
+  VINA_GATE_MARCAS="$MARCAS" npx playwright test --workers=2 \
+    --reporter=list,./scripts/memoria-del-gate.mjs "${PENDIENTES[@]}" \
+    > /tmp/vina-deploy-e2e.log 2>&1 || E2E=$?
+  mapfile -t FALTAN < <(sin_marca)
+  if [ "$E2E" -ne 0 ] || [ ${#FALTAN[@]} -gt 0 ]; then
     echo "  log completo: /tmp/vina-deploy-e2e.log" >&2
     tail -60 /tmp/vina-deploy-e2e.log >&2
+    if [ ${#FALTAN[@]} -gt 0 ]; then
+      echo "✗ faltan ${#FALTAN[@]} specs por pasar sobre este árbol. El intento siguiente corre solo estos:" >&2
+      printf '    %s\n' "${FALTAN[@]}" >&2
+    else
+      echo "✗ Playwright salió con $E2E aunque cada spec pasó entero: mira el log" >&2
+    fi
     exit 1
-  }
-# Sin `tail -1`: Playwright imprime «X flaky» en su PROPIA linea, ANTES de
-# «N passed», asi que quedarse con la ultima se los tragaba en silencio. Un
-# flaky en el gate no lo tumba (paso al reintento) pero es justo lo que hay que
-# ver antes de desplegar: con 114 casos en vez de 69 salen mas a menudo, y uno
-# que nadie mira es un rojo esperando su turno.
-grep -E "passed|failed|flaky" /tmp/vina-deploy-e2e.log | sed 's/^ */✓ emplazamiento y contratos: /'
-
-echo "── Home ───────────────────────────────────────────────"
-npx playwright test --config playwright.home.config.ts > /tmp/vina-deploy-home.log 2>&1 \
-  || { tail -30 /tmp/vina-deploy-home.log >&2; echo "✗ e2e de la home en rojo" >&2; exit 1; }
-grep -E "passed|failed|flaky" /tmp/vina-deploy-home.log | sed 's/^ */✓ home: /'
-
-echo "── Build ──────────────────────────────────────────────"
-npm run build > /tmp/vina-deploy-build.log 2>&1 || { tail -20 /tmp/vina-deploy-build.log >&2; exit 1; }
-# Del index.html del taller, no por glob: assets/ puede tener más de un *.js
-# (chunks) y el que importa es el que el index referencia de verdad. La
-# entrada se llama como su clave en rollupOptions.input: `app` → app-*.js.
-BUNDLE=$(grep -oE 'assets/app-[^"]+\.js' dist/app/index.html | head -1)
-[ -n "$BUNDLE" ] || { echo "✗ dist/app/index.html no referencia ningún assets/app-*.js" >&2; exit 1; }
-echo "✓ dist listo ($(du -sh dist | cut -f1), bundle ${BUNDLE})"
+  fi
+  # Sin `tail -1`: Playwright imprime «X flaky» en su PROPIA linea, ANTES de
+  # «N passed», asi que quedarse con la ultima se los tragaba en silencio. Un
+  # flaky en el gate no lo tumba (paso al reintento) pero es justo lo que hay
+  # que ver antes de desplegar: con 114 casos en vez de 69 salen mas a menudo,
+  # y uno que nadie mira es un rojo esperando su turno.
+  grep -E "passed|failed|flaky" /tmp/vina-deploy-e2e.log | sed 's/^ */✓ emplazamiento y contratos: /'
+fi
 
 if [ "$ENSAYO" = "1" ]; then
   echo "── Ensayo: no se envía nada. ──────────────────────────"
