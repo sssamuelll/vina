@@ -432,10 +432,33 @@ afinaron:
   - El mecanismo: el estiramiento, con su tope rígido del 2 %, corría al principio del subpaso;
     costuras, autocolisión, tirante y colisión volvían a estirar después, y eso solo se corregía
     en el subpaso siguiente.
-  - El arreglo (Samuel eligió «tres repasos»): el estiramiento se repasa tres veces entre la
-    colisión y el cierre de cada subpaso (`nodosDelSubpaso.ts`). Medido: 20,6 cuadros/s, 3,9 %
-    de aristas sobre el 8 % y p95 de 7,0 %, lo mismo que 30 subpasos, sin penetración. Solo el
-    tier GPU: WASM y CPU no tienen el tope (divergencia A7).
+  - El arreglo (Samuel eligió «tres repasos»): el estiramiento se repasa tres veces en cada
+    subpaso, después del suelo y ANTES de la colisión con el cuerpo (`nodosDelSubpaso.ts`).
+    Medido: 21,7 cuadros/s, 3,7 % de aristas sobre el 8 % y p95 de 6,9 %, lo mismo que 30
+    subpasos, sin penetración.
+  - Dónde van importa. La primera versión los ponía entre la colisión y el cierre: la fricción
+    no los veía y el cierre los tomaba por empuje, y la prenda subía sola (el ruedo, de 0,836 a
+    0,864 m entre el segundo 1 y el 8). Antes de la colisión entran en la velocidad como
+    cualquier restricción y la camisa queda quieta (ruedo a 0,850-0,851 m; el área crece 0,7 %
+    en 8 s, contra 4,6 % sin repasos). Medido con el descenso largo de la réplica de María.
+  - Solo el tier GPU tiene los repasos. WASM y CPU tienen el mismo tope del 2 % (backport A7
+    STEP-4) pero no los repasos, así que ahí la tela se lee más estirada; `fit_map` lo dice en
+    su respuesta fuera de WebGPU.
+  - Validado en GPU (`@gpu-local`, versión final): pasan la caída M4, el cierre de costuras (las
+    cuatro sisas a 0,2-0,3 cm), el determinismo, el descenso largo, la demo del flujo y los
+    diagnósticos del mapa de ajuste (su prueba de paridad leía una sola vez una muestra que
+    llega después; ahora la espera). El orden de Cusick pasa, pero por azar: chiffon y canvas
+    dan 10,3 los dos (la tela no se distingue en el disco, problema anterior). El DoD de ≥30
+    cuadros/s falla en esta máquina con y sin repasos: 25,8 sin ellos, 22,5 con ellos (−13 %).
+  - `fit_map` de la camisa holgada, cada cambio por separado. El solver: las aristas sobre el
+    8 % bajan de 17,9 % a 3,7 % con los repasos (misma medida). La medida: por vértice (el
+    máximo de sus aristas) un 4 % de aristas estiradas pintaba de rojo casi toda la pieza, y
+    salía 70 % «no se puede poner»; por largo de tela y sin astillas, la prenda queda en mediana
+    0,1 %, p95 7,1 % y 3,5 % «no se puede poner». El delantero 6,2 %, la espalda 2,7 %, las
+    mangas 0,1-0,4 % y el cuello 4,7 % (la tira de punto, cosida como popelina).
+  - Sin medir: una prenda ajustada o de punto. El tope del 2 % es el mismo para todas las telas
+    (`maxStrain`), y los repasos lo hacen cumplir más; un tejido de punto o una prenda con
+    holgura negativa podría abrir costuras. Antes del deploy.
 
 ## 6. Riesgos
 

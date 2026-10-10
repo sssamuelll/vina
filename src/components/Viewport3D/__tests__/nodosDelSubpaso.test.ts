@@ -23,23 +23,24 @@ function solver(over: Partial<Record<string, unknown>> = {}): TslSolver {
 }
 
 describe('nodosDelSubpaso: el orden de un subpaso del solver de GPU', () => {
-  it('es el de siempre, más los repasos del estiramiento entre la colisión y el cierre', () => {
+  it('es el de siempre, más los repasos del estiramiento entre el suelo y el agarre', () => {
     const nodos = nodosDelSubpaso(solver(), { tether: true, grab: true, facePoke: true }) as unknown as string[];
     expect(nodos).toEqual([
-      'pre', 'st0', 'st1', 'b0', 'se0', 'scClear', 'scScatter', 'scResolve', 'scApply', 'tether', 'ground', 'grab', 'snap',
-      'find', 'push', 'fpSolve',
+      'pre', 'st0', 'st1', 'b0', 'se0', 'scClear', 'scScatter', 'scResolve', 'scApply', 'tether', 'ground',
       ...Array.from({ length: REPASOS_DE_ESTIRAMIENTO }, () => ['st0', 'st1']).flat(),
-      'post',
+      'grab', 'snap', 'find', 'push', 'fpSolve', 'post',
     ]);
   });
 
-  it('repasa el estiramiento tres veces: medido con la camisa de María (18 % → 3,9 % de aristas sobre el 8 %)', () => {
+  it('repasa el estiramiento tres veces ANTES de la colisión: la velocidad y la fricción lo ven (revisión de los repasos)', () => {
     expect(REPASOS_DE_ESTIRAMIENTO).toBe(3);
     const nodos = nodosDelSubpaso(solver(), { tether: false, grab: false, facePoke: false }) as unknown as string[];
-    const ultimaColision = nodos.lastIndexOf('push');
-    const cierre = nodos.indexOf('post');
-    // Lo que la colisión vuelve a estirar se corrige en el mismo subpaso, antes del cierre.
-    expect(nodos.slice(ultimaColision + 1, cierre)).toEqual(Array.from({ length: 3 }, () => ['st0', 'st1']).flat());
+    // Entre el suelo y el snapshot: como toda restricción, entra en la velocidad
+    // (postSolve la saca de preCollisionPos) y la fricción de la colisión la ve.
+    // Tras la colisión, la prenda subía 2,8 cm en 8 s y el cierre tomaba la
+    // corrección por empuje; aquí la tela queda quieta (medido el 10-10).
+    expect(nodos.slice(nodos.indexOf('ground') + 1, nodos.indexOf('snap'))).toEqual(Array.from({ length: 3 }, () => ['st0', 'st1']).flat());
+    expect(nodos.slice(nodos.lastIndexOf('push') + 1)).toEqual(['post']);
   });
 
   it('sin tirante, sin agarre y sin face-poke, esos pasos no están', () => {

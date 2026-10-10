@@ -2,15 +2,20 @@ import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
 import type { TslSolver } from '../../utils/cloth/gpu/tslSolver';
 
 /**
- * Repasos del estiramiento al final de cada subpaso, después de la colisión
- * (IA 1b-2, «Física primero», aprobado por Samuel el 10-10). El estiramiento
- * con su tope rígido del 2 % corre al principio del subpaso; costuras,
- * autocolisión, tirante y colisión lo vuelven a estirar después, y con 15
- * subpasos el residuo era grande: la camisa de María, holgada, quedaba con el
- * 17,9 % de sus aristas por encima del 8 %. Medido con la camisa cosida en
- * WebGPU (cuadros/s · aristas > 8 % · p95): sin repaso 25,1 · 17,9 % · 19,7 %;
- * 1 → 23,2 · 9,4 % · 12,0 %; 2 → 21,9 · 5,7 % · 8,7 %; 3 → 20,6 · 3,9 % · 7,0 %,
- * lo mismo que 30 subpasos (12,9 cuadros/s). Penetración 0 en todos.
+ * Repasos del estiramiento en cada subpaso, después de costuras, autocolisión,
+ * tirante y suelo y ANTES de la colisión con el cuerpo (IA 1b-2, «Física
+ * primero», aprobado por Samuel el 10-10). El estiramiento con su tope rígido
+ * del 2 % corre al principio del subpaso; lo que viene después lo volvía a
+ * estirar, y con 15 subpasos el residuo era grande: la camisa de María,
+ * holgada, quedaba con el 17,9 % de sus aristas por encima del 8 % y su área
+ * crecía un 4,6 % en 8 s. Medido con la camisa cosida en WebGPU (cuadros/s ·
+ * aristas > 8 % · p95): sin repaso 25,1 · 17,9 % · 19,7 %; con tres, 21,7 ·
+ * 3,7 % · 6,9 %, lo mismo que 30 subpasos (12,9 cuadros/s). Aquí, antes del
+ * snapshot, la corrección entra en la velocidad como cualquier restricción y
+ * la fricción de la colisión la ve; tras la colisión (la primera versión) el
+ * cierre la tomaba por empuje y la prenda subía 2,8 cm en 8 s. Con ellos aquí
+ * queda quieta (ruedo a 0,851 m de 1 a 8 s) y pasan la caída M4, Cusick y el
+ * descenso largo.
  */
 export const REPASOS_DE_ESTIRAMIENTO = 3;
 
@@ -74,6 +79,10 @@ export function nodosDelSubpaso(
   // el snapshot pre-colisión captura la posición post-ground y la
   // velocidad natural excluye solo el push del cuerpo.
   nodos.push(solver.groundClamp);
+  // Repasos del estiramiento (con su tope): lo que costuras, autocolisión y
+  // tirante volvieron a estirar se corrige aquí, antes del snapshot, así que
+  // entra en la velocidad y la colisión de abajo (con su fricción) lo ve.
+  for (let r = 0; r < REPASOS_DE_ESTIRAMIENTO; r++) nodos.push(...solver.stretchColors);
   // Mesh grab ANTES del snapshot: su desplazamiento SÍ debe entrar en
   // la velocidad (vNat = (preCol - prev) / sdt) → momentum natural al
   // soltar en vez de caída muerta.
@@ -96,11 +105,6 @@ export function nodosDelSubpaso(
   // el par push+grip por substep es protector). Gate = capability + dev
   // flag 'vina-facepoke-on'.
   if (op.facePoke && solver.facePokeNodes) nodos.push(solver.facePokeNodes.solve);
-  // Repasos del estiramiento (con su tope) tras la colisión: lo que el
-  // subpaso volvió a estirar se corrige antes del cierre (ver arriba). Como
-  // el push del cuerpo, no entra en la velocidad: postSolve la deriva de
-  // preCollisionPos.
-  for (let r = 0; r < REPASOS_DE_ESTIRAMIENTO; r++) nodos.push(...solver.stretchColors);
   // postSolve deriva la velocidad de preCollisionPos (no de pos): el
   // push de colisión corrige posición sin crear velocidad, + respuesta
   // inelástica (#897 F2.3, espejo wasmSolverWorker.ts:367-399).

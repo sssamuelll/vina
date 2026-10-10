@@ -15,7 +15,8 @@
  *   2. stretch      — graph-colored distance constraints (per-color dispatch)
  *   3. bend         — graph-colored distance constraint on opposite verts (per-color dispatch)
  *   4. seam         — graph-colored decaying-target constraints closing seam pairs
- *   5. groundClamp  — clamp positions to ground plane (AFTER constraints)
+ *   5. groundClamp  — clamp positions to ground plane (AFTER constraints),
+ *      then the stretch colors again ×REPASOS_DE_ESTIRAMIENTO (IA 1b-2)
  *   6. snapshotPreCollision — pos → preCollisionPos (tras grab, ANTES de
  *      colisión de cuerpo; espejo de preCollisionBuf en wasmSolverWorker)
  *   7. postSolve    — velocity from preCollisionPos (collision push excluded),
@@ -96,7 +97,9 @@ export interface TslSolverConfig {
    * Hard strain limit (#gummy STEP 4): max fractional edge elongation past rest
    * before a rigid one-sided clamp pulls it back. εmax=0.02 (2%, woven default).
    * Kills the residual rubberiness the compliant stretch solve can't (Jacobi
-   * under-convergence). 0 disables. GPU-ahead vs WASM/CPU (A7 divergence).
+   * under-convergence). 0 disables. WASM y CPU llevan el mismo tope (backport
+   * A7 STEP-4); lo que solo tiene el tier GPU son los repasos del estiramiento
+   * antes de la colisión (`nodosDelSubpaso.ts`, IA 1b-2).
    */
   maxStrain?: number;
 }
@@ -412,7 +415,9 @@ function makeDistanceConstraintFn(
   // WGSL). Elimina ~150 dispatches/frame (~1ms medido). Semántica que
   // CAMBIA: el cap ya no corre al FINAL del substep — el estiramiento que
   // bend/seams/self-collision introduzcan después se capea con 1 substep de
-  // lag (~µm/substep; gates: drape sleeve count + Cusick).
+  // lag. Ese lag NO era de µm: con 15 substeps dejaba el 17,9 % de las
+  // aristas de la camisa de María sobre el 8 %; por eso el subpaso repasa
+  // el stretch antes de la colisión (`nodosDelSubpaso.ts`, IA 1b-2).
   maxStrainUniform?: FloatUniform,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1148,9 +1153,10 @@ function makeFitColorizeFn(
  * All data is stored in StorageBufferAttributes shared with the vertex shader,
  * enabling zero-copy rendering.
  *
- * Execution order per substep (espejo WASM — ver GarmentSimulation.tsx):
+ * Execution order per substep (la lista vive en `nodosDelSubpaso.ts`):
  *   preSolve → stretch(per-color) → bend(per-color) → seam(per-color) → groundClamp →
- *   [grab] → snapshotPreCollision → collision bodies → postSolve
+ *   stretch ×REPASOS_DE_ESTIRAMIENTO → [grab] → snapshotPreCollision →
+ *   collision bodies → postSolve
  */
 export function createTslSolver(
   buffers: TslBufferSet,
