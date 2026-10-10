@@ -78,6 +78,7 @@ export function registerClothGeometry(
   // no valen para ella (revisión final IA 1b-2: `fit_map` medía la pose plana).
   aristas = null;
   latidosDeLaTela = 0;
+  tierDeLaTela = 'none';
 }
 
 export function getClothGeometry(): ClothGeometryRecord | null {
@@ -89,6 +90,8 @@ export function getClothGeometry(): ClothGeometryRecord | null {
 let latidos = 0;
 let latidosDeLaTela = 0;
 let aristas: SolverEdgeData | null = null;
+/** El tier que movió la tela en su último latido: parar libera el solver y el activo vuelve a 'none'. */
+let tierDeLaTela: SolverTier = 'none';
 
 /**
  * Un cuadro en que la app dibujó tela nueva (el `useFrame` de
@@ -101,6 +104,7 @@ export function latirLaSimulacion(edges: SolverEdgeData | null): void {
   latidos += 1;
   latidosDeLaTela += 1;
   aristas = edges;
+  tierDeLaTela = activeTier;
 }
 
 export function latidosDeLaSimulacion(): number {
@@ -114,6 +118,10 @@ export function latidosDeEstaTela(): number {
 
 export function aristasDeLaTela(): SolverEdgeData | null {
   return aristas;
+}
+
+export function tierDeEstaTela(): SolverTier {
+  return tierDeLaTela;
 }
 
 // ─── Ring de eventos de la cascada ──────────────────────────────────────────

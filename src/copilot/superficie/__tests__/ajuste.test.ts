@@ -65,8 +65,8 @@ describe('fit_map', () => {
   it('mide cada pieza con la tela de la simulación', async () => {
     // Popelina: se rompe al 8 % (`maxStretchBeforeBreak: 8`). Al 20 % no se puede
     // poner (2,5 veces lo que aguanta); al 7 % está ajustada (0,875); sin estirar, bien.
-    tela([{ pieceId: 'a', factor: 1.2 }, { pieceId: 'b', factor: 1.07 }, { pieceId: 'c', factor: 1 }]);
     setActiveSolverTier('webgpu');
+    tela([{ pieceId: 'a', factor: 1.2 }, { pieceId: 'b', factor: 1.07 }, { pieceId: 'c', factor: 1 }]);
     const { ctx } = tienda([suelta('a', 'Delantero'), suelta('b', 'Espalda'), suelta('c', 'Cuello')], [], {}, {}, { simulationState: 'running' });
     const r = await leer(ctx);
     expect(r).toMatchObject({ available: true, tier: 'webgpu', fabric: { id: 'cotton-poplin', max_stretch_pct: 8 } });
@@ -115,13 +115,24 @@ describe('fit_map', () => {
   });
 
   it('fuera de WebGPU avisa que las cifras salen altas: allí no hay repasos del estiramiento', async () => {
-    tela([{ pieceId: 'a', factor: 1.05 }]);
     setActiveSolverTier('wasm');
+    tela([{ pieceId: 'a', factor: 1.05 }]);
     const { ctx } = tienda([suelta('a')], [], {}, {}, { simulationState: 'running' });
     const enWasm = await leer(ctx);
     expect(enWasm.note).toMatch(/wasm.*stretch passes.*read high/i);
     setActiveSolverTier('webgpu');
+    tela([{ pieceId: 'a', factor: 1.05 }]);
     expect((await leer(ctx)).note).toBeUndefined();
+  });
+
+  it('con la simulación parada dice el tier que movió la tela, no «none», y no avisa de más', async () => {
+    setActiveSolverTier('webgpu');
+    tela([{ pieceId: 'a', factor: 1.05 }]);
+    clearActiveSolverTier(); // parar libera el solver (useSimulationLifecycle)
+    const { ctx } = tienda([suelta('a')], [], {}, {}, { simulationState: 'paused' });
+    const r = await leer(ctx);
+    expect(r).toMatchObject({ available: true, tier: 'webgpu' });
+    expect(r.note).toBeUndefined();
   });
 
   it('cuenta la tela por largo, no por vértice: dos aristas cortas estiradas no vuelven roja la pieza entera', async () => {

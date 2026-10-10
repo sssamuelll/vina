@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { definirVerbo, type ContextoDeVerbo, type Verbo } from '../tipos';
-import { aristasDeLaTela, getActiveSolverTier, getClothGeometry, latidosDeEstaTela } from '../../../utils/cloth/solverRuntimeTracker';
+import { aristasDeLaTela, getClothGeometry, latidosDeEstaTela, tierDeEstaTela } from '../../../utils/cloth/solverRuntimeTracker';
 import { DEFAULT_FIT_MAP_CONFIG, DEFAULT_FIT_PARAMS, fabricToFitParams } from '../../../utils/cloth/fitMaps';
 import { getPhysicalFabric } from '../../../utils/cloth/physicalFabric';
 import { revisionDelProyecto } from '../../../store/revisionDelProyecto';
@@ -99,7 +99,8 @@ export function ajusteDeLaTela(ctx: ContextoDeVerbo): Ajuste {
     }
   }
   const nombre = new Map(project.pieces.map(x => [x.id, x.name]));
-  const tier = getActiveSolverTier();
+  // El tier que movió ESTA tela: con la simulación parada el activo ya es 'none'.
+  const tier = tierDeEstaTela();
   return {
     available: true,
     tier,
