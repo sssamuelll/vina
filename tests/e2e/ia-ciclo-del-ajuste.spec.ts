@@ -62,7 +62,12 @@ test('tu agente viste la camisa, la simula y lee el ajuste de cada pieza', async
     expect(vestido.measure!.pieces).toHaveLength(5);
     expect(vestido.measure).toMatchObject({ view: 'split', view_changed: true });
 
-    const simulada = await yo.llamar('simulate', { action: 'start', wait_seconds: 45 });
+    let simulada = await yo.llamar('simulate', { action: 'start', wait_seconds: 45 });
+    // Con la máquina cargada el WASM puede tardar más de 30 s en dar su primer cuadro, y el
+    // recibo lo dice («did not start»). Un agente vuelve a esperar: la simulación sigue corriendo.
+    if ((simulada.measure!.frames as number) === 0) simulada = await yo.llamar('simulate', { action: 'start', wait_seconds: 45 });
+    // El recibo entero al log: si falla, se ve qué dijo (tier, cuadros, avisos) y no solo el número.
+    console.log('simulate:', JSON.stringify({ done: simulada.done, measure: { ...simulada.measure, fit: undefined }, warnings: simulada.warnings }));
     expect(simulada.measure).toMatchObject({ state: 'running' });
     expect(simulada.measure!.frames as number).toBeGreaterThan(0);
     expect(simulada.measure!.tier).not.toBe('none');
