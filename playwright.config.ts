@@ -7,6 +7,13 @@ import { defineConfig, devices } from '@playwright/test';
 // de mudarse a otro donde nadie lo espera.
 const PUERTO = Number(process.env.VINA_E2E_PORT ?? 5174);
 
+// VINA_E2E_BUILD=1: los e2e miden el build (`vite preview` del `dist` que ya
+// compiló quien lo pide, el gate del deploy) y no el servidor de desarrollo.
+// Lo que se mide es lo que se publica: el de desarrollo pinta cosas que
+// producción no tiene (`top-bar__status`). Sin compilar antes, se mide un
+// `dist` viejo.
+const CONTRA_EL_BUILD = Boolean(process.env.VINA_E2E_BUILD);
+
 export default defineConfig({
   testDir: './tests/e2e',
   // Los specs @gpu-local (DoD #897, perf) requieren GPU/WebGPU real — corren
@@ -26,6 +33,9 @@ export default defineConfig({
     },
   },
   fullyParallel: true,
+  // Un `test.only` commiteado deja su spec en un solo test, y el gate lo daría
+  // por pasado entero. El gate del deploy corre con CI=1.
+  forbidOnly: Boolean(process.env.CI),
   // CI runners (ubuntu-latest, 4 vCPU). Within each shard, 2 parallel workers
   // gives good speedup without OOM under ANGLE+SwiftShader WebGL.
   workers: process.env.CI ? 2 : undefined,
@@ -47,9 +57,16 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npx vite --port ${PUERTO} --strictPort`,
+    command: CONTRA_EL_BUILD
+      ? `npx vite preview --port ${PUERTO} --strictPort`
+      : `npx vite --port ${PUERTO} --strictPort`,
     port: PUERTO,
-    reuseExistingServer: true,
-    timeout: 15000,
+    // Contra el build no se reutiliza nada: lo que ya escuchara en el puerto
+    // sería otra cosa (un Vite de desarrollo, otro proyecto) y se mediría en
+    // silencio. Con el puerto ocupado, Playwright para y lo dice.
+    reuseExistingServer: !CONTRA_EL_BUILD,
+    // `vite preview` arranca en un segundo con la máquina libre; el gate corre
+    // con la máquina cargada, y el script viejo esperaba al servidor hasta 60 s.
+    timeout: CONTRA_EL_BUILD ? 60_000 : 15000,
   },
 });
