@@ -56,6 +56,7 @@ import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection, togglePieceSelection, enterSuperimposePickMode } from '../../store/editorSlice';
 import { toggleIK, resetPose } from '../../store/avatarSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
+import { selectAvatarVisible, toggleAvatarVisible } from '../../store/renderSettingsSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal, clearFlippedNormals, setSelectedVertices, setRenderSettingsOpen } from '../../store/simulationSlice';
 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
@@ -455,7 +456,9 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [fitMapStats, setFitMapStats] = useState<import('../../utils/cloth/fitMaps').FitMapStats | null>(null);
   const [inspectedValue, setInspectedValue] = useState<number | null>(null);
-  const [avatarHidden, setAvatarHidden] = useState(false);
+  // El avatar a la vista vive en el store (renderSettings.avatarRenderStyle): el
+  // interruptor de la barra superior, Shift+A y el menú del 3D son lo mismo.
+  const avatarVisible = useSelector(selectAvatarVisible);
   const [collisionPanelOpen, setCollisionPanelOpen] = useState(false);
   // Redux y no useState: las puertas (File menu, palette) viven fuera de este árbol.
   const renderPanelOpen = useSelector((s: RootState) => s.simulation.renderSettingsOpen);
@@ -694,7 +697,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
 
       if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
-        setAvatarHidden(h => !h);
+        dispatch(toggleAvatarVisible());
       }
       if (e.shiftKey && (e.key === 'F' || e.key === 'f')) {
         e.preventDefault();
@@ -867,8 +870,8 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         <CustomLights />
         <AnimationDriver />
 
-        {!avatarHidden && avatarMode === 'dressform' && <Mannequin />}
-        {!avatarHidden && avatarMode === 'model' && avatarModelUrl && (
+        {avatarVisible && avatarMode === 'dressform' && <Mannequin />}
+        {avatarVisible && avatarMode === 'model' && avatarModelUrl && (
           <Suspense fallback={null}>
             <AvatarModel
             url={avatarModelUrl}
@@ -987,8 +990,8 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       <FitMapToggle
         stats={fitMapStats}
         inspectedValue={inspectedValue}
-        avatarHidden={avatarHidden}
-        onToggleAvatar={() => setAvatarHidden(h => !h)}
+        avatarHidden={!avatarVisible}
+        onToggleAvatar={() => dispatch(toggleAvatarVisible())}
         onSnapshot={snapshot3D}
       />
 
@@ -1062,7 +1065,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         menu={ctxMenu}
         onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
         onResetCamera={handleResetCamera}
-        onToggleAvatar={() => setAvatarHidden(h => !h)}
+        onToggleAvatar={() => dispatch(toggleAvatarVisible())}
         onSnapshot={snapshot3D}
         onSelectPiece={(id) => dispatch(selectPiece(id))}
         onResetPieceArrangement={(id) => dispatch(clearArrangementOverride(id))} // reset = LIMPIAR el override (antes: [0,0,0] world = "muévete al origen", el mismo bug que el tool del agente tenía)
