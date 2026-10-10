@@ -10,8 +10,8 @@ import { suelta, tienda } from './fixtures';
 
 /**
  * Una tela de mentira: cada pieza son dos vértices unidos por una arista de
- * 0,1 m en reposo, estirada por su factor. El estiramiento por vértice es
- * ese factor (`computePerVertexStrain`).
+ * 0,1 m en reposo, estirada por su factor. El estiramiento de la pieza es ese
+ * factor.
  */
 function tela(trozos: { pieceId: string; factor: number }[]) {
   const pos: number[] = [];
@@ -62,7 +62,7 @@ describe('fit_map', () => {
     expect(await leer(ctx)).toMatchObject({ available: false, reason: expect.stringMatching(/simulate/) });
   });
 
-  it('mide cada pieza por sus vértices, con la tela de la simulación', async () => {
+  it('mide cada pieza con la tela de la simulación', async () => {
     // Popelina: se rompe al 8 % (`maxStretchBeforeBreak: 8`). Al 20 % no se puede
     // poner (2,5 veces lo que aguanta); al 7 % está ajustada (0,875); sin estirar, bien.
     tela([{ pieceId: 'a', factor: 1.2 }, { pieceId: 'b', factor: 1.07 }, { pieceId: 'c', factor: 1 }]);
@@ -76,6 +76,52 @@ describe('fit_map', () => {
       { piece_id: 'c', name: 'Cuello', strain_p50_pct: 0, strain_p95_pct: 0, tight_pct: 0, cant_wear_pct: 0 },
     ]);
     expect(r.garment).toMatchObject({ strain_p50_pct: 7, strain_p95_pct: 20, tight_pct: 33.3, cant_wear_pct: 33.3 });
+  });
+
+  it('el percentil 95 no es el máximo, y la tela encogida cuenta como 0 (revisión de los repasos)', async () => {
+    // 19 aristas encogidas al 95 % de su largo, una al 2 % y una al 50 %, todas de 1 cm y sueltas.
+    // Ordenadas: 19 ceros, 2, 50. Sin el recorte en 0 la mediana daría −5; con el máximo, el p95 daría 50.
+    const vertices: number[][] = [];
+    const aristas: [number, number, number][] = [];
+    const arista = (f: number) => {
+      const i = vertices.length;
+      vertices.push([0, 0, i * 0.02], [0.01 * f, 0, i * 0.02]);
+      aristas.push([i, i + 1, 0.01]);
+    };
+    for (let k = 0; k < 19; k++) arista(0.95);
+    arista(1.02);
+    arista(1.5);
+    telaConAristas([{ pieceId: 'a', vertices, aristas }]);
+    const { ctx } = tienda([suelta('a')], [], {}, {}, { simulationState: 'running' });
+    const r = await leer(ctx);
+    expect((r.pieces as object[])[0]).toMatchObject({ strain_p50_pct: 0, strain_p95_pct: 2 });
+  });
+
+  it('una pieza sin aristas que medir no dice que le queda perfecta: dice null', async () => {
+    telaConAristas([
+      { pieceId: 'a', vertices: [[0, 0, 0], [0.0005, 0, 0]], aristas: [[0, 1, 0.0005]] },
+      { pieceId: 'b', vertices: [[0, 0, 0], [0.101, 0, 0]], aristas: [[0, 1, 0.1]] },
+    ]);
+    const { ctx } = tienda([suelta('a'), suelta('b')], [], {}, {}, { simulationState: 'running' });
+    const r = await leer(ctx);
+    expect((r.pieces as object[])[0]).toMatchObject({ strain_p50_pct: null, strain_p95_pct: null, tight_pct: null, cant_wear_pct: null });
+    expect((r.pieces as object[])[1]).toMatchObject({ strain_p95_pct: 1, cant_wear_pct: 0 });
+  });
+
+  it('una tela con posiciones rotas no tiene mapa: no dice que le queda bien', async () => {
+    telaConAristas([{ pieceId: 'a', vertices: [[0, 0, 0], [0.101, 0, 0], [NaN, 0, 0]], aristas: [[0, 1, 0.1], [0, 2, 0.1]] }]);
+    const { ctx } = tienda([suelta('a')], [], {}, {}, { simulationState: 'running' });
+    expect(await leer(ctx)).toMatchObject({ available: false, reason: expect.stringMatching(/invalid positions/) });
+  });
+
+  it('fuera de WebGPU avisa que las cifras salen altas: allí no hay repasos del estiramiento', async () => {
+    tela([{ pieceId: 'a', factor: 1.05 }]);
+    setActiveSolverTier('wasm');
+    const { ctx } = tienda([suelta('a')], [], {}, {}, { simulationState: 'running' });
+    const enWasm = await leer(ctx);
+    expect(enWasm.note).toMatch(/wasm.*stretch passes.*read high/i);
+    setActiveSolverTier('webgpu');
+    expect((await leer(ctx)).note).toBeUndefined();
   });
 
   it('cuenta la tela por largo, no por vértice: dos aristas cortas estiradas no vuelven roja la pieza entera', async () => {

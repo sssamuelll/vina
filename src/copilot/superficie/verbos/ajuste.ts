@@ -9,17 +9,21 @@ import { unDecimal } from '../costuras';
 /**
  * Las aristas más cortas que esto son astillas del mallado junto a costuras y
  * esquinas: medidas el 10-10 en la camisa de María, las de menos de 0,5 mm
- * daban entre 240 y 890 % y eran el «máximo» del mapa. No son tela.
+ * daban entre 240 y 890 % y eran el «máximo» del mapa. No son tela. El corte
+ * en 1 mm deja margen sobre esas.
  */
 const ASTILLA_M = 0.001;
 
-interface Medida { strain_p50_pct: number; strain_p95_pct: number; tight_pct: number; cant_wear_pct: number }
+/** `null`: la pieza no tiene tela que medir (solo astillas); no es un ajuste perfecto. */
+interface Medida { strain_p50_pct: number | null; strain_p95_pct: number | null; tight_pct: number | null; cant_wear_pct: number | null }
 
 export type Ajuste =
   | { available: false; reason: string }
   | {
     available: true;
     tier: string;
+    /** Fuera de WebGPU: las cifras salen altas, allí no hay repasos del estiramiento. */
+    note?: string;
     /** Cuadros que avanzó esta tela desde que se montó. */
     frames: number;
     fabric: { id: string; max_stretch_pct: number };
@@ -32,7 +36,7 @@ interface Cuenta { e: number[]; largo: number; justas: number; rotas: number }
 const cuentaNueva = (): Cuenta => ({ e: [], largo: 0, justas: 0, rotas: 0 });
 
 function medida(c: Cuenta): Medida {
-  if (c.e.length === 0 || c.largo === 0) return { strain_p50_pct: 0, strain_p95_pct: 0, tight_pct: 0, cant_wear_pct: 0 };
+  if (c.e.length === 0 || c.largo === 0) return { strain_p50_pct: null, strain_p95_pct: null, tight_pct: null, cant_wear_pct: null };
   const o = Float64Array.from(c.e).sort();
   const q = (f: number) => o[Math.min(o.length - 1, Math.floor(f * o.length))];
   return {
@@ -80,6 +84,10 @@ export function ajusteDeLaTela(ctx: ContextoDeVerbo): Ajuste {
     const a = aristas.stretchingIds[2 * i];
     const b = aristas.stretchingIds[2 * i + 1];
     const largo = Math.hypot(p[3 * b] - p[3 * a], p[3 * b + 1] - p[3 * a + 1], p[3 * b + 2] - p[3 * a + 2]);
+    // Un NaN (o una arista que apunta fuera de la tela) no es «le queda bien»: no hay mapa.
+    if (!Number.isFinite(largo)) {
+      return { available: false, reason: 'the cloth has invalid positions (the simulation is unstable); stop it and simulate again' };
+    }
     const e = Math.max(0, largo / reposo - 1);
     const fit = e / aguanta;
     for (const c of [porPieza[deLaPieza[a]], prenda]) {
@@ -91,9 +99,16 @@ export function ajusteDeLaTela(ctx: ContextoDeVerbo): Ajuste {
     }
   }
   const nombre = new Map(project.pieces.map(x => [x.id, x.name]));
+  const tier = getActiveSolverTier();
   return {
     available: true,
-    tier: getActiveSolverTier(),
+    tier,
+    // Los repasos del estiramiento son del tier GPU (`nodosDelSubpaso.ts`): WASM y
+    // CPU conservan el residuo de antes (la camisa holgada de María: 17,9 % de
+    // aristas sobre el 8 %), así que ahí la tela se lee más estirada de lo que es.
+    ...(tier === 'webgpu' ? {} : {
+      note: `on the ${tier} tier the simulation leaves more stretch than real fabric would (the extra stretch passes run only on WebGPU), so these numbers read high`,
+    }),
     frames,
     fabric: { id: simulation.defaultFabricId, max_stretch_pct: unDecimal(aguanta * 100) },
     garment: medida(prenda),
@@ -104,7 +119,7 @@ export function ajusteDeLaTela(ctx: ContextoDeVerbo): Ajuste {
 const fitMap = definirVerbo({
   name: 'fit_map',
   description:
-    "How the simulated garment fits, piece by piece, measured now on the cloth: how much the fabric is stretched along the mesh (median and 95th percentile, in %), and the share of each piece's cloth, by length, that is tight or can't be worn (stretched past 80% or 100% of what its fabric takes before breaking). Mesh slivers under 1 mm are left out, and contact with the body is not measured. A garment that fits still reads a few percent: the simulation leaves some local stretch. Needs a simulation (simulate).",
+    "How the simulated garment fits, piece by piece, measured now on the cloth: how much the fabric is stretched along the mesh (median and 95th percentile, in %), and the share of each piece's cloth, by length, that is tight or can't be worn (stretched past 80% or 100% of what its fabric takes before breaking). Mesh slivers under 1 mm are left out, and contact with the body is not measured. On WebGPU a garment that fits still reads a few percent (the simulation leaves some local stretch); on other tiers the numbers read high, and the result says so. Needs a simulation (simulate).",
   args: z.object({}),
   run: (_args, ctx) => ({ revision: revisionDelProyecto(), ...ajusteDeLaTela(ctx) }),
 });

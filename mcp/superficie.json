@@ -279,7 +279,7 @@
     },
     {
       "name": "fit_map",
-      "description": "How the simulated garment fits, piece by piece, measured now on the cloth: how much the fabric is stretched along the mesh (median and 95th percentile, in %), and the share of each piece's cloth, by length, that is tight or can't be worn (stretched past 80% or 100% of what its fabric takes before breaking). Mesh slivers under 1 mm are left out, and contact with the body is not measured. A garment that fits still reads a few percent: the simulation leaves some local stretch. Needs a simulation (simulate).",
+      "description": "How the simulated garment fits, piece by piece, measured now on the cloth: how much the fabric is stretched along the mesh (median and 95th percentile, in %), and the share of each piece's cloth, by length, that is tight or can't be worn (stretched past 80% or 100% of what its fabric takes before breaking). Mesh slivers under 1 mm are left out, and contact with the body is not measured. On WebGPU a garment that fits still reads a few percent (the simulation leaves some local stretch); on other tiers the numbers read high, and the result says so. Needs a simulation (simulate).",
       "input_schema": {
         "type": "object",
         "properties": {}
