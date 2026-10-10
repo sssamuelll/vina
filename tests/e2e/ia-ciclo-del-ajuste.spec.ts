@@ -75,9 +75,13 @@ test('tu agente viste la camisa, la simula y lee el ajuste de cada pieza', async
 
     const ajuste = await yo.llamar('fit_map', {});
     expect(ajuste.available, JSON.stringify(ajuste)).toBe(true);
-    const piezas = ajuste.pieces as Array<{ strain_max_pct: number }>;
+    const piezas = ajuste.pieces as Array<{ strain_p95_pct: number; cant_wear_pct: number }>;
     expect(piezas).toHaveLength(5);
-    for (const p of piezas) expect(Number.isFinite(p.strain_max_pct) && p.strain_max_pct >= 0).toBe(true);
+    for (const p of piezas) {
+      expect(Number.isFinite(p.strain_p95_pct) && p.strain_p95_pct >= 0).toBe(true);
+      expect(p.cant_wear_pct).toBeGreaterThanOrEqual(0);
+      expect(p.cant_wear_pct).toBeLessThanOrEqual(100);
+    }
 
     const parada = await yo.llamar('simulate', { action: 'stop' });
     expect(parada).toMatchObject({ done: true, measure: { state: 'paused' } });
