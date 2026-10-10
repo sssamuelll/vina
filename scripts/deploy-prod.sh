@@ -75,8 +75,17 @@ echo "✓ limpio ($(git rev-parse --short HEAD) en $(git branch --show-current))
 # El verde exige lo mismo que antes: todos los specs de la lista en verde
 # sobre ESTE árbol, en una corrida o en varias. Para correrlo todo otra vez:
 #   rm -rf "$(git rev-parse --git-common-dir)/vina-gate"
+#
+# La clave lleva también lo instalado. El lockfile está en el árbol, pero
+# node_modules puede no corresponderle: los worktrees comparten el del checkout
+# principal, y un `npm ci` después del ensayo cambiaría lo que se compila sin
+# cambiar el árbol. npm deja lo que instaló de verdad en
+# node_modules/.package-lock.json, y con él viaja la versión de Playwright y,
+# por tanto, la de su Chromium.
 ARBOL=$(git rev-parse 'HEAD^{tree}')
-MARCAS="$(git rev-parse --git-common-dir)/vina-gate/$ARBOL"
+INSTALADO=$(git hash-object node_modules/.package-lock.json) \
+  || { echo "✗ no hay node_modules/.package-lock.json: instala las dependencias (npm ci)" >&2; exit 1; }
+MARCAS="$(git rev-parse --git-common-dir)/vina-gate/$ARBOL-${INSTALADO:0:12}"
 mkdir -p "$MARCAS"
 
 echo "── Gates ──────────────────────────────────────────────"
@@ -142,10 +151,26 @@ echo "✓ dist listo ($(du -sh dist | cut -f1), bundle ${BUNDLE})"
 export VINA_E2E_BUILD=1 CI=1
 export VINA_E2E_PORT="${VINA_E2E_PORT:-5174}"
 
+# Un puerto ocupado para antes de lanzar Playwright, y dice por quién. Lo más
+# probable es un `vite preview` que sobrevivió a un ensayo cortado: en Windows,
+# matar el envoltorio de npx no mata a node (medido el 2026-09-18 y otra vez el
+# 10-10, cuando parar el ensayo dejó vivo el Playwright entero con su
+# servidor). Playwright tampoco mide lo que ya escucha (reuseExistingServer:
+# false), pero su aviso se queda dentro del log, y el gate diría «faltan N
+# specs» como si el intento siguiente fuera a salir distinto.
+puerto_libre() {
+  local pid
+  pid=$(netstat -ano | grep -E "[:.]$1 +[^ ]+ +LISTENING" | awk '{print $NF}' | head -1 || true)
+  [ -z "$pid" ] && return 0
+  echo "✗ el puerto $1 lo tiene el proceso $pid, quizá un ensayo cortado. Ciérralo con: taskkill //F //T //PID $pid" >&2
+  exit 1
+}
+
 echo "── Home ───────────────────────────────────────────────"
 if [ -f "$MARCAS/home.ok" ]; then
   echo "✓ home: ya pasó sobre este árbol"
 else
+  puerto_libre 4179
   npx playwright test --config playwright.home.config.ts > /tmp/vina-deploy-home.log 2>&1 \
     || { tail -30 /tmp/vina-deploy-home.log >&2; echo "✗ e2e de la home en rojo" >&2; exit 1; }
   grep -E "passed|failed|flaky" /tmp/vina-deploy-home.log | sed 's/^ */✓ home: /'
@@ -276,6 +301,7 @@ else
   if [ ${#PENDIENTES[@]} -lt ${#SPECS_DEL_GATE[@]} ]; then
     echo "  corren ${#PENDIENTES[@]} de ${#SPECS_DEL_GATE[@]} specs: los demás ya pasaron sobre este árbol"
   fi
+  puerto_libre "$VINA_E2E_PORT"
   E2E=0
   VINA_GATE_MARCAS="$MARCAS" npx playwright test --workers=2 \
     --reporter=list,./scripts/memoria-del-gate.mjs "${PENDIENTES[@]}" \

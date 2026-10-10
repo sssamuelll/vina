@@ -6,6 +6,8 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: /home\.spec\.ts/,
+  // Un `test.only` commiteado dejaría la home en un solo test (el deploy corre con CI=1).
+  forbidOnly: Boolean(process.env.CI),
   reporter: 'list',
   use: { baseURL: 'http://localhost:4179', ...devices['Desktop Chrome'] },
   webServer: {

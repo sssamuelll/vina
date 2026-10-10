@@ -33,6 +33,9 @@ export default defineConfig({
     },
   },
   fullyParallel: true,
+  // Un `test.only` commiteado deja su spec en un solo test, y el gate lo daría
+  // por pasado entero. El gate del deploy corre con CI=1.
+  forbidOnly: Boolean(process.env.CI),
   // CI runners (ubuntu-latest, 4 vCPU). Within each shard, 2 parallel workers
   // gives good speedup without OOM under ANGLE+SwiftShader WebGL.
   workers: process.env.CI ? 2 : undefined,
@@ -62,6 +65,8 @@ export default defineConfig({
     // sería otra cosa (un Vite de desarrollo, otro proyecto) y se mediría en
     // silencio. Con el puerto ocupado, Playwright para y lo dice.
     reuseExistingServer: !CONTRA_EL_BUILD,
-    timeout: 15000,
+    // `vite preview` arranca en un segundo con la máquina libre; el gate corre
+    // con la máquina cargada, y el script viejo esperaba al servidor hasta 60 s.
+    timeout: CONTRA_EL_BUILD ? 60_000 : 15000,
   },
 });
