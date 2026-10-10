@@ -28,6 +28,16 @@ ENSAYO=0
 
 cd "$(dirname "$0")/.."
 
+# LA MÁQUINA ES UNA SOLA (2026-10-10). El ensayo y el deploy son lo más pesado que
+# corre aquí, una hora de e2e con dos navegadores, y se lanzan de nuevo dentro
+# del candado de `scripts/pesado.mjs`: si otra sesión tiene la máquina, hacen cola
+# hasta dos horas en vez de aplastar su trabajo, y no arrancan con la memoria o la
+# CPU ya ocupadas por otras aplicaciones. Dentro del candado, `VINA_PESADO` está
+# puesta y el script sigue de largo.
+if [ -z "${VINA_PESADO:-}" ]; then
+  exec node scripts/pesado.mjs "--nombre=deploy-prod ${1:-}" --espera=120 --ram=6 --cpu=60 -- bash "$(pwd)/scripts/deploy-prod.sh" "$@"
+fi
+
 echo "── Árbol ──────────────────────────────────────────────"
 # Cambios tracked sin commitear = desplegarías algo que el repo no registra.
 # Untracked se tolera (docs/research vive así).
@@ -99,13 +109,7 @@ else
   node scripts/ui-contract-lint.mjs > /tmp/vina-ui-contract.log 2>&1 \
     || { cat /tmp/vina-ui-contract.log >&2; exit 1; }
   echo "✓ contrato de interfaz (trinquete)"
-  # Con tope de 30 s por test y por hook, no los 5 y 10 s por defecto. El gate
-  # mide si el código está bien, no cuánto tarda: el 10-10 el ensayo de la #1241
-  # murió aquí con 2 de 9959 en «Test timed out in 5000ms» (7,0 y 7,9 s; aislados
-  # pasan en 1,4 y 1,8 s) porque otras aplicaciones tenían la CPU al 100 %, y esos
-  # tests leen archivos y lanzan `node` y `git` de forma síncrona. 30 s sigue
-  # cazando un test colgado.
-  npx vitest run --testTimeout=30000 --hookTimeout=30000 > /tmp/vina-deploy-vitest.log 2>&1 || { tail -20 /tmp/vina-deploy-vitest.log >&2; exit 1; }
+  npx vitest run > /tmp/vina-deploy-vitest.log 2>&1 || { tail -20 /tmp/vina-deploy-vitest.log >&2; exit 1; }
   grep -E "Test Files|Tests " /tmp/vina-deploy-vitest.log | sed 's/^ */✓ /'
   node scripts/verify-wasm-smoke.mjs
   echo "✓ smoke del WASM commiteado"

@@ -82,28 +82,3 @@ describe('el gate del deploy corre los trinquetes de la interfaz', () => {
     expect(new Set(specs).size).toBe(specs.length);
   });
 });
-
-/**
- * Los unitarios del gate aguantan una máquina cargada (2026-10-10).
- *
- * El ensayo de la #1241 murió en este paso con 2 de 9959 tests en «Test timed
- * out in 5000ms» (7,0 y 7,9 s; aislados pasan en 1,4 y 1,8 s): Ableton, Blender
- * y otro Vite tenían la CPU al 100 %, y esos dos leen archivos y lanzan `node` y
- * `git` de forma síncrona. El gate mide si el código está bien, no cuánto
- * tarda: con los 5 s por defecto, quien lo corre en una máquina ocupada pierde
- * el ensayo entero por un tiempo, no por un fallo.
- */
-describe('el gate del deploy aguanta una máquina cargada', () => {
-  const lineaDeVitest = GUION.split('\n').find((l) => l.trimStart().startsWith('npx vitest run'));
-
-  it('el censo no está ciego: el gate corre `npx vitest run`', () => {
-    expect(lineaDeVitest).toBeDefined();
-  });
-
-  it('y sube el tope de cada test y de cada hook por encima de los 5 s y 10 s por defecto', () => {
-    expect(lineaDeVitest).toMatch(/--testTimeout=(\d+)/);
-    expect(Number(lineaDeVitest?.match(/--testTimeout=(\d+)/)?.[1])).toBeGreaterThanOrEqual(30_000);
-    expect(lineaDeVitest).toMatch(/--hookTimeout=(\d+)/);
-    expect(Number(lineaDeVitest?.match(/--hookTimeout=(\d+)/)?.[1])).toBeGreaterThanOrEqual(30_000);
-  });
-});
