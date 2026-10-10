@@ -35,7 +35,7 @@ cd "$(dirname "$0")/.."
 # CPU ya ocupadas por otras aplicaciones. Dentro del candado, `VINA_PESADO` está
 # puesta y el script sigue de largo.
 if [ -z "${VINA_PESADO:-}" ]; then
-  exec node scripts/pesado.mjs "--nombre=deploy-prod ${1:-}" --espera=120 --ram=6 --cpu=60 -- bash "$(pwd)/scripts/deploy-prod.sh" "$@"
+  exec node scripts/pesado.mjs "--nombre=deploy-prod ${1:-}" --espera=120 --ram=6 --cpu=60 -- bash scripts/deploy-prod.sh "$@"
 fi
 
 echo "── Árbol ──────────────────────────────────────────────"
