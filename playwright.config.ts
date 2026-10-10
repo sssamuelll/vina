@@ -7,6 +7,13 @@ import { defineConfig, devices } from '@playwright/test';
 // de mudarse a otro donde nadie lo espera.
 const PUERTO = Number(process.env.VINA_E2E_PORT ?? 5174);
 
+// VINA_E2E_BUILD=1: los e2e miden el build (`vite preview` del `dist` que ya
+// compiló quien lo pide, el gate del deploy) y no el servidor de desarrollo.
+// Lo que se mide es lo que se publica: el de desarrollo pinta cosas que
+// producción no tiene (`top-bar__status`). Sin compilar antes, se mide un
+// `dist` viejo.
+const CONTRA_EL_BUILD = Boolean(process.env.VINA_E2E_BUILD);
+
 export default defineConfig({
   testDir: './tests/e2e',
   // Los specs @gpu-local (DoD #897, perf) requieren GPU/WebGPU real — corren
@@ -47,9 +54,14 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npx vite --port ${PUERTO} --strictPort`,
+    command: CONTRA_EL_BUILD
+      ? `npx vite preview --port ${PUERTO} --strictPort`
+      : `npx vite --port ${PUERTO} --strictPort`,
     port: PUERTO,
-    reuseExistingServer: true,
+    // Contra el build no se reutiliza nada: lo que ya escuchara en el puerto
+    // sería otra cosa (un Vite de desarrollo, otro proyecto) y se mediría en
+    // silencio. Con el puerto ocupado, Playwright para y lo dice.
+    reuseExistingServer: !CONTRA_EL_BUILD,
     timeout: 15000,
   },
 });

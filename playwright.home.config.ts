@@ -9,7 +9,11 @@ export default defineConfig({
   reporter: 'list',
   use: { baseURL: 'http://localhost:4179', ...devices['Desktop Chrome'] },
   webServer: {
-    command: 'npm run build && npx vite preview --port 4179 --strictPort',
+    // VINA_E2E_BUILD=1: el gate del deploy ya compiló y aquí solo se sirve; sin
+    // ella, compila él. Antes el deploy compilaba dos veces.
+    command: process.env.VINA_E2E_BUILD
+      ? 'npx vite preview --port 4179 --strictPort'
+      : 'npm run build && npx vite preview --port 4179 --strictPort',
     port: 4179,
     reuseExistingServer: false,
     timeout: 300_000,

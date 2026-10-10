@@ -15,23 +15,33 @@ import { join } from 'node:path';
 const RAIZ = process.cwd();
 const GUION = readFileSync(join(RAIZ, 'scripts/deploy-prod.sh'), 'utf8');
 
-/** Los specs del comando `npx playwright test --workers=2 \` del gate, en orden. */
-function specsDelGate(): string[] {
+/**
+ * Los specs del array `SPECS_DEL_GATE=(…)` del gate, en orden, y el renglón
+ * donde se dejó de leer: si no es el `)` que cierra el array, la lectura se
+ * cortó antes de tiempo y lo que viene detrás no lo ve nadie.
+ */
+function leerLista(): { specs: string[]; corte: string | undefined } {
   const lineas = GUION.split('\n');
-  const inicio = lineas.findIndex((l) => l.startsWith('npx playwright test --workers=2 \\'));
-  if (inicio === -1) return [];
+  const inicio = lineas.findIndex((l) => l === 'SPECS_DEL_GATE=(');
+  if (inicio === -1) return { specs: [], corte: undefined };
   const specs: string[] = [];
   for (const linea of lineas.slice(inicio + 1)) {
-    const m = linea.match(/^\s+(tests\/e2e\/\S+\.spec\.ts) \\$/);
-    if (!m) break;
+    const m = linea.match(/^\s+(tests\/e2e\/\S+\.spec\.ts)$/);
+    if (!m) return { specs, corte: linea };
     specs.push(m[1]);
   }
-  return specs;
+  return { specs, corte: undefined };
 }
+
+const specsDelGate = (): string[] => leerLista().specs;
 
 describe('el gate del deploy corre los trinquetes de la interfaz', () => {
   it('el censo no está ciego: la lista se lee y es larga', () => {
     expect(specsDelGate().length).toBeGreaterThanOrEqual(28);
+  });
+
+  it('y se lee entera: después del último spec viene el `)` que cierra el array', () => {
+    expect(leerLista().corte).toBe(')');
   });
 
   it('están los tres trinquetes', () => {
