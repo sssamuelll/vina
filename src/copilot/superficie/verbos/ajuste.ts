@@ -1,14 +1,19 @@
 import { z } from 'zod';
 import { definirVerbo, type ContextoDeVerbo, type Verbo } from '../tipos';
 import { aristasDeLaTela, getActiveSolverTier, getClothGeometry, latidosDeEstaTela } from '../../../utils/cloth/solverRuntimeTracker';
-import {
-  computePerVertexStrain, DEFAULT_FIT_MAP_CONFIG, DEFAULT_FIT_PARAMS, fabricToFitParams,
-} from '../../../utils/cloth/fitMaps';
+import { DEFAULT_FIT_MAP_CONFIG, DEFAULT_FIT_PARAMS, fabricToFitParams } from '../../../utils/cloth/fitMaps';
 import { getPhysicalFabric } from '../../../utils/cloth/physicalFabric';
 import { revisionDelProyecto } from '../../../store/revisionDelProyecto';
 import { unDecimal } from '../costuras';
 
-interface Medida { strain_max_pct: number; strain_mean_pct: number; tight_pct: number; cant_wear_pct: number }
+/**
+ * Las aristas más cortas que esto son astillas del mallado junto a costuras y
+ * esquinas: medidas el 10-10 en la camisa de María, las de menos de 0,5 mm
+ * daban entre 240 y 890 % y eran el «máximo» del mapa. No son tela.
+ */
+const ASTILLA_M = 0.001;
+
+interface Medida { strain_p50_pct: number; strain_p95_pct: number; tight_pct: number; cant_wear_pct: number }
 
 export type Ajuste =
   | { available: false; reason: string }
@@ -22,11 +27,29 @@ export type Ajuste =
     pieces: Array<{ piece_id: string; name: string } & Medida>;
   };
 
+/** Lo acumulado de un tramo de tela: estiramientos de sus aristas y su largo, entero, ajustado y roto. */
+interface Cuenta { e: number[]; largo: number; justas: number; rotas: number }
+const cuentaNueva = (): Cuenta => ({ e: [], largo: 0, justas: 0, rotas: 0 });
+
+function medida(c: Cuenta): Medida {
+  if (c.e.length === 0 || c.largo === 0) return { strain_p50_pct: 0, strain_p95_pct: 0, tight_pct: 0, cant_wear_pct: 0 };
+  const o = Float64Array.from(c.e).sort();
+  const q = (f: number) => o[Math.min(o.length - 1, Math.floor(f * o.length))];
+  return {
+    strain_p50_pct: unDecimal(q(0.5) * 100),
+    strain_p95_pct: unDecimal(q(0.95) * 100),
+    tight_pct: unDecimal((c.justas / c.largo) * 100),
+    cant_wear_pct: unDecimal((c.rotas / c.largo) * 100),
+  };
+}
+
 /**
- * El mapa de ajuste por pieza, medido ahora sobre la tela que la app dibuja:
- * las mismas fórmulas que el mapa en pantalla (`fitMaps.ts`) y la misma tela
- * de la simulación. Cada pieza es su tramo de vértices en el manifiesto de la
- * malla. Sin el cuerpo, como hoy la app: cuenta la pieza entera.
+ * El ajuste por pieza, medido ahora sobre la tela que la app dibuja, con la
+ * tela de la simulación. Cuenta por aristas y por largo de tela, no por
+ * vértice: el mapa en pantalla toma en cada vértice el máximo de sus aristas,
+ * y con eso un 4 % de aristas estiradas pintaba de rojo casi toda la pieza
+ * (IA 1b-2, «Física primero»). Cada pieza es su tramo de vértices en el
+ * manifiesto de la malla. Sin el cuerpo: cuenta la pieza entera.
  */
 export function ajusteDeLaTela(ctx: ContextoDeVerbo): Ajuste {
   const { simulation, project } = ctx.getState();
@@ -45,41 +68,43 @@ export function ajusteDeLaTela(ctx: ContextoDeVerbo): Ajuste {
   const params = fabric ? fabricToFitParams(fabric) : DEFAULT_FIT_PARAMS;
   const aguanta = Math.max(params.maxStretchRatio, 0.001);
   const [ajustada, noSePone] = DEFAULT_FIT_MAP_CONFIG.fitThresholds;
-  const estirado = computePerVertexStrain(pos.array as Float32Array, pos.count, aristas);
-  const medir = (desde: number, cuantos: number): Medida => {
-    let max = 1, suma = 0, justas = 0, rotas = 0;
-    const hasta = Math.min(desde + cuantos, estirado.length);
-    for (let i = desde; i < hasta; i++) {
-      const s = estirado[i];
-      if (s > max) max = s;
-      suma += s;
-      const fit = Math.max(0, s - 1) / aguanta;
-      if (fit > noSePone) rotas++;
-      else if (fit > ajustada) justas++;
+
+  const p = pos.array as Float32Array;
+  const deLaPieza = new Int32Array(pos.count).fill(-1);
+  tela.manifest.forEach((m, k) => deLaPieza.fill(k, m.vertexOffset, Math.min(m.vertexOffset + m.vertexCount, pos.count)));
+  const porPieza = tela.manifest.map(cuentaNueva);
+  const prenda = cuentaNueva();
+  for (let i = 0; i < aristas.stretchingLengths.length; i++) {
+    const reposo = aristas.stretchingLengths[i];
+    if (reposo < ASTILLA_M) continue;
+    const a = aristas.stretchingIds[2 * i];
+    const b = aristas.stretchingIds[2 * i + 1];
+    const largo = Math.hypot(p[3 * b] - p[3 * a], p[3 * b + 1] - p[3 * a + 1], p[3 * b + 2] - p[3 * a + 2]);
+    const e = Math.max(0, largo / reposo - 1);
+    const fit = e / aguanta;
+    for (const c of [porPieza[deLaPieza[a]], prenda]) {
+      if (!c) continue;
+      c.e.push(e);
+      c.largo += reposo;
+      if (fit > noSePone) c.rotas += reposo;
+      else if (fit > ajustada) c.justas += reposo;
     }
-    const n = Math.max(hasta - desde, 1);
-    return {
-      strain_max_pct: unDecimal((max - 1) * 100),
-      strain_mean_pct: unDecimal((suma / n - 1) * 100),
-      tight_pct: unDecimal((justas / n) * 100),
-      cant_wear_pct: unDecimal((rotas / n) * 100),
-    };
-  };
-  const nombre = new Map(project.pieces.map(p => [p.id, p.name]));
+  }
+  const nombre = new Map(project.pieces.map(x => [x.id, x.name]));
   return {
     available: true,
     tier: getActiveSolverTier(),
     frames,
     fabric: { id: simulation.defaultFabricId, max_stretch_pct: unDecimal(aguanta * 100) },
-    garment: medir(0, pos.count),
-    pieces: tela.manifest.map(m => ({ piece_id: m.pieceId, name: nombre.get(m.pieceId) ?? m.pieceId, ...medir(m.vertexOffset, m.vertexCount) })),
+    garment: medida(prenda),
+    pieces: tela.manifest.map((m, k) => ({ piece_id: m.pieceId, name: nombre.get(m.pieceId) ?? m.pieceId, ...medida(porPieza[k]) })),
   };
 }
 
 const fitMap = definirVerbo({
   name: 'fit_map',
   description:
-    "How the simulated garment fits, piece by piece, measured now on the cloth: strain (how much the fabric is stretched, in %), and the share of each piece that is tight or can't be worn (stretched past 80% or 100% of what its fabric takes before breaking). It counts the whole piece; contact with the body is not measured. Needs a simulation (simulate).",
+    "How the simulated garment fits, piece by piece, measured now on the cloth: how much the fabric is stretched along the mesh (median and 95th percentile, in %), and the share of each piece's cloth, by length, that is tight or can't be worn (stretched past 80% or 100% of what its fabric takes before breaking). Mesh slivers under 1 mm are left out, and contact with the body is not measured. A garment that fits still reads a few percent: the simulation leaves some local stretch. Needs a simulation (simulate).",
   args: z.object({}),
   run: (_args, ctx) => ({ revision: revisionDelProyecto(), ...ajusteDeLaTela(ctx) }),
 });

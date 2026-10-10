@@ -371,10 +371,13 @@ afinaron:
   debajo de los 120 s del puente.
 - **`stop` pausa:** la app libera el solver y la tela queda donde estaba. Un `start` después
   vuelve a vestir desde la pose del vestido.
-- **`fit_map` mide cada pieza por sus vértices** (el manifiesto de la malla), con las fórmulas del
-  mapa en pantalla y la tela de la simulación.
-  - Sin el cuerpo, como la app (que pasa el avatar como `null`): «ajustada» y «no se puede poner»
-    cuentan la pieza entera.
+- **`fit_map` mide cada pieza por sus aristas y por largo de tela** (las del manifiesto de la
+  malla), con la tela de la simulación. Da la mediana y el percentil 95 del estiramiento, y qué
+  parte de la tela pasa del 80 % («ajustada») o del 100 % («no se puede poner») de lo que aguanta.
+  - No toma el máximo de cada vértice, como el mapa en pantalla: con eso, un 4 % de aristas
+    estiradas pintaba de rojo casi toda la pieza.
+  - Deja fuera las aristas de menos de 1 mm: son astillas del mallado y daban 240-890 %.
+  - Sin el cuerpo, como la app (que pasa el avatar como `null`): cuenta la pieza entera.
   - Las aristas del solver se piden mientras falten, con el mapa en pantalla o sin él.
   - El «por pieza» que copiaba la cifra global (`getFitMapByPiece`) no lo usa la superficie.
 - **`dress` no escribe el patrón** ni borra lo que María movió a mano, cosa que la herramienta
@@ -412,7 +415,7 @@ afinaron:
   - «No arrancó» cita lo que dijo el solver en esta corrida, no en una vieja.
   - Dos lecturas iguales de la malla no cuentan como tela quieta: en TSL la malla se relee cada
     15 cuadros.
-- **Hallazgo abierto: el simulador estira la tela (medido el 10-10).** Con la camisa de María
+- **El simulador estiraba la tela (medido y arreglado el 10-10, Samuel: «Física primero»).** Con la camisa de María
   cosida y asentada en WebGPU, el 15-26 % del cuerpo pasa del 8 % de estiramiento con ~12 cm de
   holgura de pecho sobre el avatar «mujer-eu38» (88 cm), así que `fit_map` y el mapa de ajuste de
   la app dicen «no se puede poner» de una camisa holgada.
@@ -426,6 +429,13 @@ afinaron:
     queda en 3,8 % (p95 6,9 %); con 45, en 1,6 % (p95 4,0 %), como sin coser.
   - El precio en esta máquina, con la camisa de María: 25,3 cuadros/s con 15, 12,9 con 30 y
     ~8,5 con 45.
+  - El mecanismo: el estiramiento, con su tope rígido del 2 %, corría al principio del subpaso;
+    costuras, autocolisión, tirante y colisión volvían a estirar después, y eso solo se corregía
+    en el subpaso siguiente.
+  - El arreglo (Samuel eligió «tres repasos»): el estiramiento se repasa tres veces entre la
+    colisión y el cierre de cada subpaso (`nodosDelSubpaso.ts`). Medido: 20,6 cuadros/s, 3,9 %
+    de aristas sobre el 8 % y p95 de 7,0 %, lo mismo que 30 subpasos, sin penetración. Solo el
+    tier GPU: WASM y CPU no tienen el tope (divergencia A7).
 
 ## 6. Riesgos
 
