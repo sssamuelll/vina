@@ -151,6 +151,11 @@
 .canvas-area__3d {
   position: relative;
   overflow: hidden;
+  /* El escenario es el papel de la hoja (spec 2026-10-02 § 4.5). El lienzo es
+     transparente (renderSettings.backgroundMode: 'transparent') y el color lo
+     pone esto: `scene.background` pasa por el mapeo de tonos y un #faf4e3 sale
+     #e1e0da. Con un fondo sólido o HDRI, el lienzo pinta encima. */
+  background: var(--canvas-2d);
 }
 
 /* La línea al pie (spec 2026-10-02 «la interfaz en papel» § 5.3): marco, del

@@ -1,7 +1,6 @@
 import { Component, Suspense, type ReactNode, useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import FloorGrid from './FloorGrid';
 import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import type { AnyRenderer } from '../../types/renderer';
@@ -30,6 +29,7 @@ import { resolveArrangement } from '../../utils/cloth/arrangement/arrangementBin
 import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
 import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
+import { sobreElPapel } from '../../utils/export/sobreElPapel';
 import { collectExportScene } from '../../utils/export/sceneCollector';
 import { downloadGLTF } from '../../utils/export/gltfExporter';
 import { downloadUSDZ } from '../../utils/export/usdzExporter';
@@ -213,7 +213,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
   const colorways = useSelector((s: RootState) => s.project.colorways);
   const activeColorwayId = useSelector((s: RootState) => s.project.activeColorwayId);
-  const { groundVisible } = useSelector((s: RootState) => s.renderSettings);
+  const { groundVisible, shadowOpacity, exportTransparent } = useSelector((s: RootState) => s.renderSettings);
   const playbackState = useSelector((s: RootState) => s.animation.playbackState);
   const useClothSim = simulationState !== 'idle';
   const isArrangeMode = viewMode3D === 'arrange';
@@ -527,31 +527,38 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     controls.update();
   }, []);
 
-  const snapshot3D = useCallback(() => {
+  /**
+   * El visor tal como está, listo para sacarlo: se fuerza un cuadro (un lienzo
+   * WebGPU solo se puede leer en la misma tarea en que se pinta) y, con el
+   * fondo «Papel», que es transparente, se compone sobre el papel salvo que se
+   * pida transparente (spec 2026-10-02 § 12, «las exportaciones del 3D»).
+   */
+  const lienzoParaSacar = useCallback((): HTMLCanvasElement | null => {
     const container = containerRef.current;
-    if (!container) return;
-    const store = container as unknown as Record<string, unknown>;
-    const renderer = store.__gl as AnyRenderer | undefined;
-    const scene = store.__scene as THREE.Scene | undefined;
-    const camera = store.__camera as THREE.Camera | undefined;
-    if (!renderer || !scene || !camera) return;
+    if (!container) return null;
+    const refs = container as unknown as Record<string, unknown>;
+    const renderer = refs.__gl as AnyRenderer | undefined;
+    const scene = refs.__scene as THREE.Scene | undefined;
+    const camera = refs.__camera as THREE.Camera | undefined;
+    if (!renderer || !scene || !camera) return null;
+    renderer.render(scene, camera);
+    return exportTransparent ? renderer.domElement : sobreElPapel(renderer.domElement);
+  }, [exportTransparent]);
 
-    // Force a render so the canvas content is current, then capture.
+  const snapshot3D = useCallback(() => {
     // canvas.toDataURL() works for both WebGL and WebGPU canvases,
     // unlike readPixels which is WebGL-only.
-    renderer.render(scene, camera);
-    const canvas = renderer.domElement;
+    const canvas = lienzoParaSacar();
+    if (!canvas) return;
 
     const link = document.createElement('a');
     link.download = `vina-fitmap-${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
-  }, []);
+  }, [lienzoParaSacar]);
 
   const handleCopyToClipboard = useCallback(async () => {
-    const container = containerRef.current;
-    if (!container) return;
-    const canvas = container.querySelector('canvas');
+    const canvas = lienzoParaSacar();
     if (!canvas) return;
     try {
       const blob = await new Promise<Blob>((resolve, reject) =>
@@ -561,7 +568,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     } catch (err) {
       console.warn('Copy to clipboard failed:', err);
     }
-  }, []);
+  }, [lienzoParaSacar]);
 
   const handleExportStill = useCallback(async (width: number, height: number, transparent: boolean) => {
     const container = containerRef.current;
@@ -961,15 +968,16 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         {/* drei ContactShadows (raw ShaderMaterial) stays incompatible with the
             WebGPURenderer — real shadow maps on the key light replace it. */}
 
+        {/* El suelo de fábrica es solo sombra (spec 2026-10-02 § 4.5): un plano
+            que no se pinta y solo recibe la sombra del avatar y de la prenda,
+            con la opacidad de `shadowOpacity`. Se fueron el piso gris y su
+            cuadrícula: el escenario es el papel. */}
         {groundVisible && (
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow>
             <planeGeometry args={[100, 100]} />
-            <meshStandardMaterial color="#ffffff" />
+            <shadowMaterial transparent opacity={shadowOpacity} />
           </mesh>
         )}
-
-        {/* Geometry-based grid — works with NodeMaterial/WebGPU renderer */}
-        {groundVisible && <FloorGrid y={-0.001} />}
 
         <OrbitControls
           ref={orbitRef}

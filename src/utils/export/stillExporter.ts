@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { AnyRenderer } from '../../types/renderer';
+import { sobreElPapel } from './sobreElPapel';
 
 export interface StillExportConfig {
   width: number;
@@ -94,6 +95,10 @@ export async function exportStill(
   }
   ctx.putImageData(imageData, 0, 0);
 
+  // Con el fondo «Papel» el visor es transparente: salvo que se pida así, la
+  // imagen sale sobre el papel (en JPEG, lo transparente saldría negro).
+  const imagen = transparent ? canvas : sobreElPapel(canvas);
+
   // Encode and download based on format
   if (format === 'exr') {
     try {
@@ -125,7 +130,7 @@ export async function exportStill(
   const quality = format === 'jpeg' ? jpegQuality : undefined;
 
   const blob = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob(
+    imagen.toBlob(
       (b) => (b ? resolve(b) : reject(new Error('canvas.toBlob returned null'))),
       mimeType,
       quality,

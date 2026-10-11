@@ -51,7 +51,10 @@ describe('renderSettingsSlice', () => {
     expect(state.hdriCustomUrl).toBeNull();
     expect(state.toneMapping).toBe('aces');
     expect(state.exposure).toBe(1.0);
-    expect(state.backgroundMode).toBe('solid');
+    // De fábrica el fondo es el papel (spec 2026-10-02 § 4.5, P5): el modo
+    // transparente, con el color de la hoja puesto por CSS. El sólido conserva
+    // su color por si se elige.
+    expect(state.backgroundMode).toBe('transparent');
     expect(state.backgroundColor).toBe('#e0e0e0');
     expect(state.lights).toEqual([]);
     expect(state.groundVisible).toBe(true);

@@ -183,7 +183,10 @@ const initialState: RenderSettingsState = {
   hdriCustomUrl: null,
   toneMapping: 'aces',
   exposure: 1.0,
-  backgroundMode: 'solid',
+  // De fábrica el escenario es el papel (spec 2026-10-02 § 4.5): el lienzo es
+  // transparente y el color de la hoja lo pone el CSS detrás. `scene.background`
+  // no sirve: pasa por el mapeo de tonos y un #faf4e3 se ve #e1e0da.
+  backgroundMode: 'transparent',
   backgroundColor: '#e0e0e0',
   lights: [],
   groundVisible: true,
