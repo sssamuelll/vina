@@ -1,0 +1,313 @@
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+import { FakeGPUDevice } from './fakeDevice';
+
+// Arnés de gpuSolverClient.test.ts: vi.hoisted corre antes que los vi.mock, así
+// el MockSBA es visible para las dos fábricas (three/webgpu y three/tsl). El
+// MockSBA guarda `array` POR REFERENCIA: la huella lee los mismos bits que
+// createTslBuffers le entrega al solver.
+const { sharedMock } = vi.hoisted(() => {
+  class MockSBA {
+    array: Float32Array | Uint32Array | Int32Array;
+    count: number;
+    itemSize: number;
+    version = 0;
+    constructor(array: Float32Array | Uint32Array | Int32Array, itemSize: number) {
+      this.array = array;
+      this.count = array.length / itemSize;
+      this.itemSize = itemSize;
+    }
+  }
+
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const createChainProxy = (): any => {
+    const handler: ProxyHandler<(...args: unknown[]) => unknown> = {
+      get() { return createChainProxy(); },
+      apply() { return createChainProxy(); },
+    };
+    return new Proxy(function () {}, handler);
+  };
+
+  const makeUniform = (val: unknown): any => {
+    const target = { value: val };
+    return new Proxy(target, {
+      get(t, prop) {
+        if (prop === 'value') return t.value;
+        return createChainProxy();
+      },
+      set(t, prop, v) {
+        if (prop === 'value') t.value = v;
+        return true;
+      },
+    });
+  };
+
+  const sharedMock = () => ({
+    StorageBufferAttribute: MockSBA,
+    storage: () => createChainProxy(),
+    Fn: () => () => createChainProxy(),
+    compute: (_fn: unknown, count: number) => ({ __tslCompute: true, dispatchCount: count }),
+    uniform: (val: unknown) => makeUniform(val),
+    float: (val: unknown) => makeUniform(val),
+    int: (val: unknown) => makeUniform(val),
+    uint: (val: unknown) => makeUniform(val),
+    vec3: () => createChainProxy(),
+    instanceIndex: createChainProxy(),
+    Loop: () => createChainProxy(),
+    Break: () => createChainProxy(),
+    If: () => createChainProxy(),
+    atomicStore: () => createChainProxy(),
+    atomicAdd: () => createChainProxy(),
+    atomicLoad: () => createChainProxy(),
+    atomicMin: () => createChainProxy(),
+    atomicMax: () => createChainProxy(),
+  });
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  return { sharedMock };
+});
+
+vi.mock('three/webgpu', () => sharedMock());
+vi.mock('three/tsl', () => sharedMock());
+
+import { GpuSolverClient, type PieceMeshData } from '../gpuSolverClient';
+import type { FabricComplianceConfig } from '../tslBuffers';
+import type { SeamPair } from '../../seamPairs';
+import { importDXFContent } from '../../../dxf';
+import { classifyImportedPieces } from '../../../geometricClassifier';
+import { meshPiece } from '../../../mesh';
+import { colocarMallas } from '../../../../components/Viewport3D/colocarMallas';
+import type { MeshedPiece } from '../../../../components/Viewport3D/useMeshing';
+import type { BodyMeasurements } from '../../../../types/types';
+
+// ─── La huella ───────────────────────────────────────────────────────────────
+
+type Parte = ArrayBufferView | number | string | null | undefined;
+
+/**
+ * FNV-1a de 32 bits sobre los BYTES de cada parte, en el orden dado: lee los
+ * bits tal cual, sin redondear. Byte a byte y no palabra a palabra: con el XOR
+ * de una palabra de 32 bits, el bit alto (el signo de un float) no se mezcla
+ * con los demás y dos cambios en él se cancelan. Cada parte entra con su
+ * nombre y su largo: una ausente (null) o vacía cambia la huella, y dos
+ * arreglos no se confunden con su concatenación.
+ */
+function huellaDe(partes: Array<[string, Parte]>): string {
+  let h = 0x811c9dc5;
+  const texto = new TextEncoder();
+  const mezcla = (bytes: Uint8Array) => {
+    for (let i = 0; i < bytes.length; i++) h = Math.imul(h ^ bytes[i], 0x01000193);
+  };
+  for (const [nombre, v] of partes) {
+    const bits = v == null ? null
+      : typeof v === 'number' ? new Float64Array([v])
+        : typeof v === 'string' ? texto.encode(v)
+          : v;
+    mezcla(texto.encode(bits ? `${nombre}:${bits.byteLength};` : `${nombre}:null;`));
+    if (bits) mezcla(new Uint8Array(bits.buffer, bits.byteOffset, bits.byteLength));
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * Todo lo que la parte CPU del armado le deja al solver, en este orden:
+ *  1. tslBuffers: numParticles, numTriangles, positionSBA, invMassSBA,
+ *     triangleIdsSBA (los triángulos fusionados) y tetherMaxDistSBA (los
+ *     radios del tirante por región);
+ *  2. stretchColors: cuántos grupos y, por grupo, count, idsSBA,
+ *     restLengthsSBA y complianceSBA;
+ *  3. numBendConstraints y bendColors (flexión intra-pieza, banda F3 y quads
+ *     entre piezas): por grupo, count, idsSBA, restAnglesSBA y complianceSBA;
+ *  4. numSeamConstraints y seamColors: por grupo, count, idsSBA,
+ *     targetDistSBA y complianceSBA;
+ *  5. scBuffers: tableSize, adjOffsetsSBA y adjNeighborsSBA (el CSR);
+ *  6. weldBuffers: count, vertsSBA, offsetsSBA y partnersSBA;
+ *  7. del cliente: originalInvMass, edgeData (ids y lengths),
+ *     pieceVertexRanges (id, start y count por pieza), crossQuadPartners
+ *     (llave y partners por quad) y pressedBendCompliance.
+ * Un grupo que falta (null) entra como etiqueta: aparecer o desaparecer cambia
+ * la huella. Lo que createTslBuffers deriva por su cuenta (las copias de las
+ * posiciones, los buffers en cero, el CSR de face-poke) no entra: no sale del
+ * armado CPU.
+ */
+function huellaDelArmado(client: GpuSolverClient): string {
+  const c = client as any;
+  const b = c.tslBuffers;
+  const partes: Array<[string, Parte]> = [
+    ['numParticles', b.numParticles],
+    ['numTriangles', b.numTriangles],
+    ['positions', b.positionSBA.array],
+    ['invMass', b.invMassSBA.array],
+    ['triangles', b.triangleIdsSBA.array],
+    ['tetherMaxDist', b.tetherMaxDistSBA.array],
+  ];
+  const grupos = (tipo: string, gs: any[], campos: string[]) => {
+    partes.push([tipo, gs.length]);
+    gs.forEach((g, i) => {
+      partes.push([`${tipo}[${i}].count`, g.count]);
+      for (const k of campos) partes.push([`${tipo}[${i}].${k}`, g[k].array]);
+    });
+  };
+  grupos('stretchColors', b.stretchColors, ['idsSBA', 'restLengthsSBA', 'complianceSBA']);
+  partes.push(['numBendConstraints', b.numBendConstraints]);
+  grupos('bendColors', b.bendColors, ['idsSBA', 'restAnglesSBA', 'complianceSBA']);
+  partes.push(['numSeamConstraints', b.numSeamConstraints]);
+  grupos('seamColors', b.seamColors, ['idsSBA', 'targetDistSBA', 'complianceSBA']);
+  const sc = b.scBuffers;
+  if (sc) partes.push(['sc.tableSize', sc.tableSize], ['sc.offsets', sc.adjOffsetsSBA.array], ['sc.neighbors', sc.adjNeighborsSBA.array]);
+  else partes.push(['scBuffers', null]);
+  const weld = b.weldBuffers;
+  if (weld) partes.push(['weld.count', weld.count], ['weld.verts', weld.vertsSBA.array], ['weld.offsets', weld.offsetsSBA.array], ['weld.partners', weld.partnersSBA.array]);
+  else partes.push(['weldBuffers', null]);
+  partes.push(['originalInvMass', c.originalInvMass], ['edgeData.ids', c.edgeData?.ids], ['edgeData.lengths', c.edgeData?.lengths]);
+  for (const [id, r] of c.pieceVertexRanges as Map<string, { start: number; count: number }>) {
+    partes.push(['rango.id', id], ['rango.start', r.start], ['rango.count', r.count]);
+  }
+  if (c.crossQuadPartners) {
+    for (const [llave, [b0, b1]] of c.crossQuadPartners as Map<string, [number, number]>) {
+      partes.push(['cruce', llave], ['cruce.b0', b0], ['cruce.b1', b1]);
+    }
+  } else partes.push(['crossQuadPartners', null]);
+  partes.push(['pressedBendCompliance', c.pressedBendCompliance]);
+  return huellaDe(partes);
+}
+
+async function armar(
+  piezas: PieceMeshData[],
+  costuras?: SeamPair[],
+  tela?: FabricComplianceConfig,
+): Promise<GpuSolverClient> {
+  const client = new GpuSolverClient(new FakeGPUDevice() as any);
+  await client.initMultiPieceTsl(piezas, costuras, undefined, tela);
+  return client;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/** Lo que entra al armado: si esto cambia, cambió la malla o la colocación. */
+function huellaDeLaEntrada(piezas: PieceMeshData[]): string {
+  return huellaDe(piezas.flatMap((p): Array<[string, Parte]> => [
+    ['pieceId', p.pieceId],
+    ['vertices', p.vertices],
+    ['triIds', p.triIds],
+    ['uvs', p.uvs],
+    ['region', p.region],
+  ]));
+}
+
+// ─── Prenda 1: dos piezas con costura ────────────────────────────────────────
+
+/** Quad de 4 vértices (2 triángulos), con UV para clasificar las aristas. */
+function makeQuadPiece(id: string): PieceMeshData {
+  return {
+    pieceId: id,
+    vertices: new Float32Array([
+      -0.5, 1.0, 0.0,
+       0.5, 1.0, 0.0,
+       0.5, 0.0, 0.0,
+      -0.5, 0.0, 0.0,
+    ]),
+    triIds: new Int32Array([0, 1, 2, 0, 2, 3]),
+    uvs: new Float32Array([0, 1,  1, 1,  1, 0,  0, 0]),
+  };
+}
+
+/** El quad corrido +dx en x del mundo: los índices locales no cambian. */
+function makeQuadPieceAt(id: string, dx: number): PieceMeshData {
+  const p = makeQuadPiece(id);
+  for (let i = 0; i < p.vertices.length; i += 3) p.vertices[i] += dx;
+  return p;
+}
+
+const dosPiezas = () => [makeQuadPiece('A'), makeQuadPieceAt('B', 0.3)];
+
+// Las dos costuras del behavior #11 de gpuSolverClient.test.ts (un par sembrado
+// a 0,3 × 0,5; dos pares que comparten el vértice 0 de B y se parten en dos
+// colores) y dos que ese bloque no trae: el borde 1-2 de A contra el 0-3 de B,
+// dos pares seguidos sobre aristas de frontera, que es lo que arma un quad
+// entre piezas; y una que apunta a una pieza que no existe, que el armado
+// salta con un aviso.
+const COSTURAS = [
+  { pieceAId: 'A', pieceBId: 'B', vertexPairs: [[0, 0]], compliance: 0.0001, tensionFactor: 0.5 },
+  { pieceAId: 'A', pieceBId: 'B', vertexPairs: [[0, 0], [1, 0]], compliance: 0.0001, tensionFactor: 1.0 },
+  { pieceAId: 'A', pieceBId: 'B', vertexPairs: [[1, 0], [2, 3]], compliance: 0.0002, tensionFactor: 0.9 },
+  { pieceAId: 'A', pieceBId: 'fantasma', vertexPairs: [[3, 3]], compliance: 0.0001, tensionFactor: 1.0 },
+] as unknown as SeamPair[];
+
+// Tela propia con densidad: la masa pasa por fabricInvMassScale, y urdimbre,
+// trama y sesgo llevan cada uno su valor, así cada mapeo deja su marca. La
+// camisa de María va con la tela por defecto: sin banda F3, su flexión sale
+// del default que el armado le pasa a createTslBuffers.
+const TELA: FabricComplianceConfig = {
+  stretchComplianceWarp: 1e-6,
+  stretchComplianceWeft: 2e-6,
+  shearCompliance: 0.002,
+  bendComplianceWarp: 1.2e4,
+  bendComplianceWeft: 3e4,
+  density: 0.2,
+};
+
+// ─── Prenda 2: la camisa de María, sin costuras ──────────────────────────────
+
+const MARIA = resolve(__dirname, '../../../../../tests/fixtures/garments/maria_patrones_samuel_2M.dxf');
+const MEDIDAS: BodyMeasurements = { height: 168, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 };
+
+/** Malladas con las opciones de SimulationInitClient.meshPiece, a 20 mm para que el test sea rápido. */
+function camisaDeMaria(): PieceMeshData[] {
+  const piezas = importDXFContent(readFileSync(MARIA, 'utf-8'), { unit: 'auto', autoDetect: true }).pieces;
+  // La importación da a cada pieza un UUID nuevo, y el id entra a la huella
+  // (pieceVertexRanges): ids fijos para que la huella no cambie en cada corrida.
+  piezas.forEach((p, i) => { p.id = `maria-${i}`; });
+  // Como AppShell al importar: con las piezas clasificadas, cuello, mangas y
+  // torso llevan cada uno su radio de tirante (sin clasificar, todo es torso).
+  classifyImportedPieces(piezas);
+  const mallas: MeshedPiece[] = [];
+  for (const pieza of piezas) {
+    const malla = meshPiece(pieza, { yHeight: 0, scale: 0.001, maxEdgeLength: 20, minAngle: 25, maxRefinementPasses: 3, curveResolution: 12 });
+    if (malla.vertices.length > 0 && malla.triIds.length > 0) mallas.push({ ...malla, pieceId: pieza.id, outline: pieza.outline });
+  }
+  return colocarMallas(mallas, piezas, MEDIDAS, {}, { left: null, right: null, ready: false });
+}
+
+// ─── Los tests ───────────────────────────────────────────────────────────────
+
+describe('prepararTela: la huella del armado TSL de hoy, antes de moverlo', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('dos piezas con costura: empaquetado, quads entre piezas, banda F3 y soldadura', async () => {
+    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = await armar(dosPiezas(), COSTURAS, TELA);
+
+    // La prenda pasa por lo que dice cubrir; si no, la huella no lo vigila.
+    expect(aviso).toHaveBeenCalledWith(expect.stringContaining('fantasma'));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = client as any;
+    expect(c.crossQuadPartners?.size).toBe(1);
+    expect(c.tslBuffers.weldBuffers).not.toBeNull();
+    expect(huellaDelArmado(client)).toBe('faf078df');
+  });
+
+  // Los interruptores de desarrollo cambian el armado: con uno apagado sale
+  // otra huella, y cada uno la suya (si se cruzaran, se vería).
+  it.each([
+    ['vina-crossbend', '5178a24d'],
+    ['vina-seamscx', '7844fbc0'],
+  ])('con %s apagado en localStorage, su propia huella', async (clave, esperada) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('window', { localStorage: { getItem: (k: string) => (k === clave ? 'off' : null) } });
+    const client = await armar(dosPiezas(), COSTURAS, TELA);
+    expect(huellaDelArmado(client)).toBe(esperada);
+  });
+
+  it('la camisa de María, sin costuras: coloreado, radios por región y CSR a tamaño real', async () => {
+    const piezas = camisaDeMaria();
+    expect(huellaDeLaEntrada(piezas), 'cambió la malla o la colocación, no el armado').toBe('dbdaaaec');
+    const client = await armar(piezas);
+    expect(huellaDelArmado(client)).toBe('89f454e2');
+  });
+});
