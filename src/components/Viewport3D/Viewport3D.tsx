@@ -878,7 +878,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         <AnimationDriver />
 
         {avatarVisible && avatarMode === 'dressform' && <Mannequin />}
-        {avatarVisible && avatarMode === 'model' && avatarModelUrl && (
+        {/* El modelo no se desmonta al ocultarlo: se esconde solo (AvatarModel: `scene.visible = false`
+            con el estilo «hidden»). Desmontarlo soltaba la raíz del horneado de colisión y una simulación
+            arrancada con el avatar oculto chocaba con otro cuerpo, 10-15 mm desalineado (renderCollisionBake). */}
+        {avatarMode === 'model' && avatarModelUrl && (
           <Suspense fallback={null}>
             <AvatarModel
             url={avatarModelUrl}

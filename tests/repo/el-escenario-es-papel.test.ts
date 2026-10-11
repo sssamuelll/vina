@@ -117,6 +117,32 @@ describe('entre las dos vistas de Split hay una línea de pelo sobre papel', () 
 // interna y la de Margen de costura en Split a 1366 y tumbaba cinco casos de e2e de P2b
 // («la frase entera en una línea»). Lo que se mide está en `el-3d-en-papel.spec.ts` y en
 // `linea-al-pie.spec.ts`; esto fija la decisión para que nadie vuelva al reparto de antes.
+// Ocultar el avatar (el interruptor de la barra superior, Shift+A, el menú del 3D y el panel de
+// render son lo mismo: `avatarRenderStyle === 'hidden'`). El modelo NO se desmonta al ocultarlo:
+// se esconde solo (`AvatarModel`: `scene.visible = false`). Desmontarlo soltaba la raíz del
+// horneado de colisión (`registerAvatarRenderRoot(null)`) y una simulación arrancada con el avatar
+// oculto pasaba al camino por URL, que se desalinea 10-15 mm de lo que se ve (`renderCollisionBake`):
+// al volver a mostrarlo, la tela le atravesaba el cuerpo (revisión final de P5, A5). `Viewport3D` no
+// se monta en jsdom: se fija sobre las fuentes.
+describe('ocultar el avatar no cambia el cuerpo con el que choca la tela', () => {
+  const visor = sinComentarios(lee('src/components/Viewport3D/Viewport3D.tsx'));
+  const modelo = sinComentarios(lee('src/components/Viewport3D/AvatarModel.tsx'));
+
+  it('el visor monta el modelo aunque el avatar esté oculto', () => {
+    expect(visor, 'el modelo se desmonta al ocultarlo y la colisión pasa a otro cuerpo').not.toMatch(/avatarVisible\s*&&\s*avatarMode\s*===\s*'model'/);
+    expect(visor).toMatch(/avatarMode\s*===\s*'model'\s*&&\s*avatarModelUrl/);
+  });
+
+  it('el maniquí, que no hornea colisión desde lo que se ve, sí se desmonta', () => {
+    expect(visor).toMatch(/avatarVisible\s*&&\s*avatarMode\s*===\s*'dressform'\s*&&\s*<Mannequin/);
+  });
+
+  it('el modelo se esconde solo con el estilo «hidden», sin soltar su raíz de colisión', () => {
+    expect(modelo).toMatch(/scene\.visible\s*=\s*avatarRenderStyle\s*!==\s*'hidden'/);
+    expect(modelo).toMatch(/registerAvatarRenderRoot\(groupRef\.current\)/);
+  });
+});
+
 describe('el pie reparte el ancho: el patrón ocupa lo que necesita y la sección del 3D, lo que sobra', () => {
   const layout = lee('src/styles/layout.css');
   const seccion = lee('src/components/shell/SeccionDel3D.css');
@@ -144,6 +170,21 @@ describe('el pie reparte el ancho: el patrón ocupa lo que necesita y la secció
     expect(r, 'sin `width: 0` la voz entera sería el mínimo de la sección').toContain('width: 0');
     expect(r).toContain('flex: 1 1 0');
     expect(r).toContain('min-width: 0');
+  });
+
+  it('ceder es recortar: la voz del 3D recorta lo que no cabe, y el nombre cede con puntos suspensivos', () => {
+    // Sin `overflow: hidden`, la caja de la voz medía 0 px pero el nombre se desbordaba y se
+    // pintaba encima del estado (revisión final de P5, a 1366 px en Split con Piquete y la
+    // Plancha a vapor): `quien` era `flex: none`.
+    expect(regla(seccion, '.seccion-del-3d__voz'), 'sin recorte el nombre se pinta sobre el estado').toContain('overflow: hidden');
+    const quien = regla(seccion, '.seccion-del-3d__quien');
+    expect(quien, 'un nombre que no se encoge se desborda de la voz').toContain('flex: 0 1 auto');
+    expect(quien).toContain('min-width: 0');
+    const nombre = regla(seccion, '.seccion-del-3d__nombre');
+    expect(nombre).toContain('text-overflow: ellipsis');
+    expect(nombre).toContain('min-width: 0');
+    // La frase cede antes que el nombre: su `flex-shrink` es mayor que el de «quién».
+    expect(regla(seccion, '.seccion-del-3d__frase')).toMatch(/flex:\s*1\s+1000\s+auto/);
   });
 
   it('la frase del 3D se corta con puntos suspensivos en vez de empujar al estado', () => {

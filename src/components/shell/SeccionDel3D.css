@@ -9,14 +9,20 @@
    cuente para el tamaño de la sección (la sección mide lo que su estado y sus
    márgenes, y crece a lo que sobra), y `flex: 1 1 0` le da todo lo que haya. Sin
    el `width: 0`, la voz entera (311 px) sería el mínimo de la sección y le
-   quitaría el ancho a la frase del patrón. */
-.seccion-del-3d__voz { flex: 1 1 0; min-width: 0; width: 0; display: flex; align-items: center; column-gap: 12px; font-size: var(--text-sm); }
-.seccion-del-3d__quien { flex: none; display: flex; align-items: center; gap: 6px; }
-.seccion-del-3d__nombre { color: var(--text-primary); font-size: var(--text-ui); font-weight: var(--weight-semibold); white-space: nowrap; }
-.seccion-del-3d__tecla { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-tertiary); }
+   quitaría el ancho a la frase del patrón.
+   Ceder es recortar de verdad: `overflow: hidden` en la voz. Sin él, su caja
+   medía 0 px pero el nombre (que no se encogía) se desbordaba y se pintaba encima
+   del estado, o fuera de la ventana (revisión final de P5, a 1366 px en Split con
+   Piquete y la Plancha a vapor). Cede en este orden: primero la frase (con puntos
+   suspensivos), luego el nombre (también), y la tecla no. */
+.seccion-del-3d__voz { flex: 1 1 0; min-width: 0; width: 0; display: flex; align-items: center; column-gap: 12px; overflow: hidden; font-size: var(--text-sm); }
+.seccion-del-3d__quien { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.seccion-del-3d__nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); font-size: var(--text-ui); font-weight: var(--weight-semibold); white-space: nowrap; }
+.seccion-del-3d__tecla { flex: none; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-tertiary); }
 /* La frase cede primero: lo que no quepa se corta con puntos suspensivos y queda
-   entero en el título y en la región viva. */
-.seccion-del-3d__frase { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+   entero en el título y en la región viva. Su `flex-shrink` enorme hace que el nombre
+   solo ceda cuando la frase ya no tiene nada que dar. */
+.seccion-del-3d__frase { flex: 1 1000 auto; min-width: 0; overflow: hidden; }
 .seccion-del-3d__texto { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-secondary); }
 
 /* El estado: no se encoge. Una insignia ⚠ y la flecha de abrir hacia arriba. */
