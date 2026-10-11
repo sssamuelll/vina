@@ -26,7 +26,18 @@ Browser-based garment CAD with AI copilot and real-time XPBD cloth simulation. B
 | E2E tests | `npm run test:e2e` |
 | Lint | `npm run lint` |
 | Typecheck | `npx tsc -b --noEmit` |
+| Quién tiene la máquina | `node scripts/pesado.mjs --estado` |
 | WASM rebuild | `cd crates/xpbd-wasm && wasm-pack build --target web --out-dir pkg && cp pkg/xpbd_wasm.{js,_bg.wasm} ../../public/wasm/` |
+
+## Recursos escasos
+
+La máquina es una sola y la comparten varias sesiones y las aplicaciones de Samuel (Ableton, Blender). Todo lo pesado pasa por `scripts/pesado.mjs`, un candado: quien lo tiene corre; los demás hacen cola o paran diciendo de quién es. `npm run test`, `test:coverage`, `test:e2e`, `build`, el ensayo y el deploy (`scripts/deploy-prod.sh`) y el pre-push ya lo piden solos. Además de turno pide cupo: no arranca con poca memoria libre ni con la CPU ocupada por otras aplicaciones, y espera diciendo por qué.
+
+- Antes de lanzar algo largo, `node scripts/pesado.mjs --estado`: quién la tiene, memoria libre y CPU.
+- «Ocupada por …»: no insistas ni lo rodees. Espera (`--espera=<minutos>` hace cola; lo largo, en segundo plano) o habla con quien la tiene. Ni matas lo suyo ni saltas el candado: `--sin-admision` y `VINA_PESADO_OMITIR=1` son de Samuel.
+- Una prueba suelta (`npx vitest run <archivo>`, un solo spec de Playwright) es ligera y no pide candado. Una suite entera por fuera de `npm run`, sí debería.
+- El chat entre sesiones es para decidir, no para avisar «voy a correr»: eso ya lo dice el candado.
+- Detalle y límites en el encabezado de `scripts/pesado.mjs`.
 
 ## Key Directories
 

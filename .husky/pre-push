@@ -10,9 +10,18 @@
 # pre-commit —que solo corre typecheck + eslint de lo staged + el trinquete de
 # UI— y producción no hay NADA que corra un test. El caso que lo motivó:
 # dxfImport.test.ts se quedó rojo dos semanas tras a00851c0 y nadie lo vio.
+# `npm run test` pide el candado de la máquina (scripts/pesado.mjs): si otra
+# sesión la tiene —un ensayo de una hora, por ejemplo—, este push espera hasta 10
+# min y, si sigue ocupada, para diciendo de quién es, en vez de aplastar su
+# trabajo. El código 75 es «ocupada», no «tests en rojo».
 echo "🔍 Suite de tests (~75 s)..."
 npm run test
-if [ $? -ne 0 ]; then
+codigo=$?
+if [ "$codigo" -eq 75 ]; then
+  echo "⏳ La máquina está ocupada (arriba dice de quién). No se sube todavía: reintenta cuando termine."
+  exit 1
+fi
+if [ "$codigo" -ne 0 ]; then
   echo "❌ Tests en rojo. No se sube."
   exit 1
 fi
