@@ -108,6 +108,14 @@ vi.mock('../../../utils/cloth/gpu/webgpuDetect', async (importOriginal) => ({
 vi.mock('../../../utils/cloth/avatarCollisionMesh', () => ({
   extractAvatarCollisionMesh: vi.fn().mockResolvedValue(null),
 }));
+// El horneado del cuerpo que se ve: con un cuerpo de mentira, la carga de la
+// colisión (y su reconstrucción) llegan al cliente y se pueden contar.
+vi.mock('../../../utils/cloth/renderCollisionBake', () => ({
+  bakeCollisionFromRender: vi.fn().mockResolvedValue({ triCount: 1 }),
+}));
+vi.mock('../../../utils/cloth/penetrationMetric', () => ({
+  registerPenetrationBody: vi.fn(),
+}));
 vi.mock('../../../utils/import/meshImporter', () => ({
   importMesh: vi.fn().mockRejectedValue(new Error('not in test')),
 }));
@@ -312,6 +320,26 @@ describe('pausar no vuelve a vestir', () => {
     await act(async () => { store.dispatch(startSimulation()); });
     expect(cliente.start).toHaveBeenCalledTimes(2);
     expect(neural.instancias).toHaveLength(1);
+  });
+
+  it('reanudar no reconstruye la colisión del cuerpo: no cambió ninguna medida', async () => {
+    // La reconstrucción (horneado + BVH de ~25.000 triángulos) escuchaba
+    // `simulationState` y corría en cada «reanudar» diciendo «measurement change».
+    localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'false');
+    wasm.isWasmSolverAvailable.mockResolvedValue(true);
+    wasm.initMultiPiece.mockResolvedValue(undefined);
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    montar(store);
+    await waitFor(() => expect(getActiveSolverTier()).toBe('wasm'));
+    const cliente = wasm.instancias[0] as unknown as { setCollisionMesh: ReturnType<typeof vi.fn> };
+    await waitFor(() => expect(cliente.setCollisionMesh).toHaveBeenCalledTimes(1));
+
+    await act(async () => { store.dispatch(pauseSimulation()); });
+    await act(async () => { store.dispatch(startSimulation()); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 400)); });
+
+    expect(cliente.setCollisionMesh, 'la colisión del init sigue valiendo').toHaveBeenCalledTimes(1);
   });
 
   it('Restablecer sí suelta el solver: es el único que vuelve a empezar', async () => {

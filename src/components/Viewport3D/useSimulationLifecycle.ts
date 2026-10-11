@@ -917,7 +917,11 @@ export function useSimulationLifecycle({
     // Skip a downgraded GPU client (#901): its setCollisionMesh routes a BVH
     // upload through the lost renderer device — wasted work + uncaptured errors.
     const activeClient = (gpuDowngradedRef.current ? null : gpuClientRef.current) || wasmClientRef.current || clientRef.current;
-    if (!activeClient || simulationState !== 'running' || !avatarModelUrl) return;
+    // La sesión, no el estado: pausar o reanudar no cambia el cuerpo, y con el
+    // estado en las dependencias cada «reanudar» volvía a hornear el cuerpo y a
+    // armar su BVH (~25.000 triángulos) como si una medida hubiera cambiado.
+    // Una medida que cambia en pausa sí reconstruye: el solver sigue vivo.
+    if (!activeClient || !sesionViva || !avatarModelUrl) return;
 
     // Debounce 200ms to batch rapid slider movements
     if (collisionRebuildTimer.current) {
@@ -960,7 +964,7 @@ export function useSimulationLifecycle({
     };
     // fabricId is a dep so a fabric swap rebuilds the avatar collider with the
     // new frictionBody (F0); the rebuild is debounced + gated on running sim.
-  }, [measurements, morphTargets, avatarModelUrl, avatarHeight, simulationState, fabricId]);
+  }, [measurements, morphTargets, avatarModelUrl, avatarHeight, sesionViva, fabricId]);
 
   // ─── Push wind config to GPU solver when it changes ───────────────────────
   useEffect(() => {
