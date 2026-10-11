@@ -5,8 +5,9 @@ export type Ruta =
   | { tipo: 'redirigir'; a: string }
   | { tipo: 'no-encontrado' };
 
-/** Qué servir de dist/ para un pathname. `/` es la home; bajo `/app/` el
- *  fallback SPA es el taller; fuera de ahí, lo que no existe es 404. */
+/** Qué servir de dist/ para un pathname. `/` es la home en inglés y `/es/` la
+ *  española; bajo `/app/` el fallback SPA es el taller; fuera de ahí, lo que no
+ *  existe es 404. */
 export function resolverRuta(pathname: string, existe: (rel: string) => boolean): Ruta {
   let decodificado: string;
   try { decodificado = decodeURIComponent(pathname); } catch { return { tipo: 'no-encontrado' }; }
@@ -16,6 +17,8 @@ export function resolverRuta(pathname: string, existe: (rel: string) => boolean)
   if (rel.startsWith('..')) return { tipo: 'no-encontrado' };
   if (rel === '') return { tipo: 'archivo', ruta: 'index.html' };
   if (rel === 'app') return { tipo: 'redirigir', a: '/app/' };
+  if (rel === 'es') return { tipo: 'redirigir', a: '/es/' };
+  if (rel === 'es/') return { tipo: 'archivo', ruta: 'es/index.html' };
   if (rel.startsWith('app/')) {
     return rel !== 'app/' && existe(rel) ? { tipo: 'archivo', ruta: rel } : { tipo: 'archivo', ruta: 'app/index.html' };
   }

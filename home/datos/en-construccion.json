@@ -1,0 +1,8 @@
+[
+  { "id": "escalado", "texto": { "en": "Real grading. Sizes scale in proportion today; rules per point come next.", "es": "Escalado de verdad. Hoy las tallas escalan en proporción; las reglas por punto vienen después." }, "enlace": "https://github.com/sssamuelll/vina/issues/915", "rotulo": "#915" },
+  { "id": "marcada", "texto": { "en": "A marker you can export. The nesting panel estimates fabric use and stops there.", "es": "Una marcada que se pueda exportar. El panel de marcada estima el consumo de tela y ahí se queda." }, "enlace": "https://github.com/sssamuelll/vina/blob/main/ROADMAP.md#next", "rotulo": "ROADMAP" },
+  { "id": "pinza", "texto": { "en": "A dart tool. Darts arrive with your DXF or the copilot, not from the pen yet.", "es": "Una herramienta de pinza. Las pinzas llegan con tu DXF o por el copiloto, todavía no con la pluma." }, "enlace": "https://github.com/sssamuelll/vina/blob/main/ROADMAP.md#next", "rotulo": "ROADMAP" },
+  { "id": "proyectos", "texto": { "en": "Project files. Your work lives in this browser until .vina files can be saved.", "es": "Archivos de proyecto. Tu trabajo vive en este navegador hasta que los .vina se puedan guardar." }, "enlace": "https://github.com/sssamuelll/vina/issues/15", "rotulo": "#15" },
+  { "id": "ingles", "texto": { "en": "The interface in English. The workshop speaks Spanish.", "es": "La interfaz en inglés. El taller habla español." }, "enlace": "https://github.com/sssamuelll/vina/issues/964", "rotulo": "#964" },
+  { "id": "telas", "texto": { "en": "Fabrics measured from cloth. Thirty-two presets today.", "es": "Telas medidas sobre el tejido. Hoy hay treinta y dos preajustes." }, "enlace": "https://github.com/sssamuelll/vina/issues/1005", "rotulo": "#1005" }
+]
