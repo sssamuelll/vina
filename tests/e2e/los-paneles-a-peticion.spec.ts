@@ -62,14 +62,24 @@ test('«Producción» se despliega, y lo último del panel se alcanza con la rue
   await propiedadesDesdeLaBarrita(page);
   await page.getByRole('button', { name: 'Producción' }).click();
   await expect(page.getByRole('button', { name: 'Producción' })).toHaveAttribute('aria-expanded', 'true');
-  expect(await altoDeProduccion(page)).toBeGreaterThan(100);
+  // El atributo cambia al instante, pero el cuerpo se abre con una transición de `grid-template-rows`
+  // (200 ms) que arranca un cuadro DESPUÉS de pintar el cambio: leer el alto ya daba 0, y con la
+  // transición a medias la rueda solo alcanza lo que mide en ese momento. Se espera a que llegue a su
+  // alto final: más de 100 y quieto. Medido en el ensayo de P5 (11-10), también contra la base 97e78e98
+  // (sin P5): sin esperar, falla siempre; en el gate de P4 había pasado por pura suerte de tiempos.
+  await expect.poll(async () => {
+    const antes = await altoDeProduccion(page);
+    await page.waitForTimeout(150);
+    return antes > 100 && antes === (await altoDeProduccion(page));
+  }, { message: '«Producción» desplegada no se queda en un alto mayor de 100' }).toBe(true);
   // Con la rueda sobre el panel, como ella: `scrollIntoViewIfNeeded` también
   // movería la `.canvas-area`, que recorta.
   const panel = (await page.locator('.context-panel').boundingBox())!;
   await page.mouse.move(panel.x + panel.width / 2, panel.y + panel.height / 2);
   await page.mouse.wheel(0, 3000);
-  await page.waitForTimeout(300);
-  expect(await aLaVista(page, '.panel-delete'), '«Eliminar pieza» no se alcanza con la rueda').toBe(true);
+  // La rueda mueve el panel con el cuadro siguiente, no al instante: se espera con reintento en
+  // vez de 300 ms a ojo (con el rasterizador por software de los e2e, un cuadro tarda más).
+  await expect.poll(() => aLaVista(page, '.panel-delete'), { message: '«Eliminar pieza» no se alcanza con la rueda' }).toBe(true);
 });
 
 test('el Avatar, desde su botón del 3D: siete campos, y Enter escribe la medida', async ({ page }) => {
