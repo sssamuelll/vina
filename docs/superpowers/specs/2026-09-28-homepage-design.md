@@ -1,5 +1,6 @@
 # Homepage de Vina — el patrón sobre la página
 
+> **Sucedido el 2026-10-10 por `2026-10-10-home-taller-abierto-design.md`; sigue rigiendo la piel (§ 4) y los activos de marca (§ 5.4, § 5.5).**
 > **Estado:** implementado el 2026-09-29 (PR #1218); publicado: pendiente de nginx y repo público. Plan: `docs/superpowers/plans/2026-09-29-homepage.md`; lo que falta para publicar: `docs/superpowers/specs/2026-09-29-homepage-nginx.md`. **Enmendado el 2026-09-29 (§ 12): manda sobre el cuerpo.**
 > Sale de `docs/reports/2026-09-27-homepage-competencia-y-referentes.md` (investigación del
 > 2026-09-27: 12 CAD de moda, 16 entrantes con IA, 24 homepages de software premium, 20 casas de
