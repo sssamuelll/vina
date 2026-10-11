@@ -1246,7 +1246,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   //   caveat per A6 RFC Q2 — see solverProtocol.ts JSDoc).
   // - CPU + Neural: silent no-op. Capability flags
   //   (`SolverCapabilities.tools`) document the matrix; UI surface in
-  //   `SimulationStatusOverlay` communicates absence to user.
+  //   `SeccionDel3D` communicates absence to user.
   //
   // R3F handlers (handlePointerDown/Move) duplicate manual raycaster
   // dispatch (onDown/onMove) for TSL geometry-sync workaround — both

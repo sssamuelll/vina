@@ -13,7 +13,7 @@ import { join } from 'node:path';
 export const VOCABULARIO = new Set([
   'ambiente', 'documento', 'dev',
   'pie', 'pista', 'barra', 'paleta', 'velo', 'cabina', 'menu', 'panel',
-  'modal', 'toast', 'tooltip', 'estado-vacio', 'indicador-simulacion',
+  'modal', 'toast', 'tooltip', 'estado-vacio',
   'leyenda', 'instantaneas',
 ]);
 
@@ -73,7 +73,12 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/shell/ToolTooltip.tsx', 'tooltip', 1],
   ['src/components/shell/AppShell.tsx', 'velo', 1],
   ['src/components/PatternEditor/EmptyState2D.tsx', 'estado-vacio', 1],
-  ['src/components/Viewport3D/SimulationStatusOverlay.tsx', 'indicador-simulacion', 1],
+  // La sección del 3D de la línea al pie (spec 2026-10-02 § 5.3, P5): la voz (la
+  // frase de la herramienta, `pista`, como la del patrón) y el detalle del estado
+  // de la simulación, que cuelga de <body> (`menu`). Sustituye a la caja oscura
+  // de la esquina del visor (`indicador-simulacion`) y al «SIMULANDO · N fps» del dock.
+  ['src/components/shell/SeccionDel3D.tsx', 'pista', 1],
+  ['src/components/shell/SeccionDel3D.tsx', 'menu', 1],
   ['src/components/Viewport3D/SnapshotBar.tsx', 'instantaneas', 1],
 ];
 

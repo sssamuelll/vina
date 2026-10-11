@@ -350,7 +350,7 @@ const simulationSlice = createSlice({
     /**
      * Record the seam → constraint resolution summary for the current init.
      * Pass `null` to clear (sim teardown / project without seams).
-     * Surfaced in `SimulationStatusOverlay`; zero-constraint seams also get
+     * Surfaced in `SeccionDel3D`; zero-constraint seams also get
      * a toast + `inspector.seamResolutionErrors` entry (E-async conventions).
      */
     setSeamResolution(state, action: PayloadAction<SeamResolutionSummary | null>) {

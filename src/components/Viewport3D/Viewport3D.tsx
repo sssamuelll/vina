@@ -16,7 +16,6 @@ import GarmentSimulation from './GarmentSimulation';
 import type { GarmentSimulationHandle } from './GarmentSimulation';
 import { markRendererDeviceLost } from './rendererDeviceLost';
 import { SimulationErrorBoundary } from './SimulationErrorBoundary';
-import { SimulationStatusOverlay } from './SimulationStatusOverlay';
 import JointGizmos from './JointGizmos';
 import IKEndEffectorGizmos from './IKEndEffectorGizmos';
 import LeyendaDeMapas from './LeyendaDeMapas';
@@ -68,7 +67,6 @@ import { resolveAnchorClick, selectionNamespace } from './anchorClick';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
 import { useDispatch } from 'react-redux';
 import { toolRegistry } from '../../tools';
-import { displayShortcut } from '../shell/shortcutDisplay';
 import { pushError } from '../../utils/errorTracker';
 import { pushSolverEvent } from '../../utils/cloth/solverRuntimeTracker';
 import './Viewport3D.css';
@@ -183,7 +181,7 @@ function AnimationDriver() {
 
 interface Viewport3DProps {
   activeTool3D?: Tool3D;
-  /** When true, hides legacy chrome (SimModeToggle, Render/CB buttons, sim-status)
+  /** When true, hides legacy chrome (SimModeToggle, Render/CB buttons)
    *  because the new AppShell provides RightDock instead. */
   hideChrome?: boolean;
 }
@@ -282,7 +280,6 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   }, [activePieces, selectedPieceIds, cuerpo, armAxis, dispatch]);
 
   const simRef = useRef<GarmentSimulationHandle>(null);
-  const cameraMode = activeTool3D === 'camera';
   const orbitRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const cameraPresets = useCameraPresets(orbitRef);
 
@@ -852,14 +849,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       }}
       onContextMenu={handleContextMenu}
     >
-      {/* NOT gated on hideChrome (same rationale as SurfaceModePill below):
-          AppShell — the only production shell — mounts Viewport3D with
-          hideChrome, which left this overlay permanently dark. It is the
-          ratified observability surface (C4 § 3.1.A tool silent-absence;
-          parity plan Fase 4 seam constraint count + zero-constraint
-          warnings), not legacy chrome. Caught by the R1 replay specs:
-          the Fase 4 "aviso explícito" was invisible in the real shell. */}
-      <SimulationStatusOverlay />
+      {/* El estado de la simulación (y el aviso de C4 § 3.1.A, la «silent-absence
+          surface» de la herramienta sin soporte y de las costuras sin restricciones)
+          ya no se pinta aquí: baja a la sección del 3D de la línea al pie
+          (shell/SeccionDel3D, P5). Este visor solo pinta la escena. */}
       <div ref={boxOverlayRef} style={{
         display: 'none', position: 'absolute', border: '1px dashed #00e5ff',
         backgroundColor: 'rgba(0, 229, 255, 0.08)', pointerEvents: 'none', zIndex: 10,
@@ -1061,14 +1054,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         onClose={() => setCollisionPanelOpen(false)}
       />
 
-      {/* El selector de modo de superficie («Texturizado ▾») ya no vive aquí:
-          sube a la barra superior con el avatar y los mapas (GrupoDeLaPrenda). */}
-
-      {!cameraMode && (
-        <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9, pointerEvents: 'none' }}>
-          {poseEditorOpen ? '● MODO POSE' : activeTool3D === 'arrangement' ? '⊕ COLOCAR — clic en la pieza, luego clic en el punto de colocación' : '✏️ MODO EDICIÓN'} — {inputScheme === 'trackpad' ? `orbitar con dos dedos · zoom con pellizco · ${displayShortcut('⌥')}arrastrar panea` : `clic derecho orbita · clic central/${displayShortcut('⌥')}arrastrar panea`}
-        </div>
-      )}
+      {/* El selector de modo de superficie («Texturizado ▾») sube a la barra
+          superior con el avatar y los mapas (GrupoDeLaPrenda), y lo que decía el
+          rótulo azul «MODO EDICIÓN — …» lo dice la voz del 3D en la línea al pie
+          (SeccionDel3D, vozDelTresD). */}
 
       <ContextMenu3D
         menu={ctxMenu}

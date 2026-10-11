@@ -14,6 +14,7 @@ import TopBar from './TopBar';
 import UnifiedBar from './UnifiedBar';
 import LeftDock from './LeftDock';
 import RightDock from './RightDock';
+import SeccionDel3D from './SeccionDel3D';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import ReferenceImageSettings from '../PatternEditor/ReferenceImageSettings';
 import { useReferenceImages } from '../PatternEditor/useReferenceImages';
@@ -367,11 +368,14 @@ export default function AppShell() {
         <RightDock onOpenPanel={togglePanel} />
       </div>
       {/* La línea al pie (spec 2026-10-02 § 5.3): la tercera fila de la
-          ventana. Marco, de lado a lado y siempre; la sección del patrón la
+          ventana. Marco, de lado a lado y siempre. La sección del patrón la
           llena PatternEditor por portal, porque su frase sale del estado de
-          sus herramientas. */}
-      <div className="linea-al-pie" data-superficie="ambiente">
-        <div ref={setRanuraDelPie} className="linea-al-pie__patron" />
+          sus herramientas; la del 3D (la voz de la vista y el estado de la
+          simulación) es un hijo directo. Con la vista 3D sola la ranura del
+          patrón se esconde y la del 3D ocupa todo el pie; con 2D no hay del 3D. */}
+      <div className={`linea-al-pie${viewMode === '3d' ? ' linea-al-pie--3d-solo' : ''}`} data-superficie="ambiente">
+        <div ref={setRanuraDelPie} className="linea-al-pie__patron" hidden={viewMode === '3d'} />
+        {viewMode !== '2d' && <SeccionDel3D />}
       </div>
       {iaAbierta && <UnifiedBar onOpenPanel={togglePanel} />}
       <ToastContainer />

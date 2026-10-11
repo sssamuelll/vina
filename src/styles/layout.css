@@ -162,7 +162,13 @@
    material y el alto de la barra superior, de lado a lado y siempre. Es una
    fila de la ventana, no flota: la hoja termina encima y nada la empuja. La
    sección del patrón la pinta PatternEditor por portal en su ranura
-   (SeccionDelPatron.css); la del 3D llega en P5. */
+   (SeccionDelPatron.css); la del 3D es un hijo directo (SeccionDel3D.css).
+
+   Cómo se reparten el ancho (P5): el patrón se queda con lo que sobra y no baja
+   de 320 px, porque es quien tiene las opciones de la herramienta; el 3D se
+   encoge hasta lo que mida su estado (la frase cede primero, con puntos
+   suspensivos). Con la vista 3D sola la ranura del patrón se esconde y el 3D se
+   lleva todo el pie, sin la línea de pelo que lo separaba del patrón. */
 .linea-al-pie {
   height: var(--top-bar-h);
   flex-shrink: 0;
@@ -171,7 +177,19 @@
   border-top: 1px solid var(--border);
   color: var(--text-primary);
 }
-.linea-al-pie__patron { flex: 1 1 auto; min-width: 0; display: flex; }
+.linea-al-pie__patron { flex: 1 1 0; min-width: 320px; display: flex; }
+.linea-al-pie__patron[hidden] { display: none; }
+.linea-al-pie__3d {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-3);
+  border-left: var(--hairline);
+}
+.linea-al-pie--3d-solo .linea-al-pie__3d { flex: 1 1 auto; border-left: 0; }
 
 /* unified-bar-slot removed — bar is now position:fixed overlay */
 
