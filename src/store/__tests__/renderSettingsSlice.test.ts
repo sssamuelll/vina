@@ -28,6 +28,8 @@ import reducer, {
   setDenoiserEnabled,
   setAvatarRenderStyle,
   setExportTransparent,
+  toggleAvatarVisible,
+  selectAvatarVisible,
   HDRI_PRESETS,
   LIGHT_PRESETS,
   type RenderSettingsState,
@@ -49,7 +51,10 @@ describe('renderSettingsSlice', () => {
     expect(state.hdriCustomUrl).toBeNull();
     expect(state.toneMapping).toBe('aces');
     expect(state.exposure).toBe(1.0);
-    expect(state.backgroundMode).toBe('solid');
+    // De fábrica el fondo es el papel (spec 2026-10-02 § 4.5, P5): el modo
+    // transparente, con el color de la hoja puesto por CSS. El sólido conserva
+    // su color por si se elige.
+    expect(state.backgroundMode).toBe('transparent');
     expect(state.backgroundColor).toBe('#e0e0e0');
     expect(state.lights).toEqual([]);
     expect(state.groundVisible).toBe(true);
@@ -408,5 +413,65 @@ describe('renderSettingsSlice', () => {
     expect(state3.avatarRenderStyle).toBe('xray');
     const state4 = reducer(state3, setAvatarRenderStyle('visible'));
     expect(state4.avatarRenderStyle).toBe('visible');
+  });
+});
+
+// El avatar a la vista (spec 2026-10-02 § 4.2, P5): el interruptor de la barra
+// superior, Shift+A y el menú del 3D son la misma cosa, y viven en el store.
+describe('el avatar a la vista (P5)', () => {
+  it('ocultar y volver devuelve el estilo que había', () => {
+    let s = reducer(initial(), setAvatarRenderStyle('wireframe'));
+    s = reducer(s, toggleAvatarVisible());
+    expect(s.avatarRenderStyle).toBe('hidden');
+    s = reducer(s, toggleAvatarVisible());
+    expect(s.avatarRenderStyle).toBe('wireframe');
+  });
+
+  it('desde «visible» oculta, y al volver queda «visible»', () => {
+    let s = reducer(initial(), toggleAvatarVisible());
+    expect(s.avatarRenderStyle).toBe('hidden');
+    s = reducer(s, toggleAvatarVisible());
+    expect(s.avatarRenderStyle).toBe('visible');
+  });
+
+  it('elegir un estilo desde el panel suelta el guardado', () => {
+    let s = reducer(initial(), setAvatarRenderStyle('wireframe'));
+    s = reducer(s, toggleAvatarVisible());           // oculto: guarda «wireframe»
+    s = reducer(s, setAvatarRenderStyle('xray'));    // lo elige ella: ya se ve, y lo guardado ya no vale
+    // Se mira el estado y no el siguiente interruptor: ocultar otra vez vuelve a
+    // guardar y taparía un guardado que se hubiera quedado (el test pasaba aunque
+    // `setAvatarRenderStyle` no soltara nada).
+    expect(s.avatarEstiloAnterior ?? null).toBeNull();
+  });
+
+  it('el oculto que pone el copiloto no inventa un estilo guardado', () => {
+    // `setAvatarRenderStyle('hidden')` es lo que hacen las herramientas de render
+    // (guardan el anterior y lo restauran ellas): el interruptor, al volver, da «visible».
+    let s = reducer(initial(), setAvatarRenderStyle('hidden'));
+    s = reducer(s, toggleAvatarVisible());
+    expect(s.avatarRenderStyle).toBe('visible');
+  });
+
+  it('selectAvatarVisible lee el estilo', () => {
+    const oculto = reducer(initial(), toggleAvatarVisible());
+    expect(selectAvatarVisible({ renderSettings: oculto })).toBe(false);
+    expect(selectAvatarVisible({ renderSettings: initial() })).toBe(true);
+    expect(selectAvatarVisible({ renderSettings: reducer(initial(), setAvatarRenderStyle('xray')) })).toBe(true);
+  });
+});
+
+describe('el guardado del interruptor del avatar', () => {
+  it('volver con el interruptor suelta el guardado', () => {
+    let s = reducer(initial(), setAvatarRenderStyle('wireframe'));
+    s = reducer(s, toggleAvatarVisible());
+    s = reducer(s, toggleAvatarVisible());
+    expect(s.avatarEstiloAnterior ?? null).toBeNull();
+  });
+  it('«Oculto» con el avatar ya oculto no borra lo guardado', () => {
+    let s = reducer(initial(), setAvatarRenderStyle('wireframe'));
+    s = reducer(s, toggleAvatarVisible());
+    s = reducer(s, setAvatarRenderStyle('hidden'));
+    s = reducer(s, toggleAvatarVisible());
+    expect(s.avatarRenderStyle).toBe('wireframe');
   });
 });

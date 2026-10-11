@@ -1,7 +1,8 @@
-/* El margen de herramientas del patrón (spec 2026-10-02 «la interfaz en papel»
-   § 4.3). Es papel, no marco: el color de la hoja, y una línea de pelo la
-   separa de ella. Es una columna en el flujo de `.canvas-area__2d`, no flota:
-   no tapa la hoja ni se mueve con lo que pase encima. Lleva
+/* Los márgenes de herramientas (spec 2026-10-02 «la interfaz en papel» § 4.3).
+   Son papel, no marco: el color de la hoja, y una línea de pelo los separa de
+   ella. Son columnas en el flujo, no flotan: no tapan la hoja ni se mueven con
+   lo que pase encima. El del patrón vive dentro de `.canvas-area__2d`; el del
+   3D (`.margen--derecho`), en `.canvas-area`, DETRÁS de los paneles. Llevan
    data-material="papel", así que `--text-*`, `--bg-elevated` y `--border` de
    `.dock__tool` y `.dock__add` son los del papel. */
 .margen {
@@ -34,51 +35,13 @@
 .margen .dock__add { width: 36px; height: 36px; flex-shrink: 0; }
 .margen .dock-editor { margin-top: 10px; }
 
-/* Side dock — vertical tool column framing the canvas (redesign surface #4).
-   Desde P2 solo la usa el 3D (`RightDock`), hasta que P5 la vuelva margen. */
-.dock {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: var(--z-dock);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  padding: 4px;
-  /* Material `chrome`: va acoplado a la canaleta, así que es opaco y sin
-     sombra. Radio 10 = 6 del botón + 4 de padding (radios concéntricos,
-     spec 2026-09-24 § 4.4): es el único sitio con --radius-lg. */
-  background: var(--surface-chrome-bg);
-  border: var(--surface-chrome-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--surface-chrome-shadow);
-  /* Acotado, porque va centrado: `top:50%` con `translateY(-50%)` reparte lo
-     que sobra por ARRIBA y por abajo a la vez, así que sin tope no se sale por
-     un lado sino por los dos. Medido a 1366×643 con el catálogo entero fijado:
-     el dock iba de -109 a 788 en una ventana de 643, y siete botones quedaban
-     fuera sin scroll y sin ninguna señal.
-
-     `MAX_DOCK_2D_TOOLS` protege el otro lado del mismo problema —que el sobre
-     persistido se pase y María pierda TODA su configuración al recargar—, pero
-     no este. Con catorce en el catálogo pasarse era casi imposible; con
-     diecinueve, no. Los 28 px son los 14 de `--left` arriba y abajo.
-
-     La barra de scroll es la señal, y por eso NO se esconde: salirse en
-     silencio es justo el defecto de #1095. Mismo remedio que `.dock-picker`. */
-  max-height: calc(100% - 28px);
-  overflow-y: auto;
-}
-
-.dock--right { right: 14px; }
-
-.dock__label {
-  font-family: var(--font-sans);
-  font-size: var(--text-1);
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  padding: 2px 0 4px;
+/* El margen del 3D (spec 2026-10-02 § 4.3, P5): la misma columna, pegada al
+   borde derecho de la ventana y detrás de los paneles. La línea de pelo va a su
+   izquierda, la que lo separa del escenario (o del panel). Hasta P4 era un dock
+   flotante de material chrome, centrado y con un rótulo «3D». */
+.margen--derecho {
+  border-right: 0;
+  border-left: var(--hairline);
 }
 
 .dock__tool {
@@ -128,10 +91,6 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
-
-/* ToolTooltip wraps each item in a div; keep it transparent to the dock's
-   flex column so gap/centering are unchanged. */
-.dock .tool-tooltip-wrapper { display: flex; }
 
 /* ── ＋ customize editor (slice 4) ── */
 .dock-editor { position: relative; display: flex; }

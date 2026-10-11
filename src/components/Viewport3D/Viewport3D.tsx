@@ -1,7 +1,6 @@
 import { Component, Suspense, type ReactNode, useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import FloorGrid from './FloorGrid';
 import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import type { AnyRenderer } from '../../types/renderer';
@@ -17,11 +16,9 @@ import GarmentSimulation from './GarmentSimulation';
 import type { GarmentSimulationHandle } from './GarmentSimulation';
 import { markRendererDeviceLost } from './rendererDeviceLost';
 import { SimulationErrorBoundary } from './SimulationErrorBoundary';
-import { SimulationStatusOverlay } from './SimulationStatusOverlay';
 import JointGizmos from './JointGizmos';
 import IKEndEffectorGizmos from './IKEndEffectorGizmos';
-import FitMapToggle from './FitMapToggle';
-import SurfaceModePill from './SurfaceModePill';
+import LeyendaDeMapas from './LeyendaDeMapas';
 import { usePoseDrag } from './usePoseDrag';
 import { isPanGesture, isPanRelease, cameraViewFromKeyEvent, isDoublePanClick, type PanClick } from './inputBindings';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
@@ -31,12 +28,14 @@ import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
 import { seSimula } from '../../utils/cloth/piezasEnLaSimulacion';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
 import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
+import { sobreElPapel } from '../../utils/export/sobreElPapel';
 import { collectExportScene } from '../../utils/export/sceneCollector';
 import { downloadGLTF } from '../../utils/export/gltfExporter';
 import { downloadUSDZ } from '../../utils/export/usdzExporter';
 import type { Tool3D } from '../../types/types';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import PanCrosshair from './PanCrosshair';
+import { registrarVisor } from './visorBridge';
 import SnapshotBar from './SnapshotBar';
 import AnchorPoints from './AnchorPoints';
 import { medidasDelCuerpo } from '../../avatares/catalogo';
@@ -57,6 +56,7 @@ import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection, togglePieceSelection, enterSuperimposePickMode } from '../../store/editorSlice';
 import { toggleIK, resetPose } from '../../store/avatarSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
+import { selectAvatarVisible, toggleAvatarVisible } from '../../store/renderSettingsSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal, clearFlippedNormals, setSelectedVertices, setRenderSettingsOpen } from '../../store/simulationSlice';
 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
@@ -68,7 +68,6 @@ import { resolveAnchorClick, selectionNamespace } from './anchorClick';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
 import { useDispatch } from 'react-redux';
 import { toolRegistry } from '../../tools';
-import { displayShortcut } from '../shell/shortcutDisplay';
 import { pushError } from '../../utils/errorTracker';
 import { pushSolverEvent } from '../../utils/cloth/solverRuntimeTracker';
 import './Viewport3D.css';
@@ -183,7 +182,7 @@ function AnimationDriver() {
 
 interface Viewport3DProps {
   activeTool3D?: Tool3D;
-  /** When true, hides legacy chrome (SimModeToggle, Render/CB buttons, sim-status)
+  /** When true, hides legacy chrome (SimModeToggle, Render/CB buttons)
    *  because the new AppShell provides RightDock instead. */
   hideChrome?: boolean;
 }
@@ -213,7 +212,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
   const colorways = useSelector((s: RootState) => s.project.colorways);
   const activeColorwayId = useSelector((s: RootState) => s.project.activeColorwayId);
-  const { groundVisible } = useSelector((s: RootState) => s.renderSettings);
+  const { groundVisible, shadowOpacity, exportTransparent } = useSelector((s: RootState) => s.renderSettings);
   const playbackState = useSelector((s: RootState) => s.animation.playbackState);
   const useClothSim = simulationState !== 'idle';
   const isArrangeMode = viewMode3D === 'arrange';
@@ -278,7 +277,6 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   }, [activePieces, selectedPieceIds, cuerpo, armAxis, dispatch]);
 
   const simRef = useRef<GarmentSimulationHandle>(null);
-  const cameraMode = activeTool3D === 'camera';
   const orbitRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const cameraPresets = useCameraPresets(orbitRef);
 
@@ -452,7 +450,9 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [fitMapStats, setFitMapStats] = useState<import('../../utils/cloth/fitMaps').FitMapStats | null>(null);
   const [inspectedValue, setInspectedValue] = useState<number | null>(null);
-  const [avatarHidden, setAvatarHidden] = useState(false);
+  // El avatar a la vista vive en el store (renderSettings.avatarRenderStyle): el
+  // interruptor de la barra superior, Shift+A y el menú del 3D son lo mismo.
+  const avatarVisible = useSelector(selectAvatarVisible);
   const [collisionPanelOpen, setCollisionPanelOpen] = useState(false);
   // Redux y no useState: las puertas (File menu, palette) viven fuera de este árbol.
   const renderPanelOpen = useSelector((s: RootState) => s.simulation.renderSettingsOpen);
@@ -521,31 +521,45 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     controls.update();
   }, []);
 
-  const snapshot3D = useCallback(() => {
+  /**
+   * El visor tal como está, listo para sacarlo: se fuerza un cuadro (un lienzo
+   * WebGPU solo se puede leer en la misma tarea en que se pinta) y, con el
+   * fondo «Papel», que es transparente, se compone sobre el papel salvo que se
+   * pida transparente (spec 2026-10-02 § 12, «las exportaciones del 3D»).
+   */
+  const lienzoParaSacar = useCallback((): HTMLCanvasElement | null => {
     const container = containerRef.current;
-    if (!container) return;
-    const store = container as unknown as Record<string, unknown>;
-    const renderer = store.__gl as AnyRenderer | undefined;
-    const scene = store.__scene as THREE.Scene | undefined;
-    const camera = store.__camera as THREE.Camera | undefined;
-    if (!renderer || !scene || !camera) return;
+    if (!container) return null;
+    const refs = container as unknown as Record<string, unknown>;
+    const renderer = refs.__gl as AnyRenderer | undefined;
+    const scene = refs.__scene as THREE.Scene | undefined;
+    const camera = refs.__camera as THREE.Camera | undefined;
+    if (!renderer || !scene || !camera) return null;
+    renderer.render(scene, camera);
+    return exportTransparent ? renderer.domElement : sobreElPapel(renderer.domElement);
+  }, [exportTransparent]);
 
-    // Force a render so the canvas content is current, then capture.
+  const snapshot3D = useCallback(() => {
     // canvas.toDataURL() works for both WebGL and WebGPU canvases,
     // unlike readPixels which is WebGL-only.
-    renderer.render(scene, camera);
-    const canvas = renderer.domElement;
+    const canvas = lienzoParaSacar();
+    if (!canvas) return;
 
     const link = document.createElement('a');
-    link.download = `vina-fitmap-${Date.now()}.png`;
+    link.download = `vina-visor-3d-${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
-  }, []);
+  }, [lienzoParaSacar]);
+
+  // «Capturar visor 3D» vive en el menú Vina › Archivo, fuera de este árbol:
+  // el visor deja su captura en el puente mientras está montado.
+  useEffect(() => {
+    registrarVisor(snapshot3D);
+    return () => registrarVisor(null);
+  }, [snapshot3D]);
 
   const handleCopyToClipboard = useCallback(async () => {
-    const container = containerRef.current;
-    if (!container) return;
-    const canvas = container.querySelector('canvas');
+    const canvas = lienzoParaSacar();
     if (!canvas) return;
     try {
       const blob = await new Promise<Blob>((resolve, reject) =>
@@ -555,7 +569,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     } catch (err) {
       console.warn('Copy to clipboard failed:', err);
     }
-  }, []);
+  }, [lienzoParaSacar]);
 
   const handleExportStill = useCallback(async (width: number, height: number, transparent: boolean) => {
     const container = containerRef.current;
@@ -691,7 +705,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
 
       if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
-        setAvatarHidden(h => !h);
+        dispatch(toggleAvatarVisible());
       }
       if (e.shiftKey && (e.key === 'F' || e.key === 'f')) {
         e.preventDefault();
@@ -832,14 +846,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       }}
       onContextMenu={handleContextMenu}
     >
-      {/* NOT gated on hideChrome (same rationale as SurfaceModePill below):
-          AppShell — the only production shell — mounts Viewport3D with
-          hideChrome, which left this overlay permanently dark. It is the
-          ratified observability surface (C4 § 3.1.A tool silent-absence;
-          parity plan Fase 4 seam constraint count + zero-constraint
-          warnings), not legacy chrome. Caught by the R1 replay specs:
-          the Fase 4 "aviso explícito" was invisible in the real shell. */}
-      <SimulationStatusOverlay />
+      {/* El estado de la simulación (y el aviso de C4 § 3.1.A, la «silent-absence
+          surface» de la herramienta sin soporte y de las costuras sin restricciones)
+          ya no se pinta aquí: baja a la sección del 3D de la línea al pie
+          (shell/SeccionDel3D, P5). Este visor solo pinta la escena. */}
       <div ref={boxOverlayRef} style={{
         display: 'none', position: 'absolute', border: '1px dashed #00e5ff',
         backgroundColor: 'rgba(0, 229, 255, 0.08)', pointerEvents: 'none', zIndex: 10,
@@ -864,8 +874,11 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         <CustomLights />
         <AnimationDriver />
 
-        {!avatarHidden && avatarMode === 'dressform' && <Mannequin />}
-        {!avatarHidden && avatarMode === 'model' && avatarModelUrl && (
+        {avatarVisible && avatarMode === 'dressform' && <Mannequin />}
+        {/* El modelo no se desmonta al ocultarlo: se esconde solo (AvatarModel: `scene.visible = false`
+            con el estilo «hidden»). Desmontarlo soltaba la raíz del horneado de colisión y una simulación
+            arrancada con el avatar oculto chocaba con otro cuerpo, 10-15 mm desalineado (renderCollisionBake). */}
+        {avatarMode === 'model' && avatarModelUrl && (
           <Suspense fallback={null}>
             <AvatarModel
             url={avatarModelUrl}
@@ -955,15 +968,16 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         {/* drei ContactShadows (raw ShaderMaterial) stays incompatible with the
             WebGPURenderer — real shadow maps on the key light replace it. */}
 
+        {/* El suelo de fábrica es solo sombra (spec 2026-10-02 § 4.5): un plano
+            que no se pinta y solo recibe la sombra del avatar y de la prenda,
+            con la opacidad de `shadowOpacity`. Se fueron el piso gris y su
+            cuadrícula: el escenario es el papel. */}
         {groundVisible && (
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow>
             <planeGeometry args={[100, 100]} />
-            <meshStandardMaterial color="#ffffff" />
+            <shadowMaterial transparent opacity={shadowOpacity} />
           </mesh>
         )}
-
-        {/* Geometry-based grid — works with NodeMaterial/WebGPU renderer */}
-        {groundVisible && <FloorGrid y={-0.001} />}
 
         <OrbitControls
           ref={orbitRef}
@@ -980,14 +994,11 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         />
       </Canvas>
 
-      {/* Fit Map Toggle Bar */}
-      <FitMapToggle
-        stats={fitMapStats}
-        inspectedValue={inspectedValue}
-        avatarHidden={avatarHidden}
-        onToggleAvatar={() => setAvatarHidden(h => !h)}
-        onSnapshot={snapshot3D}
-      />
+      {/* La leyenda de los mapas de ajuste: escala, tabla y valor inspeccionado.
+          Los cuatro mapas y sus ajustes son el menú «Mapa» de la barra superior
+          (MenuDeMapas); el avatar y la captura tienen sus puertas en la barra
+          superior y en Archivo. */}
+      <LeyendaDeMapas stats={fitMapStats} inspectedValue={inspectedValue} />
 
       {/* Snapshot A/B comparison bar */}
       <SnapshotBar
@@ -1043,23 +1054,16 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         onClose={() => setCollisionPanelOpen(false)}
       />
 
-      {/* Surface mode picker (spec 2026-06-04 display-toggles-resurface).
-          NOT gated on hideChrome: AppShell mounts Viewport3D with hideChrome
-          (legacy chrome hidden in the redesign shell), but the pill is
-          redesign-era UI — gating it would make it a dark surface. */}
-      <SurfaceModePill />
-
-      {!cameraMode && (
-        <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9, pointerEvents: 'none' }}>
-          {poseEditorOpen ? '● MODO POSE' : activeTool3D === 'arrangement' ? '⊕ COLOCAR — clic en la pieza, luego clic en el punto de colocación' : '✏️ MODO EDICIÓN'} — {inputScheme === 'trackpad' ? `orbitar con dos dedos · zoom con pellizco · ${displayShortcut('⌥')}arrastrar panea` : `clic derecho orbita · clic central/${displayShortcut('⌥')}arrastrar panea`}
-        </div>
-      )}
+      {/* El selector de modo de superficie («Texturizado ▾») sube a la barra
+          superior con el avatar y los mapas (GrupoDeLaPrenda), y lo que decía el
+          rótulo azul «MODO EDICIÓN — …» lo dice la voz del 3D en la línea al pie
+          (SeccionDel3D, vozDelTresD). */}
 
       <ContextMenu3D
         menu={ctxMenu}
         onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
         onResetCamera={handleResetCamera}
-        onToggleAvatar={() => setAvatarHidden(h => !h)}
+        onToggleAvatar={() => dispatch(toggleAvatarVisible())}
         onSnapshot={snapshot3D}
         onSelectPiece={(id) => dispatch(selectPiece(id))}
         onResetPieceArrangement={(id) => dispatch(clearArrangementOverride(id))} // reset = LIMPIAR el override (antes: [0,0,0] world = "muévete al origen", el mismo bug que el tool del agente tenía)

@@ -120,9 +120,14 @@
   display: flex;
 }
 
+/* Entre la hoja y el escenario de Split (spec 2026-10-02 § 4.5, P5): una línea de
+   pelo sobre papel, no la franja negra de antes (la que dejaba ver lo que hay
+   detrás). Los 4 px son área de agarre y pintan el papel; lo que se ve es la
+   línea del centro. Lleva data-material="papel" (AppShell.tsx): sin el ámbito,
+   `--border-subtle` es la del marco oscuro y sobre papel no se vería. */
 .canvas-area__divider {
   width: 4px;
-  background: transparent;
+  background: var(--canvas-2d);
   cursor: col-resize;
   flex-shrink: 0;
   position: relative;
@@ -137,7 +142,7 @@
   bottom: 0;
   left: 50%;
   width: 1px;
-  background: var(--border);
+  background: var(--border-subtle);
   transition: background 0.15s ease;
 }
 .canvas-area__divider:hover {
@@ -151,13 +156,41 @@
 .canvas-area__3d {
   position: relative;
   overflow: hidden;
+  /* El escenario es el papel de la hoja (spec 2026-10-02 § 4.5). El lienzo es
+     transparente (renderSettings.backgroundMode: 'transparent') y el color lo
+     pone esto: `scene.background` pasa por el mapeo de tonos y un #faf4e3 sale
+     #e1e0da. Con un fondo sólido o HDRI, el lienzo pinta encima. */
+  background: var(--canvas-2d);
 }
 
 /* La línea al pie (spec 2026-10-02 «la interfaz en papel» § 5.3): marco, del
    material y el alto de la barra superior, de lado a lado y siempre. Es una
    fila de la ventana, no flota: la hoja termina encima y nada la empuja. La
    sección del patrón la pinta PatternEditor por portal en su ranura
-   (SeccionDelPatron.css); la del 3D llega en P5. */
+   (SeccionDelPatron.css); la del 3D es un hijo directo (SeccionDel3D.css).
+
+   Cómo se reparte el ancho (spec § 5.3, P5): la herramienta del patrón ocupa lo
+   que necesita; la sección del 3D, lo que sobra, y es la primera que se recorta.
+   La ranura del patrón mide lo que pide su sección (`flex: 0 1 auto`): lo que
+   necesita para mostrar TODO, «quién», todas sus opciones y la frase entera, con
+   200 px como mínimo. Solo se encoge si no hay sitio, hasta 320 px;
+   la del 3D crece a todo lo demás (`flex: 1 100 auto`) y es la que se encoge casi
+   todo: su voz cede hasta desaparecer (SeccionDel3D.css) y lo único que no cede es
+   su estado, que le pone el mínimo (`min-width: auto`). Con 12 herramientas del
+   margen en Split a 1366 px las doce frases caben enteras (medido con el
+   navegador); a 1000 px el estado sigue entero y la frase del patrón conserva
+   sus 200 px (e2e). Con la vista 3D sola la ranura del patrón se esconde y el 3D
+   se lleva todo el pie, sin la línea de pelo que lo separaba del patrón.
+
+   Por qué la sección PIDE un ancho en vez de medir su contenido: la medida que
+   decide cuántas opciones se pliegan en «Más» (`useCuantasCaben`) sale del ancho
+   de la sección. Si la ranura midiera lo que su contenido mide ahora, plegar una
+   opción la encogería, la ranura encogida plegaría otra, y así hasta cero (medido
+   con el navegador: Desplazar contorno a 1100 px y Piquete perdían todas sus
+   opciones, y una frase de menos de 200 px las plegaba aun con la ventana ancha).
+   La sección calcula lo que necesita con lo que midió estando todo a la vista
+   (`anchoDelPie.ts`) y lo pide como su `width`: no depende de lo plegado, así que
+   plegar no realimenta nada. */
 .linea-al-pie {
   height: var(--top-bar-h);
   flex-shrink: 0;
@@ -166,7 +199,19 @@
   border-top: 1px solid var(--border);
   color: var(--text-primary);
 }
-.linea-al-pie__patron { flex: 1 1 auto; min-width: 0; display: flex; }
+.linea-al-pie__patron { flex: 0 1 auto; min-width: 320px; display: flex; }
+.linea-al-pie__patron[hidden] { display: none; }
+.linea-al-pie__3d {
+  flex: 1 100 auto;
+  min-width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-3);
+  border-left: var(--hairline);
+}
+.linea-al-pie--3d-solo .linea-al-pie__3d { flex: 1 1 auto; border-left: 0; }
 
 /* unified-bar-slot removed — bar is now position:fixed overlay */
 

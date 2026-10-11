@@ -245,6 +245,39 @@ una línea de pelo. La del patrón a la izquierda; la del 3D a la derecha.
 - **La escala y la tabla de los mapas de ajuste** (`FitMapToggle.tsx:151-234`, hoy texto blanco
   sobre casi negro escrito a mano) toman el material de lo que flota (§ 6.3).
 
+**Nota del plan de P5 (2026-10-11).** Lo que § 4.5 no decía y el plan decidió:
+
+- **«Avatar» tiene una sola fuente:** `renderSettings.avatarRenderStyle` (`'hidden'` = oculto). Antes
+  eran dos: un `avatarHidden` local del visor (Shift+A, el botón de la barra de mapas, el menú del
+  clic derecho), que ocultaba modelo y maniquí, y el estilo del panel de render, que solo miraba el
+  modelo. El interruptor de la barra guarda el estilo que había y lo devuelve (ocultar con «alambre» y
+  volver deja «alambre»). El costo: «Oculto» en el panel de render ahora oculta también el maniquí.
+- **El papel es CSS, no el ámbito:** `.canvas-area__3d` pinta `--canvas-2d` detrás del lienzo
+  transparente. `data-material="papel"` en toda el área dejaría con tinta oscura sobre fondo oscuro
+  al panel de render y al de cuerpos de colisión, que viven dentro del visor y siguen siendo marco
+  oscuro; el ámbito va en lo que P5 pinta encima (el margen, la leyenda, los menús, el divisor).
+- **El suelo:** un plano con `<shadowMaterial>` y la opacidad de `shadowOpacity`; se borra
+  `FloorGrid` y el token `--scene-3d`. Medido con WebGPU: la sombra se pinta.
+- **Las exportaciones** componen sobre el color de `--canvas-2d` leído en el momento
+  (`getComputedStyle`), salvo con `exportTransparent`; el EXR queda como estaba, que conserva el alfa.
+  «Capturar visor 3D» sube al menú Archivo por un puente de módulo (`visorBridge.ts`); el archivo se
+  llama `vina-visor-3d-….png` (era `vina-fitmap-…`).
+- **Los mapas:** `FitMapToggle` se partió en `MenuDeMapas` y `LeyendaDeMapas`. «Mapa ▾» siempre se abre,
+  también sin simulación (con los cuatro apagados y la pista de qué hacer, #1010 punto 4); sus ajustes
+  son otra vista de la misma hoja de papel, no un segundo portal. Los colores de DATO (las ocho paradas
+  de la escala, los cuadritos de la tabla) siguen siendo literales y no se tocan.
+- **La voz del 3D** es la tabla de `vozDelTresD.ts`; la tecla de cada herramienta sale del registro de
+  atajos, no de una cadena (#1170). Una herramienta sin entrada da «Herramienta del 3D» y la frase de
+  mover la vista, nunca su id. El estado dice «Simulando · N fps · WebGPU» sin cifra hasta el primer
+  cuadro (nunca «0 fps»), «En pausa», y «⚠ n» cuando lo hay. Como ningún motor detecta hoy la
+  penetración del cuerpo (`facePoke` es falso en los cuatro), simulando hay siempre al menos un aviso.
+- **El pie reparte el ancho:** el patrón no baja de 320 px y el 3D se encoge hasta lo que mida su
+  estado (la frase cede primero); con la vista 3D sola el 3D se lleva todo el pie.
+- **El divisor** pinta el papel y lleva el ámbito: su línea es `--border-subtle`, no `--border`, que
+  dentro del papel es el borde de un campo.
+- **Se queda para P6:** la píldora «+» de instantáneas (el comparador A/B), el panel de render y el de
+  cuerpos de colisión, todavía en el overlay oscuro de `:root`.
+
 ### 4.6 Reposo, por vista
 
 | Vista | Lo que hay |
@@ -483,6 +516,13 @@ en P1b.
 - Las capas sin nombre puesto se llaman «Forro», «Exterior», «Avíos» y, de la 3 en adelante,
   «Capa N». También los glifos ▶ ▼ ☰ de Capas pasan a Lucide.
 - En Split y en 3D la ranura todavía empuja el dock del 3D: el margen del 3D llega con P5.
+
+**Nota del plan de P5 (2026-10-11).** El margen del 3D (`RightDock`) deja de flotar dentro de
+`.canvas-area__3d` y pasa a ser una columna en el flujo de `.canvas-area`, la última, DETRÁS de los
+paneles y pegada al borde derecho de la ventana. Un panel se abre entre el escenario y el margen, y el
+margen no se mueve (mide 44 px en 1322..1366, con o sin panel, en Split y en 3D). Es una botonera: con el
+foco en uno de sus botones, Espacio lo pulsa y no arranca la simulación. El estado de la simulación, que
+flotaba junto a él como «SIMULANDO · N fps», vive en la sección del 3D de la línea al pie (§ 5.3).
 
 ### 6.2 La IA
 
@@ -727,8 +767,9 @@ tres vistas, desde P2).
 
 **Quién puede ser `ambiente`.** Lista cerrada: la barra superior, los dos márgenes y la línea al
 pie. La fija `tests/repo/superficies-declaradas.test.ts`, archivo por archivo. El vocabulario gana
-`pie` (las opciones de la línea al pie, que cuentan cuando aparecen) y pierde `tira`, `fila`,
-`mapas` e `indicador-simulacion`. La frase es `pista`; la marca de escala, `documento`; las
+`pie` (las opciones de la línea al pie, que cuentan cuando aparecen) y, con P5, `leyenda` (la
+escala, la tabla y el valor de los mapas sobre el visor); y pierde `tira`, `fila`, `mapas`,
+`indicador-simulacion` e `indicador-fps`. La frase es `pista`; la marca de escala, `documento`; las
 etiquetas de opción, parte de `cabina`.
 
 **Dónde bloquean.** `scripts/deploy-prod.sh` hoy no corre ninguno de los tres: su lista e2e

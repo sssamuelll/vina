@@ -99,7 +99,7 @@ test('en español a 1366 los seis interruptores caben: el grupo no se pliega', a
   const grupo = page.getByRole('group', { name: 'Qué se ve del patrón' });
   await expect(grupo).toBeVisible();
   await expect(grupo.getByRole('button')).toHaveCount(6);
-  await expect(page.getByRole('button', { name: 'Mostrar' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Mostrar', exact: true })).toHaveCount(0);
   expect(await noSeVen(grupo), 'interruptores tapados o recortados').toEqual([]);
 });
 
@@ -107,7 +107,7 @@ test('a 1280 se pliega en «Mostrar», y desde ahí los seis siguen a un clic', 
   await page.setViewportSize({ width: 1280, height: 720 });
   await abrirAppVacia(page);
   await cargarDxfDeMaria(page);
-  const mostrar = page.getByRole('button', { name: 'Mostrar' });
+  const mostrar = page.getByRole('button', { name: 'Mostrar', exact: true });
   await expect(mostrar).toBeVisible();
   await mostrar.click();
 
@@ -134,7 +134,7 @@ test('a 1280 «Mostrar» también se recorre con el teclado: Enter abre, el foco
   await page.setViewportSize({ width: 1280, height: 720 });
   await abrirAppVacia(page);
   await cargarDxfDeMaria(page);
-  const mostrar = page.getByRole('button', { name: 'Mostrar' });
+  const mostrar = page.getByRole('button', { name: 'Mostrar', exact: true });
   await expect(mostrar).toBeVisible();
   // Con el foco de teclado en «Mostrar», su anillo se ve entero: la barra
   // tampoco lo recorta a él.

@@ -252,7 +252,7 @@ test('la barra superior plegada: el menú de «Mostrar»', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await cargarDxfDeMaria(page);
   await reposo(page);
-  await page.getByRole('button', { name: 'Mostrar' }).click();
+  await page.getByRole('button', { name: 'Mostrar', exact: true }).click();
   await expect(page.getByRole('group', { name: 'Qué se ve del patrón' })).toBeVisible();
   await page.waitForTimeout(200);
   await registrar('menú «Mostrar» (barra plegada)', page);

@@ -86,8 +86,12 @@ describe('la escala de z-index ordena por urgencia, no por antigüedad', () => {
 /** Cada fila: archivo, patrón que debe existir en el archivo (var(--token) o
  *  var(--token) + N para los anidados), y una nota de por qué. */
 const SITIOS_GLOBALES: Array<{ archivo: string; patron: RegExp; nota: string }> = [
-  { archivo: 'src/components/shell/Dock.css', patron: /z-index:\s*var\(--z-dock\)/, nota: 'dock' },
+  // El dock del 3D flotaba con `--z-dock`; desde P5 es el margen, una columna
+  // en el flujo, y el rol queda en la escala sin consumidor (como `--z-panel`).
   { archivo: 'src/styles/layout.css', patron: /\.top-bar\s*\{[^}]*z-index:\s*var\(--z-bar\)/, nota: 'top-bar' },
+  { archivo: 'src/components/Viewport3D/MenuDeMapas.css', patron: /\.menu-de-mapas__hoja\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú «Mapa» de la barra superior: cuelga de <body>' },
+  { archivo: 'src/components/Viewport3D/SurfaceModePill.css', patron: /\.surface-pill__flyout\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú «Texturizado» de la barra superior: cuelga de <body>' },
+  { archivo: 'src/components/shell/SeccionDel3D.css', patron: /\.seccion-del-3d__detalle\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'detalle del estado de la simulación, en la línea al pie: cuelga de <body>' },
   { archivo: 'src/styles/layout.css', patron: /\.grupo-del-patron__menu\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú de «Mostrar», el grupo del patrón plegado: cuelga de <body>' },
   { archivo: 'src/components/PatternEditor/SeccionDelPatron.css', patron: /\.seccion-del-patron__menu\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú «Más» de la línea al pie: cuelga de <body>' },
   { archivo: 'src/styles/unified-bar.css', patron: /z-index:\s*var\(--z-bar\)/, nota: 'unified-bar' },
@@ -113,7 +117,7 @@ const SITIOS_GLOBALES: Array<{ archivo: string; patron: RegExp; nota: string }> 
  * que leer ahí es una promesa de que el submenú le gana a algo de afuera.
  */
 
-describe('los 16 sitios verificables por texto usan el token que les toca', () => {
+describe('los 15 sitios verificables por texto usan el token que les toca', () => {
   it.each(SITIOS_GLOBALES)('$archivo — $nota', ({ archivo, patron }) => {
     const contenido = leer(archivo);
     expect(contenido).toMatch(patron);

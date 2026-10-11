@@ -50,11 +50,14 @@ describe('F11 — un solo azul de estado en el cromo del visor 3D', () => {
     expect(encontrados, `azules fuera de tokens.css: ${encontrados.join(', ')}`).toEqual([]);
   });
 
-  it('el botón de modo activo de FitMapToggle usa el acento del sistema', () => {
-    // Es el único #4a90d9 de interfaz del archivo (línea 120): el fondo del
-    // botón activo. El resto de literales de ese archivo son escala de datos.
-    const src = lee('src/components/Viewport3D/FitMapToggle.tsx');
-    expect(src, 'el fondo del botón activo sigue siendo un hex suelto').not.toContain('#4a90d9');
+  it('el mapa puesto del menú «Mapa» usa el acento del sistema', () => {
+    // Era el único #4a90d9 de interfaz de FitMapToggle: el fondo del botón
+    // activo. Desde P5 el menú lo pinta con --accent-fuerte (el paso con texto
+    // encima). El resto de literales de esos archivos son escala de datos.
+    for (const ruta of ['src/components/Viewport3D/MenuDeMapas.tsx', 'src/components/Viewport3D/MenuDeMapas.css', 'src/components/Viewport3D/LeyendaDeMapas.tsx']) {
+      expect(lee(ruta), `${ruta}: el fondo del mapa activo sigue siendo un hex suelto`).not.toContain('#4a90d9');
+    }
+    expect(lee('src/components/Viewport3D/MenuDeMapas.css'), 'el mapa puesto no sale del acento').toContain('var(--accent-fuerte)');
   });
 
   it('el chip activo de la barra de capturas deja de tener dos azules', () => {
@@ -66,19 +69,21 @@ describe('F11 — un solo azul de estado en el cromo del visor 3D', () => {
 });
 
 describe('F11 — lo que codifica un dato NO se toca', () => {
-  const fit = lee('src/components/Viewport3D/FitMapToggle.tsx');
+  // P5: la escala vive en modosDeMapa.ts y la leyenda en LeyendaDeMapas.tsx.
+  const escala = lee('src/components/Viewport3D/modosDeMapa.ts');
+  const leyenda = lee('src/components/Viewport3D/LeyendaDeMapas.tsx');
 
   it('la escala del mapa de tensión conserva sus ocho paradas', () => {
     // Espejo de STRESS_STRAIN_COLORS (utils fitMaps): si esto cambia, la barra
     // deja de describir lo que el solver pintó en la malla.
-    for (const parada of ['#0000FF', '#FF0000']) {
-      expect(fit, `la escala perdió ${parada}`).toContain(parada);
+    for (const parada of ['#0000FF', '#0066FF', '#00CCCC', '#00FF66', '#66FF00', '#FFFF00', '#FF8800', '#FF0000']) {
+      expect(escala, `la escala perdió ${parada}`).toContain(parada);
     }
   });
 
   it('la leyenda del mapa de ajuste conserva sus colores de clase', () => {
-    for (const c of ['#ff0000', '#ffff00']) {
-      expect(fit.toLowerCase(), `la leyenda perdió ${c}`).toContain(c);
+    for (const c of ['#ff0000', '#ffff00', '#ffffff']) {
+      expect(leyenda.toLowerCase(), `la leyenda perdió ${c}`).toContain(c);
     }
   });
 

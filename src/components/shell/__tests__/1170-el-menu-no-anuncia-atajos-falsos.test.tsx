@@ -126,6 +126,9 @@ describe('#1170 — el menú no anuncia atajos que no existen', () => {
       'Quitar selección': 'selection.deselect',
       'Ajustar zoom al patrón': 'view.fitPattern',
       'Margen de costura': 'view.toggleSeamAllowance',
+      // F10 captura el visor (el oyente propio de Viewport3D, que se salta el
+      // registro pero respeta su contexto 3D): la fila hace lo mismo que la tecla.
+      'Capturar visor 3D': 'tool3d.snapshot',
       // «Iniciar simulación» NO está, y es a propósito. `sim.toggle` es un
       // interruptor: fuera del modo de colocación, Espacio RESTABLECE
       // (`useKeyboardShortcuts.ts`, rama else), mientras la fila solo despacha

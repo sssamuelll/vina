@@ -14,6 +14,7 @@ import { pushJournal } from '../../utils/telemetry/journal';
 import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
 import { Control } from './ToolOptionControls';
 import { cuantasCaben } from './cuantasCaben';
+import { anchoQueNecesita } from './anchoDelPie';
 import type { FraseDelPie } from './fraseDeLaFase';
 import './SeccionDelPatron.css';
 
@@ -52,45 +53,74 @@ const FRASE_MIN_PX = 200;
 const ANCHO_MAS_PX = 64;
 
 /**
- * ¿Cuántas opciones caben a la vista? Se decide midiendo, como el plegado de la
- * barra superior: con todas a la vista se mide cada una y se guarda; plegadas
- * ya no se pueden medir, así que se decide con lo guardado. Una herramienta
- * nueva, o la fuente de verdad recién cargada, se vuelven a medir con todas a
- * la vista: el efecto de diseño corre antes de pintar, así que ese paso no
- * llega a verse. Sin `ResizeObserver` (jsdom) caben todas.
+ * ¿Cuántas opciones caben a la vista, y cuánto ancho pide la sección? Se decide
+ * midiendo, como el plegado de la barra superior: con todas a la vista se mide
+ * cada una y se guarda; plegadas ya no se pueden medir, así que se decide con lo
+ * guardado. Una herramienta nueva, o la fuente de verdad recién cargada, se
+ * vuelven a medir con todas a la vista: el efecto de diseño corre antes de pintar,
+ * así que ese paso no llega a verse. Sin `ResizeObserver` (jsdom) caben todas.
+ *
+ * El ancho que pide es lo que necesita para mostrarlo TODO (`anchoQueNecesita`), y
+ * sale de lo guardado, no de lo que se ve: la ranura de la línea al pie mide lo que
+ * pide la sección (`flex: 0 1 auto`), y si pidiera lo que su contenido mide ahora,
+ * plegar una opción la encogería, la ranura encogida plegaría otra, y así hasta
+ * cero. Mientras no se haya medido (herramienta nueva, fuente recién cargada) no
+ * pide nada y la sección mide su contenido natural, que es lo que hay que medir.
  */
-function useCuantasCaben(raiz: RefObject<HTMLDivElement>, herramienta: string, total: number): number {
-  const [medida, setMedida] = useState({ herramienta, cuantas: total });
+function useCuantasCaben(
+  raiz: RefObject<HTMLDivElement>,
+  herramienta: string,
+  total: number,
+  claveDeLaFrase: string | undefined,
+): { cuantas: number; necesita: number | null } {
+  const [medida, setMedida] = useState<{ herramienta: string; cuantas: number; necesita: number | null }>({ herramienta, cuantas: total, necesita: null });
   const anchos = useRef<{ herramienta: string; lista: number[] } | null>(null);
   const anotado = useRef('');
-  const cuantas = medida.herramienta === herramienta ? Math.min(medida.cuantas, total) : total;
+  const vigente = medida.herramienta === herramienta;
+  const cuantas = vigente ? Math.min(medida.cuantas, total) : total;
+  const necesita = vigente ? medida.necesita : null;
 
   const medir = useCallback(() => {
     const el = raiz.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
     const fila = el.querySelector<HTMLElement>('.seccion-del-patron__opciones');
     const quien = el.querySelector<HTMLElement>('.seccion-del-patron__quien');
-    if (!fila || !quien) return;
+    // Escondida (la vista 3D sola) no se pinta: no hay nada que medir, y un hueco
+    // negativo plegaría todo y guardaría anchos de cero.
+    if (!fila || !quien || !el.clientWidth) return;
     const controles = Array.from(fila.children).filter(
       (h): h is HTMLElement => h instanceof HTMLElement && h.classList.contains('opcion-del-pie'),
     );
     if (controles.length === total) anchos.current = { herramienta, lista: controles.map((c) => c.offsetWidth) };
     if (!anchos.current || anchos.current.herramienta !== herramienta || anchos.current.lista.length !== total) return;
     const css = getComputedStyle(el);
-    const hueco = el.clientWidth - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0)
-      - quien.offsetWidth - 2 * (parseFloat(css.columnGap) || 0) - FRASE_MIN_PX;
-    const k = cuantasCaben(anchos.current.lista, hueco, parseFloat(getComputedStyle(fila).columnGap) || 0, ANCHO_MAS_PX);
-    // La caja negra ve cuántas quedaron a la vista y con qué hueco: un «no
-    // encuentro el ancho» en la máquina de María se lee ahí.
+    const relleno = (parseFloat(css.paddingLeft) || 0) + (parseFloat(css.paddingRight) || 0);
+    const entreColumnas = parseFloat(css.columnGap) || 0;
+    const entreOpciones = parseFloat(getComputedStyle(fila).columnGap) || 0;
+    const hueco = el.clientWidth - relleno - quien.offsetWidth - 2 * entreColumnas - FRASE_MIN_PX;
+    const k = cuantasCaben(anchos.current.lista, hueco, entreOpciones, ANCHO_MAS_PX);
+    const pide = anchoQueNecesita({
+      relleno,
+      quien: quien.offsetWidth,
+      huecoEntreColumnas: entreColumnas,
+      opciones: anchos.current.lista,
+      huecoEntreOpciones: entreOpciones,
+      frase: el.querySelector<HTMLElement>('.seccion-del-patron__texto')?.scrollWidth ?? 0,
+      fraseMin: FRASE_MIN_PX,
+    });
+    // La caja negra ve cuántas quedaron a la vista, con qué hueco y cuánto ancho
+    // pidió la sección: un «no encuentro el ancho» en la máquina de María se lee ahí.
     const clave = `${herramienta}:${k}`;
     if (anotado.current !== clave) {
       anotado.current = clave;
-      pushJournal('ui', 'linea-al-pie', { herramienta, aLaVista: k, total, hueco: Math.round(hueco) });
+      pushJournal('ui', 'linea-al-pie', { herramienta, aLaVista: k, total, hueco: Math.round(hueco), necesita: pide });
     }
-    setMedida((m) => (m.herramienta === herramienta && m.cuantas === k ? m : { herramienta, cuantas: k }));
+    setMedida((m) => (m.herramienta === herramienta && m.cuantas === k && m.necesita === pide ? m : { herramienta, cuantas: k, necesita: pide }));
   }, [raiz, herramienta, total]);
 
-  useLayoutEffect(() => { medir(); }, [medir, cuantas]);
+  // La frase entra en lo que la sección necesita: si cambia (su texto, o su tipo, que
+  // le pone otro relleno), se vuelve a medir.
+  useLayoutEffect(() => { medir(); }, [medir, cuantas, claveDeLaFrase]);
 
   useLayoutEffect(() => {
     const el = raiz.current;
@@ -107,12 +137,12 @@ function useCuantasCaben(raiz: RefObject<HTMLDivElement>, herramienta: string, t
     void document.fonts?.ready.then(() => {
       if (!vivo) return;
       anchos.current = null;
-      setMedida((m) => ({ ...m, cuantas: Number.POSITIVE_INFINITY }));
+      setMedida((m) => ({ ...m, cuantas: Number.POSITIVE_INFINITY, necesita: null }));
     });
     return () => { vivo = false; };
   }, []);
 
-  return cuantas;
+  return { cuantas, necesita };
 }
 
 /**
@@ -191,7 +221,7 @@ export default function SeccionDelPatron({
     });
   }
 
-  const cuantas = useCuantasCaben(raiz, activeTool, controles.length);
+  const { cuantas, necesita } = useCuantasCaben(raiz, activeTool, controles.length, frase ? `${frase.tipo}:${frase.texto}` : undefined);
   const plegadas = controles.slice(cuantas);
   const [abierto, setAbierto] = useState(false);
   const [ancla, setAncla] = useState({ left: 0, bottom: 0 });
@@ -273,6 +303,7 @@ export default function SeccionDelPatron({
       data-shortcut-context="2d"
       data-botonera
       onMouseDown={noTomarElFoco}
+      style={necesita === null ? undefined : { width: necesita }}
     >
       <span className="seccion-del-patron__quien">
         {Icono && <Icono size={16} />}

@@ -1,0 +1,105 @@
+/* La leyenda de los mapas de ajuste (LeyendaDeMapas.tsx, P5). Cubre el visor
+   sin tapar nada: no recibe el ratón, y cada pieza se ancla a su borde. Es papel
+   (data-material="papel" en la raíz): la tinta es --text-*, la tabla es
+   --surface-overlay-*. Antes era negro con letra blanca, de cuando el visor era
+   oscuro. Sin z-index: va después del lienzo en el DOM y pinta encima. */
+.leyenda-de-mapas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+}
+
+/* La escala vertical: borde derecho, de arriba a abajo del visor. */
+.leyenda-de-mapas__escala {
+  position: absolute;
+  top: 16px;
+  right: 12px;
+  bottom: 16px;
+  width: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.leyenda-de-mapas__barra {
+  width: 14px;
+  flex: 1;
+  border-radius: 2px;
+  border: var(--hairline);
+}
+/* Las marcas y los extremos van sobre su propia hoja, como la tabla: el fondo
+   «Sólido» del visor puede ser oscuro, y la tinta de papel suelta sobre #222 daba
+   1,05:1 (revisión final de P5). Sobre el papel de fábrica la hoja casi no se nota. */
+.leyenda-de-mapas__marca {
+  padding: 2px 4px;
+  background: var(--surface-overlay-bg);
+  border-radius: var(--radius-sm);
+  font-size: 9px;
+  line-height: 1;
+  user-select: none;
+}
+.leyenda-de-mapas__marca:first-child { margin-bottom: 4px; }
+.leyenda-de-mapas__barra + .leyenda-de-mapas__marca { margin-top: 4px; }
+.leyenda-de-mapas__extremos {
+  margin-top: 6px;
+  padding: 2px 4px;
+  background: var(--surface-overlay-bg);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: 8px;
+  line-height: 1;
+  user-select: none;
+}
+
+/* La tabla del mapa de ajuste y la leyenda de presión: una hoja de papel. */
+.leyenda-de-mapas__tabla {
+  position: absolute;
+  top: 16px;
+  right: 12px;
+  min-width: 140px;
+  padding: 8px 12px;
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
+  font-size: 11px;
+}
+.leyenda-de-mapas__titulo { margin-bottom: 6px; font-size: 12px; font-weight: 700; }
+.leyenda-de-mapas__tabla table { width: 100%; border-collapse: collapse; }
+.leyenda-de-mapas__tabla td { padding: 2px 0; }
+.leyenda-de-mapas__cifra { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Un cuadrito de color de dato. La línea de pelo es lo que deja ver el «Bien»
+   blanco sobre el papel blanco. */
+.leyenda-de-mapas__muestra {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: var(--hairline);
+  border-radius: 1px;
+}
+.leyenda-de-mapas__contacto { display: flex; align-items: center; gap: 6px; }
+.leyenda-de-mapas__punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+
+/* El valor del punto inspeccionado. Es un solo número, no una columna: va en
+   sans con cifras tabulares, como la tabla (la mono es de los datos que se
+   alinean carácter a carácter, contrato § 5). */
+.leyenda-de-mapas__valor {
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
