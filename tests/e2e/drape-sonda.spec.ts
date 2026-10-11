@@ -28,6 +28,14 @@ import { exportBundle } from './helpers/diagnostico';
 /** `SONDA_TIER=wasm` apaga WebGPU: lo que ve quien abre Vina en un equipo sin él. */
 const TIER = process.env.SONDA_TIER === 'wasm' ? 'wasm' : 'webgpu';
 
+/**
+ * Lo que la sonda espera en 3D, con la simulación parada, antes de «Simular».
+ * El preparador arranca 600 ms después de entrar y a la camisa de María le
+ * toma unos 4 s: con 8 s se mide el arranque preparado, el del criterio 1 de
+ * la spec.
+ */
+const PREPARAR_MS = Number(process.env.SONDA_PREPARAR_MS ?? 8000);
+
 const SALIDA = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../../.tmp/sonda-drape',
@@ -58,6 +66,8 @@ interface Sonda {
   largas: Array<{ t: number; ms: number }>;
   muestras: Muestra[];
   ventanas: Array<{ t: number; ms: number }>;
+  /** Cuándo el estado al pie dijo «Simulando» por primera vez tras el clic. */
+  simulando?: number;
 }
 
 /** Se instala antes que la app: nada de lo que pasa al arrancar se pierde. */
@@ -242,10 +252,22 @@ test.describe('Sonda del drape @gpu-local', () => {
       .toBeGreaterThanOrEqual(6);
     await page.keyboard.press('Escape');
 
+    await marcar('vista3d');
     await cambiarVista(page, '3D');
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(PREPARAR_MS);
     await foto('0-antes-de-simular');
 
+    // El estado al pie, mirado cuadro a cuadro desde antes del clic: el instante en
+    // que deja «Preparando la tela» y dice «Simulando». Lo mira la página, no el
+    // test: el gesto no espera y las marcas no se mueven.
+    await page.evaluate(() => {
+      const sonda = (window as unknown as { __SONDA__: Sonda }).__SONDA__;
+      const mirar = () => {
+        if (document.querySelector('button[aria-label^="Estado de la simulación: Simulando"]')) sonda.simulando = performance.now();
+        else requestAnimationFrame(mirar);
+      };
+      requestAnimationFrame(mirar);
+    });
     await marcar('simular');
     await pulsarSimular(page);
     let anterior = 0;
@@ -339,15 +361,38 @@ test.describe('Sonda del drape @gpu-local', () => {
     };
     const arranques = eventosSolver.filter((e) => e.kind === 'cascade:start');
     const primeraVentana = sonda.ventanas.find((v) => v.t > marcas.simular);
+    // Del clic, por el instante del evento: su `data.ms` cuenta desde el
+    // `cascade:start`, que llega después de mallar.
+    const primerCuadro = eventosSolver.find((e) => e.kind === 'tela:primer-cuadro' && e.t >= marcas.simular);
+    // Por fase, lo último que dejó el preparador antes del clic (el ring guarda el
+    // orden): un `listo` que después falló no cuenta como preparado.
+    const preparado = new Map<unknown, Record<string, unknown>>();
+    for (const e of eventosSolver) {
+      if ((e.kind === 'preparar:listo' || e.kind === 'preparar:fallo') && e.t < marcas.simular) {
+        preparado.set(e.data.fase, { fase: e.data.fase, kind: e.kind, ...e.data });
+      }
+    }
+    const usado = eventosSolver.filter((e) => e.kind === 'preparar:usada' && e.t >= marcas.simular).map((e) => e.data);
     const resumen = {
       marcas,
       tramos,
       arranques: arranques.map((e) => ({ t: e.t, generation: e.generation })),
       tiers: eventosSolver.filter((e) => e.kind.startsWith('tier:')).map((e) => ({ t: e.t, kind: e.kind, ...e.data })),
       primerCuadroTrasSimularMs: primeraVentana ? Math.round(primeraVentana.t - marcas.simular) : null,
+      clicAPrimerCuadroMs: primerCuadro ? Math.round(primerCuadro.t - marcas.simular) : null,
+      clicAEstadoSimulandoMs:
+        sonda.simulando !== undefined && sonda.simulando < marcas.pausa ? Math.round(sonda.simulando - marcas.simular) : null,
+      preparadoAntesDelClic: [...preparado.values()],
+      usadoDeLoPreparado: usado,
       ventanasSimulando: sonda.ventanas.filter((v) => v.t >= marcas.simular && v.t < marcas.pausa).length,
       ventanasReanudada: sonda.ventanas.filter((v) => v.t >= marcas.reanudar && v.t < marcas.fin).length,
       tareasLargas: sonda.largas.filter((l) => l.t >= marcas.simular).map((l) => ({ t: Math.round(l.t), ms: Math.round(l.ms) })),
+      // Del clic al perfil: el criterio 2 mide la app, no el perfilador, la órbita, Espacio ni el 2D de la sonda.
+      tareasDeMasDe100ms: sonda.largas.filter((l) => l.t >= marcas.simular && l.t < marcas.perfil && l.ms > 100).length,
+      // Sin aserción: aquí corre el preparador, pero también el visor 3D al despertar.
+      tareasLargasAntesDelClic: sonda.largas
+        .filter((l) => l.t >= marcas.vista3d && l.t < marcas.simular)
+        .map((l) => ({ t: Math.round(l.t), ms: Math.round(l.ms) })),
       geometrias: sonda.muestras.at(-1)?.geometrias,
       ventanasEnVista2d: sonda.ventanas.filter((v) => v.t >= marcas.vista2d && v.t < marcas.vista2dFin).length,
       perfil,
@@ -384,5 +429,13 @@ test.describe('Sonda del drape @gpu-local', () => {
     expect(trasSimular.some((m) => m.estado === 'idle'), 'nada la restablece por su cuenta').toBe(false);
     const enEspacio1 = sonda.muestras.filter((m) => m.t >= marcas.espacio1 + 500 && m.t < marcas.espacio2);
     expect(enEspacio1.length > 0 && enEspacio1.every((m) => m.estado === 'paused'), 'Espacio pausa, como el botón').toBe(true);
+    if (TIER === 'webgpu') {
+      // WebGPU avisa `tier:selected` antes de armarse: si después falla y cae a WASM,
+      // el último elegido es el motor que midió la sonda.
+      const elegido = eventosSolver.filter((e) => e.kind === 'tier:selected' && e.t >= marcas.simular).at(-1);
+      expect(elegido?.data.tier, 'la corrida es de WebGPU: con una caída a WASM la medida no dice nada').toBe('webgpu');
+      // Solo aquí se comprueba que la ruta GPU avisa su primer cuadro al estado: el gate corre en WASM.
+      expect(resumen.clicAEstadoSimulandoMs, 'con WebGPU, el primer cuadro pasa el estado de «Preparando la tela» a «Simulando»').not.toBeNull();
+    }
   });
 });
