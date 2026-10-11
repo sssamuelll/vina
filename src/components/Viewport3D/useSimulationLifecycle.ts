@@ -716,9 +716,12 @@ export function useSimulationLifecycle({
 
               // Load collision BEFORE starting (prevents explosion)
               await loadCollision(wasmClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, true, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
-              simReadyRef.current = true; // 2a (consistencia — WASM ya gated por start())
 
               if (!cancelled) {
+                // Solo la corrida viva marca «listo»: una cancelada que termina
+                // tarde se lo daría al worker de la nueva antes de su init, y
+                // reanudar lo arrancaría (2026-10-11).
+                simReadyRef.current = true; // 2a (consistencia — WASM ya gated por start())
                 if (enMarchaRef.current) wasmClient.start();
                 // Push pre-existing wind config — the separate wind useEffect
                 // fires on mount before wasmClientRef is set, so it's a no-op.
@@ -778,9 +781,9 @@ export function useSimulationLifecycle({
 
             // Load collision BEFORE starting (prevents explosion)
             await loadCollision(client, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
-            simReadyRef.current = true; // 2a (consistencia — CPU ya gated por start())
 
             if (!cancelled) {
+              simReadyRef.current = true; // 2a (consistencia — CPU ya gated por start())
               if (enMarchaRef.current) client.start();
               // Push pre-existing elastic constraints
               if (elasticsRef.current.length > 0) client.setElastics(elasticsRef.current);
@@ -819,6 +822,7 @@ export function useSimulationLifecycle({
         neuralClient.onFrame = onFrame;
         await neuralClient.initMultiPiece(placedMeshes);
         if (!cancelled) {
+          simReadyRef.current = true; // reanudar tras una pausa lo vuelve a arrancar
           if (enMarchaRef.current) neuralClient.start();
           setAppliedSolverConfig({ tier: 'neural-drape', init: { pieces: placedMeshes.length }, postInit: {} });
           setActiveSolverTier('neural-drape');
@@ -888,9 +892,10 @@ export function useSimulationLifecycle({
 
   // ─── Pausar y reanudar ─── (sin soltar el solver)
   // Los workers paran y siguen con su estado; el tier TSL no tiene worker: lo
-  // frena GarmentSimulation, que no despacha cuadros fuera de 'running'. Un
-  // worker que todavía arranca no se toca: la cascada lo echa a andar al
-  // terminar si para entonces la sesión corre (`enMarchaRef`).
+  // frena GarmentSimulation, que no despacha cuadros fuera de 'running'.
+  // Reanudar no arranca un worker que todavía no terminó su init
+  // (`simReadyRef`): lo echa a andar la cascada al terminar, si para entonces
+  // la sesión corre (`enMarchaRef`).
   useEffect(() => {
     if (simulationState === 'paused') {
       clientRef.current?.stop();

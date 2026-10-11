@@ -24,6 +24,10 @@ const wasm = vi.hoisted(() => ({
   isWasmSolverAvailable: vi.fn(),
   instancias: [] as Array<{ start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }>,
 }));
+const cpu = vi.hoisted(() => ({ initMultiPiece: vi.fn() }));
+const neural = vi.hoisted(() => ({
+  instancias: [] as Array<{ start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }>,
+}));
 const gpu = vi.hoisted(() => ({
   initMultiPieceTsl: vi.fn(),
   isWebGPUAvailable: vi.fn(() => false),
@@ -54,7 +58,7 @@ vi.mock('../../../utils/cloth/clothWorkerClient', () => ({
   ClothWorkerClient: class {
     onFrame = null;
     onEdgeData = null;
-    initMultiPiece = vi.fn();
+    initMultiPiece = cpu.initMultiPiece;
     init = vi.fn();
     setFabric = vi.fn();
     requestEdgeData = vi.fn();
@@ -87,8 +91,11 @@ vi.mock('../../../utils/cloth/gpu/gpuSolverClient', () => ({
 }));
 vi.mock('../../../utils/cloth/neural/neuralDrapeClient', () => ({
   NeuralDrapeClient: class {
+    constructor() {
+      neural.instancias.push(this as unknown as (typeof neural.instancias)[number]);
+    }
     onFrame = null;
-    initMultiPiece = vi.fn();
+    initMultiPiece = vi.fn().mockResolvedValue(undefined);
     start = vi.fn();
     stop = vi.fn();
     dispose = vi.fn();
@@ -184,6 +191,7 @@ afterEach(() => {
   clearSolverEvents();
   wasm.instancias.length = 0;
   gpu.instancias.length = 0;
+  neural.instancias.length = 0;
   vi.clearAllMocks();
   localStorage.removeItem(WEBGPU_FEATURE_FLAG_KEY);
   gpu.isWebGPUAvailable.mockReturnValue(false);
@@ -251,6 +259,59 @@ describe('pausar no vuelve a vestir', () => {
     await act(async () => { store.dispatch(startSimulation()); });
     expect(cliente.start).toHaveBeenCalledTimes(1);
     expect(wasm.instancias).toHaveLength(1);
+  });
+
+  it('una cascada vieja que termina tarde no da por listo al worker de la nueva', async () => {
+    // Las mallas cambian a mitad del arranque (el esqueleto publica la pose A
+    // tras el primer «Simular»): la cascada vieja se cancela, pero su arranque
+    // sigue en vuelo. Si al terminar marca «listo», reanudar le haría start()
+    // al worker NUEVO antes de que termine su init.
+    localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'false');
+    wasm.isWasmSolverAvailable.mockResolvedValue(true);
+    const terminar: Array<() => void> = [];
+    wasm.initMultiPiece.mockImplementation(() => new Promise<void>((ok) => { terminar.push(ok); }));
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    const seamInitData: SeamInitData[] = [];
+    const elastics: Elastic[] = [];
+    const stretchingIdsRef = { current: null as Int32Array | null };
+    const { rerender } = renderHook(
+      ({ mallas }: { mallas: PlacedMesh[] }) =>
+        useSimulationLifecycle({ placedMeshes: mallas, seamInitData, elastics, fabricId: 'cotton-poplin', stretchingIdsRef }),
+      {
+        initialProps: { mallas: [malla('a')] },
+        wrapper: ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>,
+      },
+    );
+    await waitFor(() => expect(wasm.initMultiPiece).toHaveBeenCalledTimes(1));
+    rerender({ mallas: [malla('a')] });
+    await waitFor(() => expect(wasm.initMultiPiece).toHaveBeenCalledTimes(2));
+
+    await act(async () => { terminar[0](); });
+    await act(async () => { store.dispatch(pauseSimulation()); });
+    await act(async () => { store.dispatch(startSimulation()); });
+    expect(wasm.instancias[1].start, 'el worker nuevo no arranca antes de su init').not.toHaveBeenCalled();
+
+    await act(async () => { terminar[1](); });
+    await waitFor(() => expect(wasm.instancias[1].start).toHaveBeenCalledTimes(1));
+  });
+
+  it('neural (sin costuras, el último tier): pausar lo para y reanudar lo vuelve a arrancar', async () => {
+    localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'false');
+    wasm.isWasmSolverAvailable.mockResolvedValue(false);
+    cpu.initMultiPiece.mockRejectedValueOnce(new Error('sin worker'));
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    montar(store);
+    await waitFor(() => expect(getActiveSolverTier()).toBe('neural-drape'));
+    const cliente = neural.instancias[0];
+    expect(cliente.start).toHaveBeenCalledTimes(1);
+
+    await act(async () => { store.dispatch(pauseSimulation()); });
+    expect(cliente.stop).toHaveBeenCalled();
+    await act(async () => { store.dispatch(startSimulation()); });
+    expect(cliente.start).toHaveBeenCalledTimes(2);
+    expect(neural.instancias).toHaveLength(1);
   });
 
   it('Restablecer sí suelta el solver: es el único que vuelve a empezar', async () => {
