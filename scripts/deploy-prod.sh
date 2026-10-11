@@ -28,6 +28,16 @@ ENSAYO=0
 
 cd "$(dirname "$0")/.."
 
+# LA MÁQUINA ES UNA SOLA (2026-10-10). El ensayo y el deploy son lo más pesado que
+# corre aquí, una hora de e2e con dos navegadores, y se lanzan de nuevo dentro
+# del candado de `scripts/pesado.mjs`: si otra sesión tiene la máquina, hacen cola
+# hasta dos horas en vez de aplastar su trabajo, y no arrancan con la memoria o la
+# CPU ya ocupadas por otras aplicaciones. Dentro del candado, `VINA_PESADO` está
+# puesta y el script sigue de largo.
+if [ -z "${VINA_PESADO:-}" ]; then
+  exec node scripts/pesado.mjs "--nombre=deploy-prod ${1:-}" --espera=120 --ram=6 --cpu=60 -- bash scripts/deploy-prod.sh "$@"
+fi
+
 echo "── Árbol ──────────────────────────────────────────────"
 # Cambios tracked sin commitear = desplegarías algo que el repo no registra.
 # Untracked se tolera (docs/research vive así).
@@ -257,6 +267,7 @@ SPECS_DEL_GATE=(
   tests/e2e/linea-al-pie.spec.ts
   tests/e2e/ia-convocada.spec.ts
   tests/e2e/puente-mcp.spec.ts
+  tests/e2e/ia-ciclo-del-ajuste.spec.ts
   tests/e2e/la-cabina-de-la-pieza.spec.ts
   tests/e2e/la-cota-de-lo-que-se-pone.spec.ts
   tests/e2e/la-puerta-de-vuelta.spec.ts

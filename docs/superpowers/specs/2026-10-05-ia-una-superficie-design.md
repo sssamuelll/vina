@@ -347,6 +347,129 @@ Dentro de este subproyecto, para probar la superficie desde el primer día y cum
 - Queda para la segunda mitad: `dart`, `seam_allowance`, `classify`, `assign_fabric`, `dress`,
   `simulate` con `fit_map`, `grade` y `export`.
 
+**Nota del plan de la entrega 1b, segunda mitad, parte A (2026-10-09).** Plan
+`docs/superpowers/plans/2026-10-09-ia-superficie-1b2-ajuste.md`. Entra el ciclo del ajuste:
+`classify`, `assign_fabric`, `dress`, `simulate` y `fit_map`. La parte B (`dart`,
+`seam_allowance`, `grade`, `export`) tiene su propio plan. Lo que el código y dos sondas
+afinaron:
+
+- **La simulación solo avanza con Vina a la vista.**
+  - Con otra pestaña delante o la ventana minimizada, el navegador baja a 1 cuadro por segundo y
+    la tela no se mueve.
+  - `simulate` mira el latido: los cuadros de tela nueva que la app dibuja
+    (`latirLaSimulacion`, en el `useFrame` de `GarmentSimulation`).
+  - No espera de balde. Lo dice con la pestaña oculta 2 s, sin cuadro nuevo en 10 s, o sin
+    ningún cuadro en 30 s; en este último caso, con lo último que dijo el solver.
+- **Asentada.** Pasados 180 cuadros, la tela se mueve menos de 0,02 mm por cuadro (percentil 95
+  de sus vértices) en tres lecturas seguidas, separadas por al menos 30 cuadros.
+  - Medido con la camisa de María cosida, en WebGPU: el percentil 95 baja de 4,9 mm a ~0,01 mm
+    hacia el cuadro 500, y ahí se queda entre 0,006 y 0,015. El máximo nunca baja de 0,14: unos
+    pocos vértices tiemblan siempre.
+  - En WASM el worker da un cuadro cada 1-2 s: la camisa no se asienta en el plazo, y el recibo
+    lo dice con el tier, los cuadros por segundo y lo que se mueve todavía.
+- **`wait_seconds`** va de 1 a 110 y por defecto vale 60: los 60 s de esta spec, siempre por
+  debajo de los 120 s del puente.
+- **`stop` pausa:** la app libera el solver y la tela queda donde estaba. Un `start` después
+  vuelve a vestir desde la pose del vestido.
+- **`fit_map` mide cada pieza por sus aristas y por largo de tela** (las del manifiesto de la
+  malla), con la tela de la simulación. Da la mediana y el percentil 95 del estiramiento, y qué
+  parte de la tela pasa del 80 % («ajustada») o del 100 % («no se puede poner») de lo que aguanta.
+  - No toma el máximo de cada vértice, como el mapa en pantalla: con eso, un 4 % de aristas
+    estiradas pintaba de rojo casi toda la pieza.
+  - Deja fuera las aristas de menos de 1 mm: son astillas del mallado y daban 240-890 %.
+  - Sin el cuerpo, como la app (que pasa el avatar como `null`): cuenta la pieza entera.
+  - Las aristas del solver se piden mientras falten, con el mapa en pantalla o sin él.
+  - El «por pieza» que copiaba la cifra global (`getFitMapByPiece`) no lo usa la superficie.
+- **`dress` no escribe el patrón** ni borra lo que María movió a mano, cosa que la herramienta
+  vieja (`arrangeGarment`) sí hacía. Para la simulación si corre y deja el 3D en vestir.
+  - Por cada pieza dice si su región la decidió la categoría o el nombre. La que Vina no sabe
+    ubicar sale sin región, con el aviso de clasificarla: caería en el delantero del torso.
+- **Desde 2D, `dress` y `simulate` pasan la vista a Split**, como el panel de render.
+- **`classify` nombra de nuevo los bordes por la categoría solo si nada los usa** (costuras,
+  grupos, pliegues, elásticos, puntos de medida). Si algo los usa, los deja y lo avisa. Sin
+  `side`, el lado viejo se va.
+- **El candado protege el contorno y las internas:** `classify` y `assign_fabric` se permiten,
+  como coser.
+- **`assign_fabric`** usa la biblioteca que lee el simulador (`PHYSICAL_FABRIC_LIBRARY`).
+  - El simulador viste con una sola tela: la toma cuando todas las piezas activas comparten una.
+    Si difieren, sigue con la suya y el recibo lo dice.
+  - La tela de las piezas se deshace con Ctrl+Z; la de la simulación no, porque es estado de la
+    simulación, como la vista.
+- **Pasos del historial:** «IA: clasificar Manga», «IA: poner Denim 12oz a 5 piezas» (el
+  `nameEs` de la tela).
+- **Lo que dio la camisa de María al vestirla:** el clasificador geométrico ubica las cinco
+  piezas (cuello, dos mangas, delantero, espalda) con 15 costuras activas.
+  - Quitada la categoría del cuello, `dress` lo nombra sin región. `classify` como cuello deja
+    sus bordes, que están cosidos, y entonces la camisa se viste entera.
+- **Las instrucciones** dicen que la simulación solo avanza con Vina a la vista, y la línea del
+  candado dice lo que protege.
+- **La superficie tiene 17 verbos** y sus definiciones miden 14.646 caracteres.
+- **Lo que cambió la revisión final (Opus, 0 críticos, 3 importantes y 2 menores subidos de grado):**
+  - Las piezas que se visten y se simulan salen de un solo filtro, el de `GarmentSimulation`
+    (`piezasEnLaSimulacion.ts`): activas, sin ocultar en 3D y en una capa visible. `dress` dice
+    cuáles deja fuera y por qué; antes miraba solo `active` y vestía otra prenda que la simulada.
+  - `classify` tampoco nombra de nuevo los bordes si un avío está puesto sobre uno o si un borde
+    tiene margen propio: el margen se perdía en silencio.
+  - `fit_map` no mide una tela recién montada (0 cuadros desde que se montó): daba un ajuste
+    perfecto de la pose de partida.
+  - «No arrancó» cita lo que dijo el solver en esta corrida, no en una vieja.
+  - Dos lecturas iguales de la malla no cuentan como tela quieta: en TSL la malla se relee cada
+    15 cuadros.
+- **El simulador estiraba la tela (medido y arreglado el 10-10, Samuel: «Física primero»).** Con la camisa de María
+  cosida y asentada en WebGPU, el 15-26 % del cuerpo pasa del 8 % de estiramiento con ~12 cm de
+  holgura de pecho sobre el avatar «mujer-eu38» (88 cm), así que `fit_map` y el mapa de ajuste de
+  la app dicen «no se puede poner» de una camisa holgada.
+  - No es la medida: el reposo de la malla es el patrón plano (UV × 0,1 exacto) y la tela
+    envuelta nace a 0 %.
+  - No es una costura: quitar el cuello, las mangas, los costados o los hombros deja el
+    estiramiento entre 14 y 20 %; solo sin ninguna costura baja al 2 %. Tampoco es el tirante del
+    cuerpo ni la velocidad del cierre.
+  - Es convergencia: con 15 subpasos por cuadro las restricciones «rígidas» no aguantan el peso
+    de la prenda cerrada, que cuelga de los hombros, y lo de arriba se estira. Con 30 subpasos
+    queda en 3,8 % (p95 6,9 %); con 45, en 1,6 % (p95 4,0 %), como sin coser.
+  - El precio en esta máquina, con la camisa de María: 25,3 cuadros/s con 15, 12,9 con 30 y
+    ~8,5 con 45.
+  - El mecanismo: el estiramiento, con su tope rígido del 2 %, corría al principio del subpaso;
+    costuras, autocolisión, tirante y colisión volvían a estirar después, y eso solo se corregía
+    en el subpaso siguiente.
+  - El arreglo (Samuel eligió «tres repasos»): el estiramiento se repasa tres veces en cada
+    subpaso, después del suelo y ANTES de la colisión con el cuerpo (`nodosDelSubpaso.ts`).
+    Medido: 21,7 cuadros/s, 3,7 % de aristas sobre el 8 % y p95 de 6,9 %, lo mismo que 30
+    subpasos, sin penetración.
+  - Dónde van importa. La primera versión los ponía entre la colisión y el cierre: la fricción
+    no los veía y el cierre los tomaba por empuje, y la prenda subía sola (el ruedo, de 0,836 a
+    0,864 m entre el segundo 1 y el 8). Antes de la colisión entran en la velocidad como
+    cualquier restricción y la camisa queda quieta (ruedo a 0,850-0,851 m; el área crece 0,7 %
+    en 8 s, contra 4,6 % sin repasos). Medido con el descenso largo de la réplica de María.
+  - Solo el tier GPU tiene los repasos. WASM y CPU tienen el mismo tope del 2 % (backport A7
+    STEP-4) pero no los repasos, así que ahí la tela se lee más estirada; `fit_map` lo dice en
+    su respuesta fuera de WebGPU.
+  - Validado en GPU (`@gpu-local`, versión final): pasan la caída M4, el cierre de costuras (las
+    cuatro sisas a 0,2-0,3 cm), el determinismo, el descenso largo, la demo del flujo y los
+    diagnósticos del mapa de ajuste (su prueba de paridad leía una sola vez una muestra que
+    llega después; ahora la espera). El orden de Cusick pasa, pero por azar: chiffon y canvas
+    dan 10,3 los dos (la tela no se distingue en el disco, problema anterior). El DoD de ≥30
+    cuadros/s falla en esta máquina con y sin repasos: 25,8 sin ellos, 22,5 con ellos (−13 %).
+  - `fit_map` de la camisa holgada, cada cambio por separado. El solver: las aristas sobre el
+    8 % bajan de 17,9 % a 3,7 % con los repasos (misma medida). La medida: por vértice (el
+    máximo de sus aristas) un 4 % de aristas estiradas pintaba de rojo casi toda la pieza, y
+    salía 70 % «no se puede poner»; por largo de tela y sin astillas, la prenda queda en mediana
+    0,1 %, p95 7,1 % y 3,5 % «no se puede poner». El delantero 6,2 %, la espalda 2,7 %, las
+    mangas 0,1-0,4 % y el cuello 4,7 % (la tira de punto, cosida como popelina).
+  - Prenda ajustada (10-10): la camisa de María (≈100 cm de pecho) sobre las tallas 46 y 48 de
+    la biblioteca (busto 104 y 108). Ninguna costura se abre (la media de cada una queda bajo
+    1 cm) y la penetración es 0, con y sin repasos. Sin repasos la prenda da 19-20 % «no se
+    puede poner» en todas las tallas, holgada o no: era el residuo del solver, no el ajuste. Con
+    repasos: 3,5 % (talla 38), 3,8 % (46) y 6,0 % (48); el delantero, 6,2 / 7,1 / 11,1 %. Ahora
+    el ajuste se distingue, pero poco: la popelina no pasa del tope y la prenda chica se acomoda
+    sin estirarse; que no entre es contacto con el cuerpo, y `fit_map` no lo mide.
+  - El cuello: con repasos la costura del cuello al escote se abre en un punto, hasta 3,3 cm en
+    la talla 38 y 4,5 cm en la 48 (media 0,6-0,9 cm; sin repasos, 0,9 cm como máximo). El cuello
+    mide 62 mm menos que el escote: parece una tira de punto que en la realidad estira, pero la
+    simulación viste todo con una sola tela y en GPU el estiramiento es rígido con el mismo tope
+    del 2 % para todas, así que el punto se comporta como la popelina. El arreglo de fondo es un
+    tope por tela, con la tela de cada pieza llegando al simulador.
+
 ## 6. Riesgos
 
 - **Perder alcance.** La superficie corta deja fuera nesting, BOM, colorways, render y avíos. Si
