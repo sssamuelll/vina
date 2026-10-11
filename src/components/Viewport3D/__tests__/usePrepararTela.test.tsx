@@ -42,6 +42,8 @@ const entradas = (id: string, densidad = 5): EntradasDeLaTela => ({
   densidades: { [id]: densidad },
   densidad,
 });
+/** Lo que devuelve `meshAllPieces` cuando todas mallaron: una por pieza. */
+const mallasDe = (e: EntradasDeLaTela) => e.piezas.map((p) => ({ pieceId: p.id }));
 const llamadas = () => clientes.flatMap((c) => c.meshAllPieces.mock.calls);
 const eventos = (kind: SolverEventKind) => getSolverEvents().filter((e) => e.kind === kind).map((e) => e.data);
 const montar = (inicial: EntradasDeLaTela | null) =>
@@ -86,19 +88,20 @@ describe('usePrepararTela', () => {
   });
 
   it('pulsar «Simular» (entradas → null) mientras malla no la suelta: se suelta al terminar, y avisa', async () => {
-    const { rerender } = montar(entradas('a'));
+    const e = entradas('a');
+    const { rerender } = montar(e);
     act(() => { vi.advanceTimersByTime(600); });
     const [cliente] = clientes;
 
     rerender({ e: null });
     expect(cliente.dispose, 'la simulación espera esa malla en vuelo').not.toHaveBeenCalled();
 
-    await act(async () => { cliente.terminar([]); });
+    await act(async () => { cliente.terminar(mallasDe(e)); });
     expect(cliente.dispose).toHaveBeenCalledTimes(1);
     expect(eventos('preparar:listo'), 'la que se dejó terminar sí cuenta').toHaveLength(1);
   });
 
-  it('una edición mientras malla la suelta en el acto; lo soltado no avisa y la nueva malla llega 600 ms después', async () => {
+  it('una edición mientras malla la suelta en el acto, y la nueva malla llega 600 ms después', () => {
     const { rerender } = montar(entradas('a'));
     act(() => { vi.advanceTimersByTime(600); });
     const [primero] = clientes;
@@ -107,26 +110,61 @@ describe('usePrepararTela', () => {
     rerender({ e: editadas });
     expect(primero.dispose, 'su malla ya no sirve').toHaveBeenCalledTimes(1);
 
-    // Un cliente soltado resuelve después con lo que alcanzó a mallar: no es «listo».
-    await act(async () => { primero.terminar([]); });
-    expect(eventos('preparar:listo'), 'una corrida soltada no avisa').toHaveLength(0);
-    expect(eventos('preparar:fallo')).toHaveLength(0);
-
     act(() => { vi.advanceTimersByTime(600); });
     expect(clientes).toHaveLength(2);
     expect(clientes[1].meshAllPieces).toHaveBeenCalledWith(editadas.piezas, editadas.densidades, editadas.densidad);
   });
 
-  it('al terminar avisa preparar:listo con la fase de las mallas', async () => {
-    montar(entradas('a'));
+  // Un cliente soltado resuelve después, casi siempre corto (lo que tenía en
+  // vuelo o en cola falla con «Disposed»): eso no es ni «listo» ni «fallo».
+  it.each<[string, (c: ClienteFalso, e: EntradasDeLaTela) => void]>([
+    ['resuelve con todas', (c, e) => c.terminar(mallasDe(e))],
+    ['resuelve corta', (c) => c.terminar([])],
+    ['rechaza', (c) => c.fallar(new Error('Worker crashed'))],
+  ])('una corrida soltada por una edición no avisa nada cuando %s', async (_, asentar) => {
+    const e = entradas('a');
+    const { rerender } = montar(e);
+    act(() => { vi.advanceTimersByTime(600); });
+    const [primero] = clientes;
+    rerender({ e: entradas('a', 3) });
+
+    await act(async () => { asentar(primero, e); });
+    expect(getSolverEvents()).toEqual([]);
+  });
+
+  it('desmontar mientras malla la suelta en el acto, y lo soltado no avisa', async () => {
+    const e = entradas('a');
+    const { unmount } = montar(e);
+    act(() => { vi.advanceTimersByTime(600); });
+    const [cliente] = clientes;
+
+    unmount();
+    expect(cliente.dispose).toHaveBeenCalledTimes(1);
+    await act(async () => { cliente.terminar(mallasDe(e)); });
+    expect(getSolverEvents()).toEqual([]);
+  });
+
+  it('al terminar con todas las piezas avisa preparar:listo con la fase de las mallas', async () => {
+    const e = entradas('a');
+    montar(e);
     act(() => { vi.advanceTimersByTime(600); });
 
-    await act(async () => { clientes[0].terminar([]); });
+    await act(async () => { clientes[0].terminar(mallasDe(e)); });
     expect(eventos('preparar:listo')).toEqual([expect.objectContaining({ fase: 'mallas' })]);
     expect(eventos('preparar:fallo')).toHaveLength(0);
   });
 
-  it('si falla avisa preparar:fallo con la fase y el mensaje, y no lanza', async () => {
+  it('si alguna pieza no malla (meshAllPieces la deja fuera y resuelve), avisa preparar:fallo con cuántas, no listo', async () => {
+    const dos: EntradasDeLaTela = { piezas: [pieza('a'), pieza('b')], densidades: {}, densidad: 5 };
+    montar(dos);
+    act(() => { vi.advanceTimersByTime(600); });
+
+    await act(async () => { clientes[0].terminar([{ pieceId: 'a' }]); });
+    expect(eventos('preparar:fallo')).toEqual([{ fase: 'mallas', message: '1 de 2 piezas sin malla' }]);
+    expect(eventos('preparar:listo'), 'una prenda a medias no está lista').toHaveLength(0);
+  });
+
+  it('si meshAllPieces rechaza avisa preparar:fallo con la fase y el mensaje, y no lanza', async () => {
     montar(entradas('a'));
     act(() => { vi.advanceTimersByTime(600); });
 
@@ -147,25 +185,34 @@ describe('usePrepararTela', () => {
   });
 
   it('cada preparación reemplaza el «listo» de las mallas de la anterior: en el ring queda uno', async () => {
-    const { rerender } = montar(entradas('a'));
+    const primeras = entradas('a');
+    const { rerender } = montar(primeras);
     act(() => { vi.advanceTimersByTime(600); });
-    await act(async () => { clientes[0].terminar([]); });
-    rerender({ e: entradas('a', 3) });
+    await act(async () => { clientes[0].terminar(mallasDe(primeras)); });
+    const segundas = entradas('a', 3);
+    rerender({ e: segundas });
     act(() => { vi.advanceTimersByTime(600); });
-    await act(async () => { clientes[1].terminar([]); });
+    await act(async () => { clientes[1].terminar(mallasDe(segundas)); });
 
     expect(eventos('preparar:listo'), 'una sesión larga editando no llena el ring de «listo»').toHaveLength(1);
   });
 
-  it('los fallos no se reemplazan: cada uno queda en la caja negra', async () => {
-    const { rerender } = montar(entradas('a'));
+  it('un fallo reemplaza al fallo anterior de la misma fase (la pieza que no malla falla en cada preparación); listo y fallo conviven', async () => {
+    const primeras = entradas('a');
+    const { rerender } = montar(primeras);
     act(() => { vi.advanceTimersByTime(600); });
-    await act(async () => { clientes[0].fallar(new Error('uno')); });
+    await act(async () => { clientes[0].terminar(mallasDe(primeras)); });
     rerender({ e: entradas('a', 3) });
     act(() => { vi.advanceTimersByTime(600); });
-    await act(async () => { clientes[1].fallar(new Error('dos')); });
+    await act(async () => { clientes[1].fallar(new Error('uno')); });
+    rerender({ e: entradas('a', 2) });
+    act(() => { vi.advanceTimersByTime(600); });
+    await act(async () => { clientes[2].fallar(new Error('dos')); });
 
-    expect(eventos('preparar:fallo').map((d) => d.message)).toEqual(['uno', 'dos']);
+    expect(getSolverEvents().map((e) => ({ kind: e.kind, fase: e.data.fase, message: e.data.message }))).toEqual([
+      { kind: 'preparar:listo', fase: 'mallas' },
+      { kind: 'preparar:fallo', fase: 'mallas', message: 'dos' },
+    ]);
   });
 });
 

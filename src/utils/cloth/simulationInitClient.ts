@@ -98,7 +98,15 @@ export class SimulationInitClient {
     }
   }
 
-  /** Malla fuera del hilo principal: su worker se pudo crear. Sin él, `meshPiece` malla en el hilo. */
+  /**
+   * Malla fuera del hilo principal: su worker se pudo crear. Sin él,
+   * `meshPiece` malla en el hilo.
+   * ponytail: solo ve un constructor de Worker que lanza en el acto. Un script
+   * de worker que no carga después (CSP, error de sintaxis) llega por el
+   * evento `error` del worker: aquí sigue diciendo true, el preparador lo
+   * intenta y sus piezas fallan (quedan como `preparar:fallo`). Si hace falta
+   * saberlo antes de mallar, un mensaje de ida y vuelta al worker.
+   */
   get fueraDelHilo(): boolean {
     return this.worker !== null;
   }

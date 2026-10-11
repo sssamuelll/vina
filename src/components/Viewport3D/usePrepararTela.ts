@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { PatternPiece, ViewMode } from '../../types/types';
 import type { SimulationState } from '../../store/simulationSlice';
 import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
-import { pushSolverEvent, reemplazarEventoDeLaFase } from '../../utils/cloth/solverRuntimeTracker';
+import { reemplazarEventoDeLaFase } from '../../utils/cloth/solverRuntimeTracker';
 
 export const ESPERA_PARA_PREPARAR_MS = 600;
 
@@ -46,8 +46,9 @@ export function usePrepararTela(entradas: EntradasDeLaTela | null): void {
   useEffect(() => {
     if (!entradas) return;
     let cliente: SimulationInitClient | null = null;
-    // Una corrida soltada no avisa: su cliente resuelve igual, más tarde, con lo
-    // que alcanzó a mallar, y eso no es un «listo» en la caja negra.
+    // Una corrida soltada no avisa: su cliente resuelve igual, más tarde y casi
+    // siempre corto (lo que tenía en vuelo o en cola falla con «Disposed»), y
+    // eso no es ni un «listo» ni un «fallo» en la caja negra.
     let vigente = true;
     const temporizador = setTimeout(() => {
       const t0 = performance.now();
@@ -59,11 +60,21 @@ export function usePrepararTela(entradas: EntradasDeLaTela | null): void {
         cliente.dispose();
         return;
       }
+      // Uno por kind y fase en el ring: se prepara tras cada pausa de la
+      // edición, y una pieza que no malla vuelve a fallar cada vez.
+      const avisar = (kind: 'preparar:listo' | 'preparar:fallo', data: Record<string, unknown>) => {
+        if (vigente) reemplazarEventoDeLaFase(kind, data);
+      };
+      const n = entradas.piezas.length;
       cliente.meshAllPieces(entradas.piezas, entradas.densidades, entradas.densidad)
         .then(
-          // Uno por fase en el ring: se prepara tras cada pausa de la edición.
-          () => { if (vigente) reemplazarEventoDeLaFase('preparar:listo', { fase: 'mallas', ms: Math.round(performance.now() - t0) }); },
-          (e: unknown) => { if (vigente) pushSolverEvent('preparar:fallo', { fase: 'mallas', message: e instanceof Error ? e.message : String(e) }); },
+          // Una pieza que no malla no rechaza: `meshAllPieces` la deja fuera.
+          (mallas) => {
+            const faltan = n - mallas.length;
+            if (faltan > 0) avisar('preparar:fallo', { fase: 'mallas', message: `${faltan} de ${n} piezas sin malla` });
+            else avisar('preparar:listo', { fase: 'mallas', ms: Math.round(performance.now() - t0) });
+          },
+          (e: unknown) => avisar('preparar:fallo', { fase: 'mallas', message: e instanceof Error ? e.message : String(e) }),
         )
         .finally(() => cliente?.dispose());
     }, ESPERA_PARA_PREPARAR_MS);
