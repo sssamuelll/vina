@@ -130,13 +130,11 @@ describe('#1170 — el menú no anuncia atajos que no existen', () => {
       // registro pero respeta su contexto 3D): la fila hace lo mismo que la tecla.
       'Capturar visor 3D': 'tool3d.snapshot',
       // «Iniciar simulación» NO está, y es a propósito. `sim.toggle` es un
-      // interruptor: fuera del modo de colocación, Espacio RESTABLECE
-      // (`useKeyboardShortcuts.ts`, rama else), mientras la fila solo despacha
-      // `startSimulation()`. El rótulo y la tecla no hacían lo mismo — el
-      // trinquete de arriba no podía verlo porque solo compara notación, y lo
-      // cazó la revisión adversarial. Unificarlos (¿la fila pasa a ser el
-      // interruptor y se llama «Iniciar o pausar»?) es decisión de producto y
-      // vive en #1170.
+      // interruptor: Espacio corre o PAUSA, como el botón «Simular» del margen
+      // (desde 2026-10-11; antes, fuera del modo de colocación, restablecía),
+      // mientras la fila solo despacha `startSimulation()`. Con la tela en
+      // marcha la tecla pausa y la fila no hace nada: no hacen lo mismo, y el
+      // trinquete de arriba no podría verlo porque solo compara notación.
     };
 
     const anuncios = anunciosDelMenu();
