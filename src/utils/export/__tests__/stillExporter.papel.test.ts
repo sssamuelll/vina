@@ -62,14 +62,17 @@ describe('exportStill sobre el papel', () => {
     await exportStill(renderer, scene, camera, { width: 4, height: 4, transparent: false });
     expect(llamadas).toEqual(['putImageData', 'fillStyle=#faf4e3', 'fillRect', 'drawImage']);
     expect(creados).toHaveLength(2);
-    expect(codificados).toEqual([creados[1]]);
+    // Identidad, no `toEqual`: dos canvas del mismo tamaño son «iguales» para jsdom.
+    expect(codificados).toHaveLength(1);
+    expect(codificados[0]).toBe(creados[1]);
   });
 
   it('pidiendo transparente, no toca el alfa: no hay papel y se codifica el canvas de la imagen', async () => {
     const { llamadas, creados, codificados, renderer, scene, camera } = montar();
     await exportStill(renderer, scene, camera, { width: 4, height: 4, transparent: true });
     expect(llamadas).toEqual(['putImageData']);
-    expect(codificados).toEqual([creados[0]]);
+    expect(codificados).toHaveLength(1);
+    expect(codificados[0]).toBe(creados[0]);
   });
 
   it('en JPEG también va sobre el papel: sin él, lo transparente sale negro', async () => {
