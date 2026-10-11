@@ -342,7 +342,7 @@ export default function AppShell() {
           />
         </div>
         {viewMode === 'split' && (
-          <div className="canvas-area__divider" onMouseDown={handleDividerMouseDown} />
+          <div className="canvas-area__divider" data-material="papel" onMouseDown={handleDividerMouseDown} />
         )}
         <div
           className="canvas-area__3d"

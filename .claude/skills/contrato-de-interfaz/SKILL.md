@@ -95,15 +95,26 @@ sobre el papel. No sabe dónde está. Cinco reglas:
   nombre que el ámbito redefine (`--text-muted: var(--text-tertiary)`), el
   ámbito lo vuelve a declarar; si no, baja con el valor del marco. Lo vigila
   `src/styles/__tests__/ambito-de-papel.test.ts`.
-- **Hasta su fase sigue con el overlay oscuro de `:root`** el cromo del 3D
-  (P5). Desde P4 los paneles son `chrome` a ras, entre la barra superior y la
-  línea al pie (`.context-panel`, `floating.css`). La fila dejó el
-  lienzo en P2a: sus seis interruptores viven en la barra superior, que es
-  marco, y solo su menú plegado («Mostrar») flota y es papel. La tira murió en
-  P2b: sus opciones viven en la línea al pie, que es marco, y solo su menú
-  «Más» flota y es papel. La barra de IA es papel desde P2c, y solo existe
-  convocada. El margen de herramientas lleva el ámbito desde P2a y la hoja
-  desde P2b; el escenario lo gana en P5.
+- **El 3D ya no es «hasta su fase» (P5).** El escenario es el papel de la hoja:
+  el lienzo es transparente de fábrica y `.canvas-area__3d` pinta `--canvas-2d`
+  (`scene.background` pasa por el mapeo de tonos y un `#faf4e3` sale `#e1e0da`),
+  el suelo es solo sombra, y entre la hoja y el escenario de Split hay una línea
+  de pelo (`.canvas-area__divider`, con el ámbito). Lo que se leía sobre la
+  escena bajó al marco o se hizo papel: los mapas son un menú de papel en la
+  barra superior («Mapa ▾», con «Texturizado ▾» y el interruptor del avatar en el
+  grupo de la prenda) y su escala y su tabla son papel (`LeyendaDeMapas`); el
+  estado de la simulación y la voz de la vista viven en la sección del 3D de la
+  línea al pie (`SeccionDel3D`). Desde P4 los paneles son `chrome` a ras, entre
+  la barra superior y la línea al pie (`.context-panel`, `floating.css`). La
+  fila dejó el lienzo en P2a: sus seis interruptores viven en la barra
+  superior, que es marco, y solo su menú plegado («Mostrar») flota y es papel.
+  La tira murió en P2b: sus opciones viven en la línea al pie, que es marco, y
+  solo su menú «Más» flota y es papel. La barra de IA es papel desde P2c, y solo
+  existe convocada. El margen de herramientas lleva el ámbito desde P2a y la
+  hoja desde P2b; el margen del 3D y el escenario, desde P5. **Lo único que
+  sigue en el overlay oscuro de `:root` dentro del visor** son los dos paneles
+  que se abren a petición (`RenderSettingsPanel`, `CollisionBodyPanel`) y la
+  barra de instantáneas, hasta su fase.
 
 Más una familia de **tinta**, que no es superficie: `--ink-*` es lo que se
 dibuja **sobre el papel** del lienzo 2D.
@@ -181,13 +192,19 @@ de una sola lista por concepto (`FORMAS_DE_PIQUETE`, `TIPOS_DE_COSTURA`,
   (lo mide `margen-de-herramientas.spec.ts`). Van en el flujo, al lado de la
   hoja: lo que flota encima no comparte caja con ellos y no los empuja. Con
   barras clásicas el margen crece de 44 a 47 px mientras sus herramientas no
-  caben, y la hoja se corre esos 3 px. Al abrir un panel tampoco se mueven en
-  2D desde P4: va a la derecha, a ras, y la hoja se estrecha por ese lado
-  (`emplazamiento-paneles.spec.ts`). En Split llega con P5.
+  caben, y la hoja se corre esos 3 px. Al abrir un panel tampoco se mueven,
+  en 2D desde P4 y en Split y 3D desde P5: el panel va a la derecha, a ras, y la
+  hoja se estrecha por ese lado (`emplazamiento-paneles.spec.ts`). El margen del
+  3D es la última columna de la ventana, DETRÁS de los paneles: un panel se abre
+  entre el escenario y el margen, nunca tapa ni empuja al margen
+  (`el-3d-en-papel.spec.ts`).
 - **La línea al pie es una fila de la ventana.** Marco, de lado a lado y
   siempre, con el alto de la barra superior; la hoja termina encima y nada la
   empuja. Las opciones de la herramienta viven ahí, como botones; lo que no
-  cabe pasa a «Más». Lo mide `linea-al-pie.spec.ts`.
+  cabe pasa a «Más». Con el visor a la vista lleva también la sección del 3D
+  (la voz de la vista y el estado de la simulación, P5): el patrón no baja de
+  320 px y el 3D se encoge hasta lo que mida su estado; con la vista 3D sola el
+  3D se lleva todo el pie. Lo mide `linea-al-pie.spec.ts`.
 - **La IA no existe en reposo.** Se llama con «IA», `Ctrl+/`, `Ctrl+K` o desde
   la pantalla vacía, y aparece sobre la línea al pie, en papel. Ocultarla no
   pierde la conversación ni corta al agente: viven en el store

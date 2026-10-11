@@ -120,9 +120,14 @@
   display: flex;
 }
 
+/* Entre la hoja y el escenario de Split (spec 2026-10-02 § 4.5, P5): una línea de
+   pelo sobre papel, no la franja negra de antes (la que dejaba ver lo que hay
+   detrás). Los 4 px son área de agarre y pintan el papel; lo que se ve es la
+   línea del centro. Lleva data-material="papel" (AppShell.tsx): sin el ámbito,
+   `--border-subtle` es la del marco oscuro y sobre papel no se vería. */
 .canvas-area__divider {
   width: 4px;
-  background: transparent;
+  background: var(--canvas-2d);
   cursor: col-resize;
   flex-shrink: 0;
   position: relative;
@@ -137,7 +142,7 @@
   bottom: 0;
   left: 50%;
   width: 1px;
-  background: var(--border);
+  background: var(--border-subtle);
   transition: background 0.15s ease;
 }
 .canvas-area__divider:hover {

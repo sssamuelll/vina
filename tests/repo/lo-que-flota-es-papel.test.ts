@@ -54,7 +54,8 @@ const RAICES: Array<[string, number]> = [
   // Avisos y tooltips
   ['src/components/shell/ToastContainer.tsx', 1],
   ['src/components/shell/ToolTooltip.tsx', 1],
-  ['src/components/shell/AppShell.tsx', 1],
+  // La tarjeta de «suelta tu archivo» y el divisor de Split (una línea de pelo sobre papel, P5)
+  ['src/components/shell/AppShell.tsx', 2],
   // Modales
   ['src/components/shell/ConfirmDialog.tsx', 1],
   ['src/components/PatternEditor/CalibrationModal.tsx', 1],
