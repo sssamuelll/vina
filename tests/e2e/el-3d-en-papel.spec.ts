@@ -22,7 +22,7 @@ const MARIA = { width: 1366, height: 643 };
 const PAPEL = 'rgb(250, 244, 227)';
 
 interface VentanaConStore {
-  __VINA_STORE__: { getState: () => { renderSettings: { backgroundMode: string; avatarRenderStyle: string }; simulation: { simulationState: string } } };
+  __VINA_STORE__: { getState: () => { renderSettings: { backgroundMode: string; avatarRenderStyle: string }; simulation: { simulationState: string; viewMode3D: string } } };
 }
 const render = (page: Page) =>
   page.evaluate(() => (window as unknown as VentanaConStore).__VINA_STORE__.getState().renderSettings);
@@ -177,6 +177,15 @@ test('«Mapa»: apagado antes de simular, con los cuatro mapas de siempre al sim
     return { papel: h.getAttribute('data-material'), padre: h.parentElement === document.body, encima: document.elementFromPoint(r.left + r.width / 2, r.top + 12)?.closest('.menu-de-mapas__hoja') !== null };
   });
   expect(alcanzable).toEqual({ papel: 'papel', padre: true, encima: true });
+  // Y está anclada bajo su disparador, alineada a su borde derecho: no pegada a una esquina de la ventana.
+  const ancla = await page.evaluate(() => {
+    const h = document.querySelector('.menu-de-mapas__hoja')!.getBoundingClientRect();
+    const d = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Mapa')!.getBoundingClientRect();
+    return { separacion: h.top - d.bottom, desfaseDerecho: Math.abs(h.right - d.right) };
+  });
+  expect(ancla.separacion, 'la hoja no está justo debajo de «Mapa»').toBeGreaterThanOrEqual(0);
+  expect(ancla.separacion, 'la hoja no está justo debajo de «Mapa»').toBeLessThan(12);
+  expect(ancla.desfaseDerecho, 'la hoja no se alinea con el borde derecho de «Mapa»').toBeLessThan(2);
   await page.keyboard.press('Escape');
   await expect(hoja).toHaveCount(0);
   await dispatch(page, 'simulation/resetSimulation');
@@ -197,6 +206,42 @@ test('«Capturar visor 3D» sale al menú Archivo: apagado con la vista 2D, y ya
   await abrirSubmenuDeVina(page, 'Archivo');
   await expect(item).toBeVisible({ timeout: 10_000 });
   await expect(item, 'con la vista 2D no hay visor que capturar').toHaveClass(/logo-menu__item--disabled/);
+});
+
+test('«Capturar visor 3D» saca el visor sobre el papel: la captura sale con el color de la hoja, no transparente ni oscura', async ({ page }) => {
+  // Revisión final de P5 (B-2): nada ejercía el camino menú → puente → visor → papel. Si se perdía el
+  // registro del visor, el ítem era una puerta muerta y callada; si se perdía la composición, o el lienzo
+  // dejaba de ser transparente, la captura salía sin fondo o negra, y ningún test lo veía.
+  await abrirConElPatron(page, 'Split');
+  // La descarga es un <a download> con una URL de datos: se intercepta el clic y se lee la imagen en la página.
+  await page.evaluate(() => {
+    const w = window as unknown as { __descarga?: { download: string; href: string } };
+    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) { w.__descarga = { download: this.download, href: this.href }; };
+  });
+  await abrirSubmenuDeVina(page, 'Archivo');
+  const item = page.locator('.logo-menu__submenu .logo-menu__item', { hasText: 'Capturar visor 3D' });
+  await expect(item).toBeVisible({ timeout: 10_000 });
+  await item.click();
+
+  await expect.poll(
+    () => page.evaluate(() => (window as unknown as { __descarga?: { download: string } }).__descarga?.download ?? null),
+    { message: 'el ítem no sacó ninguna captura', timeout: 10_000 },
+  ).toMatch(/^vina-visor-3d-\d+\.png$/);
+  const imagen = await page.evaluate(async () => {
+    const { href } = (window as unknown as { __descarga: { href: string } }).__descarga;
+    const img = new Image();
+    img.src = href;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(img, 0, 0);
+    return { ancho: img.naturalWidth, alto: img.naturalHeight, esquina: [...ctx.getImageData(1, 1, 1, 1).data] };
+  });
+  expect(imagen.ancho, 'la captura salió vacía').toBeGreaterThan(100);
+  expect(imagen.alto).toBeGreaterThan(100);
+  expect(imagen.esquina, 'la esquina de la captura no es el papel de la hoja (250, 244, 227)').toEqual([250, 244, 227, 255]);
 });
 
 test('el pie lleva la sección del 3D con la voz de la vista: en Split y en 3D, no en 2D', async ({ page }) => {
@@ -287,6 +332,71 @@ test('el pie reparte el ancho como dice la spec: el patrón ocupa lo que necesit
   expect(conEstado.estado!.entero, 'el estado de la simulación se recorta').toBe(true);
   expect(conEstado.frase!.recortada, 'con el estado a la vista, la frase del patrón se cortó').toBe(false);
   await dispatch(page, 'tools/setActiveTool3D', 'camera');
+});
+
+test('la voz del 3D cede recortándose: su nombre nunca se pinta sobre el estado ni fuera de la ventana', async ({ page }) => {
+  // Revisión final de P5 (A4): la caja de la voz medía 0 px, pero el nombre de la herramienta no se
+  // encogía y se desbordaba: a 1366 en Split, con Piquete y la Plancha a vapor, «Plancha a vapor» se
+  // pintaba encima de «En reposo». Se mide la caja del nombre contra la del estado, en reposo (con una
+  // herramienta sin soporte, que es cuando el estado se ve) y con la simulación en marcha.
+  await abrirConElPatron(page, 'Split');
+  const comprobar = async (donde: string) => {
+    const m = await page.evaluate(() => {
+      const r = (s: string) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { left: b.left, right: b.right }; };
+      return { quien: r('.seccion-del-3d__quien'), voz: r('.seccion-del-3d__voz'), estado: r('.seccion-del-3d__boton'), ventana: window.innerWidth };
+    });
+    expect(m.estado, `${donde}: no hay estado`).not.toBeNull();
+    expect(m.quien, `${donde}: no hay nombre`).not.toBeNull();
+    expect(m.quien!.right, `${donde}: el nombre se desborda de su voz`).toBeLessThanOrEqual(m.voz!.right + 1);
+    expect(m.quien!.right, `${donde}: el nombre se pinta sobre el estado`).toBeLessThanOrEqual(m.estado!.left + 1);
+    expect(m.quien!.right, `${donde}: el nombre se sale de la ventana`).toBeLessThanOrEqual(m.ventana);
+  };
+  for (const herramientaDelMargen of ['Piquete', 'Línea interna']) {
+    await page.locator(`nav.margen:not(.margen--derecho) .dock__tool[aria-label^="${herramientaDelMargen}"]`).first().click();
+    for (const tool3D of ['steamBrush', 'meshGrab']) {
+      await dispatch(page, 'tools/setActiveTool3D', tool3D);
+      await expect(page.getByRole('button', { name: 'Estado de la simulación' })).toBeVisible();
+      await page.waitForTimeout(250);
+      await comprobar(`${herramientaDelMargen} + ${tool3D} en reposo`);
+    }
+    await dispatch(page, 'simulation/startSimulation');
+    for (const tool3D of ['pin', 'arrangement', 'steamBrush', 'meshGrab']) {
+      await dispatch(page, 'tools/setActiveTool3D', tool3D);
+      await expect(page.getByRole('button', { name: 'Estado de la simulación' })).toBeVisible();
+      await page.waitForTimeout(250);
+      await comprobar(`${herramientaDelMargen} + ${tool3D} simulando`);
+    }
+    await dispatch(page, 'simulation/resetSimulation');
+    await dispatch(page, 'tools/setActiveTool3D', 'camera');
+  }
+});
+
+test('tras elegir con el ratón en «Mapa» o en «Texturizado», Espacio sigue siendo el atajo de la simulación', async ({ page }) => {
+  // Revisión final de P5 (B-1): el menú devolvía el foco a su disparador tras CUALQUIER clic. El grupo de la
+  // prenda es una botonera, así que Espacio pasaba a ser «del botón»: reabría el menú y el atajo no llegaba.
+  // `sim.toggle` (Espacio) NO pausa: con el visor en «colocar» arranca la simulación y, ya arrancada, la
+  // devuelve a reposo. Que llegó se lee en `viewMode3D` ('arrange' → 'simulate') y en el paso a reposo.
+  await abrirConElPatron(page, 'Split');
+  const sim = () => page.evaluate(() => {
+    const s = (window as unknown as VentanaConStore).__VINA_STORE__.getState().simulation;
+    return { estado: s.simulationState, modo: s.viewMode3D };
+  });
+  await dispatch(page, 'simulation/startSimulation');
+  await expect.poll(sim).toEqual({ estado: 'running', modo: 'arrange' });
+
+  await page.getByRole('button', { name: 'Mapa', exact: true }).click();
+  await page.locator('button[title="Mapa de tensión (Alt+6)"]').click();
+  await expect(page.locator('.menu-de-mapas__hoja')).toHaveCount(0);
+  expect(await page.evaluate(() => document.activeElement?.closest('[data-botonera]') != null), 'el menú dejó el foco en un botón de la barra').toBe(false);
+  await page.keyboard.press('Space');
+  await expect.poll(sim, { message: 'Espacio no llegó al atajo de la simulación tras elegir un mapa con el ratón' }).toMatchObject({ modo: 'simulate' });
+
+  await page.getByRole('button', { name: /^Modo de superficie:/ }).click();
+  await page.getByRole('button', { name: 'Plano', exact: true }).click();
+  await expect(page.locator('.surface-pill__flyout')).toHaveCount(0);
+  expect(await page.evaluate(() => document.activeElement?.closest('[data-botonera]') != null), 'el menú dejó el foco en un botón de la barra').toBe(false);
+  await page.keyboard.press('Space');
+  await expect.poll(sim, { message: 'Espacio no llegó al atajo de la simulación tras elegir un modo de superficie con el ratón' }).toEqual({ estado: 'idle', modo: 'arrange' });
 });
 
 test('a 1000 px el estado de la simulación sigue entero y la frase del patrón conserva 200 px', async ({ page }) => {
