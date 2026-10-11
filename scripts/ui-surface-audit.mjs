@@ -1063,10 +1063,11 @@ async function collectCensus() {
   });
 }
 
+// Desde P5 el margen del 3D también es `nav.margen`: el dock izquierdo es el que no lleva `--derecho`.
 async function enumerateLeftDockTools() {
   activeStateName = 'enumeración dinámica del dock izquierdo';
   await prepareLoadedBase();
-  return page.locator('nav.margen button.dock__tool').evaluateAll((buttons) => buttons
+  return page.locator('nav.margen:not(.margen--derecho) button.dock__tool').evaluateAll((buttons) => buttons
     .filter((button) => {
       const rect = button.getBoundingClientRect();
       const style = getComputedStyle(button);
@@ -1081,11 +1082,11 @@ async function enumerateLeftDockTools() {
 }
 
 async function clickDockTool(tool) {
-  const button = page.locator('nav.margen').getByRole('button', { name: tool.nombre, exact: true }).first();
+  const button = page.locator('nav.margen:not(.margen--derecho)').getByRole('button', { name: tool.nombre, exact: true }).first();
   await button.click();
   if (tool.tieneAriaPressed) {
     await page.waitForFunction((name) => {
-      const candidates = [...document.querySelectorAll('nav.margen button.dock__tool')];
+      const candidates = [...document.querySelectorAll('nav.margen:not(.margen--derecho) button.dock__tool')];
       const target = candidates.find((item) => (
         (item.getAttribute('aria-label') || item.getAttribute('title') || item.textContent || '').replace(/\s+/g, ' ').trim() === name
       ));

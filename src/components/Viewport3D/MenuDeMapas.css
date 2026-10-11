@@ -50,7 +50,7 @@
 .menu-de-mapas__elemento:disabled { color: var(--text-disabled); cursor: default; background: transparent; }
 
 /* El mapa puesto lleva relleno: lleva texto encima, así que el paso fuerte del
-   acento (blanco a 6,29:1) y su hover (4,65:1). */
+   acento (blanco a 5,05:1) y su hover (4,65:1). */
 .menu-de-mapas__elemento--activo,
 .menu-de-mapas__elemento--activo:hover,
 .menu-de-mapas__elemento--activo:focus-visible { background: var(--accent-fuerte); color: var(--on-accent); }

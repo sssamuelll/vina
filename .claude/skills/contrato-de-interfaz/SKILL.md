@@ -112,9 +112,12 @@ sobre el papel. No sabe dónde está. Cinco reglas:
   solo su menú «Más» flota y es papel. La barra de IA es papel desde P2c, y solo
   existe convocada. El margen de herramientas lleva el ámbito desde P2a y la
   hoja desde P2b; el margen del 3D y el escenario, desde P5. **Lo único que
-  sigue en el overlay oscuro de `:root` dentro del visor** son los dos paneles
-  que se abren a petición (`RenderSettingsPanel`, `CollisionBodyPanel`) y la
-  barra de instantáneas, hasta su fase.
+  sigue en el overlay oscuro de `:root` dentro del visor** son dos paneles y la
+  barra de instantáneas, hasta su fase: `RenderSettingsPanel` (se abre desde
+  Archivo ▸ Exportar 3D, la paleta y «Ajustes del mapa…») y `CollisionBodyPanel`,
+  que hoy NO tiene puerta en el shell —su botón «CC» solo se pinta con
+  `!hideChrome` y `AppShell` monta el visor con `hideChrome`—: es previo a P5 y
+  rompe la ley de puertas (§ 6); P6 tiene que darle una o retirarlo.
 
 Más una familia de **tinta**, que no es superficie: `--ink-*` es lo que se
 dibuja **sobre el papel** del lienzo 2D.
@@ -204,7 +207,8 @@ de una sola lista por concepto (`FORMAS_DE_PIQUETE`, `TIPOS_DE_COSTURA`,
   cabe pasa a «Más». Con el visor a la vista lleva también la sección del 3D
   (la voz de la vista y el estado de la simulación, P5): el patrón no baja de
   320 px y el 3D se encoge hasta lo que mida su estado; con la vista 3D sola el
-  3D se lleva todo el pie. Lo mide `linea-al-pie.spec.ts`.
+  3D se lleva todo el pie. Lo miden `linea-al-pie.spec.ts` (el patrón) y
+  `el-3d-en-papel.spec.ts` (el reparto con el 3D).
 - **La IA no existe en reposo.** Se llama con «IA», `Ctrl+/`, `Ctrl+K` o desde
   la pantalla vacía, y aparece sobre la línea al pie, en papel. Ocultarla no
   pierde la conversación ni corta al agente: viven en el store

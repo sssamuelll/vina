@@ -767,8 +767,9 @@ tres vistas, desde P2).
 
 **Quién puede ser `ambiente`.** Lista cerrada: la barra superior, los dos márgenes y la línea al
 pie. La fija `tests/repo/superficies-declaradas.test.ts`, archivo por archivo. El vocabulario gana
-`pie` (las opciones de la línea al pie, que cuentan cuando aparecen) y pierde `tira`, `fila`,
-`mapas` e `indicador-simulacion`. La frase es `pista`; la marca de escala, `documento`; las
+`pie` (las opciones de la línea al pie, que cuentan cuando aparecen) y, con P5, `leyenda` (la
+escala, la tabla y el valor de los mapas sobre el visor); y pierde `tira`, `fila`, `mapas`,
+`indicador-simulacion` e `indicador-fps`. La frase es `pista`; la marca de escala, `documento`; las
 etiquetas de opción, parte de `cabina`.
 
 **Dónde bloquean.** `scripts/deploy-prod.sh` hoy no corre ninguno de los tres: su lista e2e
