@@ -93,20 +93,35 @@ h2 { margin-top: 10px; font-size: 32px; line-height: 1.1; font-weight: 500; lett
 h3 { font-size: 20px; line-height: 1.2; font-weight: 500; letter-spacing: -0.01em; }
 .cols p { margin-top: 8px; font-size: 15px; color: var(--tinta-70); }
 
-/* Formatos */
+/* Filas con rótulo (formatos y copiloto) y la banda hundida (la oferta) */
 .formatos { background: var(--papel-hundido); }
-.fila { margin-top: 36px; display: grid; grid-template-columns: 120px 1fr; column-gap: 24px; padding: 18px 0; border-top: 1px solid var(--hairline); font-size: 14px; }
+.filas { margin-top: 40px; }
+.fila { display: grid; grid-template-columns: 120px 1fr; column-gap: 24px; padding: 18px 0; border-top: 1px solid var(--hairline); font-size: 14px; }
 .fila:last-child { border-bottom: 1px solid var(--hairline); }
 .fila dt { font-weight: 500; color: var(--tinta); }
 .fila dd { margin: 0; color: var(--tinta-70); }
+.fila dd.prosa { font-size: 15px; max-width: 640px; }
+.fig-ajuste { margin-top: 56px; }
 
-/* Código (sección oscura) */
-.cierre { background: var(--tinta); color: var(--papel); }
-.cierre .eyebrow, .cierre .intro { color: var(--papel-60); }
+/* Listas con línea de pelo: lo que falta y el diario. El enlace va a la derecha,
+ * en mono y en señal; en móvil se apila bajo la frase. */
+.rotulo-lista { margin-top: 40px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--tinta-70); font-weight: 500; }
+.lista { margin-top: 20px; list-style: none; border-top: 1px solid var(--hairline); max-width: 860px; }
+.lista li { display: grid; grid-template-columns: 1fr auto; column-gap: 24px; align-items: baseline; padding: 16px 0; border-bottom: 1px solid var(--hairline); font-size: 16px; }
+.lista a { display: inline-flex; align-items: center; min-height: 24px; font-size: 13px; color: var(--senal-texto); }
+.lista a:focus-visible, .lista a:hover { color: var(--tinta); }
+.diario li { grid-template-columns: 104px 1fr auto; }
+.fecha { font-size: 13px; color: var(--tinta-70); }
+#making .lista { margin-top: 36px; }
+#send .meta { margin-top: 18px; }
+
+/* Cierre (sección oscura): el repo y las dos puertas al código */
+.cierre { background: var(--tinta); color: var(--papel); padding: 56px 0; }
 .cierre .btn-primario { background: var(--papel); color: var(--tinta); }
 .cierre .btn-contorno { border-color: color-mix(in srgb, var(--papel) 35%, transparent); color: var(--papel); }
-.repo { margin-top: 40px; font-size: 13px; color: var(--papel-60); }
+.repo { font-size: 13px; color: var(--papel-60); }
 .repo em { font-style: normal; color: var(--papel); background: color-mix(in srgb, var(--oro) 18%, transparent); padding: 2px 6px; }
+.cierre .cta { margin-top: 22px; }
 
 /* Pie */
 .pie { border-top: 1px solid var(--hairline); padding: 28px 0; font-size: 13px; line-height: 1.45; color: var(--tinta-70); }
@@ -144,7 +159,9 @@ h3 { font-size: 20px; line-height: 1.2; font-weight: 500; letter-spacing: -0.01e
 /* Móvil: una columna (la de arriba), más baja. */
 @media (max-width: 720px) {
   .wrap { width: min(1280px, 100% - 32px); }
-  nav a:not(.pill) { display: none; }
+  nav a:not(.pill):not(.idioma) { display: none; }
+  .lista li, .diario li { grid-template-columns: 1fr; row-gap: 6px; }
+  .fig-ajuste { margin-top: 40px; }
   .hero .wrap { padding-top: 32px; }
   .hero-patron { height: 420px; }
   .hero-visor { height: 240px; }
