@@ -169,11 +169,23 @@
    sección del patrón la pinta PatternEditor por portal en su ranura
    (SeccionDelPatron.css); la del 3D es un hijo directo (SeccionDel3D.css).
 
-   Cómo se reparten el ancho (P5): el patrón se queda con lo que sobra y no baja
-   de 320 px, porque es quien tiene las opciones de la herramienta; el 3D se
-   encoge hasta lo que mida su estado (la frase cede primero, con puntos
-   suspensivos). Con la vista 3D sola la ranura del patrón se esconde y el 3D se
-   lleva todo el pie, sin la línea de pelo que lo separaba del patrón. */
+   Cómo se reparte el ancho (spec § 5.3, P5): la herramienta del patrón ocupa lo
+   que necesita; la sección del 3D, lo que sobra, y es la primera que se recorta.
+   La ranura del patrón mide lo que mide su contenido (`flex: 0 1 auto`: la frase
+   entera y las opciones que caben) y solo se encoge si no hay sitio, hasta 320 px;
+   la del 3D crece a todo lo demás (`flex: 1 100 auto`) y es la que se encoge casi
+   todo: su voz cede hasta desaparecer (SeccionDel3D.css) y lo único que no cede es
+   su estado, que le pone el mínimo (`min-width: auto`). Con 12 herramientas del
+   margen en Split a 1366 px las doce frases caben enteras (medido con el
+   navegador); a 1000 px el estado sigue entero y la frase del patrón conserva
+   sus 200 px (e2e). Con la vista 3D sola la ranura del patrón se esconde y el 3D
+   se lleva todo el pie, sin la línea de pelo que lo separaba del patrón.
+
+   Por qué el patrón puede medir lo que su contenido: la medida que decide cuántas
+   opciones se pliegan en «Más» (`useCuantasCaben`) sale del ancho de la sección,
+   y la frase cuenta entera en su tamaño natural, así que plegar opciones no la
+   encoge por debajo de lo que el espacio da: el reparto es estable (medido sin
+   oscilaciones, tres muestras por herramienta). */
 .linea-al-pie {
   height: var(--top-bar-h);
   flex-shrink: 0;
@@ -182,11 +194,11 @@
   border-top: 1px solid var(--border);
   color: var(--text-primary);
 }
-.linea-al-pie__patron { flex: 1 1 0; min-width: 320px; display: flex; }
+.linea-al-pie__patron { flex: 0 1 auto; min-width: 320px; display: flex; }
 .linea-al-pie__patron[hidden] { display: none; }
 .linea-al-pie__3d {
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: 1 100 auto;
+  min-width: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;

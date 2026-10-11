@@ -241,6 +241,54 @@ test('el pie lleva la sección del 3D con la voz de la vista: en Split y en 3D, 
   expect(await page.locator('.seccion-del-patron').count(), '2D: falta la sección del patrón').toBe(1);
 });
 
+test('el pie reparte el ancho como dice la spec: el patrón ocupa lo que necesita y la voz del 3D es lo primero que se recorta', async ({ page }) => {
+  // Spec § 5.3: «la herramienta del patrón ocupa lo que necesita; la sección del 3D, lo que
+  // sobra, y es la primera que se recorta». Con el reparto del plan (el patrón se quedaba con
+  // lo que sobraba del 3D) la frase de Línea interna y la de Margen de costura se cortaban en
+  // Split a 1366: la pista «entera en una línea» de P2b (`linea-al-pie`, F2, `las-siete-puertas`).
+  await abrirConElPatron(page, 'Split');
+  const medir = () => page.evaluate(() => {
+    const frase = document.querySelector<HTMLElement>('.seccion-del-patron__texto');
+    const voz = document.querySelector<HTMLElement>('.seccion-del-3d__texto');
+    const boton = document.querySelector<HTMLElement>('.seccion-del-3d__boton');
+    const tres = document.querySelector<HTMLElement>('.linea-al-pie__3d')!.getBoundingClientRect();
+    return {
+      frase: frase ? { recortada: frase.scrollWidth > frase.clientWidth + 1, ancho: frase.clientWidth } : null,
+      voz: voz ? { recortada: voz.scrollWidth > voz.clientWidth + 1 } : null,
+      estado: boton ? { entero: boton.getBoundingClientRect().right <= window.innerWidth && boton.scrollWidth <= boton.clientWidth + 1 } : null,
+      tresAncho: tres.width, tresDerecha: tres.right, ventana: window.innerWidth,
+    };
+  });
+
+  // Con una frase corta sobra sitio: la voz del 3D se lee entera.
+  const corta = await medir();
+  expect(corta.frase!.recortada, 'Seleccionar: la frase del patrón se cortó').toBe(false);
+  expect(corta.voz!.recortada, 'Seleccionar: sobra sitio y la voz del 3D se cortó').toBe(false);
+
+  // Con la más larga (Línea interna, 1166 px con sus opciones) la voz cede y la frase queda entera.
+  await page.locator('nav.margen .dock__tool[aria-label^="Línea interna"]').first().click();
+  await page.waitForTimeout(500);
+  const larga = await medir();
+  expect(larga.frase!.recortada, 'Línea interna: la frase del patrón se cortó mientras la voz del 3D tenía sitio').toBe(false);
+  expect(larga.voz!.recortada, 'Línea interna: la voz del 3D debía ceder primero').toBe(true);
+  expect(Math.round(larga.tresDerecha), 'la sección del 3D no llega al borde').toBe(MARIA.width);
+
+  // Margen de costura: la otra frase larga, que quedaba a 2 px de caber.
+  await page.locator('nav.margen .dock__tool[aria-label^="Margen de costura"]').first().click();
+  await page.waitForTimeout(500);
+  expect((await medir()).frase!.recortada, 'Margen de costura: la frase del patrón se cortó').toBe(false);
+
+  // Con el estado a la vista el estado no cede nunca, y la frase del patrón sigue entera.
+  await page.locator('nav.margen .dock__tool[aria-label^="Línea interna"]').first().click();
+  await dispatch(page, 'tools/setActiveTool3D', 'steamBrush');
+  await expect(page.getByRole('button', { name: 'Estado de la simulación' })).toBeVisible();
+  await page.waitForTimeout(400);
+  const conEstado = await medir();
+  expect(conEstado.estado!.entero, 'el estado de la simulación se recorta').toBe(true);
+  expect(conEstado.frase!.recortada, 'con el estado a la vista, la frase del patrón se cortó').toBe(false);
+  await dispatch(page, 'tools/setActiveTool3D', 'camera');
+});
+
 test('a 1000 px el estado de la simulación sigue entero y la frase del patrón conserva 200 px', async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 643 });
   await abrirAppVacia(page);

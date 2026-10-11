@@ -4,8 +4,13 @@
    están en layout.css. Vive en el marco: tinta clara de `:root` sobre
    --bg-deeper. El detalle del estado cuelga de <body> y es papel. */
 
-/* La voz: nombre, tecla y frase, en el orden de la sección del patrón. */
-.seccion-del-3d__voz { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; column-gap: 12px; font-size: var(--text-sm); }
+/* La voz: nombre, tecla y frase, en el orden de la sección del patrón. Es lo
+   PRIMERO que se recorta (spec § 5.3): `width: 0` hace que su ancho natural no
+   cuente para el tamaño de la sección (la sección mide lo que su estado y sus
+   márgenes, y crece a lo que sobra), y `flex: 1 1 0` le da todo lo que haya. Sin
+   el `width: 0`, la voz entera (311 px) sería el mínimo de la sección y le
+   quitaría el ancho a la frase del patrón. */
+.seccion-del-3d__voz { flex: 1 1 0; min-width: 0; width: 0; display: flex; align-items: center; column-gap: 12px; font-size: var(--text-sm); }
 .seccion-del-3d__quien { flex: none; display: flex; align-items: center; gap: 6px; }
 .seccion-del-3d__nombre { color: var(--text-primary); font-size: var(--text-ui); font-weight: var(--weight-semibold); white-space: nowrap; }
 .seccion-del-3d__tecla { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-tertiary); }

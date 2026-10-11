@@ -110,3 +110,39 @@ describe('entre las dos vistas de Split hay una línea de pelo sobre papel', () 
     expect(regla(css, '.canvas-area__divider:hover::after')).toContain('background: var(--accent)');
   });
 });
+
+// Spec § 5.3: «la herramienta del patrón ocupa lo que necesita; la sección del 3D, lo que
+// sobra, y es la primera que se recorta». El reparto del plan (`.linea-al-pie__patron
+// { flex: 1 1 0 }`: el patrón se queda con lo que SOBRA del 3D) cortaba la frase de Línea
+// interna y la de Margen de costura en Split a 1366 y tumbaba cinco casos de e2e de P2b
+// («la frase entera en una línea»). Lo que se mide está en `el-3d-en-papel.spec.ts` y en
+// `linea-al-pie.spec.ts`; esto fija la decisión para que nadie vuelva al reparto de antes.
+describe('el pie reparte el ancho: el patrón ocupa lo que necesita y la sección del 3D, lo que sobra', () => {
+  const layout = lee('src/styles/layout.css');
+  const seccion = lee('src/components/shell/SeccionDel3D.css');
+
+  it('la ranura del patrón mide lo que su contenido y solo se encoge si no hay sitio', () => {
+    const r = regla(layout, '.linea-al-pie__patron');
+    expect(r).toContain('flex: 0 1 auto');
+    expect(r, 'sin mínimo la ranura se iría a cero').toContain('min-width: 320px');
+  });
+
+  it('la sección del 3D crece a lo que sobra y es la que cede casi todo, pero no por debajo de su estado', () => {
+    const r = regla(layout, '.linea-al-pie__3d');
+    expect(r).toContain('flex: 1 100 auto');
+    expect(r, 'con `min-width: 0` el estado se saldría de su caja al cederla').toContain('min-width: auto');
+  });
+
+  it('con la vista 3D sola el 3D ocupa todo el pie, sin la línea de pelo del patrón', () => {
+    const r = regla(layout, '.linea-al-pie--3d-solo .linea-al-pie__3d');
+    expect(r).toContain('flex: 1 1 auto');
+    expect(r).toContain('border-left: 0');
+  });
+
+  it('la voz del 3D no cuenta para el tamaño de la sección: es lo primero que se recorta', () => {
+    const r = regla(seccion, '.seccion-del-3d__voz');
+    expect(r, 'sin `width: 0` la voz entera sería el mínimo de la sección').toContain('width: 0');
+    expect(r).toContain('flex: 1 1 0');
+    expect(r).toContain('min-width: 0');
+  });
+});

@@ -68,7 +68,7 @@ src/
 │   │   ├── CollisionBodyPanel.tsx  # Collision body management UI
 │   │   └── SnapshotBar.tsx         # A/B/C drape comparison
 │   ├── DisplayBar2D/      # 2D context toolbar
-│   ├── shell/             # AppShell + UnifiedBar (chat/commands/settings) + TopBar + LeftDock/RightDock (DockShell — 2D & 3D side docks) + ContextPanel
+│   ├── shell/             # AppShell + UnifiedBar (chat/commands/settings) + TopBar + LeftDock/RightDock (los márgenes de herramientas del 2D y del 3D, columnas pegadas al borde) + GrupoDeLaPrenda + SeccionDel3D (la línea al pie) + ContextPanel
 │   ├── Toolbar2D/         # 2D tool palette
 │   ├── Toolbar3D/         # 3D tool palette
 │   └── Workspace/         # Synchronized 2D/3D state management

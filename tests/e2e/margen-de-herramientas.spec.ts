@@ -92,7 +92,7 @@ test('con el catálogo entero: la barra se ve, ningún botón queda recortado y 
   expect(recortados, 'botones recortados por la barra de desplazamiento').toEqual([]);
 
   // Abajo del todo, Pliegue; con Z se vuelve a Seleccionar, que está arriba.
-  const margen = page.locator('nav.margen');
+  const margen = page.locator('nav.margen:not(.margen--derecho)');
   await margen.evaluate((el) => { el.scrollTop = el.scrollHeight; });
   await page.getByRole('button', { name: 'Pliegue', exact: true }).click();
   await page.locator('svg.pattern-svg').hover({ position: { x: 400, y: 300 } });
@@ -111,7 +111,7 @@ test('la activa que no está en el margen aparece al final, marcada, y se va al 
   await cargarDxfDeMaria(page);
   await page.locator('svg.pattern-svg').hover({ position: { x: 400, y: 300 } });
   await page.keyboard.press('Shift+G');
-  const hilo = page.locator('nav.margen').getByRole('button', { name: /^Hilo/ });
+  const hilo = page.locator('nav.margen:not(.margen--derecho)').getByRole('button', { name: /^Hilo/ });
   await expect(hilo).toHaveAttribute('aria-pressed', 'true');
   // Que se vea de verdad: lo de arriba en su centro es el propio botón.
   const encima = await hilo.evaluate((el) => {
@@ -120,5 +120,5 @@ test('la activa que no está en el margen aparece al final, marcada, y se va al 
   });
   expect(encima, 'la marca de la activa está tapada').toBe(true);
   await page.keyboard.press('z');
-  await expect(page.locator('nav.margen').getByRole('button', { name: /^Hilo/ })).toHaveCount(0);
+  await expect(page.locator('nav.margen:not(.margen--derecho)').getByRole('button', { name: /^Hilo/ })).toHaveCount(0);
 });
