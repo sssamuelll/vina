@@ -348,7 +348,6 @@ export default function AppShell() {
           data-shortcut-context="3d"
           style={{ flex: `${get3dFlexGrow()} 1 0px`, display: viewMode === '2d' ? 'none' : undefined }}
         >
-          <RightDock onOpenPanel={togglePanel} />
           <Viewport3DErrorBoundary>
             <Viewport3D activeTool3D={activeTool3D as Tool3D} hideChrome />
           </Viewport3DErrorBoundary>
@@ -356,12 +355,16 @@ export default function AppShell() {
         {/* Los paneles (spec 2026-10-02 § 6.1): a la derecha y a ras, detrás
             del 3D, así que la hoja se estrecha por la derecha y las
             herramientas no se mueven. El primero de la lista va pegado al
-            borde de la ventana: se pintan al revés. */}
+            borde de la ventana (o del margen del 3D): se pintan al revés. */}
         {[...paneles].reverse().map((nombre) => (
           <ContextPanel key={nombre} title={PANEL_LABELS[nombre] ?? nombre} onClose={() => closePanel(nombre)}>
             {renderPanelContent(nombre, () => closePanel(nombre))}
           </ContextPanel>
         ))}
+        {/* El margen del 3D (§ 4.3): una columna pegada al borde derecho de la
+            ventana, DETRÁS de los paneles. Un panel se abre entre el escenario
+            y él, y el margen no se mueve. En 2D no se pinta. */}
+        <RightDock onOpenPanel={togglePanel} />
       </div>
       {/* La línea al pie (spec 2026-10-02 § 5.3): la tercera fila de la
           ventana. Marco, de lado a lado y siempre; la sección del patrón la

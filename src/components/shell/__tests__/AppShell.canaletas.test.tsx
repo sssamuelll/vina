@@ -57,6 +57,14 @@ describe('los paneles van a la derecha (spec 2026-10-02 § 6.1)', () => {
     expect(src).not.toMatch(/leftPanel/);
   });
 
+  it('el margen del 3D va detrás de los paneles y fuera de canvas-area__3d: el panel se abre entre el escenario y el margen, y el margen no se mueve', () => {
+    const idx3d = src.indexOf('className="canvas-area__3d"');
+    const idxPaneles = src.indexOf('[...paneles].reverse().map(');
+    const idxMargen = src.indexOf('<RightDock');
+    expect(idxMargen).toBeGreaterThan(idxPaneles);
+    expect(src.slice(idx3d, idxPaneles), 'RightDock sigue dentro del área del 3D').not.toContain('<RightDock');
+  });
+
   it('los paneles se pintan después de canvas-area__3d, el primero de la lista al final', () => {
     const idx3d = src.indexOf('className="canvas-area__3d"');
     const idxPaneles = src.indexOf('[...paneles].reverse().map(');

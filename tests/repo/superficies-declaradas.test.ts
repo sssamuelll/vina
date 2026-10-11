@@ -21,8 +21,10 @@ export const VOCABULARIO = new Set([
 const MARCAS: Array<[string, string, number]> = [
   ['src/components/shell/TopBar.tsx', 'ambiente', 1],
   ['src/components/shell/TopBar.tsx', 'dev', 1],
-  ['src/components/shell/DockShell.tsx', 'ambiente', 1],
   ['src/components/shell/Dock.tsx', 'ambiente', 1],
+  // El margen del 3D (spec 2026-10-02 § 4.3, P5): el segundo de los dos márgenes
+  // de la lista cerrada de `ambiente`. Desde P5 el dock flotante (DockShell) no existe.
+  ['src/components/shell/RightDock.tsx', 'ambiente', 1],
   // La línea al pie (spec 2026-10-02 § 5.3): marco. Lo que aparece en ella
   // son las opciones (`pie`) y la frase (`pista`), que pinta la sección del
   // patrón por portal.
@@ -68,7 +70,6 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/shell/AppShell.tsx', 'velo', 1],
   ['src/components/PatternEditor/EmptyState2D.tsx', 'estado-vacio', 1],
   ['src/components/Viewport3D/SimulationStatusOverlay.tsx', 'indicador-simulacion', 1],
-  ['src/components/shell/RightDock.tsx', 'indicador-fps', 1],
   ['src/components/Viewport3D/SnapshotBar.tsx', 'instantaneas', 1],
 ];
 

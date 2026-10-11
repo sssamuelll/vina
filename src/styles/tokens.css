@@ -258,6 +258,9 @@
    * Ley de emplazamiento (§ 5.2 del informe 2026-08-14): nada de z-index
    * literal. El orden es de URGENCIA, no de antigüedad. Lo fija
    * zIndexScale.test.ts, escalón por escalón. */
+  /* Sin consumidor desde P5: el margen del 3D es una columna en el flujo, como
+   * el del patrón, y ya no un dock flotante. Se queda porque la escala es un
+   * mapa de ROLES (lo mismo que --z-panel, aquí abajo). */
   --z-dock: 5;
   /* Sin consumidor desde que los paneles son hijos flex de .canvas-area
    * (60643b35); se queda porque la escala es un mapa de ROLES. */
