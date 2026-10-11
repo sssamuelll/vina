@@ -91,6 +91,8 @@ const PINTA: Array<[string, string[] | '*']> = [
   // El menú «Mapa» (la hoja, sus elementos y sus ajustes) y la leyenda de los mapas (P5)
   ['src/components/Viewport3D/MenuDeMapas.css', '*'],
   ['src/components/Viewport3D/LeyendaDeMapas.css', '*'],
+  // El detalle del estado de la simulación, que se abre desde la línea al pie (P5)
+  ['src/components/shell/SeccionDel3D.css', ['.seccion-del-3d__detalle', '.seccion-del-3d__linea']],
   // Avisos y tooltips
   ['src/components/shell/ToastContainer.css', '*'],
   ['src/components/shell/ToolTooltip.css', '*'],
@@ -106,7 +108,7 @@ const PINTA: Array<[string, string[] | '*']> = [
 ];
 
 const FONDO_DEL_MARCO = /var\(--(bg-surface|bg-base|bg-deeper|bg-primary|panel-bg|surface-chrome-bg)\)/;
-const COLOR_A_MANO = /#[0-9a-fA-F]{3,8}\b|\brgba?\(\s*\d/;
+const COLOR_A_MANO = /#[0-9a-fA-F]{3,8}\b|\brgba?\(\s*\d|(?<![-\w])(?:color|background(?:-color)?|border(?:-color)?|fill|stroke)\s*:\s*(?:white|black)\b/i;
 const ACENTO_COMO_TINTA = /(?<![-\w])color:\s*['"]?var\(--accent\)/;
 
 /** Las reglas de lo que flota en una hoja; en un componente o con '*', sus líneas. */

@@ -426,3 +426,66 @@ describe('SeccionDel3D no trae el material oscuro ni los colores sueltos de ante
     }
   });
 });
+
+describe('SeccionDel3D ▸ lo que el pie no debe decir ni hacer', () => {
+  it('en reposo con el motor de la corrida anterior, el estado no nombra ese motor', () => {
+    act(() => { store.dispatch(setSolverTier('wasm')); store.dispatch(setActiveTool3D('steamBrush')); });
+    montar();
+    expect(estado()!.textContent).toContain('En reposo');
+    expect(estado()!.textContent).not.toContain('WASM');
+  });
+
+  it('un clic en cualquier sitio suelta el foco de teclado de un botón del pie', () => {
+    simulando({ ms: 16.7 });
+    montar();
+    estado()!.focus();
+    expect(document.activeElement).toBe(estado());
+    fireEvent.mouseDown(document.body);
+    expect(document.activeElement).not.toBe(estado());
+  });
+
+  it('la frase de Fijar anuncia la tecla REASIGNADA de quitar todas', () => {
+    localStorage.setItem('vina-shortcut-overrides', JSON.stringify({ 'tool3d.clearPins': { key: 'k', ctrl: true, shift: true } }));
+    try {
+      act(() => { store.dispatch(setActiveTool3D('pin')); });
+      montar();
+      expect(screen.getByText(/\+K quita todas$/)).toBeTruthy();
+    } finally {
+      localStorage.removeItem('vina-shortcut-overrides');
+    }
+  });
+
+  it('con la pose abierta no se enseña la tecla de la herramienta de debajo', () => {
+    act(() => { store.dispatch(setActiveTool3D('pin')); store.dispatch(togglePoseEditor()); });
+    const { container } = montar();
+    expect(container.querySelector('.seccion-del-3d__tecla')).toBeNull();
+  });
+
+  it('el detalle no dice «0 fps» antes del primer cuadro, ni habla del modo en reposo', () => {
+    simulando();
+    montar();
+    abrir();
+    expect(detalle()!.textContent).not.toMatch(/(^|\D)0 fps/);
+    cleanup();
+    act(() => { store.dispatch(resetSimulation()); store.dispatch(setActiveTool3D('steamBrush')); });
+    montar();
+    abrir();
+    expect(detalle(), 'el caso no se ejerce').not.toBeNull();
+    expect(detalle()!.textContent).not.toContain('Modo:');
+  });
+
+  it('el agarre de malla funciona en WebGPU: ahí no avisa de la herramienta', () => {
+    act(() => { store.dispatch(setActiveTool3D('meshGrab')); });
+    simulando({ tier: 'webgpu', seam: null });
+    act(() => { store.dispatch(setBodyCollision(true)); });
+    montar();
+    abrir();
+    expect(screen.queryByText(/La herramienta activa/)).toBeNull();
+  });
+
+  it('un clic sobre lo de dentro del botón (el punto, el texto) tampoco deja el foco', () => {
+    simulando({ ms: 16.7 });
+    montar();
+    expect(fireEvent.mouseDown(estado()!.querySelector('span')!)).toBe(false);
+  });
+});

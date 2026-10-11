@@ -121,7 +121,7 @@ describe('el pie reparte el ancho: el patrón ocupa lo que necesita y la secció
   const layout = lee('src/styles/layout.css');
   const seccion = lee('src/components/shell/SeccionDel3D.css');
 
-  it('la ranura del patrón mide lo que su contenido y solo se encoge si no hay sitio', () => {
+  it('la ranura del patrón mide lo que pide su sección y solo se encoge si no hay sitio', () => {
     const r = regla(layout, '.linea-al-pie__patron');
     expect(r).toContain('flex: 0 1 auto');
     expect(r, 'sin mínimo la ranura se iría a cero').toContain('min-width: 320px');
@@ -144,5 +144,12 @@ describe('el pie reparte el ancho: el patrón ocupa lo que necesita y la secció
     expect(r, 'sin `width: 0` la voz entera sería el mínimo de la sección').toContain('width: 0');
     expect(r).toContain('flex: 1 1 0');
     expect(r).toContain('min-width: 0');
+  });
+
+  it('la frase del 3D se corta con puntos suspensivos en vez de empujar al estado', () => {
+    const r = regla(seccion, '.seccion-del-3d__texto');
+    expect(r).toContain('text-overflow: ellipsis');
+    expect(r).toContain('white-space: nowrap');
+    expect(r).toContain('overflow: hidden');
   });
 });

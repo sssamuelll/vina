@@ -86,3 +86,10 @@ describe('el gate del deploy corre los trinquetes de la interfaz', () => {
     expect(new Set(specs).size).toBe(specs.length);
   });
 });
+
+describe('el gate del deploy no se salta ningún spec', () => {
+  it('ninguno lleva un test.skip/fixme incondicional ni un describe saltado', () => {
+    const saltados = specsDelGate().filter((s) => /^\s*test\.(?:skip|fixme)\(\s*true\b|^\s*test\.describe\.(?:skip|fixme)\(/m.test(readFileSync(join(RAIZ, s), 'utf8')));
+    expect(saltados).toEqual([]);
+  });
+});

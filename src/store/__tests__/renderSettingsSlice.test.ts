@@ -438,9 +438,10 @@ describe('el avatar a la vista (P5)', () => {
     let s = reducer(initial(), setAvatarRenderStyle('wireframe'));
     s = reducer(s, toggleAvatarVisible());           // oculto: guarda «wireframe»
     s = reducer(s, setAvatarRenderStyle('xray'));    // lo elige ella: ya se ve, y lo guardado ya no vale
-    s = reducer(s, toggleAvatarVisible());           // oculta: guarda «xray»
-    s = reducer(s, toggleAvatarVisible());
-    expect(s.avatarRenderStyle).toBe('xray');
+    // Se mira el estado y no el siguiente interruptor: ocultar otra vez vuelve a
+    // guardar y taparía un guardado que se hubiera quedado (el test pasaba aunque
+    // `setAvatarRenderStyle` no soltara nada).
+    expect(s.avatarEstiloAnterior ?? null).toBeNull();
   });
 
   it('el oculto que pone el copiloto no inventa un estilo guardado', () => {
@@ -456,5 +457,21 @@ describe('el avatar a la vista (P5)', () => {
     expect(selectAvatarVisible({ renderSettings: oculto })).toBe(false);
     expect(selectAvatarVisible({ renderSettings: initial() })).toBe(true);
     expect(selectAvatarVisible({ renderSettings: reducer(initial(), setAvatarRenderStyle('xray')) })).toBe(true);
+  });
+});
+
+describe('el guardado del interruptor del avatar', () => {
+  it('volver con el interruptor suelta el guardado', () => {
+    let s = reducer(initial(), setAvatarRenderStyle('wireframe'));
+    s = reducer(s, toggleAvatarVisible());
+    s = reducer(s, toggleAvatarVisible());
+    expect(s.avatarEstiloAnterior ?? null).toBeNull();
+  });
+  it('«Oculto» con el avatar ya oculto no borra lo guardado', () => {
+    let s = reducer(initial(), setAvatarRenderStyle('wireframe'));
+    s = reducer(s, toggleAvatarVisible());
+    s = reducer(s, setAvatarRenderStyle('hidden'));
+    s = reducer(s, toggleAvatarVisible());
+    expect(s.avatarRenderStyle).toBe('wireframe');
   });
 });

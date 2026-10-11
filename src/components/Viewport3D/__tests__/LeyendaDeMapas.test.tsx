@@ -138,3 +138,17 @@ describe('LeyendaDeMapas no trae el material oscuro de antes', () => {
     expect(src.match(OSCURO)?.[0] ?? null, `quedó ${src.match(OSCURO)?.[0]} en ${ruta}`).toBeNull();
   });
 });
+
+describe('LeyendaDeMapas ▸ la escala va de arriba (tope, rojo) a abajo (piso, azul)', () => {
+  it('el tope arriba, el piso abajo, y el gradiente empieza en rojo', () => {
+    const { container } = montar('stress', { stats });
+    const marcas = [...container.querySelectorAll('.leyenda-de-mapas__marca')].map((e) => e.textContent);
+    expect(marcas).toEqual(['100 kPa', '0 kPa']);
+    const barra = container.querySelector<HTMLElement>('.leyenda-de-mapas__barra')!;
+    const fondo = barra.style.backgroundImage || barra.style.background || barra.getAttribute('style') || '';
+    const rojo = fondo.search(/#ff0000|rgb\(255, ?0, ?0\)/i);
+    const azul = fondo.search(/#0000ff|rgb\(0, ?0, ?255\)/i);
+    expect(rojo, `el gradiente no se lee: «${fondo}»`).toBeGreaterThanOrEqual(0);
+    expect(rojo).toBeLessThan(azul);
+  });
+});

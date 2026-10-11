@@ -52,3 +52,30 @@ describe('renderTurntable sobre el papel', () => {
     ]);
   });
 });
+
+describe('la vuelta ▸ el papel cubre el cuadro entero', () => {
+  it('fillRect(0, 0, ancho, alto) en cada cuadro', async () => {
+    const rects: number[][] = [];
+    const ctx = { set fillStyle(_v: string) { /* nada */ }, fillRect: (...a: number[]) => { rects.push(a); }, drawImage: () => {} };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((() => ctx) as never);
+    (HTMLCanvasElement.prototype as unknown as { captureStream: () => unknown }).captureStream = () => ({});
+    vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+      getPropertyValue: (n: string) => (n === '--canvas-2d' ? '#faf4e3' : ''),
+    } as unknown as CSSStyleDeclaration);
+    class GrabadorFalso {
+      static isTypeSupported() { return true; }
+      ondataavailable: ((e: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() {}
+      stop() { this.onstop?.(); }
+    }
+    vi.stubGlobal('MediaRecorder', GrabadorFalso);
+    const lienzo = document.createElement('canvas');
+    lienzo.width = 8;
+    lienzo.height = 6;
+    const camara = new THREE.PerspectiveCamera();
+    camara.position.set(0, 1, 3);
+    await renderTurntable({ domElement: lienzo, render: () => {} } as never, new THREE.Scene(), camara, { frameCount: 2, direction: 'cw', fps: 1000 });
+    expect(rects).toEqual([[0, 0, 8, 6], [0, 0, 8, 6]]);
+  });
+});

@@ -5,12 +5,19 @@
  * modo transparente, con el color de la hoja puesto por CSS detrás del lienzo,
  * se llama «Papel» en el panel de render. Las demás opciones siguen.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import renderSettingsReducer, { setBackgroundMode } from '../../../../store/renderSettingsSlice';
 import BackgroundSection from '../BackgroundSection';
+import EnvironmentSetup from '../../EnvironmentSetup';
+
+// `EnvironmentSetup` le habla al renderer de three por `useThree`: aquí es un doble
+// que anota el último `setClearColor` y deja ver `scene.background`.
+const tres = vi.hoisted(() => ({ gl: { setClearColor: vi.fn(), toneMapping: 0, toneMappingExposure: 1 }, scene: { background: 'algo' as unknown } }));
+vi.mock('@react-three/fiber', () => ({ useThree: () => tres }));
+vi.mock('@react-three/drei', () => ({ Environment: () => null }));
 
 afterEach(cleanup);
 
@@ -41,5 +48,14 @@ describe('BackgroundSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Papel' }));
     expect(store.getState().renderSettings.backgroundMode).toBe('transparent');
     expect(setBackgroundMode('transparent').payload).toBe('transparent');
+  });
+});
+
+describe('EnvironmentSetup ▸ con «Papel» el lienzo es transparente de verdad', () => {
+  it('el renderer limpia con alfa 0 y la escena no tiene fondo', () => {
+    const store = configureStore({ reducer: { renderSettings: renderSettingsReducer } });
+    render(<Provider store={store}><EnvironmentSetup /></Provider>);
+    expect(tres.scene.background).toBeNull();
+    expect(tres.gl.setClearColor).toHaveBeenLastCalledWith(0x000000, 0);
   });
 });

@@ -59,3 +59,19 @@ describe('sobreElPapel', () => {
     expect([salida.width, salida.height]).toEqual([40, 20]);
   });
 });
+
+describe('sobreElPapel ▸ lo que va encima es el origen', () => {
+  it('drawImage recibe el origen, no otro lienzo', () => {
+    conToken('#faf4e3');
+    const dibujados: unknown[] = [];
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((() => ({
+      set fillStyle(_v: string) { /* nada */ },
+      fillRect: () => {},
+      drawImage: (img: unknown) => { dibujados.push(img); },
+    })) as never);
+    const origen = document.createElement('canvas');
+    sobreElPapel(origen);
+    expect(dibujados).toHaveLength(1);
+    expect(dibujados[0]).toBe(origen);
+  });
+});

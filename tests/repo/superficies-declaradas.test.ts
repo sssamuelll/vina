@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -98,5 +99,19 @@ describe('cada superficie del shell declara data-superficie', () => {
       }
     }
     expect(fuera).toEqual([]);
+  });
+});
+
+describe('el vocabulario y la lista de «ambiente» valen para todo archivo', () => {
+  const todos = execFileSync('git', ['ls-files', 'src/**/*.tsx'], { encoding: 'utf8' })
+    .split('\n').filter((f) => f && !/__tests__|\.test\./.test(f));
+  it('ningún componente usa un valor fuera del vocabulario', () => {
+    const fuera = todos.flatMap((f) => [...lee(f).matchAll(/data-superficie="([^"]+)"/g)].filter((m) => !VOCABULARIO.has(m[1])).map((m) => `${f}: ${m[1]}`));
+    expect(fuera).toEqual([]);
+  });
+  it('«ambiente» solo lo declaran los de la lista cerrada', () => {
+    const conAmbiente = todos.filter((f) => lee(f).includes('data-superficie="ambiente"')).sort();
+    const lista = [...new Set(MARCAS.filter(([, v]) => v === 'ambiente').map(([r]) => r))].sort();
+    expect(conAmbiente).toEqual(lista);
   });
 });

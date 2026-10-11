@@ -142,3 +142,24 @@ describe('el margen del 3D es un margen (P5)', () => {
     expect(fireEvent.mouseDown(margen)).toBe(true);
   });
 });
+
+describe('el margen del 3D ▸ lo que no puede perder', () => {
+  it('un clic sobre el icono tampoco deja el foco: el blanco del evento es el <svg>', () => {
+    renderRightDock();
+    const icono = screen.getByRole('button', { name: 'Colocar' }).querySelector('svg')!;
+    expect(fireEvent.mouseDown(icono)).toBe(false);
+  });
+  it('Coser dice si está puesto', () => {
+    renderRightDock();
+    expect(screen.getByRole('button', { name: 'Coser' }).getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(screen.getByRole('button', { name: 'Coser' }));
+    expect(screen.getByRole('button', { name: 'Coser' }).getAttribute('aria-pressed')).toBe('true');
+  });
+  it('Simular, corriendo, pausa', () => {
+    const { store } = renderRightDock();
+    fireEvent.click(screen.getByRole('button', { name: 'Simular' }));
+    expect(store.getState().simulation.simulationState).toBe('running');
+    fireEvent.click(screen.getByRole('button', { name: 'Simular' }));
+    expect(store.getState().simulation.simulationState).toBe('paused');
+  });
+});
