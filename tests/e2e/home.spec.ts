@@ -69,7 +69,7 @@ for (const p of PAGINAS) {
       await cargar(page, p.url);
       const oferta = page.locator('a.btn-oferta');
       await expect(oferta).toHaveCount(2);
-      for (const href of await oferta.evaluateAll((as) => as.map((a) => a.getAttribute('href')))) expect(href).toBe(`mailto:vina@sdar.dev?subject=${p.asunto}`);
+      for (const href of await oferta.evaluateAll((as) => as.map((a) => a.getAttribute('href')))) expect(href).toBe(`mailto:contact@sdar.dev?subject=${p.asunto}`);
       await expect(oferta.first()).toHaveText(p.enviar);
     });
 

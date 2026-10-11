@@ -39,7 +39,7 @@ The workshop's interface is in Spanish. Contributor docs and code are in English
 
 ## Send a pattern
 
-Email a DXF (AAMA or ASTM) to **vina@sdar.dev**. You get it back sewn and draped in Vina, with its fit map, and an honest note on where Vina fell short. Every pattern that comes in is a test the workshop hasn't passed yet. A few each month.
+Email a DXF (AAMA or ASTM) to **contact@sdar.dev**. You get it back sewn and draped in Vina, with its fit map, and an honest note on where Vina fell short. Every pattern that comes in is a test the workshop hasn't passed yet. A few each month.
 
 ## Quick start
 

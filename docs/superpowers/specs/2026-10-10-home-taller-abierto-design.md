@@ -22,7 +22,7 @@ Un hallazgo del 2026-10-10 fija el tono: la home publicada promete formatos que 
 
 1. en el primer viewport de un portátil de 1366×768 enseñe el patrón y la tela cayendo, como hoy;
 2. diga en el vocabulario del oficio lo que Vina hace hoy, lo que todavía no está y cómo se hace;
-3. convierta a la lectora en un lead por un solo camino: mandar un patrón por correo a `vina@sdar.dev`;
+3. convierta a la lectora en un lead por un solo camino: mandar un patrón por correo a `contact@sdar.dev`;
 4. tenga un README que cuente la misma historia con la misma honestidad;
 5. conserve lo que la home de septiembre ya ganó: cero JavaScript en el navegador, cero terceros, ≤ 2 fuentes, trinquete de peso, axe limpio, regla del pliegue.
 
@@ -35,7 +35,7 @@ Un hallazgo del 2026-10-10 fija el tono: la home publicada promete formatos que 
 | E1 | Posición | Samuel | **Taller abierto.** Primera persona, sin superlativos, sin competidores, sin contadores. Lo que hace hoy y lo que falta, dicho igual de claro. |
 | E2 | Idiomas | Samuel | **Inglés en `/`, español en `/es/`.** Es lo que el spec de i18n (D10) ya decidía: `/` inglés y `x-default`, `/es/`, sin redirección automática. En vez de la «suggestion strip» de aquel spec, un enlace de idioma en la cabecera y en el pie: menos ruido, mismo resultado. |
 | E3 | Oferta | recomendación, sin objeción | **Mandar un patrón.** Quien escribe recibe su DXF cosido y caído en Vina, con su mapa de ajuste, y una respuesta honesta sobre dónde Vina se quedó corta. Unos pocos al mes. Cada patrón que entra es una prueba real del taller y, con permiso, material para la página. |
-| E4 | Mecanismo | recomendación, sin objeción | **`mailto:`, sin formulario.** `sdar.dev` ya recibe correo en Zoho (MX `mx.zoho.eu`, comprobado el 2026-10-10); `vina@sdar.dev` es un alias que crea Samuel. Cero JS, cero terceros, nada que mantener en el servidor; el DXF viaja adjunto, que es como una patronista manda un patrón de todas formas. Los leads se cuentan con un filtro en la bandeja. |
+| E4 | Mecanismo | recomendación, sin objeción | **`mailto:`, sin formulario.** `sdar.dev` ya recibe correo en Zoho (MX `mx.zoho.eu`, comprobado el 2026-10-10); `contact@sdar.dev` es un alias que crea Samuel. Cero JS, cero terceros, nada que mantener en el servidor; el DXF viaja adjunto, que es como una patronista manda un patrón de todas formas. Los leads se cuentan con un filtro en la bandeja. |
 | E5 | Honestidad | recomendación, sin objeción | **Archivos de datos con prueba.** Lo que hace hoy (`home/datos/hoy.json`) lleva la ruta del código que lo demuestra; lo que falta (`home/datos/en-construccion.json`) lleva su issue o su sección del `ROADMAP.md`; el diario (`home/datos/diario.json`) cita PRs que existen en el historial. Tests en § 10. |
 | E6 | Diario | corrección propia | **Escrito a mano, no generado.** Generarlo del historial daría títulos de commit en jerga. Cinco entradas con fecha, una línea en cada idioma y el enlace al PR; un test comprueba que cada PR citado existe. |
 | E7 | README | Samuel | **Misma historia, mismos datos.** Las secciones «What it does today» y «In the making» del README se generan de los mismos archivos que la página; un test falla si página y README dejan de decir lo mismo. |
@@ -159,10 +159,10 @@ Eyebrow `Send a pattern` / `Envía un patrón`. Sobre `--papel-hundido`, como la
 | H2 | **Bring your pattern, I'll drape it** | **Trae tu patrón, yo lo visto** |
 | Entradilla | Email me a DXF. I'll return it sewn and draped in Vina, with its fit map, and I'll tell you where Vina fell short. Every pattern that comes in is a test the workshop hasn't passed yet. A few each month, in the order they arrive. | Mándame un DXF por correo. Te lo devuelvo cosido y caído en Vina, con su mapa de ajuste, y te digo dónde Vina se quedó corta. Cada patrón que llega es una prueba que el taller todavía no ha pasado. Unos pocos al mes, en el orden en que llegan. |
 | Botón (tinta) | **Send a pattern** | **Enviar un patrón** |
-| Línea mono | `vina@sdar.dev · DXF-AAMA or DXF-ASTM · I read and reply myself` | `vina@sdar.dev · DXF-AAMA o DXF-ASTM · leo y respondo yo mismo` |
+| Línea mono | `contact@sdar.dev · DXF-AAMA or DXF-ASTM · I read and reply myself` | `contact@sdar.dev · DXF-AAMA o DXF-ASTM · leo y respondo yo mismo` |
 
 Los dos botones de oferta de la página (hero y este) llevan el mismo `href`:
-`mailto:vina@sdar.dev?subject=A%20pattern%20for%20Vina` (ES: `?subject=Un%20patr%C3%B3n%20para%20Vina`). Sin cuerpo prellenado: un formulario disfrazado no es zen.
+`mailto:contact@sdar.dev?subject=A%20pattern%20for%20Vina` (ES: `?subject=Un%20patr%C3%B3n%20para%20Vina`). Sin cuerpo prellenado: un formulario disfrazado no es zen.
 
 ### 3.7 Pie
 
@@ -283,7 +283,7 @@ Hoy: 100 líneas, seis insignias de shields.io, cero imágenes, un badge de «Bu
 3. Dos enlaces en una línea: `vina.sdar.dev` · `vina.sdar.dev/es/`.
 4. `## What it does today` ← generado entre `<!-- hoy -->` y `<!-- /hoy -->` desde `hoy.json` (las seis frases en inglés, cada una con su ruta de prueba como enlace relativo al repo).
 5. `## In the making` ← generado entre `<!-- en-construccion -->` y `<!-- /en-construccion -->` (las seis frases con su enlace).
-6. `## Send a pattern` (la oferta de § 3.6, en tres líneas, con `vina@sdar.dev`).
+6. `## Send a pattern` (la oferta de § 3.6, en tres líneas, con `contact@sdar.dev`).
 7. `## Quick start` (los comandos de hoy; `npm run dev` abre `/app/`).
 8. `## How it's made` (los specs en `docs/superpowers/specs/`, la investigación en `docs/reports/`, el gate de `CONTRIBUTING.md`, el puente MCP y `vina-studio` en npm: aquí sí, para quien programa).
 9. `## Tech stack`, `## Architecture at a glance`, `## Contributing`, `## Language` (se conservan, revisados contra lo que existe).
@@ -372,7 +372,7 @@ Los dieciocho tests de hoy se mantienen con esos valores (título, `lang`, un so
 
 ## 12. Pendientes de Samuel y estado previo
 
-- Crear el alias `vina@sdar.dev` en Zoho antes del deploy.
+- Crear el alias `contact@sdar.dev` en Zoho antes del deploy (enmendado el 2026-10-11: antes era `vina@sdar.dev`, § 15).
 - Pedirle a María permiso para su DXF en las figuras y, si quiere, una frase firmada (D11).
 - Correr `gh repo edit` de § 8.3 con `!`.
 - Grabar el póster y la figura 2 con `--gpu` en su máquina (§ 5.2, § 5.3), o dejar que lo haga Claude con Chrome visible si él está delante.
@@ -406,3 +406,7 @@ Y dos cosas de § 5 que salieron de capturar con WebGPU (Task 8):
 
 - **La figura 2 enseña el mapa de estiramiento, no el de ajuste.** Con sus umbrales por defecto, el mapa de ajuste pinta la camiseta entera de rojo («no se puede poner»), un artefacto de calibración y no de la prenda. El de estiramiento (azul en reposo, rojo estirado, la convención de CLO) sí dice algo verdadero: hombros y pecho tensos, mangas y bajo en reposo. Pie: «The strain map on the avatar · stretched in red, at rest in blue» (ES: «El mapa de estiramiento sobre el avatar · estirado en rojo, en reposo en azul»). El mapa de ajuste sigue en «lo que hace hoy» porque existe.
 - **El póster y la figura 2 salen del mismo contexto** (el del paso 7 de `activos.mjs`, a @2x con `--gpu`): la misma simulación en reposo, primero sin mapa y luego con él. Capturarla en el contexto del 2D daba la cámara de lado y las piezas sin coser. Con WebGPU el póster no trae la franja de #1219: era del tier WASM.
+
+## 15. Enmienda del 2026-10-11 — el correo es contact@sdar.dev
+
+Samuel pidió, al autorizar el merge y el deploy, que la oferta use `contact@sdar.dev` en vez de `vina@sdar.dev` (E4, § 3.6). Cambia el texto en los dos idiomas y los dos `mailto:` de la plantilla; no cambia nada de la mecánica (sigue siendo un alias de Zoho, sin formulario, sin backend).

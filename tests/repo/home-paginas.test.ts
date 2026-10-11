@@ -46,7 +46,7 @@ describe.each(Object.keys(PAGINAS) as ('en' | 'es')[])('la página %s', (idioma)
   });
   it('los dos botones de oferta abren el correo con el asunto', () => {
     const asunto = idioma === 'en' ? 'A%20pattern%20for%20Vina' : 'Un%20patr%C3%B3n%20para%20Vina';
-    expect(html.match(new RegExp(`href="mailto:vina@sdar\\.dev\\?subject=${asunto}"`, 'g'))).toHaveLength(2);
+    expect(html.match(new RegExp(`href="mailto:contact@sdar\\.dev\\?subject=${asunto}"`, 'g'))).toHaveLength(2);
   });
   it('tiene los cuatro bloques y las listas enteras', () => {
     for (const id of ['today', 'making', 'how', 'send']) expect(html).toContain(`<section id="${id}"`);
