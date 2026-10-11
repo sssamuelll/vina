@@ -70,6 +70,7 @@ export default defineConfig({
       input: {
         inicio: fileURLToPath(new URL('./index.html', import.meta.url)),
         app: fileURLToPath(new URL('./app/index.html', import.meta.url)),
+        es: fileURLToPath(new URL('./es/index.html', import.meta.url)),
       },
       output: {
         manualChunks(id) {

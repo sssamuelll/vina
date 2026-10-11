@@ -4,8 +4,8 @@ import { addPiece, activarHerramienta, clickAt, dispatch } from './helpers/lienz
 
 /**
  * La línea al pie (spec 2026-10-02 «la interfaz en papel» § 5.3 y § 5.4),
- * medida en la pantalla de María (1366 × 643, en Split): una franja del
- * marco, de lado a lado y siempre, con el nombre y la tecla de la herramienta,
+ * medida en la pantalla de María (1366 × 643, en Split): una franja de papel
+ * (marco hasta el 2026-10-11), de lado a lado y siempre, con el nombre y la tecla de la herramienta,
  * sus opciones como botones y la frase entera en una línea. Sustituye a la red
  * de la tarjeta de la esquina (`emplazamiento-tira.spec.ts`, hasta P2b).
  *
@@ -58,7 +58,9 @@ async function medirPie(page: Page) {
       areaBottom: document.querySelector('.canvas-area')!.getBoundingClientRect().bottom,
       ventana: { w: window.innerWidth, h: window.innerHeight },
       fondo: getComputedStyle(linea).backgroundColor,
-      fondoBarra: getComputedStyle(document.querySelector('.top-bar')!).backgroundColor,
+      // El del margen de herramientas: con la vista 3D sola solo queda el del 3D, del mismo papel.
+      fondoMargen: getComputedStyle(document.querySelector('nav.margen')!).backgroundColor,
+      material: linea.getAttribute('data-material'),
       seccion: document.querySelector('.seccion-del-patron') !== null,
       nombre: document.querySelector('.seccion-del-patron__nombre')?.textContent ?? null,
       frase: texto ? { texto: texto.textContent ?? '', recortada: texto.scrollWidth > texto.clientWidth + 1 } : null,
@@ -68,7 +70,7 @@ async function medirPie(page: Page) {
   });
 }
 
-test('al pie, de lado a lado, con el material y el alto de la barra superior, en las tres vistas; la hoja termina encima y es papel', async ({ page }) => {
+test('al pie, de lado a lado, con el alto de la barra superior y el papel del margen, en las tres vistas; la hoja termina encima y es papel', async ({ page }) => {
   await page.setViewportSize(MARIA);
   await abrirAppVacia(page);
   await cargarDxfDeMaria(page);
@@ -80,7 +82,10 @@ test('al pie, de lado a lado, con el material y el alto de la barra superior, en
     expect(r.pie.right, `${vista}: no llega al otro borde`).toBe(r.ventana.w);
     expect(Math.round(r.pie.bottom), `${vista}: no está al pie`).toBe(r.ventana.h);
     expect(Math.round(r.pie.height), `${vista}: no tiene el alto de la barra superior`).toBe(Math.round(r.barraAlto));
-    expect(r.fondo, `${vista}: no es del material de la barra superior`).toBe(r.fondoBarra);
+    // Hasta el 2026-10-11 era marco, del material de la barra superior; desde entonces es papel,
+    // con los colores del margen de herramientas (Samuel: «me equivoqué con la línea al pie»).
+    expect(r.fondo, `${vista}: no es del papel del margen de herramientas`).toBe(r.fondoMargen);
+    expect(r.material, `${vista}: no lleva el ámbito de papel`).toBe('papel');
     expect(r.areaBottom, `${vista}: la hoja se mete debajo`).toBeLessThanOrEqual(r.pie.top + 0.5);
     // En 3D no hay hoja que explicar: la sección del patrón se va, la franja no.
     expect(r.seccion, `${vista}: la sección del patrón`).toBe(vista !== '3D');

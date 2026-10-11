@@ -340,7 +340,7 @@ export interface SeamResolutionEntry {
  * constraints is their correct state, not a failure).
  *
  * Consumed by `useSimulationLifecycle` at sim start: total + zero-count
- * seams go to `simulation.seamResolution` (SeccionDel3D),
+ * seams go to `simulation.seamResolution` (EstadoDeLaSimulacion),
  * zero-count seams additionally to `inspector.seamResolutionErrors` +
  * an error toast (E-async dual-surface convention).
  */

@@ -180,6 +180,8 @@ echo "── Home ────────────────────�
 if [ -f "$MARCAS/home.ok" ]; then
   echo "✓ home: ya pasó sobre este árbol"
 else
+  node scripts/home/paginas.mjs --check || { echo "✗ los HTML de la home no son los generados: node scripts/home/paginas.mjs" >&2; exit 1; }
+  node scripts/home/enlaces.mjs || { echo "✗ un enlace público de la home no responde" >&2; exit 1; }
   puerto_libre 4179
   npx playwright test --config playwright.home.config.ts > /tmp/vina-deploy-home.log 2>&1 \
     || { tail -30 /tmp/vina-deploy-home.log >&2; echo "✗ e2e de la home en rojo" >&2; exit 1; }
@@ -358,7 +360,10 @@ CODE=$(curl -s -o /tmp/vina-deploy-index.html -w "%{http_code}" "${URL}app/")
 grep -q "$BUNDLE" /tmp/vina-deploy-index.html \
   || { echo "✗ el taller servido no referencia $BUNDLE — se publicó otra cosa" >&2; exit 1; }
 CODE=$(curl -s -o /tmp/vina-deploy-home.html -w "%{http_code}" "$URL")
-[ "$CODE" = "200" ] && grep -q "Traza el patrón" /tmp/vina-deploy-home.html \
-  || { echo "✗ $URL no sirve la home" >&2; exit 1; }
-echo "✓ ${URL}app/ → 200 y sirve $BUNDLE; $URL sirve la home"
+[ "$CODE" = "200" ] && grep -q "Draft the pattern" /tmp/vina-deploy-home.html \
+  || { echo "✗ $URL no sirve la home en inglés" >&2; exit 1; }
+CODE=$(curl -s -o /tmp/vina-deploy-home-es.html -w "%{http_code}" "${URL}es/")
+[ "$CODE" = "200" ] && grep -q "Traza el patrón" /tmp/vina-deploy-home-es.html \
+  || { echo "✗ ${URL}es/ no sirve la home en español" >&2; exit 1; }
+echo "✓ ${URL}app/ → 200 y sirve $BUNDLE; $URL y ${URL}es/ sirven la home"
 echo "Deploy completo: $(git rev-parse --short HEAD)"

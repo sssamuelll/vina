@@ -2,13 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { resolverRuta } from '../rutas.js';
 
 // dist/ de mentira: solo importa qué existe.
-const existe = new Set(['index.html', 'app/index.html', 'assets/index-abc.js', 'wasm/xpbd_wasm_bg.wasm']);
+const existe = new Set(['index.html', 'es/index.html', 'app/index.html', 'assets/index-abc.js', 'wasm/xpbd_wasm_bg.wasm']);
 const r = (p: string) => resolverRuta(p, (rel) => existe.has(rel));
 
 describe('resolverRuta', () => {
   it('/ es la home', () => expect(r('/')).toEqual({ tipo: 'archivo', ruta: 'index.html' }));
   it('/app/ es el taller', () => expect(r('/app/')).toEqual({ tipo: 'archivo', ruta: 'app/index.html' }));
   it('/app sin barra redirige', () => expect(r('/app')).toEqual({ tipo: 'redirigir', a: '/app/' }));
+  it('/es/ es la home en español', () => expect(r('/es/')).toEqual({ tipo: 'archivo', ruta: 'es/index.html' }));
+  it('/es sin barra redirige', () => expect(r('/es')).toEqual({ tipo: 'redirigir', a: '/es/' }));
+  it('una ruta profunda bajo /es/ es 404 (no es una SPA)', () => expect(r('/es/algo')).toEqual({ tipo: 'no-encontrado' }));
   it('una ruta profunda del taller cae en el taller (SPA)', () =>
     expect(r('/app/proyecto/123')).toEqual({ tipo: 'archivo', ruta: 'app/index.html' }));
   it('un asset existente se sirve tal cual', () =>

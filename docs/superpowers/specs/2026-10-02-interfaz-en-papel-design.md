@@ -62,7 +62,7 @@ Todas las tomó Samuel mirando maquetas. Donde dice «recomendación», la propu
 | # | Decisión | Resultado |
 |---|---|---|
 | D1 | Dirección | **Nada oscuro flota sobre el papel.** Escogida entre tres: terminar cromo callado tal cual, esta, y «solo el papel» (todo se convoca). La tercera se descartó porque el problema medido de María es no encontrar lo que ya existe. |
-| D2 | Materiales | **Papel con marco oscuro.** La hoja, sus márgenes de herramientas y lo que flota son papel y tinta. El marco (barra superior, línea al pie y paneles) conserva el oscuro que la app ya tiene. Primero se aceptó «todo claro», por recomendación mía; Samuel lo corrigió el mismo día, dos veces. |
+| D2 | Materiales | **Papel con marco oscuro.** La hoja, sus márgenes de herramientas y lo que flota son papel y tinta. El marco (barra superior, línea al pie y paneles) conserva el oscuro que la app ya tiene. Primero se aceptó «todo claro», por recomendación mía; Samuel lo corrigió el mismo día, dos veces. **Enmienda 2026-10-11:** la línea al pie pasa a papel, con los colores del margen de herramientas; el marco se queda con la barra superior y los paneles. Samuel, con P5 desplegada: «me equivoqué con la línea al pie … creo que va mejor en los colores de la barra de herramientas: Herramientas del patrón». |
 | D3 | Papel | **`#faf4e3`**, más amarillo que el de hoy (`#f1efe8`), y **siempre cuadriculado**. El relleno blanco de las piezas se conserva: condición expresa de Samuel. |
 | D4 | Reglas | **Fuera** las reglas numeradas de arriba y de la izquierda, y con ellas la cruz del origen. **Queda una marca de escala** que dice cuánto mide un cuadro. |
 | D5 | Herramientas | Las mismas, en el mismo orden y a un clic, como **tinta en el margen de la hoja**: las del patrón a la izquierda, las del 3D a la derecha. Sin tarjeta, sin sombra, sin rótulo. |
@@ -107,7 +107,8 @@ Por eso este documento distingue entre **callar** (bajar el volumen de lo que pe
 
 1. **Una hoja y su marco.** La ventana tiene dos materiales. El marco (barra superior, línea al pie,
    paneles) es oscuro y está atracado a los bordes: no flota. Todo lo demás es papel y tinta: la
-   hoja, sus márgenes y lo que flota sobre ella.
+   hoja, sus márgenes y lo que flota sobre ella. *(Enmienda 2026-10-11: la línea al pie es papel,
+   como los márgenes; ver D2.)*
 2. **En reposo, solo lo que perdura.** Barra superior, márgenes de herramientas, línea al pie y
    marca de escala. Nada más está montado.
 3. **Las opciones nacen donde se actúa.** Lo que se escoge antes de actuar, en la línea al pie. Lo
@@ -241,7 +242,16 @@ una línea de pelo. La del patrón a la izquierda; la del 3D a la derecha.
 - **El estado de la simulación** (`SimulationStatusOverlay.tsx`) pasa a esa misma sección: una línea
   con el estado y su aviso ⚠ cuando lo hay; el detalle se abre al clicarla, como hoy. Se conserva lo
   que C4 § 3.1.A ratifica: el aviso nunca se calla. El pill «SIMULANDO» del dock
-  (`RightDock.tsx:123`) se va: decía lo mismo.
+  (`RightDock.tsx:123`) se va: decía lo mismo. **Enmienda 2026-10-11:** el estado sale de la
+  línea al pie y va al pie del margen del 3D (`EstadoDeLaSimulacion.tsx`). Es un icono: el ⚠ con
+  su número si hay avisos; si no, el pulso mientras simula y la pausa detenida. Al pulsarlo
+  despliega el detalle a la izquierda del margen, que ahora empieza diciendo el estado y el motor.
+  El nombre accesible del icono lo dice todo. Samuel pidió los mensajes del simulador «en otro
+  lado o que sea muy muy pequeño tipo un par de iconos o algo así y expandible» y, de dos maquetas
+  sobre la app real, eligió esta (B) sobre dejar dos iconos en el pie (A). Con su «dale» del mismo
+  día, el ⚠ cuenta solo los problemas de la corrida. Que el motor no detecte la penetración
+  (ninguno de los cuatro lo hace) encendía el ⚠ en toda simulación; pasa a ser una nota del
+  detalle, tenue y sin triángulo.
 - **La escala y la tabla de los mapas de ajuste** (`FitMapToggle.tsx:151-234`, hoy texto blanco
   sobre casi negro escrito a mano) toman el material de lo que flota (§ 6.3).
 
@@ -385,7 +395,9 @@ solace-wren.
 
 Una franja al pie de la ventana, de lado a lado, del material y del alto de la barra superior
 (`--bg-deeper`, `--top-bar-h`: 36 px a 1366). **Está siempre**, con cualquier herramienta y en
-cualquier vista. Capturas 01, 03, 05 y 13.
+cualquier vista. Capturas 01, 03, 05 y 13. *(Enmienda 2026-10-11: ya no es del material de la
+barra superior sino papel, con los colores del margen de herramientas: `--canvas-2d`, la tinta del
+ámbito y una línea de pelo arriba; el alto sigue siendo el de la barra. Ver D2.)*
 
 De izquierda a derecha:
 
@@ -575,8 +587,8 @@ Viven en `src/styles/tokens.css`. Los ratios de esta sección están calculados 
 
 | Material | Qué es | Valores |
 |---|---|---|
-| **El marco** (`chrome`) | La barra superior, la línea al pie y los paneles. Atracado, opaco, sin sombra. | **Los de hoy, sin cambio:** `--bg-deeper` `#080706` (barra y línea al pie), `--bg-surface` `#151411` (paneles), `--bg-elevated` `#23211e`, `--border` `#34332f`, y los `--text-*` claros. |
-| **El papel** | La hoja, los márgenes de herramientas y el escenario 3D. | `--canvas-2d: #faf4e3`, con la rampa de § 7.2. |
+| **El marco** (`chrome`) | La barra superior y los paneles (y la línea al pie, hasta la enmienda del 2026-10-11, que la pasó a papel). Atracado, opaco, sin sombra. | **Los de hoy, sin cambio:** `--bg-deeper` `#080706` (la barra, y la línea al pie hasta el 2026-10-11), `--bg-surface` `#151411` (paneles), `--bg-elevated` `#23211e`, `--border` `#34332f`, y los `--text-*` claros. |
+| **El papel** | La hoja, los márgenes de herramientas, el escenario 3D y, desde el 2026-10-11, la línea al pie. | `--canvas-2d: #faf4e3`, con la rampa de § 7.2. |
 | **Lo que flota** (`overlay`) | Menús, avisos, tooltips, modales, la barra de IA, la barrita de la pieza, las etiquetas de opción. Es papel que se despega de la hoja. | `--surface-overlay-bg: #ffffff`; borde `1px solid rgba(40, 36, 30, 0.14)`; sombra `0 1px 2px rgba(40,36,30,0.10), 0 8px 24px rgba(40,36,30,0.12)`; con la rampa de § 7.2. Velo de un modal: `--scrim: rgb(41 38 33 / 32%)`. |
 
 El marco contra la hoja da 18,32:1 (la barra) y 16,77:1 (un panel): es el contraste más fuerte de
@@ -791,7 +803,7 @@ literales siguen valiendo y bajan en P6. El contador solo baja.
 |---|---|
 | Skill `contrato-de-interfaz` § 2 (materiales) | Vuelven a ser dos materiales distintos: `chrome` (el marco: oscuro, atracado, sin sombra) y `overlay` (lo que flota sobre la hoja: blanco, línea de pelo, sombra corta). Deroga la enmienda del 26-09, «un solo material». Se añade el ámbito de papel y se reescribe la advertencia de «`--text-*` es tinta de cromo oscuro» (§ 7.2). |
 | Skill § 3 (emplazamiento) | Se añade la ley 2: en reposo, solo lo que perdura. Y «los márgenes y el selector de vista no se mueven». |
-| Skill § 2, excepción de la tira | Se reemplaza por la línea al pie, que es marco, no una excepción. |
+| Skill § 2, excepción de la tira | Se reemplaza por la línea al pie, que es marco, no una excepción. *(Enmienda 2026-10-11: la línea al pie es papel, como los márgenes; sigue sin ser una excepción.)* |
 | Skill § Verificación | Se añade el trinquete de reposo. |
 | Skill «Lo que NO se hace» | Sigue vigente: ni más aire, ni otra fuente, ni otros iconos. |
 | `2026-09-24-cromo-callado-design.md` | Encabezado: F2 a F6, § 4.4, § 4.6 y § 8 sustituidos por este documento. |
@@ -803,7 +815,7 @@ literales siguen valiendo y bajan en P6. El contador solo baja.
 | #1099 (modal del piquete junto a la pieza) | El modal desaparece; la cota conserva la vista previa y el largo del borde. |
 | #1010 (los mapas de ajuste, a la vista) | «Mapa» está siempre en el grupo de la prenda, apagado hasta que se simula. |
 | #1095 (el dock que no cabe) | El margen conserva la barra de desplazamiento a la vista. |
-| C4 § 3.1.A (el aviso de la simulación no se calla) | El indicador cambia de sitio, a la línea al pie; el aviso se conserva. |
+| C4 § 3.1.A (el aviso de la simulación no se calla) | El indicador cambia de sitio, a la línea al pie; el aviso se conserva. *(Enmienda 2026-10-11: el indicador vuelve a cambiar, a un icono al pie del margen del 3D, `EstadoDeLaSimulacion`; el aviso se conserva.)* |
 | `CLAUDE.md`, fila D4 | «AgentSettings re-homed in UnifiedBar» pasa a «panel Preferencias desde LogoMenu», al cerrar P2. |
 
 ## 11. Fases

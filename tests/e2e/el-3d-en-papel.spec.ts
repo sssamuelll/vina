@@ -295,12 +295,10 @@ test('el pie reparte el ancho como dice la spec: el patrón ocupa lo que necesit
   const medir = () => page.evaluate(() => {
     const frase = document.querySelector<HTMLElement>('.seccion-del-patron__texto');
     const voz = document.querySelector<HTMLElement>('.seccion-del-3d__texto');
-    const boton = document.querySelector<HTMLElement>('.seccion-del-3d__boton');
     const tres = document.querySelector<HTMLElement>('.linea-al-pie__3d')!.getBoundingClientRect();
     return {
       frase: frase ? { recortada: frase.scrollWidth > frase.clientWidth + 1, ancho: frase.clientWidth } : null,
       voz: voz ? { recortada: voz.scrollWidth > voz.clientWidth + 1 } : null,
-      estado: boton ? { entero: boton.getBoundingClientRect().right <= window.innerWidth && boton.scrollWidth <= boton.clientWidth + 1 } : null,
       tresAncho: tres.width, tresDerecha: tres.right, ventana: window.innerWidth,
     };
   });
@@ -323,46 +321,47 @@ test('el pie reparte el ancho como dice la spec: el patrón ocupa lo que necesit
   await page.waitForTimeout(500);
   expect((await medir()).frase!.recortada, 'Margen de costura: la frase del patrón se cortó').toBe(false);
 
-  // Con el estado a la vista el estado no cede nunca, y la frase del patrón sigue entera.
+  // Con el estado de la simulación a la vista (al pie del margen del 3D desde el 2026-10-11),
+  // la frase del patrón sigue entera: el estado ya no le quita ancho al pie.
   await page.locator('nav.margen .dock__tool[aria-label^="Línea interna"]').first().click();
   await dispatch(page, 'tools/setActiveTool3D', 'steamBrush');
-  await expect(page.getByRole('button', { name: 'Estado de la simulación' })).toBeVisible();
+  await expect(page.locator(`${MARGEN} button[aria-label^="Estado de la simulación"]`)).toBeVisible();
   await page.waitForTimeout(400);
   const conEstado = await medir();
-  expect(conEstado.estado!.entero, 'el estado de la simulación se recorta').toBe(true);
   expect(conEstado.frase!.recortada, 'con el estado a la vista, la frase del patrón se cortó').toBe(false);
   await dispatch(page, 'tools/setActiveTool3D', 'camera');
 });
 
-test('la voz del 3D cede recortándose: su nombre nunca se pinta sobre el estado ni fuera de la ventana', async ({ page }) => {
+test('la voz del 3D cede recortándose: su nombre nunca se sale de su voz ni de la ventana', async ({ page }) => {
   // Revisión final de P5 (A4): la caja de la voz medía 0 px, pero el nombre de la herramienta no se
   // encogía y se desbordaba: a 1366 en Split, con Piquete y la Plancha a vapor, «Plancha a vapor» se
-  // pintaba encima de «En reposo». Se mide la caja del nombre contra la del estado, en reposo (con una
-  // herramienta sin soporte, que es cuando el estado se ve) y con la simulación en marcha.
+  // pintaba encima de «En reposo», el estado que entonces vivía a su derecha. Desde el 2026-10-11 el
+  // estado va al pie del margen del 3D, pero el nombre sigue sin poder salirse de su voz: se mide en
+  // reposo (con una herramienta sin soporte, que es cuando el estado se ve) y con la simulación en marcha.
   await abrirConElPatron(page, 'Split');
+  const estado = page.locator(`${MARGEN} button[aria-label^="Estado de la simulación"]`);
   const comprobar = async (donde: string) => {
     const m = await page.evaluate(() => {
       const r = (s: string) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { left: b.left, right: b.right }; };
-      return { quien: r('.seccion-del-3d__quien'), voz: r('.seccion-del-3d__voz'), estado: r('.seccion-del-3d__boton'), ventana: window.innerWidth };
+      return { quien: r('.seccion-del-3d__quien'), voz: r('.seccion-del-3d__voz'), tres: r('.linea-al-pie__3d'), ventana: window.innerWidth };
     });
-    expect(m.estado, `${donde}: no hay estado`).not.toBeNull();
     expect(m.quien, `${donde}: no hay nombre`).not.toBeNull();
     expect(m.quien!.right, `${donde}: el nombre se desborda de su voz`).toBeLessThanOrEqual(m.voz!.right + 1);
-    expect(m.quien!.right, `${donde}: el nombre se pinta sobre el estado`).toBeLessThanOrEqual(m.estado!.left + 1);
+    expect(m.quien!.right, `${donde}: el nombre se sale de la sección del 3D`).toBeLessThanOrEqual(m.tres!.right + 1);
     expect(m.quien!.right, `${donde}: el nombre se sale de la ventana`).toBeLessThanOrEqual(m.ventana);
   };
   for (const herramientaDelMargen of ['Piquete', 'Línea interna']) {
     await page.locator(`nav.margen:not(.margen--derecho) .dock__tool[aria-label^="${herramientaDelMargen}"]`).first().click();
     for (const tool3D of ['steamBrush', 'meshGrab']) {
       await dispatch(page, 'tools/setActiveTool3D', tool3D);
-      await expect(page.getByRole('button', { name: 'Estado de la simulación' })).toBeVisible();
+      await expect(estado).toBeVisible();
       await page.waitForTimeout(250);
       await comprobar(`${herramientaDelMargen} + ${tool3D} en reposo`);
     }
     await dispatch(page, 'simulation/startSimulation');
     for (const tool3D of ['pin', 'arrangement', 'steamBrush', 'meshGrab']) {
       await dispatch(page, 'tools/setActiveTool3D', tool3D);
-      await expect(page.getByRole('button', { name: 'Estado de la simulación' })).toBeVisible();
+      await expect(estado).toBeVisible();
       await page.waitForTimeout(250);
       await comprobar(`${herramientaDelMargen} + ${tool3D} simulando`);
     }
@@ -400,34 +399,151 @@ test('tras elegir con el ratón en «Mapa» o en «Texturizado», Espacio sigue 
   await expect.poll(sim, { message: 'Espacio no llegó al atajo de la simulación tras elegir un modo de superficie con el ratón' }).toEqual({ estado: 'running', modo: 'arrange' });
 });
 
-test('a 1000 px el estado de la simulación sigue entero y la frase del patrón conserva 200 px', async ({ page }) => {
+test('a 1000 px la frase del patrón conserva 200 px y el estado de la simulación se ve entero al pie del margen', async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 643 });
   await abrirAppVacia(page);
   await cargarDxfDeMaria(page);
   await cambiarVista(page, 'Split');
   await reposo(page);
-  // La voz más larga (Fijar) y el estado a la vista: lo más ancho que puede pasar.
+  // La voz más larga (Fijar) y el estado a la vista: lo más apretado que puede pasar.
   await dispatch(page, 'tools/setActiveTool3D', 'pin');
   await dispatch(page, 'simulation/startSimulation');
-  const estado = page.getByRole('button', { name: 'Estado de la simulación' });
+  const estado = page.locator(`${MARGEN} button[aria-label^="Estado de la simulación"]`);
   await expect(estado, 'no hay estado de la simulación').toBeVisible({ timeout: 10_000 });
   await page.waitForTimeout(500);
-  const m = await page.evaluate(() => {
-    const boton = document.querySelector<HTMLElement>('.seccion-del-3d__boton')!;
+  const m = await page.evaluate((selMargen) => {
+    const margen = document.querySelector(selMargen)!.getBoundingClientRect();
+    const boton = document.querySelector<HTMLElement>(`${selMargen} button[aria-label^="Estado de la simulación"]`)!;
     const b = boton.getBoundingClientRect();
+    const encima = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
     const frase = document.querySelector<HTMLElement>('.seccion-del-patron__frase')!;
     const texto = document.querySelector<HTMLElement>('.seccion-del-3d__texto')!;
     return {
-      botonRight: b.right, botonRecortado: boton.scrollWidth > boton.clientWidth + 1, ventana: window.innerWidth,
+      dentroDelMargen: b.left >= margen.left - 0.5 && b.right <= margen.right + 0.5 && b.bottom <= margen.bottom + 0.5,
+      aLaVista: encima !== null && boton.contains(encima),
+      ventana: window.innerWidth, botonRight: b.right,
       frasePatron: frase.getBoundingClientRect().width,
       vozAncho: texto.getBoundingClientRect().width,
     };
-  });
-  expect(m.botonRecortado, 'el estado de la simulación se recorta').toBe(false);
+  }, MARGEN);
+  expect(m.dentroDelMargen, 'el estado se sale de la columna del 3D').toBe(true);
+  expect(m.aLaVista, 'algo tapa el estado de la simulación').toBe(true);
   expect(m.botonRight, 'el estado se sale de la ventana').toBeLessThanOrEqual(m.ventana);
   expect(m.frasePatron, 'la frase del patrón bajó de 200 px').toBeGreaterThanOrEqual(200);
   expect(m.vozAncho, 'la voz del 3D desapareció en vez de cortarse').toBeGreaterThan(0);
-  // Si algo tiene que ceder, es la voz del 3D (con puntos suspensivos): el estado no se encoge.
-  // Que quepa entera o no depende de lo ancho que sea el motor; lo que no puede pasar es lo de arriba.
   await dispatch(page, 'simulation/resetSimulation');
+});
+
+test('la línea al pie es papel, con los colores del margen de herramientas, en las tres vistas', async ({ page }) => {
+  // Enmienda 2026-10-11. Samuel, con P5 desplegada: «me equivoqué con la línea al pie … creo que va
+  // mejor en los colores de la barra de herramientas: Herramientas del patrón». Se mide lo que pinta el
+  // navegador: el fondo y la tinta del pie contra los del margen, y su borde de arriba, una línea de pelo.
+  await abrirConElPatron(page, '2D');
+  for (const vista of ['2D', 'Split', '3D'] as const) {
+    await cambiarVista(page, vista);
+    await page.waitForTimeout(300);
+    const c = await page.evaluate(() => {
+      const pie = document.querySelector<HTMLElement>('.linea-al-pie')!;
+      const margen = document.querySelector<HTMLElement>('nav.margen')!;
+      // La línea de pelo del margen: la del patrón está a su derecha; con la vista 3D sola solo
+      // queda el del 3D, que la lleva a su izquierda.
+      const delPatron = document.querySelector('nav.margen:not(.margen--derecho)');
+      const del3D = document.querySelector('nav.margen.margen--derecho');
+      const p = getComputedStyle(pie);
+      return {
+        material: pie.getAttribute('data-material'),
+        fondo: p.backgroundColor, fondoDelMargen: getComputedStyle(margen).backgroundColor,
+        tinta: p.color, tintaDelMargen: getComputedStyle(margen).color,
+        borde: `${p.borderTopWidth} ${p.borderTopStyle} ${p.borderTopColor}`,
+        bordeDelMargen: delPatron ? getComputedStyle(delPatron).borderRightColor : getComputedStyle(del3D!).borderLeftColor,
+        barra: getComputedStyle(document.querySelector('.top-bar')!).backgroundColor,
+      };
+    });
+    expect(c.material, `${vista}: el pie no lleva el ámbito de papel`).toBe('papel');
+    expect(c.fondo, `${vista}: el pie no es el papel`).toBe(PAPEL);
+    expect(c.fondo, `${vista}: el pie no es del color del margen`).toBe(c.fondoDelMargen);
+    expect(c.fondo, `${vista}: el pie sigue siendo del material de la barra superior`).not.toBe(c.barra);
+    expect(c.tinta, `${vista}: la tinta del pie no es la del margen`).toBe(c.tintaDelMargen);
+    expect(c.borde, `${vista}: arriba no hay una línea de pelo`).toBe(`1px solid ${c.bordeDelMargen}`);
+  }
+});
+
+test('el estado de la simulación vive al pie del margen del 3D: un icono que despliega el detalle a su izquierda', async ({ page }) => {
+  // Enmienda 2026-10-11. Samuel pidió los mensajes del simulador «en otro lado o que sea muy muy pequeño
+  // tipo un par de iconos o algo así y expandible», y de las dos maquetas eligió la del margen.
+  await abrirConElPatron(page, 'Split');
+  await dispatch(page, 'simulation/startSimulation');
+  const estado = page.locator(`${MARGEN} button[aria-label^="Estado de la simulación"]`);
+  await expect(estado, 'no hay estado de la simulación en el margen').toBeVisible({ timeout: 10_000 });
+  const detalle = page.getByRole('group', { name: 'Detalle de la simulación' });
+
+  const caja = await page.evaluate((selMargen) => {
+    const margen = document.querySelector(selMargen)!;
+    const botones = [...margen.querySelectorAll('button')];
+    const b = botones[botones.length - 1].getBoundingClientRect();
+    const m = margen.getBoundingClientRect();
+    const pie = document.querySelector('.linea-al-pie')!;
+    return {
+      ultimo: botones[botones.length - 1].getAttribute('aria-label') ?? '',
+      alPie: m.bottom - b.bottom, ancho: b.width,
+      enElPie: pie.querySelector('[aria-label^="Estado de la simulación"]') !== null || /Simulando|En pausa/.test(pie.textContent ?? ''),
+    };
+  }, MARGEN);
+  expect(caja.ultimo, 'el estado no es lo último del margen').toMatch(/^Estado de la simulación/);
+  expect(caja.alPie, 'el estado no está al pie de la columna').toBeLessThanOrEqual(12);
+  expect(caja.ancho, 'el estado no es un icono del margen').toBeLessThanOrEqual(44);
+  expect(caja.enElPie, 'la línea al pie sigue diciendo el estado').toBe(false);
+
+  // Un aviso no cae encima del icono: con el visor a la vista los avisos se apartan a la izquierda
+  // del margen. A 16 px del borde se tragaban sus clics de 3 a 5 s, justo cuando sale el aviso de
+  // una costura que no cose (revisión del 2026-10-11).
+  await dispatch(page, 'copilotUI/showToast', { type: 'error', message: 'Una costura no se pudo coser', duration: 0 });
+  await expect(page.locator('.toast')).toBeVisible();
+  const conAviso = await page.evaluate((selMargen) => {
+    const margen = document.querySelector(selMargen)!;
+    const botones = [...margen.querySelectorAll('button')];
+    const icono = botones[botones.length - 1];
+    const b = icono.getBoundingClientRect();
+    const e = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+    return {
+      aLaVista: e !== null && icono.contains(e),
+      avisoDerecha: document.querySelector('.toast')!.getBoundingClientRect().right,
+      margenIzquierda: margen.getBoundingClientRect().left,
+    };
+  }, MARGEN);
+  expect(conAviso.aLaVista, 'el aviso tapa el estado de la simulación').toBe(true);
+  expect(conAviso.avisoDerecha, 'el aviso cae sobre el margen del 3D').toBeLessThanOrEqual(conAviso.margenIzquierda);
+  await page.locator('.toast__dismiss').first().click();
+  await expect(page.locator('.toast')).toHaveCount(0);
+
+  await estado.click();
+  await expect(detalle).toBeVisible();
+  const d = await page.evaluate((selMargen) => {
+    const hoja = document.querySelector('[aria-label="Detalle de la simulación"]')!;
+    const h = hoja.getBoundingClientRect();
+    const margen = document.querySelector(selMargen)!;
+    const m = margen.getBoundingClientRect();
+    const botones = [...margen.querySelectorAll('button')];
+    const b = botones[botones.length - 1].getBoundingClientRect();
+    // Las herramientas del margen siguen a la vista y a mano con el detalle abierto.
+    const tapadas = botones.slice(0, 4).filter((x) => {
+      const r = x.getBoundingClientRect();
+      const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !(e !== null && x.contains(e));
+    }).map((x) => x.getAttribute('aria-label'));
+    return {
+      derecha: h.right, margenIzquierda: m.left, abajo: h.bottom, botonAbajo: b.bottom,
+      cabecera: hoja.firstElementChild?.textContent ?? '', material: hoja.getAttribute('data-material'), tapadas,
+    };
+  }, MARGEN);
+  expect(d.derecha, 'el detalle tapa el margen').toBeLessThanOrEqual(d.margenIzquierda);
+  expect(Math.abs(d.abajo - d.botonAbajo), 'el detalle no se apoya en el icono').toBeLessThanOrEqual(2);
+  expect(d.cabecera, 'el detalle no empieza diciendo el estado').toMatch(/^(Simulando|En pausa)/);
+  expect(d.material).toBe('papel');
+  expect(d.tapadas, 'el detalle tapa herramientas del margen').toEqual([]);
+
+  await page.keyboard.press('Escape');
+  await expect(detalle, 'Esc no cierra el detalle').toHaveCount(0);
+  await dispatch(page, 'simulation/resetSimulation');
+  await expect(estado, 'en reposo el estado sigue en el margen').toHaveCount(0);
 });

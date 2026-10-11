@@ -10,7 +10,10 @@ import copilotUIReducer, {
   showToast,
   cleanupExpiredToasts,
 } from '../../../store/copilotUISlice';
+import editorReducer, { setViewMode } from '../../../store/editorSlice';
 import { NEW_PROJECT } from '../../../store/actions';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import ToastContainer from '../ToastContainer';
 
 afterEach(cleanup);
@@ -21,8 +24,32 @@ function probeReducer(state = { newProjectFired: false }, action: UnknownAction)
 }
 
 function makeStore() {
-  return configureStore({ reducer: { copilotUI: copilotUIReducer, probe: probeReducer } });
+  return configureStore({ reducer: { copilotUI: copilotUIReducer, probe: probeReducer, editor: editorReducer } });
 }
+
+describe('ToastContainer ▸ con el margen del 3D a la vista (2026-10-11)', () => {
+  // Al pie del margen del 3D va el estado de la simulación. Los avisos, a 16 px del borde,
+  // le caían encima y se tragaban sus clics durante 3 a 5 s: justo cuando sale el aviso de
+  // una costura que no cose, que es cuando el ⚠ del estado aparece.
+  it('en 2D se queda en su sitio; con el visor se aparta a la izquierda del margen', () => {
+    const store = makeStore();
+    act(() => { store.dispatch(setViewMode('2d')); store.dispatch(showToast({ type: 'info', message: 'Hola', duration: 0 })); });
+    const container = renderWithStore(store);
+    const pila = () => container.querySelector('.toast-container')!;
+    expect(pila().classList.contains('toast-container--con-margen-3d')).toBe(false);
+    act(() => { store.dispatch(setViewMode('split')); });
+    expect(pila().classList.contains('toast-container--con-margen-3d')).toBe(true);
+    act(() => { store.dispatch(setViewMode('3d')); });
+    expect(pila().classList.contains('toast-container--con-margen-3d')).toBe(true);
+  });
+
+  it('se aparta el ancho del margen, que es un token', () => {
+    const css = readFileSync(join(process.cwd(), 'src/components/shell/ToastContainer.css'), 'utf8');
+    const regla = css.match(/\.toast-container--con-margen-3d\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(regla).toMatch(/right:\s*calc\(var\(--margen-ancho\)\s*\+\s*16px\)/);
+    expect(readFileSync(join(process.cwd(), 'src/components/shell/Dock.css'), 'utf8')).toMatch(/min-width:\s*var\(--margen-ancho\)/);
+  });
+});
 
 function renderWithStore(store: ReturnType<typeof makeStore>) {
   const { container } = render(

@@ -1,0 +1,57 @@
+{
+  "columnas": [
+    {
+      "id": "trazado",
+      "titulo": { "en": "Drafting", "es": "Trazado" },
+      "texto": {
+        "en": "Pen, rectangle, notches and seam allowances, with the grainline drawn and the dimensions written where they measure. Darts come in with your DXF.",
+        "es": "Pluma, rectángulo, piquetes y márgenes de costura, con el hilo dibujado y las cotas escritas donde miden. Las pinzas entran con tu DXF."
+      },
+      "prueba": ["src/components/shell/dock2dTools.ts", "src/utils/seam/tiposDeEsquina.ts", "src/utils/notchAnchor.ts", "src/utils/grainLine.ts", "src/utils/dartEntity.ts"]
+    },
+    {
+      "id": "costura",
+      "titulo": { "en": "Sewing", "es": "Costura" },
+      "texto": {
+        "en": "Sew pieces automatically or edge to edge, and watch the seams close in 3D.",
+        "es": "Cose las piezas automáticamente o borde a borde, y mira las costuras cerrarse en el 3D."
+      },
+      "prueba": ["src/utils/seam/caminarCostura.ts", "src/copilot/action/tools/definitions/autoSewTools.ts", "src/utils/cloth"]
+    },
+    {
+      "id": "caida",
+      "titulo": { "en": "Drape", "es": "Caída" },
+      "texto": {
+        "en": "Fabric simulated in real time on the avatar, with WebGPU inside the browser. A fit map from the first frame.",
+        "es": "Tela simulada en tiempo real sobre el avatar, con WebGPU dentro del navegador. Mapa de ajuste desde el primer fotograma."
+      },
+      "prueba": ["src/utils/cloth/gpu", "src/utils/cloth/fitMaps.ts", "public/wasm/xpbd_wasm_bg.wasm", "public/avatares"]
+    }
+  ],
+  "filas": [
+    {
+      "id": "lee",
+      "titulo": { "en": "Reads", "es": "Lee" },
+      "mono": true,
+      "texto": { "en": "DXF-AAMA · DXF-ASTM · Gerber and Lectra dialects", "es": "DXF-AAMA · DXF-ASTM · dialectos Gerber y Lectra" },
+      "prueba": ["src/utils/dxf/formatProfiles.ts", "src/components/shell/AppShell.tsx"]
+    },
+    {
+      "id": "escribe",
+      "titulo": { "en": "Writes", "es": "Escribe" },
+      "mono": true,
+      "texto": { "en": "DXF-AAMA · PDF at 1:1 · BOM (CSV) · glTF · USDZ · 360° turn", "es": "DXF-AAMA · PDF a escala 1:1 · BOM (CSV) · glTF · USDZ · vuelta 360°" },
+      "prueba": ["src/utils/export/uiExport.ts", "src/components/Viewport3D/renderSections/ExportSection.tsx", "src/components/shell/LogoMenu.tsx"]
+    },
+    {
+      "id": "copiloto",
+      "titulo": { "en": "Copilot", "es": "Copiloto" },
+      "mono": false,
+      "texto": {
+        "en": "Ask it to add a dart or to audit the seam allowances. Same tools as yours, and every change can be undone. With your own key.",
+        "es": "Pídele que añada una pinza o que audite los márgenes. Las mismas herramientas que tú, y cada cambio se puede deshacer. Con tu propia llave."
+      },
+      "prueba": ["src/copilot/connections/registry.ts", "src/copilot/action/tools/definitions"]
+    }
+  ]
+}

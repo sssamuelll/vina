@@ -102,14 +102,17 @@ sobre el papel. No sabe dónde está. Cinco reglas:
   de pelo (`.canvas-area__divider`, con el ámbito). Lo que se leía sobre la
   escena bajó al marco o se hizo papel: los mapas son un menú de papel en la
   barra superior («Mapa ▾», con «Texturizado ▾» y el interruptor del avatar en el
-  grupo de la prenda) y su escala y su tabla son papel (`LeyendaDeMapas`); el
-  estado de la simulación y la voz de la vista viven en la sección del 3D de la
-  línea al pie (`SeccionDel3D`). Desde P4 los paneles son `chrome` a ras, entre
-  la barra superior y la línea al pie (`.context-panel`, `floating.css`). La
-  fila dejó el lienzo en P2a: sus seis interruptores viven en la barra
-  superior, que es marco, y solo su menú plegado («Mostrar») flota y es papel.
-  La tira murió en P2b: sus opciones viven en la línea al pie, que es marco, y
-  solo su menú «Más» flota y es papel. La barra de IA es papel desde P2c, y solo
+  grupo de la prenda) y su escala y su tabla son papel (`LeyendaDeMapas`); la
+  voz de la vista vive en la sección del 3D de la línea al pie (`SeccionDel3D`),
+  y el estado de la simulación, desde el 2026-10-11, es un icono al pie del
+  margen del 3D (`EstadoDeLaSimulacion`) que despliega su detalle a la izquierda
+  del margen (en P5 fue una línea de texto en el pie). Desde P4 los paneles son
+  `chrome` a ras, entre la barra superior y la línea al pie (`.context-panel`,
+  `floating.css`). La fila dejó el lienzo en P2a: sus seis interruptores viven en
+  la barra superior, que es marco, y solo su menú plegado («Mostrar») flota y es
+  papel. La tira murió en P2b: sus opciones viven en la línea al pie, que es
+  papel desde el 2026-10-11 (hasta entonces fue marco), y su menú «Más» flota.
+  La barra de IA es papel desde P2c, y solo
   existe convocada. El margen de herramientas lleva el ámbito desde P2a y la
   hoja desde P2b; el margen del 3D y el escenario, desde P5. **Lo único que
   sigue en el overlay oscuro de `:root` dentro del visor** son dos paneles y la
@@ -126,7 +129,8 @@ dibuja **sobre el papel** del lienzo 2D.
 > cambian con el material. Dentro de `data-material="papel"` son tinta
 > oscura; fuera, la del marco. La hoja lleva el ámbito desde P2b, así que lo
 > que vive sobre ella puede usar `--text-*`; lo que está en el marco (la barra
-> superior, la línea al pie, los paneles) recibe la tinta clara. Lo que se
+> superior y los paneles) recibe la tinta clara. La línea al pie es papel desde
+> el 2026-10-11: su raíz lleva el ámbito, como el margen. Lo que se
 > dibuja del patrón, dentro del `<svg>`, sigue con `--ink-*`, que no cambia
 > con el material.
 
@@ -147,7 +151,8 @@ de una sola lista por concepto (`FORMAS_DE_PIQUETE`, `TIPOS_DE_COSTURA`,
 > (`docs/superpowers/specs/2026-08-30-cotas-vivas-design.md` § 9-10). La
 > tira de herramienta, el otro `overlay` que no se iba, murió en P2b con su
 > borde `-flush` y su sombra `-sheet`: su sitio es la línea al pie, que es
-> marco y no una excepción (spec 2026-10-02 § 10).
+> una fila de la ventana y no una excepción (spec 2026-10-02 § 10), papel
+> como los márgenes desde el 2026-10-11.
 
 > **Nota 2026-09-26:** ya no hay blur, así que un overlay ya NO establece
 > contexto de apilamiento por sí mismo; lo que sigue vale para cualquier
@@ -201,14 +206,16 @@ de una sola lista por concepto (`FORMAS_DE_PIQUETE`, `TIPOS_DE_COSTURA`,
   3D es la última columna de la ventana, DETRÁS de los paneles: un panel se abre
   entre el escenario y el margen, nunca tapa ni empuja al margen
   (`el-3d-en-papel.spec.ts`).
-- **La línea al pie es una fila de la ventana.** Marco, de lado a lado y
-  siempre, con el alto de la barra superior; la hoja termina encima y nada la
-  empuja. Las opciones de la herramienta viven ahí, como botones; lo que no
-  cabe pasa a «Más». Con el visor a la vista lleva también la sección del 3D
-  (la voz de la vista y el estado de la simulación, P5): el patrón no baja de
-  320 px y el 3D se encoge hasta lo que mida su estado; con la vista 3D sola el
-  3D se lleva todo el pie. Lo miden `linea-al-pie.spec.ts` (el patrón) y
-  `el-3d-en-papel.spec.ts` (el reparto con el 3D).
+- **La línea al pie es una fila de la ventana.** Papel, con los colores del
+  margen de herramientas (enmienda 2026-10-11; hasta entonces fue marco), de
+  lado a lado y siempre, con el alto de la barra superior; la hoja termina
+  encima y nada la empuja. Las opciones de la herramienta viven ahí, como
+  botones; lo que no cabe pasa a «Más». Con el visor a la vista lleva también
+  la sección del 3D (la voz de la vista, P5): el patrón no baja de 320 px y la
+  voz del 3D es lo primero que se recorta; con la vista 3D sola el 3D se lleva
+  todo el pie. El estado de la simulación no va aquí: es un icono al pie del
+  margen del 3D (`EstadoDeLaSimulacion`). Lo miden `linea-al-pie.spec.ts` (el
+  patrón) y `el-3d-en-papel.spec.ts` (el reparto, el papel y el estado).
 - **La IA no existe en reposo.** Se llama con «IA», `Ctrl+/`, `Ctrl+K` o desde
   la pantalla vacía, y aparece sobre la línea al pie, en papel. Ocultarla no
   pierde la conversación ni corta al agente: viven en el store
