@@ -36,6 +36,7 @@ import { downloadUSDZ } from '../../utils/export/usdzExporter';
 import type { Tool3D } from '../../types/types';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import PanCrosshair from './PanCrosshair';
+import { registrarVisor } from './visorBridge';
 import SnapshotBar from './SnapshotBar';
 import AnchorPoints from './AnchorPoints';
 import { medidasDelCuerpo } from '../../avatares/catalogo';
@@ -552,10 +553,17 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     if (!canvas) return;
 
     const link = document.createElement('a');
-    link.download = `vina-fitmap-${Date.now()}.png`;
+    link.download = `vina-visor-3d-${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   }, [lienzoParaSacar]);
+
+  // «Capturar visor 3D» vive en el menú Vina › Archivo, fuera de este árbol:
+  // el visor deja su captura en el puente mientras está montado.
+  useEffect(() => {
+    registrarVisor(snapshot3D);
+    return () => registrarVisor(null);
+  }, [snapshot3D]);
 
   const handleCopyToClipboard = useCallback(async () => {
     const canvas = lienzoParaSacar();
