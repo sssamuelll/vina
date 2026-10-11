@@ -1429,22 +1429,25 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   if (!staticGeometry) return null;
 
-  // La tela solo escucha al ratón con las herramientas que la tocan. Con un
-  // manejador puesto, r3f le hace raycast a la malla entera (~57.000 triángulos
-  // en la camisa de María, sin BVH) en cada movimiento del ratón: girar la
-  // cámara mientras simula pagaba milisegundos por cuadro (2026-10-11).
-  const telaConRaton = activeTool3D === 'pin' || activeTool3D === 'steamBrush' || activeTool3D === 'meshGrab';
+  // La tela sigue el movimiento del ratón solo con las herramientas que lo
+  // usan (cepillo, agarre). Con `onPointerMove` u `onPointerLeave` puestos, r3f
+  // le hace raycast a la malla entera (~57.000 triángulos en la camisa de
+  // María, sin BVH) en CADA movimiento del ratón (`filterPointerEvents`): girar
+  // la cámara mientras simula pagaba milisegundos por cuadro (2026-10-11). El
+  // clic, pulsar y soltar se quedan: solo cuestan al pulsar, y sin ellos un
+  // clic sobre la tela contaría como «fuera» y soltaría la selección.
+  const sigueAlRaton = activeTool3D === 'steamBrush' || activeTool3D === 'meshGrab';
 
   return (
     <>
       <mesh
         ref={meshRef}
         geometry={staticGeometry}
-        onClick={telaConRaton ? handleMeshClick : undefined}
-        onPointerDown={telaConRaton ? handlePointerDown : undefined}
-        onPointerMove={telaConRaton ? handlePointerMove : undefined}
-        onPointerUp={telaConRaton ? handlePointerUp : undefined}
-        onPointerLeave={telaConRaton ? handlePointerLeave : undefined}
+        onClick={handleMeshClick}
+        onPointerDown={handlePointerDown}
+        onPointerMove={sigueAlRaton ? handlePointerMove : undefined}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={sigueAlRaton ? handlePointerLeave : undefined}
         material={tslMaterial || undefined}
         // Render pass 2026-07-02: la tela castea y recibe sombra (ShadowNode
         // r184 soporta NodeMaterial; guard stale removido en EnvironmentSetup).
