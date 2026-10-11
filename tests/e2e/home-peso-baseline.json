@@ -1,20 +1,20 @@
 {
   "/": {
-    "document": 18371,
+    "document": 18308,
     "stylesheet": 8910,
     "script": 0,
     "font": 88660,
     "image": 44109,
     "media": 0,
-    "total": 160050
+    "total": 159987
   },
   "/es/": {
-    "document": 18771,
+    "document": 18731,
     "stylesheet": 8910,
     "script": 0,
     "font": 88660,
     "image": 44109,
     "media": 0,
-    "total": 160450
+    "total": 160410
   }
 }

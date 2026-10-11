@@ -15,8 +15,8 @@ const leer = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
 const json = (rel) => JSON.parse(leer(rel));
 
 export const PAGINAS = {
-  en: { salida: 'index.html', raiz: './', url: 'https://vina.sdar.dev/', ogImagen: 'og.png', ogLocale: 'en_US' },
-  es: { salida: 'es/index.html', raiz: '../', url: 'https://vina.sdar.dev/es/', ogImagen: 'og-es.png', ogLocale: 'es_VE' },
+  en: { salida: 'index.html', raiz: './', ruta: '/', url: 'https://vina.sdar.dev/', ogImagen: 'og.png', ogLocale: 'en_US' },
+  es: { salida: 'es/index.html', raiz: '../', ruta: '/es/', url: 'https://vina.sdar.dev/es/', ogImagen: 'og-es.png', ogLocale: 'es_VE' },
 };
 
 /** En una lista, `{{k}}` es `d[k][idioma]` si el dato es bilingüe, y `d[k]` si no. */
@@ -32,16 +32,18 @@ export function generarPagina(idioma) {
   const otro = idioma === 'en' ? 'es' : 'en';
   const copy = json(`home/copy/${idioma}.json`);
   const hoy = json('home/datos/hoy.json');
+  // Los términos de motor no se traducen, pero en la página española llevan lang="en" (spec § 9).
+  const webgpu = idioma === 'en' ? 'WebGPU' : '<span lang="en">WebGPU</span>';
+  const motor = (e) => ({ ...e, texto: { ...e.texto, [idioma]: e.texto[idioma].replace(/WebGPU/g, webgpu) } });
   const listas = {
-    columnas: hoy.columnas,
-    filas: hoy.filas.map((f) => ({ ...f, clase: f.mono ? 'mono' : 'prosa' })),
+    columnas: hoy.columnas.map(motor),
+    filas: hoy.filas.map(motor).map((f) => ({ ...f, clase: f.mono ? 'mono' : 'prosa' })),
     enConstruccion: json('home/datos/en-construccion.json'),
     diario: json('home/datos/diario.json'),
   };
   const vars = {
-    ...copy, idioma, raiz: p.raiz, url: p.url, otraUrl: PAGINAS[otro].url,
-    ogImagen: p.ogImagen, ogLocale: p.ogLocale, ogLocaleOtro: PAGINAS[otro].ogLocale,
-    webgpu: idioma === 'en' ? 'WebGPU' : '<span lang="en">WebGPU</span>',
+    ...copy, idioma, raiz: p.raiz, ruta: p.ruta, otraRuta: PAGINAS[otro].ruta, url: p.url, otraUrl: PAGINAS[otro].url,
+    ogImagen: p.ogImagen, ogLocale: p.ogLocale, ogLocaleOtro: PAGINAS[otro].ogLocale, webgpu,
   };
   let html = leer('home/plantilla.html');
   html = html.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, nombre, cuerpo) => {

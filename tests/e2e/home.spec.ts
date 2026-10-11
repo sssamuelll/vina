@@ -47,7 +47,10 @@ for (const p of PAGINAS) {
       await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `https://vina.sdar.dev${p.url}`);
       const idioma = page.locator('header nav a.idioma');
       await expect(idioma).toHaveText(p.idioma);
-      await expect(idioma).toHaveAttribute('href', `https://vina.sdar.dev${p.otra}`);
+      await expect(idioma).toHaveAttribute('href', p.otra);
+      await expect(page.locator('header a.marca')).toHaveAttribute('href', p.url);
+      await idioma.click();
+      await expect(page.locator('h1')).toHaveText(PAGINAS.find((q) => q.url === p.otra)!.h1);
     });
 
     test('los «Abrir Vina» llevan al taller y los «Ver el código» al repo', async ({ page }) => {

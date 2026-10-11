@@ -62,6 +62,11 @@ describe.each(Object.keys(PAGINAS) as ('en' | 'es')[])('la página %s', (idioma)
       expect(nombre.length, visible).toBeGreaterThan(visible.length + 10);
     }
   });
+  it('WebGPU lleva lang="en" en la página española, en el hero y en la columna de caída', () => {
+    const marcados = (html.match(/<span lang="en">WebGPU<\/span>/g) ?? []).length;
+    expect(marcados).toBe(idioma === 'es' ? 2 : 0);
+    expect((html.match(/WebGPU/g) ?? []).length).toBe(2);
+  });
   it('un solo script, el JSON-LD, en su idioma', () => {
     expect(html.match(/<script/g)).toHaveLength(1);
     expect(html).toContain(`"inLanguage":"${idioma}"`);
