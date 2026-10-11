@@ -374,8 +374,9 @@ test('la voz del 3D cede recortándose: su nombre nunca se pinta sobre el estado
 test('tras elegir con el ratón en «Mapa» o en «Texturizado», Espacio sigue siendo el atajo de la simulación', async ({ page }) => {
   // Revisión final de P5 (B-1): el menú devolvía el foco a su disparador tras CUALQUIER clic. El grupo de la
   // prenda es una botonera, así que Espacio pasaba a ser «del botón»: reabría el menú y el atajo no llegaba.
-  // `sim.toggle` (Espacio) NO pausa: con el visor en «colocar» arranca la simulación y, ya arrancada, la
-  // devuelve a reposo. Que llegó se lee en `viewMode3D` ('arrange' → 'simulate') y en el paso a reposo.
+  // `sim.toggle` (Espacio) es el botón «Simular»: corre o pausa (desde el 2026-10-11; antes, ya arrancada,
+  // la devolvía a reposo y Samuel lo vivió como «se reinicia»). Que llegó se lee en el estado: corriendo →
+  // en pausa → corriendo.
   await abrirConElPatron(page, 'Split');
   const sim = () => page.evaluate(() => {
     const s = (window as unknown as VentanaConStore).__VINA_STORE__.getState().simulation;
@@ -389,14 +390,14 @@ test('tras elegir con el ratón en «Mapa» o en «Texturizado», Espacio sigue 
   await expect(page.locator('.menu-de-mapas__hoja')).toHaveCount(0);
   expect(await page.evaluate(() => document.activeElement?.closest('[data-botonera]') != null), 'el menú dejó el foco en un botón de la barra').toBe(false);
   await page.keyboard.press('Space');
-  await expect.poll(sim, { message: 'Espacio no llegó al atajo de la simulación tras elegir un mapa con el ratón' }).toMatchObject({ modo: 'simulate' });
+  await expect.poll(sim, { message: 'Espacio no llegó al atajo de la simulación tras elegir un mapa con el ratón' }).toEqual({ estado: 'paused', modo: 'arrange' });
 
   await page.getByRole('button', { name: /^Modo de superficie:/ }).click();
   await page.getByRole('button', { name: 'Plano', exact: true }).click();
   await expect(page.locator('.surface-pill__flyout')).toHaveCount(0);
   expect(await page.evaluate(() => document.activeElement?.closest('[data-botonera]') != null), 'el menú dejó el foco en un botón de la barra').toBe(false);
   await page.keyboard.press('Space');
-  await expect.poll(sim, { message: 'Espacio no llegó al atajo de la simulación tras elegir un modo de superficie con el ratón' }).toEqual({ estado: 'idle', modo: 'arrange' });
+  await expect.poll(sim, { message: 'Espacio no llegó al atajo de la simulación tras elegir un modo de superficie con el ratón' }).toEqual({ estado: 'running', modo: 'arrange' });
 });
 
 test('a 1000 px el estado de la simulación sigue entero y la frase del patrón conserva 200 px', async ({ page }) => {

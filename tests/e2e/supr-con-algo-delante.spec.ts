@@ -143,18 +143,19 @@ test.describe('#1173 — un diálogo abierto no deja que Supr borre lo de atrás
     // dejaba la pregunta en pantalla. Sin este caso nada lo protege.
     await conPiezaSeleccionada(page);
     await abrirDialogo(page);
-    const modoAntes = await page.evaluate(() => (window as unknown as {
-      __VINA_STORE__: { getState: () => { simulation: { viewMode3D: string } } };
-    }).__VINA_STORE__.getState().simulation.viewMode3D);
+    // El estado de la simulación, no `viewMode3D`: desde el 2026-10-11 Espacio
+    // es el botón «Simular» (corre o pausa) y ya no toca el modo del visor, así
+    // que mirar el modo dejaba este caso ciego a un arranque detrás del diálogo.
+    const simulacion = () => page.evaluate(() => (window as unknown as {
+      __VINA_STORE__: { getState: () => { simulation: { simulationState: string } } };
+    }).__VINA_STORE__.getState().simulation.simulationState);
+    const antes = await simulacion();
 
     await page.keyboard.press(' ');
     await page.waitForTimeout(500);
 
     await expect(page.locator('.confirm-dialog'), 'Espacio no activó el botón enfocado').toHaveCount(0);
-    const modoDespues = await page.evaluate(() => (window as unknown as {
-      __VINA_STORE__: { getState: () => { simulation: { viewMode3D: string } } };
-    }).__VINA_STORE__.getState().simulation.viewMode3D);
-    expect(modoDespues, 'Espacio arrancó la simulación detrás del diálogo').toBe(modoAntes);
+    expect(await simulacion(), 'Espacio arrancó la simulación detrás del diálogo').toBe(antes);
   });
 });
 
