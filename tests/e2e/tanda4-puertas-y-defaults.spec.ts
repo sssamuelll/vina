@@ -73,7 +73,7 @@ test.describe('tanda 4 — puertas que no mienten y defaults que ella quiere', (
     await page.setViewportSize({ width: 1280, height: 520 });
     await waitForApp(page);
 
-    const margen = page.locator('nav.margen');
+    const margen = page.locator('nav.margen:not(.margen--derecho)');
     const alcanzable = await margen.evaluate(el => el.scrollHeight - el.clientHeight);
     expect(alcanzable, 'el margen tiene que desbordar para que este caso mida algo').toBeGreaterThan(0);
 

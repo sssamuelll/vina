@@ -23,15 +23,19 @@ import toolsReducer from '../../../store/toolSlice';
 import constructionReducer from '../../../store/constructionSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
 import { store as appStore } from '../../../store';
-import { selectTrazo, setLineLengthMode, selectInternalLine } from '../../../store/editorSlice';
+import { selectTrazo, setLineLengthMode, selectInternalLine, setViewMode } from '../../../store/editorSlice';
 import { addTrazo, restoreState } from '../../../store/projectSlice';
 import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 import type { Trazo, InternalLine, PatternPiece } from '../../../types/types';
 import LogoMenu from '../LogoMenu';
 
-const { downloadDiagnosticBundleMock } = vi.hoisted(() => ({
+const { downloadDiagnosticBundleMock, capturarVisor3DMock } = vi.hoisted(() => ({
   downloadDiagnosticBundleMock: vi.fn(),
+  capturarVisor3DMock: vi.fn(() => true),
 }));
+
+// El visor es quien sabe capturar; aquí solo importa que el menú lo llame.
+vi.mock('../../Viewport3D/visorBridge', () => ({ capturarVisor3D: capturarVisor3DMock }));
 
 // uiExport pulls export-heavy deps (pdf/dxf writers) — irrelevant here.
 vi.mock('../../../utils/export/uiExport', () => ({ runUiExport: vi.fn() }));
@@ -388,5 +392,38 @@ describe('LogoMenu ▸ Patrón — las puertas de la zona AUTO (spec 2026-10-02 
     renderMenu();
     openViewMenu();
     expect(screen.queryByText('Sugerencias del dock')).toBeNull();
+  });
+});
+
+describe('LogoMenu ▸ Archivo — «Capturar visor 3D» (spec 2026-10-02 § 4.2, P5)', () => {
+  // La acción y el `disabled` leen el store canónico: el menú se monta contra él.
+  function abrirArchivoCon(vista: '2d' | 'split' | '3d') {
+    appStore.dispatch(setViewMode(vista));
+    render(<Provider store={appStore}><LogoMenu onOpenPanel={() => {}} onImportDXF={() => {}} /></Provider>);
+    openFileMenu();
+  }
+  const item = () => screen.getByText('Capturar visor 3D').closest('.logo-menu__item')!;
+
+  it('sale de la pantalla y vive en Archivo, junto a «Exportar 3D / Vuelta 360°...», con su atajo', () => {
+    abrirArchivoCon('3d');
+    const rotulos = Array.from(document.querySelectorAll('.logo-menu__label')).map((e) => e.textContent);
+    const i = rotulos.indexOf('Capturar visor 3D');
+    expect(i, 'no está en Archivo').toBeGreaterThan(-1);
+    expect(rotulos[i - 1]).toBe('Exportar 3D / Vuelta 360°...');
+    expect(item().querySelector('.logo-menu__shortcut')?.textContent).toMatch(/F10/);
+  });
+
+  it.each([['split'], ['3d']] as const)('con la vista %s está encendido y llama al visor', (vista) => {
+    abrirArchivoCon(vista);
+    expect(item().className).not.toContain('logo-menu__item--disabled');
+    fireEvent.click(screen.getByText('Capturar visor 3D'));
+    expect(capturarVisor3DMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('con la vista 2D está apagado: no hay visor a la vista que capturar', () => {
+    abrirArchivoCon('2d');
+    expect(item().className).toContain('logo-menu__item--disabled');
+    fireEvent.click(screen.getByText('Capturar visor 3D'));
+    expect(capturarVisor3DMock).not.toHaveBeenCalled();
   });
 });

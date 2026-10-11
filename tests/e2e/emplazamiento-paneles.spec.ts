@@ -7,6 +7,11 @@ import { test, expect, Page } from '@playwright/test';
  * a partir de 1600, dos, uno junto al otro. En 2D, abrir uno no mueve el
  * margen de herramientas ni reencuadra la hoja: se estrecha por la derecha.
  *
+ * P5 (§ 6.1): con el visor a la vista (Split y 3D) el margen del 3D es la última
+ * columna de la ventana, DETRÁS de los paneles: el primero se pega a ÉL y no al
+ * borde de la ventana, y el margen no se mueve (lo mide `el-3d-en-papel.spec.ts`).
+ * En 2D no hay margen del 3D y el panel sí toca el borde.
+ *
  * Por qué es un e2e: jsdom no calcula layout —`getBoundingClientRect()` da 0
  * y no existe `elementFromPoint`—, así que ningún test unitario ve si un
  * panel encoge el lienzo, si dos caben ni si algo queda encerrado. Compañero
@@ -78,6 +83,17 @@ async function abrirPanel(page: Page, nombre: string) {
   await page.waitForTimeout(400);
 }
 
+/**
+ * Dónde se pegan los paneles por la derecha: el borde izquierdo del margen del
+ * 3D si hay visor a la vista (Split y 3D), y el de la ventana si no (2D).
+ */
+async function bordeDeLosPaneles(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const margen = document.querySelector('nav[aria-label="Herramientas del 3D"]');
+    return margen ? margen.getBoundingClientRect().left : document.documentElement.clientWidth;
+  });
+}
+
 /** Ancho del SVG del lienzo 2D, que es lo que la usuaria ve del patrón. */
 async function anchoDelLienzo(page: Page): Promise<number> {
   return page.evaluate(() => {
@@ -135,7 +151,7 @@ test.describe('los paneles: a la derecha, a ras y con reemplazo', () => {
     await sembrarPieza(page);
   });
 
-  test('un panel abre pegado al borde derecho, de la barra superior a la línea al pie, sin margen, radio ni sombra', async ({ page }) => {
+  test('un panel abre pegado al borde derecho —al margen del 3D si hay visor—, de la barra superior a la línea al pie, sin margen, radio ni sombra', async ({ page }) => {
     await abrirPanel(page, 'Propiedades');
     await expect(page.locator(PANEL)).toHaveCount(1);
 
@@ -143,9 +159,13 @@ test.describe('los paneles: a la derecha, a ras y con reemplazo', () => {
       const p = document.querySelector('.context-panel') as HTMLElement;
       const r = p.getBoundingClientRect();
       const s = getComputedStyle(p);
+      const margen3D = document.querySelector('nav[aria-label="Herramientas del 3D"]');
       return {
         derecha: r.right,
-        ventana: document.documentElement.clientWidth,
+        // Con el visor a la vista (la app abre en Split) el margen del 3D es la última
+        // columna y el panel se pega a él; sin visor (2D) toca el borde de la ventana.
+        ventana: margen3D ? margen3D.getBoundingClientRect().left : document.documentElement.clientWidth,
+        margen3DEnElBorde: margen3D ? Math.round(margen3D.getBoundingClientRect().right) === document.documentElement.clientWidth : true,
         ancho: r.width,
         arriba: r.top,
         finDeLaBarra: document.querySelector('.top-bar')!.getBoundingClientRect().bottom,
@@ -158,6 +178,7 @@ test.describe('los paneles: a la derecha, a ras y con reemplazo', () => {
     });
 
     expect(Math.abs(m.derecha - m.ventana)).toBeLessThan(1);
+    expect(m.margen3DEnElBorde, 'el margen del 3D no está en el borde de la ventana').toBe(true);
     expect(m.ancho).toBe(300);
     expect(Math.abs(m.arriba - m.finDeLaBarra)).toBeLessThan(1);
     expect(Math.abs(m.abajo - m.inicioDelPie)).toBeLessThan(1);
@@ -209,7 +230,8 @@ test.describe('los paneles: a la derecha, a ras y con reemplazo', () => {
 
     const capas = await cajaDelPanel(page, 'Capas');
     const propiedades = await cajaDelPanel(page, 'Propiedades');
-    expect(Math.abs(capas.left + capas.width - 1680), 'Capas, el primero, va pegado al borde').toBeLessThan(1);
+    // El primero va pegado al borde: el del margen del 3D en Split y 3D (P5), el de la ventana en 2D.
+    expect(Math.abs(capas.left + capas.width - (await bordeDeLosPaneles(page))), 'Capas, el primero, va pegado al borde').toBeLessThan(1);
     expect(Math.abs(propiedades.left + propiedades.width - capas.left), 'Propiedades, a su izquierda').toBeLessThan(1);
 
     await abrirPanel(page, 'Escalado');
@@ -277,7 +299,8 @@ test.describe('los paneles: a la derecha, a ras y con reemplazo', () => {
       return { suma, area: area.getBoundingClientRect().width, clases };
     });
 
-    expect(medida.clases).toEqual(['canvas-area__2d', 'canvas-area__divider', 'canvas-area__3d', 'context-panel', 'context-panel']);
+    // El margen del 3D (P5) es la última columna: detrás de los paneles.
+    expect(medida.clases).toEqual(['canvas-area__2d', 'canvas-area__divider', 'canvas-area__3d', 'context-panel', 'context-panel', 'margen']);
     expect(medida.suma).toBeLessThanOrEqual(medida.area + 1);
     expect(medida.suma).toBeGreaterThan(medida.area - 2);
   });

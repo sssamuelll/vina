@@ -51,6 +51,8 @@ describe('3. la mono solo viste datos', () => {
     'src/components/shell/ToolTooltip.css': ['.tool-tooltip-shortcut'],
     'src/components/shell/Dock.css': ['.dock-picker__kbd'],
     'src/components/PatternEditor/SeccionDelPatron.css': ['.seccion-del-patron__tecla'],
+    // La tecla de la herramienta del 3D en la línea al pie: una tecla, como la del patrón.
+    'src/components/shell/SeccionDel3D.css': ['.seccion-del-3d__tecla'],
     'src/components/PatternEditor/cotas/cotas.css': '*',
   };
   const css = rastreados('src/**/*.css');

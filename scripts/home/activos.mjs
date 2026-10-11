@@ -206,8 +206,11 @@ await clickViewMode('3D');
 await settle(1500);
 // El fondo del visor de la home (--visor-arriba) y sin suelo: son ajustes de render que la
 // usuaria tiene en el panel de render; sin ellos el recuadro saldría gris claro y el
-// indicador «Simulando» (--visor-texto) no se leería encima.
+// indicador «Simulando» (--visor-texto) no se leería encima. Desde P5 el fondo de fábrica es
+// «Papel» (`transparent`): el color se ignora y, sin cromo, asoma el negro del body. Hay que
+// pasar a «Sólido» antes de poner el color.
 await page.evaluate(() => {
+  window.__VINA_STORE__.dispatch({ type: 'renderSettings/setBackgroundMode', payload: 'solid' });
   window.__VINA_STORE__.dispatch({ type: 'renderSettings/setBackgroundColor', payload: '#2a2825' });
   window.__VINA_STORE__.dispatch({ type: 'renderSettings/setGroundVisible', payload: false });
 });
@@ -220,6 +223,8 @@ async function comando(nombre) {
   await settle(1500);
   await page.keyboard.press('Escape');
 }
+const fondo = await page.evaluate(() => window.__VINA_STORE__.getState().renderSettings.backgroundMode);
+if (fondo !== 'solid') throw new Error(`caida-poster: el fondo del visor quedó en «${fondo}» y el póster saldría sobre otro color`);
 await comando('Coser piezas automáticamente');
 const costuras = await page.evaluate(() => window.__VINA_STORE__.getState().project.seams.length);
 if (!costuras) throw new Error('caida-poster: «Coser piezas automáticamente» no cosió nada');

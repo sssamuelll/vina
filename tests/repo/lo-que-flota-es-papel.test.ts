@@ -42,16 +42,20 @@ const RAICES: Array<[string, number]> = [
   ['src/components/LayerPanel/LayerPanel.tsx', 1],
   ['src/components/LayerPanel/LayerColorPicker.tsx', 1],
   ['src/components/Viewport3D/SurfaceModePill.tsx', 1],
+  ['src/components/Viewport3D/MenuDeMapas.tsx', 1],
   ['src/components/PatternEditor/FilaDeCapas.tsx', 1],
   ['src/components/PatternEditor/SeccionDelPatron.tsx', 1],
   // La hoja de «Tu agente», que cuelga del enchufe (spec 2026-10-09)
   ['src/components/shell/PuertaDelAgente.tsx', 1],
   // La barra de IA convocada (P2c)
   ['src/components/shell/UnifiedBar.tsx', 1],
+  // La leyenda de los mapas: escala, tabla y valor sobre el visor (P5)
+  ['src/components/Viewport3D/LeyendaDeMapas.tsx', 1],
   // Avisos y tooltips
   ['src/components/shell/ToastContainer.tsx', 1],
   ['src/components/shell/ToolTooltip.tsx', 1],
-  ['src/components/shell/AppShell.tsx', 1],
+  // La tarjeta de «suelta tu archivo» y el divisor de Split (una línea de pelo sobre papel, P5)
+  ['src/components/shell/AppShell.tsx', 2],
   // Modales
   ['src/components/shell/ConfirmDialog.tsx', 1],
   ['src/components/PatternEditor/CalibrationModal.tsx', 1],
@@ -84,6 +88,11 @@ const PINTA: Array<[string, string[] | '*']> = [
   ['src/components/PatternEditor/ToolOptionControls.css', '*'],
   ['src/components/LayerPanel/LayerPanel.css', ['.layer-context-menu', '.layer-color-popover', '.layer-color-swatch']],
   ['src/components/Viewport3D/SurfaceModePill.css', ['.surface-pill__flyout', '.surface-pill__option']],
+  // El menú «Mapa» (la hoja, sus elementos y sus ajustes) y la leyenda de los mapas (P5)
+  ['src/components/Viewport3D/MenuDeMapas.css', '*'],
+  ['src/components/Viewport3D/LeyendaDeMapas.css', '*'],
+  // El detalle del estado de la simulación, que se abre desde la línea al pie (P5)
+  ['src/components/shell/SeccionDel3D.css', ['.seccion-del-3d__detalle', '.seccion-del-3d__linea']],
   // Avisos y tooltips
   ['src/components/shell/ToastContainer.css', '*'],
   ['src/components/shell/ToolTooltip.css', '*'],
@@ -99,7 +108,7 @@ const PINTA: Array<[string, string[] | '*']> = [
 ];
 
 const FONDO_DEL_MARCO = /var\(--(bg-surface|bg-base|bg-deeper|bg-primary|panel-bg|surface-chrome-bg)\)/;
-const COLOR_A_MANO = /#[0-9a-fA-F]{3,8}\b|\brgba?\(\s*\d/;
+const COLOR_A_MANO = /#[0-9a-fA-F]{3,8}\b|\brgba?\(\s*\d|(?<![-\w])(?:color|background(?:-color)?|border(?:-color)?|fill|stroke)\s*:\s*(?:white|black)\b/i;
 const ACENTO_COMO_TINTA = /(?<![-\w])color:\s*['"]?var\(--accent\)/;
 
 /** Las reglas de lo que flota en una hoja; en un componente o con '*', sus líneas. */

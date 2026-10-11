@@ -9,6 +9,9 @@ import {
   getAppliedSolverConfig,
   getClothGeometry,
   getSolverEvents,
+  aristasDeLaTela,
+  latidosDeLaSimulacion,
+  latirLaSimulacion,
   pushSolverEvent,
   registerClothGeometry,
   setActiveSolverTier,
@@ -127,5 +130,18 @@ describe('solverRuntimeTracker — espejo en la bitácora', () => {
     const solverEvents = getJournal().events.filter((e) => e.kind === 'solver');
     expect(solverEvents).toHaveLength(1);
     expect(solverEvents[0].n).toBe(2);
+  });
+});
+
+describe('solverRuntimeTracker — el latido de la tela (IA 1b-2)', () => {
+  it('cada latido cuenta un cuadro de tela nueva y deja a la vista las aristas del solver', () => {
+    const antes = latidosDeLaSimulacion();
+    const aristas = { stretchingIds: new Int32Array([0, 1]), stretchingLengths: new Float32Array([0.1]) };
+    latirLaSimulacion(aristas);
+    latirLaSimulacion(aristas);
+    expect(latidosDeLaSimulacion()).toBe(antes + 2);
+    expect(aristasDeLaTela()).toBe(aristas);
+    latirLaSimulacion(null);
+    expect(aristasDeLaTela()).toBeNull();
   });
 });

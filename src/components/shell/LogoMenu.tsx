@@ -20,6 +20,7 @@ import { parteElTrazo } from '../PatternEditor/trazos/trazoPath';
 import { pushJournal } from '../../utils/telemetry/journal';
 import { runAutoSew } from '../../store/autoSewThunk';
 import { openRenderSettings } from '../../store/renderSettingsThunk';
+import { capturarVisor3D } from '../Viewport3D/visorBridge';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { store } from '../../store';
 import { runUiExport } from '../../utils/export/uiExport';
@@ -102,6 +103,9 @@ const FILE_MENU: MenuItem[] = [
   { label: 'Exportar PDF (1:1)', action: (d) => runUiExport('pdf', store.getState().project, d) },
   { label: 'Exportar BOM (CSV)', action: (d) => runUiExport('bom', store.getState().project, d) },
   { label: 'Exportar 3D / Vuelta 360°...', action: (d) => d(openRenderSettings()) },
+  // Salió de la pantalla (era un botón de la barra de mapas): es una acción, no
+  // algo que se ve (spec 2026-10-02 § 4.2). Sin visor a la vista no hay qué capturar.
+  { label: 'Capturar visor 3D', shortcutId: 'tool3d.snapshot', action: () => { capturarVisor3D(); }, disabled: (s) => s.editor.viewMode === '2d' },
   { separator: true, label: '' },
   {
     label: 'Exportar diagnóstico',

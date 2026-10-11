@@ -22,9 +22,6 @@
    * --border-subtle, y es también lo que separa dentro de lo que flota: ahí
    * --border es el borde de un campo, a 3:1, y de separador pesa como uno. */
   --hairline: 1px solid rgba(255, 255, 255, 0.07);
-  /* Escenario del visor 3D, un paso más claro que el cromo para que la
-   * prenda no se lea sobre negro. Consumidor: F3 (renderSettingsSlice). */
-  --scene-3d: oklch(0.26 0.004 80);     /* #252422 */
 
   /* ── Texto — cuatro pasos (spec § 4.2) ─────────────────────────────── */
   --text-primary: oklch(0.93 0.006 80);   /* #eae7e3 · 14,95:1 sobre surface */
@@ -261,6 +258,9 @@
    * Ley de emplazamiento (§ 5.2 del informe 2026-08-14): nada de z-index
    * literal. El orden es de URGENCIA, no de antigüedad. Lo fija
    * zIndexScale.test.ts, escalón por escalón. */
+  /* Sin consumidor desde P5: el margen del 3D es una columna en el flujo, como
+   * el del patrón, y ya no un dock flotante. Se queda porque la escala es un
+   * mapa de ROLES (lo mismo que --z-panel, aquí abajo). */
   --z-dock: 5;
   /* Sin consumidor desde que los paneles son hijos flex de .canvas-area
    * (60643b35); se queda porque la escala es un mapa de ROLES. */
@@ -302,9 +302,11 @@
  *  2. color se hereda ya calculado: sin la línea color de abajo, un portal
  *     colgado de body heredaría la tinta clara del marco.
  *
- * La hoja y sus márgenes lo ganan en P2, el escenario 3D en P5: hasta entonces
- * llevan encima el dock, la tira, la fila y el cromo del 3D, que siguen
- * oscuros, y con el ámbito su tinta se volvería oscura sobre fondo oscuro. */
+ * La hoja y sus márgenes lo ganan en P2 y el margen del 3D en P5. El escenario
+ * 3D NO lo lleva entero: dentro del visor viven paneles del marco (render,
+ * colisión) que siguen oscuros, y con el ámbito su tinta se volvería oscura
+ * sobre fondo oscuro. Lo que P5 pinta encima del escenario (la leyenda de los
+ * mapas, sus menús) lo declara cada uno. */
 [data-material="papel"] {
   color: var(--text-primary);
 

@@ -10,6 +10,7 @@ export const INSTRUCCIONES = [
   'Every answer carries the project revision, which goes up with every change. A receipt gives revision.before and revision.after: if before is not the revision you last saw, someone else changed the pattern in between, so read it again. The revision starts again from 0 when the user reloads Vina.',
   'Every tool that changes the pattern returns a receipt. done is true only when the measured result confirms the change. done: false is an honest answer, not a crash: read its warnings; nothing was half-changed.',
   'Each change is one undo step for the user (Ctrl+Z). The undo tool reverts only steps made by an agent.',
-  'A locked piece is never edited or removed: the tools that would do it answer done: false.',
+  'A locked piece keeps its shape: the tools that would change its outline or internal lines, or remove it, answer done: false.',
+  "The simulation runs in the user's browser and only advances while Vina is visible on screen. simulate waits for the cloth to settle and says why when it cannot; fit_map reads the result piece by piece.",
   'The user works in Spanish: pieza = piece, costura = seam, piquete = notch, pinza = dart, patrón = pattern.',
 ].join('\n');

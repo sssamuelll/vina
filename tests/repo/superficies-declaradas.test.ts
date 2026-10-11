@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -13,16 +14,18 @@ import { join } from 'node:path';
 export const VOCABULARIO = new Set([
   'ambiente', 'documento', 'dev',
   'pie', 'pista', 'barra', 'paleta', 'velo', 'cabina', 'menu', 'panel',
-  'modal', 'toast', 'tooltip', 'estado-vacio', 'indicador-simulacion',
-  'indicador-fps', 'mapas', 'instantaneas',
+  'modal', 'toast', 'tooltip', 'estado-vacio',
+  'leyenda', 'instantaneas',
 ]);
 
 /** [archivo, valor, veces] */
 const MARCAS: Array<[string, string, number]> = [
   ['src/components/shell/TopBar.tsx', 'ambiente', 1],
   ['src/components/shell/TopBar.tsx', 'dev', 1],
-  ['src/components/shell/DockShell.tsx', 'ambiente', 1],
   ['src/components/shell/Dock.tsx', 'ambiente', 1],
+  // El margen del 3D (spec 2026-10-02 § 4.3, P5): el segundo de los dos márgenes
+  // de la lista cerrada de `ambiente`. Desde P5 el dock flotante (DockShell) no existe.
+  ['src/components/shell/RightDock.tsx', 'ambiente', 1],
   // La línea al pie (spec 2026-10-02 § 5.3): marco. Lo que aparece en ella
   // son las opciones (`pie`) y la frase (`pista`), que pinta la sección del
   // patrón por portal.
@@ -31,7 +34,8 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/PatternEditor/SeccionDelPatron.tsx', 'pista', 1],
   ['src/components/PatternEditor/SeccionDelPatron.tsx', 'menu', 1],
   ['src/components/PatternEditor/renderers/MarcaDeEscala.tsx', 'documento', 1],
-  ['src/components/Viewport3D/SurfaceModePill.tsx', 'ambiente', 1],
+  // «Texturizado ▾» vive en el grupo de la prenda de la barra superior (P5): ya
+  // no es un ambiente propio, solo su menú es una superficie.
   ['src/components/Viewport3D/SurfaceModePill.tsx', 'menu', 1],
   ['src/components/Debug/SolverMetrics.tsx', 'dev', 2],
   // La fila vive en la barra superior desde P2: es parte de su ambiente. Lo
@@ -58,8 +62,11 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/shell/ContextPanel.tsx', 'panel', 1],
   ['src/components/Viewport3D/RenderSettingsPanel.tsx', 'panel', 1],
   ['src/components/Viewport3D/CollisionBodyPanel.tsx', 'panel', 1],
-  ['src/components/Viewport3D/FitMapToggle.tsx', 'panel', 1],
-  ['src/components/Viewport3D/FitMapToggle.tsx', 'mapas', 1],
+  // Los mapas de ajuste (spec 2026-10-02 § 4.2, P5): el menú «Mapa» cuelga de la
+  // barra superior (una hoja, con la lista y los ajustes como dos vistas), y la
+  // leyenda —escala, tabla y valor— es lo que se lee sobre el visor.
+  ['src/components/Viewport3D/MenuDeMapas.tsx', 'menu', 1],
+  ['src/components/Viewport3D/LeyendaDeMapas.tsx', 'leyenda', 1],
   ['src/components/shell/ConfirmDialog.tsx', 'modal', 1],
   ['src/components/PatternEditor/CalibrationModal.tsx', 'modal', 1],
   ['src/copilot/connections/ConnectionModal.tsx', 'modal', 1],
@@ -67,8 +74,12 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/shell/ToolTooltip.tsx', 'tooltip', 1],
   ['src/components/shell/AppShell.tsx', 'velo', 1],
   ['src/components/PatternEditor/EmptyState2D.tsx', 'estado-vacio', 1],
-  ['src/components/Viewport3D/SimulationStatusOverlay.tsx', 'indicador-simulacion', 1],
-  ['src/components/shell/RightDock.tsx', 'indicador-fps', 1],
+  // La sección del 3D de la línea al pie (spec 2026-10-02 § 5.3, P5): la voz (la
+  // frase de la herramienta, `pista`, como la del patrón) y el detalle del estado
+  // de la simulación, que cuelga de <body> (`menu`). Sustituye a la caja oscura
+  // de la esquina del visor (`indicador-simulacion`) y al «SIMULANDO · N fps» del dock.
+  ['src/components/shell/SeccionDel3D.tsx', 'pista', 1],
+  ['src/components/shell/SeccionDel3D.tsx', 'menu', 1],
   ['src/components/Viewport3D/SnapshotBar.tsx', 'instantaneas', 1],
 ];
 
@@ -88,5 +99,19 @@ describe('cada superficie del shell declara data-superficie', () => {
       }
     }
     expect(fuera).toEqual([]);
+  });
+});
+
+describe('el vocabulario y la lista de «ambiente» valen para todo archivo', () => {
+  const todos = execFileSync('git', ['ls-files', 'src/**/*.tsx'], { encoding: 'utf8' })
+    .split('\n').filter((f) => f && !/__tests__|\.test\./.test(f));
+  it('ningún componente usa un valor fuera del vocabulario', () => {
+    const fuera = todos.flatMap((f) => [...lee(f).matchAll(/data-superficie="([^"]+)"/g)].filter((m) => !VOCABULARIO.has(m[1])).map((m) => `${f}: ${m[1]}`));
+    expect(fuera).toEqual([]);
+  });
+  it('«ambiente» solo lo declaran los de la lista cerrada', () => {
+    const conAmbiente = todos.filter((f) => lee(f).includes('data-superficie="ambiente"')).sort();
+    const lista = [...new Set(MARCAS.filter(([, v]) => v === 'ambiente').map(([r]) => r))].sort();
+    expect(conAmbiente).toEqual(lista);
   });
 });

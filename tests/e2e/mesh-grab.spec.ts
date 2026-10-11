@@ -38,7 +38,7 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
     await addRectanglePiece(page);
     await switchView(page, '3D');
 
-    await page.locator('.canvas-area__3d [aria-label="Avatar"]').focus();
+    await page.locator('nav[aria-label="Herramientas del 3D"] [aria-label="Avatar"]').focus();
     await page.keyboard.press('o');
     await page.waitForTimeout(300);
 
@@ -100,7 +100,7 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
 
     expect(await waitForClothMesh(page)).toBe(true);
 
-    await page.locator('.canvas-area__3d [aria-label="Avatar"]').focus();
+    await page.locator('nav[aria-label="Herramientas del 3D"] [aria-label="Avatar"]').focus();
     await page.keyboard.press('o');
     await page.waitForTimeout(500);
 

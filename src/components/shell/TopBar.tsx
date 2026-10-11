@@ -8,6 +8,7 @@ import { useState } from 'react';
 import LogoMenu from './LogoMenu';
 import PuertaDelAgente from './PuertaDelAgente';
 import FilaDeCapas from '../PatternEditor/FilaDeCapas';
+import GrupoDeLaPrenda from './GrupoDeLaPrenda';
 import { displayShortcut } from './shortcutDisplay';
 import {
   particleCountLabel,
@@ -86,6 +87,9 @@ export default function TopBar({ onOpenPanel, onImportDXF }: TopBarProps) {
       </div>
 
       <div className="top-bar__lado top-bar__lado--derecho">
+        {/* Lo que se ve de la prenda (spec 2026-10-02 § 4.2): con el visor a la
+            vista, junto a «IA». En 2D no hay prenda que mirar. */}
+        {viewMode !== '2d' && <GrupoDeLaPrenda />}
         {import.meta.env.DEV && (
           <div className="top-bar__status" aria-label="Estado técnico de la simulación" data-superficie="dev">
             <span className={dotClass} aria-hidden />

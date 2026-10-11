@@ -73,6 +73,10 @@ describe('el gate del deploy corre los trinquetes de la interfaz', () => {
     expect(specsDelGate()).toContain('tests/e2e/la-cabina-de-la-pieza.spec.ts');
   });
 
+  it('y la red del 3D en papel (P5): el escenario, el margen que no se mueve, el grupo de la prenda y el pie', () => {
+    expect(specsDelGate()).toContain('tests/e2e/el-3d-en-papel.spec.ts');
+  });
+
   it('cada spec de la lista existe en disco', () => {
     expect(specsDelGate().filter((s) => !existsSync(join(RAIZ, s)))).toEqual([]);
   });
@@ -80,5 +84,12 @@ describe('el gate del deploy corre los trinquetes de la interfaz', () => {
   it('ninguno está repetido', () => {
     const specs = specsDelGate();
     expect(new Set(specs).size).toBe(specs.length);
+  });
+});
+
+describe('el gate del deploy no se salta ningún spec', () => {
+  it('ninguno lleva un test.skip/fixme incondicional ni un describe saltado', () => {
+    const saltados = specsDelGate().filter((s) => /^\s*test\.(?:skip|fixme)\(\s*true\b|^\s*test\.describe\.(?:skip|fixme)\(/m.test(readFileSync(join(RAIZ, s), 'utf8')));
+    expect(saltados).toEqual([]);
   });
 });

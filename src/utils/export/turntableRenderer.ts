@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { AnyRenderer } from '../../types/renderer';
+import { colorDelPapel } from './sobreElPapel';
 
 export interface TurntableConfig {
   frameCount: number;       // 12, 24, 36, 72
@@ -47,6 +48,9 @@ export async function renderTurntable(
   offscreen.width = width;
   offscreen.height = height;
   const ctx = offscreen.getContext('2d')!;
+  // Un vídeo no tiene canal alfa: con el fondo «Papel» el lienzo es transparente
+  // y cada cuadro saldría negro. Cada uno lleva el papel debajo (spec § 12).
+  const papel = colorDelPapel();
 
   const stream = offscreen.captureStream(fps);
 
@@ -92,6 +96,8 @@ export async function renderTurntable(
       );
       camera.lookAt(target);
       renderer.render(scene, camera);
+      ctx.fillStyle = papel;
+      ctx.fillRect(0, 0, width, height);
       ctx.drawImage(canvas, 0, 0, width, height);
       onProgress?.(i + 1, frameCount);
       await new Promise(r => setTimeout(r, 1000 / fps));

@@ -66,6 +66,13 @@ export interface RenderSettingsState {
   videoFps: number;
   // Avatar
   avatarRenderStyle: AvatarRenderStyle;
+  /**
+   * El estilo que había antes de ocultar el avatar con el interruptor, para
+   * devolverlo. Opcional a propósito: es una ayuda del interruptor, no ajuste de
+   * render, y los sitios que construyen un estado entero (el contexto del
+   * copiloto, sus tests) no tienen por qué saberlo.
+   */
+  avatarEstiloAnterior?: Exclude<AvatarRenderStyle, 'hidden'> | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +183,10 @@ const initialState: RenderSettingsState = {
   hdriCustomUrl: null,
   toneMapping: 'aces',
   exposure: 1.0,
-  backgroundMode: 'solid',
+  // De fábrica el escenario es el papel (spec 2026-10-02 § 4.5): el lienzo es
+  // transparente y el color de la hoja lo pone el CSS detrás. `scene.background`
+  // no sirve: pasa por el mapeo de tonos y un #faf4e3 se ve #e1e0da.
+  backgroundMode: 'transparent',
   backgroundColor: '#e0e0e0',
   lights: [],
   groundVisible: true,
@@ -200,7 +210,16 @@ const initialState: RenderSettingsState = {
   videoFps: 30,
   // Avatar
   avatarRenderStyle: 'visible',
+  avatarEstiloAnterior: null,
 };
+
+/**
+ * ¿Se ve el avatar? La fuente única es el estilo: `'hidden'` es oculto, y lo
+ * leen `AvatarModel` y el maniquí por igual (spec 2026-10-02 § 4.2: «el estado
+ * de Avatar sube al store»).
+ */
+export const selectAvatarVisible = (s: { renderSettings: RenderSettingsState }): boolean =>
+  s.renderSettings.avatarRenderStyle !== 'hidden';
 
 const renderSettingsSlice = createSlice({
   name: 'renderSettings',
@@ -355,6 +374,19 @@ const renderSettingsSlice = createSlice({
 
     setAvatarRenderStyle(state, action: PayloadAction<AvatarRenderStyle>) {
       state.avatarRenderStyle = action.payload;
+      // Un estilo que se ve lo elige ella: el que se guardó al ocultar ya no vale.
+      if (action.payload !== 'hidden') state.avatarEstiloAnterior = null;
+    },
+
+    /** El interruptor «Avatar» de la barra superior, Shift+A y el menú del 3D. */
+    toggleAvatarVisible(state) {
+      if (state.avatarRenderStyle === 'hidden') {
+        state.avatarRenderStyle = state.avatarEstiloAnterior ?? 'visible';
+        state.avatarEstiloAnterior = null;
+      } else {
+        state.avatarEstiloAnterior = state.avatarRenderStyle;
+        state.avatarRenderStyle = 'hidden';
+      }
     },
   },
 });
@@ -388,6 +420,7 @@ export const {
   setVideoFormat,
   setVideoFps,
   setAvatarRenderStyle,
+  toggleAvatarVisible,
 } = renderSettingsSlice.actions;
 
 export default renderSettingsSlice.reducer;

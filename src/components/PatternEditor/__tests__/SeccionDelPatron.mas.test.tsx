@@ -167,7 +167,8 @@ describe('lo que no cabe pasa a «Más»', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Más' }));
     fireEvent.click(screen.getByRole('button', { name: 'Más' }));
     const ui = getJournal().events.filter((e) => e.kind === 'ui').map((e) => [e.name, e.data]);
-    expect(ui).toContainEqual(['linea-al-pie', { herramienta: '__pie_tres', aLaVista: 1, total: 3, hueco: 300 }]);
+    // `necesita`: «quién» 100 + tres de 150 + la frase en su mínimo (200) + la holgura (4).
+    expect(ui).toContainEqual(['linea-al-pie', { herramienta: '__pie_tres', aLaVista: 1, total: 3, hueco: 300, necesita: 754 }]);
     expect(ui).toContainEqual(['mas', { abierto: true, herramienta: '__pie_tres' }]);
     expect(ui).toContainEqual(['mas', { abierto: false, herramienta: '__pie_tres' }]);
   });

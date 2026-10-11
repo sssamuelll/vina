@@ -18,9 +18,6 @@ import { Suspense, useRef, useEffect, useCallback, useMemo, useState, forwardRef
 import { useDisposable } from './hooks/useDisposable';
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-// Same type-only deep import as tslSolver.ts/tslCollision.ts — the TSL solver
-// node fields are typed against this, so the per-substep batch list reuses it.
-import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
@@ -32,7 +29,7 @@ import { resolveArrangementWithFrames } from '../../utils/cloth/arrangement/arra
 import { computeEffectiveRegions } from '../../utils/cloth/garmentPlacement';
 import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
 import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
-import { computeFitMapData, fabricToFitParams, shouldRequestEdgeData } from '../../utils/cloth/fitMaps';
+import { computeFitMapData, DEFAULT_FIT_PARAMS, fabricToFitParams, shouldRequestEdgeData } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { addPin, setCollisionDistance, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
 import { showErrorToast } from '../../store/copilotUISlice';
@@ -44,7 +41,9 @@ import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
-import { pushSolverEvent, registerClothGeometry, type MeshManifestEntry } from '../../utils/cloth/solverRuntimeTracker';
+import { latirLaSimulacion, pushSolverEvent, registerClothGeometry, type MeshManifestEntry } from '../../utils/cloth/solverRuntimeTracker';
+import { seSimula } from '../../utils/cloth/piezasEnLaSimulacion';
+import { nodosDelSubpaso } from './nodosDelSubpaso';
 import { pushError } from '../../utils/errorTracker';
 import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { FACE_POKE_GENERATE_CADENCE } from '../../utils/cloth/gpu/tslFacePoke';
@@ -166,11 +165,9 @@ interface GarmentSimulationProps {
  * Merged multi-piece simulation component.
  * Renders all pieces as a single merged mesh with vertex colors.
  */
-// #1010: fallback de FabricFitParams cuando la tela activa no está en la
-// librería (compartido por el bloque TSL y el CPU readback path).
-const DEFAULT_FIT_PARAMS = {
-  maxStretchRatio: 0.08, weight: 150, thickness: 0.4, avgStretch: 0.025,
-};
+// #1010: el fallback de FabricFitParams (DEFAULT_FIT_PARAMS) vive en
+// fitMaps.ts desde la IA 1b-2: lo comparten el bloque TSL, el CPU readback
+// path y `fit_map` de la superficie.
 
 // #1010 diag — evidencia e2e de la ruta de datos del fit map por tier.
 // Mutado in-place en useFrame (cero alloc); mismo patrón window-global que
@@ -203,6 +200,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // `GrabState` ref + boolean `grabDragging` pair.
   const grabHandleRef = useRef<GrabHandle | null>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
+  // IA 1b-2: el último cuadro del worker que llegó a la malla (cuenta un latido por cuadro nuevo).
+  const ultimaTelaCopiadaRef = useRef<Float32Array | null>(null);
   const tslFrameCounter = useRef(0);
   const tslReadbackPending = useRef(false);
   // §A1: completed-readback counter — the penetration metric runs on every
@@ -280,13 +279,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
 
   // Filter inactive pieces — only active pieces participate in simulation
-  // Also filter out hidden pieces (3D arrangement visibility) and hidden layers
+  // Also filter out hidden pieces (3D arrangement visibility) and hidden layers.
+  // El filtro es uno (`piezasEnLaSimulacion.ts`): lo leen Viewport3D y la superficie.
   const activePieces = useMemo(
-    () => pieces.filter(p =>
-      p.active !== false
-      && !hiddenPieceIds.includes(p.id)
-      && !hiddenLayerIds.includes(p.layer ?? 1)
-    ),
+    () => pieces.filter(p => seSimula(p, hiddenPieceIds, hiddenLayerIds)),
     [pieces, hiddenPieceIds, hiddenLayerIds],
   );
 
@@ -577,7 +573,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // aterriza, edgeDataRef queda null para siempre y el fit map no pinta
     // nada, en silencio. Acá se re-pide mientras haga falta — antes del
     // branch de tier, porque los tres caminos sufren lo mismo.
-    if (shouldRequestEdgeData(fitMapMode, edgeDataRef.current, performance.now(), lastEdgeDataRequestRef.current)) {
+    if (shouldRequestEdgeData(edgeDataRef.current, performance.now(), lastEdgeDataRequestRef.current)) {
       lastEdgeDataRequestRef.current = performance.now();
       (clients.wasm ?? clients.cpu ?? clients.gpu)?.requestEdgeData();
     }
@@ -602,96 +598,17 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         }
       }
 
-      // #897 F2 (H-Q2): UN renderer.compute(array) por substep = un submit
-      // (antes ~12+). Las barreras implícitas de WebGPU entre dispatches del
-      // mismo pass preservan el orden secuencial exacto del loop anterior.
-      // La lista se construye UNA vez por frame: grabActive se lee una vez
-      // arriba y collisionBodies solo muta entre frames (setTslCollisionBody).
-      const substepNodes: ComputeNode[] = [solver.preSolve];
-      // Wind force (two-pass: accumulate per-triangle, apply per-particle)
-      if (solver.windNodes) {
-        substepNodes.push(solver.windNodes.accumNode, solver.windNodes.applyNode);
-      }
-      // Batch all stretch colors — graph coloring guarantees no two
-      // constraints WITHIN a color share a vertex, so each color's parallel
-      // dispatch is race-free; cross-color shared vertices are ordered by
-      // the sequential dispatches inside the pass (same guarantee as the
-      // seam batch below).
-      substepNodes.push(...solver.stretchColors);
-      // Bend colored like stretch (P4-1 determinism): one dispatch per color,
-      // no two constraints in a color share a vertex → race-free.
-      substepNodes.push(...solver.bendColors);
-      // Seam colors batched like stretch (#897 F1.3): sequential dispatches
-      // inside one compute pass — WebGPU guarantees storage writes from one
-      // dispatch are visible to the next, so cross-color shared vertices
-      // are race-free.
-      substepNodes.push(...solver.seamColors);
-      // Self-collision (#897 F3): los 4 pases bucket ANTES de groundClamp —
-      // espejo del orden Rust (self corre DENTRO de la dinámica natural,
-      // pre-snapshot), así su corrección SÍ entra en la velocidad (vNat),
-      // igual que en WASM donde self corre dentro del step de Rust.
-      // Siempre-on en el tier GPU (divergencia ratificada vs preset
-      // 'normal'); este gate de dispatch es el kill-switch.
-      if (solver.selfCollisionNodes) {
-        const sc = solver.selfCollisionNodes;
-        substepNodes.push(sc.cellClearNode, sc.scatterNode, sc.resolveNode, sc.applyNode);
-      }
-      // Strain limiting (#gummy STEP 4): FUSIONADO dentro del kernel de
-      // stretch (consejo 2026-07-02 — mismos ids/colores, ~150 dispatches
-      // menos/frame). El cap corre en el slot del stretch; ver
-      // makeDistanceConstraintFn (tslSolver.ts) para la semántica de lag.
-      // Body-tether (frente#2): max-distance cling that holds each vertex within
-      // its per-region radius of a target. Targets = each vertex's own SETTLED
-      // position, captured from the wrapped-on-body drape (see settle-trigger
-      // after the substep dispatch), NOT at init — init positions are the pre-wrap
-      // spread-out layout (~0.6 m mean from the body), which collapsed the garment
-      // (belowHip 72%, root-caused 2026-06-25). Gated on tetherReady so the kernel
-      // runs only once good settled targets exist; with those, the cloth starts at
-      // dist≈0 < radius so the clamp is a gentle anti-drift/anti-slide that also
-      // arrests the #902 long-horizon slide-off, not an over-constraint.
-      if (tetherReady.current && solver.tether) substepNodes.push(solver.tether);
-      // Ground ANTES de la colisión de cuerpo (#897 F2.3) — espejo WASM:
-      // en esa tier el ground corre DENTRO del step de Rust y la colisión
-      // de triángulos JS corre después (wasmSolverWorker.ts:336,359). Así
-      // el snapshot pre-colisión captura la posición post-ground y la
-      // velocidad natural excluye solo el push del cuerpo.
-      substepNodes.push(solver.groundClamp);
-      // Mesh grab ANTES del snapshot: su desplazamiento SÍ debe entrar en
-      // la velocidad (vNat = (preCol - prev) / sdt) → momentum natural al
-      // soltar en vez de caída muerta.
-      if (grabActive) {
-        substepNodes.push(solver.grabNodes.grabNode);
-      }
-      // Snapshot pos → preCollisionPos (espejo de preCollisionBuf.set(
-      // posView) en wasmSolverWorker.ts:352). Siempre se despacha: con 0
-      // cuerpos, preCollisionPos == pos y postSolve degrada al
-      // comportamiento previo exacto.
-      substepNodes.push(solver.snapshotPreCollision);
-      // 2-pass body collision (atomic-emulation pattern in tslCollision.ts):
-      // findBest fills per-body atomic scratch; applyPush reads it,
-      // pushes the particle, and resets the scratch for the next substep.
-      for (const body of solver.collisionBodies) {
-        substepNodes.push(body.findBestNode, body.applyPushNode);
-      }
-      // A4 face-poke Pass B (solve) — DENTRO del substep loop, tras el par de
-      // colisión de cuerpo y antes de postSolve: la corrección queda excluida
-      // de la velocidad vía preCollisionPos, igual que el push del cuerpo (el
-      // monolito v1 corría 1×/frame post-substeps y los 15 substeps lo
-      // deshacían). Gate = capability + dev flag 'vina-facepoke-on'.
-      // A4 face-poke Pass B (solve) — DENTRO del substep loop, tras el par de
-      // colisión de cuerpo y antes de postSolve: corrección excluida de la
-      // velocidad vía preCollisionPos + fricción Coulomb propia. CADA substep:
-      // a substeps alternos la retención de manga cae (medido 6151 → 3945 —
-      // el par push+grip por substep es protector). Gate = capability + dev
-      // flag 'vina-facepoke-on'.
+      // A4 face-poke: gate = capability + dev flag 'vina-facepoke-on'. Su
+      // Pass B (solve) va dentro del subpaso; la Pass A (generate), abajo.
       const facePokeOn = (GPU_CAPABILITIES.facePoke || facePokeForced.current) && solver.facePokeNodes;
-      if (facePokeOn && solver.facePokeNodes) {
-        substepNodes.push(solver.facePokeNodes.solve);
-      }
-      // postSolve deriva la velocidad de preCollisionPos (no de pos): el
-      // push de colisión corrige posición sin crear velocidad, + respuesta
-      // inelástica (#897 F2.3, espejo wasmSolverWorker.ts:367-399).
-      substepNodes.push(solver.postSolve);
+      // Los kernels del subpaso, en orden, con los repasos del estiramiento
+      // antes de la colisión (IA 1b-2): `nodosDelSubpaso.ts`, donde viven los
+      // porqués de cada posición. Un submit por substep (#897 F2).
+      const substepNodes = nodosDelSubpaso(solver, {
+        tether: tetherReady.current,
+        grab: grabActive,
+        facePoke: Boolean(facePokeOn),
+      });
 
       // A4 face-poke Pass A (generate) — por CARA, cadencia 2 frames, ANTES
       // de los substeps: llena faceContactBuf (identidad del contacto más
@@ -706,6 +623,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       for (let s = 0; s < substeps; s++) {
         renderer.compute(substepNodes);
       }
+      // IA 1b-2: un cuadro de tela nueva (en TSL, render y sim van al mismo paso).
+      latirLaSimulacion(edgeDataRef.current);
 
       // Steam brush (once per frame, after substeps settle; skip when inactive)
       if (solver.brushNodes.strength.value > 0) {
@@ -893,6 +812,12 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           posAttr.needsUpdate = true;
           staticGeometry.computeVertexNormals();
           staticGeometry.computeBoundingSphere();
+          // IA 1b-2: cada cuadro del worker llega en un array nuevo
+          // (transferido, o copiado en el neural): solo ese cuenta como latido.
+          if (positions !== ultimaTelaCopiadaRef.current) {
+            ultimaTelaCopiadaRef.current = positions;
+            latirLaSimulacion(edgeDataRef.current);
+          }
         }
       }
     }
@@ -1246,7 +1171,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   //   caveat per A6 RFC Q2 — see solverProtocol.ts JSDoc).
   // - CPU + Neural: silent no-op. Capability flags
   //   (`SolverCapabilities.tools`) document the matrix; UI surface in
-  //   `SimulationStatusOverlay` communicates absence to user.
+  //   `SeccionDel3D` communicates absence to user.
   //
   // R3F handlers (handlePointerDown/Move) duplicate manual raycaster
   // dispatch (onDown/onMove) for TSL geometry-sync workaround — both

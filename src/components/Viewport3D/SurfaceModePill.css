@@ -1,57 +1,24 @@
-.surface-pill {
-  position: absolute;
-  top: 8px;
-  /* Carril propio en el borde: el toolbar de FitMapToggle crece hacia la
-     izquierda desde right:130 (Fase1-S3) — a right:116 el pill quedaba
-     DEBAJO de los iconos cuando la simulación corría. */
-  right: 8px;
-  z-index: var(--z-panel);
-}
+/* «Texturizado ▾» (SurfaceModePill.tsx). El disparador toma el estilo de texto de
+   «Mostrar» (`.grupo-del-patron__plegado`, layout.css) y vive en el grupo de la
+   prenda de la barra superior: aquí solo lo que le es propio. Abierto lleva la
+   tinta plena; el estado del MODO lo lleva la opción de abajo, con relleno. */
+.surface-pill__trigger--open { color: var(--text-primary); }
 
-/* Material `overlay` del contrato de interfaz: la píldora flota sobre el
-   visor y se va. Antes traía su propio gris opaco con borde y radio
-   decididos aquí solos — el octavo material para la misma idea. */
-.surface-pill__trigger {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--surface-overlay-bg);
-  backdrop-filter: var(--surface-overlay-blur);
-  border: var(--surface-overlay-border);
-  border-radius: var(--surface-overlay-radius);
-  box-shadow: var(--surface-overlay-shadow);
-  color: var(--text-secondary);
-  padding: 6px 10px;
-  cursor: pointer;
-  font-size: 12px;
-  font-family: var(--font-sans);
-}
-
-/* Abierto ≠ seleccionado: el disparador se tiñe y marca el borde con el
-   acento, y la opción activa de abajo es la que lleva el relleno sólido. */
-.surface-pill__trigger--open {
-  background: var(--accent-subtle);
-  border-color: var(--accent);
-  color: var(--text-primary);
-}
-
+/* El menú de nueve cuadros cuelga de <body>, es papel (data-material="papel") y
+   por eso `--text-*` y `--bg-elevated` de las opciones son los del papel. Se ancla
+   al abrirse bajo el borde derecho del disparador: `right` y `top` van en línea. */
 .surface-pill__flyout {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+  position: fixed;
+  z-index: var(--z-menu);
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   width: 264px;
   background: var(--surface-overlay-bg);
-  backdrop-filter: var(--surface-overlay-blur);
   border: var(--surface-overlay-border);
   border-radius: var(--surface-overlay-radius);
   box-shadow: var(--surface-overlay-shadow);
   padding: 6px;
-  /* Es un menú, y vive dentro del contexto de apilamiento de .surface-pill:
-     el rol correcto es --z-menu y el orden de pintado no cambia. */
-  z-index: var(--z-menu);
 }
 
 .surface-pill__option {
