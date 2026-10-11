@@ -1,46 +1,45 @@
 # Vina
 
-[![Build](https://img.shields.io/github/actions/workflow/status/sssamuelll/vina/deploy.yml?branch=main)](https://github.com/sssamuelll/vina/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 [![WebGPU](https://img.shields.io/badge/WebGPU-TSL-6B4BFF?logo=webgpu&logoColor=white)](src/utils/cloth/gpu)
 [![Rust](https://img.shields.io/badge/Rust-WASM-DEA584?logo=rust&logoColor=white)](crates/xpbd-wasm)
-[![Tests](https://img.shields.io/badge/tests-6000%2B%20passing-success?logo=vitest&logoColor=white)](tests/)
 
-**Browser-based garment CAD with real-time cloth simulation and an AI copilot.**
+Pattern-making CAD in the browser: an editable 2D pattern, real-time cloth on an avatar, and a copilot that knows a dart from a notch. Free, MIT, in the making.
 
-Vina lets a patternmaker bring a flat pattern into the browser, sew it in 3D, and watch it drape on an avatar with GPU-accelerated cloth physics. No install, no plugin, no server for design work. The pattern stays on your machine.
+![The avatar wearing a T-shirt in Vina's 3D viewer, with the fit map on](home/img/fig-02@1x.webp)
 
-**[Try it → vina.sdar.dev](https://vina.sdar.dev)**  ·  [Contributing](CONTRIBUTING.md)  ·  [Architecture](docs/specs/ARCHITECTURE.md)
-
-> **Status — v0.11.0 (August 2026).** The core loop works end to end: import a DXF/AAMA pattern → auto-detect edges → sew pieces in 3D → drape on an avatar with WebGPU cloth simulation. Since July the 2D editor has been hardened against a professional patternmaker's daily notes (rotated pieces, seam allowance on real DXFs, drag-to-measure). Size grading and production output (nesting, BOM) are in the tool; per-point grading of imported patterns and drafting-from-scratch are on the [roadmap](ROADMAP.md). A local diagnostic export (`Archivo ▸ Exportar diagnóstico`) bundles state and error history for bug reports — it reproduces 2D pattern bugs today; 3D drape bugs are next. We build in the open — expect rough edges and honest labels where a feature isn't finished yet.
-
----
+**[vina.sdar.dev](https://vina.sdar.dev/)** · [vina.sdar.dev/es/](https://vina.sdar.dev/es/) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/specs/ARCHITECTURE.md)
 
 ## What it does today
 
-The working path, end to end:
+<!-- hoy -->
+- **Drafting.** Pen, rectangle, notches and seam allowances, with the grainline drawn and the dimensions written where they measure. Darts come in with your DXF. · [`dock2dTools.ts`](src/components/shell/dock2dTools.ts), [`tiposDeEsquina.ts`](src/utils/seam/tiposDeEsquina.ts), [`notchAnchor.ts`](src/utils/notchAnchor.ts), [`grainLine.ts`](src/utils/grainLine.ts), [`dartEntity.ts`](src/utils/dartEntity.ts)
+- **Sewing.** Sew pieces automatically or edge to edge, and watch the seams close in 3D. · [`caminarCostura.ts`](src/utils/seam/caminarCostura.ts), [`autoSewTools.ts`](src/copilot/action/tools/definitions/autoSewTools.ts), [`cloth`](src/utils/cloth)
+- **Drape.** Fabric simulated in real time on the avatar, with WebGPU inside the browser. A fit map from the first frame. · [`gpu`](src/utils/cloth/gpu), [`fitMaps.ts`](src/utils/cloth/fitMaps.ts), [`xpbd_wasm_bg.wasm`](public/wasm/xpbd_wasm_bg.wasm), [`avatares`](public/avatares)
+- **Reads.** DXF-AAMA · DXF-ASTM · Gerber and Lectra dialects · [`formatProfiles.ts`](src/utils/dxf/formatProfiles.ts), [`AppShell.tsx`](src/components/shell/AppShell.tsx)
+- **Writes.** DXF-AAMA · PDF at 1:1 · BOM (CSV) · glTF · USDZ · 360° turn · [`uiExport.ts`](src/utils/export/uiExport.ts), [`ExportSection.tsx`](src/components/Viewport3D/renderSections/ExportSection.tsx), [`LogoMenu.tsx`](src/components/shell/LogoMenu.tsx)
+- **Copilot.** Ask it to add a dart or to audit the seam allowances. Same tools as yours, and every change can be undone. With your own key. · [`registry.ts`](src/copilot/connections/registry.ts), [`definitions`](src/copilot/action/tools/definitions)
 
-1. **Import** a pattern from a DXF/AAMA file (the format professional CAD tools like CLO3D and Gerber export).
-2. **Detect** piece outlines, seams, notches, and grainlines from the imported geometry.
-3. **Sew** pieces together in the 3D viewport by clicking edges, CLO3D-style.
-4. **Simulate** the drape on an avatar with a real-time XPBD cloth solver running on WebGPU.
-5. **Grade** the pattern across a size run, **nest** pieces for fabric consumption, and export a **bill of materials** or a **tech pack**.
+Each line links to the code that makes it true; a test fails if that code goes away (`tests/repo/home-honestidad.test.ts`).
+<!-- /hoy -->
 
-An AI copilot sits alongside the canvas: it retrieves pattern-making knowledge (drafting methods, ease standards, fabric behavior) and can drive the same tools you use by hand.
+## In the making
 
-## Why it's interesting to build on
+<!-- en-construccion -->
+- Real grading. Sizes scale in proportion today; rules per point come next. · [#915](https://github.com/sssamuelll/vina/issues/915)
+- A marker you can export. The nesting panel estimates fabric use and stops there. · [ROADMAP](https://github.com/sssamuelll/vina/blob/main/ROADMAP.md#next)
+- A dart tool. Darts arrive with your DXF or the copilot, not from the pen yet. · [ROADMAP](https://github.com/sssamuelll/vina/blob/main/ROADMAP.md#next)
+- Project files. Your work lives in this browser until .vina files can be saved. · [#15](https://github.com/sssamuelll/vina/issues/15)
+- The interface in English. The workshop speaks Spanish. · [#964](https://github.com/sssamuelll/vina/issues/964)
+- Fabrics measured from cloth. Thirty-two presets today. · [#1005](https://github.com/sssamuelll/vina/issues/1005)
+<!-- /en-construccion -->
 
-If you like graphics, physics, or applied AI, there's a lot of real engineering here:
+The workshop's interface is in Spanish. Contributor docs and code are in English.
 
-- **A 4-tier cloth solver with parity.** The same XPBD simulation runs on **WebGPU** (TSL compute shaders, the default tier), **Rust/WASM** (the fallback and CI parity oracle), a **CPU** reference, and an experimental neural tier. Cross-tier equivalence is locked by a boundary-contract test suite.
-- **A semantic garment engine.** Pieces, seams, darts, and notches are first-class domain entities with their own rules, not just polylines. Editing one piece propagates to its symmetric twin; changing a measurement can re-grade a size run.
-- **A knowledge-grounded copilot.** The agent retrieves relevant pattern-making knowledge before it acts, and operates the app through the same tool layer the UI uses, so human and agent affordances stay in sync.
-- **Browser-native and client-side.** WebGPU physics, Rust compiled to WASM, zero-copy rendering into Three.js. It runs in a tab.
+## Send a pattern
 
-## Tech stack
-
-React 18 · Redux Toolkit + Zustand · Three.js (WebGPU renderer) · Vite 6 · Rust + wasm-pack · Vitest + Playwright. TypeScript in strict mode throughout.
+Email a DXF (AAMA or ASTM) to **vina@sdar.dev**. You get it back sewn and draped in Vina, with its fit map, and an honest note on where Vina fell short. Every pattern that comes in is a test the workshop hasn't passed yet. A few each month.
 
 ## Quick start
 
@@ -48,53 +47,52 @@ React 18 · Redux Toolkit + Zustand · Three.js (WebGPU renderer) · Vite 6 · R
 git clone https://github.com/sssamuelll/vina.git
 cd vina
 npm install
-npm run dev        # workspace at http://localhost:5173/app/
-npm test           # ~6,000 unit tests
+npm run dev        # workshop at http://localhost:5173/app/ — the home is at /
+npm test           # the unit suite
 ```
 
-WebGPU runs in current Chrome, Edge, and Chromium-based browsers. Where WebGPU is unavailable, the simulation falls back to the WASM tier automatically. You only need Rust + `wasm-pack` if you plan to modify the cloth solver in `crates/xpbd-wasm`.
+WebGPU runs in current Chrome, Edge and other Chromium browsers; without it the simulation falls back to the WASM tier. You only need Rust and `wasm-pack` to change the cloth solver in `crates/xpbd-wasm`.
 
-## Contributing
+## How it's made
 
-We'd love the help. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the commit gate, and code conventions, then browse [open issues](https://github.com/sssamuelll/vina/issues) — issues labeled `roadmap` describe larger pieces of the vision, and smaller bugs make good first contributions.
+Each change starts as a written design in [`docs/superpowers/specs/`](docs/superpowers/specs/), gets a review, and lands with its tests. The research behind the public pages is in [`docs/reports/`](docs/reports/). The commit gate is in [CONTRIBUTING.md](CONTRIBUTING.md); GitHub Actions stay off on purpose and releases are cut locally after the full gate ([`scripts/deploy-prod.sh`](scripts/deploy-prod.sh)).
 
-The commit gate is three commands, and a pre-commit hook runs the fast half automatically:
+The copilot runs with your own key (Anthropic, OpenAI, DeepSeek or a local Ollama). Your own agent can work on the pattern open in Vina through the MCP bridge: [`mcp/`](mcp/) and [`vina-studio`](studio/) on npm.
 
-```bash
-npx tsc -b --noEmit && npm run test && npm run lint
-```
+## Tech stack
+
+React 18 · Redux Toolkit + Zustand · Three.js (WebGPU renderer) · Vite 6 · Rust + wasm-pack · Vitest + Playwright. TypeScript in strict mode throughout.
 
 ## Architecture at a glance
 
 ```
 src/
 ├── components/   # React UI: shell, 2D PatternEditor, 3D Viewport
-├── copilot/      # AI copilot: agentic loop, tools, RAG knowledge, skills
+├── copilot/      # AI copilot: agentic loop, tools, knowledge
 ├── store/        # Redux slices + middleware
 ├── stores/       # Zustand state
 ├── utils/        # engines: cloth/, dxf/, grading/, nesting/, seam/, mesh/
 └── workers/      # Web Worker pool (WASM + CPU solvers)
 
 crates/xpbd-wasm/ # Rust XPBD cloth solver → public/wasm/
+home/             # the public home: template, copy, data, assets
 docs/             # specs, research, RFCs, historical plans
 ```
 
 Full write-up in [docs/specs/ARCHITECTURE.md](docs/specs/ARCHITECTURE.md). The [docs index](docs/README.md) maps the rest.
 
-## Interoperability
+## Contributing
 
-| Format | Direction | Use case |
-|--------|-----------|----------|
-| **DXF (AAMA/ASTM)** | Import + Export | Industrial pattern exchange — the primary import path |
-| **OBJ / FBX / GLB / GLTF** | Import + Export | 3D meshes and avatars |
-| **PDF** | Export | 1:1 patterns, cutting layouts, tech packs |
-| **PNG / JPG / SVG** | Import | Reference images and artwork |
-| **CSV** | Export | Bill of materials |
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the commit gate and conventions, then the [open issues](https://github.com/sssamuelll/vina/issues). The gate before a commit:
+
+```bash
+npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui
+```
 
 ## Language
 
-The application UI is in Spanish, aimed at professional patternmakers. Project documentation and code are in English so the project is open to contributors worldwide. A Spanish translation of the contributor docs is planned.
+The application is in Spanish, for professional pattern makers; an English interface is [in the making](https://github.com/sssamuelll/vina/issues/964). Project documentation and code are in English.
 
 ---
 
-**Vina** — the Cognitive Design Engine for professional fashion engineering. MIT Licensed.
+MIT Licensed.

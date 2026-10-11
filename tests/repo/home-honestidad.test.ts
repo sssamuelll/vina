@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+// @ts-expect-error — módulo .mjs sin tipos
+import { generarSecciones, MARCAS } from '../../scripts/home/readme.mjs';
 
 const json = (rel: string) => JSON.parse(readFileSync(rel, 'utf8'));
 const hoy = json('home/datos/hoy.json') as { columnas: Entrada[]; filas: (Entrada & { mono: boolean })[] };
@@ -61,5 +63,28 @@ describe('home/datos/diario.json: la historia que se cuenta existe', () => {
   });
   it.each(diario.map((d) => [d.pr, d.fecha]))('el PR #%s está en el historial', (pr) => {
     expect(new RegExp(`Merge pull request #${pr}\\b|\\(#${pr}\\)`).test(historial), `#${pr} no está en git log origin/main`).toBe(true);
+  });
+});
+
+describe('el README dice lo mismo que la página', () => {
+  it('las dos secciones marcadas son las generadas', () => {
+    const md = readFileSync('README.md', 'utf8');
+    const secciones = generarSecciones() as Record<string, string>;
+    for (const [nombre, [inicio, fin]] of Object.entries(MARCAS as Record<string, [string, string]>)) {
+      const dentro = md.split(inicio)[1]?.split(fin)[0];
+      expect(dentro, `faltan las marcas ${inicio} … ${fin}`).toBeDefined();
+      expect(dentro.trim()).toBe(secciones[nombre].trim());
+    }
+  });
+  it('sin la insignia de un workflow apagado y con una imagen real', () => {
+    const md = readFileSync('README.md', 'utf8');
+    expect(md).not.toContain('actions/workflow/status');
+    expect(md).toMatch(/!\[[^\]]+\]\(home\/img\/fig-02@1x\.webp\)/);
+  });
+  it('ROADMAP.md ya no enumera lo que hoy.json desmiente', () => {
+    const rm = readFileSync('ROADMAP.md', 'utf8');
+    expect(rm).not.toMatch(/Grade across a size run, nest for fabric consumption/);
+    expect(rm).toContain('home/datos/hoy.json');
+    for (const t of ['A marker you can export', 'A dart tool']) expect(rm).toContain(t);
   });
 });

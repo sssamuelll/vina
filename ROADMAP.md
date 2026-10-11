@@ -4,13 +4,7 @@ Vina is at **v0.11.0**. The core loop — import a pattern, sew it in 3D, drape 
 
 ## Where we are
 
-The beachhead is the professional patternmaker who already has a pattern and wants to see it in 3D. Today that path works:
-
-- Import a **DXF/AAMA** pattern (the format CLO3D, Gerber, and Optitex export).
-- Detect pieces, seams, notches, and grainlines.
-- Sew pieces in the 3D viewport and watch them drape with a **WebGPU** cloth solver.
-- Grade across a size run, nest for fabric consumption, and export a BOM or tech pack.
-- Work alongside a **knowledge-grounded AI copilot** that can drive the same tools.
+What works today is the list in the [README](README.md#what-it-does-today), generated from `home/datos/hoy.json` so the page and the repo say the same thing. The beachhead is still the professional pattern maker who already has a pattern and wants to see it in 3D.
 
 ## Now
 
@@ -23,6 +17,8 @@ The work in flight — deepening the beachhead so the pattern that comes in gets
 
 ## Next
 
+- **A marker you can export.** The nesting panel estimates fabric use; writing the marker (PDF, PLT) is next.
+- **A dart tool.** Darts arrive with a DXF or through the copilot; drawing them from the pen is next.
 - **Robust import.** Handle the messy variety of real-world DXFs — different vendors, layer conventions, and grade-data encodings.
 - **Coherent measurements.** One source of truth between the avatar, the size tables, and grading.
 - **Production output.** Polish nesting, BOM, and tech-pack export toward genuinely factory-ready sheets.
