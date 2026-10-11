@@ -14,7 +14,7 @@ import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import editorReducer, { setViewMode } from '../../../store/editorSlice';
-import simulationReducer, { startSimulation, pauseSimulation } from '../../../store/simulationSlice';
+import simulationReducer, { startSimulation, pauseSimulation, marcarTelaEnMovimiento } from '../../../store/simulationSlice';
 import toolsReducer from '../../../store/toolSlice';
 import projectReducer, { addPiece } from '../../../store/projectSlice';
 import dockReducer from '../../../store/dockSlice';
@@ -108,7 +108,8 @@ describe('el margen del 3D es un margen (P5)', () => {
 
   it('el estado de la simulación es un icono al pie del margen, después de sus cuatro herramientas (enmienda 2026-10-11)', () => {
     const { store } = renderRightDock();
-    act(() => { store.dispatch(startSimulation()); });
+    // Pasado el primer cuadro: antes, el estado dice «Preparando la tela».
+    act(() => { store.dispatch(startSimulation()); store.dispatch(marcarTelaEnMovimiento(true)); });
     // Ni el «SIMULANDO» flotante de antes de P5 ni una línea de texto: un icono.
     expect(screen.queryByText(/SIMULANDO|Simulando/)).toBeNull();
     const margen = screen.getByRole('navigation', { name: 'Herramientas del 3D' });

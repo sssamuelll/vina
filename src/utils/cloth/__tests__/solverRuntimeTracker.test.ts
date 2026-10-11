@@ -144,4 +144,16 @@ describe('solverRuntimeTracker — el latido de la tela (IA 1b-2)', () => {
     latirLaSimulacion(null);
     expect(aristasDeLaTela()).toBeNull();
   });
+
+  it('el primer latido de cada corrida se marca una vez, con lo que tardó desde su cascada', () => {
+    clearSolverEvents();
+    beginCascade();
+    expect(latirLaSimulacion(null)).toBe(true);
+    expect(latirLaSimulacion(null)).toBe(false);
+    const ev = getSolverEvents().filter((e) => e.kind === 'tela:primer-cuadro');
+    expect(ev).toHaveLength(1);
+    expect(typeof ev[0].data.ms).toBe('number');
+    beginCascade();
+    expect(latirLaSimulacion(null), 'una corrida nueva vuelve a empezar').toBe(true);
+  });
 });

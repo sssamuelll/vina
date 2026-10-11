@@ -99,12 +99,19 @@ let tierDeLaTela: SolverTier = 'none';
  * saber si la simulación avanza: con Vina oculta el navegador no dibuja, y el
  * latido se para aunque un worker siga calculando. Lleva las aristas del
  * solver, que el mapa de ajuste por pieza necesita (`fit_map`).
+ *
+ * Devuelve `true` solo en el primer latido de la corrida, que además queda en
+ * la caja negra como `tela:primer-cuadro`, con los ms desde su `beginCascade`.
  */
-export function latirLaSimulacion(edges: SolverEdgeData | null): void {
+export function latirLaSimulacion(edges: SolverEdgeData | null): boolean {
   latidos += 1;
   latidosDeLaTela += 1;
   aristas = edges;
   tierDeLaTela = activeTier;
+  latidosDeLaCorrida += 1;
+  if (latidosDeLaCorrida !== 1) return false;
+  pushSolverEvent('tela:primer-cuadro', { ms: Date.now() - inicioDeLaCorrida });
+  return true;
 }
 
 export function latidosDeLaSimulacion(): number {
@@ -138,7 +145,11 @@ export type SolverEventKind =
   | 'nan:solver-stopped'
   | 'collision:degraded'
   | 'meshing:piece-failed'
-  | 'start:failed';
+  | 'start:failed'
+  | 'tela:primer-cuadro'
+  | 'preparar:listo'
+  | 'preparar:fallo'
+  | 'preparar:usada';
 
 export interface SolverEvent {
   kind: SolverEventKind;
@@ -152,10 +163,15 @@ export const SOLVER_EVENTS_MAX = 200;
 
 const events: SolverEvent[] = [];
 let generation = 0;
+/** Cuándo empezó la corrida viva y cuántos latidos lleva: su primero es `tela:primer-cuadro`. */
+let inicioDeLaCorrida = 0;
+let latidosDeLaCorrida = 0;
 
 /** Cada corrida de la cascada (Play, Stop→Play, pérdida de device) abre una generación. */
 export function beginCascade(): number {
   generation += 1;
+  inicioDeLaCorrida = Date.now();
+  latidosDeLaCorrida = 0;
   return generation;
 }
 

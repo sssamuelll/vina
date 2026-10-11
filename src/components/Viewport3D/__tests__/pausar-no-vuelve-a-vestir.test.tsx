@@ -125,7 +125,7 @@ import type { SeamInitData } from '../../../utils/cloth/clothWorker';
 import type { Elastic } from '../../../types/types';
 import { WEBGPU_FEATURE_FLAG_KEY } from '../../../utils/cloth/gpu/webgpuDetect';
 import projectReducer from '../../../store/projectSlice';
-import simulationReducer, { pauseSimulation, resetSimulation, startSimulation } from '../../../store/simulationSlice';
+import simulationReducer, { marcarTelaEnMovimiento, pauseSimulation, resetSimulation, startSimulation } from '../../../store/simulationSlice';
 import avatarReducer from '../../../store/avatarSlice';
 import collisionBodyReducer from '../../../store/collisionBodySlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
@@ -302,6 +302,40 @@ describe('pausar no vuelve a vestir', () => {
 
     await act(async () => { terminar[1](); });
     await waitFor(() => expect(wasm.instancias[1].start).toHaveBeenCalledTimes(1));
+  });
+
+  it('pausar y reanudar sigue con la tela en movimiento; una cascada nueva la vuelve a preparar', async () => {
+    // «Preparando la tela» dura hasta el primer cuadro de la corrida, que marca GarmentSimulation.
+    // Mallas nuevas en marcha (una edición, la pose A) son otra corrida, con otra tela que preparar.
+    localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'false');
+    wasm.isWasmSolverAvailable.mockResolvedValue(true);
+    wasm.initMultiPiece.mockResolvedValue(undefined);
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    const seamInitData: SeamInitData[] = [];
+    const elastics: Elastic[] = [];
+    const stretchingIdsRef = { current: null as Int32Array | null };
+    const { rerender } = renderHook(
+      ({ mallas }: { mallas: PlacedMesh[] }) =>
+        useSimulationLifecycle({ placedMeshes: mallas, seamInitData, elastics, fabricId: 'cotton-poplin', stretchingIdsRef }),
+      {
+        initialProps: { mallas: [malla('a')] },
+        wrapper: ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>,
+      },
+    );
+    await waitFor(() => expect(getActiveSolverTier()).toBe('wasm'));
+    await act(async () => { store.dispatch(marcarTelaEnMovimiento(true)); }); // el primer cuadro
+    const enMovimiento = () => store.getState().simulation.telaEnMovimiento;
+
+    await act(async () => { store.dispatch(pauseSimulation()); });
+    await act(async () => { store.dispatch(startSimulation()); });
+    expect(enMovimiento(), 'pausar y reanudar no vuelve a preparar la tela').toBe(true);
+
+    rerender({ mallas: [malla('a')] });
+    await waitFor(() => expect(wasm.instancias).toHaveLength(2));
+    await waitFor(() => expect(getActiveSolverTier()).toBe('wasm'));
+    expect(arranques()).toBe(2);
+    expect(enMovimiento(), 'la cascada nueva arranca sin decir que prepara otra tela').toBe(false);
   });
 
   it('neural (sin costuras, el último tier): pausar lo para y reanudar lo vuelve a arrancar', async () => {

@@ -105,7 +105,7 @@ import { aMorph } from '../../utils/avatar/morphTargets';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
-import { setSolverTier, setFrameTime, setBodyCollision, setIsWarmStarting, setSeamResolution } from '../../store/simulationSlice';
+import { setSolverTier, setFrameTime, setBodyCollision, setIsWarmStarting, setSeamResolution, marcarTelaEnMovimiento } from '../../store/simulationSlice';
 import { setSeamResolutionErrors } from '../../store/inspectorSlice';
 import { showWarningToast, showErrorToast } from '../../store/copilotUISlice';
 import { seamResolutionFailureLabel } from './solverTierDisplay';
@@ -483,6 +483,8 @@ export function useSimulationLifecycle({
       // Caja negra 3D: cada corrida de la cascada lleva su generación para que
       // un evento de una corrida cancelada no se confunda con la viva.
       const generation = beginCascade();
+      // Hasta el primer cuadro de esta corrida, el estado dice «Preparando la tela».
+      dispatch(marcarTelaEnMovimiento(false));
       // 2a: cada (re)init re-arma el gate — el solver nuevo no stepea hasta
       // que SU colisión cargue.
       simReadyRef.current = false;

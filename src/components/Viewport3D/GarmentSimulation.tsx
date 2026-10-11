@@ -31,7 +31,7 @@ import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
 import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
 import { computeFitMapData, DEFAULT_FIT_PARAMS, fabricToFitParams, shouldRequestEdgeData } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
-import { addPin, setCollisionDistance, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
+import { addPin, marcarTelaEnMovimiento, setCollisionDistance, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
 import { showErrorToast } from '../../store/copilotUISlice';
 import { textureManager } from '../../utils/textures/TextureManager';
 import type { Texture } from 'three';
@@ -544,7 +544,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         renderer.compute(substepNodes);
       }
       // IA 1b-2: un cuadro de tela nueva (en TSL, render y sim van al mismo paso).
-      latirLaSimulacion(edgeDataRef.current);
+      // El primero de la corrida apaga «Preparando la tela».
+      if (latirLaSimulacion(edgeDataRef.current)) dispatch(marcarTelaEnMovimiento(true));
 
       // Steam brush (once per frame, after substeps settle; skip when inactive)
       if (solver.brushNodes.strength.value > 0) {
@@ -743,7 +744,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           staticGeometry.computeVertexNormals();
           staticGeometry.computeBoundingSphere();
           ultimaTelaCopiadaRef.current = positions;
-          latirLaSimulacion(edgeDataRef.current);
+          if (latirLaSimulacion(edgeDataRef.current)) dispatch(marcarTelaEnMovimiento(true));
         }
       }
     }
