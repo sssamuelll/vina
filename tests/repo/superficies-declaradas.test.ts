@@ -33,7 +33,8 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/PatternEditor/SeccionDelPatron.tsx', 'pista', 1],
   ['src/components/PatternEditor/SeccionDelPatron.tsx', 'menu', 1],
   ['src/components/PatternEditor/renderers/MarcaDeEscala.tsx', 'documento', 1],
-  ['src/components/Viewport3D/SurfaceModePill.tsx', 'ambiente', 1],
+  // «Texturizado ▾» vive en el grupo de la prenda de la barra superior (P5): ya
+  // no es un ambiente propio, solo su menú es una superficie.
   ['src/components/Viewport3D/SurfaceModePill.tsx', 'menu', 1],
   ['src/components/Debug/SolverMetrics.tsx', 'dev', 2],
   // La fila vive en la barra superior desde P2: es parte de su ambiente. Lo

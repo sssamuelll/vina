@@ -8,8 +8,10 @@
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  /* Por encima del SurfaceModePill (z-25): a z-20 el pill tapaba el header
-     y el botón de cerrar del drawer abierto (Fase 2, puerta-export). */
+  /* Por encima de lo que flota sobre el visor (la barra de instantáneas, z-10):
+     el header y el botón de cerrar del drawer abierto no se dejan tapar (Fase 2,
+     puerta-export). La píldora de modo de superficie, que tapó el header a z-20,
+     subió a la barra superior en P5. */
   z-index: 30;
 }
 

@@ -76,8 +76,9 @@
 .leyenda-de-mapas__contacto { display: flex; align-items: center; gap: 6px; }
 .leyenda-de-mapas__punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
 
-/* El valor del punto inspeccionado: un número, así que va en mono (la
-   alineación carácter a carácter es lo que se lee). */
+/* El valor del punto inspeccionado. Es un solo número, no una columna: va en
+   sans con cifras tabulares, como la tabla (la mono es de los datos que se
+   alinean carácter a carácter, contrato § 5). */
 .leyenda-de-mapas__valor {
   position: absolute;
   bottom: 48px;
@@ -88,8 +89,8 @@
   border: var(--surface-overlay-border);
   border-radius: var(--surface-overlay-radius);
   box-shadow: var(--surface-overlay-shadow);
-  font-family: var(--font-mono);
   font-size: 14px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

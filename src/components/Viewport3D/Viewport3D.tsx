@@ -20,7 +20,6 @@ import { SimulationStatusOverlay } from './SimulationStatusOverlay';
 import JointGizmos from './JointGizmos';
 import IKEndEffectorGizmos from './IKEndEffectorGizmos';
 import LeyendaDeMapas from './LeyendaDeMapas';
-import SurfaceModePill from './SurfaceModePill';
 import { usePoseDrag } from './usePoseDrag';
 import { isPanGesture, isPanRelease, cameraViewFromKeyEvent, isDoublePanClick, type PanClick } from './inputBindings';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
@@ -1062,11 +1061,8 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         onClose={() => setCollisionPanelOpen(false)}
       />
 
-      {/* Surface mode picker (spec 2026-06-04 display-toggles-resurface).
-          NOT gated on hideChrome: AppShell mounts Viewport3D with hideChrome
-          (legacy chrome hidden in the redesign shell), but the pill is
-          redesign-era UI — gating it would make it a dark surface. */}
-      <SurfaceModePill />
+      {/* El selector de modo de superficie («Texturizado ▾») ya no vive aquí:
+          sube a la barra superior con el avatar y los mapas (GrupoDeLaPrenda). */}
 
       {!cameraMode && (
         <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9, pointerEvents: 'none' }}>

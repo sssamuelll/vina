@@ -42,12 +42,15 @@ const RAICES: Array<[string, number]> = [
   ['src/components/LayerPanel/LayerPanel.tsx', 1],
   ['src/components/LayerPanel/LayerColorPicker.tsx', 1],
   ['src/components/Viewport3D/SurfaceModePill.tsx', 1],
+  ['src/components/Viewport3D/MenuDeMapas.tsx', 1],
   ['src/components/PatternEditor/FilaDeCapas.tsx', 1],
   ['src/components/PatternEditor/SeccionDelPatron.tsx', 1],
   // La hoja de «Tu agente», que cuelga del enchufe (spec 2026-10-09)
   ['src/components/shell/PuertaDelAgente.tsx', 1],
   // La barra de IA convocada (P2c)
   ['src/components/shell/UnifiedBar.tsx', 1],
+  // La leyenda de los mapas: escala, tabla y valor sobre el visor (P5)
+  ['src/components/Viewport3D/LeyendaDeMapas.tsx', 1],
   // Avisos y tooltips
   ['src/components/shell/ToastContainer.tsx', 1],
   ['src/components/shell/ToolTooltip.tsx', 1],
@@ -84,6 +87,9 @@ const PINTA: Array<[string, string[] | '*']> = [
   ['src/components/PatternEditor/ToolOptionControls.css', '*'],
   ['src/components/LayerPanel/LayerPanel.css', ['.layer-context-menu', '.layer-color-popover', '.layer-color-swatch']],
   ['src/components/Viewport3D/SurfaceModePill.css', ['.surface-pill__flyout', '.surface-pill__option']],
+  // El menú «Mapa» (la hoja, sus elementos y sus ajustes) y la leyenda de los mapas (P5)
+  ['src/components/Viewport3D/MenuDeMapas.css', '*'],
+  ['src/components/Viewport3D/LeyendaDeMapas.css', '*'],
   // Avisos y tooltips
   ['src/components/shell/ToastContainer.css', '*'],
   ['src/components/shell/ToolTooltip.css', '*'],

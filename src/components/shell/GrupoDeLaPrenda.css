@@ -1,0 +1,10 @@
+/* El grupo de la prenda (GrupoDeLaPrenda.tsx): lo suyo es solo el contenedor. Los
+   botones llevan los estilos del grupo del patrón (layout.css). Sin
+   `overflow: clip`, a diferencia de aquel: ni el anillo de foco ni lo que se abre
+   desde aquí quedan recortados. No se encoge: cabe o la barra lo dice. */
+.grupo-de-la-prenda {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

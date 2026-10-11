@@ -72,4 +72,90 @@ describe('SurfaceModePill', () => {
     fireEvent.mouseDown(document.body);
     expect(screen.queryByRole('group', { name: 'Modo de superficie' })).toBeNull();
   });
+
+  it('a mousedown inside the flyout does not close it', () => {
+    renderPill();
+    fireEvent.click(screen.getByRole('button', { name: /^modo de superficie:/i }));
+    fireEvent.mouseDown(screen.getByRole('button', { name: 'Malla' }));
+    expect(screen.queryByRole('group', { name: 'Modo de superficie' })).not.toBeNull();
+  });
+});
+
+// P5 (spec 2026-10-02 § 4.2): «Texturizado ▾» sube a la barra superior, junto a
+// «IA». Deja de ser una píldora absoluta sobre el visor: el disparador toma el
+// estilo de texto de «Mostrar» y el menú de nueve cuadros cuelga de <body>, en
+// papel (contrato § 2, «todo portal nace papel»). Los nombres accesibles y las
+// clases que usan los e2e y el trinquete de contraste no cambian.
+describe('SurfaceModePill en la barra superior', () => {
+  function montar() {
+    const store = configureStore({ reducer: { simulation: simulationReducer } });
+    const r = render(<Provider store={store}><ShortcutProvider><SurfaceModePill /></ShortcutProvider></Provider>);
+    return { store, ...r };
+  }
+  const disparador = () => screen.getByRole('button', { name: /^modo de superficie:/i });
+  const menu = () => screen.queryByRole('group', { name: 'Modo de superficie' });
+
+  it('el disparador es de texto, con el estilo de «Mostrar», y conserva su clase', () => {
+    montar();
+    expect(disparador().className).toContain('grupo-del-patron__plegado');
+    expect(disparador().className).toContain('surface-pill__trigger');
+    expect(disparador().textContent).toBe('Texturizado');
+  });
+
+  it('abierto, el disparador lo dice (aria-expanded) y se marca', () => {
+    montar();
+    expect(disparador().getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(disparador());
+    expect(disparador().getAttribute('aria-expanded')).toBe('true');
+    expect(disparador().className).toContain('surface-pill__trigger--open');
+  });
+
+  it('el menú cuelga de <body> y es papel: no queda dentro de la barra', () => {
+    const { container } = montar();
+    fireEvent.click(disparador());
+    const grupo = menu()!;
+    expect(container.contains(grupo), 'el menú quedó dentro del árbol de la barra: nada fixed escapa de ahí').toBe(false);
+    expect(grupo.parentElement).toBe(document.body);
+    expect(grupo.getAttribute('data-material')).toBe('papel');
+    expect(grupo.getAttribute('data-superficie')).toBe('menu');
+    expect(grupo.className).toContain('surface-pill__flyout');
+  });
+
+  it('con el menú abierto el foco entra a él, en el modo que está puesto', () => {
+    montar();
+    fireEvent.click(disparador());
+    // Cuelga del final de <body>: Tab desde el disparador no llegaría a las nueve opciones.
+    expect(menu()!.contains(document.activeElement)).toBe(true);
+    expect((document.activeElement as HTMLElement).getAttribute('aria-label')).toBe('Texturizado');
+  });
+
+  it('Escape lo cierra y el foco vuelve al disparador', () => {
+    montar();
+    fireEvent.click(disparador());
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    expect(menu()).toBeNull();
+    expect(document.activeElement).toBe(disparador());
+  });
+
+  it('elegir un modo lo aplica, cierra y devuelve el foco al disparador', () => {
+    const { store } = montar();
+    fireEvent.click(disparador());
+    fireEvent.click(screen.getByRole('button', { name: 'Plano' }));
+    expect(store.getState().simulation.surfaceMode3D).toBe('flat');
+    expect(menu()).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Modo de superficie: Plano' }));
+  });
+
+  it('Enter y Espacio sobre una opción son de la opción: el menú es una botonera', () => {
+    montar();
+    fireEvent.click(disparador());
+    expect(menu()!.hasAttribute('data-botonera')).toBe(true);
+  });
+
+  it('cambiar el tamaño de la ventana con el menú abierto lo cierra: estaba anclado al botón', () => {
+    montar();
+    fireEvent.click(disparador());
+    fireEvent(window, new Event('resize'));
+    expect(menu()).toBeNull();
+  });
 });
