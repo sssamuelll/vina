@@ -171,8 +171,9 @@
 
    Cómo se reparte el ancho (spec § 5.3, P5): la herramienta del patrón ocupa lo
    que necesita; la sección del 3D, lo que sobra, y es la primera que se recorta.
-   La ranura del patrón mide lo que mide su contenido (`flex: 0 1 auto`: la frase
-   entera y las opciones que caben) y solo se encoge si no hay sitio, hasta 320 px;
+   La ranura del patrón mide lo que pide su sección (`flex: 0 1 auto`): lo que
+   necesita para mostrar TODO, «quién», todas sus opciones y la frase entera, con
+   200 px como mínimo. Solo se encoge si no hay sitio, hasta 320 px;
    la del 3D crece a todo lo demás (`flex: 1 100 auto`) y es la que se encoge casi
    todo: su voz cede hasta desaparecer (SeccionDel3D.css) y lo único que no cede es
    su estado, que le pone el mínimo (`min-width: auto`). Con 12 herramientas del
@@ -181,11 +182,15 @@
    sus 200 px (e2e). Con la vista 3D sola la ranura del patrón se esconde y el 3D
    se lleva todo el pie, sin la línea de pelo que lo separaba del patrón.
 
-   Por qué el patrón puede medir lo que su contenido: la medida que decide cuántas
-   opciones se pliegan en «Más» (`useCuantasCaben`) sale del ancho de la sección,
-   y la frase cuenta entera en su tamaño natural, así que plegar opciones no la
-   encoge por debajo de lo que el espacio da: el reparto es estable (medido sin
-   oscilaciones, tres muestras por herramienta). */
+   Por qué la sección PIDE un ancho en vez de medir su contenido: la medida que
+   decide cuántas opciones se pliegan en «Más» (`useCuantasCaben`) sale del ancho
+   de la sección. Si la ranura midiera lo que su contenido mide ahora, plegar una
+   opción la encogería, la ranura encogida plegaría otra, y así hasta cero (medido
+   con el navegador: Desplazar contorno a 1100 px y Piquete perdían todas sus
+   opciones, y una frase de menos de 200 px las plegaba aun con la ventana ancha).
+   La sección calcula lo que necesita con lo que midió estando todo a la vista
+   (`anchoDelPie.ts`) y lo pide como su `width`: no depende de lo plegado, así que
+   plegar no realimenta nada. */
 .linea-al-pie {
   height: var(--top-bar-h);
   flex-shrink: 0;
