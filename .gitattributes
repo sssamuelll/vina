@@ -29,6 +29,14 @@ app/index.html text eol=lf
 es/index.html text eol=lf
 home/copy/*.json text eol=lf
 home/datos/*.json text eol=lf
+
+# Los scripts de la home son .mjs sin regla propia: sin ésta, git los deja al
+# criterio de autocrlf y un checkout en Windows los pasa a CRLF (medido el
+# 2026-10-11: Vitest carga vía SSR de Vite el .mjs con CRLF y revienta con
+# «SyntaxError: Invalid or unexpected token» aunque node --check y esbuild lo
+# analizan bien sueltos — git log y node --check no lo ven, solo el loader SSR).
+# Force LF.
+scripts/home/*.mjs text eol=lf
 home/*.css text eol=lf
 home/*.html text eol=lf
 home/img/*.svg text eol=lf
