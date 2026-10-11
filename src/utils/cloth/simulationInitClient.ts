@@ -29,10 +29,50 @@ export interface SimInitProgress {
 
 const SCALE = 0.001; // 1 SVG unit = 1mm = 0.001m
 
+type Malla = { vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array; boundaryOrig?: Float64Array };
+
+/**
+ * Las mallas ya hechas, por lo que las decide: el contorno, las líneas
+ * internas y las opciones (la densidad). Mallar la camisa de María cuesta
+ * ~8,6 s (cdt2d es el 99 %) y se repetía en cada «Simular» y en cada re-mallado
+ * tras una edición, aunque la pieza no hubiera cambiado (sonda del drape,
+ * 2026-10-11). Entra y sale copiado: nadie comparte arrays con la caché.
+ * ponytail: 64 mallas en memoria de la pestaña, la más vieja sale primero; a IDB
+ * si hace falta que sobreviva a recargar.
+ */
+const mallasHechas = new Map<string, Malla>();
+const MALLAS_GUARDADAS = 64;
+const copia = (m: Malla): Malla => ({
+  vertices: m.vertices.slice(),
+  triIds: m.triIds.slice(),
+  uvs: m.uvs?.slice(),
+  boundaryOrig: m.boundaryOrig?.slice(),
+});
+
+/** El área de la caja del contorno: para mallar primero las piezas grandes. */
+function tamanoDe(piece: PatternPiece): number {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const c of piece.outline) {
+    for (let i = 0; i + 1 < c.values.length; i += 2) {
+      x0 = Math.min(x0, c.values[i]); x1 = Math.max(x1, c.values[i]);
+      y0 = Math.min(y0, c.values[i + 1]); y1 = Math.max(y1, c.values[i + 1]);
+    }
+  }
+  return x1 > x0 && y1 > y0 ? (x1 - x0) * (y1 - y0) : 0;
+}
+
+/** Workers para mallar a la vez: hasta 4, y nunca más de la mitad de los núcleos. */
+function workersParaMallar(piezas: number): number {
+  const nucleos = typeof navigator !== 'undefined' && navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 2;
+  return Math.max(1, Math.min(piezas, 4, Math.floor(nucleos / 2)));
+}
+
 // ─── Client ─────────────────────────────────────────────────────────────────
 
 export class SimulationInitClient {
   private worker: Worker | null = null;
+  /** Workers de más para mallar en paralelo (`meshAllPieces`); los suelta `dispose`. */
+  private extras: Worker[] = [];
   private pendingMesh = new Map<string, {
     resolve: (v: { vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array; boundaryOrig?: Float64Array }) => void;
     reject: (e: Error) => void;
@@ -41,20 +81,25 @@ export class SimulationInitClient {
 
   constructor() {
     try {
-      this.worker = new Worker(
-        new URL('./simulationWorker.ts', import.meta.url),
-        { type: 'module' },
-      );
-      this.worker.addEventListener('message', this.handleMessage);
-      this.worker.addEventListener('error', (e) => {
-        e.preventDefault();
-        console.error('[SimInitClient] Worker error:', e.message || e);
-        this.rejectAll(new Error('Worker crashed'));
-      });
+      this.worker = this.nuevoWorker();
     } catch {
       console.warn('[SimInitClient] Worker not available, will use main thread fallback');
       this.worker = null;
     }
+  }
+
+  private nuevoWorker(): Worker {
+    const worker = new Worker(
+      new URL('./simulationWorker.ts', import.meta.url),
+      { type: 'module' },
+    );
+    worker.addEventListener('message', this.handleMessage);
+    worker.addEventListener('error', (e) => {
+      e.preventDefault();
+      console.error('[SimInitClient] Worker error:', e.message || e);
+      this.rejectAll(new Error('Worker crashed'));
+    });
+    return worker;
   }
 
   private handleMessage = (event: MessageEvent) => {
@@ -78,9 +123,10 @@ export class SimulationInitClient {
   };
 
   /**
-   * Mesh a pattern piece off the main thread.
+   * Mesh a pattern piece off the main thread (in `worker`, the client's own by
+   * default). Una pieza ya mallada con las mismas opciones sale de la caché.
    */
-  async meshPiece(piece: PatternPiece, particleDistance: number): Promise<{ vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array; boundaryOrig?: Float64Array }> {
+  async meshPiece(piece: PatternPiece, particleDistance: number, worker: Worker | null = this.worker): Promise<Malla> {
     const options = {
       yHeight: 0,
       scale: SCALE,
@@ -89,8 +135,24 @@ export class SimulationInitClient {
       maxRefinementPasses: 3,
       curveResolution: 12,
     };
+    const clave = JSON.stringify([piece.outline, piece.internals ?? null, options]);
+    const hecha = mallasHechas.get(clave);
+    if (hecha) {
+      // La recién usada pasa al final: la que sale es la que hace más que no se usa.
+      mallasHechas.delete(clave);
+      mallasHechas.set(clave, hecha);
+      return copia(hecha);
+    }
+    const malla = await this.mallar(piece, options, worker);
+    if (malla.vertices.length > 0 && malla.triIds.length > 0) {
+      mallasHechas.set(clave, copia(malla));
+      if (mallasHechas.size > MALLAS_GUARDADAS) mallasHechas.delete(mallasHechas.keys().next().value!);
+    }
+    return malla;
+  }
 
-    if (!this.worker) {
+  private async mallar(piece: PatternPiece, options: { yHeight: number; scale: number; maxEdgeLength: number; minAngle: number; maxRefinementPasses: number; curveResolution: number }, worker: Worker | null): Promise<Malla> {
+    if (!worker) {
       // Fallback: dynamic import + sync execution (yields to event loop via microtask)
       const { meshPiece } = await import('../mesh');
       return meshPiece(piece, options);
@@ -98,7 +160,7 @@ export class SimulationInitClient {
 
     return new Promise((resolve, reject) => {
       this.pendingMesh.set(piece.id, { resolve, reject });
-      this.worker!.postMessage({ type: 'meshPiece', piece, options });
+      worker.postMessage({ type: 'meshPiece', piece, options });
 
       // Timeout: 30s per piece (large pieces at 5mm can generate 5K+ interior points)
       setTimeout(() => {
@@ -118,32 +180,44 @@ export class SimulationInitClient {
     particleDistances: Record<string, number>,
     globalPD: number,
   ): Promise<MeshedPiece[]> {
-    const results: MeshedPiece[] = [];
-
-    // Process sequentially to avoid worker overload (worker is single-threaded)
-    for (let i = 0; i < pieces.length; i++) {
-      const piece = pieces[i];
-      const pd = particleDistances[piece.id] ?? globalPD;
-      this.onProgress?.({ stage: 'Meshing pieces', current: i + 1, total: pieces.length });
-
+    // Varias piezas a la vez, cada una en un worker (un worker es un hilo): con
+    // la camisa de María, ~8,6 s en fila pasan a lo que tarda la pieza más
+    // grande. Las grandes salen primero; el resultado vuelve en el orden de
+    // entrada, que fija el orden de los vértices del solver.
+    if (this.worker) {
       try {
-        const { vertices, triIds, uvs, boundaryOrig } = await this.meshPiece(piece, pd);
-        if (vertices.length > 0 && triIds.length > 0) {
-          results.push({
-            pieceId: piece.id,
-            vertices,
-            triIds,
-            uvs,
-            boundaryOrig,
-          });
-        }
-      } catch (err) {
-        console.warn(`[SimInitClient] Meshing failed for piece ${piece.id}:`, err);
-        pushSolverEvent('meshing:piece-failed', { pieceId: piece.id, message: err instanceof Error ? err.message : String(err) });
+        while (this.extras.length < workersParaMallar(pieces.length) - 1) this.extras.push(this.nuevoWorker());
+      } catch {
+        // Sin más workers se malla con los que haya: más lento, igual de bien.
       }
     }
+    const workers = this.worker ? [this.worker, ...this.extras] : [null];
+    const porMallar = pieces.map((_, i) => i).sort((a, b) => tamanoDe(pieces[b]) - tamanoDe(pieces[a]));
+    const mallas: Array<MeshedPiece | null> = pieces.map(() => null);
+    let hechas = 0;
 
-    return results;
+    const carril = async (worker: Worker | null) => {
+      for (let i = porMallar.shift(); i !== undefined; i = porMallar.shift()) {
+        const piece = pieces[i];
+        const pd = particleDistances[piece.id] ?? globalPD;
+        try {
+          const { vertices, triIds, uvs, boundaryOrig } = await this.meshPiece(piece, pd, worker);
+          if (vertices.length > 0 && triIds.length > 0) {
+            mallas[i] = { pieceId: piece.id, vertices, triIds, uvs, boundaryOrig };
+          }
+        } catch (err) {
+          console.warn(`[SimInitClient] Meshing failed for piece ${piece.id}:`, err);
+          pushSolverEvent('meshing:piece-failed', { pieceId: piece.id, message: err instanceof Error ? err.message : String(err) });
+        }
+        this.onProgress?.({ stage: 'Meshing pieces', current: ++hechas, total: pieces.length });
+      }
+    };
+    await Promise.all(workers.map(carril));
+    // Los de más solo sirven mientras se malla: no se quedan vivos y ociosos.
+    for (const w of this.extras) w.terminate();
+    this.extras = [];
+
+    return mallas.filter((m): m is MeshedPiece => m !== null);
   }
 
   private rejectAll(error: Error) {
@@ -224,6 +298,8 @@ export class SimulationInitClient {
   dispose() {
     this.worker?.terminate();
     this.worker = null;
+    for (const w of this.extras) w.terminate();
+    this.extras = [];
     this.rejectAll(new Error('Disposed'));
   }
 }
