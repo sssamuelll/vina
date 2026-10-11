@@ -819,19 +819,20 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // ─── CPU readback path (WASM/CPU solvers) ────────────────────────
     {
       const positions = positionsRef.current;
-      if (positions && positions.length > 0) {
+      // IA 1b-2: cada cuadro del worker llega en un array nuevo (transferido,
+      // o copiado en el neural y en la vista previa): solo ese cuenta como
+      // latido, y solo ese se copia. Antes se copiaba y se recalculaban las
+      // normales de toda la malla en CADA cuadro de render, llegara tela nueva
+      // o no: el WASM da un cuadro cada varios de render, y en pausa ninguno.
+      if (positions && positions.length > 0 && positions !== ultimaTelaCopiadaRef.current) {
         const posAttr = staticGeometry.getAttribute('position') as THREE.BufferAttribute;
         if (posAttr && posAttr.array.length === positions.length) {
           (posAttr.array as Float32Array).set(positions);
           posAttr.needsUpdate = true;
           staticGeometry.computeVertexNormals();
           staticGeometry.computeBoundingSphere();
-          // IA 1b-2: cada cuadro del worker llega en un array nuevo
-          // (transferido, o copiado en el neural): solo ese cuenta como latido.
-          if (positions !== ultimaTelaCopiadaRef.current) {
-            ultimaTelaCopiadaRef.current = positions;
-            latirLaSimulacion(edgeDataRef.current);
-          }
+          ultimaTelaCopiadaRef.current = positions;
+          latirLaSimulacion(edgeDataRef.current);
         }
       }
     }
@@ -1428,16 +1429,22 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   if (!staticGeometry) return null;
 
+  // La tela solo escucha al ratón con las herramientas que la tocan. Con un
+  // manejador puesto, r3f le hace raycast a la malla entera (~57.000 triángulos
+  // en la camisa de María, sin BVH) en cada movimiento del ratón: girar la
+  // cámara mientras simula pagaba milisegundos por cuadro (2026-10-11).
+  const telaConRaton = activeTool3D === 'pin' || activeTool3D === 'steamBrush' || activeTool3D === 'meshGrab';
+
   return (
     <>
       <mesh
         ref={meshRef}
         geometry={staticGeometry}
-        onClick={handleMeshClick}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerLeave}
+        onClick={telaConRaton ? handleMeshClick : undefined}
+        onPointerDown={telaConRaton ? handlePointerDown : undefined}
+        onPointerMove={telaConRaton ? handlePointerMove : undefined}
+        onPointerUp={telaConRaton ? handlePointerUp : undefined}
+        onPointerLeave={telaConRaton ? handlePointerLeave : undefined}
         material={tslMaterial || undefined}
         // Render pass 2026-07-02: la tela castea y recibe sombra (ShadowNode
         // r184 soporta NodeMaterial; guard stale removido en EnvironmentSetup).
