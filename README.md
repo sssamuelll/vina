@@ -7,7 +7,7 @@
 
 Pattern-making CAD in the browser: an editable 2D pattern, real-time cloth on an avatar, and a copilot that knows a dart from a notch. Free, MIT, in the making.
 
-![The avatar wearing a T-shirt in Vina's 3D viewer, with the fit map on](home/img/fig-02@1x.webp)
+![The avatar wearing a T-shirt in Vina's 3D viewer, with the strain map on](home/img/fig-02@1x.webp)
 
 **[vina.sdar.dev](https://vina.sdar.dev/)** · [vina.sdar.dev/es/](https://vina.sdar.dev/es/) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/specs/ARCHITECTURE.md)
 

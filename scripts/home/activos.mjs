@@ -5,6 +5,7 @@
  *   npm run build && npx vite preview --port 4179 --strictPort     # terminal 1
  *   npm run home:activos -- --url=http://localhost:4179 [--espera=120000] [--sin-poster]
  * --sin-poster salta el paso 7 (2,5 min de simulación); el resto sale byte a byte igual.
+ * --gpu: Chrome visible con WebGPU (máquina con GPU): el póster y fig-02 salen del render real y en segundos, no en minutos.
  * Los pasos del taller están copiados de scripts/capturas-ui.mjs (es un script, no un módulo).
  */
 import { chromium } from 'playwright';
@@ -19,6 +20,9 @@ const BASE = (arg('url') ?? 'http://localhost:4179').replace(/\/$/, '');
 // Medido el 2026-09-29: a los 8 s la tela ni ha empezado; a los 90–120 s ya está quieta.
 const ESPERA = Number(arg('espera') ?? 120_000);
 const SIN_POSTER = process.argv.includes('--sin-poster');
+const GPU = process.argv.includes('--gpu'); // Chrome visible con WebGPU: solo en una máquina con GPU
+const COPY = { en: JSON.parse(await readFile(path.join(REPO, 'home/copy/en.json'), 'utf8')), es: JSON.parse(await readFile(path.join(REPO, 'home/copy/es.json'), 'utf8')) };
+const lanzar = () => chromium.launch(GPU ? { headless: false, args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'] } : {});
 const FIXTURE = path.join(REPO, 'tests/fixtures/garments/maria_patrones_samuel_2M.dxf');
 const PAPEL = '#F4EFE6';
 
@@ -55,7 +59,7 @@ function pngAIco(png) { // ICO con una entrada PNG (válido desde Vista; todos l
   return Buffer.concat([h, png]);
 }
 
-let browser = await chromium.launch();
+let browser = await lanzar();
 
 // Primero lo estático (favicons, OG, manifest): tras minutos de WebGL + WASM el proceso de
 // GPU de Chromium headless puede quedarse colgado y tumbar la siguiente captura (visto el 2026-09-29).
@@ -73,14 +77,17 @@ for (const [lado, destino] of [[512, 'public/icon-512.png'], [192, 'public/icon-
 }
 await ctxIcono.close();
 
-// ── 2. OG 1200×630 desde home/og.html por file:// ───────────────────────────
+// ── 2. OG 1200×630 por idioma desde home/og.html por file:// ────────────────
 const ctxOg = await browser.newContext({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
 const pOg = await ctxOg.newPage();
-await pOg.goto(pathToFileURL(path.join(REPO, 'home/og.html')).href, { waitUntil: 'load' });
-await pOg.evaluate(() => document.fonts.ready);
-const og = await pOg.screenshot();
-await writeFile(path.join(REPO, 'public/og.png'), og);
-console.log('✓ public/og.png', og.length, 'B');
+for (const [idioma, destino, pie] of [['en', 'public/og.png', 'vina.sdar.dev · Pattern making and 3D simulation in the browser'], ['es', 'public/og-es.png', 'vina.sdar.dev · Patronaje y simulación 3D en el navegador']]) {
+  const q = new URLSearchParams({ h1: COPY[idioma].h1, pie, lang: idioma });
+  await pOg.goto(`${pathToFileURL(path.join(REPO, 'home/og.html')).href}?${q}`, { waitUntil: 'load' });
+  await pOg.evaluate(() => document.fonts.ready);
+  const og = await pOg.screenshot();
+  await writeFile(path.join(REPO, destino), og);
+  console.log('✓', destino, og.length, 'B');
+}
 await ctxOg.close();
 
 // ── 3. Manifest, escrito aquí para que no se desincronice de los iconos ──────
@@ -178,22 +185,7 @@ await aWebp(page, png, 'home/img/fig-01-movil.webp', {
   ancho: 780,
 });
 
-// ── 6. fig-02: la paleta abierta (07-paleta), 1280×560 anclado a la paleta ───
-// La paleta se abre hacia arriba desde la barra de abajo (≈ 353–975 px): el recorte la
-// centra (con su campo de búsqueda) y se pega al borde si no cabe. El ratón, a un hueco del
-// lienzo, para que ninguna fila salga resaltada por un hover sobrante.
-await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
-await page.mouse.move(W - 40, H / 2);
-await page.keyboard.press('Control+k'); await settle(800);
-png = await page.screenshot();
-const alto02 = Math.round(W * 560 / 1280);
-const paleta = await page.locator('.unified-bar__panel').boundingBox();
-const barra = await page.locator('.unified-bar').first().boundingBox();
-const [arriba, abajo] = [Math.min(paleta.y, barra.y), Math.max(paleta.y + paleta.height, barra.y + barra.height)];
-if (abajo - arriba + 24 > alto02) throw new Error(`fig-02: la paleta (${Math.round(abajo - arriba)} px) no cabe en ${alto02} con margen`);
-const y02 = Math.round(Math.min(Math.max((arriba + abajo) / 2 - alto02 / 2, 0), H - alto02));
-await aWebp(page, png, 'home/img/fig-02@2x.webp', { recorte: { x: 0, y: y02 * DPR, w: W * DPR, h: alto02 * DPR }, ancho: 2560 });
-await aWebp(page, png, 'home/img/fig-02@1x.webp', { recorte: { x: 0, y: y02 * DPR, w: W * DPR, h: alto02 * DPR }, ancho: 1280 });
+// ── 6. fig-02 sale del paso 7, con el póster: mismo contexto, misma simulación en reposo ──
 await page.keyboard.press('Escape');
 await context.close();
 
@@ -205,17 +197,9 @@ if (SIN_POSTER) { await browser.close(); process.exit(0); }
 // y los clics esperan «estable» 30 s (visto 4 veces el 2026-09-29; en un Chromium limpio a
 // @1x, nunca). El recorte de 1040×600 sale a tamaño real, sin reescalar.
 await browser.close();
-browser = await chromium.launch();
-context = await abrirTaller({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
-// El DXF llega sin costuras: sin coser, «Vestir avatar» deja caer las piezas sueltas.
-async function comando(nombre) {
-  await page.keyboard.press('Control+k'); await settle(600);
-  // dispatchEvent y no click(): la espera de «estable» de Playwright se queda sin fotogramas
-  // con el WebGL por software de headless y agota los 30 s aunque la fila ya esté quieta.
-  await page.locator('.unified-bar__panel').getByText(nombre, { exact: true }).first().dispatchEvent('click');
-  await settle(1500);
-  await page.keyboard.press('Escape');
-}
+browser = await lanzar();
+const dpr7 = GPU ? DPR : 1; // con GPU real, @2x cabe sin dejar el hilo principal sin fotogramas
+context = await abrirTaller({ viewport: { width: W, height: H }, deviceScaleFactor: dpr7 });
 // Al 3D antes de coser (el orden del sondeo que funcionó): cosido en 2D, el clic en «3D»
 // se quedaba esperando «estable» 30 s.
 await clickViewMode('3D');
@@ -227,12 +211,22 @@ await page.evaluate(() => {
   window.__VINA_STORE__.dispatch({ type: 'renderSettings/setBackgroundColor', payload: '#2a2825' });
   window.__VINA_STORE__.dispatch({ type: 'renderSettings/setGroundVisible', payload: false });
 });
+// El DXF llega sin costuras: sin coser, «Vestir avatar» deja caer las piezas sueltas.
+async function comando(nombre) {
+  await page.keyboard.press('Control+k'); await settle(600);
+  // dispatchEvent y no click(): la espera de «estable» de Playwright se queda sin fotogramas
+  // con el WebGL por software de headless y agota los 30 s aunque la fila ya esté quieta.
+  await page.locator('.unified-bar__panel').getByText(nombre, { exact: true }).first().dispatchEvent('click');
+  await settle(1500);
+  await page.keyboard.press('Escape');
+}
 await comando('Coser piezas automáticamente');
 const costuras = await page.evaluate(() => window.__VINA_STORE__.getState().project.seams.length);
 if (!costuras) throw new Error('caida-poster: «Coser piezas automáticamente» no cosió nada');
 await comando('Vestir avatar');
 console.log(`… simulando ${ESPERA / 1000} s (${costuras} costuras)`);
-await settle(ESPERA);
+await settle(GPU ? 20_000 : ESPERA);
+if (GPU) console.log('mira la costura lateral derecha del póster antes de commitear: si hay franja negra, #1219 sigue y se arregla primero');
 await dismissToasts();
 // Sin cromo: todo invisible salvo los <canvas> (visibility se hereda y el hijo la puede recuperar).
 await page.addStyleTag({ content: 'body *{visibility:hidden!important}canvas{visibility:visible!important}' });
@@ -244,7 +238,18 @@ png = await lienzo.screenshot();
 // muslos, de mano a mano). ponytail: fijo a esa cámara; si cambia el encuadre inicial del
 // visor, recalcular aquí mirando el póster.
 const [rx, ry] = [Math.round(caja.width / 2 - 520), 0];
-await aWebp(page, png, 'home/img/caida-poster.webp', { recorte: { x: rx, y: ry, w: 1040, h: 600 }, maxBytes: 100_000 });
+await aWebp(page, png, 'home/img/caida-poster.webp', { recorte: { x: rx * dpr7, y: ry, w: 1040 * dpr7, h: 600 * dpr7 }, ancho: 1040, maxBytes: 100_000 });
+// fig-02: el mismo visor con el mapa de estiramiento (azul en reposo → rojo estirado, la convención de CLO);
+// el mapa de ajuste («fit») pinta la camiseta entera de rojo con sus umbrales por defecto. 1280×560, centrado en x, pegado arriba.
+await page.evaluate(() => window.__VINA_STORE__.dispatch({ type: 'simulation/setFitMapMode', payload: 'strain' }));
+await settle(2500);
+if ((await page.evaluate(() => window.__VINA_STORE__.getState().simulation.fitMapMode)) !== 'strain') throw new Error('fig-02: el mapa de estiramiento no se activó');
+png = await lienzo.screenshot();
+const w02 = Math.min(Math.round(caja.width), 1280), h02 = Math.round(w02 * 560 / 1280), x02 = Math.round((caja.width - w02) / 2);
+await aWebp(page, png, 'home/img/fig-02@2x.webp', { recorte: { x: x02 * dpr7, y: 0, w: w02 * dpr7, h: h02 * dpr7 }, ancho: 2560, maxBytes: 90_000 });
+await aWebp(page, png, 'home/img/fig-02@1x.webp', { recorte: { x: x02 * dpr7, y: 0, w: w02 * dpr7, h: h02 * dpr7 }, ancho: 1280, maxBytes: 45_000 });
+const mw2 = Math.round(h02 * 1.38), x02m = Math.round((caja.width - mw2) / 2);
+await aWebp(page, png, 'home/img/fig-02-movil.webp', { recorte: { x: x02m * dpr7, y: 0, w: mw2 * dpr7, h: h02 * dpr7 }, ancho: 780, maxBytes: 30_000 });
 await context.close();
 
 await browser.close();

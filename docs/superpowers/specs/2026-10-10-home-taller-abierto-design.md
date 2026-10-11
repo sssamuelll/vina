@@ -401,3 +401,8 @@ Medido con la página construida, el techo de § 3 y § 10.1 no se sostenía: 58
 - **El techo pasa a 580 palabras visibles por página** (medido tras las podas: ≈ 545 en inglés, ≈ 565 en español). Es un trinquete: solo baja.
 
 Y un detalle de § 4: los enlaces de las listas llevan `min-width: 24px` (el rótulo `#15` medía 23 px de ancho, bajo el objetivo de puntero de § 9).
+
+Y dos cosas de § 5 que salieron de capturar con WebGPU (Task 8):
+
+- **La figura 2 enseña el mapa de estiramiento, no el de ajuste.** Con sus umbrales por defecto, el mapa de ajuste pinta la camiseta entera de rojo («no se puede poner»), un artefacto de calibración y no de la prenda. El de estiramiento (azul en reposo, rojo estirado, la convención de CLO) sí dice algo verdadero: hombros y pecho tensos, mangas y bajo en reposo. Pie: «The strain map on the avatar · stretched in red, at rest in blue» (ES: «El mapa de estiramiento sobre el avatar · estirado en rojo, en reposo en azul»). El mapa de ajuste sigue en «lo que hace hoy» porque existe.
+- **El póster y la figura 2 salen del mismo contexto** (el del paso 7 de `activos.mjs`, a @2x con `--gpu`): la misma simulación en reposo, primero sin mapa y luego con él. Capturarla en el contexto del 2D daba la cámara de lado y las piezas sin coser. Con WebGPU el póster no trae la franja de #1219: era del tier WASM.
