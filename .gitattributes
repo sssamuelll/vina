@@ -19,7 +19,7 @@ scripts/*.sh text eol=lf
 
 # El SVG del hero lo compara byte a byte tests/repo/home-patron.test.ts con la
 # salida del generador (LF). Un checkout CRLF lo rompería. Force LF.
-home/img/patron.svg text eol=lf
+home/img/patron.*.svg text eol=lf
 
 # La home se publica tal cual sale del build (el HTML no se minifica): con
 # autocrlf=true un checkout en Windows le metía un CR por línea y el trinquete

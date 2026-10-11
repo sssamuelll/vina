@@ -1,5 +1,5 @@
 /**
- * DXF de María → home/img/patron.svg (el patrón del hero de la home).
+ * DXF de María → home/img/patron.{en,es}.svg (el patrón del hero de la home, rotulado por idioma).
  * Determinista: mismo DXF, mismo SVG byte a byte (tests/repo/home-patron.test.ts
  * lo compara con el commiteado). Spec: docs/superpowers/specs/2026-09-28-homepage-design.md
  * § 5.1 y su enmienda del 2026-09-29: sin línea de costura (el contorno ES la de
@@ -13,6 +13,13 @@ import { importDXFContent } from '../../src/utils/dxf/importPipeline.ts';
 
 const W = 720, H = 540, MARGEN = 24, HUECO = 32, ALTO_COTA = 44, ALTO_ROTULO = 28;
 const f = (n) => (Math.round(n * 10) / 10).toString();
+
+const ROTULOS = {
+  en: { delantero: 'FRONT · ×1', manga: 'SLEEVE · ×2', cota: 'hem',
+        aria: (mm) => `The front and the sleeve of a T-shirt pattern, drawn in ink, with the hem measurement: ${mm} millimetres` },
+  es: { delantero: 'DELANTERO · ×1', manga: 'MANGA · ×2', cota: 'dobladillo',
+        aria: (mm) => `El delantero y la manga del patrón de una camiseta, trazados en tinta, con la medida del dobladillo: ${mm} milímetros` },
+};
 
 const puntos = (outline) => outline.flatMap((c) => {
   const p = []; for (let i = 0; i < c.values.length; i += 2) p.push([c.values[i], c.values[i + 1]]); return p;
@@ -32,7 +39,9 @@ function escote(pieza) {
   return Math.min(...centro.map(([, y]) => y)) - c.y0;
 }
 
-export function generarPatronSvg(dxfTexto) {
+export function generarPatronSvg(dxfTexto, idioma) {
+  const r = ROTULOS[idioma];
+  if (!r) throw new Error(`idioma desconocido: ${idioma} (en | es)`);
   const { pieces, format } = importDXFContent(dxfTexto);
   const grandes = pieces.filter((p) => { const c = caja(puntos(p.outline)); return c.y1 - c.y0 > 500; });
   const delantero = [...grandes].sort((a, b) => escote(b) - escote(a))[0];
@@ -67,7 +76,7 @@ export function generarPatronSvg(dxfTexto) {
 
   const archivo = `${delantero.name.replace(/-\d+$/, '')} · ${(format ?? 'dxf').toUpperCase()} · mm`;
   const svg = [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" class="patron" role="img" aria-label="El delantero y la manga del patrón de una camiseta, trazados en tinta, con la medida del dobladillo: ${dobladilloMm} milímetros">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" class="patron" role="img" aria-label="${r.aria(dobladilloMm)}">`,
     `<rect class="marcador" x="${MARGEN}" y="4" width="${f(archivo.length * 7)}" height="14"/>`,
     `<text class="rotulo" x="${MARGEN}" y="15">${archivo}</text>`,
     `<path class="pieza" data-pieza="${delantero.name}" d="${d(delantero.outline, tD)}"/>`,
@@ -75,11 +84,11 @@ export function generarPatronSvg(dxfTexto) {
     lineas(delantero, tD, 'grainline'), lineas(manga, tM, 'grainline'),
     lineas(delantero, tD, 'notch'), lineas(manga, tM, 'notch'),
     // Centrado en el eje de la pieza: a x = MARGEN + 24 pisaba la sisa (visto en Step 4).
-    `<text class="rotulo" x="${f(MARGEN + 0.5 * (cd.x1 - cd.x0) * s)}" y="${f(oy + 0.2 * (cd.y1 - cd.y0) * s)}" text-anchor="middle">DELANTERO · ×1</text>`,
-    `<text class="rotulo" x="${f(mx + 24)}" y="${f(oy + 0.5 * (cm.y1 - cm.y0) * s)}">MANGA · ×2</text>`,
+    `<text class="rotulo" x="${f(MARGEN + 0.5 * (cd.x1 - cd.x0) * s)}" y="${f(oy + 0.2 * (cd.y1 - cd.y0) * s)}" text-anchor="middle">${r.delantero}</text>`,
+    `<text class="rotulo" x="${f(mx + 24)}" y="${f(oy + 0.5 * (cm.y1 - cm.y0) * s)}">${r.manga}</text>`,
     `<g class="cota"><path d="M${f(hx0)} ${f(yc)} H${f(hx1)} M${f(hx0)} ${f(yc - 6)} v12 M${f(hx1)} ${f(yc - 6)} v12"/>`,
     `<rect x="${f((hx0 + hx1) / 2 - 70)}" y="${f(yc + 6)}" width="140" height="22" rx="3"/>`,
-    `<text x="${f((hx0 + hx1) / 2)}" y="${f(yc + 21)}" text-anchor="middle">${dobladilloMm} mm · dobladillo</text></g>`,
+    `<text x="${f((hx0 + hx1) / 2)}" y="${f(yc + 21)}" text-anchor="middle">${dobladilloMm} mm · ${r.cota}</text></g>`,
     `</svg>`,
   ].join('\n') + '\n';
   return { svg, dobladilloMm };
@@ -87,7 +96,9 @@ export function generarPatronSvg(dxfTexto) {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const dxf = readFileSync('tests/fixtures/garments/maria_patrones_samuel_2M.dxf', 'utf8');
-  const { svg, dobladilloMm } = generarPatronSvg(dxf);
-  writeFileSync('home/img/patron.svg', svg);
-  console.log(`home/img/patron.svg · dobladillo ${dobladilloMm} mm`);
+  for (const idioma of ['en', 'es']) {
+    const { svg, dobladilloMm } = generarPatronSvg(dxf, idioma);
+    writeFileSync(`home/img/patron.${idioma}.svg`, svg);
+    console.log(`home/img/patron.${idioma}.svg · ${dobladilloMm} mm`);
+  }
 }
