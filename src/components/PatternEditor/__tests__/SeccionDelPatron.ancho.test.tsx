@@ -95,10 +95,10 @@ afterEach(() => {
   (globalThis as { ResizeObserver?: unknown }).ResizeObserver = RO;
 });
 
-function arbol(store: ReturnType<typeof crearStore>, texto: string) {
+function arbol(store: ReturnType<typeof crearStore>, texto: string, tipo: 'fase' | 'falta' | 'desenlace' = 'fase') {
   return (
     <Provider store={store}>
-      <ShortcutProvider><SeccionDelPatron frase={{ texto, tipo: 'fase' }} /></ShortcutProvider>
+      <ShortcutProvider><SeccionDelPatron frase={{ texto, tipo }} /></ShortcutProvider>
     </Provider>
   );
 }
@@ -161,6 +161,16 @@ describe('la sección pide lo que necesita, no lo que se ve', () => {
     fraseNatural = 564;
     rerender(arbol(store, 'Una frase mucho más larga que la de antes'));
     expect(seccion().style.width).toBe(`${QUIEN + 4 * OPCION + 564 + HOLGURA_PX}px`);
+  });
+
+  it('si solo cambia el tipo de la frase (otro relleno, el mismo texto), el ancho que pide cambia', () => {
+    // «Lo que falta» lleva `padding: 2px 8px`: 16 px más con el mismo texto.
+    fraseNatural = 300;
+    const { store, rerender } = montar('__pie_cuatro', 'Falta la pieza');
+    expect(seccion().style.width).toBe(`${QUIEN + 4 * OPCION + 300 + HOLGURA_PX}px`);
+    fraseNatural = 316;
+    rerender(arbol(store, 'Falta la pieza', 'falta'));
+    expect(seccion().style.width).toBe(`${QUIEN + 4 * OPCION + 316 + HOLGURA_PX}px`);
   });
 
   it('otra herramienta, otra medida: sin opciones no pide ancho', () => {

@@ -71,7 +71,7 @@ function useCuantasCaben(
   raiz: RefObject<HTMLDivElement>,
   herramienta: string,
   total: number,
-  frase: string | undefined,
+  claveDeLaFrase: string | undefined,
 ): { cuantas: number; necesita: number | null } {
   const [medida, setMedida] = useState<{ herramienta: string; cuantas: number; necesita: number | null }>({ herramienta, cuantas: total, necesita: null });
   const anchos = useRef<{ herramienta: string; lista: number[] } | null>(null);
@@ -118,8 +118,9 @@ function useCuantasCaben(
     setMedida((m) => (m.herramienta === herramienta && m.cuantas === k && m.necesita === pide ? m : { herramienta, cuantas: k, necesita: pide }));
   }, [raiz, herramienta, total]);
 
-  // La frase entra en lo que la sección necesita: si cambia, se vuelve a medir.
-  useLayoutEffect(() => { medir(); }, [medir, cuantas, frase]);
+  // La frase entra en lo que la sección necesita: si cambia (su texto, o su tipo, que
+  // le pone otro relleno), se vuelve a medir.
+  useLayoutEffect(() => { medir(); }, [medir, cuantas, claveDeLaFrase]);
 
   useLayoutEffect(() => {
     const el = raiz.current;
@@ -220,7 +221,7 @@ export default function SeccionDelPatron({
     });
   }
 
-  const { cuantas, necesita } = useCuantasCaben(raiz, activeTool, controles.length, frase?.texto);
+  const { cuantas, necesita } = useCuantasCaben(raiz, activeTool, controles.length, frase ? `${frase.tipo}:${frase.texto}` : undefined);
   const plegadas = controles.slice(cuantas);
   const [abierto, setAbierto] = useState(false);
   const [ancla, setAncla] = useState({ left: 0, bottom: 0 });
