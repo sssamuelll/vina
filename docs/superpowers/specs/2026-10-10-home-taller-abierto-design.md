@@ -388,3 +388,16 @@ Los dieciocho tests de hoy se mantienen con esos valores (título, `lang`, un so
 - `.agents/context/PRODUCT.md` (María como usuaria de referencia; tono sobrio).
 - `.claude/skills/contrato-de-interfaz/SKILL.md` (leyes de tokens, idioma y puertas, aplicadas aquí a la home).
 - Issues citados: #915, #15, #964, #1005, #1219.
+
+## 14. Enmienda al implementar (2026-10-11)
+
+Medido con la página construida, el techo de § 3 y § 10.1 no se sostenía: 583 palabras visibles en inglés y 604 en español con el copy aprobado, porque la lista de faltas y el diario que este spec exige pesan más de lo estimado. Decidido al ejecutar el plan (Task 5), con las podas que § 11 ya preveía y tres recortes mínimos:
+
+- El diario baja a **cuatro entradas** (sale #1233, la cabina de la pieza, la menos significativa para una patronista).
+- La fila del copiloto pierde la lista de proveedores: «Ask it to add a dart or to audit the seam allowances. Same tools as yours, and every change can be undone. With your own key.» (ES: «Pídele que añada una pinza o que audite los márgenes. Las mismas herramientas que tú, y cada cambio se puede deshacer. Con tu propia llave.»). Los proveedores siguen en el README.
+- Pie de la figura 1: «A real DXF pattern · the selected piece with its dimension» (ES: «Patrón real de un DXF · pieza seleccionada con su cota»).
+- «Project files. Your work lives in this browser until .vina files can be saved.» y «A dart tool. Darts arrive with your DXF or the copilot, not from the pen yet.» (ES: «…hasta que los .vina se puedan guardar.»).
+- La oferta cierra en «A few each month.» / «Unos pocos al mes.»
+- **El techo pasa a 580 palabras visibles por página** (medido tras las podas: ≈ 545 en inglés, ≈ 565 en español). Es un trinquete: solo baja.
+
+Y un detalle de § 4: los enlaces de las listas llevan `min-width: 24px` (el rótulo `#15` medía 23 px de ancho, bajo el objetivo de puntero de § 9).

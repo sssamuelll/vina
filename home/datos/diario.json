@@ -1,7 +1,6 @@
 [
-  { "fecha": "2026-10-09", "pr": 1238, "texto": { "en": "Your own agent can work on the pattern open in Vina.", "es": "Tu propio agente puede trabajar en el patrón abierto en Vina." } },
-  { "fecha": "2026-10-09", "pr": 1239, "texto": { "en": "The panels moved onto paper: one slot on the right, properties in two levels, the avatar in seven fields.", "es": "Los paneles pasaron al papel: una ranura a la derecha, propiedades en dos niveles, el avatar en siete campos." } },
-  { "fecha": "2026-10-06", "pr": 1235, "texto": { "en": "A seam fix: the sleeve cap splits where each half measures its armhole.", "es": "Un arreglo de costura: la copa se parte donde cada mitad mide lo que su sisa." } },
-  { "fecha": "2026-10-05", "pr": 1233, "texto": { "en": "The piece's cabin: a strip of four tools and one dimension at a time.", "es": "La cabina de la pieza: una barrita de cuatro herramientas y una cota a la vez." } },
-  { "fecha": "2026-07-10", "pr": 934, "texto": { "en": "Real sewing on the avatar: a shirt forms and drapes for the first time.", "es": "Costura real sobre el avatar: una camisa se forma y cae por primera vez." } }
+  {"fecha": "2026-10-09", "pr": 1238, "texto": {"en": "Your own agent can work on the pattern open in Vina.", "es": "Tu propio agente puede trabajar en el patrón abierto en Vina."}},
+  {"fecha": "2026-10-09", "pr": 1239, "texto": {"en": "The panels moved onto paper: one slot on the right, properties in two levels, the avatar in seven fields.", "es": "Los paneles pasaron al papel: una ranura a la derecha, propiedades en dos niveles, el avatar en siete campos."}},
+  {"fecha": "2026-10-06", "pr": 1235, "texto": {"en": "A seam fix: the sleeve cap splits where each half measures its armhole.", "es": "Un arreglo de costura: la copa se parte donde cada mitad mide lo que su sisa."}},
+  {"fecha": "2026-07-10", "pr": 934, "texto": {"en": "Real sewing on the avatar: a shirt forms and drapes for the first time.", "es": "Costura real sobre el avatar: una camisa se forma y cae por primera vez."}}
 ]

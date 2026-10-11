@@ -1,9 +1,20 @@
 {
-  "document": 13886,
-  "stylesheet": 8047,
-  "script": 0,
-  "font": 88660,
-  "image": 65339,
-  "media": 0,
-  "total": 175932
+  "/": {
+    "document": 18362,
+    "stylesheet": 8910,
+    "script": 0,
+    "font": 88660,
+    "image": 65339,
+    "media": 0,
+    "total": 181271
+  },
+  "/es/": {
+    "document": 18763,
+    "stylesheet": 8910,
+    "script": 0,
+    "font": 88660,
+    "image": 65339,
+    "media": 0,
+    "total": 181672
+  }
 }

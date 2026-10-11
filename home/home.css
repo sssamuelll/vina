@@ -108,7 +108,7 @@ h3 { font-size: 20px; line-height: 1.2; font-weight: 500; letter-spacing: -0.01e
 .rotulo-lista { margin-top: 40px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--tinta-70); font-weight: 500; }
 .lista { margin-top: 20px; list-style: none; border-top: 1px solid var(--hairline); max-width: 860px; }
 .lista li { display: grid; grid-template-columns: 1fr auto; column-gap: 24px; align-items: baseline; padding: 16px 0; border-bottom: 1px solid var(--hairline); font-size: 16px; }
-.lista a { display: inline-flex; align-items: center; min-height: 24px; font-size: 13px; color: var(--senal-texto); }
+.lista a { display: inline-flex; align-items: center; justify-content: flex-end; min-height: 24px; min-width: 24px; font-size: 13px; color: var(--senal-texto); }
 .lista a:focus-visible, .lista a:hover { color: var(--tinta); }
 .diario li { grid-template-columns: 104px 1fr auto; }
 .fecha { font-size: 13px; color: var(--tinta-70); }

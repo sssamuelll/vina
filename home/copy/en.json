@@ -23,7 +23,7 @@
   "hoyH2": "What it does today",
   "hoyIntro": "A paper canvas with your pattern, a 3D viewer with the avatar, and the usual tools in the usual order. The interface speaks Spanish for now.",
   "fig01Alt": "Vina's 2D canvas with a T-shirt pattern and one piece selected, showing its dimension",
-  "fig01Pie": "A real pattern imported from a DXF · the selected piece with its dimension",
+  "fig01Pie": "A real DXF pattern · the selected piece with its dimension",
   "fig01Dispositivo": "Chromium · 1600 × 1000",
   "fig02Alt": "The avatar wearing the T-shirt in the 3D viewer, with the fit map on",
   "fig02Pie": "The fit map on the avatar · tighter in red, looser in blue",
@@ -39,7 +39,7 @@
   "leerNotas": "Read the design notes",
   "enviaEyebrow": "Send a pattern",
   "enviaH2": "Bring your pattern, I'll drape it",
-  "enviaIntro": "Email me a DXF. I'll return it sewn and draped in Vina, with its fit map, and I'll tell you where Vina fell short. Every pattern that comes in is a test the workshop hasn't passed yet. A few each month, in the order they arrive.",
+  "enviaIntro": "Email me a DXF. I'll return it sewn and draped in Vina, with its fit map, and I'll tell you where Vina fell short. Every pattern that comes in is a test the workshop hasn't passed yet. A few each month.",
   "enviaCondiciones": "vina@sdar.dev · DXF-AAMA or DXF-ASTM · I read and reply myself",
   "pie": "© 2026 Vina · Pattern making and 3D simulation in the browser"
 }

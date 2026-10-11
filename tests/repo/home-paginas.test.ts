@@ -51,12 +51,12 @@ describe.each(Object.keys(PAGINAS) as ('en' | 'es')[])('la página %s', (idioma)
   it('tiene los cuatro bloques y las listas enteras', () => {
     for (const id of ['today', 'making', 'how', 'send']) expect(html).toContain(`<section id="${id}"`);
     expect(html.match(/<li class="falta">/g)).toHaveLength(6);
-    expect(html.match(/<li class="entrada">/g)).toHaveLength(5);
+    expect(html.match(/<li class="entrada">/g)).toHaveLength(4);
     expect(html.match(/<div class="fila">/g)).toHaveLength(3);
   });
   it('cada enlace de las listas tiene nombre completo para el lector de pantalla', () => {
     const enlaces = [...html.matchAll(/<a class="mono" href="[^"]+" aria-label="([^"]+)">([^<]+)<\/a>/g)];
-    expect(enlaces).toHaveLength(11);
+    expect(enlaces).toHaveLength(10);
     for (const [, nombre, visible] of enlaces) {
       expect(nombre, visible).toContain(visible);
       expect(nombre.length, visible).toBeGreaterThan(visible.length + 10);

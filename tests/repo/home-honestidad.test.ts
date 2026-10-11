@@ -53,8 +53,8 @@ describe('home/datos/en-construccion.json: cada falta tiene a dónde ir', () => 
 
 describe('home/datos/diario.json: la historia que se cuenta existe', () => {
   const historial = execSync('git log --oneline origin/main', { encoding: 'utf8' });
-  it('cinco entradas, de la más nueva a la más vieja', () => {
-    expect(diario).toHaveLength(5);
+  it('cuatro entradas, de la más nueva a la más vieja', () => {
+    expect(diario).toHaveLength(4);
     const fechas = diario.map((d) => d.fecha);
     expect([...fechas].sort().reverse()).toEqual(fechas);
     for (const d of diario) expect(d.fecha).toMatch(/^\d{4}-\d{2}-\d{2}$/);

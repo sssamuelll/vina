@@ -23,7 +23,7 @@
   "hoyH2": "Lo que hace hoy",
   "hoyIntro": "Un lienzo de papel con tu patrón, un visor 3D con el avatar y las herramientas de siempre en el orden de siempre.",
   "fig01Alt": "El lienzo 2D de Vina con el patrón de una camiseta y una pieza seleccionada con su cota",
-  "fig01Pie": "Patrón real importado de un DXF · pieza seleccionada con su cota",
+  "fig01Pie": "Patrón real de un DXF · pieza seleccionada con su cota",
   "fig01Dispositivo": "Chromium · 1600 × 1000",
   "fig02Alt": "El avatar con la camiseta puesta en el visor 3D, con el mapa de ajuste activo",
   "fig02Pie": "El mapa de ajuste sobre el avatar · más tenso en rojo, más suelto en azul",
@@ -39,7 +39,7 @@
   "leerNotas": "Leer las notas de diseño",
   "enviaEyebrow": "Envía un patrón",
   "enviaH2": "Trae tu patrón, yo lo visto",
-  "enviaIntro": "Mándame un DXF por correo. Te lo devuelvo cosido y caído en Vina, con su mapa de ajuste, y te digo dónde Vina se quedó corta. Cada patrón que llega es una prueba que el taller todavía no ha pasado. Unos pocos al mes, en el orden en que llegan.",
+  "enviaIntro": "Mándame un DXF por correo. Te lo devuelvo cosido y caído en Vina, con su mapa de ajuste, y te digo dónde Vina se quedó corta. Cada patrón que llega es una prueba que el taller todavía no ha pasado. Unos pocos al mes.",
   "enviaCondiciones": "vina@sdar.dev · DXF-AAMA o DXF-ASTM · leo y respondo yo mismo",
   "pie": "© 2026 Vina · Patronaje y simulación 3D en el navegador"
 }

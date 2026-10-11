@@ -48,8 +48,8 @@
       "titulo": { "en": "Copilot", "es": "Copiloto" },
       "mono": false,
       "texto": {
-        "en": "Ask it to add a dart or to audit the seam allowances. It uses the same tools you do, and every change can be undone. With your own key: Anthropic, OpenAI, DeepSeek or Ollama.",
-        "es": "Pídele que añada una pinza o que audite los márgenes. Usa las mismas herramientas que tú y cada cambio se puede deshacer. Con tu propia llave: Anthropic, OpenAI, DeepSeek u Ollama."
+        "en": "Ask it to add a dart or to audit the seam allowances. Same tools as yours, and every change can be undone. With your own key.",
+        "es": "Pídele que añada una pinza o que audite los márgenes. Las mismas herramientas que tú, y cada cambio se puede deshacer. Con tu propia llave."
       },
       "prueba": ["src/copilot/connections/registry.ts", "src/copilot/action/tools/definitions"]
     }
