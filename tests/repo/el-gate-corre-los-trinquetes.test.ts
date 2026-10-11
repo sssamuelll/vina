@@ -73,6 +73,10 @@ describe('el gate del deploy corre los trinquetes de la interfaz', () => {
     expect(specsDelGate()).toContain('tests/e2e/la-cabina-de-la-pieza.spec.ts');
   });
 
+  it('y la red del 3D en papel (P5): el escenario, el margen que no se mueve, el grupo de la prenda y el pie', () => {
+    expect(specsDelGate()).toContain('tests/e2e/el-3d-en-papel.spec.ts');
+  });
+
   it('cada spec de la lista existe en disco', () => {
     expect(specsDelGate().filter((s) => !existsSync(join(RAIZ, s)))).toEqual([]);
   });

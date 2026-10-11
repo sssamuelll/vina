@@ -1245,14 +1245,23 @@ async function switchTo3D() {
 async function ensureSimulationRunning() {
   const running = await page.evaluate(() => window.__VINA_STORE__?.getState?.()?.simulation?.simulationState === 'running');
   if (!running) {
-    await page.locator('.dock--right').getByRole('button', { name: 'Simular', exact: true }).click();
+    await page.locator('nav[aria-label="Herramientas del 3D"]').getByRole('button', { name: 'Simular', exact: true }).click();
   }
   await page.waitForFunction(() => window.__VINA_STORE__?.getState?.()?.simulation?.simulationState === 'running', undefined, { timeout: 20_000 });
+}
+
+async function abrirMenuDeMapas() {
+  if ((await page.locator('.menu-de-mapas__hoja').count()) === 0) {
+    await page.getByRole('button', { name: 'Mapa', exact: true }).click();
+  }
+  await page.locator('.menu-de-mapas__hoja').waitFor({ state: 'visible' });
 }
 
 async function activateFitMap(label, mode) {
   await switchTo3D();
   await ensureSimulationRunning();
+  // Desde P5 los mapas son el menú «Mapa ▾» de la barra superior, no una barra sobre el visor.
+  await abrirMenuDeMapas();
   const button = page.locator(`button[title^="${label}"]`).first();
   await button.waitFor({ state: 'visible' });
   await page.waitForFunction((titlePrefix) => {
@@ -1265,7 +1274,7 @@ async function activateFitMap(label, mode) {
 
 async function clickRightDock(name) {
   await switchTo3D();
-  await page.locator('.dock--right').getByRole('button', { name, exact: true }).click();
+  await page.locator('nav[aria-label="Herramientas del 3D"]').getByRole('button', { name, exact: true }).click();
   if (name === 'Coser') {
     await page.waitForFunction(() => window.__VINA_STORE__?.getState?.()?.tools?.activeTool3D === 'sew3d');
   } else if (name === 'Simular') {
@@ -1657,17 +1666,20 @@ async function runVisits() {
     },
   });
 
+  // «Capturar visor 3D» salió de la barra de mapas a Vina ▸ Archivo (spec 2026-10-02 § 4.2, P5):
+  // sin botón sobre el visor, la puerta con foco es su atajo.
   await visit('Visor 3D · Captura F10', 'controles visor 3D', {
     action: async () => {
       await switchTo3D();
-      await page.getByTitle('Captura del visor 3D (F10)', { exact: true }).click();
+      await page.keyboard.press('F10');
     },
   });
 
-  await visit('Visor 3D · Ajustes del mapa de ajuste', 'controles visor 3D', {
+  await visit('Visor 3D · Ajustes del mapa', 'controles visor 3D', {
     action: async () => {
       await switchTo3D();
-      await page.getByTitle('Ajustes del mapa de ajuste', { exact: true }).click();
+      await abrirMenuDeMapas();
+      await page.getByRole('button', { name: 'Ajustes del mapa…', exact: true }).click();
       await page.getByLabel('Tensión mín', { exact: true }).waitFor({ state: 'visible' });
     },
   });

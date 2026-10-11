@@ -291,6 +291,7 @@ SPECS_DEL_GATE=(
   tests/e2e/marca-de-escala.spec.ts
   tests/e2e/margen-de-herramientas.spec.ts
   tests/e2e/barra-superior.spec.ts
+  tests/e2e/el-3d-en-papel.spec.ts
 )
 # Los specs de la lista que todavía no pasaron sobre este árbol.
 sin_marca() { for s in "${SPECS_DEL_GATE[@]}"; do [ -f "$MARCAS/$(basename "$s").ok" ] || echo "$s"; done; }

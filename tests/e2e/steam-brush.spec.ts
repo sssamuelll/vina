@@ -41,7 +41,7 @@ test.describe('Steam Brush Tool (issue #303)', () => {
 
     // Focus an element inside the 3D pane so the shortcut resolves to the 3D
     // context (otherwise 'b' hits the 2D seam tool first).
-    await page.locator('.canvas-area__3d [aria-label="Avatar"]').focus();
+    await page.locator('nav[aria-label="Herramientas del 3D"] [aria-label="Avatar"]').focus();
     await page.keyboard.press('b');
     await page.waitForTimeout(300);
 
@@ -104,7 +104,7 @@ test.describe('Steam Brush Tool (issue #303)', () => {
     expect(await waitForClothMesh(page)).toBe(true);
 
     // Activate steam brush via the 3D shortcut.
-    await page.locator('.canvas-area__3d [aria-label="Avatar"]').focus();
+    await page.locator('nav[aria-label="Herramientas del 3D"] [aria-label="Avatar"]').focus();
     await page.keyboard.press('b');
     await page.waitForTimeout(500);
 

@@ -75,7 +75,7 @@ test('«Producción» se despliega, y lo último del panel se alcanza con la rue
 test('el Avatar, desde su botón del 3D: siete campos, y Enter escribe la medida', async ({ page }) => {
   await abrirAppVacia(page);
   await cambiarVista(page, 'Split');
-  await page.locator('.canvas-area__3d [aria-label="Avatar"]').click();
+  await page.locator('nav[aria-label="Herramientas del 3D"] [aria-label="Avatar"]').click();
   await expect(page.locator('.context-panel__header', { hasText: 'Avatar' })).toBeVisible();
   await expect(page.locator('.ap-medidas input')).toHaveCount(7);
   expect(await aLaVista(page, '#ap-medida-height')).toBe(true);
