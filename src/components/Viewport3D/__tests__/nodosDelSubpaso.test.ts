@@ -49,4 +49,19 @@ describe('nodosDelSubpaso: el orden de un subpaso del solver de GPU', () => {
     expect(nodos).not.toContain('grab');
     expect(nodos).not.toContain('fpSolve');
   });
+
+  const viento = (x: number, y: number, z: number) => ({
+    windNodes: { accumNode: 'wAcc', applyNode: 'wApp', windX: { value: x }, windY: { value: y }, windZ: { value: z } },
+  });
+
+  it('sin viento no despacha el viento: con fuerza cero sumaba ceros con atómicas en cada triángulo y cada subpaso', () => {
+    const nodos = nodosDelSubpaso(solver(viento(0, 0, 0)), { tether: false, grab: false, facePoke: false }) as unknown as string[];
+    expect(nodos).not.toContain('wAcc');
+    expect(nodos).not.toContain('wApp');
+  });
+
+  it('con viento, lo despacha justo después de preSolve', () => {
+    const nodos = nodosDelSubpaso(solver(viento(0, 0, 2)), { tether: false, grab: false, facePoke: false }) as unknown as string[];
+    expect(nodos.slice(0, 3)).toEqual(['pre', 'wAcc', 'wApp']);
+  });
 });

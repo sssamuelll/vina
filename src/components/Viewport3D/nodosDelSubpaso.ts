@@ -31,9 +31,14 @@ export function nodosDelSubpaso(
   op: { tether: boolean; grab: boolean; facePoke: boolean },
 ): ComputeNode[] {
   const nodos: ComputeNode[] = [solver.preSolve];
-  // Wind force (two-pass: accumulate per-triangle, apply per-particle)
-  if (solver.windNodes) {
-    nodos.push(solver.windNodes.accumNode, solver.windNodes.applyNode);
+  // Wind force (two-pass: accumulate per-triangle, apply per-particle). Con
+  // fuerza cero no se despacha: su acumulado suma con 9 atómicas por triángulo
+  // y su aplicación con 6 por partícula, ~10 millones de atómicas por cuadro en
+  // la camisa de María para sumar ceros (2026-10-11). La fuerza es lineal en el
+  // viento, así que saltarlo con viento cero da la misma tela.
+  const w = solver.windNodes;
+  if (w && (w.windX.value !== 0 || w.windY.value !== 0 || w.windZ.value !== 0)) {
+    nodos.push(w.accumNode, w.applyNode);
   }
   // Batch all stretch colors — graph coloring guarantees no two
   // constraints WITHIN a color share a vertex, so each color's parallel
