@@ -40,6 +40,7 @@ import { buildAdjacency } from '../selfCollision';
 import { buildAdjacencyCSR } from './adjacencyCSR';
 import { createCountSamplingLimiter } from '../../rateLimit';
 import { fabricInvMassScale } from '../physicalFabric';
+import { esperaTrasElPaso } from '../ritmoDelWorker';
 import type { PieceMeshData, WasmSolverConfig } from './wasmSolverClient';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -215,8 +216,6 @@ function applySolverConfig(): void {
 let invMassCache: Float32Array | null = null;
 /** Pre-allocated buffer for saving positions before collision (avoids per-frame allocation) */
 let preCollisionBuf: Float32Array | null = null;
-
-const FRAME_BUDGET_MS = 14;
 
 /**
  * A3 Sec 3.3.A: telemetry counter for NaN detected in WASM positions buffer.
@@ -455,9 +454,7 @@ function simulationLoop(): void {
     );
   }
 
-  const elapsed = performance.now() - t0;
-  const delay = elapsed > FRAME_BUDGET_MS ? Math.min(elapsed, 50) : 1000 / 60;
-  animFrameId = setTimeout(simulationLoop, delay);
+  animFrameId = setTimeout(simulationLoop, esperaTrasElPaso(performance.now() - t0));
 }
 
 function readPositions(): Float32Array | null {
