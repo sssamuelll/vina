@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Shirt, Spline, Play, Pause, PersonStanding } from 'lucide-react';
 import type { RootState } from '../../store';
 import { startSimulation, pauseSimulation, setViewMode3D, resetSimulation } from '../../store/simulationSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
 import ToolTooltip from './ToolTooltip';
+import EstadoDeLaSimulacion from './EstadoDeLaSimulacion';
 import './Dock.css';
 
 interface RightDockProps {
@@ -25,14 +27,30 @@ interface RightDockProps {
  * Es una botonera (contrato § 4): «Simular» tiene Espacio de atajo, así que con
  * el foco en «Colocar» Espacio pulsa el botón y no arranca la simulación; y un
  * clic de ratón no deja el foco en el botón. Sin visor a la vista (vista 2D) no
- * se pinta. El estado de la simulación, que antes flotaba aquí («SIMULANDO · N
- * fps»), vive en la línea al pie (`SeccionDel3D`).
+ * se pinta. Al pie de la columna va el estado de la simulación
+ * (`EstadoDeLaSimulacion`, enmienda 2026-10-11): un icono que despliega el
+ * detalle. Antes de P5 flotaba aquí como «SIMULANDO · N fps» y en P5 fue una
+ * línea de texto en la línea al pie.
  */
 export default function RightDock({ onOpenPanel }: RightDockProps) {
   const dispatch = useDispatch();
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
   const simState = useSelector((s: RootState) => s.simulation.simulationState);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
+
+  // Un clic en cualquier sitio suelta el botón de una botonera que dejó el teclado, y
+  // el botón pinchado no lo toma: Enter y Espacio solo son de un botón al que se llegó
+  // con el teclado (`esTeclaDeBotonera`). Con la vista 3D sola no está montada la
+  // sección del patrón, que tiene el mismo oído: el margen trae el suyo.
+  useEffect(() => {
+    if (viewMode === '2d') return;
+    const soltar = () => {
+      const activo = document.activeElement;
+      if (activo instanceof HTMLElement && activo.matches('[data-botonera] button')) activo.blur();
+    };
+    window.addEventListener('mousedown', soltar, true);
+    return () => window.removeEventListener('mousedown', soltar, true);
+  }, [viewMode]);
 
   if (viewMode === '2d') return null;
 
@@ -107,6 +125,7 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
           <PersonStanding size={16} />
         </button>
       </ToolTooltip>
+      <EstadoDeLaSimulacion />
     </nav>
   );
 }

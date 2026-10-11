@@ -56,7 +56,8 @@
 }
 .grupo-del-patron__fila { display: flex; align-items: center; gap: 8px; }
 /* `.opcion-del-pie__interruptor` es el interruptor de una opción en la línea
-   al pie (ToolOptionControls.tsx): un solo estilo de interruptor en el marco. */
+   al pie (ToolOptionControls.tsx): un solo estilo de interruptor, el mismo en la
+   barra superior (marco) y en el pie (papel desde el 2026-10-11). */
 .grupo-del-patron__interruptor,
 .grupo-del-patron__plegado,
 .opcion-del-pie__interruptor {
@@ -163,11 +164,18 @@
   background: var(--canvas-2d);
 }
 
-/* La línea al pie (spec 2026-10-02 «la interfaz en papel» § 5.3): marco, del
-   material y el alto de la barra superior, de lado a lado y siempre. Es una
-   fila de la ventana, no flota: la hoja termina encima y nada la empuja. La
-   sección del patrón la pinta PatternEditor por portal en su ranura
-   (SeccionDelPatron.css); la del 3D es un hijo directo (SeccionDel3D.css).
+/* La línea al pie (spec 2026-10-02 «la interfaz en papel» § 5.3): del alto de la
+   barra superior, de lado a lado y siempre. Es una fila de la ventana, no flota:
+   la hoja termina encima y nada la empuja. La sección del patrón la pinta
+   PatternEditor por portal en su ranura (SeccionDelPatron.css); la del 3D es un
+   hijo directo (SeccionDel3D.css).
+
+   Es papel, con los colores del margen de herramientas (Dock.css): el color de la
+   hoja, la tinta del ámbito (`data-material="papel"` en su raíz, AppShell.tsx) y
+   una línea de pelo arriba. Hasta el 2026-10-11 era marco, del material de la
+   barra superior; Samuel, con P5 desplegada: «me equivoqué con la línea al pie …
+   creo que va mejor en los colores de la barra de herramientas: Herramientas del
+   patrón». El estado de la simulación se fue ese día al pie del margen del 3D.
 
    Cómo se reparte el ancho (spec § 5.3, P5): la herramienta del patrón ocupa lo
    que necesita; la sección del 3D, lo que sobra, y es la primera que se recorta.
@@ -175,12 +183,11 @@
    necesita para mostrar TODO, «quién», todas sus opciones y la frase entera, con
    200 px como mínimo. Solo se encoge si no hay sitio, hasta 320 px;
    la del 3D crece a todo lo demás (`flex: 1 100 auto`) y es la que se encoge casi
-   todo: su voz cede hasta desaparecer (SeccionDel3D.css) y lo único que no cede es
-   su estado, que le pone el mínimo (`min-width: auto`). Con 12 herramientas del
-   margen en Split a 1366 px las doce frases caben enteras (medido con el
-   navegador); a 1000 px el estado sigue entero y la frase del patrón conserva
-   sus 200 px (e2e). Con la vista 3D sola la ranura del patrón se esconde y el 3D
-   se lleva todo el pie, sin la línea de pelo que lo separaba del patrón.
+   todo: su voz cede hasta desaparecer (SeccionDel3D.css) y le queda su relleno
+   (`min-width: auto`). Con 12 herramientas del margen en Split a 1366 px las doce
+   frases caben enteras (medido con el navegador); a 1000 px la frase del patrón
+   conserva sus 200 px (e2e). Con la vista 3D sola la ranura del patrón se esconde y
+   el 3D se lleva todo el pie, sin la línea de pelo que lo separaba del patrón.
 
    Por qué la sección PIDE un ancho en vez de medir su contenido: la medida que
    decide cuántas opciones se pliegan en «Más» (`useCuantasCaben`) sale del ancho
@@ -195,8 +202,8 @@
   height: var(--top-bar-h);
   flex-shrink: 0;
   display: flex;
-  background: var(--bg-deeper);
-  border-top: 1px solid var(--border);
+  background: var(--canvas-2d);
+  border-top: var(--hairline);
   color: var(--text-primary);
 }
 .linea-al-pie__patron { flex: 0 1 auto; min-width: 320px; display: flex; }

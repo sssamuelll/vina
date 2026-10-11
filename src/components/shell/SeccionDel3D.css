@@ -1,20 +1,21 @@
 /* La sección del 3D de la línea al pie (SeccionDel3D.tsx, spec 2026-10-02 § 5.3,
-   P5): la voz a la izquierda, el estado de la simulación a la derecha. Su caja
-   (`.linea-al-pie__3d`) y cómo se reparte el ancho con la sección del patrón
-   están en layout.css. Vive en el marco: tinta clara de `:root` sobre
-   --bg-deeper. El detalle del estado cuelga de <body> y es papel. */
+   P5): la voz de la vista. Su caja (`.linea-al-pie__3d`) y cómo se reparte el
+   ancho con la sección del patrón están en layout.css. Vive en la línea al pie,
+   que es papel desde el 2026-10-11 (tinta del ámbito sobre --canvas-2d). El
+   estado de la simulación se mudó ese día al pie del margen del 3D
+   (EstadoDeLaSimulacion.css). */
 
 /* La voz: nombre, tecla y frase, en el orden de la sección del patrón. Es lo
    PRIMERO que se recorta (spec § 5.3): `width: 0` hace que su ancho natural no
-   cuente para el tamaño de la sección (la sección mide lo que su estado y sus
-   márgenes, y crece a lo que sobra), y `flex: 1 1 0` le da todo lo que haya. Sin
-   el `width: 0`, la voz entera (311 px) sería el mínimo de la sección y le
-   quitaría el ancho a la frase del patrón.
+   cuente para el tamaño de la sección (la sección mide sus márgenes y crece a lo
+   que sobra), y `flex: 1 1 0` le da todo lo que haya. Sin el `width: 0`, la voz
+   entera (311 px) sería el mínimo de la sección y le quitaría el ancho a la frase
+   del patrón.
    Ceder es recortar de verdad: `overflow: hidden` en la voz. Sin él, su caja
    medía 0 px pero el nombre (que no se encogía) se desbordaba y se pintaba encima
-   del estado, o fuera de la ventana (revisión final de P5, a 1366 px en Split con
-   Piquete y la Plancha a vapor). Cede en este orden: primero la frase (con puntos
-   suspensivos), luego el nombre (también), y la tecla no. */
+   de lo que hubiera a su derecha, o fuera de la ventana (revisión final de P5, a
+   1366 px en Split con Piquete y la Plancha a vapor). Cede en este orden: primero
+   la frase (con puntos suspensivos), luego el nombre (también), y la tecla no. */
 .seccion-del-3d__voz { flex: 1 1 0; min-width: 0; width: 0; display: flex; align-items: center; column-gap: 12px; overflow: hidden; font-size: var(--text-sm); }
 .seccion-del-3d__quien { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; }
 .seccion-del-3d__nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); font-size: var(--text-ui); font-weight: var(--weight-semibold); white-space: nowrap; }
@@ -24,52 +25,3 @@
    solo ceda cuando la frase ya no tiene nada que dar. */
 .seccion-del-3d__frase { flex: 1 1000 auto; min-width: 0; overflow: hidden; }
 .seccion-del-3d__texto { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-secondary); }
-
-/* El estado: no se encoge. Una insignia ⚠ y la flecha de abrir hacia arriba. */
-.seccion-del-3d__boton {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 8px;
-  background: transparent;
-  border: var(--hairline);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: var(--text-sm);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.seccion-del-3d__boton:hover { color: var(--text-primary); }
-.seccion-del-3d__boton:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; color: var(--text-primary); }
-.seccion-del-3d__boton[aria-expanded="true"] { background: var(--bg-elevated); color: var(--text-primary); }
-
-/* El punto de estado: apagado salvo mientras corre. El color del MOTOR ya no tiñe
-   nada: el estado se lee en el texto. */
-.seccion-del-3d__punto { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--text-tertiary); }
-.seccion-del-3d__punto--corriendo { background: var(--success); }
-.seccion-del-3d__aviso { color: var(--warning); font-weight: var(--weight-semibold); }
-
-/* El detalle cuelga de <body> y es papel (contrato § 2: todo portal nace papel).
-   Se abre hacia arriba, sobre la línea al pie, alineado con el botón. */
-.seccion-del-3d__detalle {
-  position: fixed;
-  z-index: var(--z-menu);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: min(380px, calc(100vw - 32px));
-  padding: 8px 12px;
-  background: var(--surface-overlay-bg);
-  border: var(--surface-overlay-border);
-  border-radius: var(--surface-overlay-radius);
-  box-shadow: var(--surface-overlay-shadow);
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-}
-.seccion-del-3d__linea--bien { color: var(--success); }
-.seccion-del-3d__linea--aviso { color: var(--warning); }
-.seccion-del-3d__linea--error { color: var(--destructive); }
-.seccion-del-3d__linea--tenue { color: var(--text-tertiary); }

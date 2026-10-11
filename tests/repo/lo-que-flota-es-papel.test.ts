@@ -54,8 +54,11 @@ const RAICES: Array<[string, number]> = [
   // Avisos y tooltips
   ['src/components/shell/ToastContainer.tsx', 1],
   ['src/components/shell/ToolTooltip.tsx', 1],
-  // La tarjeta de «suelta tu archivo» y el divisor de Split (una línea de pelo sobre papel, P5)
-  ['src/components/shell/AppShell.tsx', 2],
+  // La tarjeta de «suelta tu archivo», el divisor de Split (una línea de pelo sobre papel, P5)
+  // y la línea al pie, que es papel como los márgenes desde el 2026-10-11
+  ['src/components/shell/AppShell.tsx', 3],
+  // El detalle del estado de la simulación, que cuelga del margen del 3D (2026-10-11)
+  ['src/components/shell/EstadoDeLaSimulacion.tsx', 1],
   // Modales
   ['src/components/shell/ConfirmDialog.tsx', 1],
   ['src/components/PatternEditor/CalibrationModal.tsx', 1],
@@ -82,17 +85,19 @@ const PINTA: Array<[string, string[] | '*']> = [
   ['src/styles/floating.css', ['.logo-menu', '.context-menu']],
   ['src/components/shared/SubMenu.css', '*'],
   ['src/components/shell/Dock.css', ['.dock-picker', '.margen']],
-  ['src/styles/layout.css', ['.grupo-del-patron__menu', '.opcion-del-pie', '.hoja-del-agente']],
-  // El menú «Más» de la línea al pie y los controles que lleva dentro
-  ['src/components/PatternEditor/SeccionDelPatron.css', ['.seccion-del-patron__menu', '.opcion-del-pie']],
+  ['src/styles/layout.css', ['.grupo-del-patron__menu', '.opcion-del-pie', '.hoja-del-agente', '.linea-al-pie']],
+  // La línea al pie es papel desde el 2026-10-11: sus dos secciones, el menú «Más» y los
+  // controles que lleva dentro, enteros
+  ['src/components/PatternEditor/SeccionDelPatron.css', '*'],
+  ['src/components/shell/SeccionDel3D.css', '*'],
   ['src/components/PatternEditor/ToolOptionControls.css', '*'],
   ['src/components/LayerPanel/LayerPanel.css', ['.layer-context-menu', '.layer-color-popover', '.layer-color-swatch']],
   ['src/components/Viewport3D/SurfaceModePill.css', ['.surface-pill__flyout', '.surface-pill__option']],
   // El menú «Mapa» (la hoja, sus elementos y sus ajustes) y la leyenda de los mapas (P5)
   ['src/components/Viewport3D/MenuDeMapas.css', '*'],
   ['src/components/Viewport3D/LeyendaDeMapas.css', '*'],
-  // El detalle del estado de la simulación, que se abre desde la línea al pie (P5)
-  ['src/components/shell/SeccionDel3D.css', ['.seccion-del-3d__detalle', '.seccion-del-3d__linea']],
+  // El estado de la simulación al pie del margen del 3D y su detalle (2026-10-11)
+  ['src/components/shell/EstadoDeLaSimulacion.css', '*'],
   // Avisos y tooltips
   ['src/components/shell/ToastContainer.css', '*'],
   ['src/components/shell/ToolTooltip.css', '*'],

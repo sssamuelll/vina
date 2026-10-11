@@ -25,6 +25,9 @@ import './ToastContainer.css';
 export default function ToastContainer() {
   const dispatch = useDispatch();
   const toasts = useSelector((s: RootState) => s.copilotUI.toasts);
+  // Con el visor a la vista, el margen del 3D ocupa el borde derecho y a su pie va el estado
+  // de la simulación: los avisos se apartan a su izquierda (ToastContainer.css).
+  const conMargen3D = useSelector((s: RootState) => s.editor.viewMode !== '2d');
 
   // Cleanup interval — only runs while toasts are present.
   useEffect(() => {
@@ -38,7 +41,7 @@ export default function ToastContainer() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="toast-container" data-material="papel" aria-live="polite" aria-label="Notificaciones">
+    <div className={`toast-container${conMargen3D ? ' toast-container--con-margen-3d' : ''}`} data-material="papel" aria-live="polite" aria-label="Notificaciones">
       {toasts.map((toast) => (
         <div key={toast.id} className={`toast toast--${toast.type}`} role="status" data-superficie="toast">
           <span className="toast__message">{toast.message}</span>

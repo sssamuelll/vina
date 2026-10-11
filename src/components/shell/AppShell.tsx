@@ -368,12 +368,14 @@ export default function AppShell() {
         <RightDock onOpenPanel={togglePanel} />
       </div>
       {/* La línea al pie (spec 2026-10-02 § 5.3): la tercera fila de la
-          ventana. Marco, de lado a lado y siempre. La sección del patrón la
-          llena PatternEditor por portal, porque su frase sale del estado de
-          sus herramientas; la del 3D (la voz de la vista y el estado de la
-          simulación) es un hijo directo. Con la vista 3D sola la ranura del
-          patrón se esconde y la del 3D ocupa todo el pie; con 2D no hay del 3D. */}
-      <div className={`linea-al-pie${viewMode === '3d' ? ' linea-al-pie--3d-solo' : ''}`} data-superficie="ambiente">
+          ventana, de lado a lado y siempre. Es papel, con los colores del margen
+          de herramientas (enmienda 2026-10-11; hasta entonces fue marco). La
+          sección del patrón la llena PatternEditor por portal, porque su frase
+          sale del estado de sus herramientas; la del 3D (la voz de la vista) es
+          un hijo directo. El estado de la simulación va al pie del margen del
+          3D (EstadoDeLaSimulacion). Con la vista 3D sola la ranura del patrón
+          se esconde y la del 3D ocupa todo el pie; con 2D no hay del 3D. */}
+      <div className={`linea-al-pie${viewMode === '3d' ? ' linea-al-pie--3d-solo' : ''}`} data-superficie="ambiente" data-material="papel">
         <div ref={setRanuraDelPie} className="linea-al-pie__patron" hidden={viewMode === '3d'} />
         {viewMode !== '2d' && <SeccionDel3D />}
       </div>
