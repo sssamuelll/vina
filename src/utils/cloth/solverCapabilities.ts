@@ -95,7 +95,7 @@ export interface SolverCapabilities {
    *   has no positional pin in inference contract).
    *
    * Capability flag is documentary — consumer code (helper or inline)
-   * checks before dispatch; UI surface (`SeccionDel3D`)
+   * checks before dispatch; UI surface (`EstadoDeLaSimulacion`)
    * communicates absence to user.
    *
    * Per C4 RFC § 3.1.A ratification. Per C4 follow-up #701 the field is

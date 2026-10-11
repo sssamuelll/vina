@@ -848,8 +848,8 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     >
       {/* El estado de la simulación (y el aviso de C4 § 3.1.A, la «silent-absence
           surface» de la herramienta sin soporte y de las costuras sin restricciones)
-          ya no se pinta aquí: baja a la sección del 3D de la línea al pie
-          (shell/SeccionDel3D, P5). Este visor solo pinta la escena. */}
+          ya no se pinta aquí: es un icono al pie del margen del 3D
+          (shell/EstadoDeLaSimulacion, 2026-10-11). Este visor solo pinta la escena. */}
       <div ref={boxOverlayRef} style={{
         display: 'none', position: 'absolute', border: '1px dashed #00e5ff',
         backgroundColor: 'rgba(0, 229, 255, 0.08)', pointerEvents: 'none', zIndex: 10,

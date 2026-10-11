@@ -1,7 +1,8 @@
 /* Las opciones de una herramienta en la línea al pie (spec 2026-10-02 § 5.3):
-   rótulo y control en una fila. Se pintan en el marco (la línea al pie) y en
-   el papel (el menú «Más»), así que solo usan tokens que valen en los dos: ni
-   un fondo del marco ni un color a mano (lo vigila
+   rótulo y control en una fila. Se pintan en la línea al pie y en el menú
+   «Más», papel los dos desde el 2026-10-11 (el pie fue marco hasta entonces),
+   y solo usan tokens que valen en los dos materiales: ni un fondo del marco ni
+   un color a mano (lo vigila
    tests/repo/lo-que-flota-es-papel.test.ts). El interruptor comparte las
    reglas del grupo del patrón de la barra superior (layout.css). */
 .opcion-del-pie { flex: none; display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: var(--text-sm); }

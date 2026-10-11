@@ -141,7 +141,8 @@
   /* Tinta de texto instructivo dibujado SOBRE el papel: la marca de escala y
    * la pantalla vacía. Da 5,32:1 sobre --canvas-2d y 5,85:1 sobre
    * --piece-fill-2d; lo verifica contrasteDeTokens.ts. La frase de la
-   * herramienta vive desde P2b en la línea al pie, que es marco. */
+   * herramienta vive desde P2b en la línea al pie, que es papel desde el
+   * 2026-10-11 y usa los --text-* de su ámbito, no esta tinta. */
   --ink-hint: #6b6459;
   /* Seam overlay (SeamRenderer) on the paper ground: tension labels are muted
      warm (gather) / cool (ease). */
@@ -197,6 +198,9 @@
 
   /* Sizes — scale with viewport for comfort on large displays */
   --top-bar-h: clamp(36px, 2.5vw, 48px);
+  /* El ancho mínimo de un margen de herramientas (Dock.css). Los avisos se
+     apartan ese ancho del borde cuando el margen del 3D está a la vista. */
+  --margen-ancho: 44px;
   --unified-bar-h: clamp(44px, 3vw, 56px);
   --toolbar-btn: clamp(28px, 2vw, 38px);
 

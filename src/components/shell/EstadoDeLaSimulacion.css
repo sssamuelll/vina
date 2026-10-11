@@ -1,0 +1,60 @@
+/* El estado de la simulación (EstadoDeLaSimulacion.tsx; enmienda 2026-10-11 a la
+   spec «la interfaz en papel» § 4.5): un icono al pie del margen del 3D y su
+   detalle. El margen es papel (Dock.css), así que el icono es un botón más del
+   margen (`.dock__tool`, con su hover y su foco) y toma la tinta del ámbito; el
+   aviso y el pulso llevan su tono. El detalle cuelga de <body> y es papel
+   (contrato § 2: todo portal nace papel). */
+
+/* Debajo de las herramientas, al pie de la columna: `margin-top: auto` se lleva
+   todo el aire de la columna, que es un flex vertical. */
+.estado-de-la-simulacion { margin-top: auto; display: flex; }
+
+/* La cuenta de avisos va en la esquina de abajo del icono. */
+.estado-de-la-simulacion__boton { position: relative; }
+/* Abierto pesa más que rozado (ley de estado): el hover del margen pone el relleno; abierto,
+   además, un anillo. La variante `:hover` es explícita, como en Dock.css: sin ella, cuál gana
+   depende del orden de las hojas. */
+.estado-de-la-simulacion__boton[aria-expanded="true"], .estado-de-la-simulacion__boton[aria-expanded="true"]:focus-visible, .estado-de-la-simulacion__boton[aria-expanded="true"]:hover {
+  background: var(--bg-elevated);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--text-primary);
+}
+
+/* El tono va en el icono y no en el botón: el hover del margen tiñe el botón de
+   tinta, y el aviso tiene que seguir siendo aviso bajo el ratón. La cuenta es
+   texto de 11 px y va en tinta: --warning sobre --bg-elevated (hover, abierto)
+   da 4,45:1, bajo AA; el tono lo lleva el triángulo, a quien le basta 3:1. */
+.estado-de-la-simulacion__boton--aviso svg { color: var(--warning); }
+.estado-de-la-simulacion__boton--corriendo svg { color: var(--success); }
+.estado-de-la-simulacion__cuenta {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+/* El detalle se abre a la izquierda del margen, con su borde de abajo en el del
+   icono (el ancla la pone el componente). */
+.estado-de-la-simulacion__detalle {
+  position: fixed;
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(380px, calc(100vw - 32px));
+  padding: 8px 12px;
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+.estado-de-la-simulacion__linea--cabecera { font-weight: var(--weight-semibold); }
+.estado-de-la-simulacion__linea--bien { color: var(--success); }
+.estado-de-la-simulacion__linea--aviso { color: var(--warning); }
+.estado-de-la-simulacion__linea--error { color: var(--destructive); }
+.estado-de-la-simulacion__linea--tenue { color: var(--text-tertiary); }

@@ -36,6 +36,17 @@ describe('ToolTooltip', () => {
     expect(tip!.querySelector('.tool-tooltip-name')!.textContent).toBe('Select');
   });
 
+  it('apagado no sale: lo que el botón abrió ya está a la vista y el tooltip lo taparía', () => {
+    // El estado de la simulación (2026-10-11): con su detalle abierto, volver a pasar por el
+    // icono sacaba el tooltip (z del tooltip) encima de las últimas líneas del detalle, los avisos.
+    const { container, rerender } = renderTip({ apagado: true });
+    hover(container);
+    expect(document.querySelector('.tool-tooltip')).toBeNull();
+    rerender(<ToolTooltip name="Select"><button type="button">child</button></ToolTooltip>);
+    hover(container);
+    expect(document.querySelector('.tool-tooltip'), 'encendido de nuevo, vuelve a salir').toBeTruthy();
+  });
+
   it('renders the shortcut as a kbd when given', () => {
     const { container } = renderTip({ name: 'Select', shortcut: 'Z' });
     hover(container);

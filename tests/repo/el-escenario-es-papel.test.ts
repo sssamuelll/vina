@@ -153,10 +153,11 @@ describe('el pie reparte el ancho: el patrón ocupa lo que necesita y la secció
     expect(r, 'sin mínimo la ranura se iría a cero').toContain('min-width: 320px');
   });
 
-  it('la sección del 3D crece a lo que sobra y es la que cede casi todo, pero no por debajo de su estado', () => {
+  it('la sección del 3D crece a lo que sobra y es la que cede casi todo', () => {
+    // Desde el 2026-10-11 el estado de la simulación ya no está en el pie (va al pie del
+    // margen del 3D): lo único que le queda a la sección es su relleno.
     const r = regla(layout, '.linea-al-pie__3d');
     expect(r).toContain('flex: 1 100 auto');
-    expect(r, 'con `min-width: 0` el estado se saldría de su caja al cederla').toContain('min-width: auto');
   });
 
   it('con la vista 3D sola el 3D ocupa todo el pie, sin la línea de pelo del patrón', () => {
@@ -187,10 +188,31 @@ describe('el pie reparte el ancho: el patrón ocupa lo que necesita y la secció
     expect(regla(seccion, '.seccion-del-3d__frase')).toMatch(/flex:\s*1\s+1000\s+auto/);
   });
 
-  it('la frase del 3D se corta con puntos suspensivos en vez de empujar al estado', () => {
+  it('la frase del 3D se corta con puntos suspensivos en vez de empujar lo de al lado', () => {
     const r = regla(seccion, '.seccion-del-3d__texto');
     expect(r).toContain('text-overflow: ellipsis');
     expect(r).toContain('white-space: nowrap');
     expect(r).toContain('overflow: hidden');
+  });
+});
+
+describe('la línea al pie es papel, como los márgenes (enmienda 2026-10-11)', () => {
+  // Samuel, con P5 desplegada: «me equivoqué con la línea al pie … creo que va mejor en los
+  // colores de la barra de herramientas: Herramientas del patrón». Es lo que hace el margen
+  // (Dock.css): el color de la hoja, la tinta del ámbito y una línea de pelo como borde.
+  const layout = lee('src/styles/layout.css');
+  const margen = lee('src/components/shell/Dock.css');
+  const appShell = lee('src/components/shell/AppShell.tsx');
+
+  it('pinta el color de la hoja con la línea de pelo, los mismos tokens que el margen', () => {
+    const pie = regla(layout, '.linea-al-pie');
+    expect(regla(margen, '.margen'), 'el margen cambió de fondo: el pie lo copia').toContain('background: var(--canvas-2d)');
+    expect(pie).toContain('background: var(--canvas-2d)');
+    expect(pie, 'lo que separa es línea de pelo, no el borde de un campo').toContain('border-top: var(--hairline)');
+  });
+
+  it('su raíz lleva el ámbito de papel: la tinta de dentro es la oscura', () => {
+    const raiz = appShell.slice(appShell.indexOf('className={`linea-al-pie'));
+    expect(raiz.slice(0, raiz.indexOf('>'))).toContain('data-material="papel"');
   });
 });

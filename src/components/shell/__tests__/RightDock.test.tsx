@@ -106,12 +106,36 @@ describe('el margen del 3D es un margen (P5)', () => {
     expect(screen.queryByText('3D')).toBeNull();
   });
 
-  it('el estado de la simulación ya no es un «SIMULANDO» flotante del margen: baja a la línea al pie', () => {
+  it('el estado de la simulación es un icono al pie del margen, después de sus cuatro herramientas (enmienda 2026-10-11)', () => {
     const { store } = renderRightDock();
     act(() => { store.dispatch(startSimulation()); });
-    expect(screen.queryByText(/SIMULANDO/)).toBeNull();
+    // Ni el «SIMULANDO» flotante de antes de P5 ni una línea de texto: un icono.
+    expect(screen.queryByText(/SIMULANDO|Simulando/)).toBeNull();
+    const margen = screen.getByRole('navigation', { name: 'Herramientas del 3D' });
+    const nombres = Array.from(margen.querySelectorAll('button')).map((b) => b.getAttribute('aria-label') ?? '');
+    expect(nombres.slice(0, 4)).toEqual(['Colocar', 'Coser', 'Simular', 'Avatar']);
+    expect(nombres[4]).toMatch(/^Estado de la simulación: Simulando/);
+    expect(nombres).toHaveLength(5);
     // Simular, corriendo, se ve apretado y ofrece pausar.
     expect(screen.getByRole('button', { name: 'Simular' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('un mousedown en el estado se cancela, como en los demás botones del margen: el ratón no le da el foco', () => {
+    const { store } = renderRightDock();
+    act(() => { store.dispatch(startSimulation()); });
+    expect(fireEvent.mouseDown(screen.getByRole('button', { name: /^Estado de la simulación/ }))).toBe(false);
+  });
+
+  it('un clic en cualquier sitio suelta el foco de teclado de un botón del margen', () => {
+    // Con la vista 3D sola no está la sección del patrón, que también lo hace: el margen
+    // tiene su propio oído (contrato § 4: Enter y Espacio solo son de un botón al que se
+    // llegó con el teclado).
+    renderRightDock();
+    const colocar = screen.getByRole('button', { name: 'Colocar' });
+    colocar.focus();
+    expect(document.activeElement).toBe(colocar);
+    fireEvent.mouseDown(document.body);
+    expect(document.activeElement).not.toBe(colocar);
   });
 
   it('es una botonera: Espacio sobre uno de sus botones no llega a los atajos', () => {
