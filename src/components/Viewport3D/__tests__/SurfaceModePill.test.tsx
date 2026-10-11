@@ -4,7 +4,7 @@
  * Guards the SurfaceModePill — the floating 9-way surface-mode picker for the
  * 3D viewport (spec 2026-06-04 display-toggles-resurface §3).
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -146,6 +146,27 @@ describe('SurfaceModePill en la barra superior', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Modo de superficie: Plano' }));
   });
 
+  // Con el ratón el foco no se mueve (ver GrupoDeLaPrenda.test.tsx): los botones de
+  // la barra no lo toman, y un `focus()` de más deja a Espacio siendo «del botón».
+  it('abierto con el ratón, el foco se queda donde estaba', () => {
+    montar();
+    const antes = document.activeElement;
+    fireEvent.mouseDown(disparador());
+    fireEvent.click(disparador(), { detail: 1 });
+    expect(menu(), 'el caso no se ejerce: no abrió').not.toBeNull();
+    expect(document.activeElement, 'abrir con el ratón movió el foco al menú').toBe(antes);
+  });
+
+  it('elegir un modo con el ratón no deja el foco en el disparador', () => {
+    const { store } = montar();
+    fireEvent.mouseDown(disparador());
+    fireEvent.click(disparador(), { detail: 1 });
+    fireEvent.mouseDown(screen.getByRole('button', { name: 'Plano' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Plano' }), { detail: 1 });
+    expect(store.getState().simulation.surfaceMode3D, 'el caso no se ejerce: no se eligió el modo').toBe('flat');
+    expect(document.activeElement, 'el menú dejó el foco en un botón de la barra').toBe(document.body);
+  });
+
   it('Enter y Espacio sobre una opción son de la opción: el menú es una botonera', () => {
     montar();
     fireEvent.click(disparador());
@@ -157,5 +178,28 @@ describe('SurfaceModePill en la barra superior', () => {
     fireEvent.click(disparador());
     fireEvent(window, new Event('resize'));
     expect(menu()).toBeNull();
+  });
+});
+
+describe('SurfaceModePill ▸ el modo puesto y el ancla del menú', () => {
+  function montarCon(modo?: Parameters<typeof setSurfaceMode3D>[0]) {
+    const store = configureStore({ reducer: { simulation: simulationReducer } });
+    if (modo) store.dispatch(setSurfaceMode3D(modo));
+    render(<Provider store={store}><ShortcutProvider><SurfaceModePill /></ShortcutProvider></Provider>);
+    return screen.getByRole('button', { name: /^modo de superficie:/i });
+  }
+  // El modo de fábrica es también el primero de la lista: hay que poner otro para
+  // distinguir «al puesto» de «al primero».
+  it('con «Malla» puesta, el foco entra a «Malla», no al primero', () => {
+    fireEvent.click(montarCon('mesh'));
+    expect((document.activeElement as HTMLElement).getAttribute('aria-label')).toBe('Malla');
+  });
+  it('se ancla bajo el borde derecho del disparador', () => {
+    const d = montarCon();
+    vi.spyOn(d, 'getBoundingClientRect').mockReturnValue({ left: 800, right: 900, top: 20, bottom: 40, width: 100, height: 20, x: 800, y: 20, toJSON: () => ({}) } as DOMRect);
+    fireEvent.click(d);
+    const m = screen.getByRole('group', { name: 'Modo de superficie' });
+    expect(m.style.right).toBe(`${window.innerWidth - 900}px`);
+    expect(m.style.top).toBe('44px');
   });
 });

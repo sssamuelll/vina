@@ -53,9 +53,13 @@ export default function SurfaceModePill() {
   const botonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // El foco entra al menú, al modo puesto (o al primero).
+  // Con un clic del teclado (`detail` 0) el foco entra al menú, al modo puesto (o al
+  // primero) y vuelve al disparador al elegir. Con el ratón no se mueve, como en «Más»
+  // de la línea al pie: un botón de la barra con el foco por código deja a Espacio
+  // siendo «del botón» (`esTeclaDeBotonera`) y no de la simulación.
+  const deTeclado = useRef(false);
   useEffect(() => {
-    if (!open) return;
+    if (!open || !deTeclado.current) return;
     const menu = menuRef.current;
     (menu?.querySelector<HTMLElement>('[aria-pressed="true"]') ?? menu?.querySelector<HTMLElement>('button'))?.focus();
   }, [open]);
@@ -96,6 +100,7 @@ export default function SurfaceModePill() {
         aria-expanded={open}
         aria-haspopup="true"
         onClick={(e) => {
+          deTeclado.current = e.detail === 0;
           if (open) { setOpen(false); return; }
           const r = e.currentTarget.getBoundingClientRect();
           setAncla({ right: window.innerWidth - r.right, top: r.bottom + 4 });
@@ -123,7 +128,11 @@ export default function SurfaceModePill() {
               className={`surface-pill__option ${mode === surfaceMode3D ? 'surface-pill__option--active' : ''}`}
               aria-label={label}
               aria-pressed={mode === surfaceMode3D}
-              onClick={() => { dispatch(setSurfaceMode3D(mode)); botonRef.current?.focus(); setOpen(false); }}
+              onClick={(e) => {
+                dispatch(setSurfaceMode3D(mode));
+                if (e.detail === 0) botonRef.current?.focus();
+                setOpen(false);
+              }}
             >
               <Icon size={16} />
               <span>{label}</span>

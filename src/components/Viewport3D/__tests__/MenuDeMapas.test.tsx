@@ -16,6 +16,7 @@ import { ShortcutProvider } from '../../../shortcuts/ShortcutProvider';
 import { subirPeldano } from '../../../shortcuts/escaleraDeLoLlamado';
 import { startSimulation, resetSimulation, setFitMapMode, updateFitMapConfig } from '../../../store/simulationSlice';
 import { DEFAULT_FIT_MAP_CONFIG } from '../../../utils/cloth/fitMaps';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 import MenuDeMapas from '../MenuDeMapas';
 import { MODOS_DE_MAPA } from '../modosDeMapa';
 
@@ -129,6 +130,72 @@ describe('MenuDeMapas', () => {
   });
 });
 
+// El foco, como «Más» en la línea al pie: con el teclado (`detail` 0: Enter o Espacio)
+// entra a la hoja —cuelga de <body> y Tab desde «Mapa» no llegaría— y vuelve al
+// disparador al elegir o con Escape; con el ratón no se mueve, porque los botones de
+// la barra no toman el foco y un `focus()` de más deja a Espacio siendo «del botón»
+// (`esTeclaDeBotonera`) en vez de alternar la simulación. Los tests de arriba usan
+// `fireEvent.click`, que trae `detail: 0`: solo ejercían el camino del teclado.
+describe('MenuDeMapas ▸ el foco', () => {
+  const clicDeRaton = (el: Element) => { fireEvent.mouseDown(el); fireEvent.mouseUp(el); fireEvent.click(el, { detail: 1 }); };
+
+  it('abierto con el teclado, el foco entra a la hoja', () => {
+    montar();
+    simulando();
+    abrir();
+    expect(menu()!.contains(document.activeElement), 'el foco se quedó fuera de la hoja').toBe(true);
+  });
+
+  it('abierto con el ratón, el foco se queda donde estaba', () => {
+    montar();
+    simulando();
+    const antes = document.activeElement;
+    clicDeRaton(disparador());
+    expect(menu(), 'el caso no se ejerce: no abrió').not.toBeNull();
+    expect(document.activeElement, 'abrir con el ratón movió el foco a la hoja').toBe(antes);
+  });
+
+  it('Escape, con el foco dentro de la hoja, lo devuelve a «Mapa»', () => {
+    montar();
+    simulando();
+    abrir();
+    escape();
+    expect(menu()).toBeNull();
+    expect(document.activeElement).toBe(disparador());
+  });
+
+  it('elegir un mapa con el teclado devuelve el foco a «Mapa»', () => {
+    montar();
+    simulando();
+    abrir();
+    fireEvent.click(screen.getByTitle('Mapa de estiramiento (Alt+7)'));
+    expect(document.activeElement).toBe(disparador());
+  });
+
+  it('elegir un mapa con el ratón no deja el foco en «Mapa»', () => {
+    montar();
+    simulando();
+    clicDeRaton(disparador());
+    clicDeRaton(screen.getByTitle('Mapa de estiramiento (Alt+7)'));
+    expect(store.getState().simulation.fitMapMode, 'el caso no se ejerce: no se eligió el mapa').toBe('strain');
+    expect(document.activeElement, 'el menú dejó el foco en un botón de la barra').toBe(document.body);
+  });
+
+  it('«Ajustes del mapa…»: con el teclado el foco pasa a sus campos; con el ratón se queda donde estaba', () => {
+    montar();
+    abrir();
+    fireEvent.click(screen.getByRole('button', { name: 'Ajustes del mapa…' }));
+    expect(screen.getByRole('group', { name: 'Ajustes del mapa' }).contains(document.activeElement), 'con el teclado el foco no pasó a los campos').toBe(true);
+    cleanup();
+    montar();
+    clicDeRaton(disparador());
+    const antes = document.activeElement;
+    clicDeRaton(screen.getByRole('button', { name: 'Ajustes del mapa…' }));
+    expect(screen.getByRole('group', { name: 'Ajustes del mapa' }), 'el caso no se ejerce').toBeTruthy();
+    expect(document.activeElement, 'con el ratón el foco se movió a los campos').toBe(antes);
+  });
+});
+
 describe('MenuDeMapas ▸ Ajustes del mapa…', () => {
   it('abre los rangos, y los campos escriben en la configuración', () => {
     montar();
@@ -162,5 +229,61 @@ describe('MenuDeMapas ▸ Ajustes del mapa…', () => {
     expect(container.contains(popover)).toBe(false);
     escape();
     expect(screen.queryByText(/Rango de tensión/i)).toBeNull();
+  });
+});
+
+describe('MenuDeMapas ▸ los campos, el cierre y la bitácora', () => {
+  const abrirAjustes = () => { abrir(); fireEvent.click(screen.getByRole('button', { name: 'Ajustes del mapa…' })); };
+
+  it('cada campo escribe su sitio, con su escala (mínimos y umbrales)', () => {
+    montar();
+    abrirAjustes();
+    fireEvent.change(screen.getByLabelText('Tensión mín'), { target: { value: '5' } });
+    expect(store.getState().simulation.fitMapConfig.stressRange).toEqual([5, 100]);
+    fireEvent.change(screen.getByLabelText('Estiramiento mín'), { target: { value: '95' } });
+    expect(store.getState().simulation.fitMapConfig.strainRange[0]).toBeCloseTo(0.95);
+    fireEvent.change(screen.getByLabelText('Umbral apretado'), { target: { value: '70' } });
+    expect(store.getState().simulation.fitMapConfig.fitThresholds[0]).toBeCloseTo(0.7);
+    fireEvent.change(screen.getByLabelText('Umbral no entra'), { target: { value: '110' } });
+    expect(store.getState().simulation.fitMapConfig.fitThresholds[1]).toBeCloseTo(1.1);
+  });
+
+  it('cada campo enseña la configuración en su unidad', () => {
+    act(() => { store.dispatch(updateFitMapConfig({ strainRange: [1, 1.25], fitThresholds: [0.75, 0.9], pressureDistance: 0.004 })); });
+    montar();
+    abrirAjustes();
+    expect((screen.getByLabelText('Estiramiento máx') as HTMLInputElement).value).toBe('125');
+    expect((screen.getByLabelText('Umbral no entra') as HTMLInputElement).value).toBe('90');
+    expect((screen.getByLabelText('Distancia de presión') as HTMLInputElement).value).toBe('4');
+  });
+
+  it('se cierra con un clic fuera, con un cambio de tamaño y con otro clic en «Mapa»', () => {
+    montar();
+    abrir();
+    fireEvent.mouseDown(document.body);
+    expect(menu(), 'un clic fuera no la cierra').toBeNull();
+    abrir();
+    fireEvent(window, new Event('resize'));
+    expect(menu(), 'cambiar el tamaño no la cierra').toBeNull();
+    abrir();
+    fireEvent.click(disparador());
+    expect(menu(), 'otro clic en «Mapa» no la cierra').toBeNull();
+  });
+
+  it('en reposo «Mapa» dice qué hacer, y ningún mapa sale marcado aunque el modo siga puesto', () => {
+    act(() => { store.dispatch(setFitMapMode('strain')); });
+    montar();
+    expect(disparador().title).toBe('Simula para ver los mapas de ajuste');
+    abrir();
+    expect(screen.getByTitle(/^Mapa de estiramiento/).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('abrir y cerrar quedan en la bitácora', () => {
+    clearJournal();
+    montar();
+    abrir();
+    escape();
+    const hojas = getJournal().events.filter((e) => e.kind === 'ui' && e.name === 'mapas').map((e) => (e.data as { hoja: unknown }).hoja);
+    expect(hojas).toEqual(['lista', null]);
   });
 });

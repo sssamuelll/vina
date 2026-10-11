@@ -73,14 +73,18 @@ export default function MenuDeMapas() {
   const puesto = idle ? undefined : MODOS_DE_MAPA.find((m) => m.mode === fitMapMode);
 
   // Abrir, pasar a los ajustes y cerrar quedan en la bitácora, venga de un clic,
-  // de Escape o de un cambio de tamaño. Con la hoja abierta el foco entra a ella:
-  // cuelga de <body>, y Tab desde «Mapa» no llegaría (igual que «Mostrar»).
+  // de Escape o de un cambio de tamaño. Con un clic del teclado (`detail` 0) el foco
+  // entra a la hoja: cuelga de <body>, y Tab desde «Mapa» no llegaría (igual que
+  // «Mostrar»). Con el ratón se queda donde estaba, como en «Más» de la línea al pie:
+  // los botones de la barra no toman el foco por un clic, y uno que lo recibiera por
+  // código dejaría a Espacio siendo «del botón» (`esTeclaDeBotonera`) y no de la simulación.
+  const deTeclado = useRef(false);
   const hojaAntes = useRef<Hoja>(null);
   useEffect(() => {
     if (hojaAntes.current === hoja) return;
     hojaAntes.current = hoja;
     pushJournal('ui', 'mapas', { hoja });
-    if (hoja) hojaRef.current?.querySelector<HTMLElement>('button:not(:disabled), input')?.focus();
+    if (hoja && deTeclado.current) hojaRef.current?.querySelector<HTMLElement>('button:not(:disabled), input')?.focus();
   }, [hoja]);
 
   useEffect(() => {
@@ -109,7 +113,7 @@ export default function MenuDeMapas() {
 
   const elegir = (mode: FitMapMode) => {
     dispatch(setFitMapMode(fitMapMode === mode ? 'none' : mode));
-    botonRef.current?.focus();
+    if (deTeclado.current) botonRef.current?.focus();
     setHoja(null);
   };
   const ajustar = (parche: Partial<typeof cfg>) => dispatch(updateFitMapConfig(parche));
@@ -130,6 +134,7 @@ export default function MenuDeMapas() {
         aria-haspopup="true"
         title={idle ? 'Simula para ver los mapas de ajuste' : puesto?.label}
         onClick={(e) => {
+          deTeclado.current = e.detail === 0;
           if (hoja) { setHoja(null); return; }
           const r = e.currentTarget.getBoundingClientRect();
           setAncla({ right: window.innerWidth - r.right, top: r.bottom + 4 });
@@ -163,7 +168,7 @@ export default function MenuDeMapas() {
                     disabled={idle}
                     aria-pressed={encendido}
                     title={idle ? `${label} — simula para ver los mapas de ajuste` : `${label} (${displayShortcut(shortcut)})`}
-                    onClick={() => elegir(mode)}
+                    onClick={(e) => { deTeclado.current = e.detail === 0; elegir(mode); }}
                   >
                     <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d={icon} />
@@ -174,7 +179,7 @@ export default function MenuDeMapas() {
                 );
               })}
               <div className="menu-de-mapas__separador" role="separator" />
-              <button type="button" className="menu-de-mapas__elemento" onClick={() => setHoja('ajustes')}>
+              <button type="button" className="menu-de-mapas__elemento" onClick={(e) => { deTeclado.current = e.detail === 0; setHoja('ajustes'); }}>
                 Ajustes del mapa…
               </button>
             </>
