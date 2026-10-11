@@ -43,19 +43,24 @@ describe('vozDelTresD ▸ las herramientas del 3D', () => {
     expect(vozDelTresD(herramienta, RATON)).toEqual({ nombre, frase });
   });
 
-  it('Fijar nombra la tecla que quita todas, la que dé el registro (no una escrita a mano)', () => {
-    expect(vozDelTresD('pin', { ...RATON, teclaQuitarFijaciones: 'Ctrl+W' })).toEqual({
-      nombre: 'Fijar',
-      frase: 'Clic en la tela para fijar un punto · Ctrl+W quita todas',
-    });
-    // Reasignada: la frase anuncia la nueva, no la de fábrica.
-    expect(vozDelTresD('pin', { ...RATON, teclaQuitarFijaciones: 'Ctrl+Shift+K' }).frase)
-      .toBe('Clic en la tela para fijar un punto · Ctrl+Shift+K quita todas');
+  // Chrome se queda con Ctrl+W (cierra la pestaña) y la página nunca lo recibe. La frase
+  // de Fijar anunciaba «Ctrl+W quita todas» y María, al pulsarlo, cerraba la pestaña con la
+  // simulación dentro (revisión final de P5). El visor sigue atendiendo Ctrl+W, pero ya no
+  // se anuncia: una frase que promete una tecla muerta es peor que no prometer ninguna.
+  it('Fijar solo dice cómo fijar: no anuncia una tecla que el navegador se queda', () => {
+    expect(vozDelTresD('pin', RATON)).toEqual({ nombre: 'Fijar', frase: 'Clic en la tela para fijar un punto' });
+    expect(vozDelTresD('pin', PANEL)).toEqual({ nombre: 'Fijar', frase: 'Clic en la tela para fijar un punto' });
   });
 
-  it('Fijar sin tecla para quitar todas no promete una: solo dice cómo fijar', () => {
-    expect(vozDelTresD('pin', { ...RATON, teclaQuitarFijaciones: null }).frase).toBe('Clic en la tela para fijar un punto');
-    expect(vozDelTresD('pin', RATON).frase).toBe('Clic en la tela para fijar un punto');
+  it('ninguna frase anuncia un atajo que el navegador reserva (cerrar pestaña, ventana nueva…)', () => {
+    const RESERVADAS = /(?:Ctrl|Control|Cmd)\s*\+\s*(?:Shift\s*\+\s*)?[WTN]\b|⌘\s*⇧?\s*[WTN]\b|Ctrl\s*\+\s*Tab/i;
+    const herramientas = ['camera', 'arrangement', 'sew3d', 'pin', 'steamBrush', 'meshGrab', 'meshSelectBox', 'meshSelectLasso', 'pose', 'edit', 'avatar', 'algo-que-no-existe'];
+    for (const herramienta of herramientas) {
+      for (const opciones of [RATON, PANEL, { ...RATON, poseAbierta: true }]) {
+        const { frase } = vozDelTresD(herramienta, opciones);
+        expect(frase, `${herramienta}: «${frase}»`).not.toMatch(RESERVADAS);
+      }
+    }
   });
 
   it('con la pose abierta gana la pose, sea cual sea la herramienta', () => {

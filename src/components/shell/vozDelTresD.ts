@@ -13,9 +13,9 @@ import { displayModifierKey } from './shortcutDisplay';
  * frase de mover la vista, que siempre es cierta.
  *
  * Las TECLAS no se escriben aquí: la del nombre la pone `SeccionDel3D` desde el
- * registro de atajos, y la de «quitar todas» llega por `teclaQuitarFijaciones`,
- * ya traducida a la notación de la plataforma. Reasignar el atajo no deja una
- * frase que anuncie la tecla de fábrica (#1170).
+ * registro de atajos. Y ninguna frase anuncia un atajo que el navegador se queda:
+ * Ctrl+W (quitar todas las fijaciones) cierra la pestaña y la página nunca lo
+ * recibe, así que la frase de Fijar ya no lo dice.
  */
 
 export interface VozDelTresD {
@@ -28,8 +28,6 @@ export interface OpcionesDeLaVoz {
   esquema: 'trackpad' | 'mouse';
   /** El editor de pose está abierto: gana sobre cualquier herramienta. */
   poseAbierta: boolean;
-  /** La tecla EFECTIVA de «quitar todas las fijaciones», o `null` si no tiene. */
-  teclaQuitarFijaciones?: string | null;
 }
 
 /** Cómo se mueve la vista: la frase de la cámara y la de lo que no tiene frase propia. */
@@ -43,15 +41,10 @@ function moverLaVista(esquema: OpcionesDeLaVoz['esquema']): string {
 const POSE: VozDelTresD = { nombre: 'Pose', frase: 'Arrastra una articulación para cambiar la pose' };
 
 /** Un Map, no un objeto: un id como `constructor` no debe encontrar nada. */
-const HERRAMIENTAS = new Map<string, (o: OpcionesDeLaVoz) => VozDelTresD>([
+const HERRAMIENTAS = new Map<string, () => VozDelTresD>([
   ['arrangement', () => ({ nombre: 'Colocar', frase: 'Clic en la pieza y luego en el punto del cuerpo donde va' })],
   ['sew3d', () => ({ nombre: 'Coser', frase: 'Clic en un borde y luego en el otro' })],
-  ['pin', (o) => ({
-    nombre: 'Fijar',
-    frase: o.teclaQuitarFijaciones
-      ? `Clic en la tela para fijar un punto · ${o.teclaQuitarFijaciones} quita todas`
-      : 'Clic en la tela para fijar un punto',
-  })],
+  ['pin', () => ({ nombre: 'Fijar', frase: 'Clic en la tela para fijar un punto' })],
   ['steamBrush', () => ({ nombre: 'Plancha a vapor', frase: 'Arrastra sobre la tela para alisar las arrugas' })],
   ['meshGrab', () => ({ nombre: 'Agarre de malla', frase: 'Arrastra un punto de la tela para tirar de él' })],
   ['meshSelectBox', () => ({ nombre: 'Selección por caja', frase: 'Arrastra un recuadro para seleccionar puntos de la tela' })],
@@ -63,6 +56,6 @@ export function vozDelTresD(herramienta: string, opciones: OpcionesDeLaVoz): Voz
   if (opciones.poseAbierta) return POSE;
   if (herramienta === 'camera') return { nombre: null, frase: moverLaVista(opciones.esquema) };
   const entrada = HERRAMIENTAS.get(herramienta);
-  if (entrada) return entrada(opciones);
+  if (entrada) return entrada();
   return { nombre: 'Herramienta del 3D', frase: moverLaVista(opciones.esquema) };
 }

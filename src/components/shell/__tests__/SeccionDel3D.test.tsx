@@ -121,12 +121,13 @@ describe('SeccionDel3D ▸ la voz', () => {
     expect(screen.getByText('Clic en la pieza y luego en el punto del cuerpo donde va')).toBeTruthy();
   });
 
-  it('con Fijar activo, la frase nombra la tecla de quitar todas que da el registro', () => {
+  it('con Fijar activo, la frase solo dice cómo fijar: Ctrl+W lo reserva el navegador y no se anuncia', () => {
     act(() => { store.dispatch(setActiveTool3D('pin')); });
     const { container } = montar();
     expect(container.querySelector('.seccion-del-3d__nombre')?.textContent).toBe('Fijar');
     expect(container.querySelector('.seccion-del-3d__tecla')?.textContent).toBe('W');
-    expect(screen.getByText('Clic en la tela para fijar un punto · Ctrl+W quita todas')).toBeTruthy();
+    expect(screen.getByText('Clic en la tela para fijar un punto')).toBeTruthy();
+    expect(container.textContent).not.toContain('quita todas');
   });
 
   it('una herramienta sin tecla (Coser) se nombra sin tecla', () => {
@@ -442,17 +443,6 @@ describe('SeccionDel3D ▸ lo que el pie no debe decir ni hacer', () => {
     expect(document.activeElement).toBe(estado());
     fireEvent.mouseDown(document.body);
     expect(document.activeElement).not.toBe(estado());
-  });
-
-  it('la frase de Fijar anuncia la tecla REASIGNADA de quitar todas', () => {
-    localStorage.setItem('vina-shortcut-overrides', JSON.stringify({ 'tool3d.clearPins': { key: 'k', ctrl: true, shift: true } }));
-    try {
-      act(() => { store.dispatch(setActiveTool3D('pin')); });
-      montar();
-      expect(screen.getByText(/\+K quita todas$/)).toBeTruthy();
-    } finally {
-      localStorage.removeItem('vina-shortcut-overrides');
-    }
   });
 
   it('con la pose abierta no se enseña la tecla de la herramienta de debajo', () => {

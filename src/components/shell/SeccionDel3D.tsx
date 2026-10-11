@@ -96,7 +96,7 @@ export default function SeccionDel3D() {
     const combo = registroDeAtajos?.getBinding(accion);
     return combo ? displayShortcutBinding(combo) : null;
   };
-  const voz = vozDelTresD(activeTool3D, { esquema, poseAbierta, teclaQuitarFijaciones: teclaDe('tool3d.clearPins') });
+  const voz = vozDelTresD(activeTool3D, { esquema, poseAbierta });
   const accion = poseAbierta ? undefined : ACCION_DE_LA_TECLA[activeTool3D];
   const atajo = accion ? teclaDe(accion) : null;
 
