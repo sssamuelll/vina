@@ -68,7 +68,7 @@ describe('home/datos/diario.json: la historia que se cuenta existe', () => {
 
 describe('el README dice lo mismo que la página', () => {
   it('las dos secciones marcadas son las generadas', () => {
-    const md = readFileSync('README.md', 'utf8');
+    const md = readFileSync('README.md', 'utf8').replace(/\r\n/g, '\n');
     const secciones = generarSecciones() as Record<string, string>;
     for (const [nombre, [inicio, fin]] of Object.entries(MARCAS as Record<string, [string, string]>)) {
       const dentro = md.split(inicio)[1]?.split(fin)[0];
@@ -77,7 +77,7 @@ describe('el README dice lo mismo que la página', () => {
     }
   });
   it('sin la insignia de un workflow apagado y con una imagen real', () => {
-    const md = readFileSync('README.md', 'utf8');
+    const md = readFileSync('README.md', 'utf8').replace(/\r\n/g, '\n');
     expect(md).not.toContain('actions/workflow/status');
     expect(md).toMatch(/!\[[^\]]+\]\(home\/img\/fig-02@1x\.webp\)/);
   });

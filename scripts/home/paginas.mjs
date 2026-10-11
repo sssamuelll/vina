@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Las dos páginas de la home desde una plantilla, el copy de cada idioma y los datos
  * de home/datos/ (spec 2026-10-10 § 6.2). Los HTML se commitean; `--check` sale con 1

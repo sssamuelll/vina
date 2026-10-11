@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /** Las secciones «What it does today» y «In the making» del README salen de home/datos/,
  *  los mismos datos que la página (spec 2026-10-10 § 8.1). `--check` sale con 1 si difieren. */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -33,7 +32,9 @@ export function aplicar(md) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const actual = readFileSync('README.md', 'utf8');
+  // En Windows, con core.autocrlf, la copia de trabajo trae CRLF y las secciones generadas
+  // son LF: se compara y se escribe en LF (git normaliza al añadir).
+  const actual = readFileSync('README.md', 'utf8').replace(/\r\n/g, '\n');
   const nuevo = aplicar(actual);
   if (process.argv.includes('--check')) {
     if (actual !== nuevo) { console.error('✗ README.md desactualizado: node scripts/home/readme.mjs'); process.exit(1); }
