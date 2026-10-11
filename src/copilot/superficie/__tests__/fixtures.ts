@@ -12,6 +12,7 @@ import projectReducer from '../../../store/projectSlice';
 import editorReducer from '../../../store/editorSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
 import workflowReducer from '../../../store/workflowSlice';
+import simulationReducer from '../../../store/simulationSlice';
 import { confirmationMiddleware } from '../../../store/confirmationMiddleware';
 import { linkedEditingMiddleware } from '../../../store/linkedEditingMiddleware';
 import { undoMiddleware } from '../../../store/undoMiddleware';
@@ -72,13 +73,17 @@ export function tienda(
   seams: Seam[] = [],
   proyecto: Record<string, unknown> = {},
   workflow: Record<string, unknown> = {},
+  simulacion: Record<string, unknown> = {},
 ) {
   const inicio = { type: '@@prueba/inicio' };
-  const reducer = combineReducers({ project: projectReducer, editor: editorReducer, copilotUI: copilotUIReducer, workflow: workflowReducer });
+  const reducer = combineReducers({
+    project: projectReducer, editor: editorReducer, copilotUI: copilotUIReducer, workflow: workflowReducer, simulation: simulationReducer,
+  });
   type Estado = ReturnType<typeof reducer>;
   const preloadedState: Partial<Estado> = {
     project: { ...projectReducer(undefined, inicio), pieces, seams, ...proyecto } as Estado['project'],
     workflow: { ...workflowReducer(undefined, inicio), ...workflow } as Estado['workflow'],
+    simulation: { ...simulationReducer(undefined, inicio), ...simulacion } as Estado['simulation'],
   };
   const store = configureStore({
     reducer,
@@ -107,4 +112,17 @@ export function camisaDeMaria(): { piezas: PatternPiece[]; seams: Seam[] } {
     p.edges = detectSemanticEdges(p);
   }
   return { piezas, seams: autoSew(piezas, { minConfidence: 0.3 }).seams.map(s => s.seam) };
+}
+
+/** Un rectángulo de 400 × 600 mm con los bordes que le daría `addPiece` (por su nombre y su categoría). */
+export function suelta(id: string, name = id, over: Partial<PatternPiece> = {}): PatternPiece {
+  const p: PatternPiece = {
+    id, name, position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 0, internals: [],
+    outline: [
+      { type: 'M', values: [0, 0] }, { type: 'L', values: [400, 0] }, { type: 'L', values: [400, 600] },
+      { type: 'L', values: [0, 600] }, { type: 'Z', values: [] },
+    ],
+    layer: 1, sublayer: 0, active: true, createdAt: 0, updatedAt: 0, ...over,
+  };
+  return { ...p, edges: over.edges ?? detectSemanticEdges(p) };
 }

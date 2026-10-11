@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { createServer } from 'node:net';
 import WebSocket from 'ws';
@@ -76,7 +77,9 @@ describe('vina-mcp, como lo arranca un agente', { timeout: 20_000 }, () => {
     const nombres = (lista.result!.tools as Array<{ name: string }>).map(t => t.name);
     expect(nombres).toContain('read_pattern');
     expect(nombres).toContain('create_piece');
-    expect(nombres.length).toBe(12);
+    // La que lleva el paquete, verbo por verbo: crece con cada entrega de la superficie.
+    const horneada = JSON.parse(readFileSync('mcp/superficie.json', 'utf8')) as { definiciones: Array<{ name: string }> };
+    expect(nombres).toEqual(horneada.definiciones.map(d => d.name));
   });
 
   it('una pestaña con otra lista la cambia y avisa; una llamada va y vuelve', async () => {

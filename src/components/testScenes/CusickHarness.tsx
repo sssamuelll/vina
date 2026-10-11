@@ -27,10 +27,8 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { WebGPURenderer, MeshStandardNodeMaterial } from 'three/webgpu';
-// Same type-only deep import as GarmentSimulation.tsx — the per-substep batch
-// list is typed against the solver's node fields.
-import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
+import { nodosDelSubpaso } from '../Viewport3D/nodosDelSubpaso';
 import { buildCusickDiscMesh, buildCusickPedestal } from '../../utils/cloth/cusickScene';
 import {
   extractOrderedBoundaryLoop,
@@ -215,25 +213,13 @@ function CusickScene({ fabricId }: { fabricId: string }) {
       return; // pose congelada post-gate — Samuel puede orbitar e inspeccionar
     }
 
-    // Espejo MINIMAL del dispatch TSL de GarmentSimulation.tsx (~:493-587),
-    // MISMO ORDEN de producción. Incluidos: self-collision (always-on GPU) y
-    // strain-limit. Excluidos: wind (windForce=0 → no-op), seams (no hay),
-    // tether (B1: el gate mide el drape que el tether congelaría), face-poke
-    // (avatar-only: se construye solo para el body '__avatar__'), brush/grab.
-    const substepNodes: ComputeNode[] = [solver.preSolve];
-    substepNodes.push(...solver.stretchColors);
-    substepNodes.push(...solver.bendColors);
-    if (solver.selfCollisionNodes) {
-      const sc = solver.selfCollisionNodes;
-      substepNodes.push(sc.cellClearNode, sc.scatterNode, sc.resolveNode, sc.applyNode);
-    }
-      // strainLimit: fusionado dentro del stretch (2026-07-02) — implícito.
-    substepNodes.push(solver.groundClamp);
-    substepNodes.push(solver.snapshotPreCollision);
-    for (const body of solver.collisionBodies) {
-      substepNodes.push(body.findBestNode, body.applyPushNode);
-    }
-    substepNodes.push(solver.postSolve);
+    // La MISMA lista de producción (`nodosDelSubpaso.ts`, la que usa
+    // GarmentSimulation), para que el gate mida lo que Samuel ve: antes era una
+    // copia a mano y no corría los repasos del estiramiento (revisión IA 1b-2).
+    // Sin tether (B1: el gate mide el drape que el tether congelaría), sin
+    // grab y sin face-poke (avatar-only); wind con fuerza 0 no empuja, y no hay
+    // costuras.
+    const substepNodes = nodosDelSubpaso(solver, { tether: false, grab: false, facePoke: false });
 
     for (let s = 0; s < SUBSTEPS; s++) {
       renderer.compute(substepNodes);

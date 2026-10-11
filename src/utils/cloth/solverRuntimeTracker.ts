@@ -1,5 +1,6 @@
 import type { BufferGeometry } from 'three';
 import type { SolverTier } from '../../store/simulationSlice';
+import type { SolverEdgeData } from './fitMaps';
 import { pushJournal } from '../telemetry/journal';
 
 /**
@@ -73,10 +74,54 @@ export function registerClothGeometry(
   manifest: MeshManifestEntry[],
 ): void {
   clothGeometry = geometry ? { geometry, manifest } : null;
+  // Una tela nueva todavía no se movió: las aristas y los cuadros de la vieja
+  // no valen para ella (revisión final IA 1b-2: `fit_map` medía la pose plana).
+  aristas = null;
+  latidosDeLaTela = 0;
+  tierDeLaTela = 'none';
 }
 
 export function getClothGeometry(): ClothGeometryRecord | null {
   return clothGeometry;
+}
+
+// ─── El latido de la tela (IA 1b-2) ─────────────────────────────────────────
+
+let latidos = 0;
+let latidosDeLaTela = 0;
+let aristas: SolverEdgeData | null = null;
+/** El tier que movió la tela en su último latido: parar libera el solver y el activo vuelve a 'none'. */
+let tierDeLaTela: SolverTier = 'none';
+
+/**
+ * Un cuadro en que la app dibujó tela nueva (el `useFrame` de
+ * GarmentSimulation, pasadas sus compuertas). Lo cuenta la superficie para
+ * saber si la simulación avanza: con Vina oculta el navegador no dibuja, y el
+ * latido se para aunque un worker siga calculando. Lleva las aristas del
+ * solver, que el mapa de ajuste por pieza necesita (`fit_map`).
+ */
+export function latirLaSimulacion(edges: SolverEdgeData | null): void {
+  latidos += 1;
+  latidosDeLaTela += 1;
+  aristas = edges;
+  tierDeLaTela = activeTier;
+}
+
+export function latidosDeLaSimulacion(): number {
+  return latidos;
+}
+
+/** Los cuadros que avanzó la tela registrada ahora (0 recién montada). */
+export function latidosDeEstaTela(): number {
+  return latidosDeLaTela;
+}
+
+export function aristasDeLaTela(): SolverEdgeData | null {
+  return aristas;
+}
+
+export function tierDeEstaTela(): SolverTier {
+  return tierDeLaTela;
 }
 
 // ─── Ring de eventos de la cascada ──────────────────────────────────────────

@@ -28,6 +28,7 @@ import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIn
 import { orbitAroundTarget, dollyTowardTarget, panViewpoint, recenterTarget } from '../../input/orbitMath';
 import { resolveArrangement } from '../../utils/cloth/arrangement/arrangementBinding';
 import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
+import { seSimula } from '../../utils/cloth/piezasEnLaSimulacion';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
 import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
 import { collectExportScene } from '../../utils/export/sceneCollector';
@@ -225,13 +226,9 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   // MISMOS opts que GarmentSimulation (espejo — ver anchorClick.ts).
   const armAxis = useSelector((s: RootState) => s.simulation.armAxis);
   const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
-  // ESPEJO de GarmentSimulation.activePieces (axisHints source).
+  // El mismo filtro que GarmentSimulation.activePieces (axisHints source): `piezasEnLaSimulacion.ts`.
   const activePieces = useMemo(
-    () => pieces.filter(p =>
-      p.active !== false
-      && !hiddenPieceIds.includes(p.id)
-      && !hiddenLayerIds.includes(p.layer ?? 1)
-    ),
+    () => pieces.filter(p => seSimula(p, hiddenPieceIds, hiddenLayerIds)),
     [pieces, hiddenPieceIds, hiddenLayerIds],
   );
 

@@ -138,6 +138,18 @@ interface Evidence {
 }
 
 /**
+ * La muestra de paridad llega DESPUÉS de las stats: se publica cuando vuelve
+ * la lectura de colores de la GPU (`readFitColorsToCPU`, asíncrona). Leerla una
+ * sola vez justo tras las stats perdía la carrera 1 de cada 3 con el patrón de
+ * María (10-10). Si no llega, el `expect` de quien llama da el mensaje.
+ */
+async function esperarParidad(page: Page): Promise<void> {
+  await page
+    .waitForFunction(() => Boolean((window as any).__VINA_FITMAP_PARITY__), null, { timeout: 15_000 })
+    .catch(() => { /* el expect not.toBeNull de quien llama lo reporta */ });
+}
+
+/**
  * Activa el modo strain vía store y espera (por condición, no por timeout
  * ciego) a que se cumpla el contrato. Devuelve la foto de la evidencia.
  */
@@ -256,6 +268,7 @@ test.describe('diagnóstico #1010 — tier WebGPU (default) @gpu-local', () => {
 
     // El bloque de readback (DEV) publica una muestra de 100 vértices de
     // ambos lados: colores del kernel GPU y colores CPU del mismo readback.
+    await esperarParidad(page);
     const parity = await page.evaluate(() => {
       return ((window as any).__VINA_FITMAP_PARITY__ ?? null) as
         | { gpu: number[]; cpu: number[]; n: number }
@@ -353,6 +366,7 @@ test.describe('diagnóstico #1010 — fit map sobre el patrón real de María @g
     expect(ev.stats!.mean, `strain medio absurdo: ${ev.stats!.mean}`).toBeLessThan(500);
 
     // Paridad GPU↔CPU sobre geometría real.
+    await esperarParidad(page);
     const parity = await page.evaluate(() => {
       return ((window as any).__VINA_FITMAP_PARITY__ ?? null) as
         | { gpu: number[]; cpu: number[]; n: number }
