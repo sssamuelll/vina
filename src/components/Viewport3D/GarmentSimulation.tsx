@@ -587,6 +587,20 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const renderer = gl as any;
       const substeps = substepsRef.current;
 
+      // En pausa el solver sigue vivo (useSimulationLifecycle) y la tela se
+      // queda donde está: ni física, ni lecturas, ni latido. El mapa de ajuste
+      // se sigue pintando sobre la pose quieta, por si María lo enciende ahora.
+      // ponytail: sus cifras (setFitMapStats) se quedan en la última lectura en
+      // marcha; leer una vez al encenderlo en pausa si hace falta.
+      if (simulationState !== 'running') {
+        if (fitMapMode !== 'none') {
+          renderer.compute(solver.fitMapNodes.zero);
+          for (const accumNode of solver.fitMapNodes.accum) renderer.compute(accumNode);
+          renderer.compute(solver.fitMapNodes.colorize);
+        }
+        return;
+      }
+
       // Mesh grab: one-shot init kernel fills per-particle mask + offset on GPU
       const grabActiveVal = solver.grabNodes.grabActive.value;
       const grabInitVal = solver.grabNodes.grabInitPending.value;
