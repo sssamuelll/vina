@@ -368,6 +368,17 @@ export function useSimulationLifecycle({
   const simulationModeRef = useRef(simulationMode);
   simulationModeRef.current = simulationMode;
 
+  // Una sesión vive mientras la simulación no esté en 'idle': pausar la para
+  // sin soltar el solver, y reanudar sigue donde estaba. Solo «Restablecer»
+  // (idle) la destruye. Antes la cascada dependía de `simulationState` y su
+  // limpieza destruía el solver al pausar: reanudar volvía a vestir desde la
+  // colocación (Samuel, 2026-10-11: «se reinicia»).
+  const sesionViva = simulationState !== 'idle';
+  // La cascada lo lee al terminar el arranque: con la sesión en pausa, el
+  // worker listo no echa a andar hasta que se reanude.
+  const enMarchaRef = useRef(simulationState === 'running');
+  enMarchaRef.current = simulationState === 'running';
+
   const clientRef = useRef<ClothWorkerClient | null>(null);
   const gpuClientRef = useRef<GpuSolverClient | null>(null);
   const wasmClientRef = useRef<WasmSolverClient | null>(null);
@@ -466,7 +477,7 @@ export function useSimulationLifecycle({
   // ─── Tier cascade ─── (Start/stop simulation — solver tier cascade)
   useEffect(() => {
     clearActiveSolverTier();
-    if (simulationState === 'running' && placedMeshes.length > 0) {
+    if (sesionViva && placedMeshes.length > 0) {
       let cancelled = false;
       const cancelFlag = { get value() { return cancelled; } };
       // Caja negra 3D: cada corrida de la cascada lleva su generación para que
@@ -705,10 +716,13 @@ export function useSimulationLifecycle({
 
               // Load collision BEFORE starting (prevents explosion)
               await loadCollision(wasmClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, true, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
-              simReadyRef.current = true; // 2a (consistencia — WASM ya gated por start())
 
               if (!cancelled) {
-                wasmClient.start();
+                // Solo la corrida viva marca «listo»: una cancelada que termina
+                // tarde se lo daría al worker de la nueva antes de su init, y
+                // reanudar lo arrancaría (2026-10-11).
+                simReadyRef.current = true; // 2a (consistencia — WASM ya gated por start())
+                if (enMarchaRef.current) wasmClient.start();
                 // Push pre-existing wind config — the separate wind useEffect
                 // fires on mount before wasmClientRef is set, so it's a no-op.
                 if (windEnabled) wasmClient.setWind(windForce);
@@ -767,10 +781,10 @@ export function useSimulationLifecycle({
 
             // Load collision BEFORE starting (prevents explosion)
             await loadCollision(client, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false, avatarJointsRef.current, getPhysicalFabric(fabricId)?.frictionBody);
-            simReadyRef.current = true; // 2a (consistencia — CPU ya gated por start())
 
             if (!cancelled) {
-              client.start();
+              simReadyRef.current = true; // 2a (consistencia — CPU ya gated por start())
+              if (enMarchaRef.current) client.start();
               // Push pre-existing elastic constraints
               if (elasticsRef.current.length > 0) client.setElastics(elasticsRef.current);
               setAppliedSolverConfig({
@@ -808,7 +822,8 @@ export function useSimulationLifecycle({
         neuralClient.onFrame = onFrame;
         await neuralClient.initMultiPiece(placedMeshes);
         if (!cancelled) {
-          neuralClient.start();
+          simReadyRef.current = true; // reanudar tras una pausa lo vuelve a arrancar
+          if (enMarchaRef.current) neuralClient.start();
           setAppliedSolverConfig({ tier: 'neural-drape', init: { pieces: placedMeshes.length }, postInit: {} });
           setActiveSolverTier('neural-drape');
         }
@@ -839,7 +854,7 @@ export function useSimulationLifecycle({
         positionsRef.current = null;
         resetFrameWindow();
       };
-    } else if (simulationState === 'idle') {
+    } else if (!sesionViva) {
       // ─── Cleanup cascade ─── (idle branch)
       clearActiveSolverTier();
       if (warmStartTimerRef.current) {
@@ -867,19 +882,34 @@ export function useSimulationLifecycle({
       // intentionally kept for post-stop inspection (same convention as
       // `lastSolverError`) and replaced wholesale on the next init.
       dispatch(setSeamResolution(null));
-    } else if (simulationState === 'paused') {
-      // ─── Cleanup cascade ─── (paused branch — stop only, no dispose)
-      clientRef.current?.stop();
-      gpuClientRef.current?.stop();
-      wasmClientRef.current?.stop();
-      neuralClientRef.current?.stop();
     }
     return undefined;
     // deviceLostGeneration: bumped by handleGpuDeviceLost so a renderer device
     // loss re-enters startSim (and, with gpuDowngradedRef set, falls to WASM).
     // placedMeshes dep is load-bearing: an armAxis-driven placedMeshes rebuild intentionally re-seeds the solver in A-pose (transient T-pose→A-pose reinit). Do not drop it.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- collisionBodies/avatarModelUrl/avatarHeight read from refs to prevent reinit cascades (#315); live updates handled by separate effects. windEnabled/windForce/dragCoefficient also handled separately.
-  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, stretchingIdsRef, dispatch, deviceLostGeneration]);
+  }, [sesionViva, placedMeshes, seamInitData, fabricId, onFrame, stretchingIdsRef, dispatch, deviceLostGeneration]);
+
+  // ─── Pausar y reanudar ─── (sin soltar el solver)
+  // Los workers paran y siguen con su estado; el tier TSL no tiene worker: lo
+  // frena GarmentSimulation, que no despacha cuadros fuera de 'running'.
+  // Reanudar no arranca un worker que todavía no terminó su init
+  // (`simReadyRef`): lo echa a andar la cascada al terminar, si para entonces
+  // la sesión corre (`enMarchaRef`).
+  useEffect(() => {
+    if (simulationState === 'paused') {
+      clientRef.current?.stop();
+      gpuClientRef.current?.stop();
+      wasmClientRef.current?.stop();
+      neuralClientRef.current?.stop();
+      // La ventana de frame-time no promedia la pausa con los cuadros de después.
+      resetFrameWindow();
+    } else if (simulationState === 'running' && simReadyRef.current) {
+      clientRef.current?.start();
+      wasmClientRef.current?.start();
+      neuralClientRef.current?.start();
+    }
+  }, [simulationState, resetFrameWindow]);
 
   // ─── Debounced collision mesh rebuild on measurement/morph change ───────────
   useEffect(() => {
@@ -887,7 +917,11 @@ export function useSimulationLifecycle({
     // Skip a downgraded GPU client (#901): its setCollisionMesh routes a BVH
     // upload through the lost renderer device — wasted work + uncaptured errors.
     const activeClient = (gpuDowngradedRef.current ? null : gpuClientRef.current) || wasmClientRef.current || clientRef.current;
-    if (!activeClient || simulationState !== 'running' || !avatarModelUrl) return;
+    // La sesión, no el estado: pausar o reanudar no cambia el cuerpo, y con el
+    // estado en las dependencias cada «reanudar» volvía a hornear el cuerpo y a
+    // armar su BVH (~25.000 triángulos) como si una medida hubiera cambiado.
+    // Una medida que cambia en pausa sí reconstruye: el solver sigue vivo.
+    if (!activeClient || !sesionViva || !avatarModelUrl) return;
 
     // Debounce 200ms to batch rapid slider movements
     if (collisionRebuildTimer.current) {
@@ -930,7 +964,7 @@ export function useSimulationLifecycle({
     };
     // fabricId is a dep so a fabric swap rebuilds the avatar collider with the
     // new frictionBody (F0); the rebuild is debounced + gated on running sim.
-  }, [measurements, morphTargets, avatarModelUrl, avatarHeight, simulationState, fabricId]);
+  }, [measurements, morphTargets, avatarModelUrl, avatarHeight, sesionViva, fabricId]);
 
   // ─── Push wind config to GPU solver when it changes ───────────────────────
   useEffect(() => {

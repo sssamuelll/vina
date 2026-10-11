@@ -857,6 +857,14 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       <PanCrosshair ref={crosshairRef} />
       <Canvas
         camera={{ position: [0, 0.85, 3.0], fov: 50 }}
+        // En la vista 2D el visor no se desmonta (AppShell lo esconde con
+        // `display: none`), y sin esto seguía dibujando y simulando detrás del
+        // patrón: con la tela en marcha el 2D bajaba a 24 fps y el hilo
+        // principal pasaba el 90 % del tiempo en `submit` de un lienzo sin
+        // tamaño (sonda del drape, 2026-10-11). Escondido no dibuja: la tela
+        // WebGPU se queda donde está y sigue al volver; los workers (WASM y
+        // CPU) siguen calculando solos.
+        frameloop={viewMode === '2d' ? 'never' : 'always'}
         shadows
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}

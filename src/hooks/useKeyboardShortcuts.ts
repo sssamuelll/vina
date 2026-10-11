@@ -30,6 +30,7 @@ import { removePieces, removeSeam, removeInternalLine, removeTramosDeInterna, re
 import { seBorraEntera } from '../types/types';
 import {
   startSimulation,
+  pauseSimulation,
   resetSimulation,
   setViewMode3D,
   setSimulationMode,
@@ -67,6 +68,7 @@ export function useKeyboardShortcuts() {
   const selectedTrazo = useSelector((s: RootState) => s.editor.selectedTrazo);
   const activeTool = useSelector((s: RootState) => s.editor.activeTool);
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
+  const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
   // Colocar piezas va sobre el cuerpo que se ve (spec § 5).
   const cuerpo = useSelector((s: RootState) => medidasDelCuerpo(s.project));
@@ -217,21 +219,13 @@ export function useKeyboardShortcuts() {
           dispatch(startSimulation());
         }
       }],
+      // La tecla es el botón «Simular» del margen (`RightDock`): corre o pausa.
+      // Venía de la interfaz de dos modos y, fuera de «colocar», RESTABLECÍA:
+      // la prenda volvía a las piezas sueltas (Samuel, 2026-10-11: «se
+      // reinicia»; #1170 lo dejó como decisión pendiente). Restablecer tiene su
+      // propia puerta (menú, `sim.reset`).
       ['sim.toggle', () => {
-        if (viewMode3D === 'arrange') {
-          const placements = placeGarmentPieces(pieces, cuerpo);
-          const snapshot: Record<string, [number, number, number]> = {};
-          pieces.forEach((p, i) => {
-            const pos = placements[i].position;
-            snapshot[p.id] = [pos[0], pos[1], pos[2]];
-          });
-          dispatch(saveArrangementSnapshot(snapshot));
-          dispatch(setViewMode3D('simulate'));
-          dispatch(startSimulation());
-        } else {
-          dispatch(resetSimulation());
-          dispatch(setViewMode3D('arrange'));
-        }
+        dispatch(simulationState === 'running' ? pauseSimulation() : startSimulation());
       }],
       ['sim.reset', () => {
         dispatch(resetSimulation());
@@ -306,5 +300,5 @@ export function useKeyboardShortcuts() {
         registry.unregisterHandler(id);
       }
     };
-  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, selectedPOMId, selectedInternalLine, selectedTrazo, activeTool, viewMode3D, fitMapMode, cuerpo, projectState, clipboard, xrayMode, layerLocked]);
+  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, selectedPOMId, selectedInternalLine, selectedTrazo, activeTool, viewMode3D, simulationState, fitMapMode, cuerpo, projectState, clipboard, xrayMode, layerLocked]);
 }

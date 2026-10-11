@@ -270,6 +270,7 @@ SPECS_DEL_GATE=(
   tests/e2e/ia-convocada.spec.ts
   tests/e2e/puente-mcp.spec.ts
   tests/e2e/ia-ciclo-del-ajuste.spec.ts
+  tests/e2e/simular-pausar-reanudar.spec.ts
   tests/e2e/la-cabina-de-la-pieza.spec.ts
   tests/e2e/la-cota-de-lo-que-se-pone.spec.ts
   tests/e2e/la-puerta-de-vuelta.spec.ts

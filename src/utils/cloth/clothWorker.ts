@@ -11,6 +11,7 @@ import { XPBDClothSolver, type ClothSimConfig, type ClothMeshData, type SphereCo
 import { getComplianceForFabric } from './fabricLibrary';
 import { mergeMeshes, buildSeamConstraints, seamInitDataToSeams, type MergedMesh, type SeamInitData } from './seamAssembly';
 import { buildElasticConstraints } from './elasticAssembly';
+import { esperaTrasElPaso } from './ritmoDelWorker';
 import type { Elastic, PathCommand, SemanticEdge } from '../../types/types';
 
 // ─── Message Protocol ───────────────────────────────────────────────────────
@@ -74,9 +75,6 @@ let cachedPieceEdges: Map<string, { edges?: Array<{ name: string; segmentRange: 
 const snapshots = new Map<string, Float32Array>();
 const MAX_SNAPSHOTS = 5; // 1 auto pre-edit + 3 manual + 1 buffer
 
-/** Max time budget per frame in ms. If substeps exceed this, skip remaining. */
-const FRAME_BUDGET_MS = 14; // ~60fps target, leave 2ms headroom
-
 /**
  * Run one simulation step and post the result.
  * Respects frame budget — if step takes too long, reduces effective substeps.
@@ -99,9 +97,7 @@ function simulationLoop(): void {
   // Transfer the positions buffer for zero-copy perf
   (self as unknown as Worker).postMessage(msg, [snap.positions.buffer]);
 
-  // Adaptive scheduling: if frame took too long, add delay to prevent backpressure
-  const delay = elapsed > FRAME_BUDGET_MS ? Math.min(elapsed, 50) : 1000 / 60;
-  animFrameId = setTimeout(simulationLoop, delay);
+  animFrameId = setTimeout(simulationLoop, esperaTrasElPaso(elapsed));
 }
 
 /**

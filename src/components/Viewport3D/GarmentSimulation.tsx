@@ -587,6 +587,20 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const renderer = gl as any;
       const substeps = substepsRef.current;
 
+      // En pausa el solver sigue vivo (useSimulationLifecycle) y la tela se
+      // queda donde está: ni física, ni lecturas, ni latido. El mapa de ajuste
+      // se sigue pintando sobre la pose quieta, por si María lo enciende ahora.
+      // ponytail: sus cifras (setFitMapStats) se quedan en la última lectura en
+      // marcha; leer una vez al encenderlo en pausa si hace falta.
+      if (simulationState !== 'running') {
+        if (fitMapMode !== 'none') {
+          renderer.compute(solver.fitMapNodes.zero);
+          for (const accumNode of solver.fitMapNodes.accum) renderer.compute(accumNode);
+          renderer.compute(solver.fitMapNodes.colorize);
+        }
+        return;
+      }
+
       // Mesh grab: one-shot init kernel fills per-particle mask + offset on GPU
       const grabActiveVal = solver.grabNodes.grabActive.value;
       const grabInitVal = solver.grabNodes.grabInitPending.value;
@@ -762,8 +776,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
               dispatch(setCollisionDistance(minSignedDist * 1000));
             }
             // A4 face-aware oracle — counts body verts through cloth FACES (the
-            // visible symptom A1 is blind to). HALF the A1 cadence (~2s): the
-            // 120mm-band grid scan costs ~10-30ms per tick on the main thread.
+            // visible symptom A1 is blind to). HALF the A1 cadence (~2s). Solo
+            // en desarrollo: su único lector es `__VINA_FACE_POKE__` (los e2e
+            // @gpu-local, contra el servidor de desarrollo), y medido en
+            // producción cada pasada bloquea el hilo principal 250-450 ms
+            // (no los 10-30 que decía este comentario): un tirón cada ~5 s
+            // mientras la tela corre (sonda del drape, 2026-10-11).
+            if (!import.meta.env.DEV) return;
             if (tslReadbackCount.current % (PENETRATION_READBACK_CADENCE * 2) !== 0) return;
             const fpBody = getFacePokeMetricBody();
             const idxAttr = staticGeometry.getIndex();
@@ -805,19 +824,20 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // ─── CPU readback path (WASM/CPU solvers) ────────────────────────
     {
       const positions = positionsRef.current;
-      if (positions && positions.length > 0) {
+      // IA 1b-2: cada cuadro del worker llega en un array nuevo (transferido,
+      // o copiado en el neural y en la vista previa): solo ese cuenta como
+      // latido, y solo ese se copia. Antes se copiaba y se recalculaban las
+      // normales de toda la malla en CADA cuadro de render, llegara tela nueva
+      // o no: el WASM da un cuadro cada varios de render, y en pausa ninguno.
+      if (positions && positions.length > 0 && positions !== ultimaTelaCopiadaRef.current) {
         const posAttr = staticGeometry.getAttribute('position') as THREE.BufferAttribute;
         if (posAttr && posAttr.array.length === positions.length) {
           (posAttr.array as Float32Array).set(positions);
           posAttr.needsUpdate = true;
           staticGeometry.computeVertexNormals();
           staticGeometry.computeBoundingSphere();
-          // IA 1b-2: cada cuadro del worker llega en un array nuevo
-          // (transferido, o copiado en el neural): solo ese cuenta como latido.
-          if (positions !== ultimaTelaCopiadaRef.current) {
-            ultimaTelaCopiadaRef.current = positions;
-            latirLaSimulacion(edgeDataRef.current);
-          }
+          ultimaTelaCopiadaRef.current = positions;
+          latirLaSimulacion(edgeDataRef.current);
         }
       }
     }
@@ -1414,6 +1434,15 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   if (!staticGeometry) return null;
 
+  // La tela sigue el movimiento del ratón solo con las herramientas que lo
+  // usan (cepillo, agarre). Con `onPointerMove` u `onPointerLeave` puestos, r3f
+  // le hace raycast a la malla entera (~57.000 triángulos en la camisa de
+  // María, sin BVH) en CADA movimiento del ratón (`filterPointerEvents`): girar
+  // la cámara mientras simula pagaba milisegundos por cuadro (2026-10-11). El
+  // clic, pulsar y soltar se quedan: solo cuestan al pulsar, y sin ellos un
+  // clic sobre la tela contaría como «fuera» y soltaría la selección.
+  const sigueAlRaton = activeTool3D === 'steamBrush' || activeTool3D === 'meshGrab';
+
   return (
     <>
       <mesh
@@ -1421,9 +1450,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         geometry={staticGeometry}
         onClick={handleMeshClick}
         onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
+        onPointerMove={sigueAlRaton ? handlePointerMove : undefined}
         onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerLeave}
+        onPointerLeave={sigueAlRaton ? handlePointerLeave : undefined}
         material={tslMaterial || undefined}
         // Render pass 2026-07-02: la tela castea y recibe sombra (ShadowNode
         // r184 soporta NodeMaterial; guard stale removido en EnvironmentSetup).
