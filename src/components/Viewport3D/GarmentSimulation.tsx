@@ -776,8 +776,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
               dispatch(setCollisionDistance(minSignedDist * 1000));
             }
             // A4 face-aware oracle — counts body verts through cloth FACES (the
-            // visible symptom A1 is blind to). HALF the A1 cadence (~2s): the
-            // 120mm-band grid scan costs ~10-30ms per tick on the main thread.
+            // visible symptom A1 is blind to). HALF the A1 cadence (~2s). Solo
+            // en desarrollo: su único lector es `__VINA_FACE_POKE__` (los e2e
+            // @gpu-local, contra el servidor de desarrollo), y medido en
+            // producción cada pasada bloquea el hilo principal 250-450 ms
+            // (no los 10-30 que decía este comentario): un tirón cada ~5 s
+            // mientras la tela corre (sonda del drape, 2026-10-11).
+            if (!import.meta.env.DEV) return;
             if (tslReadbackCount.current % (PENETRATION_READBACK_CADENCE * 2) !== 0) return;
             const fpBody = getFacePokeMetricBody();
             const idxAttr = staticGeometry.getIndex();
