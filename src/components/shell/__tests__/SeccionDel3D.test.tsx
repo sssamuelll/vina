@@ -22,6 +22,7 @@ import { store } from '../../../store';
 import { ShortcutProvider } from '../../../shortcuts/ShortcutProvider';
 import { esTeclaDeBotonera } from '../../../shortcuts/teclaDeBotonera';
 import { subirPeldano } from '../../../shortcuts/escaleraDeLoLlamado';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 import {
   startSimulation, pauseSimulation, resetSimulation, setSolverTier, setSeamResolution, setParticleCount,
   setFrameTime, setBodyCollision, type SeamResolutionSummary, type SolverTier,
@@ -250,6 +251,16 @@ describe('SeccionDel3D ▸ el estado de la simulación', () => {
     expect(alEscapeIA).toBe(0);
     escape();
     expect(alEscapeIA).toBe(1);
+  });
+
+  it('abrir y cerrar el detalle quedan en la bitácora: la caja negra ve la superficie, no solo los dispatches', () => {
+    clearJournal();
+    simulando();
+    montar();
+    abrir();
+    escape();
+    const eventos = getJournal().events.filter((e) => e.kind === 'ui' && e.name === 'estado-3d').map((e) => (e.data as { abierto: boolean }).abierto);
+    expect(eventos).toEqual([true, false]);
   });
 
   it('un clic fuera del detalle lo cierra, uno dentro no', () => {

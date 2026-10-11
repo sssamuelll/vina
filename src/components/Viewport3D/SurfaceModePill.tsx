@@ -24,6 +24,7 @@ import type { RootState } from '../../store';
 import { setSurfaceMode3D } from '../../store/simulationSlice';
 import type { SurfaceMode3D } from '../../store/simulationSlice';
 import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
+import { pushJournal } from '../../utils/telemetry/journal';
 import './SurfaceModePill.css';
 
 interface ModeDef {
@@ -58,6 +59,16 @@ export default function SurfaceModePill() {
   // de la línea al pie: un botón de la barra con el foco por código deja a Espacio
   // siendo «del botón» (`esTeclaDeBotonera`) y no de la simulación.
   const deTeclado = useRef(false);
+
+  // Abrir y cerrar quedan en la bitácora, venga de un clic, de Escape o de un cambio
+  // de tamaño: la caja negra ve el menú, no solo el dispatch del modo que se elige.
+  const abiertoAntes = useRef(false);
+  useEffect(() => {
+    if (abiertoAntes.current === open) return;
+    abiertoAntes.current = open;
+    pushJournal('ui', 'superficie', { abierto: open });
+  }, [open]);
+
   useEffect(() => {
     if (!open || !deTeclado.current) return;
     const menu = menuRef.current;

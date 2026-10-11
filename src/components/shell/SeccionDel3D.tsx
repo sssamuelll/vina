@@ -6,6 +6,7 @@ import type { RootState } from '../../store';
 import type { SolverTier } from '../../store/simulationSlice';
 import { useShortcutRegistry } from '../../shortcuts';
 import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
+import { pushJournal } from '../../utils/telemetry/journal';
 import {
   CPU_CAPABILITIES,
   WASM_CAPABILITIES,
@@ -136,6 +137,15 @@ export default function SeccionDel3D() {
 
   // Sin simulación ni herramienta sin soporte no hay estado que abrir: se cierra.
   useEffect(() => { if (!hayEstado) setAbierto(false); }, [hayEstado]);
+
+  // Abrir y cerrar el detalle quedan en la bitácora, con el estado que enseñaba: un «no
+  // veo el aviso» en la máquina de María se lee ahí.
+  const abiertoAntes = useRef(false);
+  useEffect(() => {
+    if (abiertoAntes.current === abierto) return;
+    abiertoAntes.current = abierto;
+    pushJournal('ui', 'estado-3d', { abierto, estado: textoDelEstado });
+  }, [abierto, textoDelEstado]);
 
   useEffect(() => {
     if (!abierto) return;

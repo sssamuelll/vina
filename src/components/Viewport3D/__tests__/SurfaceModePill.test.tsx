@@ -11,6 +11,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import simulationReducer, { setSurfaceMode3D } from '../../../store/simulationSlice';
 import SurfaceModePill from '../SurfaceModePill';
 import { ShortcutProvider } from '../../../shortcuts/ShortcutProvider';
+import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 
 afterEach(cleanup);
 
@@ -165,6 +166,15 @@ describe('SurfaceModePill en la barra superior', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Plano' }), { detail: 1 });
     expect(store.getState().simulation.surfaceMode3D, 'el caso no se ejerce: no se eligió el modo').toBe('flat');
     expect(document.activeElement, 'el menú dejó el foco en un botón de la barra').toBe(document.body);
+  });
+
+  it('abrir y cerrar el menú quedan en la bitácora: la caja negra ve la superficie, no solo los dispatches', () => {
+    clearJournal();
+    montar();
+    fireEvent.click(disparador());
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    const eventos = getJournal().events.filter((e) => e.kind === 'ui' && e.name === 'superficie').map((e) => (e.data as { abierto: boolean }).abierto);
+    expect(eventos).toEqual([true, false]);
   });
 
   it('Enter y Espacio sobre una opción son de la opción: el menú es una botonera', () => {
