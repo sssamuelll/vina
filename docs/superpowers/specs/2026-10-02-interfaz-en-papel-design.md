@@ -248,7 +248,10 @@ una línea de pelo. La del patrón a la izquierda; la del 3D a la derecha.
   despliega el detalle a la izquierda del margen, que ahora empieza diciendo el estado y el motor.
   El nombre accesible del icono lo dice todo. Samuel pidió los mensajes del simulador «en otro
   lado o que sea muy muy pequeño tipo un par de iconos o algo así y expandible» y, de dos maquetas
-  sobre la app real, eligió esta (B) sobre dejar dos iconos en el pie (A).
+  sobre la app real, eligió esta (B) sobre dejar dos iconos en el pie (A). Con su «dale» del mismo
+  día, el ⚠ cuenta solo los problemas de la corrida. Que el motor no detecte la penetración
+  (ninguno de los cuatro lo hace) encendía el ⚠ en toda simulación; pasa a ser una nota del
+  detalle, tenue y sin triángulo.
 - **La escala y la tabla de los mapas de ajuste** (`FitMapToggle.tsx:151-234`, hoy texto blanco
   sobre casi negro escrito a mano) toman el material de lo que flota (§ 6.3).
 

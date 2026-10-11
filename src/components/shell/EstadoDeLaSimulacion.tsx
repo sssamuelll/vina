@@ -98,11 +98,13 @@ export default function EstadoDeLaSimulacion() {
   const hayEstado = !idle || toolUnsupported;
 
   // Diagnósticos reales que el icono no puede silenciar (C4 § 3.1.A): el ⚠ delata
-  // que hay detalle que leer.
+  // que hay detalle que leer. Que el motor no detecte la penetración NO cuenta: ninguno
+  // de los cuatro la detecta (`facePoke` es falso en todos), así que encendía el ⚠ en
+  // toda simulación y el pulso y la pausa no se veían nunca. Es un límite del motor, no
+  // un problema de la corrida (Samuel, 2026-10-11): su texto sigue en el detalle, como nota.
   const warningCount =
     (seamResolution && seamResolution.zeroConstraintSeams.length > 0 ? 1 : 0) +
     (solverTier !== 'none' && !bodyCollision ? 1 : 0) +
-    (solverTier !== 'none' && bodyCollision && !TIER_CAPS[solverTier].facePoke ? 1 : 0) +
     (solverTier === 'wasm' ? 1 : 0) +
     (toolUnsupported ? 1 : 0);
 
@@ -232,7 +234,8 @@ export default function EstadoDeLaSimulacion() {
             <Linea tono="aviso">Sin colisión con el cuerpo</Linea>
           )}
           {solverTier !== 'none' && bodyCollision && !TIER_CAPS[solverTier].facePoke && (
-            <Linea tono="aviso">
+            // Una nota y no un aviso: no se cuenta en el ⚠ (ver `warningCount`).
+            <Linea tono="tenue">
               El cuerpo puede asomar a través de la tela — la detección de penetración no está disponible en este motor
             </Linea>
           )}

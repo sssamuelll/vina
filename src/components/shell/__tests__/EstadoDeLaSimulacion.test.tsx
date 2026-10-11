@@ -336,12 +336,21 @@ describe('EstadoDeLaSimulacion ▸ los avisos nunca se callan (C4 § 3.1.A)', ()
   });
 
   it('un solo aviso se anuncia en singular', () => {
-    // Ningún motor detecta hoy la penetración del cuerpo (facePoke es falso en los
-    // cuatro): con colisión y WebGPU queda ese único aviso.
-    simulando({ tier: 'webgpu', seam: null });
-    act(() => { store.dispatch(setBodyCollision(true)); });
+    simulando({ tier: 'webgpu', seam: null }); // sin colisión con el cuerpo: un aviso
     montar();
     expect(nombre()).toMatch(/· 1 aviso$/);
+  });
+
+  it('lo que el motor no sabe hacer no es un aviso: con colisión y sin problemas, el icono es el pulso', () => {
+    // Ningún motor detecta hoy la penetración del cuerpo (facePoke es falso en los cuatro).
+    // Contarlo encendía el ⚠ en toda simulación con un motor elegido, y el pulso y la pausa no
+    // se veían nunca. Samuel, el 11-10: que el ⚠ cuente solo los problemas de la corrida.
+    simulando({ tier: 'webgpu', seam: null, ms: 16.7 });
+    act(() => { store.dispatch(setBodyCollision(true)); });
+    montar();
+    expect(estado()!.className).toContain('estado-de-la-simulacion__boton--corriendo');
+    expect(estado()!.querySelector('.estado-de-la-simulacion__cuenta')).toBeNull();
+    expect(nombre()).toBe('Estado de la simulación: Simulando · WebGPU');
   });
 
   it('la herramienta sin soporte avisa AUNQUE NO SE SIMULE', () => {
@@ -431,12 +440,16 @@ describe('EstadoDeLaSimulacion ▸ observabilidad de costuras (Fase 4, tras abri
     expect(limitado.title).toMatch(/LRA/);
   });
 
-  it('con colisión, avisa de que el cuerpo puede asomar: ningún motor detecta la penetración', () => {
+  it('con colisión, el detalle dice que el cuerpo puede asomar, como nota y no como aviso', () => {
+    // Ningún motor detecta la penetración: no se calla (C4 § 3.1.A), pero es un límite del
+    // motor, no un problema de la corrida, así que va tenue, sin triángulo y sin contar.
     simulando({ tier: 'webgpu', seam: null });
     act(() => { store.dispatch(setBodyCollision(true)); });
     montar();
     abrir();
-    expect(screen.getByText(/El cuerpo puede asomar a través de la tela/).className).toContain('estado-de-la-simulacion__linea--aviso');
+    const nota = screen.getByText(/El cuerpo puede asomar a través de la tela/);
+    expect(nota.className).toContain('estado-de-la-simulacion__linea--tenue');
+    expect(nota.textContent, 'una nota no lleva el triángulo de los avisos').not.toMatch(/⚠/);
     expect(screen.queryByText(/Sin colisión con el cuerpo/)).toBeNull();
   });
 });
