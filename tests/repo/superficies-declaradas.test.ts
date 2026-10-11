@@ -14,7 +14,7 @@ export const VOCABULARIO = new Set([
   'ambiente', 'documento', 'dev',
   'pie', 'pista', 'barra', 'paleta', 'velo', 'cabina', 'menu', 'panel',
   'modal', 'toast', 'tooltip', 'estado-vacio', 'indicador-simulacion',
-  'indicador-fps', 'mapas', 'instantaneas',
+  'leyenda', 'instantaneas',
 ]);
 
 /** [archivo, valor, veces] */
@@ -60,8 +60,11 @@ const MARCAS: Array<[string, string, number]> = [
   ['src/components/shell/ContextPanel.tsx', 'panel', 1],
   ['src/components/Viewport3D/RenderSettingsPanel.tsx', 'panel', 1],
   ['src/components/Viewport3D/CollisionBodyPanel.tsx', 'panel', 1],
-  ['src/components/Viewport3D/FitMapToggle.tsx', 'panel', 1],
-  ['src/components/Viewport3D/FitMapToggle.tsx', 'mapas', 1],
+  // Los mapas de ajuste (spec 2026-10-02 § 4.2, P5): el menú «Mapa» cuelga de la
+  // barra superior (una hoja, con la lista y los ajustes como dos vistas), y la
+  // leyenda —escala, tabla y valor— es lo que se lee sobre el visor.
+  ['src/components/Viewport3D/MenuDeMapas.tsx', 'menu', 1],
+  ['src/components/Viewport3D/LeyendaDeMapas.tsx', 'leyenda', 1],
   ['src/components/shell/ConfirmDialog.tsx', 'modal', 1],
   ['src/components/PatternEditor/CalibrationModal.tsx', 'modal', 1],
   ['src/copilot/connections/ConnectionModal.tsx', 'modal', 1],

@@ -19,7 +19,7 @@ import { SimulationErrorBoundary } from './SimulationErrorBoundary';
 import { SimulationStatusOverlay } from './SimulationStatusOverlay';
 import JointGizmos from './JointGizmos';
 import IKEndEffectorGizmos from './IKEndEffectorGizmos';
-import FitMapToggle from './FitMapToggle';
+import LeyendaDeMapas from './LeyendaDeMapas';
 import SurfaceModePill from './SurfaceModePill';
 import { usePoseDrag } from './usePoseDrag';
 import { isPanGesture, isPanRelease, cameraViewFromKeyEvent, isDoublePanClick, type PanClick } from './inputBindings';
@@ -1002,14 +1002,11 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         />
       </Canvas>
 
-      {/* Fit Map Toggle Bar */}
-      <FitMapToggle
-        stats={fitMapStats}
-        inspectedValue={inspectedValue}
-        avatarHidden={!avatarVisible}
-        onToggleAvatar={() => dispatch(toggleAvatarVisible())}
-        onSnapshot={snapshot3D}
-      />
+      {/* La leyenda de los mapas de ajuste: escala, tabla y valor inspeccionado.
+          Los cuatro mapas y sus ajustes son el menú «Mapa» de la barra superior
+          (MenuDeMapas); el avatar y la captura tienen sus puertas en la barra
+          superior y en Archivo. */}
+      <LeyendaDeMapas stats={fitMapStats} inspectedValue={inspectedValue} />
 
       {/* Snapshot A/B comparison bar */}
       <SnapshotBar

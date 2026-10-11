@@ -1,0 +1,101 @@
+/* El menú «Mapa» (MenuDeMapas.tsx, P5). El disparador comparte el estilo de
+   «Mostrar» (`.grupo-del-patron__plegado`, layout.css): aquí solo lo que le es
+   propio. La hoja cuelga de <body>, es papel (data-material="papel") y por eso
+   `--text-*`, `--border`, `--field-bg` y `--bg-elevated` son los del papel. */
+
+/* Sin simulación: apagado, no deshabilitado (se abre, y dice qué hacer). El
+   texto se queda a contraste de texto, no a opacidad. */
+.menu-de-mapas__disparador--apagado { color: var(--text-tertiary); }
+/* Con un mapa puesto: tinta plena y la marca llena. El estado no depende solo
+   del tono (ley de estado del contrato). */
+.menu-de-mapas__disparador--activo { color: var(--text-primary); }
+.menu-de-mapas__disparador--activo .grupo-del-patron__marca { background: currentColor; }
+
+.menu-de-mapas__hoja {
+  position: fixed;
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 232px;
+  padding: 6px;
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+}
+
+.menu-de-mapas__elemento {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.menu-de-mapas__elemento:hover,
+.menu-de-mapas__elemento:focus-visible { background: var(--bg-elevated); color: var(--text-primary); }
+.menu-de-mapas__elemento:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.menu-de-mapas__elemento:disabled { color: var(--text-disabled); cursor: default; background: transparent; }
+
+/* El mapa puesto lleva relleno: lleva texto encima, así que el paso fuerte del
+   acento (blanco a 6,29:1) y su hover (4,65:1). */
+.menu-de-mapas__elemento--activo,
+.menu-de-mapas__elemento--activo:hover,
+.menu-de-mapas__elemento--activo:focus-visible { background: var(--accent-fuerte); color: var(--on-accent); }
+.menu-de-mapas__elemento--activo:hover { background: var(--accent-fuerte-hover); }
+
+.menu-de-mapas__atajo {
+  margin-left: auto;
+  padding-left: 16px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.menu-de-mapas__elemento--activo .menu-de-mapas__atajo { color: inherit; }
+
+.menu-de-mapas__separador { margin: 4px 0; border-top: 1px solid var(--border-subtle); }
+
+/* Los ajustes: la misma hoja con otra vista. */
+.menu-de-mapas__titulo { padding: 2px 4px 6px; font-size: var(--text-sm); font-weight: 700; }
+.menu-de-mapas__rotulo { padding: 4px 4px 2px; font-size: var(--text-sm); color: var(--text-secondary); }
+.menu-de-mapas__fila { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px 4px; }
+.menu-de-mapas__etiqueta { display: flex; align-items: center; gap: 4px; font-size: var(--text-sm); color: var(--text-secondary); white-space: nowrap; }
+.menu-de-mapas__campo {
+  width: 56px;
+  padding: 2px 4px;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.menu-de-mapas__campo:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+
+/* Botón secundario del papel: transparente con línea de campo. */
+.menu-de-mapas__restablecer {
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.menu-de-mapas__restablecer:hover,
+.menu-de-mapas__restablecer:focus-visible { background: var(--bg-elevated); color: var(--text-primary); }
+.menu-de-mapas__restablecer:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
