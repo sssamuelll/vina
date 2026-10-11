@@ -1,0 +1,121 @@
+<!doctype html>
+<!-- Generado por scripts/home/paginas.mjs desde home/plantilla.html, home/copy/{{idioma}}.json y home/datos/. No editar a mano. -->
+<html lang="{{idioma}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{titulo}}</title>
+  <meta name="description" content="{{descripcion}}">
+  <link rel="canonical" href="{{url}}">
+  <link rel="alternate" hreflang="en" href="https://vina.sdar.dev/">
+  <link rel="alternate" hreflang="es" href="https://vina.sdar.dev/es/">
+  <link rel="alternate" hreflang="x-default" href="https://vina.sdar.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{url}}">
+  <meta property="og:title" content="{{titulo}}">
+  <meta property="og:description" content="{{ogDescripcion}}">
+  <meta property="og:image" content="https://vina.sdar.dev/{{ogImagen}}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="{{ogLocale}}">
+  <meta property="og:locale:alternate" content="{{ogLocaleOtro}}">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="preload" href="{{raiz}}home/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{raiz}}home/tokens.css">
+  <link rel="stylesheet" href="{{raiz}}home/home.css">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"WebApplication","name":"Vina","url":"{{url}}",
+   "applicationCategory":"DesignApplication","operatingSystem":"Web","inLanguage":"{{idioma}}",
+   "offers":{"@type":"Offer","price":0,"priceCurrency":"USD"},"isAccessibleForFree":true,
+   "license":"https://opensource.org/licenses/MIT","sameAs":["https://github.com/sssamuelll/vina"]}
+  </script>
+</head>
+<body>
+<a class="saltar" href="#contenido">{{saltar}}</a>
+<header class="cabecera"><div class="wrap">
+  <a href="{{url}}" class="marca"><img class="logo" src="{{raiz}}home/img/logo.svg" alt="Vina" width="48" height="28"></a>
+  <nav aria-label="{{navPrincipal}}">
+    <a href="#today">{{navHoy}}</a><a href="#making">{{navFalta}}</a><a href="#how">{{navComo}}</a><a href="#send">{{navEnvia}}</a>
+    <a class="idioma" href="{{otraUrl}}" hreflang="{{idiomaOtroCodigo}}" lang="{{idiomaOtroCodigo}}">{{idiomaOtro}}</a>
+    <a class="pill" href="/app/">{{abrir}}</a>
+  </nav>
+</div></header>
+
+<main id="contenido">
+<section class="hero"><div class="wrap">
+  <div class="texto">
+    <h1>{{h1}}</h1>
+    <p class="lead">{{entradilla}}</p>
+    <div class="cta"><a class="btn btn-primario" href="/app/">{{abrir}}</a><a class="btn btn-contorno btn-oferta" href="mailto:vina@sdar.dev?subject={{asunto}}">{{enviar}}</a></div>
+    <p class="meta mono">{{condiciones}}</p>
+  </div>
+  <div class="hero-visor">
+    <img class="visor-poster" src="{{raiz}}home/img/caida-poster.webp" alt="{{posterAlt}}" width="520" height="300" decoding="async">
+    <p class="indicador mono"><i aria-hidden="true"></i>{{simulando}}{{webgpu}}</p>
+  </div>
+  <div class="hero-patron"><!-- incluir: home/img/patron.{{idioma}}.svg --></div>
+</div></section>
+
+<section id="today"><div class="wrap">
+  <p class="eyebrow mono">{{hoyEyebrow}}</p>
+  <h2>{{hoyH2}}</h2>
+  <p class="intro">{{hoyIntro}}</p>
+  <figure class="fig"><picture>
+    <source media="(max-width: 720px)" srcset="{{raiz}}home/img/fig-01-movil.webp">
+    <img class="fig-01" src="{{raiz}}home/img/fig-01@1x.webp" srcset="{{raiz}}home/img/fig-01@1x.webp 1x, {{raiz}}home/img/fig-01@2x.webp 2x" alt="{{fig01Alt}}" width="1280" height="620" loading="lazy" decoding="async">
+  </picture><figcaption class="figcap mono"><span>{{fig01Pie}}</span><span>{{fig01Dispositivo}}</span></figcaption></figure>
+  <div class="cols">
+{{#columnas}}    <div><h3>{{titulo}}</h3><p>{{texto}}</p></div>
+{{/columnas}}  </div>
+  <figure class="fig fig-ajuste"><picture>
+    <source media="(max-width: 720px)" srcset="{{raiz}}home/img/fig-02-movil.webp">
+    <img class="fig-02" src="{{raiz}}home/img/fig-02@1x.webp" srcset="{{raiz}}home/img/fig-02@1x.webp 1x, {{raiz}}home/img/fig-02@2x.webp 2x" alt="{{fig02Alt}}" width="1280" height="560" loading="lazy" decoding="async">
+  </picture><figcaption class="figcap mono"><span>{{fig02Pie}}</span><span>{{fig02Rotulo}}</span></figcaption></figure>
+  <dl class="filas">
+{{#filas}}    <div class="fila"><dt>{{titulo}}</dt><dd class="{{clase}}">{{texto}}</dd></div>
+{{/filas}}  </dl>
+</div></section>
+
+<section id="making"><div class="wrap">
+  <p class="eyebrow mono">{{faltaEyebrow}}</p>
+  <h2>{{faltaH2}}</h2>
+  <p class="intro">{{faltaIntro}}</p>
+  <ul class="lista">
+{{#enConstruccion}}    <li class="falta"><span>{{texto}}</span><a class="mono" href="{{enlace}}" aria-label="{{rotulo}} · {{texto}}">{{rotulo}}</a></li>
+{{/enConstruccion}}  </ul>
+</div></section>
+
+<section id="how"><div class="wrap">
+  <p class="eyebrow mono">{{comoEyebrow}}</p>
+  <h2>{{comoH2}}</h2>
+  <p class="intro">{{comoIntro}}</p>
+  <p class="rotulo-lista mono">{{diarioRotulo}}</p>
+  <ul class="lista diario">
+{{#diario}}    <li class="entrada"><span class="fecha mono">{{fecha}}</span><span>{{texto}}</span><a class="mono" href="https://github.com/sssamuelll/vina/pull/{{pr}}" aria-label="PR #{{pr}} · {{texto}}">#{{pr}}</a></li>
+{{/diario}}  </ul>
+</div></section>
+
+<section class="cierre" aria-label="{{verCodigo}}"><div class="wrap">
+  <p class="repo mono">github.com/sssamuelll/vina · <em>MIT</em> · v%VITE_VINA_VERSION%</p>
+  <div class="cta"><a class="btn btn-primario" href="https://github.com/sssamuelll/vina">{{verCodigo}}</a><a class="btn btn-contorno" href="https://github.com/sssamuelll/vina/tree/main/docs/superpowers/specs">{{leerNotas}}</a></div>
+</div></section>
+
+<section id="send" class="formatos"><div class="wrap">
+  <p class="eyebrow mono">{{enviaEyebrow}}</p>
+  <h2>{{enviaH2}}</h2>
+  <p class="intro">{{enviaIntro}}</p>
+  <div class="cta"><a class="btn btn-primario btn-oferta" href="mailto:vina@sdar.dev?subject={{asunto}}">{{enviar}}</a></div>
+  <p class="meta mono">{{enviaCondiciones}}</p>
+</div></section>
+</main>
+
+<footer class="pie"><div class="wrap">
+  <span>{{pie}}</span>
+  <nav aria-label="{{navPie}}"><a href="#today">{{navHoy}}</a><a href="#making">{{navFalta}}</a><a href="#how">{{navComo}}</a><a href="#send">{{navEnvia}}</a><a class="idioma" href="{{otraUrl}}" hreflang="{{idiomaOtroCodigo}}" lang="{{idiomaOtroCodigo}}">{{idiomaOtro}}</a></nav>
+</div></footer>
+</body>
+</html>

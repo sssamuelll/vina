@@ -1,18 +1,24 @@
 <!doctype html>
-<html lang="es">
+<!-- Generado por scripts/home/paginas.mjs desde home/plantilla.html, home/copy/en.json y home/datos/. No editar a mano. -->
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Vina — Patronaje y simulación 3D en el navegador</title>
-  <meta name="description" content="CAD de patronaje en el navegador: patrón 2D editable, tela simulada en tiempo real y un copiloto que entiende de costuras. Gratis y de código abierto.">
+  <title>Vina — Pattern making and 3D simulation in the browser</title>
+  <meta name="description" content="A pattern-making CAD that opens in the browser: editable 2D pattern, real-time cloth on an avatar, and a copilot. Free, open source, in the making.">
   <link rel="canonical" href="https://vina.sdar.dev/">
+  <link rel="alternate" hreflang="en" href="https://vina.sdar.dev/">
+  <link rel="alternate" hreflang="es" href="https://vina.sdar.dev/es/">
+  <link rel="alternate" hreflang="x-default" href="https://vina.sdar.dev/">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://vina.sdar.dev/">
-  <meta property="og:title" content="Vina — Patronaje y simulación 3D en el navegador">
-  <meta property="og:description" content="Traza el patrón, mira la caída. Un CAD de patronaje en el navegador, gratis y de código abierto.">
+  <meta property="og:title" content="Vina — Pattern making and 3D simulation in the browser">
+  <meta property="og:description" content="Draft the pattern, watch it drape. A pattern-making CAD in the browser, free and open source.">
   <meta property="og:image" content="https://vina.sdar.dev/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="es_VE">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/favicon.ico" sizes="32x32">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -23,80 +29,106 @@
   <link rel="stylesheet" href="./home/home.css">
   <script type="application/ld+json">
   {"@context":"https://schema.org","@type":"WebApplication","name":"Vina","url":"https://vina.sdar.dev/",
-   "applicationCategory":"DesignApplication","operatingSystem":"Web","inLanguage":"es",
+   "applicationCategory":"DesignApplication","operatingSystem":"Web","inLanguage":"en",
    "offers":{"@type":"Offer","price":0,"priceCurrency":"USD"},"isAccessibleForFree":true,
    "license":"https://opensource.org/licenses/MIT","sameAs":["https://github.com/sssamuelll/vina"]}
   </script>
 </head>
 <body>
-<a class="saltar" href="#contenido">Saltar al contenido</a>
+<a class="saltar" href="#contenido">Skip to content</a>
 <header class="cabecera"><div class="wrap">
-  <a href="/" class="marca"><img class="logo" src="./home/img/logo.svg" alt="Vina" width="48" height="28"></a>
-  <nav aria-label="Principal">
-    <a href="#taller">Producto</a><a href="#formatos">Formatos</a><a href="#copiloto">Copiloto</a><a href="#codigo">Código</a>
-    <a class="pill" href="/app/">Abrir Vina</a>
+  <a href="https://vina.sdar.dev/" class="marca"><img class="logo" src="./home/img/logo.svg" alt="Vina" width="48" height="28"></a>
+  <nav aria-label="Main">
+    <a href="#today">Today</a><a href="#making">In the making</a><a href="#how">How it's made</a><a href="#send">Send a pattern</a>
+    <a class="idioma" href="https://vina.sdar.dev/es/" hreflang="es" lang="es">Español</a>
+    <a class="pill" href="/app/">Open Vina</a>
   </nav>
 </div></header>
 
 <main id="contenido">
 <section class="hero"><div class="wrap">
   <div class="texto">
-    <h1>Traza el patrón, mira la caída.</h1>
-    <p class="lead">Vina es un CAD de patronaje que se abre en el navegador: patrón 2D editable, tela simulada en tiempo real y un copiloto que entiende de pinzas y costuras.</p>
-    <div class="cta"><a class="btn btn-primario" href="/app/">Abrir Vina</a><a class="btn btn-contorno" href="#codigo">Ver el código</a></div>
-    <p class="meta mono">Gratis y de código abierto · Sin cuenta · Tus proyectos se guardan en tu navegador</p>
+    <h1>Draft the pattern, watch it drape.</h1>
+    <p class="lead">Vina is a pattern-making CAD that opens in the browser: an editable 2D pattern, fabric simulated in real time on an avatar, and a copilot that knows a dart from a notch.</p>
+    <div class="cta"><a class="btn btn-primario" href="/app/">Open Vina</a><a class="btn btn-contorno btn-oferta" href="mailto:vina@sdar.dev?subject=A%20pattern%20for%20Vina">Send a pattern</a></div>
+    <p class="meta mono">Free · Open source · No account · In the making</p>
   </div>
   <div class="hero-visor">
-    <img class="visor-poster" src="./home/img/caida-poster.webp" alt="La tela de la camiseta cayendo sobre el avatar en el visor 3D" width="520" height="300" decoding="async">
-    <p class="indicador mono"><i aria-hidden="true"></i>Simulando · <span lang="en">WebGPU</span></p>
+    <img class="visor-poster" src="./home/img/caida-poster.webp" alt="The T-shirt's fabric falling onto the avatar in the 3D viewer" width="520" height="300" decoding="async">
+    <p class="indicador mono"><i aria-hidden="true"></i>Simulating · WebGPU</p>
   </div>
-  <div class="hero-patron"><!-- incluir: home/img/patron.svg --></div>
+  <div class="hero-patron"><!-- incluir: home/img/patron.en.svg --></div>
 </div></section>
 
-<section id="taller"><div class="wrap">
-  <p class="eyebrow mono">Fig 0.1 · El taller</p>
-  <h2>Tal como se abre. Sin cuenta, sin instalar.</h2>
-  <p class="intro">Un lienzo de papel con tu patrón, un visor 3D con el avatar, y las herramientas de siempre en el orden de siempre.</p>
+<section id="today"><div class="wrap">
+  <p class="eyebrow mono">Fig 0.1 · The workshop</p>
+  <h2>What it does today</h2>
+  <p class="intro">A paper canvas with your pattern, a 3D viewer with the avatar, and the usual tools in the usual order. The interface speaks Spanish for now.</p>
   <figure class="fig"><picture>
     <source media="(max-width: 720px)" srcset="./home/img/fig-01-movil.webp">
-    <img class="fig-01" src="./home/img/fig-01@1x.webp" srcset="./home/img/fig-01@1x.webp 1x, ./home/img/fig-01@2x.webp 2x" alt="El lienzo 2D de Vina con el patrón de María y una pieza seleccionada con su cota" width="1280" height="620" loading="lazy" decoding="async">
-  </picture><figcaption class="figcap mono"><span>Patrón real importado de un DXF · pieza seleccionada con su cota</span><span>Chromium · 1600 × 1000</span></figcaption></figure>
+    <img class="fig-01" src="./home/img/fig-01@1x.webp" srcset="./home/img/fig-01@1x.webp 1x, ./home/img/fig-01@2x.webp 2x" alt="Vina's 2D canvas with a T-shirt pattern and one piece selected, showing its dimension" width="1280" height="620" loading="lazy" decoding="async">
+  </picture><figcaption class="figcap mono"><span>A real pattern imported from a DXF · the selected piece with its dimension</span><span>Chromium · 1600 × 1000</span></figcaption></figure>
   <div class="cols">
-    <div><h3>Trazado</h3><p>Pluma, rectángulo, pinzas, piquetes y márgenes de costura. Las cotas se escriben donde miden.</p></div>
-    <div><h3>Costura</h3><p>Coser piezas automáticamente o borde a borde. Las costuras se ven en el 2D y se cierran en el 3D.</p></div>
-    <div><h3>Caída</h3><p>Tela simulada en tiempo real sobre el avatar, con <span lang="en">WebGPU</span> dentro del navegador. Mapas de ajuste desde el primer fotograma.</p></div>
+    <div><h3>Drafting</h3><p>Pen, rectangle, notches and seam allowances, with the grainline drawn and the dimensions written where they measure. Darts come in with your DXF.</p></div>
+    <div><h3>Sewing</h3><p>Sew pieces automatically or edge to edge, and watch the seams close in 3D.</p></div>
+    <div><h3>Drape</h3><p>Fabric simulated in real time on the avatar, with WebGPU inside the browser. A fit map from the first frame.</p></div>
   </div>
-</div></section>
-
-<section id="formatos" class="formatos"><div class="wrap">
-  <p class="eyebrow mono">Formatos</p>
-  <h2>Abre tu DXF y míralo caer.</h2>
-  <p class="intro">Lo que trazas en el lienzo es lo que lee la cortadora. Importa el patrón que ya tienes y expórtalo como salió.</p>
+  <figure class="fig fig-ajuste"><picture>
+    <source media="(max-width: 720px)" srcset="./home/img/fig-02-movil.webp">
+    <img class="fig-02" src="./home/img/fig-02@1x.webp" srcset="./home/img/fig-02@1x.webp 1x, ./home/img/fig-02@2x.webp 2x" alt="The avatar wearing the T-shirt in the 3D viewer, with the fit map on" width="1280" height="560" loading="lazy" decoding="async">
+  </picture><figcaption class="figcap mono"><span>The fit map on the avatar · tighter in red, looser in blue</span><span>Fig 0.2</span></figcaption></figure>
   <dl class="filas">
-    <div class="fila"><dt>Lee</dt><dd class="mono">DXF-AAMA · DXF-ASTM · Gerber · SVG · ZPRJ (CLO)</dd></div>
-    <div class="fila"><dt>Escribe</dt><dd class="mono">DXF-AAMA · DXF por tallas · PDF de corte · BOM (CSV) · glTF · USDZ · OBJ · FBX</dd></div>
+    <div class="fila"><dt>Reads</dt><dd class="mono">DXF-AAMA · DXF-ASTM · Gerber and Lectra dialects</dd></div>
+    <div class="fila"><dt>Writes</dt><dd class="mono">DXF-AAMA · PDF at 1:1 · BOM (CSV) · glTF · USDZ · 360° turn</dd></div>
+    <div class="fila"><dt>Copilot</dt><dd class="prosa">Ask it to add a dart or to audit the seam allowances. It uses the same tools you do, and every change can be undone. With your own key: Anthropic, OpenAI, DeepSeek or Ollama.</dd></div>
   </dl>
 </div></section>
 
-<section id="copiloto"><div class="wrap">
-  <p class="eyebrow mono">Fig 0.2 · El copiloto</p>
-  <h2>Un copiloto que habla de costuras.</h2>
-  <p class="intro">Pídele que añada una pinza, que audite los márgenes o que cosa las piezas: usa las mismas herramientas que tú, y cada cambio se puede deshacer. Con tu propia clave de API.</p>
-  <figure class="fig"><img class="fig-02" src="./home/img/fig-02@1x.webp" srcset="./home/img/fig-02@1x.webp 1x, ./home/img/fig-02@2x.webp 2x" alt="La barra de comandos de Vina abierta sobre el patrón, con las acciones del taller" width="1280" height="560" loading="lazy" decoding="async"><figcaption class="figcap mono"><span>Cada verbo del taller está en la barra: coser, vestir, escalar, marcar, exportar</span><span>Fig 0.2</span></figcaption></figure>
+<section id="making"><div class="wrap">
+  <p class="eyebrow mono">In the making</p>
+  <h2>What isn't there yet</h2>
+  <p class="intro">You'd find it in the workshop anyway. Better to read it here first.</p>
+  <ul class="lista">
+    <li class="falta"><span>Real grading. Sizes scale in proportion today; rules per point come next.</span><a class="mono" href="https://github.com/sssamuelll/vina/issues/915" aria-label="#915 · Real grading. Sizes scale in proportion today; rules per point come next.">#915</a></li>
+    <li class="falta"><span>A marker you can export. The nesting panel estimates fabric use and stops there.</span><a class="mono" href="https://github.com/sssamuelll/vina/blob/main/ROADMAP.md#next" aria-label="ROADMAP · A marker you can export. The nesting panel estimates fabric use and stops there.">ROADMAP</a></li>
+    <li class="falta"><span>A dart tool. Darts arrive with your DXF or through the copilot, not from the pen yet.</span><a class="mono" href="https://github.com/sssamuelll/vina/blob/main/ROADMAP.md#next" aria-label="ROADMAP · A dart tool. Darts arrive with your DXF or through the copilot, not from the pen yet.">ROADMAP</a></li>
+    <li class="falta"><span>Project files. Your work lives in this browser until .vina files can be saved and opened.</span><a class="mono" href="https://github.com/sssamuelll/vina/issues/15" aria-label="#15 · Project files. Your work lives in this browser until .vina files can be saved and opened.">#15</a></li>
+    <li class="falta"><span>The interface in English. The workshop speaks Spanish.</span><a class="mono" href="https://github.com/sssamuelll/vina/issues/964" aria-label="#964 · The interface in English. The workshop speaks Spanish.">#964</a></li>
+    <li class="falta"><span>Fabrics measured from cloth. Thirty-two presets today.</span><a class="mono" href="https://github.com/sssamuelll/vina/issues/1005" aria-label="#1005 · Fabrics measured from cloth. Thirty-two presets today.">#1005</a></li>
+  </ul>
 </div></section>
 
-<section id="codigo" class="cierre"><div class="wrap">
-  <p class="eyebrow mono">Código</p>
-  <h2>Abierto, y se queda abierto.</h2>
-  <p class="intro">Vina es software libre bajo licencia MIT. El código, los tests y las decisiones de diseño están en el repositorio.</p>
-  <div class="cta"><a class="btn btn-primario" href="/app/">Abrir Vina</a><a class="btn btn-contorno" href="https://github.com/sssamuelll/vina">Ver el código</a></div>
+<section id="how"><div class="wrap">
+  <p class="eyebrow mono">How it's made</p>
+  <h2>In the open, one decision at a time</h2>
+  <p class="intro">Each change starts as a written design, gets a review, and lands with its tests. The specs, the research and the mistakes are in the repository, so the history tells itself.</p>
+  <p class="rotulo-lista mono">From the workshop diary</p>
+  <ul class="lista diario">
+    <li class="entrada"><span class="fecha mono">2026-10-09</span><span>Your own agent can work on the pattern open in Vina.</span><a class="mono" href="https://github.com/sssamuelll/vina/pull/1238" aria-label="PR #1238 · Your own agent can work on the pattern open in Vina.">#1238</a></li>
+    <li class="entrada"><span class="fecha mono">2026-10-09</span><span>The panels moved onto paper: one slot on the right, properties in two levels, the avatar in seven fields.</span><a class="mono" href="https://github.com/sssamuelll/vina/pull/1239" aria-label="PR #1239 · The panels moved onto paper: one slot on the right, properties in two levels, the avatar in seven fields.">#1239</a></li>
+    <li class="entrada"><span class="fecha mono">2026-10-06</span><span>A seam fix: the sleeve cap splits where each half measures its armhole.</span><a class="mono" href="https://github.com/sssamuelll/vina/pull/1235" aria-label="PR #1235 · A seam fix: the sleeve cap splits where each half measures its armhole.">#1235</a></li>
+    <li class="entrada"><span class="fecha mono">2026-10-05</span><span>The piece's cabin: a strip of four tools and one dimension at a time.</span><a class="mono" href="https://github.com/sssamuelll/vina/pull/1233" aria-label="PR #1233 · The piece's cabin: a strip of four tools and one dimension at a time.">#1233</a></li>
+    <li class="entrada"><span class="fecha mono">2026-07-10</span><span>Real sewing on the avatar: a shirt forms and drapes for the first time.</span><a class="mono" href="https://github.com/sssamuelll/vina/pull/934" aria-label="PR #934 · Real sewing on the avatar: a shirt forms and drapes for the first time.">#934</a></li>
+  </ul>
+</div></section>
+
+<section class="cierre" aria-label="See the code"><div class="wrap">
   <p class="repo mono">github.com/sssamuelll/vina · <em>MIT</em> · v%VITE_VINA_VERSION%</p>
+  <div class="cta"><a class="btn btn-primario" href="https://github.com/sssamuelll/vina">See the code</a><a class="btn btn-contorno" href="https://github.com/sssamuelll/vina/tree/main/docs/superpowers/specs">Read the design notes</a></div>
+</div></section>
+
+<section id="send" class="formatos"><div class="wrap">
+  <p class="eyebrow mono">Send a pattern</p>
+  <h2>Bring your pattern, I'll drape it</h2>
+  <p class="intro">Email me a DXF. I'll return it sewn and draped in Vina, with its fit map, and I'll tell you where Vina fell short. Every pattern that comes in is a test the workshop hasn't passed yet. A few each month, in the order they arrive.</p>
+  <div class="cta"><a class="btn btn-primario btn-oferta" href="mailto:vina@sdar.dev?subject=A%20pattern%20for%20Vina">Send a pattern</a></div>
+  <p class="meta mono">vina@sdar.dev · DXF-AAMA or DXF-ASTM · I read and reply myself</p>
 </div></section>
 </main>
 
 <footer class="pie"><div class="wrap">
-  <span>© 2026 Vina · Patronaje y simulación 3D en el navegador</span>
-  <nav aria-label="Pie"><a href="#taller">Producto</a><a href="#formatos">Formatos</a><a href="#copiloto">Copiloto</a><a href="#codigo">Código</a></nav>
+  <span>© 2026 Vina · Pattern making and 3D simulation in the browser</span>
+  <nav aria-label="Footer"><a href="#today">Today</a><a href="#making">In the making</a><a href="#how">How it's made</a><a href="#send">Send a pattern</a><a class="idioma" href="https://vina.sdar.dev/es/" hreflang="es" lang="es">Español</a></nav>
 </div></footer>
 </body>
 </html>

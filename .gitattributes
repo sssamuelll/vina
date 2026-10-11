@@ -26,6 +26,9 @@ home/img/patron.*.svg text eol=lf
 # de peso (tests/e2e/home-peso-baseline.json) medía 102 B de más. Force LF.
 index.html text eol=lf
 app/index.html text eol=lf
+es/index.html text eol=lf
+home/copy/*.json text eol=lf
+home/datos/*.json text eol=lf
 home/*.css text eol=lf
 home/*.html text eol=lf
 home/img/*.svg text eol=lf
