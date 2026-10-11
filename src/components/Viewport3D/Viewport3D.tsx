@@ -49,6 +49,7 @@ import RenderSettingsPanel from './RenderSettingsPanel';
 import EnvironmentSetup from './EnvironmentSetup';
 import CustomLights from './CustomLights';
 import { useAvatarTape } from './useAvatarTape';
+import { debePrepararLaTela, usePrepararTela } from './usePrepararTela';
 import { useCameraPresets, DEFAULT_TARGET, DEFAULT_POSITION } from './useCameraPresets';
 import { useAnimationPlayback } from '../../hooks/useAnimationPlayback';
 import { useColorwaySync } from '../../hooks/useColorwaySync';
@@ -230,6 +231,19 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     () => pieces.filter(p => seSimula(p, hiddenPieceIds, hiddenLayerIds)),
     [pieces, hiddenPieceIds, hiddenLayerIds],
   );
+
+  // El preparador: en reposo y con la prenda a la vista, malla en segundo plano
+  // lo que «Simular» va a necesitar (usePrepararTela). Las cuatro condiciones
+  // entran como un solo booleano: pasar de 3D a Split no cambia las entradas, y
+  // si las cambiara soltaría la malla en vuelo.
+  const densidad = useSelector((s: RootState) => s.simulation.particleDistance);
+  const densidades = useSelector((s: RootState) => s.simulation.pieceParticleDistance);
+  const prepararLaTela = debePrepararLaTela({ simulationState, viewMode, showGarment, piezas: activePieces });
+  const entradasDeLaTela = useMemo(
+    () => (prepararLaTela ? { piezas: activePieces, densidades, densidad } : null),
+    [prepararLaTela, activePieces, densidades, densidad],
+  );
+  usePrepararTela(entradasDeLaTela);
 
   // Colocaciones RESUELTAS (auto + overrides/bindings) — la ÚNICA autoridad
   // (consejo 2026-07-03 §1: cardinalidad uno). Antes: placeGarmentPieces sin

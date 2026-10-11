@@ -28,6 +28,12 @@ class WorkerFalso {
       for (const f of this.oyentes) f({ data } as MessageEvent);
     }
   }
+  /** El mallador de verdad no pudo: contesta con el error, como `simulationWorker`. */
+  fallar(error: string) {
+    for (const { piece } of this.pedidos.splice(0)) {
+      for (const f of this.oyentes) f({ data: { type: 'meshPieceResult', pieceId: piece.id, error } } as MessageEvent);
+    }
+  }
 }
 
 const pieza = (id: string, lado: number): PatternPiece => ({
@@ -171,5 +177,44 @@ describe('mallar en paralelo y una sola vez', () => {
     await responderTodo();
     expect((await p2).map((m) => m.pieceId)).toEqual(['e']);
     segundo.dispose();
+  });
+
+  it('soltar un cliente con piezas en cola cancela, no falla; un fallo de verdad sí queda en la caja negra', async () => {
+    const { SimulationInitClient } = await import('../simulationInitClient');
+    const { clearSolverEvents, getSolverEvents } = await import('../solverRuntimeTracker');
+    clearSolverEvents();
+    const avisos = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fallos = () => getSolverEvents().filter((e) => e.kind === 'meshing:piece-failed').map((e) => e.data);
+
+    // Cuatro en vuelo y «e» en cola, como el preparador cuando María edita a mitad.
+    const suelto = new SimulationInitClient();
+    const p1 = suelto.meshAllPieces([pieza('a', 500), pieza('b', 400), pieza('c', 300), pieza('d', 200), pieza('e', 100)], {}, 5);
+    await new Promise((r) => setTimeout(r, 0));
+    suelto.dispose();
+    expect(await p1).toEqual([]);
+    expect(fallos(), 'soltar no es un fallo de mallado').toEqual([]);
+    expect(avisos).not.toHaveBeenCalled();
+
+    const vivo = new SimulationInitClient();
+    const p2 = vivo.meshAllPieces([pieza('f', 100)], {}, 5);
+    await new Promise((r) => setTimeout(r, 0));
+    for (const w of WorkerFalso.todos) w.fallar('cdt2d se rindió');
+    expect(await p2).toEqual([]);
+    expect(fallos()).toEqual([{ pieceId: 'f', message: 'cdt2d se rindió' }]);
+    expect(avisos).toHaveBeenCalledTimes(1);
+    vivo.dispose();
+    avisos.mockRestore();
+  });
+
+  it('fueraDelHilo dice si el cliente malla en un worker o en el hilo principal', async () => {
+    const { SimulationInitClient } = await import('../simulationInitClient');
+    const conWorker = new SimulationInitClient();
+    expect(conWorker.fueraDelHilo).toBe(true);
+    conWorker.dispose();
+
+    vi.stubGlobal('Worker', class { constructor() { throw new Error('bloqueado por la CSP'); } });
+    const avisos = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(new SimulationInitClient().fueraDelHilo, 'sin worker malla en el hilo principal').toBe(false);
+    avisos.mockRestore();
   });
 });

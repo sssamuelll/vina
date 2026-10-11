@@ -98,6 +98,11 @@ export class SimulationInitClient {
     }
   }
 
+  /** Malla fuera del hilo principal: su worker se pudo crear. Sin él, `meshPiece` malla en el hilo. */
+  get fueraDelHilo(): boolean {
+    return this.worker !== null;
+  }
+
   private nuevoWorker(): Worker {
     const worker = new Worker(
       new URL('./simulationWorker.ts', import.meta.url),
@@ -236,8 +241,12 @@ export class SimulationInitClient {
             mallas[i] = { pieceId: piece.id, vertices, triIds, uvs, boundaryOrig };
           }
         } catch (err) {
-          console.warn(`[SimInitClient] Meshing failed for piece ${piece.id}:`, err);
-          pushSolverEvent('meshing:piece-failed', { pieceId: piece.id, message: err instanceof Error ? err.message : String(err) });
+          // Un cliente suelto cancela, no falla: lo que tenía en vuelo o en cola
+          // no es un fallo de mallado (el preparador se suelta en cada edición).
+          if (!this.suelto) {
+            console.warn(`[SimInitClient] Meshing failed for piece ${piece.id}:`, err);
+            pushSolverEvent('meshing:piece-failed', { pieceId: piece.id, message: err instanceof Error ? err.message : String(err) });
+          }
         }
         this.onProgress?.({ stage: 'Meshing pieces', current: ++hechas, total: pieces.length });
       }

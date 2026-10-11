@@ -211,6 +211,20 @@ export function coalesceSolverEvent(
   pushSolverEvent(kind, data);
 }
 
+/**
+ * Para lo que se repite en reposo: el preparador avisa `preparar:listo` tras
+ * cada pausa de la edición, y una tarde editando en Split llenaba el ring y
+ * desalojaba los eventos de la cascada. El evento nuevo reemplaza a los
+ * anteriores del mismo kind y la misma `data.fase`, y entra al final: queda
+ * uno por fase, el último.
+ */
+export function reemplazarEventoDeLaFase(kind: SolverEventKind, data: Record<string, unknown>): void {
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].kind === kind && events[i].data.fase === data.fase) events.splice(i, 1);
+  }
+  pushSolverEvent(kind, data);
+}
+
 export function getSolverEvents(): readonly SolverEvent[] {
   return events;
 }

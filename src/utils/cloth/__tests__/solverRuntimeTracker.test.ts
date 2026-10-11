@@ -13,6 +13,7 @@ import {
   latidosDeLaSimulacion,
   latirLaSimulacion,
   pushSolverEvent,
+  reemplazarEventoDeLaFase,
   registerClothGeometry,
   setActiveSolverTier,
   setAppliedSolverConfig,
@@ -67,6 +68,25 @@ describe('solverRuntimeTracker — coalescencia de diagnósticos repetidos', () 
     const events = getSolverEvents();
     expect(events.map(e => e.data.code)).toEqual(['nan_reset', 'self_collision_disabled', 'nan_reset']);
     expect(events[0].data.cumulative).toBe(8);
+  });
+});
+
+describe('solverRuntimeTracker — un evento por fase (el preparador en reposo)', () => {
+  beforeEach(clearSolverEvents);
+
+  it('reemplazarEventoDeLaFase deja solo el último del mismo kind y la misma fase, y no toca lo demás', () => {
+    pushSolverEvent('tier:selected', { tier: 'wasm' });
+    reemplazarEventoDeLaFase('preparar:listo', { fase: 'mallas', ms: 1 });
+    reemplazarEventoDeLaFase('preparar:listo', { fase: 'tela', ms: 2 });
+    pushSolverEvent('preparar:fallo', { fase: 'mallas', message: 'x' });
+    reemplazarEventoDeLaFase('preparar:listo', { fase: 'mallas', ms: 3 });
+
+    expect(getSolverEvents().map((e) => ({ kind: e.kind, ...e.data }))).toEqual([
+      { kind: 'tier:selected', tier: 'wasm' },
+      { kind: 'preparar:listo', fase: 'tela', ms: 2 },
+      { kind: 'preparar:fallo', fase: 'mallas', message: 'x' },
+      { kind: 'preparar:listo', fase: 'mallas', ms: 3 },
+    ]);
   });
 });
 
