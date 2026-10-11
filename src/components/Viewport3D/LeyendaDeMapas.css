@@ -28,7 +28,13 @@
   border-radius: 2px;
   border: var(--hairline);
 }
+/* Las marcas y los extremos van sobre su propia hoja, como la tabla: el fondo
+   «Sólido» del visor puede ser oscuro, y la tinta de papel suelta sobre #222 daba
+   1,05:1 (revisión final de P5). Sobre el papel de fábrica la hoja casi no se nota. */
 .leyenda-de-mapas__marca {
+  padding: 2px 4px;
+  background: var(--surface-overlay-bg);
+  border-radius: var(--radius-sm);
   font-size: 9px;
   line-height: 1;
   user-select: none;
@@ -37,10 +43,13 @@
 .leyenda-de-mapas__barra + .leyenda-de-mapas__marca { margin-top: 4px; }
 .leyenda-de-mapas__extremos {
   margin-top: 6px;
+  padding: 2px 4px;
+  background: var(--surface-overlay-bg);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
   text-align: center;
   font-size: 8px;
   line-height: 1;
-  opacity: 0.7;
   user-select: none;
 }
 

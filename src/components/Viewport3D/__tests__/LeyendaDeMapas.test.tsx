@@ -152,3 +152,23 @@ describe('LeyendaDeMapas ▸ la escala va de arriba (tope, rojo) a abajo (piso, 
     expect(rojo).toBeLessThan(azul);
   });
 });
+
+describe('LeyendaDeMapas ▸ se lee sobre cualquier fondo del visor', () => {
+  // El fondo «Sólido» puede ser oscuro. La tabla y el valor llevan su hoja de papel; las marcas de
+  // la escala vertical iban sueltas sobre la escena, con tinta de papel: sobre #222 daban 1,05:1 y no
+  // se leían (revisión final de P5, A8). Antes eran blancas con halo negro.
+  const css = readFileSync(join(process.cwd(), 'src/components/Viewport3D/LeyendaDeMapas.css'), 'utf8');
+  const regla = (selector: string) =>
+    [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .filter((m) => m[1].split(',').map((x) => x.trim()).includes(selector))
+      .map((m) => m[2].replace(/\s+/g, ' ').trim())
+      .join(' ');
+
+  it.each(['.leyenda-de-mapas__marca', '.leyenda-de-mapas__extremos'])('«%s» lleva su propia hoja, no la escena de detrás', (selector) => {
+    expect(regla(selector), `${selector} se pinta directo sobre la escena`).toContain('background: var(--surface-overlay-bg)');
+  });
+
+  it('los extremos no se atenúan con `opacity`: sobre su hoja bajarían el contraste de la tinta', () => {
+    expect(regla('.leyenda-de-mapas__extremos')).not.toContain('opacity');
+  });
+});
