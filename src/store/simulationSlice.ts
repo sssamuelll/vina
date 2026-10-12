@@ -85,7 +85,8 @@ interface SimulationSliceState {
    * La tela ya dio su primer cuadro en esta corrida; hasta entonces el estado
    * dice «Preparando la tela». Vuelve a `false` al arrancar desde reposo, al
    * restablecer y al empezar cada corrida de la cascada; pasa a `true` con el
-   * primer latido (GarmentSimulation).
+   * primer cuadro (GarmentSimulation): en WebGPU, cuando la GPU termina los
+   * kernels de ese cuadro.
    */
   telaEnMovimiento: boolean;
   /** Fabric ID assigned to each pattern piece, keyed by piece ID */

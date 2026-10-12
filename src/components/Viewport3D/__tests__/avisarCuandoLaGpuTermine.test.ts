@@ -39,7 +39,9 @@ describe('avisarCuandoLaGpuTermine (el primer cuadro, cuando ya se ve)', () => {
     expect(avisar.mock.calls).toEqual([[{ gpuMs: 180 }]]);
   });
 
-  it('si la corrida murió mientras la GPU trabajaba (Restablecer, otra cascada), no avisa', async () => {
+  // El device perdido tiene esta misma forma: la espera resuelve igual (spec de
+  // WebGPU), y lo que frena el aviso es `sigueViva`, que lo mira.
+  it('si la corrida murió mientras la GPU trabajaba (Restablecer, otra cascada, device perdido), no avisa', async () => {
     const { device, terminar } = colaPendiente();
     let viva = true;
     const avisar = vi.fn();
@@ -50,11 +52,11 @@ describe('avisarCuandoLaGpuTermine (el primer cuadro, cuando ya se ve)', () => {
     expect(avisar).not.toHaveBeenCalled();
   });
 
-  it('si la espera falla (device perdido), no avisa ni deja un rechazo suelto', async () => {
+  it('si la espera falla, no avisa ni deja un rechazo suelto', async () => {
     const { device, fallar } = colaPendiente();
     const avisar = vi.fn();
     avisarCuandoLaGpuTermine(device, () => true, avisar);
-    fallar(new Error('device lost'));
+    fallar(new Error('la cola no respondió'));
     await vuelta();
     expect(avisar).not.toHaveBeenCalled();
   });

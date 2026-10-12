@@ -133,11 +133,11 @@ entradas y obtienen el mismo resultado. Un test compara su salida con la del
 
 - **Telemetría**: un evento del solver nuevo, `tela:primer-cuadro`
   (generación y ms desde su `cascade:start`), con el primer cuadro de cada
-  corrida. En WebGPU sale cuando la GPU termina el trabajo de ese cuadro
-  (`onSubmittedWorkDone`) y lleva `gpuMs`, que incluye la primera compilación
-  de los kernels; en WASM y CPU, al momento. Desde ese instante el estado
-  dice «Simulando». La sonda lo lee para medir el criterio 1, sin depender de
-  las ventanas de 30 cuadros.
+  corrida. En WebGPU sale cuando la GPU termina los kernels de ese cuadro
+  (`onSubmittedWorkDone`; el pase de dibujo queda fuera) y lleva `gpuMs`, que
+  incluye la primera compilación de los kernels; en WASM y CPU, al momento.
+  Desde ese instante el estado dice «Simulando». La sonda lo lee para medir el
+  criterio 1, sin depender de las ventanas de 30 cuadros.
   (enmienda 2026-10-12: salía al enviar el primer subpaso, antes de que la GPU
   compilara sus pipelines; la sonda midió 883 ms sin cuadros bajo
   «Simulando».)

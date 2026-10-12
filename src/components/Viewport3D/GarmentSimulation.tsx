@@ -558,19 +558,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       for (let s = 0; s < substeps; s++) {
         renderer.compute(substepNodes);
       }
-      // IA 1b-2: un cuadro de tela nueva (en TSL, render y sim van al mismo paso).
-      // El primero de la corrida apaga «Preparando la tela» cuando la GPU lo
-      // termina, no al enviarlo (el porqué, en `avisarCuandoLaGpuTermine`). La
-      // corrida sigue viva mientras sean su cascada y su solver: Restablecer lo
-      // suelta y anula la ref, y una cascada nueva lo reemplaza.
-      if (latirLaSimulacion(edgeDataRef.current)) {
-        const generacion = currentCascadeGeneration();
-        avisarCuandoLaGpuTermine(
-          rendererDevice,
-          () => generacion === currentCascadeGeneration() && tslSolverRef.current === solver,
-          avisarPrimerCuadro,
-        );
-      }
 
       // Steam brush (once per frame, after substeps settle; skip when inactive)
       if (solver.brushNodes.strength.value > 0) {
@@ -595,6 +582,26 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         renderer.compute(solver.fitMapNodes.zero);
         for (const accumNode of solver.fitMapNodes.accum) renderer.compute(accumNode);
         renderer.compute(solver.fitMapNodes.colorize);
+      }
+
+      // IA 1b-2: un cuadro de tela nueva (en TSL, render y sim van al mismo paso).
+      // El primero de la corrida apaga «Preparando la tela» cuando la GPU termina
+      // sus kernels, no al enviarlos (el porqué, en `avisarCuandoLaGpuTermine`):
+      // por eso va tras el último del cuadro. El pase de dibujo se envía después
+      // de este useFrame y queda fuera, un límite conocido. La corrida sigue viva
+      // mientras sean su cascada, su solver y su device: Restablecer suelta el
+      // solver y anula la ref, una cascada nueva lo reemplaza, y con el device
+      // perdido la espera resuelve igual (no falla), así que eso se mira aquí.
+      if (latirLaSimulacion(edgeDataRef.current)) {
+        const generacion = currentCascadeGeneration();
+        avisarCuandoLaGpuTermine(
+          rendererDevice,
+          () =>
+            generacion === currentCascadeGeneration() &&
+            tslSolverRef.current === solver &&
+            !(rendererDevice && isRendererDeviceLost(rendererDevice)),
+          avisarPrimerCuadro,
+        );
       }
 
       // F0 (#897): en TSL la cadencia de render == cadencia de sim.
