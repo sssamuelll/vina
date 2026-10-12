@@ -59,6 +59,16 @@ describe('huella', () => {
     expect(huella(-0)).not.toBe(huella(0));
   });
 
+  // Un cambio solo en el bit 31 (el signo de un float) se queda en el bit 31
+  // tras un XOR y una multiplicación impar: sin desplazar los bits, dos cambios
+  // de signo se cancelan en esa mitad de la huella.
+  it('cambiar el signo de dos floats cambia las dos mitades de la huella', () => {
+    const antes = huella(new Float32Array([1, 2, 3, 4]));
+    const despues = huella(new Float32Array([-1, 2, -3, 4]));
+    expect(despues.slice(0, 8), 'la mitad alta').not.toBe(antes.slice(0, 8));
+    expect(despues.slice(8), 'la mitad baja').not.toBe(antes.slice(8));
+  });
+
   it('un campo undefined es lo mismo que no tenerlo', () => {
     expect(huella({ a: 1, b: undefined })).toBe(huella({ a: 1 }));
   });

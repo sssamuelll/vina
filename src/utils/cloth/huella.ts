@@ -12,6 +12,9 @@ export function huella(...valores: unknown[]): string {
   let b = 0x9e3779b9;
   const mezclar = (w: number) => {
     a = Math.imul(a ^ w, 0x01000193);
+    // Sin esto, un cambio solo en el bit 31 (el signo de un float) se queda
+    // ahí para siempre, y dos se cancelan en esta mitad.
+    a ^= a >>> 15;
     b = Math.imul(b ^ w, 0x5bd1e995);
     b ^= b >>> 13;
   };

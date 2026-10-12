@@ -4,10 +4,12 @@
  *    los arreglos que recibe, así que cada llamada recibe su copia y la
  *    guardada queda como salió del armado.
  *  - Pulsar «Simular» mientras el preparador arma: se espera la misma tela en
- *    vuelo, no se arma otra.
+ *    vuelo, no se arma otra; y si esa falla o es de otras piezas, el clic arma
+ *    la suya.
  *  - Una guardada que no coincide con las entradas no se usa.
  *  - Sin workers, o con uno que falla o no contesta, se arma en el hilo
- *    principal, como hoy.
+ *    principal, como hoy, y se dice por qué; con `soloFueraDelHilo` (el
+ *    preparador, en reposo) se rechaza en vez de bloquear el hilo.
  *  - El worker no carga three.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -42,7 +44,7 @@ class WorkerFalso {
   static todos: WorkerFalso[] = [];
   static modo: Modo = 'contesta';
   onmessage: ((m: { data: unknown }) => void) | null = null;
-  onerror: (() => void) | null = null;
+  onerror: ((ev: { message: string }) => void) | null = null;
   enviados = 0;
   terminado = false;
   constructor(readonly url: URL, readonly opciones: WorkerOptions) { WorkerFalso.todos.push(this); }
@@ -54,7 +56,7 @@ class WorkerFalso {
     setTimeout(() => {
       // Terminado, ni recibe ni contesta.
       if (this.terminado) return;
-      if (WorkerFalso.modo === 'dispara-error') this.onerror?.();
+      if (WorkerFalso.modo === 'dispara-error') this.onerror?.({ message: 'no cargó' });
       if (WorkerFalso.modo === 'contesta-error') this.onmessage?.({ data: { error: 'se rompió' } });
       if (WorkerFalso.modo === 'contesta') {
         const tela = prepararTela(recibidas.pieces, recibidas.seamPairs, recibidas.fabric, recibidas.interruptores);
@@ -67,8 +69,36 @@ class WorkerFalso {
 
 const enviados = () => WorkerFalso.todos.reduce((n, w) => n + w.enviados, 0);
 
-/** El módulo cargado de nuevo: cada caso empieza con la caché vacía. */
-const cargar = () => import('../telasPreparadas');
+/**
+ * El módulo cargado de nuevo (cada caso empieza con la caché vacía), con un
+ * espía en el prepararTela que él ve: `enElHilo` cuenta los armados en el hilo
+ * principal. El worker falso usa el de este archivo, que el espía no ve.
+ */
+async function cargar() {
+  const enElHilo = vi.fn();
+  vi.doMock('../prepararTela', async (original) => {
+    const real = await original<typeof import('../prepararTela')>();
+    return {
+      ...real,
+      prepararTela: (...args: Parameters<typeof real.prepararTela>) => { enElHilo(); return real.prepararTela(...args); },
+    };
+  });
+  return { ...(await import('../telasPreparadas')), enElHilo };
+}
+
+/** Cada forma en que el worker no arma la tela: el motivo que se dice y cuánto tarda en saberse (ms). */
+const FALLOS: Array<[string, Modo | 'sin-worker', RegExp, number]> = [
+  ['sin Worker', 'sin-worker', /: sin worker$/, 0],
+  ['un worker que dispara error', 'dispara-error', /: error del worker: no cargó$/, 0],
+  ['un worker que contesta con { error }', 'contesta-error', /: error del worker: se rompió$/, 0],
+  ['unas entradas que no se pueden clonar', 'no-clona', /: no se pudo clonar$/, 0],
+  ['un worker que no contesta en 10 s', 'mudo', /: no contestó en 10 s$/, 10_000],
+];
+
+const fallar = (modo: Modo | 'sin-worker') => {
+  if (modo === 'sin-worker') vi.stubGlobal('Worker', undefined);
+  else WorkerFalso.modo = modo;
+};
 
 beforeEach(() => {
   WorkerFalso.todos = [];
@@ -77,17 +107,20 @@ beforeEach(() => {
   vi.resetModules();
 });
 afterEach(() => {
+  vi.doUnmock('../prepararTela');
   vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe('obtenerTela', () => {
   it('la primera vez la arma un worker de módulo; la segunda sale de la caché, con el mismo contenido', async () => {
-    const { obtenerTela } = await cargar();
+    const { obtenerTela, enElHilo } = await cargar();
     const primera = await obtenerTela('h', entradas());
     const segunda = await obtenerTela('h', entradas());
 
     expect([primera.origen, segunda.origen]).toEqual(['armada', 'cache']);
+    expect(enElHilo, "'armada' es en el worker: nada en el hilo principal").not.toHaveBeenCalled();
     expect(huella(primera.tela)).toBe(directa(entradas()));
     expect(huella(segunda.tela)).toBe(huella(primera.tela));
     expect(enviados(), 'la caché no la vuelve a pedir').toBe(1);
@@ -122,17 +155,52 @@ describe('obtenerTela', () => {
     expect(huella((await obtenerTela('h', entradas())).tela), 'la de la caché tampoco').toBe(intacta);
   });
 
-  it('dos llamadas a la vez con la misma huella arman una sola vez, y cada una recibe su copia', async () => {
+  it('«Simular» mientras el preparador arma: se arma una sola vez, y cada uno recibe su copia', async () => {
     const { obtenerTela } = await cargar();
-    const [a, b] = await Promise.all([obtenerTela('h', entradas()), obtenerTela('h', entradas())]);
+    const [preparador, clic] = await Promise.all([
+      obtenerTela('h', entradas(), { soloFueraDelHilo: true }),
+      obtenerTela('h', entradas()),
+    ]);
 
     expect(enviados()).toBe(1);
-    expect([a.origen, b.origen]).toEqual(['armada', 'en-vuelo']);
-    const intacta = huella(a.tela);
-    expect(huella(b.tela)).toBe(intacta);
-    a.tela.invMass[0] = 123;
-    b.tela.invMass[1] = 123;
+    expect([preparador.origen, clic.origen]).toEqual(['armada', 'en-vuelo']);
+    const intacta = huella(preparador.tela);
+    expect(huella(clic.tela)).toBe(intacta);
+    preparador.tela.invMass[0] = 123;
+    clic.tela.invMass[1] = 123;
     expect(huella((await obtenerTela('h', entradas())).tela), 'ninguna de las dos es la guardada').toBe(intacta);
+  });
+
+  it('la que está en vuelo con otras piezas no se usa: la segunda llamada arma la suya', async () => {
+    const { obtenerTela } = await cargar();
+    const otras = entradas([makeQuadPiece('A'), makeQuadPieceAt('C', 0.3)]);
+    const [a, b] = await Promise.all([obtenerTela('h', entradas()), obtenerTela('h', otras)]);
+
+    expect([a.origen, b.origen]).toEqual(['armada', 'armada']);
+    expect(huella(a.tela)).toBe(directa(entradas()));
+    expect(huella(b.tela)).toBe(directa(otras));
+    expect(enviados()).toBe(2);
+  });
+
+  it('si la que está en vuelo falla, quien la esperaba arma la suya, y no queda nada en vuelo', async () => {
+    WorkerFalso.modo = 'dispara-error';
+    const { obtenerTela } = await cargar();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Con su manejador desde el principio: un rechazo sin manejador rompe la corrida.
+    const preparador = obtenerTela('h', entradas(), { soloFueraDelHilo: true })
+      .then((r) => `resolvió: ${r.origen}`, (err: Error) => err.message);
+    const clic = obtenerTela('h', entradas());
+
+    expect(await preparador).toMatch(/error del worker/);
+    const { tela, origen } = await clic;
+    expect(origen, 'el clic sí puede armar en el hilo').toBe('armada-en-el-hilo');
+    expect(huella(tela)).toBe(directa(entradas()));
+    expect(enviados(), 'el clic probó con su propio worker').toBe(2);
+    // Sin la guardada (sale con dos huellas más), la huella se vuelve a armar:
+    // nada de lo que estuvo en vuelo se quedó en el mapa.
+    WorkerFalso.modo = 'contesta';
+    for (const otra of ['h2', 'h3']) await obtenerTela(otra, entradas());
+    expect((await obtenerTela('h', entradas())).origen).toBe('armada');
   });
 
   it('guarda dos telas: con tres huellas, la primera ya no está', async () => {
@@ -154,46 +222,53 @@ describe('obtenerTela', () => {
     expect((await obtenerTela('h2', entradas())).origen).toBe('armada');
   });
 
-  it('sin Worker se arma en el hilo principal, igual que prepararTela', async () => {
-    vi.stubGlobal('Worker', undefined);
-    const { obtenerTela } = await cargar();
-    const { tela, origen } = await obtenerTela('h', entradas());
-    expect(origen).toBe('armada');
-    expect(huella(tela)).toBe(directa(entradas()));
+  it('el worker que contesta no deja armado el reloj de los 10 s', async () => {
+    const { obtenerTela, enElHilo } = await cargar();
+    vi.useFakeTimers();
+    const promesa = obtenerTela('h', entradas());
+    await vi.advanceTimersByTimeAsync(1);
+    expect((await promesa).origen).toBe('armada');
+    expect(vi.getTimerCount()).toBe(0);
+    // Si quedara armado, 10 s después armaría la tela otra vez en el hilo, en silencio.
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(enElHilo).not.toHaveBeenCalled();
   });
 
-  it.each<[string, Modo]>([
-    ['dispara error', 'dispara-error'],
-    ['contesta con { error }', 'contesta-error'],
-    ['no puede recibir las entradas', 'no-clona'],
-  ])('un worker que %s: se arma en el hilo principal en el acto, igual que prepararTela', async (_, modo) => {
-    WorkerFalso.modo = modo;
-    const { obtenerTela } = await cargar();
+  it.each(FALLOS)('%s: se arma en el hilo principal, se dice por qué y el origen lo marca', async (_, modo, motivo, espera) => {
+    fallar(modo);
+    const { obtenerTela, enElHilo } = await cargar();
+    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.useFakeTimers();
     let lista = false;
     const promesa = obtenerTela('h', entradas()).finally(() => { lista = true; });
-    // Lo que tarda el falso en fallar, no los 10 s del reloj.
+    if (espera > 0) {
+      await vi.advanceTimersByTimeAsync(espera - 1);
+      expect(lista, 'hasta los 10 s espera al worker').toBe(false);
+    }
     await vi.advanceTimersByTimeAsync(1);
-    expect(lista).toBe(true);
+    expect(lista, 'sin esperar de más').toBe(true);
     const { tela, origen } = await promesa;
-    expect(origen).toBe('armada');
+    expect(origen).toBe('armada-en-el-hilo');
+    expect(enElHilo).toHaveBeenCalledTimes(1);
     expect(huella(tela)).toBe(directa(entradas()));
+    expect(aviso).toHaveBeenCalledWith(expect.stringMatching(motivo));
+    expect(vi.getTimerCount()).toBe(0);
     expect(WorkerFalso.todos.every((w) => w.terminado)).toBe(true);
   });
 
-  it('un worker que no contesta en 10 s: se arma en el hilo principal', async () => {
-    WorkerFalso.modo = 'mudo';
-    const { obtenerTela } = await cargar();
+  it.each(FALLOS)('con soloFueraDelHilo, %s: rechaza diciendo por qué, sin armar en el hilo', async (_, modo, motivo, espera) => {
+    fallar(modo);
+    const { obtenerTela, enElHilo } = await cargar();
     vi.useFakeTimers();
-    let lista = false;
-    const promesa = obtenerTela('h', entradas()).finally(() => { lista = true; });
-    await vi.advanceTimersByTimeAsync(9_999);
-    expect(lista).toBe(false);
-    await vi.advanceTimersByTimeAsync(1);
-    const { tela, origen } = await promesa;
-    expect(origen).toBe('armada');
-    expect(huella(tela)).toBe(directa(entradas()));
-    expect(WorkerFalso.todos[0].terminado).toBe(true);
+    const resultado = obtenerTela('h', entradas(), { soloFueraDelHilo: true })
+      .then((r) => `resolvió: ${r.origen}`, (err: Error) => err.message);
+    await vi.advanceTimersByTimeAsync(espera + 1);
+    const mensaje = await resultado;
+    expect(mensaje).toMatch(/^La tela no se armó fuera del hilo principal: /);
+    expect(mensaje).toMatch(motivo);
+    expect(enElHilo).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(WorkerFalso.todos.every((w) => w.terminado)).toBe(true);
   });
 
   it.each<[string, () => PieceMeshData[]]>([
