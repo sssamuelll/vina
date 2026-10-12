@@ -73,6 +73,7 @@ vi.mock('three/webgpu', () => sharedMock());
 vi.mock('three/tsl', () => sharedMock());
 
 import { GpuSolverClient, type PieceMeshData } from '../gpuSolverClient';
+import { prepararTela, interruptoresDeTela, type TelaPreparada } from '../prepararTela';
 import type { FabricComplianceConfig } from '../tslBuffers';
 import type { SeamPair } from '../../seamPairs';
 import { importDXFContent } from '../../../dxf';
@@ -175,13 +176,29 @@ function huellaDelArmado(client: GpuSolverClient): string {
   return huellaDe(partes);
 }
 
+const CAMINOS = ['directo', 'preparado'] as const;
+
+/**
+ * 'directo': initMultiPieceTsl prepara la tela por su cuenta. 'preparado': lo
+ * que llega del worker. Los interruptores se leen en el hilo principal, y
+ * prepararTela corre sin window, como en un worker, y la tela cruza por
+ * structuredClone. Si prepararTela leyera localStorage por su cuenta, aquí no
+ * vería los interruptores apagados y la huella cambiaría.
+ */
 async function armar(
+  camino: (typeof CAMINOS)[number],
   piezas: PieceMeshData[],
   costuras?: SeamPair[],
   tela?: FabricComplianceConfig,
 ): Promise<GpuSolverClient> {
   const client = new GpuSolverClient(new FakeGPUDevice() as any);
-  await client.initMultiPieceTsl(piezas, costuras, undefined, tela);
+  let preparada: TelaPreparada | undefined;
+  if (camino === 'preparado') {
+    const interruptores = interruptoresDeTela();
+    vi.stubGlobal('window', undefined);
+    preparada = structuredClone(prepararTela(piezas, costuras, tela, interruptores));
+  }
+  await client.initMultiPieceTsl(piezas, costuras, undefined, tela, preparada);
   return client;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -271,9 +288,15 @@ function camisaDeMaria(): PieceMeshData[] {
   return colocarMallas(mallas, piezas, MEDIDAS, {}, { left: null, right: null, ready: false });
 }
 
+// Se malla una vez para los dos caminos: nadie escribe en las piezas de
+// entrada, y si alguien lo hiciera, la huella de la entrada lo diría.
+let camisa: PieceMeshData[] | undefined;
+
 // ─── Los tests ───────────────────────────────────────────────────────────────
 
-describe('prepararTela: la huella del armado TSL de hoy, antes de moverlo', () => {
+// Las huellas se fijaron con el armado de antes de moverlo (600c8028): los
+// dos caminos tienen que dar exactamente esas.
+describe.each(CAMINOS)('prepararTela: la huella del armado TSL, camino %s', (camino) => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -281,7 +304,7 @@ describe('prepararTela: la huella del armado TSL de hoy, antes de moverlo', () =
 
   it('dos piezas con costura: empaquetado, quads entre piezas, banda F3 y soldadura', async () => {
     const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const client = await armar(dosPiezas(), COSTURAS, TELA);
+    const client = await armar(camino, dosPiezas(), COSTURAS, TELA);
 
     // La prenda pasa por lo que dice cubrir; si no, la huella no lo vigila.
     expect(aviso).toHaveBeenCalledWith(expect.stringContaining('fantasma'));
@@ -300,14 +323,39 @@ describe('prepararTela: la huella del armado TSL de hoy, antes de moverlo', () =
   ])('con %s apagado en localStorage, su propia huella', async (clave, esperada) => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubGlobal('window', { localStorage: { getItem: (k: string) => (k === clave ? 'off' : null) } });
-    const client = await armar(dosPiezas(), COSTURAS, TELA);
+    const client = await armar(camino, dosPiezas(), COSTURAS, TELA);
     expect(huellaDelArmado(client)).toBe(esperada);
   });
 
   it('la camisa de María, sin costuras: coloreado, radios por región y CSR a tamaño real', async () => {
-    const piezas = camisaDeMaria();
+    const piezas = (camisa ??= camisaDeMaria());
     expect(huellaDeLaEntrada(piezas), 'cambió la malla o la colocación, no el armado').toBe('dbdaaaec');
-    const client = await armar(piezas);
+    const client = await armar(camino, piezas);
     expect(huellaDelArmado(client)).toBe('89f454e2');
+  });
+});
+
+describe('prepararTela corre en un worker: sin window y sin three', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('sin window prepara la tela, y los avisos vuelven en la tela, no por la consola', () => {
+    vi.stubGlobal('window', undefined);
+    const consola = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const tela = prepararTela(dosPiezas(), COSTURAS, TELA, { crossBend: true, seamScExcl: true });
+    expect(tela.avisos).toEqual([expect.stringContaining('fantasma')]);
+    expect(consola).not.toHaveBeenCalled();
+  });
+
+  // Un worker que importa three revienta al cargar. De tslBuffers y de
+  // gpuSolverClient (los dos cargan three) solo entran tipos, que se borran
+  // al compilar.
+  it('el texto de prepararTela.ts no importa three, y de tslBuffers y gpuSolverClient solo tipos', () => {
+    const fuente = readFileSync(resolve(__dirname, '../prepararTela.ts'), 'utf-8');
+    // `from 'three…'`, y también `import 'three…'` e `import('three…')`.
+    expect(fuente).not.toMatch(/(?:from|import)\s*\(?\s*['"]three(?:\/|['"])/);
+    expect(fuente).not.toMatch(/^import\s+(?!type\b)[^;]*from\s+['"]\.\/(?:tslBuffers|gpuSolverClient)['"]/m);
   });
 });
