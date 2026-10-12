@@ -83,13 +83,22 @@ export class SimulationInitClient {
   private extras: Worker[] = [];
   /** `dispose` ya pasó: sus workers no contestan. */
   private suelto = false;
+  /** No avisa (consola ni caja negra) cada pieza que no malla. */
+  private readonly silenciarFallos: boolean;
   private pendingMesh = new Map<string, {
     resolve: (v: { vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array; boundaryOrig?: Float64Array }) => void;
     reject: (e: Error) => void;
   }>();
   onProgress?: (p: SimInitProgress) => void;
 
-  constructor() {
+  /**
+   * `silenciarFallos`: para el preparador en reposo. Una pieza que no malla
+   * vuelve a fallar en cada preparación, y él ya lo cuenta en su
+   * `preparar:fallo`; sin esto, cada intento dejaba un `meshing:piece-failed`
+   * en el ring y un aviso en la consola. Al pulsar «Simular» sí se dice.
+   */
+  constructor({ silenciarFallos = false }: { silenciarFallos?: boolean } = {}) {
+    this.silenciarFallos = silenciarFallos;
     try {
       this.worker = this.nuevoWorker();
     } catch {
@@ -251,7 +260,7 @@ export class SimulationInitClient {
         } catch (err) {
           // Un cliente suelto cancela, no falla: lo que tenía en vuelo o en cola
           // no es un fallo de mallado (el preparador se suelta en cada edición).
-          if (!this.suelto) {
+          if (!this.suelto && !this.silenciarFallos) {
             console.warn(`[SimInitClient] Meshing failed for piece ${piece.id}:`, err);
             pushSolverEvent('meshing:piece-failed', { pieceId: piece.id, message: err instanceof Error ? err.message : String(err) });
           }

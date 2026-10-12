@@ -240,9 +240,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   // soltaría lo que está en vuelo. Los valores son los que lee GarmentSimulation.
   const densidad = useSelector((s: RootState) => s.simulation.particleDistance);
   const densidades = useSelector((s: RootState) => s.simulation.pieceParticleDistance);
-  // La pose y los morphs del cuerpo, como los lee AvatarModel: un cambio vuelve
-  // a preparar, y el preparador hornea el cuerpo nuevo para su BVH.
-  const pose = useSelector((s: RootState) => s.avatar.pose.joints);
+  // La pose (con el IK, que vive en ella) y los morphs del cuerpo, como los lee
+  // AvatarModel: un cambio vuelve a preparar, y el preparador hornea el cuerpo
+  // nuevo para su BVH.
+  const pose = useSelector((s: RootState) => s.avatar.pose);
   const morphs = useSelector((s: RootState) => s.avatar.morphTargets);
   const prepararLaTela = debePrepararLaTela({ simulationState, viewMode, showGarment, piezas: activePieces });
   const conGpu = isWebGPUAvailable() && isWebGPUFeatureEnabled();
@@ -256,7 +257,8 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       : null),
     [prepararLaTela, activePieces, densidades, densidad, cuerpo, arrangementOverrides, armAxis, seams, seamGroups, defaultFabricId, conGpu, pose, morphs],
   );
-  usePrepararTela(entradasDeLaTela);
+  // Por qué las entradas pasan a null: solo «Simular» espera lo que está en vuelo.
+  usePrepararTela(entradasDeLaTela, useClothSim);
 
   // Colocaciones RESUELTAS (auto + overrides/bindings) — la ÚNICA autoridad
   // (consejo 2026-07-03 §1: cardinalidad uno). Antes: placeGarmentPieces sin

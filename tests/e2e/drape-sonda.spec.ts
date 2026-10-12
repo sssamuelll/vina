@@ -2,7 +2,8 @@
  * La sonda del drape (2026-10-11). Samuel, en su PC con Chrome: «no es estable,
  * se siente buggy, la tela no está tocando el suelo y se reinicia». Este spec
  * hace el gesto de María con la interfaz de verdad —el DXF, coser, 3D,
- * «Simular», pausa y reanudar— y deja la línea de tiempo entera en disco:
+ * «Simular», pausa y reanudar; al final, Restablecer y «Simular» otra vez— y
+ * deja la línea de tiempo entera en disco:
  *
  *  - una muestra cada 250 ms del estado de la simulación y de la malla (tier,
  *    cuadros, `armAxis`, minY/maxY/avgY, NaN, cuántas geometrías distintas);
@@ -33,8 +34,15 @@ const TIER = process.env.SONDA_TIER === 'wasm' ? 'wasm' : 'webgpu';
 /**
  * Lo que la sonda espera en 3D, con la simulación parada, antes de «Simular».
  * El preparador arranca 600 ms después de entrar y a la camisa de María le
- * toma unos 4 s: con 8 s se mide el arranque preparado, el del criterio 1 de
- * la spec.
+ * toma unos 4,6 s (el 2026-10-12: mallas ~3,8, tela ~0,6 y BVH ~0,15): con 8 s
+ * se mide el arranque preparado, el del criterio 1 de la spec.
+ *
+ * Es también el umbral de una aserción dura: con esta espera o más, la tela y
+ * el BVH tienen que estar listos antes del clic. Bajarla de ~5,3 s (los 600 ms
+ * más los ~4,6 s) deja la corrida por defecto sin margen —solo le quedan los
+ * 700 ms de `cambiarVista`, menos lo que tarde en montarse el visor—, y falla
+ * en cuanto la máquina va más lenta. Para medir con menos espera está
+ * `SONDA_PREPARAR_MS`, que entonces no exige lo preparado.
  */
 const PREPARAR_MS_POR_DEFECTO = 8000;
 const PREPARAR_MS = Number(process.env.SONDA_PREPARAR_MS ?? PREPARAR_MS_POR_DEFECTO);
@@ -71,6 +79,8 @@ interface Sonda {
   ventanas: Array<{ t: number; ms: number }>;
   /** El `timeStamp` del clic en «Simular»: el instante del evento, en el reloj de la página. */
   clic?: number;
+  /** El del segundo «Simular», el de la repetición (Restablecer → Simular). */
+  clicRepeticion?: number;
   /** Cuándo el estado al pie dijo «Simulando» por primera vez tras el clic. */
   simulando?: number;
 }
@@ -351,9 +361,45 @@ test.describe('Sonda del drape @gpu-local', () => {
       solver?: { events?: Array<{ kind: string; timestamp: number; generation: number; data: Record<string, unknown> }> };
     };
 
+    // La repetición (spec § 4.6): la compilación de los kernels se mide la primera
+    // vez y otra tras Restablecer → Simular. De vuelta en 3D, «Restablecer
+    // simulación» por la paleta (la tela sigue en marcha desde el gesto), la
+    // espera del preparador y otro «Simular», con el instante de su clic como el
+    // primero. Va después de leer la sonda y la caja negra del gesto, que quedan
+    // como siempre: el preparador deja un evento por fase en el ring, y el de la
+    // repetición reemplazaría los del gesto. La repetición se exporta aparte.
+    await cambiarVista(page, '3D');
+    await abrirPaleta(page);
+    await marcar('restablecer');
+    await page.locator('.unified-bar__panel').getByText('Restablecer simulación', { exact: true }).first().click();
+    await page.waitForTimeout(PREPARAR_MS);
+    await page.evaluate(() => {
+      const sonda = (window as unknown as { __SONDA__: Sonda }).__SONDA__;
+      document.addEventListener('click', (e) => { sonda.clicRepeticion = e.timeStamp; }, { capture: true, once: true });
+    });
+    await marcar('simularRepeticion');
+    await pulsarSimular(page);
+    // `telaEnMovimiento` pasa a true en el mismo `avisarPrimerCuadro` que deja
+    // `tela:primer-cuadro` en la caja negra. Si no llega, la evidencia se escribe
+    // igual: el resumen lo dice con null.
+    await page
+      .waitForFunction(() => {
+        const st = (window as unknown as { __VINA_STORE__: { getState: () => { simulation: { telaEnMovimiento: boolean } } } }).__VINA_STORE__;
+        return st.getState().simulation.telaEnMovimiento;
+      }, undefined, { timeout: 30_000 })
+      .catch(() => undefined);
+    const clicRepeticion =
+      (await page.evaluate(() => (window as unknown as { __SONDA__: Sonda }).__SONDA__.clicRepeticion)) ?? marcas.simularRepeticion;
+    const bundleRepeticion = (await exportBundle(page)) as {
+      solver?: { events?: Array<{ kind: string; timestamp: number; generation: number; data: Record<string, unknown> }> };
+    };
+
     // La bitácora en el reloj de las muestras (ms desde que cargó la página).
     const enSonda = (tEpoch: number) => Math.round(tEpoch - sonda.origen);
     const eventosSolver = (bundle.solver?.events ?? []).map((e) => ({ ...e, t: enSonda(e.timestamp) }));
+    const eventosRepeticion = (bundleRepeticion.solver?.events ?? [])
+      .map((e) => ({ ...e, t: enSonda(e.timestamp) }))
+      .filter((e) => e.t >= marcas.restablecer);
     const bitacora = (bundle.journal?.events ?? [])
       .filter((e) => e.kind !== 'console' || /warn|error/.test(e.name))
       .map((e) => ({ ...e, t: enSonda(e.t) }));
@@ -385,6 +431,8 @@ test.describe('Sonda del drape @gpu-local', () => {
       if (esPreparar(e) && e.t < marcas.simular) preparado.set(e.data.fase, { fase: e.data.fase, kind: e.kind, ...e.data });
     }
     const usado = eventosSolver.filter((e) => e.kind === 'preparar:usada' && e.t >= marcas.simular).map((e) => e.data);
+    const primerCuadroRepeticion = eventosRepeticion.find((e) => e.kind === 'tela:primer-cuadro' && e.t >= marcas.simularRepeticion);
+    const gpuMsRepeticion = primerCuadroRepeticion?.data.gpuMs;
     const resumen = {
       marcas,
       tramos,
@@ -416,6 +464,13 @@ test.describe('Sonda del drape @gpu-local', () => {
       ventanasEnVista2d: sonda.ventanas.filter((v) => v.t >= marcas.vista2d && v.t < marcas.vista2dFin).length,
       perfil,
       perfil2d,
+      // La repetición (Restablecer → Simular), sin aserción: la compilación de los
+      // kernels otra vez (spec § 4.6; en WASM no hay) y si la cascada usó lo preparado.
+      clicAPrimerCuadroRepeticionMs: primerCuadroRepeticion ? Math.round(primerCuadroRepeticion.t - clicRepeticion) : null,
+      compilacionRepeticionMs: typeof gpuMsRepeticion === 'number' ? gpuMsRepeticion : null,
+      usadoEnLaRepeticion: eventosRepeticion
+        .filter((e) => e.kind === 'preparar:usada' && e.t >= marcas.simularRepeticion)
+        .map((e) => e.data),
     };
 
     writeFileSync(path.join(SALIDA, 'resumen.json'), JSON.stringify(resumen, null, 1));
@@ -423,6 +478,7 @@ test.describe('Sonda del drape @gpu-local', () => {
     writeFileSync(path.join(SALIDA, 'ventanas.json'), JSON.stringify(sonda.ventanas));
     writeFileSync(path.join(SALIDA, 'raf.json'), JSON.stringify(sonda.raf));
     writeFileSync(path.join(SALIDA, 'solver.json'), JSON.stringify(eventosSolver, null, 1));
+    writeFileSync(path.join(SALIDA, 'solver-repeticion.json'), JSON.stringify(eventosRepeticion, null, 1));
     writeFileSync(path.join(SALIDA, 'consola.txt'), consola.join('\n') + '\n');
     writeFileSync(
       path.join(SALIDA, 'bitacora.txt'),

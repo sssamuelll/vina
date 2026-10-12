@@ -5,12 +5,15 @@
  * la vista y la simulación parada, malla en segundo plano 600 ms después del
  * último cambio y, con WebGPU, arma la tela del solver fuera del hilo, para que
  * «Simular» encuentre las mallas y la tela hechas o en vuelo. Una edición
- * suelta lo que está en vuelo; pulsar «Simular» lo deja terminar.
+ * suelta lo que está en vuelo; pulsar «Simular» lo deja terminar. Pasar a 2D,
+ * ocultar la prenda o quedarse sin piezas lo suelta, como una edición.
  */
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
 
 interface ClienteFalso {
+  /** Lo que recibió el constructor. */
+  opciones: unknown;
   fueraDelHilo: boolean;
   meshAllPieces: Mock;
   dispose: Mock;
@@ -36,7 +39,11 @@ vi.mock('../../../utils/cloth/simulationInitClient', () => ({
     fallar: (e: unknown) => void = () => {};
     meshAllPieces = vi.fn(() => new Promise((ok, mal) => { this.terminar = ok; this.fallar = mal; }));
     dispose = vi.fn();
-    constructor() { clientes.push(this); }
+    opciones: unknown;
+    constructor(opciones?: unknown) {
+      this.opciones = opciones;
+      clientes.push(this);
+    }
   },
 }));
 
@@ -54,9 +61,11 @@ import type { ArmAxis } from '../../../utils/cloth/arrangement/buildAxisHints';
 import type { CollisionMeshData } from '../../../utils/cloth/collisionMesh';
 import type { LinearBVH } from '../../../utils/cloth/gpu/bvh';
 import type { BodyMeasurements, PatternPiece, Seam, SeamGroup } from '../../../types/types';
+import type { PoseState } from '../../../store/avatarSlice';
 
 const MEDIDAS: BodyMeasurements = { height: 168, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 };
 const SIN_BRAZOS: ArmAxis = { left: null, right: null, ready: false };
+const POSE: PoseState = { joints: {}, activePreset: null, porResolver: false, ikChains: [], ikTargets: [], ikEnabled: false };
 /** La malla que da hornear el cuerpo: un triángulo basta. */
 const CUERPO: CollisionMeshData = {
   vertices: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
@@ -78,15 +87,22 @@ const entradas = (id: string, densidad = 5): EntradasDeLaTela => ({
   seamGroups: undefined,
   fabricId: 'cotton-poplin',
   conGpu: false,
-  pose: {},
+  pose: POSE,
   morphs: {},
 });
 /** Lo que devuelve `meshAllPieces` cuando todas mallaron: una por pieza. */
 const mallasDe = (e: EntradasDeLaTela) => e.piezas.map((p) => ({ pieceId: p.id }));
 const llamadas = () => clientes.flatMap((c) => c.meshAllPieces.mock.calls);
 const eventos = (kind: SolverEventKind) => getSolverEvents().filter((e) => e.kind === kind).map((e) => e.data);
-const montar = (inicial: EntradasDeLaTela | null) =>
-  renderHook(({ e }: { e: EntradasDeLaTela | null }) => usePrepararTela(e), { initialProps: { e: inicial } });
+/**
+ * `simulando` dice por qué las entradas pasan a null: con la simulación en
+ * marcha es «Simular»; sin ella, la vista 2D, la prenda oculta o sin piezas.
+ */
+interface Props { e: EntradasDeLaTela | null; simulando?: boolean }
+const montar = (inicial: EntradasDeLaTela | null) => {
+  const initialProps: Props = { e: inicial };
+  return renderHook(({ e, simulando = false }: Props) => usePrepararTela(e, simulando), { initialProps });
+};
 
 beforeEach(() => {
   clientes.length = 0;
@@ -142,7 +158,7 @@ describe('usePrepararTela', () => {
     act(() => { vi.advanceTimersByTime(600); });
     const [cliente] = clientes;
 
-    rerender({ e: null });
+    rerender({ e: null, simulando: true });
     expect(cliente.dispose, 'la simulación espera esa malla en vuelo').not.toHaveBeenCalled();
 
     await act(async () => { cliente.terminar(mallasDe(e)); });
@@ -211,6 +227,12 @@ describe('usePrepararTela', () => {
     await act(async () => { clientes[0].terminar([{ pieceId: 'a' }]); });
     expect(eventos('preparar:fallo')).toEqual([{ fase: 'mallas', message: '1 de 2 piezas sin malla' }]);
     expect(eventos('preparar:listo'), 'una prenda a medias no está lista').toHaveLength(0);
+  });
+
+  it('malla con un cliente que no avisa pieza por pieza: el fallo ya va en su preparar:fallo, y se repite en cada preparación', () => {
+    montar(entradas('a'));
+    act(() => { vi.advanceTimersByTime(600); });
+    expect(clientes[0].opciones).toEqual({ silenciarFallos: true });
   });
 
   it('si meshAllPieces rechaza avisa preparar:fallo con la fase y el mensaje, y no lanza', async () => {
@@ -304,7 +326,7 @@ const prenda = (cambios: Partial<EntradasDeLaTela> = {}): EntradasDeLaTela => ({
   seamGroups: [grupo('manga', 'delantero')],
   fabricId: 'cotton-poplin',
   conGpu: true,
-  pose: {},
+  pose: POSE,
   morphs: {},
   ...cambios,
 });
@@ -438,13 +460,31 @@ describe('usePrepararTela: la tela del solver WebGPU', () => {
     const e = prenda();
     const { rerender } = montar(e);
     act(() => { vi.advanceTimersByTime(600); });
-    rerender({ e: null });
+    rerender({ e: null, simulando: true });
 
     const mallas = mallasPlanas(e);
     await act(async () => { clientes[0].terminar(mallas); });
     expect(telas.obtenerTela).toHaveBeenCalledTimes(1);
     expect(telas.obtenerTela.mock.calls[0][0]).toBe(comoLaCascada(e, mallas).clave);
     expect(deLaTela().map((d) => d.kind), 'la que se dejó terminar sí cuenta').toEqual(['preparar:listo']);
+  });
+
+  // Spec § 6: «en 2D no se prepara nada». Solo la simulación que arranca espera
+  // lo que está en vuelo; la vista 2D, la prenda oculta o quedarse sin piezas
+  // no esperan nada, y la corrida se suelta como en una edición.
+  it('pasar a 2D (entradas → null sin simular) mientras malla la suelta en el acto: no avisa, ni pide la tela ni hornea el cuerpo', async () => {
+    const e = prenda();
+    const { rerender } = montar(e);
+    act(() => { vi.advanceTimersByTime(600); });
+    const [cliente] = clientes;
+
+    rerender({ e: null, simulando: false });
+    expect(cliente.dispose, 'lo suyo ya no sirve: no se espera a que termine').toHaveBeenCalledTimes(1);
+
+    await act(async () => { cliente.terminar(mallasPlanas(e)); });
+    expect(getSolverEvents()).toEqual([]);
+    expect(telas.obtenerTela).not.toHaveBeenCalled();
+    expect(cuerpo.hornear).not.toHaveBeenCalled();
   });
 
   it('si obtenerTela rechaza, avisa preparar:fallo con la fase tela y el mensaje, y no lanza', async () => {
@@ -583,11 +623,11 @@ describe('usePrepararTela: el BVH del cuerpo', () => {
   // setTslCollisionBody es síncrono: no puede esperar un BVH en vuelo. Tras el
   // clic, hornear aquí (~54 ms en el hilo principal) solo alargaría el
   // clic→primer cuadro. La tela sí se termina: la cascada la espera en vuelo.
-  it('las entradas pasan a null («Simular», o la vista 2D) mientras se arma la tela: la tela se termina, pero no hornea el cuerpo ni arma su BVH', async () => {
+  it('pulsar «Simular» (entradas → null) mientras se arma la tela: la tela se termina, pero no hornea el cuerpo ni arma su BVH', async () => {
     let llegaLaTela = () => {};
     telas.obtenerTela.mockImplementation(() => new Promise((ok) => { llegaLaTela = () => ok({ tela: {}, origen: 'armada' }); }));
     const { rerender } = await prepararHastaLaTela();
-    rerender({ e: null });
+    rerender({ e: null, simulando: true });
 
     await act(async () => { llegaLaTela(); });
     expect(eventos('preparar:listo').map((d) => d.fase), 'la tela se dejó terminar y cuenta').toEqual(['mallas', 'tela']);
@@ -596,11 +636,11 @@ describe('usePrepararTela: el BVH del cuerpo', () => {
     expect(delBvh()).toEqual([]);
   });
 
-  it('las entradas pasan a null mientras hornea el cuerpo: lo horneado no va al worker', async () => {
+  it('pulsar «Simular» mientras hornea el cuerpo: lo horneado no va al worker', async () => {
     let horneado: (m: unknown) => void = () => {};
     cuerpo.hornear.mockImplementation(() => new Promise((ok) => { horneado = ok; }));
     const { rerender } = await prepararHastaLaTela();
-    rerender({ e: null });
+    rerender({ e: null, simulando: true });
 
     await act(async () => { horneado(CUERPO); });
     expect(bvhs.armarBvhFueraDelHilo).not.toHaveBeenCalled();

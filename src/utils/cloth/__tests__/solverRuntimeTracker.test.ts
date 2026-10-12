@@ -89,6 +89,20 @@ describe('solverRuntimeTracker — un evento por fase (el preparador en reposo)'
       { kind: 'preparar:listo', fase: 'mallas', ms: 3 },
     ]);
   });
+
+  // Lo que se prepara en reposo no es de la corrida anterior: con la generación
+  // de la última cascada, una caja negra exportada lo leería como parte de ella.
+  it('lo del preparador lleva la generación 0, de ninguna cascada, aunque ya haya corrido una', () => {
+    beginCascade();
+    reemplazarEventoDeLaFase('preparar:listo', { fase: 'mallas', ms: 1 });
+    pushSolverEvent('tier:selected', { tier: 'wasm' });
+
+    expect(getSolverEvents().map((e) => [e.kind, e.generation])).toEqual([
+      ['preparar:listo', 0],
+      ['tier:selected', currentCascadeGeneration()],
+    ]);
+    expect(currentCascadeGeneration(), 'beginCascade empieza en 1: el 0 no es de nadie').toBeGreaterThan(0);
+  });
 });
 
 describe('solverRuntimeTracker — config aplicada y geometría retenida', () => {

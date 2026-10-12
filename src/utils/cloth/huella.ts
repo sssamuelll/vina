@@ -6,6 +6,12 @@
  * claves de un objeto, en orden alfabético, y un campo undefined no cuenta.
  * Es la clave de las cachés del arranque: dos entradas con la misma huella
  * dan el mismo armado.
+ *
+ * Solo recorre lo que puede leer entero: objetos planos (de `Object.prototype`
+ * o sin prototipo), arreglos, arreglos tipados, DataView y Map. Un Set, una
+ * fecha, un ArrayBuffer suelto o la instancia de una clase guardan lo suyo
+ * fuera de sus claves propias: recorridos como un objeto, dos distintos daban
+ * la misma huella. Con ellos lanza, y dice qué es.
  */
 export function huella(...valores: unknown[]): string {
   let a = 0x811c9dc5;
@@ -42,6 +48,10 @@ export function huella(...valores: unknown[]): string {
     if (Array.isArray(v)) { mezclar(7); mezclar(v.length); for (const x of v) recorrer(x); return; }
     if (v instanceof Map) { mezclar(8); return recorrer([...v.entries()]); }
     if (typeof v === 'object') {
+      const proto: unknown = Object.getPrototypeOf(v);
+      if (proto !== Object.prototype && proto !== null) {
+        throw new Error(`huella: no sé recorrer un objeto ${(v as object).constructor?.name || 'sin constructor'}`);
+      }
       const o = v as Record<string, unknown>;
       const claves = Object.keys(o).filter((k) => o[k] !== undefined).sort();
       mezclar(9);

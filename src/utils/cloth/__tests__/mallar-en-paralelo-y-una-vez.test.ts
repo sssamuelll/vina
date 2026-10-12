@@ -206,6 +206,37 @@ describe('mallar en paralelo y una sola vez', () => {
     avisos.mockRestore();
   });
 
+  // Una pieza que no malla vuelve a fallar en cada preparación del reposo, y el
+  // preparador ya lo cuenta en `preparar:fallo` (cuántas): su cliente no llena
+  // el ring con un `meshing:piece-failed` por intento. Al pulsar sí se dice.
+  it('con silenciarFallos, un fallo de verdad no va a la caja negra ni a la consola; el cliente por defecto sí lo dice', async () => {
+    const { SimulationInitClient } = await import('../simulationInitClient');
+    const { clearSolverEvents, getSolverEvents } = await import('../solverRuntimeTracker');
+    clearSolverEvents();
+    const avisos = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fallos = () => getSolverEvents().filter((e) => e.kind === 'meshing:piece-failed').map((e) => e.data);
+    const fallarTodo = () => { for (const w of WorkerFalso.todos) w.fallar('cdt2d se rindió'); };
+
+    const callado = new SimulationInitClient({ silenciarFallos: true });
+    const p1 = callado.meshAllPieces([pieza('a', 100)], {}, 5);
+    await new Promise((r) => setTimeout(r, 0));
+    fallarTodo();
+    expect(await p1, 'la pieza queda fuera igual').toEqual([]);
+    expect(fallos(), 'ni un evento por pieza').toEqual([]);
+    expect(avisos).not.toHaveBeenCalled();
+    callado.dispose();
+
+    const porDefecto = new SimulationInitClient();
+    const p2 = porDefecto.meshAllPieces([pieza('b', 100)], {}, 5);
+    await new Promise((r) => setTimeout(r, 0));
+    fallarTodo();
+    expect(await p2).toEqual([]);
+    expect(fallos()).toEqual([{ pieceId: 'b', message: 'cdt2d se rindió' }]);
+    expect(avisos).toHaveBeenCalledTimes(1);
+    porDefecto.dispose();
+    avisos.mockRestore();
+  });
+
   it('fueraDelHilo dice si el cliente malla en un worker o en el hilo principal', async () => {
     const { SimulationInitClient } = await import('../simulationInitClient');
     const conWorker = new SimulationInitClient();

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { BodyMeasurements, PatternPiece, Seam, SeamGroup, ViewMode } from '../../types/types';
 import type { SimulationState } from '../../store/simulationSlice';
-import type { JointRotation } from '../../store/avatarSlice';
+import type { PoseState } from '../../store/avatarSlice';
 import type { ArrangementOverride } from '../../utils/cloth/arrangement/arrangementBinding';
 import type { ArmAxis } from '../../utils/cloth/arrangement/buildAxisHints';
 import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
@@ -50,11 +50,12 @@ export interface EntradasDeLaTela {
    */
   conGpu: boolean;
   /**
-   * `avatar.pose.joints` y `avatar.morphTargets`, los de AvatarModel. No entran
-   * a ninguna huella (la del BVH es la de la malla horneada): están para que un
+   * `avatar.pose` entera (las articulaciones y el IK: `ikEnabled`, `ikTargets`,
+   * `ikChains`) y `avatar.morphTargets`, lo que lee AvatarModel. No entran a
+   * ninguna huella (la del BVH es la de la malla horneada): están para que un
    * cambio del cuerpo vuelva a preparar y se hornee el cuerpo nuevo.
    */
-  pose: Record<string, JointRotation>;
+  pose: PoseState;
   morphs: Record<string, number>;
 }
 
@@ -81,15 +82,20 @@ const mensaje = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * arma en workers la tela del solver (`obtenerTela`) y el BVH del cuerpo
  * (`armarBvhFueraDelHilo`): al pulsar, la cascada encuentra las mallas, la tela
  * (hechas o en vuelo) y el BVH hechos, y no los hace otra vez.
- * Un cambio de entradas suelta lo que esté en vuelo; pasar a null (pulsar
- * «Simular») deja terminar la malla y la tela, porque la simulación las está
- * esperando, pero no sigue con el cuerpo.
+ * Un cambio de entradas suelta lo que esté en vuelo. Pasar a null porque la
+ * simulación arranca (pulsar «Simular») deja terminar la malla y la tela,
+ * porque la simulación las está esperando, pero no sigue con el cuerpo. Pasar
+ * a null por otra razón (la vista 2D, la prenda oculta, sin piezas) la suelta
+ * como una edición: nadie espera lo suyo (spec § 6: en 2D no se prepara nada).
  *
- * `entradas` null = no preparar (ver `debePrepararLaTela`).
+ * `entradas` null = no preparar (ver `debePrepararLaTela`). `simulando`: la
+ * simulación no está en reposo (`simulationState !== 'idle'`).
  */
-export function usePrepararTela(entradas: EntradasDeLaTela | null): void {
+export function usePrepararTela(entradas: EntradasDeLaTela | null, simulando: boolean): void {
   const siguiente = useRef<EntradasDeLaTela | null>(entradas);
   siguiente.current = entradas;
+  const enMarcha = useRef(simulando);
+  enMarcha.current = simulando;
 
   useEffect(() => {
     if (!entradas) return;
@@ -101,7 +107,9 @@ export function usePrepararTela(entradas: EntradasDeLaTela | null): void {
     let vigente = true;
     const temporizador = setTimeout(() => {
       const t0 = performance.now();
-      cliente = new SimulationInitClient();
+      // Una pieza que no malla falla otra vez en cada preparación: lo dice el
+      // `preparar:fallo` de las mallas, no un aviso por pieza e intento.
+      cliente = new SimulationInitClient({ silenciarFallos: true });
       // Sin worker, el cliente malla en el hilo principal: en reposo eso
       // congelaría el visor tras cada edición. No se prepara nada y «Simular»
       // malla al pulsar, como antes del preparador.
@@ -157,9 +165,9 @@ export function usePrepararTela(entradas: EntradasDeLaTela | null): void {
             // busca setTslCollisionBody al pulsar. No depende de la tela, así
             // que va aunque ella haya fallado. Hornear son ~54 ms en el hilo
             // principal, en trozos; el BVH, solo en un worker.
-            // Con las entradas en null («Simular», o la vista 2D) no se sigue:
-            // setTslCollisionBody es síncrono y no puede esperar un BVH en
-            // vuelo, y hornear aquí solo alargaría el clic→primer cuadro.
+            // Tras «Simular» (entradas en null, la corrida sigue viva) no se
+            // sigue: setTslCollisionBody es síncrono y no puede esperar un BVH
+            // en vuelo, y hornear aquí solo alargaría el clic→primer cuadro.
             const sigueElCuerpo = () => vigente && siguiente.current !== null;
             if (!sigueElCuerpo()) return;
             const t2 = performance.now();
@@ -181,10 +189,11 @@ export function usePrepararTela(entradas: EntradasDeLaTela | null): void {
     }, ESPERA_PARA_PREPARAR_MS);
     return () => {
       clearTimeout(temporizador);
-      // Pulsar «Simular» (entradas → null) deja terminar la malla y la tela en
-      // vuelo: la simulación las espera (en vuelo compartidas). Un cambio de
-      // entradas (una edición) o desmontar la suelta: lo suyo ya no sirve.
-      if (siguiente.current === null) return;
+      // Pulsar «Simular» (entradas → null con la simulación en marcha) deja
+      // terminar la malla y la tela en vuelo: la simulación las espera (en
+      // vuelo compartidas). Una edición, pasar a 2D, ocultar la prenda,
+      // quedarse sin piezas o desmontar la suelta: lo suyo ya no sirve.
+      if (siguiente.current === null && enMarcha.current) return;
       vigente = false;
       cliente?.dispose();
     };

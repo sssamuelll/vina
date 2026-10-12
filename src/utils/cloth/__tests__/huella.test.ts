@@ -76,4 +76,22 @@ describe('huella', () => {
   it('lo que no sabe recorrer lo dice, no lo salta', () => {
     expect(() => huella({ a: () => 1 })).toThrow(/no sé recorrer/);
   });
+
+  // Recorridos por sus claves propias, dos Set distintos (o dos fechas, o dos
+  // ArrayBuffer) daban la misma huella que un {} vacío: la caché le habría
+  // dado a uno la tela del otro.
+  it.each<[string, unknown, string]>([
+    ['un Set', new Set([1, 2]), 'Set'],
+    ['una fecha', new Date(0), 'Date'],
+    ['un ArrayBuffer suelto', new ArrayBuffer(8), 'ArrayBuffer'],
+    ['la instancia de una clase', new (class Punto { x = 1; })(), 'Punto'],
+  ])('%s no se recorre como un objeto: lanza y nombra su constructor', (_, valor, constructor) => {
+    expect(() => huella({ dentro: valor })).toThrow(new RegExp(`huella: no sé recorrer .*${constructor}`));
+  });
+
+  it('un objeto plano, también uno sin prototipo, se recorre como siempre', () => {
+    const sinPrototipo = Object.assign(Object.create(null) as Record<string, unknown>, { a: 1, b: [2] });
+    expect(huella(sinPrototipo)).toBe(huella({ a: 1, b: [2] }));
+    expect(huella({ a: 1, b: [2] })).not.toBe(huella({ a: 1, b: [3] }));
+  });
 });

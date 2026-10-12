@@ -125,7 +125,7 @@ import type { SeamInitData } from '../../../utils/cloth/clothWorker';
 import type { Elastic } from '../../../types/types';
 import { WEBGPU_FEATURE_FLAG_KEY } from '../../../utils/cloth/gpu/webgpuDetect';
 import projectReducer from '../../../store/projectSlice';
-import simulationReducer, { marcarTelaEnMovimiento, pauseSimulation, resetSimulation, startSimulation } from '../../../store/simulationSlice';
+import simulationReducer, { marcarTelaEnMovimiento, pauseSimulation, resetSimulation, setFrameTime, startSimulation } from '../../../store/simulationSlice';
 import avatarReducer from '../../../store/avatarSlice';
 import collisionBodyReducer from '../../../store/collisionBodySlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
@@ -336,6 +336,33 @@ describe('pausar no vuelve a vestir', () => {
     await waitFor(() => expect(getActiveSolverTier()).toBe('wasm'));
     expect(arranques()).toBe(2);
     expect(enMovimiento(), 'la cascada nueva arranca sin decir que prepara otra tela').toBe(false);
+  });
+
+  it('una cascada nueva no arrastra los fps de la anterior: frameTimeMs vuelve a 0', async () => {
+    // `setFrameTime` llega cada 30 cuadros: sin esto, la corrida nueva mostraría
+    // (y la IA leería) los fps de la vieja hasta su primera ventana.
+    localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'false');
+    wasm.isWasmSolverAvailable.mockResolvedValue(true);
+    wasm.initMultiPiece.mockResolvedValue(undefined);
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    const seamInitData: SeamInitData[] = [];
+    const elastics: Elastic[] = [];
+    const stretchingIdsRef = { current: null as Int32Array | null };
+    const { rerender } = renderHook(
+      ({ mallas }: { mallas: PlacedMesh[] }) =>
+        useSimulationLifecycle({ placedMeshes: mallas, seamInitData, elastics, fabricId: 'cotton-poplin', stretchingIdsRef }),
+      {
+        initialProps: { mallas: [malla('a')] },
+        wrapper: ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>,
+      },
+    );
+    await waitFor(() => expect(getActiveSolverTier()).toBe('wasm'));
+    await act(async () => { store.dispatch(setFrameTime(16.7)); }); // la primera ventana de la corrida
+
+    rerender({ mallas: [malla('a')] });
+    await waitFor(() => expect(arranques()).toBe(2));
+    expect(store.getState().simulation.frameTimeMs).toBe(0);
   });
 
   it('neural (sin costuras, el último tier): pausar lo para y reanudar lo vuelve a arrancar', async () => {

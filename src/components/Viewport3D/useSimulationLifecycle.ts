@@ -490,6 +490,9 @@ export function useSimulationLifecycle({
       const generation = beginCascade();
       // Hasta el primer cuadro de esta corrida, el estado dice «Preparando la tela».
       dispatch(marcarTelaEnMovimiento(false));
+      // Y sin los fps de la corrida anterior: llegan cada 30 cuadros, y hasta la
+      // primera ventana de esta el estado y la IA leerían los de la vieja.
+      dispatch(setFrameTime(0));
       // 2a: cada (re)init re-arma el gate — el solver nuevo no stepea hasta
       // que SU colisión cargue.
       simReadyRef.current = false;
