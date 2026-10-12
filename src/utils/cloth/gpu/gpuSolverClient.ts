@@ -36,7 +36,7 @@ import type { LocalVertexIndex, SeamPair } from '../seamPairs';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import * as THREE from 'three';
 import { withErrorScope, attachUncapturedErrorListener, instrumentShaderCapture } from './webgpuDebug';
-import { prepararTela, interruptoresDeTela, type TelaPreparada } from './prepararTela';
+import { prepararTela, interruptoresDeTela, diferenciaConLasPiezas, type TelaPreparada } from './prepararTela';
 
 // ─── CPU helpers ─────────────────────────────────────────────────────────────
 
@@ -438,7 +438,12 @@ export class GpuSolverClient implements ClothSolverClient {
    *   value based on UV-classified edge direction (warp/weft/shear).
    * @param preparada — la parte CPU del armado ya hecha por prepararTela (en
    *   el preparador o en un worker) para estas mismas piezas, costuras y tela.
-   *   Sin ella, se prepara aquí, con los interruptores de este hilo.
+   *   El cliente se queda con sus arreglos: guarda algunos por referencia y el
+   *   solver escribe en ellos (congelar piezas reescribe invMass, el planchado
+   *   la flexión). Quien llama pasa una copia que no vuelve a tocar;
+   *   `obtenerTela` ya entrega una en cada llamada. Si no es de estas piezas
+   *   (ids, orden o vértices), avisa y la prepara aquí. Sin ella, se prepara
+   *   aquí, con los interruptores de este hilo.
    */
   async initMultiPieceTsl(
     pieces: PieceMeshData[],
@@ -450,8 +455,13 @@ export class GpuSolverClient implements ClothSolverClient {
     // La parte CPU del armado (fusión, restricciones, coloreado, costuras,
     // banda F3, quads entre piezas, CSR, soldadura y radios del tirante) es
     // pura y vive en prepararTela.ts; aquí queda lo que toca al cliente y a
-    // la GPU.
-    const t = preparada ?? prepararTela(pieces, seamPairs, fabricCompliance, interruptoresDeTela());
+    // la GPU. Una preparada de otras piezas no se simula: la huella de quien
+    // la entrega debió impedirlo, y esto lo comprueba barato.
+    const diferencia = preparada && diferenciaConLasPiezas(preparada, pieces);
+    if (diferencia) console.warn(`[GpuSolverClient] La tela preparada no es de estas piezas (${diferencia}): se arma aquí.`);
+    const t = preparada && !diferencia
+      ? preparada
+      : prepararTela(pieces, seamPairs, fabricCompliance, interruptoresDeTela());
 
     this.reportInputNaN(t.positions);
 

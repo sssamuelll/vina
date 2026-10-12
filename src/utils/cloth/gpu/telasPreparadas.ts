@@ -7,7 +7,7 @@
  * @module telasPreparadas
  */
 
-import { prepararTela, type TelaPreparada, type Interruptores } from './prepararTela';
+import { prepararTela, diferenciaConLasPiezas, type TelaPreparada, type Interruptores } from './prepararTela';
 import type { PieceMeshData } from './gpuSolverClient';
 import type { SeamPair } from '../seamPairs';
 import type { FabricComplianceConfig } from './tslBuffers';
@@ -35,8 +35,7 @@ const enVuelo = new Map<string, Promise<Armado>>();
 
 /** Lo barato de la spec § 4.4: las mismas piezas, en el mismo orden, con los mismos vértices. */
 function coincide(t: TelaPreparada, e: EntradasDelArmado): boolean {
-  return t.pieceVertexRanges.length === e.pieces.length
-    && e.pieces.every((p, i) => t.pieceVertexRanges[i][0] === p.pieceId && t.pieceVertexRanges[i][1].count === p.vertices.length / 3);
+  return diferenciaConLasPiezas(t, e.pieces) === null;
 }
 
 function guardar(h: string, t: TelaPreparada): void {

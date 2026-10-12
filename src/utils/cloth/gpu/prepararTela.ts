@@ -75,6 +75,24 @@ export interface TelaPreparada {
   avisos: string[];
 }
 
+/**
+ * Lo barato de la spec § 4.4: una tela es de estas piezas si trae las mismas,
+ * en el mismo orden y con los mismos vértices. Devuelve la primera diferencia,
+ * dicha, o null si coinciden. O(piezas).
+ */
+export function diferenciaConLasPiezas(t: TelaPreparada, pieces: PieceMeshData[]): string | null {
+  if (t.pieceVertexRanges.length !== pieces.length) {
+    return `piezas: ${t.pieceVertexRanges.length} en la tela, ${pieces.length} para simular`;
+  }
+  for (let i = 0; i < pieces.length; i++) {
+    const [id, { count }] = t.pieceVertexRanges[i];
+    const { pieceId, vertices } = pieces[i];
+    if (id !== pieceId) return `pieza ${i + 1}: '${id}' en la tela, '${pieceId}' para simular`;
+    if (count !== vertices.length / 3) return `vértices de '${id}': ${count} en la tela, ${vertices.length / 3} para simular`;
+  }
+  return null;
+}
+
 /** Lee los interruptores de desarrollo en el hilo principal (localStorage). */
 export function interruptoresDeTela(): Interruptores {
   return {

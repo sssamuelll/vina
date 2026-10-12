@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 import { FakeGPUDevice } from './fakeDevice';
-import { dosPiezas, COSTURAS, TELA } from './dosPiezas';
+import { dosPiezas, makeQuadPiece, makeQuadPieceAt, COSTURAS, TELA } from './dosPiezas';
 
 // Arnés de gpuSolverClient.test.ts: vi.hoisted corre antes que los vi.mock, así
 // el MockSBA es visible para las dos fábricas (three/webgpu y three/tsl). El
@@ -283,6 +283,48 @@ describe.each(CAMINOS)('prepararTela: la huella del armado TSL, camino %s', (cam
     expect(huellaDeLaEntrada(piezas), 'cambió la malla o la colocación, no el armado').toBe('dbdaaaec');
     const client = await armar(camino, piezas);
     expect(huellaDelArmado(client)).toBe('89f454e2');
+  });
+});
+
+// Defensa detrás de la huella de obtenerTela: si una tela preparada llegara
+// con otras piezas, el cliente la rearma en vez de simular otra tela.
+describe('initMultiPieceTsl con una tela preparada que no es de estas piezas', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** Como la entrega obtenerTela: armada aparte, y una copia. */
+  const preparadaPara = (piezas: PieceMeshData[]) =>
+    structuredClone(prepararTela(piezas, COSTURAS, TELA, interruptoresDeTela()));
+
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  async function iniciar(preparada: TelaPreparada): Promise<any> {
+    const client = new GpuSolverClient(new FakeGPUDevice() as any);
+    await client.initMultiPieceTsl(dosPiezas(), COSTURAS, undefined, TELA, preparada);
+    return client;
+  }
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  it('la de estas piezas se usa tal cual, sin avisar', async () => {
+    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const preparada = preparadaPara(dosPiezas());
+    const client = await iniciar(preparada);
+    expect(client.originalInvMass, 'se queda con sus arreglos: no la arma otra vez').toBe(preparada.originalInvMass);
+    expect(aviso).not.toHaveBeenCalledWith(expect.stringContaining('no es de estas piezas'));
+  });
+
+  it.each<[string, () => PieceMeshData[], string]>([
+    ['otra pieza', () => [makeQuadPiece('A'), makeQuadPieceAt('C', 0.3)], "pieza 2: 'C' en la tela, 'B' para simular"],
+    ['otros vértices', () => {
+      const [a, b] = dosPiezas();
+      return [a, { ...b, vertices: new Float32Array([...b.vertices, 0.4, 0.5, 0]) }];
+    }, "vértices de 'B': 5 en la tela, 4 para simular"],
+    ['menos piezas', () => [makeQuadPiece('A')], 'piezas: 1 en la tela, 2 para simular'],
+  ])('con %s, avisa qué no coincide y simula la de estas piezas', async (_, ajenas, motivo) => {
+    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = await iniciar(preparadaPara(ajenas()));
+    expect(aviso).toHaveBeenCalledWith(expect.stringContaining(motivo));
+    expect(huellaDelArmado(client), 'la de la prenda 1, armada aquí').toBe('faf078df');
   });
 });
 
