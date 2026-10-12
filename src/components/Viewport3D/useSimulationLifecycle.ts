@@ -195,8 +195,9 @@ interface UseSimulationLifecycleResult {
  *  browsers without WebGPU fall back to WASM regardless.
  *  Default flipped ON in #897 after the tier reached ≥30fps prod-verified on the
  *  María fixture (seams close, body+self collision). Known debt: the long-horizon
- *  drape creep (#902) is now visible at real-time fps — escape hatch is 'false'. */
-function isWebGPUFeatureEnabled(): boolean {
+ *  drape creep (#902) is now visible at real-time fps — escape hatch is 'false'.
+ *  El preparador (Viewport3D → usePrepararTela) lo lee para saber si armar la tela. */
+export function isWebGPUFeatureEnabled(): boolean {
   return safeGetItem(WEBGPU_FEATURE_FLAG_KEY) !== 'false';
 }
 

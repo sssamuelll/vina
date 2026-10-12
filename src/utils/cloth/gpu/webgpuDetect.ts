@@ -79,6 +79,33 @@ export function isWebGPUAvailable(): boolean {
   return typeof navigator !== 'undefined' && 'gpu' in navigator;
 }
 
+/** El `navigator.gpu` al que se le preguntó por un adaptador, y su respuesta. */
+let preguntado: { gpu: GPU; hay: Promise<boolean> } | null = null;
+
+/**
+ * Si `navigator.gpu` da un adaptador, como el que pide la cascada al pulsar
+ * «Simular». `navigator.gpu` puede existir sin darlo (GPU vetada por el
+ * navegador, o un Chromium sin GPU como el de los e2e), y entonces la cascada
+ * cae a WASM. Se pregunta una vez por sesión: la respuesta se guarda con el
+ * `navigator.gpu` que la dio, que es siempre el mismo objeto. Nunca rechaza:
+ * sin `navigator.gpu`, o si la pregunta falla, es false.
+ */
+export function hayAdaptadorWebGPU(): Promise<boolean> {
+  const gpu = typeof navigator === 'undefined' ? undefined : navigator.gpu;
+  if (!gpu) return Promise.resolve(false);
+  if (preguntado?.gpu !== gpu) {
+    const hay = (async () => {
+      try {
+        return Boolean(await gpu.requestAdapter());
+      } catch {
+        return false;
+      }
+    })();
+    preguntado = { gpu, hay };
+  }
+  return preguntado.hay;
+}
+
 /**
  * Whether the WebGPU **rendering** backend is active.
  *

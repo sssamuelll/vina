@@ -4,7 +4,7 @@ import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import type { AnyRenderer } from '../../types/renderer';
-import { isWebGPURendererActive } from '../../utils/cloth/gpu/webgpuDetect';
+import { isWebGPUAvailable, isWebGPURendererActive } from '../../utils/cloth/gpu/webgpuDetect';
 import { cmToM } from '../../utils/geometry';
 import { pushJournal } from '../../utils/telemetry/journal';
 import { useSelector } from 'react-redux';
@@ -50,6 +50,7 @@ import EnvironmentSetup from './EnvironmentSetup';
 import CustomLights from './CustomLights';
 import { useAvatarTape } from './useAvatarTape';
 import { debePrepararLaTela, usePrepararTela } from './usePrepararTela';
+import { isWebGPUFeatureEnabled } from './useSimulationLifecycle';
 import { useCameraPresets, DEFAULT_TARGET, DEFAULT_POSITION } from './useCameraPresets';
 import { useAnimationPlayback } from '../../hooks/useAnimationPlayback';
 import { useColorwaySync } from '../../hooks/useColorwaySync';
@@ -194,7 +195,7 @@ const SAFARI_GESTURES = typeof window !== 'undefined' && 'ongesturestart' in win
 
 export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false }: Viewport3DProps) {
   const dispatch = useDispatch();
-  const { pieces, seams, avatarMode, avatarModelUrl, avatar, arrangementOverrides } = useSelector((s: RootState) => s.project);
+  const { pieces, seams, seamGroups, avatarMode, avatarModelUrl, avatar, arrangementOverrides } = useSelector((s: RootState) => s.project);
   // Lo que se coloca sobre el cuerpo usa SUS medidas: uno de la biblioteca no se estira (spec § 5).
   const cuerpo = medidasDelCuerpo({ avatarMode, avatarModelUrl, avatar });
   const { selectedPieceIds } = useSelector((s: RootState) => s.editor);
@@ -233,15 +234,23 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   );
 
   // El preparador: en reposo y con la prenda a la vista, malla en segundo plano
-  // lo que «Simular» va a necesitar (usePrepararTela). Las cuatro condiciones
-  // entran como un solo booleano: pasar de 3D a Split no cambia las entradas, y
-  // si las cambiara soltaría la malla en vuelo.
+  // lo que «Simular» va a necesitar y, si la cascada irá por WebGPU, arma su
+  // tela (usePrepararTela). Las cuatro condiciones entran como un solo
+  // booleano: pasar de 3D a Split no cambia las entradas, y si las cambiara
+  // soltaría lo que está en vuelo. Los valores son los que lee GarmentSimulation.
   const densidad = useSelector((s: RootState) => s.simulation.particleDistance);
   const densidades = useSelector((s: RootState) => s.simulation.pieceParticleDistance);
   const prepararLaTela = debePrepararLaTela({ simulationState, viewMode, showGarment, piezas: activePieces });
+  const conGpu = isWebGPUAvailable() && isWebGPUFeatureEnabled();
   const entradasDeLaTela = useMemo(
-    () => (prepararLaTela ? { piezas: activePieces, densidades, densidad } : null),
-    [prepararLaTela, activePieces, densidades, densidad],
+    () => (prepararLaTela
+      ? {
+          piezas: activePieces, densidades, densidad,
+          medidas: cuerpo, overrides: arrangementOverrides, armAxis, seams, seamGroups,
+          fabricId: defaultFabricId, conGpu,
+        }
+      : null),
+    [prepararLaTela, activePieces, densidades, densidad, cuerpo, arrangementOverrides, armAxis, seams, seamGroups, defaultFabricId, conGpu],
   );
   usePrepararTela(entradasDeLaTela);
 
