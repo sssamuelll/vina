@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { BodyMeasurements, PatternPiece, Seam, SeamGroup, ViewMode } from '../../types/types';
 import type { SimulationState } from '../../store/simulationSlice';
+import type { JointRotation } from '../../store/avatarSlice';
 import type { ArrangementOverride } from '../../utils/cloth/arrangement/arrangementBinding';
 import type { ArmAxis } from '../../utils/cloth/arrangement/buildAxisHints';
 import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
@@ -8,8 +9,10 @@ import { reemplazarEventoDeLaFase } from '../../utils/cloth/solverRuntimeTracker
 import { seamInitDataToPairs } from '../../utils/cloth/seamPairs';
 import { complianceDeTela } from '../../utils/cloth/complianceDeTela';
 import { huella } from '../../utils/cloth/huella';
+import { bakeCollisionFromRender } from '../../utils/cloth/renderCollisionBake';
 import { obtenerTela } from '../../utils/cloth/gpu/telasPreparadas';
 import { interruptoresDeTela } from '../../utils/cloth/gpu/prepararTela';
+import { armarBvhFueraDelHilo, bvhGuardado, guardarBvh } from '../../utils/cloth/gpu/bvhPreparado';
 import { hayAdaptadorWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
 import { mallasDePiezas } from './mallasDePiezas';
 import { colocarMallas } from './colocarMallas';
@@ -46,6 +49,13 @@ export interface EntradasDeLaTela {
    * la cascada irá por WebGPU; si no, solo se malla: WASM y CPU arman su propia tela.
    */
   conGpu: boolean;
+  /**
+   * `avatar.pose.joints` y `avatar.morphTargets`, los de AvatarModel. No entran
+   * a ninguna huella (la del BVH es la de la malla horneada): están para que un
+   * cambio del cuerpo vuelva a preparar y se hornee el cuerpo nuevo.
+   */
+  pose: Record<string, JointRotation>;
+  morphs: Record<string, number>;
 }
 
 /**
@@ -68,10 +78,12 @@ const mensaje = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * Prepara en segundo plano lo que «Simular» va a necesitar, mientras la prenda
  * está a la vista y la simulación parada (spec 2026-10-11 «simular al
  * instante» § 4.1). Malla con la caché de SimulationInitClient y, con WebGPU,
- * arma la tela del solver en un worker (`obtenerTela`): al pulsar, la cascada
- * encuentra las mallas y la tela hechas (o en vuelo) y no las hace otra vez.
+ * arma en workers la tela del solver (`obtenerTela`) y el BVH del cuerpo
+ * (`armarBvhFueraDelHilo`): al pulsar, la cascada encuentra las mallas, la tela
+ * (hechas o en vuelo) y el BVH hechos, y no los hace otra vez.
  * Un cambio de entradas suelta lo que esté en vuelo; pasar a null (pulsar
- * «Simular») lo deja terminar, porque la simulación lo está esperando.
+ * «Simular») deja terminar la malla y la tela, porque la simulación las está
+ * esperando, pero no sigue con el cuerpo.
  *
  * `entradas` null = no preparar (ver `debePrepararLaTela`).
  */
@@ -140,6 +152,28 @@ export function usePrepararTela(entradas: EntradasDeLaTela | null): void {
               avisar('preparar:listo', { fase: 'tela', ms: Math.round(performance.now() - t1) });
             } catch (e) {
               avisar('preparar:fallo', { fase: 'tela', message: mensaje(e) });
+            }
+            // El BVH del cuerpo, con la huella de la malla horneada: la que
+            // busca setTslCollisionBody al pulsar. No depende de la tela, así
+            // que va aunque ella haya fallado. Hornear son ~54 ms en el hilo
+            // principal, en trozos; el BVH, solo en un worker.
+            // Con las entradas en null («Simular», o la vista 2D) no se sigue:
+            // setTslCollisionBody es síncrono y no puede esperar un BVH en
+            // vuelo, y hornear aquí solo alargaría el clic→primer cuadro.
+            const sigueElCuerpo = () => vigente && siguiente.current !== null;
+            if (!sigueElCuerpo()) return;
+            const t2 = performance.now();
+            try {
+              const mesh = await bakeCollisionFromRender();
+              // Sin cuerpo a la vista no hay nada que preparar: al pulsar se hace como hoy.
+              if (!mesh || !sigueElCuerpo()) return;
+              const h = huella(mesh);
+              // Lo que termina se guarda aunque la corrida se haya soltado: es
+              // el BVH de ese cuerpo, y una edición de una pieza no lo cambia.
+              if (!bvhGuardado(h)) guardarBvh(h, await armarBvhFueraDelHilo(mesh, { soloFueraDelHilo: true }));
+              avisar('preparar:listo', { fase: 'bvh', ms: Math.round(performance.now() - t2) });
+            } catch (e) {
+              avisar('preparar:fallo', { fase: 'bvh', message: mensaje(e) });
             }
           },
           (e: unknown) => avisar('preparar:fallo', { fase: 'mallas', message: mensaje(e) }),

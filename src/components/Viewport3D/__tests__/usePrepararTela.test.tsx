@@ -22,8 +22,13 @@ const clientes = vi.hoisted(() => [] as ClienteFalso[]);
 /** Lo que el cliente falso dice de su worker: sin él mallaría en el hilo principal. */
 const entorno = vi.hoisted(() => ({ conWorker: true }));
 const telas = vi.hoisted(() => ({ obtenerTela: vi.fn() }));
+/** El cuerpo que se hornea (bakeCollisionFromRender) y la caché de su BVH. */
+const cuerpo = vi.hoisted(() => ({ hornear: vi.fn() }));
+const bvhs = vi.hoisted(() => ({ bvhGuardado: vi.fn(), guardarBvh: vi.fn(), armarBvhFueraDelHilo: vi.fn() }));
 
 vi.mock('../../../utils/cloth/gpu/telasPreparadas', () => ({ obtenerTela: telas.obtenerTela }));
+vi.mock('../../../utils/cloth/renderCollisionBake', () => ({ bakeCollisionFromRender: cuerpo.hornear }));
+vi.mock('../../../utils/cloth/gpu/bvhPreparado', () => bvhs);
 vi.mock('../../../utils/cloth/simulationInitClient', () => ({
   SimulationInitClient: class {
     fueraDelHilo = entorno.conWorker;
@@ -46,10 +51,19 @@ import { interruptoresDeTela } from '../../../utils/cloth/gpu/prepararTela';
 import { huella } from '../../../utils/cloth/huella';
 import type { MeshedPiece as SimMeshedPiece } from '../../../utils/cloth/simulationInitClient';
 import type { ArmAxis } from '../../../utils/cloth/arrangement/buildAxisHints';
+import type { CollisionMeshData } from '../../../utils/cloth/collisionMesh';
+import type { LinearBVH } from '../../../utils/cloth/gpu/bvh';
 import type { BodyMeasurements, PatternPiece, Seam, SeamGroup } from '../../../types/types';
 
 const MEDIDAS: BodyMeasurements = { height: 168, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 };
 const SIN_BRAZOS: ArmAxis = { left: null, right: null, ready: false };
+/** La malla que da hornear el cuerpo: un triángulo basta. */
+const CUERPO: CollisionMeshData = {
+  vertices: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+  normals: new Float32Array([0, 0, 1]),
+  triCount: 1,
+};
+const BVH = { nodeCount: 1 } as LinearBVH;
 
 const pieza = (id: string) => ({ id, name: id, outline: [] }) as unknown as PatternPiece;
 /** Los casos del mallado: sin WebGPU el preparador no pasa de las mallas. Los de la tela usan `prenda`. */
@@ -64,6 +78,8 @@ const entradas = (id: string, densidad = 5): EntradasDeLaTela => ({
   seamGroups: undefined,
   fabricId: 'cotton-poplin',
   conGpu: false,
+  pose: {},
+  morphs: {},
 });
 /** Lo que devuelve `meshAllPieces` cuando todas mallaron: una por pieza. */
 const mallasDe = (e: EntradasDeLaTela) => e.piezas.map((p) => ({ pieceId: p.id }));
@@ -77,6 +93,13 @@ beforeEach(() => {
   entorno.conWorker = true;
   telas.obtenerTela.mockReset();
   telas.obtenerTela.mockResolvedValue({ tela: {}, origen: 'armada' });
+  cuerpo.hornear.mockReset();
+  cuerpo.hornear.mockResolvedValue(CUERPO);
+  bvhs.bvhGuardado.mockReset();
+  bvhs.bvhGuardado.mockReturnValue(null);
+  bvhs.guardarBvh.mockReset();
+  bvhs.armarBvhFueraDelHilo.mockReset();
+  bvhs.armarBvhFueraDelHilo.mockResolvedValue(BVH);
   clearSolverEvents();
   vi.useFakeTimers();
 });
@@ -281,6 +304,8 @@ const prenda = (cambios: Partial<EntradasDeLaTela> = {}): EntradasDeLaTela => ({
   seamGroups: [grupo('manga', 'delantero')],
   fabricId: 'cotton-poplin',
   conGpu: true,
+  pose: {},
+  morphs: {},
   ...cambios,
 });
 
@@ -331,16 +356,21 @@ describe('usePrepararTela: la tela del solver WebGPU', () => {
     expect(clave, 'la huella de la cascada: si difiere, «Simular» vuelve a armar la tela, en silencio').toBe(cascada.clave);
     expect(armado).toEqual(cascada.entradas);
     expect(opciones, 'en reposo, nunca en el hilo principal').toEqual({ soloFueraDelHilo: true });
-    expect(eventos('preparar:listo')).toEqual([expect.objectContaining({ fase: 'mallas' }), { fase: 'tela', ms: expect.any(Number) }]);
+    expect(eventos('preparar:listo')).toEqual([
+      expect.objectContaining({ fase: 'mallas' }),
+      { fase: 'tela', ms: expect.any(Number) },
+      { fase: 'bvh', ms: expect.any(Number) },
+    ]);
   });
 
-  it('sin WebGPU solo malla: la tela de WASM y CPU no es esta', async () => {
+  it('sin WebGPU solo malla: la tela de WASM y CPU no es esta, ni el BVH del cuerpo', async () => {
     const e = prenda({ conGpu: false });
     montar(e);
     act(() => { vi.advanceTimersByTime(600); });
     await act(async () => { clientes[0].terminar(mallasPlanas(e)); });
 
     expect(telas.obtenerTela).not.toHaveBeenCalled();
+    expect(cuerpo.hornear).not.toHaveBeenCalled();
     expect(eventos('preparar:listo').map((d) => d.fase)).toEqual(['mallas']);
   });
 
@@ -352,6 +382,7 @@ describe('usePrepararTela: la tela del solver WebGPU', () => {
     await act(async () => { clientes[0].terminar(mallasPlanas(e)); });
 
     expect(telas.obtenerTela).not.toHaveBeenCalled();
+    expect(cuerpo.hornear, 'ni hornea el cuerpo').not.toHaveBeenCalled();
     expect(getSolverEvents().map((ev) => [ev.kind, ev.data.fase]), 'ni un fallo de la tela').toEqual([['preparar:listo', 'mallas']]);
   });
 
@@ -380,6 +411,7 @@ describe('usePrepararTela: la tela del solver WebGPU', () => {
     rerender({ e: prenda({ densidad: 4 }) });
     await act(async () => { responder({}); });
     expect(telas.obtenerTela).not.toHaveBeenCalled();
+    expect(cuerpo.hornear).not.toHaveBeenCalled();
   });
 
   it('otra pose (armAxis) mientras malla suelta esa preparación y, 600 ms después, pide la tela de la colocación nueva, con otra huella', async () => {
@@ -423,7 +455,8 @@ describe('usePrepararTela: la tela del solver WebGPU', () => {
     await act(async () => { clientes[0].terminar(mallasPlanas(e)); });
 
     expect(eventos('preparar:fallo')).toEqual([{ fase: 'tela', message: 'La tela no se armó fuera del hilo principal: sin worker' }]);
-    expect(eventos('preparar:listo').map((d) => d.fase), 'las mallas sí quedaron').toEqual(['mallas']);
+    expect(eventos('preparar:listo').map((d) => d.fase), 'las mallas sí quedaron, y el BVH del cuerpo no depende de la tela')
+      .toEqual(['mallas', 'bvh']);
   });
 
   it.each<[string, (llega: () => void, falla: () => void) => void]>([
@@ -445,6 +478,7 @@ describe('usePrepararTela: la tela del solver WebGPU', () => {
     rerender({ e: prenda({ densidad: 4 }) });
     await act(async () => { asentar(llega, falla); });
     expect(deLaTela()).toEqual([]);
+    expect(cuerpo.hornear, 'ni sigue con el cuerpo').not.toHaveBeenCalled();
   });
 
   it('si alguna pieza no malla no pide la tela: la preparación ya falló en las mallas', async () => {
@@ -454,7 +488,124 @@ describe('usePrepararTela: la tela del solver WebGPU', () => {
     await act(async () => { clientes[0].terminar(mallasPlanas(e).slice(1)); });
 
     expect(telas.obtenerTela).not.toHaveBeenCalled();
+    expect(cuerpo.hornear).not.toHaveBeenCalled();
     expect(eventos('preparar:fallo')).toEqual([{ fase: 'mallas', message: '1 de 3 piezas sin malla' }]);
+  });
+});
+
+// ─── El BVH del cuerpo ───────────────────────────────────────────────────────
+
+describe('usePrepararTela: el BVH del cuerpo', () => {
+  beforeEach(() => { ponerGpu(async () => ({})); });
+  afterEach(() => { delete (navigator as { gpu?: unknown }).gpu; });
+
+  /** Monta la prenda, espera los 600 ms y termina el mallado: lo que sigue es la tela y, después, el cuerpo. */
+  const prepararHastaLaTela = async (e = prenda()) => {
+    const montado = montar(e);
+    act(() => { vi.advanceTimersByTime(600); });
+    await act(async () => { clientes[0].terminar(mallasPlanas(e)); });
+    return montado;
+  };
+  const delBvh = () => getSolverEvents().filter((ev) => ev.data.fase === 'bvh').map((ev) => ({ kind: ev.kind, ...ev.data }));
+
+  it('después de la tela hornea el cuerpo, arma su BVH solo fuera del hilo, lo guarda con la huella de la malla horneada y avisa', async () => {
+    let llegaLaTela = () => {};
+    telas.obtenerTela.mockImplementation(() => new Promise((ok) => { llegaLaTela = () => ok({ tela: {}, origen: 'armada' }); }));
+    await prepararHastaLaTela();
+    expect(cuerpo.hornear, 'mientras se arma la tela, el cuerpo espera').not.toHaveBeenCalled();
+
+    await act(async () => { llegaLaTela(); });
+    expect(cuerpo.hornear).toHaveBeenCalledTimes(1);
+    expect(bvhs.armarBvhFueraDelHilo, 'en reposo, nunca en el hilo principal').toHaveBeenCalledWith(CUERPO, { soloFueraDelHilo: true });
+    // La clave que busca setTslCollisionBody al pulsar: la huella de la malla horneada.
+    expect(bvhs.bvhGuardado).toHaveBeenCalledWith(huella(CUERPO));
+    expect(bvhs.guardarBvh).toHaveBeenCalledWith(huella(CUERPO), BVH);
+    expect(delBvh()).toEqual([{ kind: 'preparar:listo', fase: 'bvh', ms: expect.any(Number) }]);
+  });
+
+  it('si el BVH de ese cuerpo ya está guardado no lo vuelve a armar, y avisa que está listo', async () => {
+    bvhs.bvhGuardado.mockReturnValue(BVH);
+    await prepararHastaLaTela();
+
+    expect(bvhs.armarBvhFueraDelHilo).not.toHaveBeenCalled();
+    expect(bvhs.guardarBvh).not.toHaveBeenCalled();
+    expect(delBvh()).toEqual([{ kind: 'preparar:listo', fase: 'bvh', ms: expect.any(Number) }]);
+  });
+
+  it('sin cuerpo que hornear (el avatar no está a la vista) no arma nada ni avisa del BVH: al pulsar se hace como hoy', async () => {
+    cuerpo.hornear.mockResolvedValue(null);
+    await prepararHastaLaTela();
+
+    expect(bvhs.armarBvhFueraDelHilo).not.toHaveBeenCalled();
+    expect(delBvh()).toEqual([]);
+  });
+
+  it.each<[string, () => void, string]>([
+    [
+      'el BVH no se arma fuera del hilo',
+      () => bvhs.armarBvhFueraDelHilo.mockRejectedValue(new Error('El BVH del cuerpo no se armó fuera del hilo principal: sin worker')),
+      'El BVH del cuerpo no se armó fuera del hilo principal: sin worker',
+    ],
+    ['hornear el cuerpo falla', () => cuerpo.hornear.mockRejectedValue(new Error('sin esqueleto')), 'sin esqueleto'],
+  ])('si %s, avisa preparar:fallo con la fase bvh y el mensaje, no guarda nada y no lanza', async (_, romper, message) => {
+    romper();
+    await prepararHastaLaTela();
+
+    expect(bvhs.guardarBvh).not.toHaveBeenCalled();
+    expect(delBvh()).toEqual([{ kind: 'preparar:fallo', fase: 'bvh', message }]);
+  });
+
+  it('una edición mientras hornea el cuerpo suelta la corrida: no arma su BVH ni avisa', async () => {
+    let horneado: (m: unknown) => void = () => {};
+    cuerpo.hornear.mockImplementation(() => new Promise((ok) => { horneado = ok; }));
+    const { rerender } = await prepararHastaLaTela();
+    expect(cuerpo.hornear).toHaveBeenCalledTimes(1);
+
+    rerender({ e: prenda({ densidad: 4 }) });
+    await act(async () => { horneado(CUERPO); });
+    expect(bvhs.armarBvhFueraDelHilo).not.toHaveBeenCalled();
+    expect(delBvh()).toEqual([]);
+  });
+
+  it('una edición mientras arma el BVH suelta la corrida: no avisa, pero lo que termina se guarda con la huella de su cuerpo', async () => {
+    let llega: (b: unknown) => void = () => {};
+    bvhs.armarBvhFueraDelHilo.mockImplementation(() => new Promise((ok) => { llega = ok; }));
+    const { rerender } = await prepararHastaLaTela();
+    expect(bvhs.armarBvhFueraDelHilo).toHaveBeenCalledTimes(1);
+
+    rerender({ e: prenda({ densidad: 4 }) });
+    await act(async () => { llega(BVH); });
+    // Una edición de una pieza no cambia el cuerpo: la próxima preparación lo encuentra.
+    expect(bvhs.guardarBvh).toHaveBeenCalledWith(huella(CUERPO), BVH);
+    expect(delBvh()).toEqual([]);
+  });
+
+  // setTslCollisionBody es síncrono: no puede esperar un BVH en vuelo. Tras el
+  // clic, hornear aquí (~54 ms en el hilo principal) solo alargaría el
+  // clic→primer cuadro. La tela sí se termina: la cascada la espera en vuelo.
+  it('las entradas pasan a null («Simular», o la vista 2D) mientras se arma la tela: la tela se termina, pero no hornea el cuerpo ni arma su BVH', async () => {
+    let llegaLaTela = () => {};
+    telas.obtenerTela.mockImplementation(() => new Promise((ok) => { llegaLaTela = () => ok({ tela: {}, origen: 'armada' }); }));
+    const { rerender } = await prepararHastaLaTela();
+    rerender({ e: null });
+
+    await act(async () => { llegaLaTela(); });
+    expect(eventos('preparar:listo').map((d) => d.fase), 'la tela se dejó terminar y cuenta').toEqual(['mallas', 'tela']);
+    expect(cuerpo.hornear).not.toHaveBeenCalled();
+    expect(bvhs.armarBvhFueraDelHilo).not.toHaveBeenCalled();
+    expect(delBvh()).toEqual([]);
+  });
+
+  it('las entradas pasan a null mientras hornea el cuerpo: lo horneado no va al worker', async () => {
+    let horneado: (m: unknown) => void = () => {};
+    cuerpo.hornear.mockImplementation(() => new Promise((ok) => { horneado = ok; }));
+    const { rerender } = await prepararHastaLaTela();
+    rerender({ e: null });
+
+    await act(async () => { horneado(CUERPO); });
+    expect(bvhs.armarBvhFueraDelHilo).not.toHaveBeenCalled();
+    expect(bvhs.guardarBvh).not.toHaveBeenCalled();
+    expect(delBvh()).toEqual([]);
   });
 });
 

@@ -26,6 +26,8 @@ import { makeFacePokeGenerateNode, makeFacePokeSolveNode, packFacePokeBodyGeom }
 import { createSelfCollisionBuffers } from './tslSelfCollision';
 import { nextPrime } from '../selfCollision';
 import { buildLinearBVH } from './bvh';
+import { bvhGuardado } from './bvhPreparado';
+import { huella } from '../huella';
 import { createTslCollisionBody } from './tslCollision';
 import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities';
 import { DEFAULT_SEAM_CONFIG } from '../seamAssembly';
@@ -1047,8 +1049,14 @@ export class GpuSolverClient implements ClothSolverClient {
       return;
     }
 
-    // Build BVH on CPU
-    const bvh = buildLinearBVH(mesh);
+    // El BVH que dejó el preparador para esta misma malla (bvhPreparado), o
+    // armado aquí en la CPU, como siempre. La huella es la de la malla
+    // horneada: un cuerpo que cambió (pose, medidas, morphs) da otra. El
+    // evento lleva el id: el avatar es '__avatar__'; los maniquíes y las
+    // reconstrucciones durante la simulación también pasan por aquí.
+    const guardado = bvhGuardado(huella(mesh));
+    const bvh = guardado ?? buildLinearBVH(mesh);
+    pushSolverEvent('preparar:usada', { fase: 'bvh', origen: guardado ? 'cache' : 'armado', cuerpo: id });
     if (bvh.nodeCount === 0) {
       console.warn(
         `[GpuSolverClient] setTslCollisionBody '${id}': BVH build produced 0 nodes from ${mesh.triCount} triangles, skipping. ` +

@@ -240,6 +240,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   // soltaría lo que está en vuelo. Los valores son los que lee GarmentSimulation.
   const densidad = useSelector((s: RootState) => s.simulation.particleDistance);
   const densidades = useSelector((s: RootState) => s.simulation.pieceParticleDistance);
+  // La pose y los morphs del cuerpo, como los lee AvatarModel: un cambio vuelve
+  // a preparar, y el preparador hornea el cuerpo nuevo para su BVH.
+  const pose = useSelector((s: RootState) => s.avatar.pose.joints);
+  const morphs = useSelector((s: RootState) => s.avatar.morphTargets);
   const prepararLaTela = debePrepararLaTela({ simulationState, viewMode, showGarment, piezas: activePieces });
   const conGpu = isWebGPUAvailable() && isWebGPUFeatureEnabled();
   const entradasDeLaTela = useMemo(
@@ -247,10 +251,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       ? {
           piezas: activePieces, densidades, densidad,
           medidas: cuerpo, overrides: arrangementOverrides, armAxis, seams, seamGroups,
-          fabricId: defaultFabricId, conGpu,
+          fabricId: defaultFabricId, conGpu, pose, morphs,
         }
       : null),
-    [prepararLaTela, activePieces, densidades, densidad, cuerpo, arrangementOverrides, armAxis, seams, seamGroups, defaultFabricId, conGpu],
+    [prepararLaTela, activePieces, densidades, densidad, cuerpo, arrangementOverrides, armAxis, seams, seamGroups, defaultFabricId, conGpu, pose, morphs],
   );
   usePrepararTela(entradasDeLaTela);
 
