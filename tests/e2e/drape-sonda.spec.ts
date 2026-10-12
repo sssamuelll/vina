@@ -36,7 +36,8 @@ const TIER = process.env.SONDA_TIER === 'wasm' ? 'wasm' : 'webgpu';
  * toma unos 4 s: con 8 s se mide el arranque preparado, el del criterio 1 de
  * la spec.
  */
-const PREPARAR_MS = Number(process.env.SONDA_PREPARAR_MS ?? 8000);
+const PREPARAR_MS_POR_DEFECTO = 8000;
+const PREPARAR_MS = Number(process.env.SONDA_PREPARAR_MS ?? PREPARAR_MS_POR_DEFECTO);
 
 const SALIDA = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -454,6 +455,32 @@ test.describe('Sonda del drape @gpu-local', () => {
       expect(elegido?.data.tier, 'la corrida es de WebGPU: con una caída a WASM la medida no dice nada').toBe('webgpu');
       // Solo aquí se comprueba que la ruta GPU avisa su primer cuadro al estado: el gate corre en WASM.
       expect(resumen.clicAEstadoSimulandoMs, 'con WebGPU, el primer cuadro pasa el estado de «Preparando la tela» a «Simulando»').not.toBeNull();
+      // Los criterios 1 y 2 de la spec (del clic al primer cuadro en menos de 1 s; ninguna
+      // tarea de más de 100 ms) no se exigen porque aún no se cumplen: el 2026-10-12 dieron
+      // 1622 ms y tareas de 183 y ~119 ms. No se aflojan para que pasen: esperan la decisión
+      // sobre la entrega 4 (menos pipelines distintos).
+      // Lo preparado sí se exige. Con la espera por defecto el preparador termina antes del
+      // clic (el 2026-10-12, ~4,6 s: mallas ~3,8, tela ~0,6 y BVH ~0,15), así que uno roto
+      // falla aquí en vez de saltarse; con una más corta puede no terminar, y la sonda dice
+      // por qué. Si terminó, la cascada usa la tela y el BVH de la caché.
+      const antesDelClic = (fase: string) => String(resumen.preparadoAntesDelClic.find((p) => p.fase === fase)?.kind ?? 'nada');
+      const fases = { tela: antesDelClic('tela'), bvh: antesDelClic('bvh') };
+      if (PREPARAR_MS >= PREPARAR_MS_POR_DEFECTO) {
+        expect(fases, 'la preparación termina dentro de la espera por defecto: la tela y el BVH, listos antes del clic').toEqual({
+          tela: 'preparar:listo',
+          bvh: 'preparar:listo',
+        });
+      }
+      if (fases.tela === 'preparar:listo' && fases.bvh === 'preparar:listo') {
+        expect(resumen.usadoDeLoPreparado, 'la cascada usa lo que preparó el reposo: la tela y el BVH del cuerpo salen de la caché').toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ fase: 'tela', origen: 'cache' }),
+            expect.objectContaining({ fase: 'bvh', origen: 'cache', cuerpo: '__avatar__' }),
+          ]),
+        );
+      } else {
+        console.log(`[sonda-drape] lo preparado no se exige: el preparador no dejó listas la tela y el BVH antes del clic (tela: ${fases.tela}, bvh: ${fases.bvh}; SONDA_PREPARAR_MS=${PREPARAR_MS})`);
+      }
     }
   });
 });
