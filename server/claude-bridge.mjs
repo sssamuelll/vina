@@ -39,7 +39,7 @@ function readBody(req) {
 
 // ─── System prompt ──────────────────────────────────────────────────────────
 
-const DEFAULT_SYSTEM = `You are an AI assistant inside Vina, an open-source CLO3D alternative. Be concise. Match user's language.`;
+const DEFAULT_SYSTEM = `You are an AI assistant inside Vina, a browser-based garment CAD. Be concise. Match user's language.`;
 
 // ─── Chat handler ───────────────────────────────────────────────────────────
 
