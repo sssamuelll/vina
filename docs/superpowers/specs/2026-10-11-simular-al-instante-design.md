@@ -132,9 +132,15 @@ entradas y obtienen el mismo resultado. Un test compara su salida con la del
 ### 4.6 El primer cuadro, a la vista de la caja negra
 
 - **Telemetría**: un evento del solver nuevo, `tela:primer-cuadro`
-  (generación y ms desde su `cascade:start`), en el primer latido de cada
-  tela. La sonda lo lee para medir el criterio 1, sin depender de las
-  ventanas de 30 cuadros.
+  (generación y ms desde su `cascade:start`), con el primer cuadro de cada
+  corrida. En WebGPU sale cuando la GPU termina el trabajo de ese cuadro
+  (`onSubmittedWorkDone`) y lleva `gpuMs`, que incluye la primera compilación
+  de los kernels; en WASM y CPU, al momento. Desde ese instante el estado
+  dice «Simulando». La sonda lo lee para medir el criterio 1, sin depender de
+  las ventanas de 30 cuadros.
+  (enmienda 2026-10-12: salía al enviar el primer subpaso, antes de que la GPU
+  compilara sus pipelines; la sonda midió 883 ms sin cuadros bajo
+  «Simulando».)
 - **Compilación de kernels**: se mide la primera vez de la sesión y la
   repetición (Restablecer → Simular). Si la primera pasa de 500 ms con todo
   preparado, va la entrega 4. Esa entrega reduce los pipelines distintos

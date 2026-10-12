@@ -41,13 +41,21 @@ import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
-import { latirLaSimulacion, pushSolverEvent, registerClothGeometry, type MeshManifestEntry } from '../../utils/cloth/solverRuntimeTracker';
+import {
+  currentCascadeGeneration,
+  latirLaSimulacion,
+  marcarPrimerCuadro,
+  pushSolverEvent,
+  registerClothGeometry,
+  type MeshManifestEntry,
+} from '../../utils/cloth/solverRuntimeTracker';
 import { seSimula } from '../../utils/cloth/piezasEnLaSimulacion';
 import { nodosDelSubpaso } from './nodosDelSubpaso';
 import { pushError } from '../../utils/errorTracker';
 import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { FACE_POKE_GENERATE_CADENCE } from '../../utils/cloth/gpu/tslFacePoke';
 import { isRendererDeviceLost, markRendererDeviceLost } from './rendererDeviceLost';
+import { avisarCuandoLaGpuTermine } from './avisarCuandoLaGpuTermine';
 import { isTetherDisabled } from './tetherFlag';
 import { useCollisionBodies } from './useCollisionBodies';
 import { useMeshing } from './useMeshing';
@@ -444,6 +452,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   // ─── Per-frame geometry update ──────────────────────────────────────────────
 
+  // El primer cuadro de la corrida ya se ve: a la caja negra, y el estado deja
+  // «Preparando la tela».
+  const avisarPrimerCuadro = (datos?: Record<string, unknown>) => {
+    marcarPrimerCuadro(datos);
+    dispatch(marcarTelaEnMovimiento(true));
+  };
+
   useFrame(({ gl }) => {
     if (!meshRef.current || !staticGeometry) return;
     if (isPlayingBack) return;
@@ -544,8 +559,18 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         renderer.compute(substepNodes);
       }
       // IA 1b-2: un cuadro de tela nueva (en TSL, render y sim van al mismo paso).
-      // El primero de la corrida apaga «Preparando la tela».
-      if (latirLaSimulacion(edgeDataRef.current)) dispatch(marcarTelaEnMovimiento(true));
+      // El primero de la corrida apaga «Preparando la tela» cuando la GPU lo
+      // termina, no al enviarlo (el porqué, en `avisarCuandoLaGpuTermine`). La
+      // corrida sigue viva mientras sean su cascada y su solver: Restablecer lo
+      // suelta y anula la ref, y una cascada nueva lo reemplaza.
+      if (latirLaSimulacion(edgeDataRef.current)) {
+        const generacion = currentCascadeGeneration();
+        avisarCuandoLaGpuTermine(
+          rendererDevice,
+          () => generacion === currentCascadeGeneration() && tslSolverRef.current === solver,
+          avisarPrimerCuadro,
+        );
+      }
 
       // Steam brush (once per frame, after substeps settle; skip when inactive)
       if (solver.brushNodes.strength.value > 0) {
@@ -744,7 +769,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           staticGeometry.computeVertexNormals();
           staticGeometry.computeBoundingSphere();
           ultimaTelaCopiadaRef.current = positions;
-          if (latirLaSimulacion(edgeDataRef.current)) dispatch(marcarTelaEnMovimiento(true));
+          // Estas posiciones se dibujan en este mismo cuadro: el primero ya se ve.
+          if (latirLaSimulacion(edgeDataRef.current)) avisarPrimerCuadro();
         }
       }
     }

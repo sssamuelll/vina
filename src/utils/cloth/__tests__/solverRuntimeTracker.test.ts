@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BufferGeometry } from 'three';
 import {
   beginCascade,
@@ -12,6 +12,7 @@ import {
   aristasDeLaTela,
   latidosDeLaSimulacion,
   latirLaSimulacion,
+  marcarPrimerCuadro,
   pushSolverEvent,
   reemplazarEventoDeLaFase,
   registerClothGeometry,
@@ -165,15 +166,28 @@ describe('solverRuntimeTracker — el latido de la tela (IA 1b-2)', () => {
     expect(aristasDeLaTela()).toBeNull();
   });
 
-  it('el primer latido de cada corrida se marca una vez, con lo que tardó desde su cascada', () => {
-    clearSolverEvents();
-    beginCascade();
-    expect(latirLaSimulacion(null)).toBe(true);
-    expect(latirLaSimulacion(null)).toBe(false);
-    const ev = getSolverEvents().filter((e) => e.kind === 'tela:primer-cuadro');
-    expect(ev).toHaveLength(1);
-    expect(typeof ev[0].data.ms).toBe('number');
-    beginCascade();
-    expect(latirLaSimulacion(null), 'una corrida nueva vuelve a empezar').toBe(true);
+  it('el primer latido de cada corrida se cuenta una vez; el evento lo marca quien sabe que ya se ve', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      clearSolverEvents();
+      const primeros = () => getSolverEvents().filter((e) => e.kind === 'tela:primer-cuadro').map((e) => e.data);
+      vi.setSystemTime(10_000);
+      beginCascade();
+      expect(latirLaSimulacion(null)).toBe(true);
+      expect(latirLaSimulacion(null)).toBe(false);
+      expect(primeros(), 'latir no lo marca: en WebGPU el cuadro apenas se envió').toEqual([]);
+      vi.setSystemTime(10_250);
+      marcarPrimerCuadro({ gpuMs: 180 });
+      expect(primeros(), 'los ms cuentan desde su cascada').toEqual([{ ms: 250, gpuMs: 180 }]);
+
+      vi.setSystemTime(20_000);
+      beginCascade();
+      expect(latirLaSimulacion(null), 'una corrida nueva vuelve a empezar').toBe(true);
+      vi.setSystemTime(20_040);
+      marcarPrimerCuadro();
+      expect(primeros().at(-1), 'y mide desde su propia cascada').toEqual({ ms: 40 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

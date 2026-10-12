@@ -16,7 +16,9 @@
  * Corre con GPU real (config webgpu, headed) y contra el build:
  *   npm run build && VINA_E2E_BUILD=1 VINA_E2E_PORT=5187 \
  *     npx playwright test --config playwright.webgpu.config.ts drape-sonda
- * La evidencia queda en `.tmp/sonda-drape/<instante>/`.
+ * La evidencia queda en `.tmp/sonda-drape/<instante>/`. `SONDA_PREPARAR_MS=0`
+ * no es un arranque en frío: `cambiarVista` ya espera 700 ms y el preparador
+ * arranca a los 600.
  */
 import { test, expect, type Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -66,6 +68,8 @@ interface Sonda {
   largas: Array<{ t: number; ms: number }>;
   muestras: Muestra[];
   ventanas: Array<{ t: number; ms: number }>;
+  /** El `timeStamp` del clic en «Simular»: el instante del evento, en el reloj de la página. */
+  clic?: number;
   /** Cuándo el estado al pie dijo «Simulando» por primera vez tras el clic. */
   simulando?: number;
 }
@@ -258,10 +262,12 @@ test.describe('Sonda del drape @gpu-local', () => {
     await foto('0-antes-de-simular');
 
     // El estado al pie, mirado cuadro a cuadro desde antes del clic: el instante en
-    // que deja «Preparando la tela» y dice «Simulando». Lo mira la página, no el
+    // que deja «Preparando la tela» y dice «Simulando». Y el clic de verdad, con el
+    // instante de su evento: «del clic» se mide desde ahí. Lo mira la página, no el
     // test: el gesto no espera y las marcas no se mueven.
     await page.evaluate(() => {
       const sonda = (window as unknown as { __SONDA__: Sonda }).__SONDA__;
+      document.addEventListener('click', (e) => { sonda.clic = e.timeStamp; }, { capture: true, once: true });
       const mirar = () => {
         if (document.querySelector('button[aria-label^="Estado de la simulación: Simulando"]')) sonda.simulando = performance.now();
         else requestAnimationFrame(mirar);
@@ -275,6 +281,9 @@ test.describe('Sonda del drape @gpu-local', () => {
     for (const s of [3, 8, 15, 30, 45]) {
       await page.waitForTimeout((s - anterior) * 1000);
       anterior = s;
+      // Las fotos de antes del perfil caen en la ventana de `tareasDeMasDe100ms`:
+      // con su marca, una tarea larga se le puede atribuir.
+      if (marcas.perfil === undefined) await marcar(`foto${s}`);
       await foto(`1-simulando-${String(s).padStart(2, '0')}s`);
       // Del 15 al 20: cinco segundos de perfil de CPU del hilo principal, con la
       // tela ya en marcha. El perfilador pesa algo: ese tramo se marca aparte.
@@ -361,16 +370,18 @@ test.describe('Sonda del drape @gpu-local', () => {
     };
     const arranques = eventosSolver.filter((e) => e.kind === 'cascade:start');
     const primeraVentana = sonda.ventanas.find((v) => v.t > marcas.simular);
-    // Del clic, por el instante del evento: su `data.ms` cuenta desde el
-    // `cascade:start`, que llega después de mallar.
+    // «Del clic» cuenta desde el evento de verdad; sin él, desde la marca.
+    const clic = sonda.clic ?? marcas.simular;
+    // Por el instante del evento: su `data.ms` cuenta desde el `cascade:start`,
+    // que llega después de mallar.
     const primerCuadro = eventosSolver.find((e) => e.kind === 'tela:primer-cuadro' && e.t >= marcas.simular);
+    const gpuMs = primerCuadro?.data.gpuMs;
+    const esPreparar = (e: { kind: string }) => e.kind === 'preparar:listo' || e.kind === 'preparar:fallo';
     // Por fase, lo último que dejó el preparador antes del clic (el ring guarda el
     // orden): un `listo` que después falló no cuenta como preparado.
     const preparado = new Map<unknown, Record<string, unknown>>();
     for (const e of eventosSolver) {
-      if ((e.kind === 'preparar:listo' || e.kind === 'preparar:fallo') && e.t < marcas.simular) {
-        preparado.set(e.data.fase, { fase: e.data.fase, kind: e.kind, ...e.data });
-      }
+      if (esPreparar(e) && e.t < marcas.simular) preparado.set(e.data.fase, { fase: e.data.fase, kind: e.kind, ...e.data });
     }
     const usado = eventosSolver.filter((e) => e.kind === 'preparar:usada' && e.t >= marcas.simular).map((e) => e.data);
     const resumen = {
@@ -379,10 +390,17 @@ test.describe('Sonda del drape @gpu-local', () => {
       arranques: arranques.map((e) => ({ t: e.t, generation: e.generation })),
       tiers: eventosSolver.filter((e) => e.kind.startsWith('tier:')).map((e) => ({ t: e.t, kind: e.kind, ...e.data })),
       primerCuadroTrasSimularMs: primeraVentana ? Math.round(primeraVentana.t - marcas.simular) : null,
-      clicAPrimerCuadroMs: primerCuadro ? Math.round(primerCuadro.t - marcas.simular) : null,
+      clicAPrimerCuadroMs: primerCuadro ? Math.round(primerCuadro.t - clic) : null,
       clicAEstadoSimulandoMs:
-        sonda.simulando !== undefined && sonda.simulando < marcas.pausa ? Math.round(sonda.simulando - marcas.simular) : null,
+        sonda.simulando !== undefined && sonda.simulando < marcas.pausa ? Math.round(sonda.simulando - clic) : null,
+      // Lo que tardó la GPU en terminar el primer cuadro (compila sus kernels); en WASM no hay.
+      compilacionPrimerCuadroMs: typeof gpuMs === 'number' ? gpuMs : null,
       preparadoAntesDelClic: [...preparado.values()],
+      // El ring guarda uno por fase: lo que el preparador terminó tras el clic
+      // reemplaza lo de antes, y aquí se ve.
+      preparadoTrasElClic: eventosSolver
+        .filter((e) => esPreparar(e) && e.t >= marcas.simular)
+        .map((e) => ({ t: e.t, kind: e.kind, ...e.data })),
       usadoDeLoPreparado: usado,
       ventanasSimulando: sonda.ventanas.filter((v) => v.t >= marcas.simular && v.t < marcas.pausa).length,
       ventanasReanudada: sonda.ventanas.filter((v) => v.t >= marcas.reanudar && v.t < marcas.fin).length,

@@ -100,8 +100,9 @@ let tierDeLaTela: SolverTier = 'none';
  * latido se para aunque un worker siga calculando. Lleva las aristas del
  * solver, que el mapa de ajuste por pieza necesita (`fit_map`).
  *
- * Devuelve `true` solo en el primer latido de la corrida, que además queda en
- * la caja negra como `tela:primer-cuadro`, con los ms desde su `beginCascade`.
+ * Devuelve `true` solo en el primer latido de la corrida. No lo marca en la
+ * caja negra: en WebGPU ese cuadro apenas se envió y todavía no se ve. Lo marca
+ * `marcarPrimerCuadro`, que llama quien sabe cuándo se ve.
  */
 export function latirLaSimulacion(edges: SolverEdgeData | null): boolean {
   latidos += 1;
@@ -109,9 +110,16 @@ export function latirLaSimulacion(edges: SolverEdgeData | null): boolean {
   aristas = edges;
   tierDeLaTela = activeTier;
   latidosDeLaCorrida += 1;
-  if (latidosDeLaCorrida !== 1) return false;
-  pushSolverEvent('tela:primer-cuadro', { ms: Date.now() - inicioDeLaCorrida });
-  return true;
+  return latidosDeLaCorrida === 1;
+}
+
+/**
+ * El primer cuadro de la corrida, ya en pantalla: queda en la caja negra como
+ * `tela:primer-cuadro`, con los ms desde su `beginCascade` y lo que traiga
+ * `datos` (en WebGPU, `gpuMs`: lo que tardó la GPU en terminarlo).
+ */
+export function marcarPrimerCuadro(datos?: Record<string, unknown>): void {
+  pushSolverEvent('tela:primer-cuadro', { ms: Date.now() - inicioDeLaCorrida, ...datos });
 }
 
 export function latidosDeLaSimulacion(): number {
@@ -163,7 +171,7 @@ export const SOLVER_EVENTS_MAX = 200;
 
 const events: SolverEvent[] = [];
 let generation = 0;
-/** Cuándo empezó la corrida viva y cuántos latidos lleva: su primero es `tela:primer-cuadro`. */
+/** Cuándo empezó la corrida viva (`marcarPrimerCuadro` mide desde ahí) y cuántos latidos lleva. */
 let inicioDeLaCorrida = 0;
 let latidosDeLaCorrida = 0;
 
