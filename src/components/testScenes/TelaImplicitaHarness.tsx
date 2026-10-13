@@ -1,0 +1,103 @@
+/**
+ * La tela nueva en la GPU (spec docs/superpowers/specs/2026-10-13-tela-nueva-design.md §4.4.3): paridad
+ * con la CPU, velocidad y segundos hasta quedar quieta.
+ *
+ * DEV-only: App.tsx la monta con `?testScene=tela-implicita` y reemplaza la app entera. La consume
+ * tests/e2e/tela-implicita.spec.ts (@gpu-local). Parámetros: `modo` = paridad | velocidad | quietud;
+ * `escena` = chica (disco Cusick de 10 mm) | grande (disco de 48 cm con malla de 5 mm, del tamaño de la
+ * camiseta); `cg` = iteraciones por ronda; `cuadros`; `anticipar=0` y `busqueda=0` apagan esos pasos para
+ * aislar una diferencia. Publica el resultado en `window.__TELA_IMPLICITA__`.
+ */
+import { useEffect, useState } from 'react';
+import { escenaCusick, TELA_DE_LABORATORIO } from '../../utils/cloth/implicito/banco/escenas';
+import { SistemaTela } from '../../utils/cloth/implicito/sistema';
+import { pasoImplicito } from '../../utils/cloth/implicito/paso';
+import { VigiaDeQuietud } from '../../utils/cloth/implicito/quietud';
+import { MotorGpu, type EstadoGpu } from '../../utils/cloth/implicito/gpu/motorGpu';
+
+interface Resultado {
+  modo: string;
+  escena: string;
+  vertices: number;
+  gpu: string;
+  dif?: { maxima: number; media: number };
+  msPorCuadro?: number;
+  segundosHastaQuieta?: number | null;
+  estado?: EstadoGpu;
+  error?: string;
+}
+
+async function correr(q: URLSearchParams): Promise<Resultado> {
+  const modo = q.get('modo') ?? 'paridad';
+  const escena = q.get('escena') ?? 'chica';
+  const e = escena === 'grande' ? escenaCusick(5, 480) : escenaCusick(10);
+  const ajustes = {
+    maxCG: Number(q.get('cg') ?? 50),
+    // en la paridad, todas las iteraciones en las dos: la tolerancia no decide nada
+    tolCG: modo === 'paridad' ? 0 : 1e-4,
+    anticipar: q.get('anticipar') !== '0',
+    busqueda: q.get('busqueda') !== '0',
+  };
+  const nuevo = () => new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: e.obstaculos, ajustes });
+  const s = nuevo();
+  const adaptador = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+  if (!adaptador) throw new Error('este navegador no tiene WebGPU');
+  const device = await adaptador.requestDevice();
+  const { vendor, architecture, description } = adaptador.info;
+  const base = { modo, escena, vertices: s.n, gpu: `${vendor} ${architecture} ${description}`.trim() };
+  const motor = await MotorGpu.crear(device, s);
+  try {
+    if (modo === 'paridad') {
+      const cuadros = Number(q.get('cuadros') ?? 3);
+      const cpu = nuevo();
+      await motor.avanzar(cuadros);
+      for (let c = 0; c < cuadros; c++) pasoImplicito(cpu);
+      const xg = await motor.leerPosiciones();
+      let maxima = 0, suma = 0;
+      for (let i = 0; i < cpu.n; i++) {
+        const dist = Math.hypot(xg[3 * i] - cpu.x[3 * i], xg[3 * i + 1] - cpu.x[3 * i + 1], xg[3 * i + 2] - cpu.x[3 * i + 2]);
+        maxima = Math.max(maxima, dist);
+        suma += dist;
+      }
+      return { ...base, dif: { maxima, media: suma / cpu.n }, estado: await motor.leerEstado() };
+    }
+    if (modo === 'velocidad') {
+      await motor.avanzar(2); // calentamiento: el primer envío compila las tuberías
+      const cuadros = Number(q.get('cuadros') ?? 60);
+      const t0 = performance.now();
+      await motor.avanzar(cuadros);
+      return { ...base, msPorCuadro: (performance.now() - t0) / cuadros, estado: await motor.leerEstado() };
+    }
+    // quietud: hasta 10 s de tela, leyendo la historia de a un segundo
+    const vigia = new VigiaDeQuietud();
+    for (let segundo = 0; segundo < 10; segundo++) {
+      await motor.avanzar(60);
+      const historia = await motor.leerQuietud(60 * segundo, 60);
+      for (let c = 0; c < 60; c++) {
+        if (vigia.registrar(historia[c])) return { ...base, segundosHastaQuieta: (60 * segundo + c + 1) / 60, estado: await motor.leerEstado() };
+      }
+    }
+    return { ...base, segundosHastaQuieta: null, estado: await motor.leerEstado() };
+  } finally {
+    motor.destruir();
+    device.destroy();
+  }
+}
+
+function publicar(r: Resultado): void {
+  (window as unknown as { __TELA_IMPLICITA__?: Resultado }).__TELA_IMPLICITA__ = r;
+  console.log(`[tela-implicita] ${JSON.stringify(r)}`);
+}
+
+export default function TelaImplicitaHarness() {
+  const [texto, setTexto] = useState('preparando la escena…');
+  useEffect(() => {
+    correr(new URLSearchParams(window.location.search))
+      .catch((e: unknown): Resultado => ({ modo: '', escena: '', vertices: 0, gpu: '', error: e instanceof Error ? (e.stack ?? e.message) : String(e) }))
+      .then((r) => {
+        publicar(r);
+        setTexto(JSON.stringify(r, null, 1));
+      });
+  }, []);
+  return <pre>{texto}</pre>;
+}
