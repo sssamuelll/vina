@@ -10,6 +10,11 @@
 
 .pattern-svg {
   display: block;
+  /* Un gesto que empieza en la hoja no selecciona texto (T#212): arrastrar una
+     pieza hasta la barra superior seleccionaba la barra, y esa selección
+     secuestraba el arrastre siguiente. El campo del nombre de la pieza no
+     cambia: se abre con el nombre entero seleccionado y se escribe encima. */
+  user-select: none;
 }
 
 /* La pieza NO declara cursor propio (nota de María #207). Antes ponía
