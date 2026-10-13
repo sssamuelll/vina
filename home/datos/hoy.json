@@ -33,7 +33,7 @@
       "id": "lee",
       "titulo": { "en": "Reads", "es": "Lee" },
       "mono": true,
-      "texto": { "en": "DXF-AAMA · DXF-ASTM · Gerber and Lectra dialects", "es": "DXF-AAMA · DXF-ASTM · dialectos Gerber y Lectra" },
+      "texto": { "en": "DXF-AAMA · DXF-ASTM", "es": "DXF-AAMA · DXF-ASTM" },
       "prueba": ["src/utils/dxf/formatProfiles.ts", "src/components/shell/AppShell.tsx"]
     },
     {
