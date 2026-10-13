@@ -111,3 +111,22 @@ PASS: all bench thresholds OK.
 - Thresholds may need a small bump if the project starts running benches
   on consistently slower hardware (e.g. arm64 emulation). Treat that as a
   PR with a one-line rationale, not as a routine maintenance task.
+
+## `bench:tela` — the new cloth engine against a private reference
+
+`npm run bench:tela` runs the lab tests of the new cloth engine (spec
+`docs/superpowers/specs/2026-10-13-tela-nueva-design.md` §4.4: the Cusick disc
+and the cantilever strip at 5, 10 and 20 mm) and compares them with a
+reference that is **not** in this repo. `VINA_REFERENCIAS` must point to a
+private folder holding `referencias.json`; the report is written to its
+`informes/` subfolder, and the script refuses to run without it.
+
+```bash
+VINA_REFERENCIAS=<private folder> npm run bench:tela -- --motor=xpbd
+```
+
+`--motor=xpbd` measures today's engine, the baseline every delivery is
+measured against (§4.4.4). Other flags: `--ensayo=cusick|voladizo|todo` and
+`--mallas=5,10,20`. The script already runs under the `scripts/pesado.mjs`
+lock. The exact-physics half of the bench (§4.4.1) needs no private data: it
+is the vitest suite in `src/utils/cloth/implicito/__tests__/`.

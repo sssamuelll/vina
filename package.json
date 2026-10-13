@@ -38,6 +38,7 @@
     "bench": "tsx bench/run.ts",
     "bench:matchvertices": "tsx bench/matchVertices.bench.ts",
     "bench:lra": "tsx bench/buildLRAConstraints.bench.ts",
+    "bench:tela": "node scripts/pesado.mjs --nombre=banco-tela --espera=15 -- tsx bench/telaNueva.ts",
     "home:patron": "tsx scripts/home/dxf-a-svg.mjs",
     "home:paginas": "node scripts/home/paginas.mjs",
     "home:readme": "node scripts/home/readme.mjs",
