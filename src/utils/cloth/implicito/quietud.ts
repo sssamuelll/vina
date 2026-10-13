@@ -1,7 +1,9 @@
 /**
- * El medidor de quietud (spec 2026-10-13 §4.2.4): cuánto se movió la tela en el último cuadro, frente a
+ * El medidor de quietud (spec 2026-10-13 §4.2.4): cuánto pide moverse la tela en el último cuadro, frente a
  * un cuadro de caída libre. Se mide por velocidad y no por fuerza: en la GPU, la fuerza de una tela en
- * reposo no baja del ruido de la precisión simple. La GPU lo calcula igual (gpu/wgsl.ts, `aplicar`).
+ * reposo no baja del ruido de la precisión simple. Y es la velocidad que pide el paso de Newton, no la que
+ * dejó la búsqueda en línea: una tela trabada no se mueve, pero no está quieta. La GPU lo calcula igual
+ * (gpu/wgsl.ts, `aplicar`).
  */
 import type { SistemaTela } from './sistema';
 
@@ -19,7 +21,7 @@ export function medirQuietud(s: SistemaTela): Quietud {
   let mv = 0, peso = 0, maximo = 0, vertice = -1;
   for (let i = 0; i < s.n; i++) {
     if (s.fijo[i]) continue;
-    const v = Math.hypot(s.v[3 * i], s.v[3 * i + 1], s.v[3 * i + 2]);
+    const v = Math.hypot(s.vPedida[3 * i], s.vPedida[3 * i + 1], s.vPedida[3 * i + 2]);
     mv += s.masa[i] * v;
     peso += s.masa[i] * gh;
     if (vertice < 0 || v / gh > maximo) {

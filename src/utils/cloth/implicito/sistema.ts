@@ -76,6 +76,11 @@ export class SistemaTela {
   readonly xt: Float64Array;
   /** velocidades */
   readonly v: Float64Array;
+  /**
+   * la velocidad que pidió el último paso de Newton (Δ/h), antes de que la búsqueda en línea lo recorte: es
+   * la que mide la quietud, porque una tela trabada (α = 0) no se mueve pero sigue pidiendo moverse
+   */
+  readonly vPedida: Float64Array;
 
   constructor(malla: MallaDeTela, tela: TelaFisica, op: OpcionesSistema = {}) {
     this.n = malla.x.length / 3;
@@ -94,6 +99,7 @@ export class SistemaTela {
     this.x = Float64Array.from(malla.x);
     this.xt = Float64Array.from(malla.x);
     this.v = new Float64Array(3 * this.n);
+    this.vPedida = new Float64Array(3 * this.n);
   }
 
   /** La coordenada d de y = x_t + h·v + h²·g del vértice i; un empotrado no se mueve. */

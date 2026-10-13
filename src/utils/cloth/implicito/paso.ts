@@ -86,6 +86,7 @@ export function pasoImplicito(s: SistemaTela): InfoPaso {
   for (let q = 0; q < 3 * n; q++) {
     s.x[q] = s.xt[q] + alfa * dx[q];
     s.v[q] = (s.x[q] - s.xt[q]) / h;
+    s.vPedida[q] = dx[q] / h;
   }
   return { cg, anticipados, alfa, G0, G1 };
 }
