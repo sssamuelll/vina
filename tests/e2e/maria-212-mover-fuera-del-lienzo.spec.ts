@@ -5,7 +5,8 @@ import { activarHerramienta, addPiece, dispatch, st } from './helpers/lienzo';
  * maria-212 (Trello T#212, 09-08): «cuando los quiero mover solo se mueven unos
  * pocos milímetros y mayor rango de movimiento queda bloqueado».
  *
- * Dos causas, reproducidas el 13-10 contra producción (69910bcd):
+ * Dos causas, reproducidas el 13-10 contra el build de main (69910bcd), el
+ * mismo que estaba desplegado:
  *  A. El arrastre de la pieza solo oía `mousemove` sobre el <svg>. Al salir del
  *     lienzo la pieza se quedaba en el borde; con zoom alto el lienzo abarca
  *     unos 30 mm, y eso era todo lo que avanzaba por arrastre.
