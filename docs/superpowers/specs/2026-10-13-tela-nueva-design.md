@@ -205,7 +205,13 @@ y = x_t + h·v_t + h²·g
    (bloques 3×3 de la diagonal), con un presupuesto de iteraciones por cuadro
    (20-50, ajustable) y una tolerancia relativa.
 4. **Anticipación de contactos**: si `x + Δ` mete vértices en el cuerpo o en la propia
-   tela, esos contactos se agregan al sistema y se resuelve una vez más.
+   tela, esos contactos se agregan al sistema y se resuelve una vez más. Medido en el
+   disco Cusick de 10 mm: el término `½·k_c·(p0 − n·Δ)²` con `p0 < 0` tira de los
+   vértices anticipados hasta la superficie y un poco más allá, la búsqueda en línea
+   recorta el paso a 1/16 y la segunda ronda duplica el gradiente conjugado sin ganarle a
+   no anticipar. La forma del contacto (restricción en el gradiente conjugado o varias
+   iteraciones de Newton) se decide con el cuerpo, en la entrega 4; mientras tanto la
+   anticipación se puede apagar.
 5. **Búsqueda en línea**: si `G(x + Δ) > G(x)`, el paso se reduce a la mitad (hasta 8
    veces).
 6. `v = (x − x_t)/h`.
@@ -231,9 +237,12 @@ fuente de verdad de las pruebas y el patrón contra el que se compara la GPU.
 
 #### 4.2.4 El medidor de quietud
 
-Cada cuadro informa cuánto se movió la prenda: la suma de `m·|v|` de sus vértices
-libres, dividida por la de un cuadro de caída libre (`m·g·h`); y, aparte, el máximo
-por vértice, para ubicar dónde se mueve. La prenda está **quieta** cuando el total baja
+Cada cuadro informa cuánto pide moverse la prenda: la suma de `m·|v|` de sus vértices
+libres, con `v = Δ/h` la velocidad que pide el paso de Newton antes de la búsqueda en
+línea, dividida por la de un cuadro de caída libre (`m·g·h`); y, aparte, el máximo por
+vértice, para ubicar dónde se mueve. Se usa la velocidad pedida y no la aceptada porque
+una tela trabada (la búsqueda en línea rechaza el paso entero) no se mueve, pero no está
+quieta. La prenda está **quieta** cuando el total baja
 de 0,1 % durante 30 cuadros seguidos (umbral que se confirma con el banco). El estado
 se publica en la caja negra (`solverRuntimeTracker`) y reemplaza al asentado por reloj
 del cuadro 150.
