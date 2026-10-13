@@ -1393,8 +1393,20 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     handleMouseUpRef.current(e);
   }, []);
 
+  // Soltar fuera de la hoja apaga los resaltes, como salir de ella (#1132). El
+  // gesto sigue oyendo el ratón fuera (T#212, abajo) y las herramientas
+  // calculan su resalte con esas coordenadas: lo que eso encendía no tenía
+  // quién lo apagara, porque el mouseleave ya había pasado al salir.
+  const handleMouseLeaveRef = useRef(handleMouseLeave);
+  handleMouseLeaveRef.current = handleMouseLeave;
   useEffect(() => {
-    const finishGlobalMouseInteraction = () => finishMouseInteraction();
+    const finishGlobalMouseInteraction = (ev: Event) => {
+      const svg = svgRef.current;
+      const sueltaFuera = mouseInteractionActiveRef.current
+        && !(ev.target instanceof Node && svg?.contains(ev.target));
+      finishMouseInteraction();
+      if (sueltaFuera) handleMouseLeaveRef.current();
+    };
     window.addEventListener('mouseup', finishGlobalMouseInteraction);
     window.addEventListener('blur', finishGlobalMouseInteraction);
     return () => {
@@ -1402,7 +1414,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
       window.removeEventListener('blur', finishGlobalMouseInteraction);
       finishMouseInteraction();
     };
-  }, [finishMouseInteraction]);
+  }, [finishMouseInteraction, svgRef]);
 
   // Track SVG viewport size: the fit-to-view needs it.
   useEffect(() => {
@@ -1558,7 +1570,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
   useEffect(() => {
     const seguirFuera = (ev: MouseEvent) => {
       const svg = svgRef.current;
-      if (!mouseInteractionActiveRef.current || !svg || svg.contains(ev.target as Node)) return;
+      if (!mouseInteractionActiveRef.current || !svg || (ev.target instanceof Node && svg.contains(ev.target))) return;
       handleMouseMoveRef.current({
         clientX: ev.clientX, clientY: ev.clientY, button: ev.button, buttons: ev.buttons, detail: ev.detail,
         shiftKey: ev.shiftKey, altKey: ev.altKey, ctrlKey: ev.ctrlKey, metaKey: ev.metaKey,
