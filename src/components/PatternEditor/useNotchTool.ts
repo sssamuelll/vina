@@ -492,6 +492,11 @@ export function useNotchTool(
     });
   }, [gesture, resolveTarget, resolveTargetOnRing]);
 
+  /** Al salir del lienzo de golpe no llega mousemove que lo apague (#1132). */
+  const limpiarHover = useCallback(() => {
+    setState(prev => (prev.hoveredPoint ? { ...prev, hoveredPoint: null } : prev));
+  }, []);
+
   // Todo se mide contra la pieza de AHORA: la línea, su ancla, la esquina, el
   // piquete y el techo. Si el contorno encoge con la cota abierta, el techo de
   // la cota encoge con él (#1124).
@@ -524,6 +529,7 @@ export function useNotchTool(
     handleKeyDown,
     cancel: gesture.cancel,
     isArmed: gesture.isArmed,
+    limpiarHover,
     refining: refiningConTecho,
     refineExisting,
     confirmRefine,

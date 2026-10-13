@@ -528,6 +528,12 @@ export function useSlashAndSpreadTool(
     setState(INITIAL_STATE);
   }, []);
 
+  /** Al salir del lienzo de golpe no llega mousemove que lo apague (#1132).
+   *  Solo la mitad bajo el ratón: la fase y el corte se quedan. */
+  const limpiarHover = useCallback(() => {
+    setState(prev => (prev.hoveredHalf ? { ...prev, hoveredHalf: null } : prev));
+  }, []);
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
       const pt = toPattern(e);
@@ -607,5 +613,6 @@ export function useSlashAndSpreadTool(
     handleKeyDown,
     getCursor,
     reset,
+    limpiarHover,
   };
 }
