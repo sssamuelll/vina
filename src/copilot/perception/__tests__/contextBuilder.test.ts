@@ -123,6 +123,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
     },
     simulation: {
       simulationState: 'idle',
+      telaEnMovimiento: false,
       pieceFabrics: { 'piece-1': 'cotton-poplin' },
       defaultFabricId: 'cotton-poplin',
       particleDistance: 5,

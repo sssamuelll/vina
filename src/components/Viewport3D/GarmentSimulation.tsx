@@ -21,17 +21,17 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { PatternPiece, Seam, SeamGroup } from '../../types/types';
-import type { SeamInitData } from '../../utils/cloth/clothWorker';
+import { PatternPiece, Seam } from '../../types/types';
 import { seamInitDataToPairs } from '../../utils/cloth/seamPairs';
 import { buildSeamFillBridges, filterSewnBridges } from './seamFill';
+import { seamsToInitData } from './costurasDeLaSimulacion';
+import { colocarMallas } from './colocarMallas';
 import { resolveArrangementWithFrames } from '../../utils/cloth/arrangement/arrangementBinding';
-import { computeEffectiveRegions } from '../../utils/cloth/garmentPlacement';
 import { wrapPlacedMesh } from '../../utils/cloth/arrangement/wrapPlacedMesh';
 import { buildAxisHints } from '../../utils/cloth/arrangement/buildAxisHints';
 import { computeFitMapData, DEFAULT_FIT_PARAMS, fabricToFitParams, shouldRequestEdgeData } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
-import { addPin, setCollisionDistance, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
+import { addPin, marcarTelaEnMovimiento, setCollisionDistance, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
 import { showErrorToast } from '../../store/copilotUISlice';
 import { textureManager } from '../../utils/textures/TextureManager';
 import type { Texture } from 'three';
@@ -41,20 +41,27 @@ import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
-import { latirLaSimulacion, pushSolverEvent, registerClothGeometry, type MeshManifestEntry } from '../../utils/cloth/solverRuntimeTracker';
+import {
+  currentCascadeGeneration,
+  latirLaSimulacion,
+  marcarPrimerCuadro,
+  pushSolverEvent,
+  registerClothGeometry,
+  type MeshManifestEntry,
+} from '../../utils/cloth/solverRuntimeTracker';
 import { seSimula } from '../../utils/cloth/piezasEnLaSimulacion';
 import { nodosDelSubpaso } from './nodosDelSubpaso';
 import { pushError } from '../../utils/errorTracker';
 import { GPU_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { FACE_POKE_GENERATE_CADENCE } from '../../utils/cloth/gpu/tslFacePoke';
 import { isRendererDeviceLost, markRendererDeviceLost } from './rendererDeviceLost';
+import { avisarCuandoLaGpuTermine } from './avisarCuandoLaGpuTermine';
 import { isTetherDisabled } from './tetherFlag';
 import { useCollisionBodies } from './useCollisionBodies';
 import { useMeshing } from './useMeshing';
 import { useSimulationRecorder } from '../../hooks/useSimulationRecorder';
 import { useSimulationPlayback } from '../../hooks/useSimulationPlayback';
 import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
-import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
 import { computePenetrationMetric, getPenetrationBody, penetrationStrideFor } from '../../utils/cloth/penetrationMetric';
 import { computeFacePokeMetric, getFacePokeMetricBody, facePokeStrideFor } from '../../utils/cloth/facePokeMetric';
 import { mapClothSimConfigToWasmSolverConfig, type SharedClothSimConfigKeys } from '../../utils/cloth/configBridge';
@@ -82,70 +89,6 @@ const TETHER_SETTLE_FRAMES = 150;
 // (sample-budgeted stride, see penetrationStrideFor) + one-time ~60ms lazy
 // body build (pseudonormals + hash) on the first tick after a body registers.
 const PENETRATION_READBACK_CADENCE = 4;
-
-/**
- * Convert Seam[] to SeamInitData[] for the worker.
- * Filters out inactive seams and passes extended fields (tension, strength, etc.).
- */
-function seamsToInitData(seams: Seam[], seamGroups?: SeamGroup[]): SeamInitData[] {
-  // Convert regular seams, filtering out inactive ones
-  const seamEntries: SeamInitData[] = seams
-    .filter(s => s.active !== false)
-    .map(s => ({
-      id: s.id,
-      pieceAId: s.pieceA.pieceId,
-      pieceAEdgeName: s.pieceA.edgeName,
-      pieceBId: s.pieceB.pieceId,
-      pieceBEdgeName: s.pieceB.edgeName,
-      type: s.type,
-      pieceARange: s.pieceA.tStart != null && s.pieceA.tEnd != null
-        ? [s.pieceA.tStart, s.pieceA.tEnd] as [number, number]
-        : undefined,
-      pieceBRange: s.pieceB.tStart != null && s.pieceB.tEnd != null
-        ? [s.pieceB.tStart, s.pieceB.tEnd] as [number, number]
-        : undefined,
-      // Sewing direction (Fase 5) — flows through every tier's resolution.
-      pieceBReversed: s.pieceB.reversed === true ? true : undefined,
-      tension: s.tension ?? 100,
-      strength: s.strength ?? 1.0,
-      active: true,
-      taped: s.taped ?? false,
-      // Proveniencia — solo para el color de las seam lines (seamThreadColor).
-      createdBy: s.createdBy,
-    }));
-
-  // Flatten SeamGroups into additional SeamInitData entries
-  if (seamGroups) {
-    for (const group of seamGroups) {
-      if (!group.active) continue;
-      const count = Math.min(group.edgesA.length, group.edgesB.length);
-      for (let i = 0; i < count; i++) {
-        const edgeA = group.edgesA[i];
-        const edgeB = group.edgesB[i];
-        seamEntries.push({
-          id: `${group.id}_${i}`,
-          pieceAId: edgeA.pieceId,
-          pieceAEdgeName: edgeA.edgeName,
-          pieceBId: edgeB.pieceId,
-          pieceBEdgeName: edgeB.edgeName,
-          type: group.type,
-          pieceARange: edgeA.tStart != null && edgeA.tEnd != null
-            ? [edgeA.tStart, edgeA.tEnd] as [number, number]
-            : undefined,
-          pieceBRange: edgeB.tStart != null && edgeB.tEnd != null
-            ? [edgeB.tStart, edgeB.tEnd] as [number, number]
-            : undefined,
-          tension: group.tension ?? 100,
-          strength: group.strength ?? 1.0,
-          active: true,
-          taped: group.taped ?? false,
-        });
-      }
-    }
-  }
-
-  return seamEntries;
-}
 
 export interface GarmentSimulationHandle {
   saveSnapshot: (id: string) => void;
@@ -353,7 +296,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // Envelope wrap (Task 5): curve each piece's flat mesher vertices over the
       // region cylinder (frame.point already carries the gross landmark, so the
       // wrap fully replaces the old rigid Euler rotate+translate). `flip` is the
-      // M4-C anatomy-up correction. MUST stay identical to the solver loop.
+      // M4-C anatomy-up correction. MUST stay identical to the solver loop (colocarMallas).
       const curved = wrapPlacedMesh(p.vertices, frame, wrapParams, flip);
       positions.set(curved, vOffset * 3);
       wrappedMeshes.push({ ...p, vertices: curved });
@@ -422,40 +365,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   // ─── Placed meshes for solver init ──────────────────────────────────────────
 
-  const placedMeshes = useMemo(() => {
-    if (pieceMeshes.length === 0) return [];
-
-    // M2: arrange-mode drags apply here too — what the user sees in the
-    // arrange view is EXACTLY where the solver starts.
-    const axisHints = buildAxisHints(activePieces, armAxis);
-    const arrangement = resolveArrangementWithFrames(activePieces, avatarMeasurements, arrangementOverrides, { axisHints, skeletonReady: armAxis.ready });
-    // Index by pieceId — pieceMeshes may have dropped failed-to-mesh pieces, so
-    // it is not guaranteed index-aligned with activePieces (matches render loop).
-    const arrangeById = new Map(activePieces.map((p, i) => [p.id, arrangement[i]]));
-
-    // Per-region tether radii (frente#2): one deterministic pass via
-    // computeEffectiveRegions (same toggle-reset semantics as the arrangement path).
-    const regions = computeEffectiveRegions(activePieces);
-    const regionById = new Map(activePieces.map((p, i) => [p.id, regions[i] as string]));
-
-    // Skip stale meshes (deleted piece, no frame) — same guard as the render
-    // loop; the old `?? arrangement[i]` fallback destructured undefined (#924).
-    return pieceMeshes
-      .filter(pm => arrangeById.has(pm.pieceId))
-      .map((pm) => {
-      const { frame, flip, wrapParams } = arrangeById.get(pm.pieceId)!;
-      // Envelope wrap (Task 5): IDENTICAL call to the render loop above — render
-      // and solver must not diverge. `frame.point` carries the landmark; `flip`
-      // is the M4-C anatomy-up correction.
-      const transformed = wrapPlacedMesh(pm.vertices, frame, wrapParams, flip);
-      const piece = activePieces.find(p => p.id === pm.pieceId);
-      const stiffnessMultiplier = computeStiffnessMultiplier(piece?.interfacingType, piece?.solidifyFactor);
-      const pressurePa = piece?.pressurePa ?? 0;
-      const foldInternals = piece?.internals?.filter(l => l.type === 'fold' && l.foldOptions);
-      return { ...pm, vertices: transformed, stiffnessMultiplier, pressurePa, internals: foldInternals, region: regionById.get(pm.pieceId) };
-    });
+  const placedMeshes = useMemo(
+    () => colocarMallas(pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis),
     // armAxis dep is load-bearing: when AvatarModel publishes posed arm dirs (async), this rebuilds → the solver re-seeds in A-pose. Removing it strands sleeves in T-pose (#924 A-pose).
-  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis]);
+    [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides, armAxis],
+  );
 
   // ─── Simulation lifecycle (solver cascade + collision) ──────────────────────
 
@@ -537,6 +451,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   });
 
   // ─── Per-frame geometry update ──────────────────────────────────────────────
+
+  // El primer cuadro de la corrida ya se ve: a la caja negra, y el estado deja
+  // «Preparando la tela».
+  const avisarPrimerCuadro = (datos?: Record<string, unknown>) => {
+    marcarPrimerCuadro(datos);
+    dispatch(marcarTelaEnMovimiento(true));
+  };
 
   useFrame(({ gl }) => {
     if (!meshRef.current || !staticGeometry) return;
@@ -637,8 +558,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       for (let s = 0; s < substeps; s++) {
         renderer.compute(substepNodes);
       }
-      // IA 1b-2: un cuadro de tela nueva (en TSL, render y sim van al mismo paso).
-      latirLaSimulacion(edgeDataRef.current);
 
       // Steam brush (once per frame, after substeps settle; skip when inactive)
       if (solver.brushNodes.strength.value > 0) {
@@ -663,6 +582,26 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         renderer.compute(solver.fitMapNodes.zero);
         for (const accumNode of solver.fitMapNodes.accum) renderer.compute(accumNode);
         renderer.compute(solver.fitMapNodes.colorize);
+      }
+
+      // IA 1b-2: un cuadro de tela nueva (en TSL, render y sim van al mismo paso).
+      // El primero de la corrida apaga «Preparando la tela» cuando la GPU termina
+      // sus kernels, no al enviarlos (el porqué, en `avisarCuandoLaGpuTermine`):
+      // por eso va tras el último del cuadro. El pase de dibujo se envía después
+      // de este useFrame y queda fuera, un límite conocido. La corrida sigue viva
+      // mientras sean su cascada, su solver y su device: Restablecer suelta el
+      // solver y anula la ref, una cascada nueva lo reemplaza, y con el device
+      // perdido la espera resuelve igual (no falla), así que eso se mira aquí.
+      if (latirLaSimulacion(edgeDataRef.current)) {
+        const generacion = currentCascadeGeneration();
+        avisarCuandoLaGpuTermine(
+          rendererDevice,
+          () =>
+            generacion === currentCascadeGeneration() &&
+            tslSolverRef.current === solver &&
+            !(rendererDevice && isRendererDeviceLost(rendererDevice)),
+          avisarPrimerCuadro,
+        );
       }
 
       // F0 (#897): en TSL la cadencia de render == cadencia de sim.
@@ -837,7 +776,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           staticGeometry.computeVertexNormals();
           staticGeometry.computeBoundingSphere();
           ultimaTelaCopiadaRef.current = positions;
-          latirLaSimulacion(edgeDataRef.current);
+          // Estas posiciones se dibujan en este mismo cuadro: el primero ya se ve.
+          if (latirLaSimulacion(edgeDataRef.current)) avisarPrimerCuadro();
         }
       }
     }

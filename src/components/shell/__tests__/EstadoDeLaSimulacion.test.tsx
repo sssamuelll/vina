@@ -25,7 +25,7 @@ import { subirPeldano } from '../../../shortcuts/escaleraDeLoLlamado';
 import { clearJournal, getJournal } from '../../../utils/telemetry/journal';
 import {
   startSimulation, pauseSimulation, resetSimulation, setSolverTier, setSeamResolution, setParticleCount,
-  setFrameTime, setBodyCollision, type SeamResolutionSummary, type SolverTier,
+  setFrameTime, setBodyCollision, marcarTelaEnMovimiento, type SeamResolutionSummary, type SolverTier,
 } from '../../../store/simulationSlice';
 import { setActiveTool3D } from '../../../store/toolSlice';
 import { seamResolutionFailureLabel } from '../../Viewport3D/solverTierDisplay';
@@ -61,10 +61,11 @@ const estado = () => screen.queryByRole('button', { name: /^Estado de la simulac
 const nombre = () => estado()!.getAttribute('aria-label') ?? '';
 const detalle = () => screen.queryByRole('group', { name: 'Detalle de la simulación' });
 
-/** La simulación en marcha, con un motor y (si se pide) un resumen de costuras. */
+/** La simulación en marcha y pasado su primer cuadro, con un motor y (si se pide) un resumen de costuras. */
 function simulando(opciones: { tier?: SolverTier; seam?: SeamResolutionSummary | null; ms?: number } = {}) {
   act(() => {
     store.dispatch(startSimulation());
+    store.dispatch(marcarTelaEnMovimiento(true));
     store.dispatch(setSolverTier(opciones.tier ?? 'wasm'));
     store.dispatch(setParticleCount(29338));
     store.dispatch(setSeamResolution(opciones.seam === undefined ? { totalConstraints: 124, zeroConstraintSeams: [] } : opciones.seam));
@@ -118,6 +119,13 @@ describe('EstadoDeLaSimulacion ▸ el icono', () => {
     act(() => { store.dispatch(setFrameTime(33.3)); });
     expect(nombre()).toBe(antes);
     expect(nombre()).not.toMatch(/fps/);
+  });
+
+  it('del clic al primer cuadro dice «Preparando la tela», no «Simulando»: todavía no se mueve nada', () => {
+    act(() => { store.dispatch(startSimulation()); });
+    montar();
+    expect(nombre()).toMatch(/^Estado de la simulación: Preparando la tela/);
+    expect(nombre()).not.toContain('Simulando');
   });
 
   it('el motor del solver es el que se dice', () => {
@@ -227,6 +235,20 @@ describe('EstadoDeLaSimulacion ▸ el detalle', () => {
     act(() => { store.dispatch(pauseSimulation()); });
     abrir();
     expect(detalle()!.firstElementChild!.textContent, 'en pausa también se dice el motor').toBe('En pausa · WebGPU');
+  });
+
+  it('mientras la tela se prepara empieza por «Preparando la tela · motor», sin la cifra de una corrida anterior', () => {
+    // Una cascada que vuelve a correr (una edición, una pérdida del device) prepara otra tela con el
+    // promedio de la anterior todavía en el store: esos fps no son de esta corrida.
+    act(() => {
+      store.dispatch(startSimulation());
+      store.dispatch(setSolverTier('webgpu'));
+      store.dispatch(setFrameTime(16.7));
+    });
+    montar();
+    abrir();
+    expect(detalle()!.firstElementChild!.textContent).toBe('Preparando la tela · WebGPU');
+    expect(detalle()!.textContent).not.toMatch(/fps/);
   });
 
   it('cuelga de <body>, es papel y se declara menú', () => {

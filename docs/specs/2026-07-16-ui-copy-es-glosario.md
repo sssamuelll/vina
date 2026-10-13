@@ -53,7 +53,7 @@ exclamaciones, verbos que nombran el resultado (protocolo de microcopy solace-wr
 | Layers | Capas | |
 | View | Vista | |
 | Snapshot | Captura | |
-| Simulate / Simulating | Simular / Simulando | sentence case; el estado de la línea al pie dice «Simulando · N fps · motor» (P5), ya no «SIMULANDO» en mayúsculas |
+| Simulate / Simulating | Simular / Simulando | sentence case; el estado de la línea al pie dice «Simulando · N fps · motor» (P5), ya no «SIMULANDO» en mayúsculas. Del clic en «Simular» al primer cuadro, el estado dice «Preparando la tela · motor» |
 | Arrange | Colocar | colocación 3D de piezas |
 | Sew | Coser | |
 | Dress Avatar | Vestir avatar | |

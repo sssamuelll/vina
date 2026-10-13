@@ -486,7 +486,7 @@ test('el estado de la simulación vive al pie del margen del 3D: un icono que de
     return {
       ultimo: botones[botones.length - 1].getAttribute('aria-label') ?? '',
       alPie: m.bottom - b.bottom, ancho: b.width,
-      enElPie: pie.querySelector('[aria-label^="Estado de la simulación"]') !== null || /Simulando|En pausa/.test(pie.textContent ?? ''),
+      enElPie: pie.querySelector('[aria-label^="Estado de la simulación"]') !== null || /Preparando la tela|Simulando|En pausa/.test(pie.textContent ?? ''),
     };
   }, MARGEN);
   expect(caja.ultimo, 'el estado no es lo último del margen').toMatch(/^Estado de la simulación/);
@@ -538,7 +538,8 @@ test('el estado de la simulación vive al pie del margen del 3D: un icono que de
   }, MARGEN);
   expect(d.derecha, 'el detalle tapa el margen').toBeLessThanOrEqual(d.margenIzquierda);
   expect(Math.abs(d.abajo - d.botonAbajo), 'el detalle no se apoya en el icono').toBeLessThanOrEqual(2);
-  expect(d.cabecera, 'el detalle no empieza diciendo el estado').toMatch(/^(Simulando|En pausa)/);
+  // Hasta el primer cuadro de la corrida, el estado dice «Preparando la tela».
+  expect(d.cabecera, 'el detalle no empieza diciendo el estado').toMatch(/^(Preparando la tela|Simulando|En pausa)/);
   expect(d.material).toBe('papel');
   expect(d.tapadas, 'el detalle tapa herramientas del margen').toEqual([]);
 

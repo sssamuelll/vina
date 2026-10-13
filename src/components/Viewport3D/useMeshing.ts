@@ -26,6 +26,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece } from '../../types/types';
 import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
+import { mallasDePiezas } from './mallasDePiezas';
 import { classifyEdit } from '../../utils/cloth/editClassifier';
 import { computeRestLengths } from '../../utils/cloth/restLengthComputer';
 import { setParticleCount, setIsWarmStarting } from '../../store/simulationSlice';
@@ -122,15 +123,7 @@ export function useMeshing({
         }
       }
 
-      const result = meshed.map(m => {
-        const piece = pieces.find(p => p.id === m.pieceId);
-        return {
-          ...m,
-          outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
-          edges: piece?.edges?.map(e => ({ name: e.name, segmentRange: e.segmentRange })),
-          meshMaxEdgeLength: pieceParticleDistances[m.pieceId] ?? globalParticleDistance,
-        };
-      });
+      const result = mallasDePiezas(meshed, pieces, pieceParticleDistances, globalParticleDistance);
 
       setPieceMeshes(result);
       const totalParticles = result.reduce((sum, p) => sum + p.vertices.length / 3, 0);
@@ -197,15 +190,7 @@ export function useMeshing({
           }
 
           // Update pieceMeshes for static rendering
-          setPieceMeshes(meshed.map(m => {
-            const piece = pieces.find(p => p.id === m.pieceId);
-            return {
-              ...m,
-              outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
-              edges: piece?.edges?.map(e => ({ name: e.name, segmentRange: e.segmentRange })),
-              meshMaxEdgeLength: pieceParticleDistances[m.pieceId] ?? globalParticleDistance,
-            };
-          }));
+          setPieceMeshes(mallasDePiezas(meshed, pieces, pieceParticleDistances, globalParticleDistance));
 
           dispatch(setIsWarmStarting(false));
         })
