@@ -227,12 +227,18 @@ fuente de verdad de las pruebas y el patrón contra el que se compara la GPU.
 
 #### 4.2.4 El medidor de quietud
 
-Cada cuadro informa la fuerza neta que le sobra a la prenda: la suma de las fuerzas
-netas de todos sus vértices (elásticas, gravedad, contacto y costuras), dividida por su
-peso total; y, aparte, el máximo por vértice, para ubicar dónde se mueve. La prenda
-está **quieta** cuando el total baja de 0,1 % durante 30 cuadros seguidos (umbral que
-se confirma con el banco). El estado se publica en la caja negra
-(`solverRuntimeTracker`) y reemplaza al asentado por reloj del cuadro 150.
+Cada cuadro informa cuánto se movió la prenda: la suma de `m·|v|` de sus vértices
+libres, dividida por la de un cuadro de caída libre (`m·g·h`); y, aparte, el máximo
+por vértice, para ubicar dónde se mueve. La prenda está **quieta** cuando el total baja
+de 0,1 % durante 30 cuadros seguidos (umbral que se confirma con el banco). El estado
+se publica en la caja negra (`solverRuntimeTracker`) y reemplaza al asentado por reloj
+del cuadro 150.
+
+Se mide por velocidad y no por fuerza neta. En la GPU las posiciones van en precisión
+simple, y la fuerza neta de una tela en reposo no baja del ruido de redondeo: en el
+disco Cusick de 5 mm ya asentado, solo redondear las posiciones a precisión simple
+cambia la fuerza elástica en un 11,6 % del peso total (mediana por vértice 8 %). La
+velocidad sí baja de 0,1 %, y la CPU y la GPU la miden igual.
 
 ### 4.3 El cuerpo, la tela contra sí misma y las costuras
 
@@ -284,7 +290,8 @@ costura de la nuca invertida) se arreglan antes de comparar la camiseta.
 - Lámina curvada sobre un cilindro: energía de flexión entre 0,85 y 1,05 de la teórica
   con malla de 2,5, 5 y 10 mm, a lo ancho, a lo largo y al bies.
 - Tira en voladizo empotrada: la punta converge a la elástica teórica al afinar la
-  malla (2,5 → 1,25 mm reduce el error a la mitad o menos).
+  malla: de 2,5 a 1,25 mm el error queda en 0,6 o menos del anterior (convergencia de
+  primer orden; la prueba midió 0,52).
 - Un paso nunca sube `G`; el medidor de quietud marca cero en un equilibrio
   construido.
 
