@@ -72,7 +72,7 @@ prendas reales.
 
 | Qué | Meta |
 |---|---|
-| Caída en el disco Cusick | a 5 puntos o menos de la referencia con malla de 5 mm; y el rango de coeficientes entre 5, 10 y 20 mm no supera el rango de la referencia en esas mismas mallas |
+| Caída en el disco Cusick | a 5 puntos o menos de la referencia con malla de 5 mm; y el rango de coeficientes entre 5, 10 y 20 mm no supera el rango de la referencia en esas mismas mallas, comparados en décimas porque la referencia trae un decimal |
 | Triángulos de la camiseta con menos de la mitad del área de su patrón | menos de 0,1 % |
 | Costuras de la camiseta | separación mediana 0 mm, máxima 1 mm |
 | Asentado | la camiseta queda quieta sola (§4.2.4) en 10 s de tela o menos |

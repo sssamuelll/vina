@@ -2,16 +2,18 @@
  * Calibra el factor de pandeo (spec 2026-10-13 §4.1.4) contra la referencia privada del disco Cusick en
  * 5, 10 y 20 mm.
  *
- *   VINA_REFERENCIAS=<carpeta privada> npm run bench:tela:calibrar
+ *   VINA_REFERENCIAS=<carpeta privada> npm run bench:tela:calibrar [-- --factores=0.7,0.8,1]
  *
  * Entre los factores que cumplen el criterio de §2 (nivel, rango y menos de 0,1 % de triángulos aplastados en
  * las tres mallas), elige el que deja la malla de 5 mm más cerca de la referencia. Si ninguno lo cumple, lo
- * dice: la ley de pandeo necesitaría otra forma (§5).
+ * dice: la ley de pandeo necesitaría otra forma (§5). Con --factores corre y compara solo esos.
  */
 import { criterioCusick, ensayoCusick, guardarInforme, imprimirCusick, leerReferencias } from './_banco';
 import { correrImplicito } from './motorImplicito';
 
-const FACTORES = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1];
+const pedidos = process.argv.find((a) => a.startsWith('--factores='))?.slice('--factores='.length).split(',').map(Number);
+const FACTORES = pedidos ?? [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1];
+if (FACTORES.some((f) => !(f > 0))) throw new Error('--factores pide números positivos separados por comas');
 const ref = leerReferencias();
 const ensayos = FACTORES.map((pandeo) => {
   console.log(`— pandeo ${pandeo}`);

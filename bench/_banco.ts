@@ -141,7 +141,8 @@ export function criterioCusick(filas: FilaCusick[], ref: Referencias): { nivel: 
   const rangoReferencia = rango(['5', '10', '20'].map((k) => ref.cusickRango[k]?.coeficiente ?? NaN));
   return {
     nivel: Math.abs(propio(5) - (ref.cusick['5']?.coeficiente ?? NaN)) <= 5,
-    rango: rangoPropio <= rangoReferencia,
+    // la referencia trae un decimal: el rango se compara en décimas
+    rango: Math.round(10 * rangoPropio) <= Math.round(10 * rangoReferencia),
     rangoPropio,
     rangoReferencia,
   };
