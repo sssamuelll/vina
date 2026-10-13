@@ -123,7 +123,14 @@ private folder holding `referencias.json`; the report is written to its
 
 ```bash
 VINA_REFERENCIAS=<private folder> npm run bench:tela -- --motor=xpbd
+VINA_REFERENCIAS=<private folder> npm run bench:tela -- --motor=implicito
+VINA_REFERENCIAS=<private folder> npm run bench:tela:calibrar
 ```
+
+`bench:tela:calibrar` sweeps the buckling factor of the new engine (spec
+§4.1.4) on the Cusick disc at 5, 10 and 20 mm and prints the factor that meets
+the §2 criterion closest to the reference; the chosen value lives in
+`PANDEO_CALIBRADO` (`src/utils/cloth/implicito/tela.ts`).
 
 `--motor=xpbd` measures today's engine, the baseline every delivery is
 measured against (§4.4.4). Other flags: `--ensayo=cusick|voladizo|todo` and

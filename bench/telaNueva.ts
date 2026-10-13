@@ -2,7 +2,7 @@
  * El banco de la tela nueva contra la referencia privada (spec 2026-10-13 §4.4.2) y contra el motor de
  * hoy (§4.4.4).
  *
- *   VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- [--motor=xpbd] [--ensayo=cusick|voladizo|todo] [--mallas=5,10,20]
+ *   VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- [--motor=implicito|xpbd] [--pandeo=<factor>] [--ensayo=cusick|voladizo|todo] [--mallas=5,10,20]
  *
  * `npm run bench:tela` ya corre con el candado de scripts/pesado.mjs. El informe queda en
  * `$VINA_REFERENCIAS/informes/`.
@@ -19,8 +19,11 @@ import {
   type Corredor,
   type Referencias,
 } from './_banco';
+import { PANDEO_CALIBRADO } from '../src/utils/cloth/implicito/tela';
+import { correrImplicito } from './motorImplicito';
 
 const MOTORES: Record<string, (ref: Referencias, args: Map<string, string>) => Corredor> = {
+  implicito: (ref, args) => correrImplicito({ ...ref.tela, pandeo: Number(args.get('pandeo') || PANDEO_CALIBRADO) }),
   xpbd: () => correrXpbd,
 };
 
@@ -30,7 +33,7 @@ const args = new Map(
     return [k, v ?? ''];
   }),
 );
-const motor = args.get('motor') ?? 'xpbd';
+const motor = args.get('motor') ?? 'implicito';
 const ensayo = args.get('ensayo') ?? 'todo';
 const mallas = (args.get('mallas') ?? '5,10,20').split(',').map(Number);
 const fabrica = MOTORES[motor];

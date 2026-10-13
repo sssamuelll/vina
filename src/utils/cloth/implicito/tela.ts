@@ -57,3 +57,10 @@ export function telaSI(t: TelaFisica): TelaSI {
 export function separacion(t: TelaSI): number {
   return t.grosor / 2 + 0.001;
 }
+
+/**
+ * Factor de pandeo de la ley de Choi y Ko (§4.1.4) para las telas que no traen uno medido. Se calibra con
+ * `npm run bench:tela:calibrar` contra la referencia privada del disco Cusick en 5, 10 y 20 mm. Valor de
+ * partida: 1, el de la prueba corta (§1.2).
+ */
+export const PANDEO_CALIBRADO = 1;
