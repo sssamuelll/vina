@@ -18,6 +18,10 @@ new Vectorizer fixture retain their separate provenance below.
 | `maria_patrones_samuel_2M.dxf` | 5 | **María (patternmaker), 2026-06-11** — real external CAD export (AC1009, block `PATRONES PARA SAMUEL-2_M`): front/back bodices, 2 sleeves, strip. NOT Seamly2D-derived — this is the canonical real-pattern substrate; the user mandated all integration-level verification use it (`seam-parity-replay.spec.ts`). |
 | `vectorizer_jacket_M.dxf` | 7 | Regenerated Phase 0 Vectorizer output (`patent_pattern/jacket_sizes/jacket_M.dxf`), mechanically copied into this fixture set: front/back panels, sleeves L/R, collar, waistband. |
 
+**License.** The four Seamly2D-derived fixtures come from Seamly2D sample
+patterns. Seamly2D is distributed under the GNU GPL v3, and these files are not
+covered by Vina's MIT license (see [`THIRD-PARTY-NOTICES.md`](../../../THIRD-PARTY-NOTICES.md)).
+
 **How the four Seamly2D-derived fixtures were produced** (one-shot script,
 deleted after running — it imported modules that died with the nuke): for each
 pattern JSON, replicate the `loadSeamlyPattern` pipeline —

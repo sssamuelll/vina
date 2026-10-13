@@ -1,23 +1,36 @@
-# Legal & IP Compliance: Vina Integrity Spec
+# Legal & IP compliance
 
-## 1. Core Philosophy
-Vina is a "Clean-Room" implementation of a 3D garment design tool. Our mission is to provide an open standard for the fashion industry without infringing on the proprietary trade secrets or copyrighted source code of legacy vendors.
+> Last reviewed 2026-10-13. What can be checked in the repository; not legal advice.
 
-## 2. Source Code Integrity
-- **Originality**: All core modules including the `xpbd-wasm` solver, the `pattern-construction` engine, and the `copilot` architecture are written from scratch.
-- **Academic Foundation**: Our physics engine is based on public domain research papers (Position Based Dynamics, Müller et al.) and standard geometric algorithms (Delaunay Triangulation, PSLG cleaning).
-- **Clean-Room Development**: No proprietary code from competitors has been accessed, decompiled, or integrated into Vina.
+## 1. Vina's code
 
-## 3. Licensing Strategy
-- **Open Source**: The project is licensed under the **MIT License**, permitting free use, modification, and distribution.
-- **Dependencies**: All third-party libraries (Three.js, React, cdt2d, etc.) have been audited for compatible open-source licenses.
+- Vina is released under the MIT License ([`LICENSE`](../../LICENSE)); `package.json` and the Rust crate (`crates/xpbd-wasm/Cargo.toml`) declare the same.
+- It contains no source code from proprietary products, and no such code was accessed or decompiled to write it.
+- Parts of the cloth solver adapt open-source code under MIT and Apache-2.0. Each source is credited in [`THIRD-PARTY-NOTICES.md`](../../THIRD-PARTY-NOTICES.md) and in a comment in the file that uses it.
+- The algorithms come from published research (Position Based Dynamics and XPBD, Müller et al.; dihedral bending, Bridson et al.) and from standard computational geometry (constrained Delaunay triangulation, PSLG cleaning).
 
-## 4. Interoperability & Standards
-Vina supports industry standards like **DXF-AAMA/ASTM D6673**. Implementing support for public industry standards is a recognized legal practice for interoperability and does not constitute intellectual property infringement of any specific vendor.
+## 2. Interoperability
 
-## 5. Asset Provenance
-- **Avatars**: Any default avatar included in the repository must be verified as CC0, original creation, or licensed for redistribution.
-- **Icons**: Icons are sourced from the Lucide/React-Icons library (MIT).
+- DXF import and export follow the layer conventions of AAMA and ASTM D6673. Vina does not claim certified conformance with either.
+- The Seamly2D importer (`src/utils/seamly2d/`) reads Seamly2D pattern files.
 
-## 6. Conclusion
-Vina is built on the principle of **Technological Sovereignty**. By using modern, open-source stacks (Wasm, Rust, WebGL), we provide a legally safe and technically superior alternative to legacy proprietary silos.
+## 3. Assets and data
+
+- Bundled avatars, HDRI maps and fonts, with their sources and licenses: [`THIRD-PARTY-NOTICES.md`](../../THIRD-PARTY-NOTICES.md).
+- Test patterns and their provenance: [`tests/fixtures/garments/README.md`](../../tests/fixtures/garments/README.md).
+- An avatar, texture or font added to the repository is original, CC0 or licensed for redistribution, and its provenance is written down next to it.
+- Icons come from `lucide-react` (ISC).
+
+## 4. Dependencies (inventory of 2026-10-13)
+
+- **npm**: 887 packages in `package-lock.json`, 248 of them outside dev: 742 MIT, 56 Apache-2.0, 36 ISC, 22 BSD, plus a few other permissive licenses. No GPL, AGPL, SSPL or non-commercial license. The exceptions, one by one:
+  - LGPL-3.0: only the optional native builds of `sharp`, a dev dependency pulled by `@gltf-transform/functions` through `ndarray-pixels`. It never reaches the browser bundle.
+  - MPL-2.0: `axe-core` and `@axe-core/playwright`, dev only, for the e2e accessibility checks.
+  - `clipper2-js` (production): Boost Software License, permissive.
+  - `webgl-constants` (production, via `@react-three/drei` → `detect-gpu`) declares no license field; its package ships an MIT license. Two dev-only packages, `console-browserify` and `querystring-es3`, also lack the field and ship a license file.
+- **Rust** (`crates/xpbd-wasm/Cargo.lock`): `wasm-bindgen`, `console_error_panic_hook` and their 11 transitive crates are MIT OR Apache-2.0; `unicode-ident` adds Unicode-3.0.
+- The npm count reads the `license` field of every entry in `package-lock.json`; the Rust one, each crate's metadata on crates.io.
+
+## 5. Trademarks
+
+Product names that appear in the code and docs belong to their owners and are used only to describe compatibility or compare behaviour. Vina is not affiliated with or endorsed by any of them.
