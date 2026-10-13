@@ -2,7 +2,9 @@
  * La membrana de la tela (spec 2026-10-13 §4.1.3 y §4.1.4). Por triángulo
  *   E = A0·[ψ_u(|f_u| − 1) + ψ_v(|f_v| − 1) + ½·kCizalla·(f_u·f_v)²]
  * con tracción lineal por hilo y pandeo de Choi y Ko al encoger, y su hessiana de Gauss-Newton:
- * ψ''·n·nᵀ + max(ψ'/s, 0)·(I − n·nᵀ) por hilo y kCizalla·∇γ·∇γᵀ para la cizalla.
+ * k·n·nᵀ + max(ψ'/s, 0)·(I − n·nᵀ) por hilo y kCizalla·∇γ·∇γᵀ para la cizalla. A lo largo del hilo va la
+ * rigidez k también en la meseta de pandeo, donde ψ'' es 0: la energía y la fuerza siguen la ley, pero el
+ * paso no mueve gratis el hilo comprimido (con 0, la malla gruesa se trababa).
  */
 import type { TelaSI } from './tela';
 
@@ -17,8 +19,9 @@ export function ley(eps: number, k: number, pcr: number): [number, number, numbe
 }
 
 /**
- * Estado de cada triángulo tras `linealizar`: f_u(3) f_v(3) |f_u| |f_v| ψ'_u/|f_u| ψ'_v/|f_v| ψ''_u ψ''_v
- * max(ψ'_u/|f_u|, 0) max(ψ'_v/|f_v|, 0). La GPU usa la misma disposición.
+ * Estado de cada triángulo tras `linealizar`: f_u(3) f_v(3) |f_u| |f_v| ψ'_u/|f_u| ψ'_v/|f_v| k_u k_v
+ * max(ψ'_u/|f_u|, 0) max(ψ'_v/|f_v|, 0), con k_u y k_v la rigidez del hilo en la hessiana. La GPU usa la
+ * misma disposición.
  */
 export const ESTADO_MEMBRANA = 14;
 
@@ -75,13 +78,13 @@ export class Membrana {
     for (let t = 0; t < this.nt; t++) {
       this.columnas(t, x, f);
       const su = Math.hypot(f[0], f[1], f[2]), sv = Math.hypot(f[3], f[4], f[5]);
-      const [, du, hu] = ley(su - 1, kTrama, this.pcrU[t]);
-      const [, dv, hv] = ley(sv - 1, kUrdimbre, this.pcrV[t]);
+      const du = ley(su - 1, kTrama, this.pcrU[t])[1];
+      const dv = ley(sv - 1, kUrdimbre, this.pcrV[t])[1];
       // un triángulo aplastado en una dirección no tiene dirección: sin fuerza ni rigidez transversal
       const gu = su > 1e-12 ? du / su : 0, gv = sv > 1e-12 ? dv / sv : 0;
       const s = ESTADO_MEMBRANA * t;
       for (let k = 0; k < 6; k++) e[s + k] = f[k];
-      e[s + 6] = su; e[s + 7] = sv; e[s + 8] = gu; e[s + 9] = gv; e[s + 10] = hu; e[s + 11] = hv;
+      e[s + 6] = su; e[s + 7] = sv; e[s + 8] = gu; e[s + 9] = gv; e[s + 10] = kTrama; e[s + 11] = kUrdimbre;
       e[s + 12] = Math.max(gu, 0); e[s + 13] = Math.max(gv, 0);
     }
   }

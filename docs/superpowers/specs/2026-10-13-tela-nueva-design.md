@@ -130,8 +130,12 @@ E_m = A0 · [ ψ_u(|f_u| − 1) + ψ_v(|f_v| − 1) + ½·kCizalla·(f_u·f_v)²
 ```
 
 `ψ` en tracción: lineal con `k`, o por tramos según `endurece`. Hessiana de
-Gauss-Newton por componente: `ψ''·n nᵀ + max(ψ'/s, 0)·(I − n nᵀ)` con `n = f/|f|`,
-`s = |f|`; cizalla: `kCizalla·∇γ ∇γᵀ` con `γ = f_u·f_v`.
+Gauss-Newton por componente: `k·n nᵀ + max(ψ'/s, 0)·(I − n nᵀ)` con `n = f/|f|`,
+`s = |f|`; cizalla: `kCizalla·∇γ ∇γᵀ` con `γ = f_u·f_v`. A lo largo del hilo va la
+rigidez `k` también en la meseta de pandeo (§4.1.4), donde `ψ''` es 0: la energía y la
+fuerza siguen la ley, pero el paso no mueve gratis el hilo comprimido. Con `ψ''` la malla
+de 20 mm se trababa: el hilo cruzaba a tracción en un solo paso, la energía se disparaba
+y la búsqueda en línea rechazaba el paso entero.
 
 #### 4.1.4 Compresión con pandeo (Choi y Ko)
 

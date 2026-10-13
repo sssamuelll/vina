@@ -3,7 +3,7 @@ import { SistemaTela } from '../sistema';
 import { pasoImplicito } from '../paso';
 import { distancia } from '../obstaculos';
 import { CUSICK, escenaCusick, escenaVoladizo, laminaPlana, TELA_DE_LABORATORIO } from '../banco/escenas';
-import { aplastados } from '../banco/medidas';
+import { aplastados, caidaCusick } from '../banco/medidas';
 import { azar } from './ayudas';
 
 describe('el paso implícito', () => {
@@ -50,5 +50,17 @@ describe('el paso implícito', () => {
     let minY = 0;
     for (let i = 0; i < s.n; i++) minY = Math.min(minY, s.x[3 * i + 1]);
     expect(minY).toBeLessThan(-1e-4);
+  });
+
+  it('con poca resistencia a encoger, el disco de 20 mm no se traba', () => {
+    // en la meseta de pandeo el hilo comprimido no tiene rigidez: si el paso tampoco se la da, lo mueve
+    // gratis varios milímetros, el hilo cruza a tracción, la energía se dispara y la búsqueda en línea
+    // rechaza el paso entero cuadro tras cuadro: la tela queda congelada en el aire
+    const e = escenaCusick(20);
+    const s = new SistemaTela(e.malla, { ...TELA_DE_LABORATORIO, pandeo: 0.2 }, { obstaculos: e.obstaculos });
+    let trabados = 0;
+    for (let k = 0; k < 60; k++) if (pasoImplicito(s).alfa === 0) trabados++;
+    expect(trabados).toBe(0);
+    expect(caidaCusick(s.x, e.malla).coeficiente).toBeLessThan(45);
   });
 });
