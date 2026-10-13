@@ -539,6 +539,10 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
 
   const clear = reset;
 
+  /** Al salir del lienzo de golpe no llega mousemove que lo apague (#1132).
+   *  Solo el enganche: los bordes elegidos y el fantasma se quedan. */
+  const limpiarHover = useCallback(() => setHoveredSnapPoint(null), []);
+
   const formatDistance = useCallback((mm: number): string => {
     return formatDimension(mm, units);
   }, [units]);
@@ -564,5 +568,6 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
     getCursor,
     reset,
     clear,
+    limpiarHover,
   };
 }

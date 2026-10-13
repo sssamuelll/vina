@@ -120,7 +120,7 @@ interface ToolHooks {
   /** La puerta de Tab al largo de un lado (#1167, spec 2026-09-18 § 3.1). */
   lados?: { enfocar: () => boolean; soltar: () => boolean };
   /** `handleKeyDown` devuelve si consumió la tecla (la captura CF-1 detiene la propagación solo entonces). */
-  pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => boolean; handleDoubleClick: () => void; reset: () => void };
+  pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => boolean; handleDoubleClick: () => void; reset: () => void; limpiarHover: () => void };
   rectTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -158,6 +158,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     cancel: () => void;
     isArmed: () => boolean;
+    limpiarHover: () => void;
   };
   pointTool: {
     armed: boolean;
@@ -168,6 +169,7 @@ interface ToolHooks {
     handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleKeyDown: (e: KeyboardEvent) => void;
     getCursor: () => string;
+    limpiarHover: () => void;
   };
   seamAllowanceTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -178,7 +180,7 @@ interface ToolHooks {
     isArmed: () => boolean;
     limpiarHover: () => void;
   };
-  trimTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
+  trimTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; limpiarHover: () => void };
   grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e?: React.MouseEvent<SVGSVGElement>) => void; cancel: () => void };
   measureTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void; clear: () => void; limpiarHover?: () => void };
   nodeEditor: {
@@ -228,6 +230,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     getCursor: () => string;
     reset: () => void;
+    limpiarHover: () => void;
   };
   slashAndSpreadTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -236,6 +239,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     getCursor: () => string;
     reset: () => void;
+    limpiarHover: () => void;
   };
   mergeTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -257,6 +261,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => boolean;
     getCursor: () => string;
     reset: () => void;
+    limpiarHover: () => void;
   };
   walkSeamTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -264,6 +269,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     getCursor: () => string;
     reset: () => void;
+    limpiarHover: () => void;
   };
   offsetTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -280,6 +286,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     getCursor: () => string;
     reset: () => void;
+    limpiarHover: () => void;
   };
   /** El motor de "Línea interna" (`usePolyPenTool`). */
   internalShapeTool: {
@@ -1524,9 +1531,11 @@ export function useEditorInteractions(
    * El ratón salió del lienzo. Todo resalte de hover se va con él (#1132).
    *
    * Cubría solo Margen. El censo del 06-09 encontró 14 hooks con estado de
-   * hover y uno cableado; estos tres son los que María nombró. Los que faltan
-   * están declarados en `1132-el-resalte-se-va-al-salir.test.ts`, que falla si
-   * el número sube — el mismo trinquete que ya guarda el espacio de pieza.
+   * hover y uno cableado; el 13-10 se cablearon las nueve que faltaban. Lo
+   * guarda `1132-el-resalte-se-va-al-salir.test.ts`: cada hook con hover
+   * expone `limpiarHover` y aquí se llama a todos. Cada uno deja su estado
+   * como lo dejaría un mousemove sobre la hoja vacía, y nada más: el trabajo
+   * en curso (los nodos de la Pluma, el inicio del corte) se queda.
    *
    * No se filtra por `activeTool`: un resalte encendido por la herramienta
    * anterior también se quedaba pegado, y limpiar de más no cuesta nada.
@@ -1538,7 +1547,16 @@ export function useEditorInteractions(
     measureTool.limpiarHover?.();
     editPattern.limpiarHover();
     nodeEditor.limpiarHover();
-  }, [seamAllowanceTool, seamEditTool, seamTool, measureTool, editPattern, nodeEditor]);
+    pen.limpiarHover();
+    notchTool.limpiarHover();
+    pointTool.limpiarHover();
+    scissorsTool.limpiarHover();
+    topstitchTool.limpiarHover();
+    extendTrimTool.limpiarHover();
+    slashAndSpreadTool.limpiarHover();
+    walkSeamTool.limpiarHover();
+    trimTool.limpiarHover();
+  }, [seamAllowanceTool, seamEditTool, seamTool, measureTool, editPattern, nodeEditor, pen, notchTool, pointTool, scissorsTool, topstitchTool, extendTrimTool, slashAndSpreadTool, walkSeamTool, trimTool]);
 
   const getCursor = () => {
     switch (activeTool) {
