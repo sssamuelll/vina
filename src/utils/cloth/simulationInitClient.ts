@@ -49,6 +49,14 @@ const copia = (m: Malla): Malla => ({
   boundaryOrig: m.boundaryOrig?.slice(),
 });
 
+/**
+ * Las mallas que se están haciendo ahora, por la misma clave: quien pide una
+ * que ya está en vuelo espera esa, en vez de mallar dos veces (el preparador y
+ * «Simular» a la vez). Si la compartida falla (su cliente se soltó porque
+ * cambiaron las entradas), se malla aquí.
+ */
+const mallasEnVuelo = new Map<string, Promise<Malla>>();
+
 /** El área de la caja del contorno: para mallar primero las piezas grandes. */
 function tamanoDe(piece: PatternPiece): number {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -73,19 +81,43 @@ export class SimulationInitClient {
   private worker: Worker | null = null;
   /** Workers de más para mallar en paralelo (`meshAllPieces`); los suelta `dispose`. */
   private extras: Worker[] = [];
+  /** `dispose` ya pasó: sus workers no contestan. */
+  private suelto = false;
+  /** No avisa (consola ni caja negra) cada pieza que no malla. */
+  private readonly silenciarFallos: boolean;
   private pendingMesh = new Map<string, {
     resolve: (v: { vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array; boundaryOrig?: Float64Array }) => void;
     reject: (e: Error) => void;
   }>();
   onProgress?: (p: SimInitProgress) => void;
 
-  constructor() {
+  /**
+   * `silenciarFallos`: para el preparador en reposo. Una pieza que no malla
+   * vuelve a fallar en cada preparación, y él ya lo cuenta en su
+   * `preparar:fallo`; sin esto, cada intento dejaba un `meshing:piece-failed`
+   * en el ring y un aviso en la consola. Al pulsar «Simular» sí se dice.
+   */
+  constructor({ silenciarFallos = false }: { silenciarFallos?: boolean } = {}) {
+    this.silenciarFallos = silenciarFallos;
     try {
       this.worker = this.nuevoWorker();
     } catch {
       console.warn('[SimInitClient] Worker not available, will use main thread fallback');
       this.worker = null;
     }
+  }
+
+  /**
+   * Malla fuera del hilo principal: su worker se pudo crear. Sin él,
+   * `meshPiece` malla en el hilo.
+   * ponytail: solo ve un constructor de Worker que lanza en el acto. Un script
+   * de worker que no carga después (CSP, error de sintaxis) llega por el
+   * evento `error` del worker: aquí sigue diciendo true, el preparador lo
+   * intenta y sus piezas fallan (quedan como `preparar:fallo`). Si hace falta
+   * saberlo antes de mallar, un mensaje de ida y vuelta al worker.
+   */
+  get fueraDelHilo(): boolean {
+    return this.worker !== null;
   }
 
   private nuevoWorker(): Worker {
@@ -143,7 +175,23 @@ export class SimulationInitClient {
       mallasHechas.set(clave, hecha);
       return copia(hecha);
     }
-    const malla = await this.mallar(piece, options, worker);
+    const enVuelo = mallasEnVuelo.get(clave);
+    if (enVuelo) {
+      try {
+        const m = await enVuelo;
+        return copia(mallasHechas.get(clave) ?? m);
+      } catch {
+        // El que mallaba se soltó: se malla aquí.
+      }
+    }
+    const promesa = this.mallar(piece, options, worker);
+    mallasEnVuelo.set(clave, promesa);
+    let malla: Malla;
+    try {
+      malla = await promesa;
+    } finally {
+      if (mallasEnVuelo.get(clave) === promesa) mallasEnVuelo.delete(clave);
+    }
     if (malla.vertices.length > 0 && malla.triIds.length > 0) {
       mallasHechas.set(clave, copia(malla));
       if (mallasHechas.size > MALLAS_GUARDADAS) mallasHechas.delete(mallasHechas.keys().next().value!);
@@ -152,6 +200,10 @@ export class SimulationInitClient {
   }
 
   private async mallar(piece: PatternPiece, options: { yHeight: number; scale: number; maxEdgeLength: number; minAngle: number; maxRefinementPasses: number; curveResolution: number }, worker: Worker | null): Promise<Malla> {
+    // Un cliente suelto no malla: su worker terminado no contesta, y la promesa
+    // quedaría en `mallasEnVuelo` hasta el timeout de 30 s, con otros clientes
+    // esperándola (las piezas que seguían en la cola de `meshAllPieces`).
+    if (this.suelto) throw new Error('Disposed');
     if (!worker) {
       // Fallback: dynamic import + sync execution (yields to event loop via microtask)
       const { meshPiece } = await import('../mesh');
@@ -206,8 +258,12 @@ export class SimulationInitClient {
             mallas[i] = { pieceId: piece.id, vertices, triIds, uvs, boundaryOrig };
           }
         } catch (err) {
-          console.warn(`[SimInitClient] Meshing failed for piece ${piece.id}:`, err);
-          pushSolverEvent('meshing:piece-failed', { pieceId: piece.id, message: err instanceof Error ? err.message : String(err) });
+          // Un cliente suelto cancela, no falla: lo que tenía en vuelo o en cola
+          // no es un fallo de mallado (el preparador se suelta en cada edición).
+          if (!this.suelto && !this.silenciarFallos) {
+            console.warn(`[SimInitClient] Meshing failed for piece ${piece.id}:`, err);
+            pushSolverEvent('meshing:piece-failed', { pieceId: piece.id, message: err instanceof Error ? err.message : String(err) });
+          }
         }
         this.onProgress?.({ stage: 'Meshing pieces', current: ++hechas, total: pieces.length });
       }
@@ -296,6 +352,7 @@ export class SimulationInitClient {
   }
 
   dispose() {
+    this.suelto = true;
     this.worker?.terminate();
     this.worker = null;
     for (const w of this.extras) w.terminate();

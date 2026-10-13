@@ -281,6 +281,14 @@ export function useTopstitchTool(
     }
   }, [toPattern, getMode, findEdge, pieces, zoom2D]);
 
+  /** Lo que haría un mousemove lejos de los bordes, que al salir del lienzo
+   *  de golpe no llega (#1132). Los puntos ya puestos se quedan. */
+  const limpiarHover = useCallback(() => {
+    setState(prev => (prev.hoveredEdge || prev.segHover || prev.hoveredSnapPoint
+      ? { ...prev, hoveredEdge: null, segHover: null, hoveredSnapPoint: null }
+      : prev));
+  }, []);
+
   /**
    * P1 (#1115): devuelve si consumio la tecla, porque este gancho paso a la
    * captura CF-1. En Pespunte libre, Retroceso deshace el ultimo punto — pero
@@ -346,5 +354,6 @@ export function useTopstitchTool(
     handleKeyDown,
     getCursor,
     reset,
+    limpiarHover,
   };
 }

@@ -415,6 +415,9 @@ export function usePointTool(
     setHover(resolveHover(e));
   }, [gesture, resolveHover]);
 
+  /** Al salir del lienzo de golpe no llega mousemove que lo apague (#1132). */
+  const limpiarHover = useCallback(() => setHover(null), []);
+
   /**
    * Esc con colocación armada = cancelar SOLO eso (coordinación CF-1). Sin
    * colocación, y con la cota del punto a la vista, Esc cierra la cota: el
@@ -452,6 +455,7 @@ export function usePointTool(
     handleMouseUp,
     handleKeyDown,
     getCursor,
+    limpiarHover,
     /** El punto recién puesto, con su cota abierta (spec 2026-10-02 § 5.2). */
     puesto,
     moverPuesto,

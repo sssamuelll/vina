@@ -307,6 +307,12 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
 
   const handleMouseUp = useCallback(() => {}, []);
 
+  /** Al salir del lienzo de golpe no llega mousemove que lo apague (#1132).
+   *  Lo ya elegido (`selectedSnap`) se queda esperando su Enter. */
+  const limpiarHover = useCallback(() => {
+    setState(prev => (prev.hoveredSnap ? { ...prev, hoveredSnap: null } : prev));
+  }, []);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -371,5 +377,6 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
     handleKeyDown,
     getCursor,
     reset,
+    limpiarHover,
   };
 }

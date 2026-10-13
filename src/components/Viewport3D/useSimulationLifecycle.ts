@@ -105,7 +105,7 @@ import { aMorph } from '../../utils/avatar/morphTargets';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
-import { setSolverTier, setFrameTime, setBodyCollision, setIsWarmStarting, setSeamResolution } from '../../store/simulationSlice';
+import { setSolverTier, setFrameTime, setBodyCollision, setIsWarmStarting, setSeamResolution, marcarTelaEnMovimiento } from '../../store/simulationSlice';
 import { setSeamResolutionErrors } from '../../store/inspectorSlice';
 import { showWarningToast, showErrorToast } from '../../store/copilotUISlice';
 import { seamResolutionFailureLabel } from './solverTierDisplay';
@@ -119,6 +119,10 @@ import {
   setAppliedSolverConfig,
 } from '../../utils/cloth/solverRuntimeTracker';
 import { getPhysicalFabric, toXPBDParams } from '../../utils/cloth/physicalFabric';
+import { complianceDeTela } from '../../utils/cloth/complianceDeTela';
+import { huella } from '../../utils/cloth/huella';
+import { obtenerTela } from '../../utils/cloth/gpu/telasPreparadas';
+import { interruptoresDeTela } from '../../utils/cloth/gpu/prepararTela';
 import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
 import { registerPenetrationBody } from '../../utils/cloth/penetrationMetric';
 import { bakeCollisionFromRender } from '../../utils/cloth/renderCollisionBake';
@@ -191,8 +195,9 @@ interface UseSimulationLifecycleResult {
  *  browsers without WebGPU fall back to WASM regardless.
  *  Default flipped ON in #897 after the tier reached ≥30fps prod-verified on the
  *  María fixture (seams close, body+self collision). Known debt: the long-horizon
- *  drape creep (#902) is now visible at real-time fps — escape hatch is 'false'. */
-function isWebGPUFeatureEnabled(): boolean {
+ *  drape creep (#902) is now visible at real-time fps — escape hatch is 'false'.
+ *  El preparador (Viewport3D → usePrepararTela) lo lee para saber si armar la tela. */
+export function isWebGPUFeatureEnabled(): boolean {
   return safeGetItem(WEBGPU_FEATURE_FLAG_KEY) !== 'false';
 }
 
@@ -483,6 +488,11 @@ export function useSimulationLifecycle({
       // Caja negra 3D: cada corrida de la cascada lleva su generación para que
       // un evento de una corrida cancelada no se confunda con la viva.
       const generation = beginCascade();
+      // Hasta el primer cuadro de esta corrida, el estado dice «Preparando la tela».
+      dispatch(marcarTelaEnMovimiento(false));
+      // Y sin los fps de la corrida anterior: llegan cada 30 cuadros, y hasta la
+      // primera ventana de esta el estado y la IA leerían los de la vieja.
+      dispatch(setFrameTime(0));
       // 2a: cada (re)init re-arma el gate — el solver nuevo no stepea hasta
       // que SU colisión cargue.
       simReadyRef.current = false;
@@ -581,36 +591,14 @@ export function useSimulationLifecycle({
                   stretchingIdsRef.current = ids;
                 };
 
-                // #gummy STEP 3: wire the active fabric's BEND compliance to the GPU
-                // (was dead data, omitted — like frictionBody pre-F0). Bend is the
-                // material's drape/flexibility differentiator (silk soft, denim stiff),
-                // rescaled to the live alpha band in STEP 1. GPU-ahead vs WASM/CPU
-                // (still on defaults) — A7 divergence.
                 const pf = getPhysicalFabric(fabricId);
-                const xpbd = pf ? toXPBDParams(pf) : undefined;
                 const tslSolverConfig: Partial<import('../../utils/cloth/gpu/tslSolver').TslSolverConfig> = {
                   ...(pf ? { internalDamping: pf.internalDamping } : {}),
                   windForce: windEnabled ? windForce : [0, 0, 0],
                   dragCoefficient,
                 };
-                const fabricCompliance = xpbd
-                  ? {
-                      // Stretch stays RIGID (0.0): wiring the compliant fabric stretch
-                      // let edges compact and the sleeve recoil (verified @gpu-local —
-                      // sleeve ~6460 stable at 0.0 vs ~3590 at the fabric's 1e-6).
-                      // Stretch/shear differentiation (lycra) is a follow-up needing
-                      // two-sided strain handling; toXPBDParams already has them
-                      // rescaled+ready. Bend alone gives the drape differentiation.
-                      stretchComplianceWarp: 0.0,
-                      stretchComplianceWeft: 0.0,
-                      shearCompliance: 0.001,
-                      bendComplianceWarp: xpbd.bendComplianceWarp,
-                      bendComplianceWeft: xpbd.bendComplianceWeft,
-                      // P7-density: el peso GSM entra a la masa (invMass ∝ 1/ρ)
-                      // — antes solo tocaba damping y chiffon caía como lona.
-                      density: xpbd.density,
-                    }
-                  : undefined;
+                // Stretch rígido, flexión y densidad de la tela activa (#gummy STEP 3).
+                const fabricCompliance = complianceDeTela(fabricId);
 
                 const seamPairs = seamInitDataToPairs(seamInitData, placedMeshes);
                 // Sonda seam-gap (diagnóstico sisa↔cap): publica los pares
@@ -638,8 +626,24 @@ export function useSimulationLifecycle({
                     };
                   });
                 }
+                // La parte CPU del armado (~735 ms en la camisa de María) ya no
+                // corre aquí: obtenerTela entrega la que dejó el preparador, la
+                // que está armando o una armada ahora en un worker (sin worker,
+                // en este hilo, como antes). La huella cubre todo lo que entra al
+                // armado, y el plazo, la tela y la subida a la GPU.
+                const interruptores = interruptoresDeTela();
                 await withTimeout(
-                  gpuClient.initMultiPieceTsl(placedMeshes, seamPairs, tslSolverConfig, fabricCompliance),
+                  (async () => {
+                    const { tela, origen } = await obtenerTela(
+                      huella(placedMeshes, seamPairs, fabricCompliance, interruptores),
+                      { pieces: placedMeshes, seamPairs, fabric: fabricCompliance, interruptores },
+                    );
+                    // Cancelada, o vencida por el plazo: la cascada ya soltó
+                    // este cliente y siguió con WASM.
+                    if (cancelled || gpuClientRef.current !== gpuClient) return;
+                    pushSolverEvent('preparar:usada', { fase: 'tela', origen }, generation);
+                    await gpuClient.initMultiPieceTsl(placedMeshes, seamPairs, tslSolverConfig, fabricCompliance, tela);
+                  })(),
                   12000,
                   'TSL solver init',
                 );

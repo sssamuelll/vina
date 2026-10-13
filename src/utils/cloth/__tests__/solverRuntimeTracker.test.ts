@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BufferGeometry } from 'three';
 import {
   beginCascade,
@@ -12,7 +12,9 @@ import {
   aristasDeLaTela,
   latidosDeLaSimulacion,
   latirLaSimulacion,
+  marcarPrimerCuadro,
   pushSolverEvent,
+  reemplazarEventoDeLaFase,
   registerClothGeometry,
   setActiveSolverTier,
   setAppliedSolverConfig,
@@ -67,6 +69,39 @@ describe('solverRuntimeTracker — coalescencia de diagnósticos repetidos', () 
     const events = getSolverEvents();
     expect(events.map(e => e.data.code)).toEqual(['nan_reset', 'self_collision_disabled', 'nan_reset']);
     expect(events[0].data.cumulative).toBe(8);
+  });
+});
+
+describe('solverRuntimeTracker — un evento por fase (el preparador en reposo)', () => {
+  beforeEach(clearSolverEvents);
+
+  it('reemplazarEventoDeLaFase deja solo el último del mismo kind y la misma fase, y no toca lo demás', () => {
+    pushSolverEvent('tier:selected', { tier: 'wasm' });
+    reemplazarEventoDeLaFase('preparar:listo', { fase: 'mallas', ms: 1 });
+    reemplazarEventoDeLaFase('preparar:listo', { fase: 'tela', ms: 2 });
+    pushSolverEvent('preparar:fallo', { fase: 'mallas', message: 'x' });
+    reemplazarEventoDeLaFase('preparar:listo', { fase: 'mallas', ms: 3 });
+
+    expect(getSolverEvents().map((e) => ({ kind: e.kind, ...e.data }))).toEqual([
+      { kind: 'tier:selected', tier: 'wasm' },
+      { kind: 'preparar:listo', fase: 'tela', ms: 2 },
+      { kind: 'preparar:fallo', fase: 'mallas', message: 'x' },
+      { kind: 'preparar:listo', fase: 'mallas', ms: 3 },
+    ]);
+  });
+
+  // Lo que se prepara en reposo no es de la corrida anterior: con la generación
+  // de la última cascada, una caja negra exportada lo leería como parte de ella.
+  it('lo del preparador lleva la generación 0, de ninguna cascada, aunque ya haya corrido una', () => {
+    beginCascade();
+    reemplazarEventoDeLaFase('preparar:listo', { fase: 'mallas', ms: 1 });
+    pushSolverEvent('tier:selected', { tier: 'wasm' });
+
+    expect(getSolverEvents().map((e) => [e.kind, e.generation])).toEqual([
+      ['preparar:listo', 0],
+      ['tier:selected', currentCascadeGeneration()],
+    ]);
+    expect(currentCascadeGeneration(), 'beginCascade empieza en 1: el 0 no es de nadie').toBeGreaterThan(0);
   });
 });
 
@@ -143,5 +178,30 @@ describe('solverRuntimeTracker — el latido de la tela (IA 1b-2)', () => {
     expect(aristasDeLaTela()).toBe(aristas);
     latirLaSimulacion(null);
     expect(aristasDeLaTela()).toBeNull();
+  });
+
+  it('el primer latido de cada corrida se cuenta una vez; el evento lo marca quien sabe que ya se ve', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      clearSolverEvents();
+      const primeros = () => getSolverEvents().filter((e) => e.kind === 'tela:primer-cuadro').map((e) => e.data);
+      vi.setSystemTime(10_000);
+      beginCascade();
+      expect(latirLaSimulacion(null)).toBe(true);
+      expect(latirLaSimulacion(null)).toBe(false);
+      expect(primeros(), 'latir no lo marca: en WebGPU el cuadro apenas se envió').toEqual([]);
+      vi.setSystemTime(10_250);
+      marcarPrimerCuadro({ gpuMs: 180 });
+      expect(primeros(), 'los ms cuentan desde su cascada').toEqual([{ ms: 250, gpuMs: 180 }]);
+
+      vi.setSystemTime(20_000);
+      beginCascade();
+      expect(latirLaSimulacion(null), 'una corrida nueva vuelve a empezar').toBe(true);
+      vi.setSystemTime(20_040);
+      marcarPrimerCuadro();
+      expect(primeros().at(-1), 'y mide desde su propia cascada').toEqual({ ms: 40 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

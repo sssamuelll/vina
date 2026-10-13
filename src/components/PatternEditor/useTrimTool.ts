@@ -180,9 +180,13 @@ export function useTrimTool(
     });
   }, [toPattern, pieces, zoom, dispatch, toolOptions]);
 
+  /** Al salir del lienzo de golpe no llega mousemove que lo apague (#1132). */
+  const limpiarHover = useCallback(() => setHoveredEdge(null), []);
+
   return {
     hoveredEdge,
     handleMouseDown,
     handleMouseMove,
+    limpiarHover,
   };
 }

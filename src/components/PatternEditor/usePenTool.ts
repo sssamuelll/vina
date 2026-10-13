@@ -403,6 +403,10 @@ export function usePenTool(
     setState(EMPTY);
   }, [complete]);
 
+  /** Al salir del lienzo de golpe no llega mousemove que lo apague (#1132).
+   *  Solo el enganche: los nodos y la línea hasta el cursor se quedan. */
+  const limpiarHover = useCallback(() => setHover(null), []);
+
   /** Doble clic = terminar (= Enter): con tres nodos cierra la pieza; con dos
    *  queda el trazo abierto. El nodo duplicado del segundo par down/up se
    *  descarta. */
@@ -548,5 +552,6 @@ export function usePenTool(
     setNextPointValues,
     placePolar,
     reset,
+    limpiarHover,
   };
 }
