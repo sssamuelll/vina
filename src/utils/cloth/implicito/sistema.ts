@@ -3,6 +3,7 @@
  * placa), las masas, los obstáculos y el estado. El cuadro minimiza
  *   G(x) = ½·|x − y|²_M / h² + ½·aire·|x − x_t|²_M / h + E(x) + contacto,  con y = x_t + h·v_t + h²·g.
  */
+import { Costuras, type PuntoDeCostura } from './costuras';
 import { aMarcoDelHilo, type MallaDeTela } from './malla';
 import { Membrana } from './membrana';
 import { masCercano, type Obstaculo } from './obstaculos';
@@ -19,6 +20,12 @@ export interface AjustesImplicito {
   aire: number;
   /** rigidez del contacto con los obstáculos (N/m) */
   kContacto: number;
+  /**
+   * rigidez de cada punto de costura (N/m). Con 1000, una costura que sostiene 1 N/m de tela con puntos cada
+   * 5 mm queda abierta 5 µm; el banco de la camiseta la confirma (spec §5: «el resorte de costura se elige
+   * con el banco»).
+   */
+  kCostura: number;
   /** iteraciones de gradiente conjugado por ronda */
   maxCG: number;
   /** tolerancia relativa: se para cuando rᵀz ≤ tolCG²·r0ᵀz0 */
@@ -34,6 +41,7 @@ export const AJUSTES_IMPLICITO: AjustesImplicito = {
   gravedad: -9.81,
   aire: 1,
   kContacto: 2000,
+  kCostura: 1000,
   maxCG: 50,
   tolCG: 1e-4,
   anticipar: true,
@@ -45,6 +53,8 @@ export interface OpcionesSistema {
   obstaculos?: Obstaculo[];
   /** dirección de la urdimbre en el dibujo; por defecto, vertical (§4.1.2) */
   hilo?: readonly [number, number];
+  /** los puntos de costura de la prenda (costuras.ts) */
+  costuras?: { puntos: readonly PuntoDeCostura[] };
 }
 
 /** Un vértice en contacto: obstáculo k, su normal y la penetración p0 = separación − distancia al empezar el paso. */
@@ -70,6 +80,7 @@ export class SistemaTela {
   readonly fijo: Uint8Array;
   readonly membrana: Membrana;
   readonly placa: Placa;
+  readonly costuras: Costuras;
   /** posiciones */
   readonly x: Float64Array;
   /** posiciones al empezar el paso */
@@ -97,6 +108,7 @@ export class SistemaTela {
     this.membrana = new Membrana(malla.tris, this.coef, this.tela);
     this.placa = new Placa(uv, malla.tris, this.tela);
     this.x = Float64Array.from(malla.x);
+    this.costuras = new Costuras(op.costuras?.puntos ?? [], malla.x, this.aj.kCostura);
     this.xt = Float64Array.from(malla.x);
     this.v = new Float64Array(3 * this.n);
     this.vPedida = new Float64Array(3 * this.n);
@@ -124,7 +136,7 @@ export class SistemaTela {
   }
 
   energiaElastica(x: Float64Array = this.x): number {
-    return this.membrana.energia(x) + this.placa.energia(x);
+    return this.membrana.energia(x) + this.placa.energia(x) + this.costuras.energia(x);
   }
 
   /** G(x) del cuadro en curso. */
@@ -138,6 +150,7 @@ export class SistemaTela {
   linealizar(): void {
     this.membrana.linealizar(this.x);
     this.placa.linealizar(this.x);
+    this.costuras.linealizar(this.x);
   }
 
   /** out = ∇E elástica, del último `linealizar`. */
@@ -145,6 +158,7 @@ export class SistemaTela {
     out.fill(0);
     this.membrana.gradiente(out);
     this.placa.gradiente(out);
+    this.costuras.gradiente(out);
   }
 
   /** out = H·p elástica de Gauss-Newton, del último `linealizar`. */
@@ -152,6 +166,7 @@ export class SistemaTela {
     out.fill(0);
     this.membrana.hessianaPor(p, out);
     this.placa.hessianaPor(p, out);
+    this.costuras.hessianaPor(p, out);
   }
 
   /** out = los bloques 3×3 de la diagonal de la hessiana elástica (9 por vértice, fila mayor). */
@@ -159,6 +174,12 @@ export class SistemaTela {
     out.fill(0);
     this.membrana.sumarBloquesDiagonales(out);
     this.placa.sumarBloquesDiagonales(out);
+    this.costuras.sumarBloquesDiagonales(out);
+  }
+
+  /** Lo que pasa entre un cuadro y el siguiente: las costuras se cierran un cuadro más. */
+  alTerminarCuadro(): void {
+    this.costuras.avanzarCierre();
   }
 
   /** Los vértices libres que están a menos de la separación de un obstáculo, en las posiciones actuales. */

@@ -88,6 +88,7 @@ export function pasoImplicito(s: SistemaTela): InfoPaso {
     s.v[q] = (s.x[q] - s.xt[q]) / h;
     s.vPedida[q] = dx[q] / h;
   }
+  s.alTerminarCuadro();
   return { cg, anticipados, alfa, G0, G1 };
 }
 

@@ -3,6 +3,8 @@
  * una con su dibujo girado al marco de su propio hilo. Ningún triángulo cruza piezas, así que la membrana y la
  * placa ven cada pieza en su marco; las costuras (costuras.ts) las unen.
  */
+import type { SeamPair } from '../seamPairs';
+import { puntosDeCostura, type PuntoDeCostura } from './costuras';
 import { aMarcoDelHilo, type MallaDeTela } from './malla';
 
 export interface PiezaDeTela {
@@ -66,4 +68,28 @@ export function armarPrenda(piezas: readonly PiezaDeTela[]): Prenda {
     t0 += m;
   });
   return { malla: { x, patron, tris, piezaDeTri, ...(hayFijos ? { fijos } : {}) }, piezas: rangos };
+}
+
+/** Los dos lados de una costura en la prenda, con índices GLOBALES y en orden de cosido. */
+export interface LadosDeCostura {
+  a: number[];
+  b: number[];
+}
+
+/**
+ * Los puntos de costura de la prenda y los lados de cada costura, con índices globales. Cada par trae sus
+ * lados desde `seamInitDataToPairs`.
+ */
+export function costurasDePrenda(prenda: Prenda, pares: readonly SeamPair[]): { puntos: PuntoDeCostura[]; lados: LadosDeCostura[] } {
+  const v0 = new Map(prenda.piezas.map((p) => [p.id, p.v0]));
+  const puntos: PuntoDeCostura[] = [], lados: LadosDeCostura[] = [];
+  for (const par of pares) {
+    const oa = v0.get(par.pieceAId), ob = v0.get(par.pieceBId);
+    if (oa === undefined || ob === undefined) throw new Error(`costurasDePrenda: falta una pieza de la costura ${par.pieceAId}↔${par.pieceBId}`);
+    if (!par.lados) throw new Error('costurasDePrenda: el par no trae sus lados (los arma seamInitDataToPairs)');
+    const lado = { a: par.lados.a.map((v) => v + oa), b: par.lados.b.map((v) => v + ob) };
+    lados.push(lado);
+    puntos.push(...puntosDeCostura(prenda.malla.patron, lado.a, lado.b));
+  }
+  return { puntos, lados };
 }

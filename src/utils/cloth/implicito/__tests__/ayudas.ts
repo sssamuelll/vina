@@ -1,4 +1,5 @@
 /** Ayudas de las pruebas del motor implícito. */
+import type { MallaDeTela } from '../malla';
 
 /** Generador determinista (Park-Miller) en [−0,5, 0,5). */
 export function azar(semilla: number): () => number {
@@ -43,4 +44,11 @@ export function errorDeHessiana(
     den += fd ** 2;
   }
   return Math.sqrt(num / den);
+}
+
+/** Los vértices del borde x = x0 del dibujo, de abajo hacia arriba, corridos v0. */
+export function borde(m: MallaDeTela, x0: number, v0 = 0): number[] {
+  const n = m.x.length / 3, vs: number[] = [];
+  for (let i = 0; i < n; i++) if (Math.abs(m.patron[2 * i] - x0) < 1e-9) vs.push(i);
+  return vs.sort((i, j) => m.patron[2 * i + 1] - m.patron[2 * j + 1]).map((i) => i + v0);
 }

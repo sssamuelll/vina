@@ -79,6 +79,12 @@ export interface SeamPair {
   compliance: number;
   /** tension/100 — escala el target inicial (1 = distancia actual). */
   tensionFactor: number;
+  /**
+   * Los dos lados de la costura en orden de cosido (el B ya invertido si va al revés) y con el filtro de
+   * rango aplicado. El motor implícito cose cada vértice de un lado a un punto del otro
+   * (implicito/costuras.ts); el XPBD usa `vertexPairs`.
+   */
+  lados?: { a: LocalVertexIndex[]; b: LocalVertexIndex[] };
 }
 
 /**
@@ -192,6 +198,7 @@ export function seamInitDataToPairs(
       vertexPairs: resolved.vertexPairs,
       compliance: (baseCompliance / (seam.strength ?? 1.0)) * (seam.taped ? 0.1 : 1.0),
       tensionFactor: (seam.tension ?? 100) / 100,
+      lados: resolved.lados,
     });
   }
 
@@ -211,6 +218,7 @@ interface ResolvedSeamVertexPairs {
   vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]>;
   /** `null` when the seam resolved to ≥1 vertex pair. */
   failure: SeamResolutionFailure | null;
+  lados?: { a: LocalVertexIndex[]; b: LocalVertexIndex[] };
 }
 
 function buildPieceIndex(
@@ -320,7 +328,11 @@ function resolveSeamVertexPairs(
     return fail('empty-match', 'empty match');
   }
 
-  return { vertexPairs, failure: null };
+  return {
+    vertexPairs,
+    failure: null,
+    lados: { a: edgeA.map((v) => v.index as LocalVertexIndex), b: edgeB.map((v) => v.index as LocalVertexIndex) },
+  };
 }
 
 // ─── Observability (parity plan Fase 4) ──────────────────────────────────────

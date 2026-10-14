@@ -56,6 +56,7 @@ export interface PaqueteGpu {
 }
 
 export function empaquetar(s: SistemaTela): PaqueteGpu {
+  if (s.costuras.n > 0) throw new Error('empaquetar: las costuras llegan a la GPU en la parte 2 de la entrega 4');
   const n = s.n, nt = s.tris.length / 3, { bisagras, bisDeTri, K, nh } = s.placa;
 
   // las ranuras de aporte al gradiente que suma cada vértice
