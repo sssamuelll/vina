@@ -58,6 +58,22 @@ export function esMitadDeCopa(s: Seam): boolean {
   return desde > EPS || hasta < 1 - EPS;
 }
 
+/** El lado de la tira en una costura tira↔escote, o null si no lo es. */
+function ladoDeLaTira(s: Seam): Lado | null {
+  const a = raiz(s.pieceA.edgeName), b = raiz(s.pieceB.edgeName);
+  if (a === 'collarneckedge' && b === 'neckline') return 'pieceA';
+  if (b === 'collarneckedge' && a === 'neckline') return 'pieceB';
+  return null;
+}
+
+/** Una media costura de cuello: tira↔escote con la tira cosida solo en parte (#1250 C2). */
+export function esMediaDeCollar(s: Seam): boolean {
+  const lado = ladoDeLaTira(s);
+  if (!lado) return false;
+  const [desde, hasta] = rangoFisico(s, lado);
+  return desde > EPS || hasta < 1 - EPS;
+}
+
 /**
  * Pone el corte de cada copa partida en dos donde cada mitad mide, en
  * proporción, lo que su sisa. Solo toca una copa con exactamente dos medias

@@ -285,7 +285,7 @@ function resolveSeamVertexPairs(
   let edgeA = pieceA.boundaryOrig && pieceA.vertices
     ? parameterizeEdgeFromBoundary(
         pieceA.boundaryOrig, pieceA.vertices, 0,
-        flattenPath(toPathCommands(pieceA.outline)).length, rangeA,
+        flattenPath(toPathCommands(pieceA.outline)), rangeA,
       )
     : parameterizeEdge(
         toPathCommands(pieceA.outline), rangeA[0], rangeA[1], 0,
@@ -296,7 +296,7 @@ function resolveSeamVertexPairs(
   let edgeB = pieceB.boundaryOrig && pieceB.vertices
     ? parameterizeEdgeFromBoundary(
         pieceB.boundaryOrig, pieceB.vertices, 0,
-        flattenPath(toPathCommands(pieceB.outline)).length, rangeB, reversedB,
+        flattenPath(toPathCommands(pieceB.outline)), rangeB, reversedB,
       )
     : parameterizeEdge(
         toPathCommands(pieceB.outline), rangeB[0], rangeB[1], 0,
