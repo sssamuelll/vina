@@ -2,7 +2,9 @@
  * Las escenas del banco de la tela nueva (spec 2026-10-13 §4.4): el disco Cusick, la tira en voladizo y
  * la lámina del cilindro. No dependen del motor: el banco las corre con el de hoy y con el nuevo.
  */
+import { buildLinearBVH } from '../../gpu/bvh';
 import { puntosDeCostura } from '../costuras';
+import { CuerpoRigido } from '../cuerpo';
 import { mallaDeContorno, type MallaDeTela } from '../malla';
 import type { Obstaculo } from '../obstaculos';
 import type { OpcionesSistema } from '../sistema';
@@ -192,4 +194,24 @@ export function piramideDeColision(base: number, altura: number): CollisionMeshD
   const v: V3[] = [[-h, 0, -h], [h, 0, -h], [h, 0, h], [-h, 0, h], [0, altura, 0]];
   const centro: V3 = [0, altura / 4, 0];
   return mallaDeCuerpo(v, [[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4], [0, 1, 2], [0, 2, 3]], (c) => resta(c, centro));
+}
+
+/** Una lámina de 120 mm, 5 mm sobre una esfera de 5 cm (malla de cuerpo): el contacto llega por anticipación en el segundo cuadro. */
+export function escenaEsfera(): Escena {
+  const cuerpo = new CuerpoRigido(buildLinearBVH(esferaDeColision(0.05, 3)));
+  return { malla: mallaDeContorno(rectangulo(-60, -60, 60, 60), 10, 0.055), obstaculos: [{ tipo: 'cuerpo', cuerpo }] };
+}
+
+/** Una lámina de 100 mm apoyada en un plano inclinado 15° (malla de cuerpo), 0,1 mm dentro de su separación. */
+export function escenaInclinada(): Escena {
+  const a = (15 * Math.PI) / 180, n: [number, number, number] = [-Math.sin(a), Math.cos(a), 0];
+  const cuerpo = new CuerpoRigido(buildLinearBVH(planoDeColision(n, 0.4)));
+  const malla = mallaDeContorno(rectangulo(-50, -50, 50, 50), 10);
+  const h = separacion(telaSI(TELA_DE_LABORATORIO)) - 0.0001;
+  // el dibujo sobre el plano: x a lo largo de la pendiente, z horizontal
+  malla.x = Float64Array.from(malla.x, (_, k) => {
+    const i = Math.floor(k / 3), px = malla.patron[2 * i], pz = malla.patron[2 * i + 1];
+    return [px * Math.cos(a) + h * n[0], px * Math.sin(a) + h * n[1], pz][k % 3];
+  });
+  return { malla, obstaculos: [{ tipo: 'cuerpo', cuerpo }] };
 }

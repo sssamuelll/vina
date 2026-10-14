@@ -5,9 +5,10 @@
  */
 import { EPS_FRICCION } from '../contactos';
 import { CIERRE_POR_CUADRO, LARGO_CERRADO } from '../costuras';
-import type { Obstaculo } from '../obstaculos';
+import { RADIO_DE_BUSQUEDA, type Obstaculo } from '../obstaculos';
 import type { SistemaTela } from '../sistema';
 import type { PaqueteGpu } from './empaquetar';
+import { wgslCuerpoCercano, wgslPuntoMasCercano } from './wgslCuerpo';
 
 /** Hilos por grupo de trabajo. */
 export const WG = 128;
@@ -39,7 +40,7 @@ function zonas<K extends string>(tamanos: Record<K, number>): Record<K, number> 
 }
 
 type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT';
-type ZonaTf = 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH';
+type ZonaTf = 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH' | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV';
 /** las sumas parciales de cada reducción, los escalares y la historia de la quietud */
 type ZonaRed = 'PA' | 'PB' | 'PC' | 'PD' | 'SC' | 'HISTO';
 
@@ -67,6 +68,7 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
   const tf = zonas<ZonaTf>({
     COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, THP: nh, CONTRIB: 45 * nt + 9 * p.nc,
     CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch,
+    CUN: p.f32.cuNodos.length, CUT: p.f32.cuTri.length, CUNT: p.f32.cuNt.length, CUPA: p.f32.cuPa.length, CUPV: p.f32.cuPv.length,
   });
   const iu = { total: 0 } as Distribucion['iu'];
   for (const k of Object.keys(p.u32) as Array<keyof PaqueteGpu['u32']>) {
@@ -96,7 +98,7 @@ const entero = (v: number): string => `${v >>> 0}u`;
 export function wgslObstaculos(obs: readonly Obstaculo[]): string {
   const f = flotante;
   const cuerpos = obs.map((o, k) => {
-    if (o.tipo === 'cuerpo') throw new Error('wgsl: el cuerpo llega a la GPU en la parte 2 de la entrega 4');
+    if (o.tipo === 'cuerpo') return `fn obstaculo${k}(p: vec3<f32>) -> vec4<f32> { return cuerpoCercano(p, RADIO_B); }`;
     return o.tipo === 'plano'
       ? `fn obstaculo${k}(p: vec3<f32>) -> vec4<f32> { return vec4<f32>(p.y - ${f(o.altura)}, 0.0, 1.0, 0.0); }`
       : `fn obstaculo${k}(p: vec3<f32>) -> vec4<f32> {
@@ -159,6 +161,9 @@ const NCH = ${u(p.nch)};
 const GC = ${u(d.gc)};
 const I_CV = ${u(iu.costura)}; const I_CK = ${u(iu.costuraK)};
 const KCOST = ${f(aj.kCostura)};
+const NCU = ${u(p.ncu)};
+const I_CUS = ${u(iu.cuSalto)};
+const RADIO_B = ${f(RADIO_DE_BUSQUEDA)};
 const CIERRE = ${f(CIERRE_POR_CUADRO)};
 const LCERRADO = ${f(LARGO_CERRADO)};
 // la primera ranura de aporte de las costuras, después de las de la membrana y la placa
@@ -178,6 +183,10 @@ const BUSQUEDA = ${aj.busqueda};
 const MU_C = ${f(tela.friccionCuerpo)};
 const EPS_F = ${f(EPS_FRICCION)};
 const I3 = mat3x3<f32>(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+
+${wgslPuntoMasCercano()}
+
+${wgslCuerpoCercano()}
 
 ${wgslObstaculos(s.obstaculos)}
 

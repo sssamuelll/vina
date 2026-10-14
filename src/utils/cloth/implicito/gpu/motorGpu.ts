@@ -50,6 +50,11 @@ export class MotorGpu {
     tf.set(p.f32.cs, d.tf.CS);
     tf.set(p.f32.cl, d.tf.CL);
     tf.set(p.f32.ckh, d.tf.CKH);
+    tf.set(p.f32.cuNodos, d.tf.CUN);
+    tf.set(p.f32.cuTri, d.tf.CUT);
+    tf.set(p.f32.cuNt, d.tf.CUNT);
+    tf.set(p.f32.cuPa, d.tf.CUPA);
+    tf.set(p.f32.cuPv, d.tf.CUPV);
     const iu = new Uint32Array(d.iu.total);
     for (const clave of Object.keys(p.u32) as Array<keyof PaqueteGpu['u32']>) iu.set(p.u32[clave], d.iu[clave]);
     const datos: Record<Bufer, Float32Array | Uint32Array> = {

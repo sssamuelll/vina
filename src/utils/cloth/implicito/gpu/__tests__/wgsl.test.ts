@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SistemaTela } from '../../sistema';
-import { escenaCusick, TELA_DE_LABORATORIO } from '../../banco/escenas';
+import { escenaCusick, escenaEsfera, TELA_DE_LABORATORIO } from '../../banco/escenas';
 import { empaquetar } from '../empaquetar';
 import { distribuir, ENTRADAS, tamanosDeBufer, wgslDelMotor, wgslObstaculos } from '../wgsl';
 
@@ -22,6 +22,15 @@ describe('el WGSL del motor', () => {
     const cuerpo = fuente.slice(fuente.indexOf('fn posPrueba('), fuente.indexOf('fn anguloPrueba('));
     expect(cuerpo).not.toMatch(/masCercano/);
     expect(cuerpo).toMatch(/energiaPlano/);
+  });
+
+  it('con un cuerpo, el obstáculo es el BVH recorrido hasta el radio de búsqueda', () => {
+    const e = escenaEsfera();
+    const sc = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: e.obstaculos, ajustes: { contactoPropio: false } });
+    const pc = empaquetar(sc), fc = wgslDelMotor(sc, pc, distribuir(pc, 60));
+    expect(fc).toMatch(/fn cuerpoCercano\(/);
+    expect(fc).toMatch(/return cuerpoCercano\(p, RADIO_B\)/);
+    expect(fc).not.toMatch(/Infinity|NaN/);
   });
 
   it('sin obstáculos, nadie queda en contacto', () => {

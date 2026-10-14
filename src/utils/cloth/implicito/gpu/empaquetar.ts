@@ -23,6 +23,8 @@ export interface PaqueteGpu {
   nc: number;
   /** bisagras de costura que se encienden al cerrar */
   nch: number;
+  /** nodos del BVH del cuerpo; 0 sin cuerpo */
+  ncu: number;
   f32: {
     x: Float32Array;
     masa: Float32Array;
@@ -38,6 +40,12 @@ export interface PaqueteGpu {
     cl: Float32Array;
     /** la rigidez de cada bisagra de costura al encenderse */
     ckh: Float32Array;
+    /** el BVH del cuerpo (gpu/bvh.ts, LinearBVH): nodos, triángulos, normales de cara y pseudonormales */
+    cuNodos: Float32Array;
+    cuTri: Float32Array;
+    cuNt: Float32Array;
+    cuPa: Float32Array;
+    cuPv: Float32Array;
   };
   u32: {
     tris: Uint32Array;
@@ -69,12 +77,17 @@ export interface PaqueteGpu {
     costura: Uint32Array;
     /** dónde va en K (9 por triángulo) la rigidez de cada bisagra de costura */
     costuraK: Uint32Array;
+    /** el puntero de escape de cada nodo del BVH del cuerpo */
+    cuSalto: Uint32Array;
   };
 }
 
 export function empaquetar(s: SistemaTela): PaqueteGpu {
   const n = s.n, nt = s.tris.length / 3, { bisagras, bisDeTri, K, nh } = s.placa, c = s.costuras, nc = c.n;
   if (nt >= 1 << 26 || nc >= 1 << 26) throw new Error('empaquetar: más triángulos o puntos de costura de los que caben en un código de bloque');
+  const cuerpos = s.obstaculos.flatMap((o) => (o.tipo === 'cuerpo' ? [o.cuerpo] : []));
+  if (cuerpos.length > 1) throw new Error('empaquetar: la GPU lleva un solo cuerpo');
+  const bvh = cuerpos[0]?.bvh;
 
   // las ranuras de aporte al gradiente que suma cada vértice
   const aportes: number[][] = Array.from({ length: n }, () => []);
@@ -164,6 +177,7 @@ export function empaquetar(s: SistemaTela): PaqueteGpu {
     pesoTotal,
     nc,
     nch: s.placa.costura.length,
+    ncu: bvh?.nodeCount ?? 0,
     f32: {
       x: Float32Array.from(s.x),
       masa: Float32Array.from(s.masa),
@@ -173,6 +187,11 @@ export function empaquetar(s: SistemaTela): PaqueteGpu {
       cs: Float32Array.from(c.s),
       cl: Float32Array.from(c.L),
       ckh: Float32Array.from(s.placa.costura, (k) => k.kh),
+      cuNodos: bvh?.nodes ?? new Float32Array(0),
+      cuTri: bvh?.triVerts ?? new Float32Array(0),
+      cuNt: bvh?.triNormals ?? new Float32Array(0),
+      cuPa: bvh?.edgePseudonormals ?? new Float32Array(0),
+      cuPv: bvh?.vertexPseudonormals ?? new Float32Array(0),
     },
     u32: {
       tris: Uint32Array.from(s.tris),
@@ -192,6 +211,7 @@ export function empaquetar(s: SistemaTela): PaqueteGpu {
       diag,
       costura: Uint32Array.from({ length: 3 * nc }, (_, k) => c.vertices(Math.floor(k / 3))[k % 3]),
       costuraK: Uint32Array.from(s.placa.costura, (k) => k.o),
+      cuSalto: bvh?.skip ?? new Uint32Array(0),
     },
   };
 }

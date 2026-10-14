@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SistemaTela } from '../../sistema';
 import { ESTADO_MEMBRANA } from '../../membrana';
-import { escenaCostura, escenaCusick, TELA_DE_LABORATORIO } from '../../banco/escenas';
+import { escenaCostura, escenaCusick, escenaEsfera, TELA_DE_LABORATORIO } from '../../banco/escenas';
 import { azar } from '../../__tests__/ayudas';
 import { empaquetar, NINGUNA, type PaqueteGpu } from '../empaquetar';
 
@@ -133,5 +133,25 @@ describe('el paquete de una prenda cosida', () => {
     expect(p.nc).toBe(s.costuras.n);
     expect(Array.from(p.f32.cl)).toEqual(Array.from(Float32Array.from(s.costuras.L)));
     expect(Array.from(p.u32.costuraK)).toEqual(s.placa.costura.map((c) => c.o));
+  });
+});
+
+describe('el paquete con un cuerpo', () => {
+  it('lleva el BVH del cuerpo tal cual', () => {
+    const e = escenaEsfera();
+    const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: e.obstaculos, ajustes: { contactoPropio: false } });
+    const p = empaquetar(s), o = e.obstaculos[0];
+    if (o.tipo !== 'cuerpo') throw new Error('la escena trae un cuerpo');
+    const bvh = o.cuerpo.bvh;
+    expect(p.ncu).toBe(bvh.nodeCount);
+    expect(Array.from(p.u32.cuSalto)).toEqual(Array.from(bvh.skip));
+    expect(Array.from(p.f32.cuTri)).toEqual(Array.from(bvh.triVerts));
+    expect(Array.from(p.f32.cuPv)).toEqual(Array.from(bvh.vertexPseudonormals));
+  });
+
+  it('con dos cuerpos se niega', () => {
+    const e = escenaEsfera();
+    const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: [...e.obstaculos, ...e.obstaculos], ajustes: { contactoPropio: false } });
+    expect(() => empaquetar(s)).toThrow(/un solo cuerpo/);
   });
 });
