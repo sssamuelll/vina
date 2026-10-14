@@ -10,8 +10,8 @@
  * Misma escena que el runner CPU (cusickGate.cpu.test.ts): disco de 30 cm
  * (seed 42) a y=0.855 sobre pedestal rígido de 18 cm (topY=0.85), 300 frames
  * = 5 s de sim, substeps 15, dt 1/60. La física es la del tier GPU REAL:
- * initMultiPieceTsl con el fabricCompliance de producción
- * (useSimulationLifecycle.ts:521-538) y el dispatch de GarmentSimulation.tsx
+ * initMultiPieceTsl con el fabricCompliance de producción (`complianceDeTela`,
+ * el de la rama WebGPU de la cascada) y el dispatch de GarmentSimulation.tsx
  * (~:493-587) espejado MINIMAL — incluye self-collision (always-on en GPU,
  * #897 F3) y strain-limit (#gummy STEP 4), que el runner CPU no tiene: por
  * eso este gate lleva SU PROPIO baseline. Excluidos: tether (el harness nunca
@@ -35,7 +35,8 @@ import {
   computeDrapeCoefficient,
   countFolds,
 } from '../../utils/cloth/cusickMetric';
-import { getPhysicalFabric, toXPBDParams } from '../../utils/cloth/physicalFabric';
+import { getPhysicalFabric } from '../../utils/cloth/physicalFabric';
+import { complianceDeTela } from '../../utils/cloth/complianceDeTela';
 
 // Constantes de escena — MISMOS valores que cusickGate.cpu.test.ts.
 const PEDESTAL_TOP_Y = 0.85;
@@ -116,7 +117,6 @@ function CusickScene({ fabricId }: { fabricId: string }) {
       try {
         const pf = getPhysicalFabric(fabricId);
         if (!pf) throw new Error(`cusick harness: fabric '${fabricId}' not in library`);
-        const xpbd = toXPBDParams(pf);
 
         // Device propio como en useSimulationLifecycle (los kernels TSL corren
         // en el device del RENDERER; este es el señuelo de init — #901).
@@ -127,20 +127,13 @@ function CusickScene({ fabricId }: { fabricId: string }) {
         if (cancelled) return;
 
         client = new GpuSolverClient(device);
-        // fabricCompliance — espejo campo a campo de useSimulationLifecycle.ts:521-538
+        // fabricCompliance: la misma función que la rama WebGPU de la cascada
         // (stretch RIGID 0.0, shear 0.001, bend + density de la tela).
         await client.initMultiPieceTsl(
           [{ pieceId: 'cusick-disc', vertices: scene.mesh.vertices, triIds: scene.mesh.triIds, uvs: scene.mesh.uvs }],
           [], // sin seams
           { internalDamping: pf.internalDamping }, // substeps 15 / dt 1/60 / gravedad -9.81 = defaults del cliente
-          {
-            stretchComplianceWarp: 0.0,
-            stretchComplianceWeft: 0.0,
-            shearCompliance: 0.001,
-            bendComplianceWarp: xpbd.bendComplianceWarp,
-            bendComplianceWeft: xpbd.bendComplianceWeft,
-            density: xpbd.density,
-          },
+          complianceDeTela(fabricId),
         );
         if (cancelled) return;
 

@@ -9,9 +9,10 @@
  * function — that would shade into a "migration helper pattern" which
  * pre-empts B6-state (Persistence). One key, one function, idempotent.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   WEBGPU_FEATURE_FLAG_KEY,
+  hayAdaptadorWebGPU,
   migrateLegacyWebGpuFlag,
 } from '../webgpuDetect';
 
@@ -75,5 +76,35 @@ describe('migrateLegacyWebGpuFlag (BUG-11 / #614)', () => {
     };
 
     expect(afterSecond).toEqual(afterFirst);
+  });
+});
+
+// El preparador solo arma la tela de WebGPU si la cascada va a tener ese tier:
+// `navigator.gpu` puede existir sin dar adaptador (GPU vetada por el navegador,
+// o el Chromium sin GPU de los e2e), y entonces la cascada cae a WASM.
+describe('hayAdaptadorWebGPU', () => {
+  const ponerGpu = (requestAdapter: () => unknown) => { (navigator as { gpu?: unknown }).gpu = { requestAdapter }; };
+  afterEach(() => { delete (navigator as { gpu?: unknown }).gpu; });
+
+  it('sin navigator.gpu responde false, sin lanzar', async () => {
+    expect((navigator as { gpu?: unknown }).gpu, 'jsdom no trae WebGPU').toBeUndefined();
+    await expect(hayAdaptadorWebGPU()).resolves.toBe(false);
+  });
+
+  it.each<[string, () => unknown]>([
+    ['da null', async () => null],
+    ['rechaza', async () => { throw new Error('GPU vetada'); }],
+    ['lanza al llamarla', () => { throw new Error('GPU vetada'); }],
+  ])('si requestAdapter %s responde false', async (_, requestAdapter) => {
+    ponerGpu(requestAdapter);
+    await expect(hayAdaptadorWebGPU()).resolves.toBe(false);
+  });
+
+  it('con un adaptador responde true, y no vuelve a preguntar', async () => {
+    const requestAdapter = vi.fn(async () => ({}));
+    ponerGpu(requestAdapter);
+    await expect(hayAdaptadorWebGPU()).resolves.toBe(true);
+    await expect(hayAdaptadorWebGPU()).resolves.toBe(true);
+    expect(requestAdapter).toHaveBeenCalledTimes(1);
   });
 });

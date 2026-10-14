@@ -1393,8 +1393,20 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     handleMouseUpRef.current(e);
   }, []);
 
+  // Soltar fuera de la hoja apaga los resaltes, como salir de ella (#1132). El
+  // gesto sigue oyendo el ratón fuera (T#212, abajo) y las herramientas
+  // calculan su resalte con esas coordenadas: lo que eso encendía no tenía
+  // quién lo apagara, porque el mouseleave ya había pasado al salir.
+  const handleMouseLeaveRef = useRef(handleMouseLeave);
+  handleMouseLeaveRef.current = handleMouseLeave;
   useEffect(() => {
-    const finishGlobalMouseInteraction = () => finishMouseInteraction();
+    const finishGlobalMouseInteraction = (ev: Event) => {
+      const svg = svgRef.current;
+      const sueltaFuera = mouseInteractionActiveRef.current
+        && !(ev.target instanceof Node && svg?.contains(ev.target));
+      finishMouseInteraction();
+      if (sueltaFuera) handleMouseLeaveRef.current();
+    };
     window.addEventListener('mouseup', finishGlobalMouseInteraction);
     window.addEventListener('blur', finishGlobalMouseInteraction);
     return () => {
@@ -1402,7 +1414,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
       window.removeEventListener('blur', finishGlobalMouseInteraction);
       finishMouseInteraction();
     };
-  }, [finishMouseInteraction]);
+  }, [finishMouseInteraction, svgRef]);
 
   // Track SVG viewport size: the fit-to-view needs it.
   useEffect(() => {
@@ -1545,6 +1557,31 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
     finishMouseInteraction(e);
   }, [finishMouseInteraction]);
 
+  // Un gesto que empezó en la hoja la sigue oyendo fuera de ella (T#212). El
+  // <svg> solo recibe mousemove con el ratón encima: el mouseup ya se oía en
+  // window y el movimiento no, así que al salir del lienzo la pieza se quedaba
+  // en el borde, y con zoom alto eso son unos 30 mm. Lo mismo el paneo, la caja
+  // y los puntos. Las herramientas convierten con
+  // `e.currentTarget.getBoundingClientRect()`, así que el evento les llega con
+  // el <svg> de currentTarget, como dentro. En captura, para que nada fuera de
+  // la hoja lo pare antes.
+  const handleMouseMoveRef = useRef(handleMouseMove);
+  handleMouseMoveRef.current = handleMouseMove;
+  useEffect(() => {
+    const seguirFuera = (ev: MouseEvent) => {
+      const svg = svgRef.current;
+      if (!mouseInteractionActiveRef.current || !svg || (ev.target instanceof Node && svg.contains(ev.target))) return;
+      handleMouseMoveRef.current({
+        clientX: ev.clientX, clientY: ev.clientY, button: ev.button, buttons: ev.buttons, detail: ev.detail,
+        shiftKey: ev.shiftKey, altKey: ev.altKey, ctrlKey: ev.ctrlKey, metaKey: ev.metaKey,
+        target: ev.target, currentTarget: svg, nativeEvent: ev,
+        preventDefault: () => ev.preventDefault(), stopPropagation: () => ev.stopPropagation(),
+      } as unknown as React.MouseEvent<SVGSVGElement>);
+    };
+    window.addEventListener('mousemove', seguirFuera, true);
+    return () => window.removeEventListener('mousemove', seguirFuera, true);
+  }, [svgRef]);
+
   // Shift de la herramienta activa (spec 2026-09-23): sus guías, para el
   // lienzo, y su modo y su segundo marco, para la pista. Cada herramienta
   // calcula las suyas con `guiasShift`; aquí solo se elige de cuál leer.
@@ -1608,6 +1645,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }
         onMouseMove={handleMouseMove}
         onMouseUp={handleHostMouseUp}
         onMouseLeave={handleMouseLeave}
+        // Una selección de texto que cubre la hoja convertía cualquier gesto
+        // en un arrastre nativo del navegador: dragstart a ~6 px y después ni
+        // mousemove ni mouseup (T#212). En la hoja no se arrastra nada nativo.
+        onDragStart={e => e.preventDefault()}
         onPointerCancel={handlePointerCancel}
         onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}

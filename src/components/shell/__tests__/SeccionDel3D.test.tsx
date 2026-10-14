@@ -16,7 +16,7 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { store } from '../../../store';
 import { ShortcutProvider } from '../../../shortcuts/ShortcutProvider';
-import { startSimulation, resetSimulation, setSolverTier, setFrameTime, setBodyCollision } from '../../../store/simulationSlice';
+import { startSimulation, resetSimulation, setSolverTier, setFrameTime, setBodyCollision, marcarTelaEnMovimiento } from '../../../store/simulationSlice';
 import { setActiveTool3D } from '../../../store/toolSlice';
 import { togglePoseEditor } from '../../../store/avatarSlice';
 import { setUserScheme } from '../../../store/inputSchemeSlice';
@@ -47,6 +47,9 @@ describe('SeccionDel3D ▸ la sección', () => {
   it('simulando y con avisos, el pie no dice el estado: vive al pie del margen del 3D', () => {
     act(() => {
       store.dispatch(startSimulation());
+      // Ya dio su primer cuadro: sin esto el estado sería «Preparando la tela», y
+      // «Simulando» y los fps no tendrían cómo aparecer aunque el pie los dijera.
+      store.dispatch(marcarTelaEnMovimiento(true));
       store.dispatch(setSolverTier('webgpu'));
       store.dispatch(setFrameTime(16.7));
     });

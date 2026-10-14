@@ -74,7 +74,7 @@ export const COMMANDS: CommandDef[] = [
   { id: 'view-3d', category: 'Vista', name: 'Vista: solo 3D', description: 'Solo la simulación 3D', icon: Eye, action: (d) => d(setViewMode('3d')) },
   { id: 'view-split', category: 'Vista', name: 'Vista: dividida', description: '2D y 3D lado a lado', icon: Layers, action: (d) => d(setViewMode('split')) },
   { id: 'input-trackpad', category: 'Vista', name: 'Controles de panel táctil', description: 'Orbitar con dos dedos, zoom con pellizco', icon: Hand, action: (d) => d(setUserScheme('trackpad')) },
-  { id: 'input-mouse', category: 'Vista', name: 'Controles de ratón', description: 'Estilo CLO3D: orbitar con clic derecho, zoom con rueda', icon: MousePointer2, action: (d) => d(setUserScheme('mouse')) },
+  { id: 'input-mouse', category: 'Vista', name: 'Controles de ratón', description: 'Orbitar con clic derecho, zoom con rueda', icon: MousePointer2, action: (d) => d(setUserScheme('mouse')) },
 
   // ─── Toggles ───
   { id: 'toggle-seam-allowance', category: 'Vista', name: 'Mostrar u ocultar margen de costura', description: 'El margen alrededor de cada pieza', icon: ScanLine, shortcutId: 'view.toggleSeamAllowance', action: (d) => d(toggleSeamAllowance()) },

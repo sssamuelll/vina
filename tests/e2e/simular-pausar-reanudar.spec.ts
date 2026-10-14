@@ -25,6 +25,7 @@ const estado = (page: Page) =>
 const cuadro = (page: Page) =>
   page.evaluate(() => (window as unknown as VentanaConStore).__VINA_STORE__.getState().simulation.frameTimeMs);
 const simular = (page: Page) => page.getByRole('button', { name: 'Simular', exact: true }).click();
+const elEstado = (page: Page) => page.locator('button[aria-label^="Estado de la simulación"]');
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('vina-use-webgpu', 'false'));
@@ -37,6 +38,9 @@ test('pausar y reanudar, con el botón o con Espacio, no vuelve a vestir', async
 
   await simular(page);
   await expect.poll(() => cuadro(page), { timeout: 90_000 }).toBeGreaterThan(0);
+  // Con la tela en movimiento, el estado deja «Preparando la tela»: lo apaga el primer cuadro.
+  await expect(elEstado(page), 'la tela se mueve y el estado sigue en «Preparando la tela»')
+    .toHaveAttribute('aria-label', /^Estado de la simulación: Simulando/, { timeout: 30_000 });
 
   // El botón: pausa y reanuda. La espera cubre el arranque en caliente del
   // mallado (medio segundo), que volvía a mallar y a vestir tras la pausa.

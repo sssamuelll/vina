@@ -10,6 +10,8 @@ import './App.css';
 
 // DEV-only Cusick gate harness (plan drape-profesional §B2) — lazy: chunk aparte, jamás cargado en prod.
 const CusickHarness = lazy(() => import('./components/testScenes/CusickHarness'));
+// DEV-only: la tela nueva en la GPU (spec 2026-10-13 §4.4.3) — lazy, como la de arriba.
+const TelaImplicitaHarness = lazy(() => import('./components/testScenes/TelaImplicitaHarness'));
 
 function App() {
   const [ready, setReady] = useState(false);
@@ -37,6 +39,16 @@ function App() {
     return (
       <Suspense fallback={null}>
         <CusickHarness fabricId={new URLSearchParams(window.location.search).get('fabric') ?? 'chiffon'} />
+      </Suspense>
+    );
+  }
+
+  // DEV-only: ?testScene=tela-implicita reemplaza la app entera por el banco de la tela nueva en la GPU
+  // (tests/e2e/tela-implicita.spec.ts, @gpu-local).
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('testScene') === 'tela-implicita') {
+    return (
+      <Suspense fallback={null}>
+        <TelaImplicitaHarness />
       </Suspense>
     );
   }

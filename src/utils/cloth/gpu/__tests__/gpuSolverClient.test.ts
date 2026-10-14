@@ -134,10 +134,19 @@ type TestSeamColorGroup = {
 
 vi.mock('three/webgpu', () => sharedMock());
 vi.mock('three/tsl', () => sharedMock());
+// El BVH del cuerpo, armado de verdad pero con un espía: con uno guardado para
+// la huella de esa malla, setTslCollisionBody no lo vuelve a armar.
+vi.mock('../bvh', async (original) => {
+  const real = await original<typeof import('../bvh')>();
+  return { ...real, buildLinearBVH: vi.fn(real.buildLinearBVH) };
+});
 
 import { GpuSolverClient, type PieceMeshData } from '../gpuSolverClient';
 import { DEFAULT_SEAM_CONFIG } from '../../seamAssembly';
 import { CELL_CAPACITY } from '../tslSelfCollision';
+import { buildLinearBVH } from '../bvh';
+import { guardarBvh } from '../bvhPreparado';
+import { huella } from '../../huella';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -1723,5 +1732,85 @@ describe('caja negra 3D — eventos del tier GPU', () => {
     expect(getSolverEvents()).toContainEqual(
       expect.objectContaining({ kind: 'collision:degraded', data: { tier: 'webgpu', id: 'avatar', reason: 'zero-triangles' } }),
     );
+  });
+});
+
+// ─── El BVH del cuerpo preparado en reposo (simular al instante, tarea 11) ───
+//
+// El preparador hornea el cuerpo y guarda su BVH con la huella de la malla
+// horneada. Al pulsar «Simular», la cascada hornea la suya (otros arreglos, el
+// mismo contenido si el cuerpo no cambió) y setTslCollisionBody busca esa
+// huella: con acierto no arma el BVH (~130 ms en el hilo principal). Un cuerpo
+// que cambió da otra huella y se arma como siempre. `preparar:usada` lo dice.
+
+describe('setTslCollisionBody y el BVH preparado en reposo', () => {
+  beforeEach(clearSolverEvents);
+
+  /**
+   * Un cuerpo de prueba que ningún otro caso de este archivo usa: lo que se
+   * guarda aquí no le cambia el camino a otro. Arreglos nuevos en cada llamada.
+   */
+  const unCuerpo = (cambiar: (v: Float32Array) => void = () => {}) => {
+    const triCount = 16;
+    const vertices = new Float32Array(triCount * 9);
+    const normals = new Float32Array(triCount * 3);
+    for (let t = 0; t < triCount; t++) {
+      const x = 3 + t * 0.1;
+      vertices.set([x, 0, 0, x + 0.1, 0, 0, x, 0.1, 0], t * 9);
+      normals.set([0, 0, 1], t * 3);
+    }
+    cambiar(vertices);
+    return { vertices, normals, triCount };
+  };
+  const usadas = () => getSolverEvents().filter((e) => e.kind === 'preparar:usada').map((e) => e.data);
+  const clienteConTela = async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(new FakeGPUDevice() as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+    return client;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sbasDelCuerpo = (client: GpuSolverClient) => (client as any).collisionBodySBAs.get('__avatar__');
+
+  it('con un BVH guardado para la huella de esa malla no lo vuelve a armar: usa el guardado y dice cache', async () => {
+    const client = await clienteConTela();
+    const guardado = buildLinearBVH(unCuerpo());
+    guardarBvh(huella(unCuerpo()), guardado);
+    vi.mocked(buildLinearBVH).mockClear();
+
+    // La malla que hornea la cascada al pulsar: otros arreglos, el mismo contenido.
+    client.setTslCollisionBody('__avatar__', unCuerpo(), 0.4, 0.008);
+
+    expect(buildLinearBVH, 'el BVH ya estaba: no se arma en el hilo principal').not.toHaveBeenCalled();
+    const sbas = sbasDelCuerpo(client);
+    expect(sbas.bvhNodesSBA.array).toBe(guardado.nodes);
+    expect(sbas.bvhSkipSBA.array).toBe(guardado.skip);
+    expect(sbas.triVertsSBA.array).toBe(guardado.triVerts);
+    expect(usadas()).toEqual([{ fase: 'bvh', origen: 'cache', cuerpo: '__avatar__' }]);
+  });
+
+  it.each<[string, (v: Float32Array) => void]>([
+    ['otra pose (un vértice se movió 1 mm)', (v) => { v[0] += 0.001; }],
+    ['otras medidas (todo un 1 % más grande)', (v) => { v.forEach((x, i) => { v[i] = x * 1.01; }); }],
+  ])('con %s no usa el guardado del cuerpo de antes: lo arma y dice armado', async (_, cambiar) => {
+    const client = await clienteConTela();
+    const deAntes = buildLinearBVH(unCuerpo());
+    guardarBvh(huella(unCuerpo()), deAntes);
+    vi.mocked(buildLinearBVH).mockClear();
+
+    const otro = unCuerpo(cambiar);
+    client.setTslCollisionBody('__avatar__', otro, 0.4, 0.008);
+
+    expect(buildLinearBVH).toHaveBeenCalledTimes(1);
+    expect(buildLinearBVH).toHaveBeenCalledWith(otro);
+    const armado = vi.mocked(buildLinearBVH).mock.results[0].value;
+    expect(sbasDelCuerpo(client).bvhNodesSBA.array, 'el que se armó, no el del cuerpo de antes').toBe(armado.nodes);
+    expect(usadas()).toEqual([{ fase: 'bvh', origen: 'armado', cuerpo: '__avatar__' }]);
+  });
+
+  it('un cuerpo de colisión que no es el avatar (un maniquí) lo dice con su id: la sonda no lo confunde con el avatar', async () => {
+    const client = await clienteConTela();
+    client.setTslCollisionBody('maniqui', unCuerpo((v) => { v[1] += 0.5; }), 0.3, 0.005);
+    expect(usadas()).toEqual([{ fase: 'bvh', origen: 'armado', cuerpo: 'maniqui' }]);
   });
 });

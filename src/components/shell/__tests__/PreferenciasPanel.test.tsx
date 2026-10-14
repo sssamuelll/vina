@@ -19,7 +19,7 @@ afterEach(cleanup);
 describe('el panel «IA y ratón»', () => {
   it('trae el esquema del ratón y los ajustes de la IA, sin una segunda cabecera ni un segundo «Cerrar»', () => {
     render(<Provider store={store}><PreferenciasPanel alCerrar={() => {}} /></Provider>);
-    expect(screen.getByText('Ratón (CLO3D)')).toBeTruthy();
+    expect(screen.getByText('Ratón')).toBeTruthy();
     expect(screen.getByText('Idioma')).toBeTruthy();
     expect(screen.queryByText('Ajustes del agente')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Cerrar' })).toBeNull();

@@ -71,6 +71,7 @@ function Linea({ tono, title, children }: { tono?: 'cabecera' | 'bien' | 'aviso'
 export default function EstadoDeLaSimulacion() {
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
+  const telaEnMovimiento = useSelector((s: RootState) => s.simulation.telaEnMovimiento);
   const solverTier = useSelector((s: RootState) => s.simulation.solverTier);
   const frameTimeMs = useSelector((s: RootState) => s.simulation.frameTimeMs);
   const particleCount = useSelector((s: RootState) => s.simulation.particleCount);
@@ -92,6 +93,9 @@ export default function EstadoDeLaSimulacion() {
 
   const idle = simulationState === 'idle';
   const corriendo = simulationState === 'running';
+  // Del clic en «Simular» al primer cuadro de la corrida la tela se prepara (malla, motor,
+  // colisión): nada se mueve todavía, y «Simulando» ahí era mentira.
+  const preparando = corriendo && !telaEnMovimiento;
   // Se ve con la simulación en marcha o en pausa, O con una herramienta sin soporte
   // armada en reposo: se puede activar la plancha o el agarre antes de dar a Simular,
   // y sin este aviso arrastrar sobre la tela no haría nada y sin una sola pista.
@@ -109,16 +113,21 @@ export default function EstadoDeLaSimulacion() {
     (toolUnsupported ? 1 : 0);
 
   // Sin cifra hasta el primer cuadro: `frameTimeMs` es el promedio de una ventana de 30
-  // cuadros y vale 0 hasta que se llena. Un «0 fps» sería mentira, y alarmante.
-  const fps = frameTimeMs > 0 ? Math.round(1000 / frameTimeMs) : 0;
+  // cuadros y vale 0 hasta que se llena. Un «0 fps» sería mentira, y alarmante. Mientras la
+  // tela se prepara, tampoco: una cascada que vuelve a correr deja el promedio de la anterior.
+  const fps = frameTimeMs > 0 && !preparando ? Math.round(1000 / frameTimeMs) : 0;
   const motor = solverTier === 'none' ? null : (SOLVER_TIER_INFO[solverTier] ?? SOLVER_TIER_INFO.none).label;
   const textoDelEstado = idle
     ? SOLVER_TIER_INFO.none.label
-    : corriendo
-      ? ['Simulando', fps > 0 ? `${fps} fps` : null, motor].filter(Boolean).join(' · ')
-      : 'En pausa';
+    : preparando
+      ? ['Preparando la tela', motor].filter(Boolean).join(' · ')
+      : corriendo
+        ? ['Simulando', fps > 0 ? `${fps} fps` : null, motor].filter(Boolean).join(' · ')
+        : 'En pausa';
   // La primera línea del detalle: el estado y el motor. La cifra va en la línea siguiente.
-  const cabecera = idle ? SOLVER_TIER_INFO.none.label : [corriendo ? 'Simulando' : 'En pausa', motor].filter(Boolean).join(' · ');
+  const cabecera = idle
+    ? SOLVER_TIER_INFO.none.label
+    : [preparando ? 'Preparando la tela' : corriendo ? 'Simulando' : 'En pausa', motor].filter(Boolean).join(' · ');
   const avisos = warningCount === 0 ? '' : warningCount === 1 ? ' · 1 aviso' : ` · ${warningCount} avisos`;
   const resumen = `${textoDelEstado}${avisos}`;
   // El nombre accesible no lleva la cifra: `setFrameTime` llega cada 30 cuadros, y un nombre

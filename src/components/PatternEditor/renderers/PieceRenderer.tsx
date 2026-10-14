@@ -384,7 +384,9 @@ const SinglePiece = memo(function SinglePiece({
         );
       })}
 
-      {showPieceNames && (() => {
+      {/* El campo de «Renombrar…» vive en este bloque: con los nombres
+          apagados (lo de fábrica) también se pinta mientras se renombra. */}
+      {(showPieceNames || isEditingName) && (() => {
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const cmd of piece.outline) {
           for (let i = 0; i < cmd.values.length - 1; i += 2) {
