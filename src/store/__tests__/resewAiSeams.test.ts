@@ -22,7 +22,7 @@ import projectReducer, { addSeam, restoreProject } from '../projectSlice';
 import { undoMiddleware } from '../undoMiddleware';
 import { resewAiSeams, runAutoSew } from '../autoSewThunk';
 import { SEAM_ENGINE_VERSION, isStaleAiSeam } from '../../utils/autoSew';
-import { esMitadDeCopa } from '../../utils/autoSew/repartoDeCopa';
+import { esMediaDeCollar, esMitadDeCopa } from '../../utils/autoSew/repartoDeCopa';
 import { largosDeCostura } from '../../utils/seam/largoCosido';
 import { SEAM_MISMATCH_THRESHOLD_MM } from '../../components/PatternEditor/renderers/seamVisuals';
 import { importDXFContent } from '../../utils/dxf';
@@ -198,7 +198,7 @@ describe('runAutoSew — la camisa de María por la puerta de la app', () => {
   });
 });
 
-describe('el motor 2 solo cambió dónde se parte la copa', () => {
+describe('los motores 2 y 3 solo cambiaron la copa partida y las medias de cuello', () => {
   const ia = (over: Partial<Seam> = {}): Seam => ({
     id: 'auto-seam-1-0', type: 'standard', tension: 100, strength: 1, active: true, taped: false, tapeWidth: 10,
     createdBy: 'ai',
@@ -208,10 +208,11 @@ describe('el motor 2 solo cambió dónde se parte la copa', () => {
   });
   const sisa = { pieceId: 'del', edgeName: 'armhole', tStart: 0, tEnd: 1 };
 
-  it('del motor 1, solo las mitades de copa están viejas: un costado o una copa entera siguen vigentes', () => {
+  it('del motor 1, están viejas las mitades de copa y las medias de cuello: un costado o una copa entera siguen vigentes', () => {
     expect(isStaleAiSeam(ia({ sewEngine: 1 }))).toBe(false);
     expect(isStaleAiSeam(ia({ sewEngine: 1, pieceA: sisa, pieceB: { pieceId: 'manga', edgeName: 'sleeveCap', tStart: 0, tEnd: 1 } }))).toBe(false);
     expect(isStaleAiSeam(ia({ sewEngine: 1, pieceA: sisa, pieceB: { pieceId: 'manga', edgeName: 'sleeveCap', tStart: 0, tEnd: 0.5, reversed: true } }))).toBe(true);
+    expect(isStaleAiSeam(ia({ sewEngine: 1, pieceA: { pieceId: 'del', edgeName: 'neckline', tStart: 0, tEnd: 0.5 }, pieceB: { pieceId: 'tira', edgeName: 'collarNeckEdge', tStart: 0, tEnd: 0.578 } }))).toBe(true);
   });
 
   it('todo el motor 0 está viejo; lo del motor actual y lo humano, nunca', () => {
@@ -224,25 +225,27 @@ describe('el motor 2 solo cambió dónde se parte la copa', () => {
     expect(isStaleAiSeam({ ...ia(), id: '3f6c1d2e-agente', sewEngine: undefined })).toBe(false);
   });
 
-  it('en un proyecto del motor 1, «Re-coser» rehace solo las cuatro mitades de copa, cortadas por sus sisas', () => {
+  it('en un proyecto del motor 1, «Re-coser» rehace solo las cuatro mitades de copa (cortadas por sus sisas) y las cuatro medias de cuello', () => {
     const pieces = importMariaClassified();
     const cosida = makeStore(pieces, []);
     runAutoSew()(cosida.dispatch as never, cosida.getState as never);
     const delMotor1 = comoElMotor1(cosida.getState().project.seams);
     const store = makeStore(pieces, delMotor1);
-    expect(store.getState().project.seams.filter(isStaleAiSeam)).toHaveLength(4);
+    // Cuatro de copa (las dejó viejas el motor 2) y cuatro de cuello (las dejó viejas el motor 3, #1250 C2).
+    expect(store.getState().project.seams.filter(isStaleAiSeam)).toHaveLength(8);
 
     const result = resewAiSeams()(store.dispatch as never, store.getState as never);
 
-    expect(result.removed).toBe(4);
+    expect(result.removed).toBe(8);
     const { seams, pieces: enStore } = store.getState().project;
     // Lo demás del motor 1 se queda como estaba, con su id.
-    for (const s of delMotor1.filter(x => !esMitadDeCopa(x))) {
+    for (const s of delMotor1.filter(x => !esMitadDeCopa(x) && !esMediaDeCollar(x))) {
       expect(seams.some(x => x.id === s.id), `se rehízo ${s.pieceA.edgeName} ↔ ${s.pieceB.edgeName}`).toBe(true);
     }
     const copas = seams.filter(esMitadDeCopa);
     expect(copas).toHaveLength(4);
     aMenosDeUnMm(copas, enStore);
+    expect(seams.filter(esMediaDeCollar)).toHaveLength(4);
     expect(seams.some(isStaleAiSeam)).toBe(false);
   });
 });
