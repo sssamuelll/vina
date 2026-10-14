@@ -47,6 +47,9 @@ export class MotorGpu {
     tf.set(p.f32.coef, d.tf.COEF);
     tf.set(p.f32.K, d.tf.KP);
     tf.set(p.f32.pcr, d.tf.PCR);
+    tf.set(p.f32.cs, d.tf.CS);
+    tf.set(p.f32.cl, d.tf.CL);
+    tf.set(p.f32.ckh, d.tf.CKH);
     const iu = new Uint32Array(d.iu.total);
     for (const clave of Object.keys(p.u32) as Array<keyof PaqueteGpu['u32']>) iu.set(p.u32[clave], d.iu[clave]);
     const datos: Record<Bufer, Float32Array | Uint32Array> = {
@@ -82,8 +85,9 @@ export class MotorGpu {
 
   /** Graba un cuadro completo en el pase, en el orden de paso.ts. */
   grabarCuadro(pase: GPUComputePassEncoder): void {
-    const { aj } = this.s, { gv, gt, gh, gb } = this.d;
+    const { aj } = this.s, { gv, gt, gh, gb, gc, gch } = this.d;
     const d = (e: Entrada, grupos: number) => {
+      if (grupos === 0) return;
       pase.setPipeline(this.k[e]);
       pase.dispatchWorkgroups(grupos);
     };
@@ -103,6 +107,7 @@ export class MotorGpu {
     d('prepTri', gt);
     d('prepHinge', gh);
     d('gradElem', gt);
+    d('prepCostura', gc);
     d('ensamblar', gb);
     ronda();
     // ponytail: la segunda ronda y los intentos de la búsqueda se despachan siempre y salen enseguida si no
@@ -118,11 +123,17 @@ export class MotorGpu {
         d('posPrueba', gv);
         d('anguloPrueba', gh);
         d('difTri', gt);
+        d('difCostura', gc);
         d('decidir', 1);
       }
     }
     d('aplicar', gv);
     d('cerrarCuadro', 1);
+    if (gc > 0) {
+      d('cerrarCosturas', gc);
+      d('revisarCosido', 1);
+      d('coser', gch);
+    }
   }
 
   /** Avanza `cuadros` cuadros, un envío por cuadro, y espera a la GPU. */

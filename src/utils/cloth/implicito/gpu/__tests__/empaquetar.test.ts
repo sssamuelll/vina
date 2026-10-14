@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { SistemaTela } from '../../sistema';
 import { ESTADO_MEMBRANA } from '../../membrana';
-import { escenaCusick, TELA_DE_LABORATORIO } from '../../banco/escenas';
+import { escenaCostura, escenaCusick, TELA_DE_LABORATORIO } from '../../banco/escenas';
 import { azar } from '../../__tests__/ayudas';
 import { empaquetar, NINGUNA, type PaqueteGpu } from '../empaquetar';
 
-/** Lo que `gradElem` escribe en cada ranura de aporte (un vec3 por ranura), desde el estado linealizado. */
+/** Lo que gradElem y prepCostura escriben en cada ranura de aporte (un vec3 por ranura), desde el estado linealizado. */
 function ranuras(s: SistemaTela): Float64Array {
-  const nt = s.tris.length / 3, out = new Float64Array(3 * 15 * nt);
+  const nt = s.tris.length / 3, cs = s.costuras, out = new Float64Array(3 * (15 * nt + 3 * cs.n));
   const em = s.membrana.estado, c = s.coef, kC = s.tela.kCizalla, { bisDeTri, K, estado: ep } = s.placa;
   for (let t = 0; t < nt; t++) {
     const e = ESTADO_MEMBRANA * t, o = 7 * t, A0 = c[o + 6];
@@ -27,6 +27,10 @@ function ranuras(s: SistemaTela): Float64Array {
       for (let r = 0; r < 4; r++) for (let d = 0; d < 3; d++) out[3 * (3 * nt + 12 * t + 4 * k + r) + d] = w * ep[13 * h + 1 + 3 * r + d];
     }
   }
+  for (let e = 0; e < cs.n; e++) {
+    const w = cs.pesos(e), o = 6 * e, g = cs.estado[o + 3];
+    for (let m = 0; m < 3; m++) for (let d = 0; d < 3; d++) out[3 * (15 * nt + 3 * e + m) + d] = w[m] * g * cs.estado[o + d];
+  }
   return out;
 }
 
@@ -39,7 +43,10 @@ function franjas(s: SistemaTela, p: PaqueteGpu): Float64Array {
     for (let k = p.u32.blqOff[b]; k < p.u32.blqOff[b + 1]; k++) {
       const cod = p.u32.blqCod[k];
       if (cod >= 0x80000000) s.placa.sumarBloque(cod - 0x80000000, i, j, M);
-      else s.membrana.sumarBloque(cod >>> 4, (cod >>> 2) & 3, cod & 3, M);
+      else if (cod >= 0x40000000) {
+        const k = cod - 0x40000000;
+        s.costuras.sumarBloque(k >>> 4, (k >>> 2) & 3, k & 3, M);
+      } else s.membrana.sumarBloque(cod >>> 4, (cod >>> 2) & 3, cod & 3, M);
     }
     vals.set(M, 9 * p.u32.posDe[b]);
   }
@@ -87,5 +94,44 @@ describe('el paquete de la tela para la GPU', () => {
       const s2 = new SistemaTela(e.malla, { ...TELA_DE_LABORATORIO, pandeo }, { obstaculos: e.obstaculos });
       expect(empaquetar(s2).f32.pcr.every(Number.isFinite)).toBe(true);
     }
+  });
+});
+
+describe('el paquete de una prenda cosida', () => {
+  const e = escenaCostura(30);
+  const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { costuras: e.costuras, franja: e.franja, ajustes: { contactoPropio: false } });
+  const r = azar(43);
+  for (let q = 0; q < s.x.length; q++) s.x[q] += 0.003 * r();
+  s.linealizar();
+  const p = empaquetar(s);
+
+  it('los aportes de cada vértice suman el gradiente elástico, con las costuras', () => {
+    const slot = ranuras(s), g = new Float64Array(3 * s.n), esperado = new Float64Array(3 * s.n);
+    for (let i = 0; i < s.n; i++) {
+      for (let k = p.u32.aporOff[i]; k < p.u32.aporOff[i + 1]; k++) for (let d = 0; d < 3; d++) g[3 * i + d] += slot[3 * p.u32.aporIdx[k] + d];
+    }
+    s.gradienteElastico(esperado);
+    for (let q = 0; q < g.length; q++) expect(g[q]).toBeCloseTo(esperado[q], 9);
+  });
+
+  it('la matriz en franjas, armada desde los códigos, da H·p con las costuras', () => {
+    const vals = franjas(s, p), v = Float64Array.from({ length: 3 * s.n }, () => r());
+    const Ap = new Float64Array(3 * s.n), esperado = new Float64Array(3 * s.n);
+    for (let i = 0; i < s.n; i++) {
+      const f = i >> 5, carril = i & 31;
+      for (let k = 0; k < p.u32.franjaAncho[f]; k++) {
+        const q = p.u32.franjaBase[f] + 32 * k + carril, j = p.u32.colSell[q];
+        if (j === NINGUNA) continue;
+        for (let a = 0; a < 3; a++) for (let c = 0; c < 3; c++) Ap[3 * i + a] += vals[9 * q + 3 * a + c] * v[3 * j + c];
+      }
+    }
+    s.hessianaPor(v, esperado);
+    for (let q = 0; q < Ap.length; q++) expect(Ap[q]).toBeCloseTo(esperado[q], 6);
+  });
+
+  it('lleva el largo de cada punto y dónde encender cada bisagra de costura', () => {
+    expect(p.nc).toBe(s.costuras.n);
+    expect(Array.from(p.f32.cl)).toEqual(Array.from(Float32Array.from(s.costuras.L)));
+    expect(Array.from(p.u32.costuraK)).toEqual(s.placa.costura.map((c) => c.o));
   });
 });

@@ -2,9 +2,11 @@
  * Las escenas del banco de la tela nueva (spec 2026-10-13 §4.4): el disco Cusick, la tira en voladizo y
  * la lámina del cilindro. No dependen del motor: el banco las corre con el de hoy y con el nuevo.
  */
+import { puntosDeCostura } from '../costuras';
 import { mallaDeContorno, type MallaDeTela } from '../malla';
 import type { Obstaculo } from '../obstaculos';
 import type { OpcionesSistema } from '../sistema';
+import { armarPrenda, bisagrasDePrenda, franjaDePrenda } from '../prenda';
 import { separacion, telaSI, type TelaFisica } from '../tela';
 import type { CollisionMeshData } from '../../collisionMesh';
 
@@ -56,6 +58,41 @@ export function escenaCusick(aristaMm: number, radioMm = 150): Escena {
 export function escenaApoyada(): Escena {
   const malla = mallaDeContorno(rectangulo(-50, -50, 50, 50), 10, separacion(telaSI(TELA_DE_LABORATORIO)) - 0.0002);
   return { malla, obstaculos: [{ tipo: 'plano', altura: 0 }], v: Float64Array.from(malla.x, (_, k) => (k % 3 === 0 ? 0.05 : 0)) };
+}
+
+/** Los vértices del borde x = x0 del dibujo, de abajo hacia arriba, corridos v0. */
+export function bordeDelDibujo(m: MallaDeTela, x0: number, v0 = 0): number[] {
+  const n = m.x.length / 3, vs: number[] = [];
+  for (let i = 0; i < n; i++) if (Math.abs(m.patron[2 * i] - x0) < 1e-9) vs.push(i);
+  return vs.sort((i, j) => m.patron[2 * i + 1] - m.patron[2 * j + 1]).map((i) => i + v0);
+}
+
+/**
+ * Dos piezas de 100 × 60 mm, A con malla de 5 mm y B de 7 (los lados de la costura no coinciden), B a `abiertaMm` de A,
+ * cosidas por los bordes de enfrente, con su franja de margen y sus bisagras de costura. Con 0 mm la costura cierra en
+ * el primer cuadro y la flexión la cruza desde el segundo; `pliegueGrados` dobla B sobre la línea de la costura, para
+ * que la bisagra tenga qué enderezar.
+ */
+export function escenaCostura(abiertaMm: number, pliegueGrados = 0): Escena {
+  const A = mallaDeContorno(rectangulo(0, 0, 100, 60), 5), B = mallaDeContorno(rectangulo(0, 0, 100, 60), 7);
+  const a = (pliegueGrados * Math.PI) / 180, borde = 0.1 + abiertaMm / 1000;
+  const xB = Float64Array.from(B.x);
+  for (let i = 0; i < xB.length / 3; i++) {
+    const r = B.x[3 * i];
+    xB[3 * i] = borde + r * Math.cos(a);
+    xB[3 * i + 1] = B.x[3 * i + 1] + r * Math.sin(a);
+  }
+  const prenda = armarPrenda([
+    { id: 'A', ...A },
+    { id: 'B', ...B, x: xB },
+  ]);
+  const lados = [{ a: bordeDelDibujo(A, 0.1), b: bordeDelDibujo(B, 0, A.x.length / 3) }];
+  return {
+    malla: prenda.malla,
+    obstaculos: [],
+    costuras: { puntos: puntosDeCostura(prenda.malla.patron, lados[0].a, lados[0].b), bisagras: bisagrasDePrenda(prenda, lados, TELA_DE_LABORATORIO) },
+    franja: franjaDePrenda(prenda, lados),
+  };
 }
 
 /**

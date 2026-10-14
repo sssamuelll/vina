@@ -4,6 +4,7 @@
  * en el mismo orden; el cuadro entero cabe en un pase de cómputo y las sumas se reducen en la GPU.
  */
 import { EPS_FRICCION } from '../contactos';
+import { CIERRE_POR_CUADRO, LARGO_CERRADO } from '../costuras';
 import type { Obstaculo } from '../obstaculos';
 import type { SistemaTela } from '../sistema';
 import type { PaqueteGpu } from './empaquetar';
@@ -14,15 +15,15 @@ export const WG = 128;
 /** Los escalares del cuadro, en la zona SC de `red`. */
 export const ESC = {
   RZ: 0, RZ0: 1, ALFA: 2, BETA: 3, HECHO: 4, ACTIVO: 5, NUEVOS: 6, ALFA_LS: 7, PROBANDO: 8,
-  CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14,
+  CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14, COSIDA: 15,
 } as const;
 const N_ESC = 16;
 
 /** Las entradas de cómputo, en el orden en que las despacha un cuadro. */
 export const ENTRADAS = [
-  'inicio', 'prepTri', 'prepHinge', 'gradElem', 'ensamblar', 'residuo', 'sumarInicio', 'spmv', 'sumarAlfa',
+  'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar', 'residuo', 'sumarInicio', 'spmv', 'sumarAlfa',
   'actualizar', 'sumarBeta', 'nuevaP', 'anticipar', 'armarRonda2', 'prepBusqueda', 'posPrueba', 'anguloPrueba',
-  'difTri', 'decidir', 'aplicar', 'cerrarCuadro',
+  'difTri', 'difCostura', 'decidir', 'aplicar', 'cerrarCuadro', 'cerrarCosturas', 'revisarCosido', 'coser',
 ] as const;
 
 /** Desplazamientos seguidos para los tamaños dados, en el orden de las claves, y el total. */
@@ -38,9 +39,9 @@ function zonas<K extends string>(tamanos: Record<K, number>): Record<K, number> 
 }
 
 type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT';
-type ZonaTf = 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB';
+type ZonaTf = 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH';
 /** las sumas parciales de cada reducción, los escalares y la historia de la quietud */
-type ZonaRed = 'PA' | 'PB' | 'PC' | 'SC' | 'HISTO';
+type ZonaRed = 'PA' | 'PB' | 'PC' | 'PD' | 'SC' | 'HISTO';
 
 export interface Distribucion {
   /** por vértice, en f32: inicio de cada arreglo */
@@ -51,26 +52,32 @@ export interface Distribucion {
   iu: Record<keyof PaqueteGpu['u32'], number> & { total: number };
   /** las zonas de sumas parciales, los escalares y la historia de la quietud */
   red: Record<ZonaRed, number> & { total: number; HIST: number };
-  /** grupos de trabajo por vértice, triángulo, bisagra y bloque */
+  /** grupos de trabajo por vértice, triángulo, bisagra, bloque, punto de costura y bisagra de costura */
   gv: number;
   gt: number;
   gh: number;
   gb: number;
+  gc: number;
+  gch: number;
 }
 
 export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribucion {
   const { n, nt, nh } = p;
   const vf = zonas<ZonaVf>({ XT: 3 * n, V: 3 * n, R: 3 * n, Z: 3 * n, AP: 3 * n, DX: 3 * n, XP: 3 * n, MASA: n, EV0: n, PINV: 9 * n, CONT: 6 * n });
-  const tf = zonas<ZonaTf>({ COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, THP: nh, CONTRIB: 45 * nt });
+  const tf = zonas<ZonaTf>({
+    COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, THP: nh, CONTRIB: 45 * nt + 9 * p.nc,
+    CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch,
+  });
   const iu = { total: 0 } as Distribucion['iu'];
   for (const k of Object.keys(p.u32) as Array<keyof PaqueteGpu['u32']>) {
     iu[k] = iu.total;
     iu.total += p.u32[k].length;
   }
   const gv = Math.ceil(n / WG), gt = Math.ceil(nt / WG), gh = Math.ceil(nh / WG), gb = Math.ceil(p.nb / WG);
-  const zona = Math.max(gv, gt, gh, 1);
-  const red = { ...zonas<ZonaRed>({ PA: zona, PB: zona, PC: zona, SC: N_ESC, HISTO: cuadrosDeHistoria }), HIST: cuadrosDeHistoria };
-  return { vf, tf, iu, red, gv, gt, gh, gb };
+  const gc = Math.ceil(p.nc / WG), gch = Math.ceil(p.nch / WG);
+  const zona = Math.max(gv, gt, gh, gc, 1);
+  const red = { ...zonas<ZonaRed>({ PA: zona, PB: zona, PC: zona, PD: zona, SC: N_ESC, HISTO: cuadrosDeHistoria }), HIST: cuadrosDeHistoria };
+  return { vf, tf, iu, red, gv, gt, gh, gb, gc, gch };
 }
 
 /** Bytes de cada búfer, en el orden de las ligaduras del WGSL. */
@@ -146,7 +153,16 @@ const I_AOFF = ${u(iu.aporOff)}; const I_AIDX = ${u(iu.aporIdx)}; const I_BOFF =
 const I_BFILA = ${u(iu.blqFila)}; const I_BCOL = ${u(iu.blqCol)}; const I_FBASE = ${u(iu.franjaBase)};
 const I_FANCHO = ${u(iu.franjaAncho)}; const I_COLE = ${u(iu.colSell)}; const I_POSDE = ${u(iu.posDe)}; const I_DIAG = ${u(iu.diag)};
 const R_PA = ${u(red.PA)}; const R_PB = ${u(red.PB)}; const R_PC = ${u(red.PC)}; const R_SC = ${u(red.SC)};
-const R_HISTO = ${u(red.HISTO)}; const HIST = ${u(red.HIST)};
+const R_HISTO = ${u(red.HISTO)}; const HIST = ${u(red.HIST)}; const R_PD = ${u(red.PD)};
+const NC = ${u(p.nc)};
+const NCH = ${u(p.nch)};
+const GC = ${u(d.gc)};
+const I_CV = ${u(iu.costura)}; const I_CK = ${u(iu.costuraK)};
+const KCOST = ${f(aj.kCostura)};
+const CIERRE = ${f(CIERRE_POR_CUADRO)};
+const LCERRADO = ${f(LARGO_CERRADO)};
+// la primera ranura de aporte de las costuras, después de las de la membrana y la placa
+const SLOT_C = 15u * NT;
 ${Object.entries(ESC).map(([k, v]) => `const E_${k} = ${u(v)};`).join('\n')}
 const H = ${f(aj.h)};
 const AIRE = ${f(aj.aire)};
@@ -294,6 +310,25 @@ fn bloquePlaca(t: u32, i: u32, j: u32) -> mat3x3<f32> {
   return M;
 }
 
+fn pesoCostura(e: u32, m: u32) -> f32 {
+  let s = tf[O_CS + e];
+  if (m == 0u) { return 1.0; }
+  if (m == 1u) { return -(1.0 - s); }
+  return -s;
+}
+
+fn sepCostura(e: u32, a: vec3<f32>, b0: vec3<f32>, b1: vec3<f32>) -> vec3<f32> {
+  let s = tf[O_CS + e];
+  return a - (1.0 - s) * b0 - s * b1;
+}
+
+// el bloque (li, lj) del punto de costura e (costuras.ts, sumarBloque): c1 = g en todas las ramas de linealizar
+fn bloqueCostura(e: u32, li: u32, lj: u32) -> mat3x3<f32> {
+  let o = O_CST + 5u * e;
+  let d = vec3<f32>(tf[o], tf[o + 1u], tf[o + 2u]);
+  return pesoCostura(e, li) * pesoCostura(e, lj) * (tf[o + 3u] * I3 + tf[o + 4u] * outer(d, d));
+}
+
 var<workgroup> sh: array<f32, ${WG}>;
 var<workgroup> wBandera: u32;
 
@@ -428,6 +463,31 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   tf[O_E0 + t] += eplaca;
 }
 
+// 4b. cada punto de costura linealizado en x_t (costuras.ts, linealizar), su energía y sus aportes al gradiente
+@compute @workgroup_size(${WG}) fn prepCostura(@builtin(global_invocation_id) g: vec3<u32>) {
+  let e = g.x;
+  if (e >= NC) { return; }
+  let b = I_CV + 3u * e;
+  let d = sepCostura(e, ldx(iu[b]), ldx(iu[b + 1u]), ldx(iu[b + 2u]));
+  let r = length(d);
+  let L = tf[O_CL + e];
+  var gg = 0.0;
+  var c2 = 0.0;
+  if (L == 0.0) {
+    gg = KCOST;
+  } else if (r > L) {
+    let q = L / r;
+    gg = KCOST * (1.0 - q);
+    c2 = KCOST * q / (r * r);
+  }
+  let o = O_CST + 5u * e;
+  tf[o] = d.x; tf[o + 1u] = d.y; tf[o + 2u] = d.z; tf[o + 3u] = gg; tf[o + 4u] = c2;
+  var e0 = 0.0;
+  if (r > L) { e0 = 0.5 * KCOST * (r - L) * (r - L); }
+  tf[O_CE0 + e] = e0;
+  for (var m = 0u; m < 3u; m++) { stc(SLOT_C + 3u * e + m, pesoCostura(e, m) * gg * d); }
+}
+
 // 5. cada bloque de la matriz, sumando los elementos que lo tocan; se guarda en franjas de 32 filas
 @compute @workgroup_size(${WG}) fn ensamblar(@builtin(global_invocation_id) g: vec3<u32>) {
   let b = g.x;
@@ -438,6 +498,7 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   for (var s = iu[I_BOFF + b]; s < iu[I_BOFF + b + 1u]; s++) {
     let cod = iu[I_BCOD + s];
     if (cod >= 0x80000000u) { M += bloquePlaca(cod - 0x80000000u, i, j); }
+    else if (cod >= 0x40000000u) { let k = cod - 0x40000000u; M += bloqueCostura(k >> 4u, (k >> 2u) & 3u, k & 3u); }
     else { M += bloqueMembrana(cod >> 4u, (cod >> 2u) & 3u, cod & 3u); }
   }
   let q = iu[I_POSDE + b];
@@ -669,11 +730,28 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   if (l.x == 0u) { red[R_PC + w.x] = total; }
 }
 
+@compute @workgroup_size(${WG}) fn difCostura(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
+  if (!bandera(l.x, E_PROBANDO)) { return; }
+  let e = g.x;
+  var de = 0.0;
+  if (e < NC) {
+    let b = I_CV + 3u * e;
+    let r = length(sepCostura(e, ld(O_XP, iu[b]), ld(O_XP, iu[b + 1u]), ld(O_XP, iu[b + 2u])));
+    let L = tf[O_CL + e];
+    var en = 0.0;
+    if (r > L) { en = 0.5 * KCOST * (r - L) * (r - L); }
+    de = en - tf[O_CE0 + e];
+  }
+  let total = reducirSuma(l.x, de);
+  if (l.x == 0u) { red[R_PD + w.x] = total; }
+}
+
 @compute @workgroup_size(1) fn decidir() {
   if (red[R_SC + E_PROBANDO] < 0.5) { return; }
   var dg = 0.0;
   for (var k = 0u; k < GV; k++) { dg += red[R_PB + k]; }
   for (var k = 0u; k < GT; k++) { dg += red[R_PC + k]; }
+  for (var k = 0u; k < GC; k++) { dg += red[R_PD + k]; }
   red[R_SC + E_DG] = dg;
   if (dg <= 0.0) { red[R_SC + E_PROBANDO] = 0.0; } else { red[R_SC + E_ALFA_LS] = 0.5 * red[R_SC + E_ALFA_LS]; }
 }
@@ -718,6 +796,34 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   let c = u32(red[R_SC + E_CUADRO]);
   if (c < HIST) { red[R_HISTO + c] = q; }
   red[R_SC + E_CUADRO] = red[R_SC + E_CUADRO] + 1.0;
+}
+
+// 11. las costuras se cierran un cuadro más; cuando todas llegan a 0, la flexión las cruza (sistema.ts, alTerminarCuadro)
+@compute @workgroup_size(${WG}) fn cerrarCosturas(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
+  let e = g.x;
+  var abierta = 0.0;
+  if (e < NC) {
+    var L = tf[O_CL + e] * CIERRE;
+    if (L < LCERRADO) { L = 0.0; }
+    tf[O_CL + e] = L;
+    abierta = L;
+  }
+  let m = reducirMax(l.x, abierta);
+  if (l.x == 0u) { red[R_PD + w.x] = m; }
+}
+
+@compute @workgroup_size(1) fn revisarCosido() {
+  if (NC == 0u) { return; }
+  var m = 0.0;
+  for (var k = 0u; k < GC; k++) { m = max(m, red[R_PD + k]); }
+  if (m == 0.0) { red[R_SC + E_COSIDA] = 1.0; }
+}
+
+// escribir la rigidez de una bisagra de costura en K una y otra vez da lo mismo (placa.ts, activarCosturas)
+@compute @workgroup_size(${WG}) fn coser(@builtin(global_invocation_id) g: vec3<u32>) {
+  let c = g.x;
+  if (c >= NCH || red[R_SC + E_COSIDA] < 0.5) { return; }
+  tf[O_KP + iu[I_CK + c]] = tf[O_CKH + c];
 }
 `;
 }

@@ -35,9 +35,13 @@ async function correr(page: Page, consulta: string): Promise<ResultadoTela> {
 test.describe('La tela nueva en la GPU @gpu-local', () => {
   test.setTimeout(300_000);
 
-  for (const escena of ['chica', 'apoyada']) {
+  // las costuras (1000 N/m frente a m/h² de unos 7e-3 N/m) dejan el sistema mal condicionado: con 50 iteraciones el
+  // gradiente conjugado no converge y la precisión simple y la doble siguen caminos distintos; con 400 converge, y la
+  // paridad mide la física y no el redondeo
+  const PARIDAD: Array<[string, number]> = [['chica', 50], ['apoyada', 50], ['costura', 400], ['costura-cerrada', 400]];
+  for (const [escena, cg] of PARIDAD) {
     test(`da lo mismo que la CPU tras 3 cuadros (${escena})`, async ({ page }) => {
-      const r = await correr(page, `modo=paridad&escena=${escena}&cg=50&cuadros=3`);
+      const r = await correr(page, `modo=paridad&escena=${escena}&cg=${cg}&cuadros=3`);
       expect(r.dif?.maxima).toBeLessThan(1e-4);
     });
   }

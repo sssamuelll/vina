@@ -46,12 +46,8 @@ export function errorDeHessiana(
   return Math.sqrt(num / den);
 }
 
-/** Los vértices del borde x = x0 del dibujo, de abajo hacia arriba, corridos v0. */
-export function borde(m: MallaDeTela, x0: number, v0 = 0): number[] {
-  const n = m.x.length / 3, vs: number[] = [];
-  for (let i = 0; i < n; i++) if (Math.abs(m.patron[2 * i] - x0) < 1e-9) vs.push(i);
-  return vs.sort((i, j) => m.patron[2 * i + 1] - m.patron[2 * j + 1]).map((i) => i + v0);
-}
+/** Los vértices del borde x = x0 del dibujo (vive en las escenas del banco, que también lo usan). */
+export { bordeDelDibujo as borde } from '../banco/escenas';
 
 /** Enrolla la lámina sobre un cilindro de radio R, sin estirarla; la curvatura va en la dirección `dir` del dibujo. */
 export function curvar(m: MallaDeTela, dir: readonly [number, number], R: number): Float64Array {
