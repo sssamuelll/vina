@@ -3,16 +3,23 @@
  * con la CPU, velocidad y segundos hasta quedar quieta.
  *
  * DEV-only: App.tsx la monta con `?testScene=tela-implicita` y reemplaza la app entera. La consume
- * tests/e2e/tela-implicita.spec.ts (@gpu-local). Parámetros: `modo` = paridad | velocidad | quietud;
+ * tests/e2e/tela-implicita.spec.ts (@gpu-local). Parámetros: `modo` = paridad | velocidad | quietud | camiseta;
  * `escena` = una de ESCENAS (chica: disco Cusick de 10 mm; grande: disco de 48 cm con malla de 5 mm, del tamaño de
- * la camiseta; y las escenas de paridad del banco); `cg` = iteraciones por ronda; `cuadros`; `anticipar=0` y
- * `busqueda=0` apagan esos pasos para aislar una diferencia. Publica el resultado en `window.__TELA_IMPLICITA__`.
+ * la camiseta; las escenas de paridad del banco; y camiseta, con `malla` en mm, armada con los archivos de la
+ * referencia privada que sirve la prueba); `cg` = iteraciones por ronda; `cuadros`; `anticipar=0`, `busqueda=0` y
+ * `propio=0` apagan esos pasos para aislar una diferencia; `kc` cambia la rigidez de contacto; `maxPares`, la
+ * capacidad de pares. El modo camiseta la corre hasta quieta o 10 s de tela y la mide. Publica el resultado en
+ * `window.__TELA_IMPLICITA__`.
  */
 import { useEffect, useState } from 'react';
 import {
   escenaApoyada, escenaCapas, escenaCostura, escenaCusick, escenaEsfera, escenaInclinada, escenaPunta, TELA_DE_LABORATORIO, type Escena,
 } from '../../utils/cloth/implicito/banco/escenas';
+import {
+  camisetaContraLaReferencia, medirCamiseta, type CamisetaContraLaReferencia, type ConfigCamiseta, type MedidasDeCamiseta,
+} from '../../utils/cloth/implicito/banco/camiseta';
 import { SistemaTela } from '../../utils/cloth/implicito/sistema';
+import type { TelaFisica } from '../../utils/cloth/implicito/tela';
 import { pasoImplicito } from '../../utils/cloth/implicito/paso';
 import { VigiaDeQuietud } from '../../utils/cloth/implicito/quietud';
 import { MotorGpu, type EstadoGpu } from '../../utils/cloth/implicito/gpu/motorGpu';
@@ -27,8 +34,35 @@ interface Resultado {
   dgCpu?: number;
   msPorCuadro?: number;
   segundosHastaQuieta?: number | null;
+  medidas?: MedidasDeCamiseta;
   estado?: EstadoGpu;
   error?: string;
+}
+
+/** Lo que sirve tela-implicita.spec.ts desde la carpeta privada; sin ella, la escena no se arma. */
+async function delBanco(nombre: string, opcional = false): Promise<string | undefined> {
+  const r = await fetch(`/__banco__/${nombre}`);
+  if (r.ok) return r.text();
+  if (opcional) return undefined;
+  throw new Error(`falta ${nombre}: lo sirve tela-implicita.spec.ts desde VINA_REFERENCIAS`);
+}
+
+/** La camiseta de la última escena `camiseta`, para medirla al terminar. */
+let camisetaEnCurso: CamisetaContraLaReferencia | null = null;
+/** La tela de la referencia, si la escena es la camiseta; si no, la de laboratorio. */
+let telaEnCurso: TelaFisica = TELA_DE_LABORATORIO;
+
+async function escenaCamiseta(malla: number): Promise<Escena> {
+  const [config, tela, dxf, colocacion, cuerpo, asentada] = await Promise.all([
+    delBanco('camiseta.json'), delBanco('tela.json'), delBanco('maria.dxf'), delBanco('colocacion.obj'), delBanco('cuerpo.obj'), delBanco(`asentada-${malla}.obj`, true),
+  ]);
+  telaEnCurso = JSON.parse(tela!) as TelaFisica;
+  camisetaEnCurso = camisetaContraLaReferencia(
+    { dxf: dxf!, config: JSON.parse(config!) as ConfigCamiseta, colocacion: colocacion!, cuerpo: cuerpo!, asentada },
+    malla,
+    telaEnCurso,
+  );
+  return camisetaEnCurso.escena;
 }
 
 /** Las escenas del harness; cada tarea del plan de la parte 2 suma la suya. */
@@ -42,6 +76,7 @@ const ESCENAS: Record<string, () => Escena | Promise<Escena>> = {
   inclinada: () => escenaInclinada(),
   capas: () => escenaCapas(),
   punta: () => escenaPunta(),
+  camiseta: () => escenaCamiseta(Number(new URLSearchParams(window.location.search).get('malla') ?? 5)),
 };
 
 async function correr(q: URLSearchParams): Promise<Resultado> {
@@ -62,7 +97,7 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
     ...(q.get('kc') ? { kContacto: Number(q.get('kc')) } : {}),
   };
   const nuevo = () => {
-    const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: e.obstaculos, hilo: e.hilo, costuras: e.costuras, franja: e.franja, ajustes });
+    const s = new SistemaTela(e.malla, telaEnCurso, { obstaculos: e.obstaculos, hilo: e.hilo, costuras: e.costuras, franja: e.franja, ajustes });
     if (e.v) s.v.set(e.v);
     return s;
   };
@@ -95,6 +130,26 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
       const t0 = performance.now();
       await motor.avanzar(cuadros);
       return { ...base, msPorCuadro: (performance.now() - t0) / cuadros, estado: await motor.leerEstado() };
+    }
+    if (modo === 'camiseta') {
+      if (!camisetaEnCurso) throw new Error('el modo camiseta va con escena=camiseta');
+      // hasta quieta o 10 s de tela, de a un segundo; el primer cuadro cuenta para la quietud y no para el tiempo,
+      // porque su envío espera a que se compilen las tuberías
+      const vigia = new VigiaDeQuietud();
+      let quieta: number | null = null, ms = 0, hechos = 1;
+      await motor.avanzar(1);
+      if (vigia.registrar((await motor.leerQuietud(0, 1))[0])) quieta = 1 / 60;
+      while (hechos < 600 && quieta === null) {
+        const t0 = performance.now();
+        await motor.avanzar(60);
+        ms += performance.now() - t0;
+        const historia = await motor.leerQuietud(hechos, 60);
+        for (let c = 0; c < 60 && quieta === null; c++) if (vigia.registrar(historia[c])) quieta = (hechos + c + 1) / 60;
+        hechos += 60;
+      }
+      const cuadros = hechos - 1;
+      const x = await motor.leerPosiciones();
+      return { ...base, segundosHastaQuieta: quieta, msPorCuadro: ms / cuadros, medidas: medirCamiseta(x, camisetaEnCurso), estado: await motor.leerEstado() };
     }
     // quietud: hasta 10 s de tela, leyendo la historia de a un segundo
     const vigia = new VigiaDeQuietud();
