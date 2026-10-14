@@ -5,6 +5,7 @@
  * compatible con esos ángulos (un borde libre no lleva momento). K se calcula una vez, en el patrón; la
  * hessiana de Gauss-Newton es Σ K_kl·∇θ_k·∇θ_lᵀ.
  */
+import type { BisagraDeCostura } from './costuras';
 import type { TelaSI } from './tela';
 
 /**
@@ -64,6 +65,11 @@ function invertir(M: number[][]): number[][] | null {
   return R.every((fila) => fila.every(Number.isFinite)) ? R : null;
 }
 
+export interface OpcionesPlaca {
+  /** bisagras que cruzan las costuras (E2): entran como un borde más de su triángulo, apagadas hasta coser */
+  costura?: readonly BisagraDeCostura[];
+}
+
 export class Placa {
   /** a b c d por bisagra; a→b va en el sentido del triángulo que tiene el ala c, así todas usan la misma convención */
   readonly bisagras: Uint32Array;
@@ -72,6 +78,8 @@ export class Placa {
   /** por triángulo, K de 3×3 (fila mayor) indexado por borde; ceros en los bordes libres */
   readonly K: Float64Array;
   readonly nh: number;
+  /** por bisagra de costura: dónde va su rigidez en K (el término diagonal de su borde) y cuánto vale al coser */
+  readonly costura: Array<{ o: number; kh: number }>;
   /** por bisagra: θ y ∇θ respecto de a, b, c y d (13 números), del último `linealizar` */
   readonly estado: Float64Array;
   private readonly g = new Float64Array(12);
@@ -79,7 +87,7 @@ export class Placa {
   private readonly gi = new Float64Array(9);
   private readonly gj = new Float64Array(9);
 
-  constructor(uv: Float64Array, readonly tris: Uint32Array, tela: TelaSI) {
+  constructor(uv: Float64Array, readonly tris: Uint32Array, tela: TelaSI, op: OpcionesPlaca = {}) {
     const nt = tris.length / 3, n = uv.length / 2;
     const clave = (a: number, b: number) => (a < b ? a * n + b : b * n + a);
     const deArista = new Map<number, Array<[number, number]>>();
@@ -106,6 +114,13 @@ export class Placa {
       const a = tris[3 * t0 + k0], b = tris[3 * t0 + ((k0 + 1) % 3)];
       bisDeArista.set(key, bis.length / 4);
       bis.push(a, b, tercero(t0, a, b), tercero(lista[1][0], a, b));
+    }
+    // las bisagras de costura van después de las de adentro, con a→b en el sentido del triángulo que tiene el ala c
+    const deCostura: Array<{ t: number; k: number; h: number; kh: number }> = [];
+    for (const c of op.costura ?? []) {
+      const a = tris[3 * c.t + c.k], b = tris[3 * c.t + ((c.k + 1) % 3)];
+      deCostura.push({ t: c.t, k: c.k, h: bis.length / 4, kh: c.kh });
+      bis.push(a, b, tercero(c.t, a, b), c.d);
     }
     this.bisagras = Uint32Array.from(bis);
     this.nh = bis.length / 4;
@@ -178,6 +193,17 @@ export class Placa {
         for (let c = 0; c < filas.length; c++) this.K[9 * t + 3 * cuales[r] + cuales[c]] = A0[t] * Mi[r][c];
       }
     }
+    this.costura = [];
+    for (const c of deCostura) {
+      if (this.bisDeTri[3 * c.t + c.k] >= 0) continue; // el borde no era libre: queda su bisagra de adentro
+      this.bisDeTri[3 * c.t + c.k] = c.h;
+      this.costura.push({ o: 9 * c.t + 4 * c.k, kh: c.kh });
+    }
+  }
+
+  /** Enciende las bisagras de costura: desde aquí, la flexión cruza la costura. */
+  activarCosturas(): void {
+    for (const c of this.costura) this.K[c.o] = c.kh;
   }
 
   /** θ y ∇θ de cada bisagra en las posiciones x. */

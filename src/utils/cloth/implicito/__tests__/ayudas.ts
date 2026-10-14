@@ -52,3 +52,17 @@ export function borde(m: MallaDeTela, x0: number, v0 = 0): number[] {
   for (let i = 0; i < n; i++) if (Math.abs(m.patron[2 * i] - x0) < 1e-9) vs.push(i);
   return vs.sort((i, j) => m.patron[2 * i + 1] - m.patron[2 * j + 1]).map((i) => i + v0);
 }
+
+/** Enrolla la lámina sobre un cilindro de radio R, sin estirarla; la curvatura va en la dirección `dir` del dibujo. */
+export function curvar(m: MallaDeTela, dir: readonly [number, number], R: number): Float64Array {
+  const x = new Float64Array(m.x.length);
+  for (let i = 0; i < m.patron.length / 2; i++) {
+    const u = m.patron[2 * i], v = m.patron[2 * i + 1];
+    const s = u * dir[0] + v * dir[1], w = -u * dir[1] + v * dir[0];
+    const X = R * Math.sin(s / R), Y = R * (1 - Math.cos(s / R));
+    x[3 * i] = X * dir[0] - w * dir[1];
+    x[3 * i + 1] = Y;
+    x[3 * i + 2] = X * dir[1] + w * dir[0];
+  }
+  return x;
+}

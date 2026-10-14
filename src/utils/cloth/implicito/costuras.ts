@@ -8,6 +8,7 @@
  * tira y no empuja. Con L = 0 la energía es cuadrática y la hessiana, k·I, exacta; con L > 0 también es la
  * exacta: k·(L/|d|)·n·nᵀ + k·(1 − L/|d|)·I.
  */
+import type { TelaSI } from './tela';
 
 /** Un vértice cosido al punto (1 − s)·x_b0 + s·x_b1 del otro lado. */
 export interface PuntoDeCostura {
@@ -195,4 +196,83 @@ export class Costuras {
       for (let m = 0; m < 3; m++) this.sumarBloque(e, m, m, out, 9 * v[m]);
     }
   }
+}
+
+/** Una bisagra que cruza la costura (E2): el borde k del triángulo t, del lado A, con su ala d en la otra pieza. */
+export interface BisagraDeCostura {
+  t: number;
+  k: number;
+  d: number;
+  /** rigidez (N·m): E = ½·kh·θ² */
+  kh: number;
+}
+
+/**
+ * La rigidez a la flexión de la placa (§4.1.5) cuando la curvatura cruza el segmento p→q del patrón, en el
+ * marco del hilo de su pieza: para la dirección δ ⟂ al segmento, b = δu⁴·bTrama + 4·D66·δu²·δv² + δv⁴·bUrdimbre.
+ */
+function rigidezQueCruza(uv: ArrayLike<number>, p: number, q: number, tela: TelaSI): number {
+  const tu = uv[2 * q] - uv[2 * p], tv = uv[2 * q + 1] - uv[2 * p + 1], l = Math.hypot(tu, tv);
+  const du = -tv / l, dv = tu / l;
+  const D66 = Math.max(1e-3 * Math.min(tela.bTrama, tela.bUrdimbre), tela.bBies - (tela.bTrama + tela.bUrdimbre) / 4);
+  return du ** 4 * tela.bTrama + 4 * D66 * du * du * dv * dv + dv ** 4 * tela.bUrdimbre;
+}
+
+/**
+ * Las bisagras de una costura: por cada borde de A entre dos vértices cosidos seguidos, el triángulo de A que
+ * lo tiene y, como ala, el vértice opuesto del triángulo de B en el segmento que cae a la mitad del borde. La
+ * rigidez es la de una franja curvada a lo ancho, kh = b⊥·ℓ²/(A_T + A_N), con b⊥ el promedio de los dos lados.
+ * Un borde que no es libre en su pieza (no debería pasar) no lleva bisagra.
+ */
+export function bisagrasDeCostura(
+  uv: ArrayLike<number>,
+  tris: ArrayLike<number>,
+  ladoA: readonly number[],
+  ladoB: readonly number[],
+  tela: TelaSI,
+): BisagraDeCostura[] {
+  if (ladoA.length < 2 || ladoB.length < 2) return [];
+  const nt = tris.length / 3, n = uv.length / 2;
+  const clave = (a: number, b: number) => (a < b ? a * n + b : b * n + a);
+  const deBorde = new Map<number, Array<[number, number]>>();
+  for (let t = 0; t < nt; t++) {
+    for (let k = 0; k < 3; k++) {
+      const key = clave(tris[3 * t + k], tris[3 * t + ((k + 1) % 3)]);
+      const lista = deBorde.get(key);
+      if (lista) lista.push([t, k]);
+      else deBorde.set(key, [[t, k]]);
+    }
+  }
+  const libre = (a: number, b: number) => {
+    const lista = deBorde.get(clave(a, b));
+    return lista && lista.length === 1 ? lista[0] : null;
+  };
+  const tercero = (t: number, a: number, b: number) => {
+    for (let k = 0; k < 3; k++) {
+      const v = tris[3 * t + k];
+      if (v !== a && v !== b) return v;
+    }
+    return -1;
+  };
+  const area = (t: number) => {
+    const a = tris[3 * t], b = tris[3 * t + 1], c = tris[3 * t + 2];
+    return 0.5 * Math.abs((uv[2 * b] - uv[2 * a]) * (uv[2 * c + 1] - uv[2 * a + 1]) - (uv[2 * c] - uv[2 * a]) * (uv[2 * b + 1] - uv[2 * a + 1]));
+  };
+  const tA = largosEnElPatron(uv, ladoA), tB = largosEnElPatron(uv, ladoB);
+  const bisagras: BisagraDeCostura[] = [];
+  for (let i = 0; i + 1 < ladoA.length; i++) {
+    const a0 = ladoA[i], a1 = ladoA[i + 1], deA = libre(a0, a1);
+    if (!deA) continue;
+    const medio = (tA[i] + tA[i + 1]) / 2;
+    let j = 0;
+    while (j < ladoB.length - 2 && tB[j + 1] < medio) j++;
+    const b0 = ladoB[j], b1 = ladoB[j + 1], deB = libre(b0, b1);
+    if (!deB) continue;
+    const d = tercero(deB[0], b0, b1);
+    if (d < 0 || d === a0 || d === a1) continue;
+    const bPerp = 0.5 * (rigidezQueCruza(uv, a0, a1, tela) + rigidezQueCruza(uv, b0, b1, tela));
+    const l = Math.hypot(uv[2 * a1] - uv[2 * a0], uv[2 * a1 + 1] - uv[2 * a0 + 1]);
+    bisagras.push({ t: deA[0], k: deA[1], d, kh: (bPerp * l * l) / (area(deA[0]) + area(deB[0])) });
+  }
+  return bisagras;
 }

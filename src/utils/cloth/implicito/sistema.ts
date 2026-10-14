@@ -3,7 +3,7 @@
  * placa), las masas, los obstáculos y el estado. El cuadro minimiza
  *   G(x) = ½·|x − y|²_M / h² + ½·aire·|x − x_t|²_M / h + E(x) + contacto,  con y = x_t + h·v_t + h²·g.
  */
-import { Costuras, type PuntoDeCostura } from './costuras';
+import { Costuras, type BisagraDeCostura, type PuntoDeCostura } from './costuras';
 import { aMarcoDelHilo, type MallaDeTela } from './malla';
 import { Membrana } from './membrana';
 import { masCercano, type Obstaculo } from './obstaculos';
@@ -54,7 +54,7 @@ export interface OpcionesSistema {
   /** dirección de la urdimbre en el dibujo; por defecto, vertical (§4.1.2) */
   hilo?: readonly [number, number];
   /** los puntos de costura de la prenda (costuras.ts) */
-  costuras?: { puntos: readonly PuntoDeCostura[] };
+  costuras?: { puntos: readonly PuntoDeCostura[]; bisagras?: readonly BisagraDeCostura[] };
 }
 
 /** Un vértice en contacto: obstáculo k, su normal y la penetración p0 = separación − distancia al empezar el paso. */
@@ -81,6 +81,8 @@ export class SistemaTela {
   readonly membrana: Membrana;
   readonly placa: Placa;
   readonly costuras: Costuras;
+  /** la flexión cruza las costuras desde que cierran */
+  private cosida = false;
   /** posiciones */
   readonly x: Float64Array;
   /** posiciones al empezar el paso */
@@ -106,7 +108,7 @@ export class SistemaTela {
     this.masa = reposo.masa;
     this.fijo = malla.fijos ? Uint8Array.from(malla.fijos) : new Uint8Array(this.n);
     this.membrana = new Membrana(malla.tris, this.coef, this.tela);
-    this.placa = new Placa(uv, malla.tris, this.tela);
+    this.placa = new Placa(uv, malla.tris, this.tela, { costura: op.costuras?.bisagras });
     this.x = Float64Array.from(malla.x);
     this.costuras = new Costuras(op.costuras?.puntos ?? [], malla.x, this.aj.kCostura);
     this.xt = Float64Array.from(malla.x);
@@ -177,9 +179,13 @@ export class SistemaTela {
     this.costuras.sumarBloquesDiagonales(out);
   }
 
-  /** Lo que pasa entre un cuadro y el siguiente: las costuras se cierran un cuadro más. */
+  /** Lo que pasa entre un cuadro y el siguiente: las costuras se cierran un cuadro más, y al cerrar, la flexión las cruza. */
   alTerminarCuadro(): void {
     this.costuras.avanzarCierre();
+    if (!this.cosida && this.costuras.n > 0 && this.costuras.cerradas()) {
+      this.placa.activarCosturas();
+      this.cosida = true;
+    }
   }
 
   /** Los vértices libres que están a menos de la separación de un obstáculo, en las posiciones actuales. */

@@ -4,8 +4,9 @@
  * placa ven cada pieza en su marco; las costuras (costuras.ts) las unen.
  */
 import type { SeamPair } from '../seamPairs';
-import { puntosDeCostura, type PuntoDeCostura } from './costuras';
+import { bisagrasDeCostura, puntosDeCostura, type BisagraDeCostura, type PuntoDeCostura } from './costuras';
 import { aMarcoDelHilo, type MallaDeTela } from './malla';
+import { telaSI, type TelaFisica } from './tela';
 
 export interface PiezaDeTela {
   id: string;
@@ -92,4 +93,10 @@ export function costurasDePrenda(prenda: Prenda, pares: readonly SeamPair[]): { 
     puntos.push(...puntosDeCostura(prenda.malla.patron, lado.a, lado.b));
   }
   return { puntos, lados };
+}
+
+/** Las bisagras que cruzan las costuras de la prenda (E2), sobre el dibujo de cada pieza en el marco de su hilo. */
+export function bisagrasDePrenda(prenda: Prenda, lados: readonly LadosDeCostura[], tela: TelaFisica): BisagraDeCostura[] {
+  const si = telaSI(tela);
+  return lados.flatMap((l) => bisagrasDeCostura(prenda.malla.patron, prenda.malla.tris, l.a, l.b, si));
 }
