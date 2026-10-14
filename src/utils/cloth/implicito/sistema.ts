@@ -90,7 +90,7 @@ export class SistemaTela {
     this.sep = separacion(this.tela);
     this.tris = malla.tris;
     const uv = aMarcoDelHilo(malla.patron, op.hilo);
-    const reposo = prepararReposo(uv, malla.tris, this.tela.densidad);
+    const reposo = prepararReposo(uv, malla.tris, this.tela.densidad, malla.piezaDeTri);
     this.coef = reposo.coef;
     this.masa = reposo.masa;
     this.fijo = malla.fijos ? Uint8Array.from(malla.fijos) : new Uint8Array(this.n);

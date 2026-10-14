@@ -13,6 +13,8 @@ export interface MallaDeTela {
   tris: Uint32Array;
   /** 1 = vértice empotrado: no se mueve */
   fijos?: Uint8Array;
+  /** la pieza de cada triángulo, en una prenda de varias piezas (prenda.ts): el reposo revisa el sentido por pieza */
+  piezaDeTri?: Uint16Array;
 }
 
 /**
