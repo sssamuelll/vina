@@ -73,8 +73,9 @@ const entero = (v: number): string => `${v >>> 0}u`;
 /** La misma distancia que obstaculos.ts: `masCercano(p)` y `obstaculoK(p, k)` devuelven (d, normal). */
 export function wgslObstaculos(obs: readonly Obstaculo[]): string {
   const f = flotante;
-  const cuerpos = obs.map((o, k) =>
-    o.tipo === 'plano'
+  const cuerpos = obs.map((o, k) => {
+    if (o.tipo === 'cuerpo') throw new Error('wgsl: el cuerpo llega a la GPU en la parte 2 de la entrega 4');
+    return o.tipo === 'plano'
       ? `fn obstaculo${k}(p: vec3<f32>) -> vec4<f32> { return vec4<f32>(p.y - ${f(o.altura)}, 0.0, 1.0, 0.0); }`
       : `fn obstaculo${k}(p: vec3<f32>) -> vec4<f32> {
   let radio = ${f(o.radio)};
@@ -92,8 +93,8 @@ export function wgslObstaculos(obs: readonly Obstaculo[]): string {
   }
   if (tapa - p.y < radio - r) { return vec4<f32>(-(tapa - p.y), 0.0, 1.0, 0.0); }
   return vec4<f32>(-(radio - r), rad.x, 0.0, rad.y);
-}`,
-  );
+}`;
+  });
   return `${cuerpos.join('\n')}
 struct Cercano { c: vec4<f32>, k: u32 }
 fn obstaculoK(p: vec3<f32>, k: u32) -> vec4<f32> {
