@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildLinearBVH } from '../../gpu/bvh';
-import { RejillaDeTriangulos, separacionPropia } from '../contactoPropio';
+import { RejillaDePuntos, separacionPropia } from '../contactoPropio';
 import { CuerpoRigido, puntoMasCercano, type PuntoEnTriangulo } from '../cuerpo';
 import { armarPrenda } from '../prenda';
 import { mallaDeContorno } from '../malla';
@@ -8,33 +8,25 @@ import { puntosDeCostura } from '../costuras';
 import { SistemaTela } from '../sistema';
 import { pasoImplicito } from '../paso';
 import { separacion, telaSI } from '../tela';
-import { laminaPlana, piramideDeColision, rectangulo, TELA_DE_LABORATORIO } from '../banco/escenas';
+import { piramideDeColision, rectangulo, TELA_DE_LABORATORIO } from '../banco/escenas';
 import { azar, borde, errorDelGradiente } from './ayudas';
 
 const sepTela = separacionPropia(telaSI(TELA_DE_LABORATORIO).grosor);
 const nuevoPunto = (): PuntoEnTriangulo => ({ x: 0, y: 0, z: 0, wa: 0, wb: 0, wc: 0, rasgo: 0 });
 
 describe('la tela contra sí misma', () => {
-  it('la rejilla devuelve todo triángulo a menos de la holgura de un punto', () => {
-    const r = azar(71), m = laminaPlana(10);
-    const x = Float64Array.from(m.x, (q, k) => (k % 3 === 1 ? 0.01 * r() : q)); // arrugada ±5 mm
-    const rejilla = new RejillaDeTriangulos(0.004);
-    rejilla.armar(x, m.tris, sepTela);
-    const p = nuevoPunto();
-    let cerca = 0;
-    for (let caso = 0; caso < 200; caso++) {
-      const px = 0.12 * r(), py = 0.01 * r(), pz = 0.12 * r();
-      const candidatos = new Set(rejilla.cercanos(px, py, pz));
-      for (let t = 0; t < m.tris.length / 3; t++) {
-        const a = 3 * m.tris[3 * t], b = 3 * m.tris[3 * t + 1], c = 3 * m.tris[3 * t + 2];
-        puntoMasCercano(px, py, pz, x[a], x[a + 1], x[a + 2], x[b], x[b + 1], x[b + 2], x[c], x[c + 1], x[c + 2], p);
-        if (Math.hypot(px - p.x, py - p.y, pz - p.z) < sepTela) {
-          expect(candidatos.has(t)).toBe(true);
-          cerca++;
-        }
+  it('la rejilla de puntos da todo punto que cae dentro de la caja', () => {
+    const r = azar(71), P = Float64Array.from({ length: 3 * 500 }, () => 0.2 * r());
+    const rejilla = new RejillaDePuntos();
+    rejilla.armar(P, 0.013);
+    for (let caso = 0; caso < 100; caso++) {
+      const c = [0.2 * r(), 0.2 * r(), 0.2 * r()], m = 0.02 * (r() + 0.5);
+      const vistos = new Set<number>();
+      rejilla.enCaja(c[0] - m, c[1] - m, c[2] - m, c[0] + m, c[1] + m, c[2] + m, (p) => vistos.add(p));
+      for (let p = 0; p < 500; p++) {
+        if ([0, 1, 2].every((d) => Math.abs(P[3 * p + d] - c[d]) <= m)) expect(vistos.has(p)).toBe(true);
       }
     }
-    expect(cerca).toBeGreaterThan(10);
   });
 
   it('residuo = −∂G/∂x con los pares de dos láminas a 1 mm (diferencias finitas)', () => {
@@ -118,5 +110,51 @@ describe('la tela contra sí misma', () => {
     };
     expect(sobreLaPunta(true)).toBeGreaterThan(sepTela - 0.0005);
     expect(sobreLaPunta(false)).toBeLessThan(0);
+  });
+  it('una lámina sola no tiene pares, aunque un vértice corra (E6: la tela de al lado no es otra capa)', () => {
+    const s = new SistemaTela(mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), TELA_DE_LABORATORIO);
+    s.v[0] = 1.2; // a 1,2 m/s el radio de búsqueda llega a su tope de 2 cm
+    s.xt.set(s.x);
+    s.armarParesPropios();
+    expect(s.paresPropios).toHaveLength(0);
+  });
+
+  it('un vértice justo encima de un vértice de la otra capa forma par: cae sobre la cara cerrada de sus triángulos', () => {
+    const abajo = mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), nAbajo = abajo.x.length / 3;
+    // el vértice de abajo más cerca del centro y uno 1 mm encima, en una pieza aparte de un triángulo lejano
+    let c = 0;
+    for (let i = 1; i < nAbajo; i++) if (Math.hypot(abajo.x[3 * i], abajo.x[3 * i + 2]) < Math.hypot(abajo.x[3 * c], abajo.x[3 * c + 2])) c = i;
+    const punto = { x: Float64Array.from([abajo.x[3 * c], 0.001, abajo.x[3 * c + 2], 0.3, 0.001, 0.3, 0.31, 0.001, 0.3]), patron: Float64Array.from([0, 0, 0.3, 0.3, 0.31, 0.3]), tris: Uint32Array.from([0, 1, 2]) };
+    const prenda = armarPrenda([{ id: 'abajo', ...abajo }, { id: 'punto', ...punto }]);
+    const s = new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { ajustes: { gravedad: 0 } });
+    s.xt.set(s.x);
+    s.armarParesPropios();
+    expect(s.paresPropios.filter((p) => p.v[0] === nAbajo && p.activo).length).toBeGreaterThan(0);
+  });
+
+  it('una capa que viene rápido no atraviesa la de abajo en un cuadro (la anticipación)', () => {
+    // la de arriba a 6 mm y bajando a 0,6 m/s: sola, el paso la llevaría 10 mm más abajo
+    const abajo = mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), arriba = mallaDeContorno(rectangulo(-40, -40, 40, 40), 10, 0.006);
+    const nAbajo = abajo.x.length / 3;
+    const prenda = armarPrenda([{ id: 'abajo', ...abajo, fijos: new Uint8Array(nAbajo).fill(1) }, { id: 'arriba', ...arriba }]);
+    const s = new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { ajustes: { gravedad: 0 } });
+    for (let i = nAbajo; i < s.n; i++) s.v[3 * i + 1] = -0.6;
+    pasoImplicito(s);
+    let masBajo = Infinity;
+    for (let i = nAbajo; i < s.n; i++) masBajo = Math.min(masBajo, s.x[3 * i + 1]);
+    expect(masBajo).toBeGreaterThan(sepTela - 0.0005);
+  });
+
+  it('las puntas del cuerpo frenan con la fricción de la tela contra el cuerpo', () => {
+    const cuerpo = new CuerpoRigido(buildLinearBVH(piramideDeColision(0.3, 0.1)));
+    const m = mallaDeContorno(rectangulo(-60, -60, 60, 60), 20);
+    // la punta ya pasó la tela 1 mm, en medio de un triángulo (los mismos corrimientos de la prueba de la pirámide)
+    m.x = Float64Array.from(m.x, (q, k) => (k % 3 === 0 ? q + 0.007 : k % 3 === 1 ? q + 0.099 : q + 0.003));
+    const s = new SistemaTela(m, { ...TELA_DE_LABORATORIO, friccionTela: 0 }, { obstaculos: [{ tipo: 'cuerpo', cuerpo }] });
+    s.xt.set(s.x);
+    s.armarParesPropios();
+    const puntas = s.paresPropios.filter((p) => p.v.length === 3);
+    expect(puntas.length).toBeGreaterThan(0);
+    expect(puntas.every((p) => p.kt > 0)).toBe(true);
   });
 });

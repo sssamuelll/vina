@@ -1,9 +1,10 @@
 /**
- * La tela contra sí misma (spec 2026-10-13 §4.3.2, con la enmienda E3 del plan de la entrega 4): pares de un
- * vértice de tela y un triángulo de tela más cerca que la separación entre capas, hallados con una rejilla, y
- * pares de un vértice del cuerpo y un triángulo de tela, para las puntas del cuerpo que la malla de la tela no
- * ve. Cada par es un plano fijado al empezar el paso, como el contacto con el cuerpo (contactos.ts): la misma
- * energía en la solución y en la búsqueda en línea, con fricción, y la misma anticipación sobre el plano fijo.
+ * La tela contra sí misma (spec 2026-10-13 §4.3.2, con las enmiendas E3 y E6 de la entrega 4): pares de un
+ * vértice de tela y un triángulo de tela cuando el vértice cae sobre la cara del triángulo más cerca que la
+ * separación entre capas, y pares de un vértice del cuerpo y un triángulo de tela, para las puntas del cuerpo que
+ * la malla de la tela no ve. Los halla una rejilla de puntos que cada triángulo recorre en su caja. Cada par es un
+ * plano fijado al empezar el paso, como el contacto con el cuerpo (contactos.ts): la misma energía en la solución y
+ * en la búsqueda en línea, con fricción, y la misma anticipación sobre el plano fijo.
  */
 
 /**
@@ -34,46 +35,38 @@ export function separacionPropia(grosor: number): number {
 /** Hasta dónde (m) se buscan candidatos más allá de la separación: lo que un cuadro de 2 m/s alcanza a mover. */
 export const ALCANCE_MAXIMO = 0.02;
 
-/** Una rejilla de triángulos: cada uno en todas las celdas que toca su caja agrandada por la holgura. */
-export class RejillaDeTriangulos {
+/** Una rejilla de puntos: cada punto en la celda que lo contiene. Quien busca pasa una caja y recibe los de sus celdas. */
+export class RejillaDePuntos {
   private readonly celdas = new Map<number, number[]>();
-
-  constructor(readonly celda: number) {}
+  private c = 1;
 
   private clave(ix: number, iy: number, iz: number): number {
     return ((ix + 4096) * 8192 + (iy + 4096)) * 8192 + (iz + 4096);
   }
 
-  armar(x: ArrayLike<number>, tris: ArrayLike<number>, holgura: number): void {
+  /** `puntos`: [x0, y0, z0, x1, …] (m); `celda`: el lado de cada celda (m). */
+  armar(puntos: ArrayLike<number>, celda: number): void {
     this.celdas.clear();
-    const c = this.celda;
-    for (let t = 0; t < tris.length / 3; t++) {
-      let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
-      for (let k = 0; k < 3; k++) {
-        const q = 3 * tris[3 * t + k];
-        x0 = Math.min(x0, x[q]);
-        x1 = Math.max(x1, x[q]);
-        y0 = Math.min(y0, x[q + 1]);
-        y1 = Math.max(y1, x[q + 1]);
-        z0 = Math.min(z0, x[q + 2]);
-        z1 = Math.max(z1, x[q + 2]);
-      }
-      for (let ix = Math.floor((x0 - holgura) / c); ix <= Math.floor((x1 + holgura) / c); ix++) {
-        for (let iy = Math.floor((y0 - holgura) / c); iy <= Math.floor((y1 + holgura) / c); iy++) {
-          for (let iz = Math.floor((z0 - holgura) / c); iz <= Math.floor((z1 + holgura) / c); iz++) {
-            const k = this.clave(ix, iy, iz), lista = this.celdas.get(k);
-            if (lista) lista.push(t);
-            else this.celdas.set(k, [t]);
-          }
-        }
-      }
+    this.c = celda;
+    for (let p = 0; p < puntos.length / 3; p++) {
+      const k = this.clave(Math.floor(puntos[3 * p] / celda), Math.floor(puntos[3 * p + 1] / celda), Math.floor(puntos[3 * p + 2] / celda));
+      const lista = this.celdas.get(k);
+      if (lista) lista.push(p);
+      else this.celdas.set(k, [p]);
     }
   }
 
-  /** Los triángulos de la celda del punto: están todos los que quedan a menos de la holgura. */
-  cercanos(px: number, py: number, pz: number): readonly number[] {
-    const c = this.celda;
-    return this.celdas.get(this.clave(Math.floor(px / c), Math.floor(py / c), Math.floor(pz / c))) ?? [];
+  /** Llama a `cada` con los puntos de las celdas que toca la caja: entre ellos están todos los de adentro. */
+  enCaja(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, cada: (p: number) => void): void {
+    const c = this.c;
+    for (let ix = Math.floor(x0 / c); ix <= Math.floor(x1 / c); ix++) {
+      for (let iy = Math.floor(y0 / c); iy <= Math.floor(y1 / c); iy++) {
+        for (let iz = Math.floor(z0 / c); iz <= Math.floor(z1 / c); iz++) {
+          const lista = this.celdas.get(this.clave(ix, iy, iz));
+          if (lista) for (const p of lista) cada(p);
+        }
+      }
+    }
   }
 }
 

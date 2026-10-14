@@ -3,10 +3,10 @@
  * placa), las masas, los obstáculos y el estado. El cuadro minimiza
  *   G(x) = ½·|x − y|²_M / h² + ½·aire·|x − x_t|²_M / h + E(x) + contacto,  con y = x_t + h·v_t + h²·g.
  */
-import { ALCANCE_MAXIMO, energiaDelPar, RejillaDeTriangulos, separacionPropia, type ParPropio } from './contactoPropio';
+import { ALCANCE_MAXIMO, energiaDelPar, RejillaDePuntos, separacionPropia, type ParPropio } from './contactoPropio';
 import { energiaDePlano, rigidezDeFriccion, type PlanoDeContacto } from './contactos';
 import { Costuras, type BisagraDeCostura, type PuntoDeCostura } from './costuras';
-import { puntoMasCercano, type PuntoEnTriangulo } from './cuerpo';
+import { puntoMasCercano, type CuerpoRigido, type PuntoEnTriangulo } from './cuerpo';
 import { aMarcoDelHilo, type MallaDeTela } from './malla';
 import { CAPAS_DEL_MARGEN, FLEXION_DEL_MARGEN } from './margen';
 import { Membrana } from './membrana';
@@ -106,12 +106,21 @@ export class SistemaTela {
   readonly sepPropia: number;
   /** los pares del contacto propio del cuadro en curso: candidatos y activos (contactoPropio.ts) */
   paresPropios: ParPropio[] = [];
-  private readonly rejilla: RejillaDeTriangulos;
-  /** por vértice: él y sus compañeros de costura, cuyos triángulos no cuentan para su contacto propio */
-  private readonly excluidos: number[][];
+  private readonly rejilla = new RejillaDePuntos();
+  /**
+   * por vértice: él y sus compañeros de costura, cuyos triángulos no cuentan para su contacto propio (lo lee también
+   * gpu/empaquetar.ts)
+   */
+  readonly excluidos: number[][];
+  /** la arista media del patrón (m): el lado mínimo de la celda de la rejilla del contacto propio */
+  readonly aristaMedia: number;
+  /** los cuerpos rígidos de los obstáculos, en orden: sus vértices van en la rejilla detrás de los de la tela */
+  private readonly cuerpos: CuerpoRigido[];
+  /** las posiciones que guarda la rejilla: la tela (se copia cada cuadro) y los vértices de cada cuerpo */
+  private readonly puntos: Float64Array;
   private readonly punto: PuntoEnTriangulo = { x: 0, y: 0, z: 0, wa: 0, wb: 0, wc: 0, rasgo: 0 };
   /** por cuerpo, 1 = ese vértice del cuerpo sostenía la tela el cuadro anterior */
-  private readonly sostiene = new Map<object, Uint8Array>();
+  private sostiene: Uint8Array[];
 
   constructor(malla: MallaDeTela, tela: TelaFisica, op: OpcionesSistema = {}) {
     this.n = malla.x.length / 3;
@@ -137,7 +146,7 @@ export class SistemaTela {
     this.vPedida = new Float64Array(3 * this.n);
     this.enContacto = new Uint8Array(this.n);
     this.sepPropia = separacionPropia(this.tela.grosor);
-    // la celda de la rejilla: la arista media del patrón, y nunca menos de dos separaciones
+    // la arista media del patrón: con dos separaciones y el radio de búsqueda, decide la celda de la rejilla
     let largo = 0;
     for (let t = 0; t < malla.tris.length / 3; t++) {
       for (let k = 0; k < 3; k++) {
@@ -145,7 +154,15 @@ export class SistemaTela {
         largo += Math.hypot(uv[2 * b] - uv[2 * a], uv[2 * b + 1] - uv[2 * a + 1]);
       }
     }
-    this.rejilla = new RejillaDeTriangulos(Math.max(2 * this.sepPropia, largo / Math.max(1, malla.tris.length)));
+    this.aristaMedia = largo / Math.max(1, malla.tris.length);
+    this.cuerpos = this.obstaculos.flatMap((o) => (o.tipo === 'cuerpo' ? [o.cuerpo] : []));
+    this.puntos = new Float64Array(3 * this.n + this.cuerpos.reduce((suma, c) => suma + c.vertices.length, 0));
+    let o = 3 * this.n;
+    for (const c of this.cuerpos) {
+      this.puntos.set(c.vertices, o);
+      o += c.vertices.length;
+    }
+    this.sostiene = this.cuerpos.map((c) => new Uint8Array(c.vertices.length / 3));
     this.excluidos = Array.from({ length: this.n }, (_, i) => [i]);
     for (let e = 0; e < this.costuras.n; e++) {
       const [a, b0, b1] = this.costuras.vertices(e);
@@ -260,20 +277,23 @@ export class SistemaTela {
   }
 
   /**
-   * Los pares del contacto propio en x_t (§4.3.2, E3): cada vértice libre contra los triángulos de tela a menos
-   * de la separación entre capas más el alcance del cuadro (salvo los suyos y los de sus compañeros de costura),
-   * y cada vértice del cuerpo contra los triángulos de tela que tiene encima. Entra activo el que ya está dentro
-   * de la separación, con la fricción de la tela contra sí misma.
+   * Los pares del contacto propio en x_t (§4.3.2, E3 y E6): cada triángulo de tela mira, en la rejilla de puntos, los
+   * que caen en su caja agrandada por el radio de búsqueda. Un vértice libre de tela entra si cae sobre la cara a menos
+   * del radio (salvo los vértices del triángulo y sus compañeros de costura); un vértice del cuerpo, si atravesó la
+   * tela por la cara o la sostenía el cuadro anterior. Entra activo el que ya está dentro de la separación, con su
+   * fricción.
    */
   armarParesPropios(): void {
     this.paresPropios = [];
     if (!this.aj.contactoPropio) return;
-    const { x, v, tris, punto: q } = this, sep = this.sepPropia, { kContacto: kc, h, gravedad } = this.aj, mu = this.tela.friccionTela;
+    const { x, v, tris, fijo, n, punto: q } = this, sep = this.sepPropia, { kContacto: kc, h, gravedad } = this.aj;
     let vmax = 0;
-    for (let i = 0; i < this.n; i++) vmax = Math.max(vmax, Math.hypot(v[3 * i], v[3 * i + 1], v[3 * i + 2]));
+    for (let i = 0; i < n; i++) vmax = Math.max(vmax, Math.hypot(v[3 * i], v[3 * i + 1], v[3 * i + 2]));
     const radio = sep + Math.min(ALCANCE_MAXIMO, 2 * vmax * h + Math.abs(gravedad) * h * h);
-    this.rejilla.armar(x, tris, radio);
-    const agregar = (vs: number[], ws: number[], nx: number, ny: number, nz: number, s0: number, separacionDelPar: number) => {
+    this.puntos.set(x);
+    // la celda mide al menos el radio: la caja de un triángulo toca a lo sumo cinco celdas por eje
+    this.rejilla.armar(this.puntos, Math.max(2 * sep, this.aristaMedia, radio));
+    const agregar = (vs: number[], ws: number[], nx: number, ny: number, nz: number, s0: number, separacionDelPar: number, mu: number) => {
       const p0 = separacionDelPar - s0;
       let kt = 0;
       if (p0 > 0) {
@@ -288,56 +308,60 @@ export class SistemaTela {
       }
       this.paresPropios.push({ v: vs, w: ws, nx, ny, nz, p0, kt, activo: p0 > 0 });
     };
-    for (let i = 0; i < this.n; i++) {
-      if (this.fijo[i]) continue;
-      const px = x[3 * i], py = x[3 * i + 1], pz = x[3 * i + 2], fuera = this.excluidos[i];
-      for (const t of this.rejilla.cercanos(px, py, pz)) {
-        const a = tris[3 * t], b = tris[3 * t + 1], c = tris[3 * t + 2];
-        if (fuera.includes(a) || fuera.includes(b) || fuera.includes(c)) continue;
-        puntoMasCercano(px, py, pz, x[3 * a], x[3 * a + 1], x[3 * a + 2], x[3 * b], x[3 * b + 1], x[3 * b + 2], x[3 * c], x[3 * c + 1], x[3 * c + 2], q);
-        const ex = px - q.x, ey = py - q.y, ez = pz - q.z, d = Math.hypot(ex, ey, ez);
-        if (d >= radio || d < 1e-9) continue;
-        agregar([i, a, b, c], [1, -q.wa, -q.wb, -q.wc], ex / d, ey / d, ez / d, d, sep);
-      }
-    }
-    for (const o of this.obstaculos) {
-      if (o.tipo !== 'cuerpo') continue;
-      const yv = o.cuerpo.vertices, yn = o.cuerpo.normales;
-      const antes = this.sostiene.get(o.cuerpo), ahora = new Uint8Array(yv.length / 3);
-      let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
-      for (let i = 0; i < this.n; i++) {
-        x0 = Math.min(x0, x[3 * i]);
-        x1 = Math.max(x1, x[3 * i]);
-        y0 = Math.min(y0, x[3 * i + 1]);
-        y1 = Math.max(y1, x[3 * i + 1]);
-        z0 = Math.min(z0, x[3 * i + 2]);
-        z1 = Math.max(z1, x[3 * i + 2]);
-      }
-      for (let b = 0; b < yv.length / 3; b++) {
-        const yx = yv[3 * b], yy = yv[3 * b + 1], yz = yv[3 * b + 2];
-        if (yx < x0 - radio || yx > x1 + radio || yy < y0 - radio || yy > y1 + radio || yz < z0 - radio || yz > z1 + radio) continue;
-        for (const t of this.rejilla.cercanos(yx, yy, yz)) {
-          const t0 = tris[3 * t], t1 = tris[3 * t + 1], t2 = tris[3 * t + 2];
-          if (this.fijo[t0] && this.fijo[t1] && this.fijo[t2]) continue;
-          puntoMasCercano(yx, yy, yz, x[3 * t0], x[3 * t0 + 1], x[3 * t0 + 2], x[3 * t1], x[3 * t1 + 1], x[3 * t1 + 2], x[3 * t2], x[3 * t2 + 1], x[3 * t2 + 2], q);
-          // una punta que atraviesa la tela cae dentro de un triángulo (rasgo 0); si el punto más cercano es un borde o un
-          // vértice de la tela, el vértice del cuerpo está al costado y s no mide nada
-          if (q.rasgo !== 0 || Math.hypot(yx - q.x, yy - q.y, yz - q.z) >= radio) continue;
-          // la tela queda del lado de afuera del cuerpo, a la separación del cuerpo y no a la de dos capas: s = n·(punto de
+    const ahora = this.cuerpos.map((c) => new Uint8Array(c.vertices.length / 3));
+    for (let t = 0; t < tris.length / 3; t++) {
+      const a = tris[3 * t], b = tris[3 * t + 1], c = tris[3 * t + 2];
+      const ax = x[3 * a], ay = x[3 * a + 1], az = x[3 * a + 2], bx = x[3 * b], by = x[3 * b + 1], bz = x[3 * b + 2];
+      const cx = x[3 * c], cy = x[3 * c + 1], cz = x[3 * c + 2];
+      const libres = !(fijo[a] && fijo[b] && fijo[c]);
+      // E6: un punto cae sobre la cara cerrada del triángulo si su separación del punto más cercano va a lo largo de la
+      // normal de la cara; la tolerancia de 1/1000 deja entrar al que cae justo sobre un borde o un vértice (mallas
+      // alineadas), y el vecino de la misma capa, que la mira de canto, queda fuera
+      const tnx = (by - ay) * (cz - az) - (bz - az) * (cy - ay), tny = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
+      const tnz = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax), tn2 = tnx * tnx + tny * tny + tnz * tnz;
+      const sobreLaCara = (ex: number, ey: number, ez: number) => {
+        const e2 = ex * ex + ey * ey + ez * ez, en = ex * tnx + ey * tny + ez * tnz;
+        return e2 - (en * en) / tn2 <= 1e-6 * e2;
+      };
+      this.rejilla.enCaja(
+        Math.min(ax, bx, cx) - radio, Math.min(ay, by, cy) - radio, Math.min(az, bz, cz) - radio,
+        Math.max(ax, bx, cx) + radio, Math.max(ay, by, cy) + radio, Math.max(az, bz, cz) + radio,
+        (p) => {
+          if (p < n) {
+            if (fijo[p]) return;
+            const fuera = this.excluidos[p];
+            if (fuera.includes(a) || fuera.includes(b) || fuera.includes(c)) return;
+            const px = x[3 * p], py = x[3 * p + 1], pz = x[3 * p + 2];
+            puntoMasCercano(px, py, pz, ax, ay, az, bx, by, bz, cx, cy, cz, q);
+            const ex = px - q.x, ey = py - q.y, ez = pz - q.z, d = Math.hypot(ex, ey, ez);
+            if (d >= radio || d < 1e-9 || !sobreLaCara(ex, ey, ez)) return;
+            agregar([p, a, b, c], [1, -q.wa, -q.wb, -q.wc], ex / d, ey / d, ez / d, d, sep, this.tela.friccionTela);
+            return;
+          }
+          if (!libres) return;
+          let k = 0, j = p - n;
+          while (j >= this.cuerpos[k].vertices.length / 3) j -= this.cuerpos[k++].vertices.length / 3;
+          const cuerpo = this.cuerpos[k], yx = cuerpo.vertices[3 * j], yy = cuerpo.vertices[3 * j + 1], yz = cuerpo.vertices[3 * j + 2];
+          puntoMasCercano(yx, yy, yz, ax, ay, az, bx, by, bz, cx, cy, cz, q);
+          // una punta que atraviesa la tela cae sobre la cara de un triángulo (E6); si no, el vértice del cuerpo está al
+          // costado y s no mide nada.
+          // La tela queda del lado de afuera del cuerpo, a la separación del cuerpo y no a la de dos capas: s = n·(punto de
           // la tela − y) ≥ sep. El par rescata la tela que una punta del cuerpo atravesó: entra cuando el vértice cruzó
           // la tela (s < 0) y sigue mientras la sostiene (s < sep). Sobre un cuerpo liso el apoyo lo dan los planos de
           // los vértices de tela; si estos pares entraran antes (o anticipados), competirían con ellos por el mismo
           // contacto: el centro de un triángulo plano queda más cerca del cuerpo que sus vértices, y la tela temblaba
           // sobre los vértices del cuerpo o la búsqueda en línea rechazaba el paso entero
-          const nx = yn[3 * b], ny = yn[3 * b + 1], nz = yn[3 * b + 2];
+          if (Math.hypot(yx - q.x, yy - q.y, yz - q.z) >= radio || !sobreLaCara(yx - q.x, yy - q.y, yz - q.z)) return;
+          const nx = cuerpo.normales[3 * j], ny = cuerpo.normales[3 * j + 1], nz = cuerpo.normales[3 * j + 2];
           const s0 = nx * (q.x - yx) + ny * (q.y - yy) + nz * (q.z - yz);
-          if (!(s0 < 0 || (antes?.[b] && s0 < this.sep))) continue;
-          ahora[b] = 1;
-          agregar([t0, t1, t2], [q.wa, q.wb, q.wc], nx, ny, nz, s0, this.sep);
-        }
-      }
-      this.sostiene.set(o.cuerpo, ahora);
+          if (!(s0 < 0 || (this.sostiene[k][j] && s0 < this.sep))) return;
+          ahora[k][j] = 1;
+          // tela contra cuerpo: la fricción del cuerpo (§4.3.1)
+          agregar([a, b, c], [q.wa, q.wb, q.wc], nx, ny, nz, s0, this.sep, this.tela.friccionCuerpo);
+        },
+      );
     }
+    this.sostiene = ahora;
   }
 
   /**
