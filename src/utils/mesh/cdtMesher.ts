@@ -12,7 +12,10 @@ import cdt2d from 'cdt2d';
 import cleanPSLG from 'clean-pslg';
 import type { PatternPiece, Point2D, PathCommand } from '../../types/types';
 import type { ClothMeshData } from '../cloth/xpbdSolver';
-import { flattenPath } from '../seam/index';
+import { flattenPath, TOLERANCIA_DE_DUPLICADOS } from '../seam/index';
+
+// La tolerancia vive en seam/index.ts (sin dependencias pesadas); se re-exporta para quien la busque en el mallador.
+export { TOLERANCIA_DE_DUPLICADOS } from '../seam/index';
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
@@ -194,7 +197,7 @@ export function meshPieceOutline(
  * @param tolerance - Distance tolerance for considering points identical
  * @returns Cleaned point array
  */
-function removeDuplicatePoints(points: Point2D[], tolerance: number = 0.1): Point2D[] {
+function removeDuplicatePoints(points: Point2D[], tolerance: number = TOLERANCIA_DE_DUPLICADOS): Point2D[] {
   if (points.length <= 1) return points;
 
   const result: Point2D[] = [points[0]];

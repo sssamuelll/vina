@@ -9,7 +9,7 @@
  */
 
 import type { PathCommand, Point2D, Seam, SemanticEdge } from '../../types/types';
-import { flattenPath, commandRangeToFlattened, edgeNToCommandIndex } from '../seam/index';
+import { flattenPath, commandRangeToFlattened, edgeNToCommandIndex, TOLERANCIA_DE_DUPLICADOS } from '../seam/index';
 import { renormalizeFilteredT } from '../seam/seamRange';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -369,6 +369,27 @@ export function parameterizeEdge(
 // ─── Boundary-provenance parameterization (M4) ──────────────────────────────
 
 /**
+ * El rango [fs, fe] de un borde en el contorno aplanado, extendido sobre las copias exactas de sus puntas
+ * (#1250 C1). En el DXF cada borde termina en un punto y el siguiente empieza en una copia; el mallador deja
+ * una sola, con el origen de la primera, y sin esto la esquina entra solo en el borde que termina en ella.
+ * `fe < fs` da la vuelta por el cierre. Un rango nunca da más de una vuelta al contorno.
+ */
+export function extenderSobreCopias(flat: ReadonlyArray<Point2D>, range: [number, number]): [number, number] {
+  const N = flat.length;
+  if (N < 2) return range;
+  const punto = (k: number) => flat[((k % N) + N) % N];
+  const cerca = (i: number, j: number) => {
+    const p = punto(i), q = punto(j);
+    return Math.hypot(p.x - q.x, p.y - q.y) <= TOLERANCIA_DE_DUPLICADOS;
+  };
+  let s = range[0];
+  let e = range[1] < range[0] ? range[1] + N : range[1];
+  while (s - 1 > e - N && cerca(s - 1, s)) s--;
+  while (e + 1 < s + N && cerca(e + 1, e)) e++;
+  return [((s % N) + N) % N, e % N];
+}
+
+/**
  * Parameterize an edge range directly from the mesher's boundary provenance
  * (`ClothMeshData.boundaryOrig`) instead of reconstructing the mesher's
  * numbering. Selects the piece's boundary vertices whose original outline
@@ -380,7 +401,7 @@ export function parameterizeEdge(
  *   index (fractional for subdivided points, NaN for interior vertices)
  * @param positions - flat xyz positions indexed by GLOBAL vertex id
  * @param vertexOffset - piece's vertex offset inside `positions`
- * @param flatCount - number of points in the piece's flattened outline (N)
+ * @param flat - the piece's flattened outline: the same points the range indexes (#1250 C1)
  * @param range - [start, end] in flattened-outline index space (end may wrap)
  * @param reverse - traverse end→start (Seam.pieceB.reversed)
  */
@@ -388,12 +409,12 @@ export function parameterizeEdgeFromBoundary(
   boundaryOrig: ArrayLike<number>,
   positions: Float32Array,
   vertexOffset: number,
-  flatCount: number,
+  flat: ReadonlyArray<Point2D>,
   range: [number, number],
   reverse: boolean = false,
 ): ParameterizedVertex[] {
-  const [fs, fe] = range;
-  const N = flatCount;
+  const [fs, fe] = extenderSobreCopias(flat, range);
+  const N = flat.length;
   if (N <= 0) return [];
   const EPS = 1e-6;
 
@@ -407,8 +428,11 @@ export function parameterizeEdgeFromBoundary(
       : orig >= fs - EPS && orig <= fe + EPS;
     if (!inRange) continue;
     // Distance along the original traversal from the range start — sorts
-    // correctly for wrapped ranges too.
-    const d = (((orig - fs) % N) + N) % N;
+    // correctly for wrapped ranges too. Un vértice hasta EPS ANTES del inicio (lo admite inRange) está a ~0, no
+    // a N: un duplicado de la esquina cuyo origen redondea justo bajo el entero (la línea central de la tira de
+    // María: 14,9999995) caía al final del borde y la tira "volvía" por toda su longitud (#1250 C1).
+    let d = orig - fs;
+    if (d < -EPS) d += N;
     selected.push({ local, d });
   }
   if (selected.length === 0) return [];
@@ -736,7 +760,7 @@ export function buildSeamConstraints(
     let edgeA = pieceAData?.boundaryOrig
       ? parameterizeEdgeFromBoundary(
           pieceAData.boundaryOrig, positions, offsetA.vertexOffset,
-          flattenPath(outlineA, SEAM_CURVE_RESOLUTION).length, rangeA,
+          flattenPath(outlineA, SEAM_CURVE_RESOLUTION), rangeA,
         )
       : parameterizeEdge(
           outlineA, rangeA[0], rangeA[1], offsetA.vertexOffset,
@@ -745,7 +769,7 @@ export function buildSeamConstraints(
     let edgeB = pieceBData?.boundaryOrig
       ? parameterizeEdgeFromBoundary(
           pieceBData.boundaryOrig, positions, offsetB.vertexOffset,
-          flattenPath(outlineB, SEAM_CURVE_RESOLUTION).length, rangeB, reversedB,
+          flattenPath(outlineB, SEAM_CURVE_RESOLUTION), rangeB, reversedB,
         )
       : parameterizeEdge(
           outlineB, rangeB[0], rangeB[1], offsetB.vertexOffset,
