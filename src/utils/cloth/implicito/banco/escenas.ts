@@ -233,3 +233,11 @@ export function escenaCapas(): Escena {
     v: Float64Array.from(prenda.malla.x, (_, k) => (k < 3 * nAbajo ? 0 : k % 3 === 1 ? -0.3 : k % 3 === 0 ? 0.05 : 0)),
   };
 }
+
+/** Una lámina de malla gruesa (20 mm), 2 mm sobre la punta de una pirámide y corrida para que la punta caiga en medio de un triángulo. */
+export function escenaPunta(): Escena {
+  const cuerpo = new CuerpoRigido(buildLinearBVH(piramideDeColision(0.3, 0.1)));
+  const malla = mallaDeContorno(rectangulo(-60, -60, 60, 60), 20);
+  malla.x = Float64Array.from(malla.x, (q, k) => (k % 3 === 0 ? q + 0.007 : k % 3 === 1 ? q + 0.102 : q + 0.003));
+  return { malla, obstaculos: [{ tipo: 'cuerpo', cuerpo }] };
+}

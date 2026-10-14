@@ -25,11 +25,13 @@ export interface PaqueteGpu {
   nch: number;
   /** nodos del BVH del cuerpo; 0 sin cuerpo */
   ncu: number;
+  /** vértices del cuerpo (sin repetir), que entran a la rejilla detrás de los de la tela */
+  nvb: number;
   /** la tela contra sí misma (sistema.ts, armarParesPropios) */
   propio: boolean;
   /** pares que caben por cuadro */
   maxPares: number;
-  /** puntos de la rejilla: la tela (la Tarea 8 del plan de la parte 2 suma los vértices del cuerpo) */
+  /** puntos de la rejilla: los vértices de la tela y, detrás, los del cuerpo */
   np: number;
   /** entradas de la tabla de hash de la rejilla: una potencia de 2, al menos dos por punto */
   nceldas: number;
@@ -58,6 +60,9 @@ export interface PaqueteGpu {
     cuNt: Float32Array;
     cuPa: Float32Array;
     cuPv: Float32Array;
+    /** los vértices del cuerpo y sus pseudonormales (cuerpo.ts, CuerpoRigido) */
+    cuVertices: Float32Array;
+    cuNormales: Float32Array;
   };
   u32: {
     tris: Uint32Array;
@@ -102,10 +107,10 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
   if (nt >= 1 << 26 || nc >= 1 << 26) throw new Error('empaquetar: más triángulos o puntos de costura de los que caben en un código de bloque');
   const cuerpos = s.obstaculos.flatMap((o) => (o.tipo === 'cuerpo' ? [o.cuerpo] : []));
   if (cuerpos.length > 1) throw new Error('empaquetar: la GPU lleva un solo cuerpo');
-  const bvh = cuerpos[0]?.bvh;
+  const cuerpo = cuerpos[0], bvh = cuerpo?.bvh, nvb = cuerpo ? cuerpo.vertices.length / 3 : 0;
   // con E6, un vértice forma par con una cara por cada capa que tiene a menos del radio: 16 por vértice sobran
   const maxPares = op.maxPares ?? Math.max(64, 16 * n);
-  const np = n;
+  const np = n + nvb;
   let nceldas = 1;
   while (nceldas < 2 * np) nceldas *= 2;
   // los índices de pares, listas y rejilla viajan como enteros exactos en f32
@@ -202,6 +207,7 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
     nc,
     nch: s.placa.costura.length,
     ncu: bvh?.nodeCount ?? 0,
+    nvb,
     propio: s.aj.contactoPropio,
     maxPares,
     np,
@@ -222,6 +228,8 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
       cuNt: bvh?.triNormals ?? new Float32Array(0),
       cuPa: bvh?.edgePseudonormals ?? new Float32Array(0),
       cuPv: bvh?.vertexPseudonormals ?? new Float32Array(0),
+      cuVertices: Float32Array.from(cuerpo?.vertices ?? []),
+      cuNormales: Float32Array.from(cuerpo?.normales ?? []),
     },
     u32: {
       tris: Uint32Array.from(s.tris),

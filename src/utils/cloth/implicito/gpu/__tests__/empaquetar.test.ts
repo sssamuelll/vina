@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SistemaTela } from '../../sistema';
 import { ESTADO_MEMBRANA } from '../../membrana';
-import { escenaCostura, escenaCusick, escenaEsfera, TELA_DE_LABORATORIO } from '../../banco/escenas';
+import { escenaCostura, escenaCusick, escenaEsfera, escenaPunta, TELA_DE_LABORATORIO } from '../../banco/escenas';
 import { azar } from '../../__tests__/ayudas';
 import { empaquetar, NINGUNA, type PaqueteGpu } from '../empaquetar';
 
@@ -153,6 +153,16 @@ describe('el paquete con un cuerpo', () => {
     const e = escenaEsfera();
     const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: [...e.obstaculos, ...e.obstaculos], ajustes: { contactoPropio: false } });
     expect(() => empaquetar(s)).toThrow(/un solo cuerpo/);
+  });
+
+  it('con un cuerpo, la rejilla lleva también sus vértices', () => {
+    const e = escenaPunta();
+    const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: e.obstaculos });
+    const p = empaquetar(s), o = e.obstaculos[0];
+    if (o.tipo !== 'cuerpo') throw new Error('la escena trae un cuerpo');
+    expect(p.nvb).toBe(o.cuerpo.vertices.length / 3);
+    expect(p.np).toBe(s.n + p.nvb);
+    expect(Array.from(p.f32.cuNormales)).toEqual(Array.from(Float32Array.from(o.cuerpo.normales)));
   });
 });
 

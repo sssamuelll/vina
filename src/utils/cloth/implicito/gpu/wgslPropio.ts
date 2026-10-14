@@ -142,7 +142,34 @@ fn parDeVertice(i: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, b: vec3<f32>, c
   guardarPar(vec4<f32>(f32(i), f32(ia), f32(ib), f32(ic)), vec4<f32>(1.0, -e.w.x, -e.w.y, -e.w.z), n, p0, kt);
 }
 
-// (aquí van parDePunta y limpiarPuntas, de la Tarea 8)
+// 1 = ese vértice del cuerpo sostenía la tela: el arreglo de este cuadro y el del anterior se alternan por paridad
+fn sostiene(b: u32, este: bool) -> u32 {
+  let par = u32(red[R_SC + E_CUADRO]) & 1u;
+  let cual = select(1u - par, par, este);
+  return O_SOST + cual * NVB + b;
+}
+
+@compute @workgroup_size(WG) fn limpiarPuntas(@builtin(global_invocation_id) g: vec3<u32>) {
+  if (g.x >= NVB) { return; }
+  tf[sostiene(g.x, true)] = 0.0;
+}
+
+// un vértice del cuerpo contra la cara (ia, ib, ic): cae sobre ella (E6) y la atravesó o la sostenía el cuadro anterior (R13)
+fn parDePunta(b: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, bb: vec3<f32>, c: vec3<f32>, tn: vec3<f32>, y: vec3<f32>, r: f32, libres: bool) {
+  if (!libres) { return; }
+  let e = puntoMasCercano(y, a, bb, c);
+  let dv = y - e.q;
+  if (length(dv) >= r || !sobreLaCara(dv, tn)) { return; }
+  let nn = v3tf(O_CUVN + 3u * b);
+  let s0 = dot(nn, e.q - y);
+  if (!(s0 < 0.0 || (tf[sostiene(b, false)] > 0.5 && s0 < SEP))) { return; }
+  tf[sostiene(b, true)] = 1.0;
+  let p0 = SEP - s0;
+  let vr = e.w.x * ld(O_V, ia) + e.w.y * ld(O_V, ib) + e.w.z * ld(O_V, ic);
+  // tela contra cuerpo: la fricción del cuerpo (§4.3.1)
+  let kt = rigidez(MU_C, KC * p0, tangencial(vr, nn));
+  guardarPar(vec4<f32>(f32(ia), f32(ib), f32(ic), -1.0), vec4<f32>(e.w, 0.0), nn, p0, kt);
+}
 
 @compute @workgroup_size(WG) fn paresDeTriangulo(@builtin(global_invocation_id) g: vec3<u32>) {
   let t = g.x;
@@ -156,6 +183,7 @@ fn parDeVertice(i: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, b: vec3<f32>, c
   let tn = cross(b - a, c - a);
   let r = red[R_SC + E_RADIO];
   let cel = red[R_SC + E_CELDA];
+  let libres = iu[I_FIJO + ia] == 0u || iu[I_FIJO + ib] == 0u || iu[I_FIJO + ic] == 0u;
   let k0 = celdaDe(min(min(a, b), c) - vec3<f32>(r), cel);
   let k1 = celdaDe(max(max(a, b), c) + vec3<f32>(r), cel);
   // ponytail: un triángulo estirado más allá de ocho celdas por eje no busca pares y se cuenta como desborde
@@ -175,6 +203,7 @@ fn parDeVertice(i: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, b: vec3<f32>, c
           // la misma entrada del hash guarda puntos de otras celdas: cada punto se mira desde la suya
           if (any(celdaDe(q, cel) != k)) { continue; }
           if (p < N) { parDeVertice(p, ia, ib, ic, a, b, c, tn, q, r); }
+          else { parDePunta(p - N, ia, ib, ic, a, b, c, tn, q, r, libres); }
         }
       }
     }

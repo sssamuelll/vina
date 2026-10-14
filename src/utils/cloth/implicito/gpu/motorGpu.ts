@@ -61,6 +61,8 @@ export class MotorGpu {
     tf.set(p.f32.cuNt, d.tf.CUNT);
     tf.set(p.f32.cuPa, d.tf.CUPA);
     tf.set(p.f32.cuPv, d.tf.CUPV);
+    tf.set(p.f32.cuVertices, d.tf.CUV);
+    tf.set(p.f32.cuNormales, d.tf.CUVN);
     const iu = new Uint32Array(d.iu.total);
     for (const clave of Object.keys(p.u32) as Array<keyof PaqueteGpu['u32']>) iu.set(p.u32[clave], d.iu[clave]);
     const datos: Record<Bufer, Float32Array | Uint32Array> = {
@@ -97,7 +99,7 @@ export class MotorGpu {
 
   /** Graba un cuadro completo en el pase, en el orden de paso.ts. */
   grabarCuadro(pase: GPUComputePassEncoder): void {
-    const { aj } = this.s, { gv, gt, gh, gb, gc, gch, gp, gcel, gpnt } = this.d, propio = this.p.propio;
+    const { aj } = this.s, { gv, gt, gh, gb, gc, gch, gp, gcel, gpnt, gvb } = this.d, propio = this.p.propio;
     const d = (e: Entrada, grupos: number) => {
       if (grupos === 0) return;
       pase.setPipeline(this.k[e]);
@@ -131,6 +133,7 @@ export class MotorGpu {
       d('scanCTotales', 1);
       d('scanCSumar', gcel);
       d('hashLlenar', gpnt);
+      d('limpiarPuntas', gvb);
       d('paresDeTriangulo', gt);
       d('limpiarVertices', gv);
       d('contarEntradas', gp);

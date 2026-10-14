@@ -9,7 +9,9 @@
  * `busqueda=0` apagan esos pasos para aislar una diferencia. Publica el resultado en `window.__TELA_IMPLICITA__`.
  */
 import { useEffect, useState } from 'react';
-import { escenaApoyada, escenaCapas, escenaCostura, escenaCusick, escenaEsfera, escenaInclinada, TELA_DE_LABORATORIO, type Escena } from '../../utils/cloth/implicito/banco/escenas';
+import {
+  escenaApoyada, escenaCapas, escenaCostura, escenaCusick, escenaEsfera, escenaInclinada, escenaPunta, TELA_DE_LABORATORIO, type Escena,
+} from '../../utils/cloth/implicito/banco/escenas';
 import { SistemaTela } from '../../utils/cloth/implicito/sistema';
 import { pasoImplicito } from '../../utils/cloth/implicito/paso';
 import { VigiaDeQuietud } from '../../utils/cloth/implicito/quietud';
@@ -39,6 +41,7 @@ const ESCENAS: Record<string, () => Escena | Promise<Escena>> = {
   esfera: () => escenaEsfera(),
   inclinada: () => escenaInclinada(),
   capas: () => escenaCapas(),
+  punta: () => escenaPunta(),
 };
 
 async function correr(q: URLSearchParams): Promise<Resultado> {

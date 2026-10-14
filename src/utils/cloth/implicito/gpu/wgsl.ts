@@ -26,7 +26,7 @@ const N_ESC = 32;
 export const ENTRADAS = [
   'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar',
   'velMax', 'armarRadio', 'limpiarCeldas', 'hashContar', 'scanCBloques', 'scanCTotales', 'scanCSumar', 'hashLlenar',
-  'paresDeTriangulo', 'limpiarVertices', 'contarEntradas', 'scanVBloques', 'scanVTotales', 'scanVSumar', 'llenarEntradas',
+  'limpiarPuntas', 'paresDeTriangulo', 'limpiarVertices', 'contarEntradas', 'scanVBloques', 'scanVTotales', 'scanVSumar', 'llenarEntradas',
   'residuo', 'sumarInicio', 'spmv', 'sumarAlfa', 'actualizar', 'sumarBeta', 'nuevaP', 'anticipar', 'anticiparPares',
   'armarRonda2', 'prepBusqueda', 'posPrueba', 'anguloPrueba', 'difTri', 'difCostura', 'difPares', 'decidir', 'aplicar',
   'cerrarCuadro', 'cerrarCosturas', 'revisarCosido', 'coser',
@@ -47,7 +47,7 @@ function zonas<K extends string>(tamanos: Record<K, number>): Record<K, number> 
 type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT';
 type ZonaTf =
   | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH'
-  | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'HP' | 'OFFC' | 'ORD' | 'PAR' | 'OFFV' | 'ENT' | 'SCB';
+  | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'CUVN' | 'SOST' | 'HP' | 'OFFC' | 'ORD' | 'PAR' | 'OFFV' | 'ENT' | 'SCB';
 /** el búfer atómico del contacto propio: cuentas y cursores de la rejilla y de las listas, los pares y los desbordes */
 type ZonaAt = 'CNTC' | 'CURC' | 'CNTV' | 'CURV' | 'NPAR' | 'DESB';
 /** las sumas parciales de cada reducción, los escalares y la historia de la quietud */
@@ -71,10 +71,11 @@ export interface Distribucion {
   gb: number;
   gc: number;
   gch: number;
-  /** grupos por par, por celda de la rejilla y por punto de la rejilla */
+  /** grupos por par, por celda de la rejilla, por punto de la rejilla y por vértice del cuerpo */
   gp: number;
   gcel: number;
   gpnt: number;
+  gvb: number;
 }
 
 export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribucion {
@@ -84,7 +85,7 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
     COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, THP: nh, CONTRIB: 45 * nt + 9 * p.nc,
     CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch,
     CUN: p.f32.cuNodos.length, CUT: p.f32.cuTri.length, CUNT: p.f32.cuNt.length, CUPA: p.f32.cuPa.length, CUPV: p.f32.cuPv.length,
-    CUV: 0, HP: p.np, OFFC: p.nceldas + 1, ORD: p.np, PAR: 14 * p.maxPares, OFFV: n + 1, ENT: 4 * p.maxPares,
+    CUV: 3 * p.nvb, CUVN: 3 * p.nvb, SOST: 2 * p.nvb, HP: p.np, OFFC: p.nceldas + 1, ORD: p.np, PAR: 14 * p.maxPares, OFFV: n + 1, ENT: 4 * p.maxPares,
     SCB: Math.max(Math.ceil(p.nceldas / WG), Math.ceil(n / WG)) + 1,
   });
   const iu = { total: 0 } as Distribucion['iu'];
@@ -94,11 +95,11 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
   }
   const gv = Math.ceil(n / WG), gt = Math.ceil(nt / WG), gh = Math.ceil(nh / WG), gb = Math.ceil(p.nb / WG);
   const gc = Math.ceil(p.nc / WG), gch = Math.ceil(p.nch / WG);
-  const gp = Math.ceil(p.maxPares / WG), gcel = Math.ceil(p.nceldas / WG), gpnt = Math.ceil(p.np / WG);
+  const gp = Math.ceil(p.maxPares / WG), gcel = Math.ceil(p.nceldas / WG), gpnt = Math.ceil(p.np / WG), gvb = Math.ceil(p.nvb / WG);
   const zona = Math.max(gv, gt, gh, gc, gp, 1);
   const red = { ...zonas<ZonaRed>({ PA: zona, PB: zona, PC: zona, PD: zona, PE: zona, SC: N_ESC, HISTO: cuadrosDeHistoria }), HIST: cuadrosDeHistoria };
   const at = zonas<ZonaAt>({ CNTC: p.nceldas, CURC: p.nceldas, CNTV: n, CURV: n, NPAR: 1, DESB: 1 });
-  return { vf, tf, iu, red, at, gv, gt, gh, gb, gc, gch, gp, gcel, gpnt };
+  return { vf, tf, iu, red, at, gv, gt, gh, gb, gc, gch, gp, gcel, gpnt, gvb };
 }
 
 /** Bytes de cada búfer, en el orden de las ligaduras del WGSL. */
@@ -207,6 +208,7 @@ const MU_C = ${f(tela.friccionCuerpo)};
 const WG = ${u(WG)};
 const PROPIO = ${p.propio};
 const NP = ${u(p.np)};
+const NVB = ${u(p.nvb)};
 const NCELDAS = ${u(p.nceldas)};
 const MAXP = ${u(p.maxPares)};
 const GP = ${u(d.gp)};
