@@ -50,13 +50,13 @@ test.describe('La tela nueva en la GPU @gpu-local', () => {
   // un cuadro (0,55 mm en tres); con 20 N/m baja de 1 µm
   const PARIDAD: Array<[string, string]> = [
     ['chica', 'cg=50'], ['apoyada', 'cg=50'], ['costura', 'cg=400'], ['costura-cerrada', 'cg=400'], ['esfera', 'cg=50'],
-    ['inclinada', 'cg=50'], ['capas', 'cg=400&kc=20'], ['punta', 'cg=50'],
+    ['inclinada', 'cg=50'], ['capas', 'cg=400&kc=20'], ['punta', 'cg=50'], ['hundida', 'cg=400&kc=20'],
   ];
   for (const [escena, ajustes] of PARIDAD) {
     test(`da lo mismo que la CPU tras 3 cuadros (${escena})`, async ({ page }) => {
       const r = await correr(page, `modo=paridad&escena=${escena}&${ajustes}&cuadros=3`);
       expect(r.dif?.maxima).toBeLessThan(1e-4);
-      if (escena === 'capas' || escena === 'punta') expect(r.estado?.pares).toBeGreaterThan(0);
+      if (escena === 'capas' || escena === 'punta' || escena === 'hundida') expect(r.estado?.pares).toBeGreaterThan(0);
     });
   }
 

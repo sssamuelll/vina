@@ -13,7 +13,7 @@
  */
 import { useEffect, useState } from 'react';
 import {
-  escenaApoyada, escenaCapas, escenaCostura, escenaCusick, escenaEsfera, escenaInclinada, escenaPunta, TELA_DE_LABORATORIO, type Escena,
+  escenaApoyada, escenaCapas, escenaCostura, escenaCusick, escenaEsfera, escenaHundida, escenaInclinada, escenaPunta, TELA_DE_LABORATORIO, type Escena,
 } from '../../utils/cloth/implicito/banco/escenas';
 import {
   camisetaContraLaReferencia, medirCamiseta, type CamisetaContraLaReferencia, type ConfigCamiseta, type MedidasDeCamiseta,
@@ -76,6 +76,7 @@ const ESCENAS: Record<string, () => Escena | Promise<Escena>> = {
   inclinada: () => escenaInclinada(),
   capas: () => escenaCapas(),
   punta: () => escenaPunta(),
+  hundida: () => escenaHundida(),
   camiseta: () => escenaCamiseta(Number(new URLSearchParams(window.location.search).get('malla') ?? 5)),
 };
 

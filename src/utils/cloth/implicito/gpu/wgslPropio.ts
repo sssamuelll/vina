@@ -110,6 +110,12 @@ fn sobreLaCara(e: vec3<f32>, tn: vec3<f32>) -> bool {
   return e2 - en * en / dot(tn, tn) <= 1e-6 * e2;
 }
 
+// la separación de p a su punto más cercano de la cara, relativa a a: q = a + wb·(b − a) + wc·(c − a). Restar posiciones
+// absolutas lejos del origen (la tela sobre el torso, a 1,4 m) pierde en precisión simple las micras que E6 compara
+fn sepDeCara(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>, c: vec3<f32>, w: vec3<f32>) -> vec3<f32> {
+  return (p - a) - w.y * (b - a) - w.z * (c - a);
+}
+
 fn guardarPar(v: vec4<f32>, w: vec4<f32>, n: vec3<f32>, p0: f32, kt: f32) {
   let k = atomicAdd(&at[A_NPAR], 1u);
   if (k >= MAXP) {
@@ -129,7 +135,7 @@ fn guardarPar(v: vec4<f32>, w: vec4<f32>, n: vec3<f32>, p0: f32, kt: f32) {
 fn parDeVertice(i: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, b: vec3<f32>, c: vec3<f32>, tn: vec3<f32>, xi: vec3<f32>, r: f32) {
   if (iu[I_FIJO + i] != 0u || excluido(i, ia) || excluido(i, ib) || excluido(i, ic)) { return; }
   let e = puntoMasCercano(xi, a, b, c);
-  let dv = xi - e.q;
+  let dv = sepDeCara(xi, a, b, c, e.w);
   let d = length(dv);
   if (d >= r || d < 1e-9 || !sobreLaCara(dv, tn)) { return; }
   let n = dv / d;
@@ -158,10 +164,10 @@ fn sostiene(b: u32, este: bool) -> u32 {
 fn parDePunta(b: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, bb: vec3<f32>, c: vec3<f32>, tn: vec3<f32>, y: vec3<f32>, r: f32, libres: bool) {
   if (!libres) { return; }
   let e = puntoMasCercano(y, a, bb, c);
-  let dv = y - e.q;
+  let dv = sepDeCara(y, a, bb, c, e.w);
   if (length(dv) >= r || !sobreLaCara(dv, tn)) { return; }
   let nn = v3tf(O_CUVN + 3u * b);
-  let s0 = dot(nn, e.q - y);
+  let s0 = -dot(nn, dv);
   if (!(s0 < 0.0 || (tf[sostiene(b, false)] > 0.5 && s0 < SEP))) { return; }
   tf[sostiene(b, true)] = 1.0;
   let p0 = SEP - s0;

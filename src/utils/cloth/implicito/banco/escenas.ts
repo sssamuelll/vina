@@ -234,6 +234,21 @@ export function escenaCapas(): Escena {
   };
 }
 
+/**
+ * Dos láminas de pie a la altura del pecho (1,4 m), una de 90 mm 0,05 mm delante de otra de 120 mm: los pares entran
+ * muy hundidos en la separación, como la tela sobre el torso. De pie, la altura cae en la dirección tangencial de la
+ * cara, donde el criterio de la cara (E6) mide una separación de micras; en precisión simple, con coordenadas
+ * absolutas, la altura se comía esas micras.
+ */
+export function escenaHundida(): Escena {
+  const dePie = (m: MallaDeTela, delante: number): MallaDeTela => ({
+    ...m,
+    x: Float64Array.from(m.x, (_, k) => [delante, 1.4 + m.x[k - (k % 3)], m.x[k - (k % 3) + 2]][k % 3]),
+  });
+  const abajo = dePie(mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), 0), arriba = dePie(mallaDeContorno(rectangulo(-45, -45, 45, 45), 10), 0.00005);
+  return { malla: armarPrenda([{ id: 'abajo', ...abajo }, { id: 'arriba', ...arriba }]).malla, obstaculos: [] };
+}
+
 /** Una lámina de malla gruesa (20 mm), 2 mm sobre la punta de una pirámide y corrida para que la punta caiga en medio de un triángulo. */
 export function escenaPunta(): Escena {
   const cuerpo = new CuerpoRigido(buildLinearBVH(piramideDeColision(0.3, 0.1)));
