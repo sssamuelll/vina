@@ -4,6 +4,7 @@
  */
 import { mallaDeContorno, type MallaDeTela } from '../malla';
 import type { Obstaculo } from '../obstaculos';
+import type { OpcionesSistema } from '../sistema';
 import type { TelaFisica } from '../tela';
 import type { CollisionMeshData } from '../../collisionMesh';
 
@@ -24,6 +25,12 @@ export interface Escena {
   malla: MallaDeTela;
   obstaculos: Obstaculo[];
   hilo?: readonly [number, number];
+  /** los puntos y bisagras de costura de una prenda (sistema.ts, OpcionesSistema) */
+  costuras?: OpcionesSistema['costuras'];
+  /** la franja del margen (prenda.ts, franjaDePrenda) */
+  franja?: Uint8Array;
+  /** velocidades iniciales (m/s), 3 por vértice */
+  v?: Float64Array;
 }
 
 export function circulo(radioMm: number, lados: number): Array<[number, number]> {

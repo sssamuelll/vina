@@ -8,7 +8,8 @@ import type { Corredor } from './_banco';
 
 export function correrImplicito(tela: TelaFisica, ajustes: Partial<AjustesImplicito> = {}): Corredor {
   return (e: Escena) => {
-    const s = new SistemaTela(e.malla, tela, { obstaculos: e.obstaculos, hilo: e.hilo, ajustes });
+    const s = new SistemaTela(e.malla, tela, { obstaculos: e.obstaculos, hilo: e.hilo, costuras: e.costuras, franja: e.franja, ajustes });
+    if (e.v) s.v.set(e.v);
     const vigia = new VigiaDeQuietud();
     const t0 = performance.now();
     let cuadros = 0, quieta: number | null = null;

@@ -2,7 +2,10 @@
  * El banco de la tela nueva contra la referencia privada (spec 2026-10-13 §4.4.2) y contra el motor de
  * hoy (§4.4.4).
  *
- *   VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- [--motor=implicito|xpbd] [--pandeo=<factor>] [--ensayo=cusick|voladizo|todo] [--mallas=5,10,20]
+ *   VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- [--motor=implicito|xpbd] [--pandeo=<factor>] [--ensayo=cusick|voladizo|todo|camiseta] [--mallas=5,10,20] [--cg=<n>] [--flexionDelMargen=<f>]
+ *
+ * `camiseta` no entra en `todo`: corre la camiseta de María sobre el avatar y desde la colocación de la referencia
+ * (camiseta.json en la carpeta privada), solo con el motor implícito.
  *
  * `npm run bench:tela` ya corre con el candado de scripts/pesado.mjs. El informe queda en
  * `$VINA_REFERENCIAS/informes/`.
@@ -10,9 +13,11 @@
 import {
   correrXpbd,
   criterioCusick,
+  ensayoCamiseta,
   ensayoCusick,
   ensayoVoladizo,
   guardarInforme,
+  imprimirCamiseta,
   imprimirCusick,
   imprimirVoladizo,
   leerReferencias,
@@ -42,7 +47,7 @@ if (!fabrica) throw new Error(`motor desconocido: ${motor} (hay ${Object.keys(MO
 const ref = leerReferencias();
 const correr = fabrica(ref, args);
 const informe: Record<string, unknown> = { motor, mallas, args: Object.fromEntries(args) };
-if (ensayo !== 'voladizo') {
+if (ensayo === 'todo' || ensayo === 'cusick') {
   const filas = ensayoCusick(correr, mallas, ref);
   imprimirCusick(filas);
   const criterio = criterioCusick(filas, ref);
@@ -50,9 +55,18 @@ if (ensayo !== 'voladizo') {
   informe.cusick = filas;
   informe.criterio = criterio;
 }
-if (ensayo !== 'cusick') {
+if (ensayo === 'todo' || ensayo === 'voladizo') {
   const filas = ensayoVoladizo(correr, mallas, ref);
   imprimirVoladizo(filas);
   informe.voladizo = filas;
+}
+if (ensayo === 'camiseta') {
+  if (motor !== 'implicito') throw new Error('la camiseta corre solo con el motor implícito');
+  const filas = ensayoCamiseta(telaDeLaReferencia(ref, Number(args.get('pandeo') || PANDEO_CALIBRADO)), mallas, {
+    ...(args.has('cg') ? { maxCG: Number(args.get('cg')) } : {}),
+    ...(args.has('flexionDelMargen') ? { flexionDelMargen: Number(args.get('flexionDelMargen')) } : {}),
+  });
+  imprimirCamiseta(filas);
+  informe.camiseta = filas;
 }
 console.log(`informe: ${guardarInforme(motor, informe)}`);

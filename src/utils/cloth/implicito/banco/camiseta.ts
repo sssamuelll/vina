@@ -16,9 +16,16 @@ import { resolveArrangementWithFrames } from '../../arrangement/arrangementBindi
 import { seamInitDataToPairs, type PieceWithOutline } from '../../seamPairs';
 import { seamsToInitData } from '../../../../components/Viewport3D/costurasDeLaSimulacion';
 import type { BodyMeasurements, PatternPiece, Seam } from '../../../../types/types';
+import { buildLinearBVH } from '../../gpu/bvh';
 import type { BisagraDeCostura, PuntoDeCostura } from '../costuras';
+import { CuerpoRigido } from '../cuerpo';
+import type { MallaDeTela } from '../malla';
 import { armarPrenda, bisagrasDePrenda, costurasDePrenda, franjaDePrenda, type LadosDeCostura, type Prenda } from '../prenda';
 import type { TelaFisica } from '../tela';
+import { colocarDesdeObj } from './colocacion';
+import type { Escena } from './escenas';
+import { aplastados, distanciaAlCuerpo, distanciaASuperficie, estiramiento, pliegues, separacionDeCosturas } from './medidas';
+import { cuerpoDeObj, leerObj, mallaDeObj } from './obj';
 
 /** Las medidas con que la app refina las costuras de María en el mundo (las de seamCoverage.maria.test.ts). */
 export const MEDIDAS_DE_MARIA = { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 } as BodyMeasurements;
@@ -101,4 +108,99 @@ export function camisetaDeMaria(dxf: string, aristaMm: number, tela: TelaFisica,
   })));
   const { puntos, lados } = costurasDePrenda(prenda, pares);
   return { piezas, mallas, prenda, costuras: { puntos, bisagras: bisagrasDePrenda(prenda, lados, tela) }, lados, franja: franjaDePrenda(prenda, lados) };
+}
+
+/** `$VINA_REFERENCIAS/camiseta.json`: dónde están los archivos de la referencia y cómo se leen. Privado. */
+export interface ConfigCamiseta {
+  /** el OBJ con la colocación inicial; cada grupo es una pieza */
+  colocacion: string;
+  /** el nombre de la pieza de Vina de cada grupo de la colocación, en orden */
+  piezasEnOrden: string[];
+  /** el OBJ del avatar y los grupos que son su piel */
+  cuerpo: string;
+  gruposDelCuerpo: string[];
+  /** la camiseta asentada de la referencia, por malla (mm) */
+  asentada: Record<string, string>;
+  /** el espejo entre el dibujo de Vina y el patrón del OBJ (colocacion.ts): fijo, para que una manga cruzada se note */
+  espejo?: [number, number];
+}
+
+/** Los textos de los archivos, leídos del disco (banco en Node) o pedidos al servidor (la prueba con GPU). */
+export interface ArchivosDeLaCamiseta {
+  dxf: string;
+  config: ConfigCamiseta;
+  colocacion: string;
+  cuerpo: string;
+  /** la asentada de la referencia con esta malla, si hay */
+  asentada?: string;
+}
+
+export interface CamisetaContraLaReferencia {
+  escena: Escena;
+  camiseta: Camiseta;
+  cuerpo: CuerpoRigido;
+  /** la asentada de la referencia, medible como una malla de tela, y su superficie para medir distancias */
+  referencia: { malla: MallaDeTela; superficie: CuerpoRigido } | null;
+  /** por pieza, la mayor distancia (mm de patrón) de un vértice de Vina a la malla de la colocación */
+  errorDeColocacion: number[];
+}
+
+/** La camiseta sobre el avatar de la referencia y desde su colocación inicial (E5). Las posiciones de los OBJ van en mm. */
+export function camisetaContraLaReferencia(a: ArchivosDeLaCamiseta, aristaMm: number, tela: TelaFisica): CamisetaContraLaReferencia {
+  const colocacion = leerObj(a.colocacion);
+  let mmPorVt = 1, errorDeColocacion: number[] = [];
+  const camiseta = camisetaDeMaria(a.dxf, aristaMm, tela, (piezas, mallas) => {
+    const grupos = piezas.map((p) => {
+      const g = a.config.piezasEnOrden.indexOf(p.name);
+      if (g < 0) throw new Error(`camiseta.json no dice qué grupo de la colocación es ${p.name}`);
+      return g;
+    });
+    const r = colocarDesdeObj(mallas.map((m) => ({ patron: patronDe(m), tris: m.triIds })), colocacion, grupos, a.config.espejo);
+    mmPorVt = r.mmPorVt;
+    errorDeColocacion = r.error;
+    return r.x;
+  });
+  const cuerpo = new CuerpoRigido(buildLinearBVH(cuerpoDeObj(leerObj(a.cuerpo), a.config.gruposDelCuerpo, 0.001)));
+  let referencia: CamisetaContraLaReferencia['referencia'] = null;
+  if (a.asentada) {
+    const obj = leerObj(a.asentada);
+    referencia = { malla: mallaDeObj(obj, 0.001, mmPorVt), superficie: new CuerpoRigido(buildLinearBVH(cuerpoDeObj(obj, null, 0.001))) };
+  }
+  const escena: Escena = { malla: camiseta.prenda.malla, obstaculos: [{ tipo: 'cuerpo', cuerpo }], costuras: camiseta.costuras, franja: camiseta.franja };
+  return { escena, camiseta, cuerpo, referencia, errorDeColocacion };
+}
+
+export interface MedidasDeCamiseta {
+  vertices: number;
+  aplastados: number;
+  estiramiento: ReturnType<typeof estiramiento>;
+  costuras: ReturnType<typeof separacionDeCosturas>;
+  pliegues: ReturnType<typeof pliegues>;
+  alCuerpo: ReturnType<typeof distanciaAlCuerpo>;
+  /** la distancia de cada vértice de Vina a la asentada de la referencia */
+  contraLaReferencia: ReturnType<typeof distanciaASuperficie> | null;
+  /** lo mismo medido sobre la asentada de la referencia (sin costuras: el OBJ no las trae) */
+  referencia: Omit<MedidasDeCamiseta, 'costuras' | 'contraLaReferencia' | 'referencia'> | null;
+}
+
+export function medirCamiseta(x: ArrayLike<number>, c: CamisetaContraLaReferencia): MedidasDeCamiseta {
+  const { malla } = c.escena, ref = c.referencia;
+  return {
+    vertices: x.length / 3,
+    aplastados: aplastados(x, malla),
+    estiramiento: estiramiento(x, malla),
+    costuras: separacionDeCosturas(x, c.camiseta.costuras.puntos),
+    pliegues: pliegues(x, malla),
+    alCuerpo: distanciaAlCuerpo(x, c.cuerpo),
+    contraLaReferencia: ref ? distanciaASuperficie(x, ref.superficie) : null,
+    referencia: ref
+      ? {
+          vertices: ref.malla.x.length / 3,
+          aplastados: aplastados(ref.malla.x, ref.malla),
+          estiramiento: estiramiento(ref.malla.x, ref.malla),
+          pliegues: pliegues(ref.malla.x, ref.malla),
+          alCuerpo: distanciaAlCuerpo(ref.malla.x, c.cuerpo),
+        }
+      : null,
+  };
 }
