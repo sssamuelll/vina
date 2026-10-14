@@ -25,6 +25,7 @@ export function pasoImplicito(s: SistemaTela): InfoPaso {
   s.xt.set(s.x);
   s.linealizar();
   s.armarContactos();
+  s.armarParesPropios();
 
   // bloques de la diagonal sin el contacto: elástica + (m/h² + aire·m/h)·I
   const base = new Float64Array(9 * n), diag = new Float64Array(n);
