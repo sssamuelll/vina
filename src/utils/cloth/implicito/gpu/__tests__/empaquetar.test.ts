@@ -155,3 +155,20 @@ describe('el paquete con un cuerpo', () => {
     expect(() => empaquetar(s)).toThrow(/un solo cuerpo/);
   });
 });
+
+describe('el paquete con contacto propio', () => {
+  const e = escenaCostura(30);
+  const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { costuras: e.costuras, franja: e.franja });
+  const p = empaquetar(s);
+
+  it('lleva los compañeros de costura de cada vértice, como la CPU', () => {
+    for (let i = 0; i < s.n; i++) expect(Array.from(p.u32.exIdx.subarray(p.u32.exOff[i], p.u32.exOff[i + 1]))).toEqual(s.excluidos[i]);
+  });
+
+  it('la rejilla tiene al menos dos celdas por punto y la capacidad de pares es la pedida', () => {
+    expect(p.propio).toBe(true);
+    expect(p.nceldas & (p.nceldas - 1)).toBe(0);
+    expect(p.nceldas).toBeGreaterThanOrEqual(2 * p.np);
+    expect(empaquetar(s, { maxPares: 8 }).maxPares).toBe(8);
+  });
+});

@@ -45,7 +45,10 @@ describe('el WGSL del motor', () => {
     const pg = empaquetar(sg);
     const tam = tamanosDeBufer(distribuir(pg, 3600), pg);
     expect(sg.n).toBeGreaterThan(25_000);
-    // 128 MiB por búfer (maxStorageBufferBindingSize) y 8 búferes por etapa (maxStorageBuffersPerShaderStage)
+    // con contacto propio (el búfer atómico incluido): 128 MiB por búfer (maxStorageBufferBindingSize) y 8 búferes por etapa
+    // (maxStorageBuffersPerShaderStage)
+    expect(sg.aj.contactoPropio).toBe(true);
+    expect(Object.keys(tam)).toContain('at');
     for (const bytes of Object.values(tam)) expect(bytes).toBeLessThanOrEqual(128 * 1024 * 1024);
     expect(Object.keys(tam).length).toBeLessThanOrEqual(8);
   }, 180_000);

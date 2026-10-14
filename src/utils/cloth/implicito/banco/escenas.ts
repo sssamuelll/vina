@@ -215,3 +215,21 @@ export function escenaInclinada(): Escena {
   });
   return { malla, obstaculos: [{ tipo: 'cuerpo', cuerpo }] };
 }
+
+/**
+ * Dos láminas en caída libre, sin piso: una de 90 mm inclinada sobre otra de 120 mm, de 1,2 mm (dentro de la
+ * separación) a 6 mm, bajando 0,3 m/s más rápido y resbalando a 0,05 m/s. El primer cuadro tiene pares activos desde
+ * la entrada, con su fricción, y pares anticipados. Con un piso, el piso frenaba las dos láminas a la misma altura y la
+ * de arriba terminaba sobre la de abajo a distancia cero, donde la CPU y la GPU no pueden armar los mismos pares.
+ */
+export function escenaCapas(): Escena {
+  const abajo = mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), arriba = mallaDeContorno(rectangulo(-45, -45, 45, 45), 10);
+  const nAbajo = abajo.x.length / 3;
+  arriba.x = Float64Array.from(arriba.x, (y, k) => (k % 3 === 1 ? 0.0012 + ((arriba.x[k - 1] + 0.045) * 0.0048) / 0.09 : y));
+  const prenda = armarPrenda([{ id: 'abajo', ...abajo }, { id: 'arriba', ...arriba }]);
+  return {
+    malla: prenda.malla,
+    obstaculos: [],
+    v: Float64Array.from(prenda.malla.x, (_, k) => (k < 3 * nAbajo ? 0 : k % 3 === 1 ? -0.3 : k % 3 === 0 ? 0.05 : 0)),
+  };
+}

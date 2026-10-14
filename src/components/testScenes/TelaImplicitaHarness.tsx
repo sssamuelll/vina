@@ -9,7 +9,7 @@
  * `busqueda=0` apagan esos pasos para aislar una diferencia. Publica el resultado en `window.__TELA_IMPLICITA__`.
  */
 import { useEffect, useState } from 'react';
-import { escenaApoyada, escenaCostura, escenaCusick, escenaEsfera, escenaInclinada, TELA_DE_LABORATORIO, type Escena } from '../../utils/cloth/implicito/banco/escenas';
+import { escenaApoyada, escenaCapas, escenaCostura, escenaCusick, escenaEsfera, escenaInclinada, TELA_DE_LABORATORIO, type Escena } from '../../utils/cloth/implicito/banco/escenas';
 import { SistemaTela } from '../../utils/cloth/implicito/sistema';
 import { pasoImplicito } from '../../utils/cloth/implicito/paso';
 import { VigiaDeQuietud } from '../../utils/cloth/implicito/quietud';
@@ -21,6 +21,8 @@ interface Resultado {
   vertices: number;
   gpu: string;
   dif?: { maxima: number; media: number };
+  /** G1 − G0 del último cuadro de la CPU (paso.ts) */
+  dgCpu?: number;
   msPorCuadro?: number;
   segundosHastaQuieta?: number | null;
   estado?: EstadoGpu;
@@ -36,6 +38,7 @@ const ESCENAS: Record<string, () => Escena | Promise<Escena>> = {
   'costura-cerrada': () => escenaCostura(0, 30),
   esfera: () => escenaEsfera(),
   inclinada: () => escenaInclinada(),
+  capas: () => escenaCapas(),
 };
 
 async function correr(q: URLSearchParams): Promise<Resultado> {
@@ -50,8 +53,10 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
     tolCG: modo === 'paridad' ? 0 : 1e-4,
     anticipar: q.get('anticipar') !== '0',
     busqueda: q.get('busqueda') !== '0',
-    // el contacto propio llega a la GPU en la Tarea 7 del plan de la parte 2
-    contactoPropio: false,
+    // la tela contra sí misma, salvo que se pida apagarla
+    contactoPropio: q.get('propio') !== '0',
+    // la rigidez de contacto, si se pide otra
+    ...(q.get('kc') ? { kContacto: Number(q.get('kc')) } : {}),
   };
   const nuevo = () => {
     const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: e.obstaculos, hilo: e.hilo, costuras: e.costuras, franja: e.franja, ajustes });
@@ -64,13 +69,14 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
   const device = await adaptador.requestDevice();
   const { vendor, architecture, description } = adaptador.info;
   const base = { modo, escena, vertices: s.n, gpu: `${vendor} ${architecture} ${description}`.trim() };
-  const motor = await MotorGpu.crear(device, s);
+  const motor = await MotorGpu.crear(device, s, 3600, Number(q.get('maxPares')) || undefined);
   try {
     if (modo === 'paridad') {
       const cuadros = Number(q.get('cuadros') ?? 3);
       const cpu = nuevo();
       await motor.avanzar(cuadros);
-      for (let c = 0; c < cuadros; c++) pasoImplicito(cpu);
+      let info = pasoImplicito(cpu);
+      for (let c = 1; c < cuadros; c++) info = pasoImplicito(cpu);
       const xg = await motor.leerPosiciones();
       let maxima = 0, suma = 0;
       for (let i = 0; i < cpu.n; i++) {
@@ -78,7 +84,7 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
         maxima = Math.max(maxima, dist);
         suma += dist;
       }
-      return { ...base, dif: { maxima, media: suma / cpu.n }, estado: await motor.leerEstado() };
+      return { ...base, dif: { maxima, media: suma / cpu.n }, dgCpu: info.G1 - info.G0, estado: await motor.leerEstado() };
     }
     if (modo === 'velocidad') {
       await motor.avanzar(2); // calentamiento: el primer envío compila las tuberías

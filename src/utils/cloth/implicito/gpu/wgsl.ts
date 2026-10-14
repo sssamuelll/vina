@@ -3,12 +3,14 @@
  * escena: tamaños, desplazamientos, ajustes y obstáculos van como constantes. La física es la de paso.ts,
  * en el mismo orden; el cuadro entero cabe en un pase de cómputo y las sumas se reducen en la GPU.
  */
+import { ALCANCE_MAXIMO } from '../contactoPropio';
 import { EPS_FRICCION } from '../contactos';
 import { CIERRE_POR_CUADRO, LARGO_CERRADO } from '../costuras';
 import { RADIO_DE_BUSQUEDA, type Obstaculo } from '../obstaculos';
 import type { SistemaTela } from '../sistema';
 import type { PaqueteGpu } from './empaquetar';
 import { wgslCuerpoCercano, wgslPuntoMasCercano } from './wgslCuerpo';
+import { wgslPropio } from './wgslPropio';
 
 /** Hilos por grupo de trabajo. */
 export const WG = 128;
@@ -16,15 +18,18 @@ export const WG = 128;
 /** Los escalares del cuadro, en la zona SC de `red`. */
 export const ESC = {
   RZ: 0, RZ0: 1, ALFA: 2, BETA: 3, HECHO: 4, ACTIVO: 5, NUEVOS: 6, ALFA_LS: 7, PROBANDO: 8,
-  CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14, COSIDA: 15,
+  CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14, COSIDA: 15, RADIO: 16, CELDA: 17,
 } as const;
-const N_ESC = 16;
+const N_ESC = 32;
 
 /** Las entradas de cómputo, en el orden en que las despacha un cuadro. */
 export const ENTRADAS = [
-  'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar', 'residuo', 'sumarInicio', 'spmv', 'sumarAlfa',
-  'actualizar', 'sumarBeta', 'nuevaP', 'anticipar', 'armarRonda2', 'prepBusqueda', 'posPrueba', 'anguloPrueba',
-  'difTri', 'difCostura', 'decidir', 'aplicar', 'cerrarCuadro', 'cerrarCosturas', 'revisarCosido', 'coser',
+  'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar',
+  'velMax', 'armarRadio', 'limpiarCeldas', 'hashContar', 'scanCBloques', 'scanCTotales', 'scanCSumar', 'hashLlenar',
+  'paresDeTriangulo', 'limpiarVertices', 'contarEntradas', 'scanVBloques', 'scanVTotales', 'scanVSumar', 'llenarEntradas',
+  'residuo', 'sumarInicio', 'spmv', 'sumarAlfa', 'actualizar', 'sumarBeta', 'nuevaP', 'anticipar', 'anticiparPares',
+  'armarRonda2', 'prepBusqueda', 'posPrueba', 'anguloPrueba', 'difTri', 'difCostura', 'difPares', 'decidir', 'aplicar',
+  'cerrarCuadro', 'cerrarCosturas', 'revisarCosido', 'coser',
 ] as const;
 
 /** Desplazamientos seguidos para los tamaños dados, en el orden de las claves, y el total. */
@@ -40,9 +45,13 @@ function zonas<K extends string>(tamanos: Record<K, number>): Record<K, number> 
 }
 
 type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT';
-type ZonaTf = 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH' | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV';
+type ZonaTf =
+  | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH'
+  | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'HP' | 'OFFC' | 'ORD' | 'PAR' | 'OFFV' | 'ENT' | 'SCB';
+/** el búfer atómico del contacto propio: cuentas y cursores de la rejilla y de las listas, los pares y los desbordes */
+type ZonaAt = 'CNTC' | 'CURC' | 'CNTV' | 'CURV' | 'NPAR' | 'DESB';
 /** las sumas parciales de cada reducción, los escalares y la historia de la quietud */
-type ZonaRed = 'PA' | 'PB' | 'PC' | 'PD' | 'SC' | 'HISTO';
+type ZonaRed = 'PA' | 'PB' | 'PC' | 'PD' | 'PE' | 'SC' | 'HISTO';
 
 export interface Distribucion {
   /** por vértice, en f32: inicio de cada arreglo */
@@ -53,6 +62,8 @@ export interface Distribucion {
   iu: Record<keyof PaqueteGpu['u32'], number> & { total: number };
   /** las zonas de sumas parciales, los escalares y la historia de la quietud */
   red: Record<ZonaRed, number> & { total: number; HIST: number };
+  /** en u32 atómicos */
+  at: Record<ZonaAt, number> & { total: number };
   /** grupos de trabajo por vértice, triángulo, bisagra, bloque, punto de costura y bisagra de costura */
   gv: number;
   gt: number;
@@ -60,6 +71,10 @@ export interface Distribucion {
   gb: number;
   gc: number;
   gch: number;
+  /** grupos por par, por celda de la rejilla y por punto de la rejilla */
+  gp: number;
+  gcel: number;
+  gpnt: number;
 }
 
 export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribucion {
@@ -69,6 +84,8 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
     COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, THP: nh, CONTRIB: 45 * nt + 9 * p.nc,
     CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch,
     CUN: p.f32.cuNodos.length, CUT: p.f32.cuTri.length, CUNT: p.f32.cuNt.length, CUPA: p.f32.cuPa.length, CUPV: p.f32.cuPv.length,
+    CUV: 0, HP: p.np, OFFC: p.nceldas + 1, ORD: p.np, PAR: 14 * p.maxPares, OFFV: n + 1, ENT: 4 * p.maxPares,
+    SCB: Math.max(Math.ceil(p.nceldas / WG), Math.ceil(n / WG)) + 1,
   });
   const iu = { total: 0 } as Distribucion['iu'];
   for (const k of Object.keys(p.u32) as Array<keyof PaqueteGpu['u32']>) {
@@ -77,14 +94,19 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
   }
   const gv = Math.ceil(n / WG), gt = Math.ceil(nt / WG), gh = Math.ceil(nh / WG), gb = Math.ceil(p.nb / WG);
   const gc = Math.ceil(p.nc / WG), gch = Math.ceil(p.nch / WG);
-  const zona = Math.max(gv, gt, gh, gc, 1);
-  const red = { ...zonas<ZonaRed>({ PA: zona, PB: zona, PC: zona, PD: zona, SC: N_ESC, HISTO: cuadrosDeHistoria }), HIST: cuadrosDeHistoria };
-  return { vf, tf, iu, red, gv, gt, gh, gb, gc, gch };
+  const gp = Math.ceil(p.maxPares / WG), gcel = Math.ceil(p.nceldas / WG), gpnt = Math.ceil(p.np / WG);
+  const zona = Math.max(gv, gt, gh, gc, gp, 1);
+  const red = { ...zonas<ZonaRed>({ PA: zona, PB: zona, PC: zona, PD: zona, PE: zona, SC: N_ESC, HISTO: cuadrosDeHistoria }), HIST: cuadrosDeHistoria };
+  const at = zonas<ZonaAt>({ CNTC: p.nceldas, CURC: p.nceldas, CNTV: n, CURV: n, NPAR: 1, DESB: 1 });
+  return { vf, tf, iu, red, at, gv, gt, gh, gb, gc, gch, gp, gcel, gpnt };
 }
 
 /** Bytes de cada búfer, en el orden de las ligaduras del WGSL. */
-export function tamanosDeBufer(d: Distribucion, p: PaqueteGpu): Record<'pos' | 'vf' | 'tf' | 'iu' | 'red' | 'vals' | 'pv', number> {
-  return { pos: 12 * p.n, vf: 4 * d.vf.total, tf: 4 * d.tf.total, iu: 4 * d.iu.total, red: 4 * d.red.total, vals: 48 * Math.max(p.nq, 1), pv: 16 * p.n };
+export function tamanosDeBufer(d: Distribucion, p: PaqueteGpu): Record<'pos' | 'vf' | 'tf' | 'iu' | 'red' | 'vals' | 'pv' | 'at', number> {
+  return {
+    pos: 12 * p.n, vf: 4 * d.vf.total, tf: 4 * d.tf.total, iu: 4 * d.iu.total, red: 4 * d.red.total, vals: 48 * Math.max(p.nq, 1), pv: 16 * p.n,
+    at: 4 * d.at.total,
+  };
 }
 
 function flotante(v: number): string {
@@ -139,6 +161,7 @@ export function wgslDelMotor(s: SistemaTela, p: PaqueteGpu, d: Distribucion): st
 @group(0) @binding(4) var<storage, read_write> red: array<f32>;
 @group(0) @binding(5) var<storage, read_write> vals: array<vec4<f32>>;
 @group(0) @binding(6) var<storage, read_write> pv: array<vec4<f32>>;
+@group(0) @binding(7) var<storage, read_write> at: array<atomic<u32>>;
 
 const N = ${u(p.n)};
 const NT = ${u(p.nt)};
@@ -181,12 +204,27 @@ const KV = ${f(tela.kUrdimbre)};
 const KS = ${f(tela.kCizalla)};
 const BUSQUEDA = ${aj.busqueda};
 const MU_C = ${f(tela.friccionCuerpo)};
+const WG = ${u(WG)};
+const PROPIO = ${p.propio};
+const NP = ${u(p.np)};
+const NCELDAS = ${u(p.nceldas)};
+const MAXP = ${u(p.maxPares)};
+const GP = ${u(d.gp)};
+const R_PE = ${u(red.PE)};
+const I_EXO = ${u(iu.exOff)}; const I_EXI = ${u(iu.exIdx)};
+${Object.entries(d.at).filter(([k]) => k !== 'total').map(([k, v]) => `const A_${k} = ${u(v)};`).join(' ')}
+const SEPP = ${f(p.sepPropia)};
+const ALCANCE = ${f(ALCANCE_MAXIMO)};
+const ARISTA = ${f(p.aristaMedia)};
+const MU_T = ${f(tela.friccionTela)};
 const EPS_F = ${f(EPS_FRICCION)};
 const I3 = mat3x3<f32>(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
 
 ${wgslPuntoMasCercano()}
 
 ${wgslCuerpoCercano()}
+
+${wgslPropio()}
 
 ${wgslObstaculos(s.obstaculos)}
 
@@ -537,6 +575,19 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
       r += KC * vf[o + 4u] * nn;
       B += (KC - kt) * outer(nn, nn) + kt * I3;
     }
+    if (PROPIO) {
+      for (var s = u32(tf[O_OFFV + i]); s < u32(tf[O_OFFV + i + 1u]); s++) {
+        let ent = u32(tf[O_ENT + s]);
+        let o = O_PAR + 14u * (ent >> 2u);
+        if (tf[o + 13u] < 0.5) { continue; }
+        let wk = tf[o + 4u + (ent & 3u)];
+        let nn = v3tf(o + 8u);
+        let kt = tf[o + 12u];
+        // en x = x_t el par empuja con kc·p0 y su fricción todavía no (sistema.ts, residuo)
+        r += wk * KC * tf[o + 11u] * nn;
+        B += wk * wk * ((KC - kt) * outer(nn, nn) + kt * I3);
+      }
+    }
     if (iu[I_FIJO + i] != 0u) { r = vec3<f32>(0.0); }
     let Bi = inversa3(B);
     for (var a = 0u; a < 3u; a++) {
@@ -588,6 +639,21 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
       let nn = vec3<f32>(vf[o + 1u], vf[o + 2u], vf[o + 3u]);
       let pn = dot(nn, p);
       ap += KC * pn * nn + vf[o + 5u] * (p - pn * nn);
+    }
+    if (PROPIO) {
+      for (var s = u32(tf[O_OFFV + i]); s < u32(tf[O_OFFV + i + 1u]); s++) {
+        let ent = u32(tf[O_ENT + s]);
+        let o = O_PAR + 14u * (ent >> 2u);
+        if (tf[o + 13u] < 0.5) { continue; }
+        var qv = vec3<f32>(0.0);
+        for (var j = 0u; j < 4u; j++) {
+          let v = tf[o + j];
+          if (v >= 0.0) { qv += tf[o + 4u + j] * pv[u32(v)].xyz; }
+        }
+        let nn = v3tf(o + 8u);
+        let qn = dot(nn, qv);
+        ap += tf[o + 4u + (ent & 3u)] * (KC * qn * nn + tf[o + 12u] * (qv - qn * nn));
+      }
     }
     if (iu[I_FIJO + i] != 0u) { ap = vec3<f32>(0.0); }
     st(O_AP, i, ap);
@@ -678,6 +744,7 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
 @compute @workgroup_size(1) fn armarRonda2() {
   var s = 0.0;
   for (var k = 0u; k < GV; k++) { s += red[R_PA + k]; }
+  if (PROPIO) { for (var k = 0u; k < GP; k++) { s += red[R_PE + k]; } }
   red[R_SC + E_NUEVOS] = s;
   red[R_SC + E_ACTIVO] = select(0.0, 1.0, s > 0.5);
 }
@@ -761,6 +828,7 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   for (var k = 0u; k < GV; k++) { dg += red[R_PB + k]; }
   for (var k = 0u; k < GT; k++) { dg += red[R_PC + k]; }
   for (var k = 0u; k < GC; k++) { dg += red[R_PD + k]; }
+  if (PROPIO) { for (var k = 0u; k < GP; k++) { dg += red[R_PE + k]; } }
   red[R_SC + E_DG] = dg;
   if (dg <= 0.0) { red[R_SC + E_PROBANDO] = 0.0; } else { red[R_SC + E_ALFA_LS] = 0.5 * red[R_SC + E_ALFA_LS]; }
 }

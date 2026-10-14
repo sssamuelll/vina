@@ -25,6 +25,18 @@ export interface PaqueteGpu {
   nch: number;
   /** nodos del BVH del cuerpo; 0 sin cuerpo */
   ncu: number;
+  /** la tela contra sí misma (sistema.ts, armarParesPropios) */
+  propio: boolean;
+  /** pares que caben por cuadro */
+  maxPares: number;
+  /** puntos de la rejilla: la tela (la Tarea 8 del plan de la parte 2 suma los vértices del cuerpo) */
+  np: number;
+  /** entradas de la tabla de hash de la rejilla: una potencia de 2, al menos dos por punto */
+  nceldas: number;
+  /** la separación entre capas (m) */
+  sepPropia: number;
+  /** la arista media del patrón (m): el lado mínimo de la celda */
+  aristaMedia: number;
   f32: {
     x: Float32Array;
     masa: Float32Array;
@@ -79,15 +91,27 @@ export interface PaqueteGpu {
     costuraK: Uint32Array;
     /** el puntero de escape de cada nodo del BVH del cuerpo */
     cuSalto: Uint32Array;
+    /** por vértice, él y sus compañeros de costura (sistema.ts, excluidos), en CSR */
+    exOff: Uint32Array;
+    exIdx: Uint32Array;
   };
 }
 
-export function empaquetar(s: SistemaTela): PaqueteGpu {
+export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): PaqueteGpu {
   const n = s.n, nt = s.tris.length / 3, { bisagras, bisDeTri, K, nh } = s.placa, c = s.costuras, nc = c.n;
   if (nt >= 1 << 26 || nc >= 1 << 26) throw new Error('empaquetar: más triángulos o puntos de costura de los que caben en un código de bloque');
   const cuerpos = s.obstaculos.flatMap((o) => (o.tipo === 'cuerpo' ? [o.cuerpo] : []));
   if (cuerpos.length > 1) throw new Error('empaquetar: la GPU lleva un solo cuerpo');
   const bvh = cuerpos[0]?.bvh;
+  // con E6, un vértice forma par con una cara por cada capa que tiene a menos del radio: 16 por vértice sobran
+  const maxPares = op.maxPares ?? Math.max(64, 16 * n);
+  const np = n;
+  let nceldas = 1;
+  while (nceldas < 2 * np) nceldas *= 2;
+  // los índices de pares, listas y rejilla viajan como enteros exactos en f32
+  if (4 * maxPares >= 1 << 24 || np >= 1 << 24 || nceldas >= 1 << 24) throw new Error('empaquetar: más pares o puntos de los que la GPU guarda como enteros exactos');
+  const exOff = new Uint32Array(n + 1);
+  for (let i = 0; i < n; i++) exOff[i + 1] = exOff[i] + s.excluidos[i].length;
 
   // las ranuras de aporte al gradiente que suma cada vértice
   const aportes: number[][] = Array.from({ length: n }, () => []);
@@ -178,6 +202,12 @@ export function empaquetar(s: SistemaTela): PaqueteGpu {
     nc,
     nch: s.placa.costura.length,
     ncu: bvh?.nodeCount ?? 0,
+    propio: s.aj.contactoPropio,
+    maxPares,
+    np,
+    nceldas,
+    sepPropia: s.sepPropia,
+    aristaMedia: s.aristaMedia,
     f32: {
       x: Float32Array.from(s.x),
       masa: Float32Array.from(s.masa),
@@ -212,6 +242,8 @@ export function empaquetar(s: SistemaTela): PaqueteGpu {
       costura: Uint32Array.from({ length: 3 * nc }, (_, k) => c.vertices(Math.floor(k / 3))[k % 3]),
       costuraK: Uint32Array.from(s.placa.costura, (k) => k.o),
       cuSalto: bvh?.skip ?? new Uint32Array(0),
+      exOff,
+      exIdx: Uint32Array.from(s.excluidos.flat()),
     },
   };
 }
