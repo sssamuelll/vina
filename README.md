@@ -7,11 +7,20 @@
 
 Pattern-making CAD in the browser: an editable 2D pattern, real-time cloth on an avatar, and a copilot that knows a dart from a notch. Free, MIT, in the making.
 
-![The avatar wearing a T-shirt in Vina's 3D viewer, with the strain map on](home/img/fig-02@1x.webp)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pattern-to-drape-dark.webp">
+    <img src="docs/assets/pattern-to-drape-light.webp" width="843" alt="Animation of a skirt pattern on a drafting board and the same pattern sewn and draped on a dress form. The pattern's hip changes from 104 to 93 to 114 cm, the cloth settles again each time, and a meter beside the form reads its stretch.">
+  </picture>
+</p>
 
-**[vina.sdar.dev](https://vina.sdar.dev/)** · [vina.sdar.dev/es/](https://vina.sdar.dev/es/) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/specs/ARCHITECTURE.md)
+**Fig. 1.** A reduced model of Vina's drape. A skirt pattern is cut twice, sewn at the sides and draped on a dress form. Each crossing of the toile's grid is a particle, stepped with XPBD and the solver constants Vina uses (15 substeps a frame, damping 0.99). The pattern's hip goes from 104 to 93 to 114 cm, and the meter reads the worst row's stretch against the fit map. Sewing is shown at ⅛ speed.
+
+**[Open the workshop](https://vina.sdar.dev/app/)** · [vina.sdar.dev](https://vina.sdar.dev/) · [Español](https://vina.sdar.dev/es/) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/specs/ARCHITECTURE.md)
 
 ## What it does today
+
+![The avatar wearing a T-shirt in Vina's 3D viewer, with the strain map on](home/img/fig-02@1x.webp)
 
 <!-- hoy -->
 - **Drafting.** Pen, rectangle, notches and seam allowances, with the grainline drawn and the dimensions written where they measure. Darts come in with your DXF. · [`dock2dTools.ts`](src/components/shell/dock2dTools.ts), [`tiposDeEsquina.ts`](src/utils/seam/tiposDeEsquina.ts), [`notchAnchor.ts`](src/utils/notchAnchor.ts), [`grainLine.ts`](src/utils/grainLine.ts), [`dartEntity.ts`](src/utils/dartEntity.ts)
@@ -35,7 +44,7 @@ Each line links to the code that makes it true; a test fails if that code goes a
 - Fabrics measured from cloth. Thirty-two presets today. · [#1005](https://github.com/sssamuelll/vina/issues/1005)
 <!-- /en-construccion -->
 
-The workshop's interface is in Spanish. Contributor docs and code are in English.
+The workshop's interface is in Spanish, for professional pattern makers. Contributor docs and code are in English.
 
 ## Send a pattern
 
@@ -61,7 +70,7 @@ The copilot runs with your own key (Anthropic, OpenAI, DeepSeek or a local Ollam
 
 ## Tech stack
 
-React 18 · Redux Toolkit + Zustand · Three.js (WebGPU renderer) · Vite 6 · Rust + wasm-pack · Vitest + Playwright. TypeScript in strict mode throughout.
+React 18 · Redux Toolkit · Three.js (WebGPU renderer) · Vite 6 · Rust + wasm-pack · Vitest + Playwright. TypeScript in strict mode throughout.
 
 ## Architecture at a glance
 
@@ -70,11 +79,11 @@ src/
 ├── components/   # React UI: shell, 2D PatternEditor, 3D Viewport
 ├── copilot/      # AI copilot: agentic loop, tools, knowledge
 ├── store/        # Redux slices + middleware
-├── stores/       # Zustand state
 ├── utils/        # engines: cloth/, dxf/, grading/, nesting/, seam/, mesh/
 └── workers/      # Web Worker pool (WASM + CPU solvers)
 
 crates/xpbd-wasm/ # Rust XPBD cloth solver → public/wasm/
+mcp/, studio/     # the MCP bridge and its npm package, vina-studio
 home/             # the public home: template, copy, data, assets
 docs/             # specs, research, RFCs, historical plans
 ```
@@ -89,10 +98,6 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the commit gate and con
 npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui
 ```
 
-## Language
-
-The application is in Spanish, for professional pattern makers; an English interface is [in the making](https://github.com/sssamuelll/vina/issues/964). Project documentation and code are in English.
-
 ---
 
-MIT Licensed.
+MIT licensed. Third-party notices are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
