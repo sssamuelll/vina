@@ -385,7 +385,8 @@ El banco corre también sobre el XPBD actual, para medir cada entrega contra él
 
 ## 7. Enmiendas de la entrega 4
 
-Las aprobó Samuel con los planes de la entrega 4 y mandan sobre las secciones que citan.
+Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el plan de la parte 1; E5 y E6 vienen con
+el plan de la parte 2, que mandó a ejecutar sin objetarlas, y esperan su confirmación.
 
 - **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
   patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.
@@ -405,3 +406,8 @@ Las aprobó Samuel con los planes de la entrega 4 y mandan sobre las secciones q
   la cara cerrada del triángulo (con 1/1000 de tolerancia, que deja entrar al que cae justo sobre un borde o un
   vértice): los vecinos de la misma capa miran la tela de canto y nunca sostienen nada. Plan
   `2026-10-14-la-prenda-en-la-gpu.md`.
+- **R13 (§4.3.1, se aparta de «con anticipación»).** Los pares de un vértice del cuerpo contra un triángulo de tela no
+  se anticipan: entran cuando el vértice atravesó la tela por la cara y siguen mientras la sostiene, a menos de la
+  separación. Anticiparlos los hacía competir con los planos de los vértices de tela sobre un cuerpo liso (la tela se
+  trababa o temblaba). *Costo:* una punta que entra muy rápido se rescata un cuadro tarde. Plan
+  `2026-10-14-la-prenda-en-la-cpu.md`; espera la confirmación de Samuel.
