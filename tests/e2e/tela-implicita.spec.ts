@@ -35,10 +35,12 @@ async function correr(page: Page, consulta: string): Promise<ResultadoTela> {
 test.describe('La tela nueva en la GPU @gpu-local', () => {
   test.setTimeout(300_000);
 
-  test('da lo mismo que la CPU tras 3 cuadros (disco de 10 mm)', async ({ page }) => {
-    const r = await correr(page, 'modo=paridad&escena=chica&cg=50&cuadros=3');
-    expect(r.dif?.maxima).toBeLessThan(1e-4);
-  });
+  for (const escena of ['chica', 'apoyada']) {
+    test(`da lo mismo que la CPU tras 3 cuadros (${escena})`, async ({ page }) => {
+      const r = await correr(page, `modo=paridad&escena=${escena}&cg=50&cuadros=3`);
+      expect(r.dif?.maxima).toBeLessThan(1e-4);
+    });
+  }
 
   for (const cg of [20, 50]) {
     test(`velocidad con unos 29 mil vértices y ${cg} iteraciones`, async ({ page }) => {

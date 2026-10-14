@@ -42,6 +42,7 @@ export class MotorGpu {
     const vf = new Float32Array(d.vf.total);
     vf.set(p.f32.x, d.vf.XT);
     vf.set(p.f32.masa, d.vf.MASA);
+    vf.set(Float32Array.from(s.v), d.vf.V);
     const tf = new Float32Array(d.tf.total);
     tf.set(p.f32.coef, d.tf.COEF);
     tf.set(p.f32.K, d.tf.KP);

@@ -2,8 +2,7 @@
  * Un cuadro del motor implícito (spec 2026-10-13 §4.2.1): Euler implícito resuelto con un paso de Newton
  * de Gauss-Newton desde el estado actual y gradiente conjugado precondicionado por bloques 3×3, con los planos
  * de contacto del cuadro (E4 del plan de la entrega 4), su anticipación (una ronda más) y búsqueda en línea
- * sobre G con la misma energía de contacto, de un solo lado. La GPU (gpu/wgsl.ts) mide todavía el contacto por
- * distancia: la parte 2 de la entrega 4 la lleva a los planos.
+ * sobre G con la misma energía de contacto, de un solo lado. La GPU (gpu/wgsl.ts) hace el mismo cuadro.
  */
 import type { SistemaTela } from './sistema';
 

@@ -18,6 +18,12 @@ describe('el WGSL del motor', () => {
     expect(fuente).not.toMatch(/Infinity|NaN/);
   });
 
+  it('la búsqueda en línea usa los planos fijos: posPrueba no consulta el obstáculo (E4)', () => {
+    const cuerpo = fuente.slice(fuente.indexOf('fn posPrueba('), fuente.indexOf('fn anguloPrueba('));
+    expect(cuerpo).not.toMatch(/masCercano/);
+    expect(cuerpo).toMatch(/energiaPlano/);
+  });
+
   it('sin obstáculos, nadie queda en contacto', () => {
     const sin = wgslObstaculos([]);
     expect(sin).toMatch(/fn masCercano/);

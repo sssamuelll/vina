@@ -4,12 +4,12 @@
  *
  * DEV-only: App.tsx la monta con `?testScene=tela-implicita` y reemplaza la app entera. La consume
  * tests/e2e/tela-implicita.spec.ts (@gpu-local). Parámetros: `modo` = paridad | velocidad | quietud;
- * `escena` = chica (disco Cusick de 10 mm) | grande (disco de 48 cm con malla de 5 mm, del tamaño de la
- * camiseta); `cg` = iteraciones por ronda; `cuadros`; `anticipar=0` y `busqueda=0` apagan esos pasos para
- * aislar una diferencia. Publica el resultado en `window.__TELA_IMPLICITA__`.
+ * `escena` = una de ESCENAS (chica: disco Cusick de 10 mm; grande: disco de 48 cm con malla de 5 mm, del tamaño de
+ * la camiseta; y las escenas de paridad del banco); `cg` = iteraciones por ronda; `cuadros`; `anticipar=0` y
+ * `busqueda=0` apagan esos pasos para aislar una diferencia. Publica el resultado en `window.__TELA_IMPLICITA__`.
  */
 import { useEffect, useState } from 'react';
-import { escenaCusick, TELA_DE_LABORATORIO } from '../../utils/cloth/implicito/banco/escenas';
+import { escenaApoyada, escenaCusick, TELA_DE_LABORATORIO, type Escena } from '../../utils/cloth/implicito/banco/escenas';
 import { SistemaTela } from '../../utils/cloth/implicito/sistema';
 import { pasoImplicito } from '../../utils/cloth/implicito/paso';
 import { VigiaDeQuietud } from '../../utils/cloth/implicito/quietud';
@@ -27,18 +27,33 @@ interface Resultado {
   error?: string;
 }
 
+/** Las escenas del harness; cada tarea del plan de la parte 2 suma la suya. */
+const ESCENAS: Record<string, () => Escena | Promise<Escena>> = {
+  chica: () => escenaCusick(10),
+  grande: () => escenaCusick(5, 480),
+  apoyada: () => escenaApoyada(),
+};
+
 async function correr(q: URLSearchParams): Promise<Resultado> {
   const modo = q.get('modo') ?? 'paridad';
   const escena = q.get('escena') ?? 'chica';
-  const e = escena === 'grande' ? escenaCusick(5, 480) : escenaCusick(10);
+  const armar = ESCENAS[escena];
+  if (!armar) throw new Error(`escena desconocida: ${escena} (hay ${Object.keys(ESCENAS).join(', ')})`);
+  const e = await armar();
   const ajustes = {
     maxCG: Number(q.get('cg') ?? 50),
     // en la paridad, todas las iteraciones en las dos: la tolerancia no decide nada
     tolCG: modo === 'paridad' ? 0 : 1e-4,
     anticipar: q.get('anticipar') !== '0',
     busqueda: q.get('busqueda') !== '0',
+    // el contacto propio llega a la GPU en la Tarea 7 del plan de la parte 2
+    contactoPropio: false,
   };
-  const nuevo = () => new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: e.obstaculos, ajustes });
+  const nuevo = () => {
+    const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: e.obstaculos, hilo: e.hilo, costuras: e.costuras, franja: e.franja, ajustes });
+    if (e.v) s.v.set(e.v);
+    return s;
+  };
   const s = nuevo();
   const adaptador = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
   if (!adaptador) throw new Error('este navegador no tiene WebGPU');

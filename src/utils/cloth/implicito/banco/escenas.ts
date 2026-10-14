@@ -5,7 +5,7 @@
 import { mallaDeContorno, type MallaDeTela } from '../malla';
 import type { Obstaculo } from '../obstaculos';
 import type { OpcionesSistema } from '../sistema';
-import type { TelaFisica } from '../tela';
+import { separacion, telaSI, type TelaFisica } from '../tela';
 import type { CollisionMeshData } from '../../collisionMesh';
 
 /**
@@ -50,6 +50,12 @@ export function escenaCusick(aristaMm: number, radioMm = 150): Escena {
     malla: mallaDeContorno(circulo(radioMm, Math.max(96, Math.round(radioMm / 3))), aristaMm, CUSICK.alturaInicial),
     obstaculos: [{ tipo: 'pedestal', radio: CUSICK.radioPedestal, tapa: CUSICK.tapa }],
   };
+}
+
+/** Una lámina de 100 mm apoyada en el suelo, 0,2 mm dentro de su separación y corriendo a 5 cm/s: plano con fricción desde el primer cuadro. */
+export function escenaApoyada(): Escena {
+  const malla = mallaDeContorno(rectangulo(-50, -50, 50, 50), 10, separacion(telaSI(TELA_DE_LABORATORIO)) - 0.0002);
+  return { malla, obstaculos: [{ tipo: 'plano', altura: 0 }], v: Float64Array.from(malla.x, (_, k) => (k % 3 === 0 ? 0.05 : 0)) };
 }
 
 /**
