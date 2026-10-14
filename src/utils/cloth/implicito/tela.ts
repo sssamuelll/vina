@@ -24,6 +24,10 @@ export interface TelaFisica {
   bUrdimbre: number;
   /** µN·m */
   bBies: number;
+  /** coeficiente de Coulomb de la tela contra el cuerpo (§4.3.1) */
+  friccionCuerpo: number;
+  /** coeficiente de Coulomb de la tela contra sí misma (§4.3.2) */
+  friccionTela: number;
 }
 
 /** La misma tela en SI: kg/m², m, N/m y N·m. */
@@ -37,6 +41,8 @@ export interface TelaSI {
   bTrama: number;
   bUrdimbre: number;
   bBies: number;
+  friccionCuerpo: number;
+  friccionTela: number;
 }
 
 export function telaSI(t: TelaFisica): TelaSI {
@@ -50,6 +56,8 @@ export function telaSI(t: TelaFisica): TelaSI {
     bTrama: t.bTrama * 1e-6,
     bUrdimbre: t.bUrdimbre * 1e-6,
     bBies: t.bBies * 1e-6,
+    friccionCuerpo: t.friccionCuerpo,
+    friccionTela: t.friccionTela,
   };
 }
 

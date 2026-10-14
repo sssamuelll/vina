@@ -9,10 +9,11 @@ import type { CollisionMeshData } from '../../collisionMesh';
 
 /**
  * Tela de laboratorio con números redondos, para las pruebas y las escenas públicas. No es una tela
- * medida: las medidas viven en la referencia privada del banco.
+ * medida: las medidas viven en la referencia privada del banco. La fricción es la del jersey de algodón de la
+ * biblioteca (physicalFabric.ts, `cotton-jersey`).
  */
 export const TELA_DE_LABORATORIO: TelaFisica = {
-  gramaje: 200, grosor: 0.5, kTrama: 300, kUrdimbre: 600, kCizalla: 50, pandeo: 1, bTrama: 2, bUrdimbre: 5, bBies: 3,
+  gramaje: 200, grosor: 0.5, kTrama: 300, kUrdimbre: 600, kCizalla: 50, pandeo: 1, bTrama: 2, bUrdimbre: 5, bBies: 3, friccionCuerpo: 0.4, friccionTela: 0.45,
 };
 
 /** Ensayo Cusick (ISO 9073-9): disco de 30 cm sobre pedestal de 18 cm, 5 mm por encima de la tapa. */

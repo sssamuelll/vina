@@ -7,7 +7,7 @@ import { elasticaExacta } from '../banco/elastica';
 
 describe('el banco: escenas y medidas', () => {
   it('la tela pasa a SI: g/m² a kg/m², mm a m y µN·m a N·m', () => {
-    const t = telaSI({ gramaje: 200, grosor: 0.5, kTrama: 300, kUrdimbre: 600, kCizalla: 50, pandeo: 1, bTrama: 2, bUrdimbre: 5, bBies: 3 });
+    const t = telaSI({ gramaje: 200, grosor: 0.5, kTrama: 300, kUrdimbre: 600, kCizalla: 50, pandeo: 1, bTrama: 2, bUrdimbre: 5, bBies: 3, friccionCuerpo: 0.4, friccionTela: 0.45 });
     expect(t.densidad).toBeCloseTo(0.2, 12);
     expect(t.grosor).toBeCloseTo(0.0005, 12);
     expect(t.bUrdimbre).toBeCloseTo(5e-6, 15);

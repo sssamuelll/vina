@@ -1,11 +1,11 @@
 /**
  * Un cuadro del motor implícito (spec 2026-10-13 §4.2.1): Euler implícito resuelto con un paso de Newton
- * de Gauss-Newton desde el estado actual y gradiente conjugado precondicionado por bloques 3×3, con
- * anticipación de contactos (una ronda más) y búsqueda en línea sobre G. La GPU (gpu/wgsl.ts) hace lo
- * mismo, en el mismo orden.
+ * de Gauss-Newton desde el estado actual y gradiente conjugado precondicionado por bloques 3×3, con los planos
+ * de contacto del cuadro (E4 del plan de la entrega 4), su anticipación (una ronda más) y búsqueda en línea
+ * sobre G con la misma energía de contacto, de un solo lado. La GPU (gpu/wgsl.ts) mide todavía el contacto por
+ * distancia: la parte 2 de la entrega 4 la lleva a los planos.
  */
-import { distancia, masCercano } from './obstaculos';
-import type { ContactoActivo, SistemaTela } from './sistema';
+import type { SistemaTela } from './sistema';
 
 export interface InfoPaso {
   /** iteraciones de gradiente conjugado de las dos rondas */
@@ -21,12 +21,10 @@ export interface InfoPaso {
 
 export function pasoImplicito(s: SistemaTela): InfoPaso {
   const { n, aj } = s;
-  const { h, aire, kContacto, maxCG, tolCG } = aj;
+  const { h, aire, maxCG, tolCG } = aj;
   s.xt.set(s.x);
   s.linealizar();
-  const contactos = s.contactosActuales();
-  const enContacto = new Uint8Array(n);
-  for (const c of contactos) enContacto[c.i] = 1;
+  s.armarContactos();
 
   // bloques de la diagonal sin el contacto: elástica + (m/h² + aire·m/h)·I
   const base = new Float64Array(9 * n), diag = new Float64Array(n);
@@ -40,12 +38,7 @@ export function pasoImplicito(s: SistemaTela): InfoPaso {
   const A = (p: Float64Array, out: Float64Array) => {
     s.hessianaPor(p, out);
     for (let i = 0; i < n; i++) for (let d = 0; d < 3; d++) out[3 * i + d] += diag[i] * p[3 * i + d];
-    for (const c of contactos) {
-      const pn = kContacto * (c.nx * p[3 * c.i] + c.ny * p[3 * c.i + 1] + c.nz * p[3 * c.i + 2]);
-      out[3 * c.i] += pn * c.nx;
-      out[3 * c.i + 1] += pn * c.ny;
-      out[3 * c.i + 2] += pn * c.nz;
-    }
+    s.sumarContactosPor(p, out);
     for (let i = 0; i < n; i++) if (s.fijo[i]) out[3 * i] = out[3 * i + 1] = out[3 * i + 2] = 0;
   };
 
@@ -53,24 +46,18 @@ export function pasoImplicito(s: SistemaTela): InfoPaso {
   const tmp = { z: new Float64Array(3 * n), p: new Float64Array(3 * n), Ap: new Float64Array(3 * n) };
   let cg = 0, anticipados = 0;
   for (let ronda = 0; ronda < 2; ronda++) {
-    s.residuo(contactos, r);
-    precondicionador(base, contactos, kContacto, Pinv);
+    s.residuo(r);
+    // el precondicionador: las inversas de los bloques de la diagonal, con los planos
+    Pinv.set(base);
+    s.sumarBloquesDeContacto(Pinv);
+    for (let o = 0; o < Pinv.length; o += 9) invertir3(Pinv, o);
     cg += gradienteConjugado(A, r, Pinv, dx, maxCG, tolCG, tmp);
     if (ronda === 1 || !aj.anticipar) break;
-    // anticipación: los vértices que este paso metería en un obstáculo entran al sistema (§4.2.1, paso 4)
-    for (let i = 0; i < n; i++) {
-      if (s.fijo[i] || enContacto[i]) continue;
-      const c = masCercano(s.obstaculos, s.x[3 * i] + dx[3 * i], s.x[3 * i + 1] + dx[3 * i + 1], s.x[3 * i + 2] + dx[3 * i + 2]);
-      if (c === null || s.sep - c.d <= 0) continue;
-      const d0 = distancia(s.obstaculos[c.k], s.x[3 * i], s.x[3 * i + 1], s.x[3 * i + 2]).d;
-      contactos.push({ i, k: c.k, nx: c.nx, ny: c.ny, nz: c.nz, p0: s.sep - d0 });
-      enContacto[i] = 1;
-      anticipados++;
-    }
+    anticipados = s.anticiparContactos(dx);
     if (anticipados === 0) break;
   }
 
-  // búsqueda en línea: el paso no puede subir G (§4.2.1, paso 5)
+  // búsqueda en línea: el paso no puede subir G (§4.2.1, paso 5), con los mismos planos de un solo lado
   const G0 = s.energiaIncremental(s.xt);
   const prueba = new Float64Array(3 * n);
   let alfa = 1, G1 = G0;
@@ -90,16 +77,6 @@ export function pasoImplicito(s: SistemaTela): InfoPaso {
   }
   s.alTerminarCuadro();
   return { cg, anticipados, alfa, G0, G1 };
-}
-
-/** Inversas de los bloques de la diagonal, con el contacto de cada vértice: kContacto·n·nᵀ. */
-function precondicionador(base: Float64Array, contactos: readonly ContactoActivo[], kc: number, Pinv: Float64Array): void {
-  Pinv.set(base);
-  for (const c of contactos) {
-    const nn = [c.nx, c.ny, c.nz], o = 9 * c.i;
-    for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) Pinv[o + 3 * a + b] += kc * nn[a] * nn[b];
-  }
-  for (let o = 0; o < Pinv.length; o += 9) invertir3(Pinv, o);
 }
 
 /** Invierte en su lugar la matriz 3×3 (fila mayor) que empieza en o; deja ceros si es singular. */

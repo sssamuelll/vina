@@ -16,6 +16,7 @@ import {
   imprimirCusick,
   imprimirVoladizo,
   leerReferencias,
+  telaDeLaReferencia,
   type Corredor,
   type Referencias,
 } from './_banco';
@@ -23,7 +24,7 @@ import { PANDEO_CALIBRADO } from '../src/utils/cloth/implicito/tela';
 import { correrImplicito } from './motorImplicito';
 
 const MOTORES: Record<string, (ref: Referencias, args: Map<string, string>) => Corredor> = {
-  implicito: (ref, args) => correrImplicito({ ...ref.tela, pandeo: Number(args.get('pandeo') || PANDEO_CALIBRADO) }),
+  implicito: (ref, args) => correrImplicito(telaDeLaReferencia(ref, Number(args.get('pandeo') || PANDEO_CALIBRADO))),
   xpbd: () => correrXpbd,
 };
 

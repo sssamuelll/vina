@@ -22,7 +22,7 @@ export interface Referencias {
   /** ángulo de Peirce en grados por «hilo-volado»: "urdimbre-15", "trama-40"… */
   voladizo: Record<string, { angulo: number }>;
   /** la tela de la referencia; el pandeo lo pone el banco */
-  tela: Omit<TelaFisica, 'pandeo'>;
+  tela: Omit<TelaFisica, 'pandeo' | 'friccionCuerpo' | 'friccionTela'>;
 }
 
 export function carpetaPrivada(): string {
@@ -33,6 +33,13 @@ export function carpetaPrivada(): string {
 
 export function leerReferencias(): Referencias {
   return JSON.parse(fs.readFileSync(path.join(carpetaPrivada(), 'referencias.json'), 'utf8')) as Referencias;
+}
+
+/** La tela de la referencia con su pandeo y la fricción del jersey de la biblioteca: la referencia no la publica. */
+export function telaDeLaReferencia(ref: Referencias, pandeo: number): TelaFisica {
+  const jersey = getPhysicalFabric('cotton-jersey');
+  if (!jersey) throw new Error('falta cotton-jersey en la biblioteca');
+  return { ...ref.tela, pandeo, friccionCuerpo: jersey.frictionBody, friccionTela: jersey.friction };
 }
 
 /** Lo que devuelve un motor después de correr una escena. */

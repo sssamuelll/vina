@@ -3,11 +3,12 @@
  * placa), las masas, los obstáculos y el estado. El cuadro minimiza
  *   G(x) = ½·|x − y|²_M / h² + ½·aire·|x − x_t|²_M / h + E(x) + contacto,  con y = x_t + h·v_t + h²·g.
  */
+import { energiaDePlano, rigidezDeFriccion, type PlanoDeContacto } from './contactos';
 import { Costuras, type BisagraDeCostura, type PuntoDeCostura } from './costuras';
 import { aMarcoDelHilo, type MallaDeTela } from './malla';
 import { CAPAS_DEL_MARGEN, FLEXION_DEL_MARGEN } from './margen';
 import { Membrana } from './membrana';
-import { masCercano, type Obstaculo } from './obstaculos';
+import { masCercano, RADIO_DE_BUSQUEDA, type Obstaculo } from './obstaculos';
 import { Placa } from './placa';
 import { prepararReposo } from './reposo';
 import { separacion, telaSI, type TelaFisica, type TelaSI } from './tela';
@@ -66,16 +67,6 @@ export interface OpcionesSistema {
   franja?: Uint8Array;
 }
 
-/** Un vértice en contacto: obstáculo k, su normal y la penetración p0 = separación − distancia al empezar el paso. */
-export interface ContactoActivo {
-  i: number;
-  k: number;
-  nx: number;
-  ny: number;
-  nz: number;
-  p0: number;
-}
-
 export class SistemaTela {
   readonly n: number;
   readonly tela: TelaSI;
@@ -103,6 +94,9 @@ export class SistemaTela {
    * la que mide la quietud, porque una tela trabada (α = 0) no se mueve pero sigue pidiendo moverse
    */
   readonly vPedida: Float64Array;
+  /** los planos de contacto del cuadro en curso (E4): los de x_t y los anticipados */
+  contactos: PlanoDeContacto[] = [];
+  private readonly enContacto: Uint8Array;
 
   constructor(malla: MallaDeTela, tela: TelaFisica, op: OpcionesSistema = {}) {
     this.n = malla.x.length / 3;
@@ -126,6 +120,7 @@ export class SistemaTela {
     this.xt = Float64Array.from(malla.x);
     this.v = new Float64Array(3 * this.n);
     this.vPedida = new Float64Array(3 * this.n);
+    this.enContacto = new Uint8Array(this.n);
   }
 
   /** La coordenada d de y = x_t + h·v + h²·g del vértice i; un empotrado no se mueve. */
@@ -136,17 +131,26 @@ export class SistemaTela {
     return this.xt[q] + h * this.v[q] + (d === 1 ? h * h * gravedad : 0);
   }
 
-  /** Inercia, aire y contacto del vértice i en las posiciones x. */
+  /** Inercia y aire del vértice i en las posiciones x. */
   energiaVertice(i: number, x: Float64Array): number {
-    const { h, aire, kContacto } = this.aj, m = this.masa[i];
+    const { h, aire } = this.aj, m = this.masa[i];
     let E = 0;
     for (let d = 0; d < 3; d++) {
       const q = x[3 * i + d];
       E += (m / (2 * h * h)) * (q - this.prediccion(i, d)) ** 2 + ((aire * m) / (2 * h)) * (q - this.xt[3 * i + d]) ** 2;
     }
-    const c = masCercano(this.obstaculos, x[3 * i], x[3 * i + 1], x[3 * i + 2]);
-    const p = c === null ? 0 : this.sep - c.d;
-    return p > 0 ? E + 0.5 * kContacto * p * p : E;
+    return E;
+  }
+
+  /** Los planos del cuadro en x, de un solo lado, con su fricción (contactos.ts). */
+  energiaContactos(x: Float64Array): number {
+    const kc = this.aj.kContacto;
+    let E = 0;
+    for (const c of this.contactos) {
+      const q = 3 * c.i;
+      E += energiaDePlano(c, kc, x[q] - this.xt[q], x[q + 1] - this.xt[q + 1], x[q + 2] - this.xt[q + 2]);
+    }
+    return E;
   }
 
   energiaElastica(x: Float64Array = this.x): number {
@@ -155,7 +159,7 @@ export class SistemaTela {
 
   /** G(x) del cuadro en curso. */
   energiaIncremental(x: Float64Array = this.x): number {
-    let E = this.energiaElastica(x);
+    let E = this.energiaElastica(x) + this.energiaContactos(x);
     for (let i = 0; i < this.n; i++) E += this.energiaVertice(i, x);
     return E;
   }
@@ -200,25 +204,81 @@ export class SistemaTela {
     }
   }
 
-  /** Los vértices libres que están a menos de la separación de un obstáculo, en las posiciones actuales. */
-  contactosActuales(): ContactoActivo[] {
-    const lista: ContactoActivo[] = [];
+  /**
+   * Los planos de los vértices libres a menos de la separación de un obstáculo en x_t (§4.2.1, E4), con la
+   * fricción de la normal λ = kc·p0 y la velocidad tangencial del cuadro anterior.
+   */
+  armarContactos(): void {
+    this.contactos = [];
+    this.enContacto.fill(0);
+    const { kContacto, h } = this.aj, mu = this.tela.friccionCuerpo;
     for (let i = 0; i < this.n; i++) {
       if (this.fijo[i]) continue;
-      const c = masCercano(this.obstaculos, this.x[3 * i], this.x[3 * i + 1], this.x[3 * i + 2]);
-      if (c !== null && this.sep - c.d > 0) lista.push({ i, k: c.k, nx: c.nx, ny: c.ny, nz: c.nz, p0: this.sep - c.d });
+      const q = 3 * i;
+      const c = masCercano(this.obstaculos, this.x[q], this.x[q + 1], this.x[q + 2], RADIO_DE_BUSQUEDA);
+      if (c === null || this.sep - c.d <= 0) continue;
+      const p0 = this.sep - c.d;
+      const vn = c.nx * this.v[q] + c.ny * this.v[q + 1] + c.nz * this.v[q + 2];
+      const vt = Math.hypot(this.v[q] - vn * c.nx, this.v[q + 1] - vn * c.ny, this.v[q + 2] - vn * c.nz);
+      this.contactos.push({ i, nx: c.nx, ny: c.ny, nz: c.nz, p0, kt: rigidezDeFriccion(mu, kContacto * p0, vt, h) });
+      this.enContacto[i] = 1;
     }
-    return lista;
   }
 
   /**
-   * out = −∇G en las posiciones actuales, con el contacto linealizado ½·kContacto·(p0 − n·Δx)² de cada
-   * vértice de `contactos` (exacto al empezar el paso, con x = x_t). Los empotrados quedan en cero. Pide
-   * `linealizar` antes.
+   * Los vértices que el paso dx metería en un obstáculo entran con el plano tangente en el punto adonde iban
+   * (§4.2.1, paso 4). Su fricción usa la normal que frena en un cuadro la penetración que el paso traía,
+   * λ = m·p/h²: sin ella, la tela que llega a un plano inclinado resbalaba sin fricción el primer cuadro.
+   * Devuelve cuántos.
    */
-  residuo(contactos: readonly ContactoActivo[], out: Float64Array): void {
+  anticiparContactos(dx: Float64Array): number {
+    let nuevos = 0;
+    const { h } = this.aj, mu = this.tela.friccionCuerpo;
+    for (let i = 0; i < this.n; i++) {
+      if (this.fijo[i] || this.enContacto[i]) continue;
+      const q = 3 * i;
+      const c = masCercano(this.obstaculos, this.x[q] + dx[q], this.x[q + 1] + dx[q + 1], this.x[q + 2] + dx[q + 2], RADIO_DE_BUSQUEDA);
+      if (c === null || this.sep - c.d <= 0) continue;
+      // la penetración en x_t respecto del plano tangente en el punto adonde iba: sep − d + n·dx
+      const p0 = this.sep - c.d + (c.nx * dx[q] + c.ny * dx[q + 1] + c.nz * dx[q + 2]);
+      const lambda = (this.masa[i] * (this.sep - c.d)) / (h * h);
+      const vn = c.nx * this.v[q] + c.ny * this.v[q + 1] + c.nz * this.v[q + 2];
+      const vt = Math.hypot(this.v[q] - vn * c.nx, this.v[q + 1] - vn * c.ny, this.v[q + 2] - vn * c.nz);
+      this.contactos.push({ i, nx: c.nx, ny: c.ny, nz: c.nz, p0, kt: rigidezDeFriccion(mu, lambda, vt, h) });
+      this.enContacto[i] = 1;
+      nuevos++;
+    }
+    return nuevos;
+  }
+
+  /** out += H·p de los planos del cuadro: kc·n·nᵀ + kt·(I − n·nᵀ). */
+  sumarContactosPor(p: Float64Array, out: Float64Array): void {
+    const kc = this.aj.kContacto;
+    for (const c of this.contactos) {
+      const q = 3 * c.i, pn = c.nx * p[q] + c.ny * p[q + 1] + c.nz * p[q + 2];
+      out[q] += kc * pn * c.nx + c.kt * (p[q] - pn * c.nx);
+      out[q + 1] += kc * pn * c.ny + c.kt * (p[q + 1] - pn * c.ny);
+      out[q + 2] += kc * pn * c.nz + c.kt * (p[q + 2] - pn * c.nz);
+    }
+  }
+
+  /** B[9i..9i+8] += el bloque de cada plano del cuadro. */
+  sumarBloquesDeContacto(B: Float64Array): void {
+    const kc = this.aj.kContacto;
+    for (const c of this.contactos) {
+      const n = [c.nx, c.ny, c.nz], o = 9 * c.i;
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) B[o + 3 * a + b] += (kc - c.kt) * n[a] * n[b] + (a === b ? c.kt : 0);
+    }
+  }
+
+  /**
+   * out = −∇G en las posiciones actuales, con cada plano del cuadro de dos lados, ½·kc·(p0 − n·u)², y su
+   * fricción, ½·kt·|u − (n·u)·n|², con u = x − x_t: en la solución el plano no suelta (E4); en la búsqueda en
+   * línea, sí. Los empotrados quedan en cero. Pide `linealizar` y `armarContactos` antes.
+   */
+  residuo(out: Float64Array): void {
     this.gradienteElastico(out);
-    const { h, aire, kContacto } = this.aj;
+    const { h, aire, kContacto: kc } = this.aj;
     for (let i = 0; i < this.n; i++) {
       const m = this.masa[i];
       for (let d = 0; d < 3; d++) {
@@ -226,10 +286,13 @@ export class SistemaTela {
         out[q] = -(out[q] + (m / (h * h)) * (this.x[q] - this.prediccion(i, d)) + ((aire * m) / h) * (this.x[q] - this.xt[q]));
       }
     }
-    for (const c of contactos) {
-      out[3 * c.i] += kContacto * c.p0 * c.nx;
-      out[3 * c.i + 1] += kContacto * c.p0 * c.ny;
-      out[3 * c.i + 2] += kContacto * c.p0 * c.nz;
+    for (const c of this.contactos) {
+      const q = 3 * c.i;
+      const ux = this.x[q] - this.xt[q], uy = this.x[q + 1] - this.xt[q + 1], uz = this.x[q + 2] - this.xt[q + 2];
+      const un = c.nx * ux + c.ny * uy + c.nz * uz, f = kc * (c.p0 - un);
+      out[q] += f * c.nx - c.kt * (ux - un * c.nx);
+      out[q + 1] += f * c.ny - c.kt * (uy - un * c.ny);
+      out[q + 2] += f * c.nz - c.kt * (uz - un * c.nz);
     }
     for (let i = 0; i < this.n; i++) if (this.fijo[i]) out[3 * i] = out[3 * i + 1] = out[3 * i + 2] = 0;
   }
