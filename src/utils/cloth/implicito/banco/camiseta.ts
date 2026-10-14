@@ -15,7 +15,7 @@ import { meshPiece } from '../../../mesh';
 import { resolveArrangementWithFrames } from '../../arrangement/arrangementBinding';
 import { seamInitDataToPairs, type PieceWithOutline } from '../../seamPairs';
 import { seamsToInitData } from '../../../../components/Viewport3D/costurasDeLaSimulacion';
-import type { BodyMeasurements, PatternPiece, Seam } from '../../../../types/types';
+import type { BodyMeasurements, InternalLineType, PatternPiece, Seam } from '../../../../types/types';
 import { buildLinearBVH } from '../../gpu/bvh';
 import type { BisagraDeCostura, PuntoDeCostura } from '../costuras';
 import { CuerpoRigido } from '../cuerpo';
@@ -67,6 +67,18 @@ export function mallarPiezas(piezas: PatternPiece[], aristaMm: number): PiezaMal
   });
 }
 
+/**
+ * Las líneas internas que son tela. Las de dibujo (grano, piquetes, referencia, pespunte) no lo son, y el mallador, que
+ * las toma como restricción, siembra alrededor astillas, copias de un mismo punto y puntos fuera de la pieza: en la
+ * camiseta de María, triángulos con una flexión 1e16 veces la de los demás, que traban el paso entero.
+ */
+const LINEAS_DE_TELA: ReadonlySet<InternalLineType> = new Set<InternalLineType>(['dart', 'fold', 'pleat', 'seam']);
+
+/** Las piezas malladas para el motor implícito: como mallarPiezas, pero sin las líneas internas de dibujo. */
+export function mallarParaElMotor(piezas: PatternPiece[], aristaMm: number): PiezaMallada[] {
+  return mallarPiezas(piezas.map((p) => ({ ...p, internals: (p.internals ?? []).filter((l) => LINEAS_DE_TELA.has(l.type)) })), aristaMm);
+}
+
 /** El dibujo de una pieza mallada (m): el mallador la acuesta en y = 0 con (x, z) = (x, y) del dibujo, centrada. */
 export function patronDe(m: PiezaMallada): Float64Array {
   const n = m.vertices.length / 3, uv = new Float64Array(2 * n);
@@ -100,7 +112,7 @@ export interface Camiseta {
 
 export function camisetaDeMaria(dxf: string, aristaMm: number, tela: TelaFisica, colocar: Colocacion): Camiseta {
   const piezas = piezasDeMaria(dxf);
-  const mallas = mallarPiezas(piezas, aristaMm);
+  const mallas = mallarParaElMotor(piezas, aristaMm);
   const pares = seamInitDataToPairs(seamsToInitData(costurasDeMaria(piezas)), mallas);
   const x = colocar(piezas, mallas);
   const prenda = armarPrenda(piezas.map((p, k) => ({

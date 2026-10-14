@@ -15,8 +15,8 @@ describe('la camiseta de María para el motor implícito', () => {
   it('a 20 mm se arma: cinco piezas sin vértices sueltos, sus costuras, sus bisagras, su margen y un paso que no sube G', () => {
     const c = camisetaDeMaria(DXF, 20, TELA_DE_LABORATORIO, enFila);
     expect(c.prenda.piezas).toHaveLength(5);
-    // la tira y las dos mangas traían vértices sueltos (Tarea 1 del plan de la parte 2)
-    expect(c.prenda.piezas.filter((p) => p.local.some((j) => j < 0)).length).toBeGreaterThanOrEqual(1);
+    // sin las líneas de dibujo, el mallador no deja puntos fuera de la pieza
+    expect(c.prenda.piezas.every((p) => p.local.every((j) => j >= 0))).toBe(true);
     expect(c.lados.length).toBeGreaterThanOrEqual(15);
     expect(c.costuras.puntos.length).toBeGreaterThan(400);
     expect(c.costuras.bisagras.length).toBeGreaterThan(100);
@@ -24,6 +24,21 @@ describe('la camiseta de María para el motor implícito', () => {
     const s = new SistemaTela(c.prenda.malla, TELA_DE_LABORATORIO, { costuras: c.costuras, franja: c.franja, ajustes: { gravedad: 0 } });
     const info = pasoImplicito(s);
     expect(info.G1).toBeLessThanOrEqual(info.G0);
+  }, 120_000);
+
+  it('la malla del motor no trae astillas: la flexión de cada triángulo queda cerca de la de los demás', () => {
+    const c = camisetaDeMaria(DXF, 20, TELA_DE_LABORATORIO, enFila);
+    const s = new SistemaTela(c.prenda.malla, TELA_DE_LABORATORIO);
+    const k: number[] = [];
+    for (let t = 0; t < s.tris.length / 3; t++) {
+      let m = 0;
+      for (let q = 0; q < 9; q++) m = Math.max(m, Math.abs(s.placa.K[9 * t + q]));
+      k.push(m);
+    }
+    const mediana = [...k].sort((a, b) => a - b)[Math.floor(k.length / 2)];
+    // con las líneas de dibujo como restricción, el mallador dejaba astillas con K 1e16 veces la mediana; sin ellas, lo
+    // más alto (unas 6e5 veces) son triángulos de borde con sus dos bordes interiores casi alineados, que la placa mide mal
+    expect(Math.max(...k)).toBeLessThan(1e8 * mediana);
   }, 120_000);
 
   it('cada pieza toma la urdimbre de su línea de grano', () => {
