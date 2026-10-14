@@ -12,7 +12,7 @@ import { autoSew } from '../../autoSew';
 import { refineSeamsInWorld } from '../../autoSew/worldRefine';
 import { resolveArrangementWithFrames } from '../arrangement/arrangementBinding';
 import { meshPiece } from '../../mesh';
-import type { SeamInitData } from '../seamAssembly';
+import { seamsToInitData } from '../../../components/Viewport3D/costurasDeLaSimulacion';
 import type { PieceWithOutline } from '../seamPairs';
 import type { BodyMeasurements, PatternPiece, Seam } from '../../../types/types';
 
@@ -42,19 +42,8 @@ export function costurasDeMaria(piezas: PatternPiece[]): Seam[] {
   );
 }
 
-/** Espejo de seamsToInitData (costurasDeLaSimulacion.ts). */
-export function aInitData(costuras: Seam[]): SeamInitData[] {
-  return costuras.filter((s) => s.active !== false).map((s) => ({
-    id: s.id,
-    pieceAId: s.pieceA.pieceId, pieceAEdgeName: s.pieceA.edgeName,
-    pieceBId: s.pieceB.pieceId, pieceBEdgeName: s.pieceB.edgeName,
-    type: s.type,
-    pieceARange: s.pieceA.tStart != null && s.pieceA.tEnd != null ? ([s.pieceA.tStart, s.pieceA.tEnd] as [number, number]) : undefined,
-    pieceBRange: s.pieceB.tStart != null && s.pieceB.tEnd != null ? ([s.pieceB.tStart, s.pieceB.tEnd] as [number, number]) : undefined,
-    pieceBReversed: s.pieceB.reversed === true ? true : undefined,
-    tension: s.tension ?? 100, strength: s.strength ?? 1.0, active: true, taped: s.taped ?? false,
-  }));
-}
+/** El mismo mapeo que manda la app (costurasDeLaSimulacion.ts, seamsToInitData). */
+export const aInitData = (costuras: Seam[]) => seamsToInitData(costuras);
 
 /** Las piezas malladas con las opciones de SimulationInitClient.meshPiece, listas para seamInitDataToPairs. */
 export function mallarParaCoser(piezas: PatternPiece[], aristaMm: number): Array<PieceWithOutline & { triIds: Int32Array; uvs?: Float32Array }> {
