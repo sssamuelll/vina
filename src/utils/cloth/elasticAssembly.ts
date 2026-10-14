@@ -63,7 +63,7 @@ export function buildElasticConstraints(
           pieceData.boundaryOrig,
           mergedMesh.vertices,
           offset.vertexOffset,
-          flattenPath(outline, SEAM_CURVE_RESOLUTION).length,
+          flattenPath(outline, SEAM_CURVE_RESOLUTION),
           [flatStart, flatEnd],
         )
       : parameterizeEdge(

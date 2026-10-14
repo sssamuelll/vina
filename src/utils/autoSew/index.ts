@@ -19,7 +19,7 @@ import { extractEdges, type Edge } from './edgeExtractor';
 import { scorePieceNames } from './namingHeuristics';
 import { matchEdgesByLength, lengthSimilarity } from './arcLengthMatcher';
 import { scoreEdgePair, rankAndDeduplicate, areDeclaredPartners, type ScoredSeamCandidate, type ScorerWeights } from './scorer';
-import { esMitadDeCopa, repartirCopas } from './repartoDeCopa';
+import { esMediaDeCollar, esMitadDeCopa, repartirCopas } from './repartoDeCopa';
 
 // ─── Seam engine versioning ──────────────────────────────────────────────────
 
@@ -29,12 +29,14 @@ import { esMitadDeCopa, repartirCopas } from './repartoDeCopa';
  * proyectos viejos quedan marcadas stale y el toast "Re-coser" ofrece
  * regenerarlas. Historia: 1 = splits M:N de sisa+collar + cierre de
  * collarEnds + fix reversed×rango (2026-07-04). 2 = la copa se parte donde
- * cada mitad mide lo que su sisa, no en t = 0,5 (2026-10-06). Ausente en la
+ * cada mitad mide lo que su sisa, no en t = 0,5 (2026-10-06). 3 = las puntas de
+ * un sub-rango se ubican por largo de arco, y la dirección de las medias
+ * costuras de cuello deja de salir al azar (#1250 C2, 2026-10-14). Ausente en la
  * seam = 0 (pre-versionado). Disciplina manual — si cambias la propuesta,
  * súbela, y di en isStaleAiSeam qué costuras de los motores anteriores
  * quedaron viejas.
  */
-export const SEAM_ENGINE_VERSION = 2;
+export const SEAM_ENGINE_VERSION = 3;
 
 /**
  * ¿Es una seam IA generada por un motor anterior? Solo autoSew tiene motor:
@@ -47,11 +49,12 @@ export const SEAM_ENGINE_VERSION = 2;
  * viejas sus mitades de copa. Sin esto, «Re-coser» se ofrecía en cualquier
  * prenda con costuras IA, aunque no tuviera mangas, y rehacía costuras que
  * salían iguales perdiendo lo que la usuaria les hubiera cambiado.
+ * El motor 3 cambió la dirección de las medias costuras de cuello: del motor 2 solo están viejas esas.
  */
 export function isStaleAiSeam(s: Seam): boolean {
   if (!s.id.startsWith('auto-seam-')) return false;
   const motor = s.sewEngine ?? 0;
-  return motor < 1 || (motor < SEAM_ENGINE_VERSION && esMitadDeCopa(s));
+  return motor < 1 || (motor < 2 && esMitadDeCopa(s)) || (motor < 3 && esMediaDeCollar(s));
 }
 
 // ─── Public types ───────────────────────────────────────────────────────────

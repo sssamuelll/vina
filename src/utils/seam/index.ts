@@ -3,6 +3,13 @@ import { ClipperOffset, Path64, Point64, Paths64, JoinType, EndType } from 'clip
 
 const CURVE_RESOLUTION = 12;
 
+/**
+ * Distancia (mm) bajo la cual dos puntos seguidos del contorno son el mismo: el mallador deja uno. La usa
+ * también el emparejado de costuras (seamAssembly.ts, extenderSobreCopias) para reconocer las copias. Vive aquí,
+ * y no en el mallador, para que los workers del solver no arrastren cdt2d y clean-pslg; cdtMesher.ts la re-exporta.
+ */
+export const TOLERANCIA_DE_DUPLICADOS = 0.1;
+
 /** A flattened point carrying the index of the source command that produced it. */
 export interface SourcedPoint extends Point2D {
   /** Index into the original `commands` array of the command that emitted this point. */
