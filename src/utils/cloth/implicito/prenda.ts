@@ -6,6 +6,7 @@
 import type { SeamPair } from '../seamPairs';
 import { bisagrasDeCostura, puntosDeCostura, type BisagraDeCostura, type PuntoDeCostura } from './costuras';
 import { aMarcoDelHilo, type MallaDeTela } from './malla';
+import { franjaDelMargen, MARGEN_POR_DEFECTO_MM } from './margen';
 import { telaSI, type TelaFisica } from './tela';
 
 export interface PiezaDeTela {
@@ -99,4 +100,16 @@ export function costurasDePrenda(prenda: Prenda, pares: readonly SeamPair[]): { 
 export function bisagrasDePrenda(prenda: Prenda, lados: readonly LadosDeCostura[], tela: TelaFisica): BisagraDeCostura[] {
   const si = telaSI(tela);
   return lados.flatMap((l) => bisagrasDeCostura(prenda.malla.patron, prenda.malla.tris, l.a, l.b, si));
+}
+
+/**
+ * La franja del margen de la prenda (margen.ts): los segmentos de cada lado cosido, con el margen de cada
+ * pieza, o el de por defecto si la pieza no trae uno mayor que 0.
+ */
+export function franjaDePrenda(prenda: Prenda, lados: readonly LadosDeCostura[]): Uint8Array {
+  const bordes: Array<[number, number]> = [];
+  for (const l of lados) for (const lado of [l.a, l.b]) for (let k = 1; k < lado.length; k++) bordes.push([lado[k - 1], lado[k]]);
+  const ancho = prenda.piezas.map((p) => (p.margenMm !== undefined && p.margenMm > 0 ? p.margenMm : MARGEN_POR_DEFECTO_MM) / 1000);
+  const piezaDeTri = prenda.malla.piezaDeTri ?? new Uint16Array(prenda.malla.tris.length / 3);
+  return franjaDelMargen(prenda.malla.patron, prenda.malla.tris, piezaDeTri, bordes, ancho);
 }

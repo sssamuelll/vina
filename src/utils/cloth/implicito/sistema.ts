@@ -5,6 +5,7 @@
  */
 import { Costuras, type BisagraDeCostura, type PuntoDeCostura } from './costuras';
 import { aMarcoDelHilo, type MallaDeTela } from './malla';
+import { CAPAS_DEL_MARGEN, FLEXION_DEL_MARGEN } from './margen';
 import { Membrana } from './membrana';
 import { masCercano, type Obstaculo } from './obstaculos';
 import { Placa } from './placa';
@@ -26,6 +27,10 @@ export interface AjustesImplicito {
    * con el banco»).
    */
   kCostura: number;
+  /** capas de la franja del margen: multiplica su masa (margen.ts) */
+  capasDelMargen: number;
+  /** multiplica la flexión de la franja del margen (margen.ts) */
+  flexionDelMargen: number;
   /** iteraciones de gradiente conjugado por ronda */
   maxCG: number;
   /** tolerancia relativa: se para cuando rᵀz ≤ tolCG²·r0ᵀz0 */
@@ -42,6 +47,8 @@ export const AJUSTES_IMPLICITO: AjustesImplicito = {
   aire: 1,
   kContacto: 2000,
   kCostura: 1000,
+  capasDelMargen: CAPAS_DEL_MARGEN,
+  flexionDelMargen: FLEXION_DEL_MARGEN,
   maxCG: 50,
   tolCG: 1e-4,
   anticipar: true,
@@ -55,6 +62,8 @@ export interface OpcionesSistema {
   hilo?: readonly [number, number];
   /** los puntos de costura de la prenda (costuras.ts) */
   costuras?: { puntos: readonly PuntoDeCostura[]; bisagras?: readonly BisagraDeCostura[] };
+  /** 1 = el triángulo está en la franja del margen (prenda.ts, franjaDePrenda) */
+  franja?: Uint8Array;
 }
 
 /** Un vértice en contacto: obstáculo k, su normal y la penetración p0 = separación − distancia al empezar el paso. */
@@ -103,12 +112,15 @@ export class SistemaTela {
     this.sep = separacion(this.tela);
     this.tris = malla.tris;
     const uv = aMarcoDelHilo(malla.patron, op.hilo);
-    const reposo = prepararReposo(uv, malla.tris, this.tela.densidad, malla.piezaDeTri);
+    const franja = op.franja;
+    const capas = franja ? Float64Array.from(franja, (f) => (f ? this.aj.capasDelMargen : 1)) : undefined;
+    const flexion = franja ? Float64Array.from(franja, (f) => (f ? this.aj.flexionDelMargen : 1)) : undefined;
+    const reposo = prepararReposo(uv, malla.tris, this.tela.densidad, malla.piezaDeTri, capas);
     this.coef = reposo.coef;
     this.masa = reposo.masa;
     this.fijo = malla.fijos ? Uint8Array.from(malla.fijos) : new Uint8Array(this.n);
     this.membrana = new Membrana(malla.tris, this.coef, this.tela);
-    this.placa = new Placa(uv, malla.tris, this.tela, { costura: op.costuras?.bisagras });
+    this.placa = new Placa(uv, malla.tris, this.tela, { costura: op.costuras?.bisagras, factor: flexion });
     this.x = Float64Array.from(malla.x);
     this.costuras = new Costuras(op.costuras?.puntos ?? [], malla.x, this.aj.kCostura);
     this.xt = Float64Array.from(malla.x);

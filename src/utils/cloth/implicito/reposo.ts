@@ -13,8 +13,11 @@ export interface Reposo {
   masa: Float64Array;
 }
 
-/** `uv`: el patrón en el marco del hilo (m), de `aMarcoDelHilo`; `densidad` en kg/m². */
-export function prepararReposo(uv: Float64Array, tris: Uint32Array, densidad: number, piezaDeTri?: ArrayLike<number>): Reposo {
+/**
+ * `uv`: el patrón en el marco del hilo (m), de `aMarcoDelHilo`; `densidad` en kg/m². `factorDeMasa`: capas de cada
+ * triángulo (el margen, margen.ts); 1 por defecto.
+ */
+export function prepararReposo(uv: Float64Array, tris: Uint32Array, densidad: number, piezaDeTri?: ArrayLike<number>, factorDeMasa?: ArrayLike<number>): Reposo {
   const n = uv.length / 2, nt = tris.length / 3;
   const coef = new Float64Array(7 * nt), masa = new Float64Array(n);
   const signos = new Map<number, number>();
@@ -31,9 +34,10 @@ export function prepararReposo(uv: Float64Array, tris: Uint32Array, densidad: nu
     const a1 = d11 / det, a2 = -d10 / det, b1 = -d01 / det, b2 = d00 / det;
     const A0 = Math.abs(det) / 2;
     coef.set([-(a1 + a2), a1, a2, -(b1 + b2), b1, b2, A0], 7 * t);
-    masa[i0] += (densidad * A0) / 3;
-    masa[i1] += (densidad * A0) / 3;
-    masa[i2] += (densidad * A0) / 3;
+    const m = (densidad * A0 * (factorDeMasa ? factorDeMasa[t] : 1)) / 3;
+    masa[i0] += m;
+    masa[i1] += m;
+    masa[i2] += m;
   }
   const suelto = masa.findIndex((m) => m === 0);
   if (suelto >= 0) throw new Error(`prepararReposo: el vértice ${suelto} no está en ningún triángulo`);

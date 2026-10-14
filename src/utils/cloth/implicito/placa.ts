@@ -68,6 +68,8 @@ function invertir(M: number[][]): number[][] | null {
 export interface OpcionesPlaca {
   /** bisagras que cruzan las costuras (E2): entran como un borde más de su triángulo, apagadas hasta coser */
   costura?: readonly BisagraDeCostura[];
+  /** factor de la flexión de cada triángulo (el margen, margen.ts); 1 por defecto */
+  factor?: ArrayLike<number>;
 }
 
 export class Placa {
@@ -119,7 +121,7 @@ export class Placa {
     const deCostura: Array<{ t: number; k: number; h: number; kh: number }> = [];
     for (const c of op.costura ?? []) {
       const a = tris[3 * c.t + c.k], b = tris[3 * c.t + ((c.k + 1) % 3)];
-      deCostura.push({ t: c.t, k: c.k, h: bis.length / 4, kh: c.kh });
+      deCostura.push({ t: c.t, k: c.k, h: bis.length / 4, kh: c.kh * (op.factor ? op.factor[c.t] : 1) });
       bis.push(a, b, tercero(c.t, a, b), c.d);
     }
     this.bisagras = Uint32Array.from(bis);
@@ -189,8 +191,9 @@ export class Placa {
       const Mi = invertir(M);
       // si sus bordes no miden curvaturas independientes, el triángulo queda sin flexión propia
       if (!Mi) continue;
+      const f = op.factor ? op.factor[t] : 1;
       for (let r = 0; r < filas.length; r++) {
-        for (let c = 0; c < filas.length; c++) this.K[9 * t + 3 * cuales[r] + cuales[c]] = A0[t] * Mi[r][c];
+        for (let c = 0; c < filas.length; c++) this.K[9 * t + 3 * cuales[r] + cuales[c]] = f * A0[t] * Mi[r][c];
       }
     }
     this.costura = [];
