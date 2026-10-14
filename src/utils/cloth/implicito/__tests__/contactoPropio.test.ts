@@ -4,12 +4,11 @@ import { RejillaDePuntos, separacionPropia } from '../contactoPropio';
 import { CuerpoRigido, puntoMasCercano, type PuntoEnTriangulo } from '../cuerpo';
 import { armarPrenda } from '../prenda';
 import { mallaDeContorno } from '../malla';
-import { puntosDeCostura } from '../costuras';
 import { SistemaTela } from '../sistema';
 import { pasoImplicito } from '../paso';
 import { separacion, telaSI } from '../tela';
-import { piramideDeColision, rectangulo, TELA_DE_LABORATORIO } from '../banco/escenas';
-import { azar, borde, errorDelGradiente } from './ayudas';
+import { escenaCostura, piramideDeColision, rectangulo, TELA_DE_LABORATORIO } from '../banco/escenas';
+import { azar, errorDelGradiente } from './ayudas';
 
 const sepTela = separacionPropia(telaSI(TELA_DE_LABORATORIO).grosor);
 const nuevoPunto = (): PuntoEnTriangulo => ({ x: 0, y: 0, z: 0, wa: 0, wb: 0, wc: 0, rasgo: 0 });
@@ -66,21 +65,16 @@ describe('la tela contra sí misma', () => {
     expect(masBajo).toBeGreaterThan(s0 + sepTela - 0.0005);
   });
 
-  it('con contacto propio, la costura cierra igual: los compañeros de costura no se empujan', () => {
-    const A = mallaDeContorno(rectangulo(0, 0, 100, 60), 5), B = mallaDeContorno(rectangulo(0, 0, 100, 60), 7);
-    const prenda = armarPrenda([
-      { id: 'A', ...A },
-      { id: 'B', ...B, x: Float64Array.from(B.x, (q, k) => (k % 3 === 0 ? q + 0.13 : q)) },
-    ]);
-    const s = new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, {
-      costuras: { puntos: puntosDeCostura(prenda.malla.patron, borde(A, 0.1), borde(B, 0, A.x.length / 3)) },
-      ajustes: { gravedad: 0, contactoPropio: true },
-    });
+  it('con contacto propio, una costura plegada cierra igual: los compañeros de costura no se empujan', () => {
+    // B plegada 150° sobre la costura: junto a la línea, los vértices de un lado caen sobre la cara del otro a menos
+    // de la separación; si los compañeros de costura formaran par, se empujarían y la costura no cerraría
+    const e = escenaCostura(0, 150);
+    const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { costuras: e.costuras, franja: e.franja, ajustes: { gravedad: 0, contactoPropio: true } });
     for (let c = 0; c < 60; c++) pasoImplicito(s);
     let peor = 0;
     const d = [0, 0, 0];
-    for (let e = 0; e < s.costuras.n; e++) {
-      s.costuras.separacion(e, s.x, d);
+    for (let k = 0; k < s.costuras.n; k++) {
+      s.costuras.separacion(k, s.x, d);
       peor = Math.max(peor, Math.hypot(d[0], d[1], d[2]));
     }
     expect(peor).toBeLessThan(1e-4);
