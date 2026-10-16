@@ -382,3 +382,32 @@ El banco corre también sobre el XPBD actual, para medir cada entrega contra él
   Simulation*, SIGGRAPH Asia 2015 (subproyecto 1).
 - J. E. Zhang et al., *Progressive Simulation for Cloth Quasistatics*, SIGGRAPH Asia
   2022 (subproyecto 1).
+
+## 7. Enmiendas de la entrega 4
+
+Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el plan de la parte 1, y E5, E6 y R13 el
+2026-10-16.
+
+- **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
+  patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.
+  Plan `2026-10-14-la-prenda-en-la-cpu.md`.
+- **E2 (§4.3.3).** La flexión cruza la costura con una bisagra por arista cosida, con la rigidez de una franja
+  curvada a lo ancho, `kh = b⊥·ℓ²/(A_T + A_N)`, encendida cuando la costura cierra. Plan
+  `2026-10-14-la-prenda-en-la-cpu.md`.
+- **E3 (§4.3.2).** El contacto propio es solo vértice-triángulo, más vértice del cuerpo contra triángulo de tela;
+  arista-arista queda para cuando el banco lo pida. Plan `2026-10-14-la-prenda-en-la-cpu.md`.
+- **E4 (§4.2.1).** El contacto es un plano tangente al obstáculo, fijado al empezar el paso (o al anticiparlo, en
+  el punto adonde iba el vértice), con fricción de Coulomb suavizada: de dos lados en la solución y de uno en la
+  búsqueda en línea, que no consulta el cuerpo. Plan `2026-10-14-la-prenda-en-la-cpu.md`.
+- **E5 (§4.4.2).** La camiseta se compara sobre el avatar de la referencia y desde su colocación inicial, llevada a
+  la malla de Vina por las coordenadas del patrón; la colocación y el cuerpo de Vina los mide la parte 3. Plan
+  `2026-10-14-la-prenda-en-la-gpu.md`.
+- **E6 (§4.3.2).** Un par vértice-triángulo de la tela, y uno de punta del cuerpo, entra solo si el vértice cae sobre
+  la cara cerrada del triángulo (con 1/1000 de tolerancia, que deja entrar al que cae justo sobre un borde o un
+  vértice): los vecinos de la misma capa miran la tela de canto y nunca sostienen nada. Plan
+  `2026-10-14-la-prenda-en-la-gpu.md`.
+- **R13 (§4.3.1, se aparta de «con anticipación»).** Los pares de un vértice del cuerpo contra un triángulo de tela no
+  se anticipan: entran cuando el vértice atravesó la tela por la cara y siguen mientras la sostiene, a menos de la
+  separación. Anticiparlos los hacía competir con los planos de los vértices de tela sobre un cuerpo liso (la tela se
+  trababa o temblaba). *Costo:* una punta que entra muy rápido se rescata un cuadro tarde. Plan
+  `2026-10-14-la-prenda-en-la-cpu.md`.

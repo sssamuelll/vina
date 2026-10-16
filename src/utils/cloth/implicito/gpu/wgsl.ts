@@ -3,9 +3,14 @@
  * escena: tamaños, desplazamientos, ajustes y obstáculos van como constantes. La física es la de paso.ts,
  * en el mismo orden; el cuadro entero cabe en un pase de cómputo y las sumas se reducen en la GPU.
  */
-import type { Obstaculo } from '../obstaculos';
+import { ALCANCE_MAXIMO } from '../contactoPropio';
+import { EPS_FRICCION } from '../contactos';
+import { CIERRE_POR_CUADRO, LARGO_CERRADO } from '../costuras';
+import { RADIO_DE_BUSQUEDA, type Obstaculo } from '../obstaculos';
 import type { SistemaTela } from '../sistema';
 import type { PaqueteGpu } from './empaquetar';
+import { wgslCuerpoCercano, wgslPuntoMasCercano } from './wgslCuerpo';
+import { wgslPropio } from './wgslPropio';
 
 /** Hilos por grupo de trabajo. */
 export const WG = 128;
@@ -13,54 +18,96 @@ export const WG = 128;
 /** Los escalares del cuadro, en la zona SC de `red`. */
 export const ESC = {
   RZ: 0, RZ0: 1, ALFA: 2, BETA: 3, HECHO: 4, ACTIVO: 5, NUEVOS: 6, ALFA_LS: 7, PROBANDO: 8,
-  CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14,
+  CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14, COSIDA: 15, RADIO: 16, CELDA: 17,
 } as const;
-const N_ESC = 16;
+const N_ESC = 32;
 
 /** Las entradas de cómputo, en el orden en que las despacha un cuadro. */
 export const ENTRADAS = [
-  'inicio', 'prepTri', 'prepHinge', 'gradElem', 'ensamblar', 'residuo', 'sumarInicio', 'spmv', 'sumarAlfa',
-  'actualizar', 'sumarBeta', 'nuevaP', 'anticipar', 'armarRonda2', 'prepBusqueda', 'posPrueba', 'anguloPrueba',
-  'difTri', 'decidir', 'aplicar', 'cerrarCuadro',
+  'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar',
+  'velMax', 'armarRadio', 'limpiarCeldas', 'hashContar', 'scanCBloques', 'scanCTotales', 'scanCSumar', 'hashLlenar',
+  'limpiarPuntas', 'paresDeTriangulo', 'limpiarVertices', 'contarEntradas', 'scanVBloques', 'scanVTotales', 'scanVSumar', 'llenarEntradas',
+  'residuo', 'sumarInicio', 'spmv', 'sumarAlfa', 'actualizar', 'sumarBeta', 'nuevaP', 'anticipar', 'anticiparPares',
+  'armarRonda2', 'prepBusqueda', 'posPrueba', 'anguloPrueba', 'difTri', 'difCostura', 'difPares', 'decidir', 'aplicar',
+  'cerrarCuadro', 'cerrarCosturas', 'revisarCosido', 'coser',
 ] as const;
+
+/** Desplazamientos seguidos para los tamaños dados, en el orden de las claves, y el total. */
+function zonas<K extends string>(tamanos: Record<K, number>): Record<K, number> & { total: number } {
+  const o: Record<string, number> = {};
+  let total = 0;
+  for (const k of Object.keys(tamanos) as K[]) {
+    o[k] = total;
+    total += tamanos[k];
+  }
+  o.total = total;
+  return o as Record<K, number> & { total: number };
+}
+
+type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT';
+type ZonaTf =
+  | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH'
+  | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'CUVN' | 'SOST' | 'HP' | 'OFFC' | 'ORD' | 'PAR' | 'OFFV' | 'ENT' | 'SCB';
+/** el búfer atómico del contacto propio: cuentas y cursores de la rejilla y de las listas, los pares y los desbordes */
+type ZonaAt = 'CNTC' | 'CURC' | 'CNTV' | 'CURV' | 'NPAR' | 'DESB';
+/** las sumas parciales de cada reducción, los escalares y la historia de la quietud */
+type ZonaRed = 'PA' | 'PB' | 'PC' | 'PD' | 'PE' | 'SC' | 'HISTO';
 
 export interface Distribucion {
   /** por vértice, en f32: inicio de cada arreglo */
-  vf: { XT: number; V: number; R: number; Z: number; AP: number; DX: number; XP: number; MASA: number; EV0: number; PINV: number; CONT: number; total: number };
+  vf: Record<ZonaVf, number> & { total: number };
   /** por elemento, en f32 */
-  tf: { COEF: number; KP: number; PCR: number; TRI: number; E0: number; HD: number; THP: number; CONTRIB: number; total: number };
+  tf: Record<ZonaTf, number> & { total: number };
   /** dónde empieza cada arreglo de índices de `PaqueteGpu['u32']` */
   iu: Record<keyof PaqueteGpu['u32'], number> & { total: number };
-  /** tres zonas de sumas parciales, los escalares y la historia de la quietud */
-  red: { PA: number; PB: number; PC: number; SC: number; HISTO: number; HIST: number; total: number };
-  /** grupos de trabajo por vértice, triángulo, bisagra y bloque */
+  /** las zonas de sumas parciales, los escalares y la historia de la quietud */
+  red: Record<ZonaRed, number> & { total: number; HIST: number };
+  /** en u32 atómicos */
+  at: Record<ZonaAt, number> & { total: number };
+  /** grupos de trabajo por vértice, triángulo, bisagra, bloque, punto de costura y bisagra de costura */
   gv: number;
   gt: number;
   gh: number;
   gb: number;
+  gc: number;
+  gch: number;
+  /** grupos por par, por celda de la rejilla, por punto de la rejilla y por vértice del cuerpo */
+  gp: number;
+  gcel: number;
+  gpnt: number;
+  gvb: number;
 }
 
 export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribucion {
   const { n, nt, nh } = p;
-  const vf = { XT: 0, V: 3 * n, R: 6 * n, Z: 9 * n, AP: 12 * n, DX: 15 * n, XP: 18 * n, MASA: 21 * n, EV0: 22 * n, PINV: 23 * n, CONT: 32 * n, total: 37 * n };
-  const tf = {
-    COEF: 0, KP: 7 * nt, PCR: 16 * nt, TRI: 18 * nt, E0: 32 * nt, HD: 33 * nt,
-    THP: 33 * nt + 16 * nh, CONTRIB: 33 * nt + 17 * nh, total: 78 * nt + 17 * nh,
-  };
+  const vf = zonas<ZonaVf>({ XT: 3 * n, V: 3 * n, R: 3 * n, Z: 3 * n, AP: 3 * n, DX: 3 * n, XP: 3 * n, MASA: n, EV0: n, PINV: 9 * n, CONT: 6 * n });
+  const tf = zonas<ZonaTf>({
+    COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, THP: nh, CONTRIB: 45 * nt + 9 * p.nc,
+    CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch,
+    CUN: p.f32.cuNodos.length, CUT: p.f32.cuTri.length, CUNT: p.f32.cuNt.length, CUPA: p.f32.cuPa.length, CUPV: p.f32.cuPv.length,
+    CUV: 3 * p.nvb, CUVN: 3 * p.nvb, SOST: 2 * p.nvb, HP: p.np, OFFC: p.nceldas + 1, ORD: p.np, PAR: 14 * p.maxPares, OFFV: n + 1, ENT: 4 * p.maxPares,
+    SCB: Math.max(Math.ceil(p.nceldas / WG), Math.ceil(n / WG)) + 1,
+  });
   const iu = { total: 0 } as Distribucion['iu'];
   for (const k of Object.keys(p.u32) as Array<keyof PaqueteGpu['u32']>) {
     iu[k] = iu.total;
     iu.total += p.u32[k].length;
   }
   const gv = Math.ceil(n / WG), gt = Math.ceil(nt / WG), gh = Math.ceil(nh / WG), gb = Math.ceil(p.nb / WG);
-  const zona = Math.max(gv, gt, gh, 1);
-  const red = { PA: 0, PB: zona, PC: 2 * zona, SC: 3 * zona, HISTO: 3 * zona + N_ESC, HIST: cuadrosDeHistoria, total: 3 * zona + N_ESC + cuadrosDeHistoria };
-  return { vf, tf, iu, red, gv, gt, gh, gb };
+  const gc = Math.ceil(p.nc / WG), gch = Math.ceil(p.nch / WG);
+  const gp = Math.ceil(p.maxPares / WG), gcel = Math.ceil(p.nceldas / WG), gpnt = Math.ceil(p.np / WG), gvb = Math.ceil(p.nvb / WG);
+  const zona = Math.max(gv, gt, gh, gc, gp, 1);
+  const red = { ...zonas<ZonaRed>({ PA: zona, PB: zona, PC: zona, PD: zona, PE: zona, SC: N_ESC, HISTO: cuadrosDeHistoria }), HIST: cuadrosDeHistoria };
+  const at = zonas<ZonaAt>({ CNTC: p.nceldas, CURC: p.nceldas, CNTV: n, CURV: n, NPAR: 1, DESB: 1 });
+  return { vf, tf, iu, red, at, gv, gt, gh, gb, gc, gch, gp, gcel, gpnt, gvb };
 }
 
 /** Bytes de cada búfer, en el orden de las ligaduras del WGSL. */
-export function tamanosDeBufer(d: Distribucion, p: PaqueteGpu): Record<'pos' | 'vf' | 'tf' | 'iu' | 'red' | 'vals' | 'pv', number> {
-  return { pos: 12 * p.n, vf: 4 * d.vf.total, tf: 4 * d.tf.total, iu: 4 * d.iu.total, red: 4 * d.red.total, vals: 48 * Math.max(p.nq, 1), pv: 16 * p.n };
+export function tamanosDeBufer(d: Distribucion, p: PaqueteGpu): Record<'pos' | 'vf' | 'tf' | 'iu' | 'red' | 'vals' | 'pv' | 'at', number> {
+  return {
+    pos: 12 * p.n, vf: 4 * d.vf.total, tf: 4 * d.tf.total, iu: 4 * d.iu.total, red: 4 * d.red.total, vals: 48 * Math.max(p.nq, 1), pv: 16 * p.n,
+    at: 4 * d.at.total,
+  };
 }
 
 function flotante(v: number): string {
@@ -73,8 +120,9 @@ const entero = (v: number): string => `${v >>> 0}u`;
 /** La misma distancia que obstaculos.ts: `masCercano(p)` y `obstaculoK(p, k)` devuelven (d, normal). */
 export function wgslObstaculos(obs: readonly Obstaculo[]): string {
   const f = flotante;
-  const cuerpos = obs.map((o, k) =>
-    o.tipo === 'plano'
+  const cuerpos = obs.map((o, k) => {
+    if (o.tipo === 'cuerpo') return `fn obstaculo${k}(p: vec3<f32>) -> vec4<f32> { return cuerpoCercano(p, RADIO_B); }`;
+    return o.tipo === 'plano'
       ? `fn obstaculo${k}(p: vec3<f32>) -> vec4<f32> { return vec4<f32>(p.y - ${f(o.altura)}, 0.0, 1.0, 0.0); }`
       : `fn obstaculo${k}(p: vec3<f32>) -> vec4<f32> {
   let radio = ${f(o.radio)};
@@ -92,14 +140,10 @@ export function wgslObstaculos(obs: readonly Obstaculo[]): string {
   }
   if (tapa - p.y < radio - r) { return vec4<f32>(-(tapa - p.y), 0.0, 1.0, 0.0); }
   return vec4<f32>(-(radio - r), rad.x, 0.0, rad.y);
-}`,
-  );
+}`;
+  });
   return `${cuerpos.join('\n')}
 struct Cercano { c: vec4<f32>, k: u32 }
-fn obstaculoK(p: vec3<f32>, k: u32) -> vec4<f32> {
-${obs.map((_, k) => `  if (k == ${k}u) { return obstaculo${k}(p); }`).join('\n')}
-  return vec4<f32>(1e30, 0.0, 1.0, 0.0);
-}
 fn masCercano(p: vec3<f32>) -> Cercano {
   var m = Cercano(vec4<f32>(1e30, 0.0, 1.0, 0.0), NINGUNA);
 ${obs.map((_, k) => `  { let c = obstaculo${k}(p); if (c.x < m.c.x) { m = Cercano(c, ${k}u); } }`).join('\n')}
@@ -118,6 +162,7 @@ export function wgslDelMotor(s: SistemaTela, p: PaqueteGpu, d: Distribucion): st
 @group(0) @binding(4) var<storage, read_write> red: array<f32>;
 @group(0) @binding(5) var<storage, read_write> vals: array<vec4<f32>>;
 @group(0) @binding(6) var<storage, read_write> pv: array<vec4<f32>>;
+@group(0) @binding(7) var<storage, read_write> at: array<atomic<u32>>;
 
 const N = ${u(p.n)};
 const NT = ${u(p.nt)};
@@ -127,17 +172,26 @@ const NQ = ${u(Math.max(p.nq, 1))};
 const GV = ${u(d.gv)};
 const GT = ${u(d.gt)};
 const NINGUNA = 0xffffffffu;
-const O_XT = ${u(vf.XT)}; const O_V = ${u(vf.V)}; const O_R = ${u(vf.R)}; const O_Z = ${u(vf.Z)}; const O_AP = ${u(vf.AP)};
-const O_DX = ${u(vf.DX)}; const O_XP = ${u(vf.XP)}; const O_MASA = ${u(vf.MASA)}; const O_EV0 = ${u(vf.EV0)};
-const O_PINV = ${u(vf.PINV)}; const O_CONT = ${u(vf.CONT)};
-const O_COEF = ${u(tf.COEF)}; const O_KP = ${u(tf.KP)}; const O_PCR = ${u(tf.PCR)}; const O_TRI = ${u(tf.TRI)};
-const O_E0 = ${u(tf.E0)}; const O_HD = ${u(tf.HD)}; const O_THP = ${u(tf.THP)}; const O_CONTRIB = ${u(tf.CONTRIB)};
+${Object.entries(vf).filter(([k]) => k !== 'total').map(([k, v]) => `const O_${k} = ${u(v)};`).join(' ')}
+${Object.entries(tf).filter(([k]) => k !== 'total').map(([k, v]) => `const O_${k} = ${u(v)};`).join(' ')}
 const I_TRIS = ${u(iu.tris)}; const I_BIS = ${u(iu.bisagras)}; const I_HOT = ${u(iu.bisDeTri)}; const I_FIJO = ${u(iu.fijo)};
 const I_AOFF = ${u(iu.aporOff)}; const I_AIDX = ${u(iu.aporIdx)}; const I_BOFF = ${u(iu.blqOff)}; const I_BCOD = ${u(iu.blqCod)};
 const I_BFILA = ${u(iu.blqFila)}; const I_BCOL = ${u(iu.blqCol)}; const I_FBASE = ${u(iu.franjaBase)};
 const I_FANCHO = ${u(iu.franjaAncho)}; const I_COLE = ${u(iu.colSell)}; const I_POSDE = ${u(iu.posDe)}; const I_DIAG = ${u(iu.diag)};
 const R_PA = ${u(red.PA)}; const R_PB = ${u(red.PB)}; const R_PC = ${u(red.PC)}; const R_SC = ${u(red.SC)};
-const R_HISTO = ${u(red.HISTO)}; const HIST = ${u(red.HIST)};
+const R_HISTO = ${u(red.HISTO)}; const HIST = ${u(red.HIST)}; const R_PD = ${u(red.PD)};
+const NC = ${u(p.nc)};
+const NCH = ${u(p.nch)};
+const GC = ${u(d.gc)};
+const I_CV = ${u(iu.costura)}; const I_CK = ${u(iu.costuraK)};
+const KCOST = ${f(aj.kCostura)};
+const NCU = ${u(p.ncu)};
+const I_CUS = ${u(iu.cuSalto)};
+const RADIO_B = ${f(RADIO_DE_BUSQUEDA)};
+const CIERRE = ${f(CIERRE_POR_CUADRO)};
+const LCERRADO = ${f(LARGO_CERRADO)};
+// la primera ranura de aporte de las costuras, después de las de la membrana y la placa
+const SLOT_C = 15u * NT;
 ${Object.entries(ESC).map(([k, v]) => `const E_${k} = ${u(v)};`).join('\n')}
 const H = ${f(aj.h)};
 const AIRE = ${f(aj.aire)};
@@ -150,7 +204,29 @@ const KU = ${f(tela.kTrama)};
 const KV = ${f(tela.kUrdimbre)};
 const KS = ${f(tela.kCizalla)};
 const BUSQUEDA = ${aj.busqueda};
+const MU_C = ${f(tela.friccionCuerpo)};
+const WG = ${u(WG)};
+const PROPIO = ${p.propio};
+const NP = ${u(p.np)};
+const NVB = ${u(p.nvb)};
+const NCELDAS = ${u(p.nceldas)};
+const MAXP = ${u(p.maxPares)};
+const GP = ${u(d.gp)};
+const R_PE = ${u(red.PE)};
+const I_EXO = ${u(iu.exOff)}; const I_EXI = ${u(iu.exIdx)};
+${Object.entries(d.at).filter(([k]) => k !== 'total').map(([k, v]) => `const A_${k} = ${u(v)};`).join(' ')}
+const SEPP = ${f(p.sepPropia)};
+const ALCANCE = ${f(ALCANCE_MAXIMO)};
+const ARISTA = ${f(p.aristaMedia)};
+const MU_T = ${f(tela.friccionTela)};
+const EPS_F = ${f(EPS_FRICCION)};
 const I3 = mat3x3<f32>(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+
+${wgslPuntoMasCercano()}
+
+${wgslCuerpoCercano()}
+
+${wgslPropio()}
 
 ${wgslObstaculos(s.obstaculos)}
 
@@ -184,13 +260,29 @@ fn prediccion(i: u32) -> vec3<f32> {
   return ld(O_XT, i) + H * ld(O_V, i) + vec3<f32>(0.0, H * H * GRAV, 0.0);
 }
 
-// inercia, aire y contacto del vértice i en x (sistema.ts, energiaVertice)
+// inercia y aire del vértice i en x (sistema.ts, energiaVertice)
 fn energiaVertice(i: u32, x: vec3<f32>) -> f32 {
   let m = vf[O_MASA + i];
   let dy = x - prediccion(i);
   let dt = x - ld(O_XT, i);
-  var e = m / (2.0 * H * H) * dot(dy, dy) + AIRE * m / (2.0 * H) * dot(dt, dt);
-  let p = SEP - masCercano(x).c.x;
+  return m / (2.0 * H * H) * dot(dy, dy) + AIRE * m / (2.0 * H) * dot(dt, dt);
+}
+
+// la fricción de Coulomb suavizada (contactos.ts, rigidezDeFriccion)
+fn rigidez(mu: f32, lambda: f32, vt: f32) -> f32 {
+  if (mu > 0.0 && lambda > 0.0) { return mu * lambda / (max(vt, EPS_F) * H); }
+  return 0.0;
+}
+
+fn tangencial(v: vec3<f32>, n: vec3<f32>) -> f32 { return length(v - dot(v, n) * n); }
+
+// el plano del vértice (en CONT, desde o) con u = x − x_t, de un solo lado (contactos.ts, energiaDePlano)
+fn energiaPlano(o: u32, u: vec3<f32>) -> f32 {
+  let n = vec3<f32>(vf[o + 1u], vf[o + 2u], vf[o + 3u]);
+  let un = dot(n, u);
+  let p = vf[o + 4u] - un;
+  let t = u - un * n;
+  var e = 0.5 * vf[o + 5u] * dot(t, t);
   if (p > 0.0) { e += 0.5 * KC * p * p; }
   return e;
 }
@@ -267,6 +359,25 @@ fn bloquePlaca(t: u32, i: u32, j: u32) -> mat3x3<f32> {
   return M;
 }
 
+fn pesoCostura(e: u32, m: u32) -> f32 {
+  let s = tf[O_CS + e];
+  if (m == 0u) { return 1.0; }
+  if (m == 1u) { return -(1.0 - s); }
+  return -s;
+}
+
+fn sepCostura(e: u32, a: vec3<f32>, b0: vec3<f32>, b1: vec3<f32>) -> vec3<f32> {
+  let s = tf[O_CS + e];
+  return a - (1.0 - s) * b0 - s * b1;
+}
+
+// el bloque (li, lj) del punto de costura e (costuras.ts, sumarBloque): c1 = g en todas las ramas de linealizar
+fn bloqueCostura(e: u32, li: u32, lj: u32) -> mat3x3<f32> {
+  let o = O_CST + 5u * e;
+  let d = vec3<f32>(tf[o], tf[o + 1u], tf[o + 2u]);
+  return pesoCostura(e, li) * pesoCostura(e, lj) * (tf[o + 3u] * I3 + tf[o + 4u] * outer(d, d));
+}
+
 var<workgroup> sh: array<f32, ${WG}>;
 var<workgroup> wBandera: u32;
 
@@ -300,7 +411,7 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   return t;
 }
 
-// 1. x_t, los contactos de partida y la energía de cada vértice al empezar
+// 1. x_t, el plano de cada vértice en x_t con su fricción (sistema.ts, armarContactos) y la inercia al empezar
 @compute @workgroup_size(${WG}) fn inicio(@builtin(global_invocation_id) g: vec3<u32>) {
   let i = g.x;
   if (i == 0u) {
@@ -311,11 +422,13 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   if (i >= N) { return; }
   let x = ldx(i);
   st(O_XT, i, x);
-  let o = O_CONT + 5u * i;
+  let o = O_CONT + 6u * i;
   let c = masCercano(x);
   let p0 = SEP - c.c.x;
   if (p0 > 0.0 && iu[I_FIJO + i] == 0u) {
-    vf[o] = 1.0; vf[o + 1u] = c.c.y; vf[o + 2u] = c.c.z; vf[o + 3u] = c.c.w; vf[o + 4u] = p0;
+    let n = c.c.yzw;
+    vf[o] = 1.0; vf[o + 1u] = n.x; vf[o + 2u] = n.y; vf[o + 3u] = n.z; vf[o + 4u] = p0;
+    vf[o + 5u] = rigidez(MU_C, KC * p0, tangencial(ld(O_V, i), n));
   } else {
     vf[o] = 0.0;
   }
@@ -399,6 +512,31 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   tf[O_E0 + t] += eplaca;
 }
 
+// 4b. cada punto de costura linealizado en x_t (costuras.ts, linealizar), su energía y sus aportes al gradiente
+@compute @workgroup_size(${WG}) fn prepCostura(@builtin(global_invocation_id) g: vec3<u32>) {
+  let e = g.x;
+  if (e >= NC) { return; }
+  let b = I_CV + 3u * e;
+  let d = sepCostura(e, ldx(iu[b]), ldx(iu[b + 1u]), ldx(iu[b + 2u]));
+  let r = length(d);
+  let L = tf[O_CL + e];
+  var gg = 0.0;
+  var c2 = 0.0;
+  if (L == 0.0) {
+    gg = KCOST;
+  } else if (r > L) {
+    let q = L / r;
+    gg = KCOST * (1.0 - q);
+    c2 = KCOST * q / (r * r);
+  }
+  let o = O_CST + 5u * e;
+  tf[o] = d.x; tf[o + 1u] = d.y; tf[o + 2u] = d.z; tf[o + 3u] = gg; tf[o + 4u] = c2;
+  var e0 = 0.0;
+  if (r > L) { e0 = 0.5 * KCOST * (r - L) * (r - L); }
+  tf[O_CE0 + e] = e0;
+  for (var m = 0u; m < 3u; m++) { stc(SLOT_C + 3u * e + m, pesoCostura(e, m) * gg * d); }
+}
+
 // 5. cada bloque de la matriz, sumando los elementos que lo tocan; se guarda en franjas de 32 filas
 @compute @workgroup_size(${WG}) fn ensamblar(@builtin(global_invocation_id) g: vec3<u32>) {
   let b = g.x;
@@ -409,6 +547,7 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   for (var s = iu[I_BOFF + b]; s < iu[I_BOFF + b + 1u]; s++) {
     let cod = iu[I_BCOD + s];
     if (cod >= 0x80000000u) { M += bloquePlaca(cod - 0x80000000u, i, j); }
+    else if (cod >= 0x40000000u) { let k = cod - 0x40000000u; M += bloqueCostura(k >> 4u, (k >> 2u) & 3u, k & 3u); }
     else { M += bloqueMembrana(cod >> 4u, (cod >> 2u) & 3u, cod & 3u); }
   }
   let q = iu[I_POSDE + b];
@@ -430,11 +569,26 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
     // en x = x_t: −(m/h²)·(x − y) = (m/h)·v + m·g, y el aire todavía no empuja
     var r = -grad + (m / H) * ld(O_V, i) + vec3<f32>(0.0, m * GRAV, 0.0);
     var B = ld9(iu[I_DIAG + i]) + (m / (H * H) + AIRE * m / H) * I3;
-    let o = O_CONT + 5u * i;
+    let o = O_CONT + 6u * i;
     if (vf[o] > 0.5) {
       let nn = vec3<f32>(vf[o + 1u], vf[o + 2u], vf[o + 3u]);
+      let kt = vf[o + 5u];
+      // en x = x_t el plano empuja con kc·p0 y la fricción todavía no (sistema.ts, residuo)
       r += KC * vf[o + 4u] * nn;
-      B += KC * outer(nn, nn);
+      B += (KC - kt) * outer(nn, nn) + kt * I3;
+    }
+    if (PROPIO) {
+      for (var s = u32(tf[O_OFFV + i]); s < u32(tf[O_OFFV + i + 1u]); s++) {
+        let ent = u32(tf[O_ENT + s]);
+        let o = O_PAR + 14u * (ent >> 2u);
+        if (tf[o + 13u] < 0.5) { continue; }
+        let wk = tf[o + 4u + (ent & 3u)];
+        let nn = v3tf(o + 8u);
+        let kt = tf[o + 12u];
+        // en x = x_t el par empuja con kc·p0 y su fricción todavía no (sistema.ts, residuo)
+        r += wk * KC * tf[o + 11u] * nn;
+        B += wk * wk * ((KC - kt) * outer(nn, nn) + kt * I3);
+      }
     }
     if (iu[I_FIJO + i] != 0u) { r = vec3<f32>(0.0); }
     let Bi = inversa3(B);
@@ -482,10 +636,26 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
     let m = vf[O_MASA + i];
     let p = pv[i].xyz;
     ap += (m / (H * H) + AIRE * m / H) * p;
-    let o = O_CONT + 5u * i;
+    let o = O_CONT + 6u * i;
     if (vf[o] > 0.5) {
       let nn = vec3<f32>(vf[o + 1u], vf[o + 2u], vf[o + 3u]);
-      ap += KC * dot(nn, p) * nn;
+      let pn = dot(nn, p);
+      ap += KC * pn * nn + vf[o + 5u] * (p - pn * nn);
+    }
+    if (PROPIO) {
+      for (var s = u32(tf[O_OFFV + i]); s < u32(tf[O_OFFV + i + 1u]); s++) {
+        let ent = u32(tf[O_ENT + s]);
+        let o = O_PAR + 14u * (ent >> 2u);
+        if (tf[o + 13u] < 0.5) { continue; }
+        var qv = vec3<f32>(0.0);
+        for (var j = 0u; j < 4u; j++) {
+          let v = tf[o + j];
+          if (v >= 0.0) { qv += tf[o + 4u + j] * pv[u32(v)].xyz; }
+        }
+        let nn = v3tf(o + 8u);
+        let qn = dot(nn, qv);
+        ap += tf[o + 4u + (ent & 3u)] * (KC * qn * nn + tf[o + 12u] * (qv - qn * nn));
+      }
     }
     if (iu[I_FIJO + i] != 0u) { ap = vec3<f32>(0.0); }
     st(O_AP, i, ap);
@@ -548,18 +718,23 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   pv[i] = vec4<f32>(ld(O_Z, i) + red[R_SC + E_BETA] * pv[i].xyz, 0.0);
 }
 
-// 8. anticipación: los vértices que el paso metería en un obstáculo entran al sistema
+// 8. anticipación (sistema.ts, anticiparContactos): el vértice que el paso metería en un obstáculo entra con el plano
+// tangente en el punto adonde iba, y con la fricción de la normal que frena en un cuadro esa penetración (R11)
 @compute @workgroup_size(${WG}) fn anticipar(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
   let i = g.x;
   var nuevo = 0.0;
   if (i < N) {
-    let o = O_CONT + 5u * i;
+    let o = O_CONT + 6u * i;
     if (iu[I_FIJO + i] == 0u && vf[o] < 0.5) {
-      let x = ldx(i);
-      let c = masCercano(x + ld(O_DX, i));
-      if (SEP - c.c.x > 0.0) {
-        vf[o] = 1.0; vf[o + 1u] = c.c.y; vf[o + 2u] = c.c.z; vf[o + 3u] = c.c.w;
-        vf[o + 4u] = SEP - obstaculoK(x, c.k).x;
+      let dx = ld(O_DX, i);
+      let c = masCercano(ldx(i) + dx);
+      let pen = SEP - c.c.x;
+      if (pen > 0.0) {
+        let n = c.c.yzw;
+        vf[o] = 1.0; vf[o + 1u] = n.x; vf[o + 2u] = n.y; vf[o + 3u] = n.z;
+        // la penetración en x_t respecto del plano tangente en el punto adonde iba: sep − d + n·dx
+        vf[o + 4u] = pen + dot(n, dx);
+        vf[o + 5u] = rigidez(MU_C, vf[O_MASA + i] * pen / (H * H), tangencial(ld(O_V, i), n));
         nuevo = 1.0;
       }
     }
@@ -571,6 +746,7 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
 @compute @workgroup_size(1) fn armarRonda2() {
   var s = 0.0;
   for (var k = 0u; k < GV; k++) { s += red[R_PA + k]; }
+  if (PROPIO) { for (var k = 0u; k < GP; k++) { s += red[R_PE + k]; } }
   red[R_SC + E_NUEVOS] = s;
   red[R_SC + E_ACTIVO] = select(0.0, 1.0, s > 0.5);
 }
@@ -586,9 +762,13 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   let i = g.x;
   var de = 0.0;
   if (i < N) {
-    let xp = ld(O_XT, i) + red[R_SC + E_ALFA_LS] * ld(O_DX, i);
+    let u = red[R_SC + E_ALFA_LS] * ld(O_DX, i);
+    let xp = ld(O_XT, i) + u;
     st(O_XP, i, xp);
     de = energiaVertice(i, xp) - vf[O_EV0 + i];
+    // el plano fijado al empezar, de un solo lado, sin consultar el obstáculo (E4)
+    let o = O_CONT + 6u * i;
+    if (vf[o] > 0.5) { de += energiaPlano(o, u) - energiaPlano(o, vec3<f32>(0.0)); }
   }
   let total = reducirSuma(l.x, de);
   if (l.x == 0u) { red[R_PB + w.x] = total; }
@@ -628,11 +808,29 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   if (l.x == 0u) { red[R_PC + w.x] = total; }
 }
 
+@compute @workgroup_size(${WG}) fn difCostura(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
+  if (!bandera(l.x, E_PROBANDO)) { return; }
+  let e = g.x;
+  var de = 0.0;
+  if (e < NC) {
+    let b = I_CV + 3u * e;
+    let r = length(sepCostura(e, ld(O_XP, iu[b]), ld(O_XP, iu[b + 1u]), ld(O_XP, iu[b + 2u])));
+    let L = tf[O_CL + e];
+    var en = 0.0;
+    if (r > L) { en = 0.5 * KCOST * (r - L) * (r - L); }
+    de = en - tf[O_CE0 + e];
+  }
+  let total = reducirSuma(l.x, de);
+  if (l.x == 0u) { red[R_PD + w.x] = total; }
+}
+
 @compute @workgroup_size(1) fn decidir() {
   if (red[R_SC + E_PROBANDO] < 0.5) { return; }
   var dg = 0.0;
   for (var k = 0u; k < GV; k++) { dg += red[R_PB + k]; }
   for (var k = 0u; k < GT; k++) { dg += red[R_PC + k]; }
+  for (var k = 0u; k < GC; k++) { dg += red[R_PD + k]; }
+  if (PROPIO) { for (var k = 0u; k < GP; k++) { dg += red[R_PE + k]; } }
   red[R_SC + E_DG] = dg;
   if (dg <= 0.0) { red[R_SC + E_PROBANDO] = 0.0; } else { red[R_SC + E_ALFA_LS] = 0.5 * red[R_SC + E_ALFA_LS]; }
 }
@@ -677,6 +875,34 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   let c = u32(red[R_SC + E_CUADRO]);
   if (c < HIST) { red[R_HISTO + c] = q; }
   red[R_SC + E_CUADRO] = red[R_SC + E_CUADRO] + 1.0;
+}
+
+// 11. las costuras se cierran un cuadro más; cuando todas llegan a 0, la flexión las cruza (sistema.ts, alTerminarCuadro)
+@compute @workgroup_size(${WG}) fn cerrarCosturas(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
+  let e = g.x;
+  var abierta = 0.0;
+  if (e < NC) {
+    var L = tf[O_CL + e] * CIERRE;
+    if (L < LCERRADO) { L = 0.0; }
+    tf[O_CL + e] = L;
+    abierta = L;
+  }
+  let m = reducirMax(l.x, abierta);
+  if (l.x == 0u) { red[R_PD + w.x] = m; }
+}
+
+@compute @workgroup_size(1) fn revisarCosido() {
+  if (NC == 0u) { return; }
+  var m = 0.0;
+  for (var k = 0u; k < GC; k++) { m = max(m, red[R_PD + k]); }
+  if (m == 0.0) { red[R_SC + E_COSIDA] = 1.0; }
+}
+
+// escribir la rigidez de una bisagra de costura en K una y otra vez da lo mismo (placa.ts, activarCosturas)
+@compute @workgroup_size(${WG}) fn coser(@builtin(global_invocation_id) g: vec3<u32>) {
+  let c = g.x;
+  if (c >= NCH || red[R_SC + E_COSIDA] < 0.5) { return; }
+  tf[O_KP + iu[I_CK + c]] = tf[O_CKH + c];
 }
 `;
 }

@@ -8,7 +8,7 @@
  * las tres mallas), elige el que deja la malla de 5 mm más cerca de la referencia. Si ninguno lo cumple, lo
  * dice: la ley de pandeo necesitaría otra forma (§5). Con --factores corre y compara solo esos.
  */
-import { criterioCusick, ensayoCusick, guardarInforme, imprimirCusick, leerReferencias } from './_banco';
+import { criterioCusick, ensayoCusick, guardarInforme, imprimirCusick, leerReferencias, telaDeLaReferencia } from './_banco';
 import { correrImplicito } from './motorImplicito';
 
 const pedidos = process.argv.find((a) => a.startsWith('--factores='))?.slice('--factores='.length).split(',').map(Number);
@@ -17,7 +17,7 @@ if (FACTORES.some((f) => !(f > 0))) throw new Error('--factores pide números po
 const ref = leerReferencias();
 const ensayos = FACTORES.map((pandeo) => {
   console.log(`— pandeo ${pandeo}`);
-  const filas = ensayoCusick(correrImplicito({ ...ref.tela, pandeo }), [5, 10, 20], ref);
+  const filas = ensayoCusick(correrImplicito(telaDeLaReferencia(ref, pandeo)), [5, 10, 20], ref);
   imprimirCusick(filas);
   return { pandeo, filas, criterio: criterioCusick(filas, ref) };
 });

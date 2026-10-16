@@ -1,27 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { dihedralAngle } from '../../dihedral';
-import { aMarcoDelHilo, type MallaDeTela } from '../malla';
+import { aMarcoDelHilo } from '../malla';
 import { anguloYGradiente, Placa } from '../placa';
 import { telaSI } from '../tela';
 import { laminaPlana, TELA_DE_LABORATORIO } from '../banco/escenas';
-import { azar, errorDeHessiana, errorDelGradiente } from './ayudas';
+import { azar, curvar, errorDeHessiana, errorDelGradiente } from './ayudas';
 
 const R = 0.05;
 const tela = telaSI(TELA_DE_LABORATORIO);
-
-/** Enrolla la lámina sobre un cilindro de radio R, sin estirarla; la curvatura va en la dirección `dir` del dibujo. */
-function curvar(m: MallaDeTela, dir: readonly [number, number]): Float64Array {
-  const x = new Float64Array(m.x.length);
-  for (let i = 0; i < m.patron.length / 2; i++) {
-    const u = m.patron[2 * i], v = m.patron[2 * i + 1];
-    const s = u * dir[0] + v * dir[1], w = -u * dir[1] + v * dir[0];
-    const X = R * Math.sin(s / R), Y = R * (1 - Math.cos(s / R));
-    x[3 * i] = X * dir[0] - w * dir[1];
-    x[3 * i + 1] = Y;
-    x[3 * i + 2] = X * dir[1] + w * dir[0];
-  }
-  return x;
-}
 
 describe('la placa', () => {
   it('el gradiente del ángulo coincide con diferencias finitas', () => {
@@ -65,7 +51,7 @@ describe('la placa', () => {
       it(`lámina sobre un cilindro, curvatura ${nombre}, malla de ${arista} mm: entre 0,85 y 1,05 de la energía exacta`, () => {
         const m = laminaPlana(arista);
         const placa = new Placa(aMarcoDelHilo(m.patron), m.tris, tela);
-        const razon = placa.energia(curvar(m, dir)) / (0.5 * B * (1 / R) ** 2 * 0.12 * 0.12);
+        const razon = placa.energia(curvar(m, dir, R)) / (0.5 * B * (1 / R) ** 2 * 0.12 * 0.12);
         expect(razon).toBeGreaterThan(0.85);
         expect(razon).toBeLessThan(1.05);
       });
@@ -75,7 +61,7 @@ describe('la placa', () => {
   it('con la urdimbre a lo largo del eje x del dibujo, curvar a lo largo de x pide bUrdimbre', () => {
     const m = laminaPlana(5);
     const placa = new Placa(aMarcoDelHilo(m.patron, [1, 0]), m.tris, tela);
-    const razon = placa.energia(curvar(m, [1, 0])) / (0.5 * tela.bUrdimbre * (1 / R) ** 2 * 0.12 * 0.12);
+    const razon = placa.energia(curvar(m, [1, 0], R)) / (0.5 * tela.bUrdimbre * (1 / R) ** 2 * 0.12 * 0.12);
     expect(razon).toBeGreaterThan(0.85);
     expect(razon).toBeLessThan(1.05);
   });

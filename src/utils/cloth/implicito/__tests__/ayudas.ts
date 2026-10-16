@@ -1,4 +1,5 @@
 /** Ayudas de las pruebas del motor implícito. */
+import type { MallaDeTela } from '../malla';
 
 /** Generador determinista (Park-Miller) en [−0,5, 0,5). */
 export function azar(semilla: number): () => number {
@@ -43,4 +44,21 @@ export function errorDeHessiana(
     den += fd ** 2;
   }
   return Math.sqrt(num / den);
+}
+
+/** Los vértices del borde x = x0 del dibujo (vive en las escenas del banco, que también lo usan). */
+export { bordeDelDibujo as borde } from '../banco/escenas';
+
+/** Enrolla la lámina sobre un cilindro de radio R, sin estirarla; la curvatura va en la dirección `dir` del dibujo. */
+export function curvar(m: MallaDeTela, dir: readonly [number, number], R: number): Float64Array {
+  const x = new Float64Array(m.x.length);
+  for (let i = 0; i < m.patron.length / 2; i++) {
+    const u = m.patron[2 * i], v = m.patron[2 * i + 1];
+    const s = u * dir[0] + v * dir[1], w = -u * dir[1] + v * dir[0];
+    const X = R * Math.sin(s / R), Y = R * (1 - Math.cos(s / R));
+    x[3 * i] = X * dir[0] - w * dir[1];
+    x[3 * i + 1] = Y;
+    x[3 * i + 2] = X * dir[1] + w * dir[0];
+  }
+  return x;
 }

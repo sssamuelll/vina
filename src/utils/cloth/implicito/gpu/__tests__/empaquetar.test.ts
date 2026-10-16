@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { SistemaTela } from '../../sistema';
 import { ESTADO_MEMBRANA } from '../../membrana';
-import { escenaCusick, TELA_DE_LABORATORIO } from '../../banco/escenas';
+import { escenaCostura, escenaCusick, escenaEsfera, escenaPunta, TELA_DE_LABORATORIO } from '../../banco/escenas';
 import { azar } from '../../__tests__/ayudas';
 import { empaquetar, NINGUNA, type PaqueteGpu } from '../empaquetar';
 
-/** Lo que `gradElem` escribe en cada ranura de aporte (un vec3 por ranura), desde el estado linealizado. */
+/** Lo que gradElem y prepCostura escriben en cada ranura de aporte (un vec3 por ranura), desde el estado linealizado. */
 function ranuras(s: SistemaTela): Float64Array {
-  const nt = s.tris.length / 3, out = new Float64Array(3 * 15 * nt);
+  const nt = s.tris.length / 3, cs = s.costuras, out = new Float64Array(3 * (15 * nt + 3 * cs.n));
   const em = s.membrana.estado, c = s.coef, kC = s.tela.kCizalla, { bisDeTri, K, estado: ep } = s.placa;
   for (let t = 0; t < nt; t++) {
     const e = ESTADO_MEMBRANA * t, o = 7 * t, A0 = c[o + 6];
@@ -27,6 +27,10 @@ function ranuras(s: SistemaTela): Float64Array {
       for (let r = 0; r < 4; r++) for (let d = 0; d < 3; d++) out[3 * (3 * nt + 12 * t + 4 * k + r) + d] = w * ep[13 * h + 1 + 3 * r + d];
     }
   }
+  for (let e = 0; e < cs.n; e++) {
+    const w = cs.pesos(e), o = 6 * e, g = cs.estado[o + 3];
+    for (let m = 0; m < 3; m++) for (let d = 0; d < 3; d++) out[3 * (15 * nt + 3 * e + m) + d] = w[m] * g * cs.estado[o + d];
+  }
   return out;
 }
 
@@ -39,7 +43,10 @@ function franjas(s: SistemaTela, p: PaqueteGpu): Float64Array {
     for (let k = p.u32.blqOff[b]; k < p.u32.blqOff[b + 1]; k++) {
       const cod = p.u32.blqCod[k];
       if (cod >= 0x80000000) s.placa.sumarBloque(cod - 0x80000000, i, j, M);
-      else s.membrana.sumarBloque(cod >>> 4, (cod >>> 2) & 3, cod & 3, M);
+      else if (cod >= 0x40000000) {
+        const k = cod - 0x40000000;
+        s.costuras.sumarBloque(k >>> 4, (k >>> 2) & 3, k & 3, M);
+      } else s.membrana.sumarBloque(cod >>> 4, (cod >>> 2) & 3, cod & 3, M);
     }
     vals.set(M, 9 * p.u32.posDe[b]);
   }
@@ -87,5 +94,91 @@ describe('el paquete de la tela para la GPU', () => {
       const s2 = new SistemaTela(e.malla, { ...TELA_DE_LABORATORIO, pandeo }, { obstaculos: e.obstaculos });
       expect(empaquetar(s2).f32.pcr.every(Number.isFinite)).toBe(true);
     }
+  });
+});
+
+describe('el paquete de una prenda cosida', () => {
+  const e = escenaCostura(30);
+  const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { costuras: e.costuras, franja: e.franja, ajustes: { contactoPropio: false } });
+  const r = azar(43);
+  for (let q = 0; q < s.x.length; q++) s.x[q] += 0.003 * r();
+  s.linealizar();
+  const p = empaquetar(s);
+
+  it('los aportes de cada vértice suman el gradiente elástico, con las costuras', () => {
+    const slot = ranuras(s), g = new Float64Array(3 * s.n), esperado = new Float64Array(3 * s.n);
+    for (let i = 0; i < s.n; i++) {
+      for (let k = p.u32.aporOff[i]; k < p.u32.aporOff[i + 1]; k++) for (let d = 0; d < 3; d++) g[3 * i + d] += slot[3 * p.u32.aporIdx[k] + d];
+    }
+    s.gradienteElastico(esperado);
+    for (let q = 0; q < g.length; q++) expect(g[q]).toBeCloseTo(esperado[q], 9);
+  });
+
+  it('la matriz en franjas, armada desde los códigos, da H·p con las costuras', () => {
+    const vals = franjas(s, p), v = Float64Array.from({ length: 3 * s.n }, () => r());
+    const Ap = new Float64Array(3 * s.n), esperado = new Float64Array(3 * s.n);
+    for (let i = 0; i < s.n; i++) {
+      const f = i >> 5, carril = i & 31;
+      for (let k = 0; k < p.u32.franjaAncho[f]; k++) {
+        const q = p.u32.franjaBase[f] + 32 * k + carril, j = p.u32.colSell[q];
+        if (j === NINGUNA) continue;
+        for (let a = 0; a < 3; a++) for (let c = 0; c < 3; c++) Ap[3 * i + a] += vals[9 * q + 3 * a + c] * v[3 * j + c];
+      }
+    }
+    s.hessianaPor(v, esperado);
+    for (let q = 0; q < Ap.length; q++) expect(Ap[q]).toBeCloseTo(esperado[q], 6);
+  });
+
+  it('lleva el largo de cada punto y dónde encender cada bisagra de costura', () => {
+    expect(p.nc).toBe(s.costuras.n);
+    expect(Array.from(p.f32.cl)).toEqual(Array.from(Float32Array.from(s.costuras.L)));
+    expect(Array.from(p.u32.costuraK)).toEqual(s.placa.costura.map((c) => c.o));
+  });
+});
+
+describe('el paquete con un cuerpo', () => {
+  it('lleva el BVH del cuerpo tal cual', () => {
+    const e = escenaEsfera();
+    const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: e.obstaculos, ajustes: { contactoPropio: false } });
+    const p = empaquetar(s), o = e.obstaculos[0];
+    if (o.tipo !== 'cuerpo') throw new Error('la escena trae un cuerpo');
+    const bvh = o.cuerpo.bvh;
+    expect(p.ncu).toBe(bvh.nodeCount);
+    expect(Array.from(p.u32.cuSalto)).toEqual(Array.from(bvh.skip));
+    expect(Array.from(p.f32.cuTri)).toEqual(Array.from(bvh.triVerts));
+    expect(Array.from(p.f32.cuPv)).toEqual(Array.from(bvh.vertexPseudonormals));
+  });
+
+  it('con dos cuerpos se niega', () => {
+    const e = escenaEsfera();
+    const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: [...e.obstaculos, ...e.obstaculos], ajustes: { contactoPropio: false } });
+    expect(() => empaquetar(s)).toThrow(/un solo cuerpo/);
+  });
+
+  it('con un cuerpo, la rejilla lleva también sus vértices', () => {
+    const e = escenaPunta();
+    const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: e.obstaculos });
+    const p = empaquetar(s), o = e.obstaculos[0];
+    if (o.tipo !== 'cuerpo') throw new Error('la escena trae un cuerpo');
+    expect(p.nvb).toBe(o.cuerpo.vertices.length / 3);
+    expect(p.np).toBe(s.n + p.nvb);
+    expect(Array.from(p.f32.cuNormales)).toEqual(Array.from(Float32Array.from(o.cuerpo.normales)));
+  });
+});
+
+describe('el paquete con contacto propio', () => {
+  const e = escenaCostura(30);
+  const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { costuras: e.costuras, franja: e.franja });
+  const p = empaquetar(s);
+
+  it('lleva los compañeros de costura de cada vértice, como la CPU', () => {
+    for (let i = 0; i < s.n; i++) expect(Array.from(p.u32.exIdx.subarray(p.u32.exOff[i], p.u32.exOff[i + 1]))).toEqual(s.excluidos[i]);
+  });
+
+  it('la rejilla tiene al menos dos celdas por punto y la capacidad de pares es la pedida', () => {
+    expect(p.propio).toBe(true);
+    expect(p.nceldas & (p.nceldas - 1)).toBe(0);
+    expect(p.nceldas).toBeGreaterThanOrEqual(2 * p.np);
+    expect(empaquetar(s, { maxPares: 8 }).maxPares).toBe(8);
   });
 });

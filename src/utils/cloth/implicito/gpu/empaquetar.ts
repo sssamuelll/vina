@@ -19,6 +19,26 @@ export interface PaqueteGpu {
   nq: number;
   /** Σ m·|g| de los vértices libres (N), para la quietud */
   pesoTotal: number;
+  /** puntos de costura */
+  nc: number;
+  /** bisagras de costura que se encienden al cerrar */
+  nch: number;
+  /** nodos del BVH del cuerpo; 0 sin cuerpo */
+  ncu: number;
+  /** vértices del cuerpo (sin repetir), que entran a la rejilla detrás de los de la tela */
+  nvb: number;
+  /** la tela contra sí misma (sistema.ts, armarParesPropios) */
+  propio: boolean;
+  /** pares que caben por cuadro */
+  maxPares: number;
+  /** puntos de la rejilla: los vértices de la tela y, detrás, los del cuerpo */
+  np: number;
+  /** entradas de la tabla de hash de la rejilla: una potencia de 2, al menos dos por punto */
+  nceldas: number;
+  /** la separación entre capas (m) */
+  sepPropia: number;
+  /** la arista media del patrón (m): el lado mínimo de la celda */
+  aristaMedia: number;
   f32: {
     x: Float32Array;
     masa: Float32Array;
@@ -28,6 +48,21 @@ export interface PaqueteGpu {
     K: Float32Array;
     /** pcrU y pcrV por triángulo, finitos */
     pcr: Float32Array;
+    /** s de cada punto de costura */
+    cs: Float32Array;
+    /** el largo de reposo de cada punto de costura, ahora */
+    cl: Float32Array;
+    /** la rigidez de cada bisagra de costura al encenderse */
+    ckh: Float32Array;
+    /** el BVH del cuerpo (gpu/bvh.ts, LinearBVH): nodos, triángulos, normales de cara y pseudonormales */
+    cuNodos: Float32Array;
+    cuTri: Float32Array;
+    cuNt: Float32Array;
+    cuPa: Float32Array;
+    cuPv: Float32Array;
+    /** los vértices del cuerpo y sus pseudonormales (cuerpo.ts, CuerpoRigido) */
+    cuVertices: Float32Array;
+    cuNormales: Float32Array;
   };
   u32: {
     tris: Uint32Array;
@@ -35,10 +70,13 @@ export interface PaqueteGpu {
     /** 3 por triángulo; NINGUNA = borde libre */
     bisDeTri: Uint32Array;
     fijo: Uint32Array;
-    /** CSR de las ranuras que suma cada vértice: membrana 3t + j, placa 3nt + 12t + 4k + r */
+    /** CSR de las ranuras que suma cada vértice: membrana 3t + j, placa 3nt + 12t + 4k + r, costura 15nt + 3e + m */
     aporOff: Uint32Array;
     aporIdx: Uint32Array;
-    /** de qué elementos se arma cada bloque: membrana (t << 4 | li << 2 | lj) o placa (0x80000000 | t) */
+    /**
+     * de qué elementos se arma cada bloque: membrana (t << 4 | li << 2 | lj), costura (0x40000000 | e << 4 | li << 2 | lj)
+     * o placa (0x80000000 | t)
+     */
     blqOff: Uint32Array;
     blqCod: Uint32Array;
     blqFila: Uint32Array;
@@ -52,11 +90,33 @@ export interface PaqueteGpu {
     posDe: Uint32Array;
     /** la posición del bloque diagonal de cada fila */
     diag: Uint32Array;
+    /** a, b0 y b1 de cada punto de costura */
+    costura: Uint32Array;
+    /** dónde va en K (9 por triángulo) la rigidez de cada bisagra de costura */
+    costuraK: Uint32Array;
+    /** el puntero de escape de cada nodo del BVH del cuerpo */
+    cuSalto: Uint32Array;
+    /** por vértice, él y sus compañeros de costura (sistema.ts, excluidos), en CSR */
+    exOff: Uint32Array;
+    exIdx: Uint32Array;
   };
 }
 
-export function empaquetar(s: SistemaTela): PaqueteGpu {
-  const n = s.n, nt = s.tris.length / 3, { bisagras, bisDeTri, K, nh } = s.placa;
+export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): PaqueteGpu {
+  const n = s.n, nt = s.tris.length / 3, { bisagras, bisDeTri, K, nh } = s.placa, c = s.costuras, nc = c.n;
+  if (nt >= 1 << 26 || nc >= 1 << 26) throw new Error('empaquetar: más triángulos o puntos de costura de los que caben en un código de bloque');
+  const cuerpos = s.obstaculos.flatMap((o) => (o.tipo === 'cuerpo' ? [o.cuerpo] : []));
+  if (cuerpos.length > 1) throw new Error('empaquetar: la GPU lleva un solo cuerpo');
+  const cuerpo = cuerpos[0], bvh = cuerpo?.bvh, nvb = cuerpo ? cuerpo.vertices.length / 3 : 0;
+  // con E6, un vértice forma par con una cara por cada capa que tiene a menos del radio: 16 por vértice sobran
+  const maxPares = op.maxPares ?? Math.max(64, 16 * n);
+  const np = n + nvb;
+  let nceldas = 1;
+  while (nceldas < 2 * np) nceldas *= 2;
+  // los índices de pares, listas y rejilla viajan como enteros exactos en f32
+  if (4 * maxPares >= 1 << 24 || np >= 1 << 24 || nceldas >= 1 << 24) throw new Error('empaquetar: más pares o puntos de los que la GPU guarda como enteros exactos');
+  const exOff = new Uint32Array(n + 1);
+  for (let i = 0; i < n; i++) exOff[i + 1] = exOff[i] + s.excluidos[i].length;
 
   // las ranuras de aporte al gradiente que suma cada vértice
   const aportes: number[][] = Array.from({ length: n }, () => []);
@@ -67,6 +127,11 @@ export function empaquetar(s: SistemaTela): PaqueteGpu {
       if (h < 0) continue;
       for (let r = 0; r < 4; r++) aportes[bisagras[4 * h + r]].push(3 * nt + 12 * t + 4 * k + r);
     }
+  }
+  // después de las ranuras de la placa: 3 por punto de costura (a, b0, b1)
+  for (let e = 0; e < nc; e++) {
+    const v = c.vertices(e);
+    for (let m = 0; m < 3; m++) aportes[v[m]].push(15 * nt + 3 * e + m);
   }
   const aporOff = new Uint32Array(n + 1);
   for (let i = 0; i < n; i++) aporOff[i + 1] = aporOff[i] + aportes[i].length;
@@ -83,6 +148,10 @@ export function empaquetar(s: SistemaTela): PaqueteGpu {
     for (let li = 0; li < 3; li++) for (let lj = 0; lj < 3; lj++) aporte(s.tris[3 * t + li], s.tris[3 * t + lj], (t << 4) | (li << 2) | lj);
     const plantilla = s.placa.plantilla(t);
     for (const i of plantilla) for (const j of plantilla) aporte(i, j, (0x80000000 | t) >>> 0);
+  }
+  for (let e = 0; e < nc; e++) {
+    const v = c.vertices(e);
+    for (let li = 0; li < 3; li++) for (let lj = 0; lj < 3; lj++) aporte(v[li], v[lj], (0x40000000 | (e << 4) | (li << 2) | lj) >>> 0);
   }
   const filaOff = new Uint32Array(n + 1);
   const blqFila: number[] = [], blqCol: number[] = [], blqOff: number[] = [0], blqCod: number[] = [];
@@ -135,7 +204,33 @@ export function empaquetar(s: SistemaTela): PaqueteGpu {
     nb: blqCol.length,
     nq,
     pesoTotal,
-    f32: { x: Float32Array.from(s.x), masa: Float32Array.from(s.masa), coef: Float32Array.from(s.coef), K: Float32Array.from(K), pcr },
+    nc,
+    nch: s.placa.costura.length,
+    ncu: bvh?.nodeCount ?? 0,
+    nvb,
+    propio: s.aj.contactoPropio,
+    maxPares,
+    np,
+    nceldas,
+    sepPropia: s.sepPropia,
+    aristaMedia: s.aristaMedia,
+    f32: {
+      x: Float32Array.from(s.x),
+      masa: Float32Array.from(s.masa),
+      coef: Float32Array.from(s.coef),
+      K: Float32Array.from(K),
+      pcr,
+      cs: Float32Array.from(c.s),
+      cl: Float32Array.from(c.L),
+      ckh: Float32Array.from(s.placa.costura, (k) => k.kh),
+      cuNodos: bvh?.nodes ?? new Float32Array(0),
+      cuTri: bvh?.triVerts ?? new Float32Array(0),
+      cuNt: bvh?.triNormals ?? new Float32Array(0),
+      cuPa: bvh?.edgePseudonormals ?? new Float32Array(0),
+      cuPv: bvh?.vertexPseudonormals ?? new Float32Array(0),
+      cuVertices: Float32Array.from(cuerpo?.vertices ?? []),
+      cuNormales: Float32Array.from(cuerpo?.normales ?? []),
+    },
     u32: {
       tris: Uint32Array.from(s.tris),
       bisagras: Uint32Array.from(bisagras),
@@ -152,6 +247,11 @@ export function empaquetar(s: SistemaTela): PaqueteGpu {
       colSell,
       posDe,
       diag,
+      costura: Uint32Array.from({ length: 3 * nc }, (_, k) => c.vertices(Math.floor(k / 3))[k % 3]),
+      costuraK: Uint32Array.from(s.placa.costura, (k) => k.o),
+      cuSalto: bvh?.skip ?? new Uint32Array(0),
+      exOff,
+      exIdx: Uint32Array.from(s.excluidos.flat()),
     },
   };
 }

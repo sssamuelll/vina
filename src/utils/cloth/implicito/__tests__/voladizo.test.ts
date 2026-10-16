@@ -11,7 +11,7 @@ import { elasticaExacta } from '../banco/elastica';
 import type { TelaFisica } from '../tela';
 
 // la misma flexión en las tres direcciones: la tira es una viga y la elástica es exacta
-const TELA: TelaFisica = { gramaje: 200, grosor: 0.5, kTrama: 600, kUrdimbre: 600, kCizalla: 50, pandeo: Infinity, bTrama: 5, bUrdimbre: 5, bBies: 5 };
+const TELA: TelaFisica = { gramaje: 200, grosor: 0.5, kTrama: 600, kUrdimbre: 600, kCizalla: 50, pandeo: Infinity, bTrama: 5, bUrdimbre: 5, bBies: 5, friccionCuerpo: 0, friccionTela: 0 };
 
 function yDeLaPunta(aristaMm: number): number {
   const e = escenaVoladizo(15, 'urdimbre', aristaMm);

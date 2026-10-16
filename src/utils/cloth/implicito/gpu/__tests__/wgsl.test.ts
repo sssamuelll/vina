@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SistemaTela } from '../../sistema';
-import { escenaCusick, TELA_DE_LABORATORIO } from '../../banco/escenas';
+import { escenaCusick, escenaEsfera, TELA_DE_LABORATORIO } from '../../banco/escenas';
 import { empaquetar } from '../empaquetar';
 import { distribuir, ENTRADAS, tamanosDeBufer, wgslDelMotor, wgslObstaculos } from '../wgsl';
 
@@ -18,6 +18,21 @@ describe('el WGSL del motor', () => {
     expect(fuente).not.toMatch(/Infinity|NaN/);
   });
 
+  it('la búsqueda en línea usa los planos fijos: posPrueba no consulta el obstáculo (E4)', () => {
+    const cuerpo = fuente.slice(fuente.indexOf('fn posPrueba('), fuente.indexOf('fn anguloPrueba('));
+    expect(cuerpo).not.toMatch(/masCercano/);
+    expect(cuerpo).toMatch(/energiaPlano/);
+  });
+
+  it('con un cuerpo, el obstáculo es el BVH recorrido hasta el radio de búsqueda', () => {
+    const e = escenaEsfera();
+    const sc = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { obstaculos: e.obstaculos, ajustes: { contactoPropio: false } });
+    const pc = empaquetar(sc), fc = wgslDelMotor(sc, pc, distribuir(pc, 60));
+    expect(fc).toMatch(/fn cuerpoCercano\(/);
+    expect(fc).toMatch(/return cuerpoCercano\(p, RADIO_B\)/);
+    expect(fc).not.toMatch(/Infinity|NaN/);
+  });
+
   it('sin obstáculos, nadie queda en contacto', () => {
     const sin = wgslObstaculos([]);
     expect(sin).toMatch(/fn masCercano/);
@@ -30,7 +45,10 @@ describe('el WGSL del motor', () => {
     const pg = empaquetar(sg);
     const tam = tamanosDeBufer(distribuir(pg, 3600), pg);
     expect(sg.n).toBeGreaterThan(25_000);
-    // 128 MiB por búfer (maxStorageBufferBindingSize) y 8 búferes por etapa (maxStorageBuffersPerShaderStage)
+    // con contacto propio (el búfer atómico incluido): 128 MiB por búfer (maxStorageBufferBindingSize) y 8 búferes por etapa
+    // (maxStorageBuffersPerShaderStage)
+    expect(sg.aj.contactoPropio).toBe(true);
+    expect(Object.keys(tam)).toContain('at');
     for (const bytes of Object.values(tam)) expect(bytes).toBeLessThanOrEqual(128 * 1024 * 1024);
     expect(Object.keys(tam).length).toBeLessThanOrEqual(8);
   }, 180_000);
