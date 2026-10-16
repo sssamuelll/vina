@@ -82,6 +82,11 @@ export interface PaqueteGpu {
      */
     blqOff: Uint32Array;
     blqCod: Uint32Array;
+    /**
+     * por cada aporte de la placa, dónde están sus dos vértices en las bisagras del triángulo: 6 bits por bisagra k,
+     * el lugar r (0-3) de la fila y el de la columna, 7 si no está; 0 en los demás aportes
+     */
+    blqRanura: Uint32Array;
     blqFila: Uint32Array;
     blqCol: Uint32Array;
     /** franjas de 32 filas: el bloque k de la fila 32·f + c va en franjaBase[f] + 32·k + c */
@@ -175,12 +180,31 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
     for (let li = 0; li < 3; li++) for (let lj = 0; lj < 3; lj++) aporte(v[li], v[lj], (0x40000000 | (e << 4) | (li << 2) | lj) >>> 0);
   }
   const filaOff = new Uint32Array(n + 1);
-  const blqFila: number[] = [], blqCol: number[] = [], blqOff: number[] = [0], blqCod: number[] = [];
+  const blqFila: number[] = [], blqCol: number[] = [], blqOff: number[] = [0], blqCod: number[] = [], blqRanura: number[] = [];
+  // el lugar de i y de j en cada bisagra del triángulo t, para que el bloque de la placa no los busque en cada cuadro
+  const ranuras = (t: number, i: number, j: number) => {
+    let r = 0;
+    for (let k = 0; k < 3; k++) {
+      const h = bisDeTri[3 * t + k];
+      let ri = 7, rj = 7;
+      if (h >= 0) {
+        for (let q = 0; q < 4; q++) {
+          if (bisagras[4 * h + q] === i) ri = q;
+          if (bisagras[4 * h + q] === j) rj = q;
+        }
+      }
+      r |= (ri | (rj << 3)) << (6 * k);
+    }
+    return r >>> 0;
+  };
   for (let i = 0; i < n; i++) {
     for (const j of [...filas[i].keys()].sort((a, b) => a - b)) {
       blqFila.push(i);
       blqCol.push(j);
-      for (const cod of filas[i].get(j) ?? []) blqCod.push(cod);
+      for (const cod of filas[i].get(j) ?? []) {
+        blqCod.push(cod);
+        blqRanura.push(cod >= 0x80000000 ? ranuras(cod - 0x80000000, i, j) : 0);
+      }
       blqOff.push(blqCod.length);
     }
     filaOff[i + 1] = blqCol.length;
@@ -263,6 +287,7 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
       aporIdx,
       blqOff: Uint32Array.from(blqOff),
       blqCod: Uint32Array.from(blqCod),
+      blqRanura: Uint32Array.from(blqRanura),
       blqFila: Uint32Array.from(blqFila),
       blqCol: Uint32Array.from(blqCol),
       franjaBase,

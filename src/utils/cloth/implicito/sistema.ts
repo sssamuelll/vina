@@ -383,7 +383,7 @@ export class SistemaTela {
     if (!this.aj.contactoPropio) return;
     const { x, v, tris, fijo, n, punto: q } = this, sep = this.sepPropia, { kContacto, kPropio, h, gravedad } = this.aj, kp = kPropio ?? kContacto;
     const rapidez = (i: number) => Math.hypot(v[3 * i], v[3 * i + 1], v[3 * i + 2]);
-    const regiones = new RegionesDeRapidez(celdaDeRegion(sep));
+    const regiones = new RegionesDeRapidez(celdaDeRegion(sep, this.aristaMedia));
     for (let i = 0; i < n; i++) regiones.anotar(x[3 * i], x[3 * i + 1], x[3 * i + 2], rapidez(i));
     this.puntos.set(x);
     this.rejilla.armar(this.puntos, celdaDeLaRejilla(sep, this.aristaMedia));

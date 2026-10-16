@@ -45,9 +45,12 @@ export function celdaDeLaRejilla(sep: number, aristaMedia: number): number {
   return Math.max(2 * sep, aristaMedia, 0.5 * (sep + ALCANCE_MAXIMO));
 }
 
-/** El lado de las regiones de rapidez (m): las 27 alrededor de un triángulo cubren todo lo que su caja puede tocar. */
-export function celdaDeRegion(sep: number): number {
-  return 2 * (sep + ALCANCE_MAXIMO);
+/**
+ * El lado de las regiones de rapidez (m): las 27 alrededor del centro de un triángulo cubren todo lo que su caja puede
+ * tocar, el radio más grande más dos aristas desde el centro.
+ */
+export function celdaDeRegion(sep: number, aristaMedia: number): number {
+  return sep + ALCANCE_MAXIMO + 2 * aristaMedia;
 }
 
 /**

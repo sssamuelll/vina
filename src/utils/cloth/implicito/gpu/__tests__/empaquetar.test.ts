@@ -61,6 +61,30 @@ describe('el paquete de la tela para la GPU', () => {
   s.linealizar();
   const p = empaquetar(s);
 
+  it('cada aporte de la placa sabe dónde están sus dos vértices en las bisagras de su triángulo', () => {
+    const { bisagras, bisDeTri } = s.placa;
+    let placas = 0;
+    for (let b = 0; b < p.nb; b++) {
+      const i = p.u32.blqFila[b], j = p.u32.blqCol[b];
+      for (let k = p.u32.blqOff[b]; k < p.u32.blqOff[b + 1]; k++) {
+        const cod = p.u32.blqCod[k], ran = p.u32.blqRanura[k];
+        if (cod < 0x80000000) {
+          expect(ran).toBe(0);
+          continue;
+        }
+        placas++;
+        const t = cod - 0x80000000;
+        for (let q = 0; q < 3; q++) {
+          const h = bisDeTri[3 * t + q], ri = (ran >>> (6 * q)) & 7, rj = (ran >>> (6 * q + 3)) & 7;
+          const lugar = (v: number) => (h < 0 ? -1 : [0, 1, 2, 3].findIndex((r) => bisagras[4 * h + r] === v));
+          expect(ri === 7 ? -1 : ri).toBe(lugar(i));
+          expect(rj === 7 ? -1 : rj).toBe(lugar(j));
+        }
+      }
+    }
+    expect(placas).toBeGreaterThan(0);
+  });
+
   it('los aportes de cada vértice suman el gradiente elástico', () => {
     const slot = ranuras(s), g = new Float64Array(3 * s.n), esperado = new Float64Array(3 * s.n);
     for (let i = 0; i < s.n; i++) {

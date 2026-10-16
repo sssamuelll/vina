@@ -44,7 +44,7 @@ function zonas<K extends string>(tamanos: Record<K, number>): Record<K, number> 
   return o as Record<K, number> & { total: number };
 }
 
-type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT' | 'RN';
+type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT' | 'RN' | 'DC';
 type ZonaTf =
   | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH' | 'CCOS' | 'CDES'
   | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'CUVN' | 'SOST' | 'HP' | 'OFFC' | 'ORD4' | 'PAR' | 'OFFV' | 'ENT' | 'SCB'
@@ -83,7 +83,7 @@ export interface Distribucion {
 
 export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribucion {
   const { n, nt, nh } = p;
-  const vf = zonas<ZonaVf>({ XT: 3 * n, V: 3 * n, R: 3 * n, Z: 3 * n, AP: 3 * n, DX: 3 * n, XP: 3 * n, MASA: n, EV0: n, PINV: 9 * n, CONT: 6 * n, RN: n });
+  const vf = zonas<ZonaVf>({ XT: 3 * n, V: 3 * n, R: 3 * n, Z: 3 * n, AP: 3 * n, DX: 3 * n, XP: 3 * n, MASA: n, EV0: n, PINV: 9 * n, CONT: 6 * n, RN: n, DC: n });
   const tf = zonas<ZonaTf>({
     COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, THP: nh, CONTRIB: 45 * nt + 9 * p.nc,
     CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch, CCOS: p.nc, CDES: 3 * p.nc,
@@ -182,7 +182,7 @@ const NINGUNA = 0xffffffffu;
 ${Object.entries(vf).filter(([k]) => k !== 'total').map(([k, v]) => `const O_${k} = ${u(v)};`).join(' ')}
 ${Object.entries(tf).filter(([k]) => k !== 'total').map(([k, v]) => `const O_${k} = ${u(v)};`).join(' ')}
 const I_TRIS = ${u(iu.tris)}; const I_BIS = ${u(iu.bisagras)}; const I_HOT = ${u(iu.bisDeTri)}; const I_FIJO = ${u(iu.fijo)};
-const I_AOFF = ${u(iu.aporOff)}; const I_AIDX = ${u(iu.aporIdx)}; const I_BOFF = ${u(iu.blqOff)}; const I_BCOD = ${u(iu.blqCod)};
+const I_AOFF = ${u(iu.aporOff)}; const I_AIDX = ${u(iu.aporIdx)}; const I_BOFF = ${u(iu.blqOff)}; const I_BCOD = ${u(iu.blqCod)}; const I_BRAN = ${u(iu.blqRanura)};
 const I_BFILA = ${u(iu.blqFila)}; const I_BCOL = ${u(iu.blqCol)}; const I_FBASE = ${u(iu.franjaBase)};
 const I_FANCHO = ${u(iu.franjaAncho)}; const I_COLE = ${u(iu.colSell)}; const I_POSDE = ${u(iu.posDe)}; const I_DIAG = ${u(iu.diag)};
 const R_PA = ${u(red.PA)}; const R_PB = ${u(red.PB)}; const R_PC = ${u(red.PC)}; const R_SC = ${u(red.SC)};
@@ -239,7 +239,7 @@ const SEPP = ${f(p.sepPropia)};
 const ALCANCE = ${f(ALCANCE_MAXIMO)};
 // la celda de la rejilla de puntos y la de las regiones de rapidez (contactoPropio.ts)
 const CELDA = ${f(celdaDeLaRejilla(p.sepPropia, p.aristaMedia))};
-const CREG = ${f(celdaDeRegion(p.sepPropia))};
+const CREG = ${f(celdaDeRegion(p.sepPropia, p.aristaMedia))};
 const ARISTA = ${f(p.aristaMedia)};
 const MU_T = ${f(tela.friccionTela)};
 const EPS_F = ${f(EPS_FRICCION)};
@@ -373,18 +373,18 @@ fn bloqueMembrana(t: u32, li: u32, lj: u32) -> mat3x3<f32> {
   return tf[o + 6u] * (ai * aj * Hu + bi * bj * Hv + KS * outer(ai * fv + bi * fu, aj * fv + bj * fu));
 }
 
-// el bloque (i, j) de la placa del triángulo t (placa.ts, sumarBloque)
-fn bloquePlaca(t: u32, i: u32, j: u32) -> mat3x3<f32> {
+// el bloque (i, j) de la placa del triángulo t (placa.ts, sumarBloque); ranuras dice dónde están i y j en cada
+// bisagra (empaquetar.ts, blqRanura)
+fn bloquePlaca(t: u32, ranuras: u32) -> mat3x3<f32> {
   var gi = array<vec3<f32>, 3>(vec3<f32>(0.0), vec3<f32>(0.0), vec3<f32>(0.0));
   var gj = array<vec3<f32>, 3>(vec3<f32>(0.0), vec3<f32>(0.0), vec3<f32>(0.0));
   for (var k = 0u; k < 3u; k++) {
     let h = iu[I_HOT + 3u * t + k];
     if (h == NINGUNA) { continue; }
-    for (var r = 0u; r < 4u; r++) {
-      let v = iu[I_BIS + 4u * h + r];
-      if (v == i) { gi[k] = hg(h, r); }
-      if (v == j) { gj[k] = hg(h, r); }
-    }
+    let ri = (ranuras >> (6u * k)) & 7u;
+    let rj = (ranuras >> (6u * k + 3u)) & 7u;
+    if (ri < 4u) { gi[k] = hg(h, ri); }
+    if (rj < 4u) { gj[k] = hg(h, rj); }
   }
   var M = mat3x3<f32>(vec3<f32>(0.0), vec3<f32>(0.0), vec3<f32>(0.0));
   for (var k = 0u; k < 3u; k++) {
@@ -561,6 +561,11 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   stx(iu[b], (1.0 - s) * xE2(iu[b + 1u]) + s * xE2(iu[b + 2u]) + des(e));
 }
 
+// la cota de la distancia de cada vértice al cuerpo (en DC): la distancia que dio la última búsqueda (hasta el radio de
+// búsqueda), menos lo que el vértice se movió desde entonces. Con ella, el vértice que no puede tocar el cuerpo no lo busca
+// (inicio y aplicar), sin cambiar nada: la distancia no baja más que lo que el vértice se mueve
+const MARGEN_DC = 1e-5;
+
 // 1. x_t, el apoyo de cada vértice en el cuerpo con su fricción (sistema.ts, armarApoyos) y la inercia al empezar
 @compute @workgroup_size(${WG}) fn inicio(@builtin(global_invocation_id) g: vec3<u32>) {
   let i = g.x;
@@ -575,8 +580,9 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   // la fuerza de apoyo del cuadro anterior: negativa, su restricción jalaba hacia el cuerpo y este cuadro se suelta
   let lambda = vf[o + 4u];
   vf[o] = 0.0;
-  if (iu[I_FIJO + i] == 0u && !cosidoV(i) && lambda >= 0.0) {
+  if (iu[I_FIJO + i] == 0u && !cosidoV(i) && lambda >= 0.0 && vf[O_DC + i] < SEP + HOLGURA + MARGEN_DC) {
     let c = masCercano(x);
+    vf[O_DC + i] = min(c.c.x, RADIO_B);
     let n = c.c.yzw;
     let v = ld(O_V, i);
     let vn = dot(v, n);
@@ -698,12 +704,10 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
 @compute @workgroup_size(${WG}) fn ensamblar(@builtin(global_invocation_id) g: vec3<u32>) {
   let b = g.x;
   if (b >= NB) { return; }
-  let i = iu[I_BFILA + b];
-  let j = iu[I_BCOL + b];
   var M = mat3x3<f32>(vec3<f32>(0.0), vec3<f32>(0.0), vec3<f32>(0.0));
   for (var s = iu[I_BOFF + b]; s < iu[I_BOFF + b + 1u]; s++) {
     let cod = iu[I_BCOD + s];
-    if (cod >= 0x80000000u) { M += bloquePlaca(cod - 0x80000000u, i, j); }
+    if (cod >= 0x80000000u) { M += bloquePlaca(cod - 0x80000000u, iu[I_BRAN + s]); }
     else if (cod >= 0x40000000u) { let k = cod - 0x40000000u; M += bloqueCostura(k >> 4u, (k >> 2u) & 3u, k & 3u); }
     else { M += bloqueMembrana(cod >> 4u, (cod >> 2u) & 3u, cod & 3u); }
   }
@@ -1066,8 +1070,10 @@ fn lugarRz(siguiente: bool) -> u32 {
     let o = O_CONT + 6u * i;
     var lambda = 0.0;
     if (vf[o] > 0.5) { lambda = -vf[O_RN + i]; }
-    if (iu[I_FIJO + i] == 0u && !cosidoV(i)) {
+    var cota = vf[O_DC + i] - length(dx);
+    if (iu[I_FIJO + i] == 0u && !cosidoV(i) && cota < SEP + MARGEN_DC) {
       let c = masCercano(x);
+      cota = min(c.c.x, RADIO_B);
       if (c.c.x < SEP) {
         let n = c.c.yzw;
         x = x + (SEP - c.c.x) * n;
@@ -1077,8 +1083,10 @@ fn lugarRz(siguiente: bool) -> u32 {
           lambda = max(lambda, vf[O_MASA + i] * -vn / H);
         }
         proyectado = 1.0;
+        cota = 0.0;
       }
     }
+    vf[O_DC + i] = cota;
     vf[o + 4u] = lambda;
     stx(i, x);
     st(O_V, i, v);
