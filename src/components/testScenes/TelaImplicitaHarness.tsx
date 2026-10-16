@@ -19,6 +19,7 @@ import {
   camisetaContraLaReferencia, medirCamiseta, type CamisetaContraLaReferencia, type ConfigCamiseta, type MedidasDeCamiseta,
 } from '../../utils/cloth/implicito/banco/camiseta';
 import { toparPlaca } from '../../utils/cloth/implicito/banco/experimentos';
+import { paresEnCosturas, peoresPuntos, type ParesEnCostura, type PeorPunto } from '../../utils/cloth/implicito/banco/paresEnCosturas';
 import { SistemaTela } from '../../utils/cloth/implicito/sistema';
 import type { TelaFisica } from '../../utils/cloth/implicito/tela';
 import { pasoImplicito } from '../../utils/cloth/implicito/paso';
@@ -36,6 +37,9 @@ interface Resultado {
   msPorCuadro?: number;
   segundosHastaQuieta?: number | null;
   medidas?: MedidasDeCamiseta;
+  /** con diag=1: los pares del contacto propio junto a las costuras abiertas (banco/paresEnCosturas.ts) */
+  diagnostico?: ParesEnCostura[];
+  peores?: PeorPunto[];
   estado?: EstadoGpu;
   error?: string;
 }
@@ -157,7 +161,23 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
       }
       const cuadros = hechos - 1;
       const x = await motor.leerPosiciones();
-      return { ...base, segundosHastaQuieta: quieta, msPorCuadro: ms / cuadros, medidas: medirCamiseta(x, camisetaEnCurso), estado: await motor.leerEstado() };
+      let diagnostico: ParesEnCostura[] | undefined, peores: PeorPunto[] | undefined;
+      if (q.get('diag')) {
+        // los pares que arma la CPU sobre las posiciones de la GPU
+        const cpu = nuevo();
+        cpu.x.set(x);
+        cpu.v.fill(0);
+        cpu.costuras.cosido.set(await motor.leerCosidos());
+        cpu.armarParesPropios();
+        const { piezas, prenda } = camisetaEnCurso.camiseta;
+        const piezaDe = (v: number) => {
+          const k = prenda.piezas.findIndex((p) => v >= p.v0 && v < p.v0 + p.nv);
+          return `${piezas[k].name} (${piezas[k].category ?? 'sin clase'})`;
+        };
+        diagnostico = paresEnCosturas(cpu, piezaDe);
+        peores = peoresPuntos(cpu, piezaDe);
+      }
+      return { ...base, segundosHastaQuieta: quieta, msPorCuadro: ms / cuadros, medidas: medirCamiseta(x, camisetaEnCurso), diagnostico, peores, estado: await motor.leerEstado() };
     }
     // quietud: hasta 10 s de tela, leyendo la historia de a un segundo
     const vigia = new VigiaDeQuietud();
