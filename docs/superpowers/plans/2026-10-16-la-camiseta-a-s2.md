@@ -39,7 +39,7 @@ Se aplicó sobre `51215997` y se revirtió sin commitear.
 
   El tope mejora todas las medidas, pero no lleva la camiseta a §2. Los desbordes bajan solo un 20 %: no salen sobre todo del cierre.
 - **La camiseta en la CPU a 20 mm, con todo el código del plan y el tope de 5 mm** (informe `2026-10-16-06-48-52-implicito.json`): no queda quieta; 5,12 % de triángulos aplastados; costuras con mediana 0,1 mm y máxima 21,5 mm; el gradiente conjugado llega al tope en todos los cuadros (100 iteraciones por cuadro, 50 por ronda); la primera costura cierra en el cuadro 6 y la última en el 63. Las costuras más abiertas son dos del cuello (21,5 y 7,7 mm) y una de la sisa (8,3 mm, con lados de 219,9 y 218,8 mm). La pieza más aplastada es la tira del cuello (14,8 %), seguida de las mangas (7,4 y 7,8 %).
-- **La tira del cuello es un cuello doblado, y el spec lo deja fuera.** Es una tira de punto que se dobla a lo largo y se cose al escote por sus dos bordes (#1251); el motor la simula como una sola capa sin doblar, y el spec la excluye en §3. Aun así, §2 se mide sobre la camiseta entera: la pieza que más falla es una que este motor no modela.
+- **La tira del cuello cierra en la referencia.** En la prenda real es un cuello de punto doblado (#1251), pero la referencia la cosió de una sola capa y con el mismo jersey que el resto, igual que Vina, para que la comparación aísle el motor. Con esa construcción, en la referencia las costuras cierran y la tira no se aplasta: la costura abierta y la tira aplastada de Vina son del motor.
 - **Las costuras del cuello piden estirar la tira.** En el patrón, el escote mide entre 11 y 14 % más que la tira en sus cuatro costuras (510 mm contra 446 en total); las demás costuras difieren en 1 % o menos. Es la candidata a la costura de 23 mm, y la Tarea 3 lo mide.
 - **El mallador no refina.** `meshPiece` nunca llama a `refineMesh` (`src/utils/mesh/refine.ts`): `minAngle` y `maxRefinementPasses` no se leen, y con 3, 10 y 30 pases sale la misma malla. Anotado en #1261.
 - **Los triángulos de más rigidez de placa no son astillas.** Son de borde, en las mangas, con un solo borde libre. A 5 mm el peor tiene ángulos de 82/67/31° y una K 4·10⁴ veces la mediana; a 20 mm, 7·10⁵ veces, con 11,6° entre sus dos bordes interiores. La placa los mide mal, y la Tarea 5 mide cuánto pesa eso en la camiseta.
@@ -78,7 +78,7 @@ Se aplicó sobre `51215997` y se revirtió sin commitear.
 - Todo va en la rama `feat/camiseta-a-s2`, sacada de main `51215997` en el worktree `.claude/worktrees/tela-prenda`. Se sube y abre su PR en la Tarea 7; mergear espera la orden de Samuel. Es laboratorio: no cambia nada para la usuaria y no necesita deploy.
 - La carpeta privada la toca solo el controlador: corre el banco y la camiseta en la GPU, y lee los informes. Ningún subagente la lee, corre Playwright con GPU, sube ramas ni mergea.
 - Las pruebas con GPU real corren con `VINA_E2E_PORT=5193`.
-- **Puntos de decisión:** la Tarea 3, si la costura abierta es una del cuello, como dio el ensayo (¿§2 sin la tira, o el cuello doblado y su tela dentro del alcance?); la Tarea 4, si ningún resorte cumple costuras y quietud; la Tarea 5, si topar la placa cambia la camiseta (cambiar la placa es física); la Tarea 6, porque lo que se optimice va al subproyecto de velocidad.
+- **Puntos de decisión:** la Tarea 3, si la costura que queda abierta pide cambiar el modelo; la Tarea 4, si ningún resorte cumple costuras y quietud; la Tarea 5, si topar la placa cambia la camiseta (cambiar la placa es física); la Tarea 6, porque lo que se optimice va al subproyecto de velocidad.
 
 ## Antes de empezar
 
@@ -588,8 +588,7 @@ Expected: en la CPU, las tres costuras más abiertas con el largo de sus lados y
 
 - [ ] **Step 7: Decidir**
 
-- Si las costuras más abiertas son las del cuello (cuerpo ↔ cuello, con lados que difieren 11-14 % en el patrón), como en el ensayo: la tira es un cuello de punto doblado (#1251), que el motor no modela y el spec deja fuera (§3). Va a Samuel con los números y una pregunta: medir §2 sin la tira (sus costuras y su pieza), para juzgar el motor, o traer al alcance el cuello doblado y una tela de punto para la tira (varias telas por prenda). Las Tareas 4 a 6 siguen, porque miden la convergencia y no dependen de esto.
-- Si es otra costura, `superpowers:systematic-debugging` sobre ella antes de seguir: sus lados, sus puntos y su cierre. Un error de código se arregla aquí, con su prueba en rojo antes.
+- La costura más abierta pasa por `superpowers:systematic-debugging` antes de seguir: sus lados, sus puntos, su cierre y, si sus lados miden distinto (las del cuello, 11-14 %), cuánto le pide estirarse a la tira. La referencia cose esa tira igual que Vina, de una sola capa y con el mismo jersey, y ahí cierra: una costura del cuello abierta es del motor. Un error de código se arregla aquí, con su prueba en rojo antes; si lo que falla es el modelo, la tarea para y va a Samuel.
 - Los aplastados por pieza dicen dónde mirar; la Tarea 5 comprueba si son las mangas.
 
 - [ ] **Step 8: Commit**
