@@ -5,7 +5,7 @@
  */
 import type { SeamPair } from '../seamPairs';
 import { TOLERANCIA_DE_DUPLICADOS } from '../../seam';
-import { bisagrasDeCostura, puntosDeCostura, type BisagraDeCostura, type PuntoDeCostura } from './costuras';
+import { bisagrasDeCostura, puntosDeCostura, type BisagraDeCostura, type PuntoDeCostura, type VecinosDelTramo } from './costuras';
 import { aMarcoDelHilo, type MallaDeTela } from './malla';
 import { franjaDelMargen, MARGEN_POR_DEFECTO_MM } from './margen';
 import { telaSI, type TelaFisica } from './tela';
@@ -144,6 +144,8 @@ export interface LadosDeCostura {
   b: number[];
   ta?: number[];
   tb?: number[];
+  vecinosA?: VecinosDelTramo;
+  vecinosB?: VecinosDelTramo;
 }
 
 /**
@@ -167,15 +169,32 @@ export function costurasDePrenda(prenda: Prenda, pares: readonly SeamPair[]): { 
     });
     return { g, t: t ? tg : undefined };
   };
+  // el vecino de afuera de cada punta pasa a índice global; si armarPrenda lo quitó, esa punta queda sin vecino
+  const vecinosGlobales = (r: RangoDePieza, vec?: VecinosDelTramo): VecinosDelTramo | undefined => {
+    if (!vec) return undefined;
+    const uno = (x?: { v: number; t: number }) => {
+      if (!x) return undefined;
+      const j = r.local[x.v];
+      if (j === undefined) throw new Error(`costurasDePrenda: la pieza ${r.id} no tiene el vértice ${x.v}`);
+      return j >= 0 ? { v: r.v0 + j, t: x.t } : undefined;
+    };
+    const antes = uno(vec.antes), despues = uno(vec.despues);
+    return antes || despues ? { ...(antes ? { antes } : {}), ...(despues ? { despues } : {}) } : undefined;
+  };
   const puntos: PuntoDeCostura[] = [], lados: LadosDeCostura[] = [];
   for (const par of pares) {
     const ra = rango.get(par.pieceAId), rb = rango.get(par.pieceBId);
     if (!ra || !rb) throw new Error(`costurasDePrenda: falta una pieza de la costura ${par.pieceAId}↔${par.pieceBId}`);
     if (!par.lados) throw new Error('costurasDePrenda: el par no trae sus lados (los arma seamInitDataToPairs)');
     const A = globales(ra, par.lados.a, par.lados.ta), B = globales(rb, par.lados.b, par.lados.tb);
-    const lado: LadosDeCostura = { a: A.g, b: B.g, ...(A.t ? { ta: A.t } : {}), ...(B.t ? { tb: B.t } : {}) };
+    const vA = vecinosGlobales(ra, par.lados.vecinosA), vB = vecinosGlobales(rb, par.lados.vecinosB);
+    const lado: LadosDeCostura = {
+      a: A.g, b: B.g,
+      ...(A.t ? { ta: A.t } : {}), ...(B.t ? { tb: B.t } : {}),
+      ...(vA ? { vecinosA: vA } : {}), ...(vB ? { vecinosB: vB } : {}),
+    };
     lados.push(lado);
-    puntos.push(...puntosDeCostura(prenda.malla.patron, lado.a, lado.b, lado.ta, lado.tb));
+    puntos.push(...puntosDeCostura(prenda.malla.patron, lado.a, lado.b, lado.ta, lado.tb, lado.vecinosA, lado.vecinosB));
   }
   return { puntos, lados };
 }

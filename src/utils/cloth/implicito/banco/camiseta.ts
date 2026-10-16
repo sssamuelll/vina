@@ -30,9 +30,13 @@ import { cuerpoDeObj, leerObj, mallaDeObj } from './obj';
 /** Las medidas con que la app refina las costuras de María en el mundo (las de seamCoverage.maria.test.ts). */
 export const MEDIDAS_DE_MARIA = { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 } as BodyMeasurements;
 
-/** Las piezas del DXF, clasificadas y con sus bordes semánticos, como al importarlas en la app. */
+/**
+ * Las piezas del DXF, clasificadas y con sus bordes semánticos, como al importarlas en la app. Con ids fijos: autoSew
+ * orienta algunas costuras según los ids, y con los de la importación (al azar) la camiseta del banco no se repetía.
+ */
 export function piezasDeMaria(dxf: string): PatternPiece[] {
-  const piezas = importDXFContent(dxf, { unit: 'auto', autoDetect: true }).pieces;
+  // state-encoded ID: el orden de la pieza en el DXF
+  const piezas = importDXFContent(dxf, { unit: 'auto', autoDetect: true }).pieces.map((p, k) => ({ ...p, id: `maria-${k}` }));
   const clases = classifyPiecesGeometric(piezas);
   for (const p of piezas) {
     const c = clases.get(p.id);
@@ -218,7 +222,7 @@ export function medirCamiseta(x: ArrayLike<number>, c: CamisetaContraLaReferenci
     porCostura: lados
       .filter((l) => l.a.length > 0 && l.b.length > 0)
       .map((l) => {
-        const puntos = puntosDeCostura(malla.patron, l.a, l.b, l.ta, l.tb);
+        const puntos = puntosDeCostura(malla.patron, l.a, l.b, l.ta, l.tb, l.vecinosA, l.vecinosB);
         return {
           piezas: [nombre(piezaDe(l.a[0])), nombre(piezaDe(l.b[0]))] as [string, string],
           puntos: puntos.length,

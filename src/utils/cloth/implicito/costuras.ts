@@ -34,9 +34,28 @@ export function largosEnElPatron(patron: ArrayLike<number>, lado: readonly numbe
   return t.map((v) => (total > 0 ? v / total : 0));
 }
 
+/**
+ * El vértice de afuera de cada punta del tramo cosido, con su t (< 0 el de antes, > 1 el de después): en una costura
+ * parcial, los vértices de adentro no llegan a las puntas, y un punto que cae entre una punta y el primer (o el último)
+ * vértice de adentro va sobre el segmento que cruza la punta.
+ */
+export interface VecinosDelTramo {
+  antes?: { v: number; t: number };
+  despues?: { v: number; t: number };
+}
+
 /** El segmento del lado que contiene la fracción t, y dónde cae t en él. */
-function sobre(t: number, lado: readonly number[], tl: readonly number[]): Omit<PuntoDeCostura, 'a'> {
-  if (lado.length === 1) return { b0: lado[0], b1: lado[0], s: 0 };
+function sobre(t: number, lado: readonly number[], tl: readonly number[], vecinos?: VecinosDelTramo): Omit<PuntoDeCostura, 'a'> {
+  const n = lado.length;
+  if (vecinos?.antes && t < tl[0]) {
+    const { v, t: tv } = vecinos.antes;
+    return { b0: v, b1: lado[0], s: Math.min(1, Math.max(0, (t - tv) / (tl[0] - tv))) };
+  }
+  if (vecinos?.despues && t > tl[n - 1]) {
+    const { v, t: tv } = vecinos.despues;
+    return { b0: lado[n - 1], b1: v, s: Math.min(1, Math.max(0, (t - tl[n - 1]) / (tv - tl[n - 1]))) };
+  }
+  if (n === 1) return { b0: lado[0], b1: lado[0], s: 0 };
   let j = 0;
   while (j < lado.length - 2 && tl[j + 1] < t) j++;
   const tramo = tl[j + 1] - tl[j];
@@ -48,7 +67,7 @@ function sobre(t: number, lado: readonly number[], tl: readonly number[]): Omit<
  * sobre A. Los lados van en orden de cosido (el B ya invertido si va al revés) y con índices globales. `tA` y `tB`
  * son el lugar de cada vértice en el tramo cosido del patrón (0 al inicio, 1 al final): en una costura parcial, los
  * vértices que quedan dentro del tramo no llegan a sus puntas, y medir el largo de arco entre ellos correría el cosido.
- * Sin ellos, el lado se toma como el tramo entero.
+ * Sin ellos, el lado se toma como el tramo entero. `vecinosA` y `vecinosB` cosen las puntas (VecinosDelTramo).
  */
 export function puntosDeCostura(
   patron: ArrayLike<number>,
@@ -56,6 +75,8 @@ export function puntosDeCostura(
   ladoB: readonly number[],
   tLadoA?: readonly number[],
   tLadoB?: readonly number[],
+  vecinosA?: VecinosDelTramo,
+  vecinosB?: VecinosDelTramo,
 ): PuntoDeCostura[] {
   if (ladoA.length === 0 || ladoB.length === 0) return [];
   const tA = tLadoA ?? largosEnElPatron(patron, ladoA), tB = tLadoB ?? largosEnElPatron(patron, ladoB);
@@ -64,9 +85,9 @@ export function puntosDeCostura(
     // un vértice cosido a un segmento suyo (lados que comparten una punta) no es costura
     if (p.a !== p.b0 && p.a !== p.b1) puntos.push(p);
   };
-  ladoA.forEach((a, i) => agregar({ a, ...sobre(tA[i], ladoB, tB) }));
+  ladoA.forEach((a, i) => agregar({ a, ...sobre(tA[i], ladoB, tB, vecinosB) }));
   ladoB.forEach((b, i) => {
-    if (!tA.some((t) => Math.abs(t - tB[i]) < 1e-9)) agregar({ a: b, ...sobre(tB[i], ladoA, tA) });
+    if (!tA.some((t) => Math.abs(t - tB[i]) < 1e-9)) agregar({ a: b, ...sobre(tB[i], ladoA, tA, vecinosA) });
   });
   return puntos;
 }

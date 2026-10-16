@@ -118,6 +118,16 @@ describe('las costuras', () => {
     expect(medio.s).toBeCloseTo(0.625, 12);
   });
 
+  it('en las puntas de una costura parcial, el punto que cae fuera de los vértices de adentro se cose en el segmento que cruza la punta del tramo', () => {
+    // B: dos vértices adentro (t 0,2 y 0,8) y sus vecinos de afuera (5 en t −0,2, 6 en t 1,2)
+    const patron = [0, 0, 0.05, 0, 0.1, 0, 0, 1, 0.08, 1, -0.02, 1, 0.1, 1];
+    const p = puntosDeCostura(patron, [0, 1, 2], [3, 4], [0, 0.5, 1], [0.2, 0.8], undefined, { antes: { v: 5, t: -0.2 }, despues: { v: 6, t: 1.2 } });
+    expect(p[0]).toMatchObject({ a: 0, b0: 5, b1: 3 });
+    expect(p[0].s).toBeCloseTo(0.5, 12);
+    expect(p[2]).toMatchObject({ a: 2, b0: 4, b1: 6 });
+    expect(p[2].s).toBeCloseTo(0.5, 12);
+  });
+
   it('dos piezas de distinta malla se cosen sin aplastar la orilla', () => {
     const { prenda, ladoA, ladoB } = dosPiezas();
     expect(ladoA.length).not.toBe(ladoB.length);
