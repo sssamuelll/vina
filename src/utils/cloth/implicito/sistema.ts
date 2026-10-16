@@ -374,8 +374,8 @@ export class SistemaTela {
    * que caen en su caja agrandada por el radio de búsqueda. Un vértice libre de tela entra si cae sobre la cara a menos
    * del radio (salvo los vértices del triángulo y sus compañeros de costura); un vértice del cuerpo, si atravesó la
    * tela por la cara o la sostenía el cuadro anterior. Entra activo el que ya está dentro de la separación, con su
-   * fricción, y el par de dos capas que la velocidad del cuadro anterior metería en la separación en dos cuadros (E10:
-   * sin segunda ronda, la predicción reemplaza a la anticipación). Cada triángulo busca hasta su propio radio, el de su
+   * fricción, y el par de dos capas que el cuadro sin fuerzas (y = x_t + h·v + h²·g) metería en la separación (E10: sin
+   * segunda ronda, la predicción reemplaza a la anticipación). Cada triángulo busca hasta su propio radio, el de su
    * rapidez y la de su región (contactoPropio.ts, radioDeBusqueda).
    */
   armarParesPropios(): void {
@@ -389,16 +389,21 @@ export class SistemaTela {
     this.rejilla.armar(this.puntos, celdaDeLaRejilla(sep, this.aristaMedia));
     const agregar = (vs: number[], ws: number[], nx: number, ny: number, nz: number, s0: number, separacionDelPar: number, mu: number, k: number, predecir: boolean) => {
       const p0 = separacionDelPar - s0;
-      let vx = 0, vy = 0, vz = 0;
+      let vx = 0, vy = 0, vz = 0, un = 0;
       for (let q = 0; q < vs.length; q++) {
         vx += ws[q] * v[3 * vs[q]];
         vy += ws[q] * v[3 * vs[q] + 1];
         vz += ws[q] * v[3 * vs[q] + 2];
+        // lo que la separación cambia en el cuadro sin fuerzas, hasta y = x_t + h·v + h²·g (la gravedad se va salvo en
+        // un empotrado)
+        const o = 3 * vs[q];
+        un += ws[q] * ((this.prediccion(vs[q], 0) - x[o]) * nx + (this.prediccion(vs[q], 1) - x[o + 1]) * ny + (this.prediccion(vs[q], 2) - x[o + 2]) * nz);
       }
-      // vn: cuánto crece la separación por segundo
       const vn = vx * nx + vy * ny + vz * nz;
       const kt = p0 > 0 ? rigidezDeFriccion(mu, k * p0, Math.hypot(vx - vn * nx, vy - vn * ny, vz - vn * nz), h) : 0;
-      this.paresPropios.push({ v: vs, w: ws, nx, ny, nz, p0, k, kt, activo: p0 > 0 || (predecir && p0 - 2 * h * vn > 0) });
+      // E10: entra también el que el cuadro sin fuerzas metería en la separación; uno más lejos, con el resorte de dos
+      // lados de la solución, jalaría las capas una contra otra
+      this.paresPropios.push({ v: vs, w: ws, nx, ny, nz, p0, k, kt, activo: p0 > 0 || (predecir && p0 - un > 0) });
     };
     const ahora = this.cuerpos.map((c) => new Uint8Array(c.vertices.length / 3));
     for (let t = 0; t < tris.length / 3; t++) {

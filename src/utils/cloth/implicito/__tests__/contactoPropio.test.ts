@@ -186,6 +186,23 @@ describe('la tela contra sí misma', () => {
     expect(activos.every((p) => p.p0 < 0)).toBe(true);
   });
 
+  it('el par que la velocidad todavía no mete en la separación no jala las capas', () => {
+    // la de arriba a 8 mm de una empotrada, bajando 5 mm por cuadro y sin gravedad: llega a 3 mm, sin acelerar
+    const abajo = mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), arriba = mallaDeContorno(rectangulo(-45, -45, 45, 45), 10, 0.008);
+    const nAbajo = abajo.x.length / 3;
+    const prenda = armarPrenda([{ id: 'abajo', ...abajo, fijos: new Uint8Array(nAbajo).fill(1) }, { id: 'arriba', ...arriba }]);
+    const s = new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { ajustes: { gravedad: 0, aire: 0 } });
+    for (let i = nAbajo; i < s.n; i++) s.v[3 * i + 1] = -0.3;
+    pasoImplicito(s);
+    let y = 0, vy = 0;
+    for (let i = nAbajo; i < s.n; i++) {
+      y += s.x[3 * i + 1] / (s.n - nAbajo);
+      vy += s.v[3 * i + 1] / (s.n - nAbajo);
+    }
+    expect(y).toBeCloseTo(0.003, 4);
+    expect(vy).toBeCloseTo(-0.3, 3);
+  });
+
   it('un vértice rápido lejos no agranda la búsqueda de dos capas quietas', () => {
     // dos capas quietas a 8 mm, más que la separación y lo que la gravedad mueve en un cuadro (4,2 mm), y a medio
     // metro una tercera lámina que corre a 1 m/s

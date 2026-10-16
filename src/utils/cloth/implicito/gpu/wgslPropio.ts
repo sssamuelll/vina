@@ -139,12 +139,14 @@ fn parDeVertice(i: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, b: vec3<f32>, c
   if (d >= r || d < 1e-9 || !sobreLaCara(dv, tn)) { return; }
   let n = dv / d;
   let p0 = SEPP - d;
-  // vn: cuánto crece la separación por segundo; entra activo el que en dos cuadros a esa velocidad entraría (E10)
   let vr = ld(O_V, i) - e.w.x * ld(O_V, ia) - e.w.y * ld(O_V, ib) - e.w.z * ld(O_V, ic);
   let vn = dot(n, vr);
   var kt = 0.0;
   if (p0 > 0.0) { kt = rigidez(MU_T, KCP * p0, length(vr - vn * n)); }
-  guardarPar(vec4<f32>(f32(i), f32(ia), f32(ib), f32(ic)), vec4<f32>(1.0, -e.w.x, -e.w.y, -e.w.z), n, p0, kt, p0 > 0.0 || p0 - 2.0 * H * vn > 0.0);
+  // E10: entra también el que el cuadro sin fuerzas (y = x_t + h·v + h²·g) metería en la separación (sistema.ts)
+  let uf = (prediccion(i) - ld(O_XT, i)) - e.w.x * (prediccion(ia) - ld(O_XT, ia)) - e.w.y * (prediccion(ib) - ld(O_XT, ib))
+    - e.w.z * (prediccion(ic) - ld(O_XT, ic));
+  guardarPar(vec4<f32>(f32(i), f32(ia), f32(ib), f32(ic)), vec4<f32>(1.0, -e.w.x, -e.w.y, -e.w.z), n, p0, kt, p0 > 0.0 || p0 - dot(n, uf) > 0.0);
 }
 
 // 1 = ese vértice del cuerpo sostenía la tela: el arreglo de este cuadro y el del anterior se alternan por paridad
