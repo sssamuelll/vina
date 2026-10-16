@@ -223,6 +223,8 @@ export function imprimirCamiseta(filas: FilaCamiseta[]): void {
     const ref = f.referencia;
     console.log(`camiseta ${f.malla} mm (${f.vertices} vértices; colocación a ${Math.max(...f.errorDeColocacion).toFixed(2)} mm): quieta ${uno(f.quieta)} s · ${f.msPorCuadro.toFixed(0)} ms por cuadro · cg ${f.cgMedio?.toFixed(1) ?? '—'} por cuadro · costuras cerradas: la primera en el cuadro ${f.primeraCerrada ?? '—'}, todas en el ${f.todasCerradas ?? '—'}`);
     console.log(`  aplastados ${f.aplastados.toFixed(2)} %${ref ? ` (referencia ${ref.aplastados.toFixed(2)} %)` : ''} · costuras mediana ${mm(f.costuras.mediana)} mm, máxima ${mm(f.costuras.maxima)} mm`);
+    console.log(`  costuras más abiertas: ${f.porCostura.slice(0, 3).map((q) => `${q.piezas.join(' ↔ ')}: ${mm(q.maxima)} mm (lados de ${mm(q.largos[0])} y ${mm(q.largos[1])} mm)`).join(' · ')}`);
+    console.log(`  aplastados por pieza: ${f.porPieza.map((q) => `${q.pieza} ${q.aplastados.toFixed(2)} %`).join(' · ')}`);
     console.log(`  estiramiento p05/p50/p95 ${pct(f.estiramiento)} %${ref ? ` (referencia ${pct(ref.estiramiento)})` : ''} · encogidas >10 % ${f.estiramiento.encogidas.toFixed(2)} %`);
     console.log(`  pliegues p50/p95 ${f.pliegues.p50.toFixed(1)}°/${f.pliegues.p95.toFixed(1)}°, >90° ${f.pliegues.sobre90}, >150° ${f.pliegues.sobre150}${ref ? ` (referencia ${ref.pliegues.p50.toFixed(1)}°/${ref.pliegues.p95.toFixed(1)}°, ${ref.pliegues.sobre90}, ${ref.pliegues.sobre150})` : ''}`);
     console.log(`  al cuerpo p05/p50/p95 ${mm(f.alCuerpo.p05)}/${mm(f.alCuerpo.p50)}/${mm(f.alCuerpo.p95)} mm${ref ? ` (referencia ${mm(ref.alCuerpo.p05)}/${mm(ref.alCuerpo.p50)}/${mm(ref.alCuerpo.p95)})` : ''}`);

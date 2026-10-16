@@ -83,11 +83,11 @@ export function distanciaASuperficie(x: ArrayLike<number>, superficie: CuerpoRig
   return { p50: percentil(d, 0.5), p90: percentil(d, 0.9), p99: percentil(d, 0.99), maxima: d.reduce((m, q) => Math.max(m, q), 0) };
 }
 
-/** Porcentaje de triángulos con menos de la mitad del área de su patrón. */
-export function aplastados(x: ArrayLike<number>, malla: MallaDeTela): number {
-  const { tris, patron } = malla, nt = tris.length / 3;
+/** Porcentaje de triángulos con menos de la mitad del área de su patrón, entre los `cuantos` que empiezan en `desde`. */
+export function aplastados(x: ArrayLike<number>, malla: MallaDeTela, desde = 0, cuantos = malla.tris.length / 3 - desde): number {
+  const { tris, patron } = malla;
   let bajo = 0;
-  for (let t = 0; t < nt; t++) {
+  for (let t = desde; t < desde + cuantos; t++) {
     const a = tris[3 * t], b = tris[3 * t + 1], c = tris[3 * t + 2];
     const A0 = 0.5 * Math.abs(
       (patron[2 * b] - patron[2 * a]) * (patron[2 * c + 1] - patron[2 * a + 1]) -
@@ -98,7 +98,7 @@ export function aplastados(x: ArrayLike<number>, malla: MallaDeTela): number {
     const A = 0.5 * Math.hypot(ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]);
     if (A < 0.5 * A0) bajo++;
   }
-  return (100 * bajo) / nt;
+  return (100 * bajo) / cuantos;
 }
 
 /** Coeficiente de caída (ISO 9073-9, %) y ondas del disco Cusick. */

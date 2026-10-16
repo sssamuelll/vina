@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildLinearBVH } from '../../gpu/bvh';
 import { CuerpoRigido } from '../cuerpo';
 import { mallaDeContorno } from '../malla';
-import { distanciaAlCuerpo, estiramiento, pliegues, separacionDeCosturas } from '../banco/medidas';
+import { aplastados, distanciaAlCuerpo, estiramiento, pliegues, separacionDeCosturas } from '../banco/medidas';
 import { esferaDeColision, rectangulo } from '../banco/escenas';
 
 describe('las medidas de la camiseta', () => {
@@ -32,5 +32,14 @@ describe('las medidas de la camiseta', () => {
     const cuerpo = new CuerpoRigido(buildLinearBVH(esferaDeColision(0.05, 4)));
     const x = Float64Array.from({ length: 30 }, (_, k) => (k % 3 === 1 ? 0.06 : 0.001 * (k % 7)));
     expect(distanciaAlCuerpo(x, cuerpo).p50 * 1000).toBeCloseTo(10, 0);
+  });
+
+  it('cuenta los aplastados de un rango de triángulos', () => {
+    // dos triángulos de 0,5 de área en el patrón; en x, el primero queda igual y el segundo, a un cuarto de su área
+    const malla = { x: new Float64Array(18), patron: Float64Array.from([0, 0, 1, 0, 0, 1, 2, 0, 3, 0, 2, 1]), tris: Uint32Array.from([0, 1, 2, 3, 4, 5]) };
+    const x = [0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0, 0, 2.5, 0, 0, 2, 0.5, 0];
+    expect(aplastados(x, malla)).toBe(50);
+    expect(aplastados(x, malla, 0, 1)).toBe(0);
+    expect(aplastados(x, malla, 1, 1)).toBe(100);
   });
 });

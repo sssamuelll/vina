@@ -17,7 +17,7 @@ import { seamInitDataToPairs, type PieceWithOutline } from '../../seamPairs';
 import { seamsToInitData } from '../../../../components/Viewport3D/costurasDeLaSimulacion';
 import type { BodyMeasurements, InternalLineType, PatternPiece, Seam } from '../../../../types/types';
 import { buildLinearBVH } from '../../gpu/bvh';
-import type { BisagraDeCostura, PuntoDeCostura } from '../costuras';
+import { puntosDeCostura, type BisagraDeCostura, type PuntoDeCostura } from '../costuras';
 import { CuerpoRigido } from '../cuerpo';
 import type { MallaDeTela } from '../malla';
 import { armarPrenda, bisagrasDePrenda, costurasDePrenda, franjaDePrenda, type LadosDeCostura, type Prenda } from '../prenda';
@@ -187,21 +187,47 @@ export interface MedidasDeCamiseta {
   aplastados: number;
   estiramiento: ReturnType<typeof estiramiento>;
   costuras: ReturnType<typeof separacionDeCosturas>;
+  /** por costura, de la más abierta a la más cerrada: sus dos piezas, cuántos puntos, el largo de cada lado en el patrón (m) y la separación (m) */
+  porCostura: Array<{ piezas: [string, string]; puntos: number; largos: [number, number]; mediana: number; maxima: number }>;
+  /** por pieza, el porcentaje de sus triángulos con menos de la mitad del área de su patrón */
+  porPieza: Array<{ pieza: string; aplastados: number }>;
   pliegues: ReturnType<typeof pliegues>;
   alCuerpo: ReturnType<typeof distanciaAlCuerpo>;
   /** la distancia de cada vértice de Vina a la asentada de la referencia */
   contraLaReferencia: ReturnType<typeof distanciaASuperficie> | null;
   /** lo mismo medido sobre la asentada de la referencia (sin costuras: el OBJ no las trae) */
-  referencia: Omit<MedidasDeCamiseta, 'costuras' | 'contraLaReferencia' | 'referencia'> | null;
+  referencia: Omit<MedidasDeCamiseta, 'costuras' | 'porCostura' | 'porPieza' | 'contraLaReferencia' | 'referencia'> | null;
 }
 
 export function medirCamiseta(x: ArrayLike<number>, c: CamisetaContraLaReferencia): MedidasDeCamiseta {
-  const { malla } = c.escena, ref = c.referencia;
+  const { malla } = c.escena, ref = c.referencia, { piezas, prenda, lados } = c.camiseta;
+  const nombre = (k: number) => `${piezas[k].name} (${piezas[k].category ?? 'sin clase'})`;
+  const piezaDe = (v: number) => prenda.piezas.findIndex((p) => v >= p.v0 && v < p.v0 + p.nv);
+  const largo = (lado: readonly number[]) => {
+    let L = 0;
+    for (let k = 1; k < lado.length; k++) {
+      L += Math.hypot(malla.patron[2 * lado[k]] - malla.patron[2 * lado[k - 1]], malla.patron[2 * lado[k] + 1] - malla.patron[2 * lado[k - 1] + 1]);
+    }
+    return L;
+  };
   return {
     vertices: x.length / 3,
     aplastados: aplastados(x, malla),
     estiramiento: estiramiento(x, malla),
     costuras: separacionDeCosturas(x, c.camiseta.costuras.puntos),
+    porCostura: lados
+      .filter((l) => l.a.length > 0 && l.b.length > 0)
+      .map((l) => {
+        const puntos = puntosDeCostura(malla.patron, l.a, l.b);
+        return {
+          piezas: [nombre(piezaDe(l.a[0])), nombre(piezaDe(l.b[0]))] as [string, string],
+          puntos: puntos.length,
+          largos: [largo(l.a), largo(l.b)] as [number, number],
+          ...separacionDeCosturas(x, puntos),
+        };
+      })
+      .sort((p, q) => q.maxima - p.maxima),
+    porPieza: prenda.piezas.map((p, k) => ({ pieza: nombre(k), aplastados: aplastados(x, malla, p.t0, p.nt) })),
     pliegues: pliegues(x, malla),
     alCuerpo: distanciaAlCuerpo(x, c.cuerpo),
     contraLaReferencia: ref ? distanciaASuperficie(x, ref.superficie) : null,
