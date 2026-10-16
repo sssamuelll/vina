@@ -28,7 +28,7 @@ export const ENTRADAS = [
   'limpiarPares', 'limpiarCeldas', 'anotarRegiones', 'hashContar', 'scanCBloques', 'scanCTotales', 'scanCSumar', 'hashLlenar',
   'limpiarPuntas', 'paresDeTriangulo', 'limpiarVertices', 'contarEntradas', 'scanVBloques', 'scanVTotales', 'scanVSumar', 'llenarEntradas',
   'residuo', 'sumarInicio', 'aportePares', 'spmv', 'actualizar', 'nuevaP', 'expandirP',
-  'prepBusqueda', 'posPrueba', 'anguloPrueba', 'difTri', 'difCostura', 'difPares', 'decidir', 'aplicar',
+  'prepBusqueda', 'posPrueba', 'difElementos', 'decidir', 'aplicar',
   'cerrarCuadro', 'cerrarCosturas', 'revisarCosido', 'coser',
 ] as const;
 
@@ -46,7 +46,7 @@ function zonas<K extends string>(tamanos: Record<K, number>): Record<K, number> 
 
 type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT' | 'RN' | 'DC';
 type ZonaTf =
-  | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH' | 'CCOS' | 'CDES'
+  | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH' | 'CCOS' | 'CDES'
   | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'CUVN' | 'SOST' | 'HP' | 'OFFC' | 'ORD4' | 'PAR' | 'OFFV' | 'ENT' | 'SCB'
   | 'APORTE';
 /** el búfer atómico del contacto propio: cuentas y cursores de la rejilla y de las listas, los pares y los desbordes */
@@ -76,6 +76,8 @@ export interface Distribucion {
   gp: number;
   /** grupos que recorren los pares en cada iteración (aportePares) */
   gpa: number;
+  /** grupos de cada intento de la búsqueda en línea: un hilo por triángulo, punto de costura y par (difElementos) */
+  ge: number;
   gcel: number;
   gpnt: number;
   gvb: number;
@@ -85,7 +87,7 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
   const { n, nt, nh } = p;
   const vf = zonas<ZonaVf>({ XT: 3 * n, V: 3 * n, R: 3 * n, Z: 3 * n, AP: 3 * n, DX: 3 * n, XP: 3 * n, MASA: n, EV0: n, PINV: 9 * n, CONT: 6 * n, RN: n, DC: n });
   const tf = zonas<ZonaTf>({
-    COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, THP: nh, CONTRIB: 45 * nt + 9 * p.nc,
+    COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, CONTRIB: 45 * nt + 9 * p.nc,
     CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch, CCOS: p.nc, CDES: 3 * p.nc,
     CUN: p.f32.cuNodos.length, CUT: p.f32.cuTri.length, CUNT: p.f32.cuNt.length, CUPA: p.f32.cuPa.length, CUPV: p.f32.cuPv.length,
     CUV: 3 * p.nvb, CUVN: 3 * p.nvb, SOST: 2 * p.nvb, HP: p.np, OFFC: p.nceldas + 1, ORD4: 4 * p.np, PAR: 14 * p.maxPares, OFFV: n + 1, ENT: 4 * p.maxPares,
@@ -102,10 +104,11 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
   const gc = Math.ceil(p.nc / WG), gch = Math.ceil(p.nch / WG);
   const gp = Math.ceil(p.maxPares / WG), gcel = Math.ceil(p.nceldas / WG), gpnt = Math.ceil(p.np / WG), gvb = Math.ceil(p.nvb / WG);
   const gpa = Math.min(gp, 256);
+  const ge = Math.max(gt, gc, p.propio ? gp : 0, 1);
   const zona = Math.max(gv, gt, gh, gc, gp, 1);
   const red = { ...zonas<ZonaRed>({ PA: zona, PB: zona, PC: zona, PD: zona, PE: zona, SC: N_ESC, HISTO: cuadrosDeHistoria }), HIST: cuadrosDeHistoria };
   const at = zonas<ZonaAt>({ CNTC: p.nceldas, CURC: p.nceldas, VREG: p.nceldas, CNTV: n, CURV: n, NPAR: 1, DESB: 1 });
-  return { vf, tf, iu, red, at, gv, gt, gh, gb, gc, gch, gp, gpa, gcel, gpnt, gvb };
+  return { vf, tf, iu, red, at, gv, gt, gh, gb, gc, gch, gp, gpa, ge, gcel, gpnt, gvb };
 }
 
 /** Bytes de cada búfer, en el orden de las ligaduras del WGSL. */
@@ -232,6 +235,7 @@ const NCELDAS = ${u(p.nceldas)};
 const MAXP = ${u(p.maxPares)};
 const GP = ${u(d.gp)};
 const GPA = ${u(d.gpa)};
+const GE = ${u(d.ge)};
 const R_PE = ${u(red.PE)};
 const I_EXO = ${u(iu.exOff)}; const I_EXI = ${u(iu.exIdx)};
 ${Object.entries(d.at).filter(([k]) => k !== 'total').map(([k, v]) => `const A_${k} = ${u(v)};`).join(' ')}
@@ -1000,63 +1004,58 @@ fn lugarRz(siguiente: bool) -> u32 {
   if (l.x == 0u) { red[R_PB + w.x] = total; }
 }
 
-@compute @workgroup_size(${WG}) fn anguloPrueba(@builtin(global_invocation_id) g: vec3<u32>) {
-  let e = g.x;
-  if (e >= NH || red[R_SC + E_PROBANDO] < 0.5) { return; }
-  let b = I_BIS + 4u * e;
-  tf[O_THP + e] = soloAngulo(ld(O_XP, iu[b]), ld(O_XP, iu[b + 1u]), ld(O_XP, iu[b + 2u]), ld(O_XP, iu[b + 3u]));
+// lo que cambia la energía del triángulo t en el paso de prueba: su membrana y su placa, con los ángulos de sus bisagras
+// en x_p (cada bisagra la calculan sus dos triángulos: cuesta menos que un despacho más)
+fn difTriangulo(t: u32) -> f32 {
+  let o = O_COEF + 7u * t;
+  let p0 = ld(O_XP, iu[I_TRIS + 3u * t]);
+  let d1 = ld(O_XP, iu[I_TRIS + 3u * t + 1u]) - p0;
+  let d2 = ld(O_XP, iu[I_TRIS + 3u * t + 2u]) - p0;
+  let fu = tf[o + 1u] * d1 + tf[o + 2u] * d2;
+  let fv = tf[o + 4u] * d1 + tf[o + 5u] * d2;
+  let gam = dot(fu, fv);
+  var e = tf[o + 6u] * (ley(length(fu) - 1.0, KU, tf[O_PCR + 2u * t]).x + ley(length(fv) - 1.0, KV, tf[O_PCR + 2u * t + 1u]).x + 0.5 * KS * gam * gam);
+  var th = vec3<f32>(0.0);
+  for (var k = 0u; k < 3u; k++) {
+    let h = iu[I_HOT + 3u * t + k];
+    if (h != NINGUNA) {
+      let b = I_BIS + 4u * h;
+      th[k] = soloAngulo(ld(O_XP, iu[b]), ld(O_XP, iu[b + 1u]), ld(O_XP, iu[b + 2u]), ld(O_XP, iu[b + 3u]));
+    }
+  }
+  for (var k = 0u; k < 3u; k++) {
+    for (var q = 0u; q < 3u; q++) { e += 0.5 * tf[O_KP + 9u * t + 3u * k + q] * th[k] * th[q]; }
+  }
+  return e - tf[O_E0 + t];
 }
 
-@compute @workgroup_size(${WG}) fn difTri(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
+// lo que cambia la energía del punto de costura e en el paso de prueba
+fn difDeCostura(e: u32) -> f32 {
+  let b = I_CV + 3u * e;
+  let r = length(sepCostura(e, ld(O_XP, iu[b]), ld(O_XP, iu[b + 1u]), ld(O_XP, iu[b + 2u])));
+  let L = tf[O_CL + e];
+  var en = 0.0;
+  if (activa(e) && r > L) { en = 0.5 * KCOST * (r - L) * (r - L); }
+  return en - tf[O_CE0 + e];
+}
+
+// cada intento, en un despacho: lo que cambia la energía de los triángulos, las costuras y los pares, en una suma por grupo
+@compute @workgroup_size(${WG}) fn difElementos(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
   if (!bandera(l.x, E_PROBANDO)) { return; }
   let t = g.x;
   var de = 0.0;
-  if (t < NT) {
-    let o = O_COEF + 7u * t;
-    let p0 = ld(O_XP, iu[I_TRIS + 3u * t]);
-    let d1 = ld(O_XP, iu[I_TRIS + 3u * t + 1u]) - p0;
-    let d2 = ld(O_XP, iu[I_TRIS + 3u * t + 2u]) - p0;
-    let fu = tf[o + 1u] * d1 + tf[o + 2u] * d2;
-    let fv = tf[o + 4u] * d1 + tf[o + 5u] * d2;
-    let gam = dot(fu, fv);
-    var e = tf[o + 6u] * (ley(length(fu) - 1.0, KU, tf[O_PCR + 2u * t]).x + ley(length(fv) - 1.0, KV, tf[O_PCR + 2u * t + 1u]).x + 0.5 * KS * gam * gam);
-    var th = vec3<f32>(0.0);
-    for (var k = 0u; k < 3u; k++) {
-      let h = iu[I_HOT + 3u * t + k];
-      if (h != NINGUNA) { th[k] = tf[O_THP + h]; }
-    }
-    for (var k = 0u; k < 3u; k++) {
-      for (var q = 0u; q < 3u; q++) { e += 0.5 * tf[O_KP + 9u * t + 3u * k + q] * th[k] * th[q]; }
-    }
-    de = e - tf[O_E0 + t];
-  }
+  if (t < NT) { de += difTriangulo(t); }
+  if (t < NC) { de += difDeCostura(t); }
+  if (PROPIO) { de += difPar(t); }
   let total = reducirSuma(l.x, de);
   if (l.x == 0u) { red[R_PC + w.x] = total; }
-}
-
-@compute @workgroup_size(${WG}) fn difCostura(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
-  if (!bandera(l.x, E_PROBANDO)) { return; }
-  let e = g.x;
-  var de = 0.0;
-  if (e < NC) {
-    let b = I_CV + 3u * e;
-    let r = length(sepCostura(e, ld(O_XP, iu[b]), ld(O_XP, iu[b + 1u]), ld(O_XP, iu[b + 2u])));
-    let L = tf[O_CL + e];
-    var en = 0.0;
-    if (activa(e) && r > L) { en = 0.5 * KCOST * (r - L) * (r - L); }
-    de = en - tf[O_CE0 + e];
-  }
-  let total = reducirSuma(l.x, de);
-  if (l.x == 0u) { red[R_PD + w.x] = total; }
 }
 
 @compute @workgroup_size(1) fn decidir() {
   if (red[R_SC + E_PROBANDO] < 0.5) { return; }
   var dg = 0.0;
   for (var k = 0u; k < GV; k++) { dg += red[R_PB + k]; }
-  for (var k = 0u; k < GT; k++) { dg += red[R_PC + k]; }
-  for (var k = 0u; k < GC; k++) { dg += red[R_PD + k]; }
-  if (PROPIO) { for (var k = 0u; k < GP; k++) { dg += red[R_PE + k]; } }
+  for (var k = 0u; k < GE; k++) { dg += red[R_PC + k]; }
   red[R_SC + E_DG] = dg;
   if (dg <= 0.0) { red[R_SC + E_PROBANDO] = 0.0; } else { red[R_SC + E_ALFA_LS] = 0.5 * red[R_SC + E_ALFA_LS]; }
 }
@@ -1068,41 +1067,41 @@ fn lugarRz(siguiente: bool) -> u32 {
   var vmax = 0.0;
   var proyectado = 0.0;
   if (i < N) {
-    var alfa = 1.0;
-    if (BUSQUEDA) { alfa = select(0.0, red[R_SC + E_ALFA_LS], red[R_SC + E_PROBANDO] < 0.5); }
-    let dx = alfa * ld(O_DX, i);
-    var x = ld(O_XT, i) + dx;
-    var v = dx / H;
-    // la fuerza de apoyo del cuadro: la de la restricción (−n·r sin filtrar), o la que frena al proyectado
-    let o = O_CONT + 6u * i;
-    var lambda = 0.0;
-    if (vf[o] > 0.5) { lambda = -vf[O_RN + i]; }
-    var cota = vf[O_DC + i] - length(dx);
-    if (iu[I_FIJO + i] == 0u && !cosidoV(i) && cota < SEP + MARGEN_DC) {
-      let c = masCercano(x);
-      cota = min(c.c.x, RADIO_B);
-      if (c.c.x < SEP) {
-        let n = c.c.yzw;
-        x = x + (SEP - c.c.x) * n;
-        let vn = dot(v, n);
-        if (vn < 0.0) {
-          v = v - vn * n;
-          lambda = max(lambda, vf[O_MASA + i] * -vn / H);
-        }
-        proyectado = 1.0;
-        cota = 0.0;
-      }
+  var alfa = 1.0;
+  if (BUSQUEDA) { alfa = select(0.0, red[R_SC + E_ALFA_LS], red[R_SC + E_PROBANDO] < 0.5); }
+  let dx = alfa * ld(O_DX, i);
+  var x = ld(O_XT, i) + dx;
+  var v = dx / H;
+  // la fuerza de apoyo del cuadro: la de la restricción (−n·r sin filtrar), o la que frena al proyectado
+  let o = O_CONT + 6u * i;
+  var lambda = 0.0;
+  if (vf[o] > 0.5) { lambda = -vf[O_RN + i]; }
+  var cota = vf[O_DC + i] - length(dx);
+  if (iu[I_FIJO + i] == 0u && !cosidoV(i) && cota < SEP + MARGEN_DC) {
+  let c = masCercano(x);
+  cota = min(c.c.x, RADIO_B);
+  if (c.c.x < SEP) {
+    let n = c.c.yzw;
+    x = x + (SEP - c.c.x) * n;
+    let vn = dot(v, n);
+    if (vn < 0.0) {
+      v = v - vn * n;
+      lambda = max(lambda, vf[O_MASA + i] * -vn / H);
     }
-    vf[O_DC + i] = cota;
-    vf[o + 4u] = lambda;
-    stx(i, x);
-    st(O_V, i, v);
-    if (iu[I_FIJO + i] == 0u) {
-      // la quietud mira la velocidad que pide el paso, no la aceptada (quietud.ts)
-      let rapidez = length(ld(O_DX, i)) / H;
-      mv = vf[O_MASA + i] * rapidez;
-      vmax = rapidez;
-    }
+    proyectado = 1.0;
+    cota = 0.0;
+  }
+  }
+  vf[O_DC + i] = cota;
+  vf[o + 4u] = lambda;
+  stx(i, x);
+  st(O_V, i, v);
+  if (iu[I_FIJO + i] == 0u) {
+  // la quietud mira la velocidad que pide el paso, no la aceptada (quietud.ts)
+  let rapidez = length(ld(O_DX, i)) / H;
+  mv = vf[O_MASA + i] * rapidez;
+  vmax = rapidez;
+  }
   }
   let a = reducirSuma(l.x, mv);
   if (l.x == 0u) { red[R_PA + w.x] = a; }
@@ -1117,9 +1116,9 @@ fn lugarRz(siguiente: bool) -> u32 {
   var mx = 0.0;
   var proyectados = 0.0;
   for (var k = 0u; k < GV; k++) {
-    s += red[R_PA + k];
-    mx = max(mx, red[R_PB + k]);
-    proyectados += red[R_PC + k];
+  s += red[R_PA + k];
+  mx = max(mx, red[R_PB + k]);
+  proyectados += red[R_PC + k];
   }
   red[R_SC + E_PROYECTADOS] = proyectados;
   let q = s / MGH;
@@ -1138,29 +1137,29 @@ fn lugarRz(siguiente: bool) -> u32 {
   let e = g.x;
   var abierta = 0.0;
   if (e < NC) {
-    let L0 = tf[O_CL + e];
-    var L = max(L0 * CIERRE, L0 - CIERRE_MAX);
-    if (L < LCERRADO) { L = 0.0; }
-    tf[O_CL + e] = L;
-    abierta = L;
-    // E8: se cose el punto soldable que quedó a menos del umbral de su punto (costuras.ts, coser)
-    if (iu[I_SOLD + e] != 0u && tf[O_CCOS + e] < 0.5) {
-      let b = I_CV + 3u * e;
-      let xa = ldx(iu[b]);
-      let d = sepCostura(e, xa, ldx(iu[b + 1u]), ldx(iu[b + 2u]));
-      if (length(d) <= UMBRAL_P) {
-        // la línea hasta su punto no puede entrar en un obstáculo (sistema.ts, cruzaUnObstaculo)
-        var cruza = false;
-        for (var k = 1u; k < MUESTRAS_P; k++) {
-          if (masCercano(xa - (f32(k) / f32(MUESTRAS_P)) * d).c.x < -SEP) { cruza = true; }
-        }
-        if (!cruza) {
-          tf[O_CCOS + e] = 1.0;
-          let o = O_CDES + 3u * e;
-          tf[o] = d.x; tf[o + 1u] = d.y; tf[o + 2u] = d.z;
-        }
-      }
+  let L0 = tf[O_CL + e];
+  var L = max(L0 * CIERRE, L0 - CIERRE_MAX);
+  if (L < LCERRADO) { L = 0.0; }
+  tf[O_CL + e] = L;
+  abierta = L;
+  // E8: se cose el punto soldable que quedó a menos del umbral de su punto (costuras.ts, coser)
+  if (iu[I_SOLD + e] != 0u && tf[O_CCOS + e] < 0.5) {
+  let b = I_CV + 3u * e;
+  let xa = ldx(iu[b]);
+  let d = sepCostura(e, xa, ldx(iu[b + 1u]), ldx(iu[b + 2u]));
+  if (length(d) <= UMBRAL_P) {
+    // la línea hasta su punto no puede entrar en un obstáculo (sistema.ts, cruzaUnObstaculo)
+    var cruza = false;
+    for (var k = 1u; k < MUESTRAS_P; k++) {
+      if (masCercano(xa - (f32(k) / f32(MUESTRAS_P)) * d).c.x < -SEP) { cruza = true; }
     }
+    if (!cruza) {
+      tf[O_CCOS + e] = 1.0;
+      let o = O_CDES + 3u * e;
+      tf[o] = d.x; tf[o + 1u] = d.y; tf[o + 2u] = d.z;
+    }
+  }
+  }
   }
   let m = reducirMax(l.x, abierta);
   if (l.x == 0u) { red[R_PD + w.x] = m; }

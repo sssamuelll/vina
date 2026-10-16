@@ -19,7 +19,7 @@ describe('el WGSL del motor', () => {
   });
 
   it('la búsqueda en línea no consulta el obstáculo: del apoyo solo cuenta su fricción (E10)', () => {
-    const cuerpo = fuente.slice(fuente.indexOf('fn posPrueba('), fuente.indexOf('fn anguloPrueba('));
+    const cuerpo = fuente.slice(fuente.indexOf('fn posPrueba('), fuente.indexOf('fn difTriangulo('));
     expect(cuerpo).not.toMatch(/masCercano/);
     expect(cuerpo).toMatch(/energiaFriccion/);
   });

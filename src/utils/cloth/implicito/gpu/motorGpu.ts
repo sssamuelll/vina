@@ -110,7 +110,7 @@ export class MotorGpu {
 
   /** Los despachos de un cuadro, en el orden de paso.ts; `despachar` recibe solo los que tienen grupos. */
   private grabar(despachar: (e: Entrada, grupos: number) => void): void {
-    const { aj } = this.s, { gv, gt, gh, gb, gc, gch, gp, gpa, gcel, gpnt, gvb } = this.d, propio = this.p.propio;
+    const { aj } = this.s, { gv, gt, gh, gb, gc, gch, gp, gpa, ge, gcel, gpnt, gvb } = this.d, propio = this.p.propio;
     const d = (e: Entrada, grupos: number) => {
       if (grupos > 0) despachar(e, grupos);
     };
@@ -159,16 +159,13 @@ export class MotorGpu {
       listas();
     }
     ronda();
-    // ponytail: los intentos de la búsqueda se despachan siempre y salen enseguida si no hacen falta (cuestan los
-    // despachos vacíos); pasar a despacho indirecto cuando se optimice la velocidad
+    // los intentos se despachan siempre y salen enseguida si ya se aceptó uno: el despacho indirecto, que los saltaría,
+    // cuesta más en Chrome que uno vacío. Cada intento son tres despachos
     if (aj.busqueda) {
       d('prepBusqueda', 1);
       for (let intento = 0; intento < 8; intento++) {
         d('posPrueba', gv);
-        d('anguloPrueba', gh);
-        d('difTri', gt);
-        d('difCostura', gc);
-        if (propio) d('difPares', gp);
+        d('difElementos', ge);
         d('decidir', 1);
       }
     }

@@ -285,9 +285,8 @@ ${wgslScan('scanV', 'A_CNTV', 'N', 'O_OFFV')}
 }
 
 // 9b. la energía de los pares activos en la búsqueda en línea (contactoPropio.ts, energiaDelPar)
-@compute @workgroup_size(WG) fn difPares(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
-  if (!bandera(l.x, E_PROBANDO)) { return; }
-  let k = g.x;
+// lo que cambia la energía del par k en el paso de prueba (wgsl.ts, difElementos); 0 fuera de los pares o sin activar
+fn difPar(k: u32) -> f32 {
   var de = 0.0;
   if (k < nPares()) {
     let o = O_PAR + 14u * k;
@@ -311,7 +310,6 @@ ${wgslScan('scanV', 'A_CNTV', 'N', 'O_OFFV')}
       de = e - e0;
     }
   }
-  let total = reducirSuma(l.x, de);
-  if (l.x == 0u) { red[R_PE + w.x] = total; }
+  return de;
 }`;
 }
