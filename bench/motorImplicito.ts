@@ -2,13 +2,16 @@
 import { SistemaTela, type AjustesImplicito } from '../src/utils/cloth/implicito/sistema';
 import { pasoImplicito } from '../src/utils/cloth/implicito/paso';
 import { medirQuietud, VigiaDeQuietud } from '../src/utils/cloth/implicito/quietud';
+import { toparPlaca } from '../src/utils/cloth/implicito/banco/experimentos';
 import type { TelaFisica } from '../src/utils/cloth/implicito/tela';
 import type { Escena } from '../src/utils/cloth/implicito/banco/escenas';
 import type { Corredor } from './_banco';
 
-export function correrImplicito(tela: TelaFisica, ajustes: Partial<AjustesImplicito> = {}): Corredor {
+/** `topePlaca`: el experimento de banco/experimentos.ts; sin él, la placa del motor */
+export function correrImplicito(tela: TelaFisica, ajustes: Partial<AjustesImplicito> = {}, topePlaca?: number): Corredor {
   return (e: Escena) => {
     const s = new SistemaTela(e.malla, tela, { obstaculos: e.obstaculos, hilo: e.hilo, costuras: e.costuras, franja: e.franja, ajustes });
+    if (topePlaca !== undefined) toparPlaca(s.placa, topePlaca);
     if (e.v) s.v.set(e.v);
     const vigia = new VigiaDeQuietud();
     const t0 = performance.now();

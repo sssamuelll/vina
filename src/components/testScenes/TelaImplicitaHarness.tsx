@@ -18,6 +18,7 @@ import {
 import {
   camisetaContraLaReferencia, medirCamiseta, type CamisetaContraLaReferencia, type ConfigCamiseta, type MedidasDeCamiseta,
 } from '../../utils/cloth/implicito/banco/camiseta';
+import { toparPlaca } from '../../utils/cloth/implicito/banco/experimentos';
 import { SistemaTela } from '../../utils/cloth/implicito/sistema';
 import type { TelaFisica } from '../../utils/cloth/implicito/tela';
 import { pasoImplicito } from '../../utils/cloth/implicito/paso';
@@ -103,6 +104,8 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
   };
   const nuevo = () => {
     const s = new SistemaTela(e.malla, telaEnCurso, { obstaculos: e.obstaculos, hilo: e.hilo, costuras: e.costuras, franja: e.franja, ajustes });
+    // el experimento de banco/experimentos.ts, solo si se pide
+    if (q.get('topePlaca')) toparPlaca(s.placa, Number(q.get('topePlaca')));
     if (e.v) s.v.set(e.v);
     return s;
   };

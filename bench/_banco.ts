@@ -199,7 +199,7 @@ export interface FilaCamiseta extends MedidasDeCamiseta {
 }
 
 /** La camiseta sobre el avatar de la referencia, desde su colocación (E5), en la CPU hasta quieta o 10 s de tela. */
-export function ensayoCamiseta(tela: TelaFisica, mallas: number[], ajustes: Partial<AjustesImplicito> = {}): FilaCamiseta[] {
+export function ensayoCamiseta(tela: TelaFisica, mallas: number[], ajustes: Partial<AjustesImplicito> = {}, topePlaca?: number): FilaCamiseta[] {
   const dir = carpetaPrivada();
   const config = JSON.parse(fs.readFileSync(path.join(dir, 'camiseta.json'), 'utf8')) as ConfigCamiseta;
   const leer = (r: string) => fs.readFileSync(path.join(dir, r), 'utf8');
@@ -207,7 +207,7 @@ export function ensayoCamiseta(tela: TelaFisica, mallas: number[], ajustes: Part
   return mallas.map((malla) => {
     const asentada = config.asentada[String(malla)];
     const c = camisetaContraLaReferencia({ ...base, asentada: asentada ? leer(asentada) : undefined }, malla, tela);
-    const r = correrImplicito(tela, ajustes)(c.escena);
+    const r = correrImplicito(tela, ajustes, topePlaca)(c.escena);
     return {
       malla, quieta: r.quieta, msPorCuadro: r.msPorCuadro, errorDeColocacion: c.errorDeColocacion,
       cgMedio: r.cgMedio, primeraCerrada: r.primeraCerrada, todasCerradas: r.todasCerradas, ...medirCamiseta(r.x, c),
