@@ -101,11 +101,27 @@ export class MotorGpu {
 
   /** Graba un cuadro completo en el pase, en el orden de paso.ts. */
   grabarCuadro(pase: GPUComputePassEncoder): void {
-    const { aj } = this.s, { gv, gt, gh, gb, gc, gch, gp, gcel, gpnt, gvb } = this.d, propio = this.p.propio;
-    const d = (e: Entrada, grupos: number) => {
-      if (grupos === 0) return;
+    pase.setBindGroup(0, this.grupo);
+    this.grabar((e, grupos) => {
       pase.setPipeline(this.k[e]);
       pase.dispatchWorkgroups(grupos);
+    });
+  }
+
+  /** Los despachos de un cuadro, en el orden de paso.ts; `despachar` recibe solo los que tienen grupos. */
+  private grabar(despachar: (e: Entrada, grupos: number) => void): void {
+    const { aj } = this.s, { gv, gt, gh, gb, gc, gch, gp, gpa, gcel, gpnt, gvb } = this.d, propio = this.p.propio;
+    const d = (e: Entrada, grupos: number) => {
+      if (grupos > 0) despachar(e, grupos);
+    };
+    // la lista de entradas de cada vértice en los pares activos
+    const listas = () => {
+      d('limpiarVertices', gv);
+      d('contarEntradas', gp);
+      d('scanVBloques', gv);
+      d('scanVTotales', 1);
+      d('scanVSumar', gv);
+      d('llenarEntradas', gp);
     };
     const ronda = () => {
       d('residuo', gv);
@@ -113,6 +129,7 @@ export class MotorGpu {
       // E8: el p de cada vértice cosido es el de sus dos vértices
       d('expandirP', gc);
       for (let k = 0; k < aj.maxCG; k++) {
+        if (propio) d('aportePares', gpa);
         d('spmv', gv);
         d('sumarAlfa', 1);
         d('actualizar', gv);
@@ -121,7 +138,6 @@ export class MotorGpu {
         d('expandirP', gc);
       }
     };
-    pase.setBindGroup(0, this.grupo);
     d('encoger', gc);
     d('ubicar', gc);
     d('inicio', gv);
@@ -142,19 +158,18 @@ export class MotorGpu {
       d('hashLlenar', gpnt);
       d('limpiarPuntas', gvb);
       d('paresDeTriangulo', gt);
-      d('limpiarVertices', gv);
-      d('contarEntradas', gp);
-      d('scanVBloques', gv);
-      d('scanVTotales', 1);
-      d('scanVSumar', gv);
-      d('llenarEntradas', gp);
+      listas();
     }
     ronda();
     // ponytail: la segunda ronda y los intentos de la búsqueda se despachan siempre y salen enseguida si no
     // hacen falta (cuestan los despachos vacíos); pasar a despacho indirecto cuando se optimice la velocidad
     if (aj.anticipar && (this.s.obstaculos.length > 0 || propio)) {
       d('anticipar', gv);
-      if (propio) d('anticiparPares', gp);
+      if (propio) {
+        d('anticiparPares', gp);
+        // los pares que la anticipación activó entran a las listas
+        listas();
+      }
       d('armarRonda2', 1);
       ronda();
     }
@@ -188,6 +203,49 @@ export class MotorGpu {
       this.device.queue.submit([enc.finish()]);
     }
     await this.device.queue.onSubmittedWorkDone();
+  }
+
+  /**
+   * El tiempo de GPU de cada entrada en `cuadros` cuadros: un pase por despacho, con una marca de tiempo al empezar y
+   * otra al terminar. Pide un device con 'timestamp-query' (y Chrome redondea las marcas a 0,1 ms salvo con
+   * --enable-webgpu-developer-features). Los pases sueltos cuestan algo más que el pase único del cuadro: sirve para
+   * repartir el cuadro, no para medir su total.
+   */
+  async perfilar(cuadros: number): Promise<Array<{ entrada: Entrada; veces: number; ms: number }>> {
+    if (!this.device.features.has('timestamp-query')) throw new Error('perfilar: el device no tiene timestamp-query');
+    const total = new Map<Entrada, { veces: number; ms: number }>();
+    for (let c = 0; c < cuadros; c++) {
+      const nombres: Entrada[] = [];
+      this.grabar((e) => nombres.push(e));
+      const marcas = this.device.createQuerySet({ type: 'timestamp', count: 2 * nombres.length });
+      const resueltas = this.device.createBuffer({ size: 16 * nombres.length, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC });
+      const lectura = this.device.createBuffer({ size: 16 * nombres.length, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+      const enc = this.device.createCommandEncoder();
+      let q = 0;
+      this.grabar((e, grupos) => {
+        const pase = enc.beginComputePass({ timestampWrites: { querySet: marcas, beginningOfPassWriteIndex: 2 * q, endOfPassWriteIndex: 2 * q + 1 } });
+        pase.setBindGroup(0, this.grupo);
+        pase.setPipeline(this.k[e]);
+        pase.dispatchWorkgroups(grupos);
+        pase.end();
+        q++;
+      });
+      enc.resolveQuerySet(marcas, 0, 2 * q, resueltas, 0);
+      enc.copyBufferToBuffer(resueltas, 0, lectura, 0, 16 * q);
+      this.device.queue.submit([enc.finish()]);
+      await lectura.mapAsync(GPUMapMode.READ);
+      const t = new BigUint64Array(lectura.getMappedRange());
+      nombres.forEach((e, k) => {
+        const fila = total.get(e) ?? { veces: 0, ms: 0 };
+        fila.veces++;
+        fila.ms += Number(t[2 * k + 1] - t[2 * k]) / 1e6;
+        total.set(e, fila);
+      });
+      lectura.unmap();
+      for (const b of [lectura, resueltas]) b.destroy();
+      marcas.destroy();
+    }
+    return [...total].map(([entrada, f]) => ({ entrada, veces: f.veces / cuadros, ms: f.ms / cuadros })).sort((a, b) => b.ms - a.ms);
   }
 
   private async leer(nombre: Bufer, desde: number, bytes: number): Promise<ArrayBuffer> {

@@ -3,7 +3,7 @@
  * con la CPU, velocidad y segundos hasta quedar quieta.
  *
  * DEV-only: App.tsx la monta con `?testScene=tela-implicita` y reemplaza la app entera. La consume
- * tests/e2e/tela-implicita.spec.ts (@gpu-local). Parámetros: `modo` = paridad | velocidad | quietud | camiseta;
+ * tests/e2e/tela-implicita.spec.ts (@gpu-local). Parámetros: `modo` = paridad | velocidad | perfil | quietud | camiseta;
  * `escena` = una de ESCENAS (chica: disco Cusick de 10 mm; grande: disco de 48 cm con malla de 5 mm, del tamaño de
  * la camiseta; las escenas de paridad del banco; y camiseta, con `malla` en mm, armada con los archivos de la
  * referencia privada que sirve la prueba); `cg` = iteraciones por ronda; `cuadros`; `anticipar=0`, `busqueda=0` y
@@ -41,6 +41,8 @@ interface Resultado {
   diagnostico?: ParesEnCostura[];
   peores?: PeorPunto[];
   estado?: EstadoGpu;
+  /** modo perfil: ms de GPU por cuadro y despachos por cuadro de cada entrada, de la más cara a la más barata */
+  perfil?: Array<{ entrada: string; veces: number; ms: number }>;
   error?: string;
 }
 
@@ -121,7 +123,8 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
   const s = nuevo();
   const adaptador = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
   if (!adaptador) throw new Error('este navegador no tiene WebGPU');
-  const device = await adaptador.requestDevice();
+  // las marcas de tiempo, para el modo perfil, si el adaptador las tiene
+  const device = await adaptador.requestDevice({ requiredFeatures: adaptador.features.has('timestamp-query') ? ['timestamp-query'] : [] });
   const { vendor, architecture, description } = adaptador.info;
   const base = { modo, escena, vertices: s.n, gpu: `${vendor} ${architecture} ${description}`.trim() };
   const motor = await MotorGpu.crear(device, s, 3600, Number(q.get('maxPares')) || undefined);
@@ -147,6 +150,11 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
       const t0 = performance.now();
       await motor.avanzar(cuadros);
       return { ...base, msPorCuadro: (performance.now() - t0) / cuadros, estado: await motor.leerEstado() };
+    }
+    if (modo === 'perfil') {
+      // desde la colocación, como la velocidad: `desde` cuadros sin medir y luego `cuadros` repartidos por entrada
+      await motor.avanzar(Number(q.get('desde') ?? 2));
+      return { ...base, perfil: await motor.perfilar(Number(q.get('cuadros') ?? 10)), estado: await motor.leerEstado() };
     }
     if (modo === 'camiseta') {
       if (!camisetaEnCurso) throw new Error('el modo camiseta va con escena=camiseta');

@@ -223,9 +223,10 @@ fn parDePunta(b: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, bb: vec3<f32>, c:
   atomicStore(&at[A_CURV + g.x], 0u);
 }
 
+// solo los pares activos: los candidatos no empujan, y el producto recorre la lista en cada iteración
 @compute @workgroup_size(WG) fn contarEntradas(@builtin(global_invocation_id) g: vec3<u32>) {
   let k = g.x;
-  if (k >= nPares()) { return; }
+  if (k >= nPares() || tf[O_PAR + 14u * k + 13u] < 0.5) { return; }
   for (var j = 0u; j < 4u; j++) {
     let v = tf[O_PAR + 14u * k + j];
     if (v >= 0.0) { atomicAdd(&at[A_CNTV + u32(v)], 1u); }
@@ -236,12 +237,37 @@ ${wgslScan('scanV', 'A_CNTV', 'N', 'O_OFFV')}
 
 @compute @workgroup_size(WG) fn llenarEntradas(@builtin(global_invocation_id) g: vec3<u32>) {
   let k = g.x;
-  if (k >= nPares()) { return; }
+  if (k >= nPares() || tf[O_PAR + 14u * k + 13u] < 0.5) { return; }
   for (var j = 0u; j < 4u; j++) {
     let v = tf[O_PAR + 14u * k + j];
     if (v < 0.0) { continue; }
     let vi = u32(v);
     tf[O_ENT + u32(tf[O_OFFV + vi]) + atomicAdd(&at[A_CURV + vi], 1u)] = f32(4u * k + j);
+  }
+}
+
+// 7b. lo de cada par activo en A·p, una vez por iteración y antes del producto: k·(n·q)·n + kt·(q − (n·q)·n), con
+// q = Σ w·p, ya multiplicado por el peso de cada uno de sus vértices; spmv suma lo de cada vértice. GPA grupos recorren
+// todos los pares, para no lanzar un grupo por cada lugar libre de la lista
+@compute @workgroup_size(WG) fn aportePares(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>) {
+  if (!bandera(l.x, E_ACTIVO)) { return; }
+  let total = nPares();
+  for (var k = g.x; k < total; k += GPA * WG) {
+    let o = O_PAR + 14u * k;
+    if (tf[o + 13u] < 0.5) { continue; }
+    var qv = vec3<f32>(0.0);
+    for (var j = 0u; j < 4u; j++) {
+      let v = tf[o + j];
+      if (v >= 0.0) { qv += tf[o + 4u + j] * pv[u32(v)].xyz; }
+    }
+    let nn = v3tf(o + 8u);
+    let qn = dot(nn, qv);
+    let a = rigidezDelPar(o) * qn * nn + tf[o + 12u] * (qv - qn * nn);
+    for (var j = 0u; j < 4u; j++) {
+      let b = O_APORTE + 12u * k + 3u * j;
+      let w = tf[o + 4u + j];
+      tf[b] = w * a.x; tf[b + 1u] = w * a.y; tf[b + 2u] = w * a.z;
+    }
   }
 }
 

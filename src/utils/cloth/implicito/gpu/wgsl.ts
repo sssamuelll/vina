@@ -27,7 +27,7 @@ export const ENTRADAS = [
   'encoger', 'ubicar', 'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar',
   'velMax', 'armarRadio', 'limpiarCeldas', 'hashContar', 'scanCBloques', 'scanCTotales', 'scanCSumar', 'hashLlenar',
   'limpiarPuntas', 'paresDeTriangulo', 'limpiarVertices', 'contarEntradas', 'scanVBloques', 'scanVTotales', 'scanVSumar', 'llenarEntradas',
-  'residuo', 'sumarInicio', 'spmv', 'sumarAlfa', 'actualizar', 'sumarBeta', 'nuevaP', 'expandirP', 'anticipar', 'anticiparPares',
+  'residuo', 'sumarInicio', 'aportePares', 'spmv', 'sumarAlfa', 'actualizar', 'sumarBeta', 'nuevaP', 'expandirP', 'anticipar', 'anticiparPares',
   'armarRonda2', 'prepBusqueda', 'posPrueba', 'anguloPrueba', 'difTri', 'difCostura', 'difPares', 'decidir', 'aplicar',
   'cerrarCuadro', 'cerrarCosturas', 'revisarCosido', 'coser',
 ] as const;
@@ -47,7 +47,8 @@ function zonas<K extends string>(tamanos: Record<K, number>): Record<K, number> 
 type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT';
 type ZonaTf =
   | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH' | 'CCOS' | 'CDES'
-  | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'CUVN' | 'SOST' | 'HP' | 'OFFC' | 'ORD' | 'PAR' | 'OFFV' | 'ENT' | 'SCB';
+  | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'CUVN' | 'SOST' | 'HP' | 'OFFC' | 'ORD' | 'PAR' | 'OFFV' | 'ENT' | 'SCB'
+  | 'APORTE';
 /** el búfer atómico del contacto propio: cuentas y cursores de la rejilla y de las listas, los pares y los desbordes */
 type ZonaAt = 'CNTC' | 'CURC' | 'CNTV' | 'CURV' | 'NPAR' | 'DESB';
 /** las sumas parciales de cada reducción, los escalares y la historia de la quietud */
@@ -73,6 +74,8 @@ export interface Distribucion {
   gch: number;
   /** grupos por par, por celda de la rejilla, por punto de la rejilla y por vértice del cuerpo */
   gp: number;
+  /** grupos que recorren los pares en cada iteración (aportePares) */
+  gpa: number;
   gcel: number;
   gpnt: number;
   gvb: number;
@@ -87,6 +90,8 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
     CUN: p.f32.cuNodos.length, CUT: p.f32.cuTri.length, CUNT: p.f32.cuNt.length, CUPA: p.f32.cuPa.length, CUPV: p.f32.cuPv.length,
     CUV: 3 * p.nvb, CUVN: 3 * p.nvb, SOST: 2 * p.nvb, HP: p.np, OFFC: p.nceldas + 1, ORD: p.np, PAR: 14 * p.maxPares, OFFV: n + 1, ENT: 4 * p.maxPares,
     SCB: Math.max(Math.ceil(p.nceldas / WG), Math.ceil(n / WG)) + 1,
+    // el aporte de cada par activo a A·p, por cada uno de sus cuatro vértices (aportePares)
+    APORTE: 12 * p.maxPares,
   });
   const iu = { total: 0 } as Distribucion['iu'];
   for (const k of Object.keys(p.u32) as Array<keyof PaqueteGpu['u32']>) {
@@ -96,10 +101,11 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
   const gv = Math.ceil(n / WG), gt = Math.ceil(nt / WG), gh = Math.ceil(nh / WG), gb = Math.ceil(p.nb / WG);
   const gc = Math.ceil(p.nc / WG), gch = Math.ceil(p.nch / WG);
   const gp = Math.ceil(p.maxPares / WG), gcel = Math.ceil(p.nceldas / WG), gpnt = Math.ceil(p.np / WG), gvb = Math.ceil(p.nvb / WG);
+  const gpa = Math.min(gp, 256);
   const zona = Math.max(gv, gt, gh, gc, gp, 1);
   const red = { ...zonas<ZonaRed>({ PA: zona, PB: zona, PC: zona, PD: zona, PE: zona, SC: N_ESC, HISTO: cuadrosDeHistoria }), HIST: cuadrosDeHistoria };
   const at = zonas<ZonaAt>({ CNTC: p.nceldas, CURC: p.nceldas, CNTV: n, CURV: n, NPAR: 1, DESB: 1 });
-  return { vf, tf, iu, red, at, gv, gt, gh, gb, gc, gch, gp, gcel, gpnt, gvb };
+  return { vf, tf, iu, red, at, gv, gt, gh, gb, gc, gch, gp, gpa, gcel, gpnt, gvb };
 }
 
 /** Bytes de cada búfer, en el orden de las ligaduras del WGSL. */
@@ -221,6 +227,7 @@ const NVB = ${u(p.nvb)};
 const NCELDAS = ${u(p.nceldas)};
 const MAXP = ${u(p.maxPares)};
 const GP = ${u(d.gp)};
+const GPA = ${u(d.gpa)};
 const R_PE = ${u(red.PE)};
 const I_EXO = ${u(iu.exOff)}; const I_EXI = ${u(iu.exIdx)};
 ${Object.entries(d.at).filter(([k]) => k !== 'total').map(([k, v]) => `const A_${k} = ${u(v)};`).join(' ')}
@@ -833,19 +840,8 @@ fn arbolR0(v: u32) -> ResiduoB {
       ap += KC * pn * nn + vf[o + 5u] * (p - pn * nn);
     }
     if (PROPIO) {
-      for (var s = u32(tf[O_OFFV + i]); s < u32(tf[O_OFFV + i + 1u]); s++) {
-        let ent = u32(tf[O_ENT + s]);
-        let o = O_PAR + 14u * (ent >> 2u);
-        if (tf[o + 13u] < 0.5) { continue; }
-        var qv = vec3<f32>(0.0);
-        for (var j = 0u; j < 4u; j++) {
-          let v = tf[o + j];
-          if (v >= 0.0) { qv += tf[o + 4u + j] * pv[u32(v)].xyz; }
-        }
-        let nn = v3tf(o + 8u);
-        let qn = dot(nn, qv);
-        ap += tf[o + 4u + (ent & 3u)] * (rigidezDelPar(o) * qn * nn + tf[o + 12u] * (qv - qn * nn));
-      }
+      // la lista lleva solo los pares activos, y aportePares ya calculó lo de cada uno para cada vértice
+      for (var s = u32(tf[O_OFFV + i]); s < u32(tf[O_OFFV + i + 1u]); s++) { ap += v3tf(O_APORTE + 3u * u32(tf[O_ENT + s])); }
     }
     if (iu[I_FIJO + i] != 0u) { ap = vec3<f32>(0.0); }
     st(O_AP, i, ap);

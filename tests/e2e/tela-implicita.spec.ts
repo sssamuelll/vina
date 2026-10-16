@@ -24,6 +24,7 @@ interface ResultadoTela {
   dgCpu?: number;
   medidas?: MedidasDeCamiseta;
   estado?: { cuadro: number; cg: number; anticipados: number; alfa: number; quietud: number; quietudMaxima: number; dg: number; pares: number; desbordes: number };
+  perfil?: Array<{ entrada: string; veces: number; ms: number }>;
   error?: string;
 }
 
@@ -161,5 +162,13 @@ test.describe('La camiseta de María en la GPU, contra la referencia @gpu-local'
     }
     console.log(`[velocidad] informe: ${guardarInforme('camiseta-velocidad', { filas })}`);
     for (const f of filas) expect(f.msPorCuadro).toBeGreaterThan(0);
+  });
+
+  test('perfil por entrada a 5 mm: ms de GPU de cada despacho (medido, sin meta)', async ({ page }) => {
+    // con VINA_WEBGPU_PERFIL=1 Chrome no redondea las marcas de tiempo (playwright.webgpu.config.ts)
+    const extra = process.env.VINA_TELA_AJUSTES ? `&${process.env.VINA_TELA_AJUSTES}` : '';
+    const r = await correr(page, `modo=perfil&escena=camiseta&malla=5${extra}&cg=50&desde=30&cuadros=10`, 880_000);
+    console.log(`[perfil] informe: ${guardarInforme('camiseta-perfil', { extra, perfil: r.perfil, estado: r.estado })}`);
+    expect(r.perfil!.length).toBeGreaterThan(0);
   });
 });

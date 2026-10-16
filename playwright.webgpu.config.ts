@@ -22,6 +22,8 @@ export default defineConfig({
         // Evita el throttling de rAF cuando la ventana headed queda ocluida.
         '--disable-backgrounding-occluded-windows',
         '--disable-renderer-backgrounding',
+        // marcas de tiempo de la GPU sin redondear a 0,1 ms, para el perfil de la tela (tela-implicita.spec.ts)
+        ...(process.env.VINA_WEBGPU_PERFIL ? ['--enable-webgpu-developer-features'] : []),
       ],
     },
   },
