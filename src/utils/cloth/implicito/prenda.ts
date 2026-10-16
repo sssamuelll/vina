@@ -135,10 +135,15 @@ export function armarPrenda(piezas: readonly PiezaDeTela[]): Prenda {
   return { malla: { x, patron, tris, piezaDeTri, ...(hayFijos ? { fijos } : {}) }, piezas: rangos };
 }
 
-/** Los dos lados de una costura en la prenda, con índices GLOBALES y en orden de cosido. */
+/**
+ * Los dos lados de una costura en la prenda, con índices GLOBALES y en orden de cosido, y el t de cada vértice en el
+ * tramo cosido cuando el par lo trae (puntosDeCostura).
+ */
 export interface LadosDeCostura {
   a: number[];
   b: number[];
+  ta?: number[];
+  tb?: number[];
 }
 
 /**
@@ -148,24 +153,29 @@ export interface LadosDeCostura {
 export function costurasDePrenda(prenda: Prenda, pares: readonly SeamPair[]): { puntos: PuntoDeCostura[]; lados: LadosDeCostura[] } {
   const rango = new Map(prenda.piezas.map((p) => [p.id, p]));
   // una copia soldada cuenta una sola vez; un vértice que armarPrenda quitó no es tela (los puntos de una línea interna
-  // que sale de la pieza) y la costura sigue por los vértices de al lado
-  const globales = (r: RangoDePieza, lado: readonly number[]) => {
-    const g: number[] = [];
-    for (const v of lado) {
+  // que sale de la pieza) y la costura sigue por los vértices de al lado; el t de cada vértice se va con él
+  const globales = (r: RangoDePieza, lado: readonly number[], t?: readonly number[]) => {
+    if (t && t.length !== lado.length) throw new Error(`costurasDePrenda: el lado de ${r.id} trae ${lado.length} vértices y ${t.length} t`);
+    const g: number[] = [], tg: number[] = [];
+    lado.forEach((v, k) => {
       const j = r.local[v];
       if (j === undefined) throw new Error(`costurasDePrenda: la pieza ${r.id} no tiene el vértice ${v}`);
-      if (j >= 0 && g[g.length - 1] !== r.v0 + j) g.push(r.v0 + j);
-    }
-    return g;
+      if (j >= 0 && g[g.length - 1] !== r.v0 + j) {
+        g.push(r.v0 + j);
+        if (t) tg.push(t[k]);
+      }
+    });
+    return { g, t: t ? tg : undefined };
   };
   const puntos: PuntoDeCostura[] = [], lados: LadosDeCostura[] = [];
   for (const par of pares) {
     const ra = rango.get(par.pieceAId), rb = rango.get(par.pieceBId);
     if (!ra || !rb) throw new Error(`costurasDePrenda: falta una pieza de la costura ${par.pieceAId}↔${par.pieceBId}`);
     if (!par.lados) throw new Error('costurasDePrenda: el par no trae sus lados (los arma seamInitDataToPairs)');
-    const lado = { a: globales(ra, par.lados.a), b: globales(rb, par.lados.b) };
+    const A = globales(ra, par.lados.a, par.lados.ta), B = globales(rb, par.lados.b, par.lados.tb);
+    const lado: LadosDeCostura = { a: A.g, b: B.g, ...(A.t ? { ta: A.t } : {}), ...(B.t ? { tb: B.t } : {}) };
     lados.push(lado);
-    puntos.push(...puntosDeCostura(prenda.malla.patron, lado.a, lado.b));
+    puntos.push(...puntosDeCostura(prenda.malla.patron, lado.a, lado.b, lado.ta, lado.tb));
   }
   return { puntos, lados };
 }
@@ -173,7 +183,7 @@ export function costurasDePrenda(prenda: Prenda, pares: readonly SeamPair[]): { 
 /** Las bisagras que cruzan las costuras de la prenda (E2), sobre el dibujo de cada pieza en el marco de su hilo. */
 export function bisagrasDePrenda(prenda: Prenda, lados: readonly LadosDeCostura[], tela: TelaFisica): BisagraDeCostura[] {
   const si = telaSI(tela);
-  return lados.flatMap((l) => bisagrasDeCostura(prenda.malla.patron, prenda.malla.tris, l.a, l.b, si));
+  return lados.flatMap((l) => bisagrasDeCostura(prenda.malla.patron, prenda.malla.tris, l.a, l.b, si, l.ta, l.tb));
 }
 
 /**

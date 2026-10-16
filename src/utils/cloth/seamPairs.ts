@@ -82,9 +82,17 @@ export interface SeamPair {
   /**
    * Los dos lados de la costura en orden de cosido (el B ya invertido si va al revés) y con el filtro de
    * rango aplicado. El motor implícito cose cada vértice de un lado a un punto del otro
-   * (implicito/costuras.ts); el XPBD usa `vertexPairs`.
+   * (implicito/costuras.ts); el XPBD usa `vertexPairs`. `ta` y `tb` son el t de cada vértice renormalizado al
+   * tramo cosido: en una costura parcial, los vértices que quedan no llegan a las puntas del tramo.
    */
-  lados?: { a: LocalVertexIndex[]; b: LocalVertexIndex[] };
+  lados?: LadosDeSeamPair;
+}
+
+export interface LadosDeSeamPair {
+  a: LocalVertexIndex[];
+  b: LocalVertexIndex[];
+  ta?: number[];
+  tb?: number[];
 }
 
 /**
@@ -218,7 +226,7 @@ interface ResolvedSeamVertexPairs {
   vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]>;
   /** `null` when the seam resolved to ≥1 vertex pair. */
   failure: SeamResolutionFailure | null;
-  lados?: { a: LocalVertexIndex[]; b: LocalVertexIndex[] };
+  lados?: LadosDeSeamPair;
 }
 
 function buildPieceIndex(
@@ -331,7 +339,12 @@ function resolveSeamVertexPairs(
   return {
     vertexPairs,
     failure: null,
-    lados: { a: edgeA.map((v) => v.index as LocalVertexIndex), b: edgeB.map((v) => v.index as LocalVertexIndex) },
+    lados: {
+      a: edgeA.map((v) => v.index as LocalVertexIndex),
+      b: edgeB.map((v) => v.index as LocalVertexIndex),
+      ta: edgeA.map((v) => v.t),
+      tb: edgeB.map((v) => v.t),
+    },
   };
 }
 

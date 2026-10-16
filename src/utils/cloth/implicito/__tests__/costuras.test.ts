@@ -110,6 +110,14 @@ describe('las costuras', () => {
     }
   });
 
+  it('en una costura parcial, cada vértice se cose por su t en el tramo del patrón y no por lo que abarcan los vértices que quedaron', () => {
+    // A cubre su tramo entero (t 0, 0,5 y 1); el último vértice de B está en t = 0,8: el filtro del tramo dejó fuera la punta
+    const patron = [0, 0, 0.05, 0, 0.1, 0, 0, 1, 0.08, 1];
+    const [, medio] = puntosDeCostura(patron, [0, 1, 2], [3, 4], [0, 0.5, 1], [0, 0.8]);
+    expect(medio).toMatchObject({ a: 1, b0: 3, b1: 4 });
+    expect(medio.s).toBeCloseTo(0.625, 12);
+  });
+
   it('dos piezas de distinta malla se cosen sin aplastar la orilla', () => {
     const { prenda, ladoA, ladoB } = dosPiezas();
     expect(ladoA.length).not.toBe(ladoB.length);

@@ -45,11 +45,20 @@ function sobre(t: number, lado: readonly number[], tl: readonly number[]): Omit<
 
 /**
  * Los puntos de una costura: cada vértice de A sobre B, y cada vértice de B que no coincide con uno de A,
- * sobre A. Los lados van en orden de cosido (el B ya invertido si va al revés) y con índices globales.
+ * sobre A. Los lados van en orden de cosido (el B ya invertido si va al revés) y con índices globales. `tA` y `tB`
+ * son el lugar de cada vértice en el tramo cosido del patrón (0 al inicio, 1 al final): en una costura parcial, los
+ * vértices que quedan dentro del tramo no llegan a sus puntas, y medir el largo de arco entre ellos correría el cosido.
+ * Sin ellos, el lado se toma como el tramo entero.
  */
-export function puntosDeCostura(patron: ArrayLike<number>, ladoA: readonly number[], ladoB: readonly number[]): PuntoDeCostura[] {
+export function puntosDeCostura(
+  patron: ArrayLike<number>,
+  ladoA: readonly number[],
+  ladoB: readonly number[],
+  tLadoA?: readonly number[],
+  tLadoB?: readonly number[],
+): PuntoDeCostura[] {
   if (ladoA.length === 0 || ladoB.length === 0) return [];
-  const tA = largosEnElPatron(patron, ladoA), tB = largosEnElPatron(patron, ladoB);
+  const tA = tLadoA ?? largosEnElPatron(patron, ladoA), tB = tLadoB ?? largosEnElPatron(patron, ladoB);
   const puntos: PuntoDeCostura[] = [];
   const agregar = (p: PuntoDeCostura) => {
     // un vértice cosido a un segmento suyo (lados que comparten una punta) no es costura
@@ -223,7 +232,7 @@ function rigidezQueCruza(uv: ArrayLike<number>, p: number, q: number, tela: Tela
  * Las bisagras de una costura: por cada borde de A entre dos vértices cosidos seguidos, el triángulo de A que
  * lo tiene y, como ala, el vértice opuesto del triángulo de B en el segmento que cae a la mitad del borde. La
  * rigidez es la de una franja curvada a lo ancho, kh = b⊥·ℓ²/(A_T + A_N), con b⊥ el promedio de los dos lados.
- * Un borde que no es libre en su pieza (no debería pasar) no lleva bisagra.
+ * Un borde que no es libre en su pieza (no debería pasar) no lleva bisagra. `tA` y `tB`, como en puntosDeCostura.
  */
 export function bisagrasDeCostura(
   uv: ArrayLike<number>,
@@ -231,6 +240,8 @@ export function bisagrasDeCostura(
   ladoA: readonly number[],
   ladoB: readonly number[],
   tela: TelaSI,
+  tLadoA?: readonly number[],
+  tLadoB?: readonly number[],
 ): BisagraDeCostura[] {
   if (ladoA.length < 2 || ladoB.length < 2) return [];
   const nt = tris.length / 3, n = uv.length / 2;
@@ -259,7 +270,7 @@ export function bisagrasDeCostura(
     const a = tris[3 * t], b = tris[3 * t + 1], c = tris[3 * t + 2];
     return 0.5 * Math.abs((uv[2 * b] - uv[2 * a]) * (uv[2 * c + 1] - uv[2 * a + 1]) - (uv[2 * c] - uv[2 * a]) * (uv[2 * b + 1] - uv[2 * a + 1]));
   };
-  const tA = largosEnElPatron(uv, ladoA), tB = largosEnElPatron(uv, ladoB);
+  const tA = tLadoA ?? largosEnElPatron(uv, ladoA), tB = tLadoB ?? largosEnElPatron(uv, ladoB);
   const bisagras: BisagraDeCostura[] = [];
   for (let i = 0; i + 1 < ladoA.length; i++) {
     const a0 = ladoA[i], a1 = ladoA[i + 1], deA = libre(a0, a1);

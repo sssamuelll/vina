@@ -24,4 +24,25 @@ describe('los lados de una costura', () => {
       }
     }
   });
+
+  it('María a 20 mm: cada lado trae el t de sus vértices en el tramo del patrón, y en el cuello no llegan a las puntas', { timeout: 120_000 }, () => {
+    const piezas = importarMariaClasificada();
+    const pares = seamInitDataToPairs(aInitData(costurasDeMaria(piezas)), mallarParaCoser(piezas, 20));
+    let sinPunta = 0;
+    for (const par of pares) {
+      const { a, b, ta, tb } = par.lados!;
+      expect(ta).toHaveLength(a.length);
+      expect(tb).toHaveLength(b.length);
+      for (const t of [ta!, tb!]) {
+        for (let k = 0; k < t.length; k++) {
+          expect(t[k]).toBeGreaterThanOrEqual(-1e-9);
+          expect(t[k]).toBeLessThanOrEqual(1 + 1e-9);
+          if (k > 0) expect(t[k]).toBeGreaterThanOrEqual(t[k - 1]);
+        }
+      }
+      if (tb![0] > 0.05 || tb![tb!.length - 1] < 0.95) sinPunta++;
+    }
+    // las costuras parciales del cuello: el filtro del tramo deja vértices lejos de las puntas, y el t lo dice
+    expect(sinPunta).toBeGreaterThan(0);
+  });
 });

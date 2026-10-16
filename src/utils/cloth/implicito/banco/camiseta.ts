@@ -218,7 +218,7 @@ export function medirCamiseta(x: ArrayLike<number>, c: CamisetaContraLaReferenci
     porCostura: lados
       .filter((l) => l.a.length > 0 && l.b.length > 0)
       .map((l) => {
-        const puntos = puntosDeCostura(malla.patron, l.a, l.b);
+        const puntos = puntosDeCostura(malla.patron, l.a, l.b, l.ta, l.tb);
         return {
           piezas: [nombre(piezaDe(l.a[0])), nombre(piezaDe(l.b[0]))] as [string, string],
           puntos: puntos.length,
