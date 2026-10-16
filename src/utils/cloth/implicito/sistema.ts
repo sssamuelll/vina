@@ -32,7 +32,9 @@ export interface AjustesImplicito {
   kCostura: number;
   /**
    * lo más que se cierra en un cuadro el largo de reposo de una costura (m, E7): con huecos de 270 mm en la
-   * colocación, el cierre de ×0,97¹⁵ tiraba unos 100 mm de cada costura en el primer cuadro
+   * colocación, el cierre de ×0,97¹⁵ tiraba unos 100 mm de cada costura en el primer cuadro. 5 mm, escogido con el
+   * banco el 2026-10-16: de los topes de 2, 5 y 10 mm, el único que en la camiseta en la GPU a 5 mm mejora a la vez
+   * los aplastados (2,10 → 1,51 %) y la costura más abierta (27,0 → 22,8 mm)
    */
   cierreMaximo: number;
   /** capas de la franja del margen: multiplica su masa (margen.ts) */

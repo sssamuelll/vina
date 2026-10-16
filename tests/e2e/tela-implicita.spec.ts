@@ -112,11 +112,13 @@ test.describe('La camiseta de María en la GPU, contra la referencia @gpu-local'
 
   test('a 5 mm queda quieta sola, con las costuras cerradas, nada aplastado y a 17 ms por cuadro (§2)', async ({ page }) => {
     const espera = 880_000;
-    const camiseta = await correr(page, 'modo=camiseta&escena=camiseta&malla=5&cg=50', espera);
-    const velocidad20 = await correr(page, 'modo=velocidad&escena=camiseta&malla=5&cg=20&cuadros=60', espera);
-    const velocidad50 = await correr(page, 'modo=velocidad&escena=camiseta&malla=5&cg=50&cuadros=60', espera);
-    const paridad = await correr(page, 'modo=paridad&escena=camiseta&malla=5&cg=50&cuadros=3', espera);
-    console.log(`[camiseta] informe: ${guardarInforme('camiseta-gpu', { camiseta, velocidad20, velocidad50, paridad })}`);
+    // ajustes de la URL para medir otras variantes con el banco (p. ej. VINA_TELA_AJUSTES='cierre=2&kcost=300')
+    const extra = process.env.VINA_TELA_AJUSTES ? `&${process.env.VINA_TELA_AJUSTES}` : '';
+    const camiseta = await correr(page, `modo=camiseta&escena=camiseta&malla=5&cg=50${extra}`, espera);
+    const velocidad20 = await correr(page, `modo=velocidad&escena=camiseta&malla=5&cg=20&cuadros=60${extra}`, espera);
+    const velocidad50 = await correr(page, `modo=velocidad&escena=camiseta&malla=5&cg=50&cuadros=60${extra}`, espera);
+    const paridad = await correr(page, `modo=paridad&escena=camiseta&malla=5&cg=50&cuadros=3${extra}`, espera);
+    console.log(`[camiseta] informe: ${guardarInforme('camiseta-gpu', { extra, camiseta, velocidad20, velocidad50, paridad })}`);
     const m = camiseta.medidas!;
     expect(camiseta.estado?.desbordes).toBe(0);
     expect(m.aplastados).toBeLessThan(0.1);

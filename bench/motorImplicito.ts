@@ -12,12 +12,15 @@ export function correrImplicito(tela: TelaFisica, ajustes: Partial<AjustesImplic
     if (e.v) s.v.set(e.v);
     const vigia = new VigiaDeQuietud();
     const t0 = performance.now();
-    let cuadros = 0, quieta: number | null = null;
+    let cuadros = 0, quieta: number | null = null, cg = 0;
+    let primeraCerrada: number | null = null, todasCerradas: number | null = null;
     while (cuadros < 600 && quieta === null) {
-      pasoImplicito(s);
+      cg += pasoImplicito(s).cg;
       cuadros++;
+      if (primeraCerrada === null && s.costuras.L.some((L) => L === 0)) primeraCerrada = cuadros;
+      if (todasCerradas === null && s.costuras.n > 0 && s.costuras.cerradas()) todasCerradas = cuadros;
       if (vigia.registrar(medirQuietud(s).total)) quieta = cuadros / 60;
     }
-    return { x: s.x, quieta, msPorCuadro: (performance.now() - t0) / cuadros };
+    return { x: s.x, quieta, msPorCuadro: (performance.now() - t0) / cuadros, cgMedio: cg / cuadros, primeraCerrada, todasCerradas };
   };
 }

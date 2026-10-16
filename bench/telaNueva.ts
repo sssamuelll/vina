@@ -2,7 +2,7 @@
  * El banco de la tela nueva contra la referencia privada (spec 2026-10-13 §4.4.2) y contra el motor de
  * hoy (§4.4.4).
  *
- *   VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- [--motor=implicito|xpbd] [--pandeo=<factor>] [--ensayo=cusick|voladizo|todo|camiseta] [--mallas=5,10,20] [--cg=<n>] [--flexionDelMargen=<f>]
+ *   VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- [--motor=implicito|xpbd] [--pandeo=<factor>] [--ensayo=cusick|voladizo|todo|camiseta] [--mallas=5,10,20] [--cg=<n>] [--cierre=<mm por cuadro>] [--flexionDelMargen=<f>]
  *
  * `camiseta` no entra en `todo`: corre la camiseta de María sobre el avatar y desde la colocación de la referencia
  * (camiseta.json en la carpeta privada), solo con el motor implícito.
@@ -65,6 +65,7 @@ if (ensayo === 'camiseta') {
   const filas = ensayoCamiseta(telaDeLaReferencia(ref, Number(args.get('pandeo') || PANDEO_CALIBRADO)), mallas, {
     ...(args.has('cg') ? { maxCG: Number(args.get('cg')) } : {}),
     ...(args.has('flexionDelMargen') ? { flexionDelMargen: Number(args.get('flexionDelMargen')) } : {}),
+    ...(args.has('cierre') ? { cierreMaximo: Number(args.get('cierre')) / 1000 } : {}),
   });
   imprimirCamiseta(filas);
   informe.camiseta = filas;

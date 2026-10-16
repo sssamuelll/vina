@@ -96,6 +96,8 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
     contactoPropio: q.get('propio') !== '0',
     // la rigidez de contacto, si se pide otra
     ...(q.get('kc') ? { kContacto: Number(q.get('kc')) } : {}),
+    // el tope del cierre de las costuras (mm por cuadro), si se pide otro
+    ...(q.get('cierre') ? { cierreMaximo: Number(q.get('cierre')) / 1000 } : {}),
   };
   const nuevo = () => {
     const s = new SistemaTela(e.malla, telaEnCurso, { obstaculos: e.obstaculos, hilo: e.hilo, costuras: e.costuras, franja: e.franja, ajustes });
