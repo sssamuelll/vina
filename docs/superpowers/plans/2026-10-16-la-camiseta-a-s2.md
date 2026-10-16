@@ -14,7 +14,7 @@
 
 La camiseta en la GPU a 5 mm (informe `2026-10-14-14-37-35-camiseta-gpu.json`): no queda quieta en 10 s; 2,02 % de triángulos aplastados; costuras con mediana 0,05 mm y máxima 23 mm; 4,86 % de aristas encogidas más de 10 %; 63 ms por cuadro con cg 20 y 101 ms con cg 50; 9.230 desbordes del contacto propio. Las causas que midió:
 
-1. **El cierre.** El largo de reposo baja 37 % por cuadro (`CIERRE_POR_CUADRO = 0,97¹⁵ ≈ 0,633`, `costuras.ts:22`). Con huecos de hasta 270 mm en la colocación, el primer cuadro tira unos 90 mm de cada costura a 1000 N/m, y en la CPU 67 triángulos pasan de 30 mm en ese cuadro.
+1. **El cierre.** El largo de reposo baja 37 % por cuadro (`CIERRE_POR_CUADRO = 0,97¹⁵ ≈ 0,633`, `costuras.ts:22`). Con huecos de decenas de centímetros en la colocación, el primer cuadro tira de cada costura más de un tercio de su hueco a 1000 N/m, y en la CPU 67 triángulos pasan de 30 mm en ese cuadro.
 2. **El resorte.** A 1000 N/m contra m/h² ≈ 7·10⁻³ N/m, 50 iteraciones de gradiente conjugado no convergen: una costura cerrada queda a 2,6 mm entre CPU y GPU tras un cuadro, y hacen falta 400 iteraciones para bajar a 0,64 µm.
 3. **Los triángulos de borde.** La K de placa llega a 5·10⁵ veces la mediana en triángulos de borde (segunda prueba de `camiseta.test.ts`), y la precisión simple no los resuelve.
 4. **La velocidad.** La rama spike daba 9,8 ms (cg 20) y 17 ms (cg 50) por paso con la camiseta, antes de la entrega 4; con la prenda completa son 63 y 101 ms.
@@ -69,7 +69,7 @@ Se aplicó sobre `51215997` y se revirtió sin commitear.
 
 1. Un `cierreMaximo` que no es un número positivo (`--cierre=0` en el banco, `cierre=abc` en la URL): con 0 las costuras no cerrarían nunca, y con NaN la tela se llenaría de NaN. El sistema se niega con un error que lo nombra. Lo prueba la Tarea 1.
 2. Una costura que arranca a menos de unos 13,6 mm (`cierreMaximo/(1 − 0,97¹⁵)` con 5 mm): cierra exactamente como hoy. Lo prueba la Tarea 1.
-3. Costuras que cierran en cuadros muy distintos: con el tope, una que arranca a 270 mm tarda unos 60 cuadros y una de 5 mm, unos 9. La flexión cruza todas solo cuando cierran todas (`alTerminarCuadro`, `sistema.ts:250-256`), así que las chicas pasan hasta un segundo sin bisagra. La Tarea 2 mide en qué cuadro cierra la primera y en cuál cierran todas; si la diferencia deja quiebres en las costuras, va a Samuel.
+3. Costuras que cierran en cuadros muy distintos: con el tope, una que arranca a decenas de centímetros tarda unos 60 cuadros y una de 5 mm, unos 9. La flexión cruza todas solo cuando cierran todas (`alTerminarCuadro`, `sistema.ts:250-256`), así que las chicas pasan hasta un segundo sin bisagra. La Tarea 2 mide en qué cuadro cierra la primera y en cuál cierran todas; si la diferencia deja quiebres en las costuras, va a Samuel.
 4. La escena `costura` de la paridad arranca a 30 mm, así que el tope actúa desde el primer cuadro: la CPU y la GPU tienen que cerrar igual. Lo prueba la Tarea 1 con esa escena y su mutación.
 5. Una costura con lados de largo distinto en el patrón (la tira del cuello, 11-14 % más corta que el escote): para cerrar, la tela tiene que estirarse. La Tarea 3 mide si cierra a 1 mm o si la tira y la costura pelean.
 
@@ -180,8 +180,8 @@ En `src/utils/cloth/implicito/sistema.ts`, en `AjustesImplicito`, después de `k
 
 ```ts
   /**
-   * lo más que se cierra en un cuadro el largo de reposo de una costura (m, E7): con huecos de 270 mm en la
-   * colocación, el cierre de ×0,97¹⁵ tiraba unos 100 mm de cada costura en el primer cuadro
+   * lo más que se cierra en un cuadro el largo de reposo de una costura (m, E7): con huecos de decenas de centímetros
+   * en la colocación, el cierre de ×0,97¹⁵ tiraba de cada costura más de un tercio de su hueco en el primer cuadro
    */
   cierreMaximo: number;
 ```

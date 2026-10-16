@@ -386,7 +386,7 @@ El banco corre también sobre el XPBD actual, para medir cada entrega contra él
 ## 7. Enmiendas de la entrega 4
 
 Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el plan de la parte 1, y E5, E6, R13 y E7
-el 2026-10-16.
+el 2026-10-16 (el valor de E7 espera su ratificación).
 
 - **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
   patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.
@@ -413,7 +413,11 @@ el 2026-10-16.
   `2026-10-14-la-prenda-en-la-cpu.md`.
 - **E7 (§4.3.3).** El largo de reposo de una costura baja cada cuadro lo mismo que antes (×0,97¹⁵), pero nunca más de
   `cierreMaximo`: `L ← max(L·0,97¹⁵, L − cierreMaximo)`, con `cierreMaximo` = 5 mm por cuadro. Una costura que arranca a
-  menos de `cierreMaximo/(1 − 0,97¹⁵)` ≈ 13,6 mm cierra como antes. Sin tope, con huecos de hasta 270 mm en la colocación,
-  el primer cuadro tiraba unos 100 mm de cada costura. Escogido con el banco el 2026-10-16: de los topes de 2, 5 y 10 mm,
-  el único que en la camiseta en la GPU a 5 mm mejora a la vez los triángulos aplastados (2,10 → 1,51 %) y la costura más
-  abierta (27,0 → 22,8 mm). Plan `2026-10-16-la-camiseta-a-s2.md`.
+  menos de `cierreMaximo/(1 − 0,97¹⁵)` ≈ 13,6 mm cierra como antes. Sin tope, con huecos de decenas de centímetros en la
+  colocación, el primer cuadro tiraba de cada costura más de un tercio de su hueco. *Costo:* la flexión cruza las costuras
+  cuando cierran todas, y con el tope eso espera a la más abierta: unos G/5 cuadros por cada G mm de hueco (en la
+  camiseta, 63 cuadros; sin tope, 18). 5 mm es el valor de partida: entre 2, 5 y 10 mm, medidos el 2026-10-16 con una
+  corrida por tope y antes del arreglo de las costuras parciales, los triángulos aplastados quedan dentro del ruido de la
+  GPU; se queda porque con 2 mm las costuras chicas pasan 136 cuadros sin bisagra y porque 5 mm dio la menor costura
+  máxima en esas corridas. La regla del plan, fijada antes de medir, escogía 2 mm: el valor espera la ratificación de
+  Samuel. Plan `2026-10-16-la-camiseta-a-s2.md`.

@@ -26,15 +26,15 @@ export interface AjustesImplicito {
   kContacto: number;
   /**
    * rigidez de cada punto de costura (N/m). Con 1000, una costura que sostiene 1 N/m de tela con puntos cada
-   * 5 mm queda abierta 5 µm; el banco de la camiseta la confirma (spec §5: «el resorte de costura se elige
-   * con el banco»).
+   * 5 mm queda abierta 5 µm. El banco todavía no la escoge (spec §5): el 2026-10-16, con 300, 1000 y 3000 N/m la
+   * camiseta no quedó quieta y ninguno cumplió las costuras de §2; 3000 las cerró mejor pero duplicó los aplastados
+   * en la CPU a 20 mm. Queda 1000 hasta que el gradiente conjugado converja.
    */
   kCostura: number;
   /**
-   * lo más que se cierra en un cuadro el largo de reposo de una costura (m, E7): con huecos de 270 mm en la
-   * colocación, el cierre de ×0,97¹⁵ tiraba unos 100 mm de cada costura en el primer cuadro. 5 mm, escogido con el
-   * banco el 2026-10-16: de los topes de 2, 5 y 10 mm, el único que en la camiseta en la GPU a 5 mm mejora a la vez
-   * los aplastados (2,10 → 1,51 %) y la costura más abierta (27,0 → 22,8 mm)
+   * lo más que se cierra en un cuadro el largo de reposo de una costura (m, E7): con huecos de decenas de centímetros
+   * en la colocación, el cierre de ×0,97¹⁵ tiraba de cada costura más de un tercio de su hueco en el primer cuadro.
+   * 5 mm es el valor de partida: entre 2, 5 y 10 mm la camiseta queda dentro del ruido de la GPU (spec §7, E7)
    */
   cierreMaximo: number;
   /** capas de la franja del margen: multiplica su masa (margen.ts) */
