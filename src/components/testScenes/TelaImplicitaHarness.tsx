@@ -112,9 +112,9 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
     // la rigidez de los puntos de costura (N/m), si se pide otra
     ...(q.get('kcost') ? { kCostura: Number(q.get('kcost')) } : {}),
   };
-  // la tela, con el pandeo, su tope y las rigideces de tracción que pida el banco (p. ej. topePandeo=0.2&kUrdimbre=200)
+  // la tela, con el gramaje, el pandeo, su tope y las rigideces de tracción y de flexión que pida el banco (p. ej. topePandeo=0.2&bUrdimbre=7.6)
   const tela: TelaFisica = { ...telaEnCurso };
-  for (const k of ['pandeo', 'topePandeo', 'kTrama', 'kUrdimbre', 'kCizalla', 'friccionCuerpo', 'friccionTela'] as const) if (q.get(k)) tela[k] = Number(q.get(k));
+  for (const k of ['gramaje', 'pandeo', 'topePandeo', 'kTrama', 'kUrdimbre', 'kCizalla', 'bTrama', 'bUrdimbre', 'bBies', 'friccionCuerpo', 'friccionTela'] as const) if (q.get(k)) tela[k] = Number(q.get(k));
   const nuevo = () => {
     const s = new SistemaTela(e.malla, tela, { obstaculos: e.obstaculos, hilo: e.hilo, costuras: e.costuras, franja: e.franja, ajustes });
     // el experimento de banco/experimentos.ts, solo si se pide

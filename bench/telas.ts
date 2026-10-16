@@ -3,11 +3,12 @@
  * privada (tracción por dirección, flexión del voladizo, gramaje y grosor) se lleva al modelo del motor y se compara su
  * coeficiente de caída con el de la referencia.
  *
- *   VINA_REFERENCIAS=<carpeta privada> npx tsx bench/telas.ts [--mallas=5] [--telas=Jersey,Rib] [--cg=<n>] [--flexion=<factor>]
+ *   VINA_REFERENCIAS=<carpeta privada> npx tsx bench/telas.ts [--mallas=5] [--telas=Jersey,Rib] [--cg=<n>] [--ajusteDe=<malla>] [--flexion=<factor>]
  *
  * La flexión de cada tela es la ajustada en el voladizo apoyado de la referencia para cada malla
  * (`telas/flexion-<malla>mm.json`, de bench/flexionDeLaReferencia.ts); sin ese archivo, la de la fórmula de Peirce.
- * `--flexion` la multiplica además por un factor (para medir cuánto mueve la caída).
+ * `--ajusteDe=<malla>` usa en todas las mallas el ajuste de esa (en una malla gruesa no caben las tiras cortas), y
+ * `--flexion` multiplica además la flexión por un factor (para medir cuánto mueve la caída).
  *
  * Lee `$VINA_REFERENCIAS/telas/resultados.json`. Corre en la CPU; con muchas telas tarda: va con el candado de
  * scripts/pesado.mjs. El informe queda en `$VINA_REFERENCIAS/informes/`.
@@ -54,7 +55,7 @@ for (const [nombre, medida] of Object.entries(datos.telas)) {
   }
   const f = Number(args.get('flexion') ?? 1);
   for (const malla of mallas) {
-    const ajuste = ajustes(malla)[nombre]?.factor ?? { urdimbre: 1, trama: 1, bies: 1 };
+    const ajuste = ajustes(args.has('ajusteDe') ? Number(args.get('ajusteDe')) : malla)[nombre]?.factor ?? { urdimbre: 1, trama: 1, bies: 1 };
     const tela = {
       ...medidaComoTela,
       bUrdimbre: f * ajuste.urdimbre * medidaComoTela.bUrdimbre,
