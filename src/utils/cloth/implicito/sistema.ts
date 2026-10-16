@@ -302,6 +302,8 @@ export class SistemaTela {
    * otra), y la velocidad tangencial del cuadro anterior.
    */
   armarApoyos(): void {
+    // la normal con que se sostuvo cada vértice el cuadro anterior: la restricción le dejó en 0 la velocidad por ella
+    const previa = new Map(this.apoyos.map((c) => [c.i, c]));
     this.apoyos = [];
     const { h, gravedad } = this.aj, mu = this.tela.friccionCuerpo;
     for (let i = 0; i < this.n; i++) {
@@ -310,7 +312,10 @@ export class SistemaTela {
       const c = masCercano(this.obstaculos, this.x[q], this.x[q + 1], this.x[q + 2], RADIO_DE_BUSQUEDA);
       if (c === null || c.d >= this.sep + HOLGURA_DE_APOYO) continue;
       const vn = c.nx * this.v[q] + c.ny * this.v[q + 1] + c.nz * this.v[q + 2];
-      if (vn > VELOCIDAD_DE_DESPEGUE) continue;
+      // se despega el que se aleja del cuerpo. Del que estaba apoyado se mira la normal con que se lo sostuvo: en un canto
+      // redondeado, resbalar por su plano tangente lo aleja de la normal nueva sin despegarlo
+      const p = previa.get(i);
+      if ((p ? p.nx * this.v[q] + p.ny * this.v[q + 1] + p.nz * this.v[q + 2] : vn) > VELOCIDAD_DE_DESPEGUE) continue;
       const vt = Math.hypot(this.v[q] - vn * c.nx, this.v[q + 1] - vn * c.ny, this.v[q + 2] - vn * c.nz);
       const lambda = Math.max(this.fuerzaDeApoyo[i], -this.masa[i] * gravedad * c.ny);
       this.apoyos.push({ i, nx: c.nx, ny: c.ny, nz: c.nz, kt: rigidezDeFriccion(mu, lambda, vt, h) });

@@ -581,6 +581,10 @@ const MARGEN_DC = 1e-5;
   let o = O_CONT + 6u * i;
   // la fuerza de apoyo del cuadro anterior: negativa, su restricción jalaba hacia el cuerpo y este cuadro se suelta
   let lambda = vf[o + 4u];
+  // la normal con que se lo sostuvo el cuadro anterior: del que estaba apoyado, el despegue se mira por ella (sistema.ts,
+  // armarApoyos)
+  let antes = vf[o] > 0.5;
+  let nAntes = vec3<f32>(vf[o + 1u], vf[o + 2u], vf[o + 3u]);
   vf[o] = 0.0;
   if (iu[I_FIJO + i] == 0u && !cosidoV(i) && lambda >= 0.0 && vf[O_DC + i] < SEP + HOLGURA + MARGEN_DC) {
     let c = masCercano(x);
@@ -588,7 +592,8 @@ const MARGEN_DC = 1e-5;
     let n = c.c.yzw;
     let v = ld(O_V, i);
     let vn = dot(v, n);
-    if (c.c.x < SEP + HOLGURA && vn <= DESPEGUE) {
+    let sale = select(vn, dot(v, nAntes), antes);
+    if (c.c.x < SEP + HOLGURA && sale <= DESPEGUE) {
       vf[o] = 1.0; vf[o + 1u] = n.x; vf[o + 2u] = n.y; vf[o + 3u] = n.z;
       // nunca menos que el peso que carga sobre el cuerpo (sistema.ts, armarApoyos)
       vf[o + 5u] = rigidez(MU_C, max(lambda, -vf[O_MASA + i] * GRAV * n.y), length(v - vn * n));

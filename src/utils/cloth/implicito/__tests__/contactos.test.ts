@@ -54,6 +54,44 @@ describe('el cuerpo es un piso duro (E10)', () => {
     }
   });
 
+  describe('en un canto redondeado', () => {
+    // el canto del pedestal: el vértice 0 a la separación, con la normal a 30° de la vertical; el resto de la lámina, lejos
+    const R = 0.09, T = 0.5, a = Math.PI / 6;
+    const enElCanto = (v: [number, number]) => {
+      const s = new SistemaTela(laminaPlana(20), TELA_DE_LABORATORIO, { obstaculos: [{ tipo: 'pedestal', radio: R, tapa: T }] });
+      for (let i = 0; i < s.n; i++) s.x[3 * i + 1] = T + 0.1;
+      s.x.set([R + s.sep * Math.sin(a), T + s.sep * Math.cos(a), 0], 0);
+      s.v.set([v[0], v[1], 0], 0);
+      s.fuerzaDeApoyo[0] = 0.1 * s.masa[0] * 9.81;
+      return s;
+    };
+    // la normal con que lo sostuvo el cuadro anterior, a 20°: resbalando por su plano tangente a 13 mm/s, se aleja de la
+    // normal nueva 13·sen 10° = 2,3 mm/s, más que la velocidad de despegue
+    const b = Math.PI / 9, deslizando: [number, number] = [0.013 * Math.cos(b), -0.013 * Math.sin(b)];
+    const sostenidoA20 = (s: SistemaTela) => (s.apoyos = [{ i: 0, nx: Math.sin(b), ny: Math.cos(b), nz: 0, kt: 0 }]);
+
+    it('el vértice apoyado que resbala por el canto sigue apoyado: no se aleja de la normal con que se lo sostuvo', () => {
+      const s = enElCanto(deslizando);
+      sostenidoA20(s);
+      s.armarApoyos();
+      expect(s.apoyos.map((c) => c.i)).toEqual([0]);
+      expect(s.apoyos[0].ny).toBeCloseTo(Math.cos(a), 9);
+    });
+
+    it('el que llega alejándose del canto no se apoya', () => {
+      const s = enElCanto(deslizando);
+      s.armarApoyos();
+      expect(s.apoyos).toEqual([]);
+    });
+
+    it('el apoyado al que algo lanza hacia afuera de su normal se suelta', () => {
+      const s = enElCanto([0.5 * Math.sin(b), 0.5 * Math.cos(b)]);
+      sostenidoA20(s);
+      s.armarApoyos();
+      expect(s.apoyos).toEqual([]);
+    });
+  });
+
   it('el cuadro se resuelve en una sola ronda de gradiente conjugado', () => {
     const s = lamina({ tolCG: 0, maxCG: 20 }, undefined, -2);
     for (let i = 0; i < s.n; i++) s.x[3 * i + 1] = s.sep + 0.001;
