@@ -17,8 +17,8 @@ export const WG = 128;
 
 /** Los escalares del cuadro, en la zona SC de `red`. */
 export const ESC = {
-  RZ: 0, RZ0: 1, ALFA: 2, BETA: 3, HECHO: 4, ACTIVO: 5, PROYECTADOS: 6, ALFA_LS: 7, PROBANDO: 8,
-  CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14, COSIDA: 15,
+  RZ: 0, RZ0: 1, HECHO: 4, ACTIVO: 5, PROYECTADOS: 6, ALFA_LS: 7, PROBANDO: 8,
+  CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14, COSIDA: 15, RZ_IMPAR: 16,
 } as const;
 const N_ESC = 32;
 
@@ -27,7 +27,7 @@ export const ENTRADAS = [
   'encoger', 'ubicar', 'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar',
   'limpiarPares', 'limpiarCeldas', 'anotarRegiones', 'hashContar', 'scanCBloques', 'scanCTotales', 'scanCSumar', 'hashLlenar',
   'limpiarPuntas', 'paresDeTriangulo', 'limpiarVertices', 'contarEntradas', 'scanVBloques', 'scanVTotales', 'scanVSumar', 'llenarEntradas',
-  'residuo', 'sumarInicio', 'aportePares', 'spmv', 'sumarAlfa', 'actualizar', 'sumarBeta', 'nuevaP', 'expandirP',
+  'residuo', 'sumarInicio', 'aportePares', 'spmv', 'actualizar', 'nuevaP', 'expandirP',
   'prepBusqueda', 'posPrueba', 'anguloPrueba', 'difTri', 'difCostura', 'difPares', 'decidir', 'aplicar',
   'cerrarCuadro', 'cerrarCosturas', 'revisarCosido', 'coser',
 ] as const;
@@ -111,7 +111,7 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
 /** Bytes de cada búfer, en el orden de las ligaduras del WGSL. */
 export function tamanosDeBufer(d: Distribucion, p: PaqueteGpu): Record<'pos' | 'vf' | 'tf' | 'iu' | 'red' | 'vals' | 'pv' | 'at', number> {
   return {
-    pos: 12 * p.n, vf: 4 * d.vf.total, tf: 4 * d.tf.total, iu: 4 * d.iu.total, red: 4 * d.red.total, vals: 48 * Math.max(p.nq, 1), pv: 16 * p.n,
+    pos: 12 * p.n, vf: 4 * d.vf.total, tf: 4 * d.tf.total, iu: 4 * d.iu.total, red: 4 * d.red.total, vals: 36 * Math.max(p.nq, 1), pv: 16 * p.n,
     at: 4 * d.at.total,
   };
 }
@@ -166,7 +166,8 @@ export function wgslDelMotor(s: SistemaTela, p: PaqueteGpu, d: Distribucion): st
 @group(0) @binding(2) var<storage, read_write> tf: array<f32>;
 @group(0) @binding(3) var<storage, read> iu: array<u32>;
 @group(0) @binding(4) var<storage, read_write> red: array<f32>;
-@group(0) @binding(5) var<storage, read_write> vals: array<vec4<f32>>;
+// los bloques de la matriz: el elemento (fila r, columna c) del bloque q en (3·r + c)·NQ + q
+@group(0) @binding(5) var<storage, read_write> vals: array<f32>;
 @group(0) @binding(6) var<storage, read_write> pv: array<vec4<f32>>;
 @group(0) @binding(7) var<storage, read_write> at: array<atomic<u32>>;
 
@@ -260,7 +261,12 @@ fn ldc(s: u32) -> vec3<f32> { let b = O_CONTRIB + 3u * s; return vec3<f32>(tf[b]
 fn stc(s: u32, a: vec3<f32>) { let b = O_CONTRIB + 3u * s; tf[b] = a.x; tf[b + 1u] = a.y; tf[b + 2u] = a.z; }
 fn hg(e: u32, r: u32) -> vec3<f32> { let b = O_HD + 16u * e + 1u + 3u * r; return vec3<f32>(tf[b], tf[b + 1u], tf[b + 2u]); }
 fn outer(a: vec3<f32>, b: vec3<f32>) -> mat3x3<f32> { return mat3x3<f32>(a * b.x, a * b.y, a * b.z); }
-fn ld9(q: u32) -> mat3x3<f32> { return transpose(mat3x3<f32>(vals[q].xyz, vals[NQ + q].xyz, vals[2u * NQ + q].xyz)); }
+fn ld9(q: u32) -> mat3x3<f32> {
+  return mat3x3<f32>(
+    vec3<f32>(vals[q], vals[3u * NQ + q], vals[6u * NQ + q]),
+    vec3<f32>(vals[NQ + q], vals[4u * NQ + q], vals[7u * NQ + q]),
+    vec3<f32>(vals[2u * NQ + q], vals[5u * NQ + q], vals[8u * NQ + q]));
+}
 
 // la ley de membrana.ts: ψ, ψ' y ψ'' con pandeo y su tope
 fn ley(eps: f32, k: f32, pcr: f32) -> vec3<f32> {
@@ -500,6 +506,7 @@ fn pesoMaestro(i: u32, e: u32) -> vec2<f32> {
 
 var<workgroup> sh: array<f32, ${WG}>;
 var<workgroup> wBandera: u32;
+var<workgroup> wEscalar: f32;
 
 // una bandera de red[] leída de forma uniforme en el grupo: permite salir antes de una reducción
 fn bandera(lid: u32, k: u32) -> bool {
@@ -701,10 +708,9 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
     else { M += bloqueMembrana(cod >> 4u, (cod >> 2u) & 3u, cod & 3u); }
   }
   let q = iu[I_POSDE + b];
-  let Mt = transpose(M);
-  vals[q] = vec4<f32>(Mt[0], 0.0);
-  vals[NQ + q] = vec4<f32>(Mt[1], 0.0);
-  vals[2u * NQ + q] = vec4<f32>(Mt[2], 0.0);
+  for (var r = 0u; r < 3u; r++) {
+    for (var c = 0u; c < 3u; c++) { vals[(3u * r + c) * NQ + q] = M[c][r]; }
+  }
 }
 
 // 6. el residuo, el precondicionador de bloques y el arranque del gradiente conjugado (Δ = 0)
@@ -829,10 +835,20 @@ fn arbolR0(v: u32) -> ResiduoB {
   red[R_SC + E_HECHO] = 0.0;
 }
 
-// 7. gradiente conjugado: A·p con la matriz en franjas, la diagonal de la inercia y el contacto
+// 7. gradiente conjugado: A·p con la matriz en franjas, la diagonal de la inercia y el contacto. Cada iteración son
+// cuatro despachos (aportePares, spmv, actualizar, nuevaP; y expandirP con costuras): α y β los calcula cada grupo con
+// las sumas parciales del despacho anterior. rᵀz va en dos lugares que se alternan por iteración, para que nadie lo
+// lea mientras se escribe; al terminar (tolerancia o pᵀAp ≤ 0) ACTIVO se apaga y las iteraciones que quedan no trabajan
+fn lugarRz(siguiente: bool) -> u32 {
+  let impar = ((u32(red[R_SC + E_ITER]) - 1u) & 1u) == 1u;
+  return R_SC + select(E_RZ, E_RZ_IMPAR, impar != siguiente);
+}
+
 @compute @workgroup_size(${WG}) fn spmv(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
   if (!bandera(l.x, E_ACTIVO)) { return; }
   let i = g.x;
+  // la iteración cuenta al empezar: los demás despachos de esta iteración la leen y nadie la escribe en ellos
+  if (i == 0u) { red[R_SC + E_ITER] = red[R_SC + E_ITER] + 1.0; }
   var pap = 0.0;
   if (i < N) {
     let f = i >> 5u;
@@ -844,8 +860,11 @@ fn arbolR0(v: u32) -> ResiduoB {
       let q = base + 32u * k + carril;
       let j = iu[I_COLE + q];
       if (j == NINGUNA) { continue; }
-      let pj = pv[j];
-      ap += vec3<f32>(dot(vals[q], pj), dot(vals[NQ + q], pj), dot(vals[2u * NQ + q], pj));
+      let pj = pv[j].xyz;
+      ap += vec3<f32>(
+        vals[q] * pj.x + vals[NQ + q] * pj.y + vals[2u * NQ + q] * pj.z,
+        vals[3u * NQ + q] * pj.x + vals[4u * NQ + q] * pj.y + vals[5u * NQ + q] * pj.z,
+        vals[6u * NQ + q] * pj.x + vals[7u * NQ + q] * pj.y + vals[8u * NQ + q] * pj.z);
     }
     let m = vf[O_MASA + i];
     let p = pv[i].xyz;
@@ -868,25 +887,20 @@ fn arbolR0(v: u32) -> ResiduoB {
   if (l.x == 0u) { red[R_PA + w.x] = total; }
 }
 
-@compute @workgroup_size(1) fn sumarAlfa() {
-  if (red[R_SC + E_ACTIVO] < 0.5) { return; }
-  var pap = 0.0;
-  for (var k = 0u; k < GV; k++) { pap += red[R_PA + k]; }
-  if (red[R_SC + E_HECHO] > 0.5 || !(pap > 0.0)) {
-    red[R_SC + E_ALFA] = 0.0;
-    red[R_SC + E_HECHO] = 1.0;
-    return;
-  }
-  red[R_SC + E_ALFA] = red[R_SC + E_RZ] / pap;
-  red[R_SC + E_ITER] = red[R_SC + E_ITER] + 1.0;
-}
-
 @compute @workgroup_size(${WG}) fn actualizar(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
   if (!bandera(l.x, E_ACTIVO)) { return; }
+  // α = rᵀz / pᵀAp, con las sumas parciales de spmv; con pᵀAp ≤ 0 el gradiente conjugado termina (paso.ts)
+  if (l.x == 0u) {
+    var pap = 0.0;
+    for (var k = 0u; k < GV; k++) { pap += red[R_PA + k]; }
+    var a = 0.0;
+    if (pap > 0.0) { a = red[lugarRz(false)] / pap; } else if (w.x == 0u) { red[R_SC + E_HECHO] = 1.0; }
+    wEscalar = a;
+  }
+  let alfa = workgroupUniformLoad(&wEscalar);
   let i = g.x;
   var rz = 0.0;
   if (i < N) {
-    let alfa = red[R_SC + E_ALFA];
     // el de un vértice cosido es el de sus dos vértices: p ya llega expandido (expandirP)
     st(O_DX, i, ld(O_DX, i) + alfa * pv[i].xyz);
     if (!cosidoV(i)) {
@@ -915,26 +929,32 @@ fn arbolR0(v: u32) -> ResiduoB {
     }
   }
   let total = reducirSuma(l.x, rz);
-  if (l.x == 0u) { red[R_PA + w.x] = total; }
+  if (l.x == 0u) { red[R_PB + w.x] = total; }
 }
 
-@compute @workgroup_size(1) fn sumarBeta() {
-  if (red[R_SC + E_ACTIVO] < 0.5 || red[R_SC + E_HECHO] > 0.5) { return; }
-  var rzn = 0.0;
-  for (var k = 0u; k < GV; k++) { rzn += red[R_PA + k]; }
-  if (rzn <= TOL2 * red[R_SC + E_RZ0]) {
-    red[R_SC + E_HECHO] = 1.0;
-    return;
-  }
-  red[R_SC + E_BETA] = rzn / red[R_SC + E_RZ];
-  red[R_SC + E_RZ] = rzn;
-}
-
-@compute @workgroup_size(${WG}) fn nuevaP(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>) {
+// β = rᵀz nuevo / rᵀz anterior, con las sumas parciales de actualizar; termina por la tolerancia (paso.ts)
+@compute @workgroup_size(${WG}) fn nuevaP(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
   if (!bandera(l.x, E_ACTIVO)) { return; }
+  if (l.x == 0u) {
+    var rzn = 0.0;
+    for (var k = 0u; k < GV; k++) { rzn += red[R_PB + k]; }
+    let fin = red[R_SC + E_HECHO] > 0.5 || rzn <= TOL2 * red[R_SC + E_RZ0];
+    var b = -1.0;
+    if (!fin) { b = rzn / red[lugarRz(false)]; }
+    if (w.x == 0u) {
+      if (fin) {
+        red[R_SC + E_HECHO] = 1.0;
+        red[R_SC + E_ACTIVO] = 0.0;
+      } else {
+        red[lugarRz(true)] = rzn;
+      }
+    }
+    wEscalar = b;
+  }
+  let beta = workgroupUniformLoad(&wEscalar);
   let i = g.x;
-  if (i >= N) { return; }
-  pv[i] = vec4<f32>(ld(O_Z, i) + red[R_SC + E_BETA] * pv[i].xyz, 0.0);
+  if (beta < 0.0 || i >= N) { return; }
+  pv[i] = vec4<f32>(ld(O_Z, i) + beta * pv[i].xyz, 0.0);
 }
 
 // E8: el vértice cosido entra al producto con lo de sus dos vértices (costuras.ts, expandir)

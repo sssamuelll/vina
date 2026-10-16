@@ -73,7 +73,7 @@ export class MotorGpu {
       tf,
       iu,
       red: new Float32Array(d.red.total),
-      vals: new Float32Array(12 * Math.max(p.nq, 1)),
+      vals: new Float32Array(9 * Math.max(p.nq, 1)),
       pv: new Float32Array(4 * p.n),
       at: new Uint32Array(d.at.total),
     };
@@ -131,9 +131,7 @@ export class MotorGpu {
       for (let k = 0; k < aj.maxCG; k++) {
         if (propio) d('aportePares', gpa);
         d('spmv', gv);
-        d('sumarAlfa', 1);
         d('actualizar', gv);
-        d('sumarBeta', 1);
         d('nuevaP', gv);
         d('expandirP', gc);
       }
