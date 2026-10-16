@@ -395,7 +395,7 @@ Expected: cada corrida imprime su bloque «camiseta 20 mm …» y la ruta de su 
 - [ ] **Step 4: La camiseta en la GPU a 5 mm, con los mismos cuatro**
 
 ```bash
-for c in 100000 10 5 2; do VINA_TELA_AJUSTES="cierre=$c" VINA_E2E_PORT=5193 node scripts/pesado.mjs --nombre=camiseta-gpu --espera=15 -- npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g "a 5 mm queda quieta" --reporter=list > $LOGS/cierre-gpu-$c.log 2>&1; grep -a 'informe:' $LOGS/cierre-gpu-$c.log; done
+for c in 100000 10 5 2; do VINA_TELA_AJUSTES="cierre=$c" VINA_E2E_PORT=5193 node scripts/pesado.mjs --nombre=camiseta-gpu --espera=15 -- npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g queda.quieta.sola --reporter=list > $LOGS/cierre-gpu-$c.log 2>&1; grep -a 'informe:' $LOGS/cierre-gpu-$c.log; done
 ```
 
 Expected: cada corrida guarda su informe `…-camiseta-gpu.json` en `$VINA_REFERENCIAS/informes/` antes de las aserciones de §2, que pueden fallar: aquí se mide. Anotar, por tope: `camiseta.segundosHastaQuieta`, `medidas.aplastados`, `medidas.costuras`, `medidas.estiramiento`, `estado.desbordes`, `velocidad20.msPorCuadro`, `velocidad50.msPorCuadro` y `paridad.dif.maxima`.
@@ -580,7 +580,7 @@ Expected: verde.
 
 ```bash
 npm run bench:tela -- --ensayo=camiseta --mallas=20 > $LOGS/diagnostico-cpu.log 2>&1; grep -a -E 'camiseta 20|costuras más abiertas|aplastados por pieza' $LOGS/diagnostico-cpu.log
-VINA_E2E_PORT=5193 node scripts/pesado.mjs --nombre=camiseta-gpu --espera=15 -- npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g "a 5 mm queda quieta" --reporter=list > $LOGS/diagnostico-gpu.log 2>&1; grep -a 'informe:' $LOGS/diagnostico-gpu.log
+VINA_E2E_PORT=5193 node scripts/pesado.mjs --nombre=camiseta-gpu --espera=15 -- npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g queda.quieta.sola --reporter=list > $LOGS/diagnostico-gpu.log 2>&1; grep -a 'informe:' $LOGS/diagnostico-gpu.log
 node -e "const m = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).camiseta.medidas; console.log(JSON.stringify(m.porCostura.slice(0, 5), null, 1), JSON.stringify(m.porPieza))" "<ruta del informe de la GPU>"
 ```
 
@@ -642,7 +642,7 @@ Expected: tres bloques. Anotar por resorte: cg por cuadro, quieta, costuras (med
 - [ ] **Step 3: La camiseta en la GPU a 5 mm con los mismos tres**
 
 ```bash
-for k in 300 1000 3000; do VINA_TELA_AJUSTES="kcost=$k" VINA_E2E_PORT=5193 node scripts/pesado.mjs --nombre=camiseta-gpu --espera=15 -- npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g "a 5 mm queda quieta" --reporter=list > $LOGS/kcost-gpu-$k.log 2>&1; grep -a 'informe:' $LOGS/kcost-gpu-$k.log; done
+for k in 300 1000 3000; do VINA_TELA_AJUSTES="kcost=$k" VINA_E2E_PORT=5193 node scripts/pesado.mjs --nombre=camiseta-gpu --espera=15 -- npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g queda.quieta.sola --reporter=list > $LOGS/kcost-gpu-$k.log 2>&1; grep -a 'informe:' $LOGS/kcost-gpu-$k.log; done
 ```
 
 Expected: tres informes. Anotar lo mismo que en la Tarea 2, Step 4.
@@ -905,7 +905,7 @@ A 5 mm, el tope de 1000 toca los 9 triángulos que pasan de 10³ (Step 1).
 
 ```bash
 npm run bench:tela -- --ensayo=camiseta --mallas=20 --topePlaca=1000 > $LOGS/placa-cpu.log 2>&1; grep -a -E 'camiseta 20|aplastados|costuras más abiertas' $LOGS/placa-cpu.log
-VINA_TELA_AJUSTES="topePlaca=1000" VINA_E2E_PORT=5193 node scripts/pesado.mjs --nombre=camiseta-gpu --espera=15 -- npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g "a 5 mm queda quieta" --reporter=list > $LOGS/placa-gpu.log 2>&1; grep -a 'informe:' $LOGS/placa-gpu.log
+VINA_TELA_AJUSTES="topePlaca=1000" VINA_E2E_PORT=5193 node scripts/pesado.mjs --nombre=camiseta-gpu --espera=15 -- npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g queda.quieta.sola --reporter=list > $LOGS/placa-gpu.log 2>&1; grep -a 'informe:' $LOGS/placa-gpu.log
 ```
 
 Expected: los dos bloques. Se comparan con las últimas corridas sin el experimento (Tarea 4, con los mismos valores por defecto): quieta, aplastados (total y de las mangas), costuras y, en la GPU, `paridad.dif.maxima` de la camiseta, que en el ensayo dio 41 mm con el tope de 5 mm.
@@ -955,7 +955,7 @@ En `tests/e2e/tela-implicita.spec.ts`, dentro de `test.describe('La camiseta de 
 
 - [ ] **Step 2: Correrla**
 
-Run: `VINA_E2E_PORT=5193 node scripts/pesado.mjs --nombre=camiseta-velocidad --espera=15 -- npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g "velocidad por partes" --reporter=list`
+Run: `VINA_E2E_PORT=5193 node scripts/pesado.mjs --nombre=camiseta-velocidad --espera=15 -- npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g velocidad.por.partes --reporter=list`
 Expected: 1 passed y la ruta del informe.
 
 - [ ] **Step 3: Repartir el cuadro**
@@ -978,7 +978,7 @@ git commit -m "test(tela): la velocidad de la camiseta en la GPU, repartida por 
 
 - [ ] **Step 1: La camiseta con los valores por defecto**
 
-Run: `VINA_E2E_PORT=5193 node scripts/pesado.mjs --nombre=camiseta-gpu --espera=15 -- npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g "a 5 mm queda quieta" --reporter=list`
+Run: `VINA_E2E_PORT=5193 node scripts/pesado.mjs --nombre=camiseta-gpu --espera=15 -- npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g queda.quieta.sola --reporter=list`
 Expected: la prueba de §2 en verde. Si no, el informe dice qué criterio falla y por cuánto, y eso va al mensaje para Samuel; la prueba no se afloja.
 
 - [ ] **Step 2: La CPU y el disco**
