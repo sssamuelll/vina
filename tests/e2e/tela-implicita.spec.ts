@@ -66,6 +66,20 @@ test.describe('La tela nueva en la GPU @gpu-local', () => {
     expect(r.dif?.maxima).toBeLessThan(1e-4);
   });
 
+  test('da lo mismo que la CPU tras 3 cuadros con el contacto propio más blando que el del cuerpo (capas)', async ({ page }) => {
+    // los pares en 20 N/m con kContacto en 2000: si la GPU usara kContacto para los pares, la CPU y la GPU se separan
+    const r = await correr(page, 'modo=paridad&escena=capas&cg=400&kp=20&cuadros=3');
+    expect(r.dif?.maxima).toBeLessThan(1e-4);
+    expect(r.estado?.pares).toBeGreaterThan(0);
+  });
+
+  test('da lo mismo que la CPU tras 3 cuadros con el contacto propio blando y la punta del cuerpo dura (punta)', async ({ page }) => {
+    // la punta del cuerpo contra la tela lleva kContacto aunque los pares de tela vayan a 1 N/m
+    const r = await correr(page, 'modo=paridad&escena=punta&cg=50&kp=1&cuadros=3');
+    expect(r.dif?.maxima).toBeLessThan(1e-4);
+    expect(r.estado?.pares).toBeGreaterThan(0);
+  });
+
   test('con lugar para 8 pares, la GPU cuenta los que no caben y la tela no se llena de NaN', async ({ page }) => {
     const r = await correr(page, 'modo=paridad&escena=capas&cg=50&cuadros=3&maxPares=8');
     expect(r.estado?.desbordes).toBeGreaterThan(0);

@@ -143,7 +143,7 @@ fn parDeVertice(i: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, b: vec3<f32>, c
   var kt = 0.0;
   if (p0 > 0.0) {
     let vr = ld(O_V, i) - e.w.x * ld(O_V, ia) - e.w.y * ld(O_V, ib) - e.w.z * ld(O_V, ic);
-    kt = rigidez(MU_T, KC * p0, tangencial(vr, n));
+    kt = rigidez(MU_T, KCP * p0, tangencial(vr, n));
   }
   guardarPar(vec4<f32>(f32(i), f32(ia), f32(ib), f32(ic)), vec4<f32>(1.0, -e.w.x, -e.w.y, -e.w.z), n, p0, kt);
 }
@@ -288,9 +288,10 @@ ${wgslScan('scanV', 'A_CNTV', 'N', 'O_OFFV')}
       let p = p0 - un;
       let tt = U - un * nn;
       var e = 0.5 * tf[o + 12u] * dot(tt, tt);
-      if (p > 0.0) { e += 0.5 * KC * p * p; }
+      let kp = rigidezDelPar(o);
+      if (p > 0.0) { e += 0.5 * kp * p * p; }
       var e0 = 0.0;
-      if (p0 > 0.0) { e0 = 0.5 * KC * p0 * p0; }
+      if (p0 > 0.0) { e0 = 0.5 * kp * p0 * p0; }
       de = e - e0;
     }
   }

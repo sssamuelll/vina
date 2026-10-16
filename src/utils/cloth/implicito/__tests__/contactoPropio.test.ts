@@ -47,6 +47,38 @@ describe('la tela contra sí misma', () => {
     expect(errorDelGradiente((x) => s.energiaIncremental(x), res.map((q) => -q), s.x)).toBeLessThan(1e-4);
   });
 
+  it('los pares usan la rigidez del contacto propio (kPropio) y no la del cuerpo', () => {
+    const abajo = mallaDeContorno(rectangulo(-50, -50, 50, 50), 20), arriba = mallaDeContorno(rectangulo(-40, -40, 40, 40), 20);
+    const prenda = armarPrenda([
+      { id: 'abajo', ...abajo },
+      { id: 'arriba', ...arriba, x: Float64Array.from(arriba.x, (q, k) => (k % 3 === 1 ? q + 0.001 : q)) },
+    ]);
+    const armar = (ajustes: { kContacto: number; kPropio?: number }) => {
+      const s = new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { ajustes: { gravedad: 0, ...ajustes } });
+      const r = azar(79);
+      for (let q = 0; q < s.v.length; q++) s.v[q] = 0.05 * r();
+      s.xt.set(s.x);
+      s.armarParesPropios();
+      for (let q = 0; q < s.x.length; q++) s.x[q] += 1e-6 * r();
+      s.linealizar();
+      return s;
+    };
+    const medir = (s: SistemaTela) => {
+      const res = new Float64Array(s.x.length), Ap = new Float64Array(s.x.length), B = new Float64Array(3 * s.x.length);
+      s.residuo(res);
+      s.sumarContactosPor(Float64Array.from(s.x, (_, k) => Math.sin(k)), Ap);
+      s.sumarBloquesDeContacto(B);
+      return { E: s.energiaIncremental(s.x), res, Ap, B };
+    };
+    // sin obstáculos solo hay pares: el contacto propio en 20 con el del cuerpo en 2000 es todo en 20
+    const propio = medir(armar({ kContacto: 2000, kPropio: 20 })), todo20 = medir(armar({ kContacto: 20 }));
+    expect(propio.E).toBeCloseTo(todo20.E, 12);
+    for (const k of ['res', 'Ap', 'B'] as const) {
+      expect(propio[k].reduce((m, q, i) => Math.max(m, Math.abs(q - todo20[k][i])), 0)).toBeLessThan(1e-12 * (1 + Math.max(...todo20[k].map(Math.abs))));
+    }
+    expect(Math.abs(medir(armar({ kContacto: 2000 })).E - propio.E)).toBeGreaterThan(1e-9);
+  });
+
   it('una lámina cae sobre otra apoyada en el suelo y queda encima, a la separación entre capas', () => {
     const abajo = mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), arriba = mallaDeContorno(rectangulo(-45, -45, 45, 45), 10);
     const s0 = separacion(telaSI(TELA_DE_LABORATORIO));
@@ -82,11 +114,11 @@ describe('la tela contra sí misma', () => {
 
   it('la punta de una pirámide no atraviesa una tela de malla gruesa: el vértice del cuerpo contra el triángulo', () => {
     const cuerpo = new CuerpoRigido(buildLinearBVH(piramideDeColision(0.3, 0.1)));
-    const sobreLaPunta = (contactoPropio: boolean) => {
+    const sobreLaPunta = (contactoPropio: boolean, kPropio?: number) => {
       const m = mallaDeContorno(rectangulo(-60, -60, 60, 60), 20);
       // 5 mm sobre la punta, corrida para que la punta caiga en medio de un triángulo
       m.x = Float64Array.from(m.x, (q, k) => (k % 3 === 0 ? q + 0.007 : k % 3 === 1 ? q + 0.105 : q + 0.003));
-      const s = new SistemaTela(m, TELA_DE_LABORATORIO, { obstaculos: [{ tipo: 'cuerpo', cuerpo }], ajustes: { contactoPropio } });
+      const s = new SistemaTela(m, TELA_DE_LABORATORIO, { obstaculos: [{ tipo: 'cuerpo', cuerpo }], ajustes: { contactoPropio, kPropio } });
       for (let c = 0; c < 60; c++) pasoImplicito(s);
       // el punto de la tela más cercano a la punta, medido hacia arriba desde ella
       const p = nuevoPunto(), x = s.x;
@@ -104,6 +136,8 @@ describe('la tela contra sí misma', () => {
     };
     expect(sobreLaPunta(true)).toBeGreaterThan(sepTela - 0.0005);
     expect(sobreLaPunta(false)).toBeLessThan(0);
+    // la punta es contacto con el cuerpo: lleva su rigidez aunque la tela contra la tela sea blanda
+    expect(sobreLaPunta(true, 1)).toBeGreaterThan(sepTela - 0.0005);
   });
   it('una lámina sola no tiene pares, aunque un vértice corra (E6: la tela de al lado no es otra capa)', () => {
     const s = new SistemaTela(mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), TELA_DE_LABORATORIO);

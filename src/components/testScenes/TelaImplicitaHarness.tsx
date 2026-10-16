@@ -7,8 +7,8 @@
  * `escena` = una de ESCENAS (chica: disco Cusick de 10 mm; grande: disco de 48 cm con malla de 5 mm, del tamaño de
  * la camiseta; las escenas de paridad del banco; y camiseta, con `malla` en mm, armada con los archivos de la
  * referencia privada que sirve la prueba); `cg` = iteraciones por ronda; `cuadros`; `anticipar=0`, `busqueda=0` y
- * `propio=0` apagan esos pasos para aislar una diferencia; `kc` cambia la rigidez de contacto; `maxPares`, la
- * capacidad de pares. El modo camiseta la corre hasta quieta o 10 s de tela y la mide. Publica el resultado en
+ * `propio=0` apagan esos pasos para aislar una diferencia; `kc` cambia la rigidez de contacto; `kp`, la de los pares
+ * entre capas de tela; `maxPares`, la capacidad de pares. El modo camiseta la corre hasta quieta o 10 s de tela y la mide. Publica el resultado en
  * `window.__TELA_IMPLICITA__`.
  */
 import { useEffect, useState } from 'react';
@@ -101,6 +101,8 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
     contactoPropio: q.get('propio') !== '0',
     // la rigidez de contacto, si se pide otra
     ...(q.get('kc') ? { kContacto: Number(q.get('kc')) } : {}),
+    // la de los pares del contacto propio, si se pide otra que la del cuerpo
+    ...(q.get('kp') ? { kPropio: Number(q.get('kp')) } : {}),
     // el tope del cierre de las costuras (mm por cuadro), si se pide otro
     ...(q.get('cierre') ? { cierreMaximo: Number(q.get('cierre')) / 1000 } : {}),
     // la rigidez de los puntos de costura (N/m), si se pide otra

@@ -24,6 +24,8 @@ export interface AjustesImplicito {
   aire: number;
   /** rigidez del contacto con los obstáculos (N/m) */
   kContacto: number;
+  /** rigidez de los pares del contacto propio, la tela con la tela y las puntas del cuerpo (N/m); sin ella, kContacto */
+  kPropio?: number;
   /**
    * rigidez de cada punto de costura (N/m). Con 1000, una costura que sostiene 1 N/m de tela con puntos cada
    * 5 mm queda abierta 5 µm. El banco todavía no la escoge (spec §5): el 2026-10-16, con 300, 1000 y 3000 N/m la
@@ -209,7 +211,7 @@ export class SistemaTela {
       const q = 3 * c.i;
       E += energiaDePlano(c, kc, x[q] - this.xt[q], x[q + 1] - this.xt[q + 1], x[q + 2] - this.xt[q + 2]);
     }
-    for (const par of this.paresPropios) if (par.activo) E += energiaDelPar(par, kc, x, this.xt);
+    for (const par of this.paresPropios) if (par.activo) E += energiaDelPar(par, par.k, x, this.xt);
     return E;
   }
 
@@ -318,14 +320,14 @@ export class SistemaTela {
   armarParesPropios(): void {
     this.paresPropios = [];
     if (!this.aj.contactoPropio) return;
-    const { x, v, tris, fijo, n, punto: q } = this, sep = this.sepPropia, { kContacto: kc, h, gravedad } = this.aj;
+    const { x, v, tris, fijo, n, punto: q } = this, sep = this.sepPropia, { kContacto, kPropio, h, gravedad } = this.aj, kp = kPropio ?? kContacto;
     let vmax = 0;
     for (let i = 0; i < n; i++) vmax = Math.max(vmax, Math.hypot(v[3 * i], v[3 * i + 1], v[3 * i + 2]));
     const radio = sep + Math.min(ALCANCE_MAXIMO, 2 * vmax * h + Math.abs(gravedad) * h * h);
     this.puntos.set(x);
     // la celda mide al menos el radio: la caja de un triángulo toca a lo sumo cinco celdas por eje
     this.rejilla.armar(this.puntos, Math.max(2 * sep, this.aristaMedia, radio));
-    const agregar = (vs: number[], ws: number[], nx: number, ny: number, nz: number, s0: number, separacionDelPar: number, mu: number) => {
+    const agregar = (vs: number[], ws: number[], nx: number, ny: number, nz: number, s0: number, separacionDelPar: number, mu: number, k: number) => {
       const p0 = separacionDelPar - s0;
       let kt = 0;
       if (p0 > 0) {
@@ -336,9 +338,9 @@ export class SistemaTela {
           vz += ws[k] * v[3 * vs[k] + 2];
         }
         const vn = vx * nx + vy * ny + vz * nz;
-        kt = rigidezDeFriccion(mu, kc * p0, Math.hypot(vx - vn * nx, vy - vn * ny, vz - vn * nz), h);
+        kt = rigidezDeFriccion(mu, k * p0, Math.hypot(vx - vn * nx, vy - vn * ny, vz - vn * nz), h);
       }
-      this.paresPropios.push({ v: vs, w: ws, nx, ny, nz, p0, kt, activo: p0 > 0 });
+      this.paresPropios.push({ v: vs, w: ws, nx, ny, nz, p0, k, kt, activo: p0 > 0 });
     };
     const ahora = this.cuerpos.map((c) => new Uint8Array(c.vertices.length / 3));
     for (let t = 0; t < tris.length / 3; t++) {
@@ -367,7 +369,7 @@ export class SistemaTela {
             puntoMasCercano(px, py, pz, ax, ay, az, bx, by, bz, cx, cy, cz, q);
             const ex = px - q.x, ey = py - q.y, ez = pz - q.z, d = Math.hypot(ex, ey, ez);
             if (d >= radio || d < 1e-9 || !sobreLaCara(ex, ey, ez)) return;
-            agregar([p, a, b, c], [1, -q.wa, -q.wb, -q.wc], ex / d, ey / d, ez / d, d, sep, this.tela.friccionTela);
+            agregar([p, a, b, c], [1, -q.wa, -q.wb, -q.wc], ex / d, ey / d, ez / d, d, sep, this.tela.friccionTela, kp);
             return;
           }
           if (!libres) return;
@@ -389,7 +391,7 @@ export class SistemaTela {
           if (!(s0 < 0 || (this.sostiene[k][j] && s0 < this.sep))) return;
           ahora[k][j] = 1;
           // tela contra cuerpo: la fricción del cuerpo (§4.3.1)
-          agregar([a, b, c], [q.wa, q.wb, q.wc], nx, ny, nz, s0, this.sep, this.tela.friccionCuerpo);
+          agregar([a, b, c], [q.wa, q.wb, q.wc], nx, ny, nz, s0, this.sep, this.tela.friccionCuerpo, kContacto);
         },
       );
     }
@@ -454,7 +456,7 @@ export class SistemaTela {
         qz += par.w[k] * p[o + 2];
       }
       const qn = par.nx * qx + par.ny * qy + par.nz * qz;
-      const ax = kc * qn * par.nx + par.kt * (qx - qn * par.nx), ay = kc * qn * par.ny + par.kt * (qy - qn * par.ny), az = kc * qn * par.nz + par.kt * (qz - qn * par.nz);
+      const ax = par.k * qn * par.nx + par.kt * (qx - qn * par.nx), ay = par.k * qn * par.ny + par.kt * (qy - qn * par.ny), az = par.k * qn * par.nz + par.kt * (qz - qn * par.nz);
       for (let k = 0; k < par.v.length; k++) {
         const o = 3 * par.v[k];
         out[o] += par.w[k] * ax;
@@ -476,7 +478,7 @@ export class SistemaTela {
       const n = [par.nx, par.ny, par.nz];
       for (let k = 0; k < par.v.length; k++) {
         const o = 9 * par.v[k], w2 = par.w[k] * par.w[k];
-        for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) B[o + 3 * a + b] += w2 * ((kc - par.kt) * n[a] * n[b] + (a === b ? par.kt : 0));
+        for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) B[o + 3 * a + b] += w2 * ((par.k - par.kt) * n[a] * n[b] + (a === b ? par.kt : 0));
       }
     }
   }
@@ -513,7 +515,7 @@ export class SistemaTela {
         uy += par.w[k] * (this.x[q + 1] - this.xt[q + 1]);
         uz += par.w[k] * (this.x[q + 2] - this.xt[q + 2]);
       }
-      const un = par.nx * ux + par.ny * uy + par.nz * uz, f = kc * (par.p0 - un);
+      const un = par.nx * ux + par.ny * uy + par.nz * uz, f = par.k * (par.p0 - un);
       const fx = f * par.nx - par.kt * (ux - un * par.nx), fy = f * par.ny - par.kt * (uy - un * par.ny), fz = f * par.nz - par.kt * (uz - un * par.nz);
       for (let k = 0; k < par.v.length; k++) {
         const q = 3 * par.v[k];

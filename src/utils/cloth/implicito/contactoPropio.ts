@@ -21,6 +21,8 @@ export interface ParPropio {
   nz: number;
   /** separación entre capas − s(x_t): mayor que 0 dentro */
   p0: number;
+  /** rigidez normal (N/m): la del contacto propio entre capas de tela; la del cuerpo para una punta del cuerpo */
+  k: number;
   /** rigidez tangencial de la fricción (N/m); 0 si el par no estaba dentro al empezar */
   kt: number;
   /** entra al cuadro: estaba dentro al empezar, o el primer paso lo iba a cruzar */

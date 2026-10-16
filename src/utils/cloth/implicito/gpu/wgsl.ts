@@ -202,6 +202,7 @@ ${Object.entries(ESC).map(([k, v]) => `const E_${k} = ${u(v)};`).join('\n')}
 const H = ${f(aj.h)};
 const AIRE = ${f(aj.aire)};
 const KC = ${f(aj.kContacto)};
+const KCP = ${f(aj.kPropio ?? aj.kContacto)};
 const GRAV = ${f(aj.gravedad)};
 const SEP = ${f(s.sep)};
 const TOL2 = ${f(aj.tolCG * aj.tolCG)};
@@ -286,6 +287,10 @@ fn rigidez(mu: f32, lambda: f32, vt: f32) -> f32 {
 }
 
 fn tangencial(v: vec3<f32>, n: vec3<f32>) -> f32 { return length(v - dot(v, n) * n); }
+
+// la rigidez normal del par (en PAR, desde o): la del cuerpo para una punta del cuerpo, que no tiene cuarto vértice, y
+// la del contacto propio para dos capas de tela (contactoPropio.ts, ParPropio.k)
+fn rigidezDelPar(o: u32) -> f32 { return select(KCP, KC, tf[o + 3u] < 0.0); }
 
 // el plano del vértice (en CONT, desde o) con u = x − x_t, de un solo lado (contactos.ts, energiaDePlano)
 fn energiaPlano(o: u32, u: vec3<f32>) -> f32 {
@@ -713,9 +718,10 @@ fn residuoDe(i: u32) -> ResiduoB {
       let wk = tf[o + 4u + (ent & 3u)];
       let nn = v3tf(o + 8u);
       let kt = tf[o + 12u];
-      // en x = x_t el par empuja con kc·p0 y su fricción todavía no (sistema.ts, residuo)
-      r += wk * KC * tf[o + 11u] * nn;
-      B += wk * wk * ((KC - kt) * outer(nn, nn) + kt * I3);
+      let kp = rigidezDelPar(o);
+      // en x = x_t el par empuja con k·p0 y su fricción todavía no (sistema.ts, residuo)
+      r += wk * kp * tf[o + 11u] * nn;
+      B += wk * wk * ((kp - kt) * outer(nn, nn) + kt * I3);
     }
   }
   return ResiduoB(r, B);
@@ -838,7 +844,7 @@ fn arbolR0(v: u32) -> ResiduoB {
         }
         let nn = v3tf(o + 8u);
         let qn = dot(nn, qv);
-        ap += tf[o + 4u + (ent & 3u)] * (KC * qn * nn + tf[o + 12u] * (qv - qn * nn));
+        ap += tf[o + 4u + (ent & 3u)] * (rigidezDelPar(o) * qn * nn + tf[o + 12u] * (qv - qn * nn));
       }
     }
     if (iu[I_FIJO + i] != 0u) { ap = vec3<f32>(0.0); }
