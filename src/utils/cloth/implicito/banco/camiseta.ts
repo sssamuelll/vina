@@ -21,7 +21,8 @@ import { puntosDeCostura, type BisagraDeCostura, type PuntoDeCostura } from '../
 import { CuerpoRigido } from '../cuerpo';
 import type { MallaDeTela } from '../malla';
 import { armarPrenda, bisagrasDePrenda, costurasDePrenda, franjaDePrenda, type LadosDeCostura, type Prenda } from '../prenda';
-import type { TelaFisica } from '../tela';
+import { separacion, telaSI, type TelaFisica } from '../tela';
+import { anillarTira, type TiraEnAnillo } from './cuello';
 import { colocarDesdeObj } from './colocacion';
 import type { Escena } from './escenas';
 import { aplastados, distanciaAlCuerpo, distanciaASuperficie, estiramiento, pliegues, separacionDeCosturas } from './medidas';
@@ -159,10 +160,15 @@ export interface CamisetaContraLaReferencia {
   referencia: { malla: MallaDeTela; superficie: CuerpoRigido } | null;
   /** por pieza, la mayor distancia (mm de patrón) de un vértice de Vina a la malla de la colocación */
   errorDeColocacion: number[];
+  /** la tira del cuello en anillo (E11), si la camiseta la tiene y se pidió */
+  anillo: TiraEnAnillo | null;
 }
 
-/** La camiseta sobre el avatar de la referencia y desde su colocación inicial (E5). Las posiciones de los OBJ van en mm. */
-export function camisetaContraLaReferencia(a: ArchivosDeLaCamiseta, aristaMm: number, tela: TelaFisica): CamisetaContraLaReferencia {
+/**
+ * La camiseta sobre el avatar de la referencia y desde su colocación inicial (E5), con la tira del cuello en anillo
+ * alrededor del cuello (E11, salvo `anillo: false`). Las posiciones de los OBJ van en mm.
+ */
+export function camisetaContraLaReferencia(a: ArchivosDeLaCamiseta, aristaMm: number, tela: TelaFisica, op: { anillo?: boolean } = {}): CamisetaContraLaReferencia {
   const colocacion = leerObj(a.colocacion);
   let mmPorVt = 1, errorDeColocacion: number[] = [];
   const camiseta = camisetaDeMaria(a.dxf, aristaMm, tela, (piezas, mallas) => {
@@ -177,13 +183,18 @@ export function camisetaContraLaReferencia(a: ArchivosDeLaCamiseta, aristaMm: nu
     return r.x;
   });
   const cuerpo = new CuerpoRigido(buildLinearBVH(cuerpoDeObj(leerObj(a.cuerpo), a.config.gruposDelCuerpo, 0.001)));
+  const tira = camiseta.piezas.findIndex((p) => p.category === 'collar');
+  const { malla } = camiseta.prenda;
+  const anillo = op.anillo !== false && tira >= 0
+    ? anillarTira(malla.x, malla.patron, camiseta.prenda.piezas[tira], camiseta.costuras.puntos, cuerpo, separacion(telaSI(tela)))
+    : null;
   let referencia: CamisetaContraLaReferencia['referencia'] = null;
   if (a.asentada) {
     const obj = leerObj(a.asentada);
     referencia = { malla: mallaDeObj(obj, 0.001, mmPorVt), superficie: new CuerpoRigido(buildLinearBVH(cuerpoDeObj(obj, null, 0.001))) };
   }
   const escena: Escena = { malla: camiseta.prenda.malla, obstaculos: [{ tipo: 'cuerpo', cuerpo }], costuras: camiseta.costuras, franja: camiseta.franja };
-  return { escena, camiseta, cuerpo, referencia, errorDeColocacion };
+  return { escena, camiseta, cuerpo, referencia, errorDeColocacion, anillo };
 }
 
 export interface MedidasDeCamiseta {

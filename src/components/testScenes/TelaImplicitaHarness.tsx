@@ -6,10 +6,11 @@
  * tests/e2e/tela-implicita.spec.ts (@gpu-local). Parámetros: `modo` = paridad | velocidad | perfil | quietud | camiseta;
  * `escena` = una de ESCENAS (chica: disco Cusick de 10 mm; grande: disco de 48 cm con malla de 5 mm, del tamaño de
  * la camiseta; las escenas de paridad del banco; y camiseta, con `malla` en mm, armada con los archivos de la
- * referencia privada que sirve la prueba); `cg` = iteraciones por ronda; `cuadros`; `busqueda=0` y `propio=0`
- * apagan esos pasos para aislar una diferencia; `kc` cambia la rigidez de contacto; `kp`, la de los pares
- * entre capas de tela; `maxPares`, la capacidad de pares. El modo camiseta la corre hasta quieta o 10 s de tela y la mide. Publica el resultado en
- * `window.__TELA_IMPLICITA__`.
+ * referencia privada que sirve la prueba); `cg` = iteraciones del gradiente conjugado; `cuadros`; `busqueda=0` y
+ * `propio=0` apagan esos pasos para aislar una diferencia; `anillo=0` deja la tira del cuello donde la pone la
+ * referencia (E11); `kc` cambia la rigidez de las puntas del cuerpo; `kp`, la de los pares entre capas de tela;
+ * `maxPares`, la capacidad de pares. El modo camiseta la corre hasta quieta o 10 s de tela y la mide. Publica el
+ * resultado en `window.__TELA_IMPLICITA__`.
  */
 import { useEffect, useState } from 'react';
 import {
@@ -68,6 +69,8 @@ async function escenaCamiseta(malla: number): Promise<Escena> {
     { dxf: dxf!, config: JSON.parse(config!) as ConfigCamiseta, colocacion: colocacion!, cuerpo: cuerpo!, asentada },
     malla,
     telaEnCurso,
+    // E11: la tira del cuello en anillo, salvo anillo=0
+    { anillo: new URLSearchParams(window.location.search).get('anillo') !== '0' },
   );
   return camisetaEnCurso.escena;
 }
