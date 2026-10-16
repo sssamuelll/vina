@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CIERRE_POR_CUADRO, Costuras, LARGO_CERRADO, puntosDeCostura, type PuntoDeCostura } from '../costuras';
 import { armarPrenda } from '../prenda';
 import { mallaDeContorno } from '../malla';
-import { SistemaTela } from '../sistema';
+import { AJUSTES_IMPLICITO, SistemaTela } from '../sistema';
 import { pasoImplicito } from '../paso';
 import { aplastados } from '../banco/medidas';
 import { rectangulo, TELA_DE_LABORATORIO } from '../banco/escenas';
@@ -81,6 +81,33 @@ describe('las costuras', () => {
     for (let k = 0; k < 40 && !c.cerradas(); k++) c.avanzarCierre();
     expect(c.cerradas()).toBe(true);
     expect(0.03 * CIERRE_POR_CUADRO ** (c.cuadros - 1)).toBeGreaterThanOrEqual(LARGO_CERRADO);
+  });
+
+  it('con tope, una costura muy abierta baja a lo sumo el tope por cuadro, y cerca de cerrar manda el cierre de hoy', () => {
+    const c = new Costuras([{ a: 0, b0: 1, b1: 1, s: 0 }], [0, 0, 0, 0.03, 0, 0], 1000, 0.005);
+    for (const esperado of [0.025, 0.02, 0.015, 0.01]) {
+      c.avanzarCierre();
+      expect(c.L[0]).toBeCloseTo(esperado, 12);
+    }
+    // a 10 mm, el cierre de hoy baja 3,7 mm, menos que el tope
+    c.avanzarCierre();
+    expect(c.L[0]).toBeCloseTo(0.01 * CIERRE_POR_CUADRO, 12);
+    for (let k = 0; k < 40 && !c.cerradas(); k++) c.avanzarCierre();
+    expect(c.cerradas()).toBe(true);
+  });
+
+  it('el sistema le pasa a sus costuras el tope de los ajustes', () => {
+    const { prenda, ladoA, ladoB } = dosPiezas();
+    const costuras = { puntos: puntosDeCostura(prenda.malla.patron, ladoA, ladoB) };
+    expect(new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { costuras }).costuras.cierreMaximo).toBe(AJUSTES_IMPLICITO.cierreMaximo);
+    expect(new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { costuras, ajustes: { cierreMaximo: 0.002 } }).costuras.cierreMaximo).toBe(0.002);
+  });
+
+  it('un tope que no es positivo se rechaza: con 0 las costuras no cerrarían nunca, y con NaN la tela se llenaría de NaN', () => {
+    const { prenda } = dosPiezas();
+    for (const cierreMaximo of [0, -0.001, Number.NaN]) {
+      expect(() => new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { ajustes: { cierreMaximo } })).toThrow(/cierreMaximo/);
+    }
   });
 
   it('dos piezas de distinta malla se cosen sin aplastar la orilla', () => {

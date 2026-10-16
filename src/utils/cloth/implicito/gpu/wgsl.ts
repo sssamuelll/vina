@@ -189,6 +189,7 @@ const NCU = ${u(p.ncu)};
 const I_CUS = ${u(iu.cuSalto)};
 const RADIO_B = ${f(RADIO_DE_BUSQUEDA)};
 const CIERRE = ${f(CIERRE_POR_CUADRO)};
+const CIERRE_MAX = ${f(aj.cierreMaximo)};
 const LCERRADO = ${f(LARGO_CERRADO)};
 // la primera ranura de aporte de las costuras, después de las de la membrana y la placa
 const SLOT_C = 15u * NT;
@@ -882,7 +883,8 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   let e = g.x;
   var abierta = 0.0;
   if (e < NC) {
-    var L = tf[O_CL + e] * CIERRE;
+    let L0 = tf[O_CL + e];
+    var L = max(L0 * CIERRE, L0 - CIERRE_MAX);
     if (L < LCERRADO) { L = 0.0; }
     tf[O_CL + e] = L;
     abierta = L;

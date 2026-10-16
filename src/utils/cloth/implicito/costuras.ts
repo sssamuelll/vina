@@ -76,7 +76,8 @@ export class Costuras {
   /** cuadros de cierre */
   cuadros = 0;
 
-  constructor(puntos: readonly PuntoDeCostura[], x: ArrayLike<number>, readonly k: number) {
+  /** `cierreMaximo`: lo más que baja L en un cuadro (m); sin tope, el cierre de hoy */
+  constructor(puntos: readonly PuntoDeCostura[], x: ArrayLike<number>, readonly k: number, readonly cierreMaximo = Infinity) {
     this.n = puntos.length;
     this.a = Uint32Array.from(puntos, (p) => p.a);
     this.b0 = Uint32Array.from(puntos, (p) => p.b0);
@@ -107,11 +108,11 @@ export class Costuras {
     return [this.a[e], this.b0[e], this.b1[e]];
   }
 
-  /** Un cuadro de cierre: L ← L·CIERRE_POR_CUADRO, y 0 al bajar de LARGO_CERRADO. */
+  /** Un cuadro de cierre: L ← L·CIERRE_POR_CUADRO, sin bajar más de `cierreMaximo`, y 0 al bajar de LARGO_CERRADO. */
   avanzarCierre(): void {
     this.cuadros++;
     for (let e = 0; e < this.n; e++) {
-      const L = this.L[e] * CIERRE_POR_CUADRO;
+      const L = Math.max(this.L[e] * CIERRE_POR_CUADRO, this.L[e] - this.cierreMaximo);
       this.L[e] = L < LARGO_CERRADO ? 0 : L;
     }
   }

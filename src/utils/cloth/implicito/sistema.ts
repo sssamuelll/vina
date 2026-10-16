@@ -30,6 +30,11 @@ export interface AjustesImplicito {
    * con el banco»).
    */
   kCostura: number;
+  /**
+   * lo más que se cierra en un cuadro el largo de reposo de una costura (m, E7): con huecos de 270 mm en la
+   * colocación, el cierre de ×0,97¹⁵ tiraba unos 100 mm de cada costura en el primer cuadro
+   */
+  cierreMaximo: number;
   /** capas de la franja del margen: multiplica su masa (margen.ts) */
   capasDelMargen: number;
   /** multiplica la flexión de la franja del margen (margen.ts) */
@@ -52,6 +57,7 @@ export const AJUSTES_IMPLICITO: AjustesImplicito = {
   aire: 1,
   kContacto: 2000,
   kCostura: 1000,
+  cierreMaximo: 0.005,
   capasDelMargen: CAPAS_DEL_MARGEN,
   flexionDelMargen: FLEXION_DEL_MARGEN,
   contactoPropio: true,
@@ -126,6 +132,7 @@ export class SistemaTela {
     this.n = malla.x.length / 3;
     this.tela = telaSI(tela);
     this.aj = { ...AJUSTES_IMPLICITO, ...op.ajustes };
+    if (!(this.aj.cierreMaximo > 0)) throw new Error(`SistemaTela: cierreMaximo tiene que ser positivo (llegó ${this.aj.cierreMaximo})`);
     this.obstaculos = op.obstaculos ?? [];
     this.sep = separacion(this.tela);
     this.tris = malla.tris;
@@ -140,7 +147,7 @@ export class SistemaTela {
     this.membrana = new Membrana(malla.tris, this.coef, this.tela);
     this.placa = new Placa(uv, malla.tris, this.tela, { costura: op.costuras?.bisagras, factor: flexion });
     this.x = Float64Array.from(malla.x);
-    this.costuras = new Costuras(op.costuras?.puntos ?? [], malla.x, this.aj.kCostura);
+    this.costuras = new Costuras(op.costuras?.puntos ?? [], malla.x, this.aj.kCostura, this.aj.cierreMaximo);
     this.xt = Float64Array.from(malla.x);
     this.v = new Float64Array(3 * this.n);
     this.vPedida = new Float64Array(3 * this.n);
