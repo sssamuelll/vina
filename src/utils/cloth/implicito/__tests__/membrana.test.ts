@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { aMarcoDelHilo } from '../malla';
 import { prepararReposo } from '../reposo';
 import { ley, Membrana } from '../membrana';
-import { telaSI } from '../tela';
+import { telaSI, TOPE_DE_PANDEO } from '../tela';
 import { laminaPlana, TELA_DE_LABORATORIO } from '../banco/escenas';
 import { azar, errorDeHessiana, errorDelGradiente } from './ayudas';
 
@@ -40,6 +40,12 @@ describe('la membrana', () => {
     expect(pasado[1]).toBeCloseTo(-pcr - 0.05 * k, 9);
     expect(pasado[2]).toBe(k);
     expect(pasado[0]).toBeCloseTo(ley(-0.25, k, pcr)[0] + 0.5 * k * 0.05 * 0.05, 9);
+  });
+
+  it('una tela sin tope de pandeo toma el de por defecto (E9): la meseta termina al 10 %', () => {
+    expect(TOPE_DE_PANDEO).toBe(0.1);
+    expect(telaSI(TELA_DE_LABORATORIO).topePandeo).toBe(TOPE_DE_PANDEO);
+    expect(telaSI({ ...TELA_DE_LABORATORIO, topePandeo: Infinity }).topePandeo).toBe(Infinity);
   });
 
   it('sin pandeo o con compresión gratis la ley queda finita', () => {

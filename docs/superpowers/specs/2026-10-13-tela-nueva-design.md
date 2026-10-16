@@ -386,7 +386,7 @@ El banco corre también sobre el XPBD actual, para medir cada entrega contra él
 ## 7. Enmiendas de la entrega 4
 
 Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el plan de la parte 1, y E5, E6, R13 y E7
-el 2026-10-16 (el valor de E7 espera su ratificación), y E8 el mismo día.
+el 2026-10-16 (el valor de E7 espera su ratificación), y E8 y E9 el mismo día.
 
 - **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
   patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.
@@ -439,3 +439,11 @@ el 2026-10-16 (el valor de E7 espera su ratificación), y E8 el mismo día.
   donde el cuerpo queda entre los bordes (5-15 mm). *Costo:* mientras cierra, el desfase une los dos bordes como una
   varilla de hasta 25 mm, y un vértice cosido ya no se desliza a lo largo de la costura. Plan
   `2026-10-16-la-camiseta-a-s2.md`.
+- **E9 (§4.1.4). La meseta de pandeo termina.** Pasado un encogimiento de 10 % (`TOPE_DE_PANDEO`, o el `topePandeo` de
+  la tela), la tela vuelve a resistir como al estirar: ψ suma ½·k·(ε + tope)². Con la meseta sin fin, un triángulo
+  podía encogerse casi gratis: en la camiseta a 5 mm, 1,53 % de los triángulos quedaba con menos de la mitad de su
+  área. Sin meseta bajan a 0,17 %, pero el disco Cusick pierde el rango entre mallas (10,1 puntos: la malla de 10 mm
+  se pone rígida). Medido el 2026-10-16 en la GPU a 5 mm y en el Cusick a 5, 10 y 20 mm: con el tope en 0,1, 0,28 % de
+  aplastados, y el Cusick cumple (rango 2,6); con 0,05 y 0,03, 0,19 y 0,15 %, pero el Cusick pierde el rango (4,4 y
+  4,1). Lo que queda aplastado está en la tira del cuello. *Costo:* la tela que encoge más de 10 % ya no se dobla
+  dentro del triángulo y empuja como al estirar. Plan `2026-10-16-la-camiseta-a-s2.md`.
