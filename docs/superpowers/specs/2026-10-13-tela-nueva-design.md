@@ -450,7 +450,8 @@ la referencia y dar un motor eficiente para la web y natural: de ahí E10 en ade
   dentro del triángulo y empuja como al estirar. Plan `2026-10-16-la-camiseta-a-s2.md`.
 - **E10 (§4.2.1, §4.3.1 y §4.3.2; reemplaza a E4 y a la anticipación). El cuerpo es un piso duro.** El vértice libre y
   sin coser que al empezar el paso está a menos de la separación del cuerpo (más 0,1 mm de holgura), sin irse hacia
-  afuera a más de 1 mm/s y sin que el cuadro anterior lo jalara hacia el cuerpo, queda restringido en la normal del
+  afuera a más de 1 mm/s (el que ya estaba apoyado, por la normal con que se lo sostuvo) y sin que el cuadro anterior lo
+  jalara hacia el cuerpo, queda restringido en la normal del
   cuerpo, como las restricciones de Baraff y Witkin (*Large Steps*, §5.3): el gradiente conjugado filtra esa componente
   y el vértice solo se mueve por el plano tangente, con su fricción. La fuerza de la restricción es −n·r, con r el
   residuo sin filtrar al terminar el gradiente conjugado; si jala hacia el cuerpo, el vértice se suelta el cuadro
@@ -463,6 +464,11 @@ la referencia y dar un motor eficiente para la web y natural: de ahí E10 en ade
   0,39 m/s, y en la camiseta la tela se arrugaba sobre sí misma. El par de una punta del cuerpo sigue con su resorte
   (`kContacto`). Con el resorte de 2000 N/m del cuerpo, una tela de 27 N/m quedaba con un sistema mal
   condicionado o, con un resorte blando, atravesaba el cuerpo donde la costura jalaba; la restricción no tiene rigidez.
+  La velocidad de despegue del que ya estaba apoyado se mide por su normal anterior porque en un canto redondeado (el
+  del pedestal del disco Cusick tiene el radio de la separación) resbalar por el plano tangente aleja al vértice de la
+  normal nueva, h·v²/R (2,3 mm/s a 13 mm/s), sin despegarlo: medida con la normal nueva, el vértice se soltaba, caía, se
+  proyectaba y volvía a apoyarse, en ciclos de dos cuadros que movían a mil vértices. Medido el 2026-10-17 en el disco de
+  5 mm con el jersey medido (E12): la quietud baja de 0,19 a 0,03 % de la caída libre, debajo de su umbral de 0,1 %.
   *Costo:* la tela queda pegada un cuadro antes de soltarse, y la proyección no conserva la energía. Plan
   `2026-10-16-el-motor-a-s2.md`.
 - **E11 (§4.4.2, se aparta de E5 en la tira del cuello). La tira del cuello arranca en anillo.** La colocación de la
@@ -472,3 +478,19 @@ la referencia y dar un motor eficiente para la web y natural: de ahí E10 en ade
   escote, con el largo de reposo de su borde cosido (o rodeando el cuello a la separación si es más ancho), girada para
   que cada vértice quede frente a su punto del escote; el borde libre sube lo que mide la tira de ancho (`banco/cuello.ts`).
   Cambia el punto de partida, no la física. Plan `2026-10-16-el-motor-a-s2.md`.
+- **E12 (§4.1.1 y §4.4.2). La tela medida, con la flexión ajustada en su mismo ensayo.** Las telas que midió la
+  referencia (tracción de una tira colgada de su peso a lo largo, a lo ancho y en los dos bies; voladizo de Peirce en
+  las tres direcciones; gramaje y grosor) entran al motor así (`banco/telasMedidas.ts`): kTrama y kUrdimbre, la rigidez
+  de la tira a lo ancho y a lo largo; kCizalla, la que da a 45° la rigidez medida en bies con nuestra membrana sin
+  Poisson, 1/E45 = ¼·(1/kT + 1/kU + 1/kS); y la flexión de cada dirección, G = ρ·g·c³ con la c de la fórmula de Peirce,
+  multiplicada por el factor que da en el motor el mismo ángulo que la referencia con la misma tira apoyada en la mesa
+  (`bench/flexionDeLaReferencia.ts`, `escenaPeirceApoyada`). La referencia apoya la tira sin sujetarla: en el borde la
+  tira gira y la cola se levanta, y la fórmula de Peirce, que la supone empotrada, lee una flexión más blanda que la de
+  la tela. Medido el 2026-10-16 en la CPU con tres telas (un jersey, un rib y un denim), cuatro largos por dirección y
+  malla de 5 mm: el factor va de 1,9 a 2,5 por dirección (de 1,6 a 3,1 por corrida), y en el jersey a 2,5 mm queda
+  entre 1,8 y 2,2, así que casi no depende de la malla. Con la flexión de la fórmula, el disco Cusick de las tres telas
+  caía entre 6 y 9 puntos por debajo de la referencia; con la ajustada queda dentro de los 5 puntos de §2 en las tres:
+  el jersey a una décima, el rib y el denim unos 3,5 puntos por encima. *Costo:* el ajuste corre el voladizo de cada
+  tela en el motor (minutos por tela) y vale para la malla en que se ajustó (en una malla gruesa no caben las tiras
+  cortas: ahí se usa el de 5 mm). El rib y el denim quedan algo rígidos en el disco: la tracción del denim no es lineal
+  y el pandeo se calibró con la tela anterior del banco. Plan `2026-10-16-el-motor-a-s2.md`.
