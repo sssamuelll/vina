@@ -114,6 +114,26 @@ export function escenaVoladizo(voladoMm: number, hilo: 'urdimbre' | 'trama', ari
   return { malla, obstaculos: [], hilo: hilo === 'urdimbre' ? [1, 0] : [0, 1] };
 }
 
+/** La mesa del voladizo apoyado: un pedestal de 1 m de radio con la tapa en y = 0; en los 25 mm de la tira, su borde se curva 0,08 mm. */
+export const MESA_DE_PEIRCE = { radio: 1, tapa: 0 } as const;
+
+/**
+ * El voladizo de Peirce apoyado, como lo corre la referencia (spec §4.4.2, E12): una tira de 25 mm sobre una mesa, sin
+ * sujetar, con `apoyoMm` sobre la mesa y `voladoMm` en el aire, 3 mm por encima de la tapa. El borde de la mesa corre en
+ * x = 1 m. Con 'urdimbre' el hilo va a lo largo de la tira; con 'trama', a lo ancho; con 'bies', a 45°.
+ */
+export function escenaPeirceApoyada(voladoMm: number, apoyoMm: number, hilo: 'urdimbre' | 'trama' | 'bies', aristaMm: number): Escena {
+  const R = 1000 * MESA_DE_PEIRCE.radio;
+  const malla = mallaDeContorno(
+    [[R - apoyoMm, -12.5], [R, -12.5], [R + voladoMm, -12.5], [R + voladoMm, 12.5], [R, 12.5], [R - apoyoMm, 12.5]],
+    aristaMm,
+    MESA_DE_PEIRCE.tapa + 0.003,
+    [[[R, -12.5], [R, 12.5]]],
+  );
+  const hilos = { urdimbre: [1, 0], trama: [0, 1], bies: [Math.SQRT1_2, Math.SQRT1_2] } as const;
+  return { malla, obstaculos: [{ tipo: 'pedestal', ...MESA_DE_PEIRCE }], hilo: hilos[hilo] };
+}
+
 /** Lámina de 120 × 120 mm, para curvarla sobre un cilindro. */
 export function laminaPlana(aristaMm: number): MallaDeTela {
   return mallaDeContorno(rectangulo(-60, -60, 60, 60), aristaMm);

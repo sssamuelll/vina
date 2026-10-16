@@ -6,7 +6,7 @@ import { computeDrapeCoefficient, countFolds, extractOrderedBoundaryLoop } from 
 import type { PuntoDeCostura } from '../costuras';
 import type { CuerpoRigido } from '../cuerpo';
 import type { MallaDeTela } from '../malla';
-import { CUSICK } from './escenas';
+import { CUSICK, MESA_DE_PEIRCE } from './escenas';
 
 /** El percentil p (0..1) de unos valores; NaN si no hay. */
 export function percentil(v: ArrayLike<number>, p: number): number {
@@ -126,6 +126,29 @@ export function puntaDelVoladizo(x: ArrayLike<number>, malla: MallaDeTela, volad
     k++;
   }
   return { x: sx / k, y: sy / k };
+}
+
+/**
+ * El voladizo apoyado (escenas.ts, escenaPeirceApoyada): el ángulo (grados) de la cuerda que va del borde de la mesa, a la
+ * altura de la tira apoyada (el promedio de sus últimos 20 mm sobre la mesa), a la punta, como lo mide la referencia.
+ */
+export function peirceApoyado(x: ArrayLike<number>, malla: MallaDeTela, voladoM: number, apoyoM: number): { angulo: number; alturaApoyada: number } {
+  const R = MESA_DE_PEIRCE.radio;
+  let h = 0, nh = 0, px = 0, py = 0, np = 0;
+  for (let i = 0; i < malla.patron.length / 2; i++) {
+    const u = malla.patron[2 * i];
+    if (u <= R - apoyoM + 0.02) {
+      h += x[3 * i + 1];
+      nh++;
+    }
+    if (u >= R + voladoM - 1e-5) {
+      px += x[3 * i];
+      py += x[3 * i + 1];
+      np++;
+    }
+  }
+  h /= nh;
+  return { angulo: (Math.atan2(h - py / np, px / np - R) * 180) / Math.PI, alturaApoyada: h };
 }
 
 /**

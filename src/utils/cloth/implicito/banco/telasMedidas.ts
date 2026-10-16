@@ -13,12 +13,21 @@ import { PANDEO_CALIBRADO, type TelaFisica } from '../tela';
 
 type Direccion = 'urdimbre' | 'trama' | 'bies+45' | 'bies-45';
 
+/** Una corrida del voladizo apoyado de la referencia: el largo fuera de la mesa y sobre ella (mm) y el ángulo de la cuerda. */
+export interface CorridaDePeirce {
+  L_nominal_mm: number;
+  S_mm: number;
+  theta_deg: number;
+  /** el ángulo cae entre 10 y 70°, donde la fórmula de Peirce vale */
+  valida_10_70: boolean;
+}
+
 /** El registro de una tela en `telas/resultados.json` (solo lo que se lee aquí). */
 export interface TelaMedidaEnLaReferencia {
   gramaje_g_m2: number;
   grosor_mm_informacion: number;
   traccion?: Partial<Record<Direccion, { fitting?: { k_mean_N_m: number } }>>;
-  peirce?: Partial<Record<'urdimbre' | 'trama' | 'bies', { G_ef_media_N_m?: number | null }>>;
+  peirce?: Partial<Record<'urdimbre' | 'trama' | 'bies', { G_ef_media_N_m?: number | null; corridas?: CorridaDePeirce[] }>>;
   cusick?: Record<string, { calidad: number; pd_mm: number; dc_final: number; ondas_final_umbral4?: number; dc_primeros_3s?: Array<[number, number, number]> }>;
 }
 
