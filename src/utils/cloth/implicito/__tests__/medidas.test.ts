@@ -34,6 +34,13 @@ describe('las medidas de la camiseta', () => {
     expect(distanciaAlCuerpo(x, cuerpo).p50 * 1000).toBeCloseTo(10, 0);
   });
 
+  it('cuenta los vértices que quedaron dentro del cuerpo', () => {
+    const cuerpo = new CuerpoRigido(buildLinearBVH(esferaDeColision(0.05, 4)));
+    // tres vértices a 1 cm de la esfera y uno en su centro
+    const x = Float64Array.from([0, 0.06, 0, 0.06, 0, 0, 0, 0, 0.06, 0, 0, 0]);
+    expect(distanciaAlCuerpo(x, cuerpo).dentro).toBeCloseTo(25, 9);
+  });
+
   it('cuenta los aplastados de un rango de triángulos', () => {
     // dos triángulos de 0,5 de área en el patrón; en x, el primero queda igual y el segundo, a un cuarto de su área
     const malla = { x: new Float64Array(18), patron: Float64Array.from([0, 0, 1, 0, 0, 1, 2, 0, 3, 0, 2, 1]), tris: Uint32Array.from([0, 1, 2, 3, 4, 5]) };
@@ -41,5 +48,13 @@ describe('las medidas de la camiseta', () => {
     expect(aplastados(x, malla)).toBe(50);
     expect(aplastados(x, malla, 0, 1)).toBe(0);
     expect(aplastados(x, malla, 1, 1)).toBe(100);
+  });
+
+  it('mide el estiramiento de un rango de triángulos', () => {
+    // los mismos dos triángulos: el primero igual al patrón y el segundo, con las aristas a la mitad
+    const malla = { x: new Float64Array(18), patron: Float64Array.from([0, 0, 1, 0, 0, 1, 2, 0, 3, 0, 2, 1]), tris: Uint32Array.from([0, 1, 2, 3, 4, 5]) };
+    const x = [0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0, 0, 2.5, 0, 0, 2, 0.5, 0];
+    expect(estiramiento(x, malla, 0, 1).p95).toBeCloseTo(0, 12);
+    expect(estiramiento(x, malla, 1, 1).p95).toBeCloseTo(-0.5, 12);
   });
 });

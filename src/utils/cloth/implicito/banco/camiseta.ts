@@ -194,7 +194,7 @@ export interface MedidasDeCamiseta {
   /** por costura, de la más abierta a la más cerrada: sus dos piezas, cuántos puntos, el largo de cada lado en el patrón (m) y la separación (m) */
   porCostura: Array<{ piezas: [string, string]; puntos: number; largos: [number, number]; mediana: number; maxima: number }>;
   /** por pieza, el porcentaje de sus triángulos con menos de la mitad del área de su patrón */
-  porPieza: Array<{ pieza: string; aplastados: number }>;
+  porPieza: Array<{ pieza: string; aplastados: number; estiramiento95: number }>;
   pliegues: ReturnType<typeof pliegues>;
   alCuerpo: ReturnType<typeof distanciaAlCuerpo>;
   /** la distancia de cada vértice de Vina a la asentada de la referencia */
@@ -231,7 +231,11 @@ export function medirCamiseta(x: ArrayLike<number>, c: CamisetaContraLaReferenci
         };
       })
       .sort((p, q) => q.maxima - p.maxima),
-    porPieza: prenda.piezas.map((p, k) => ({ pieza: nombre(k), aplastados: aplastados(x, malla, p.t0, p.nt) })),
+    porPieza: prenda.piezas.map((p, k) => ({
+      pieza: nombre(k),
+      aplastados: aplastados(x, malla, p.t0, p.nt),
+      estiramiento95: estiramiento(x, malla, p.t0, p.nt).p95,
+    })),
     pliegues: pliegues(x, malla),
     alCuerpo: distanciaAlCuerpo(x, c.cuerpo),
     contraLaReferencia: ref ? distanciaASuperficie(x, ref.superficie) : null,

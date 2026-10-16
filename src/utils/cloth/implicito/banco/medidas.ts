@@ -14,10 +14,15 @@ export function percentil(v: ArrayLike<number>, p: number): number {
   return s.length > 0 ? s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))] : NaN;
 }
 
-/** El estiramiento de cada arista frente a su largo en el patrón (fracción): percentiles y el % que encogió más de 10 %. */
-export function estiramiento(x: ArrayLike<number>, malla: MallaDeTela): { p05: number; p50: number; p95: number; encogidas: number } {
+/** El estiramiento de cada arista frente a su largo en el patrón (fracción), en toda la malla o en un rango de triángulos: percentiles y el % que encogió más de 10 %. */
+export function estiramiento(
+  x: ArrayLike<number>,
+  malla: MallaDeTela,
+  desde = 0,
+  cuantos = malla.tris.length / 3 - desde,
+): { p05: number; p50: number; p95: number; encogidas: number } {
   const { tris, patron } = malla, n = patron.length / 2, vistas = new Set<number>(), e: number[] = [];
-  for (let t = 0; t < tris.length / 3; t++) {
+  for (let t = desde; t < desde + cuantos; t++) {
     for (let k = 0; k < 3; k++) {
       const a = tris[3 * t + k], b = tris[3 * t + ((k + 1) % 3)], clave = a < b ? a * n + b : b * n + a;
       if (vistas.has(clave)) continue;
@@ -63,14 +68,14 @@ export function pliegues(x: ArrayLike<number>, malla: MallaDeTela): { p50: numbe
   return { p50: percentil(angulos, 0.5), p95: percentil(angulos, 0.95), sobre90: angulos.filter((q) => q > 90).length, sobre150: angulos.filter((q) => q > 150).length };
 }
 
-/** La distancia con signo de cada vértice al cuerpo (m), hasta 20 cm: mediana, p05 y p95. */
-export function distanciaAlCuerpo(x: ArrayLike<number>, cuerpo: CuerpoRigido): { p05: number; p50: number; p95: number } {
+/** La distancia con signo de cada vértice al cuerpo (m), hasta 20 cm: mediana, p05, p95 y el % de los vértices que quedó dentro. */
+export function distanciaAlCuerpo(x: ArrayLike<number>, cuerpo: CuerpoRigido): { p05: number; p50: number; p95: number; dentro: number } {
   const d: number[] = [];
   for (let i = 0; i < x.length / 3; i++) {
     const c = cuerpo.cercano(x[3 * i], x[3 * i + 1], x[3 * i + 2], 0.2);
     if (c) d.push(c.d);
   }
-  return { p05: percentil(d, 0.05), p50: percentil(d, 0.5), p95: percentil(d, 0.95) };
+  return { p05: percentil(d, 0.05), p50: percentil(d, 0.5), p95: percentil(d, 0.95), dentro: (100 * d.filter((q) => q < 0).length) / (x.length / 3) };
 }
 
 /** La distancia de cada vértice a otra superficie (m), hasta 20 cm: mediana, p90, p99 y máxima. */
