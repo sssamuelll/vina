@@ -456,9 +456,19 @@ la referencia y dar un motor eficiente para la web y natural: de ahí E10 en ade
   residuo sin filtrar al terminar el gradiente conjugado; si jala hacia el cuerpo, el vértice se suelta el cuadro
   siguiente. La fricción usa esa fuerza, nunca menos que el peso que el vértice carga sobre el cuerpo. El vértice que el
   paso mete en el cuerpo sin estar apoyado se proyecta a la separación al terminar el paso, sin velocidad hacia adentro,
-  y su fuerza de apoyo es la que lo frenó. Sin segunda ronda: el par de dos capas de tela entra activo también cuando la
-  velocidad del cuadro anterior lo metería en la separación en dos cuadros. El par de una punta del cuerpo sigue con su
-  resorte (`kContacto`). Con el resorte de 2000 N/m del cuerpo, una tela de 27 N/m quedaba con un sistema mal
+  y su fuerza de apoyo es la que lo frenó. Sin segunda ronda: el par de dos capas de tela entra activo también cuando el
+  cuadro sin fuerzas (y = x_t + h·v + h²·g) lo metería en la separación. Con dos cuadros de margen, el resorte de dos
+  lados de la solución jalaba una contra otra a dos capas que todavía no se iban a tocar: medido en dos láminas a 8 mm
+  que se acercan a 5 mm por cuadro, la de arriba llegaba a la separación en un cuadro y salía acelerada de 0,3 a
+  0,39 m/s, y en la camiseta la tela se arrugaba sobre sí misma. El par de una punta del cuerpo sigue con su resorte
+  (`kContacto`). Con el resorte de 2000 N/m del cuerpo, una tela de 27 N/m quedaba con un sistema mal
   condicionado o, con un resorte blando, atravesaba el cuerpo donde la costura jalaba; la restricción no tiene rigidez.
   *Costo:* la tela queda pegada un cuadro antes de soltarse, y la proyección no conserva la energía. Plan
   `2026-10-16-el-motor-a-s2.md`.
+- **E11 (§4.4.2, se aparta de E5 en la tira del cuello). La tira del cuello arranca en anillo.** La colocación de la
+  referencia deja la tira plana detrás de la cabeza, y sus costuras la jalaban en línea recta a través del cuello hasta
+  el escote del delantero: el cuerpo quedaba entre los dos bordes, la puntada no cosía (E8) y la tira se estiraba de 38 a
+  240 %. En el banco la tira arranca en un círculo horizontal alrededor del cuello, a la altura del punto más alto del
+  escote, con el largo de reposo de su borde cosido (o rodeando el cuello a la separación si es más ancho), girada para
+  que cada vértice quede frente a su punto del escote; el borde libre sube lo que mide la tira de ancho (`banco/cuello.ts`).
+  Cambia el punto de partida, no la física. Plan `2026-10-16-el-motor-a-s2.md`.
