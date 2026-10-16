@@ -386,7 +386,8 @@ El banco corre también sobre el XPBD actual, para medir cada entrega contra él
 ## 7. Enmiendas de la entrega 4
 
 Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el plan de la parte 1, y E5, E6, R13 y E7
-el 2026-10-16 (el valor de E7 espera su ratificación), y E8 y E9 el mismo día.
+el 2026-10-16 (el valor de E7 espera su ratificación), y E8 y E9 el mismo día. El mismo día ordenó usar las telas de
+la referencia y dar un motor eficiente para la web y natural: de ahí E10 en adelante, cada una con lo que se midió.
 
 - **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
   patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.
@@ -447,3 +448,17 @@ el 2026-10-16 (el valor de E7 espera su ratificación), y E8 y E9 el mismo día.
   aplastados, y el Cusick cumple (rango 2,6); con 0,05 y 0,03, 0,19 y 0,15 %, pero el Cusick pierde el rango (4,4 y
   4,1). Lo que queda aplastado está en la tira del cuello. *Costo:* la tela que encoge más de 10 % ya no se dobla
   dentro del triángulo y empuja como al estirar. Plan `2026-10-16-la-camiseta-a-s2.md`.
+- **E10 (§4.2.1, §4.3.1 y §4.3.2; reemplaza a E4 y a la anticipación). El cuerpo es un piso duro.** El vértice libre y
+  sin coser que al empezar el paso está a menos de la separación del cuerpo (más 0,1 mm de holgura), sin irse hacia
+  afuera a más de 1 mm/s y sin que el cuadro anterior lo jalara hacia el cuerpo, queda restringido en la normal del
+  cuerpo, como las restricciones de Baraff y Witkin (*Large Steps*, §5.3): el gradiente conjugado filtra esa componente
+  y el vértice solo se mueve por el plano tangente, con su fricción. La fuerza de la restricción es −n·r, con r el
+  residuo sin filtrar al terminar el gradiente conjugado; si jala hacia el cuerpo, el vértice se suelta el cuadro
+  siguiente. La fricción usa esa fuerza, nunca menos que el peso que el vértice carga sobre el cuerpo. El vértice que el
+  paso mete en el cuerpo sin estar apoyado se proyecta a la separación al terminar el paso, sin velocidad hacia adentro,
+  y su fuerza de apoyo es la que lo frenó. Sin segunda ronda: el par de dos capas de tela entra activo también cuando la
+  velocidad del cuadro anterior lo metería en la separación en dos cuadros. El par de una punta del cuerpo sigue con su
+  resorte (`kContacto`). Con el resorte de 2000 N/m del cuerpo, una tela de 27 N/m quedaba con un sistema mal
+  condicionado o, con un resorte blando, atravesaba el cuerpo donde la costura jalaba; la restricción no tiene rigidez.
+  *Costo:* la tela queda pegada un cuadro antes de soltarse, y la proyección no conserva la energía. Plan
+  `2026-10-16-el-motor-a-s2.md`.

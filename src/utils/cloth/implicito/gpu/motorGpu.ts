@@ -12,11 +12,11 @@ type Bufer = 'pos' | 'vf' | 'tf' | 'iu' | 'red' | 'vals' | 'pv' | 'at';
 /** En el orden de las ligaduras del WGSL. */
 const BUFERES: Bufer[] = ['pos', 'vf', 'tf', 'iu', 'red', 'vals', 'pv', 'at'];
 
-/** Lo que dejó el último cuadro: iteraciones, contactos anticipados, paso aceptado, quietud y pares de contacto propio (§4.2.4). */
+/** Lo que dejó el último cuadro: iteraciones, vértices proyectados (E10), paso aceptado, quietud y pares de contacto propio (§4.2.4). */
 export interface EstadoGpu {
   cuadro: number;
   cg: number;
-  anticipados: number;
+  proyectados: number;
   alfa: number;
   quietud: number;
   quietudMaxima: number;
@@ -161,18 +161,8 @@ export class MotorGpu {
       listas();
     }
     ronda();
-    // ponytail: la segunda ronda y los intentos de la búsqueda se despachan siempre y salen enseguida si no
-    // hacen falta (cuestan los despachos vacíos); pasar a despacho indirecto cuando se optimice la velocidad
-    if (aj.anticipar && (this.s.obstaculos.length > 0 || propio)) {
-      d('anticipar', gv);
-      if (propio) {
-        d('anticiparPares', gp);
-        // los pares que la anticipación activó entran a las listas
-        listas();
-      }
-      d('armarRonda2', 1);
-      ronda();
-    }
+    // ponytail: los intentos de la búsqueda se despachan siempre y salen enseguida si no hacen falta (cuestan los
+    // despachos vacíos); pasar a despacho indirecto cuando se optimice la velocidad
     if (aj.busqueda) {
       d('prepBusqueda', 1);
       for (let intento = 0; intento < 8; intento++) {
@@ -268,7 +258,7 @@ export class MotorGpu {
     const e = new Float32Array(await this.leer('red', 4 * this.d.red.SC, 4 * 16));
     const a = new Uint32Array(await this.leer('at', 4 * this.d.at.NPAR, 8));
     return {
-      cuadro: e[ESC.CUADRO], cg: e[ESC.ITER], anticipados: e[ESC.NUEVOS], alfa: e[ESC.ALFA_FINAL], quietud: e[ESC.QUIETUD], quietudMaxima: e[ESC.QMAX],
+      cuadro: e[ESC.CUADRO], cg: e[ESC.ITER], proyectados: e[ESC.PROYECTADOS], alfa: e[ESC.ALFA_FINAL], quietud: e[ESC.QUIETUD], quietudMaxima: e[ESC.QMAX],
       dg: e[ESC.DG], pares: Math.min(a[0], this.p.maxPares), desbordes: a[1],
     };
   }

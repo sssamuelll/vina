@@ -196,7 +196,7 @@ export function piramideDeColision(base: number, altura: number): CollisionMeshD
   return mallaDeCuerpo(v, [[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4], [0, 1, 2], [0, 2, 3]], (c) => resta(c, centro));
 }
 
-/** Una lámina de 120 mm, 5 mm sobre una esfera de 5 cm (malla de cuerpo): el contacto llega por anticipación en el segundo cuadro. */
+/** Una lámina de 120 mm, 5 mm sobre una esfera de 5 cm (malla de cuerpo): el segundo cuadro la mete en la esfera y la proyecta (E10). */
 export function escenaEsfera(): Escena {
   const cuerpo = new CuerpoRigido(buildLinearBVH(esferaDeColision(0.05, 3)));
   return { malla: mallaDeContorno(rectangulo(-60, -60, 60, 60), 10, 0.055), obstaculos: [{ tipo: 'cuerpo', cuerpo }] };
@@ -219,7 +219,7 @@ export function escenaInclinada(): Escena {
 /**
  * Dos láminas en caída libre, sin piso: una de 90 mm inclinada sobre otra de 120 mm, de 1,2 mm (dentro de la
  * separación) a 6 mm, bajando 0,3 m/s más rápido y resbalando a 0,05 m/s. El primer cuadro tiene pares activos desde
- * la entrada, con su fricción, y pares anticipados. Con un piso, el piso frenaba las dos láminas a la misma altura y la
+ * la entrada, con su fricción, y pares que la velocidad mete en la separación (E10). Con un piso, el piso frenaba las dos láminas a la misma altura y la
  * de arriba terminaba sobre la de abajo a distancia cero, donde la CPU y la GPU no pueden armar los mismos pares.
  */
 export function escenaCapas(): Escena {

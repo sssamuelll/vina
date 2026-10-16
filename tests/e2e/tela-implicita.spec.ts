@@ -23,7 +23,7 @@ interface ResultadoTela {
   segundosHastaQuieta?: number | null;
   dgCpu?: number;
   medidas?: MedidasDeCamiseta;
-  estado?: { cuadro: number; cg: number; anticipados: number; alfa: number; quietud: number; quietudMaxima: number; dg: number; pares: number; desbordes: number };
+  estado?: { cuadro: number; cg: number; proyectados: number; alfa: number; quietud: number; quietudMaxima: number; dg: number; pares: number; desbordes: number };
   perfil?: Array<{ entrada: string; veces: number; ms: number }>;
   error?: string;
 }
@@ -150,14 +150,12 @@ test.describe('La camiseta de María en la GPU, contra la referencia @gpu-local'
     expect(velocidad50.msPorCuadro!).toBeLessThanOrEqual(17);
   });
 
-  test('velocidad por partes a 5 mm: iteraciones × contacto propio × anticipación (medida, sin meta)', async ({ page }) => {
+  test('velocidad por partes a 5 mm: iteraciones × contacto propio (medida, sin meta)', async ({ page }) => {
     const filas: Array<{ consulta: string; msPorCuadro: number }> = [];
     for (const cg of [20, 50]) {
       for (const propio of [1, 0]) {
-        for (const anticipar of [1, 0]) {
-          const consulta = `modo=velocidad&escena=camiseta&malla=5&cg=${cg}&propio=${propio}&anticipar=${anticipar}&cuadros=60`;
-          filas.push({ consulta, msPorCuadro: (await correr(page, consulta, 880_000)).msPorCuadro! });
-        }
+        const consulta = `modo=velocidad&escena=camiseta&malla=5&cg=${cg}&propio=${propio}&cuadros=60`;
+        filas.push({ consulta, msPorCuadro: (await correr(page, consulta, 880_000)).msPorCuadro! });
       }
     }
     console.log(`[velocidad] informe: ${guardarInforme('camiseta-velocidad', { filas })}`);

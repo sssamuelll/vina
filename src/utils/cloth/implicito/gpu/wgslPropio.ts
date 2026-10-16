@@ -116,7 +116,7 @@ fn sepDeCara(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>, c: vec3<f32>, w: vec3<f32
   return (p - a) - w.y * (b - a) - w.z * (c - a);
 }
 
-fn guardarPar(v: vec4<f32>, w: vec4<f32>, n: vec3<f32>, p0: f32, kt: f32) {
+fn guardarPar(v: vec4<f32>, w: vec4<f32>, n: vec3<f32>, p0: f32, kt: f32, activo: bool) {
   let k = atomicAdd(&at[A_NPAR], 1u);
   if (k >= MAXP) {
     atomicAdd(&at[A_DESB], 1u);
@@ -128,7 +128,7 @@ fn guardarPar(v: vec4<f32>, w: vec4<f32>, n: vec3<f32>, p0: f32, kt: f32) {
   tf[o + 8u] = n.x; tf[o + 9u] = n.y; tf[o + 10u] = n.z;
   tf[o + 11u] = p0;
   tf[o + 12u] = kt;
-  tf[o + 13u] = select(0.0, 1.0, p0 > 0.0);
+  tf[o + 13u] = select(0.0, 1.0, activo);
 }
 
 // un vértice libre de tela contra la cara (ia, ib, ic): solo si cae sobre ella (E6), a menos del radio
@@ -140,12 +140,12 @@ fn parDeVertice(i: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, b: vec3<f32>, c
   if (d >= r || d < 1e-9 || !sobreLaCara(dv, tn)) { return; }
   let n = dv / d;
   let p0 = SEPP - d;
+  // vn: cuánto crece la separación por segundo; entra activo el que en dos cuadros a esa velocidad entraría (E10)
+  let vr = ld(O_V, i) - e.w.x * ld(O_V, ia) - e.w.y * ld(O_V, ib) - e.w.z * ld(O_V, ic);
+  let vn = dot(n, vr);
   var kt = 0.0;
-  if (p0 > 0.0) {
-    let vr = ld(O_V, i) - e.w.x * ld(O_V, ia) - e.w.y * ld(O_V, ib) - e.w.z * ld(O_V, ic);
-    kt = rigidez(MU_T, KCP * p0, tangencial(vr, n));
-  }
-  guardarPar(vec4<f32>(f32(i), f32(ia), f32(ib), f32(ic)), vec4<f32>(1.0, -e.w.x, -e.w.y, -e.w.z), n, p0, kt);
+  if (p0 > 0.0) { kt = rigidez(MU_T, KCP * p0, length(vr - vn * n)); }
+  guardarPar(vec4<f32>(f32(i), f32(ia), f32(ib), f32(ic)), vec4<f32>(1.0, -e.w.x, -e.w.y, -e.w.z), n, p0, kt, p0 > 0.0 || p0 - 2.0 * H * vn > 0.0);
 }
 
 // 1 = ese vértice del cuerpo sostenía la tela: el arreglo de este cuadro y el del anterior se alternan por paridad
@@ -174,7 +174,7 @@ fn parDePunta(b: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, bb: vec3<f32>, c:
   let vr = e.w.x * ld(O_V, ia) + e.w.y * ld(O_V, ib) + e.w.z * ld(O_V, ic);
   // tela contra cuerpo: la fricción del cuerpo (§4.3.1)
   let kt = rigidez(MU_C, KC * p0, tangencial(vr, nn));
-  guardarPar(vec4<f32>(f32(ia), f32(ib), f32(ic), -1.0), vec4<f32>(e.w, 0.0), nn, p0, kt);
+  guardarPar(vec4<f32>(f32(ia), f32(ib), f32(ic), -1.0), vec4<f32>(e.w, 0.0), nn, p0, kt, p0 > 0.0);
 }
 
 @compute @workgroup_size(WG) fn paresDeTriangulo(@builtin(global_invocation_id) g: vec3<u32>) {
@@ -269,29 +269,6 @@ ${wgslScan('scanV', 'A_CNTV', 'N', 'O_OFFV')}
       tf[b] = w * a.x; tf[b + 1u] = w * a.y; tf[b + 2u] = w * a.z;
     }
   }
-}
-
-// 8b. los pares que el paso cruzaría, medidos sobre su plano fijo (sistema.ts, anticiparContactos)
-@compute @workgroup_size(WG) fn anticiparPares(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
-  let k = g.x;
-  var nuevo = 0.0;
-  if (k < nPares()) {
-    let o = O_PAR + 14u * k;
-    if (tf[o + 13u] < 0.5) {
-      let nn = v3tf(o + 8u);
-      var un = 0.0;
-      for (var j = 0u; j < 4u; j++) {
-        let v = tf[o + j];
-        if (v >= 0.0) { un += tf[o + 4u + j] * dot(nn, ld(O_DX, u32(v))); }
-      }
-      if (tf[o + 11u] - un > 0.0) {
-        tf[o + 13u] = 1.0;
-        nuevo = 1.0;
-      }
-    }
-  }
-  let total = reducirSuma(l.x, nuevo);
-  if (l.x == 0u) { red[R_PE + w.x] = total; }
 }
 
 // 9b. la energía de los pares activos en la búsqueda en línea (contactoPropio.ts, energiaDelPar)

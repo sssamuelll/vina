@@ -6,8 +6,8 @@
  * tests/e2e/tela-implicita.spec.ts (@gpu-local). Parámetros: `modo` = paridad | velocidad | perfil | quietud | camiseta;
  * `escena` = una de ESCENAS (chica: disco Cusick de 10 mm; grande: disco de 48 cm con malla de 5 mm, del tamaño de
  * la camiseta; las escenas de paridad del banco; y camiseta, con `malla` en mm, armada con los archivos de la
- * referencia privada que sirve la prueba); `cg` = iteraciones por ronda; `cuadros`; `anticipar=0`, `busqueda=0` y
- * `propio=0` apagan esos pasos para aislar una diferencia; `kc` cambia la rigidez de contacto; `kp`, la de los pares
+ * referencia privada que sirve la prueba); `cg` = iteraciones por ronda; `cuadros`; `busqueda=0` y `propio=0`
+ * apagan esos pasos para aislar una diferencia; `kc` cambia la rigidez de contacto; `kp`, la de los pares
  * entre capas de tela; `maxPares`, la capacidad de pares. El modo camiseta la corre hasta quieta o 10 s de tela y la mide. Publica el resultado en
  * `window.__TELA_IMPLICITA__`.
  */
@@ -97,7 +97,6 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
     maxCG: Number(q.get('cg') ?? 50),
     // en la paridad, todas las iteraciones en las dos: la tolerancia no decide nada
     tolCG: modo === 'paridad' ? 0 : 1e-4,
-    anticipar: q.get('anticipar') !== '0',
     busqueda: q.get('busqueda') !== '0',
     // la tela contra sí misma, salvo que se pida apagarla
     contactoPropio: q.get('propio') !== '0',

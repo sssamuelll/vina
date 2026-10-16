@@ -4,7 +4,7 @@
  * en el mismo orden; el cuadro entero cabe en un pase de cómputo y las sumas se reducen en la GPU.
  */
 import { ALCANCE_MAXIMO } from '../contactoPropio';
-import { EPS_FRICCION } from '../contactos';
+import { EPS_FRICCION, HOLGURA_DE_APOYO, VELOCIDAD_DE_DESPEGUE } from '../contactos';
 import { CIERRE_POR_CUADRO, CUADROS_DE_PUNTADA, LARGO_CERRADO, MUESTRAS_DE_PUNTADA } from '../costuras';
 import { RADIO_DE_BUSQUEDA, type Obstaculo } from '../obstaculos';
 import type { SistemaTela } from '../sistema';
@@ -17,7 +17,7 @@ export const WG = 128;
 
 /** Los escalares del cuadro, en la zona SC de `red`. */
 export const ESC = {
-  RZ: 0, RZ0: 1, ALFA: 2, BETA: 3, HECHO: 4, ACTIVO: 5, NUEVOS: 6, ALFA_LS: 7, PROBANDO: 8,
+  RZ: 0, RZ0: 1, ALFA: 2, BETA: 3, HECHO: 4, ACTIVO: 5, PROYECTADOS: 6, ALFA_LS: 7, PROBANDO: 8,
   CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14, COSIDA: 15, RADIO: 16, CELDA: 17,
 } as const;
 const N_ESC = 32;
@@ -27,8 +27,8 @@ export const ENTRADAS = [
   'encoger', 'ubicar', 'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar',
   'velMax', 'armarRadio', 'limpiarCeldas', 'hashContar', 'scanCBloques', 'scanCTotales', 'scanCSumar', 'hashLlenar',
   'limpiarPuntas', 'paresDeTriangulo', 'limpiarVertices', 'contarEntradas', 'scanVBloques', 'scanVTotales', 'scanVSumar', 'llenarEntradas',
-  'residuo', 'sumarInicio', 'aportePares', 'spmv', 'sumarAlfa', 'actualizar', 'sumarBeta', 'nuevaP', 'expandirP', 'anticipar', 'anticiparPares',
-  'armarRonda2', 'prepBusqueda', 'posPrueba', 'anguloPrueba', 'difTri', 'difCostura', 'difPares', 'decidir', 'aplicar',
+  'residuo', 'sumarInicio', 'aportePares', 'spmv', 'sumarAlfa', 'actualizar', 'sumarBeta', 'nuevaP', 'expandirP',
+  'prepBusqueda', 'posPrueba', 'anguloPrueba', 'difTri', 'difCostura', 'difPares', 'decidir', 'aplicar',
   'cerrarCuadro', 'cerrarCosturas', 'revisarCosido', 'coser',
 ] as const;
 
@@ -44,7 +44,7 @@ function zonas<K extends string>(tamanos: Record<K, number>): Record<K, number> 
   return o as Record<K, number> & { total: number };
 }
 
-type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT';
+type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT' | 'RN';
 type ZonaTf =
   | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH' | 'CCOS' | 'CDES'
   | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'CUVN' | 'SOST' | 'HP' | 'OFFC' | 'ORD' | 'PAR' | 'OFFV' | 'ENT' | 'SCB'
@@ -83,7 +83,7 @@ export interface Distribucion {
 
 export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribucion {
   const { n, nt, nh } = p;
-  const vf = zonas<ZonaVf>({ XT: 3 * n, V: 3 * n, R: 3 * n, Z: 3 * n, AP: 3 * n, DX: 3 * n, XP: 3 * n, MASA: n, EV0: n, PINV: 9 * n, CONT: 6 * n });
+  const vf = zonas<ZonaVf>({ XT: 3 * n, V: 3 * n, R: 3 * n, Z: 3 * n, AP: 3 * n, DX: 3 * n, XP: 3 * n, MASA: n, EV0: n, PINV: 9 * n, CONT: 6 * n, RN: n });
   const tf = zonas<ZonaTf>({
     COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, THP: nh, CONTRIB: 45 * nt + 9 * p.nc,
     CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch, CCOS: p.nc, CDES: 3 * p.nc,
@@ -211,6 +211,9 @@ const KC = ${f(aj.kContacto)};
 const KCP = ${f(aj.kPropio ?? aj.kContacto)};
 const GRAV = ${f(aj.gravedad)};
 const SEP = ${f(s.sep)};
+// E10: el apoyo en el cuerpo (contactos.ts)
+const HOLGURA = ${f(HOLGURA_DE_APOYO)};
+const DESPEGUE = ${f(VELOCIDAD_DE_DESPEGUE)};
 const TOL2 = ${f(aj.tolCG * aj.tolCG)};
 const MGH = ${f(Math.max(p.pesoTotal * aj.h, 1e-30))};
 const KU = ${f(tela.kTrama)};
@@ -299,15 +302,14 @@ fn tangencial(v: vec3<f32>, n: vec3<f32>) -> f32 { return length(v - dot(v, n) *
 // la del contacto propio para dos capas de tela (contactoPropio.ts, ParPropio.k)
 fn rigidezDelPar(o: u32) -> f32 { return select(KCP, KC, tf[o + 3u] < 0.0); }
 
-// el plano del vértice (en CONT, desde o) con u = x − x_t, de un solo lado (contactos.ts, energiaDePlano)
-fn energiaPlano(o: u32, u: vec3<f32>) -> f32 {
-  let n = vec3<f32>(vf[o + 1u], vf[o + 2u], vf[o + 3u]);
-  let un = dot(n, u);
-  let p = vf[o + 4u] - un;
-  let t = u - un * n;
-  var e = 0.5 * vf[o + 5u] * dot(t, t);
-  if (p > 0.0) { e += 0.5 * KC * p * p; }
-  return e;
+// E10: el apoyo del vértice en CONT, desde o: [apoyado, normal, fuerza de apoyo del último cuadro, kt]
+fn normalDeApoyo(o: u32) -> vec3<f32> { return vec3<f32>(vf[o + 1u], vf[o + 2u], vf[o + 3u]); }
+
+// la fricción del apoyo con u = x − x_t (contactos.ts, energiaDeFriccion)
+fn energiaFriccion(o: u32, u: vec3<f32>) -> f32 {
+  let n = normalDeApoyo(o);
+  let t = u - dot(n, u) * n;
+  return 0.5 * vf[o + 5u] * dot(t, t);
 }
 
 // el ángulo entre caras y su gradiente (placa.ts, anguloYGradiente)
@@ -549,26 +551,30 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   stx(iu[b], (1.0 - s) * xE2(iu[b + 1u]) + s * xE2(iu[b + 2u]) + des(e));
 }
 
-// 1. x_t, el plano de cada vértice en x_t con su fricción (sistema.ts, armarContactos) y la inercia al empezar
+// 1. x_t, el apoyo de cada vértice en el cuerpo con su fricción (sistema.ts, armarApoyos) y la inercia al empezar
 @compute @workgroup_size(${WG}) fn inicio(@builtin(global_invocation_id) g: vec3<u32>) {
   let i = g.x;
   if (i == 0u) {
     red[R_SC + E_ACTIVO] = 1.0;
     red[R_SC + E_ITER] = 0.0;
-    red[R_SC + E_NUEVOS] = 0.0;
   }
   if (i >= N) { return; }
   let x = ldx(i);
   st(O_XT, i, x);
   let o = O_CONT + 6u * i;
-  let c = masCercano(x);
-  let p0 = SEP - c.c.x;
-  if (p0 > 0.0 && iu[I_FIJO + i] == 0u) {
+  // la fuerza de apoyo del cuadro anterior: negativa, su restricción jalaba hacia el cuerpo y este cuadro se suelta
+  let lambda = vf[o + 4u];
+  vf[o] = 0.0;
+  if (iu[I_FIJO + i] == 0u && !cosidoV(i) && lambda >= 0.0) {
+    let c = masCercano(x);
     let n = c.c.yzw;
-    vf[o] = 1.0; vf[o + 1u] = n.x; vf[o + 2u] = n.y; vf[o + 3u] = n.z; vf[o + 4u] = p0;
-    vf[o + 5u] = rigidez(MU_C, KC * p0, tangencial(ld(O_V, i), n));
-  } else {
-    vf[o] = 0.0;
+    let v = ld(O_V, i);
+    let vn = dot(v, n);
+    if (c.c.x < SEP + HOLGURA && vn <= DESPEGUE) {
+      vf[o] = 1.0; vf[o + 1u] = n.x; vf[o + 2u] = n.y; vf[o + 3u] = n.z;
+      // nunca menos que el peso que carga sobre el cuerpo (sistema.ts, armarApoyos)
+      vf[o + 5u] = rigidez(MU_C, max(lambda, -vf[O_MASA + i] * GRAV * n.y), length(v - vn * n));
+    }
   }
   vf[O_EV0 + i] = energiaVertice(i, x);
 }
@@ -711,11 +717,10 @@ fn residuoDe(i: u32) -> ResiduoB {
   var B = ld9(iu[I_DIAG + i]) + (m / (H * H) + AIRE * m / H) * I3;
   let o = O_CONT + 6u * i;
   if (vf[o] > 0.5) {
-    let nn = vec3<f32>(vf[o + 1u], vf[o + 2u], vf[o + 3u]);
-    let kt = vf[o + 5u];
-    // en x = x_t el plano empuja con kc·p0 y la fricción todavía no (sistema.ts, residuo)
-    r += KC * vf[o + 4u] * nn;
-    B += (KC - kt) * outer(nn, nn) + kt * I3;
+    // E10: el apoyo no empuja (lo fija su restricción) y en x = x_t su fricción todavía no; entra al bloque
+    // (sistema.ts, residuo y sumarBloquesDeContacto)
+    let nn = normalDeApoyo(o);
+    B += vf[o + 5u] * (I3 - outer(nn, nn));
   }
   if (PROPIO) {
     for (var s = u32(tf[O_OFFV + i]); s < u32(tf[O_OFFV + i + 1u]); s++) {
@@ -788,11 +793,20 @@ fn arbolR0(v: u32) -> ResiduoB {
       B = t.B;
     }
     if (iu[I_FIJO + i] != 0u) { r = vec3<f32>(0.0); }
+    // E10: el apoyo guarda la normal de su residuo sin filtrar, para su fuerza al terminar, y filtra r y z (paso.ts)
+    let o = O_CONT + 6u * i;
+    let apoyo = vf[o] > 0.5;
+    let nn = normalDeApoyo(o);
+    if (apoyo) {
+      vf[O_RN + i] = dot(nn, r);
+      r = r - dot(nn, r) * nn;
+    }
     let Bi = inversa3(B);
     for (var a = 0u; a < 3u; a++) {
       for (var c = 0u; c < 3u; c++) { vf[O_PINV + 9u * i + 3u * a + c] = Bi[c][a]; }
     }
-    let z = Bi * r;
+    var z = Bi * r;
+    if (apoyo) { z = z - dot(nn, z) * nn; }
     st(O_R, i, r);
     st(O_Z, i, z);
     pv[i] = vec4<f32>(z, 0.0);
@@ -833,11 +847,11 @@ fn arbolR0(v: u32) -> ResiduoB {
     let m = vf[O_MASA + i];
     let p = pv[i].xyz;
     ap += (m / (H * H) + AIRE * m / H) * p;
+    // E10: del apoyo, solo su fricción en el plano tangente
     let o = O_CONT + 6u * i;
     if (vf[o] > 0.5) {
-      let nn = vec3<f32>(vf[o + 1u], vf[o + 2u], vf[o + 3u]);
-      let pn = dot(nn, p);
-      ap += KC * pn * nn + vf[o + 5u] * (p - pn * nn);
+      let nn = normalDeApoyo(o);
+      ap += vf[o + 5u] * (p - dot(nn, p) * nn);
     }
     if (PROPIO) {
       // la lista lleva solo los pares activos, y aportePares ya calculó lo de cada uno para cada vértice
@@ -876,13 +890,23 @@ fn arbolR0(v: u32) -> ResiduoB {
       // E8: A·p de cada vértice cosido pasa a sus dos vértices del otro lado (costuras.ts, restringir)
       var ap = arbolA0(i);
       if (iu[I_FIJO + i] != 0u) { ap = vec3<f32>(0.0); }
+      // E10: el apoyo sigue la normal de su residuo sin filtrar y filtra A·p y z (paso.ts, gradienteConjugado)
+      let oc = O_CONT + 6u * i;
+      let apoyo = vf[oc] > 0.5;
+      let nn = normalDeApoyo(oc);
+      if (apoyo) {
+        let an = dot(nn, ap);
+        vf[O_RN + i] = vf[O_RN + i] - alfa * an;
+        ap = ap - an * nn;
+      }
       let r = ld(O_R, i) - alfa * ap;
       st(O_R, i, r);
       let o = O_PINV + 9u * i;
-      let z = vec3<f32>(
+      var z = vec3<f32>(
         vf[o] * r.x + vf[o + 1u] * r.y + vf[o + 2u] * r.z,
         vf[o + 3u] * r.x + vf[o + 4u] * r.y + vf[o + 5u] * r.z,
         vf[o + 6u] * r.x + vf[o + 7u] * r.y + vf[o + 8u] * r.z);
+      if (apoyo) { z = z - dot(nn, z) * nn; }
       st(O_Z, i, z);
       rz = dot(r, z);
     }
@@ -919,39 +943,6 @@ fn arbolR0(v: u32) -> ResiduoB {
   pv[iu[b]] = vec4<f32>((1.0 - s) * pE2(iu[b + 1u]) + s * pE2(iu[b + 2u]), 0.0);
 }
 
-// 8. anticipación (sistema.ts, anticiparContactos): el vértice que el paso metería en un obstáculo entra con el plano
-// tangente en el punto adonde iba, y con la fricción de la normal que frena en un cuadro esa penetración (R11)
-@compute @workgroup_size(${WG}) fn anticipar(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
-  let i = g.x;
-  var nuevo = 0.0;
-  if (i < N) {
-    let o = O_CONT + 6u * i;
-    if (iu[I_FIJO + i] == 0u && vf[o] < 0.5) {
-      let dx = ld(O_DX, i);
-      let c = masCercano(ldx(i) + dx);
-      let pen = SEP - c.c.x;
-      if (pen > 0.0) {
-        let n = c.c.yzw;
-        vf[o] = 1.0; vf[o + 1u] = n.x; vf[o + 2u] = n.y; vf[o + 3u] = n.z;
-        // la penetración en x_t respecto del plano tangente en el punto adonde iba: sep − d + n·dx
-        vf[o + 4u] = pen + dot(n, dx);
-        vf[o + 5u] = rigidez(MU_C, vf[O_MASA + i] * pen / (H * H), tangencial(ld(O_V, i), n));
-        nuevo = 1.0;
-      }
-    }
-  }
-  let total = reducirSuma(l.x, nuevo);
-  if (l.x == 0u) { red[R_PA + w.x] = total; }
-}
-
-@compute @workgroup_size(1) fn armarRonda2() {
-  var s = 0.0;
-  for (var k = 0u; k < GV; k++) { s += red[R_PA + k]; }
-  if (PROPIO) { for (var k = 0u; k < GP; k++) { s += red[R_PE + k]; } }
-  red[R_SC + E_NUEVOS] = s;
-  red[R_SC + E_ACTIVO] = select(0.0, 1.0, s > 0.5);
-}
-
 // 9. búsqueda en línea: α = 1, ½, … mientras G suba; se compara la suma de las diferencias por elemento
 @compute @workgroup_size(1) fn prepBusqueda() {
   red[R_SC + E_ALFA_LS] = 1.0;
@@ -967,9 +958,9 @@ fn arbolR0(v: u32) -> ResiduoB {
     let xp = ld(O_XT, i) + u;
     st(O_XP, i, xp);
     de = energiaVertice(i, xp) - vf[O_EV0 + i];
-    // el plano fijado al empezar, de un solo lado, sin consultar el obstáculo (E4)
+    // la fricción del apoyo (E10), sin consultar el obstáculo
     let o = O_CONT + 6u * i;
-    if (vf[o] > 0.5) { de += energiaPlano(o, u) - energiaPlano(o, vec3<f32>(0.0)); }
+    if (vf[o] > 0.5) { de += energiaFriccion(o, u); }
   }
   let total = reducirSuma(l.x, de);
   if (l.x == 0u) { red[R_PB + w.x] = total; }
@@ -1036,17 +1027,38 @@ fn arbolR0(v: u32) -> ResiduoB {
   if (dg <= 0.0) { red[R_SC + E_PROBANDO] = 0.0; } else { red[R_SC + E_ALFA_LS] = 0.5 * red[R_SC + E_ALFA_LS]; }
 }
 
-// 10. el paso aceptado, la velocidad y la quietud (quietud.ts)
+// 10. el paso aceptado, la velocidad, la proyección (E10, sistema.ts, proyectar) y la quietud (quietud.ts)
 @compute @workgroup_size(${WG}) fn aplicar(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
   let i = g.x;
   var mv = 0.0;
   var vmax = 0.0;
+  var proyectado = 0.0;
   if (i < N) {
     var alfa = 1.0;
     if (BUSQUEDA) { alfa = select(0.0, red[R_SC + E_ALFA_LS], red[R_SC + E_PROBANDO] < 0.5); }
     let dx = alfa * ld(O_DX, i);
-    stx(i, ld(O_XT, i) + dx);
-    st(O_V, i, dx / H);
+    var x = ld(O_XT, i) + dx;
+    var v = dx / H;
+    // la fuerza de apoyo del cuadro: la de la restricción (−n·r sin filtrar), o la que frena al proyectado
+    let o = O_CONT + 6u * i;
+    var lambda = 0.0;
+    if (vf[o] > 0.5) { lambda = -vf[O_RN + i]; }
+    if (iu[I_FIJO + i] == 0u && !cosidoV(i)) {
+      let c = masCercano(x);
+      if (c.c.x < SEP) {
+        let n = c.c.yzw;
+        x = x + (SEP - c.c.x) * n;
+        let vn = dot(v, n);
+        if (vn < 0.0) {
+          v = v - vn * n;
+          lambda = max(lambda, vf[O_MASA + i] * -vn / H);
+        }
+        proyectado = 1.0;
+      }
+    }
+    vf[o + 4u] = lambda;
+    stx(i, x);
+    st(O_V, i, v);
     if (iu[I_FIJO + i] == 0u) {
       // la quietud mira la velocidad que pide el paso, no la aceptada (quietud.ts)
       let rapidez = length(ld(O_DX, i)) / H;
@@ -1058,15 +1070,20 @@ fn arbolR0(v: u32) -> ResiduoB {
   if (l.x == 0u) { red[R_PA + w.x] = a; }
   let b = reducirMax(l.x, vmax);
   if (l.x == 0u) { red[R_PB + w.x] = b; }
+  let c = reducirSuma(l.x, proyectado);
+  if (l.x == 0u) { red[R_PC + w.x] = c; }
 }
 
 @compute @workgroup_size(1) fn cerrarCuadro() {
   var s = 0.0;
   var mx = 0.0;
+  var proyectados = 0.0;
   for (var k = 0u; k < GV; k++) {
     s += red[R_PA + k];
     mx = max(mx, red[R_PB + k]);
+    proyectados += red[R_PC + k];
   }
+  red[R_SC + E_PROYECTADOS] = proyectados;
   let q = s / MGH;
   red[R_SC + E_QUIETUD] = q;
   red[R_SC + E_QMAX] = mx / (abs(GRAV) * H);

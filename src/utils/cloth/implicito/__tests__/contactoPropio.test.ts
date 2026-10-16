@@ -173,6 +173,19 @@ describe('la tela contra sí misma', () => {
     expect(masBajo).toBeGreaterThan(sepTela - 0.0005);
   });
 
+  it('dos capas que se acercan forman par activo antes de tocarse, por la velocidad del cuadro anterior', () => {
+    // la de arriba 2 mm más allá de la separación y bajando 5 mm por cuadro
+    const abajo = mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), arriba = mallaDeContorno(rectangulo(-45, -45, 45, 45), 10, sepTela + 0.002);
+    const nAbajo = abajo.x.length / 3;
+    const s = new SistemaTela(armarPrenda([{ id: 'abajo', ...abajo }, { id: 'arriba', ...arriba }]).malla, TELA_DE_LABORATORIO);
+    for (let i = nAbajo; i < s.n; i++) s.v[3 * i + 1] = -0.3;
+    s.xt.set(s.x);
+    s.armarParesPropios();
+    const activos = s.paresPropios.filter((p) => p.activo);
+    expect(activos.length).toBeGreaterThan(0);
+    expect(activos.every((p) => p.p0 < 0)).toBe(true);
+  });
+
   it('las puntas del cuerpo frenan con la fricción de la tela contra el cuerpo', () => {
     const cuerpo = new CuerpoRigido(buildLinearBVH(piramideDeColision(0.3, 0.1)));
     const m = mallaDeContorno(rectangulo(-60, -60, 60, 60), 20);

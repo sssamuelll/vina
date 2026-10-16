@@ -4,7 +4,7 @@
  *   G(x) = ½·|x − y|²_M / h² + ½·aire·|x − x_t|²_M / h + E(x) + contacto,  con y = x_t + h·v_t + h²·g.
  */
 import { ALCANCE_MAXIMO, energiaDelPar, RejillaDePuntos, separacionPropia, type ParPropio } from './contactoPropio';
-import { energiaDePlano, rigidezDeFriccion, type PlanoDeContacto } from './contactos';
+import { energiaDeFriccion, HOLGURA_DE_APOYO, rigidezDeFriccion, VELOCIDAD_DE_DESPEGUE, type ApoyoEnCuerpo } from './contactos';
 import { Costuras, MUESTRAS_DE_PUNTADA, type BisagraDeCostura, type PuntoDeCostura } from './costuras';
 import { puntoMasCercano, type CuerpoRigido, type PuntoEnTriangulo } from './cuerpo';
 import { aMarcoDelHilo, type MallaDeTela } from './malla';
@@ -22,9 +22,12 @@ export interface AjustesImplicito {
   gravedad: number;
   /** amortiguamiento del aire, proporcional a la masa (1/s) */
   aire: number;
-  /** rigidez del contacto con los obstáculos (N/m) */
+  /**
+   * rigidez de los pares de una punta del cuerpo contra un triángulo de tela (N/m), lo que la malla de la tela no ve; el
+   * vértice de tela apoyado en el cuerpo no lleva resorte: es un piso duro (E10, contactos.ts)
+   */
   kContacto: number;
-  /** rigidez de los pares del contacto propio, la tela con la tela y las puntas del cuerpo (N/m); sin ella, kContacto */
+  /** rigidez de los pares entre capas de tela (N/m); sin ella, kContacto */
   kPropio?: number;
   /**
    * rigidez de cada punto de costura (N/m). Con 1000, una costura que sostiene 1 N/m de tela con puntos cada
@@ -49,8 +52,6 @@ export interface AjustesImplicito {
   maxCG: number;
   /** tolerancia relativa: se para cuando rᵀz ≤ tolCG²·r0ᵀz0 */
   tolCG: number;
-  /** agrega los contactos que el paso va a crear y resuelve otra vez (§4.2.1, paso 4) */
-  anticipar: boolean;
   /** búsqueda en línea sobre G (§4.2.1, paso 5) */
   busqueda: boolean;
 }
@@ -67,7 +68,6 @@ export const AJUSTES_IMPLICITO: AjustesImplicito = {
   contactoPropio: true,
   maxCG: 50,
   tolCG: 1e-4,
-  anticipar: true,
   busqueda: true,
 };
 
@@ -109,9 +109,14 @@ export class SistemaTela {
    * la que mide la quietud, porque una tela trabada (α = 0) no se mueve pero sigue pidiendo moverse
    */
   readonly vPedida: Float64Array;
-  /** los planos de contacto del cuadro en curso (E4): los de x_t y los anticipados */
-  contactos: PlanoDeContacto[] = [];
-  private readonly enContacto: Uint8Array;
+  /** los vértices apoyados en el cuerpo en el cuadro en curso (E10) */
+  apoyos: ApoyoEnCuerpo[] = [];
+  /**
+   * por vértice, la fuerza (N) con que el cuerpo lo sostuvo el último cuadro: la de su restricción, o la que lo frenó al
+   * proyectarlo; negativa si la restricción jalaba hacia el cuerpo (entonces se suelta). Decide la fricción del cuadro
+   * siguiente.
+   */
+  readonly fuerzaDeApoyo: Float64Array;
   /** separación entre dos capas de la tela (m) */
   readonly sepPropia: number;
   /** los pares del contacto propio del cuadro en curso: candidatos y activos (contactoPropio.ts) */
@@ -155,7 +160,7 @@ export class SistemaTela {
     this.xt = Float64Array.from(malla.x);
     this.v = new Float64Array(3 * this.n);
     this.vPedida = new Float64Array(3 * this.n);
-    this.enContacto = new Uint8Array(this.n);
+    this.fuerzaDeApoyo = new Float64Array(this.n);
     this.sepPropia = separacionPropia(this.tela.grosor);
     // la arista media del patrón: con dos separaciones y el radio de búsqueda, decide la celda de la rejilla
     let largo = 0;
@@ -203,13 +208,12 @@ export class SistemaTela {
     return E;
   }
 
-  /** Los planos del cuadro en x, de un solo lado, con su fricción (contactos.ts). */
+  /** La fricción de los apoyos del cuadro y los pares del contacto propio, en x (contactos.ts y contactoPropio.ts). */
   energiaContactos(x: Float64Array): number {
-    const kc = this.aj.kContacto;
     let E = 0;
-    for (const c of this.contactos) {
+    for (const c of this.apoyos) {
       const q = 3 * c.i;
-      E += energiaDePlano(c, kc, x[q] - this.xt[q], x[q + 1] - this.xt[q + 1], x[q + 2] - this.xt[q + 2]);
+      E += energiaDeFriccion(c, x[q] - this.xt[q], x[q + 1] - this.xt[q + 1], x[q + 2] - this.xt[q + 2]);
     }
     for (const par of this.paresPropios) if (par.activo) E += energiaDelPar(par, par.k, x, this.xt);
     return E;
@@ -290,24 +294,77 @@ export class SistemaTela {
   }
 
   /**
-   * Los planos de los vértices libres a menos de la separación de un obstáculo en x_t (§4.2.1, E4), con la
-   * fricción de la normal λ = kc·p0 y la velocidad tangencial del cuadro anterior.
+   * Los vértices apoyados en el cuerpo en x_t (E10): libres y sin coser, a menos de la separación más la holgura, sin
+   * irse hacia afuera y sin que el cuadro anterior los jalara hacia el cuerpo. La fricción usa la fuerza de apoyo del
+   * cuadro anterior, nunca menos que el peso que el vértice carga sobre el cuerpo (el primer cuadro apoyado no tiene
+   * otra), y la velocidad tangencial del cuadro anterior.
    */
-  armarContactos(): void {
-    this.contactos = [];
-    this.enContacto.fill(0);
-    const { kContacto, h } = this.aj, mu = this.tela.friccionCuerpo;
+  armarApoyos(): void {
+    this.apoyos = [];
+    const { h, gravedad } = this.aj, mu = this.tela.friccionCuerpo;
     for (let i = 0; i < this.n; i++) {
-      if (this.fijo[i]) continue;
+      if (this.fijo[i] || this.costuras.cosidoV(i) || this.fuerzaDeApoyo[i] < 0) continue;
       const q = 3 * i;
       const c = masCercano(this.obstaculos, this.x[q], this.x[q + 1], this.x[q + 2], RADIO_DE_BUSQUEDA);
-      if (c === null || this.sep - c.d <= 0) continue;
-      const p0 = this.sep - c.d;
+      if (c === null || c.d >= this.sep + HOLGURA_DE_APOYO) continue;
       const vn = c.nx * this.v[q] + c.ny * this.v[q + 1] + c.nz * this.v[q + 2];
+      if (vn > VELOCIDAD_DE_DESPEGUE) continue;
       const vt = Math.hypot(this.v[q] - vn * c.nx, this.v[q + 1] - vn * c.ny, this.v[q + 2] - vn * c.nz);
-      this.contactos.push({ i, nx: c.nx, ny: c.ny, nz: c.nz, p0, kt: rigidezDeFriccion(mu, kContacto * p0, vt, h) });
-      this.enContacto[i] = 1;
+      const lambda = Math.max(this.fuerzaDeApoyo[i], -this.masa[i] * gravedad * c.ny);
+      this.apoyos.push({ i, nx: c.nx, ny: c.ny, nz: c.nz, kt: rigidezDeFriccion(mu, lambda, vt, h) });
     }
+  }
+
+  /** Quita a v la componente normal de cada apoyo: el vértice apoyado no se mueve en la normal del cuerpo (E10). */
+  filtrar(v: Float64Array): void {
+    for (const c of this.apoyos) {
+      const q = 3 * c.i, vn = c.nx * v[q] + c.ny * v[q + 1] + c.nz * v[q + 2];
+      v[q] -= vn * c.nx;
+      v[q + 1] -= vn * c.ny;
+      v[q + 2] -= vn * c.nz;
+    }
+  }
+
+  /** out[k] = n·v del apoyo k. */
+  normalesDeApoyo(v: Float64Array, out: Float64Array): void {
+    this.apoyos.forEach((c, k) => (out[k] = c.nx * v[3 * c.i] + c.ny * v[3 * c.i + 1] + c.nz * v[3 * c.i + 2]));
+  }
+
+  /**
+   * La fuerza de cada apoyo es −n·r, con r el residuo sin filtrar al terminar el gradiente conjugado: lo que la
+   * restricción tuvo que poner para que el vértice no se moviera en la normal. Los demás vértices quedan en 0.
+   */
+  guardarFuerzasDeApoyo(rn: Float64Array): void {
+    this.fuerzaDeApoyo.fill(0);
+    this.apoyos.forEach((c, k) => (this.fuerzaDeApoyo[c.i] = -rn[k]));
+  }
+
+  /**
+   * Al terminar el paso (E10): el vértice libre y sin coser que quedó a menos de la separación de un obstáculo vuelve a
+   * ella por la normal, sin velocidad hacia adentro; su fuerza de apoyo es la que lo frenó en el cuadro. Devuelve cuántos.
+   */
+  proyectar(): number {
+    const { h } = this.aj;
+    let proyectados = 0;
+    for (let i = 0; i < this.n; i++) {
+      if (this.fijo[i] || this.costuras.cosidoV(i)) continue;
+      const q = 3 * i;
+      const c = masCercano(this.obstaculos, this.x[q], this.x[q + 1], this.x[q + 2], RADIO_DE_BUSQUEDA);
+      if (c === null || c.d >= this.sep) continue;
+      const p = this.sep - c.d;
+      this.x[q] += p * c.nx;
+      this.x[q + 1] += p * c.ny;
+      this.x[q + 2] += p * c.nz;
+      const vn = c.nx * this.v[q] + c.ny * this.v[q + 1] + c.nz * this.v[q + 2];
+      if (vn < 0) {
+        this.v[q] -= vn * c.nx;
+        this.v[q + 1] -= vn * c.ny;
+        this.v[q + 2] -= vn * c.nz;
+        this.fuerzaDeApoyo[i] = Math.max(this.fuerzaDeApoyo[i], (this.masa[i] * -vn) / h);
+      }
+      proyectados++;
+    }
+    return proyectados;
   }
 
   /**
@@ -315,7 +372,8 @@ export class SistemaTela {
    * que caen en su caja agrandada por el radio de búsqueda. Un vértice libre de tela entra si cae sobre la cara a menos
    * del radio (salvo los vértices del triángulo y sus compañeros de costura); un vértice del cuerpo, si atravesó la
    * tela por la cara o la sostenía el cuadro anterior. Entra activo el que ya está dentro de la separación, con su
-   * fricción.
+   * fricción, y el par de dos capas que la velocidad del cuadro anterior metería en la separación en dos cuadros (E10:
+   * sin segunda ronda, la predicción reemplaza a la anticipación).
    */
   armarParesPropios(): void {
     this.paresPropios = [];
@@ -327,20 +385,18 @@ export class SistemaTela {
     this.puntos.set(x);
     // la celda mide al menos el radio: la caja de un triángulo toca a lo sumo cinco celdas por eje
     this.rejilla.armar(this.puntos, Math.max(2 * sep, this.aristaMedia, radio));
-    const agregar = (vs: number[], ws: number[], nx: number, ny: number, nz: number, s0: number, separacionDelPar: number, mu: number, k: number) => {
+    const agregar = (vs: number[], ws: number[], nx: number, ny: number, nz: number, s0: number, separacionDelPar: number, mu: number, k: number, predecir: boolean) => {
       const p0 = separacionDelPar - s0;
-      let kt = 0;
-      if (p0 > 0) {
-        let vx = 0, vy = 0, vz = 0;
-        for (let k = 0; k < vs.length; k++) {
-          vx += ws[k] * v[3 * vs[k]];
-          vy += ws[k] * v[3 * vs[k] + 1];
-          vz += ws[k] * v[3 * vs[k] + 2];
-        }
-        const vn = vx * nx + vy * ny + vz * nz;
-        kt = rigidezDeFriccion(mu, k * p0, Math.hypot(vx - vn * nx, vy - vn * ny, vz - vn * nz), h);
+      let vx = 0, vy = 0, vz = 0;
+      for (let q = 0; q < vs.length; q++) {
+        vx += ws[q] * v[3 * vs[q]];
+        vy += ws[q] * v[3 * vs[q] + 1];
+        vz += ws[q] * v[3 * vs[q] + 2];
       }
-      this.paresPropios.push({ v: vs, w: ws, nx, ny, nz, p0, k, kt, activo: p0 > 0 });
+      // vn: cuánto crece la separación por segundo
+      const vn = vx * nx + vy * ny + vz * nz;
+      const kt = p0 > 0 ? rigidezDeFriccion(mu, k * p0, Math.hypot(vx - vn * nx, vy - vn * ny, vz - vn * nz), h) : 0;
+      this.paresPropios.push({ v: vs, w: ws, nx, ny, nz, p0, k, kt, activo: p0 > 0 || (predecir && p0 - 2 * h * vn > 0) });
     };
     const ahora = this.cuerpos.map((c) => new Uint8Array(c.vertices.length / 3));
     for (let t = 0; t < tris.length / 3; t++) {
@@ -369,7 +425,7 @@ export class SistemaTela {
             puntoMasCercano(px, py, pz, ax, ay, az, bx, by, bz, cx, cy, cz, q);
             const ex = px - q.x, ey = py - q.y, ez = pz - q.z, d = Math.hypot(ex, ey, ez);
             if (d >= radio || d < 1e-9 || !sobreLaCara(ex, ey, ez)) return;
-            agregar([p, a, b, c], [1, -q.wa, -q.wb, -q.wc], ex / d, ey / d, ez / d, d, sep, this.tela.friccionTela, kp);
+            agregar([p, a, b, c], [1, -q.wa, -q.wb, -q.wc], ex / d, ey / d, ez / d, d, sep, this.tela.friccionTela, kp, true);
             return;
           }
           if (!libres) return;
@@ -390,61 +446,21 @@ export class SistemaTela {
           const s0 = nx * (q.x - yx) + ny * (q.y - yy) + nz * (q.z - yz);
           if (!(s0 < 0 || (this.sostiene[k][j] && s0 < this.sep))) return;
           ahora[k][j] = 1;
-          // tela contra cuerpo: la fricción del cuerpo (§4.3.1)
-          agregar([a, b, c], [q.wa, q.wb, q.wc], nx, ny, nz, s0, this.sep, this.tela.friccionCuerpo, kContacto);
+          // tela contra cuerpo: la fricción del cuerpo (§4.3.1); la punta no se predice (R13)
+          agregar([a, b, c], [q.wa, q.wb, q.wc], nx, ny, nz, s0, this.sep, this.tela.friccionCuerpo, kContacto, false);
         },
       );
     }
     this.sostiene = ahora;
   }
 
-  /**
-   * Los vértices que el paso dx metería en un obstáculo entran con el plano tangente en el punto adonde iban
-   * (§4.2.1, paso 4). Su fricción usa la normal que frena en un cuadro la penetración que el paso traía,
-   * λ = m·p/h²: sin ella, la tela que llega a un plano inclinado resbalaba sin fricción el primer cuadro.
-   * Activa también los pares del contacto propio que el paso iba a cruzar. Devuelve cuántos.
-   */
-  anticiparContactos(dx: Float64Array): number {
-    let nuevos = 0;
-    const { h } = this.aj, mu = this.tela.friccionCuerpo;
-    for (let i = 0; i < this.n; i++) {
-      if (this.fijo[i] || this.enContacto[i]) continue;
-      const q = 3 * i;
-      const c = masCercano(this.obstaculos, this.x[q] + dx[q], this.x[q + 1] + dx[q + 1], this.x[q + 2] + dx[q + 2], RADIO_DE_BUSQUEDA);
-      if (c === null || this.sep - c.d <= 0) continue;
-      // la penetración en x_t respecto del plano tangente en el punto adonde iba: sep − d + n·dx
-      const p0 = this.sep - c.d + (c.nx * dx[q] + c.ny * dx[q + 1] + c.nz * dx[q + 2]);
-      const lambda = (this.masa[i] * (this.sep - c.d)) / (h * h);
-      const vn = c.nx * this.v[q] + c.ny * this.v[q + 1] + c.nz * this.v[q + 2];
-      const vt = Math.hypot(this.v[q] - vn * c.nx, this.v[q + 1] - vn * c.ny, this.v[q + 2] - vn * c.nz);
-      this.contactos.push({ i, nx: c.nx, ny: c.ny, nz: c.nz, p0, kt: rigidezDeFriccion(mu, lambda, vt, h) });
-      this.enContacto[i] = 1;
-      nuevos++;
-    }
-    // los pares que el paso cruzaría, medidos sobre su plano fijo: también el que pasaría de un lado al otro
-    for (const par of this.paresPropios) {
-      if (par.activo) continue;
-      let un = 0;
-      for (let k = 0; k < par.v.length; k++) {
-        const q = 3 * par.v[k];
-        un += par.w[k] * (par.nx * dx[q] + par.ny * dx[q + 1] + par.nz * dx[q + 2]);
-      }
-      if (par.p0 - un > 0) {
-        par.activo = true;
-        nuevos++;
-      }
-    }
-    return nuevos;
-  }
-
-  /** out += H·p de los planos del cuadro: kc·n·nᵀ + kt·(I − n·nᵀ). */
+  /** out += H·p de la fricción de los apoyos, kt·(I − n·nᵀ), y de los pares activos. */
   sumarContactosPor(p: Float64Array, out: Float64Array): void {
-    const kc = this.aj.kContacto;
-    for (const c of this.contactos) {
+    for (const c of this.apoyos) {
       const q = 3 * c.i, pn = c.nx * p[q] + c.ny * p[q + 1] + c.nz * p[q + 2];
-      out[q] += kc * pn * c.nx + c.kt * (p[q] - pn * c.nx);
-      out[q + 1] += kc * pn * c.ny + c.kt * (p[q + 1] - pn * c.ny);
-      out[q + 2] += kc * pn * c.nz + c.kt * (p[q + 2] - pn * c.nz);
+      out[q] += c.kt * (p[q] - pn * c.nx);
+      out[q + 1] += c.kt * (p[q + 1] - pn * c.ny);
+      out[q + 2] += c.kt * (p[q + 2] - pn * c.nz);
     }
     for (const par of this.paresPropios) {
       if (!par.activo) continue;
@@ -466,12 +482,11 @@ export class SistemaTela {
     }
   }
 
-  /** B[9i..9i+8] += el bloque de cada plano del cuadro. */
+  /** B[9i..9i+8] += el bloque de la fricción de cada apoyo y de cada par activo. */
   sumarBloquesDeContacto(B: Float64Array): void {
-    const kc = this.aj.kContacto;
-    for (const c of this.contactos) {
+    for (const c of this.apoyos) {
       const n = [c.nx, c.ny, c.nz], o = 9 * c.i;
-      for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) B[o + 3 * a + b] += (kc - c.kt) * n[a] * n[b] + (a === b ? c.kt : 0);
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) B[o + 3 * a + b] += -c.kt * n[a] * n[b] + (a === b ? c.kt : 0);
     }
     for (const par of this.paresPropios) {
       if (!par.activo) continue;
@@ -484,13 +499,13 @@ export class SistemaTela {
   }
 
   /**
-   * out = −∇G en las posiciones actuales, con cada plano del cuadro de dos lados, ½·kc·(p0 − n·u)², y su
-   * fricción, ½·kt·|u − (n·u)·n|², con u = x − x_t: en la solución el plano no suelta (E4); en la búsqueda en
-   * línea, sí. Los empotrados quedan en cero. Pide `linealizar` y `armarContactos` antes.
+   * out = −∇G en las posiciones actuales, con la fricción de cada apoyo, ½·kt·|u − (n·u)·n|², y cada par activo, con
+   * u = x − x_t (la normal de un apoyo no lleva energía: la fija su restricción, E10). Los empotrados quedan en cero.
+   * Pide `linealizar`, `armarApoyos` y `armarParesPropios` antes.
    */
   residuo(out: Float64Array): void {
     this.gradienteElastico(out);
-    const { h, aire, kContacto: kc } = this.aj;
+    const { h, aire } = this.aj;
     for (let i = 0; i < this.n; i++) {
       const m = this.masa[i];
       for (let d = 0; d < 3; d++) {
@@ -498,13 +513,13 @@ export class SistemaTela {
         out[q] = -(out[q] + (m / (h * h)) * (this.x[q] - this.prediccion(i, d)) + ((aire * m) / h) * (this.x[q] - this.xt[q]));
       }
     }
-    for (const c of this.contactos) {
+    for (const c of this.apoyos) {
       const q = 3 * c.i;
       const ux = this.x[q] - this.xt[q], uy = this.x[q + 1] - this.xt[q + 1], uz = this.x[q + 2] - this.xt[q + 2];
-      const un = c.nx * ux + c.ny * uy + c.nz * uz, f = kc * (c.p0 - un);
-      out[q] += f * c.nx - c.kt * (ux - un * c.nx);
-      out[q + 1] += f * c.ny - c.kt * (uy - un * c.ny);
-      out[q + 2] += f * c.nz - c.kt * (uz - un * c.nz);
+      const un = c.nx * ux + c.ny * uy + c.nz * uz;
+      out[q] -= c.kt * (ux - un * c.nx);
+      out[q + 1] -= c.kt * (uy - un * c.ny);
+      out[q + 2] -= c.kt * (uz - un * c.nz);
     }
     for (const par of this.paresPropios) {
       if (!par.activo) continue;
