@@ -30,7 +30,7 @@
 - Un solo cuerpo en la GPU; con dos, `empaquetar` se niega con un error explícito.
 - Paridad: menos de 0,1 mm de diferencia máxima entre CPU y GPU tras 3 cuadros, en escenas chicas (§2).
 - La camiseta (§2): menos de 0,1 % de triángulos con menos de la mitad del área de su patrón; costuras con separación mediana 0 mm y máxima 1 mm; quieta sola en 10 s de tela o menos; 17 ms por cuadro o menos en la GTX 980.
-- La referencia del simulador comercial no entra al repo: ni su nombre, ni sus números, ni los nombres de su avatar, ni sus formas, en código, pruebas, commits, PR o issues. Sus archivos y lo que se mide sobre ellos viven en `VINA_REFERENCIAS` (`D:\Desktop\work\vina-referencias`).
+- La referencia del simulador comercial no entra al repo: ni su nombre, ni sus números, ni los nombres de su avatar, ni sus formas, en código, pruebas, commits, PR o issues. Sus archivos y lo que se mide sobre ellos viven en la carpeta privada `VINA_REFERENCIAS`.
 - Ningún número inventado: cada constante nueva cita de dónde sale.
 - Lo pesado corre con `node scripts/pesado.mjs` (`npm run test` y `npm run bench:tela` ya lo piden solos). Nunca `--sin-admision` ni `VINA_PESADO_OMITIR`. Una prueba suelta y una sola spec de Playwright no piden candado.
 - Gate por tarea: `npx tsc -b --noEmit`, `npx vitest run src/utils/cloth` y `npm run lint`, más el hook de pre-commit (como R8 de la parte 1). La suite entera (`npm run test`) y `npm run lint:ui` corren en la Tarea 10, antes de subir la rama.
@@ -679,7 +679,7 @@ Expected: PASS. Las de la parte 1 (dos láminas, la costura que cierra con conta
 
 - [ ] **Step 6: Mide que la física no cambió en el banco**
 
-Run: `VINA_REFERENCIAS=/d/Desktop/work/vina-referencias npm run bench:tela -- --ensayo=cusick`
+Run: `VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- --ensayo=cusick`
 Expected: Cusick a 5, 10 y 20 mm a menos de 0,3 puntos del informe del 14-10 (`…09-34-46-implicito.json`), 0 % aplastados y §2 en verde. Anota en el registro los ms por cuadro de antes (180 a 5 mm) y de ahora.
 
 - [ ] **Step 7: Gate y commit**
@@ -1386,7 +1386,7 @@ Corre una vez `node -e` sobre las tres asentadas: cuántos vértices traen dos c
 
 - [ ] **Step 13: Corre la camiseta a 20 y 10 mm**
 
-Run: `VINA_REFERENCIAS=/d/Desktop/work/vina-referencias npm run bench:tela -- --ensayo=camiseta --mallas=20,10`
+Run: `VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- --ensayo=camiseta --mallas=20,10`
 Expected: la colocación a menos de 0,5 mm en cada pieza; el informe en `$VINA_REFERENCIAS/informes/`. Y luego con la flexión del margen sin multiplicar: `… --ensayo=camiseta --mallas=10 --flexionDelMargen=1`.
 
 - [ ] **Step 14: El punto de decisión**
@@ -2960,7 +2960,7 @@ La prueba guarda el informe antes de verificar: si algo no pasa, las medidas que
 
 - [ ] **Step 2: Mírala fallar**
 
-Run: `VINA_REFERENCIAS=/d/Desktop/work/vina-referencias VINA_E2E_PORT=5193 npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g camiseta`
+Run: `VINA_REFERENCIAS=<carpeta privada> VINA_E2E_PORT=5193 npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g camiseta`
 Expected: FAIL: el harness no conoce la escena `camiseta`.
 
 - [ ] **Step 3: La camiseta en el harness**
@@ -3024,7 +3024,7 @@ El encabezado del harness suma `camiseta` (con `malla`) a las escenas y `camiset
 
 - [ ] **Step 4: Corre la camiseta**
 
-Run: `VINA_REFERENCIAS=/d/Desktop/work/vina-referencias VINA_E2E_PORT=5193 npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g camiseta`
+Run: `VINA_REFERENCIAS=<carpeta privada> VINA_E2E_PORT=5193 npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts -g camiseta`
 Expected: el informe en `$VINA_REFERENCIAS/informes/…-camiseta-gpu.json`. La prueba pasa si la camiseta cumple §2. Si algo de §2 no pasa, el resultado se anota igual y se sigue la regla de la Coordinación:
 - Lo que la CPU (Tarea 3) sí cumple y la GPU no es un error de la GPU: la paridad de 3 cuadros de la camiseta dice dónde mirar, porque los vértices más lejanos ubican la pieza de física.
 - Lo que tampoco cumple la CPU ya estaba en la decisión de la Tarea 3.
@@ -3032,7 +3032,7 @@ Expected: el informe en `$VINA_REFERENCIAS/informes/…-camiseta-gpu.json`. La p
 
 - [ ] **Step 5: La CPU a 5 mm, como contraste**
 
-Run: `VINA_REFERENCIAS=/d/Desktop/work/vina-referencias npm run bench:tela -- --ensayo=camiseta --mallas=5`
+Run: `VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- --ensayo=camiseta --mallas=5`
 Expected: unos 15-20 min con el candado. Compara en el registro sus medidas con las de la GPU: aplastados, costuras, quietud, distancia al cuerpo y a la asentada de la referencia. No tienen que dar lo mismo cuadro a cuadro tras cientos de cuadros, pero la forma asentada sí debe parecerse: distancia mediana entre las dos de pocos mm.
 
 - [ ] **Step 6: Gate y commit**
@@ -3061,7 +3061,7 @@ verifica §2. Sin la carpeta privada se salta."
 Run: `npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui`
 Expected: PASS. Si `lint:ui` dice que bajó un contador (el R3 venía bajando a 496), fija el techo con `node scripts/ui-contract-lint.mjs --update` y commitea `scripts/ui-contract-baseline.json` solo: `chore(ui): el techo de colores literales baja a 496`.
 
-Run: `VINA_REFERENCIAS=/d/Desktop/work/vina-referencias VINA_E2E_PORT=5193 npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts`
+Run: `VINA_REFERENCIAS=<carpeta privada> VINA_E2E_PORT=5193 npx playwright test --config playwright.webgpu.config.ts tests/e2e/tela-implicita.spec.ts`
 Expected: PASS entera, la camiseta incluida, o con su resultado anotado según la Tarea 9.
 
 - [ ] **Step 2: El ensayo del deploy**

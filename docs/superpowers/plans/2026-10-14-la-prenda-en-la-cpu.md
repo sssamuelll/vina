@@ -2643,7 +2643,7 @@ git add src/utils/cloth/implicito/contactos.ts src/utils/cloth/implicito/tela.ts
 git commit -m "feat(tela): el contacto es un plano con la misma energía en la solución y en la búsqueda en línea, con fricción"
 ```
 
-**El controlador, al cerrar la Tarea 8:** corre el banco privado contra la referencia (`VINA_REFERENCIAS=/d/Desktop/work/vina-referencias npm run bench:tela -- --motor=implicito`) y lo compara con el informe de #1257 (disco Cusick 24,2 / 26,8 / 27,9 con 0 % aplastados; quieto en 3,6 a 8,2 s; voladizo 5,3° de cambio entre mallas). Con la fricción el disco puede caer distinto sobre el pedestal; lo que no puede es aplastarse, trabarse ni dejar de quedarse quieto. Si algo de eso empeora, para ahí y lo lleva a Samuel con los dos informes.
+**El controlador, al cerrar la Tarea 8:** corre el banco privado contra la referencia (`VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- --motor=implicito`) y lo compara con el informe de #1257 (disco Cusick 24,2 / 26,8 / 27,9 con 0 % aplastados; quieto en 3,6 a 8,2 s; voladizo 5,3° de cambio entre mallas). Con la fricción el disco puede caer distinto sobre el pedestal; lo que no puede es aplastarse, trabarse ni dejar de quedarse quieto. Si algo de eso empeora, para ahí y lo lleva a Samuel con los dos informes.
 
 ### Tarea 9: La tela contra sí misma (E3)
 
@@ -3114,5 +3114,5 @@ git commit -m "feat(tela): la tela contra sí misma y las puntas del cuerpo cont
 **Files:** ninguno nuevo.
 
 - [ ] **Step 1:** `npx tsc -b --noEmit && npm run test && npm run lint && npm run lint:ui` en `feat/tela-prenda-completa`, con `fix/uniones-de-costura` ya mergeada en ella.
-- [ ] **Step 2:** El banco privado, como al cerrar la Tarea 8, con el contacto propio encendido: `VINA_REFERENCIAS=/d/Desktop/work/vina-referencias npm run bench:tela -- --motor=implicito`. Anota la tabla.
+- [ ] **Step 2:** El banco privado, como al cerrar la Tarea 8, con el contacto propio encendido: `VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- --motor=implicito`. Anota la tabla.
 - [ ] **Step 3:** El informe para Samuel: qué quedó hecho, las medidas de cada punto de decisión (el resorte de costura de la Tarea 4, las razones de energía de la Tarea 5, la esfera y el plano inclinado de la Tarea 8, el banco) y lo que pasa a la parte 2. La rama no se sube sola: va con la parte 2, que lleva todo esto a la GPU y compara la camiseta contra la referencia.
