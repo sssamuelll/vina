@@ -155,3 +155,94 @@ describe('las costuras', () => {
     expect(aplastados(s.x, prenda.malla)).toBeGreaterThan(0);
   });
 });
+
+describe('la puntada (E8)', () => {
+  it('se cose el vértice que no depende de otro punto ni sostiene a otro, y cuyos dos vértices del otro lado no están cosidos', () => {
+    const puntos: PuntoDeCostura[] = [
+      { a: 0, b0: 4, b1: 5, s: 0.5 },
+      { a: 1, b0: 5, b1: 6, s: 0.5 },
+      // un vértice de B entre dos de A: sostiene a 0 y a 1
+      { a: 5, b0: 0, b1: 1, s: 0.5 },
+      // su lado del otro lado ya está cosido a B
+      { a: 7, b0: 1, b1: 8, s: 0.5 },
+      // 0 ya depende de un punto
+      { a: 0, b0: 9, b1: 9, s: 0 },
+      // 4 sostiene a 0
+      { a: 4, b0: 10, b1: 11, s: 0.5 },
+      { a: 12, b0: 13, b1: 13, s: 0 },
+    ];
+    const c = new Costuras(puntos, new Float64Array(3 * 14), 1000, 0.005);
+    expect(Array.from(c.soldable)).toEqual([1, 1, 0, 0, 0, 0, 1]);
+  });
+
+  it('a menos de cinco cuadros de cierre se cose, y el desfase baja con la ley de E7 hasta 0', () => {
+    // el vértice 0 a 20 mm de su punto (el 1); el 2 a 30 mm del 3
+    const x = Float64Array.from([0, 0, 0, 0.02, 0, 0, 0, 0, 0, 0.03, 0, 0]);
+    const c = new Costuras([{ a: 0, b0: 1, b1: 1, s: 0 }, { a: 2, b0: 3, b1: 3, s: 0 }], x, 1000, 0.005);
+    c.coser(x);
+    expect(Array.from(c.cosido)).toEqual([1, 0]);
+    for (const esperado of [0.005, 0.01]) {
+      c.avanzarPuntadas(x);
+      expect(x[0]).toBeCloseTo(esperado, 12);
+    }
+    // a 10 mm, el cierre de hoy baja menos que el tope
+    c.avanzarPuntadas(x);
+    expect(x[0]).toBeCloseTo(0.02 - 0.01 * CIERRE_POR_CUADRO, 12);
+    for (let k = 0; k < 60; k++) c.avanzarPuntadas(x);
+    expect(x[0]).toBe(0.02);
+    // el que no se cosió no se mueve
+    expect(x[6]).toBe(0);
+  });
+
+  it('no se cose a través de un obstáculo: con el tramo hasta su punto por dentro de él, sigue el resorte', () => {
+    // la orilla de A sobre el piso y la de B, cosida a ella, 20 mm por debajo: el tramo que las une entra en el piso
+    const A = mallaDeContorno(rectangulo(0, 0, 100, 60), 10), B = mallaDeContorno(rectangulo(0, 0, 100, 60), 10);
+    const prenda = armarPrenda([
+      { id: 'A', x: Float64Array.from(A.x, (q, k) => (k % 3 === 1 ? q + 0.005 : q)), patron: A.patron, tris: A.tris },
+      { id: 'B', x: Float64Array.from(B.x, (q, k) => (k % 3 === 0 ? q + 0.1 : k % 3 === 1 ? q - 0.015 : q)), patron: B.patron, tris: B.tris },
+    ]);
+    const puntos = puntosDeCostura(prenda.malla.patron, borde(A, 0.1), borde(B, 0, A.x.length / 3));
+    const s = new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { costuras: { puntos }, obstaculos: [{ tipo: 'plano', altura: 0 }], ajustes: { gravedad: 0 } });
+    s.alTerminarCuadro();
+    expect(Array.from(s.costuras.cosido).some((c) => c === 1)).toBe(false);
+    // sin el piso, las mismas orillas se cosen
+    const libre = new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { costuras: { puntos }, ajustes: { gravedad: 0 } });
+    libre.alTerminarCuadro();
+    expect(Array.from(libre.costuras.cosido).some((c) => c === 1)).toBe(true);
+  });
+
+  it('lo que empuja a un vértice cosido lo cargan sus dos vértices del otro lado: restringir es la traspuesta de expandir', () => {
+    const r = azar(43);
+    const puntos: PuntoDeCostura[] = [{ a: 0, b0: 2, b1: 3, s: 0.3 }, { a: 1, b0: 3, b1: 4, s: 0.8 }];
+    const c = new Costuras(puntos, new Float64Array(3 * 5), 1000, 0.005);
+    c.coser(new Float64Array(3 * 5));
+    const u = Float64Array.from({ length: 15 }, (_, k) => (k < 6 ? 0 : r()));
+    const v = Float64Array.from({ length: 15 }, () => r());
+    const Pu = Float64Array.from(u), Ptv = Float64Array.from(v);
+    c.expandir(Pu);
+    c.restringir(Ptv);
+    let izq = 0, der = 0;
+    for (let k = 0; k < 15; k++) {
+      izq += Pu[k] * v[k];
+      der += u[k] * Ptv[k];
+    }
+    expect(izq).toBeCloseTo(der, 12);
+    expect(Array.from(Ptv.subarray(0, 6))).toEqual([0, 0, 0, 0, 0, 0]);
+  });
+
+  it('cosida, la costura no cede: la pieza que cuelga de ella no la abre aunque el resorte sea blando', () => {
+    // A empotrada por su orilla x = 0 y B a continuación, desde x = 100 mm: B cuelga de la costura
+    const A = mallaDeContorno(rectangulo(0, 0, 100, 60), 10), B = mallaDeContorno(rectangulo(0, 0, 100, 60), 10);
+    const prenda = armarPrenda([
+      { id: 'A', x: A.x, patron: A.patron, tris: A.tris },
+      { id: 'B', x: Float64Array.from(B.x, (q, k) => (k % 3 === 0 ? q + 0.1 : q)), patron: B.patron, tris: B.tris },
+    ]);
+    const n = prenda.malla.x.length / 3;
+    prenda.malla.fijos = Uint8Array.from({ length: n }, (_, i) => (prenda.malla.x[3 * i] <= 1e-9 ? 1 : 0));
+    const puntos = puntosDeCostura(prenda.malla.patron, borde(A, 0.1), borde(B, 0, A.x.length / 3));
+    // con 1 N/m, el peso de B abre la costura más de un milímetro
+    const s = new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { costuras: { puntos }, ajustes: { kCostura: 1 } });
+    for (let c = 0; c < 30; c++) pasoImplicito(s);
+    expect(peorSeparacion(s)).toBeLessThan(1e-6);
+  });
+});

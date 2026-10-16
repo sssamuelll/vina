@@ -22,6 +22,10 @@ export interface PuntoDeCostura {
 export const CIERRE_POR_CUADRO = 0.97 ** 15;
 /** Largo (m) bajo el cual la costura queda cerrada: desde ahí, L = 0. */
 export const LARGO_CERRADO = 1e-4;
+/** E8: un punto se cose a menos de estos cuadros de cierre al tope de E7 de su punto. */
+export const CUADROS_DE_PUNTADA = 5;
+/** E8: en cuántos tramos se mira la línea entre un vértice y su punto para ver si cruza un obstáculo. */
+export const MUESTRAS_DE_PUNTADA = 8;
 
 /** El largo de arco de cada vértice del lado, medido en el patrón y normalizado a [0, 1]. */
 export function largosEnElPatron(patron: ArrayLike<number>, lado: readonly number[]): number[] {
@@ -105,9 +109,20 @@ export class Costuras {
   readonly estado: Float64Array;
   /** cuadros de cierre */
   cuadros = 0;
+  /**
+   * E8, por punto: 1 si se puede coser. Su vértice no depende ya de otro punto ni sostiene a otro, y los dos del otro
+   * lado no dependen de ninguno; manda el orden de los puntos.
+   */
+  readonly soldable: Uint8Array;
+  /** E8, por punto: 1 si está cosido, con x_a = (1 − s)·x_b0 + s·x_b1 + el desfase (3 por punto, m) */
+  readonly cosido: Uint8Array;
+  readonly desfase: Float64Array;
+  /** E8, por vértice: el punto soldable del que depende (−1 si ninguno) y 1 si sostiene a uno */
+  readonly dependeDe: Int32Array;
+  readonly sostiene: Uint8Array;
 
-  /** `cierreMaximo`: lo más que baja L en un cuadro (m); sin tope, el cierre de hoy */
-  constructor(puntos: readonly PuntoDeCostura[], x: ArrayLike<number>, readonly k: number, readonly cierreMaximo = Infinity) {
+  /** `cierreMaximo`: lo más que baja L en un cuadro (m); sin tope, el cierre de hoy. Un vértice `fijo` no se cose. */
+  constructor(puntos: readonly PuntoDeCostura[], x: ArrayLike<number>, readonly k: number, readonly cierreMaximo = Infinity, fijo?: ArrayLike<number>) {
     this.n = puntos.length;
     this.a = Uint32Array.from(puntos, (p) => p.a);
     this.b0 = Uint32Array.from(puntos, (p) => p.b0);
@@ -121,6 +136,94 @@ export class Costuras {
     }
     this.L = Float64Array.from(this.L0);
     this.estado = new Float64Array(6 * this.n);
+    this.soldable = new Uint8Array(this.n);
+    this.cosido = new Uint8Array(this.n);
+    this.desfase = new Float64Array(3 * this.n);
+    this.dependeDe = new Int32Array(x.length / 3).fill(-1);
+    this.sostiene = new Uint8Array(x.length / 3);
+    for (let e = 0; e < this.n; e++) {
+      const a = this.a[e], b0 = this.b0[e], b1 = this.b1[e];
+      if (fijo?.[a] || this.dependeDe[a] >= 0 || this.sostiene[a] || this.dependeDe[b0] >= 0 || this.dependeDe[b1] >= 0) continue;
+      this.soldable[e] = 1;
+      this.dependeDe[a] = e;
+      this.sostiene[b0] = 1;
+      this.sostiene[b1] = 1;
+    }
+  }
+
+  /**
+   * E8: un punto lleva su resorte si no está cosido y no quedó entre puntadas, es decir, si no es un vértice que
+   * sostiene puntadas y cae entre dos vértices ya cosidos (la línea de la costura ya es la suya).
+   */
+  activo(e: number): boolean {
+    if (this.cosido[e]) return false;
+    const d0 = this.dependeDe[this.b0[e]], d1 = this.dependeDe[this.b1[e]];
+    return !(this.sostiene[this.a[e]] && d0 >= 0 && this.cosido[d0] && d1 >= 0 && this.cosido[d1]);
+  }
+
+  /**
+   * E8, al terminar el cuadro: cose los puntos soldables que quedaron a menos de CUADROS_DE_PUNTADA cierres de su
+   * punto, salvo los que `cruza` (con el punto y su separación d) diga que llegarían a través de un obstáculo.
+   */
+  coser(x: ArrayLike<number>, cruza?: (e: number, d: readonly number[]) => boolean): void {
+    const d = [0, 0, 0], umbral = CUADROS_DE_PUNTADA * this.cierreMaximo;
+    for (let e = 0; e < this.n; e++) {
+      if (!this.soldable[e] || this.cosido[e]) continue;
+      this.separacion(e, x, d);
+      if (Math.hypot(d[0], d[1], d[2]) > umbral || cruza?.(e, d)) continue;
+      this.cosido[e] = 1;
+      this.desfase.set(d, 3 * e);
+    }
+  }
+
+  /** E8, al empezar el cuadro: el desfase de cada puntada baja con la ley de E7, y su vértice va a su punto más el desfase. */
+  avanzarPuntadas(x: Float64Array): void {
+    for (let e = 0; e < this.n; e++) {
+      if (!this.cosido[e]) continue;
+      const o = 3 * e, m = Math.hypot(this.desfase[o], this.desfase[o + 1], this.desfase[o + 2]);
+      const nuevo = Math.max(m * CIERRE_POR_CUADRO, m - this.cierreMaximo);
+      const f = nuevo < LARGO_CERRADO ? 0 : nuevo / m;
+      const a = 3 * this.a[e], b0 = 3 * this.b0[e], b1 = 3 * this.b1[e], s = this.s[e];
+      for (let k = 0; k < 3; k++) {
+        this.desfase[o + k] *= f;
+        x[a + k] = (1 - s) * x[b0 + k] + s * x[b1 + k] + this.desfase[o + k];
+      }
+    }
+  }
+
+  /** E8: v_a ← (1 − s)·v_b0 + s·v_b1 en cada vértice cosido, de las incógnitas que quedan a todos los vértices. */
+  expandir(v: Float64Array): void {
+    for (let e = 0; e < this.n; e++) {
+      if (!this.cosido[e]) continue;
+      const a = 3 * this.a[e], b0 = 3 * this.b0[e], b1 = 3 * this.b1[e], s = this.s[e];
+      for (let k = 0; k < 3; k++) v[a + k] = (1 - s) * v[b0 + k] + s * v[b1 + k];
+    }
+  }
+
+  /** E8, la traspuesta de expandir: lo de cada vértice cosido pasa a sus dos vértices del otro lado, y el suyo queda en 0. */
+  restringir(v: Float64Array): void {
+    for (let e = 0; e < this.n; e++) {
+      if (!this.cosido[e]) continue;
+      const a = 3 * this.a[e], b0 = 3 * this.b0[e], b1 = 3 * this.b1[e], s = this.s[e];
+      for (let k = 0; k < 3; k++) {
+        v[b0 + k] += (1 - s) * v[a + k];
+        v[b1 + k] += s * v[a + k];
+        v[a + k] = 0;
+      }
+    }
+  }
+
+  /** E8, los bloques del precondicionador: el de cada vértice cosido pasa a los suyos con el peso al cuadrado, y queda I. */
+  restringirBloques(B: Float64Array): void {
+    for (let e = 0; e < this.n; e++) {
+      if (!this.cosido[e]) continue;
+      const a = 9 * this.a[e], b0 = 9 * this.b0[e], b1 = 9 * this.b1[e], s = this.s[e], w0 = (1 - s) * (1 - s), w1 = s * s;
+      for (let k = 0; k < 9; k++) {
+        B[b0 + k] += w0 * B[a + k];
+        B[b1 + k] += w1 * B[a + k];
+        B[a + k] = k % 4 === 0 ? 1 : 0;
+      }
+    }
   }
 
   /** d = x_a − (1 − s)·x_b0 − s·x_b1 del punto e, en `d`. */
@@ -152,6 +255,7 @@ export class Costuras {
   }
 
   energiaDe(e: number, x: ArrayLike<number>): number {
+    if (!this.activo(e)) return 0;
     const d = [0, 0, 0];
     this.separacion(e, x, d);
     const r = Math.hypot(d[0], d[1], d[2]) - this.L[e];
@@ -173,7 +277,11 @@ export class Costuras {
       st[o] = d[0];
       st[o + 1] = d[1];
       st[o + 2] = d[2];
-      if (L === 0) {
+      if (!this.activo(e)) {
+        st[o + 3] = 0;
+        st[o + 4] = 0;
+        st[o + 5] = 0;
+      } else if (L === 0) {
         st[o + 3] = k;
         st[o + 4] = k;
         st[o + 5] = 0;

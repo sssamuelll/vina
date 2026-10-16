@@ -54,6 +54,9 @@ export interface PaqueteGpu {
     cl: Float32Array;
     /** la rigidez de cada bisagra de costura al encenderse */
     ckh: Float32Array;
+    /** E8: las puntadas al empaquetar, cosido (0 o 1) y desfase (3 por punto) */
+    ccos: Float32Array;
+    cdes: Float32Array;
     /** el BVH del cuerpo (gpu/bvh.ts, LinearBVH): nodos, triángulos, normales de cara y pseudonormales */
     cuNodos: Float32Array;
     cuTri: Float32Array;
@@ -99,6 +102,14 @@ export interface PaqueteGpu {
     /** por vértice, él y sus compañeros de costura (sistema.ts, excluidos), en CSR */
     exOff: Uint32Array;
     exIdx: Uint32Array;
+    /** E8, por punto: 1 si se puede coser (costuras.ts, soldable) */
+    cSoldable: Uint32Array;
+    /** E8, por vértice: el punto soldable del que depende (NINGUNA si ninguno) y 1 si sostiene a uno */
+    dependeDe: Uint32Array;
+    sostiene: Uint32Array;
+    /** E8, por vértice, en CSR: los puntos soldables que sostiene, sin repetir */
+    depOff: Uint32Array;
+    depIdx: Uint32Array;
   };
 }
 
@@ -117,6 +128,15 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
   if (4 * maxPares >= 1 << 24 || np >= 1 << 24 || nceldas >= 1 << 24) throw new Error('empaquetar: más pares o puntos de los que la GPU guarda como enteros exactos');
   const exOff = new Uint32Array(n + 1);
   for (let i = 0; i < n; i++) exOff[i + 1] = exOff[i] + s.excluidos[i].length;
+  // E8: los puntos soldables que sostiene cada vértice, para que reciba lo de sus vértices cosidos
+  const sostenidos: number[][] = Array.from({ length: n }, () => []);
+  for (let e = 0; e < nc; e++) {
+    if (!c.soldable[e]) continue;
+    sostenidos[c.b0[e]].push(e);
+    if (c.b1[e] !== c.b0[e]) sostenidos[c.b1[e]].push(e);
+  }
+  const depOff = new Uint32Array(n + 1);
+  for (let i = 0; i < n; i++) depOff[i + 1] = depOff[i] + sostenidos[i].length;
 
   // las ranuras de aporte al gradiente que suma cada vértice
   const aportes: number[][] = Array.from({ length: n }, () => []);
@@ -223,6 +243,8 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
       cs: Float32Array.from(c.s),
       cl: Float32Array.from(c.L),
       ckh: Float32Array.from(s.placa.costura, (k) => k.kh),
+      ccos: Float32Array.from(c.cosido),
+      cdes: Float32Array.from(c.desfase),
       cuNodos: bvh?.nodes ?? new Float32Array(0),
       cuTri: bvh?.triVerts ?? new Float32Array(0),
       cuNt: bvh?.triNormals ?? new Float32Array(0),
@@ -252,6 +274,11 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
       cuSalto: bvh?.skip ?? new Uint32Array(0),
       exOff,
       exIdx: Uint32Array.from(s.excluidos.flat()),
+      cSoldable: Uint32Array.from(c.soldable),
+      dependeDe: Uint32Array.from(c.dependeDe, (e) => (e < 0 ? NINGUNA : e)),
+      sostiene: Uint32Array.from(c.sostiene),
+      depOff,
+      depIdx: Uint32Array.from(sostenidos.flat()),
     },
   };
 }

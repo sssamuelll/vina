@@ -2,7 +2,8 @@
  * Un cuadro del motor implícito (spec 2026-10-13 §4.2.1): Euler implícito resuelto con un paso de Newton
  * de Gauss-Newton desde el estado actual y gradiente conjugado precondicionado por bloques 3×3, con los planos
  * de contacto del cuadro (E4 del plan de la entrega 4), su anticipación (una ronda más) y búsqueda en línea
- * sobre G con la misma energía de contacto, de un solo lado. La GPU (gpu/wgsl.ts) hace el mismo cuadro.
+ * sobre G con la misma energía de contacto, de un solo lado. Los vértices cosidos (E8) no son incógnitas: el sistema
+ * es Pᵀ·A·P, con P = expandir y Pᵀ = restringir (costuras.ts). La GPU (gpu/wgsl.ts) hace el mismo cuadro.
  */
 import type { SistemaTela } from './sistema';
 
@@ -21,6 +22,8 @@ export interface InfoPaso {
 export function pasoImplicito(s: SistemaTela): InfoPaso {
   const { n, aj } = s;
   const { h, aire, maxCG, tolCG } = aj;
+  // E8: cada puntada cierra un cuadro de su desfase y lleva a su vértice
+  s.costuras.avanzarPuntadas(s.x);
   s.xt.set(s.x);
   s.linealizar();
   s.armarContactos();
@@ -35,11 +38,15 @@ export function pasoImplicito(s: SistemaTela): InfoPaso {
     base[9 * i + 4] += diag[i];
     base[9 * i + 8] += diag[i];
   }
+  const pe = new Float64Array(3 * n);
   const A = (p: Float64Array, out: Float64Array) => {
-    s.hessianaPor(p, out);
-    for (let i = 0; i < n; i++) for (let d = 0; d < 3; d++) out[3 * i + d] += diag[i] * p[3 * i + d];
-    s.sumarContactosPor(p, out);
-    for (let i = 0; i < n; i++) if (s.fijo[i]) out[3 * i] = out[3 * i + 1] = out[3 * i + 2] = 0;
+    pe.set(p);
+    s.costuras.expandir(pe);
+    s.hessianaPor(pe, out);
+    for (let i = 0; i < n; i++) for (let d = 0; d < 3; d++) out[3 * i + d] += diag[i] * pe[3 * i + d];
+    s.sumarContactosPor(pe, out);
+    s.costuras.restringir(out);
+    s.anularFijos(out);
   };
 
   const r = new Float64Array(3 * n), dx = new Float64Array(3 * n), Pinv = new Float64Array(9 * n);
@@ -47,11 +54,15 @@ export function pasoImplicito(s: SistemaTela): InfoPaso {
   let cg = 0, anticipados = 0;
   for (let ronda = 0; ronda < 2; ronda++) {
     s.residuo(r);
+    s.costuras.restringir(r);
+    s.anularFijos(r);
     // el precondicionador: las inversas de los bloques de la diagonal, con los planos
     Pinv.set(base);
     s.sumarBloquesDeContacto(Pinv);
+    s.costuras.restringirBloques(Pinv);
     for (let o = 0; o < Pinv.length; o += 9) invertir3(Pinv, o);
     cg += gradienteConjugado(A, r, Pinv, dx, maxCG, tolCG, tmp);
+    s.costuras.expandir(dx);
     if (ronda === 1 || !aj.anticipar) break;
     anticipados = s.anticiparContactos(dx);
     if (anticipados === 0) break;

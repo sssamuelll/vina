@@ -5,7 +5,7 @@
  */
 import { ALCANCE_MAXIMO } from '../contactoPropio';
 import { EPS_FRICCION } from '../contactos';
-import { CIERRE_POR_CUADRO, LARGO_CERRADO } from '../costuras';
+import { CIERRE_POR_CUADRO, CUADROS_DE_PUNTADA, LARGO_CERRADO, MUESTRAS_DE_PUNTADA } from '../costuras';
 import { RADIO_DE_BUSQUEDA, type Obstaculo } from '../obstaculos';
 import type { SistemaTela } from '../sistema';
 import type { PaqueteGpu } from './empaquetar';
@@ -24,10 +24,10 @@ const N_ESC = 32;
 
 /** Las entradas de cómputo, en el orden en que las despacha un cuadro. */
 export const ENTRADAS = [
-  'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar',
+  'puntadas', 'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar',
   'velMax', 'armarRadio', 'limpiarCeldas', 'hashContar', 'scanCBloques', 'scanCTotales', 'scanCSumar', 'hashLlenar',
   'limpiarPuntas', 'paresDeTriangulo', 'limpiarVertices', 'contarEntradas', 'scanVBloques', 'scanVTotales', 'scanVSumar', 'llenarEntradas',
-  'residuo', 'sumarInicio', 'spmv', 'sumarAlfa', 'actualizar', 'sumarBeta', 'nuevaP', 'anticipar', 'anticiparPares',
+  'residuo', 'sumarInicio', 'spmv', 'sumarAlfa', 'actualizar', 'sumarBeta', 'nuevaP', 'expandirP', 'anticipar', 'anticiparPares',
   'armarRonda2', 'prepBusqueda', 'posPrueba', 'anguloPrueba', 'difTri', 'difCostura', 'difPares', 'decidir', 'aplicar',
   'cerrarCuadro', 'cerrarCosturas', 'revisarCosido', 'coser',
 ] as const;
@@ -46,7 +46,7 @@ function zonas<K extends string>(tamanos: Record<K, number>): Record<K, number> 
 
 type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT';
 type ZonaTf =
-  | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH'
+  | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH' | 'CCOS' | 'CDES'
   | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'CUVN' | 'SOST' | 'HP' | 'OFFC' | 'ORD' | 'PAR' | 'OFFV' | 'ENT' | 'SCB';
 /** el búfer atómico del contacto propio: cuentas y cursores de la rejilla y de las listas, los pares y los desbordes */
 type ZonaAt = 'CNTC' | 'CURC' | 'CNTV' | 'CURV' | 'NPAR' | 'DESB';
@@ -83,7 +83,7 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
   const vf = zonas<ZonaVf>({ XT: 3 * n, V: 3 * n, R: 3 * n, Z: 3 * n, AP: 3 * n, DX: 3 * n, XP: 3 * n, MASA: n, EV0: n, PINV: 9 * n, CONT: 6 * n });
   const tf = zonas<ZonaTf>({
     COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, THP: nh, CONTRIB: 45 * nt + 9 * p.nc,
-    CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch,
+    CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch, CCOS: p.nc, CDES: 3 * p.nc,
     CUN: p.f32.cuNodos.length, CUT: p.f32.cuTri.length, CUNT: p.f32.cuNt.length, CUPA: p.f32.cuPa.length, CUPV: p.f32.cuPv.length,
     CUV: 3 * p.nvb, CUVN: 3 * p.nvb, SOST: 2 * p.nvb, HP: p.np, OFFC: p.nceldas + 1, ORD: p.np, PAR: 14 * p.maxPares, OFFV: n + 1, ENT: 4 * p.maxPares,
     SCB: Math.max(Math.ceil(p.nceldas / WG), Math.ceil(n / WG)) + 1,
@@ -191,6 +191,11 @@ const RADIO_B = ${f(RADIO_DE_BUSQUEDA)};
 const CIERRE = ${f(CIERRE_POR_CUADRO)};
 const CIERRE_MAX = ${f(aj.cierreMaximo)};
 const LCERRADO = ${f(LARGO_CERRADO)};
+// E8: las puntadas (costuras.ts, coser y expandir)
+const UMBRAL_P = ${f(CUADROS_DE_PUNTADA * aj.cierreMaximo)};
+const MUESTRAS_P = ${u(MUESTRAS_DE_PUNTADA)};
+const I_SOLD = ${u(iu.cSoldable)}; const I_DEPDE = ${u(iu.dependeDe)}; const I_SOST = ${u(iu.sostiene)};
+const I_DOFF = ${u(iu.depOff)}; const I_DIDX = ${u(iu.depIdx)};
 // la primera ranura de aporte de las costuras, después de las de la membrana y la placa
 const SLOT_C = 15u * NT;
 ${Object.entries(ESC).map(([k, v]) => `const E_${k} = ${u(v)};`).join('\n')}
@@ -379,6 +384,26 @@ fn bloqueCostura(e: u32, li: u32, lj: u32) -> mat3x3<f32> {
   return pesoCostura(e, li) * pesoCostura(e, lj) * (tf[o + 3u] * I3 + tf[o + 4u] * outer(d, d));
 }
 
+// E8: el vértice i está cosido (costuras.ts, dependeDe y cosido)
+fn cosidoV(i: u32) -> bool {
+  let e = iu[I_DEPDE + i];
+  return e != NINGUNA && tf[O_CCOS + e] > 0.5;
+}
+
+// E8: el punto e lleva su resorte: no está cosido ni quedó entre puntadas (costuras.ts, activo)
+fn activa(e: u32) -> bool {
+  if (tf[O_CCOS + e] > 0.5) { return false; }
+  let b = I_CV + 3u * e;
+  return !(iu[I_SOST + iu[b]] != 0u && cosidoV(iu[b + 1u]) && cosidoV(iu[b + 2u]));
+}
+
+// E8: el peso del vértice i en el punto cosido e, como b0 y como b1 (costuras.ts, restringir)
+fn pesoMaestro(i: u32, e: u32) -> vec2<f32> {
+  let b = I_CV + 3u * e;
+  let s = tf[O_CS + e];
+  return vec2<f32>(select(0.0, 1.0 - s, iu[b + 1u] == i), select(0.0, s, iu[b + 2u] == i));
+}
+
 var<workgroup> sh: array<f32, ${WG}>;
 var<workgroup> wBandera: u32;
 
@@ -410,6 +435,23 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   let t = sh[0];
   workgroupBarrier();
   return t;
+}
+
+// 0. E8: cada puntada cierra un cuadro de su desfase y lleva a su vértice (costuras.ts, avanzarPuntadas)
+@compute @workgroup_size(${WG}) fn puntadas(@builtin(global_invocation_id) g: vec3<u32>) {
+  let e = g.x;
+  if (e >= NC || tf[O_CCOS + e] < 0.5) { return; }
+  let o = O_CDES + 3u * e;
+  let d = vec3<f32>(tf[o], tf[o + 1u], tf[o + 2u]);
+  let m = length(d);
+  let nuevo = max(m * CIERRE, m - CIERRE_MAX);
+  var f = 0.0;
+  if (nuevo >= LCERRADO) { f = nuevo / m; }
+  let dn = f * d;
+  tf[o] = dn.x; tf[o + 1u] = dn.y; tf[o + 2u] = dn.z;
+  let b = I_CV + 3u * e;
+  let s = tf[O_CS + e];
+  stx(iu[b], (1.0 - s) * ldx(iu[b + 1u]) + s * ldx(iu[b + 2u]) + dn);
 }
 
 // 1. x_t, el plano de cada vértice en x_t con su fricción (sistema.ts, armarContactos) y la inercia al empezar
@@ -521,9 +563,12 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   let d = sepCostura(e, ldx(iu[b]), ldx(iu[b + 1u]), ldx(iu[b + 2u]));
   let r = length(d);
   let L = tf[O_CL + e];
+  // E8: el punto cosido o que quedó entre puntadas no lleva resorte
+  let act = activa(e);
   var gg = 0.0;
   var c2 = 0.0;
-  if (L == 0.0) {
+  if (!act) {
+  } else if (L == 0.0) {
     gg = KCOST;
   } else if (r > L) {
     let q = L / r;
@@ -533,7 +578,7 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   let o = O_CST + 5u * e;
   tf[o] = d.x; tf[o + 1u] = d.y; tf[o + 2u] = d.z; tf[o + 3u] = gg; tf[o + 4u] = c2;
   var e0 = 0.0;
-  if (r > L) { e0 = 0.5 * KCOST * (r - L) * (r - L); }
+  if (act && r > L) { e0 = 0.5 * KCOST * (r - L) * (r - L); }
   tf[O_CE0 + e] = e0;
   for (var m = 0u; m < 3u; m++) { stc(SLOT_C + 3u * e + m, pesoCostura(e, m) * gg * d); }
 }
@@ -559,36 +604,59 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
 }
 
 // 6. el residuo, el precondicionador de bloques y el arranque del gradiente conjugado (Δ = 0)
+struct ResiduoB { r: vec3<f32>, B: mat3x3<f32> }
+
+// −∇G y el bloque diagonal del vértice i en x = x_t, antes de las puntadas
+fn residuoDe(i: u32) -> ResiduoB {
+  var grad = vec3<f32>(0.0);
+  for (var s = iu[I_AOFF + i]; s < iu[I_AOFF + i + 1u]; s++) { grad += ldc(iu[I_AIDX + s]); }
+  let m = vf[O_MASA + i];
+  // en x = x_t: −(m/h²)·(x − y) = (m/h)·v + m·g, y el aire todavía no empuja
+  var r = -grad + (m / H) * ld(O_V, i) + vec3<f32>(0.0, m * GRAV, 0.0);
+  var B = ld9(iu[I_DIAG + i]) + (m / (H * H) + AIRE * m / H) * I3;
+  let o = O_CONT + 6u * i;
+  if (vf[o] > 0.5) {
+    let nn = vec3<f32>(vf[o + 1u], vf[o + 2u], vf[o + 3u]);
+    let kt = vf[o + 5u];
+    // en x = x_t el plano empuja con kc·p0 y la fricción todavía no (sistema.ts, residuo)
+    r += KC * vf[o + 4u] * nn;
+    B += (KC - kt) * outer(nn, nn) + kt * I3;
+  }
+  if (PROPIO) {
+    for (var s = u32(tf[O_OFFV + i]); s < u32(tf[O_OFFV + i + 1u]); s++) {
+      let ent = u32(tf[O_ENT + s]);
+      let o = O_PAR + 14u * (ent >> 2u);
+      if (tf[o + 13u] < 0.5) { continue; }
+      let wk = tf[o + 4u + (ent & 3u)];
+      let nn = v3tf(o + 8u);
+      let kt = tf[o + 12u];
+      // en x = x_t el par empuja con kc·p0 y su fricción todavía no (sistema.ts, residuo)
+      r += wk * KC * tf[o + 11u] * nn;
+      B += wk * wk * ((KC - kt) * outer(nn, nn) + kt * I3);
+    }
+  }
+  return ResiduoB(r, B);
+}
+
 @compute @workgroup_size(${WG}) fn residuo(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
   if (!bandera(l.x, E_ACTIVO)) { return; }
   let i = g.x;
   var rz = 0.0;
   if (i < N) {
-    var grad = vec3<f32>(0.0);
-    for (var s = iu[I_AOFF + i]; s < iu[I_AOFF + i + 1u]; s++) { grad += ldc(iu[I_AIDX + s]); }
-    let m = vf[O_MASA + i];
-    // en x = x_t: −(m/h²)·(x − y) = (m/h)·v + m·g, y el aire todavía no empuja
-    var r = -grad + (m / H) * ld(O_V, i) + vec3<f32>(0.0, m * GRAV, 0.0);
-    var B = ld9(iu[I_DIAG + i]) + (m / (H * H) + AIRE * m / H) * I3;
-    let o = O_CONT + 6u * i;
-    if (vf[o] > 0.5) {
-      let nn = vec3<f32>(vf[o + 1u], vf[o + 2u], vf[o + 3u]);
-      let kt = vf[o + 5u];
-      // en x = x_t el plano empuja con kc·p0 y la fricción todavía no (sistema.ts, residuo)
-      r += KC * vf[o + 4u] * nn;
-      B += (KC - kt) * outer(nn, nn) + kt * I3;
-    }
-    if (PROPIO) {
-      for (var s = u32(tf[O_OFFV + i]); s < u32(tf[O_OFFV + i + 1u]); s++) {
-        let ent = u32(tf[O_ENT + s]);
-        let o = O_PAR + 14u * (ent >> 2u);
-        if (tf[o + 13u] < 0.5) { continue; }
-        let wk = tf[o + 4u + (ent & 3u)];
-        let nn = v3tf(o + 8u);
-        let kt = tf[o + 12u];
-        // en x = x_t el par empuja con kc·p0 y su fricción todavía no (sistema.ts, residuo)
-        r += wk * KC * tf[o + 11u] * nn;
-        B += wk * wk * ((KC - kt) * outer(nn, nn) + kt * I3);
+    var r = vec3<f32>(0.0);
+    var B = I3;
+    // E8: lo de cada vértice cosido pasa a sus dos vértices del otro lado (costuras.ts, restringir y restringirBloques)
+    if (!cosidoV(i)) {
+      let propio = residuoDe(i);
+      r = propio.r;
+      B = propio.B;
+      for (var k = iu[I_DOFF + i]; k < iu[I_DOFF + i + 1u]; k++) {
+        let e = iu[I_DIDX + k];
+        if (tf[O_CCOS + e] < 0.5) { continue; }
+        let wm = pesoMaestro(i, e);
+        let suyo = residuoDe(iu[I_CV + 3u * e]);
+        r += (wm.x + wm.y) * suyo.r;
+        B += (wm.x * wm.x + wm.y * wm.y) * suyo.B;
       }
     }
     if (iu[I_FIJO + i] != 0u) { r = vec3<f32>(0.0); }
@@ -685,16 +753,28 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   var rz = 0.0;
   if (i < N) {
     let alfa = red[R_SC + E_ALFA];
+    // el de un vértice cosido es el de sus dos vértices: p ya llega expandido (expandirP)
     st(O_DX, i, ld(O_DX, i) + alfa * pv[i].xyz);
-    let r = ld(O_R, i) - alfa * ld(O_AP, i);
-    st(O_R, i, r);
-    let o = O_PINV + 9u * i;
-    let z = vec3<f32>(
-      vf[o] * r.x + vf[o + 1u] * r.y + vf[o + 2u] * r.z,
-      vf[o + 3u] * r.x + vf[o + 4u] * r.y + vf[o + 5u] * r.z,
-      vf[o + 6u] * r.x + vf[o + 7u] * r.y + vf[o + 8u] * r.z);
-    st(O_Z, i, z);
-    rz = dot(r, z);
+    if (!cosidoV(i)) {
+      // E8: A·p de cada vértice cosido pasa a sus dos vértices del otro lado (costuras.ts, restringir)
+      var ap = ld(O_AP, i);
+      for (var k = iu[I_DOFF + i]; k < iu[I_DOFF + i + 1u]; k++) {
+        let e = iu[I_DIDX + k];
+        if (tf[O_CCOS + e] < 0.5) { continue; }
+        let wm = pesoMaestro(i, e);
+        ap += (wm.x + wm.y) * ld(O_AP, iu[I_CV + 3u * e]);
+      }
+      if (iu[I_FIJO + i] != 0u) { ap = vec3<f32>(0.0); }
+      let r = ld(O_R, i) - alfa * ap;
+      st(O_R, i, r);
+      let o = O_PINV + 9u * i;
+      let z = vec3<f32>(
+        vf[o] * r.x + vf[o + 1u] * r.y + vf[o + 2u] * r.z,
+        vf[o + 3u] * r.x + vf[o + 4u] * r.y + vf[o + 5u] * r.z,
+        vf[o + 6u] * r.x + vf[o + 7u] * r.y + vf[o + 8u] * r.z);
+      st(O_Z, i, z);
+      rz = dot(r, z);
+    }
   }
   let total = reducirSuma(l.x, rz);
   if (l.x == 0u) { red[R_PA + w.x] = total; }
@@ -717,6 +797,15 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   let i = g.x;
   if (i >= N) { return; }
   pv[i] = vec4<f32>(ld(O_Z, i) + red[R_SC + E_BETA] * pv[i].xyz, 0.0);
+}
+
+// E8: el vértice cosido entra al producto con lo de sus dos vértices (costuras.ts, expandir)
+@compute @workgroup_size(${WG}) fn expandirP(@builtin(global_invocation_id) g: vec3<u32>) {
+  let e = g.x;
+  if (e >= NC || red[R_SC + E_ACTIVO] < 0.5 || tf[O_CCOS + e] < 0.5) { return; }
+  let b = I_CV + 3u * e;
+  let s = tf[O_CS + e];
+  pv[iu[b]] = vec4<f32>((1.0 - s) * pv[iu[b + 1u]].xyz + s * pv[iu[b + 2u]].xyz, 0.0);
 }
 
 // 8. anticipación (sistema.ts, anticiparContactos): el vértice que el paso metería en un obstáculo entra con el plano
@@ -818,7 +907,7 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
     let r = length(sepCostura(e, ld(O_XP, iu[b]), ld(O_XP, iu[b + 1u]), ld(O_XP, iu[b + 2u])));
     let L = tf[O_CL + e];
     var en = 0.0;
-    if (r > L) { en = 0.5 * KCOST * (r - L) * (r - L); }
+    if (activa(e) && r > L) { en = 0.5 * KCOST * (r - L) * (r - L); }
     de = en - tf[O_CE0 + e];
   }
   let total = reducirSuma(l.x, de);
@@ -888,6 +977,24 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
     if (L < LCERRADO) { L = 0.0; }
     tf[O_CL + e] = L;
     abierta = L;
+    // E8: se cose el punto soldable que quedó a menos del umbral de su punto (costuras.ts, coser)
+    if (iu[I_SOLD + e] != 0u && tf[O_CCOS + e] < 0.5) {
+      let b = I_CV + 3u * e;
+      let xa = ldx(iu[b]);
+      let d = sepCostura(e, xa, ldx(iu[b + 1u]), ldx(iu[b + 2u]));
+      if (length(d) <= UMBRAL_P) {
+        // la línea hasta su punto no puede entrar en un obstáculo (sistema.ts, cruzaUnObstaculo)
+        var cruza = false;
+        for (var k = 1u; k < MUESTRAS_P; k++) {
+          if (masCercano(xa - (f32(k) / f32(MUESTRAS_P)) * d).c.x < -SEP) { cruza = true; }
+        }
+        if (!cruza) {
+          tf[O_CCOS + e] = 1.0;
+          let o = O_CDES + 3u * e;
+          tf[o] = d.x; tf[o + 1u] = d.y; tf[o + 2u] = d.z;
+        }
+      }
+    }
   }
   let m = reducirMax(l.x, abierta);
   if (l.x == 0u) { red[R_PD + w.x] = m; }

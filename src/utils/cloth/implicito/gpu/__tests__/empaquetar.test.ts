@@ -134,6 +134,19 @@ describe('el paquete de una prenda cosida', () => {
     expect(Array.from(p.f32.cl)).toEqual(Array.from(Float32Array.from(s.costuras.L)));
     expect(Array.from(p.u32.costuraK)).toEqual(s.placa.costura.map((c) => c.o));
   });
+
+  it('lleva las puntadas como la CPU: qué punto se cose, de cuál depende cada vértice y cuáles sostiene (E8)', () => {
+    const c = s.costuras;
+    expect(Array.from(p.u32.cSoldable)).toEqual(Array.from(c.soldable));
+    expect(Array.from(p.u32.dependeDe)).toEqual(Array.from(c.dependeDe, (e) => (e < 0 ? NINGUNA : e)));
+    expect(Array.from(p.u32.sostiene)).toEqual(Array.from(c.sostiene));
+    for (let i = 0; i < s.n; i++) {
+      const esperado = [...Array(c.n).keys()].filter((e) => c.soldable[e] && (c.b0[e] === i || c.b1[e] === i));
+      expect(Array.from(p.u32.depIdx.subarray(p.u32.depOff[i], p.u32.depOff[i + 1]))).toEqual(esperado);
+    }
+    expect(Array.from(p.f32.ccos)).toEqual(Array.from(c.cosido));
+    expect(Array.from(p.f32.cdes)).toEqual(Array.from(Float32Array.from(c.desfase)));
+  });
 });
 
 describe('el paquete con un cuerpo', () => {

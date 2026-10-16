@@ -56,6 +56,8 @@ export class MotorGpu {
     tf.set(p.f32.cs, d.tf.CS);
     tf.set(p.f32.cl, d.tf.CL);
     tf.set(p.f32.ckh, d.tf.CKH);
+    tf.set(p.f32.ccos, d.tf.CCOS);
+    tf.set(p.f32.cdes, d.tf.CDES);
     tf.set(p.f32.cuNodos, d.tf.CUN);
     tf.set(p.f32.cuTri, d.tf.CUT);
     tf.set(p.f32.cuNt, d.tf.CUNT);
@@ -108,15 +110,19 @@ export class MotorGpu {
     const ronda = () => {
       d('residuo', gv);
       d('sumarInicio', 1);
+      // E8: el p de cada vértice cosido es el de sus dos vértices
+      d('expandirP', gc);
       for (let k = 0; k < aj.maxCG; k++) {
         d('spmv', gv);
         d('sumarAlfa', 1);
         d('actualizar', gv);
         d('sumarBeta', 1);
         d('nuevaP', gv);
+        d('expandirP', gc);
       }
     };
     pase.setBindGroup(0, this.grupo);
+    d('puntadas', gc);
     d('inicio', gv);
     d('prepTri', gt);
     d('prepHinge', gh);
@@ -206,6 +212,11 @@ export class MotorGpu {
       cuadro: e[ESC.CUADRO], cg: e[ESC.ITER], anticipados: e[ESC.NUEVOS], alfa: e[ESC.ALFA_FINAL], quietud: e[ESC.QUIETUD], quietudMaxima: e[ESC.QMAX],
       dg: e[ESC.DG], pares: Math.min(a[0], this.p.maxPares), desbordes: a[1],
     };
+  }
+
+  /** E8: 1 en cada punto de costura que quedó cosido. */
+  async leerCosidos(): Promise<Float32Array> {
+    return new Float32Array(await this.leer('tf', 4 * this.d.tf.CCOS, 4 * Math.max(this.p.nc, 1))).subarray(0, this.p.nc);
   }
 
   /** La quietud de los cuadros [desde, desde + cuantos). */

@@ -386,7 +386,7 @@ El banco corre también sobre el XPBD actual, para medir cada entrega contra él
 ## 7. Enmiendas de la entrega 4
 
 Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el plan de la parte 1, y E5, E6, R13 y E7
-el 2026-10-16 (el valor de E7 espera su ratificación).
+el 2026-10-16 (el valor de E7 espera su ratificación), y E8 el mismo día.
 
 - **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
   patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.
@@ -421,3 +421,19 @@ el 2026-10-16 (el valor de E7 espera su ratificación).
   GPU; se queda porque con 2 mm las costuras chicas pasan 136 cuadros sin bisagra y porque 5 mm dio la menor costura
   máxima en esas corridas. La regla del plan, fijada antes de medir, escogía 2 mm: el valor espera la ratificación de
   Samuel. Plan `2026-10-16-la-camiseta-a-s2.md`.
+- **E8 (§4.3.3). La puntada no cede.** Un punto de costura cuyo vértice queda a menos de `5·cierreMaximo` (25 mm,
+  cinco cuadros de cierre) de su punto se cose: el vértice deja de ser una incógnita y se mueve con su punto del otro
+  lado, `x_a = (1 − s)·x_b0 + s·x_b1 + d`. El desfase `d` arranca en la separación de ese momento y baja cada cuadro
+  con la ley de E7 hasta 0. El paso se resuelve en las incógnitas que quedan: lo que empuja al vértice cosido lo
+  cargan sus dos vértices del otro lado, y el resorte de ese punto se apaga. Se cose el vértice que no depende ya de
+  otro punto ni sostiene a otro, y cuyos dos vértices del otro lado no están cosidos a su vez; decide el orden de los
+  puntos (en cada costura, los vértices de A sobre B). Un punto de B que cae entre dos vértices de A ya cosidos se
+  apaga, porque la línea de la costura ya es la de B; en las esquinas donde no alcanza, sigue el resorte. Tampoco se
+  cose un punto cuya línea hasta su punto entra en un obstáculo más hondo que la separación (se miran sus siete puntos
+  intermedios): cerrar a través del cuerpo deja la tela adentro, y ese punto sigue con su resorte. Medido el
+  2026-10-16 en la GPU a 5 mm: el resorte de 1000 N/m cede ante el contacto (un par vale 2000 N/m), 1-2 mm donde
+  empujan otras capas o pliegues y 10-18 mm donde el cuerpo queda entre los dos bordes. Con 20000 N/m casi todo
+  cierra, pero el gradiente conjugado no converge ni con 600 iteraciones y los aplastados suben. Con la puntada, la
+  mediana queda en 0 mm y las costuras cierran salvo en las esquinas (1-3 mm) y donde el cuerpo queda entre los bordes
+  (5-15 mm). *Costo:* mientras cierra, el desfase une los dos bordes como una varilla de hasta 25 mm, y un vértice
+  cosido ya no se desliza a lo largo de la costura. Plan `2026-10-16-la-camiseta-a-s2.md`.

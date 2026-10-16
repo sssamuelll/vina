@@ -5,7 +5,7 @@
  */
 import { ALCANCE_MAXIMO, energiaDelPar, RejillaDePuntos, separacionPropia, type ParPropio } from './contactoPropio';
 import { energiaDePlano, rigidezDeFriccion, type PlanoDeContacto } from './contactos';
-import { Costuras, type BisagraDeCostura, type PuntoDeCostura } from './costuras';
+import { Costuras, MUESTRAS_DE_PUNTADA, type BisagraDeCostura, type PuntoDeCostura } from './costuras';
 import { puntoMasCercano, type CuerpoRigido, type PuntoEnTriangulo } from './cuerpo';
 import { aMarcoDelHilo, type MallaDeTela } from './malla';
 import { CAPAS_DEL_MARGEN, FLEXION_DEL_MARGEN } from './margen';
@@ -149,7 +149,7 @@ export class SistemaTela {
     this.membrana = new Membrana(malla.tris, this.coef, this.tela);
     this.placa = new Placa(uv, malla.tris, this.tela, { costura: op.costuras?.bisagras, factor: flexion });
     this.x = Float64Array.from(malla.x);
-    this.costuras = new Costuras(op.costuras?.puntos ?? [], malla.x, this.aj.kCostura, this.aj.cierreMaximo);
+    this.costuras = new Costuras(op.costuras?.puntos ?? [], malla.x, this.aj.kCostura, this.aj.cierreMaximo, this.fijo);
     this.xt = Float64Array.from(malla.x);
     this.v = new Float64Array(3 * this.n);
     this.vPedida = new Float64Array(3 * this.n);
@@ -255,13 +255,36 @@ export class SistemaTela {
     this.costuras.sumarBloquesDiagonales(out);
   }
 
-  /** Lo que pasa entre un cuadro y el siguiente: las costuras se cierran un cuadro más, y al cerrar, la flexión las cruza. */
+  /**
+   * Lo que pasa entre un cuadro y el siguiente: las costuras se cierran un cuadro más, se cosen las que quedaron cerca
+   * de su punto (E8), y al cerrar todas, la flexión las cruza.
+   */
   alTerminarCuadro(): void {
     this.costuras.avanzarCierre();
+    this.costuras.coser(this.x, (e, d) => this.cruzaUnObstaculo(this.costuras.a[e], d));
     if (!this.cosida && this.costuras.n > 0 && this.costuras.cerradas()) {
       this.placa.activarCosturas();
       this.cosida = true;
     }
+  }
+
+  /**
+   * E8: la línea entre el vértice a y su punto (x_a − d) entra en un obstáculo más hondo que la separación. Se miran
+   * sus puntos intermedios, sin las puntas: una puntada no se cierra a través del cuerpo.
+   */
+  cruzaUnObstaculo(a: number, d: readonly number[]): boolean {
+    const q = 3 * a;
+    for (let k = 1; k < MUESTRAS_DE_PUNTADA && this.obstaculos.length > 0; k++) {
+      const t = k / MUESTRAS_DE_PUNTADA;
+      const c = masCercano(this.obstaculos, this.x[q] - t * d[0], this.x[q + 1] - t * d[1], this.x[q + 2] - t * d[2], RADIO_DE_BUSQUEDA);
+      if (c && c.d < -this.sep) return true;
+    }
+    return false;
+  }
+
+  /** v[i] = 0 en cada vértice empotrado. */
+  anularFijos(v: Float64Array): void {
+    for (let i = 0; i < this.n; i++) if (this.fijo[i]) v[3 * i] = v[3 * i + 1] = v[3 * i + 2] = 0;
   }
 
   /**
