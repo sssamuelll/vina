@@ -197,7 +197,7 @@ fn parDePunta(b: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, bb: vec3<f32>, c:
       for (var dz = -1; dz <= 1; dz++) { vr = max(vr, bitcast<f32>(atomicLoad(&at[A_VREG + hashCelda(kr + vec3<i32>(dx, dy, dz))]))); }
     }
   }
-  let r = SEPP + min(ALCANCE, 2.0 * H * (vt + vr) + abs(GRAV) * H * H);
+  let r = SEPP + min(ALCANCE, H * (vt + vr) + GRAV_EMP * H * H);
   let libres = iu[I_FIJO + ia] == 0u || iu[I_FIJO + ib] == 0u || iu[I_FIJO + ic] == 0u;
   let lo = min(min(a, b), c) - vec3<f32>(r);
   let hi = max(max(a, b), c) + vec3<f32>(r);

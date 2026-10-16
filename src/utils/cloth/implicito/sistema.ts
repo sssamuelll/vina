@@ -383,6 +383,8 @@ export class SistemaTela {
     if (!this.aj.contactoPropio) return;
     const { x, v, tris, fijo, n, punto: q } = this, sep = this.sepPropia, { kContacto, kPropio, h, gravedad } = this.aj, kp = kPropio ?? kContacto;
     const rapidez = (i: number) => Math.hypot(v[3 * i], v[3 * i + 1], v[3 * i + 2]);
+    // la gravedad acerca un par solo si uno de sus lados está empotrado y no cae
+    const gravedadRelativa = fijo.some((f) => f !== 0) ? gravedad : 0;
     const regiones = new RegionesDeRapidez(celdaDeRegion(sep, this.aristaMedia));
     for (let i = 0; i < n; i++) regiones.anotar(x[3 * i], x[3 * i + 1], x[3 * i + 2], rapidez(i));
     this.puntos.set(x);
@@ -411,7 +413,7 @@ export class SistemaTela {
       const ax = x[3 * a], ay = x[3 * a + 1], az = x[3 * a + 2], bx = x[3 * b], by = x[3 * b + 1], bz = x[3 * b + 2];
       const cx = x[3 * c], cy = x[3 * c + 1], cz = x[3 * c + 2];
       const libres = !(fijo[a] && fijo[b] && fijo[c]);
-      const radio = radioDeBusqueda(sep, Math.max(rapidez(a), rapidez(b), rapidez(c)), regiones.alrededor((ax + bx + cx) / 3, (ay + by + cy) / 3, (az + bz + cz) / 3), h, gravedad);
+      const radio = radioDeBusqueda(sep, Math.max(rapidez(a), rapidez(b), rapidez(c)), regiones.alrededor((ax + bx + cx) / 3, (ay + by + cy) / 3, (az + bz + cz) / 3), h, gravedadRelativa);
       // E6: un punto cae sobre la cara cerrada del triángulo si su separación del punto más cercano va a lo largo de la
       // normal de la cara; la tolerancia de 1/1000 deja entrar al que cae justo sobre un borde o un vértice (mallas
       // alineadas), y el vecino de la misma capa, que la mira de canto, queda fuera

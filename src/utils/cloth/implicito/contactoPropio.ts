@@ -55,11 +55,13 @@ export function celdaDeRegion(sep: number, aristaMedia: number): number {
 
 /**
  * El radio de búsqueda de un triángulo (m): la separación más lo que él (`vTriangulo`, su vértice más rápido) y la tela
- * de su región (`vRegion`) pueden acercarse en dos cuadros, más lo que la gravedad mueve en uno, hasta el alcance. Un
- * vértice rápido en otra región no agranda la búsqueda de esta.
+ * de su región (`vRegion`) pueden acercarse en un cuadro, hasta el alcance. Con E10 entra el par que el cuadro sin
+ * fuerzas mete en la separación, y en ese cuadro la gravedad mueve igual a los dos lados del par: solo cuenta
+ * (`gravedadRelativa`) cuando hay vértices empotrados, que no caen. Un vértice rápido en otra región no agranda la
+ * búsqueda de esta.
  */
-export function radioDeBusqueda(sep: number, vTriangulo: number, vRegion: number, h: number, gravedad: number): number {
-  return sep + Math.min(ALCANCE_MAXIMO, 2 * h * (vTriangulo + vRegion) + Math.abs(gravedad) * h * h);
+export function radioDeBusqueda(sep: number, vTriangulo: number, vRegion: number, h: number, gravedadRelativa: number): number {
+  return sep + Math.min(ALCANCE_MAXIMO, h * (vTriangulo + vRegion) + Math.abs(gravedadRelativa) * h * h);
 }
 
 /** La mayor rapidez de la tela por región: celdas de `lado` (m); `alrededor` mira la del punto y sus 26 vecinas. */

@@ -237,6 +237,8 @@ const I_EXO = ${u(iu.exOff)}; const I_EXI = ${u(iu.exIdx)};
 ${Object.entries(d.at).filter(([k]) => k !== 'total').map(([k, v]) => `const A_${k} = ${u(v)};`).join(' ')}
 const SEPP = ${f(p.sepPropia)};
 const ALCANCE = ${f(ALCANCE_MAXIMO)};
+// la gravedad del radio de búsqueda: solo si hay vértices empotrados (contactoPropio.ts, radioDeBusqueda)
+const GRAV_EMP = ${f(s.fijo.some((q) => q !== 0) ? Math.abs(aj.gravedad) : 0)};
 // la celda de la rejilla de puntos y la de las regiones de rapidez (contactoPropio.ts)
 const CELDA = ${f(celdaDeLaRejilla(p.sepPropia, p.aristaMedia))};
 const CREG = ${f(celdaDeRegion(p.sepPropia, p.aristaMedia))};

@@ -204,8 +204,8 @@ describe('la tela contra sí misma', () => {
   });
 
   it('un vértice rápido lejos no agranda la búsqueda de dos capas quietas', () => {
-    // dos capas quietas a 8 mm, más que la separación y lo que la gravedad mueve en un cuadro (4,2 mm), y a medio
-    // metro una tercera lámina que corre a 1 m/s
+    // dos capas quietas a 8 mm, más que la separación (la gravedad las mueve igual), y a medio metro una tercera lámina
+    // que corre a 1 m/s
     const abajo = mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), arriba = mallaDeContorno(rectangulo(-45, -45, 45, 45), 10, 0.008);
     const lejos = mallaDeContorno(rectangulo(440, -45, 530, 45), 10);
     const nQuietos = abajo.x.length / 3 + arriba.x.length / 3;
