@@ -6,9 +6,9 @@ import { telaSI } from '../tela';
 import { laminaPlana, TELA_DE_LABORATORIO } from '../banco/escenas';
 import { azar, errorDeHessiana, errorDelGradiente } from './ayudas';
 
-function membranaDeLamina(pandeo: number) {
+function membranaDeLamina(pandeo: number, topePandeo?: number) {
   const m = laminaPlana(20);
-  const tela = telaSI({ ...TELA_DE_LABORATORIO, pandeo });
+  const tela = telaSI({ ...TELA_DE_LABORATORIO, pandeo, topePandeo });
   const { coef } = prepararReposo(aMarcoDelHilo(m.patron), m.tris, tela.densidad);
   return { m, mem: new Membrana(m.tris, coef, tela) };
 }
@@ -27,6 +27,21 @@ describe('la membrana', () => {
     expect(ley(-0.1, k, pcr)[2]).toBe(0);
   });
 
+  it('con tope, la meseta termina: pasado el encogimiento del tope, la tela vuelve a resistir como al estirar', () => {
+    const k = 600, pcr = 3, tope = 0.2;
+    // en la meseta, igual que sin tope
+    expect(ley(-0.1, k, pcr, tope)).toEqual(ley(-0.1, k, pcr));
+    // en el tope, la energía y la fuerza siguen sin salto
+    const antes = ley(-tope, k, pcr, tope), despues = ley(-tope - 1e-12, k, pcr, tope);
+    expect(despues[0]).toBeCloseTo(antes[0], 9);
+    expect(despues[1]).toBeCloseTo(antes[1], 6);
+    // más allá, la fuerza crece con k: −pcr + k·(ε + tope)
+    const pasado = ley(-0.25, k, pcr, tope);
+    expect(pasado[1]).toBeCloseTo(-pcr - 0.05 * k, 9);
+    expect(pasado[2]).toBe(k);
+    expect(pasado[0]).toBeCloseTo(ley(-0.25, k, pcr)[0] + 0.5 * k * 0.05 * 0.05, 9);
+  });
+
   it('sin pandeo o con compresión gratis la ley queda finita', () => {
     const libre = ley(-0.1, 600, 0);
     expect(libre[0]).toBe(0);
@@ -38,9 +53,9 @@ describe('la membrana', () => {
     expect(rigida[2]).toBe(600);
   });
 
-  for (const pandeo of [Infinity, 1, 0]) {
-    it(`fuerza = −∂E/∂x por diferencias finitas (pandeo ${pandeo})`, () => {
-      const { m, mem } = membranaDeLamina(pandeo);
+  for (const [pandeo, tope] of [[Infinity, undefined], [1, undefined], [0, undefined], [1, 0.05]] as const) {
+    it(`fuerza = −∂E/∂x por diferencias finitas (pandeo ${pandeo}, tope ${tope ?? 'ninguno'})`, () => {
+      const { m, mem } = membranaDeLamina(pandeo, tope);
       const r = azar(7), x = Float64Array.from(m.x, (q) => q + 0.004 * r());
       mem.linealizar(x);
       const g = new Float64Array(x.length);

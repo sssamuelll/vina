@@ -209,6 +209,8 @@ const MGH = ${f(Math.max(p.pesoTotal * aj.h, 1e-30))};
 const KU = ${f(tela.kTrama)};
 const KV = ${f(tela.kUrdimbre)};
 const KS = ${f(tela.kCizalla)};
+// sin tope, uno que nunca se llega a tocar
+const TOPE_P = ${f(Math.min(tela.topePandeo, 3e38))};
 const BUSQUEDA = ${aj.busqueda};
 const MU_C = ${f(tela.friccionCuerpo)};
 const WG = ${u(WG)};
@@ -246,11 +248,14 @@ fn hg(e: u32, r: u32) -> vec3<f32> { let b = O_HD + 16u * e + 1u + 3u * r; retur
 fn outer(a: vec3<f32>, b: vec3<f32>) -> mat3x3<f32> { return mat3x3<f32>(a * b.x, a * b.y, a * b.z); }
 fn ld9(q: u32) -> mat3x3<f32> { return transpose(mat3x3<f32>(vals[q].xyz, vals[NQ + q].xyz, vals[2u * NQ + q].xyz)); }
 
-// la ley de membrana.ts: ψ, ψ' y ψ'' con pandeo
+// la ley de membrana.ts: ψ, ψ' y ψ'' con pandeo y su tope
 fn ley(eps: f32, k: f32, pcr: f32) -> vec3<f32> {
   let ecr = pcr / k;
   if (eps >= -ecr) { return vec3<f32>(0.5 * k * eps * eps, k * eps, k); }
-  return vec3<f32>(0.5 * k * ecr * ecr + pcr * (-eps - ecr), -pcr, 0.0);
+  let meseta = 0.5 * k * ecr * ecr + pcr * (-eps - ecr);
+  let t = max(TOPE_P, ecr);
+  if (eps >= -t) { return vec3<f32>(meseta, -pcr, 0.0); }
+  return vec3<f32>(meseta + 0.5 * k * (eps + t) * (eps + t), -pcr + k * (eps + t), k);
 }
 
 fn inversa3(m: mat3x3<f32>) -> mat3x3<f32> {

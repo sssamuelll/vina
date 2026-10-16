@@ -10,12 +10,16 @@ import type { TelaSI } from './tela';
 
 /**
  * ψ(ε), ψ'(ε) y ψ''(ε) por unidad de área: rigidez k hasta la carga de pandeo `pcr` (N/m) al encoger;
- * desde ahí la fuerza queda en −pcr y la tela se dobla en vez de encoger.
+ * desde ahí la fuerza queda en −pcr y la tela se dobla en vez de encoger. Pasado el encogimiento `tope`, la
+ * tela vuelve a resistir con k: ψ suma ½·k·(ε + tope)².
  */
-export function ley(eps: number, k: number, pcr: number): [number, number, number] {
+export function ley(eps: number, k: number, pcr: number, tope = Infinity): [number, number, number] {
   const ecr = pcr / k;
   if (eps >= -ecr) return [0.5 * k * eps * eps, k * eps, k];
-  return [0.5 * k * ecr * ecr + pcr * (-eps - ecr), -pcr, 0];
+  const meseta = 0.5 * k * ecr * ecr + pcr * (-eps - ecr);
+  const t = Math.max(tope, ecr);
+  if (eps >= -t) return [meseta, -pcr, 0];
+  return [meseta + 0.5 * k * (eps + t) * (eps + t), -pcr + k * (eps + t), k];
 }
 
 /**
@@ -62,8 +66,8 @@ export class Membrana {
     this.columnas(t, x, f);
     const su = Math.hypot(f[0], f[1], f[2]), sv = Math.hypot(f[3], f[4], f[5]);
     const g = f[0] * f[3] + f[1] * f[4] + f[2] * f[5];
-    const { kTrama, kUrdimbre, kCizalla } = this.tela;
-    return this.coef[7 * t + 6] * (ley(su - 1, kTrama, this.pcrU[t])[0] + ley(sv - 1, kUrdimbre, this.pcrV[t])[0] + 0.5 * kCizalla * g * g);
+    const { kTrama, kUrdimbre, kCizalla, topePandeo } = this.tela;
+    return this.coef[7 * t + 6] * (ley(su - 1, kTrama, this.pcrU[t], topePandeo)[0] + ley(sv - 1, kUrdimbre, this.pcrV[t], topePandeo)[0] + 0.5 * kCizalla * g * g);
   }
 
   energia(x: Float64Array): number {
@@ -74,12 +78,12 @@ export class Membrana {
 
   /** Guarda el estado de cada triángulo en las posiciones x, para el gradiente, H·p y los bloques. */
   linealizar(x: Float64Array): void {
-    const f = this.f, e = this.estado, { kTrama, kUrdimbre } = this.tela;
+    const f = this.f, e = this.estado, { kTrama, kUrdimbre, topePandeo } = this.tela;
     for (let t = 0; t < this.nt; t++) {
       this.columnas(t, x, f);
       const su = Math.hypot(f[0], f[1], f[2]), sv = Math.hypot(f[3], f[4], f[5]);
-      const du = ley(su - 1, kTrama, this.pcrU[t])[1];
-      const dv = ley(sv - 1, kUrdimbre, this.pcrV[t])[1];
+      const du = ley(su - 1, kTrama, this.pcrU[t], topePandeo)[1];
+      const dv = ley(sv - 1, kUrdimbre, this.pcrV[t], topePandeo)[1];
       // un triángulo aplastado en una dirección no tiene dirección: sin fuerza ni rigidez transversal
       const gu = su > 1e-12 ? du / su : 0, gv = sv > 1e-12 ? dv / sv : 0;
       const s = ESTADO_MEMBRANA * t;

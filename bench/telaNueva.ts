@@ -2,7 +2,7 @@
  * El banco de la tela nueva contra la referencia privada (spec 2026-10-13 §4.4.2) y contra el motor de
  * hoy (§4.4.4).
  *
- *   VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- [--motor=implicito|xpbd] [--pandeo=<factor>] [--ensayo=cusick|voladizo|todo|camiseta] [--mallas=5,10,20] [--cg=<n>] [--cierre=<mm por cuadro>] [--kCostura=<N/m>] [--topePlaca=<veces la mediana>] [--flexionDelMargen=<f>]
+ *   VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- [--motor=implicito|xpbd] [--pandeo=<factor>] [--topePandeo=<fracción>] [--kTrama=<N/m>] [--kUrdimbre=<N/m>] [--kCizalla=<N/m>] [--ensayo=cusick|voladizo|todo|camiseta] [--mallas=5,10,20] [--cg=<n>] [--cierre=<mm por cuadro>] [--kCostura=<N/m>] [--topePlaca=<veces la mediana>] [--flexionDelMargen=<f>]
  *
  * `camiseta` no entra en `todo`: corre la camiseta de María sobre el avatar y desde la colocación de la referencia
  * (camiseta.json en la carpeta privada), solo con el motor implícito.
@@ -28,8 +28,15 @@ import {
 import { PANDEO_CALIBRADO } from '../src/utils/cloth/implicito/tela';
 import { correrImplicito } from './motorImplicito';
 
+/** La tela de la referencia con el pandeo, su tope y las rigideces de tracción (N/m) que se pidan. */
+function telaDelBanco(ref: Referencias, args: Map<string, string>) {
+  const tela = telaDeLaReferencia(ref, Number(args.get('pandeo') || PANDEO_CALIBRADO));
+  for (const k of ['topePandeo', 'kTrama', 'kUrdimbre', 'kCizalla'] as const) if (args.has(k)) tela[k] = Number(args.get(k));
+  return tela;
+}
+
 const MOTORES: Record<string, (ref: Referencias, args: Map<string, string>) => Corredor> = {
-  implicito: (ref, args) => correrImplicito(telaDeLaReferencia(ref, Number(args.get('pandeo') || PANDEO_CALIBRADO))),
+  implicito: (ref, args) => correrImplicito(telaDelBanco(ref, args)),
   xpbd: () => correrXpbd,
 };
 
@@ -63,7 +70,7 @@ if (ensayo === 'todo' || ensayo === 'voladizo') {
 if (ensayo === 'camiseta') {
   if (motor !== 'implicito') throw new Error('la camiseta corre solo con el motor implícito');
   const filas = ensayoCamiseta(
-    telaDeLaReferencia(ref, Number(args.get('pandeo') || PANDEO_CALIBRADO)),
+    telaDelBanco(ref, args),
     mallas,
     {
       ...(args.has('cg') ? { maxCG: Number(args.get('cg')) } : {}),

@@ -60,6 +60,12 @@ test.describe('La tela nueva en la GPU @gpu-local', () => {
     });
   }
 
+  test('da lo mismo que la CPU tras 3 cuadros con el tope de la meseta (chica)', async ({ page }) => {
+    // con un tope de 0,1 %, casi todo lo que encoge pasa la meseta y vuelve a resistir con k
+    const r = await correr(page, 'modo=paridad&escena=chica&cg=50&pandeo=1&topePandeo=0.001&cuadros=3');
+    expect(r.dif?.maxima).toBeLessThan(1e-4);
+  });
+
   test('con lugar para 8 pares, la GPU cuenta los que no caben y la tela no se llena de NaN', async ({ page }) => {
     const r = await correr(page, 'modo=paridad&escena=capas&cg=50&cuadros=3&maxPares=8');
     expect(r.estado?.desbordes).toBeGreaterThan(0);

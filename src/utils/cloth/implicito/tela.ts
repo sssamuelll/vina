@@ -18,6 +18,8 @@ export interface TelaFisica {
   kCizalla: number;
   /** factor de la carga de pandeo P = pandeo·π²·B/L² (§4.1.4); Infinity = resiste igual que al estirar */
   pandeo: number;
+  /** encogimiento (fracción) desde el que la tela vuelve a resistir como al estirar; sin él, la meseta no termina */
+  topePandeo?: number;
   /** µN·m */
   bTrama: number;
   /** µN·m */
@@ -38,6 +40,8 @@ export interface TelaSI {
   kUrdimbre: number;
   kCizalla: number;
   pandeo: number;
+  /** Infinity sin tope */
+  topePandeo: number;
   bTrama: number;
   bUrdimbre: number;
   bBies: number;
@@ -53,6 +57,7 @@ export function telaSI(t: TelaFisica): TelaSI {
     kUrdimbre: t.kUrdimbre,
     kCizalla: t.kCizalla,
     pandeo: t.pandeo,
+    topePandeo: t.topePandeo ?? Infinity,
     bTrama: t.bTrama * 1e-6,
     bUrdimbre: t.bUrdimbre * 1e-6,
     bBies: t.bBies * 1e-6,
