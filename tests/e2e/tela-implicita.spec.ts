@@ -128,4 +128,18 @@ test.describe('La camiseta de María en la GPU, contra la referencia @gpu-local'
     expect(camiseta.segundosHastaQuieta!).toBeLessThanOrEqual(10);
     expect(velocidad50.msPorCuadro!).toBeLessThanOrEqual(17);
   });
+
+  test('velocidad por partes a 5 mm: iteraciones × contacto propio × anticipación (medida, sin meta)', async ({ page }) => {
+    const filas: Array<{ consulta: string; msPorCuadro: number }> = [];
+    for (const cg of [20, 50]) {
+      for (const propio of [1, 0]) {
+        for (const anticipar of [1, 0]) {
+          const consulta = `modo=velocidad&escena=camiseta&malla=5&cg=${cg}&propio=${propio}&anticipar=${anticipar}&cuadros=60`;
+          filas.push({ consulta, msPorCuadro: (await correr(page, consulta, 880_000)).msPorCuadro! });
+        }
+      }
+    }
+    console.log(`[velocidad] informe: ${guardarInforme('camiseta-velocidad', { filas })}`);
+    for (const f of filas) expect(f.msPorCuadro).toBeGreaterThan(0);
+  });
 });
