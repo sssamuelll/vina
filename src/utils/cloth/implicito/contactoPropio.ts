@@ -37,6 +37,51 @@ export function separacionPropia(grosor: number): number {
 /** Hasta dónde (m) se buscan candidatos más allá de la separación: lo que un cuadro de 2 m/s alcanza a mover. */
 export const ALCANCE_MAXIMO = 0.02;
 
+/**
+ * El lado de la celda de la rejilla de puntos (m): con la mitad del alcance, la caja de un triángulo cabe en pocas
+ * celdas aunque busque hasta el alcance, y la de uno quieto no recorre celdas de más.
+ */
+export function celdaDeLaRejilla(sep: number, aristaMedia: number): number {
+  return Math.max(2 * sep, aristaMedia, 0.5 * (sep + ALCANCE_MAXIMO));
+}
+
+/** El lado de las regiones de rapidez (m): las 27 alrededor de un triángulo cubren todo lo que su caja puede tocar. */
+export function celdaDeRegion(sep: number): number {
+  return 2 * (sep + ALCANCE_MAXIMO);
+}
+
+/**
+ * El radio de búsqueda de un triángulo (m): la separación más lo que él (`vTriangulo`, su vértice más rápido) y la tela
+ * de su región (`vRegion`) pueden acercarse en dos cuadros, más lo que la gravedad mueve en uno, hasta el alcance. Un
+ * vértice rápido en otra región no agranda la búsqueda de esta.
+ */
+export function radioDeBusqueda(sep: number, vTriangulo: number, vRegion: number, h: number, gravedad: number): number {
+  return sep + Math.min(ALCANCE_MAXIMO, 2 * h * (vTriangulo + vRegion) + Math.abs(gravedad) * h * h);
+}
+
+/** La mayor rapidez de la tela por región: celdas de `lado` (m); `alrededor` mira la del punto y sus 26 vecinas. */
+export class RegionesDeRapidez {
+  private readonly celdas = new Map<number, number>();
+
+  constructor(private readonly lado: number) {}
+
+  private clave(ix: number, iy: number, iz: number): number {
+    return ((ix + 4096) * 8192 + (iy + 4096)) * 8192 + (iz + 4096);
+  }
+
+  anotar(x: number, y: number, z: number, rapidez: number): void {
+    const k = this.clave(Math.floor(x / this.lado), Math.floor(y / this.lado), Math.floor(z / this.lado));
+    this.celdas.set(k, Math.max(this.celdas.get(k) ?? 0, rapidez));
+  }
+
+  alrededor(x: number, y: number, z: number): number {
+    const ix = Math.floor(x / this.lado), iy = Math.floor(y / this.lado), iz = Math.floor(z / this.lado);
+    let v = 0;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) v = Math.max(v, this.celdas.get(this.clave(ix + a, iy + b, iz + c)) ?? 0);
+    return v;
+  }
+}
+
 /** Una rejilla de puntos: cada punto en la celda que lo contiene. Quien busca pasa una caja y recibe los de sus celdas. */
 export class RejillaDePuntos {
   private readonly celdas = new Map<number, number[]>();

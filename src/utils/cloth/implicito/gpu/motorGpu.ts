@@ -148,9 +148,9 @@ export class MotorGpu {
     d('ensamblar', gb);
     if (propio) {
       // los pares del contacto propio en x_t (sistema.ts, armarParesPropios) y la lista de entradas de cada vértice
-      d('velMax', gv);
-      d('armarRadio', 1);
+      d('limpiarPares', 1);
       d('limpiarCeldas', gcel);
+      d('anotarRegiones', gv);
       d('hashContar', gpnt);
       d('scanCBloques', gcel);
       d('scanCTotales', 1);

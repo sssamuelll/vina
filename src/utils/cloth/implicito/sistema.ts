@@ -3,7 +3,9 @@
  * placa), las masas, los obstáculos y el estado. El cuadro minimiza
  *   G(x) = ½·|x − y|²_M / h² + ½·aire·|x − x_t|²_M / h + E(x) + contacto,  con y = x_t + h·v_t + h²·g.
  */
-import { ALCANCE_MAXIMO, energiaDelPar, RejillaDePuntos, separacionPropia, type ParPropio } from './contactoPropio';
+import {
+  celdaDeLaRejilla, celdaDeRegion, energiaDelPar, radioDeBusqueda, RegionesDeRapidez, RejillaDePuntos, separacionPropia, type ParPropio,
+} from './contactoPropio';
 import { energiaDeFriccion, HOLGURA_DE_APOYO, rigidezDeFriccion, VELOCIDAD_DE_DESPEGUE, type ApoyoEnCuerpo } from './contactos';
 import { Costuras, MUESTRAS_DE_PUNTADA, type BisagraDeCostura, type PuntoDeCostura } from './costuras';
 import { puntoMasCercano, type CuerpoRigido, type PuntoEnTriangulo } from './cuerpo';
@@ -373,18 +375,18 @@ export class SistemaTela {
    * del radio (salvo los vértices del triángulo y sus compañeros de costura); un vértice del cuerpo, si atravesó la
    * tela por la cara o la sostenía el cuadro anterior. Entra activo el que ya está dentro de la separación, con su
    * fricción, y el par de dos capas que la velocidad del cuadro anterior metería en la separación en dos cuadros (E10:
-   * sin segunda ronda, la predicción reemplaza a la anticipación).
+   * sin segunda ronda, la predicción reemplaza a la anticipación). Cada triángulo busca hasta su propio radio, el de su
+   * rapidez y la de su región (contactoPropio.ts, radioDeBusqueda).
    */
   armarParesPropios(): void {
     this.paresPropios = [];
     if (!this.aj.contactoPropio) return;
     const { x, v, tris, fijo, n, punto: q } = this, sep = this.sepPropia, { kContacto, kPropio, h, gravedad } = this.aj, kp = kPropio ?? kContacto;
-    let vmax = 0;
-    for (let i = 0; i < n; i++) vmax = Math.max(vmax, Math.hypot(v[3 * i], v[3 * i + 1], v[3 * i + 2]));
-    const radio = sep + Math.min(ALCANCE_MAXIMO, 2 * vmax * h + Math.abs(gravedad) * h * h);
+    const rapidez = (i: number) => Math.hypot(v[3 * i], v[3 * i + 1], v[3 * i + 2]);
+    const regiones = new RegionesDeRapidez(celdaDeRegion(sep));
+    for (let i = 0; i < n; i++) regiones.anotar(x[3 * i], x[3 * i + 1], x[3 * i + 2], rapidez(i));
     this.puntos.set(x);
-    // la celda mide al menos el radio: la caja de un triángulo toca a lo sumo cinco celdas por eje
-    this.rejilla.armar(this.puntos, Math.max(2 * sep, this.aristaMedia, radio));
+    this.rejilla.armar(this.puntos, celdaDeLaRejilla(sep, this.aristaMedia));
     const agregar = (vs: number[], ws: number[], nx: number, ny: number, nz: number, s0: number, separacionDelPar: number, mu: number, k: number, predecir: boolean) => {
       const p0 = separacionDelPar - s0;
       let vx = 0, vy = 0, vz = 0;
@@ -404,6 +406,7 @@ export class SistemaTela {
       const ax = x[3 * a], ay = x[3 * a + 1], az = x[3 * a + 2], bx = x[3 * b], by = x[3 * b + 1], bz = x[3 * b + 2];
       const cx = x[3 * c], cy = x[3 * c + 1], cz = x[3 * c + 2];
       const libres = !(fijo[a] && fijo[b] && fijo[c]);
+      const radio = radioDeBusqueda(sep, Math.max(rapidez(a), rapidez(b), rapidez(c)), regiones.alrededor((ax + bx + cx) / 3, (ay + by + cy) / 3, (az + bz + cz) / 3), h, gravedad);
       // E6: un punto cae sobre la cara cerrada del triángulo si su separación del punto más cercano va a lo largo de la
       // normal de la cara; la tolerancia de 1/1000 deja entrar al que cae justo sobre un borde o un vértice (mallas
       // alineadas), y el vecino de la misma capa, que la mira de canto, queda fuera

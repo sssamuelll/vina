@@ -1,10 +1,10 @@
 /**
  * La tela contra sí misma en la GPU (spec 2026-10-13 §4.3.2, con E3 y E6): el mismo armado de pares que sistema.ts,
  * armarParesPropios. Una rejilla de puntos por hash espacial (contar, sumar, repartir; las atómicas solo cuentan) y
- * cada triángulo recorre las celdas de su caja agrandada por el radio. Los pares van a una lista, y cada vértice tiene,
- * rearmada en cada cuadro, la lista de sus entradas en los pares: la recorren el residuo, el producto matriz-vector y
- * el bloque diagonal (§4.3.2). Un par ocupa 14 números en tf: los cuatro vértices (−1 si no hay), sus pesos, la normal,
- * p0, kt y si está activo.
+ * cada triángulo recorre las celdas de su caja agrandada por su radio, el de su rapidez y la de su región. Los pares van
+ * a una lista, y cada vértice tiene, rearmada en cada cuadro, la lista de sus entradas en los pares activos: la recorren
+ * el residuo, el producto matriz-vector y el bloque diagonal (§4.3.2). Un par ocupa 14 números en tf: los cuatro
+ * vértices (−1 si no hay), sus pesos, la normal, p0, kt y si está activo.
  */
 
 /** Suma exclusiva de `largo` cuentas del búfer `at` (desde `cuenta`) a tf (desde `salida`, como f32 exactos), con el total al final. */
@@ -54,21 +54,8 @@ fn puntoDe(p: u32) -> vec3<f32> {
 }
 fn nPares() -> u32 { return min(atomicLoad(&at[A_NPAR]), MAXP); }
 
-// 4c. el radio de búsqueda y la celda del cuadro (sistema.ts, armarParesPropios)
-@compute @workgroup_size(WG) fn velMax(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
-  var v = 0.0;
-  if (g.x < N) { v = length(ld(O_V, g.x)); }
-  let m = reducirMax(l.x, v);
-  if (l.x == 0u) { red[R_PB + w.x] = m; }
-}
-
-@compute @workgroup_size(1) fn armarRadio() {
-  var vmax = 0.0;
-  for (var k = 0u; k < GV; k++) { vmax = max(vmax, red[R_PB + k]); }
-  let r = SEPP + min(ALCANCE, 2.0 * vmax * H + abs(GRAV) * H * H);
-  red[R_SC + E_RADIO] = r;
-  // la celda mide al menos el radio: la caja de un triángulo toca a lo sumo cinco celdas por eje
-  red[R_SC + E_CELDA] = max(max(2.0 * SEPP, ARISTA), r);
+// 4c. la lista de pares del cuadro empieza vacía
+@compute @workgroup_size(1) fn limpiarPares() {
   atomicStore(&at[A_NPAR], 0u);
 }
 
@@ -77,12 +64,21 @@ fn nPares() -> u32 { return min(atomicLoad(&at[A_NPAR]), MAXP); }
   if (g.x >= NCELDAS) { return; }
   atomicStore(&at[A_CNTC + g.x], 0u);
   atomicStore(&at[A_CURC + g.x], 0u);
+  atomicStore(&at[A_VREG + g.x], 0u);
+}
+
+// la rapidez de cada región (sistema.ts, armarParesPropios): la mayor de su tela, como u32 (un f32 positivo ordena igual
+// que sus bits); dos regiones que caen en la misma entrada del hash comparten la mayor, y el radio solo crece
+@compute @workgroup_size(WG) fn anotarRegiones(@builtin(global_invocation_id) g: vec3<u32>) {
+  let i = g.x;
+  if (i >= N) { return; }
+  atomicMax(&at[A_VREG + hashCelda(celdaDe(ldx(i), CREG))], bitcast<u32>(length(ld(O_V, i))));
 }
 
 @compute @workgroup_size(WG) fn hashContar(@builtin(global_invocation_id) g: vec3<u32>) {
   let p = g.x;
   if (p >= NP) { return; }
-  let h = hashCelda(celdaDe(puntoDe(p), red[R_SC + E_CELDA]));
+  let h = hashCelda(celdaDe(puntoDe(p), CELDA));
   tf[O_HP + p] = f32(h);
   atomicAdd(&at[A_CNTC + h], 1u);
 }
@@ -93,7 +89,10 @@ ${wgslScan('scanC', 'A_CNTC', 'NCELDAS', 'O_OFFC')}
   let p = g.x;
   if (p >= NP) { return; }
   let h = u32(tf[O_HP + p]);
-  tf[O_ORD + u32(tf[O_OFFC + h]) + atomicAdd(&at[A_CURC + h], 1u)] = f32(p);
+  // cada lugar guarda el punto y su posición, para que quien recorre una celda lea seguido
+  let o = O_ORD4 + 4u * (u32(tf[O_OFFC + h]) + atomicAdd(&at[A_CURC + h], 1u));
+  let x = puntoDe(p);
+  tf[o] = x.x; tf[o + 1u] = x.y; tf[o + 2u] = x.z; tf[o + 3u] = f32(p);
 }
 
 // 4e. los pares
@@ -187,11 +186,21 @@ fn parDePunta(b: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, bb: vec3<f32>, c:
   let b = ldx(ib);
   let c = ldx(ic);
   let tn = cross(b - a, c - a);
-  let r = red[R_SC + E_RADIO];
-  let cel = red[R_SC + E_CELDA];
+  // el radio del triángulo: su rapidez y la de su región en dos cuadros (contactoPropio.ts, radioDeBusqueda)
+  let vt = max(length(ld(O_V, ia)), max(length(ld(O_V, ib)), length(ld(O_V, ic))));
+  let kr = celdaDe((a + b + c) / 3.0, CREG);
+  var vr = 0.0;
+  for (var dx = -1; dx <= 1; dx++) {
+    for (var dy = -1; dy <= 1; dy++) {
+      for (var dz = -1; dz <= 1; dz++) { vr = max(vr, bitcast<f32>(atomicLoad(&at[A_VREG + hashCelda(kr + vec3<i32>(dx, dy, dz))]))); }
+    }
+  }
+  let r = SEPP + min(ALCANCE, 2.0 * H * (vt + vr) + abs(GRAV) * H * H);
   let libres = iu[I_FIJO + ia] == 0u || iu[I_FIJO + ib] == 0u || iu[I_FIJO + ic] == 0u;
-  let k0 = celdaDe(min(min(a, b), c) - vec3<f32>(r), cel);
-  let k1 = celdaDe(max(max(a, b), c) + vec3<f32>(r), cel);
+  let lo = min(min(a, b), c) - vec3<f32>(r);
+  let hi = max(max(a, b), c) + vec3<f32>(r);
+  let k0 = celdaDe(lo, CELDA);
+  let k1 = celdaDe(hi, CELDA);
   // ponytail: un triángulo estirado más allá de ocho celdas por eje no busca pares y se cuenta como desborde
   if (any(k1 - k0 >= vec3<i32>(8))) {
     atomicAdd(&at[A_DESB], 1u);
@@ -204,10 +213,12 @@ fn parDePunta(b: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, bb: vec3<f32>, c:
         let h = hashCelda(k);
         let fin = u32(tf[O_OFFC + h + 1u]);
         for (var s = u32(tf[O_OFFC + h]); s < fin; s++) {
-          let p = u32(tf[O_ORD + s]);
-          let q = puntoDe(p);
-          // la misma entrada del hash guarda puntos de otras celdas: cada punto se mira desde la suya
-          if (any(celdaDe(q, cel) != k)) { continue; }
+          let o4 = O_ORD4 + 4u * s;
+          let q = vec3<f32>(tf[o4], tf[o4 + 1u], tf[o4 + 2u]);
+          // fuera de la caja no hay nada que buscar; y la misma entrada del hash guarda puntos de otras celdas: cada
+          // punto se mira desde la suya
+          if (any(q < lo) || any(q > hi) || any(celdaDe(q, CELDA) != k)) { continue; }
+          let p = u32(tf[o4 + 3u]);
           if (p < N) { parDeVertice(p, ia, ib, ic, a, b, c, tn, q, r); }
           else { parDePunta(p - N, ia, ib, ic, a, b, c, tn, q, r, libres); }
         }

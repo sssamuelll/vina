@@ -3,7 +3,7 @@
  * escena: tamaños, desplazamientos, ajustes y obstáculos van como constantes. La física es la de paso.ts,
  * en el mismo orden; el cuadro entero cabe en un pase de cómputo y las sumas se reducen en la GPU.
  */
-import { ALCANCE_MAXIMO } from '../contactoPropio';
+import { ALCANCE_MAXIMO, celdaDeLaRejilla, celdaDeRegion } from '../contactoPropio';
 import { EPS_FRICCION, HOLGURA_DE_APOYO, VELOCIDAD_DE_DESPEGUE } from '../contactos';
 import { CIERRE_POR_CUADRO, CUADROS_DE_PUNTADA, LARGO_CERRADO, MUESTRAS_DE_PUNTADA } from '../costuras';
 import { RADIO_DE_BUSQUEDA, type Obstaculo } from '../obstaculos';
@@ -18,14 +18,14 @@ export const WG = 128;
 /** Los escalares del cuadro, en la zona SC de `red`. */
 export const ESC = {
   RZ: 0, RZ0: 1, ALFA: 2, BETA: 3, HECHO: 4, ACTIVO: 5, PROYECTADOS: 6, ALFA_LS: 7, PROBANDO: 8,
-  CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14, COSIDA: 15, RADIO: 16, CELDA: 17,
+  CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14, COSIDA: 15,
 } as const;
 const N_ESC = 32;
 
 /** Las entradas de cómputo, en el orden en que las despacha un cuadro. */
 export const ENTRADAS = [
   'encoger', 'ubicar', 'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar',
-  'velMax', 'armarRadio', 'limpiarCeldas', 'hashContar', 'scanCBloques', 'scanCTotales', 'scanCSumar', 'hashLlenar',
+  'limpiarPares', 'limpiarCeldas', 'anotarRegiones', 'hashContar', 'scanCBloques', 'scanCTotales', 'scanCSumar', 'hashLlenar',
   'limpiarPuntas', 'paresDeTriangulo', 'limpiarVertices', 'contarEntradas', 'scanVBloques', 'scanVTotales', 'scanVSumar', 'llenarEntradas',
   'residuo', 'sumarInicio', 'aportePares', 'spmv', 'sumarAlfa', 'actualizar', 'sumarBeta', 'nuevaP', 'expandirP',
   'prepBusqueda', 'posPrueba', 'anguloPrueba', 'difTri', 'difCostura', 'difPares', 'decidir', 'aplicar',
@@ -47,10 +47,10 @@ function zonas<K extends string>(tamanos: Record<K, number>): Record<K, number> 
 type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT' | 'RN';
 type ZonaTf =
   | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'THP' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH' | 'CCOS' | 'CDES'
-  | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'CUVN' | 'SOST' | 'HP' | 'OFFC' | 'ORD' | 'PAR' | 'OFFV' | 'ENT' | 'SCB'
+  | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'CUVN' | 'SOST' | 'HP' | 'OFFC' | 'ORD4' | 'PAR' | 'OFFV' | 'ENT' | 'SCB'
   | 'APORTE';
 /** el búfer atómico del contacto propio: cuentas y cursores de la rejilla y de las listas, los pares y los desbordes */
-type ZonaAt = 'CNTC' | 'CURC' | 'CNTV' | 'CURV' | 'NPAR' | 'DESB';
+type ZonaAt = 'CNTC' | 'CURC' | 'VREG' | 'CNTV' | 'CURV' | 'NPAR' | 'DESB';
 /** las sumas parciales de cada reducción, los escalares y la historia de la quietud */
 type ZonaRed = 'PA' | 'PB' | 'PC' | 'PD' | 'PE' | 'SC' | 'HISTO';
 
@@ -88,7 +88,7 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
     COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, THP: nh, CONTRIB: 45 * nt + 9 * p.nc,
     CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch, CCOS: p.nc, CDES: 3 * p.nc,
     CUN: p.f32.cuNodos.length, CUT: p.f32.cuTri.length, CUNT: p.f32.cuNt.length, CUPA: p.f32.cuPa.length, CUPV: p.f32.cuPv.length,
-    CUV: 3 * p.nvb, CUVN: 3 * p.nvb, SOST: 2 * p.nvb, HP: p.np, OFFC: p.nceldas + 1, ORD: p.np, PAR: 14 * p.maxPares, OFFV: n + 1, ENT: 4 * p.maxPares,
+    CUV: 3 * p.nvb, CUVN: 3 * p.nvb, SOST: 2 * p.nvb, HP: p.np, OFFC: p.nceldas + 1, ORD4: 4 * p.np, PAR: 14 * p.maxPares, OFFV: n + 1, ENT: 4 * p.maxPares,
     SCB: Math.max(Math.ceil(p.nceldas / WG), Math.ceil(n / WG)) + 1,
     // el aporte de cada par activo a A·p, por cada uno de sus cuatro vértices (aportePares)
     APORTE: 12 * p.maxPares,
@@ -104,7 +104,7 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
   const gpa = Math.min(gp, 256);
   const zona = Math.max(gv, gt, gh, gc, gp, 1);
   const red = { ...zonas<ZonaRed>({ PA: zona, PB: zona, PC: zona, PD: zona, PE: zona, SC: N_ESC, HISTO: cuadrosDeHistoria }), HIST: cuadrosDeHistoria };
-  const at = zonas<ZonaAt>({ CNTC: p.nceldas, CURC: p.nceldas, CNTV: n, CURV: n, NPAR: 1, DESB: 1 });
+  const at = zonas<ZonaAt>({ CNTC: p.nceldas, CURC: p.nceldas, VREG: p.nceldas, CNTV: n, CURV: n, NPAR: 1, DESB: 1 });
   return { vf, tf, iu, red, at, gv, gt, gh, gb, gc, gch, gp, gpa, gcel, gpnt, gvb };
 }
 
@@ -236,6 +236,9 @@ const I_EXO = ${u(iu.exOff)}; const I_EXI = ${u(iu.exIdx)};
 ${Object.entries(d.at).filter(([k]) => k !== 'total').map(([k, v]) => `const A_${k} = ${u(v)};`).join(' ')}
 const SEPP = ${f(p.sepPropia)};
 const ALCANCE = ${f(ALCANCE_MAXIMO)};
+// la celda de la rejilla de puntos y la de las regiones de rapidez (contactoPropio.ts)
+const CELDA = ${f(celdaDeLaRejilla(p.sepPropia, p.aristaMedia))};
+const CREG = ${f(celdaDeRegion(p.sepPropia))};
 const ARISTA = ${f(p.aristaMedia)};
 const MU_T = ${f(tela.friccionTela)};
 const EPS_F = ${f(EPS_FRICCION)};

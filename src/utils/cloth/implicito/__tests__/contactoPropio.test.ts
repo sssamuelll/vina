@@ -186,6 +186,24 @@ describe('la tela contra sí misma', () => {
     expect(activos.every((p) => p.p0 < 0)).toBe(true);
   });
 
+  it('un vértice rápido lejos no agranda la búsqueda de dos capas quietas', () => {
+    // dos capas quietas a 8 mm, más que la separación y lo que la gravedad mueve en un cuadro (4,2 mm), y a medio
+    // metro una tercera lámina que corre a 1 m/s
+    const abajo = mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), arriba = mallaDeContorno(rectangulo(-45, -45, 45, 45), 10, 0.008);
+    const lejos = mallaDeContorno(rectangulo(440, -45, 530, 45), 10);
+    const nQuietos = abajo.x.length / 3 + arriba.x.length / 3;
+    const s = new SistemaTela(armarPrenda([{ id: 'abajo', ...abajo }, { id: 'arriba', ...arriba }, { id: 'lejos', ...lejos }]).malla, TELA_DE_LABORATORIO);
+    for (let i = nQuietos; i < s.n; i++) s.v[3 * i] = 1;
+    s.xt.set(s.x);
+    s.armarParesPropios();
+    expect(s.paresPropios.filter((p) => p.v.every((v) => v < nQuietos)).length).toBe(0);
+    // con un vértice rápido en una de las capas, su región sí busca entre las dos
+    for (let i = nQuietos; i < s.n; i++) s.v[3 * i] = 0;
+    s.v[3 * (nQuietos - 1) + 1] = 1;
+    s.armarParesPropios();
+    expect(s.paresPropios.filter((p) => p.v.every((v) => v < nQuietos)).length).toBeGreaterThan(0);
+  });
+
   it('las puntas del cuerpo frenan con la fricción de la tela contra el cuerpo', () => {
     const cuerpo = new CuerpoRigido(buildLinearBVH(piramideDeColision(0.3, 0.1)));
     const m = mallaDeContorno(rectangulo(-60, -60, 60, 60), 20);
