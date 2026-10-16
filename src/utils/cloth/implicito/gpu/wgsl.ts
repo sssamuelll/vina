@@ -24,7 +24,7 @@ const N_ESC = 32;
 
 /** Las entradas de cómputo, en el orden en que las despacha un cuadro. */
 export const ENTRADAS = [
-  'puntadas', 'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar',
+  'encoger', 'ubicar', 'inicio', 'prepTri', 'prepHinge', 'gradElem', 'prepCostura', 'ensamblar',
   'velMax', 'armarRadio', 'limpiarCeldas', 'hashContar', 'scanCBloques', 'scanCTotales', 'scanCSumar', 'hashLlenar',
   'limpiarPuntas', 'paresDeTriangulo', 'limpiarVertices', 'contarEntradas', 'scanVBloques', 'scanVTotales', 'scanVSumar', 'llenarEntradas',
   'residuo', 'sumarInicio', 'spmv', 'sumarAlfa', 'actualizar', 'sumarBeta', 'nuevaP', 'expandirP', 'anticipar', 'anticiparPares',
@@ -194,7 +194,7 @@ const LCERRADO = ${f(LARGO_CERRADO)};
 // E8: las puntadas (costuras.ts, coser y expandir)
 const UMBRAL_P = ${f(CUADROS_DE_PUNTADA * aj.cierreMaximo)};
 const MUESTRAS_P = ${u(MUESTRAS_DE_PUNTADA)};
-const I_SOLD = ${u(iu.cSoldable)}; const I_DEPDE = ${u(iu.dependeDe)}; const I_SOST = ${u(iu.sostiene)};
+const I_SOLD = ${u(iu.cSoldable)}; const I_DEPDE = ${u(iu.dependeDe)}; const I_INV = ${u(iu.cInversa)};
 const I_DOFF = ${u(iu.depOff)}; const I_DIDX = ${u(iu.depIdx)};
 // la primera ranura de aporte de las costuras, después de las de la membrana y la placa
 const SLOT_C = 15u * NT;
@@ -390,11 +390,83 @@ fn cosidoV(i: u32) -> bool {
   return e != NINGUNA && tf[O_CCOS + e] > 0.5;
 }
 
-// E8: el punto e lleva su resorte: no está cosido ni quedó entre puntadas (costuras.ts, activo)
+// E8: el punto e lleva su resorte: no está cosido ni es uno de vuelta entre dos vértices cosidos (costuras.ts, activo)
 fn activa(e: u32) -> bool {
   if (tf[O_CCOS + e] > 0.5) { return false; }
   let b = I_CV + 3u * e;
-  return !(iu[I_SOST + iu[b]] != 0u && cosidoV(iu[b + 1u]) && cosidoV(iu[b + 2u]));
+  return !(iu[I_INV + e] != 0u && cosidoV(iu[b + 1u]) && cosidoV(iu[b + 2u]));
+}
+
+// E8: el desfase del punto e
+fn des(e: u32) -> vec3<f32> {
+  let o = O_CDES + 3u * e;
+  return vec3<f32>(tf[o], tf[o + 1u], tf[o + 2u]);
+}
+
+// E8: la posición y el p de un vértice, desde los que no dependen, por una cadena de hasta tres niveles (costuras.ts,
+// avanzarPuntadas y expandir); solo leen vértices que no dependen, así que no chocan con quien escribe un cosido
+fn xE0(v: u32) -> vec3<f32> { return ldx(v); }
+fn xE1(v: u32) -> vec3<f32> {
+  if (!cosidoV(v)) { return ldx(v); }
+  let e = iu[I_DEPDE + v];
+  let b = I_CV + 3u * e;
+  let s = tf[O_CS + e];
+  return (1.0 - s) * xE0(iu[b + 1u]) + s * xE0(iu[b + 2u]) + des(e);
+}
+fn xE2(v: u32) -> vec3<f32> {
+  if (!cosidoV(v)) { return ldx(v); }
+  let e = iu[I_DEPDE + v];
+  let b = I_CV + 3u * e;
+  let s = tf[O_CS + e];
+  return (1.0 - s) * xE1(iu[b + 1u]) + s * xE1(iu[b + 2u]) + des(e);
+}
+fn pE0(v: u32) -> vec3<f32> { return pv[v].xyz; }
+fn pE1(v: u32) -> vec3<f32> {
+  if (!cosidoV(v)) { return pv[v].xyz; }
+  let e = iu[I_DEPDE + v];
+  let b = I_CV + 3u * e;
+  let s = tf[O_CS + e];
+  return (1.0 - s) * pE0(iu[b + 1u]) + s * pE0(iu[b + 2u]);
+}
+fn pE2(v: u32) -> vec3<f32> {
+  if (!cosidoV(v)) { return pv[v].xyz; }
+  let e = iu[I_DEPDE + v];
+  let b = I_CV + 3u * e;
+  let s = tf[O_CS + e];
+  return (1.0 - s) * pE1(iu[b + 1u]) + s * pE1(iu[b + 2u]);
+}
+
+// E8: A·p del vértice v con lo de los vértices cosidos que cuelgan de él, hasta tres niveles (costuras.ts, restringir)
+fn arbolA3(v: u32) -> vec3<f32> { return ld(O_AP, v); }
+fn arbolA2(v: u32) -> vec3<f32> {
+  var t = ld(O_AP, v);
+  for (var k = iu[I_DOFF + v]; k < iu[I_DOFF + v + 1u]; k++) {
+    let e = iu[I_DIDX + k];
+    if (tf[O_CCOS + e] < 0.5) { continue; }
+    let wm = pesoMaestro(v, e);
+    t += (wm.x + wm.y) * arbolA3(iu[I_CV + 3u * e]);
+  }
+  return t;
+}
+fn arbolA1(v: u32) -> vec3<f32> {
+  var t = ld(O_AP, v);
+  for (var k = iu[I_DOFF + v]; k < iu[I_DOFF + v + 1u]; k++) {
+    let e = iu[I_DIDX + k];
+    if (tf[O_CCOS + e] < 0.5) { continue; }
+    let wm = pesoMaestro(v, e);
+    t += (wm.x + wm.y) * arbolA2(iu[I_CV + 3u * e]);
+  }
+  return t;
+}
+fn arbolA0(v: u32) -> vec3<f32> {
+  var t = ld(O_AP, v);
+  for (var k = iu[I_DOFF + v]; k < iu[I_DOFF + v + 1u]; k++) {
+    let e = iu[I_DIDX + k];
+    if (tf[O_CCOS + e] < 0.5) { continue; }
+    let wm = pesoMaestro(v, e);
+    t += (wm.x + wm.y) * arbolA1(iu[I_CV + 3u * e]);
+  }
+  return t;
 }
 
 // E8: el peso del vértice i en el punto cosido e, como b0 y como b1 (costuras.ts, restringir)
@@ -437,21 +509,27 @@ fn reducirMax(lid: u32, v: f32) -> f32 {
   return t;
 }
 
-// 0. E8: cada puntada cierra un cuadro de su desfase y lleva a su vértice (costuras.ts, avanzarPuntadas)
-@compute @workgroup_size(${WG}) fn puntadas(@builtin(global_invocation_id) g: vec3<u32>) {
+// 0. E8: el desfase de cada puntada baja un cuadro con la ley de E7 (costuras.ts, avanzarPuntadas)
+@compute @workgroup_size(${WG}) fn encoger(@builtin(global_invocation_id) g: vec3<u32>) {
   let e = g.x;
   if (e >= NC || tf[O_CCOS + e] < 0.5) { return; }
   let o = O_CDES + 3u * e;
-  let d = vec3<f32>(tf[o], tf[o + 1u], tf[o + 2u]);
+  let d = des(e);
   let m = length(d);
   let nuevo = max(m * CIERRE, m - CIERRE_MAX);
   var f = 0.0;
   if (nuevo >= LCERRADO) { f = nuevo / m; }
   let dn = f * d;
   tf[o] = dn.x; tf[o + 1u] = dn.y; tf[o + 2u] = dn.z;
+}
+
+// 0b. E8: cada vértice cosido va a su punto más el desfase, por la cadena desde los que no dependen
+@compute @workgroup_size(${WG}) fn ubicar(@builtin(global_invocation_id) g: vec3<u32>) {
+  let e = g.x;
+  if (e >= NC || tf[O_CCOS + e] < 0.5) { return; }
   let b = I_CV + 3u * e;
   let s = tf[O_CS + e];
-  stx(iu[b], (1.0 - s) * ldx(iu[b + 1u]) + s * ldx(iu[b + 2u]) + dn);
+  stx(iu[b], (1.0 - s) * xE2(iu[b + 1u]) + s * xE2(iu[b + 2u]) + des(e));
 }
 
 // 1. x_t, el plano de cada vértice en x_t con su fricción (sistema.ts, armarContactos) y la inercia al empezar
@@ -638,6 +716,46 @@ fn residuoDe(i: u32) -> ResiduoB {
   return ResiduoB(r, B);
 }
 
+// E8: el residuo y el bloque del vértice v con lo de los vértices cosidos que cuelgan de él, hasta tres niveles
+// (costuras.ts, restringir y restringirBloques)
+fn arbolR3(v: u32) -> ResiduoB { return residuoDe(v); }
+fn arbolR2(v: u32) -> ResiduoB {
+  var t = residuoDe(v);
+  for (var k = iu[I_DOFF + v]; k < iu[I_DOFF + v + 1u]; k++) {
+    let e = iu[I_DIDX + k];
+    if (tf[O_CCOS + e] < 0.5) { continue; }
+    let wm = pesoMaestro(v, e);
+    let h = arbolR3(iu[I_CV + 3u * e]);
+    t.r += (wm.x + wm.y) * h.r;
+    t.B += (wm.x * wm.x + wm.y * wm.y) * h.B;
+  }
+  return t;
+}
+fn arbolR1(v: u32) -> ResiduoB {
+  var t = residuoDe(v);
+  for (var k = iu[I_DOFF + v]; k < iu[I_DOFF + v + 1u]; k++) {
+    let e = iu[I_DIDX + k];
+    if (tf[O_CCOS + e] < 0.5) { continue; }
+    let wm = pesoMaestro(v, e);
+    let h = arbolR2(iu[I_CV + 3u * e]);
+    t.r += (wm.x + wm.y) * h.r;
+    t.B += (wm.x * wm.x + wm.y * wm.y) * h.B;
+  }
+  return t;
+}
+fn arbolR0(v: u32) -> ResiduoB {
+  var t = residuoDe(v);
+  for (var k = iu[I_DOFF + v]; k < iu[I_DOFF + v + 1u]; k++) {
+    let e = iu[I_DIDX + k];
+    if (tf[O_CCOS + e] < 0.5) { continue; }
+    let wm = pesoMaestro(v, e);
+    let h = arbolR1(iu[I_CV + 3u * e]);
+    t.r += (wm.x + wm.y) * h.r;
+    t.B += (wm.x * wm.x + wm.y * wm.y) * h.B;
+  }
+  return t;
+}
+
 @compute @workgroup_size(${WG}) fn residuo(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>, @builtin(workgroup_id) w: vec3<u32>) {
   if (!bandera(l.x, E_ACTIVO)) { return; }
   let i = g.x;
@@ -647,17 +765,9 @@ fn residuoDe(i: u32) -> ResiduoB {
     var B = I3;
     // E8: lo de cada vértice cosido pasa a sus dos vértices del otro lado (costuras.ts, restringir y restringirBloques)
     if (!cosidoV(i)) {
-      let propio = residuoDe(i);
-      r = propio.r;
-      B = propio.B;
-      for (var k = iu[I_DOFF + i]; k < iu[I_DOFF + i + 1u]; k++) {
-        let e = iu[I_DIDX + k];
-        if (tf[O_CCOS + e] < 0.5) { continue; }
-        let wm = pesoMaestro(i, e);
-        let suyo = residuoDe(iu[I_CV + 3u * e]);
-        r += (wm.x + wm.y) * suyo.r;
-        B += (wm.x * wm.x + wm.y * wm.y) * suyo.B;
-      }
+      let t = arbolR0(i);
+      r = t.r;
+      B = t.B;
     }
     if (iu[I_FIJO + i] != 0u) { r = vec3<f32>(0.0); }
     let Bi = inversa3(B);
@@ -757,13 +867,7 @@ fn residuoDe(i: u32) -> ResiduoB {
     st(O_DX, i, ld(O_DX, i) + alfa * pv[i].xyz);
     if (!cosidoV(i)) {
       // E8: A·p de cada vértice cosido pasa a sus dos vértices del otro lado (costuras.ts, restringir)
-      var ap = ld(O_AP, i);
-      for (var k = iu[I_DOFF + i]; k < iu[I_DOFF + i + 1u]; k++) {
-        let e = iu[I_DIDX + k];
-        if (tf[O_CCOS + e] < 0.5) { continue; }
-        let wm = pesoMaestro(i, e);
-        ap += (wm.x + wm.y) * ld(O_AP, iu[I_CV + 3u * e]);
-      }
+      var ap = arbolA0(i);
       if (iu[I_FIJO + i] != 0u) { ap = vec3<f32>(0.0); }
       let r = ld(O_R, i) - alfa * ap;
       st(O_R, i, r);
@@ -805,7 +909,7 @@ fn residuoDe(i: u32) -> ResiduoB {
   if (e >= NC || red[R_SC + E_ACTIVO] < 0.5 || tf[O_CCOS + e] < 0.5) { return; }
   let b = I_CV + 3u * e;
   let s = tf[O_CS + e];
-  pv[iu[b]] = vec4<f32>((1.0 - s) * pv[iu[b + 1u]].xyz + s * pv[iu[b + 2u]].xyz, 0.0);
+  pv[iu[b]] = vec4<f32>((1.0 - s) * pE2(iu[b + 1u]) + s * pE2(iu[b + 2u]), 0.0);
 }
 
 // 8. anticipación (sistema.ts, anticiparContactos): el vértice que el paso metería en un obstáculo entra con el plano

@@ -46,6 +46,8 @@ describe('las costuras', () => {
       expect([q.a, q.b0, q.b1]).toEqual([esperado[k].a, esperado[k].b0, esperado[k].b1]);
       expect(q.s).toBeCloseTo(esperado[k].s, 12);
     });
+    // los de B sobre A van de vuelta: con A cosido sobre B, sobran (E8)
+    expect(p.map((q) => q.inversa === true)).toEqual([false, false, false, true, true]);
   });
 
   it('un vértice nunca se cose a un segmento suyo', () => {
@@ -157,22 +159,49 @@ describe('las costuras', () => {
 });
 
 describe('la puntada (E8)', () => {
-  it('se cose el vértice que no depende de otro punto ni sostiene a otro, y cuyos dos vértices del otro lado no están cosidos', () => {
+  it('se cose en cadena hasta tres niveles: nunca un punto de vuelta, ni un vértice que ya depende, ni un ciclo', () => {
     const puntos: PuntoDeCostura[] = [
-      { a: 0, b0: 4, b1: 5, s: 0.5 },
-      { a: 1, b0: 5, b1: 6, s: 0.5 },
-      // un vértice de B entre dos de A: sostiene a 0 y a 1
-      { a: 5, b0: 0, b1: 1, s: 0.5 },
-      // su lado del otro lado ya está cosido a B
-      { a: 7, b0: 1, b1: 8, s: 0.5 },
+      { a: 0, b0: 1, b1: 1, s: 0 },
+      // 1 sostiene a 0: se cose igual, y 0 baja un nivel
+      { a: 1, b0: 2, b1: 2, s: 0 },
+      // 0 depende de 1, que depende de 2: un ciclo
+      { a: 2, b0: 0, b1: 0, s: 0 },
+      { a: 3, b0: 0, b1: 0, s: 0 },
+      // 3 ya está en el nivel 3: un cuarto nivel no
+      { a: 4, b0: 3, b1: 3, s: 0 },
+      { a: 5, b0: 6, b1: 6, s: 0, inversa: true },
       // 0 ya depende de un punto
-      { a: 0, b0: 9, b1: 9, s: 0 },
-      // 4 sostiene a 0
-      { a: 4, b0: 10, b1: 11, s: 0.5 },
-      { a: 12, b0: 13, b1: 13, s: 0 },
+      { a: 0, b0: 7, b1: 7, s: 0 },
     ];
-    const c = new Costuras(puntos, new Float64Array(3 * 14), 1000, 0.005);
-    expect(Array.from(c.soldable)).toEqual([1, 1, 0, 0, 0, 0, 1]);
+    const c = new Costuras(puntos, new Float64Array(3 * 8), 1000, 0.005);
+    expect(Array.from(c.soldable)).toEqual([1, 1, 0, 1, 0, 0, 0]);
+    expect(Array.from(c.nivel)).toEqual([2, 1, 0, 3, 0, 0, 0]);
+  });
+
+  it('en cadena, cada vértice cosido va a su punto en orden de nivel, y restringir sigue siendo la traspuesta de expandir', () => {
+    const r = azar(47);
+    // 0 sobre el segmento 1-2, y 1 sobre el 3-4: la cadena 0 → 1 → (3, 4)
+    const puntos: PuntoDeCostura[] = [{ a: 0, b0: 1, b1: 2, s: 0.25 }, { a: 1, b0: 3, b1: 4, s: 0.5 }];
+    const x = Float64Array.from({ length: 15 }, () => r());
+    const c = new Costuras(puntos, x, 1000, 0.005);
+    c.cosido.fill(1);
+    c.avanzarPuntadas(x);
+    for (let k = 0; k < 3; k++) {
+      expect(x[3 + k]).toBeCloseTo(0.5 * x[9 + k] + 0.5 * x[12 + k], 12);
+      expect(x[k]).toBeCloseTo(0.75 * x[3 + k] + 0.25 * x[6 + k], 12);
+    }
+    const u = Float64Array.from({ length: 15 }, (_, k) => (k < 6 ? 0 : r()));
+    const v = Float64Array.from({ length: 15 }, () => r());
+    const Pu = Float64Array.from(u), Ptv = Float64Array.from(v);
+    c.expandir(Pu);
+    c.restringir(Ptv);
+    let izq = 0, der = 0;
+    for (let k = 0; k < 15; k++) {
+      izq += Pu[k] * v[k];
+      der += u[k] * Ptv[k];
+    }
+    expect(izq).toBeCloseTo(der, 12);
+    expect(Array.from(Ptv.subarray(0, 6))).toEqual([0, 0, 0, 0, 0, 0]);
   });
 
   it('a menos de cinco cuadros de cierre se cose, y el desfase baja con la ley de E7 hasta 0', () => {

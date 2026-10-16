@@ -104,9 +104,10 @@ export interface PaqueteGpu {
     exIdx: Uint32Array;
     /** E8, por punto: 1 si se puede coser (costuras.ts, soldable) */
     cSoldable: Uint32Array;
-    /** E8, por vértice: el punto soldable del que depende (NINGUNA si ninguno) y 1 si sostiene a uno */
+    /** E8, por punto: 1 si es de vuelta (costuras.ts, inversa) */
+    cInversa: Uint32Array;
+    /** E8, por vértice: el punto soldable del que depende (NINGUNA si ninguno) */
     dependeDe: Uint32Array;
-    sostiene: Uint32Array;
     /** E8, por vértice, en CSR: los puntos soldables que sostiene, sin repetir */
     depOff: Uint32Array;
     depIdx: Uint32Array;
@@ -276,7 +277,7 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
       exIdx: Uint32Array.from(s.excluidos.flat()),
       cSoldable: Uint32Array.from(c.soldable),
       dependeDe: Uint32Array.from(c.dependeDe, (e) => (e < 0 ? NINGUNA : e)),
-      sostiene: Uint32Array.from(c.sostiene),
+      cInversa: Uint32Array.from(c.inversa),
       depOff,
       depIdx: Uint32Array.from(sostenidos.flat()),
     },

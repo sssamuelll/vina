@@ -139,7 +139,7 @@ describe('el paquete de una prenda cosida', () => {
     const c = s.costuras;
     expect(Array.from(p.u32.cSoldable)).toEqual(Array.from(c.soldable));
     expect(Array.from(p.u32.dependeDe)).toEqual(Array.from(c.dependeDe, (e) => (e < 0 ? NINGUNA : e)));
-    expect(Array.from(p.u32.sostiene)).toEqual(Array.from(c.sostiene));
+    expect(Array.from(p.u32.cInversa)).toEqual(Array.from(c.inversa));
     for (let i = 0; i < s.n; i++) {
       const esperado = [...Array(c.n).keys()].filter((e) => c.soldable[e] && (c.b0[e] === i || c.b1[e] === i));
       expect(Array.from(p.u32.depIdx.subarray(p.u32.depOff[i], p.u32.depOff[i + 1]))).toEqual(esperado);

@@ -122,7 +122,8 @@ export class MotorGpu {
       }
     };
     pase.setBindGroup(0, this.grupo);
-    d('puntadas', gc);
+    d('encoger', gc);
+    d('ubicar', gc);
     d('inicio', gv);
     d('prepTri', gt);
     d('prepHinge', gh);

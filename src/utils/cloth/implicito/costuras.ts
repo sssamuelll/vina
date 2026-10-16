@@ -16,6 +16,8 @@ export interface PuntoDeCostura {
   b0: number;
   b1: number;
   s: number;
+  /** E8: un vértice de B sobre A, de vuelta; con A cosido sobre B, sobra */
+  inversa?: boolean;
 }
 
 /** Cuánto se cierra el largo de reposo por cuadro: el cierre de hoy, ×0,97 por subpaso de 15. */
@@ -26,6 +28,8 @@ export const LARGO_CERRADO = 1e-4;
 export const CUADROS_DE_PUNTADA = 5;
 /** E8: en cuántos tramos se mira la línea entre un vértice y su punto para ver si cruza un obstáculo. */
 export const MUESTRAS_DE_PUNTADA = 8;
+/** E8: hasta cuántos niveles se cose en cadena (un vértice cosido a otro que también está cosido, en las esquinas). */
+export const NIVELES_DE_PUNTADA = 3;
 
 /** El largo de arco de cada vértice del lado, medido en el patrón y normalizado a [0, 1]. */
 export function largosEnElPatron(patron: ArrayLike<number>, lado: readonly number[]): number[] {
@@ -91,7 +95,7 @@ export function puntosDeCostura(
   };
   ladoA.forEach((a, i) => agregar({ a, ...sobre(tA[i], ladoB, tB, vecinosB) }));
   ladoB.forEach((b, i) => {
-    if (!tA.some((t) => Math.abs(t - tB[i]) < 1e-9)) agregar({ a: b, ...sobre(tB[i], ladoA, tA, vecinosA) });
+    if (!tA.some((t) => Math.abs(t - tB[i]) < 1e-9)) agregar({ a: b, ...sobre(tB[i], ladoA, tA, vecinosA), inversa: true });
   });
   return puntos;
 }
@@ -110,16 +114,21 @@ export class Costuras {
   /** cuadros de cierre */
   cuadros = 0;
   /**
-   * E8, por punto: 1 si se puede coser. Su vértice no depende ya de otro punto ni sostiene a otro, y los dos del otro
-   * lado no dependen de ninguno; manda el orden de los puntos.
+   * E8, por punto: 1 si se puede coser. No es de vuelta, su vértice no depende ya de otro punto, la cadena no hace un
+   * ciclo y no pasa de NIVELES_DE_PUNTADA; manda el orden de los puntos.
    */
   readonly soldable: Uint8Array;
+  /** E8, por punto: 1 si es de vuelta (PuntoDeCostura.inversa) */
+  readonly inversa: Uint8Array;
+  /** E8, por punto soldable: su nivel en la cadena (1 si sus dos vértices no dependen de nadie) */
+  readonly nivel: Uint8Array;
+  /** E8: los puntos soldables por nivel, de menor a mayor */
+  readonly orden: Uint32Array;
   /** E8, por punto: 1 si está cosido, con x_a = (1 − s)·x_b0 + s·x_b1 + el desfase (3 por punto, m) */
   readonly cosido: Uint8Array;
   readonly desfase: Float64Array;
-  /** E8, por vértice: el punto soldable del que depende (−1 si ninguno) y 1 si sostiene a uno */
+  /** E8, por vértice: el punto soldable del que depende (−1 si ninguno) */
   readonly dependeDe: Int32Array;
-  readonly sostiene: Uint8Array;
 
   /** `cierreMaximo`: lo más que baja L en un cuadro (m); sin tope, el cierre de hoy. Un vértice `fijo` no se cose. */
   constructor(puntos: readonly PuntoDeCostura[], x: ArrayLike<number>, readonly k: number, readonly cierreMaximo = Infinity, fijo?: ArrayLike<number>) {
@@ -137,28 +146,54 @@ export class Costuras {
     this.L = Float64Array.from(this.L0);
     this.estado = new Float64Array(6 * this.n);
     this.soldable = new Uint8Array(this.n);
+    this.inversa = Uint8Array.from(puntos, (p) => (p.inversa ? 1 : 0));
+    this.nivel = new Uint8Array(this.n);
     this.cosido = new Uint8Array(this.n);
     this.desfase = new Float64Array(3 * this.n);
     this.dependeDe = new Int32Array(x.length / 3).fill(-1);
-    this.sostiene = new Uint8Array(x.length / 3);
+    // por vértice, los puntos soldables que lo tienen de b0 o de b1
+    const cuelgan: number[][] = Array.from({ length: x.length / 3 }, () => []);
+    const nivelDe = (v: number) => (this.dependeDe[v] >= 0 ? this.nivel[this.dependeDe[v]] : 0);
+    const dependeDeA = (v: number, a: number): boolean => {
+      if (v === a) return true;
+      const e = this.dependeDe[v];
+      return e >= 0 && (dependeDeA(this.b0[e], a) || dependeDeA(this.b1[e], a));
+    };
+    const altura = (v: number): number => cuelgan[v].reduce((h, e) => Math.max(h, 1 + altura(this.a[e])), 0);
+    const bajar = (v: number, desde: number): void => {
+      for (const e of cuelgan[v]) {
+        if (this.nivel[e] > desde) continue;
+        this.nivel[e] = desde + 1;
+        bajar(this.a[e], desde + 1);
+      }
+    };
     for (let e = 0; e < this.n; e++) {
       const a = this.a[e], b0 = this.b0[e], b1 = this.b1[e];
-      if (fijo?.[a] || this.dependeDe[a] >= 0 || this.sostiene[a] || this.dependeDe[b0] >= 0 || this.dependeDe[b1] >= 0) continue;
+      if (this.inversa[e] || fijo?.[a] || this.dependeDe[a] >= 0 || dependeDeA(b0, a) || dependeDeA(b1, a)) continue;
+      const nivel = 1 + Math.max(nivelDe(b0), nivelDe(b1));
+      if (nivel + altura(a) > NIVELES_DE_PUNTADA) continue;
       this.soldable[e] = 1;
+      this.nivel[e] = nivel;
       this.dependeDe[a] = e;
-      this.sostiene[b0] = 1;
-      this.sostiene[b1] = 1;
+      cuelgan[b0].push(e);
+      if (b1 !== b0) cuelgan[b1].push(e);
+      bajar(a, nivel);
     }
+    this.orden = Uint32Array.from([...Array(this.n).keys()].filter((e) => this.soldable[e]).sort((p, q) => this.nivel[p] - this.nivel[q]));
+  }
+
+  /** E8: el vértice v se mueve con un punto cosido. */
+  cosidoV(v: number): boolean {
+    const e = this.dependeDe[v];
+    return e >= 0 && this.cosido[e] === 1;
   }
 
   /**
-   * E8: un punto lleva su resorte si no está cosido y no quedó entre puntadas, es decir, si no es un vértice que
-   * sostiene puntadas y cae entre dos vértices ya cosidos (la línea de la costura ya es la suya).
+   * E8: un punto lleva su resorte si no está cosido y no es uno de vuelta entre dos vértices ya cosidos (la línea de
+   * la costura ya es la suya).
    */
   activo(e: number): boolean {
-    if (this.cosido[e]) return false;
-    const d0 = this.dependeDe[this.b0[e]], d1 = this.dependeDe[this.b1[e]];
-    return !(this.sostiene[this.a[e]] && d0 >= 0 && this.cosido[d0] && d1 >= 0 && this.cosido[d1]);
+    return !this.cosido[e] && !(this.inversa[e] && this.cosidoV(this.b0[e]) && this.cosidoV(this.b1[e]));
   }
 
   /**
@@ -176,46 +211,55 @@ export class Costuras {
     }
   }
 
-  /** E8, al empezar el cuadro: el desfase de cada puntada baja con la ley de E7, y su vértice va a su punto más el desfase. */
+  /**
+   * E8, al empezar el cuadro: el desfase de cada puntada baja con la ley de E7, y cada vértice cosido va a su punto
+   * más el desfase, por nivel (en una cadena, el de abajo después del de arriba).
+   */
   avanzarPuntadas(x: Float64Array): void {
-    for (let e = 0; e < this.n; e++) {
+    for (const e of this.orden) {
       if (!this.cosido[e]) continue;
       const o = 3 * e, m = Math.hypot(this.desfase[o], this.desfase[o + 1], this.desfase[o + 2]);
       const nuevo = Math.max(m * CIERRE_POR_CUADRO, m - this.cierreMaximo);
       const f = nuevo < LARGO_CERRADO ? 0 : nuevo / m;
+      for (let k = 0; k < 3; k++) this.desfase[o + k] *= f;
+    }
+    for (const e of this.orden) {
+      if (!this.cosido[e]) continue;
       const a = 3 * this.a[e], b0 = 3 * this.b0[e], b1 = 3 * this.b1[e], s = this.s[e];
-      for (let k = 0; k < 3; k++) {
-        this.desfase[o + k] *= f;
-        x[a + k] = (1 - s) * x[b0 + k] + s * x[b1 + k] + this.desfase[o + k];
-      }
+      for (let k = 0; k < 3; k++) x[a + k] = (1 - s) * x[b0 + k] + s * x[b1 + k] + this.desfase[3 * e + k];
     }
   }
 
-  /** E8: v_a ← (1 − s)·v_b0 + s·v_b1 en cada vértice cosido, de las incógnitas que quedan a todos los vértices. */
+  /** E8: v_a ← (1 − s)·v_b0 + s·v_b1 en cada vértice cosido, por nivel: de las incógnitas que quedan a todos los vértices. */
   expandir(v: Float64Array): void {
-    for (let e = 0; e < this.n; e++) {
+    for (const e of this.orden) {
       if (!this.cosido[e]) continue;
       const a = 3 * this.a[e], b0 = 3 * this.b0[e], b1 = 3 * this.b1[e], s = this.s[e];
       for (let k = 0; k < 3; k++) v[a + k] = (1 - s) * v[b0 + k] + s * v[b1 + k];
     }
   }
 
-  /** E8, la traspuesta de expandir: lo de cada vértice cosido pasa a sus dos vértices del otro lado, y el suyo queda en 0. */
+  /**
+   * E8, la traspuesta de expandir: lo de cada vértice cosido pasa a sus dos vértices del otro lado y el suyo queda en 0,
+   * del nivel más hondo al primero.
+   */
   restringir(v: Float64Array): void {
-    for (let e = 0; e < this.n; e++) {
+    for (let k = this.orden.length - 1; k >= 0; k--) {
+      const e = this.orden[k];
       if (!this.cosido[e]) continue;
       const a = 3 * this.a[e], b0 = 3 * this.b0[e], b1 = 3 * this.b1[e], s = this.s[e];
-      for (let k = 0; k < 3; k++) {
-        v[b0 + k] += (1 - s) * v[a + k];
-        v[b1 + k] += s * v[a + k];
-        v[a + k] = 0;
+      for (let q = 0; q < 3; q++) {
+        v[b0 + q] += (1 - s) * v[a + q];
+        v[b1 + q] += s * v[a + q];
+        v[a + q] = 0;
       }
     }
   }
 
   /** E8, los bloques del precondicionador: el de cada vértice cosido pasa a los suyos con el peso al cuadrado, y queda I. */
   restringirBloques(B: Float64Array): void {
-    for (let e = 0; e < this.n; e++) {
+    for (let q = this.orden.length - 1; q >= 0; q--) {
+      const e = this.orden[q];
       if (!this.cosido[e]) continue;
       const a = 9 * this.a[e], b0 = 9 * this.b0[e], b1 = 9 * this.b1[e], s = this.s[e], w0 = (1 - s) * (1 - s), w1 = s * s;
       for (let k = 0; k < 9; k++) {
